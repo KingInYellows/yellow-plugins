@@ -3,7 +3,8 @@
 # failure, timeout or interruption, save the resolver diff as a patch, revert
 # the listed files and report whether the tree is clean again.
 # Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted
-#                           [--unattended] [--files-from <file>] [-- <files...>]
+#                           [--unattended] [--ignored-since <marker-file>]
+#                           [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-dirty
 #   --trusted:     required to run a command. The caller sets it only after
@@ -13,6 +14,19 @@
 #                  (a file a git hook, package manager or verify command would
 #                  execute); report result "skipped". Every run, attended or
 #                  not, skips when a file is outside the PR's changed files.
+#                  Requires --ignored-since (usage error, exit 2, without it).
+#   --ignored-since <marker-file>: guard for gitignored files, which the tree
+#                  listing cannot see (a resolver edit to an ignored executable
+#                  such as node_modules/.bin/<runner> would run with the
+#                  command). The caller touches <marker-file> before the
+#                  resolvers start; before running, any ignored regular file or
+#                  symlink with an mtime newer than the marker makes the run
+#                  refuse (exit 2, up to 20 paths named, never contents). A
+#                  marker that is missing, unreadable, a symlink or not a
+#                  regular file also refuses (fail closed), as does a listing
+#                  failure. Attended runs may omit it. The revert modes ignore
+#                  it. Ignored changes are refused, never reported as a clean
+#                  tree: treeClean covers tracked and untracked-unignored files.
 #   --revert-only: run nothing; save the patch and revert the listed files
 #                  (result "reverted"). Deny-listed paths may be reverted. A
 #                  listed file without changes is skipped and named in
@@ -34,7 +48,9 @@
 #   Running a command also requires the tree to have no changes outside the
 #   listed files.
 #   files:     repo-root-relative paths the resolvers modified, one per line
-#              in --files-from and/or after --. When running a command, each
+#              in --files-from and/or after --; a path listed more than once
+#              counts once (first-seen order), so the recovery patch holds one
+#              diff per file and re-applies. When running a command, each
 #              must have changes, must not be gitignored and must not be on the
 #              resolver deny list (it is about to be executed and, on failure,
 #              reverted). Under --revert-only only the deny-list check is
@@ -49,11 +65,14 @@
 #   that left changes outside the listed files reports result "pass" with
 #   treeClean false and a reason; nothing is reverted.
 # Exit codes: 0 ran (read "result"), 2 refused or could not start: usage
-#   error (including run-only flags next to a revert flag), no --trusted,
+#   error (including run-only flags next to a revert flag, and --unattended
+#   without --ignored-since), no --trusted,
 #   unreadable --command-file or --files-from, not in a git repository, a
 #   refused path (not canonical, deny-listed when running, gitignored or
 #   unverifiable, or without changes when running), a change outside the
-#   listed files, a tree listing or setup failure (library, output directory,
+#   listed files, an ignored file changed since the --ignored-since marker (or
+#   a marker or ignored-file listing that cannot be read), a tree listing or
+#   setup failure (library, output directory,
 #   log, temp file or pipe), or a recovery patch that could not be screened
 #   for credentials (nothing is reverted).
 # Signals: TERM, HUP and INT stop the command and its process group, then the
@@ -66,9 +85,9 @@
 #        per PR are kept (other PRs' files are never pruned).
 #        The verifier's output is redacted on its way to disk: a FIFO feeds
 #        vr_redact_stream (which first cuts the stream into records of at most
-#        64 KiB, so no redaction filter buffers more than one record; a
-#        credential split by a hard cut inside a blank-free 64 KiB run can
-#        escape its pattern, and the final scan is the backstop), then tail
+#        64 KiB, so no redaction filter buffers more than one record; a cut
+#        can sever a credential from its value, so if any record was cut the
+#        log is withheld with a notice instead of published), then tail
 #        keeps the last 1 MiB of the REDACTED stream in a private mktemp file
 #        (mode 0600) outside the git directory.
 #        Only after the final credential scan is it copied to the .log path, so
@@ -114,7 +133,8 @@ gh() {
     fi
 }
 usage() {
-    printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] | --revert-only | --revert-dirty) [--files-from <file>] [-- <files...>]\n' >&2
+    printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] [--ignored-since <marker-file>] | --revert-only | --revert-dirty) [--files-from <file>] [-- <files...>]\n' >&2
+    printf '  --ignored-since <marker-file>: refuse to run when a gitignored file is newer than the marker; required with --unattended\n' >&2
     exit 2
 }
 
@@ -126,9 +146,11 @@ TIMEOUT=""
 COMMAND_FILE=""
 TRUSTED=0
 UNATTENDED=0
+IGNORED_SINCE=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --pr) [ $# -ge 2 ] || usage; PR="$2"; shift 2 ;;
+        --ignored-since) [ $# -ge 2 ] || usage; IGNORED_SINCE="$2"; shift 2 ;;
         --timeout) [ $# -ge 2 ] || usage; TIMEOUT="$2"; shift 2 ;;
         --command-file) [ $# -ge 2 ] || usage; COMMAND_FILE="$2"; shift 2 ;;
         --trusted) TRUSTED=1; shift ;;
@@ -156,6 +178,18 @@ if [ "$MODE" = run ]; then
     [ -f "$COMMAND_FILE" ] && [ -r "$COMMAND_FILE" ] || die 2 "--command-file not readable: $COMMAND_FILE"
     [ -n "$(tr -d '[:space:]' <"$COMMAND_FILE")" ] || die 2 "--command-file is empty"
     COMMAND_FILE=$(cd -- "$(dirname -- "$COMMAND_FILE")" && pwd)/$(basename -- "$COMMAND_FILE")
+    # Unattended, nothing else sees resolver edits to gitignored files, so the
+    # marker is required. Resolve it now: the script changes directory below.
+    if [ "$UNATTENDED" = 1 ] && [ -z "$IGNORED_SINCE" ]; then
+        printf '[run-verify-command] Error: --unattended requires --ignored-since <marker-file> (touch the file before the resolvers start)\n' >&2
+        exit 2
+    fi
+    if [ -n "$IGNORED_SINCE" ]; then
+        [ -f "$IGNORED_SINCE" ] && [ ! -L "$IGNORED_SINCE" ] && [ -r "$IGNORED_SINCE" ] \
+            || die 2 "--ignored-since marker is not a readable regular file: $IGNORED_SINCE"
+        IGNORED_SINCE=$(cd -- "$(dirname -- "$IGNORED_SINCE")" && pwd)/$(basename -- "$IGNORED_SINCE") \
+            || die 2 "cannot resolve --ignored-since: $IGNORED_SINCE"
+    fi
 fi
 
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
@@ -171,6 +205,7 @@ TEXT_FILE=""
 FIFO=""
 MARKER=""
 STREAM_FILE=""
+IGNORED_SCRATCH=""
 # The snapshot is provisional until it is complete and credential-screened: any
 # exit before then (a signal, a die, a failed screen) removes it, so no
 # unscreened patch stays under .git.
@@ -178,7 +213,7 @@ PATCH=""
 PATCH_PROVISIONAL=0
 cleanup() {
     local f
-    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE"; do
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
     if [ "$PATCH_PROVISIONAL" = 1 ] && [ -n "$PATCH" ]; then
@@ -205,9 +240,20 @@ if [ "$MODE" = revert-dirty ]; then
         [ -n "$f" ] && FILES+=("$f")
     done <"$CHANGES_FILE"
 else
+    # KEEP_FILES is the deduplicated list (first-seen order). A path listed
+    # twice, in --files-from and/or after --, would otherwise put its diff into
+    # the recovery patch twice, and `git apply` rejects the second copy. A
+    # canonical path has one spelling, so an exact match is the same path.
     KEEP_FILES=()
+    SEEN_FILES=()
     for f in ${FILES[@]+"${FILES[@]}"}; do
         rp_canonical "$f" || die 2 "path must be canonical and repo-relative: $f"
+        SEEN=0
+        for p in ${SEEN_FILES[@]+"${SEEN_FILES[@]}"}; do
+            [ "$p" = "$f" ] && { SEEN=1; break; }
+        done
+        [ "$SEEN" = 0 ] || continue
+        SEEN_FILES+=("$f")
         # Reverting is always safe; the deny list only stops running and committing.
         [ "$MODE" = run ] && rp_denied "$f" && die 2 "refusing a deny-listed path: $f"
         # Fail closed unless check-ignore positively says "not ignored" (exit 1).
@@ -222,13 +268,29 @@ else
         fi
         KEEP_FILES+=("$f")
     done
-    [ "$MODE" = run ] || FILES=(${KEEP_FILES[@]+"${KEEP_FILES[@]}"})
+    FILES=(${KEEP_FILES[@]+"${KEEP_FILES[@]}"})
 fi
 
 if [ "$MODE" = run ]; then
     # Never run a command while the tree has changes the list does not name.
     d=$(rp_assert_only_listed "$CHANGES_FILE" ${FILES[@]+"${FILES[@]}"}) \
         || die 2 "change outside the listed files: $d"
+
+    # Never run a command while a gitignored file is newer than the marker: the
+    # tree listing above cannot see ignored files, and one may be an executable
+    # the command runs (node_modules/.bin/<runner>). Exit 1 means files changed,
+    # exit 2 means the check could not tell; both refuse.
+    if [ -n "$IGNORED_SINCE" ]; then
+        IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"
+        IGN_RC=0
+        IGN_HITS=$(rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH") || IGN_RC=$?
+        rm -f -- "$IGNORED_SCRATCH"
+        case "$IGN_RC" in
+            0) ;;
+            1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: ${IGN_HITS//$'\n'/, }" ;;
+            *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
+        esac
+    fi
 
     # Never execute files outside the PR (the resolver's list is untrusted),
     # attended or not. Unattended also never runs runner files.
@@ -466,7 +528,9 @@ fi
 # Publish the redacted, bounded stream to the log path after the final
 # credential scan. A log the stream job withheld already holds its notice.
 if [ -n "$LOG" ] && [ "$LOG_WITHHELD" != 1 ]; then
-    vr_publish_log "$STREAM_FILE" "$LOG"
+    PUBLISH_RC=0
+    vr_publish_log "$STREAM_FILE" "$LOG" || PUBLISH_RC=$?
+    [ "$PUBLISH_RC" -ne 3 ] || add_reason "log withheld: output had a record longer than 64 KiB"
 fi
 
 if [ "$MODE" = run ] && [ "$RC" -eq 0 ] && [ "$TIMED_OUT" = 0 ] && [ -z "$SIGNALED" ]; then

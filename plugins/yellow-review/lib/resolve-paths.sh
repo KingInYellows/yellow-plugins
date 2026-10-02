@@ -205,7 +205,8 @@ rp_pr_files() {
 # listing failure returns non-zero and must stop the caller, never read as
 # "clean", and git's first stderr line goes to stderr so the caller's own
 # message can sit beside the cause. The caller owns <outfile> (a mktemp file
-# it removes on exit).
+# it removes on exit). Gitignored files are not listed (--exclude-standard);
+# rp_ignored_changed_since covers them.
 rp_tree_changes() {
     local err rc=0
     err=$({ git diff --no-renames --name-only -z HEAD -- \
@@ -214,6 +215,66 @@ rp_tree_changes() {
         printf 'rp_tree_changes: %s\n' "${err%%$'\n'*}" >&2
         return "$rc"
     fi
+}
+
+# rp_ignored_changed_since <marker> <scratch>: the guard for gitignored files,
+# which rp_tree_changes cannot see: a resolver edit to an ignored executable
+# (node_modules/.bin/<runner>) would run with the verify command. A resolver
+# cannot backdate a file's mtime (it only has edit tools), so any ignored
+# regular file or symlink with an mtime newer than <marker> (a file the
+# caller touched before the resolvers started) counts as changed. Symlinks are
+# judged by their own mtime, never followed; `.git` is skipped. Prints up to 20
+# repository-relative paths, one per line (control characters shown as `?`,
+# never file contents), and returns 1 when any file changed. Returns 0 when
+# none did and 2 when it cannot tell: the marker is missing, unreadable, not a
+# regular file or a symlink, or git or find fails. A caller must treat 2 as a
+# refusal. Whole ignored directories are walked with find; the caller owns
+# <scratch>, a scratch file for git's NUL-delimited listing.
+rp_ignored_changed_since() {
+    local marker="$1" scratch="$2" mdir
+    [ -f "$marker" ] && [ ! -L "$marker" ] && [ -r "$marker" ] || return 2
+    mdir=$(cd -- "$(dirname -- "$marker")" 2>/dev/null && pwd) || return 2
+    marker="$mdir/$(basename -- "$marker")"
+    (
+        local top f out p rc n=0 hits=""
+        top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 2
+        cd -- "$top" 2>/dev/null || exit 2
+        git ls-files --others --ignored --exclude-standard --directory -z >|"$scratch" 2>/dev/null || exit 2
+        while IFS= read -r -d '' f; do
+            case "$f" in .git|.git/*|*/.git|*/.git/*) continue ;; esac
+            out=""
+            rc=0
+            if [ "${f%/}" != "$f" ]; then
+                # A wholly ignored directory. head bounds the output, so a
+                # tree rewritten end to end cannot fill memory; a find that
+                # fails with nothing found is "cannot tell".
+                out=$(set -o pipefail
+                    find "./$f" -name .git -prune -o \( -type f -o -type l \) -newer "$marker" -print 2>/dev/null \
+                        | head -n 20) || rc=$?
+            elif [ -L "./$f" ]; then
+                out=$(find "./$f" -type l -newer "$marker" -print 2>/dev/null) || rc=$?
+            elif [ -f "./$f" ]; then
+                [ "./$f" -nt "$marker" ] && out="./$f"
+            fi
+            if [ -z "$out" ]; then
+                [ "$rc" -eq 0 ] || exit 2
+                continue
+            fi
+            while IFS= read -r p; do
+                [ -n "$p" ] || continue
+                n=$((n + 1))
+                p="${p#./}"
+                hits="${hits}${p//[[:cntrl:]]/?}"$'\n'
+                [ "$n" -lt 20 ] || break
+            done <<<"$out"
+            [ "$n" -lt 20 ] || break
+        done <"$scratch"
+        if [ "$n" -gt 0 ]; then
+            printf '%s' "$hits"
+            exit 1
+        fi
+        exit 0
+    )
 }
 
 # rp_hooks_untracked <outfile>: the dirty-set guard cannot see a resolver edit

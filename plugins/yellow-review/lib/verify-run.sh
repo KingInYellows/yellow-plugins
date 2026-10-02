@@ -108,13 +108,45 @@ vr_load_redactor() {
 # after the last blank inside the window and hard-breaks only a run of 64 KiB
 # with no blank). Minified output or binary data without newlines therefore
 # costs one bounded record per filter, not the whole stream. This inserts a
-# newline at each break. Residual: a credential that straddles a hard break (a
-# 64 KiB run with no blank, cut mid-value) can escape its pattern; the final
-# rt_looks_secret screen in vr_publish_log is the backstop.
+# newline at each break, which can sever a credential assignment from its value
+# (more than 64 KiB of blanks between them): the filters would redact only the
+# first piece. So the filter fails closed. Two wc taps count the newlines
+# before and after fold (fold adds newlines and nothing else), in O(1) memory;
+# if fold added any, the output ends with VR_FOLD_SENTINEL and the caller
+# (vr_publish_log, vr_redact_log) withholds the stream instead of publishing
+# it. Counts that cannot be read count as a boundary. The counts travel on fd 4
+# through a command substitution; the data goes to fd 3, this function's stdout.
+VR_FOLD_SENTINEL='[yellow-review: output had a record longer than 64 KiB]'
 vr_redact_filter() {
-    fold -b -s -w 65536 \
-        | cs_redact_secrets 2>/dev/null \
-        | sed -E 's/(^|[^A-Za-z0-9_])([A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_ID|_PASSWORD)[[:space:]]*[=:][[:space:]]*).*/\1\2[REDACTED]/'
+    local counts rc=0 tag val n_in="" n_out=""
+    { counts=$(
+        {
+            tee >(printf 'in %s\n' "$(wc -l)" >&4) \
+                | fold -b -s -w 65536 \
+                | tee >(printf 'out %s\n' "$(wc -l)" >&4) \
+                | cs_redact_secrets 2>/dev/null \
+                | sed -E 's/(^|[^A-Za-z0-9_])([A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_ID|_PASSWORD)[[:space:]]*[=:][[:space:]]*).*/\1\2[REDACTED]/'
+        } 4>&1 >&3
+    ) || rc=$?; } 3>&1
+    while read -r tag val; do
+        case "$tag" in
+            in) n_in="$val" ;;
+            out) n_out="$val" ;;
+        esac
+    done <<<"$counts"
+    if [[ "$n_in" =~ ^[0-9]+$ ]] && [[ "$n_out" =~ ^[0-9]+$ ]] && [ "$n_in" -eq "$n_out" ]; then
+        return "$rc"
+    fi
+    printf '\n%s\n' "$VR_FOLD_SENTINEL"
+    return "$rc"
+}
+
+# vr_fold_withheld <file>: succeeds when <file> (filter output) ends with
+# VR_FOLD_SENTINEL, i.e. fold cut a record and the stream must be withheld. A
+# stream whose last line merely ends in the same text is withheld too; that is
+# the safe side.
+vr_fold_withheld() {
+    [ "$(tail -c $((${#VR_FOLD_SENTINEL} + 1)) <"$1" 2>/dev/null)" = "$VR_FOLD_SENTINEL" ]
 }
 
 # vr_redact_stream: redact stdin to stdout as it arrives, so the verifier's raw
@@ -138,9 +170,15 @@ vr_redact_stream() {
 # final log path, but only after the last credential scan (rt_looks_secret, from
 # resolve-text.sh). A stream that still looks like a credential, or that cannot
 # be scanned, is replaced by a notice. Fail closed: the log path never holds
-# text that has not passed the scan.
+# text that has not passed the scan. A stream in which fold cut a record
+# (vr_fold_withheld) is replaced by a notice and the function returns 3, so the
+# caller can name it in the result's reason; every other outcome returns 0.
 vr_publish_log() {
     local src="$1" log="$2" rc=0
+    if vr_fold_withheld "$src"; then
+        (umask 077 && printf '[log withheld: output had a record longer than 64 KiB]\n' >|"$log") || rm -f -- "$log"
+        return 3
+    fi
     if declare -F rt_looks_secret >/dev/null 2>&1; then
         rt_looks_secret "$src" || rc=$?
         if [ "$rc" -eq 1 ]; then
@@ -173,6 +211,11 @@ vr_redact_log() {
             set -o pipefail
             vr_redact_filter <"$log" >"$log.tmp"
         ); then
+        if vr_fold_withheld "$log.tmp"; then
+            rm -f -- "$log.tmp"
+            (umask 077 && printf '[log withheld: output had a record longer than 64 KiB]\n' >|"$log") || rm -f -- "$log"
+            return 0
+        fi
         rt_looks_secret "$log.tmp" || scan_rc=$?
         if [ "$scan_rc" -eq 1 ] && mv -f -- "$log.tmp" "$log"; then
             return 0
