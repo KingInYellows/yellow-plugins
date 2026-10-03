@@ -1,0 +1,41 @@
+plans/specs/yellow-review-grounding-and-resolve-loop.md
+  s_19981440458bca::t_be9c592f620281 102-107
+  s_19981440458bca::t_3a04693732b1e5 123,125
+  s_19981440458bca::t_cba96a86a1ce38 127-131
+  s_19981440458bca::t_8d0934b38b7986 29
+  s_19981440458bca::t_bfa27ece06a09d 26-27
+  s_19981440458bca::t_095a1c5277cb72 47-50
+plans/specs/yellow-council-v3-multi-round.md
+  s_19981440458bca::t_971d984144e2f7 28,37,44-51
+plans/specs/docs-debt-and-delegation-borrows.md
+  s_19981440458bca::t_0bc04a1ebfb434 145
+  s_19981440458bca::t_c08076931891ba 47-51,118-119
+  s_19981440458bca::t_ccaa3795dd30ed 98
+plans/specs/yellow-core-loop-work-integrity.md
+  s_19981440458bca::t_55d60f9604d595 98
+  s_19981440458bca::t_94027c6f342cd6 24-28,30,99-102
+  s_19981440458bca::t_6c5686b0ca42f7 47
+  s_19981440458bca::t_4accfc01524505 117
+  s_19981440458bca::t_dacfaee761b8fc 29,93,103-104,153,161
+docs/brainstorms/2026-10-02-turn-the-integration-evaluation-into-an-brainstorm.md
+  s_19981440458bca::t_a2c2de6c6a1fc8 107
+  s_19981440458bca::t_1f658bda72bd52 108
+  s_19981440458bca::t_6ebd6730961303 113
+  s_19981440458bca::t_359d2ff8b14c39 103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "cfa48b78ad4ba5437142e8c5f3482539cdf89276",
+  "prompts": {},
+  "sessions": {
+    "s_19981440458bca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "74820cce-4cfb-4b65-9b63-0ecd4a17dcd5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
