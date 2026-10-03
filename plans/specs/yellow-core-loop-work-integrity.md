@@ -45,7 +45,7 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 ### Plan supersession and resolution (roadmap step 4)
 
 - **R6.** When `/flow:plan` writes a new plan, the system shall prepend YAML frontmatter with `status: active` and `supersedes: <plan-slug>`, leaving `supersedes` empty when none. It shall use no `spec:` or `depends_on:` keys, because those mark shells (`expand-shell.md`).
-- **R7.** Before `/flow:plan` writes a plan, the system shall check active plans for overlap with the new one. Overlap means two or more shared non-stopword slug tokens, or the same brainstorm or spec path cited. When one or more overlap, it shall ask once, "Does this replace <plan>?" (options: each overlapping plan, plus "No"), and record the answer in `supersedes`. With no overlap it shall ask nothing.
+- **R7.** Before `/flow:plan` writes a plan, the system shall check active plans for overlap with the new one. Overlap means two or more shared non-stopword slug tokens, or the same brainstorm or spec path cited. When one or more overlap, it shall rank them (most shared tokens first, then a shared cited source, then newest) and ask once, "Does this replace <plan>?" (options: the top 3 ranked overlapping plans, plus "No"), and record the answer in `supersedes`. `AskUserQuestion` allows at most 4 options, so when more than 3 overlap, the question text shall note how many were left out. The `plan-chain.sh overlap` subcommand returns the overlapping plans already ranked. With no overlap it shall ask nothing.
 - **R8.** When `/flow:spec` writes a spec, the system shall write the same `status` / `supersedes` frontmatter with the R7 overlap check against active specs. `/flow:decompose`'s implicit spec resolution shall skip superseded specs.
 - **R9.** The plan resolver shall classify each `plans/*.md` file (top level only) as **active** or **inactive**.
   - **Inactive** means any of:
@@ -141,7 +141,11 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 - **Picker sites.**
   - `commands/flow/work.md` Phase 1 step 1 (R10).
   - `commands/flow/review.md` no-argument branch (R11). The file-not-found listing at line 51 also switches to `resolve`.
-  - `plugins/yellow-research/commands/flow/deepen-plan.md` Step 1 (R12) finds the script under `${CLAUDE_PLUGIN_ROOT}/../yellow-core/` with a highest-version sibling fallback (`…/../yellow-core/*/lib/plan-chain.sh`, `sort -V`), and uses its Glob path when the script is not found.
+  - `plugins/yellow-research/commands/flow/deepen-plan.md` Step 1 (R12) finds the script with the lookup in `plugins/yellow-debt/lib/validate.sh` (lines ~12–62).
+    - It tries the checkout sibling `${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/plan-chain.sh` first.
+    - If that file is missing, it scans the installed cache at `${CLAUDE_PLUGIN_ROOT}/../../yellow-core/*/lib/plan-chain.sh` and takes the highest version, read from the directory name.
+    - It compares versions in pure bash with a SemVer comparison like `_debt_ver_gt`. It does not use `sort -V`, because BSD sort lacks it.
+    - It uses its Glob path when no script is found.
 - **plan-status (R13).**
   - `skills/plan-status/SKILL.md` Phase 1 adds a status column via `plan-chain.sh status`.
   - Run `pnpm generate:manifests` for the Codex copy.
