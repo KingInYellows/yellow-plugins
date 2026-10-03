@@ -58,11 +58,11 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
   - Files in a `supersedes` cycle are all reported active and the cycle is named on stderr.
 - **R10.** When `/flow:work` runs without a plan argument:
   - With exactly one active plan, the system shall use it without asking and print which plan it chose and why.
-  - With two or more, it shall ask among active plans only (newest first, at most 5).
+  - With two or more, it shall ask among active plans only, offering the 4 newest (the `AskUserQuestion` limit, as in R7). When more exist, the question says how many were left out, and the user can still name any plan through the free-text "Other" answer.
   - With none, it shall fall back to today's `ls -t` list.
   - An explicit plan argument bypasses the resolver unchanged.
   - Acceptance: with a fixture holding one active and two inactive plans, the picker step makes 0 AskUserQuestion calls.
-- **R11.** When `/flow:review` runs without an argument, the system shall offer the resolver's active plans plus the existing "None — redirect to review:pr" option, in place of `ls -t … | head -3`.
+- **R11.** When `/flow:review` runs without an argument, the system shall offer the 3 newest of the resolver's active plans plus the existing "None — redirect to review:pr" option (4 options, the `AskUserQuestion` limit), in place of `ls -t … | head -3`. When more active plans exist, the question says how many were left out.
 - **R12.** When `/flow:deepen-plan` (yellow-research) runs without an argument, the system shall use the yellow-core resolver located through cross-plugin path resolution. When the resolver cannot be found it falls back to the current Glob listing.
 - **R13.** The plan-status dashboard shall show each open plan's status. It annotates superseded plans `-- superseded by <slug>` and leaves frontmatter-less plans rendered as today. The generated Codex copy, `tests/plan-status-parity.bats` and the golden fixtures change in the same PR.
 - **R14.** Before the step 4 PR merges, the system's picker behaviour shall be measured on current `main` (AskUserQuestion calls in the picker step with no argument, expected 1). The same measurement after the change shall be 0 on the R10 fixture. Both are recorded in the PR.
