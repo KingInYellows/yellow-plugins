@@ -223,6 +223,12 @@ case "$ALL_ARGS" in
       *"PRRT_reply_done"*)
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_done","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_done disposition=fixed -->\n"}]}}}}'
         ;;
+      *"PRRT_reply_suffix"*)
+        # Our marker followed by MOCK_REPLY_SUFFIX (escapes expanded): trailing
+        # newline, CRLF or spaces still count; extra prose does not.
+        _sfx=$(printf '%b' "${MOCK_REPLY_SUFFIX:-}" | jq -Rs .)
+        MOCK_BODY=$(jq -nc --argjson sfx "$_sfx" '{data:{node:{id:"PRRT_reply_suffix",comments:{nodes:[{viewerDidAuthor:true,body:("Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_suffix disposition=fixed -->" + $sfx)}]}}}}')
+        ;;
       *"PRRT_reply_priorunclear"*)
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_priorunclear","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Could not verify.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_priorunclear disposition=unclear -->\n"}]}}}}'
         ;;

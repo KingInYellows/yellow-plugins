@@ -23,8 +23,13 @@
 #             5 the dedupe window is full and holds no marker: an older issue
 #             may carry it, so nothing is filed and the thread stays open (not
 #             a transient failure; retrying does not help).
+# Concurrency: the dedupe scan and the create are not atomic. The post-create
+#   rescan and duplicate close only cover two runs filing for the same thread
+#   at the same moment (two sessions on one PR); a single session never needs
+#   them.
 # Env: YELLOW_REVIEW_GH_TIMEOUT (default 30) — seconds per gh call; needs
-#      timeout(1), skipped when it is not installed (lib/resolve-gh.sh).
+#      timeout(1) or gtimeout(1), skipped when neither is installed
+#      (lib/resolve-gh.sh).
 # Contract: references/resolve/dispositions.md
 
 set -eu
@@ -120,7 +125,7 @@ gh_fail() {
         printf 'Error: gh timed out after %s s on %s.\n' "$RG_GH_TIMEOUT" "$1" >&2
         exit 4
     fi
-    if grep -qiE 'rate limit|HTTP 429' "$ERR"; then
+    if grep -qiE 'rate limit|abuse|HTTP 429' "$ERR"; then
         printf 'Error: GitHub rate limit on %s.\n' "$1" >&2
         exit 4
     fi
@@ -222,7 +227,7 @@ else
     LOOKUP_RC=$?
     # Ordinary lookup failures keep the PR-URL fallback; a rate limit or a
     # timeout stops the caller.
-    if [ "$LOOKUP_RC" -eq 124 ] || grep -qiE 'rate limit|HTTP 429' "$ERR"; then
+    if [ "$LOOKUP_RC" -eq 124 ] || grep -qiE 'rate limit|abuse|HTTP 429' "$ERR"; then
         gh_fail 'thread link lookup' "$LOOKUP_RC"
     fi
     # A thread that does not exist is not a transient failure: filing an
@@ -231,7 +236,11 @@ else
         printf 'Error: Thread %s was not found; refusing to file an issue for it.\n' "$THREAD_ID" >&2
         exit 2
     fi
-    printf 'Note: thread link lookup failed (%s); linking the PR instead.\n' "$(head -c 200 "$ERR" | tr '\n' ' ')" >&2
+    # Any other failure leaves the thread unverified: filing could attach an
+    # issue to a thread of another pull request. Only a lookup that succeeded
+    # and returned no comment URL falls back to the PR link (above).
+    printf 'Error: thread link lookup failed (%s); not filing an issue for an unverified thread.\n' "$(head -c 200 "$ERR" | tr '\n' ' ')" >&2
+    exit 1
 fi
 
 ISSUE_BODY="$WORK_DIR/issue-body.md"
@@ -266,7 +275,7 @@ if list_viewer_issues "$WORK_DIR/issues-after.json"; then
             :
         else
             CLOSE_RC=$?
-            if [ "$CLOSE_RC" -eq 124 ] || grep -qiE 'rate limit|HTTP 429' "$ERR"; then
+            if [ "$CLOSE_RC" -eq 124 ] || grep -qiE 'rate limit|abuse|HTTP 429' "$ERR"; then
                 gh_fail 'duplicate issue close' "$CLOSE_RC"
             fi
             printf 'Note: could not close duplicate issue #%s (%s); close it by hand.\n' \
@@ -279,7 +288,7 @@ else
     RESCAN_RC=$?
     # The issue exists, but the contract requires exit 4 after any rate limit
     # or timeout. Re-running finds the created issue by its thread marker.
-    if [ "$RESCAN_RC" -eq 124 ] || grep -qiE 'rate limit|HTTP 429' "$ERR"; then
+    if [ "$RESCAN_RC" -eq 124 ] || grep -qiE 'rate limit|abuse|HTTP 429' "$ERR"; then
         gh_fail 'post-create issue list' "$RESCAN_RC"
     fi
     printf 'Note: post-create issue list failed; a concurrent duplicate of #%s, if any, was not checked.\n' "$MY_NUMBER" >&2

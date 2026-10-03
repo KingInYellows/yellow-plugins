@@ -17,7 +17,7 @@
 # while lookupFailed is false.
 # Never fails the caller: usage errors exit 2, every lookup error exits 0
 # with unknown fields and a note on stderr. That includes a gh call that
-# exceeds YELLOW_REVIEW_GH_TIMEOUT (default 30 s, needs timeout(1); see
+# exceeds YELLOW_REVIEW_GH_TIMEOUT (default 30 s, needs timeout(1) or gtimeout(1); see
 # lib/resolve-gh.sh): it is treated like any other failed lookup.
 
 set -eu

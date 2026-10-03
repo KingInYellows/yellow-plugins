@@ -353,12 +353,14 @@ once wired, they run without a per-post prompt. The controls
   destination is added beyond `gh`'s GitHub API.
 - **Bounded waits.** Rate limits wait at most 90 seconds (one retry in
   `reply-pr-thread`), then exit 4. Each `gh` call in `reply-pr-thread`,
-  `file-followup-issue` and `get-pr-blockers` runs under `timeout(1)`
-  (`YELLOW_REVIEW_GH_TIMEOUT`, default 30 seconds). A timeout exits 4
-  without a retry in the first two, since the post may have landed; a
-  re-run finds it by its marker. In `get-pr-blockers` a timeout is a failed
-  lookup (`lookupFailed`, exit 0). Without `timeout(1)` installed, no
-  timeout applies.
+  `file-followup-issue` and `get-pr-blockers` runs under `timeout(1)` or
+  `gtimeout(1)` (`YELLOW_REVIEW_GH_TIMEOUT`, default 30 seconds). A timeout
+  exits 4 without a retry in the first two, since the post may have landed;
+  a re-run finds it by its marker. In `get-pr-blockers` a timeout of the
+  review lookup sets `lookupFailed` true, while a timeout of the
+  branch-protection or ruleset lookup leaves `conversationResolution`
+  `unknown`; both exit 0. Without either binary installed, no timeout
+  applies.
 
 ### Context Observer Persistence (yellow-core)
 
