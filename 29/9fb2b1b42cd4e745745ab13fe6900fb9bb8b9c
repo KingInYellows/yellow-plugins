@@ -1,0 +1,26 @@
+plans/specs/docs-debt-and-delegation-borrows.md
+  s_19981440458bca::t_c6c2b289d1ce38 1-77,79-135,137-164
+  s_19981440458bca::t_d3a21f969194e8 78
+  s_19981440458bca::t_4be6d140323185 136
+plans/specs/authoring-evals-and-context-budget.md
+  s_19981440458bca::t_1d5730b2269630 110
+  s_19981440458bca::t_acec9be49a57ca 139
+docs/brainstorms/2026-10-02-turn-the-integration-evaluation-into-an-brainstorm.md
+  s_19981440458bca::t_ae53f33c9d7802 88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "299fb2b1b42cd4e745745ab13fe6900fb9bb8b9c",
+  "prompts": {},
+  "sessions": {
+    "s_19981440458bca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "74820cce-4cfb-4b65-9b63-0ecd4a17dcd5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
