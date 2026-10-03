@@ -3,8 +3,8 @@ title: 'Command Fences: Aggregated Output Truncation and Untested Orchestration'
 date: 2026-09-30
 category: code-quality
 track: knowledge
-problem: A command fence that prints N untrusted blocks in one Bash call hits the tool output cap, and deleting inputs in the same fence makes the truncation unrecoverable.
-tags: [bash-tool, output-cap, command-authoring, bats, council, orchestration]
+problem: A command fence that prints N untrusted blocks in one Bash call hits the tool output cap, and deleting inputs in the same fence makes the truncation unrecoverable; contract tests that grep one token let safety-critical branches be deleted unnoticed.
+tags: [bash-tool, output-cap, command-authoring, bats, skill-content, contract-tests, council, orchestration]
 components: [yellow-council]
 ---
 
@@ -93,7 +93,8 @@ for the evidence-fidelity side of the same change.
 
 ## Update — 2026-10-01
 
-PR #955 (open when this note was written; its tests are not on `main`) added
+PR #955 (open when this note was written; its tests are not on `main`, and
+the assertions named below were confirmed only on that PR's branch) added
 `skill-content.bats` tests for resolve-stack and sweep-all. Review found the
 first drafts of the contract and dirty-tree tests only grepped for
 `ratelimited=`, so the safety-critical branches (each field of the `Resolve:`

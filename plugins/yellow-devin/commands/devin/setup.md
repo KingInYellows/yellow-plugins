@@ -35,8 +35,9 @@ printf '\n=== Credentials ===\n'
 # 2-arg has_userconfig: identical copies live in the research, devin and
 # semgrep setup commands (tests/has-userconfig.bats in yellow-research fails
 # on drift) — if you change one, change all copies (search for
-# "has_userconfig()" across plugins/). `grep -qF` (fixed-string) fallback guards against regex
-# metacharacters; jq path is preferred and path-scoped.
+# "has_userconfig()" across plugins/). The no-jq fallback matches the plugin id with
+# `grep -qF` (fixed-string) and requires a non-empty string value for the option
+# (`grep -qE`), like the jq path; the jq path is preferred and path-scoped.
 has_userconfig() {
   # Sensitive userConfig values live under .pluginSecrets in the credentials
   # store (~/.claude/.credentials.json on Linux; the macOS keychain is not
@@ -48,7 +49,7 @@ has_userconfig() {
   local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
   if ! command -v jq >/dev/null 2>&1; then
     have_jq=0
-    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    printf '[has_userconfig] Warning: jq not installed; using grep fallback (may produce false positives)\n' >&2
   fi
   for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
     [ -r "$file" ] || continue
@@ -70,8 +71,9 @@ has_userconfig() {
              "$file" "$jq_exit" >&2 ;;
       esac
     else
-      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+      # Flatten newlines, then require the option inside the same plugin object.
+      tr -d '\n\r' < "$file" 2>/dev/null \
+        | grep -qE "\"($plugin|$plugin@yellow-plugins)\"[[:space:]]*:[[:space:]]*\{[^{}]*(\"options\"[[:space:]]*:[[:space:]]*\{[^{}]*)?\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" 2>/dev/null && return 0
     fi
   done
   return 1
@@ -165,7 +167,7 @@ has_userconfig() {
   local config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" have_jq=1
   if ! command -v jq >/dev/null 2>&1; then
     have_jq=0
-    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    printf '[has_userconfig] Warning: jq not installed; using grep fallback (may produce false positives)\n' >&2
   fi
   for file in "$config_dir/.credentials.json" "$config_dir/settings.json"; do
     [ -r "$file" ] || continue
@@ -187,8 +189,9 @@ has_userconfig() {
              "$file" "$jq_exit" >&2 ;;
       esac
     else
-      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qF "\"$option\"" "$file" 2>/dev/null && return 0
+      # Flatten newlines, then require the option inside the same plugin object.
+      tr -d '\n\r' < "$file" 2>/dev/null \
+        | grep -qE "\"($plugin|$plugin@yellow-plugins)\"[[:space:]]*:[[:space:]]*\{[^{}]*(\"options\"[[:space:]]*:[[:space:]]*\{[^{}]*)?\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" 2>/dev/null && return 0
     fi
   done
   return 1

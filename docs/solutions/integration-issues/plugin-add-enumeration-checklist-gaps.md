@@ -26,19 +26,27 @@ validators are the authority on what actually fails.
    pins phrases in `delegate.md`: the Step 3 heading, `resolve_plugin_root`,
    "overriding only the CONFLICT state", and `devin:delegate`. Edits that add a
    provider must keep them.
-3. **Re-count plugins from `.claude-plugin/marketplace.json`.** The spec said
-   20 plugins; the marketplace had 19. Count claims live at `CLAUDE.md:10`,
-   `README.md:3`, and `docs/architecture-overview.md:3,60`. Spec-era counts drift.
+3. **Re-count plugins from `.claude-plugin/marketplace.json`.** At plan time
+   the spec said 20 plugins while the marketplace listed 19 (a point-in-time
+   observation, not a current count; the marketplace has since grown, so
+   re-count instead of trusting either number). Count claims live in the
+   "Repository Purpose" section of `CLAUDE.md`, the intro of `README.md`, and
+   the intro and "The N plugins" heading of `docs/architecture-overview.md`.
+   Spec-era counts drift.
 4. **Use the untracked-aware form for committed-dist drift checks.**
    yellow-cursor's `git diff --exit-code` misses untracked files. yellow-goal's
    `test -z "$(git status --porcelain --untracked-files=all -- <dist>)"` catches
    them. A new plugin's dist check must use the yellow-goal form.
-5. **Ship a lockfile for a data-dir `npm ci`.** Precedent:
-   `plugins/yellow-morph/package-lock.json` plus
-   `plugins/yellow-morph/lib/install-morphmcp.sh`.
-   `.gitignore:47` ignores `package-lock.json` globally with per-plugin
-   negations. Placing it at `plugins/<name>/runtime/` keeps it out of the pnpm
-   workspace, because the `plugins/*` glob matches direct children only.
+5. **Ship a lockfile for a data-dir `npm ci`.** Precedents:
+   `plugins/yellow-jules/runtime/package-lock.json`, which sits in a `runtime/`
+   directory and is installed by `setup --install-sdk` with
+   `npm ci --ignore-scripts` (see `plugins/yellow-jules/src/sdk-resolver.ts`),
+   and `plugins/yellow-morph/package-lock.json` with
+   `plugins/yellow-morph/lib/install-morphmcp.sh`. The root `.gitignore` ignores
+   `package-lock.json` globally and adds one negation per plugin lockfile, so a
+   new plugin needs its own negation. Placing the lockfile at
+   `plugins/<name>/runtime/` keeps it out of the pnpm workspace, because the
+   `plugins/*` glob in `pnpm-workspace.yaml` matches direct children only.
    yellow-cursor's `installSdk` runs an unlocked `npm install` without
    `--ignore-scripts`, a supply-chain gap not to copy.
 6. **Keep `ERROR-PROVIDER-*` codes concatenated.** The codes in
@@ -59,10 +67,12 @@ that consumes an earlier shell's enumeration checklist.
 
 ## Examples
 
-### Testing a forbidden path: the R50 vs R52 tension
+### Testing a forbidden path: transport fixtures vs. zero observed mutations
 
-The spec required create/429/lost-2xx transport fixtures in the same PR that
-must compile no vendor-mutating runtime path. Resolution:
+In `plans/specs/yellow-jules-integration.md`, R50 required create, 429/5xx and
+lost-2xx transport fixtures, while R52's PR2 negative test required that same PR
+to have its fake server observe zero mutating requests across every subcommand
+it ships. Resolution:
 
 - Export pure builders (`buildClientOptions`, `buildCreateSessionConfig`) and an
   error classifier from the adapter.

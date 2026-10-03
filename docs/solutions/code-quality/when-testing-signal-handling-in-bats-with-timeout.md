@@ -5,6 +5,7 @@ category: code-quality
 track: knowledge
 problem: 'timeout exits 124 after successfully delivering a signal, which makes bats tests fail even though signal delivery is the intended outcome.'
 tags: [test-harness, bats, timeout-handling]
+components: [yellow-core]
 source: compound-staging
 ---
 

@@ -520,37 +520,101 @@ trust boundary from the pack and fenced-output files above:
   trusting it). `mktemp -d` creates the directory 0700.
 - **Ownership and authentication handoff**: the capability (directory plus a
   32-hex token) lives in a shell-owned state file,
-  `$GIT_ROOT/.git/council-synth.state` (line 1 directory, line 2 token; written
-  only by 5a: a temp file beside it under `umask 077`, `chmod 600`, then
-  hard-linked into place, so an interrupted write never leaves a partial
-  state file). 5a refuses a symlink or a
-  non-regular/foreign file at that path and removes the directory and state
-  file if the write fails. Steps 5b, 5d resume, and 5e reload both values from
-  the state file (regular, non-symlink, owned by the current user) and require
-  a `/tmp/council-synth-*` shape with no `..` or extra `/`, a directory that
+  `$GIT_ROOT/.git/council-synth.state` (line 1 directory, line 2 token), written
+  only by 5a and never relayed through the model. 5a refuses a symlink or a
+  non-regular/foreign file at that path. If its own claim fails it removes the
+  directory it minted and its temp file, and never an existing state file (it
+  removes a leftover only when that file's directory is gone or past the 24-hour
+  retention). Steps 5b, 5d resume, and 5e reload both values from the state file
+  (regular, non-symlink, owned by the current user) and require a
+  `/tmp/council-synth-*` shape with no `..` or extra `/`, a directory that
   exists, is not a symlink and is owned by the user, a 32-hex token, and a
   `$SYNTH_DIR/.token` equal to the state token. Anything missing, foreign, or
-  garbled fails closed with nothing deleted. The model sees only the printed
-  `COUNCIL_SYNTH_DIR`, for non-destructive `Read`/`Write`, so no destructive
-  step trusts a path or token the model relayed. One synthesis runs per
-  worktree at a time: 5a refuses while another run's state file is live.
-  Worktrees where `.git` is a file are unsupported, as with
-  `.git/council-state.tsv`.
+  garbled fails closed with nothing deleted. The token covers a state file that
+  names a directory 5a did not mint for it (a stale or hand-edited entry, or a
+  user-owned directory that reuses a `/tmp/council-synth-*` name): the check
+  fails and nothing is deleted. It adds nothing against the forgery below. The
+  model sees only the printed `COUNCIL_SYNTH_DIR`, for non-destructive
+  `Read`/`Write`, so no destructive step trusts a path or token the model
+  relayed. One synthesis runs per checkout at a time (the state file lives in
+  `$GIT_ROOT/.git`): 5a refuses while another run's state file is live.
+  Checkouts where `.git` is a file (linked worktrees) are unsupported, as with
+  `.git/council-state.tsv`, and the state claim needs a filesystem with hard
+  links.
 - **Known residual (Write)**: the state file removes the relayed-literal
   vector, not a deliberate forgery. The orchestrator holds `Write`, which is
   not path-scoped at runtime, so a prompt-injected orchestrator could write a
   matching state file and `.token` for a directory it chose and steer 5e's
   `rm -rf` to it. The shape checks bound that to a `/tmp/council-synth-*`
-  directory the user owns. Closing it needs a `Write` deny rule for
-  `.git/council-synth.state` or a token only the shell holds.
-- **Cleanup and retention**: 5e removes the directory and state file;
-  `council_synth_abort` removes both. Step 7 early exit, Step 8 Cancel, and
-  Step 9 cleanup remove the state file only. The next run's 5a sweep deletes
-  `/tmp/council-synth-*` directories older than 24 hours, so an interrupted run
-  leaves redacted, normalized reviewer text in `/tmp` for up to about 24 hours.
-  A `.git/council-synth.state` left by such a run stays until the next 5a
-  reclaims it (directory gone or over 24 hours old; before that 5a refuses
-  to start another synthesis in the worktree) or you remove it by hand.
+  directory the user owns. Any model-driven write channel can do the same, a
+  Bash fence as well as `Write`, so a `Write` deny rule for
+  `.git/council-synth.state` only narrows the residual. Closing it needs a
+  capability held where no model-launched process can write.
+- **Known residual (stale-state reclaim race)**: "one synthesis per checkout"
+  holds except while a stale state file is being reclaimed. Two runs that both
+  find the same leftover can each remove the other's fresh claim between 5a's
+  stale check and its `ln`, so two syntheses can proceed in one checkout. The
+  window is milliseconds and is left open because `sh` has no atomic
+  compare-and-remove.
+- **Known residual (resumed run after a reclaim)**: 5b, 5d and 5e take the
+  directory and token only from the state file and compare nothing against this
+  run's own 5a directory. A run paused past 24 hours whose stale state another
+  `/council` reclaimed therefore finds the new run's valid claim on resume and
+  can print that run's label map, release its claim, and delete the new run's
+  staging directory, disrupting that run. Binding those steps to a directory
+  recorded at 5a needs either a relayed value or an owner PID in the state
+  file, so it is left open as protocol design work.
+- **Known residual (pathname unlink after validation)**: the final unlink in
+  `council_rm_synth_state` is by pathname after validation, so a reclaim that
+  lands between the check and the `rm` can remove another run's fresh claim.
+  Narrow, same class as the reclaim race above, and left open for the same
+  reason (no atomic compare-and-remove); the function's behavior is unchanged.
+- **Cleanup and retention**: 5e and `council_synth_abort` release the claim
+  first (unlink the state file) and only then remove the directory. The state
+  file is authenticated with the directory's `.token`, and a `rm -rf` that fails
+  partway can delete `.token` yet leave the directory, after which the file
+  could no longer be authenticated and would block the next run for up to a
+  day; so the file goes while `.token` is intact, and a directory that cannot be
+  removed does not block a new run once its state claim is unlinked. If the
+  release itself fails and cleanup leaves a directory younger than 24 hours, 5a
+  still refuses to start. A file that fails authentication is still
+  never unlinked, and a symlink is never followed. When `rm -rf` fails (a
+  non-writable directory),
+  they run `chmod -R u+rwx` on the directory and retry once, only for a real
+  directory the user owns under `/tmp/council-synth-*`; if it still cannot be
+  removed they print the exact `chmod -R u+rwx <dir> && rm -rf <dir>` command
+  to run by hand. Step 7 early exit and Step 9 cleanup remove the state file
+  only, and only when this run's 5a claimed it AND the file is still this run's
+  claim (`council_rm_synth_state`: a regular, non-symlink file
+  owned by the user whose line 1 equals the `COUNCIL_SYNTH_DIR` this run's 5a
+  printed and, while that directory exists, whose token equals its `.token`).
+  A missing file is success. A symlink (never followed or removed), a foreign
+  owner, another run's directory or a token mismatch leaves the path alone with
+  a one-line note: this covers a run whose 5a refused, a 5e that already removed
+  the file (it prints that this run's claim is released) and a paused run whose
+  stale state another `/council` reclaimed. The relayed `COUNCIL_SYNTH_DIR` is
+  only compared, never deleted; a wrong or missing literal fails closed. A
+  5d-resume or 5e failure runs the Step 8 Cancel block, which also removes the
+  staging directory so the staged reviewer text does not outlive the run. It
+  authenticates the directory BEFORE releasing the claim, because afterwards the
+  state file can no longer prove which directory is this run's: only when this
+  run's 5a claimed the file (`SYNTH_STATE_CLAIMED=1`) and `SYNTH_OWN_DIR` passes
+  the shape check (`/tmp/council-synth-*`, no `..`, no extra `/`), the state
+  file is a regular non-symlink file of the user whose line 1 equals it and whose
+  line 2 is a 32-character hex token, and the directory is real, not a symlink,
+  owned by the user, with a regular non-symlink `.token` equal to that token. It
+  then releases the claim and removes the directory (same `chmod -R u+rwx`
+  retry and manual-command warning as 5e). A run that claimed nothing, a
+  symlinked or unowned directory, or a path outside the shape is never removed.
+  24 hours is the eligibility threshold for the 5a sweep, not a maximum
+  retention: the sweep runs only when a later `/council` invocation reaches 5a,
+  and then deletes `/tmp/council-synth-*` directories older than 24 hours
+  (with the same chmod-then-remove for an owned directory). An interrupted run
+  leaves redacted, normalized reviewer text in `/tmp` until that later run, or
+  until you remove it. A `.git/council-synth.state` left by such a run stays
+  until a later 5a reclaims it (directory gone or over 24 hours old; before
+  that 5a refuses to start another synthesis in the checkout) or you remove it
+  by hand.
 - **Prompt-injection boundary**: all staged reviewer text is untrusted. It is
   redacted in Step 4, normalized, fenced with `[ESCAPED]` delimiter handling,
   and read from files rather than large Bash results. Labels hide reviewer

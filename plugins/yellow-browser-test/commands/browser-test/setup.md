@@ -45,10 +45,11 @@ If install fails, report error and suggest manual installation.
 Before spawning app discovery, check if this project is a web application.
 The signal checks mirror the "Web App Signals" block in yellow-core's
 `commands/setup/all.md` (minus its `repo_top` guards, since `repo_top` falls
-back to `.` here) — keep the two in sync when either changes:
+back to the current directory here) — keep the two in sync when either
+changes:
 
 ```bash
-repo_top=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
+repo_top=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 web_signals=""
 if [ -f "$repo_top/package.json" ] && \
    grep -qE '"(next|react|vue|svelte|astro|nuxt|remix|express|fastify|koa|hono|gatsby|vite|webpack-dev-server|@angular/core|lit|solid-js|preact|alpinejs)"' "$repo_top/package.json" 2>/dev/null; then
@@ -69,7 +70,10 @@ if [ -f "$repo_top/go.mod" ] && \
   web_signals="$web_signals go"
 fi
 if [ -f "$repo_top/Cargo.toml" ] && \
-   grep -qE "^[[:space:]]*(\[[^]]*\.)?(axum|actix-web|rocket|warp)(\][[:space:]]*$|[[:space:]]*=)|^[^#]*package[[:space:]]*=[[:space:]]*\"(axum|actix-web|rocket|warp)\"" "$repo_top/Cargo.toml" 2>/dev/null; then
+   { grep -qE "^[[:space:]]*(\[[^]]*\.)?(axum|actix-web|rocket|warp)(\][[:space:]]*(#.*)?$|[[:space:]]*=)|^[^#]*package[[:space:]]*=[[:space:]]*\"(axum|actix-web|rocket|warp)\"" "$repo_top/Cargo.toml" 2>/dev/null || \
+     awk '/^[ \t]*\[+[^]]*\]+[ \t]*(#.*)?$/ { t = $0; sub(/^[ \t]*\[+[ \t]*/, "", t); sub(/[ \t]*\]+.*$/, "", t); dep = (t ~ /^(workspace\.|target\..*\.)?(dev-|build-)?dependencies$/); next }
+          dep && /^[ \t]*(axum|actix-web|rocket|warp)\.[A-Za-z_-]+[ \t]*=/ { found = 1; exit }
+          END { exit !found }' "$repo_top/Cargo.toml" 2>/dev/null; }; then
   web_signals="$web_signals rust"
 fi
 for f in fly.toml render.yaml vercel.json netlify.toml; do
@@ -92,18 +96,20 @@ else
 fi
 ```
 
-If `is_web` is `false`, use AskUserQuestion:
+If the output line is `is_web: false`, use AskUserQuestion:
 
 > "No web-app signals found in {the `checked:` path from the output above}
 > (checked: package.json, Gemfile, Python deps, go.mod, Cargo.toml, PaaS
-> config, docker-compose ports). That path is the git root, or your current
-> directory if you are not in a git repository. Browser testing requires a web
-> app with a dev server."
+> config, Compose ports). Browser testing requires a web app with a dev
+> server."
 >
 > Options:
 > - "Continue anyway" — proceed to app discovery
 > - "Configure manually" — skip discovery, ask for dev server command and base URL
 > - "Skip" — exit setup
+
+The `checked:` path is the git root, or your current directory outside a git
+repository.
 
 If the user chooses "Skip", report "Setup skipped — run `/browser-test:setup`
 from within a web project." and stop. If "Configure manually", skip Step 3 and
@@ -117,7 +123,9 @@ Spawn the `app-discoverer` agent to analyze the codebase:
 Agent(subagent_type="yellow-browser-test:testing:app-discoverer"): "Discover dev server command, base URL, routes, and auth flow for this project."
 ```
 
-The agent will return the discovered configuration.
+The agent will return the discovered configuration. If it returns "no web app
+detected", or no dev server command, follow the "Configure manually" path from
+Step 2.5: ask for the dev server command and base URL, then continue at Step 6.
 
 ### Step 4: Handle Multiple Dev Commands
 

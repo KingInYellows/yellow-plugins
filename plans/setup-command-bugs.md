@@ -26,9 +26,9 @@ Three defects in plugin setup commands:
 
 Decisions (from SpecFlow review):
 
-- **`repo_top` outside git:** keep Step 2.5's existing `|| echo "."` fallback and drop the `[ -n "$repo_top" ]` guards from the copy, so a non-git web project still detects.
-- **Drift check:** keep-in-sync comment only. A validator is a follow-up, not in scope. `all.md` gets only a one-line reciprocal sync comment (with a yellow-core patch changeset).
-- **Known false positives/negatives** (substring match on `pyproject.toml`, root-only files, compose filename variants) are inherited from `setup:all` and left as-is.
+- **`repo_top` outside git:** keep a current-directory fallback and drop the `[ -n "$repo_top" ]` guards from the copy, so a non-git web project still detects. The fallback is `|| pwd` (superseded: an earlier draft of this plan said `|| echo "."`); `web-app-signals.bats` asserts the checked directory.
+- **Drift check:** keep-in-sync comment plus `plugins/yellow-core/tests/web-app-signals.bats`, which extracts both blocks and runs them on shared fixtures under bash and zsh. A text-diff validator is a follow-up, not in scope. `all.md` gets a reciprocal sync comment (with a yellow-core patch changeset). Superseded in implementation: the PR added dotted Cargo dependency-key matching (`axum.workspace = true`) to the Cargo regex, mirrored in the web-signals block of both files (`all.md` already matched `[dependencies.axum]` tables, comment lines and `package = "axum"` renames before this PR), and replaced its single `docker-compose.yml` test with a loop over the four Compose filenames, and edited `agents/testing/app-discoverer.md` to list all four Compose names.
+- **Known false positives/negatives** (substring match on `pyproject.toml`, root-only files) are inherited from `setup:all` and left as-is. Compose filename variants and the Cargo regex were widened in the PR (see Drift check); a bare `warp = [...]` key under `[features]` can still match the Rust signal.
 
 ## Implementation Plan
 
@@ -39,7 +39,7 @@ Decisions (from SpecFlow review):
 
 ### Phase 2: Stale shell-env claim (yellow-research)
 
-- [x] 2.1: `setup.md:156` — change the `elif [ $has_env -eq 1 ]` message to `set (shell env only — MCP reads it via the start-*.sh fallback)`.
+- [x] 2.1: `setup.md:156` — change the `elif [ $has_env -eq 1 ]` message to say the MCP reads it via the start-*.sh fallback (shipped wording: `set (shell env; MCP uses it via the start-*.sh fallback unless a keychain userConfig key exists, which this check cannot see on macOS)`).
 - [x] 2.2: Rewrite the three `provider_detail` strings so a 401 on a shell-env key lists only real causes (expired/revoked key, wrong account); delete cause (b) and the "migrate to userConfig" instruction. Update the nearby comments.
 <!-- deepen-plan: codebase -->
 > **Codebase:** `resolve_mcp_key` makes userConfig win when both are set, but the curl probe runs whenever the shell var is non-empty (setup.md ~285). With both set, a 401 on the shell key says nothing about what the MCP uses. Word the 401 detail as "the shell key was rejected; if a userConfig key is also set, the MCP uses that instead", or gate it on `has_cfg` if it is in scope in those blocks.
@@ -75,7 +75,9 @@ Decisions (from SpecFlow review):
 
 ## Technical Details
 
-- Modify: `plugins/yellow-research/commands/research/setup.md`, `plugins/yellow-research/skills/research-patterns/SKILL.md`, `plugins/yellow-browser-test/commands/browser-test/setup.md`.
+- Modify: `plugins/yellow-research/commands/research/setup.md`, `plugins/yellow-research/skills/research-patterns/SKILL.md`, `plugins/yellow-browser-test/commands/browser-test/setup.md`, `plugins/yellow-browser-test/agents/testing/app-discoverer.md` (Compose names), `plugins/yellow-core/commands/setup/all.md` (sync comment, Cargo regex, Compose loop).
+- Create: `plugins/yellow-core/tests/web-app-signals.bats`.
+- Step 2.5 drops the `repo_top` guards, so the block works outside git; the browser-test Error Handling row at `:155` changed with it. In research `setup.md`, the precedence statuses also touched Step 2, Step 4, Step 5 and the Error Handling table.
 - Create: three changesets (yellow-research, yellow-browser-test, yellow-core).
 - Shell rules: no variable named `path` or `status`; use `>|` for overwrites; quote all expansions; no bash-only constructs.
 - No catalog, manifest or count changes.

@@ -85,12 +85,21 @@ and never auto-commits. The user decides what to do with the verdicts.
   prompt-level inside one orchestrator context — not isolated passes — and
   correctness is self-assessed until citation verification (`verify_finding()`)
   lands. `council-patterns` SKILL.md "Synthesis Contract (V2)" has the rules.
-  The staging directory's capability (path + random token) lives in
-  `.git/council-synth.state`, written only by 5a and never relayed through the
-  model; it does not stop a deliberate `Write` forgery, and one synthesis runs
-  per worktree. Validation, cleanup and that residual are in
-  `docs/security.md` "Synthesis staging directory (yellow-council)". The
-  `CLAUDE_FENCED_FILE` literal handoff still relays its path through the model.
+  The staging directory's capability lives in a shell-owned
+  `.git/council-synth.state`, one synthesis per checkout, though reclaiming a
+  stale state file can race a new run's claim and admit two syntheses in one
+  checkout (a millisecond window, recorded as a residual). The final unlink in
+  `council_rm_synth_state` is by pathname after validation, so a reclaim that
+  lands between the check and the `rm` can remove another run's fresh claim;
+  narrow, same class as the reclaim race. The Step 8 Cancel block also removes
+  the staging directory after a 5d-resume or 5e failure: it proves the directory
+  is this run's, attempts to release the claim, and only then removes the
+  directory. If the release fails, the claim can remain and block a later run
+  until it ages out. Validation, cleanup,
+  that race ("Known residual (stale-state reclaim race)"), the pathname-unlink
+  residual and the residual Write forgery are in `docs/security.md` "Synthesis staging directory
+  (yellow-council)". The `CLAUDE_FENCED_FILE` literal handoff still
+  relays its path through the model.
 - **Read-only invocation.** Reviewers must NOT use
   `--dangerously-skip-permissions` (agy, OpenCode) or
   `--sandbox workspace-write` (Codex). Read-only behavior is enforced via
@@ -246,8 +255,10 @@ without it. There is no fresh-machine install CI (see Known Limitations).
   when the slot returns and parses. If the in-process reviewer is cancelled or
   hangs, the `chmod` never executes and the file, holding RAW un-redacted
   review text, stays world-readable in `/tmp` until the age-gated sweep
-  reclaims it (`STALE_MINUTES=1440`, so up to 24 hours) or the OS reaps
-  `/tmp`. Closing this properly means minting the path inside a private
+  reclaims it or the OS reaps `/tmp`. The sweep removes only files older than
+  `STALE_MINUTES=1440` (24 hours is the eligibility threshold, not a maximum
+  retention) and runs only when a later `/council` invocation reaches Step 4.
+  Closing this properly means minting the path inside a private
   `mktemp -d`, which every path guard in `council.md` rejects on purpose —
   see the `chmod` site for why that trade was taken. On a multi-user host,
   cancel a hung `/council` and remove `/tmp/council-claude-fenced-*.txt`
