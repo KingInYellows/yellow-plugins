@@ -33,7 +33,8 @@ does both in the background; `/ruvector:setup` does them in the foreground.
   title (`Follow-up from PR #N: <path or "review">`), the resolver's
   `oos_reason`, a link to the thread, and a dedupe marker; the reviewer's
   comment text is never sent. Otherwise, or when Linear fails or its team
-  cannot be resolved, it files once on GitHub
+  cannot be resolved, it files once on GitHub and the report says so
+  (`tracker=github (linear unavailable)`).
 - **yellow-browser-test** — Uses `agent-browser` CLI locally, no MCP
 - **yellow-debt** — Pure local analysis, no network calls
 - **yellow-council** — Ships no MCP server. Three of its four reviewers are

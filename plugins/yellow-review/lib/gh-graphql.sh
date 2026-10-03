@@ -6,11 +6,11 @@
 
 # Longest rate-limit wait a caller may sleep before its single retry; a longer
 # wait exits 4 instead. This caps the wait only: reply-pr-thread's worst case is
-# three gh calls (the pre-check, the wait, then the retried call and the reply),
-# the wait and the pacing pause. GG_TIMEOUT is capped at GG_MAX_TIMEOUT, so the
-# worst case is bounded: 3 x 60 + 90 + 10 = 280 s, inside the 420000 ms Bash
-# tool timeout the write phase uses (references/resolve/dispositions.md,
-# "Bash timeouts").
+# three gh calls (the pre-check, the retried pre-check after a rate limit, and
+# the reply), one wait and the pacing pause. GG_TIMEOUT is capped at
+# GG_MAX_TIMEOUT, so the worst case is bounded: 3 x 60 + 90 + 10 = 280 s,
+# inside the 420000 ms Bash tool timeout the write phase uses
+# (references/resolve/dispositions.md, "Bash timeouts").
 GG_MAX_WAIT_SECONDS=90
 # Longest pause gg_pace will sleep after a call.
 GG_MAX_PACE_SECONDS=10
@@ -147,6 +147,6 @@ gg_rate_limit_wait() {
 gg_pace() {
     _gg_pace="${YELLOW_REVIEW_PACE_SECONDS:-1}"
     case "$_gg_pace" in ''|*[!0-9]*) _gg_pace=1 ;; esac
-    [ "${#_gg_pace}" -le 4 ] && [ "$_gg_pace" -le "$GG_MAX_PACE_SECONDS" ] || _gg_pace=$GG_MAX_PACE_SECONDS
+    [ "${#_gg_pace}" -le "$GG_MAX_DIGITS" ] && [ "$_gg_pace" -le "$GG_MAX_PACE_SECONDS" ] || _gg_pace=$GG_MAX_PACE_SECONDS
     sleep "$_gg_pace"
 }

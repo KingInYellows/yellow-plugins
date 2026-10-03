@@ -1,6 +1,6 @@
 #!/bin/bash
 # Poll for review threads that appeared after round 1 of /review:resolve.
-# Usage: poll-new-threads --wait <seconds> <owner/repo> <pr-number> <round1-ids-file> <out-file>
+# Usage: poll-new-threads --wait <seconds, at most 480> <owner/repo> <pr-number> <round1-ids-file> <out-file>
 #   --wait 0 fetches exactly once with no sleep. Otherwise the script sleeps
 #   min(20, remaining) seconds, fetches, and stops at the first fetch that
 #   shows a thread ID missing from <round1-ids-file> (one ID per line; blank
@@ -60,6 +60,9 @@ done
 [ $# -eq 4 ] || usage
 REPO="$1"; PR="$2"; ROUND1="$3"; OUT="$4"
 case "$WAIT" in ''|*[!0-9]*) usage ;; esac
+# At most 4 digits and 480 s, the cap the settings enforce: a longer value
+# would make the integer tests below error and the loop spin without sleeping.
+[ "${#WAIT}" -le 4 ] && [ "$WAIT" -le 480 ] || usage
 [ -r "$ROUND1" ] || { printf 'Error: round-1 file not readable: %s\n' "$ROUND1" >&2; exit 2; }
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)

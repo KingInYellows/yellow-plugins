@@ -126,6 +126,7 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String, $pageSize
           path
           line
           startLine
+          originalLine
           comments(first: 50) {
             totalCount
             nodes {
@@ -134,6 +135,7 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String, $pageSize
               body
               createdAt
               viewerDidAuthor
+              diffHunk
             }
           }
         }
@@ -310,7 +312,9 @@ OUTPUT=$(printf '%s' "$ALL_THREADS" | jq --argjson includeOutdated "$INCLUDE_OUT
         commentsTruncated: ((.comments.totalCount // 0) > ((.comments.nodes // []) | length)),
         isOutdated: (.isOutdated // false),
         viewerCanResolve: (.viewerCanResolve // false),
-        viewerCanReply: (.viewerCanReply // false)
+        viewerCanReply: (.viewerCanReply // false),
+        originalLine: (.originalLine // null),
+        diffHunk: ((.comments.nodes[0].diffHunk // null) | if type == "string" then .[0:2000] else null end)
       }
   ]') || {
     printf 'Error: Failed to transform GraphQL response.\n' >&2

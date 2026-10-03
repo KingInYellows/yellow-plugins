@@ -92,7 +92,7 @@ Linear.
 
 | Agent                 | Description                                |
 | --------------------- | ------------------------------------------ |
-| `pr-comment-resolver` | Implements fix for a single review comment |
+| `pr-comment-resolver` | Implements one fix per cluster of review comments and proposes a disposition for each thread (no Bash) |
 
 ## Skills
 
@@ -117,8 +117,6 @@ fetch, verify, commit and re-pass steps.
 | `get-pr-blockers` | `CHANGES_REQUESTED` reviewers and conversation-resolution enforcement |
 | `pr-changed-ranges` | Changed line ranges per file in the PR, for the in-diff check |
 | `file-line-counts` | Before/after line counts per changed file, for the thermonuclear-reviewer's size rule |
-| `run-verify-command` | Run the repository's verify command under a timeout, reverting on failure |
-| `commit-resolve-fixes` | Commit and submit the resolver's fixes through the enabled stack provider |
 | `reply-pr-thread` | Reply to a thread with an idempotency marker |
 | `resolve-pr-thread` | Resolve a single thread |
 | `file-followup-issue` | File or find the follow-up issue for an out-of-scope thread |

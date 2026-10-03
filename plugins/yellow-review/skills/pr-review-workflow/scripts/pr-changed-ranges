@@ -38,16 +38,12 @@ jq -r '
   | [ .filename,
       ( if (.patch // "") == "" then "unknown"
         else
-          [ .patch | split("\n")[]
-            | if startswith("@@") then {h: ((capture("\\+(?<s>[0-9]+)") | .s | tonumber))}
-              elif startswith("+") then {a: 1}
-              elif startswith("-") or startswith("\\") then {}
-              else {c: 1} end ]
-          | reduce .[] as $e ({n: 0, add: []};
-              if $e.h != null then .n = $e.h
-              elif $e.a != null then .add += [.n] | .n += 1
-              elif $e.c != null then .n += 1
-              else . end)
+          .patch | split("\n")
+          | reduce .[] as $l ({n: 0, add: []};
+              if ($l | startswith("@@")) then .n = ($l | capture("\\+(?<s>[0-9]+)") | .s | tonumber)
+              elif ($l | startswith("+")) then .add += [.n] | .n += 1
+              elif ($l | startswith("-") or startswith("\\")) then .
+              else .n += 1 end)
           | .add
           | reduce .[] as $x ([];
               if length > 0 and .[-1][1] == $x - 1 then .[-1][1] = $x

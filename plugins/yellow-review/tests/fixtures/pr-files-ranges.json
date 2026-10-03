@@ -1,0 +1,10 @@
+[
+  {
+    "filename": "src/run.ts",
+    "patch": "@@ -1,2 +1,5 @@\n ctx\n+one\n+two\n+three\n ctx2"
+  },
+  {
+    "filename": "src/nonl.ts",
+    "patch": "@@ -1,2 +1,2 @@\n ctx\n-old\n+new\n\\ No newline at end of file\n@@ -10,1 +10,2 @@\n ctx\n+late"
+  }
+]

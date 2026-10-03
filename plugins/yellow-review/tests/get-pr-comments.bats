@@ -130,6 +130,19 @@ teardown() {
   [ "$outdated" = "true" ]
 }
 
+@test "threads carry originalLine and a capped diffHunk, appended after the existing fields" {
+  export MOCK_GH_COMMENTS_FIXTURE=outdated-anchor-response.json
+  run "$SCRIPT" --include-outdated "test/repo" "500"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.[0].line')" = "null" ]
+  [ "$(printf '%s' "$output" | jq -r '.[0].originalLine')" = "42" ]
+  [ "$(printf '%s' "$output" | jq -r '.[0].diffHunk | length')" = "2000" ]
+  [[ "$(printf '%s' "$output" | jq -r '.[0].diffHunk')" == "@@ -40,3 +40,4 @@"* ]]
+  # A thread whose first comment has no hunk gets null, not an error.
+  [ "$(printf '%s' "$output" | jq -r '.[1].diffHunk')" = "null" ]
+  [ "$(printf '%s' "$output" | jq -c '.[0] | keys_unsorted[-2:]')" = '["originalLine","diffHunk"]' ]
+}
+
 @test "--include-outdated is accepted after the positional arguments" {
   run "$SCRIPT" "test/repo" "123" --include-outdated
   [ "$status" -eq 0 ]
@@ -333,6 +346,54 @@ teardown() {
   [ "$(printf '%s' "$output" | jq -r '.[].threadId')" = "PRRT_slow1" ]
   [[ "$(cat "$stderr_file")" == *"get-pr-comments: deadline reached"* ]]
   [[ "$(cat "$stderr_file")" != *"pagination limit"* ]]
+}
+
+# A timeout stub that lets page 1 through and kills every later call (exit 124),
+# logging the limit each later call was given. TIMEOUT_STUB_SLEEP delays the kill.
+stub_timeout_after_page1() {
+  mkdir -p "${BATS_TEST_TMPDIR}/tobin"
+  cat >| "${BATS_TEST_TMPDIR}/tobin/timeout" <<'EOS'
+#!/bin/sh
+n=$(( $(cat "$TIMEOUT_STUB_STATE" 2>/dev/null || echo 0) + 1 ))
+printf '%s' "$n" >| "$TIMEOUT_STUB_STATE"
+if [ "$n" -eq 1 ]; then shift; exec "$@"; fi
+printf '%s\n' "$1" >> "$TIMEOUT_STUB_LIMITS"
+sleep "${TIMEOUT_STUB_SLEEP:-0}"
+exit 124
+EOS
+  chmod +x "${BATS_TEST_TMPDIR}/tobin/timeout"
+  export PATH="${BATS_TEST_TMPDIR}/tobin:${PATH}"
+  export TIMEOUT_STUB_STATE="${BATS_TEST_TMPDIR}/timeout_state" TIMEOUT_STUB_LIMITS="${BATS_TEST_TMPDIR}/timeout_limits"
+  rm -f "$TIMEOUT_STUB_STATE" "$TIMEOUT_STUB_LIMITS" "${BATS_TEST_TMPDIR}/mock_gh_count_pr370"
+}
+
+@test "a gh call killed on page 2 before the deadline exits 1 with a timeout message" {
+  stub_timeout_after_page1
+  local stderr_file="${BATS_TEST_TMPDIR}/stderr_p2kill"
+  run bash -c "'$SCRIPT' test/repo 370 2>'$stderr_file'"
+  [ "$status" -eq 1 ]
+  [[ "$(cat "$stderr_file")" == *"gh timed out after"*"(page 2)"* ]]
+  [[ "$(cat "$stderr_file")" != *"deadline reached"* ]]
+}
+
+@test "a gh call killed on page 2 after the deadline passed is the deadline: exit 3 with the partial array" {
+  stub_timeout_after_page1
+  local stderr_file="${BATS_TEST_TMPDIR}/stderr_p2deadline"
+  TIMEOUT_STUB_SLEEP=2 YELLOW_REVIEW_FETCH_DEADLINE=1 run bash -c "'$SCRIPT' test/repo 370 2>'$stderr_file'"
+  # With a 1 s deadline the loop stops before page 2 unless the first page was fast;
+  # either way the outcome is the deadline, never a timeout error.
+  [ "$status" -eq 3 ]
+  [[ "$(cat "$stderr_file")" == *"deadline reached"* ]]
+  [ "$(printf '%s' "$output" | jq -r '.[0].threadId')" = "PRRT_slow1" ]
+}
+
+@test "from page 2 the per-call limit shrinks to the time the deadline has left" {
+  stub_timeout_after_page1
+  local stderr_file="${BATS_TEST_TMPDIR}/stderr_shrink"
+  MOCK_GH_SLEEP=2 YELLOW_REVIEW_FETCH_DEADLINE=4 run bash -c "'$SCRIPT' test/repo 370 2>'$stderr_file'"
+  [ "$status" -eq 1 ]
+  lim=$(head -n 1 "$TIMEOUT_STUB_LIMITS")
+  [ "$lim" -ge 1 ] && [ "$lim" -le 2 ]
 }
 
 @test "an invalid or oversized deadline falls back to the 270 s default" {

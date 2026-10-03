@@ -17,35 +17,8 @@
 set -eu
 
 usage_text() {
-    cat <<'HELP'
-Usage: resolve-pr-thread [-h|--help] <thread-node-id>
-
-Resolve one PR review thread (PRRT_ node id). Prints
-{"resolved": true, "threadId": "..."} on success; an already-resolved
-thread counts as success.
-
-Exit codes:
-  0  resolved (or already resolved)
-  1  other failure (including authentication)
-  2  usage error or invalid thread id
-  3  not found or not permitted; stderr has a reason=not-found or
-     reason=permission line
-  4  rate limited (one retry first; a required wait over 90 s skips it),
-     or a gh call timed out (not retried); stderr has a reason=rate-limit
-     or reason=timeout line
-
-Environment:
-  YELLOW_REVIEW_PACE_SECONDS     sleep after the call; default 1, invalid
-                                 values fall back to 1, capped at 10
-  YELLOW_REVIEW_RATE_LIMIT_WAIT  retry wait when no Retry-After or
-                                 x-ratelimit-reset header says; default 60,
-                                 over 90 exits 4; non-numeric or over 4
-                                 digits falls back to 60
-  YELLOW_REVIEW_GH_TIMEOUT       seconds per gh call; default 30, needs
-                                 timeout(1); 0, non-numeric or over 4
-                                 digits falls back to 30; a larger valid
-                                 value is clamped to 60
-HELP
+    printf 'Usage: resolve-pr-thread [-h|--help] <thread-node-id>\n'
+    printf 'Exit codes and environment: see the header of this script and references/resolve/dispositions.md.\n'
 }
 
 case "${1:-}" in
