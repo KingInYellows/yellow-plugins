@@ -1,0 +1,35 @@
+plugins/yellow-review/CLAUDE.md
+  s_79ab629205942a::t_f914d083a2415c 179,226-228,237-241
+plugins/yellow-review/README.md
+  s_79ab629205942a::t_725a5f6e3af6e6 162
+plugins/yellow-review/commands/review/resolve-stack.md
+  s_79ab629205942a::t_e0b6b9a77e7f54 180-195,275-294,313-319,368-371,374,406-409
+plugins/yellow-review/commands/review/sweep-all.md
+  s_79ab629205942a::t_9033a90fe821bb 226-233,236-240,251-256
+plugins/yellow-review/commands/review/sweep.md
+  s_79ab629205942a::t_6b8178be263a39 88-89,122-124,251-268
+plugins/yellow-review/skills/pr-review-workflow/references/local-scripts.md
+  s_79ab629205942a::t_ac7441b54a5a87 17-19,24-27
+plugins/yellow-review/skills/pr-review-workflow/scripts/guard-local-config
+  s_79ab629205942a::t_962088a20d5b7f 1-134
+plugins/yellow-review/tests/guard-local-config.bats
+  s_79ab629205942a::t_57347386273204 1-138
+plugins/yellow-review/tests/skill-content.bats
+  s_79ab629205942a::t_b2643c17221a52 490-528
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5a81d7f282b82e0c756502aae7db926fbbbc0c6f",
+  "prompts": {},
+  "sessions": {
+    "s_79ab629205942a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "af7c3a89-4c40-4dc4-bd49-8799be9e99c6",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
