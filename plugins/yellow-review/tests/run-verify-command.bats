@@ -1489,7 +1489,11 @@ cap_boundary_command() {
   run ! grep -q 'withheld' "$log"
   [ "$(wc -c <"$log")" -le 1048576 ]
   [ "$(wc -c <"$log")" -gt 1040000 ]
-  [ "$(head -n 1 "$log")" = '  lowentropyvalue' ]
+  # The published tail starts on a whole line: the value line when the cut lands exactly on it,
+  # otherwise a complete 1023-character filler line (a partial first line is dropped). Which of
+  # the two depends on byte-exact stream alignment, so accept either.
+  first=$(head -n 1 "$log")
+  [ "$first" = '  lowentropyvalue' ] || [ "${#first}" -eq 1023 ]
   tail -n 1 "$log" | grep -q 'done-marker$'
   [ "$(mode "$log")" = 600 ]
   [ -z "$(find "$STREAM_TMP" -mindepth 1)" ]
