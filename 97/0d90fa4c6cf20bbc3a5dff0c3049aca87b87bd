@@ -1,0 +1,27 @@
+plans/specs/docs-debt-and-delegation-borrows.md
+  s_19981440458bca::t_a7e8a793fc1cac 92-93
+  s_19981440458bca::t_d5b4ef207d3c5b 119-121
+plans/specs/yellow-core-loop-work-integrity.md
+  s_19981440458bca::t_59af433d914f07 136
+  s_19981440458bca::t_1a815eedc094da 53
+plans/specs/yellow-council-v3-multi-round.md
+  s_19981440458bca::t_88c3742469970a 31
+  s_19981440458bca::t_005173f339c06c 80-81
+  s_19981440458bca::t_ab20cdf4be161b 52-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "970d90fa4c6cf20bbc3a5dff0c3049aca87b87bd",
+  "prompts": {},
+  "sessions": {
+    "s_19981440458bca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "74820cce-4cfb-4b65-9b63-0ecd4a17dcd5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
