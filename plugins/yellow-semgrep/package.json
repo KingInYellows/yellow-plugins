@@ -1,6 +1,6 @@
 {
   "name": "yellow-semgrep",
-  "version": "4.2.4",
+  "version": "4.2.5",
   "private": true,
   "description": "Semgrep security finding remediation for Claude Code"
 }
