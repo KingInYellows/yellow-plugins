@@ -85,7 +85,7 @@ Scope is all 13 steps. Each step is one PR with its own changeset, stays within 
 | B — review pipeline (yellow-review) | 5 grounding gate; 13(a) `get-pr-comments` fields + `reply-pr-thread`; 13(b) disposition contract + step 7 ownership check; 13(c) loop; step-12 repro-required "Confirmed" (debugging skill, correctness-reviewer) |
 | Council V3 (after v2 shells 04/05) | 11 prior-round context, anti-escalation, corrections-only addendum, `opencode serve` |
 | C — authoring tooling and context budget | baseline + listing-budget measurement; 8 trigger evals; step-12 `disable-model-invocation` pass; fix `create-agent-skills/SKILL.md:83,95` |
-| D — docs, debt and delegation | 9 `sources`/`verified_at`; 10 debt ratchet + pin inventory (covers step 8's provenance file); step-12 borrows: dependency rubric (security-sentinel), coding brief (`/devin:delegate`), runner detection + `--verify` (`/setup:claude-web`), consent and verbatim rules (session-handoff), diagram citation file-existence check (diagram-architect), `--help` discovery for repo scripts |
+| D — docs, debt and delegation | 9 `sources`/`verified_at`; 10 debt ratchet + pin inventory (behaviour-pinning tests before a debt refactor, not upstream pins); step-12 borrows: dependency rubric (security-sentinel), coding brief (`/devin:delegate`), runner detection + `--verify` (`/setup:claude-web`), consent and verbatim rules (session-handoff), diagram citation file-existence check (diagram-architect), `--help` discovery for repo scripts |
 | Direct PRs | 2 docs notes; 3 spike + follow-up PR |
 
 ### Resolved open questions

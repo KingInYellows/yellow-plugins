@@ -107,7 +107,7 @@ This spec covers roadmap step 8 (trigger evals), the step-12 `disable-model-invo
   - `vendor/anthropics/skill-creator-evals/` holds `PROVENANCE.json`, validated by a small ajv schema under `schemas/`.
   - Add a row in `docs/upstream-pins.md` with a monthly sync owner.
   - Add the R12 hash check in `scripts/check-upstream-pins.js`, with a fixture test in `tests/integration/check-upstream-pins.test.ts`.
-  - Spec D's pin inventory covers this provenance file.
+  - R12 is the only check on this provenance file. Spec D's "pin inventory" is a different thing: the tests that pin behaviour before a debt refactor.
 - **Eval sets (R9, R10).**
   - Each set is `evals/<plugin>/<component>/cases.jsonl`, one object per line: `{query, should_trigger, split}`.
   - Pick the three seeds from yellow-core, covering a skill and a command with distinct trigger phrases. One should be a component with a known near-miss sibling (for example `optimize` against `/flow:review`).
@@ -136,7 +136,7 @@ Edit `create-agent-skills/SKILL.md` at the frontmatter table (lines 83 and 95) a
 | `docs/research/2026-10-integration-baseline.md` | R1–R3, R5, R18 | maintainer; Specs A, B, D targets |
 | `scripts/report-description-budget.js` | R4 | R1, R18 re-measurement |
 | `scripts/eval-skill-trigger.sh` + `evals/` | R6, R8–R10 | maintainer before description PRs (R11), R18 |
-| `vendor/anthropics/skill-creator-evals/` (conditional) | R7, R12 | runner; check-upstream-pins; Spec D pin inventory |
+| `vendor/anthropics/skill-creator-evals/` (conditional) | R7, R12 | runner; check-upstream-pins |
 | Description-change advisory | R11 | PR authors |
 | create-agent-skills edits | R14, R15 | skill and command authors |
 | Validator rule | R16 | R17 pass; future authors |
