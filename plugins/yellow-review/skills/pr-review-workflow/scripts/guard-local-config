@@ -1,0 +1,134 @@
+#!/bin/bash
+# Snapshot, check and restore the untracked trusted-config files that a
+# resolver edit must never leave behind. `git status` cannot see them: they are
+# gitignored, so a resolver edit to yellow-plugins.local.md (whose
+# resolve_pr.verify_command a later unattended run executes) leaves a clean
+# tree and passes every clean-tree check.
+# Usage: guard-local-config snapshot
+#        guard-local-config check <snap-dir>
+#        guard-local-config clear <snap-dir>
+#   snapshot: record each guarded file's state (a regular file's bytes, a
+#             symlink's target, or absence) in a private mktemp directory and
+#             print its path. Exit 2 when a guarded path is a directory or
+#             another special file, because it cannot be restored.
+#   check:    compare each guarded path with the snapshot. A path that changed
+#             is put back from the snapshot (a created file is deleted), then
+#             compared again. Prints `changed: <path>` per path that differed.
+#   clear:    remove the snapshot directory.
+# Exit codes: 0 nothing changed, 3 something changed and every path was
+#   restored, 4 a path could not be restored (stop; the file is tampered),
+#   2 usage, unsafe snapshot directory or a path that cannot be guarded.
+# Guarded paths (repository root): yellow-plugins.local.md.
+# Callers: /review:resolve-stack (Step 2b snapshot, item 3b check, Step 4 clear).
+
+set -uo pipefail
+
+GUARDED=(yellow-plugins.local.md)
+
+die() { printf '[guard-local-config] Error: %s\n' "$2" >&2; exit "$1"; }
+usage() {
+    printf 'Usage: guard-local-config snapshot | check <snap-dir> | clear <snap-dir>\n' >&2
+    exit 2
+}
+
+[ $# -ge 1 ] || usage
+CMD="$1"
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
+TMP_ROOT="${TMPDIR:-/tmp}"
+TMP_ROOT="${TMP_ROOT%/}"
+
+# The directory must be one this script minted: directly under the temp root,
+# named resolve-guard.<suffix>, owned by the caller and not a symlink.
+valid_dir() {
+    local d="$1" rest
+    rest="${d#"$TMP_ROOT"/}"
+    case "$rest" in
+        "$d"|*/*|*..*) return 1 ;;
+        resolve-guard.?*) ;;
+        *) return 1 ;;
+    esac
+    [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ]
+}
+
+# state_of <path>: file | absent | symlink:<target> | other
+state_of() {
+    if [ -L "$1" ]; then
+        printf 'symlink:%s\n' "$(readlink -- "$1")"
+    elif [ -f "$1" ]; then
+        printf 'file\n'
+    elif [ ! -e "$1" ]; then
+        printf 'absent\n'
+    else
+        printf 'other\n'
+    fi
+}
+
+# same_as_snapshot <index> <path>
+same_as_snapshot() {
+    local i="$1" p="$2" want now
+    want=$(cat -- "$SNAP/state.$i") || return 1
+    now=$(state_of "$p")
+    [ "$want" = "$now" ] || return 1
+    if [ "$want" = file ]; then
+        cmp -s -- "$p" "$SNAP/copy.$i" || return 1
+    fi
+    return 0
+}
+
+case "$CMD" in
+    snapshot)
+        [ $# -eq 1 ] || usage
+        SNAP=$(mktemp -d "$TMP_ROOT/resolve-guard.XXXXXX") || die 2 "could not create the snapshot directory"
+        i=0
+        for rel in "${GUARDED[@]}"; do
+            p="$TOP/$rel"
+            st=$(state_of "$p")
+            if [ "$st" = other ]; then
+                rm -rf -- "$SNAP"
+                die 2 "cannot guard $rel: it is not a regular file, a symlink or absent"
+            fi
+            printf '%s\n' "$st" >|"$SNAP/state.$i"
+            if [ "$st" = file ]; then
+                cp -p -- "$p" "$SNAP/copy.$i" || { rm -rf -- "$SNAP"; die 2 "could not copy $rel"; }
+            fi
+            i=$((i + 1))
+        done
+        printf '%s\n' "$SNAP"
+        ;;
+    check)
+        [ $# -eq 2 ] || usage
+        SNAP="$2"
+        valid_dir "$SNAP" || die 2 "snapshot directory rejected: $SNAP"
+        changed=0
+        failed=0
+        i=0
+        for rel in "${GUARDED[@]}"; do
+            p="$TOP/$rel"
+            if ! same_as_snapshot "$i" "$p"; then
+                changed=1
+                printf 'changed: %s\n' "$rel"
+                want=$(cat -- "$SNAP/state.$i")
+                rm -rf -- "$p" 2>/dev/null
+                case "$want" in
+                    file) cp -p -- "$SNAP/copy.$i" "$p" 2>/dev/null ;;
+                    symlink:*) ln -s -- "${want#symlink:}" "$p" 2>/dev/null ;;
+                    absent) : ;;
+                esac
+                if ! same_as_snapshot "$i" "$p"; then
+                    failed=1
+                    printf 'restore failed: %s\n' "$rel"
+                fi
+            fi
+            i=$((i + 1))
+        done
+        [ "$failed" = 0 ] || exit 4
+        [ "$changed" = 0 ] || exit 3
+        ;;
+    clear)
+        [ $# -eq 2 ] || usage
+        SNAP="$2"
+        valid_dir "$SNAP" || die 2 "snapshot directory rejected: $SNAP"
+        rm -rf -- "$SNAP"
+        ;;
+    *) usage ;;
+esac
