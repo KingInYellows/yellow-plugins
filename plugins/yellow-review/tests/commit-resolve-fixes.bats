@@ -149,7 +149,9 @@ STUB
   [ "$(git log -1 --format=%s)" = "$MSG" ]
   [ "$(git show --name-only --format= HEAD | sort | tr '\n' ' ')" = "src/a.txt src/b.txt " ]
   [ -z "$(git status --porcelain)" ]
-  grep -q '^gt submit --no-interactive --no-edit$' "$STUB_LOG"
+  # --stack publishes the upstack that the commit restacked locally.
+  grep -q '^gt submit --stack --no-interactive --no-edit$' "$STUB_LOG"
+  ! grep -q '^gt submit --no-interactive' "$STUB_LOG"
 }
 
 @test "refuses a leading-dash filename (exit 2) and commits nothing" {

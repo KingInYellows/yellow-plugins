@@ -52,6 +52,12 @@ THREAD <PRRT_id> | disposition=<fixed|addressed|oos|disagree|unclear> | evidence
   patterns below first, and file lists are written to a file with the
   Write tool and passed with `--files-from` (a flag of the planned
   `commit-resolve-fixes` and `run-verify-command`).
+- **Resolver read bounds.** The resolver's Read, Grep and Glob are limited
+  to the working tree and exclude the secret-bearing paths its agent file
+  lists (`.env*`, key and certificate files, `secrets.*`, `.git/`, `.ssh/`,
+  `.aws/`, `.npmrc`, `yellow-plugins.local.md`). The deny list is a rule for
+  the resolver, not a runtime block, so the prose allowlist below stays the
+  enforcement: `evidence` and `oos_reason` never carry file content.
 - **Prose allowlist.** This is the single source. Replies and issue bodies
   embed `evidence` and `oos_reason`, so the orchestrator checks both values
   before any reply, issue or resolve helper runs. A value is accepted only
@@ -93,7 +99,11 @@ The orchestrator turns a proposed disposition into `unclear` when:
   disposition becomes `unclear` with evidence `comments truncated (<n> of
   <commentCount> fetched)`;
 - `oos` has an empty `oos_reason` in an unattended run, the interactive user
-  declined the issue, or the thread is over the issue cap.
+  declined the issue, or the thread is over the issue cap;
+- the cluster was dispatched with `PR-changed lines` `unknown` and the
+  proposal is `oos`: it becomes `unclear` with evidence `PR ranges
+  unavailable`, so an unreadable files API never files an issue or resolves a
+  thread.
 
 Skipped reasons from the resolver map as follows:
 
@@ -251,7 +261,9 @@ phase failed.
    optional `verify_command` (`run-verify-command`), then stage and commit
    (`commit-resolve-fixes`). See Verify below.
 2. **Phase B, remote.** Submit and verify the head (`commit-resolve-fixes`
-   does both). Graphite pushes to `gt repo remote` (default `origin`), so the
+   does both). On Graphite the submit is `--stack`: the commit restacked the
+   upstack branches locally, and publishing them keeps the next PR's head
+   check (Step 2c) from refusing a stack walk. Graphite pushes to `gt repo remote` (default `origin`), so the
    head is verified there when it names a configured remote, else through the
    git chain below. The GitHub runtime gets `--remote` only for
    `branch.<name>.pushRemote`, `remote.pushDefault` or a sole remote; with
@@ -666,7 +678,8 @@ any failure, usage included.
 Report exit 3 as `needs permission` only for `reason=permission`, and as
 `not found` for `reason=not-found`; both leave the thread open (blocking).
 
-`pr-changed-ranges` exits 1 on a fetch failure (the caller passes `unknown`)
+`pr-changed-ranges` exits 1 on a fetch failure (the caller passes `unknown`,
+and every resolver proposal for that cluster is `unclear`, never `oos`)
 and 2 on usage. `poll-new-threads` exits 4 on a rate limit and 2 on usage.
 
 `get-pr-comments` exits 1 on any failure (usage included, and a `gh` call

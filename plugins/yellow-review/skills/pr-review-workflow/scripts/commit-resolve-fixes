@@ -58,8 +58,12 @@
 # (no validator scans scripts, so change both together):
 #   commitOrAmend  graphite `gt modify -c -m` (registry: `gt modify -m`, plus
 #                  -c for a new commit); github `git commit -m`
-#   submitStack    graphite `gt submit --no-interactive` (+ --no-edit);
-#                  github runtime `submit` (the runtime adds --auto itself)
+#   submitStack    graphite `gt submit --no-interactive` (+ --stack, --no-edit:
+#                  `gt modify -c` restacked the upstack locally, and a submit
+#                  of the current branch alone leaves every later PR's local
+#                  head ahead of its remote, which the next PR's head check
+#                  refuses); github runtime `submit` (the runtime adds --auto
+#                  itself and submits the whole stack)
 #   rebaseUpstack  graphite `gt restack --upstack` (registry: `gt restack`; the
 #                  flag limits it to the branches above the reset one)
 #   abortConflict  graphite `gt abort`
@@ -521,9 +525,12 @@ fi
 # --- Submit ---
 case "$PROVIDER" in
     graphite)
-        # No --update-only: it has not been shown to leave the set of
-        # submitted stack branches unchanged, and the PR already exists.
-        bounded "$SUBMIT_TIMEOUT" gt submit --no-interactive --no-edit >&2 \
+        # --stack publishes the upstack branches that `gt modify -c` restacked
+        # onto the new commit; without it they stay local-only and the next PR
+        # in a stack walk fails its head check. No --update-only: it has not
+        # been shown to leave the set of submitted stack branches unchanged,
+        # and the PR already exists.
+        bounded "$SUBMIT_TIMEOUT" gt submit --stack --no-interactive --no-edit >&2 \
             || die 5 "gt submit failed or timed out after ${SUBMIT_TIMEOUT}s"
         ;;
     github)
