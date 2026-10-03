@@ -1,0 +1,22 @@
+plans/specs/yellow-review-grounding-and-resolve-loop.md
+  s_19981440458bca::t_b316bedaf43865 26
+  s_19981440458bca::t_62d3c7569404f1 199-204
+plans/specs/yellow-core-loop-work-integrity.md
+  s_19981440458bca::t_6ea75537c801f1 192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5776f4e0952b8937d181092a29c31bdcb26391fa",
+  "prompts": {},
+  "sessions": {
+    "s_19981440458bca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "74820cce-4cfb-4b65-9b63-0ecd4a17dcd5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
