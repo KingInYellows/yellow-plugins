@@ -117,6 +117,33 @@ stub_sleep() {
   [ ! -f "$CALLS" ]
 }
 
+@test "a prior unclear marker does not block a fixed reply" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_priorunclear fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.replied, .threadId]')" = '[true,"PRRT_reply_priorunclear"]' ]
+  [ "$(tail -n 1 "$POSTED")" = "<!-- yellow-review:resolve v1 thread=PRRT_reply_priorunclear disposition=fixed -->" ]
+}
+
+@test "a prior disagree marker does not block an addressed or oos reply" {
+  for d in addressed oos; do
+    rm -f "$POSTED" "$CALLS"
+    run --separate-stderr "$SCRIPT" PRRT_reply_priordisagree "$d" "$BODY"
+    [ "$status" -eq 0 ]
+    [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
+    [ "$(tail -n 1 "$POSTED")" = "<!-- yellow-review:resolve v1 thread=PRRT_reply_priordisagree disposition=$d -->" ]
+  done
+}
+
+@test "a prior unclear marker still skips an unclear or disagree reply" {
+  for d in unclear disagree; do
+    rm -f "$POSTED" "$CALLS"
+    run --separate-stderr "$SCRIPT" PRRT_reply_priorunclear "$d" "$BODY"
+    [ "$status" -eq 0 ]
+    [ "$(printf '%s' "$output" | jq -c '[.replied, .skipped, .disposition]')" = '[false,"already-replied","unclear"]' ]
+    [ ! -f "$CALLS" ]
+  done
+}
+
 @test "a marker quoted in a reviewer comment does not cause a skip" {
   run --separate-stderr "$SCRIPT" PRRT_reply_spoof fixed "$BODY"
   [ "$status" -eq 0 ]

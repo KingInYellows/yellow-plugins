@@ -333,11 +333,20 @@ are capped at 540 and 480 seconds.
 
 `reply-pr-thread` reads the thread's last comment before posting. When that
 comment was authored by the viewer (`viewerDidAuthor`) and ends with a
-marker for the same thread, whatever its disposition, it skips the reply
-(`already-replied`), reports the posted marker's disposition in the skip
-JSON, and the orchestrator retries only the resolve (when the lane allows
-it). A re-run right after our reply therefore never posts a second,
-contradicting reply. Any comment after ours, including a bot's
+marker for the same thread, it skips the reply (`already-replied`) and
+reports the posted marker's disposition in the skip JSON. A re-run right
+after our reply therefore never posts a second, contradicting reply. Two
+rules follow:
+
+- Upgrade: a prior `disagree` or `unclear` marker does not block a `fixed`,
+  `addressed` or `oos` reply. That reply carries the evidence the resolve
+  needs, so it is posted.
+- Compare before resolving: after a skip, the orchestrator retries the
+  resolve (when the lane allows it) only if the reported `disposition`
+  equals the one it asked for. Any other posted disposition leaves the
+  thread open and is reported as `reply posted as <d> (open)`.
+
+Any comment after ours, including a bot's
 acknowledgement, makes the marker no longer last, so the thread is processed
 again; ignoring such later replies is not implemented.
 
