@@ -457,6 +457,15 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   grep -q 'Edit bounds' "$RESOLVE_REFS/clusters.md"
 }
 
+@test "resolver agent: a read deny list names secret paths and bars quoting file content" {
+  text=$(flat "$RESOLVER_AGENT")
+  [[ "$text" == *'Read, Grep or Glob secrets, credentials or files outside the repository'* ]]
+  [[ "$text" == *'`.env`, `.env.*`, `*.pem`, `*.key`'* ]]
+  [[ "$text" == *'they name a `path:line` and never copy file content'* ]]
+  disp=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$disp" == *'**Resolver read bounds.**'* ]]
+}
+
 @test "resolve-pr: Step 5 cancel reverts the unscreened edits and Step 6 drops unchanged paths from the file set" {
   step5=$(sed -n '/^### Step 5: Dispositions/,/^### Step 6/p' "$RESOLVE_PR")
   printf '%s\n' "$step5" | tr '\n' ' ' | tr -s ' ' | grep -q 'Cancel runs `run-verify-command --pr "<PR#>" --revert-dirty`'
@@ -488,15 +497,19 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   text=$(flat "$RESOLVER_AGENT")
   # The old exception (edit the cluster File when PR files is unknown) must be gone.
   [[ "$text" != *"edit only the cluster's \`File\`"* ]]
-  # Both surviving rules say: unknown means no edit and oos.
-  [[ "$text" == *'(when it is `unknown`, edit nothing and propose `oos`)'* ]]
-  [[ "$text" == *'When the bound is `none`, `unknown` or absent'* ]]
+  # Both surviving rules say: unknown means no edit and unclear, never oos.
+  [[ "$text" == *'(when it is `unknown`, edit nothing and propose `unclear`)'* ]]
+  [[ "$text" == *'When the bound is `none` or absent'* ]]
   [[ "$text" == *'do not edit: propose `oos` for the thread'* ]]
+  [[ "$text" == *'propose `unclear` with evidence `PR ranges unavailable`, never `oos`'* ]]
   clusters=$(flat "$RESOLVE_REFS/clusters.md")
-  [[ "$clusters" == *'When the value is `none` or `unknown`'* ]]
-  [[ "$clusters" == *'the resolver edits nothing and proposes `oos`'* ]]
+  [[ "$clusters" == *'When the value is `none`, or the path has no range'* ]]
+  [[ "$clusters" == *'When the value is `unknown`'* ]]
+  [[ "$clusters" == *'proposes `unclear` with evidence `PR ranges unavailable`'* ]]
   text=$(flat "$RESOLVE_PR")
-  [[ "$text" == *'pass `unknown` for both, so the resolver edits nothing and proposes `oos`'* ]]
+  [[ "$text" == *'pass `unknown` for both, so the resolver edits nothing and proposes `unclear`'* ]]
+  disp=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$disp" == *'`PR-changed lines` `unknown` and the proposal is `oos`: it becomes `unclear`'* ]]
 }
 
 @test "dispositions: a reused Linear hit passes the same response checks as save_issue" {

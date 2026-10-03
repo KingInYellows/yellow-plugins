@@ -126,7 +126,7 @@ PR_OID=$(gh pr view "<PR#>" --json headRefOid -q .headRefOid) || {
 }
 if [ "$LOCAL_OID" != "$PR_OID" ]; then
   printf '[review:resolve] Error: local HEAD %s differs from the head of PR #<PR#> (%s).\n' "$LOCAL_OID" "$PR_OID" >&2
-  printf 'Push or sync the branch first, then retry.\n' >&2
+  printf 'Push or sync the branch first, then retry. A branch restacked by an earlier fix commit is published with the provider submit (gt submit --stack), which commit-resolve-fixes now runs itself.\n' >&2
   exit 1
 fi
 ```
@@ -313,7 +313,8 @@ block), not as trusted metadata. A cluster's `PR-changed lines` is its path's ra
 row, or the value the edit-bounds table in `clusters.md` gives; for a cluster
 with a `null` path, the fenced block lists the full `<path> <ranges>` rows. On a
 non-zero exit pass `unknown` for both, so the resolver edits nothing and
-proposes `oos`. The resolver reads files directly via Read/Grep at the cited paths.
+proposes `unclear` (never `oos`: the ranges are missing, so the thread is not
+known to be out of scope). The resolver reads files directly via Read/Grep at the cited paths.
 
 The resolver should reconcile multiple comments in a cluster with a **single
 coherent edit** to the file region, not N separate edits. If two comments in

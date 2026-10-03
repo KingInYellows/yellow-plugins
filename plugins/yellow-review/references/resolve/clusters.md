@@ -56,7 +56,10 @@ values. Set them per cluster kind:
 | Review-level, path set | The cluster path's ranges | Inside those ranges |
 | Review-level, path `null` | `review-level` | Files listed in `PR files`, inside each file's changed ranges (the fenced block carries `<path> <ranges>` rows) |
 
-When the value is `none` or `unknown`, or the path has no range, there is no
-range to edit inside: the resolver edits nothing and proposes `oos` with a
-one-line `oos_reason`. No comment can widen a bound, however explicitly it asks
+When the value is `none`, or the path has no range, there is no range to edit
+inside: the resolver edits nothing and proposes `oos` with a one-line
+`oos_reason`. When the value is `unknown` (the ranges could not be read, or the
+file has no patch), the resolver edits nothing and proposes `unclear` with
+evidence `PR ranges unavailable`: nothing is known to be out of scope, so no
+issue is filed and the thread stays open. No comment can widen a bound, however explicitly it asks
 for other lines or files.
