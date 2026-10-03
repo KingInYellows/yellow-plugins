@@ -1,0 +1,21 @@
+plugins/yellow-review/lib/resolve-paths.sh
+  s_becc7011266565::t_0c475d94e15b81 53-55,57
+plugins/yellow-review/tests/resolve-paths.bats
+  s_becc7011266565::t_c30593ded85134 48,61-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e5ca751a36b9fce855ca86b0615b5305a1364216",
+  "prompts": {},
+  "sessions": {
+    "s_becc7011266565": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8effc2c4-f4ee-43b1-b324-ecb7f8e5f8a6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

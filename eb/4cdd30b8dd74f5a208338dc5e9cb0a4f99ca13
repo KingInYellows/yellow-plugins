@@ -1,0 +1,52 @@
+plugins/yellow-review/lib/verify-run.sh
+  s_7a82748dd606d9::t_87db7eff289c18 106-113,115-116
+  s_7a82748dd606d9::t_6848d3c066b9e3 169
+  s_7a82748dd606d9::t_0d701ec3c9e049 127
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  s_7a82748dd606d9::t_e43fb8a39bc7c4 345-351,356-357
+  s_7a82748dd606d9::t_e7b70bf35a9dda 209-214,216
+  s_7a82748dd606d9::t_b7073b5bbc26b1 361-373
+  s_7a82748dd606d9::t_9fb37b9c19c8f6 67-78
+  s_7a82748dd606d9::t_8c7c586631ea65 255-270,273-274,277,281-283,286,291-301
+  s_7a82748dd606d9::t_ac252a5fe958ab 28-30
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_7a82748dd606d9::t_00248e520ef718 68-73
+  s_7a82748dd606d9::t_a43c6e6a44dcf3 351-354
+plugins/yellow-review/tests/run-verify-command.bats
+  s_7a82748dd606d9::t_fa2f46e3c6a98a 1164-1196
+plugins/yellow-review/lib/resolve-paths.sh
+  s_7a82748dd606d9::t_851ce03d92cc2e 248-250
+  s_7a82748dd606d9::t_30eb26b514ed20 103
+  s_7a82748dd606d9::t_6e49d28f34f98a 219-231,233-247,251-256
+  s_7a82748dd606d9::t_c1f3be28dd1115 119-121
+  s_7a82748dd606d9::t_1e8eddc22cb1d6 62-89
+  s_7a82748dd606d9::t_4a77f75007f40f 122-127
+  s_7a82748dd606d9::t_336d558e46b2b7 232
+plugins/yellow-review/tests/helpers/resolve-repo.bash
+  s_7a82748dd606d9::t_9f86005fdee60b 15
+  s_7a82748dd606d9::t_5dbc1c1d01dd3b 169,171
+  s_7a82748dd606d9::t_2e719072480379 168,170,173,175
+plugins/yellow-review/lib/resolve-text.sh
+  s_7a82748dd606d9::t_bb059126706714 12
+  s_7a82748dd606d9::t_508b5c76de3e40 100-104
+plugins/yellow-review/tests/commit-resolve-fixes.bats
+  s_7a82748dd606d9::t_db4eaece056ab8 925-1159
+plugins/yellow-review/tests/resolve-paths.bats
+  s_7a82748dd606d9::t_e61db50503657d 312-424
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "eb4cdd30b8dd74f5a208338dc5e9cb0a4f99ca13",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
