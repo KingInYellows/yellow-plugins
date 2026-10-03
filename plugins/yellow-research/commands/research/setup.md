@@ -890,12 +890,14 @@ them; if the Perplexity visibility check finds the MCP UNAVAILABLE, treat the
 key as inactive for the summary. `UNVERIFIED (shell key rejected; …)` and
 `UNVERIFIED (shell key passed; …)` also do not count as active (the effective
 key is unconfirmed) and are not `INVALID`. For Perplexity, both end with
-`; pending MCP-visibility confirmation`. When Step 3.5 finds the MCP tools, each
-becomes `PRESENT (validated via MCP startup — effective credential source
-unconfirmed; reflects the key as of the MCP's last start)`. ToolSearch confirms
-that the MCP started with a key, not whether it came from userConfig, keychain
-or shell. It counts as active only if the key was not changed this session;
-otherwise it stays pending and inactive.
+`; pending MCP-visibility confirmation`. When Step 3.5 finds the MCP tools, the
+passed status becomes `PRESENT (validated via MCP startup — effective credential
+source unconfirmed; reflects the key as of the MCP's last start)`. It counts as
+active only if the key was not changed this session; otherwise it stays pending
+and inactive. The rejected status never counts as active on visibility alone:
+the MCP may have started before the key was revoked, so it stays `UNVERIFIED
+(shell key rejected; …)` with the note "MCP started with a key whose source is
+unconfirmed; restart Claude Code and re-run to verify".
 
 Counts:
 
