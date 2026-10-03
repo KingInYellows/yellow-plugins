@@ -1,0 +1,25 @@
+plans/review-resolve-hardening.md
+  s_79ab629205942a::t_fa124060c34089 233-234,807
+plugins/yellow-review/CLAUDE.md
+  s_79ab629205942a::t_36158f8c65fb83 220-221
+plugins/yellow-review/lib/resolve-text.sh
+  s_79ab629205942a::t_7278f54f15e8ae 117-123,428-432,438-444,449,456-461
+plugins/yellow-review/tests/check-resolve-text.bats
+  s_79ab629205942a::t_a2e3758b7a5a82 334-358,492,506
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a86898f7f2f69db1143128f1fad02d1abd6fd268",
+  "prompts": {},
+  "sessions": {
+    "s_79ab629205942a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "af7c3a89-4c40-4dc4-bd49-8799be9e99c6",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
