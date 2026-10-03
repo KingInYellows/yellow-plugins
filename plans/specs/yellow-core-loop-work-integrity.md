@@ -21,13 +21,19 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 
 - **R1.** When the Stop hook fires with `stop_hook_active: true`, the system shall capture the transcript tail exactly as it does for a non-re-entrant stop, regardless of which loop driver caused the continuation.
   - Acceptance: `tests/compound-stop-hook.bats` case "stop hook exits when stop_hook_active is true" is replaced by a case asserting one pending entry exists for the session.
-- **R2.** When a capture for a session finishes, the system shall keep at most one pending entry per session, and the entry shall always be the one with the longest transcript seen for that session. A capture shall not write when a per-session high-water mark of `transcript_lines` is already at or above its own, so an out-of-order subshell cannot overwrite or re-create a stale entry, including after the drain has consumed a newer one. The compare and the write shall run under a per-session lock, so two overlapping captures cannot both pass the check.
+- **R2.** When a capture for a session finishes, the system shall keep at most one pending entry per session, and the entry shall always be the one with the longest transcript seen for that session. A capture shall not write when a per-session high-water mark of `transcript_lines` is already at or above its own, so an out-of-order subshell cannot overwrite or re-create a stale entry, including after the drain has consumed a newer one. The compare, the mark update and the write shall run under a per-session lock, so two overlapping captures cannot both pass the check. Only the capture that took the lock may release it. A capture that cannot take the lock within the wait shall abandon without writing.
+  - Residual: the mark is written before the entry, so a capture that dies between the two is lost, and the pending entry keeps an earlier tail. This is chosen over the reverse order, which can recreate a stale entry after the drain consumes a newer one.
   - Acceptance:
     - A bats case runs two captures for one session, the later one with a longer transcript, in reverse completion order. The pending entry holds the longer tail.
     - A bats case runs the longer capture, moves its entry to `processing/` (as the drain does), then runs the shorter capture. No new pending entry exists.
     - A bats case starts two captures for one session concurrently (backgrounded, released together, repeated at least 20 times). Every run ends with the longer tail as the only pending entry.
-- **R23.** When the drain holds entries for the same session in `pending/` and `processing/`, the system shall keep only the entry with the greatest `transcript_lines` and discard the others as superseded, in addition to the `content_hash` dedupe. Entries without the field compare as 0. An entry already promoted by an earlier drain pass is not retracted.
-  - Acceptance: a fixture with an early entry in `processing/` and a later, longer entry in `pending/` for one session yields one promoted entry, the longer one.
+    - A bats case holds the lock with a live owner and runs a capture with a short wait. The capture writes nothing, leaves the mark unchanged and leaves the holder's lock intact.
+    - A bats case plants a lock whose recorded owner PID is dead. The capture breaks it and writes. A second case has the original holder release after its lock was broken and re-taken: the new holder's lock survives.
+- **R23.** When the drain finds a session's `pending/` entry and a same-session `processing/` file, the system shall keep the one with the greater `transcript_lines` and delete the other as superseded, in addition to the `content_hash` dedupe. Entries without the field compare as 0, and a tie keeps the `pending/` entry. It shall never touch a `processing/` file that another drain owns (in-flight, younger than 5 minutes). An entry already promoted by an earlier drain pass is not retracted.
+  - Acceptance:
+    - A fixture with a stale (older than 5 minutes) early entry in `processing/` and a longer entry in `pending/` for one session leaves only the longer entry in `processing/`, and `pending/` empty.
+    - A fixture with a stale longer entry in `processing/` and a shorter entry in `pending/` deletes the `pending/` entry and keeps the stale one.
+    - A fixture with an in-flight `processing/` twin leaves both files untouched. The `pending/` entry waits for a later drain.
 - **R3.** The pending entry shall add `stop_hook_active` (boolean) and `transcript_lines` (integer) fields. They are additive within schema `"1"`, and the drain shall keep working on entries without them.
 - **R4.** The Stop hook shall emit `{"continue": true}` on every path, never emit `decision: "block"`, and add no synchronous I/O to the parent process.
 - **R5.** Before the step 1 PR merges, the system's behaviour shall be checked on the installed Claude Code version.
@@ -95,13 +101,23 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 - **`stop.sh`.** Delete the `STOP_HOOK_ACTIVE` early exit (lines 52–57) and pass the flag to the subshell as a fifth argument. The `COMPOUND_DRAIN_IN_PROGRESS` recursion guard stays first. No new synchronous work in the parent (R4).
 - **`_stop-capture-subshell.sh`.**
   - Count transcript lines (`wc -l`) and add `stop_hook_active` and `transcript_lines` to the jq entry (R3).
-  - Serialize on a per-session `mkdir` lock under the staging root (portable, no `flock` dependency). Wait a bounded few seconds, break a lock older than the wait, and release it on exit. The wait runs in the disowned subshell, never in the parent (R4). On wait timeout, fall back to an unlocked best-effort check: read the mark and write only when this capture is longer. Losing a capture is worse than the rare race this reopens.
+  - Serialize on a per-session lock directory `<session>.lock/` under the staging root (`mkdir`, portable, no `flock` dependency). The wait runs in the disowned subshell, never in the parent (R4).
+    - **Owner token.** After `mkdir`, write `<pid>.<random>` to `<session>.lock/owner`. Release removes the directory only when `owner` still holds this capture's token.
+    - **Wait and break.** Wait up to 5 seconds. Break a lock only when its recorded owner PID is dead (`kill -0` fails) or the lock is older than 60 seconds (this covers a crash between `mkdir` and the owner write). Break by renaming the directory to a unique name, then removing it, so one waiter wins. Then retry `mkdir`.
+    - **Timeout.** Abandon: log to the disowned subshell's stderr and write nothing. An unlocked write would reopen the R2 race, and a later stop captures again.
+    - **Residual.** A live holder stalled past 60 seconds can lose its lock. It re-checks its token just before the entry write and skips if the token is gone, which leaves only a few-millisecond window.
   - Under the lock, read the per-session high-water mark file (`<session>.hwm`, holding the highest `transcript_lines` written). If it is at or above this capture's `transcript_lines`, exit without writing (R2).
-  - Otherwise, still under the lock, call `cs_atomic_jsonl_write`, then update the mark atomically (tmp + `mv`). Order matters: a crash between the two leaves a newer entry and an older mark, which is safe.
+  - Otherwise, still under the lock, update the mark atomically (tmp + `mv`) **first**, then call `cs_atomic_jsonl_write`. If the entry write fails without a crash, restore the previous mark.
+    - **Why mark first.** A crash between the two loses this capture. The reverse order leaves a newer entry and an older mark, so the drain can consume the entry and an older waiting capture then recreates a shorter one. A lost capture is the smaller harm.
   - The mark survives the drain moving the entry to `processing/`, so a slow earlier capture cannot re-create a stale pending entry after the drain consumed the newer one. Retention reaping of an old mark is harmless.
   - A missing mark compares as 0. Existing `pending/` entries without `transcript_lines` also compare as 0.
-- **Drain (R23).** The staging-reviewer's Phase 2 dedupe gains a supersession pass before the `content_hash` pass. Group the batch by session, including entries in `processing/` and entries moved from `pending/` in this pass, and delete all but the greatest `transcript_lines`. Entries without the field compare as 0 and fall back to `content_hash`. Residual: an early entry promoted by an earlier drain pass before the final one is written stays promoted. The drain cannot know a later capture is coming.
-- **Tests.** In `tests/compound-stop-hook.bats`: invert the re-entrant case (R1), add the out-of-order, post-drain and concurrent cases by calling the subshell directly (R2), and assert the new fields (R3). Add the supersession fixture for the drain (R23) alongside the existing staging-reviewer tests.
+- **Drain (R23).** Entries are named `<session_id>.jsonl`, so each directory holds at most one file per session. The supersession check is therefore a per-session comparison inside the staging-reviewer's Phase 1 loop, before the `mv`. It reads `pending/<session>.jsonl` directly and runs before the Phase 2 `content_hash` pass.
+  - **No `processing/` twin.** Move as today.
+  - **In-flight twin** (not moved by this drain, younger than 5 minutes). Keep today's skip. Leave both files untouched. The `pending/` entry waits for a later drain.
+  - **Stale twin** (older than 5 minutes, left by a crashed drain). Compare `transcript_lines`, with a missing field as 0. When `pending/` is greater or equal, `mv` replaces the stale file as today. Otherwise delete the `pending/` entry and keep the stale file, which Phase 4 scores.
+  - Never delete a file this drain does not own, other than the stale replacement above.
+  - **Residual.** An early entry promoted by another drain or an earlier pass stays promoted, and the longer entry is promoted later. The drain cannot know a later capture is coming.
+- **Tests.** In `tests/compound-stop-hook.bats`: invert the re-entrant case (R1), add the out-of-order, post-drain and concurrent cases by calling the subshell directly (R2), and assert the new fields (R3). Add the three R23 fixtures (stale-shorter, stale-longer, in-flight twin) and the R2 lock cases alongside the existing staging-reviewer tests.
 - **Checks.** R5's live check is manual and recorded in the PR.
 
 ### Step 4: plan resolver (R6–R14)
@@ -150,7 +166,7 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 | Component | Requirements | Consumer |
 | --- | --- | --- |
 | `stop.sh`, `_stop-capture-subshell.sh` | R1–R4 | staging-reviewer drain |
-| staging-reviewer Phase 2 | R23 | compound pipeline |
+| staging-reviewer Phase 1 (pre-move check) | R23 | compound pipeline |
 | `lib/plan-chain.sh` | R7–R13 | `/flow:plan`, `/flow:spec`, `/flow:decompose`, `/flow:work`, `/flow:review`, `/flow:deepen-plan`, plan-status |
 | Plan/spec frontmatter | R6, R8 | `plan-chain.sh` |
 | `## Proof Commands` section | R17, R18 | `--goal-condition` compose step |

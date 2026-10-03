@@ -22,6 +22,7 @@ The open resolve-hardening stack (#950, #952, #954, #955; plan `plans/review-res
 ### Shared quote-grounding primitive
 
 - **R1.** When given a file, a cited line, a radius (default 3) and a single-line quote, the yellow-core quote-grounding script shall report the quote as **grounded** when the whitespace-normalized quote is a substring of a whitespace-normalized line within `[line − radius, line + radius]`.
+  - Before comparing, the script shall redact each file line in the window with `cs_redact_secrets`, so a quote that a persona self-redacted (R5) still matches. The script redacts the quote as well, which is a no-op on an already-redacted quote.
   - A quote with fewer than 8 non-whitespace characters is **too-short** and never grounded.
   - Exit 0 means grounded and prints the matched line number. Exit 1 means ungrounded, too-short, or unsafe-path. Exit 2 means a usage or file error.
   - Finding `file` values come from persona output over untrusted diffs and PR content, so the script shall open only canonical repo-relative regular files. Before any read it shall reject a path that is empty, absolute, `~`-prefixed, contains `..` or a newline or CR, resolves outside the repository root through a symlink, or is not a regular file. A rejected path is **unsafe-path**: never grounded, never read, and in a batch it affects only that finding.
@@ -32,10 +33,12 @@ The open resolve-hardening stack (#950, #952, #954, #955; plan `plans/review-res
 ### Grounding gate in `/review:pr` (roadmap step 5)
 
 - **R5.** The compact-return finding schema shall gain two optional fields:
-  - `evidence`: one verbatim line of at most 200 characters from the cited file.
+  - `evidence`: one verbatim line of at most 200 characters from the cited file. When the line holds a credential-shaped value, the persona shall write the `[REDACTED]` placeholder in its place, using the tokens `cs_redact_secrets` emits (for example `[REDACTED:github-token]`), and shall never copy the value into `evidence`.
   - `absence`: boolean, true when the finding is about something missing, such as a missing test or missing doc.
 
   Every finding-producing persona shall be instructed to emit `evidence`, or `absence: true` with `evidence: null`.
+
+  The grounding script redacts file lines before comparing (R1), so a self-redacted quote still grounds. This narrows the exposure of the `evidence` field only. Personas already read the raw file, and other finding text (`title`, `suggested_fix`) could carry a secret today, so R5 does not close every persona-output exposure.
 - **R6.** When `/review:pr` Step 6 validates returns, the system shall classify every finding before deduplication:
   - **grounded:** the script returns 0.
   - **ungrounded:** the script returns 1.
@@ -44,7 +47,8 @@ The open resolve-hardening stack (#950, #952, #954, #955; plan `plans/review-res
 - **R7.** While grounding mode is `report` (the default), the system shall drop no finding. It shall show per-class counts in the report's Coverage section.
 - **R8.** While grounding mode is `enforce`, the system shall drop ungrounded and missing findings before deduplication, count them, and list the count in Coverage. Absence findings pass through.
 - **R9.** The system shall read the grounding mode from `review_pr.grounding: report|enforce` in `yellow-plugins.local.md`. An invalid value falls back to `report` with a stderr warning. The local-config skill documents the key.
-- **R10.** The system shall ground against the raw quote through a non-persistent channel, and shall write or render only a redacted quote.
+- **R10.** The system shall ground through a non-persistent channel, and shall write or render only a redacted quote.
+  - Personas shall emit `evidence` already redacted (R5). The gate shall still treat any `evidence` as possibly raw, because a persona may not comply.
   - The raw quote shall reach the grounding script only on stdin. It shall never be written to a temporary file, passed on a command line, or placed in the ledger, a report, or a prompt.
   - Every sink that persists or renders a quote (the ledger, the report, any file) shall receive the value redacted by `cs_redact_secrets`, not the raw value. The gate shall not depend on the ledger alone for redaction.
   - A redacted quote shall enter a prompt or report only inside an untrusted-content fence. The fence blocks instruction-following; it is not a substitute for redaction.
@@ -58,6 +62,7 @@ The open resolve-hardening stack (#950, #952, #954, #955; plan `plans/review-res
   yellow-review CLAUDE.md documents this criterion.
 - **R13.** `/review:all` Step 8 shall apply the same gate (the parity rule with `review-pr.md` Step 6). `tests/skill-content.bats` census and schema-parity tests shall cover the new fields.
 - **R14.** The deterministic gate shall replace the LLM "Line accuracy" quality gate for grounded findings. The LLM check remains for ungrounded and missing findings while in report mode.
+  - For a grounded finding, the gate shall set the finding's `line` to the script's `matched_line`, so the published anchor is the verified line.
 
 ### Repro-required "Confirmed" (step 12 borrow)
 
@@ -99,6 +104,7 @@ The open resolve-hardening stack (#950, #952, #954, #955; plan `plans/review-res
   - A standalone bash script, executed with `bash`, never sourced.
   - Single mode: `quote-ground.sh check <file> <line> <radius>`, with the quote read from stdin so it never appears on a command line.
   - Batch mode: `quote-ground.sh batch`, reading JSONL `{id, file, line, quote}` on stdin and writing JSONL `{id, result, matched_line}`. It runs one awk pass per distinct file (R2).
+  - Redaction source: the script sources `plugins/yellow-core/lib/compound-staging.sh` from its own directory for `cs_redact_secrets`. That filter's multi-line private-key range cannot match one line at a time, so a quote taken from inside a key block is redacted only by the single-line patterns. Implementation decides whether to pre-redact the whole file once or accept that residual.
 - **Path containment (R1).** Every `file` value, in single and batch mode, passes this check before the script opens it.
   - The script sources `validate-fs.sh` from its own directory (`$(dirname "$0")`) and calls `validate_file_path "$file" "$root"`. That helper rejects empty, `..`, absolute, `~`-prefixed and newline/CR paths, and symlinks whose target escapes the root.
   - `root` is the git toplevel (or `$PWD`), the helper's default. The script then requires `[ -f "$root/$file" ]`, so directories, devices and FIFOs are never read.
@@ -119,10 +125,13 @@ The open resolve-hardening stack (#950, #952, #954, #955; plan `plans/review-res
 
 - **Schema (R5).** Add `evidence` and `absence` to the schema example in `review-pr.md` and to `skills/pr-review-workflow/SKILL.md`. Add both fields to every producer listed in `tests/skill-content.bats` (the 11 yellow-review personas plus the yellow-core security and performance reviewers).
   - The fields are optional extensions. A return without them is never dropped at validation, so producers can update in any order.
+  - Each producer's instructions say: never copy a credential-shaped value into `evidence`; write the `[REDACTED]` placeholder instead. Grounding redacts the file line the same way (R1), so the self-redacted quote still grounds.
+  - Residual: this narrows the `evidence` field's exposure only. Personas read the raw file already, and `title` or `suggested_fix` could carry a secret, so persona output as a whole is not made secret-free.
 - **Gate placement (R6–R8).** A new sub-step 1a runs between Validate (sub-step 1) and Deduplicate (sub-step 2).
   - It streams the findings as JSONL to `quote-ground.sh batch` on stdin (a heredoc or pipe). It writes no `mktemp` file, because the raw quote must not reach disk.
   - It runs `quote-ground.sh batch` through `${CLAUDE_PLUGIN_ROOT}/../yellow-core/` with the highest-version-sibling fallback. If the script is not found, every finding is classed `not_evaluated` with a warning.
   - The script's output carries only `{id, result, matched_line}`, with no quote. The gate attaches the class to each finding, applies the mode, and then replaces each finding's `evidence` with its `cs_redact_secrets` form. Later sub-steps, the ledger, and the report see only the redacted value.
+  - For a grounded finding whose `matched_line` differs from its cited `line` (the quote moved by one to three lines), the gate overwrites the finding's `line` with `matched_line` before deduplication. Dedup keys, the ledger, and inline-comment anchors then use the corrected line. This keeps R14 safe: the gate's anchor correction replaces the LLM line-accuracy check only because the surviving `line` is the verified one.
 - **Mode (R9).** Read from `yellow-plugins.local.md` as `resolve_pr.*` keys already are. Document `review_pr.grounding` in `plugins/yellow-core/skills/local-config/SKILL.md`.
 - **Redaction and fencing (R10).**
   - Grounding runs on the raw quote, delivered on stdin only. Immediately after grounding, the gate redacts `evidence` with `cs_redact_secrets` (from `plugins/yellow-core/lib/compound-staging.sh`) and discards the raw value.

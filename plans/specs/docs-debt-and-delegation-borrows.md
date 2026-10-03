@@ -45,7 +45,7 @@ Every behaviour is project-agnostic, because these plugins run in any repository
 - **R3.** The drift computation shall be a deterministic yellow-docs script with JSON output per doc, covered by a new yellow-docs bats suite.
   - Acceptance: a seeded repo with one stale and one fresh page yields exactly the stale page and its changed files.
 - **R4.** When `/docs:generate` writes a doc, and when knowledge-compounder writes a solution doc, the system shall set `sources` to the files the doc describes. For solution docs, those are the PR's changed files, or the files touched in the session.
-  - It shall set `verified_at` to HEAD only when none of those files has uncommitted changes, because HEAD must be the commit that contains the documented source versions.
+  - It shall set `verified_at` to HEAD only when none of those files has uncommitted changes and every `sources` glob matches a tracked path, because HEAD must be the commit that contains the documented source versions.
   - Otherwise it omits `verified_at` and tells the user the stamp is pending until the sources are committed.
 - **R5.** When the user accepts a `/docs:refresh` update, the system shall bump that doc's `verified_at` to HEAD, under the same clean-sources condition as R4.
   - For a doc that has `sources` but no `verified_at`, `/docs:refresh` shall offer to stamp it once its sources are committed.
@@ -108,7 +108,7 @@ Every behaviour is project-agnostic, because these plugins run in any repository
 ### Doc freshness (R1–R6)
 
 - **Drift script.** `plugins/yellow-docs/scripts/doc-drift.sh` is standalone bash, executed with `bash`.
-  - It reads frontmatter with awk, expands `sources` globs with `git ls-files`, and computes `git diff --name-only <verified_at>..HEAD -- <files>`.
+  - It reads frontmatter with awk and passes the `sources` globs straight to `git diff --name-only --no-renames <verified_at>..HEAD -- <pathspecs>`, each as a `:(glob)` pathspec. It does not pre-expand them against HEAD with `git ls-files`, because that drops files deleted since `verified_at`. Git matches the pathspecs against both trees, so deletions and the old side of renames show up in `changed`.
   - It prints JSONL `{doc, state: fresh|stale|verified_at_unknown|no_keys, changed: [...]}`.
   - Tests: `plugins/yellow-docs/tests/doc-drift.bats`. The suite runs in CI's advisory plugin-bats loop.
 - **Integration (R2).** In `commands/docs/refresh.md` and `commands/docs/audit.md`, `doc-auditor` calls the script first and keeps its git-blame heuristics for `no_keys` docs.
@@ -116,6 +116,7 @@ Every behaviour is project-agnostic, because these plugins run in any repository
   - R5's bump is an Edit after the user accepts.
 - **Writers (R4).** `commands/docs/generate.md` sets the keys. `plugins/yellow-core/agents/workflow/knowledge-compounder.md` sets them on new solution docs.
   - Each writer checks `git status --porcelain -- <sources>` before stamping. Any output means the sources are uncommitted, so it writes `sources` and leaves `verified_at` out.
+  - Empty output is not enough to stamp: a glob can match nothing, or only gitignored files, which `git status` hides. The writer also confirms every source glob matches a tracked path (`git ls-files --error-unmatch -- <sources>`) before setting `verified_at`. Otherwise it leaves the stamp pending.
   - A doc with `sources` but no `verified_at` falls back to today's signals until `/docs:refresh` stamps it after the commit (R5).
 - **Validator (R1).** `scripts/validate-solutions.js` adds shape checks for the two optional keys.
 - **compound-lifecycle (R6).** `plugins/yellow-core/skills/compound-lifecycle/SKILL.md` adds drift as a candidate signal. It calls the yellow-docs script when installed, and skips the signal otherwise.
