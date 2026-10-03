@@ -1,0 +1,21 @@
+plugins/yellow-review/references/review-resolve-stack/dirty-tree-cleanup.md
+  s_7a82748dd606d9::t_b106bba83906d4 101-102
+plugins/yellow-review/references/review-sweep-all/dirty-tree-cleanup.md
+  s_7a82748dd606d9::t_996438029366c6 101-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3e28041b8abfc09fa2911a9e79405bdb66c52797",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
