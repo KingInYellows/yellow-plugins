@@ -440,13 +440,26 @@ trap 'rm -rf -- "$MARK_DIR"' EXIT
 ```
 
 A rejected marker path is a setup failure: treat it as `verify=skipped
-(marker unavailable)` and revert as above. **Marker cleanup.** When no verify
-call ran (`verify=none`, a stop before this step, or a declined command), run
-the same re-validation, then `rm -rf -- "$MARK_DIR"` instead of the script,
-before Step 9; a rejected path is left for the OS temp sweep, never deleted.
+(marker unavailable)` and revert as above.
+
+**No verify command.** When there is no `verify_command`, or an unattended run
+has not opted in, still guard the gitignored files before committing: the
+commit runs hooks and an ignored file a resolver edited outlives the run. In
+the same re-validated call, with the same trap, run
+`run-verify-command --pr "<PR#>" --check-ignored --ignored-since "$MARK_DIR/ignored-marker"`
+instead of the verify line above. Exit 0 → `verify=none` and the commit
+proceeds. Any non-zero exit (a gitignored file newer than the marker, or a
+marker that cannot be read) is a refusal: revert as above and make every
+`fixed` thread `unclear`.
+
+**Marker cleanup.** When no call ran at all (a stop before this step, or a
+declined command), run the same re-validation, then `rm -rf -- "$MARK_DIR"`
+instead of the script, before Step 9; a rejected path is left for the OS temp
+sweep, never deleted.
 
 `pass` → `verify=pass`. No `verify_command`, or an unattended run that has not
-opted in → `verify=none` and the commit proceeds. `skipped` (a script reason,
+opted in → `verify=none` after the `--check-ignored` guard above, and the
+commit proceeds. `skipped` (a script reason,
 or the interactive user declining the command) → `verify=skipped`
 (`verify skipped (<reason>)`): a refusal, so revert as above. `fail`/`timeout`
 → `verify=fail`: the files were reverted and a patch saved, every `fixed`
