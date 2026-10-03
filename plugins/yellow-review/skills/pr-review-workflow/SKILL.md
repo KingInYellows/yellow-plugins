@@ -460,7 +460,8 @@ Located at `skills/pr-review-workflow/scripts/`:
   fetch or parse is never read as "no new threads". Exit 4 on a rate limit
   (`poll rate-limited`), 2 on usage.
 
-All require `gh` and `jq`. Exit codes and markers are defined in
+The GraphQL scripts above require `gh` and `jq`; `check-resolve-text` needs only
+POSIX sh with awk. Exit codes and markers are defined in
 `references/resolve/dispositions.md`.
 
 The local (non-GraphQL) scripts `/review:resolve` Steps 5–7 and the callers

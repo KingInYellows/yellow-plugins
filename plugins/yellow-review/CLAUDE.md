@@ -290,11 +290,11 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   that tells a refusal from a usage error: `refused rule=<rule> line=<n>` for
   a credential hit, `scan failed` when the scan did not run. Callers look for
   that line anywhere on stderr rather than assume it is first.
-- `lib/resolve-gh.sh` (POSIX sh, sourced by `file-followup-issue` and
-  `get-pr-blockers`) — runs `gh` under `YELLOW_REVIEW_GH_TIMEOUT` (default
-  30 s, clamped to 60 s) and returns 124 on a timeout, but only when
-  `timeout(1)` is installed;
-  without it `gh` runs unbounded.
+- `lib/resolve-gh.sh` (POSIX sh, sourced by `file-followup-issue`,
+  `get-pr-blockers` and `get-pr-comments`) — runs `gh` under
+  `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s, clamped to 60 s) and returns 124 on
+  a timeout, but only when `timeout(1)` or `gtimeout(1)` is installed; without
+  either `gh` runs unbounded.
 - `lib/gh-graphql.sh` (POSIX sh, sourced by `reply-pr-thread` and
   `resolve-pr-thread`) — the shared GraphQL call (bounded by
   `YELLOW_REVIEW_GH_TIMEOUT`), rate-limit wait and not-found/permission
@@ -448,6 +448,14 @@ with `cache_read_input_tokens` in the transcript (Ctrl-O) on a second
 `/review:pr` run within the hour.
 
 ### MCP Tool Integration
+
+- **yellow-linear** (optional) — `/review:resolve` files out-of-scope follow-up
+  issues through yellow-linear's `save_issue`, `list_issues` and `list_teams`
+  when ToolSearch finds `save_issue` and the branch name carries a Linear
+  issue ID; the issue holds a generated title, the resolver's `oos_reason`, a
+  thread link and a dedupe marker, never the reviewer's comment text.
+  Otherwise, or when Linear fails, it files once on GitHub (the Resolve report
+  names the tracker, e.g. `tracker=github (linear unavailable)`).
 
 - **ruvector** — Recall past learnings at workflow start; tiered remember at
   workflow end (Auto for P0/P1 findings, Prompted for P2). Graceful skip if

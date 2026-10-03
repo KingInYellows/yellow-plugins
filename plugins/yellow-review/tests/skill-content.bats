@@ -217,7 +217,8 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   grep -q 'Never print the full fold' "$TRIAGE"
   tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'Never put a title, reason or other stored'
   grep -q '"\$RL" resolve-path <PR> <finding_id> --head <headRefOid>' "$TRIAGE"
-  run ! grep -q 'validate-path anchor <headRefOid> "<file>"' "$TRIAGE"
+  run grep -q 'validate-path anchor <headRefOid> "<file>"' "$TRIAGE"
+  [ "$status" -eq 1 ]
   grep -q -- '--reason "$(cat <reason-file>)"' "$TRIAGE"
 }
 
@@ -253,7 +254,8 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   cards=$(grep -n '"\$RL" cards <PR>' "$TRIAGE" | cut -d: -f1)
   [ "$rec" -lt "$cards" ]
   grep -q '"\$RL" prune <PR>' "$TRIAGE"
-  ! grep -q 'rm -' "$TRIAGE"
+  run grep -q 'rm -' "$TRIAGE"
+  [ "$status" -eq 1 ]
 }
 
 @test "triage: a closed PR's ledger is never pruned unattended; attended prune asks first" {
@@ -262,7 +264,8 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   grep -qF 'ask one AskUserQuestion, "Delete the ledger for closed PR #<n>?", with the options "Delete" and "Keep"; after a failed refresh, append "(state not recorded, exit <N>)" to the question. Run Step 2 only on "Delete"; either way, stop.' <<<"$step3"
   # Step 2 (prune) is named only by those two bullets
   [ "$(grep -o 'Step 2' <<<"$step3" | wc -l)" -eq 2 ]
-  ! grep -q 'run Step 2 and stop' "$TRIAGE"
+  run grep -q 'run Step 2 and stop' "$TRIAGE"
+  [ "$status" -eq 1 ]
 }
 
 @test "triage: a closed PR's state is recorded before the prune question" {
@@ -316,8 +319,10 @@ assert_head_ref_checkout() {
   [ "$(printf '%s' "$block" | grep -n 'case "$head_ref"' | cut -d: -f1)" -lt \
     "$(printf '%s' "$block" | grep -n 'check-ref-format' | cut -d: -f1)" ]
   # the value is never templated into command text anywhere in the file
-  run ! grep -qE '"<headRefName>"|"<branch>"' "$f"
-  ! grep -qE '(gt|git) checkout <(headRefName|branch)>' "$f"
+  run grep -qE '"<headRefName>"|"<branch>"' "$f"
+  [ "$status" -eq 1 ]
+  run grep -qE '(gt|git) checkout <(headRefName|branch)>' "$f"
+  [ "$status" -eq 1 ]
 }
 
 @test "review-pr: headRefName is captured into a variable and validated before any command" {
@@ -355,7 +360,8 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   grep -qF 'Always, whatever step 1 did:** print' <<<"$block"
   grep -qF '[review:sweep-all] No open non-draft PRs found. Nothing to sweep.' <<<"$block"
   # the exit is not conjoined with the prune condition
-  ! grep -q 'empty (`\[\]` or length 0) and the prune list' <<<"$block"
+  run grep -q 'empty (`\[\]` or length 0) and the prune list' <<<"$block"
+  [ "$status" -eq 1 ]
 }
 
 @test "sweep: unattended triage never prunes a PR that closed after the state check" {
@@ -375,7 +381,8 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   grep -q "jq 'length')\" -lt 1000 \] || { printf 'skip" "$SWEEP_ALL"
   grep -q '`--prune <PR#>`' "$SWEEP_ALL"
   # the prune query covers every author, not the --author @me sweep list
-  ! grep -q 'gh pr list --state open --limit 1000 --json number.*--author' "$SWEEP_ALL"
+  run grep -q 'gh pr list --state open --limit 1000 --json number.*--author' "$SWEEP_ALL"
+  [ "$status" -eq 1 ]
 }
 
 @test "sweep-all: the summary table carries a Residual column from the ledger" {
@@ -462,12 +469,14 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
 @test "resolve-stack: keys on the not attempted tokens /review:resolve emits" {
   grep -q 'not attempted (cluster cap)' "$RESOLVE_STACK"
   grep -q 'not attempted (rate limit)' "$RESOLVE_STACK"
-  ! grep -q 'skipped (cluster cap)' "$RESOLVE_STACK"
+  run grep -q 'skipped (cluster cap)' "$RESOLVE_STACK"
+  [ "$status" -eq 1 ]
 }
 
 @test "resolver agent: no Bash tool, and edit bounds point at clusters.md" {
   tools=$(sed -n '/^tools:/,/^---$/p' "$RESOLVER_AGENT")
-  run ! grep -q 'Bash' <<<"$tools"
+  run grep -q 'Bash' <<<"$tools"
+  [ "$status" -eq 1 ]
   grep -q 'references/resolve/clusters.md' "$RESOLVER_AGENT"
   grep -q 'Edit bounds' "$RESOLVE_REFS/clusters.md"
 }
@@ -591,7 +600,8 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   printf '%s\n' "$step3f" | grep -qF 'mktemp -d'
   printf '%s\n' "$step3f" | grep -qF 'touch "$MARK_DIR/ignored-marker"'
   # No trap in the minting call: the trap lives in the consuming call.
-  ! printf '%s\n' "$step3f" | grep -q '^trap '
+  run grep -q '^trap ' <<<"$step3f"
+  [ "$status" -eq 1 ]
   step6=$(sed -n '/^### Step 6: Verify, Commit and Push/,/^### Step 7/p' "$RESOLVE_PR")
   printf '%s\n' "$step6" | grep -qF -- '--ignored-since "$MARK_DIR/ignored-marker"'
   printf '%s\n' "$step6" | grep -qF "trap 'rm -rf -- \"\$MARK_DIR\"' EXIT"
