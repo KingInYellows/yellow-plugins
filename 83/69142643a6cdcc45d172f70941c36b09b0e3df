@@ -1,0 +1,36 @@
+plugins/yellow-review/references/review-resolve-stack/dirty-tree-cleanup.md
+  s_7a82748dd606d9::t_a1584230151c8f 41-43,46-50
+  s_7a82748dd606d9::t_24d02de6dfb8c7 51-53
+plugins/yellow-review/CLAUDE.md
+  s_7a82748dd606d9::t_794097f75fa9cf 253-256
+plugins/yellow-review/references/review-sweep-all/dirty-tree-cleanup.md
+  s_7a82748dd606d9::t_f9f03945eb1f0a 41-43,46-53
+plugins/yellow-review/skills/pr-review-workflow/scripts/pr-changed-ranges
+  s_7a82748dd606d9::t_03ce314f4222bd 34-37,40
+plugins/yellow-review/tests/fixtures/pr-files-newline-names.json
+  s_7a82748dd606d9::t_21937b18b26b87 1-5
+plugins/yellow-review/tests/fixtures/pr-files-renames-newline.json
+  s_7a82748dd606d9::t_5e0aa906d25a6a 1-5
+plugins/yellow-review/tests/fixtures/pr-files-renames.json
+  s_7a82748dd606d9::t_dc90220e27c825 1-5
+plugins/yellow-review/tests/pr-changed-ranges.bats
+  s_7a82748dd606d9::t_3dfd3d071337da 47-52
+plugins/yellow-review/tests/skill-content.bats
+  s_7a82748dd606d9::t_e89f88421bc994 584-620
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8369142643a6cdcc45d172f70941c36b09b0e3df",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

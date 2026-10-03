@@ -1,0 +1,31 @@
+plugins/yellow-review/skills/pr-review-workflow/scripts/pr-changed-ranges
+  s_34897998dae600::t_56c1c2cd161b40 34
+plugins/yellow-review/commands/review/sweep.md
+  s_34897998dae600::t_b86c3661bf24f7 277-279
+  s_34897998dae600::t_ebfecb50e1060f 237-243
+plugins/yellow-review/commands/review/sweep-all.md
+  s_34897998dae600::t_5d2aadace088bf 260
+  s_34897998dae600::t_eb885b269c5c70 220-234
+plugins/yellow-review/tests/skill-content.bats
+  s_34897998dae600::t_d3b2f23af3f488 762-775
+plugins/yellow-review/references/review-resolve-stack/dirty-tree-cleanup.md
+  s_34897998dae600::t_245823887b44ee 59-69
+plugins/yellow-review/references/review-sweep-all/dirty-tree-cleanup.md
+  s_34897998dae600::t_0d6a50f067effc 59-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "241b06617b8414cf403ee6a530d41ceb0cfdeafc",
+  "prompts": {},
+  "sessions": {
+    "s_34897998dae600": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "59f66293-277e-4e30-a1f0-fee6407f5862",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
