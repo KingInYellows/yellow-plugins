@@ -454,6 +454,23 @@ ignored_repo() {
   [[ "$output" != *new* ]]
 }
 
+@test "rp_ignored_changed_since ignores the ruvector coedit-sessions log but not its siblings" {
+  ignored_repo
+  printf '.ruvector/\n' >> .gitignore
+  mkdir -p .ruvector/coedit-sessions
+  printf 'old\n' >| .ruvector/coedit-sessions/s1.json
+  printf 'old\n' >| .ruvector/hook.sh
+  touch -t 201901010000 .ruvector/coedit-sessions/s1.json .ruvector/hook.sh
+  printf 'new\n' >| .ruvector/coedit-sessions/s1.json
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  printf 'new\n' >| .ruvector/hook.sh
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$output" = .ruvector/hook.sh ]
+}
+
 @test "rp_ignored_changed_since works from a subdirectory and with a relative marker" {
   ignored_repo
   printf 'new\n' >| node_modules/.bin/runner

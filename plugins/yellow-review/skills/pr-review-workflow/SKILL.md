@@ -259,7 +259,7 @@ This rule applies to:
   before interpolation.
 
 The fence + advisory pattern is the *naive-injection-attack* mitigation. The
-**load-bearing controls** (path deny lists, Bash read-only restriction,
+**load-bearing controls** (path deny lists, no Bash tool,
 50-line scope cap, no-rollback rule) are documented in
 `pr-comment-resolver.md` and must not be removed without an explicit threat
 model justification.
@@ -407,7 +407,8 @@ Located at `skills/pr-review-workflow/scripts/`:
 - **get-pr-comments** `[--include-outdated] <owner/repo> <pr-number>` —
   Returns JSON array of unresolved review threads (outdated threads are
   excluded unless `--include-outdated` is passed); exits 3 with the partial
-  array on stdout when the thread list is truncated; each thread carries
+  array on stdout when the thread list is truncated (page cap, missing cursor
+  or the 270 s fetch deadline); each thread carries
   `commentsTruncated` (true past the 50 comments fetched), and a resolver
   must never resolve such a thread
 - **get-pr-blockers** `<owner/repo> <pr-number>` — Reports
@@ -416,7 +417,13 @@ Located at `skills/pr-review-workflow/scripts/`:
 - **reply-pr-thread** `<PRRT_id> <disposition> <body-file>` — Replies to a
   thread with an idempotency marker; skips threads already replied to
 - **resolve-pr-thread** `<thread-node-id>` — Resolves a single thread
-  (idempotent)
+  (idempotent). Exit codes: 1 other failure, 2 usage, 3 not found or
+  permission, 4 rate limited or `gh` timed out (`YELLOW_REVIEW_GH_TIMEOUT`,
+  default 30 s, clamped to 60 s, not retried). It sleeps 1 s after the mutation
+  (`YELLOW_REVIEW_PACE_SECONDS`) and, on a rate limit, waits `Retry-After`
+  (else 60 s) and retries once; a required wait over 90 s exits 4. After exit
+  4, stop mutating. The contract's "Script exit codes" and "Pacing and rate
+  limits" sections in `references/resolve/dispositions.md` are authoritative.
 - **file-followup-issue** `<owner/repo> <pr> <PRRT_id> <title-file>
   <body-file>` — Files or finds the follow-up issue for an out-of-scope
   thread; `--find <owner/repo> <PRRT_id>` only looks and never files
@@ -424,12 +431,20 @@ Located at `skills/pr-review-workflow/scripts/`:
   credential. A refusal prints a `resolve-text:` line on stderr
   (`refused rule=<rule> line=<n>` for a credential hit, `scan failed` when
   the scan did not run); look for it anywhere on stderr, not just first.
-  `reply-pr-thread` and `file-followup-issue` print the same line
+  `reply-pr-thread` and `file-followup-issue` print the same line.
+- **pr-changed-ranges** `<pr-number>` — Prints one `<path> <ranges>` row per
+  changed file from the files API (`10-24,58-60`, `none`, or `unknown` when
+  GitHub returns no patch); only paths matching `^[A-Za-z0-9._/-]+$` are
+  listed. Exit 1 on a fetch failure, 2 on usage. `/review:resolve` Step 4
+  builds the resolver's `PR-changed lines` and `PR files` from it.
+- **poll-new-threads** `--wait <s> <owner/repo> <pr> <round1-ids-file> <out-file>`
+  — The Step 8 re-pass poll: fetches at least once (`--wait 0` fetches once
+  with no sleep), stops at the first fetch with a thread ID not in the
+  round-1 file, and ends with `repass fetched=<0|1> found=<0|1>`. A failed
+  fetch or parse is never read as "no new threads". Exit 4 on a rate limit
+  (`poll rate-limited`), 2 on usage.
 
-`get-pr-blockers`, `reply-pr-thread`, `file-followup-issue` and
-`check-resolve-text` are not yet invoked by `/review:resolve`; the contract
-is `references/resolve/dispositions.md`. The other five scripts require `gh`
-and `jq`; `check-resolve-text` needs only POSIX sh with awk.
+The GraphQL scripts above require `gh` and `jq`. `check-resolve-text` needs only POSIX sh with awk, and `commit-resolve-fixes`, `run-verify-command` and `poll-new-threads` have their own prerequisites in their headers.
 
 ## File Line Counts Script
 
@@ -446,9 +461,7 @@ Same directory. Not GraphQL; it reads only the local repository:
 
 ## Verification Loop
 
-After resolving threads:
-
-1. Wait 2 seconds
-2. Re-fetch comments with `get-pr-comments`
-3. If unresolved threads remain, retry up to 3 times
-4. Unresolved threads after retries are reported as warnings
+After resolving threads, `/review:resolve` Step 8 re-fetches with a bounded
+re-pass (`poll-new-threads`) instead of a fixed wait: the rules, caps and exit
+codes are in `references/resolve/dispositions.md` ("Pacing and rate limits").
+Unresolved threads after the re-pass are reported as warnings.

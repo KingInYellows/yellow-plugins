@@ -3,6 +3,8 @@
 
 bats_require_minimum_version 1.5.0
 
+load helpers/timeout-stub
+
 SCRIPT_DIR="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/skills/pr-review-workflow/scripts"
 SCRIPT="${SCRIPT_DIR}/file-followup-issue"
 
@@ -519,4 +521,65 @@ path_without_timeout() {
   PATH="${BATS_TEST_TMPDIR}/notimeout" run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
   [ "$status" -eq 0 ]
   [[ "$stderr" == *"neither timeout nor gtimeout is installed"* ]]
+}
+
+# --- structured exit-4 reason (rate-limit vs timeout) ---
+
+@test "exit 4 from a rate-limited create prints reason=rate-limit" {
+  export MOCK_GH_ISSUE_CREATE_FAIL=ratelimit
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
+}
+
+@test "exit 4 from a rate-limited duplicate close prints reason=rate-limit" {
+  export MOCK_GH_RESCAN=winner MOCK_GH_ISSUE_CLOSE_FAIL=ratelimit
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+}
+
+@test "exit 4 from a timed-out create prints reason=timeout and no other reason" {
+  fake_timeout
+  export MOCK_TIMEOUT_ON=create
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=timeout'
+  [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
+}
+
+@test "exit 4 from a timed-out issue list prints reason=timeout" {
+  fake_timeout
+  export MOCK_TIMEOUT_ON=list
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=timeout'
+}
+
+@test "an oversized YELLOW_REVIEW_GH_TIMEOUT falls back to the 30 s default" {
+  fake_timeout
+  export MOCK_TIMEOUT_ON=list
+  YELLOW_REVIEW_GH_TIMEOUT=99999999999999999999 run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"timed out after 30 s"* ]]
+  [[ "$stderr" != *"integer expression"* ]]
+}
+
+@test "a YELLOW_REVIEW_GH_TIMEOUT over 60 is clamped to 60, not reset to the default" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=9999 run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 60 ]
+  [[ "$stderr" == *"timed out after 60 s"* ]]
+}
+
+@test "the default and invalid YELLOW_REVIEW_GH_TIMEOUT values stay at 30 s; 45 passes through" {
+  stub_timeout_logging
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 30 ]
+  YELLOW_REVIEW_GH_TIMEOUT=abc run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 30 ]
+  YELLOW_REVIEW_GH_TIMEOUT=45 run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 45 ]
 }

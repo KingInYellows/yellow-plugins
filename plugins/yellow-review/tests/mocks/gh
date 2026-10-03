@@ -13,7 +13,9 @@
 #                                        PRRT_reply_* thread ids pick the
 #                                        scenario (rate-limit sequences with
 #                                        Retry-After or reset headers, 5xx,
-#                                        missing comment, spoofed marker)
+#                                        missing comment, spoofed marker,
+#                                        botafter / humanafter / nomarker /
+#                                        ghostafter marker-then-comment windows)
 #   latestOpinionatedReviews             MOCK_GH_BLOCKERS_{FAIL,FIXTURE}
 #   */protection, */rules/branches/*     MOCK_GH_PROTECTION, MOCK_GH_RULES
 #   pr view                              MOCK_GH_{FAIL,PR_STATE,HEAD_OID,
@@ -107,6 +109,15 @@ case "$ALL_ARGS" in
     _turl="${MOCK_GH_THREAD_URL-https://github.com/test/repo/pull/7#discussion_r1}"
     MOCK_BODY=$(jq -nc --arg u "$_turl" '{data:{node:{comments:{nodes:(if $u == "" then [] else [{url:$u}] end)}}}}')
     emit "$@"
+    exit 0
+    ;;
+  *"/pulls/"*"/files"*)
+    # PR file list. MOCK_GH_FILES_FAIL=1 simulates an API failure.
+    if [ "${MOCK_GH_FILES_FAIL:-0}" = 1 ]; then
+      printf 'gh: Server Error (HTTP 500)\n' >&2
+      exit 1
+    fi
+    cat "$FIXTURE_DIR/${MOCK_GH_FILES_FIXTURE:-pr-files-response.json}"
     exit 0
     ;;
   "issue list "*)
@@ -235,6 +246,28 @@ case "$ALL_ARGS" in
       *"PRRT_reply_priordisagree"*)
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_priordisagree","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Not changing this.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_priordisagree disposition=disagree -->\n"}]}}}}'
         ;;
+      *"PRRT_reply_outwindow"*)
+        # Our marker pushed out of the 10-comment window by 10 Bot replies: the
+        # window holds only Bot comments, so no viewer comment is found and we post.
+        MOCK_BODY=$(jq -nc '{data:{node:{id:"PRRT_reply_outwindow",comments:{nodes:[range(0;10)|{viewerDidAuthor:false,author:{__typename:"Bot"},body:"Thanks."}]}}}}')
+        ;;
+      *"PRRT_reply_botafter"*)
+        # Our marker, then a Bot acknowledgement: still a skip.
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_botafter","comments":{"nodes":[{"viewerDidAuthor":false,"author":{"__typename":"User"},"body":"Please add a null check."},{"viewerDidAuthor":true,"author":{"__typename":"User"},"body":"Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_botafter disposition=fixed -->"},{"viewerDidAuthor":false,"author":{"__typename":"Bot"},"body":"Thanks, noted."},{"viewerDidAuthor":false,"author":{"__typename":"Bot"},"body":"Looks resolved."}]}}}}'
+        ;;
+      *"PRRT_reply_humanafter"*)
+        # Our marker, then a human reply: new input, so post.
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_humanafter","comments":{"nodes":[{"viewerDidAuthor":true,"author":{"__typename":"User"},"body":"Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_humanafter disposition=fixed -->"},{"viewerDidAuthor":false,"author":{"__typename":"Bot"},"body":"Thanks, noted."},{"viewerDidAuthor":false,"author":{"__typename":"User"},"body":"That does not fix it."}]}}}}'
+        ;;
+      *"PRRT_reply_ghostafter"*)
+        # Our marker, then a comment whose author cannot be read: post.
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_ghostafter","comments":{"nodes":[{"viewerDidAuthor":true,"author":{"__typename":"User"},"body":"Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_ghostafter disposition=fixed -->"},{"viewerDidAuthor":false,"author":null,"body":"Deleted-user comment."}]}}}}'
+        ;;
+      *"PRRT_reply_nomarker"*)
+        # Our latest comment has no marker for this thread (an older marker
+        # sits behind it, and another thread's marker is not ours): post.
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_nomarker","comments":{"nodes":[{"viewerDidAuthor":true,"author":{"__typename":"User"},"body":"Fixed.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_nomarker disposition=fixed -->"},{"viewerDidAuthor":false,"author":{"__typename":"User"},"body":"Still broken."},{"viewerDidAuthor":true,"author":{"__typename":"User"},"body":"Looking.\n\n<!-- yellow-review:resolve v1 thread=PRRT_other disposition=fixed -->"},{"viewerDidAuthor":false,"author":{"__typename":"Bot"},"body":"Thanks."}]}}}}'
+        ;;
       *"PRRT_reply_spoof"*)
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_spoof","comments":{"nodes":[{"viewerDidAuthor":false,"body":"> <!-- yellow-review:resolve v1 thread=PRRT_reply_spoof disposition=fixed -->"}]}}}}'
         ;;
@@ -268,10 +301,11 @@ case "$ALL_ARGS" in
           exit 1
         fi
         ;;
-      *"PRRT_reply_ra120"*|*"PRRT_reply_ra90"*|*"PRRT_reply_radate"*|*"PRRT_reply_dflt"*|*"PRRT_reply_reset"*|*"PRRT_reply_resetpast"*|*"PRRT_reply_resetfar"*)
-        # Wait-source arms. ra120 / resetfar are always limited (over the
-        # cap); the rest are limited on the first call only.
-        case "$ALL_ARGS" in *"PRRT_reply_ra120"*|*"PRRT_reply_resetfar"*) limited=1 ;; *) [ "$n" -eq 1 ] && limited=1 || limited=0 ;; esac
+      *"PRRT_reply_ra120"*|*"PRRT_reply_ra90"*|*"PRRT_reply_radate"*|*"PRRT_reply_rahuge"*|*"PRRT_reply_dflt"*|*"PRRT_reply_reset"*|*"PRRT_reply_resetpast"*|*"PRRT_reply_resetfar"*|*"PRRT_reply_resethuge"*|*"PRRT_reply_envhuge"*)
+        # Wait-source arms. ra120 / rahuge / resetfar / resethuge are always
+        # limited (over the cap); envhuge is always limited with no header;
+        # the rest are limited on the first call only.
+        case "$ALL_ARGS" in *"PRRT_reply_ra120"*|*"PRRT_reply_rahuge"*|*"PRRT_reply_resetfar"*|*"PRRT_reply_resethuge"*|*"PRRT_reply_envhuge"*) limited=1 ;; *) [ "$n" -eq 1 ] && limited=1 || limited=0 ;; esac
         if [ "$limited" = 1 ]; then
           MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
           _now=$(date +%s)
@@ -279,6 +313,8 @@ case "$ALL_ARGS" in
             *"PRRT_reply_ra120"*) _hdr="Retry-After: 120" ;;
             *"PRRT_reply_ra90"*) _hdr="Retry-After: 90" ;;
             *"PRRT_reply_radate"*) _hdr="Retry-After: Wed, 21 Oct 2026 07:28:00 GMT" ;;
+            *"PRRT_reply_rahuge"*) _hdr="Retry-After: 99999999999999999999" ;;
+            *"PRRT_reply_resethuge"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: 99999999999999999999') ;;
             *"PRRT_reply_resetpast"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: %s' "$((_now - 100))") ;;
             *"PRRT_reply_resetfar"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: %s' "$((_now + 500))") ;;
             *"PRRT_reply_reset"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: %s' "$((_now + 30))") ;;
@@ -405,21 +441,26 @@ case "$ALL_ARGS" in
     cat "$FIXTURE_DIR/graphql-error-response.json" >&2
     exit 1
     ;;
+  *"number=429"*)
+    printf 'gh: API rate limit exceeded for user.\n' >&2
+    exit 1
+    ;;
+  *"number=403"*)
+    # Secondary rate limit: GitHub answers it with HTTP 403.
+    printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2
+    exit 1
+    ;;
   *"number=401"*)
     printf 'Bad credentials' >&2
     exit 1
     ;;
-  *"number=403"*)
+  *"number=431"*)
     printf 'gh: Resource not accessible by integration (HTTP 403)\n' >&2
     exit 1
     ;;
   *"number=420"*)
     # GitHub reports a secondary rate limit as HTTP 403.
     printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2
-    exit 1
-    ;;
-  *"number=429"*)
-    printf 'gh: Too Many Requests (HTTP 429)\n' >&2
     exit 1
     ;;
   *"number=502"*)
@@ -435,11 +476,156 @@ case "$ALL_ARGS" in
     # Endless pagination: every page says there is another, with a cursor.
     printf '{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":true,"endCursor":"Y3Vyc29y"},"nodes":[]}}}}}\n'
     ;;
+  *"number=370"*)
+    # Slow endless pagination: each page takes MOCK_GH_SLEEP seconds (default
+    # 2), holds one unresolved thread, and says there is another page.
+    sleep "${MOCK_GH_SLEEP:-2}"
+    _n=$(bump pr370)
+    printf '{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":true,"endCursor":"Y3Vyc29y"},"nodes":[{"id":"PRRT_slow%s","isResolved":false,"isOutdated":false,"viewerCanResolve":true,"viewerCanReply":true,"path":"a.txt","line":1,"startLine":null,"comments":{"totalCount":0,"nodes":[]}}]}}}}}\n' "$_n"
+    ;;
+  *"PRRT_gqlrl_exit0"*)
+    # HTTP 200 with a GraphQL rate-limit error and gh exiting 0.
+    bump resolve_gqlrl_exit0 >/dev/null
+    printf '{"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded for user."}]}\n'
+    exit 0
+    ;;
+  *"PRRT_gqlratelimit"*)
+    # Real gh prints the body and exits 1 on a GraphQL .errors payload.
+    bump resolve_gqlrl >/dev/null
+    printf '{"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded for user."}]}\n'
+    printf 'gh: API rate limit exceeded for user.\n' >&2
+    exit 1
+    ;;
+  *"PRRT_bare429"*)
+    # 429 with no rate-limit wording and no headers.
+    bump resolve_429 >/dev/null
+    printf 'gh: HTTP 429\n' >&2
+    exit 1
+    ;;
+  *"PRRT_auth401"*)
+    printf 'gh: HTTP 401: Bad credentials (https://api.github.com/graphql)\n' >&2
+    exit 1
+    ;;
+  *"PRRT_plain403"*)
+    printf 'gh: Resource not accessible by integration (HTTP 403)\n' >&2
+    exit 1
+    ;;
+  *"PRRT_403notfoundtext"*)
+    # A 403 whose text also says "not found": permission wins.
+    printf 'gh: HTTP 403: thread not found in token scope\n' >&2
+    exit 1
+    ;;
+  *"PRRT_generic500"*)
+    printf 'gh: HTTP 500: Server Error\n' >&2
+    exit 1
+    ;;
+  *"PRRT_rl_header"*)
+    # 429 with Retry-After: 1 on the first call, then success.
+    if [ "$(bump resolve_rl_header)" -eq 1 ]; then
+      MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
+      http "HTTP/2.0 429 Too Many Requests" "Retry-After: 1"
+      printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
+      exit 1
+    fi
+    MOCK_BODY=$(cat "$FIXTURE_DIR/resolve-success-response.json")
+    http "HTTP/2.0 200 OK" ""
+    ;;
+  *"PRRT_rl_long"*)
+    # 429 with Retry-After beyond the 90 s ceiling.
+    bump resolve_rl_long >/dev/null
+    MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
+    http "HTTP/2.0 429 Too Many Requests" "Retry-After: 120"
+    printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
+    exit 1
+    ;;
+  *"PRRT_rl_huge"*|*"PRRT_rl_resethuge"*)
+    # Retry-After / x-ratelimit-reset values past the shell's integer range;
+    # always limited.
+    bump "resolve_$(printf '%s' "$ALL_ARGS" | grep -o 'PRRT_rl_[a-z]*huge' | head -1)" >/dev/null
+    MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
+    case "$ALL_ARGS" in
+      *"PRRT_rl_resethuge"*) _hdr=$(printf 'x-ratelimit-remaining: 0\nx-ratelimit-reset: 99999999999999999999') ;;
+      *) _hdr="Retry-After: 99999999999999999999" ;;
+    esac
+    http "HTTP/2.0 429 Too Many Requests" "$_hdr"
+    printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
+    exit 1
+    ;;
+  *"PRRT_rl_reset"*|*"PRRT_rl_resetpast"*|*"PRRT_rl_resetfar"*)
+    # x-ratelimit-reset wait source (no Retry-After). resetfar (+500 s) is
+    # always limited; reset (+30 s) and resetpast (-100 s) only on call 1.
+    _n=$(bump "resolve_$(printf '%s' "$ALL_ARGS" | grep -o 'PRRT_rl_reset[a-z]*' | head -1)")
+    case "$ALL_ARGS" in *"PRRT_rl_resetfar"*) _lim=1 ;; *) [ "$_n" -eq 1 ] && _lim=1 || _lim=0 ;; esac
+    if [ "$_lim" = 1 ]; then
+      _now=$(date +%s)
+      case "$ALL_ARGS" in
+        *"PRRT_rl_resetfar"*) _at=$((_now + 500)) ;;
+        *"PRRT_rl_resetpast"*) _at=$((_now - 100)) ;;
+        *) _at=$((_now + 30)) ;;
+      esac
+      MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
+      http "HTTP/2.0 429 Too Many Requests" "$(printf 'x-ratelimit-remaining: 0\nx-ratelimit-reset: %s' "$_at")"
+      printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
+      exit 1
+    fi
+    MOCK_BODY=$(cat "$FIXTURE_DIR/resolve-success-response.json")
+    http "HTTP/2.0 200 OK" ""
+    ;;
+  *"PRRT_gqlnf_exit0"*)
+    printf '{"data":{"resolveReviewThread":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to a node with the global id."}]}\n'
+    exit 0
+    ;;
+  *"PRRT_gqlfb_exit0"*)
+    printf '{"data":{"resolveReviewThread":null},"errors":[{"type":"FORBIDDEN","message":"Resource not accessible by integration"}]}\n'
+    exit 0
+    ;;
+  *"PRRT_gqlnotfound"*)
+    # Real gh: body on stdout, message on stderr, exit 1.
+    printf '{"data":{"resolveReviewThread":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to a node with the global id."}]}\n'
+    printf 'gh: Could not resolve to a node with the global id.\n' >&2
+    exit 1
+    ;;
+  *"PRRT_gqlforbidden"*)
+    printf '{"data":{"resolveReviewThread":null},"errors":[{"type":"FORBIDDEN","message":"Resource not accessible by integration"}]}\n'
+    printf 'gh: Resource not accessible by integration\n' >&2
+    exit 1
+    ;;
+  *"PRRT_alreadyjson"*)
+    # gh exits 0 with an already-resolved GraphQL error payload.
+    printf '{"data":{"resolveReviewThread":null},"errors":[{"message":"Thread is already resolved"}]}\n'
+    exit 0
+    ;;
+  *"PRRT_rl_then_nf"*)
+    # Rate limited on the first call, then the thread turns out not to exist.
+    if [ "$(bump resolve_rl_then_nf)" -eq 1 ]; then
+      printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2
+      exit 1
+    fi
+    printf '{"data":{"resolveReviewThread":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to a node with the global id."}]}\n'
+    printf 'gh: Could not resolve to a node with the global id.\n' >&2
+    exit 1
+    ;;
   *"PRRT_valid"*)
     cat "$FIXTURE_DIR/resolve-success-response.json"
     ;;
   *"PRRT_notfound"*)
     printf 'Could not resolve to a node' >&2
+    exit 1
+    ;;
+  *"PRRT_ratelimited"*)
+    bump resolve_rl >/dev/null
+    printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2
+    exit 1
+    ;;
+  *"PRRT_ratelimit_once"*)
+    if [ "$(bump resolve_rl_once)" -eq 1 ]; then
+      printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2
+      exit 1
+    fi
+    cat "$FIXTURE_DIR/resolve-success-response.json"
+    ;;
+  *"PRRT_forbidden"*)
+    printf 'gh: Resource not accessible by integration\n' >&2
     exit 1
     ;;
   *"PRRT_resolved"*)
@@ -468,6 +654,8 @@ case "$ALL_ARGS" in
     printf '  PRRT_valid  → resolve-success-response.json\n' >&2
     printf '  PRRT_notfound → not found error\n' >&2
     printf '  PRRT_resolved → already resolved error\n' >&2
+    printf '  PRRT_ratelimited / PRRT_ratelimit_once / PRRT_forbidden → rate limit / permission error\n' >&2
+    printf '  PRRT_gql* / PRRT_bare429 / PRRT_auth401 / PRRT_plain403 / PRRT_generic500 → typed and bare gh failures (exit 1)\n' >&2
     printf '  pr view <n>  → {state,headRefOid,baseRefOid} from MOCK_GH_* env\n' >&2
     printf '  latestOpinionatedReviews → blockers-response.json (MOCK_GH_BLOCKERS_*)\n' >&2
     printf '  */protection → MOCK_GH_PROTECTION; */rules/branches/* → MOCK_GH_RULES\n' >&2

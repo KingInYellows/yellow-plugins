@@ -17,7 +17,7 @@
  * process.
  */
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -216,8 +216,8 @@ describe('validate-agent-authoring W1.5 read-only reviewer rule', () => {
   });
 
   it('does NOT flag non-review agents (e.g., agents/workflow/)', () => {
-    // pr-comment-resolver legitimately needs Bash and Edit; it lives under
-    // agents/workflow/ not agents/review/ and Rule X does not apply.
+    // Workflow agents (e.g. pr-comment-resolver, which needs Edit) live under
+    // agents/workflow/ not agents/review/, and Rule X does not apply.
     writeAgent(
       tmpRoot,
       'yellow-test/agents/workflow/some-worker.md',
@@ -228,5 +228,41 @@ describe('validate-agent-authoring W1.5 read-only reviewer rule', () => {
 
     expect(status).toBe(0);
     expect(stderr).not.toMatch(/some-worker\.md.*review\/ agent/);
+  });
+});
+
+describe('pr-comment-resolver controls and disposition contract', () => {
+  const reviewDir = join(__dirname, '../../plugins/yellow-review');
+  const agent = readFileSync(
+    join(reviewDir, 'agents/workflow/pr-comment-resolver.md'),
+    'utf8'
+  );
+  const contract = readFileSync(
+    join(reviewDir, 'references/resolve/dispositions.md'),
+    'utf8'
+  );
+
+  const frontmatterTools = (): string[] => {
+    const frontmatter = /^---\n([\s\S]*?)\n---/.exec(agent)?.[1] ?? '';
+    const block = /^tools:\n((?:\s+- .*\n?)+)/m.exec(frontmatter)?.[1] ?? '';
+    return block
+      .split('\n')
+      .map((line) => line.replace(/^\s*- /, '').trim())
+      .filter(Boolean);
+  };
+
+  const threadFormatLines = (text: string): string[] =>
+    text.split('\n').filter((line) => line.startsWith('THREAD <PRRT_id> |'));
+
+  it('has no Bash tool', () => {
+    const tools = frontmatterTools();
+    expect(tools).toContain('Edit');
+    expect(tools).not.toContain('Bash');
+  });
+
+  it('restates the THREAD line exactly as the contract does', () => {
+    const contractLines = threadFormatLines(contract);
+    expect(contractLines).toHaveLength(1);
+    expect(threadFormatLines(agent)).toEqual(contractLines);
   });
 });

@@ -1,0 +1,137 @@
+#!/bin/bash
+# Poll for review threads that appeared after round 1 of /review:resolve.
+# Usage: poll-new-threads --wait <seconds, at most 480> <owner/repo> <pr-number> <round1-ids-file> <out-file>
+#   --wait 0 fetches exactly once with no sleep. Otherwise the script sleeps
+#   min(20, remaining) seconds, fetches, and stops at the first fetch that
+#   shows a thread ID missing from <round1-ids-file> (one ID per line; blank
+#   lines and CRs are ignored) or when the wait is used up; it always fetches
+#   at least once. --wait is a wall-clock bound: time spent inside
+#   get-pr-comments counts, so the remaining wait shrinks after a slow fetch
+#   and no further round starts once it is used up.
+# Output: the last successful get-pr-comments JSON in <out-file>; progress
+#   lines "poll t=<s> new=<0|1>" and a final "repass fetched=<0|1> found=<0|1>"
+#   on stdout. fetched=0 means no fetch succeeded (inconclusive).
+# Exit codes: 0 finished (read the final line), 2 usage, 4 rate limited
+#             ("poll rate-limited" is printed; stop mutating).
+# Each fetch gets its own pagination deadline: this script passes
+#   YELLOW_REVIEW_FETCH_DEADLINE=55 to get-pr-comments, which stops paginating
+#   there (a partial array and exit 3, read here as a failed fetch), and backs
+#   it with a 60 s hard cap (timeout(1)). The script ends within --wait + 60 s.
+#   YELLOW_REVIEW_GH_TIMEOUT (default 30, clamped to 60) still bounds each gh
+#   call inside get-pr-comments; this script does not parse it.
+# A failed fetch, jq parse or grep is never read as "no new threads": the
+# round is skipped and the loop moves on. The first 300 bytes of a failed
+# fetch's stderr go to this script's stderr ("poll fetch-failed: ..."). An
+# authentication, permission or not-found failure cannot clear by waiting, so
+# polling stops there (still exit 0, fetched=0 unless an earlier round fetched). A failed copy to <out-file> resets
+# fetched to 0, since <out-file> would hold stale data.
+
+set -u
+
+STEP=20
+
+# One get-pr-comments run gets FETCH_DEADLINE seconds of pagination (its own
+# YELLOW_REVIEW_FETCH_DEADLINE, which cuts each later page's gh call to the time
+# left) and FETCH_WINDOW seconds as a hard cap, so the last fetch ends within
+# --wait + 60 s, inside the (wait + 120) x 1000 ms Bash tool timeout the caller
+# passes. A multi-page fetch is not killed by the per-call gh limit.
+FETCH_WINDOW=60
+FETCH_DEADLINE=55
+# GNU coreutils on macOS installs it as gtimeout.
+TIMEOUT_BIN=""
+for _t in timeout gtimeout; do
+    if command -v "$_t" >/dev/null 2>&1; then TIMEOUT_BIN=$_t; break; fi
+done
+[ -n "$TIMEOUT_BIN" ] || printf 'Note: neither timeout nor gtimeout is installed; fetches run without a time limit.\n' >&2
+
+usage() {
+    printf 'Usage: poll-new-threads --wait <seconds> <owner/repo> <pr-number> <round1-ids-file> <out-file>\n' >&2
+    exit 2
+}
+
+WAIT=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --wait) [ $# -ge 2 ] || usage; WAIT="$2"; shift 2 ;;
+        --*) usage ;;
+        *) break ;;
+    esac
+done
+[ $# -eq 4 ] || usage
+REPO="$1"; PR="$2"; ROUND1="$3"; OUT="$4"
+case "$WAIT" in ''|*[!0-9]*) usage ;; esac
+# At most 4 digits and 480 s, the cap the settings enforce: a longer value
+# would make the integer tests below error and the loop spin without sleeping.
+[ "${#WAIT}" -le 4 ] && [ "$WAIT" -le 480 ] || usage
+[ -r "$ROUND1" ] || { printf 'Error: round-1 file not readable: %s\n' "$ROUND1" >&2; exit 2; }
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
+WORK=$(mktemp -d) || exit 1
+trap 'rm -rf "$WORK"' EXIT
+
+# Blank lines would make grep -F match everything; CRs would never match.
+tr -d '\r' <"$ROUND1" | grep -v '^$' >"$WORK/round1" || :
+
+fetched=0
+found=0
+START=$(date +%s)
+slept=0
+waited=0
+# Seconds used so far: wall-clock since START, never less than the time slept.
+tick() {
+    now=$(date +%s) || now=$START
+    waited=$((now - START))
+    [ "$waited" -lt "$slept" ] && waited=$slept
+    return 0
+}
+# fetch_threads: run get-pr-comments; exit 124 means the time limit killed it.
+fetch_threads() {
+    if [ -n "$TIMEOUT_BIN" ]; then
+        YELLOW_REVIEW_FETCH_DEADLINE=$FETCH_DEADLINE "$TIMEOUT_BIN" "$FETCH_WINDOW" "$SCRIPT_DIR/get-pr-comments" --include-outdated "$REPO" "$PR"
+    else
+        YELLOW_REVIEW_FETCH_DEADLINE=$FETCH_DEADLINE "$SCRIPT_DIR/get-pr-comments" --include-outdated "$REPO" "$PR"
+    fi
+}
+while :; do
+    tick
+    if [ "$waited" -lt "$WAIT" ]; then
+        step=$((WAIT - waited))
+        [ "$step" -gt "$STEP" ] && step=$STEP
+        sleep "$step"
+        slept=$((slept + step))
+        tick
+    fi
+    fetch_rc=0
+    fetch_threads >"$WORK/new" 2>"$WORK/err" || fetch_rc=$?
+    if [ "$fetch_rc" -eq 0 ]; then
+        if jq -r '.[].threadId' "$WORK/new" >"$WORK/ids" 2>/dev/null; then
+            grep_rc=0
+            grep -qvxF -f "$WORK/round1" "$WORK/ids" || grep_rc=$?
+            # grep exits 0 for a new ID, 1 for none, 2 or more on error.
+            if [ "$grep_rc" -le 1 ] && cp "$WORK/new" "$OUT"; then
+                fetched=1
+                if [ "$grep_rc" -eq 0 ]; then found=1; fi
+                printf 'poll t=%s new=%s\n' "$waited" "$found"
+            else
+                fetched=0
+            fi
+        fi
+    elif [ "$fetch_rc" -eq 124 ] && [ -n "$TIMEOUT_BIN" ]; then
+        # A stalled fetch is inconclusive and unlikely to clear: stop here so
+        # the final status line still prints.
+        printf 'poll fetch-failed: get-pr-comments timed out after %ss\n' "$FETCH_WINDOW" >&2
+        break
+    elif grep -qi 'rate limit' "$WORK/err"; then
+        printf 'poll rate-limited\n'
+        exit 4
+    else
+        printf 'poll fetch-failed: %s\n' "$(head -c 300 "$WORK/err" | tr '\n' ' ')" >&2
+        # Permanent failures (get-pr-comments' own wording): stop early.
+        if grep -qE 'Authentication failed|Insufficient permissions|not found' "$WORK/err"; then
+            break
+        fi
+    fi
+    tick
+    if [ "$found" = 1 ] || [ "$waited" -ge "$WAIT" ]; then break; fi
+done
+printf 'repass fetched=%s found=%s\n' "$fetched" "$found"

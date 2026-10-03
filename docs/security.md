@@ -25,7 +25,16 @@ does both in the background; `/ruvector:setup` does them in the foreground.
 ### Plugins Without MCP Servers
 
 - **gt-workflow** — Pure CLI wrapper for Graphite, no network calls
-- **yellow-review** — Uses `gh` CLI (GitHub CLI) for GraphQL API calls, not MCP
+- **yellow-review** — Ships no MCP server; uses `gh` CLI (GitHub CLI) for
+  GraphQL API calls. When yellow-linear's `save_issue` tool is discoverable and
+  the branch name carries a Linear issue ID, `/review:resolve` files follow-up
+  issues through yellow-linear's `linear` server (`list_teams`, `list_issues`,
+  `save_issue`) under that server's OAuth grant. The issue holds a generated
+  title (`Follow-up from PR #N: <path or "review">`), the resolver's
+  `oos_reason`, a link to the thread, and a dedupe marker; the reviewer's
+  comment text is never sent. Otherwise, or when Linear fails or its team
+  cannot be resolved, it files once on GitHub and the report says so
+  (`tracker=github (linear unavailable)`).
 - **yellow-browser-test** — Uses `agent-browser` CLI locally, no MCP
 - **yellow-debt** — Pure local analysis, no network calls
 - **yellow-council** — Ships no MCP server. Three of its four reviewers are

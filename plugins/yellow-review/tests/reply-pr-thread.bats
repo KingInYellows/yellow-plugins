@@ -3,6 +3,8 @@
 
 bats_require_minimum_version 1.5.0
 
+load helpers/timeout-stub
+
 SCRIPT_DIR="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/skills/pr-review-workflow/scripts"
 SCRIPT="${SCRIPT_DIR}/reply-pr-thread"
 
@@ -206,6 +208,27 @@ stub_sleep() {
   [[ "$stderr" == *"timed out"* ]]
 }
 
+@test "YELLOW_REVIEW_GH_TIMEOUT=0 falls back to the 30 s default, not no limit" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=0 run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 30 ]
+}
+
+@test "a non-numeric YELLOW_REVIEW_GH_TIMEOUT falls back to the 30 s default" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=abc run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 30 ]
+}
+
+@test "a valid YELLOW_REVIEW_GH_TIMEOUT is passed to timeout" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=7 run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 7 ]
+}
+
 @test "refuses a body that looks like a credential, before any API call" {
   printf 'Fixed. Token was ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345\n' >| "$BODY"
   run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
@@ -328,7 +351,7 @@ stub_sleep() {
 @test "a last comment the prior-marker check cannot read exits 1 and posts nothing" {
   run --separate-stderr "$SCRIPT" PRRT_reply_badbody fixed "$BODY"
   [ "$status" -eq 1 ]
-  [[ "$stderr" == *"could not read the last comment"* ]]
+  [[ "$stderr" == *"could not read the recent comments"* ]]
   [ ! -f "$CALLS" ]
 }
 
@@ -364,4 +387,129 @@ path_without_timeout() {
   PATH="${BATS_TEST_TMPDIR}/notimeout" run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
   [ "$status" -eq 0 ]
   [[ "$stderr" == *"neither timeout nor gtimeout is installed"* ]]
+}
+
+# --- Recovery window: comments(last: 10), Bot acknowledgements ignored ---
+
+@test "skips when only Bot comments follow our marker and reports its disposition" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_botafter unclear "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.replied, .skipped, .disposition]')" = '[false,"already-replied","fixed"]' ]
+  [ ! -f "$CALLS" ]
+}
+
+@test "posts when a human comment follows our marker" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_humanafter fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
+  [ "$(cat "$CALLS")" = 1 ]
+}
+
+@test "posts when a comment with an unreadable author follows our marker" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_ghostafter fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
+  [ "$(cat "$CALLS")" = 1 ]
+}
+
+@test "posts when our latest comment has no marker for this thread" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_nomarker fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
+  [ "$(cat "$CALLS")" = 1 ]
+}
+
+@test "posts when our marker has fallen out of the 10-comment window behind Bot replies" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_outwindow fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
+  [ "$(cat "$CALLS")" = 1 ]
+}
+
+# --- structured exit-4 reason (rate-limit vs timeout) ---
+
+@test "exit 4 from a gh timeout prints reason=timeout and no other reason" {
+  mkdir -p "${BATS_TEST_TMPDIR}/tobin"
+  printf '#!/bin/sh\nexit 124\n' >| "${BATS_TEST_TMPDIR}/tobin/timeout"
+  chmod +x "${BATS_TEST_TMPDIR}/tobin/timeout"
+  PATH="${BATS_TEST_TMPDIR}/tobin:${PATH}" run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=timeout'
+  [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
+}
+
+@test "exit 4 from a wait over the cap prints reason=rate-limit" {
+  stub_sleep
+  run --separate-stderr "$SCRIPT" PRRT_reply_ra120 fixed "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
+}
+
+@test "exit 4 from a second rate limit prints reason=rate-limit" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_rl2 fixed "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [ "$(printf '%s\n' "$stderr" | grep -c '^reason=')" = 1 ]
+}
+
+# --- Oversized numeric values (past the shell's integer range) ---
+
+@test "an oversized YELLOW_REVIEW_RATE_LIMIT_WAIT falls back to 60 s and never sleeps the huge value" {
+  stub_sleep
+  YELLOW_REVIEW_RATE_LIMIT_WAIT=99999999999999999999 run --separate-stderr "$SCRIPT" PRRT_reply_envhuge fixed "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [[ "$stderr" != *"integer expression"* ]]
+  [ "$(cat "$SLEEP_LOG")" = 60 ]
+}
+
+@test "a Retry-After past the integer range exits 4 with reason=rate-limit and does not sleep" {
+  stub_sleep
+  run --separate-stderr "$SCRIPT" PRRT_reply_rahuge fixed "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [[ "$stderr" != *"integer expression"* ]]
+  [ "$(cat "$CALLS")" = 1 ]
+  [ ! -f "$SLEEP_LOG" ]
+}
+
+@test "an x-ratelimit-reset past the integer range exits 4 with reason=rate-limit and does not sleep" {
+  stub_sleep
+  run --separate-stderr "$SCRIPT" PRRT_reply_resethuge fixed "$BODY"
+  [ "$status" -eq 4 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=rate-limit'
+  [[ "$stderr" != *"integer expression"* ]]
+  [ "$(cat "$CALLS")" = 1 ]
+  [ ! -f "$SLEEP_LOG" ]
+}
+
+@test "an oversized YELLOW_REVIEW_GH_TIMEOUT falls back to the 30 s default" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=99999999999999999999 run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 30 ]
+}
+
+@test "a 5-digit YELLOW_REVIEW_GH_TIMEOUT falls back to the 30 s default" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=10000 run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 30 ]
+}
+
+@test "a YELLOW_REVIEW_GH_TIMEOUT over 60 is clamped to 60, not reset to the default" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=9999 run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 4 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 60 ]
+  [[ "$stderr" == *"timed out after 60s"* ]]
+}
+
+@test "YELLOW_REVIEW_GH_TIMEOUT=61 is clamped to 60 and 60 passes through" {
+  stub_timeout_logging
+  YELLOW_REVIEW_GH_TIMEOUT=61 run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 60 ]
+  YELLOW_REVIEW_GH_TIMEOUT=60 run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 60 ]
 }
