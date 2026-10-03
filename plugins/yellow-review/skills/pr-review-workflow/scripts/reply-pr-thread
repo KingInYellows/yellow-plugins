@@ -7,7 +7,11 @@
 #   {"replied":true,"commentId":"PRRC_...","threadId":"PRRT_..."}
 #   {"replied":false,"skipped":"already-replied","disposition":"...","threadId":"PRRT_..."}
 #     (skipped when the thread's last comment is ours and carries a marker
-#     for this thread with ANY disposition; "disposition" is the one found)
+#     for this thread; "disposition" is the one found. The one exception: a
+#     prior disagree or unclear marker never blocks a fixed, addressed or oos
+#     reply, because that reply carries the evidence the later resolve needs.
+#     A caller resolves after a skip only when "disposition" equals the one
+#     it asked for.)
 # Exit codes: 1 other failure (including a non-JSON response),
 #             2 usage: wrong argument count, invalid thread ID or
 #               disposition, unreadable, empty or over-long body file, or a
@@ -225,6 +229,9 @@ fi
 # A marker counts only on a comment the viewer authored; a reviewer quoting
 # our marker never causes a skip. Any disposition counts: a re-run after a
 # crash (reply posted, resolve failed) must not post a contradictory reply.
+# The exception is an upgrade from a reply that left the thread open
+# (disagree, unclear) to one that lets the caller resolve it (fixed,
+# addressed, oos): skipping would resolve the thread with no evidence posted.
 # No match prints nothing and exits 0; a jq failure must not read as "no
 # marker", or the reply the marker exists to prevent would be posted.
 if ! PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
@@ -237,6 +244,10 @@ if ! PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
     printf 'Error: could not read the last comment of %s; not posting.\n' "$THREAD_ID" >&2
     exit 1
 fi
+case "$PRIOR_DISPOSITION:$DISPOSITION" in
+    disagree:fixed|disagree:addressed|disagree:oos|unclear:fixed|unclear:addressed|unclear:oos)
+        PRIOR_DISPOSITION="" ;;
+esac
 if [ -n "$PRIOR_DISPOSITION" ]; then
     jq -nc --arg id "$THREAD_ID" --arg d "$PRIOR_DISPOSITION" '{replied: false, skipped: "already-replied", disposition: $d, threadId: $id}'
     exit 0

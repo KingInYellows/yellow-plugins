@@ -223,6 +223,12 @@ case "$ALL_ARGS" in
       *"PRRT_reply_done"*)
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_done","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_done disposition=fixed -->\n"}]}}}}'
         ;;
+      *"PRRT_reply_priorunclear"*)
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_priorunclear","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Could not verify.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_priorunclear disposition=unclear -->\n"}]}}}}'
+        ;;
+      *"PRRT_reply_priordisagree"*)
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_priordisagree","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Not changing this.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_priordisagree disposition=disagree -->\n"}]}}}}'
+        ;;
       *"PRRT_reply_spoof"*)
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_spoof","comments":{"nodes":[{"viewerDidAuthor":false,"body":"> <!-- yellow-review:resolve v1 thread=PRRT_reply_spoof disposition=fixed -->"}]}}}}'
         ;;
