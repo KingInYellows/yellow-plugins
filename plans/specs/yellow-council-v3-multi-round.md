@@ -70,3 +70,7 @@ Roadmap step 11 of the integration evaluation (`docs/brainstorms/2026-10-02-turn
   - R8–R9 (serve), which can ship independently of rounds;
   - R10 before any default change;
   - R11 with each PR.
+
+## Open Questions
+
+- Stale-server sweep ownership (serve spike): the R8 sweep must not reclaim a server that another running `/council` still uses. The spike decides how ownership is recorded and checked (for example, the owning council's PID plus a heartbeat or lease file) before any reclaim. Raised in PR #986 review.

@@ -31,7 +31,7 @@ This spec covers roadmap step 8 (trigger evals), the step-12 `disable-model-invo
 ### Trigger-eval vehicle (roadmap step 8)
 
 - **R5.** Before any eval tooling lands, a spike shall decide between native `claude plugin eval` and vendoring skill-creator's eval scripts.
-  - Native wins if it can score each skill on both should-trigger and should-not-trigger (near-miss) cases, with n runs and a threshold, without the run firing yellow's compound-staging hooks.
+  - Native wins if it can score both a skill and a command on both should-trigger and should-not-trigger (near-miss) cases, with n runs and a threshold, without the run firing yellow's compound-staging hooks. A vehicle that passes for the skill but cannot observe or grade command invocation does not win.
   - The spike records the Claude Code version and its verdict in the baseline document.
 - **R6.** If native wins, the eval runner shall wrap `claude plugin eval` (`--ablation none`, `--max-cost-usd`). It stages repo-level eval sets into a temporary copy of the target plugin.
 - **R7.** If native loses, the system shall vendor skill-creator's `run_eval.py`, `run_loop.py`, `improve_description.py` and `utils.py` into `vendor/anthropics/skill-creator-evals/`, and record the local modifications in `PROVENANCE.json`. The vendored copy carries:
@@ -94,11 +94,11 @@ This spec covers roadmap step 8 (trigger evals), the step-12 `disable-model-invo
 
 ### Eval vehicle (R5–R13)
 
-- **Spike (R5).** Build one hand-written case pair for one skill:
-  - a should-trigger case graded `tool_used: Skill`;
-  - a near-miss case whose grader asserts the skill was not used.
+- **Spike (R5).** Build one hand-written case pair for one skill and one for one command. Each pair has:
+  - a should-trigger case graded on the component's invocation (`tool_used: Skill` for the skill; whatever signal the vehicle exposes for the command);
+  - a near-miss case whose grader asserts the component was not used.
 
-  Run it with `--ablation none` under the R8 isolation. The verdict depends on whether a "not used" grader exists, whether n-run thresholds work, and whether the run left a compound staging entry.
+  Run both pairs with `--ablation none` under the R8 isolation. The winning vehicle must pass both pairs. The verdict depends on whether command invocation can be observed and graded, whether a "not used" grader exists, whether n-run thresholds work, and whether the run left a compound staging entry.
 - **Runner.** `scripts/eval-skill-trigger.sh`, exposed as `pnpm eval:skill-trigger`, does three things:
   1. Resolves `<plugin>:<component>` to its eval set.
   2. Builds the isolated environment.

@@ -21,7 +21,7 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 
 - **R1.** When the Stop hook fires with `stop_hook_active: true`, the system shall capture the transcript tail exactly as it does for a non-re-entrant stop, regardless of which loop driver caused the continuation.
   - Acceptance: `tests/compound-stop-hook.bats` case "stop hook exits when stop_hook_active is true" is replaced by a case asserting one pending entry exists for the session.
-- **R2.** When a capture for a session finishes, the system shall keep at most one pending entry per session, and the entry shall always be the one with the longest transcript seen for that session. A capture shall not write when a per-session high-water mark of `transcript_lines` is already at or above its own, so an out-of-order subshell cannot overwrite or re-create a stale entry, including after the drain has consumed a newer one. The compare, the mark update and the write shall run under a per-session lock, so two overlapping captures cannot both pass the check. Only the capture that took the lock may release it. A capture that cannot take the lock within the wait shall abandon without writing.
+- **R2.** When a capture for a session finishes, the system shall keep at most one pending entry per session, and the entry shall always be the one with the longest transcript seen for that session. A capture shall not write when a per-session high-water mark of `transcript_lines` is already at or above its own, so an out-of-order subshell cannot overwrite or re-create a stale entry, including after the drain has consumed a newer one. The compare, the mark update and the write shall run under a per-session lock, so two overlapping captures cannot both pass the check. Only the capture that took the lock may release it, and a lock is reclaimed only when its recorded owner process is dead; a live owner keeps it. A capture that cannot take the lock within the wait shall abandon without writing.
   - Residual: the mark is written before the entry, so a capture that dies between the two is lost, and the pending entry keeps an earlier tail. This is chosen over the reverse order, which can recreate a stale entry after the drain consumes a newer one.
   - Acceptance:
     - A bats case runs two captures for one session, the later one with a longer transcript, in reverse completion order. The pending entry holds the longer tail.
@@ -73,19 +73,22 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 - **R16.** The composed condition shall have three parts in order, totalling at most 3,800 characters (native limit 4,000). It is refused, with the reason, if longer.
   - **Objective.** Execute `<plan>` with `/flow:work`.
   - **Exit branch.** STOP when three consecutive BLOCKED lines appear or after 20 turns.
-  - **DONE WHEN.** Numbered criteria, each naming a proof command whose output must appear in the transcript.
-- **R17.** The system shall take proof commands from the plan's `## Proof Commands` section.
-  - If the section is absent and the project has an AGENTS.md "Targeted Validation Matrix", it shall propose commands from that matrix for the plan's touched paths and confirm them with the user.
-  - Otherwise it shall ask the user for them.
+  - **DONE WHEN.** Numbered criteria, each naming a proof command (of either kind, R18) whose output must appear in the transcript.
+- **R17.** The system shall take proof commands, each with its kind (`target` or `invariant`, R18), from the plan's `## Proof Commands` section.
+  - If the section is absent and the project has an AGENTS.md "Targeted Validation Matrix", it shall propose commands from that matrix for the plan's touched paths and confirm them with the user. Matrix commands are proposed as `invariant` unless the user marks them `target`.
+  - Otherwise it shall ask the user for them and their kinds.
   - It shall refuse to compose a condition with zero proof commands.
-- **R18.** The `/flow:plan` templates shall include an optional `## Proof Commands` section (one runnable command per acceptance criterion).
+- **R18.** The `/flow:plan` templates shall include an optional `## Proof Commands` section with one runnable command per acceptance criterion. Each entry is a list item of the form `- <kind>: <command>`, where `<kind>` is one of:
+  - `target`: expected to fail before the work and pass after (for example a new reproduction or a newly added test).
+  - `invariant`: expected to pass both before and after (for example an existing test suite, lint or typecheck).
+  - An entry with a missing or unknown kind is invalid. The compose step asks the user to classify it, and never guesses.
 - **R19.** Before the step 6 PR merges, a check shall determine whether a command can start native `/goal` on the installed Claude Code version, and record the version.
   - If it can, `--goal-condition` starts the goal.
   - If it cannot, it prints a ready-to-paste `/goal <condition>` line and stops.
 - **R20.** The flag's help text and yellow-core docs shall state that `--goal-condition` targets native Claude Code `/goal`, and is unrelated to the `yellow-goal` plugin (`/goal:*`) and the jules goal-engine milestone.
 - **R21.** As a user running a goal, I want every proof command baseline-checked before the goal starts and re-run afterwards so that "done" is never vacuous.
   - Acceptance:
-    - Before composing, each proof runs once. A target that already passes is rejected as vacuous, and an invariant that already fails is rejected as invalid.
+    - Before composing, each proof runs once and its result is compared with its declared kind (R18). A `target` that already passes is rejected as vacuous, and an `invariant` that already fails is rejected as invalid. A `target` that fails and an `invariant` that passes are accepted. The rejection names the command and its kind.
     - Commands are shown and confirmed before any execution.
     - After the run, a recheck log records each proof's result.
     - The plan's spec (not the mutable plan) is pinned by hash.
@@ -103,9 +106,9 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
   - Count transcript lines (`wc -l`) and add `stop_hook_active` and `transcript_lines` to the jq entry (R3).
   - Serialize on a per-session lock directory `<session>.lock/` under the staging root (`mkdir`, portable, no `flock` dependency). The wait runs in the disowned subshell, never in the parent (R4).
     - **Owner token.** After `mkdir`, write `<pid>.<random>` to `<session>.lock/owner`. Release removes the directory only when `owner` still holds this capture's token.
-    - **Wait and break.** Wait up to 5 seconds. Break a lock only when its recorded owner PID is dead (`kill -0` fails) or the lock is older than 60 seconds (this covers a crash between `mkdir` and the owner write). Break by renaming the directory to a unique name, then removing it, so one waiter wins. Then retry `mkdir`.
+    - **Wait and break.** Wait up to 5 seconds. Break a lock only when its recorded owner PID is dead (`kill -0` fails). A live owner keeps the lock however long it holds it; there is no age-based eviction. Break by renaming the directory to a unique name, then removing it, so one waiter wins. Then retry `mkdir`.
     - **Timeout.** Abandon: log to the disowned subshell's stderr and write nothing. An unlocked write would reopen the R2 race, and a later stop captures again.
-    - **Residual.** A live holder stalled past 60 seconds can lose its lock. It re-checks its token just before the entry write and skips if the token is gone, which leaves only a few-millisecond window.
+    - **Residual.** A crash between `mkdir` and the owner write leaves a lock with no recorded owner. Waiters treat it as held and abandon, so that session's captures stop until retention reaping removes the lock. A live holder is never evicted. The holder still re-checks its token just before the entry write and skips if the token is gone, as a defensive guard.
   - Under the lock, read the per-session high-water mark file (`<session>.hwm`, holding the highest `transcript_lines` written). If it is at or above this capture's `transcript_lines`, exit without writing (R2).
   - Otherwise, still under the lock, update the mark atomically (tmp + `mv`) **first**, then call `cs_atomic_jsonl_write`. If the entry write fails without a crash, restore the previous mark.
     - **Why mark first.** A crash between the two loses this capture. The reverse order leaves a newer entry and an older mark, so the drain can consume the entry and an older waiting capture then recreates a shorter one. A lost capture is the smaller harm.
@@ -150,7 +153,7 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 
 - **Flag parsing.** `/flow:work` Phase 1 parses `$ARGUMENTS` as an optional `--goal-condition` followed by an optional plan path. The path goes through the existing validation. With no path, R10 resolution applies.
 - **Compose step (new, before Phase 2).**
-  - Read proof commands (R17).
+  - Read proof commands and their kinds (R17, R18).
   - Assemble objective, exit branch and DONE WHEN (R16).
   - Enforce the length limit.
   - Then either start `/goal` or print the ready-to-paste line, per R19's recorded result.
@@ -180,7 +183,11 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 
 ## Open Questions
 
-None. Both were resolved during spec review on 2026-10-03:
+Deferred to expansion:
+
+- High-water mark recovery (step 1 shell): mark-first ordering can leave the mark above the longest written entry after a crash or a token-gone skip, suppressing later captures. Expansion chooses the fix (restore the mark on every skip path, derive it from the entries, or reset it when no entry exists) and tests it. The same expansion also settles the ownerless lock left by a crash between `mkdir` and the owner write, which dead-owner reclaim cannot see (for example, rename a pre-built directory that already holds the owner file into place). Raised in PR #986 review.
+
+Resolved during spec review on 2026-10-03:
 
 - Whether a command can start native `/goal` stays a recorded pre-merge check (R19). The design covers both outcomes.
 - The R7 overlap heuristic is kept as specified and tuned after use. It asks at most one question, so false positives are cheap.
