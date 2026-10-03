@@ -23,7 +23,7 @@ The open resolve-hardening stack (#950, #952, #954, #955; plan `plans/review-res
 
 - **R1.** When given a file, a cited line, a radius (default 3) and a single-line quote, the yellow-core quote-grounding script shall report the quote as **grounded** when the whitespace-normalized quote is a substring of a whitespace-normalized line within `[line − radius, line + radius]`.
   - Before comparing, the script shall redact each file line in the window and the quote with `cs_redact_secrets`. It shall then canonicalize every `[REDACTED]` and `[REDACTED:<type>]` token to a single `[REDACTED]` on both sides. A quote that a persona self-redacted (R5) still matches, and the persona's choice of placeholder never decides the match. This holds even when the filter's generic `key=value` pass emits `[REDACTED]` where a vendor-prefix pass would emit a typed token.
-  - A quote with fewer than 8 non-whitespace characters is **too-short** and never grounded.
+  - A quote with fewer than 8 non-whitespace characters, counted after removing every `[REDACTED]` placeholder, is **too-short** and never grounded. A quote that is only placeholders therefore never matches an unrelated redacted line.
   - Exit 0 means grounded and prints the matched line number. Exit 1 means ungrounded, too-short, or unsafe-path. Exit 2 means a usage or file error.
   - Finding `file` values come from persona output over untrusted diffs and PR content, so the script shall open only canonical repo-relative regular files. Before any read it shall reject a path that is empty, absolute, `~`-prefixed, contains `..` or a newline or CR, resolves outside the repository root through a symlink, or is not a regular file. A rejected path is **unsafe-path**: never grounded, never read, and in a batch it affects only that finding.
 - **R2.** The script shall accept a batch of findings in one invocation and return one result per finding, so that grounding 100 findings across 20 files takes under 2 seconds.
@@ -196,3 +196,9 @@ Step 6 "Files" currently drops resolver-listed paths with no change. It will ins
   - After #950–#955 merge: R17–R23 (loop and phantom claims).
 - **Later:** R12, the enforce flip, once its evidence threshold is met.
 - **Out of scope:** applying the gate to yellow-debt's audit-synthesizer. The evaluation suggests it, but it belongs to yellow-debt's own roadmap work.
+
+## Open Questions
+
+Deferred to expansion:
+
+- Private-key interiors (primitive shell): per-line redaction cannot see `cs_redact_secrets`'s multi-line `BEGIN`/`END` private-key range, so base64 key material on an interior line could reach the ledger or report. Expansion adds a stateful, line-preserving redactor that replaces every line inside a private-key block, and tests a quote cited from inside one. Raised in PR #986 review.

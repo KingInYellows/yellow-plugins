@@ -189,6 +189,7 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 
 Deferred to expansion:
 
+- Post-goal recheck in the print-only fallback (R21 stage): when R19 finds a command cannot start `/goal`, `--goal-condition` prints the condition and stops, so nothing re-runs the proofs after the goal ends. The R21 expansion specifies the completion path (for example a `--goal-recheck` mode of `/flow:work` that re-runs the recorded proofs and writes the recheck log) and tests it. Raised in PR #986 review.
 - High-water mark recovery (step 1 shell): mark-first ordering can leave the mark above the longest written entry after a crash or a token-gone skip, suppressing later captures. Expansion chooses the fix (restore the mark on every skip path, derive it from the entries, or reset it when no entry exists) and tests it. The same expansion also settles the ownerless lock left by a crash between `mkdir` and the owner write, which dead-owner reclaim cannot see (for example, rename a pre-built directory that already holds the owner file into place). Raised in PR #986 review.
 
 Resolved during spec review on 2026-10-03:
