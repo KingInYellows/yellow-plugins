@@ -1,0 +1,25 @@
+plugins/yellow-review/CLAUDE.md
+  s_79ab629205942a::t_579472759d4b3f 244-247
+plugins/yellow-review/references/resolve/dispositions.md
+  s_79ab629205942a::t_c17072a3140210 629-630,634-635
+plugins/yellow-review/skills/pr-review-workflow/scripts/file-followup-issue
+  s_79ab629205942a::t_9b74caa07a16ce 27-30,32,130,232,241-245,280,293
+plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-blockers
+  s_79ab629205942a::t_c690ae995bb9bf 20-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "39bbd304b6653abde2fff45e61af2b1be89c185e",
+  "prompts": {},
+  "sessions": {
+    "s_79ab629205942a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "af7c3a89-4c40-4dc4-bd49-8799be9e99c6",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
