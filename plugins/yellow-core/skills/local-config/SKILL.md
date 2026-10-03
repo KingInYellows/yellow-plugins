@@ -145,9 +145,10 @@ flipping it to `persona`).
 Commands that honor this config (today: `review:pr`, `review:all`,
 `review:resolve`) read the file from the project root and merge values with
 their built-in defaults. `review:resolve` reads only the `resolve_pr.*` keys;
-`review:resolve-stack`, `review:sweep` and `review:sweep-all` do not read the
-file themselves but run `review:resolve` per PR, so those keys apply to them
-too. The merge precedence is:
+`review:resolve-stack` and `review:sweep` do not read the file themselves but
+run `review:resolve` per PR, so those keys apply to them too.
+`review:sweep-all` also reads `resolve_pr.repass_wait_seconds` itself, to
+print the worst-case re-pass wait before it starts. The merge precedence is:
 
 1. Command argument overrides (e.g., explicit flags) — highest
 2. `yellow-plugins.local.md` frontmatter

@@ -1,0 +1,1 @@
+[{"filename": "a b.ts", "patch": "@@ -1 +1 @@\n+x", "status": "modified"}, {"filename": "c@d.ts", "patch": "@@ -1 +1 @@\n+y", "status": "modified"}]

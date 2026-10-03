@@ -48,7 +48,11 @@ command -v jq >/dev/null 2>&1 || {
   printf '[review:sweep-all] Error: jq is not installed (required for PR filtering).\n' >&2
   exit 1
 }
-[ -z "$(git status --porcelain)" ] || {
+STATUS=$(git status --porcelain=v1 --untracked-files=all 2>&1) || {
+  printf '[review:sweep-all] Error: could not read the git status.\n' >&2
+  exit 1
+}
+[ -z "$STATUS" ] || {
   printf '[review:sweep-all] Error: uncommitted changes detected. Commit or stash first.\n' >&2
   exit 1
 }
@@ -276,9 +280,12 @@ For each iteration:
      error (e.g., item 1b found the PR closed/merged between enumeration and
      invocation): outcome is `skipped — <one-line reason>`. A dirty tree after
      the sweep is item 4's stop, not a skip.
-4. **Clean-tree check** — run `git status --porcelain`. A sweep normally
-   leaves the tree clean (fixes are committed and pushed; a failed verify
-   reverts its files). If it is dirty, Read
+4. **Clean-tree check** — run
+   `git status --porcelain=v1 --untracked-files=all` and capture its exit code
+   (`OUT=$(…) && RC=0 || RC=$?`). A sweep normally leaves the tree clean
+   (fixes are committed and pushed; a failed verify reverts its files). A
+   non-zero exit is a dirty tree with unknown contents, never a clean one:
+   revert nothing and report `revert incomplete`. If it is dirty, Read
    `${CLAUDE_PLUGIN_ROOT}/references/review-sweep-all/dirty-tree-cleanup.md` and run its
    procedure with this PR's number to revert the sweep's own edits. Add
    `working tree dirty after sweep (patch: <patch>)` to this PR's `Notes` —

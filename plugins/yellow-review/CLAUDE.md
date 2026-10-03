@@ -78,7 +78,10 @@ resolution, and sequential stack review. Graphite-native workflow.
   `/review:resolve-stack` and `/review:sweep`)
 - `/review:resolve-stack` — Walk the current Graphite stack bottom-up and run
   `/review:resolve --non-interactive` on every open PR fully autonomously (no
-  prompts), pushing and restacking as it goes
+  prompts), pushing and restacking as it goes. It ends the walk, and exits 1,
+  on a dirty tree or a changed ignored `yellow-plugins.local.md` after a PR, a
+  rate limit, or a PR whose output has no valid `Resolve:` contract line
+  (`no contract`); the summary table has a `blocking` column
 - `/review:all` — Sequential review of multiple PRs (Graphite stack, all open,
   or single PR)
 - `/review:sweep` — Wrapper that runs `/review:pr --non-interactive` then
@@ -87,8 +90,10 @@ resolution, and sequential stack review. Graphite-native workflow.
   (reconcile only) and a Ledger line in its summary
 - `/review:sweep-all` — Run `/review:sweep` on every open non-draft PR you
   authored sequentially, with one upfront confirmation, skip-and-continue per
-  PR, end-of-loop summary (with a `Residual` pending/attention column), and a
-  single `/flow:compound` pass at the end. It lists the ledgers of PRs
+  PR, end-of-loop summary (with `Blocking` and `Residual` pending/attention
+  columns), and a single `/flow:compound` pass at the end. A rate limit, a
+  dirty tree or a missing `Resolve:` contract line ends the batch and exits 1;
+  a PR-specific stop (`Sweep: skipped`) is skipped and the batch continues. It lists the ledgers of PRs
   missing from an all-authors open-PR query and deletes them via
   `/review:triage --prune` only after the confirmation (a prune-only prompt
   when there is nothing to sweep); it skips pruning when that query fails
