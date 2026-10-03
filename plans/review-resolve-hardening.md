@@ -230,7 +230,8 @@ Decisions from the brainstorm and the planning round:
   - Add an `--include-outdated` flag, which drops only the `isOutdated ==
     false` clause in the thread filter. The default filter is unchanged.
   - Add these fields to each thread: `isOutdated`, `viewerCanResolve`,
-    `viewerCanReply`.
+    `viewerCanReply`, `commentCount` and `commentsTruncated` (true when more
+    than the 50 comments fetched exist; a truncated thread is never resolved).
   - Add these fields to each comment: `id`, `createdAt`, `viewerDidAuthor`,
     `authorType` (`author.__typename`).
   - Existing fields and their order stay the same.
@@ -803,7 +804,7 @@ Decisions from the brainstorm and the planning round:
 - **Type:** feat
 - **Description:** Add the resolve dispositions contract and GitHub thread and issue scripts
 - **Scope:** plugins/yellow-review/references/resolve/dispositions.md, plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-comments, plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-blockers, plugins/yellow-review/skills/pr-review-workflow/scripts/reply-pr-thread, plugins/yellow-review/skills/pr-review-workflow/scripts/file-followup-issue, plugins/yellow-review/tests/, docs/brainstorms/2026-09-30-review-resolve-hardening-brainstorm.md, plans/review-resolve-hardening.md, .changeset/
-- **Tasks:** 1.1, 1.2, 1.3, 1.4, 1.5, 1.8, 4.3, 4.4
+- **Tasks:** 1.1, 1.2, 1.3, 1.4, 1.5, 1.5a, 1.8, 4.3, 4.4
 - **Depends on:** (none)
 
 ### 2. agent/feat/resolve-commit-verify-scripts

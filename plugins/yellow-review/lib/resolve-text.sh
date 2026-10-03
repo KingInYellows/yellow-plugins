@@ -114,6 +114,13 @@ _rt_scan() {
         # benignword(w): 1 when one word of an unquoted value is a placeholder,
         # type word, bare punctuation (`=`, `|`), a call or a generic type, so
         # `password: str = None` and `password: optional string` stay clean.
+        # ident(s): 1 when s is built only from identifier humps (an optional
+        # capital plus 2+ lowercase letters), runs of capitals (an acronym) and
+        # digit runs, e.g. `ReviewFindingsHelper2` or `HTTPServerHandler3`.
+        # Random key material breaks that within a few characters.
+        function ident(s) {
+            return s ~ /^([A-Z]?[a-z][a-z]+|[A-Z][A-Z]+|[0-9]+)+$/
+        }
         function benignword(w) {
             sub(/[.,;:!?)]+$/, "", w)
             if (w == "" || w !~ /[a-z0-9]/ || isplaceholder(w)) return 1
@@ -418,25 +425,40 @@ _rt_scan() {
                     if (v ~ /^xox[abprs]-/ && mv >= 14) flag("token-prefix")
                     if (v ~ /^sk-/ && mv >= 23) flag("token-prefix")
                     if (v ~ /^(sk|rk|pk)_live_/ && mv >= 24) flag("token-prefix")
+                    if (v ~ /^glpat-/ && mv >= 26) flag("token-prefix")
+                    # hooks.slack.com/services/T<id>/B<id>/<secret>: the dot
+                    # splits the host off, and the slashes would otherwise earn
+                    # the path exemption below.
+                    if (v ~ /^com\/services\/T[A-Z0-9]+\/B[A-Z0-9]+\/[A-Za-z0-9]/) flag("token-prefix")
                 }
                 # A long mixed-case token with a digit looks like a key, but
                 # URLs, file paths and camelCase identifiers are too and are
                 # routine in replies.
                 # Exempt a path-shaped token: 2+ slashes, no base64 `+` or
-                # `=`, and every segment short or hyphen-separated words.
+                # `=`, and every segment either short, hyphen-separated words,
+                # an identifier (`ident`) or a 40-hex commit SHA. A segment of
+                # 20+ characters with all three character classes that is none
+                # of those is token-shaped, so the whole token is judged, not
+                # exempted on the shape of its harmless segments. This is an
+                # allowlist of shapes, not a proof: a secret that happens to
+                # look like an identifier or a short segment passes.
                 # Exempt an identifier-shaped token: letters only in humps of
                 # an optional capital plus 2+ lowercase letters, and digit
                 # runs (`ReviewFindingsHelper2`). Random key material breaks
                 # that within a few characters. A token over 256 characters is
-                # never exempt (fail closed), which keeps the match bounded.
+                # never exempt, which keeps the match bounded.
                 if (m >= 32 && w ~ /[a-z]/ && w ~ /[A-Z]/ && w ~ /[0-9]/) {
                     exempt = 0
                     if (w !~ /[+=]/) {
                         ns = split(w, segs, "/")
                         if (ns >= 3) {
                             exempt = 1
-                            for (j = 1; j <= ns; j++)
-                                if (length(segs[j]) > 24 && segs[j] !~ /-/) exempt = 0
+                            for (j = 1; j <= ns; j++) {
+                                sg = segs[j]
+                                if (length(sg) == 40 && sg ~ /^[0-9a-f]+$/) continue
+                                if (length(sg) > 24 && sg !~ /-/ && !ident(sg)) exempt = 0
+                                else if (length(sg) >= 20 && sg !~ /-/ && sg ~ /[a-z]/ && sg ~ /[A-Z]/ && sg ~ /[0-9]/ && !ident(sg)) exempt = 0
+                            }
                         }
                     }
                     if (m <= 256 && w ~ /^([A-Z]?[a-z][a-z]+|[0-9]+)+$/) exempt = 1

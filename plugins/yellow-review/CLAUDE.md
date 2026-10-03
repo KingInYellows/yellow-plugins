@@ -217,8 +217,8 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
   on stderr rather than assume it is first.
 - `lib/resolve-gh.sh` (POSIX sh, sourced by `file-followup-issue` and
   `get-pr-blockers`) — runs `gh` under `YELLOW_REVIEW_GH_TIMEOUT` (default
-  30 s) and returns 124 on a timeout, but only when `timeout(1)` is installed;
-  without it `gh` runs unbounded.
+  30 s) and returns 124 on a timeout, but only when `timeout(1)` or
+  `gtimeout(1)` is installed; without either `gh` runs unbounded.
 - `lib/resolve-paths.sh` (bash, sourced by `commit-resolve-fixes` and
   `run-verify-command`) — canonical-path check, the case-insensitive resolver
   deny list, and the runner-file list (files a git hook or verify command
