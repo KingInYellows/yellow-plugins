@@ -241,10 +241,10 @@ the one edit-bounds table), `envelope.md` (resolver prompt and sanitization),
   `scan failed` when the scan did not run. Callers look for that line anywhere
   on stderr rather than assume it is first.
 - `lib/resolve-gh.sh` (POSIX sh, sourced by `file-followup-issue`,
-  `get-pr-blockers` and `get-pr-comments`) — runs `gh` under `YELLOW_REVIEW_GH_TIMEOUT` (default
-  30 s, clamped to 60 s) and returns 124 on a timeout, but only when
-  `timeout(1)` is installed;
-  without it `gh` runs unbounded.
+  `get-pr-blockers` and `get-pr-comments`) — runs `gh` under
+  `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s, clamped to 60 s) and returns 124 on
+  a timeout, but only when `timeout(1)` or `gtimeout(1)` is installed; without
+  either `gh` runs unbounded.
 - `lib/gh-graphql.sh` (POSIX sh, sourced by `reply-pr-thread` and
   `resolve-pr-thread`) — one GraphQL call helper with rate-limit and
   not-found/permission classification, so both scripts agree on exit codes.

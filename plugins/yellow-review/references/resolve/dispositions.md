@@ -626,12 +626,13 @@ Replies and issue bodies end with:
   limit, or a required wait over 90 s, exits 4, which bounds the call to the
   280 s worst case the write-phase `timeout` covers ("Bash timeouts").
   `file-followup-issue`
-  never waits or retries: stderr matching "rate limit" or "HTTP 429" (it does
-  not match "abuse") exits 4 at once. A bare 403 is not a rate limit: it
+  never waits or retries: stderr matching "rate limit", "abuse" or "HTTP 429"
+  exits 4 at once. A bare 403 is not a rate limit: it
   exits 3.
 - Each `gh` call in `reply-pr-thread`, `resolve-pr-thread` and
   `file-followup-issue` is bounded by `YELLOW_REVIEW_GH_TIMEOUT` (default
-  30 s, clamped to 60 s; needs `timeout(1)`; `file-followup-issue` and `get-pr-blockers`
+  30 s, clamped to 60 s; needs `timeout(1)` or `gtimeout(1)`; `file-followup-issue` and
+  `get-pr-blockers`
   share it through `lib/resolve-gh.sh`). A timeout exits 4 with no retry
   and `reason=timeout` on stderr: the mutation may have landed, a re-run of `reply-pr-thread` skips
   through its pre-check, and a re-run of `file-followup-issue` finds a
