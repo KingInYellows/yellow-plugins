@@ -85,7 +85,8 @@ gh pr view <PR#> --json state -q .state
 
 If the command fails or the state is not `OPEN`, report
 `[review:sweep] Error: PR #<PR#> is not open or could not be fetched.` and
-stop.
+stop, ending the output with the skip line `Sweep: skipped (pr-not-open)`
+(see "Skip line").
 
 ### Step 2: Run /review:pr --non-interactive
 
@@ -118,7 +119,9 @@ ACTUAL=$(git rev-parse --abbrev-ref HEAD)
 }
 ```
 
-If the branch does not match, stop — do not proceed to Step 3.
+If the branch does not match, stop — do not proceed to Step 3 — and end the
+output with the skip line `Sweep: skipped (branch-mismatch)` (see "Skip
+line").
 
 ### Step 3: Run /review:resolve --non-interactive
 
@@ -244,6 +247,24 @@ exit 4 and this command ran none. The fallback makes `/review:sweep-all` record
 The indented `Resolve:` row in the summary stays; the final line repeats the
 contract so `/review:sweep-all` (which reads only the last line of this
 command's output) can parse `blocking` and `ratelimited`.
+
+## Skip line
+
+A stop before `/review:resolve` runs never reaches the command that prints the
+`Resolve:` contract line, so a caller that fails closed on a missing contract
+would read a benign skip as a crash. The two PR-specific stops therefore end
+with one distinct line, as the very last line of output:
+
+```text
+Sweep: skipped (pr-not-open)
+Sweep: skipped (branch-mismatch)
+```
+
+`/review:sweep-all` reads it by the anchored form
+`^Sweep: skipped \((pr-not-open|branch-mismatch)\)$`, on the last line only,
+and records `skipped — <reason>`. Its absence means the sweep crashed or was
+cut off, which stays `no contract`. Argument errors and a dirty tree print no
+skip line: they are not specific to this PR, so the batch must still stop.
 
 ## Error Handling
 

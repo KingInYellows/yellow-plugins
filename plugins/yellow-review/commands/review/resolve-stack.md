@@ -177,6 +177,22 @@ If no open non-draft PRs remain (either provider), report
 `[review:resolve-stack] No open PRs found in current stack.` and exit
 successfully — there is nothing to walk.
 
+### Step 2b: Snapshot the Trusted Ignored Files
+
+`git status` cannot see gitignored files, so a resolver edit to the ignored
+`yellow-plugins.local.md` (whose `resolve_pr.verify_command` a later unattended
+`/review:resolve` would run) leaves a clean tree and passes item 3b's status
+check. Snapshot it once, before the first resolve:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" snapshot
+```
+
+Keep the printed path as `<guard-dir>` and substitute it as a literal in item
+3b and Step 4 (variables do not survive across Bash calls). A non-zero exit
+stops the command before any resolve: `[review:resolve-stack] Error: could not
+snapshot the local config.` and exit `1`.
+
 ### Step 3: Walk the stack
 
 Before the first iteration, Read
@@ -256,8 +272,26 @@ failures and continue.
    `inconclusive` with the stderr output, count it as blocking, and flag it.
    The cross-check never sets `ratelimited`: only item 2's contract line does.
 
-   **3b. Clean-tree check** — continuing on a dirty tree would carry this PR's
-   edits onto the next branch:
+   **3b. Clean-tree and local-config check** — continuing on a dirty tree would
+   carry this PR's edits onto the next branch. First compare the ignored local
+   config with Step 2b's snapshot; it restores a changed, created or deleted
+   `yellow-plugins.local.md` before anything else can read it:
+
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" check "<guard-dir>"
+   ```
+
+   Exit `0`: unchanged. Exit `3` (changed and restored) or `4` (restore
+   failed): print this PR's row, then
+   `[review:resolve-stack] aborted at PR #<PR#>: yellow-plugins.local.md changed during the resolve`
+   with the script's `changed:` / `restore failed:` lines. List the PR under
+   Needs manual attention as `ignored config changed (restored)` or `ignored
+   config tampered (restore failed: inspect yellow-plugins.local.md before any
+   further run)`, mark the remaining PRs `not attempted (config changed)`, run
+   the dirty-tree check below only for its revert, and go to `### Step 4:
+   Final aggregate summary` (exit `1`). Any other exit is treated as exit `4`.
+
+   Then the status check:
 
    ```bash
    git status --porcelain
@@ -276,7 +310,13 @@ failures and continue.
    `not attempted (dirty tree)` and go to `### Step 4: Final aggregate summary`
    (exit `1`).
 
-4. **Restack** — `gt upstack restack`. If it reports a conflict: do not pause —
+4. **Restack** — `gt upstack restack`. A fix commit already restacked the
+   upstack and `commit-resolve-fixes` submitted it with `--stack`, so this is
+   normally a no-op; when it does restack a branch, publish it with
+   `gt submit --stack --no-interactive --no-edit` before the next PR (the
+   next PR's head check refuses a local branch that is ahead of its remote),
+   and record a failed publish as `restack not published`. If it reports a
+   conflict: do not pause —
    run `gt abort` to clear the conflicted restack (without this, the repo stays
    mid-rebase and the next iteration's `gt checkout` fails), record the
    conflict for the final summary, and continue to the next PR.
@@ -325,9 +365,13 @@ line before the revert output, so it is not necessarily the last line. A
 rate-limit or no-contract stop prints no such line; its `not attempted (rate limit)`
 or `not attempted (no contract)` rows signal the truncated walk.
 
+Remove the snapshot first, in its own Bash call, whatever stopped the walk:
+`"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" clear "<guard-dir>"`
+(a rejected path is left for the OS temp sweep, never deleted).
+
 Then totals: PRs walked, PRs fully resolved (`b == 0` and remaining == 0),
 PRs with residual comments, PRs skipped (no open PR / draft / checkout
-failure), and PRs not attempted (rate limit / no contract / dirty tree).
+failure), and PRs not attempted (rate limit / no contract / dirty tree / config changed).
 
 Finally, a **Needs manual attention** section listing every PR with:
 blocking items (`b > 0`), residual unresolved threads (`>0` from step 3),
@@ -359,6 +403,10 @@ is not a failure.
   verify revert that could not clean up, a rejected push) — step 3b stops
   the walk with `aborted at PR #<N>` and the file list, and the command exits
   `1`. Continuing would carry those edits onto the next branch.
+- **A PR's resolve changes the ignored `yellow-plugins.local.md`** — item 3b
+  restores it from the Step 2b snapshot and stops the walk with
+  `aborted at PR #<N>`; a failed restore is reported as tampered. The command
+  exits `1`.
 - **A PR is rate limited** (`ratelimited=1` on its valid final `Resolve:`
   line) — the walk finishes that PR except its restack, marks
   the remaining PRs `not attempted (rate limit)`, and the command exits `1`

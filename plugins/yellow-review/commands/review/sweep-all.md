@@ -223,11 +223,21 @@ For each iteration:
    skip as `no contract`. Check the PR first, with the literal PR number:
 
    ```bash
-   STATE=$(gh pr view <PR#> --json state -q .state) && RC=0 || RC=$?
-   printf 'state=%s exit=%s\n' "$STATE" "$RC"
+   OUT=$(gh pr view <PR#> --json state -q .state 2>&1) && RC=0 || RC=$?
+   if [ "$RC" -eq 0 ]; then
+     printf 'state=%s exit=0 ratelimited=0\n' "$OUT"
+   elif printf '%s' "$OUT" | grep -qiE 'rate limit|HTTP 429'; then
+     printf 'state=unreadable exit=%s ratelimited=1\n' "$RC"
+   else
+     printf 'state=unreadable exit=%s ratelimited=0\n' "$RC"
+   fi
    ```
 
-   When `exit` is non-zero, record `skipped — state unreadable`. When it is `0`
+   When `ratelimited=1`, the next `gh` call would hit the same limit: record
+   `rate limited` in this PR's `Notes`, mark every remaining PR
+   `skipped — not attempted (rate limit)`, record `pending-exit-1` and go to
+   `### Step 5: End-of-loop summary table` (item 5's stop). Otherwise, when
+   `exit` is non-zero, record `skipped — state unreadable`. When it is `0`
    and `state` is not `OPEN`, record `skipped — PR closed before sweep`. Either
    way do NOT invoke the Skill: go to item 6. Only `exit=0` with `state=OPEN`
    proceeds to item 2. A stop inside the sweep that this check cannot foresee
@@ -238,6 +248,12 @@ For each iteration:
    `review:sweep-all` (the name of this command, which would silently
    fail to invoke) or any directory-based path.
 3. **Record outcome** for the summary table:
+   - If the LAST line of the sweep output fully matches
+     `^Sweep: skipped \((pr-not-open|branch-mismatch)\)$` (`/review:sweep`
+     "Skip line"), the sweep stopped before `/review:resolve` on a PR-specific
+     condition: outcome is `skipped — <reason>` (`PR not open` or `branch
+     mismatch`), not `no contract`. Item 4's clean-tree check still runs; the
+     batch continues.
    - If the Skill call returned and no exception was raised in the
      surrounding Bash blocks: outcome is `attempted`. (The Skill tool
      returns no machine-readable exit status, so any errors inside the

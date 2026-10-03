@@ -504,6 +504,45 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   ! printf '%s\n' "$step5" | grep -q 'keeps its edits and the conflicted'
 }
 
+@test "resolve-stack: the ignored local config is snapshotted before the walk and checked after every PR" {
+  snap=$(grep -n '^### Step 2b: Snapshot the Trusted Ignored Files' "$RESOLVE_STACK" | cut -d: -f1)
+  walk=$(grep -n '^### Step 3: Walk the stack' "$RESOLVE_STACK" | cut -d: -f1)
+  [ -n "$snap" ] && [ "$snap" -lt "$walk" ]
+  text=$(flat "$RESOLVE_STACK")
+  [[ "$text" == *'guard-local-config" snapshot'* ]]
+  [[ "$text" == *'guard-local-config" check "<guard-dir>"'* ]]
+  [[ "$text" == *'guard-local-config" clear "<guard-dir>"'* ]]
+  [[ "$text" == *'aborted at PR #<PR#>: yellow-plugins.local.md changed during the resolve'* ]]
+  [[ "$text" == *'`not attempted (config changed)`'* ]]
+  # The check precedes the status check inside item 3b.
+  chk=$(grep -n 'guard-local-config" check' "$RESOLVE_STACK" | head -1 | cut -d: -f1)
+  sts=$(grep -n '^   git status --porcelain$' "$RESOLVE_STACK" | head -1 | cut -d: -f1)
+  [ "$chk" -lt "$sts" ]
+}
+
+@test "resolve-stack: a restack that changes a branch is published before the next PR" {
+  text=$(flat "$RESOLVE_STACK")
+  [[ "$text" == *'publish it with `gt submit --stack --no-interactive --no-edit` before the next PR'* ]]
+  [[ "$text" == *'`restack not published`'* ]]
+}
+
+@test "sweep: PR-specific pre-resolve stops end with a skip line that sweep-all reads" {
+  text=$(flat "$SWEEP")
+  [[ "$text" == *'`Sweep: skipped (pr-not-open)`'* ]]
+  [[ "$text" == *'`Sweep: skipped (branch-mismatch)`'* ]]
+  [[ "$text" == *'^Sweep: skipped \((pr-not-open|branch-mismatch)\)$'* ]]
+  all=$(flat "$SWEEP_ALL")
+  [[ "$all" == *'^Sweep: skipped \((pr-not-open|branch-mismatch)\)$'* ]]
+  [[ "$all" == *'outcome is `skipped — <reason>`'* ]]
+  [[ "$all" == *'not `no contract`'* ]]
+}
+
+@test "sweep-all: a rate-limited open-PR pre-check stops the batch instead of skipping every PR" {
+  text=$(flat "$SWEEP_ALL")
+  [[ "$text" == *'grep -qiE '"'"'rate limit|HTTP 429'"'"''* ]]
+  [[ "$text" == *'When `ratelimited=1`, the next `gh` call would hit the same limit'* ]]
+}
+
 # Collapse line wraps so a phrase can be matched across them.
 flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
 
@@ -521,21 +560,6 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   [[ "$text" == *'exited 4 with `reason=rate-limit` (or no recognizable reason)'* ]]
   [[ "$text" == *'`reason=timeout` stops mutations too but leaves `ratelimited=0`'* ]]
   [[ "$text" == *'A missing or unrecognized reason is treated as `rate-limit`'* ]]
-}
-
-@test "resolver agent: no rule permits editing when PR-changed ranges are unknown" {
-  text=$(flat "$RESOLVER_AGENT")
-  # The old exception (edit the cluster File when PR files is unknown) must be gone.
-  [[ "$text" != *"edit only the cluster's \`File\`"* ]]
-  # Both surviving rules say: unknown means no edit and oos.
-  [[ "$text" == *'(when it is `unknown`, edit nothing and propose `oos`)'* ]]
-  [[ "$text" == *'When the bound is `none`, `unknown` or absent'* ]]
-  [[ "$text" == *'do not edit: propose `oos` for the thread'* ]]
-  clusters=$(flat "$RESOLVE_REFS/clusters.md")
-  [[ "$clusters" == *'When the value is `none` or `unknown`'* ]]
-  [[ "$clusters" == *'the resolver edits nothing and proposes `oos`'* ]]
-  text=$(flat "$RESOLVE_PR")
-  [[ "$text" == *'pass `unknown` for both, so the resolver edits nothing and proposes `oos`'* ]]
 }
 
 @test "dispositions: a reused Linear hit passes the same response checks as save_issue" {

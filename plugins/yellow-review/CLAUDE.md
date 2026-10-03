@@ -176,7 +176,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   rails and inline MIT attribution so the rules survive on hosts with no
   tool restriction (not user-invocable)
 
-### Scripts (11)
+### Scripts (12)
 
 - `get-pr-comments [--include-outdated] <owner/repo> <pr>` — Fetch unresolved
   PR review threads via GitHub GraphQL API (non-outdated only unless the flag
@@ -223,7 +223,9 @@ resolution, and sequential stack review. Graphite-native workflow.
   (`--unattended` skips runner files and requires `--ignored-since
   <marker-file>`, which refuses when a gitignored file is newer than the marker;
   `--revert-only` reverts the listed files; `--revert-dirty` reverts every change in the tree and takes no
-  file list. `/review:resolve-stack` and `/review:sweep-all` run it after a
+  file list; `--check-ignored --ignored-since <marker-file>` runs only the
+  gitignored-file guard, for a resolve with no verify command.
+  `/review:resolve-stack` and `/review:sweep-all` run it after a
   dirty resolve only when every dirty path is owned by the run (a PR file
   or trusted-config path); otherwise they run `--revert-only` on the owned
   trusted-config paths, which leaves unrecognized changes in place, so the
@@ -232,6 +234,11 @@ resolution, and sequential stack review. Graphite-native workflow.
   `--trusted` and `--unattended`). The verify gate: interactive runs ask
   first, unattended runs need `verify_unattended: true` and an untracked
   config
+- `guard-local-config snapshot | check <dir> | clear <dir>` — Snapshot the
+  ignored `yellow-plugins.local.md`, then detect and restore a resolver edit
+  to it (changed, created or deleted; `git status` cannot see it); exit 3
+  means changed and restored, 4 means the restore failed.
+  `/review:resolve-stack` snapshots before the walk and checks after each PR
 - `file-line-counts <diff-base-ref>` — Authoritative base/head line counts per
   changed file for `thermonuclear-reviewer`'s size-threshold rule; the
   header and footer rows are its completeness signal
