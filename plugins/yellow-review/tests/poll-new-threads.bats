@@ -272,27 +272,39 @@ make_expiring_timeout() {
     run --separate-stderr "$FAKE_DIR/poll-new-threads" --wait 100 "o/r" 1 "$ROUND1" "$OUT"
   [ "$status" -eq 0 ]
   [[ "$output" == *"repass fetched=0 found=0"* ]]
-  [[ "$stderr" == *"poll fetch-failed: get-pr-comments timed out after 30s"* ]]
+  [[ "$stderr" == *"poll fetch-failed: get-pr-comments timed out after 60s"* ]]
   [ "$(paste -sd, "$SLEEP_LOG")" = "20" ]
-  [ "$(cat "$TIMEOUT_LOG")" = "30" ]
+  [ "$(cat "$TIMEOUT_LOG")" = "60" ]
   [ ! -e "$OUT" ]
 }
 
-@test "YELLOW_REVIEW_GH_TIMEOUT sets the fetch limit and invalid values fall back to 30" {
+@test "the fetch hard cap is 60 s whatever YELLOW_REVIEW_GH_TIMEOUT says" {
   fake_setup
   : >"$ROUND1"
   export TIMEOUT_LOG="${BATS_TEST_TMPDIR}/timeout.log"
   bin_setup bin-timeout $BASE_TOOLS
   make_expiring_timeout timeout
-  : >"$TIMEOUT_LOG"
-  PATH="${BIN_DIR}:${BATS_TEST_TMPDIR}/stubs" YELLOW_REVIEW_GH_TIMEOUT=7 \
+  local v
+  for v in 7 0 9999; do
+    : >"$TIMEOUT_LOG"
+    PATH="${BIN_DIR}:${BATS_TEST_TMPDIR}/stubs" YELLOW_REVIEW_GH_TIMEOUT=$v \
+      run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$TIMEOUT_LOG")" = "60" ]
+  done
+}
+
+@test "get-pr-comments gets its own 55 s pagination deadline, overriding the caller's env" {
+  fake_setup
+  : >"$ROUND1"
+  # Record the deadline the child sees, then behave as a normal fetch.
+  sed -i '2a printf "%s\\n" "${YELLOW_REVIEW_FETCH_DEADLINE:-unset}" >>"$DEADLINE_LOG"' "$FAKE_DIR/get-pr-comments"
+  export DEADLINE_LOG="${BATS_TEST_TMPDIR}/deadline.log"
+  : >"$DEADLINE_LOG"
+  YELLOW_REVIEW_FETCH_DEADLINE=270 FAKE_RESULTS="ok:PRRT_a" \
     run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
   [ "$status" -eq 0 ]
-  [ "$(cat "$TIMEOUT_LOG")" = "7" ]
-  : >"$TIMEOUT_LOG"
-  PATH="${BIN_DIR}:${BATS_TEST_TMPDIR}/stubs" YELLOW_REVIEW_GH_TIMEOUT=0 \
-    run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
-  [ "$(cat "$TIMEOUT_LOG")" = "30" ]
+  [ "$(cat "$DEADLINE_LOG")" = "55" ]
 }
 
 @test "a timeout after a successful fetch keeps fetched=1 with the earlier output" {
@@ -329,8 +341,8 @@ EOS
     run --separate-stderr "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
   [ "$status" -eq 0 ]
   [[ "$output" == *"repass fetched=0 found=0"* ]]
-  [[ "$stderr" == *"timed out after 30s"* ]]
-  [ "$(cat "$TIMEOUT_LOG")" = "30" ]
+  [[ "$stderr" == *"timed out after 60s"* ]]
+  [ "$(cat "$TIMEOUT_LOG")" = "60" ]
 }
 
 @test "without timeout or gtimeout the fetch runs unbounded with one stderr note" {
@@ -342,17 +354,4 @@ EOS
   [ "$status" -eq 0 ]
   [[ "$output" == *"repass fetched=1 found=0"* ]]
   [ "$(grep -c 'neither timeout nor gtimeout' <<<"$stderr")" -eq 1 ]
-}
-
-@test "a YELLOW_REVIEW_GH_TIMEOUT over 60 is clamped to 60, not reset to 30" {
-  fake_setup
-  : >"$ROUND1"
-  export TIMEOUT_LOG="${BATS_TEST_TMPDIR}/timeout.log"
-  bin_setup bin-timeout $BASE_TOOLS
-  make_expiring_timeout timeout
-  : >"$TIMEOUT_LOG"
-  PATH="${BIN_DIR}:${BATS_TEST_TMPDIR}/stubs" YELLOW_REVIEW_GH_TIMEOUT=9999 \
-    run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
-  [ "$status" -eq 0 ]
-  [ "$(cat "$TIMEOUT_LOG")" = "60" ]
 }

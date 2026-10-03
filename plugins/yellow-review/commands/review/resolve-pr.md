@@ -362,7 +362,9 @@ not already. Then, for every thread sent to a resolver:
      deny-listed one must not stay on disk), then stops before Step 6 and goes
      to Step 9 with `push=skipped, verify=none`; run Step 6's marker cleanup
      block first.
-   - **Non-interactive:** keep the edits, log the conflict for Step 9.
+   - **Non-interactive:** do not prompt and do not keep unreconciled edits:
+     roll the conflicted cluster back exactly as above (same per-file rule),
+     so Step 6 never commits or pushes them, and log the conflict for Step 9.
    Either way, the conflicted cluster's threads become `unclear`.
 2. **Parse and validate** each `THREAD` line, applying the contract's
    downgrade rules, skipped-reason mapping and `addressed` evidence rules. A
@@ -390,8 +392,12 @@ not already. Then, for every thread sent to a resolver:
 
 ### Step 6: Verify, Commit and Push
 
-**Files.** The expected set is the union of every resolver's `Files
-modified`, minus clusters rolled back in Step 5; write it, one path per
+**Files.** The expected set is the union of `Files modified` from every
+cluster that still has at least one `fixed` thread after Step 5's validation.
+A cluster with none (partial, rolled back, or all threads downgraded) adds
+nothing: revert its files with Step 5's per-file `--revert-only` (only files
+no surviving cluster modified), because a changed file outside the set is a
+refusal. Write the set, one path per
 line, to a `mktemp` file with the Write tool (`<files-file>`). First make each
 path repo-relative (strip the working-tree root from an absolute path) and drop
 every path that `git status --porcelain --untracked-files=all` does not list as

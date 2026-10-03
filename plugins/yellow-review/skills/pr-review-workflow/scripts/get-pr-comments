@@ -106,6 +106,8 @@ case "$FETCH_DEADLINE" in ''|*[!0-9]*) FETCH_DEADLINE=$MAX_DEADLINE ;; esac
 [ "${#FETCH_DEADLINE}" -le 4 ] || FETCH_DEADLINE=$MAX_DEADLINE
 [ "$FETCH_DEADLINE" -gt 0 ] 2>/dev/null || FETCH_DEADLINE=$MAX_DEADLINE
 [ "$FETCH_DEADLINE" -le "$MAX_DEADLINE" ] || FETCH_DEADLINE=$MAX_DEADLINE
+# Force base 10: a zero-padded value ("08", "010") is octal inside $((...)).
+FETCH_DEADLINE=$((10#$FETCH_DEADLINE))
 
 # --- GraphQL query with cursor pagination ---
 # shellcheck disable=SC2016

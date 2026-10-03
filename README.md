@@ -75,11 +75,14 @@ Eight plugins bundle MCP servers. Authentication requirements vary by server.
 | `yellow-ruvector` | ruvector   | Local stdio — no auth required                                                                                    |
 | `yellow-semgrep`  | semgrep    | `SEMGREP_APP_TOKEN` required                                                                                      |
 
-`yellow-review` bundles no MCP server but can reach one. When the optional `yellow-linear`
-plugin is installed and the branch name carries a Linear ID, `/review:resolve` in `yellow-review` uses
-`yellow-linear`'s OAuth-backed Linear MCP server for reads, marker searches and follow-up issue creation. It writes to
-Linear only in that case, and authentication is the `yellow-linear` login above. See "Optional integrations" in
-`plugins/yellow-review/README.md`.
+`yellow-review` bundles no MCP server but can reach one. When the optional
+`yellow-linear` plugin is installed, its `save_issue` tool is discoverable, and
+the branch name carries a Linear ID, `/review:resolve` in `yellow-review` uses
+`yellow-linear`'s OAuth-backed Linear MCP server for reads, marker searches and
+follow-up issue creation. It writes to Linear only in that case, and
+authentication is the `yellow-linear` login above. If any condition is missing,
+or a Linear call fails, follow-ups are filed on GitHub instead. See "Optional
+integrations" in `plugins/yellow-review/README.md`.
 
 ### Context7 (user-level MCP)
 

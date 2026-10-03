@@ -86,8 +86,8 @@ The orchestrator turns a proposed disposition into `unclear` when:
   `complete` means every thread has a final disposition and every `fixed`
   edit is applied, so a cluster mixing `fixed` with `oos`, `addressed` or
   `disagree` is still `complete`;
-- the cluster emitted `CONFLICT:` and its edits were rolled back (or, under
-  `--non-interactive`, were kept but not reconciled);
+- the cluster emitted `CONFLICT:` (its edits are rolled back, or kept when the
+  interactive user chose "Keep the resolver's partial edits");
 - an evidence check below fails;
 - the thread has `commentsTruncated` true (see Lanes): any proposed
   disposition becomes `unclear` with evidence `comments truncated (<n> of
@@ -499,10 +499,13 @@ values still fall back to 30), and the budget is derived from that cap:
 
 The largest is 360 s; 420 s adds 60 s for `jq`, the credential scan and
 startup, and stays under the Bash tool's 600 s maximum. Change the cap and
-this budget together. `poll-new-threads` uses the same cap for each fetch and
-ends within `--wait` + 60 s, inside its `(wait + 120) × 1000` ms budget. It
-runs `get-pr-comments` under that 60 s cap, so the deadline below does not
-change the Step 8 poll budget.
+this budget together. `poll-new-threads` ends within `--wait` + 60 s, inside
+its `(wait + 120) × 1000` ms budget. It bounds each `get-pr-comments` run with
+that script's own deadline (`YELLOW_REVIEW_FETCH_DEADLINE=55`, below) behind a
+60 s hard cap, not with the per-call `gh` limit, so a multi-page fetch is not
+killed mid-pagination. A fetch that hits the deadline exits 3 and counts as
+a failed fetch for that round. The 270 s default below does not apply to the
+poll.
 
 `get-pr-comments` (Step 2, with `get-pr-blockers`) gets a `timeout` of 300000 ms.
 It can fetch 10 pages, so it adds a wall-clock deadline to the per-call cap:

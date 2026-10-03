@@ -348,6 +348,19 @@ teardown() {
   done
 }
 
+@test "a zero-padded deadline is read as decimal, not octal" {
+  local stderr_file="${BATS_TEST_TMPDIR}/stderr_paddeadline"
+  local v
+  # "08" is invalid octal and "010" would be 8 s; both must run as decimal.
+  for v in 08 010 0270; do
+    rm -f "${BATS_TEST_TMPDIR}/mock_gh_pr300_page"
+    YELLOW_REVIEW_FETCH_DEADLINE="$v" run bash -c "'$SCRIPT' test/repo 300 2>'$stderr_file'"
+    [ "$status" -eq 0 ]
+    [ "$(printf '%s' "$output" | jq 'length')" -eq 2 ]
+    [[ "$(cat "$stderr_file")" != *"value too great"* ]]
+  done
+}
+
 @test "the default deadline leaves a normal multi-page fetch unchanged" {
   rm -f "${BATS_TEST_TMPDIR}/mock_gh_pr300_page"
   run "$SCRIPT" "test/repo" "300"
