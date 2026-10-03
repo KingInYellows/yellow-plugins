@@ -1,0 +1,24 @@
+docs/brainstorms/2026-10-02-turn-the-integration-evaluation-into-an-brainstorm.md
+  s_19981440458bca::t_9b5014dd56a837 4
+  s_19981440458bca::t_79f2270348fbb1 63-139
+  s_19981440458bca::t_48a86b86115ec1 1-3,5-62
+plans/specs/yellow-core-loop-work-integrity.md
+  s_19981440458bca::t_baf93246fca672 1-158
+  s_19981440458bca::t_85542a9dcca1b4 159-162
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "637dd9df80d0912b8d799fd3ec7fbbde42fd4680",
+  "prompts": {},
+  "sessions": {
+    "s_19981440458bca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "74820cce-4cfb-4b65-9b63-0ecd4a17dcd5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
