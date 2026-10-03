@@ -62,6 +62,10 @@ rt_looks_secret() {
         # `password: z.string()` and `token: $TOKEN` stay clean. A value that
         # only contains `$`, `<`, `{` or `[` is a credential.
         function litval(seg, inword,    np, parts, allph, j) {
+            # Markdown inline-code backticks delimit the value; they are not
+            # part of it (`password: `hunter``, `token: `$TOKEN``).
+            sub(/^`+/, "", seg)
+            sub(/`+[.!?]*$/, "", seg)
             sub(/[.!?]+$/, "", seg)
             if (length(seg) < 6 || isplaceholder(seg)) return 0
             # A call such as `z.string(`: the value stops at the `)`.
