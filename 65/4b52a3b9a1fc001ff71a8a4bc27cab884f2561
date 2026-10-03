@@ -1,0 +1,67 @@
+docs/security.md
+  s_79ab629205942a::t_7a61498362a234 36-37
+plugins/yellow-review/CLAUDE.md
+  s_79ab629205942a::t_74cc5bddc3f0ad 66-68,243-244,314-316,398-405
+plugins/yellow-review/README.md
+  s_79ab629205942a::t_aef787fee34d0d 95
+plugins/yellow-review/agents/workflow/pr-comment-resolver.md
+  s_79ab629205942a::t_ee9df52d01f310 3,27-32,127-130,134-137,153-155,186-187,215-217,233-237
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_79ab629205942a::t_714d90ac246b00 39,77-83,86-88,165-168,265-267,334-336,500-507,530-532,555,582
+plugins/yellow-review/lib/gh-graphql.sh
+  s_79ab629205942a::t_d8b7d003074721 9-13,150
+plugins/yellow-review/references/resolve/dispositions.md
+  s_79ab629205942a::t_01cf4bac056a0d 53,103-105,111,498,527
+plugins/yellow-review/references/resolve/envelope.md
+  s_79ab629205942a::t_5afa927ee291f1 71-72,79-87
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_79ab629205942a::t_b68680db86473e 447,464-467
+plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-comments
+  s_79ab629205942a::t_d02c95aba6ce69 129,138,315-317
+plugins/yellow-review/skills/pr-review-workflow/scripts/poll-new-threads
+  s_79ab629205942a::t_7b4f5a0e72bb69 3,63-65
+plugins/yellow-review/skills/pr-review-workflow/scripts/pr-changed-ranges
+  s_79ab629205942a::t_cc8f09e98f12e2 41-46
+plugins/yellow-review/skills/pr-review-workflow/scripts/resolve-pr-thread
+  s_79ab629205942a::t_96fd21fb718454 20-21
+plugins/yellow-review/tests/file-followup-issue.bats
+  s_79ab629205942a::t_d6130bb7849a1a 6-7
+plugins/yellow-review/tests/fixtures/outdated-anchor-response.json
+  s_79ab629205942a::t_a6bf86e0d8461e 1-69
+plugins/yellow-review/tests/fixtures/pr-files-notarray.json
+  s_79ab629205942a::t_d3ab4a34933b1b 1
+plugins/yellow-review/tests/fixtures/pr-files-ranges.json
+  s_79ab629205942a::t_ab65e11e868010 1-10
+plugins/yellow-review/tests/get-pr-comments.bats
+  s_79ab629205942a::t_176fb0d8172b21 133-145,351-398
+plugins/yellow-review/tests/helpers/timeout-stub.bash
+  s_79ab629205942a::t_6a3ad78bb1903c 1-7
+plugins/yellow-review/tests/mocks/gh
+  s_79ab629205942a::t_a9f610686dbe6d 249-253,593-607
+plugins/yellow-review/tests/poll-new-threads.bats
+  s_79ab629205942a::t_ee00d45568f83f 85-87,107-134
+plugins/yellow-review/tests/pr-changed-ranges.bats
+  s_79ab629205942a::t_98f6adcac0a2c2 47-64
+plugins/yellow-review/tests/reply-pr-thread.bats
+  s_79ab629205942a::t_0a5d5308e8933b 6-7,422-423,425-426
+plugins/yellow-review/tests/resolve-pr-thread.bats
+  s_79ab629205942a::t_272270cac91b0e 6-7,72-84,87,90-91,186-187
+plugins/yellow-review/tests/skill-content.bats
+  s_79ab629205942a::t_99ba9f24302938 220-221,257-258,267-268,322-325,363-364,384-385,457-458,463-464,561-562
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "654b52a3b9a1fc001ff71a8a4bc27cab884f2561",
+  "prompts": {},
+  "sessions": {
+    "s_79ab629205942a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "af7c3a89-4c40-4dc4-bd49-8799be9e99c6",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

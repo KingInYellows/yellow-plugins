@@ -1,0 +1,21 @@
+plugins/yellow-review/CLAUDE.md
+  s_79ab629205942a::t_b29c7f50090d01 202-204
+plugins/yellow-review/README.md
+  s_79ab629205942a::t_af32acc1665f2c 128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "457d4b71121d5e6ebfd3a34f6405297151c0f8bd",
+  "prompts": {},
+  "sessions": {
+    "s_79ab629205942a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "af7c3a89-4c40-4dc4-bd49-8799be9e99c6",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
