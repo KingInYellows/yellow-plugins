@@ -100,17 +100,17 @@ Scope is all 13 steps. Each step is one PR with its own changeset, stays within 
   - `stop.sh:52-57` early-exits on `stop_hook_active`.
   - Capture is a tmp+`mv` overwrite in a disowned subshell. Concurrent subshells can finish out of order, so add a monotonic guard (for example, transcript length).
   - A mid-run SessionStart drain (`session-start.sh:233` requeue) can split one session's capture into two entries, so check dedupe at drain time.
-  - Invert `tests/compound-stop-hook.bats:71-81`.
+  - Invert `plugins/yellow-core/tests/compound-stop-hook.bats:71-81`.
   - The hook must never emit `decision:block`. The block cap is 8 (`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`).
   - yellow-core is the only first-party Stop hook.
 - **Step 4.**
-  - Picker sites: `flow/work.md:47`, `flow/review.md:51,79`, `plugins/yellow-research/commands/flow/deepen-plan.md:36`. That last one is a cross-plugin exception, or a shared picker script.
-  - Plan-status has a generated Codex copy, `tests/plan-status-parity.bats`, and golden fixtures, which all change together.
+  - Picker sites: `flow/work.md:50`, `flow/review.md:51,79`, `plugins/yellow-research/commands/flow/deepen-plan.md:37`. That last one is a cross-plugin exception, or a shared picker script.
+  - Plan-status has a generated Codex copy, `plugins/yellow-core/tests/plan-status-parity.bats`, and golden fixtures, which all change together.
   - Supersession frontmatter must not use `spec:` or `depends_on:`, because `expand-shell.md:31` uses those keys to detect shells.
   - Reuse compound-lifecycle's `superseded_by:` naming.
   - A plan with no frontmatter counts as active.
 - **Step 5.**
-  - The finding schema has no quote field. Adding one touches about 13 producer agents, the `tests/skill-content.bats` census and parity tests, the `review-all.md` Step 8 mirror, and ledger `observe`.
+  - The finding schema has no quote field. Adding one touches about 13 producer agents, the `plugins/yellow-review/tests/skill-content.bats` census and parity tests, the `review-all.md` Step 8 mirror, and ledger `observe`.
   - Gate placement: between validate (`review-pr.md:865`) and dedupe (`:901`).
   - Ground against the raw quote, then store only the redacted quote.
   - A ledger record with no quote field means "not evaluated", not "ungrounded".

@@ -21,8 +21,13 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 
 - **R1.** When the Stop hook fires with `stop_hook_active: true`, the system shall capture the transcript tail exactly as it does for a non-re-entrant stop, regardless of which loop driver caused the continuation.
   - Acceptance: `tests/compound-stop-hook.bats` case "stop hook exits when stop_hook_active is true" is replaced by a case asserting one pending entry exists for the session.
-- **R2.** When a capture for a session finishes, the system shall keep at most one pending entry per session. It shall not replace an existing entry whose recorded transcript length is greater than its own, so an out-of-order subshell cannot overwrite a later capture.
-  - Acceptance: a bats case runs two captures for one session, the later one with a longer transcript, in reverse completion order. The pending entry holds the longer tail.
+- **R2.** When a capture for a session finishes, the system shall keep at most one pending entry per session, and the entry shall always be the one with the longest transcript seen for that session. A capture shall not write when a per-session high-water mark of `transcript_lines` is already at or above its own, so an out-of-order subshell cannot overwrite or re-create a stale entry, including after the drain has consumed a newer one. The compare and the write shall run under a per-session lock, so two overlapping captures cannot both pass the check.
+  - Acceptance:
+    - A bats case runs two captures for one session, the later one with a longer transcript, in reverse completion order. The pending entry holds the longer tail.
+    - A bats case runs the longer capture, moves its entry to `processing/` (as the drain does), then runs the shorter capture. No new pending entry exists.
+    - A bats case starts two captures for one session concurrently (backgrounded, released together, repeated at least 20 times). Every run ends with the longer tail as the only pending entry.
+- **R23.** When the drain holds entries for the same session in `pending/` and `processing/`, the system shall keep only the entry with the greatest `transcript_lines` and discard the others as superseded, in addition to the `content_hash` dedupe. Entries without the field compare as 0. An entry already promoted by an earlier drain pass is not retracted.
+  - Acceptance: a fixture with an early entry in `processing/` and a later, longer entry in `pending/` for one session yields one promoted entry, the longer one.
 - **R3.** The pending entry shall add `stop_hook_active` (boolean) and `transcript_lines` (integer) fields. They are additive within schema `"1"`, and the drain shall keep working on entries without them.
 - **R4.** The Stop hook shall emit `{"continue": true}` on every path, never emit `decision: "block"`, and add no synchronous I/O to the parent process.
 - **R5.** Before the step 1 PR merges, the system's behaviour shall be checked on the installed Claude Code version.
@@ -39,7 +44,7 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 - **R9.** The plan resolver shall classify each `plans/*.md` file (top level only) as **active** or **inactive**.
   - **Inactive** means any of:
     - frontmatter `status` is `superseded` or `complete`;
-    - another active file names it in `supersedes`;
+    - it is reachable from an active file by following `supersedes` links, so every ancestor of an active head stays inactive (if active A supersedes B and B supersedes C, both B and C are inactive);
     - it has no frontmatter and has at least one checkbox, all ticked.
   - Everything else is **active**.
   - Malformed frontmatter counts as absent, with a stderr warning.
@@ -85,16 +90,18 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 
 ## Design
 
-### Step 1: capture path (R1–R5)
+### Step 1: capture path (R1–R5, R23)
 
 - **`stop.sh`.** Delete the `STOP_HOOK_ACTIVE` early exit (lines 52–57) and pass the flag to the subshell as a fifth argument. The `COMPOUND_DRAIN_IN_PROGRESS` recursion guard stays first. No new synchronous work in the parent (R4).
 - **`_stop-capture-subshell.sh`.**
   - Count transcript lines (`wc -l`) and add `stop_hook_active` and `transcript_lines` to the jq entry (R3).
-  - Before `cs_atomic_jsonl_write`, read any existing `pending/<session>.jsonl`. If its `transcript_lines` is greater than this capture's, exit without writing (R2).
-  - The check-then-move window is accepted. The guard covers the realistic case: an earlier capture's subshell finishing after a later one's, where turns are seconds apart.
-  - Entries without the field compare as 0.
-- **Drain.** Unchanged. `content_hash` dedupe and the staging-reviewer ignore unknown fields.
-- **Tests.** In `tests/compound-stop-hook.bats`: invert the re-entrant case (R1), add the out-of-order case by calling the subshell directly (R2), and assert the new fields (R3).
+  - Serialize on a per-session `mkdir` lock under the staging root (portable, no `flock` dependency). Wait a bounded few seconds, break a lock older than the wait, and release it on exit. The wait runs in the disowned subshell, never in the parent (R4). On wait timeout, fall back to an unlocked best-effort check: read the mark and write only when this capture is longer. Losing a capture is worse than the rare race this reopens.
+  - Under the lock, read the per-session high-water mark file (`<session>.hwm`, holding the highest `transcript_lines` written). If it is at or above this capture's `transcript_lines`, exit without writing (R2).
+  - Otherwise, still under the lock, call `cs_atomic_jsonl_write`, then update the mark atomically (tmp + `mv`). Order matters: a crash between the two leaves a newer entry and an older mark, which is safe.
+  - The mark survives the drain moving the entry to `processing/`, so a slow earlier capture cannot re-create a stale pending entry after the drain consumed the newer one. Retention reaping of an old mark is harmless.
+  - A missing mark compares as 0. Existing `pending/` entries without `transcript_lines` also compare as 0.
+- **Drain (R23).** The staging-reviewer's Phase 2 dedupe gains a supersession pass before the `content_hash` pass. Group the batch by session, including entries in `processing/` and entries moved from `pending/` in this pass, and delete all but the greatest `transcript_lines`. Entries without the field compare as 0 and fall back to `content_hash`. Residual: an early entry promoted by an earlier drain pass before the final one is written stays promoted. The drain cannot know a later capture is coming.
+- **Tests.** In `tests/compound-stop-hook.bats`: invert the re-entrant case (R1), add the out-of-order, post-drain and concurrent cases by calling the subshell directly (R2), and assert the new fields (R3). Add the supersession fixture for the drain (R23) alongside the existing staging-reviewer tests.
 - **Checks.** R5's live check is manual and recorded in the PR.
 
 ### Step 4: plan resolver (R6–R14)
@@ -107,7 +114,7 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
     - `status <file>` prints the classified status and supersedes target, for plan-status (R13).
   - It implements R9's classification and warnings.
   - Fenced blocks call it as `bash "${CLAUDE_PLUGIN_ROOT}/lib/plan-chain.sh" …`.
-  - It gets a bats suite `tests/plan-chain.bats` covering every R9 branch, cycles, dangling links, malformed frontmatter and the 100%-ticked rule.
+  - It gets a bats suite `tests/plan-chain.bats` covering every R9 branch, multi-link supersession chains (A→B→C leaves only A active), cycles, dangling links, malformed frontmatter and the 100%-ticked rule.
 - **`/flow:plan` (`commands/flow/plan.md`).**
   - Phase 4 writes the frontmatter (R6) and runs `overlap` before the write (R7).
   - The MINIMAL, STANDARD and COMPREHENSIVE templates gain the optional `## Proof Commands` section (R18).
@@ -143,6 +150,7 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 | Component | Requirements | Consumer |
 | --- | --- | --- |
 | `stop.sh`, `_stop-capture-subshell.sh` | R1–R4 | staging-reviewer drain |
+| staging-reviewer Phase 2 | R23 | compound pipeline |
 | `lib/plan-chain.sh` | R7–R13 | `/flow:plan`, `/flow:spec`, `/flow:decompose`, `/flow:work`, `/flow:review`, `/flow:deepen-plan`, plan-status |
 | Plan/spec frontmatter | R6, R8 | `plan-chain.sh` |
 | `## Proof Commands` section | R17, R18 | `--goal-condition` compose step |
@@ -150,7 +158,7 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 
 ## MVP Scope
 
-- **Now:** R1–R5 (step 1, one PR) and R6–R14 (step 4: a yellow-core PR, plus the yellow-research PR for R12).
+- **Now:** R1–R5 and R23 (step 1, one PR) and R6–R14 (step 4: a yellow-core PR, plus the yellow-research PR for R12).
 - **Next:** R15–R20 (step 6 MVP: compose and start/print). Depends on step 1 having merged, so `/goal` runs capture their final state.
 - **Later:** R21 (baseline vacuity check, recheck log, spec pinning).
 

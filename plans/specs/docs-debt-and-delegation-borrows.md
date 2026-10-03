@@ -44,8 +44,11 @@ Every behaviour is project-agnostic, because these plugins run in any repository
   - Docs without the keys keep today's signals (`age_exceeded`, `source_newer`, `broken_ref`).
 - **R3.** The drift computation shall be a deterministic yellow-docs script with JSON output per doc, covered by a new yellow-docs bats suite.
   - Acceptance: a seeded repo with one stale and one fresh page yields exactly the stale page and its changed files.
-- **R4.** When `/docs:generate` writes a doc, and when knowledge-compounder writes a solution doc, the system shall set `verified_at` to HEAD and `sources` to the files the doc describes. For solution docs, those are the PR's changed files, or the files touched in the session.
-- **R5.** When the user accepts a `/docs:refresh` update, the system shall bump that doc's `verified_at` to HEAD.
+- **R4.** When `/docs:generate` writes a doc, and when knowledge-compounder writes a solution doc, the system shall set `sources` to the files the doc describes. For solution docs, those are the PR's changed files, or the files touched in the session.
+  - It shall set `verified_at` to HEAD only when none of those files has uncommitted changes, because HEAD must be the commit that contains the documented source versions.
+  - Otherwise it omits `verified_at` and tells the user the stamp is pending until the sources are committed.
+- **R5.** When the user accepts a `/docs:refresh` update, the system shall bump that doc's `verified_at` to HEAD, under the same clean-sources condition as R4.
+  - For a doc that has `sources` but no `verified_at`, `/docs:refresh` shall offer to stamp it once its sources are committed.
 - **R6.** compound-lifecycle shall treat R2 drift on a solution doc as a staleness candidate, using its existing `status: stale` / `stale_reason` vocabulary.
 
 ### Debt ratchet and pin inventory (roadmap step 10)
@@ -92,7 +95,7 @@ Every behaviour is project-agnostic, because these plugins run in any repository
   - one invocation authorizes one capture;
   - quotes come verbatim from the transcript, and any reconstructed quote is marked with a leading `~`;
   - secrets are redacted from titles and tags as well as bodies.
-- **R19.** Before diagram-architect writes a diagram, every file path it cites shall be checked for existence by a deterministic step. Missing citations are removed and reported. The agent's docs state that generated diagrams are regenerated, never hand-edited.
+- **R19.** Before diagram-architect writes a diagram, every file path it cites shall be checked for existence by a deterministic step. Cited paths are untrusted model output, so the step first rejects absolute paths, `..` traversal and symlinks that resolve outside the repo, then tests filesystem existence. Existence is independent of Git tracking, so a new untracked source file keeps its citation. Missing and rejected citations are removed and reported. The agent's docs state that generated diagrams are regenerated, never hand-edited.
 - **R20.** Before repo-research-analyst recommends new tooling, it shall list the project's existing scripts with their usage. It reads usage from header comments and argument parsers, and never executes a script.
 - **R21.** yellow-plugins' own `scripts/*.js` shall carry a header usage block. A root validator warns when a script lacks one.
 
@@ -112,6 +115,8 @@ Every behaviour is project-agnostic, because these plugins run in any repository
   - `skills/docs-conventions/SKILL.md` "Staleness Detection" documents the new signals and frontmatter.
   - R5's bump is an Edit after the user accepts.
 - **Writers (R4).** `commands/docs/generate.md` sets the keys. `plugins/yellow-core/agents/workflow/knowledge-compounder.md` sets them on new solution docs.
+  - Each writer checks `git status --porcelain -- <sources>` before stamping. Any output means the sources are uncommitted, so it writes `sources` and leaves `verified_at` out.
+  - A doc with `sources` but no `verified_at` falls back to today's signals until `/docs:refresh` stamps it after the commit (R5).
 - **Validator (R1).** `scripts/validate-solutions.js` adds shape checks for the two optional keys.
 - **compound-lifecycle (R6).** `plugins/yellow-core/skills/compound-lifecycle/SKILL.md` adds drift as a candidate signal. It calls the yellow-docs script when installed, and skips the signal otherwise.
 
@@ -137,7 +142,7 @@ Every behaviour is project-agnostic, because these plugins run in any repository
 | Delegate adoption (R16) | `plugins/yellow-devin/commands/devin/delegate.md` Step 3; `plugins/yellow-cursor/commands/cursor/delegate.md`; `plugins/yellow-linear/commands/linear/delegate.md` packet build; `plugins/yellow-codex/commands/codex/rescue.md` |
 | Runner detection (R17) | `plugins/yellow-core/commands/setup/claude-web.md`. Detection extends the existing package-manager probe, and the allow-entry proposal joins the 5c settings step. |
 | Consent and verbatim (R18) | `plugins/yellow-core/skills/session-handoff/SKILL.md`, `knowledge-compounder.md` |
-| Diagram citations (R19) | `plugins/yellow-docs/agents/generation/diagram-architect.md`, plus a small existence-check block (`git ls-files --error-unmatch` per cited path) |
+| Diagram citations (R19) | `plugins/yellow-docs/agents/generation/diagram-architect.md`, plus a small existence-check block. Per cited path it rejects absolute paths and `..` segments, resolves symlinks and rejects any target outside the repo root, then tests filesystem existence (`test -e`), not Git tracking, so untracked new files pass. |
 | Script discovery (R20) | `plugins/yellow-core/agents/research/repo-research-analyst.md` |
 | Usage headers (R21) | `scripts/*.js` headers; a warning in an existing root validator, or `scripts/validate-script-headers.js` wired into `validate:schemas` as an advisory |
 

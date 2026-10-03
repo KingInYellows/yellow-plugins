@@ -23,9 +23,10 @@ The open resolve-hardening stack (#950, #952, #954, #955; plan `plans/review-res
 
 - **R1.** When given a file, a cited line, a radius (default 3) and a single-line quote, the yellow-core quote-grounding script shall report the quote as **grounded** when the whitespace-normalized quote is a substring of a whitespace-normalized line within `[line − radius, line + radius]`.
   - A quote with fewer than 8 non-whitespace characters is **too-short** and never grounded.
-  - Exit 0 means grounded and prints the matched line number. Exit 1 means ungrounded or too-short. Exit 2 means a usage or file error.
+  - Exit 0 means grounded and prints the matched line number. Exit 1 means ungrounded, too-short, or unsafe-path. Exit 2 means a usage or file error.
+  - Finding `file` values come from persona output over untrusted diffs and PR content, so the script shall open only canonical repo-relative regular files. Before any read it shall reject a path that is empty, absolute, `~`-prefixed, contains `..` or a newline or CR, resolves outside the repository root through a symlink, or is not a regular file. A rejected path is **unsafe-path**: never grounded, never read, and in a batch it affects only that finding.
 - **R2.** The script shall accept a batch of findings in one invocation and return one result per finding, so that grounding 100 findings across 20 files takes under 2 seconds.
-- **R3.** The script's tests shall cover tabs, CRLF, repeated spaces, backslashes and printf escapes, non-ASCII text, a cited line past EOF, a missing file, a too-short quote, and a match at each window edge.
+- **R3.** The script's tests shall cover tabs, CRLF, repeated spaces, backslashes and printf escapes, non-ASCII text, a cited line past EOF, a missing file, a too-short quote, and a match at each window edge. They shall also cover unsafe paths: `../` traversal, an absolute path, a `~` path, a symlink that escapes the root, a directory, and a path with an embedded newline. Each is rejected without a read, and a batch containing one still grounds its other findings.
 - **R4.** Before council shell 05 is expanded, the system shall amend `plans/shells/yellow-council-v2-four-cli-05-evidence-verification-and-finalization.md` so that its Tier 1 check consumes the yellow-core script. The amendment also adds a yellow-core dependency to `catalog/plugins/yellow-council.json` in the shell 05 PR.
 
 ### Grounding gate in `/review:pr` (roadmap step 5)
@@ -43,7 +44,10 @@ The open resolve-hardening stack (#950, #952, #954, #955; plan `plans/review-res
 - **R7.** While grounding mode is `report` (the default), the system shall drop no finding. It shall show per-class counts in the report's Coverage section.
 - **R8.** While grounding mode is `enforce`, the system shall drop ungrounded and missing findings before deduplication, count them, and list the count in Coverage. Absence findings pass through.
 - **R9.** The system shall read the grounding mode from `review_pr.grounding: report|enforce` in `yellow-plugins.local.md`. An invalid value falls back to `report` with a stderr warning. The local-config skill documents the key.
-- **R10.** The system shall ground against the raw quote, and then let the ledger store only the redacted quote. A quote shall enter a prompt or report only inside an untrusted-content fence.
+- **R10.** The system shall ground against the raw quote through a non-persistent channel, and shall write or render only a redacted quote.
+  - The raw quote shall reach the grounding script only on stdin. It shall never be written to a temporary file, passed on a command line, or placed in the ledger, a report, or a prompt.
+  - Every sink that persists or renders a quote (the ledger, the report, any file) shall receive the value redacted by `cs_redact_secrets`, not the raw value. The gate shall not depend on the ledger alone for redaction.
+  - A redacted quote shall enter a prompt or report only inside an untrusted-content fence. The fence blocks instruction-following; it is not a substitute for redaction.
 - **R11.** The review ledger shall record each observed finding's grounding class, and in enforce mode a drop record for each dropped finding.
   - A record without a grounding class reads as `not_evaluated`, never `ungrounded`.
   - `summary --all` shall report per-class counts and the ungrounded rate across PRs.
@@ -95,6 +99,12 @@ The open resolve-hardening stack (#950, #952, #954, #955; plan `plans/review-res
   - A standalone bash script, executed with `bash`, never sourced.
   - Single mode: `quote-ground.sh check <file> <line> <radius>`, with the quote read from stdin so it never appears on a command line.
   - Batch mode: `quote-ground.sh batch`, reading JSONL `{id, file, line, quote}` on stdin and writing JSONL `{id, result, matched_line}`. It runs one awk pass per distinct file (R2).
+- **Path containment (R1).** Every `file` value, in single and batch mode, passes this check before the script opens it.
+  - The script sources `validate-fs.sh` from its own directory (`$(dirname "$0")`) and calls `validate_file_path "$file" "$root"`. That helper rejects empty, `..`, absolute, `~`-prefixed and newline/CR paths, and symlinks whose target escapes the root.
+  - `root` is the git toplevel (or `$PWD`), the helper's default. The script then requires `[ -f "$root/$file" ]`, so directories, devices and FIFOs are never read.
+  - If `validate-fs.sh` is missing, the script exits 2 rather than skipping the check (fail closed).
+  - A failing path yields `result: "unsafe-path"` (batch) or exit 1 (single). The `/review:pr` gate (R6) classes `unsafe-path` as **ungrounded**, so enforce mode drops it.
+  - Path checks run once per distinct file, ahead of the awk pass, so R2's budget holds.
 - **Normalization.** Same rules as `rl_normalize_line` in `plugins/yellow-review/lib/review-ledger.sh`:
   - tabs become spaces;
   - CRs are dropped;
@@ -110,11 +120,15 @@ The open resolve-hardening stack (#950, #952, #954, #955; plan `plans/review-res
 - **Schema (R5).** Add `evidence` and `absence` to the schema example in `review-pr.md` and to `skills/pr-review-workflow/SKILL.md`. Add both fields to every producer listed in `tests/skill-content.bats` (the 11 yellow-review personas plus the yellow-core security and performance reviewers).
   - The fields are optional extensions. A return without them is never dropped at validation, so producers can update in any order.
 - **Gate placement (R6–R8).** A new sub-step 1a runs between Validate (sub-step 1) and Deduplicate (sub-step 2).
-  - It writes the findings as JSONL to a `mktemp` file.
+  - It streams the findings as JSONL to `quote-ground.sh batch` on stdin (a heredoc or pipe). It writes no `mktemp` file, because the raw quote must not reach disk.
   - It runs `quote-ground.sh batch` through `${CLAUDE_PLUGIN_ROOT}/../yellow-core/` with the highest-version-sibling fallback. If the script is not found, every finding is classed `not_evaluated` with a warning.
-  - It attaches the class to each finding and applies the mode.
+  - The script's output carries only `{id, result, matched_line}`, with no quote. The gate attaches the class to each finding, applies the mode, and then replaces each finding's `evidence` with its `cs_redact_secrets` form. Later sub-steps, the ledger, and the report see only the redacted value.
 - **Mode (R9).** Read from `yellow-plugins.local.md` as `resolve_pr.*` keys already are. Document `review_pr.grounding` in `plugins/yellow-core/skills/local-config/SKILL.md`.
-- **Redaction and fencing (R10).** Grounding runs on the raw quote before `review-ledger.sh observe`, which already applies `cs_redact_secrets`. Report rendering wraps quotes in the untrusted-content fence.
+- **Redaction and fencing (R10).**
+  - Grounding runs on the raw quote, delivered on stdin only. Immediately after grounding, the gate redacts `evidence` with `cs_redact_secrets` (from `plugins/yellow-core/lib/compound-staging.sh`) and discards the raw value.
+  - Redaction happens in the gate, before any file or report sink. `review-ledger.sh observe` keeps its own `cs_redact_secrets` pass as defense in depth, not as the only control.
+  - Report rendering shows only the redacted quote, wrapped in the untrusted-content fence.
+  - Tests: a fixture finding whose cited line holds a token-shaped string is grounded, and the token is absent from the ledger, the rendered report, and any file under the gate's temp directory.
 - **Ledger (R11).**
   - Add a `grounding` field to observed findings, and a `grounding_drop` record type.
   - Update `lib/review-ledger-vocab.json` and `references/review-pr/ledger.md`.

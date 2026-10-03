@@ -25,7 +25,7 @@ Roadmap step 11 of the integration evaluation (`docs/brainstorms/2026-10-02-turn
 - **R5.** In round 2, each reviewer shall receive its own round-1 review, the round-1 synthesis, and the addendum. It shall not receive other reviewers' raw reviews. Its prompt carries the anti-escalation clause: do not introduce new blocking issues unless critical, and revise or withdraw findings the addendum corrects.
 - **R6.** The final synthesis shall keep minority (dissenting) positions from both rounds visible. It marks each finding as kept, revised or withdrawn between rounds.
 - **R7.** A reviewer that returned `QUOTA_EXHAUSTED` or timed out in round 1 shall be skipped in round 2. The skip is reported with its reason.
-- **R8.** When OpenCode is in the roster, the system shall start one `opencode serve` at council start, route every OpenCode spawn in the invocation (both rounds) through it, and stop it on every exit path.
+- **R8.** When OpenCode is in the roster, the system shall start one `opencode serve` at council start, route every OpenCode spawn in the invocation (both rounds) through it, and stop it on every exit path the orchestrator controls. A later council start reclaims any server a cancelled run left behind.
   - The server runs with headless permission-deny settings, so it can never prompt for or grant tool permissions.
   - `--dangerously-skip-permissions` stays forbidden.
 - **R9.** If `opencode serve` fails to start or becomes unreachable, the system shall fall back to today's per-spawn `opencode run` and report the fallback.
@@ -34,18 +34,21 @@ Roadmap step 11 of the integration evaluation (`docs/brainstorms/2026-10-02-turn
 
 ## Design
 
-- **Flag and env.** Step 1 argument parsing in `plugins/yellow-council/commands/council/council.md` accepts `--rounds <n>`. A `COUNCIL_ROUNDS` row joins the configuration table (R2).
+- **Flag and env.** Step 2 argument parsing in `plugins/yellow-council/commands/council/council.md` accepts `--rounds <n>`. A `COUNCIL_ROUNDS` row joins the configuration table (R2).
 - **Round loop.**
   - After Step 5 synthesis, when rounds = 2, a new step builds the addendum (R4) from the per-finding `verify_finding()` results and a synthesizer contradictions list.
   - The synthesizer's output contract gains a `contradictions` block.
   - The step re-dispatches the surviving reviewers (R7) with round-2 prompts (R5), then runs final synthesis with round annotations and preserved dissent (R6).
   - Round-2 prompt text and the addendum are untrusted-content fenced, like the existing pack.
 - **Herding guard.** R5's visibility rule (own review, synthesis and addendum only) keeps round 2 from copying other reviewers. It is consistent with shell 03's synthesis-bias mitigation.
-- **OpenCode serve (R8, R9).**
-  - A start block launches `opencode serve` on a free localhost port, inside the existing `timeout` discipline, with a headless permission-deny config file written to a `mktemp` directory.
-  - A trap in the same Bash call that consumes the server stops it, per `docs/solutions/code-quality/trap-cleanup-across-tool-call-boundaries.md`.
-  - `plugins/yellow-council/agents/review/opencode-reviewer.md` gains an attach-to-server invocation path, with `opencode run` as the fallback.
-  - Spike before implementation: confirm `opencode serve` and attach flags plus the permission-deny config keys on the pinned OpenCode version, and record them in the PR.
+- **OpenCode serve (R8, R9).** `opencode-reviewer` runs as a separate Agent with its own Bash calls, so no `trap` can span the server's life. The lifecycle lives in a state directory instead, per `docs/solutions/code-quality/trap-cleanup-across-tool-call-boundaries.md`.
+  - **Mint and stage.** One Bash call mints a `council-opencode.XXXXXX` directory under the temp root, with no trap, and prints its path and a random token. `Write` stages the headless permission-deny config file into it.
+  - **Start.** A Bash call re-validates the path (direct child of the temp root, owned, not a symlink, token match), then launches `opencode serve` detached on a free localhost port. It sets a lifetime `timeout` as a backstop and registers no trap. It records PID, port and a process marker in a state file in that directory. If the server is not reachable before a start deadline, the call stops it and R9 applies.
+  - **Attach.** The reviewer reads the state file and re-validates it. The directory checks repeat, the PID is alive, and its command line is `opencode serve` on the recorded port. Any failed check falls back to `opencode run` (R9). The reviewer never stops the server.
+  - **Stop.** The orchestrator runs an explicit stop block at council end and on every exit path it controls: abort, reviewer failure and synthesis error. The block repeats the re-validation, kills only a validated PID, then removes the directory. A trap is allowed only inside this consuming call.
+  - **Stale recovery.** Council start sweeps `council-opencode.*` directories left by earlier runs. It stops a validated stale server and removes the directory, using the same checks. A user cancel gives the orchestrator no later tool call, so that case leaves an orphan until the next council start or the lifetime `timeout`.
+  - `plugins/yellow-council/agents/review/opencode-reviewer.md` gains the attach-to-server invocation path, with `opencode run` as the fallback.
+  - Spike before implementation: confirm `opencode serve` and attach flags, the permission-deny config keys, and whether the server accepts an auth token, on the pinned OpenCode version. Record them in the PR. If the lifecycle cannot be validated across tool calls, drop R8 to per-spawn `opencode run` and keep R9 as the only path.
 - **Measurement (R10).** A manual 10-run protocol is documented in yellow-council CLAUDE.md. Its results are recorded in the PR that would change any default.
 
 ### Traceability
