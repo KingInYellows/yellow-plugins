@@ -125,7 +125,7 @@ fetch, verify, commit and re-pass steps.
 | `poll-new-threads` | Bounded re-pass poll for threads that appeared after round 1 |
 | `check-resolve-text` | Refuse credential-shaped text before it is posted outside the resolve scripts (for example a Linear issue) |
 | `commit-resolve-fixes` | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files |
-| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--unattended` skips runner files and requires `--ignored-since <marker-file>`, which refuses when a gitignored file is newer than the marker; `--revert-only` and `--revert-dirty` revert without running) |
+| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--unattended` skips runner files and requires `--ignored-since <marker-file>`, which refuses when a gitignored file is newer than the marker; `--revert-only` and `--revert-dirty` revert without running; `--check-ignored` runs only the gitignored-file guard) |
 
 Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-paths.sh`,
 `gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.
