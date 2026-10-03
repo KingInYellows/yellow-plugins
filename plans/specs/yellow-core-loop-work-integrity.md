@@ -50,7 +50,7 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
 - **R9.** The plan resolver shall classify each `plans/*.md` file (top level only) as **active** or **inactive**.
   - **Inactive** means any of:
     - frontmatter `status` is `superseded` or `complete`;
-    - it is reachable from an active file by following `supersedes` links, so every ancestor of an active head stays inactive (if active A supersedes B and B supersedes C, both B and C are inactive);
+    - it is reachable by following `supersedes` links from any file whose `status` is not `superseded` (an active file or a `complete` one), so every ancestor of a head stays inactive, including after the head completes (if A supersedes B and B supersedes C, both B and C are inactive whether A is `active` or `complete`);
     - it has no frontmatter and has at least one checkbox, all ticked.
   - Everything else is **active**.
   - Malformed frontmatter counts as absent, with a stderr warning.
@@ -133,7 +133,7 @@ This spec covers roadmap steps 1 (re-entrant Stop capture), 4 (plan supersession
     - `status <file>` prints the classified status and supersedes target, for plan-status (R13).
   - It implements R9's classification and warnings.
   - Fenced blocks call it as `bash "${CLAUDE_PLUGIN_ROOT}/lib/plan-chain.sh" …`.
-  - It gets a bats suite `tests/plan-chain.bats` covering every R9 branch, multi-link supersession chains (A→B→C leaves only A active), cycles, dangling links, malformed frontmatter and the 100%-ticked rule.
+  - It gets a bats suite `tests/plan-chain.bats` covering every R9 branch, multi-link supersession chains (A→B→C leaves only A active), a `complete` A that supersedes B (B stays inactive), cycles, dangling links, malformed frontmatter and the 100%-ticked rule.
 - **`/flow:plan` (`commands/flow/plan.md`).**
   - Phase 4 writes the frontmatter (R6) and runs `overlap` before the write (R7).
   - The MINIMAL, STANDARD and COMPREHENSIVE templates gain the optional `## Proof Commands` section (R18).

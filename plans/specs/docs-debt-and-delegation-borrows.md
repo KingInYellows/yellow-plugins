@@ -89,7 +89,8 @@ Every behaviour is project-agnostic, because these plugins run in any repository
 - **R16.** `/devin:delegate`, `/cursor:delegate`, `/linear:delegate` and `/codex:rescue` shall each build their task from the R15 brief, within their existing prompt limits (for example, the 8,000-character packet in `/linear:delegate`). Each command adopts the brief in its own PR.
 - **R17.** `/setup:claude-web` shall:
   - detect the project's linters and test runners;
-  - propose narrow `Bash(<runner> *)` allow entries, asking only when detection is ambiguous;
+  - propose one allow entry per detected command, each naming the runner and the exact detected subcommand (for example `Bash(pnpm test *)` and `Bash(pnpm lint *)`), never a bare runner wildcard such as `Bash(pnpm *)`, asking only when detection is ambiguous;
+  - show the proposed entries to the user and write them only after confirmation;
   - accept `--verify`, which dry-runs the configured commands, reports pass or fail per command, and writes nothing.
 - **R18.** session-handoff and knowledge-compounder shall follow three rules:
   - one invocation authorizes one capture;
@@ -115,8 +116,9 @@ Every behaviour is project-agnostic, because these plugins run in any repository
   - `skills/docs-conventions/SKILL.md` "Staleness Detection" documents the new signals and frontmatter.
   - R5's bump is an Edit after the user accepts.
 - **Writers (R4).** `commands/docs/generate.md` sets the keys. `plugins/yellow-core/agents/workflow/knowledge-compounder.md` sets them on new solution docs.
-  - Each writer checks `git status --porcelain -- <sources>` before stamping. Any output means the sources are uncommitted, so it writes `sources` and leaves `verified_at` out.
-  - Empty output is not enough to stamp: a glob can match nothing, or only gitignored files, which `git status` hides. The writer also confirms every source glob matches a tracked path (`git ls-files --error-unmatch -- <sources>`) before setting `verified_at`. Otherwise it leaves the stamp pending.
+  - Both writer checks receive each source as a `:(glob)<source>` pathspec, the same form the drift script uses, so all three agree on what a glob matches. A default pathspec lets `*` match `/`; `:(glob)` does not. Without it, `docs/*.md` would match a tracked `docs/nested/source.md` in the writer while drift detection never sees it, and the doc would stay marked fresh after that file changes.
+  - Each writer checks `git status --porcelain -- ':(glob)<source>'...` before stamping. Any output means the sources are uncommitted, so it writes `sources` and leaves `verified_at` out.
+  - Empty output is not enough to stamp: a glob can match nothing, or only gitignored files, which `git status` hides. The writer also confirms every source glob matches a tracked path (`git ls-files --error-unmatch -- ':(glob)<source>'...`) before setting `verified_at`. Otherwise it leaves the stamp pending.
   - A doc with `sources` but no `verified_at` falls back to today's signals until `/docs:refresh` stamps it after the commit (R5).
 - **Validator (R1).** `scripts/validate-solutions.js` adds shape checks for the two optional keys.
 - **compound-lifecycle (R6).** `plugins/yellow-core/skills/compound-lifecycle/SKILL.md` adds drift as a candidate signal. It calls the yellow-docs script when installed, and skips the signal otherwise.
