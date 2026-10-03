@@ -234,6 +234,13 @@ summary block and the ledger line. When the nested output's last line is a
 valid contract, print it exactly as `/review:resolve` emitted it: unindented,
 with no label or prefix added, and nothing printed after it. Otherwise print
 the `Resolve: completed (output unavailable — see above)` fallback instead.
+Print the fallback as well when Step 3b's own calls (the `gh pr view` state
+check, `refresh-state`, `summary` or the triage run) reported a GitHub rate
+limit, even if the nested contract is valid: that contract was emitted before
+the limit was hit and its `ratelimited=0` is stale. Do not rewrite the contract
+to `ratelimited=1` either, because that value is reserved for a write helper's
+exit 4 and this command ran none. The fallback makes `/review:sweep-all` record
+`no contract` and stop instead of sweeping the next PR into the same limit.
 The indented `Resolve:` row in the summary stays; the final line repeats the
 contract so `/review:sweep-all` (which reads only the last line of this
 command's output) can parse `blocking` and `ratelimited`.
@@ -267,6 +274,8 @@ command's output) can parse `blocking` and `ratelimited`.
   last is a validated contract or this fallback (Step 4). The fallback never
   implies a rate limit.
 - **Ledger step fails** (Step 3b): report `Ledger:  unavailable` and finish
-  normally — the ledger never blocks a sweep.
+  normally — the ledger never blocks a sweep. When the failure is a GitHub
+  rate limit, also print the contract fallback in place of the nested
+  contract line (Step 4) so `/review:sweep-all` stops.
 - **Zero unresolved threads** is a clean outcome — `/review:resolve`
   reports that as success and `/review:sweep` does the same.

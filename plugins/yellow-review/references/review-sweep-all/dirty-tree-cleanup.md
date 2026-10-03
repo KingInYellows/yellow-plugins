@@ -56,9 +56,17 @@ A path is **owned** when it is one of:
   `.claude/agent-memory/` rules. If this call fails, no `previous_filename` is
   known and original paths stay unrecognized;
 - a **trusted-config path**, which a refused resolver edit must never leave on
-  disk: anything under `.claude/` except `.claude/agent-memory/`,
-  `yellow-plugins.local.md`, and the root `CLAUDE.md`, `AGENTS.md` and
-  `.mcp.json`.
+  disk: any path the resolver deny list (`rp_denied` in
+  `${CLAUDE_PLUGIN_ROOT}/lib/resolve-paths.sh`) blocks for its instruction and
+  tooling-config names, matched case-insensitively at any depth, because a
+  nested file steers tooling as the root one does. That covers a path inside,
+  or equal to, a `.claude`, `.cursor`, `.codex`, `.agents`, `.gemini`,
+  `.windsurf`, `.cline`, `.vscode`, `.devcontainer` or `.idea` directory, and
+  a file named `yellow-plugins.local.md`, `CLAUDE.md`, `AGENTS.md`,
+  `GEMINI.md`, `.mcp.json`, `.cursorrules`, `.windsurfrules`, `.clinerules` or
+  `copilot-instructions.md`, except `.claude/agent-memory/` at the
+  repository root (described below). Read the list from
+  `rp_denied` when it changes; do not trust this copy to be current.
 
 `.claude/agent-memory/` is excluded because agents with `memory: project`
 write learnings there as a normal part of a run. Those writes are not

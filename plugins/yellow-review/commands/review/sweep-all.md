@@ -217,6 +217,21 @@ For each iteration:
 1. **Announce** — print
    `[review:sweep-all] Sweeping PR #<PR#> (<i>/<N>): <title>`
    where `<i>` is the 1-indexed position and `<N>` is the total count.
+1b. **Open-PR pre-check** — `/review:sweep` stops in its Step 1 on a PR that is
+   no longer open, before `/review:resolve` prints a `Resolve:` line, and the
+   `Skill` tool gives no exit status, so item 5b would misread that foreseeable
+   skip as `no contract`. Check the PR first, with the literal PR number:
+
+   ```bash
+   STATE=$(gh pr view <PR#> --json state -q .state) && RC=0 || RC=$?
+   printf 'state=%s exit=%s\n' "$STATE" "$RC"
+   ```
+
+   When `exit` is non-zero, record `skipped — state unreadable`. When it is `0`
+   and `state` is not `OPEN`, record `skipped — PR closed before sweep`. Either
+   way do NOT invoke the Skill: go to item 6. Only `exit=0` with `state=OPEN`
+   proceeds to item 2. A stop inside the sweep that this check cannot foresee
+   (for example a branch mismatch) still reaches item 5b.
 2. **Invoke sweep** — invoke the `Skill` tool with `skill: "review:sweep"`
    and `args: "<PR#>"`. The skill name is `review:sweep` (the value of
    the `name:` frontmatter field in `sweep.md`) — do NOT use
@@ -242,7 +257,7 @@ For each iteration:
      distinct note, not `rate limited`) in this PR's `Notes` and count it
      blocking.
    - If a pre-Skill or post-Skill check in the surrounding Bash raised an
-     error (e.g., the PR was closed/merged between enumeration and
+     error (e.g., item 1b found the PR closed/merged between enumeration and
      invocation): outcome is `skipped — <one-line reason>`. A dirty tree after
      the sweep is item 4's stop, not a skip.
 4. **Clean-tree check** — run `git status --porcelain`. A sweep normally

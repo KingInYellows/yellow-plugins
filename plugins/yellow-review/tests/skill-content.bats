@@ -793,6 +793,20 @@ dirty_ref_jq() {
   grep -qF '`/review:sweep-all` treats it as `no contract`' <<<"$flat_sweep"
 }
 
+@test "sweep-all: an open-PR pre-check skips a closed or unreadable PR before the no-contract stop can misread it" {
+  step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
+  flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
+  grep -qF '**Open-PR pre-check**' <<<"$flat4"
+  grep -qF 'gh pr view <PR#> --json state -q .state' <<<"$flat4"
+  grep -qF 'record `skipped — state unreadable`' <<<"$flat4"
+  grep -qF 'record `skipped — PR closed before sweep`' <<<"$flat4"
+  grep -qF 'do NOT invoke the Skill: go to item 6' <<<"$flat4"
+  # the pre-check precedes the Skill invocation
+  pre=$(grep -n 'Open-PR pre-check' "$SWEEP_ALL" | head -1 | cut -d: -f1)
+  inv=$(grep -n '\*\*Invoke sweep\*\*' "$SWEEP_ALL" | head -1 | cut -d: -f1)
+  [ "$pre" -lt "$inv" ]
+}
+
 @test "sweep-all: an early stop's exit 1 survives Step 6 and compound's failure path" {
   step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
   step6=$(awk '/^### Step 6:/ { p = 1; next } /^## Error Handling/ { p = 0 } p' "$SWEEP_ALL")
