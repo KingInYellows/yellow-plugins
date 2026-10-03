@@ -207,8 +207,8 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
   on stderr rather than assume it is first.
 - `lib/resolve-gh.sh` (POSIX sh, sourced by `file-followup-issue` and
   `get-pr-blockers`) — runs `gh` under `YELLOW_REVIEW_GH_TIMEOUT` (default
-  30 s) and returns 124 on a timeout, but only when `timeout(1)` is installed;
-  without it `gh` runs unbounded.
+  30 s) and returns 124 on a timeout, but only when `timeout(1)` or
+  `gtimeout(1)` is installed; without either `gh` runs unbounded.
 - `lib/review-ledger.sh <subcommand>` — the durable review-findings ledger
   (plans/review-findings-ledger.md): an append-only JSONL file per PR at
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`,

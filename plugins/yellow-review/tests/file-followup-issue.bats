@@ -100,14 +100,13 @@ setup() {
   [ ! -e "$CREATES" ]
 }
 
-@test "a failed thread lookup links the PR and says so on stderr" {
+@test "a failed thread lookup exits 1 and files nothing" {
   export MOCK_GH_THREAD_FAIL=1
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
   [[ "$stderr" == *"thread link lookup failed"* ]]
-  body="${BATS_TEST_TMPDIR}/mock_gh_issue_body"
-  grep -qF 'pull/7' "$body"
-  ! grep -qF 'discussion_r1' "$body"
+  [[ "$stderr" == *"unverified thread"* ]]
+  [ ! -e "$CREATES" ]
 }
 
 @test "a thread lookup with no URL links the PR and says so on stderr" {

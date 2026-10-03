@@ -402,7 +402,7 @@ Replies and issue bodies end with:
   3. `file-followup-issue` never waits or retries; stderr matching "rate limit"
   or "HTTP 429" (it does not match "abuse") exits 4 at once.
 - `reply-pr-thread` also exits 4 when a `gh` call exceeds
-  `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s; needs `timeout(1)`). It does not
+  `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s; needs `timeout(1)` or `gtimeout(1)`). It does not
   retry, because the killed call may already have posted the reply. A re-run
   skips through the idempotency pre-check if the reply landed.
   `file-followup-issue` applies the same limit to every `gh` call through

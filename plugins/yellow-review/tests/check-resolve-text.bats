@@ -331,6 +331,31 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   [ "$status" -eq 2 ]
 }
 
+@test "a Slack webhook URL and a glpat token are refused; ordinary services paths are not" {
+  check_refused() {
+    printf '%s\n' "$1" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 2 ]
+  }
+  check_refused "posted to https://hooks.slack.com/services/T0A1B2C3D/B0E1F2G3H/$(printf '%s%s' aB3dE5gH7jK9 mN1pQ3sT5uVw)"
+  check_refused "token glpat-$(printf '%s%s' aB3dE5gH7jK9 mN1pQ3sT)"
+  printf '%s\n' 'see https://example.com/services/Tracker/Billing/handlers and com/services/Tracker/Billing/Retry2' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "a path with a token-shaped segment is refused; Java paths, acronyms and SHA segments are not" {
+  printf '%s\n' 'leaked path/to/qZ8xK2mLp9RtVw4YbN7cJd3H/x' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 2 ]
+  printf '%s\n' \
+    'src/main/java/com/acme/ReviewFindingsLedgerTransitionHelperFactory2/Impl' \
+    'src/main/java/com/acme/HTTPServerRequestHandlerFactory3/Impl' \
+    'objects/da39a3ee5e6b4b0d3255bfef95601890afd80709/Readme/Impl1' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
 @test "the identifier exemption stops at 256 characters so appended key material is refused" {
   local unit='Abcd' body='' i
   for i in $(seq 1 63); do body="$body$unit"; done
@@ -464,7 +489,7 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
 
 @test "a keyword alone on a line checks the next non-blank line as its value" {
   check() {
-    printf "$2" >| "$A"
+    printf '%b' "$2" >| "$A"
     run --separate-stderr "$SCRIPT" "$A"
     [ "$status" -eq 2 ]
     [[ "$stderr" == *"rule=$1 "* ]]
@@ -478,7 +503,7 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
 
 @test "next-line values that are placeholders, prose or out of reach stay clean" {
   while IFS= read -r t; do
-    printf "$t" >| "$A"
+    printf '%b' "$t" >| "$A"
     run "$SCRIPT" "$A"
     [ "$status" -eq 0 ]
   done <<'CASES'

@@ -144,6 +144,23 @@ stub_sleep() {
   done
 }
 
+@test "a viewer marker with trailing newline, CRLF or spaces is still a skip, extra prose after it is not" {
+  for suffix in '\n' '\r\n' '   ' ' \n\n'; do
+    rm -f "$POSTED" "$CALLS"
+    export MOCK_REPLY_SUFFIX="$suffix"
+    run --separate-stderr "$SCRIPT" PRRT_reply_suffix fixed "$BODY"
+    [ "$status" -eq 0 ]
+    [ "$(printf '%s' "$output" | jq -c '[.replied, .skipped]')" = '[false,"already-replied"]' ]
+    [ ! -f "$CALLS" ]
+  done
+  rm -f "$POSTED" "$CALLS"
+  export MOCK_REPLY_SUFFIX=' trailing prose'
+  run --separate-stderr "$SCRIPT" PRRT_reply_suffix fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
+  unset MOCK_REPLY_SUFFIX
+}
+
 @test "a marker quoted in a reviewer comment does not cause a skip" {
   run --separate-stderr "$SCRIPT" PRRT_reply_spoof fixed "$BODY"
   [ "$status" -eq 0 ]
