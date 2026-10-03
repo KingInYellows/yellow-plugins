@@ -413,7 +413,10 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   and cannot backdate an mtime. `/review:resolve` Step 3f mints the marker in
   a private `mktemp -d` directory before any resolver runs, and Step 6 passes
   it to every verify call (interactive runs may pass it too) and removes the
-  directory. `--revert-only`
+  directory. When no verify command runs, Step 6 still calls
+  `run-verify-command --check-ignored --ignored-since <marker-file>`, which
+  runs the same guard and nothing else; a refusal reverts and downgrades
+  `fixed` threads like any other. `--revert-only`
   saves a patch and reverts the listed files without running anything
   (Step 5's CONFLICT rollback). It waives only the deny-list check; an
   unchanged listed file is skipped and named in `reason`

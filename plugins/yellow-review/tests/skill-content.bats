@@ -457,6 +457,14 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   grep -q 'Edit bounds' "$RESOLVE_REFS/clusters.md"
 }
 
+@test "resolve-pr: the ignored-file guard also runs when there is no verify command" {
+  text=$(flat "$RESOLVE_PR")
+  [[ "$text" == *'run-verify-command --pr "<PR#>" --check-ignored --ignored-since "$MARK_DIR/ignored-marker"'* ]]
+  [[ "$text" == *'`verify=none` after the `--check-ignored` guard'* ]]
+  disp=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$disp" == *'`run-verify-command --check-ignored --ignored-since <marker-file>`'* ]]
+}
+
 @test "resolver agent: a read deny list names secret paths and bars quoting file content" {
   text=$(flat "$RESOLVER_AGENT")
   [[ "$text" == *'Read, Grep or Glob secrets, credentials or files outside the repository'* ]]

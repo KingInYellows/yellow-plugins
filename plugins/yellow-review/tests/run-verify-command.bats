@@ -1300,6 +1300,36 @@ ignored_fixture() {
   [ -f src/new.txt ]
 }
 
+@test "--check-ignored passes when no ignored file is newer than the marker and changes nothing" {
+  ignored_fixture
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = clean ]
+  # Nothing ran and nothing was reverted: the resolver edits are still there.
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+@test "--check-ignored refuses an ignored file edited after the marker and names it" {
+  ignored_fixture
+  printf '#!/bin/sh\necho pwned\n' >| node_modules/.bin/runner
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/.bin/runner"* ]]
+  [[ "$stderr" != *pwned* ]]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "--check-ignored needs a readable marker and takes no file list" {
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"requires --ignored-since"* ]]
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$BATS_TEST_TMPDIR/missing"
+  [ "$status" -eq 2 ]
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER" -- src/a.txt
+  [ "$status" -eq 2 ]
+}
+
 @test "--ignored-since refuses an ignored file created after the marker, also when the run is attended" {
   ignored_fixture
   printf 'new\n' >| node_modules/.bin/added
