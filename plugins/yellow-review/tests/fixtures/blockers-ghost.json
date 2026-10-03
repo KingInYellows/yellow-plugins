@@ -1,0 +1,26 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "baseRefName": "main",
+        "reviewDecision": "CHANGES_REQUESTED",
+        "latestOpinionatedReviews": {
+          "pageInfo": {
+            "hasNextPage": false
+          },
+          "nodes": [
+            {
+              "id": "PRR_ghost",
+              "state": "CHANGES_REQUESTED",
+              "submittedAt": "2026-09-30T09:00:00Z",
+              "author": null,
+              "commit": {
+                "oid": "aaaaaaa"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

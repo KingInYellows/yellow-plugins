@@ -404,12 +404,32 @@ degradation to the review.
 
 Located at `skills/pr-review-workflow/scripts/`:
 
-- **get-pr-comments** `<owner/repo> <pr-number>` — Returns JSON array of
-  unresolved, non-outdated review threads
+- **get-pr-comments** `[--include-outdated] <owner/repo> <pr-number>` —
+  Returns JSON array of unresolved review threads (outdated threads are
+  excluded unless `--include-outdated` is passed); exits 3 with the partial
+  array on stdout when the thread list is truncated; each thread carries
+  `commentsTruncated` (true past the 50 comments fetched), and a resolver
+  must never resolve such a thread
+- **get-pr-blockers** `<owner/repo> <pr-number>` — Reports
+  `CHANGES_REQUESTED` reviews, `reviewDecision`, and whether conversation
+  resolution is enforced
+- **reply-pr-thread** `<PRRT_id> <disposition> <body-file>` — Replies to a
+  thread with an idempotency marker; skips threads already replied to
 - **resolve-pr-thread** `<thread-node-id>` — Resolves a single thread
   (idempotent)
+- **file-followup-issue** `<owner/repo> <pr> <PRRT_id> <title-file>
+  <body-file>` — Files or finds the follow-up issue for an out-of-scope
+  thread; `--find <owner/repo> <PRRT_id>` only looks and never files
+- **check-resolve-text** `<file>...` — Exits 2 when text looks like a
+  credential. A refusal prints a `resolve-text:` line on stderr
+  (`refused rule=<rule> line=<n>` for a credential hit, `scan failed` when
+  the scan did not run); look for it anywhere on stderr, not just first.
+  `reply-pr-thread` and `file-followup-issue` print the same line
 
-Both require `gh` and `jq` to be installed.
+`get-pr-blockers`, `reply-pr-thread`, `file-followup-issue` and
+`check-resolve-text` are not yet invoked by `/review:resolve`; the contract
+is `references/resolve/dispositions.md`. The other five scripts require `gh`
+and `jq`; `check-resolve-text` needs only POSIX sh with awk.
 
 ## File Line Counts Script
 

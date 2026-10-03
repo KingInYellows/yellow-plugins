@@ -1,0 +1,40 @@
+#!/bin/sh
+# Refuse resolver-written text that looks like a credential before it goes
+# anywhere public that the resolve scripts do not post themselves (for
+# example a Linear issue created through MCP).
+# Usage: check-resolve-text <file>...
+# Output: nothing on success.
+# Exit codes: 0 clean, 2 usage, an unreadable file, or a file that looks like
+#             it contains a credential or could not be scanned (every such
+#             file is named on stderr; all arguments are scanned). A refusal
+#             prints a `resolve-text:` line, never the text: `refused rule=<rule> line=<n>` for a credential
+#             hit, `scan failed` when the scan did not run. Look for that
+#             line anywhere on stderr; it is not always first.
+# Contract: references/resolve/dispositions.md ("Reply hygiene")
+
+set -eu
+
+if [ $# -lt 1 ]; then
+    printf 'Usage: check-resolve-text <file>...\n' >&2
+    exit 2
+fi
+
+# shellcheck source=../../../lib/resolve-text.sh
+. "$(dirname -- "$0")/../../../lib/resolve-text.sh"
+
+# Scan every argument so one call reports all failing files; exit 2 once at
+# the end. An unreadable file does not stop the scan of the others.
+rc=0
+for f in "$@"; do
+    if ! { [ -f "$f" ] && [ -r "$f" ]; }; then
+        printf 'Error: File not readable: %s\n' "$f" >&2
+        rc=2
+        continue
+    fi
+    if ! rt_text_clean "$f"; then
+        rt_report_refusal
+        printf 'Error: %s looks like it contains a credential, or could not be scanned.\n' "$f" >&2
+        rc=2
+    fi
+done
+exit "$rc"

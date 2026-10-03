@@ -1,0 +1,29 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "baseRefName": "main",
+        "reviewDecision": "APPROVED",
+        "latestOpinionatedReviews": {
+          "pageInfo": {
+            "hasNextPage": false
+          },
+          "nodes": [
+            {
+              "id": "PRR_dave",
+              "state": "APPROVED",
+              "submittedAt": "2026-09-30T09:00:00Z",
+              "author": {
+                "__typename": "User",
+                "login": "dave"
+              },
+              "commit": {
+                "oid": "aaaaaaa"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

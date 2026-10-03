@@ -1,0 +1,16 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "baseRefName": "main",
+        "reviewDecision": "CHANGES_REQUESTED",
+        "latestOpinionatedReviews": {
+          "pageInfo": {
+            "hasNextPage": false
+          },
+          "nodes": "oops"
+        }
+      }
+    }
+  }
+}

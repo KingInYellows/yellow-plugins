@@ -1,6 +1,25 @@
 #!/bin/sh
 # Mock gh CLI for bats tests
-# Serves fixture JSON based on PR number or thread ID in arguments
+# Serves fixture JSON based on PR number or thread ID in arguments, and
+# scripts the calls the resolve scripts make. Arms keyed on query or
+# endpoint text come first; each arm documents its own drivers:
+#   FollowupViewer / FollowupThreadUrl   MOCK_GH_VIEWER, MOCK_GH_VIEWER_FAIL,
+#                                        MOCK_GH_THREAD_URL, MOCK_GH_THREAD_FAIL
+#   issue list / create / close          MOCK_GH_ISSUE_LIST_{FAIL,COUNT,FULL,
+#                                        MARKER_THREAD}, MOCK_GH_RESCAN,
+#                                        MOCK_GH_ISSUE_CREATE_FAIL,
+#                                        MOCK_GH_ISSUE_CLOSE_FAIL
+#   ReplyPrecheck / addPullRequestReviewThreadReply
+#                                        PRRT_reply_* thread ids pick the
+#                                        scenario (rate-limit sequences with
+#                                        Retry-After or reset headers, 5xx,
+#                                        missing comment, spoofed marker)
+#   latestOpinionatedReviews             MOCK_GH_BLOCKERS_{FAIL,FIXTURE}
+#   */protection, */rules/branches/*     MOCK_GH_PROTECTION, MOCK_GH_RULES
+#   pr view                              MOCK_GH_{FAIL,PR_STATE,HEAD_OID,
+#                                        BASE_OID}
+# The reply arms match bare thread-id substrings, so order matters: a new id
+# must not contain an earlier arm's id (PRRT_reply_rl also matches rl2).
 set -eu
 
 FIXTURE_DIR="${BATS_FIXTURE_DIR:-$(dirname "$0")/../fixtures}"
@@ -10,6 +29,351 @@ ALL_ARGS="$*"
 
 # State file for multi-page pagination (tracks call count per PR)
 PAGE_STATE_DIR="${BATS_TEST_TMPDIR:-/tmp}"
+
+# Record that gh was invoked at all, so tests can prove "no API call".
+printf '%s\n' "$ALL_ARGS" >> "${PAGE_STATE_DIR}/mock_gh_any_call"
+
+# Emulate `gh api --jq <expr>`: print the value after --jq, if any.
+jq_expr() {
+  _want=0
+  for _a in "$@"; do
+    if [ "$_want" = 1 ]; then printf '%s' "$_a"; return 0; fi
+    [ "$_a" = "--jq" ] && _want=1
+  done
+  return 0
+}
+
+# Print JSON, applying --jq when the caller passed one.
+emit() {
+  _expr=$(jq_expr "$@")
+  if [ -n "$_expr" ]; then
+    printf '%s' "$MOCK_BODY" | jq -r "$_expr"
+  else
+    printf '%s\n' "$MOCK_BODY"
+  fi
+}
+
+# Print an HTTP response the way `gh api` does: headers first only when -i
+# was passed. $1 = status line, $2 = extra header lines (may be empty),
+# MOCK_BODY = body.
+http() {
+  case " $* $ALL_ARGS " in
+    *" -i "*|*" --include "*)
+      printf '%s\r\nContent-Type: application/json\r\n' "$1"
+      [ -n "$2" ] && printf '%s\r\n' "$2"
+      printf '\r\n'
+      ;;
+  esac
+  printf '%s\n' "$MOCK_BODY"
+}
+
+# Count calls per key in BATS_TEST_TMPDIR; prints the new count.
+bump() {
+  _f="${PAGE_STATE_DIR}/mock_gh_count_$1"
+  _n=$(( $(cat "$_f" 2>/dev/null || printf 0) + 1 ))
+  printf '%s' "$_n" >| "$_f"
+  printf '%s' "$_n"
+}
+
+# Arms keyed on query or endpoint text come first so the number=/PRRT_ arms
+# below never capture them.
+case "$ALL_ARGS" in
+  *"FollowupViewer"*)
+    # file-followup-issue viewer lookup. MOCK_GH_VIEWER overrides the login;
+    # MOCK_GH_VIEWER_FAIL=1|ratelimit simulates a failure.
+    case "${MOCK_GH_VIEWER_FAIL:-0}" in
+      ratelimit) printf 'gh: API rate limit exceeded for user. (HTTP 403)\n' >&2; exit 1 ;;
+      1) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
+    esac
+    MOCK_BODY="{\"data\":{\"viewer\":{\"login\":\"${MOCK_GH_VIEWER:-me}\"}}}"
+    emit "$@"
+    exit 0
+    ;;
+  *"FollowupThreadUrl"*)
+    # MOCK_GH_THREAD_FAIL=1|ratelimit simulates a failed lookup;
+    # MOCK_GH_THREAD_URL overrides the first comment URL (empty = none).
+    # MOCK_GH_THREAD_FAIL=notfound is gh's error for an unknown node id;
+    # MOCK_GH_THREAD_FAIL=nullnode is a null node with no error.
+    case "${MOCK_GH_THREAD_FAIL:-0}" in
+      notfound) printf 'gh: Could not resolve to a node with the global id of PRRT_gone. (HTTP 200)\n' >&2; exit 1 ;;
+      nullnode)
+        MOCK_BODY='{"data":{"node":null}}'
+        emit "$@"
+        exit 0
+        ;;
+      ratelimit) printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2; exit 1 ;;
+      1) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
+    esac
+    _turl="${MOCK_GH_THREAD_URL-https://github.com/test/repo/pull/7#discussion_r1}"
+    MOCK_BODY=$(jq -nc --arg u "$_turl" '{data:{node:{comments:{nodes:(if $u == "" then [] else [{url:$u}] end)}}}}')
+    emit "$@"
+    exit 0
+    ;;
+  "issue list "*)
+    printf '%s\n' "$ALL_ARGS" >| "${PAGE_STATE_DIR}/mock_gh_issue_list_args"
+    _call=$(bump issue_list)
+    # MOCK_GH_RESCAN shapes the second list call only (the post-create rescan):
+    # winner = an older marker issue #70 plus ours (#77); own = ours (#77)
+    # plus a later marker issue #80; fail / ratelimit = the list fails.
+    # Any other value is a test typo and fails loudly.
+    if [ "$_call" -eq 2 ] && [ -n "${MOCK_GH_RESCAN:-}" ]; then
+      _nums=""
+      case "$MOCK_GH_RESCAN" in
+        ratelimit) printf 'gh: API rate limit exceeded for user. (HTTP 429)\n' >&2; exit 1 ;;
+        fail) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
+        winner) _nums='70 77' ;;
+        own) _nums='77 80' ;;
+        *) printf 'mock gh: unknown MOCK_GH_RESCAN value: %s (expected winner|own|fail|ratelimit)\n' "$MOCK_GH_RESCAN" >&2; exit 2 ;;
+      esac
+      jq -n --arg nums "$_nums" '[ ($nums | split(" ")[] | tonumber) as $n
+        | {number: $n, url: "https://github.com/test/repo/issues/\($n)", author: {login: "me"},
+           body: "Follow-up\n\n<!-- yellow-review:resolve v1 thread=PRRT_issue_new disposition=oos -->"} ]'
+      exit 0
+    fi
+    # MOCK_GH_ISSUE_LIST_FAIL=1|ratelimit simulates a failed list.
+    case "${MOCK_GH_ISSUE_LIST_FAIL:-0}" in
+      ratelimit) printf 'gh: API rate limit exceeded for user. (HTTP 429)\n' >&2; exit 1 ;;
+      1) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
+    esac
+    # MOCK_GH_ISSUE_LIST_COUNT=N (or MOCK_GH_ISSUE_LIST_FULL=1, N=200): a
+    # window of N unrelated issues with no marker for the requested thread.
+    _n="${MOCK_GH_ISSUE_LIST_COUNT:-}"
+    [ -z "$_n" ] && [ "${MOCK_GH_ISSUE_LIST_FULL:-0}" = 1 ] && _n=200
+    if [ -n "$_n" ]; then
+      _base=$(jq -n --argjson n "$_n" '[range(0; $n) | {number: (1000 + .), url: "https://github.com/test/repo/issues/\(1000 + .)", author: {login: "me"}, body: "unrelated"}]')
+    else
+      _base=$(cat "$FIXTURE_DIR/issue-list-response.json")
+    fi
+    # MOCK_GH_ISSUE_LIST_MARKER_THREAD=PRRT_x appends two issues carrying
+    # that thread's marker, #90 listed before #50, so the oldest must win.
+    if [ -n "${MOCK_GH_ISSUE_LIST_MARKER_THREAD:-}" ]; then
+      printf '%s' "$_base" | jq --arg t "$MOCK_GH_ISSUE_LIST_MARKER_THREAD" '. + [ (90, 50) as $n
+        | {number: $n, url: "https://github.com/test/repo/issues/\($n)", author: {login: "me"},
+           body: "Out of scope.\n\n<!-- yellow-review:resolve v1 thread=\($t) disposition=oos -->"} ]'
+    else
+      printf '%s\n' "$_base"
+    fi
+    exit 0
+    ;;
+  "issue create "*)
+    # Saves the title and body for assertions. MOCK_GH_ISSUE_CREATE_FAIL=1
+    # simulates a failure.
+    if [ "${MOCK_GH_ISSUE_CREATE_FAIL:-0}" = ratelimit ]; then
+      printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2
+      exit 1
+    fi
+    if [ "${MOCK_GH_ISSUE_CREATE_FAIL:-0}" = 1 ]; then
+      printf 'HTTP 422: Validation Failed\n' >&2
+      exit 1
+    fi
+    if [ "${MOCK_GH_ISSUE_CREATE_FAIL:-0}" = nourl ]; then
+      # Created, but gh printed no issue URL.
+      bump issue_create >/dev/null
+      printf 'Creating issue in test/repo\n'
+      exit 0
+    fi
+    bump issue_create >/dev/null
+    _next=""
+    for a in "$@"; do
+      case "$_next" in
+        title) printf '%s' "$a" >| "${PAGE_STATE_DIR}/mock_gh_issue_title" ;;
+        body) cat "$a" >| "${PAGE_STATE_DIR}/mock_gh_issue_body" ;;
+      esac
+      case "$a" in
+        --title) _next=title ;;
+        --body-file) _next=body ;;
+        *) _next="" ;;
+      esac
+    done
+    printf 'Creating issue in test/repo\n\nhttps://github.com/test/repo/issues/77\n'
+    exit 0
+    ;;
+  "issue close "*)
+    # Saves the arguments. MOCK_GH_ISSUE_CLOSE_FAIL=1|ratelimit simulates a
+    # failure.
+    printf '%s\n' "$ALL_ARGS" >| "${PAGE_STATE_DIR}/mock_gh_issue_close_args"
+    if [ "${MOCK_GH_ISSUE_CLOSE_FAIL:-0}" = ratelimit ]; then
+      printf 'gh: API rate limit exceeded for user. (HTTP 429)\n' >&2
+      exit 1
+    fi
+    if [ "${MOCK_GH_ISSUE_CLOSE_FAIL:-0}" = 1 ]; then
+      printf 'HTTP 403: Forbidden\n' >&2
+      exit 1
+    fi
+    exit 0
+    ;;
+  *"ReplyPrecheck"*)
+    # reply-pr-thread pre-check: the thread's last comment.
+    case "$ALL_ARGS" in
+      *"PRRT_reply_rlboth"*)
+        # Rate limited on the first pre-check only; the mutation then limits
+        # too (see below), so the script must not get a second retry.
+        if [ "$(bump precheck_rlboth)" -eq 1 ]; then
+          MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
+          http "HTTP/2.0 429 Too Many Requests" "Retry-After: 0"
+          printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
+          exit 1
+        fi
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_rlboth","comments":{"nodes":[{"viewerDidAuthor":false,"body":"x"}]}}}}'
+        ;;
+      *"PRRT_reply_badbody"*)
+        # Our last comment with a non-string body: the prior-marker jq errors.
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_badbody","comments":{"nodes":[{"viewerDidAuthor":true,"body":5}]}}}}'
+        ;;
+      *"PRRT_reply_done"*)
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_done","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_done disposition=fixed -->\n"}]}}}}'
+        ;;
+      *"PRRT_reply_suffix"*)
+        # Our marker followed by MOCK_REPLY_SUFFIX (escapes expanded): trailing
+        # newline, CRLF or spaces still count; extra prose does not.
+        _sfx=$(printf '%b' "${MOCK_REPLY_SUFFIX:-}" | jq -Rs .)
+        MOCK_BODY=$(jq -nc --argjson sfx "$_sfx" '{data:{node:{id:"PRRT_reply_suffix",comments:{nodes:[{viewerDidAuthor:true,body:("Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_suffix disposition=fixed -->" + $sfx)}]}}}}')
+        ;;
+      *"PRRT_reply_priorunclear"*)
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_priorunclear","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Could not verify.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_priorunclear disposition=unclear -->\n"}]}}}}'
+        ;;
+      *"PRRT_reply_priordisagree"*)
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_priordisagree","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Not changing this.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_priordisagree disposition=disagree -->\n"}]}}}}'
+        ;;
+      *"PRRT_reply_spoof"*)
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_spoof","comments":{"nodes":[{"viewerDidAuthor":false,"body":"> <!-- yellow-review:resolve v1 thread=PRRT_reply_spoof disposition=fixed -->"}]}}}}'
+        ;;
+      *"PRRT_reply_gone"*)
+        MOCK_BODY='{"data":{"node":null}}'
+        ;;
+      *)
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_x","comments":{"nodes":[{"viewerDidAuthor":false,"body":"Please add a null check."}]}}}}'
+        ;;
+    esac
+    http "HTTP/2.0 200 OK" ""
+    exit 0
+    ;;
+  *"addPullRequestReviewThreadReply"*)
+    # reply-pr-thread mutation. Saves the posted body for assertions.
+    n=$(bump reply)
+    for a in "$@"; do
+      case "$a" in body=@*) cat "${a#body=@}" >| "${PAGE_STATE_DIR}/mock_gh_reply_body" ;; esac
+    done
+    case "$ALL_ARGS" in
+      *"PRRT_reply_rl2"*|*"PRRT_reply_rlboth"*|*"PRRT_reply_rl"*)
+        # rl: limited on the first call only. rl2 / rlboth: always limited.
+        case "$ALL_ARGS" in *"PRRT_reply_rl2"*|*"PRRT_reply_rlboth"*) limited=1 ;; *) [ "$n" -eq 1 ] && limited=1 || limited=0 ;; esac
+        if [ "$limited" = 1 ]; then
+          MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
+          case "$ALL_ARGS" in
+            *"PRRT_reply_rl2"*) _status=403; http "HTTP/2.0 403 Forbidden" "" ;;
+            *) _status=429; http "HTTP/2.0 429 Too Many Requests" "Retry-After: 7" ;;
+          esac
+          printf 'gh: You have exceeded a secondary rate limit. (HTTP %s)\n' "$_status" >&2
+          exit 1
+        fi
+        ;;
+      *"PRRT_reply_ra120"*|*"PRRT_reply_ra90"*|*"PRRT_reply_radate"*|*"PRRT_reply_dflt"*|*"PRRT_reply_reset"*|*"PRRT_reply_resetpast"*|*"PRRT_reply_resetfar"*)
+        # Wait-source arms. ra120 / resetfar are always limited (over the
+        # cap); the rest are limited on the first call only.
+        case "$ALL_ARGS" in *"PRRT_reply_ra120"*|*"PRRT_reply_resetfar"*) limited=1 ;; *) [ "$n" -eq 1 ] && limited=1 || limited=0 ;; esac
+        if [ "$limited" = 1 ]; then
+          MOCK_BODY='{"message":"You have exceeded a secondary rate limit."}'
+          _now=$(date +%s)
+          case "$ALL_ARGS" in
+            *"PRRT_reply_ra120"*) _hdr="Retry-After: 120" ;;
+            *"PRRT_reply_ra90"*) _hdr="Retry-After: 90" ;;
+            *"PRRT_reply_radate"*) _hdr="Retry-After: Wed, 21 Oct 2026 07:28:00 GMT" ;;
+            *"PRRT_reply_resetpast"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: %s' "$((_now - 100))") ;;
+            *"PRRT_reply_resetfar"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: %s' "$((_now + 500))") ;;
+            *"PRRT_reply_reset"*) _hdr=$(printf 'x-ratelimit-remaining: 0\r\nx-ratelimit-reset: %s' "$((_now + 30))") ;;
+            *) _hdr="" ;;
+          esac
+          http "HTTP/2.0 429 Too Many Requests" "$_hdr"
+          printf 'gh: You have exceeded a secondary rate limit. (HTTP 429)\n' >&2
+          exit 1
+        fi
+        ;;
+      *"PRRT_reply_502"*)
+        MOCK_BODY='<html><body>502 Bad Gateway</body></html>'
+        http "HTTP/2.0 502 Bad Gateway" ""
+        printf 'gh: HTTP 502\n' >&2
+        exit 1
+        ;;
+      *"PRRT_reply_500"*)
+        MOCK_BODY='{"errors":[{"type":"INTERNAL","message":"Something went wrong while executing your query."}]}'
+        http "HTTP/2.0 200 OK" ""
+        exit 1
+        ;;
+      *"PRRT_reply_nocomment"*)
+        MOCK_BODY='{"data":{"addPullRequestReviewThreadReply":{"comment":null}}}'
+        http "HTTP/2.0 200 OK" ""
+        exit 0
+        ;;
+      *"PRRT_reply_gqlrl"*)
+        if [ "$n" -eq 1 ]; then
+          MOCK_BODY='{"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded for user."}]}'
+          http "HTTP/2.0 200 OK" ""
+          printf 'gh: API rate limit exceeded for user.\n' >&2
+          exit 1
+        fi
+        ;;
+      *"PRRT_reply_forbidden"*)
+        MOCK_BODY='{"errors":[{"type":"FORBIDDEN","message":"Resource not accessible by integration"}]}'
+        http "HTTP/2.0 200 OK" ""
+        printf 'gh: Resource not accessible by integration\n' >&2
+        exit 1
+        ;;
+    esac
+    MOCK_BODY='{"data":{"addPullRequestReviewThreadReply":{"comment":{"id":"PRRC_new"}}}}'
+    http "HTTP/2.0 200 OK" ""
+    exit 0
+    ;;
+  *"latestOpinionatedReviews"*)
+    # get-pr-blockers review lookup. MOCK_GH_BLOCKERS_FAIL=1 simulates an
+    # API failure.
+    if [ "${MOCK_GH_BLOCKERS_FAIL:-0}" = 1 ]; then
+      printf 'gh: Something went wrong (HTTP 502)\n' >&2
+      exit 1
+    fi
+    cat "$FIXTURE_DIR/${MOCK_GH_BLOCKERS_FIXTURE:-blockers-response.json}"
+    exit 0
+    ;;
+  *"/protection"*)
+    # Classic branch protection. MOCK_GH_PROTECTION: enabled | disabled |
+    # notprotected | 403 | 404 (default).
+    case "${MOCK_GH_PROTECTION:-404}" in
+      enabled) MOCK_BODY='{"required_conversation_resolution":{"enabled":true}}'; emit "$@" ;;
+      disabled) MOCK_BODY='{"required_conversation_resolution":{"enabled":false}}'; emit "$@" ;;
+      notprotected)
+        printf 'gh: Branch not protected (HTTP 404)\n' >&2
+        exit 1
+        ;;
+      403) printf 'gh: Resource not accessible by integration (HTTP 403)\n' >&2; exit 1 ;;
+      *) printf '{"message":"Not Found"}gh: Not Found (HTTP 404)\n' >&2; exit 1 ;;
+    esac
+    exit 0
+    ;;
+  *"/rules/branches/"*)
+    # Branch rulesets. MOCK_GH_RULES: enforced | none (default) | fail |
+    # page2 (the enforcing rule only on page two; needs --paginate, which
+    # prints one array per page) | page2fail (page two errors).
+    case "${MOCK_GH_RULES:-none}" in
+      page2|page2fail)
+        printf '[{"type":"deletion"},{"type":"pull_request","parameters":{"required_review_thread_resolution":false}}]\n'
+        case " $ALL_ARGS " in
+          *" --paginate "*)
+            if [ "$MOCK_GH_RULES" = page2fail ]; then
+              printf 'gh: Server Error (HTTP 500)\n' >&2
+              exit 1
+            fi
+            printf '[{"type":"pull_request","parameters":{"required_review_thread_resolution":true}}]\n'
+            ;;
+        esac
+        exit 0
+        ;;
+      enforced) MOCK_BODY='[{"type":"deletion"},{"type":"pull_request","parameters":{"required_review_thread_resolution":true}}]'; emit "$@" ;;
+      fail) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
+      *) MOCK_BODY='[{"type":"deletion"},{"type":"pull_request","parameters":{"required_review_thread_resolution":false}}]'; emit "$@" ;;
+    esac
+    exit 0
+    ;;
+esac
 
 case "$ALL_ARGS" in
   *"number=123"*)
@@ -28,6 +392,10 @@ case "$ALL_ARGS" in
       cat "$FIXTURE_DIR/multi-page-response-page1.json"
     fi
     ;;
+  *"number=500"*)
+    # Reviewer-thread fixture chosen per test via MOCK_GH_COMMENTS_FIXTURE.
+    cat "$FIXTURE_DIR/${MOCK_GH_COMMENTS_FIXTURE:-viewer-fields-response.json}"
+    ;;
   *"number=350"*)
     # Null cursor: hasNextPage=true but endCursor=null
     cat "$FIXTURE_DIR/null-cursor-response.json"
@@ -40,6 +408,32 @@ case "$ALL_ARGS" in
   *"number=401"*)
     printf 'Bad credentials' >&2
     exit 1
+    ;;
+  *"number=403"*)
+    printf 'gh: Resource not accessible by integration (HTTP 403)\n' >&2
+    exit 1
+    ;;
+  *"number=420"*)
+    # GitHub reports a secondary rate limit as HTTP 403.
+    printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2
+    exit 1
+    ;;
+  *"number=429"*)
+    printf 'gh: Too Many Requests (HTTP 429)\n' >&2
+    exit 1
+    ;;
+  *"number=502"*)
+    printf 'gh: Server Error (HTTP 502)\n' >&2
+    exit 1
+    ;;
+  *"number=778"*)
+    # Status-code digits that are not an HTTP status must not classify.
+    printf 'gh: request 4012345-5001 failed (HTTP 418)\n' >&2
+    exit 1
+    ;;
+  *"number=360"*)
+    # Endless pagination: every page says there is another, with a cursor.
+    printf '{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":true,"endCursor":"Y3Vyc29y"},"nodes":[]}}}}}\n'
     ;;
   *"PRRT_valid"*)
     cat "$FIXTURE_DIR/resolve-success-response.json"
@@ -75,6 +469,10 @@ case "$ALL_ARGS" in
     printf '  PRRT_notfound → not found error\n' >&2
     printf '  PRRT_resolved → already resolved error\n' >&2
     printf '  pr view <n>  → {state,headRefOid,baseRefOid} from MOCK_GH_* env\n' >&2
+    printf '  latestOpinionatedReviews → blockers-response.json (MOCK_GH_BLOCKERS_*)\n' >&2
+    printf '  */protection → MOCK_GH_PROTECTION; */rules/branches/* → MOCK_GH_RULES\n' >&2
+    printf '  ReplyPrecheck / addPullRequestReviewThreadReply → PRRT_reply_* arms\n' >&2
+    printf '  FollowupViewer / FollowupThreadUrl / issue list / issue create\n' >&2
     exit 1
     ;;
 esac
