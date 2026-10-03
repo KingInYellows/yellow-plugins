@@ -1,0 +1,43 @@
+plans/specs/yellow-review-grounding-and-resolve-loop.md
+  s_19981440458bca::t_7e724136ca51da 134
+  s_19981440458bca::t_65674bcbace5e1 65
+  s_19981440458bca::t_90d6ca3f7549ba 107
+  s_68074fe8ec0a96::t_f28990fb219a2d 25,36,40-41,50-51,128-129
+plans/specs/yellow-council-v3-multi-round.md
+  s_19981440458bca::t_7d21ca4addde55 45
+plans/specs/yellow-core-loop-work-integrity.md
+  s_19981440458bca::t_f405f720d11247 30-36
+  s_19981440458bca::t_275ac4072e5386 104-108,110-111
+  s_19981440458bca::t_9d25c45a901b42 114-119
+  s_19981440458bca::t_e780e21d3e53d1 120
+  s_19981440458bca::t_3a4853462a37e5 169
+  s_19981440458bca::t_e9aa013e56c02b 24-25
+plans/specs/docs-debt-and-delegation-borrows.md
+  s_19981440458bca::t_f0456616d223ec 48
+  s_19981440458bca::t_53018779715e7c 111
+  s_19981440458bca::t_f2eae836452038 119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6e8a76da4a1acc9a915f54e794661431c5663811",
+  "prompts": {},
+  "sessions": {
+    "s_19981440458bca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "74820cce-4cfb-4b65-9b63-0ecd4a17dcd5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_68074fe8ec0a96": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a4e8b4bff1a0663d7",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
