@@ -3,6 +3,8 @@
 
 bats_require_minimum_version 1.5.0
 
+load helpers/timeout-stub
+
 SCRIPT_DIR="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/skills/pr-review-workflow/scripts"
 SCRIPT="${SCRIPT_DIR}/file-followup-issue"
 
@@ -581,14 +583,6 @@ path_without_timeout() {
   [ "$status" -eq 4 ]
   [[ "$stderr" == *"timed out after 30 s"* ]]
   [[ "$stderr" != *"integer expression"* ]]
-}
-
-# A timeout stub that logs the limit it was given, then times out.
-stub_timeout_logging() {
-  mkdir -p "${BATS_TEST_TMPDIR}/tobin"
-  printf '#!/bin/sh\nprintf "%%s\\n" "$1" >| "%s/timeout_arg"\nexit 124\n' "$BATS_TEST_TMPDIR" >| "${BATS_TEST_TMPDIR}/tobin/timeout"
-  chmod +x "${BATS_TEST_TMPDIR}/tobin/timeout"
-  export PATH="${BATS_TEST_TMPDIR}/tobin:${PATH}"
 }
 
 @test "a YELLOW_REVIEW_GH_TIMEOUT over 60 is clamped to 60, not reset to the default" {

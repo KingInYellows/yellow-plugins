@@ -3,6 +3,8 @@
 
 bats_require_minimum_version 1.5.0
 
+load helpers/timeout-stub
+
 SCRIPT_DIR="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/skills/pr-review-workflow/scripts"
 SCRIPT="${SCRIPT_DIR}/reply-pr-thread"
 
@@ -204,14 +206,6 @@ stub_sleep() {
   PATH="${BATS_TEST_TMPDIR}/tobin:${PATH}" run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
   [ "$status" -eq 4 ]
   [[ "$stderr" == *"timed out"* ]]
-}
-
-# Put a timeout stub first on PATH that logs its first argument, then times out.
-stub_timeout_logging() {
-  mkdir -p "${BATS_TEST_TMPDIR}/tobin"
-  printf '#!/bin/sh\nprintf "%%s\\n" "$1" > "%s/timeout_arg"\nexit 124\n' "$BATS_TEST_TMPDIR" >| "${BATS_TEST_TMPDIR}/tobin/timeout"
-  chmod +x "${BATS_TEST_TMPDIR}/tobin/timeout"
-  export PATH="${BATS_TEST_TMPDIR}/tobin:${PATH}"
 }
 
 @test "YELLOW_REVIEW_GH_TIMEOUT=0 falls back to the 30 s default, not no limit" {
@@ -425,11 +419,11 @@ path_without_timeout() {
   [ "$(cat "$CALLS")" = 1 ]
 }
 
-@test "the pre-check reads the last 10 comments with their author type" {
-  run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+@test "posts when our marker has fallen out of the 10-comment window behind Bot replies" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_outwindow fixed "$BODY"
   [ "$status" -eq 0 ]
-  grep -q 'comments(last: 10)' "$SCRIPT"
-  grep -q 'author { __typename }' "$SCRIPT"
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
+  [ "$(cat "$CALLS")" = 1 ]
 }
 
 # --- structured exit-4 reason (rate-limit vs timeout) ---

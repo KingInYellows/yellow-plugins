@@ -445,7 +445,7 @@ Located at `skills/pr-review-workflow/scripts/`:
   fetch or parse is never read as "no new threads". Exit 4 on a rate limit
   (`poll rate-limited`), 2 on usage.
 
-All require `gh` and `jq` to be installed.
+The GraphQL scripts above require `gh` and `jq`. `check-resolve-text` needs only POSIX sh with awk, and `commit-resolve-fixes`, `run-verify-command` and `poll-new-threads` have their own prerequisites in their headers.
 
 ## File Line Counts Script
 
@@ -462,9 +462,7 @@ Same directory. Not GraphQL; it reads only the local repository:
 
 ## Verification Loop
 
-After resolving threads:
-
-1. Wait 2 seconds
-2. Re-fetch comments with `get-pr-comments`
-3. If unresolved threads remain, retry up to 3 times
-4. Unresolved threads after retries are reported as warnings
+After resolving threads, `/review:resolve` Step 8 re-fetches with a bounded
+re-pass (`poll-new-threads`) instead of a fixed wait: the rules, caps and exit
+codes are in `references/resolve/dispositions.md` ("Pacing and rate limits").
+Unresolved threads after the re-pass are reported as warnings.

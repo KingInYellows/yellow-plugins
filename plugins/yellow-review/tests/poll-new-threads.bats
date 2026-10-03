@@ -82,6 +82,9 @@ IFS='|' read -ra results <<<"$FAKE_RESULTS"
 r="${results[$((n - 1))]:-${results[$((${#results[@]} - 1))]}}"
 case "$r" in
   ok:*) printf '%s' "${r#ok:}" | jq -Rc 'split(",") | map(select(. != "") | {threadId: .})' ;;
+  partial:*) printf '%s' "${r#partial:}" | jq -Rc 'split(",") | map(select(. != "") | {threadId: .})'
+             echo "get-pr-comments: deadline reached" >&2; exit 3 ;;
+  notfound) echo "Error: Pull request not found" >&2; exit 1 ;;
   badjson) printf 'not json' ;;
   *) echo "boom" >&2; exit 1 ;;
 esac
@@ -99,6 +102,34 @@ EOS
   [ "$status" -eq 2 ]
   run "$SCRIPT" --wait 0 --interval 5 "o/r" 123 "$ROUND1" "$OUT"
   [ "$status" -eq 2 ]
+}
+
+@test "an oversized or out-of-range --wait exits 2 instead of spinning" {
+  : >"$ROUND1"
+  run "$SCRIPT" --wait 99999999999999999999 "o/r" 123 "$ROUND1" "$OUT"
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --wait 481 "o/r" 123 "$ROUND1" "$OUT"
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --wait 480 "o/r" 123 "$ROUND1" "$OUT"
+  [ "$status" -ne 2 ]
+}
+
+@test "a get-pr-comments exit 3 partial array is never read as a complete fetch" {
+  fake_setup
+  printf 'PRRT_a\n' >"$ROUND1"
+  FAKE_RESULTS="partial:PRRT_a,PRRT_b" run "$FAKE_DIR/poll-new-threads" --wait 40 "o/r" 1 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repass fetched=0 found=0"* ]]
+  [ ! -e "$OUT" ]
+}
+
+@test "a not-found failure stops the loop after one wait" {
+  fake_setup
+  : >"$ROUND1"
+  FAKE_RESULTS="notfound" run "$FAKE_DIR/poll-new-threads" --wait 100 "o/r" 1 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repass fetched=0 found=0"* ]]
+  [ "$(wc -l <"$SLEEP_LOG")" -eq 1 ]
 }
 
 @test "an unreadable round-1 file exits 2" {

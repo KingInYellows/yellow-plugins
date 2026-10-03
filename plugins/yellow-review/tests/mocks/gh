@@ -290,6 +290,11 @@ case "$ALL_ARGS" in
       *"PRRT_reply_priordisagree"*)
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_priordisagree","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Not changing this.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_priordisagree disposition=disagree -->\n"}]}}}}'
         ;;
+      *"PRRT_reply_outwindow"*)
+        # Our marker pushed out of the 10-comment window by 10 Bot replies: the
+        # window holds only Bot comments, so no viewer comment is found and we post.
+        MOCK_BODY=$(jq -nc '{data:{node:{id:"PRRT_reply_outwindow",comments:{nodes:[range(0;10)|{viewerDidAuthor:false,author:{__typename:"Bot"},body:"Thanks."}]}}}}')
+        ;;
       *"PRRT_reply_botafter"*)
         # Our marker, then a Bot acknowledgement: still a skip.
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_botafter","comments":{"nodes":[{"viewerDidAuthor":false,"author":{"__typename":"User"},"body":"Please add a null check."},{"viewerDidAuthor":true,"author":{"__typename":"User"},"body":"Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_botafter disposition=fixed -->"},{"viewerDidAuthor":false,"author":{"__typename":"Bot"},"body":"Thanks, noted."},{"viewerDidAuthor":false,"author":{"__typename":"Bot"},"body":"Looks resolved."}]}}}}'
@@ -673,6 +678,21 @@ case "$ALL_ARGS" in
   *"PRRT_gqlforbidden"*)
     printf '{"data":{"resolveReviewThread":null},"errors":[{"type":"FORBIDDEN","message":"Resource not accessible by integration"}]}\n'
     printf 'gh: Resource not accessible by integration\n' >&2
+    exit 1
+    ;;
+  *"PRRT_alreadyjson"*)
+    # gh exits 0 with an already-resolved GraphQL error payload.
+    printf '{"data":{"resolveReviewThread":null},"errors":[{"message":"Thread is already resolved"}]}\n'
+    exit 0
+    ;;
+  *"PRRT_rl_then_nf"*)
+    # Rate limited on the first call, then the thread turns out not to exist.
+    if [ "$(bump resolve_rl_then_nf)" -eq 1 ]; then
+      printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2
+      exit 1
+    fi
+    printf '{"data":{"resolveReviewThread":null},"errors":[{"type":"NOT_FOUND","message":"Could not resolve to a node with the global id."}]}\n'
+    printf 'gh: Could not resolve to a node with the global id.\n' >&2
     exit 1
     ;;
   *"PRRT_valid"*)

@@ -36,7 +36,7 @@ Step 5 and follow it; this file does not restate it.
 
 **Every stop after the PR number is known prints the contract's `Resolve:`
 line** as its last line: an error, a cancel, a refusal or an early exit,
-including the dirty-tree, branch and HEAD stops in Steps 2a to 2c. Those early
+including the dirty-tree, branch and HEAD stops in Steps 2 to 2c. Those early
 stops print their error, then the line for a stop before any write. Only stops
 before the PR number is known (unknown flag, too many arguments, or a failed
 branch detection) print just their error.
@@ -74,8 +74,17 @@ skill; invalid values warn and fall back) and whether the file is tracked.
 Later steps use only this snapshot, so edits during the run change nothing:
 
 ```bash
-git -C "$(git rev-parse --show-toplevel)" ls-files --error-unmatch -- yellow-plugins.local.md >/dev/null 2>&1 && printf 'tracked\n' || printf 'untracked\n'
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
+if [ -n "$TOP" ]; then
+  git -C "$TOP" ls-files --error-unmatch -- yellow-plugins.local.md >/dev/null 2>&1; rc=$?
+else
+  rc=128
+fi
+case "$rc" in 0) printf 'tracked\n' ;; 1) printf 'untracked\n' ;; *) printf 'unknown\n' ;; esac
 ```
+
+Only exit 1 means untracked. `unknown` (any other git failure) is treated as
+tracked for the unattended verify gate, so a git error never opens it.
 
 **Non-interactive mode** suppresses every `AskUserQuestion` gate in this
 command — the Step 4 spawn-cap gate, the Step 5 `CONFLICT:` surfacing gate,
@@ -153,9 +162,10 @@ threads still block merge, so include them:
 ```
 
 If it exits non-zero, report its stderr verbatim and stop; stderr naming a
-rate limit means `ratelimited=1` on the `Resolve:` line. Exit 3 means the
-thread list is partial (page cap, missing cursor or the fetch deadline): report
-it as a partial list and do not treat it as complete. Then:
+rate limit means `ratelimited=1` on the `Resolve:` line. Exit 3 stops too: the
+thread list is partial (page cap, missing cursor or the fetch deadline), so
+report `thread list partial` and write nothing, because the threads not seen
+would stay open without a report. Then:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-blockers" "<owner/repo>" "<PR#>"
@@ -252,8 +262,9 @@ Step 8's second round mints a fresh marker before its resolvers.
 - **Interactive mode (default).** Before dispatching any resolvers, call
   `AskUserQuestion` showing the cluster count and a per-cluster summary
   (`<path>:<line_range>` and thread count). Options: "Resolve all M clusters" /
-  "Resolve first 10 only" / "Cancel". On Cancel, stop without dispatch and go
-  to Step 9's `Resolve:` line only. On "Resolve first 10 only", dispatch the
+  "Resolve first 10 only" / "Cancel". On Cancel, stop without dispatch, run Step 6's **Marker
+  cleanup** for `<marker-dir>`, and go to Step 9's `Resolve:` line only
+  (`push=skipped`, `verify=none`). On "Resolve first 10 only", dispatch the
   first 10 clusters (sorted by file path, then line range) and record the
   remaining `M − 10` clusters as `not attempted (cluster cap)` — their threads
   get no reply, stay open, and are reported as blocking in Step 9. The gate
@@ -320,11 +331,9 @@ The resolver should reconcile multiple comments in a cluster with a **single
 coherent edit** to the file region, not N separate edits. If two comments in
 the same cluster contradict each other (e.g., one asks to rename and another
 asks to keep the name), it MUST emit `CONFLICT: <one-line description>` as the
-first line of its return summary. Step 5 grep-detects this prefix and surfaces
-the conflict via `AskUserQuestion`; soft-phrased prose ("the comments seem to
-disagree") will not trigger reconciliation. After its output block the resolver
-emits one `THREAD` line per thread ID (format in the contract); Step 5
-validates them.
+first line of its return summary (Step 5 grep-detects the prefix). After its
+output block the resolver emits one `THREAD` line per thread ID (format in the
+contract); Step 5 validates them.
 
 The fence delimiters and the "Resume normal agent behavior." re-anchor are required even for short comment text.
 
@@ -488,8 +497,14 @@ refusal and revert. Unattended, it is a refusal.
 
 ### Step 7: Write Phase
 
-Check the PR is still open (`gh pr view "<PR#>" --json state -q .state`); if
-not `OPEN`, print `PR #<N> is <STATE>; write phase stopped` and go to Step 9.
+Capture the PR state with no pipe, so an unreadable state is not read as open:
+
+```bash
+PR_STATE=$(gh pr view "<PR#>" --json state -q .state) || PR_STATE="unreadable"
+```
+
+If `PR_STATE` is not `OPEN` (including `unreadable`), print
+`PR #<N> is <PR_STATE>; write phase stopped` and go to Step 9.
 
 Process threads serially, sorted by path, line, threadId — including Step
 3c's dropped threads — per the contract's write order and lanes. Write each
@@ -512,10 +527,9 @@ start a thread's next stage only after the previous one exits 0:
   procedure" (team resolution, dedupe, text check) and its "Linear response
   checks", which every reused `list_issues` hit and the `save_issue` response
   must pass, with one fallback to `file-followup-issue`.
-- `reply-pr-thread` is safe to re-run: it skips with `already-replied` when
-  our latest marker in the thread's last 10 comments is followed only by Bot
-  comments; a later human comment makes it post again. Go on to
-  `resolve-pr-thread` after a skip.
+- `reply-pr-thread` is safe to re-run (the contract's Recovery rule). After an
+  `already-replied` skip, go on to `resolve-pr-thread` only when the reported
+  `disposition` equals the one you asked for.
 - Exit 3 from `reply-pr-thread` or `resolve-pr-thread` prints a stderr line
   `reason=permission` or `reason=not-found`. Report `needs permission` only
   for the first and `not found` for the second.
@@ -538,7 +552,7 @@ that the re-pass was skipped because the write phase stopped on a timeout: the
 timed-out call may have landed, so retries and new-thread writes wait for a
 later run. Before polling, and again after the poll
 returns, before any retry or second-round write, capture the PR state with no
-pipe, as in Step 2b:
+pipe, as in Step 7:
 
 ```bash
 PR_STATE=$(gh pr view "<PR#>" --json state -q .state) || PR_STATE="unreadable"
@@ -565,9 +579,7 @@ below, and leave those threads as they are. Otherwise, from `<refetch-file>`:
 - threads this run attempted to resolve but still open → retry
   `resolve-pr-thread` up to 3 times on exit 1 only (exit 3 → `needs
   permission` or `not found` per its `reason=` line; exit 4 → stop and apply
-  Step 7's exit 4 rule: `reason=rate-limit` → mark the rest `not attempted
-  (rate limit)` and set `ratelimited=1`; `reason=timeout` → `not attempted
-  (gh timeout)`, `ratelimited=0`, `write_stopped=timeout`); a thread we resolved
+  Step 7's exit 4 rule); a thread we resolved
   that is open again is reported `reopened by bot`, not retried;
 - if `found=1` and `push=ok`, re-check the PR state, re-run `pr-changed-ranges`
   (Step 4) because the round-1 push added lines, mint a fresh marker (Step 3f;

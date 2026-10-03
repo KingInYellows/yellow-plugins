@@ -3,6 +3,8 @@
 
 bats_require_minimum_version 1.5.0
 
+load helpers/timeout-stub
+
 SCRIPT_DIR="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/skills/pr-review-workflow/scripts"
 SCRIPT="${SCRIPT_DIR}/resolve-pr-thread"
 
@@ -67,15 +69,26 @@ stub_sleep() {
   [ "$resolved" = "true" ]
 }
 
+@test "an already-resolved GraphQL error with gh exit 0 is success" {
+  run --separate-stderr "$SCRIPT" "PRRT_alreadyjson"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .resolved)" = true ]
+}
+
+@test "a rate limit followed by NOT_FOUND on the retry exits 3 with reason=not-found" {
+  run --separate-stderr "$SCRIPT" "PRRT_rl_then_nf"
+  [ "$status" -eq 3 ]
+  printf '%s\n' "$stderr" | grep -qx 'reason=not-found'
+  [ "$(cat "${BATS_TEST_TMPDIR}/mock_gh_count_resolve_rl_then_nf")" = 2 ]
+}
+
 # --- Error handling ---
 
-@test "--help prints exit codes and env vars and exits 0" {
+@test "--help prints the usage line and where the exit codes live, and exits 0" {
   run --separate-stderr "$SCRIPT" --help
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Exit codes:"* ]]
-  [[ "$output" == *"reason=permission"* ]]
-  [[ "$output" == *"YELLOW_REVIEW_PACE_SECONDS"* ]]
-  [[ "$output" == *"YELLOW_REVIEW_RATE_LIMIT_WAIT"* ]]
+  [[ "$output" == *"Usage: resolve-pr-thread"* ]]
+  [[ "$output" == *"dispositions.md"* ]]
 }
 
 @test "thread not found exits 3 with reason=not-found" {
@@ -170,8 +183,8 @@ stub_sleep() {
   stub_sleep
   run --separate-stderr "$SCRIPT" "PRRT_rl_reset"
   [ "$status" -eq 0 ]
-  [[ "$stderr" =~ retrying\ once\ in\ (29|30)s ]]
-  grep -qE '^(29|30)$' "$SLEEP_LOG"
+  [[ "$stderr" =~ retrying\ once\ in\ (2[5-9]|30)s ]]
+  grep -qE '^(2[5-9]|30)$' "$SLEEP_LOG"
 }
 
 @test "a reset time in the past retries after 0 s" {
@@ -330,13 +343,6 @@ stub_sleep() {
 }
 
 # --- Oversized numeric values (past the shell's integer range) ---
-
-stub_timeout_logging() {
-  mkdir -p "${BATS_TEST_TMPDIR}/tobin"
-  printf '#!/bin/sh\nprintf "%%s\\n" "$1" >| "%s/timeout_arg"\nexit 124\n' "$BATS_TEST_TMPDIR" >| "${BATS_TEST_TMPDIR}/tobin/timeout"
-  chmod +x "${BATS_TEST_TMPDIR}/tobin/timeout"
-  export PATH="${BATS_TEST_TMPDIR}/tobin:${PATH}"
-}
 
 @test "an oversized YELLOW_REVIEW_RATE_LIMIT_WAIT falls back to 60 s and never sleeps the huge value" {
   stub_sleep

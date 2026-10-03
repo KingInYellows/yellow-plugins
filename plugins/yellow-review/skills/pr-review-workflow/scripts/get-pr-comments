@@ -131,7 +131,6 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String, $pageSize
           line
           startLine
           originalLine
-          originalStartLine
           comments(first: 50) {
             totalCount
             nodes {
@@ -319,8 +318,7 @@ OUTPUT=$(printf '%s' "$ALL_THREADS" | jq --argjson includeOutdated "$INCLUDE_OUT
         viewerCanResolve: (.viewerCanResolve // false),
         viewerCanReply: (.viewerCanReply // false),
         originalLine: (.originalLine // null),
-        originalStartLine: (.originalStartLine // null),
-        diffHunk: (if (.isOutdated // false) then (.comments.nodes[0].diffHunk // null) else null end)
+        diffHunk: ((.comments.nodes[0].diffHunk // null) | if type == "string" then .[0:2000] else null end)
       }
   ]') || {
     printf 'Error: Failed to transform GraphQL response.\n' >&2
