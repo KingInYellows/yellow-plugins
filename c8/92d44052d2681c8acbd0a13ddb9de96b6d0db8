@@ -1,0 +1,39 @@
+docs/security.md
+  s_79ab629205942a::t_b83ea28a116dfc 356-363
+plans/review-resolve-hardening.md
+  s_79ab629205942a::t_e1f880068f379b 233-234,421-424,810
+plugins/yellow-review/CLAUDE.md
+  s_79ab629205942a::t_bab1db04c7e197 210-211
+plugins/yellow-review/lib/resolve-text.sh
+  s_79ab629205942a::t_ad348cbc605906 127-133,431-435,441-447,452,459-464
+plugins/yellow-review/references/resolve/dispositions.md
+  s_79ab629205942a::t_b24a355b95631b 405
+plugins/yellow-review/skills/pr-review-workflow/scripts/file-followup-issue
+  s_79ab629205942a::t_8c7a91cdecfac9 26-29,31-32,128,230,239-243,278,291
+plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-blockers
+  s_79ab629205942a::t_f1d41de80dce94 20
+plugins/yellow-review/tests/check-resolve-text.bats
+  s_79ab629205942a::t_4cb9548e3500cd 334-358,492,506
+plugins/yellow-review/tests/file-followup-issue.bats
+  s_79ab629205942a::t_624ece24443b35 103,106,108-109
+plugins/yellow-review/tests/mocks/gh
+  s_79ab629205942a::t_9197c7cf7f6a10 226-231
+plugins/yellow-review/tests/reply-pr-thread.bats
+  s_79ab629205942a::t_3617ba029dfe4e 147-163
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c892d44052d2681c8acbd0a13ddb9de96b6d0db8",
+  "prompts": {},
+  "sessions": {
+    "s_79ab629205942a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "af7c3a89-4c40-4dc4-bd49-8799be9e99c6",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
