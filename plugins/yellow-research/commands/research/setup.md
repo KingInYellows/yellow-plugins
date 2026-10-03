@@ -136,8 +136,9 @@ has_userconfig() {
              "$file" "$jq_exit" >&2 ;;
       esac
     else
-      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qE "\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" "$file" 2>/dev/null && return 0
+      # Flatten newlines, then require the option inside the same plugin object.
+      tr -d '\n\r' < "$file" 2>/dev/null \
+        | grep -qE "\"($plugin|$plugin@yellow-plugins)\"[[:space:]]*:[[:space:]]*\{[^{}]*(\"options\"[[:space:]]*:[[:space:]]*\{[^{}]*)?\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" 2>/dev/null && return 0
     fi
   done
   return 1
@@ -296,8 +297,9 @@ has_userconfig() {
              "$file" "$jq_exit" >&2 ;;
       esac
     else
-      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qE "\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" "$file" 2>/dev/null && return 0
+      # Flatten newlines, then require the option inside the same plugin object.
+      tr -d '\n\r' < "$file" 2>/dev/null \
+        | grep -qE "\"($plugin|$plugin@yellow-plugins)\"[[:space:]]*:[[:space:]]*\{[^{}]*(\"options\"[[:space:]]*:[[:space:]]*\{[^{}]*)?\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" 2>/dev/null && return 0
     fi
   done
   return 1
@@ -423,8 +425,9 @@ has_userconfig() {
              "$file" "$jq_exit" >&2 ;;
       esac
     else
-      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qE "\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" "$file" 2>/dev/null && return 0
+      # Flatten newlines, then require the option inside the same plugin object.
+      tr -d '\n\r' < "$file" 2>/dev/null \
+        | grep -qE "\"($plugin|$plugin@yellow-plugins)\"[[:space:]]*:[[:space:]]*\{[^{}]*(\"options\"[[:space:]]*:[[:space:]]*\{[^{}]*)?\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" 2>/dev/null && return 0
     fi
   done
   return 1
@@ -549,8 +552,9 @@ has_userconfig() {
              "$file" "$jq_exit" >&2 ;;
       esac
     else
-      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qE "\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" "$file" 2>/dev/null && return 0
+      # Flatten newlines, then require the option inside the same plugin object.
+      tr -d '\n\r' < "$file" 2>/dev/null \
+        | grep -qE "\"($plugin|$plugin@yellow-plugins)\"[[:space:]]*:[[:space:]]*\{[^{}]*(\"options\"[[:space:]]*:[[:space:]]*\{[^{}]*)?\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" 2>/dev/null && return 0
     fi
   done
   return 1
@@ -887,13 +891,11 @@ key as inactive for the summary. `UNVERIFIED (shell key rejected; …)` and
 `UNVERIFIED (shell key passed; …)` also do not count as active (the effective
 key is unconfirmed) and are not `INVALID`. For Perplexity, both end with
 `; pending MCP-visibility confirmation`. When Step 3.5 finds the MCP tools, each
-becomes
-`PRESENT (userConfig takes precedence — shell key probe: <result>; validated via
-MCP startup; reflects the key as of the MCP's last start)`, where `<result>` is
-`INVALID` for the rejected status and `ACTIVE` for the passed one (the MCP
-started, so it resolved a key, and a userConfig key wins when one is set). It
-counts as active, with the same keep-pending rule for a key changed this
-session; otherwise it stays unverified and inactive.
+becomes `PRESENT (validated via MCP startup — effective credential source
+unconfirmed; reflects the key as of the MCP's last start)`. ToolSearch confirms
+that the MCP started with a key, not whether it came from userConfig, keychain
+or shell. It counts as active only if the key was not changed this session;
+otherwise it stays pending and inactive.
 
 Counts:
 

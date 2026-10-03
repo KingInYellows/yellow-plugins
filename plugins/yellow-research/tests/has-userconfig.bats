@@ -88,6 +88,7 @@ without_jq() {
 make_nojq_path() {
   mkdir -p "$BATS_TEST_TMPDIR/nojq"
   ln -sf "$(command -v grep)" "$BATS_TEST_TMPDIR/nojq/grep"
+  ln -sf "$(command -v tr)" "$BATS_TEST_TMPDIR/nojq/tr"
 }
 
 @test "jq absent: warns and matches a non-empty value" {
@@ -139,6 +140,22 @@ make_nojq_path() {
     >| "$CLAUDE_CONFIG_DIR/.credentials.json"
   printf '{"pluginConfigs":{"yellow-research":{"options":{"exa_api_key": "x"}}}}' \
     >| "$CLAUDE_CONFIG_DIR/settings.json"
+  run without_jq yellow-research exa_api_key
+  [ "$status" -eq 0 ]
+}
+
+@test "jq absent: an option under another plugin does not count" {
+  make_nojq_path
+  printf '{"pluginSecrets":{"yellow-research@yellow-plugins":{"tavily_api_key":"x"},"yellow-devin@yellow-plugins":{"exa_api_key":"x"}}}' \
+    >| "$CLAUDE_CONFIG_DIR/.credentials.json"
+  run without_jq yellow-research exa_api_key
+  [ "$status" -eq 1 ]
+}
+
+@test "jq absent: a value on the line after the colon counts" {
+  make_nojq_path
+  printf '{\n  "pluginSecrets": {\n    "yellow-research@yellow-plugins": {\n      "exa_api_key":\n        "x"\n    }\n  }\n}\n' \
+    >| "$CLAUDE_CONFIG_DIR/.credentials.json"
   run without_jq yellow-research exa_api_key
   [ "$status" -eq 0 ]
 }

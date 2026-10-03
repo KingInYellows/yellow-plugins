@@ -181,8 +181,9 @@ has_userconfig() {
              "$file" "$jq_exit" >&2 ;;
       esac
     else
-      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qE "\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" "$file" 2>/dev/null && return 0
+      # Flatten newlines, then require the option inside the same plugin object.
+      tr -d '\n\r' < "$file" 2>/dev/null \
+        | grep -qE "\"($plugin|$plugin@yellow-plugins)\"[[:space:]]*:[[:space:]]*\{[^{}]*(\"options\"[[:space:]]*:[[:space:]]*\{[^{}]*)?\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" 2>/dev/null && return 0
     fi
   done
   return 1
@@ -263,8 +264,9 @@ has_userconfig() {
              "$file" "$jq_exit" >&2 ;;
       esac
     else
-      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qE "\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" "$file" 2>/dev/null && return 0
+      # Flatten newlines, then require the option inside the same plugin object.
+      tr -d '\n\r' < "$file" 2>/dev/null \
+        | grep -qE "\"($plugin|$plugin@yellow-plugins)\"[[:space:]]*:[[:space:]]*\{[^{}]*(\"options\"[[:space:]]*:[[:space:]]*\{[^{}]*)?\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" 2>/dev/null && return 0
     fi
   done
   return 1
@@ -342,8 +344,9 @@ has_userconfig() {
              "$file" "$jq_exit" >&2 ;;
       esac
     else
-      { grep -qF "\"$plugin\"" "$file" || grep -qF "\"$plugin@yellow-plugins\"" "$file"; } 2>/dev/null \
-        && grep -qE "\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" "$file" 2>/dev/null && return 0
+      # Flatten newlines, then require the option inside the same plugin object.
+      tr -d '\n\r' < "$file" 2>/dev/null \
+        | grep -qE "\"($plugin|$plugin@yellow-plugins)\"[[:space:]]*:[[:space:]]*\{[^{}]*(\"options\"[[:space:]]*:[[:space:]]*\{[^{}]*)?\"$option\"[[:space:]]*:[[:space:]]*\"[^\"]" 2>/dev/null && return 0
     fi
   done
   return 1

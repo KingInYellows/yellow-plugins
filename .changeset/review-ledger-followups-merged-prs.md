@@ -33,11 +33,12 @@ and setup-command PRs.
   restart. The shell-env wording says Claude Code must have been launched with
   the key exported. A Perplexity `UNVERIFIED` status, passed or rejected shell
   key, stays pending until Step 3.5 sees the MCP tools; Step 4 then promotes it
-  to `PRESENT (userConfig takes precedence — …; validated via MCP startup; …)`,
-  one of the two established promotion shapes, and counts it as active.
+  to `PRESENT (validated via MCP startup — effective credential source
+  unconfirmed; …)` and counts it as active only if the key was not changed this
+  session; otherwise it stays pending with a restart-and-rerun instruction.
 - `yellow-research`, `yellow-devin` and `yellow-semgrep`: the jq-less fallback in
-  `has_userconfig` matches only a non-empty string value for the option, like
-  the jq path, so a leftover empty `"exa_api_key": ""` entry no longer downgrades
+  `has_userconfig` matches only a non-empty string value for the option inside the
+  same plugin object, like the jq path, so a leftover empty `"exa_api_key": ""` entry no longer downgrades
   a passing shell key to `UNVERIFIED`. `has-userconfig.bats` covers the empty,
   whitespace, other-provider and jq-absent cases.
 - `yellow-browser-test` and `yellow-core`: web-app detection recognizes dotted
