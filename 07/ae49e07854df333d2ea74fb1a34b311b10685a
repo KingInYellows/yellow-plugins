@@ -1,0 +1,40 @@
+plans/specs/authoring-evals-and-context-budget.md
+  s_19981440458bca::t_438611fbfbe7dc 97-99,101
+  s_19981440458bca::t_d41eb42126e528 34
+plans/specs/yellow-council-v3-multi-round.md
+  s_19981440458bca::t_bd010eae991572 73-76
+plans/specs/yellow-review-grounding-and-resolve-loop.md
+  s_19981440458bca::t_d0199ac81e2499 30
+  s_19981440458bca::t_1c580f8a2a5aa9 48
+  s_19981440458bca::t_da43ca065d0fa1 25
+  s_19981440458bca::t_970102cacaaf68 107
+  s_19981440458bca::t_35ad3a6b6c8a20 36
+  s_19981440458bca::t_977aa95994e6cc 131-134
+plans/specs/yellow-core-loop-work-integrity.md
+  s_19981440458bca::t_d88ca9535e32c1 188
+  s_19981440458bca::t_4db7c2da93796c 81-84
+  s_19981440458bca::t_87e426511b55ca 186-187,189-190
+  s_19981440458bca::t_6969590e9e0a77 111
+  s_19981440458bca::t_b7da0f239e2b79 77-79
+  s_19981440458bca::t_1a858dedcce69f 76
+  s_19981440458bca::t_6b794babde9e77 24
+  s_19981440458bca::t_4558474eefac53 109
+  s_19981440458bca::t_edf4b4dcc6d0c4 91
+  s_19981440458bca::t_fe8dc6bf63d542 156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "07ae49e07854df333d2ea74fb1a34b311b10685a",
+  "prompts": {},
+  "sessions": {
+    "s_19981440458bca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "74820cce-4cfb-4b65-9b63-0ecd4a17dcd5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
