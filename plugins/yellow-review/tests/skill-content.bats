@@ -516,7 +516,7 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   [[ "$text" == *'`not attempted (config changed)`'* ]]
   # The check precedes the status check inside item 3b.
   chk=$(grep -n 'guard-local-config" check' "$RESOLVE_STACK" | head -1 | cut -d: -f1)
-  sts=$(grep -n '^   git status --porcelain$' "$RESOLVE_STACK" | head -1 | cut -d: -f1)
+  sts=$(grep -n 'OUT=$(git status --porcelain=v1' "$RESOLVE_STACK" | head -1 | cut -d: -f1)
   [ "$chk" -lt "$sts" ]
 }
 
@@ -639,41 +639,13 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -q 'memory: project' "$DIRTY_REF"
 }
 
-# The documented previous_filename projection, extracted from the reference so
-# the test runs exactly what the procedure tells the agent to run.
-dirty_ref_jq() {
-  awk '/--jq \x27$/ {on = 1; next} on {last = /\x27$/; sub(/\x27$/, ""); print; if (last) exit}' "$DIRTY_REF"
-}
-
-@test "dirty-tree-cleanup: the previous_filename projection validates each value before output" {
-  grep -qF '\\A[A-Za-z0-9._/-]+\\z' "$DIRTY_REF"
-  grep -qF 'error("unsafe previous_filename")' "$DIRTY_REF"
-  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'raises an error for any value outside'
-  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'discard its partial output and treat the lookup as failed'
-  [ -n "$(dirty_ref_jq)" ]
-}
-
-@test "dirty-tree-cleanup: the documented jq yields clean renames as one value per line" {
-  command -v jq >/dev/null 2>&1 || skip "jq not installed"
-  expr=$(dirty_ref_jq)
-  run jq -r "$expr" "$BATS_TEST_DIRNAME/fixtures/pr-files-renames.json"
-  [ "$status" -eq 0 ]
-  [ "$output" = "$(printf 'src/old.ts\nlib/orig.ts')" ]
-}
-
-@test "dirty-tree-cleanup: the documented jq fails closed on a name with a newline" {
-  command -v jq >/dev/null 2>&1 || skip "jq not installed"
-  expr=$(dirty_ref_jq)
-  # an embedded newline would print safe and victim.txt as two lines
-  run jq -r "$expr" "$BATS_TEST_DIRNAME/fixtures/pr-files-renames-newline.json"
-  [ "$status" -ne 0 ]
-  # the forged record never reaches output
-  [[ "$output" != *"victim.txt"* ]]
-  # a trailing newline is rejected as well (a bare $ anchor would accept it)
-  printf '[{"previous_filename":"lib/orig.ts\n"}]' >"$BATS_TEST_TMPDIR/trail.json"
-  run jq -r "$expr" "$BATS_TEST_TMPDIR/trail.json"
-  [ "$status" -ne 0 ]
-  [[ "$output" != *"lib/orig.ts"* ]]
+@test "dirty-tree-cleanup: previous filenames come from pr-changed-ranges --previous, validated by the script" {
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'pr-changed-ranges" --previous "<PR#>"'
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'fails the whole call (exit 1, no output)'
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'including a `gh` timeout, means the lookup failed'
+  # The hand-written gh api / jq projection is gone from the reference.
+  run grep -qF 'gh api --paginate' "$DIRTY_REF"
+  [ "$status" -eq 1 ]
 }
 
 @test "dirty-tree cleanup: each command loads its own byte-identical copy and neither inlines it" {
@@ -690,6 +662,19 @@ dirty_ref_jq() {
     run ! grep -qE -e '--revert-(dirty|only)' "$f"
     run ! grep -qF 'gh pr diff' "$f"
   done
+}
+
+@test "resolve-stack: each provider branch checks the tree before it restacks, and the GitHub branch covers no contract" {
+  graphite=$(awk '/^#### Graphite/{on=1;next} /^#### GitHub/{on=0} on' "$RESOLVE_STACK")
+  github=$(awk '/^#### GitHub/{on=1;next} /^### Step 4/{on=0} on' "$RESOLVE_STACK")
+  [ -n "$graphite" ] && [ -n "$github" ]
+  g_clean=$(printf '%s\n' "$graphite" | grep -n '3b\. \*\*Clean-tree' | head -1 | cut -d: -f1)
+  g_restack=$(printf '%s\n' "$graphite" | grep -n '^4\. \*\*Restack' | head -1 | cut -d: -f1)
+  [ -n "$g_clean" ] && [ -n "$g_restack" ] && [ "$g_clean" -lt "$g_restack" ]
+  h_clean=$(printf '%s\n' "$github" | grep -n 'clean-tree check' | head -1 | cut -d: -f1)
+  h_rebase=$(printf '%s\n' "$github" | grep -n '^4\. \*\*Rebase upstack' | head -1 | cut -d: -f1)
+  [ -n "$h_clean" ] && [ -n "$h_rebase" ] && [ "$h_clean" -lt "$h_rebase" ]
+  printf '%s\n' "$github" | tr '\n' ' ' | tr -s ' ' | grep -qF 'no-contract rule'
 }
 
 @test "resolve-stack: a rate-limited PR is finished before the walk stops" {

@@ -8,7 +8,9 @@ callers that walk several PRs. Exit codes and markers are defined in
   <msg> [--unattended] [--allow-credential-shaped] [--files-from <f>]
   [-- <files...>]` — Stage, new commit, submit, verify remote head; never
   runs a push itself
-- **run-verify-command** — prints `{result, patch, log, treeClean}`:
+- **run-verify-command** — prints `{result, patch, log, treeClean}` plus a
+  `reason` that is non-empty when something was skipped or only partly
+  reverted:
   - `--pr <N> --timeout <s> --command-file <f> --trusted [--unattended]
     [--files-from <f>]` runs `resolve_pr.verify_command`; on failure it
     saves a patch, reverts the files and reports whether the tree is clean

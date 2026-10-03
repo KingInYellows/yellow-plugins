@@ -62,7 +62,7 @@ Linear.
 | `/review:resolve-stack` | Walk a Graphite stack bottom-up and run `/review:resolve` on every open PR autonomously; stops on a dirty tree, exits 1 when anything blocks |
 | `/review:all`           | Sequential review of multiple PRs (Graphite stack, all open, or single)   |
 | `/review:sweep`         | Run `/review:pr --non-interactive` then `/review:resolve --non-interactive` on the same PR in one unattended pass |
-| `/review:sweep-all`     | Run `/review:sweep` on every open non-draft PR you authored, sequentially, with one upfront confirmation |
+| `/review:sweep-all`     | Run `/review:sweep` on every open non-draft PR you authored, sequentially, with one upfront confirmation; stops and exits 1 on a rate limit, a dirty tree or a missing `Resolve:` line |
 | `/review:triage`        | Re-verify a PR's review-findings ledger, then fix, dismiss, restore or skip each residual finding (`--non-interactive`, `--prune <PR#>`) |
 
 ### Dispositions

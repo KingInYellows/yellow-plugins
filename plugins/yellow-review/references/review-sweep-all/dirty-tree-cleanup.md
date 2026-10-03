@@ -34,22 +34,13 @@ A path is **owned** when it is one of:
   `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/pr-changed-ranges" "<PR#>"`
   (paginated files API; it works past `gh pr diff` size limits and lists only
   paths matching `^[A-Za-z0-9._/-]+$`) — plus the `previous_filename` of each
-  renamed file. `pr-changed-ranges` prints only `filename`, so read the
-  originals from the same files API:
-
-  ```bash
-  gh api --paginate "repos/{owner}/{repo}/pulls/<PR#>/files?per_page=100" --jq '
-    .[] | select(.previous_filename) | .previous_filename
-    | if test("\\A[A-Za-z0-9._/-]+\\z") then . else error("unsafe previous_filename") end'
-  ```
-
-  Git permits a newline in a file name, and `--jq` prints a decoded value
-  literally, so an unchecked name would split into two output lines and forge
-  a record. The expression validates each value before output and raises an
-  error for any value outside `^[A-Za-z0-9._/-]+$` or containing a control
-  character (`\A` and `\z` anchor the whole string, so a trailing newline
-  cannot slip through). The call then exits non-zero; discard its partial
-  output and treat the lookup as failed.
+  renamed file, read with
+  `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/pr-changed-ranges" --previous "<PR#>"`
+  (one original path per line, nothing else). The script validates each value
+  against `^[A-Za-z0-9._/-]+$` with whole-string anchors and fails the whole
+  call (exit 1, no output) on any other value, because git permits a newline
+  in a file name and an unchecked name would forge a record. A non-zero exit,
+  including a `gh` timeout, means the lookup failed: discard its output.
 
   The PR's owned file set is each file's `filename` plus its
   `previous_filename`, under the same `^[A-Za-z0-9._/-]+$` and

@@ -67,7 +67,11 @@ gh auth status >/dev/null 2>&1 || {
   printf '[review:resolve-stack] Error: gh is not authenticated. Run `gh auth login`.\n' >&2
   exit 1
 }
-[ -z "$(git status --porcelain)" ] || {
+STATUS=$(git status --porcelain=v1 --untracked-files=all 2>&1) || {
+  printf '[review:resolve-stack] Error: could not read the git status.\n' >&2
+  exit 1
+}
+[ -z "$STATUS" ] || {
   printf '[review:resolve-stack] Error: uncommitted changes detected. Commit or stash first.\n' >&2
   exit 1
 }
@@ -204,7 +208,8 @@ the anchored form defined there.
 
 For each PR in the base-to-tip list, in order, do the following, using the
 provider resolved in Step 0. **No pauses anywhere in this loop** — log
-failures and continue.
+per-PR failures and continue, except where a rate-limit stop, a no-contract
+stop or item 3b's dirty-tree or config stop ends the walk.
 
 #### Graphite
 
@@ -294,10 +299,13 @@ failures and continue.
    Then the status check:
 
    ```bash
-   git status --porcelain
+   OUT=$(git status --porcelain=v1 --untracked-files=all 2>&1) && RC=0 || RC=$?
+   printf 'status_exit=%s\n%s\n' "$RC" "$OUT"
    ```
 
-   Non-empty output: print this PR's row, then
+   A non-zero `status_exit` is a dirty tree with unknown contents, never a
+   clean one: revert nothing, report `revert incomplete`, and stop as below.
+   Non-empty output is a dirty tree too. For either: print this PR's row, then
    `[review:resolve-stack] aborted at PR #<PR#>: working tree dirty after resolve`
    followed by the file list. Read
    `${CLAUDE_PLUGIN_ROOT}/references/review-resolve-stack/dirty-tree-cleanup.md` and run its
@@ -335,7 +343,8 @@ failures and continue.
 
 2. **Resolve** — invoke the `Skill` tool with `skill: "review:resolve"` and
    `args: "<PR#> --non-interactive"`, exactly as in the Graphite branch above,
-   including its `ratelimited=1` rule.
+   including its `ratelimited=1` rule and its no-contract rule (a missing or
+   malformed final `Resolve:` line is `no contract`).
    `/review:resolve` resolves its own active provider internally, so this
    step is identical regardless of which provider this walk resolved.
 
@@ -416,8 +425,9 @@ is not a failure.
   blocking, the walk finishes it except its restack, marks the remaining PRs
   `not attempted (no contract)`, and the command exits `1`.
 - **PR merged or closed between stack-build and the walk reaching it** —
-  `/review:resolve` detects the non-open state and reports; record the PR as
-  skipped and continue.
+  `/review:resolve` detects the non-open state and still prints a valid
+  zero `Resolve:` line (`push=skipped`); record the PR as skipped and
+  continue. Only a missing or malformed final line is `no contract`.
 - **Restack conflict** — Graphite: run `gt abort`; GitHub: run the adapter's
   `rebase --mode abort`, to clear the conflicted rebase, continue to the
   next PR, surface in the summary. The walk never pauses.
