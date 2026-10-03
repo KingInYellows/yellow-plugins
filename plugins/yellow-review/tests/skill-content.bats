@@ -605,7 +605,10 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   # The cap is 60 s in every place that parses YELLOW_REVIEW_GH_TIMEOUT.
   grep -q '^GG_MAX_TIMEOUT=60$' "$lib/gh-graphql.sh"
   grep -q '^RG_MAX_TIMEOUT=60$' "$lib/resolve-gh.sh"
-  grep -q 'FETCH_TIMEOUT" -le 60 \] || FETCH_TIMEOUT=60' "$scripts/poll-new-threads"
+  # poll-new-threads bounds a fetch by get-pr-comments' own deadline (below the
+  # 60 s hard cap), so --wait + 60 s holds without a per-call timeout.
+  grep -q '^FETCH_WINDOW=60$' "$scripts/poll-new-threads"
+  grep -q '^FETCH_DEADLINE=55$' "$scripts/poll-new-threads"
   # The outer budget is stated once with its arithmetic, and the command uses it.
   budget=420000
   refs=$(flat "$RESOLVE_REFS/dispositions.md")

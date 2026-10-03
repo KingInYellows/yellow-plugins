@@ -13,9 +13,12 @@
 #   on stdout. fetched=0 means no fetch succeeded (inconclusive).
 # Exit codes: 0 finished (read the final line), 2 usage, 4 rate limited
 #             ("poll rate-limited" is printed; stop mutating).
-# Env: YELLOW_REVIEW_GH_TIMEOUT (default 30; 0, non-numeric or over 4 digits
-#      falls back to 30; a larger valid value is clamped to 60) — seconds one
-#      fetch may run. The script ends within --wait + 60 s.
+# Each fetch gets its own pagination deadline: this script passes
+#   YELLOW_REVIEW_FETCH_DEADLINE=55 to get-pr-comments, which stops paginating
+#   there (a partial array and exit 3, read here as a failed fetch), and backs
+#   it with a 60 s hard cap (timeout(1)). The script ends within --wait + 60 s.
+#   YELLOW_REVIEW_GH_TIMEOUT (default 30, clamped to 60) still bounds each gh
+#   call inside get-pr-comments; this script does not parse it.
 # A failed fetch, jq parse or grep is never read as "no new threads": the
 # round is skipped and the loop moves on. The first 300 bytes of a failed
 # fetch's stderr go to this script's stderr ("poll fetch-failed: ..."). An
@@ -27,14 +30,13 @@ set -u
 
 STEP=20
 
-# Seconds one get-pr-comments call may run (see header). A valid value over 60
-# is clamped to 60, so the last fetch ends within --wait + 60 s, inside the
-# (wait + 120) x 1000 ms Bash tool timeout the caller passes.
-FETCH_TIMEOUT="${YELLOW_REVIEW_GH_TIMEOUT:-30}"
-case "$FETCH_TIMEOUT" in ''|*[!0-9]*) FETCH_TIMEOUT=30 ;; esac
-[ "${#FETCH_TIMEOUT}" -le 4 ] || FETCH_TIMEOUT=30
-[ "$FETCH_TIMEOUT" -gt 0 ] 2>/dev/null || FETCH_TIMEOUT=30
-[ "$FETCH_TIMEOUT" -le 60 ] || FETCH_TIMEOUT=60
+# One get-pr-comments run gets FETCH_DEADLINE seconds of pagination (its own
+# YELLOW_REVIEW_FETCH_DEADLINE, which cuts each later page's gh call to the time
+# left) and FETCH_WINDOW seconds as a hard cap, so the last fetch ends within
+# --wait + 60 s, inside the (wait + 120) x 1000 ms Bash tool timeout the caller
+# passes. A multi-page fetch is not killed by the per-call gh limit.
+FETCH_WINDOW=60
+FETCH_DEADLINE=55
 # GNU coreutils on macOS installs it as gtimeout.
 TIMEOUT_BIN=""
 for _t in timeout gtimeout; do
@@ -82,9 +84,9 @@ tick() {
 # fetch_threads: run get-pr-comments; exit 124 means the time limit killed it.
 fetch_threads() {
     if [ -n "$TIMEOUT_BIN" ]; then
-        "$TIMEOUT_BIN" "$FETCH_TIMEOUT" "$SCRIPT_DIR/get-pr-comments" --include-outdated "$REPO" "$PR"
+        YELLOW_REVIEW_FETCH_DEADLINE=$FETCH_DEADLINE "$TIMEOUT_BIN" "$FETCH_WINDOW" "$SCRIPT_DIR/get-pr-comments" --include-outdated "$REPO" "$PR"
     else
-        "$SCRIPT_DIR/get-pr-comments" --include-outdated "$REPO" "$PR"
+        YELLOW_REVIEW_FETCH_DEADLINE=$FETCH_DEADLINE "$SCRIPT_DIR/get-pr-comments" --include-outdated "$REPO" "$PR"
     fi
 }
 while :; do
@@ -114,7 +116,7 @@ while :; do
     elif [ "$fetch_rc" -eq 124 ] && [ -n "$TIMEOUT_BIN" ]; then
         # A stalled fetch is inconclusive and unlikely to clear: stop here so
         # the final status line still prints.
-        printf 'poll fetch-failed: get-pr-comments timed out after %ss\n' "$FETCH_TIMEOUT" >&2
+        printf 'poll fetch-failed: get-pr-comments timed out after %ss\n' "$FETCH_WINDOW" >&2
         break
     elif grep -qi 'rate limit' "$WORK/err"; then
         printf 'poll rate-limited\n'
