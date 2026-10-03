@@ -331,7 +331,7 @@ Decisions from the brainstorm and the planning round:
   description). Both refuse and never redact; a refusal prints
   `resolve-text: refused rule=<rule> line=<n>` (or `scan failed`) on stderr,
   never the text. Covered by `tests/check-resolve-text.bats`.
-- [ ] 1.6: New script `skills/pr-review-workflow/scripts/commit-resolve-fixes
+- [x] 1.6: New script `skills/pr-review-workflow/scripts/commit-resolve-fixes
   --provider graphite|github --pr <N> --message <msg> -- <files...>`. It:
   - checks that each path is inside the repo and has a diff;
   - runs `git add --`, then checks `git diff --cached --name-only` equals the
@@ -370,7 +370,7 @@ Decisions from the brainstorm and the planning round:
 > symlink and `commit_all`, and hardcodes `RL`/`LEDGER_DIR`. Write the `gt` and
 > `node` mocks fresh.
 <!-- /deepen-plan -->
-- [ ] 1.7: New script `skills/pr-review-workflow/scripts/run-verify-command
+- [x] 1.7: New script `skills/pr-review-workflow/scripts/run-verify-command
   --pr <N> --timeout <s> --command-file <f> -- <files...>`. It:
   - refuses unless the caller passes `--trusted`. The command sets
     `--trusted` after the tracked-file check or the interactive approval;
@@ -418,10 +418,7 @@ Decisions from the brainstorm and the planning round:
 > See https://stackoverflow.com/questions/687948 and
 > https://unix.stackexchange.com/questions/43340
 <!-- /deepen-plan -->
-- [ ] 1.8: Bats tests in `plugins/yellow-review/tests/`, covering (done in
-  this PR: `get-pr-comments`, `get-pr-blockers`, `reply-pr-thread`,
-  `file-followup-issue`, `check-resolve-text`; `commit-resolve-fixes` and
-  `run-verify-command` ship in the later PRs):
+- [x] 1.8: Bats tests in `plugins/yellow-review/tests/`, covering:
   - `get-pr-comments.bats`: the default output is unchanged; `--include-outdated`
     includes thread3; the new fields are present;
   - `get-pr-blockers.bats`: enforced, not enforced, and 403 → unknown;
@@ -830,3 +827,10 @@ Decisions from the brainstorm and the planning round:
 - **Scope:** plugins/yellow-review/commands/review/resolve-stack.md, plugins/yellow-review/commands/review/sweep.md, plugins/yellow-review/commands/review/sweep-all.md, plugins/yellow-review/skills/pr-review-workflow/SKILL.md, docs/plugin-scope-mode-protocol.md, plugins/yellow-review/CLAUDE.md, plugins/yellow-review/README.md, .changeset/
 - **Tasks:** 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6
 - **Depends on:** #3
+
+## Stack Progress
+<!-- Updated by flow:work. Do not edit manually. -->
+- [x] 1. agent/feat/resolve-thread-scripts (completed 2026-09-30)
+- [ ] 2. agent/feat/resolve-commit-verify-scripts
+- [ ] 3. agent/fix/resolve-dispositions
+- [ ] 4. agent/feat/resolve-stack-callers

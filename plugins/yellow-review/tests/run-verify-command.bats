@@ -1,0 +1,1582 @@
+#!/usr/bin/env bats
+# Tests for run-verify-command (trust gate, pass/fail/timeout, patch + revert)
+
+bats_require_minimum_version 1.5.0
+
+load helpers/resolve-repo
+
+SCRIPT="${RESOLVE_SCRIPTS}/run-verify-command"
+
+setup() {
+  resolve_repo_init
+  unset YELLOW_REVIEW_NO_TIMEOUT_BIN
+  CMD="$BATS_TEST_TMPDIR/verify.sh"
+  PATCH_DIR="$REPO/.git/yellow-review/resolve-patches"
+  # Resolver edits: one tracked file changed, one new untracked file.
+  printf 'one\nfeature\nresolver edit\n' >| src/a.txt
+  printf 'new\n' >| src/new.txt
+  # The runner refuses files outside the PR, so the PR's file list also names
+  # src/new.txt (the stub otherwise lists only the fixture's committed changes).
+  mv "$STUB_BIN/gh" "$STUB_BIN/gh-base"
+  cat >| "$STUB_BIN/gh" <<'STUB'
+#!/bin/sh
+gh-base "$@" || exit $?
+case "$*" in
+  "api --paginate repos/{owner}/{repo}/pulls/"*"/files"*) echo src/new.txt ;;
+esac
+STUB
+  chmod +x "$STUB_BIN/gh"
+  # The mtime marker --ignored-since compares against (unattended runs need it).
+  IGN_MARKER="$BATS_TEST_TMPDIR/ignored-marker"
+  touch "$IGN_MARKER"
+}
+
+verify() {
+  printf '%s\n' "$1" >| "$CMD"
+  shift
+  run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" "$@"
+}
+
+mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
+
+has_kill_after() {
+  command -v timeout >/dev/null 2>&1 && timeout --kill-after=1 1 true >/dev/null 2>&1
+}
+
+@test "refuses to run without --trusted" {
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"untrusted"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "rejects a non-numeric timeout" {
+  verify 'true' --timeout soon --trusted -- src/a.txt
+  [ "$status" -eq 2 ]
+}
+
+@test "pass leaves the resolver edits in place" {
+  verify 'test -f src/a.txt && echo checked' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .patch, .treeClean]')" = '["pass",null,true]' ]
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+  grep -q checked "$(printf '%s' "$output" | jq -r .log)"
+}
+
+@test "credentials the command prints are redacted from the log, with the exit status kept" {
+  verify 'echo "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789"; echo visible; exit 3' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = fail ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  run ! grep -q 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' "$log"
+  grep -q visible "$log"
+  [ "$(mode "$log")" = 600 ]
+}
+
+@test "runs from the repository root" {
+  cd src
+  verify 'pwd' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(cat "$(printf '%s' "$output" | jq -r .log)")" = "$(cd "$REPO" && pwd -P)" ]
+}
+
+@test "fail saves a patch, reverts tracked and untracked files, and reports a clean tree" {
+  verify 'echo boom >&2; exit 3' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["fail",true]' ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [[ "$patch" == "$PATCH_DIR/7-"*.patch ]]
+  grep -q '+resolver edit' "$patch"
+  grep -q '+new' "$patch"
+  [ "$(mode "$patch")" = 600 ]
+  [ "$(mode "$PATCH_DIR")" = 700 ]
+  [ -z "$(git status --porcelain)" ]
+  grep -q boom "$(printf '%s' "$output" | jq -r .log)"
+}
+
+@test "the saved patch re-applies the resolver edits" {
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  git apply "$patch"
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+@test "refuses to run while the tree has changes the list does not name" {
+  printf 'two\nstray\n' >| src/b.txt
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"change outside the listed files: src/b.txt"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "an unlisted dirty file left after --revert-only makes treeClean false" {
+  printf 'two\nstray\n' >| src/b.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = false ]
+}
+
+@test "timeout via the timeout binary" {
+  has_kill_after || skip "timeout --kill-after not available"
+  verify 'sleep 30' --timeout 1 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["timeout",true]' ]
+}
+
+@test "timeout via the watchdog fallback kills the whole process group" {
+  export YELLOW_REVIEW_NO_TIMEOUT_BIN=1
+  start=$(date +%s)
+  # A distinctive duration so pgrep matches only this test's children.
+  verify 'sleep 31.7 & sleep 31.7; wait' --timeout 1 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = timeout ]
+  [ $(( $(date +%s) - start )) -lt 15 ]
+  # TERM is delivered before the script returns; allow the children a
+  # moment to exit before asserting none survived.
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    pgrep -f 'sleep 31\.7' >/dev/null || break
+    sleep 0.2
+  done
+  ! pgrep -f 'sleep 31\.7' >/dev/null
+}
+
+@test "watchdog timeout still escalates to KILL for a descendant that ignores TERM" {
+  export YELLOW_REVIEW_NO_TIMEOUT_BIN=1
+  # The command shell dies on TERM; its child ignores TERM and needs KILL.
+  verify '(trap "" TERM; exec sleep 31.3) & wait' --timeout 1 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = timeout ]
+  # The script waits out the KILL escalation, so nothing may survive.
+  ! pgrep -f 'sleep 31\.3' >/dev/null
+}
+
+@test "a command exiting 124 on its own under the watchdog is fail, not timeout" {
+  export YELLOW_REVIEW_NO_TIMEOUT_BIN=1
+  verify 'exit 124' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$(printf '%s' "$output" | jq -r .result)" = fail ]
+}
+
+@test "a command exiting 137 quickly under the timeout binary is fail, not timeout" {
+  has_kill_after || skip "timeout --kill-after not available"
+  verify 'exit 137' --timeout 30 --trusted -- src/a.txt src/new.txt
+  [ "$(printf '%s' "$output" | jq -r .result)" = fail ]
+}
+
+@test "--files-from lists the files to revert" {
+  printf 'src/a.txt\nsrc/new.txt\n' >| "$BATS_TEST_TMPDIR/files"
+  verify 'exit 1' --timeout 5 --trusted --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["fail",true]' ]
+  [ ! -e src/new.txt ]
+}
+
+@test "refuses a gitignored file so a revert can never delete it" {
+  printf 'secret.txt\n' >| .gitignore
+  git add .gitignore && git commit -q -m "chore: ignore"
+  printf 'user data\n' >| secret.txt
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt secret.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"gitignored"* ]]
+  [ -f secret.txt ]
+}
+
+@test "refuses a listed file without changes" {
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/b.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"no changes: src/b.txt"* ]]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "list entries are literal paths, never globs" {
+  verify 'exit 1' --timeout 5 --trusted -- 'src/*'
+  [ "$status" -eq 2 ]
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+@test "an untracked stray left after --revert-only makes treeClean false" {
+  printf 'stray\n' >| src/stray.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = false ]
+}
+
+@test "--revert-dirty reverts every change git sees, deny-listed and staged files included" {
+  mkdir -p .claude
+  printf '{}\n' >| .claude/settings.json
+  git add .claude && git commit -q -m "chore: settings"
+  printf '{"hooks":{}}\n' >| .claude/settings.json
+  printf 'staged new\n' >| src/staged.txt
+  git add src/staged.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ "$(cat .claude/settings.json)" = '{}' ]
+  [ ! -e src/staged.txt ]
+  [ ! -e src/new.txt ]
+  grep -q 'hooks' "$(printf '%s' "$output" | jq -r .patch)"
+}
+
+@test "--revert-dirty keeps a newline in a filename from forging a second path" {
+  victim="$(dirname -- "$REPO")/victim-$$"
+  : >| "$victim"
+  # One untracked file "x\n../victim-N"; split on newlines it would forge "../victim-N".
+  bad=$(printf 'x\n../victim-%s' "$$")
+  mkdir -p -- "$(dirname -- "$bad")"
+  printf 'y\n' >| "$bad"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ -e "$victim" ]
+  [ ! -e "$bad" ]
+  rm -f -- "$victim"
+}
+
+@test "a failed tree listing exits 2 and neither runs nor reverts anything" {
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v git)
+  {
+    printf '#!/bin/bash\n'
+    printf 'for a in "$@"; do [ "$a" = --others ] && exit 1; done\n'
+    printf 'exec "%s" "$@"\n' "$real"
+  } >| "$shim/git"
+  chmod +x "$shim/git"
+  PATH="$shim:$PATH" verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"cannot list tree changes"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  PATH="$shim:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"cannot list tree changes"* ]]
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+@test "--revert-dirty takes no file list" {
+  run "$SCRIPT" --pr 7 --revert-dirty -- src/a.txt
+  [ "$status" -eq 2 ]
+}
+
+@test "--revert-only may revert a deny-listed path" {
+  mkdir -p .claude
+  printf '{}\n' >| .claude/settings.json
+  git add .claude && git commit -q -m "chore: settings"
+  printf '{"hooks":{}}\n' >| .claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- .claude/settings.json src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(cat .claude/settings.json)" = '{}' ]
+}
+
+@test "refuses a deny-listed path" {
+  printf 'X=1\n' >| .env
+  verify 'exit 1' --timeout 5 --trusted -- .env
+  [ "$status" -eq 2 ]
+  [ -f .env ]
+}
+
+@test "the verify command does not inherit literal-pathspec mode" {
+  verify 'printf "%s\n" "${GIT_LITERAL_PATHSPECS:-unset}"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$(cat "$(printf '%s' "$output" | jq -r .log)")" = unset ]
+}
+
+@test "--unattended skips a runner file without running the command" {
+  printf '{"name":"y"}\n' >| package.json
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt package.json src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == "runner files changed: package.json" ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "--unattended skips a file outside the PR" {
+  git checkout -q -- src/a.txt && rm src/new.txt
+  printf 'edited\n' >| src/c.txt
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/c.txt
+  [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--unattended runs when every file is in the PR and not a runner" {
+  rm src/new.txt
+  verify 'true' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+}
+
+@test "an interactive run also skips a file outside the PR" {
+  git checkout -q -- src/a.txt && rm src/new.txt
+  printf 'edited\n' >| src/c.txt
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/c.txt
+  [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "an interactive run skips when the PR's files cannot be listed" {
+  export STUB_PR_DIFF_FAIL=1
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "an interactive run does not skip a runner file in the PR" {
+  rm src/new.txt
+  printf '{"name":"y"}\n' >| package.json
+  verify 'true' --timeout 5 --trusted -- src/a.txt package.json
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+}
+
+@test "--revert-only saves a patch and reverts without --trusted or a command" {
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  grep -q '+resolver edit' "$(printf '%s' "$output" | jq -r .patch)"
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "the saved patch ignores colour and prefix settings" {
+  git config color.ui always
+  git config diff.noprefix true
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  run ! grep -q $'\033' "$patch"
+  git apply "$patch"
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "a credential-shaped edit is reverted but never archived in a patch" {
+  printf 'one\nfeature\nGH=ghp_abcdefghijklmnopqrstuvwxyz0123456789\n' >| src/a.txt
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .patch, .treeClean]')" = '["fail",null,true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"credential"* ]]
+  [ -z "$(git status --porcelain)" ]
+  [ -z "$(find "$PATCH_DIR" -name '*.patch' 2>/dev/null)" ]
+  run ! grep -rq 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' "$PATCH_DIR"
+}
+
+@test "a PEM private key edit is reverted and its patch withheld" {
+  printf 'one\nfeature\n-----BEGIN RSA PRIVATE KEY-----\nMIIEabc\n' >| src/a.txt
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$(printf '%s' "$output" | jq -c '[.result, .patch, .treeClean]')" = '["fail",null,true]' ]
+  [ -z "$(find "$PATCH_DIR" -name '*.patch' 2>/dev/null)" ]
+}
+
+@test "code that only declares a token keeps its recovery patch" {
+  printf 'one\nfeature\ntoken: string\n' >| src/a.txt
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["fail",true]' ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ "$patch" != null ]
+  grep -q 'token: string' "$patch"
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "an untracked dangling symlink is kept in the patch before it is removed" {
+  ln -s missing-target src/dangling
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt src/dangling
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = true ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  grep -q 'src/dangling' "$patch"
+  grep -q 'missing-target' "$patch"
+  [ ! -L src/dangling ]
+}
+
+@test "a patch that cannot be saved reverts nothing" {
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v git)
+  {
+    printf '#!/bin/bash\n'
+    printf 'for a in "$@"; do [ "$a" = --binary ] && exit 128; done\n'
+    printf 'exec "%s" "$@"\n' "$real"
+  } >| "$shim/git"
+  chmod +x "$shim/git"
+  # Run mode now refuses to start without its pre-verification snapshot (see the
+  # last test); the revert modes still save at revert time and must not revert.
+  PATH="$shim:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"nothing was reverted"* ]]
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+  [ -z "$(find "$PATCH_DIR" -name '*.patch' 2>/dev/null)" ]
+}
+
+@test "keeps only the newest 10 patches and logs of a PR, and never prunes another PR's" {
+  mkdir -p "$PATCH_DIR"
+  for i in 1 2 3; do
+    : >| "$PATCH_DIR/99-2020010${i}T000000Z-1.patch"
+    : >| "$PATCH_DIR/99-2020010${i}T000000Z-1.log"
+  done
+  rm src/new.txt
+  for i in $(seq 1 12); do
+    printf 'one\nfeature\nedit %s\n' "$i" >| src/a.txt
+    verify 'exit 1' --timeout 5 --trusted -- src/a.txt
+    sleep 0.01
+  done
+  [ "$(find "$PATCH_DIR" -name '7-*.patch' | wc -l)" -eq 10 ]
+  [ "$(find "$PATCH_DIR" -name '7-*.log' | wc -l)" -eq 10 ]
+  [ "$(find "$PATCH_DIR" -name '99-*.patch' | wc -l)" -eq 3 ]
+  [ "$(find "$PATCH_DIR" -name '99-*.log' | wc -l)" -eq 3 ]
+}
+
+@test "passing runs prune that PR's logs too" {
+  for i in $(seq 1 12); do
+    verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+    sleep 0.01
+  done
+  [ "$(find "$PATCH_DIR" -name '7-*.log' | wc -l)" -eq 10 ]
+}
+
+@test "patch and log names end in the UTC stamp and the pid, and no temp files are left behind" {
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  log=$(printf '%s' "$output" | jq -r .log)
+  [[ "$patch" =~ /7-[0-9]{8}T[0-9]{6}Z-[0-9]+\.patch$ ]]
+  [[ "$log" =~ /7-[0-9]{8}T[0-9]{6}Z-[0-9]+\.log$ ]]
+  [ -z "$(find "$PATCH_DIR" -mindepth 1 -name '.*')" ]
+}
+
+@test "the log keeps the last 1 MiB of a chatty command, which still exits with its own status" {
+  verify 'yes 0123456789abcdef | head -c 5000000; echo done-marker; exit 5' --timeout 60 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = fail ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  [ "$(wc -c <"$log")" -le 1048576 ]
+  [ "$(wc -c <"$log")" -gt 1000000 ]
+  tail -n 1 "$log" | grep -q "done-marker$"
+  [ "$(mode "$log")" = 600 ]
+}
+
+@test "a process left holding the output open is killed and the log is kept" {
+  verify 'echo hello; sleep 31.9 &' --timeout 60 --trusted -- src/a.txt src/new.txt
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  grep -q hello "$(printf '%s' "$output" | jq -r .log)"
+  run ! pgrep -f 'sleep 31\.9'
+}
+
+@test "a pass that left changes outside the listed files reports treeClean false and reverts nothing" {
+  verify 'printf stray > src/stray.txt' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '[.result, .treeClean] | join(",")')" = "pass,false" ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"src/stray.txt"* ]]
+  [ -f src/stray.txt ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+# Starts the script in the background (job control on, so a non-interactive
+# shell does not leave SIGINT ignored for it), waits for the verify command
+# to be running, sends signal $1 and leaves the JSON in $BATS_TEST_TMPDIR/out.
+terminate_while_running() {
+  printf '%s\n' 'touch "$BATS_TEST_TMPDIR/started"; sleep 31.1 & sleep 31.1; wait' >| "$CMD"
+  set -m
+  "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 60 --trusted -- src/a.txt src/new.txt \
+    >| "$BATS_TEST_TMPDIR/out" 2>/dev/null 3>&- &
+  local pid=$!
+  set +m
+  for _ in $(seq 1 100); do
+    [ -e "$BATS_TEST_TMPDIR/started" ] && break
+    sleep 0.1
+  done
+  [ -e "$BATS_TEST_TMPDIR/started" ]
+  kill -s "$1" "$pid"
+  wait "$pid"
+}
+
+assert_interrupted_and_reverted() {
+  [ "$(jq -c '[.result, .treeClean]' "$BATS_TEST_TMPDIR/out")" = '["fail",true]' ]
+  [[ "$(jq -r .reason "$BATS_TEST_TMPDIR/out")" == *"interrupted by SIG$1"* ]]
+  grep -q '+resolver edit' "$(jq -r .patch "$BATS_TEST_TMPDIR/out")"
+  [ -z "$(git status --porcelain)" ]
+  run ! pgrep -f 'sleep 31\.1'
+}
+
+@test "TERM, HUP and INT stop the command and its group, then save the edits and revert them" {
+  has_kill_after || skip "timeout --kill-after not available"
+  for sig in TERM HUP INT; do
+    terminate_while_running "$sig"
+    assert_interrupted_and_reverted "$sig"
+    # Put the resolver edits back for the next signal.
+    git apply "$(jq -r .patch "$BATS_TEST_TMPDIR/out")"
+    rm -f "$BATS_TEST_TMPDIR/started"
+  done
+}
+
+@test "TERM, HUP and INT under the watchdog fallback stop the group and the watchdog, then revert" {
+  export YELLOW_REVIEW_NO_TIMEOUT_BIN=1
+  for sig in TERM HUP INT; do
+    terminate_while_running "$sig"
+    assert_interrupted_and_reverted "$sig"
+    # The watchdog's sleep for the 60 s timeout must not outlive the script.
+    run ! pgrep -f 'sleep 60'
+    git apply "$(jq -r .patch "$BATS_TEST_TMPDIR/out")"
+    rm -f "$BATS_TEST_TMPDIR/started"
+  done
+}
+
+@test "a binary-marked file cannot smuggle a credential into the patch" {
+  printf 'GH=ghp_abcdefghijklmnopqrstuvwxyz0123456789\n\0' >| src/bin.dat
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt src/bin.dat
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"credential"* ]]
+  [ ! -e src/bin.dat ]
+  run ! grep -rq 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' "$PATCH_DIR"
+}
+
+@test "a clean binary file is kept in the patch as a binary patch" {
+  printf 'plain\0data\n' >| src/bin.dat
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt src/bin.dat
+  grep -q 'GIT binary patch' "$(printf '%s' "$output" | jq -r .patch)"
+  [ ! -e src/bin.dat ]
+}
+
+@test "a credential screen that cannot answer is treated as a hit" {
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v awk)
+  {
+    printf '#!/bin/bash\n'
+    printf '# The scanner feeds the file on stdin, so detect its awk program instead.\n'
+    printf 'for a in "$@"; do case "$a" in *"PRIVATE KEY"*) exit 2 ;; esac; done\n'
+    printf 'exec "%s" "$@"\n' "$real"
+  } >| "$shim/awk"
+  chmod +x "$shim/awk"
+  PATH="$shim:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"screen failed"* ]]
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "a staged deletion is saved in the patch before the revert restores the file" {
+  git rm -q src/c.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt src/c.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  grep -q 'deleted file mode' "$(printf '%s' "$output" | jq -r .patch)"
+  [ -f src/c.txt ]
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "failed revert steps are named in the reason" {
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v git)
+  {
+    printf '#!/bin/bash\n'
+    printf 'for a in "$@"; do [ "$a" = checkout ] && exit 1; done\n'
+    printf 'exec "%s" "$@"\n' "$real"
+  } >| "$shim/git"
+  chmod +x "$shim/git"
+  PATH="$shim:$PATH" verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"revert failed: git checkout src/a.txt"* ]]
+  [ ! -e src/new.txt ]
+}
+
+@test "--revert-dirty and --revert-only together still revert every change" {
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty --revert-only
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ ! -e src/new.txt ]
+}
+
+@test "bad arguments exit 2 before anything runs" {
+  printf 'true\n' >| "$CMD"
+  : >| "$BATS_TEST_TMPDIR/empty"
+  run "$SCRIPT" --timeout 5 --command-file "$CMD" --trusted -- src/a.txt
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --pr 0 --timeout 5 --command-file "$CMD" --trusted -- src/a.txt
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --pr abc --revert-only
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --pr
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --pr 7 --bogus
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --pr 7 --timeout 0 --command-file "$CMD" --trusted -- src/a.txt
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --pr 7 --timeout 5 --trusted -- src/a.txt
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --pr 7 --timeout 5 --command-file "$BATS_TEST_TMPDIR/missing" --trusted -- src/a.txt
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --pr 7 --timeout 5 --command-file "$BATS_TEST_TMPDIR/empty" --trusted -- src/a.txt
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --pr 7 --revert-only --files-from "$BATS_TEST_TMPDIR/missing"
+  [ "$status" -eq 2 ]
+  run "$SCRIPT" --pr 7 --revert-only -- /etc/passwd
+  [ "$status" -eq 2 ]
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+# A copy of the plugin's script and libraries, to run where yellow-core is or
+# is not a sibling. Prints the copied script's path.
+copy_plugin() {
+  mkdir -p "$1/lib" "$1/skills/pr-review-workflow/scripts"
+  cp "$BATS_TEST_DIRNAME/../lib/resolve-paths.sh" "$BATS_TEST_DIRNAME/../lib/resolve-text.sh" \
+    "$BATS_TEST_DIRNAME/../lib/verify-run.sh" "$1/lib/"
+  cp "$SCRIPT" "$1/skills/pr-review-workflow/scripts/"
+  printf '%s' "$1/skills/pr-review-workflow/scripts/run-verify-command"
+}
+
+SECRET_COMMAND='echo "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789"; echo visible'
+
+@test "without yellow-core the log is withheld rather than kept raw" {
+  copy=$(copy_plugin "$BATS_TEST_TMPDIR/solo/yellow-review")
+  printf '%s\n' "$SECRET_COMMAND" >| "$CMD"
+  run --separate-stderr "$copy" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  [ "$(cat "$log")" = '[withheld: log redaction unavailable]' ]
+}
+
+@test "the installed-cache layout finds the newest numeric yellow-core version" {
+  market="$BATS_TEST_TMPDIR/market"
+  copy=$(copy_plugin "$market/yellow-review/1.0.0")
+  mkdir -p "$market/yellow-core/1.10.0/lib" "$market/yellow-core/1.9.0/lib" "$market/yellow-core/next/lib"
+  cp "$BATS_TEST_DIRNAME/../../yellow-core/lib/compound-staging.sh" "$market/yellow-core/1.10.0/lib/"
+  # Older and non-numeric versions would leave the token in the log.
+  printf 'cs_redact_secrets() { cat; }\n' >| "$market/yellow-core/1.9.0/lib/compound-staging.sh"
+  cp "$market/yellow-core/1.9.0/lib/compound-staging.sh" "$market/yellow-core/next/lib/"
+  printf '%s\n' "$SECRET_COMMAND" >| "$CMD"
+  run --separate-stderr "$copy" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  grep -q visible "$log"
+  run ! grep -q 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' "$log"
+  grep -q 'REDACTED' "$log"
+}
+
+@test "an output directory that is a regular file exits 2 before anything runs" {
+  mkdir -p "$REPO/.git/yellow-review"
+  : >| "$PATCH_DIR"
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"cannot create"*"resolve-patches"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+@test "a failed output pipe exits 2 before the command runs" {
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  printf '#!/bin/sh\nexit 1\n' >| "$shim/mkfifo"
+  chmod +x "$shim/mkfifo"
+  PATH="$shim:$PATH" verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"cannot create the output pipe"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "a process in another session that keeps the output open withholds the log" {
+  command -v setsid >/dev/null 2>&1 || skip "setsid not available"
+  # The pause lets setsid leave the command's group before the command exits.
+  verify "echo hello; setsid sleep 31.8 & echo \$! >| '$BATS_TEST_TMPDIR/holder.pid'; sleep 0.5" --timeout 60 --trusted -- src/a.txt src/new.txt
+  kill "$(cat "$BATS_TEST_TMPDIR/holder.pid")" 2>/dev/null || true
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"log withheld"* ]]
+  [[ "$(cat "$(printf '%s' "$output" | jq -r .log)")" == *"[withheld: a process kept the output open"* ]]
+}
+
+@test "a failed log stream is named in the reason" {
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  printf '#!/bin/sh\nexit 1\n' >| "$shim/tail"
+  chmod +x "$shim/tail"
+  PATH="$shim:$PATH" verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"log may be incomplete"* ]]
+}
+
+@test "a stalled gh call is bounded and skips the run" {
+  has_kill_after || skip "timeout --kill-after not available"
+  printf '#!/bin/sh\nexec sleep 31.6\n' >| "$STUB_BIN/gh"
+  start=$SECONDS
+  YELLOW_REVIEW_NET_TIMEOUT=1 verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ $((SECONDS - start)) -lt 20 ]
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"could not list the PR's changed files"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "a non-numeric YELLOW_REVIEW_NET_TIMEOUT exits 2" {
+  YELLOW_REVIEW_NET_TIMEOUT=soon verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"YELLOW_REVIEW_NET_TIMEOUT"* ]]
+}
+
+@test "--revert-only skips an unchanged listed file, names it, and reverts the rest" {
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/c.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"skipped, no changes: src/c.txt"* ]]
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "--revert-only still refuses a gitignored file and reverts nothing" {
+  printf 'secret.txt\n' >| .gitignore
+  git add .gitignore && git commit -q -m "chore: ignore"
+  printf 'user data\n' >| secret.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt secret.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"gitignored"* ]]
+  [ -f secret.txt ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "the revert modes reject flags that only apply when running a command" {
+  printf 'true\n' >| "$CMD"
+  for flag in "--timeout 5" "--command-file $CMD" "--trusted" "--unattended"; do
+    # shellcheck disable=SC2086
+    run --separate-stderr "$SCRIPT" --pr 7 --revert-only $flag -- src/a.txt
+    [ "$status" -eq 2 ]
+    # shellcheck disable=SC2086
+    run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty $flag
+    [ "$status" -eq 2 ]
+  done
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+# vr_redact_log run directly (bash): the log is redacted in place.
+redact_log() {
+  run bash -c '
+    root=$1; log=$2
+    . "$root/lib/resolve-paths.sh"
+    . "$root/lib/resolve-text.sh"
+    . "$root/lib/verify-run.sh"
+    vr_redact_log "$log" "$root"' _ "$BATS_TEST_DIRNAME/.." "$1"
+}
+
+@test "vr_redact_log redacts a credential ID assignment that cs_redact_secrets misses" {
+  log="$BATS_TEST_TMPDIR/id.log"
+  printf 'before\nDEVIN_ORG_ID=org-1234567\nafter\n' >| "$log"
+  redact_log "$log"
+  [ "$status" -eq 0 ]
+  grep -q before "$log"
+  grep -q after "$log"
+  run ! grep -q 'org-1234567' "$log"
+  grep -q 'DEVIN_ORG_ID=\[REDACTED\]' "$log"
+}
+
+@test "vr_redact_log redacts _TOKEN, _SECRET and _KEY assignments and an exported quoted value" {
+  log="$BATS_TEST_TMPDIR/names.log"
+  printf 'MY_TOKEN: hunter2value\nexport APP_SECRET="two words"\nSVC_KEY = abc123\n' >| "$log"
+  redact_log "$log"
+  [ "$status" -eq 0 ]
+  run ! grep -Eq 'hunter2value|two words|abc123' "$log"
+}
+
+@test "vr_redact_log withholds a log that still looks like a credential" {
+  log="$BATS_TEST_TMPDIR/shape.log"
+  # No credential-looking name, so only the final scan can catch it.
+  printf 'password = "correcthorsebatterystaple"\n' >| "$log"
+  redact_log "$log"
+  [ "$status" -eq 0 ]
+  run ! grep -q 'correcthorsebatterystaple' "$log"
+  grep -q '^\[withheld' "$log"
+}
+
+@test "vr_redact_log keeps a clean log" {
+  log="$BATS_TEST_TMPDIR/clean.log"
+  printf 'ok 1 passes\nok 2 passes\n' >| "$log"
+  redact_log "$log"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$log")" = "$(printf 'ok 1 passes\nok 2 passes')" ]
+}
+
+@test "a verifier that prints a credential ID leaves it out of the retained log" {
+  printf '%s\n' 'echo "DEVIN_ORG_ID=org-1234567"; echo visible' >| "$CMD"
+  run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  grep -q visible "$log"
+  run ! grep -q 'org-1234567' "$log"
+}
+
+@test "a keyword-shaped credential in the resolver edit is withheld from the recovery patch" {
+  printf 'one\nfeature\npassword = "hunter22"\n' >| src/a.txt
+  verify 'exit 3' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .patch, .treeClean]')" = '["fail",null,true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"recovery patch withheld"* ]]
+  [[ "$output" != *hunter22* ]]
+  [ -z "$(find "$PATCH_DIR" -name '*.patch' 2>/dev/null)" ]
+  run ! grep -rq 'hunter22' "$PATCH_DIR"
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "a passing verify that restores a listed file keeps the recovery patch and reports reverted" {
+  verify 'git checkout -q HEAD -- src/a.txt' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"removed listed edits: src/a.txt"* ]]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ -f "$patch" ]
+  grep -q 'resolver edit' "$patch"
+  grep -q '+new' "$patch"
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "a passing verify that deletes a new listed file keeps the recovery patch" {
+  verify 'rm -f src/new.txt' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"src/new.txt"* ]]
+  grep -q '+new' "$(printf '%s' "$output" | jq -r .patch)"
+}
+
+@test "an untracked FIFO among the listed files is refused without hanging" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  rm -f src/new.txt && mkfifo src/new.txt
+  printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"src/new.txt"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "a FIFO in place of a listed tracked file is refused before the command runs" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  rm -f src/a.txt && mkfifo src/a.txt
+  printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"not a regular file or symlink: src/a.txt"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--revert-dirty deletes a tracked file's FIFO replacement unopened and restores the file" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  rm -f src/a.txt && mkfifo src/a.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"not a regular file or symlink: src/a.txt"* ]]
+  [ -f src/a.txt ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "--revert-only restores a tracked file that was replaced by a FIFO" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  rm -f src/a.txt && mkfifo src/a.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ -f src/a.txt ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "a failed pre-verification snapshot aborts with exit 2 before the command runs" {
+  real_git=$(command -v git)
+  cat >| "$STUB_BIN/git" <<STUB
+#!/bin/sh
+# Fail the snapshot diff of a tracked listed file (the only call using --binary).
+case "\$*" in
+  *" diff "*--binary*) exit 1 ;;
+esac
+exec "$real_git" "\$@"
+STUB
+  chmod +x "$STUB_BIN/git"
+  printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"could not snapshot"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  # The resolver edits are untouched and no patch is left behind.
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+  run ! compgen -G "$PATCH_DIR/*.patch"
+}
+
+@test "--revert-dirty removes a directory standing where a tracked file was and restores the file" {
+  rm -f src/a.txt && mkdir src/a.txt && printf 'child\n' >| src/a.txt/child.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ -f src/a.txt ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
+  [ ! -e src/new.txt ]
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "--revert-only removes a directory standing where a tracked file was and restores the file" {
+  rm -f src/a.txt && mkdir src/a.txt && printf 'child\n' >| src/a.txt/child.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ -f src/a.txt ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "a listed path that is a symlink to an outside directory is not followed on revert" {
+  outside="$BATS_TEST_TMPDIR/outside"
+  mkdir -p "$outside" && printf 'keep\n' >| "$outside/survivor.txt"
+  rm -f src/a.txt && ln -s "$outside" src/a.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ -f "$outside/survivor.txt" ]
+  [ "$(cat "$outside/survivor.txt")" = keep ]
+  [ -f src/a.txt ] && [ ! -L src/a.txt ]
+  [ -z "$(git status --porcelain)" ]
+}
+
+@test "the revert modes report no log, create none and leave a PR's kept logs alone" {
+  mkdir -p "$PATCH_DIR"
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    : >| "$PATCH_DIR/7-2020010${i}T000000Z-1.log"
+  done
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .log]')" = '["reverted",null]' ]
+  printf 'x\n' >| src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .log]')" = '["reverted",null]' ]
+  [ "$(find "$PATCH_DIR" -name '7-*.log' | wc -l)" -eq 10 ]
+  [ -e "$PATCH_DIR/7-20200101T000000Z-1.log" ]
+}
+
+@test "--revert-dirty refuses to remove an untracked nested git repository" {
+  mkdir src/nested && git -C src/nested init -q && printf 'precious\n' >| src/nested/work.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"nested git repository"* ]]
+  [ -d src/nested/.git ]
+  [ "$(cat src/nested/work.txt)" = precious ]
+}
+
+# A dirty submodule: committed gitlink, then an untracked and a modified file
+# inside its worktree. Reverting must refuse it and keep both files.
+make_dirty_submodule() {
+  local sub="$BATS_TEST_TMPDIR/subsrc"
+  git init -q -b main "$sub"
+  git -C "$sub" config user.email test@test.com
+  git -C "$sub" config user.name Test
+  git -C "$sub" config commit.gpgsign false
+  printf 'tracked\n' >| "$sub/tracked.txt"
+  git -C "$sub" add -A && git -C "$sub" commit -q -m "chore: sub"
+  git -c protocol.file.allow=always submodule add -q "$sub" vendor/sub >/dev/null 2>&1
+  git commit -q -m "chore: add submodule"
+  printf 'dirty\n' >| vendor/sub/tracked.txt
+  printf 'precious\n' >| vendor/sub/untracked.txt
+}
+
+@test "--revert-dirty refuses a dirty submodule and keeps its files" {
+  make_dirty_submodule
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"nested git repository"* ]]
+  [ "$(cat vendor/sub/untracked.txt)" = precious ]
+  [ "$(cat vendor/sub/tracked.txt)" = dirty ]
+}
+
+@test "--revert-only refuses a dirty submodule and keeps its files" {
+  make_dirty_submodule
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- vendor/sub
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"nested git repository"* ]]
+  [ "$(cat vendor/sub/untracked.txt)" = precious ]
+  [ "$(cat vendor/sub/tracked.txt)" = dirty ]
+}
+
+# Starts a run whose pre-verification snapshot hangs after writing a partial,
+# credential-bearing diff, sends <signal> to the script and leaves the exit
+# status in SNAP_STATUS. The stub git records its pid, then sleeps in place.
+snapshot_interrupted_by() {
+  local sig="$1" pid i
+  real_git=$(command -v git)
+  cat >| "$STUB_BIN/git" <<STUB
+#!/bin/sh
+case "\$*" in
+  *" diff "*--binary*)
+    echo "+GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+    echo \$\$ >| "$BATS_TEST_TMPDIR/slow.pid"
+    : >| "$BATS_TEST_TMPDIR/slow.ready"
+    exec sleep 30 ;;
+esac
+exec "$real_git" "\$@"
+STUB
+  chmod +x "$STUB_BIN/git"
+  printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
+  "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt \
+    </dev/null >"$BATS_TEST_TMPDIR/out" 2>"$BATS_TEST_TMPDIR/err" &
+  pid=$!
+  for i in $(seq 1 100); do
+    [ -e "$BATS_TEST_TMPDIR/slow.ready" ] && break
+    sleep 0.1
+  done
+  [ -e "$BATS_TEST_TMPDIR/slow.ready" ] || { kill -KILL "$pid" 2>/dev/null; return 1; }
+  # The partial patch exists while the snapshot is being written.
+  compgen -G "$PATCH_DIR/*.patch" >/dev/null || { kill -KILL "$pid" 2>/dev/null; return 1; }
+  kill -s "$sig" "$pid"
+  # The shell runs its trap once the foreground diff ends.
+  kill -s TERM "$(cat "$BATS_TEST_TMPDIR/slow.pid")" 2>/dev/null
+  SNAP_STATUS=0
+  wait "$pid" || SNAP_STATUS=$?
+}
+
+@test "a TERM while the pre-verification snapshot is written removes the partial patch" {
+  snapshot_interrupted_by TERM
+  [ "$SNAP_STATUS" -eq 143 ]
+  run ! compgen -G "$PATCH_DIR/*.patch"
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  # The tree is untouched: the resolver edits are still there.
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+# INT is not tested: a background job starts with SIGINT ignored, and a shell
+# cannot trap a signal that was ignored on entry.
+@test "a HUP while the pre-verification snapshot is written removes the partial patch" {
+  snapshot_interrupted_by HUP
+  [ "$SNAP_STATUS" -eq 129 ]
+  run ! compgen -G "$PATCH_DIR/*.patch"
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+# The verifier's output is redacted on its way to disk. A credential-shaped
+# value (assembled from pieces, so no source line holds it whole) must never
+# be written raw under .git/yellow-review or to the temp file that holds the
+# stream, and the stream's temp file must not outlive the run.
+secret_pieces() {
+  SECRET_A=ghp_
+  SECRET_B=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+  SECRET="$SECRET_A$SECRET_B"
+  PRINT_SECRET="printf '%s%s\\n' $SECRET_A $SECRET_B; printf '%s%s\\n' $SECRET_A $SECRET_B >&2"
+}
+
+# Assert nothing but kept .patch/.log files is left under .git/yellow-review,
+# no stream temp file is left, and no file holds the planted value.
+assert_no_raw_left() {
+  [ -d "$REPO/.git/yellow-review" ]
+  run ! grep -rqF "$SECRET" "$REPO/.git/yellow-review" "$STREAM_TMP"
+  [ -z "$(find "$REPO/.git/yellow-review" -type f ! -name '*.patch' ! -name '*.log')" ]
+  [ -z "$(find "$STREAM_TMP" -mindepth 1)" ]
+}
+
+@test "a credential the verifier prints is redacted in the final log and no raw file remains after a pass" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  TMPDIR="$STREAM_TMP" verify "$PRINT_SECRET; echo visible" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  grep -q visible "$log"
+  grep -q 'REDACTED' "$log"
+  run ! grep -qF "$SECRET" "$log"
+  [ "$(mode "$log")" = 600 ]
+  assert_no_raw_left
+}
+
+@test "a credential the verifier prints is redacted in the final log and no raw file remains after a failure" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  TMPDIR="$STREAM_TMP" verify "$PRINT_SECRET; echo visible; exit 3" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = fail ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  grep -q visible "$log"
+  run ! grep -qF "$SECRET" "$log"
+  assert_no_raw_left
+}
+
+@test "a credential the verifier prints is redacted in the final log and no raw file remains after a timeout" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  TMPDIR="$STREAM_TMP" verify "$PRINT_SECRET; echo visible; sleep 30" --timeout 1 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = timeout ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  grep -q visible "$log"
+  run ! grep -qF "$SECRET" "$log"
+  assert_no_raw_left
+}
+
+@test "the watchdog fallback redacts the log and leaves no raw file after a timeout" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  YELLOW_REVIEW_NO_TIMEOUT_BIN=1 TMPDIR="$STREAM_TMP" verify "$PRINT_SECRET; echo visible; sleep 30" --timeout 1 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = timeout ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  grep -q visible "$log"
+  run ! grep -qF "$SECRET" "$log"
+  assert_no_raw_left
+}
+
+@test "a credential the verifier printed is on no disk path under .git while the verifier still runs" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  printf '%s\n' "$PRINT_SECRET; sleep 4" >| "$CMD"
+  TMPDIR="$STREAM_TMP" "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 20 --trusted -- src/a.txt src/new.txt \
+    >"$BATS_TEST_TMPDIR/mid.out" 2>&1 &
+  pid=$!
+  sleep 2
+  # Mid-run: the verifier has printed, and nothing on disk may hold the value.
+  [ -d "$REPO/.git/yellow-review" ]
+  run ! grep -rqF "$SECRET" "$REPO/.git/yellow-review" "$STREAM_TMP"
+  wait "$pid"
+  log=$(jq -r .log "$BATS_TEST_TMPDIR/mid.out")
+  run ! grep -qF "$SECRET" "$log"
+  assert_no_raw_left
+}
+
+@test "--revert-only refuses a tracked directory and keeps its untracked files and edits" {
+  printf 'precious\n' >| src/precious.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"not a replaced file"* ]]
+  [[ "$stderr" == *": src"* ]]
+  [ "$(cat src/precious.txt)" = precious ]
+  [ -f src/new.txt ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "--revert-only refuses a directory with nothing at HEAD and keeps its files" {
+  mkdir src/fresh && printf 'precious\n' >| src/fresh/work.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/fresh
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"not a replaced file"* ]]
+  [[ "$stderr" == *"src/fresh"* ]]
+  [ "$(cat src/fresh/work.txt)" = precious ]
+}
+
+@test "--revert-dirty lists the files of a dirty tracked directory and reverts them" {
+  printf 'precious\n' >| src/precious.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
+  [ ! -e src/new.txt ]
+  [ ! -e src/precious.txt ]
+  [ -z "$(git status --porcelain)" ]
+}
+
+# The redaction filters are line-buffered sed passes, so the stream is cut into
+# records of at most 64 KiB before them. A verifier that prints megabytes with
+# no newline must finish without unbounded memory, and because the cut can sever
+# a credential from its value the log is withheld with a notice, never published.
+@test "a 3 MiB stream with no newline finishes and its log is withheld, with the planted credential nowhere on disk" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  # 2.5 MiB of filler, a blank, the credential, then 0.5 MiB of filler: the
+  # value sits inside the last 1 MiB, so its absence from the log is meaningful.
+  TMPDIR="$STREAM_TMP" verify "{ head -c 2621440 /dev/zero | tr '\\0' a; printf ' %s%s ' $SECRET_A $SECRET_B; head -c 524288 /dev/zero | tr '\\0' b; }" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  [ "$(cat "$log")" = '[log withheld: output had a record longer than 64 KiB]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"log withheld: output had a record longer than 64 KiB"* ]]
+  run ! grep -qF "$SECRET" "$log"
+  assert_no_raw_left
+}
+
+@test "a credential in the middle of ordinary short lines is still redacted" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  TMPDIR="$STREAM_TMP" verify "yes ordinary-line | head -n 2000; $PRINT_SECRET; yes tail-line | head -n 2000; echo visible" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  grep -q ordinary-line "$log"
+  grep -q visible "$log"
+  grep -q 'REDACTED' "$log"
+  run ! grep -qF "$SECRET" "$log"
+  assert_no_raw_left
+}
+
+# fold cuts a record longer than 64 KiB, which can sever a credential name from
+# its value (here 70000 blanks apart). The filter then fails closed.
+@test "a credential severed from its value by a fold boundary withholds the log" {
+  SECRET=lowentropyvalue
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  TMPDIR="$STREAM_TMP" verify "printf 'GITHUB_TOKEN='; head -c 70000 /dev/zero | tr '\\0' ' '; printf '$SECRET\\n'; echo visible" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  [ "$(cat "$log")" = '[log withheld: output had a record longer than 64 KiB]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"log withheld: output had a record longer than 64 KiB"* ]]
+  assert_no_raw_left
+}
+
+@test "a record of exactly 64 KiB is not cut, so the log is kept" {
+  secret_pieces
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  TMPDIR="$STREAM_TMP" verify "head -c 65536 /dev/zero | tr '\\0' a; echo; $PRINT_SECRET; echo visible" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  grep -q visible "$log"
+  grep -q 'REDACTED' "$log"
+  run ! grep -qF "$SECRET" "$log"
+  run ! grep -q 'withheld' "$log"
+  assert_no_raw_left
+}
+
+@test "vr_redact_log withholds a log with a record longer than 64 KiB" {
+  log="$BATS_TEST_TMPDIR/long.log"
+  { printf 'GITHUB_TOKEN='; head -c 70000 /dev/zero | tr '\0' ' '; printf 'lowentropyvalue\n'; } >| "$log"
+  redact_log "$log"
+  [ "$status" -eq 0 ]
+  [ "$(cat "$log")" = '[log withheld: output had a record longer than 64 KiB]' ]
+  [ ! -e "$log.tmp" ]
+}
+
+# --- --ignored-since: resolver edits to gitignored files -------------------
+# rp_tree_changes never lists ignored files, so an edit to node_modules/.bin/<x>
+# is caught only by comparing mtimes with the marker. Times are set explicitly
+# (touch -t) so the tests do not depend on clock granularity.
+ignored_fixture() {
+  printf 'node_modules/\n*.cache\n' >> "$REPO/.git/info/exclude"
+  mkdir -p node_modules/.bin
+  printf '#!/bin/sh\necho original\n' >| node_modules/.bin/runner
+  printf 'cached\n' >| src/gen.cache
+  touch -t 201901010000 node_modules/.bin/runner src/gen.cache
+  touch -t 202001010000 "$IGN_MARKER"
+}
+
+@test "--ignored-since refuses an ignored executable edited after the marker and names it" {
+  ignored_fixture
+  printf '#!/bin/sh\necho pwned\n' >| node_modules/.bin/runner
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/.bin/runner"* ]]
+  [[ "$stderr" != *pwned* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  # Refused before anything ran: the resolver edits are still there.
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+@test "--ignored-since refuses an ignored file created after the marker, also when the run is attended" {
+  ignored_fixture
+  printf 'new\n' >| node_modules/.bin/added
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/.bin/added"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--ignored-since refuses an ignored file changed inside a directory that also holds tracked files" {
+  ignored_fixture
+  printf 'changed\n' >| src/gen.cache
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"src/gen.cache"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--ignored-since refuses an ignored symlink newer than the marker" {
+  ignored_fixture
+  ln -s /nonexistent-target node_modules/.bin/link
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/.bin/link"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--ignored-since passes an old symlink to an unchanged target" {
+  ignored_fixture
+  ln -s runner node_modules/.bin/link
+  touch -h -t 201901010000 node_modules/.bin/link
+  verify 'true' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+}
+
+@test "--ignored-since names at most 20 paths" {
+  ignored_fixture
+  for i in $(seq 1 30); do printf 'x\n' >| "node_modules/.bin/f$i"; done
+  verify 'true' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [ "$(printf '%s' "$stderr" | grep -o 'node_modules/.bin/f[0-9]*' | wc -l)" -le 20 ]
+}
+
+@test "--ignored-since passes when every ignored file predates the marker" {
+  ignored_fixture
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["pass",true]' ]
+  [ -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--ignored-since fails closed on a missing, non-regular or symlinked marker" {
+  ignored_fixture
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$BATS_TEST_TMPDIR/no-marker" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"--ignored-since"* ]]
+  mkdir "$BATS_TEST_TMPDIR/marker-dir"
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$BATS_TEST_TMPDIR/marker-dir" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  ln -s "$IGN_MARKER" "$BATS_TEST_TMPDIR/marker-link"
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$BATS_TEST_TMPDIR/marker-link" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--unattended without --ignored-since is refused before anything runs" {
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"--ignored-since"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "an attended run may omit --ignored-since" {
+  ignored_fixture
+  printf '#!/bin/sh\necho changed\n' >| node_modules/.bin/runner
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+}
+
+@test "the revert modes ignore --ignored-since" {
+  ignored_fixture
+  printf '#!/bin/sh\necho changed\n' >| node_modules/.bin/runner
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only --ignored-since "$BATS_TEST_TMPDIR/no-marker" -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  printf 'again\n' >| src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+}
+
+# --- a path listed twice ---------------------------------------------------
+@test "a path listed in --files-from and after -- yields a recovery patch that re-applies" {
+  printf 'src/a.txt\nsrc/new.txt\nsrc/a.txt\n' >| "$BATS_TEST_TMPDIR/list"
+  verify 'exit 3' --timeout 5 --trusted --files-from "$BATS_TEST_TMPDIR/list" -- src/new.txt src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["fail",true]' ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ "$(grep -c '^diff --git a/src/a.txt ' "$patch")" -eq 1 ]
+  [ "$(grep -c '^diff --git a/src/new.txt ' "$patch")" -eq 1 ]
+  # The tree is back at HEAD, so the patch must apply to it.
+  git apply --check "$patch"
+  git apply "$patch"
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+@test "--revert-only deduplicates the listed files before saving the patch" {
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/a.txt src/new.txt src/new.txt
+  [ "$status" -eq 0 ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ "$(grep -c '^diff --git a/src/a.txt ' "$patch")" -eq 1 ]
+  git apply --check "$patch"
+}
+
+@test "a duplicated listed path is checked once against the tree and the PR" {
+  rm src/new.txt
+  verify 'true' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+}
+
+# --- --ignored-since: the target of an ignored symlink ---
+# A write through a symlink leaves the link's own mtime alone, so the target is
+# judged too. The targets live outside the repository, so the symlinks are the
+# only ignored files the guard sees.
+
+link_fixture() {
+  ignored_fixture
+  EXT="$BATS_TEST_TMPDIR/ext"
+  mkdir -p "$EXT/dir"
+  printf 'old\n' >| "$EXT/tool"
+  printf 'old\n' >| "$EXT/dir/inner"
+  touch -t 201901010000 "$EXT/tool" "$EXT/dir/inner"
+  ln -s "$EXT/tool" node_modules/.bin/tool-link
+  ln -s "$EXT/dir" node_modules/.bin/dir-link
+  ln -s "$EXT/tool" src/tool.cache
+  touch -h -t 201901010000 node_modules/.bin/tool-link node_modules/.bin/dir-link src/tool.cache
+}
+
+@test "--ignored-since refuses an ignored symlink whose file target was written after the marker" {
+  link_fixture
+  printf '#!/bin/sh\necho pwned\n' >| "$EXT/tool"
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/.bin/tool-link"* ]]
+  [[ "$stderr" == *"src/tool.cache"* ]]
+  [[ "$stderr" != *pwned* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  # Refused before anything ran: the resolver edits are still there.
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "--ignored-since refuses an ignored symlink to a directory holding a file written after the marker" {
+  link_fixture
+  printf 'changed\n' >| "$EXT/dir/inner"
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/.bin/dir-link"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--ignored-since passes ignored symlinks whose targets are unchanged or dangling" {
+  link_fixture
+  ln -s /nonexistent-target node_modules/.bin/dangling
+  touch -h -t 201901010000 node_modules/.bin/dangling
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  [ -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "--ignored-since fails closed on an ignored symlink whose target directory cannot be walked" {
+  link_fixture
+  mkdir "$EXT/locked"
+  printf 'x\n' >| "$EXT/locked/f"
+  touch -t 201901010000 "$EXT/locked/f" "$EXT/locked"
+  ln -s "$EXT/locked" node_modules/.bin/locked-link
+  touch -h -t 201901010000 node_modules/.bin/locked-link
+  chmod 000 "$EXT/locked"
+  if [ -r "$EXT/locked" ]; then
+    chmod 755 "$EXT/locked"
+    skip "directory permissions are not enforced (running as root?)"
+  fi
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  chmod 755 "$EXT/locked"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"cannot check gitignored files"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+# --- the log tail cap must not separate a credential label from its value ---
+# The stream file keeps the cap plus 64 KiB of context and the final scan runs
+# over all of it, so a label (`password: |`) just before the 1 MiB boundary is
+# still seen with a value that opens the published suffix.
+# Filler is 1 KiB lines; the header, then the indented value line, then enough
+# filler and a marker line that the last 1048576 bytes start exactly at the
+# value line.
+cap_boundary_command() {
+  # 18 bytes of value line and 12 of the closing "done-marker" line.
+  local label="$1" valline_len=18 marker_len=12 after
+  after=$((1048576 - valline_len - marker_len))
+  printf '%s' "f=\$(head -c 1023 /dev/zero | tr '\\0' x); yes \"\$f\" | head -n 1200; printf '%s: |\\n' $label; printf '  %s%s\\n' lowentropy value; yes \"\$f\" | head -c $((after - 1)); echo; echo done-marker"
+}
+
+@test "a credential label just before the log cap boundary still withholds the log" {
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  # "pass" "word" so the literal label is not in this file.
+  TMPDIR="$STREAM_TMP" verify "$(cap_boundary_command 'pass""word')" --timeout 60 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  [ "$(cat "$log")" = '[withheld: log still looks like a credential after redaction]' ]
+  run ! grep -qF lowentropyvalue "$log"
+  [ -z "$(find "$STREAM_TMP" -mindepth 1)" ]
+}
+
+@test "the same boundary without a credential label keeps the log, tail intact and under the cap" {
+  STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
+  TMPDIR="$STREAM_TMP" verify "$(cap_boundary_command 'note')" --timeout 60 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  run ! grep -q 'withheld' "$log"
+  [ "$(wc -c <"$log")" -le 1048576 ]
+  [ "$(wc -c <"$log")" -gt 1040000 ]
+  # The published tail starts on a whole line: the value line when the cut lands exactly on it,
+  # otherwise a complete 1023-character filler line (a partial first line is dropped). Which of
+  # the two depends on byte-exact stream alignment, so accept either.
+  first=$(head -n 1 "$log")
+  [ "$first" = '  lowentropyvalue' ] || [ "${#first}" -eq 1023 ]
+  tail -n 1 "$log" | grep -q 'done-marker$'
+  [ "$(mode "$log")" = 600 ]
+  [ -z "$(find "$STREAM_TMP" -mindepth 1)" ]
+}
+
+# --- rollback runs with git hooks disabled ---
+# A resolver can plant or edit a hook that git status and rp_tree_changes do not
+# list (ignored, or under .git). A file checkout runs post-checkout and an index
+# write runs post-index-change, so the revert must not run any hook.
+
+plant_marker_hooks() {
+  mkdir -p "$1"
+  for h in post-checkout post-index-change post-merge reference-transaction; do
+    printf '#!/bin/sh\necho %s >> "%s/hook-ran.log"\n' "$h" "$BATS_TEST_TMPDIR" >| "$1/$h"
+    chmod +x "$1/$h"
+  done
+}
+
+# The planted hooks fire for a plain checkout, so a silent revert means hooks
+# were off and not that the fixture is broken.
+hooks_fire_control() {
+  rm -f "$BATS_TEST_TMPDIR/hook-ran.log"
+  git checkout -q HEAD -- package.json
+  [ -e "$BATS_TEST_TMPDIR/hook-ran.log" ]
+  rm -f "$BATS_TEST_TMPDIR/hook-ran.log"
+}
+
+@test "--revert-dirty runs no hook from .git/hooks and still restores the tracked file" {
+  plant_marker_hooks .git/hooks
+  hooks_fire_control
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ "$(cat src/a.txt)" = $'one\nfeature' ]
+  [ ! -e src/new.txt ]
+  [ ! -e "$BATS_TEST_TMPDIR/hook-ran.log" ]
+}
+
+@test "--revert-only runs no hook from .git/hooks and still restores the tracked file" {
+  plant_marker_hooks .git/hooks
+  hooks_fire_control
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ "$(cat src/a.txt)" = $'one\nfeature' ]
+  [ ! -e src/new.txt ]
+  [ ! -e "$BATS_TEST_TMPDIR/hook-ran.log" ]
+}
+
+@test "--revert-dirty runs no hook from an ignored in-repo core.hooksPath and still restores the file" {
+  plant_marker_hooks .hooks
+  printf '.hooks/\n' >> .git/info/exclude
+  git config core.hooksPath .hooks
+  hooks_fire_control
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ "$(cat src/a.txt)" = $'one\nfeature' ]
+  [ ! -e src/new.txt ]
+  [ ! -e "$BATS_TEST_TMPDIR/hook-ran.log" ]
+}
+
+@test "--revert-only runs no hook from an ignored in-repo core.hooksPath and still restores the file" {
+  plant_marker_hooks .hooks
+  printf '.hooks/\n' >> .git/info/exclude
+  git config core.hooksPath .hooks
+  hooks_fire_control
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ "$(cat src/a.txt)" = $'one\nfeature' ]
+  [ ! -e src/new.txt ]
+  [ ! -e "$BATS_TEST_TMPDIR/hook-ran.log" ]
+}
+
+@test "a failing verify run reverts without running an ignored in-repo hook" {
+  plant_marker_hooks .hooks
+  printf '.hooks/\n' >> .git/info/exclude
+  git config core.hooksPath .hooks
+  hooks_fire_control
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$(printf '%s' "$output" | jq -r .result)" = fail ]
+  [ "$(cat src/a.txt)" = $'one\nfeature' ]
+  [ ! -e src/new.txt ]
+  [ ! -e "$BATS_TEST_TMPDIR/hook-ran.log" ]
+}

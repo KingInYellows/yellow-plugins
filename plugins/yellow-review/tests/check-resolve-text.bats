@@ -527,6 +527,111 @@ CASES
   [ "$status" -eq 0 ]
 }
 
+@test "rt_looks_secret_strict skips keyword rules but keeps high-precision ones" {
+  LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
+  # shellcheck source=../lib/resolve-text.sh
+  . "$LIB"
+  for t in 'password = "hunter22"' 'API_KEY=abcd1234efgh5678' 'token: string' 'password: hunter22'; do
+    printf '%s\n' "$t" >| "$A"
+    if [ "$t" != 'token: string' ]; then rt_looks_secret "$A" || { echo "keyword rules missed: $t"; false; }; fi
+    run rt_looks_secret_strict "$A"
+    [ "$status" -eq 1 ] || { echo "strict flagged: $t"; false; }
+  done
+  for t in 'x ghp_abcdefghijklmnopqrstuvwxyz0123456789' 'AKIA''ABCDEFGHIJKLMNOP' \
+           'ASIA''ABCDEFGHIJKLMNOP' 'gl''pat-abcdefghijklmnopqrstu1234' \
+           'xoxb-1234567890-abcdef' 'sk-ant-abcdefghijklmnopqrstuvwxyz' \
+           'AIzaSyA1234567890abcdefghijklmnopqrstuvw' \
+           'aB3dEf6hIj9kLm2n''Op5qRs8tUv1wXy4zAb' '-----BEGIN PRIVATE KEY-----'; do
+    printf '%s\n' "$t" >| "$A"
+    rt_looks_secret_strict "$A" || { echo "strict missed: $t"; false; }
+  done
+}
+
+@test "rt_looks_secret_strict keeps the URL-userinfo rule and the keyword-in-word anchoring" {
+  LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
+  # shellcheck source=../lib/resolve-text.sh
+  . "$LIB"
+  printf 'clone https://deploy:%s@example.com/o/r.git\n' 'S3cr3t9x' >| "$A"
+  rt_looks_secret_strict "$A"
+  printf '%s\n' 'bypass: something-else' >| "$A"
+  run rt_looks_secret_strict "$A"
+  [ "$status" -eq 1 ]
+}
+
+# rt_added_lines (lib/resolve-text.sh): fixed diffs, exact output.
+
+@test "rt_added_lines prints added lines without the plus and skips file headers" {
+  run bash -c ". '$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh'; rt_added_lines" <<'DIFF'
+diff --git a/f.txt b/f.txt
+index 111..222 100644
+--- a/f.txt
++++ b/f.txt
+@@ -1,2 +1,3 @@
+ context
+-removed
++added one
++ indented add
+DIFF
+  [ "$status" -eq 0 ]
+  [ "$output" = $'added one\n indented add' ]
+}
+
+@test "rt_added_lines keeps an added line that itself starts with ++ or --" {
+  run bash -c ". '$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh'; rt_added_lines" <<'DIFF'
+diff --git a/f.txt b/f.txt
+--- a/f.txt
++++ b/f.txt
+@@ -1 +1,2 @@
++++ x
++-- y
+DIFF
+  [ "$output" = $'++ x\n-- y' ]
+}
+
+@test "rt_added_lines ignores the no-newline marker and removed lines" {
+  run bash -c ". '$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh'; rt_added_lines" <<'DIFF'
+diff --git a/f.txt b/f.txt
+--- a/f.txt
++++ b/f.txt
+@@ -1 +1 @@
+-old
+\ No newline at end of file
++new
+\ No newline at end of file
+DIFF
+  [ "$output" = new ]
+}
+
+@test "rt_added_lines prints nothing for a hunk-less diff and for empty input" {
+  run bash -c ". '$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh'; rt_added_lines" <<'DIFF'
+diff --git a/bin b/bin
+new file mode 100755
+index 0000000..e69de29
+--- /dev/null
++++ b/bin
+DIFF
+  [ -z "$output" ]
+  run bash -c ". '$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh'; rt_added_lines" </dev/null
+  [ -z "$output" ]
+}
+
+@test "rt_added_lines resets at the next file header across several files" {
+  run bash -c ". '$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh'; rt_added_lines" <<'DIFF'
+diff --git a/a b/a
+--- a/a
++++ b/a
+@@ -0,0 +1 @@
++from a
+diff --git a/b b/b
+--- a/b
++++ b/b
++++ not a hunk line
+@@ -0,0 +1 @@
++from b
+DIFF
+  [ "$output" = $'from a\nfrom b' ]
+}
+
 @test "a value that merely contains a placeholder character is refused" {
   while IFS= read -r t; do
     printf '%s\n' "$t" >| "$A"

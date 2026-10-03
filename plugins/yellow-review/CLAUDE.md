@@ -164,7 +164,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   rails and inline MIT attribution so the rules survive on hosts with no
   tool restriction (not user-invocable)
 
-### Scripts (7)
+### Scripts (9)
 
 - `get-pr-comments [--include-outdated] <owner/repo> <pr>` — Fetch unresolved
   PR review threads via GitHub GraphQL API; outdated threads are excluded
@@ -185,12 +185,22 @@ resolution, and sequential stack review. Graphite-native workflow.
   `references/resolve/dispositions.md`
 - `check-resolve-text <file>...` — Refuse resolver-written text that looks
   like a credential (for text posted outside the resolve scripts)
+- `commit-resolve-fixes` — Stage the resolver files, add a new commit and
+  verify the result; refuses paths outside the PR, deny-listed paths,
+  credential-shaped added lines and (`--unattended`) runner files. Not yet
+  invoked by `/review:resolve`; see `references/resolve/dispositions.md`
+- `run-verify-command` — Run `resolve_pr.verify_command` under a timeout; on
+  failure save a patch and revert the files (`--unattended` skips runner
+  files; `--revert-only`, `--revert-dirty`). Not yet invoked by
+  `/review:resolve`; see `references/resolve/dispositions.md`
 - `file-line-counts <diff-base-ref>` — Authoritative base/head line counts per
   changed file for `thermonuclear-reviewer`'s size-threshold rule; the
   header and footer rows are its completeness signal
 
 `reply-pr-thread`, `file-followup-issue` and `check-resolve-text` source
 `lib/resolve-text.sh` (credential-shape check) before posting.
+`commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`
+and `lib/verify-run.sh`.
 
 All live at `skills/pr-review-workflow/scripts/` and are invoked as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`.
@@ -209,6 +219,12 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
   `get-pr-blockers`) — runs `gh` under `YELLOW_REVIEW_GH_TIMEOUT` (default
   30 s) and returns 124 on a timeout, but only when `timeout(1)` or
   `gtimeout(1)` is installed; without either `gh` runs unbounded.
+- `lib/resolve-paths.sh` (bash, sourced by `commit-resolve-fixes` and
+  `run-verify-command`) — canonical-path check, the case-insensitive resolver
+  deny list, and the runner-file list (files a git hook or verify command
+  would execute)
+- `lib/verify-run.sh` (bash, sourced by `run-verify-command`) — timeout,
+  process-group and redacted-log helpers for the verify run
 - `lib/review-ledger.sh <subcommand>` — the durable review-findings ledger
   (plans/review-findings-ledger.md): an append-only JSONL file per PR at
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`,
@@ -384,7 +400,8 @@ explicit-invocation wording live in the skill body and description.
 
 `bats tests/` from the plugin directory — `get-pr-comments.bats`,
 `get-pr-blockers.bats`, `reply-pr-thread.bats`, `file-followup-issue.bats`,
-`check-resolve-text.bats`, `resolve-pr-thread.bats` (GraphQL fixtures in
+`check-resolve-text.bats`, `resolve-paths.bats`, `commit-resolve-fixes.bats`,
+`run-verify-command.bats`, `resolve-pr-thread.bats` (GraphQL fixtures in
 `tests/fixtures/`, fake `gh` in `tests/mocks/gh`), `file-line-counts.bats`
 (pins the thermonuclear line-count invariant alongside
 `skills/pr-review-workflow/scripts/file-line-counts`),
