@@ -34,7 +34,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.6.1",
+      "version": "2.6.2",
       "author": {
         "name": "KingInYellows"
       },
@@ -64,7 +64,7 @@
     {
       "name": "yellow-devin",
       "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, orchestrate plan-implement-review chains",
-      "version": "3.0.4",
+      "version": "3.0.5",
       "author": {
         "name": "KingInYellows"
       },
@@ -104,7 +104,7 @@
     {
       "name": "yellow-browser-test",
       "description": "Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting",
-      "version": "1.1.9",
+      "version": "1.1.10",
       "author": {
         "name": "KingInYellows"
       },
@@ -144,7 +144,7 @@
     {
       "name": "yellow-research",
       "description": "Deep research plugin with Ceramic, DeepWiki, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
-      "version": "4.2.2",
+      "version": "4.2.3",
       "author": {
         "name": "KingInYellows"
       },
@@ -164,7 +164,7 @@
     {
       "name": "yellow-semgrep",
       "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
-      "version": "4.2.4",
+      "version": "4.2.5",
       "author": {
         "name": "KingInYellows"
       },
@@ -194,7 +194,7 @@
     {
       "name": "yellow-council",
       "description": "On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "author": {
         "name": "KingInYellows"
       },

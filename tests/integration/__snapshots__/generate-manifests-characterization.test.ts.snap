@@ -37,7 +37,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.6.1",
+      "version": "2.6.2",
       "author": {
         "name": "KingInYellows"
       },
@@ -67,7 +67,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-devin",
       "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, orchestrate plan-implement-review chains",
-      "version": "3.0.4",
+      "version": "3.0.5",
       "author": {
         "name": "KingInYellows"
       },
@@ -107,7 +107,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-browser-test",
       "description": "Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting",
-      "version": "1.1.9",
+      "version": "1.1.10",
       "author": {
         "name": "KingInYellows"
       },
@@ -147,7 +147,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-research",
       "description": "Deep research plugin with Ceramic, DeepWiki, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
-      "version": "4.2.2",
+      "version": "4.2.3",
       "author": {
         "name": "KingInYellows"
       },
@@ -167,7 +167,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-semgrep",
       "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
-      "version": "4.2.4",
+      "version": "4.2.5",
       "author": {
         "name": "KingInYellows"
       },
@@ -197,7 +197,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-council",
       "description": "On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -363,7 +363,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-browser-test/.claude-p
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-browser-test",
-  "version": "1.1.9",
+  "version": "1.1.10",
   "description": "Autonomous web app testing with agent-browser — auto-discovery, structured flows, exploratory testing, and bug reporting",
   "author": {
     "name": "KingInYellows",
@@ -487,7 +487,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-core",
-  "version": "2.6.1",
+  "version": "2.6.2",
   "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
   "author": {
     "name": "KingInYellows",
@@ -550,7 +550,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-council/.claude-plugin
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-council",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
   "author": {
     "name": "KingInYellows",
@@ -652,7 +652,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-devin/.claude-plugin/p
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-devin",
-  "version": "3.0.4",
+  "version": "3.0.5",
   "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, orchestrate plan-implement-review chains",
   "author": {
     "name": "KingInYellows",
@@ -865,7 +865,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-research/.claude-plugi
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-research",
-  "version": "4.2.2",
+  "version": "4.2.3",
   "description": "Deep research plugin with Ceramic, DeepWiki, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
   "author": {
     "name": "KingInYellows",
@@ -1106,7 +1106,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-semgrep/.claude-plugin
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-semgrep",
-  "version": "4.2.4",
+  "version": "4.2.5",
   "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
   "author": {
     "name": "KingInYellows",
