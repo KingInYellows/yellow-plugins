@@ -205,6 +205,17 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   [ "$status" -eq 0 ]
 }
 
+@test "a keyword value wrapped in Markdown inline-code backticks is judged unwrapped" {
+  for t in 'password: `hunter`' 'token: `correct-horse-battery`' 'secret: `hunter`.' 'password: `hunter22`'; do
+    printf '%s\n' "$t" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 2 ] || { echo "not flagged: $t"; false; }
+  done
+  printf '%s\n' 'password: `string`' 'token: `$TOKEN`' 'The token: `abc`.' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
 @test "an Authorization or Bearer header with a 20+ character token exits 2" {
   printf 'Authorization: Bearer %s\n' "$(pad 20)" >| "$A"
   run "$SCRIPT" "$A"
