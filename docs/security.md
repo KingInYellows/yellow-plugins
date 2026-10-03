@@ -556,6 +556,13 @@ trust boundary from the pack and fenced-output files above:
   stale check and its `ln`, so two syntheses can proceed in one checkout. The
   window is milliseconds and is left open because `sh` has no atomic
   compare-and-remove.
+- **Known residual (resumed run after a reclaim)**: 5b, 5d and 5e take the
+  directory and token only from the state file and compare nothing against this
+  run's own 5a directory. A run paused past 24 hours whose stale state another
+  `/council` reclaimed therefore finds the new run's valid claim on resume and
+  can print that run's label map and release its claim. Binding those steps to a
+  directory recorded at 5a needs a relayed value or an owner PID in the state
+  file, so it is left open as protocol design work.
 - **Known residual (pathname unlink after validation)**: the final unlink in
   `council_rm_synth_state` is by pathname after validation, so a reclaim that
   lands between the check and the `rm` can remove another run's fresh claim.
