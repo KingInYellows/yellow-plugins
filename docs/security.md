@@ -560,8 +560,9 @@ trust boundary from the pack and fenced-output files above:
   directory and token only from the state file and compare nothing against this
   run's own 5a directory. A run paused past 24 hours whose stale state another
   `/council` reclaimed therefore finds the new run's valid claim on resume and
-  can print that run's label map and release its claim. Binding those steps to a
-  directory recorded at 5a needs a relayed value or an owner PID in the state
+  can print that run's label map, release its claim, and delete the new run's
+  staging directory, disrupting that run. Binding those steps to a directory
+  recorded at 5a needs either a relayed value or an owner PID in the state
   file, so it is left open as protocol design work.
 - **Known residual (pathname unlink after validation)**: the final unlink in
   `council_rm_synth_state` is by pathname after validation, so a reclaim that
