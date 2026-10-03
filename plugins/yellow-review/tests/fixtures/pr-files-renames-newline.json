@@ -1,0 +1,5 @@
+[
+  {"filename":"src/new.ts","previous_filename":"src/old.ts","status":"renamed"},
+  {"filename":"src/other.ts","previous_filename":"safe\nvictim.txt","status":"renamed"},
+  {"filename":"lib/moved.ts","previous_filename":"lib/orig.ts\n","status":"renamed"}
+]

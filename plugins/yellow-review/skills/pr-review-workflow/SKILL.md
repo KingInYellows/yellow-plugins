@@ -316,7 +316,7 @@ fix: address review findings from <agent-list>
 ### `/review:resolve`
 
 ```
-fix: resolve PR #<num> review comments
+fix: resolve PR #<num> review comments (<n> files)
 ```
 
 ### `/review:all`
@@ -327,16 +327,27 @@ The commands that use these conventions resolve the active stacked-PR
 provider (`stack-provider-router` skill) before their first commit/push
 action; the message conventions above apply to both providers.
 
-On the Graphite provider, all default single-commit branches use
-`gt modify -m "<message>"`. Only use `gt modify --commit -m "<message>"`
-when you intentionally want multiple commits on one branch. Push via
-`gt submit --no-interactive`.
+When resolvers edited files, `/review:resolve` adds a **new** commit so
+reviewers keep their "changes since my last review" view. With no resolver
+edits (a reply/resolve-only run), `commit-resolve-fixes` returns `NOOP` and
+no commit is added. `/review:resolve` never calls `gt modify` directly:
+`commit-resolve-fixes` stages the exact files the resolvers changed
+(`git add -- <files>`), checks the staged set, then makes a new commit with
+the active provider, submits, and verifies the remote head. Staging
+explicitly matters: Graphite's modify silently skips unstaged edits in
+non-interactive runs.
+
+`/review:pr` and `/review:all` still fold their fixes into the branch's
+last commit with `gt modify -m "<message>"` on the Graphite provider; a
+follow-up issue tracks moving them to stage plus a new commit as well. Push
+via `gt submit --no-interactive`.
 
 ## Graphite Integration
 
 ### Standard Operations
 
-- **Commit**: `gt modify -m "fix: ..."`
+- **Commit**: `gt modify -m "fix: ..."` (`/review:pr`, `/review:all`;
+  `/review:resolve` goes through `commit-resolve-fixes`)
 - **Push**: `gt submit --no-interactive`
 - **Restack**: `gt upstack restack` (abort on conflict, report to user)
 - **Checkout**: `gt checkout <branch>`
@@ -405,17 +416,21 @@ degradation to the review.
 Located at `skills/pr-review-workflow/scripts/`:
 
 - **get-pr-comments** `[--include-outdated] <owner/repo> <pr-number>` —
-  Returns JSON array of unresolved review threads (outdated threads are
-  excluded unless `--include-outdated` is passed); exits 3 with the partial
-  array on stdout when the thread list is truncated (page cap, missing cursor
-  or the 270 s fetch deadline); each thread carries
-  `commentsTruncated` (true past the 50 comments fetched), and a resolver
-  must never resolve such a thread
-- **get-pr-blockers** `<owner/repo> <pr-number>` — Reports
-  `CHANGES_REQUESTED` reviews, `reviewDecision`, and whether conversation
-  resolution is enforced
-- **reply-pr-thread** `<PRRT_id> <disposition> <body-file>` — Replies to a
-  thread with an idempotency marker; skips threads already replied to
+  Returns a JSON array of unresolved review threads (non-outdated only
+  unless `--include-outdated`), with `isOutdated`, `viewerCanResolve`,
+  `viewerCanReply` per thread and `id`, `createdAt`, `viewerDidAuthor`,
+  `authorType` per comment, and `commentsTruncated` per thread (true when it
+  has more comments than were fetched, and a resolver must never resolve such a
+  thread); exits 3 with the partial array on stdout when the thread list is
+  truncated (page cap, missing cursor or the 270 s fetch deadline)
+- **get-pr-blockers** `<owner/repo> <pr-number>` — `CHANGES_REQUESTED`
+  reviewers, `reviewDecision`, and whether the base branch enforces
+  conversation resolution; never fails the caller (`lookupFailed` is true,
+  and fields are null or `unknown`, when a lookup did not complete)
+- **reply-pr-thread** `<PRRT_id> <disposition> <body-file>` — Replies with
+  an idempotency marker; skips when our latest recent comment carries a marker for
+  this thread, whatever its disposition, and only bot comments follow it, and
+  reports that disposition
 - **resolve-pr-thread** `<thread-node-id>` — Resolves a single thread
   (idempotent). Exit codes: 1 other failure, 2 usage, 3 not found or
   permission, 4 rate limited or `gh` timed out (`YELLOW_REVIEW_GH_TIMEOUT`,
@@ -425,8 +440,9 @@ Located at `skills/pr-review-workflow/scripts/`:
   4, stop mutating. The contract's "Script exit codes" and "Pacing and rate
   limits" sections in `references/resolve/dispositions.md` are authoritative.
 - **file-followup-issue** `<owner/repo> <pr> <PRRT_id> <title-file>
-  <body-file>` — Files or finds the follow-up issue for an out-of-scope
-  thread; `--find <owner/repo> <PRRT_id>` only looks and never files
+  <body-file>` — Files or finds (by marker) the follow-up issue for an
+  out-of-scope thread; `--find <owner/repo> <PRRT_id>` only looks and never
+  files
 - **check-resolve-text** `<file>...` — Exits 2 when text looks like a
   credential. A refusal prints a `resolve-text:` line on stderr
   (`refused rule=<rule> line=<n>` for a credential hit, `scan failed` when
@@ -444,7 +460,14 @@ Located at `skills/pr-review-workflow/scripts/`:
   fetch or parse is never read as "no new threads". Exit 4 on a rate limit
   (`poll rate-limited`), 2 on usage.
 
-The GraphQL scripts above require `gh` and `jq`. `check-resolve-text` needs only POSIX sh with awk, and `commit-resolve-fixes`, `run-verify-command` and `poll-new-threads` have their own prerequisites in their headers.
+The GraphQL scripts above require `gh` and `jq`; `check-resolve-text` needs only
+POSIX sh with awk. Exit codes and markers are defined in
+`references/resolve/dispositions.md`.
+
+The local (non-GraphQL) scripts `/review:resolve` Steps 5–7 and the callers
+that walk several PRs use (`commit-resolve-fixes`, `run-verify-command`,
+`check-resolve-text`) are documented in `references/local-scripts.md`; Read it
+before calling them.
 
 ## File Line Counts Script
 
@@ -461,7 +484,6 @@ Same directory. Not GraphQL; it reads only the local repository:
 
 ## Verification Loop
 
-After resolving threads, `/review:resolve` Step 8 re-fetches with a bounded
-re-pass (`poll-new-threads`) instead of a fixed wait: the rules, caps and exit
-codes are in `references/resolve/dispositions.md` ("Pacing and rate limits").
-Unresolved threads after the re-pass are reported as warnings.
+`/review:resolve` Step 8 (the bounded re-pass and resolve retries) is the
+procedure; `references/resolve/dispositions.md` defines what counts as
+blocking. Threads left open by design are not errors.

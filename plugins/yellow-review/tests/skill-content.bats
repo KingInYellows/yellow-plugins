@@ -393,6 +393,11 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   grep -q 'Exclude any `?` row from the pending' "$SWEEP_ALL"
 }
 
+@test "sweep-all: the summary table carries a Blocking column from the Resolve line" {
+  grep -q '^| PR# | Title .*| Residual | Blocking |' "$SWEEP_ALL"
+  grep -q "sweep's \`Resolve:\` line" "$SWEEP_ALL"
+}
+
 @test "sweep-all: the prune loop uses find (zsh-safe) and a bounded PR-number check" {
   grep -q "find \"\$DIR\" -maxdepth 1 -type f -name '\*.jsonl'" "$SWEEP_ALL"
   grep -q "grep -Exq '\[1-9\]\[0-9\]{0,9}'" "$SWEEP_ALL"
@@ -491,6 +496,45 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   printf '%s\n' "$step6" | tr '\n' ' ' | tr -s ' ' | grep -q 'never put a resolver path on a command line'
 }
 
+@test "resolve-stack: the ignored local config is snapshotted before the walk and checked after every PR" {
+  snap=$(grep -n '^### Step 2b: Snapshot the Trusted Ignored Files' "$RESOLVE_STACK" | cut -d: -f1)
+  walk=$(grep -n '^### Step 3: Walk the stack' "$RESOLVE_STACK" | cut -d: -f1)
+  [ -n "$snap" ] && [ "$snap" -lt "$walk" ]
+  text=$(flat "$RESOLVE_STACK")
+  [[ "$text" == *'guard-local-config" snapshot'* ]]
+  [[ "$text" == *'guard-local-config" check "<guard-dir>"'* ]]
+  [[ "$text" == *'guard-local-config" clear "<guard-dir>"'* ]]
+  [[ "$text" == *'aborted at PR #<PR#>: yellow-plugins.local.md changed during the resolve'* ]]
+  [[ "$text" == *'`not attempted (config changed)`'* ]]
+  # The check precedes the status check inside item 3b.
+  chk=$(grep -n 'guard-local-config" check' "$RESOLVE_STACK" | head -1 | cut -d: -f1)
+  sts=$(grep -n 'OUT=$(git status --porcelain=v1' "$RESOLVE_STACK" | head -1 | cut -d: -f1)
+  [ "$chk" -lt "$sts" ]
+}
+
+@test "resolve-stack: a restack that changes a branch is published before the next PR" {
+  text=$(flat "$RESOLVE_STACK")
+  [[ "$text" == *'publish it with `gt submit --stack --no-interactive --no-edit` before the next PR'* ]]
+  [[ "$text" == *'`restack not published`'* ]]
+}
+
+@test "sweep: PR-specific pre-resolve stops end with a skip line that sweep-all reads" {
+  text=$(flat "$SWEEP")
+  [[ "$text" == *'`Sweep: skipped (pr-not-open)`'* ]]
+  [[ "$text" == *'`Sweep: skipped (branch-mismatch)`'* ]]
+  [[ "$text" == *'^Sweep: skipped \((pr-not-open|branch-mismatch)\)$'* ]]
+  all=$(flat "$SWEEP_ALL")
+  [[ "$all" == *'^Sweep: skipped \((pr-not-open|branch-mismatch)\)$'* ]]
+  [[ "$all" == *'outcome is `skipped — <reason>`'* ]]
+  [[ "$all" == *'not `no contract`'* ]]
+}
+
+@test "sweep-all: a rate-limited open-PR pre-check stops the batch instead of skipping every PR" {
+  text=$(flat "$SWEEP_ALL")
+  [[ "$text" == *'grep -qiE '"'"'rate limit|HTTP 429'"'"''* ]]
+  [[ "$text" == *'When `ratelimited=1`, the next `gh` call would hit the same limit'* ]]
+}
+
 # Collapse line wraps so a phrase can be matched across them.
 flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
 
@@ -508,25 +552,6 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   [[ "$text" == *'exited 4 with `reason=rate-limit` (or no recognizable reason)'* ]]
   [[ "$text" == *'`reason=timeout` stops mutations too but leaves `ratelimited=0`'* ]]
   [[ "$text" == *'A missing or unrecognized reason is treated as `rate-limit`'* ]]
-}
-
-@test "resolver agent: no rule permits editing when PR-changed ranges are unknown" {
-  text=$(flat "$RESOLVER_AGENT")
-  # The old exception (edit the cluster File when PR files is unknown) must be gone.
-  [[ "$text" != *"edit only the cluster's \`File\`"* ]]
-  # Both surviving rules say: unknown means no edit and unclear, never oos.
-  [[ "$text" == *'(when it is `unknown`, edit nothing and propose `unclear`)'* ]]
-  [[ "$text" == *'When the bound is `none` or absent'* ]]
-  [[ "$text" == *'do not edit: propose `oos` for the thread'* ]]
-  [[ "$text" == *'propose `unclear` with evidence `PR ranges unavailable`, never `oos`'* ]]
-  clusters=$(flat "$RESOLVE_REFS/clusters.md")
-  [[ "$clusters" == *'When the value is `none`, or the path has no range'* ]]
-  [[ "$clusters" == *'When the value is `unknown`'* ]]
-  [[ "$clusters" == *'proposes `unclear` with evidence `PR ranges unavailable`'* ]]
-  text=$(flat "$RESOLVE_PR")
-  [[ "$text" == *'pass `unknown` for both, so the resolver edits nothing and proposes `unclear`'* ]]
-  disp=$(flat "$RESOLVE_REFS/dispositions.md")
-  [[ "$disp" == *'`PR-changed lines` `unknown` and the proposal is `oos`: it becomes `unclear`'* ]]
 }
 
 @test "dispositions: a reused Linear hit passes the same response checks as save_issue" {
@@ -568,6 +593,309 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   [[ "$step6flat" == *'required unattended'* ]]
   [[ "$step6flat" == *'**Marker cleanup.**'* ]]
   flat "$RESOLVE_REFS/dispositions.md" | grep -qF -- '`--ignored-since <marker-file>` is required'
+}
+
+# The dirty-tree and rate-limit stops must finish the current PR (clean-tree
+# check, revert, row) before ending the walk, and name the summary heading.
+DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-cleanup.md"
+
+@test "resolve-stack: dirty-tree stop uses the shared cleanup, names the summary heading, exits 1" {
+  grep -qF 'references/review-resolve-stack/dirty-tree-cleanup.md' "$RESOLVE_STACK"
+  grep -q 'aborted at PR #<PR#>: working tree dirty after resolve' "$RESOLVE_STACK"
+  grep -q 'revert incomplete' "$RESOLVE_STACK"
+  grep -q 'unrecognized changes left in place' "$RESOLVE_STACK"
+  grep -q 'not attempted (dirty tree)' "$RESOLVE_STACK"
+  grep -q 'go to `### Step 4: Final aggregate summary`' "$RESOLVE_STACK"
+  grep -q 'the command exits `1`' "$RESOLVE_STACK"
+  run ! grep -q 'go to Step 4' "$RESOLVE_STACK"
+}
+
+@test "dirty-tree-cleanup: lists with -z, owns via the files API, and handles both revert branches" {
+  grep -qF 'git status --porcelain=v1 -z --untracked-files=all' "$DIRTY_REF"
+  grep -qF 'pr-changed-ranges" "<PR#>"' "$DIRTY_REF"
+  grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-dirty' "$DIRTY_REF"
+  grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-only -- ' "$DIRTY_REF"
+  grep -q 'do NOT run `--revert-dirty`' "$DIRTY_REF"
+  grep -q 'treeClean: false' "$DIRTY_REF"
+  grep -q 'revert incomplete' "$DIRTY_REF"
+  grep -q 'unrecognized changes left in place' "$DIRTY_REF"
+  grep -q 'exits non-zero' "$DIRTY_REF"
+  grep -q '#973' "$DIRTY_REF"
+  # renames: the owned set includes previous_filename; an entry needs both paths owned
+  grep -qF 'previous_filename' "$DIRTY_REF"
+  grep -qF 'each file'"'"'s `filename` plus its' "$DIRTY_REF"
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'owned only when **both** of its paths are owned'
+  # a failed ownership lookup leaves every path unrecognized
+  grep -qE 'no path is owned through the PR file list' "$DIRTY_REF"
+  # agent memory is not trusted config, and the reference says why
+  grep -qF 'except `.claude/agent-memory/`' "$DIRTY_REF"
+  grep -q 'memory: project' "$DIRTY_REF"
+}
+
+@test "dirty-tree-cleanup: previous filenames come from pr-changed-ranges --previous, validated by the script" {
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'pr-changed-ranges" --previous "<PR#>"'
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'fails the whole call (exit 1, no output)'
+  tr '\n' ' ' <"$DIRTY_REF" | tr -s ' ' | grep -qF 'including a `gh` timeout, means the lookup failed'
+  # The hand-written gh api / jq projection is gone from the reference.
+  run grep -qF 'gh api --paginate' "$DIRTY_REF"
+  [ "$status" -eq 1 ]
+}
+
+@test "dirty-tree cleanup: each command loads its own byte-identical copy and neither inlines it" {
+  stack_copy="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-cleanup.md"
+  sweep_copy="$BATS_TEST_DIRNAME/../references/review-sweep-all/dirty-tree-cleanup.md"
+  grep -qF 'references/review-resolve-stack/dirty-tree-cleanup.md' "$RESOLVE_STACK"
+  grep -qF 'references/review-sweep-all/dirty-tree-cleanup.md' "$SWEEP_ALL"
+  # a command never loads another command's reference directory
+  run ! grep -qF 'references/review-sweep-all/' "$RESOLVE_STACK"
+  run ! grep -qF 'references/review-resolve-stack/' "$SWEEP_ALL"
+  # the two copies cannot drift
+  cmp -s "$stack_copy" "$sweep_copy" || { echo "the two dirty-tree-cleanup.md copies differ"; false; }
+  for f in "$RESOLVE_STACK" "$SWEEP_ALL"; do
+    run ! grep -qE -e '--revert-(dirty|only)' "$f"
+    run ! grep -qF 'gh pr diff' "$f"
+  done
+}
+
+@test "resolve-stack: each provider branch checks the tree before it restacks, and the GitHub branch covers no contract" {
+  graphite=$(awk '/^#### Graphite/{on=1;next} /^#### GitHub/{on=0} on' "$RESOLVE_STACK")
+  github=$(awk '/^#### GitHub/{on=1;next} /^### Step 4/{on=0} on' "$RESOLVE_STACK")
+  [ -n "$graphite" ] && [ -n "$github" ]
+  g_clean=$(printf '%s\n' "$graphite" | grep -n '3b\. \*\*Clean-tree' | head -1 | cut -d: -f1)
+  g_restack=$(printf '%s\n' "$graphite" | grep -n '^4\. \*\*Restack' | head -1 | cut -d: -f1)
+  [ -n "$g_clean" ] && [ -n "$g_restack" ] && [ "$g_clean" -lt "$g_restack" ]
+  h_clean=$(printf '%s\n' "$github" | grep -n 'clean-tree check' | head -1 | cut -d: -f1)
+  h_rebase=$(printf '%s\n' "$github" | grep -n '^4\. \*\*Rebase upstack' | head -1 | cut -d: -f1)
+  [ -n "$h_clean" ] && [ -n "$h_rebase" ] && [ "$h_clean" -lt "$h_rebase" ]
+  printf '%s\n' "$github" | tr '\n' ' ' | tr -s ' ' | grep -qF 'no-contract rule'
+}
+
+@test "resolve-stack: a rate-limited PR is finished before the walk stops" {
+  grep -q 'ratelimited=<0|1>' "$RESOLVE_STACK"
+  grep -q 'finish \*\*this\*\* PR first' "$RESOLVE_STACK"
+  grep -q 'not attempted (rate limit)' "$RESOLVE_STACK"
+  grep -q -- '--include-outdated' "$RESOLVE_STACK"
+}
+
+@test "sweep-all: the rate-limit stop runs after the clean-tree check, and both stops exit 1" {
+  clean=$(grep -n 'Clean-tree check' "$SWEEP_ALL" | head -1 | cut -d: -f1)
+  rate=$(grep -n 'Rate-limit stop' "$SWEEP_ALL" | head -1 | cut -d: -f1)
+  [ -n "$clean" ] && [ -n "$rate" ] && [ "$clean" -lt "$rate" ]
+  grep -qF 'references/review-sweep-all/dirty-tree-cleanup.md' "$SWEEP_ALL"
+  grep -q 'go to `### Step 5: End-of-loop' "$SWEEP_ALL"
+  grep -q 'Re-pass wait: up to' "$SWEEP_ALL"
+  grep -q 'Dirty tree after a sweep' "$SWEEP_ALL"
+  grep -q 'Rate-limited PR' "$SWEEP_ALL"
+  [ "$(grep -c 'exits `1`' "$SWEEP_ALL")" -ge 2 ]
+  run ! grep -q 'go to Step 5' "$SWEEP_ALL"
+}
+
+@test "sweep-all: a dirty tree after the cleanup skips compound and the remaining PRs" {
+  grep -qF 'skipped — working tree dirty after PR' "$SWEEP_ALL"
+  grep -qF '[review:sweep-all] Skipping /flow:compound — working tree not clean.' "$SWEEP_ALL"
+  grep -q 'Dirty-tree guard' "$SWEEP_ALL"
+  grep -qF 'working tree dirty after sweep (patch: <patch>)' "$SWEEP_ALL"
+}
+
+@test "resolve-stack, sweep and sweep-all read the same Resolve: contract fields" {
+  for f in "$RESOLVE_STACK" "$SWEEP" "$SWEEP_ALL"; do
+    grep -q 'ratelimited=' "$f" || { echo "no ratelimited= in $f"; false; }
+  done
+  # resolve-stack names every field of the line; sweep shows them in its example
+  for field in '<r> resolved' '<f> fixed' '<i> issues filed' '<b> blocking' 'push=<' 'verify=<' 'ratelimited=<0|1>'; do
+    grep -qF "$field" "$RESOLVE_STACK" || { echo "missing $field in resolve-stack"; false; }
+  done
+  for field in 'resolved' 'fixed' 'issues filed' 'blocking' 'push=ok' 'verify=skipped' 'ratelimited=0'; do
+    tr '\n' ' ' <"$SWEEP" | tr -s ' ' | grep -qF "$field" || { echo "missing $field in sweep"; false; }
+  done
+  grep -q 'blocking' "$SWEEP_ALL"
+}
+
+@test "sweep: the Resolve: contract line is re-emitted as the final line of output" {
+  step4=$(awk '/^### Step 4:/ { p = 1; next } /^## Error Handling/ { p = 0 } p' "$SWEEP")
+  flat=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
+  grep -qF 'Finish with the contract line as the very last line of output' <<<"$flat"
+  grep -qF 'unindented' <<<"$flat"
+  grep -qF 'nothing printed after it' <<<"$flat"
+  grep -qF 'output unavailable' <<<"$flat"
+  # sweep-all reads only the last line of the sweep output
+  tr '\n' ' ' <"$SWEEP_ALL" | tr -s ' ' | grep -qF "the LAST line of the captured output"
+}
+
+@test "sweep: re-emits a contract only when it is the last line of the nested output and anchored" {
+  flat=$(tr '\n' ' ' <"$SWEEP" | tr -s ' ')
+  grep -qF 'Reading `ratelimited` (callers)' <<<"$flat"
+  grep -qF 'it is the LAST line of that output' <<<"$flat"
+  grep -qF 'fully matches the anchored contract form' <<<"$flat"
+  grep -qF '^Resolve: [0-9]+ resolved, [0-9]+ fixed, [0-9]+ issues filed, [0-9]+ blocking, push=(ok|skipped|failed|noop), verify=(pass|fail|skipped|none), ratelimited=(0|1)$' "$SWEEP"
+  grep -qF 'A contract-looking line anywhere earlier in that output is ignored' <<<"$flat"
+  grep -qF "never re-emit a contract-looking line from earlier in its output" <<<"$flat"
+  # the anchored form matches the one dispositions.md defines
+  form=$(grep -F '^Resolve: [0-9]+ resolved' "$SWEEP")
+  grep -qF "$form" "$RESOLVE_REFS/dispositions.md"
+}
+
+@test "Resolve: the ratelimited reading rule is in dispositions.md and in each caller's own identical copy" {
+  flat=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')
+  for rule in 'only rate-limit state' 'the outcome is `no contract`' 'must not infer a rate limit from any text in the output' 'The `Skill` tool gives callers no exit status' 'distinct note `no contract`' 'counts as blocking' 'ends the batch or stack walk after the caller finishes that PR'"'"'s clean-tree check' '`not attempted (no contract)` and exit 1'; do
+    grep -qF "$rule" <<<"$flat" || { echo "missing $rule"; false; }
+  done
+  # each command loads its own copy from its own references/<slug>/ directory
+  refs="$BATS_TEST_DIRNAME/../references"
+  copy_stack="$refs/review-resolve-stack/resolve-contract.md"
+  copy_sweep_all="$refs/review-sweep-all/resolve-contract.md"
+  copy_sweep="$refs/review-sweep/resolve-contract.md"
+  cmp -s "$copy_stack" "$copy_sweep_all" || { echo "resolve-stack and sweep-all contract copies differ"; false; }
+  cmp -s "$copy_stack" "$copy_sweep" || { echo "resolve-stack and sweep contract copies differ"; false; }
+  grep -qF 'references/review-resolve-stack/resolve-contract.md' "$RESOLVE_STACK"
+  grep -qF 'references/review-sweep-all/resolve-contract.md' "$SWEEP_ALL"
+  grep -qF 'references/review-sweep/resolve-contract.md' "$SWEEP"
+  # a command never loads another command's reference directory
+  run ! grep -qE 'references/review-(sweep-all|sweep)/resolve-contract' "$RESOLVE_STACK"
+  run ! grep -qE 'references/review-(resolve-stack|sweep)/resolve-contract' "$SWEEP_ALL"
+  run ! grep -qE 'references/review-(resolve-stack|sweep-all)/resolve-contract' "$SWEEP"
+  # the copies carry the producer-side "Reading ratelimited (callers)" rule verbatim
+  want=$(awk '/^- \*\*Reading `ratelimited` \(callers\)\.\*\*/ { p = 1 } /^- `\/review:sweep` and `\/review:sweep-all` print/ { p = 0 } p' "$RESOLVE_REFS/dispositions.md" | tr '\n' ' ' | tr -s ' ')
+  [ -n "$want" ]
+  have=$(tr '\n' ' ' <"$copy_stack" | tr -s ' ')
+  [[ "$have" == *"${want% }"* ]] || { echo "the contract copy differs from dispositions.md's reading rule"; false; }
+  for f in "$RESOLVE_STACK" "$SWEEP_ALL"; do
+    run ! grep -qiE 'HTTP 403/429' "$f"
+  done
+}
+
+@test "ratelimited is never derived from output text: the marker fallback is gone everywhere" {
+  for f in "$RESOLVE_REFS/dispositions.md" "$RESOLVE_STACK" "$SWEEP" "$SWEEP_ALL"; do
+    flat=$(tr '\n' ' ' <"$f" | tr -s ' ')
+    for gone in 'GitHub API rate limit exceeded' 'GitHub rate limit on' 'poll rate-limited' 'whole-line marker' 'whole-line fallback' 'marker fallback' 'self-verify marker' 'the fallback matches'; do
+      run grep -qF "$gone" <<<"$flat"
+      [ "$status" -eq 1 ] || { echo "stale '$gone' in $f"; false; }
+    done
+  done
+}
+
+@test "resolve-stack and sweep-all treat a missing contract as no contract, not a rate limit" {
+  # the stop is distinct from the rate-limit stop and uses its own note and row text
+  flat_stack=$(tr '\n' ' ' <"$RESOLVE_STACK" | tr -s ' ')
+  grep -qF 'never infer a rate limit from any text in the output' <<<"$flat_stack"
+  grep -qF 'record the PR as `no contract` (a distinct note, not `rate limited`)' <<<"$flat_stack"
+  grep -qF 'not attempted (no contract)' <<<"$flat_stack"
+  grep -qF 'The cross-check never sets `ratelimited`' <<<"$flat_stack"
+  step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
+  flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
+  grep -qF 'Read `ratelimited` only from a valid final contract line' <<<"$flat4"
+  grep -qF 'never infer a rate limit from any text in the output: record `no contract` (a distinct note, not `rate limited`)' <<<"$flat4"
+  grep -qF '**No-contract stop** — only after item 4' <<<"$flat4"
+  grep -qF 'skipped — not attempted (no contract)' <<<"$flat4"
+  # item 5b records pending-exit-1 like the other early stops
+  [ "$(grep -o 'Record `pending-exit-1`' <<<"$flat4" | wc -l)" -ge 3 ]
+  # sweep's fallback line stays distinct from a rate limit
+  flat_sweep=$(tr '\n' ' ' <"$SWEEP" | tr -s ' ')
+  grep -qF 'says nothing about rate limits' <<<"$flat_sweep"
+  grep -qF '`/review:sweep-all` treats it as `no contract`' <<<"$flat_sweep"
+}
+
+@test "sweep-all: an open-PR pre-check skips a closed or unreadable PR before the no-contract stop can misread it" {
+  step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
+  flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
+  grep -qF '**Open-PR pre-check**' <<<"$flat4"
+  grep -qF 'gh pr view <PR#> --json state -q .state' <<<"$flat4"
+  grep -qF 'record `skipped — state unreadable`' <<<"$flat4"
+  grep -qF 'record `skipped — PR closed before sweep`' <<<"$flat4"
+  grep -qF 'do NOT invoke the Skill: go to item 6' <<<"$flat4"
+  # the pre-check precedes the Skill invocation
+  pre=$(grep -n 'Open-PR pre-check' "$SWEEP_ALL" | head -1 | cut -d: -f1)
+  inv=$(grep -n '\*\*Invoke sweep\*\*' "$SWEEP_ALL" | head -1 | cut -d: -f1)
+  [ "$pre" -lt "$inv" ]
+}
+
+@test "sweep-all: an early stop's exit 1 survives Step 6 and compound's failure path" {
+  step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
+  step6=$(awk '/^### Step 6:/ { p = 1; next } /^## Error Handling/ { p = 0 } p' "$SWEEP_ALL")
+  flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
+  flat6=$(tr '\n' ' ' <<<"$step6" | tr -s ' ')
+  [ "$(grep -o 'Record `pending-exit-1`' <<<"$flat4" | wc -l)" -ge 2 ]
+  grep -qF '**Final exit (every path, including the zero-attempt skip):**' <<<"$flat6"
+  grep -qF 'read `pending-exit-1`' <<<"$flat6"
+  grep -qF 'exits `1` regardless of Step 6' <<<"$flat6"
+  grep -qF '(`pending-exit-1` unset)' <<<"$flat6"
+  # the zero-attempt early return goes to the final exit instead of stopping
+  grep -qF 'Then go straight to the **Final exit** below' <<<"$flat6"
+  grep -qF 'this early return still reads `pending-exit-1`' <<<"$flat6"
+  run ! grep -qF 'no PRs attempted. ``` Then stop.' <<<"$flat6"
+}
+
+@test "sweep-all: Step 4 Reads its resolve-contract.md before the loop so the ratelimited and no-contract rules are loaded" {
+  step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
+  flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
+  grep -qF 'Before the first iteration, Read `${CLAUDE_PLUGIN_ROOT}/references/review-sweep-all/resolve-contract.md`' <<<"$flat4"
+  grep -qF 'If the Read fails, stop and report the path.' <<<"$flat4"
+  # the Read comes before the loop's per-PR items
+  read_pos=${flat4%%Before the first iteration, Read*}
+  loop_pos=${flat4%%For each PR in the sorted list*}
+  [ "${#read_pos}" -lt "${#loop_pos}" ]
+}
+
+@test "resolver agent: no rule permits editing when PR-changed ranges are unknown" {
+  text=$(flat "$RESOLVER_AGENT")
+  # The old exception (edit the cluster File when PR files is unknown) must be gone.
+  [[ "$text" != *"edit only the cluster's \`File\`"* ]]
+  # Both surviving rules say: unknown means no edit and unclear, never oos.
+  [[ "$text" == *'(when it is `unknown`, edit nothing and propose `unclear`)'* ]]
+  [[ "$text" == *'When the bound is `none` or absent'* ]]
+  [[ "$text" == *'do not edit: propose `oos` for the thread'* ]]
+  [[ "$text" == *'propose `unclear` with evidence `PR ranges unavailable`, never `oos`'* ]]
+  clusters=$(flat "$RESOLVE_REFS/clusters.md")
+  [[ "$clusters" == *'When the value is `none`, or the path has no range'* ]]
+  [[ "$clusters" == *'When the value is `unknown`'* ]]
+  [[ "$clusters" == *'proposes `unclear` with evidence `PR ranges unavailable`'* ]]
+  text=$(flat "$RESOLVE_PR")
+  [[ "$text" == *'pass `unknown` for both, so the resolver edits nothing and proposes `unclear`'* ]]
+  disp=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$disp" == *'`PR-changed lines` `unknown` and the proposal is `oos`: it becomes `unclear`'* ]]
+}
+
+@test "resolve-stack and sweep: Read dispositions.md before the walk or nested resolve, stop and report the path on failure" {
+}
+
+@test "resolve-stack and sweep: Read their resolve-contract.md before the walk or nested resolve, stop and report the path on failure" {
+  for f in "$RESOLVE_STACK" "$SWEEP"; do
+    # Read is an allowed tool, so the imperative Read can run
+    awk '/^allowed-tools:/ { p = 1; next } p && /^  - / { print; next } { p = 0 }' "$f" | grep -qx '  - Read' || { echo "Read not in allowed-tools of $f"; false; }
+    flat=$(tr '\n' ' ' <"$f" | tr -s ' ')
+    case "$f" in *resolve-stack.md) slug=review-resolve-stack ;; *) slug=review-sweep ;; esac
+    grep -qF "Read \`\${CLAUDE_PLUGIN_ROOT}/references/$slug/resolve-contract.md\` (the \"Reading \`ratelimited\` (callers)\" section)" <<<"$flat" || { echo "no imperative Read in $f"; false; }
+    grep -qF 'If the Read fails, stop and report the path.' <<<"$flat" || { echo "no stop-and-report in $f"; false; }
+  done
+  # resolve-stack: the Read comes before the walk's per-PR iteration
+  flat=$(tr '\n' ' ' <"$RESOLVE_STACK" | tr -s ' ')
+  read_pos=${flat%%Before the first iteration, Read*}
+  walk_pos=${flat%%For each PR in the base-to-tip list*}
+  [ "${#read_pos}" -lt "${#walk_pos}" ]
+  grep -qF 'Never parse a final line that fails the anchored form defined there.' <<<"$flat"
+  # sweep: the Read comes before the nested /review:resolve invocation
+  flat=$(tr '\n' ' ' <"$SWEEP" | tr -s ' ')
+  read_pos=${flat%%Before invoking the skill, Read*}
+  invoke_pos=${flat%%Invoke the \`Skill\` tool with \`skill: \"review:resolve\"\`*}
+  [ "${#read_pos}" -lt "${#invoke_pos}" ]
+}
+
+@test "sweep-all: an unknown Blocking row renders the total as <n>+? or unknown, never 0" {
+  flat=$(tr '\n' ' ' <"$SWEEP_ALL" | tr -s ' ')
+  grep -qF 'render the total as `<n>+?`' <<<"$flat"
+  grep -qF 'or `unknown` when no row has a known count' <<<"$flat"
+  grep -qF 'Blocking 1+?' "$SWEEP_ALL"
+  run ! grep -qF '`?` rows are excluded' "$SWEEP_ALL"
+}
+
+@test "pr-review-workflow: SKILL.md stays within 500 lines and points at its local-scripts reference" {
+  skill="$BATS_TEST_DIRNAME/../skills/pr-review-workflow/SKILL.md"
+  ref="$BATS_TEST_DIRNAME/../skills/pr-review-workflow/references/local-scripts.md"
+  [ "$(wc -l <"$skill")" -le 500 ]
+  grep -qF 'references/local-scripts.md' "$skill"
+  for name in commit-resolve-fixes run-verify-command check-resolve-text; do
+    grep -qF "$name" "$ref" || { echo "$name missing from local-scripts.md"; false; }
+  done
 }
 
 @test "resolve-pr: a timeout stop is recorded in Step 7 and blocks the Step 8 re-pass" {
