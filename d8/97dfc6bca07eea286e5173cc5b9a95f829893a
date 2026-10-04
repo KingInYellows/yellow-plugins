@@ -1,0 +1,63 @@
+plugins/yellow-council/README.md
+  s_092275c4e6a6a0::t_858119e94f6e9a 154-156
+plugins/yellow-council/commands/council/council.md
+  s_092275c4e6a6a0::t_056756ce57f1ac 570
+  s_092275c4e6a6a0::t_a6684847d2d92b 569,598,1263,1316
+  s_092275c4e6a6a0::t_d0196df9dd9f4c 84-163,249-250,266-269,275-279,565-568,571-574,580,586-588,1134,1241-1246,1256,2005-2007,2461-2462,2474,3701,3704,3730
+  s_092275c4e6a6a0::t_9813640af44726 1317
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_092275c4e6a6a0::t_858119e94f6e9a 145-151,1038-1039
+docs/security.md
+  s_092275c4e6a6a0::t_858119e94f6e9a 627-648
+docs/solutions/integration-issues/opencode-cli-listing-rewrites-user-config-in-place.md
+  s_092275c4e6a6a0::t_858119e94f6e9a 35-41
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_092275c4e6a6a0::t_ecbfec1eea836f 66,70-72,192,197,217-218,340,347-348,351,359-360,362
+plugins/yellow-council/agents/review/claude-reviewer.md
+  s_092275c4e6a6a0::t_ecbfec1eea836f 369-370
+plugins/yellow-council/tests/synthesis.bats
+  s_092275c4e6a6a0::t_090f41f75a668b 1163-1191
+plugins/yellow-council/commands/council/setup.md
+  s_092275c4e6a6a0::t_ecbfec1eea836f 129-132,213,217-218
+docs/solutions/code-quality/unhandled-outcome-defaults-to-success-bucket.md
+  s_092275c4e6a6a0::t_858119e94f6e9a 417-420
+.changeset/council-quota-and-opencode-routing.md
+  s_092275c4e6a6a0::t_858119e94f6e9a 23-24,36-40
+docs/testing/yellow-council-manual-tests.md
+  s_092275c4e6a6a0::t_858119e94f6e9a 245-247,256-261,265,285
+plans/yellow-council-v2-four-cli-04-quota-and-opencode-routing.md
+  s_092275c4e6a6a0::t_858119e94f6e9a 345-366
+plugins/yellow-council/CLAUDE.md
+  s_092275c4e6a6a0::t_858119e94f6e9a 32-33,210,233-239,245-252
+plugins/yellow-council/tests/lib/extract-synthesis-lib.bash
+  s_092275c4e6a6a0::t_463205b0312ca3 24
+  s_092275c4e6a6a0::t_858119e94f6e9a 2-5
+plugins/yellow-council/skills/council-patterns/references/cross-references.md
+  s_092275c4e6a6a0::t_858119e94f6e9a 24-26
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_092275c4e6a6a0::t_ecbfec1eea836f 66-67,76-77
+plugins/yellow-review/tests/skill-content.bats
+  s_092275c4e6a6a0::t_090f41f75a668b 398-406
+docs/spikes/opencode-cli-format-json-2026-05-04.md
+  s_092275c4e6a6a0::t_858119e94f6e9a 151-152
+plugins/yellow-council/tests/quota-lineage.bats
+  s_092275c4e6a6a0::t_090f41f75a668b 327,379,383,447-451,456,460-461,467-468,472-526,528-591,619-620
+  s_092275c4e6a6a0::t_d76926f8632aee 527
+  s_092275c4e6a6a0::t_463205b0312ca3 7,40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d897dfc6bca07eea286e5173cc5b9a95f829893a",
+  "prompts": {},
+  "sessions": {
+    "s_092275c4e6a6a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "53398599-95a5-4127-ba6b-f2642ceba186",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
