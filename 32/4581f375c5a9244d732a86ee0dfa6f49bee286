@@ -1,0 +1,46 @@
+docs/solutions/integration-issues/opencode-cli-listing-rewrites-user-config-in-place.md
+  s_815e61b370a533::t_6488255e20653d 1-32,41-50
+  s_815e61b370a533::t_d1a09e6e31ed0e 33-40
+docs/CONCEPTS.md
+  s_815e61b370a533::t_e76260c8f12bbe 62-65,96-112
+docs/solutions/code-quality/unhandled-outcome-defaults-to-success-bucket.md
+  s_815e61b370a533::t_6488255e20653d 412-472
+plans/yellow-council-v2-four-cli-04-quota-and-opencode-routing.md
+  s_815e61b370a533::t_8b08606795ebb5 312-313
+  s_815e61b370a533::t_1a1c36a1b4d37a 214,232-243,270-274,276-282,292-296,303,316,323,325-328,334,338-339,341
+  s_092275c4e6a6a0::t_3d7176ecce7371 152,163
+  s_092275c4e6a6a0::t_c63dda8652c427 197
+  s_815e61b370a533::t_94d3f96583b29f 1-31,34,42-151,153-162,164-171,173-176,178-183,185-192,194-196,198-200,202-213,216-222,258-266,268-269,283-291,297-302,304-311,314-315,317-322,329-333,335-337,342-360,366-384,387-393
+  s_815e61b370a533::t_eae98738012304 35-41,361-364,385-386
+  s_092275c4e6a6a0::t_9e2070f932fefd 172,177
+  s_092275c4e6a6a0::t_83e4471d453497 184
+  s_815e61b370a533::t_d1a09e6e31ed0e 32-33,215,223-227,267,275,324,340,365
+  s_092275c4e6a6a0::t_dd1b3a260cf9a7 193
+  s_815e61b370a533::t_9f12bbdbf24b20 228-231
+  s_815e61b370a533::t_31ac5fe80b8a02 244-257
+  s_092275c4e6a6a0::t_589c897d8ec834 201
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "324581f375c5a9244d732a86ee0dfa6f49bee286",
+  "prompts": {},
+  "sessions": {
+    "s_092275c4e6a6a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "53398599-95a5-4127-ba6b-f2642ceba186",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_815e61b370a533": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cae1c6fe-f8f2-471f-9d60-d5e760653cbf",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
