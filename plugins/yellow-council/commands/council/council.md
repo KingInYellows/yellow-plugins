@@ -239,6 +239,7 @@ case "$MODE" in
     printf '  --single-pass (any mode) skips the order-swapped second synthesis pass\n\n'
     printf 'Configuration env vars (see plugin CLAUDE.md):\n'
     printf '  COUNCIL_TIMEOUT (default 600), COUNCIL_OPENCODE_VARIANT (high),\n'
+    printf '  COUNCIL_OPENCODE_MODEL (openrouter/deepseek/deepseek-v4-pro; "" = no --model),\n'
     printf '  COUNCIL_PATH_CHAR_CAP (8000), COUNCIL_PATH_MAX_FILES (3),\n'
     printf '  COUNCIL_DOUBLE_PASS_SYNTHESIS (1)\n'
     exit 0
@@ -534,9 +535,9 @@ declare -A REVIEWER_VERDICTS REVIEWER_CONFIDENCES REVIEWER_SUMMARIES \
 council_quota_eta() {
   local flat eta
   flat=$(printf '%s' "${1:-}" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
-  eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Rr]esets? +([^.;|]{1,60}).*/resets \1/p' | head -n 1)
-  [ -n "$eta" ] || eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Tt]ry again in +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
-  [ -n "$eta" ] || eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Rr]etry[- ]after +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
+  eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Ss][Ee][Tt][Ss]? +([^.;|]{1,60}).*/resets \1/p' | head -n 1)
+  [ -n "$eta" ] || eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
+  [ -n "$eta" ] || eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
   eta=$(printf '%s' "$eta" | LC_ALL=C sed -E 's/[[:space:]]+$//' | head -c 200)
   [ -n "$eta" ] || eta="reset time not reported"
   printf '%s\n' "$eta"
@@ -1953,20 +1954,16 @@ while IFS=: read -r label r; do
   why=""
   detail=""
   excluded=0
+  # A QUOTA_EXHAUSTED stub (R18) reports /dev/null, which fails the path checks
+  # below. That is harmless only because an excluded slot's `why` is cleared
+  # before it is reported: its ETA comes from the staged summary line.
   case "$verdict" in TIMEOUT|ERROR|UNAVAILABLE|QUOTA_EXHAUSTED) excluded=1 ;; esac
-  # A QUOTA_EXHAUSTED stub (R18) reports /dev/null: no fenced file exists by
-  # design, so skip the path checks and the read rather than log a refusal.
-  # Only that verdict earns the exemption.
-  quota_stub=0
-  if [ "$verdict" = "QUOTA_EXHAUSTED" ] && [ "$fp" = "/dev/null" ]; then quota_stub=1; fi
   # The reviewer's own fenced file, after the same checks Step 7 applies
   # before reading it: exact identity for the path this run minted,
   # per-reviewer /tmp shape for the rest, and never a symlink. An excluded
   # slot runs the same checks but keeps only its Summary line (its status
   # detail); it contributes no findings and a failed check is not a warning.
-  if [ "$quota_stub" -eq 1 ]; then
-    fence_label="council-output:${r}"
-  elif [ "$r" = "claude" ]; then
+  if [ "$r" = "claude" ]; then
     [ "$fp" = "$CLAUDE_FENCED" ] || why="reported path is not the one this run minted"
     fence_label="council-output:claude"
   else
@@ -1978,10 +1975,10 @@ while IFS=: read -r label r; do
     fence_label="council-output:${r}"
     [ "$r" = "codex" ] && fence_label="codex-output"
   fi
-  if [ "$quota_stub" -eq 0 ] && [ -z "$why" ] && { [ -z "$fp" ] || [ ! -f "$fp" ] || [ -L "$fp" ]; }; then
+  if [ -z "$why" ] && { [ -z "$fp" ] || [ ! -f "$fp" ] || [ -L "$fp" ]; }; then
     why="fenced output file missing or not a regular file"
   fi
-  if [ "$quota_stub" -eq 0 ] && [ -z "$why" ]; then
+  if [ -z "$why" ]; then
     text=$(council_extract_fenced "$fp" "$fence_label") || why="could not read the fenced output"
   fi
   if [ "$excluded" -eq 1 ]; then
@@ -3682,6 +3679,7 @@ This is the final output of the command. Exit 0.
 |-----|---------|---------|
 | `COUNCIL_TIMEOUT` | 600 | Per-reviewer timeout in seconds. Applies to the three CLI reviewers only — the in-process claude-reviewer spawns no subprocess and has nothing to bound with `timeout(1)` |
 | `COUNCIL_OPENCODE_VARIANT` | high | OpenCode reasoning effort (high/max/minimal) |
+| `COUNCIL_OPENCODE_MODEL` | `openrouter/deepseek/deepseek-v4-pro` | OpenCode model, by presence: **unset** uses the default (needs OpenRouter auth: `opencode auth login --provider openrouter`); **set but empty** (`export COUNCIL_OPENCODE_MODEL=""`) passes no `--model` (V1 behaviour); **non-empty** is passed verbatim, e.g. `opencode/deepseek-v4-pro` (OpenCode Zen). An unlisted model or unauthenticated provider returns `UNAVAILABLE` with the fix named |
 | `COUNCIL_PATH_CHAR_CAP` | 8000 | Per-file content cap for `--paths` |
 | `COUNCIL_PATH_MAX_FILES` | 3 | Max `--paths` files per invocation |
 | `COUNCIL_DOUBLE_PASS_SYNTHESIS` | 1 | `1` runs the order-swapped Pass B and reports low-confidence ties; `0` runs Pass A only. Other values warn and keep `1`. `--single-pass` disables it per invocation |

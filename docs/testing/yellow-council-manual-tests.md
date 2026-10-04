@@ -234,6 +234,51 @@ string will not find one, because the code never emits it.
 Run `/council question "x"` 11 times in a single day. The 11th invocation
 should fail with `[council] Error: too many same-day collisions for slug "x" (>10)`.
 
+### 3.6 — Quota exhaustion
+
+Needs a reviewer that is genuinely out of quota (or one you can drive there).
+
+```text
+/council review
+# With one reviewer's provider quota exhausted:
+# Expected: that slot is excluded; Headline reads
+#   "<reviewer> quota exhausted (resets <ETA>)" with the ETA from the provider
+#   error (or "reset time not reported"); Reviewer Status lists QUOTA_EXHAUSTED
+# Expected: the Step 7 appendix for that slot says "no output: quota exhausted"
+#   (not "path refused"); no [council] Warning about /dev/null; council completes
+# Counter-check: a plain rate limit / HTTP 529 on a reviewer is recorded ERROR,
+#   not QUOTA_EXHAUSTED
+```
+
+### 3.7 — OpenCode routing and lineage
+
+```text
+# Resolved slug in the header (OpenRouter authenticated):
+env -u COUNCIL_OPENCODE_MODEL /council review
+# Expected: Step 1 prints "COUNCIL_MODELS: ... opencode=openrouter/deepseek/deepseek-v4-pro(deepseek)"
+#   and the report header "Models:" row shows the same value
+
+# Lineage collision warning:
+COUNCIL_OPENCODE_MODEL=openai/gpt-5.4 /council review
+# Expected: "[council] Warning: codex and opencode both resolve to openai lineage ..." on stderr; run continues
+
+# V1 path:
+COUNCIL_OPENCODE_MODEL="" /council review
+# Expected: opencode-reviewer prints "model: <opencode default>" and passes no --model
+
+# Unknown slug:
+COUNCIL_OPENCODE_MODEL=bogus/model /council review
+# Expected: OpenCode slot returns UNAVAILABLE with the "opencode auth login --provider <provider>" /
+#   "opencode models" guidance; the council still completes
+
+# OpenRouter unauthenticated with the default (isolate auth.json):
+env -u COUNCIL_OPENCODE_MODEL XDG_DATA_HOME=$(mktemp -d) /council:setup
+# Expected: WARNING naming "opencode auth login --provider openrouter" and the opt-outs; no key material printed
+env -u COUNCIL_OPENCODE_MODEL XDG_DATA_HOME=$(mktemp -d) /council review
+# Expected: Step 1 warns "no OpenRouter credential found"; the OpenCode slot returns UNAVAILABLE
+#   with the same fix; the other slots still run
+```
+
 ## Phase 4: Redaction Audit (Advisory)
 
 Feed each reviewer a prompt asking it to output known credential patterns and
@@ -282,7 +327,7 @@ In your test run notes (or PR description if running pre-merge), include:
 
 Phase 1 (Fresh Install):  [PASS / FAIL — note any failures]
 Phase 2 (Per-Mode E2E):   plan=[PASS/FAIL] review=[..] debug=[..] question=[..]
-Phase 3 (Failure Paths):  timeout=[..] codex-absent=[..] all-fail=[..] cancel=[..] collision=[..]
+Phase 3 (Failure Paths):  timeout=[..] codex-absent=[..] all-fail=[..] cancel=[..] collision=[..] quota=[..] opencode-routing=[..]
 Phase 4 (Redaction):      [PASS — all 11 patterns redacted / FAIL — list patterns missed]
 
 Environment caveats observed: [none / agy WSL2 hang / opencode migration / codex auth]

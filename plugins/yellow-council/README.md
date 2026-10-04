@@ -123,11 +123,42 @@ The user is asked for confirmation before the report file is written.
 > change. The ceiling is not arbitrary: OpenCode rejects any pack over 120000
 > bytes outright and would otherwise return `UNAVAILABLE` for the whole slot.
 
+## Reviewer lineages
+
+| Slot | Runs | Lineage |
+|---|---|---|
+| Claude | in-process reviewer | Anthropic |
+| Codex | `codex` via yellow-codex | OpenAI |
+| Gemini | Antigravity CLI (`agy`) | Google |
+| OpenCode | `opencode`, DeepSeek V4 Pro via OpenRouter by default | DeepSeek (a lineage outside the big three) |
+
+`/council` resolves each slot's model before it fans out, prints a
+`COUNCIL_MODELS:` line, shows the resolved models in the report header, and warns
+(without blocking) when two slots share a lineage, for example
+`COUNCIL_OPENCODE_MODEL=openai/gpt-5.4` alongside Codex. Lineage detection is
+best-effort: codex's model may be unreadable, and `agy` has no model field.
+
+A reviewer whose provider reports quota or credit exhaustion returns
+`QUOTA_EXHAUSTED`: it is left out of the synthesis like an unavailable reviewer
+and the headline names the reset time. Detection matches provider error text, so
+Gemini is covered by the `RESOURCE_EXHAUSTED` signal only; a transient rate limit
+stays an ordinary error.
+
+> **Upgrading: the OpenCode default now needs OpenRouter auth.** With
+> `COUNCIL_OPENCODE_MODEL` unset, the OpenCode slot routes to
+> `openrouter/deepseek/deepseek-v4-pro`. Without an OpenRouter credential it
+> returns `UNAVAILABLE` where V1 ran. Authenticate with
+> `opencode auth login --provider openrouter` (or export `OPENROUTER_API_KEY`),
+> set `COUNCIL_OPENCODE_MODEL=""` to keep V1 behaviour, or use
+> `COUNCIL_OPENCODE_MODEL=opencode/deepseek-v4-pro` for OpenCode Zen.
+> `/council:setup` checks the credential and warns when it is missing.
+
 ## Configuration
 
 | Var | Default | Purpose |
 |---|---|---|
 | `COUNCIL_TIMEOUT` | `600` | Timeout in seconds for the three CLI reviewers. The in-process Claude reviewer spawns no subprocess and is not bounded by it |
+| `COUNCIL_OPENCODE_MODEL` | `openrouter/deepseek/deepseek-v4-pro` | OpenCode model. Unset uses the default (needs OpenRouter auth); set but empty (`export COUNCIL_OPENCODE_MODEL=""`) passes no `--model`, the V1 behaviour; a non-empty value is passed verbatim, e.g. `opencode/deepseek-v4-pro` (OpenCode Zen) |
 | `COUNCIL_OPENCODE_VARIANT` | `high` | OpenCode reasoning effort |
 | `COUNCIL_PATH_CHAR_CAP` | `8000` | Per-file content cap for `--paths` |
 | `COUNCIL_PATH_MAX_FILES` | `3` | Max `--paths` files per invocation |

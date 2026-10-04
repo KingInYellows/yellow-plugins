@@ -308,9 +308,9 @@ case $CLI_EXIT in
       # recorded as QUOTA_EXHAUSTED, not a transient ERROR. The ETA extraction
       # mirrors council.md's council_quota_eta (this agent cannot source
       # council.md); credit exhaustion usually reports none.
-      QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C sed -nE 's/.*[Rr]esets? +([^.;|]{1,60}).*/resets \1/p' | head -n 1)
-      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C sed -nE 's/.*[Tt]ry again in +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
-      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C sed -nE 's/.*[Rr]etry[- ]after +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
+      QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Ss][Ee][Tt][Ss]? +([^.;|]{1,60}).*/resets \1/p' | head -n 1)
+      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C sed -nE 's/.*[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
+      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
       QUOTA_ETA=$(printf '%s' "$QUOTA_ETA" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_-' | sed -E 's/[[:space:]]+$//' | head -c 200)
       [ -n "$QUOTA_ETA" ] || QUOTA_ETA="reset time not reported"
       printf '[opencode-reviewer] Quota exhausted (%s) — returning QUOTA_EXHAUSTED\n' "$QUOTA_ETA" >&2

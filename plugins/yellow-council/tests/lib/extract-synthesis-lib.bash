@@ -15,9 +15,14 @@
 SYNTH_LIB_OPEN='# >>> council-synthesis-lib'
 SYNTH_LIB_CLOSE='# <<< council-synthesis-lib'
 
-extract_synthesis_lib() {
-  local src="$1" out="$2"
-  awk -v opener="$SYNTH_LIB_OPEN" -v closer="$SYNTH_LIB_CLOSE" '
+# extract_marked_lib <file> <outfile> <marker-name> — the same extraction for
+# any `# >>> <marker-name>` / `# <<< <marker-name>` pair. council.md carries
+# three: council-synthesis-lib (Step 5b), council-quota-lib (Step 4) and
+# council-lineage-lib (Step 1). Marker names are compared as whole-line
+# prefixes, so one name must not be a prefix of another.
+extract_marked_lib() {
+  local src="$1" out="$2" name="$3"
+  awk -v opener="# >>> ${name}" -v closer="# <<< ${name}" -v fn="extract_marked_lib(${name})" '
     index($0, opener) == 1 {
       if (opens++ || inside) { err = "more than one opening marker (line " NR ")"; exit 1 }
       inside = 1; next
@@ -30,9 +35,13 @@ extract_synthesis_lib() {
     END {
       if (err == "" && opens == 0) err = "no opening marker"
       if (err == "" && inside) err = "no closing marker"
-      if (err != "") { print "extract_synthesis_lib: " FILENAME ": " err > "/dev/stderr"; exit 1 }
+      if (err != "") { print fn ": " FILENAME ": " err > "/dev/stderr"; exit 1 }
     }
   ' "$src" >| "$out"
+}
+
+extract_synthesis_lib() {
+  extract_marked_lib "$1" "$2" council-synthesis-lib
 }
 
 # extract_fence_after <file> <heading-prefix> <outfile> — write the body of the

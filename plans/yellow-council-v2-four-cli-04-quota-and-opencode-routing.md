@@ -300,7 +300,7 @@ and `## Gotchas to Watch For` (`:120`); error-event table `:44-50`.
 
 ### Phase C — Tests, docs, ship (R26–R30 slices)
 
-- [ ] Step 15: Add `extract_quota_lib` (or generalize `extract_synthesis_lib`
+- [x] Step 15: Add `extract_quota_lib` (or generalize `extract_synthesis_lib`
   to take a marker name) in `plugins/yellow-council/tests/lib/extract-synthesis-lib.bash`,
   and a new `plugins/yellow-council/tests/quota-lineage.bats` using the
   `run_in` profiles: claude quota strings match (session / weekly / Opus /
@@ -313,7 +313,7 @@ and `## Gotchas to Watch For` (`:120`); error-event table `:44-50`.
   `setup.md`. Add a
   `QUOTA_EXHAUSTED` excluded-slot fixture to `synthesis.bats` following
   `:1301`/`:1310`.
-- [ ] Step 16: Docs — `COUNCIL_OPENCODE_MODEL` row (three states, default
+- [x] Step 16: Docs — `COUNCIL_OPENCODE_MODEL` row (three states, default
   slug, Zen alternative) in `plugins/yellow-council/CLAUDE.md:188-196`,
   `README.md:126-134`, `council.md:3458-3466`, and help text
   `council.md:123-126`; update the CLAUDE.md opencode-reviewer entry
@@ -325,20 +325,20 @@ and `## Gotchas to Watch For` (`:120`); error-event table `:44-50`.
   without it the OpenCode slot returns `UNAVAILABLE` where V1 ran, so set
   `COUNCIL_OPENCODE_MODEL=""` to keep V1 or `opencode/deepseek-v4-pro` for
   Zen.
-- [ ] Step 17: `plugins/yellow-council/skills/council-patterns/SKILL.md`
+- [x] Step 17: `plugins/yellow-council/skills/council-patterns/SKILL.md`
   lockstep: opencode invocation block (`:1000-1008`) with `--model`, the
   exit-code / verdict table (`:618-621`), claude-slot degradation prose
   (`:934-936`), and the Reviewer Output Schema (`:85-143`) gain
   `QUOTA_EXHAUSTED`. Update `plugins/yellow-codex/skills/codex-patterns/SKILL.md`
   near `:198` for the codex quota arm.
-- [ ] Step 18: `docs/testing/yellow-council-manual-tests.md`: add R29
+- [x] Step 18: `docs/testing/yellow-council-manual-tests.md`: add R29
   scenarios — one reviewer `QUOTA_EXHAUSTED` with ETA matching the provider
   error; lineage-collision warning (e.g. `COUNCIL_OPENCODE_MODEL=openai/gpt-5.4`);
   OpenCode resolved slug in the report header; `COUNCIL_OPENCODE_MODEL=""`
   V1 path; unknown slug → actionable `UNAVAILABLE`; OpenRouter
   unauthenticated with the default → `/council:setup` warns and the slot
   returns `UNAVAILABLE` with the `opencode auth login --provider openrouter` fix.
-- [ ] Step 19: Changesets — `yellow-council` minor, `yellow-codex` minor
+- [x] Step 19: Changesets — `yellow-council` minor, `yellow-codex` minor
   (additive verdict), `yellow-review` patch; CHANGELOG entries come from
   `pnpm apply:changesets`. Run the verification gate below.
 

@@ -131,6 +131,22 @@ capitalized keys, and an in-process reviewer that obeys that block instead of
 the Layer-2 contract returns nothing `parse_reviewer_return` can match — its
 slot is then silently recorded as `ERROR` on every run.
 
+**Quota exhaustion (`QUOTA_EXHAUSTED`).** The Layer-2 verdict enum is
+`APPROVE | REVISE | REJECT | UNKNOWN | TIMEOUT | ERROR | UNAVAILABLE | QUOTA_EXHAUSTED`.
+When a provider reports quota or credit exhaustion (not a transient rate limit
+or HTTP 529), the reviewer returns the full 6-key block with
+`verdict=QUOTA_EXHAUSTED`, `confidence=N/A`, the parsed reset ETA in `summary=`
+(`resets <time>`, `resets in <duration>`, or `reset time not reported`),
+`fenced_output_path=/dev/null` and an empty findings pair, so
+`parse_reviewer_return` needs no special case. It is excluded from synthesis
+like `UNAVAILABLE`, and `/dev/null` is accepted only under this verdict.
+Match sets: codex `insufficient_quota` / `model_cap_exceeded`; gemini
+`RESOURCE_EXHAUSTED` (floor only); opencode provider passthrough (`insufficient_quota`,
+`model_cap_exceeded`, `RESOURCE_EXHAUSTED`, `usage limit`, HTTP 402 "requires more
+credits"); claude `session limit`, `weekly limit` or `Opus limit` followed by
+`resets`, or `usage limit reached` followed by `try again`, matched by
+`council.md` against a failed claude spawn.
+
 If the CLI output's `Verdict:` line is absent, the reviewer agent must:
 
 1. Set `VERDICT=UNKNOWN`, `CONFIDENCE=LOW`
@@ -614,7 +630,7 @@ Exit code handling:
 | Exit | Meaning | Action |
 |------|---------|--------|
 | 0 | Success | Parse output normally |
-| 1–123 | CLI's own error | Grep stderr for keywords (`auth`, `rate limit`, `invalid`) and surface in synthesis |
+| 1–123 | CLI's own error | Grep stderr for keywords (`auth`, `rate limit`, `invalid`) and surface in synthesis. A provider quota signal (`RESOURCE_EXHAUSTED`, `insufficient_quota`, HTTP 402) is `QUOTA_EXHAUSTED`, checked before the rate-limit keyword; opencode `ProviderModelNotFoundError` or HTTP 401/403 is `UNAVAILABLE` naming the fix |
 | 124 | timeout SIGTERM (time limit hit) | Mark TIMEOUT; exclude from synthesis Headline; surface in partial-result note |
 | 137 | timeout SIGKILL (escalation after `--kill-after=10`) | Same as 124 |
 | 125 | timeout utility failed | Surface as ERROR with full stderr |
@@ -933,7 +949,9 @@ background, deliberately kept out of the preload budget.
   redaction block, the `sed` delimiter escape — is N/A here.
 - `COUNCIL_TIMEOUT` does not apply: there is no subprocess to bound. The only
   degradation verdicts it can emit are `UNKNOWN` and `ERROR`; `TIMEOUT` and
-  `UNAVAILABLE` describe external-CLI failure modes.
+  `UNAVAILABLE` describe external-CLI failure modes. It never emits
+  `QUOTA_EXHAUSTED` either: a quota wall stops the agent before it can return,
+  so `council.md` classifies the failed spawn and synthesizes that block.
 - `Write` is granted for exactly one file: the fenced-output path `council.md`
   mints with `mktemp -u` and passes in the spawn prompt. Rationale:
   `docs/solutions/code-quality/bash-less-agent-write-tool-temp-path-minting.md`.
@@ -1008,11 +1026,15 @@ timeout --signal=TERM --kill-after=10 "$CT" \
 
 **OpenCode** (direct bash):
 ```bash
+# Argv is built with `set --` (same list in bash and zsh). The model is resolved
+# by PRESENCE: unset -> default slug, set-but-empty -> no --model (V1),
+# non-empty -> verbatim.
+set -- --format json --variant "${COUNCIL_OPENCODE_VARIANT:-high}" --print-logs --log-level ERROR
+if [ -z "${COUNCIL_OPENCODE_MODEL+x}" ]; then OC_MODEL="openrouter/deepseek/deepseek-v4-pro"
+else OC_MODEL="$COUNCIL_OPENCODE_MODEL"; fi
+[ -z "$OC_MODEL" ] || set -- "$@" --model "$OC_MODEL"
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
-  opencode run \
-    --format json \
-    --variant "${COUNCIL_OPENCODE_VARIANT:-high}" \
-    "<full-pack-prompt>" \
+  opencode run "$@" "<full-pack-prompt>" \
   >| "$OUTPUT_FILE" 2>| "$STDERR_FILE"
 CLI_EXIT=$?
 SESSION_ID=$(jq -r 'select(.part.snapshot.sessionID != null) | .part.snapshot.sessionID' "$OUTPUT_FILE" 2>/dev/null | head -1)
@@ -1024,6 +1046,10 @@ fi
 ```
 - `--format json`: structured event stream
 - `--variant high`: default reasoning effort (`max` is significantly slower; reserve)
+- `--model`: from `COUNCIL_OPENCODE_MODEL` (see above); the default needs OpenRouter auth
+- `--print-logs --log-level ERROR`: on opencode 1.18 a missing model or an
+  unauthenticated provider is an opaque `UnknownError` event; stderr carries
+  `ProviderModelNotFoundError`
 - Apply redaction to `$ASSISTANT_TEXT` ONLY — never write raw JSONL (contains `tool_use` events with file content)
 - ALWAYS run `opencode session delete` post-call to prevent session accumulation
 
