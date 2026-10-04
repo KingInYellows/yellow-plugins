@@ -1,0 +1,27 @@
+docs/security.md
+  s_771064b1487eb8::t_449aec6448f575 368-369
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_771064b1487eb8::t_a224d34ed00814 454-455
+plugins/yellow-review/references/resolve/dispositions.md
+  s_771064b1487eb8::t_1774c2698eff5f 413-417,423-424
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  s_771064b1487eb8::t_6a1a43b2c023ef 22-25,32-34,136-139,206-207,213-234,239,274-282,699-706,789-792
+plugins/yellow-review/tests/commit-resolve-fixes.bats
+  s_771064b1487eb8::t_2afe59cc5e85af 682-757
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a50f8400c4f2b3c24c39316438c2b2568371accb",
+  "prompts": {},
+  "sessions": {
+    "s_771064b1487eb8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "344118bf-2aa9-4d5a-a9e5-a6b94995fa25",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
