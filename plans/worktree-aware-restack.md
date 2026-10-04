@@ -578,15 +578,15 @@ conflict · `20` preflight refused · `30` restack failed, worktrees restored ·
 
 ### Phase 6: Quality gates
 
-- [ ] 6.1: `pnpm validate:agents`, `pnpm lint:plugins`,
+- [x] 6.1: `pnpm validate:agents`, `pnpm lint:plugins`,
       `pnpm validate:shell-compat`, `pnpm check:shell-parse`, then
       `pnpm validate:schemas` (includes provider-neutral-commands and
       doc-counts).
-- [ ] 6.2: `cd plugins/yellow-core && bats skills/git-worktree/tests/ tests/`.
-- [ ] 6.3: Baseline: `pnpm test:unit && pnpm test:integration && pnpm lint &&
+- [x] 6.2: `cd plugins/yellow-core && bats skills/git-worktree/tests/ tests/`.
+- [x] 6.3: Baseline: `pnpm test:unit && pnpm test:integration && pnpm lint &&
       pnpm typecheck` (via `corepack pnpm@8.15.0`, Node through
       `nvm exec "$(cat <workspace>/.node-version)"`).
-- [ ] 6.4: CRLF check on new files; no token-shaped literals in tests.
+- [x] 6.4: CRLF check on new files; no token-shaped literals in tests.
 
 ## Technical Specifications
 
