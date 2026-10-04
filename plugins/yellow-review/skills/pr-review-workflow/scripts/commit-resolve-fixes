@@ -78,7 +78,12 @@
 # the host of the PR's URL (ssh.github.com and www.github.com count as
 # github.com); none known fails closed. Any other scheme (file, ext, ftp ...)
 # and a URL that cannot be parsed fail closed too; no message prints a URL.
-# Hooks: the effective hooks directory (core.hooksPath honoured) must not hold
+# Hooks: the commit and the submit run with git hooks disabled
+# (core.hooksPath=/dev/null through GIT_CONFIG_COUNT, checked, one stderr note)
+# unless YELLOW_REVIEW_COMMIT_HOOKS=1: a tracked hook, even one equal to HEAD, is
+# code the PR controls and would run with submission authority. With the opt-in
+# the checks that follow apply. The effective hooks directory (core.hooksPath
+# honoured) must not hold
 # untracked or ignored files when it lies inside the working tree, else exit 3
 # before anything is staged: the commit would run them and the dirty-set check
 # cannot see them (lib/resolve-paths.sh rp_hooks_untracked). A hooks path that
@@ -654,9 +659,20 @@ disable_git_hooks() {
     export "GIT_CONFIG_KEY_$n=core.hooksPath" "GIT_CONFIG_VALUE_$n=/dev/null" "GIT_CONFIG_COUNT=$((n + 1))"
     [ "$(git config --get core.hooksPath 2>/dev/null)" = /dev/null ] \
         || die 3 "could not disable git hooks for the commit; nothing committed"
-    printf '[commit-resolve-fixes] Note: the git hooks in the %s hooks directory are not verified, so the commit and the submit run with git hooks disabled\n' "$1" >&2
+    if [ "$1" = default ]; then
+        printf '[commit-resolve-fixes] Note: git hooks are disabled for the commit and the submit (a hook in the PR is code the PR controls; set YELLOW_REVIEW_COMMIT_HOOKS=1 to run verified tracked hooks)\n' >&2
+    else
+        printf '[commit-resolve-fixes] Note: the git hooks in the %s hooks directory are not verified, so the commit and the submit run with git hooks disabled\n' "$1" >&2
+    fi
 }
 HOOKS_RC=0
+# Hooks are off unless the caller opts in: a tracked hook, even one equal to
+# HEAD, is code the PR controls, and the commit runs it with submission
+# authority. The checks below judge hooks only for that opt-in.
+if [ "${YELLOW_REVIEW_COMMIT_HOOKS:-0}" != 1 ]; then
+    disable_git_hooks default
+    HOOKS_RC=1
+else
 HOOKS_DIR=$(rp_hooks_untracked "$DIRTY_FILE") || HOOKS_RC=$?
 case "$HOOKS_RC" in
     4) disable_git_hooks "$HOOKS_DIR" ;;
@@ -665,6 +681,7 @@ case "$HOOKS_RC" in
     1) ;;
     *) die 3 "could not inspect the git hooks directory; nothing committed" ;;
 esac
+fi
 
 # The runtime that will run ($RUNTIME: the override, else the sibling
 # find_runtime picked) runs with submission authority. When it resolves inside

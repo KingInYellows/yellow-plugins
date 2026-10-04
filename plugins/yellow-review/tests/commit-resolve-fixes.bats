@@ -10,6 +10,9 @@ MSG="fix: resolve PR #7 review comments (2 files)"
 
 setup() {
   resolve_repo_init
+  # Most tests exercise the verified-hook paths, which the default (hooks off)
+  # skips; the default itself is tested with the variable unset.
+  export YELLOW_REVIEW_COMMIT_HOOKS=1
 }
 
 # The fixture remotes are local bare repositories. The script reads each
@@ -2183,4 +2186,35 @@ STUB
   [[ "$stderr" == *"resolve-text: scan failed"* ]]
   [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
   [ -z "$(git diff --cached --name-only)" ]
+}
+
+@test "by default git hooks are disabled, even a tracked hook equal to HEAD, with a note" {
+  unset YELLOW_REVIEW_COMMIT_HOOKS
+  marker="$BATS_TEST_TMPDIR/hook-ran"
+  mkdir -p .hooks
+  printf '#!/bin/sh\ntouch "%s"\n' "$marker" >| .hooks/pre-commit
+  chmod +x .hooks/pre-commit
+  git add .hooks && git commit -q -m "chore: tracked hook" && git push -q origin feature 2>/dev/null
+  git config core.hooksPath .hooks
+  for provider in graphite github; do
+    printf 'one\nfeature\nfix-%s\n' "$provider" >| src/a.txt
+    run_crf --provider "$provider" --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 0 ] || { echo "$provider: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git hooks are disabled for the commit and the submit"* ]]
+    [ ! -e "$marker" ] || { echo "hook ran: $provider" >&2; return 1; }
+  done
+}
+
+@test "YELLOW_REVIEW_COMMIT_HOOKS=1 runs a verified tracked in-tree hook" {
+  marker="$BATS_TEST_TMPDIR/hook-ran"
+  mkdir -p .hooks
+  printf '#!/bin/sh\ntouch "%s"\n' "$marker" >| .hooks/pre-commit
+  chmod +x .hooks/pre-commit
+  git add .hooks && git commit -q -m "chore: tracked hook" && git push -q origin feature 2>/dev/null
+  git config core.hooksPath .hooks
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ -e "$marker" ]
+  [[ "$stderr" != *"git hooks are disabled for the commit and the submit"* ]]
 }
