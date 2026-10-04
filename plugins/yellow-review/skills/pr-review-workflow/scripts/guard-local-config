@@ -17,7 +17,9 @@
 #             directory or another special file.
 #   check:    compare each guarded path with the snapshot. A path that changed
 #             is put back from the snapshot (a created file is deleted), then
-#             compared again. Prints `changed: <path>` per path that differed.
+#             compared again. A directory or other special file under a
+#             guarded name is never removed: the restore fails (exit 4) and
+#             names the path. Prints `changed: <path>` per path that differed.
 #             <digest> is the hex value from snapshot's `digest=` line. Every
 #             snapshot entry (state, copy and the content hash recorded at
 #             snapshot time) is validated, and the digest is recomputed from
@@ -133,8 +135,14 @@ valid_entry() {
 restore_entry() {
     local i="$1" p="$2" want stage
     want=$(cat -- "$SNAP/state.$i") || return 1
+    # Only a regular file, a symlink or nothing is put back or removed. A
+    # directory (an editor or build can create one under the guarded name) may
+    # hold someone's work, and a socket, fifo or device is not ours to delete:
+    # leave it and fail the restore, so the caller reports it and keeps the
+    # snapshot.
+    if [ -e "$p" ] && [ ! -L "$p" ] && [ ! -f "$p" ]; then return 1; fi
     if [ "$want" = absent ]; then
-        rm -rf -- "$p" 2>/dev/null
+        rm -f -- "$p" 2>/dev/null
         return 0
     fi
     stage=$(mktemp -d "$(dirname -- "$p")/.guard-restore.XXXXXX" 2>/dev/null) || return 1
@@ -142,8 +150,9 @@ restore_entry() {
     # snapshot refuses symlinks, so no symlink is ever recreated.
     if [ "$want" != file ]; then rm -rf -- "$stage"; return 1; fi
     cp -p -- "$SNAP/copy.$i" "$stage/new" 2>/dev/null || { rm -rf -- "$stage"; return 1; }
-    # mv -f would move into a directory (or a symlink to one) instead of replacing it.
-    if [ -d "$p" ]; then rm -rf -- "$p" 2>/dev/null; fi
+    # mv -f would move into a symlink to a directory instead of replacing it
+    # (a real directory was refused above).
+    if [ -L "$p" ]; then rm -f -- "$p" 2>/dev/null; fi
     mv -f -- "$stage/new" "$p" 2>/dev/null
     local rc=$?
     rm -rf -- "$stage"

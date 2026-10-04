@@ -302,3 +302,38 @@ snap() {
   run --separate-stderr "$SCRIPT" snapshot extra
   [ "$status" -eq 2 ]
 }
+
+@test "a directory created under the guarded name is kept, not deleted: exit 4 naming the path" {
+  snap
+  mkdir -p "$CFG/work"
+  printf 'precious\n' >| "$CFG/work/notes.txt"
+  run --separate-stderr "$SCRIPT" check "$SNAP" "$DIGEST"
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"changed: yellow-plugins.local.md"* ]]
+  [[ "$output" == *"restore failed: yellow-plugins.local.md"* ]]
+  [ "$(cat "$CFG/work/notes.txt")" = precious ]
+  # the snapshot stays, so a later run can still recover
+  [ -d "$SNAP" ]
+}
+
+@test "a directory replacing a snapshotted config is kept too, and the snapshot copy is untouched" {
+  printf 'verify_command: true\n' >| "$CFG"
+  snap
+  rm -f "$CFG"
+  mkdir -p "$CFG/work"
+  printf 'precious\n' >| "$CFG/work/notes.txt"
+  run --separate-stderr "$SCRIPT" check "$SNAP" "$DIGEST"
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"restore failed: yellow-plugins.local.md"* ]]
+  [ "$(cat "$CFG/work/notes.txt")" = precious ]
+  [ "$(cat "$SNAP/copy.0")" = 'verify_command: true' ]
+}
+
+@test "a fifo under the guarded name is not removed" {
+  command -v mkfifo >/dev/null || skip "mkfifo is not available"
+  snap
+  mkfifo "$CFG"
+  run --separate-stderr "$SCRIPT" check "$SNAP" "$DIGEST"
+  [ "$status" -eq 4 ]
+  [ -p "$CFG" ]
+}
