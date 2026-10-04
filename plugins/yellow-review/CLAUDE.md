@@ -189,10 +189,9 @@ resolution, and sequential stack review. Graphite-native workflow.
   `commentsTruncated` flag (a truncated thread is never resolved); exits 3
   (partial array on stdout) when the thread list is truncated (page cap, missing
   cursor or the 270 s fetch deadline)
-- `get-pr-blockers <owner/repo> <pr>` — `CHANGES_REQUESTED` reviewers,
-  `reviewDecision` and whether the base branch enforces conversation
-  resolution; never fails the caller (`lookupFailed` true and null or
-  `unknown` fields when a lookup failed)
+- `get-pr-blockers <owner/repo> <pr>` — Report CHANGES_REQUESTED reviews,
+  `reviewDecision`, whether conversation resolution is enforced (read from the
+  base branch and the default branch), and `lookupReason` when a lookup failed
 - `reply-pr-thread <PRRT_id> <disposition> <body-file>` — Reply to a thread
   with an idempotency marker (skips when our latest recent comment has a
   marker for the thread, any disposition, and only bot comments follow it), with
@@ -212,7 +211,8 @@ resolution, and sequential stack review. Graphite-native workflow.
   runs file at most 3 per PR per run (`/review:resolve` Step 5; see
   `references/resolve/dispositions.md`)
 - `check-resolve-text <file>...` — Refuse resolver-written text that looks
-  like a credential (for text posted outside the resolve scripts)
+  like a credential, or has an image, an `@` mention or a foreign URL (for
+  text posted outside the resolve scripts); exits 6
 - `pr-changed-ranges <pr>` — The PR's changed files and new-side line ranges
   from the files API (`/review:resolve` resolver envelope)
 - `poll-new-threads --wait <s> ...` — Step 8 re-pass poll for threads that
@@ -252,6 +252,15 @@ resolution, and sequential stack review. Graphite-native workflow.
   changed file for `thermonuclear-reviewer`'s size-threshold rule; the
   header and footer rows are its completeness signal
 
+`reply-pr-thread`, `file-followup-issue` and `check-resolve-text` source
+`lib/resolve-text.sh` (text screen) before posting and exit 6 on a refusal.
+`reply-pr-thread` and `file-followup-issue` exit 7 on a permanent GitHub
+refusal (not authenticated; for the issue script also no permission or Issues
+disabled). `reply-pr-thread` and `resolve-pr-thread` also source
+`lib/gh-graphql.sh`.
+`commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`
+and `lib/verify-run.sh`.
+
 All live at `skills/pr-review-workflow/scripts/` and are invoked as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`. Exit codes
 and markers for the resolve scripts are in
@@ -288,17 +297,26 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   fails closed
 - `lib/resolve-text.sh` (POSIX sh, sourced by `reply-pr-thread`,
   `file-followup-issue`, `check-resolve-text`, `commit-resolve-fixes` and
-  `run-verify-command`) —
-  refuses credential-shaped text before it is posted or committed. On a hit it sets `RT_HIT_RULE` and `RT_HIT_LINE`, and
-  `rt_report_refusal` prints a `resolve-text:` stderr line (never the text)
-  that tells a refusal from a usage error: `refused rule=<rule> line=<n>` for
-  a credential hit, `scan failed` when the scan did not run. Callers look for
-  that line anywhere on stderr rather than assume it is first.
+  `run-verify-command`) — the text screen for
+  resolver-written text; a match means the text is never posted. Two functions
+  share one convention (0 clean, 1 a hit, 2 the scan did not run):
+  `rt_text_clean <file>` for text posted publicly (credential shapes plus a
+  markdown image, `@` mention or foreign URL) and `rt_code_clean [--strict]
+  <file>` for code, diffs and logs, where those are ordinary (credential rules
+  only; `--strict` keeps the high-precision ones). On 1 they set `RT_HIT_RULE`
+  and `RT_HIT_LINE`, and `rt_report_refusal` prints a `resolve-text:` stderr
+  line (never the text): `refused rule=<rule> line=<n>` for a hit, `scan
+  failed` when the scan did not run. The posting scripts exit 6 on a refusal;
+  callers key on the code and keep the line as detail. The one URL host
+  allowed is `RT_ALLOWED_HOST`, else `GH_HOST`, else `github.com`.
 - `lib/resolve-gh.sh` (POSIX sh, sourced by `file-followup-issue`,
-  `get-pr-blockers` and `get-pr-comments`) — runs `gh` under
+  `get-pr-blockers` and `get-pr-comments`) — runs `gh` through `rg_gh` under
   `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s, clamped to 60 s) and returns 124 on
   a timeout, but only when `timeout(1)` or `gtimeout(1)` is installed; without
-  either `gh` runs unbounded.
+  either `gh` runs unbounded. It also holds the failure classifiers
+  (`rg_is_rate_limited`, `rg_is_auth_failure`, `rg_is_permission_denied`) the
+  scripts share; test a rate limit before a permission failure, since a
+  secondary rate limit is also an HTTP 403.
 - `lib/gh-graphql.sh` (POSIX sh, sourced by `reply-pr-thread` and
   `resolve-pr-thread`) — the shared GraphQL call (bounded by
   `YELLOW_REVIEW_GH_TIMEOUT`), rate-limit wait and not-found/permission

@@ -423,10 +423,10 @@ Located at `skills/pr-review-workflow/scripts/`:
   has more comments than were fetched, and a resolver must never resolve such a
   thread); exits 3 with the partial array on stdout when the thread list is
   truncated (page cap, missing cursor or the 270 s fetch deadline)
-- **get-pr-blockers** `<owner/repo> <pr-number>` — `CHANGES_REQUESTED`
-  reviewers, `reviewDecision`, and whether the base branch enforces
-  conversation resolution; never fails the caller (`lookupFailed` is true,
-  and fields are null or `unknown`, when a lookup did not complete)
+- **get-pr-blockers** `<owner/repo> <pr-number>` — Reports
+  `CHANGES_REQUESTED` reviews, `reviewDecision`, whether conversation
+  resolution is enforced (read from the base branch and the default branch),
+  and `lookupReason` when a lookup failed
 - **reply-pr-thread** `<PRRT_id> <disposition> <body-file>` — Replies with
   an idempotency marker; skips when our latest recent comment carries a marker for
   this thread, whatever its disposition, and only bot comments follow it, and
@@ -443,11 +443,13 @@ Located at `skills/pr-review-workflow/scripts/`:
   <body-file>` — Files or finds (by marker) the follow-up issue for an
   out-of-scope thread; `--find <owner/repo> <PRRT_id>` only looks and never
   files
-- **check-resolve-text** `<file>...` — Exits 2 when text looks like a
-  credential. A refusal prints a `resolve-text:` line on stderr
-  (`refused rule=<rule> line=<n>` for a credential hit, `scan failed` when
-  the scan did not run); look for it anywhere on stderr, not just first.
-  `reply-pr-thread` and `file-followup-issue` print the same line.
+- **check-resolve-text** `<file>...` — Exits 6 when text looks like a
+  credential, has a markdown image, an `@` mention or a foreign URL, or could
+  not be scanned (2 stays usage or an unreadable file). A refusal prints a
+  `resolve-text:` line on stderr (`refused rule=<rule> line=<n>`, or `scan
+  failed` when the scan did not run); look for it anywhere on stderr, not just
+  first. `reply-pr-thread` and `file-followup-issue` exit 6 and print the same
+  line
 - **pr-changed-ranges** `<pr-number>` — Prints one `<path> <ranges>` row per
   changed file from the files API (`10-24,58-60`, `none`, or `unknown` when
   GitHub returns no patch); only paths matching `^[A-Za-z0-9._/-]+$` are

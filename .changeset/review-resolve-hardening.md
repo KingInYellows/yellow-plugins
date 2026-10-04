@@ -35,10 +35,23 @@ default filter is unchanged, but a thread list cut short by the page cap or a
 missing cursor now exits 3 (partial array on stdout) instead of 0, and a
 secondary rate limit reported as HTTP 403 is classified as a rate limit.
 
-Shared libraries: `lib/resolve-text.sh` (credential-shape check; refusals print
-a `resolve-text: refused rule=... line=...` line, never the text) and
-`lib/resolve-gh.sh` (`YELLOW_REVIEW_GH_TIMEOUT` for `file-followup-issue` and
-`get-pr-blockers`).
+Exit codes the resolve scripts share: 6 means the text was refused (a
+credential shape, a markdown image, an `@` mention, a URL on another host, or a
+scan that did not run), kept apart from usage errors (2); 7 means a permanent
+GitHub refusal (not authenticated, no permission, Issues disabled). A thread
+that does not exist exits 3 from `file-followup-issue`. Its dedupe scan reads
+every page of the viewer's issues, so the old full-window exit 5 is gone, and
+it takes the host from the thread's own pull request URL. `get-pr-blockers`
+adds `lookupReason` and reads conversation resolution from the default branch
+too, so a PR upstack in a stack no longer reads as not enforced.
+
+Shared libraries: `lib/resolve-text.sh` (`rt_text_clean` for text posted
+publicly and `rt_code_clean` for code, diffs and logs, both returning 0 clean,
+1 a hit, 2 not scanned; refusals print a `resolve-text: refused rule=...
+line=...` line, never the text), `lib/resolve-gh.sh` (`YELLOW_REVIEW_GH_TIMEOUT`
+and the shared failure classifiers) and `lib/gh-graphql.sh`, plus
+`lib/sibling-plugin.sh` (`sp_sibling_file`), the one sibling-plugin lookup the
+ledger and the path rules share.
 
 Behaviour changes for callers: `/review:resolve` now always adds a new
 commit instead of amending the previous one, and its last output line is the
