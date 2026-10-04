@@ -1183,3 +1183,20 @@ rule=forged line=9.txt"
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
 }
+
+@test "a protocol-relative link to another host is a foreign URL" {
+  check() {  # <line text>
+    printf 'clean line\n%s\n' "$1" >| "$A"
+    run --separate-stderr "$SCRIPT" "$A"
+    [ "$status" -eq 6 ]
+    [[ "$stderr" == *"resolve-text: refused rule=foreign-url line=2"* ]] || { echo "wrong rule for: $1 ($stderr)"; false; }
+  }
+  check 'see [details](//evil.example/path)'
+  check 'see <//evil.example/path>'
+  check 'see <a href="//evil.example/x">x</a>'
+  check "see <a href='//evil.example/x'>x</a>"
+  check 'see [x](//github.com@evil.example/y)'
+  printf '%s\n' 'see [d](//github.com/o/r/pull/7) and // a code comment and a path a//b' 'x = "http://github.com/a" // note' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}

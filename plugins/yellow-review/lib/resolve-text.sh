@@ -541,6 +541,11 @@ rt_text_clean() {
             if ((" " $0) ~ /([[:space:]]|[(,;"\047])[][*_~]*@[A-Za-z0-9]/) flag("mention")
             l = tolower($0)
             h = tolower(host)
+            # A protocol-relative destination (`](//host/x)`, `<//host>`,
+            # `href="//host"`) renders as an external link: judge it as https.
+            gsub(/\]\(\/\//, "](https://", l)
+            gsub(/<\/\//, "<https://", l)
+            gsub(/=["\047]\/\//, "=\"https://", l)
             while (match(l, /https?:\/\/[^\/ \t"\047`]*/)) {
                 u = substr(l, RSTART, RLENGTH)
                 l = substr(l, RSTART + RLENGTH)
