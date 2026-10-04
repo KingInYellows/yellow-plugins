@@ -1,0 +1,39 @@
+.changeset/review-resolve-hardening.md
+  s_771064b1487eb8::t_27a5eff29ba60b 19-27,46-59
+docs/security.md
+  s_771064b1487eb8::t_c377d3283569ad 361-362
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_771064b1487eb8::t_ebceb11af04c5e 248-249,254-255,367,381-385,390,433-443
+plugins/yellow-review/references/resolve/dispositions.md
+  s_771064b1487eb8::t_5dd4ff7634eccc 94-96,522-530,600-611,791-797
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  s_771064b1487eb8::t_d5cbb549758a38 257,260,266-269,894-904
+plugins/yellow-review/skills/pr-review-workflow/scripts/reply-pr-thread
+  s_771064b1487eb8::t_a5d5926e389f36 9-17,186-198,200-204
+plugins/yellow-review/tests/commit-resolve-fixes.bats
+  s_771064b1487eb8::t_ecff93da6a395c 677-692
+plugins/yellow-review/tests/file-followup-issue.bats
+  s_771064b1487eb8::t_36654399c0a584 549-562,589,592
+plugins/yellow-review/tests/mocks/gh
+  s_771064b1487eb8::t_ea933aa2bc71d0 20-22,322-340
+plugins/yellow-review/tests/reply-pr-thread.bats
+  s_771064b1487eb8::t_21317525823837 546-568
+plugins/yellow-review/tests/skill-content.bats
+  s_771064b1487eb8::t_e6cd1978792433 711-738
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8b2504b23d350d7fb92a104f3743992fe80915ac",
+  "prompts": {},
+  "sessions": {
+    "s_771064b1487eb8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "344118bf-2aa9-4d5a-a9e5-a6b94995fa25",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
