@@ -500,7 +500,7 @@ conflict · `20` preflight refused · `30` restack failed, worktrees restored ·
 
 ### Phase 4: Tests
 
-- [ ] 4.1: `skills/git-worktree/tests/worktree-restack.bats` builds real temp
+- [x] 4.1: `skills/git-worktree/tests/worktree-restack.bats` builds real temp
       repos with linked worktrees. A stub `gt` on `PATH` replays a stack file
       with real `git rebase --onto` per branch, so git's own worktree
       constraint is exercised. A stub `gh` does the same for `stack rebase`,
@@ -518,7 +518,7 @@ conflict · `20` preflight refused · `30` restack failed, worktrees restored ·
       > uses about 1 of them.
       <!-- /deepen-plan -->
 
-- [ ] 4.2: Cases, each with a negative assertion (`run grep` + `[ "$status"
+- [x] 4.2: Cases, each with a negative assertion (`run grep` + `[ "$status"
       -eq 1 ]`, never a mid-test `! grep`):
       - success: all worktrees end on their branches, state gone, lock gone
       - dirty, locked, mid-rebase and prunable worktrees refused, and nothing
@@ -535,9 +535,9 @@ conflict · `20` preflight refused · `30` restack failed, worktrees restored ·
       - forged state (path outside the worktree list, `refs/tags/x`, a
         leading `-`, bad SHA, wrong common dir) → exit 4, no checkout run
       - provider mismatch → exit 5
-      - worktree removed during the pause, branch deleted during the pause,
-        worktree switched by the user during the pause → exit 40 with the
-        right per-entry lines
+      - worktree removed during the pause → entry dropped with a warning,
+        exit 0 (decision 9); branch deleted or worktree switched by the user
+        during the pause → exit 40 with the right per-entry lines (`restore`)
       - commit made in a detached worktree during the pause → that entry is
         not restored, its floating commit SHA and rescue line are printed,
         exit 40, and the commit is still reachable from that worktree's HEAD
@@ -553,9 +553,9 @@ conflict · `20` preflight refused · `30` restack failed, worktrees restored ·
         adapter `rebase --mode upstack` run from the current worktree; stub
         reporting v0.1.0 or an unparseable version → exit 20 with an upgrade
         message and nothing touched
-- [ ] 4.3: Keep the suite inside CI's 10-minute `plugin-shell-tests` budget
+- [x] 4.3: Keep the suite inside CI's 10-minute `plugin-shell-tests` budget
       (smallest repos, shared fixtures).
-- [ ] 4.4: Manual live acceptance (not CI): rerun the throwaway-repo proof
+- [x] 4.4: Manual live acceptance (not CI): rerun the throwaway-repo proof
       against real gt 1.7.20 (and the 1.8.x scratch install) through the
       script, conflict case included.
 

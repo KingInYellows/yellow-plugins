@@ -435,10 +435,9 @@ validate_state() {
         return 1
         ;;
     esac
-    [ "$(wt_index "$p")" -ge 0 ] || {
-      STATE_ERR="entry path is not a worktree of this repository"
-      return 1
-    }
+    # A path that is no longer a worktree is not rejected: the worktree may
+    # have been removed during a pause, and restore drops such an entry with a
+    # warning without running any git command on the path.
     [ "$p" != "$S_RUN" ] || {
       STATE_ERR="run worktree listed as detached entry"
       return 1

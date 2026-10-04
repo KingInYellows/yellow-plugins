@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Stub gt: replays a stack with real rebases in the current worktree.
+set -u
+# shellcheck disable=SC2034
+STUB_NAME=gt
+# shellcheck source=stack-engine.bash
+. "$(dirname "$(readlink -f "$0")")/stack-engine.bash"
+stub_log "$*"
+
+gitdir() { g rev-parse --path-format=absolute --git-dir; }
+
+case "${1:-}" in
+  --version) echo "${STUB_GT_VERSION:-1.7.20}"; exit 0 ;;
+  log)
+    cur=$(g branch --show-current)
+    lines=()
+    while IFS= read -r b; do lines=("$b" "${lines[@]+"${lines[@]}"}"); done <"$STUB_STACK"
+    n=0
+    for b in "${lines[@]}"; do
+      glyph='◯'
+      [ "$b" != "$cur" ] || glyph='◉'
+      suffix=""
+      par=$(parent_of "$b")
+      if [ -n "$par" ] && [ "$(cat "$(base_file "$b")" 2>/dev/null)" != "$(g rev-parse "refs/heads/$par")" ]; then suffix=" (needs restack)"; fi
+      printf '%s    %s%s\n' "$glyph" "$b" "$suffix"
+      n=$((n + 1))
+      if [ "$n" -eq 1 ] && [ -n "${STUB_FORK:-}" ]; then printf '│ ◯  %s\n' "$STUB_FORK"; fi
+    done
+    exit 0
+    ;;
+  restack)
+    cur=$(g branch --show-current)
+    eng_begin "$cur"
+    eng_run cwd
+    rc=$?
+    if [ "$rc" -eq 3 ]; then : >"$(gitdir)/.gtcontinue"; echo "Hit conflict restacking $(cat "$STUB_DIR/conflict-branch")." >&2; exit 1; fi
+    exit "$rc"
+    ;;
+  continue)
+    eng_continue cwd
+    rc=$?
+    if [ "$rc" -eq 0 ]; then rm -f "$(gitdir)/.gtcontinue"; fi
+    [ "$rc" -eq 0 ] || exit 1
+    ;;
+  abort)
+    case " $* " in *" --force "*) ;; *) echo "Cannot perform interactive operation" >&2; exit 1 ;; esac
+    eng_abort cwd
+    echo "Successfully aborted gt restack."
+    exit 0
+    ;;
+  submit) exit "${STUB_SUBMIT_RC:-0}" ;;
+  *) echo "stub gt: unsupported: $*" >&2; exit 2 ;;
+esac

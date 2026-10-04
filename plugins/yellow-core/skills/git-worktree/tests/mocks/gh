@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Stub gh: only `extension list` and `stack view|rebase`, rebasing in the
+# owning worktree like gh-stack >= 0.2.0.
+set -u
+# shellcheck disable=SC2034
+STUB_NAME=gh
+# shellcheck source=stack-engine.bash
+. "$(dirname "$(readlink -f "$0")")/stack-engine.bash"
+stub_log "pwd=$PWD $*"
+
+common_dir() { g rev-parse --path-format=absolute --git-common-dir; }
+
+conflict_report() {
+  printf 'Conflict worktree: %s\n\nConflicted files:\n  C x.txt (lines 1-5)\n\nResolve conflicts on %s\n' \
+    "$(cat "$STUB_DIR/conflict-wt")" "$(cat "$STUB_DIR/conflict-branch")" >&2
+}
+
+case "${1:-}" in
+  extension)
+    [ -z "${STUB_GH_VERSION-v0.2.0}" ] || printf 'gh stack\tgithub/gh-stack\t%s\n' "${STUB_GH_VERSION-v0.2.0}"
+    exit 0
+    ;;
+  stack)
+    shift
+    case "${1:-}" in
+      view)
+        cur=$(g branch --show-current)
+        {
+          printf '{"trunk":"%s","currentBranch":"%s","branches":[' "$(head -n 1 "$STUB_STACK")" "$cur"
+          first=1
+          while IFS= read -r b; do
+            [ "$first" -eq 1 ] || printf ','
+            first=0
+            is=false
+            [ "$b" != "$cur" ] || is=true
+            printf '{"name":"%s","isCurrent":%s}' "$b" "$is"
+          done < <(tail -n +2 "$STUB_STACK")
+          printf ']}\n'
+        }
+        exit 0
+        ;;
+      rebase)
+        shift
+        case "${1:-}" in
+          --continue)
+            eng_continue owner
+            rc=$?
+            ;;
+          --abort)
+            eng_abort owner
+            rm -f "$(common_dir)/gh-stack-rebase-state"
+            exit 0
+            ;;
+          *)
+            cur=$(g branch --show-current)
+            eng_begin "$cur"
+            eng_run owner
+            rc=$?
+            ;;
+        esac
+        if [ "$rc" -eq 3 ]; then : >"$(common_dir)/gh-stack-rebase-state"; conflict_report; exit 3; fi
+        [ "$rc" -ne 0 ] || rm -f "$(common_dir)/gh-stack-rebase-state"
+        exit "$rc"
+        ;;
+      submit) exit 0 ;;
+    esac
+    ;;
+esac
+echo "stub gh: unsupported: $*" >&2
+exit 2

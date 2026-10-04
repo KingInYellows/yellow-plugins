@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Logging shim: record every git call, then run the real git.
+printf '%s\n' "$*" >>"$STUB_DIR/git.log"
+exec "$STUB_REAL_GIT" "$@"
