@@ -239,7 +239,7 @@ _rt_scan() {
             if (match(r, /^[^ \t"\047,;)]+/)) {
                 seg = substr(r, RSTART, RLENGTH)
                 r = substr(r, RSTART + RLENGTH)
-                if (r ~ /^["\047]?[ \t\r,;]*$/ && litval(seg, inword, pin)) flag(q == "\"" || q == "\047" ? "quoted-keyword-assignment" : "unquoted-keyword-value")
+                if (r ~ /^[)"\047]*[ \t\r,;]*$/ && litval(seg, inword, pin)) flag(q == "\"" || q == "\047" ? "quoted-keyword-assignment" : "unquoted-keyword-value")
             }
         }
         BEGIN {
