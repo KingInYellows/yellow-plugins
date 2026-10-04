@@ -1,0 +1,21 @@
+plugins/yellow-council/commands/council/council.md
+  s_092275c4e6a6a0::t_18ab1f69d76b92 257-263
+plugins/yellow-council/tests/quota-lineage.bats
+  s_092275c4e6a6a0::t_18ab1f69d76b92 752-763
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3fca7c6ba87cfdfb9b4382e76a966a092a30ecd7",
+  "prompts": {},
+  "sessions": {
+    "s_092275c4e6a6a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "53398599-95a5-4127-ba6b-f2642ceba186",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
