@@ -409,3 +409,67 @@ for the adjacent failure family — verifying against a surface that was
 assumed rather than confirmed from the real primary source.
 
 **Components (this Update):** `plans/specs/yellow-jules-integration.md`.
+
+---
+
+## Update — 2026-10-03: a non-voting verdict plus a sentinel path touches six kinds of site
+
+Written at plan time and implemented in PR 992 (the line anchors below are
+from origin/main 0c384957a and have since moved). Found while expanding
+yellow-council V2 shell 04 (a QUOTA_EXHAUSTED verdict). Re-grep before relying
+on any claim below.
+
+The spec gives quota-exhausted stubs `fenced_output_path=/dev/null` and a new
+non-voting verdict. A pattern survey found that each site below encodes the
+closed set or the path rule on its own:
+
+1. **Verdict `case` enums.** The three yellow-council reviewer agents, the
+   yellow-codex reviewer and council.md's `parse_reviewer_return` each carry
+   one. An unlisted verdict hits `*)` and is normalised to UNKNOWN.
+   claude-reviewer's enum is a different shape (no TIMEOUT or UNAVAILABLE),
+   so copying a sibling's arm is wrong.
+2. **Path checks.** The claude branch of `parse_reviewer_return`, the 5b shape
+   case and the Step 7 appendix case refuse any path outside `/tmp/council-*`.
+   The sentinel is refused as malformed and the stub becomes ERROR.
+3. **Unlink loops.** The cleanup loops in council.md and in yellow-review's
+   review-pr.md `rm -f` whatever path a reviewer reports. As root, that
+   deletes the `/dev/null` device node. The sentinel needs an explicit skip.
+4. **Excluded-slot logic.** The 5b case that marks TIMEOUT/ERROR/UNAVAILABLE
+   as excluded, and the Coverage "Reviewers skipped" list.
+5. **review-pr.md's codex-return handling.** A present-but-empty findings
+   sentinel pair reads as "reviewed and found nothing". The new verdict must
+   join the TIMEOUT/ERROR skipped bullet, or a quota wall renders as a clean
+   review. This is the "plausible default" failure this doc is about.
+6. **Arm shape.** Most existing UNAVAILABLE/TIMEOUT/ERROR arms emit three
+   keys, not the 6-key block. A stub carrying a sentinel path has to emit all
+   six, or the fixed-key grep falls to `${verdict:-ERROR}` again.
+
+Two corollaries from the same survey:
+
+- claude-reviewer has no Bash, so it cannot detect a quota wall, and a quota
+  wall kills the Agent spawn. Detection has to live in the orchestrator.
+- A three-state env var (unset / set-empty / set) needs `[ -n "${VAR+x}" ]`
+  (precedent: the `RL_CORE_LIB` check in `plugins/yellow-review/lib/review-ledger.sh`).
+  `${VAR:+...}`, as used for `CODEX_MODEL` in codex-reviewer, collapses empty and unset.
+
+**Added guidance.** Enumerate the sites by grep before editing, and re-run
+the greps afterwards:
+
+```bash
+rg -n 'APPROVE\|REVISE\|REJECT' plugins --glob '*.md'   # literal pipe-delimited enum sites
+rg -n 'rm -f' plugins/yellow-council/commands/council/council.md plugins/yellow-review/commands/review/review-pr.md
+rg -n 'fenced_output_path' plugins                      # every path consumer
+```
+
+Add a bats case that every token in the contract's `verdict=` line appears in
+each enum, so a new verdict cannot fall to `*)`. Whatever sentinel is chosen
+(`/dev/null`, empty or `none`), each path-check and unlink site needs an
+explicit branch for it. See
+[bash-less-agent-write-tool-temp-path-minting.md](bash-less-agent-write-tool-temp-path-minting.md)
+for who mints reviewer temp paths.
+
+**Components (this Update):** `plugins/yellow-council/commands/council/council.md`,
+`plugins/yellow-council/agents/review/*.md`,
+`plugins/yellow-codex/agents/review/codex-reviewer.md`,
+`plugins/yellow-review/commands/review/review-pr.md`,
+`plans/yellow-council-v2-four-cli-04-quota-and-opencode-routing.md`.

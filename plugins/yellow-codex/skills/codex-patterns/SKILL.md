@@ -199,6 +199,15 @@ message text (`The '<name>' model is not supported …`; the generic
 `docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md`
 (2026-09-05 and 2026-09-16 updates).
 
+The same arm chain separates quota exhaustion from a transient 429: an API error
+containing `insufficient_quota`, `model_cap_exceeded`, `usage_limit_reached`,
+"hit your usage limit" or "Quota exceeded. Check your plan" (the last three are the
+ChatGPT-plan wording present in codex-cli 0.157.0) returns
+`verdict=QUOTA_EXHAUSTED` (full 6-key stub, `fenced_output_path=/dev/null`, the
+reset ETA in `summary=`), checked before `rate_limit_exceeded`, which stays a
+transient `ERROR`. Callers that read `codex-reviewer`'s return (`/council`,
+`/review:pr`) treat `QUOTA_EXHAUSTED` as a skipped reviewer, not a clean review.
+
 ## Output Parsing
 
 ### JSONL Event Stream (`--json`)
@@ -327,7 +336,7 @@ Or ensure `.codexignore` is populated in the project root.
 | Exit Code | Meaning | Recovery |
 |-----------|---------|----------|
 | 0 | Success | Parse output |
-| 1 | General error: 429 rate limit (`rate_limit_exceeded`) or an HTTP 400 API refusal such as a model rejection (`The '<name>' model is not supported`) | Read the API error out of the captured output (see below); model rejection → set or unset `CODEX_MODEL` / fix `model` in `~/.codex/config.toml` |
+| 1 | General error: 429 rate limit (`rate_limit_exceeded`; `insufficient_quota`, `model_cap_exceeded`, `usage_limit_reached`, "hit your usage limit" and "Quota exceeded. Check your plan" are quota exhaustion → `QUOTA_EXHAUSTED`) or an HTTP 400 API refusal such as a model rejection (`The '<name>' model is not supported`) | Read the API error out of the captured output (see below); model rejection → set or unset `CODEX_MODEL` / fix `model` in `~/.codex/config.toml`; quota (`QUOTA_EXHAUSTED`) is not retryable — the reset ETA is in `summary=`, so wait for it or switch plan/account |
 | 2 | Argument parse error OR authentication failure | If stderr matches `unexpected argument`, `invalid value`, `unrecognized subcommand`, or `required arguments`, the invocation itself is wrong (CLI flag drift) — fix the command; otherwise run `/codex:setup`, check OPENAI_API_KEY |
 | 3 | Configuration error | Check ~/.codex/config.toml |
 | 4 | Reserved by the CLI for model/API errors; not observed for model rejection in practice (that is exit 1, above) | Try different model |

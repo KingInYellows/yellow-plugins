@@ -21,4 +21,6 @@ CLI Flag Pattern" section, which stays preloaded).
   Google's 2026-06-18 shutdown.
 - `docs/spikes/opencode-cli-format-json-2026-05-04.md` — verified OpenCode
   CLI v1.14+ invocation: `opencode run --format json --variant high "..."`
-  plus `opencode session delete <id>` cleanup.
+  plus `opencode session delete <id>` cleanup. The current argv adds
+  `--print-logs --log-level ERROR` and `[--model <slug>]`; its "OpenRouter
+  Routing Spike" section records the 1.18.34 behaviour.

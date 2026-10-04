@@ -29,7 +29,8 @@ and never auto-commits. The user decides what to do with the verdicts.
   - `agy` — Google Antigravity CLI v1.0+ (replaces Gemini CLI, which stopped
     serving consumer subscriptions on 2026-06-18; run `agy` once
     interactively to migrate auth, `agy plugin import gemini` for extensions)
-  - `opencode` — OpenCode CLI v1.14+ (curl install or npm `opencode-ai`)
+  - `opencode` — OpenCode CLI v1.14+ (curl install or npm `opencode-ai`); the
+    model routing and error classification were verified on 1.18.34 only
 - **Optional cross-plugin dependency:** `yellow-codex` ≥ 0.2.0 — provides the
   `yellow-codex:review:codex-reviewer` agent. If absent, council runs with
   3 of 4 reviewers (graceful soft-skip).
@@ -46,6 +47,15 @@ and never auto-commits. The user decides what to do with the verdicts.
   the `awk`/`sed` mechanics the CLI wrappers run. It also cannot mint its own
   temp path, so `council.md` mints its fenced-output path with `mktemp -u` and
   passes the literal path in the spawn prompt.
+- **Quota exhaustion is a non-voting verdict.** A reviewer whose provider
+  reports quota or credit exhaustion returns `verdict=QUOTA_EXHAUSTED` with the
+  parsed reset ETA, `confidence=N/A`, `fenced_output_path=/dev/null` and an empty
+  findings block. It is excluded from synthesis like `UNAVAILABLE`, and the
+  headline names the ETA. Detection is error-string driven only (no state file,
+  no headroom pre-flight, no quorum gate), and a transient rate limit or HTTP 529
+  stays `ERROR`. `/dev/null` is accepted only under this verdict. The in-process
+  claude slot cannot self-report, so `council.md` classifies a failed claude
+  spawn against Claude's quota strings.
 - **Per-reviewer timeout: 600 seconds** (CLI reviewers only). Configurable via
   `COUNCIL_TIMEOUT`.
   Partial results: timed-out reviewers are excluded from synthesis but the
@@ -131,7 +141,9 @@ and never auto-commits. The user decides what to do with the verdicts.
 - `/council fleet` is reserved for V2 fleet management; prints "fleet management
   not available in V1 — coming in V2" and exits 0.
 - `/council:setup` — prerequisite check (bash 4.3+ or zsh, `timeout`, `jq`, `od`, `sort`, readable `/dev/urandom`) plus a
-  reviewer-availability summary. Does NOT verify CLI authentication.
+  reviewer-availability summary. Does NOT verify CLI authentication, except that
+  when the OpenCode model resolves to `openrouter/*` it checks `opencode auth list`
+  for an OpenRouter credential (never reading or printing the key).
 
 ### Agents (3)
 
@@ -152,8 +164,13 @@ and never auto-commits. The user decides what to do with the verdicts.
   not that instructions were followed). Spawned via
   `Agent(subagent_type="yellow-council:review:gemini-reviewer")`.
 - `opencode-reviewer` — OpenCode CLI wrapper. Invokes
-  `opencode run --format json --variant high "<prompt>"` plus session cleanup
-  via `opencode session delete <id>`. Spawned via
+  `opencode run --format json --variant high --model <slug> "<prompt>"` plus
+  session cleanup via `opencode session delete <id>`. `--model` follows
+  `COUNCIL_OPENCODE_MODEL` (unset: DeepSeek V4 Pro via OpenRouter for a
+  non-Big-3 lineage; set but empty: no `--model`, V1 behaviour). Passes
+  `--print-logs --log-level ERROR` because opencode 1.18 reports a missing model
+  or unauthenticated provider only on stderr. Returns `UNAVAILABLE` naming the
+  fix for those, and `QUOTA_EXHAUSTED` for provider quota or credit errors. Spawned via
   `Agent(subagent_type="yellow-council:review:opencode-reviewer")`.
 
 (Codex reviewer is reused from yellow-codex when installed:
@@ -190,6 +207,7 @@ Codex agent.)
 | Var | Type | Default | Purpose |
 |-----|------|---------|---------|
 | `COUNCIL_TIMEOUT` | integer seconds | `600` | Per-reviewer timeout passed to GNU `timeout`. Increase for very slow models / very large packs. Must be a plain integer number of seconds; non-integer values (e.g. `10m`, `600s`) fall back to 600 with a warning. |
+| `COUNCIL_OPENCODE_MODEL` | model slug | `openrouter/deepseek/deepseek-v4-pro` | OpenCode `--model`, resolved by presence: **unset** uses the default, which needs OpenRouter auth (`opencode auth login --provider openrouter`, or `OPENROUTER_API_KEY`); **set but empty** (`export COUNCIL_OPENCODE_MODEL=""`) passes no `--model` (V1); **non-empty** is passed verbatim (e.g. `opencode/deepseek-v4-pro` for OpenCode Zen, verified listed). An unlisted model or unauthenticated provider returns `UNAVAILABLE`. The resolved model and lineage are printed in Step 2b and shown in the report header. |
 | `COUNCIL_OPENCODE_VARIANT` | `high \| max \| minimal` | `high` | OpenCode `--variant` reasoning effort. `max` is significantly slower; reserve for explicit override. |
 | `COUNCIL_PATH_CHAR_CAP` | integer chars | `8000` | Per-file content cap for `--paths` injection in `debug`/`question` modes. |
 | `COUNCIL_PATH_MAX_FILES` | integer | `3` | Maximum number of files accepted via `--paths` in any single invocation. |
@@ -197,8 +215,8 @@ Codex agent.)
 
 ## Testing
 
-`bats tests/` from the plugin directory (`redaction.bats`, `extract.bats` and
-`synthesis.bats` —
+`bats tests/` from the plugin directory (`redaction.bats`, `extract.bats`,
+`synthesis.bats` and `quota-lineage.bats` —
 the blocking CI gate runs the whole directory). The awk redaction program is
 shipped as four synchronized carrier files (`REDACTION_SOURCES` in
 `tests/lib/extract-redaction-awk.bash`): `agents/review/gemini-reviewer.md`,
@@ -212,10 +230,39 @@ just one. `synthesis.bats` extracts the Step 5b helper library (between the
 (Cancel) and 9 fences from `council.md` and runs them under bash, zsh and zsh
 with snapshot options, and
 under every awk it finds; it needs zsh, and fails rather than skips in CI
-without it. There is no fresh-machine install CI (see Known Limitations).
+without it. `quota-lineage.bats` extracts the `council-quota-lib` (Step 4) and
+`council-lineage-lib` (Step 2b) marker pairs, runs the Step 4 parse fence, the
+Step 2b fence (with a stub `opencode`) and the codex, gemini and opencode error
+arms under bash, zsh and zsh with noclobber, and fails when the four copies of the
+reset-ETA extraction or the OpenCode default slug drift. Its fixtures must never
+point `rm` at a device path: a root runner would delete it. There is no
+fresh-machine install CI (see Known Limitations).
 
 ## Known Limitations
 
+- **Quota detection is best-effort and string-matched.** Gemini (agy) detection is
+  the `RESOURCE_EXHAUSTED` floor only: the Antigravity spike recorded no
+  exhaustion catalog. A bare `RESOURCE_EXHAUSTED` or agy's "You have exhausted
+  your quota on this model" is quota; `RESOURCE_EXHAUSTED` with rate-limit,
+  too-many-requests, overload or capacity wording stays a transient `ERROR`
+  (agy retries those itself, so little reaches the reviewer). The claude classifier runs only on
+  a real spawn failure (no `verdict=` or `confidence=` line, no fenced file at the
+  minted path, at most 2000 characters) and echoes an ETA only when it is a plain
+  time or duration. It has not been verified against a real spawn-failure
+  message, and an account-wide session or weekly limit may stop the orchestrating
+  turn as well. Codex matches `insufficient_quota`,
+  `model_cap_exceeded`, `usage_limit_reached` and the ChatGPT-plan "hit your usage
+  limit" / "Quota exceeded. Check your plan" wording; OpenCode matches provider passthrough text and HTTP 402.
+  A provider that words quota errors differently is recorded as `ERROR`.
+- **Lineage detection is best-effort.** `/council` maps each slot's model to a
+  lineage by slug prefix or family and warns on a collision, but codex's model
+  may be unreadable (`~/.codex/config.toml`) and gemini's `agy` has no model
+  field, so those slots are assumed openai and google. The warning never blocks.
+- **The OpenCode default needs OpenRouter auth.** With `COUNCIL_OPENCODE_MODEL`
+  unset the slot routes to `openrouter/deepseek/deepseek-v4-pro`; without an
+  OpenRouter credential it returns `UNAVAILABLE` where V1 ran. Authenticate
+  (`opencode auth login --provider openrouter`) or set
+  `COUNCIL_OPENCODE_MODEL=""` to keep V1 behaviour.
 - **OpenCode persistent sessions.** Every `opencode run` creates a SQLite
   session in `~/.local/share/opencode/`. yellow-council cleans up after each
   invocation via `opencode session delete <id>`, but if the cleanup itself

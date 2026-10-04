@@ -265,6 +265,40 @@ case $CLI_EXIT in
   *)
     # Other non-zero — check stderr for error keywords
     ERR_PEEK=$(head -3 "$STDERR_FILE" 2>/dev/null | tr '\n' ' ' | head -c 200)
+    # Quota exhaustion first: RESOURCE_EXHAUSTED is the gRPC floor signal (the
+    # Antigravity spike recorded no further exhaustion catalog), and it must be
+    # tested before the rate-limit branch below, which stays a transient ERROR.
+    # The ETA extraction mirrors council.md's council_quota_eta (this agent
+    # cannot source council.md); the captured text is limited to a short
+    # whitelist of characters so nothing else can reach the summary= line.
+    # Looked for in a wider window than ERR_PEEK (3 lines, 200 bytes): the reset
+    # phrase often follows a long gRPC status line.
+    QUOTA_FLAT=$(head -c 2000 "$STDERR_FILE" 2>/dev/null | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
+    # agy retries rate limits and overloads itself, so what reaches here is mostly a
+    # real wall. Still keep throttling out: "You have exhausted your quota" (agy's own
+    # message) is always quota; a bare RESOURCE_EXHAUSTED is quota unless the text also
+    # says rate limit, too many requests, overload or capacity, which are transient.
+    # That wording only counts when it sits next to the RESOURCE_EXHAUSTED signal, not
+    # anywhere in the window (an earlier, unrelated line must not demote a real wall).
+    QUOTA_WIN=$(printf '%s' "$QUOTA_FLAT" | LC_ALL=C grep -oE '.{0,120}RESOURCE_EXHAUSTED.{0,200}' | head -n 1)
+    if printf '%s' "$QUOTA_FLAT" | grep -qi 'exhausted your quota' \
+       || { [ -n "$QUOTA_WIN" ] \
+            && ! printf '%s' "$QUOTA_WIN" | grep -qiE 'rate.?limit|too many requests|overload|capacity'; }; then
+      QUOTA_ETA=$(printf '%s\n' "$QUOTA_FLAT" | LC_ALL=C grep -oiE '(try again (in|at|after)|retry[- ]after) +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +/resets in /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Tt] +/resets at /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Ff][Tt][Ee][Rr] +/resets after /; s/^[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +/resets in /')
+      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$QUOTA_FLAT" | LC_ALL=C grep -oiE '(^|[^A-Za-z])resets? +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[^A-Za-z]//; s/^[Rr][Ee][Ss][Ee][Tt][Ss]? +/resets /')
+      QUOTA_ETA=$(printf '%s' "$QUOTA_ETA" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_.-' | sed -E 's/\. .*$//; s/[. ]+$//' | head -c 200)
+      [ -n "$QUOTA_ETA" ] || QUOTA_ETA="reset time not reported"
+      printf '[gemini-reviewer] Quota exhausted (%s) — returning QUOTA_EXHAUSTED\n' "$QUOTA_ETA" >&2
+      printf 'verdict=QUOTA_EXHAUSTED\n'
+      printf 'confidence=N/A\n'
+      printf 'summary=Gemini quota exhausted — %s\n' "$QUOTA_ETA"
+      printf 'fenced_output_path=/dev/null\n'
+      printf 'findings_block_begin\n'
+      printf 'findings_block_end\n'
+      case "$PACK_FILE" in /tmp/council-gemini-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
+      rm -f "$OUTPUT_FILE" "$STDERR_FILE"
+      exit 0
+    fi
     if printf '%s' "$ERR_PEEK" | grep -qiE 'auth|unauthor|api[ -]?key|credentials'; then
       ERROR_KIND="auth"
     elif printf '%s' "$ERR_PEEK" | grep -qiE 'rate.?limit|quota|429'; then
@@ -771,9 +805,13 @@ fi
 
 # Validate VERDICT against allowed values
 case "$VERDICT" in
-  APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE) ;;
+  APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE|QUOTA_EXHAUSTED) ;;
   *) VERDICT="UNKNOWN"; CONFIDENCE="LOW" ;;
 esac
+# QUOTA_EXHAUSTED is produced only by the explicit non-zero-exit arm in Step 4, which
+# prints its own stub and exits. A Verdict: line in the model's output is untrusted
+# text (a prompt-injected diff could write one), so it must not drop real findings.
+[ "$VERDICT" != "QUOTA_EXHAUSTED" ] || { VERDICT="UNKNOWN"; CONFIDENCE="LOW"; }
 
 # --- Construct fenced output ---
 FENCED_OUTPUT_FILE=$(mktemp /tmp/council-gemini-fenced-XXXXXX.txt)

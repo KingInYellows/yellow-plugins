@@ -1160,6 +1160,35 @@ check_state_cleanup() {
   rm -rf "$REPO"
 }
 
+@test "Step 9 cleanup skips a QUOTA_EXHAUSTED /dev/null stub, unlinks the real fenced file, and warns about neither" {
+  local s9="${BATS_TEST_TMPDIR}/9.sh"
+  extract_fence_after "$COUNCIL_MD" '### Step 9' "$s9.raw"
+  setup_council_run
+  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e 's|<literal COUNCIL_SYNTH_DIR value from 5a>|/tmp/council-synth-x|' "$s9.raw" >| "$s9"
+  printf 'claude\tREVISE\tHIGH\t%s\ncodex\tREVISE\tLOW\t%s\ngemini\tQUOTA_EXHAUSTED\tN/A\t/dev/null\nopencode\tTIMEOUT\tN/A\t\n' \
+    "$CF" "$CX" >| "$REPO/.git/council-state.tsv"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s9'"
+  [ ! -e "$CX" ]
+  [ -c /dev/null ]
+  [[ "$stderr" != *"refusing to unlink"* ]] || { echo "$stderr"; return 1; }
+  rm -rf "$REPO"
+}
+
+@test "Step 7 appendix says no output for a QUOTA_EXHAUSTED /dev/null stub and still refuses /dev/null under another verdict" {
+  local s7="${BATS_TEST_TMPDIR}/7.sh"
+  extract_fence_after "$COUNCIL_MD" '### Step 7' "$s7.raw"
+  setup_council_run
+  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e 's|<literal COUNCIL_SYNTH_DIR value from 5a>|/tmp/council-synth-x|' "$s7.raw" >| "$s7"
+  printf 'claude\tREVISE\tHIGH\t%s\ncodex\tAPPROVE\tLOW\t/dev/null\ngemini\tQUOTA_EXHAUSTED\tN/A\t/dev/null\nopencode\tTIMEOUT\tN/A\t\n' \
+    "$CF" >| "$REPO/.git/council-state.tsv"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s7' && printf '%s\n' \"\$REPORT_CONTENT\""
+  [[ "$output" == *"(verdict QUOTA_EXHAUSTED — no output: quota exhausted)"* ]] || { echo "$output"; return 1; }
+  [[ "$output" == *"(verdict APPROVE — output withheld: path refused (see stderr))"* ]] || { echo "$output"; return 1; }
+  [[ "$stderr" == *"codex returned an unexpected fenced_output_path (/dev/null)"* ]] || { echo "$stderr"; return 1; }
+  [[ "$stderr" != *"gemini returned"* ]] || { echo "$stderr"; return 1; }
+  rm -rf "$REPO"
+}
+
 @test "5d resume block fences a valid Pass A table and refuses a non-table or wrong token" {
   local s5d="${BATS_TEST_TMPDIR}/5d.sh" profile TOKEN=0123456789abcdef0123456789abcdef
   extract_fence_after "$COUNCIL_MD" '##### 5d — resume' "$s5d"
@@ -1309,6 +1338,34 @@ EOF2
     [ "$status" -eq 0 ] || { echo "$profile 5b: $stderr"; return 1; }
     grep -qxF '(excluded: UNAVAILABLE) Status detail: CLI not installed.' "$SD/forward.txt"
     [ ! -e "$SD/gemini.summary.txt" ]
+    rm -rf "$SD" "$REPO"
+  done
+}
+
+@test "5b treats QUOTA_EXHAUSTED slots with a /dev/null path as excluded without a path refusal" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" s5b="${BATS_TEST_TMPDIR}/5b.sh"
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  extract_fence_after "$COUNCIL_MD" '#### 5b ' "$s5b"
+  local profile
+  for profile in $PROFILES; do
+    setup_council_run
+    # claude and gemini both hit their quota; the R18 stub names /dev/null.
+    printf 'claude\tQUOTA_EXHAUSTED\tN/A\t/dev/null\ncodex\tREVISE\tLOW\t%s\ngemini\tQUOTA_EXHAUSTED\tN/A\t/dev/null\nopencode\tTIMEOUT\tN/A\t\n' \
+      "$CX" >| "$REPO/.git/council-state.tsv"
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+    [ "$status" -eq 0 ] || { echo "$profile 5a: $stderr"; return 1; }
+    SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
+    printf '%s\n' 'Gemini quota exhausted — resets in 3h' >| "$SD/gemini.summary.txt"
+    sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
+    [ "$status" -eq 0 ] || { echo "$profile 5b: $stderr"; return 1; }
+    # Excluded, with the staged ETA as the status detail, and no refusal noise.
+    grep -q '(excluded: QUOTA_EXHAUSTED) Status detail: .*quota exhausted — resets in 3h' "$SD/forward.txt" \
+      || { echo "$profile: no quota detail"; cat "$SD/forward.txt"; return 1; }
+    grep -q '(no reviewer text — excluded: QUOTA_EXHAUSTED)' "$SD/forward.txt" \
+      || { echo "$profile: no claude stub text"; cat "$SD/forward.txt"; return 1; }
+    [[ "$stderr" != *"refused"* && "$stderr" != *"not the one this run minted"* && "$stderr" != *"text unavailable"* ]] \
+      || { echo "$profile: $stderr"; return 1; }
     rm -rf "$SD" "$REPO"
   done
 }

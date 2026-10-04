@@ -16,7 +16,7 @@ skills:
 # OpenCode Reviewer
 
 You are a CLI-invocation agent. Your sole responsibility is running
-`opencode run --format json --variant high "..."` against a council pack and
+`opencode run --format json --variant high [--model <slug>] "..."` against a council pack and
 returning structured findings. You do NOT edit files, NEVER call
 AskUserQuestion, ALWAYS clean up persistent OpenCode sessions, and ALWAYS
 wrap CLI output in injection fences before returning.
@@ -63,11 +63,15 @@ The legitimate Bash surface for this agent covers ONLY:
 - `mktemp /tmp/council-opencode-XXXXXX.json` — JSONL capture
 - `mktemp /tmp/council-opencode-err-XXXXXX.txt` — stderr capture
 - `timeout --signal=TERM --kill-after=10 ${COUNCIL_TIMEOUT:-600}` — timeout guard
-- `opencode run --format json --variant high "..."` — OpenCode CLI invocation
+- `opencode run --format json --variant high --print-logs --log-level ERROR [--model <slug>] "..."`
+  — OpenCode CLI invocation; `--model` follows `COUNCIL_OPENCODE_MODEL` (unset: DeepSeek V4 Pro via
+  OpenRouter; set but empty: omitted)
 - `opencode session delete <id>` — REQUIRED post-call cleanup
 - `jq -r '...'` — extract `text` events and `sessionID`
 - `awk '...'` — credential redaction (applied to extracted text only)
-- `grep` / `awk` / `sed` — output parsing
+- `grep` / `awk` / `sed` — output parsing, including the quota ETA and the
+  sanitizer for provider error text (`tr` flatten and control-character strip,
+  URL and long-token masking, `head -c` cap)
 - `printf` — structured findings output
 - `rm -f` — temp file cleanup
 
@@ -166,19 +170,54 @@ if [ "$PACK_BYTES" -gt 120000 ]; then
   exit 0
 fi
 
+# Resolve the model by PRESENCE, not value (R19). Each bash fence is a separate
+# Bash call, so this lives here, next to the invocation:
+#   unset          -> the default slug below (DeepSeek V4 Pro via OpenRouter)
+#   set, empty     -> no --model flag at all (V1 behaviour)
+#   set, non-empty -> --model "$COUNCIL_OPENCODE_MODEL", verbatim
+# `${VAR+x}` separates unset from empty; `${VAR:-default}` would collapse them.
+# The argv is built with `set --` so it is the same list in bash and zsh (zsh
+# does not word-split an unquoted expansion).
+set -- --format json --variant "${COUNCIL_OPENCODE_VARIANT:-high}" --print-logs --log-level ERROR
+if [ -z "${COUNCIL_OPENCODE_MODEL+x}" ]; then
+  OC_MODEL="openrouter/deepseek/deepseek-v4-pro"
+elif [ -n "$COUNCIL_OPENCODE_MODEL" ]; then
+  OC_MODEL="$COUNCIL_OPENCODE_MODEL"
+else
+  OC_MODEL=""
+fi
+# The value becomes its own argv item: refuse anything that is not a plain model
+# slug (a leading `-` would be read as an opencode flag), in the same structured
+# shape as the pack-size guard above.
+case "$OC_MODEL" in
+  "") ;;
+  [![:alnum:]]* | *[![:alnum:]._~:/@-]*)
+    printf '[opencode-reviewer] Error: COUNCIL_OPENCODE_MODEL is not a plain model slug\n' >&2
+    printf 'CLI_EXIT=skipped\n'
+    printf 'verdict=UNAVAILABLE\n'
+    printf 'confidence=N/A\n'
+    printf 'summary=COUNCIL_OPENCODE_MODEL is not a plain model slug (letters, digits and . _ ~ : / @ - only, starting with a letter or digit); CLI not invoked. Set it to a model listed by "opencode models".\n'
+    case "$PACK_FILE" in /tmp/council-opencode-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
+    rm -f "$OUTPUT_FILE" "$STDERR_FILE"
+    exit 0 ;;
+esac
+[ -z "$OC_MODEL" ] || set -- "$@" --model "$OC_MODEL"
+printf '[opencode-reviewer] model: %s\n' "${OC_MODEL:-<opencode default>}" >&2
+
+# --print-logs --log-level ERROR: on opencode 1.18 the JSON error event for a
+# missing model or an unauthenticated provider is an opaque UnknownError; the
+# cause (ProviderModelNotFoundError) is only on stderr (Step 6 reads it from
+# $STDERR_FILE).
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
-  opencode run \
-    --format json \
-    --variant "${COUNCIL_OPENCODE_VARIANT:-high}" \
-    "$(cat "$PACK_FILE")" \
+  opencode run "$@" "$(cat "$PACK_FILE")" \
   >| "$OUTPUT_FILE" 2>| "$STDERR_FILE"
 CLI_EXIT=$?
 printf 'CLI_EXIT=%s\n' "$CLI_EXIT"
 ```
 
 Capture the printed CLI_EXIT value as well — later blocks substitute it
-alongside the three paths. If the pack-size guard fired (`CLI_EXIT=skipped`
-was printed), the CLI was never invoked: report the printed `verdict=` /
+alongside the three paths. If a pre-invocation guard fired (the pack-size guard
+or the model-slug guard; `CLI_EXIT=skipped` was printed), the CLI was never invoked: report the printed `verdict=` /
 `confidence=` / `summary=` triplet as this reviewer's final result and skip
 Steps 4-7, exactly as with the failure arms in Step 6.
 
@@ -275,13 +314,66 @@ case $CLI_EXIT in
   *)
     # Check for `error` events in JSONL FIRST (more specific than CLI exit)
     ERROR_MSG=$(jq -r 'select(.type=="error") | .error.data.message // .error.name // "unknown"' "$OUTPUT_FILE" 2>/dev/null | head -1)
-    if [ -n "$ERROR_MSG" ]; then
+    ERROR_STATUS=$(jq -r 'select(.type=="error") | .error.data.statusCode // empty' "$OUTPUT_FILE" 2>/dev/null | head -1)
+    # The provider message is untrusted text that reaches summary= and stderr:
+    # flatten it to one line, drop control characters, replace URLs (OpenRouter's
+    # credit errors embed an account key-management link) and any 24+ character
+    # token run (key-shaped strings). The quota scan below reads the whole sanitized
+    # text; only the copy that reaches summary= is capped at 300 bytes.
+    ERROR_FULL=$(printf '%s' "$ERROR_MSG" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177' \
+      | LC_ALL=C sed -E 's#https?://[^[:space:]]+#[url]#g; s/(AKIA|ASIA)[0-9A-Z]{16}/[redacted]/g; s/[Bb]earer +[A-Za-z0-9._-]+/Bearer [redacted]/g; s/(sk|ghp|gho|ghs|ghu|AIza|ses)[_-][A-Za-z0-9_-]{8,}/[redacted]/g; s/github_pat_[A-Za-z0-9_]+/[redacted]/g; s/[A-Za-z0-9_-]{24,}/[redacted]/g')
+    ERROR_MSG=$(printf '%s' "$ERROR_FULL" | head -c 300)
+    if [ -n "$ERROR_MSG" ] && { [ "$ERROR_STATUS" = "402" ] || printf '%s' "$ERROR_FULL" | grep -qiE 'insufficient_quota|model_cap_exceeded|RESOURCE_EXHAUSTED|quota exceeded|usage limit|requires more credits|insufficient.credits'; }; then
+      # Provider quota passthrough (OpenRouter's HTTP 402 "requires more
+      # credits", OpenAI-style insufficient_quota, Google RESOURCE_EXHAUSTED):
+      # recorded as QUOTA_EXHAUSTED, not a transient ERROR. The ETA extraction
+      # mirrors council.md's council_quota_eta (this agent cannot source
+      # council.md); credit exhaustion usually reports none.
+      QUOTA_ETA=$(printf '%s\n' "$ERROR_FULL" | LC_ALL=C grep -oiE '(try again (in|at|after)|retry[- ]after) +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +/resets in /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Tt] +/resets at /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Ff][Tt][Ee][Rr] +/resets after /; s/^[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +/resets in /')
+      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$ERROR_FULL" | LC_ALL=C grep -oiE '(^|[^A-Za-z])resets? +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[^A-Za-z]//; s/^[Rr][Ee][Ss][Ee][Tt][Ss]? +/resets /')
+      QUOTA_ETA=$(printf '%s' "$QUOTA_ETA" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_.-' | sed -E 's/\. .*$//; s/[. ]+$//' | head -c 200)
+      [ -n "$QUOTA_ETA" ] || QUOTA_ETA="reset time not reported"
+      printf '[opencode-reviewer] Quota exhausted (%s) — returning QUOTA_EXHAUSTED\n' "$QUOTA_ETA" >&2
+      printf 'verdict=QUOTA_EXHAUSTED\n'
+      printf 'confidence=N/A\n'
+      printf 'summary=OpenCode quota exhausted — %s. Provider said: %s\n' "$QUOTA_ETA" "$ERROR_MSG"
+      printf 'fenced_output_path=/dev/null\n'
+      printf 'findings_block_begin\n'
+      printf 'findings_block_end\n'
+    elif grep -q 'ProviderModelNotFoundError' "$STDERR_FILE" 2>/dev/null || [ "$ERROR_STATUS" = "401" ]; then
+      # R20: the configured model is unavailable, so the slot is UNAVAILABLE
+      # with the fix named, never a bare ERROR. On opencode 1.18 an unknown
+      # slug and a provider with no credential look identical in the JSON
+      # event (an opaque UnknownError); only stderr, via --print-logs, says
+      # `ProviderModelNotFoundError: Model not found: <slug>` (docs/spikes/
+      # opencode-cli-format-json-2026-05-04.md, "OpenRouter Routing Spike").
+      # An invalid key comes back as an APIError with HTTP 401 instead. Other
+      # statuses (403 is also used for moderation and key limits) stay ERROR.
+      # The slug is taken from stderr through a character whitelist, so only
+      # model-identifier characters can reach summary=.
+      MISSING_SLUG=$(grep -m1 -o 'Model not found: [A-Za-z0-9._~:/@-]*' "$STDERR_FILE" 2>/dev/null | sed -e 's/^Model not found: //' -e 's/[.:,]*$//' | head -c 120)
+      MISSING_PROVIDER="${MISSING_SLUG%%/*}"
+      [ -n "$MISSING_PROVIDER" ] || MISSING_PROVIDER="<provider>"
+      printf '[opencode-reviewer] Model or provider unavailable (%s) — returning UNAVAILABLE\n' "${MISSING_SLUG:-HTTP ${ERROR_STATUS:-?}}" >&2
+      printf 'verdict=UNAVAILABLE\n'
+      printf 'confidence=N/A\n'
+      if [ -n "$MISSING_SLUG" ]; then
+        printf 'summary=OpenCode model %s is unavailable (not listed, or its provider is not authenticated). Run "opencode auth login --provider %s" or set COUNCIL_OPENCODE_MODEL to a model listed by "opencode models".\n' "$MISSING_SLUG" "$MISSING_PROVIDER"
+      elif [ "$ERROR_STATUS" = "401" ]; then
+        printf 'summary=OpenCode provider rejected the credential (HTTP 401). Run "opencode auth login --provider <provider>" (an exported OPENROUTER_API_KEY overrides the stored credential) or set COUNCIL_OPENCODE_MODEL to a model listed by "opencode models".\n'
+      else
+        printf 'summary=OpenCode model or provider is unavailable (the opencode log named no model). Run "opencode auth login --provider <provider>" or set COUNCIL_OPENCODE_MODEL to a model listed by "opencode models".\n'
+      fi
+    elif [ -n "$ERROR_MSG" ]; then
       printf '[opencode-reviewer] Session error: %s\n' "$ERROR_MSG" >&2
       printf 'verdict=ERROR\n'
       printf 'confidence=N/A\n'
       printf 'summary=OpenCode error: %s\n' "$ERROR_MSG"
     else
-      ERR_PEEK=$(head -3 "$STDERR_FILE" 2>/dev/null | tr '\n' ' ' | head -c 200)
+      # --print-logs puts opencode's ERROR logs in $STDERR_FILE, which can carry
+      # provider options and request fragments: sanitize like ERROR_MSG above.
+      ERR_PEEK=$(head -3 "$STDERR_FILE" 2>/dev/null | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177' \
+        | LC_ALL=C sed -E 's#https?://[^[:space:]]+#[url]#g; s/(AKIA|ASIA)[0-9A-Z]{16}/[redacted]/g; s/[Bb]earer +[A-Za-z0-9._-]+/Bearer [redacted]/g; s/(sk|ghp|gho|ghs|ghu|AIza|ses)[_-][A-Za-z0-9_-]{8,}/[redacted]/g; s/github_pat_[A-Za-z0-9_]+/[redacted]/g; s/[A-Za-z0-9_-]{24,}/[redacted]/g' | head -c 200)
       printf 'verdict=ERROR\n'
       printf 'confidence=N/A\n'
       printf 'summary=OpenCode CLI error (exit %d). Excerpt: %s\n' "$CLI_EXIT" "$ERR_PEEK"
@@ -779,9 +871,13 @@ if [ -z "$VERDICT" ]; then
 fi
 
 case "$VERDICT" in
-  APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE) ;;
+  APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE|QUOTA_EXHAUSTED) ;;
   *) VERDICT="UNKNOWN"; CONFIDENCE="LOW" ;;
 esac
+# QUOTA_EXHAUSTED is produced only by the explicit non-zero-exit arm in Step 6, which
+# prints its own stub and exits. A Verdict: line in the model's output is untrusted
+# text (a prompt-injected diff could write one), so it must not drop real findings.
+[ "$VERDICT" != "QUOTA_EXHAUSTED" ] || { VERDICT="UNKNOWN"; CONFIDENCE="LOW"; }
 
 # --- Construct fenced output ---
 FENCED_OUTPUT_FILE=$(mktemp /tmp/council-opencode-fenced-XXXXXX.txt)
@@ -840,9 +936,14 @@ verification record. Key invocation patterns:
 
 - `opencode run "<message>" --format json` for non-interactive structured output
 - `--variant high` is the default; `max` is significantly slower
+- `--model <provider/model>` follows `COUNCIL_OPENCODE_MODEL` (Step 3); the
+  unset default is `openrouter/deepseek/deepseek-v4-pro`
 - `text` events with `part.text` are the assistant message (concatenate all)
 - `step_finish` event with `reason: "stop"` is terminal
-- `error` events have `error.data.message` and indicate session failure
+- `error` events have `error.data.message` and indicate session failure. On
+  opencode 1.18 a missing model or an unauthenticated provider surfaces there
+  only as "Unexpected server error"; the cause (`ProviderModelNotFoundError`)
+  is on stderr with `--print-logs --log-level ERROR`
 - `~/.local/share/opencode/<sessionID>/` is the persistent SQLite session directory
 
 Known gotchas:

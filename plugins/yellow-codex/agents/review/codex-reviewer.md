@@ -63,8 +63,8 @@ below and supporting utilities:
   event extracted from it) and Step 6's `FINDINGS_LINES` count
 - `head` — Step 4's `ERR_PEEK` truncation and Step 6's `FINDINGS` byte-cap
   truncation
-- `tr` — Step 4's `ERR_PEEK` newline flattening and Step 6's `SUMMARY`
-  newline flattening
+- `tr` — Step 4's `ERR_PEEK` newline flattening, the quota-ETA flatten and
+  character whitelist, and Step 6's `SUMMARY` newline flattening
 - `awk` — Step 4's `ERR_PEEK` redaction; Step 6's `FINDINGS`/`SUMMARY`
   credential redaction and confidence-score threshold mapping
 - `jq` — Step 4's `{"type":"error"}` event extraction from the captured
@@ -73,8 +73,8 @@ below and supporting utilities:
   `overall_explanation` (a second call, kept separate so its embedded
   newlines survive for the flatten step) from the Codex JSON result
 - `cut` — Step 6 splits the TSV row into its three fields
-- `sed` — Step 4's rejected-model-name extraction from the API error event
-  and Step 6's findings-block sentinel escaping and fenced-output
+- `sed` — Step 4's rejected-model-name extraction from the API error event,
+  the quota-ETA extraction, and Step 6's findings-block sentinel escaping and fenced-output
   delimiter escaping
 
 If you find yourself wanting to use `Bash` for anything outside this
@@ -431,6 +431,30 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
       else
         printf 'summary=Codex rejected model %s: it came from the account default or the model key in ~/.codex/config.toml — change or remove that key.\n' "$rejected_model"
       fi
+    elif [ "$codex_exit" -eq 1 ] && printf '%s' "$codex_api_error" | grep -qE "insufficient_quota|model_cap_exceeded|usage_limit_reached|hit your usage limit|Quota exceeded\. Check your plan"; then
+      # Quota exhaustion, not a transient 429. API-key accounts: insufficient_quota
+      # and model_cap_exceeded. ChatGPT plans: usage_limit_reached, "You've hit your
+      # usage limit ... Try again at <time>" and "Quota exceeded. Check your plan and
+      # billing details" (strings present in codex-cli 0.157.0). Recorded
+      # as QUOTA_EXHAUSTED so the council names the reset instead of a generic
+      # error. Must stay ahead of the rate_limit_exceeded arm below, which is
+      # the transient case and stays ERROR. The ETA extraction mirrors
+      # council.md's council_quota_eta (this agent cannot source council.md):
+      # `resets <time>`, `try again in <dur>`, `retry after <dur>`. The
+      # captured text is limited to a short whitelist of characters so
+      # nothing else in the API error can reach the summary= line.
+      quota_flat=$(printf '%s' "$codex_api_error" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
+      quota_eta=$(printf '%s\n' "$quota_flat" | LC_ALL=C grep -oiE '(try again (in|at|after)|retry[- ]after) +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +/resets in /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Tt] +/resets at /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Ff][Tt][Ee][Rr] +/resets after /; s/^[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +/resets in /')
+      [ -n "$quota_eta" ] || quota_eta=$(printf '%s\n' "$quota_flat" | LC_ALL=C grep -oiE '(^|[^A-Za-z])resets? +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[^A-Za-z]//; s/^[Rr][Ee][Ss][Ee][Tt][Ss]? +/resets /')
+      quota_eta=$(printf '%s' "$quota_eta" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_.-' | sed -E 's/\. .*$//; s/[. ]+$//' | head -c 200)
+      [ -n "$quota_eta" ] || quota_eta="reset time not reported"
+      printf '[codex-reviewer] Quota exhausted (%s) — returning QUOTA_EXHAUSTED\n' "$quota_eta" >&2
+      printf 'verdict=QUOTA_EXHAUSTED\n'
+      printf 'confidence=N/A\n'
+      printf 'summary=Codex quota exhausted — %s\n' "$quota_eta"
+      printf 'fenced_output_path=/dev/null\n'
+      printf 'findings_block_begin\n'
+      printf 'findings_block_end\n'
     elif [ "$codex_exit" -eq 1 ] && printf '%s' "$codex_api_error" | grep -q "rate_limit_exceeded"; then
       printf '[codex-reviewer] Rate limited\n' >&2
       printf 'verdict=ERROR\n'
@@ -919,7 +943,7 @@ SUMMARY=$(printf '%s' "$OVERALL_EXPLANATION" | redact_credentials 0 | tr '\n' ' 
 # value to the same UNKNOWN/LOW fallback every other reviewer in the
 # marketplace uses.
 case "$VERDICT" in
-  APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE) ;;
+  APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE|QUOTA_EXHAUSTED) ;;
   *) VERDICT="UNKNOWN"; CONFIDENCE="LOW" ;;
 esac
 

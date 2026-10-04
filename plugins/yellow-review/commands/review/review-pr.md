@@ -798,11 +798,14 @@ Apply the aggregation steps from
    they are emitted both by arms that never carry a findings block AND by
    arms that do.
 
-   - **`TIMEOUT` or `ERROR`** — these arms genuinely never emit a
-     `findings_block_begin`/`findings_block_end` pair (see
-     `codex-reviewer.md` Step 4 — every branch there `exit 0`s
+   - **`TIMEOUT`, `ERROR` or `QUOTA_EXHAUSTED`** — the first two arms
+     genuinely never emit a `findings_block_begin`/`findings_block_end`
+     pair (see `codex-reviewer.md` Step 4 — every branch there `exit 0`s
      immediately after the 3-key partial, before Step 6's findings-block
-     emission). Treat `codex-reviewer` as a skipped/failed reviewer:
+     emission). `QUOTA_EXHAUSTED` does emit the pair, but it is the EMPTY
+     pair of a 6-key stub (`fenced_output_path=/dev/null`), so reading it
+     as "no findings" would say the same false thing. Treat
+     `codex-reviewer` as a skipped/failed reviewer:
      record it in the Coverage "Reviewers skipped" list with the
      `summary=` line as the reason, same as a spawn failure. Do NOT
      proceed to findings extraction or emit an empty findings envelope
@@ -836,7 +839,10 @@ Apply the aggregation steps from
    directly from the return above. Unlink the `fenced_output_path=`
    value (`rm -f`) right after processing the return (whichever branch
    above was taken), so this pipeline doesn't leak that temp file on
-   every run.
+   every run — but only when the value is exactly
+   `/tmp/council-codex-fenced-<suffix>.txt`: no `..`, no further `/`, and not a
+   symlink. Any other value, including the `/dev/null` a `QUOTA_EXHAUSTED` return
+   reports, is never unlinked (the return text is untrusted).
 
    **Convert these to the compact-return schema BEFORE Step 1 validation
    runs** — otherwise the validator drops them as malformed and every
