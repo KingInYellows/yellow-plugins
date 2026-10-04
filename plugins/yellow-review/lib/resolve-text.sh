@@ -72,20 +72,24 @@ rt_text_clean() {
             if (seg ~ /^\[[^\[\]]*\]$/) return sentinel(substr(seg, 2, length(seg) - 2))
             return 0
         }
-        # litval(seg, inword): 1 when an unquoted keyword value looks like a
-        # literal credential. Flag only a plausible one: 6+ characters, a
+        # litval(seg, inword, pin): 1 when an unquoted keyword value looks like a
+        # literal credential. Flag only a plausible one: 6+ characters (4+
+        # digits when pin says the label is a passcode), a
         # digit or all letters (minus placeholder words), and not a whole
         # placeholder (`$TOKEN`, `${TOKEN}`, `<your token>`, `[REDACTED]`)
         # or a call (`z.string()`), so `password: string`,
         # `password: z.string()` and `token: $TOKEN` stay clean. A value that
         # only contains `$`, `<`, `{` or `[` is a credential.
-        function litval(seg, inword,    np, parts, allph, j, core) {
+        function litval(seg, inword, pin,    np, parts, allph, j, core) {
             # Markdown inline-code backticks delimit the value; they are not
             # part of it (`password: `hunter``, `token: `$TOKEN``).
             sub(/^`+/, "", seg)
             sub(/`+[.!?]*$/, "", seg)
             sub(/[.!?]+$/, "", seg)
-            if (length(seg) < 6 || isplaceholder(seg)) return 0
+            # A passcode (`pin` set) is conventionally 4+ digits; other labels
+            # keep the 6-character floor so `token: 4096` stays clean.
+            if (isplaceholder(seg)) return 0
+            if (length(seg) < 6 && !(pin && length(seg) >= 4 && seg ~ /^[0-9]+$/)) return 0
             # A call such as `z.string(`: the value stops at the `)`.
             if (seg ~ /^[a-z_][a-z0-9_.]*\(([a-z_][a-z0-9_.]*)?$/) return 0
             # A generic type annotation such as `Optional[str]` or
@@ -218,7 +222,7 @@ rt_text_clean() {
         # is judged as a whole (qcred), carrying an unclosed quote onto the
         # next lines when mqok; anything else must be a single token (prose
         # after a keyword line stays clean) judged by litval.
-        function valueline(r, inword, mqok, rraw,    q, n, seg, v, rr) {
+        function valueline(r, inword, mqok, rraw, pin,    q, n, seg, v, rr) {
             q = substr(r, 1, 1)
             if (q == "\"" || q == "\047") {
                 r = substr(r, 2)
@@ -234,19 +238,20 @@ rt_text_clean() {
             if (match(r, /^[^ \t"\047,;)]+/)) {
                 seg = substr(r, RSTART, RLENGTH)
                 r = substr(r, RSTART + RLENGTH)
-                if (r ~ /^["\047]?[ \t\r,;]*$/ && litval(seg, inword)) flag(q == "\"" || q == "\047" ? "quoted-keyword-assignment" : "unquoted-keyword-value")
+                if (r ~ /^["\047]?[ \t\r,;]*$/ && litval(seg, inword, pin)) flag(q == "\"" || q == "\047" ? "quoted-keyword-assignment" : "unquoted-keyword-value")
             }
         }
         BEGIN {
             # The credential labels, once for every rule below: pass,
             # password, passwd, pwd, passphrase, pass_phrase, pass-phrase, passcode,
             # pass_code, pass-code, secret, secret key (secret_key, secret-key,
-            # secretKey), private key, access key, token, api key, credential.
+            # secretKey), private key, access key, token, api key, credential,
+            # credentials.
             # `client_secret`, `api_secret` and `clientSecret` are covered by
             # `secret` (the `_`, `-` or capital starts the keyword). Do not add
             # a `client`/`api` prefix here: it would start the match earlier,
             # and `myclient_secret` would then count as in-word.
-            kw = "(pass([_-]?(phrase|code)|word|wd)?|pwd|secret([_ \t-]?key)?|(private|access)[_ \t-]?key|token|api[_ \t-]?key|credential)"
+            kw = "(pass([_-]?(phrase|code)|word|wd)?|pwd|secret([_ \t-]?key)?|(private|access)[_ \t-]?key|token|api[_ \t-]?key|credentials?)"
             ph =" string number integer boolean object array unknown undefined"
             ph = ph " nullable optional required redacted placeholder example"
             ph = ph " secret password passwd token credential credentials apikey"
@@ -332,9 +337,12 @@ rt_text_clean() {
                 if (++nu > 200) { flag("too-many-matches"); break }
                 r = substr(r, RSTART + RLENGTH)
                 inword = (start > 1 && substr($0, start - 1, 1) ~ /[A-Za-z]/ && substr($0, start, 1) !~ /[A-Z]/)
+                pin = seg
+                sub(/[ \t]*[=:].*$/, "", pin)
+                pin = (pin ~ /pass[_-]?code$/)
                 sub(/^[^=:]*[=:][ \t]*/, "", seg)
                 sub(/^[^=:]*[=:][ \t]*/, "", val)
-                if (litval(seg, inword)) flag("unquoted-keyword-value")
+                if (litval(seg, inword, pin)) flag("unquoted-keyword-value")
                 # A keyword that starts the line (indentation, list dashes,
                 # `export`, a quote and a key-name prefix such as `db_` may
                 # precede it) is an assignment: judge the whole value, not
@@ -375,7 +383,7 @@ rt_text_clean() {
                     sub(/^[ \t]*(-[ \t]*)?/, "", r)
                     rraw = r
                     sub(/[ \t]+#.*$/, "", r)
-                    valueline(r, carryin, carry == 1, rraw)
+                    valueline(r, carryin, carry == 1, rraw, carrypin)
                     if (carry == 2 && !carryin && ind > hind) {
                         t = l
                         sub(/^[ \t]+/, "", t)
@@ -395,6 +403,7 @@ rt_text_clean() {
                     bfirst = 1
                     bn = 0; bbuf = ""; bdone = 0
                     carryin = (kstart > 1 && substr($0, kstart - 1, 1) ~ /[A-Za-z]/ && substr($0, kstart, 1) !~ /[A-Z]/)
+                    carrypin = (substr(lh, kstart, RLENGTH) ~ /^pass[_-]?code/)
                     hind = match($0, /^[ \t]*/) ? RLENGTH : 0
                 }
             }

@@ -1143,3 +1143,38 @@ rule=forged line=9.txt"
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
 }
+
+@test "an unquoted four-digit passcode is a credential, other short numbers are not" {
+  refuses() {  # <line text>
+    printf '%b\n' "$1" >| "$A"
+    run --separate-stderr "$SCRIPT" "$A"
+    [ "$status" -eq 6 ] || { echo "not refused: $1"; false; }
+  }
+  refuses 'passcode: 1234'
+  refuses 'PASSCODE=0042'
+  refuses 'pass_code: 9876'
+  refuses 'pass-code = 12345'
+  refuses 'passcode:\n  1234'
+  refuses 'passcode:\n  1234 # office door'
+  refuses 'passcode: |\n  4321'
+  printf '%s\n' 'passcode: 123' 'passcode: <your passcode>' 'passcode: string' 'token: 4096' 'password: 2024' 'secret: 1234' 'The passcode: is required.' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "a plural credentials label is a credential keyword" {
+  refuses() {  # <line text>
+    printf '%b\n' "$1" >| "$A"
+    run --separate-stderr "$SCRIPT" "$A"
+    [ "$status" -eq 6 ] || { echo "not refused: $1"; false; }
+  }
+  refuses 'credentials: hunter'
+  refuses 'credentials=correcthorse'
+  refuses 'Credentials: "correct horse"'
+  refuses 'credentials: hunter2x'
+  refuses 'credentials:\n  correcthorse'
+  refuses 'my_credentials: correcthorse'
+  printf '%s\n' 'credentials: string' 'credentials: <your credentials>' 'credentials: $CREDENTIALS' 'The credentials are required for this call.' 'credentials: [REDACTED]' 'credentials: optional string' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
