@@ -148,7 +148,8 @@ keyring, so the codex non-TTY failure mode does not apply.
 
 **Credential check without printing the key.** `opencode auth list` (accepts
 `--pure`) prints a `Credentials` section and an `Environment` section. After
-stripping ANSI colour codes, `grep -E '●[[:space:]]+OpenRouter'` matches when
+stripping ANSI colour codes, `grep -E '^[^A-Za-z0-9]*OpenRouter([[:space:]]|$)'`
+(the shipped matcher, which does not depend on the bullet glyph) matches when
 OpenRouter is available either as a stored credential
 (`●  OpenRouter api`) or through `OPENROUTER_API_KEY` (listed under
 `Environment`). It prints no key material. With `XDG_DATA_HOME` pointed at an

@@ -20,7 +20,8 @@ four-reviewer council.
   presence. Unset routes to `openrouter/deepseek/deepseek-v4-pro`, set but empty
   passes no `--model` (V1), and a non-empty value is passed verbatim. A missing
   model, an unauthenticated provider or HTTP 401/403 returns `UNAVAILABLE` naming
-  the fix. `/council` Step 1 prints each slot's resolved model and lineage, warns
+  the fix. `/council` Step 2b (after mode dispatch, so help and `fleet` never start
+  opencode) prints each slot's resolved model and lineage, warns
   without blocking on a lineage collision or a missing OpenRouter credential, and
   the report header carries a `Models` row. `/council:setup` checks for an
   OpenRouter credential. The routing spike on opencode 1.18.34 is recorded in
@@ -32,7 +33,11 @@ four-reviewer council.
   Zen.
 - `yellow-codex`: `codex-reviewer` returns `QUOTA_EXHAUSTED` for
   `insufficient_quota` and `model_cap_exceeded`, checked before the transient
-  `rate_limit_exceeded` arm.
+  `rate_limit_exceeded` arm. Compatibility: the verdict and its `/dev/null` path
+  are read by `yellow-review` and `yellow-council`, so release those with (or
+  before) this `yellow-codex` version. A `/review:pr` from before this change reads
+  the stub's empty findings pair as "Codex found nothing" and would try to `rm -f`
+  `/dev/null`.
 - `yellow-review`: `/review:pr` treats a codex `QUOTA_EXHAUSTED` as a skipped
   reviewer and unlinks only an exact `/tmp/council-codex-fenced-*.txt` path, never
   `/dev/null`.

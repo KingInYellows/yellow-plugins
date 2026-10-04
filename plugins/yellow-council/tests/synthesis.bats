@@ -1160,6 +1160,35 @@ check_state_cleanup() {
   rm -rf "$REPO"
 }
 
+@test "Step 9 cleanup skips a QUOTA_EXHAUSTED /dev/null stub, unlinks the real fenced file, and warns about neither" {
+  local s9="${BATS_TEST_TMPDIR}/9.sh"
+  extract_fence_after "$COUNCIL_MD" '### Step 9' "$s9.raw"
+  setup_council_run
+  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e 's|<literal COUNCIL_SYNTH_DIR value from 5a>|/tmp/council-synth-x|' "$s9.raw" >| "$s9"
+  printf 'claude\tREVISE\tHIGH\t%s\ncodex\tREVISE\tLOW\t%s\ngemini\tQUOTA_EXHAUSTED\tN/A\t/dev/null\nopencode\tTIMEOUT\tN/A\t\n' \
+    "$CF" "$CX" >| "$REPO/.git/council-state.tsv"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s9'"
+  [ ! -e "$CX" ]
+  [ -c /dev/null ]
+  [[ "$stderr" != *"refusing to unlink"* ]] || { echo "$stderr"; return 1; }
+  rm -rf "$REPO"
+}
+
+@test "Step 7 appendix says no output for a QUOTA_EXHAUSTED /dev/null stub and still refuses /dev/null under another verdict" {
+  local s7="${BATS_TEST_TMPDIR}/7.sh"
+  extract_fence_after "$COUNCIL_MD" '### Step 7' "$s7.raw"
+  setup_council_run
+  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e 's|<literal COUNCIL_SYNTH_DIR value from 5a>|/tmp/council-synth-x|' "$s7.raw" >| "$s7"
+  printf 'claude\tREVISE\tHIGH\t%s\ncodex\tAPPROVE\tLOW\t/dev/null\ngemini\tQUOTA_EXHAUSTED\tN/A\t/dev/null\nopencode\tTIMEOUT\tN/A\t\n' \
+    "$CF" >| "$REPO/.git/council-state.tsv"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s7' && printf '%s\n' \"\$REPORT_CONTENT\""
+  [[ "$output" == *"(verdict QUOTA_EXHAUSTED — no output: quota exhausted)"* ]] || { echo "$output"; return 1; }
+  [[ "$output" == *"(verdict APPROVE — output withheld: path refused (see stderr))"* ]] || { echo "$output"; return 1; }
+  [[ "$stderr" == *"codex returned an unexpected fenced_output_path (/dev/null)"* ]] || { echo "$stderr"; return 1; }
+  [[ "$stderr" != *"gemini returned"* ]] || { echo "$stderr"; return 1; }
+  rm -rf "$REPO"
+}
+
 @test "5d resume block fences a valid Pass A table and refuses a non-table or wrong token" {
   local s5d="${BATS_TEST_TMPDIR}/5d.sh" profile TOKEN=0123456789abcdef0123456789abcdef
   extract_fence_after "$COUNCIL_MD" '##### 5d — resume' "$s5d"

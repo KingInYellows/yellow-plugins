@@ -151,6 +151,9 @@ stays an ordinary error.
 > `opencode auth login --provider openrouter` (or export `OPENROUTER_API_KEY`),
 > set `COUNCIL_OPENCODE_MODEL=""` to keep V1 behaviour, or use
 > `COUNCIL_OPENCODE_MODEL=opencode/deepseek-v4-pro` for OpenCode Zen.
+> The route spends OpenRouter credit on every run (the spike measured about 38k
+> input tokens for a one-word prompt), and any OpenRouter credential found,
+> including an `OPENROUTER_API_KEY` exported for another tool, is used.
 > `/council:setup` checks the credential and warns when it is missing.
 
 ## Configuration

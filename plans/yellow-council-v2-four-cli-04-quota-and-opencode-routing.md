@@ -342,6 +342,28 @@ and `## Gotchas to Watch For` (`:120`); error-event table `:44-50`.
   (additive verdict), `yellow-review` patch; CHANGELOG entries come from
   `pnpm apply:changesets`. Run the verification gate below.
 
+## Implementation Notes (deviations from the steps above)
+
+- Step 3: `/dev/null` is not accepted at the claude path check in
+  `parse_reviewer_return`. The stub is synthesized after that check, and any
+  claude `QUOTA_EXHAUSTED` return (whatever path) fails closed to `ERROR`.
+- Step 4: the headline reads `<reviewer> quota exhausted (<ETA>)`; the ETA phrase
+  already starts with `resets`.
+- Step 6: `/review:pr` unlinks only an exact `/tmp/council-codex-fenced-*.txt`
+  path (no `..`, no extra `/`, not a symlink), not any `/tmp/` path.
+- Step 8: `claude-reviewer.md`'s emit template is unchanged (the agent never emits
+  the verdict); its enum sentence and rule text gained it.
+- Step 9 / 11: on opencode 1.18.34 the JSON error event is opaque for a missing
+  model or an unauthenticated provider, so the invocation also passes
+  `--print-logs --log-level ERROR` and the reviewer classifies stderr.
+- Step 13 / 15: the lineage helpers live in their own `council-lineage-lib`
+  marker pair (Step 1's fence is a separate Bash call from Step 4's), and the
+  pre-flight runs in a new Step 2b after mode dispatch. The test helper is
+  `extract_marked_lib`, with `extract_synthesis_lib` kept as a wrapper.
+- Review follow-ups: the claude classifier runs only on a real spawn failure with
+  a plain-time ETA; any non-zero `opencode auth list` exit means the credential
+  check was skipped, not that the credential is missing.
+
 ## Verification
 
 - `pnpm validate:agents && pnpm lint:plugins` -> expected: pass (agent and

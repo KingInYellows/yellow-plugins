@@ -63,8 +63,8 @@ below and supporting utilities:
   event extracted from it) and Step 6's `FINDINGS_LINES` count
 - `head` — Step 4's `ERR_PEEK` truncation and Step 6's `FINDINGS` byte-cap
   truncation
-- `tr` — Step 4's `ERR_PEEK` newline flattening and Step 6's `SUMMARY`
-  newline flattening
+- `tr` — Step 4's `ERR_PEEK` newline flattening, the quota-ETA flatten and
+  character whitelist, and Step 6's `SUMMARY` newline flattening
 - `awk` — Step 4's `ERR_PEEK` redaction; Step 6's `FINDINGS`/`SUMMARY`
   credential redaction and confidence-score threshold mapping
 - `jq` — Step 4's `{"type":"error"}` event extraction from the captured
@@ -73,8 +73,8 @@ below and supporting utilities:
   `overall_explanation` (a second call, kept separate so its embedded
   newlines survive for the flatten step) from the Codex JSON result
 - `cut` — Step 6 splits the TSV row into its three fields
-- `sed` — Step 4's rejected-model-name extraction from the API error event
-  and Step 6's findings-block sentinel escaping and fenced-output
+- `sed` — Step 4's rejected-model-name extraction from the API error event,
+  the quota-ETA extraction, and Step 6's findings-block sentinel escaping and fenced-output
   delimiter escaping
 
 If you find yourself wanting to use `Bash` for anything outside this

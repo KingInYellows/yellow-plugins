@@ -395,3 +395,12 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   [ "$(sed -n '2,5p' "$TRIAGE" | grep -c '^description: ')" -eq 1 ]
   tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'show it with `git diff` and no path argument'
 }
+
+@test "review-pr: a codex QUOTA_EXHAUSTED is a skipped reviewer and only an exact council fenced path is unlinked" {
+  # The stub's findings pair is empty, so reading it as "no findings" would say
+  # Codex reviewed and found nothing.
+  grep -q 'TIMEOUT`, `ERROR` or `QUOTA_EXHAUSTED`' "$REVIEW_PR"
+  grep -q 'exactly' "$REVIEW_PR"
+  grep -q '/tmp/council-codex-fenced-<suffix>.txt' "$REVIEW_PR"
+  grep -q 'never unlinked' "$REVIEW_PR"
+}

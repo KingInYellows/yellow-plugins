@@ -142,10 +142,13 @@ or HTTP 529), the reviewer returns the full 6-key block with
 like `UNAVAILABLE`, and `/dev/null` is accepted only under this verdict.
 Match sets: codex `insufficient_quota` / `model_cap_exceeded`; gemini
 `RESOURCE_EXHAUSTED` (floor only); opencode provider passthrough (`insufficient_quota`,
-`model_cap_exceeded`, `RESOURCE_EXHAUSTED`, `usage limit`, HTTP 402 "requires more
-credits"); claude `session limit`, `weekly limit` or `Opus limit` followed by
-`resets`, or `usage limit reached` followed by `try again`, matched by
-`council.md` against a failed claude spawn.
+`model_cap_exceeded`, `RESOURCE_EXHAUSTED`, `quota exceeded`, `usage limit`,
+`insufficient credits`, HTTP 402 "requires more credits"); claude `session limit`,
+`weekly limit` or `Opus limit` followed by `reset(s)`, or `usage limit reached`
+followed by `try again`, matched by `council.md` only against a real spawn failure
+(no `verdict=` or `confidence=` line, no fenced file at the minted path, at most
+2000 characters). A bare `RESOURCE_EXHAUSTED` is also how Google reports some
+transient throttling, so Gemini can report this verdict for a transient condition.
 
 If the CLI output's `Verdict:` line is absent, the reviewer agent must:
 
@@ -1032,6 +1035,8 @@ timeout --signal=TERM --kill-after=10 "$CT" \
 set -- --format json --variant "${COUNCIL_OPENCODE_VARIANT:-high}" --print-logs --log-level ERROR
 if [ -z "${COUNCIL_OPENCODE_MODEL+x}" ]; then OC_MODEL="openrouter/deepseek/deepseek-v4-pro"
 else OC_MODEL="$COUNCIL_OPENCODE_MODEL"; fi
+# opencode-reviewer.md refuses a value that is not a plain slug before this
+# point (a leading `-` would be read as an opencode flag).
 [ -z "$OC_MODEL" ] || set -- "$@" --model "$OC_MODEL"
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
   opencode run "$@" "<full-pack-prompt>" \

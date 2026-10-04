@@ -624,6 +624,28 @@ trust boundary from the pack and fenced-output files above:
   check on `/tmp/council-claude-fenced-*.txt` plus identity with the minted
   literal; converting it to a state file is a follow-up.
 
+### OpenCode default route and quota stubs (yellow-council)
+
+With `COUNCIL_OPENCODE_MODEL` unset, `opencode-reviewer` routes to
+`openrouter/deepseek/deepseek-v4-pro`, which needs an OpenRouter credential.
+`/council:setup` and `/council` Step 2b probe for it with `opencode auth list
+--pure` (run from `/tmp`, bounded by a kill timer), which names the provider and
+prints no key; neither reads, prompts for or prints the key. The model value is
+validated as a plain slug before it becomes an argv item, because a leading `-`
+would be read as an opencode flag. Provider error text that reaches `summary=`
+(including the `--print-logs` stderr excerpt) is flattened, stripped of control
+characters and URLs, has long token runs masked and is length-capped; it does not
+go through the 11-pattern redaction block, so a short credential-shaped string
+could survive (recorded residual).
+
+A reviewer whose provider reports quota exhaustion returns `fenced_output_path=/dev/null`
+with `verdict=QUOTA_EXHAUSTED`. The path is accepted only under that verdict
+(Step 7 appendix), is never read, and the unlink loops skip it. The claude slot's
+quota verdict is synthesized by `council.md`, never accepted from the agent, only
+for a real spawn failure, and its ETA is echoed only when it is a plain time or
+duration. Gemini, opencode and codex `QUOTA_EXHAUSTED` summaries are staged for 5b
+like the other excluded-slot summaries (see the staging directory above).
+
 ### In-Process Reviewer (yellow-council `claude-reviewer`)
 
 `/council`'s fourth slot does not shell out at all. It runs inside Claude Code

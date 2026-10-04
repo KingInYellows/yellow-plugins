@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Extract the Step 5b synthesis helpers from commands/council/council.md.
+# Extract marker-delimited helper libraries from commands/council/council.md:
+# the Step 5b synthesis helpers (`extract_synthesis_lib`), and any other pair via
+# `extract_marked_lib <file> <outfile> <marker-name>` (council-quota-lib in
+# Step 4, council-lineage-lib in Step 2b).
 #
 # council.md carries council_normalize_text, council_assign_labels and
 # council_fence_block inline in its Step 5b bash fence, between two marker
@@ -18,7 +21,7 @@ SYNTH_LIB_CLOSE='# <<< council-synthesis-lib'
 # extract_marked_lib <file> <outfile> <marker-name> — the same extraction for
 # any `# >>> <marker-name>` / `# <<< <marker-name>` pair. council.md carries
 # three: council-synthesis-lib (Step 5b), council-quota-lib (Step 4) and
-# council-lineage-lib (Step 1). Marker names are compared as whole-line
+# council-lineage-lib (Step 2b). Marker names are compared as whole-line
 # prefixes, so one name must not be a prefix of another.
 extract_marked_lib() {
   local src="$1" out="$2" name="$3"

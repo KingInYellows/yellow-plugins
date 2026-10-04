@@ -63,11 +63,13 @@ The legitimate Bash surface for this agent covers ONLY:
 - `mktemp /tmp/council-opencode-XXXXXX.json` — JSONL capture
 - `mktemp /tmp/council-opencode-err-XXXXXX.txt` — stderr capture
 - `timeout --signal=TERM --kill-after=10 ${COUNCIL_TIMEOUT:-600}` — timeout guard
-- `opencode run --format json --variant high [--model <slug>] "..."` — OpenCode CLI invocation; `--model` follows `COUNCIL_OPENCODE_MODEL` (unset: DeepSeek V4 Pro via OpenRouter; set but empty: omitted)
+- `opencode run --format json --variant high --print-logs --log-level ERROR [--model <slug>] "..."` — OpenCode CLI invocation; `--model` follows `COUNCIL_OPENCODE_MODEL` (unset: DeepSeek V4 Pro via OpenRouter; set but empty: omitted)
 - `opencode session delete <id>` — REQUIRED post-call cleanup
 - `jq -r '...'` — extract `text` events and `sessionID`
 - `awk '...'` — credential redaction (applied to extracted text only)
-- `grep` / `awk` / `sed` — output parsing
+- `grep` / `awk` / `sed` — output parsing, including the quota ETA and the
+  sanitizer for provider error text (`tr` flatten and control-character strip,
+  URL and long-token masking, `head -c` cap)
 - `printf` — structured findings output
 - `rm -f` — temp file cleanup
 
@@ -187,12 +189,12 @@ fi
 # shape as the pack-size guard above.
 case "$OC_MODEL" in
   "") ;;
-  [!A-Za-z0-9]* | *[!A-Za-z0-9._~:/-]*)
+  [![:alnum:]]* | *[![:alnum:]._~:/@-]*)
     printf '[opencode-reviewer] Error: COUNCIL_OPENCODE_MODEL is not a plain model slug\n' >&2
     printf 'CLI_EXIT=skipped\n'
     printf 'verdict=UNAVAILABLE\n'
     printf 'confidence=N/A\n'
-    printf 'summary=COUNCIL_OPENCODE_MODEL is not a plain model slug (letters, digits and . _ ~ : / - only, starting with a letter or digit); CLI not invoked. Set it to a model listed by "opencode models".\n'
+    printf 'summary=COUNCIL_OPENCODE_MODEL is not a plain model slug (letters, digits and . _ ~ : / @ - only, starting with a letter or digit); CLI not invoked. Set it to a model listed by "opencode models".\n'
     case "$PACK_FILE" in /tmp/council-opencode-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
     rm -f "$OUTPUT_FILE" "$STDERR_FILE"
     exit 0 ;;
@@ -212,8 +214,8 @@ printf 'CLI_EXIT=%s\n' "$CLI_EXIT"
 ```
 
 Capture the printed CLI_EXIT value as well — later blocks substitute it
-alongside the three paths. If the pack-size guard fired (`CLI_EXIT=skipped`
-was printed), the CLI was never invoked: report the printed `verdict=` /
+alongside the three paths. If a pre-invocation guard fired (the pack-size guard
+or the model-slug guard; `CLI_EXIT=skipped` was printed), the CLI was never invoked: report the printed `verdict=` /
 `confidence=` / `summary=` triplet as this reviewer's final result and skip
 Steps 4-7, exactly as with the failure arms in Step 6.
 
@@ -335,17 +337,18 @@ case $CLI_EXIT in
       printf 'fenced_output_path=/dev/null\n'
       printf 'findings_block_begin\n'
       printf 'findings_block_end\n'
-    elif grep -q 'ProviderModelNotFoundError' "$STDERR_FILE" 2>/dev/null || [ "$ERROR_STATUS" = "401" ] || [ "$ERROR_STATUS" = "403" ]; then
+    elif grep -q 'ProviderModelNotFoundError' "$STDERR_FILE" 2>/dev/null || [ "$ERROR_STATUS" = "401" ]; then
       # R20: the configured model is unavailable, so the slot is UNAVAILABLE
       # with the fix named, never a bare ERROR. On opencode 1.18 an unknown
       # slug and a provider with no credential look identical in the JSON
       # event (an opaque UnknownError); only stderr, via --print-logs, says
       # `ProviderModelNotFoundError: Model not found: <slug>` (docs/spikes/
       # opencode-cli-format-json-2026-05-04.md, "OpenRouter Routing Spike").
-      # An invalid key comes back as an APIError with HTTP 401/403 instead.
+      # An invalid key comes back as an APIError with HTTP 401 instead. Other
+      # statuses (403 is also used for moderation and key limits) stay ERROR.
       # The slug is taken from stderr through a character whitelist, so only
       # model-identifier characters can reach summary=.
-      MISSING_SLUG=$(grep -m1 -o 'Model not found: [A-Za-z0-9._~:/-]*' "$STDERR_FILE" 2>/dev/null | sed -e 's/^Model not found: //' -e 's/[.:,]*$//' | head -c 120)
+      MISSING_SLUG=$(grep -m1 -o 'Model not found: [A-Za-z0-9._~:/@-]*' "$STDERR_FILE" 2>/dev/null | sed -e 's/^Model not found: //' -e 's/[.:,]*$//' | head -c 120)
       MISSING_PROVIDER="${MISSING_SLUG%%/*}"
       [ -n "$MISSING_PROVIDER" ] || MISSING_PROVIDER="<provider>"
       printf '[opencode-reviewer] Model or provider unavailable (%s) — returning UNAVAILABLE\n' "${MISSING_SLUG:-HTTP ${ERROR_STATUS:-?}}" >&2
@@ -353,8 +356,10 @@ case $CLI_EXIT in
       printf 'confidence=N/A\n'
       if [ -n "$MISSING_SLUG" ]; then
         printf 'summary=OpenCode model %s is unavailable (not listed, or its provider is not authenticated). Run "opencode auth login --provider %s" or set COUNCIL_OPENCODE_MODEL to a model listed by "opencode models".\n' "$MISSING_SLUG" "$MISSING_PROVIDER"
+      elif [ "$ERROR_STATUS" = "401" ]; then
+        printf 'summary=OpenCode provider rejected the credential (HTTP 401). Run "opencode auth login --provider <provider>" (an exported OPENROUTER_API_KEY overrides the stored credential) or set COUNCIL_OPENCODE_MODEL to a model listed by "opencode models".\n'
       else
-        printf 'summary=OpenCode provider rejected the credential (HTTP %s). Run "opencode auth login --provider <provider>" or set COUNCIL_OPENCODE_MODEL to a model listed by "opencode models".\n' "$ERROR_STATUS"
+        printf 'summary=OpenCode model or provider is unavailable (the opencode log named no model). Run "opencode auth login --provider <provider>" or set COUNCIL_OPENCODE_MODEL to a model listed by "opencode models".\n'
       fi
     elif [ -n "$ERROR_MSG" ]; then
       printf '[opencode-reviewer] Session error: %s\n' "$ERROR_MSG" >&2

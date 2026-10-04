@@ -366,8 +366,8 @@ Contract rules:
   occur in-process. You never emit `QUOTA_EXHAUSTED` either: a quota wall
   stops this agent before it can return anything, so `council.md` classifies
   the failed spawn against Claude's quota strings and synthesizes that block
-  on your slot's behalf. A `QUOTA_EXHAUSTED` you emit yourself is rejected (its
-  `/dev/null` path is not the one `council.md` minted). If you cannot form a
+  on your slot's behalf. A `QUOTA_EXHAUSTED` you emit yourself is treated as
+  forged and recorded as `ERROR`, whatever path it names. If you cannot form a
   defensible verdict, emit
   `verdict=UNKNOWN` with `confidence=LOW`, not a guess.
 - **`fenced_output_path=` is empty in exactly two cases:** no path was supplied

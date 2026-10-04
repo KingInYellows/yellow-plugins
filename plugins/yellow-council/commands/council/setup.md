@@ -126,8 +126,10 @@ if command -v opencode >/dev/null 2>&1; then
       # codes, then match the provider name after the bullet glyph.
       ESC=$(printf '\033')
       OC_AUTH=$(cd /tmp && timeout --signal=TERM --kill-after=5 15 opencode auth list --pure </dev/null 2>&1); OC_AUTH_RC=$?
-      if [ "$OC_AUTH_RC" -eq 124 ] || [ "$OC_AUTH_RC" -eq 137 ]; then
-        printf '[yellow-council] opencode OpenRouter auth: check skipped (opencode auth list timed out); re-run /council:setup\n'
+      if [ "$OC_AUTH_RC" -ne 0 ]; then
+        # Timed out (124/137), crashed, or an opencode that rejects --pure: the
+        # check did not run, which is not the same as "no credential".
+        printf '[yellow-council] opencode OpenRouter auth: check skipped (opencode auth list exited %s); re-run /council:setup\n' "$OC_AUTH_RC"
       elif printf '%s\n' "$OC_AUTH" | sed "s/${ESC}\[[0-9;?]*[A-Za-z]//g" \
            | grep -qE '^[^A-Za-z0-9]*OpenRouter([[:space:]]|$)'; then
         printf '[yellow-council] opencode OpenRouter auth: ok\n'
@@ -208,10 +210,12 @@ if command -v opencode >/dev/null 2>&1; then
     openrouter/*)
       ESC=$(printf '\033')
       OC_AUTH=$(cd /tmp && timeout --signal=TERM --kill-after=5 15 opencode auth list --pure </dev/null 2>&1); OC_AUTH_RC=$?
-      if [ "$OC_AUTH_RC" -ne 124 ] && [ "$OC_AUTH_RC" -ne 137 ] \
+      if [ "$OC_AUTH_RC" -eq 0 ] \
          && ! printf '%s\n' "$OC_AUTH" | sed "s/${ESC}\[[0-9;?]*[A-Za-z]//g" \
               | grep -qE '^[^A-Za-z0-9]*OpenRouter([[:space:]]|$)'; then
         OPENCODE_STATUS="installed (needs OpenRouter auth)"
+        # The slot will return UNAVAILABLE, so it is not an available reviewer.
+        READY_COUNT=$((READY_COUNT - 1))
       fi ;;
   esac
 else

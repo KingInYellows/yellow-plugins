@@ -29,7 +29,8 @@ and never auto-commits. The user decides what to do with the verdicts.
   - `agy` — Google Antigravity CLI v1.0+ (replaces Gemini CLI, which stopped
     serving consumer subscriptions on 2026-06-18; run `agy` once
     interactively to migrate auth, `agy plugin import gemini` for extensions)
-  - `opencode` — OpenCode CLI v1.14+ (curl install or npm `opencode-ai`)
+  - `opencode` — OpenCode CLI v1.14+ (curl install or npm `opencode-ai`); the
+    model routing and error classification were verified on 1.18.34 only
 - **Optional cross-plugin dependency:** `yellow-codex` ≥ 0.2.0 — provides the
   `yellow-codex:review:codex-reviewer` agent. If absent, council runs with
   3 of 4 reviewers (graceful soft-skip).
@@ -206,7 +207,7 @@ Codex agent.)
 | Var | Type | Default | Purpose |
 |-----|------|---------|---------|
 | `COUNCIL_TIMEOUT` | integer seconds | `600` | Per-reviewer timeout passed to GNU `timeout`. Increase for very slow models / very large packs. Must be a plain integer number of seconds; non-integer values (e.g. `10m`, `600s`) fall back to 600 with a warning. |
-| `COUNCIL_OPENCODE_MODEL` | model slug | `openrouter/deepseek/deepseek-v4-pro` | OpenCode `--model`, resolved by presence: **unset** uses the default, which needs OpenRouter auth (`opencode auth login --provider openrouter`, or `OPENROUTER_API_KEY`); **set but empty** (`export COUNCIL_OPENCODE_MODEL=""`) passes no `--model` (V1); **non-empty** is passed verbatim (e.g. `opencode/deepseek-v4-pro` for OpenCode Zen, verified listed). An unlisted model or unauthenticated provider returns `UNAVAILABLE`. The resolved model and lineage are printed in Step 1 and shown in the report header. |
+| `COUNCIL_OPENCODE_MODEL` | model slug | `openrouter/deepseek/deepseek-v4-pro` | OpenCode `--model`, resolved by presence: **unset** uses the default, which needs OpenRouter auth (`opencode auth login --provider openrouter`, or `OPENROUTER_API_KEY`); **set but empty** (`export COUNCIL_OPENCODE_MODEL=""`) passes no `--model` (V1); **non-empty** is passed verbatim (e.g. `opencode/deepseek-v4-pro` for OpenCode Zen, verified listed). An unlisted model or unauthenticated provider returns `UNAVAILABLE`. The resolved model and lineage are printed in Step 2b and shown in the report header. |
 | `COUNCIL_OPENCODE_VARIANT` | `high \| max \| minimal` | `high` | OpenCode `--variant` reasoning effort. `max` is significantly slower; reserve for explicit override. |
 | `COUNCIL_PATH_CHAR_CAP` | integer chars | `8000` | Per-file content cap for `--paths` injection in `debug`/`question` modes. |
 | `COUNCIL_PATH_MAX_FILES` | integer | `3` | Maximum number of files accepted via `--paths` in any single invocation. |
@@ -229,13 +230,26 @@ just one. `synthesis.bats` extracts the Step 5b helper library (between the
 (Cancel) and 9 fences from `council.md` and runs them under bash, zsh and zsh
 with snapshot options, and
 under every awk it finds; it needs zsh, and fails rather than skips in CI
-without it. There is no fresh-machine install CI (see Known Limitations).
+without it. `quota-lineage.bats` extracts the `council-quota-lib` (Step 4) and
+`council-lineage-lib` (Step 2b) marker pairs, runs the Step 4 parse fence, the
+Step 2b fence (with a stub `opencode`) and the codex, gemini and opencode error
+arms under bash, zsh and zsh with noclobber, and fails when the four copies of the
+reset-ETA extraction or the OpenCode default slug drift. Its fixtures must never
+point `rm` at a device path: a root runner would delete it. There is no
+fresh-machine install CI (see Known Limitations).
 
 ## Known Limitations
 
 - **Quota detection is best-effort and string-matched.** Gemini (agy) detection is
   the `RESOURCE_EXHAUSTED` floor only: the Antigravity spike recorded no
-  exhaustion catalog. Codex matches `insufficient_quota` and
+  exhaustion catalog, and a bare `RESOURCE_EXHAUSTED` is also how Google reports
+  some transient throttling, so a transient condition can read as quota
+  exhaustion with "reset time not reported". The claude classifier runs only on
+  a real spawn failure (no `verdict=` or `confidence=` line, no fenced file at the
+  minted path, at most 2000 characters) and echoes an ETA only when it is a plain
+  time or duration. It has not been verified against a real spawn-failure
+  message, and an account-wide session or weekly limit may stop the orchestrating
+  turn as well. Codex matches `insufficient_quota` and
   `model_cap_exceeded`; OpenCode matches provider passthrough text and HTTP 402.
   A provider that words quota errors differently is recorded as `ERROR`.
 - **Lineage detection is best-effort.** `/council` maps each slot's model to a

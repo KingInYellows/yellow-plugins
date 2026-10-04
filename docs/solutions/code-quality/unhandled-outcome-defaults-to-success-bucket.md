@@ -414,9 +414,10 @@ assumed rather than confirmed from the real primary source.
 
 ## Update — 2026-10-03: a non-voting verdict plus a sentinel path touches six kinds of site
 
-Plan-time record, not shipped behaviour. Found while expanding yellow-council
-V2 shell 04 (a QUOTA_EXHAUSTED verdict) against origin/main 0c384957a. Re-grep
-before relying on any claim below.
+Written at plan time and implemented in PR 992 (the line anchors below are
+from origin/main 0c384957a and have since moved). Found while expanding
+yellow-council V2 shell 04 (a QUOTA_EXHAUSTED verdict). Re-grep before relying
+on any claim below.
 
 The spec gives quota-exhausted stubs `fenced_output_path=/dev/null` and a new
 non-voting verdict. A pattern survey found that each site below encodes the

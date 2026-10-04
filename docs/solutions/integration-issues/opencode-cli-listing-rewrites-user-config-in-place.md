@@ -32,9 +32,13 @@ was not established. It coincided with the migration run.
   classify empty output as exhaustion.
 - Prefer `--pure` ("run without external plugins", opencode 1.14.33) on
   probe commands; it should skip the plugin load that performed the
-  migration. Redirecting `XDG_CONFIG_HOME` to a temp dir may also isolate a
-  probe. Both are untested here, so confirm with `diff -r` that the real
-  directory is untouched.
+  migration. On 2026-10-03 (opencode 1.18.34) every spike probe used `--pure`
+  and `opencode.json` and `tui.json` were unchanged afterwards, which is
+  consistent with `--pure` avoiding the rewrite but does not prove it.
+  Redirecting `XDG_DATA_HOME` to an empty directory is verified to isolate
+  `auth.json` for credential tests; `XDG_CONFIG_HOME` is still untested.
+  Confirm with `diff -r` (excluding `node_modules`) that the real directory is
+  untouched.
 - `opencode auth login <arg>` treats the positional as a well-known-auth
   URL, not a provider id: `opencode auth login openrouter` fails with
   "fetch() URL is invalid". Use `opencode auth login --provider openrouter`.

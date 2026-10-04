@@ -242,8 +242,9 @@ Needs a reviewer that is genuinely out of quota (or one you can drive there).
 /council review
 # With one reviewer's provider quota exhausted:
 # Expected: that slot is excluded; Headline reads
-#   "<reviewer> quota exhausted (resets <ETA>)" with the ETA from the provider
-#   error (or "reset time not reported"); Reviewer Status lists QUOTA_EXHAUSTED
+#   "<reviewer> quota exhausted (<ETA>)" where <ETA> is "resets <time>",
+#   "resets in <duration>" or "reset time not reported", taken from the provider
+#   error; Reviewer Status lists QUOTA_EXHAUSTED
 # Expected: the Step 7 appendix for that slot says "no output: quota exhausted"
 #   (not "path refused"); no [council] Warning about /dev/null; council completes
 # Counter-check: a plain rate limit / HTTP 529 on a reviewer is recorded ERROR,
@@ -252,10 +253,16 @@ Needs a reviewer that is genuinely out of quota (or one you can drive there).
 
 ### 3.7 — OpenCode routing and lineage
 
+`/council` is a slash command, not a shell binary: the `env ...` prefixes below
+show which variable applies. Start Claude Code with the same variables set (for
+example `COUNCIL_OPENCODE_MODEL="" claude`) and run the slash command inside it.
+Step 2b runs only for `plan`, `review`, `debug` and `question`: bare `/council`
+and `/council fleet` must not start opencode.
+
 ```text
 # Resolved slug in the header (OpenRouter authenticated):
 env -u COUNCIL_OPENCODE_MODEL /council review
-# Expected: Step 1 prints "COUNCIL_MODELS: ... opencode=openrouter/deepseek/deepseek-v4-pro(deepseek)"
+# Expected: Step 2b prints "COUNCIL_MODELS: ... opencode=openrouter/deepseek/deepseek-v4-pro(deepseek)"
 #   and the report header "Models:" row shows the same value
 
 # Lineage collision warning:
@@ -275,7 +282,7 @@ COUNCIL_OPENCODE_MODEL=bogus/model /council review
 env -u COUNCIL_OPENCODE_MODEL XDG_DATA_HOME=$(mktemp -d) /council:setup
 # Expected: WARNING naming "opencode auth login --provider openrouter" and the opt-outs; no key material printed
 env -u COUNCIL_OPENCODE_MODEL XDG_DATA_HOME=$(mktemp -d) /council review
-# Expected: Step 1 warns "no OpenRouter credential found"; the OpenCode slot returns UNAVAILABLE
+# Expected: Step 2b warns "no OpenRouter credential found"; the OpenCode slot returns UNAVAILABLE
 #   with the same fix; the other slots still run
 ```
 
