@@ -50,4 +50,4 @@ its summary table now has `blocking` and `issues` columns instead of
 the checkout and, when it is ignored and untracked, snapshots it before the
 resolve (`guard-local-config`, authenticated by a digest the walk holds; a
 symlinked config is refused), checks it after, and clears the snapshot before
-the next PR; it stops the walk, restoring the file, if a PR changed it. `/review:sweep-all` gains a `Blocking` column.
+the next PR; it stops the walk, restoring the file, if a PR changed it. `/review:sweep` guards the same config around `/review:pr` and `/review:resolve` too (checked before the resolve runs and again after it, stopping with no contract line if either changed it). `/review:sweep-all` gains a `Blocking` column.

@@ -317,9 +317,10 @@ stop or item 3b's dirty-tree or config stop ends the walk.
    `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" clear "<guard-dir>"`
    (a rejected path is left for the OS temp sweep, never deleted).
 
-   Exit `0`: unchanged. Exit `3` (changed and restored) or `4` (restore
-   failed, or the snapshot failed its digest check; the live config was not
-   touched): print this PR's row, then
+   Exit `0`: unchanged. Exit `3` (changed and restored) or `4` (the snapshot
+   failed validation or its digest check, leaving the live config untouched,
+   or a restore failed, which may leave the change live): print this PR's
+   row, then
    `[review:resolve-stack] aborted at PR #<PR#>: yellow-plugins.local.md changed during the resolve`
    with the script's `changed:` / `restore failed:` lines. List the PR under
    Needs manual attention as `ignored config changed (restored)` or `ignored

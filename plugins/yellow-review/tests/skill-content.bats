@@ -353,6 +353,26 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   grep -q '^  Ledger:  <pending> pending, <attention> need attention' "$SWEEP"
 }
 
+@test "sweep: the ignored local config is snapshotted before /review:pr, checked before /review:resolve and after it, and cleared" {
+  snap=$(grep -n 'guard-local-config" snapshot' "$SWEEP" | head -1 | cut -d: -f1)
+  pr=$(grep -n '^### Step 2: Run /review:pr' "$SWEEP" | cut -d: -f1)
+  chk1=$(grep -n 'guard-local-config" check' "$SWEEP" | head -1 | cut -d: -f1)
+  chk2=$(grep -n 'guard-local-config" check' "$SWEEP" | tail -1 | cut -d: -f1)
+  res=$(grep -n '^### Step 3: Run /review:resolve' "$SWEEP" | cut -d: -f1)
+  clr=$(grep -n 'guard-local-config" clear' "$SWEEP" | head -1 | cut -d: -f1)
+  triage=$(grep -n '^### Step 3b: Reconcile the review-findings ledger' "$SWEEP" | cut -d: -f1)
+  [ -n "$snap" ] && [ -n "$pr" ] && [ -n "$chk1" ] && [ -n "$res" ] && [ -n "$clr" ] && [ -n "$triage" ]
+  [ "$snap" -lt "$pr" ] && [ "$pr" -lt "$chk1" ] && [ "$chk1" -lt "$res" ]
+  [ "$res" -lt "$chk2" ] && [ "$chk2" -lt "$clr" ] && [ "$clr" -lt "$triage" ]
+  [ "$chk1" -ne "$chk2" ]
+  [ "$(grep -c 'guard-local-config" clear' "$SWEEP")" -eq 1 ]
+  text=$(flat "$SWEEP")
+  [[ "$text" == *'guard-local-config" check "<guard-dir>" "<guard-digest>"'* ]]
+  [[ "$text" == *'set `<guard-dir>` to `none`'* ]]
+  [[ "$text" == *'yellow-plugins.local.md changed during the review'* ]]
+  [[ "$text" == *'Print no `Sweep:` or `Resolve:` line'* ]]
+}
+
 @test "sweep-all: the empty-list exit always prints and stops; only the prune prompt is conditional" {
   block=$(awk '/^\*\*Empty-list early exit\.\*\*/ { p = 1 } /^### Step 3: Upfront confirmation gate/ { p = 0 } p' "$SWEEP_ALL" | tr -s ' \n' ' ')
   grep -qF 'If the resulting array is empty (`[]` or length 0), run both steps below in order, then stop:' <<<"$block"

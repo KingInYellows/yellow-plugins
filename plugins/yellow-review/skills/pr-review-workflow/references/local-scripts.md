@@ -27,7 +27,8 @@ callers that walk several PRs. Exit codes and markers are defined in
   Snapshot the ignored `yellow-plugins.local.md` (prints the path, then
   `digest=<hex>` for the caller to hold), then detect a resolver
   edit to it and put it back; exit 0 unchanged, 3 changed and restored, 4
-  restore failed or digest mismatch (live config untouched); a symlinked
+  snapshot validation or digest failure (live config untouched) or a failed
+  restore (the change may still be live); a symlinked
   config is refused at snapshot (exit 2).
   `/review:resolve-stack` runs it around the walk
 - **check-resolve-text** `<file>...` — Exits 2 when text looks like a

@@ -98,6 +98,48 @@ If `exit` is non-zero, the fetch failed and the PR's state is unknown: report
 `ratelimited=1`) and stop. Print no skip line, so `/review:sweep-all` finds no
 contract and stops the batch as `no contract`.
 
+### Step 1b: Guard the local config
+
+`git status` cannot see the gitignored `yellow-plugins.local.md`, and its
+`resolve_pr.verify_command` is run without confirmation by the unattended
+`/review:resolve`. An untrusted PR can steer `/review:pr`'s fix `Edit` into
+that file, so snapshot it before `/review:pr` and validate it before resolve
+reads it. This is `/review:resolve-stack` item 1b: classify the file after the
+checkout, never from an earlier result:
+
+```bash
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
+if [ -n "$TOP" ]; then
+  git -C "$TOP" ls-files --error-unmatch -- yellow-plugins.local.md >/dev/null 2>&1; rc=$?
+else
+  rc=128
+fi
+case "$rc" in
+  0) printf 'tracked\n' ;;
+  1) if git -C "$TOP" check-ignore -q -- yellow-plugins.local.md; then printf 'ignored\n'; else printf 'unignored\n'; fi ;;
+  *) printf 'unknown\n' ;;
+esac
+```
+
+Only `ignored` is guarded. For any other result, log
+`[review:sweep] PR #<PR#>: yellow-plugins.local.md is not an ignored untracked file; not guarded`,
+set `<guard-dir>` to `none`, and skip every `guard-local-config` call below
+(`/review:resolve` treats a tracked config as untrusted). For `ignored`:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" snapshot
+```
+
+The output is the snapshot path, then `digest=<hex>`. Keep the path as
+`<guard-dir>` and the hex as `<guard-digest>`, and substitute both as
+literals in Steps 2b and 3a (variables do not survive across Bash calls).
+Never write the digest to a file. On a non-zero exit, report
+`[review:sweep] Error: could not snapshot the local config.` and stop with no
+skip line.
+
+Every stop after this step, including every Error Handling case below, first
+runs the `clear` call in Step 3a.
+
 ### Step 2: Run /review:pr --non-interactive
 
 Invoke the `Skill` tool with `skill: "review:pr"`. Pass the args string
@@ -131,7 +173,27 @@ ACTUAL=$(git rev-parse --abbrev-ref HEAD)
 
 If the branch does not match, stop — do not proceed to Step 3 — and end the
 output with the skip line `Sweep: skipped (branch-mismatch)` (see "Skip
-line").
+line"). Run Step 2b's check and the Step 3a `clear` first, so a config edit
+from `/review:pr` is restored even on this stop.
+
+### Step 2b: Check the local config before resolve
+
+Unless `<guard-dir>` is `none`, compare the ignored config with Step 1b's
+snapshot before `/review:resolve` can read it. The check restores a changed,
+created or deleted `yellow-plugins.local.md`:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" check "<guard-dir>" "<guard-digest>"
+```
+
+Exit `0`: unchanged, continue to Step 3 with the same snapshot. Exit `3`
+(changed and restored), `4` (restore failed, or the snapshot failed its
+digest check) or any other exit: run the Step 3a `clear` call, print
+`[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md changed during the review`
+with the script's `changed:` / `restore failed:` lines (for exit `4` add
+`inspect yellow-plugins.local.md before any further run`), and stop without
+invoking `/review:resolve`. Print no `Sweep:` or `Resolve:` line, so
+`/review:sweep-all` records `no contract` and stops the batch.
 
 ### Step 3: Run /review:resolve --non-interactive
 
@@ -156,7 +218,7 @@ documented unattended rule (for issues: at most 3 per PR, and only with a
 one-line out-of-scope reason). The Skill tool returns no machine-readable
 exit status, so the wrapper cannot programmatically detect whether
 `/review:pr` errored or its fixes weren't pushed — sweep proceeds
-unconditionally; if `/review:pr` left no fixes to resolve against,
+unconditionally (Step 2b's config check is the one exception); if `/review:pr` left no fixes to resolve against,
 `/review:resolve` will simply find fewer threads to address. Post-hoc
 cleanup is the user's responsibility (this risk is documented in the
 plan that authored the gate removal).
@@ -168,6 +230,30 @@ a reply and are resolved, `oos` threads get a follow-up issue, and
 `disagree` / `unclear` threads get a reply and stay open as blocking.
 Human-reviewer threads are resolved only on hard evidence by default. Its
 last output line is the `Resolve:` contract line.
+
+### Step 3a: Check the local config again and clear the snapshot
+
+Unless `<guard-dir>` is `none`, run Step 2b's check once more with the same
+snapshot: `/review:resolve` can also edit the ignored config, and a later
+run would execute its `verify_command`.
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" check "<guard-dir>" "<guard-digest>"
+```
+
+Then, in its own Bash call and whatever the check reported (and on every
+earlier stop after Step 1b), remove the snapshot (a rejected path is left for
+the OS temp sweep, never deleted):
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" clear "<guard-dir>"
+```
+
+Exit `0`: continue. Exit `3`, `4` or any other exit: print
+`[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md changed during the resolve`
+with the script's lines and stop. Skip Step 3b, and print neither the
+nested `Resolve:` line nor a `Sweep:` line, so `/review:sweep-all` records
+`no contract` and stops the batch.
 
 ### Step 3b: Reconcile the review-findings ledger
 
@@ -297,6 +383,10 @@ they are not specific to this PR, so the batch must still stop.
   resolve.` and stop. Indicates `/review:pr` errored mid-checkout or
   another tool changed branches during the run — re-run after manually
   checking out the PR head branch.
+- **Local config changed or unguardable** (Steps 1b, 2b, 3a): the snapshot is
+  cleared, the file restored when possible, and the sweep stops with no
+  `Sweep:` or `Resolve:` line, so `/review:sweep-all` records `no contract`.
+  Review-time changes stop before `/review:resolve` runs.
 - **`/review:pr` failed silently**: with the human gate removed, sweep
   proceeds to `/review:resolve` unconditionally. If `/review:pr`'s push
   failed or fixes weren't applied, `/review:resolve` may find unexpected

@@ -243,8 +243,9 @@ resolution, and sequential stack review. Graphite-native workflow.
   ignored `yellow-plugins.local.md` (printing the path and a `digest=<hex>`
   line the caller holds), then detect and restore a resolver edit
   to it (changed, created or deleted; `git status` cannot see it); exit 3
-  means changed and restored, 4 means the restore failed or the snapshot
-  failed its digest check (live config untouched), and a symlinked
+  means changed and restored, 4 means the snapshot failed validation or its
+  digest check (live config untouched) or a restore failed (the change may
+  still be live), and a symlinked
   config is refused at snapshot (exit 2).
   `/review:resolve-stack` snapshots per PR (after its checkout, before the resolve), checks after it and clears before the next PR
 - `file-line-counts <diff-base-ref>` — Authoritative base/head line counts per
