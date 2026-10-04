@@ -7,13 +7,18 @@
 # Usage: guard-local-config snapshot
 #        guard-local-config check <snap-dir>
 #        guard-local-config clear <snap-dir>
-#   snapshot: record each guarded file's state (a regular file's bytes, a
-#             symlink's target, or absence) in a private mktemp directory and
-#             print its path. Exit 2 when a guarded path is a directory or
-#             another special file, because it cannot be restored.
+#   snapshot: record each guarded file's state (a regular file's bytes or
+#             absence) in a private mktemp directory and print its path. Exit 2
+#             when a guarded path is a symlink (its target's bytes are not
+#             snapshotted, so a rewrite through it would go unseen), a
+#             directory or another special file.
 #   check:    compare each guarded path with the snapshot. A path that changed
 #             is put back from the snapshot (a created file is deleted), then
 #             compared again. Prints `changed: <path>` per path that differed.
+#             Every snapshot entry (state, copy and the content hash recorded
+#             at snapshot time) is validated before anything is removed; an
+#             invalid snapshot exits 4 and leaves the live file untouched. A
+#             restore is staged beside the file and moved in with mv -f.
 #   clear:    remove the snapshot directory.
 # Exit codes: 0 nothing changed, 3 something changed and every path was
 #   restored, 4 a path could not be restored (stop; the file is tampered),
@@ -50,6 +55,58 @@ valid_dir() {
     [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ]
 }
 
+# hash_of <file>: content hash recorded at snapshot time and re-checked before a restore.
+hash_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum -- "$1" | cut -d' ' -f1
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 -- "$1" | cut -d' ' -f1
+    else
+        cksum <"$1" | tr ' ' '-'
+    fi
+}
+
+# valid_entry <index>: the snapshot's state (and, for a file, its copy and the
+# hash recorded for it) is present and intact. A restore trusts nothing else.
+valid_entry() {
+    local i="$1" want h
+    [ -f "$SNAP/state.$i" ] && [ ! -L "$SNAP/state.$i" ] || return 1
+    want=$(cat -- "$SNAP/state.$i") || return 1
+    case "$want" in
+        absent | symlink:?*) ;;
+        file)
+            [ -f "$SNAP/copy.$i" ] && [ ! -L "$SNAP/copy.$i" ] || return 1
+            [ -f "$SNAP/hash.$i" ] && [ ! -L "$SNAP/hash.$i" ] || return 1
+            h=$(cat -- "$SNAP/hash.$i") || return 1
+            [ -n "$h" ] && [ "$h" = "$(hash_of "$SNAP/copy.$i")" ] || return 1
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+# restore_entry <index> <path>: put the snapshotted state back. The new entry is
+# staged in a private directory beside <path> and moved in with mv -f (a rename
+# on one filesystem), so the live path is never left half-written.
+restore_entry() {
+    local i="$1" p="$2" want stage
+    want=$(cat -- "$SNAP/state.$i") || return 1
+    if [ "$want" = absent ]; then
+        rm -rf -- "$p" 2>/dev/null
+        return 0
+    fi
+    stage=$(mktemp -d "$(dirname -- "$p")/.guard-restore.XXXXXX" 2>/dev/null) || return 1
+    case "$want" in
+        file) cp -p -- "$SNAP/copy.$i" "$stage/new" 2>/dev/null || { rm -rf -- "$stage"; return 1; } ;;
+        symlink:*) ln -s -- "${want#symlink:}" "$stage/new" 2>/dev/null || { rm -rf -- "$stage"; return 1; } ;;
+    esac
+    # mv -f would move into a directory (or a symlink to one) instead of replacing it.
+    if [ -d "$p" ]; then rm -rf -- "$p" 2>/dev/null; fi
+    mv -f -- "$stage/new" "$p" 2>/dev/null
+    local rc=$?
+    rm -rf -- "$stage"
+    return "$rc"
+}
+
 # state_of <path>: file | absent | symlink:<target> | other
 state_of() {
     if [ -L "$1" ]; then
@@ -83,13 +140,23 @@ case "$CMD" in
         for rel in "${GUARDED[@]}"; do
             p="$TOP/$rel"
             st=$(state_of "$p")
-            if [ "$st" = other ]; then
-                rm -rf -- "$SNAP"
-                die 2 "cannot guard $rel: it is not a regular file, a symlink or absent"
-            fi
+            # A symlink's referent can change while its target string stays the
+            # same, so the guard would report "unchanged" after a rewrite. Fail
+            # closed instead of snapshotting through it.
+            case "$st" in
+                other)
+                    rm -rf -- "$SNAP"
+                    die 2 "cannot guard $rel: it is not a regular file or absent"
+                    ;;
+                symlink:*)
+                    rm -rf -- "$SNAP"
+                    die 2 "cannot guard $rel: it is a symlink, and a change to its target would go unseen; replace it with a regular file"
+                    ;;
+            esac
             printf '%s\n' "$st" >|"$SNAP/state.$i"
             if [ "$st" = file ]; then
                 cp -p -- "$p" "$SNAP/copy.$i" || { rm -rf -- "$SNAP"; die 2 "could not copy $rel"; }
+                hash_of "$SNAP/copy.$i" >|"$SNAP/hash.$i" || { rm -rf -- "$SNAP"; die 2 "could not hash $rel"; }
             fi
             i=$((i + 1))
         done
@@ -99,6 +166,16 @@ case "$CMD" in
         [ $# -eq 2 ] || usage
         SNAP="$2"
         valid_dir "$SNAP" || die 2 "snapshot directory rejected: $SNAP"
+        # Prove the whole snapshot is usable before touching any live path: a
+        # missing or corrupted entry must fail without modifying the config.
+        i=0
+        for rel in "${GUARDED[@]}"; do
+            if ! valid_entry "$i"; then
+                printf 'snapshot invalid: %s\n' "$rel"
+                exit 4
+            fi
+            i=$((i + 1))
+        done
         changed=0
         failed=0
         i=0
@@ -107,13 +184,7 @@ case "$CMD" in
             if ! same_as_snapshot "$i" "$p"; then
                 changed=1
                 printf 'changed: %s\n' "$rel"
-                want=$(cat -- "$SNAP/state.$i")
-                rm -rf -- "$p" 2>/dev/null
-                case "$want" in
-                    file) cp -p -- "$SNAP/copy.$i" "$p" 2>/dev/null ;;
-                    symlink:*) ln -s -- "${want#symlink:}" "$p" 2>/dev/null ;;
-                    absent) : ;;
-                esac
+                restore_entry "$i" "$p"
                 if ! same_as_snapshot "$i" "$p"; then
                     failed=1
                     printf 'restore failed: %s\n' "$rel"

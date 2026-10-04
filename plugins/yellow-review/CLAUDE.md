@@ -242,7 +242,8 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `guard-local-config snapshot | check <dir> | clear <dir>` — Snapshot the
   ignored `yellow-plugins.local.md`, then detect and restore a resolver edit
   to it (changed, created or deleted; `git status` cannot see it); exit 3
-  means changed and restored, 4 means the restore failed.
+  means changed and restored, 4 means the restore failed, and a symlinked
+  config is refused at snapshot (exit 2).
   `/review:resolve-stack` snapshots before the walk and checks after each PR
 - `file-line-counts <diff-base-ref>` — Authoritative base/head line counts per
   changed file for `thermonuclear-reviewer`'s size-threshold rule; the

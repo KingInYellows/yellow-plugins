@@ -26,7 +26,8 @@ callers that walk several PRs. Exit codes and markers are defined in
 - **guard-local-config** `snapshot` | `check <snap-dir>` | `clear <snap-dir>` —
   Snapshot the ignored `yellow-plugins.local.md`, then detect a resolver
   edit to it and put it back; exit 0 unchanged, 3 changed and restored, 4
-  restore failed. `/review:resolve-stack` runs it around the walk
+  restore failed; a symlinked config is refused at snapshot (exit 2).
+  `/review:resolve-stack` runs it around the walk
 - **check-resolve-text** `<file>...` — Exits 2 when text looks like a
   credential or cannot be read; run it on text posted outside the resolve
   scripts (for example a Linear issue)

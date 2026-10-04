@@ -523,6 +523,10 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   [[ "$text" == *'guard-local-config" clear "<guard-dir>"'* ]]
   [[ "$text" == *'aborted at PR #<PR#>: yellow-plugins.local.md changed during the resolve'* ]]
   [[ "$text" == *'`not attempted (config changed)`'* ]]
+  # Only an ignored, untracked config is guarded; a tracked one is skipped.
+  [[ "$text" == *'git -C "$TOP" check-ignore -q -- yellow-plugins.local.md'* ]]
+  [[ "$text" == *'set `<guard-dir>` to `none`'* ]]
+  [[ "$text" == *'Unless `<guard-dir>` is `none`'* ]]
   # The check precedes the status check inside item 3b.
   chk=$(grep -n 'guard-local-config" check' "$RESOLVE_STACK" | head -1 | cut -d: -f1)
   sts=$(grep -n 'OUT=$(git status --porcelain=v1' "$RESOLVE_STACK" | head -1 | cut -d: -f1)
