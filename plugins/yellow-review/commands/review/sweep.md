@@ -79,14 +79,24 @@ set -eu
 Confirm the PR is open:
 
 ```bash
-set -eu
-gh pr view <PR#> --json state -q .state
+OUT=$(gh pr view <PR#> --json state -q .state 2>&1) && RC=0 || RC=$?
+if [ "$RC" -eq 0 ]; then
+  printf 'state=%s exit=0 ratelimited=0\n' "$OUT"
+elif printf '%s' "$OUT" | grep -qiE 'rate limit|HTTP 429'; then
+  printf 'state=unreadable exit=%s ratelimited=1\n' "$RC"
+else
+  printf 'state=unreadable exit=%s ratelimited=0\n' "$RC"
+fi
 ```
 
-If the command fails or the state is not `OPEN`, report
-`[review:sweep] Error: PR #<PR#> is not open or could not be fetched.` and
-stop, ending the output with the skip line `Sweep: skipped (pr-not-open)`
-(see "Skip line").
+If `exit=0` and the state is not `OPEN`, report
+`[review:sweep] Error: PR #<PR#> is not open.` and stop, ending the output
+with the skip line `Sweep: skipped (pr-not-open)` (see "Skip line").
+
+If `exit` is non-zero, the fetch failed and the PR's state is unknown: report
+`[review:sweep] Error: could not fetch PR #<PR#>.` (add `GitHub rate limit` when
+`ratelimited=1`) and stop. Print no skip line, so `/review:sweep-all` finds no
+contract and stops the batch as `no contract`.
 
 ### Step 2: Run /review:pr --non-interactive
 
@@ -263,8 +273,10 @@ Sweep: skipped (branch-mismatch)
 `/review:sweep-all` reads it by the anchored form
 `^Sweep: skipped \((pr-not-open|branch-mismatch)\)$`, on the last line only,
 and records `skipped — <reason>`. Its absence means the sweep crashed or was
-cut off, which stays `no contract`. Argument errors and a dirty tree print no
-skip line: they are not specific to this PR, so the batch must still stop.
+cut off, which stays `no contract`. `pr-not-open` is printed only when
+`gh pr view` succeeded and returned a state other than `OPEN`. Argument errors,
+a failed PR fetch (including a rate limit) and a dirty tree print no skip line:
+they are not specific to this PR, so the batch must still stop.
 
 ## Error Handling
 
@@ -272,8 +284,10 @@ skip line: they are not specific to this PR, so the batch must still stop.
   GitHub PR URL, a valid branch name, and the current branch has no PR):
   `[review:sweep] Error: could not resolve PR number from input
   <sanitized $ARGUMENTS>.` and stop.
-- **PR not open / not found**: `[review:sweep] Error: PR #<PR#> is not
-  open or could not be fetched.` and stop.
+- **PR not open**: `[review:sweep] Error: PR #<PR#> is not open.` and stop,
+  ending with `Sweep: skipped (pr-not-open)`.
+- **PR fetch failed** (including a rate limit): `[review:sweep] Error: could
+  not fetch PR #<PR#>.` and stop, with no skip line.
 - **Dirty working directory** at Step 1: `[review:sweep] Error:
   uncommitted changes detected. Commit or stash first.` and stop.
   Both downstream skills enforce this independently; the wrapper-level

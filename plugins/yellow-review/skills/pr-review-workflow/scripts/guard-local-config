@@ -36,7 +36,7 @@
 #   (stop; the snapshot or file is tampered), 2 usage (including a missing or
 #   malformed digest), unsafe snapshot directory or a path that cannot be guarded.
 # Guarded paths (repository root): yellow-plugins.local.md.
-# Callers: /review:resolve-stack (Step 2b snapshot, item 3b check, Step 4 clear).
+# Callers: /review:resolve-stack (per PR: item 1b snapshot, item 3b check and clear).
 
 set -uo pipefail
 

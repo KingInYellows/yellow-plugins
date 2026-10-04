@@ -181,50 +181,6 @@ If no open non-draft PRs remain (either provider), report
 `[review:resolve-stack] No open PRs found in current stack.` and exit
 successfully — there is nothing to walk.
 
-### Step 2b: Snapshot the Trusted Ignored Files
-
-`git status` cannot see gitignored files, so a resolver edit to the ignored
-`yellow-plugins.local.md` (whose `resolve_pr.verify_command` a later unattended
-`/review:resolve` would run) leaves a clean tree and passes item 3b's status
-check. Guard it only when it is ignored and untracked. A tracked config can
-legitimately differ between stack branches, so a baseline taken before the
-first checkout would flag the next checkout as tampering; `resolve-pr.md`
-already treats a tracked config as untrusted and skips unattended
-verification, and `git status` sees its edits. Classify it first:
-
-```bash
-TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
-if [ -n "$TOP" ]; then
-  git -C "$TOP" ls-files --error-unmatch -- yellow-plugins.local.md >/dev/null 2>&1; rc=$?
-else
-  rc=128
-fi
-case "$rc" in
-  0) printf 'tracked\n' ;;
-  1) if git -C "$TOP" check-ignore -q -- yellow-plugins.local.md; then printf 'ignored\n'; else printf 'unignored\n'; fi ;;
-  *) printf 'unknown\n' ;;
-esac
-```
-
-Only `ignored` is guarded. For `tracked`, `unknown` (any other git failure,
-treated as tracked) or `unignored` (an untracked, non-ignored file shows in
-`git status`), log
-`[review:resolve-stack] yellow-plugins.local.md is not an ignored untracked file; not guarded`,
-set `<guard-dir>` to `none`, and skip the snapshot, item 3b's config check and
-Step 4's clear. For `ignored`, snapshot it once, before the first resolve:
-
-```bash
-"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" snapshot
-```
-
-The output is the snapshot path, then a `digest=<hex>` line. Keep the path as
-`<guard-dir>` and the hex after `digest=` as `<guard-digest>`, and substitute
-both as literals in item 3b and Step 4 (variables do not survive across Bash
-calls). Only the digest authenticates the snapshot; never write it into the
-snapshot directory or a file. A non-zero exit
-stops the command before any resolve: `[review:resolve-stack] Error: could not
-snapshot the local config.` and exit `1`.
-
 ### Step 3: Walk the stack
 
 Before the first iteration, Read
@@ -245,6 +201,47 @@ stop or item 3b's dirty-tree or config stop ends the walk.
    stack in a bad state): log
    `[review:resolve-stack] checkout failed for <branch>; skipping` and continue
    to the next PR.
+
+1b. **Guard the local config** — `git status` cannot see gitignored files, so
+   a resolver edit to the ignored `yellow-plugins.local.md` (whose
+   `resolve_pr.verify_command` a later unattended `/review:resolve` would run)
+   leaves a clean tree. Classify it after every checkout; never carry an
+   earlier branch's result forward (a lower branch can untrack and ignore a
+   config the starting branch tracks):
+
+   ```bash
+   TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
+   if [ -n "$TOP" ]; then
+     git -C "$TOP" ls-files --error-unmatch -- yellow-plugins.local.md >/dev/null 2>&1; rc=$?
+   else
+     rc=128
+   fi
+   case "$rc" in
+     0) printf 'tracked\n' ;;
+     1) if git -C "$TOP" check-ignore -q -- yellow-plugins.local.md; then printf 'ignored\n'; else printf 'unignored\n'; fi ;;
+     *) printf 'unknown\n' ;;
+   esac
+   ```
+
+   Only `ignored` is guarded. For `tracked`, `unknown` (any other git failure,
+   treated as tracked) or `unignored` (shows in `git status`), log
+   `[review:resolve-stack] PR #<PR#>: yellow-plugins.local.md is not an ignored untracked file; not guarded`,
+   set `<guard-dir>` to `none` for this PR, and skip its snapshot, config check
+   and clear (`resolve-pr.md` treats a tracked config as untrusted and skips
+   unattended verification). For `ignored`, snapshot it before the resolve:
+
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" snapshot
+   ```
+
+   The output is the snapshot path, then a `digest=<hex>` line. Keep the path as
+   `<guard-dir>` and the hex after `digest=` as `<guard-digest>` for this PR
+   only, and substitute both as literals in item 3b (variables do not survive
+   across Bash calls). Only the digest authenticates the snapshot; never write
+   it into the snapshot directory or a file. A non-zero exit logs
+   `[review:resolve-stack] Error: could not snapshot the local config.`, marks
+   this and the remaining PRs `not attempted (config changed)`, and goes to
+   `### Step 4: Final aggregate summary` (exit `1`) without resolving.
 
 2. **Resolve** — invoke the `Skill` tool with `skill: "review:resolve"` and
    `args: "<PR#> --non-interactive"`. The skill name is `review:resolve` (the
@@ -307,13 +304,18 @@ stop or item 3b's dirty-tree or config stop ends the walk.
 
    **3b. Clean-tree and local-config check** — continuing on a dirty tree would
    carry this PR's edits onto the next branch. Unless `<guard-dir>` is
-   `none` (Step 2b did not guard the config), first compare the ignored local
-   config with Step 2b's snapshot; it restores a changed, created or deleted
-   `yellow-plugins.local.md` before anything else can read it:
+   `none` (item 1b did not guard this PR's config), first compare the ignored
+   local config with item 1b's snapshot; it restores a changed, created or
+   deleted `yellow-plugins.local.md` before anything else can read it:
 
    ```bash
    "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" check "<guard-dir>" "<guard-digest>"
    ```
+
+   Then, in its own Bash call and whatever the check reported, remove this
+   PR's snapshot before the next PR or any stop below:
+   `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" clear "<guard-dir>"`
+   (a rejected path is left for the OS temp sweep, never deleted).
 
    Exit `0`: unchanged. Exit `3` (changed and restored) or `4` (restore
    failed, or the snapshot failed its digest check; the live config was not
@@ -371,6 +373,8 @@ stop or item 3b's dirty-tree or config stop ends the walk.
    `[review:resolve-stack] checkout failed for <branch>; skipping` and continue
    to the next PR.
 
+1b. **Guard the local config** — identical to Graphite step 1b.
+
 2. **Resolve** — invoke the `Skill` tool with `skill: "review:resolve"` and
    `args: "<PR#> --non-interactive"`, exactly as in the Graphite branch above,
    including its `ratelimited=1` rule and its no-contract rule (a missing or
@@ -404,12 +408,7 @@ line before the revert output, so it is not necessarily the last line. A
 rate-limit or no-contract stop prints no such line; its `not attempted (rate limit)`
 or `not attempted (no contract)` rows signal the truncated walk.
 
-Unless `<guard-dir>` is `none`, remove the snapshot first, in its own Bash call,
-whatever stopped the walk:
-`"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" clear "<guard-dir>"`
-(a rejected path is left for the OS temp sweep, never deleted).
-
-Then totals: PRs walked, PRs fully resolved (`b == 0` and remaining == 0),
+Totals: PRs walked, PRs fully resolved (`b == 0` and remaining == 0),
 PRs with residual comments, PRs skipped (no open PR / draft / checkout
 failure), and PRs not attempted (rate limit / no contract / dirty tree / config changed).
 
@@ -445,7 +444,7 @@ is not a failure.
   `1`. Continuing would carry those edits onto the next branch.
 - **A PR's resolve changes the ignored `yellow-plugins.local.md`** (guarded only
   when it is ignored and untracked; a tracked config is not guarded) — item 3b
-  restores it from the Step 2b snapshot and stops the walk with
+  restores it from the item 1b snapshot and stops the walk with
   `aborted at PR #<N>`; a failed restore is reported as tampered. The command
   exits `1`.
 - **A PR is rate limited** (`ratelimited=1` on its valid final `Resolve:`

@@ -246,7 +246,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   means changed and restored, 4 means the restore failed or the snapshot
   failed its digest check (live config untouched), and a symlinked
   config is refused at snapshot (exit 2).
-  `/review:resolve-stack` snapshots before the walk and checks after each PR
+  `/review:resolve-stack` snapshots per PR (after its checkout, before the resolve), checks after it and clears before the next PR
 - `file-line-counts <diff-base-ref>` — Authoritative base/head line counts per
   changed file for `thermonuclear-reviewer`'s size-threshold rule; the
   header and footer rows are its completeness signal

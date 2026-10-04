@@ -513,11 +513,28 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   ! printf '%s\n' "$step5" | grep -q 'keeps its edits and the conflicted'
 }
 
-@test "resolve-stack: the ignored local config is snapshotted before the walk and checked after every PR" {
-  snap=$(grep -n '^### Step 2b: Snapshot the Trusted Ignored Files' "$RESOLVE_STACK" | cut -d: -f1)
+@test "resolve-stack: the ignored local config is classified and snapshotted per PR after checkout, checked after the resolve and cleared before the next PR" {
+  run grep -q '^### Step 2b: Snapshot the Trusted Ignored Files' "$RESOLVE_STACK"
+  [ "$status" -eq 1 ]
   walk=$(grep -n '^### Step 3: Walk the stack' "$RESOLVE_STACK" | cut -d: -f1)
-  [ -n "$snap" ] && [ "$snap" -lt "$walk" ]
+  # Graphite branch: checkout, then item 1b classify + snapshot, then the resolve.
+  gr=$(sed -n '/^#### Graphite/,/^#### GitHub/p' "$RESOLVE_STACK")
+  co=$(printf '%s\n' "$gr" | grep -n '^1\. \*\*Checkout\*\*' | cut -d: -f1)
+  g1b=$(printf '%s\n' "$gr" | grep -n '^1b\. \*\*Guard the local config\*\*' | cut -d: -f1)
+  cls=$(printf '%s\n' "$gr" | grep -n 'git -C "\$TOP" ls-files --error-unmatch' | head -1 | cut -d: -f1)
+  snap=$(printf '%s\n' "$gr" | grep -n 'guard-local-config" snapshot' | head -1 | cut -d: -f1)
+  res=$(printf '%s\n' "$gr" | grep -n '^2\. \*\*Resolve\*\*' | cut -d: -f1)
+  [ -n "$walk" ] && [ -n "$co" ] && [ -n "$g1b" ] && [ -n "$cls" ] && [ -n "$snap" ] && [ -n "$res" ]
+  [ "$co" -lt "$g1b" ] && [ "$g1b" -lt "$cls" ] && [ "$cls" -lt "$snap" ] && [ "$snap" -lt "$res" ]
+  # The GitHub branch runs the same item 1b between its checkout and resolve.
+  gh=$(sed -n '/^#### GitHub/,/^### Step 4/p' "$RESOLVE_STACK")
+  gco=$(printf '%s\n' "$gh" | grep -n '^1\. \*\*Checkout\*\*' | cut -d: -f1)
+  gg=$(printf '%s\n' "$gh" | grep -n '^1b\. \*\*Guard the local config\*\* — identical to Graphite step 1b' | cut -d: -f1)
+  gres=$(printf '%s\n' "$gh" | grep -n '^2\. \*\*Resolve\*\*' | cut -d: -f1)
+  [ "$gco" -lt "$gg" ] && [ "$gg" -lt "$gres" ]
   text=$(flat "$RESOLVE_STACK")
+  [[ "$text" == *'Classify it after every checkout; never carry an earlier branch'* ]]
+  [[ "$text" == *'for this PR only'* ]]
   [[ "$text" == *'guard-local-config" snapshot'* ]]
   [[ "$text" == *'guard-local-config" check "<guard-dir>" "<guard-digest>"'* ]]
   [[ "$text" == *'`digest=<hex>`'* ]]
@@ -528,10 +545,17 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   [[ "$text" == *'git -C "$TOP" check-ignore -q -- yellow-plugins.local.md'* ]]
   [[ "$text" == *'set `<guard-dir>` to `none`'* ]]
   [[ "$text" == *'Unless `<guard-dir>` is `none`'* ]]
-  # The check precedes the status check inside item 3b.
+  # Item 3b: the check, then the clear, both precede the status check and
+  # follow the snapshot; Step 4 no longer clears.
+  snp=$(grep -n 'guard-local-config" snapshot' "$RESOLVE_STACK" | head -1 | cut -d: -f1)
   chk=$(grep -n 'guard-local-config" check' "$RESOLVE_STACK" | head -1 | cut -d: -f1)
+  clr=$(grep -n 'guard-local-config" clear' "$RESOLVE_STACK" | head -1 | cut -d: -f1)
   sts=$(grep -n 'OUT=$(git status --porcelain=v1' "$RESOLVE_STACK" | head -1 | cut -d: -f1)
-  [ "$chk" -lt "$sts" ]
+  stp4=$(grep -n '^### Step 4: Final aggregate summary' "$RESOLVE_STACK" | cut -d: -f1)
+  [ "$snp" -lt "$chk" ] && [ "$chk" -lt "$clr" ] && [ "$clr" -lt "$sts" ]
+  [ "$(grep -c 'guard-local-config" clear' "$RESOLVE_STACK")" -eq 1 ]
+  [ "$clr" -lt "$stp4" ]
+  [[ "$text" == *"remove this PR's snapshot before the next PR or any stop below"* ]]
 }
 
 @test "resolve-stack: a restack that changes a branch is published before the next PR" {
@@ -549,6 +573,16 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   [[ "$all" == *'^Sweep: skipped \((pr-not-open|branch-mismatch)\)$'* ]]
   [[ "$all" == *'outcome is `skipped — <reason>`'* ]]
   [[ "$all" == *'not `no contract`'* ]]
+}
+
+@test "sweep: a failed PR fetch prints no skip line; only a confirmed non-OPEN state does" {
+  text=$(flat "$SWEEP")
+  [[ "$text" == *'If `exit=0` and the state is not `OPEN`'* ]]
+  [[ "$text" == *'`Sweep: skipped (pr-not-open)`'* ]]
+  [[ "$text" == *"grep -qiE 'rate limit|HTTP 429'"* ]]
+  [[ "$text" == *'If `exit` is non-zero, the fetch failed'* ]]
+  [[ "$text" == *'Print no skip line'* ]]
+  [[ "$text" == *'`pr-not-open` is printed only when `gh pr view` succeeded and returned a state other than `OPEN`'* ]]
 }
 
 @test "sweep-all: a rate-limited open-PR pre-check stops the batch instead of skipping every PR" {

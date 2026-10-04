@@ -46,7 +46,8 @@ commit instead of amending the previous one, and its last output line is the
 blocks (open threads, `CHANGES_REQUESTED`, a rate limit or a dirty-tree
 abort), stops and reverts (patch saved) when a PR leaves the tree dirty, and
 its summary table now has `blocking` and `issues` columns instead of
-`comments found`. It snapshots an ignored, untracked `yellow-plugins.local.md`
-before the walk (`guard-local-config`, authenticated by a digest the walk
-holds; a symlinked config is refused) and stops the walk, restoring the file,
-if a PR changed it. `/review:sweep-all` gains a `Blocking` column.
+`comments found`. For each PR it re-classifies `yellow-plugins.local.md` after
+the checkout and, when it is ignored and untracked, snapshots it before the
+resolve (`guard-local-config`, authenticated by a digest the walk holds; a
+symlinked config is refused), checks it after, and clears the snapshot before
+the next PR; it stops the walk, restoring the file, if a PR changed it. `/review:sweep-all` gains a `Blocking` column.
