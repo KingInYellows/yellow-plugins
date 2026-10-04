@@ -163,28 +163,37 @@ checked out a different branch, `/review:resolve` would commit fixes
 against the wrong PR.
 
 ```bash
-set -eu
-EXPECTED=$(gh pr view <PR#> --json headRefName -q .headRefName)
-ACTUAL=$(git rev-parse --abbrev-ref HEAD)
+set -u
+EXPECTED=$(gh pr view <PR#> --json headRefName -q .headRefName) || EXPECTED=""
+ACTUAL=$(git rev-parse --abbrev-ref HEAD) || ACTUAL=""
+if [ -z "$EXPECTED" ] || [ -z "$ACTUAL" ]; then
+  printf '[review:sweep] Error: could not read the PR head branch or the current branch. Aborting resolve.\n' >&2
+  exit 2
+fi
 [ "$EXPECTED" = "$ACTUAL" ] || {
   printf '[review:sweep] Error: branch mismatch (expected %s, on %s). Aborting resolve.\n' "$EXPECTED" "$ACTUAL" >&2
   exit 1
 }
 ```
 
-If the branch does not match, stop — do not proceed to Step 3 — and end the
-output with the skip line `Sweep: skipped (branch-mismatch)` (see "Skip
-line"). If `gh pr view` or `git rev-parse` fails, stop the same way. Before
-either stop prints anything, run the guard exit check (Step 3a's `check` call
-and its exit handling: clear only on exit `0` or `3`, keep and name the
-snapshot otherwise), so a config edit from `/review:pr` is restored and never
-loses its recovery snapshot. Skip it when `<guard-dir>` is `none`.
+Exit 1 means both names were read and they differ: stop, do not proceed to
+Step 3, and end the output with the skip line
+`Sweep: skipped (branch-mismatch)` (see "Skip line"). Exit 2 means `gh pr
+view` or `git rev-parse` failed or printed nothing, so no mismatch was
+established (a failed fetch can be a rate limit): stop the same way, but print
+no `Sweep:` or `Resolve:` line, so `/review:sweep-all` records `no contract`
+and stops the batch. Before either stop prints anything, run the guard exit
+check (Step 3a's `check` call and its exit handling: clear only on exit `0` or
+`3`, keep and name the snapshot otherwise), so a config edit from `/review:pr`
+is restored and never loses its recovery snapshot. Skip it when `<guard-dir>`
+is `none`.
 
 ### Step 2b: Check the local config before resolve
 
-When `<guard-dir>` is `none`, Step 1b may have classified the starting branch
-rather than the PR head. `/review:pr` has now checked out the PR head, so run
-the Step 1b classification probe again, unchanged:
+`/review:pr` has checked out the PR head, and the PR head can treat
+`yellow-plugins.local.md` differently from the starting branch that Step 1b
+classified: the path may be tracked there, or ignored only there. Run the
+Step 1b classification probe again, unchanged, whatever `<guard-dir>` is:
 
 ```bash
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
@@ -200,31 +209,40 @@ case "$rc" in
 esac
 ```
 
-If it now prints `ignored`, the config was not snapshotted before the review.
-Print
-`[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md is ignored on the PR branch but was not snapshotted before the review; rerun /review:sweep from the PR's branch`
-and stop without invoking `/review:resolve`. Print no `Sweep:` or `Resolve:`
-line, so `/review:sweep-all` records `no contract` and stops the batch. Any
-other result continues unguarded, as in Step 1b.
+- **`ignored` and `<guard-dir>` is `none`:** the config was not snapshotted
+  before the review. Print
+  `[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md is ignored on the PR branch but was not snapshotted before the review; rerun /review:sweep from the PR's branch`
+  and stop without invoking `/review:resolve`. Print no `Sweep:` or `Resolve:`
+  line, so `/review:sweep-all` records `no contract` and stops the batch.
+- **Anything but `ignored`, and `<guard-dir>` is not `none`:** the PR head
+  tracks the path (or does not ignore it), so the checkout replaced the ignored
+  file and Step 1b's snapshot no longer describes it. Run no `guard-local-config`
+  call: `check` would overwrite the PR's file with the starting branch's
+  private config. Print
+  `[review:sweep] PR #<PR#>: yellow-plugins.local.md is not an ignored untracked file on the PR branch; not guarded`
+  and
+  `snapshot kept at <guard-dir> (it holds the starting branch's private config; restore it by hand if you need it, then run guard-local-config clear "<guard-dir>")`,
+  set `<guard-dir>` to `none`, and continue unguarded, as in Step 1b.
+- **Anything but `ignored`, and `<guard-dir>` is `none`:** continue unguarded,
+  as in Step 1b.
+- **`ignored` and `<guard-dir>` is set:** the path is still an ignored file, so
+  compare it with Step 1b's snapshot before `/review:resolve` can read it. The
+  check restores a changed, created or deleted `yellow-plugins.local.md`:
 
-Otherwise, unless `<guard-dir>` is `none`, compare the ignored config with
-Step 1b's snapshot before `/review:resolve` can read it. The check restores a
-changed, created or deleted `yellow-plugins.local.md`:
+  ```bash
+  "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" check "<guard-dir>" "<guard-digest>"
+  ```
 
-```bash
-"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" check "<guard-dir>" "<guard-digest>"
-```
-
-Exit `0`: unchanged, continue to Step 3 with the same snapshot. Exit `3`
-(changed and restored): run the Step 3a `clear` call, print
-`[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md changed during the review`
-with the script's `changed:` / `restore failed:` lines, and stop without
-invoking `/review:resolve`. Exit `4` (restore failed, or the snapshot failed
-its digest check) or any other exit: do not clear; print the same abort
-message plus `inspect yellow-plugins.local.md before any further run` and
-`snapshot kept at <guard-dir> (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear "<guard-dir>")`,
-and stop without invoking `/review:resolve`. Print no `Sweep:` or `Resolve:` line, so
-`/review:sweep-all` records `no contract` and stops the batch.
+  Exit `0`: unchanged, continue to Step 3 with the same snapshot. Exit `3`
+  (changed and restored): run the Step 3a `clear` call, print
+  `[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md changed during the review`
+  with the script's `changed:` / `restore failed:` lines, and stop without
+  invoking `/review:resolve`. Exit `4` (restore failed, or the snapshot failed
+  its digest check) or any other exit: do not clear; print the same abort
+  message plus `inspect yellow-plugins.local.md before any further run` and
+  `snapshot kept at <guard-dir> (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear "<guard-dir>")`,
+  and stop without invoking `/review:resolve`. Print no `Sweep:` or `Resolve:` line, so
+  `/review:sweep-all` records `no contract` and stops the batch.
 
 ### Step 3: Run /review:resolve --non-interactive
 
@@ -399,8 +417,10 @@ Sweep: skipped (branch-mismatch)
 `^Sweep: skipped \((pr-not-open|branch-mismatch)\)$`, on the last line only,
 and records `skipped — <reason>`. Its absence means the sweep crashed or was
 cut off, which stays `no contract`. `pr-not-open` is printed only when
-`gh pr view` succeeded and returned a state other than `OPEN`. Argument errors,
-a failed PR fetch (including a rate limit) and a dirty tree print no skip line:
+`gh pr view` succeeded and returned a state other than `OPEN`, and
+`branch-mismatch` only when `gh pr view` and `git rev-parse` both succeeded and
+their branch names differ. Argument errors,
+a failed PR fetch (including a rate limit, at Step 1 or Step 2a) and a dirty tree print no skip line:
 they are not specific to this PR, so the batch must still stop.
 
 ## Error Handling
@@ -422,6 +442,10 @@ they are not specific to this PR, so the batch must still stop.
   resolve.` and stop. Indicates `/review:pr` errored mid-checkout or
   another tool changed branches during the run — re-run after manually
   checking out the PR head branch.
+- **Branch unreadable after `/review:pr`** (Step 2a, exit 2): `[review:sweep]
+  Error: could not read the PR head branch or the current branch. Aborting
+  resolve.` and stop, with no skip line: no mismatch was established, and a
+  failed fetch can be a rate limit.
 - **Local config changed or unguardable** (Steps 1b, 2b, 3a): the file is
   restored when possible, the snapshot is cleared unless the check exited `4`
   (then it is kept and its path printed), and the sweep stops with no

@@ -300,7 +300,13 @@ stop or item 3b's dirty-tree or config stop ends the walk.
    not proof of agreement); record that as `self-verify disagreement`. On
    non-zero exit (including exit 3): record the PR's verification as
    `inconclusive` with the stderr output, count it as blocking, and flag it.
-   The cross-check never sets `ratelimited`: only item 2's contract line does.
+   The cross-check never sets `ratelimited` (only item 2's contract line does)
+   and never infers a rate limit from the failure's text. But an inconclusive
+   check is an unknown outcome, and it may be the very call that exhausted the
+   limit, so it ends the walk like a missing contract: finish **this** PR —
+   items 3b and 5, skipping only its restack — then mark every remaining PR
+   `not attempted (self-verify inconclusive)` and go to
+   `### Step 4: Final aggregate summary` (exit `1`).
 
    **3b. Clean-tree and local-config check** — continuing on a dirty tree would
    carry this PR's edits onto the next branch. Unless `<guard-dir>` is
@@ -411,12 +417,14 @@ PR#  | blocking | issues | remaining unresolved | push status | restack status
 `restack status` is `-` for a PR whose walk stopped before its restack. Only
 the step 3b dirty-tree stop prints `aborted at PR #<N>`, and it prints that
 line before the revert output, so it is not necessarily the last line. A
-rate-limit or no-contract stop prints no such line; its `not attempted (rate limit)`
-or `not attempted (no contract)` rows signal the truncated walk.
+rate-limit, no-contract or inconclusive-self-verify stop prints no such line; its
+`not attempted (rate limit)`, `not attempted (no contract)` or
+`not attempted (self-verify inconclusive)` rows signal the truncated walk.
 
 Totals: PRs walked, PRs fully resolved (`b == 0` and remaining == 0),
 PRs with residual comments, PRs skipped (no open PR / draft / checkout
-failure), and PRs not attempted (rate limit / no contract / dirty tree / config changed).
+failure), and PRs not attempted (rate limit / no contract / self-verify
+inconclusive / dirty tree / config changed).
 
 Finally, a **Needs manual attention** section listing every PR with:
 blocking items (`b > 0`), residual unresolved threads (`>0` from step 3),
@@ -461,6 +469,11 @@ is not a failure.
   is inferred from any output text; the PR is noted `no contract`, counts
   blocking, the walk finishes it except its restack, marks the remaining PRs
   `not attempted (no contract)`, and the command exits `1`.
+- **A PR's self-verify is inconclusive** (the `get-pr-comments` re-fetch exited
+  non-zero, including a truncated list) — no rate limit is inferred; the PR is
+  noted `inconclusive`, counts blocking, the walk finishes it except its
+  restack, marks the remaining PRs `not attempted (self-verify inconclusive)`,
+  and the command exits `1`.
 - **PR merged or closed between stack-build and the walk reaching it** —
   `/review:resolve` detects the non-open state and still prints a valid
   zero `Resolve:` line (`push=skipped`); record the PR as skipped and

@@ -382,17 +382,25 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   step2a=$(awk '/^### Step 2a:/ { p = 1; next } /^### Step 2b:/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
   step3=$(awk '/^### Step 3: Run \/review:resolve/ { p = 1; next } /^### Step 3a:/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
   [[ "$step1b" == *'first runs the guard exit check in Step 3a'* ]]
-  [[ "$step2a" == *'If `gh pr view` or `git rev-parse` fails, stop'* ]]
+  [[ "$step2a" == *'Exit 2 means `gh pr view` or `git rev-parse` failed or printed nothing, so no mismatch was established'* ]]
+  [[ "$step2a" == *'print no `Sweep:` or `Resolve:` line, so `/review:sweep-all` records `no contract`'* ]]
+  # Only a read-and-differ comparison reaches the skip line; a failed read exits 2 first.
+  [[ "$step2a" == *'|| EXPECTED=""'* && "$step2a" == *'|| ACTUAL=""'* ]]
+  [[ "$step2a" == *'exit 2'*'exit 1'* ]]
   [[ "$step2a" == *'run the guard exit check'*'clear only on exit `0` or `3`'* ]]
   [[ "$step3" == *'If the Read fails, stop and report the path. Before stopping, run the guard exit check'* ]]
   run grep -nE 'runs the `clear` call|Run Step 2b.s check and, when' "$SWEEP"
   [ "$status" -eq 1 ]
   # Step 2b re-classifies on the checked-out PR head when Step 1b set none, and stops on ignored.
   step2b=$(awk '/^### Step 2b:/ { p = 1 } /^### Step 3: Run \/review:resolve/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
-  [[ "$step2b" == *'When `<guard-dir>` is `none`'* ]]
-  [[ "$step2b" == *'run the Step 1b classification probe again'* ]]
+  [[ "$step2b" == *'whatever `<guard-dir>` is'* ]]
+  # A PR head that tracks the path must not get the starting branch's snapshot restored over it.
+  [[ "$step2b" == *'Anything but `ignored`, and `<guard-dir>` is not `none`'* ]]
+  [[ "$step2b" == *'Run no `guard-local-config` call'* ]]
+  [[ "$step2b" == *'set `<guard-dir>` to `none`, and continue unguarded'* ]]
+  [[ "$step2b" == *'Run the Step 1b classification probe again'* ]]
   [[ "$step2b" == *'git -C "$TOP" check-ignore -q -- yellow-plugins.local.md'* ]]
-  [[ "$step2b" == *'If it now prints `ignored`'* ]]
+  [[ "$step2b" == *'**`ignored` and `<guard-dir>` is `none`:** the config was not snapshotted before the review'* ]]
   [[ "$step2b" == *'is ignored on the PR branch but was not snapshotted before the review; rerun /review:sweep from the PR'* ]]
   [[ "$step2b" == *'stop without invoking `/review:resolve`'* ]]
 }
@@ -885,6 +893,11 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -qF 'record the PR as `no contract` (a distinct note, not `rate limited`)' <<<"$flat_stack"
   grep -qF 'not attempted (no contract)' <<<"$flat_stack"
   grep -qF 'The cross-check never sets `ratelimited`' <<<"$flat_stack"
+  # An inconclusive cross-check may be the call that hit the limit: it ends the walk like a
+  # missing contract, without inferring a rate limit from its text.
+  grep -qF 'never infers a rate limit from the failure' <<<"$flat_stack"
+  grep -qF 'it ends the walk like a missing contract' <<<"$flat_stack"
+  [ "$(grep -o 'not attempted (self-verify inconclusive)' <<<"$flat_stack" | wc -l)" -ge 3 ]
   step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
   flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
   grep -qF 'Read `ratelimited` only from a valid final contract line' <<<"$flat4"
