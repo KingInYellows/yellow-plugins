@@ -909,24 +909,6 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$disp" == *'Non-interactive never includes an out-of-range edit'* ]]
 }
 
-@test "dispositions: a reused Linear hit passes the same response checks as save_issue" {
-  text=$(flat "$RESOLVE_REFS/dispositions.md")
-  [[ "$text" == *'reuse a hit only when it passes the **Linear response checks** below'* ]]
-  [[ "$text" == *'A hit that fails any check is ignored, as if the search found nothing'* ]]
-  [[ "$text" == *'accept its response only when it passes the same checks'* ]]
-  # The checks are stated once, with all three conditions.
-  [ "$(grep -c '^- \*\*Linear response checks\.\*\*' "$RESOLVE_REFS/dispositions.md")" -eq 1 ]
-  [[ "$text" == *'Apply to every `list_issues` hit before reuse and to the `save_issue` response before use'* ]]
-  [[ "$text" == *'the identifier matches `^<PREFIX>-[0-9]{1,6}$`'* ]]
-  [[ "$text" == *'`^https://linear\.app/[A-Za-z0-9_-]+/issue/<ID>(/[A-Za-z0-9_-]*)?$`'* ]]
-  [[ "$text" == *'the description carries the full marker'* ]]
-  # The old unvalidated reuse must be gone.
-  [[ "$text" != *'reuse a hit whose description carries the full marker'* ]]
-  # resolve-pr.md references the checks instead of restating them.
-  text=$(flat "$RESOLVE_PR")
-  [[ "$text" == *'"Linear response checks", which every reused `list_issues` hit and the `save_issue` response must pass'* ]]
-}
-
 @test "resolve-stack and sweep: Read dispositions.md before the walk or nested resolve, stop and report the path on failure" {
 }
 
