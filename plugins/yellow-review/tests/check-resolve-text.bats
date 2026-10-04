@@ -1157,7 +1157,12 @@ rule=forged line=9.txt"
   refuses 'passcode:\n  1234'
   refuses 'passcode:\n  1234 # office door'
   refuses 'passcode: |\n  4321'
-  printf '%s\n' 'passcode: 123' 'passcode: <your passcode>' 'passcode: string' 'token: 4096' 'password: 2024' 'secret: 1234' 'The passcode: is required.' >| "$A"
+  refuses 'passcode: (1234)'
+  refuses 'passcode: [1234]'
+  refuses 'passcode: **1234**'
+  refuses 'passcode: ~1234~'
+  refuses 'passcode:\n  (1234)'
+  printf '%s\n' 'passcode: 123' 'passcode: (123)' 'token: (1234)' 'passcode: <your passcode>' 'passcode: string' 'token: 4096' 'password: 2024' 'secret: 1234' 'The passcode: is required.' >| "$A"
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
 }

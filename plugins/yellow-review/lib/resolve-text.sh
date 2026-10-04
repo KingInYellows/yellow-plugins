@@ -80,7 +80,7 @@ rt_text_clean() {
         # or a call (`z.string()`), so `password: string`,
         # `password: z.string()` and `token: $TOKEN` stay clean. A value that
         # only contains `$`, `<`, `{` or `[` is a credential.
-        function litval(seg, inword, pin,    np, parts, allph, j, core) {
+        function litval(seg, inword, pin,    np, parts, allph, j, core, pc) {
             # Markdown inline-code backticks delimit the value; they are not
             # part of it (`password: `hunter``, `token: `$TOKEN``).
             sub(/^`+/, "", seg)
@@ -89,7 +89,12 @@ rt_text_clean() {
             # A passcode (`pin` set) is conventionally 4+ digits; other labels
             # keep the 6-character floor so `token: 4096` stays clean.
             if (isplaceholder(seg)) return 0
-            if (length(seg) < 6 && !(pin && length(seg) >= 4 && seg ~ /^[0-9]+$/)) return 0
+            # The digits are judged without wrapper punctuation, so
+            # `passcode: (1234)` and `passcode: "1234"` count too.
+            pc = seg
+            sub(/^[!@#%^&*~+=|(\[{<"\047]+/, "", pc)
+            sub(/[!@#%^&*~+=|)\]}>"\047]+$/, "", pc)
+            if (length(seg) < 6 && !(pin && length(pc) >= 4 && pc ~ /^[0-9]+$/)) return 0
             # A call such as `z.string(`: the value stops at the `)`.
             if (seg ~ /^[a-z_][a-z0-9_.]*\(([a-z_][a-z0-9_.]*)?$/) return 0
             # A generic type annotation such as `Optional[str]` or
@@ -238,7 +243,7 @@ rt_text_clean() {
             if (match(r, /^[^ \t"\047,;)]+/)) {
                 seg = substr(r, RSTART, RLENGTH)
                 r = substr(r, RSTART + RLENGTH)
-                if (r ~ /^["\047]?[ \t\r,;]*$/ && litval(seg, inword, pin)) flag(q == "\"" || q == "\047" ? "quoted-keyword-assignment" : "unquoted-keyword-value")
+                if (r ~ /^[)"\047]*[ \t\r,;]*$/ && litval(seg, inword, pin)) flag(q == "\"" || q == "\047" ? "quoted-keyword-assignment" : "unquoted-keyword-value")
             }
         }
         BEGIN {
