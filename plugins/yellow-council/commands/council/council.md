@@ -280,7 +280,7 @@ if command -v opencode >/dev/null 2>&1; then
   case "$OC_MODEL" in
     openrouter/*)
       ESC=$(printf '\033')
-      OC_AUTH=$(cd /tmp && timeout --signal=TERM --kill-after=5 15 opencode auth list --pure </dev/null 2>&1); OC_AUTH_RC=$?
+      OC_AUTH=$(cd /tmp && timeout --signal=TERM --kill-after=2 6 opencode auth list --pure </dev/null 2>&1); OC_AUTH_RC=$?
       if [ "$OC_AUTH_RC" -ne 0 ]; then
         printf '[council] Note: OpenRouter credential check skipped (opencode auth list exited %s)\n' "$OC_AUTH_RC" >&2
       elif ! printf '%s\n' "$OC_AUTH" | sed "s/${ESC}\[[0-9;?]*[A-Za-z]//g" \
@@ -560,7 +560,7 @@ declare -A REVIEWER_VERDICTS REVIEWER_CONFIDENCES REVIEWER_SUMMARIES \
 council_quota_eta() {
   local flat eta
   flat=$(printf '%s' "${1:-}" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
-  eta=$(printf '%s\n' "$flat" | LC_ALL=C grep -oiE '(try again (in|at)|retry[- ]after) +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +/resets in /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Tt] +/resets at /; s/^[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +/resets in /')
+  eta=$(printf '%s\n' "$flat" | LC_ALL=C grep -oiE '(try again (in|at|after)|retry[- ]after) +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +/resets in /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Tt] +/resets at /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Ff][Tt][Ee][Rr] +/resets after /; s/^[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +/resets in /')
   [ -n "$eta" ] || eta=$(printf '%s\n' "$flat" | LC_ALL=C grep -oiE '(^|[^A-Za-z])resets? +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[^A-Za-z]//; s/^[Rr][Ee][Ss][Ee][Tt][Ss]? +/resets /')
   # Keep model-identifier-safe characters only, cut at the first sentence end
   # ("in 4 hours. Please ...") and cap: the value is reviewer-adjacent text that
@@ -575,7 +575,7 @@ council_quota_eta() {
 # free text from a return cannot ride into the headline dressed as an ETA.
 council_eta_plain() {
   printf '%s\n' "${1:-}" | LC_ALL=C tr -s ' ' '\n' \
-    | LC_ALL=C grep -qviE '^(resets?|in|at|on|and|am|pm|utc|time|not|reported|[0-9]{1,4}([:.][0-9]{1,2})?(am|pm|st|nd|rd|th)?,?|[0-9]+(s|m|h|d)|(mon|tue|wed|thu|fri|sat|sun)[a-z]*,?|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*,?|hours?|minutes?|mins?|seconds?|secs?|days?|weeks?|\([A-Za-z_]+(/[A-Za-z_]+)*\))$' \
+    | LC_ALL=C grep -qviE '^(resets?|in|at|on|and|after|am|pm|utc|time|not|reported|[0-9]{1,4}([:.][0-9]{1,2})?(am|pm|st|nd|rd|th)?,?|[0-9]+(s|m|h|d)|(mon|tue|wed|thu|fri|sat|sun)[a-z]*,?|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*,?|hours?|minutes?|mins?|seconds?|secs?|days?|weeks?|\([A-Za-z_]+(/[A-Za-z_]+)*\))$' \
     && return 1
   return 0
 }
@@ -590,7 +590,7 @@ council_classify_claude_quota() {
   # quote the strings below from the diff under review, so it is never a quota wall.
   [ "${#1}" -le 2000 ] || return 1
   flat=$(printf '%s' "${1:-}" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
-  if printf '%s\n' "$flat" | grep -qiE 'session limit.*resets?|weekly limit.*resets?|Opus limit.*resets?|usage limit reached.*try again'; then
+  if printf '%s\n' "$flat" | grep -qiE 'session limit.*resets?|weekly limit.*resets?|Opus limit.*resets?|hit your (usage )?limit.*resets?|usage limit reached.*try again'; then
     eta=$(council_quota_eta "$flat")
     council_eta_plain "$eta" || eta="reset time not reported"
     printf '%s\n' "$eta"

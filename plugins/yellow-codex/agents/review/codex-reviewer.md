@@ -444,7 +444,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
       # captured text is limited to a short whitelist of characters so
       # nothing else in the API error can reach the summary= line.
       quota_flat=$(printf '%s' "$codex_api_error" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
-      quota_eta=$(printf '%s\n' "$quota_flat" | LC_ALL=C grep -oiE '(try again (in|at)|retry[- ]after) +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +/resets in /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Tt] +/resets at /; s/^[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +/resets in /')
+      quota_eta=$(printf '%s\n' "$quota_flat" | LC_ALL=C grep -oiE '(try again (in|at|after)|retry[- ]after) +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +/resets in /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Tt] +/resets at /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Ff][Tt][Ee][Rr] +/resets after /; s/^[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +/resets in /')
       [ -n "$quota_eta" ] || quota_eta=$(printf '%s\n' "$quota_flat" | LC_ALL=C grep -oiE '(^|[^A-Za-z])resets? +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[^A-Za-z]//; s/^[Rr][Ee][Ss][Ee][Tt][Ss]? +/resets /')
       quota_eta=$(printf '%s' "$quota_eta" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_.-' | sed -E 's/\. .*$//; s/[. ]+$//' | head -c 200)
       [ -n "$quota_eta" ] || quota_eta="reset time not reported"

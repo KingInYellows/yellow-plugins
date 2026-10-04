@@ -281,7 +281,7 @@ case $CLI_EXIT in
     if printf '%s' "$QUOTA_FLAT" | grep -qi 'exhausted your quota' \
        || { printf '%s' "$QUOTA_FLAT" | grep -q 'RESOURCE_EXHAUSTED' \
             && ! printf '%s' "$QUOTA_FLAT" | grep -qiE 'rate.?limit|too many requests|overload|capacity'; }; then
-      QUOTA_ETA=$(printf '%s\n' "$QUOTA_FLAT" | LC_ALL=C grep -oiE '(try again (in|at)|retry[- ]after) +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +/resets in /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Tt] +/resets at /; s/^[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +/resets in /')
+      QUOTA_ETA=$(printf '%s\n' "$QUOTA_FLAT" | LC_ALL=C grep -oiE '(try again (in|at|after)|retry[- ]after) +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +/resets in /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Tt] +/resets at /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Ff][Tt][Ee][Rr] +/resets after /; s/^[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +/resets in /')
       [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$QUOTA_FLAT" | LC_ALL=C grep -oiE '(^|[^A-Za-z])resets? +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[^A-Za-z]//; s/^[Rr][Ee][Ss][Ee][Tt][Ss]? +/resets /')
       QUOTA_ETA=$(printf '%s' "$QUOTA_ETA" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_.-' | sed -E 's/\. .*$//; s/[. ]+$//' | head -c 200)
       [ -n "$QUOTA_ETA" ] || QUOTA_ETA="reset time not reported"

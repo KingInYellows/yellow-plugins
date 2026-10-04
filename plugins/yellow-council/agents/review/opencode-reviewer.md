@@ -316,17 +316,19 @@ case $CLI_EXIT in
     # The provider message is untrusted text that reaches summary= and stderr:
     # flatten it to one line, drop control characters, replace URLs (OpenRouter's
     # credit errors embed an account key-management link) and any 24+ character
-    # token run (key-shaped strings), and cap it at 300 bytes.
-    ERROR_MSG=$(printf '%s' "$ERROR_MSG" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177' \
-      | LC_ALL=C sed -E 's#https?://[^[:space:]]+#[url]#g; s/AKIA[0-9A-Z]{16}/[redacted]/g; s/[Bb]earer +[A-Za-z0-9._-]+/Bearer [redacted]/g; s/(sk|ghp|gho|ghs|ghu|AIza|ses)[_-][A-Za-z0-9_-]{8,}/[redacted]/g; s/github_pat_[A-Za-z0-9_]+/[redacted]/g; s/[A-Za-z0-9_-]{24,}/[redacted]/g' | head -c 300)
-    if [ -n "$ERROR_MSG" ] && { [ "$ERROR_STATUS" = "402" ] || printf '%s' "$ERROR_MSG" | grep -qiE 'insufficient_quota|model_cap_exceeded|RESOURCE_EXHAUSTED|quota exceeded|usage limit|requires more credits|insufficient.credits'; }; then
+    # token run (key-shaped strings). The quota scan below reads the whole sanitized
+    # text; only the copy that reaches summary= is capped at 300 bytes.
+    ERROR_FULL=$(printf '%s' "$ERROR_MSG" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177' \
+      | LC_ALL=C sed -E 's#https?://[^[:space:]]+#[url]#g; s/AKIA[0-9A-Z]{16}/[redacted]/g; s/[Bb]earer +[A-Za-z0-9._-]+/Bearer [redacted]/g; s/(sk|ghp|gho|ghs|ghu|AIza|ses)[_-][A-Za-z0-9_-]{8,}/[redacted]/g; s/github_pat_[A-Za-z0-9_]+/[redacted]/g; s/[A-Za-z0-9_-]{24,}/[redacted]/g')
+    ERROR_MSG=$(printf '%s' "$ERROR_FULL" | head -c 300)
+    if [ -n "$ERROR_MSG" ] && { [ "$ERROR_STATUS" = "402" ] || printf '%s' "$ERROR_FULL" | grep -qiE 'insufficient_quota|model_cap_exceeded|RESOURCE_EXHAUSTED|quota exceeded|usage limit|requires more credits|insufficient.credits'; }; then
       # Provider quota passthrough (OpenRouter's HTTP 402 "requires more
       # credits", OpenAI-style insufficient_quota, Google RESOURCE_EXHAUSTED):
       # recorded as QUOTA_EXHAUSTED, not a transient ERROR. The ETA extraction
       # mirrors council.md's council_quota_eta (this agent cannot source
       # council.md); credit exhaustion usually reports none.
-      QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C grep -oiE '(try again (in|at)|retry[- ]after) +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +/resets in /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Tt] +/resets at /; s/^[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +/resets in /')
-      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C grep -oiE '(^|[^A-Za-z])resets? +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[^A-Za-z]//; s/^[Rr][Ee][Ss][Ee][Tt][Ss]? +/resets /')
+      QUOTA_ETA=$(printf '%s\n' "$ERROR_FULL" | LC_ALL=C grep -oiE '(try again (in|at|after)|retry[- ]after) +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +/resets in /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Tt] +/resets at /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Ff][Tt][Ee][Rr] +/resets after /; s/^[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +/resets in /')
+      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$ERROR_FULL" | LC_ALL=C grep -oiE '(^|[^A-Za-z])resets? +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[^A-Za-z]//; s/^[Rr][Ee][Ss][Ee][Tt][Ss]? +/resets /')
       QUOTA_ETA=$(printf '%s' "$QUOTA_ETA" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_.-' | sed -E 's/\. .*$//; s/[. ]+$//' | head -c 200)
       [ -n "$QUOTA_ETA" ] || QUOTA_ETA="reset time not reported"
       printf '[opencode-reviewer] Quota exhausted (%s) — returning QUOTA_EXHAUSTED\n' "$QUOTA_ETA" >&2

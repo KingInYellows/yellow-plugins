@@ -635,7 +635,7 @@ Exit code handling:
 | Exit | Meaning | Action |
 |------|---------|--------|
 | 0 | Success | Parse output normally |
-| 1–123 | CLI's own error | Grep stderr for keywords (`auth`, `rate limit`, `invalid`) and surface in synthesis. A provider quota signal (`RESOURCE_EXHAUSTED`, `insufficient_quota`, HTTP 402) is `QUOTA_EXHAUSTED`, checked before the rate-limit keyword; opencode `ProviderModelNotFoundError` or HTTP 401/403 is `UNAVAILABLE` naming the fix |
+| 1–123 | CLI's own error | Grep stderr for keywords (`auth`, `rate limit`, `invalid`) and surface in synthesis. A provider quota signal (`RESOURCE_EXHAUSTED`, `insufficient_quota`, HTTP 402) is `QUOTA_EXHAUSTED`, checked before the rate-limit keyword; opencode `ProviderModelNotFoundError` or HTTP 401 is `UNAVAILABLE` naming the fix (other statuses, including 403, stay `ERROR`) |
 | 124 | timeout SIGTERM (time limit hit) | Mark TIMEOUT; exclude from synthesis Headline; surface in partial-result note |
 | 137 | timeout SIGKILL (escalation after `--kill-after=10`) | Same as 124 |
 | 125 | timeout utility failed | Surface as ERROR with full stderr |

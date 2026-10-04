@@ -103,6 +103,8 @@ You've hit your weekly limit · resets Mon 12:00am|resets Mon 12:00am
 You've hit your Opus limit · resets 3:45pm|resets 3:45pm
 Claude usage limit reached. Please try again in 4 hours.|resets in 4 hours
 YOU'VE HIT YOUR SESSION LIMIT, RESETS 5PM|resets 5PM
+You've hit your limit · resets 3pm (America/New_York)|resets 3pm (America/New_York)
+Claude AI usage limit reached, please try again after 2 hours|resets after 2 hours
 EOF
 }
 
@@ -675,6 +677,75 @@ step2b_in() {
     [[ "$output" == *"codex=deepseek-v4-pro(deepseek)"* ]] || { echo "$profile: $output"; return 1; }
     # codex and opencode (default deepseek route) now share a lineage
     [[ "$stderr" == *"codex and opencode both resolve to deepseek lineage"* ]] || { echo "$profile: $stderr"; return 1; }
+  done
+}
+
+@test "opencode arm: a quota keyword past the 300-byte summary cap is still QUOTA_EXHAUSTED" {
+  local profile out="${BATS_TEST_TMPDIR}/o.jsonl" err="${BATS_TEST_TMPDIR}/o.err" pad
+  pad=$(printf 'x%.0s' $(seq 1 400))
+  printf '%s\n' "{\"type\":\"error\",\"error\":{\"name\":\"APIError\",\"data\":{\"message\":\"upstream said ${pad} then: usage limit reached. Try again in 3h.\",\"statusCode\":500}}}" >| "$out"
+  : >| "$err"
+  for profile in $PROFILES; do
+    opencode_arm_in "$profile" "$out" "$err"
+    [[ "$output" == *"verdict=QUOTA_EXHAUSTED"* ]] || { echo "$profile: $output"; return 1; }
+    [[ "$output" == *"resets in 3h"* ]] || { echo "$profile: ETA lost: $output"; return 1; }
+  done
+}
+
+# setup3_in <profile> <stub-dir> [env assignments...] — run setup.md's Step 3 fence
+# (OpenCode detection and the OpenRouter credential check) with a stub opencode.
+setup3_in() {
+  local profile="$1" stub="$2"; shift 2
+  local fence="${BATS_TEST_TMPDIR}/setup3.sh"
+  extract_fence_after "${PLUGIN_DIR}/commands/council/setup.md" '### Step 3: Detect OpenCode CLI' "$fence"
+  printf 'export PATH=%q\nunset COUNCIL_OPENCODE_MODEL\n%s\n. %q\n' "$stub:$PATH" "$*" "$fence" >| "${BATS_TEST_TMPDIR}/setup3.run"
+  run_arm "$profile" "${BATS_TEST_TMPDIR}/setup3.run"
+}
+
+# make_oc_stub <dir> <auth-list-script-body> — a stub opencode: --version prints a
+# version, `auth list` runs the given body.
+make_oc_stub() {
+  mkdir -p "$1"
+  printf '#!/bin/sh\ncase "$1" in\n  --version) echo 1.18.34 ;;\n  auth) %s ;;\nesac\n' "$2" >| "$1/opencode"
+  chmod +x "$1/opencode"
+}
+
+@test "setup Step 3 reports the OpenRouter credential state as a literal for Step 5" {
+  local profile stub="${BATS_TEST_TMPDIR}/stub3"
+  for profile in $PROFILES; do
+    make_oc_stub "$stub" 'printf "┌  Credentials\n\033[90m●  OpenRouter api\n"'
+    setup3_in "$profile" "$stub"
+    [[ "$output" == *"OpenRouter auth: ok"* && "$output" == *"OPENCODE_AUTH=ok"* ]] || { echo "$profile (ok): $output"; return 1; }
+    make_oc_stub "$stub" 'printf "┌  Credentials\n●  Anthropic oauth\n"'
+    setup3_in "$profile" "$stub"
+    [[ "$output" == *"WARNING — no OpenRouter credential found"* && "$output" == *"OPENCODE_AUTH=missing"* ]] || { echo "$profile (missing): $output"; return 1; }
+    make_oc_stub "$stub" 'echo boom >&2; exit 3'
+    setup3_in "$profile" "$stub"
+    [[ "$output" == *"check skipped (opencode auth list exited 3)"* && "$output" == *"OPENCODE_AUTH=skipped"* && "$output" != *"WARNING"* ]] || { echo "$profile (skipped): $output"; return 1; }
+    setup3_in "$profile" "$stub" 'export COUNCIL_OPENCODE_MODEL=opencode/deepseek-v4-pro'
+    [[ "$output" != *"OPENCODE_AUTH="* ]] || { echo "$profile (zen): probe ran: $output"; return 1; }
+  done
+}
+
+@test "setup Step 5 drops an OpenCode slot that needs OpenRouter auth from the ready count" {
+  local profile stub="${BATS_TEST_TMPDIR}/stub5" fence="${BATS_TEST_TMPDIR}/setup5.sh" st ready_ok ready_missing
+  make_oc_stub "$stub" 'true'
+  extract_fence_after "${PLUGIN_DIR}/commands/council/setup.md" '### Step 5: Final readiness summary' "$fence"
+  for profile in $PROFILES; do
+    for st in ok missing unchecked skipped; do
+      sed -e "s|<the OPENCODE_AUTH value Step 3 printed, or unchecked>|$st|" "$fence" >| "${fence}.$st"
+      printf 'export PATH=%q\n. %q\n' "$stub:$PATH" "${fence}.$st" >| "${BATS_TEST_TMPDIR}/setup5.run"
+      run_arm "$profile" "${BATS_TEST_TMPDIR}/setup5.run"
+      [ "$status" -eq 0 ] || { echo "$profile/$st: $stderr"; return 1; }
+      case "$st" in
+        ok) ready_ok=$(printf '%s' "$output" | sed -n 's/.*Reviewers: \([0-9]\) of 4.*/\1/p') ;;
+        missing)
+          ready_missing=$(printf '%s' "$output" | sed -n 's/.*Reviewers: \([0-9]\) of 4.*/\1/p')
+          [[ "$output" == *"OpenCode=installed (needs OpenRouter auth)"* ]] || { echo "$profile: $output"; return 1; } ;;
+        *) [[ "$output" != *"needs OpenRouter auth"* ]] || { echo "$profile/$st: $output"; return 1; } ;;
+      esac
+    done
+    [ "$((ready_ok - ready_missing))" -eq 1 ] || { echo "$profile: ready count did not drop ($ready_ok -> $ready_missing)"; return 1; }
   done
 }
 

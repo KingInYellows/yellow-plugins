@@ -400,7 +400,7 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   # The stub's findings pair is empty, so reading it as "no findings" would say
   # Codex reviewed and found nothing.
   grep -q 'TIMEOUT`, `ERROR` or `QUOTA_EXHAUSTED`' "$REVIEW_PR"
-  grep -q 'exactly' "$REVIEW_PR"
+  grep -q 'only when the value is exactly' "$REVIEW_PR"
   grep -q '/tmp/council-codex-fenced-<suffix>.txt' "$REVIEW_PR"
   grep -q 'never unlinked' "$REVIEW_PR"
 }

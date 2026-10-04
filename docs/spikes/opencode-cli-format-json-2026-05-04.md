@@ -180,7 +180,7 @@ unauthenticated provider fails this way because its models are never loaded.
 The stdout JSON stream is unchanged by those flags and a successful run prints
 nothing extra at ERROR level. opencode-reviewer therefore passes
 `--print-logs --log-level ERROR` and classifies `ProviderModelNotFoundError`
-(plus HTTP 401/403) as `UNAVAILABLE`, and HTTP 402 / "requires more credits"
+(plus HTTP 401; other statuses such as 403, which OpenRouter also uses for moderation and key limits, stay `ERROR`) as `UNAVAILABLE`, and HTTP 402 / "requires more credits"
 as `QUOTA_EXHAUSTED`.
 
 ## Gotchas to Watch For

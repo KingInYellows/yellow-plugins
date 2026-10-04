@@ -125,7 +125,7 @@ if command -v opencode >/dev/null 2>&1; then
       # OPENROUTER_API_KEY exists, and prints no key material. Strip colour
       # codes, then match the provider name after the bullet glyph.
       ESC=$(printf '\033')
-      OC_AUTH=$(cd /tmp && timeout --signal=TERM --kill-after=5 15 opencode auth list --pure </dev/null 2>&1); OC_AUTH_RC=$?
+      OC_AUTH=$(cd /tmp && timeout --signal=TERM --kill-after=2 6 opencode auth list --pure </dev/null 2>&1); OC_AUTH_RC=$?
       if [ "$OC_AUTH_RC" -ne 0 ]; then
         # Timed out (124/137), crashed, or an opencode that rejects --pure: the
         # check did not run, which is not the same as "no credential".
