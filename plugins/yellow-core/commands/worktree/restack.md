@@ -39,9 +39,12 @@ except through the provider's submit when `--submit` is given.
 
 ## Phase 1: Parse flags
 
-`--continue`, `--abort` and `--status` are mutually exclusive.
+`--continue`, `--abort` and `--status` are mutually exclusive. The block runs
+in a bash child because zsh does not word-split `$ARGUMENTS`, which would turn
+`--submit --yes` into one rejected token.
 
 ```bash
+bash /dev/fd/3 3<<'__YELLOW_CORE_BASH__'
 MODE=start
 SUBMIT=0
 YES=0
@@ -65,6 +68,7 @@ if [ "$SUBMIT" = 1 ] && [ "$MODE" != start ]; then
   exit 2
 fi
 printf 'mode=%s submit=%s yes=%s\n' "$MODE" "$SUBMIT" "$YES"
+__YELLOW_CORE_BASH__
 ```
 
 Hold the printed `mode`, `submit` and `yes` values for the rest of the run;

@@ -216,7 +216,7 @@ conflict · `20` preflight refused · `30` restack failed, worktrees restored ·
    <!-- deepen-plan: codebase -->
    > **Codebase:** `mkdir`-lock precedents with a generation-safe stale reclaim (directory
    > inode + mtime, `.reclaim.*` marker) are `plugins/yellow-ruvector/lib/install-ruvector.sh:296-330`
-   > and `hooks/scripts/lib/coedit.sh:258-300` (`yellow_ruvector_reclaim_dir`).
+   > and `plugins/yellow-ruvector/hooks/scripts/lib/coedit.sh:258-336` (`coedit_lock_path`).
    > Copy that rather than "pid dead and no state", which misses the window between
    > `mkdir` and the pid write. `flock` (as in `review-ledger.sh:157-171`) is
    > unsuitable here because it dies with the process, and the lock must survive a
@@ -305,9 +305,9 @@ conflict · `20` preflight refused · `30` restack failed, worktrees restored ·
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Registry deviation to state explicitly or fix:
-> - the script's `restack --upstack` vs `rebaseUpstack` = `['restack']` (`stack-operation-registry.js:145`)
-> - `submit --stack` vs `submitStack` = `['submit','--no-interactive']` (:141)
-> - `inspectStack` has no `--stack` (:113)
+> - the script's `restack --upstack` vs `rebaseUpstack` = `['restack']` (`stack-operation-registry.js:149`)
+> - `submit --stack` vs `submitStack` = `['submit','--no-interactive']` (:145)
+> - `inspectStack` has no `--stack` (:117)
 > - the GitHub entries spell `['--upstack']`/`['--continue']`/`['--abort']`, but the adapter CLI takes `--mode upstack|continue|abort`
 > - the adapter's `submit` adds `--auto` itself
 <!-- /deepen-plan -->

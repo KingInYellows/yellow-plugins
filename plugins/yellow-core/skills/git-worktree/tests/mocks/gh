@@ -47,7 +47,9 @@ case "${1:-}" in
             rc=$?
             ;;
           --abort)
-            eng_abort owner
+            if [ "${STUB_FAIL:-}" = abort ]; then echo "error: abort failed (stub)" >&2; exit 1; fi
+            # Keep the marker when the abort did not happen.
+            eng_abort owner || { echo "error: rebase abort failed" >&2; exit 1; }
             rm -f "$(common_dir)/gh-stack-rebase-state"
             exit 0
             ;;

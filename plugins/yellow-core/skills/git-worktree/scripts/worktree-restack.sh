@@ -557,7 +557,7 @@ gt_paused() {
 # --- provider: GitHub (gh-stack >= 0.2.0, through the github-workflow adapter)
 
 gh_stack_version() {
-  gh extension list 2>/dev/null | awk -F'\t' '$1 ~ /^gh stack/ {print $3; exit}'
+  gh extension list 2>/dev/null | awk '$1 == "gh" && $2 == "stack" && $3 == "github/gh-stack" {print $NF; exit}'
 }
 
 # gh_version_ok VER: v0.2.0 or newer; an unparseable version fails.
@@ -866,9 +866,8 @@ restore_entries() {
       continue
     fi
     if [ -n "$cur" ]; then
-      unlock_entry "$i"
-      note "dropped: $(v "$path") is now on $(v "${cur#refs/heads/}"), not $(v "$br"); left alone"
-      continue
+      note "kept: $(v "$path") is now on $(v "${cur#refs/heads/}"), not $(v "$br"); left alone"
+      note "  fix: git -C $(q "$path") checkout $(q "$br")"
     elif report_floating "$i"; then
       :
     elif holder=$(branch_holder "$ref"); then
@@ -1029,8 +1028,19 @@ on_exit() {
       err "interrupted while a conflict was paused; run /worktree:restack --continue or --abort"
       [ "$rc" -ne 0 ] || rc=$X_PAUSED
     else
-      err "interrupted; restoring worktrees"
-      restore_and_clear || rc=$X_PARTIAL
+      local busy
+      if busy=$(wt_busy "$S_RUN"); then
+        # No conflict marker yet, but the provider's rebase is mid-flight in
+        # the run worktree: restoring now would drop the recovery record.
+        lock_detached_entries
+        write_state || true
+        lock_mark_paused
+        err "interrupted while the provider's rebase is still in progress in $(v "$S_RUN") ($busy); finish or abort that rebase, then run /worktree:restack --continue or --abort"
+        [ "$rc" -ne 0 ] || rc=$X_PAUSED
+      else
+        err "interrupted; restoring worktrees"
+        restore_and_clear || rc=$X_PARTIAL
+      fi
     fi
   fi
   exit "$rc"
@@ -1353,7 +1363,7 @@ cmd_status() {
   printf 'stack: %s' "$(v "${S_CHAIN[0]}")"
   for ((i = 1; i < ${#S_CHAIN[@]}; i++)); do printf ' -> %s' "$(v "${S_CHAIN[i]}")"; done
   printf '\n'
-  if gt_paused "$S_RUN" 2>/dev/null; then note "a conflict is paused in the run worktree"; fi
+  if { gt_paused "$S_RUN" 2>/dev/null; } || { [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; }; then note "a conflict is paused in the run worktree"; fi
   for ((i = 0; i < ${#E_PATH[@]}; i++)); do
     wi=$(wt_index "${E_PATH[i]}")
     if [ "$wi" -lt 0 ]; then

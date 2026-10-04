@@ -44,7 +44,7 @@ mk_stack() {
   local prev=main b f
   printf '%s\n' main >"$STUB_STACK"
   for b in a b c; do
-    git rev-parse "refs/heads/$prev" >"$STUB_DIR/base/$b"
+    git rev-parse "refs/heads/$prev" >"$STUB_DIR/base/${b//\//__}"
     git checkout -q -b "$b" "$prev"
     printf '%s\n' "$b" >"$b.txt"
     git add "$b.txt"
@@ -472,8 +472,10 @@ forge() {
   git -C "$(wtp c)" checkout -q -b other
   run bash "$SCRIPT" restore
   [ "$status" -eq 40 ]
-  [[ $output == *"is now on other, not c"* ]]
+  [[ $output == *"kept:"*"is now on other, not c"* ]]
+  [[ $output == *"fix: git -C "*"checkout c"* ]]
   [ "$(branch_of "$(wtp c)")" = other ]
+  [ -e "$SD/state" ]
 }
 
 @test "a commit made in a detached worktree during the pause is never orphaned" {
@@ -612,6 +614,18 @@ forge() {
   assert_all_restored
 }
 
+@test "github: a failed provider abort keeps the state and the gh-stack marker, exit 31" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack b
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  STUB_GH_VERSION=v0.2.1 STUB_FAIL=abort run bash "$SCRIPT" abort --provider github
+  [ "$status" -eq 31 ]
+  [[ $output == *"state kept"* ]]
+  [ -e "$SD/state" ]
+  [ -e "$(git rev-parse --path-format=absolute --git-common-dir)/gh-stack-rebase-state" ]
+}
+
 @test "github: gh-stack 0.1.0, an unparseable version, or none exits 20 with an upgrade message" {
   mk_stack
   local v
@@ -738,8 +752,16 @@ JSEOF
   STUB_GH_VERSION=v0.2.1 STUB_FAIL=rebase-marker run bash "$SCRIPT" start --provider github
   [ "$status" -eq 10 ]
   rm -f "$COMMON/gh-stack-rebase-state"
+  # The stub aborted before rebasing: finish the restack by hand so the
+  # verification step has a stacked tree to accept.
+  git -C "$(wtp a)" rebase -q main
+  git -C "$(wtp b)" rebase -q a
+  git -C "$(wtp c)" rebase -q b
   STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" continue --provider github
+  [ "$status" -eq 0 ]
   [[ $output == *"no provider rebase is paused"* ]]
+  assert_all_restored
+  assert_stacked
 }
 
 @test "github: the version gate accepts 0.2.0, 0.10.0 and 1.0.0" {

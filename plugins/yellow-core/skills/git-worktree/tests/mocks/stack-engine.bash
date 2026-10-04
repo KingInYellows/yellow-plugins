@@ -89,11 +89,12 @@ eng_abort() {
   local mode=$1 where b sha base wt
   where=$(cat "$STUB_DIR/conflict-wt")
   [ "$mode" != cwd ] || where=$PWD
-  g -C "$where" rebase --abort >/dev/null 2>&1
+  # Fail (nonzero) when the rebase is still in progress afterwards.
+  g -C "$where" rebase --abort >/dev/null 2>&1 || ! in_progress "$where" || return 1
   while read -r b sha base; do
     printf '%s\n' "$base" >|"$(base_file "$b")"
     wt=$(owner_of "$b")
-    if [ -n "$wt" ]; then g -C "$wt" reset -q --hard "$sha"; else g update-ref "refs/heads/$b" "$sha"; fi
+    if [ -n "$wt" ]; then g -C "$wt" reset -q --hard "$sha"; elif g show-ref -q --verify "refs/heads/$b"; then g update-ref "refs/heads/$b" "$sha"; fi
   done <"$STUB_DIR/snap"
   if [ "$mode" = cwd ]; then g checkout -q "$(cat "$STUB_DIR/orig")"; fi
   rm -f "$STUB_DIR/todo"

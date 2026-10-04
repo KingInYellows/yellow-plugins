@@ -209,9 +209,11 @@ Safety rules the script holds:
   `--ignore-other-worktrees` (Graphite's abort, which the script runs on
   `--abort`, still rolls the whole restack back). A worktree that cannot be restored stays detached
   and the script prints the `git -C <path> checkout <branch>` line.
-- A conflict pauses the run (exit 10): the stack worktrees stay detached and are
-  `git worktree lock`ed with a reason. Do not commit in them; a commit there
-  lands on no branch, and the script reports it and refuses to restore over it.
+- A conflict pauses the run (exit 10). Graphite: the stack worktrees stay
+  detached and are `git worktree lock`ed with a reason. Do not commit in them;
+  a commit there lands on no branch, and the script reports it and refuses to
+  restore over it. GitHub: nothing was detached or locked, because gh-stack
+  holds the paused rebase itself.
 - State lives in `<git-common-dir>/yellow-core/worktree-restack/` and is
   re-validated on every read; a rejected state file runs nothing.
 - Residual: the dirty check ignores gitignored files, and a restore checkout

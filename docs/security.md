@@ -394,6 +394,42 @@ fields (working directory, session context metrics). The boundary:
   `context-observations/` directory also clears its history, and
   `statusline-settings.py remove` disables the observer entirely.
 
+### Worktree Restack State (yellow-core)
+
+`/worktree:restack` (`skills/git-worktree/scripts/worktree-restack.sh`)
+detaches, restacks and restores the worktrees of a stack through the active
+stacked-PR provider. It persists run state and acts on provider output. The
+boundary:
+
+- **Storage.** State lives under
+  `$(git rev-parse --git-common-dir)/yellow-core/worktree-restack/` (a `state`
+  file and a `lock.d` directory): inside the Git directory, so it is never
+  committed or pushed, and shared by every worktree of the clone. The script
+  creates it under `umask 077`. The state file is fixed-field TSV and is never
+  sourced or evaluated.
+- **State is untrusted on every read.** `validate_state` runs before anything
+  read from the file reaches git. It rejects an unknown provider, a state
+  recorded for another repository, a chain shorter than two branches, an invalid
+  branch name or ref, a branch outside the recorded stack, a run worktree that
+  is not a worktree of this clone, non-absolute or `..` or control-character
+  paths, duplicate entries, and non-commit-id SHAs. A rejected file runs nothing
+  (exit 4).
+- **Provider output is untrusted.** Stack branch names parsed from
+  `gt log short` or the github-workflow adapter's JSON must pass the same
+  branch-name check before they reach a command line. A failed provider call
+  fails closed: the run stops and the state is kept for `status`, `--continue`,
+  `--abort` or `restore`, and a stack that forks or a dirty, locked, prunable or
+  mid-operation stack worktree is refused before any change. Its own git calls
+  never force a checkout, stash, hard-reset or pass `--ignore-other-worktrees`.
+- **Documented residuals.** The dirty check ignores gitignored files, and a
+  restore checkout overwrites an ignored file when the restacked branch now
+  tracks that path. A model with a file-write tool that writes a self-consistent
+  state file is constrained, not prevented: validation limits it to this clone's
+  worktrees and the recorded stack branches. See
+  `docs/solutions/security-issues/shell-owned-state-is-not-a-boundary-against-write.md`.
+  The script puts no timeout on provider calls, and `--submit` runs after the
+  lock is released.
+
 ### Cloud/Remote Execution (yellow-review Cursor distribution)
 
 - **yellow-review's Cursor copy is both a trust-boundary downgrade and a
