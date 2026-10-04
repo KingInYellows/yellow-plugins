@@ -79,6 +79,9 @@
 # hook file in .git/hooks or in a hooks directory outside the working tree
 # cannot be verified, so the commit and the submit run with git hooks disabled
 # (GIT_CONFIG_COUNT override, checked) and a note on stderr.
+# core.fsmonitor and core.untrackedCache are forced off for every git call,
+# including the commit and the child gt and git (GIT_CONFIG_COUNT override,
+# checked), because a resolver can set an fsmonitor command in .git/config.
 # Network diagnostics in the verify messages (git ls-remote, gh pr view
 # stderr) go through the credential redactor lib/verify-run.sh loads
 # (vr_load_redactor); with no redactor the diagnostic is withheld.
@@ -180,6 +183,25 @@ gh() { bounded "$NET_TIMEOUT" "$GH_BIN" "$@"; }
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
 cd -- "$TOP"
 BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || die 2 "HEAD is detached; check out the PR branch"
+
+# A core.fsmonitor command a resolver wrote into .git/config would run on any
+# later git call that refreshes the index: the plain `git commit` below, and
+# the git that gt and the submit step spawn. lgit overrides it per call; this
+# overrides it for the rest of the process tree. It is environment config
+# (GIT_CONFIG_COUNT), appended to the caller's, and verified, failing closed on
+# a git too old to read it.
+harden_git_config() {
+    local n="${GIT_CONFIG_COUNT:-0}"
+    case "$n" in ''|*[!0-9]*) die 3 "GIT_CONFIG_COUNT is not a number, so core.fsmonitor cannot be disabled; nothing committed" ;; esac
+    n=$((10#$n))
+    export "GIT_CONFIG_KEY_$n=core.fsmonitor" "GIT_CONFIG_VALUE_$n=false" \
+        "GIT_CONFIG_KEY_$((n + 1))=core.untrackedCache" "GIT_CONFIG_VALUE_$((n + 1))=false" \
+        "GIT_CONFIG_COUNT=$((n + 2))"
+    [ "$(git config --get core.fsmonitor 2>/dev/null)" = false ] \
+        && [ "$(git config --get core.untrackedCache 2>/dev/null)" = false ] \
+        || die 3 "could not disable core.fsmonitor; nothing committed"
+}
+harden_git_config
 
 # The github-workflow runtime sits beside this plugin: plugins/<name>/ in the
 # source tree, <marketplace>/<name>/<version>/ in the installed cache.

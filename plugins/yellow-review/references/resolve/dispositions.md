@@ -576,10 +576,10 @@ requirement. `lookupReason` says why a lookup failed (`tool_missing`, `timeout`,
 `conversationResolution: "unknown"` is a separate, independent signal that
 enforcement could not be determined. `resolutionLookupReason: "rate_limited"`
 (null otherwise) reports that a branch-protection or ruleset read hit a rate
-limit while `lookupFailed` is still false; it sets `ratelimited=1` too. It is
-read from the PR's base branch and, for a PR upstack in a stack, from the
-default branch too: `enforced` when either enforces it, `not_enforced` only when
-every branch read answered no.
+limit, independently of `lookupFailed` (either can be set without the other); it
+sets `ratelimited=1` too. It is read from the PR's base branch and, for a PR
+upstack in a stack, from the default branch too: `enforced` when either enforces
+it, `not_enforced` only when every branch read answered no.
 
 ## Report and contract line
 

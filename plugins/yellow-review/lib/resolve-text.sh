@@ -244,14 +244,14 @@ _rt_scan() {
         }
         BEGIN {
             # The credential labels, once for every rule below: pass,
-            # password, passwd, passphrase, pass_phrase, pass-phrase, passcode,
+            # password, passwd, pwd, passphrase, pass_phrase, pass-phrase, passcode,
             # pass_code, pass-code, secret, secret key (secret_key, secret-key,
             # secretKey), private key, access key, token, api key, credential.
             # `client_secret`, `api_secret` and `clientSecret` are covered by
             # `secret` (the `_`, `-` or capital starts the keyword). Do not add
             # a `client`/`api` prefix here: it would start the match earlier,
             # and `myclient_secret` would then count as in-word.
-            kw = "(pass([_-]?(phrase|code)|word|wd)?|secret([_ \t-]?key)?|(private|access)[_ \t-]?key|token|api[_ \t-]?key|credential)"
+            kw = "(pass([_-]?(phrase|code)|word|wd)?|pwd|secret([_ \t-]?key)?|(private|access)[_ \t-]?key|token|api[_ \t-]?key|credential)"
             ph =" string number integer boolean object array unknown undefined"
             ph = ph " nullable optional required redacted placeholder example"
             ph = ph " secret password passwd token credential credentials apikey"
@@ -591,6 +591,9 @@ rt_text_clean() {
                 # A backslash ends the host for URL parsers (`evil.com\@github.com`
                 # is evil.com), so refuse it before userinfo is stripped.
                 if (index(u, "\\")) flag("foreign-url")
+                # `?` and `#` end the authority too (`evil.com?x=@github.com`
+                # is evil.com), so cut there before userinfo is stripped.
+                sub(/[?#].*$/, "", u)
                 sub(/^[^@]*@/, "", u)
                 sub(/[])>.,;:!?*]+$/, "", u)
                 sub(/:[0-9]+$/, "", u)

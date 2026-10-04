@@ -1729,6 +1729,18 @@ in_repo_plugin_init() {
   [ ! -e "$marker" ]
 }
 
+@test "a core.fsmonitor command is not run by the commit or the stack tools either" {
+  marker="$BATS_TEST_TMPDIR/fsmonitor-ran"
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$BATS_TEST_TMPDIR/fsm.sh"
+  chmod +x "$BATS_TEST_TMPDIR/fsm.sh"
+  git config core.fsmonitor "$BATS_TEST_TMPDIR/fsm.sh"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(git rev-parse HEAD)" != "$FIRST_SHA" ]
+  [ ! -e "$marker" ]
+}
+
 @test "a pushRemote URL with a query-string credential is not printed (exit 3)" {
   git remote add odd "$ORIGIN"
   git config remote.odd.pushurl 'https://github.com'
