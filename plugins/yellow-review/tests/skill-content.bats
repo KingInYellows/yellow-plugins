@@ -1200,3 +1200,9 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$flat" == *'`skipped — not attempted (verify skipped)`'* ]]
   [[ "$flat" == *'Unless item 4, 5, 5b or 5c stopped the loop'* ]]
 }
+
+@test "sweep-all: no /flow:compound after a verify-skipped stop" {
+  flat=$(tr '\n' ' ' <"$SWEEP_ALL" | tr -s ' ')
+  [[ "$flat" == *'**Verify-skipped guard:** if Step 4 item 5c stopped the loop, skip this step'* ]]
+  [[ "$flat" == *'Do NOT invoke `/flow:compound`: it runs project commands'* ]]
+}

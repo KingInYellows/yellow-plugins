@@ -392,6 +392,11 @@ Then go straight to the **Final exit** below: this early return still reads
 revert or unrecognized changes), skip this step and print the message
 given there. Do NOT invoke `/flow:compound`.
 
+**Verify-skipped guard:** if Step 4 item 5c stopped the loop, skip this step and
+print `[review:sweep-all] Skipping /flow:compound — verification was refused.`
+Do NOT invoke `/flow:compound`: it runs project commands, and a gitignored file
+the resolver edited may still be on disk.
+
 Otherwise, with `attempted_count >= 1`:
 
 1. Invoke the `Skill` tool with `skill: "flow:compound"` and
