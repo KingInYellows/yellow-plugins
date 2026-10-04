@@ -101,7 +101,9 @@
 # left untouched.
 # Transport commands: a repository-local or worktree-scope core.sshCommand,
 # core.askPass, core.gitProxy or credential.helper (also credential.<url>.helper)
-# would be run by the submit step with submission authority, so exit 3 naming
+# or filter.<driver>.clean|smudge|process (the stock git-lfs commands excepted)
+# would be run by the submit step, `git add` or a checkout with submission
+# authority, so exit 3 naming
 # the key (never the value) before any network call; nothing is committed. The
 # user's global or system config is not judged, and no key is overridden with an
 # empty value, which would also disable the user's own credential helper.
@@ -309,11 +311,19 @@ harden_git_config() {
     # values are never overridden, which would also disable the user's own
     # credential helper.
     local tcfg trc=0 tkey
-    tcfg=$(git config --show-scope --get-regexp '^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper)$' 2>/dev/null) || trc=$?
+    # A clean, smudge or process filter runs on `git add` and on checkout, so a
+    # repository-local one is judged the same way; the three stock Git LFS
+    # commands (`git lfs install --local`) are allowed by exact value.
+    tcfg=$(git config --show-scope --get-regexp '^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process))$' 2>/dev/null) || trc=$?
     case "$trc" in 0|1) ;; *) die 3 "could not read the git transport config; nothing committed" ;; esac
-    tkey=$(printf '%s\n' "$tcfg" | awk -F'\t' '($1 == "local" || $1 == "worktree") { sub(/ .*/, "", $2); print $2; exit }')
+    tkey=$(printf '%s\n' "$tcfg" | awk -F'\t' '
+        ($1 == "local" || $1 == "worktree") {
+            k = $2; v = $2; sub(/ .*/, "", k); sub(/^[^ ]* /, "", v)
+            if (k ~ /^filter\.lfs\.(clean|smudge|process)$/ && (v == "git-lfs clean -- %f" || v == "git-lfs smudge -- %f" || v == "git-lfs filter-process" || v == "git-lfs smudge --skip -- %f" || v == "git-lfs filter-process --skip")) next
+            print k; exit
+        }')
     # A credential URL can carry userinfo: name the key without it.
-    case "$tkey" in credential.?*.helper) tkey="credential.<url>.helper" ;; esac
+    case "$tkey" in credential.?*.helper) tkey="credential.<url>.helper" ;; filter.*) tkey="filter.<driver>.${tkey##*.}" ;; esac
     [ -z "$tkey" ] || die 3 "the repository config sets $tkey, which would run a command with submission authority; remove it from the repository config (a global or system config is fine); nothing committed"
     # A resolver can also write commit.gpgSign and gpg.program (or
     # gpg.<format>.program) into the repository's own config: signing the commit

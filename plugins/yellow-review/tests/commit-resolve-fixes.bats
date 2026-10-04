@@ -2014,6 +2014,25 @@ crf_refuses_untouched() {
   done
 }
 
+@test "a repository-local filter command is refused, but the stock git-lfs filters are allowed" {
+  for provider in graphite github; do
+    for entry in filter.evil.clean filter.evil.smudge filter.evil.process filter.lfs.clean; do
+      git config "$entry" "touch $BATS_TEST_TMPDIR/filter-ran; git-lfs clean -- %f"
+      crf_refuses_untouched "$provider" || { echo "not refused: $entry $provider" >&2; return 1; }
+      [[ "$stderr" == *"repository config sets filter.<driver>."* ]]
+      [[ "$stderr" != *filter-ran* ]]
+      git config --unset "$entry"
+    done
+  done
+  [ ! -e "$BATS_TEST_TMPDIR/filter-ran" ]
+  git config filter.lfs.clean "git-lfs clean -- %f"
+  git config filter.lfs.smudge "git-lfs smudge -- %f"
+  git config filter.lfs.process "git-lfs filter-process"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+}
+
 @test "a transport command in a worktree-scope config or an included file is refused too" {
   git config extensions.worktreeConfig true
   git config --worktree core.sshCommand "/bin/echo x"
