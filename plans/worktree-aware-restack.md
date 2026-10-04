@@ -479,7 +479,7 @@ conflict · `20` preflight refused · `30` restack failed, worktrees restored ·
 
 ### Phase 3: Command
 
-- [ ] 3.1: `commands/worktree/restack.md`. Frontmatter `name:
+- [x] 3.1: `commands/worktree/restack.md`. Frontmatter `name:
       worktree:restack`, single-line single-quoted `description`,
       `argument-hint: '[--continue | --abort | --status] [--submit] [--yes]'`,
       `allowed-tools: [Bash, Skill, AskUserQuestion]`. Flow:
@@ -490,7 +490,7 @@ conflict · `20` preflight refused · `30` restack failed, worktrees restored ·
       - `preflight`, render it, confirm via `AskUserQuestion` unless `--yes`
       - `start` / `continue` / `abort`
       - map the exit code to a report and the next step
-- [ ] 3.2: Keep the body free of `gt <verb>` / `gh stack <verb>` literals.
+- [x] 3.2: Keep the body free of `gt <verb>` / `gh stack <verb>` literals.
       Refer to "the provider's `rebaseUpstack` primitive" instead.
 
 <!-- deepen-plan: codebase -->
