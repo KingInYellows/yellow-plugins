@@ -1,0 +1,48 @@
+docs/solutions/workflow/plugins-yellow-review-lib-resolve-text-sh-conflict.md
+  s_f5c6ea4ab2cc53::t_726f92d4df2434 1-23
+docs/solutions/logic-errors/pre-resolve-stops-print-no-contract-line.md
+  s_34897998dae600::t_7b93d8f7a215b1 1-89
+docs/solutions/logic-errors/resolver-unknown-scope-and-guard-misfires.md
+  s_79ab629205942a::t_30b147b8e5cf47 23
+  s_34897998dae600::t_73129ac65f2d23 1-22,24-118
+docs/solutions/workflow/sweep-resolve-threads-per-thread-by-source-id.md
+  s_34897998dae600::t_a57974284943d9 1-56
+docs/solutions/code-quality/cleanup-helper-order-and-vacuous-test-guards.md
+  s_34897998dae600::t_68db43d4ebb3e0 1-77
+docs/solutions/logic-errors/idempotency-skip-window-and-fail-open-guards.md
+  s_34897998dae600::t_c8b0498ba5a672 1-92
+docs/solutions/security-issues/credential-heuristic-exemptions-fail-both-ways.md
+  s_79ab629205942a::t_03d193d0d64301 1-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1d19e7b9411d0a9df19b23f55049c342dba235ef",
+  "prompts": {},
+  "sessions": {
+    "s_34897998dae600": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "59f66293-277e-4e30-a1f0-fee6407f5862",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_79ab629205942a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "af7c3a89-4c40-4dc4-bd49-8799be9e99c6",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": null
+    },
+    "s_f5c6ea4ab2cc53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6133a3ae-402d-4d58-8aca-7a9859fcce88",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
