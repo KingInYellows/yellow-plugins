@@ -233,8 +233,8 @@ council_lineage_collisions() {
 # <<< council-lineage-lib
 
 # Resolve each slot. claude is `model: inherit` (the session model), gemini is
-# `agy` (no model field), and codex is the OpenAI CLI whatever its model, so
-# only the OpenCode slot's lineage varies. The OpenCode model uses the same
+# `agy` (no model field), and codex is the OpenAI CLI unless its config routes
+# it to another model_provider, so in practice only the OpenCode slot varies. The OpenCode model uses the same
 # three-state presence logic and default slug literal as opencode-reviewer.md
 # and setup.md (tests/quota-lineage.bats fails on drift).
 if [ -z "${COUNCIL_OPENCODE_MODEL+x}" ]; then
@@ -242,11 +242,20 @@ if [ -z "${COUNCIL_OPENCODE_MODEL+x}" ]; then
 else
   OC_MODEL="$COUNCIL_OPENCODE_MODEL"
 fi
-CODEX_RESOLVED="${CODEX_MODEL:-}"
-if [ -z "$CODEX_RESOLVED" ] && [ -r "$HOME/.codex/config.toml" ]; then
-  CODEX_RESOLVED=$(awk '/^\[/ { exit } { if (match($0, /^model[ \t]*=[ \t]*"[^"]+"/)) { v = substr($0, RSTART, RLENGTH); sub(/^model[ \t]*=[ \t]*"/, "", v); sub(/"$/, "", v); print v; exit } }' "$HOME/.codex/config.toml" 2>/dev/null)
-fi
+# Top-level key of codex's config (CODEX_HOME relocates it), in double or single
+# quotes; a key inside a [table] is not the default and is ignored.
+council_codex_key() {
+  [ -r "${CODEX_HOME:-$HOME/.codex}/config.toml" ] || return 0
+  K="$1" awk 'BEGIN { k = ENVIRON["K"] } /^\[/ { exit } $0 ~ "^" k "[ \t]*=" { v = $0; sub(/^[^=]*=[ \t]*/, "", v); sub(/[ \t]*#.*$/, "", v); gsub(/^["\047]|["\047]$/, "", v); print v; exit }' "${CODEX_HOME:-$HOME/.codex}/config.toml" 2>/dev/null
+}
+CODEX_RESOLVED="${CODEX_MODEL:-$(council_codex_key model)}"
 CODEX_RESOLVED=$(printf '%s' "${CODEX_RESOLVED:-account-default}" | LC_ALL=C tr -cd 'A-Za-z0-9._~:/@-' | head -c 80)
+CODEX_PROVIDER=$(council_codex_key model_provider | LC_ALL=C tr -cd 'A-Za-z0-9._-' | head -c 40)
+CODEX_LINEAGE="openai"
+case "$CODEX_PROVIDER" in
+  "" | openai) ;;
+  *) CODEX_LINEAGE=$(council_resolve_lineage "${CODEX_PROVIDER}/x") ;;
+esac
 OC_SHOWN=$(printf '%s' "$OC_MODEL" | LC_ALL=C tr -cd 'A-Za-z0-9._~:/@-' | head -c 80)
 if [ -n "$OC_MODEL" ]; then
   OC_LINEAGE=$(council_resolve_lineage "$OC_MODEL")
@@ -254,9 +263,9 @@ else
   OC_SHOWN="opencode-default"
   OC_LINEAGE="unknown"
 fi
-printf 'COUNCIL_MODELS: claude=inherit(anthropic) codex=%s(openai) gemini=agy-default(google) opencode=%s(%s)\n' \
-  "$CODEX_RESOLVED" "$OC_SHOWN" "$OC_LINEAGE"
-council_lineage_collisions claude=anthropic codex=openai gemini=google "opencode=$OC_LINEAGE" \
+printf 'COUNCIL_MODELS: claude=inherit(anthropic) codex=%s(%s) gemini=agy-default(google) opencode=%s(%s)\n' \
+  "$CODEX_RESOLVED" "$CODEX_LINEAGE" "$OC_SHOWN" "$OC_LINEAGE"
+council_lineage_collisions claude=anthropic "codex=$CODEX_LINEAGE" gemini=google "opencode=$OC_LINEAGE" \
   | while read -r la lb lineage; do
       printf '[council] Warning: %s and %s both resolve to %s lineage — reviews will be less independent\n' "$la" "$lb" "$lineage" >&2
     done
@@ -551,9 +560,8 @@ declare -A REVIEWER_VERDICTS REVIEWER_CONFIDENCES REVIEWER_SUMMARIES \
 council_quota_eta() {
   local flat eta
   flat=$(printf '%s' "${1:-}" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
-  eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Ss][Ee][Tt][Ss]? +([^;|]{1,60}).*/resets \1/p' | head -n 1)
-  [ -n "$eta" ] || eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +([^;,|]{1,40}).*/resets in \1/p' | head -n 1)
-  [ -n "$eta" ] || eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +([^;,|]{1,40}).*/resets in \1/p' | head -n 1)
+  eta=$(printf '%s\n' "$flat" | LC_ALL=C grep -oiE '(try again (in|at)|retry[- ]after) +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +/resets in /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Tt] +/resets at /; s/^[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +/resets in /')
+  [ -n "$eta" ] || eta=$(printf '%s\n' "$flat" | LC_ALL=C grep -oiE '(^|[^A-Za-z])resets? +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[^A-Za-z]//; s/^[Rr][Ee][Ss][Ee][Tt][Ss]? +/resets /')
   # Keep model-identifier-safe characters only, cut at the first sentence end
   # ("in 4 hours. Please ...") and cap: the value is reviewer-adjacent text that
   # reaches summary= and the headline.
@@ -567,7 +575,7 @@ council_quota_eta() {
 # free text from a return cannot ride into the headline dressed as an ETA.
 council_eta_plain() {
   printf '%s\n' "${1:-}" | LC_ALL=C tr -s ' ' '\n' \
-    | LC_ALL=C grep -qviE '^(resets?|in|at|on|and|am|pm|utc|time|not|reported|[0-9]{1,4}([:.][0-9]{1,2})?(am|pm)?,?|[0-9]+(s|m|h|d)|(mon|tue|wed|thu|fri|sat|sun)[a-z]*,?|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*,?|hours?|minutes?|mins?|seconds?|secs?|days?|weeks?|\([A-Za-z_]+(/[A-Za-z_]+)*\))$' \
+    | LC_ALL=C grep -qviE '^(resets?|in|at|on|and|am|pm|utc|time|not|reported|[0-9]{1,4}([:.][0-9]{1,2})?(am|pm|st|nd|rd|th)?,?|[0-9]+(s|m|h|d)|(mon|tue|wed|thu|fri|sat|sun)[a-z]*,?|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*,?|hours?|minutes?|mins?|seconds?|secs?|days?|weeks?|\([A-Za-z_]+(/[A-Za-z_]+)*\))$' \
     && return 1
   return 0
 }

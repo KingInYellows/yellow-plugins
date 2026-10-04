@@ -140,7 +140,8 @@ or HTTP 529), the reviewer returns the full 6-key block with
 `fenced_output_path=/dev/null` and an empty findings pair, so
 `parse_reviewer_return` needs no special case. It is excluded from synthesis
 like `UNAVAILABLE`, and `/dev/null` is accepted only under this verdict.
-Match sets: codex `insufficient_quota` / `model_cap_exceeded`; gemini
+Match sets: codex `insufficient_quota` / `model_cap_exceeded` / `usage_limit_reached`
+(and "hit your usage limit"); gemini
 `RESOURCE_EXHAUSTED` (floor only); opencode provider passthrough (`insufficient_quota`,
 `model_cap_exceeded`, `RESOURCE_EXHAUSTED`, `quota exceeded`, `usage limit`,
 `insufficient credits`, HTTP 402 "requires more credits"); claude `session limit`,

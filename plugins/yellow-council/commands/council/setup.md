@@ -130,11 +130,14 @@ if command -v opencode >/dev/null 2>&1; then
         # Timed out (124/137), crashed, or an opencode that rejects --pure: the
         # check did not run, which is not the same as "no credential".
         printf '[yellow-council] opencode OpenRouter auth: check skipped (opencode auth list exited %s); re-run /council:setup\n' "$OC_AUTH_RC"
+        printf 'OPENCODE_AUTH=skipped\n'
       elif printf '%s\n' "$OC_AUTH" | sed "s/${ESC}\[[0-9;?]*[A-Za-z]//g" \
            | grep -qE '^[^A-Za-z0-9]*OpenRouter([[:space:]]|$)'; then
         printf '[yellow-council] opencode OpenRouter auth: ok\n'
+        printf 'OPENCODE_AUTH=ok\n'
       else
         printf '[yellow-council] opencode OpenRouter auth: WARNING — no OpenRouter credential found; the OpenCode slot (%s) will return UNAVAILABLE.\n' "$OC_MODEL"
+        printf 'OPENCODE_AUTH=missing\n'
         printf '[yellow-council]   Fix: opencode auth login --provider openrouter (or export OPENROUTER_API_KEY)\n'
         printf '[yellow-council]   Or opt out: export COUNCIL_OPENCODE_MODEL="" (V1 behaviour, no --model) or COUNCIL_OPENCODE_MODEL=opencode/deepseek-v4-pro (OpenCode Zen)\n'
       fi ;;
@@ -200,24 +203,15 @@ fi
 if command -v opencode >/dev/null 2>&1; then
   OPENCODE_STATUS="installed"
   READY_COUNT=$((READY_COUNT + 1))
-  # Same model resolution and credential check as Step 3.
-  if [ -z "${COUNCIL_OPENCODE_MODEL+x}" ]; then
-    OC_MODEL="openrouter/deepseek/deepseek-v4-pro"
-  else
-    OC_MODEL="$COUNCIL_OPENCODE_MODEL"
+  # Step 3 printed OPENCODE_AUTH=ok|missing|skipped when the model routes through
+  # OpenRouter. Substitute it here: a fresh Bash call cannot see it, and probing
+  # again would repeat the same bounded `opencode auth list`.
+  OC_AUTH_STATE="<the OPENCODE_AUTH value Step 3 printed, or unchecked>"
+  if [ "$OC_AUTH_STATE" = "missing" ]; then
+    OPENCODE_STATUS="installed (needs OpenRouter auth)"
+    # The slot will return UNAVAILABLE, so it is not an available reviewer.
+    READY_COUNT=$((READY_COUNT - 1))
   fi
-  case "$OC_MODEL" in
-    openrouter/*)
-      ESC=$(printf '\033')
-      OC_AUTH=$(cd /tmp && timeout --signal=TERM --kill-after=5 15 opencode auth list --pure </dev/null 2>&1); OC_AUTH_RC=$?
-      if [ "$OC_AUTH_RC" -eq 0 ] \
-         && ! printf '%s\n' "$OC_AUTH" | sed "s/${ESC}\[[0-9;?]*[A-Za-z]//g" \
-              | grep -qE '^[^A-Za-z0-9]*OpenRouter([[:space:]]|$)'; then
-        OPENCODE_STATUS="installed (needs OpenRouter auth)"
-        # The slot will return UNAVAILABLE, so it is not an available reviewer.
-        READY_COUNT=$((READY_COUNT - 1))
-      fi ;;
-  esac
 else
   OPENCODE_STATUS="missing"
 fi

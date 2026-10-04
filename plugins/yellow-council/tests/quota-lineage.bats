@@ -337,19 +337,30 @@ parse_in() {
   done
 }
 
-@test "the reset-ETA sed programs are identical in council.md and the three reviewer agents" {
+@test "the reset-ETA extraction is identical in council.md and the three reviewer agents" {
   local f all="" per
   for f in plugins/yellow-council/commands/council/council.md \
            plugins/yellow-council/agents/review/gemini-reviewer.md \
            plugins/yellow-council/agents/review/opencode-reviewer.md \
            plugins/yellow-codex/agents/review/codex-reviewer.md; do
-    run grep -ohE "sed -nE '[^']*(resets?|Tt\]\[Rr\]\[Yy|Rr\]\[Ee\]\[Tt\]\[Rr\]\[Yy)[^']*'" "${REPO_ROOT}/$f"
-    [ "$status" -eq 0 ] || { echo "$f: no ETA sed programs"; return 1; }
+    # Each copy is two lines: a grep -oiE program and its normalizing sed.
+    run grep -ohE "grep -oiE '[^']*' \| head -n 1 \| LC_ALL=C sed -E '[^']*'" "${REPO_ROOT}/$f"
+    [ "$status" -eq 0 ] || { echo "$f: no ETA extraction lines"; return 1; }
     per=$(printf '%s\n' "$output" | sort -u | wc -l | tr -d ' ')
-    [ "$per" -eq 3 ] || { echo "$f: $per distinct ETA programs, want 3"; return 1; }
+    [ "$per" -eq 2 ] || { echo "$f: $per distinct ETA programs, want 2"; return 1; }
     all="${all}${output}"$'\n'
   done
-  [ "$(printf '%s' "$all" | sort -u | wc -l | tr -d ' ')" -eq 3 ] || { echo "ETA sed programs drifted between files"; return 1; }
+  [ "$(printf '%s' "$all" | sort -u | wc -l | tr -d ' ')" -eq 2 ] || { echo "ETA extraction drifted between files"; return 1; }
+}
+
+@test "the OpenRouter credential matcher is identical in council.md and setup.md" {
+  local f all=""
+  for f in plugins/yellow-council/commands/council/council.md plugins/yellow-council/commands/council/setup.md; do
+    run grep -ohE "grep -qE '\^\[\^A-Za-z0-9\]\*OpenRouter[^']*'" "${REPO_ROOT}/$f"
+    [ "$status" -eq 0 ] || { echo "$f: no credential matcher"; return 1; }
+    all="${all}${output}"$'\n'
+  done
+  [ "$(printf '%s' "$all" | sort -u | wc -l | tr -d ' ')" -eq 1 ] || { echo "credential matcher drifted: $all"; return 1; }
 }
 
 # --- Reviewer error arms, extracted and run as shipped ----------------------
@@ -588,6 +599,69 @@ step2b_in() {
     [[ "$output" == *"opencode=opencode-default(unknown)"* && "$stderr" != *"OpenRouter"* ]] || { echo "$profile (V1): $output $stderr"; return 1; }
     step2b_in "$profile" "$stub" 'export COUNCIL_OPENCODE_MODEL=openai/gpt-5.4'
     [[ "$stderr" == *"codex and opencode both resolve to openai lineage"* ]] || { echo "$profile (collision): $stderr"; return 1; }
+  done
+}
+
+@test "council_quota_eta takes the first reset-like phrase, not one inside another word" {
+  local profile
+  for profile in $PROFILES; do
+    run_in "$profile" "council_quota_eta 'Try again in 2h. Plan limits reset monthly'"
+    [ "$output" = "resets in 2h" ] || { echo "$profile: $output"; return 1; }
+    run_in "$profile" "council_quota_eta 'The preset value is 5; quota resets 9am'"
+    [ "$output" = "resets 9am" ] || { echo "$profile: $output"; return 1; }
+    run_in "$profile" "council_quota_eta \"You've hit your usage limit. Try again at Oct 7th, 2026 3:00 PM.\""
+    [ "$output" = "resets at Oct 7th, 2026 3:00 PM" ] || { echo "$profile: $output"; return 1; }
+    run_in "$profile" 'council_eta_plain "resets at Oct 7th, 2026 3:00 PM"'
+    [ "$status" -eq 0 ] || { echo "$profile: ordinal date rejected"; return 1; }
+  done
+}
+
+@test "codex quota arm matches the ChatGPT-plan wording and wins over rate_limit_exceeded" {
+  local profile body="${BATS_TEST_TMPDIR}/codex-chain.sh" msg
+  # The quota arm and the transient arm that follows it, closed by an else.
+  { printf 'if false; then :\n'
+    extract_range "${REPO_ROOT}/plugins/yellow-codex/agents/review/codex-reviewer.md" 'elif \[ "\$codex_exit" -eq 1 \] && printf .%s. "\$codex_api_error" \| grep -qE "insufficient_quota' "printf 'summary=Codex rate limited" "${body}.part"
+    cat "${body}.part"; printf 'fi\n'; } >| "$body"
+  for profile in $PROFILES; do
+    for msg in \
+      'You'"'"'ve hit your usage limit. Upgrade to Plus to continue using Codex. Try again at Oct 7th, 2026 3:00 PM.' \
+      '{"type":"usage_limit_reached","message":"limit"}' \
+      'Quota exceeded. Check your plan and billing details.' \
+      'rate_limit_exceeded and also insufficient_quota'; do
+      { printf 'codex_exit=1 codex_api_error=%q\n' "$msg"; cat "$body"; } >| "${body}.run"
+      run_arm "$profile" "${body}.run"
+      [[ "$output" == *"verdict=QUOTA_EXHAUSTED"* ]] || { echo "$profile: '$msg' -> $output"; return 1; }
+    done
+    { printf 'codex_exit=1 codex_api_error=%q\n' 'rate_limit_exceeded: slow down'; cat "$body"; } >| "${body}.run"
+    run_arm "$profile" "${body}.run"
+    [[ "$output" == *"verdict=ERROR"* && "$output" == *"Codex rate limited"* ]] || { echo "$profile: transient arm: $output"; return 1; }
+    { printf 'codex_exit=2 codex_api_error=%q\n' 'insufficient_quota'; cat "$body"; } >| "${body}.run"
+    run_arm "$profile" "${body}.run"
+    [ -z "$output" ] || { echo "$profile: matched on a non-1 exit: $output"; return 1; }
+  done
+}
+
+@test "opencode arm masks short credential shapes in provider text and the stderr excerpt" {
+  local profile out="${BATS_TEST_TMPDIR}/o.jsonl" err="${BATS_TEST_TMPDIR}/o.err"
+  printf '%s\n' '{"type":"error","error":{"name":"APIError","data":{"message":"upstream rejected AKIAABCDEFGHIJKLMNOP and Bearer abc.def-123 with sk-proj-abcd1234 plus ghp_abcd12345678","statusCode":500}}}' >| "$out"
+  : >| "$err"
+  for profile in $PROFILES; do
+    opencode_arm_in "$profile" "$out" "$err"
+    [[ "$output" == *"verdict=ERROR"* ]] || { echo "$profile: $output"; return 1; }
+    [[ "$output" != *AKIAABCDEFGHIJKLMNOP* && "$output" != *abc.def-123* && "$output" != *sk-proj-abcd1234* && "$output" != *ghp_abcd12345678* ]] || { echo "$profile: a credential shape survived: $output"; return 1; }
+  done
+}
+
+@test "Step 2b reads codex's provider and model from CODEX_HOME, with single or double quotes" {
+  local profile stub="${BATS_TEST_TMPDIR}/stub2c"
+  mkdir -p "$stub" "${BATS_TEST_TMPDIR}/chome"
+  printf '#!/bin/sh\nprintf "●  OpenRouter api\\n"\n' >| "$stub/opencode"; chmod +x "$stub/opencode"
+  printf "# c\nmodel_provider = 'deepseek'\nmodel = \"deepseek-v4-pro\"  # note\n\n[profiles.p]\nmodel = \"other\"\n" >| "${BATS_TEST_TMPDIR}/chome/config.toml"
+  for profile in $PROFILES; do
+    step2b_in "$profile" "$stub" "export CODEX_HOME=${BATS_TEST_TMPDIR}/chome"
+    [[ "$output" == *"codex=deepseek-v4-pro(deepseek)"* ]] || { echo "$profile: $output"; return 1; }
+    # codex and opencode (default deepseek route) now share a lineage
+    [[ "$stderr" == *"codex and opencode both resolve to deepseek lineage"* ]] || { echo "$profile: $stderr"; return 1; }
   done
 }
 

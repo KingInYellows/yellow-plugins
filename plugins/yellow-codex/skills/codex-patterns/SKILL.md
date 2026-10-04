@@ -200,7 +200,9 @@ message text (`The '<name>' model is not supported …`; the generic
 (2026-09-05 and 2026-09-16 updates).
 
 The same arm chain separates quota exhaustion from a transient 429: an API error
-containing `insufficient_quota` or `model_cap_exceeded` returns
+containing `insufficient_quota`, `model_cap_exceeded`, `usage_limit_reached`,
+"hit your usage limit" or "Quota exceeded. Check your plan" (the last three are the
+ChatGPT-plan wording present in codex-cli 0.157.0) returns
 `verdict=QUOTA_EXHAUSTED` (full 6-key stub, `fenced_output_path=/dev/null`, the
 reset ETA in `summary=`), checked before `rate_limit_exceeded`, which stays a
 transient `ERROR`. Callers that read `codex-reviewer`'s return (`/council`,

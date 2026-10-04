@@ -32,7 +32,8 @@ four-reviewer council.
   V1 behaviour, or `COUNCIL_OPENCODE_MODEL=opencode/deepseek-v4-pro` for OpenCode
   Zen.
 - `yellow-codex`: `codex-reviewer` returns `QUOTA_EXHAUSTED` for
-  `insufficient_quota` and `model_cap_exceeded`, checked before the transient
+  `insufficient_quota`, `model_cap_exceeded`, `usage_limit_reached` and the
+  ChatGPT-plan "hit your usage limit" wording, checked before the transient
   `rate_limit_exceeded` arm. Compatibility: the verdict and its `/dev/null` path
   are read by `yellow-review` and `yellow-council`, so release those with (or
   before) this `yellow-codex` version. A `/review:pr` from before this change reads

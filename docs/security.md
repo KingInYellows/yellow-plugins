@@ -634,9 +634,11 @@ prints no key; neither reads, prompts for or prints the key. The model value is
 validated as a plain slug before it becomes an argv item, because a leading `-`
 would be read as an opencode flag. Provider error text that reaches `summary=`
 (including the `--print-logs` stderr excerpt) is flattened, stripped of control
-characters and URLs, has long token runs masked and is length-capped; it does not
-go through the 11-pattern redaction block, so a short credential-shaped string
-could survive (recorded residual).
+characters and URLs, has the common short credential shapes (AWS key ids, Bearer
+values, `sk-`/`gh*_`/`AIza`/`ses_` prefixed tokens, `github_pat_`) and long token runs
+masked and is length-capped; it does not go through the full 11-pattern redaction
+block (no PEM handling), so other short credential-shaped strings could survive
+(recorded residual).
 
 A reviewer whose provider reports quota exhaustion returns `fenced_output_path=/dev/null`
 with `verdict=QUOTA_EXHAUSTED`. The path is accepted only under that verdict

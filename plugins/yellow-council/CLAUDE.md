@@ -249,8 +249,9 @@ fresh-machine install CI (see Known Limitations).
   minted path, at most 2000 characters) and echoes an ETA only when it is a plain
   time or duration. It has not been verified against a real spawn-failure
   message, and an account-wide session or weekly limit may stop the orchestrating
-  turn as well. Codex matches `insufficient_quota` and
-  `model_cap_exceeded`; OpenCode matches provider passthrough text and HTTP 402.
+  turn as well. Codex matches `insufficient_quota`,
+  `model_cap_exceeded`, `usage_limit_reached` and the ChatGPT-plan "hit your usage
+  limit" / "Quota exceeded. Check your plan" wording; OpenCode matches provider passthrough text and HTTP 402.
   A provider that words quota errors differently is recorded as `ERROR`.
 - **Lineage detection is best-effort.** `/council` maps each slot's model to a
   lineage by slug prefix or family and warns on a collision, but codex's model
