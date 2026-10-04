@@ -345,7 +345,18 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   `log.showSignature`, one stderr note) when the repository's own local or
   worktree config sets `commit.gpgsign` or a `gpg.*`
   key, because signing runs the configured `gpg.program`; the user's global or
-  system signing config is left alone. The Graphite submit's output reaches
+  system signing config is left alone. A repository-local or worktree-scope
+  `core.sshCommand`, `core.askPass`, `core.gitProxy` or `credential.helper`
+  (also `credential.<url>.helper`) would be run by the submit with submission
+  authority, so it exits 3 before any network call, naming the key (never the
+  value) and committing nothing; the user's global or system config is not
+  judged, and no key is overridden with an empty value (that would disable the
+  user's own credential helper). `gt` (Graphite) or `node` (GitHub), `gh` and
+  `jq` are found through `PATH`: one whose canonical directory is inside the
+  repository's working tree (an ignored `node_modules/.bin`, say) could be
+  replaced by a resolver without a tracked change, so it exits 3 naming the tool
+  and directory before any of them runs. A tool outside the repository, the
+  normal case, is not judged. The Graphite submit's output reaches
   stderr only through the credential redactor, and is withheld when the redactor
   is unavailable;
 - `commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`,
@@ -385,7 +396,10 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   that a failed verify loses the patch for code that assigns a
   credential-looking value. A patch whose added lines match is deleted rather
   than archived; the files are still reverted so the secret leaves the disk, and
-  the result carries `patch: null` and a `reason`. Before any patch is built,
+  the result carries `patch: null` and a `reason`. The screen also covers the
+  file names that go into the patch (every `diff --git` path, including the
+  files found inside a replacement directory), so a credential-shaped name
+  withholds the patch like a content hit. Before any patch is built,
   every listed path is checked: only regular files, symlinks (dangling ones too)
   and absent paths are accepted. A FIFO, socket, device or directory in its
   place is refused with exit 2 in run mode, and removed unopened by the revert
@@ -660,10 +674,13 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   runner and hook definition files are refused, but the code the hooks run is
   not. How unattended commits should treat hooks is an open decision.
 - `commit-resolve-fixes` covers signing through `commit.gpgSign`,
-  `push.gpgSign` and `log.showSignature` only. Other repository-local settings
-  that run a program (`credential.helper`, `core.sshCommand`, a `filter.*`
-  driver) are not neutralised; the file bound and the dirty-set checks are the
-  controls there.
+  `push.gpgSign` and `log.showSignature`, and refuses a repository-local
+  `core.sshCommand`, `core.askPass`, `core.gitProxy` and `credential.helper`.
+  Other repository-local settings that run a program (a `filter.*` driver, a
+  `url.<base>.insteadOf` pointing at a helper, `http.*` options) are not
+  neutralised; the file bound and the dirty-set checks are the controls there.
+  The `PATH` check judges the directory of each tool as found on `PATH`,
+  not a symlink inside a directory outside the repository that points into it.
 - Step 7 costs about three tool calls per thread; very large PRs (hundreds of
   threads) are slow. A batch apply script would help and is not written.
 - Two accounts resolving the same PR concurrently can each post a reply; markers

@@ -1831,3 +1831,52 @@ lib_tamper() {
   run ! compgen -G "$PATCH_DIR/*.patch"
   run ! grep -rq hunter22x "$REPO/.git/yellow-review"
 }
+
+# --- A credential in a file name is screened like one in the content ---
+
+# The token-shaped string is built at runtime from pieces.
+cred_name() { printf 'src/token-%s%s.txt' "ghp_" "abcdefghijklmnopqrstuvwxyz0123456789"; }
+
+@test "--revert-only withholds the patch when a file NAME looks like a credential" {
+  name=$(cred_name)
+  printf 'harmless\n' >| "$name"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt "$name"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .patch, .treeClean]')" = '["reverted",null,true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"recovery patch withheld"* ]]
+  [[ "$output" != *"${name#src/token-}"* ]]
+  [ ! -e "$name" ]
+  run ! compgen -G "$PATCH_DIR/*.patch"
+  run ! grep -rqF "${name#src/token-}" "$REPO/.git/yellow-review"
+}
+
+@test "--revert-dirty withholds the patch when a file NAME looks like a credential" {
+  name=$(cred_name)
+  printf 'harmless\n' >| "$name"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .patch, .treeClean]')" = '["reverted",null,true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"recovery patch withheld"* ]]
+  run ! compgen -G "$PATCH_DIR/*.patch"
+  run ! grep -rqF "${name#src/token-}" "$REPO/.git/yellow-review"
+}
+
+@test "a credential-shaped name inside a replacement directory withholds the patch" {
+  name=$(cred_name)
+  rm -f src/a.txt && mkdir src/a.txt && printf 'harmless\n' >| "src/a.txt/${name#src/}"
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .patch)" = null ]
+  [ -f src/a.txt ]
+  run ! compgen -G "$PATCH_DIR/*.patch"
+  run ! grep -rqF "${name#src/token-}" "$REPO/.git/yellow-review"
+}
+
+@test "a normal file name keeps its patch" {
+  printf 'harmless\n' >| src/token-notes.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/token-notes.txt
+  [ "$status" -eq 0 ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ -s "$patch" ]
+  grep -q 'src/token-notes.txt' "$patch"
+}

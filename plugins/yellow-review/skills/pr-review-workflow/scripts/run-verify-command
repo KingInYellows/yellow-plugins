@@ -41,7 +41,8 @@
 #                  created it: the pre-resolve state is not recorded (issue
 #                  #973), so pass only files a resolver edited. The patch saved
 #                  first holds its content unless the credential screen
-#                  withheld the patch.
+#                  withheld the patch. The screen also reads the file names in
+#                  the patch, so a credential-shaped name withholds it too.
 #                  A listed directory is removed only where HEAD has a regular
 #                  file (a replaced file); a tracked directory, a gitlink or an
 #                  untracked directory is refused (exit 2) so its untracked
@@ -594,13 +595,31 @@ PATCH_SCREENED=0
 # verifier's own output is screened separately, on its way to the log.
 # Every hunk line is screened, not only the added ones: a resolver that removes
 # a credential, or edits beside one, leaves it in a removed or context line of
-# the patch. Diff headers (diff --git, index, ---/+++, mode and rename lines) are
-# skipped by position, as rt_added_lines does, because a path is not content
-# and would only add false positives. A hunk header keeps its trailing section
-# text, which is file content.
+# the patch. Diff headers (index, ---/+++, mode and rename lines) are skipped by
+# position, as rt_added_lines does. The one header line that is kept is
+# diff --git: it names every path in the patch (replacement-directory files
+# included), and a credential in a file name would otherwise stay under .git.
+# The credential rules anchor a token prefix (ghp_, sk-, ...) at the start of a
+# word, and a path word starts with its directory, so the path is also emitted
+# once per suffix that follows a non-alphanumeric character, which gives a token
+# embedded in a name that anchor. The rules themselves are unchanged.
+# A hunk header keeps its trailing section text, which is file content.
 patch_hunk_lines() {
     awk '
-        /^diff --git / { h = 0; next }
+        /^diff --git / {
+            h = 0
+            s = substr($0, 12)
+            n = length(s)
+            # "a/P b/P": screen P once, not twice.
+            if (n >= 5 && n % 2 == 1) {
+                pl = (n - 5) / 2
+                if (substr(s, 1, 2) == "a/" && substr(s, pl + 3, 3) == " b/" && substr(s, 3, pl) == substr(s, n - pl + 1)) s = substr(s, 3, pl)
+            }
+            print s
+            n = length(s)
+            for (i = 1; i < n; i++) if (substr(s, i, 1) !~ /[A-Za-z0-9]/) print substr(s, i + 1)
+            next
+        }
         /^@@/ { h = 1; s = $0; if (sub(/^@@[^@]*@@ ?/, "", s) && s != "") print s; next }
         h && /^[-+ ]/ { print substr($0, 2) }
     '
@@ -616,7 +635,7 @@ screen_patch() {
         1)
             rm -f -- "$PATCH"
             PATCH_OUT=""
-            add_reason "recovery patch withheld: patch lines look like a credential"
+            add_reason "recovery patch withheld: patch lines or file names look like a credential"
             ;;
         *)
             rm -f -- "$PATCH"

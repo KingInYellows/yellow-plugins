@@ -1987,6 +1987,82 @@ STUB
   done
 }
 
+# --- Transport commands in the repository config ---
+
+# refused_untouched <provider>: the run exits 3 and nothing is staged or committed.
+crf_refuses_untouched() {
+  local head
+  head=$(git rev-parse HEAD)
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider "$1" --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [ "$(git rev-parse HEAD)" = "$head" ]
+  [ -z "$(git diff --cached --name-only)" ]
+  run ! grep -q . "$STUB_LOG"
+}
+
+@test "a repository-local transport command is refused, naming the key and never the value" {
+  for provider in graphite github; do
+    for entry in "core.sshCommand" "core.askPass" "core.gitProxy" "credential.helper" "credential.https://example.com.helper"; do
+      git config "$entry" "/bin/echo SECRETVALUE"
+      crf_refuses_untouched "$provider" || { echo "not refused: $entry $provider" >&2; return 1; }
+      [[ "$stderr" == *"repository config sets"* ]]
+      [[ "$stderr" != *SECRETVALUE* ]]
+      [[ "$stderr" != *example.com* ]]
+      git config --unset "$entry"
+    done
+  done
+}
+
+@test "a transport command in a worktree-scope config or an included file is refused too" {
+  git config extensions.worktreeConfig true
+  git config --worktree core.sshCommand "/bin/echo x"
+  crf_refuses_untouched graphite
+  [[ "$stderr" == *"core.sshcommand"* ]]
+  git config --worktree --unset core.sshCommand
+  printf '[credential]\n\thelper = /bin/echo x\n' >| "$BATS_TEST_TMPDIR/inc.cfg"
+  git config include.path "$BATS_TEST_TMPDIR/inc.cfg"
+  crf_refuses_untouched github
+  [[ "$stderr" == *"credential.helper"* ]]
+}
+
+@test "a credential.helper from the global config alone is not refused" {
+  printf '[credential]\n\thelper = /bin/true\n[core]\n\tsshCommand = /bin/true\n' >| "$BATS_TEST_TMPDIR/global.cfg"
+  for provider in graphite github; do
+    printf 'one\nfeature\nfix-%s\n' "$provider" >| src/a.txt
+    GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global.cfg" run_crf --provider "$provider" --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 0 ] || { echo "refused: $provider: $stderr" >&2; return 1; }
+  done
+}
+
+# --- Tools inside the repository ---
+
+# The tool's stub (or the real binary, for jq) copied into an ignored directory
+# of the repository that comes first on PATH.
+@test "gt, gh, jq or node found inside the repository is refused, naming the tool" {
+  old_path="$PATH"
+  printf 'node_modules/\n' >> .git/info/exclude
+  for entry in "graphite gt" "graphite gh" "graphite jq" "github node" "github gh"; do
+    set -- $entry
+    mkdir -p node_modules/.bin
+    cp "$(command -v "$2")" "node_modules/.bin/$2"
+    PATH="$REPO/node_modules/.bin:$old_path"
+    crf_refuses_untouched "$1" || { PATH="$old_path"; echo "not refused: $entry" >&2; return 1; }
+    PATH="$old_path"
+    [[ "$stderr" == *"$2 resolves to"* ]]
+    [[ "$stderr" == *"inside the repository"* ]]
+    rm -rf node_modules
+  done
+}
+
+@test "tools outside the repository still work" {
+  for provider in graphite github; do
+    printf 'one\nfeature\nfix-%s\n' "$provider" >| src/a.txt
+    run_crf --provider "$provider" --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 0 ] || { echo "refused: $provider: $stderr" >&2; return 1; }
+  done
+}
+
 # gt_stub_submit <stderr-line> <exit>: gt submit prints the line to stderr and
 # exits with <exit> (0 publishes as the real stub does); every other gt call
 # goes to the real stub.
