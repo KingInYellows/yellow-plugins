@@ -1,0 +1,25 @@
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_092275c4e6a6a0::t_d0fd7283c30d4a 277-283
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_092275c4e6a6a0::t_d0fd7283c30d4a 151-153
+plugins/yellow-council/tests/quota-lineage.bats
+  s_092275c4e6a6a0::t_d0fd7283c30d4a 400-412
+plugins/yellow-council/CLAUDE.md
+  s_092275c4e6a6a0::t_d0fd7283c30d4a 245-248
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dbb6b95c337f3dc0a41a6dbb2cf90f83a1495aaf",
+  "prompts": {},
+  "sessions": {
+    "s_092275c4e6a6a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "53398599-95a5-4127-ba6b-f2642ceba186",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
