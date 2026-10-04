@@ -420,8 +420,9 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   key, because signing runs the configured `gpg.program`; the user's global or
   system signing config is left alone. A repository-local or worktree-scope
   `core.sshCommand`, `core.askPass`, `core.gitProxy` or `credential.helper`
-  (also `credential.<url>.helper`) would be run by the submit with submission
-  authority, so it exits 3 before any network call, naming the key (never the
+  (also `credential.<url>.helper`), or a `filter.<driver>.clean|smudge|process`
+  command (the stock Git LFS commands excepted), would be run by the submit or
+  by `git add` and checkout with submission authority, so it exits 3 before any network call, naming the key (never the
   value) and committing nothing; the user's global or system config is not
   judged, and no key is overridden with an empty value (that would disable the
   user's own credential helper). `gt` (Graphite) or `node` (GitHub), `gh` and
@@ -891,10 +892,10 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   not. How unattended commits should treat hooks is an open decision.
 - `commit-resolve-fixes` covers signing through `commit.gpgSign`,
   `push.gpgSign` and `log.showSignature`, and refuses a repository-local
-  `core.sshCommand`, `core.askPass`, `core.gitProxy` and `credential.helper`.
-  Other repository-local settings that run a program (a `filter.*` driver, a
-  `url.<base>.insteadOf` pointing at a helper, `http.*` options) are not
-  neutralised; the file bound and the dirty-set checks are the controls there.
+  `core.sshCommand`, `core.askPass`, `core.gitProxy`, `credential.helper` and
+  `filter.*` commands (the stock Git LFS ones excepted). Other repository-local
+  settings that run a program (a `url.<base>.insteadOf` pointing at a helper,
+  `http.*` options) are not neutralised; the file bound and the dirty-set checks are the controls there.
   The `PATH` check judges the directory of each tool as found on `PATH`,
   not a symlink inside a directory outside the repository that points into it.
 - Step 7 costs about three tool calls per thread; very large PRs (hundreds of
