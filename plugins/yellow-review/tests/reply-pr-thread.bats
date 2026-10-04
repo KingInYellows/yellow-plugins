@@ -406,12 +406,11 @@ path_without_timeout() {
   [ "$(cat "$CALLS")" = 1 ]
 }
 
-@test "our own later comment without a marker does not hide the marker before it" {
+@test "a later comment from our own human account sends the thread back through the resolver" {
   run "$SCRIPT" PRRT_reply_ownafter fixed "$BODY"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -r '.skipped')" = already-replied ]
-  [ "$(printf '%s' "$output" | jq -r '.disposition')" = fixed ]
-  [ ! -f "$CALLS" ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = true ]
+  [ "$(cat "$CALLS")" = 1 ]
 }
 
 @test "a jq that fails while measuring the body exits 1 with a message, not jq's status" {

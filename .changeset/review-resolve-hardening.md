@@ -25,12 +25,14 @@ scan that did not run), kept apart from usage errors (2); 4 means a rate limit
 or timeout. Exit 7, a permanent GitHub refusal, differs by script:
 `reply-pr-thread` exits 7 only for HTTP 401 (bad credentials) and exits 3 for
 not found or HTTP 403/forbidden; `file-followup-issue` exits 7 for HTTP 401,
-HTTP 403 (no issue-write permission) or Issues disabled, and exits 3 for a
-missing thread. The `file-followup-issue` dedupe scan reads
-every page of the viewer's issues, so the old full-window exit 5 is gone, and
+HTTP 403 (no issue-write permission) or Issues disabled. Filing exits 3 for a
+missing thread; `--find` never looks the thread up and prints
+`{"exists":false}` with exit 0 when no marker matches. The
+`file-followup-issue` dedupe scan reads every page of the viewer's issues, so the old full-window exit 5 is gone, and
 it takes the host from the thread's own pull request URL. `reply-pr-thread`
 looks at the newest 20 comments and ignores bot acknowledgements after its
-marker. `get-pr-blockers` adds `lookupReason` and reads conversation
+marker; a later comment from the viewer's own human account sends the thread
+back through the resolver. `get-pr-blockers` adds `lookupReason` and reads conversation
 resolution from the default branch too, so a PR upstack in a stack no longer
 reads as not enforced.
 

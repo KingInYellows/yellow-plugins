@@ -287,8 +287,9 @@ case "$ALL_ARGS" in
         ;;
       *"PRRT_reply_botafter"*|*"PRRT_reply_humanafter"*|*"PRRT_reply_ownafter"*)
         # Our fixed reply, then one later comment: a bot acknowledgement
-        # (botafter), a human reply (humanafter) or our own unmarked note
-        # (ownafter). Only the human reply sends the thread back to the resolver.
+        # (botafter), a human reply (humanafter) or an unmarked note from our
+        # own human account (ownafter). Only the bot acknowledgement is ignored;
+        # the other two send the thread back to the resolver.
         case "$ALL_ARGS" in
           *"PRRT_reply_botafter"*) _later='{"viewerDidAuthor":false,"body":"Thanks for the update.","author":{"__typename":"Bot"}}'; _tid=PRRT_reply_botafter ;;
           *"PRRT_reply_humanafter"*) _later='{"viewerDidAuthor":false,"body":"That does not fix it.","author":{"__typename":"User"}}'; _tid=PRRT_reply_humanafter ;;

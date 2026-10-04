@@ -41,8 +41,10 @@ rt_text_clean() {
         # redaction or template form, never arbitrary words. Either every
         # word is a placeholder word (`<password>`, `[REDACTED]`,
         # `[redacted value]`) or it is a template of 2-4 words that opens with
-        # your/my/the/a/an and ends in a credential noun (`<your token>`,
-        # `<your private key>`). `<correcthorse>` and `[hunter]` are values.
+        # your/my/the/a/an, ends in a credential noun and has only placeholder
+        # words or access/api/private between (`<your token>`,
+        # `<your private key>`). `<correcthorse>`, `[hunter]` and
+        # `<your correcthorse token>` are values.
         function sentinel(inner,    np, parts, j, allph) {
             if (inner !~ /^[a-z_ -]+$/) return 0
             np = split(inner, parts, /[_ -]+/)
@@ -50,7 +52,12 @@ rt_text_clean() {
             allph = 1
             for (j = 1; j <= np; j++) if (index(ph, " " parts[j] " ") == 0) allph = 0
             if (allph) return 1
-            return np >= 2 && np <= 4 && index(" your my the a an ", " " parts[1] " ") > 0 && index(" key code token password passcode passwd secret credential credentials apikey value id pass passphrase phrase ", " " parts[np] " ") > 0
+            if (np < 2 || np > 4 || index(" your my the a an ", " " parts[1] " ") == 0) return 0
+            if (index(" key code token password passcode passwd secret credential credentials apikey value id pass passphrase phrase ", " " parts[np] " ") == 0) return 0
+            # Words between the opener and the noun must be placeholder words
+            # or a known qualifier: `<your correcthorsebattery token>` is a value.
+            for (j = 2; j < np; j++) if (index(ph, " " parts[j] " ") == 0 && index(" access api private ", " " parts[j] " ") == 0) return 0
+            return 1
         }
         # isplaceholder(seg): 1 when the WHOLE value is placeholder syntax:
         # `$NAME`, `${NAME}`, or a `<...>` / `[...]` wrapping a known sentinel
@@ -232,14 +239,14 @@ rt_text_clean() {
         }
         BEGIN {
             # The credential labels, once for every rule below: pass,
-            # password, passwd, passphrase, pass_phrase, pass-phrase, passcode,
+            # password, passwd, pwd, passphrase, pass_phrase, pass-phrase, passcode,
             # pass_code, pass-code, secret, secret key (secret_key, secret-key,
             # secretKey), private key, access key, token, api key, credential.
             # `client_secret`, `api_secret` and `clientSecret` are covered by
             # `secret` (the `_`, `-` or capital starts the keyword). Do not add
             # a `client`/`api` prefix here: it would start the match earlier,
             # and `myclient_secret` would then count as in-word.
-            kw = "(pass([_-]?(phrase|code)|word|wd)?|secret([_ \t-]?key)?|(private|access)[_ \t-]?key|token|api[_ \t-]?key|credential)"
+            kw = "(pass([_-]?(phrase|code)|word|wd)?|pwd|secret([_ \t-]?key)?|(private|access)[_ \t-]?key|token|api[_ \t-]?key|credential)"
             ph =" string number integer boolean object array unknown undefined"
             ph = ph " nullable optional required redacted placeholder example"
             ph = ph " secret password passwd token credential credentials apikey"
@@ -527,6 +534,9 @@ rt_text_clean() {
                 # A backslash ends the host for URL parsers (`evil.com\@github.com`
                 # is evil.com), so refuse it before userinfo is stripped.
                 if (index(u, "\\")) flag("foreign-url")
+                # `?` and `#` end the authority too (`evil.com?x=@github.com`
+                # is evil.com), so cut there before userinfo is stripped.
+                sub(/[?#].*$/, "", u)
                 sub(/^[^@]*@/, "", u)
                 sub(/[])>.,;:!?*]+$/, "", u)
                 sub(/:[0-9]+$/, "", u)

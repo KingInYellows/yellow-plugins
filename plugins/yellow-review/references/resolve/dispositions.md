@@ -350,13 +350,14 @@ for the same thread, of any disposition. Viewer comments without such a marker
 are ignored when choosing it. When no later comment is from a human, the script
 skips the reply (`already-replied`) and reports the posted marker's disposition
 in the skip JSON. A re-run right after our reply therefore never posts a second,
-contradicting reply. Later comments from a bot (`authorType` `Bot`) or from the
-viewer do not count, so a bot's acknowledgement after our reply no longer sends
-the thread back through the resolver. This holds when `gh` authenticates as a
-bot account: its own acknowledgement is `viewerDidAuthor` too, but carries no
+contradicting reply. Later comments from a bot (`authorType` `Bot`) do not
+count, so a bot's acknowledgement after our reply no longer sends the thread
+back through the resolver. This holds when `gh` authenticates as a bot account:
+its own acknowledgement is `viewerDidAuthor` and `Bot` too, but carries no
 marker, so it never displaces the marker comment, and a bot-authored marker
-still counts. A later comment from anyone else, or with no author type, means
-the thread moved on and it is processed again. Two rules follow:
+still counts. A later comment from anyone else, including the viewer's own
+human account, or with no author type, means the thread moved on and it is
+processed again. Two rules follow:
 
 - Upgrade: a prior `disagree` or `unclear` marker does not block a `fixed`,
   `addressed` or `oos` reply. That reply carries the evidence the resolve needs,
@@ -466,7 +467,8 @@ requirement. `lookupReason` says why a lookup failed (`tool_missing`, `timeout`,
 `conversationResolution: "unknown"` is a separate, independent signal that
 enforcement could not be determined. `resolutionLookupReason: "rate_limited"`
 (null otherwise) reports that a branch-protection or ruleset read hit a rate
-limit while `lookupFailed` is still false; it sets `ratelimited=1` too. It is read from the PR's base branch and,
+limit, independently of `lookupFailed` (either can be set without the other);
+it sets `ratelimited=1` too. It is read from the PR's base branch and,
 for a PR upstack in a stack, from the default branch too: `enforced` when either
 enforces it, `not_enforced` only when every branch read answered no.
 

@@ -1100,9 +1100,46 @@ rule=forged line=9.txt"
   refuses 'token: [correcthorse]'
   refuses 'token=[hunter22]'
   refuses 'secret: <your hunter2x>'
+  refuses 'password: "<your correcthorsebattery token>"'
+  refuses 'password: <your correcthorsebattery token>'
+  refuses 'token: <the hunter secret key>'
+  refuses 'token: <your key code token pass>'
   refuses 'https://user:<correcthorse>@host/x'
   printf '%s\n' 'password: <password>' 'password: <your password>' 'token: <your private key>' \
-    'secret: [REDACTED]' 'token: "[redacted value]"' 'api key: <your-api-key>' >| "$A"
+    'secret: [REDACTED]' 'token: "[redacted value]"' 'api key: <your-api-key>' \
+    'token: <your access token>' 'token: <your api key>' 'secret: <my secret key>' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "a pwd label is a credential keyword" {
+  refuses() {  # <line text>
+    printf '%s\n' "$1" >| "$A"
+    run --separate-stderr "$SCRIPT" "$A"
+    [ "$status" -eq 6 ] || { echo "not refused: $1"; false; }
+  }
+  refuses 'pwd: hunter'
+  refuses 'pwd=correcthorse'
+  refuses 'pwd: "correct horse"'
+  refuses 'PWD=hunter22'
+  printf '%s\n' 'pwd: <your password>' 'pwd: string' 'cwd: hunter' 'run `pwd` to print the directory' 'pwd: /home/me/project' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "a question mark or hash ends the URL authority before userinfo is stripped" {
+  check() {  # <line text>
+    printf 'clean line\n%s\n' "$1" >| "$A"
+    run --separate-stderr "$SCRIPT" "$A"
+    [ "$status" -eq 6 ]
+    [[ "$stderr" == *"resolve-text: refused rule=foreign-url line=2"* ]] || { echo "wrong rule for: $1 ($stderr)"; false; }
+  }
+  check 'see https://evil.com?x=@github.com/'
+  check 'see https://evil.com?x=@github.com'
+  check 'see https://evil.com#@github.com/'
+  check 'see https://evil.com#frag@github.com'
+  check 'see https://evil.com?@github.com'
+  printf '%s\n' 'see https://github.com?tab=readme and https://github.com#top and https://github.com/o/r?x=1#y' >| "$A"
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
 }

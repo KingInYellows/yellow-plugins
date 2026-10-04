@@ -9,7 +9,8 @@
 #     (skipped when the newest comment of ours in the last PRECHECK_WINDOW
 #     comments carries a marker for this thread and no later comment is from a
 #     human; "disposition" is the one found. Bot replies after our marker do
-#     not count, and neither do our own comments. The one exception: a
+#     not count, and neither do our own Bot-typed comments (gh signed in as a
+#     bot account); a later comment from our own human account does. The one exception: a
 #     prior disagree or unclear marker never blocks a fixed, addressed or oos
 #     reply, because that reply carries the evidence the later resolve needs.
 #     A caller resolves after a skip only when "disposition" equals the one
@@ -247,8 +248,9 @@ fi
 # marker for this thread decides; viewer comments without one are ignored, so
 # when gh authenticates as a bot account its own acknowledgement (also
 # viewerDidAuthor) cannot displace the marker comment, and a bot-authored
-# marker still counts. A later comment from a human (a missing author type
-# counts as human) means the thread moved on and is processed again. Any
+# marker still counts. A later comment that is not from a Bot, including one
+# from the viewer's own human account and one with a missing author type,
+# means the thread moved on and is processed again. Any
 # disposition counts: a re-run after a crash (reply posted, resolve failed)
 # must not post a contradictory reply.
 # The exception is an upgrade from a reply that left the thread open
@@ -265,7 +267,7 @@ if ! PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
     | $ours
     | select(. != null)
     | select([ $nodes[(.key + 1):][]
-               | select(.viewerDidAuthor != true and (.author.__typename // "") != "Bot") ]
+               | select((.author.__typename // "") != "Bot") ]
              | length == 0)
     | .value
     | (.body // "") | sub("\\s+$"; "")
