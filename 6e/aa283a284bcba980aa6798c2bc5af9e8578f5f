@@ -1,0 +1,23 @@
+plugins/yellow-core/commands/worktree/restack.md
+  s_771064b1487eb8::t_cbb204988867f2 67,81
+plugins/yellow-core/skills/git-worktree/scripts/worktree-restack.sh
+  s_771064b1487eb8::t_df0b0a29f2dd69 263,1174,1187
+plugins/yellow-core/skills/git-worktree/tests/worktree-restack.bats
+  s_771064b1487eb8::t_a8c9a230833d5f 966,973-980,985-998,1019
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6eaa283a284bcba980aa6798c2bc5af9e8578f5f",
+  "prompts": {},
+  "sessions": {
+    "s_771064b1487eb8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "344118bf-2aa9-4d5a-a9e5-a6b94995fa25",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
