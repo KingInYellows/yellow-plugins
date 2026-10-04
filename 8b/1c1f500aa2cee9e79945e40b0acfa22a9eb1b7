@@ -1,0 +1,29 @@
+plugins/yellow-core/skills/git-worktree/SKILL.md
+  s_d906b15dcf2596::t_7251b8de5e229f 216-219
+plugins/yellow-core/skills/git-worktree/scripts/worktree-restack.sh
+  s_d906b15dcf2596::t_94371e7f322471 49-52,130,142,148-154,189-209,221,255,273-282,290,302,326,332-335,341-343,357,416-424,427,438-442,500-509,608,610-617,736,760-772,775,801-803,809-812,815-818,827-832,1012-1022,1040,1042-1044,1046,1107-1108,1110,1113,1115,1124-1125,1131,1134,1149,1166,1168-1171,1174,1288,1298-1300,1315,1324-1327,1343,1345,1347-1348,1350,1353,1360-1365
+plugins/yellow-core/skills/git-worktree/tests/mocks/gh
+  s_d906b15dcf2596::t_caa49d58deceec 8
+plugins/yellow-core/skills/git-worktree/tests/mocks/git
+  s_d906b15dcf2596::t_b34f6bff3caeae 1
+plugins/yellow-core/skills/git-worktree/tests/mocks/gt
+  s_d906b15dcf2596::t_99d42d0f35f46f 7
+plugins/yellow-core/skills/git-worktree/tests/worktree-restack.bats
+  s_d906b15dcf2596::t_14b9d8be12ebdd 12,16,352-353,381-400,434,550,562,576,599
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8b1c1f500aa2cee9e79945e40b0acfa22a9eb1b7",
+  "prompts": {},
+  "sessions": {
+    "s_d906b15dcf2596": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0170b453-4513-4753-b904-fd0ab9d9878d",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
