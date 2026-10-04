@@ -2,7 +2,7 @@
 # Process and log helpers for run-verify-command (bash; sourced after
 # resolve-paths.sh). They hold no state. Values come in as arguments, except
 # that vr_timeout_bin reads YELLOW_REVIEW_NO_TIMEOUT_BIN and vr_load_redactor
-# sources yellow-core's compound-staging.sh (found through rp_sibling_file).
+# sources yellow-core's compound-staging.sh (found through sp_sibling_file).
 # shellcheck shell=bash
 
 # vr_timeout_bin: print a timeout binary that supports --kill-after, or fail.
@@ -76,7 +76,7 @@ vr_drain_log() {
 }
 
 # vr_load_redactor <plugin-root>: source yellow-core's lib/compound-staging.sh
-# (source tree first, then the installed cache; see rp_sibling_file) so that
+# (source tree first, then the installed cache; see sp_sibling_file) so that
 # cs_redact_secrets is defined. Returns 1 when the library is missing, or is a
 # source-checkout copy that is modified, untracked or unverifiable in git: it
 # may carry uncommitted resolver edits (it is not an rp_runner path), and
@@ -86,7 +86,7 @@ vr_load_redactor() {
     local lib dirty
     # Always source the canonical definition: a PATH executable of the same
     # name must never stand in for it.
-    lib=$(rp_sibling_file "$1" yellow-core lib/compound-staging.sh) || lib=""
+    lib=$(sp_sibling_file "$1" yellow-core lib/compound-staging.sh) || lib=""
     if [ -n "$lib" ] && git -C "${lib%/*}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         # Same integrity rule as rp_runtime_override_untrusted: git status, git
         # diff and a bare ls-files all miss an edit hidden by assume-unchanged

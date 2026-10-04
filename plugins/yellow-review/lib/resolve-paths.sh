@@ -6,6 +6,10 @@
 # execute. Contract: references/resolve/dispositions.md ("File set").
 # shellcheck shell=bash
 
+# sp_sibling_file: the sibling-plugin lookup shared with review-ledger.sh.
+# shellcheck source=sibling-plugin.sh
+. "$(dirname -- "${BASH_SOURCE[0]}")/sibling-plugin.sh"
+
 # Git with listed paths taken literally (no globs or pathspec magic). A
 # per-call flag, not GIT_LITERAL_PATHSPECS, so hooks, gt and the verify
 # command never inherit it.
@@ -547,25 +551,4 @@ rp_read_file_list() {
         [ -n "$line" ] && RP_FILES+=("$line")
     done <"$1"
     return 0
-}
-
-# rp_sibling_file <plugin-root> <plugin> <relpath>: print the path of a file
-# in a sibling plugin. Source tree first (plugins/<plugin>/<relpath>), then
-# the newest numeric version in the installed cache
-# (<marketplace>/<plugin>/<version>/<relpath>). <plugin-root> is this
-# plugin's directory (cache: <marketplace>/<name>/<version>/).
-rp_sibling_file() {
-    local root="$1" plugin="$2" rel="$3" path dir name ver
-    path="$root/../$plugin/$rel"
-    if [ -f "$path" ]; then
-        printf '%s' "$path"
-        return 0
-    fi
-    ver=$(for dir in "$root/../../$plugin"/*/; do
-        name="${dir%/}"; name="${name##*/}"
-        [[ "$name" =~ ^[0-9]+(\.[0-9]+)*$ ]] && printf '%s\n' "$name"
-    done | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)
-    path="$root/../../$plugin/$ver/$rel"
-    [ -n "$ver" ] && [ -f "$path" ] && { printf '%s' "$path"; return 0; }
-    return 1
 }

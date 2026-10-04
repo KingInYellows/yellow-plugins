@@ -186,7 +186,7 @@ BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || die 2 "HEAD is de
 find_runtime() {
     local root
     root=$(cd -- "$(dirname -- "$0")/../../.." && pwd) || return 1
-    rp_sibling_file "$root" github-workflow lib/github-stack-runtime.js
+    sp_sibling_file "$root" github-workflow lib/github-stack-runtime.js
 }
 
 if [ "$PROVIDER" = github ]; then

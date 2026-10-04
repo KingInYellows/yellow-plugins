@@ -226,6 +226,11 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
   would execute)
 - `lib/verify-run.sh` (bash, sourced by `run-verify-command`) — timeout,
   process-group and redacted-log helpers for the verify run
+- `lib/sibling-plugin.sh` (bash, sourced by `review-ledger.sh` and
+  `resolve-paths.sh`) — `sp_sibling_file`, the one lookup of a file in a
+  sibling plugin: the source tree first, then the newest numeric version in
+  the installed cache. `review-ledger.sh` checks `RL_CORE_LIB` before calling
+  it; the helper itself has no override.
 - `lib/review-ledger.sh <subcommand>` — the durable review-findings ledger
   (plans/review-findings-ledger.md): an append-only JSONL file per PR at
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`,

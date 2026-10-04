@@ -617,7 +617,7 @@ assert_interrupted_and_reverted() {
 copy_plugin() {
   mkdir -p "$1/lib" "$1/skills/pr-review-workflow/scripts"
   cp "$BATS_TEST_DIRNAME/../lib/resolve-paths.sh" "$BATS_TEST_DIRNAME/../lib/resolve-text.sh" \
-    "$BATS_TEST_DIRNAME/../lib/verify-run.sh" "$1/lib/"
+    "$BATS_TEST_DIRNAME/../lib/sibling-plugin.sh" "$BATS_TEST_DIRNAME/../lib/verify-run.sh" "$1/lib/"
   cp "$SCRIPT" "$1/skills/pr-review-workflow/scripts/"
   printf '%s' "$1/skills/pr-review-workflow/scripts/run-verify-command"
 }
