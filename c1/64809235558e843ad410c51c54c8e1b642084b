@@ -1,0 +1,19 @@
+plans/worktree-aware-restack.md
+  s_d906b15dcf2596::t_26061b93ba5025 581,585-586,589
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c164809235558e843ad410c51c54c8e1b642084b",
+  "prompts": {},
+  "sessions": {
+    "s_d906b15dcf2596": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0170b453-4513-4753-b904-fd0ab9d9878d",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
