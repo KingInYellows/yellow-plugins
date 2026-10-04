@@ -749,6 +749,18 @@ make_oc_stub() {
   done
 }
 
+@test "Step 2b takes codex's lineage from the routed model when its provider is a router" {
+  local profile stub="${BATS_TEST_TMPDIR}/stub2d"
+  mkdir -p "$stub" "${BATS_TEST_TMPDIR}/chome2"
+  printf '#!/bin/sh\nprintf "●  OpenRouter api\\n"\n' >| "$stub/opencode"; chmod +x "$stub/opencode"
+  printf 'model_provider = "openrouter"\nmodel = "deepseek/deepseek-v4-pro"\n' >| "${BATS_TEST_TMPDIR}/chome2/config.toml"
+  for profile in $PROFILES; do
+    step2b_in "$profile" "$stub" "export CODEX_HOME=${BATS_TEST_TMPDIR}/chome2"
+    [[ "$output" == *"codex=deepseek/deepseek-v4-pro(deepseek)"* ]] || { echo "$profile: $output"; return 1; }
+    [[ "$stderr" == *"codex and opencode both resolve to deepseek lineage"* ]] || { echo "$profile: $stderr"; return 1; }
+  done
+}
+
 # --- Cross-file contracts -----------------------------------------------------
 
 @test "every verdict case in the reviewers and council.md lists QUOTA_EXHAUSTED" {

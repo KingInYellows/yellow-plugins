@@ -254,7 +254,13 @@ CODEX_PROVIDER=$(council_codex_key model_provider | LC_ALL=C tr -cd 'A-Za-z0-9._
 CODEX_LINEAGE="openai"
 case "$CODEX_PROVIDER" in
   "" | openai) ;;
-  *) CODEX_LINEAGE=$(council_resolve_lineage "${CODEX_PROVIDER}/x") ;;
+  *)
+    # A routing provider (openrouter, opencode) carries the real lineage in the
+    # model slug ("openrouter" + "deepseek/deepseek-v4-pro" -> deepseek), so resolve
+    # provider/model together; with no model, the provider alone decides.
+    CODEX_ROUTED="$CODEX_RESOLVED"
+    [ "$CODEX_ROUTED" != "account-default" ] || CODEX_ROUTED="x"
+    CODEX_LINEAGE=$(council_resolve_lineage "${CODEX_PROVIDER}/${CODEX_ROUTED}") ;;
 esac
 OC_SHOWN=$(printf '%s' "$OC_MODEL" | LC_ALL=C tr -cd 'A-Za-z0-9._~:/@-' | head -c 80)
 if [ -n "$OC_MODEL" ]; then
