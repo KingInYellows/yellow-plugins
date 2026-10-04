@@ -37,7 +37,7 @@
 
 set -uo pipefail
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)
+SCRIPT_DIR=$(CDPATH="" cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)
 
 readonly X_OK=0 X_USAGE=2 X_BUSY=3 X_STATE=4 X_PROVIDER=5 X_PAUSED=10
 readonly X_REFUSED=20 X_FAILED=30 X_PARTIAL=40 X_INCOMPLETE=50 X_SUBMIT=60
@@ -338,7 +338,10 @@ acquire_lock() {
 # takeover is the same atomic rename + fresh mkdir, so two takers cannot both win.
 take_lock() {
   if (umask 077 && mkdir -- "$LOCK_DIR") 2>/dev/null; then
-    lock_stamp
+    lock_stamp || {
+      rm -rf -- "$LOCK_DIR"
+      return 1
+    }
     return
   fi
   [ -d "$LOCK_DIR" ] || return 1

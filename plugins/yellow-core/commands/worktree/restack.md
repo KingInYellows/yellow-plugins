@@ -139,6 +139,16 @@ a detached worktree during the pause (SHA and a rescue line) before they do
 anything else. With no recorded restack they print "no restack in progress" and
 exit `0`.
 
+## Recovery: restore only
+
+When the exit table below points to the script's `restore` subcommand (a
+rejected provider or state, or a partial restore), run it without a provider.
+It puts the recorded worktrees back on their branches and runs no restack:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-restack.sh" restore
+```
+
 ## Phase 5: Status (mode `status`)
 
 ```bash
@@ -163,6 +173,9 @@ branch that no worktree holds, with the `checkout` line that restores it.
 | `40` | Partial restore | Some worktree is still detached; show each per-entry line and its `checkout` fix, then re-run `--continue` or `--abort` |
 | `50` | Restack incomplete | The ancestry check found a branch that was not restacked; worktrees are restored and nothing was submitted |
 | `60` | Submit failed | The restack and restore are done; retry the provider's submit |
+
+Give the start, continue and abort Bash calls a long explicit timeout (for
+example 600000 ms): a large restack or `--submit` can outlast the default.
 
 Never run `git push`, `gh pr create` or the provider's CLI directly to finish a
 restack; re-run this command or the script's `restore` subcommand instead.
