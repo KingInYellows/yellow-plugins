@@ -242,9 +242,10 @@ fresh-machine install CI (see Known Limitations).
 
 - **Quota detection is best-effort and string-matched.** Gemini (agy) detection is
   the `RESOURCE_EXHAUSTED` floor only: the Antigravity spike recorded no
-  exhaustion catalog, and a bare `RESOURCE_EXHAUSTED` is also how Google reports
-  some transient throttling, so a transient condition can read as quota
-  exhaustion with "reset time not reported". The claude classifier runs only on
+  exhaustion catalog. A bare `RESOURCE_EXHAUSTED` or agy's "You have exhausted
+  your quota on this model" is quota; `RESOURCE_EXHAUSTED` with rate-limit,
+  too-many-requests, overload or capacity wording stays a transient `ERROR`
+  (agy retries those itself, so little reaches the reviewer). The claude classifier runs only on
   a real spawn failure (no `verdict=` or `confidence=` line, no fenced file at the
   minted path, at most 2000 characters) and echoes an ETA only when it is a plain
   time or duration. It has not been verified against a real spawn-failure

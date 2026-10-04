@@ -397,6 +397,19 @@ parse_in() {
     printf 'HTTP 429 Too Many Requests: rate limit exceeded\n' >| "$stderr_file"
     run_arm "$profile" "${body}.run"
     [ -z "$output" ] || { echo "$profile: a transient rate limit matched: $output"; return 1; }
+
+    # RESOURCE_EXHAUSTED with throttling wording is transient too ...
+    printf 'rpc error: RESOURCE_EXHAUSTED: rate limit exceeded, retry shortly\n' >| "$stderr_file"
+    run_arm "$profile" "${body}.run"
+    [ -z "$output" ] || { echo "$profile: throttled RESOURCE_EXHAUSTED matched: $output"; return 1; }
+
+    # ... unless agy itself says the quota is gone.
+    printf 'RESOURCE_EXHAUSTED: rate limited. You have exhausted your quota on this model.\n' >| "$stderr_file"
+    run_arm "$profile" "${body}.run"
+    [[ "$output" == *"verdict=QUOTA_EXHAUSTED"* ]] || { echo "$profile: agy quota message missed: $output"; return 1; }
+    printf 'You have exhausted your quota on this model.\n' >| "$stderr_file"
+    run_arm "$profile" "${body}.run"
+    [[ "$output" == *"verdict=QUOTA_EXHAUSTED"* ]] || { echo "$profile: agy quota message alone missed: $output"; return 1; }
   done
 }
 

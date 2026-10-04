@@ -148,8 +148,9 @@ Match sets: codex `insufficient_quota` / `model_cap_exceeded` / `usage_limit_rea
 `weekly limit` or `Opus limit` followed by `reset(s)`, or `usage limit reached`
 followed by `try again`, matched by `council.md` only against a real spawn failure
 (no `verdict=` or `confidence=` line, no fenced file at the minted path, at most
-2000 characters). A bare `RESOURCE_EXHAUSTED` is also how Google reports some
-transient throttling, so Gemini can report this verdict for a transient condition.
+2000 characters). For gemini, `RESOURCE_EXHAUSTED` together with rate-limit,
+too-many-requests, overload or capacity wording stays a transient `ERROR` unless
+agy's "exhausted your quota" message is present.
 
 If the CLI output's `Verdict:` line is absent, the reviewer agent must:
 
