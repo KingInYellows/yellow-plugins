@@ -93,9 +93,10 @@
 # Commit signing is forced off the same way (commit.gpgSign=false, checked, one
 # note on stderr) when the repository's local or worktree config sets
 # commit.gpgsign (to anything but false) or any gpg.* key, because signing runs
-# gpg.program (or gpg.<format>.program) from that config. A signing config from
-# the user's global or system config alone is left untouched. Not covered:
-# push.gpgSign and log.showSignature, which can also run gpg.program.
+# gpg.program (or gpg.<format>.program) from that config; push.gpgSign and
+# log.showSignature, which can run it in the submit step's git, are forced off
+# with it. A signing config from the user's global or system config alone is
+# left untouched.
 # Libraries: lib/resolve-paths.sh, sibling-plugin.sh, resolve-text.sh and
 # verify-run.sh are sourced before any dirty-set check. When the plugin's lib
 # directory is inside the repository's working tree (a source checkout), each
@@ -274,8 +275,15 @@ harden_git_config() {
     hit=$(printf '%s\n' "$cfg" | awk -F'\t' '($1 == "local" || $1 == "worktree") && tolower($2) !~ /^commit\.gpgsign (false|no|off|0)$/ { print "y"; exit }')
     [ -n "$hit" ] || return 0
     n=$((n + 2))
-    export "GIT_CONFIG_KEY_$n=commit.gpgSign" "GIT_CONFIG_VALUE_$n=false" "GIT_CONFIG_COUNT=$((n + 1))"
+    # push.gpgSign and log.showSignature reach gpg.program in the child git of
+    # the submit step, so they are forced off with commit signing.
+    export "GIT_CONFIG_KEY_$n=commit.gpgSign" "GIT_CONFIG_VALUE_$n=false" \
+        "GIT_CONFIG_KEY_$((n + 1))=push.gpgSign" "GIT_CONFIG_VALUE_$((n + 1))=false" \
+        "GIT_CONFIG_KEY_$((n + 2))=log.showSignature" "GIT_CONFIG_VALUE_$((n + 2))=false" \
+        "GIT_CONFIG_COUNT=$((n + 3))"
     [ "$(git config --bool --get commit.gpgsign 2>/dev/null)" = false ] \
+        && [ "$(git config --bool --get push.gpgsign 2>/dev/null)" = false ] \
+        && [ "$(git config --bool --get log.showsignature 2>/dev/null)" = false ] \
         || die 3 "could not disable commit signing; nothing committed"
     printf '[commit-resolve-fixes] Note: the repository'"'"'s own config sets commit signing (commit.gpgsign or gpg.*), which could run a program, so the commit is made unsigned\n' >&2
 }

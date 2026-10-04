@@ -341,8 +341,9 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   screened like posted text (`rt_text_clean`) before anything is staged: a
   credential shape, image, mention or foreign URL in it exits 2 with the
   `resolve-text: refused` line on stderr, and no override excuses it. Commit
-  signing is forced off (`commit.gpgSign=false`, one stderr note) when the
-  repository's own local or worktree config sets `commit.gpgsign` or a `gpg.*`
+  signing is forced off (`commit.gpgSign=false`, with `push.gpgSign` and
+  `log.showSignature`, one stderr note) when the repository's own local or
+  worktree config sets `commit.gpgsign` or a `gpg.*`
   key, because signing runs the configured `gpg.program`; the user's global or
   system signing config is left alone. The Graphite submit's output reaches
   stderr only through the credential redactor, and is withheld when the redactor
@@ -658,9 +659,11 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   directory (for example husky's `.husky/`) still run on resolver-edited code;
   runner and hook definition files are refused, but the code the hooks run is
   not. How unattended commits should treat hooks is an open decision.
-- `commit-resolve-fixes` forces off only commit signing. A resolver-written
-  `push.gpgSign` or `log.showSignature` in `.git/config` can still make the
-  submit's git run `gpg.program`; the override list does not cover them.
+- `commit-resolve-fixes` covers signing through `commit.gpgSign`,
+  `push.gpgSign` and `log.showSignature` only. Other repository-local settings
+  that run a program (`credential.helper`, `core.sshCommand`, a `filter.*`
+  driver) are not neutralised; the file bound and the dirty-set checks are the
+  controls there.
 - Step 7 costs about three tool calls per thread; very large PRs (hundreds of
   threads) are slow. A batch apply script would help and is not written.
 - Two accounts resolving the same PR concurrently can each post a reply; markers

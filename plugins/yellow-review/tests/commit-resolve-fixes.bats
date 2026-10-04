@@ -1931,6 +1931,19 @@ lib_tamper() {
   done
 }
 
+@test "push.gpgSign and log.showSignature are forced off too, so the submit's git never runs a local gpg.program" {
+  printf '#!/bin/sh\nexit 1\n' >| "$BATS_TEST_TMPDIR/evil-gpg"
+  chmod +x "$BATS_TEST_TMPDIR/evil-gpg"
+  git config gpg.program "$BATS_TEST_TMPDIR/evil-gpg"
+  git config push.gpgsign true
+  git config log.showsignature true
+  export STUB_SUBMIT_CONFIG_LOG="$BATS_TEST_TMPDIR/submit-config"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(cat "$STUB_SUBMIT_CONFIG_LOG")" = $'commit.gpgsign=false\npush.gpgsign=false\nlog.showsignature=false' ]
+}
+
 @test "a local commit.gpgsign=false is no signing config, a local gpgsign=true beside a global gpg.program is overridden" {
   marker="$BATS_TEST_TMPDIR/gpg-ran"
   printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$BATS_TEST_TMPDIR/evil-gpg"

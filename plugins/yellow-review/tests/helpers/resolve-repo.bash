@@ -107,6 +107,12 @@ case "$1" in
     [ "$2" = remote ] && { printf '%s\n' "${STUB_GT_REMOTE:-origin}"; exit 0; }
     ;;
   submit)
+    # STUB_SUBMIT_CONFIG_LOG: record the signing config this child git sees.
+    if [ -n "${STUB_SUBMIT_CONFIG_LOG:-}" ]; then
+      for k in commit.gpgsign push.gpgsign log.showsignature; do
+        printf '%s=%s\n' "$k" "$(git config --bool --get "$k" 2>/dev/null)"
+      done >| "$STUB_SUBMIT_CONFIG_LOG"
+    fi
     [ "${STUB_SUBMIT_FAIL:-0}" = 1 ] && exit 1
     [ "${STUB_SUBMIT_SKIP_PUBLISH:-0}" = 1 ] && exit 0
     exec publish
