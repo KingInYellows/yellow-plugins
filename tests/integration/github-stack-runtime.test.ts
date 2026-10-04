@@ -384,6 +384,19 @@ describe('CLI end to end', () => {
       execFileSync(process.execPath, [LIB, 'teleport'], { encoding: 'utf8', env: process.env })
     ).toThrow();
   });
+
+  it('accepts --timeout-ms without changing the shaped result', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    process.env.FAKE_GH_STDOUT = '{"trunk":"main"}';
+    const cliResult = JSON.parse(
+      execFileSync(process.execPath, [LIB, '--timeout-ms', '600000', 'view'], {
+        encoding: 'utf8',
+        env: process.env,
+      })
+    );
+    expect(cliResult.status).toBe('SUCCESS');
+    expect(cliResult.command).toEqual({ bin: 'gh', args: ['stack', 'view', '--json'] });
+  });
 });
 
 // Token-shaped strings are BUILT at runtime, never written as literals:

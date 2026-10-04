@@ -1,5 +1,6 @@
 ---
 'yellow-core': minor
+'github-workflow': patch
 ---
 
 feat: add `/worktree:restack` to restack a stack whose branches are checked out
@@ -15,4 +16,7 @@ needs gh-stack 0.2.0 or newer, which rebases across worktrees itself, so nothing
 is detached there. The engine is
 `skills/git-worktree/scripts/worktree-restack.sh` (per-run state under the git
 common dir, re-validated on every read, restore never forces a checkout),
-covered by `skills/git-worktree/tests/worktree-restack.bats`.
+covered by `skills/git-worktree/tests/worktree-restack.bats`. GitHub restacks
+pass `--timeout-ms 600000` through `github-stack-runtime.js` (the adapter
+default remains 120 s for other callers) and keep recovery state when the
+adapter reports `SPAWN_FAILURE`.

@@ -746,6 +746,33 @@ JSEOF
   [ -e "$SD/state" ]
 }
 
+@test "github: an adapter SPAWN_FAILURE keeps state as a pause, not a failure" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  mkdir -p "$T/cache/yellow-core/2.6.2"
+  mkdir -p "$T/cache/github-workflow/1.0.0/lib"
+  cat >"$T/cache/github-workflow/1.0.0/lib/github-stack-runtime.js" <<'JSEOF'
+const op = process.argv.slice(2).find((arg) => !arg.startsWith('--') && !/^\d+$/.test(arg));
+if (op === 'view') {
+  process.stdout.write(JSON.stringify({
+    status: 'SUCCESS',
+    stdout: JSON.stringify({ trunk: 'main', branches: [{ name: 'a', isCurrent: true }, { name: 'b' }, { name: 'c' }] }),
+  }));
+} else {
+  process.stdout.write(JSON.stringify({
+    status: 'SPAWN_FAILURE',
+    stderr: 'spawnSync ETIMEDOUT',
+    recoveryAction: 'The subprocess did not finish (timed out or failed to start).',
+    mayHaveMutated: true,
+  }));
+}
+JSEOF
+  CLAUDE_PLUGIN_ROOT="$T/cache/yellow-core/2.6.2" STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  [[ $output == *"no conflict details were reported"* ]]
+  [ -e "$SD/state" ]
+}
+
 @test "github: --continue with no paused provider rebase verifies and finishes" {
   command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
   mk_stack

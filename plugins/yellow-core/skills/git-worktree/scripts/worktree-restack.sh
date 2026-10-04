@@ -45,6 +45,7 @@ SCRIPT_DIR=$(CDPATH="" cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
 
 readonly X_OK=0 X_USAGE=2 X_BUSY=3 X_STATE=4 X_PROVIDER=5 X_PAUSED=10
 readonly X_REFUSED=20 X_FAILED=30 X_KEPT=31 X_PARTIAL=40 X_INCOMPLETE=50 X_SUBMIT=60
+readonly ADAPTER_TIMEOUT_MS=600000
 readonly PAUSE_REASON='worktree:restack paused - do not commit; run /worktree:restack --continue or --abort'
 readonly MAX_LISTED=20
 
@@ -597,7 +598,7 @@ resolve_adapter() {
 # JSON on stdout and inherits cwd. Sets AD_JSON, AD_STATUS, AD_STDERR, AD_RECOVERY.
 adapter_run() {
   local parsed
-  AD_JSON=$(cd -- "$RUN_WT" && node "$ADAPTER" "$@" 2>/dev/null)
+  AD_JSON=$(cd -- "$RUN_WT" && node "$ADAPTER" --timeout-ms "$ADAPTER_TIMEOUT_MS" "$@" 2>/dev/null)
   AD_STATUS=ERROR AD_RECOVERY="" AD_STDERR=""
   if [ -z "$AD_JSON" ]; then
     AD_RECOVERY="the github-workflow adapter produced no output (node or the adapter failed to run)"
@@ -1088,9 +1089,14 @@ step_github() { # step_github upstack|continue|abort
     *)
       err "gh stack rebase ($1): $(v "$AD_STATUS") $(v "$AD_RECOVERY")"
       printf '%s\n' "$AD_STDERR" | cap_lines 10 >&2
-      # A failed step with gh-stack's own rebase record still present is a
-      # pause, not a failure: clearing our state would orphan that rebase.
-      if [ "$1" != abort ] && [ -e "$COMMON/gh-stack-rebase-state" ]; then RESULT=conflict; else RESULT=failed; fi
+      # A failed step with gh-stack's own rebase record, an in-flight git
+      # rebase, or an adapter timeout (SPAWN_FAILURE) is a pause, not a
+      # failure: clearing our state would orphan a partially applied restack.
+      if [ "$1" != abort ] && { [ -e "$COMMON/gh-stack-rebase-state" ] || [ "$AD_STATUS" = SPAWN_FAILURE ] || wt_busy "$S_RUN" >/dev/null; }; then
+        RESULT=conflict
+      else
+        RESULT=failed
+      fi
       ;;
   esac
 }

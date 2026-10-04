@@ -61,6 +61,8 @@
 const { spawnSync } = require('child_process');
 
 const MAX_OUTPUT_CHARS = 8000;
+const DEFAULT_TIMEOUT_MS = 120000;
+let spawnTimeoutMs = DEFAULT_TIMEOUT_MS;
 
 /** Exit-code -> status mapping, verified against github/gh-stack source at
  * ab00aa4a3f2dddc51aa65849c68b391a1b079311 (cmd/utils.go) — see
@@ -109,7 +111,7 @@ const MERGE_METHODS = Object.freeze(['merge', 'squash', 'rebase']);
 function run(bin, args) {
   const result = spawnSync(bin, args, {
     encoding: 'utf8',
-    timeout: 120000,
+    timeout: spawnTimeoutMs,
     shell: false,
     windowsHide: true,
   });
@@ -304,6 +306,8 @@ const RECOVERY_ACTIONS = Object.freeze({
   LOCK_FAILED: 'Could not acquire the stack file lock — another gh-stack process may be running. Wait and retry.',
   STACKS_UNAVAILABLE: 'Stacked PRs are not enabled for this repository. This is a repository-level GitHub setting, not fixable by retrying.',
   MODIFY_RECOVERY: 'A previous `gh stack modify` session was interrupted. This runtime never invokes `modify` — resolve the interrupted session with `gh stack modify --continue` or `--abort` directly, outside this runtime.',
+  SPAWN_FAILURE:
+    'The subprocess did not finish (timed out or failed to start). The operation may have partially applied — inspect repository state before retrying.',
   ERROR: 'The command failed; see stderr for the printed error.',
   SYNC_ABORTED: 'Sync detected a divergence it cannot resolve non-interactively and made no changes. Re-run in an interactive terminal, or import the remote stack explicitly.',
   REQUIRES_CONFIRMATION: 'This is a destructive operation. Re-invoke with confirm: true after showing the caller exactly what will change.',
@@ -598,9 +602,17 @@ function parseArgs(argv) {
 
 function main(argv) {
   const args = parseArgs(argv);
+  if (typeof args['timeout-ms'] === 'string') {
+    const parsed = Number.parseInt(args['timeout-ms'], 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      spawnTimeoutMs = parsed;
+    }
+  }
   const op = args._[0];
   if (typeof op !== 'string' || !OPERATIONS[op]) {
-    console.error(`usage: github-stack-runtime.js <${Object.keys(OPERATIONS).join('|')}> [--flag value ...] [--confirm]`);
+    console.error(
+      `usage: github-stack-runtime.js <${Object.keys(OPERATIONS).join('|')}> [--flag value ...] [--confirm] [--timeout-ms <ms>]`
+    );
     return 1;
   }
   const params = {
