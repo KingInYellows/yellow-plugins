@@ -17,8 +17,15 @@
 #             compared again. Prints `changed: <path>` per path that differed.
 #             Every snapshot entry (state, copy and the content hash recorded
 #             at snapshot time) is validated before anything is removed; an
-#             invalid snapshot exits 4 and leaves the live file untouched. A
-#             restore is staged beside the file and moved in with mv -f.
+#             invalid snapshot exits 4 and leaves the live file untouched. The
+#             only valid states are `file` (copy and matching hash present) and
+#             `absent` (neither copy nor hash present); any other state,
+#             including `symlink:*`, is invalid, so a tampered state cannot
+#             delete the config or install a link. A restore is staged beside
+#             the file and moved in with mv -f.
+#             Residual: a process that rewrites the state AND deletes the copy
+#             and hash can make `check` remove the live config. That fails safe:
+#             no config means no verify_command to execute.
 #   clear:    remove the snapshot directory.
 # Exit codes: 0 nothing changed, 3 something changed and every path was
 #   restored, 4 a path could not be restored (stop; the file is tampered),
@@ -73,7 +80,13 @@ valid_entry() {
     [ -f "$SNAP/state.$i" ] && [ ! -L "$SNAP/state.$i" ] || return 1
     want=$(cat -- "$SNAP/state.$i") || return 1
     case "$want" in
-        absent | symlink:?*) ;;
+        absent)
+            # A genuine absent snapshot writes neither a copy nor a hash. If
+            # either exists, the state was rewritten (file -> absent) and
+            # restoring it would delete the live config.
+            [ ! -e "$SNAP/copy.$i" ] && [ ! -L "$SNAP/copy.$i" ] || return 1
+            [ ! -e "$SNAP/hash.$i" ] && [ ! -L "$SNAP/hash.$i" ] || return 1
+            ;;
         file)
             [ -f "$SNAP/copy.$i" ] && [ ! -L "$SNAP/copy.$i" ] || return 1
             [ -f "$SNAP/hash.$i" ] && [ ! -L "$SNAP/hash.$i" ] || return 1
@@ -95,10 +108,10 @@ restore_entry() {
         return 0
     fi
     stage=$(mktemp -d "$(dirname -- "$p")/.guard-restore.XXXXXX" 2>/dev/null) || return 1
-    case "$want" in
-        file) cp -p -- "$SNAP/copy.$i" "$stage/new" 2>/dev/null || { rm -rf -- "$stage"; return 1; } ;;
-        symlink:*) ln -s -- "${want#symlink:}" "$stage/new" 2>/dev/null || { rm -rf -- "$stage"; return 1; } ;;
-    esac
+    # Only `file` reaches here: valid_entry rejects every other state, and
+    # snapshot refuses symlinks, so no symlink is ever recreated.
+    if [ "$want" != file ]; then rm -rf -- "$stage"; return 1; fi
+    cp -p -- "$SNAP/copy.$i" "$stage/new" 2>/dev/null || { rm -rf -- "$stage"; return 1; }
     # mv -f would move into a directory (or a symlink to one) instead of replacing it.
     if [ -d "$p" ]; then rm -rf -- "$p" 2>/dev/null; fi
     mv -f -- "$stage/new" "$p" 2>/dev/null
