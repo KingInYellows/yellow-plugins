@@ -415,13 +415,18 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   docs/security.md point here): an edit's old-side lines must sit inside one
   changed range of its file widened by `RANGE_MARGIN` (3, a constant in
   `commit-resolve-fixes`); a listed file whose row is `none`, `unknown` or
-  missing accepts no hunk. It is enforced twice, with `<ranges-file>` the Step 4
+  missing accepts no hunk. The listed files together may change at most
+  `MAX_CHANGED_LINES` (50, the resolver's scope limit; the larger side of each
+  hunk, so an insertion counts its length): a run over it is refused at commit,
+  and the pre-check marks every listed file with the entry `over-cap`. It is
+  enforced twice, with `<ranges-file>` the Step 4
   `pr-changed-ranges` capture:
   - `commit-resolve-fixes --check-ranges --ranges-from <ranges-file> --files-from <files-file>`
     is the pre-check, run before verify. It stages and commits nothing, makes no
     network call, and prints
     `{"out_of_range":[{"path","old_lines":["a-b",...]}]}` for the files with an
-    out-of-range hunk. Exit 0 means the check ran; a missing, unreadable or
+    out-of-range hunk (`old_lines` also holds `over-cap` on every listed file
+    when the total changed lines exceed the cap). Exit 0 means the check ran; a missing, unreadable or
     malformed ranges file or a non-canonical path is exit 2; a failed diff is
     exit 3 (a refusal: revert and downgrade as below). Non-interactive runs
     revert every listed file; interactive runs ask once per run to include them

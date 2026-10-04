@@ -693,6 +693,82 @@ STUB
   ! grep -q '^gt submit' "$STUB_LOG"
 }
 
+# --- The changed-line cap (MAX_CHANGED_LINES = 50) ---
+
+# long_file: src/a.txt of 100 lines, committed and pushed; every line is in the changed range.
+long_file() {
+  seq 1 100 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file" && git push -q origin feature 2>/dev/null
+  printf 'src/a.txt 1-100\n' >| "$BATS_TEST_TMPDIR/ranges"
+}
+
+@test "--ranges-from refuses an insertion longer than the 50-line cap even inside the range (exit 3)" {
+  long_file
+  base=$(git rev-parse HEAD)
+  { head -n 5 src/a.txt; seq 1000 1050; tail -n +6 src/a.txt; } >| "$BATS_TEST_TMPDIR/new.txt" && cp "$BATS_TEST_TMPDIR/new.txt" src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"exceeds the 50-line cap"* ]]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+  [ -z "$(git diff --cached --name-only)" ]
+}
+
+@test "--ranges-from accepts an insertion of exactly 50 lines" {
+  long_file
+  { head -n 5 src/a.txt; seq 1000 1049; tail -n +6 src/a.txt; } >| "$BATS_TEST_TMPDIR/new.txt" && cp "$BATS_TEST_TMPDIR/new.txt" src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+}
+
+@test "--ranges-from counts many small hunks together against the cap" {
+  long_file
+  sed -i.bak -e 's/^\([0-9]*[0-5]\)$/x\1/' src/a.txt && rm -f src/a.txt.bak
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"exceeds the 50-line cap"* ]]
+}
+
+@test "the cap is shared by every listed file, and without --ranges-from it does not apply" {
+  long_file
+  seq 1 100 >| src/b.txt
+  git add src/b.txt && git commit -q -m "chore: second file" && git push -q origin feature 2>/dev/null
+  printf 'src/a.txt 1-100\nsrc/b.txt 1-100\n' >| "$BATS_TEST_TMPDIR/ranges"
+  sed -i.bak -e '1,30s/$/x/' src/a.txt && sed -i.bak -e '1,30s/$/x/' src/b.txt && rm -f src/a.txt.bak src/b.txt.bak
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt src/b.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"exceeds the 50-line cap"* ]]
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt src/b.txt
+  [ "$status" -eq 0 ]
+}
+
+@test "--check-ranges marks every listed file over-cap when the total exceeds 50 changed lines" {
+  long_file
+  seq 1 100 >| src/b.txt
+  git add src/b.txt && git commit -q -m "chore: second file"
+  printf 'src/a.txt 1-100\nsrc/b.txt 1-100\n' >| "$BATS_TEST_TMPDIR/ranges"
+  sed -i.bak -e '1,30s/$/x/' src/a.txt && sed -i.bak -e '1,30s/$/x/' src/b.txt && rm -f src/a.txt.bak src/b.txt.bak
+  printf 'src/a.txt\nsrc/b.txt\n' >| "$BATS_TEST_TMPDIR/files"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$status" -eq 0 ]
+  [ "$(jq -c '[.out_of_range[] | [.path, .old_lines]]' <<<"$output")" = '[["src/a.txt",["over-cap"]],["src/b.txt",["over-cap"]]]' ]
+  # a file that is also out of range keeps its span and gains the marker
+  printf 'src/a.txt 1-5\nsrc/b.txt 1-100\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$(jq -c '.out_of_range[0].old_lines' <<<"$output")" = '["1-30","over-cap"]' ]
+}
+
+@test "a hook that adds more than 50 lines to a listed file in range makes the commit undo itself (exit 4)" {
+  long_file
+  printf '#!/bin/sh\nseq 2000 2060 >> src/a.txt && git add src/a.txt\n' >| .git/hooks/pre-commit
+  chmod +x .git/hooks/pre-commit
+  track_git_hooks pre-commit
+  printf 'src/a.txt 1-200\n' >| "$BATS_TEST_TMPDIR/ranges"
+  sed -i.bak 's/^3$/three/' src/a.txt && rm -f src/a.txt.bak
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 4 ]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
 @test "a rejected graphite commit restacks the upstack back onto the reset branch" {
   printf '#!/bin/sh\nprintf "two\\nfeature\\nhook\\n" > src/b.txt && git add src/b.txt\n' >| .git/hooks/pre-commit
   chmod +x .git/hooks/pre-commit

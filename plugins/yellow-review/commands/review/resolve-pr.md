@@ -451,7 +451,8 @@ either way.
 `<ranges-file>` is the Step 4 capture the resolvers were bounded by, never a
 re-capture. It prints `{"out_of_range":[{"path","old_lines"}]}`: files with an
 edit outside the PR-changed lines plus `RANGE_MARGIN` (the script's constant,
-`clusters.md`). A non-zero exit is a refusal (above). An empty list continues
+`clusters.md`), and every listed file when the run changes more than 50 lines
+in total (its `old_lines` then holds `over-cap`). A non-zero exit is a refusal (above). An empty list continues
 to Verify. Otherwise:
 
 - **Non-interactive:** revert the listed files.

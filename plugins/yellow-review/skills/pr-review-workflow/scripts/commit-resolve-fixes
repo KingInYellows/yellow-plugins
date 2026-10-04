@@ -19,14 +19,19 @@
 #            hunk must lie inside its file's changed new-side ranges, widened
 #            by RANGE_MARGIN lines (the resolver's "minimal adjacent lines"),
 #            else exit 3 with nothing committed. A listed file whose row is
-#            missing, "none" or "unknown" accepts no hunk. The ranges describe
+#            missing, "none" or "unknown" accepts no hunk. The listed files may
+#            change at most MAX_CHANGED_LINES lines in total (the larger side
+#            of each hunk), else exit 3 too: an insertion cannot be
+#            smuggled past the range check by its length. The ranges describe
 #            the local HEAD, so capture them from the same head the resolvers
 #            edited. Without the flag no range check runs (membership only).
 #   check:   --check-ranges runs that same hunk check on the working tree
 #            against HEAD and nothing else: it stages and commits nothing, needs
 #            no --provider, --pr or --message, makes no network call, and prints
 #            {"out_of_range":[{"path":"<file>","old_lines":["<a>-<b>",...]}]}
-#            (an empty list when every hunk is inside). Exit 0 when the check
+#            (an empty list when every hunk is inside; when the files change
+#            more than MAX_CHANGED_LINES lines in total, every listed file
+#            also carries the entry "over-cap"). Exit 0 when the check
 #            ran, 2 for a missing, unreadable or malformed --ranges-from or a
 #            non-canonical path, 3 when git could not produce the diff. The
 #            caller runs it before verification so out-of-range files can be
@@ -176,6 +181,10 @@ MAX_MESSAGE_CHARS=200
 # --check-ranges). The resolver prompt and references/resolve/clusters.md state
 # the same number; change all three together.
 RANGE_MARGIN=3
+# Changed lines (the larger side of each hunk, summed over the listed files) a
+# run may commit with --ranges-from. The resolver prompt's 50-line scope limit
+# is the same number; change both together.
+MAX_CHANGED_LINES=50
 
 # The libraries below run before any dirty-set check. In a source checkout they
 # sit inside the repository's working tree, where a resolver can edit one, or
@@ -269,18 +278,40 @@ fi
 # inside. `commit` judges BEFORE..SHA. -U0, old side = the HEAD the ranges were captured against. An
 # insertion counts as the line it follows. A row that is missing, "none" or
 # "unknown" accepts no hunk. Fails when git or awk fails.
-out_of_range_spans() {
-    local f="$1" file_ranges
+# diff_for <file> <staged|worktree|commit>: the -U0 diff of one file.
+diff_for() {
     local -a rev=(HEAD)
     case "$2" in
         staged) rev=(--cached) ;;
         commit) rev=("$BEFORE" "$SHA") ;;
     esac
+    lgit diff "${rev[@]}" --no-renames --no-color --no-ext-diff --no-textconv --text -U0 -- "$1"
+}
+
+# changed_lines <staged|worktree|commit> <file>...: the larger side of each hunk,
+# summed over the files (a replaced line counts once, an insertion counts its
+# length). Fails when git or awk fails.
+changed_lines() {
+    local mode="$1" f total=0 n
+    shift
+    for f in "$@"; do
+        n=$(diff_for "$f" "$mode" | awk '/^@@/ {
+                split($2, a, ","); split($3, b, ",")
+                o = (a[2] == "" ? 1 : a[2] + 0); c = (b[2] == "" ? 1 : b[2] + 0)
+                t += (o > c ? o : c)
+            } END { print t + 0 }') || return 1
+        total=$((total + n))
+    done
+    printf '%s\n' "$total"
+}
+
+out_of_range_spans() {
+    local f="$1" file_ranges
     file_ranges=$(awk -v p="$f" '$1 == p { print $2; exit }' <<<"$RANGE_ROWS")
     case "$file_ranges" in
         ''|none|unknown) file_ranges="" ;;
     esac
-    lgit diff "${rev[@]}" --no-renames --no-color --no-ext-diff --no-textconv --text -U0 -- "$f" \
+    diff_for "$f" "$2" \
         | awk -v ranges="$file_ranges" -v m="$RANGE_MARGIN" '
             BEGIN {
                 n = split(ranges, r, ",")
@@ -315,6 +346,15 @@ if [ "$CHECK_RANGES" = 1 ]; then
         REPORT=$(jq -c --arg p "$f" --arg s "$spans" '.out_of_range += [{path: $p, old_lines: ($s | split(","))}]' <<<"$REPORT") \
             || die 3 "could not build the report"
     done
+    if [ "${#FILES[@]}" -gt 0 ]; then
+        total=$(changed_lines worktree "${FILES[@]}") || die 3 "could not count the changed lines"
+        if [ "$total" -gt "$MAX_CHANGED_LINES" ]; then
+            for f in "${FILES[@]}"; do
+                REPORT=$(jq -c --arg p "$f" 'if any(.out_of_range[]; .path == $p) then .out_of_range |= map(if .path == $p then .old_lines += ["over-cap"] else . end) else .out_of_range += [{path: $p, old_lines: ["over-cap"]}] end' <<<"$REPORT") \
+                    || die 3 "could not build the report"
+            done
+        fi
+    fi
     printf '%s\n' "$REPORT"
     exit 0
 fi
@@ -856,6 +896,14 @@ if [ -n "$RANGES_FROM" ]; then
             die 3 "staged change outside the PR's changed line ranges: $f (old lines $bad); nothing committed"
         fi
     done
+    total=$(changed_lines staged "${EXPECTED[@]}") || {
+        lgit reset -q -- "${EXPECTED[@]}" || true
+        die 3 "could not count the staged changed lines; nothing committed"
+    }
+    if [ "$total" -gt "$MAX_CHANGED_LINES" ]; then
+        lgit reset -q -- "${EXPECTED[@]}" || true
+        die 3 "staged change of $total lines exceeds the $MAX_CHANGED_LINES-line cap; nothing committed"
+    fi
 fi
 
 # A review comment can steer a resolver into pasting a secret it read into a
@@ -938,6 +986,10 @@ if [ -n "$RANGES_FROM" ]; then
         [ -z "$bad" ] \
             || undo_commit "committed change outside the PR's changed line ranges: $f (old lines $bad; a hook changed it); nothing submitted"
     done
+    total=$(changed_lines commit "${EXPECTED[@]}") \
+        || undo_commit "could not count the committed changed lines; nothing submitted"
+    [ "$total" -le "$MAX_CHANGED_LINES" ] \
+        || undo_commit "committed change of $total lines exceeds the $MAX_CHANGED_LINES-line cap (a hook changed it); nothing submitted"
 fi
 git diff --no-renames --no-color --no-ext-diff --no-textconv --text -U0 "$BEFORE" "$SHA" \
     | rt_added_lines >|"$ADDED" \

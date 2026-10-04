@@ -365,7 +365,8 @@ once wired, they run without a per-post prompt. The controls
 - **Scope.** Issues are filed only in the PR's repository, and the script
   refuses a thread that does not belong to the PR. No new network
   destination is added beyond `gh`'s GitHub API.
-- **Edit range.** A hunk outside a file's PR-changed lines plus `RANGE_MARGIN`
+- **Edit range.** A hunk outside a file's PR-changed lines plus `RANGE_MARGIN`,
+  or more than 50 changed lines in total (an insertion counts its length),
   never reaches a commit unattended: `commit-resolve-fixes --check-ranges`
   reverts the file before verify and `--ranges-from` refuses it at commit, so a
   steered resolver cannot commit edits to unrelated parts of a PR file. An
