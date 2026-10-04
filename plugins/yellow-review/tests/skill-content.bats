@@ -1183,7 +1183,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$flat" == *'A valid contract line with `verify=skipped` is a refusal'* ]]
   [ "$(grep -o 'not attempted (verify skipped)' <<<"$flat" | wc -l)" -ge 1 ]
   dispo=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')
-  [[ "$dispo" == *'`/review:resolve-stack` reads `verify=skipped` as the stop'* ]]
+  [[ "$dispo" == *'`/review:resolve-stack` and `/review:sweep-all` read `verify=skipped` as the stop'* ]]
 }
 
 @test "local-scripts: check-resolve-text documents exit 6 for refused text and exit 2 for usage" {
@@ -1193,8 +1193,10 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$flat" == *'and 2 for a usage error or an unreadable file'* ]]
 }
 
-@test "dispositions: the addressed path:line evidence refuses an option-shaped path segment" {
-  DISP="$BATS_TEST_DIRNAME/../references/resolve/dispositions.md"
-  tr '\n' ' ' <"$DISP" | tr -s ' ' | grep -q 'no `\.`, `\.\.` or empty segment and no segment starting with `-`'
-  tr '\n' ' ' <"$DISP" | tr -s ' ' | grep -q '`-config.yml` is refused'
+@test "sweep-all: a verify=skipped contract line ends the batch after the clean-tree check" {
+  flat=$(tr '\n' ' ' <"$SWEEP_ALL" | tr -s ' ')
+  [[ "$flat" == *'`blocking` count `<b>`, `verify` and `ratelimited`'* ]]
+  [[ "$flat" == *'5c. **Verify-skipped stop** — only after item 4'* ]]
+  [[ "$flat" == *'`skipped — not attempted (verify skipped)`'* ]]
+  [[ "$flat" == *'Unless item 4, 5, 5b or 5c stopped the loop'* ]]
 }

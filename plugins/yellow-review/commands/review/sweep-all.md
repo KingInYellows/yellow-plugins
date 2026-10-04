@@ -214,7 +214,7 @@ fails, stop and report the path.
 For each PR in the sorted list, in order from lowest PR number to
 highest, do the following. **No pauses anywhere in this loop** — log
 per-PR failures and continue, except where item 4 (dirty tree), item 5
-(rate limit) or item 5b (no contract) ends the loop.
+(rate limit), item 5b (no contract) or item 5c (verify skipped) ends the loop.
 
 For each iteration:
 
@@ -266,7 +266,7 @@ For each iteration:
      ran, not that every internal step succeeded.) Capture any stderr
      lines containing `Error:` or `fatal:` from the sweep output as the
      `Notes` value for this PR; leave `Notes` empty when the output is
-     clean. Take the `blocking` count `<b>` and `ratelimited` from the
+     clean. Take the `blocking` count `<b>`, `verify` and `ratelimited` from the
      sweep's `Resolve:` line: the LAST line of the captured output, and only
      when it fully matches the contract form (`?` otherwise, including the
      `Resolve: completed (output unavailable …)` fallback). An earlier
@@ -310,7 +310,16 @@ For each iteration:
    `### Step 5: End-of-loop summary table`: an unknown outcome is not safe to
    sweep past. Record `pending-exit-1` (this stop forces the final exit; see
    Step 6). The command exits `1` after the summary.
-6. **Continue** to the next PR otherwise. Unless item 4, 5 or 5b stopped the
+5c. **Verify-skipped stop** — only after item 4: if this PR's valid final
+   contract line has `verify=skipped` (a refusal; the ignored-file stop is one:
+   a resolver edited a gitignored file that nothing could restore, and the
+   clean-tree check above cannot see it), add `verify skipped` to its `Notes`,
+   count it blocking, mark every remaining PR
+   `skipped — not attempted (verify skipped)` and go to
+   `### Step 5: End-of-loop summary table`: no project command may run while
+   that file is on disk. Record `pending-exit-1` (this stop forces the final
+   exit; see Step 6). The command exits `1` after the summary.
+6. **Continue** to the next PR otherwise. Unless item 4, 5, 5b or 5c stopped the
    loop, do not pause, do not prompt, and do not abort on per-PR failures.
 
 The PR number and title for each iteration must be substituted as
@@ -403,7 +412,7 @@ Otherwise, with `attempted_count >= 1`:
    only the optional compounding step failed.
 
 **Final exit (every path, including the zero-attempt skip):** after Step 6
-finishes, skips, or warns, read `pending-exit-1`. If Step 4 item 4, 5 or 5b set it, the command exits `1`
+finishes, skips, or warns, read `pending-exit-1`. If Step 4 item 4, 5, 5b or 5c set it, the command exits `1`
 regardless of Step 6's outcome: a clean compound pass, a skip, or a compound
 warning never turns an early stop into success, and the "sweep-all
 succeeded" wording above does not apply. Otherwise exit `0`.
@@ -420,7 +429,7 @@ succeeded" wording above does not apply. Otherwise exit `0`.
 - **User cancels at the M3 gate**: exit 0 with the `Cancelled.` message.
   No sweeps run.
 - **Per-PR sweep failure mid-loop**: marked `skipped` in the summary
-  with a short reason. The loop continues unless Step 4 item 4, 5 or 5b
+  with a short reason. The loop continues unless Step 4 item 4, 5, 5b or 5c
   stops it. The user can re-run `/review:sweep <PR#>` manually to inspect.
 - **Dirty tree after a sweep** (Step 4 item 4): the loop stops after
   reverting the sweep's own edits, marks every remaining PR `skipped —

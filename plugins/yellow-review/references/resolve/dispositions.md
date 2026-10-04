@@ -876,9 +876,9 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   command, makes every `fixed` thread `unclear`, names each path as
   `restore by hand (not tracked, no HEAD copy)`, and ends with
   `push=skipped, verify=skipped`. The `Resolve:` line has no stop field of its
-  own; `/review:resolve-stack` reads `verify=skipped` as the stop and ends the
-  walk after that PR, but the sweeps do not detect it and carry on: restore the
-  named files before running them again.
+  own; `/review:resolve-stack` and `/review:sweep-all` read `verify=skipped` as
+  the stop and end the walk or batch after that PR: restore the named files
+  before running anything again.
 - Issue dedupe follows every page of the viewer's issues, but the whole scan is
   one `gh` call under one `YELLOW_REVIEW_GH_TIMEOUT`. A viewer with a very large
   issue history can time it out (exit 4); raise the variable for that
