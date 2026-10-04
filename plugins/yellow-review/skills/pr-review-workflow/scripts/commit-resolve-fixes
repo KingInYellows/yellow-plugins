@@ -72,9 +72,13 @@
 #                  flag limits it to the branches above the reset one)
 #   abortConflict  graphite `gt abort`
 # Remote: resolved before anything is staged, and its push URL
-# (`git remote get-url --push`; https, http, ssh, git or scp-style,
+# (`git remote get-url --push --all`; https, http, ssh, git or scp-style,
 # case-insensitive, .git optional) must name the PR's head repository on the
-# active GitHub host, else exit 3. The active host is GH_HOST when set, else
+# active GitHub host, else exit 3. A remote with several push URLs pushes to all
+# of them, so every one must pass the host, port and repository checks, and the
+# post-push `git ls-remote` runs against every one (a stale one exits 6). A
+# branch pushRemote or remote.pushDefault that is "." or not the name of a
+# configured remote (a URL, say) exits 3 before staging, whatever the provider. The active host is GH_HOST when set, else
 # the host of the PR's URL (ssh.github.com and www.github.com count as
 # github.com); none known fails closed. Any other scheme (file, ext, ftp ...)
 # and a URL that cannot be parsed fail closed too; no message prints a URL.
@@ -596,7 +600,13 @@ REMOTE_EXPLICIT=0
 REMOTES=$(git remote 2>/dev/null || true)
 REMOTE_COUNT=$(printf '%s' "$REMOTES" | grep -c . || true)
 UPSTREAM_REMOTE=$(git config --get "branch.$BRANCH.remote" 2>/dev/null || true)
-if [ -n "$REMOTE_NAME" ] && [ "$REMOTE_NAME" != . ]; then
+# An explicit push remote must name a configured remote. "." (this repository)
+# or a URL is not one: git would push there, but the checks below and the
+# provider's --remote read configured remotes only, so refuse before staging.
+if [ -n "$REMOTE_NAME" ] && { [ "$REMOTE_NAME" = . ] || ! printf '%s\n' "$REMOTES" | grep -qxF -- "$REMOTE_NAME"; }; then
+    die 3 "the push remote configured for branch '$(safe_name "$BRANCH")' (pushRemote or remote.pushDefault) is '.' or not a configured remote; nothing committed"
+fi
+if [ -n "$REMOTE_NAME" ]; then
     REMOTE_EXPLICIT=1
 elif [ "$REMOTE_COUNT" -eq 1 ]; then
     REMOTE_NAME="$REMOTES"
@@ -619,24 +629,34 @@ fi
 # Neither known fails closed.
 ACTIVE_HOST=$(norm_host "${GH_HOST:-$PR_URL_HOST}") \
     || die 3 "could not determine the active GitHub host (set GH_HOST); nothing committed"
-# Captured once: the head check after the push queries this same URL, since a
+# Captured once: the head check after the push queries these same URLs, since a
 # remote's fetch URL (what `git ls-remote <name>` reads) can differ from it.
-PUSH_URL=$(git remote get-url --push -- "$REMOTE_NAME" 2>/dev/null || true)
-PUSH_PARSED=$(remote_parse "$PUSH_URL") \
-    || die 3 "cannot tell which repository remote '$(safe_remote "$REMOTE_NAME")' pushes to (unreadable, unparseable or unsupported push URL); nothing committed"
-read -r PUSH_HOST PUSH_SLUG PUSH_PORT <<<"$PUSH_PARSED"
+# A remote can have several push URLs (remote.<name>.pushurl, multi-valued) and
+# a push goes to every one, so each must pass every check below.
+PUSH_URLS=()
+PUSH_PARSEDS=()
+PUSH_URL_LIST=$(git remote get-url --push --all -- "$REMOTE_NAME" 2>/dev/null || true)
+while IFS= read -r PUSH_URL; do
+    PUSH_PARSED=$(remote_parse "$PUSH_URL") \
+        || die 3 "cannot tell which repository remote '$(safe_remote "$REMOTE_NAME")' pushes to (unreadable, unparseable or unsupported push URL); nothing committed"
+    PUSH_URLS+=("$PUSH_URL")
+    PUSH_PARSEDS+=("$PUSH_PARSED")
+done <<<"$PUSH_URL_LIST"
 case "$PR_REPO" in
     ?*/?*) ;;
     *) die 3 "could not read PR #$PR's head repository; nothing committed" ;;
 esac
-host_matches "$ACTIVE_HOST" "$PUSH_HOST" \
-    || die 3 "remote '$(safe_remote "$REMOTE_NAME")' does not push to the active GitHub host; nothing committed"
 ACTIVE_PORT=$(norm_port "${GH_HOST:-$PR_URL_HOST}" https) \
     || die 3 "could not determine the active GitHub host's port (set GH_HOST); nothing committed"
-port_matches "$ACTIVE_HOST" "$ACTIVE_PORT" "$PUSH_HOST" "$PUSH_PORT" \
-    || die 3 "remote '$(safe_remote "$REMOTE_NAME")' pushes to a different port than the active GitHub host; nothing committed"
-[ "$PUSH_SLUG" = "$PR_REPO" ] \
-    || die 3 "remote '$(safe_remote "$REMOTE_NAME")' does not push to PR #$PR's head repository; nothing committed"
+for PUSH_PARSED in "${PUSH_PARSEDS[@]}"; do
+    read -r PUSH_HOST PUSH_SLUG PUSH_PORT <<<"$PUSH_PARSED"
+    host_matches "$ACTIVE_HOST" "$PUSH_HOST" \
+        || die 3 "remote '$(safe_remote "$REMOTE_NAME")' does not push to the active GitHub host; nothing committed"
+    port_matches "$ACTIVE_HOST" "$ACTIVE_PORT" "$PUSH_HOST" "$PUSH_PORT" \
+        || die 3 "remote '$(safe_remote "$REMOTE_NAME")' pushes to a different port than the active GitHub host; nothing committed"
+    [ "$PUSH_SLUG" = "$PR_REPO" ] \
+        || die 3 "remote '$(safe_remote "$REMOTE_NAME")' does not push to PR #$PR's head repository; nothing committed"
+done
 
 # The commit runs the effective git hooks. An untracked or ignored file in a
 # hooks directory inside the working tree is invisible to the dirty-set check
@@ -852,14 +872,17 @@ esac
 # and push URLs (fork setups) the name resolves to the fetch URL.
 # The branch ref is updated synchronously by the submit; the PR's
 # headRefOid can lag, so only that check backs off.
-LS_RC=0
-LS_OUT=$(bounded "$NET_TIMEOUT" git ls-remote -- "$PUSH_URL" "refs/heads/$BRANCH" 2>"$NET_ERR") || LS_RC=$?
-REMOTE=$(printf '%s\n' "$LS_OUT" | awk 'NR == 1 { print $1 }')
-if [ "$REMOTE" != "$SHA" ]; then
-    why=$(last_err)
-    [ "$LS_RC" -eq 124 ] || [ "$LS_RC" -eq 137 ] && why="ls-remote timed out after ${NET_TIMEOUT}s"
-    die 6 "head not verified: local=$SHA remote=${REMOTE:-none}${why:+ ($why)}"
-fi
+# Every push URL must show the new head: a push goes to all of them.
+for PUSH_URL in "${PUSH_URLS[@]}"; do
+    LS_RC=0
+    LS_OUT=$(bounded "$NET_TIMEOUT" git ls-remote -- "$PUSH_URL" "refs/heads/$BRANCH" 2>"$NET_ERR") || LS_RC=$?
+    REMOTE=$(printf '%s\n' "$LS_OUT" | awk 'NR == 1 { print $1 }')
+    if [ "$REMOTE" != "$SHA" ]; then
+        why=$(last_err)
+        [ "$LS_RC" -eq 124 ] || [ "$LS_RC" -eq 137 ] && why="ls-remote timed out after ${NET_TIMEOUT}s"
+        die 6 "head not verified: local=$SHA remote=${REMOTE:-none}${why:+ ($why)}"
+    fi
+done
 PR_HEAD=""
 PR_RC=0
 PR_ERR=""

@@ -228,6 +228,11 @@ phase failed.
    below. The GitHub runtime gets `--remote` only for
    `branch.<name>.pushRemote`, `remote.pushDefault` or a sole remote; with
    several remotes and neither setting it refuses and the script exits 5.
+   A `pushRemote` or `pushDefault` that is `.` or not a configured remote name
+   exits 3 before anything is committed, for either provider. Every push URL of
+   the chosen remote (`remote.<name>.pushurl` can repeat) must name the PR's head
+   repository on the active host and port, else exit 3, and the head is verified
+   against each of them.
    `fixed` threads need `status: PUSHED` and a verified SHA. `NOOP` or a failure
    downgrades every `fixed` thread to `unclear`; the other lanes still run.
 3. **Phase C, per thread, serial.** Issue (only `oos`), then reply

@@ -1040,6 +1040,100 @@ remote_with_push_url() {
   [[ "$stderr" != *"s3cr3t-tok3n"* ]]
 }
 
+# --- A remote with several push URLs: all of them must pass ---
+
+@test "a second push URL naming another repository is refused before committing (exit 3)" {
+  remote_with_push_url fork https://github.com/acme/widgets.git
+  git config --add remote.fork.pushurl https://github.com/mallory/widgets.git
+  git config branch.feature.pushRemote fork
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"remote 'fork' does not push to PR #7's head repository"* ]]
+  [[ "$stderr" != *"mallory"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  ! grep -q '^node ' "$STUB_LOG"
+}
+
+@test "a second push URL on another host or port is refused before committing (exit 3)" {
+  for url in https://git.example/acme/widgets.git https://github.com:8443/acme/widgets.git; do
+    git remote remove fork 2>/dev/null || true
+    remote_with_push_url fork https://github.com/acme/widgets.git
+    git config --add remote.fork.pushurl "$url"
+    git config branch.feature.pushRemote fork
+    printf 'one\nfeature\nfix\n' >| src/a.txt
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted: $url" >&2; return 1; }
+    [[ "$stderr" != *"git.example"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  done
+}
+
+@test "an unparseable second push URL is refused (exit 3)" {
+  remote_with_push_url fork https://github.com/acme/widgets.git
+  git config --add remote.fork.pushurl /some/local/path
+  git config branch.feature.pushRemote fork
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"cannot tell which repository remote 'fork' pushes to"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
+@test "two push URLs of the head repository are accepted and each is verified with ls-remote (exit 0)" {
+  remote_with_push_url fork https://github.com/acme/widgets.git
+  git config --add remote.fork.pushurl git@github.com:acme/widgets.git
+  git config branch.feature.pushRemote fork
+  local logdir="$BATS_TEST_TMPDIR/ls-log-shim"
+  mkdir -p "$logdir"
+  cat >| "$logdir/git" <<'SHIM'
+#!/bin/sh
+PATH=${PATH#"$(dirname "$0"):"}
+[ "$1" = ls-remote ] && printf 'ls-remote\n' >> "$LS_LOG"
+exec git "$@"
+SHIM
+  chmod +x "$logdir/git"
+  export LS_LOG="$BATS_TEST_TMPDIR/ls.log"
+  : >| "$LS_LOG"
+  PATH="$logdir:$PATH"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .status)" = PUSHED ]
+  [ "$(wc -l <"$LS_LOG")" -eq 2 ]
+}
+
+# --- A pushRemote or pushDefault of "." is not a remote ---
+
+@test "a branch pushRemote of '.' is refused before committing even with one remote (exit 3)" {
+  git config branch.feature.pushRemote .
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"is '.' or not a configured remote"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  ! grep -q '^node ' "$STUB_LOG"
+}
+
+@test "remote.pushDefault of '.' is refused before committing, for graphite too (exit 3)" {
+  git config remote.pushDefault .
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"is '.' or not a configured remote"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  ! grep -q '^gt modify\|^gt submit' "$STUB_LOG"
+}
+
+@test "a pushRemote naming no configured remote is refused before committing (exit 3)" {
+  git config branch.feature.pushRemote nonesuch
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"is '.' or not a configured remote"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
 # --- The push URL's host and scheme ---
 
 # push_via <url>: make the branch push to a remote reporting <url>, then edit a
