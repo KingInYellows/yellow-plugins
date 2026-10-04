@@ -21,10 +21,16 @@
 #   --allow-credential-shaped together with --unattended is a usage error
 #   (exit 2): the override needs a human.
 #   message: one line starting with a conventional `fix` prefix; carries
-#            counts and paths only, never reviewer text.
+#            counts and paths only, never reviewer text. It is screened like
+#            public text (rt_text_clean: credential shapes, images, mentions,
+#            foreign URLs) before anything is staged; a hit is exit 2 with the
+#            `resolve-text: refused rule=... line=...` token on stderr, never
+#            the text. --allow-credential-shaped does not excuse it.
 # Output: JSON to stdout: {"status":"PUSHED|NOOP","sha":"...","branch":"..."}
 # Exit codes: 2 usage (including --allow-credential-shaped with
-#             --unattended), 3 staged mismatch, refused path,
+#             --unattended and a message that fails the screen above),
+#             3 a plugin library that is modified or hidden (see Libraries),
+#             staged mismatch, refused path,
 #             pre-commit credential-shaped refusal, an untracked or ignored
 #             hook file, a hooks path through an in-tree symlink, or a remote that does not push to the PR's head
 #             repository (unparseable push URL, other scheme, host or
@@ -78,13 +84,29 @@
 # .hooks, or .git/hooks) is refused the same way, whatever it points to. A
 # hook file in .git/hooks or in a hooks directory outside the working tree
 # cannot be verified, so the commit and the submit run with git hooks disabled
-# (GIT_CONFIG_COUNT override, checked) and a note on stderr.
+# (GIT_CONFIG_COUNT override, checked) and a note on stderr. So do they when a
+# tracked file in an in-tree hooks directory is hidden from status
+# (assume-unchanged or skip-worktree: `ls-files -v` tag other than H).
 # core.fsmonitor and core.untrackedCache are forced off for every git call,
 # including the commit and the child gt and git (GIT_CONFIG_COUNT override,
 # checked), because a resolver can set an fsmonitor command in .git/config.
+# Commit signing is forced off the same way (commit.gpgSign=false, checked, one
+# note on stderr) when the repository's local or worktree config sets
+# commit.gpgsign (to anything but false) or any gpg.* key, because signing runs
+# gpg.program (or gpg.<format>.program) from that config. A signing config from
+# the user's global or system config alone is left untouched. Not covered:
+# push.gpgSign and log.showSignature, which can also run gpg.program.
+# Libraries: lib/resolve-paths.sh, sibling-plugin.sh, resolve-text.sh and
+# verify-run.sh are sourced before any dirty-set check. When the plugin's lib
+# directory is inside the repository's working tree (a source checkout), each
+# must be tracked, show tag H in `git ls-files -v` (not assume-unchanged or
+# skip-worktree) and equal its blob in HEAD, else exit 3 naming the file and
+# nothing is committed. Outside the repository (the installed cache) they are
+# not judged. The check is plain git, inline, before the first source.
 # Network diagnostics in the verify messages (git ls-remote, gh pr view
-# stderr) go through the credential redactor lib/verify-run.sh loads
-# (vr_load_redactor); with no redactor the diagnostic is withheld.
+# stderr) and the Graphite submit's own output go through the credential
+# redactor lib/verify-run.sh loads (vr_load_redactor); with no redactor the
+# diagnostic is withheld.
 # --unattended also refuses the YELLOW_REVIEW_GITHUB_STACK_RUNTIME file when it
 # is inside the repository and listed (rp_runner). With the github provider,
 # whichever runtime will run (override or default sibling) that lies inside the
@@ -99,6 +121,33 @@
 set -euo pipefail
 
 MAX_MESSAGE_CHARS=200
+
+# The libraries below run before any dirty-set check. In a source checkout they
+# sit inside the repository's working tree, where a resolver can edit one, or
+# hide the edit with `git update-index --assume-unchanged|--skip-worktree`. So
+# each must be tracked, show the plain "H" tag in `ls-files -v` and equal its
+# blob in HEAD. Inline and plain git plumbing, because nothing is sourced yet
+# (--no-filters: a clean filter in .git/config would run a command). A lib
+# directory outside the repository (the installed cache) is not judged; a
+# repository that cannot be read here is left to the checks below.
+check_lib_integrity() {
+    local libdir top rel name st blob
+    libdir=$(cd -- "$(dirname -- "$0")/../../../lib" 2>/dev/null && pwd -P) || return 0
+    top=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+    top=$(cd -- "$top" 2>/dev/null && pwd -P) || { printf '[commit-resolve-fixes] Error: cannot resolve the repository root to verify the plugin libraries; nothing committed\n' >&2; return 1; }
+    case "$libdir" in "$top"/*) ;; *) return 0 ;; esac
+    rel="${libdir#"$top"/}"
+    for name in resolve-paths.sh sibling-plugin.sh resolve-text.sh verify-run.sh; do
+        st=$(git -C "$top" -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs \
+                ls-files -v --error-unmatch -- "$rel/$name" 2>/dev/null) \
+            && [ "${st:0:2}" = "H " ] \
+            && blob=$(git -C "$top" rev-parse --verify --quiet "HEAD:$rel/$name" 2>/dev/null) \
+            && [ -n "$blob" ] \
+            && [ "$(git -C "$top" hash-object --no-filters -- "$libdir/$name" 2>/dev/null)" = "$blob" ] \
+            || { printf '[commit-resolve-fixes] Error: %s is not tracked and unmodified (modified, untracked or hidden from git status); refusing to source it; nothing committed\n' "$rel/$name" >&2; return 1; }
+    done
+}
+check_lib_integrity || exit 3
 
 # shellcheck source=../../../lib/resolve-paths.sh
 . "$(dirname -- "$0")/../../../lib/resolve-paths.sh"
@@ -151,6 +200,19 @@ esac
 [ "$UNATTENDED" = 1 ] && [ "$ALLOW_CREDENTIAL" = 1 ] \
     && die 2 "--allow-credential-shaped needs a human confirmation; never pass it with --unattended"
 
+# The diff scans below never see the message, which is committed and pushed
+# too: screen it as public text before anything is staged. No override excuses
+# it; the caller's messages carry counts and paths only.
+MSG_FILE=$(mktemp) || die 2 "mktemp failed"
+printf '%s\n' "$MESSAGE" >|"$MSG_FILE" || { rm -f "$MSG_FILE"; die 2 "cannot write the message for the credential scan"; }
+MSG_RC=0
+rt_text_clean "$MSG_FILE" || MSG_RC=$?
+rm -f "$MSG_FILE"
+if [ "$MSG_RC" -ne 0 ]; then
+    rt_report_refusal message
+    die 2 "--message looks like it contains a credential, an image, a mention or a foreign URL, or could not be scanned; nothing committed"
+fi
+
 for tool in git gh jq; do
     command -v "$tool" >/dev/null 2>&1 || die 2 "$tool not found"
 done
@@ -200,6 +262,22 @@ harden_git_config() {
     [ "$(git config --get core.fsmonitor 2>/dev/null)" = false ] \
         && [ "$(git config --get core.untrackedCache 2>/dev/null)" = false ] \
         || die 3 "could not disable core.fsmonitor; nothing committed"
+    # A resolver can also write commit.gpgSign and gpg.program (or
+    # gpg.<format>.program) into the repository's own config: signing the commit
+    # would run that program. Only the local and worktree scopes are judged
+    # (includes resolved, which --show-scope does), so the user's own global or
+    # system signing config keeps working. A local commit.gpgsign=false is no
+    # signing config.
+    local cfg rc=0 hit
+    cfg=$(git config --show-scope --get-regexp '^(commit\.gpgsign|gpg\.)' 2>/dev/null) || rc=$?
+    case "$rc" in 0|1) ;; *) die 3 "could not read the git signing config; nothing committed" ;; esac
+    hit=$(printf '%s\n' "$cfg" | awk -F'\t' '($1 == "local" || $1 == "worktree") && tolower($2) !~ /^commit\.gpgsign (false|no|off|0)$/ { print "y"; exit }')
+    [ -n "$hit" ] || return 0
+    n=$((n + 2))
+    export "GIT_CONFIG_KEY_$n=commit.gpgSign" "GIT_CONFIG_VALUE_$n=false" "GIT_CONFIG_COUNT=$((n + 1))"
+    [ "$(git config --bool --get commit.gpgsign 2>/dev/null)" = false ] \
+        || die 3 "could not disable commit signing; nothing committed"
+    printf '[commit-resolve-fixes] Note: the repository'"'"'s own config sets commit signing (commit.gpgsign or gpg.*), which could run a program, so the commit is made unsigned\n' >&2
 }
 harden_git_config
 
@@ -303,6 +381,20 @@ last_err() {
         return 0
     fi
     printf '%s' "$line" | tr -d '[:cntrl:]' | cut -c1-200
+}
+# print_submit_output: the provider's submit output ($NET_ERR) on stderr, in the
+# same screening as last_err (control characters dropped, URL userinfo masked,
+# the redactor), last 40 lines, 300 columns. When the redactor is unavailable
+# the output is withheld, not printed raw. The scratch file is emptied after.
+print_submit_output() {
+    local out
+    [ -s "$NET_ERR" ] || return 0
+    if out=$(tr -d '\000-\010\013-\037\177' <"$NET_ERR" | sed 's#://[^/@ ]*@#://***@#g' | redact_line 2>/dev/null); then
+        printf '%s\n' "$out" | tail -n 40 | cut -c1-300 >&2
+    else
+        printf '%s\n' '[submit output withheld: credential redaction unavailable]' >&2
+    fi
+    : >|"$NET_ERR"
 }
 rp_tree_changes "$DIRTY_FILE" || die 3 "cannot list tree changes"
 d=$(rp_assert_only_listed "$DIRTY_FILE" ${EXPECTED[@]+"${EXPECTED[@]}"}) \
@@ -480,10 +572,11 @@ port_matches "$ACTIVE_HOST" "$ACTIVE_PORT" "$PUSH_HOST" "$PUSH_PORT" \
 # the hooks through the link with no change Git reports.
 # A hook in .git/hooks or in a directory outside the working tree has no
 # tracked state to judge, and a resolver can rewrite an existing one (or point
-# core.hooksPath at such a directory), so the commit runs with every git hook
-# disabled instead. The override is environment config (GIT_CONFIG_COUNT), so
-# gt and the submit step inherit it; it is verified, failing closed on a git
-# too old to read it.
+# core.hooksPath at such a directory); a tracked in-tree hook hidden with
+# assume-unchanged or skip-worktree can be rewritten unseen too. So the commit
+# runs with every git hook disabled instead. The override is environment config
+# (GIT_CONFIG_COUNT), so gt and the submit step inherit it; it is verified,
+# failing closed on a git too old to read it.
 disable_git_hooks() {
     local n="${GIT_CONFIG_COUNT:-0}"
     case "$n" in ''|*[!0-9]*) die 3 "GIT_CONFIG_COUNT is not a number, so git hooks cannot be disabled; nothing committed" ;; esac
@@ -643,8 +736,12 @@ case "$PROVIDER" in
     graphite)
         # No --update-only: it has not been shown to leave the set of
         # submitted stack branches unchanged, and the PR already exists.
-        bounded "$SUBMIT_TIMEOUT" gt submit --no-interactive --no-edit >&2 \
-            || die 5 "gt submit failed or timed out after ${SUBMIT_TIMEOUT}s"
+        # Its output can carry a credential (a remote URL, a token in an error):
+        # it goes to the scratch file, then to stderr through the redactor only.
+        SUBMIT_RC=0
+        bounded "$SUBMIT_TIMEOUT" gt submit --no-interactive --no-edit >|"$NET_ERR" 2>&1 || SUBMIT_RC=$?
+        print_submit_output
+        [ "$SUBMIT_RC" -eq 0 ] || die 5 "gt submit failed or timed out after ${SUBMIT_TIMEOUT}s"
         ;;
     github)
         # The runtime always exits 0 and reports through its JSON status.

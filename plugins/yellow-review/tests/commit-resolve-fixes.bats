@@ -453,8 +453,19 @@ STUB
 
 @test "a scanner failure refuses the commit like a credential and leaves nothing staged" {
   mkdir -p "${BATS_TEST_TMPDIR}/failbin"
-  # Fail only the scanner's awk call (-v strict=...); everything else runs for real.
-  printf '#!/bin/sh\ncase "$1" in -v) exit 2 ;; esac\nexec %s "$@"\n' "$(command -v awk)" >| "${BATS_TEST_TMPDIR}/failbin/awk"
+  # Fail the scanner's awk calls (-v strict=..., -v host=...) after the first
+  # two, which screen the message; everything else runs for real.
+  cat >| "${BATS_TEST_TMPDIR}/failbin/awk" <<STUB
+#!/bin/sh
+case "\$1" in
+  -v)
+    n=\$(cat "${BATS_TEST_TMPDIR}/awk-calls" 2>/dev/null || echo 0)
+    echo \$((n + 1)) >| "${BATS_TEST_TMPDIR}/awk-calls"
+    [ "\$n" -ge 2 ] && exit 2
+    ;;
+esac
+exec $(command -v awk) "\$@"
+STUB
   chmod +x "${BATS_TEST_TMPDIR}/failbin/awk"
   printf 'one\nfeature changed\n' >| src/a.txt
   PATH="${BATS_TEST_TMPDIR}/failbin:${PATH}" run_crf --provider graphite --pr 7 --message "$MSG" --unattended -- src/a.txt
@@ -1800,4 +1811,268 @@ in_repo_plugin_init() {
   push_via ssh://git@ssh.github.com:443/acme/widgets.git
   run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 0 ] || { echo "$stderr" >&2; return 1; }
+}
+
+# --- Hardening against hidden or planted resolver changes ---
+
+@test "a clean tracked in-repository plugin lib directory is sourced and the commit goes through" {
+  in_repo_plugin_init
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+}
+
+# lib_tamper <lib>: the lib gets a line that would run when sourced.
+lib_tamper() {
+  printf 'touch "%s/lib-ran"\n' "$BATS_TEST_TMPDIR" >> "plugins/yellow-review/lib/$1"
+}
+
+@test "a modified in-repository lib file is refused before it is sourced (exit 3)" {
+  in_repo_plugin_init
+  base=$(git rev-parse HEAD)
+  lib_tamper resolve-text.sh
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"plugins/yellow-review/lib/resolve-text.sh is not tracked and unmodified"* ]]
+  [[ "$stderr" != *"lib-ran"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/lib-ran" ]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+  [ -z "$(git diff --cached --name-only)" ]
+}
+
+@test "an in-repository lib file marked assume-unchanged and modified is refused (exit 3)" {
+  in_repo_plugin_init
+  base=$(git rev-parse HEAD)
+  lib_tamper resolve-paths.sh
+  git update-index --assume-unchanged plugins/yellow-review/lib/resolve-paths.sh
+  [ -z "$(git status --porcelain)" ]
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"plugins/yellow-review/lib/resolve-paths.sh is not tracked and unmodified"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/lib-ran" ]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+}
+
+@test "an in-repository lib file marked skip-worktree and modified is refused (exit 3)" {
+  in_repo_plugin_init
+  base=$(git rev-parse HEAD)
+  lib_tamper verify-run.sh
+  git update-index --skip-worktree plugins/yellow-review/lib/verify-run.sh
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"plugins/yellow-review/lib/verify-run.sh is not tracked and unmodified"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/lib-ran" ]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+}
+
+@test "an in-repository lib file that is no longer tracked is refused (exit 3)" {
+  in_repo_plugin_init
+  git rm -q --cached plugins/yellow-review/lib/sibling-plugin.sh
+  git commit -q -m "chore: untrack"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"plugins/yellow-review/lib/sibling-plugin.sh is not tracked and unmodified"* ]]
+}
+
+@test "a plugin lib directory outside the repository is not judged" {
+  copy="$BATS_TEST_TMPDIR/outside/yellow-review"
+  mkdir -p "$copy/skills/pr-review-workflow"
+  cp -R "$RESOLVE_SCRIPTS/../../../lib" "$copy/lib"
+  cp -R "$RESOLVE_SCRIPTS" "$copy/skills/pr-review-workflow/scripts"
+  printf '# edited\n' >> "$copy/lib/resolve-text.sh"
+  SCRIPT="$copy/skills/pr-review-workflow/scripts/commit-resolve-fixes"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+}
+
+@test "a tracked in-tree hook marked assume-unchanged and edited is not run: the commit disables hooks" {
+  for flag in --assume-unchanged --skip-worktree; do
+    plant_hook .hooks
+    git add .hooks && git commit -q -m "chore: hooks"
+    git config core.hooksPath .hooks
+    git update-index "$flag" .hooks/pre-commit
+    printf 'echo edited >> "%s/hook.log"\n' "$BATS_TEST_TMPDIR" >> .hooks/pre-commit
+    [ -z "$(git status --porcelain)" ]
+    printf 'one\nfeature\nfix%s\n' "$flag" >| src/a.txt
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 0 ] || { echo "refused: $flag: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git hooks in the .hooks hooks directory are not verified"* ]]
+    [ ! -e "$BATS_TEST_TMPDIR/hook.log" ] || { echo "hook ran: $flag" >&2; return 1; }
+    git update-index "--no-${flag#--}" .hooks/pre-commit
+    git reset -q --hard HEAD
+    git config --unset core.hooksPath
+    git rm -q -r .hooks && git commit -q -m "chore: drop hooks"
+  done
+}
+
+@test "a repository-local gpg.program is not run: the commit is made unsigned with a note" {
+  marker="$BATS_TEST_TMPDIR/gpg-ran"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$BATS_TEST_TMPDIR/evil-gpg"
+  chmod +x "$BATS_TEST_TMPDIR/evil-gpg"
+  git config commit.gpgsign true
+  n=0
+  for key in gpg.program gpg.openpgp.program gpg.x509.program gpg.ssh.program; do
+    for provider in graphite github; do
+      n=$((n + 1))
+      git config "$key" "$BATS_TEST_TMPDIR/evil-gpg"
+      printf 'one\nfeature\nfix%s\n' "$n" >| src/a.txt
+      run_crf --provider "$provider" --pr 7 --message "$MSG" -- src/a.txt
+      [ "$status" -eq 0 ] || { echo "refused: $key $provider: $stderr" >&2; return 1; }
+      [[ "$stderr" == *"the commit is made unsigned"* ]]
+      [ ! -e "$marker" ] || { echo "program ran: $key $provider" >&2; return 1; }
+      ! git cat-file -p HEAD | grep -q '^gpgsig'
+    done
+    git config --unset "$key"
+  done
+}
+
+@test "a local commit.gpgsign=false is no signing config, a local gpgsign=true beside a global gpg.program is overridden" {
+  marker="$BATS_TEST_TMPDIR/gpg-ran"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$BATS_TEST_TMPDIR/evil-gpg"
+  chmod +x "$BATS_TEST_TMPDIR/evil-gpg"
+  # The fixture sets commit.gpgsign=false locally: no signing config, no note.
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [[ "$stderr" != *"made unsigned"* ]]
+  # A global gpg.program with a local gpgsign=true is the same attack.
+  printf '[gpg]\n\tprogram = %s\n' "$BATS_TEST_TMPDIR/evil-gpg" >| "$BATS_TEST_TMPDIR/global.cfg"
+  git config commit.gpgsign true
+  printf 'one\nfeature\nfix2\n' >| src/a.txt
+  GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global.cfg" run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"the commit is made unsigned"* ]]
+  [ ! -e "$marker" ]
+}
+
+@test "a signing config that comes only from the global config is left untouched" {
+  marker="$BATS_TEST_TMPDIR/gpg-ran"
+  # A signer that behaves like gpg for git: a status line on stderr, a signature on stdout.
+  cat >| "$BATS_TEST_TMPDIR/user-gpg" <<STUB
+#!/bin/sh
+touch "$marker"
+cat >/dev/null
+echo '[GNUPG:] SIG_CREATED ' >&2
+printf -- '-----BEGIN PGP SIGNATURE-----\n\nfake\n-----END PGP SIGNATURE-----\n'
+STUB
+  chmod +x "$BATS_TEST_TMPDIR/user-gpg"
+  printf '[commit]\n\tgpgsign = true\n[gpg]\n\tprogram = %s\n' "$BATS_TEST_TMPDIR/user-gpg" >| "$BATS_TEST_TMPDIR/global.cfg"
+  git config --unset commit.gpgsign
+  for provider in graphite github; do
+    rm -f "$marker"
+    printf 'one\nfeature\nfix-%s\n' "$provider" >| src/a.txt
+    GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global.cfg" run_crf --provider "$provider" --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 0 ] || { echo "refused: $provider: $stderr" >&2; return 1; }
+    [[ "$stderr" != *"made unsigned"* ]]
+    [ -e "$marker" ]
+    git cat-file -p HEAD | grep -q '^gpgsig'
+  done
+}
+
+# gt_stub_submit <stderr-line> <exit>: gt submit prints the line to stderr and
+# exits with <exit> (0 publishes as the real stub does); every other gt call
+# goes to the real stub.
+gt_stub_submit() {
+  mv "$STUB_BIN/gt" "$STUB_BIN/gt.real"
+  cat >| "$STUB_BIN/gt" <<STUB
+#!/bin/sh
+case "\$1" in
+  submit)
+    echo '$1' >&2
+    $( [ "$2" = 0 ] && printf 'exec "$(dirname "$0")/gt.real" "$@"' || printf 'exit %s' "$2" )
+    ;;
+esac
+exec "\$(dirname "\$0")/gt.real" "\$@"
+STUB
+  chmod +x "$STUB_BIN/gt"
+}
+
+@test "a credential in a failed gt submit's output never reaches stderr or the JSON output (exit 5)" {
+  v=$(cred_value)
+  for line in "error: credential helper said token=$v" "Authorization: Bearer $v" "remote: https://user:$v@example.com/o/r.git rejected"; do
+    gt_stub_submit "$line" 1
+    printf 'one\nfeature\nfix\n' >| src/a.txt
+    run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 5 ] || { echo "status $status for: ${line%%$v*}" >&2; return 1; }
+    [[ "$stderr" == *"gt submit failed"* ]]
+    [[ "$stderr" != *"$v"* ]]
+    [[ "$output" != *"$v"* ]]
+    git reset -q --hard "$FIRST_SHA"
+    mv "$STUB_BIN/gt.real" "$STUB_BIN/gt"
+  done
+}
+
+@test "gt submit output is shown redacted, and a credential in a successful submit's output is not leaked" {
+  v=$(cred_value)
+  gt_stub_submit "Pushed feature, helper said token=$v" 0
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"Pushed feature"* ]]
+  [[ "$stderr" != *"$v"* ]]
+}
+
+@test "with no credential redactor the gt submit output is withheld, never printed raw (exit 5)" {
+  v=$(cred_value)
+  copy="$BATS_TEST_TMPDIR/isolated/yellow-review"
+  mkdir -p "$copy/skills/pr-review-workflow"
+  cp -R "$RESOLVE_SCRIPTS/../../../lib" "$copy/lib"
+  cp -R "$RESOLVE_SCRIPTS" "$copy/skills/pr-review-workflow/scripts"
+  gt_stub_submit "error: helper said token=$v" 1
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  SCRIPT="$copy/skills/pr-review-workflow/scripts/commit-resolve-fixes"
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 5 ]
+  [[ "$stderr" == *"submit output withheld: credential redaction unavailable"* ]]
+  [[ "$stderr" != *"$v"* ]]
+}
+
+@test "a credential-shaped commit message is refused before anything is staged (exit 2)" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  for provider in graphite github; do
+    run_crf --provider "$provider" --pr 7 --message "fix: rotate config password: hunter22x" -- src/a.txt
+    [ "$status" -eq 2 ] || { echo "accepted: $provider" >&2; return 1; }
+    [[ "$stderr" == *"resolve-text: refused rule="* ]]
+    [[ "$stderr" != *"hunter22x"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+    [ -z "$(git diff --cached --name-only)" ]
+  done
+  ! grep -q '^node \|^gt modify\|^gt submit' "$STUB_LOG"
+}
+
+@test "a message with a mention, an image or a foreign URL is refused, the override does not excuse it (exit 2)" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  for msg in "fix: thanks @someone for the report" "fix: see ![x](https://github.com/a.png)" "fix: per https://evil.example.com/page"; do
+    run_crf --provider graphite --pr 7 --message "$msg" --allow-credential-shaped -- src/a.txt
+    [ "$status" -eq 2 ] || { echo "accepted: $msg" >&2; return 1; }
+    [[ "$stderr" == *"resolve-text: refused rule="* ]]
+  done
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
+@test "ordinary generated messages pass the message screen" {
+  n=0
+  for msg in "fix: resolve PR #7 review comments (2 files)" "fix(src/a.txt): resolve PR #7 review comments (1 file)" "fix!: resolve PR #7 review comments"; do
+    n=$((n + 1))
+    printf 'one\nfeature\nfix%s\n' "$n" >| src/a.txt
+    run_crf --provider graphite --pr 7 --message "$msg" -- src/a.txt
+    [ "$status" -eq 0 ] || { echo "refused: $msg: $stderr" >&2; return 1; }
+  done
+}
+
+@test "a scanner failure on the message refuses the commit before anything is staged (exit 2)" {
+  mkdir -p "${BATS_TEST_TMPDIR}/failbin"
+  printf '#!/bin/sh\ncase "$1" in -v) exit 2 ;; esac\nexec %s "$@"\n' "$(command -v awk)" >| "${BATS_TEST_TMPDIR}/failbin/awk"
+  chmod +x "${BATS_TEST_TMPDIR}/failbin/awk"
+  printf 'one\nfeature changed\n' >| src/a.txt
+  PATH="${BATS_TEST_TMPDIR}/failbin:${PATH}" run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"resolve-text: scan failed"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ -z "$(git diff --cached --name-only)" ]
 }

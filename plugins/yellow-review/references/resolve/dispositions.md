@@ -337,7 +337,24 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   `credential-shaped`; an interactive run may re-run with
   `--allow-credential-shaped` after the user confirms a second time, an
   unattended run never does), and with `--unattended` refuses runner files,
-  because the commit's git hooks would execute them;
+  because the commit's git hooks would execute them. The commit message is
+  screened like posted text (`rt_text_clean`) before anything is staged: a
+  credential shape, image, mention or foreign URL in it exits 2 with the
+  `resolve-text: refused` line on stderr, and no override excuses it. Commit
+  signing is forced off (`commit.gpgSign=false`, one stderr note) when the
+  repository's own local or worktree config sets `commit.gpgsign` or a `gpg.*`
+  key, because signing runs the configured `gpg.program`; the user's global or
+  system signing config is left alone. The Graphite submit's output reaches
+  stderr only through the credential redactor, and is withheld when the redactor
+  is unavailable;
+- `commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`,
+  `lib/sibling-plugin.sh`, `lib/resolve-text.sh` and `lib/verify-run.sh` before
+  any tree check. When the plugin's `lib/` directory is inside the repository's
+  working tree (a source checkout), each file must be tracked, show tag `H` in
+  `git ls-files -v` (so not assume-unchanged or skip-worktree) and equal its
+  blob in HEAD, or the script exits (3 for `commit-resolve-fixes`, 2 for
+  `run-verify-command`) naming the file, with nothing committed or reverted. An
+  installed plugin outside the repository is not judged;
 - `run-verify-command` refuses gitignored files, and when running a command also
   unchanged files, and refuses to run when the tree has changes outside the
   listed files. It does not run the command when a file is outside the PR (or
@@ -371,8 +388,11 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   every listed path is checked: only regular files, symlinks (dangling ones too)
   and absent paths are accepted. A FIFO, socket, device or directory in its
   place is refused with exit 2 in run mode, and removed unopened by the revert
-  modes, so a special file cannot block `git diff` or the refusal cleanup. The
-  patch is also withheld, with a `reason`, when the screen returns any status
+  modes, so a special file cannot block `git diff` or the refusal cleanup. A
+  directory standing where HEAD has a regular file is the exception: the revert
+  modes save the patch first, with the deletion of the file followed by every
+  regular file and symlink inside the directory as new files, and only then
+  remove the directory. The patch is also withheld, with a `reason`, when the screen returns any status
   other than 0 or 1 (the screen could not answer). When the `--text` diff cannot
   be produced or read, the script exits 2 and reverts nothing. A failed revert
   step is listed in `reason` (the first five, then a count) and `treeClean` is
@@ -631,12 +651,16 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   run, so a human has to file the issue or turn Issues on.
 - `commit-resolve-fixes` disables git hooks for its commit and submit
   (`core.hooksPath=/dev/null`, with a note on stderr) when the hooks directory
-  holds non-sample hooks it cannot verify: `.git/hooks` or a directory outside
-  the working tree. Hook managers that install there (pre-commit, lefthook)
+  holds non-sample hooks it cannot verify: `.git/hooks`, a directory outside
+  the working tree, or an in-tree directory with a tracked hook hidden from
+  status (assume-unchanged or skip-worktree). Hook managers that install there (pre-commit, lefthook)
   therefore do not lint or format resolve commits. Hooks in a tracked in-tree
   directory (for example husky's `.husky/`) still run on resolver-edited code;
   runner and hook definition files are refused, but the code the hooks run is
   not. How unattended commits should treat hooks is an open decision.
+- `commit-resolve-fixes` forces off only commit signing. A resolver-written
+  `push.gpgSign` or `log.showSignature` in `.git/config` can still make the
+  submit's git run `gpg.program`; the override list does not cover them.
 - Step 7 costs about three tool calls per thread; very large PRs (hundreds of
   threads) are slow. A batch apply script would help and is not written.
 - Two accounts resolving the same PR concurrently can each post a reply; markers

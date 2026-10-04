@@ -45,7 +45,11 @@
 #                  A listed directory is removed only where HEAD has a regular
 #                  file (a replaced file); a tracked directory, a gitlink or an
 #                  untracked directory is refused (exit 2) so its untracked
-#                  files survive.
+#                  files survive. The directory is removed after the recovery
+#                  patch is saved, and the patch holds the regular files and
+#                  symlinks inside it (as new files, after the deletion of the
+#                  replaced file), so they are recoverable unless the credential
+#                  screen withholds the patch.
 #   --revert-dirty: like --revert-only for every change in the tree, listed
 #                  by git itself (for refusals: never trust resolver text).
 #   --timeout, --command-file, --trusted and --unattended apply only when
@@ -85,6 +89,13 @@
 #   exit 0, reason names the signal). A signal while the pre-verification
 #   snapshot is written, before the command starts, removes the partial patch
 #   and exits 128+signal with the tree untouched.
+# Libraries: lib/resolve-paths.sh, sibling-plugin.sh, resolve-text.sh and
+#   verify-run.sh are sourced before any tree check. When the plugin's lib
+#   directory is inside the repository's working tree (a source checkout), each
+#   must be tracked, show tag H in `git ls-files -v` (not assume-unchanged or
+#   skip-worktree) and equal its blob in HEAD, else exit 2 naming the file and
+#   nothing is touched. Outside the repository (the installed cache) they are
+#   not judged.
 # Files: $(git rev-parse --git-common-dir)/yellow-review/resolve-patches/
 #        <pr>-<UTC ts>-<pid>.patch and .log, mode 0600; the newest 10 of each
 #        per PR are kept (other PRs' files are never pruned).
@@ -119,6 +130,34 @@ KEEP=10
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd) || exit 2
 PLUGIN_ROOT=$(cd -- "$SCRIPT_DIR/../../.." && pwd) || exit 2
+
+# The libraries below run before any tree check. In a source checkout they sit
+# inside the repository's working tree, where a resolver can edit one, or hide
+# the edit with `git update-index --assume-unchanged|--skip-worktree`. So each
+# must be tracked, show the plain "H" tag in `ls-files -v` and equal its blob in
+# HEAD. Inline and plain git plumbing, because nothing is sourced yet
+# (--no-filters: a clean filter in .git/config would run a command). A lib
+# directory outside the repository (the installed cache) is not judged; a
+# repository that cannot be read here is left to the checks below.
+check_lib_integrity() {
+    local libdir top rel name st blob
+    libdir=$(cd -- "$PLUGIN_ROOT/lib" 2>/dev/null && pwd -P) || return 0
+    top=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+    top=$(cd -- "$top" 2>/dev/null && pwd -P) || { printf '[run-verify-command] Error: cannot resolve the repository root to verify the plugin libraries\n' >&2; return 1; }
+    case "$libdir" in "$top"/*) ;; *) return 0 ;; esac
+    rel="${libdir#"$top"/}"
+    for name in resolve-paths.sh sibling-plugin.sh resolve-text.sh verify-run.sh; do
+        st=$(git -C "$top" -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs \
+                ls-files -v --error-unmatch -- "$rel/$name" 2>/dev/null) \
+            && [ "${st:0:2}" = "H " ] \
+            && blob=$(git -C "$top" rev-parse --verify --quiet "HEAD:$rel/$name" 2>/dev/null) \
+            && [ -n "$blob" ] \
+            && [ "$(git -C "$top" hash-object --no-filters -- "$libdir/$name" 2>/dev/null)" = "$blob" ] \
+            || { printf '[run-verify-command] Error: %s is not tracked and unmodified (modified, untracked or hidden from git status); refusing to source it; the tree is untouched\n' "$rel/$name" >&2; return 1; }
+    done
+}
+check_lib_integrity || exit 2
+
 # shellcheck source=../../../lib/resolve-paths.sh
 . "$PLUGIN_ROOT/lib/resolve-paths.sh" || { printf '[run-verify-command] Error: cannot load lib/resolve-paths.sh\n' >&2; exit 2; }
 # shellcheck source=../../../lib/resolve-text.sh
@@ -217,6 +256,7 @@ FIFO=""
 MARKER=""
 STREAM_FILE=""
 IGNORED_SCRATCH=""
+DIR_LIST=""
 # The snapshot is provisional until it is complete and credential-screened: any
 # exit before then (a signal, a die, a failed screen) removes it, so no
 # unscreened patch stays under .git.
@@ -224,7 +264,7 @@ PATCH=""
 PATCH_PROVISIONAL=0
 cleanup() {
     local f
-    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH"; do
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
     if [ "$PATCH_PROVISIONAL" = 1 ] && [ -n "$PATCH" ]; then
@@ -322,6 +362,7 @@ fi
 # so refusal cleanup still completes.
 TOP_REAL=$(pwd -P)
 TO_REMOVE=()
+DIR_REMOVE=()
 for f in ${FILES[@]+"${FILES[@]}"}; do
     if [ -L "$f" ] || [ -f "$f" ] || [ ! -e "$f" ]; then
         continue
@@ -357,8 +398,13 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
     fi
     # Validated; the removal waits until the output setup below has succeeded,
     # so a setup failure exits before anything is deleted that the checkout
-    # restoring the tracked file would never reach.
-    TO_REMOVE+=("$f")
+    # restoring the tracked file would never reach. A directory waits longer:
+    # the recovery patch must hold its files first (save_patch).
+    if [ -d "$f" ] && [ ! -L "$f" ]; then
+        DIR_REMOVE+=("$f")
+    else
+        TO_REMOVE+=("$f")
+    fi
 done
 
 # cwd is the top level, so the relative common dir resolves correctly (and
@@ -379,11 +425,7 @@ fi
 
 # Setup succeeded: now remove the entries validated above.
 for f in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
-    if [ -d "$f" ] && [ ! -L "$f" ]; then
-        rm -rf -- "$f" 2>/dev/null
-    else
-        rm -f -- "$f" 2>/dev/null
-    fi
+    rm -f -- "$f" 2>/dev/null
     if [ -e "$f" ] || [ -L "$f" ]; then
         die 2 "cannot remove a path that is not a regular file or symlink: $f"
     fi
@@ -497,8 +539,12 @@ run_verify() {
 # when it is in the index or in HEAD (a staged deletion is in HEAD only).
 # <fmt> is --binary for the kept patch and --text for the credential screen:
 # a binary-marked file still hides text a --binary patch would keep.
+# A listed directory standing where HEAD has a file (DIR_REMOVE) is still in
+# place: its deletion of the file blob is followed by the diff of every regular
+# file and symlink inside it, so the patch re-applies on HEAD. A file inside it
+# that is listed itself (--revert-dirty) has its own entry and is not repeated.
 save_patch() {
-    local out="$1" fmt="$2" f rc
+    local out="$1" fmt="$2" f rc c p
     umask 077
     : >"$out" || return 1
     for f in ${FILES[@]+"${FILES[@]}"}; do
@@ -515,9 +561,22 @@ save_patch() {
                 --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$f" >>"$out" || rc=$?
             [ "$rc" -le 1 ] || return 1
         fi
+        if [ -d "$f" ] && [ ! -L "$f" ]; then
+            find "$f" \( -type f -o -type l \) -print0 | LC_ALL=C sort -z >|"$DIR_LIST" || return 1
+            while IFS= read -r -d '' c; do
+                for p in ${FILES[@]+"${FILES[@]}"}; do
+                    [ "$p" = "$c" ] && continue 2
+                done
+                rc=0
+                git diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
+                    --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$c" >>"$out" || rc=$?
+                [ "$rc" -le 1 ] || return 1
+            done <"$DIR_LIST"
+        fi
     done
 }
 TEXT_FILE=$(mktemp) || die 2 "mktemp failed"
+DIR_LIST=$(mktemp) || die 2 "mktemp failed"
 ADDED_FILE=$(mktemp) || die 2 "mktemp failed"
 SAVE_BIN_OK=0 SAVE_TEXT_OK=0
 PATCH_OUT="$PATCH"
@@ -682,6 +741,16 @@ PATCH_PROVISIONAL=0
 
 # --- Revert the listed files ---
 REVERT_FAILS=()
+# The patch now holds the files of each replacement directory (save_patch), so
+# the directories can go; the checkout below restores the file in their place.
+for f in ${DIR_REMOVE[@]+"${DIR_REMOVE[@]}"}; do
+    rm -rf -- "$f" 2>/dev/null
+    if [ -e "$f" ] || [ -L "$f" ]; then
+        REVERT_FAILS+=("rm -r $f")
+    else
+        add_reason "removed a directory standing where a file was (its files are in the recovery patch): $f"
+    fi
+done
 for f in ${FILES[@]+"${FILES[@]}"}; do
     if git cat-file -e "HEAD:$f" 2>/dev/null; then
         # Hooks off: post-checkout and post-index-change would run any hook a

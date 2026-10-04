@@ -448,16 +448,18 @@ rp_ignored_changed_since() {
 # when it lies inside the working tree (the git directory does not count) and
 # any file under it is untracked or ignored; returns 1 when it is fine (no such
 # directory, no hook file outside the working tree or in the git directory, or
-# every in-tree file tracked), 2 when it cannot be inspected, 4 when the
-# directory is in the git directory (.git/hooks) or outside the working tree
+# every in-tree file tracked and plain), 2 when it cannot be inspected, 4 when
+# the directory is in the git directory (.git/hooks) or outside the working tree
 # and holds a file other than a .sample (it prints `git-dir` or `external`:
 # tracked state cannot vouch for it, so the caller must disable hooks for the
-# commit) and 3 when the hooks path passes through a symlink that
-# lives inside the working tree (the git directory included, so a symlinked
-# .git/hooks or .git counts). A caller must treat 2 and 3 as refusals. On 3 it
-# prints the repository-relative path of that symlink: a resolver can edit
-# through it, to a target Git status never lists, and the commit would run the
-# edit. The path is walked component by component from the configured value
+# commit) or lies in the working tree with a tracked file whose `ls-files -v`
+# tag is not H (assume-unchanged or skip-worktree: git status and diff cannot
+# see an edit to it; it prints the repository-relative path) and 3 when the
+# hooks path passes through a symlink that lives inside the working tree (the
+# git directory included, so a symlinked .git/hooks or .git counts). A caller
+# must treat 2 and 3 as refusals. On 3 it prints the repository-relative path of
+# that symlink: a resolver can edit through it, to a target Git status never
+# lists, and the commit would run the edit. The path is walked component by component from the configured value
 # (made absolute against the working tree root), and only a symlink located
 # inside the working tree counts; a symlink above or outside it is just a way
 # to reach the directory. The caller owns <outfile>, a scratch file. Tools that
@@ -523,9 +525,20 @@ rp_hooks_untracked() {
         # The whole tree when the hooks directory is the repository root.
         [ "$rel" = . ] || spec=(-- "$rel")
         lgit ls-files --others --directory --no-empty-directory -z ${spec[@]+"${spec[@]}"} >|"$1" 2>/dev/null || exit 2
+        if [ -s "$1" ]; then
+            printf '%s' "$rel"
+            exit 0
+        fi
+        # A tracked hook flagged assume-unchanged or skip-worktree can be edited
+        # without the dirty-set check seeing it. Only the plain H tag vouches
+        # for a tracked file (the same rule as rp_runtime_override_untrusted).
+        lgit ls-files -v -z ${spec[@]+"${spec[@]}"} >|"$1" 2>/dev/null || exit 2
         [ -s "$1" ] || exit 1
-        printf '%s' "$rel"
-        exit 0
+        if tr '\0' '\n' <"$1" | grep -v '^H ' >/dev/null; then
+            printf '%s' "$rel"
+            exit 4
+        fi
+        exit 1
     )
 }
 

@@ -375,6 +375,34 @@ hooks_repo() {
   [ "$status" -eq 0 ]
 }
 
+@test "rp_hooks_untracked reports a tracked in-tree hook hidden from status as unverifiable (4)" {
+  hooks_repo
+  mkdir -p .hooks
+  printf '#!/bin/sh\n' >| .hooks/pre-commit
+  printf '#!/bin/sh\n' >| .hooks/commit-msg
+  git add .hooks && git commit -q -m hooks
+  git config core.hooksPath .hooks
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 1 ]
+  for flag in assume-unchanged skip-worktree; do
+    git update-index "--$flag" .hooks/pre-commit
+    printf 'echo edited\n' >> .hooks/pre-commit
+    [ -z "$(git status --porcelain)" ]
+    run rp_hooks_untracked "$OUT"
+    [ "$status" -eq 4 ] || { echo "status $status for $flag"; false; }
+    [ "$output" = ".hooks" ]
+    git update-index "--no-$flag" .hooks/pre-commit
+    git checkout -q -- .hooks/pre-commit
+    run rp_hooks_untracked "$OUT"
+    [ "$status" -eq 1 ]
+  done
+  # An untracked file still wins: it is refused, not just unverified.
+  git update-index --assume-unchanged .hooks/commit-msg
+  printf 'x\n' >| .hooks/extra
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 0 ]
+}
+
 @test "rp_hooks_untracked reports a hook outside the working tree or in .git/hooks as unverifiable (4)" {
   hooks_repo
   mkdir -p "$BATS_TEST_TMPDIR/ext"

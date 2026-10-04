@@ -1708,3 +1708,126 @@ load_redactor() {
   [ -z "$(find "$PATCH_DIR" -name '*.patch' 2>/dev/null)" ]
   run ! grep -rq 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' "$PATCH_DIR"
 }
+
+# --- Plugin libraries inside the repository ---
+
+# in_repo_plugin_init: the plugin checked into the fixture repository, so its
+# lib directory lies inside the working tree. The resolver edits stay unstaged.
+in_repo_plugin_init() {
+  mkdir -p plugins/yellow-review/skills/pr-review-workflow
+  cp -R "$RESOLVE_SCRIPTS/../../../lib" plugins/yellow-review/lib
+  cp -R "$RESOLVE_SCRIPTS" plugins/yellow-review/skills/pr-review-workflow/scripts
+  git add plugins && git commit -q -m "feat: plugins"
+  SCRIPT="$REPO/plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command"
+}
+
+# lib_tamper <lib>: the lib gets a line that would run when sourced.
+lib_tamper() {
+  printf 'touch "%s/lib-ran"\n' "$BATS_TEST_TMPDIR" >> "plugins/yellow-review/lib/$1"
+}
+
+@test "a clean tracked in-repository plugin lib directory is sourced and the command runs" {
+  in_repo_plugin_init
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+}
+
+@test "a modified in-repository lib file is refused before it is sourced (exit 2)" {
+  in_repo_plugin_init
+  lib_tamper resolve-text.sh
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"plugins/yellow-review/lib/resolve-text.sh is not tracked and unmodified"* ]]
+  [[ "$stderr" != *"lib-ran"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/lib-ran" ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+@test "an in-repository lib file marked assume-unchanged or skip-worktree and modified is refused in every mode (exit 2)" {
+  in_repo_plugin_init
+  lib_tamper resolve-paths.sh
+  lib_tamper verify-run.sh
+  git update-index --assume-unchanged plugins/yellow-review/lib/resolve-paths.sh
+  git update-index --skip-worktree plugins/yellow-review/lib/verify-run.sh
+  [ -z "$(git status --porcelain -- plugins)" ]
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"plugins/yellow-review/lib/resolve-paths.sh is not tracked and unmodified"* ]]
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  git update-index --no-assume-unchanged plugins/yellow-review/lib/resolve-paths.sh
+  git checkout -q -- plugins/yellow-review/lib/resolve-paths.sh
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"plugins/yellow-review/lib/verify-run.sh is not tracked and unmodified"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/lib-ran" ]
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+@test "an in-repository lib file that is no longer tracked is refused (exit 2)" {
+  in_repo_plugin_init
+  git rm -q --cached plugins/yellow-review/lib/sibling-plugin.sh
+  git commit -q -m "chore: untrack"
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"plugins/yellow-review/lib/sibling-plugin.sh is not tracked and unmodified"* ]]
+}
+
+@test "a plugin lib directory outside the repository is not judged" {
+  copy="$BATS_TEST_TMPDIR/outside/yellow-review"
+  mkdir -p "$copy/skills/pr-review-workflow"
+  cp -R "$RESOLVE_SCRIPTS/../../../lib" "$copy/lib"
+  cp -R "$RESOLVE_SCRIPTS" "$copy/skills/pr-review-workflow/scripts"
+  printf '# edited\n' >> "$copy/lib/resolve-text.sh"
+  SCRIPT="$copy/skills/pr-review-workflow/scripts/run-verify-command"
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+}
+
+# --- A replacement directory's files stay in the recovery patch ---
+
+@test "--revert-only keeps the files of a replacement directory in the retained patch" {
+  rm -f src/a.txt && mkdir -p src/a.txt/deep && printf 'child-content\n' >| src/a.txt/child.txt
+  printf 'deep-content\n' >| src/a.txt/deep/inner.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [ -f src/a.txt ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ -s "$patch" ]
+  grep -q 'child-content' "$patch"
+  grep -q 'deep-content' "$patch"
+  grep -q '^+++ b/src/a.txt/child.txt' "$patch"
+  grep -q '^deleted file mode' "$patch"
+  # The patch re-applies on the restored tree: the file goes, the directory returns.
+  git apply "$patch"
+  [ "$(cat src/a.txt/child.txt)" = child-content ]
+  [ "$(cat src/a.txt/deep/inner.txt)" = deep-content ]
+}
+
+@test "--revert-dirty keeps a replacement directory's files in the patch once, and the patch applies" {
+  rm -f src/a.txt && mkdir src/a.txt && printf 'child-content\n' >| src/a.txt/child.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  grep -q 'child-content' "$patch"
+  [ "$(grep -c '^+++ b/src/a.txt/child.txt' "$patch")" = 1 ]
+  git apply "$patch"
+  [ "$(cat src/a.txt/child.txt)" = child-content ]
+}
+
+@test "a replacement directory whose files look like a credential is removed and the patch withheld" {
+  rm -f src/a.txt && mkdir src/a.txt && printf 'password = "hunter22x"\n' >| src/a.txt/child.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .patch)" = null ]
+  [ -f src/a.txt ]
+  run ! compgen -G "$PATCH_DIR/*.patch"
+  run ! grep -rq hunter22x "$REPO/.git/yellow-review"
+}
