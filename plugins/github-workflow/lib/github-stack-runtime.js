@@ -600,13 +600,27 @@ function parseArgs(argv) {
   return args;
 }
 
+/**
+ * Parse a `--timeout-ms` value: the whole string must be a positive safe
+ * integer, so `1foo` or `1e3` is rejected instead of silently becoming 1 ms.
+ * @param {unknown} raw
+ * @returns {number|null}
+ */
+function parseTimeoutMs(raw) {
+  if (typeof raw !== 'string' || !/^[1-9][0-9]*$/.test(raw)) return null;
+  const parsed = Number(raw);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
 function main(argv) {
   const args = parseArgs(argv);
-  if (typeof args['timeout-ms'] === 'string') {
-    const parsed = Number.parseInt(args['timeout-ms'], 10);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      spawnTimeoutMs = parsed;
+  if (args['timeout-ms'] !== undefined) {
+    const parsed = parseTimeoutMs(args['timeout-ms']);
+    if (parsed === null) {
+      console.error('--timeout-ms must be a positive integer number of milliseconds');
+      return 1;
     }
+    spawnTimeoutMs = parsed;
   }
   const op = args._[0];
   if (typeof op !== 'string' || !OPERATIONS[op]) {

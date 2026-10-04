@@ -9,11 +9,16 @@
 # so nothing is detached.
 #
 # Usage:
-#   bash worktree-restack.sh preflight --provider graphite|github
-#   bash worktree-restack.sh start     --provider graphite|github [--submit]
+#   bash worktree-restack.sh preflight --provider graphite|github [--remote NAME]
+#   bash worktree-restack.sh start     --provider graphite|github [--submit] [--remote NAME]
 #   bash worktree-restack.sh continue | abort [--provider graphite|github]
 #   bash worktree-restack.sh restore | status
 #   (--provider on continue/abort only guards against a provider mismatch: exit 5)
+#   --remote NAME (github only) is the remote gh-stack rebases and submits
+#   against; it must be a configured remote. Without it the adapter's rule
+#   applies and preflight refuses an ambiguous setup (several remotes and no
+#   valid remote.pushDefault) instead of failing later in start. A paused run
+#   keeps its remote in the state file.
 #
 # Run it from inside the stack worktree that holds the branch to restack from
 # (the restack set is that branch plus everything stacked on it). It is never
@@ -252,6 +257,13 @@ valid_ref() { # refs/heads/<valid branch>
   case $1 in refs/heads/*) valid_branch "${1#refs/heads/}" ;; *) return 1 ;; esac
 }
 
+valid_remote() { # a configured remote name that is safe to put on a command line
+  local name=$1
+  [ -n "$name" ] || return 1
+  case $name in [!A-Za-z0-9]* | *[!A-Za-z0-9._-]* | *..*) return 1 ;; esac
+  git remote 2>/dev/null | grep -Fxq -- "$name"
+}
+
 valid_sha() { [[ $1 =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]]; }
 
 branch_exists() { git show-ref --verify --quiet "refs/heads/$1" 2>/dev/null; }
@@ -357,6 +369,7 @@ write_state() {
     printf 'common\t%s\n' "$S_COMMON"
     printf 'run\t%s\n' "$S_RUN"
     printf 'submit\t%s\n' "$S_SUBMIT"
+    printf 'remote\t%s\n' "$S_REMOTE"
     printf 'chain'
     for ((i = 0; i < ${#S_CHAIN[@]}; i++)); do printf '\t%s' "${S_CHAIN[i]}"; done
     printf '\n'
@@ -377,7 +390,7 @@ clear_state() { rm -f -- "$STATE_FILE" "$STATE_FILE".tmp.* 2>/dev/null; }
 
 # read_state parses the fixed-field TSV; validate_state decides whether to trust it.
 read_state() {
-  S_PROVIDER="" S_COMMON="" S_RUN="" S_SUBMIT=""
+  S_PROVIDER="" S_COMMON="" S_RUN="" S_SUBMIT="" S_REMOTE=""
   S_CHAIN=() E_PATH=() E_REF=() E_SHA=()
   STATE_ERR=""
   if [ ! -f "$STATE_FILE" ] || [ -L "$STATE_FILE" ]; then
@@ -401,6 +414,7 @@ read_state() {
       common) S_COMMON=${f[1]:-} ;;
       run) S_RUN=${f[1]:-} ;;
       submit) S_SUBMIT=${f[1]:-} ;;
+      remote) S_REMOTE=${f[1]:-} ;;
       chain) S_CHAIN=("${f[@]:1}") ;;
       entry)
         E_PATH[n]=${f[1]:-}
@@ -445,6 +459,16 @@ validate_state() {
     return 1
     ;;
   esac
+  if [ -n "$S_REMOTE" ]; then
+    [ "$S_PROVIDER" = github ] || {
+      STATE_ERR="a remote is recorded for a non-GitHub provider"
+      return 1
+    }
+    valid_remote "$S_REMOTE" || {
+      STATE_ERR="recorded remote is not a configured remote"
+      return 1
+    }
+  fi
   [ "${#S_CHAIN[@]}" -ge 2 ] || {
     STATE_ERR="chain too short"
     return 1
@@ -733,6 +757,31 @@ plan_graphite_stack() {
   done
 }
 
+# check_github_remote: the adapter's rebase and submit refuse an ambiguous
+# remote, but `gh stack view` does not resolve one, so refuse here, in
+# preflight, with the same rule: an explicit configured remote, else the only
+# remote, else a remote.pushDefault that names a configured remote.
+check_github_remote() {
+  local known count default
+  known=$(git remote 2>/dev/null) || {
+    refuse "could not list git remotes"
+    return 1
+  }
+  if [ -n "$REMOTE" ]; then
+    if ! valid_remote "$REMOTE"; then
+      refuse "$(v "$REMOTE") is not a configured remote (known: $(v "$(printf '%s' "$known" | tr '\n' ' ')"))"
+      return 1
+    fi
+    return 0
+  fi
+  count=$(printf '%s\n' "$known" | grep -c .) || count=0
+  [ "$count" -gt 1 ] || return 0
+  default=$(git config remote.pushDefault 2>/dev/null) || default=""
+  if [ -n "$default" ] && printf '%s\n' "$known" | grep -Fxq -- "$default"; then return 0; fi
+  refuse "several remotes exist ($(v "$(printf '%s' "$known" | tr '\n' ' ')")) and no valid remote.pushDefault is set; pass --remote NAME"
+  return 1
+}
+
 plan_github_stack() {
   local ver i cur=-1 trunk names n rows name iscur
   command -v jq >/dev/null 2>&1 || {
@@ -752,6 +801,7 @@ plan_github_stack() {
     refuse "github-workflow adapter not found; install the github-workflow plugin"
     return
   }
+  check_github_remote || return
   adapter_run view
   if [ "$AD_STATUS" != SUCCESS ]; then
     refuse "gh stack view failed ($(v "$AD_STATUS")): $(v "$AD_RECOVERY")"
@@ -938,7 +988,9 @@ provider_submit() {
     (cd -- "$S_RUN" && gt submit --stack --no-interactive)
   else
     resolve_adapter || return 1
-    adapter_run submit
+    local -a remote_args=()
+    [ -z "$S_REMOTE" ] || remote_args=(--remote "$S_REMOTE")
+    adapter_run submit ${remote_args[@]+"${remote_args[@]}"}
     [ "$AD_STATUS" = SUCCESS ] || {
       err "submit failed ($(v "$AD_STATUS")): $(v "$AD_RECOVERY")"
       return 1
@@ -1082,7 +1134,10 @@ step_graphite() { # step_graphite restack|continue|abort
 
 step_github() { # step_github upstack|continue|abort
   resolve_adapter || die "$X_KEPT" "github-workflow adapter not found; install the github-workflow plugin"
-  GIT_EDITOR=true adapter_run rebase --mode "$1"
+  local -a remote_args=()
+  # Only a new rebase resolves a remote; --continue and --abort act on the one in flight.
+  if [ "$1" = upstack ] && [ -n "$S_REMOTE" ]; then remote_args=(--remote "$S_REMOTE"); fi
+  GIT_EDITOR=true adapter_run rebase --mode "$1" ${remote_args[@]+"${remote_args[@]}"}
   case $AD_STATUS in
     SUCCESS) RESULT=ok ;;
     CONFLICT) RESULT=conflict ;;
@@ -1103,8 +1158,8 @@ step_github() { # step_github upstack|continue|abort
 
 # --- subcommands ------------------------------------------------------------
 
-parse_flags() { # sets PROVIDER, SUBMIT
-  PROVIDER="" SUBMIT=0
+parse_flags() { # sets PROVIDER, SUBMIT, REMOTE
+  PROVIDER="" SUBMIT=0 REMOTE=""
   while [ $# -gt 0 ]; do
     case $1 in
       --provider)
@@ -1113,11 +1168,26 @@ parse_flags() { # sets PROVIDER, SUBMIT
         shift
         ;;
       --submit) SUBMIT=1 ;;
+      --remote)
+        [ $# -ge 2 ] || die "$X_USAGE" "--remote needs a value"
+        REMOTE=$2
+        shift
+        ;;
       *) die "$X_USAGE" "unknown argument: $(v "$1")" ;;
     esac
     shift
   done
   case $PROVIDER in '' | graphite | github) ;; *) die "$X_USAGE" "--provider must be graphite or github" ;; esac
+  [ -z "$REMOTE" ] || [ "$PROVIDER" = github ] || die "$X_USAGE" "--remote applies to --provider github only"
+  # A malformed name is a usage error here; whether it is a configured remote
+  # is judged against the repository (preflight refuses, start re-checks).
+  case $REMOTE in '' | [A-Za-z0-9]*) ;; *) die "$X_USAGE" "--remote must be a remote name" ;; esac
+  case $REMOTE in *[!A-Za-z0-9._-]* | *..*) die "$X_USAGE" "--remote must be a remote name" ;; esac
+}
+
+# reject_remote: --remote belongs to preflight and start; a paused run keeps its own.
+reject_remote() {
+  [ -z "$REMOTE" ] || die "$X_USAGE" "--remote applies to preflight and start only; a paused restack keeps the remote it started with"
 }
 
 need_provider() { [ -n "$PROVIDER" ] || die "$X_USAGE" "--provider graphite|github is required"; }
@@ -1131,6 +1201,7 @@ require_env() {
 print_plan() {
   local i
   printf 'PROVIDER\t%s\n' "$PROVIDER"
+  [ -z "$REMOTE" ] || printf 'REMOTE\t%s\n' "$(v "$REMOTE")"
   printf 'RUN\t%s\t%s\n' "$(v "$RUN_WT")" "$(v "${RUN_REF#refs/heads/}")"
   printf 'CHAIN'
   for ((i = 0; i < ${#S_CHAIN[@]}; i++)); do printf '\t%s' "$(v "${S_CHAIN[i]}")"; done
@@ -1188,7 +1259,7 @@ cmd_start() {
     lock_busy_hint
     die "$X_BUSY" "could not take the restack lock; a restack is in progress"
   }
-  S_PROVIDER=$PROVIDER S_COMMON=$COMMON S_RUN=$RUN_WT S_SUBMIT=$SUBMIT
+  S_PROVIDER=$PROVIDER S_COMMON=$COMMON S_RUN=$RUN_WT S_SUBMIT=$SUBMIT S_REMOTE=$REMOTE
   E_PATH=() E_REF=() E_SHA=()
   if [ "$PROVIDER" = graphite ]; then
     local sha
@@ -1285,6 +1356,7 @@ hold_or_release_lock() {
 
 cmd_continue() {
   parse_flags "$@"
+  reject_remote
   require_env
   load_state_or_exit
   need_lock
@@ -1314,6 +1386,7 @@ cmd_continue() {
 
 cmd_abort() {
   parse_flags "$@"
+  reject_remote
   require_env
   load_state_or_exit
   need_lock
@@ -1343,6 +1416,7 @@ cmd_abort() {
 
 cmd_restore() {
   parse_flags "$@"
+  reject_remote
   require_env
   load_state_or_exit
   need_lock
@@ -1359,6 +1433,7 @@ cmd_restore() {
 
 cmd_status() {
   parse_flags "$@"
+  reject_remote
   require_env
   load_state_or_exit
   local i wi cur
@@ -1451,7 +1526,7 @@ main() {
       fi
       cmd_status "$@"
       ;;
-    *) die "$X_USAGE" "usage: worktree-restack.sh preflight|start|continue|abort|restore|status [--provider graphite|github] [--submit]" ;;
+    *) die "$X_USAGE" "usage: worktree-restack.sh preflight|start|continue|abort|restore|status [--provider graphite|github] [--submit] [--remote NAME]" ;;
   esac
 }
 

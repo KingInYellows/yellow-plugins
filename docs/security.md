@@ -412,14 +412,19 @@ boundary:
   recorded for another repository, a chain shorter than two branches, an invalid
   branch name or ref, a branch outside the recorded stack, a run worktree that
   is not a worktree of this clone, non-absolute or `..` or control-character
-  paths, duplicate entries, and non-commit-id SHAs. A rejected file runs nothing
-  (exit 4).
+  paths, duplicate entries, non-commit-id SHAs, and a recorded remote that is
+  not a configured remote (or any remote for Graphite). A rejected file runs
+  nothing (exit 4).
 - **Provider output is untrusted.** Stack branch names parsed from
   `gt log short` or the github-workflow adapter's JSON must pass the same
   branch-name check before they reach a command line. A failed provider call
-  fails closed: the run stops and the state is kept for `status`, `--continue`,
-  `--abort` or `restore`, and a stack that forks or a dirty, locked, prunable or
-  mid-operation stack worktree is refused before any change. Its own git calls
+  fails closed: the run stops. When the provider's rebase is left in flight (a
+  pause marker, an adapter timeout or an abort that did not happen) the state is
+  kept (exit 10 or 31) for `status`, `--continue`, `--abort` or `restore`; on a
+  plain provider failure the worktrees are restored and the state is cleared
+  (exit 30), so nothing is left to recover. A stack that forks or a dirty,
+  locked, prunable or mid-operation stack worktree is refused before any
+  change. Its own git calls
   never force a checkout, stash, hard-reset or pass `--ignore-other-worktrees`.
 - **Documented residuals.** The dirty check ignores gitignored files, and a
   restore checkout overwrites an ignored file when the restacked branch now
@@ -427,8 +432,10 @@ boundary:
   state file is constrained, not prevented: validation limits it to this clone's
   worktrees and the recorded stack branches. See
   `docs/solutions/security-issues/shell-owned-state-is-not-a-boundary-against-write.md`.
-  The script puts no timeout on provider calls, and `--submit` runs after the
-  lock is released.
+  The Graphite provider calls (`gt`) have no timeout; on the GitHub path the
+  script passes a 10-minute `--timeout-ms` to the gh-stack adapter, which
+  applies it to the `gh stack` subprocess. `--submit` runs after the lock is
+  released.
 
 ### Cloud/Remote Execution (yellow-review Cursor distribution)
 

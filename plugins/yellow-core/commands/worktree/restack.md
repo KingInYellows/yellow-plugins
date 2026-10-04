@@ -1,7 +1,7 @@
 ---
 name: worktree:restack
 description: 'Restack a stack whose branches live in separate worktrees (use when a restack fails with "already used by worktree"), then restore every worktree; pauses on conflicts and resumes with --continue or --abort'
-argument-hint: '[--continue | --abort | --status] [--submit] [--yes]'
+argument-hint: '[--continue | --abort | --status] [--submit] [--remote <name>] [--yes]'
 allowed-tools:
   - Bash
   - Skill
@@ -33,6 +33,7 @@ except through the provider's submit when `--submit` is given.
 - `--abort` — roll back a paused restack and restore the worktrees
 - `--status` — show the recorded restack and any stranded or pause-locked worktree
 - `--submit` — submit the stack through the provider after a clean restack
+- `--remote <name>` — GitHub only: the configured remote gh-stack rebases and submits against. Needed when the clone has several remotes and no valid `remote.pushDefault`; preflight refuses that setup and says so
 - `--yes` — skip the confirmation prompts
 
 #$ARGUMENTS
@@ -48,31 +49,51 @@ bash /dev/fd/3 3<<'__YELLOW_CORE_BASH__'
 MODE=start
 SUBMIT=0
 YES=0
+REMOTE=""
 set_mode() {
   [ "$MODE" = start ] || { echo "ERROR: --continue, --abort and --status are mutually exclusive"; exit 2; }
   MODE=$1
 }
-for arg in $ARGUMENTS; do
-  case "$arg" in
+set -f
+set -- $ARGUMENTS
+while [ $# -gt 0 ]; do
+  case "$1" in
     --continue) set_mode continue ;;
     --abort) set_mode abort ;;
     --status) set_mode status ;;
     --submit) SUBMIT=1 ;;
     --yes) YES=1 ;;
-    --*) echo "ERROR: Unknown option: $arg"; exit 2 ;;
-    *) echo "ERROR: Unexpected argument: $arg"; exit 2 ;;
+    --remote)
+      [ $# -ge 2 ] || { echo "ERROR: --remote needs a remote name"; exit 2; }
+      REMOTE=$2
+      shift
+      ;;
+    --*) echo "ERROR: Unknown option: $1"; exit 2 ;;
+    *) echo "ERROR: Unexpected argument: $1"; exit 2 ;;
   esac
+  shift
 done
+case "$REMOTE" in
+  '' | [A-Za-z0-9]*) ;;
+  *) echo "ERROR: --remote must be a remote name"; exit 2 ;;
+esac
+case "$REMOTE" in
+  *[!A-Za-z0-9._-]* | *..*) echo "ERROR: --remote must be a remote name"; exit 2 ;;
+esac
 if [ "$SUBMIT" = 1 ] && [ "$MODE" != start ]; then
   echo "ERROR: --submit applies to a new restack only; a paused restack keeps the flag it started with"
   exit 2
 fi
-printf 'mode=%s submit=%s yes=%s\n' "$MODE" "$SUBMIT" "$YES"
+if [ -n "$REMOTE" ] && [ "$MODE" != start ]; then
+  echo "ERROR: --remote applies to a new restack only; a paused restack keeps the remote it started with"
+  exit 2
+fi
+printf 'mode=%s submit=%s remote=%s yes=%s\n' "$MODE" "$SUBMIT" "$REMOTE" "$YES"
 __YELLOW_CORE_BASH__
 ```
 
-Hold the printed `mode`, `submit` and `yes` values for the rest of the run;
-shell variables do not survive between Bash calls.
+Hold the printed `mode`, `submit`, `remote` and `yes` values for the rest of the
+run; shell variables do not survive between Bash calls. `remote` may be empty.
 
 ## Phase 2: Resolve the provider
 
@@ -110,13 +131,17 @@ every call below; never run a call with a provider the router did not report.
    bash "${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-restack.sh" preflight --provider <provider>
    ```
 
-   Output is tagged lines: `PROVIDER`, `RUN`, `CHAIN` (base, then branches
-   bottom to top), `WORKTREE` (path, branch, `detach` or `keep`), `REFUSE`, and
-   a final `PREFLIGHT`.
+   Add `--remote <remote>` when `remote` is not empty (GitHub only; the script
+   exits `2` for Graphite).
+
+   Output is tagged lines: `PROVIDER`, `REMOTE` (only with `--remote`), `RUN`,
+   `CHAIN` (base, then branches bottom to top), `WORKTREE` (path, branch,
+   `detach` or `keep`), `REFUSE`, and a final `PREFLIGHT`.
 
    - Exit `20`: show every `REFUSE` reason with the fix it implies (commit or
      stash, finish the operation, unlock, upgrade gh-stack, check out a stack
-     branch) and stop. Nothing was touched.
+     branch, pass `--remote <name>` or set `remote.pushDefault`) and stop.
+     Nothing was touched.
    - Exit `3`: a restack is already in progress. Point to `--status`, then
      `--continue` or `--abort`, and stop.
    - Exit `0`: continue.
@@ -132,7 +157,8 @@ every call below; never run a call with a provider the router did not report.
    restack" and "Cancel". With no `detach` line: "Restack from this
    worktree?" with options "Restack" and "Cancel". Stop on Cancel.
 
-4. Run it. Add `--submit` when `submit=1`:
+4. Run it. Add `--submit` when `submit=1` and `--remote <remote>` when `remote`
+   is not empty:
 
    ```bash
    bash "${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-restack.sh" start --provider <provider>

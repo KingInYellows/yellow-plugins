@@ -167,7 +167,8 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/worktree:restack` — restack a stack whose branches are each checked out in their own worktree.
   Routed through `stack-provider-router`, it detaches the stack worktrees (Graphite) or relies on
   gh-stack >= 0.2.0 (GitHub), runs one restack, and restores every worktree. A conflict pauses it;
-  `--continue` / `--abort` resume. `--submit` submits through the provider afterwards. The work lives in
+  `--continue` / `--abort` resume. `--submit` submits through the provider afterwards; `--remote <name>`
+  (GitHub) picks the remote when the clone has several. The work lives in
   `skills/git-worktree/scripts/worktree-restack.sh`; the command holds no `gt` / `gh stack` literals
 
 ### Skills (22)

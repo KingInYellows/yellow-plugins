@@ -52,7 +52,7 @@ case "${1:-}" in
   abort)
     case " $* " in *" --force "*) ;; *) echo "Cannot perform interactive operation" >&2; exit 1 ;; esac
     if [ "${STUB_FAIL:-}" = abort ]; then echo "ERROR: abort failed (stub)" >&2; exit 1; fi
-    eng_abort cwd
+    eng_abort cwd || { echo "ERROR: abort failed, the rebase is still in progress (stub)" >&2; exit 1; }
     echo "Successfully aborted gt restack."
     exit 0
     ;;

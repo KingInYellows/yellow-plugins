@@ -926,3 +926,104 @@ JSEOF
   run grep -nE '(checkout|switch)[^|;&]*[[:space:]](-f|--force|-m|--merge)([[:space:]]|$)|reset --hard|--ignore-other-worktrees|stash' <<<"$code"
   [ "$status" -eq 1 ]
 }
+
+# --- github: --remote ----------------------------------------------------------
+
+# add_remotes: two configured remotes, none of them reachable (nothing is fetched).
+add_remotes() {
+  git -C "$REPO" remote add origin "$T/o.git"
+  git -C "$REPO" remote add fork "$T/f.git"
+}
+
+@test "github: preflight refuses several remotes without --remote or a valid remote.pushDefault" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  add_remotes
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github
+  [ "$status" -eq 20 ]
+  [[ $output == *"several remotes exist"* ]]
+  [[ $output == *"pass --remote NAME"* ]]
+  git config remote.pushDefault nope
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github
+  [ "$status" -eq 20 ]
+  # start refuses the same way, before anything is touched.
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 20 ]
+  [ ! -e "$SD/state" ]
+  [ ! -f "$STUB_DIR/gh.log" ] || ! grep -q 'stack rebase' "$STUB_DIR/gh.log"
+}
+
+@test "github: a valid remote.pushDefault, or a single remote, needs no --remote" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  add_remotes
+  git config remote.pushDefault fork
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github
+  [ "$status" -eq 0 ]
+  git config --unset remote.pushDefault
+  git remote remove fork
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github
+  [ "$status" -eq 0 ]
+}
+
+@test "github: --remote is forwarded to the rebase and to the submit, and shown in the plan" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  add_remotes
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github --remote fork
+  [ "$status" -eq 0 ]
+  [[ $output == *$'REMOTE\tfork'* ]]
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github --submit --remote fork
+  [ "$status" -eq 0 ]
+  grep -q 'stack rebase --upstack --remote fork' "$STUB_DIR/gh.log"
+  grep -q 'stack submit --auto --remote fork' "$STUB_DIR/gh.log"
+}
+
+@test "--remote must name a configured remote and belongs to github preflight and start only" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  add_remotes
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github --remote nope
+  [ "$status" -eq 20 ]
+  [[ $output == *"not a configured remote"* ]]
+  for bad in 'bad name' '-x' 'a..b' 'a/b'; do
+    STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github --remote "$bad"
+    [ "$status" -eq 2 ] || { echo "accepted: $bad"; false; }
+  done
+  run bash "$SCRIPT" preflight --provider graphite --remote fork
+  [ "$status" -eq 2 ]
+  [[ $output == *"--remote applies to --provider github only"* ]]
+  for sub in continue abort restore; do
+    run bash "$SCRIPT" "$sub" --remote fork
+    [ "$status" -eq 2 ] || { echo "accepted by $sub"; false; }
+  done
+}
+
+@test "github: a paused run keeps its remote in the state file and submits to it after --continue" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack b
+  add_remotes
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github --submit --remote fork
+  [ "$status" -eq 10 ]
+  [ "$(awk -F'\t' '$1=="remote"{print $2}' "$SD/state")" = fork ]
+  resolve_in "$(wtp b)" b.txt
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" continue --provider github
+  [ "$status" -eq 0 ]
+  grep -q 'stack submit --auto --remote fork' "$STUB_DIR/gh.log"
+}
+
+@test "a state file that names a remote that is not configured, or a remote for graphite, is rejected (exit 4)" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack b
+  add_remotes
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github --remote fork
+  [ "$status" -eq 10 ]
+  sed -i.bak 's/^remote\tfork$/remote\tgone/' "$SD/state" && rm -f "$SD/state.bak"
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" status
+  [ "$status" -eq 4 ]
+  [[ $output == *"recorded remote is not a configured remote"* ]]
+  sed -i.bak 's/^provider\tgithub$/provider\tgraphite/; s/^remote\tgone$/remote\tfork/' "$SD/state" && rm -f "$SD/state.bak"
+  run bash "$SCRIPT" status
+  [ "$status" -eq 4 ]
+  [[ $output == *"a remote is recorded for a non-GitHub provider"* ]]
+}

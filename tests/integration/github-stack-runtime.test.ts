@@ -40,6 +40,7 @@ const ENV_KEYS = [
   'FAKE_GH_EXIT',
   'FAKE_GH_STDOUT',
   'FAKE_GH_STDERR',
+  'FAKE_GH_SLEEP',
   'FAKE_GIT_REMOTES',
   'FAKE_GIT_PUSH_DEFAULT',
 ];
@@ -396,6 +397,39 @@ describe('CLI end to end', () => {
     );
     expect(cliResult.status).toBe('SUCCESS');
     expect(cliResult.command).toEqual({ bin: 'gh', args: ['stack', 'view', '--json'] });
+  });
+
+  it('applies --timeout-ms to the gh subprocess: a slow gh is killed and reported as SPAWN_FAILURE', () => {
+    process.env.FAKE_GH_SLEEP = '5';
+    const started = Date.now();
+    const cliResult = JSON.parse(
+      execFileSync(process.execPath, [LIB, '--timeout-ms', '200', 'view'], {
+        encoding: 'utf8',
+        env: process.env,
+      })
+    );
+    expect(cliResult.status).toBe('SPAWN_FAILURE');
+    expect(Date.now() - started).toBeLessThan(4500);
+  });
+
+  it('rejects a malformed --timeout-ms before running anything', () => {
+    process.env.FAKE_GH_EXIT = '0';
+    for (const bad of ['1foo', '0', '-5', '1e3', '2.5', '9007199254740993', 'view']) {
+      let error: { status?: number; stdout?: string; stderr?: string } | undefined;
+      try {
+        execFileSync(process.execPath, [LIB, '--timeout-ms', bad, 'view'], {
+          encoding: 'utf8',
+          env: process.env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      } catch (caught) {
+        error = caught as typeof error;
+      }
+      expect(error, `--timeout-ms ${bad} must fail`).toBeDefined();
+      expect(error?.status).toBe(1);
+      expect(error?.stdout).toBe('');
+      expect(error?.stderr).toContain('--timeout-ms must be a positive integer');
+    }
   });
 });
 

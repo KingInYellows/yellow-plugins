@@ -18,5 +18,9 @@ is detached there. The engine is
 common dir, re-validated on every read, restore never forces a checkout),
 covered by `skills/git-worktree/tests/worktree-restack.bats`. GitHub restacks
 pass `--timeout-ms 600000` through `github-stack-runtime.js` (the adapter
-default remains 120 s for other callers) and keep recovery state when the
-adapter reports `SPAWN_FAILURE`.
+default remains 120 s for other callers; a value that is not a positive
+integer is refused) and keep recovery state when the adapter reports
+`SPAWN_FAILURE`. `--remote <name>` (GitHub) names the remote gh-stack rebases
+and submits against; with several remotes and no valid `remote.pushDefault`,
+preflight refuses instead of letting `start` fail after the plan was confirmed.
+The remote is kept in the state file across a pause.
