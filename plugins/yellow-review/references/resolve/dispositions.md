@@ -95,9 +95,11 @@ Accept exactly one of:
 
 - `path:line`, split on the last `:`, where the line matches `^[1-9][0-9]{0,6}$`
   and is within the file's length at HEAD, and the path matches
-  `^[A-Za-z0-9._/-]+$` with no `.`, `..` or empty segment, exists at HEAD, and
-  equals the thread's `path` (for outdated or review-level threads: is one of
-  the PR's changed files);
+  `^[A-Za-z0-9._/-]+$` with no `.`, `..` or empty segment and no segment
+  starting with `-` (an option-shaped name such as `-config.yml` is refused, as
+  `lib/resolve-paths.sh` `rp_canonical` does), exists at HEAD, and equals the
+  thread's `path` (for outdated or review-level threads: is one of the PR's
+  changed files);
 - a commit SHA matching `^[0-9a-f]{7,40}$` that is inside the PR's range —
   `git merge-base --is-ancestor <sha> HEAD` passes and
   `git merge-base --is-ancestor <sha> "$(git merge-base HEAD origin/<base>)"`

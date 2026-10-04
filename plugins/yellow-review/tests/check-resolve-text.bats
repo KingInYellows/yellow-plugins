@@ -1200,3 +1200,41 @@ rule=forged line=9.txt"
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
 }
+
+@test "protocol-relative attribute forms: unquoted and spaced around = are foreign URLs" {
+  check() {  # <line text>
+    printf '%s\n' "$1" >| "$A"
+    run --separate-stderr "$SCRIPT" "$A"
+    [ "$status" -eq 6 ] || { echo "not refused: $1"; false; }
+    [[ "$stderr" == *"rule=foreign-url "* ]] || { echo "wrong rule for: $1 ($stderr)"; false; }
+  }
+  check '<a href=//evil.example/x>x</a>'
+  check '<a href = "//evil.example/x">x</a>'
+  check "<a href = '//evil.example/x'>x</a>"
+  check '<a href = //evil.example/x>x</a>'
+  check '<img src=//evil.example/x.png>'
+  check '<a href =  "//evil.example/x">x</a>'
+  # The allowed host in the same forms stays clean.
+  printf '%s\n' '<a href=//github.com/o/r>x</a>' '<a href = "//github.com/o/r">x</a>' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "protocol-relative rewrite leaves comments, a//b and a full URL before a comment clean" {
+  printf '%s\n' 'see // a code comment' 'a//b' 'x = "http://github.com/a" // note' \
+    'x = // note' 'x=// note' 'path = a//b' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "a multi-word credential on the line after a bare keyword is refused; prose stays clean" {
+  refuses unquoted-keyword-value 'password:\n  my correct horse battery staple\n'
+  refuses unquoted-keyword-value 'password:\n  correct horse battery\n'
+  refuses unquoted-keyword-value '- token:\n    my correct horse battery staple # note\n'
+  refuses unquoted-keyword-value 'password:\r\n  my correct horse battery staple\r\n'
+  stays_clean 'password:\n  Rotation is scheduled for Friday\n'
+  stays_clean 'password:\n  correct horse\n'
+  stays_clean 'password:\n  optional string or number\n'
+  stays_clean 'bypass:\n  my correct horse battery staple\n'
+  stays_clean 'password:\n\nNext paragraph of prose.\n'
+}
