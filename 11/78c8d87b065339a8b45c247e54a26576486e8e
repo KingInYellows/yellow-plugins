@@ -1,0 +1,33 @@
+.changeset/worktree-aware-restack.md
+  s_d906b15dcf2596::t_650454d30c398b 1-18
+README.md
+  s_d906b15dcf2596::t_8a4e2b44cd3bc2 31,271
+plans/worktree-aware-restack.md
+  s_d906b15dcf2596::t_57349ec053513d 564,572,574,577
+plugins/yellow-core/CLAUDE.md
+  s_d906b15dcf2596::t_97f3ece749273d 80,167-171,200-202,291-292,503-504
+plugins/yellow-core/README.md
+  s_d906b15dcf2596::t_7f3f448ee11aa0 40
+plugins/yellow-core/lib/stack-operation-registry.js
+  s_d906b15dcf2596::t_0ef567b81cd8a8 47-49
+plugins/yellow-core/skills/git-worktree/SKILL.md
+  s_d906b15dcf2596::t_781093966792a7 178-218
+plugins/yellow-core/skills/git-worktree/troubleshooting.md
+  s_d906b15dcf2596::t_ae8f554225f974 91-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1178c8d87b065339a8b45c247e54a26576486e8e",
+  "prompts": {},
+  "sessions": {
+    "s_d906b15dcf2596": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0170b453-4513-4753-b904-fd0ab9d9878d",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
