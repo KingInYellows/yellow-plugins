@@ -9,7 +9,8 @@ SCRIPT="${SCRIPT_DIR}/get-pr-blockers"
 setup() {
   export PATH="${BATS_TEST_DIRNAME}/mocks:${PATH}"
   export BATS_FIXTURE_DIR="${BATS_TEST_DIRNAME}/fixtures"
-  unset MOCK_GH_PROTECTION MOCK_GH_RULES MOCK_GH_BLOCKERS_FAIL MOCK_GH_BLOCKERS_FIXTURE
+  unset MOCK_GH_PROTECTION MOCK_GH_RULES MOCK_GH_BLOCKERS_FAIL MOCK_GH_BLOCKERS_FIXTURE \
+    MOCK_GH_PROTECTION_MAIN MOCK_GH_RULES_MAIN
 }
 
 @test "rejects missing arguments with exit 2" {
@@ -215,16 +216,6 @@ SH
   [[ "$stderr" == *"timed out"* ]]
 }
 
-@test "a missing resolve-gh library exits 0 with unknown fields" {
-  tmp="${BATS_TEST_TMPDIR}/copy"
-  mkdir -p "$tmp/skills/pr-review-workflow/scripts" "$tmp/lib"
-  cp "$SCRIPT" "$tmp/skills/pr-review-workflow/scripts/get-pr-blockers"
-  run --separate-stderr "$tmp/skills/pr-review-workflow/scripts/get-pr-blockers" "test/repo" "610"
-  [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -r '.lookupFailed')" = "true" ]
-  [[ "$stderr" == *"resolve-gh.sh not readable"* ]]
-}
-
 # A PATH of symlinks to the tools the script needs, minus timeout and gtimeout.
 path_without_timeout() {
   _bin="${BATS_TEST_TMPDIR}/notimeout"
@@ -250,4 +241,101 @@ path_without_timeout() {
   PATH="${BATS_TEST_TMPDIR}/notimeout" run --separate-stderr "$SCRIPT" "test/repo" "610"
   [ "$status" -eq 0 ]
   [[ "$stderr" == *"neither timeout nor gtimeout is installed"* ]]
+}
+
+# --- lookupReason ---
+
+@test "a good lookup reports lookupReason null" {
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.lookupFailed, .lookupReason]')" = '[false,null]' ]
+}
+
+@test "lookupReason names why a failed lookup failed" {
+  check() {  # <expected reason> <env assignment...>
+    _want=$1; shift
+    run --separate-stderr env "$@" "$SCRIPT" "test/repo" "610"
+    [ "$status" -eq 0 ]
+    [ "$(printf '%s' "$output" | jq -r '.lookupReason')" = "$_want" ] || { echo "$*: $output"; false; }
+    [ "$(printf '%s' "$output" | jq -r '.lookupFailed')" = true ]
+  }
+  check other MOCK_GH_BLOCKERS_FAIL=1
+  check rate_limited MOCK_GH_BLOCKERS_FAIL=ratelimit
+  check auth MOCK_GH_BLOCKERS_FAIL=auth
+  check not_found MOCK_GH_BLOCKERS_FAIL=notfound
+  check too_many_reviewers MOCK_GH_BLOCKERS_FIXTURE=blockers-next-page.json
+  check unreadable MOCK_GH_BLOCKERS_FIXTURE=blockers-malformed.json
+}
+
+@test "a rate limit is told from a bare HTTP 403 by the classifier order" {
+  run --separate-stderr env MOCK_GH_BLOCKERS_FAIL=ratelimit "$SCRIPT" "test/repo" "610"
+  [ "$(printf '%s' "$output" | jq -r '.lookupReason')" = rate_limited ]
+}
+
+@test "a null pullRequest with a not-found error is not_found" {
+  export MOCK_GH_BLOCKERS_FIXTURE=blockers-null-pr.json
+  run --separate-stderr "$SCRIPT" "test/repo" "999"
+  [ "$(printf '%s' "$output" | jq -r '.lookupReason')" = not_found ]
+}
+
+@test "a timed-out review lookup is lookupReason timeout" {
+  fake_timeout
+  export MOCK_TIMEOUT_ON=graphql
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$(printf '%s' "$output" | jq -r '.lookupReason')" = timeout ]
+}
+
+@test "missing gh or jq is lookupReason tool_missing" {
+  run --separate-stderr env PATH=/nonexistent "$SCRIPT" "test/repo" "610"
+  [ "$(printf '%s' "$output" | jq -r '.lookupReason')" = tool_missing ]
+}
+
+# --- the query ---
+
+@test "the review query leaves out fields the script never reads" {
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  run grep -qE 'submittedAt|commit \{|__typename' "${BATS_TEST_TMPDIR}/mock_gh_any_call"
+  [ "$status" -eq 1 ]
+  grep -q 'defaultBranchRef' "${BATS_TEST_TMPDIR}/mock_gh_any_call"
+}
+
+# --- stacked PRs: the default branch counts ---
+
+@test "a stacked PR on an unprotected parent branch is enforced when the default branch enforces it" {
+  export MOCK_GH_BLOCKERS_FIXTURE=blockers-stacked.json
+  export MOCK_GH_PROTECTION=notprotected MOCK_GH_RULES=none MOCK_GH_PROTECTION_MAIN=enabled
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.conversationResolution')" = enforced ]
+  grep -q 'branches/feature-a/protection' "${BATS_TEST_TMPDIR}/mock_gh_any_call"
+  grep -q 'branches/main/protection' "${BATS_TEST_TMPDIR}/mock_gh_any_call"
+}
+
+@test "a stacked PR is enforced when a ruleset on the default branch requires resolution" {
+  export MOCK_GH_BLOCKERS_FIXTURE=blockers-stacked.json
+  export MOCK_GH_PROTECTION=notprotected MOCK_GH_RULES=none MOCK_GH_RULES_MAIN=enforced
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$(printf '%s' "$output" | jq -r '.conversationResolution')" = enforced ]
+}
+
+@test "a stacked PR is not_enforced only when the base and the default branch both answer no" {
+  export MOCK_GH_BLOCKERS_FIXTURE=blockers-stacked.json
+  export MOCK_GH_PROTECTION=notprotected MOCK_GH_RULES=none MOCK_GH_PROTECTION_MAIN=disabled
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$(printf '%s' "$output" | jq -r '.conversationResolution')" = not_enforced ]
+}
+
+@test "a stacked PR is unknown when the default branch cannot be read" {
+  export MOCK_GH_BLOCKERS_FIXTURE=blockers-stacked.json
+  export MOCK_GH_PROTECTION=notprotected MOCK_GH_RULES=none MOCK_GH_PROTECTION_MAIN=403
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$(printf '%s' "$output" | jq -r '.conversationResolution')" = unknown ]
+}
+
+@test "a PR whose base is the default branch reads that branch once" {
+  export MOCK_GH_BLOCKERS_FIXTURE=blockers-default-base.json MOCK_GH_PROTECTION=disabled MOCK_GH_RULES=none
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$(printf '%s' "$output" | jq -r '.conversationResolution')" = not_enforced ]
+  [ "$(grep -c 'branches/main/protection' "${BATS_TEST_TMPDIR}/mock_gh_any_call")" -eq 1 ]
 }

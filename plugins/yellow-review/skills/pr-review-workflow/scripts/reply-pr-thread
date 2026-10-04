@@ -6,8 +6,10 @@
 # Output: JSON to stdout:
 #   {"replied":true,"commentId":"PRRC_...","threadId":"PRRT_..."}
 #   {"replied":false,"skipped":"already-replied","disposition":"...","threadId":"PRRT_..."}
-#     (skipped when the thread's last comment is ours and carries a marker
-#     for this thread; "disposition" is the one found. The one exception: a
+#     (skipped when the newest comment of ours in the last PRECHECK_WINDOW
+#     comments carries a marker for this thread and no later comment is from a
+#     human; "disposition" is the one found. Bot replies after our marker do
+#     not count, and neither do our own comments. The one exception: a
 #     prior disagree or unclear marker never blocks a fixed, addressed or oos
 #     reply, because that reply carries the evidence the later resolve needs.
 #     A caller resolves after a skip only when "disposition" equals the one
@@ -17,17 +19,12 @@
 #   the same moment can both pass the pre-check and both post, possibly with
 #   different dispositions; this script does not detect that after the write
 #   (it has no lock, no post-write rescan and never deletes a comment). Run
-#   one resolve or sweep per PR at a time. A later re-run reads only the last
-#   comment and reports its disposition in the skip, so the caller's
-#   disposition check still guards the resolve.
+#   one resolve or sweep per PR at a time. A later re-run reports the found
+#   disposition in the skip, so the caller's disposition check still guards
+#   the resolve.
 # Exit codes: 1 other failure (including a non-JSON response),
 #             2 usage: wrong argument count, invalid thread ID or
-#               disposition, unreadable, empty or over-long body file, or a
-#               body that looks like a credential (or could not be scanned).
-#               A refusal prints a `resolve-text:` line, never the text:
-#               `refused rule=<rule> line=<n>` for a credential hit,
-#               `scan failed` when the scan did not run. Look for that line
-#               anywhere on stderr; it is not always first,
+#               disposition, unreadable, empty or over-long body file,
 #             3 not found or permission,
 #             4 rate limited or timed out: a second rate limit after the one
 #               retry the whole script gets, a wait over 90 s (the wait is
@@ -35,32 +32,32 @@
 #               x-ratelimit-remaining is 0, else
 #               YELLOW_REVIEW_RATE_LIMIT_WAIT), or a gh call that exceeded
 #               YELLOW_REVIEW_GH_TIMEOUT (not retried: the reply may have
-#               posted; a re-run skips via the pre-check).
+#               posted; a re-run skips via the pre-check),
+#             6 body refused: it looks like a credential, has an image, an
+#               @mention or a foreign URL, or could not be scanned. A refusal
+#               prints a `resolve-text:` line, never the text: `refused
+#               rule=<rule> line=<n>` for a hit, `scan failed` when the scan
+#               did not run; the line is kept as detail, the code is the
+#               signal,
+#             7 not authenticated (HTTP 401, bad credentials): no retry helps
+#               until a human signs in again.
 # Contract: references/resolve/dispositions.md
 # Env: YELLOW_REVIEW_PACE_SECONDS (default 1) — sleep after the mutation.
 #      YELLOW_REVIEW_RATE_LIMIT_WAIT (default 60) — wait when no header says.
 #      YELLOW_REVIEW_GH_TIMEOUT (default 30) — seconds per gh call; needs
 #        timeout(1) or gtimeout(1), skipped with a stderr note when neither
-#        is installed.
+#        is installed (lib/resolve-gh.sh).
 
 set -eu
 
 MAX_BODY_CHARS=1000
+# Comments read by the pre-check; the newest one of ours inside it decides.
+PRECHECK_WINDOW=20
 # Longer waits exit 4 instead. This caps the wait only: the worst case is
 # the pre-check, the wait, the retried pre-check and the reply, each gh call
-# up to GH_TIMEOUT (30 + 90 + 30 + 30 = 180 s by default), so a caller that
+# up to RG_GH_TIMEOUT (30 + 90 + 30 + 30 = 180 s by default), so a caller that
 # must survive it passes a Bash tool timeout above that, not the 120 s default.
 MAX_WAIT_SECONDS=90
-GH_TIMEOUT="${YELLOW_REVIEW_GH_TIMEOUT:-30}"
-case "$GH_TIMEOUT" in ''|*[!0-9]*) GH_TIMEOUT=30 ;; esac
-# timeout(1) treats 0 as "no limit"; fall back to the default instead.
-[ "$GH_TIMEOUT" -gt 0 ] 2>/dev/null || GH_TIMEOUT=30
-# GNU coreutils on macOS installs it as gtimeout.
-TIMEOUT_BIN=""
-for _t in timeout gtimeout; do
-    if command -v "$_t" >/dev/null 2>&1; then TIMEOUT_BIN=$_t; break; fi
-done
-[ -n "$TIMEOUT_BIN" ] || printf 'Note: neither timeout nor gtimeout is installed; gh calls run without a time limit.\n' >&2
 
 usage() {
     printf 'Usage: reply-pr-thread <PRRT_id> <fixed|addressed|oos|disagree|unclear> <body-file>\n' >&2
@@ -69,6 +66,9 @@ usage() {
 
 command -v gh >/dev/null 2>&1 || { printf 'Error: gh CLI not found.\n' >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found.\n' >&2; exit 1; }
+
+# shellcheck source=../../../lib/resolve-gh.sh
+. "$(dirname -- "$0")/../../../lib/resolve-gh.sh"
 
 [ $# -eq 3 ] || usage
 THREAD_ID="$1"
@@ -89,7 +89,10 @@ esac
 [ -f "$BODY_FILE" ] && [ -r "$BODY_FILE" ] || { printf 'Error: Body file not readable: %s\n' "$BODY_FILE" >&2; exit 2; }
 
 # Character count (not bytes), trailing whitespace ignored.
-BODY_CHARS=$(jq -Rs 'sub("\\s+$"; "") | length' <"$BODY_FILE")
+BODY_CHARS=$(jq -Rs 'sub("\\s+$"; "") | length' <"$BODY_FILE") || {
+    printf 'Error: could not measure the body file %s.\n' "$BODY_FILE" >&2
+    exit 1
+}
 if [ "$BODY_CHARS" -eq 0 ]; then
     printf 'Error: Body file is empty.\n' >&2
     exit 2
@@ -102,8 +105,8 @@ fi
 . "$(dirname -- "$0")/../../../lib/resolve-text.sh"
 if ! rt_text_clean "$BODY_FILE"; then
     rt_report_refusal
-    printf 'Error: Reply body looks like it contains a credential, or could not be scanned; refusing to post it.\n' >&2
-    exit 2
+    printf 'Error: Reply body looks like it contains a credential, an image, a mention or a foreign URL, or could not be scanned; refusing to post it.\n' >&2
+    exit 6
 fi
 
 MARKER="<!-- yellow-review:resolve v1 thread=$THREAD_ID disposition=$DISPOSITION -->"
@@ -116,7 +119,10 @@ HEADERS="$WORK_DIR/headers"
 RESP="$WORK_DIR/body"
 POST_BODY="$WORK_DIR/post-body"
 
-jq -Rrs --arg marker "$MARKER" 'sub("\\s+$"; "") + "\n\n" + $marker' <"$BODY_FILE" >"$POST_BODY"
+jq -Rrs --arg marker "$MARKER" 'sub("\\s+$"; "") + "\n\n" + $marker' <"$BODY_FILE" >"$POST_BODY" || {
+    printf 'Error: could not build the reply body for %s.\n' "$THREAD_ID" >&2
+    exit 1
+}
 
 # Run `gh api -i graphql ...`; split headers and body into $HEADERS/$RESP.
 # Returns gh's exit code (124 when timeout(1) killed it); also in GH_EC.
@@ -125,11 +131,7 @@ gh_graphql() {
     _ec=0
     : >"$HEADERS"
     : >"$RESP"
-    if [ -n "$TIMEOUT_BIN" ]; then
-        "$TIMEOUT_BIN" "$GH_TIMEOUT" gh api -i graphql "$@" >"$OUT" 2>"$ERR" || _ec=$?
-    else
-        gh api -i graphql "$@" >"$OUT" 2>"$ERR" || _ec=$?
-    fi
+    rg_gh api -i graphql "$@" >"$OUT" 2>"$ERR" || _ec=$?
     GH_EC=$_ec
     tr -d '\r' <"$OUT" | awk -v h="$HEADERS" -v b="$RESP" '
         !done && /^$/ { done = 1; next }
@@ -147,7 +149,7 @@ header() {
 }
 
 is_rate_limited() {
-    grep -qiE 'rate limit|abuse|HTTP 429' "$ERR" && return 0
+    rg_is_rate_limited "$ERR" && return 0
     jq -e '[.errors[]?.message // empty] | any(test("rate limit|abuse"; "i"))' "$RESP" >/dev/null 2>&1
 }
 
@@ -176,8 +178,9 @@ rate_limit_wait() {
     printf '%s' "$_wait"
 }
 
-# Run a GraphQL call; one rate-limit retry is shared by the whole script so
-# the call fits the caller's Bash timeout. Exits 3/4/1 on failure.
+# Run a GraphQL call; one rate-limit retry is shared by the whole script, so
+# the worst case stays at the bound MAX_WAIT_SECONDS sets (see the header for
+# the Bash tool timeout a caller needs). Exits 3/4/7/1 on failure.
 RETRIED=0
 call_with_retry() {
     _label="$1"; shift
@@ -186,7 +189,7 @@ call_with_retry() {
             return 0
         fi
         if [ "$GH_EC" -eq 124 ]; then
-            printf 'Error: gh timed out after %ss on %s for %s; not retried.\n' "$GH_TIMEOUT" "$_label" "$THREAD_ID" >&2
+            printf 'Error: gh timed out after %ss on %s for %s; not retried.\n' "$RG_GH_TIMEOUT" "$_label" "$THREAD_ID" >&2
             exit 4
         fi
         if is_rate_limited; then
@@ -204,6 +207,10 @@ call_with_retry() {
             RETRIED=1
             continue
         fi
+        if rg_is_auth_failure "$ERR"; then
+            printf 'Error: GitHub rejected the credentials on %s for %s; sign in again.\n' "$_label" "$THREAD_ID" >&2
+            exit 7
+        fi
         if is_not_found_or_forbidden; then
             printf 'Error: Thread not found or not permitted (%s): %s\n' "$_label" "$THREAD_ID" >&2
             exit 3
@@ -216,18 +223,19 @@ call_with_retry() {
     done
 }
 
-# --- Pre-check: skip when our last comment already carries a marker ---
+# --- Pre-check: skip when our newest comment already carries a marker ---
+# The window holds the newest PRECHECK_WINDOW comments, oldest first.
 # shellcheck disable=SC2016
 PRECHECK='
-query ReplyPrecheck($threadId: ID!) {
+query ReplyPrecheck($threadId: ID!, $window: Int!) {
   node(id: $threadId) {
     ... on PullRequestReviewThread {
       id
-      comments(last: 1) { nodes { viewerDidAuthor body } }
+      comments(last: $window) { nodes { viewerDidAuthor body author { __typename } } }
     }
   }
 }'
-call_with_retry precheck -f threadId="$THREAD_ID" -f query="$PRECHECK"
+call_with_retry precheck -f threadId="$THREAD_ID" -F "window=$PRECHECK_WINDOW" -f query="$PRECHECK"
 
 if ! jq -e '.data.node.id' "$RESP" >/dev/null 2>&1; then
     printf 'Error: Thread not found: %s\n' "$THREAD_ID" >&2
@@ -235,7 +243,10 @@ if ! jq -e '.data.node.id' "$RESP" >/dev/null 2>&1; then
 fi
 
 # A marker counts only on a comment the viewer authored; a reviewer quoting
-# our marker never causes a skip. Any disposition counts: a re-run after a
+# our marker never causes a skip. The newest comment of ours decides, so a bot
+# acknowledgement after our reply does not hide it; a later comment from a
+# human (a missing author type counts as human) means the thread moved on and
+# is processed again. Any disposition counts: a re-run after a
 # crash (reply posted, resolve failed) must not post a contradictory reply.
 # The exception is an upgrade from a reply that left the thread open
 # (disagree, unclear) to one that lets the caller resolve it (fixed,
@@ -243,13 +254,19 @@ fi
 # No match prints nothing and exits 0; a jq failure must not read as "no
 # marker", or the reply the marker exists to prevent would be posted.
 if ! PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
-    .data.node.comments.nodes[-1]
-    | select(. != null and .viewerDidAuthor == true)
+    (.data.node.comments.nodes // []) as $nodes
+    | ([ $nodes | to_entries[] | select(.value.viewerDidAuthor == true) ] | last) as $ours
+    | $ours
+    | select(. != null)
+    | select([ $nodes[(.key + 1):][]
+               | select(.viewerDidAuthor != true and (.author.__typename // "") != "Bot") ]
+             | length == 0)
+    | .value
     | (.body // "") | sub("\\s+$"; "")
     | capture("<!-- yellow-review:resolve v1 thread=" + $thread + " disposition=(?<d>fixed|addressed|oos|disagree|unclear) -->$")
     | .d
   ' "$RESP" 2>/dev/null); then
-    printf 'Error: could not read the last comment of %s; not posting.\n' "$THREAD_ID" >&2
+    printf 'Error: could not read the comments of %s; not posting.\n' "$THREAD_ID" >&2
     exit 1
 fi
 case "$PRIOR_DISPOSITION:$DISPOSITION" in

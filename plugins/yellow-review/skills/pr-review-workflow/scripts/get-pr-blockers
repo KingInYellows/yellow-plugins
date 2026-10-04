@@ -5,16 +5,24 @@
 #   {"changesRequested":[{"login":"...","reviewId":"..."}],
 #    "reviewDecision":"CHANGES_REQUESTED|APPROVED|REVIEW_REQUIRED|null",
 #    "conversationResolution":"enforced|not_enforced|unknown",
-#    "lookupFailed":true|false}
+#    "lookupFailed":true|false,
+#    "lookupReason":null|"tool_missing|timeout|rate_limited|auth|not_found|
+#                         too_many_reviewers|unreadable|other"}
 # Only reviews from users with write access are counted (writersOnly).
 # A failed review lookup is signalled only by lookupFailed true, together
 # with changesRequested null (also when there are more than 100 reviewers).
 # Callers must use lookupFailed to detect it and treat true as
-# blocking-unknown, never as "no blockers". reviewDecision null alone is not
-# a failure: GitHub returns it when no review is required.
-# conversationResolution "unknown" is independent of lookupFailed: it means
-# the branch-protection or ruleset lookup was unreadable, and it can occur
-# while lookupFailed is false.
+# blocking-unknown, never as "no blockers". lookupReason names why, and is
+# null whenever lookupFailed is false; a caller that must stop on a rate limit
+# keys on "rate_limited" (it sets ratelimited=1 in the Resolve: line).
+# reviewDecision null alone is not a failure: GitHub returns it when no review
+# is required.
+# conversationResolution is read from the PR's base branch and, when that is
+# not the default branch (a PR upstack in a stack), from the default branch
+# too: enforced when either enforces it, not_enforced only when every branch
+# read answered no, unknown otherwise. It is independent of lookupFailed: it
+# means the branch-protection or ruleset lookup was unreadable, and it can
+# occur while lookupFailed is false.
 # Never fails the caller: usage errors exit 2, every lookup error exits 0
 # with unknown fields and a note on stderr. That includes a gh call that
 # exceeds YELLOW_REVIEW_GH_TIMEOUT (default 30 s, needs timeout(1) or gtimeout(1); see
@@ -24,8 +32,9 @@ set -eu
 
 note() { printf '[get-pr-blockers] %s\n' "$1" >&2; }
 
+# unknown_json <reason>: <reason> is one of the fixed lookupReason tokens.
 unknown_json() {
-    printf '{"changesRequested":null,"reviewDecision":null,"conversationResolution":"unknown","lookupFailed":true}\n'
+    printf '{"changesRequested":null,"reviewDecision":null,"conversationResolution":"unknown","lookupFailed":true,"lookupReason":"%s"}\n' "$1"
 }
 
 if [ $# -ne 2 ]; then
@@ -47,29 +56,21 @@ esac
 
 if ! command -v gh >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
     note 'gh or jq not found; blockers unknown'
-    unknown_json
+    unknown_json tool_missing
     exit 0
 fi
 
-# A missing library must not fail the caller, and sourcing a missing file
-# would abort a non-interactive shell.
-RG_LIB="$(dirname -- "$0")/../../../lib/resolve-gh.sh"
-if [ ! -r "$RG_LIB" ]; then
-    note 'lib/resolve-gh.sh not readable; blockers unknown'
-    unknown_json
-    exit 0
-fi
 # shellcheck source=../../../lib/resolve-gh.sh
-. "$RG_LIB"
+. "$(dirname -- "$0")/../../../lib/resolve-gh.sh"
 
 timeout_note() {
     if [ "$1" -eq 124 ]; then note "gh timed out after ${RG_GH_TIMEOUT}s on the $2 lookup"; fi
 }
 
-ERR_FILE=$(mktemp "${TMPDIR:-/tmp}/get-pr-blockers.XXXXXX") || { note 'mktemp failed; blockers unknown'; unknown_json; exit 0; }
+ERR_FILE=$(mktemp "${TMPDIR:-/tmp}/get-pr-blockers.XXXXXX") || { note 'mktemp failed; blockers unknown'; unknown_json other; exit 0; }
 trap 'rm -f "$ERR_FILE"' EXIT
 
-# --- Reviews and base branch (GraphQL) ---
+# --- Reviews, base branch and default branch (GraphQL) ---
 # latestOpinionatedReviews may include DISMISSED reviews, so select on the
 # state client-side rather than trusting the connection to exclude them.
 # writersOnly drops drive-by reviews from users who cannot block the merge.
@@ -77,6 +78,7 @@ trap 'rm -f "$ERR_FILE"' EXIT
 QUERY='
 query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
+    defaultBranchRef { name }
     pullRequest(number: $number) {
       baseRefName
       reviewDecision
@@ -84,9 +86,7 @@ query($owner: String!, $name: String!, $number: Int!) {
         nodes {
           id
           state
-          submittedAt
-          author { __typename login }
-          commit { oid }
+          author { login }
         }
         pageInfo { hasNextPage }
       }
@@ -97,7 +97,9 @@ query($owner: String!, $name: String!, $number: Int!) {
 CHANGES_REQUESTED=null
 REVIEW_DECISION=null
 LOOKUP_FAILED=true
+LOOKUP_REASON=other
 BASE=""
+DEFAULT_BRANCH=""
 RESPONSE=""
 REVIEW_RC=0
 RESPONSE=$(rg_gh api graphql -f owner="$OWNER" -f name="$NAME" -F "number=$PR_NUMBER" \
@@ -106,6 +108,7 @@ if [ "$REVIEW_RC" -eq 0 ] \
     && PR_JSON=$(printf '%s' "$RESPONSE" | jq -e 'if ((.errors // []) | length) > 0 then empty else .data.repository.pullRequest | objects end' 2>/dev/null); then
     # A page past the first 100 reviewers would undercount; report unknown.
     if [ "$(printf '%s' "$PR_JSON" | jq -r '.latestOpinionatedReviews.pageInfo.hasNextPage // false')" = true ]; then
+        LOOKUP_REASON=too_many_reviewers
         note 'more than 100 opinionated reviewers; changesRequested unknown'
     else
         # A missing connection or a non-array nodes value is an error, not an
@@ -119,72 +122,100 @@ if [ "$REVIEW_RC" -eq 0 ] \
             | { login: ((.author.login // "ghost") | sub("\\[bot\\]$"; "")), reviewId: .id } ]
           end' 2>/dev/null); then
             LOOKUP_FAILED=false
+            LOOKUP_REASON=""
         else
             CHANGES_REQUESTED=null
+            LOOKUP_REASON=unreadable
             note 'review nodes unreadable; changesRequested unknown'
         fi
     fi
     REVIEW_DECISION=$(printf '%s' "$PR_JSON" | jq -c '.reviewDecision' 2>/dev/null) || REVIEW_DECISION=null
     BASE=$(printf '%s' "$PR_JSON" | jq -r '.baseRefName // empty' 2>/dev/null) || BASE=""
+    DEFAULT_BRANCH=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.defaultBranchRef.name // empty' 2>/dev/null) || DEFAULT_BRANCH=""
 else
-    # gh can exit 0 with a null pullRequest and the reason in .errors.
+    # gh can exit 0 with a null pullRequest and the reason in .errors; keep
+    # that message with gh's own stderr so one classifier reads both.
     GQL_MSG=$(printf '%s' "$RESPONSE" | jq -r '.errors[0].message // empty' 2>/dev/null) || GQL_MSG=""
+    printf '%s\n' "$GQL_MSG" >>"$ERR_FILE"
     timeout_note "$REVIEW_RC" review
-    note "review lookup failed; changesRequested unknown: $(head -c 300 "$ERR_FILE")${GQL_MSG:+ $GQL_MSG}"
+    if [ "$REVIEW_RC" -eq 124 ]; then
+        LOOKUP_REASON=timeout
+    elif rg_is_rate_limited "$ERR_FILE"; then
+        LOOKUP_REASON=rate_limited
+    elif rg_is_auth_failure "$ERR_FILE"; then
+        LOOKUP_REASON=auth
+    elif grep -qiE 'Could not resolve to|NOT_FOUND|HTTP 404' "$ERR_FILE"; then
+        LOOKUP_REASON=not_found
+    fi
+    note "review lookup failed ($LOOKUP_REASON); changesRequested unknown: $(head -c 300 "$ERR_FILE" | tr '\n' ' ')"
 fi
 
 # --- Conversation resolution (REST) ---
-# enforced when either classic protection or a ruleset requires it;
-# not_enforced only when both sources answered and neither requires it.
-CLASSIC=unknown
-RULES=unknown
-if [ -n "$BASE" ]; then
-    BASE_ENC=$(printf '%s' "$BASE" | jq -sRr @uri 2>/dev/null) || BASE_ENC=""
-fi
-if [ -n "$BASE" ] && [ -z "$BASE_ENC" ]; then
-    note 'base branch name could not be encoded; conversationResolution unknown'
-elif [ -n "$BASE" ]; then
-    CLASSIC_RC=0
-    OUT=$(rg_gh api "repos/$OWNER/$NAME/branches/$BASE_ENC/protection" \
-        --jq '.required_conversation_resolution.enabled // false' 2>"$ERR_FILE") || CLASSIC_RC=$?
-    if [ "$CLASSIC_RC" -eq 0 ]; then
-        case "$OUT" in
-            true) CLASSIC=true ;;
-            *) CLASSIC=false ;;
+# branch_resolution <branch>: enforced when either classic protection or a
+# ruleset requires conversation resolution on the branch; not_enforced only
+# when both sources answered and neither requires it; unknown otherwise.
+branch_resolution() {
+    _classic=unknown
+    _rules=unknown
+    _enc=$(printf '%s' "$1" | jq -sRr @uri)
+    _classic_rc=0
+    _out=$(rg_gh api "repos/$OWNER/$NAME/branches/$_enc/protection" \
+        --jq '.required_conversation_resolution.enabled // false' 2>"$ERR_FILE") || _classic_rc=$?
+    if [ "$_classic_rc" -eq 0 ]; then
+        case "$_out" in
+            true) _classic=true ;;
+            *) _classic=false ;;
         esac
     elif grep -q 'Branch not protected' "$ERR_FILE"; then
-        CLASSIC=false
+        _classic=false
     else
-        timeout_note "$CLASSIC_RC" 'classic branch protection'
+        timeout_note "$_classic_rc" 'classic branch protection'
         # 403/404 for callers without admin rights: the setting is not visible.
-        note 'classic branch protection not readable; treating as unknown'
+        note "classic branch protection of $1 not readable; treating as unknown"
     fi
 
     # The endpoint returns 30 rules per page. --paginate prints one JSON array
     # per page, so combine every page with jq -s before applying any; a failed
-    # page fails the whole lookup and RULES stays unknown.
-    RULES_RC=0
-    PAGES=$(rg_gh api --paginate "repos/$OWNER/$NAME/rules/branches/$BASE_ENC" 2>"$ERR_FILE") || RULES_RC=$?
-    if [ "$RULES_RC" -eq 0 ] \
-        && OUT=$(printf '%s' "$PAGES" | jq -s \
+    # page fails the whole lookup and the rules stay unknown.
+    _rules_rc=0
+    _pages=$(rg_gh api --paginate "repos/$OWNER/$NAME/rules/branches/$_enc" 2>"$ERR_FILE") || _rules_rc=$?
+    if [ "$_rules_rc" -eq 0 ] \
+        && _out=$(printf '%s' "$_pages" | jq -s \
             '[.[][] | select(.type == "pull_request") | .parameters.required_review_thread_resolution] | any' \
             2>>"$ERR_FILE"); then
-        case "$OUT" in
-            true) RULES=true ;;
-            *) RULES=false ;;
+        case "$_out" in
+            true) _rules=true ;;
+            *) _rules=false ;;
         esac
     else
-        timeout_note "$RULES_RC" 'branch rules'
-        note "branch rules lookup failed: $(head -c 300 "$ERR_FILE")"
+        timeout_note "$_rules_rc" 'branch rules'
+        note "branch rules lookup of $1 failed: $(head -c 300 "$ERR_FILE")"
     fi
-fi
 
-if [ "$CLASSIC" = true ] || [ "$RULES" = true ]; then
-    RESOLUTION=enforced
-elif [ "$CLASSIC" = false ] && [ "$RULES" = false ]; then
-    RESOLUTION=not_enforced
-else
-    RESOLUTION=unknown
+    if [ "$_classic" = true ] || [ "$_rules" = true ]; then
+        printf 'enforced'
+    elif [ "$_classic" = false ] && [ "$_rules" = false ]; then
+        printf 'not_enforced'
+    else
+        printf 'unknown'
+    fi
+}
+
+# A PR upstack in a stack has a parent branch as its base, and that branch
+# usually has no protection of its own: the default branch is what the stack
+# lands on, so read it too.
+RESOLUTION=unknown
+if [ -n "$BASE" ]; then
+    BASE_RESOLUTION=$(branch_resolution "$BASE")
+    TRUNK_RESOLUTION=$BASE_RESOLUTION
+    if [ -n "$DEFAULT_BRANCH" ] && [ "$DEFAULT_BRANCH" != "$BASE" ]; then
+        TRUNK_RESOLUTION=$(branch_resolution "$DEFAULT_BRANCH")
+    fi
+    if [ "$BASE_RESOLUTION" = enforced ] || [ "$TRUNK_RESOLUTION" = enforced ]; then
+        RESOLUTION=enforced
+    elif [ "$BASE_RESOLUTION" = not_enforced ] && [ "$TRUNK_RESOLUTION" = not_enforced ]; then
+        RESOLUTION=not_enforced
+    fi
 fi
 
 jq -nc \
@@ -192,5 +223,6 @@ jq -nc \
     --argjson rd "$REVIEW_DECISION" \
     --arg res "$RESOLUTION" \
     --argjson lf "$LOOKUP_FAILED" \
-    '{changesRequested: $cr, reviewDecision: $rd, conversationResolution: $res, lookupFailed: $lf}' \
-    || unknown_json
+    --arg lr "$LOOKUP_REASON" \
+    '{changesRequested: $cr, reviewDecision: $rd, conversationResolution: $res, lookupFailed: $lf,
+      lookupReason: (if $lr == "" then null else $lr end)}'

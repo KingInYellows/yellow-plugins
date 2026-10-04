@@ -7,7 +7,11 @@
 #   path, line, startLine, comments[] (author, body, id, createdAt,
 #   viewerDidAuthor, authorType), commentCount, commentsTruncated (true when
 #   the thread has more comments than the 50 fetched), isOutdated,
-#   viewerCanResolve and viewerCanReply.
+#   viewerCanResolve, viewerCanReply, originalLine and originalStartLine (the
+#   anchor when the comment was made; line is null once a thread is outdated)
+#   and diffHunk (the first comment's hunk, only for an outdated thread, else
+#   null). diffHunk is repository text, not reviewer prose, but a resolver
+#   treats it as untrusted data all the same.
 # Errors: Exit 1 with a message to stderr for every failure, usage errors
 #   included; callers key on zero vs non-zero and the rate-limit wording.
 # Truncation: when the thread list hits the page cap or GitHub returns no
@@ -90,6 +94,8 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String, $pageSize
           path
           line
           startLine
+          originalLine
+          originalStartLine
           comments(first: 50) {
             totalCount
             nodes {
@@ -98,6 +104,7 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String, $pageSize
               body
               createdAt
               viewerDidAuthor
+              diffHunk
             }
           }
         }
@@ -247,7 +254,10 @@ OUTPUT=$(printf '%s' "$ALL_THREADS" | jq --argjson includeOutdated "$INCLUDE_OUT
         commentsTruncated: ((.comments.totalCount // 0) > ((.comments.nodes // []) | length)),
         isOutdated: (.isOutdated // false),
         viewerCanResolve: (.viewerCanResolve // false),
-        viewerCanReply: (.viewerCanReply // false)
+        viewerCanReply: (.viewerCanReply // false),
+        originalLine: (.originalLine // null),
+        originalStartLine: (.originalStartLine // null),
+        diffHunk: (if (.isOutdated // false) then (.comments.nodes[0].diffHunk // null) else null end)
       }
   ]') || {
     printf 'Error: Failed to transform GraphQL response.\n' >&2

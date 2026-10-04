@@ -30,17 +30,17 @@ require_timeout() {
   [ -z "$output" ]
 }
 
-@test "a credential shape in any file exits 2 and names it" {
+@test "a credential shape in any file exits 6 and names it" {
   printf 'use AKIA''ABCDEFGHIJKLMNOP\n' >| "$B"
   run --separate-stderr "$SCRIPT" "$A" "$B"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   [[ "$stderr" == *"$B"* ]]
 }
 
-@test "a private key block exits 2" {
+@test "a private key block exits 6" {
   printf -- '-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
 @test "no arguments exits 2" {
@@ -82,17 +82,17 @@ require_timeout() {
   # ~1.5 MB of non-credential matches; the cap bounds the work and refuses.
   awk 'BEGIN { for (i = 0; i < 100000; i++) printf "bypass=\"false\" "; printf "\n" }' >| "$A"
   run --separate-stderr "$TIMEOUT_BIN" 20 "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   [[ "$stderr" == *"resolve-text: refused rule=too-many-matches line=1"* ]]
 }
 
-@test "an unquoted lowercase credential assignment exits 2" {
+@test "an unquoted lowercase credential assignment exits 6" {
   printf '%s\n' 'password: hunter22' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf '%s\n' 'the api_key=abc12345xyz was committed' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
 @test "type annotations and prose about credentials are not flagged" {
@@ -102,10 +102,10 @@ require_timeout() {
   [ "$status" -eq 0 ]
 }
 
-@test "an unquoted credential value containing a slash exits 2" {
+@test "an unquoted credential value containing a slash exits 6" {
   printf '%s\n' 'password: fake123/password' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
 @test "issue and PR URLs and long file paths are not flagged" {
@@ -117,29 +117,29 @@ require_timeout() {
   [ "$status" -eq 0 ]
 }
 
-@test "a bare mixed-case token with a digit and no slash still exits 2" {
+@test "a bare mixed-case token with a digit and no slash still exits 6" {
   tok=$(printf 'aB3%.0s' {1..12})
   printf 'leaked %s here\n' "$tok" >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
-@test "a slash-bearing token with base64 plus or equals still exits 2" {
+@test "a slash-bearing token with base64 plus or equals still exits 6" {
   tok=$(printf 'aB3%.0s' {1..12})
   printf 'leaked %s+%s/%s here\n' "$tok" "$tok" "$tok" >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf 'leaked %s/%s== here\n' "$tok" "$tok" >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
-@test "a scanner failure exits 2 instead of reporting clean" {
+@test "a scanner failure exits 6 instead of reporting clean" {
   mkdir -p "${BATS_TEST_TMPDIR}/failbin"
   printf '#!/bin/sh\nexit 2\n' >| "${BATS_TEST_TMPDIR}/failbin/awk"
   chmod +x "${BATS_TEST_TMPDIR}/failbin/awk"
   PATH="${BATS_TEST_TMPDIR}/failbin:${PATH}" run --separate-stderr "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   [[ "$stderr" == *"could not be scanned"* ]]
 }
 
@@ -157,30 +157,30 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
     floor=${spec##*:}
     printf 'x %s%s y\n' "$prefix" "$(pad $((floor - ${#prefix})))" >| "$A"
     run "$SCRIPT" "$A"
-    [ "$status" -eq 2 ] || { echo "not flagged at floor: $prefix"; false; }
+    [ "$status" -eq 6 ] || { echo "not flagged at floor: $prefix"; false; }
     printf 'x %s%s y\n' "$prefix" "$(pad $((floor - ${#prefix} - 1)))" >| "$A"
     run "$SCRIPT" "$A"
     [ "$status" -eq 0 ] || { echo "flagged below floor: $prefix"; false; }
   done
 }
 
-@test "an uppercase NAME_KEY assignment with a literal value exits 2" {
+@test "an uppercase NAME_KEY assignment with a literal value exits 6" {
   printf 'DB_PASSWORD=%s\n' "$(pad 8)" >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
-@test "a quoted keyword assignment exits 2" {
+@test "a quoted keyword assignment exits 6" {
   printf '%s\n' 'const password = "hunter22"' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
-@test "unquoted keyword values: digit, all-letter and separated literals exit 2" {
+@test "unquoted keyword values: digit, all-letter and separated literals exit 6" {
   for t in 'secret: abc123def' 'password: hunter' 'password: correct-horse-battery'; do
     printf '%s\n' "$t" >| "$A"
     run "$SCRIPT" "$A"
-    [ "$status" -eq 2 ] || { echo "not flagged: $t"; false; }
+    [ "$status" -eq 6 ] || { echo "not flagged: $t"; false; }
   done
 }
 
@@ -190,11 +190,11 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   [ "$status" -eq 0 ]
 }
 
-@test "unquoted values separated by punctuation such as . and @ exit 2" {
+@test "unquoted values separated by punctuation such as . and @ exit 6" {
   for t in 'password: hunter@cats' 'token: correct.horse.battery' 'secret: horse+battery!staple'; do
     printf '%s\n' "$t" >| "$A"
     run "$SCRIPT" "$A"
-    [ "$status" -eq 2 ] || { echo "not flagged: $t"; false; }
+    [ "$status" -eq 6 ] || { echo "not flagged: $t"; false; }
   done
 }
 
@@ -211,7 +211,7 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
     'password: (correct-horse-battery)'; do
     printf '%s\n' "$t" >| "$A"
     run "$SCRIPT" "$A"
-    [ "$status" -eq 2 ] || { echo "not flagged: $t"; false; }
+    [ "$status" -eq 6 ] || { echo "not flagged: $t"; false; }
   done
   printf '%s\n' 'password: **string**' 'token: ~optional~' 'secret: (optional@string)' \
     'password: ***' 'token: --flag' >| "$A"
@@ -223,35 +223,36 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   for t in 'password: `hunter`' 'token: `correct-horse-battery`' 'secret: `hunter`.' 'password: `hunter22`'; do
     printf '%s\n' "$t" >| "$A"
     run "$SCRIPT" "$A"
-    [ "$status" -eq 2 ] || { echo "not flagged: $t"; false; }
+    [ "$status" -eq 6 ] || { echo "not flagged: $t"; false; }
   done
   printf '%s\n' 'password: `string`' 'token: `$TOKEN`' 'The token: `abc`.' >| "$A"
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
 }
 
-@test "an Authorization or Bearer header with a 20+ character token exits 2" {
+@test "an Authorization or Bearer header with a 20+ character token exits 6" {
   printf 'Authorization: Bearer %s\n' "$(pad 20)" >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf 'sent bearer %s\n' "$(pad 20)" >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf 'Authorization: Bearer %s\n' "$(pad 19)" >| "$A"
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
 }
 
-@test "credentials in URL userinfo exit 2" {
+@test "credentials in URL userinfo exit 6" {
   printf 'clone https://deploy:%s@example.com/o/r.git\n' 'S3cr3t9x' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf 'postgres://app:%s@db.internal:5432/app\n' 'hunterhunter' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
 @test "URLs with a port, userinfo placeholders or a later @ are not flagged" {
+  export RT_ALLOWED_HOST=example.com
   printf '%s\n' 'See https://example.com:443/path/a@b and https://user:${PASS}@example.com' \
     'postgres://app:<password>@db.internal/app' 'mailto:me@example.com' >| "$A"
   run "$SCRIPT" "$A"
@@ -264,13 +265,13 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   [ "$status" -eq 0 ]
 }
 
-@test "a camelCase keyword and a digit-bearing value in a longer word still exit 2" {
+@test "a camelCase keyword and a digit-bearing value in a longer word still exit 6" {
   printf '%s\n' 'userPassword: hunter' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf '%s\n' 'mypassword: hunter22' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
 @test "a mixed-case URL, a long mixed-case path, a SHA and a thread ID are not flagged" {
@@ -295,27 +296,30 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   [ -z "$output" ]
 }
 
-@test "rt_looks_secret returns 2 and rt_text_clean fails on a missing file under sh, bash and zsh" {
+@test "rt_text_clean returns 2 on a missing file, 1 on a hit and 0 when clean, under sh, bash and zsh" {
   LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
+  printf '%s\n' 'password: hunter22' >| "$BATS_TEST_TMPDIR/hit.txt"
   for shell in sh bash zsh; do
     command -v "$shell" >/dev/null 2>&1 || continue
-    run "$shell" -c '. "$1"; rt_looks_secret "$2"' "$shell" "$LIB" "$BATS_TEST_TMPDIR/nope"
-    [ "$status" -eq 2 ] || { echo "$shell: rt_looks_secret status $status"; false; }
     run "$shell" -c '. "$1"; rt_text_clean "$2"' "$shell" "$LIB" "$BATS_TEST_TMPDIR/nope"
-    [ "$status" -ne 0 ] || { echo "$shell: rt_text_clean treated a missing file as clean"; false; }
+    [ "$status" -eq 2 ] || { echo "$shell: missing file status $status"; false; }
+    run "$shell" -c '. "$1"; rt_text_clean "$2"' "$shell" "$LIB" "$BATS_TEST_TMPDIR/hit.txt"
+    [ "$status" -eq 1 ] || { echo "$shell: hit status $status"; false; }
+    run "$shell" -c '. "$1"; rt_text_clean "$2"' "$shell" "$LIB" "$A"
+    [ "$status" -eq 0 ] || { echo "$shell: clean status $status"; false; }
   done
 }
 
-@test "a base64-padded Authorization or Basic token of 20+ characters exits 2" {
+@test "a base64-padded Authorization or Basic token of 20+ characters exits 6" {
   printf 'Authorization: Basic %s==\n' "$(pad 18)" >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf 'sent basic %s==\n' "$(pad 18)" >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf 'Authorization: %s==\n' "$(pad 18)" >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf 'Authorization: Basic %s==\n' "$(pad 17)" >| "$A"
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
@@ -327,7 +331,7 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
     floor=${spec##*:}
     printf 'x auth=%s%s y\n' "$prefix" "$(pad $((floor - ${#prefix})))" >| "$A"
     run "$SCRIPT" "$A"
-    [ "$status" -eq 2 ] || { echo "not flagged after =: $prefix"; false; }
+    [ "$status" -eq 6 ] || { echo "not flagged after =: $prefix"; false; }
     printf 'x auth=%s%s y\n' "$prefix" "$(pad $((floor - ${#prefix} - 1)))" >| "$A"
     run "$SCRIPT" "$A"
     [ "$status" -eq 0 ] || { echo "flagged below floor after =: $prefix"; false; }
@@ -342,14 +346,15 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   [ "$status" -eq 0 ]
   printf 'leaked %s\n' 'qZ8xK2mLp9RtVw4YbN7cJd3HgF6sAe1U' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
 @test "a Slack webhook URL and a glpat token are refused; ordinary services paths are not" {
+  export RT_ALLOWED_HOST=example.com
   check_refused() {
     printf '%s\n' "$1" >| "$A"
     run "$SCRIPT" "$A"
-    [ "$status" -eq 2 ]
+    [ "$status" -eq 6 ]
   }
   check_refused "posted to https://hooks.slack.com/services/T0A1B2C3D/B0E1F2G3H/$(printf '%s%s' aB3dE5gH7jK9 mN1pQ3sT5uVw)"
   check_refused "token glpat-$(printf '%s%s' aB3dE5gH7jK9 mN1pQ3sT)"
@@ -361,7 +366,7 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
 @test "a path with a token-shaped segment is refused; Java paths, acronyms and SHA segments are not" {
   printf '%s\n' 'leaked path/to/qZ8xK2mLp9RtVw4YbN7cJd3H/x' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf '%s\n' \
     'src/main/java/com/acme/ReviewFindingsLedgerTransitionHelperFactory2/Impl' \
     'src/main/java/com/acme/HTTPServerRequestHandlerFactory3/Impl' \
@@ -380,7 +385,7 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   for i in $(seq 1 65); do body="$body$unit"; done
   printf 'leaked %s%s\n' "$body" 'qZ8xK2mLp9RtVw4YbN7cJd3HgF6sAe1U' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
 # Planted credentials are assembled from pieces, as above.
@@ -389,7 +394,7 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   tok="gh""p_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345"
   printf 'first line is fine\nsecond has %s in it\n' "$tok" >| "$A"
   run --separate-stderr "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   [[ "$stderr" == *"resolve-text: refused rule=token-prefix line=2"* ]]
   [[ "$stderr" != *"$tok"* ]]
 }
@@ -399,7 +404,7 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   printf '#!/bin/sh\nexit 2\n' >| "${BATS_TEST_TMPDIR}/failbin/awk"
   chmod +x "${BATS_TEST_TMPDIR}/failbin/awk"
   PATH="${BATS_TEST_TMPDIR}/failbin:${PATH}" run --separate-stderr "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   [[ "$stderr" == *"resolve-text: scan failed"* ]]
   [[ "$stderr" != *"resolve-text: refused"* ]]
 }
@@ -417,7 +422,7 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
   check() {  # <expected rule> <line text>
     printf 'clean line\n%s\n' "$2" >| "$A"
-    run sh -c '. "$1"; rt_looks_secret "$2"; printf "%s %s" "$RT_HIT_RULE" "$RT_HIT_LINE"' sh "$LIB" "$A"
+    run sh -c '. "$1"; rt_text_clean "$2"; printf "%s %s" "$RT_HIT_RULE" "$RT_HIT_LINE"' sh "$LIB" "$A"
     [ "$output" = "$1 2" ] || { echo "expected '$1 2', got '$output' for: $2"; false; }
   }
   check private-key '-----BEGIN RSA PRIVATE KEY-----'
@@ -432,22 +437,22 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
 
 @test "RT_HIT_RULE is empty after a clean scan or a missing file" {
   LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
-  run sh -c '. "$1"; RT_HIT_RULE=stale; rt_looks_secret "$2"; printf "[%s]" "$RT_HIT_RULE"' sh "$LIB" "$A"
+  run sh -c '. "$1"; RT_HIT_RULE=stale; rt_text_clean "$2"; printf "[%s]" "$RT_HIT_RULE"' sh "$LIB" "$A"
   [ "$output" = "[]" ]
-  run sh -c '. "$1"; RT_HIT_RULE=stale; rt_looks_secret "$2"; printf "[%s]" "$RT_HIT_RULE"' sh "$LIB" "$BATS_TEST_TMPDIR/nope"
+  run sh -c '. "$1"; RT_HIT_RULE=stale; rt_text_clean "$2"; printf "[%s]" "$RT_HIT_RULE"' sh "$LIB" "$BATS_TEST_TMPDIR/nope"
   [ "$output" = "[]" ]
 }
 
 @test "a spaced API key label with a literal value is refused" {
   printf 'API key: hunter\n' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf 'api key = "abcd efgh"\n' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf 'api\tkey: hunterhunter\n' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
 @test "a spaced API key label with a placeholder or prose stays clean" {
@@ -457,9 +462,10 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
 }
 
 @test "a percent-encoded URL password is flagged; percent placeholders stay clean" {
+  export RT_ALLOWED_HOST=host
   printf '%s\n' 'https://deploy:p%40ss%21word@example.com/x' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf '%s\n' 'https://user:%PASSWORD%@host' 'https://user:%s@host' \
     'https://user:%(password)s@host' 'https://user:${PASS}@host' >| "$A"
   run "$SCRIPT" "$A"
@@ -472,7 +478,7 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   C="$BATS_TEST_TMPDIR/c.txt"
   printf 'clean text\n' >| "$C"
   run --separate-stderr "$SCRIPT" "$A" "$BATS_TEST_TMPDIR/nope" "$B" "$C"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   [[ "$stderr" == *"$A looks like"* ]]
   [[ "$stderr" == *"not readable: $BATS_TEST_TMPDIR/nope"* ]]
   [[ "$stderr" == *"$B looks like"* ]]
@@ -485,15 +491,16 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   [ "$status" -eq 0 ]
   printf '%s\n' 'the token=abcdefgh is checked' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
 @test "a URL password that merely contains a percent placeholder is refused; whole-password placeholders stay clean" {
+  export RT_ALLOWED_HOST=host
   for t in 'https://u:Hunter2%s@example.com/x' 'https://u:p%zz1word@host' \
     'https://deploy:p%40ss%21word@example.com/x'; do
     printf '%s\n' "$t" >| "$A"
     run "$SCRIPT" "$A"
-    [ "$status" -eq 2 ]
+    [ "$status" -eq 6 ]
   done
   printf '%s\n' 'https://user:%PASSWORD%@host' 'https://user:%s@host' \
     'https://user:%(password)s@host' 'https://user:${PASS}@host' >| "$A"
@@ -505,7 +512,7 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   check() {
     printf '%b' "$2" >| "$A"
     run --separate-stderr "$SCRIPT" "$A"
-    [ "$status" -eq 2 ]
+    [ "$status" -eq 6 ]
     [[ "$stderr" == *"rule=$1 "* ]]
   }
   check unquoted-keyword-value 'password:\n  hunter\n'
@@ -535,7 +542,7 @@ CASES
 @test "CRLF line endings do not hide an all-letter literal; a CRLF placeholder stays clean" {
   printf 'password: hunter\r\n' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf 'password: string\r\ntoken: <your token>\r\n' >| "$A"
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
@@ -545,7 +552,7 @@ CASES
   while IFS= read -r t; do
     printf '%s\n' "$t" >| "$A"
     run --separate-stderr "$SCRIPT" "$A"
-    [ "$status" -eq 2 ] || { echo "not flagged: $t"; false; }
+    [ "$status" -eq 6 ] || { echo "not flagged: $t"; false; }
   done <<'CASES'
 password: hunter$2x
 token=abc$def99
@@ -564,7 +571,7 @@ CASES
   check() {  # <expected rule> <line text>
     printf '%s\n' "$2" >| "$A"
     run --separate-stderr "$SCRIPT" "$A"
-    [ "$status" -eq 2 ]
+    [ "$status" -eq 6 ]
     [[ "$stderr" == *"rule=$1 "* ]] || { echo "wrong rule for: $2 ($stderr)"; false; }
   }
   check unquoted-keyword-value 'password: hunter$2x'
@@ -573,6 +580,7 @@ CASES
 }
 
 @test "a whole-value placeholder or call stays clean" {
+  export RT_ALLOWED_HOST=host
   while IFS= read -r t; do
     printf '%s\n' "$t" >| "$A"
     run "$SCRIPT" "$A"
@@ -599,27 +607,27 @@ CASES
 @test "an inline YAML comment after a credential value does not hide it" {
   printf 'password:\n  hunter22 # note\n' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf 'password: hunter22 # note\n' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf 'password:\n  "hunter22" # note\n' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
 @test "a hash inside a token is part of the token" {
   # Refused by the existing separated-literal rule, not by comment handling.
   printf 'token: abc#def\n' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
 @test "passphrase and passcode labels are credential keywords" {
   check() {  # <line text>
     printf '%b\n' "$1" >| "$A"
     run "$SCRIPT" "$A"
-    [ "$status" -eq 2 ] || { echo "not flagged: $1"; false; }
+    [ "$status" -eq 6 ] || { echo "not flagged: $1"; false; }
   }
   check 'passphrase: correcthorse'
   check 'pass_phrase = "abcd efgh"'
@@ -645,7 +653,7 @@ CASES
   check() {  # <line text>
     printf '%b\n' "$1" >| "$A"
     run "$SCRIPT" "$A"
-    [ "$status" -eq 2 ] || { echo "not flagged: $1"; false; }
+    [ "$status" -eq 6 ] || { echo "not flagged: $1"; false; }
   }
   check 'password: |\n  hunter'
   check 'password: >-\n  abcdefghij'
@@ -679,7 +687,7 @@ CASES
 refuses() {  # <expected rule> <printf %b text>
   printf '%b' "$2" >| "$A"
   run --separate-stderr "$SCRIPT" "$A"
-  [ "$status" -eq 2 ] || { echo "not flagged: $2"; false; }
+  [ "$status" -eq 6 ] || { echo "not flagged: $2"; false; }
   [[ "$stderr" == *"rule=$1 "* ]] || { echo "wrong rule for: $2 ($stderr)"; false; }
 }
 
@@ -732,7 +740,7 @@ stays_clean() {  # <printf %b text>
   while IFS= read -r t; do
     printf '%b\n' "$t" >| "$A"
     run "$SCRIPT" "$A"
-    [ "$status" -eq 2 ] || { echo "not flagged: $t"; false; }
+    [ "$status" -eq 6 ] || { echo "not flagged: $t"; false; }
   done <<'CASES'
 pass_code: hunter22
 pass-code: hunter22
@@ -779,7 +787,7 @@ CASES
   refuses quoted-keyword-assignment 'password: "string" and token: "hunter22"\n'
   printf '%s\n' 'password = "ab\"cd efgh"' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
 }
 
 @test "a quoted whole placeholder, type word or short value stays clean" {
@@ -816,7 +824,7 @@ CASES
   # The hit names the line the quote opened on.
   printf 'ok line\npassword: "abc\n  123"\n' >| "$A"
   run --separate-stderr "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   [[ "$stderr" == *"line=2"* ]] || { echo "$stderr"; false; }
 }
 
@@ -976,4 +984,71 @@ CASES
   stays_clean 'bypass: my correct horse battery staple\n'
   stays_clean 'mysecretkey: my correct horse\n'
   stays_clean 'password:\n  Rotation is scheduled for Friday\n'
+}
+
+@test "a markdown image, an @mention and a foreign URL are refused with their own rule" {
+  check() {  # <expected rule> <line text>
+    printf 'clean line\n%s\n' "$2" >| "$A"
+    run --separate-stderr "$SCRIPT" "$A"
+    [ "$status" -eq 6 ]
+    [[ "$stderr" == *"resolve-text: refused rule=$1 line=2"* ]] || { echo "wrong rule for: $2 ($stderr)"; false; }
+  }
+  check markdown-image 'see ![chart](https://github.com/o/r/raw/x.png)'
+  check mention 'cc @octocat for a look'
+  check mention 'ping (@octocat)'
+  check foreign-url 'details at https://evil.example/x.'
+  check foreign-url 'https://github.com@evil.example/x'
+}
+
+@test "github.com links, code-span handles, emails and userinfo placeholders are not flagged" {
+  printf '%s\n' 'see (https://github.com/o/r/pull/7#discussion_r1), and <https://github.com/o/r>.' \
+    'the `@ts-ignore` comment, a@b.com, https://user:<password>@github.com:443/x' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "RT_ALLOWED_HOST and GH_HOST name the one host a URL may use" {
+  printf 'see https://ghe.example/o/r/pull/7\n' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 6 ]
+  RT_ALLOWED_HOST=ghe.example run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+  GH_HOST=ghe.example run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+  GH_HOST=ghe.example RT_ALLOWED_HOST=other.example run "$SCRIPT" "$A"
+  [ "$status" -eq 6 ]
+}
+
+@test "with several files a refusal line ends in=<file>; with one file it does not" {
+  printf 'password: hunter22\n' >| "$B"
+  run --separate-stderr "$SCRIPT" "$A" "$B"
+  [ "$status" -eq 6 ]
+  [[ "$stderr" == *"resolve-text: refused rule="*" in=$B"* ]]
+  run --separate-stderr "$SCRIPT" "$B"
+  [ "$status" -eq 6 ]
+  [[ "$stderr" == *"resolve-text: refused rule="* ]]
+  [[ "$stderr" != *" in="* ]]
+}
+
+@test "a hostile file name cannot add a field or a line to the refusal line" {
+  H="$BATS_TEST_TMPDIR/bad name
+rule=forged line=9.txt"
+  printf 'password: hunter22\n' >| "$H"
+  run --separate-stderr "$SCRIPT" "$A" "$H"
+  [ "$status" -eq 6 ]
+  # Exactly one token line, and its label holds only the safe characters.
+  [ "$(printf '%s\n' "$stderr" | grep -c '^resolve-text: ')" -eq 1 ]
+  line=$(printf '%s\n' "$stderr" | grep '^resolve-text: ')
+  label=${line##* in=}
+  [ -n "$label" ]
+  [ -z "$(printf '%s' "$label" | tr -d 'A-Za-z0-9._/?-')" ]
+  [[ "$line" != *"rule=forged"* ]]
+}
+
+@test "a refused file wins over an unreadable one: exit 6, and both are named" {
+  printf 'password: hunter22\n' >| "$B"
+  run --separate-stderr "$SCRIPT" "$BATS_TEST_TMPDIR/nope" "$B"
+  [ "$status" -eq 6 ]
+  [[ "$stderr" == *"not readable"* ]]
+  [[ "$stderr" == *"resolve-text: refused"* ]]
 }

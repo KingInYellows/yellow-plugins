@@ -411,8 +411,9 @@ Located at `skills/pr-review-workflow/scripts/`:
   `commentsTruncated` (true past the 50 comments fetched), and a resolver
   must never resolve such a thread
 - **get-pr-blockers** `<owner/repo> <pr-number>` — Reports
-  `CHANGES_REQUESTED` reviews, `reviewDecision`, and whether conversation
-  resolution is enforced
+  `CHANGES_REQUESTED` reviews, `reviewDecision`, whether conversation
+  resolution is enforced (read from the base branch and the default branch),
+  and `lookupReason` when a lookup failed
 - **reply-pr-thread** `<PRRT_id> <disposition> <body-file>` — Replies to a
   thread with an idempotency marker; skips threads already replied to
 - **resolve-pr-thread** `<thread-node-id>` — Resolves a single thread
@@ -420,11 +421,13 @@ Located at `skills/pr-review-workflow/scripts/`:
 - **file-followup-issue** `<owner/repo> <pr> <PRRT_id> <title-file>
   <body-file>` — Files or finds the follow-up issue for an out-of-scope
   thread; `--find <owner/repo> <PRRT_id>` only looks and never files
-- **check-resolve-text** `<file>...` — Exits 2 when text looks like a
-  credential. A refusal prints a `resolve-text:` line on stderr
-  (`refused rule=<rule> line=<n>` for a credential hit, `scan failed` when
-  the scan did not run); look for it anywhere on stderr, not just first.
-  `reply-pr-thread` and `file-followup-issue` print the same line
+- **check-resolve-text** `<file>...` — Exits 6 when text looks like a
+  credential, has a markdown image, an `@` mention or a foreign URL, or could
+  not be scanned (2 stays usage or an unreadable file). A refusal prints a
+  `resolve-text:` line on stderr (`refused rule=<rule> line=<n>`, or `scan
+  failed` when the scan did not run); look for it anywhere on stderr, not just
+  first. `reply-pr-thread` and `file-followup-issue` exit 6 and print the same
+  line
 
 `get-pr-blockers`, `reply-pr-thread`, `file-followup-issue` and
 `check-resolve-text` are not yet invoked by `/review:resolve`; the contract

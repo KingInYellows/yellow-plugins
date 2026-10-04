@@ -11,7 +11,8 @@ setup() {
   export BATS_FIXTURE_DIR="${BATS_TEST_DIRNAME}/fixtures"
   unset MOCK_GH_VIEWER MOCK_GH_ISSUE_CREATE_FAIL MOCK_GH_ISSUE_LIST_FULL MOCK_GH_ISSUE_LIST_COUNT \
     MOCK_GH_ISSUE_LIST_FAIL MOCK_GH_VIEWER_FAIL MOCK_GH_THREAD_FAIL MOCK_GH_THREAD_URL GH_HOST \
-    MOCK_GH_RESCAN MOCK_GH_ISSUE_CLOSE_FAIL MOCK_GH_ISSUE_LIST_MARKER_THREAD
+    MOCK_GH_RESCAN MOCK_GH_ISSUE_CLOSE_FAIL MOCK_GH_ISSUE_LIST_MARKER_THREAD \
+    MOCK_GH_ISSUES_DISABLED MOCK_GH_PR_URL
   TITLE="${BATS_TEST_TMPDIR}/title.txt"
   BODY="${BATS_TEST_TMPDIR}/body.txt"
   printf 'Follow-up from PR #7: src/a.ts\n' >| "$TITLE"
@@ -64,13 +65,16 @@ setup() {
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_app "$TITLE" "$BODY"
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -c '[.number, .created]')" = '[44,false]' ]
-  grep -q -- '--app resolver-app' "${BATS_TEST_TMPDIR}/mock_gh_issue_list_args"
+  # An App login is not a createdBy value: list everyone's issues and select on
+  # the author client-side.
+  grep -q -- 'login=null' "${BATS_TEST_TMPDIR}/mock_gh_issue_list_args"
 }
 
 @test "dedupe lists only the viewer's issues" {
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_dup "$TITLE" "$BODY"
   [ "$status" -eq 0 ]
-  grep -q -- '--author me' "${BATS_TEST_TMPDIR}/mock_gh_issue_list_args"
+  grep -q -- 'login=me' "${BATS_TEST_TMPDIR}/mock_gh_issue_list_args"
+  grep -q -- 'createdBy' "${BATS_TEST_TMPDIR}/mock_gh_issue_list_args"
 }
 
 @test "creates an issue with the marker and a thread link" {
@@ -84,12 +88,28 @@ setup() {
   [ "$(tail -n 1 "$body")" = "<!-- yellow-review:resolve v1 thread=PRRT_issue_new disposition=oos -->" ]
 }
 
-@test "a thread URL on a host other than GH_HOST is a mismatch and exits 2" {
-  export GH_HOST=ghe.example.com
+@test "the host comes from the thread's own PR URL: a non-github.com default host files without GH_HOST" {
+  export MOCK_GH_THREAD_URL=https://ghe.example.com/test/repo/pull/7#discussion_r1
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.created')" = "true" ]
+  grep -qF 'https://ghe.example.com/test/repo/pull/7#discussion_r1' "${BATS_TEST_TMPDIR}/mock_gh_issue_body"
+}
+
+@test "a thread on another pull request is a mismatch on any host" {
+  export MOCK_GH_THREAD_URL=https://ghe.example.com/test/repo/pull/8#discussion_r9
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"does not belong to"* ]]
   [ ! -e "$CREATES" ]
+}
+
+@test "a node with no PR URL links the PR on GH_HOST and says so" {
+  export MOCK_GH_PR_URL="" MOCK_GH_THREAD_URL="" GH_HOST=ghe.example.com
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"no thread URL returned"* ]]
+  grep -qF 'https://ghe.example.com/test/repo/pull/7' "${BATS_TEST_TMPDIR}/mock_gh_issue_body"
 }
 
 @test "a thread whose first comment is on another pull request exits 2 and files nothing" {
@@ -156,16 +176,19 @@ setup() {
   [ ! -e "$CREATES" ]
 }
 
-@test "the dedupe list covers closed issues too" {
+@test "the dedupe list covers closed issues too, and follows every page" {
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_dup "$TITLE" "$BODY"
   [ "$status" -eq 0 ]
-  grep -q -- '--state all' "${BATS_TEST_TMPDIR}/mock_gh_issue_list_args"
+  # No filterBy.states: every state. --paginate: no window to fill.
+  run grep -q -- 'states' "${BATS_TEST_TMPDIR}/mock_gh_issue_list_args"
+  [ "$status" -eq 1 ]
+  grep -q -- '--paginate' "${BATS_TEST_TMPDIR}/mock_gh_issue_list_args"
 }
 
 @test "refuses issue text that looks like a credential" {
   printf 'Move DB_PASSWORD=hunter22 into the vault.\n' >| "$BODY"
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   [ ! -f "$CREATES" ]
 }
 
@@ -192,12 +215,12 @@ setup() {
   [[ "$stderr" == *"rate limit"* ]]
 }
 
-@test "a full dedupe window with no marker fails closed with its own exit code and creates nothing" {
+@test "a viewer with 200 or more issues and no marker still files" {
   export MOCK_GH_ISSUE_LIST_FULL=1
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-  [ "$status" -eq 5 ]
-  [[ "$stderr" == *"refusing to file a possible duplicate"* ]]
-  [ ! -e "$CREATES" ]
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.created')" = "true" ]
+  [ -e "$CREATES" ]
 }
 
 @test "a scanner failure refuses to file instead of passing the text through" {
@@ -205,24 +228,20 @@ setup() {
   printf '#!/bin/sh\nexit 2\n' >| "${BATS_TEST_TMPDIR}/failbin/awk"
   chmod +x "${BATS_TEST_TMPDIR}/failbin/awk"
   PATH="${BATS_TEST_TMPDIR}/failbin:${PATH}" run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   [[ "$stderr" == *"could not be scanned"* ]]
   [ ! -e "$CREATES" ]
 }
 
-@test "a window one short of full with no marker still creates" {
-  export MOCK_GH_ISSUE_LIST_COUNT=199
+@test "a marker issue past the first hundred is a dedupe hit, for filing and for --find" {
+  export MOCK_GH_ISSUE_LIST_COUNT=250 MOCK_GH_ISSUE_LIST_MARKER_THREAD=PRRT_issue_new
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -r '.created')" = "true" ]
-}
-
-@test "a window of exactly 200 with no marker refuses" {
-  export MOCK_GH_ISSUE_LIST_COUNT=200
-  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-  [ "$status" -eq 5 ]
-  [[ "$stderr" == *"refusing to file a possible duplicate"* ]]
+  [ "$(printf '%s' "$output" | jq -c '[.number, .created]')" = '[50,false]' ]
   [ ! -e "$CREATES" ]
+  run --separate-stderr "$SCRIPT" --find test/repo PRRT_issue_new
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.exists, .number]')" = '[true,50]' ]
 }
 
 @test "rejects a malformed repo" {
@@ -291,12 +310,11 @@ setup() {
   [ ! -e "$CREATES" ]
 }
 
-@test "--find over a full window with no marker exits 5 instead of reporting exists:false" {
+@test "--find over 200 or more issues with no marker reports exists:false" {
   export MOCK_GH_ISSUE_LIST_FULL=1
   run --separate-stderr "$SCRIPT" --find test/repo PRRT_issue_new
-  [ "$status" -eq 5 ]
-  [[ "$stderr" == *"cannot confirm"* ]]
-  [ -z "$output" ]
+  [ "$status" -eq 0 ]
+  [ "$output" = '{"exists":false}' ]
 }
 
 @test "--find rejects a wrong argument count, a malformed repo and a bad thread ID with exit 2" {
@@ -326,7 +344,8 @@ SH
 
 @test "a gh call that times out on the issue list exits 4 and creates nothing" {
   fake_timeout
-  export MOCK_TIMEOUT_ON=list
+  # Only the full dedupe scan is paginated.
+  export MOCK_TIMEOUT_ON=--paginate
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
   [ "$status" -eq 4 ]
   [[ "$stderr" == *"timed out"* ]]
@@ -353,7 +372,7 @@ SH
 
 @test "--find also exits 4 when a gh call times out" {
   fake_timeout
-  export MOCK_TIMEOUT_ON=list
+  export MOCK_TIMEOUT_ON=--paginate
   run --separate-stderr "$SCRIPT" --find test/repo PRRT_issue_new
   [ "$status" -eq 4 ]
 }
@@ -429,12 +448,12 @@ SH
 @test "a credential refusal labels the file in the resolve-text token; a wrong-PR thread has none" {
   printf 'Token was ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345\n' >| "$BODY"
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   [[ "$stderr" == *"resolve-text: refused rule=token-prefix line=1 in=body"* ]]
   [ ! -e "$CREATES" ]
   printf 'Token ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345\n' >| "$TITLE"
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   [[ "$stderr" == *"in=title"* ]]
   printf 'Follow-up from PR #7: src/a.ts\n' >| "$TITLE"
   printf 'Retry policy belongs in the client module.\n' >| "$BODY"
@@ -444,24 +463,24 @@ SH
   [[ "$stderr" != *"resolve-text:"* ]]
 }
 
-@test "a thread that does not exist exits 2 and files nothing" {
+@test "a thread that does not exist exits 3 and files nothing" {
   export MOCK_GH_THREAD_FAIL=notfound
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 3 ]
   [[ "$stderr" == *"was not found"* ]]
   [ ! -e "$CREATES" ]
 }
 
-@test "a null thread node exits 2 and files nothing" {
+@test "a null thread node exits 3 and files nothing" {
   export MOCK_GH_THREAD_FAIL=nullnode
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 3 ]
   [[ "$stderr" == *"was not found"* ]]
   [ ! -e "$CREATES" ]
 }
 
-@test "a marker inside a full window is a dedupe hit, not a window refusal" {
-  # 198 unrelated + the mock's 2 marker issues = a full 200-issue response.
+@test "a marker in the last of 200 issues is a dedupe hit" {
+  # 198 unrelated + the mock's 2 marker issues = 200 issues over two pages.
   export MOCK_GH_ISSUE_LIST_COUNT=198 MOCK_GH_ISSUE_LIST_MARKER_THREAD=PRRT_issue_new
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
   [ "$status" -eq 0 ]
@@ -519,4 +538,80 @@ path_without_timeout() {
   PATH="${BATS_TEST_TMPDIR}/notimeout" run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
   [ "$status" -eq 0 ]
   [[ "$stderr" == *"neither timeout nor gtimeout is installed"* ]]
+}
+
+# --- Refusals (6) and permanent failures (7) ---
+
+@test "a title or body with an image, a mention or a foreign URL exits 6 and files nothing" {
+  for t in 'See ![x](https://github.com/o/r/raw/x.png)' 'cc @octocat' 'See https://evil.example/x'; do
+    printf '%s\n' "$t" >| "$BODY"
+    run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+    [ "$status" -eq 6 ] || { echo "not refused: $t"; false; }
+    [[ "$stderr" == *"resolve-text: refused rule="*"in=body"* ]]
+    [ ! -e "$CREATES" ]
+  done
+}
+
+@test "usage and wrong-PR errors stay exit 2 and carry no resolve-text token" {
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" != *"resolve-text:"* ]]
+}
+
+@test "an HTTP 401 on the issue lookup exits 7 and files nothing" {
+  export MOCK_GH_ISSUE_LIST_FAIL=auth
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 7 ]
+  [[ "$stderr" == *"rejected the credentials"* ]]
+  [ ! -e "$CREATES" ]
+}
+
+@test "a token without access on the issue lookup exits 7, not the transient exit 1" {
+  export MOCK_GH_ISSUE_LIST_FAIL=forbidden
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 7 ]
+  [[ "$stderr" == *"not permitted"* ]]
+  [ ! -e "$CREATES" ]
+}
+
+@test "a rate limit that is also an HTTP 403 stays exit 4, not 7" {
+  export MOCK_GH_ISSUE_LIST_FAIL=ratelimit
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 4 ]
+}
+
+@test "a repository with Issues disabled exits 7 before the thread lookup and the create" {
+  export MOCK_GH_ISSUES_DISABLED=1
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 7 ]
+  [[ "$stderr" == *"Issues are disabled"* ]]
+  [ ! -e "$CREATES" ]
+}
+
+@test "--find on a repository with Issues disabled still just reports exists:false" {
+  export MOCK_GH_ISSUES_DISABLED=1
+  run --separate-stderr "$SCRIPT" --find test/repo PRRT_issue_new
+  [ "$status" -eq 0 ]
+  [ "$output" = '{"exists":false}' ]
+}
+
+@test "a create that fails because Issues are disabled, forbidden or unauthenticated exits 7" {
+  for mode in disabled forbidden auth; do
+    export MOCK_GH_ISSUE_CREATE_FAIL=$mode
+    run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+    [ "$status" -eq 7 ] || { echo "$mode: status $status ($stderr)"; false; }
+  done
+}
+
+@test "a thread lookup refused with HTTP 403 exits 7 instead of exit 1" {
+  export MOCK_GH_THREAD_FAIL=forbidden
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 7 ]
+  [ ! -e "$CREATES" ]
+}
+
+@test "a create that fails for another reason is still the transient exit 1" {
+  export MOCK_GH_ISSUE_CREATE_FAIL=1
+  run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+  [ "$status" -eq 1 ]
 }

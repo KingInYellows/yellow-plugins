@@ -28,10 +28,13 @@
                     "body": "Consider using a const here",
                     "id": "PRRC_c1",
                     "createdAt": "2026-09-30T10:00:00Z",
-                    "viewerDidAuthor": false
+                    "viewerDidAuthor": false,
+                    "diffHunk": "@@ -40,3 +40,3 @@\n context"
                   }
                 ]
-              }
+              },
+              "originalLine": 42,
+              "originalStartLine": null
             },
             {
               "id": "PRRT_thread2",
@@ -72,10 +75,13 @@
                     "body": "Outdated comment",
                     "id": "PRRC_c3",
                     "createdAt": "2026-09-30T11:00:00Z",
-                    "viewerDidAuthor": false
+                    "viewerDidAuthor": false,
+                    "diffHunk": "@@ -7,3 +7,3 @@\n-old line\n+new line"
                   }
                 ]
-              }
+              },
+              "originalLine": 9,
+              "originalStartLine": 7
             },
             {
               "id": "PRRT_thread4",

@@ -4,12 +4,15 @@
 # example a Linear issue created through MCP).
 # Usage: check-resolve-text <file>...
 # Output: nothing on success.
-# Exit codes: 0 clean, 2 usage, an unreadable file, or a file that looks like
-#             it contains a credential or could not be scanned (every such
-#             file is named on stderr; all arguments are scanned). A refusal
-#             prints a `resolve-text:` line, never the text: `refused rule=<rule> line=<n>` for a credential
-#             hit, `scan failed` when the scan did not run. Look for that
-#             line anywhere on stderr; it is not always first.
+# Exit codes: 0 clean, 2 usage or an unreadable file, 6 text refused: a file
+#             that looks like it contains a credential, an image, an @mention
+#             or a foreign URL, or that could not be scanned (every such file
+#             is named on stderr; all arguments are scanned). 6 wins over 2
+#             when both occur. A refusal prints a `resolve-text:` line, never
+#             the text: `refused rule=<rule> line=<n>` for a hit, `scan
+#             failed` when the scan did not run; with several files the line
+#             ends `in=<file>`. Look for that line anywhere on stderr; it is
+#             not always first.
 # Contract: references/resolve/dispositions.md ("Reply hygiene")
 
 set -eu
@@ -22,9 +25,10 @@ fi
 # shellcheck source=../../../lib/resolve-text.sh
 . "$(dirname -- "$0")/../../../lib/resolve-text.sh"
 
-# Scan every argument so one call reports all failing files; exit 2 once at
-# the end. An unreadable file does not stop the scan of the others.
+# Scan every argument so one call reports all failing files; exit once at the
+# end. An unreadable file does not stop the scan of the others.
 rc=0
+refused=0
 for f in "$@"; do
     if ! { [ -f "$f" ] && [ -r "$f" ]; }; then
         printf 'Error: File not readable: %s\n' "$f" >&2
@@ -32,9 +36,14 @@ for f in "$@"; do
         continue
     fi
     if ! rt_text_clean "$f"; then
-        rt_report_refusal
-        printf 'Error: %s looks like it contains a credential, or could not be scanned.\n' "$f" >&2
-        rc=2
+        # Name the file on the refusal line when there are several; tr keeps a
+        # hostile file name from adding a field or a line.
+        label=""
+        if [ $# -gt 1 ]; then label=$(printf '%s' "$f" | tr -c 'A-Za-z0-9._/-' '?'); fi
+        rt_report_refusal "$label"
+        printf 'Error: %s looks like it contains a credential, an image, a mention or a foreign URL, or could not be scanned.\n' "$f" >&2
+        refused=1
     fi
 done
+[ "$refused" -eq 0 ] || exit 6
 exit "$rc"

@@ -5,8 +5,10 @@
 # endpoint text come first; each arm documents its own drivers:
 #   FollowupViewer / FollowupThreadUrl   MOCK_GH_VIEWER, MOCK_GH_VIEWER_FAIL,
 #                                        MOCK_GH_THREAD_URL, MOCK_GH_THREAD_FAIL
-#   issue list / create / close          MOCK_GH_ISSUE_LIST_{FAIL,COUNT,FULL,
-#                                        MARKER_THREAD}, MOCK_GH_RESCAN,
+#   FollowupIssues / issue create / close
+#                                        MOCK_GH_ISSUE_LIST_{FAIL,COUNT,FULL,
+#                                        MARKER_THREAD}, MOCK_GH_ISSUES_DISABLED,
+#                                        MOCK_GH_RESCAN, MOCK_GH_PR_URL,
 #                                        MOCK_GH_ISSUE_CREATE_FAIL,
 #                                        MOCK_GH_ISSUE_CLOSE_FAIL
 #   ReplyPrecheck / addPullRequestReviewThreadReply
@@ -15,7 +17,10 @@
 #                                        Retry-After or reset headers, 5xx,
 #                                        missing comment, spoofed marker)
 #   latestOpinionatedReviews             MOCK_GH_BLOCKERS_{FAIL,FIXTURE}
-#   */protection, */rules/branches/*     MOCK_GH_PROTECTION, MOCK_GH_RULES
+#   */protection, */rules/branches/*     MOCK_GH_PROTECTION, MOCK_GH_RULES;
+#                                        MOCK_GH_PROTECTION_MAIN and
+#                                        MOCK_GH_RULES_MAIN override them for
+#                                        the branch named main
 #   pr view                              MOCK_GH_{FAIL,PR_STATE,HEAD_OID,
 #                                        BASE_OID}
 # The reply arms match bare thread-id substrings, so order matters: a new id
@@ -75,6 +80,29 @@ bump() {
   printf '%s' "$_n"
 }
 
+# emit_pages <issues-json-array>: the FollowupIssues response. With --paginate
+# (the full dedupe scan) one JSON document per 100 issues, the way gh prints
+# pages; without it (the post-create rescan) one document with the first=N
+# newest. MOCK_GH_ISSUES_DISABLED=1 reports hasIssuesEnabled false.
+emit_pages() {
+  _en=true
+  [ "${MOCK_GH_ISSUES_DISABLED:-0}" = 1 ] && _en=false
+  case " $ALL_ARGS " in
+    *" --paginate "*)
+      printf '%s' "$1" | jq -c --argjson en "$_en" '[_nwise(100)] | (if length == 0 then [[]] else . end) as $pages
+        | $pages | to_entries[]
+        | {data:{repository:{hasIssuesEnabled:$en, issues:{nodes:.value,
+            pageInfo:{hasNextPage:(.key < (($pages | length) - 1)), endCursor:"c\(.key)"}}}}}'
+      ;;
+    *)
+      _first=$(printf '%s' "$ALL_ARGS" | sed -n 's/.*[ ]first=\([0-9][0-9]*\).*/\1/p' | head -n 1)
+      printf '%s' "$1" | jq -c --argjson en "$_en" --argjson n "${_first:-100}" '
+        {data:{repository:{hasIssuesEnabled:$en, issues:{nodes:.[0:$n],
+          pageInfo:{hasNextPage:false, endCursor:null}}}}}'
+      ;;
+  esac
+}
+
 # Arms keyed on query or endpoint text come first so the number=/PRRT_ arms
 # below never capture them.
 case "$ALL_ARGS" in
@@ -90,7 +118,7 @@ case "$ALL_ARGS" in
     exit 0
     ;;
   *"FollowupThreadUrl"*)
-    # MOCK_GH_THREAD_FAIL=1|ratelimit simulates a failed lookup;
+    # MOCK_GH_THREAD_FAIL=1|ratelimit|forbidden simulates a failed lookup;
     # MOCK_GH_THREAD_URL overrides the first comment URL (empty = none).
     # MOCK_GH_THREAD_FAIL=notfound is gh's error for an unknown node id;
     # MOCK_GH_THREAD_FAIL=nullnode is a null node with no error.
@@ -102,19 +130,26 @@ case "$ALL_ARGS" in
         exit 0
         ;;
       ratelimit) printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2; exit 1 ;;
+      forbidden) printf 'gh: Resource not accessible by integration (HTTP 403)\n' >&2; exit 1 ;;
       1) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
     esac
+    # The thread's pullRequest.url is the comment URL without its fragment
+    # unless MOCK_GH_PR_URL sets it (an empty value is a node with no PR URL).
     _turl="${MOCK_GH_THREAD_URL-https://github.com/test/repo/pull/7#discussion_r1}"
-    MOCK_BODY=$(jq -nc --arg u "$_turl" '{data:{node:{comments:{nodes:(if $u == "" then [] else [{url:$u}] end)}}}}')
+    _pr="${MOCK_GH_PR_URL-${_turl%%#*}}"
+    [ -n "$_turl" ] || _pr="${MOCK_GH_PR_URL-https://github.com/test/repo/pull/7}"
+    MOCK_BODY=$(jq -nc --arg u "$_turl" --arg pr "$_pr" '{data:{node:{pullRequest:(if $pr == "" then null else {url:$pr} end),comments:{nodes:(if $u == "" then [] else [{url:$u}] end)}}}}')
     emit "$@"
     exit 0
     ;;
-  "issue list "*)
+  *"FollowupIssues"*)
+    # file-followup-issue's issue lookup (GraphQL repository.issues,
+    # filterBy.createdBy). The args are saved for assertions.
     printf '%s\n' "$ALL_ARGS" >| "${PAGE_STATE_DIR}/mock_gh_issue_list_args"
     _call=$(bump issue_list)
-    # MOCK_GH_RESCAN shapes the second list call only (the post-create rescan):
+    # MOCK_GH_RESCAN shapes the second lookup only (the post-create rescan):
     # winner = an older marker issue #70 plus ours (#77); own = ours (#77)
-    # plus a later marker issue #80; fail / ratelimit = the list fails.
+    # plus a later marker issue #80; fail / ratelimit = the lookup fails.
     # Any other value is a test typo and fails loudly.
     if [ "$_call" -eq 2 ] && [ -n "${MOCK_GH_RESCAN:-}" ]; then
       _nums=""
@@ -125,34 +160,38 @@ case "$ALL_ARGS" in
         own) _nums='77 80' ;;
         *) printf 'mock gh: unknown MOCK_GH_RESCAN value: %s (expected winner|own|fail|ratelimit)\n' "$MOCK_GH_RESCAN" >&2; exit 2 ;;
       esac
-      jq -n --arg nums "$_nums" '[ ($nums | split(" ")[] | tonumber) as $n
+      _all=$(jq -n --arg nums "$_nums" '[ ($nums | split(" ")[] | tonumber) as $n
         | {number: $n, url: "https://github.com/test/repo/issues/\($n)", author: {login: "me"},
-           body: "Follow-up\n\n<!-- yellow-review:resolve v1 thread=PRRT_issue_new disposition=oos -->"} ]'
+           body: "Follow-up\n\n<!-- yellow-review:resolve v1 thread=PRRT_issue_new disposition=oos -->"} ]')
+      emit_pages "$_all"
       exit 0
     fi
-    # MOCK_GH_ISSUE_LIST_FAIL=1|ratelimit simulates a failed list.
+    # MOCK_GH_ISSUE_LIST_FAIL=1|ratelimit|auth|forbidden simulates a failed lookup.
     case "${MOCK_GH_ISSUE_LIST_FAIL:-0}" in
       ratelimit) printf 'gh: API rate limit exceeded for user. (HTTP 429)\n' >&2; exit 1 ;;
+      auth) printf 'gh: Bad credentials (HTTP 401)\n' >&2; exit 1 ;;
+      forbidden) printf 'gh: Resource not accessible by personal access token (HTTP 403)\n' >&2; exit 1 ;;
       1) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
     esac
-    # MOCK_GH_ISSUE_LIST_COUNT=N (or MOCK_GH_ISSUE_LIST_FULL=1, N=200): a
-    # window of N unrelated issues with no marker for the requested thread.
+    # MOCK_GH_ISSUE_LIST_COUNT=N (or MOCK_GH_ISSUE_LIST_FULL=1, N=200): N
+    # unrelated issues with no marker for the requested thread.
     _n="${MOCK_GH_ISSUE_LIST_COUNT:-}"
     [ -z "$_n" ] && [ "${MOCK_GH_ISSUE_LIST_FULL:-0}" = 1 ] && _n=200
     if [ -n "$_n" ]; then
-      _base=$(jq -n --argjson n "$_n" '[range(0; $n) | {number: (1000 + .), url: "https://github.com/test/repo/issues/\(1000 + .)", author: {login: "me"}, body: "unrelated"}]')
+      _all=$(jq -n --argjson n "$_n" '[range(0; $n) | {number: (1000 + .), url: "https://github.com/test/repo/issues/\(1000 + .)", author: {login: "me"}, body: "unrelated"}]')
     else
-      _base=$(cat "$FIXTURE_DIR/issue-list-response.json")
+      _all=$(cat "$FIXTURE_DIR/issue-list-response.json")
     fi
     # MOCK_GH_ISSUE_LIST_MARKER_THREAD=PRRT_x appends two issues carrying
     # that thread's marker, #90 listed before #50, so the oldest must win.
+    # They come last, so with MOCK_GH_ISSUE_LIST_COUNT over 100 they sit on a
+    # later page.
     if [ -n "${MOCK_GH_ISSUE_LIST_MARKER_THREAD:-}" ]; then
-      printf '%s' "$_base" | jq --arg t "$MOCK_GH_ISSUE_LIST_MARKER_THREAD" '. + [ (90, 50) as $n
+      _all=$(printf '%s' "$_all" | jq --arg t "$MOCK_GH_ISSUE_LIST_MARKER_THREAD" '. + [ (90, 50) as $n
         | {number: $n, url: "https://github.com/test/repo/issues/\($n)", author: {login: "me"},
-           body: "Out of scope.\n\n<!-- yellow-review:resolve v1 thread=\($t) disposition=oos -->"} ]'
-    else
-      printf '%s\n' "$_base"
+           body: "Out of scope.\n\n<!-- yellow-review:resolve v1 thread=\($t) disposition=oos -->"} ]')
     fi
+    emit_pages "$_all"
     exit 0
     ;;
   "issue create "*)
@@ -166,6 +205,11 @@ case "$ALL_ARGS" in
       printf 'HTTP 422: Validation Failed\n' >&2
       exit 1
     fi
+    case "${MOCK_GH_ISSUE_CREATE_FAIL:-0}" in
+      disabled) printf "the 'test/repo' repository has disabled issues\n" >&2; exit 1 ;;
+      forbidden) printf 'HTTP 403: Resource not accessible by integration\n' >&2; exit 1 ;;
+      auth) printf 'HTTP 401: Bad credentials\n' >&2; exit 1 ;;
+    esac
     if [ "${MOCK_GH_ISSUE_CREATE_FAIL:-0}" = nourl ]; then
       # Created, but gh printed no issue URL.
       bump issue_create >/dev/null
@@ -237,6 +281,26 @@ case "$ALL_ARGS" in
         ;;
       *"PRRT_reply_spoof"*)
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_spoof","comments":{"nodes":[{"viewerDidAuthor":false,"body":"> <!-- yellow-review:resolve v1 thread=PRRT_reply_spoof disposition=fixed -->"}]}}}}'
+        ;;
+      *"PRRT_reply_botafter"*|*"PRRT_reply_humanafter"*|*"PRRT_reply_ownafter"*)
+        # Our fixed reply, then one later comment: a bot acknowledgement
+        # (botafter), a human reply (humanafter) or our own unmarked note
+        # (ownafter). Only the human reply sends the thread back to the resolver.
+        case "$ALL_ARGS" in
+          *"PRRT_reply_botafter"*) _later='{"viewerDidAuthor":false,"body":"Thanks for the update.","author":{"__typename":"Bot"}}'; _tid=PRRT_reply_botafter ;;
+          *"PRRT_reply_humanafter"*) _later='{"viewerDidAuthor":false,"body":"That does not fix it.","author":{"__typename":"User"}}'; _tid=PRRT_reply_humanafter ;;
+          *) _later='{"viewerDidAuthor":true,"body":"Edited the note.","author":{"__typename":"User"}}'; _tid=PRRT_reply_ownafter ;;
+        esac
+        MOCK_BODY=$(jq -nc --arg t "$_tid" --argjson later "$_later" '{data:{node:{id:$t,comments:{nodes:[
+          {viewerDidAuthor:false,body:"Please add a null check.",author:{__typename:"User"}},
+          {viewerDidAuthor:true,body:("Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=" + $t + " disposition=fixed -->\n"),author:{__typename:"User"}},
+          $later]}}}}')
+        ;;
+      *"PRRT_reply_auth"*)
+        MOCK_BODY='{"message":"Bad credentials"}'
+        http "HTTP/2.0 401 Unauthorized" ""
+        printf 'gh: Bad credentials (HTTP 401)\n' >&2
+        exit 1
         ;;
       *"PRRT_reply_gone"*)
         MOCK_BODY='{"data":{"node":null}}'
@@ -325,19 +389,23 @@ case "$ALL_ARGS" in
     exit 0
     ;;
   *"latestOpinionatedReviews"*)
-    # get-pr-blockers review lookup. MOCK_GH_BLOCKERS_FAIL=1 simulates an
-    # API failure.
-    if [ "${MOCK_GH_BLOCKERS_FAIL:-0}" = 1 ]; then
-      printf 'gh: Something went wrong (HTTP 502)\n' >&2
-      exit 1
-    fi
+    # get-pr-blockers review lookup. MOCK_GH_BLOCKERS_FAIL simulates an API
+    # failure: 1 (HTTP 502), ratelimit, auth or notfound.
+    case "${MOCK_GH_BLOCKERS_FAIL:-0}" in
+      1) printf 'gh: Something went wrong (HTTP 502)\n' >&2; exit 1 ;;
+      ratelimit) printf 'gh: API rate limit exceeded for user. (HTTP 429)\n' >&2; exit 1 ;;
+      auth) printf 'gh: Bad credentials (HTTP 401)\n' >&2; exit 1 ;;
+      notfound) printf 'gh: Could not resolve to a Repository with the name test/gone. (HTTP 404)\n' >&2; exit 1 ;;
+    esac
     cat "$FIXTURE_DIR/${MOCK_GH_BLOCKERS_FIXTURE:-blockers-response.json}"
     exit 0
     ;;
   *"/protection"*)
     # Classic branch protection. MOCK_GH_PROTECTION: enabled | disabled |
     # notprotected | 403 | 404 (default).
-    case "${MOCK_GH_PROTECTION:-404}" in
+    _prot="${MOCK_GH_PROTECTION:-404}"
+    case "$ALL_ARGS" in *"/branches/main/"*) _prot="${MOCK_GH_PROTECTION_MAIN:-$_prot}" ;; esac
+    case "$_prot" in
       enabled) MOCK_BODY='{"required_conversation_resolution":{"enabled":true}}'; emit "$@" ;;
       disabled) MOCK_BODY='{"required_conversation_resolution":{"enabled":false}}'; emit "$@" ;;
       notprotected)
@@ -353,12 +421,14 @@ case "$ALL_ARGS" in
     # Branch rulesets. MOCK_GH_RULES: enforced | none (default) | fail |
     # page2 (the enforcing rule only on page two; needs --paginate, which
     # prints one array per page) | page2fail (page two errors).
-    case "${MOCK_GH_RULES:-none}" in
+    _rules="${MOCK_GH_RULES:-none}"
+    case "$ALL_ARGS" in *"/rules/branches/main"*) _rules="${MOCK_GH_RULES_MAIN:-$_rules}" ;; esac
+    case "$_rules" in
       page2|page2fail)
         printf '[{"type":"deletion"},{"type":"pull_request","parameters":{"required_review_thread_resolution":false}}]\n'
         case " $ALL_ARGS " in
           *" --paginate "*)
-            if [ "$MOCK_GH_RULES" = page2fail ]; then
+            if [ "$_rules" = page2fail ]; then
               printf 'gh: Server Error (HTTP 500)\n' >&2
               exit 1
             fi

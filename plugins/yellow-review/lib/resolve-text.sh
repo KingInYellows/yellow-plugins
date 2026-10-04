@@ -13,25 +13,19 @@
 # prefix is added to one scanner, check the other.
 # shellcheck shell=sh
 
-# rt_text_clean <file>: exit 0 only when the scan ran and found no credential
-# shape. A credential hit, a scanner failure (awk missing or erroring) and an
-# unreadable file all return non-zero, so a caller that refuses on non-zero
-# fails closed instead of posting unscanned text.
-# The status is captured explicitly, so a bare call under `set -e` returns it
-# instead of aborting on the clean (awk 1) status; call it in a condition.
+# rt_text_clean <file>: exit 0 only when the scan ran and found nothing to
+# refuse. Status 1 means the text has a credential shape or a shape unsafe to
+# post publicly (markdown image, @mention, foreign URL); status 2 means the
+# scan did not run (unreadable file, awk missing or erroring). A caller that
+# refuses on non-zero fails closed instead of posting unscanned text. On
+# status 1, RT_HIT_RULE and RT_HIT_LINE name the rule and line that matched
+# (see rt_report_refusal); both are empty otherwise.
+# A missing or unreadable file returns 2 before the scan: the failed
+# `< "$1"` redirect below would otherwise leave an awk-style status that
+# reads as clean.
+# RT_ALLOWED_HOST (default GH_HOST, else github.com) is the one host a URL in
+# the text may name.
 rt_text_clean() {
-    _rt_rc=0
-    rt_looks_secret "$1" || _rt_rc=$?
-    [ "$_rt_rc" -eq 1 ]
-}
-
-# rt_looks_secret <file>: awk exit status. 0 means the file contains a
-# credential shape, 1 means clean, anything else means the scan itself failed;
-# use rt_text_clean unless the distinction matters. On a hit, RT_HIT_RULE and
-# RT_HIT_LINE name the rule and line that matched (see rt_report_refusal).
-# A missing or unreadable file returns 2: the failed `< "$1"` redirect below
-# would otherwise leave status 1, which reads as clean.
-rt_looks_secret() {
     RT_HIT_RULE=""
     RT_HIT_LINE=""
     [ -f "$1" ] && [ -r "$1" ] || return 2
@@ -485,14 +479,55 @@ rt_looks_secret() {
             exit hit ? 0 : 1
         }
     ' < "$1") || _rt_awk_rc=$?
-    if [ "$_rt_awk_rc" -eq 0 ]; then
-        RT_HIT_RULE=${_rt_out%% *}
-        RT_HIT_LINE=${_rt_out##* }
-    fi
-    return "$_rt_awk_rc"
+    case "$_rt_awk_rc" in
+        0)
+            RT_HIT_RULE=${_rt_out%% *}
+            RT_HIT_LINE=${_rt_out##* }
+            return 1
+            ;;
+        1) ;;
+        *) return 2 ;;
+    esac
+    # No credential shape. The text is also posted publicly under the user's
+    # account, so refuse the shapes that notify people or load remote content.
+    _rt_awk_rc=0
+    _rt_out=$(awk -v host="${RT_ALLOWED_HOST:-${GH_HOST:-github.com}}" '
+        function flag(rule) { if (!hit) { hit = 1; hitrule = rule; hitline = NR } }
+        /!\[/ { flag("markdown-image") }
+        {
+            # A mention is @name at the start of a line or after whitespace or
+            # an opening bracket or quote: where GitHub notifies. Not the @ of
+            # URL userinfo, an email address or a code span.
+            if ((" " $0) ~ /([[:space:]]|[(,;"\047])@[A-Za-z0-9]/) flag("mention")
+            l = tolower($0)
+            h = tolower(host)
+            while (match(l, /https?:\/\/[^\/ \t"\047`]*/)) {
+                u = substr(l, RSTART, RLENGTH)
+                l = substr(l, RSTART + RLENGTH)
+                sub(/^https?:\/\//, "", u)
+                sub(/^[^@]*@/, "", u)
+                sub(/[])>.,;:!?*]+$/, "", u)
+                sub(/:[0-9]+$/, "", u)
+                if (u != h) flag("foreign-url")
+            }
+        }
+        END {
+            if (hit) print hitrule, hitline
+            exit hit ? 0 : 1
+        }
+    ' < "$1") || _rt_awk_rc=$?
+    case "$_rt_awk_rc" in
+        0)
+            RT_HIT_RULE=${_rt_out%% *}
+            RT_HIT_LINE=${_rt_out##* }
+            return 1
+            ;;
+        1) return 0 ;;
+        *) return 2 ;;
+    esac
 }
 
-# rt_report_refusal [label]: after rt_text_clean failed, print the one stderr
+# rt_report_refusal [label]: after rt_text_clean returned non-zero, print the one stderr
 # token every resolve script uses for refused text, so a caller can tell it
 # from a usage error that also exits 2. It names the rule and the line,
 # never the text. A scan that did not run reports `scan failed`.

@@ -209,7 +209,7 @@ stub_sleep() {
 @test "refuses a body that looks like a credential, before any API call" {
   printf 'Fixed. Token was ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345\n' >| "$BODY"
   run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   [[ "$stderr" == *"credential"* ]]
   [ ! -f "$CALLS" ]
 }
@@ -219,7 +219,7 @@ stub_sleep() {
   printf '#!/bin/sh\nexit 2\n' >| "${BATS_TEST_TMPDIR}/failbin/awk"
   chmod +x "${BATS_TEST_TMPDIR}/failbin/awk"
   PATH="${BATS_TEST_TMPDIR}/failbin:${PATH}" run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   [[ "$stderr" == *"could not be scanned"* ]]
   [ ! -f "$CALLS" ]
 }
@@ -309,7 +309,7 @@ stub_sleep() {
 @test "a credential refusal prints the resolve-text token; an over-long body does not" {
   printf 'Fixed. Token was ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345\n' >| "$BODY"
   run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   [[ "$stderr" == *"resolve-text: refused rule=token-prefix line=1"* ]]
   head -c 1001 /dev/zero | tr '\0' 'a' >| "$BODY"
   run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
@@ -325,10 +325,10 @@ stub_sleep() {
   grep -qx 5 "$SLEEP_LOG"
 }
 
-@test "a last comment the prior-marker check cannot read exits 1 and posts nothing" {
+@test "a comment the prior-marker check cannot read exits 1 and posts nothing" {
   run --separate-stderr "$SCRIPT" PRRT_reply_badbody fixed "$BODY"
   [ "$status" -eq 1 ]
-  [[ "$stderr" == *"could not read the last comment"* ]]
+  [[ "$stderr" == *"could not read the comments"* ]]
   [ ! -f "$CALLS" ]
 }
 
@@ -364,4 +364,60 @@ path_without_timeout() {
   PATH="${BATS_TEST_TMPDIR}/notimeout" run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
   [ "$status" -eq 0 ]
   [[ "$stderr" == *"neither timeout nor gtimeout is installed"* ]]
+}
+
+# --- Credential refusal, auth failure and the pre-check window ---
+
+@test "a body with an image, a mention or a foreign URL exits 6 before any API call" {
+  for t in 'Fixed. ![x](https://github.com/o/r/raw/x.png)' 'Fixed, cc @octocat' 'Fixed, see https://evil.example/x'; do
+    printf '%s\n' "$t" >| "$BODY"
+    run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+    [ "$status" -eq 6 ] || { echo "not refused: $t"; false; }
+    [[ "$stderr" == *"resolve-text: refused rule="* ]]
+    [ ! -f "$CALLS" ]
+  done
+}
+
+@test "an HTTP 401 exits 7 without a retry" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_auth fixed "$BODY"
+  [ "$status" -eq 7 ]
+  [[ "$stderr" == *"rejected the credentials"* ]]
+  [ ! -f "$CALLS" ]
+}
+
+@test "the pre-check reads a bounded window of the newest comments" {
+  run "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 0 ]
+  grep -q 'window=20' "${BATS_TEST_TMPDIR}/mock_gh_any_call"
+}
+
+@test "a bot reply after our marker still skips" {
+  run "$SCRIPT" PRRT_reply_botafter fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.skipped')" = already-replied ]
+  [ "$(printf '%s' "$output" | jq -r '.disposition')" = fixed ]
+  [ ! -f "$CALLS" ]
+}
+
+@test "a human reply after our marker sends the thread back to be processed" {
+  run "$SCRIPT" PRRT_reply_humanafter fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = true ]
+  [ "$(cat "$CALLS")" = 1 ]
+}
+
+@test "our own later comment without a marker does not hide the marker before it" {
+  run "$SCRIPT" PRRT_reply_ownafter fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = true ]
+}
+
+@test "a jq that fails while measuring the body exits 1 with a message, not jq's status" {
+  mkdir -p "${BATS_TEST_TMPDIR}/jqbin"
+  printf '#!/bin/sh\nexit 5\n' >| "${BATS_TEST_TMPDIR}/jqbin/jq"
+  chmod +x "${BATS_TEST_TMPDIR}/jqbin/jq"
+  PATH="${BATS_TEST_TMPDIR}/jqbin:${PATH}" run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"could not measure the body file"* ]]
+  [ ! -f "$CALLS" ]
 }

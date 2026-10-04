@@ -87,7 +87,7 @@ new ones yet; wiring lands in a later PR of this stack.
 | `reply-pr-thread` | Reply to a thread with an idempotency marker |
 | `resolve-pr-thread` | Resolve a single thread |
 | `file-followup-issue` | File or find the follow-up issue for an out-of-scope thread |
-| `check-resolve-text` | Refuse credential-shaped text before it is posted outside the resolve scripts (for example a Linear issue) |
+| `check-resolve-text` | Refuse credential-shaped or unsafe text (image, `@` mention, foreign URL) before it is posted outside the resolve scripts (for example a Linear issue) |
 
 ## Opt-in: thermonuclear structural review
 
