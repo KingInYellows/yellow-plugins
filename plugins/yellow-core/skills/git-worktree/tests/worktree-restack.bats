@@ -254,6 +254,7 @@ assert_stacked() {
   [ "$status" -eq 10 ]
   [[ $output == *"unresolved conflicts remain"* ]]
   [ -e "$SD/state" ]
+  [ "$(cat "$SD/lock.d/pid")" = paused ]
   [ -z "$(branch_of "$(wtp b)")" ]
 }
 

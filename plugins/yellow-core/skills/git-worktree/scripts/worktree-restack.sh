@@ -37,6 +37,8 @@
 
 set -uo pipefail
 
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)
+
 readonly X_OK=0 X_USAGE=2 X_BUSY=3 X_STATE=4 X_PROVIDER=5 X_PAUSED=10
 readonly X_REFUSED=20 X_FAILED=30 X_PARTIAL=40 X_INCOMPLETE=50 X_SUBMIT=60
 readonly PAUSE_REASON='worktree:restack paused - do not commit; run /worktree:restack --continue or --abort'
@@ -559,7 +561,7 @@ gt_stack_parse() {
     prefix=${line%%"$glyph"*}
     rest=${line#*"$glyph"}
     [ -z "$prefix" ] || G_FORK=1
-    name=$(printf '%s' "$rest" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*([^)]*)[[:space:]]*$//' -e 's/[[:space:]]*$//')
+    name=$(printf '%s' "$rest" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]][[:space:]]*([^)]*)[[:space:]]*$//' -e 's/[[:space:]]*$//')
     [ -n "$name" ] || continue
     [ "$glyph" != '◉' ] || G_CUR=${#G_NAMES[@]}
     G_NAMES+=("$name")
@@ -594,7 +596,7 @@ gh_version_ok() {
 resolve_adapter() {
   local root cand best="" best_v="" ver
   root=${CLAUDE_PLUGIN_ROOT:-}
-  [ -n "$root" ] || root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." 2>/dev/null && pwd -P)
+  [ -n "$root" ] || root=$(cd -- "$SCRIPT_DIR/../../.." 2>/dev/null && pwd -P)
   ADAPTER=""
   cand="$root/../github-workflow/lib/github-stack-runtime.js"
   if [ -f "$cand" ]; then
@@ -723,15 +725,18 @@ plan_graphite_stack() {
     refuse "the stack forks at or above the current branch (not a linear stack)"
     return
   fi
-  for b in "${G_NAMES[@]}"; do
+  for ((i = 0; i < ${#G_NAMES[@]}; i++)); do
+    b=${G_NAMES[i]}
     valid_branch "$b" || {
       refuse "unusable branch name in the stack listing"
       return
     }
-    branch_exists "$b" || {
+    # The base and anything below the current branch are not restacked, so
+    # only the restack set needs a local ref.
+    if [ "$i" -le "$G_CUR" ] && ! branch_exists "$b"; then
       refuse "stack branch has no local ref: $(v "$b")"
       return
-    }
+    fi
   done
   if [ "refs/heads/${G_NAMES[G_CUR]}" != "$RUN_REF" ]; then
     refuse "the stack listing's current branch does not match this worktree's branch"
@@ -1259,6 +1264,22 @@ need_lock() {
     lock_busy_hint
     die "$X_BUSY" "another restack process is running"
   }
+  trap hold_or_release_lock EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
+}
+
+# hold_or_release_lock: on any exit of continue/abort/restore that still owns
+# the lock, keep it as "paused" while the state file exists (a recycled pid must
+# never block the next --continue) and drop it otherwise.
+hold_or_release_lock() {
+  local rc=$?
+  trap - EXIT
+  if [ "$(lock_pid)" = "$$" ]; then
+    if [ -e "$STATE_FILE" ]; then lock_mark_paused; else release_lock; fi
+  fi
+  exit "$rc"
 }
 
 cmd_continue() {

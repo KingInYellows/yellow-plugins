@@ -158,7 +158,8 @@ branch that no worktree holds, with the `checkout` line that restores it.
 | `5` | Provider differs from the recorded one | Switch back to the recorded provider and re-run, or restore the worktrees by hand |
 | `10` | Paused on a conflict | List the conflicted files and the detached, locked worktrees. Do not commit in a detached worktree. Resolve the files, `git add` them, then `/worktree:restack --continue` (or `--abort`) |
 | `20` | Preflight refused | Show the `REFUSE` reasons; nothing was touched |
-| `30` | Restack failed, worktrees restored | Show the provider output the script printed |
+| `2` | Usage error | Show the message; fix the arguments |
+| `30` | Restack failed | For a failed start or continue the worktrees were restored; show the provider output. For a failed `--abort` or a missing provider tool the state is kept and the worktrees may still be detached: point to `--status` and the script's `restore` subcommand |
 | `40` | Partial restore | Some worktree is still detached; show each per-entry line and its `checkout` fix, then re-run `--continue` or `--abort` |
 | `50` | Restack incomplete | The ancestry check found a branch that was not restacked; worktrees are restored and nothing was submitted |
 | `60` | Submit failed | The restack and restore are done; retry the provider's submit |
