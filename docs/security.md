@@ -634,7 +634,7 @@ prints no key; neither reads, prompts for or prints the key. The model value is
 validated as a plain slug before it becomes an argv item, because a leading `-`
 would be read as an opencode flag. Provider error text that reaches `summary=`
 (including the `--print-logs` stderr excerpt) is flattened, stripped of control
-characters and URLs, has the common short credential shapes (AWS key ids, Bearer
+characters and URLs, has the common short credential shapes (AWS AKIA/ASIA key ids, Bearer
 values, `sk-`/`gh*_`/`AIza`/`ses_` prefixed tokens, `github_pat_`) and long token runs
 masked and is length-capped; it does not go through the full 11-pattern redaction
 block (no PEM handling), so other short credential-shaped strings could survive

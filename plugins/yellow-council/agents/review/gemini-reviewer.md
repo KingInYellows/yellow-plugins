@@ -278,9 +278,12 @@ case $CLI_EXIT in
     # real wall. Still keep throttling out: "You have exhausted your quota" (agy's own
     # message) is always quota; a bare RESOURCE_EXHAUSTED is quota unless the text also
     # says rate limit, too many requests, overload or capacity, which are transient.
+    # That wording only counts when it sits next to the RESOURCE_EXHAUSTED signal, not
+    # anywhere in the window (an earlier, unrelated line must not demote a real wall).
+    QUOTA_WIN=$(printf '%s' "$QUOTA_FLAT" | LC_ALL=C grep -oE '.{0,120}RESOURCE_EXHAUSTED.{0,200}' | head -n 1)
     if printf '%s' "$QUOTA_FLAT" | grep -qi 'exhausted your quota' \
-       || { printf '%s' "$QUOTA_FLAT" | grep -q 'RESOURCE_EXHAUSTED' \
-            && ! printf '%s' "$QUOTA_FLAT" | grep -qiE 'rate.?limit|too many requests|overload|capacity'; }; then
+       || { [ -n "$QUOTA_WIN" ] \
+            && ! printf '%s' "$QUOTA_WIN" | grep -qiE 'rate.?limit|too many requests|overload|capacity'; }; then
       QUOTA_ETA=$(printf '%s\n' "$QUOTA_FLAT" | LC_ALL=C grep -oiE '(try again (in|at|after)|retry[- ]after) +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +/resets in /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Tt] +/resets at /; s/^[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Aa][Ff][Tt][Ee][Rr] +/resets after /; s/^[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +/resets in /')
       [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$QUOTA_FLAT" | LC_ALL=C grep -oiE '(^|[^A-Za-z])resets? +[^;|]{1,60}' | head -n 1 | LC_ALL=C sed -E 's/^[^A-Za-z]//; s/^[Rr][Ee][Ss][Ee][Tt][Ss]? +/resets /')
       QUOTA_ETA=$(printf '%s' "$QUOTA_ETA" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_.-' | sed -E 's/\. .*$//; s/[. ]+$//' | head -c 200)
@@ -805,6 +808,10 @@ case "$VERDICT" in
   APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE|QUOTA_EXHAUSTED) ;;
   *) VERDICT="UNKNOWN"; CONFIDENCE="LOW" ;;
 esac
+# QUOTA_EXHAUSTED is produced only by the explicit non-zero-exit arm in Step 6, which
+# prints its own stub and exits. A Verdict: line in the model's output is untrusted
+# text (a prompt-injected diff could write one), so it must not drop real findings.
+[ "$VERDICT" != "QUOTA_EXHAUSTED" ] || { VERDICT="UNKNOWN"; CONFIDENCE="LOW"; }
 
 # --- Construct fenced output ---
 FENCED_OUTPUT_FILE=$(mktemp /tmp/council-gemini-fenced-XXXXXX.txt)

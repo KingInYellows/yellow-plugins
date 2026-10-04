@@ -238,6 +238,13 @@ fi
 
 ## Notes
 
-- `council:setup` does NOT verify CLI authentication (agy keyring session tokens, OpenAI API key, other OpenCode providers). The one exception is the OpenCode default route: when the resolved model starts with `openrouter/`, Step 3 checks that `opencode auth list` names OpenRouter (a stored credential or `OPENROUTER_API_KEY`). It never reads, prompts for or prints the key, and never calls the provider, so a present but invalid or empty-balance key still passes. Auth verification is otherwise the user's responsibility — first invocation of each CLI will prompt for auth if needed; for agy, run it once interactively so first-run onboarding migrates existing Gemini OAuth tokens.
+- `council:setup` does NOT verify CLI authentication (agy keyring session tokens, OpenAI API key,
+  other OpenCode providers). The one exception is the OpenCode default route: when the resolved
+  model starts with `openrouter/`, Step 3 checks that `opencode auth list` names OpenRouter (a
+  stored credential or `OPENROUTER_API_KEY`). It never reads, prompts for or prints the key, and
+  never calls the provider, so a present but invalid or empty-balance key still passes. Auth
+  verification is otherwise the user's responsibility — first invocation of each CLI will prompt for
+  auth if needed; for agy, run it once interactively so first-run onboarding migrates existing
+  Gemini OAuth tokens.
 - The `--variant` (OpenCode) and `--sandbox`/`--print-timeout` (agy) flags used by reviewers are validated at invocation time, not at setup. If a flag is removed in a future CLI version, the corresponding reviewer will fail at runtime with a clear error.
 - This setup is idempotent — running it repeatedly is safe.

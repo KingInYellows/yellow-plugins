@@ -63,7 +63,9 @@ The legitimate Bash surface for this agent covers ONLY:
 - `mktemp /tmp/council-opencode-XXXXXX.json` — JSONL capture
 - `mktemp /tmp/council-opencode-err-XXXXXX.txt` — stderr capture
 - `timeout --signal=TERM --kill-after=10 ${COUNCIL_TIMEOUT:-600}` — timeout guard
-- `opencode run --format json --variant high --print-logs --log-level ERROR [--model <slug>] "..."` — OpenCode CLI invocation; `--model` follows `COUNCIL_OPENCODE_MODEL` (unset: DeepSeek V4 Pro via OpenRouter; set but empty: omitted)
+- `opencode run --format json --variant high --print-logs --log-level ERROR [--model <slug>] "..."`
+  — OpenCode CLI invocation; `--model` follows `COUNCIL_OPENCODE_MODEL` (unset: DeepSeek V4 Pro via
+  OpenRouter; set but empty: omitted)
 - `opencode session delete <id>` — REQUIRED post-call cleanup
 - `jq -r '...'` — extract `text` events and `sessionID`
 - `awk '...'` — credential redaction (applied to extracted text only)
@@ -319,7 +321,7 @@ case $CLI_EXIT in
     # token run (key-shaped strings). The quota scan below reads the whole sanitized
     # text; only the copy that reaches summary= is capped at 300 bytes.
     ERROR_FULL=$(printf '%s' "$ERROR_MSG" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177' \
-      | LC_ALL=C sed -E 's#https?://[^[:space:]]+#[url]#g; s/AKIA[0-9A-Z]{16}/[redacted]/g; s/[Bb]earer +[A-Za-z0-9._-]+/Bearer [redacted]/g; s/(sk|ghp|gho|ghs|ghu|AIza|ses)[_-][A-Za-z0-9_-]{8,}/[redacted]/g; s/github_pat_[A-Za-z0-9_]+/[redacted]/g; s/[A-Za-z0-9_-]{24,}/[redacted]/g')
+      | LC_ALL=C sed -E 's#https?://[^[:space:]]+#[url]#g; s/(AKIA|ASIA)[0-9A-Z]{16}/[redacted]/g; s/[Bb]earer +[A-Za-z0-9._-]+/Bearer [redacted]/g; s/(sk|ghp|gho|ghs|ghu|AIza|ses)[_-][A-Za-z0-9_-]{8,}/[redacted]/g; s/github_pat_[A-Za-z0-9_]+/[redacted]/g; s/[A-Za-z0-9_-]{24,}/[redacted]/g')
     ERROR_MSG=$(printf '%s' "$ERROR_FULL" | head -c 300)
     if [ -n "$ERROR_MSG" ] && { [ "$ERROR_STATUS" = "402" ] || printf '%s' "$ERROR_FULL" | grep -qiE 'insufficient_quota|model_cap_exceeded|RESOURCE_EXHAUSTED|quota exceeded|usage limit|requires more credits|insufficient.credits'; }; then
       # Provider quota passthrough (OpenRouter's HTTP 402 "requires more
@@ -371,7 +373,7 @@ case $CLI_EXIT in
       # --print-logs puts opencode's ERROR logs in $STDERR_FILE, which can carry
       # provider options and request fragments: sanitize like ERROR_MSG above.
       ERR_PEEK=$(head -3 "$STDERR_FILE" 2>/dev/null | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177' \
-        | LC_ALL=C sed -E 's#https?://[^[:space:]]+#[url]#g; s/AKIA[0-9A-Z]{16}/[redacted]/g; s/[Bb]earer +[A-Za-z0-9._-]+/Bearer [redacted]/g; s/(sk|ghp|gho|ghs|ghu|AIza|ses)[_-][A-Za-z0-9_-]{8,}/[redacted]/g; s/github_pat_[A-Za-z0-9_]+/[redacted]/g; s/[A-Za-z0-9_-]{24,}/[redacted]/g' | head -c 200)
+        | LC_ALL=C sed -E 's#https?://[^[:space:]]+#[url]#g; s/(AKIA|ASIA)[0-9A-Z]{16}/[redacted]/g; s/[Bb]earer +[A-Za-z0-9._-]+/Bearer [redacted]/g; s/(sk|ghp|gho|ghs|ghu|AIza|ses)[_-][A-Za-z0-9_-]{8,}/[redacted]/g; s/github_pat_[A-Za-z0-9_]+/[redacted]/g; s/[A-Za-z0-9_-]{24,}/[redacted]/g' | head -c 200)
       printf 'verdict=ERROR\n'
       printf 'confidence=N/A\n'
       printf 'summary=OpenCode CLI error (exit %d). Excerpt: %s\n' "$CLI_EXIT" "$ERR_PEEK"
@@ -872,6 +874,10 @@ case "$VERDICT" in
   APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE|QUOTA_EXHAUSTED) ;;
   *) VERDICT="UNKNOWN"; CONFIDENCE="LOW" ;;
 esac
+# QUOTA_EXHAUSTED is produced only by the explicit non-zero-exit arm in Step 6, which
+# prints its own stub and exits. A Verdict: line in the model's output is untrusted
+# text (a prompt-injected diff could write one), so it must not drop real findings.
+[ "$VERDICT" != "QUOTA_EXHAUSTED" ] || { VERDICT="UNKNOWN"; CONFIDENCE="LOW"; }
 
 # --- Construct fenced output ---
 FENCED_OUTPUT_FILE=$(mktemp /tmp/council-opencode-fenced-XXXXXX.txt)

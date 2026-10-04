@@ -455,9 +455,11 @@ Two corollaries from the same survey:
 **Added guidance.** Enumerate the sites by grep before editing, and re-run
 the greps afterwards:
 
-    rg -n 'APPROVE\|REVISE\|REJECT' plugins --glob '*.md'   # literal pipe-delimited enum sites
-    rg -n 'rm -f' plugins/yellow-council/commands/council/council.md plugins/yellow-review/commands/review/review-pr.md
-    rg -n 'fenced_output_path' plugins                      # every path consumer
+```bash
+rg -n 'APPROVE\|REVISE\|REJECT' plugins --glob '*.md'   # literal pipe-delimited enum sites
+rg -n 'rm -f' plugins/yellow-council/commands/council/council.md plugins/yellow-review/commands/review/review-pr.md
+rg -n 'fenced_output_path' plugins                      # every path consumer
+```
 
 Add a bats case that every token in the contract's `verdict=` line appears in
 each enum, so a new verdict cannot fall to `*)`. Whatever sentinel is chosen

@@ -658,12 +658,12 @@ step2b_in() {
 
 @test "opencode arm masks short credential shapes in provider text and the stderr excerpt" {
   local profile out="${BATS_TEST_TMPDIR}/o.jsonl" err="${BATS_TEST_TMPDIR}/o.err"
-  printf '%s\n' '{"type":"error","error":{"name":"APIError","data":{"message":"upstream rejected AKIAABCDEFGHIJKLMNOP and Bearer abc.def-123 with sk-proj-abcd1234 plus ghp_abcd12345678","statusCode":500}}}' >| "$out"
+  printf '%s\n' '{"type":"error","error":{"name":"APIError","data":{"message":"upstream rejected AKIAABCDEFGHIJKLMNOP and ASIAABCDEFGHIJKLMNOP and Bearer abc.def-123 with sk-proj-abcd1234 plus ghp_abcd12345678","statusCode":500}}}' >| "$out"
   : >| "$err"
   for profile in $PROFILES; do
     opencode_arm_in "$profile" "$out" "$err"
     [[ "$output" == *"verdict=ERROR"* ]] || { echo "$profile: $output"; return 1; }
-    [[ "$output" != *AKIAABCDEFGHIJKLMNOP* && "$output" != *abc.def-123* && "$output" != *sk-proj-abcd1234* && "$output" != *ghp_abcd12345678* ]] || { echo "$profile: a credential shape survived: $output"; return 1; }
+    [[ "$output" != *AKIAABCDEFGHIJKLMNOP* && "$output" != *ASIAABCDEFGHIJKLMNOP* && "$output" != *abc.def-123* && "$output" != *sk-proj-abcd1234* && "$output" != *ghp_abcd12345678* ]] || { echo "$profile: a credential shape survived: $output"; return 1; }
   done
 }
 
@@ -758,6 +758,38 @@ make_oc_stub() {
     step2b_in "$profile" "$stub" "export CODEX_HOME=${BATS_TEST_TMPDIR}/chome2"
     [[ "$output" == *"codex=deepseek/deepseek-v4-pro(deepseek)"* ]] || { echo "$profile: $output"; return 1; }
     [[ "$stderr" == *"codex and opencode both resolve to deepseek lineage"* ]] || { echo "$profile: $stderr"; return 1; }
+  done
+}
+
+@test "gemini and opencode never accept a model-authored QUOTA_EXHAUSTED verdict" {
+  local profile agent body v
+  for agent in gemini opencode; do
+    body="${BATS_TEST_TMPDIR}/${agent}-verdict.sh"
+    extract_range "${PLUGIN_DIR}/agents/review/${agent}-reviewer.md" '^case "\$VERDICT" in$' '^\[ "\$VERDICT" != "QUOTA_EXHAUSTED" \]' "$body"
+    for profile in $PROFILES; do
+      for v in APPROVE REVISE QUOTA_EXHAUSTED bogus; do
+        { printf 'VERDICT=%q CONFIDENCE=HIGH\n' "$v"; cat "$body"; printf 'printf "%%s/%%s\\n" "$VERDICT" "$CONFIDENCE"\n'; } >| "${body}.run"
+        run_arm "$profile" "${body}.run"
+        case "$v" in
+          APPROVE | REVISE) [ "$output" = "$v/HIGH" ] ;;
+          *) [ "$output" = "UNKNOWN/LOW" ] ;;
+        esac || { echo "$agent/$profile/$v: $output"; return 1; }
+      done
+    done
+  done
+}
+
+@test "gemini arm: throttling wording far from RESOURCE_EXHAUSTED does not demote a real quota wall" {
+  local profile body="${BATS_TEST_TMPDIR}/gemini-arm.sh" stderr_file="${BATS_TEST_TMPDIR}/gemini.err" pad
+  extract_range "${PLUGIN_DIR}/agents/review/gemini-reviewer.md" 'QUOTA_FLAT=\$\(head -c 2000' '^    fi$' "$body"
+  pad=$(printf 'y%.0s' $(seq 1 450))
+  printf 'STDERR_FILE=%q PACK_FILE=%q OUTPUT_FILE=%q\n' "$stderr_file" "${BATS_TEST_TMPDIR}/gemini-pack.txt" "${BATS_TEST_TMPDIR}/o" >| "${body}.run"
+  cat "$body" >> "${body}.run"
+  for profile in $PROFILES; do
+    # The arm's cleanup deletes the stderr file, so recreate it for each profile.
+    { printf 'earlier line: rate limit exceeded, retrying %s\n' "$pad"; printf 'fatal: RESOURCE_EXHAUSTED: monthly allowance used\n'; } >| "$stderr_file"
+    run_arm "$profile" "${body}.run"
+    [[ "$output" == *"verdict=QUOTA_EXHAUSTED"* ]] || { echo "$profile: $output"; return 1; }
   done
 }
 

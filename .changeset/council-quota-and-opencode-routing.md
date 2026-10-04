@@ -20,9 +20,9 @@ four-reviewer council.
   presence. Unset routes to `openrouter/deepseek/deepseek-v4-pro`, set but empty
   passes no `--model` (V1), and a non-empty value is passed verbatim. A missing
   model, an unauthenticated provider or HTTP 401 returns `UNAVAILABLE` naming
-  the fix (other statuses, including 403, stay `ERROR`). `/council` Step 2b (after mode dispatch, so help and `fleet` never start
-  opencode) prints each slot's resolved model and lineage, warns
-  without blocking on a lineage collision or a missing OpenRouter credential, and
+  the fix (other statuses, including 403, stay `ERROR`). `/council` Step 2b
+  (after mode dispatch, so help and `fleet` never start opencode) prints each
+  slot's resolved model and lineage, warns without blocking on a lineage collision or a missing OpenRouter credential, and
   the report header carries a `Models` row. `/council:setup` checks for an
   OpenRouter credential. The routing spike on opencode 1.18.34 is recorded in
   `docs/spikes/opencode-cli-format-json-2026-05-04.md`.

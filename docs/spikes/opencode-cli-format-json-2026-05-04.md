@@ -164,7 +164,7 @@ provider (a dummy value returns an `APIError`, `statusCode` 401, message
 the model and authentication cases are opaque there:
 
 | Case | Exit | `error` event |
-|------|------|---------------|
+| ---- | ---- | ------------- |
 | Unknown slug on a real provider (`openrouter/deepseek/no-such-model-xyz`) | 1 | `name` `UnknownError`, `data.message` "Unexpected server error. Check server logs for details.", `data.ref` `err_...` |
 | Unknown provider (`bogus/model`) | 1 | same |
 | Provider with no credential (`mistral/...`) | 1 | same |
@@ -180,8 +180,9 @@ unauthenticated provider fails this way because its models are never loaded.
 The stdout JSON stream is unchanged by those flags and a successful run prints
 nothing extra at ERROR level. opencode-reviewer therefore passes
 `--print-logs --log-level ERROR` and classifies `ProviderModelNotFoundError`
-(plus HTTP 401; other statuses such as 403, which OpenRouter also uses for moderation and key limits, stay `ERROR`) as `UNAVAILABLE`, and HTTP 402 / "requires more credits"
-as `QUOTA_EXHAUSTED`.
+(plus HTTP 401; other statuses such as 403, which OpenRouter also uses for
+moderation and key limits, stay `ERROR`) as `UNAVAILABLE`, and HTTP 402 /
+"requires more credits" as `QUOTA_EXHAUSTED`.
 
 ## Gotchas to Watch For
 
