@@ -431,6 +431,7 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   grep -q -- '--revert-only --files-from' "$RESOLVE_PR"
   grep -qF 'scripts/commit-resolve-fixes" --provider "<graphite|github>"' "$RESOLVE_PR"
   grep -q -- '--allow-credential-shaped' "$RESOLVE_PR"
+  grep -qF -- '--ranges-from "<ranges-file>"' "$RESOLVE_PR"
   grep -q 'scripts/file-followup-issue"' "$RESOLVE_PR"
   grep -q 'scripts/reply-pr-thread"' "$RESOLVE_PR"
   grep -q 'scripts/resolve-pr-thread"' "$RESOLVE_PR"
@@ -477,7 +478,7 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
 @test "resolver agent: a read deny list names secret paths and bars quoting file content" {
   text=$(flat "$RESOLVER_AGENT")
   [[ "$text" == *'Read, Grep or Glob secrets, credentials or files outside the repository'* ]]
-  [[ "$text" == *'`.env`, `.env.*`, `*.pem`, `*.key`'* ]]
+  [[ "$text" == *'`.env*`, `*.pem`, `*.key`'* ]]
   [[ "$text" == *'they name a `path:line` and never copy file content'* ]]
   disp=$(flat "$RESOLVE_REFS/dispositions.md")
   [[ "$disp" == *'**Resolver read bounds.**'* ]]
@@ -489,6 +490,13 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   step6=$(sed -n '/^### Step 6: Verify, Commit and Push/,/^### Step 7/p' "$RESOLVE_PR")
   printf '%s\n' "$step6" | tr '\n' ' ' | tr -s ' ' | grep -q 'git status --porcelain --untracked-files=all'
   printf '%s\n' "$step6" | tr '\n' ' ' | tr -s ' ' | grep -q 'never put a resolver path on a command line'
+}
+
+@test "resolve-pr: Step 5 conflict rollback includes shared files and downgrades the other clusters on them" {
+  step5=$(sed -n '/^### Step 5: Dispositions/,/^### Step 6/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  printf '%s\n' "$step5" | grep -q 'list every file the conflicted cluster modified, shared or not'
+  printf '%s\n' "$step5" | grep -q 'Every other cluster that modified a listed file loses its edits with the revert'
+  ! printf '%s\n' "$step5" | grep -q 'keeps its edits and the conflicted'
 }
 
 # Collapse line wraps so a phrase can be matched across them.
@@ -526,7 +534,9 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   text=$(flat "$RESOLVE_PR")
   [[ "$text" == *'pass `unknown` for both, so the resolver edits nothing and proposes `unclear`'* ]]
   disp=$(flat "$RESOLVE_REFS/dispositions.md")
-  [[ "$disp" == *'`PR-changed lines` `unknown` and the proposal is `oos`: it becomes `unclear`'* ]]
+  [[ "$disp" == *'`PR-changed lines` `unknown` and the proposal is `fixed`, `addressed` or `oos`'* ]]
+  [[ "$disp" == *'it becomes `unclear` with evidence `PR ranges unavailable`'* ]]
+  [[ "$disp" != *'`unknown` and the proposal is `oos`: it becomes'* ]]
 }
 
 @test "dispositions: a reused Linear hit passes the same response checks as save_issue" {

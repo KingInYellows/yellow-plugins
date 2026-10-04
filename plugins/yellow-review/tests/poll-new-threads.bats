@@ -114,6 +114,20 @@ EOS
   [ "$status" -ne 2 ]
 }
 
+@test "a zero-padded --wait is read as decimal, not octal" {
+  printf 'PRRT_thread1\nPRRT_thread3\nPRRT_thread4\n' >"$ROUND1"
+  run --separate-stderr "$SCRIPT" --wait 08 "o/r" 123 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repass fetched=1 found=0"* ]]
+  [[ "$stderr" != *"value too great for base"* ]]
+  [ "$(paste -sd, "$SLEEP_LOG")" = "8" ]
+  : >"$SLEEP_LOG"
+  run --separate-stderr "$SCRIPT" --wait 010 "o/r" 123 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repass fetched=1 found=0"* ]]
+  [ "$(paste -sd, "$SLEEP_LOG")" = "10" ]
+}
+
 @test "a get-pr-comments exit 3 partial array is never read as a complete fetch" {
   fake_setup
   printf 'PRRT_a\n' >"$ROUND1"
@@ -329,7 +343,9 @@ make_expiring_timeout() {
   fake_setup
   : >"$ROUND1"
   # Record the deadline the child sees, then behave as a normal fetch.
-  sed -i '2a printf "%s\\n" "${YELLOW_REVIEW_FETCH_DEADLINE:-unset}" >>"$DEADLINE_LOG"' "$FAKE_DIR/get-pr-comments"
+  sed -i.bak '2a\
+printf "%s\\n" "${YELLOW_REVIEW_FETCH_DEADLINE:-unset}" >>"$DEADLINE_LOG"' "$FAKE_DIR/get-pr-comments"
+  rm -f "$FAKE_DIR/get-pr-comments.bak"
   export DEADLINE_LOG="${BATS_TEST_TMPDIR}/deadline.log"
   : >"$DEADLINE_LOG"
   YELLOW_REVIEW_FETCH_DEADLINE=270 FAKE_RESULTS="ok:PRRT_a" \

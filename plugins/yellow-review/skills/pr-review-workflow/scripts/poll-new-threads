@@ -63,6 +63,8 @@ case "$WAIT" in ''|*[!0-9]*) usage ;; esac
 # At most 4 digits and 480 s, the cap the settings enforce: a longer value
 # would make the integer tests below error and the loop spin without sleeping.
 [ "${#WAIT}" -le 4 ] && [ "$WAIT" -le 480 ] || usage
+# Force base 10: arithmetic below would read a leading zero as octal ("08" errors, "010" is 8).
+WAIT=$((10#$WAIT))
 [ -r "$ROUND1" ] || { printf 'Error: round-1 file not readable: %s\n' "$ROUND1" >&2; exit 2; }
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)

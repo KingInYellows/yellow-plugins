@@ -1310,6 +1310,16 @@ ignored_fixture() {
   [ -f src/new.txt ]
 }
 
+@test "--check-ignored with tracked edits and no ignored changes does not claim treeClean" {
+  ignored_fixture
+  [ -n "$(git status --porcelain)" ]
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = clean ]
+  [ "$(printf '%s' "$output" | jq -r '.treeClean // "absent"')" != true ]
+  printf '%s' "$output" | jq -e 'has("treeClean") | not' >/dev/null
+}
+
 @test "--check-ignored refuses an ignored file edited after the marker and names it" {
   ignored_fixture
   printf '#!/bin/sh\necho pwned\n' >| node_modules/.bin/runner

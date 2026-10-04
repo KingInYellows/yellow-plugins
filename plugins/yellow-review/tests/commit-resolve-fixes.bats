@@ -385,6 +385,80 @@ STUB
   [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
 }
 
+# --- Changed-range bound (--ranges-from) ---
+# src/a.txt at HEAD is "one\nfeature\n": the PR added line 2.
+
+@test "--ranges-from accepts a hunk inside the changed range" {
+  printf 'one\nfeature2\n' >| src/a.txt
+  printf 'src/a.txt 2-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+}
+
+@test "--ranges-from accepts an insertion just after the changed range" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  printf 'src/a.txt 2-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+}
+
+@test "--ranges-from refuses a hunk outside the changed range (exit 3, nothing committed)" {
+  seq 1 30 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file" && git push -q origin feature 2>/dev/null
+  base=$(git rev-parse HEAD)
+  sed -i.bak 's/^25$/changed/' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt 1-5\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"outside the PR's changed line ranges: src/a.txt (old lines 25-25)"* ]]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+  [ -z "$(git diff --cached --name-only)" ]
+}
+
+@test "--ranges-from refuses a hunk that straddles the edge of a range" {
+  seq 1 30 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file" && git push -q origin feature 2>/dev/null
+  sed -i.bak '4,10d' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt 1-5\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 3 ]
+}
+
+@test "--ranges-from refuses a file whose row is none, unknown or missing" {
+  printf 'one\nfeature2\n' >| src/a.txt
+  for row in 'src/a.txt none' 'src/a.txt unknown' 'src/b.txt 1-2'; do
+    printf '%s\n' "$row" >| "$BATS_TEST_TMPDIR/ranges"
+    run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+    [ "$status" -eq 3 ]
+  done
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
+@test "--ranges-from with an empty ranges file refuses every file" {
+  printf 'one\nfeature2\n' >| src/a.txt
+  : >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 3 ]
+}
+
+@test "--ranges-from checks every listed file, not just the first" {
+  printf 'one\nfeature2\n' >| src/a.txt
+  printf 'two\nfeature\nextra\nextra\nextra\nextra\nextra\nextra\n' >| src/b.txt
+  printf 'src/a.txt 2-2\nsrc/b.txt 2-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt src/b.txt
+  [ "$status" -eq 0 ]
+}
+
+@test "--ranges-from rejects a malformed or unreadable ranges file (exit 2)" {
+  printf 'src/a.txt 2-\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"malformed row"* ]]
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/nope" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"--ranges-from not readable"* ]]
+}
+
 @test "an unreadable PR file list refuses the commit (exit 3)" {
   printf 'one\nfeature\nfix\n' >| src/a.txt
   export STUB_PR_FILES_FAIL=1

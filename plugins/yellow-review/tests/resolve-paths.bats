@@ -489,6 +489,26 @@ ignored_repo() {
   [ "$output" = .ruvector/hook.sh ]
 }
 
+@test "rp_ignored_changed_since ignores coedit-sessions through a .ruvector symlink but not its siblings" {
+  ignored_repo
+  printf '.ruvector\n' >> .gitignore
+  store="$BATS_TEST_TMPDIR/store"
+  mkdir -p "$store/coedit-sessions"
+  printf 'old\n' >| "$store/coedit-sessions/s1.json"
+  printf 'old\n' >| "$store/hook.sh"
+  touch -t 201901010000 "$store/coedit-sessions/s1.json" "$store/hook.sh"
+  ln -s "$store" .ruvector
+  touch -h -t 201901010000 .ruvector
+  printf 'new\n' >| "$store/coedit-sessions/s1.json"
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  printf 'new\n' >| "$store/hook.sh"
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$output" = .ruvector ]
+}
+
 @test "rp_ignored_changed_since works from a subdirectory and with a relative marker" {
   ignored_repo
   printf 'new\n' >| node_modules/.bin/runner

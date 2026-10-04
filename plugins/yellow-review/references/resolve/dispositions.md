@@ -54,8 +54,10 @@ THREAD <PRRT_id> | disposition=<fixed|addressed|oos|disagree|unclear> | evidence
   to the working tree and exclude the secret-bearing paths its agent file
   lists (`.env*`, key and certificate files, `secrets.*`, `.git/`, `.ssh/`,
   `.aws/`, `.npmrc`, `yellow-plugins.local.md`). The deny list is a rule for
-  the resolver, not a runtime block, so the prose allowlist below stays the
-  enforcement: `evidence` and `oos_reason` never carry file content.
+  the resolver, not a runtime block. The prose allowlist below is a format
+  check that bounds what `evidence` and `oos_reason` can carry (length, one
+  line, allowed shapes), and `check-resolve-text` screens credential shapes.
+  Neither proves the text did not come from a file.
 - **Prose allowlist.** This is the single source. Replies and issue bodies
   embed `evidence` and `oos_reason`, so the orchestrator checks both values
   before any reply, issue or resolve helper runs. A value is accepted only
@@ -102,9 +104,15 @@ The orchestrator turns a proposed disposition into `unclear` when:
   push is not `ok` or a revert ran: the evidence points at a sibling edit that
   was never published;
 - the cluster was dispatched with `PR-changed lines` `unknown` and the
-  proposal is `oos`: it becomes `unclear` with evidence `PR ranges
-  unavailable`, so an unreadable files API never files an issue or resolves a
-  thread.
+  proposal is `fixed`, `addressed` or `oos` (every proposal that would
+  resolve a thread or file an issue): it becomes `unclear` with evidence `PR
+  ranges unavailable`. With no ranges the resolver was told to edit nothing,
+  the `addressed` path check cannot confirm a changed file for outdated or
+  review-level threads, and `oos` cannot be proven, so an unreadable files API
+  never files an issue or resolves a thread. `fixed` is downgraded too: its
+  edit sits outside any validated bound, and no surviving `fixed` thread
+  names its files, so Step 6 does not commit them. `disagree` and `unclear`
+  already leave the thread open and pass through unchanged.
 
 Reasons the resolver gives for not editing map as follows:
 
@@ -404,6 +412,11 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   `--allow-credential-shaped` after the user confirms a second time, an
   unattended run never does), and with `--unattended` refuses runner files,
   because the commit's git hooks would execute them;
+- `commit-resolve-fixes --ranges-from <ranges-file>` (the Step 3 capture of
+  `pr-changed-ranges`) refuses, exit 3 with nothing committed, any staged hunk
+  whose old-side lines are not inside one changed range of its file widened
+  by 3 lines; a listed file whose row is `none`, `unknown` or missing accepts
+  no hunk, and a malformed ranges file is exit 2;
 - `run-verify-command` refuses gitignored files, and when running a command
   also unchanged files, and refuses to run when the tree has changes outside
   the listed files. It does not run the command when a
@@ -419,7 +432,10 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   directory. When no verify command runs, Step 6 still calls
   `run-verify-command --check-ignored --ignored-since <marker-file>`, which
   runs the same guard and nothing else; a refusal reverts and downgrades
-  `fixed` threads like any other. `--revert-only`
+  `fixed` threads like any other. Its success result,
+  `{"result":"clean","patch":null,"log":null}`, has no `treeClean` field: the
+  guard never inspects the tracked or untracked-unignored tree, so the caller
+  must not read it as a clean tree. `--revert-only`
   saves a patch and reverts the listed files without running anything
   (Step 5's CONFLICT rollback). It waives only the deny-list check; an
   unchanged listed file is skipped and named in `reason`
@@ -527,13 +543,16 @@ values still fall back to 30), and the budget is derived from that cap:
 
 The largest is 360 s; 420 s adds 60 s for `jq`, the credential scan and
 startup, and stays under the Bash tool's 600 s maximum. Change the cap and
-this budget together. `poll-new-threads` ends within `--wait` + 60 s, inside
-its `(wait + 120) × 1000` ms budget. It bounds each `get-pr-comments` run with
+this budget together. With `timeout(1)` or `gtimeout(1)` installed,
+`poll-new-threads` ends within `--wait` + 60 s, inside its
+`(wait + 120) × 1000` ms budget. It bounds each `get-pr-comments` run with
 that script's own deadline (`YELLOW_REVIEW_FETCH_DEADLINE=55`, below) behind a
 60 s hard cap, not with the per-call `gh` limit, so a multi-page fetch is not
 killed mid-pagination. A fetch that hits the deadline exits 3 and counts as
 a failed fetch for that round. The 270 s default below does not apply to the
-poll.
+poll. Without either binary the 60 s hard cap and the `--wait` + 60 s bound do
+not hold: the script prints a note and fetches run with no time limit, so only
+the between-page deadline applies and a hung `gh` call is not cut short.
 
 `get-pr-comments` (Step 3, with `get-pr-blockers`) gets a `timeout` of 300000 ms.
 It can fetch 10 pages, so it adds a wall-clock deadline to the per-call cap:
@@ -785,6 +804,14 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   reply is the resolver's claim, not a verified fact.
 - A repo with Issues disabled makes `file-followup-issue` exit 1 (`gh issue
   list` fails), so its `oos` threads get no reply and stay open on every run.
+- The range check bounds a file's edits to its PR-changed lines plus a
+  3-line margin, not to the thread's own lines: a resolver steered by one
+  thread can still edit another changed region of the same file, or the
+  margin. `<ranges-file>` is a `mktemp` file that is not hashed, so a model
+  that calls Write could in principle rewrite it; the check also assumes the
+  local HEAD is the head the ranges were captured from (a later head fails
+  closed, as a refusal). Without `--ranges-from` the script checks file
+  membership only.
 - `commit-resolve-fixes` disables git hooks for its commit and submit
   (`core.hooksPath=/dev/null`, with a note on stderr) when the hooks
   directory holds non-sample hooks it cannot verify: `.git/hooks` or a
@@ -807,7 +834,7 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   lock and no post-write reconciliation (unlike `file-followup-issue`'s
   post-create rescan, which covers issues only). Run one resolve or sweep per
   PR at a time. A duplicate reply is harmless noise; a conflicting pair is not
-  detected, and a later re-run acts on the last comment only.
+  detected, and a later re-run acts on our latest marked comment only.
 - Linear dedupe is best effort: it relies on a viewer-authored `oos` marker
   on the thread or on Linear's text search finding the marker. A reply that
   failed before Linear indexed the issue can still lead to a second issue on

@@ -311,11 +311,14 @@ rp_tree_changes() {
 # is hidden behind a directory that cannot be searched. Run it from the working
 # tree root with a path that does not begin with `-`.
 rp_link_target_changed() {
-    local l="$1" marker="$2" t p d out rc=0
+    local l="$1" marker="$2" t p d out skip="" rc=0
     if [ -e "$l" ]; then
         if [ -d "$l" ]; then
+            # The root `.ruvector` link: skip its session log as the literal
+            # directory scan does (see rp_ignored_changed_since).
+            case "$l" in .ruvector|./.ruvector) skip="$l/coedit-sessions" ;; esac
             out=$(set -o pipefail
-                find -H "$l" -name .git -prune -o -type f -newer "$marker" -print 2>/dev/null \
+                find -H "$l" -name .git -prune -o -path "$skip" -prune -o -type f -newer "$marker" -print 2>/dev/null \
                     | head -n 1) || rc=$?
             [ -z "$out" ] || return 0
             [ "$rc" -eq 0 ] || return 2

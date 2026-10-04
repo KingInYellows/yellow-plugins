@@ -325,7 +325,8 @@ row, or the value the edit-bounds table in `clusters.md` gives; for a cluster
 with a `null` path, the fenced block lists the full `<path> <ranges>` rows. On a
 non-zero exit pass `unknown` for both, so the resolver edits nothing and
 proposes `unclear` (never `oos`: the ranges are missing, so the thread is not
-known to be out of scope). The resolver reads files directly via Read/Grep at the cited paths.
+known to be out of scope). Step 5 also downgrades a `fixed`, `addressed` or
+`oos` proposal from such a cluster to `unclear`. The resolver reads files directly via Read/Grep at the cited paths.
 
 The resolver should reconcile multiple comments in a cluster with a **single
 coherent edit** to the file region, not N separate edits. If two comments in
@@ -364,18 +365,24 @@ not already. Then, for every thread sent to a resolver:
      conflicted cluster's edits / Cancel and reconcile manually". To roll
      back, write the cluster's files to a `mktemp` file with the Write tool
      and run `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command"
-     --pr "<PR#>" --revert-only --files-from "<file>"` (it saves a patch). The revert is per file, so list only files
-     no other cluster modified; a file shared with another cluster keeps its
-     edits and the conflicted cluster's threads stay `unclear`. Cancel runs
+     --pr "<PR#>" --revert-only --files-from "<file>"` (it saves a patch). The revert is per file, and
+     edits to a shared file cannot be separated by cluster, so list every file
+     the conflicted cluster modified, shared or not. Every other cluster that
+     modified a listed file loses its edits with the revert: its threads become
+     `unclear` too and stay open, and its remaining files fall under Step 6's
+     no-`fixed`-thread revert. Cancel runs
      `run-verify-command --pr "<PR#>" --revert-dirty` (patch saved, so manual
      reconciliation can start from it: the edits are unscreened and a
      deny-listed one must not stay on disk), then stops before Step 6 and goes
      to Step 9 with `push=skipped, verify=none`; run Step 6's marker cleanup
      block first.
    - **Non-interactive:** do not prompt and do not keep unreconciled edits:
-     roll the conflicted cluster back exactly as above (same per-file rule),
-     so Step 6 never commits or pushes them, and log the conflict for Step 9.
-   Either way, the conflicted cluster's threads become `unclear`.
+     roll the conflicted cluster back exactly as above (same shared-file
+     rule), so Step 6 never commits or pushes its edits, and log the conflict
+     for Step 9.
+   Either way, the conflicted cluster's threads become `unclear`; when the user
+   kept the partial edits, the kept files stay in Step 6's set only if a
+   surviving `fixed` thread names them.
 2. **Parse and validate** each `THREAD` line, applying the contract's
    downgrade rules, skipped-reason mapping and `addressed` evidence rules. A
    line that does not match the contract's full-line regex is malformed: that
@@ -483,8 +490,13 @@ uncommitted, `fixed` threads become `unclear`. In non-interactive mode add
 Step 3e's provider:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --provider "<graphite|github>" --pr "<PR#>" --message "fix: resolve PR #<PR#> review comments (<n> files)" --files-from "<files-file>"
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --provider "<graphite|github>" --pr "<PR#>" --message "fix: resolve PR #<PR#> review comments (<n> files)" --files-from "<files-file>" --ranges-from "<ranges-file>"
 ```
+
+`--ranges-from` is the Step 3 `<ranges-file>` the dispatch captured (the one
+this pass's resolvers were bounded by, never a re-capture after their edits):
+the script refuses, exit 3, any staged hunk outside a file's changed lines
+(plus a small margin) instead of trusting the resolver's prompt bound.
 
 `PUSHED` → `push=ok`, keep `sha`. `NOOP` → `push=noop`. Any non-zero exit →
 `push=failed` with its stderr (exit codes in the contract); exits 2, 3 and 4
