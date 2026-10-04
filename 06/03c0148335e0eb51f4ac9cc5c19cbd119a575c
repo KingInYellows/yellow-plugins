@@ -1,0 +1,50 @@
+plugins/yellow-review/tests/file-followup-issue.bats
+  s_50d166a981ace4::t_cd34204530b287 547-560
+  s_50d166a981ace4::t_ff6eadec65ea01 587,590
+plugins/yellow-review/references/resolve/dispositions.md
+  s_50d166a981ace4::t_56c5e37052c634 467-469
+  s_50d166a981ace4::t_3bbbfdcd9f4d29 490-491
+  s_50d166a981ace4::t_d6807c4a687e40 348-359,534-535
+docs/security.md
+  s_50d166a981ace4::t_ecfefe9501e427 343-347
+plugins/yellow-review/lib/resolve-text.sh
+  s_50d166a981ace4::t_ff7541dd746eca 527-529
+  s_50d166a981ace4::t_5a7b050184de78 50,516-520
+  s_50d166a981ace4::t_a9efa3b70ef276 40-49,51-54,56-60,64-66
+plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-blockers
+  s_50d166a981ace4::t_0d8daddadb725c 42
+  s_50d166a981ace4::t_664b55e9c085df 68-76,78
+  s_50d166a981ace4::t_1d7324849517ce 8,27-30,85-86,172-173,190,210,240-242,249-252
+.changeset/review-resolve-hardening.md
+  s_50d166a981ace4::t_2a1fbb8869ddfd 24-29
+plugins/yellow-review/tests/get-pr-blockers.bats
+  s_50d166a981ace4::t_d217d8dd6b2cf6 346-372,378,383
+  s_50d166a981ace4::t_4761f64d754986 271,273-275,345,373-377,379-382
+plugins/yellow-review/tests/mocks/gh
+  s_50d166a981ace4::t_b962a396e6f107 436
+  s_50d166a981ace4::t_1d9916147254a8 463
+  s_50d166a981ace4::t_cf31850a15e255 18-19,170-171,174,302-315,410-411,415-416
+plugins/yellow-review/tests/check-resolve-text.bats
+  s_50d166a981ace4::t_90c147d857487e 9-10
+  s_50d166a981ace4::t_65a7b76fcb2bd5 1057-1108
+plugins/yellow-review/skills/pr-review-workflow/scripts/reply-pr-thread
+  s_50d166a981ace4::t_7a0450839ab37c 246-253,260-264,272
+plugins/yellow-review/tests/reply-pr-thread.bats
+  s_50d166a981ace4::t_f418280dfb724f 412-414,426-441
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0603c0148335e0eb51f4ac9cc5c19cbd119a575c",
+  "prompts": {},
+  "sessions": {
+    "s_50d166a981ace4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fd9a89b9-6534-475e-9256-5db738960fe1",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
