@@ -87,15 +87,19 @@ usage, tools, coordination, retries, verification, and failed runs.
 3. **Establish single-model baselines.** Once an operator authorizes a supported
    live evaluation path, run every development task on each available GPT-6
    candidate, three repeats per model (108 runs if all three are available),
-   with equivalent tool access and budgets. Interleave run order. Run the
-   incumbent Claude path on that same development matrix with the same repeats,
-   required checks, and latency collection; it is a separate comparison, not one
-   of the 108 GPT-6 runs, and does not enter the GPT-6 baseline freeze. Document
-   subscription/API accounting differences. Start at model-default reasoning;
-   record the effective effort. Select and freeze the best single-model GPT-6
-   baseline from these development results only, using the predeclared quality,
-   cost, and latency criteria. Holdout scores, if collected for reporting, must
-   not reopen that selection.
+   with equivalent tool access and budgets. Predeclare a randomized,
+   task/repeat-stratified schedule that includes the incumbent Claude path. Run
+   Claude on that same development matrix with the same repeats, required
+   checks, and latency collection; it is a separate comparison, not one of the
+   108 GPT-6 runs, and does not enter the GPT-6 baseline freeze. Before any live
+   run, freeze a pricing snapshot and one cost-allocation policy (subscription
+   versus API, shared verification, retries) so every cost-per-success figure
+   uses the same basis. Start at model-default reasoning; record the effective
+   effort. If a higher effort is required, select it on development results and
+   freeze it as part of the candidate before holdout. Select and freeze the best
+   single-model GPT-6 baseline from these development results only, using the
+   predeclared quality, cost, and latency criteria. Holdout scores, if collected
+   for reporting, must not reopen that selection.
 4. **Test routing without parallelism.** Derive a policy from development
    results and compare it with the frozen single-model baseline on the
    development tasks. Validate Luna output before downstream use; escalate on
@@ -117,10 +121,10 @@ usage, tools, coordination, retries, verification, and failed runs.
    cost per verified success among those predeclared candidates that meet the
    quality and latency requirements. Do not choose a winner by shopping
    additional holdout configurations. If the comparison is inconclusive, expand
-   the evaluation rather than retuning on this set. Test higher reasoning effort
-   only where the prior effort fails. Keep beta delegation optional with a
-   serial fallback until access, quality, failure handling, and cost are
-   demonstrated.
+   the evaluation rather than retuning on this set. Do not raise reasoning
+   effort on holdout after a failure; any fallback effort must already be part
+   of a frozen candidate. Keep beta delegation optional with a serial fallback
+   until access, quality, failure handling, and cost are demonstrated.
 
 Twelve development tasks and three repeats, plus the frozen 6-task holdout with
 three repeats, are a pilot, not enough evidence for a universal routing policy.
@@ -142,7 +146,8 @@ verification bundle or equivalent task oracle evidence.
   timed-out, and failed outcomes visible; report infrastructure failures
   separately without silently removing them from the primary denominator.
 - **Cost per verified success:** total cost of all attempted trials / accepted
-  trials. Zero accepted trials means no finite cost-per-success result.
+  trials, using the frozen pricing snapshot and allocation policy. Zero accepted
+  trials means no finite cost-per-success result.
 - **Latency:** end-to-end p50/p95, including coordination and verification;
   report terminal failures and successful completion latency separately.
 - **Routing value:** compare complete routed workflows with the frozen
