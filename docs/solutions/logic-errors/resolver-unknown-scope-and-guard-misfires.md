@@ -51,8 +51,8 @@ resolve docs do not:
   `docs/solutions/security-issues/resolver-guards-trust-prompt-and-git-status-only.md`.
   New here is the narrower remedy: revert only the offending cluster.
 - **Edit bound enforced only for files.** The line-range bound in
-  `plugins/yellow-review/references/resolve/clusters.md` is prompt-only; only file membership is
-  checked in `commit-resolve-fixes`.
+  `plugins/yellow-review/references/resolve/clusters.md` is prompt-only;
+  only file membership is checked in `commit-resolve-fixes`.
 - **Unbounded `--wait`.** `poll-new-threads` accepted an arbitrarily long
   number, so the loop could spin.
 - **Tracked-config check.** Any git failure in the check mapped to
