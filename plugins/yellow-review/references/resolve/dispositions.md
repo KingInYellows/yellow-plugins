@@ -410,7 +410,25 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   `credential-shaped`; an interactive run may re-run with
   `--allow-credential-shaped` after the user confirms a second time, an
   unattended run never does), and with `--unattended` refuses runner files,
-  because the commit's git hooks would execute them;
+  because the commit's git hooks would execute them. The commit message is
+  screened like posted text (`rt_text_clean`) before anything is staged: a
+  credential shape, image, mention or foreign URL in it exits 2 with the
+  `resolve-text: refused` line on stderr, and no override excuses it. Commit
+  signing is forced off (`commit.gpgSign=false`, with `push.gpgSign` and
+  `log.showSignature`, one stderr note) when the repository's own local or
+  worktree config sets `commit.gpgsign` or a `gpg.*`
+  key, because signing runs the configured `gpg.program`; the user's global or
+  system signing config is left alone. The Graphite submit's output reaches
+  stderr only through the credential redactor, and is withheld when the redactor
+  is unavailable;
+- `commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`,
+  `lib/sibling-plugin.sh`, `lib/resolve-text.sh` and `lib/verify-run.sh` before
+  any tree check. When the plugin's `lib/` directory is inside the repository's
+  working tree (a source checkout), each file must be tracked, show tag `H` in
+  `git ls-files -v` (so not assume-unchanged or skip-worktree) and equal its
+  blob in HEAD, or the script exits (3 for `commit-resolve-fixes`, 2 for
+  `run-verify-command`) naming the file, with nothing committed or reverted. An
+  installed plugin outside the repository is not judged;
 - the edit range (the one rule; clusters.md, the resolver prompt and
   docs/security.md point here): an edit's old-side lines must sit inside one
   changed range of its file widened by `RANGE_MARGIN` (3, a constant in
@@ -853,12 +871,18 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   the script checks file membership only.
 - `commit-resolve-fixes` disables git hooks for its commit and submit
   (`core.hooksPath=/dev/null`, with a note on stderr) when the hooks directory
-  holds non-sample hooks it cannot verify: `.git/hooks` or a directory outside
-  the working tree. Hook managers that install there (pre-commit, lefthook)
+  holds non-sample hooks it cannot verify: `.git/hooks`, a directory outside
+  the working tree, or an in-tree directory with a tracked hook hidden from
+  status (assume-unchanged or skip-worktree). Hook managers that install there (pre-commit, lefthook)
   therefore do not lint or format resolve commits. Hooks in a tracked in-tree
   directory (for example husky's `.husky/`) still run on resolver-edited code;
   runner and hook definition files are refused, but the code the hooks run is
   not. How unattended commits should treat hooks is an open decision.
+- `commit-resolve-fixes` covers signing through `commit.gpgSign`,
+  `push.gpgSign` and `log.showSignature` only. Other repository-local settings
+  that run a program (`credential.helper`, `core.sshCommand`, a `filter.*`
+  driver) are not neutralised; the file bound and the dirty-set checks are the
+  controls there.
 - Step 7 costs about three tool calls per thread; very large PRs (hundreds of
   threads) are slow. A batch apply script would help and is not written.
 - The reply pre-check sees only a thread's last 10 comments. If more than ten

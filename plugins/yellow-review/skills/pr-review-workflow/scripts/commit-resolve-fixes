@@ -1029,8 +1029,12 @@ case "$PROVIDER" in
         # in a stack walk fails its head check. No --update-only: it has not
         # been shown to leave the set of submitted stack branches unchanged,
         # and the PR already exists.
-        bounded "$SUBMIT_TIMEOUT" gt submit --stack --no-interactive --no-edit >&2 \
-            || die 5 "gt submit failed or timed out after ${SUBMIT_TIMEOUT}s"
+        # Its output can carry a credential (a remote URL, a token in an error):
+        # it goes to the scratch file, then to stderr through the redactor only.
+        SUBMIT_RC=0
+        bounded "$SUBMIT_TIMEOUT" gt submit --stack --no-interactive --no-edit >|"$NET_ERR" 2>&1 || SUBMIT_RC=$?
+        print_submit_output
+        [ "$SUBMIT_RC" -eq 0 ] || die 5 "gt submit failed or timed out after ${SUBMIT_TIMEOUT}s"
         ;;
     github)
         # The runtime always exits 0 and reports through its JSON status.
