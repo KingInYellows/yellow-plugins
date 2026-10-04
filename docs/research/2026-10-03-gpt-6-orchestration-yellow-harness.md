@@ -97,23 +97,27 @@ usage, tools, coordination, retries, verification, and failed runs.
    cost, and latency criteria. Holdout scores, if collected for reporting, must
    not reopen that selection.
 4. **Test routing without parallelism.** Derive a policy from development
-   results, then compare it with the frozen single-model baseline on the
-   held-out tasks. Run the incumbent Claude path on that same holdout matrix.
-   Validate Luna output before downstream use; escalate on observed failures,
-   ambiguity, or exhausted capability. Charge all routing and escalation work.
-   Do not silently substitute a model within a hash-bound approval. Existing
-   real-run approvals authorize one attempt, not a repair loop or a multi-model
-   run.
-5. **Add orchestration features one at a time.** On suitable tasks, compare
-   async overlap, bounded parallel investigations, steering, compaction, and
-   cold/warm caching against the serial baseline. Evaluate native Sol beta
+   results and compare it with the frozen single-model baseline on the
+   development tasks. Validate Luna output before downstream use; escalate on
+   observed failures, ambiguity, or exhausted capability. Charge all routing and
+   escalation work. Do not silently substitute a model within a hash-bound
+   approval. Existing real-run approvals authorize one attempt, not a repair
+   loop or a multi-model run. Freeze that routing policy before holdout; do not
+   retune it after seeing holdout outcomes.
+5. **Add orchestration features one at a time.** On suitable development tasks,
+   compare async overlap, bounded parallel investigations, steering, compaction,
+   and cold/warm caching against the serial baseline. Evaluate native Sol beta
    delegation separately if supported. Test dependency waits, failed joins, late
-   results, permission changes, and cache/compaction correctness.
-6. **Decide from held-out evidence.** Choose the lowest total cost per verified
-   success among configurations meeting the predeclared quality and latency
-   requirements, comparing routing and orchestration against the frozen
-   development baseline and the incumbent Claude path on the same holdout
-   matrix, rather than a holdout-selected model. Test higher reasoning effort
+   results, permission changes, and cache/compaction correctness. After those
+   results, freeze at most one orchestration package (or keep serial routing
+   only) as a holdout candidate. Do not add configurations after seeing holdout.
+6. **Confirm once on held-out evidence.** Evaluate only the frozen routing
+   policy, the optional frozen orchestration package, the frozen GPT-6 baseline,
+   and the incumbent Claude path on the holdout matrix. Promote the lowest total
+   cost per verified success among those predeclared candidates that meet the
+   quality and latency requirements. Do not choose a winner by shopping
+   additional holdout configurations. If the comparison is inconclusive, expand
+   the evaluation rather than retuning on this set. Test higher reasoning effort
    only where the prior effort fails. Keep beta delegation optional with a
    serial fallback until access, quality, failure handling, and cost are
    demonstrated.
