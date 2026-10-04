@@ -1,0 +1,33 @@
+plugins/yellow-review/CLAUDE.md
+  s_50d166a981ace4::t_424e14b05165cc 188-189,203-206,216-235
+plugins/yellow-review/README.md
+  s_50d166a981ace4::t_539c7d599dd916 90
+plugins/yellow-review/lib/resolve-text.sh
+  s_50d166a981ace4::t_fd9a93776c6c38 492-493,505-516,518-523,526-573,578
+plugins/yellow-review/lib/verify-run.sh
+  s_50d166a981ace4::t_62262b997c0441 202,213,218-219,237,240,243,254-256,260
+plugins/yellow-review/references/resolve/dispositions.md
+  s_50d166a981ace4::t_995e5d6a913d72 16-20,221-226,229-230,267-287,290-296,305-309,316-319,324-325,339-346,348-353,356-360,362,366-385,390-412,438-444,446-447,526-531,533-538,550-557,592-599,608-621,623-633
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  s_50d166a981ace4::t_15fc62aec5980e 487,568
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_50d166a981ace4::t_0e2f8cfa701dde 541,543-544
+plugins/yellow-review/tests/check-resolve-text.bats
+  s_50d166a981ace4::t_6eb27cdf11ac62 353,357,369,498,503,515,545,551,557-562,570-571,575,580-581,583-594,598-603
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5682fe1d486dc4a973fca376016b088cea142cfb",
+  "prompts": {},
+  "sessions": {
+    "s_50d166a981ace4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fd9a89b9-6534-475e-9256-5db738960fe1",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
