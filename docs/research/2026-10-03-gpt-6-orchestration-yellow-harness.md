@@ -117,14 +117,16 @@ usage, tools, coordination, retries, verification, and failed runs.
    only) as a holdout candidate. Do not add configurations after seeing holdout.
 6. **Confirm once on held-out evidence.** Evaluate only the frozen routing
    policy, the optional frozen orchestration package, the frozen GPT-6 baseline,
-   and the incumbent Claude path on the holdout matrix. Promote the lowest total
-   cost per verified success among those predeclared candidates that meet the
-   quality and latency requirements. Do not choose a winner by shopping
-   additional holdout configurations. If the comparison is inconclusive, expand
-   the evaluation rather than retuning on this set. Do not raise reasoning
-   effort on holdout after a failure; any fallback effort must already be part
-   of a frozen candidate. Keep beta delegation optional with a serial fallback
-   until access, quality, failure handling, and cost are demonstrated.
+   and the incumbent Claude path on the holdout matrix. Use a predeclared
+   randomized, task/repeat-stratified schedule covering those four candidates.
+   Promote the lowest total cost per verified success among those predeclared
+   candidates that meet the quality and latency requirements. Do not choose a
+   winner by shopping additional holdout configurations. If the comparison is
+   inconclusive, expand the evaluation rather than retuning on this set. Do not
+   raise reasoning effort on holdout after a failure; any fallback effort must
+   already be part of a frozen candidate. Keep beta delegation optional with a
+   serial fallback until access, quality, failure handling, and cost are
+   demonstrated.
 
 Twelve development tasks and three repeats, plus the frozen 6-task holdout with
 three repeats, are a pilot, not enough evidence for a universal routing policy.
