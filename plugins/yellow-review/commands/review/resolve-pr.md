@@ -583,6 +583,15 @@ start a thread's next stage only after the previous one exits 0:
 - Exit 3 from `reply-pr-thread` or `resolve-pr-thread` prints a stderr line
   `reason=permission` or `reason=not-found`. Report `needs permission` only
   for the first and `not found` for the second.
+- Exit 6 from `reply-pr-thread` or `file-followup-issue` means the text was
+  refused (a credential shape, an image, an `@` mention or a foreign URL). Post
+  the plain outcome sentence for the disposition once, with no resolver text
+  (the contract's "Reply hygiene"); if that is refused too, leave the thread
+  open and blocking.
+- Exit 7 is permanent (stderr `reason=auth`, `reason=permission` or
+  `reason=issues-disabled`): do not retry. Stop that thread's later stages and
+  report it blocking. For `file-followup-issue`, post the contract's fixed
+  `Not filed` reply as `unclear` and count no issue.
 - Exit 4 from any of the three scripts prints a stderr line
   `reason=rate-limit` or `reason=timeout`. A failed stage stops that thread's
   later stages; record the per-stage outcome. After any exit 4, stop mutating

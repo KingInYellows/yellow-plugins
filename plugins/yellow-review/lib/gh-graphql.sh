@@ -85,6 +85,12 @@ gg_is_rate_limited() {
     jq -e '[.errors[]? | (.type // ""), (.message // "")] | any(test("rate limit|abuse|RATE_LIMITED"; "i"))' "$GG_RESP" >/dev/null 2>&1
 }
 
+# gg_is_auth_failure: the credentials are missing or rejected (HTTP 401); no
+# retry helps until a human signs in again. Test a rate limit first.
+gg_is_auth_failure() {
+    grep -qiE 'HTTP 401|Bad credentials|gh auth login|authentication (failed|required)' "$GG_ERR"
+}
+
 # gg_reason: print "not-found" or "permission" and return 0 when the last
 # call failed that way, else print nothing and return 1. Typed GraphQL
 # errors win; of the stderr patterns, permission is checked first because a

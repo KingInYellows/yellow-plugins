@@ -389,6 +389,36 @@ path_without_timeout() {
   [[ "$stderr" == *"neither timeout nor gtimeout is installed"* ]]
 }
 
+# --- Refusal (6) and auth failure (7) ---
+
+@test "a body with an image, a mention or a foreign URL exits 6 before any API call" {
+  for t in 'Fixed. ![x](https://github.com/o/r/raw/x.png)' 'Fixed, cc @octocat' 'Fixed, see https://evil.example/x'; do
+    printf '%s\n' "$t" >| "$BODY"
+    run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+    [ "$status" -eq 6 ] || { echo "not refused: $t"; false; }
+    [[ "$stderr" == *"resolve-text: refused rule="* ]]
+    [ ! -f "$CALLS" ]
+  done
+}
+
+@test "an HTTP 401 exits 7 without a retry and prints reason=auth" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_auth fixed "$BODY"
+  [ "$status" -eq 7 ]
+  [[ "$stderr" == *"rejected the credentials"* ]]
+  printf '%s\n' "$stderr" | grep -qx 'reason=auth'
+  [ ! -f "$CALLS" ]
+}
+
+@test "a jq that fails while measuring the body exits 1 with a message, not jq's status" {
+  mkdir -p "${BATS_TEST_TMPDIR}/jqbin"
+  printf '#!/bin/sh\nexit 5\n' >| "${BATS_TEST_TMPDIR}/jqbin/jq"
+  chmod +x "${BATS_TEST_TMPDIR}/jqbin/jq"
+  PATH="${BATS_TEST_TMPDIR}/jqbin:${PATH}" run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"could not measure the body file"* ]]
+  [ ! -f "$CALLS" ]
+}
+
 # --- Recovery window: comments(last: 10), Bot acknowledgements ignored ---
 
 @test "skips when only Bot comments follow our marker and reports its disposition" {

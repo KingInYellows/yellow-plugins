@@ -153,7 +153,9 @@ case "$ALL_ARGS" in
     cat "$FIXTURE_DIR/${MOCK_GH_FILES_FIXTURE:-pr-files-response.json}"
     exit 0
     ;;
-  "issue list "*)
+  *"FollowupIssues"*)
+    # file-followup-issue's issue lookup (GraphQL repository.issues,
+    # filterBy.createdBy). The args are saved for assertions.
     printf '%s\n' "$ALL_ARGS" >| "${PAGE_STATE_DIR}/mock_gh_issue_list_args"
     _call=$(bump issue_list)
     # MOCK_GH_RESCAN shapes the second lookup only (the post-create rescan):
@@ -314,35 +316,6 @@ case "$ALL_ARGS" in
         ;;
       *"PRRT_reply_spoof"*)
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_spoof","comments":{"nodes":[{"viewerDidAuthor":false,"body":"> <!-- yellow-review:resolve v1 thread=PRRT_reply_spoof disposition=fixed -->"}]}}}}'
-        ;;
-      *"PRRT_reply_botafter"*|*"PRRT_reply_humanafter"*|*"PRRT_reply_ownafter"*)
-        # Our fixed reply, then one later comment: a bot acknowledgement
-        # (botafter), a human reply (humanafter) or an unmarked note from our
-        # own human account (ownafter). Only the bot acknowledgement is ignored;
-        # the other two send the thread back to the resolver.
-        case "$ALL_ARGS" in
-          *"PRRT_reply_botafter"*) _later='{"viewerDidAuthor":false,"body":"Thanks for the update.","author":{"__typename":"Bot"}}'; _tid=PRRT_reply_botafter ;;
-          *"PRRT_reply_humanafter"*) _later='{"viewerDidAuthor":false,"body":"That does not fix it.","author":{"__typename":"User"}}'; _tid=PRRT_reply_humanafter ;;
-          *) _later='{"viewerDidAuthor":true,"body":"Edited the note.","author":{"__typename":"User"}}'; _tid=PRRT_reply_ownafter ;;
-        esac
-        MOCK_BODY=$(jq -nc --arg t "$_tid" --argjson later "$_later" '{data:{node:{id:$t,comments:{nodes:[
-          {viewerDidAuthor:false,body:"Please add a null check.",author:{__typename:"User"}},
-          {viewerDidAuthor:true,body:("Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=" + $t + " disposition=fixed -->\n"),author:{__typename:"User"}},
-          $later]}}}}')
-        ;;
-      *"PRRT_reply_botself"*|*"PRRT_reply_botmarker"*)
-        # gh authenticated as a bot account: every comment of ours has
-        # viewerDidAuthor true and author type Bot. botself: our marker, then
-        # our own unmarked Bot acknowledgement (must still skip). botmarker:
-        # a Bot-authored marker alone (must still be recognised).
-        case "$ALL_ARGS" in
-          *"PRRT_reply_botself"*) _tid=PRRT_reply_botself; _ack='{"viewerDidAuthor":true,"body":"Thanks, noted.","author":{"__typename":"Bot"}}' ;;
-          *) _tid=PRRT_reply_botmarker; _ack='null' ;;
-        esac
-        MOCK_BODY=$(jq -nc --arg t "$_tid" --argjson ack "$_ack" '{data:{node:{id:$t,comments:{nodes:([
-          {viewerDidAuthor:false,body:"Please add a null check.",author:{__typename:"User"}},
-          {viewerDidAuthor:true,body:("Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=" + $t + " disposition=fixed -->\n"),author:{__typename:"Bot"}},
-          $ack] | map(select(. != null)))}}}}')
         ;;
       *"PRRT_reply_auth"*)
         MOCK_BODY='{"message":"Bad credentials"}'

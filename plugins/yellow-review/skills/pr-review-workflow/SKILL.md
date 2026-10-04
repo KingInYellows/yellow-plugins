@@ -428,11 +428,13 @@ Located at `skills/pr-review-workflow/scripts/`:
 - **file-followup-issue** `<owner/repo> <pr> <PRRT_id> <title-file>
   <body-file>` — Files or finds the follow-up issue for an out-of-scope
   thread; `--find <owner/repo> <PRRT_id>` only looks and never files
-- **check-resolve-text** `<file>...` — Exits 2 when text looks like a
-  credential. A refusal prints a `resolve-text:` line on stderr
-  (`refused rule=<rule> line=<n>` for a credential hit, `scan failed` when
-  the scan did not run); look for it anywhere on stderr, not just first.
-  `reply-pr-thread` and `file-followup-issue` print the same line.
+- **check-resolve-text** `<file>...` — Exits 6 when text looks like a
+  credential, has a markdown image, an `@` mention or a foreign URL, or could
+  not be scanned (2 stays usage or an unreadable file). A refusal prints a
+  `resolve-text:` line on stderr (`refused rule=<rule> line=<n>`, or `scan
+  failed` when the scan did not run); look for it anywhere on stderr, not just
+  first. `reply-pr-thread` and `file-followup-issue` exit 6 and print the same
+  line
 - **pr-changed-ranges** `<pr-number>` — Prints one `<path> <ranges>` row per
   changed file from the files API (`10-24,58-60`, `none`, or `unknown` when
   GitHub returns no patch); only paths matching `^[A-Za-z0-9._/-]+$` are

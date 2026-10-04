@@ -216,8 +216,11 @@ resolution, and sequential stack review. Graphite-native workflow.
   header and footer rows are its completeness signal
 
 `reply-pr-thread`, `file-followup-issue` and `check-resolve-text` source
-`lib/resolve-text.sh` (credential-shape check) before posting; `reply-pr-thread`
-and `resolve-pr-thread` also source `lib/gh-graphql.sh`.
+`lib/resolve-text.sh` (text screen) before posting and exit 6 on a refusal.
+`reply-pr-thread` and `file-followup-issue` exit 7 on a permanent GitHub
+refusal (not authenticated; for the issue script also no permission or Issues
+disabled). `reply-pr-thread` and `resolve-pr-thread` also source
+`lib/gh-graphql.sh`.
 `commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`
 and `lib/verify-run.sh`.
 
@@ -235,18 +238,26 @@ the one edit-bounds table), `envelope.md` (resolver prompt and sanitization),
 ### Library
 
 - `lib/resolve-text.sh` (POSIX sh, sourced by `reply-pr-thread`,
-  `file-followup-issue` and `check-resolve-text`) — the credential-shape
-  check for resolver-written text; a match means the text is never posted.
-  On a hit it sets `RT_HIT_RULE` and `RT_HIT_LINE`, and `rt_report_refusal`
-  prints a `resolve-text:` stderr line (never the text) that tells a refusal
-  from a usage error: `refused rule=<rule> line=<n>` for a credential hit,
-  `scan failed` when the scan did not run. Callers look for that line anywhere
-  on stderr rather than assume it is first.
+  `file-followup-issue` and `check-resolve-text`) — the text screen for
+  resolver-written text; a match means the text is never posted. Two functions
+  share one convention (0 clean, 1 a hit, 2 the scan did not run):
+  `rt_text_clean <file>` for text posted publicly (credential shapes plus a
+  markdown image, `@` mention or foreign URL) and `rt_code_clean [--strict]
+  <file>` for code, diffs and logs, where those are ordinary (credential rules
+  only; `--strict` keeps the high-precision ones). On 1 they set `RT_HIT_RULE`
+  and `RT_HIT_LINE`, and `rt_report_refusal` prints a `resolve-text:` stderr
+  line (never the text): `refused rule=<rule> line=<n>` for a hit, `scan
+  failed` when the scan did not run. The posting scripts exit 6 on a refusal;
+  callers key on the code and keep the line as detail. The one URL host
+  allowed is `RT_ALLOWED_HOST`, else `GH_HOST`, else `github.com`.
 - `lib/resolve-gh.sh` (POSIX sh, sourced by `file-followup-issue`,
-  `get-pr-blockers` and `get-pr-comments`) — runs `gh` under
+  `get-pr-blockers` and `get-pr-comments`) — runs `gh` through `rg_gh` under
   `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s, clamped to 60 s) and returns 124 on
   a timeout, but only when `timeout(1)` or `gtimeout(1)` is installed; without
-  either `gh` runs unbounded.
+  either `gh` runs unbounded. It also holds the failure classifiers
+  (`rg_is_rate_limited`, `rg_is_auth_failure`, `rg_is_permission_denied`) the
+  scripts share; test a rate limit before a permission failure, since a
+  secondary rate limit is also an HTTP 403.
 - `lib/gh-graphql.sh` (POSIX sh, sourced by `reply-pr-thread` and
   `resolve-pr-thread`) — one GraphQL call helper with rate-limit and
   not-found/permission classification, so both scripts agree on exit codes.
@@ -258,6 +269,11 @@ the one edit-bounds table), `envelope.md` (resolver prompt and sanitization),
 - `lib/verify-run.sh` (bash, sourced by `run-verify-command`) — timeout,
   process-group and redacted-log helpers for the verify run; `vr_timeout_bin`
   accepts only a `timeout`/`gtimeout` that supports `--kill-after`
+- `lib/sibling-plugin.sh` (bash, sourced by `review-ledger.sh` and
+  `resolve-paths.sh`) — `sp_sibling_file`, the one lookup of a file in a
+  sibling plugin: the source tree first, then the newest numeric version in
+  the installed cache. `review-ledger.sh` checks `RL_CORE_LIB` before calling
+  it; the helper itself has no override.
 - `lib/review-ledger.sh <subcommand>` — the durable review-findings ledger
   (plans/review-findings-ledger.md): an append-only JSONL file per PR at
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`,

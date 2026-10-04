@@ -130,6 +130,20 @@ teardown() {
   [ "$outdated" = "true" ]
 }
 
+@test "an outdated thread carries originalLine, originalStartLine and the first comment's diffHunk" {
+  run "$SCRIPT" --include-outdated "test/repo" "123"
+  [ "$status" -eq 0 ]
+  t=$(printf '%s' "$output" | jq -c '.[] | select(.threadId == "PRRT_thread3") | [.originalLine, .originalStartLine, .diffHunk]')
+  [ "$t" = '[9,7,"@@ -7,3 +7,3 @@\n-old line\n+new line"]' ]
+}
+
+@test "a thread that is not outdated carries its anchor and its capped diffHunk too" {
+  run "$SCRIPT" "test/repo" "123"
+  [ "$status" -eq 0 ]
+  t=$(printf '%s' "$output" | jq -c '.[] | select(.threadId == "PRRT_thread1") | [.originalLine, .originalStartLine, .diffHunk]')
+  [ "$t" = '[42,null,"@@ -40,3 +40,3 @@\n context"]' ]
+}
+
 @test "threads carry originalLine and a capped diffHunk, appended after the existing fields" {
   export MOCK_GH_COMMENTS_FIXTURE=outdated-anchor-response.json
   run "$SCRIPT" --include-outdated "test/repo" "500"
@@ -140,7 +154,7 @@ teardown() {
   [[ "$(printf '%s' "$output" | jq -r '.[0].diffHunk')" == "@@ -40,3 +40,4 @@"* ]]
   # A thread whose first comment has no hunk gets null, not an error.
   [ "$(printf '%s' "$output" | jq -r '.[1].diffHunk')" = "null" ]
-  [ "$(printf '%s' "$output" | jq -c '.[0] | keys_unsorted[-2:]')" = '["originalLine","diffHunk"]' ]
+  [ "$(printf '%s' "$output" | jq -c '.[0] | keys_unsorted[-3:]')" = '["originalLine","originalStartLine","diffHunk"]' ]
 }
 
 @test "--include-outdated is accepted after the positional arguments" {
