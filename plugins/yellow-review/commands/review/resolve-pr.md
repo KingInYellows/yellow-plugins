@@ -490,9 +490,21 @@ commit runs hooks and an ignored file a resolver edited outlives the run. In
 the same re-validated call, with the same trap, run
 `run-verify-command --pr "<PR#>" --check-ignored --ignored-since "$MARK_DIR/ignored-marker"`
 instead of the verify line above. Exit 0 → `verify=none` and the commit
-proceeds. Any non-zero exit (a gitignored file newer than the marker, or a
-marker that cannot be read) is a refusal: revert as above and make every
-`fixed` thread `unclear`.
+proceeds. Exit 2 with `gitignored files changed since` on stderr (the verify
+call refuses the same way) is the **ignored-file stop** below. Any other
+non-zero exit (a marker that cannot be read) is a refusal: revert as above and
+make every `fixed` thread `unclear`.
+
+**Ignored-file stop.** The stderr line names the changed ignored paths. A
+resolver broke its edit bound, and nothing can undo it: the file has no HEAD
+copy, no snapshot exists, and `--revert-dirty` lists only tracked and
+untracked-unignored changes. Still run `--revert-dirty` for the tracked edits,
+then run no verify, commit, push or other project command that could execute
+the file, and skip Step 8's re-pass. Make every `fixed` thread `unclear`
+(evidence `ignored file changed`). Step 9 names each path under Blocking merge
+as `<path>: restore by hand (not tracked, no HEAD copy)` and ends with the
+contract's `Resolve:` line (`push=skipped`, `verify=skipped`). The run is a
+stop: callers must not continue past it until the files are restored.
 
 **Marker cleanup.** When no call ran at all (a stop before this step, or a
 declined command), run the same re-validation, then `rm -rf -- "$MARK_DIR"`

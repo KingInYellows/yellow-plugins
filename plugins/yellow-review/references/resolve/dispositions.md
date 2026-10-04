@@ -456,7 +456,8 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   directory. When no verify command runs, Step 6 still calls
   `run-verify-command --check-ignored --ignored-since <marker-file>`, which
   runs the same guard and nothing else; a refusal reverts and downgrades
-  `fixed` threads like any other. Its success result,
+  `fixed` threads like any other, except that a changed gitignored file is
+  the ignored-file stop (Known limits). Its success result,
   `{"result":"clean","patch":null,"log":null}`, has no `treeClean` field: the
   guard never inspects the tracked or untracked-unignored tree, so the caller
   must not read it as a clean tree. `--revert-only`
@@ -813,6 +814,16 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
 
 ## Known limits
 
+- Ignored files a resolver edits are detected, not restored. `--check-ignored`
+  and the verify guard exit 2 and list the changed paths on stderr
+  (`gitignored files changed since the --ignored-since marker: <paths>`), but
+  `--revert-dirty` never sees ignored files and no snapshot exists. Step 6
+  still reverts the tracked edits, then runs no verify, commit, push or other
+  project command, makes every `fixed` thread `unclear`, names each path as
+  `restore by hand (not tracked, no HEAD copy)`, and ends with `push=skipped,
+  verify=skipped`. The `Resolve:` line has no stop field, so
+  `/review:resolve-stack` and the sweeps do not detect the stop and carry on;
+  restore the named files before running them again.
 - Issue dedupe scans the newest 200 issues the viewer authored. When that
   window is full and holds no marker for the thread, `file-followup-issue`
   exits 5 (not 1, so it is not mistaken for a transient failure) rather than
