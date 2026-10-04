@@ -576,10 +576,10 @@ requirement. `lookupReason` says why a lookup failed (`tool_missing`, `timeout`,
 `conversationResolution: "unknown"` is a separate, independent signal that
 enforcement could not be determined. `resolutionLookupReason: "rate_limited"`
 (null otherwise) reports that a branch-protection or ruleset read hit a rate
-limit, independently of `lookupFailed` (either can be set without the other);
-it sets `ratelimited=1` too. It is read from the PR's base branch and,
-for a PR upstack in a stack, from the default branch too: `enforced` when either
-enforces it, `not_enforced` only when every branch read answered no.
+limit while `lookupFailed` is still false; it sets `ratelimited=1` too. It is
+read from the PR's base branch and, for a PR upstack in a stack, from the
+default branch too: `enforced` when either enforces it, `not_enforced` only when
+every branch read answered no.
 
 ## Report and contract line
 
@@ -599,10 +599,11 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   reviewers.
 - `ratelimited=1` means `reply-pr-thread`, `resolve-pr-thread` or
   `file-followup-issue` exited 4 (a rate limit), or `get-pr-blockers` reported
-  `lookupReason: rate_limited`, and mutations stopped. `commit-resolve-fixes`
-  exit 4 is a commit undo and never sets it. `/review:resolve-stack` and
-  `/review:sweep-all` then stop mutating: every remaining PR is reported
-  `not attempted (rate limit)` instead of hitting the limit again.
+  `lookupReason: rate_limited` or `resolutionLookupReason: rate_limited`, and
+  mutations stopped. `commit-resolve-fixes` exit 4 is a commit undo and never
+  sets it. `/review:resolve-stack` and `/review:sweep-all` then stop mutating:
+  every remaining PR is reported `not attempted (rate limit)` instead of hitting
+  the limit again.
 - `/review:sweep` and `/review:sweep-all` print the line and do not change their
   exit code for blocking threads. `/review:resolve-stack` exits 1 when any PR's
   `b` is non-zero.

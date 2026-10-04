@@ -577,15 +577,20 @@ rt_text_clean() {
         /!\[/ { flag("markdown-image") }
         {
             # A mention is @name at the start of a line or after whitespace or
-            # an opening bracket or quote: where GitHub notifies. Not the @ of
-            # URL userinfo, an email address or a code span.
-            if ((" " $0) ~ /([[:space:]]|[(,;"\047])@[A-Za-z0-9]/) flag("mention")
+            # an opening bracket or quote, optionally behind Markdown opening
+            # delimiters (`**@name**`, `_@name_`, `[@name]`): where GitHub
+            # notifies. Not the @ of URL userinfo, an email address or a code
+            # span.
+            if ((" " $0) ~ /([[:space:]]|[(,;"\047])[][*_~]*@[A-Za-z0-9]/) flag("mention")
             l = tolower($0)
             h = tolower(host)
             while (match(l, /https?:\/\/[^\/ \t"\047`]*/)) {
                 u = substr(l, RSTART, RLENGTH)
                 l = substr(l, RSTART + RLENGTH)
                 sub(/^https?:\/\//, "", u)
+                # A backslash ends the host for URL parsers (`evil.com\@github.com`
+                # is evil.com), so refuse it before userinfo is stripped.
+                if (index(u, "\\")) flag("foreign-url")
                 sub(/^[^@]*@/, "", u)
                 sub(/[])>.,;:!?*]+$/, "", u)
                 sub(/:[0-9]+$/, "", u)
