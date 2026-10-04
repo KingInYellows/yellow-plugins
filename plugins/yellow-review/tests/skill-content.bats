@@ -375,6 +375,26 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   [[ "$text" == *'Only when the check exited `0` or `3`'* ]]
   [[ "$text" == *'On exit `4` or any other exit, do not clear'* ]]
   [ "$(grep -c 'snapshot kept at <guard-dir>' "$SWEEP")" -ge 2 ]
+  # No stop path runs `clear` without a preceding `check`: Step 1b's rule, Step 2a
+  # (alignment failures and the branch-mismatch stop) and the Step 3 contract-file
+  # Read all name the guard exit check; the lone `clear` call follows Step 3a's check.
+  step1b=$(awk '/^### Step 1b:/ { p = 1; next } /^### Step 2:/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
+  step2a=$(awk '/^### Step 2a:/ { p = 1; next } /^### Step 2b:/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
+  step3=$(awk '/^### Step 3: Run \/review:resolve/ { p = 1; next } /^### Step 3a:/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step1b" == *'first runs the guard exit check in Step 3a'* ]]
+  [[ "$step2a" == *'If `gh pr view` or `git rev-parse` fails, stop'* ]]
+  [[ "$step2a" == *'run the guard exit check'*'clear only on exit `0` or `3`'* ]]
+  [[ "$step3" == *'If the Read fails, stop and report the path. Before stopping, run the guard exit check'* ]]
+  run grep -nE 'runs the `clear` call|Run Step 2b.s check and, when' "$SWEEP"
+  [ "$status" -eq 1 ]
+  # Step 2b re-classifies on the checked-out PR head when Step 1b set none, and stops on ignored.
+  step2b=$(awk '/^### Step 2b:/ { p = 1 } /^### Step 3: Run \/review:resolve/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step2b" == *'When `<guard-dir>` is `none`'* ]]
+  [[ "$step2b" == *'run the Step 1b classification probe again'* ]]
+  [[ "$step2b" == *'git -C "$TOP" check-ignore -q -- yellow-plugins.local.md'* ]]
+  [[ "$step2b" == *'If it now prints `ignored`'* ]]
+  [[ "$step2b" == *'is ignored on the PR branch but was not snapshotted before the review; rerun /review:sweep from the PR'* ]]
+  [[ "$step2b" == *'stop without invoking `/review:resolve`'* ]]
 }
 
 @test "sweep-all: the empty-list exit always prints and stops; only the prune prompt is conditional" {

@@ -138,7 +138,8 @@ Never write the digest to a file. On a non-zero exit, report
 skip line.
 
 Every stop after this step, including every Error Handling case below, first
-runs the `clear` call in Step 3a.
+runs the guard exit check in Step 3a (`check`, then `clear` only on exit `0`
+or `3`).
 
 ### Step 2: Run /review:pr --non-interactive
 
@@ -173,15 +174,42 @@ ACTUAL=$(git rev-parse --abbrev-ref HEAD)
 
 If the branch does not match, stop — do not proceed to Step 3 — and end the
 output with the skip line `Sweep: skipped (branch-mismatch)` (see "Skip
-line"). Run Step 2b's check and, when it exited `0` or `3`, the Step 3a
-`clear` first, so a config edit from `/review:pr` is restored even on this
-stop.
+line"). If `gh pr view` or `git rev-parse` fails, stop the same way. Before
+either stop prints anything, run the guard exit check (Step 3a's `check` call
+and its exit handling: clear only on exit `0` or `3`, keep and name the
+snapshot otherwise), so a config edit from `/review:pr` is restored and never
+loses its recovery snapshot. Skip it when `<guard-dir>` is `none`.
 
 ### Step 2b: Check the local config before resolve
 
-Unless `<guard-dir>` is `none`, compare the ignored config with Step 1b's
-snapshot before `/review:resolve` can read it. The check restores a changed,
-created or deleted `yellow-plugins.local.md`:
+When `<guard-dir>` is `none`, Step 1b may have classified the starting branch
+rather than the PR head. `/review:pr` has now checked out the PR head, so run
+the Step 1b classification probe again, unchanged:
+
+```bash
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
+if [ -n "$TOP" ]; then
+  git -C "$TOP" ls-files --error-unmatch -- yellow-plugins.local.md >/dev/null 2>&1; rc=$?
+else
+  rc=128
+fi
+case "$rc" in
+  0) printf 'tracked\n' ;;
+  1) if git -C "$TOP" check-ignore -q -- yellow-plugins.local.md; then printf 'ignored\n'; else printf 'unignored\n'; fi ;;
+  *) printf 'unknown\n' ;;
+esac
+```
+
+If it now prints `ignored`, the config was not snapshotted before the review.
+Print
+`[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md is ignored on the PR branch but was not snapshotted before the review; rerun /review:sweep from the PR's branch`
+and stop without invoking `/review:resolve`. Print no `Sweep:` or `Resolve:`
+line, so `/review:sweep-all` records `no contract` and stops the batch. Any
+other result continues unguarded, as in Step 1b.
+
+Otherwise, unless `<guard-dir>` is `none`, compare the ignored config with
+Step 1b's snapshot before `/review:resolve` can read it. The check restores a
+changed, created or deleted `yellow-plugins.local.md`:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" check "<guard-dir>" "<guard-digest>"
@@ -204,7 +232,8 @@ Before invoking the skill, Read
 `${CLAUDE_PLUGIN_ROOT}/references/review-sweep/resolve-contract.md` (the "Reading
 `ratelimited` (callers)" section): it defines the anchored contract line Step 4
 re-emits only when the nested output's last line fully matches it. If the Read
-fails, stop and report the path.
+fails, stop and report the path. Before stopping, run the guard exit check
+(Step 3a's `check` call and exit handling).
 
 Invoke the `Skill` tool with `skill: "review:resolve"`. Pass the args
 string `<PR#> --non-interactive` (literal — substitute the actual PR
@@ -244,9 +273,11 @@ run would execute its `verify_command`.
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" check "<guard-dir>" "<guard-digest>"
 ```
 
-Only when the check exited `0` or `3` (and on every earlier stop after Step 1b
-that has no failed check), in its own Bash call, remove the snapshot (a
-rejected path is left for the OS temp sweep, never deleted):
+This check and the exit handling below are the guard exit check that every
+stop after Step 1b runs first (Step 2a, the Step 3 contract-file Read, and
+the Error Handling cases). Only when the check exited `0` or `3`, in its own
+Bash call, remove the snapshot (a rejected path is left for the OS temp
+sweep, never deleted):
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" clear "<guard-dir>"
