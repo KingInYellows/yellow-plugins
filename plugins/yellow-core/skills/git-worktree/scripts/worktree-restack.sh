@@ -581,8 +581,10 @@ gt_paused() {
 
 # --- provider: GitHub (gh-stack >= 0.2.0, through the github-workflow adapter)
 
+# The version is the third tab-separated column; a newer release can add a
+# fourth ("Upgrade available"), so never read the last field.
 gh_stack_version() {
-  gh extension list 2>/dev/null | awk '$1 == "gh" && $2 == "stack" && $3 == "github/gh-stack" {print $NF; exit}'
+  gh extension list 2>/dev/null | awk -F'\t' '$1 == "gh stack" && $2 == "github/gh-stack" {print $3; exit}'
 }
 
 # gh_version_ok VER: v0.2.0 or newer; an unparseable version fails.

@@ -23,7 +23,7 @@ setup() {
   local s
   for s in gt gh git; do ln -s "$MOCKS/$s" "$STUB_DIR/bin/$s"; done
   export PATH="$STUB_DIR/bin:$PATH"
-  unset STUB_SKIP STUB_FORK STUB_GH_VERSION STUB_GT_VERSION CLAUDE_PLUGIN_ROOT
+  unset STUB_SKIP STUB_FORK STUB_GH_VERSION STUB_GH_UPGRADE STUB_GT_VERSION CLAUDE_PLUGIN_ROOT
   WTFMT='wt-%s'
   REPO="$T/repo"
 }
@@ -637,6 +637,16 @@ forge() {
   run grep -E 'stack rebase' "$STUB_DIR/gh.log"
   [ "$status" -eq 1 ]
   assert_all_restored
+}
+
+@test "github: an Upgrade available column does not hide the installed gh-stack version" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  STUB_GH_UPGRADE=1 STUB_GH_VERSION=v0.2.0 run bash "$SCRIPT" preflight --provider github
+  [ "$status" -eq 0 ]
+  STUB_GH_UPGRADE=1 STUB_GH_VERSION=v0.1.0 run bash "$SCRIPT" preflight --provider github
+  [ "$status" -eq 20 ]
+  [[ $output == *"found: v0.1.0"* ]]
 }
 
 @test "github: the adapter is found in the installed plugin cache, highest version wins" {

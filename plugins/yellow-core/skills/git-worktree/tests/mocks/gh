@@ -17,7 +17,8 @@ conflict_report() {
 
 case "${1:-}" in
   extension)
-    [ -z "${STUB_GH_VERSION-v0.2.0}" ] || printf 'gh stack\tgithub/gh-stack\t%s\n' "${STUB_GH_VERSION-v0.2.0}"
+    # STUB_GH_UPGRADE=1 adds the fourth column gh prints when a newer release exists.
+    [ -z "${STUB_GH_VERSION-v0.2.0}" ] || printf 'gh stack\tgithub/gh-stack\t%s%s\n' "${STUB_GH_VERSION-v0.2.0}" "${STUB_GH_UPGRADE:+$(printf '\tUpgrade available')}"
     exit 0
     ;;
   stack)
