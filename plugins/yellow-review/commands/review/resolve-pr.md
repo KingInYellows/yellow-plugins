@@ -429,6 +429,32 @@ script exit 2, 3 or 4 (exit 4 also covers a failed commit or hook; a
 saved) and make every `fixed` thread `unclear`: a refused edit must not stay
 on disk.
 
+**Range pre-check.** Before verify, run (no network; it changes nothing):
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --check-ranges --ranges-from "<ranges-file>" --files-from "<files-file>"
+```
+
+`<ranges-file>` is the Step 4 capture the resolvers were bounded by, never a
+re-capture. It prints `{"out_of_range":[{"path","old_lines"}]}`: files with an
+edit outside the PR-changed lines plus `RANGE_MARGIN` (the script's constant,
+`clusters.md`). A non-zero exit is a refusal (above). An empty list continues
+to Verify. Otherwise:
+
+- **Non-interactive:** revert the listed files.
+- **Interactive:** one `AskUserQuestion` (part of the push-confirmation gate)
+  naming each file and its old-line spans, with "Include them / Revert them". Include keeps the edits and drops
+  `--ranges-from` from this run's commit call (the file checks still run).
+  Revert is below.
+
+To revert, run Step 5's per-file `--revert-only` on the listed files (shared
+files too). Every cluster that modified one becomes `unclear` with evidence
+`edit outside PR-changed lines` (blocking, threads stay open), the no-`fixed`
+revert above covers its other files, and `<files-file>` is rewritten without
+them. The check runs before verify because dropping files afterwards would
+commit an unverified subset. With no `fixed` thread left, skip Verify and
+Push (`verify=none`, `push=skipped`).
+
 **Verify.** Apply the contract's Verify table to the Step 1 snapshot
 (interactive: ask with the command and `git diff --stat`; unattended: only
 with `verify_unattended: true` and an untracked config; add `--unattended`,
@@ -493,10 +519,10 @@ Step 3e's provider:
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/commit-resolve-fixes" --provider "<graphite|github>" --pr "<PR#>" --message "fix: resolve PR #<PR#> review comments (<n> files)" --files-from "<files-file>" --ranges-from "<ranges-file>"
 ```
 
-`--ranges-from` is the Step 3 `<ranges-file>` the dispatch captured (the one
-this pass's resolvers were bounded by, never a re-capture after their edits):
-the script refuses, exit 3, any staged hunk outside a file's changed lines
-(plus a small margin) instead of trusting the resolver's prompt bound.
+`--ranges-from` is the pre-check's `<ranges-file>`. It is a backstop that does
+not fire after a clean pre-check: the script refuses, exit 3, any staged hunk
+outside a file's changed lines (plus the margin). Omit it only when the
+interactive user chose "Include them".
 
 `PUSHED` → `push=ok`, keep `sha`. `NOOP` → `push=noop`. Any non-zero exit →
 `push=failed` with its stderr (exit codes in the contract); exits 2, 3 and 4

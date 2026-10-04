@@ -105,7 +105,11 @@ orchestrator's scripts refuse to commit, and revert, any edit that breaks
 it.
 
 Edit only where the edit-bounds table in `references/resolve/clusters.md`
-(next to the disposition contract) allows, using `PR-changed lines` and `PR files`.
+(next to the disposition contract) allows, using `PR-changed lines` and `PR files`:
+inside the PR-changed ranges plus at most 3 adjacent lines (`RANGE_MARGIN`).
+An edit beyond that fails the orchestrator's range check and is reverted. When a
+fix needs more (an import at the top, a caller elsewhere, a doc comment further
+up), do not edit: propose `oos` with an `oos_reason` naming the needed change.
 When the bound is `none` or absent, or a comment asks for a file or lines
 outside it, do not edit: propose `oos` for the thread with a one-line
 `oos_reason` naming what is out of scope. When the bound is `unknown` the

@@ -17,7 +17,11 @@ The command commits and pushes fixes as a new commit through the active
 stacked-PR provider.
 
 The resolver no longer has a Bash tool; it reads and edits only inside the
-PR's changed lines. The command checks that local HEAD matches the PR head
+PR's changed lines, plus at most 3 adjacent lines. A
+`commit-resolve-fixes --check-ranges` pre-check runs before verification:
+unattended runs revert files with edits outside that bound and leave their
+threads open as `unclear`; interactive runs ask whether to include them. The
+command checks that local HEAD matches the PR head
 before it starts, and prints a final `Resolve:` contract line on every stop
 from the fetch onward.
 

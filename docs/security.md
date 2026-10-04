@@ -365,11 +365,14 @@ once wired, they run without a per-post prompt. The controls
 - **Scope.** Issues are filed only in the PR's repository, and the script
   refuses a thread that does not belong to the PR. No new network
   destination is added beyond `gh`'s GitHub API.
-- **Edit range.** `commit-resolve-fixes --ranges-from` rejects a staged hunk
-  outside a file's PR-changed lines (plus a 3-line margin), so a steered
-  resolver cannot commit edits to unrelated parts of a PR file. Residual: the
-  bound is the PR's changed lines, not one thread's lines, and the `mktemp`
-  ranges file is not integrity-checked against a model that calls Write.
+- **Edit range.** A hunk outside a file's PR-changed lines plus `RANGE_MARGIN`
+  never reaches a commit unattended: `commit-resolve-fixes --check-ranges`
+  reverts the file before verify and `--ranges-from` refuses it at commit, so a
+  steered resolver cannot commit edits to unrelated parts of a PR file. An
+  interactive run can include such edits only after the user says so. Rule and
+  recovery: `references/resolve/dispositions.md`. Residual: the bound is the
+  PR's changed lines, not one thread's lines, and the `mktemp` ranges file is
+  not integrity-checked against a model that calls Write.
 - **Bounded waits.** Rate limits wait at most 90 seconds (one retry in
   `reply-pr-thread`), then exit 4. Each `gh` call in `reply-pr-thread`,
   `file-followup-issue` and `get-pr-blockers` runs under `timeout(1)` or

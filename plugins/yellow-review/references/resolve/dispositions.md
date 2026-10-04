@@ -94,6 +94,8 @@ The orchestrator turns a proposed disposition into `unclear` when:
   `disagree` is still `complete`;
 - the cluster emitted `CONFLICT:` (its edits are rolled back, or kept when the
   interactive user chose "Keep the resolver's partial edits");
+- Step 6's range pre-check reverted a file the cluster modified (evidence
+  `edit outside PR-changed lines`; see the edit range under File set);
 - an evidence check below fails;
 - the thread has `commentsTruncated` true (see Lanes): any proposed
   disposition becomes `unclear` with evidence `comments truncated (<n> of
@@ -412,11 +414,33 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   `--allow-credential-shaped` after the user confirms a second time, an
   unattended run never does), and with `--unattended` refuses runner files,
   because the commit's git hooks would execute them;
-- `commit-resolve-fixes --ranges-from <ranges-file>` (the Step 3 capture of
-  `pr-changed-ranges`) refuses, exit 3 with nothing committed, any staged hunk
-  whose old-side lines are not inside one changed range of its file widened
-  by 3 lines; a listed file whose row is `none`, `unknown` or missing accepts
-  no hunk, and a malformed ranges file is exit 2;
+- the edit range (the one rule; clusters.md, the resolver prompt and
+  docs/security.md point here): an edit's old-side lines must sit inside one
+  changed range of its file widened by `RANGE_MARGIN` (3, a constant in
+  `commit-resolve-fixes`); a listed file whose row is `none`, `unknown` or
+  missing accepts no hunk. It is enforced twice, with `<ranges-file>` the
+  Step 4 `pr-changed-ranges` capture:
+  - `commit-resolve-fixes --check-ranges --ranges-from <ranges-file>
+    --files-from <files-file>` is the pre-check, run before verify. It stages
+    and commits nothing, makes no network call, and prints
+    `{"out_of_range":[{"path","old_lines":["a-b",...]}]}` for the files with
+    an out-of-range hunk. Exit 0 means the check ran; a missing, unreadable or
+    malformed ranges file or a non-canonical path is exit 2; a failed diff is
+    exit 3 (a refusal: revert and downgrade as below). Non-interactive runs
+    revert every listed file; interactive runs ask once per run to include
+    them or revert them. Reverting a file makes every cluster that modified it
+    `unclear` with evidence `edit outside PR-changed lines` (blocking, the
+    threads stay open), exactly like a rolled-back conflict: the shared-file
+    rule applies and the cluster's other files fall under the no-`fixed`
+    revert. Verify and the commit then run on the remaining files only.
+    Reverting before verify matters: dropping files after verification would
+    commit a subset nobody verified. Non-interactive never includes an
+    out-of-range edit;
+  - `commit-resolve-fixes --ranges-from <ranges-file>` is the backstop at
+    commit: it refuses, exit 3 with nothing committed, any staged hunk outside
+    the range, and a malformed ranges file is exit 2. After a clean pre-check
+    it does not fire; an interactive "include them" answer omits the flag for
+    that run (file-membership checks still apply);
 - `run-verify-command` refuses gitignored files, and when running a command
   also unchanged files, and refuses to run when the tree has changes outside
   the listed files. It does not run the command when a
@@ -720,7 +744,7 @@ any failure, usage included.
 | `reply-pr-thread` | replied or skipped | usage / unreadable or over-long body / credential or scan failure | not found or permission (stderr `reason=not-found` or `reason=permission`) | rate limited (`reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; the reply may have posted) | — | — |
 | `resolve-pr-thread` | resolved | usage | not found or permission (stderr `reason=...` as above) | rate limited (`reason=rate-limit`), or `gh` timed out (`reason=timeout`) | — | — |
 | `file-followup-issue` | created or found | usage / unreadable title or body file / credential or scan failure / thread belongs to a different pull request | — | rate limited (no retry; `reason=rate-limit`), or a `gh` call timed out (`reason=timeout`; a create may have filed) | dedupe window full with no marker (not transient) | — |
-| `commit-resolve-fixes` | `PUSHED` or `NOOP` | usage | staged mismatch, refused path or PR file list unavailable | commit failed, or undone (a hook changed or left files) | submit failed or timed out | head not verified, or a verify call timed out |
+| `commit-resolve-fixes` | `PUSHED` or `NOOP`; with `--check-ranges`, the check ran | usage (with `--check-ranges`: unreadable or malformed ranges file, non-canonical path) | staged mismatch, refused path or PR file list unavailable (with `--check-ranges`: the diff failed) | commit failed, or undone (a hook changed or left files) | submit failed or timed out | head not verified, or a verify call timed out |
 | `run-verify-command` | ran (`result`: pass, fail, timeout, skipped, reverted) | usage / not trusted / refused path / change outside the list / setup failure / recovery patch unscreenable | — | — | — | — |
 | `check-resolve-text` | clean | usage / unreadable file / credential or scan failure | — | — | — | — |
 
@@ -804,14 +828,17 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   reply is the resolver's claim, not a verified fact.
 - A repo with Issues disabled makes `file-followup-issue` exit 1 (`gh issue
   list` fails), so its `oos` threads get no reply and stay open on every run.
-- The range check bounds a file's edits to its PR-changed lines plus a
-  3-line margin, not to the thread's own lines: a resolver steered by one
-  thread can still edit another changed region of the same file, or the
-  margin. `<ranges-file>` is a `mktemp` file that is not hashed, so a model
-  that calls Write could in principle rewrite it; the check also assumes the
-  local HEAD is the head the ranges were captured from (a later head fails
-  closed, as a refusal). Without `--ranges-from` the script checks file
-  membership only.
+- The range check bounds a file's edits to its PR-changed lines plus the
+  `RANGE_MARGIN` margin, not to the thread's own lines: a resolver steered by
+  one thread can still edit another changed region of the same file, or the
+  margin. A fix that needs more than the margin is not made (the resolver
+  proposes `oos`); an edit that exceeds it reverts its whole file and
+  downgrades every cluster that touched the file to `unclear`, a file at a
+  time rather than the whole commit. `<ranges-file>` is a `mktemp` file that
+  is not hashed, so a model that calls Write could in principle rewrite it;
+  the check also assumes the local HEAD is the head the ranges were captured
+  from (a later head fails closed, as a refusal). Without `--ranges-from` (an
+  interactive "include them") the script checks file membership only.
 - `commit-resolve-fixes` disables git hooks for its commit and submit
   (`core.hooksPath=/dev/null`, with a note on stderr) when the hooks
   directory holds non-sample hooks it cannot verify: `.git/hooks` or a

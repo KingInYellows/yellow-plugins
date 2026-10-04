@@ -459,6 +459,93 @@ STUB
   [[ "$stderr" == *"--ranges-from not readable"* ]]
 }
 
+# --- Check-only mode (--check-ranges) ---
+
+run_check() { run --separate-stderr "$SCRIPT" --check-ranges "$@"; }
+
+@test "--check-ranges prints an empty list when every hunk is inside" {
+  printf 'one\nfeature2\n' >| src/a.txt
+  printf 'src/a.txt 2-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$output" = '{"out_of_range":[]}' ]
+}
+
+@test "--check-ranges lists an out-of-range file with its old-line span" {
+  seq 1 30 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file"
+  sed -i.bak 's/^25$/changed/' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt 1-5\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(jq -c . <<<"$output")" = '{"out_of_range":[{"path":"src/a.txt","old_lines":["25-25"]}]}' ]
+}
+
+@test "--check-ranges lists every out-of-range span of a file" {
+  seq 1 40 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file"
+  sed -i.bak -e 's/^20$/x/' -e 's/^30$/y/' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt 1-5\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(jq -c '.out_of_range[0].old_lines' <<<"$output")" = '["20-20","30-30"]' ]
+}
+
+@test "--check-ranges lists only the offending file among several" {
+  seq 1 30 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file"
+  sed -i.bak 's/^25$/changed/' src/a.txt && rm -f src/a.txt.bak
+  printf 'two\nfeature2\n' >| src/b.txt
+  printf 'src/a.txt 1-5\nsrc/b.txt 2-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  printf 'src/a.txt\nsrc/b.txt\n' >| "$BATS_TEST_TMPDIR/files"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.out_of_range | map(.path) | join(",")' <<<"$output")" = "src/a.txt" ]
+}
+
+@test "--check-ranges lists a file whose row is none, unknown or missing" {
+  printf 'one\nfeature2\n' >| src/a.txt
+  for row in 'src/a.txt none' 'src/a.txt unknown' 'src/b.txt 1-2'; do
+    printf '%s\n' "$row" >| "$BATS_TEST_TMPDIR/ranges"
+    run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+    [ "$status" -eq 0 ]
+    [ "$(jq -r '.out_of_range[0].path' <<<"$output")" = "src/a.txt" ]
+  done
+}
+
+@test "--check-ranges stages and commits nothing and needs no provider" {
+  seq 1 30 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file"
+  base=$(git rev-parse HEAD)
+  sed -i.bak 's/^25$/changed/' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt 1-5\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+  [ -z "$(git diff --cached --name-only)" ]
+  [ "$(git diff --name-only)" = "src/a.txt" ]
+  [ ! -s "$STUB_LOG" ]
+}
+
+@test "--check-ranges needs --ranges-from and rejects a bad ranges file (exit 2)" {
+  run_check -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"--check-ranges needs --ranges-from"* ]]
+  printf 'src/a.txt 2-\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"malformed row"* ]]
+  run_check --ranges-from "$BATS_TEST_TMPDIR/nope" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"--ranges-from not readable"* ]]
+}
+
+@test "--check-ranges rejects a non-canonical path (exit 2)" {
+  printf 'src/a.txt 2-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- ./src/a.txt
+  [ "$status" -eq 2 ]
+}
+
 @test "an unreadable PR file list refuses the commit (exit 3)" {
   printf 'one\nfeature\nfix\n' >| src/a.txt
   export STUB_PR_FILES_FAIL=1

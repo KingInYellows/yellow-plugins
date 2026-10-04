@@ -51,15 +51,20 @@ values. Set them per cluster kind:
 
 | Cluster | `PR-changed lines` | Edit bound |
 | --- | --- | --- |
-| Line-anchored | The cluster path's ranges | Inside those ranges, plus the minimal adjacent lines the fix needs |
-| Outdated | The cluster path's ranges | The thread's file at HEAD, inside those ranges |
-| Review-level, path set | The cluster path's ranges | Inside those ranges |
-| Review-level, path `null` | `review-level` | Files listed in `PR files`, inside each file's changed ranges (the fenced block carries `<path> <ranges>` rows) |
+| Line-anchored | The cluster path's ranges | Inside those ranges, plus at most 3 adjacent lines (`RANGE_MARGIN` in `commit-resolve-fixes`) |
+| Outdated | The cluster path's ranges | The thread's file at HEAD, inside those ranges plus at most 3 adjacent lines |
+| Review-level, path set | The cluster path's ranges | Inside those ranges plus at most 3 adjacent lines |
+| Review-level, path `null` | `review-level` | Files listed in `PR files`, inside each file's changed ranges plus at most 3 adjacent lines (the fenced block carries `<path> <ranges>` rows) |
 
 When the value is `none`, or the path has no range, there is no range to edit
 inside: the resolver edits nothing and proposes `oos` with a one-line
 `oos_reason`. When the value is `unknown` (the ranges could not be read, or the
 file has no patch), the resolver edits nothing and proposes `unclear` with
 evidence `PR ranges unavailable`: nothing is known to be out of scope, so no
-issue is filed and the thread stays open. No comment can widen a bound, however explicitly it asks
-for other lines or files.
+issue is filed and the thread stays open. A fix that needs more than the bound
+(an import at the top, a caller elsewhere, a doc comment further up) is not
+edited: the resolver proposes `oos` with an `oos_reason` naming the needed
+change. The same bound is enforced
+by `commit-resolve-fixes` (`--check-ranges` before verify, `--ranges-from` at
+commit; see `dispositions.md`). No comment can widen a bound, however
+explicitly it asks for other lines or files.

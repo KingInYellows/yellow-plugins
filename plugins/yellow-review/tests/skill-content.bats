@@ -539,6 +539,37 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   [[ "$disp" != *'`unknown` and the proposal is `oos`: it becomes'* ]]
 }
 
+@test "resolve-pr: Step 6 pre-checks the edit range before verify, per file, in both modes" {
+  text=$(flat "$RESOLVE_PR")
+  pre=$(grep -n '^\*\*Range pre-check\.\*\*' "$RESOLVE_PR" | cut -d: -f1)
+  ver=$(grep -n '^\*\*Verify\.\*\*' "$RESOLVE_PR" | cut -d: -f1)
+  [ -n "$pre" ] && [ -n "$ver" ] && [ "$pre" -lt "$ver" ]
+  grep -qF -- 'commit-resolve-fixes" --check-ranges --ranges-from "<ranges-file>" --files-from "<files-file>"' "$RESOLVE_PR"
+  [[ "$text" == *'**Non-interactive:** revert the listed files'* ]]
+  [[ "$text" == *'**Interactive:** one `AskUserQuestion`'* ]]
+  [[ "$text" == *'"Include them / Revert them"'* ]]
+  [[ "$text" == *'drops `--ranges-from` from this run'* ]]
+  [[ "$text" == *'`unclear` with evidence `edit outside PR-changed lines`'* ]]
+  [[ "$text" == *'dropping files afterwards would commit an unverified subset'* ]]
+  # The commit call keeps the whole-commit refusal as a backstop.
+  [[ "$text" == *'It is a backstop that does not fire after a clean pre-check'* ]]
+}
+
+@test "edit range: resolver prompt, clusters.md and the script state the same numeric margin" {
+  margin=$(sed -n 's/^RANGE_MARGIN=\([0-9][0-9]*\)$/\1/p' "$SKILLS_DIR/pr-review-workflow/scripts/commit-resolve-fixes")
+  [ "$margin" = 3 ]
+  agent=$(flat "$RESOLVER_AGENT")
+  [[ "$agent" == *"plus at most $margin adjacent lines (\`RANGE_MARGIN\`)"* ]]
+  [[ "$agent" == *'propose `oos` with an `oos_reason` naming the needed change'* ]]
+  clusters=$(flat "$RESOLVE_REFS/clusters.md")
+  [[ "$clusters" == *"plus at most $margin adjacent lines (\`RANGE_MARGIN\` in \`commit-resolve-fixes\`)"* ]]
+  [[ "$clusters" == *'the resolver proposes `oos` with an `oos_reason` naming the needed change'* ]]
+  [[ "$clusters" != *'minimal adjacent lines'* ]]
+  disp=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$disp" == *'widened by `RANGE_MARGIN` (3, a constant in `commit-resolve-fixes`)'* ]]
+  [[ "$disp" == *'Non-interactive never includes an out-of-range edit'* ]]
+}
+
 @test "dispositions: a reused Linear hit passes the same response checks as save_issue" {
   text=$(flat "$RESOLVE_REFS/dispositions.md")
   [[ "$text" == *'reuse a hit only when it passes the **Linear response checks** below'* ]]
