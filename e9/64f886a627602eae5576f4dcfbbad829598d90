@@ -1,0 +1,21 @@
+plugins/yellow-review/commands/review/sweep-all.md
+  s_771064b1487eb8::t_1cd8d6fd2d112c 395-399
+plugins/yellow-review/tests/skill-content.bats
+  s_771064b1487eb8::t_ce97e7160fafaf 1194-1199
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e964f886a627602eae5576f4dcfbbad829598d90",
+  "prompts": {},
+  "sessions": {
+    "s_771064b1487eb8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "344118bf-2aa9-4d5a-a9e5-a6b94995fa25",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

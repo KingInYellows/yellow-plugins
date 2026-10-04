@@ -1,0 +1,23 @@
+plugins/yellow-review/skills/pr-review-workflow/scripts/guard-local-config
+  s_1ba83f4e504194::t_0d360d0c01c6c2 83-89
+  s_1ba83f4e504194::t_d1fd8d22d8246d 111-114
+  s_1ba83f4e504194::t_38ca87c2ff0aa8 20-28
+plugins/yellow-review/tests/guard-local-config.bats
+  s_1ba83f4e504194::t_45ea650d1f54fa 162-209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d2d027a468e1b262a3365d9eb18356e14488b449",
+  "prompts": {},
+  "sessions": {
+    "s_1ba83f4e504194": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45b80bad-9769-493c-9893-eed703ac97cd",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
