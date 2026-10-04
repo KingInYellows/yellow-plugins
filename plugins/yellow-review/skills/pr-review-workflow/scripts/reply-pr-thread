@@ -243,19 +243,25 @@ if ! jq -e '.data.node.id' "$RESP" >/dev/null 2>&1; then
 fi
 
 # A marker counts only on a comment the viewer authored; a reviewer quoting
-# our marker never causes a skip. The newest comment of ours decides, so a bot
-# acknowledgement after our reply does not hide it; a later comment from a
-# human (a missing author type counts as human) means the thread moved on and
-# is processed again. Any disposition counts: a re-run after a
-# crash (reply posted, resolve failed) must not post a contradictory reply.
+# our marker never causes a skip. The newest viewer comment that carries a
+# marker for this thread decides; viewer comments without one are ignored, so
+# when gh authenticates as a bot account its own acknowledgement (also
+# viewerDidAuthor) cannot displace the marker comment, and a bot-authored
+# marker still counts. A later comment from a human (a missing author type
+# counts as human) means the thread moved on and is processed again. Any
+# disposition counts: a re-run after a crash (reply posted, resolve failed)
+# must not post a contradictory reply.
 # The exception is an upgrade from a reply that left the thread open
 # (disagree, unclear) to one that lets the caller resolve it (fixed,
 # addressed, oos): skipping would resolve the thread with no evidence posted.
 # No match prints nothing and exits 0; a jq failure must not read as "no
 # marker", or the reply the marker exists to prevent would be posted.
 if ! PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
-    (.data.node.comments.nodes // []) as $nodes
-    | ([ $nodes | to_entries[] | select(.value.viewerDidAuthor == true) ] | last) as $ours
+    ("<!-- yellow-review:resolve v1 thread=" + $thread + " disposition=(?<d>fixed|addressed|oos|disagree|unclear) -->$") as $re
+    | (.data.node.comments.nodes // []) as $nodes
+    | ([ $nodes | to_entries[]
+         | select(.value.viewerDidAuthor == true)
+         | select((.value.body // "") | sub("\\s+$"; "") | test($re)) ] | last) as $ours
     | $ours
     | select(. != null)
     | select([ $nodes[(.key + 1):][]
@@ -263,7 +269,7 @@ if ! PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
              | length == 0)
     | .value
     | (.body // "") | sub("\\s+$"; "")
-    | capture("<!-- yellow-review:resolve v1 thread=" + $thread + " disposition=(?<d>fixed|addressed|oos|disagree|unclear) -->$")
+    | capture($re)
     | .d
   ' "$RESP" 2>/dev/null); then
     printf 'Error: could not read the comments of %s; not posting.\n' "$THREAD_ID" >&2

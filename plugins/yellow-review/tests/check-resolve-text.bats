@@ -6,6 +6,8 @@ bats_require_minimum_version 1.5.0
 SCRIPT="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/skills/pr-review-workflow/scripts/check-resolve-text"
 
 setup() {
+  # Host-default tests must not depend on the caller's environment.
+  unset RT_ALLOWED_HOST GH_HOST
   A="$BATS_TEST_TMPDIR/a.txt"
   B="$BATS_TEST_TMPDIR/b.txt"
   printf 'Out of scope: retry policy belongs in the client.\n' >| "$A"
@@ -1051,4 +1053,56 @@ rule=forged line=9.txt"
   [ "$status" -eq 6 ]
   [[ "$stderr" == *"not readable"* ]]
   [[ "$stderr" == *"resolve-text: refused"* ]]
+}
+
+@test "a mention behind Markdown opening delimiters is refused; code spans and emails stay clean" {
+  check() {  # <expected rule> <line text>
+    printf 'clean line\n%s\n' "$2" >| "$A"
+    run --separate-stderr "$SCRIPT" "$A"
+    [ "$status" -eq 6 ]
+    [[ "$stderr" == *"resolve-text: refused rule=$1 line=2"* ]] || { echo "wrong rule for: $2 ($stderr)"; false; }
+  }
+  check mention 'thanks **@octocat**'
+  check mention '**@octocat** please look'
+  check mention 'thanks _@octocat_'
+  check mention 'see [@octocat]'
+  check mention 'see [@octocat](https://github.com/octocat)'
+  check mention 'ask ~~@octocat~~'
+  check mention 'ask **[@octocat]**'
+  printf '%s\n' 'the `@ts-ignore` and `**@octocat**` spans, first_@b.com, a@b.com, *emphasis* only' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "a backslash in the URL authority cannot smuggle the allowed host in as userinfo" {
+  check() {  # <line text>
+    printf 'clean line\n%s\n' "$1" >| "$A"
+    run --separate-stderr "$SCRIPT" "$A"
+    [ "$status" -eq 6 ]
+    [[ "$stderr" == *"resolve-text: refused rule=foreign-url line=2"* ]] || { echo "wrong rule for: $1 ($stderr)"; false; }
+  }
+  check 'see https://evil.com\@github.com/path'
+  check 'see https://evil.com\@github.com'
+  check 'see https://github.com\@evil.com/path'
+  printf '%s\n' 'see https://github.com/o/r/pull/7 and https://user:<password>@github.com:443/x' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "a whole bracketed value is a placeholder only when it is a known sentinel form" {
+  refuses() {  # <line text>
+    printf '%s\n' "$1" >| "$A"
+    run --separate-stderr "$SCRIPT" "$A"
+    [ "$status" -eq 6 ] || { echo "not refused: $1"; false; }
+  }
+  refuses 'password: <correcthorsebattery>'
+  refuses 'password: <hunter2x>'
+  refuses 'token: [correcthorse]'
+  refuses 'token=[hunter22]'
+  refuses 'secret: <your hunter2x>'
+  refuses 'https://user:<correcthorse>@host/x'
+  printf '%s\n' 'password: <password>' 'password: <your password>' 'token: <your private key>' \
+    'secret: [REDACTED]' 'token: "[redacted value]"' 'api key: <your-api-key>' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
 }

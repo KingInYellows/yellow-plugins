@@ -409,7 +409,9 @@ path_without_timeout() {
 @test "our own later comment without a marker does not hide the marker before it" {
   run "$SCRIPT" PRRT_reply_ownafter fixed "$BODY"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -r '.replied')" = true ]
+  [ "$(printf '%s' "$output" | jq -r '.skipped')" = already-replied ]
+  [ "$(printf '%s' "$output" | jq -r '.disposition')" = fixed ]
+  [ ! -f "$CALLS" ]
 }
 
 @test "a jq that fails while measuring the body exits 1 with a message, not jq's status" {
@@ -419,5 +421,21 @@ path_without_timeout() {
   PATH="${BATS_TEST_TMPDIR}/jqbin:${PATH}" run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
   [ "$status" -eq 1 ]
   [[ "$stderr" == *"could not measure the body file"* ]]
+  [ ! -f "$CALLS" ]
+}
+
+@test "a bot-account viewer's own unmarked acknowledgement after our marker still skips" {
+  run "$SCRIPT" PRRT_reply_botself fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.skipped')" = already-replied ]
+  [ "$(printf '%s' "$output" | jq -r '.disposition')" = fixed ]
+  [ ! -f "$CALLS" ]
+}
+
+@test "a marker authored by a Bot viewer is still recognised" {
+  run "$SCRIPT" PRRT_reply_botmarker fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.skipped')" = already-replied ]
+  [ "$(printf '%s' "$output" | jq -r '.disposition')" = fixed ]
   [ ! -f "$CALLS" ]
 }

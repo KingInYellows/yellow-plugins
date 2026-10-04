@@ -340,9 +340,11 @@ once wired, they run without a per-post prompt. The controls
   a keyword assigned a quoted value, or a known token prefix is refused,
   never redacted and posted. So are a markdown image, an `@` mention and a URL
   on a host other than the repository's (`RT_ALLOWED_HOST`, else `GH_HOST`,
-  else `github.com`). A scanner failure or unreadable file also refuses. The
-  scripts exit 6 and the caller leaves the thread open or posts the plain
-  outcome sentence.
+  else `github.com`). A scan that did not run also refuses. The scripts exit 6
+  on a refusal or a scan that did not run, and the caller leaves the thread
+  open or posts the plain outcome sentence. An unreadable or missing input
+  file is a usage error and exits 2, not 6; in `check-resolve-text` a refusal
+  wins over an unreadable file when both occur.
 - **Bounded text.** A reply body is capped at 1000 characters. The
   orchestrator checks resolver evidence against fixed patterns and never
   places it on a command line.

@@ -15,7 +15,8 @@
 #                                        PRRT_reply_* thread ids pick the
 #                                        scenario (rate-limit sequences with
 #                                        Retry-After or reset headers, 5xx,
-#                                        missing comment, spoofed marker)
+#                                        missing comment, spoofed marker,
+#                                        bot-account viewer: botself/botmarker)
 #   latestOpinionatedReviews             MOCK_GH_BLOCKERS_{FAIL,FIXTURE}
 #   */protection, */rules/branches/*     MOCK_GH_PROTECTION, MOCK_GH_RULES;
 #                                        MOCK_GH_PROTECTION_MAIN and
@@ -166,9 +167,11 @@ case "$ALL_ARGS" in
       emit_pages "$_all"
       exit 0
     fi
-    # MOCK_GH_ISSUE_LIST_FAIL=1|ratelimit|auth|forbidden simulates a failed lookup.
+    # MOCK_GH_ISSUE_LIST_FAIL=1|ratelimit|ratelimit403|auth|forbidden simulates a
+    # failed lookup. ratelimit403 is a secondary rate limit delivered as HTTP 403.
     case "${MOCK_GH_ISSUE_LIST_FAIL:-0}" in
       ratelimit) printf 'gh: API rate limit exceeded for user. (HTTP 429)\n' >&2; exit 1 ;;
+      ratelimit403) printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2; exit 1 ;;
       auth) printf 'gh: Bad credentials (HTTP 401)\n' >&2; exit 1 ;;
       forbidden) printf 'gh: Resource not accessible by personal access token (HTTP 403)\n' >&2; exit 1 ;;
       1) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
@@ -296,6 +299,20 @@ case "$ALL_ARGS" in
           {viewerDidAuthor:true,body:("Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=" + $t + " disposition=fixed -->\n"),author:{__typename:"User"}},
           $later]}}}}')
         ;;
+      *"PRRT_reply_botself"*|*"PRRT_reply_botmarker"*)
+        # gh authenticated as a bot account: every comment of ours has
+        # viewerDidAuthor true and author type Bot. botself: our marker, then
+        # our own unmarked Bot acknowledgement (must still skip). botmarker:
+        # a Bot-authored marker alone (must still be recognised).
+        case "$ALL_ARGS" in
+          *"PRRT_reply_botself"*) _tid=PRRT_reply_botself; _ack='{"viewerDidAuthor":true,"body":"Thanks, noted.","author":{"__typename":"Bot"}}' ;;
+          *) _tid=PRRT_reply_botmarker; _ack='null' ;;
+        esac
+        MOCK_BODY=$(jq -nc --arg t "$_tid" --argjson ack "$_ack" '{data:{node:{id:$t,comments:{nodes:([
+          {viewerDidAuthor:false,body:"Please add a null check.",author:{__typename:"User"}},
+          {viewerDidAuthor:true,body:("Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=" + $t + " disposition=fixed -->\n"),author:{__typename:"Bot"}},
+          $ack] | map(select(. != null)))}}}}')
+        ;;
       *"PRRT_reply_auth"*)
         MOCK_BODY='{"message":"Bad credentials"}'
         http "HTTP/2.0 401 Unauthorized" ""
@@ -390,10 +407,13 @@ case "$ALL_ARGS" in
     ;;
   *"latestOpinionatedReviews"*)
     # get-pr-blockers review lookup. MOCK_GH_BLOCKERS_FAIL simulates an API
-    # failure: 1 (HTTP 502), ratelimit, auth or notfound.
+    # failure: 1 (HTTP 502), ratelimit (HTTP 429), ratelimit403, forbidden403,
+    # auth or notfound.
     case "${MOCK_GH_BLOCKERS_FAIL:-0}" in
       1) printf 'gh: Something went wrong (HTTP 502)\n' >&2; exit 1 ;;
       ratelimit) printf 'gh: API rate limit exceeded for user. (HTTP 429)\n' >&2; exit 1 ;;
+      ratelimit403) printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2; exit 1 ;;
+      forbidden403) printf 'gh: Resource not accessible by integration (HTTP 403)\n' >&2; exit 1 ;;
       auth) printf 'gh: Bad credentials (HTTP 401)\n' >&2; exit 1 ;;
       notfound) printf 'gh: Could not resolve to a Repository with the name test/gone. (HTTP 404)\n' >&2; exit 1 ;;
     esac
@@ -413,6 +433,7 @@ case "$ALL_ARGS" in
         exit 1
         ;;
       403) printf 'gh: Resource not accessible by integration (HTTP 403)\n' >&2; exit 1 ;;
+      ratelimit) printf 'gh: API rate limit exceeded for user ID 1. (HTTP 403)\n' >&2; exit 1 ;;
       *) printf '{"message":"Not Found"}gh: Not Found (HTTP 404)\n' >&2; exit 1 ;;
     esac
     exit 0
@@ -439,6 +460,7 @@ case "$ALL_ARGS" in
         ;;
       enforced) MOCK_BODY='[{"type":"deletion"},{"type":"pull_request","parameters":{"required_review_thread_resolution":true}}]'; emit "$@" ;;
       fail) printf 'gh: Server Error (HTTP 500)\n' >&2; exit 1 ;;
+      ratelimit) printf 'gh: API rate limit exceeded for user ID 1. (HTTP 403)\n' >&2; exit 1 ;;
       *) MOCK_BODY='[{"type":"deletion"},{"type":"pull_request","parameters":{"required_review_thread_resolution":false}}]'; emit "$@" ;;
     esac
     exit 0

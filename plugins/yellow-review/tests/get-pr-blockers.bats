@@ -268,8 +268,11 @@ path_without_timeout() {
 }
 
 @test "a rate limit is told from a bare HTTP 403 by the classifier order" {
-  run --separate-stderr env MOCK_GH_BLOCKERS_FAIL=ratelimit "$SCRIPT" "test/repo" "610"
+  run --separate-stderr env MOCK_GH_BLOCKERS_FAIL=ratelimit403 "$SCRIPT" "test/repo" "610"
   [ "$(printf '%s' "$output" | jq -r '.lookupReason')" = rate_limited ]
+  run --separate-stderr env MOCK_GH_BLOCKERS_FAIL=forbidden403 "$SCRIPT" "test/repo" "610"
+  [ "$(printf '%s' "$output" | jq -r '.lookupFailed')" = true ]
+  [ "$(printf '%s' "$output" | jq -r '.lookupReason')" != rate_limited ]
 }
 
 @test "a null pullRequest with a not-found error is not_found" {
@@ -338,4 +341,43 @@ path_without_timeout() {
   run --separate-stderr "$SCRIPT" "test/repo" "610"
   [ "$(printf '%s' "$output" | jq -r '.conversationResolution')" = not_enforced ]
   [ "$(grep -c 'branches/main/protection' "${BATS_TEST_TMPDIR}/mock_gh_any_call")" -eq 1 ]
+}
+
+# --- rate limits on the REST lookups ---
+
+@test "a rate-limited ruleset lookup sets resolutionLookupReason while lookupFailed stays false" {
+  export MOCK_GH_PROTECTION=disabled MOCK_GH_RULES=ratelimit
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.conversationResolution')" = unknown ]
+  [ "$(printf '%s' "$output" | jq -r '.lookupFailed')" = false ]
+  [ "$(printf '%s' "$output" | jq -r '.lookupReason')" = null ]
+  [ "$(printf '%s' "$output" | jq -r '.resolutionLookupReason')" = rate_limited ]
+}
+
+@test "a rate-limited classic protection lookup sets resolutionLookupReason" {
+  export MOCK_GH_PROTECTION=ratelimit MOCK_GH_RULES=none
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.conversationResolution')" = unknown ]
+  [ "$(printf '%s' "$output" | jq -r '.lookupFailed')" = false ]
+  [ "$(printf '%s' "$output" | jq -r '.resolutionLookupReason')" = rate_limited ]
+}
+
+@test "resolutionLookupReason is null when the REST lookups answer" {
+  export MOCK_GH_PROTECTION=disabled MOCK_GH_RULES=none
+  run --separate-stderr "$SCRIPT" "test/repo" "610"
+  [ "$(printf '%s' "$output" | jq -r '.resolutionLookupReason')" = null ]
+}
+
+@test "a missing resolve-gh.sh library emits unknown_json other and exits 0" {
+  tree="${BATS_TEST_TMPDIR}/no-lib"
+  mkdir -p "${tree}/skills/pr-review-workflow/scripts"
+  cp "$SCRIPT" "${tree}/skills/pr-review-workflow/scripts/get-pr-blockers"
+  run --separate-stderr "${tree}/skills/pr-review-workflow/scripts/get-pr-blockers" "test/repo" "610"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.lookupFailed')" = true ]
+  [ "$(printf '%s' "$output" | jq -r '.lookupReason')" = other ]
+  [ "$(printf '%s' "$output" | jq -c '.changesRequested')" = null ]
+  [[ "$stderr" == *"resolve-gh.sh"* ]]
 }

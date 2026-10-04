@@ -21,9 +21,12 @@ secondary rate limit reported as HTTP 403 is classified as a rate limit.
 
 Exit codes the resolve scripts share: 6 means the text was refused (a
 credential shape, a markdown image, an `@` mention, a URL on another host, or a
-scan that did not run), kept apart from usage errors (2); 7 means a permanent
-GitHub refusal (not authenticated, no permission, Issues disabled). A thread
-that does not exist exits 3 from `file-followup-issue`. Its dedupe scan reads
+scan that did not run), kept apart from usage errors (2); 4 means a rate limit
+or timeout. Exit 7, a permanent GitHub refusal, differs by script:
+`reply-pr-thread` exits 7 only for HTTP 401 (bad credentials) and exits 3 for
+not found or HTTP 403/forbidden; `file-followup-issue` exits 7 for HTTP 401,
+HTTP 403 (no issue-write permission) or Issues disabled, and exits 3 for a
+missing thread. The `file-followup-issue` dedupe scan reads
 every page of the viewer's issues, so the old full-window exit 5 is gone, and
 it takes the host from the thread's own pull request URL. `reply-pr-thread`
 looks at the newest 20 comments and ignores bot acknowledgements after its

@@ -37,16 +37,33 @@ rt_text_clean() {
         function flag(rule, line) {
             if (!hit) { hit = 1; hitrule = rule; hitline = line ? line : NR }
         }
+        # sentinel(inner): 1 when the text inside `<...>` or `[...]` is a known
+        # redaction or template form, never arbitrary words. Either every
+        # word is a placeholder word (`<password>`, `[REDACTED]`,
+        # `[redacted value]`) or it is a template of 2-4 words that opens with
+        # your/my/the/a/an and ends in a credential noun (`<your token>`,
+        # `<your private key>`). `<correcthorse>` and `[hunter]` are values.
+        function sentinel(inner,    np, parts, j, allph) {
+            if (inner !~ /^[a-z_ -]+$/) return 0
+            np = split(inner, parts, /[_ -]+/)
+            if (parts[1] == "") return 0
+            allph = 1
+            for (j = 1; j <= np; j++) if (index(ph, " " parts[j] " ") == 0) allph = 0
+            if (allph) return 1
+            return np >= 2 && np <= 4 && index(" your my the a an ", " " parts[1] " ") > 0 && index(" key code token password passcode passwd secret credential credentials apikey value id pass passphrase phrase ", " " parts[np] " ") > 0
+        }
         # isplaceholder(seg): 1 when the WHOLE value is placeholder syntax:
-        # `$NAME`, `${NAME}`, `<...>` (no nested angle brackets) or a
-        # bracketed word such as `[REDACTED]`. A value that merely contains
-        # `$`, `<`, `{` or `[` (`hunter$2x`, `p<w>x`, `${NAME:-word}`) is not
-        # one; the scan runs on the lowercased line.
+        # `$NAME`, `${NAME}`, or a `<...>` / `[...]` wrapping a known sentinel
+        # form (see sentinel). A value that merely contains `$`, `<`, `{` or
+        # `[` (`hunter$2x`, `p<w>x`, `${NAME:-word}`) is not one, and neither
+        # is a bracketed arbitrary word (`<hunter2x>`, `[correcthorse]`); the
+        # scan runs on the lowercased line.
         function isplaceholder(seg) {
             if (seg ~ /^\$[a-z_][a-z0-9_]*$/) return 1
             if (seg ~ /^\$\{[a-z_][a-z0-9_]*\}$/) return 1
-            if (seg ~ /^<[^<>]*>$/) return 1
-            return seg ~ /^\[[a-z_ -]+\]$/
+            if (seg ~ /^<[^<>]*>$/) return sentinel(substr(seg, 2, length(seg) - 2))
+            if (seg ~ /^\[[^\[\]]*\]$/) return sentinel(substr(seg, 2, length(seg) - 2))
+            return 0
         }
         # litval(seg, inword): 1 when an unquoted keyword value looks like a
         # literal credential. Flag only a plausible one: 6+ characters, a
@@ -496,15 +513,20 @@ rt_text_clean() {
         /!\[/ { flag("markdown-image") }
         {
             # A mention is @name at the start of a line or after whitespace or
-            # an opening bracket or quote: where GitHub notifies. Not the @ of
-            # URL userinfo, an email address or a code span.
-            if ((" " $0) ~ /([[:space:]]|[(,;"\047])@[A-Za-z0-9]/) flag("mention")
+            # an opening bracket or quote, optionally behind Markdown opening
+            # delimiters (`**@name**`, `_@name_`, `[@name]`): where GitHub
+            # notifies. Not the @ of URL userinfo, an email address or a code
+            # span.
+            if ((" " $0) ~ /([[:space:]]|[(,;"\047])[][*_~]*@[A-Za-z0-9]/) flag("mention")
             l = tolower($0)
             h = tolower(host)
             while (match(l, /https?:\/\/[^\/ \t"\047`]*/)) {
                 u = substr(l, RSTART, RLENGTH)
                 l = substr(l, RSTART + RLENGTH)
                 sub(/^https?:\/\//, "", u)
+                # A backslash ends the host for URL parsers (`evil.com\@github.com`
+                # is evil.com), so refuse it before userinfo is stripped.
+                if (index(u, "\\")) flag("foreign-url")
                 sub(/^[^@]*@/, "", u)
                 sub(/[])>.,;:!?*]+$/, "", u)
                 sub(/:[0-9]+$/, "", u)
