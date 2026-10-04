@@ -992,9 +992,6 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$disp" == *'Non-interactive never includes an out-of-range edit'* ]]
 }
 
-@test "resolve-stack and sweep: Read dispositions.md before the walk or nested resolve, stop and report the path on failure" {
-}
-
 @test "resolve-stack and sweep: Read their resolve-contract.md before the walk or nested resolve, stop and report the path on failure" {
   for f in "$RESOLVE_STACK" "$SWEEP"; do
     # Read is an allowed tool, so the imperative Read can run
