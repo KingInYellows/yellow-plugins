@@ -598,8 +598,16 @@ gh_version_ok() {
 # version in the plugin cache (cache/<plugin>/<version>/).
 # adapter_honors_timeout FILE: an adapter older than the --timeout-ms flag
 # ignores it and keeps its 120 s subprocess cap, so a restack that needs the
-# ten minutes this script asks for would be cut off. Skip such an adapter.
-adapter_honors_timeout() { grep -q -- 'timeout-ms' "$1" 2>/dev/null; }
+# ten minutes this script asks for would be cut off. Probe it: an adapter that
+# knows the flag refuses `--timeout-ms 0` before running anything and names the
+# flag on stderr; an older one runs `gh stack view` (read-only) and does not.
+# Skip such an adapter.
+adapter_honors_timeout() {
+  local err
+  err=$(node "$1" --timeout-ms 0 view 2>&1 >/dev/null) || true
+  case $err in *--timeout-ms*) return 0 ;; esac
+  return 1
+}
 
 resolve_adapter() {
   local root cand best="" best_v="" ver
@@ -1362,6 +1370,26 @@ hold_or_release_lock() {
   exit "$rc"
 }
 
+# chain_rebase_worktree: print the path of a worktree that is in the middle of a
+# git rebase of one of the recorded stack branches (gh-stack rebases in the
+# worktree that holds the branch, which need not be the run worktree).
+chain_rebase_worktree() {
+  local i gd name b
+  for ((i = 0; i < ${#WT_PATH[@]}; i++)); do
+    gd=$(git -C "${WT_PATH[i]}" rev-parse --path-format=absolute --git-dir 2>/dev/null) || continue
+    for name in rebase-merge rebase-apply; do
+      [ -f "$gd/$name/head-name" ] || continue
+      b=$(cat -- "$gd/$name/head-name" 2>/dev/null) || continue
+      b=${b#refs/heads/}
+      if in_chain "$b"; then
+        printf '%s' "${WT_PATH[i]}"
+        return 0
+      fi
+    done
+  done
+  return 1
+}
+
 cmd_continue() {
   parse_flags "$@"
   reject_remote
@@ -1369,6 +1397,16 @@ cmd_continue() {
   load_state_or_exit
   need_lock
   report_all_floating
+  # A git rebase still in progress that the provider has no record of (an
+  # adapter timeout, a lost marker) is not "nothing paused": finishing now
+  # would clear the state and the lock over a half-applied restack.
+  local busy
+  if busy=$(chain_rebase_worktree) && [ ! -e "$COMMON/gh-stack-rebase-state" ] \
+    && ! { [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; }; then
+    note "a git rebase of this stack is still in progress in $(v "$busy") but the provider reports none paused; state kept"
+    note "finish it with git (rebase --continue or --abort) and run --continue again, or run --abort"
+    exit "$X_PAUSED"
+  fi
   if [ "$S_PROVIDER" = graphite ]; then
     command -v gt >/dev/null 2>&1 || die "$X_KEPT" "gt (Graphite CLI) is not installed; state kept"
     if gt_paused "$S_RUN"; then
