@@ -59,6 +59,10 @@ The dedicated file path a council reviewer agent writes its human-readable
 (Layer-1, capitalized `Verdict:` / `Findings:` / `Summary:`) review to. The
 structured Layer-2 `key=value` contract is returned through the Task call, not
 written here — keeping the two layers separate is the point of the file.
+A reviewer that produces no review file (a stub or non-voting return)
+reports a sentinel value in place of a real path; every site that checks,
+reads or deletes a fenced-output path must explicitly allow that sentinel, so
+a missing file is never treated as an error or cleanup target.
 
 ## CLI-wrapper reviewer
 
@@ -89,3 +93,20 @@ associated with the last trunk commit that touched the plan file), strict (slug-
 loose (token-coverage scoring over the 100 most recent merged PRs) —
 falling through to a user-confirmed override prompt only when no tier
 meets its pass condition.
+
+## non-voting verdict
+
+A council reviewer outcome (a timeout, an error, or an unavailable or
+quota-exhausted reviewer) that reports the reviewer could not give a judgment.
+It is excluded from consensus counting and must never be read as the reviewer
+having reviewed the change and found it clean. Non-voting verdicts still appear
+in the aggregated report; a new one has to be excluded in every place that
+tallies votes or computes a "reviewed clean" reading.
+
+## reviewer return contract
+
+The fixed set of structured `key=value` fields (verdict, confidence, summary,
+fenced-output path, and a findings block) that every council reviewer returns
+through its Task call, so the council can aggregate heterogeneous reviewers
+uniformly. It is the Layer-2 contract, separate from the human-readable review
+written to the fenced-output path.
