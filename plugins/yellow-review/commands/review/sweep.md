@@ -173,8 +173,9 @@ ACTUAL=$(git rev-parse --abbrev-ref HEAD)
 
 If the branch does not match, stop — do not proceed to Step 3 — and end the
 output with the skip line `Sweep: skipped (branch-mismatch)` (see "Skip
-line"). Run Step 2b's check and the Step 3a `clear` first, so a config edit
-from `/review:pr` is restored even on this stop.
+line"). Run Step 2b's check and, when it exited `0` or `3`, the Step 3a
+`clear` first, so a config edit from `/review:pr` is restored even on this
+stop.
 
 ### Step 2b: Check the local config before resolve
 
@@ -187,12 +188,14 @@ created or deleted `yellow-plugins.local.md`:
 ```
 
 Exit `0`: unchanged, continue to Step 3 with the same snapshot. Exit `3`
-(changed and restored), `4` (restore failed, or the snapshot failed its
-digest check) or any other exit: run the Step 3a `clear` call, print
+(changed and restored): run the Step 3a `clear` call, print
 `[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md changed during the review`
-with the script's `changed:` / `restore failed:` lines (for exit `4` add
-`inspect yellow-plugins.local.md before any further run`), and stop without
-invoking `/review:resolve`. Print no `Sweep:` or `Resolve:` line, so
+with the script's `changed:` / `restore failed:` lines, and stop without
+invoking `/review:resolve`. Exit `4` (restore failed, or the snapshot failed
+its digest check) or any other exit: do not clear; print the same abort
+message plus `inspect yellow-plugins.local.md before any further run` and
+`snapshot kept at <guard-dir> (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear "<guard-dir>")`,
+and stop without invoking `/review:resolve`. Print no `Sweep:` or `Resolve:` line, so
 `/review:sweep-all` records `no contract` and stops the batch.
 
 ### Step 3: Run /review:resolve --non-interactive
@@ -241,17 +244,22 @@ run would execute its `verify_command`.
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" check "<guard-dir>" "<guard-digest>"
 ```
 
-Then, in its own Bash call and whatever the check reported (and on every
-earlier stop after Step 1b), remove the snapshot (a rejected path is left for
-the OS temp sweep, never deleted):
+Only when the check exited `0` or `3` (and on every earlier stop after Step 1b
+that has no failed check), in its own Bash call, remove the snapshot (a
+rejected path is left for the OS temp sweep, never deleted):
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" clear "<guard-dir>"
 ```
 
+On exit `4` or any other exit, do not clear: the snapshot may hold the only
+intact copy of the config.
+
 Exit `0`: continue. Exit `3`, `4` or any other exit: print
 `[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md changed during the resolve`
-with the script's lines and stop. Skip Step 3b, and print neither the
+with the script's lines (on exit `4` or any other exit, add
+`snapshot kept at <guard-dir> (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear "<guard-dir>")`)
+and stop. Skip Step 3b, and print neither the
 nested `Resolve:` line nor a `Sweep:` line, so `/review:sweep-all` records
 `no contract` and stops the batch.
 
@@ -383,8 +391,9 @@ they are not specific to this PR, so the batch must still stop.
   resolve.` and stop. Indicates `/review:pr` errored mid-checkout or
   another tool changed branches during the run — re-run after manually
   checking out the PR head branch.
-- **Local config changed or unguardable** (Steps 1b, 2b, 3a): the snapshot is
-  cleared, the file restored when possible, and the sweep stops with no
+- **Local config changed or unguardable** (Steps 1b, 2b, 3a): the file is
+  restored when possible, the snapshot is cleared unless the check exited `4`
+  (then it is kept and its path printed), and the sweep stops with no
   `Sweep:` or `Resolve:` line, so `/review:sweep-all` records `no contract`.
   Review-time changes stop before `/review:resolve` runs.
 - **`/review:pr` failed silently**: with the human gate removed, sweep

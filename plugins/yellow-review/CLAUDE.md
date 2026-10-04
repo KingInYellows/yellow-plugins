@@ -247,7 +247,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   digest check (live config untouched) or a restore failed (the change may
   still be live), and a symlinked
   config is refused at snapshot (exit 2).
-  `/review:resolve-stack` snapshots per PR (after its checkout, before the resolve), checks after it and clears before the next PR
+  `/review:resolve-stack` snapshots per PR (after its checkout, before the resolve), checks after it and clears before the next PR once the check exited 0 or 3 (on exit 4 the snapshot is kept and its path printed)
 - `file-line-counts <diff-base-ref>` — Authoritative base/head line counts per
   changed file for `thermonuclear-reviewer`'s size-threshold rule; the
   header and footer rows are its completeness signal

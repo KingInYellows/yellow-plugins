@@ -312,17 +312,22 @@ stop or item 3b's dirty-tree or config stop ends the walk.
    "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" check "<guard-dir>" "<guard-digest>"
    ```
 
-   Then, in its own Bash call and whatever the check reported, remove this
-   PR's snapshot before the next PR or any stop below:
+   Only when the check exited `0` (unchanged) or `3` (changed and restored),
+   and in its own Bash call, remove this PR's snapshot before the next PR or
+   any stop below:
    `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" clear "<guard-dir>"`
-   (a rejected path is left for the OS temp sweep, never deleted).
+   (a rejected path is left for the OS temp sweep, never deleted). On exit `4`
+   or any other non-zero exit, do not clear: the snapshot may hold the only
+   intact copy of the config.
 
    Exit `0`: unchanged. Exit `3` (changed and restored) or `4` (the snapshot
    failed validation or its digest check, leaving the live config untouched,
    or a restore failed, which may leave the change live): print this PR's
    row, then
    `[review:resolve-stack] aborted at PR #<PR#>: yellow-plugins.local.md changed during the resolve`
-   with the script's `changed:` / `restore failed:` lines. List the PR under
+   with the script's `changed:` / `restore failed:` lines. On exit `4`, add
+   `snapshot kept at <guard-dir> (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear "<guard-dir>")`.
+   List the PR under
    Needs manual attention as `ignored config changed (restored)` or `ignored
    config tampered (restore failed: inspect yellow-plugins.local.md before any
    further run)`, mark the remaining PRs `not attempted (config changed)`, run

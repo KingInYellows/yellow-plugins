@@ -371,6 +371,10 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   [[ "$text" == *'set `<guard-dir>` to `none`'* ]]
   [[ "$text" == *'yellow-plugins.local.md changed during the review'* ]]
   [[ "$text" == *'Print no `Sweep:` or `Resolve:` line'* ]]
+  # The clear is conditional on exit 0 or 3; exit 4 keeps and names the snapshot.
+  [[ "$text" == *'Only when the check exited `0` or `3`'* ]]
+  [[ "$text" == *'On exit `4` or any other exit, do not clear'* ]]
+  [ "$(grep -c 'snapshot kept at <guard-dir>' "$SWEEP")" -ge 2 ]
 }
 
 @test "sweep-all: the empty-list exit always prints and stops; only the prune prompt is conditional" {
@@ -576,6 +580,10 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   [ "$(grep -c 'guard-local-config" clear' "$RESOLVE_STACK")" -eq 1 ]
   [ "$clr" -lt "$stp4" ]
   [[ "$text" == *"remove this PR's snapshot before the next PR or any stop below"* ]]
+  # The clear is conditional on exit 0 or 3; exit 4 keeps and names the snapshot.
+  [[ "$text" == *'Only when the check exited `0` (unchanged) or `3` (changed and restored)'* ]]
+  [[ "$text" == *'On exit `4` or any other non-zero exit, do not clear'* ]]
+  [[ "$text" == *'snapshot kept at <guard-dir> (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear "<guard-dir>")'* ]]
 }
 
 @test "resolve-stack: a restack that changes a branch is published before the next PR" {
