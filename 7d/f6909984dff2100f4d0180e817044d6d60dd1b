@@ -1,0 +1,35 @@
+plugins/yellow-review/commands/review/review-pr.md
+  s_092275c4e6a6a0::t_b6deec399d6393 842-845
+.changeset/council-quota-and-opencode-routing.md
+  s_092275c4e6a6a0::t_b6deec399d6393 18,37-38
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_092275c4e6a6a0::t_b6deec399d6393 444-447
+plugins/yellow-council/commands/council/setup.md
+  s_092275c4e6a6a0::t_9213fe37bb1e43 128-132,210-213
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_092275c4e6a6a0::t_b6deec399d6393 185-199,326-329,365-368
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_092275c4e6a6a0::t_b6deec399d6393 274-281
+plugins/yellow-council/tests/quota-lineage.bats
+  s_092275c4e6a6a0::t_99325979618acd 65-67
+  s_092275c4e6a6a0::t_a63dcd2af14122 46-64,68-72,307-472
+  s_092275c4e6a6a0::t_df035826938c0c 473
+plugins/yellow-council/commands/council/council.md
+  s_092275c4e6a6a0::t_9213fe37bb1e43 191-196,542-548,555-556,559-561,563,574,1222-1230,1233,1291
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7df6909984dff2100f4d0180e817044d6d60dd1b",
+  "prompts": {},
+  "sessions": {
+    "s_092275c4e6a6a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "53398599-95a5-4127-ba6b-f2642ceba186",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
