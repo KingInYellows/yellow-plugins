@@ -1,0 +1,21 @@
+plugins/yellow-review/references/resolve/dispositions.md
+  s_771064b1487eb8::t_f47fe18e4d77ea 135-140,887-896
+plugins/yellow-review/tests/skill-content.bats
+  s_771064b1487eb8::t_a269da22894398 746-751
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cace3b139236729cefd7f904971df3d4a23b61d0",
+  "prompts": {},
+  "sessions": {
+    "s_771064b1487eb8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "344118bf-2aa9-4d5a-a9e5-a6b94995fa25",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
