@@ -1,0 +1,19 @@
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_092275c4e6a6a0::t_9a374409d89a2a 811
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7b3881b06267bfebf6c84d71f2dfcdb4d6af93d8",
+  "prompts": {},
+  "sessions": {
+    "s_092275c4e6a6a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "53398599-95a5-4127-ba6b-f2642ceba186",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
