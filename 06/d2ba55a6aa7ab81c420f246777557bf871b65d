@@ -1,0 +1,31 @@
+plans/worktree-aware-restack.md
+  s_d906b15dcf2596::t_7c9b78654fb412 503,521,538-540,556,558
+plugins/yellow-core/skills/git-worktree/scripts/worktree-restack.sh
+  s_d906b15dcf2596::t_2024b5e552f18f 438-440
+plugins/yellow-core/skills/git-worktree/tests/mocks/gh
+  s_d906b15dcf2596::t_e80d6cdab7b5c9 1-70
+plugins/yellow-core/skills/git-worktree/tests/mocks/git
+  s_d906b15dcf2596::t_92824e676bdbd4 1-4
+plugins/yellow-core/skills/git-worktree/tests/mocks/gt
+  s_d906b15dcf2596::t_aea3bb08a09dd2 1-53
+plugins/yellow-core/skills/git-worktree/tests/mocks/stack-engine.bash
+  s_d906b15dcf2596::t_3d6cfac83bf414 1-100
+plugins/yellow-core/skills/git-worktree/tests/worktree-restack.bats
+  s_d906b15dcf2596::t_31b5fbfa92aea1 1-610
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "06d2ba55a6aa7ab81c420f246777557bf871b65d",
+  "prompts": {},
+  "sessions": {
+    "s_d906b15dcf2596": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0170b453-4513-4753-b904-fd0ab9d9878d",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
