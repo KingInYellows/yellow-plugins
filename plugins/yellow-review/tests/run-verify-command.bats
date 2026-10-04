@@ -1682,3 +1682,29 @@ load_redactor() {
   load_redactor
   [ "$status" -ne 0 ]
 }
+
+# --- the recovery patch is screened whole: removed and context lines too ---
+
+@test "a credential on a removed line withholds the recovery patch" {
+  printf 'one\nGH=ghp_abcdefghijklmnopqrstuvwxyz0123456789\nfeature\n' >| src/a.txt
+  git commit -q -am "chore: commit a credential"
+  printf 'one\nfeature\nresolver edit\n' >| src/a.txt
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .patch, .treeClean]')" = '["fail",null,true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"recovery patch withheld"* ]]
+  [ -z "$(find "$PATCH_DIR" -name '*.patch' 2>/dev/null)" ]
+  run ! grep -rq 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' "$PATCH_DIR"
+}
+
+@test "a credential on a context line withholds the recovery patch" {
+  printf 'one\nGH=ghp_abcdefghijklmnopqrstuvwxyz0123456789\nfeature\n' >| src/a.txt
+  git commit -q -am "chore: commit a credential"
+  printf 'one\nGH=ghp_abcdefghijklmnopqrstuvwxyz0123456789\nfeature\nresolver edit\n' >| src/a.txt
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .patch, .treeClean]')" = '["fail",null,true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"recovery patch withheld"* ]]
+  [ -z "$(find "$PATCH_DIR" -name '*.patch' 2>/dev/null)" ]
+  run ! grep -rq 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' "$PATCH_DIR"
+}

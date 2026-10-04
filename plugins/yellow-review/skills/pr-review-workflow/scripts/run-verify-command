@@ -533,8 +533,21 @@ PATCH_SCREENED=0
 # A run screens the snapshot before the verifier starts, so a SIGKILL or a host
 # death during the verifier cannot leave an unscreened patch under .git. The
 # verifier's own output is screened separately, on its way to the log.
+# Every hunk line is screened, not only the added ones: a resolver that removes
+# a credential, or edits beside one, leaves it in a removed or context line of
+# the patch. Diff headers (diff --git, index, ---/+++, mode and rename lines) are
+# skipped by position, as rt_added_lines does, because a path is not content
+# and would only add false positives. A hunk header keeps its trailing section
+# text, which is file content.
+patch_hunk_lines() {
+    awk '
+        /^diff --git / { h = 0; next }
+        /^@@/ { h = 1; s = $0; if (sub(/^@@[^@]*@@ ?/, "", s) && s != "") print s; next }
+        h && /^[-+ ]/ { print substr($0, 2) }
+    '
+}
 screen_patch() {
-    if [ "$SAVE_TEXT_OK" != 1 ] || ! rt_added_lines <"$TEXT_FILE" >"$ADDED_FILE"; then
+    if [ "$SAVE_TEXT_OK" != 1 ] || ! patch_hunk_lines <"$TEXT_FILE" >"$ADDED_FILE"; then
         rm -f -- "$PATCH"
         die 2 "cannot screen the recovery patch; the command was not run and the tree is untouched"
     fi
@@ -544,7 +557,7 @@ screen_patch() {
         1)
             rm -f -- "$PATCH"
             PATCH_OUT=""
-            add_reason "recovery patch withheld: added lines look like a credential"
+            add_reason "recovery patch withheld: patch lines look like a credential"
             ;;
         *)
             rm -f -- "$PATCH"

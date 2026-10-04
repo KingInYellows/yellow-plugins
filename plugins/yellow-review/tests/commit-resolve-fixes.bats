@@ -719,7 +719,8 @@ STUB
   printf '#!/bin/sh\n: >| "%s/armed"\n' "$BATS_TEST_TMPDIR" >| .git/hooks/post-commit
   chmod +x .git/hooks/post-commit
   track_git_hooks post-commit
-  git_shim_failing "if [ -e \"$BATS_TEST_TMPDIR/armed\" ] && [ \"\$1\" = ls-files ]; then exit 128; fi"
+  # lgit puts -c options before the subcommand, so match ls-files anywhere.
+  git_shim_failing "if [ -e \"$BATS_TEST_TMPDIR/armed\" ]; then case \" \$* \" in *' ls-files '*) exit 128 ;; esac; fi"
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 4 ]
@@ -1711,4 +1712,80 @@ in_repo_plugin_init() {
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 0 ]
+}
+
+@test "a core.fsmonitor command set in the local git config is not run" {
+  marker="$BATS_TEST_TMPDIR/fsmonitor-ran"
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$BATS_TEST_TMPDIR/fsm.sh"
+  chmod +x "$BATS_TEST_TMPDIR/fsm.sh"
+  git config core.fsmonitor "$BATS_TEST_TMPDIR/fsm.sh"
+  # A change outside the expected set stops the run after the early status
+  # and tree-listing inspections, before anything is staged.
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  printf 'two\nextra\n' >| src/b.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"change outside the expected set"* ]]
+  [ ! -e "$marker" ]
+}
+
+@test "a pushRemote URL with a query-string credential is not printed (exit 3)" {
+  git remote add odd "$ORIGIN"
+  git config remote.odd.pushurl 'https://github.com'
+  git config branch.feature.pushRemote 'https://github.com/acme/widgets.git?access_token=SECRETVALUE123'
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" != *"SECRETVALUE123"* ]]
+  [[ "$stderr" != *"access_token"* ]]
+}
+
+# --- The push URL's port ---
+
+@test "a push URL on a different explicit port than the active endpoint is refused before committing (exit 3)" {
+  for url in https://github.com:8443/acme/widgets.git \
+             ssh://git@github.com:2222/acme/widgets.git \
+             http://github.com:8080/acme/widgets.git \
+             ssh://git@ssh.github.com:2222/acme/widgets.git; do
+    git remote remove hostcase 2>/dev/null || true
+    push_via "$url"
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted: $url" >&2; return 1; }
+    [[ "$stderr" == *"pushes to a different port than the active GitHub host"* ]]
+    [[ "$stderr" != *"8443"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  done
+  ! grep -q '^node ' "$STUB_LOG"
+}
+
+@test "a port other than the active host's explicit port is refused, the same port accepted" {
+  export GH_HOST=git.example:8443
+  push_via https://git.example:9443/acme/widgets.git
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"pushes to a different port than the active GitHub host"* ]]
+  git remote remove hostcase
+  push_via https://git.example:8443/acme/widgets.git
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+}
+
+@test "a spelled-out scheme default port equals an absent one" {
+  n=0
+  for url in https://github.com:443/acme/widgets.git \
+             ssh://git@github.com:22/acme/widgets.git \
+             http://github.com:80/acme/widgets.git; do
+    n=$((n + 1))
+    git remote remove hostcase 2>/dev/null || true
+    push_via "$url"
+    printf 'one\nfeature\nfix%s\n' "$n" >| src/a.txt
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 0 ] || { echo "rejected: $url: $stderr" >&2; return 1; }
+  done
+}
+
+@test "the ssh.github.com:443 alias is accepted for github.com" {
+  push_via ssh://git@ssh.github.com:443/acme/widgets.git
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ] || { echo "$stderr" >&2; return 1; }
 }

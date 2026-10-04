@@ -13,14 +13,19 @@
 # Git with listed paths taken literally (no globs or pathspec magic). A
 # per-call flag, not GIT_LITERAL_PATHSPECS, so hooks, gt and the verify
 # command never inherit it.
-lgit() { git --literal-pathspecs "$@"; }
+#
+# core.fsmonitor is a command pathname when it is not a boolean, and git runs
+# it on a status, diff or index refresh. A resolver can set it in .git/config,
+# which no change check lists, so every lgit call overrides it (and the
+# untracked cache it feeds) before any guard has run.
+lgit() { git -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs "$@"; }
 
 # lgit with every git hook disabled (core.hooksPath=/dev/null overrides
 # .git/hooks and any configured hooks directory). For the rollback paths: a
 # resolver can plant or edit an ignored hook that rp_tree_changes does not
 # list, and a file checkout, an index write or a status refresh would run it
 # (post-checkout, post-index-change).
-lgit_nohooks() { git -c core.hooksPath=/dev/null --literal-pathspecs "$@"; }
+lgit_nohooks() { git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs "$@"; }
 
 rp_lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 
@@ -286,8 +291,8 @@ rp_pr_files() {
 # rp_ignored_changed_since covers them.
 rp_tree_changes() {
     local err rc=0
-    err=$({ git diff --no-renames --name-only -z HEAD -- \
-        && git ls-files --others --exclude-standard -z; } 2>&1 >"$1") || rc=$?
+    err=$({ lgit diff --no-renames --name-only -z HEAD -- \
+        && lgit ls-files --others --exclude-standard -z; } 2>&1 >"$1") || rc=$?
     if [ "$rc" -ne 0 ]; then
         printf 'rp_tree_changes: %s\n' "${err%%$'\n'*}" >&2
         return "$rc"
@@ -372,7 +377,7 @@ rp_ignored_changed_since() {
         cd -- "$top" 2>/dev/null || exit 2
         symlist=$(mktemp) || exit 2
         trap 'rm -f -- "$symlist"' EXIT
-        git ls-files --others --ignored --exclude-standard --directory -z >|"$scratch" 2>/dev/null || exit 2
+        lgit ls-files --others --ignored --exclude-standard --directory -z >|"$scratch" 2>/dev/null || exit 2
         while IFS= read -r -d '' f; do
             case "$f" in .git|.git/*|*/.git|*/.git/*) continue ;; esac
             out=""

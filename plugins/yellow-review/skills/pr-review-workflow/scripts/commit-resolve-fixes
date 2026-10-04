@@ -309,12 +309,28 @@ norm_host() {
     printf '%s\n' "$h"
 }
 
-# remote_parse <push-url>: print "<host> <owner/repo>", both lowercase, for an
+# norm_port <host[:port]> <scheme>: print the explicit port of an authority, or
+# "-" when it has none or spells out the scheme's default (https 443, http 80,
+# ssh 22), so a spelled-out default equals an absent one. Fails for a port
+# above 65535. Never prints a URL.
+norm_port() {
+    local h="${1##*@}" p="" d=""
+    if [[ "$h" =~ ^[^:]+:([0-9]+)$ ]]; then
+        p=$((10#${BASH_REMATCH[1]}))
+        [ "$p" -le 65535 ] || return 1
+    fi
+    case "$2" in https) d=443 ;; http) d=80 ;; ssh) d=22 ;; esac
+    if [ -z "$p" ] || [ "$p" = "$d" ]; then p=-; fi
+    printf '%s\n' "$p"
+}
+
+# remote_parse <push-url>: print "<host> <owner/repo> <port>", host and repo
+# lowercase and port from norm_port ("-" for the scheme default), for an
 # https, http, ssh or git URL or an scp-style (user@host:owner/repo) one, with
 # or without .git. Fails for any other scheme (file, ext, ftp ...), a local
 # path or anything else unparseable. Never prints the URL.
 remote_parse() {
-    local url="$1" scheme auth rest host
+    local url="$1" scheme=ssh auth rest host port
     case "$url" in
         *://*)
             scheme=$(printf '%s' "${url%%://*}" | tr '[:upper:]' '[:lower:]')
@@ -331,11 +347,12 @@ remote_parse() {
             ;;
     esac
     host=$(norm_host "$auth") || return 1
+    port=$(norm_port "$auth" "$scheme") || return 1
     rest="${rest#"${rest%%[!/]*}"}"
     rest="${rest%"${rest##*[!/]}"}"
     rest="${rest%.git}"
     [[ "$rest" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]] || return 1
-    printf '%s %s\n' "$host" "$(printf '%s' "$rest" | tr '[:upper:]' '[:lower:]')"
+    printf '%s %s %s\n' "$host" "$(printf '%s' "$rest" | tr '[:upper:]' '[:lower:]')" "$port"
 }
 
 # host_matches <active-host> <push-host>: the same host, or, for github.com
@@ -348,10 +365,30 @@ host_matches() {
     return 1
 }
 
+# port_matches <active-host> <active-port> <push-host> <push-port>: the same
+# port after norm_port, or the documented alias: ssh.github.com serves ssh on
+# port 443 for github.com. Any other port is a different endpoint.
+port_matches() {
+    [ "$2" = "$4" ] && return 0
+    [ "$1" = github.com ] && [ "$3" = ssh.github.com ] && [ "$2" = - ] && [ "$4" = 443 ]
+}
+
 # safe_name <text>: a remote name for a message. One line, control characters
 # dropped, anything before an @ masked (a pushRemote can hold a URL), capped.
 safe_name() {
     printf '%s' "$1" | tr -d '[:cntrl:]' | sed 's#[^/[:space:]]*@#***@#g' | cut -c1-80
+}
+
+# safe_remote <text>: a remote for a message. Printed only when it is the name
+# of a configured remote; a pushRemote or pushDefault can hold a URL, and a URL
+# can carry a credential outside userinfo (query string, fragment, path token),
+# so any other value is withheld rather than masked.
+safe_remote() {
+    if [ -n "$1" ] && printf '%s\n' "$REMOTES" | grep -qxF -- "$1"; then
+        safe_name "$1"
+    else
+        printf '%s' '[configured remote value withheld]'
+    fi
 }
 
 # --- Resolve the remote once ---
@@ -397,16 +434,20 @@ ACTIVE_HOST=$(norm_host "${GH_HOST:-$PR_URL_HOST}") \
 # remote's fetch URL (what `git ls-remote <name>` reads) can differ from it.
 PUSH_URL=$(git remote get-url --push -- "$REMOTE_NAME" 2>/dev/null || true)
 PUSH_PARSED=$(remote_parse "$PUSH_URL") \
-    || die 3 "cannot tell which repository remote '$(safe_name "$REMOTE_NAME")' pushes to (unreadable, unparseable or unsupported push URL); nothing committed"
-read -r PUSH_HOST PUSH_SLUG <<<"$PUSH_PARSED"
+    || die 3 "cannot tell which repository remote '$(safe_remote "$REMOTE_NAME")' pushes to (unreadable, unparseable or unsupported push URL); nothing committed"
+read -r PUSH_HOST PUSH_SLUG PUSH_PORT <<<"$PUSH_PARSED"
 case "$PR_REPO" in
     ?*/?*) ;;
     *) die 3 "could not read PR #$PR's head repository; nothing committed" ;;
 esac
 host_matches "$ACTIVE_HOST" "$PUSH_HOST" \
-    || die 3 "remote '$(safe_name "$REMOTE_NAME")' does not push to the active GitHub host; nothing committed"
+    || die 3 "remote '$(safe_remote "$REMOTE_NAME")' does not push to the active GitHub host; nothing committed"
+ACTIVE_PORT=$(norm_port "${GH_HOST:-$PR_URL_HOST}" https) \
+    || die 3 "could not determine the active GitHub host's port (set GH_HOST); nothing committed"
+port_matches "$ACTIVE_HOST" "$ACTIVE_PORT" "$PUSH_HOST" "$PUSH_PORT" \
+    || die 3 "remote '$(safe_remote "$REMOTE_NAME")' pushes to a different port than the active GitHub host; nothing committed"
 [ "$PUSH_SLUG" = "$PR_REPO" ] \
-    || die 3 "remote '$(safe_name "$REMOTE_NAME")' does not push to PR #$PR's head repository; nothing committed"
+    || die 3 "remote '$(safe_remote "$REMOTE_NAME")' does not push to PR #$PR's head repository; nothing committed"
 
 # The commit runs the effective git hooks. An untracked or ignored file in a
 # hooks directory inside the working tree is invisible to the dirty-set check
