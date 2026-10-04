@@ -5,7 +5,7 @@ category: code-quality
 track: knowledge
 problem: council cleanup helper rm -rf ran before its shape check, fail-closed state leftovers blocked reruns, bats assert passed on an empty log
 tags: [shell, cleanup, fail-closed, bats, vacuous-assertion, fallback-parser, yellow-council, yellow-research]
-components: [yellow-council, yellow-research]
+components: [yellow-council, yellow-research, yellow-devin, yellow-semgrep]
 ---
 
 ## Context

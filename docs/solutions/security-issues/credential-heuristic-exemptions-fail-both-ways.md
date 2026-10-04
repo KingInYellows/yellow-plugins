@@ -11,7 +11,9 @@ components: [yellow-review]
 ## Problem
 
 The shared credential-shape check in
-`plugins/yellow-review/lib/resolve-text.sh` (PR #950, review findings on head
+`plugins/yellow-review/lib/resolve-text.sh` (PR #950, open and unmerged; this
+file does not exist on `main`, and the live equivalent is `RL_SUSP_AWK` in
+`plugins/yellow-review/lib/review-ledger.sh`; review findings on head
 `4b4ec0ed6`) flags a long mixed-case token that contains a digit, then
 exempts tokens that look like file paths or identifiers so ordinary reply
 text is not refused. The exemptions were wrong in both directions. Point in
@@ -69,6 +71,6 @@ users toward `--allow-credential-shaped`, which weakens the gate.
   must pass). Test both directions in the same PR.
 - Treat each exemption as an allowlist of shapes and enumerate what it admits.
 - Keep the provider-prefix list in step when a new token format appears; the
-  copies in `lib/review-ledger.sh` and yellow-core's `cs_redact_secrets` are
+  copies in `plugins/yellow-review/lib/review-ledger.sh` and yellow-core's `cs_redact_secrets` are
   separate implementations and drift.
 - State approximate behaviour as approximate in comments.

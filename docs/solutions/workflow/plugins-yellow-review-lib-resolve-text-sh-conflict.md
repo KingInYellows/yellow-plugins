@@ -13,6 +13,9 @@ source: compound-staging
 
 ## Context
 
+Note: `resolve-text.sh` comes from PR #950 (unmerged); it does not exist on
+`main` at the time of writing, so the path below is not yet locatable there.
+
 plugins/yellow-review/lib/resolve-text.sh conflict reconciliation: merge concurrent PRs by preserving both the full END block logic (blockend, mqend cleanup from #950) and the strict-mode file argument (from #952). Resolution verified through 253 local tests and 848-test full suite pass (0 failures); all validators passing.
 
 ## Source

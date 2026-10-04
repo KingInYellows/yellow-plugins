@@ -46,10 +46,12 @@ resolve docs do not:
   from an edit that a later verify failure reverted.
 - **Resolve line hides why a run stopped.** An error stop and "nothing to do"
   printed the same `Resolve:` line.
-- **Cluster blast radius.** One resolver that omitted its `Files modified`
-  block reverted every cluster's work.
+- **Cluster blast radius.** A resolver that omitted its `Files modified`
+  block reverted every cluster's work; covered in
+  `docs/solutions/security-issues/resolver-guards-trust-prompt-and-git-status-only.md`.
+  New here is the narrower remedy: revert only the offending cluster.
 - **Edit bound enforced only for files.** The line-range bound in
-  `references/resolve/clusters.md` is prompt-only; only file membership is
+  `plugins/yellow-review/references/resolve/clusters.md` is prompt-only; only file membership is
   checked in `commit-resolve-fixes`.
 - **Unbounded `--wait`.** `poll-new-threads` accepted an arbitrarily long
   number, so the loop could spin.
@@ -77,9 +79,10 @@ resolve docs do not:
    nearest surviving line instead of falling out of every range. Pass
    `diffHunk` (and `originalLine` for outdated threads) to the resolver.
 3. **Give the resolver a read deny list and screen what it publishes.** Apply
-   the resolve deny list to `Read` and `Grep` for secret paths. Reject
-   `evidence` and `oos_reason` text that is not a plain sentence, rather than
-   relying on the credential regex alone.
+   the resolve deny list to `Read` and `Grep` for secret paths. Redact or omit
+   credential-bearing text from `evidence` and `oos_reason` before posting.
+   Sentence shape is not a security boundary, so do not rely on a
+   plain-sentence check or the credential regex alone.
 4. **Exclude tool-state directories from the ignored-file scan**
    (`.ruvector/` first), keyed by an explicit list so a resolver edit to a
    real ignored file still fails closed.
