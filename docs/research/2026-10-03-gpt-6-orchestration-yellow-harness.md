@@ -62,12 +62,21 @@ usage, tools, coordination, retries, verification, and failed runs.
 
 ## Proposed experiment
 
-1. **Freeze the evaluation contract offline.** Select 12 representative tasks:
-   four bounded repairs, four difficult diagnoses/implementation milestones, and
-   four extraction/classification/summary tasks. Include negative cases
-   (insufficient evidence, impossible constraints, malformed output). Record
-   immutable inputs, required checks, allowed tools, budgets, and timeouts
-   before seeing outputs. Reserve a separate held-out set for promotion.
+1. **Freeze the evaluation contract offline.** Select 12 representative
+   development tasks: four bounded repairs, four difficult
+   diagnoses/implementation milestones, and four
+   extraction/classification/summary tasks. Include negative cases (insufficient
+   evidence, impossible constraints, malformed output). Record immutable inputs,
+   required checks, allowed tools, budgets, and timeouts before seeing outputs.
+   For write-capable tasks, each trial (model × repeat) starts from a clean
+   worktree or snapshot of that frozen base; the verifier binds its candidate to
+   that workspace so a later trial cannot inherit a prior patch, generated
+   artifact, or changed fixture. Freeze a separate held-out promotion set of 6
+   tasks before any live run: two bounded repairs, two difficult
+   diagnoses/implementation milestones, and two
+   extraction/classification/summary tasks, including at least one negative
+   case. Use the same three repeats and independently recorded immutable inputs,
+   checks, tools, budgets, timeouts, and per-trial isolation.
 2. **Check the verifier independently.** Use known passing and failing
    candidates through existing offline acceptance profiles. Confirm that missing
    evidence and worker narratives cannot produce acceptance. Current profiles
@@ -109,11 +118,12 @@ usage, tools, coordination, retries, verification, and failed runs.
    serial fallback until access, quality, failure handling, and cost are
    demonstrated.
 
-Twelve tasks and three repeats are a pilot, not enough evidence for a universal
-routing policy. Declare promotion thresholds before live runs; report paired
-results and uncertainty by task family, and expand inconclusive comparisons. Any
-false acceptance or authority violation blocks promotion. Report unavailable
-models as unavailable, not as failures or wins for another model.
+Twelve development tasks and three repeats, plus the frozen 6-task holdout with
+three repeats, are a pilot, not enough evidence for a universal routing policy.
+Declare promotion thresholds before live runs; report paired results and
+uncertainty by task family, and expand inconclusive comparisons. Any false
+acceptance or authority violation blocks promotion. Report unavailable models as
+unavailable, not as failures or wins for another model.
 
 ## Evidence to collect
 
