@@ -51,8 +51,8 @@ This doc covers what that one does not.
 ## Solution
 
 1. **Compare outcomes, not presence.** Skip only when the prior marker's
-   disposition equals the requested one, or both dispositions resolve the
-   thread. Put the comparison in the contract: the skip JSON already reports
+   disposition equals the requested one. Treat `fixed` and `oos` as distinct
+   even though both resolve the thread: their replies and evidence differ. Put the comparison in the contract: the skip JSON already reports
    the prior disposition, so the orchestrator checks it against its own and
    posts a new reply when they differ.
 2. **Make the dedupe lookup target the marker.** Search issues for the thread

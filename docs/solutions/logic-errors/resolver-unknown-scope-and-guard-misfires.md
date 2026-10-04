@@ -84,8 +84,10 @@ resolve docs do not:
    Sentence shape is not a security boundary, so do not rely on a
    plain-sentence check or the credential regex alone.
 4. **Exclude tool-state directories from the ignored-file scan**
-   (`.ruvector/` first), keyed by an explicit list so a resolver edit to a
-   real ignored file still fails closed.
+   (`.ruvector/` first), keyed by an explicit list of the exact hook-owned
+   artifacts expected to change, not the whole directory. A resolver edit to
+   other state, such as `intelligence.json` or vector data (which a linked
+   worktree may share with the main store), must still fail closed.
 5. **Cite only committed, verified edits.** If the cited edit is later
    reverted, downgrade the thread to `unclear`. Revert only the cluster whose
    resolver omitted `Files modified`, not every cluster.
