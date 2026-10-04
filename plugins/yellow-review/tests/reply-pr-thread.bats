@@ -543,3 +543,26 @@ path_without_timeout() {
   YELLOW_REVIEW_GH_TIMEOUT=60 run --separate-stderr "$SCRIPT" PRRT_reply_new fixed "$BODY"
   [ "$(cat "${BATS_TEST_TMPDIR}/timeout_arg")" = 60 ]
 }
+
+# --- Marker-filtered pre-check: a bot-account viewer, and our own human account ---
+
+@test "a bot-account viewer's own unmarked acknowledgement after our marker still skips" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_botself fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.replied, .skipped, .disposition]')" = '[false,"already-replied","fixed"]' ]
+  [ ! -f "$CALLS" ]
+}
+
+@test "a marker authored by a Bot viewer is still recognised" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_botmarker fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.replied, .skipped, .disposition]')" = '[false,"already-replied","fixed"]' ]
+  [ ! -f "$CALLS" ]
+}
+
+@test "a later unmarked comment from our own human account sends the thread back through the resolver" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_ownafter fixed "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.replied')" = true ]
+  [ "$(cat "$CALLS")" = 1 ]
+}

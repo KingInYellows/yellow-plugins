@@ -358,8 +358,8 @@ once wired, they run without a per-post prompt. The controls
   orchestrator checks resolver evidence against fixed patterns and never
   places it on a command line.
 - **Deduplication.** Each post carries a hidden marker keyed to the thread
-  ID. A reply is skipped when the viewer's newest comment among the last 20
-  carries the marker and no human has commented since. An issue is skipped
+  ID. A reply is skipped when the viewer's newest marked comment among the
+  last 10 carries the marker and only Bot authors have commented since. An issue is skipped
   when a viewer-authored issue already carries the marker; that scan reads
   every page of the viewer's issues. Markers by other authors are ignored.
 - **Scope.** Issues are filed only in the PR's repository, and the script

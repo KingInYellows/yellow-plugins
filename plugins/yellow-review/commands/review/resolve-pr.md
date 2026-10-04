@@ -245,11 +245,14 @@ files against. Mint it in one Bash call, with no trap (a trap here would fire
 when this call exits, before Step 6 uses the directory):
 
 ```bash
-MARK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/resolve-marker.XXXXXX") || exit 1
+TMP_ROOT="${TMPDIR:-/tmp}"; TMP_ROOT="${TMP_ROOT%/}"
+MARK_DIR=$(mktemp -d "$TMP_ROOT/resolve-marker.XXXXXX") || exit 1
 touch "$MARK_DIR/ignored-marker" || { rm -rf -- "$MARK_DIR"; exit 1; }
 printf '%s\n' "$MARK_DIR"
 ```
 
+The trailing `/` is stripped first (macOS sets `TMPDIR` with one), so the
+printed path has the single-slash prefix Step 6 checks.
 Keep the printed path as `<marker-dir>` for Step 6. A non-zero exit stops the
 run before any edit (`[review:resolve] Error: could not create the
 ignored-file marker.`), because an unattended verify cannot run without it.
@@ -361,7 +364,7 @@ not already. Then, for every thread sent to a resolver:
 
 1. **Conflicts.** For each cluster whose summary starts with `CONFLICT:`:
    - **Interactive:** one `AskUserQuestion` listing them (cluster, threadIds,
-     description) with "Keep the resolver's partial edits / Roll back the
+     description) with "Keep the resolver's partial edits and stop / Roll back the
      conflicted cluster's edits / Cancel and reconcile manually". To roll
      back, write the cluster's files to a `mktemp` file with the Write tool
      and run `"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command"
@@ -375,14 +378,16 @@ not already. Then, for every thread sent to a resolver:
      reconciliation can start from it: the edits are unscreened and a
      deny-listed one must not stay on disk), then stops before Step 6 and goes
      to Step 9 with `push=skipped, verify=none`; run Step 6's marker cleanup
-     block first.
+     block first. Keep stops the same way but reverts nothing: every edit
+     stays on disk, uncommitted and unpushed, for manual reconciliation, so the
+     kept edits never depend on another cluster. Every `fixed` thread of the
+     other clusters becomes `unclear` too, because nothing publishes it; Step 9
+     lists the files left on disk.
    - **Non-interactive:** do not prompt and do not keep unreconciled edits:
      roll the conflicted cluster back exactly as above (same shared-file
      rule), so Step 6 never commits or pushes its edits, and log the conflict
      for Step 9.
-   Either way, the conflicted cluster's threads become `unclear`; when the user
-   kept the partial edits, the kept files stay in Step 6's set only if a
-   surviving `fixed` thread names them.
+   Either way, the conflicted cluster's threads become `unclear`.
 2. **Parse and validate** each `THREAD` line, applying the contract's
    downgrade rules, skipped-reason mapping and `addressed` evidence rules. A
    line that does not match the contract's full-line regex is malformed: that
@@ -425,9 +430,17 @@ never put a resolver path on a command line. **On any
 refusal below** — a `git status --porcelain` change outside the set, a
 script exit 2, 3 or 4 (exit 4 also covers a failed commit or hook; a
 `credential-shaped` exit 3 first goes through the confirmation under Push), a
-`skipped` verify — run `run-verify-command --pr "<PR#>" --revert-dirty` (patch
-saved) and make every `fixed` thread `unclear`: a refused edit must not stay
-on disk.
+`skipped` verify — make every `fixed` thread `unclear` and roll back what the
+resolvers are known to have changed: a refused edit must not stay on disk. Run
+`run-verify-command --pr "<PR#>" --revert-only --files-from "<file>"` (patch
+saved) on every file a cluster reported under `Files modified`. A changed path
+that no cluster reported is not proven to be a resolver's: it can be work done
+in this tree after Step 2. Interactive: name those paths in one
+`AskUserQuestion` with "Revert them / Leave them"; Revert runs
+`run-verify-command --pr "<PR#>" --revert-dirty` (patch saved). Non-interactive:
+leave them in place and report each in Step 9 under Blocking merge as
+`<path>: changed outside the resolve set, left in place`. Nothing is committed
+either way.
 
 **Range pre-check.** Before verify, run (no network; it changes nothing):
 

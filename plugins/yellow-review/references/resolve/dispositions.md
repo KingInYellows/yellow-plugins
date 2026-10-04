@@ -91,8 +91,9 @@ The orchestrator turns a proposed disposition into `unclear` when:
   means every thread has a final disposition and every `fixed` edit is applied,
   so a cluster mixing `fixed` with `oos`, `addressed` or `disagree` is still
   `complete`;
-- the cluster emitted `CONFLICT:` (its edits are rolled back, or kept when the
-  interactive user chose "Keep the resolver's partial edits");
+- the cluster emitted `CONFLICT:` (its edits are rolled back, or, when the
+  interactive user chose "Keep the resolver's partial edits and stop", left on
+  disk with nothing committed or pushed);
 - Step 6's range pre-check reverted a file the cluster modified (evidence
   `edit outside PR-changed lines`; see the edit range under File set);
 - an evidence check below fails;
@@ -523,11 +524,15 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
 one exception to ordering: the edits stay on disk until the user answers the
 confirmation, because a revert first would leave the approved retry with nothing
 to commit.) A refused edit must not stay on disk: a deny-listed file such as
-`.claude/settings.json` would be trusted by the next session. Step 2 guarantees
-a clean start, so on any refusal — a change outside the set, a
-`commit-resolve-fixes` exit 2, 3 or 4, or verify `skipped` — the orchestrator
-runs `run-verify-command --pr <N> --revert-dirty`, which saves a patch first.
-Exit 4 leaves no new commit behind, so the revert only has to clear the tree;
+`.claude/settings.json` would be trusted by the next session. On any refusal —
+a change outside the set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify
+`skipped` — the orchestrator runs `run-verify-command --pr <N> --revert-only`
+on the files the clusters reported under `Files modified`, which saves a patch
+first. Step 2 guarantees a clean start, but not a quiet tree: a changed path no
+cluster reported is not proven to be a resolver's edit, so it is never reverted
+unasked. An interactive run asks (`--revert-dirty` on "Revert them", patch
+saved); an unattended run leaves it in place and Step 9 names it under Blocking
+merge. Exit 4 leaves no new commit behind, so the revert only has to clear the tree;
 `fixed` threads become `unclear` and the write phase still runs for the other
 threads (exit 4 here is a refusal, not a rate limit). The interactive "push
 rejected" path is the only one that leaves edits in place. After exit 5 or 6 the
@@ -597,12 +602,18 @@ out of the same budget.
 
 `reply-pr-thread` reads the thread's last 10 comments (`viewerDidAuthor`,
 `body`, `author { __typename }`) before posting and takes the latest comment the
-viewer authored. It skips the reply (`already-replied`) when that comment ends
-with a marker for the same thread and every comment after it was written by a
-Bot author. The skip JSON reports the posted marker's disposition. A re-run
-after a reply that landed but whose resolve failed therefore never posts a
-second, contradicting reply, even when a bot acknowledgement arrived in between.
-Two rules follow:
+viewer authored that ends with a marker for the same thread, of any
+disposition. Viewer comments without such a marker are ignored when choosing
+it. It skips the reply (`already-replied`) when every comment after it was
+written by a Bot author. A later comment from anyone else, including the
+viewer's own human account, or with no author type, means the thread moved on
+and it is processed again. The skip JSON reports the posted marker's
+disposition. A re-run after a reply that landed but whose resolve failed
+therefore never posts a second, contradicting reply, even when a bot
+acknowledgement arrived in between. This holds when `gh` authenticates as a bot
+account: its own acknowledgement is `viewerDidAuthor` and `Bot` too, but carries
+no marker, so it never displaces the marker comment, and a bot-authored marker
+still counts. Two rules follow:
 
 - Upgrade: a prior `disagree` or `unclear` marker does not block a `fixed`,
   `addressed` or `oos` reply. That reply carries the evidence the resolve needs,
@@ -782,12 +793,13 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   reviewers.
 - `ratelimited=1` means `reply-pr-thread`, `resolve-pr-thread` or
   `file-followup-issue` exited 4 with `reason=rate-limit` (or no recognizable
-  reason), or `get-pr-blockers` reported `lookupReason: rate_limited`, and
-  mutations stopped. An exit 4 with `reason=timeout` stops mutations too but
-  leaves `ratelimited=0`. `commit-resolve-fixes` exit 4 is a commit undo and
-  never sets it. `/review:resolve-stack` and `/review:sweep-all` then stop
-  mutating: every remaining PR is reported `not attempted (rate limit)` instead
-  of hitting the limit again.
+  reason), or `get-pr-blockers` reported `lookupReason: rate_limited` or
+  `resolutionLookupReason: rate_limited`, and mutations stopped. An exit 4 with
+  `reason=timeout` stops mutations too but leaves `ratelimited=0`.
+  `commit-resolve-fixes` exit 4 is a commit undo and never sets it.
+  `/review:resolve-stack` and `/review:sweep-all` then stop mutating: every
+  remaining PR is reported `not attempted (rate limit)` instead of hitting the
+  limit again.
 - `/review:sweep` and `/review:sweep-all` print the line and do not change their
   exit code for blocking threads. `/review:resolve-stack` exits 1 when any PR's
   `b` is non-zero.

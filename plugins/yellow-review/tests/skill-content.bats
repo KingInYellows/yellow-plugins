@@ -708,3 +708,31 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   [[ "$text" == *'Give both of these read-only calls a Bash tool `timeout` of 300000 ms'* ]]
   [[ "$text" == *'bounded at 60 s apiece'* ]]
 }
+
+@test "resolve-pr: the marker mint strips a trailing slash from TMPDIR so Step 6 accepts the path" {
+  step3f=$(sed -n '/^### Step 3f/,/^### Step 4/p' "$RESOLVE_PR")
+  block=$(printf '%s\n' "$step3f" | sed -n '/^```bash$/,/^```$/p' | sed '1d;$d')
+  mkdir -p "$BATS_TEST_TMPDIR/tmp"
+  TMPDIR="$BATS_TEST_TMPDIR/tmp/" run bash -c "$block"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "$BATS_TEST_TMPDIR/tmp/resolve-marker."* ]]
+  [[ "$output" != *"//"* ]]
+  [ -f "$output/ignored-marker" ]
+  # The same prefix strip Step 6 applies must leave a plain resolve-marker.* name.
+  [ "${output#"$BATS_TEST_TMPDIR/tmp"/}" != "$output" ]
+  case "${output#"$BATS_TEST_TMPDIR/tmp"/}" in */*) false ;; esac
+}
+
+@test "resolve-pr: a refusal reverts only reported files and asks before touching other changes" {
+  step6flat=$(sed -n '/^### Step 6/,/^### Step 7/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step6flat" == *'--revert-only --files-from "<file>"` (patch saved) on every file a cluster reported under `Files modified`'* ]]
+  [[ "$step6flat" == *'not proven to be a resolver'* ]]
+  [[ "$step6flat" == *'"Revert them / Leave them"'* ]]
+  [[ "$step6flat" == *'left in place'* ]]
+}
+
+@test "resolve-pr: keeping the partial edits of a conflicted cluster stops the run and reverts nothing" {
+  step5flat=$(sed -n '/^### Step 5/,/^### Step 6/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step5flat" == *"Keep the resolver's partial edits and stop"* ]]
+  [[ "$step5flat" == *'Keep stops the same way but reverts nothing'* ]]
+}

@@ -17,7 +17,9 @@
 #                                        Retry-After or reset headers, 5xx,
 #                                        missing comment, spoofed marker,
 #                                        botafter / humanafter / nomarker /
-#                                        ghostafter marker-then-comment windows)
+#                                        ghostafter marker-then-comment windows,
+#                                        bot-account viewer: botself/botmarker,
+#                                        own human account: ownafter)
 #   latestOpinionatedReviews             MOCK_GH_BLOCKERS_{FAIL,FIXTURE}
 #   */protection, */rules/branches/*     MOCK_GH_PROTECTION, MOCK_GH_RULES;
 #                                        MOCK_GH_PROTECTION_MAIN and
@@ -316,6 +318,25 @@ case "$ALL_ARGS" in
         ;;
       *"PRRT_reply_spoof"*)
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_spoof","comments":{"nodes":[{"viewerDidAuthor":false,"body":"> <!-- yellow-review:resolve v1 thread=PRRT_reply_spoof disposition=fixed -->"}]}}}}'
+        ;;
+      *"PRRT_reply_ownafter"*)
+        # Our marker, then an unmarked note from our own human account: new
+        # input, so post.
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_ownafter","comments":{"nodes":[{"viewerDidAuthor":false,"author":{"__typename":"User"},"body":"Please add a null check."},{"viewerDidAuthor":true,"author":{"__typename":"User"},"body":"Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_ownafter disposition=fixed -->"},{"viewerDidAuthor":true,"author":{"__typename":"User"},"body":"Edited the note."}]}}}}'
+        ;;
+      *"PRRT_reply_botself"*|*"PRRT_reply_botmarker"*)
+        # gh authenticated as a bot account: every comment of ours has
+        # viewerDidAuthor true and author type Bot. botself: our marker, then
+        # our own unmarked Bot acknowledgement (must still skip). botmarker:
+        # a Bot-authored marker alone (must still be recognised).
+        case "$ALL_ARGS" in
+          *"PRRT_reply_botself"*) _tid=PRRT_reply_botself; _ack='{"viewerDidAuthor":true,"body":"Thanks, noted.","author":{"__typename":"Bot"}}' ;;
+          *) _tid=PRRT_reply_botmarker; _ack='null' ;;
+        esac
+        MOCK_BODY=$(jq -nc --arg t "$_tid" --argjson ack "$_ack" '{data:{node:{id:$t,comments:{nodes:([
+          {viewerDidAuthor:false,body:"Please add a null check.",author:{__typename:"User"}},
+          {viewerDidAuthor:true,body:("Fixed in abc1234.\n\n<!-- yellow-review:resolve v1 thread=" + $t + " disposition=fixed -->\n"),author:{__typename:"Bot"}},
+          $ack] | map(select(. != null)))}}}}')
         ;;
       *"PRRT_reply_auth"*)
         MOCK_BODY='{"message":"Bad credentials"}'

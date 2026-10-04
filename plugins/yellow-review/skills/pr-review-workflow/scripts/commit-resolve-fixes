@@ -263,16 +263,19 @@ if [ -n "$RANGES_FROM" ] && [ -n "$RANGE_ROWS" ]; then
     done <<<"$RANGE_ROWS"
 fi
 
-# out_of_range_spans <file> <staged|worktree>: print the old-side line spans
+# out_of_range_spans <file> <staged|worktree|commit>: print the old-side line spans
 # ("a-b", comma-separated) of the file's hunks that sit outside every changed
 # range of its row in $RANGE_ROWS widened by RANGE_MARGIN; nothing when all are
-# inside. -U0, old side = the HEAD the ranges were captured against. An
+# inside. `commit` judges BEFORE..SHA. -U0, old side = the HEAD the ranges were captured against. An
 # insertion counts as the line it follows. A row that is missing, "none" or
 # "unknown" accepts no hunk. Fails when git or awk fails.
 out_of_range_spans() {
     local f="$1" file_ranges
     local -a rev=(HEAD)
-    [ "$2" = staged ] && rev=(--cached)
+    case "$2" in
+        staged) rev=(--cached) ;;
+        commit) rev=("$BEFORE" "$SHA") ;;
+    esac
     file_ranges=$(awk -v p="$f" '$1 == p { print $2; exit }' <<<"$RANGE_ROWS")
     case "$file_ranges" in
         ''|none|unknown) file_ranges="" ;;
@@ -924,6 +927,17 @@ COMMITTED=$(git diff --no-renames --name-only -z "$BEFORE" "$SHA" | tr '\0\n' '\
 if [ "$COMMITTED" != "$WANT" ]; then
     printf '[commit-resolve-fixes] expected:\n%s\n[commit-resolve-fixes] committed:\n%s\n' "$WANT" "$COMMITTED" >&2
     undo_commit "committed set does not match the expected set (a hook changed it); nothing submitted"
+fi
+# The range bound was checked on the staged hunks, before the hooks ran; a
+# hook (a formatter, say) can edit a listed file after that, so check the
+# commit's own hunks too.
+if [ -n "$RANGES_FROM" ]; then
+    for f in "${EXPECTED[@]}"; do
+        bad=$(out_of_range_spans "$f" commit) \
+            || undo_commit "could not check the committed hunks of $f against the PR's changed ranges; nothing submitted"
+        [ -z "$bad" ] \
+            || undo_commit "committed change outside the PR's changed line ranges: $f (old lines $bad; a hook changed it); nothing submitted"
+    done
 fi
 git diff --no-renames --no-color --no-ext-diff --no-textconv --text -U0 "$BEFORE" "$SHA" \
     | rt_added_lines >|"$ADDED" \

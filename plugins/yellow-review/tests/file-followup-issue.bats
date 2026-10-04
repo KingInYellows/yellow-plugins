@@ -546,11 +546,20 @@ path_without_timeout() {
 
 @test "a title or body with an image, a mention or a foreign URL exits 6 and files nothing" {
   for t in 'See ![x](https://github.com/o/r/raw/x.png)' 'cc @octocat' 'See https://evil.example/x'; do
-    printf '%s\n' "$t" >| "$BODY"
-    run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
-    [ "$status" -eq 6 ] || { echo "not refused: $t"; false; }
-    [[ "$stderr" == *"resolve-text: refused rule="*"in=body"* ]]
-    [ ! -e "$CREATES" ]
+    for where in title body; do
+      # Restore both clean files, then plant the sample in one of them.
+      printf 'Follow-up from PR #7: src/a.ts\n' >| "$TITLE"
+      printf 'Retry policy belongs in the client module.\n' >| "$BODY"
+      if [ "$where" = title ]; then
+        printf '%s\n' "$t" >| "$TITLE"
+      else
+        printf '%s\n' "$t" >| "$BODY"
+      fi
+      run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
+      [ "$status" -eq 6 ] || { echo "not refused in $where: $t"; false; }
+      [[ "$stderr" == *"resolve-text: refused rule="*"in=${where}"* ]] || { echo "wrong in= for $where: $stderr"; false; }
+      [ ! -e "$CREATES" ]
+    done
   done
 }
 
@@ -577,9 +586,10 @@ path_without_timeout() {
 }
 
 @test "a rate limit that is also an HTTP 403 stays exit 4, not 7" {
-  export MOCK_GH_ISSUE_LIST_FAIL=ratelimit
+  export MOCK_GH_ISSUE_LIST_FAIL=ratelimit403
   run --separate-stderr "$SCRIPT" test/repo 7 PRRT_issue_new "$TITLE" "$BODY"
   [ "$status" -eq 4 ]
+  [ ! -e "$CREATES" ]
 }
 
 @test "a repository with Issues disabled exits 7 before the thread lookup and the create" {

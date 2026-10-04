@@ -677,6 +677,22 @@ STUB
   ! grep -q '^gt submit' "$STUB_LOG"
 }
 
+@test "a hook that edits a listed file outside the changed range makes the commit undo itself (exit 4)" {
+  seq 1 30 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file" && git push -q origin feature 2>/dev/null
+  printf '#!/bin/sh\nsed -i.bak "s/^25$/changed/" src/a.txt && rm -f src/a.txt.bak && git add src/a.txt\n' >| .git/hooks/pre-commit
+  chmod +x .git/hooks/pre-commit
+  track_git_hooks pre-commit
+  sed -i.bak 's/^3$/three/' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt 1-5\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"committed change outside the PR's changed line ranges: src/a.txt (old lines 25-25; a hook changed it)"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ -z "$(git diff --cached --name-only)" ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
 @test "a rejected graphite commit restacks the upstack back onto the reset branch" {
   printf '#!/bin/sh\nprintf "two\\nfeature\\nhook\\n" > src/b.txt && git add src/b.txt\n' >| .git/hooks/pre-commit
   chmod +x .git/hooks/pre-commit
