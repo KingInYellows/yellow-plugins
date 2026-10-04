@@ -390,6 +390,18 @@ _rt_scan() {
                     rraw = r
                     sub(/[ \t]+#.*$/, "", r)
                     valueline(r, carryin, carry == 1, rraw, carrypin)
+                    # A plain-carry value line of 3+ unquoted words that does
+                    # not start with a capital (`password:` then `my correct
+                    # horse battery staple`) is judged whole, like a same-line
+                    # assignment (wordcred). Sentence-case prose
+                    # (`Rotation is scheduled for Friday`) and a two-word
+                    # line stay clean; a capitalised passphrase of 3+ words
+                    # is the accepted residual.
+                    if (carry == 1 && !carryin && !hit) {
+                        o = $0
+                        sub(/^[ \t]*(-[ \t]*)?/, "", o)
+                        if (substr(o, 1, 1) !~ /["\047A-Z]/ && split(r, wparts, /[ \t]+/) >= 3 && wordcred(r)) flag("unquoted-keyword-value")
+                    }
                     if (carry == 2 && !carryin && ind > hind) {
                         t = l
                         sub(/^[ \t]+/, "", t)
@@ -576,7 +588,17 @@ rt_text_clean() {
     _rt_awk_rc=0
     _rt_out=$(awk -v host="${RT_ALLOWED_HOST:-${GH_HOST:-github.com}}" '
         function flag(rule) { if (!hit) { hit = 1; hitrule = rule; hitline = NR } }
-        /!\[/ { flag("markdown-image") }
+        # relfix(s, re): re matches text ending in `//X`; rewrite each match
+        # to end in `https://X` (X is kept).
+        function relfix(s, re,    out) {
+            out = ""
+            while (match(s, re)) {
+                out = out substr(s, 1, RSTART + RLENGTH - 4) "https://" substr(s, RSTART + RLENGTH - 1, 1)
+                s = substr(s, RSTART + RLENGTH)
+            }
+            return out s
+        }
+        /!\[/{ flag("markdown-image") }
         {
             # A mention is @name at the start of a line or after whitespace or
             # an opening bracket or quote, optionally behind Markdown opening
@@ -590,7 +612,13 @@ rt_text_clean() {
             # `href="//host"`) renders as an external link: judge it as https.
             gsub(/\]\(\/\//, "](https://", l)
             gsub(/<\/\//, "<https://", l)
-            gsub(/=["\047]\/\//, "=\"https://", l)
+            # Attribute forms: quoted with optional spaces around `=`
+            # (`href = "//host"`), unquoted (`href=//host`), and unquoted with
+            # spaces after a URL attribute name (`href = //host`). A bare
+            # `x = // note` or `a//b` is a code comment or text, not a link.
+            gsub(/=[ \t]*["\047]\/\//, "=\"https://", l)
+            l = relfix(l, "=//[^ \t/]")
+            l = relfix(l, "(href|src|action|data|poster|cite|formaction|srcset)[ \t]*=[ \t]+//[^ \t/]")
             while (match(l, /https?:\/\/[^\/ \t"\047`]*/)) {
                 u = substr(l, RSTART, RLENGTH)
                 l = substr(l, RSTART + RLENGTH)
