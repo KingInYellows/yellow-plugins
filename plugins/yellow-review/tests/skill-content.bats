@@ -1206,3 +1206,9 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$flat" == *'**Verify-skipped guard:** if Step 4 item 5c stopped the loop, skip this step'* ]]
   [[ "$flat" == *'Do NOT invoke `/flow:compound`: it runs project commands'* ]]
 }
+
+@test "dispositions: the addressed path:line evidence refuses an option-shaped path segment" {
+  DISP="$BATS_TEST_DIRNAME/../references/resolve/dispositions.md"
+  tr '\n' ' ' <"$DISP" | tr -s ' ' | grep -q 'no `\.`, `\.\.` or empty segment and no segment starting with `-`'
+  tr '\n' ' ' <"$DISP" | tr -s ' ' | grep -q '`-config.yml` is refused'
+}
