@@ -360,10 +360,15 @@ text.
 Contract rules:
 
 - **Verdict enum.** The shared enum is
-  `APPROVE | REVISE | REJECT | UNKNOWN | TIMEOUT | ERROR | UNAVAILABLE`. You
-  may only ever emit `APPROVE`, `REVISE`, `REJECT`, `UNKNOWN`, or `ERROR` —
+  `APPROVE | REVISE | REJECT | UNKNOWN | TIMEOUT | ERROR | UNAVAILABLE | QUOTA_EXHAUSTED`.
+  You may only ever emit `APPROVE`, `REVISE`, `REJECT`, `UNKNOWN`, or `ERROR` —
   `TIMEOUT` and `UNAVAILABLE` describe external-CLI failure modes that cannot
-  occur in-process. If you cannot form a defensible verdict, emit
+  occur in-process. You never emit `QUOTA_EXHAUSTED` either: a quota wall
+  stops this agent before it can return anything, so `council.md` classifies
+  the failed spawn against Claude's quota strings and synthesizes that block
+  on your slot's behalf. A `QUOTA_EXHAUSTED` you emit yourself is rejected (its
+  `/dev/null` path is not the one `council.md` minted). If you cannot form a
+  defensible verdict, emit
   `verdict=UNKNOWN` with `confidence=LOW`, not a guess.
 - **`fenced_output_path=` is empty in exactly two cases:** no path was supplied
   in the spawn prompt (Step 1), or you refused a malformed one (Step 3). Say

@@ -275,7 +275,32 @@ case $CLI_EXIT in
   *)
     # Check for `error` events in JSONL FIRST (more specific than CLI exit)
     ERROR_MSG=$(jq -r 'select(.type=="error") | .error.data.message // .error.name // "unknown"' "$OUTPUT_FILE" 2>/dev/null | head -1)
-    if [ -n "$ERROR_MSG" ]; then
+    ERROR_STATUS=$(jq -r 'select(.type=="error") | .error.data.statusCode // empty' "$OUTPUT_FILE" 2>/dev/null | head -1)
+    # The provider message is untrusted text that reaches summary= and stderr:
+    # flatten it to one line, drop control characters, replace URLs (OpenRouter's
+    # credit errors embed an account key-management link) and any 24+ character
+    # token run (key-shaped strings), and cap it at 300 bytes.
+    ERROR_MSG=$(printf '%s' "$ERROR_MSG" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177' \
+      | LC_ALL=C sed -E 's#https?://[^[:space:]]+#[url]#g; s/[A-Za-z0-9_-]{24,}/[redacted]/g' | head -c 300)
+    if [ -n "$ERROR_MSG" ] && { [ "$ERROR_STATUS" = "402" ] || printf '%s' "$ERROR_MSG" | grep -qiE 'insufficient_quota|model_cap_exceeded|RESOURCE_EXHAUSTED|quota exceeded|usage limit|requires more credits|insufficient.credits'; }; then
+      # Provider quota passthrough (OpenRouter's HTTP 402 "requires more
+      # credits", OpenAI-style insufficient_quota, Google RESOURCE_EXHAUSTED):
+      # recorded as QUOTA_EXHAUSTED, not a transient ERROR. The ETA extraction
+      # mirrors council.md's council_quota_eta (this agent cannot source
+      # council.md); credit exhaustion usually reports none.
+      QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C sed -nE 's/.*[Rr]esets? +([^.;|]{1,60}).*/resets \1/p' | head -n 1)
+      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C sed -nE 's/.*[Tt]ry again in +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
+      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C sed -nE 's/.*[Rr]etry[- ]after +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
+      QUOTA_ETA=$(printf '%s' "$QUOTA_ETA" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_-' | sed -E 's/[[:space:]]+$//' | head -c 200)
+      [ -n "$QUOTA_ETA" ] || QUOTA_ETA="reset time not reported"
+      printf '[opencode-reviewer] Quota exhausted (%s) — returning QUOTA_EXHAUSTED\n' "$QUOTA_ETA" >&2
+      printf 'verdict=QUOTA_EXHAUSTED\n'
+      printf 'confidence=N/A\n'
+      printf 'summary=OpenCode quota exhausted — %s. Provider said: %s\n' "$QUOTA_ETA" "$ERROR_MSG"
+      printf 'fenced_output_path=/dev/null\n'
+      printf 'findings_block_begin\n'
+      printf 'findings_block_end\n'
+    elif [ -n "$ERROR_MSG" ]; then
       printf '[opencode-reviewer] Session error: %s\n' "$ERROR_MSG" >&2
       printf 'verdict=ERROR\n'
       printf 'confidence=N/A\n'
@@ -779,7 +804,7 @@ if [ -z "$VERDICT" ]; then
 fi
 
 case "$VERDICT" in
-  APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE) ;;
+  APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE|QUOTA_EXHAUSTED) ;;
   *) VERDICT="UNKNOWN"; CONFIDENCE="LOW" ;;
 esac
 

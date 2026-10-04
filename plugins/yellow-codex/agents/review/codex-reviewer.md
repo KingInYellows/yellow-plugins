@@ -431,6 +431,28 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
       else
         printf 'summary=Codex rejected model %s: it came from the account default or the model key in ~/.codex/config.toml — change or remove that key.\n' "$rejected_model"
       fi
+    elif [ "$codex_exit" -eq 1 ] && printf '%s' "$codex_api_error" | grep -qE "insufficient_quota|model_cap_exceeded"; then
+      # Quota exhaustion (billing or model cap), not a transient 429: recorded
+      # as QUOTA_EXHAUSTED so the council names the reset instead of a generic
+      # error. Must stay ahead of the rate_limit_exceeded arm below, which is
+      # the transient case and stays ERROR. The ETA extraction mirrors
+      # council.md's council_quota_eta (this agent cannot source council.md):
+      # `resets <time>`, `try again in <dur>`, `retry after <dur>`. The
+      # captured text is limited to a short whitelist of characters so
+      # nothing else in the API error can reach the summary= line.
+      quota_flat=$(printf '%s' "$codex_api_error" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
+      quota_eta=$(printf '%s\n' "$quota_flat" | LC_ALL=C sed -nE 's/.*[Rr]esets? +([^.;|]{1,60}).*/resets \1/p' | head -n 1)
+      [ -n "$quota_eta" ] || quota_eta=$(printf '%s\n' "$quota_flat" | LC_ALL=C sed -nE 's/.*[Tt]ry again in +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
+      [ -n "$quota_eta" ] || quota_eta=$(printf '%s\n' "$quota_flat" | LC_ALL=C sed -nE 's/.*[Rr]etry[- ]after +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
+      quota_eta=$(printf '%s' "$quota_eta" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_-' | sed -E 's/[[:space:]]+$//' | head -c 200)
+      [ -n "$quota_eta" ] || quota_eta="reset time not reported"
+      printf '[codex-reviewer] Quota exhausted (%s) — returning QUOTA_EXHAUSTED\n' "$quota_eta" >&2
+      printf 'verdict=QUOTA_EXHAUSTED\n'
+      printf 'confidence=N/A\n'
+      printf 'summary=Codex quota exhausted — %s\n' "$quota_eta"
+      printf 'fenced_output_path=/dev/null\n'
+      printf 'findings_block_begin\n'
+      printf 'findings_block_end\n'
     elif [ "$codex_exit" -eq 1 ] && printf '%s' "$codex_api_error" | grep -q "rate_limit_exceeded"; then
       printf '[codex-reviewer] Rate limited\n' >&2
       printf 'verdict=ERROR\n'
@@ -919,7 +941,7 @@ SUMMARY=$(printf '%s' "$OVERALL_EXPLANATION" | redact_credentials 0 | tr '\n' ' 
 # value to the same UNKNOWN/LOW fallback every other reviewer in the
 # marketplace uses.
 case "$VERDICT" in
-  APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE) ;;
+  APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE|QUOTA_EXHAUSTED) ;;
   *) VERDICT="UNKNOWN"; CONFIDENCE="LOW" ;;
 esac
 

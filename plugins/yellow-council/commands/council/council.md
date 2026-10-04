@@ -350,8 +350,12 @@ In a single tool-call message, invoke:
      `Write your fenced output to this exact path: <literal CLAUDE_FENCED_FILE value>`
    - This reviewer runs in-process, so there is no not-installed degradation
      branch (unlike Codex). If the spawn itself fails or returns nothing
-     parseable, it falls through to the same missing-return handling as any
-     other reviewer and is recorded as `ERROR`.
+     parseable, pass the Agent error text to `parse_reviewer_return` as the
+     return value. It is classified against Claude's quota-exhaustion strings
+     first (session / weekly / Opus limit, usage limit reached) and recorded as
+     `QUOTA_EXHAUSTED` with the parsed reset ETA; only when none match does it
+     fall through to the same missing-return handling as any other reviewer
+     and record `ERROR`.
    - The pack's `## Required Output Format` block describes Layer-1
      external-CLI output. claude-reviewer deliberately emits that shape only
      into its fenced-output file and returns the lowercase Layer-2 6-key
@@ -365,7 +369,7 @@ In a single tool-call message, invoke:
 Wait for all four Agent dispatches to return. Each reviewer returns:
 
 ```text
-verdict=<APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE>
+verdict=<APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE|QUOTA_EXHAUSTED>
 confidence=<HIGH|MEDIUM|LOW|N/A>
 summary=<2-3 sentence summary>
 fenced_output_path=<path to /tmp/council-<reviewer>-fenced-XXXXXX.txt>
@@ -373,6 +377,11 @@ findings_block_begin
 <findings text>
 findings_block_end
 ```
+
+`QUOTA_EXHAUSTED` is an excluded-slot verdict like `UNAVAILABLE`: the reviewer's
+provider reported quota exhaustion rather than a transient error. It returns
+`confidence=N/A`, the reset ETA in `summary=`, `fenced_output_path=/dev/null`
+and an empty findings pair. `/dev/null` is accepted only under this verdict.
 
 Parse each return value into structured data. The function fills associative
 arrays — `REVIEWER_VERDICTS`, `REVIEWER_CONFIDENCES`, `REVIEWER_SUMMARIES`,
@@ -397,10 +406,43 @@ STATE_FILE="$GIT_ROOT/.git/council-state.tsv"
 declare -A REVIEWER_VERDICTS REVIEWER_CONFIDENCES REVIEWER_SUMMARIES \
            REVIEWER_FENCED_PATHS REVIEWER_FINDINGS
 
+# >>> council-quota-lib — tests/quota-lineage.bats extracts the lines between
+# this marker and its closing twin and runs them under bash and zsh. Keep the
+# block free of bash-only syntax (no [[ =~ ]] captures, no arrays).
+#
+# council_quota_eta <text> — print the reset ETA as a phrase: "resets <time>",
+# "resets in <duration>", or "reset time not reported". Strips control
+# characters and caps the result at 200 bytes, so the value is safe to put in
+# a summary= line.
+council_quota_eta() {
+  local flat eta
+  flat=$(printf '%s' "${1:-}" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
+  eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Rr]esets? +([^.;|]{1,60}).*/resets \1/p' | head -n 1)
+  [ -n "$eta" ] || eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Tt]ry again in +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
+  [ -n "$eta" ] || eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Rr]etry[- ]after +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
+  eta=$(printf '%s' "$eta" | LC_ALL=C sed -E 's/[[:space:]]+$//' | head -c 200)
+  [ -n "$eta" ] || eta="reset time not reported"
+  printf '%s\n' "$eta"
+}
+
+# council_classify_claude_quota <text> — exit 0 and print the ETA phrase when
+# <text> carries one of Claude's quota-exhaustion signals; exit 1 otherwise.
+# Generic rate-limit text and HTTP 529 (overloaded) are transient and never match.
+council_classify_claude_quota() {
+  local flat
+  flat=$(printf '%s' "${1:-}" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
+  if printf '%s\n' "$flat" | grep -qiE 'session limit.*resets|weekly limit.*resets|Opus limit.*resets|usage limit reached.*try again'; then
+    council_quota_eta "$flat"
+    return 0
+  fi
+  return 1
+}
+# <<< council-quota-lib
+
 parse_reviewer_return() {
   local reviewer_output="$1"
   local reviewer_name="$2"
-  local verdict confidence summary fenced_path findings
+  local verdict confidence summary fenced_path findings quota_eta
   verdict=$(printf '%s' "$reviewer_output" | grep -m1 '^verdict=' | sed 's/^verdict=//')
   confidence=$(printf '%s' "$reviewer_output" | grep -m1 '^confidence=' | sed 's/^confidence=//')
   summary=$(printf '%s' "$reviewer_output" | grep -m1 '^summary=' | sed 's/^summary=//')
@@ -1038,6 +1080,25 @@ parse_reviewer_return() {
       fi
     fi
   fi
+  # Orchestrator-side quota classification (R17). A claude-reviewer Task that
+  # fails to SPAWN because the session/weekly/Opus limit was hit never ran, so
+  # no reviewer exists to emit QUOTA_EXHAUSTED; the Agent error text arrives
+  # here as `reviewer_output` with no verdict= line. Classify it against the
+  # claude quota strings and synthesize the R18 block on the slot's behalf.
+  # Only a return with NO verdict= line is eligible: a reviewer that ran and
+  # voted is never reclassified from text its own pack could echo. This runs
+  # after the claude branch above, so the synthesized /dev/null path is never
+  # judged against the minted fenced path (the agent itself never emits
+  # QUOTA_EXHAUSTED; a forged claude return of it still fails that check).
+  if [ -z "$verdict" ] && [ "$reviewer_name" = "claude" ]; then
+    if quota_eta=$(council_classify_claude_quota "$reviewer_output"); then
+      verdict="QUOTA_EXHAUSTED"
+      confidence="N/A"
+      summary="Claude quota exhausted — ${quota_eta}"
+      fenced_path="/dev/null"
+      findings=""
+    fi
+  fi
   # Constrain verdict/confidence to their enums HERE, at the single point of
   # entry, before anything stores or renders them. Both are taken verbatim
   # from reviewer-controlled output, and the Step 7 appendix interpolates the
@@ -1046,7 +1107,7 @@ parse_reviewer_return() {
   # repo file. Validating at the source also protects the headline counts.
   # Coerce blank FIRST. A reviewer that returned no `verdict=` line at all
   # leaves this empty, and empty is not in the enum — but it is also not in
-  # Step 5 rule 1's exclusion set (UNKNOWN/TIMEOUT/ERROR/UNAVAILABLE), so a
+  # Step 5 rule 1's exclusion set (UNKNOWN/TIMEOUT/ERROR/UNAVAILABLE/QUOTA_EXHAUSTED), so a
   # blank would be silently dropped from BOTH the majority count and the
   # `### Reviewer Status` note: a totally-failed reviewer rendering as though
   # it never existed. Coercing only at the $STATE_FILE write below is too
@@ -1057,7 +1118,7 @@ parse_reviewer_return() {
     verdict="ERROR"
   }
   case "$verdict" in
-    APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE) ;;
+    APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE|QUOTA_EXHAUSTED) ;;
     *)
       # Log the rejected value through the same redaction pass as
       # summary/findings, not raw — a malformed `verdict=` (e.g. after a
@@ -1083,11 +1144,19 @@ parse_reviewer_return() {
   # A reviewer that returned nothing parseable is recorded as ERROR, not blank
   printf '%s\t%s\t%s\t%s\n' "$reviewer_name" "${verdict:-ERROR}" "${confidence:-N/A}" "$fenced_path" >> "$STATE_FILE"
   printf '[%s] verdict=%s confidence=%s\n' "$reviewer_name" "$verdict" "$confidence"
+  # The claude slot has no staged summary file (5a never stages claude's
+  # return), and its QUOTA_EXHAUSTED summary is built above from
+  # council_quota_eta output, not reviewer text, so it is safe to print for the
+  # headline. The three CLI slots' summaries are reviewer-controlled: they reach
+  # the synthesizer only through 5a staging and 5b normalization and fencing.
+  if [ "$verdict" = "QUOTA_EXHAUSTED" ] && [ "$reviewer_name" = "claude" ]; then
+    printf '[%s] quota: %s\n' "$reviewer_name" "$summary"
+  fi
 }
 ```
 
-If any reviewer's `verdict` is `TIMEOUT`, `ERROR`, or `UNAVAILABLE`, surface
-the partial-result note in the synthesis Headline.
+If any reviewer's `verdict` is `TIMEOUT`, `ERROR`, `UNAVAILABLE`, or
+`QUOTA_EXHAUSTED`, surface the partial-result note in the synthesis Headline.
 
 ### Step 5: Synthesis — blind, two-pass, rubric-scored
 
@@ -1286,8 +1355,8 @@ If Codex's Agent return carried a `summary=` line, whatever its verdict
 (an excluded Codex slot's summary is its only status detail), use the `Write`
 tool to create `codex.summary.txt` (a new file) in the `COUNCIL_SYNTH_DIR` path
 printed by 5a, holding exactly that one `summary=` value, copied verbatim. Do the same for an
-excluded (TIMEOUT, ERROR or UNAVAILABLE) Gemini or OpenCode slot whose Agent
-return had an empty `fenced_output_path=`: stage its `summary=` value as
+excluded (TIMEOUT, ERROR, UNAVAILABLE or QUOTA_EXHAUSTED) Gemini or OpenCode
+slot whose Agent return had an empty or `/dev/null` `fenced_output_path=`: stage its `summary=` value as
 `gemini.summary.txt` or `opencode.summary.txt`, since that line is the only
 record of why it exited early. Never stage the claude leg's return. Stage nothing
 else — 5b reads every other leg from disk. Reviewer text must never be pasted
@@ -1767,13 +1836,20 @@ while IFS=: read -r label r; do
   why=""
   detail=""
   excluded=0
-  case "$verdict" in TIMEOUT|ERROR|UNAVAILABLE) excluded=1 ;; esac
+  case "$verdict" in TIMEOUT|ERROR|UNAVAILABLE|QUOTA_EXHAUSTED) excluded=1 ;; esac
+  # A QUOTA_EXHAUSTED stub (R18) reports /dev/null: no fenced file exists by
+  # design, so skip the path checks and the read rather than log a refusal.
+  # Only that verdict earns the exemption.
+  quota_stub=0
+  if [ "$verdict" = "QUOTA_EXHAUSTED" ] && [ "$fp" = "/dev/null" ]; then quota_stub=1; fi
   # The reviewer's own fenced file, after the same checks Step 7 applies
   # before reading it: exact identity for the path this run minted,
   # per-reviewer /tmp shape for the rest, and never a symlink. An excluded
   # slot runs the same checks but keeps only its Summary line (its status
   # detail); it contributes no findings and a failed check is not a warning.
-  if [ "$r" = "claude" ]; then
+  if [ "$quota_stub" -eq 1 ]; then
+    fence_label="council-output:${r}"
+  elif [ "$r" = "claude" ]; then
     [ "$fp" = "$CLAUDE_FENCED" ] || why="reported path is not the one this run minted"
     fence_label="council-output:claude"
   else
@@ -1785,10 +1861,10 @@ while IFS=: read -r label r; do
     fence_label="council-output:${r}"
     [ "$r" = "codex" ] && fence_label="codex-output"
   fi
-  if [ -z "$why" ] && { [ -z "$fp" ] || [ ! -f "$fp" ] || [ -L "$fp" ]; }; then
+  if [ "$quota_stub" -eq 0 ] && [ -z "$why" ] && { [ -z "$fp" ] || [ ! -f "$fp" ] || [ -L "$fp" ]; }; then
     why="fenced output file missing or not a regular file"
   fi
-  if [ -z "$why" ]; then
+  if [ "$quota_stub" -eq 0 ] && [ -z "$why" ]; then
     text=$(council_extract_fenced "$fp" "$fence_label") || why="could not read the fenced output"
   fi
   if [ "$excluded" -eq 1 ]; then
@@ -2243,6 +2319,10 @@ The synthesizer produces:
 - Split — N APPROVE, M REVISE
 - All 4 reviewers REVISE
 - Council ran with N of 4 reviewers (<excluded reviewers> <reason>)
+  (a `QUOTA_EXHAUSTED` slot reads `<reviewer> quota exhausted (<ETA>)`, with
+  the ETA phrase from the `[claude] quota:` line Step 4 printed or, for the
+  other slots, the block's `Status detail`, e.g.
+  `Claude quota exhausted (resets 3:40pm)`)
 <Two-pass runs only:>
 Low-confidence synthesis: N of M findings (P%)
 <When Pass B did not complete, instead of the line above:>
@@ -2270,7 +2350,7 @@ Flip analysis skipped: Pass B did not complete (<reason>)
   <rubric line per finding as above>
 
 ### Reviewer Status (present only if a reviewer was excluded or unreadable)
-- <reviewer>: <TIMEOUT | ERROR | UNAVAILABLE | text unavailable> — <one-line
+- <reviewer>: <TIMEOUT | ERROR | UNAVAILABLE | QUOTA_EXHAUSTED | text unavailable> — <one-line
   reason, in the synthesizer's own words>
 
 ### Summary
@@ -2282,7 +2362,8 @@ Full reviewer outputs: see <REPORT_PATH>
 Synthesizer rules:
 
 1. **Headline majority count:** Only count `APPROVE | REVISE | REJECT`
-   verdicts. Exclude `UNKNOWN`, `TIMEOUT`, `ERROR`, `UNAVAILABLE`.
+   verdicts. Exclude `UNKNOWN`, `TIMEOUT`, `ERROR`, `UNAVAILABLE`,
+   `QUOTA_EXHAUSTED`.
 2. **Agreement matching:** Group findings by `file:line` substring match. If
    two reviewers cite the same file:line, that's an agreement. Quote each
    verbatim from the normalized 5b input (markdown and severity markers are
@@ -2292,7 +2373,7 @@ Synthesizer rules:
 3. **Disagreement bucket:** Anything not in Agreement. Includes verdict
    conflicts (e.g., Codex APPROVE on a file Gemini wants revised).
 4. **Excluded and unreadable reviewers:** If any reviewer was excluded
-   (TIMEOUT, ERROR, etc.), mention this in the Headline AND add one line per
+   (TIMEOUT, ERROR, QUOTA_EXHAUSTED, etc.), mention this in the Headline AND add one line per
    excluded reviewer to a separate `### Reviewer Status` section; a block
    marked `reviewer text unavailable` gets a line there too, though its vote
    still counts. Each line is a synthesized status in the synthesizer's own
@@ -2393,6 +2474,8 @@ council_cleanup_temps() {
       [ "$r" = "claude" ] && continue
       case "$fp" in
         "") ;;
+        # A QUOTA_EXHAUSTED stub (R18) names /dev/null: nothing to reclaim.
+        "/dev/null") ;;
         *..*|"/tmp/council-${r}-fenced-"*/*)
           printf '[council] Warning: refusing to unlink %s path with traversal or an extra separator (%s)\n' "$r" "$fp" >&2 ;;
         "/tmp/council-${r}-fenced-"*.txt) rm -f "$fp" ;;
@@ -2544,6 +2627,14 @@ for reviewer in claude codex gemini opencode; do
   reviewer_title=$(printf '%s' "$reviewer" | awk '{ print toupper(substr($0, 1, 1)) substr($0, 2) }')
   fenced_path="${REVIEWER_FENCED_PATHS[$reviewer]}"
   omit_reason=""
+  # A QUOTA_EXHAUSTED stub (R18) carries /dev/null by design: there is no
+  # fenced file to read, and that is not a refused path. Only this verdict
+  # earns the exemption; /dev/null under any other verdict falls through to
+  # the shape check below and is refused like any other unexpected path.
+  if [ "$fenced_path" = "/dev/null" ] && [ "${REVIEWER_VERDICTS[$reviewer]:-}" = "QUOTA_EXHAUSTED" ]; then
+    fenced_path=""
+    omit_reason="no output: quota exhausted"
+  fi
   # Identity check for the leg whose path we minted; shape check for the rest.
   if [ "$reviewer" = "claude" ] && [ -n "$fenced_path" ] \
      && [ "$fenced_path" != "$CLAUDE_FENCED" ]; then
@@ -3190,6 +3281,8 @@ for reviewer in "${STATE_REVIEWERS[@]}"; do
   fenced_path="${REVIEWER_FENCED_PATHS[$reviewer]}"
   case "$fenced_path" in
     "") ;;
+    # A QUOTA_EXHAUSTED stub (R18) names /dev/null: nothing to reclaim.
+    "/dev/null") ;;
     *..*|"/tmp/council-${reviewer}-fenced-"*/*)
       printf '[council] Warning: refusing to unlink %s path with traversal or an extra separator (%s)\n' \
         "$reviewer" "$fenced_path" >&2
@@ -3326,6 +3419,8 @@ for reviewer in "${STATE_REVIEWERS[@]}"; do
   fenced_path="${REVIEWER_FENCED_PATHS[$reviewer]}"
   case "$fenced_path" in
     "") ;;
+    # A QUOTA_EXHAUSTED stub (R18) names /dev/null: nothing to reclaim.
+    "/dev/null") ;;
     *..*|"/tmp/council-${reviewer}-fenced-"*/*)
       printf '[council] Warning: refusing to unlink %s path with traversal or an extra separator (%s)\n' \
         "$reviewer" "$fenced_path" >&2
@@ -3430,10 +3525,11 @@ This is the final output of the command. Exit 0.
 | Non-existent path | Reject with `[council] Error: path not found`; exit 1 |
 | Empty `debug`/`question` text | Reject with mode-specific usage; exit 1 |
 | `--paths` exceeds `COUNCIL_PATH_MAX_FILES` | Reject with limit message; exit 1 |
-| All 4 reviewers TIMEOUT/ERROR/UNAVAILABLE | Headline: "Council ran with 0 of 4 reviewers (<all four> <reason>)" — the Step 5 template has no separate all-failed string; the confirmation gate still asks; user can save or cancel |
+| All 4 reviewers TIMEOUT/ERROR/UNAVAILABLE/QUOTA_EXHAUSTED | Headline: "Council ran with 0 of 4 reviewers (<all four> <reason>)" — the Step 5 template has no separate all-failed string; the confirmation gate still asks; user can save or cancel |
 | 1-3 of 4 reviewers fail | Headline: "Council ran with N of 4 reviewers"; synthesis proceeds with remaining |
 | yellow-codex not installed | Codex marked UNAVAILABLE; Claude + Gemini + OpenCode still run |
-| claude-reviewer spawn fails or returns nothing parseable | Recorded as `ERROR` by `parse_reviewer_return` like any other missing return; no not-installed branch exists (the reviewer is in-process); the other three still run |
+| claude-reviewer spawn fails or returns nothing parseable | The Agent error text is classified against Claude's quota strings first (`council_classify_claude_quota`): a match is recorded as `QUOTA_EXHAUSTED` with the parsed reset ETA; otherwise it is recorded as `ERROR` by `parse_reviewer_return` like any other missing return; no not-installed branch exists (the reviewer is in-process); the other three still run |
+| Reviewer `QUOTA_EXHAUSTED` | Its provider reported quota exhaustion (not a transient rate limit). The slot is excluded like `UNAVAILABLE`, its `fenced_output_path` is `/dev/null` (accepted only under this verdict; Step 7 renders "no output: quota exhausted" and no unlink loop touches it), and the Headline names the reset ETA. No retry, no state file, no pre-flight headroom check |
 | claude-reviewer never returns at all | **No automatic recovery.** `COUNCIL_TIMEOUT` wraps only the three CLI reviewers; the in-process slot has no subprocess to kill, so the fan-out blocks. The agent is instructed to bound its own investigation and return partial findings, but that is prose, not a guard. Cancel the invocation and re-run. The fenced temp file, if it was written, is NOT reclaimed immediately: the next run mints a different random `mktemp -u` suffix, and Step 4's stale-file sweep only reclaims files older than `STALE_MINUTES` (1440 = 24h) — so it stays until either the OS reaps `/tmp` or a later `/council` invocation runs after it has aged past the threshold. Deliberate — an unconditional glob-and-unlink would risk deleting a concurrent run's in-flight file from another checkout on the same machine; the age gate lets genuine orphans get reclaimed without that risk |
 | A reviewer returns a `fenced_output_path` outside `/tmp/council-<reviewer>-fenced-*.txt`, or one containing `..` or an extra `/` | Refused at every site that touches it, each warning on stderr: Step 7 does not read it (the appendix renders "output withheld: path refused (see stderr)"), and Steps 8/9 do not unlink it either — refusing to delete an attacker-named path matters more than reclaiming a temp file. A path that is a symlink is also refused at the read site |
 | Slug collision >10 same-day | Error: "too many same-day collisions for slug X (>10)"; exit 1 |
