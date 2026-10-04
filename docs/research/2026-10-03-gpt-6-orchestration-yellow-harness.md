@@ -118,15 +118,15 @@ usage, tools, coordination, retries, verification, and failed runs.
 6. **Confirm once on held-out evidence.** Evaluate only the frozen routing
    policy, the optional frozen orchestration package, the frozen GPT-6 baseline,
    and the incumbent Claude path on the holdout matrix. Use a predeclared
-   randomized, task/repeat-stratified schedule covering those four candidates.
-   Promote the lowest total cost per verified success among those predeclared
-   candidates that meet the quality and latency requirements. Do not choose a
-   winner by shopping additional holdout configurations. If the comparison is
-   inconclusive, expand the evaluation rather than retuning on this set. Do not
-   raise reasoning effort on holdout after a failure; any fallback effort must
-   already be part of a frozen candidate. Keep beta delegation optional with a
-   serial fallback until access, quality, failure handling, and cost are
-   demonstrated.
+   randomized, task/repeat-stratified schedule covering each candidate actually
+   frozen for holdout. Promote the lowest total cost per verified success among
+   those predeclared candidates that meet the quality and latency requirements.
+   Do not choose a winner by shopping additional holdout configurations. If the
+   comparison is inconclusive, expand the evaluation rather than retuning on
+   this set. Do not raise reasoning effort on holdout after a failure; any
+   fallback effort must already be part of a frozen candidate. Keep beta
+   delegation optional with a serial fallback until access, quality, failure
+   handling, and cost are demonstrated.
 
 Twelve development tasks and three repeats, plus the frozen 6-task holdout with
 three repeats, are a pilot, not enough evidence for a universal routing policy.
@@ -137,19 +137,26 @@ unavailable, not as failures or wins for another model.
 
 ## Evidence to collect
 
-Each trial records task/repeat IDs; immutable input and base identities;
+Pin versioned model identifiers and the engine/prompt/skill/tool bundle before
+development; reuse that pin on holdout. Abort or restart the comparison if a
+provider alias, Codex/engine version, or prompt/tool bundle drifts between
+stages. Each trial records task/repeat IDs; immutable input and base identities;
 candidate/artifact identity; engine, prompt, skill, and tool versions; model,
 effort, transport and service tier; approval scope; cache state; all model/tool
 usage and costs; retries/escalations; start/end times; required-check outcomes;
 inspection findings; final disposition and rejection reason; and the durable
 verification bundle or equivalent task oracle evidence.
 
-- **Verified success rate:** accepted trials / attempted trials. Keep blocked,
-  timed-out, and failed outcomes visible; report infrastructure failures
-  separately without silently removing them from the primary denominator.
-- **Cost per verified success:** total cost of all attempted trials / accepted
-  trials, using the frozen pricing snapshot and allocation policy. Zero accepted
-  trials means no finite cost-per-success result.
+- **Verified success rate:** successful trials / attempted trials. Freeze an
+  expected terminal disposition for every task before live runs. Count a
+  verified expected rejection (insufficient evidence, impossible constraint,
+  malformed output) as a successful negative trial; do not treat it as a failed
+  acceptance. Keep unexpected blocked, timed-out, and failed outcomes visible;
+  report infrastructure failures separately without silently removing them from
+  the primary denominator.
+- **Cost per verified success:** total cost of all attempted trials / successful
+  trials, using the frozen pricing snapshot and allocation policy. Zero
+  successful trials means no finite cost-per-success result.
 - **Latency:** end-to-end p50/p95, including coordination and verification;
   report terminal failures and successful completion latency separately.
 - **Routing value:** compare complete routed workflows with the frozen
