@@ -199,7 +199,7 @@ vr_write_log_tail() {
 
 # vr_publish_log <stream-file> <log> [<cap>]: write the redacted, bounded stream
 # to the final log path, but only after the last credential scan
-# (rt_looks_secret, from resolve-text.sh). <stream-file> may hold more than
+# (rt_code_clean, from resolve-text.sh). <stream-file> may hold more than
 # <cap> bytes: run-verify-command keeps extra context before the cap so the scan
 # sees a credential label whose value starts the published suffix. The scan
 # covers the whole <stream-file>; only its last <cap> bytes (see
@@ -210,14 +210,13 @@ vr_write_log_tail() {
 # notice and the function returns 3, so the caller can name it in the result's
 # reason; every other outcome returns 0.
 vr_publish_log() {
-    local src="$1" log="$2" cap="${3:-0}" rc=0
+    local src="$1" log="$2" cap="${3:-0}"
     if vr_fold_withheld "$src"; then
         (umask 077 && printf '[log withheld: output had a record longer than 64 KiB]\n' >|"$log") || rm -f -- "$log"
         return 3
     fi
-    if declare -F rt_looks_secret >/dev/null 2>&1; then
-        rt_looks_secret "$src" || rc=$?
-        if [ "$rc" -eq 1 ]; then
+    if declare -F rt_code_clean >/dev/null 2>&1; then
+        if rt_code_clean "$src"; then
             vr_write_log_tail "$src" "$log" "$cap" && return 0
             (umask 077 && printf '[withheld: the log could not be written]\n' >|"$log") || rm -f -- "$log"
             return 0
@@ -235,13 +234,13 @@ vr_publish_log() {
 vr_redact_log() {
     local log="$1"
     vr_load_redactor "$2"
-    # A final scan (rt_looks_secret, from resolve-text.sh) fails closed: a log
+    # A final scan (rt_code_clean, from resolve-text.sh) fails closed: a log
     # that still looks like a credential, or that cannot be scanned, is
     # withheld.
-    local scan_rc=0
+    local scan_rc=2
     if declare -F cs_redact_secrets >/dev/null 2>&1 \
         && command -v fold >/dev/null 2>&1 \
-        && declare -F rt_looks_secret >/dev/null 2>&1 \
+        && declare -F rt_code_clean >/dev/null 2>&1 \
         && (
             umask 077
             set -o pipefail
@@ -252,12 +251,13 @@ vr_redact_log() {
             (umask 077 && printf '[log withheld: output had a record longer than 64 KiB]\n' >|"$log") || rm -f -- "$log"
             return 0
         fi
-        rt_looks_secret "$log.tmp" || scan_rc=$?
-        if [ "$scan_rc" -eq 1 ] && mv -f -- "$log.tmp" "$log"; then
+        scan_rc=0
+        rt_code_clean "$log.tmp" || scan_rc=$?
+        if [ "$scan_rc" -eq 0 ] && mv -f -- "$log.tmp" "$log"; then
             return 0
         fi
         rm -f -- "$log.tmp"
-        if [ "$scan_rc" -ne 1 ]; then
+        if [ "$scan_rc" -ne 0 ]; then
             (umask 077 && printf '[withheld: log still looks like a credential after redaction]\n' >|"$log") || rm -f -- "$log"
             return 0
         fi

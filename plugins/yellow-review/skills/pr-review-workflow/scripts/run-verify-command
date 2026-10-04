@@ -538,10 +538,10 @@ screen_patch() {
         rm -f -- "$PATCH"
         die 2 "cannot screen the recovery patch; the command was not run and the tree is untouched"
     fi
-    rt_looks_secret "$ADDED_FILE"
+    rt_code_clean "$ADDED_FILE"
     case $? in
-        1) ;;
-        0)
+        0) ;;
+        1)
             rm -f -- "$PATCH"
             PATCH_OUT=""
             add_reason "recovery patch withheld: added lines look like a credential"

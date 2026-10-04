@@ -352,10 +352,11 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
 }
 
 @test "a Slack webhook URL and a glpat token are refused; ordinary services paths are not" {
+  export RT_ALLOWED_HOST=example.com
   check_refused() {
     printf '%s\n' "$1" >| "$A"
     run "$SCRIPT" "$A"
-    [ "$status" -eq 2 ]
+    [ "$status" -eq 6 ]
   }
   check_refused "posted to https://hooks.slack.com/services/T0A1B2C3D/B0E1F2G3H/$(printf '%s%s' aB3dE5gH7jK9 mN1pQ3sT5uVw)"
   check_refused "token glpat-$(printf '%s%s' aB3dE5gH7jK9 mN1pQ3sT)"
@@ -367,7 +368,7 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
 @test "a path with a token-shaped segment is refused; Java paths, acronyms and SHA segments are not" {
   printf '%s\n' 'leaked path/to/qZ8xK2mLp9RtVw4YbN7cJd3H/x' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf '%s\n' \
     'src/main/java/com/acme/ReviewFindingsLedgerTransitionHelperFactory2/Impl' \
     'src/main/java/com/acme/HTTPServerRequestHandlerFactory3/Impl' \
@@ -496,11 +497,12 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
 }
 
 @test "a URL password that merely contains a percent placeholder is refused; whole-password placeholders stay clean" {
+  export RT_ALLOWED_HOST=host
   for t in 'https://u:Hunter2%s@example.com/x' 'https://u:p%zz1word@host' \
     'https://deploy:p%40ss%21word@example.com/x'; do
     printf '%s\n' "$t" >| "$A"
     run "$SCRIPT" "$A"
-    [ "$status" -eq 2 ]
+    [ "$status" -eq 6 ]
   done
   printf '%s\n' 'https://user:%PASSWORD%@host' 'https://user:%s@host' \
     'https://user:%(password)s@host' 'https://user:${PASS}@host' >| "$A"
@@ -512,7 +514,7 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   check() {
     printf '%b' "$2" >| "$A"
     run --separate-stderr "$SCRIPT" "$A"
-    [ "$status" -eq 2 ]
+    [ "$status" -eq 6 ]
     [[ "$stderr" == *"rule=$1 "* ]]
   }
   check unquoted-keyword-value 'password:\n  hunter\n'
@@ -542,21 +544,24 @@ CASES
 @test "CRLF line endings do not hide an all-letter literal; a CRLF placeholder stays clean" {
   printf 'password: hunter\r\n' >| "$A"
   run "$SCRIPT" "$A"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 6 ]
   printf 'password: string\r\ntoken: <your token>\r\n' >| "$A"
   run "$SCRIPT" "$A"
   [ "$status" -eq 0 ]
 }
 
-@test "rt_looks_secret_strict skips keyword rules but keeps high-precision ones" {
+@test "rt_code_clean --strict skips keyword rules but keeps high-precision ones" {
   LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
   # shellcheck source=../lib/resolve-text.sh
   . "$LIB"
   for t in 'password = "hunter22"' 'API_KEY=abcd1234efgh5678' 'token: string' 'password: hunter22'; do
     printf '%s\n' "$t" >| "$A"
-    if [ "$t" != 'token: string' ]; then rt_looks_secret "$A" || { echo "keyword rules missed: $t"; false; }; fi
-    run rt_looks_secret_strict "$A"
-    [ "$status" -eq 1 ] || { echo "strict flagged: $t"; false; }
+    if [ "$t" != 'token: string' ]; then
+      run rt_code_clean "$A"
+      [ "$status" -eq 1 ] || { echo "keyword rules missed: $t"; false; }
+    fi
+    run rt_code_clean --strict "$A"
+    [ "$status" -eq 0 ] || { echo "strict flagged: $t"; false; }
   done
   for t in 'x ghp_abcdefghijklmnopqrstuvwxyz0123456789' 'AKIA''ABCDEFGHIJKLMNOP' \
            'ASIA''ABCDEFGHIJKLMNOP' 'gl''pat-abcdefghijklmnopqrstu1234' \
@@ -564,19 +569,38 @@ CASES
            'AIzaSyA1234567890abcdefghijklmnopqrstuvw' \
            'aB3dEf6hIj9kLm2n''Op5qRs8tUv1wXy4zAb' '-----BEGIN PRIVATE KEY-----'; do
     printf '%s\n' "$t" >| "$A"
-    rt_looks_secret_strict "$A" || { echo "strict missed: $t"; false; }
+    run rt_code_clean --strict "$A"
+    [ "$status" -eq 1 ] || { echo "strict missed: $t"; false; }
   done
 }
 
-@test "rt_looks_secret_strict keeps the URL-userinfo rule and the keyword-in-word anchoring" {
+@test "rt_code_clean --strict keeps the URL-userinfo rule and the keyword-in-word anchoring" {
   LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
   # shellcheck source=../lib/resolve-text.sh
   . "$LIB"
   printf 'clone https://deploy:%s@example.com/o/r.git\n' 'S3cr3t9x' >| "$A"
-  rt_looks_secret_strict "$A"
-  printf '%s\n' 'bypass: something-else' >| "$A"
-  run rt_looks_secret_strict "$A"
+  run rt_code_clean --strict "$A"
   [ "$status" -eq 1 ]
+  printf '%s\n' 'bypass: something-else' >| "$A"
+  run rt_code_clean --strict "$A"
+  [ "$status" -eq 0 ]
+}
+
+@test "rt_code_clean ignores what only text posted publicly refuses, and rt_text_clean does not" {
+  LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
+  # shellcheck source=../lib/resolve-text.sh
+  . "$LIB"
+  printf '%s\n' '@Injectable() class A {}' 'see https://evil.example/x and ![i](x.png)' >| "$A"
+  run rt_code_clean "$A"
+  [ "$status" -eq 0 ]
+  run rt_text_clean "$A"
+  [ "$status" -eq 1 ]
+}
+
+@test "rt_code_clean returns 2 on a missing file and clears a stale RT_HIT_RULE" {
+  LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-text.sh"
+  run sh -c '. "$1"; RT_HIT_RULE=stale; rt_code_clean "$2"; printf "%s [%s]" "$?" "$RT_HIT_RULE"' sh "$LIB" "$BATS_TEST_TMPDIR/nope"
+  [ "$output" = "2 []" ]
 }
 
 # rt_added_lines (lib/resolve-text.sh): fixed diffs, exact output.

@@ -525,7 +525,8 @@ _rt_scan() {
     return "$_rt_awk_rc"
 }
 
-# rt_report_refusal [label]: after rt_text_clean returned non-zero, print the one stderr
+# rt_report_refusal [label]: after rt_text_clean (or rt_code_clean) returned
+# non-zero, print the one stderr
 # token every resolve script uses for refused text, so a caller can tell it
 # from a usage error that also exits 2. It names the rule and the line,
 # never the text. A scan that did not run reports `scan failed`.
@@ -537,33 +538,80 @@ rt_report_refusal() {
     fi
 }
 
-# rt_looks_secret <file>: all rules. For text posted publicly (replies,
-# follow-up issues, check-resolve-text) and for the commit credential gate.
-# Exit status is awk's: 0 means a credential shape, 1 means clean, anything
-# else means the scan itself failed. Prefer rt_text_clean when posting text.
-# On a hit, RT_HIT_RULE and RT_HIT_LINE name the rule and line that matched.
-rt_looks_secret() { _rt_scan 0 "$1"; }
-
-# rt_text_clean <file>: exit 0 only when the scan ran and found no credential
-# shape. A credential hit, a scanner failure (awk missing or erroring) and an
-# unreadable file all return non-zero, so a caller that refuses on non-zero
-# fails closed instead of posting unscanned text.
-# The status is captured explicitly, so a bare call under `set -e` returns it
-# instead of aborting on the clean (awk 1) status; call it in a condition.
-rt_text_clean() {
+# rt_code_clean [--strict] <file>: the credential rules alone, for code, diffs
+# and logs, where an @, a URL or an image is ordinary. Exit 0 only when the scan
+# ran and found no credential shape; 1 for a credential shape; 2 when the scan
+# did not run (unreadable file, awk missing or erroring). --strict applies only
+# the high-precision rules (private key blocks, known token prefixes, long
+# mixed-case tokens), so a variable merely assigned to a name such as password
+# or token does not match. On status 1, RT_HIT_RULE and RT_HIT_LINE name the
+# rule and line that matched; both are empty otherwise.
+# The status is captured explicitly, so a bare call under `set -e` returns it.
+rt_code_clean() {
+    _rt_strict=0
+    if [ "${1:-}" = --strict ]; then _rt_strict=1; shift; fi
     _rt_rc=0
-    rt_looks_secret "$1" || _rt_rc=$?
-    [ "$_rt_rc" -eq 1 ]
+    _rt_scan "$_rt_strict" "$1" || _rt_rc=$?
+    case "$_rt_rc" in
+        0) return 1 ;;
+        1) return 0 ;;
+        *) return 2 ;;
+    esac
 }
 
-# rt_looks_secret_strict <file>: high-precision rules only. For screening
-# code diffs, where the keyword rules flag ordinary assignments.
-rt_looks_secret_strict() { _rt_scan 1 "$1"; }
+# rt_text_clean <file>: exit 0 only when the scan ran and found nothing to
+# refuse. Status 1 means the text has a credential shape or a shape unsafe to
+# post publicly (markdown image, @mention, foreign URL); status 2 means the
+# scan did not run. A caller that refuses on non-zero fails closed instead of
+# posting unscanned text. On status 1, RT_HIT_RULE and RT_HIT_LINE name the rule
+# and line that matched (see rt_report_refusal); both are empty otherwise.
+# RT_ALLOWED_HOST (default GH_HOST, else github.com) is the one host a URL in
+# the text may name. For code and logs use rt_code_clean.
+rt_text_clean() {
+    rt_code_clean "$1" || return $?
+    # No credential shape. The text is also posted publicly under the user's
+    # account, so refuse the shapes that notify people or load remote content.
+    _rt_awk_rc=0
+    _rt_out=$(awk -v host="${RT_ALLOWED_HOST:-${GH_HOST:-github.com}}" '
+        function flag(rule) { if (!hit) { hit = 1; hitrule = rule; hitline = NR } }
+        /!\[/ { flag("markdown-image") }
+        {
+            # A mention is @name at the start of a line or after whitespace or
+            # an opening bracket or quote: where GitHub notifies. Not the @ of
+            # URL userinfo, an email address or a code span.
+            if ((" " $0) ~ /([[:space:]]|[(,;"\047])@[A-Za-z0-9]/) flag("mention")
+            l = tolower($0)
+            h = tolower(host)
+            while (match(l, /https?:\/\/[^\/ \t"\047`]*/)) {
+                u = substr(l, RSTART, RLENGTH)
+                l = substr(l, RSTART + RLENGTH)
+                sub(/^https?:\/\//, "", u)
+                sub(/^[^@]*@/, "", u)
+                sub(/[])>.,;:!?*]+$/, "", u)
+                sub(/:[0-9]+$/, "", u)
+                if (u != h) flag("foreign-url")
+            }
+        }
+        END {
+            if (hit) print hitrule, hitline
+            exit hit ? 0 : 1
+        }
+    ' < "$1") || _rt_awk_rc=$?
+    case "$_rt_awk_rc" in
+        0)
+            RT_HIT_RULE=${_rt_out%% *}
+            RT_HIT_LINE=${_rt_out##* }
+            return 1
+            ;;
+        1) return 0 ;;
+        *) return 2 ;;
+    esac
+}
 
 # rt_added_lines: read a unified diff on stdin, print its added lines without
 # the leading "+". Only lines inside hunks count (a file header is skipped by
 # position, so an added "++ x" line is still printed). Feed the output to
-# rt_looks_secret.
+# rt_code_clean.
 rt_added_lines() {
     awk '/^diff --git / { h = 0; next } /^@@/ { h = 1; next } h && /^\+/ { print substr($0, 2) }'
 }

@@ -484,7 +484,7 @@ if ! git diff --cached --no-renames --no-color --no-ext-diff --no-textconv --tex
     lgit reset -q -- "${EXPECTED[@]}" || true
     die 3 "could not extract the added lines from the staged changes for the credential scan; nothing committed"
 fi
-if [ "$ALLOW_CREDENTIAL" = 0 ] && ! rt_text_clean "$ADDED"; then
+if [ "$ALLOW_CREDENTIAL" = 0 ] && ! rt_code_clean "$ADDED"; then
     lgit reset -q -- "${EXPECTED[@]}"
     die 3 "credential-shaped: staged changes look like they contain a credential, or could not be scanned; nothing committed"
 fi
@@ -565,7 +565,7 @@ if [ "$ALLOW_CREDENTIAL" = 1 ]; then
                   { print substr($0, index($0, "\t") + 1) }' "$APPROVED" "$REMAINING" >|"$ADDED" \
         || undo_commit "could not filter the approved lines for the credential scan; nothing submitted"
 fi
-if ! rt_text_clean "$SCAN_FILE"; then
+if ! rt_code_clean "$SCAN_FILE"; then
     undo_commit "credential-shaped: the commit looks like it contains a credential, or could not be scanned (a hook may have added it); nothing submitted"
 fi
 # A hook can also leave edits or new files unstaged or untracked. Check before

@@ -185,7 +185,8 @@ resolution, and sequential stack review. Graphite-native workflow.
   files. Not yet invoked by `/review:resolve`; see
   `references/resolve/dispositions.md`
 - `check-resolve-text <file>...` — Refuse resolver-written text that looks
-  like a credential (for text posted outside the resolve scripts)
+  like a credential, or has an image, an `@` mention or a foreign URL (for
+  text posted outside the resolve scripts); exits 6
 - `commit-resolve-fixes` — Stage the resolver files, add a new commit and
   verify the result; refuses paths outside the PR, deny-listed paths,
   credential-shaped added lines and (`--unattended`) runner files. Not yet
@@ -199,7 +200,10 @@ resolution, and sequential stack review. Graphite-native workflow.
   header and footer rows are its completeness signal
 
 `reply-pr-thread`, `file-followup-issue` and `check-resolve-text` source
-`lib/resolve-text.sh` (credential-shape check) before posting.
+`lib/resolve-text.sh` (text screen) before posting and exit 6 on a refusal.
+`reply-pr-thread` and `file-followup-issue` exit 7 on a permanent GitHub
+refusal (not authenticated; for the issue script also no permission or Issues
+disabled).
 `commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`
 and `lib/verify-run.sh`.
 
@@ -209,17 +213,26 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
 ### Library
 
 - `lib/resolve-text.sh` (POSIX sh, sourced by `reply-pr-thread`,
-  `file-followup-issue` and `check-resolve-text`) — the credential-shape
-  check for resolver-written text; a match means the text is never posted.
-  On a hit it sets `RT_HIT_RULE` and `RT_HIT_LINE`, and `rt_report_refusal`
-  prints a `resolve-text:` stderr line (never the text) that tells a refusal
-  from a usage error: `refused rule=<rule> line=<n>` for a credential hit,
-  `scan failed` when the scan did not run. Callers look for that line anywhere
-  on stderr rather than assume it is first.
-- `lib/resolve-gh.sh` (POSIX sh, sourced by `file-followup-issue` and
-  `get-pr-blockers`) — runs `gh` under `YELLOW_REVIEW_GH_TIMEOUT` (default
-  30 s) and returns 124 on a timeout, but only when `timeout(1)` or
-  `gtimeout(1)` is installed; without either `gh` runs unbounded.
+  `file-followup-issue` and `check-resolve-text`) — the text screen for
+  resolver-written text; a match means the text is never posted. Two functions
+  share one convention (0 clean, 1 a hit, 2 the scan did not run):
+  `rt_text_clean <file>` for text posted publicly (credential shapes plus a
+  markdown image, `@` mention or foreign URL) and `rt_code_clean [--strict]
+  <file>` for code, diffs and logs, where those are ordinary (credential rules
+  only; `--strict` keeps the high-precision ones). On 1 they set `RT_HIT_RULE`
+  and `RT_HIT_LINE`, and `rt_report_refusal` prints a `resolve-text:` stderr
+  line (never the text): `refused rule=<rule> line=<n>` for a hit, `scan
+  failed` when the scan did not run. The posting scripts exit 6 on a refusal;
+  callers key on the code and keep the line as detail. The one URL host
+  allowed is `RT_ALLOWED_HOST`, else `GH_HOST`, else `github.com`.
+- `lib/resolve-gh.sh` (POSIX sh, sourced by `reply-pr-thread`,
+  `file-followup-issue` and `get-pr-blockers`) — runs `gh` through `rg_gh`
+  under `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s) and returns 124 on a
+  timeout, but only when `timeout(1)` or `gtimeout(1)` is installed; without
+  either `gh` runs unbounded. It also holds the failure classifiers
+  (`rg_is_rate_limited`, `rg_is_auth_failure`, `rg_is_permission_denied`) the
+  scripts share; test a rate limit before a permission failure, since a
+  secondary rate limit is also an HTTP 403.
 - `lib/resolve-paths.sh` (bash, sourced by `commit-resolve-fixes` and
   `run-verify-command`) — canonical-path check, the case-insensitive resolver
   deny list, and the runner-file list (files a git hook or verify command
