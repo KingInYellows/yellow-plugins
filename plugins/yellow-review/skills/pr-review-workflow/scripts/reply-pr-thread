@@ -12,6 +12,14 @@
 #     reply, because that reply carries the evidence the later resolve needs.
 #     A caller resolves after a skip only when "disposition" equals the one
 #     it asked for.)
+# Concurrency: the marker makes re-runs idempotent, not the pre-check and
+#   the reply atomic. Two runs as the same viewer that reach one thread at
+#   the same moment can both pass the pre-check and both post, possibly with
+#   different dispositions; this script does not detect that after the write
+#   (it has no lock, no post-write rescan and never deletes a comment). Run
+#   one resolve or sweep per PR at a time. A later re-run reads only the last
+#   comment and reports its disposition in the skip, so the caller's
+#   disposition check still guards the resolve.
 # Exit codes: 1 other failure (including a non-JSON response),
 #             2 usage: wrong argument count, invalid thread ID or
 #               disposition, unreadable, empty or over-long body file, or a

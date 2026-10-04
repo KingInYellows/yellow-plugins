@@ -61,7 +61,7 @@ rt_looks_secret() {
         # or a call (`z.string()`), so `password: string`,
         # `password: z.string()` and `token: $TOKEN` stay clean. A value that
         # only contains `$`, `<`, `{` or `[` is a credential.
-        function litval(seg, inword,    np, parts, allph, j) {
+        function litval(seg, inword,    np, parts, allph, j, core) {
             # Markdown inline-code backticks delimit the value; they are not
             # part of it (`password: `hunter``, `token: `$TOKEN``).
             sub(/^`+/, "", seg)
@@ -80,16 +80,24 @@ rt_looks_secret() {
             # known type or prose placeholder.
             if (inword) return 0
             if (seg ~ /[$<{\[]/) return 1
-            if (seg ~ /^[a-z]+$/ && index(ph, " " seg " ") == 0) return 1
+            # Wrapper punctuation (`!hunter!`, `(hunter`, `~hunter~`,
+            # `**hunter**`) is not part of the letters the rules below
+            # test: judge the value without it. A value that is all wrapper
+            # or leaves under 6 characters is not judged here.
+            core = seg
+            sub(/^[!@#%^&*~+=|(]+/, "", core)
+            sub(/[!@#%^&*~+=|]+$/, "", core)
+            if (length(core) < 6) return 0
+            if (core ~ /^[a-z]+$/ && index(ph, " " core " ") == 0) return 1
             # Separated lowercase literal (`password: correct-horse-battery`,
             # `password: hunter@cats`): separators are punctuation that
             # passwords commonly use. Flag unless every part is a
             # placeholder word. A property access on a common config or
             # environment object (`token = process.env.api_key`) is a
             # reference, not a literal.
-            if (seg ~ /^(process\.env|import\.meta\.env|os\.environ|env|this|self|config|settings|secrets|args|params|props)\./) return 0
-            if (seg ~ /^[a-z]+([_\/.@+!#%^&*:-][a-z]+)+$/) {
-                np = split(seg, parts, /[_\/.@+!#%^&*:-]/)
+            if (core ~ /^(process\.env|import\.meta\.env|os\.environ|env|this|self|config|settings|secrets|args|params|props)\./) return 0
+            if (core ~ /^[a-z]+([_\/.@+!#%^&*:-][a-z]+)+$/) {
+                np = split(core, parts, /[_\/.@+!#%^&*:-]/)
                 allph = 1
                 for (j = 1; j <= np; j++) if (index(ph, " " parts[j] " ") == 0) allph = 0
                 return !allph

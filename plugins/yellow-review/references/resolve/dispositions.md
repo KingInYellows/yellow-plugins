@@ -189,7 +189,13 @@ record); only the resolve is withheld.
   individually. A declined candidate becomes `unclear`.
 - Unattended (`--non-interactive`): file only when `oos_reason` is non-empty,
   at most **3 created issues per PR per run**, shared across the re-pass.
-  Issues found by marker dedupe do not count against the cap.
+  Issues found by marker dedupe do not count against the cap. Passing
+  `--non-interactive` is the explicit opt-in to these unattended GitHub
+  writes (filing, replies, resolves), under the carve-out in
+  `plugins/yellow-review/CLAUDE.md` (Conventions); the default path keeps
+  every gate. The controls that replace the per-post prompt (credential
+  screen, bounded text, dedupe, same-repo scope, the cap above) are in
+  `docs/security.md` "Review-Thread Replies and Follow-Up Issues".
 - Over-cap reply: `Out of scope for this PR. The automatic follow-up issue
   limit for this run was reached, so no issue was filed. Leaving open.`
   The thread becomes `unclear` (blocking).
@@ -399,8 +405,8 @@ Replies and issue bodies end with:
   `x-ratelimit-remaining` is 0, else `YELLOW_REVIEW_RATE_LIMIT_WAIT`
   (default 60 s), then retries once per script run. A second limit, or a
   required wait over 90 s, exits 4. A bare 403 is not a rate limit: it exits
-  3. `file-followup-issue` never waits or retries; stderr matching "rate limit"
-  or "HTTP 429" (it does not match "abuse") exits 4 at once.
+  3. `file-followup-issue` never waits or retries; stderr matching "rate limit",
+  "abuse" or "HTTP 429" exits 4 at once.
 - `reply-pr-thread` also exits 4 when a `gh` call exceeds
   `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s; needs `timeout(1)` or `gtimeout(1)`). It does not
   retry, because the killed call may already have posted the reply. A re-run
@@ -488,5 +494,13 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   of threads) are slow. A batch apply script would help and is not written.
 - Two accounts resolving the same PR concurrently can each post a reply;
   markers dedupe only per viewer.
+- Two runs as the same viewer on one thread at the same moment can both pass
+  `reply-pr-thread`'s pre-check before either posts, so both post a marked
+  reply, possibly with different dispositions. The marker makes re-runs
+  idempotent; it does not make check-and-write atomic, and the script has no
+  lock and no post-write reconciliation (unlike `file-followup-issue`'s
+  post-create rescan, which covers issues only). Run one resolve or sweep per
+  PR at a time. A duplicate reply is harmless noise; a conflicting pair is not
+  detected, and a later re-run acts on the last comment only.
 - Where branch protection does not require conversation resolution, an open
   thread is a convention, not a merge block. The report says which applies.

@@ -205,6 +205,20 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   [ "$status" -eq 0 ]
 }
 
+@test "an unquoted keyword value wrapped in punctuation is judged unwrapped" {
+  for t in 'password: !hunter!' 'password: @hunter@' 'password: (hunter)' 'token: ~hunter~' \
+    'secret: **hunter**' 'password: !hunter@cats!' 'token: ~correct-horse-battery~' \
+    'password: (correct-horse-battery)'; do
+    printf '%s\n' "$t" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 2 ] || { echo "not flagged: $t"; false; }
+  done
+  printf '%s\n' 'password: **string**' 'token: ~optional~' 'secret: (optional@string)' \
+    'password: ***' 'token: --flag' >| "$A"
+  run "$SCRIPT" "$A"
+  [ "$status" -eq 0 ]
+}
+
 @test "a keyword value wrapped in Markdown inline-code backticks is judged unwrapped" {
   for t in 'password: `hunter`' 'token: `correct-horse-battery`' 'secret: `hunter`.' 'password: `hunter22`'; do
     printf '%s\n' "$t" >| "$A"

@@ -422,8 +422,9 @@ Decisions from the brainstorm and the planning round:
   this PR: `get-pr-comments`, `get-pr-blockers`, `reply-pr-thread`,
   `file-followup-issue`, `check-resolve-text`; `commit-resolve-fixes` and
   `run-verify-command` ship in the later PRs):
-  - `get-pr-comments.bats`: the default output is unchanged; `--include-outdated`
-    includes thread3; the new fields are present;
+  - `get-pr-comments.bats`: the default thread selection, legacy fields and
+    field order are unchanged (the new fields are emitted in default mode too);
+    `--include-outdated` includes thread3; the new fields are present;
   - `get-pr-blockers.bats`: enforced, not enforced, and 403 → unknown;
   - `reply-pr-thread.bats`: the marker is appended; already-replied skip;
     a spoofed marker in a reviewer comment is not skipped; the size cap;
@@ -672,7 +673,8 @@ Decisions from the brainstorm and the planning round:
 ### API Changes
 
 - `get-pr-comments`: a new opt-in flag and additive fields. The default
-  output fields and filter are unchanged.
+  thread filter, legacy fields and field order are unchanged; the additive
+  fields are emitted in default mode too.
 - The `/review:resolve` output gains the `Resolve:` line.
 - `--non-interactive` gains one more suppressed prompt (issue filing).
 

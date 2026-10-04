@@ -358,9 +358,11 @@ once wired, they run without a per-post prompt. The controls
   exits 4 without a retry in the first two, since the post may have landed;
   a re-run finds it by its marker. In `get-pr-blockers` a timeout of the
   review lookup sets `lookupFailed` true, while a timeout of the
-  branch-protection or ruleset lookup leaves `conversationResolution`
-  `unknown`; both exit 0. Without either binary installed, no timeout
-  applies.
+  branch-protection or ruleset lookup leaves that source unknown. The
+  combined `conversationResolution` is still `enforced` if the other source
+  requires resolution, and is `unknown` only when neither source confirms
+  enforcement and at least one remains unknown; both exit 0. Without either
+  binary installed, no timeout applies.
 
 ### Context Observer Persistence (yellow-core)
 

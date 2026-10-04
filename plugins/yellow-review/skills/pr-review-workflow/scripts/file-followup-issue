@@ -225,8 +225,9 @@ if THREAD_URL=$(rg_gh api graphql -f threadId="$THREAD_ID" \
     esac
 else
     LOOKUP_RC=$?
-    # Ordinary lookup failures keep the PR-URL fallback; a rate limit or a
-    # timeout stops the caller.
+    # The lookup itself failed, so no failure here falls back to the PR URL
+    # (only a successful lookup with no comment URL does, above). A rate limit
+    # or a timeout stops the caller through gh_fail.
     if [ "$LOOKUP_RC" -eq 124 ] || grep -qiE 'rate limit|abuse|HTTP 429' "$ERR"; then
         gh_fail 'thread link lookup' "$LOOKUP_RC"
     fi
