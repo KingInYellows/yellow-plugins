@@ -736,3 +736,10 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   [[ "$step5flat" == *"Keep the resolver's partial edits and stop"* ]]
   [[ "$step5flat" == *'Keep stops the same way but reverts nothing'* ]]
 }
+
+@test "resolve-pr: a rate-limited blocker lookup stops before any dispatch or write" {
+  step3=$(sed -n '/^### Step 3: /,/^### Step 3b/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step3" == *'`lookupReason` or `resolutionLookupReason` is `rate_limited`'* ]]
+  [[ "$step3" == *'without a resolver dispatch, commit, push, reply or issue'* ]]
+  [[ "$step3" == *'`push=skipped, verify=none, ratelimited=1`'* ]]
+}

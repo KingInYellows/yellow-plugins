@@ -339,8 +339,9 @@ back into later reviewer prompts. The boundary:
 Unlike the ledger, `reply-pr-thread` and `file-followup-issue` (under
 `skills/pr-review-workflow/scripts/`) publish resolver-generated text to
 GitHub under the user's `gh` credentials: a reply on a PR review thread, or a
-new issue in the same repository. `/review:resolve` does not call them yet;
-once wired, they run without a per-post prompt. The controls
+new issue in the same repository. `/review:resolve` calls them, and an
+unattended run (`--non-interactive`, `/review:sweep`) posts without a per-post
+prompt; an interactive run asks before filing an issue. The controls
 (`references/resolve/dispositions.md`):
 
 - **Text screen, fail closed.** Every body passes `lib/resolve-text.sh`
@@ -362,9 +363,14 @@ once wired, they run without a per-post prompt. The controls
   last 10 carries the marker and only Bot authors have commented since. An issue is skipped
   when a viewer-authored issue already carries the marker; that scan reads
   every page of the viewer's issues. Markers by other authors are ignored.
-- **Scope.** Issues are filed only in the PR's repository, and the script
-  refuses a thread that does not belong to the PR. No new network
-  destination is added beyond `gh`'s GitHub API.
+- **Scope.** The scripts file GitHub issues only in the PR's repository and
+  refuse a thread that does not belong to the PR; their only network
+  destination is `gh`'s GitHub API. `/review:resolve` can also file an
+  out-of-scope follow-up in Linear through the yellow-linear MCP server (OAuth
+  under the user's Linear account) when that plugin is available; the text
+  passes the same screen first, an ambiguous failure falls back to GitHub, and
+  Linear dedupe is best effort (see Known limits in the contract). Unattended
+  runs file at most 3 issues per PR.
 - **Edit range.** A hunk outside a file's PR-changed lines plus `RANGE_MARGIN`,
   or more than 50 changed lines in total (an insertion counts its length),
   never reaches a commit unattended: `commit-resolve-fixes --check-ranges`

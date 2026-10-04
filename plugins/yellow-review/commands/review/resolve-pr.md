@@ -178,7 +178,10 @@ paginating at a 270 s deadline and ends inside that budget. The contract's
 "Bash timeouts" is the single source for these numbers.
 
 It never fails the run; keep its JSON (`changesRequested`,
-`conversationResolution`, `lookupFailed`) for Step 9.
+`conversationResolution`, `lookupFailed`) for Step 9. When `lookupReason` or
+`resolutionLookupReason` is `rate_limited`, a rate limit is active: stop here
+without a resolver dispatch, commit, push, reply or issue, and go to Step 9
+with `push=skipped, verify=none, ratelimited=1`.
 
 If there are no unresolved threads, report "No unresolved comments found on
 PR #X." and go straight to Step 9, which still reports `CHANGES_REQUESTED`
