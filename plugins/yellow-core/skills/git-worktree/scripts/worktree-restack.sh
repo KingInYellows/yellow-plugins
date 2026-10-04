@@ -596,6 +596,11 @@ gh_version_ok() {
 
 # resolve_adapter: the checkout layout first, then the highest installed
 # version in the plugin cache (cache/<plugin>/<version>/).
+# adapter_honors_timeout FILE: an adapter older than the --timeout-ms flag
+# ignores it and keeps its 120 s subprocess cap, so a restack that needs the
+# ten minutes this script asks for would be cut off. Skip such an adapter.
+adapter_honors_timeout() { grep -q -- 'timeout-ms' "$1" 2>/dev/null; }
+
 resolve_adapter() {
   local root cand best="" best_v="" ver
   [ -z "${ADAPTER:-}" ] || return 0
@@ -603,12 +608,13 @@ resolve_adapter() {
   [ -n "$root" ] || root=$(cd -- "$SCRIPT_DIR/../../.." 2>/dev/null && pwd -P)
   ADAPTER=""
   cand="$root/../github-workflow/lib/github-stack-runtime.js"
-  if [ -f "$cand" ]; then
+  if [ -f "$cand" ] && adapter_honors_timeout "$cand"; then
     ADAPTER=$cand
     return 0
   fi
   for cand in "$root"/../../github-workflow/*/lib/github-stack-runtime.js; do
     [ -f "$cand" ] || continue
+    adapter_honors_timeout "$cand" || continue
     ver=${cand%/lib/github-stack-runtime.js}
     ver=${ver##*/}
     if [ -z "$best" ] || ver_gt "$ver" "$best_v"; then

@@ -649,6 +649,27 @@ forge() {
   [[ $output == *"found: v0.1.0"* ]]
 }
 
+@test "github: an installed adapter that predates --timeout-ms is skipped, a newer one is used" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  mkdir -p "$T/cache/yellow-core/2.6.2" "$T/cache/github-workflow/1.0.0/lib" "$T/cache/github-workflow/0.9.0/lib"
+  cat >"$T/cache/github-workflow/1.0.0/lib/github-stack-runtime.js" <<'JSEOF'
+// an old adapter that knows no timeout flag
+process.stdout.write(JSON.stringify({status:'SUCCESS',stdout:JSON.stringify({trunk:'old_adapter',branches:[{name:'a',isCurrent:true}]})}));
+JSEOF
+  cat >"$T/cache/github-workflow/0.9.0/lib/github-stack-runtime.js" <<'JSEOF'
+const timeoutMs = process.argv.indexOf('--timeout-ms');
+process.stdout.write(JSON.stringify({status:'SUCCESS',stdout:JSON.stringify({trunk:'timeout_aware',branches:[{name:'a',isCurrent:true}]})}));
+JSEOF
+  CLAUDE_PLUGIN_ROOT="$T/cache/yellow-core/2.6.2" STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github
+  [ "$status" -eq 0 ]
+  [[ $output == *$'CHAIN\ttimeout_aware\ta'* ]]
+  rm -rf "$T/cache/github-workflow/0.9.0"
+  CLAUDE_PLUGIN_ROOT="$T/cache/yellow-core/2.6.2" STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github
+  [ "$status" -eq 20 ]
+  [[ $output == *"adapter not found"* ]]
+}
+
 @test "github: the adapter is found in the installed plugin cache, highest version wins" {
   command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
   mk_stack
@@ -657,6 +678,7 @@ forge() {
   for ver in 1.9.0 1.10.0; do
     mkdir -p "$T/cache/github-workflow/$ver/lib"
     cat >"$T/cache/github-workflow/$ver/lib/github-stack-runtime.js" <<JSEOF
+// honors --timeout-ms
 process.stdout.write(JSON.stringify({status:'SUCCESS',stdout:JSON.stringify({trunk:'from_${ver//./_}',branches:[{name:'a',isCurrent:true}]})}));
 JSEOF
   done
@@ -762,6 +784,7 @@ JSEOF
   mkdir -p "$T/cache/yellow-core/2.6.2"
   mkdir -p "$T/cache/github-workflow/1.0.0/lib"
   cat >"$T/cache/github-workflow/1.0.0/lib/github-stack-runtime.js" <<'JSEOF'
+// honors --timeout-ms
 const op = process.argv.slice(2).find((arg) => !arg.startsWith('--') && !/^\d+$/.test(arg));
 if (op === 'view') {
   process.stdout.write(JSON.stringify({
