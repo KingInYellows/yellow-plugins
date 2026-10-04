@@ -1,0 +1,21 @@
+plugins/yellow-review/tests/check-resolve-text.bats
+  s_34897998dae600::t_4a8c9571e606eb 208-218
+plugins/yellow-review/lib/resolve-text.sh
+  s_34897998dae600::t_cede34ae5824f0 65-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "63b3bf6e94f4d231c80ba1857696710addae4156",
+  "prompts": {},
+  "sessions": {
+    "s_34897998dae600": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "59f66293-277e-4e30-a1f0-fee6407f5862",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+plugins/yellow-review/lib/resolve-gh.sh
+  s_7a82748dd606d9::t_9cc8dffc39b6e1 4,14-22,24-25
+plugins/yellow-review/tests/file-followup-issue.bats
+  s_7a82748dd606d9::t_c65d57a89af71c 496-522
+plugins/yellow-review/tests/get-pr-blockers.bats
+  s_7a82748dd606d9::t_132466b3060a91 227-253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "efc3f195b42880bcac1cabe4b8525efdf44346de",
+  "prompts": {},
+  "sessions": {
+    "s_7a82748dd606d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "89e56957-0558-415c-b2de-3ca2048fddae",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+plugins/yellow-review/lib/resolve-text.sh
+  s_c22a55971bf452::t_1a869c2cb40cfc 56-61
+  s_c22a55971bf452::t_e4c6926f2f7326 2-3
+plugins/yellow-review/tests/check-resolve-text.bats
+  s_c22a55971bf452::t_82bc18ec737a1b 88-89,95-96,99
+  s_c22a55971bf452::t_de4e7857575af4 77-87,90-94,97-98,100-102
+plugins/yellow-review/references/resolve/dispositions.md
+  s_c22a55971bf452::t_8e42a8385659c0 366
+  s_c22a55971bf452::t_6b67cef33b945a 193-198
+  s_c22a55971bf452::t_924b90b6040fca 218-220
+  s_c22a55971bf452::t_3d7b643192b65a 14-24
+  s_c22a55971bf452::t_d2f72c1b9ed608 251-254
+  s_c22a55971bf452::t_58f0d041de58be 364
+  s_c22a55971bf452::t_e8e380b0a89e2b 367
+.changeset/review-resolve-hardening.md
+  s_c22a55971bf452::t_199f6258fe35e8 5-11,14-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3998f6b6f87255f6c2536cc3d248351d5e108cf6",
+  "prompts": {},
+  "sessions": {
+    "s_c22a55971bf452": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "346b7ee8-87ce-41ac-9e4c-bd1225aec27a",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": null
+    }
+  }
+}
