@@ -1,0 +1,127 @@
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_1ba83f4e504194::t_f3c4e3dd1d4731 364
+  s_1ba83f4e504194::t_a7edec885899c1 399-400,426-427,429-433,614,738
+  s_1ba83f4e504194::t_9398f6417cc6f8 434,580,582-594,608,610-612,617-618,620-628,650,736-737,739
+  s_50d166a981ace4::t_0e2f8cfa701dde 613,615-616
+  s_50d166a981ace4::t_f49c81f522f735 595-607,609,619
+plugins/yellow-review/tests/resolve-paths.bats
+  s_1ba83f4e504194::t_bee6e563ca61d8 635-636
+  s_1ba83f4e504194::t_ec268c983086cc 406,412-425
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  s_1ba83f4e504194::t_9f8f520bafbf2c 607-616,620
+  s_1ba83f4e504194::t_6ead2e7f079e38 371-375,377-385
+  s_1ba83f4e504194::t_1ae923579c179f 581-582,588-596,600,665
+  s_1ba83f4e504194::t_3bae46d46c7547 786,790-794
+  s_1ba83f4e504194::t_a640bd55f908c2 577-578
+  s_1ba83f4e504194::t_2cadf2b837942a 799
+  s_1ba83f4e504194::t_783e5de950bb39 84-86
+  s_1ba83f4e504194::t_6982f6fcbdc063 112-114
+  s_1ba83f4e504194::t_4ea8f65b354029 618-619,622,624
+  s_1ba83f4e504194::t_172f2e71b5fcb0 347-348,555-558,657-664,667-668,715-719,722-729,772-773,777
+  s_50d166a981ace4::t_34def1f4303340 297
+  s_50d166a981ace4::t_15fc62aec5980e 651,732
+  s_50d166a981ace4::t_1578691d91d2f8 434-448,492,504
+  s_50d166a981ace4::t_03a01b9ae45066 449-450,455,472,477,490-491,493-497,505-515,559-560,566-570,572
+  s_771064b1487eb8::t_3d199e3485354c 90-92,250-265,289-291
+plugins/yellow-review/lib/verify-run.sh
+  s_1ba83f4e504194::t_1456e4e43432de 91-102
+  s_50d166a981ace4::t_ce298915d37069 5,79,89
+  s_50d166a981ace4::t_62262b997c0441 202,213,218-219,237,240,243,254-256,260
+plugins/yellow-review/lib/resolve-paths.sh
+  s_1ba83f4e504194::t_2e971b179cdbfd 470
+  s_1ba83f4e504194::t_c9dfbacb211e6a 450,453-454
+  s_1ba83f4e504194::t_8257d5e46f2d36 347-354
+  s_1ba83f4e504194::t_80548cf65e39d3 504-520,523
+  s_50d166a981ace4::t_7903fb467130da 9-12
+  s_50d166a981ace4::t_e5cdba0baa7dd7 16-21,28,294-295,380
+plugins/yellow-review/tests/run-verify-command.bats
+  s_1ba83f4e504194::t_02fbf1340fa453 913-927,1155,1159,1161,1166,1170,1174,1626,1633,1644,1652,1659
+  s_1ba83f4e504194::t_a63c1682d52593 1152-1154,1156-1158,1160,1162-1165,1167-1169,1171-1173,1175-1176,1623-1625,1627-1632,1634-1643,1645-1651,1653-1658,1660-1684
+  s_50d166a981ace4::t_16718175d47d3c 620
+  s_50d166a981ace4::t_46ea7565382568 1685-1710
+plugins/yellow-review/references/resolve/dispositions.md
+  s_1ba83f4e504194::t_a1f5bbf63f2513 651
+  s_50d166a981ace4::t_995e5d6a913d72 16-20,221-226,229-230,267-287,290-296,305-309,316-319,324-325,357-364,366-371,374-378,380,384-389,395-406,411-433,459-465,467-468,551-556,558-563,575-582,620,626-628,637-650,652,656-659,665-668
+  s_50d166a981ace4::t_6366f11c46c611 621-625
+  s_771064b1487eb8::t_bb75e4e536db36 598-601
+plugins/yellow-review/tests/commit-resolve-fixes.bats
+  s_1ba83f4e504194::t_31de8efa829673 556
+  s_1ba83f4e504194::t_b017809ac7da1a 534-535
+  s_1ba83f4e504194::t_a469e53685ba2c 695-697
+  s_1ba83f4e504194::t_86ded13f8ac304 732
+  s_1ba83f4e504194::t_15571965039ebd 27,1407-1431
+  s_1ba83f4e504194::t_abc4d2a3423deb 568
+  s_1ba83f4e504194::t_403884e0f15644 37,1211-1235,1239,1242,1245-1248
+  s_1ba83f4e504194::t_84ae1f621d5be0 880,883-884,1153-1164
+  s_1ba83f4e504194::t_2766953a300237 503
+  s_1ba83f4e504194::t_8a7af0bf350a19 580
+  s_1ba83f4e504194::t_03459c8a08ec0d 517-518
+  s_1ba83f4e504194::t_db90c5d7e7ba12 866
+  s_1ba83f4e504194::t_63fbd48357f46b 923
+  s_1ba83f4e504194::t_6fbbcdf9cd6e4c 546
+  s_1ba83f4e504194::t_107da69cf74b49 44,886,899,910,916,918,969,971,975,1657,1665-1716
+  s_d906b15dcf2596::t_56ed9a83a652e7 18-26,28-36,38-43,45,52,427,876-879,881-882,885,887-898,900-909,911-915,917,919,961-968,970,972-974,976,1717
+  s_50d166a981ace4::t_8ef8d4f2a107bf 733-734,1727-1742,1755-1814
+  s_771064b1487eb8::t_930f7f542936ab 1743-1754
+.changeset/review-resolve-hardening.md
+  s_50d166a981ace4::t_100514765430cd 44-46
+plugins/yellow-review/CLAUDE.md
+  s_50d166a981ace4::t_27f3d0c8c6472d 242-246
+  s_50d166a981ace4::t_424e14b05165cc 188-189,203-206,216-235
+plugins/yellow-review/lib/review-ledger.sh
+  s_50d166a981ace4::t_63bc0d9ecb0dfd 37-38,283-287,293
+plugins/yellow-review/lib/sibling-plugin.sh
+  s_50d166a981ace4::t_2037c945069445 1-26
+plugins/yellow-review/tests/review-ledger.bats
+  s_50d166a981ace4::t_4aa2dd393dfc29 366-378
+plugins/yellow-review/tests/sibling-plugin.bats
+  s_50d166a981ace4::t_01c1fa363e5556 1-47
+plugins/yellow-review/README.md
+  s_50d166a981ace4::t_539c7d599dd916 90
+plugins/yellow-review/lib/resolve-text.sh
+  s_50d166a981ace4::t_fd9a93776c6c38 525-526,538-549,551-556,559-576,582-587,594-614,619
+  s_50d166a981ace4::t_7cf8d0150cfdd1 577-581,588-590
+  s_771064b1487eb8::t_16b03f6c92003f 242,591-593
+plugins/yellow-review/tests/check-resolve-text.bats
+  s_50d166a981ace4::t_6eb27cdf11ac62 355,359,371,500,505,517,547,553,559-564,572-573,577,582-583,585-596,600-605
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "afefc7345056af07a9f0c7c45b9cd4352e0c4d9c",
+  "prompts": {},
+  "sessions": {
+    "s_1ba83f4e504194": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45b80bad-9769-493c-9893-eed703ac97cd",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_50d166a981ace4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fd9a89b9-6534-475e-9256-5db738960fe1",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_771064b1487eb8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "344118bf-2aa9-4d5a-a9e5-a6b94995fa25",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_d906b15dcf2596": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0170b453-4513-4753-b904-fd0ab9d9878d",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

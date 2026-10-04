@@ -1,0 +1,53 @@
+plugins/yellow-review/references/resolve/dispositions.md
+  s_1ba83f4e504194::t_629c03bc12233d 57-60
+  s_1ba83f4e504194::t_d61b9cee8ee5c2 107-115
+  s_1ba83f4e504194::t_858a5f38fcfb42 538-540,545-547
+  s_1ba83f4e504194::t_20569a31aa601d 410-414,430-433,799-806,829
+plugins/yellow-review/lib/resolve-paths.sh
+  s_1ba83f4e504194::t_49ab7114d2bfc5 314,317-319,321
+plugins/yellow-review/tests/poll-new-threads.bats
+  s_1ba83f4e504194::t_192c8790d19873 346-348
+  s_1ba83f4e504194::t_227e763d9a3e63 117-130
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_1ba83f4e504194::t_41d450979a7f30 493,496-499
+  s_1ba83f4e504194::t_affb6ad4109993 328-329
+  s_1ba83f4e504194::t_232543434741db 368-373
+  s_1ba83f4e504194::t_d5d27647549c3e 380-385
+  s_1ba83f4e504194::t_19beb445088a54 500
+plugins/yellow-review/tests/skill-content.bats
+  s_1ba83f4e504194::t_e3883632c636d4 495-501
+  s_1ba83f4e504194::t_709af8d47b9dd8 537-539
+  s_1ba83f4e504194::t_62872cad4600dc 434,481
+plugins/yellow-review/tests/resolve-paths.bats
+  s_1ba83f4e504194::t_7befcbccc9e713 492-511
+plugins/yellow-review/skills/pr-review-workflow/scripts/poll-new-threads
+  s_1ba83f4e504194::t_1070a6d0127f95 66-67
+docs/security.md
+  s_1ba83f4e504194::t_0bb471e6364840 368-372
+plugins/yellow-review/agents/workflow/pr-comment-resolver.md
+  s_1ba83f4e504194::t_4260d55622087f 87,90
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  s_1ba83f4e504194::t_dbbcbaef2dd188 6-7,15-22,138-139,181,190-191,204-209,216-224,674-709
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_1ba83f4e504194::t_31ef862bf21154 40-42,309-312
+plugins/yellow-review/tests/commit-resolve-fixes.bats
+  s_1ba83f4e504194::t_a9adbe4ec16e14 385-458
+plugins/yellow-review/tests/run-verify-command.bats
+  s_1ba83f4e504194::t_dba9ea7599130c 1313-1322
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "214edf22501cb8cc485ef92ae70b0f8d9f44eb23",
+  "prompts": {},
+  "sessions": {
+    "s_1ba83f4e504194": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "45b80bad-9769-493c-9893-eed703ac97cd",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
