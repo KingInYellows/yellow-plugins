@@ -82,7 +82,7 @@ Confirm the PR is open:
 OUT=$(gh pr view <PR#> --json state -q .state 2>&1) && RC=0 || RC=$?
 if [ "$RC" -eq 0 ]; then
   printf 'state=%s exit=0 ratelimited=0\n' "$OUT"
-elif printf '%s' "$OUT" | grep -qiE 'rate limit|HTTP 429'; then
+elif printf '%s' "$OUT" | grep -qiE 'rate limit|abuse|HTTP 429'; then
   printf 'state=unreadable exit=%s ratelimited=1\n' "$RC"
 else
   printf 'state=unreadable exit=%s ratelimited=0\n' "$RC"

@@ -265,7 +265,14 @@ stop or item 3b's dirty-tree or config stop ends the walk.
    Finish **this** PR first — items 3, 3b and 5, skipping only its restack —
    then mark every remaining PR `not attempted (no contract)` and go to
    `### Step 4: Final aggregate summary` (exit `1`): an unknown outcome is not
-   safe to walk past.
+   safe to walk past. A valid contract line with `verify=skipped` is a refusal
+   (the ignored-file stop is one: a resolver edited a gitignored file that
+   nothing could restore, and no project command may run while it is on disk):
+   record the PR as `verify skipped`, count it blocking and list it under Needs
+   manual attention. Finish **this** PR first — items 3, 3b and 5, skipping
+   only its restack — then mark every remaining PR
+   `not attempted (verify skipped)` and go to
+   `### Step 4: Final aggregate summary` (exit `1`).
 
 3. **Self-verify** — parse the `Resolve:` line from step 2's output for
    `b` (blocking), `i` (issues filed) and `push`. The `Skill` tool returns no

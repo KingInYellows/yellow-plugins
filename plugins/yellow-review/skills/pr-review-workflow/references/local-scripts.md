@@ -34,6 +34,7 @@ callers that walk several PRs. Exit codes and markers are defined in
   or 3; on exit 4 they keep the snapshot and print its path, since it may
   hold the only intact copy of the config.
   `/review:resolve-stack` runs it around the walk
-- **check-resolve-text** `<file>...` — Exits 2 when text looks like a
-  credential or cannot be read; run it on text posted outside the resolve
-  scripts (for example a Linear issue)
+- **check-resolve-text** `<file>...` — Exits 6 when text looks like a
+  credential, an image, an `@` mention or a foreign URL (or the scan did not
+  run), and 2 for a usage error or an unreadable file; run it on text posted
+  outside the resolve scripts (for example a Linear issue)

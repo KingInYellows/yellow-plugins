@@ -875,9 +875,10 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   reverts the tracked edits, then runs no verify, commit, push or other project
   command, makes every `fixed` thread `unclear`, names each path as
   `restore by hand (not tracked, no HEAD copy)`, and ends with
-  `push=skipped, verify=skipped`. The `Resolve:` line has no stop field, so
-  `/review:resolve-stack` and the sweeps do not detect the stop and carry on;
-  restore the named files before running them again.
+  `push=skipped, verify=skipped`. The `Resolve:` line has no stop field of its
+  own; `/review:resolve-stack` reads `verify=skipped` as the stop and ends the
+  walk after that PR, but the sweeps do not detect it and carry on: restore the
+  named files before running them again.
 - Issue dedupe follows every page of the viewer's issues, but the whole scan is
   one `gh` call under one `YELLOW_REVIEW_GH_TIMEOUT`. A viewer with a very large
   issue history can time it out (exit 4); raise the variable for that

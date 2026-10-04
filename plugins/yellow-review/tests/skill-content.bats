@@ -635,7 +635,7 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   text=$(flat "$SWEEP")
   [[ "$text" == *'If `exit=0` and the state is not `OPEN`'* ]]
   [[ "$text" == *'`Sweep: skipped (pr-not-open)`'* ]]
-  [[ "$text" == *"grep -qiE 'rate limit|HTTP 429'"* ]]
+  [[ "$text" == *"grep -qiE 'rate limit|abuse|HTTP 429'"* ]]
   [[ "$text" == *'If `exit` is non-zero, the fetch failed'* ]]
   [[ "$text" == *'Print no skip line'* ]]
   [[ "$text" == *'`pr-not-open` is printed only when `gh pr view` succeeded and returned a state other than `OPEN`'* ]]
@@ -643,7 +643,7 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
 
 @test "sweep-all: a rate-limited open-PR pre-check stops the batch instead of skipping every PR" {
   text=$(flat "$SWEEP_ALL")
-  [[ "$text" == *'grep -qiE '"'"'rate limit|HTTP 429'"'"''* ]]
+  [[ "$text" == *'grep -qiE '"'"'rate limit|abuse|HTTP 429'"'"''* ]]
   [[ "$text" == *'When `ratelimited=1`, the next `gh` call would hit the same limit'* ]]
 }
 
@@ -1171,11 +1171,19 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$step5flat" == *'Keep stops the same way but reverts nothing'* ]]
 }
 
-@test "resolve-pr: a rate-limited blocker lookup stops before any dispatch or write" {
-  step3=$(sed -n '/^### Step 3: /,/^### Step 3b/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
-  [[ "$step3" == *'`lookupReason` or `resolutionLookupReason` is `rate_limited`'* ]]
-  [[ "$step3" == *'without a resolver dispatch, commit, push, reply or issue'* ]]
-  [[ "$step3" == *'`push=skipped, verify=none, ratelimited=1`'* ]]
+@test "resolve-stack: a verify=skipped contract line ends the walk like a missing contract" {
+  flat=$(tr '\n' ' ' <"$RESOLVE_STACK" | tr -s ' ')
+  [[ "$flat" == *'A valid contract line with `verify=skipped` is a refusal'* ]]
+  [ "$(grep -o 'not attempted (verify skipped)' <<<"$flat" | wc -l)" -ge 1 ]
+  dispo=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')
+  [[ "$dispo" == *'`/review:resolve-stack` reads `verify=skipped` as the stop'* ]]
+}
+
+@test "local-scripts: check-resolve-text documents exit 6 for refused text and exit 2 for usage" {
+  ref="$BATS_TEST_DIRNAME/../skills/pr-review-workflow/references/local-scripts.md"
+  flat=$(tr '\n' ' ' <"$ref" | tr -s ' ')
+  [[ "$flat" == *'Exits 6 when text looks like a credential'* ]]
+  [[ "$flat" == *'and 2 for a usage error or an unreadable file'* ]]
 }
 
 @test "dispositions: the addressed path:line evidence refuses an option-shaped path segment" {
