@@ -1,0 +1,38 @@
+plugins/yellow-council/commands/council/setup.md
+  s_092275c4e6a6a0::t_5b547e30df49bf 113-136,198-211,238
+plans/yellow-council-v2-four-cli-04-quota-and-opencode-routing.md
+  s_092275c4e6a6a0::t_613fb51090937e 270
+  s_092275c4e6a6a0::t_48d9cd36c706d3 282
+  s_092275c4e6a6a0::t_4164445c89fb55 258
+  s_092275c4e6a6a0::t_35199c0075ff2a 265
+  s_092275c4e6a6a0::t_c8a7b606ec749d 296
+  s_092275c4e6a6a0::t_fdb14f9b75e6dc 214
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_092275c4e6a6a0::t_1c7d4e21f27388 19,66
+  s_092275c4e6a6a0::t_4164445c89fb55 909-910,913-916
+  s_092275c4e6a6a0::t_ad4b87331d639a 323-332,334-343
+  s_092275c4e6a6a0::t_2b4b528c3a364b 169-191,193
+  s_092275c4e6a6a0::t_35199c0075ff2a 333
+docs/spikes/opencode-cli-format-json-2026-05-04.md
+  s_092275c4e6a6a0::t_fdb14f9b75e6dc 120-184
+plugins/yellow-council/commands/council/council.md
+  s_092275c4e6a6a0::t_613fb51090937e 83-196,199-200
+  s_092275c4e6a6a0::t_c8a7b606ec749d 2414-2419,2429
+  s_092275c4e6a6a0::t_f87795174b8616 201,2430
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "446dc8a982f1423600de44a9d6e65df35977a9de",
+  "prompts": {},
+  "sessions": {
+    "s_092275c4e6a6a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "53398599-95a5-4127-ba6b-f2642ceba186",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
