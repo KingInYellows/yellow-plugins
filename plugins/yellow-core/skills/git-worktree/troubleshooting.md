@@ -106,9 +106,15 @@ bash "${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-restack.sh" sta
 git -C <worktree-path> checkout <branch>
 ```
 
+A worktree locked by a paused restack shows `locked` in `git worktree list`
+and is refused by the next `/worktree:restack` and skipped by
+`/worktree:cleanup`. After restoring it, run `git worktree unlock <worktree-path>`;
+`status` lists every worktree still locked with the restack's pause reason.
+
 If the checkout is refused because of local edits, commit or move them first;
 the script never forces it. If someone committed in the detached worktree, the
 commit is on no branch: keep it with `git -C <worktree-path> branch <new-name>
 HEAD` before restoring. When the state file is rejected (exit 4), restore each
 worktree with the `checkout` lines the script printed to stderr at start, then
-delete `<git-common-dir>/yellow-core/worktree-restack/state`.
+delete `<git-common-dir>/yellow-core/worktree-restack/state`; `status` still
+lists the stranded and pause-locked worktrees when the state file is rejected.

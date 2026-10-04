@@ -289,7 +289,7 @@ than sourced:
   (and `/flow:work`'s lower-level stack primitives) to exactly one Graphite and
   one GitHub implementation, or `null` (unsupported — callers stop, never try
   the other provider). Only its integration test loads it: `/flow:work` and
-  `skills/git-worktree/scripts/worktree-restack.sh` mirror the entries in prose, so change all together, and `/stack:status` /
+  `skills/git-worktree/scripts/worktree-restack.sh` derive from the entries in prose (the script adds scoping flags; its Graphite comment lists them), so change all together, and `/stack:status` /
   `/stack:select` do not read it. Dependency-free; verified by
   `tests/integration/stack-operation-registry.test.ts`
 - `stack-tooling-probe.js` — the shared owner of provider CLI readiness

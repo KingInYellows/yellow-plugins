@@ -363,7 +363,7 @@ assert_stacked() {
 # forge PATH REF SHA [COMMON]: a self-consistent-looking state file.
 forge() {
   mkdir -p "$SD"
-  printf 'v1\nprovider\tgraphite\ntool\t-\ncommon\t%s\nrun\t%s\nsubmit\t0\ntoken\t0123456789abcdef\nchain\tmain\ta\tb\tc\nentry\t%s\t%s\t%s\tdetached\t0\n' \
+  printf 'v1\nprovider\tgraphite\ncommon\t%s\nrun\t%s\nsubmit\t0\nchain\tmain\ta\tb\tc\nentry\t%s\t%s\t%s\n' \
     "${4:-$COMMON}" "$(cd "$(wtp a)" && pwd -P)" "$1" "$2" "$3" >"$SD/state"
 }
 
@@ -413,7 +413,7 @@ forge() {
   sha=$(git -C "$(wtp b)" rev-parse HEAD)
   wtb=$(cd "$(wtp b)" && pwd -P)
   forge "$wtb" refs/heads/b "$sha"
-  printf 'entry\t%s\trefs/heads/b\t%s\tdetached\t0\n' "$wtb" "$sha" >>"$SD/state"
+  printf 'entry\t%s\trefs/heads/b\t%s\n' "$wtb" "$sha" >>"$SD/state"
   run bash "$SCRIPT" restore
   [ "$status" -eq 4 ]
   [[ $output == *"duplicate entry path"* ]]
@@ -643,6 +643,218 @@ JSEOF
   CLAUDE_PLUGIN_ROOT="$T/cache/yellow-core/2.6.2" STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github
   [ "$status" -eq 20 ]
   [[ $output == *"adapter not found"* ]]
+}
+
+# --- failure, signals, mid-stack and resume edge cases -------------------------
+
+@test "a provider restack failure restores every worktree and exits 30" {
+  mk_stack
+  STUB_FAIL=restack run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 30 ]
+  [[ $output == *"restack failed; restoring worktrees"* ]]
+  assert_all_restored
+}
+
+@test "a SIGTERM during the restack restores every worktree" {
+  mk_stack
+  STUB_GT_SLEEP=3 bash "$SCRIPT" start --provider graphite >"$T/out" 2>&1 &
+  pid=$!
+  for _ in $(seq 100); do [ -z "$(branch_of "$(wtp b)")" ] && break; sleep 0.1; done
+  [ -z "$(branch_of "$(wtp b)")" ]
+  kill -TERM "$pid"
+  rc=0
+  wait "$pid" || rc=$?
+  [ "$rc" -eq 143 ]
+  assert_all_restored
+}
+
+@test "a SIGTERM while a conflict is paused keeps the state, the locks and a paused lock" {
+  mk_stack b
+  gd=$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)
+  STUB_HANG_ON_CONFLICT=3 bash "$SCRIPT" start --provider graphite >"$T/out" 2>&1 &
+  pid=$!
+  for _ in $(seq 100); do [ -e "$gd/.gtcontinue" ] && break; sleep 0.1; done
+  [ -e "$gd/.gtcontinue" ]
+  kill -TERM "$pid"
+  rc=0
+  wait "$pid" || rc=$?
+  [ "$rc" -eq 143 ]
+  [ -e "$SD/state" ]
+  [ "$(cat "$SD/lock.d/pid")" = paused ]
+  run git worktree list --porcelain
+  [[ $output == *"locked worktree:restack paused"* ]]
+  resolve_in "$(wtp a)" b.txt
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "running from a mid-stack branch leaves the downstack worktree alone" {
+  mk_stack
+  cd "$(wtp b)"
+  run bash "$SCRIPT" preflight --provider graphite
+  [ "$status" -eq 0 ]
+  [[ $output == *$'WORKTREE\t'*"wt-c"*$'\tc\tdetach'* ]]
+  [[ $output != *"wt-a"* ]]
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 0 ]
+  run grep -F "wt-a checkout" "$STUB_DIR/git.log"
+  [ "$status" -eq 1 ]
+  assert_all_restored
+}
+
+@test "github: running from a mid-stack branch checks ancestry against its parent, not trunk" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  cd "$(wtp b)"
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github
+  [ "$status" -eq 0 ]
+  [[ $output == *$'CHAIN\ta\tb\tc'* ]]
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 0 ]
+  [[ $output == *"restack complete"* ]]
+}
+
+@test "github: --submit goes through the adapter after a clean rebase" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github --submit
+  [ "$status" -eq 0 ]
+  grep -q 'stack submit' "$STUB_DIR/gh.log"
+}
+
+@test "github: a failed step with gh-stack's own rebase record present is a pause, not a failure" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  STUB_GH_VERSION=v0.2.1 STUB_FAIL=rebase-marker run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  [[ $output == *"no conflict details were reported"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "github: --continue with no paused provider rebase verifies and finishes" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  STUB_GH_VERSION=v0.2.1 STUB_FAIL=rebase-marker run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  rm -f "$COMMON/gh-stack-rebase-state"
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" continue --provider github
+  [[ $output == *"no provider rebase is paused"* ]]
+}
+
+@test "github: the version gate accepts 0.2.0, 0.10.0 and 1.0.0" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  local v
+  for v in v0.2.0 v0.10.0 v1.0.0; do
+    STUB_GH_VERSION=$v run bash "$SCRIPT" preflight --provider github
+    [ "$status" -eq 0 ]
+  done
+}
+
+@test "continue, abort and restore refuse a lock held by a live process (exit 3)" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  echo "$$" >|"$SD/lock.d/pid"
+  local sub
+  for sub in continue abort restore; do
+    run bash "$SCRIPT" $sub --provider graphite
+    [ "$status" -eq 3 ]
+    [[ $output == *"remove that directory"* ]]
+  done
+  [ -e "$SD/state" ]
+  [ -z "$(branch_of "$(wtp b)")" ]
+}
+
+@test "a stale lock guard blocks takeover and the hint names it" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  mkdir "$SD/lock.guard"
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 3 ]
+  [[ $output == *"lock.guard"* ]]
+  rmdir "$SD/lock.guard"
+}
+
+@test "a failed provider abort keeps the state and exits 31" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  STUB_FAIL=abort run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"state kept"* ]]
+  [ -e "$SD/state" ]
+  [ "$(cat "$SD/lock.d/pid")" = paused ]
+}
+
+@test "--continue after the user finished the provider's continue by hand verifies and restores" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  resolve_in "$(wtp a)" b.txt
+  (cd "$(wtp a)" && gt continue --no-interactive)
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 0 ]
+  [[ $output == *"no conflict is paused"* ]]
+  assert_all_restored
+  assert_stacked
+}
+
+@test "--abort refuses to report aborted while a rebase is still in progress" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"still in progress"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "a rejected state file (exit 4) still lists pause-locked worktrees" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  printf 'v2\n' >|"$SD/state"
+  run bash "$SCRIPT" status
+  [ "$status" -eq 4 ]
+  [[ $output == *"left locked by a paused restack"* ]]
+  [[ $output == *"git worktree unlock"* ]]
+}
+
+@test "status without a state file reports worktrees left locked by a paused restack" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  rm -f "$SD/state"
+  run bash "$SCRIPT" status
+  [ "$status" -eq 0 ]
+  [[ $output == *"left locked by a paused restack"* ]]
+}
+
+@test "restore never unlocks a worktree whose lock carries a different reason" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  git worktree unlock "$(wtp c)"
+  git worktree lock --reason "someone else" "$(wtp c)"
+  run bash "$SCRIPT" restore
+  run git worktree list --porcelain
+  [[ $output == *"locked someone else"* ]]
+}
+
+@test "a partial restore combined with --submit never submits" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite --submit
+  [ "$status" -eq 10 ]
+  git -C "$(wtp c)" commit -q --allow-empty -m floating-work
+  resolve_in "$(wtp a)" b.txt
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 40 ]
+  run grep '^submit' "$STUB_DIR/gt.log"
+  [ "$status" -eq 1 ]
 }
 
 # --- usage and invariants ----------------------------------------------------

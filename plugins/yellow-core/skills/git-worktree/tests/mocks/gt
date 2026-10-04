@@ -29,11 +29,18 @@ case "${1:-}" in
     exit 0
     ;;
   restack)
+    [ -z "${STUB_GT_SLEEP:-}" ] || sleep "$STUB_GT_SLEEP"
+    if [ "${STUB_FAIL:-}" = restack ]; then echo "ERROR: restack failed (stub)" >&2; exit 1; fi
     cur=$(g branch --show-current)
     eng_begin "$cur"
     eng_run cwd
     rc=$?
-    if [ "$rc" -eq 3 ]; then : >"$(gitdir)/.gtcontinue"; echo "Hit conflict restacking $(cat "$STUB_DIR/conflict-branch")." >&2; exit 1; fi
+    if [ "$rc" -eq 3 ]; then
+      : >|"$(gitdir)/.gtcontinue"
+      echo "Hit conflict restacking $(cat "$STUB_DIR/conflict-branch")." >&2
+      [ -z "${STUB_HANG_ON_CONFLICT:-}" ] || sleep "$STUB_HANG_ON_CONFLICT"
+      exit 1
+    fi
     exit "$rc"
     ;;
   continue)
@@ -44,6 +51,7 @@ case "${1:-}" in
     ;;
   abort)
     case " $* " in *" --force "*) ;; *) echo "Cannot perform interactive operation" >&2; exit 1 ;; esac
+    if [ "${STUB_FAIL:-}" = abort ]; then echo "ERROR: abort failed (stub)" >&2; exit 1; fi
     eng_abort cwd
     echo "Successfully aborted gt restack."
     exit 0

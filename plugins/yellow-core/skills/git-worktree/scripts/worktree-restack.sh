@@ -11,7 +11,9 @@
 # Usage:
 #   bash worktree-restack.sh preflight --provider graphite|github
 #   bash worktree-restack.sh start     --provider graphite|github [--submit]
-#   bash worktree-restack.sh continue | abort | restore | status
+#   bash worktree-restack.sh continue | abort [--provider graphite|github]
+#   bash worktree-restack.sh restore | status
+#   (--provider on continue/abort only guards against a provider mismatch: exit 5)
 #
 # Run it from inside the stack worktree that holds the branch to restack from
 # (the restack set is that branch plus everything stacked on it). It is never
@@ -20,12 +22,14 @@
 # Exit codes (one per outcome):
 #    0 done (also: nothing to continue/abort)
 #    2 usage
-#    3 a restack is already in progress (lock or state exists)
+#    3 a restack is already in progress (state file exists, or a live process holds the lock)
 #    4 state file invalid (nothing was run)
 #    5 the active provider differs from the recorded one
-#   10 paused on a conflict; worktrees stay detached, state kept
+#   10 paused on a conflict; state kept (Graphite: the stack worktrees stay detached and locked)
 #   20 preflight refused (REFUSE lines say why); nothing was touched
-#   30 restack failed; worktrees restored
+#   30 restack failed; worktrees restored (or: nothing had been changed yet)
+#   31 a provider step failed and the state is KEPT: worktrees may still be detached;
+#      run status, then --continue, --abort or restore
 #   40 partial restore: some worktree is still detached (per-entry lines say why)
 #   50 restack incomplete (ancestry check failed); worktrees restored, no submit
 #   60 restack finished and restored, but submit failed
@@ -37,10 +41,10 @@
 
 set -uo pipefail
 
-SCRIPT_DIR=$(CDPATH="" cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)
+SCRIPT_DIR=$(CDPATH="" cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)
 
 readonly X_OK=0 X_USAGE=2 X_BUSY=3 X_STATE=4 X_PROVIDER=5 X_PAUSED=10
-readonly X_REFUSED=20 X_FAILED=30 X_PARTIAL=40 X_INCOMPLETE=50 X_SUBMIT=60
+readonly X_REFUSED=20 X_FAILED=30 X_KEPT=31 X_PARTIAL=40 X_INCOMPLETE=50 X_SUBMIT=60
 readonly PAUSE_REASON='worktree:restack paused - do not commit; run /worktree:restack --continue or --abort'
 readonly MAX_LISTED=20
 
@@ -131,11 +135,12 @@ common_dir() {
   canon "$d"
 }
 
-# load_worktrees fills WT_* from `git worktree list --porcelain -z`. Paths may
-# hold spaces; newlines survive -z and are refused later.
+# load_worktrees fills WT_* from `git worktree list --porcelain -z` and returns
+# non-zero when the listing itself failed (callers must not read that as "no
+# worktrees"). Paths may hold spaces; newlines survive -z and are refused later.
 load_worktrees() {
   WT_PATH=() WT_HEAD=() WT_BRANCH=() WT_LOCKED=() WT_PRUNABLE=() WT_BARE=() WT_LOCKREASON=()
-  local rec i=-1
+  local rec i=-1 failed=0
   while IFS= read -r -d '' rec; do
     case $rec in
       'worktree '*)
@@ -161,9 +166,10 @@ load_worktrees() {
         ;;
       prunable*) [ "$i" -ge 0 ] && WT_PRUNABLE[i]=1 ;;
       bare) [ "$i" -ge 0 ] && WT_BARE[i]=1 ;;
+      worktree-list-failed) failed=1 ;;
     esac
-  done < <(git worktree list --porcelain -z 2>/dev/null)
-  return 0
+  done < <(git worktree list --porcelain -z 2>/dev/null || printf 'worktree-list-failed\0')
+  [ "$failed" -eq 0 ]
 }
 
 # wt_index PATH: index into WT_* or -1.
@@ -230,7 +236,7 @@ wt_dirty() {
     [ -n "$rec" ] || continue
     if [ "$rec" = '?? .ruvector' ] && [ -L "$1/.ruvector" ]; then continue; fi
     return 0
-  done < <(git -C "$1" status --porcelain=v1 -z --untracked-files=normal 2>/dev/null)
+  done < <(git -C "$1" status --porcelain=v1 -z --untracked-files=normal 2>/dev/null || printf 'status-failed\0')
   return 1
 }
 
@@ -256,6 +262,7 @@ init_paths() {
   STATE_DIR="$COMMON/yellow-core/worktree-restack"
   STATE_FILE="$STATE_DIR/state"
   LOCK_DIR="$STATE_DIR/lock.d"
+  LOCK_GUARD="$STATE_DIR/lock.guard"
 }
 
 ensure_state_dir() {
@@ -281,22 +288,31 @@ pid_takeable() {
   [[ $1 =~ ^[0-9]+$ ]] && [ "$1" -gt 0 ] && ! kill -0 "$1" 2>/dev/null
 }
 
-# lock_reclaim: remove a takeable lock. The rename is atomic, so only one
-# process gets the directory; what it got is checked again, and anything that
-# is not provably stale (a lock another process created in between) goes back.
-lock_reclaim() {
-  local moved="$LOCK_DIR.reclaim.$$" p
-  mv -- "$LOCK_DIR" "$moved" 2>/dev/null || return 1
-  p=$(cat -- "$moved/pid" 2>/dev/null)
-  if ! pid_takeable "$p"; then
-    mv -- "$moved" "$LOCK_DIR" 2>/dev/null || true
-    return 1
+# lock_replace: take over a lock whose owner is provably gone. Everything runs
+# inside an exclusive guard directory, so two takers cannot interleave; a taker
+# that cannot get the guard reports busy rather than waiting. The pid is read
+# again inside the guard, so a lock another process created meanwhile is left alone.
+lock_replace() {
+  local rc=1 p
+  (umask 077 && mkdir -- "$LOCK_GUARD") 2>/dev/null || return 1
+  p=$(lock_pid)
+  if pid_takeable "$p"; then
+    rm -rf -- "$LOCK_DIR"
+    lock_create && rc=0
   fi
-  rm -rf -- "$moved"
+  rmdir -- "$LOCK_GUARD" 2>/dev/null
+  return "$rc"
 }
 
-lock_stamp() {
-  printf '%s\n' "$$" >|"$LOCK_DIR/pid" || return 1
+lock_stamp() { printf '%s\n' "$$" >|"$LOCK_DIR/pid"; }
+
+# lock_create: mkdir the lock and stamp it; remove it again if the stamp fails.
+lock_create() {
+  (umask 077 && mkdir -- "$LOCK_DIR") 2>/dev/null || return 1
+  lock_stamp || {
+    rm -rf -- "$LOCK_DIR"
+    return 1
+  }
 }
 
 # lock_mark_paused: a paused run exits but keeps the lock; "paused" replaces its
@@ -311,46 +327,23 @@ release_lock() {
 }
 
 lock_busy_hint() {
-  err "lock $(v "$LOCK_DIR") is held (pid file: '$(v "$(lock_pid)")'); if no restack is running, remove that directory"
+  err "lock $(v "$LOCK_DIR") is held (pid file: '$(v "$(lock_pid)")'); if no restack is running, remove that directory (and $(v "$LOCK_GUARD") if it exists)"
 }
 
 # acquire_lock: new restack. With a state file present every path points to
-# --continue, --abort or --status, so a lock is never reclaimed then.
+# --continue, --abort or --status, so a lock is never replaced then.
 acquire_lock() {
-  local p _
-  for _ in 1 2; do
-    if (umask 077 && mkdir -- "$LOCK_DIR") 2>/dev/null; then
-      lock_stamp || {
-        rm -rf -- "$LOCK_DIR"
-        return 1
-      }
-      return 0
-    fi
-    [ ! -e "$STATE_FILE" ] || return 1
-    p=$(lock_pid)
-    pid_takeable "$p" || return 1
-    lock_reclaim || return 1
-  done
-  return 1
+  lock_create && return 0
+  [ ! -e "$STATE_FILE" ] || return 1
+  lock_replace
 }
 
-# take_lock: continue/abort/restore resume a run whose process is gone. The
-# takeover is the same atomic rename + fresh mkdir, so two takers cannot both win.
+# take_lock: continue/abort/restore resume a run whose process is gone.
 take_lock() {
-  if (umask 077 && mkdir -- "$LOCK_DIR") 2>/dev/null; then
-    lock_stamp || {
-      rm -rf -- "$LOCK_DIR"
-      return 1
-    }
-    return
-  fi
+  lock_create && return 0
   [ -d "$LOCK_DIR" ] || return 1
-  if [ "$(lock_pid)" != "$$" ]; then
-    pid_takeable "$(lock_pid)" || return 1
-    lock_reclaim || return 1
-    (umask 077 && mkdir -- "$LOCK_DIR") 2>/dev/null || return 1
-  fi
-  lock_stamp
+  [ "$(lock_pid)" != "$$" ] || return 0
+  lock_replace
 }
 
 write_state() {
@@ -360,16 +353,14 @@ write_state() {
 
     printf 'v1\n'
     printf 'provider\t%s\n' "$S_PROVIDER"
-    printf 'tool\t%s\n' "${S_TOOLVER:--}"
     printf 'common\t%s\n' "$S_COMMON"
     printf 'run\t%s\n' "$S_RUN"
     printf 'submit\t%s\n' "$S_SUBMIT"
-    printf 'token\t%s\n' "$S_TOKEN"
     printf 'chain'
     for ((i = 0; i < ${#S_CHAIN[@]}; i++)); do printf '\t%s' "${S_CHAIN[i]}"; done
     printf '\n'
     for ((i = 0; i < ${#E_PATH[@]}; i++)); do
-      printf 'entry\t%s\t%s\t%s\t%s\t%s\n' "${E_PATH[i]}" "${E_REF[i]}" "${E_SHA[i]}" "${E_PHASE[i]}" "${E_LOCK[i]}"
+      printf 'entry\t%s\t%s\t%s\n' "${E_PATH[i]}" "${E_REF[i]}" "${E_SHA[i]}"
     done
   ) >|"$tmp" || {
     rm -f -- "$tmp"
@@ -385,8 +376,8 @@ clear_state() { rm -f -- "$STATE_FILE" "$STATE_FILE".tmp.* 2>/dev/null; }
 
 # read_state parses the fixed-field TSV; validate_state decides whether to trust it.
 read_state() {
-  S_PROVIDER="" S_TOOLVER="" S_COMMON="" S_RUN="" S_SUBMIT="" S_TOKEN=""
-  S_CHAIN=() E_PATH=() E_REF=() E_SHA=() E_PHASE=() E_LOCK=()
+  S_PROVIDER="" S_COMMON="" S_RUN="" S_SUBMIT=""
+  S_CHAIN=() E_PATH=() E_REF=() E_SHA=()
   STATE_ERR=""
   if [ ! -f "$STATE_FILE" ] || [ -L "$STATE_FILE" ]; then
     STATE_ERR="state file is missing or not a regular file"
@@ -406,18 +397,14 @@ read_state() {
     IFS=$'\t' read -r -a f <<<"$line"
     case ${f[0]:-} in
       provider) S_PROVIDER=${f[1]:-} ;;
-      tool) S_TOOLVER=${f[1]:-} ;;
       common) S_COMMON=${f[1]:-} ;;
       run) S_RUN=${f[1]:-} ;;
       submit) S_SUBMIT=${f[1]:-} ;;
-      token) S_TOKEN=${f[1]:-} ;;
       chain) S_CHAIN=("${f[@]:1}") ;;
       entry)
         E_PATH[n]=${f[1]:-}
         E_REF[n]=${f[2]:-}
         E_SHA[n]=${f[3]:-}
-        E_PHASE[n]=${f[4]:-}
-        E_LOCK[n]=${f[5]:-}
         n=$((n + 1))
         ;;
       '') ;;
@@ -452,20 +439,11 @@ validate_state() {
     STATE_ERR="state belongs to another repository"
     return 1
   }
-  case $S_TOOLVER in *[[:cntrl:]]*)
-    STATE_ERR="control characters in tool field"
-    return 1
-    ;;
-  esac
   case $S_SUBMIT in 0 | 1) ;; *)
     STATE_ERR="bad submit flag"
     return 1
     ;;
   esac
-  [[ $S_TOKEN =~ ^[0-9a-f]{8,64}$ ]] || {
-    STATE_ERR="bad token"
-    return 1
-  }
   [ "${#S_CHAIN[@]}" -ge 2 ] || {
     STATE_ERR="chain too short"
     return 1
@@ -476,7 +454,10 @@ validate_state() {
       return 1
     }
   done
-  load_worktrees
+  load_worktrees || {
+    STATE_ERR="git worktree list failed"
+    return 1
+  }
   case $S_RUN in /*) ;; *)
     STATE_ERR="run worktree is not an absolute path"
     return 1
@@ -528,25 +509,17 @@ validate_state() {
       STATE_ERR="entry sha is not a commit id"
       return 1
     }
-    case ${E_PHASE[i]} in detached | restored) ;; *)
-      STATE_ERR="bad entry phase"
-      return 1
-      ;;
-    esac
-    case ${E_LOCK[i]} in 0 | 1) ;; *)
-      STATE_ERR="bad entry lock flag"
-      return 1
-      ;;
-    esac
   done
   return 0
 }
 
 # --- provider: Graphite -----------------------------------------------------
-# Mirrors the registry's inspectStack / rebaseUpstack / continueConflict /
-# abortConflict / submitStack entries (plugins/yellow-core/lib/stack-operation-registry.js).
-
-gt_tool_version() { gt --version 2>/dev/null | head -n 1; }
+# Same operations as the registry's inspectStack / rebaseUpstack / continueConflict /
+# abortConflict / submitStack entries (plugins/yellow-core/lib/stack-operation-registry.js),
+# with deliberate flag deviations: `--stack` / `--upstack` scope the run to one
+# stack, `continue` adds `--no-interactive`, and `abort --force` is required
+# because `gt abort --no-interactive` fails. GitHub spells the adapter's flag
+# `--mode upstack|continue|abort`. Keep this in sync with the registry.
 
 # gt_stack_parse: `gt log short --stack --no-interactive` is top-first with
 # trunk last; the current branch carries a filled glyph. Fills G_NAMES, G_CUR
@@ -598,6 +571,7 @@ gh_version_ok() {
 # version in the plugin cache (cache/<plugin>/<version>/).
 resolve_adapter() {
   local root cand best="" best_v="" ver
+  [ -z "${ADAPTER:-}" ] || return 0
   root=${CLAUDE_PLUGIN_ROOT:-}
   [ -n "$root" ] || root=$(cd -- "$SCRIPT_DIR/../../.." 2>/dev/null && pwd -P)
   ADAPTER=""
@@ -625,6 +599,10 @@ adapter_run() {
   local parsed
   AD_JSON=$(cd -- "$RUN_WT" && node "$ADAPTER" "$@" 2>/dev/null)
   AD_STATUS=ERROR AD_RECOVERY="" AD_STDERR=""
+  if [ -z "$AD_JSON" ]; then
+    AD_RECOVERY="the github-workflow adapter produced no output (node or the adapter failed to run)"
+    return 0
+  fi
   # One jq call: status line, recovery line (newlines folded), then stderr.
   parsed=$(printf '%s' "$AD_JSON" | jq -r '(.status // "ERROR"), ((.recoveryAction // "") | gsub("\n"; " ")), (.stderr // "")' 2>/dev/null) || return 0
   {
@@ -645,8 +623,11 @@ refuse() { REFUSALS+=("$1"); }
 build_plan() {
   local provider=$1 ri i b ref wi
   REFUSALS=() SEL_PATH=() SEL_BRANCH=() SEL_ACTION=() S_CHAIN=() SET_BRANCHES=()
-  RUN_WT="" RUN_REF="" S_TOOLVER=""
-  load_worktrees
+  RUN_WT="" RUN_REF=""
+  load_worktrees || {
+    refuse "git worktree list failed"
+    return
+  }
   RUN_WT=$(repo_top) || {
     refuse "not inside a git worktree"
     return
@@ -710,7 +691,6 @@ plan_graphite_stack() {
     refuse "gt (Graphite CLI) is not installed"
     return
   }
-  S_TOOLVER=$(v "$(gt_tool_version)")
   gt_stack_parse || {
     refuse "could not read the Graphite stack (the current branch may not be tracked)"
     return
@@ -763,7 +743,6 @@ plan_github_stack() {
     return
   }
   ver=$(gh_stack_version)
-  S_TOOLVER=$(v "${ver:-}")
   if ! gh_version_ok "$ver"; then
     refuse "gh-stack >= 0.2.0 is required (found: ${ver:-none or unparseable}); run: gh extension upgrade stack"
     return
@@ -801,7 +780,13 @@ plan_github_stack() {
     refuse "the current branch is not in a GitHub stack"
     return
   fi
-  S_CHAIN=("$trunk")
+  # The base is the parent of the current branch (trunk only for the bottom
+  # branch), so the ancestry check tests the real parent link.
+  if [ "$cur" -gt 0 ]; then S_CHAIN=("${names[cur - 1]}"); else S_CHAIN=("$trunk"); fi
+  valid_branch "${S_CHAIN[0]}" || {
+    refuse "unusable branch name from gh stack view"
+    return
+  }
   for ((i = cur; i < n; i++)); do
     valid_branch "${names[i]}" || {
       refuse "unusable branch name from gh stack view"
@@ -852,16 +837,18 @@ unlock_entry() { # unlock a worktree that carries this command's lock reason, ne
 }
 
 # restore_entries: per-entry best effort over E_*. Restored and dropped entries
-# leave the arrays; the rest stay (phase detached). Returns 0 when none remain.
+# leave the arrays; the rest stay detached. Returns 0 when none remain.
 restore_entries() {
   local i n=${#E_PATH[@]} path ref br wi cur holder out
-  local -a kp=() kr=() ks=() kph=() kl=()
-  load_worktrees
+  local -a kp=() kr=() ks=()
+  if ! load_worktrees; then
+    err "git worktree list failed; nothing was restored or dropped"
+    return 1
+  fi
   for ((i = 0; i < n; i++)); do
     path=${E_PATH[i]}
     ref=${E_REF[i]}
     br=${ref#refs/heads/}
-    if [ "${E_PHASE[i]}" = restored ]; then continue; fi
     wi=$(wt_index "$path")
     if [ "$wi" -lt 0 ] || [ "${WT_PRUNABLE[wi]}" -ne 0 ]; then
       note "dropped: $(v "$path") is no longer a worktree"
@@ -879,7 +866,9 @@ restore_entries() {
       continue
     fi
     if [ -n "$cur" ]; then
-      note "kept: $(v "$path") is now on $(v "${cur#refs/heads/}"), not $(v "$br"); left alone"
+      unlock_entry "$i"
+      note "dropped: $(v "$path") is now on $(v "${cur#refs/heads/}"), not $(v "$br"); left alone"
+      continue
     elif report_floating "$i"; then
       :
     elif holder=$(branch_holder "$ref"); then
@@ -895,17 +884,8 @@ restore_entries() {
     kp+=("$path")
     kr+=("$ref")
     ks+=("${E_SHA[i]}")
-    kph+=(detached)
-    kl+=("${E_LOCK[i]}")
   done
-  E_PATH=() E_REF=() E_SHA=() E_PHASE=() E_LOCK=()
-  for ((i = 0; i < ${#kp[@]}; i++)); do
-    E_PATH+=("${kp[i]}")
-    E_REF+=("${kr[i]}")
-    E_SHA+=("${ks[i]}")
-    E_PHASE+=("${kph[i]}")
-    E_LOCK+=("${kl[i]}")
-  done
+  E_PATH=("${kp[@]+"${kp[@]}"}") E_REF=("${kr[@]+"${kr[@]}"}") E_SHA=("${ks[@]+"${ks[@]}"}")
   [ "${#E_PATH[@]}" -eq 0 ]
 }
 
@@ -924,10 +904,13 @@ restore_and_clear() {
 }
 
 lock_detached_entries() {
-  local i
+  local i wi
+  load_worktrees || true
   for ((i = 0; i < ${#E_PATH[@]}; i++)); do
-    [ "${E_PHASE[i]}" = detached ] && [ "${E_LOCK[i]}" = 0 ] || continue
-    if git worktree lock --reason "$PAUSE_REASON" -- "${E_PATH[i]}" >/dev/null 2>&1; then E_LOCK[i]=1; fi
+    wi=$(wt_index "${E_PATH[i]}")
+    if [ "$wi" -ge 0 ] && [ "${WT_LOCKREASON[wi]}" = "$PAUSE_REASON" ]; then continue; fi
+    git worktree lock --reason "$PAUSE_REASON" -- "${E_PATH[i]}" >/dev/null 2>&1 ||
+      err "could not lock $(v "${E_PATH[i]}"); do not prune or remove it"
   done
 }
 
@@ -955,7 +938,6 @@ provider_submit() {
     (cd -- "$S_RUN" && gt submit --stack --no-interactive)
   else
     resolve_adapter || return 1
-    RUN_WT=$S_RUN
     adapter_run submit
     [ "$AD_STATUS" = SUCCESS ] || {
       err "submit failed ($(v "$AD_STATUS")): $(v "$AD_RECOVERY")"
@@ -1004,7 +986,7 @@ do_pause() {
   lock_detached_entries
   write_state || err "could not rewrite the state file"
   lock_mark_paused
-  note "PAUSED: restack stopped on a conflict"
+  note "PAUSED: restack stopped; the provider's rebase is waiting on you"
   if [ "$S_PROVIDER" = graphite ]; then
     gd=$(git -C "$S_RUN" rev-parse --path-format=absolute --git-dir 2>/dev/null)
     head=$(cat -- "$gd/rebase-merge/head-name" 2>/dev/null || true)
@@ -1012,9 +994,16 @@ do_pause() {
     note "conflicted files (worktree $(v "$S_RUN")):"
     git -C "$S_RUN" diff --name-only --diff-filter=U -z 2>/dev/null | tr '\0' '\n' | cap_lines "$MAX_LISTED" | sed 's/^/  /'
   else
-    printf '%s\n' "$AD_STDERR" | grep -m 1 '^Conflict worktree:' | tr -d '\000-\010\013-\037\177' || true
-    note "conflicted files:"
-    printf '%s\n' "$AD_STDERR" | awk '/^Conflicted files:/{f=1;next} f&&/^$/{exit} f{print}' | cap_lines "$MAX_LISTED"
+    local cw files
+    cw=$(printf '%s\n' "$AD_STDERR" | grep -m 1 '^Conflict worktree:' | tr -d '\000-\010\013-\037\177' || true)
+    files=$(printf '%s\n' "$AD_STDERR" | awk '/^Conflicted files:/{f=1;next} f&&/^$/{exit} f{print}' | cap_lines "$MAX_LISTED")
+    if [ -n "$cw$files" ]; then
+      [ -z "$cw" ] || note "$cw"
+      note "conflicted files:"
+      printf '%s\n' "$files"
+    else
+      note "the provider's rebase is still in progress; no conflict details were reported (see the provider output above)"
+    fi
   fi
   if [ "${#E_PATH[@]}" -gt 0 ]; then
     note "detached stack worktrees - do not commit in them until --continue or --abort:"
@@ -1041,7 +1030,7 @@ on_exit() {
       [ "$rc" -ne 0 ] || rc=$X_PAUSED
     else
       err "interrupted; restoring worktrees"
-      if ! restore_and_clear && [ "$rc" -eq 0 ]; then rc=$X_PARTIAL; fi
+      restore_and_clear || rc=$X_PARTIAL
     fi
   fi
   exit "$rc"
@@ -1063,7 +1052,7 @@ step_graphite() { # step_graphite restack|continue|abort
   local rc=0 out
   case $1 in
     restack) out=$(cd -- "$S_RUN" && gt restack --upstack --no-interactive 2>&1) || rc=$? ;;
-    continue) out=$(cd -- "$S_RUN" && gt continue --no-interactive 2>&1) || rc=$? ;;
+    continue) out=$(cd -- "$S_RUN" && GIT_EDITOR=true gt continue --no-interactive 2>&1) || rc=$? ;;
     abort) out=$(cd -- "$S_RUN" && gt abort --force 2>&1) || rc=$? ;;
   esac
   if [ "$rc" -eq 0 ] || [ "$1" = abort ]; then
@@ -1081,16 +1070,17 @@ step_graphite() { # step_graphite restack|continue|abort
 }
 
 step_github() { # step_github upstack|continue|abort
-  resolve_adapter || die "$X_FAILED" "github-workflow adapter not found; install the github-workflow plugin"
-  RUN_WT=$S_RUN
-  adapter_run rebase --mode "$1"
+  resolve_adapter || die "$X_KEPT" "github-workflow adapter not found; install the github-workflow plugin"
+  GIT_EDITOR=true adapter_run rebase --mode "$1"
   case $AD_STATUS in
     SUCCESS) RESULT=ok ;;
     CONFLICT) RESULT=conflict ;;
     *)
       err "gh stack rebase ($1): $(v "$AD_STATUS") $(v "$AD_RECOVERY")"
       printf '%s\n' "$AD_STDERR" | cap_lines 10 >&2
-      if [ "$1" = continue ] && [ -e "$COMMON/gh-stack-rebase-state" ]; then RESULT=conflict; else RESULT=failed; fi
+      # A failed step with gh-stack's own rebase record still present is a
+      # pause, not a failure: clearing our state would orphan that rebase.
+      if [ "$1" != abort ] && [ -e "$COMMON/gh-stack-rebase-state" ]; then RESULT=conflict; else RESULT=failed; fi
       ;;
   esac
 }
@@ -1117,13 +1107,6 @@ parse_flags() { # sets PROVIDER, SUBMIT
 need_provider() { [ -n "$PROVIDER" ] || die "$X_USAGE" "--provider graphite|github is required"; }
 
 in_progress() { [ -e "$STATE_FILE" ] || { [ -d "$LOCK_DIR" ] && lock_pid_alive; }; }
-
-new_token() {
-  local t
-  t=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
-  [[ $t =~ ^[0-9a-f]{16}$ ]] || t=$(printf '%08x%08x' "$(date +%s)" "$$")
-  printf '%s' "$t"
-}
 
 require_env() {
   git_at_least 2 36 || die "$X_USAGE" "git >= 2.36 is required (git worktree list --porcelain -z)"
@@ -1190,8 +1173,7 @@ cmd_start() {
     die "$X_BUSY" "could not take the restack lock; a restack is in progress"
   }
   S_PROVIDER=$PROVIDER S_COMMON=$COMMON S_RUN=$RUN_WT S_SUBMIT=$SUBMIT
-  S_TOKEN=$(new_token)
-  E_PATH=() E_REF=() E_SHA=() E_PHASE=() E_LOCK=()
+  E_PATH=() E_REF=() E_SHA=()
   if [ "$PROVIDER" = graphite ]; then
     local sha
     for ((i = 0; i < ${#SEL_PATH[@]}; i++)); do
@@ -1202,8 +1184,6 @@ cmd_start() {
       E_PATH+=("${SEL_PATH[i]}")
       E_REF+=("refs/heads/${SEL_BRANCH[i]}")
       E_SHA+=("$sha")
-      E_PHASE+=(detached)
-      E_LOCK+=(0)
     done
   fi
   write_state || {
@@ -1230,9 +1210,7 @@ drive_result() {
   case $RESULT in
     ok)
       finish_restack
-      local rc=$?
-      ARMED=0
-      exit "$rc"
+      exit $?
       ;;
     conflict) do_pause ;;
     *) fail_and_restore ;;
@@ -1243,11 +1221,16 @@ drive_result() {
 load_state_or_exit() {
   init_paths
   if [ ! -e "$STATE_FILE" ]; then
-    if [ -d "$LOCK_DIR" ] && pid_takeable "$(lock_pid)"; then lock_reclaim || true; fi
     note "no restack in progress"
     exit "$X_OK"
   fi
-  read_state && validate_state || die "$X_STATE" "state file rejected: ${STATE_ERR:-invalid}; nothing was run. Inspect $(v "$STATE_FILE"), restore the worktrees by hand, then delete it"
+  if ! { read_state && validate_state; }; then
+    err "state file rejected: ${STATE_ERR:-invalid}; nothing was run"
+    note "worktrees that may need restoring (run each fix line, then delete $(v "$STATE_FILE")):"
+    stranded_scan
+    paused_lock_scan
+    exit "$X_STATE"
+  fi
   if [ -n "$PROVIDER" ] && [ "$PROVIDER" != "$S_PROVIDER" ]; then
     die "$X_PROVIDER" "this restack was started with $S_PROVIDER but the active provider is $PROVIDER; switch back to $S_PROVIDER to continue or abort, or run the restore subcommand"
   fi
@@ -1255,11 +1238,10 @@ load_state_or_exit() {
 }
 
 report_all_floating() {
-  local i found=0
+  local i
   for ((i = 0; i < ${#E_PATH[@]}; i++)); do
-    if report_floating "$i"; then found=1; fi
+    report_floating "$i" || true
   done
-  return "$found"
 }
 
 need_lock() {
@@ -1289,11 +1271,10 @@ cmd_continue() {
   parse_flags "$@"
   require_env
   load_state_or_exit
-  ensure_state_dir
   need_lock
-  report_all_floating || true
+  report_all_floating
   if [ "$S_PROVIDER" = graphite ]; then
-    command -v gt >/dev/null 2>&1 || die "$X_FAILED" "gt (Graphite CLI) is not installed"
+    command -v gt >/dev/null 2>&1 || die "$X_KEPT" "gt (Graphite CLI) is not installed; state kept"
     if gt_paused "$S_RUN"; then
       if [ -n "$(git -C "$S_RUN" diff --name-only --diff-filter=U -z 2>/dev/null | head -c 1)" ]; then
         note "unresolved conflicts remain in $(v "$S_RUN"):"
@@ -1306,8 +1287,11 @@ cmd_continue() {
       note "no conflict is paused in $(v "$S_RUN"); verifying and restoring"
       RESULT=ok
     fi
-  else
+  elif [ -e "$COMMON/gh-stack-rebase-state" ]; then
     step_github continue
+  else
+    note "no provider rebase is paused; verifying and restoring"
+    RESULT=ok
   fi
   drive_result
 }
@@ -1316,38 +1300,40 @@ cmd_abort() {
   parse_flags "$@"
   require_env
   load_state_or_exit
-  ensure_state_dir
   need_lock
-  report_all_floating || true
+  report_all_floating
   if [ "$S_PROVIDER" = graphite ]; then
-    command -v gt >/dev/null 2>&1 || die "$X_FAILED" "gt (Graphite CLI) is not installed"
+    command -v gt >/dev/null 2>&1 || die "$X_KEPT" "gt (Graphite CLI) is not installed; state kept"
     if gt_paused "$S_RUN"; then
       note "warning: aborting rolls the whole restack back, including branches that had already restacked cleanly"
       step_graphite abort
-      if [ "$RESULT" != ok ]; then die "$X_FAILED" "the provider's abort failed; state kept, nothing restored"; fi
+      [ "$RESULT" = ok ] || die "$X_KEPT" "the provider's abort failed; state kept, nothing restored"
     fi
-    if restore_and_clear; then
-      note "aborted"
-      exit "$X_OK"
-    fi
-    exit "$X_PARTIAL"
+  elif [ -e "$COMMON/gh-stack-rebase-state" ]; then
+    step_github abort
+    [ "$RESULT" = ok ] || die "$X_KEPT" "the provider's abort failed; state kept"
   fi
-  step_github abort
-  if [ "$RESULT" != ok ]; then die "$X_FAILED" "the provider's abort failed; state kept"; fi
-  restore_and_clear
-  note "aborted"
+  # A rebase the provider no longer knows about but git still has in progress
+  # means the abort did not happen; never report "aborted" over it.
+  if busy=$(wt_busy "$S_RUN"); then
+    die "$X_KEPT" "a $(v "$busy") operation is still in progress in $(v "$S_RUN"); state kept, nothing restored. Finish or abort it, then run --abort again"
+  fi
+  if restore_and_clear; then
+    note "aborted"
+    exit "$X_OK"
+  fi
+  exit "$X_PARTIAL"
 }
 
 cmd_restore() {
   parse_flags "$@"
   require_env
   load_state_or_exit
-  ensure_state_dir
   need_lock
   if [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; then
     note "warning: a conflict is still paused; restoring now strands the provider's own --continue. Prefer /worktree:restack --continue or --abort"
   fi
-  report_all_floating || true
+  report_all_floating
   if restore_and_clear; then
     note "all worktrees restored"
     exit "$X_OK"
@@ -1361,7 +1347,7 @@ cmd_status() {
   load_state_or_exit
   local i wi cur
   note "restack in progress"
-  note "provider: $S_PROVIDER $(v "${S_TOOLVER:--}")"
+  note "provider: $S_PROVIDER"
   note "run worktree: $(v "$S_RUN")"
   note "submit after restack: $([ "$S_SUBMIT" = 1 ] && echo yes || echo no)"
   printf 'stack: %s' "$(v "${S_CHAIN[0]}")"
@@ -1390,8 +1376,14 @@ cmd_status() {
 # of a local branch that no worktree has checked out.
 stranded_scan() {
   local i tip b refs
-  load_worktrees
-  refs=$(git for-each-ref --format='%(objectname) %(refname:short)' refs/heads 2>/dev/null)
+  load_worktrees || {
+    err "git worktree list failed; stranded-worktree scan skipped"
+    return
+  }
+  refs=$(git for-each-ref --format='%(objectname) %(refname:short)' refs/heads 2>/dev/null) || {
+    err "cannot list branches; stranded-worktree scan skipped"
+    return
+  }
   for ((i = 0; i < ${#WT_PATH[@]}; i++)); do
     if [ -n "${WT_BRANCH[i]}" ] || [ "${WT_BARE[i]}" -ne 0 ] || [ -z "${WT_HEAD[i]}" ]; then continue; fi
     while read -r tip b; do
@@ -1403,12 +1395,24 @@ stranded_scan() {
   done
 }
 
+# paused_lock_scan: list worktrees still locked with this command's pause
+# reason (left by a restack whose state is gone or was rejected).
+paused_lock_scan() {
+  local i
+  load_worktrees || return 0
+  for ((i = 0; i < ${#WT_PATH[@]}; i++)); do
+    [ "${WT_LOCKED[i]}" -eq 1 ] && [ "${WT_LOCKREASON[i]}" = "$PAUSE_REASON" ] || continue
+    note "left locked by a paused restack: $(v "${WT_PATH[i]}")"
+    note "  after restoring it: git worktree unlock $(q "${WT_PATH[i]}")"
+  done
+}
+
 main() {
   local sub=${1:-}
   [ $# -eq 0 ] || shift
   case $sub in
     -h | --help | help)
-      awk 'NR==1{next} /^#/{sub(/^# ?/, ""); print; next} {exit}' "${BASH_SOURCE[0]}"
+      awk 'NR==1{next} /^#/{sub(/^# ?/, ""); print; next} {exit}' "$0"
       exit "$X_OK"
       ;;
   esac
@@ -1426,6 +1430,7 @@ main() {
       if [ ! -e "$STATE_FILE" ]; then
         note "no restack in progress"
         stranded_scan
+        paused_lock_scan
         exit "$X_OK"
       fi
       cmd_status "$@"

@@ -1,5 +1,13 @@
 # Feature: worktree-aware restack (`/worktree:restack`)
 
+> **Status: shipped (PR #993).** Plan-time text below is design history: where it
+> differs, the shipped contract is the header of
+> `plugins/yellow-core/skills/git-worktree/scripts/worktree-restack.sh`. Known
+> differences: exit `31` (state kept) and `60` (submit failed) were added; the
+> state file has no `token`, `tool` or per-entry `phase`/lock fields; the GitHub
+> base for the ancestry check is the current branch's parent; lock takeover runs
+> inside a guard directory; `runtime/probe/` was a local scratch path, not committed.
+
 ## Overview
 
 A stack whose branches are each checked out in their own worktree cannot be

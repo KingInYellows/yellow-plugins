@@ -52,13 +52,14 @@ case "${1:-}" in
             exit 0
             ;;
           *)
+            if [ "${STUB_FAIL:-}" = rebase-marker ]; then : >|"$(common_dir)/gh-stack-rebase-state"; echo "error: rebase did not finish (stub)" >&2; exit 1; fi
             cur=$(g branch --show-current)
             eng_begin "$cur"
             eng_run owner
             rc=$?
             ;;
         esac
-        if [ "$rc" -eq 3 ]; then : >"$(common_dir)/gh-stack-rebase-state"; conflict_report; exit 3; fi
+        if [ "$rc" -eq 3 ]; then : >|"$(common_dir)/gh-stack-rebase-state"; conflict_report; exit 3; fi
         [ "$rc" -ne 0 ] || rm -f "$(common_dir)/gh-stack-rebase-state"
         exit "$rc"
         ;;
