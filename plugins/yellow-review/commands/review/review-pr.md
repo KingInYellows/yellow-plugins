@@ -839,8 +839,10 @@ Apply the aggregation steps from
    directly from the return above. Unlink the `fenced_output_path=`
    value (`rm -f`) right after processing the return (whichever branch
    above was taken), so this pipeline doesn't leak that temp file on
-   every run — but only when the value is a `/tmp/` path. A
-   `QUOTA_EXHAUSTED` return reports `/dev/null`, which is never unlinked.
+   every run — but only when the value is exactly
+   `/tmp/council-codex-fenced-<suffix>.txt`: no `..`, no further `/`, and not a
+   symlink. Any other value, including the `/dev/null` a `QUOTA_EXHAUSTED` return
+   reports, is never unlinked (the return text is untrusted).
 
    **Convert these to the compact-return schema BEFORE Step 1 validation
    runs** — otherwise the validator drops them as malformed and every

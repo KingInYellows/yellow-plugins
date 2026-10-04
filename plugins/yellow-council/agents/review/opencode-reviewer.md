@@ -182,6 +182,21 @@ elif [ -n "$COUNCIL_OPENCODE_MODEL" ]; then
 else
   OC_MODEL=""
 fi
+# The value becomes its own argv item: refuse anything that is not a plain model
+# slug (a leading `-` would be read as an opencode flag), in the same structured
+# shape as the pack-size guard above.
+case "$OC_MODEL" in
+  "") ;;
+  [!A-Za-z0-9]* | *[!A-Za-z0-9._~:/-]*)
+    printf '[opencode-reviewer] Error: COUNCIL_OPENCODE_MODEL is not a plain model slug\n' >&2
+    printf 'CLI_EXIT=skipped\n'
+    printf 'verdict=UNAVAILABLE\n'
+    printf 'confidence=N/A\n'
+    printf 'summary=COUNCIL_OPENCODE_MODEL is not a plain model slug (letters, digits and . _ ~ : / - only, starting with a letter or digit); CLI not invoked. Set it to a model listed by "opencode models".\n'
+    case "$PACK_FILE" in /tmp/council-opencode-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
+    rm -f "$OUTPUT_FILE" "$STDERR_FILE"
+    exit 0 ;;
+esac
 [ -z "$OC_MODEL" ] || set -- "$@" --model "$OC_MODEL"
 printf '[opencode-reviewer] model: %s\n' "${OC_MODEL:-<opencode default>}" >&2
 
@@ -308,10 +323,10 @@ case $CLI_EXIT in
       # recorded as QUOTA_EXHAUSTED, not a transient ERROR. The ETA extraction
       # mirrors council.md's council_quota_eta (this agent cannot source
       # council.md); credit exhaustion usually reports none.
-      QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Ss][Ee][Tt][Ss]? +([^.;|]{1,60}).*/resets \1/p' | head -n 1)
-      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C sed -nE 's/.*[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
-      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
-      QUOTA_ETA=$(printf '%s' "$QUOTA_ETA" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_-' | sed -E 's/[[:space:]]+$//' | head -c 200)
+      QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Ss][Ee][Tt][Ss]? +([^;|]{1,60}).*/resets \1/p' | head -n 1)
+      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C sed -nE 's/.*[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +([^;,|]{1,40}).*/resets in \1/p' | head -n 1)
+      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$ERROR_MSG" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +([^;,|]{1,40}).*/resets in \1/p' | head -n 1)
+      QUOTA_ETA=$(printf '%s' "$QUOTA_ETA" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_.-' | sed -E 's/\. .*$//; s/[. ]+$//' | head -c 200)
       [ -n "$QUOTA_ETA" ] || QUOTA_ETA="reset time not reported"
       printf '[opencode-reviewer] Quota exhausted (%s) — returning QUOTA_EXHAUSTED\n' "$QUOTA_ETA" >&2
       printf 'verdict=QUOTA_EXHAUSTED\n'
@@ -347,7 +362,10 @@ case $CLI_EXIT in
       printf 'confidence=N/A\n'
       printf 'summary=OpenCode error: %s\n' "$ERROR_MSG"
     else
-      ERR_PEEK=$(head -3 "$STDERR_FILE" 2>/dev/null | tr '\n' ' ' | head -c 200)
+      # --print-logs puts opencode's ERROR logs in $STDERR_FILE, which can carry
+      # provider options and request fragments: sanitize like ERROR_MSG above.
+      ERR_PEEK=$(head -3 "$STDERR_FILE" 2>/dev/null | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177' \
+        | LC_ALL=C sed -E 's#https?://[^[:space:]]+#[url]#g; s/[A-Za-z0-9_-]{24,}/[redacted]/g' | head -c 200)
       printf 'verdict=ERROR\n'
       printf 'confidence=N/A\n'
       printf 'summary=OpenCode CLI error (exit %d). Excerpt: %s\n' "$CLI_EXIT" "$ERR_PEEK"

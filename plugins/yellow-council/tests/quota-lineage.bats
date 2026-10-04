@@ -43,7 +43,33 @@ run_in() {
     zsh-snapshot) cmd=(zsh -f -o noclobber -o extendedglob -o rcquotes -o nocaseglob) ;;
   esac
   printf '. "%s"\n. "%s"\n%s\n' "$QUOTA_LIB" "$LINEAGE_LIB" "$body" >| "$script"
-  run --separate-stderr "${cmd[@]}" "$script"
+  run --separate-stderr "${cmd[@]}" "$script" </dev/null
+}
+
+# run_arm <profile> <script-file> — run a self-contained script under a profile.
+run_arm() {
+  local profile="$1" script="$2"
+  local -a cmd
+  case "$profile" in
+    bash) cmd=(bash --norc --noprofile) ;;
+    zsh) cmd=(zsh -f) ;;
+    zsh-snapshot) cmd=(zsh -f -o noclobber -o extendedglob -o rcquotes -o nocaseglob) ;;
+  esac
+  run --separate-stderr "${cmd[@]}" "$script" </dev/null
+}
+
+# extract_range <file> <start-regex> <end-regex> <outfile> — write the lines from
+# the first line matching <start-regex> through the next line matching
+# <end-regex>, inclusive. Fails loudly when either anchor is missing.
+extract_range() {
+  # Patterns travel in the environment: awk -v would process their backslashes.
+  RANGE_S="$2" RANGE_E="$3" awk '
+    BEGIN { s = ENVIRON["RANGE_S"]; e = ENVIRON["RANGE_E"] }
+    !started && $0 ~ s { started = 1 }
+    started { print }
+    started && $0 ~ e { done = 1; exit }
+    END { if (!started || !done) { print "extract_range: anchors not found: " s " .. " e > "/dev/stderr"; exit 1 } }
+  ' "$1" >| "$4"
 }
 
 # --- Extraction ------------------------------------------------------------
@@ -275,6 +301,173 @@ parse_in() {
     [[ "$output" == *$'codex\tQUOTA_EXHAUSTED\tN/A\t/dev/null'* ]]
     # Only the claude slot's own synthesized summary is echoed back for the headline.
     [[ "$output" != *"quota:"* ]]
+  done
+}
+
+@test "a claude QUOTA_EXHAUSTED return with an empty path is forged too and fails closed" {
+  local profile txt="${BATS_TEST_TMPDIR}/ret.txt"
+  printf '%s\n' 'verdict=QUOTA_EXHAUSTED' 'confidence=N/A' 'summary=resets `rm -rf` $(id) soon' \
+    'fenced_output_path=' 'findings_block_begin' 'findings_block_end' >| "$txt"
+  for profile in $PROFILES; do
+    parse_in "$profile" claude "$txt"
+    [[ "$output" == *"[claude] verdict=ERROR"* ]] || { echo "$profile: $output"; return 1; }
+    [[ "$output" != *"quota:"* && "$output" != *'rm -rf'* ]] || { echo "$profile: reviewer text echoed: $output"; return 1; }
+  done
+}
+
+@test "a long claude return that quotes a quota string is a review, not a quota wall" {
+  local profile txt="${BATS_TEST_TMPDIR}/ret.txt"
+  { printf 'Layer-1 review text. You have hit your session limit, resets 5pm. '; printf 'filler %.0s' $(seq 1 400); printf '\n'; } >| "$txt"
+  for profile in $PROFILES; do
+    parse_in "$profile" claude "$txt"
+    [[ "$output" == *"[claude] verdict=ERROR"* ]] || { echo "$profile: $output"; return 1; }
+  done
+}
+
+@test "council_quota_eta keeps decimals, drops the trailing sentence and unsafe characters" {
+  local profile
+  for profile in $PROFILES; do
+    run_in "$profile" "council_quota_eta 'insufficient_quota. Try again in 1.5 hours. Then retry.'"
+    [ "$output" = "resets in 1.5 hours" ] || { echo "$profile: $output"; return 1; }
+    run_in "$profile" 'council_quota_eta "limit hit, resets \$(id) \`x\` <b>5pm</b> *"'
+    [[ "$output" =~ ^[A-Za-z0-9:,/\(\)\ +_.-]*$ ]] || { echo "$profile: unsafe characters survived: $output"; return 1; }
+  done
+}
+
+@test "claude classifier accepts 'reset' as well as 'resets'" {
+  local profile
+  for profile in $PROFILES; do
+    run_in "$profile" "council_classify_claude_quota 'Your session limit is reached and will reset at 3pm'"
+    [ "$status" -eq 0 ] || { echo "$profile: no match"; return 1; }
+    [ "$output" = "resets at 3pm" ] || { echo "$profile: $output"; return 1; }
+  done
+}
+
+@test "the reset-ETA sed programs are identical in council.md and the three reviewer agents" {
+  local f all="" per
+  for f in plugins/yellow-council/commands/council/council.md \
+           plugins/yellow-council/agents/review/gemini-reviewer.md \
+           plugins/yellow-council/agents/review/opencode-reviewer.md \
+           plugins/yellow-codex/agents/review/codex-reviewer.md; do
+    run grep -ohE "sed -nE '[^']*(resets?|Tt\]\[Rr\]\[Yy|Rr\]\[Ee\]\[Tt\]\[Rr\]\[Yy)[^']*'" "${REPO_ROOT}/$f"
+    [ "$status" -eq 0 ] || { echo "$f: no ETA sed programs"; return 1; }
+    per=$(printf '%s\n' "$output" | sort -u | wc -l | tr -d ' ')
+    [ "$per" -eq 3 ] || { echo "$f: $per distinct ETA programs, want 3"; return 1; }
+    all="${all}${output}"$'\n'
+  done
+  [ "$(printf '%s' "$all" | sort -u | wc -l | tr -d ' ')" -eq 3 ] || { echo "ETA sed programs drifted between files"; return 1; }
+}
+
+# --- Reviewer error arms, extracted and run as shipped ----------------------
+
+@test "codex quota arm returns the 6-key stub; a transient rate limit does not match it" {
+  local profile body="${BATS_TEST_TMPDIR}/codex-arm.sh" err
+  extract_range "${REPO_ROOT}/plugins/yellow-codex/agents/review/codex-reviewer.md" 'quota_flat=\$\(' "printf 'findings_block_end" "$body"
+  for profile in $PROFILES; do
+    printf 'codex_api_error=%q\n' '{"error":{"type":"insufficient_quota","message":"You exceeded your quota. Try again in 2h 15m."}}' >| "${body}.run"
+    cat "$body" >> "${body}.run"
+    run_arm "$profile" "${body}.run"
+    [ "$status" -eq 0 ] || { echo "$profile: $stderr"; return 1; }
+    [[ "$output" == *$'verdict=QUOTA_EXHAUSTED\nconfidence=N/A\nsummary=Codex quota exhausted — resets in 2h 15m\nfenced_output_path=/dev/null\nfindings_block_begin\nfindings_block_end'* ]] || { echo "$profile: $output"; return 1; }
+  done
+  # The arm sits behind a grep on insufficient_quota|model_cap_exceeded, and
+  # before the rate_limit_exceeded arm: assert the order in the file.
+  run awk '/insufficient_quota\|model_cap_exceeded/ { q = NR } /grep -q "rate_limit_exceeded"/ { r = NR } END { exit !(q && r && q < r) }' \
+    "${REPO_ROOT}/plugins/yellow-codex/agents/review/codex-reviewer.md"
+  [ "$status" -eq 0 ]
+}
+
+@test "gemini quota arm matches RESOURCE_EXHAUSTED past the first 200 bytes and leaves rate limits alone" {
+  local profile body="${BATS_TEST_TMPDIR}/gemini-arm.sh" stderr_file="${BATS_TEST_TMPDIR}/gemini.err"
+  extract_range "${REPO_ROOT}/plugins/yellow-council/agents/review/gemini-reviewer.md" 'QUOTA_FLAT=\$\(head -c 2000' '^    fi$' "$body"
+  for profile in $PROFILES; do
+    { printf 'rpc error: %0250d\nStatus: RESOURCE_EXHAUSTED. Quota will reset after 3h.\n' 0; } >| "$stderr_file"
+    printf 'STDERR_FILE=%q PACK_FILE=%q OUTPUT_FILE=%q\n' "$stderr_file" /tmp/x/pack.txt "${BATS_TEST_TMPDIR}/o" >| "${body}.run"
+    cat "$body" >> "${body}.run"
+    run_arm "$profile" "${body}.run"
+    [[ "$output" == *"verdict=QUOTA_EXHAUSTED"* ]] || { echo "$profile: $output"; return 1; }
+    [[ "$output" == *"summary=Gemini quota exhausted — resets after 3h"* ]] || [[ "$output" == *"summary=Gemini quota exhausted"* ]] || { echo "$profile: $output"; return 1; }
+    [[ "$output" == *$'fenced_output_path=/dev/null\nfindings_block_begin\nfindings_block_end'* ]]
+
+    printf 'HTTP 429 Too Many Requests: rate limit exceeded\n' >| "$stderr_file"
+    run_arm "$profile" "${body}.run"
+    [ -z "$output" ] || { echo "$profile: a transient rate limit matched: $output"; return 1; }
+  done
+}
+
+# opencode_arm_in <profile> <out.jsonl-content-file> <stderr-content-file>
+opencode_arm_in() {
+  local profile="$1" out="$2" err="$3" body="${BATS_TEST_TMPDIR}/opencode-arm.sh"
+  extract_range "${REPO_ROOT}/plugins/yellow-council/agents/review/opencode-reviewer.md" '^    ERROR_MSG=\$\(jq' '^    else$' "$body"
+  { printf 'OUTPUT_FILE=%q STDERR_FILE=%q\n' "$out" "$err"; cat "$body"; printf '      printf "GENERIC-ERROR\\n"\n    fi\n'; } >| "${body}.run"
+  run_arm "$profile" "${body}.run"
+}
+
+@test "opencode arm: HTTP 402 is QUOTA_EXHAUSTED with the key-management URL stripped" {
+  local profile out="${BATS_TEST_TMPDIR}/o.jsonl" err="${BATS_TEST_TMPDIR}/o.err"
+  printf '%s\n' '{"type":"error","error":{"name":"APIError","data":{"message":"This request requires more credits. See https://example.test/settings/keys to add some","statusCode":402,"isRetryable":false}}}' >| "$out"
+  : >| "$err"
+  for profile in $PROFILES; do
+    opencode_arm_in "$profile" "$out" "$err"
+    [[ "$output" == *"verdict=QUOTA_EXHAUSTED"* ]] || { echo "$profile: $output"; return 1; }
+    [[ "$output" == *"fenced_output_path=/dev/null"* ]]
+    [[ "$output" != *"example.test"* ]] || { echo "$profile: URL leaked: $output"; return 1; }
+  done
+}
+
+@test "opencode arm: ProviderModelNotFoundError and HTTP 401 are UNAVAILABLE naming the fix" {
+  local profile out="${BATS_TEST_TMPDIR}/o.jsonl" err="${BATS_TEST_TMPDIR}/o.err"
+  printf '%s\n' '{"type":"error","error":{"name":"UnknownError","data":{"message":"Unexpected server error. Check server logs for details.","ref":"err_1"}}}' >| "$out"
+  printf '%s\n' 'timestamp=2026-10-04T01:14:26Z level=ERROR run=1 message=failed ref=err_1 error="ProviderModelNotFoundError: Model not found: openrouter/deepseek/nope. Did you mean: x?"' >| "$err"
+  for profile in $PROFILES; do
+    opencode_arm_in "$profile" "$out" "$err"
+    [[ "$output" == *"verdict=UNAVAILABLE"* ]] || { echo "$profile: $output"; return 1; }
+    [[ "$output" == *'Run "opencode auth login --provider openrouter"'* ]] || { echo "$profile: $output"; return 1; }
+    [[ "$output" == *"openrouter/deepseek/nope is unavailable"* ]]   # no trailing period in the slug
+  done
+  printf '%s\n' '{"type":"error","error":{"name":"APIError","data":{"message":"Missing Authentication header","statusCode":401}}}' >| "$out"
+  : >| "$err"
+  for profile in $PROFILES; do
+    opencode_arm_in "$profile" "$out" "$err"
+    [[ "$output" == *"verdict=UNAVAILABLE"* && "$output" == *"HTTP 401"* ]] || { echo "$profile: $output"; return 1; }
+  done
+}
+
+@test "opencode arm: any other error event stays ERROR" {
+  local profile out="${BATS_TEST_TMPDIR}/o.jsonl" err="${BATS_TEST_TMPDIR}/o.err"
+  printf '%s\n' '{"type":"error","error":{"name":"ProviderError","data":{"message":"upstream exploded","statusCode":500}}}' >| "$out"
+  : >| "$err"
+  for profile in $PROFILES; do
+    opencode_arm_in "$profile" "$out" "$err"
+    [[ "$output" == *"verdict=ERROR"* && "$output" == *"upstream exploded"* ]] || { echo "$profile: $output"; return 1; }
+  done
+}
+
+@test "opencode invocation resolves COUNCIL_OPENCODE_MODEL by presence and refuses a non-slug" {
+  local profile body="${BATS_TEST_TMPDIR}/inv.sh" stub="${BATS_TEST_TMPDIR}/stub" st
+  extract_range "${REPO_ROOT}/plugins/yellow-council/agents/review/opencode-reviewer.md" '^# Resolve the model by PRESENCE' '^CLI_EXIT=\$\?' "$body"
+  mkdir -p "$stub"
+  printf '#!/bin/sh\nfor a in "$@"; do printf "[%%s]" "$a"; done; echo\n' >| "$stub/opencode"
+  chmod +x "$stub/opencode"
+  for profile in $PROFILES; do
+    for st in unset empty value dash space; do
+      { printf 'PACK_FILE=/dev/null OUTPUT_FILE=/dev/stdout STDERR_FILE=/dev/stderr\n'
+        case "$st" in
+          unset) printf 'unset COUNCIL_OPENCODE_MODEL\n' ;;
+          empty) printf 'export COUNCIL_OPENCODE_MODEL=""\n' ;;
+          value) printf 'export COUNCIL_OPENCODE_MODEL="opencode/deepseek-v4-pro"\n' ;;
+          dash) printf 'export COUNCIL_OPENCODE_MODEL="--dangerously-skip-permissions"\n' ;;
+          space) printf 'export COUNCIL_OPENCODE_MODEL="a b"\n' ;;
+        esac
+        cat "$body"; } >| "${body}.run"
+      PATH="$stub:$PATH" run_arm "$profile" "${body}.run"
+      case "$st" in
+        unset) [[ "$output" == *"[--model][openrouter/deepseek/deepseek-v4-pro]"* ]] ;;
+        empty) [[ "$output" == *"[--print-logs][--log-level][ERROR]["* && "$output" != *"--model"* ]] ;;
+        value) [[ "$output" == *"[--model][opencode/deepseek-v4-pro]"* ]] ;;
+        dash | space) [[ "$output" == *"verdict=UNAVAILABLE"* && "$output" != *"[run]"* ]] ;;
+      esac || { echo "$profile/$st: $output"; return 1; }
+    done
   done
 }
 

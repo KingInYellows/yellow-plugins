@@ -15,7 +15,7 @@ four-reviewer council.
   provider quota text and HTTP 402, and `/council` classifies a failed claude
   spawn against Claude's session, weekly and Opus limit strings. Transient rate
   limits and HTTP 529 stay `ERROR`. `/dev/null` is accepted only under this
-  verdict at the Step 7 appendix and every unlink loop.
+  verdict at the Step 7 appendix, and the unlink loops skip it.
 - `yellow-council`: `COUNCIL_OPENCODE_MODEL` selects the OpenCode model by
   presence. Unset routes to `openrouter/deepseek/deepseek-v4-pro`, set but empty
   passes no `--model` (V1), and a non-empty value is passed verbatim. A missing
@@ -34,4 +34,5 @@ four-reviewer council.
   `insufficient_quota` and `model_cap_exceeded`, checked before the transient
   `rate_limit_exceeded` arm.
 - `yellow-review`: `/review:pr` treats a codex `QUOTA_EXHAUSTED` as a skipped
-  reviewer and never unlinks the `/dev/null` fenced path.
+  reviewer and unlinks only an exact `/tmp/council-codex-fenced-*.txt` path, never
+  `/dev/null`.

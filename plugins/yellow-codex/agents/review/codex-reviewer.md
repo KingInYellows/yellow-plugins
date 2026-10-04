@@ -441,10 +441,10 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
       # captured text is limited to a short whitelist of characters so
       # nothing else in the API error can reach the summary= line.
       quota_flat=$(printf '%s' "$codex_api_error" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
-      quota_eta=$(printf '%s\n' "$quota_flat" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Ss][Ee][Tt][Ss]? +([^.;|]{1,60}).*/resets \1/p' | head -n 1)
-      [ -n "$quota_eta" ] || quota_eta=$(printf '%s\n' "$quota_flat" | LC_ALL=C sed -nE 's/.*[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
-      [ -n "$quota_eta" ] || quota_eta=$(printf '%s\n' "$quota_flat" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
-      quota_eta=$(printf '%s' "$quota_eta" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_-' | sed -E 's/[[:space:]]+$//' | head -c 200)
+      quota_eta=$(printf '%s\n' "$quota_flat" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Ss][Ee][Tt][Ss]? +([^;|]{1,60}).*/resets \1/p' | head -n 1)
+      [ -n "$quota_eta" ] || quota_eta=$(printf '%s\n' "$quota_flat" | LC_ALL=C sed -nE 's/.*[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +([^;,|]{1,40}).*/resets in \1/p' | head -n 1)
+      [ -n "$quota_eta" ] || quota_eta=$(printf '%s\n' "$quota_flat" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +([^;,|]{1,40}).*/resets in \1/p' | head -n 1)
+      quota_eta=$(printf '%s' "$quota_eta" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_.-' | sed -E 's/\. .*$//; s/[. ]+$//' | head -c 200)
       [ -n "$quota_eta" ] || quota_eta="reset time not reported"
       printf '[codex-reviewer] Quota exhausted (%s) — returning QUOTA_EXHAUSTED\n' "$quota_eta" >&2
       printf 'verdict=QUOTA_EXHAUSTED\n'

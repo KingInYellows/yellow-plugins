@@ -125,8 +125,11 @@ if command -v opencode >/dev/null 2>&1; then
       # OPENROUTER_API_KEY exists, and prints no key material. Strip colour
       # codes, then match the provider name after the bullet glyph.
       ESC=$(printf '\033')
-      if timeout 30 opencode auth list --pure 2>&1 | sed "s/${ESC}\[[0-9;]*m//g" \
-         | grep -qE '^[^A-Za-z0-9]*OpenRouter([[:space:]]|$)'; then
+      OC_AUTH=$(cd /tmp && timeout --signal=TERM --kill-after=5 15 opencode auth list --pure </dev/null 2>&1); OC_AUTH_RC=$?
+      if [ "$OC_AUTH_RC" -eq 124 ] || [ "$OC_AUTH_RC" -eq 137 ]; then
+        printf '[yellow-council] opencode OpenRouter auth: check skipped (opencode auth list timed out); re-run /council:setup\n'
+      elif printf '%s\n' "$OC_AUTH" | sed "s/${ESC}\[[0-9;?]*[A-Za-z]//g" \
+           | grep -qE '^[^A-Za-z0-9]*OpenRouter([[:space:]]|$)'; then
         printf '[yellow-council] opencode OpenRouter auth: ok\n'
       else
         printf '[yellow-council] opencode OpenRouter auth: WARNING — no OpenRouter credential found; the OpenCode slot (%s) will return UNAVAILABLE.\n' "$OC_MODEL"
@@ -204,8 +207,10 @@ if command -v opencode >/dev/null 2>&1; then
   case "$OC_MODEL" in
     openrouter/*)
       ESC=$(printf '\033')
-      if ! timeout 30 opencode auth list --pure 2>&1 | sed "s/${ESC}\[[0-9;]*m//g" \
-           | grep -qE '^[^A-Za-z0-9]*OpenRouter([[:space:]]|$)'; then
+      OC_AUTH=$(cd /tmp && timeout --signal=TERM --kill-after=5 15 opencode auth list --pure </dev/null 2>&1); OC_AUTH_RC=$?
+      if [ "$OC_AUTH_RC" -ne 124 ] && [ "$OC_AUTH_RC" -ne 137 ] \
+         && ! printf '%s\n' "$OC_AUTH" | sed "s/${ESC}\[[0-9;?]*[A-Za-z]//g" \
+              | grep -qE '^[^A-Za-z0-9]*OpenRouter([[:space:]]|$)'; then
         OPENCODE_STATUS="installed (needs OpenRouter auth)"
       fi ;;
   esac

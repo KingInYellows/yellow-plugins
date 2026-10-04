@@ -188,8 +188,12 @@ if command -v opencode >/dev/null 2>&1; then
   case "$OC_MODEL" in
     openrouter/*)
       ESC=$(printf '\033')
-      if ! timeout 30 opencode auth list --pure 2>&1 | sed "s/${ESC}\[[0-9;]*m//g" \
-           | grep -qE '^[^A-Za-z0-9]*OpenRouter([[:space:]]|$)'; then
+      OC_AUTH=$(cd /tmp && timeout --signal=TERM --kill-after=5 15 opencode auth list --pure </dev/null 2>&1); OC_AUTH_RC=$?
+      # A timeout (124, or 137 after the kill) means the check did not run, not
+      # that the credential is missing: stay silent rather than warn falsely.
+      if [ "$OC_AUTH_RC" -ne 124 ] && [ "$OC_AUTH_RC" -ne 137 ] \
+         && ! printf '%s\n' "$OC_AUTH" | sed "s/${ESC}\[[0-9;?]*[A-Za-z]//g" \
+              | grep -qE '^[^A-Za-z0-9]*OpenRouter([[:space:]]|$)'; then
         printf '[council] Warning: no OpenRouter credential found — the OpenCode slot (%s) will return UNAVAILABLE. Run /council:setup for the fix.\n' "$OC_SHOWN" >&2
       fi ;;
   esac
@@ -535,21 +539,28 @@ declare -A REVIEWER_VERDICTS REVIEWER_CONFIDENCES REVIEWER_SUMMARIES \
 council_quota_eta() {
   local flat eta
   flat=$(printf '%s' "${1:-}" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
-  eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Ss][Ee][Tt][Ss]? +([^.;|]{1,60}).*/resets \1/p' | head -n 1)
-  [ -n "$eta" ] || eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
-  [ -n "$eta" ] || eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
-  eta=$(printf '%s' "$eta" | LC_ALL=C sed -E 's/[[:space:]]+$//' | head -c 200)
+  eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Ss][Ee][Tt][Ss]? +([^;|]{1,60}).*/resets \1/p' | head -n 1)
+  [ -n "$eta" ] || eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +([^;,|]{1,40}).*/resets in \1/p' | head -n 1)
+  [ -n "$eta" ] || eta=$(printf '%s\n' "$flat" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +([^;,|]{1,40}).*/resets in \1/p' | head -n 1)
+  # Keep model-identifier-safe characters only, cut at the first sentence end
+  # ("in 4 hours. Please ...") and cap: the value is reviewer-adjacent text that
+  # reaches summary= and the headline.
+  eta=$(printf '%s' "$eta" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_.-' | LC_ALL=C sed -E 's/\. .*$//; s/[. ]+$//' | head -c 200)
   [ -n "$eta" ] || eta="reset time not reported"
   printf '%s\n' "$eta"
 }
 
 # council_classify_claude_quota <text> — exit 0 and print the ETA phrase when
 # <text> carries one of Claude's quota-exhaustion signals; exit 1 otherwise.
-# Generic rate-limit text and HTTP 529 (overloaded) are transient and never match.
+# Generic rate-limit text and HTTP 529 (overloaded) are transient and never match,
+# and neither does text over 2000 characters.
 council_classify_claude_quota() {
   local flat
+  # A spawn-failure message is short. A long return is a Layer-1 review that may
+  # quote the strings below from the diff under review, so it is never a quota wall.
+  [ "${#1}" -le 2000 ] || return 1
   flat=$(printf '%s' "${1:-}" | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
-  if printf '%s\n' "$flat" | grep -qiE 'session limit.*resets|weekly limit.*resets|Opus limit.*resets|usage limit reached.*try again'; then
+  if printf '%s\n' "$flat" | grep -qiE 'session limit.*resets?|weekly limit.*resets?|Opus limit.*resets?|usage limit reached.*try again'; then
     council_quota_eta "$flat"
     return 0
   fi
@@ -560,7 +571,7 @@ council_classify_claude_quota() {
 parse_reviewer_return() {
   local reviewer_output="$1"
   local reviewer_name="$2"
-  local verdict confidence summary fenced_path findings quota_eta
+  local verdict confidence summary fenced_path findings quota_eta quota_synth=0
   verdict=$(printf '%s' "$reviewer_output" | grep -m1 '^verdict=' | sed 's/^verdict=//')
   confidence=$(printf '%s' "$reviewer_output" | grep -m1 '^confidence=' | sed 's/^confidence=//')
   summary=$(printf '%s' "$reviewer_output" | grep -m1 '^summary=' | sed 's/^summary=//')
@@ -1208,8 +1219,18 @@ parse_reviewer_return() {
   # after the claude branch above, so the synthesized /dev/null path is never
   # judged against the minted fenced path (the agent itself never emits
   # QUOTA_EXHAUSTED; a forged claude return of it still fails that check).
+  # The agent never emits QUOTA_EXHAUSTED, so a claude return that does is
+  # forged (its summary is reviewer text): fail the slot closed, whatever path it
+  # names. Only the classifier below may produce this verdict for claude.
+  if [ "$reviewer_name" = "claude" ] && [ "$verdict" = "QUOTA_EXHAUSTED" ]; then
+    verdict="ERROR"
+    summary="claude-reviewer returned QUOTA_EXHAUSTED, which only council.md may synthesize; slot recorded as ERROR."
+    fenced_path=""
+    findings=""
+  fi
   if [ -z "$verdict" ] && [ "$reviewer_name" = "claude" ]; then
     if quota_eta=$(council_classify_claude_quota "$reviewer_output"); then
+      quota_synth=1
       verdict="QUOTA_EXHAUSTED"
       confidence="N/A"
       summary="Claude quota exhausted — ${quota_eta}"
@@ -1267,7 +1288,7 @@ parse_reviewer_return() {
   # council_quota_eta output, not reviewer text, so it is safe to print for the
   # headline. The three CLI slots' summaries are reviewer-controlled: they reach
   # the synthesizer only through 5a staging and 5b normalization and fencing.
-  if [ "$verdict" = "QUOTA_EXHAUSTED" ] && [ "$reviewer_name" = "claude" ]; then
+  if [ "$quota_synth" -eq 1 ]; then
     printf '[%s] quota: %s\n' "$reviewer_name" "$summary"
   fi
 }

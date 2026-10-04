@@ -271,12 +271,14 @@ case $CLI_EXIT in
     # The ETA extraction mirrors council.md's council_quota_eta (this agent
     # cannot source council.md); the captured text is limited to a short
     # whitelist of characters so nothing else can reach the summary= line.
-    if printf '%s' "$ERR_PEEK" | grep -q 'RESOURCE_EXHAUSTED'; then
-      QUOTA_FLAT=$(printf '%s' "$ERR_PEEK" | LC_ALL=C tr -d '\000-\037\177')
-      QUOTA_ETA=$(printf '%s\n' "$QUOTA_FLAT" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Ss][Ee][Tt][Ss]? +([^.;|]{1,60}).*/resets \1/p' | head -n 1)
-      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$QUOTA_FLAT" | LC_ALL=C sed -nE 's/.*[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
-      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$QUOTA_FLAT" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +([^.;,|]{1,40}).*/resets in \1/p' | head -n 1)
-      QUOTA_ETA=$(printf '%s' "$QUOTA_ETA" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_-' | sed -E 's/[[:space:]]+$//' | head -c 200)
+    # Looked for in a wider window than ERR_PEEK (3 lines, 200 bytes): the reset
+    # phrase often follows a long gRPC status line.
+    QUOTA_FLAT=$(head -c 2000 "$STDERR_FILE" 2>/dev/null | LC_ALL=C tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
+    if printf '%s' "$QUOTA_FLAT" | grep -q 'RESOURCE_EXHAUSTED'; then
+      QUOTA_ETA=$(printf '%s\n' "$QUOTA_FLAT" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Ss][Ee][Tt][Ss]? +([^;|]{1,60}).*/resets \1/p' | head -n 1)
+      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$QUOTA_FLAT" | LC_ALL=C sed -nE 's/.*[Tt][Rr][Yy] [Aa][Gg][Aa][Ii][Nn] [Ii][Nn] +([^;,|]{1,40}).*/resets in \1/p' | head -n 1)
+      [ -n "$QUOTA_ETA" ] || QUOTA_ETA=$(printf '%s\n' "$QUOTA_FLAT" | LC_ALL=C sed -nE 's/.*[Rr][Ee][Tt][Rr][Yy][- ][Aa][Ff][Tt][Ee][Rr] +([^;,|]{1,40}).*/resets in \1/p' | head -n 1)
+      QUOTA_ETA=$(printf '%s' "$QUOTA_ETA" | LC_ALL=C tr -cd 'A-Za-z0-9:,/() +_.-' | sed -E 's/\. .*$//; s/[. ]+$//' | head -c 200)
       [ -n "$QUOTA_ETA" ] || QUOTA_ETA="reset time not reported"
       printf '[gemini-reviewer] Quota exhausted (%s) — returning QUOTA_EXHAUSTED\n' "$QUOTA_ETA" >&2
       printf 'verdict=QUOTA_EXHAUSTED\n'
