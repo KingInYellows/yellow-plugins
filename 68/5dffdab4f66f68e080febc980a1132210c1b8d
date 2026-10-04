@@ -1,0 +1,41 @@
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_092275c4e6a6a0::t_d50850558c812c 434-438,447-448
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_092275c4e6a6a0::t_d50850558c812c 278-279
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_092275c4e6a6a0::t_d50850558c812c 321,328-329,372
+docs/security.md
+  s_092275c4e6a6a0::t_5604803bc4541d 637-641
+plugins/yellow-council/commands/council/council.md
+  s_092275c4e6a6a0::t_d50850558c812c 236-237,245-251,253-258,266-268,563-564
+  s_092275c4e6a6a0::t_aee2936f154494 578
+plugins/yellow-codex/skills/codex-patterns/SKILL.md
+  s_092275c4e6a6a0::t_5604803bc4541d 203-205
+plugins/yellow-council/CLAUDE.md
+  s_092275c4e6a6a0::t_5604803bc4541d 252-254
+plugins/yellow-council/tests/quota-lineage.bats
+  s_092275c4e6a6a0::t_aee2936f154494 340,346-348,350,353-363,605-666
+  s_092275c4e6a6a0::t_834eefef41f038 667
+.changeset/council-quota-and-opencode-routing.md
+  s_092275c4e6a6a0::t_5604803bc4541d 35-36
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_092275c4e6a6a0::t_5604803bc4541d 143-144
+plugins/yellow-council/commands/council/setup.md
+  s_092275c4e6a6a0::t_d50850558c812c 133,137,140,206-213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "685dffdab4f66f68e080febc980a1132210c1b8d",
+  "prompts": {},
+  "sessions": {
+    "s_092275c4e6a6a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "53398599-95a5-4127-ba6b-f2642ceba186",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
