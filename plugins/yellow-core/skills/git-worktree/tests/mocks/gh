@@ -5,7 +5,7 @@ set -u
 # shellcheck disable=SC2034
 STUB_NAME=gh
 # shellcheck source=stack-engine.bash
-. "$(dirname "$(readlink -f "$0")")/stack-engine.bash"
+. "${STUB_MOCKS:?}/stack-engine.bash"
 stub_log "pwd=$PWD $*"
 
 common_dir() { g rev-parse --path-format=absolute --git-common-dir; }

@@ -36,7 +36,6 @@
 # residual (docs/solutions/security-issues/shell-owned-state-is-not-a-boundary-against-write.md).
 
 set -uo pipefail
-umask 077
 
 readonly X_OK=0 X_USAGE=2 X_BUSY=3 X_STATE=4 X_PROVIDER=5 X_PAUSED=10
 readonly X_REFUSED=20 X_FAILED=30 X_PARTIAL=40 X_INCOMPLETE=50 X_SUBMIT=60
@@ -47,7 +46,10 @@ readonly MAX_LISTED=20
 
 # v: a value (path, branch, ref) made printable - every control character,
 # tabs and newlines included, is dropped.
-v() { printf '%s' "$1" | LC_ALL=C tr -d '\000-\037\177'; }
+v() {
+  local LC_ALL=C
+  printf '%s' "${1//[[:cntrl:]]/}"
+}
 err() { printf 'worktree-restack: %s\n' "$*" >&2; }
 note() { printf '%s\n' "$*"; }
 die() {
@@ -125,7 +127,7 @@ common_dir() {
 # load_worktrees fills WT_* from `git worktree list --porcelain -z`. Paths may
 # hold spaces; newlines survive -z and are refused later.
 load_worktrees() {
-  WT_PATH=() WT_HEAD=() WT_BRANCH=() WT_LOCKED=() WT_PRUNABLE=() WT_BARE=()
+  WT_PATH=() WT_HEAD=() WT_BRANCH=() WT_LOCKED=() WT_PRUNABLE=() WT_BARE=() WT_LOCKREASON=()
   local rec i=-1
   while IFS= read -r -d '' rec; do
     case $rec in
@@ -137,12 +139,19 @@ load_worktrees() {
         WT_HEAD[i]=""
         WT_BRANCH[i]=""
         WT_LOCKED[i]=0
+        WT_LOCKREASON[i]=""
         WT_PRUNABLE[i]=0
         WT_BARE[i]=0
         ;;
       'HEAD '*) [ "$i" -ge 0 ] && WT_HEAD[i]=${rec#HEAD } ;;
       'branch '*) [ "$i" -ge 0 ] && WT_BRANCH[i]=${rec#branch } ;;
-      locked*) [ "$i" -ge 0 ] && WT_LOCKED[i]=1 ;;
+      locked*)
+        if [ "$i" -ge 0 ]; then
+          WT_LOCKED[i]=1
+          WT_LOCKREASON[i]=${rec#locked}
+          WT_LOCKREASON[i]=${WT_LOCKREASON[i]# }
+        fi
+        ;;
       prunable*) [ "$i" -ge 0 ] && WT_PRUNABLE[i]=1 ;;
       bare) [ "$i" -ge 0 ] && WT_BARE[i]=1 ;;
     esac
@@ -174,16 +183,30 @@ branch_holder() {
   return 1
 }
 
-# wt_git_path PATH NAME: absolute path of NAME inside PATH's per-worktree git dir.
-wt_git_path() { git -C "$1" rev-parse --path-format=absolute --git-path "$2" 2>/dev/null; }
-
 # wt_busy PATH: print the in-progress operation name and return 0 when PATH is
 # in the middle of a rebase, merge, cherry-pick, revert or sequencer run.
 wt_busy() {
-  local name p
-  for name in rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD sequencer; do
-    p=$(wt_git_path "$1" "$name") || continue
-    if [ -n "$p" ] && [ -e "$p" ]; then
+  local -a names=(rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD sequencer)
+  local -a paths=()
+  local name p out i=0
+  out=$(git -C "$1" rev-parse --path-format=absolute \
+    --git-path rebase-merge --git-path rebase-apply --git-path MERGE_HEAD \
+    --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD --git-path sequencer 2>/dev/null) || {
+    printf 'unreadable'
+    return 0
+  }
+  while IFS= read -r p; do
+    paths[i]=$p
+    i=$((i + 1))
+  done <<<"$out"
+  # An unreadable worktree counts as busy so it is refused, never detached.
+  if [ "$i" -ne "${#names[@]}" ]; then
+    printf 'unreadable'
+    return 0
+  fi
+  for ((i = 0; i < ${#names[@]}; i++)); do
+    name=${names[i]}
+    if [ -e "${paths[i]}" ]; then
       printf '%s' "$name"
       return 0
     fi
@@ -195,6 +218,7 @@ wt_busy() {
 # symlink (made by worktree-manager.sh) is not a change.
 wt_dirty() {
   local rec
+  git -C "$1" rev-parse --git-dir >/dev/null 2>&1 || return 0
   while IFS= read -r -d '' rec; do
     [ -n "$rec" ] || continue
     if [ "$rec" = '?? .ruvector' ] && [ -L "$1/.ruvector" ]; then continue; fi
@@ -228,7 +252,7 @@ init_paths() {
 }
 
 ensure_state_dir() {
-  mkdir -p -- "$STATE_DIR" || die "$X_FAILED" "cannot create $(v "$STATE_DIR")"
+  (umask 077 && mkdir -p -- "$STATE_DIR") || die "$X_FAILED" "cannot create $(v "$STATE_DIR")"
   chmod 700 -- "$STATE_DIR" "$(dirname -- "$STATE_DIR")" 2>/dev/null || true
 }
 
@@ -246,17 +270,24 @@ lock_generation() { printf '%s-%s' "$(ls -di -- "$LOCK_DIR" 2>/dev/null | awk '{
 
 # Atomic: only one reclaimer wins the rename.
 lock_reclaim() {
-  mv -- "$LOCK_DIR" "$LOCK_DIR.reclaim.$$" 2>/dev/null || return 1
-  rm -rf -- "$LOCK_DIR.reclaim.$$"
+  local moved="$LOCK_DIR.reclaim.$$" p
+  mv -- "$LOCK_DIR" "$moved" 2>/dev/null || return 1
+  # A slower reclaimer may have moved a lock another process just took; put a
+  # live owner's lock back rather than delete it.
+  p=$(cat -- "$moved/pid" 2>/dev/null)
+  if [[ $p =~ ^[0-9]+$ ]] && [ "$p" -gt 0 ] && [ "$p" -ne "$$" ] && kill -0 "$p" 2>/dev/null; then
+    mv -- "$moved" "$LOCK_DIR" 2>/dev/null || true
+    return 1
+  fi
+  rm -rf -- "$moved"
 }
 
 lock_stamp() {
   printf '%s\n' "$$" >|"$LOCK_DIR/pid" || return 1
-  date -u +%Y-%m-%dT%H:%M:%SZ >|"$LOCK_DIR/started" 2>/dev/null || true
 }
 
 release_lock() {
-  rm -f -- "$LOCK_DIR/pid" "$LOCK_DIR/started" 2>/dev/null
+  rm -f -- "$LOCK_DIR/pid" 2>/dev/null
   rmdir -- "$LOCK_DIR" 2>/dev/null || true
 }
 
@@ -268,7 +299,7 @@ release_lock() {
 acquire_lock() {
   local p gen1 gen2
   for _ in 1 2; do
-    if mkdir -- "$LOCK_DIR" 2>/dev/null; then
+    if (umask 077 && mkdir -- "$LOCK_DIR") 2>/dev/null; then
       lock_stamp || {
         rm -rf -- "$LOCK_DIR"
         return 1
@@ -292,18 +323,24 @@ acquire_lock() {
 
 # take_lock: continue/abort/restore resume a run whose process is gone.
 take_lock() {
-  if mkdir -- "$LOCK_DIR" 2>/dev/null; then
+  if (umask 077 && mkdir -- "$LOCK_DIR") 2>/dev/null; then
     lock_stamp
     return
   fi
   [ -d "$LOCK_DIR" ] || return 1
   if lock_pid_alive && [ "$(lock_pid)" != "$$" ]; then return 1; fi
+  # The owner is gone. Replace the lock through the same atomic rename the
+  # reclaim uses, so two concurrent takers cannot both win.
+  lock_reclaim || return 1
+  (umask 077 && mkdir -- "$LOCK_DIR") 2>/dev/null || return 1
   lock_stamp
 }
 
 write_state() {
   local tmp="$STATE_FILE.tmp.$$" i
-  {
+  (
+    umask 077
+
     printf 'v1\n'
     printf 'provider\t%s\n' "$S_PROVIDER"
     printf 'tool\t%s\n' "${S_TOOLVER:--}"
@@ -317,7 +354,7 @@ write_state() {
     for ((i = 0; i < ${#E_PATH[@]}; i++)); do
       printf 'entry\t%s\t%s\t%s\t%s\t%s\n' "${E_PATH[i]}" "${E_REF[i]}" "${E_SHA[i]}" "${E_PHASE[i]}" "${E_LOCK[i]}"
     done
-  } >|"$tmp" || {
+  ) >|"$tmp" || {
     rm -f -- "$tmp"
     return 1
   }
@@ -376,9 +413,18 @@ read_state() {
   return 0
 }
 
+# in_chain BRANCH: true when BRANCH is one of the recorded restack set (not the base).
+in_chain() {
+  local k
+  for ((k = 1; k < ${#S_CHAIN[@]}; k++)); do
+    [ "${S_CHAIN[k]}" != "$1" ] || return 0
+  done
+  return 1
+}
+
 # validate_state: nothing read from the state file reaches git until it passes.
 validate_state() {
-  local i b p
+  local i j b p
   STATE_ERR=""
   case $S_PROVIDER in graphite | github) ;; *)
     STATE_ERR="bad provider"
@@ -389,6 +435,11 @@ validate_state() {
     STATE_ERR="state belongs to another repository"
     return 1
   }
+  case $S_TOOLVER in *[[:cntrl:]]*)
+    STATE_ERR="control characters in tool field"
+    return 1
+    ;;
+  esac
   case $S_SUBMIT in 0 | 1) ;; *)
     STATE_ERR="bad submit flag"
     return 1
@@ -446,6 +497,16 @@ validate_state() {
       STATE_ERR="entry ref is not a valid refs/heads/ name"
       return 1
     }
+    in_chain "${E_REF[i]#refs/heads/}" || {
+      STATE_ERR="entry branch is not part of the recorded stack"
+      return 1
+    }
+    for ((j = 0; j < i; j++)); do
+      if [ "${E_PATH[j]}" = "$p" ]; then
+        STATE_ERR="duplicate entry path"
+        return 1
+      fi
+    done
     valid_sha "${E_SHA[i]}" || {
       STATE_ERR="entry sha is not a commit id"
       return 1
@@ -544,10 +605,16 @@ resolve_adapter() {
 # adapter_run ARGS...: run the adapter from the run worktree; it exits 0 with
 # JSON on stdout and inherits cwd. Sets AD_JSON, AD_STATUS, AD_STDERR, AD_RECOVERY.
 adapter_run() {
+  local parsed
   AD_JSON=$(cd -- "$RUN_WT" && node "$ADAPTER" "$@" 2>/dev/null)
-  AD_STATUS=$(printf '%s' "$AD_JSON" | jq -r '.status // "ERROR"' 2>/dev/null) || AD_STATUS=ERROR
-  AD_STDERR=$(printf '%s' "$AD_JSON" | jq -r '.stderr // ""' 2>/dev/null) || AD_STDERR=""
-  AD_RECOVERY=$(printf '%s' "$AD_JSON" | jq -r '.recoveryAction // ""' 2>/dev/null) || AD_RECOVERY=""
+  AD_STATUS=ERROR AD_RECOVERY="" AD_STDERR=""
+  # One jq call: status line, recovery line (newlines folded), then stderr.
+  parsed=$(printf '%s' "$AD_JSON" | jq -r '(.status // "ERROR"), ((.recoveryAction // "") | gsub("\n"; " ")), (.stderr // "")' 2>/dev/null) || return 0
+  {
+    IFS= read -r AD_STATUS
+    IFS= read -r AD_RECOVERY
+    AD_STDERR=$(cat)
+  } <<<"$parsed"
   return 0
 }
 
@@ -666,7 +733,7 @@ plan_graphite_stack() {
 }
 
 plan_github_stack() {
-  local ver i cur=-1 trunk names n
+  local ver i cur=-1 trunk names n rows name iscur
   command -v jq >/dev/null 2>&1 || {
     refuse "jq is required for the GitHub path"
     return
@@ -690,17 +757,22 @@ plan_github_stack() {
     refuse "gh stack view failed ($(v "$AD_STATUS")): $(v "$AD_RECOVERY")"
     return
   fi
-  trunk=$(printf '%s' "$AD_JSON" | jq -r '.stdout | fromjson | .trunk // empty' 2>/dev/null)
-  n=$(printf '%s' "$AD_JSON" | jq -r '.stdout | fromjson | .branches | length' 2>/dev/null)
-  [[ $n =~ ^[0-9]+$ ]] && [ "$n" -gt 0 ] && [ -n "$trunk" ] || {
+  # One jq call: the trunk, then "name<TAB>isCurrent" per branch.
+  rows=$(printf '%s' "$AD_JSON" | jq -r '.stdout | fromjson | (.trunk // ""), (.branches[] | "\(.name // "")\t\(.isCurrent)")' 2>/dev/null) || rows=""
+  trunk=${rows%%$'\n'*}
+  names=()
+  n=0
+  if [ "$rows" != "$trunk" ]; then
+    while IFS=$'\t' read -r name iscur; do
+      names+=("$name")
+      if [ "$iscur" = true ]; then cur=$n; fi
+      n=$((n + 1))
+    done <<<"${rows#*$'\n'}"
+  fi
+  if [ "$n" -eq 0 ] || [ -z "$trunk" ]; then
     refuse "could not read the stack from gh stack view"
     return
-  }
-  names=()
-  for ((i = 0; i < n; i++)); do
-    names+=("$(printf '%s' "$AD_JSON" | jq -r ".stdout | fromjson | .branches[$i].name")")
-    if [ "$(printf '%s' "$AD_JSON" | jq -r ".stdout | fromjson | .branches[$i].isCurrent")" = true ]; then cur=$i; fi
-  done
+  fi
   valid_branch "$trunk" || {
     refuse "unusable trunk name from gh stack view"
     return
@@ -726,14 +798,24 @@ plan_github_stack() {
 
 # --- restore ----------------------------------------------------------------
 
+FLOAT_SEEN=()
+S_PROVIDER=""
+
 # report_floating I: when entry I's worktree is detached at a commit other than
 # the recorded one (someone committed or moved HEAD during the pause), print the
 # floating commits and a rescue line and return 0. A checkout would orphan
 # them, so restore never runs over them.
 report_floating() {
-  local i=$1 path=${E_PATH[$1]} sha=${E_SHA[$1]} head
+  local i=$1 path=${E_PATH[$1]} sha=${E_SHA[$1]} head seen
+  # Never run git on a path that is not a registered worktree.
+  [ "$(wt_index "$path")" -ge 0 ] || return 1
+  git -C "$path" symbolic-ref -q HEAD >/dev/null 2>&1 && return 1
   head=$(git -C "$path" rev-parse HEAD 2>/dev/null) || return 1
   [ "$head" != "$sha" ] || return 1
+  for ((seen = 0; seen < ${#FLOAT_SEEN[@]}; seen++)); do
+    [ "${FLOAT_SEEN[seen]}" != "$path" ] || return 0
+  done
+  FLOAT_SEEN+=("$path")
   err "$(v "$path") is detached at a different commit than recorded ($(v "${head:0:12}") vs $(v "${sha:0:12}")); not restoring it"
   git -C "$path" log --oneline -n "$MAX_LISTED" "$sha..HEAD" 2>/dev/null | while IFS= read -r line; do
     printf '  floating commit: %s\n' "$(v "$line")"
@@ -742,8 +824,12 @@ report_floating() {
   return 0
 }
 
-unlock_entry() { # unlock a worktree this run locked
-  if [ "${E_LOCK[$1]}" = 1 ]; then git worktree unlock -- "${E_PATH[$1]}" >/dev/null 2>&1 || true; fi
+unlock_entry() { # unlock a worktree this run locked, never someone else's lock
+  local wi
+  [ "${E_LOCK[$1]}" = 1 ] || return 0
+  wi=$(wt_index "${E_PATH[$1]}")
+  [ "$wi" -ge 0 ] && [ "${WT_LOCKREASON[wi]}" = "$PAUSE_REASON" ] || return 0
+  git worktree unlock -- "${E_PATH[$1]}" >/dev/null 2>&1 || true
 }
 
 # restore_entries: per-entry best effort over E_*. Restored and dropped entries
@@ -921,11 +1007,19 @@ do_pause() {
 on_exit() {
   local rc=$?
   trap - EXIT
-  [ -z "${LOG:-}" ] || rm -f -- "$LOG"
   if [ "${ARMED:-0}" = 1 ]; then
     ARMED=0
-    err "interrupted; restoring worktrees"
-    if ! restore_and_clear && [ "$rc" -eq 0 ]; then rc=$X_PARTIAL; fi
+    if [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; then
+      # Interrupted with a conflict paused: restoring now would strand the
+      # provider's own --continue. Keep the state and lock the worktrees.
+      lock_detached_entries
+      write_state || true
+      err "interrupted while a conflict was paused; run /worktree:restack --continue or --abort"
+      [ "$rc" -ne 0 ] || rc=$X_PAUSED
+    else
+      err "interrupted; restoring worktrees"
+      if ! restore_and_clear && [ "$rc" -eq 0 ]; then rc=$X_PARTIAL; fi
+    fi
   fi
   exit "$rc"
 }
@@ -938,22 +1032,18 @@ arm_cleanup() {
   trap 'exit 129' HUP
 }
 
-show_log() { [ -z "${LOG:-}" ] || cap_lines 40 <"$LOG"; }
 
 # --- provider steps ---------------------------------------------------------
 # Each sets RESULT to ok | conflict | failed.
 
 step_graphite() { # step_graphite restack|continue|abort
-  LOG=$(mktemp "$STATE_DIR/run.XXXXXX") || die "$X_FAILED" "cannot create a log file"
-  local rc=0
+  local rc=0 out
   case $1 in
-    restack) (cd -- "$S_RUN" && gt restack --upstack --no-interactive) >|"$LOG" 2>&1 || rc=$? ;;
-    continue) (cd -- "$S_RUN" && gt continue --no-interactive) >|"$LOG" 2>&1 || rc=$? ;;
-    abort) (cd -- "$S_RUN" && gt abort --force) >|"$LOG" 2>&1 || rc=$? ;;
+    restack) out=$(cd -- "$S_RUN" && gt restack --upstack --no-interactive 2>&1) || rc=$? ;;
+    continue) out=$(cd -- "$S_RUN" && gt continue --no-interactive 2>&1) || rc=$? ;;
+    abort) out=$(cd -- "$S_RUN" && gt abort --force 2>&1) || rc=$? ;;
   esac
-  show_log
-  rm -f -- "$LOG"
-  LOG=""
+  printf '%s\n' "$out" | cap_lines 40
   if [ "$rc" -eq 0 ]; then
     RESULT=ok
   elif [ "$1" != abort ] && gt_paused "$S_RUN"; then
@@ -1014,15 +1104,15 @@ require_env() {
 
 print_plan() {
   local i
-  note "PROVIDER	$PROVIDER"
-  note "RUN	$(v "$RUN_WT")	${RUN_REF#refs/heads/}"
+  printf 'PROVIDER\t%s\n' "$PROVIDER"
+  printf 'RUN\t%s\t%s\n' "$(v "$RUN_WT")" "$(v "${RUN_REF#refs/heads/}")"
   printf 'CHAIN'
-  for i in "${S_CHAIN[@]}"; do printf '\t%s' "$(v "$i")"; done
+  for ((i = 0; i < ${#S_CHAIN[@]}; i++)); do printf '\t%s' "$(v "${S_CHAIN[i]}")"; done
   printf '\n'
   for ((i = 0; i < ${#SEL_PATH[@]}; i++)); do
-    note "WORKTREE	$(v "${SEL_PATH[i]}")	$(v "${SEL_BRANCH[i]}")	${SEL_ACTION[i]}"
+    printf 'WORKTREE\t%s\t%s\t%s\n' "$(v "${SEL_PATH[i]}")" "$(v "${SEL_BRANCH[i]}")" "${SEL_ACTION[i]}"
   done
-  for i in "${REFUSALS[@]+"${REFUSALS[@]}"}"; do note "REFUSE	$(v "$i")"; done
+  for i in "${REFUSALS[@]+"${REFUSALS[@]}"}"; do printf 'REFUSE\t%s\n' "$(v "$i")"; done
 }
 
 cmd_preflight() {
@@ -1031,17 +1121,17 @@ cmd_preflight() {
   require_env
   init_paths
   if in_progress; then
-    note "REFUSE	a restack is already in progress; run status, then --continue or --abort"
-    note "PREFLIGHT	in-progress"
+    printf 'REFUSE\ta restack is already in progress; run status, then --continue or --abort\n'
+    printf 'PREFLIGHT\tin-progress\n'
     exit "$X_BUSY"
   fi
   build_plan "$PROVIDER"
   print_plan
   if [ "${#REFUSALS[@]}" -gt 0 ]; then
-    note "PREFLIGHT	refused"
+    printf 'PREFLIGHT\trefused\n'
     exit "$X_REFUSED"
   fi
-  note "PREFLIGHT	ok"
+  printf 'PREFLIGHT\tok\n'
 }
 
 cmd_start() {
@@ -1056,7 +1146,7 @@ cmd_start() {
   build_plan "$PROVIDER"
   if [ "${#REFUSALS[@]}" -gt 0 ]; then
     print_plan
-    note "PREFLIGHT	refused"
+    printf 'PREFLIGHT\trefused\n'
     exit "$X_REFUSED"
   fi
 
@@ -1073,10 +1163,15 @@ cmd_start() {
   S_TOKEN=$(new_token)
   E_PATH=() E_REF=() E_SHA=() E_PHASE=() E_LOCK=()
   if [ "$PROVIDER" = graphite ]; then
+    local sha
     for ((i = 0; i < ${#SEL_PATH[@]}; i++)); do
+      sha=$(git -C "${SEL_PATH[i]}" rev-parse HEAD 2>/dev/null) || {
+        release_lock
+        die "$X_FAILED" "cannot read HEAD of $(v "${SEL_PATH[i]}"); nothing was changed"
+      }
       E_PATH+=("${SEL_PATH[i]}")
       E_REF+=("refs/heads/${SEL_BRANCH[i]}")
-      E_SHA+=("$(git -C "${SEL_PATH[i]}" rev-parse HEAD)")
+      E_SHA+=("$sha")
       E_PHASE+=(detached)
       E_LOCK+=(0)
     done
@@ -1190,8 +1285,7 @@ cmd_abort() {
   fi
   step_github abort
   if [ "$RESULT" != ok ]; then die "$X_FAILED" "the provider's abort failed; state kept"; fi
-  clear_state
-  release_lock
+  restore_and_clear
   note "aborted"
 }
 
@@ -1201,6 +1295,9 @@ cmd_restore() {
   load_state_or_exit
   ensure_state_dir
   need_lock
+  if [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; then
+    note "warning: a conflict is still paused; restoring now strands the provider's own --continue. Prefer /worktree:restack --continue or --abort"
+  fi
   report_all_floating || true
   if restore_and_clear; then
     note "all worktrees restored"
@@ -1215,7 +1312,7 @@ cmd_status() {
   load_state_or_exit
   local i wi cur
   note "restack in progress"
-  note "provider: $S_PROVIDER ${S_TOOLVER:--}"
+  note "provider: $S_PROVIDER $(v "${S_TOOLVER:--}")"
   note "run worktree: $(v "$S_RUN")"
   note "submit after restack: $([ "$S_SUBMIT" = 1 ] && echo yes || echo no)"
   printf 'stack: %s' "$(v "${S_CHAIN[0]}")"
@@ -1224,6 +1321,10 @@ cmd_status() {
   if gt_paused "$S_RUN" 2>/dev/null; then note "a conflict is paused in the run worktree"; fi
   for ((i = 0; i < ${#E_PATH[@]}; i++)); do
     wi=$(wt_index "${E_PATH[i]}")
+    if [ "$wi" -lt 0 ]; then
+      note "  missing:   $(v "${E_PATH[i]}") is no longer a worktree"
+      continue
+    fi
     cur=${WT_BRANCH[wi]}
     if [ "$cur" = "${E_REF[i]}" ]; then
       note "  on branch: $(v "${E_PATH[i]}") ($(v "${E_REF[i]#refs/heads/}"))"
@@ -1239,23 +1340,29 @@ cmd_status() {
 # status with no state still looks for a stranded worktree: detached at the tip
 # of a local branch that no worktree has checked out.
 stranded_scan() {
-  local i b sha tip
+  local i tip b refs
   load_worktrees
+  refs=$(git for-each-ref --format='%(objectname) %(refname:short)' refs/heads 2>/dev/null)
   for ((i = 0; i < ${#WT_PATH[@]}; i++)); do
-    [ -z "${WT_BRANCH[i]}" ] && [ "${WT_BARE[i]}" -eq 0 ] && [ -n "${WT_HEAD[i]}" ] || continue
-    while IFS= read -r b; do
-      tip=$(git rev-parse "refs/heads/$b" 2>/dev/null) || continue
+    if [ -n "${WT_BRANCH[i]}" ] || [ "${WT_BARE[i]}" -ne 0 ] || [ -z "${WT_HEAD[i]}" ]; then continue; fi
+    while read -r tip b; do
       [ "$tip" = "${WT_HEAD[i]}" ] || continue
-      branch_holder "refs/heads/$b" >/dev/null && continue
+      if branch_holder "refs/heads/$b" >/dev/null; then continue; fi
       note "possibly stranded: $(v "${WT_PATH[i]}") is detached at the tip of $(v "$b")"
       note "  fix: git -C $(q "${WT_PATH[i]}") checkout $(q "$b")"
-    done < <(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)
+    done <<<"$refs"
   done
 }
 
 main() {
   local sub=${1:-}
   [ $# -eq 0 ] || shift
+  case $sub in
+    -h | --help | help)
+      awk 'NR==1{next} /^#/{sub(/^# ?/, ""); print; next} {exit}' "${BASH_SOURCE[0]}"
+      exit "$X_OK"
+      ;;
+  esac
   repo_top >/dev/null || die "$X_USAGE" "not inside a git repository"
   cd -- "$(repo_top)" || exit "$X_USAGE"
   case $sub in
@@ -1273,9 +1380,6 @@ main() {
         exit "$X_OK"
       fi
       cmd_status "$@"
-      ;;
-    -h | --help | help)
-      sed -n '2,35p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       ;;
     *) die "$X_USAGE" "usage: worktree-restack.sh preflight|start|continue|abort|restore|status [--provider graphite|github] [--submit]" ;;
   esac

@@ -9,10 +9,11 @@ bats_require_minimum_version 1.5.0
 setup() {
   SCRIPT="$BATS_TEST_DIRNAME/../scripts/worktree-restack.sh"
   MOCKS="$BATS_TEST_DIRNAME/mocks"
+  export STUB_MOCKS="$MOCKS"
   T="$BATS_TEST_TMPDIR"
   export HOME="$T/home"
   mkdir -p "$HOME"
-  export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+  export LC_ALL=C GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
   export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid
   export GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
   STUB_REAL_GIT="$(command -v git)"
@@ -348,6 +349,8 @@ forge() {
     "$wtb|refs/heads/b|not-a-sha|"
     "$wtb|refs/heads/b|$sha|/tmp/other-repo/.git"
     "$wtb|refs/heads/../b|$sha|"
+    "$wtb|refs/heads/not-in-stack|$sha|"
+    "relative/path|refs/heads/b|$sha|"
   )
   local c p r s cm
   for c in "${cases[@]}"; do
@@ -373,6 +376,26 @@ forge() {
   [ -z "$(branch_of "$(wtp b)")" ]
   run grep -F 'checkout --quiet' "$STUB_DIR/git.log"
   [ "$status" -eq 1 ]
+}
+
+@test "a state with a duplicate entry path, the run worktree as an entry, or a bad chain is rejected" {
+  mk_stack
+  git -C "$(wtp b)" checkout -q --detach
+  sha=$(git -C "$(wtp b)" rev-parse HEAD)
+  wtb=$(cd "$(wtp b)" && pwd -P)
+  forge "$wtb" refs/heads/b "$sha"
+  printf 'entry\t%s\trefs/heads/b\t%s\tdetached\t0\n' "$wtb" "$sha" >>"$SD/state"
+  run bash "$SCRIPT" restore
+  [ "$status" -eq 4 ]
+  [[ $output == *"duplicate entry path"* ]]
+  forge "$(cd "$(wtp a)" && pwd -P)" refs/heads/a "$sha"
+  run bash "$SCRIPT" restore
+  [ "$status" -eq 4 ]
+  forge "$wtb" refs/heads/b "$sha"
+  sed -i 's/^chain\t.*/chain\tmain/' "$SD/state"
+  run bash "$SCRIPT" restore
+  [ "$status" -eq 4 ]
+  [ -z "$(branch_of "$wtb")" ]
 }
 
 @test "a state file that is a symlink is rejected" {
@@ -408,7 +431,7 @@ forge() {
   run bash "$SCRIPT" restore
   [ "$status" -eq 40 ]
   [[ $output == *"dropped: branch c no longer exists"* ]]
-  [[ $output == *"kept: checkout of b"*"already used by worktree"* ]]
+  [[ $output == *"kept: checkout of b"*"was refused"* ]]
   [ -e "$SD/state" ]
 }
 
@@ -524,6 +547,7 @@ forge() {
 # --- GitHub path -------------------------------------------------------------
 
 @test "github (gh-stack 0.2.x): rebases from the current worktree with no detach" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
   mk_stack
   STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
   [ "$status" -eq 0 ]
@@ -535,6 +559,7 @@ forge() {
 }
 
 @test "github: a conflict pauses with no detach and --continue finishes" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
   mk_stack b
   STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
   [ "$status" -eq 10 ]
@@ -548,6 +573,7 @@ forge() {
 }
 
 @test "github: a conflict then --abort clears the state" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
   mk_stack b
   STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
   [ "$status" -eq 10 ]
@@ -570,6 +596,7 @@ forge() {
 }
 
 @test "github: the adapter is found in the installed plugin cache, highest version wins" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
   mk_stack
   local ver
   mkdir -p "$T/cache/yellow-core/2.6.2"

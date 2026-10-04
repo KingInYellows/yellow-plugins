@@ -213,6 +213,10 @@ Safety rules the script holds:
   lands on no branch, and the script reports it and refuses to restore over it.
 - State lives in `<git-common-dir>/yellow-core/worktree-restack/` and is
   re-validated on every read; a rejected state file runs nothing.
+- Residual: the dirty check ignores gitignored files, and a restore checkout
+  overwrites an ignored file when the restacked branch now tracks that path.
+  A model that writes a self-consistent state file is also not stopped, only
+  constrained to this repository's worktrees and the recorded stack branches.
 
 Exit codes are documented in the script header.
 
