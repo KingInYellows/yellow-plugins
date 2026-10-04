@@ -808,7 +808,7 @@ case "$VERDICT" in
   APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE|QUOTA_EXHAUSTED) ;;
   *) VERDICT="UNKNOWN"; CONFIDENCE="LOW" ;;
 esac
-# QUOTA_EXHAUSTED is produced only by the explicit non-zero-exit arm in Step 6, which
+# QUOTA_EXHAUSTED is produced only by the explicit non-zero-exit arm in Step 4, which
 # prints its own stub and exits. A Verdict: line in the model's output is untrusted
 # text (a prompt-injected diff could write one), so it must not drop real findings.
 [ "$VERDICT" != "QUOTA_EXHAUSTED" ] || { VERDICT="UNKNOWN"; CONFIDENCE="LOW"; }
