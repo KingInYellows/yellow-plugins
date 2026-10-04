@@ -335,8 +335,14 @@ rp_link_target_changed() {
 
 # rp_ignored_changed_since <marker> <scratch>: the guard for gitignored files,
 # which rp_tree_changes cannot see: a resolver edit to an ignored executable
-# (node_modules/.bin/<runner>) would run with the verify command. A resolver
-# cannot backdate a file's mtime (it only has edit tools), so any ignored
+# (node_modules/.bin/<runner>) would run with the verify command. This relies
+# on one assumption: the resolver cannot backdate a file's mtime, which holds
+# only while it has no shell (Read/Grep/Glob/Edit; Edit always bumps the
+# mtime). pr-comment-resolver listed Bash until the resolve-dispositions PR
+# (#954) removed it; until that lands, `touch -r <marker>` defeats this check,
+# and a content snapshot would need a new caller step and a hash of every
+# ignored file (node_modules included), so the tool restriction closes the gap
+# instead. Any ignored
 # regular file or symlink with an mtime newer than <marker> (a file the
 # caller touched before the resolvers started) counts as changed. A symlink
 # counts when its own mtime is newer, and its target is judged too, because a
@@ -432,8 +438,12 @@ rp_ignored_changed_since() {
 # honours core.hooksPath). Prints its repository-relative path and returns 0
 # when it lies inside the working tree (the git directory does not count) and
 # any file under it is untracked or ignored; returns 1 when it is fine (no such
-# directory, outside the working tree, or every file tracked), 2 when it
-# cannot be inspected and 3 when the hooks path passes through a symlink that
+# directory, no hook file outside the working tree or in the git directory, or
+# every in-tree file tracked), 2 when it cannot be inspected, 4 when the
+# directory is in the git directory (.git/hooks) or outside the working tree
+# and holds a file other than a .sample (it prints `git-dir` or `external`:
+# tracked state cannot vouch for it, so the caller must disable hooks for the
+# commit) and 3 when the hooks path passes through a symlink that
 # lives inside the working tree (the git directory included, so a symlinked
 # .git/hooks or .git counts). A caller must treat 2 and 3 as refusals. On 3 it
 # prints the repository-relative path of that symlink: a resolver can edit
@@ -446,7 +456,7 @@ rp_ignored_changed_since() {
 # too: their files cannot be told from a planted one.
 rp_hooks_untracked() {
     (
-        local hp top gitdir rel cur rest c next spec=()
+        local hp top gitdir rel cur rest c next kind spec=()
         top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 2
         cd -- "$top" 2>/dev/null || exit 2
         top=$(pwd -P) || exit 2
@@ -480,11 +490,26 @@ rp_hooks_untracked() {
         hp=$(cd -- "$hp" 2>/dev/null && pwd -P) || exit 2
         gitdir=$(git rev-parse --git-common-dir 2>/dev/null) || exit 2
         gitdir=$(cd -- "$gitdir" 2>/dev/null && pwd -P) || exit 2
-        case "$hp" in "$gitdir"|"$gitdir"/*) exit 1 ;; esac
+        # A hooks directory Git does not list (the git directory) or that lies
+        # outside the working tree cannot be judged by tracked state, and a
+        # resolver can rewrite an existing hook there (Edit follows the path).
+        # Report a real hook file (anything but a .sample) as 4: the caller
+        # disables hooks for the commit rather than running unverified code.
+        kind=""
+        case "$hp" in
+            "$gitdir"|"$gitdir"/*) kind=git-dir ;;
+            "$top"|"$top"/*) ;;
+            *) kind=external ;;
+        esac
+        if [ -n "$kind" ]; then
+            c=$(find "$hp" -mindepth 1 ! -name '*.sample' -print -quit 2>/dev/null) || exit 2
+            [ -n "$c" ] || exit 1
+            printf '%s' "$kind"
+            exit 4
+        fi
         case "$hp" in
             "$top") rel=. ;;
-            "$top"/*) rel="${hp#"$top"/}" ;;
-            *) exit 1 ;;
+            *) rel="${hp#"$top"/}" ;;
         esac
         # The whole tree when the hooks directory is the repository root.
         [ "$rel" = . ] || spec=(-- "$rel")

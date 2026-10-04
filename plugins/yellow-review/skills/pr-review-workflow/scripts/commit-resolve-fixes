@@ -75,12 +75,17 @@
 # before anything is staged: the commit would run them and the dirty-set check
 # cannot see them (lib/resolve-paths.sh rp_hooks_untracked). A hooks path that
 # passes through a symlink located inside the working tree (a symlinked
-# .hooks, or .git/hooks) is refused the same way, whatever it points to.
+# .hooks, or .git/hooks) is refused the same way, whatever it points to. A
+# hook file in .git/hooks or in a hooks directory outside the working tree
+# cannot be verified, so the commit and the submit run with git hooks disabled
+# (GIT_CONFIG_COUNT override, checked) and a note on stderr.
 # Network diagnostics in the verify messages (git ls-remote, gh pr view
 # stderr) go through the credential redactor lib/verify-run.sh loads
 # (vr_load_redactor); with no redactor the diagnostic is withheld.
 # --unattended also refuses the YELLOW_REVIEW_GITHUB_STACK_RUNTIME file when it
-# is inside the repository and listed (rp_runner).
+# is inside the repository and listed (rp_runner). With the github provider,
+# whichever runtime will run (override or default sibling) that lies inside the
+# repository must be tracked, unmodified and not hidden from status.
 # The github runtime is given --remote only for an explicit choice
 # (branch pushRemote, remote.pushDefault, or the sole remote); otherwise it
 # refuses an ambiguous setup itself (status INVALID_ARGS, exit 5). Graphite
@@ -231,8 +236,8 @@ fi
 DIRTY_FILE=$(mktemp) || die 2 "mktemp failed"
 NET_ERR=$(mktemp) || die 2 "mktemp failed"
 # ADDED: the added lines of the staged diff, then of the commit. APPROVED: the
-# added lines the user saw and approved (override only). REMAINING: the
-# commit's added lines minus the approved ones.
+# "<path><TAB><line>" records the user saw and approved (override only).
+# REMAINING: the commit's records, filtered into ADDED for the scan.
 ADDED=$(mktemp) || die 2 "mktemp failed"
 APPROVED=$(mktemp) || die 2 "mktemp failed"
 REMAINING=$(mktemp) || die 2 "mktemp failed"
@@ -255,11 +260,21 @@ redact_line() {
 # credential redactor applied (a token assignment or Authorization header that
 # a credential helper printed is not URL userinfo), capped. When the redactor
 # is unavailable the diagnostic is withheld, not printed raw.
+#
+# With an argument, last_err screens that text (stderr a caller captured in a
+# shell variable, so no raw diagnostic is ever written to disk). With none it
+# reads the $NET_ERR file, which holds a network tool's raw stderr until the
+# EXIT trap removes it (a SIGKILL skips the trap).
 last_err() {
-    local line
-    [ -s "$NET_ERR" ] || return 0
-    # Bounded before screening: the file is a network tool's raw stderr.
-    line=$(head -c 8192 "$NET_ERR" 2>/dev/null | head -n 1 | tr -d '[:cntrl:]' | sed 's#://[^/@ ]*@#://***@#g') || true
+    local line raw
+    if [ "$#" -gt 0 ]; then
+        raw=$1
+    else
+        [ -s "$NET_ERR" ] || return 0
+        raw=$(head -c 8192 "$NET_ERR" 2>/dev/null) || true
+    fi
+    # Bounded before screening: the text is a network tool's raw stderr.
+    line=$(printf '%s\n' "$raw" | head -c 8192 | head -n 1 | tr -d '[:cntrl:]' | sed 's#://[^/@ ]*@#://***@#g') || true
     [ -n "$line" ] || return 0
     if ! line=$(printf '%s\n' "$line" | redact_line 2>/dev/null); then
         printf '%s' '[diagnostic withheld: credential redaction unavailable]'
@@ -378,7 +393,10 @@ fi
 # Neither known fails closed.
 ACTIVE_HOST=$(norm_host "${GH_HOST:-$PR_URL_HOST}") \
     || die 3 "could not determine the active GitHub host (set GH_HOST); nothing committed"
-PUSH_PARSED=$(remote_parse "$(git remote get-url --push -- "$REMOTE_NAME" 2>/dev/null || true)") \
+# Captured once: the head check after the push queries this same URL, since a
+# remote's fetch URL (what `git ls-remote <name>` reads) can differ from it.
+PUSH_URL=$(git remote get-url --push -- "$REMOTE_NAME" 2>/dev/null || true)
+PUSH_PARSED=$(remote_parse "$PUSH_URL") \
     || die 3 "cannot tell which repository remote '$(safe_name "$REMOTE_NAME")' pushes to (unreadable, unparseable or unsupported push URL); nothing committed"
 read -r PUSH_HOST PUSH_SLUG <<<"$PUSH_PARSED"
 case "$PR_REPO" in
@@ -393,33 +411,53 @@ host_matches "$ACTIVE_HOST" "$PUSH_HOST" \
 # The commit runs the effective git hooks. An untracked or ignored file in a
 # hooks directory inside the working tree is invisible to the dirty-set check
 # above, so a resolver could have planted or edited one: refuse before staging.
-# (A hooks directory outside the working tree, or one whose files are all
-# tracked, is unchanged; see rp_hooks_untracked.) A hooks path that goes
+# (A hooks directory whose in-tree files are all tracked runs as before; see
+# rp_hooks_untracked.) A hooks path that goes
 # through a symlink inside the working tree is refused too: a resolver can edit
 # the hooks through the link with no change Git reports.
+# A hook in .git/hooks or in a directory outside the working tree has no
+# tracked state to judge, and a resolver can rewrite an existing one (or point
+# core.hooksPath at such a directory), so the commit runs with every git hook
+# disabled instead. The override is environment config (GIT_CONFIG_COUNT), so
+# gt and the submit step inherit it; it is verified, failing closed on a git
+# too old to read it.
+disable_git_hooks() {
+    local n="${GIT_CONFIG_COUNT:-0}"
+    case "$n" in ''|*[!0-9]*) die 3 "GIT_CONFIG_COUNT is not a number, so git hooks cannot be disabled; nothing committed" ;; esac
+    n=$((10#$n))
+    export "GIT_CONFIG_KEY_$n=core.hooksPath" "GIT_CONFIG_VALUE_$n=/dev/null" "GIT_CONFIG_COUNT=$((n + 1))"
+    [ "$(git config --get core.hooksPath 2>/dev/null)" = /dev/null ] \
+        || die 3 "could not disable git hooks for the commit; nothing committed"
+    printf '[commit-resolve-fixes] Note: the git hooks in the %s hooks directory are not verified, so the commit and the submit run with git hooks disabled\n' "$1" >&2
+}
 HOOKS_RC=0
 HOOKS_DIR=$(rp_hooks_untracked "$DIRTY_FILE") || HOOKS_RC=$?
 case "$HOOKS_RC" in
+    4) disable_git_hooks "$HOOKS_DIR" ;;
     0) die 3 "refusing to commit: git hooks directory '$(safe_name "$HOOKS_DIR")' holds untracked or ignored files that the commit would run; nothing committed" ;;
     3) die 3 "refusing to commit: the git hooks path goes through the symlink '$(safe_name "$HOOKS_DIR")' inside the working tree, so hook edits would be invisible to the change check; nothing committed" ;;
     1) ;;
     *) die 3 "could not inspect the git hooks directory; nothing committed" ;;
 esac
 
-# An override that resolves inside the repository runs with submission
-# authority, and an ignored one can be rewritten without showing in the
-# tree-change check. Judge the file itself: it must be tracked and unmodified
-# (ignored, untracked and modified are refused, with the path and never the
-# contents). An override outside the repository and the default sibling
-# runtime are not judged. <failer> is die-compatible: `die 3` before the
-# commit, undo_commit after it.
+# The runtime that will run ($RUNTIME: the override, else the sibling
+# find_runtime picked) runs with submission authority. When it resolves inside
+# the repository, an ignored or assume-unchanged one can be rewritten without
+# showing in the tree-change check. Judge the file itself: it must be tracked
+# and unmodified (ignored, untracked, hidden and modified are refused, with
+# the path and never the contents). A runtime outside the repository (the
+# usual installed-cache sibling) is not judged. The override's checker reads
+# the variable, so it is pointed at $RUNTIME for the call (in a subshell, so
+# the caller's environment is untouched). <failer> is die-compatible: `die 3`
+# before the commit, undo_commit after it.
 runtime_override_check() {
-    local failer="$1" tail="$2" bad rc=0
-    bad=$(rp_runtime_override_untrusted) || rc=$?
+    local failer="$1" tail="$2" bad rc=0 what="github-stack-runtime override"
+    [ -n "${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-}" ] || what="default github-stack-runtime"
+    bad=$(YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$RUNTIME"; export YELLOW_REVIEW_GITHUB_STACK_RUNTIME; rp_runtime_override_untrusted) || rc=$?
     case "$rc" in
-        0) set -- "refusing to run the github-stack-runtime override '$(safe_name "$bad")': inside the repository it must be tracked and unmodified (it is ignored, untracked or modified); $tail" ;;
+        0) set -- "refusing to run the $what '$(safe_name "$bad")': inside the repository it must be tracked and unmodified (it is ignored, untracked, hidden from status or modified); $tail" ;;
         1) return 0 ;;
-        *) set -- "could not verify the github-stack-runtime override${bad:+ '$(safe_name "$bad")'}; $tail" ;;
+        *) set -- "could not verify the $what${bad:+ '$(safe_name "$bad")'}; $tail" ;;
     esac
     if [ "$failer" = die ]; then die 3 "$1"; else "$failer" "$1"; fi
 }
@@ -452,8 +490,18 @@ if [ "$ALLOW_CREDENTIAL" = 0 ] && ! rt_text_clean "$ADDED"; then
 fi
 # With the override, remember what was approved so the post-commit scan can
 # still refuse anything a hook adds.
+# Each record is "<path><TAB><added line>", so the post-commit exemption is
+# per file and per occurrence. git quotes a path that holds a tab or newline,
+# so the first tab always ends the path.
+added_by_path() {
+    awk '/^diff --git / { h = 0; f = ""; next }
+         !h && /^\+\+\+ / { f = substr($0, 5); next }
+         /^@@/ { h = 1; next }
+         h && /^\+/ { printf "%s\t%s\n", f, substr($0, 2) }'
+}
 if [ "$ALLOW_CREDENTIAL" = 1 ]; then
-    cp -- "$ADDED" "$APPROVED" || {
+    git diff --cached --no-renames --no-color --no-ext-diff --no-textconv --text -U0 \
+        | added_by_path >|"$APPROVED" || {
         lgit reset -q -- "${EXPECTED[@]}" || true
         die 3 "could not record the approved added lines; nothing committed"
     }
@@ -500,13 +548,22 @@ fi
 git diff --no-renames --no-color --no-ext-diff --no-textconv --text -U0 "$BEFORE" "$SHA" \
     | rt_added_lines >|"$ADDED" \
     || undo_commit "could not extract the added lines from the commit for the credential scan; nothing submitted"
-# With the override, drop only added lines identical to an approved one (grep
-# exits 1 when nothing is left, which is fine); the rest is scanned as usual.
+# With the override, drop only added lines the user approved, matched by path
+# and occurrence: each approved "<path><TAB><line>" record cancels one
+# identical record in the commit, so a hook that moves or duplicates an approved
+# line into another file, or repeats it, leaves the extra occurrence to be
+# scanned as usual.
 SCAN_FILE="$ADDED"
 if [ "$ALLOW_CREDENTIAL" = 1 ]; then
-    LC_ALL=C grep -vxFf "$APPROVED" "$ADDED" >|"$REMAINING" || [ $? -eq 1 ] \
+    git diff --no-renames --no-color --no-ext-diff --no-textconv --text -U0 "$BEFORE" "$SHA" \
+        | added_by_path >|"$REMAINING" \
+        || undo_commit "could not extract the added lines from the commit for the credential scan; nothing submitted"
+    # Test FILENAME, not NR == FNR: an empty first file would make the second
+    # one look like the first.
+    LC_ALL=C awk 'FILENAME == ARGV[1] { n[$0]++; next }
+                  n[$0] > 0 { n[$0]--; next }
+                  { print substr($0, index($0, "\t") + 1) }' "$APPROVED" "$REMAINING" >|"$ADDED" \
         || undo_commit "could not filter the approved lines for the credential scan; nothing submitted"
-    SCAN_FILE="$REMAINING"
 fi
 if ! rt_text_clean "$SCAN_FILE"; then
     undo_commit "credential-shaped: the commit looks like it contains a credential, or could not be scanned (a hook may have added it); nothing submitted"
@@ -544,10 +601,12 @@ case "$PROVIDER" in
 esac
 
 # --- Verify the published head ---
+# Read from the validated push URL, not the remote name: with separate fetch
+# and push URLs (fork setups) the name resolves to the fetch URL.
 # The branch ref is updated synchronously by the submit; the PR's
 # headRefOid can lag, so only that check backs off.
 LS_RC=0
-LS_OUT=$(bounded "$NET_TIMEOUT" git ls-remote "$REMOTE_NAME" "refs/heads/$BRANCH" 2>"$NET_ERR") || LS_RC=$?
+LS_OUT=$(bounded "$NET_TIMEOUT" git ls-remote -- "$PUSH_URL" "refs/heads/$BRANCH" 2>"$NET_ERR") || LS_RC=$?
 REMOTE=$(printf '%s\n' "$LS_OUT" | awk 'NR == 1 { print $1 }')
 if [ "$REMOTE" != "$SHA" ]; then
     why=$(last_err)
@@ -556,15 +615,20 @@ if [ "$REMOTE" != "$SHA" ]; then
 fi
 PR_HEAD=""
 PR_RC=0
+PR_ERR=""
 for delay in 0 ${YELLOW_REVIEW_VERIFY_BACKOFF:-2 4 8 16}; do
     [ "$delay" -gt 0 ] && sleep "$delay"
     PR_RC=0
-    PR_JSON=$(gh pr view "$PR" --json headRefOid 2>"$NET_ERR") || PR_RC=$?
+    # stderr (possibly credential-bearing) is captured in memory, never on
+    # disk; stdout (the head OID, not sensitive) goes to the $NET_ERR scratch
+    # file. >| because the file exists and the shell may have noclobber set.
+    PR_ERR=$(gh pr view "$PR" --json headRefOid 2>&1 >|"$NET_ERR") || PR_RC=$?
+    PR_JSON=$(cat "$NET_ERR" 2>/dev/null || true)
     PR_HEAD=$(printf '%s' "$PR_JSON" | jq -r '.headRefOid // empty' 2>/dev/null || true)
     [ "$PR_HEAD" = "$SHA" ] && break
 done
 if [ "$PR_HEAD" != "$SHA" ]; then
-    why=$(last_err)
+    why=$(last_err "$PR_ERR")
     [ "$PR_RC" -eq 124 ] || [ "$PR_RC" -eq 137 ] && why="gh pr view timed out after ${NET_TIMEOUT}s"
     die 6 "head not verified: local=$SHA pr=${PR_HEAD:-none}${why:+ ($why)}"
 fi

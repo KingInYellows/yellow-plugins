@@ -625,28 +625,29 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   issue history can time it out (exit 4); raise the variable for that
   repository.
 - The Linear follow-up path has no marker lookup before `save_issue`, and an
-  ambiguous Linear failure falls back to GitHub. Marker dedupe therefore holds
-  only for the GitHub tracker: a Linear issue that was created but not confirmed
-  can be followed by a GitHub issue for the same thread, and a re-run that
-  reaches Linear again can file a second Linear issue.
-- The text screen refuses credential shapes, markdown images, `@` mentions and
-  URLs on a host other than the repository's. It does not stop other ways to
-  notify or mislead (an `owner/repo#1` cross-reference, a bare `www.` link, raw
-  HTML); the 200-character single-line limit on `evidence` and `oos_reason`
-  bounds them, and the reply templates put the outcome first. A legitimate
-  `@word` in a reply (a decorator name outside a code span) is refused too: the
-  orchestrator then posts the plain outcome sentence.
-- A repo with Issues disabled makes `file-followup-issue` exit 7 before it
-  files. The thread gets the fixed `Not filed` reply and stays open on every
-  run, so a human has to file the issue or turn Issues on.
-- Unattended commit and submit run the repository's git hooks (for example a
-  husky pre-push `pnpm test`) on resolver-edited code. Runner and hook
-  definition files are refused, but the code the hooks run is not. How
-  unattended commits should treat hooks is an open decision.
-- Step 7 costs about three tool calls per thread; very large PRs (hundreds of
-  threads) are slow. A batch apply script would help and is not written.
-- Two accounts resolving the same PR concurrently can each post a reply; markers
-  dedupe only per viewer.
+  ambiguous Linear failure falls back to GitHub. Marker dedupe therefore
+  holds only for the GitHub tracker: a Linear issue that was created but not
+  confirmed can be followed by a GitHub issue for the same thread, and a
+  re-run that reaches Linear again can file a second Linear issue.
+- The credential screen refuses credential shapes only. Resolver-written
+  text can still carry `@` mentions, external URLs or markdown images; the
+  200-character single-line limit on `evidence` and `oos_reason` bounds it,
+  and the reply templates put the outcome first.
+- A repo with Issues disabled makes `file-followup-issue` exit 1 (`gh issue
+  list` fails), so its `oos` threads get no reply and stay open on every run.
+- `commit-resolve-fixes` disables git hooks for its commit and submit
+  (`core.hooksPath=/dev/null`, with a note on stderr) when the hooks
+  directory holds non-sample hooks it cannot verify: `.git/hooks` or a
+  directory outside the working tree. Hook managers that install there
+  (pre-commit, lefthook) therefore do not lint or format resolve commits.
+  Hooks in a tracked in-tree directory (for example husky's `.husky/`) still
+  run on resolver-edited code; runner and hook definition files are refused,
+  but the code the hooks run is not. How unattended commits should treat
+  hooks is an open decision.
+- Step 7 costs about three tool calls per thread; very large PRs (hundreds
+  of threads) are slow. A batch apply script would help and is not written.
+- Two accounts resolving the same PR concurrently can each post a reply;
+  markers dedupe only per viewer.
 - Two runs as the same viewer on one thread at the same moment can both pass
   `reply-pr-thread`'s pre-check before either posts, so both post a marked
   reply, possibly with different dispositions. The marker makes re-runs

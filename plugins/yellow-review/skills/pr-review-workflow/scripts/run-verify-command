@@ -321,6 +321,7 @@ fi
 # keep. Running refuses; the revert modes delete the entry without opening it,
 # so refusal cleanup still completes.
 TOP_REAL=$(pwd -P)
+TO_REMOVE=()
 for f in ${FILES[@]+"${FILES[@]}"}; do
     if [ -L "$f" ] || [ -f "$f" ] || [ ! -e "$f" ]; then
         continue
@@ -353,14 +354,11 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         HEAD_TYPE=$(git cat-file -t "HEAD:$f" 2>/dev/null) || HEAD_TYPE=""
         [ "$HEAD_TYPE" = blob ] \
             || die 2 "refusing to remove a directory that is not a replaced file (HEAD has ${HEAD_TYPE:-nothing} there): $f"
-        rm -rf -- "$f" 2>/dev/null
-    else
-        rm -f -- "$f" 2>/dev/null
     fi
-    if [ -e "$f" ] || [ -L "$f" ]; then
-        die 2 "cannot remove a path that is not a regular file or symlink: $f"
-    fi
-    add_reason "removed without reading, not a regular file or symlink: $f"
+    # Validated; the removal waits until the output setup below has succeeded,
+    # so a setup failure exits before anything is deleted that the checkout
+    # restoring the tracked file would never reach.
+    TO_REMOVE+=("$f")
 done
 
 # cwd is the top level, so the relative common dir resolves correctly (and
@@ -378,6 +376,19 @@ if [ "$MODE" = run ]; then
     LOG="$OUT_DIR/$STAMP.log"
     (umask 077 && : >"$LOG") || die 2 "cannot create $LOG"
 fi
+
+# Setup succeeded: now remove the entries validated above.
+for f in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
+    if [ -d "$f" ] && [ ! -L "$f" ]; then
+        rm -rf -- "$f" 2>/dev/null
+    else
+        rm -f -- "$f" 2>/dev/null
+    fi
+    if [ -e "$f" ] || [ -L "$f" ]; then
+        die 2 "cannot remove a path that is not a regular file or symlink: $f"
+    fi
+    add_reason "removed without reading, not a regular file or symlink: $f"
+done
 
 RC=0
 TIMED_OUT=0
@@ -507,7 +518,42 @@ save_patch() {
     done
 }
 TEXT_FILE=$(mktemp) || die 2 "mktemp failed"
+ADDED_FILE=$(mktemp) || die 2 "mktemp failed"
 SAVE_BIN_OK=0 SAVE_TEXT_OK=0
+PATCH_OUT="$PATCH"
+PATCH_SCREENED=0
+
+# A resolver can paste a credential into a listed file. Do not archive it: drop
+# the patch and still revert, so the secret leaves the disk. The resolver's
+# edit is regenerable; a credential must not persist under .git. Screen a
+# forced-text diff with the FULL credential rules (including the keyword rules),
+# and treat a screen that cannot answer as a hit. A keyword-shaped value such as
+# `password = "hunter22"` would otherwise stay in the archived patch under .git
+# after the later commit scan refuses it; that refusal does not delete the patch.
+# A run screens the snapshot before the verifier starts, so a SIGKILL or a host
+# death during the verifier cannot leave an unscreened patch under .git. The
+# verifier's own output is screened separately, on its way to the log.
+screen_patch() {
+    if [ "$SAVE_TEXT_OK" != 1 ] || ! rt_added_lines <"$TEXT_FILE" >"$ADDED_FILE"; then
+        rm -f -- "$PATCH"
+        die 2 "cannot screen the recovery patch; the command was not run and the tree is untouched"
+    fi
+    rt_looks_secret "$ADDED_FILE"
+    case $? in
+        1) ;;
+        0)
+            rm -f -- "$PATCH"
+            PATCH_OUT=""
+            add_reason "recovery patch withheld: added lines look like a credential"
+            ;;
+        *)
+            rm -f -- "$PATCH"
+            PATCH_OUT=""
+            add_reason "recovery patch withheld: the credential screen failed"
+            ;;
+    esac
+    PATCH_SCREENED=1
+}
 # A signal before the verify command starts (for example while a large diff is
 # written) leaves the tree untouched, so stop here: EXIT removes the provisional
 # patch. run_verify replaces these handlers once the command is running.
@@ -529,6 +575,7 @@ if [ "$MODE" = run ]; then
         rm -f -- "$PATCH"
         die 2 "could not snapshot the listed files before the verify command; the command was not run and the tree is untouched"
     fi
+    screen_patch
     # Which listed paths exist now: a verifier that deletes or recreates one
     # has lost the resolver's edit (checked after a passing run).
     PRE_PRESENT=()
@@ -606,7 +653,6 @@ if [ "$MODE" != run ]; then
     (save_patch "$PATCH" --binary) && SAVE_BIN_OK=1
     (save_patch "$TEXT_FILE" --text) && SAVE_TEXT_OK=1
 fi
-PATCH_OUT="$PATCH"
 if [ "$SAVE_BIN_OK" != 1 ]; then
     rm -f -- "$PATCH"
     jq -nc --arg r "$RESULT" --arg log "$LOG" --arg why "$REASON" \
@@ -615,35 +661,11 @@ if [ "$SAVE_BIN_OK" != 1 ]; then
     exit 0
 fi
 
-# A resolver can paste a credential into a listed file. Do not archive it: drop
-# the patch and still revert, so the secret leaves the disk. The resolver's
-# edit is regenerable; a credential must not persist under .git. Screen a
-# forced-text diff with the FULL credential rules (including the keyword rules),
-# and treat a screen that cannot answer as a hit. A keyword-shaped value such as
-# `password = "hunter22"` would otherwise stay in the archived patch under .git
-# after the later commit scan refuses it; that refusal does not delete the patch.
-ADDED_FILE=$(mktemp) || die 2 "mktemp failed"
-if [ "$SAVE_TEXT_OK" != 1 ] || ! rt_added_lines <"$TEXT_FILE" >"$ADDED_FILE"; then
-    rm -f -- "$PATCH"
-    die 2 "cannot screen the recovery patch"
-fi
-rt_looks_secret "$ADDED_FILE"
-RT_RC=$?
-# Screened: a clean patch is kept, a flagged one is removed below.
+# Run mode screened the snapshot before the verifier started; the other modes
+# screen it now.
+[ "$PATCH_SCREENED" = 1 ] || screen_patch
+# Screened: a clean patch is kept, a flagged one is already removed.
 PATCH_PROVISIONAL=0
-case $RT_RC in
-    1) ;;
-    0)
-        rm -f -- "$PATCH"
-        PATCH_OUT=""
-        add_reason "recovery patch withheld: added lines look like a credential"
-        ;;
-    *)
-        rm -f -- "$PATCH"
-        PATCH_OUT=""
-        add_reason "recovery patch withheld: the credential screen failed"
-        ;;
-esac
 
 # --- Revert the listed files ---
 REVERT_FAILS=()

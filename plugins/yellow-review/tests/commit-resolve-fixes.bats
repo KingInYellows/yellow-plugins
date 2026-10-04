@@ -15,13 +15,41 @@ setup() {
 # The fixture remotes are local bare repositories. The script reads each
 # remote's push URL, so present the two local ones to it (and only it, via
 # environment config: the tests' own git push calls still use local paths) as
-# the PR's head repository, the gh stub's acme/widgets.
+# the PR's head repository, the gh stub's acme/widgets. The post-push head
+# check queries that push URL, so a shim in front of git (ls-remote only) sends
+# any network URL to the bare repository the stubs publish to, $ORIGIN_DIR; a
+# remote name or local path passes through, and so does every other command.
+ls_remote_shim_dir() {
+  local d="$BATS_TEST_TMPDIR/ls-remote-shim"
+  if [ ! -x "$d/git" ]; then
+    mkdir -p "$d"
+    cat >| "$d/git" <<'SHIM'
+#!/bin/sh
+# Drop this directory from PATH so the next git (a test shim or the real one) runs.
+PATH=${PATH#"$(dirname "$0"):"}
+if [ "$1" = ls-remote ]; then
+  for a in "$@"; do
+    shift
+    case "$a" in
+      *:*) a="$ORIGIN_DIR" ;;
+    esac
+    set -- "$@" "$a"
+  done
+fi
+exec git "$@"
+SHIM
+    chmod +x "$d/git"
+  fi
+  printf '%s' "$d"
+}
+
 run_crf() {
   GIT_CONFIG_COUNT=2 \
     GIT_CONFIG_KEY_0="url.https://github.com/acme/widgets.git.pushInsteadOf" \
     GIT_CONFIG_VALUE_0="$BATS_TEST_TMPDIR/origin.git" \
     GIT_CONFIG_KEY_1="url.https://github.com/acme/widgets.git.pushInsteadOf" \
     GIT_CONFIG_VALUE_1="$BATS_TEST_TMPDIR/other.git" \
+    PATH="$(ls_remote_shim_dir):$PATH" \
     run --separate-stderr "$SCRIPT" "$@"
 }
 
@@ -396,6 +424,7 @@ STUB
   GIT_CONFIG_COUNT=1 \
     GIT_CONFIG_KEY_0="url.https://github.com/acme/widgets.git.pushInsteadOf" \
     GIT_CONFIG_VALUE_0="$BATS_TEST_TMPDIR/origin.git" \
+    PATH="$(ls_remote_shim_dir):$PATH" \
     run --separate-stderr "$cache/yellow-review/1.0.0/skills/pr-review-workflow/scripts/commit-resolve-fixes" \
     --provider github --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 0 ]
@@ -460,6 +489,7 @@ STUB
 @test "a hook that stages an extra file makes the commit undo itself (exit 4)" {
   printf '#!/bin/sh\nprintf "two\\nfeature\\nhook\\n" > src/b.txt && git add src/b.txt\n' >| .git/hooks/pre-commit
   chmod +x .git/hooks/pre-commit
+  track_git_hooks pre-commit
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 4 ]
@@ -471,9 +501,10 @@ STUB
 }
 
 @test "a rejected graphite commit restacks the upstack back onto the reset branch" {
-  stub_gt_child_branch
   printf '#!/bin/sh\nprintf "two\\nfeature\\nhook\\n" > src/b.txt && git add src/b.txt\n' >| .git/hooks/pre-commit
   chmod +x .git/hooks/pre-commit
+  track_git_hooks pre-commit
+  stub_gt_child_branch
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 4 ]
@@ -486,10 +517,11 @@ STUB
 }
 
 @test "a failed restack after an undo is reported with the gt restack hint (still exit 4)" {
-  stub_gt_child_branch
   export STUB_GT_RESTACK_FAIL=1
   printf '#!/bin/sh\nprintf "two\\nfeature\\nhook\\n" > src/b.txt && git add src/b.txt\n' >| .git/hooks/pre-commit
   chmod +x .git/hooks/pre-commit
+  track_git_hooks pre-commit
+  stub_gt_child_branch
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 4 ]
@@ -500,6 +532,7 @@ STUB
 @test "the github provider never runs gt restack when it undoes a commit" {
   printf '#!/bin/sh\nprintf "late\\n" > src/b.txt && git add src/b.txt\n' >| .git/hooks/post-commit
   chmod +x .git/hooks/post-commit
+  track_git_hooks post-commit
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 4 ]
@@ -509,6 +542,7 @@ STUB
 @test "a hook that adds a credential-shaped line makes the commit undo itself (exit 4)" {
   printf '#!/bin/sh\nprintf "key = \\"AKIAABCDEFGHIJKLMNOP\\"\\n" >> src/a.txt && git add src/a.txt\n' >| .git/hooks/pre-commit
   chmod +x .git/hooks/pre-commit
+  track_git_hooks pre-commit
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 4 ]
@@ -520,6 +554,7 @@ STUB
 @test "a hook that leaves an untracked file makes the commit undo itself (exit 4)" {
   printf '#!/bin/sh\nprintf "generated\\n" > src/generated.txt\n' >| .git/hooks/post-commit
   chmod +x .git/hooks/post-commit
+  track_git_hooks post-commit
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 4 ]
@@ -531,6 +566,7 @@ STUB
 @test "changes left staged by a post-commit hook undo the commit (exit 4)" {
   printf '#!/bin/sh\nprintf "late\\n" > src/b.txt && git add src/b.txt\n' >| .git/hooks/post-commit
   chmod +x .git/hooks/post-commit
+  track_git_hooks post-commit
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 4 ]
@@ -645,6 +681,9 @@ STUB
 
 # A git shim in front of the real git that exits 128 for one diff invocation.
 git_shim_failing() {
+  # run_crf's temporary PATH clears bash's command hash, so a later git call
+  # can hash a removed shim; re-search PATH so the shim never execs itself.
+  hash -r
   real_git=$(command -v git)
   cat >| "$STUB_BIN/git" <<STUB
 #!/bin/sh
@@ -679,6 +718,7 @@ STUB
   # The post-commit hook arms the shim, so only the listing after the commit fails.
   printf '#!/bin/sh\n: >| "%s/armed"\n' "$BATS_TEST_TMPDIR" >| .git/hooks/post-commit
   chmod +x .git/hooks/post-commit
+  track_git_hooks post-commit
   git_shim_failing "if [ -e \"$BATS_TEST_TMPDIR/armed\" ] && [ \"\$1\" = ls-files ]; then exit 128; fi"
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
@@ -811,6 +851,7 @@ STUB
   approved="key = \"AKIA""ABCDEFGHIJKLMNOP\""
   printf '#!/bin/sh\nprintf "other = \\"AKIA%s\\"\\n" >> src/a.txt && git add src/a.txt\n' "QRSTUVWXYZ012345" >| .git/hooks/pre-commit
   chmod +x .git/hooks/pre-commit
+  track_git_hooks pre-commit
   printf 'one\nfeature\n%s\n' "$approved" >| src/a.txt
   run_crf --provider graphite --pr 7 --message "$MSG" --allow-credential-shaped -- src/a.txt
   [ "$status" -eq 4 ]
@@ -820,9 +861,54 @@ STUB
   ! grep -q '^gt submit' "$STUB_LOG"
 }
 
+# tracked_hook <body>: a pre-commit hook in a tracked in-tree hooks directory,
+# the one place commit-resolve-fixes still lets a hook run. HEAD moves, so
+# tests compare against $BASE_SHA instead of $FIRST_SHA.
+tracked_hook() {
+  mkdir -p .hooks
+  printf '#!/bin/sh\n%s\n' "$1" >| .hooks/pre-commit
+  chmod +x .hooks/pre-commit
+  git add .hooks && git commit -q -m "chore: hooks"
+  git config core.hooksPath .hooks
+  BASE_SHA=$(git rev-parse HEAD)
+}
+
+@test "with --allow-credential-shaped, a hook that copies an approved line into another listed file is refused and undone (exit 4)" {
+  # The same text in another file is a different occurrence: the approval was
+  # for src/a.txt only.
+  tracked_hook 'printf "key = \"AKIA%s\"\n" ABCDEFGHIJKLMNOP >> src/b.txt && git add src/b.txt'
+  printf 'one\nfeature\nkey = "AKIA%s"\n' "ABCDEFGHIJKLMNOP" >| src/a.txt
+  printf 'two\nfeature\nfix\n' >| src/b.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --allow-credential-shaped -- src/a.txt src/b.txt
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"credential-shaped"* ]]
+  [ "$(git rev-parse HEAD)" = "$BASE_SHA" ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+@test "with --allow-credential-shaped, a hook that repeats an approved line in the same file is refused and undone (exit 4)" {
+  # One approved occurrence does not cover a second identical one.
+  tracked_hook 'printf "key = \"AKIA%s\"\n" ABCDEFGHIJKLMNOP >> src/a.txt && git add src/a.txt'
+  printf 'one\nfeature\nkey = "AKIA%s"\n' "ABCDEFGHIJKLMNOP" >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --allow-credential-shaped -- src/a.txt
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"credential-shaped"* ]]
+  [ "$(git rev-parse HEAD)" = "$BASE_SHA" ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+@test "with --allow-credential-shaped, approved lines in several files are all allowed" {
+  printf 'one\nfeature\nkey = "AKIA%s"\n' "ABCDEFGHIJKLMNOP" >| src/a.txt
+  printf 'two\nfeature\nkey = "AKIA%s"\n' "ABCDEFGHIJKLMNOP" >| src/b.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --allow-credential-shaped -- src/a.txt src/b.txt
+  [ "$status" -eq 0 ]
+  grep -q '^gt submit' "$STUB_LOG"
+}
+
 @test "with --allow-credential-shaped, a hook that changes nothing is still allowed" {
   printf '#!/bin/sh\nexit 0\n' >| .git/hooks/pre-commit
   chmod +x .git/hooks/pre-commit
+  track_git_hooks pre-commit
   printf 'one\nfeature\nkey = "AKIA%s"\n' "ABCDEFGHIJKLMNOP" >| src/a.txt
   run_crf --provider graphite --pr 7 --message "$MSG" --allow-credential-shaped -- src/a.txt
   [ "$status" -eq 0 ]
@@ -858,6 +944,22 @@ remote_with_push_url() {
   [[ "$stderr" == *"remote 'fork' does not push to PR #7's head repository"* ]]
   [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
   ! grep -q '^gt modify\|^gt submit' "$STUB_LOG"
+}
+
+@test "the head check reads the validated push URL, not the fetch URL (exit 0)" {
+  STALE="$BATS_TEST_TMPDIR/stale.git"
+  git init -q --bare -b main "$STALE"
+  git push -q "$STALE" main feature 2>/dev/null
+  remote_with_push_url fork https://github.com/acme/widgets.git
+  git remote set-url fork "$STALE"
+  git config branch.feature.pushRemote fork
+  export STUB_GT_REMOTE=fork
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .status)" = PUSHED ]
+  # The fetch URL's repository never received the commit.
+  [ "$(git --git-dir="$STALE" rev-parse refs/heads/feature)" = "$FIRST_SHA" ]
 }
 
 @test "a push URL that cannot be parsed is refused (exit 3)" {
@@ -1036,6 +1138,18 @@ plant_hook() {
   chmod +x "$1/pre-commit"
 }
 
+# track_git_hooks <name>...: move hooks written to .git/hooks into a tracked
+# in-tree hooks directory, the one place a hook still runs. HEAD moves, so
+# FIRST_SHA follows.
+track_git_hooks() {
+  local h
+  mkdir -p .hooks
+  for h in "$@"; do mv ".git/hooks/$h" ".hooks/$h"; done
+  git add .hooks && git commit -q -m "chore: hooks"
+  git config core.hooksPath .hooks
+  FIRST_SHA=$(git rev-parse HEAD)
+}
+
 @test "an ignored hooks directory inside the repository is refused before committing (exit 3)" {
   for provider in github graphite; do
     plant_hook .hooks
@@ -1082,21 +1196,44 @@ plant_hook() {
   [ -e "$BATS_TEST_TMPDIR/hook.log" ]
 }
 
-@test "a hooks directory outside the repository is allowed and its hook runs" {
-  plant_hook "$BATS_TEST_TMPDIR/ext-hooks"
-  git config core.hooksPath "$BATS_TEST_TMPDIR/ext-hooks"
-  printf 'one\nfeature\nfix\n' >| src/a.txt
-  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
-  [ "$status" -eq 0 ]
-  [ -e "$BATS_TEST_TMPDIR/hook.log" ]
+@test "a hook in a hooks directory outside the repository is not run: the commit disables hooks" {
+  for provider in github graphite; do
+    plant_hook "$BATS_TEST_TMPDIR/ext-hooks"
+    git config core.hooksPath "$BATS_TEST_TMPDIR/ext-hooks"
+    printf 'one\nfeature\nfix-%s\n' "$provider" >| src/a.txt
+    run_crf --provider "$provider" --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 0 ] || { echo "refused: $provider: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"external hooks directory are not verified"* ]]
+    [ ! -e "$BATS_TEST_TMPDIR/hook.log" ] || { echo "hook ran: $provider" >&2; return 1; }
+  done
 }
 
-@test "the default hooks directory inside .git is allowed even though git does not track it" {
-  plant_hook .git/hooks
+@test "a hook in .git/hooks is not run: the commit disables hooks" {
+  for provider in github graphite; do
+    plant_hook .git/hooks
+    printf 'one\nfeature\nfix-%s\n' "$provider" >| src/a.txt
+    run_crf --provider "$provider" --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 0 ] || { echo "refused: $provider: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git-dir hooks directory are not verified"* ]]
+    [ ! -e "$BATS_TEST_TMPDIR/hook.log" ] || { echo "hook ran: $provider" >&2; return 1; }
+  done
+}
+
+@test "a .git/hooks holding only .sample files leaves hooks enabled and prints no note" {
+  printf '#!/bin/sh\n' >| .git/hooks/pre-commit.sample
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 0 ]
-  [ -e "$BATS_TEST_TMPDIR/hook.log" ]
+  [[ "$stderr" != *"not verified"* ]]
+}
+
+@test "disabling hooks appends to a caller's GIT_CONFIG_COUNT and rejects a non-numeric one" {
+  plant_hook .git/hooks
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  GIT_CONFIG_COUNT=zz run --separate-stderr "$SCRIPT" --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -ne 0 ]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ ! -e "$BATS_TEST_TMPDIR/hook.log" ]
 }
 
 # --- The runtime override is a runner file ---
@@ -1253,6 +1390,31 @@ STUB
     git reset -q --hard "$FIRST_SHA"
     mv "$STUB_BIN/gh.real" "$STUB_BIN/gh"
   done
+}
+
+@test "a gh pr view diagnostic is never written to a temp file while the call runs" {
+  v=$(cred_value)
+  scratch="$BATS_TEST_TMPDIR/tmpdir"
+  mkdir -p "$scratch"
+  mv "$STUB_BIN/gh" "$STUB_BIN/gh.real"
+  cat >| "$STUB_BIN/gh" <<STUB
+#!/bin/sh
+case "\$*" in
+  "pr view "*headRefOid*)
+    echo 'error: helper said token=$v' >&2
+    # Report a leak to stdout-independent file the test can read.
+    if grep -rqF '$v' '$scratch'; then : >| '$scratch/../leaked'; fi
+    exit 1
+    ;;
+esac
+exec "\$(dirname "\$0")/gh.real" "\$@"
+STUB
+  chmod +x "$STUB_BIN/gh"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  TMPDIR="$scratch" run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 6 ]
+  [ ! -e "$BATS_TEST_TMPDIR/leaked" ]
+  [[ "$stderr" != *"$v"* ]]
 }
 
 @test "a token assignment or bearer header in a git ls-remote diagnostic never reaches stderr or the JSON output" {
@@ -1480,12 +1642,65 @@ node_calls() { grep -c '^node ' "$STUB_LOG" || true; }
   [ "$(node_calls)" = 1 ]
 }
 
-@test "the default sibling runtime is not judged when no override is set" {
+@test "a default sibling runtime outside the repository is not judged when no override is set" {
   unset YELLOW_REVIEW_GITHUB_STACK_RUNTIME
   printf 'one\nfeature\nfix\n' >| src/a.txt
   run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 0 ]
   [ "$(node_calls)" = 1 ]
+}
+
+# The plugin checked into the fixture repository, so find_runtime selects an
+# in-repository default runtime (plugins/github-workflow/lib/...).
+in_repo_plugin_init() {
+  unset YELLOW_REVIEW_GITHUB_STACK_RUNTIME
+  mkdir -p plugins/yellow-review/skills/pr-review-workflow plugins/github-workflow/lib
+  cp -R "$RESOLVE_SCRIPTS/../../../lib" plugins/yellow-review/lib
+  cp -R "$RESOLVE_SCRIPTS" plugins/yellow-review/skills/pr-review-workflow/scripts
+  printf '// runtime\n' >| plugins/github-workflow/lib/github-stack-runtime.js
+  git add plugins && git commit -q -m "feat: plugins" && git push -q origin feature 2>/dev/null
+  SCRIPT="$REPO/plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes"
+}
+
+@test "a clean tracked in-repository default runtime is allowed" {
+  in_repo_plugin_init
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(node_calls)" = 1 ]
+}
+
+@test "a default runtime marked assume-unchanged and modified is refused (exit 3)" {
+  in_repo_plugin_init
+  base=$(git rev-parse HEAD)
+  printf '// edited\n' >> plugins/github-workflow/lib/github-stack-runtime.js
+  git update-index --assume-unchanged plugins/github-workflow/lib/github-stack-runtime.js
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"default github-stack-runtime 'plugins/github-workflow/lib/github-stack-runtime.js'"* ]]
+  [[ "$stderr" != *"// edited"* ]]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+  [ "$(node_calls)" = 0 ]
+}
+
+@test "a default runtime marked skip-worktree and modified is refused (exit 3)" {
+  in_repo_plugin_init
+  printf '// edited\n' >> plugins/github-workflow/lib/github-stack-runtime.js
+  git update-index --skip-worktree plugins/github-workflow/lib/github-stack-runtime.js
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [ "$(node_calls)" = 0 ]
+}
+
+@test "a modified in-repository default runtime is refused (exit 3)" {
+  in_repo_plugin_init
+  printf '// edited\n' >> plugins/github-workflow/lib/github-stack-runtime.js
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [ "$(node_calls)" = 0 ]
 }
 
 @test "the graphite provider ignores the override check" {

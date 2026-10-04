@@ -88,8 +88,18 @@ vr_load_redactor() {
     # name must never stand in for it.
     lib=$(rp_sibling_file "$1" yellow-core lib/compound-staging.sh) || lib=""
     if [ -n "$lib" ] && git -C "${lib%/*}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        dirty=$(git -C "${lib%/*}" status --porcelain --ignored=no -- "${lib##*/}" 2>/dev/null) \
-            && [ -z "$dirty" ] && git -C "${lib%/*}" ls-files --error-unmatch -- "${lib##*/}" >/dev/null 2>&1 \
+        # Same integrity rule as rp_runtime_override_untrusted: git status, git
+        # diff and a bare ls-files all miss an edit hidden by assume-unchanged
+        # or skip-worktree, so the index flag must be the plain "H " (tracked,
+        # not hidden) and the file's content hash must equal its blob in HEAD.
+        local dir="${lib%/*}" name="${lib##*/}" st blob
+        st=$(lgit -C "$dir" ls-files -v --error-unmatch -- "$name" 2>/dev/null) \
+            && [ "${st:0:2}" = "H " ] \
+            && dirty=$(lgit -C "$dir" status --porcelain --ignored=no -- "$name" 2>/dev/null) \
+            && [ -z "$dirty" ] \
+            && blob=$(lgit -C "$dir" rev-parse --verify --quiet "HEAD:./$name" 2>/dev/null) \
+            && [ -n "$blob" ] \
+            && [ "$(lgit -C "$dir" hash-object -- "$name" 2>/dev/null)" = "$blob" ] \
             || lib=""
     fi
     [ -n "$lib" ] || return 1

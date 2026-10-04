@@ -910,6 +910,21 @@ STUB
   [ -z "$(git status --porcelain)" ]
 }
 
+@test "a failed output setup leaves a replacement directory in place in both revert modes" {
+  mkdir -p "$REPO/.git/yellow-review"
+  : >| "$PATCH_DIR"
+  rm -f src/a.txt && mkdir src/a.txt && printf 'child\n' >| src/a.txt/child.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"cannot create"*"resolve-patches"* ]]
+  [ -f src/a.txt/child.txt ]
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"cannot create"*"resolve-patches"* ]]
+  [ -f src/a.txt/child.txt ]
+  [ -f src/new.txt ]
+}
+
 @test "--revert-only removes a directory standing where a tracked file was and restores the file" {
   rm -f src/a.txt && mkdir src/a.txt && printf 'child\n' >| src/a.txt/child.txt
   run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
@@ -1132,6 +1147,31 @@ assert_no_raw_left() {
   log=$(jq -r .log "$BATS_TEST_TMPDIR/mid.out")
   run ! grep -qF "$SECRET" "$log"
   assert_no_raw_left
+}
+
+# The snapshot is screened before the verifier starts, so a SIGKILL during the
+# verifier cannot leave an unscreened patch under .git.
+@test "a credential-shaped edit leaves no patch under .git while the verifier runs" {
+  printf 'one\nfeature\nGH=ghp_abcdefghijklmnopqrstuvwxyz0123456789\n' >| src/a.txt
+  seen="$BATS_TEST_TMPDIR/seen"
+  verify "ls '$PATCH_DIR' >| '$seen'; grep -rlF ghp_abcdefghijklmnopqrstuvwxyz0123456789 '$PATCH_DIR' >> '$seen'; exit 1" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .patch, .treeClean]')" = '["fail",null,true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"recovery patch withheld"* ]]
+  run grep -c '\.patch$' "$seen"
+  [ "$output" = 0 ]
+  run grep -c ghp_ "$seen"
+  [ "$output" = 0 ]
+}
+
+@test "a screened clean snapshot is already in place while the verifier runs and is kept on failure" {
+  seen="$BATS_TEST_TMPDIR/seen"
+  verify "ls '$PATCH_DIR' >| '$seen'; exit 1" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  grep -q '\.patch$' "$seen"
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ -s "$patch" ]
+  grep -q 'resolver edit' "$patch"
 }
 
 @test "--revert-only refuses a tracked directory and keeps its untracked files and edits" {
@@ -1579,4 +1619,66 @@ hooks_fire_control() {
   [ "$(cat src/a.txt)" = $'one\nfeature' ]
   [ ! -e src/new.txt ]
   [ ! -e "$BATS_TEST_TMPDIR/hook-ran.log" ]
+}
+
+# vr_load_redactor against a source checkout in its own git repo: yellow-review
+# (script libraries copied) beside yellow-core's compound-staging.sh, committed.
+# Sets CORE_LIB to the checkout's copy; LOAD_RC is not used (run captures it).
+redactor_checkout() {
+  CK="$BATS_TEST_TMPDIR/ck"
+  copy_plugin "$CK/plugins/yellow-review" >/dev/null
+  mkdir -p "$CK/plugins/yellow-core/lib"
+  cp "$BATS_TEST_DIRNAME/../../yellow-core/lib/compound-staging.sh" "$CK/plugins/yellow-core/lib/"
+  CORE_LIB="$CK/plugins/yellow-core/lib/compound-staging.sh"
+  git -C "$CK" init -q
+  git -C "$CK" add -A
+  git -C "$CK" -c user.name=t -c user.email=t@example.com commit -q -m init
+}
+
+load_redactor() {
+  run bash -c '
+    root=$1
+    . "$root/lib/resolve-paths.sh"
+    . "$root/lib/resolve-text.sh"
+    . "$root/lib/verify-run.sh"
+    vr_load_redactor "$root" && declare -F cs_redact_secrets >/dev/null' _ "$CK/plugins/yellow-review"
+}
+
+@test "vr_load_redactor sources a clean tracked compound-staging.sh" {
+  redactor_checkout
+  load_redactor
+  [ "$status" -eq 0 ]
+}
+
+@test "vr_load_redactor refuses a modified compound-staging.sh" {
+  redactor_checkout
+  printf '\n: modified\n' >> "$CORE_LIB"
+  load_redactor
+  [ "$status" -ne 0 ]
+}
+
+@test "vr_load_redactor refuses a modified compound-staging.sh marked assume-unchanged" {
+  redactor_checkout
+  git -C "$CK" update-index --assume-unchanged plugins/yellow-core/lib/compound-staging.sh
+  printf '\ntouch "%s/pwned"\n' "$BATS_TEST_TMPDIR" >> "$CORE_LIB"
+  # The flag hides the edit from status, diff and a bare ls-files.
+  [ -z "$(git -C "$CK" status --porcelain -- plugins/yellow-core/lib/compound-staging.sh)" ]
+  load_redactor
+  [ "$status" -ne 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/pwned" ]
+}
+
+@test "vr_load_redactor refuses a modified compound-staging.sh marked skip-worktree" {
+  redactor_checkout
+  git -C "$CK" update-index --skip-worktree plugins/yellow-core/lib/compound-staging.sh
+  printf '\n: modified\n' >> "$CORE_LIB"
+  load_redactor
+  [ "$status" -ne 0 ]
+}
+
+@test "vr_load_redactor refuses an unmodified compound-staging.sh whose index flag hides it" {
+  redactor_checkout
+  git -C "$CK" update-index --assume-unchanged plugins/yellow-core/lib/compound-staging.sh
+  load_redactor
+  [ "$status" -ne 0 ]
 }

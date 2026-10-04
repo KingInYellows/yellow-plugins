@@ -398,13 +398,26 @@ hooks_repo() {
   [ "$status" -eq 0 ]
 }
 
-@test "rp_hooks_untracked allows a hooks directory outside the working tree" {
+@test "rp_hooks_untracked reports a hook outside the working tree or in .git/hooks as unverifiable (4)" {
   hooks_repo
   mkdir -p "$BATS_TEST_TMPDIR/ext"
-  printf '#!/bin/sh\n' >| "$BATS_TEST_TMPDIR/ext/pre-commit"
   git config core.hooksPath "$BATS_TEST_TMPDIR/ext"
   run rp_hooks_untracked "$OUT"
   [ "$status" -eq 1 ]
+  printf '#!/bin/sh\n' >| "$BATS_TEST_TMPDIR/ext/pre-commit.sample"
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 1 ]
+  printf '#!/bin/sh\n' >| "$BATS_TEST_TMPDIR/ext/pre-commit"
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 4 ]
+  [ "$output" = "external" ]
+  git config --unset core.hooksPath
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 1 ]
+  printf '#!/bin/sh\n' >| .git/hooks/pre-commit
+  run rp_hooks_untracked "$OUT"
+  [ "$status" -eq 4 ]
+  [ "$output" = "git-dir" ]
 }
 
 @test "rp_hooks_untracked treats a repository-root hooks path as holding untracked files" {
@@ -614,7 +627,8 @@ plant_hook_dir() {
   ln -s "$BATS_TEST_TMPDIR/ext-hooks" "$BATS_TEST_TMPDIR/ext-link"
   git config core.hooksPath "$BATS_TEST_TMPDIR/ext-link"
   run rp_hooks_untracked "$OUT"
-  [ "$status" -eq 1 ]
+  [ "$status" -eq 4 ]
+  [ "$output" = "external" ]
 }
 
 @test "rp_hooks_untracked still refuses a plain in-tree untracked hooks directory and allows a tracked one" {
