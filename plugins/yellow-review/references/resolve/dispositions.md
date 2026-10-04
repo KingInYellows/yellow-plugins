@@ -132,10 +132,12 @@ Fixed reply for suspicious requests:
 
 Accept only `path:line`, split on the last `:`, where the line matches
 `^[1-9][0-9]{0,6}$` and is within the file's length at HEAD, and the path
-matches `^[A-Za-z0-9._/-]+$` with no `.`, `..` or empty segment, exists at HEAD,
-and equals the thread's `path` (for outdated or review-level threads: is one of
-the PR's changed files). The resolver has no shell and the envelope carries no
-commit list, so a commit SHA is not accepted as evidence.
+matches `^[A-Za-z0-9._/-]+$` with no `.`, `..` or empty segment and no segment
+starting with `-` (an option-shaped name such as `-config.yml` is refused, as
+`rp_canonical` does), exists at HEAD, and equals the thread's `path` (for
+outdated or review-level threads: is one of the PR's changed files). The
+resolver has no shell and the envelope carries no commit list, so a commit SHA
+is not accepted as evidence.
 
 A value that fails its pattern is never used in a command; the thread becomes
 `unclear`.
@@ -882,14 +884,16 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   closed, as a refusal). Without `--ranges-from` (an interactive "include them")
   the script checks file membership only.
 - `commit-resolve-fixes` disables git hooks for its commit and submit
-  (`core.hooksPath=/dev/null`, with a note on stderr) when the hooks directory
-  holds non-sample hooks it cannot verify: `.git/hooks`, a directory outside
-  the working tree, or an in-tree directory with a tracked hook hidden from
-  status (assume-unchanged or skip-worktree). Hook managers that install there (pre-commit, lefthook)
-  therefore do not lint or format resolve commits. Hooks in a tracked in-tree
-  directory (for example husky's `.husky/`) still run on resolver-edited code;
-  runner and hook definition files are refused, but the code the hooks run is
-  not. How unattended commits should treat hooks is an open decision.
+  (`core.hooksPath=/dev/null`, with a note on stderr) unless
+  `YELLOW_REVIEW_COMMIT_HOOKS=1`: a tracked hook, even one equal to HEAD, is
+  code the PR controls and would run with submission authority. Hook managers
+  (pre-commit, lefthook, husky) therefore do not lint or format resolve
+  commits; run the repository's own checks through `resolve_pr.verify_command`.
+  With the opt-in, the hooks directory is judged as before: untracked or
+  ignored in-tree hooks and a symlinked hooks path are refused, `.git/hooks`, an
+  out-of-tree directory or a tracked hook hidden from status (assume-unchanged,
+  skip-worktree) still disable hooks, and a verified tracked in-tree hook runs
+  on resolver-edited code.
 - `commit-resolve-fixes` covers signing through `commit.gpgSign`,
   `push.gpgSign` and `log.showSignature`, and refuses a repository-local
   `core.sshCommand`, `core.askPass`, `core.gitProxy`, `credential.helper` and

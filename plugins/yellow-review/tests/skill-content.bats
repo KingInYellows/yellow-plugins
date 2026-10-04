@@ -743,3 +743,9 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   [[ "$step3" == *'without a resolver dispatch, commit, push, reply or issue'* ]]
   [[ "$step3" == *'`push=skipped, verify=none, ratelimited=1`'* ]]
 }
+
+@test "dispositions: the addressed path:line evidence refuses an option-shaped path segment" {
+  DISP="$BATS_TEST_DIRNAME/../references/resolve/dispositions.md"
+  tr '\n' ' ' <"$DISP" | tr -s ' ' | grep -q 'no `\.`, `\.\.` or empty segment and no segment starting with `-`'
+  tr '\n' ' ' <"$DISP" | tr -s ' ' | grep -q '`-config.yml` is refused'
+}
