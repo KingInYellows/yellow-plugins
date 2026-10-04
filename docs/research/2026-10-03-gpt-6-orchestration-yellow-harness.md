@@ -76,22 +76,25 @@ usage, tools, coordination, retries, verification, and failed runs.
    fits that profile. Structured summaries need schema and source-grounded
    factual checks, not JSON validity alone.
 3. **Establish single-model baselines.** Once an operator authorizes a supported
-   live evaluation path, run every development task on each available model,
-   three repeats per model (108 runs if all three are available), with
-   equivalent tool access and budgets. Interleave run order. Keep the existing
-   Claude path as a separate incumbent comparison; document subscription/API
-   accounting differences. Start at model-default reasoning; record the
-   effective effort. Select and freeze the best single-model baseline from these
-   development results only, using the predeclared quality, cost, and latency
-   criteria. Holdout scores, if collected for reporting, must not reopen that
-   selection.
+   live evaluation path, run every development task on each available GPT-6
+   candidate, three repeats per model (108 runs if all three are available),
+   with equivalent tool access and budgets. Interleave run order. Run the
+   incumbent Claude path on that same development matrix with the same repeats,
+   required checks, and latency collection; it is a separate comparison, not one
+   of the 108 GPT-6 runs, and does not enter the GPT-6 baseline freeze. Document
+   subscription/API accounting differences. Start at model-default reasoning;
+   record the effective effort. Select and freeze the best single-model GPT-6
+   baseline from these development results only, using the predeclared quality,
+   cost, and latency criteria. Holdout scores, if collected for reporting, must
+   not reopen that selection.
 4. **Test routing without parallelism.** Derive a policy from development
    results, then compare it with the frozen single-model baseline on the
-   held-out tasks. Validate Luna output before downstream use; escalate on
-   observed failures, ambiguity, or exhausted capability. Charge all routing and
-   escalation work. Do not silently substitute a model within a hash-bound
-   approval. Existing real-run approvals authorize one attempt, not a repair
-   loop or a multi-model run.
+   held-out tasks. Run the incumbent Claude path on that same holdout matrix.
+   Validate Luna output before downstream use; escalate on observed failures,
+   ambiguity, or exhausted capability. Charge all routing and escalation work.
+   Do not silently substitute a model within a hash-bound approval. Existing
+   real-run approvals authorize one attempt, not a repair loop or a multi-model
+   run.
 5. **Add orchestration features one at a time.** On suitable tasks, compare
    async overlap, bounded parallel investigations, steering, compaction, and
    cold/warm caching against the serial baseline. Evaluate native Sol beta
@@ -100,10 +103,11 @@ usage, tools, coordination, retries, verification, and failed runs.
 6. **Decide from held-out evidence.** Choose the lowest total cost per verified
    success among configurations meeting the predeclared quality and latency
    requirements, comparing routing and orchestration against the frozen
-   development baseline rather than a holdout-selected model. Test higher
-   reasoning effort only where the prior effort fails. Keep beta delegation
-   optional with a serial fallback until access, quality, failure handling, and
-   cost are demonstrated.
+   development baseline and the incumbent Claude path on the same holdout
+   matrix, rather than a holdout-selected model. Test higher reasoning effort
+   only where the prior effort fails. Keep beta delegation optional with a
+   serial fallback until access, quality, failure handling, and cost are
+   demonstrated.
 
 Twelve tasks and three repeats are a pilot, not enough evidence for a universal
 routing policy. Declare promotion thresholds before live runs; report paired
@@ -128,8 +132,8 @@ verification bundle or equivalent task oracle evidence.
 - **Latency:** end-to-end p50/p95, including coordination and verification;
   report terminal failures and successful completion latency separately.
 - **Routing value:** compare complete routed workflows with the frozen
-  development-selected single-model baseline, not per-token prices or isolated
-  worker outputs.
+  development-selected single-model baseline and with the incumbent Claude path
+  on the same task matrix, not per-token prices or isolated worker outputs.
 
 ## Applied now and next boundary
 
