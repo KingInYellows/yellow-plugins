@@ -1,0 +1,27 @@
+.changeset/review-resolve-hardening.md
+  s_771064b1487eb8::t_e7ea965b462734 17-27,43-56
+plugins/yellow-review/commands/review/resolve-stack.md
+  s_771064b1487eb8::t_56ca6dfe9e09f3 303-309,420-422,426-427,472-476
+plugins/yellow-review/commands/review/sweep.md
+  s_771064b1487eb8::t_7039f4d8bbe9ac 166-172,179-189,193-196,212-245,420-423,445-448
+plugins/yellow-review/references/resolve/dispositions.md
+  s_771064b1487eb8::t_c13274205c2f71 825-831
+plugins/yellow-review/tests/skill-content.bats
+  s_771064b1487eb8::t_965490702cab68 385-389,396-401,403,887-891
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "071a784ec150d03fb239deb8c21d134adbcce3e7",
+  "prompts": {},
+  "sessions": {
+    "s_771064b1487eb8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "344118bf-2aa9-4d5a-a9e5-a6b94995fa25",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
