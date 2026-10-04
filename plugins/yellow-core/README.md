@@ -37,6 +37,7 @@ TypeScript, Python, Rust, and Go.
 | `/setup:all`            | Run setup for all installed marketplace plugins with unified dashboard |
 | `/setup:claude-web`     | Audit a repository and scaffold files Claude Code Web needs (`.claude/settings.json`, `scripts/install_pkgs.sh`, `.gitattributes`, `.gitignore`, `.github/workflows/claude.yml`) |
 | `/worktree:cleanup`     | Scan git worktrees, classify by state, and remove stale worktrees with safeguards |
+| `/worktree:restack`     | Restack a stack whose branches live in separate worktrees, then restore every worktree; pauses on conflicts and resumes with `--continue` / `--abort` |
 
 ## Agents
 

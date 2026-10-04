@@ -77,7 +77,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   background-compounding plan); RULE 14 in
   `scripts/validate-agent-authoring.js` blocks any removal of this deny
 
-### Commands (18)
+### Commands (19)
 
 - `/flow:brainstorm` — explore requirements through dialogue and research before planning
 - `/flow:spec` — draft a requirements spec (stable `R1..Rn` IDs + design)
@@ -164,6 +164,11 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   new files / config merges, warn-only for STDIO MCP and oversized
   CLAUDE.md
 - `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
+- `/worktree:restack` — restack a stack whose branches are each checked out in their own worktree.
+  Routed through `stack-provider-router`, it detaches the stack worktrees (Graphite) or relies on
+  gh-stack >= 0.2.0 (GitHub), runs one restack, and restores every worktree. A conflict pauses it;
+  `--continue` / `--abort` resume. `--submit` submits through the provider afterwards. The work lives in
+  `skills/git-worktree/scripts/worktree-restack.sh`; the command holds no `gt` / `gh stack` literals
 
 ### Skills (22)
 
@@ -192,7 +197,9 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `git-worktree` — git worktree management for parallel development;
   injects a `.ruvector/` symlink into new worktrees so the ruvector MCP
   server reaches the shared project DB instead of silently no-op'ing on
-  a missing directory
+  a missing directory. `scripts/worktree-restack.sh` is the second script: the
+  detach / restack / restore engine behind `/worktree:restack` (state under the git common dir,
+  re-validated on every read)
 - `ideation` — generate 3 grounded approaches to a soft problem using the
   Toulmin warrant contract (evidence + linking principle + idea), filtered
   through MIDAS three-phase generation, then route the chosen approach into
@@ -281,8 +288,8 @@ than sourced:
 - `stack-operation-registry.js` — maps each of the nine neutral stack operations
   (and `/flow:work`'s lower-level stack primitives) to exactly one Graphite and
   one GitHub implementation, or `null` (unsupported — callers stop, never try
-  the other provider). Only its integration test loads it: `/flow:work` mirrors
-  the entries in prose, so change both together, and `/stack:status` /
+  the other provider). Only its integration test loads it: `/flow:work` and
+  `skills/git-worktree/scripts/worktree-restack.sh` mirror the entries in prose, so change all together, and `/stack:status` /
   `/stack:select` do not read it. Dependency-free; verified by
   `tests/integration/stack-operation-registry.test.ts`
 - `stack-tooling-probe.js` — the shared owner of provider CLI readiness
@@ -493,7 +500,8 @@ inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
 `compound-staging`, `compound-stop-hook`, `context-observer`,
 `credential-status`, `handoff`, `plan-commands`, `plan-status-parity`,
 `plugin-identity`, `pre-compact-hook`, `repo-profile`,
-`setup-all-ruvector-probe`, `validate-fs`) plus `skills/git-worktree/tests/worktree-manager.bats`.
+`setup-all-ruvector-probe`, `validate-fs`) plus `skills/git-worktree/tests/` (`worktree-manager.bats`,
+`worktree-restack.bats` with stub `gt` / `gh` / `git` shims under `tests/mocks/`).
 Manifest hook budgets: Stop 5s, SessionStart 3s, PreCompact 3s
 (`catalog/plugins/yellow-core.json`).
 

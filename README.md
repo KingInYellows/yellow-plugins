@@ -28,7 +28,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners                            | 4 agents, 9 commands, 8 skills, 1 hook         |
 | `yellow-codex`        | OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration                                             | 3 agents, 4 commands, 1 skill                  |
 | `yellow-composio`     | Composio MCP integration with usage tracking and budget guardrails                                                                     | 2 commands, 1 skill, 1 MCP                     |
-| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                                               | 21 agents, 18 commands, 22 skills              |
+| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                                               | 21 agents, 19 commands, 22 skills              |
 | `yellow-council`      | On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel | 3 agents, 2 commands, 1 skill                  |
 | `yellow-cursor`       | Cursor Cloud Agent delegation — launch, track, and manage remote coding agents via a typed CLI (pilot Cursor distribution target)      | 10 commands, 1 skill                           |
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns                                       | 7 agents, 6 commands, 1 skill, 1 hook          |
@@ -268,7 +268,7 @@ yellow-plugins/
 │   ├── yellow-ci/             # CI toolkit (4 agents, 9 commands, 8 skills, 1 hook)
 │   ├── yellow-codex/          # Codex CLI wrapper (3 agents, 4 commands, 1 skill)
 │   ├── yellow-composio/       # Composio MCP (2 commands, 1 skill, 1 MCP)
-│   ├── yellow-core/           # Dev toolkit (21 agents, 18 commands, 22 skills)
+│   ├── yellow-core/           # Dev toolkit (21 agents, 19 commands, 22 skills)
 │   ├── yellow-council/        # Cross-lineage code council (3 agents, 2 commands, 1 skill)
 │   ├── yellow-cursor/         # Cursor Cloud Agent delegation, pilot target (10 commands, 1 skill)
 │   ├── yellow-debt/           # Debt audit (7 agents, 6 commands, 1 skill, 1 hook)

@@ -44,8 +44,9 @@ const PROVIDER_IDS = Object.freeze(['graphite', 'github']);
  * neither reads this registry); each entry resolves to the provider's own
  * command (a gt-workflow command such as `gt-sync` or `smart-submit`, or
  * github-workflow's `/github-stack:*`). Nothing loads this module at runtime
- * except its integration test: `/flow:work` mirrors these entries in prose,
- * so a change here needs the matching edit in `commands/flow/work.md`.
+ * except its integration test: `/flow:work` and the git-worktree skill's
+ * `scripts/worktree-restack.sh` mirror these entries in prose, so a change
+ * here needs the matching edit in `commands/flow/work.md` and that script.
  * `status` deliberately maps Graphite to the SAME `gt-setup`
  * command as `setup` — Graphite has no separate stack-status surface
  * distinct from its readiness report, and `github-stack-status` (already

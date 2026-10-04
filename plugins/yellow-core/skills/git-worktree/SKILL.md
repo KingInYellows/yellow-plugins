@@ -175,6 +175,47 @@ worktree-manager.sh clean
 - Skips currently active worktree
 - Removes empty `.worktrees/` directory if all cleaned up
 
+### Restacking across worktrees (`worktree-restack.sh`)
+
+A stack whose branches are each checked out in their own worktree cannot be
+restacked in one pass: the provider has to check a branch out, and git refuses
+with `'<branch>' is already used by worktree at <path>`. Use `/worktree:restack`
+(or the script directly) instead of restacking worktree by worktree:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-restack.sh" <subcommand> [--provider graphite|github] [--submit]
+```
+
+| Subcommand | Does |
+|---|---|
+| `preflight` | Read-only. Prints the run worktree, the stack, the worktrees to detach and any `REFUSE` reasons |
+| `start` | Takes a lock, records state, detaches, restacks, verifies ancestry, restores, clears state; `--submit` submits afterwards |
+| `continue` | Resumes a paused conflict, then verifies and restores |
+| `abort` | Aborts the provider's restack (Graphite rolls back the whole restack), then restores |
+| `status` | Shows the recorded restack, or a worktree stranded detached at a branch tip |
+| `restore` | Restore only, for recovery after a manual provider finish |
+
+Run it from the worktree whose branch starts the restack; the restack set is
+that branch plus everything stacked on it. Graphite detaches the other stack
+worktrees for the run. GitHub needs gh-stack 0.2.0 or newer, which rebases
+across worktrees itself, so nothing is detached.
+
+Safety rules the script holds:
+
+- It refuses before any change when a stack worktree is dirty, locked,
+  prunable or mid-operation, when the stack forks, or when a restack is already
+  in progress. An untracked `.ruvector` symlink does not count as dirty.
+- It never forces a checkout, stashes, hard-resets or passes
+  `--ignore-other-worktrees`. A worktree that cannot be restored stays detached
+  and the script prints the `git -C <path> checkout <branch>` line.
+- A conflict pauses the run (exit 10): the stack worktrees stay detached and are
+  `git worktree lock`ed with a reason. Do not commit in them; a commit there
+  lands on no branch, and the script reports it and refuses to restore over it.
+- State lives in `<git-common-dir>/yellow-core/worktree-restack/` and is
+  re-validated on every read; a rejected state file runs nothing.
+
+Exit codes are documented in the script header.
+
 ## When to Use
 
 ### Code Review (/flow:review)

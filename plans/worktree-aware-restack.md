@@ -561,7 +561,7 @@ conflict · `20` preflight refused · `30` restack failed, worktrees restored ·
 
 ### Phase 5: Docs and release
 
-- [ ] 5.1: `plugins/yellow-core/CLAUDE.md`:
+- [x] 5.1: `plugins/yellow-core/CLAUDE.md`:
       - "Commands (18)" → 19, plus a `/worktree:restack` bullet
       - a `git-worktree` skill note for the new script
       - the bats list in Testing
@@ -569,12 +569,12 @@ conflict · `20` preflight refused · `30` restack failed, worktrees restored ·
         second prose mirror
       Also: `README.md` command table; root `README.md` "18 commands" → 19
       (two places, not validator-gated).
-- [ ] 5.2: Registry header comment: add `worktree-restack.sh` beside
+- [x] 5.2: Registry header comment: add `worktree-restack.sh` beside
       `commands/flow/work.md` as a mirror that must change with the registry.
-- [ ] 5.3: `skills/git-worktree/SKILL.md`: document the script and its
+- [x] 5.3: `skills/git-worktree/SKILL.md`: document the script and its
       subcommands. `troubleshooting.md`: a "stranded detached worktree"
       recipe.
-- [ ] 5.4: `.changeset/worktree-aware-restack.md`: `'yellow-core': minor`.
+- [x] 5.4: `.changeset/worktree-aware-restack.md`: `'yellow-core': minor`.
 
 ### Phase 6: Quality gates
 
