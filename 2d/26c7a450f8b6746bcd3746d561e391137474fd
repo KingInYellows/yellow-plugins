@@ -1,0 +1,58 @@
+plugins/yellow-council/README.md
+  s_092275c4e6a6a0::t_fbb6cec6a9f05e 126-155,161
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_092275c4e6a6a0::t_7ae710a7a36cfd 134-149,633,952-954,1029-1035,1037,1049-1052
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_092275c4e6a6a0::t_d47be82cf60f11 276-278
+plugins/yellow-codex/skills/codex-patterns/SKILL.md
+  s_092275c4e6a6a0::t_de2bbb53efa4ae 202-208,337
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_092275c4e6a6a0::t_d47be82cf60f11 311-313
+plugins/yellow-council/commands/council/council.md
+  s_092275c4e6a6a0::t_c25acdf60c7c64 242,3682
+  s_092275c4e6a6a0::t_d47be82cf60f11 538-540
+  s_092275c4e6a6a0::t_e4ec44516b676b 1957-1959,1966,1978,1981
+docs/testing/yellow-council-manual-tests.md
+  s_092275c4e6a6a0::t_3ad4ec5aeacf64 237-281,330
+.changeset/council-quota-and-opencode-routing.md
+  s_092275c4e6a6a0::t_4b8413e95f9bff 1-37
+plugins/yellow-council/tests/lib/extract-synthesis-lib.bash
+  s_092275c4e6a6a0::t_5ab19d2c01de3b 44
+  s_092275c4e6a6a0::t_5338dd859b1ee3 18-25,38
+  s_092275c4e6a6a0::t_48082109b7e0f3 43,45-46
+plans/yellow-council-v2-four-cli-04-quota-and-opencode-routing.md
+  s_092275c4e6a6a0::t_1302c162796f50 341
+  s_092275c4e6a6a0::t_fbb6cec6a9f05e 316
+  s_092275c4e6a6a0::t_3ad4ec5aeacf64 334
+  s_092275c4e6a6a0::t_de2bbb53efa4ae 328
+  s_092275c4e6a6a0::t_c83736477e5523 303
+plugins/yellow-council/CLAUDE.md
+  s_092275c4e6a6a0::t_c25acdf60c7c64 49-57,143-145,166-172,209,217-218,236-249
+plugins/yellow-council/tests/synthesis.bats
+  s_092275c4e6a6a0::t_d4fa0664521abc 1316-1323,1325-1343
+  s_092275c4e6a6a0::t_b5f45bf3efc850 1324
+plugins/yellow-council/tests/quota-lineage.bats
+  s_092275c4e6a6a0::t_2d447de478bbfc 76
+  s_092275c4e6a6a0::t_7bfcf9d0b3be43 1-70,72,75,77-315
+  s_092275c4e6a6a0::t_6ed2fa224a4d1f 71,73-74
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_092275c4e6a6a0::t_d47be82cf60f11 444-446
+scripts/council-roster.json
+  s_092275c4e6a6a0::t_87d57063bacedf 67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2d26c7a450f8b6746bcd3746d561e391137474fd",
+  "prompts": {},
+  "sessions": {
+    "s_092275c4e6a6a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "53398599-95a5-4127-ba6b-f2642ceba186",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
