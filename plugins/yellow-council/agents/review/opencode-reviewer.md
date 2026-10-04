@@ -16,7 +16,7 @@ skills:
 # OpenCode Reviewer
 
 You are a CLI-invocation agent. Your sole responsibility is running
-`opencode run --format json --variant high "..."` against a council pack and
+`opencode run --format json --variant high [--model <slug>] "..."` against a council pack and
 returning structured findings. You do NOT edit files, NEVER call
 AskUserQuestion, ALWAYS clean up persistent OpenCode sessions, and ALWAYS
 wrap CLI output in injection fences before returning.
@@ -63,7 +63,7 @@ The legitimate Bash surface for this agent covers ONLY:
 - `mktemp /tmp/council-opencode-XXXXXX.json` — JSONL capture
 - `mktemp /tmp/council-opencode-err-XXXXXX.txt` — stderr capture
 - `timeout --signal=TERM --kill-after=10 ${COUNCIL_TIMEOUT:-600}` — timeout guard
-- `opencode run --format json --variant high "..."` — OpenCode CLI invocation
+- `opencode run --format json --variant high [--model <slug>] "..."` — OpenCode CLI invocation; `--model` follows `COUNCIL_OPENCODE_MODEL` (unset: DeepSeek V4 Pro via OpenRouter; set but empty: omitted)
 - `opencode session delete <id>` — REQUIRED post-call cleanup
 - `jq -r '...'` — extract `text` events and `sessionID`
 - `awk '...'` — credential redaction (applied to extracted text only)
@@ -166,11 +166,31 @@ if [ "$PACK_BYTES" -gt 120000 ]; then
   exit 0
 fi
 
+# Resolve the model by PRESENCE, not value (R19). Each bash fence is a separate
+# Bash call, so this lives here, next to the invocation:
+#   unset          -> the default slug below (DeepSeek V4 Pro via OpenRouter)
+#   set, empty     -> no --model flag at all (V1 behaviour)
+#   set, non-empty -> --model "$COUNCIL_OPENCODE_MODEL", verbatim
+# `${VAR+x}` separates unset from empty; `${VAR:-default}` would collapse them.
+# The argv is built with `set --` so it is the same list in bash and zsh (zsh
+# does not word-split an unquoted expansion).
+set -- --format json --variant "${COUNCIL_OPENCODE_VARIANT:-high}" --print-logs --log-level ERROR
+if [ -z "${COUNCIL_OPENCODE_MODEL+x}" ]; then
+  OC_MODEL="openrouter/deepseek/deepseek-v4-pro"
+elif [ -n "$COUNCIL_OPENCODE_MODEL" ]; then
+  OC_MODEL="$COUNCIL_OPENCODE_MODEL"
+else
+  OC_MODEL=""
+fi
+[ -z "$OC_MODEL" ] || set -- "$@" --model "$OC_MODEL"
+printf '[opencode-reviewer] model: %s\n' "${OC_MODEL:-<opencode default>}" >&2
+
+# --print-logs --log-level ERROR: on opencode 1.18 the JSON error event for a
+# missing model or an unauthenticated provider is an opaque UnknownError; the
+# cause (ProviderModelNotFoundError) is only on stderr (Step 6 reads it from
+# $STDERR_FILE).
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
-  opencode run \
-    --format json \
-    --variant "${COUNCIL_OPENCODE_VARIANT:-high}" \
-    "$(cat "$PACK_FILE")" \
+  opencode run "$@" "$(cat "$PACK_FILE")" \
   >| "$OUTPUT_FILE" 2>| "$STDERR_FILE"
 CLI_EXIT=$?
 printf 'CLI_EXIT=%s\n' "$CLI_EXIT"
@@ -300,6 +320,27 @@ case $CLI_EXIT in
       printf 'fenced_output_path=/dev/null\n'
       printf 'findings_block_begin\n'
       printf 'findings_block_end\n'
+    elif grep -q 'ProviderModelNotFoundError' "$STDERR_FILE" 2>/dev/null || [ "$ERROR_STATUS" = "401" ] || [ "$ERROR_STATUS" = "403" ]; then
+      # R20: the configured model is unavailable, so the slot is UNAVAILABLE
+      # with the fix named, never a bare ERROR. On opencode 1.18 an unknown
+      # slug and a provider with no credential look identical in the JSON
+      # event (an opaque UnknownError); only stderr, via --print-logs, says
+      # `ProviderModelNotFoundError: Model not found: <slug>` (docs/spikes/
+      # opencode-cli-format-json-2026-05-04.md, "OpenRouter Routing Spike").
+      # An invalid key comes back as an APIError with HTTP 401/403 instead.
+      # The slug is taken from stderr through a character whitelist, so only
+      # model-identifier characters can reach summary=.
+      MISSING_SLUG=$(grep -m1 -o 'Model not found: [A-Za-z0-9._~:/-]*' "$STDERR_FILE" 2>/dev/null | sed -e 's/^Model not found: //' -e 's/[.:,]*$//' | head -c 120)
+      MISSING_PROVIDER="${MISSING_SLUG%%/*}"
+      [ -n "$MISSING_PROVIDER" ] || MISSING_PROVIDER="<provider>"
+      printf '[opencode-reviewer] Model or provider unavailable (%s) — returning UNAVAILABLE\n' "${MISSING_SLUG:-HTTP ${ERROR_STATUS:-?}}" >&2
+      printf 'verdict=UNAVAILABLE\n'
+      printf 'confidence=N/A\n'
+      if [ -n "$MISSING_SLUG" ]; then
+        printf 'summary=OpenCode model %s is unavailable (not listed, or its provider is not authenticated). Run "opencode auth login --provider %s" or set COUNCIL_OPENCODE_MODEL to a model listed by "opencode models".\n' "$MISSING_SLUG" "$MISSING_PROVIDER"
+      else
+        printf 'summary=OpenCode provider rejected the credential (HTTP %s). Run "opencode auth login --provider <provider>" or set COUNCIL_OPENCODE_MODEL to a model listed by "opencode models".\n' "$ERROR_STATUS"
+      fi
     elif [ -n "$ERROR_MSG" ]; then
       printf '[opencode-reviewer] Session error: %s\n' "$ERROR_MSG" >&2
       printf 'verdict=ERROR\n'
@@ -865,9 +906,14 @@ verification record. Key invocation patterns:
 
 - `opencode run "<message>" --format json` for non-interactive structured output
 - `--variant high` is the default; `max` is significantly slower
+- `--model <provider/model>` follows `COUNCIL_OPENCODE_MODEL` (Step 3); the
+  unset default is `openrouter/deepseek/deepseek-v4-pro`
 - `text` events with `part.text` are the assistant message (concatenate all)
 - `step_finish` event with `reason: "stop"` is terminal
-- `error` events have `error.data.message` and indicate session failure
+- `error` events have `error.data.message` and indicate session failure. On
+  opencode 1.18 a missing model or an unauthenticated provider surfaces there
+  only as "Unexpected server error"; the cause (`ProviderModelNotFoundError`)
+  is on stderr with `--print-logs --log-level ERROR`
 - `~/.local/share/opencode/<sessionID>/` is the persistent SQLite session directory
 
 Known gotchas:

@@ -110,6 +110,30 @@ if command -v opencode >/dev/null 2>&1; then
     *)
       printf '[yellow-council] opencode version: WARNING — %s may be too old. Recommend v1.14+ for council use.\n' "${OPENCODE_VERSION:-$OPENCODE_RAW}" ;;
   esac
+
+  # The OpenCode slot routes to DeepSeek V4 Pro via OpenRouter unless
+  # COUNCIL_OPENCODE_MODEL says otherwise. Resolve the model the way
+  # opencode-reviewer does: by presence, so unset and set-but-empty differ.
+  if [ -z "${COUNCIL_OPENCODE_MODEL+x}" ]; then
+    OC_MODEL="openrouter/deepseek/deepseek-v4-pro"
+  else
+    OC_MODEL="$COUNCIL_OPENCODE_MODEL"
+  fi
+  case "$OC_MODEL" in
+    openrouter/*)
+      # `opencode auth list` names OpenRouter when a stored credential or
+      # OPENROUTER_API_KEY exists, and prints no key material. Strip colour
+      # codes, then match the provider name after the bullet glyph.
+      ESC=$(printf '\033')
+      if timeout 30 opencode auth list --pure 2>&1 | sed "s/${ESC}\[[0-9;]*m//g" \
+         | grep -qE '^[^A-Za-z0-9]*OpenRouter([[:space:]]|$)'; then
+        printf '[yellow-council] opencode OpenRouter auth: ok\n'
+      else
+        printf '[yellow-council] opencode OpenRouter auth: WARNING — no OpenRouter credential found; the OpenCode slot (%s) will return UNAVAILABLE.\n' "$OC_MODEL"
+        printf '[yellow-council]   Fix: opencode auth login --provider openrouter (or export OPENROUTER_API_KEY)\n'
+        printf '[yellow-council]   Or opt out: export COUNCIL_OPENCODE_MODEL="" (V1 behaviour, no --model) or COUNCIL_OPENCODE_MODEL=opencode/deepseek-v4-pro (OpenCode Zen)\n'
+      fi ;;
+  esac
 else
   printf '[yellow-council] opencode: NOT INSTALLED\n'
 fi
@@ -171,6 +195,20 @@ fi
 if command -v opencode >/dev/null 2>&1; then
   OPENCODE_STATUS="installed"
   READY_COUNT=$((READY_COUNT + 1))
+  # Same model resolution and credential check as Step 3.
+  if [ -z "${COUNCIL_OPENCODE_MODEL+x}" ]; then
+    OC_MODEL="openrouter/deepseek/deepseek-v4-pro"
+  else
+    OC_MODEL="$COUNCIL_OPENCODE_MODEL"
+  fi
+  case "$OC_MODEL" in
+    openrouter/*)
+      ESC=$(printf '\033')
+      if ! timeout 30 opencode auth list --pure 2>&1 | sed "s/${ESC}\[[0-9;]*m//g" \
+           | grep -qE '^[^A-Za-z0-9]*OpenRouter([[:space:]]|$)'; then
+        OPENCODE_STATUS="installed (needs OpenRouter auth)"
+      fi ;;
+  esac
 else
   OPENCODE_STATUS="missing"
 fi
@@ -197,6 +235,6 @@ fi
 
 ## Notes
 
-- `council:setup` does NOT verify CLI authentication (agy keyring session tokens, OpenAI API key, OpenCode provider). Auth verification is the user's responsibility — first invocation of each CLI will prompt for auth if needed; for agy, run it once interactively so first-run onboarding migrates existing Gemini OAuth tokens.
+- `council:setup` does NOT verify CLI authentication (agy keyring session tokens, OpenAI API key, other OpenCode providers). The one exception is the OpenCode default route: when the resolved model starts with `openrouter/`, Step 3 checks that `opencode auth list` names OpenRouter (a stored credential or `OPENROUTER_API_KEY`). It never reads, prompts for or prints the key, and never calls the provider, so a present but invalid or empty-balance key still passes. Auth verification is otherwise the user's responsibility — first invocation of each CLI will prompt for auth if needed; for agy, run it once interactively so first-run onboarding migrates existing Gemini OAuth tokens.
 - The `--variant` (OpenCode) and `--sandbox`/`--print-timeout` (agy) flags used by reviewers are validated at invocation time, not at setup. If a flag is removed in a future CLI version, the corresponding reviewer will fail at runtime with a clear error.
 - This setup is idempotent — running it repeatedly is safe.

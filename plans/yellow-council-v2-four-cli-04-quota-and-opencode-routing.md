@@ -211,7 +211,7 @@ and `## Gotchas to Watch For` (`:120`); error-event table `:44-50`.
 
 ### Phase B — OpenCode routing + lineage (R19–R21)
 
-- [ ] Step 9: Routing spike (gate for Steps 10–14). Ask the user to run
+- [x] Step 9: Routing spike (gate for Steps 10–14). Ask the user to run
   `! opencode auth login --provider openrouter`; then record in a new
   `## OpenRouter Routing Spike (<date>)` section of
   `docs/spikes/opencode-cli-format-json-2026-05-04.md` (between `:103` and
@@ -255,19 +255,19 @@ and `## Gotchas to Watch For` (`:120`); error-event table `:44-50`.
   credits or raising the key's weekly limit). The message embeds an
   account key-management URL — Step 8's sanitizer must strip URLs, and the
   spike doc must not copy them.
-- [ ] Step 10: Wire `COUNCIL_OPENCODE_MODEL` in `opencode-reviewer.md`'s
+- [x] Step 10: Wire `COUNCIL_OPENCODE_MODEL` in `opencode-reviewer.md`'s
   invocation fence (`:169-174`), leaving the `PACK_BYTES` guard
   (`:157-168`) untouched: `${COUNCIL_OPENCODE_MODEL+x}` presence check —
   unset → `--model <spike slug>`; set-but-empty → no `--model` (V1);
   non-empty → `--model "$COUNCIL_OPENCODE_MODEL"` verbatim. Build the argv
   with `set --` (bash/zsh-safe, no arrays). Print the resolved model to
   stderr. Update the invocation description at `:19` and `:66`.
-- [ ] Step 11: R20 — in the opencode `*)` arm, match the spike-recorded
+- [x] Step 11: R20 — in the opencode `*)` arm, match the spike-recorded
   model-not-found / unauthenticated error events → `verdict=UNAVAILABLE`
   with an actionable summary (`run "opencode auth login --provider <provider>" or set
   COUNCIL_OPENCODE_MODEL to a model listed by "opencode models"`), never
   `ERROR`.
-- [ ] Step 12: OpenRouter auth check in `plugins/yellow-council/commands/council/setup.md`
+- [x] Step 12: OpenRouter auth check in `plugins/yellow-council/commands/council/setup.md`
   (Step 3 "Detect OpenCode CLI", `:99-116`): when opencode is installed and
   the resolved model (same three-state logic and default slug as Step 10)
   starts with `openrouter/`, run the Step 9 credential check. Report
@@ -279,7 +279,7 @@ and `## Gotchas to Watch For` (`:120`); error-event table `:44-50`.
   summary line (`:187-188`) as `OpenCode=installed (needs OpenRouter auth)`
   and update the limitations note at `:200`, which today says setup does
   not verify OpenCode provider auth.
-- [ ] Step 13: Lineage pre-flight in `council.md`: add
+- [x] Step 13: Lineage pre-flight in `council.md`: add
   `council_resolve_lineage` to the `council-quota-lib` marker pair (maps a
   model string to `anthropic|openai|google|deepseek|<provider>|unknown` by
   slug prefix/family), and at the end of Step 1 (`:~85`) a block that
@@ -293,7 +293,7 @@ and `## Gotchas to Watch For` (`:120`); error-event table `:44-50`.
   Step 9 credential check fails, also print a non-blocking warning pointing
   at `/council:setup` (the slot will return `UNAVAILABLE`). Never exits
   non-zero.
-- [ ] Step 14: Add a `**Models:** <COUNCIL_MODELS line from Step 1>` row to
+- [x] Step 14: Add a `**Models:** <COUNCIL_MODELS line from Step 1>` row to
   the report header template (`council.md:2228`, before the advisory
   blockquote) and a sentence telling the model to copy it verbatim from
   Step 1 output (Step 7's subprocess does not persist it).
