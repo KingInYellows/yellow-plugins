@@ -963,17 +963,37 @@ add_remotes() {
   [ ! -f "$STUB_DIR/gh.log" ] || ! grep -q 'stack rebase' "$STUB_DIR/gh.log"
 }
 
-@test "github: a valid remote.pushDefault, or a single remote, needs no --remote" {
+@test "github: a valid remote.pushDefault needs no --remote" {
   command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
   mk_stack
   add_remotes
   git config remote.pushDefault fork
   STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github
   [ "$status" -eq 0 ]
-  git config --unset remote.pushDefault
-  git remote remove fork
+}
+
+@test "github: a clone with a single remote needs no --remote and no remote.pushDefault" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  git remote add origin "$T/o.git"
+  [ "$(git remote | wc -l)" -eq 1 ]
+  ! git config --get remote.pushDefault >/dev/null
   STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github
   [ "$status" -eq 0 ]
+}
+
+@test "github: a remote name with a slash is accepted, an empty one is a usage error" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  git -C "$REPO" remote add origin "$T/o.git"
+  git -C "$REPO" remote add team/foo "$T/t.git"
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github --remote team/foo
+  [ "$status" -eq 0 ]
+  [[ $output == *$'REMOTE\tteam/foo'* ]]
+  for bad in '' 'team/' '/foo' 'team//foo' 'a/../b'; do
+    STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github --remote "$bad"
+    [ "$status" -eq 2 ] || { echo "accepted: '$bad'"; false; }
+  done
 }
 
 @test "github: --remote is forwarded to the rebase and to the submit, and shown in the plan" {
@@ -996,7 +1016,7 @@ add_remotes() {
   STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github --remote nope
   [ "$status" -eq 20 ]
   [[ $output == *"not a configured remote"* ]]
-  for bad in 'bad name' '-x' 'a..b' 'a/b'; do
+  for bad in 'bad name' '-x' 'a..b'; do
     STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github --remote "$bad"
     [ "$status" -eq 2 ] || { echo "accepted: $bad"; false; }
   done

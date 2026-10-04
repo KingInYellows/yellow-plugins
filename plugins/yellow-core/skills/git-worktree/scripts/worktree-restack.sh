@@ -260,7 +260,7 @@ valid_ref() { # refs/heads/<valid branch>
 valid_remote() { # a configured remote name that is safe to put on a command line
   local name=$1
   [ -n "$name" ] || return 1
-  case $name in [!A-Za-z0-9]* | *[!A-Za-z0-9._-]* | *..*) return 1 ;; esac
+  case $name in [!A-Za-z0-9]* | *[!A-Za-z0-9._/-]* | *..* | *//* | */) return 1 ;; esac
   git remote 2>/dev/null | grep -Fxq -- "$name"
 }
 
@@ -1171,7 +1171,7 @@ parse_flags() { # sets PROVIDER, SUBMIT, REMOTE
         ;;
       --submit) SUBMIT=1 ;;
       --remote)
-        [ $# -ge 2 ] || die "$X_USAGE" "--remote needs a value"
+        [ $# -ge 2 ] && [ -n "$2" ] || die "$X_USAGE" "--remote needs a remote name"
         REMOTE=$2
         shift
         ;;
@@ -1184,7 +1184,7 @@ parse_flags() { # sets PROVIDER, SUBMIT, REMOTE
   # A malformed name is a usage error here; whether it is a configured remote
   # is judged against the repository (preflight refuses, start re-checks).
   case $REMOTE in '' | [A-Za-z0-9]*) ;; *) die "$X_USAGE" "--remote must be a remote name" ;; esac
-  case $REMOTE in *[!A-Za-z0-9._-]* | *..*) die "$X_USAGE" "--remote must be a remote name" ;; esac
+  case $REMOTE in *[!A-Za-z0-9._/-]* | *..* | *//* | */) die "$X_USAGE" "--remote must be a remote name" ;; esac
 }
 
 # reject_remote: --remote belongs to preflight and start; a paused run keeps its own.

@@ -64,7 +64,7 @@ while [ $# -gt 0 ]; do
     --submit) SUBMIT=1 ;;
     --yes) YES=1 ;;
     --remote)
-      [ $# -ge 2 ] || { echo "ERROR: --remote needs a remote name"; exit 2; }
+      [ $# -ge 2 ] && [ -n "$2" ] || { echo "ERROR: --remote needs a remote name"; exit 2; }
       REMOTE=$2
       shift
       ;;
@@ -78,7 +78,7 @@ case "$REMOTE" in
   *) echo "ERROR: --remote must be a remote name"; exit 2 ;;
 esac
 case "$REMOTE" in
-  *[!A-Za-z0-9._-]* | *..*) echo "ERROR: --remote must be a remote name"; exit 2 ;;
+  *[!A-Za-z0-9._/-]* | *..* | *//* | */) echo "ERROR: --remote must be a remote name"; exit 2 ;;
 esac
 if [ "$SUBMIT" = 1 ] && [ "$MODE" != start ]; then
   echo "ERROR: --submit applies to a new restack only; a paused restack keeps the flag it started with"
