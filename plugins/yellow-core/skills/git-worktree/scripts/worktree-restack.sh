@@ -46,6 +46,11 @@ readonly MAX_LISTED=20
 
 # v: a value (path, branch, ref) made printable - every control character,
 # tabs and newlines included, is dropped.
+has_cntrl() {
+  local LC_ALL=C
+  [[ $1 == *[[:cntrl:]]* ]]
+}
+
 v() {
   local LC_ALL=C
   printf '%s' "${1//[[:cntrl:]]/}"
@@ -256,8 +261,6 @@ ensure_state_dir() {
   chmod 700 -- "$STATE_DIR" "$(dirname -- "$STATE_DIR")" 2>/dev/null || true
 }
 
-mtime_of() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null; }
-
 lock_pid() { cat -- "$LOCK_DIR/pid" 2>/dev/null; }
 
 lock_pid_alive() {
@@ -266,16 +269,24 @@ lock_pid_alive() {
   [[ $p =~ ^[0-9]+$ ]] && [ "$p" -gt 0 ] && kill -0 "$p" 2>/dev/null
 }
 
-lock_generation() { printf '%s-%s' "$(ls -di -- "$LOCK_DIR" 2>/dev/null | awk '{print $1}')" "$(mtime_of "$LOCK_DIR")"; }
+# pid_takeable PID-FIELD: a lock can be taken over only when its owner is
+# provably gone: a pid that is dead, or the word "paused" that a paused run
+# leaves behind (an exited pid could be reused by an unrelated process). A lock
+# with no readable pid may be a live process between mkdir and its pid write,
+# so it is never taken.
+pid_takeable() {
+  [ "$1" = paused ] && return 0
+  [[ $1 =~ ^[0-9]+$ ]] && [ "$1" -gt 0 ] && ! kill -0 "$1" 2>/dev/null
+}
 
-# Atomic: only one reclaimer wins the rename.
+# lock_reclaim: remove a takeable lock. The rename is atomic, so only one
+# process gets the directory; what it got is checked again, and anything that
+# is not provably stale (a lock another process created in between) goes back.
 lock_reclaim() {
   local moved="$LOCK_DIR.reclaim.$$" p
   mv -- "$LOCK_DIR" "$moved" 2>/dev/null || return 1
-  # A slower reclaimer may have moved a lock another process just took; put a
-  # live owner's lock back rather than delete it.
   p=$(cat -- "$moved/pid" 2>/dev/null)
-  if [[ $p =~ ^[0-9]+$ ]] && [ "$p" -gt 0 ] && [ "$p" -ne "$$" ] && kill -0 "$p" 2>/dev/null; then
+  if ! pid_takeable "$p"; then
     mv -- "$moved" "$LOCK_DIR" 2>/dev/null || true
     return 1
   fi
@@ -286,18 +297,25 @@ lock_stamp() {
   printf '%s\n' "$$" >|"$LOCK_DIR/pid" || return 1
 }
 
+# lock_mark_paused: a paused run exits but keeps the lock; "paused" replaces its
+# pid so a recycled pid can never block --continue or --abort.
+lock_mark_paused() { printf 'paused\n' >|"$LOCK_DIR/pid" 2>/dev/null || true; }
+
+# release_lock removes the lock only when this process owns it.
 release_lock() {
+  [ "$(lock_pid)" = "$$" ] || return 0
   rm -f -- "$LOCK_DIR/pid" 2>/dev/null
   rmdir -- "$LOCK_DIR" 2>/dev/null || true
 }
 
-# acquire_lock: new restack. A lock is reclaimable only when its owner is dead
-# and no state file exists; with state present every path points to
-# --continue, --abort or --status. An unreadable pid file (owner killed
-# between mkdir and the pid write) counts as stale only when it is still
-# unreadable on the same lock generation (inode + mtime) a second later.
+lock_busy_hint() {
+  err "lock $(v "$LOCK_DIR") is held (pid file: '$(v "$(lock_pid)")'); if no restack is running, remove that directory"
+}
+
+# acquire_lock: new restack. With a state file present every path points to
+# --continue, --abort or --status, so a lock is never reclaimed then.
 acquire_lock() {
-  local p gen1 gen2
+  local p _
   for _ in 1 2; do
     if (umask 077 && mkdir -- "$LOCK_DIR") 2>/dev/null; then
       lock_stamp || {
@@ -307,32 +325,26 @@ acquire_lock() {
       return 0
     fi
     [ ! -e "$STATE_FILE" ] || return 1
-    lock_pid_alive && return 1
     p=$(lock_pid)
-    if ! [[ $p =~ ^[0-9]+$ ]] || [ "$p" -eq 0 ]; then
-      gen1=$(lock_generation)
-      sleep 1
-      gen2=$(lock_generation)
-      p=$(lock_pid)
-      { [ "$gen1" = "$gen2" ] && ! [[ $p =~ ^[0-9]+$ ]]; } || return 1
-    fi
+    pid_takeable "$p" || return 1
     lock_reclaim || return 1
   done
   return 1
 }
 
-# take_lock: continue/abort/restore resume a run whose process is gone.
+# take_lock: continue/abort/restore resume a run whose process is gone. The
+# takeover is the same atomic rename + fresh mkdir, so two takers cannot both win.
 take_lock() {
   if (umask 077 && mkdir -- "$LOCK_DIR") 2>/dev/null; then
     lock_stamp
     return
   fi
   [ -d "$LOCK_DIR" ] || return 1
-  if lock_pid_alive && [ "$(lock_pid)" != "$$" ]; then return 1; fi
-  # The owner is gone. Replace the lock through the same atomic rename the
-  # reclaim uses, so two concurrent takers cannot both win.
-  lock_reclaim || return 1
-  (umask 077 && mkdir -- "$LOCK_DIR") 2>/dev/null || return 1
+  if [ "$(lock_pid)" != "$$" ]; then
+    pid_takeable "$(lock_pid)" || return 1
+    lock_reclaim || return 1
+    (umask 077 && mkdir -- "$LOCK_DIR") 2>/dev/null || return 1
+  fi
   lock_stamp
 }
 
@@ -672,7 +684,7 @@ build_plan() {
     local p=${SEL_PATH[i]} label
     label="$(v "$p") ($(v "${SEL_BRANCH[i]}"))"
     wi=$(wt_index "$p")
-    case $p in *$'\t'* | *$'\n'*) refuse "worktree path contains a tab or newline: $label" ;; esac
+    if has_cntrl "$p"; then refuse "worktree path contains a control character: $label"; fi
     [ "${WT_LOCKED[wi]}" -eq 0 ] || refuse "worktree is locked (owned by someone else): $label"
     if [ "${WT_PRUNABLE[wi]}" -ne 0 ]; then
       refuse "worktree is prunable (its directory is missing): $label"
@@ -681,7 +693,7 @@ build_plan() {
     if why=$(wt_busy "$p"); then refuse "worktree has an operation in progress ($why): $label"; fi
     if wt_dirty "$p"; then refuse "worktree has uncommitted changes: $label"; fi
   done
-  case $RUN_WT in *$'\t'* | *$'\n'*) refuse "run worktree path contains a tab or newline" ;; esac
+  if has_cntrl "$RUN_WT"; then refuse "run worktree path contains a control character"; fi
   if why=$(wt_busy "$RUN_WT"); then refuse "run worktree has an operation in progress ($why)"; fi
   if wt_dirty "$RUN_WT"; then refuse "run worktree has uncommitted changes"; fi
   return 0
@@ -693,7 +705,7 @@ plan_graphite_stack() {
     refuse "gt (Graphite CLI) is not installed"
     return
   }
-  S_TOOLVER=$(gt_tool_version)
+  S_TOOLVER=$(v "$(gt_tool_version)")
   gt_stack_parse || {
     refuse "could not read the Graphite stack (the current branch may not be tracked)"
     return
@@ -743,7 +755,7 @@ plan_github_stack() {
     return
   }
   ver=$(gh_stack_version)
-  S_TOOLVER=${ver:-}
+  S_TOOLVER=$(v "${ver:-}")
   if ! gh_version_ok "$ver"; then
     refuse "gh-stack >= 0.2.0 is required (found: ${ver:-none or unparseable}); run: gh extension upgrade stack"
     return
@@ -757,13 +769,13 @@ plan_github_stack() {
     refuse "gh stack view failed ($(v "$AD_STATUS")): $(v "$AD_RECOVERY")"
     return
   fi
-  # One jq call: the trunk, then "name<TAB>isCurrent" per branch.
-  rows=$(printf '%s' "$AD_JSON" | jq -r '.stdout | fromjson | (.trunk // ""), (.branches[] | "\(.name // "")\t\(.isCurrent)")' 2>/dev/null) || rows=""
+  # One jq call: the trunk, then "name<US>isCurrent" per branch (US = unit separator).
+  rows=$(printf '%s' "$AD_JSON" | jq -r '.stdout | fromjson | (.trunk // ""), (.branches[] | "\(.name // "")\u001f\(.isCurrent)")' 2>/dev/null) || rows=""
   trunk=${rows%%$'\n'*}
   names=()
   n=0
   if [ "$rows" != "$trunk" ]; then
-    while IFS=$'\t' read -r name iscur; do
+    while IFS=$'\037' read -r name iscur; do
       names+=("$name")
       if [ "$iscur" = true ]; then cur=$n; fi
       n=$((n + 1))
@@ -824,9 +836,8 @@ report_floating() {
   return 0
 }
 
-unlock_entry() { # unlock a worktree this run locked, never someone else's lock
+unlock_entry() { # unlock a worktree that carries this command's lock reason, never another lock
   local wi
-  [ "${E_LOCK[$1]}" = 1 ] || return 0
   wi=$(wt_index "${E_PATH[$1]}")
   [ "$wi" -ge 0 ] && [ "${WT_LOCKREASON[wi]}" = "$PAUSE_REASON" ] || return 0
   git worktree unlock -- "${E_PATH[$1]}" >/dev/null 2>&1 || true
@@ -899,6 +910,7 @@ restore_and_clear() {
     return 0
   fi
   write_state || err "could not rewrite the state file"
+  lock_mark_paused
   err "some worktrees are still detached; resolve them, then run /worktree:restack --continue, --abort or the restore subcommand again"
   return 1
 }
@@ -951,6 +963,7 @@ finish_restack() {
   local anc=0 rc=0
   check_ancestry || anc=1
   restore_and_clear || rc=$X_PARTIAL
+  ARMED=0
   if [ "$rc" -eq 0 ] && [ "$anc" -eq 1 ]; then rc=$X_INCOMPLETE; fi
   if [ "$rc" -eq 0 ]; then
     note "restack complete"
@@ -982,6 +995,7 @@ do_pause() {
   ARMED=0
   lock_detached_entries
   write_state || err "could not rewrite the state file"
+  lock_mark_paused
   note "PAUSED: restack stopped on a conflict"
   if [ "$S_PROVIDER" = graphite ]; then
     gd=$(git -C "$S_RUN" rev-parse --path-format=absolute --git-dir 2>/dev/null)
@@ -1009,11 +1023,12 @@ on_exit() {
   trap - EXIT
   if [ "${ARMED:-0}" = 1 ]; then
     ARMED=0
-    if [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; then
+    if { [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; } || { [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; }; then
       # Interrupted with a conflict paused: restoring now would strand the
       # provider's own --continue. Keep the state and lock the worktrees.
       lock_detached_entries
       write_state || true
+      lock_mark_paused
       err "interrupted while a conflict was paused; run /worktree:restack --continue or --abort"
       [ "$rc" -ne 0 ] || rc=$X_PAUSED
     else
@@ -1043,7 +1058,11 @@ step_graphite() { # step_graphite restack|continue|abort
     continue) out=$(cd -- "$S_RUN" && gt continue --no-interactive 2>&1) || rc=$? ;;
     abort) out=$(cd -- "$S_RUN" && gt abort --force 2>&1) || rc=$? ;;
   esac
-  printf '%s\n' "$out" | cap_lines 40
+  if [ "$rc" -eq 0 ] || [ "$1" = abort ]; then
+    printf '%s\n' "$out" | cap_lines 40
+  else
+    printf '%s\n' "$out" | tail -n 40 | cap_lines 40
+  fi
   if [ "$rc" -eq 0 ]; then
     RESULT=ok
   elif [ "$1" != abort ] && gt_paused "$S_RUN"; then
@@ -1158,7 +1177,10 @@ cmd_start() {
     done
   fi
 
-  acquire_lock || die "$X_BUSY" "could not take the restack lock; a restack is in progress"
+  acquire_lock || {
+    lock_busy_hint
+    die "$X_BUSY" "could not take the restack lock; a restack is in progress"
+  }
   S_PROVIDER=$PROVIDER S_COMMON=$COMMON S_RUN=$RUN_WT S_SUBMIT=$SUBMIT
   S_TOKEN=$(new_token)
   E_PATH=() E_REF=() E_SHA=() E_PHASE=() E_LOCK=()
@@ -1213,7 +1235,7 @@ drive_result() {
 load_state_or_exit() {
   init_paths
   if [ ! -e "$STATE_FILE" ]; then
-    if [ -d "$LOCK_DIR" ] && ! lock_pid_alive; then release_lock; fi
+    if [ -d "$LOCK_DIR" ] && pid_takeable "$(lock_pid)"; then lock_reclaim || true; fi
     note "no restack in progress"
     exit "$X_OK"
   fi
@@ -1233,7 +1255,10 @@ report_all_floating() {
 }
 
 need_lock() {
-  take_lock || die "$X_BUSY" "another restack process is running"
+  take_lock || {
+    lock_busy_hint
+    die "$X_BUSY" "another restack process is running"
+  }
 }
 
 cmd_continue() {

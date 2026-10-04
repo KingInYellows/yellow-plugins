@@ -26,7 +26,7 @@ in_progress() { # in_progress DIR
 # eng_begin START: snapshot every branch, queue START and everything above it.
 eng_begin() {
   local b
-  : >"$STUB_DIR/snap"
+  : >|"$STUB_DIR/snap"
   tail -n +2 "$STUB_STACK" | while IFS= read -r b; do
     printf '%s %s %s\n' "$b" "$(g rev-parse "refs/heads/$b")" "$(cat "$(base_file "$b")")" >>"$STUB_DIR/snap"
   done
@@ -50,7 +50,7 @@ eng_run() {
     ptip=$(g rev-parse "refs/heads/$parent")
     [ "$base" != "$ptip" ] || continue
     if [ "$mode" = owner ]; then where=$(owner_of "$b"); else where=$PWD; fi
-    if g -C "$where" rebase --onto "refs/heads/$parent" "$base" "$b" >"$STUB_DIR/rebase.out" 2>&1; then
+    if g -C "$where" rebase --onto "refs/heads/$parent" "$base" "$b" >|"$STUB_DIR/rebase.out" 2>&1; then
       g rev-parse "refs/heads/$parent" >|"$(base_file "$b")"
       echo "Restacked $b on $parent." >&2
     else
@@ -73,7 +73,7 @@ eng_continue() {
   local mode=$1 where b parent
   where=$(cat "$STUB_DIR/conflict-wt")
   [ "$mode" != cwd ] || where=$PWD
-  if ! GIT_EDITOR=true g -C "$where" rebase --continue >"$STUB_DIR/rebase.out" 2>&1; then
+  if ! GIT_EDITOR=true g -C "$where" rebase --continue >|"$STUB_DIR/rebase.out" 2>&1; then
     cat "$STUB_DIR/rebase.out" >&2
     if in_progress "$where"; then return 3; fi
     return 1

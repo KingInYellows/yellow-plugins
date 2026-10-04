@@ -129,6 +129,14 @@ assert_stacked() {
   [ "$status" -eq 1 ]
 }
 
+@test "start: a worktree path containing a carriage return is refused at preflight" {
+  WTFMT=$'wt\r%s'
+  mk_stack
+  run bash "$SCRIPT" preflight --provider graphite
+  [ "$status" -eq 20 ]
+  [[ $output == *"control character"* ]]
+}
+
 @test "preflight: lists the worktrees to detach and writes nothing" {
   mk_stack
   run bash "$SCRIPT" preflight --provider graphite
@@ -309,6 +317,26 @@ assert_stacked() {
   assert_all_restored
 }
 
+@test "a lock with no readable pid is never taken: start exits 3 and names the lock" {
+  mk_stack
+  mkdir -p "$SD/lock.d"
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 3 ]
+  [[ $output == *"lock.d"*"remove that directory"* ]]
+  [ "$(branch_of "$(wtp b)")" = b ]
+}
+
+@test "a paused run leaves 'paused' in the lock, so a recycled pid cannot block --continue" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  [ "$(cat "$SD/lock.d/pid")" = paused ]
+  resolve_in "$(wtp a)" b.txt
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
 @test "a live lock blocks start" {
   mk_stack
   mkdir -p "$SD/lock.d"
@@ -392,7 +420,8 @@ forge() {
   run bash "$SCRIPT" restore
   [ "$status" -eq 4 ]
   forge "$wtb" refs/heads/b "$sha"
-  sed -i 's/^chain\t.*/chain\tmain/' "$SD/state"
+  { grep -v '^chain' "$SD/state"; printf 'chain\tmain\n'; } >|"$SD/state.new"
+  mv -f "$SD/state.new" "$SD/state"
   run bash "$SCRIPT" restore
   [ "$status" -eq 4 ]
   [ -z "$(branch_of "$wtb")" ]
