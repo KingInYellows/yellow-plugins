@@ -1,0 +1,23 @@
+plugins/yellow-review/references/resolve/dispositions.md
+  s_771064b1487eb8::t_944dc57989bbda 229-233
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  s_771064b1487eb8::t_cae1e535414c71 75,77-81,603-609,632,634-644,651-659,875-885
+plugins/yellow-review/tests/commit-resolve-fixes.bats
+  s_771064b1487eb8::t_63a3c579e22475 1043-1136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b22d726d4a7b48f116e4b9381e12b83730a08e7a",
+  "prompts": {},
+  "sessions": {
+    "s_771064b1487eb8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "344118bf-2aa9-4d5a-a9e5-a6b94995fa25",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
