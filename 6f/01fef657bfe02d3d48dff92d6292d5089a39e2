@@ -1,0 +1,21 @@
+plugins/yellow-review/lib/resolve-text.sh
+  s_50d166a981ace4::t_7cf8d0150cfdd1 580-584,591-593
+plugins/yellow-review/references/resolve/dispositions.md
+  s_50d166a981ace4::t_6366f11c46c611 577-580,600-604
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6f01fef657bfe02d3d48dff92d6292d5089a39e2",
+  "prompts": {},
+  "sessions": {
+    "s_50d166a981ace4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fd9a89b9-6534-475e-9256-5db738960fe1",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
