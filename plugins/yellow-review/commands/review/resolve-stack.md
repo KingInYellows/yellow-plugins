@@ -217,8 +217,11 @@ Step 4's clear. For `ignored`, snapshot it once, before the first resolve:
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" snapshot
 ```
 
-Keep the printed path as `<guard-dir>` and substitute it as a literal in item
-3b and Step 4 (variables do not survive across Bash calls). A non-zero exit
+The output is the snapshot path, then a `digest=<hex>` line. Keep the path as
+`<guard-dir>` and the hex after `digest=` as `<guard-digest>`, and substitute
+both as literals in item 3b and Step 4 (variables do not survive across Bash
+calls). Only the digest authenticates the snapshot; never write it into the
+snapshot directory or a file. A non-zero exit
 stops the command before any resolve: `[review:resolve-stack] Error: could not
 snapshot the local config.` and exit `1`.
 
@@ -309,11 +312,12 @@ stop or item 3b's dirty-tree or config stop ends the walk.
    `yellow-plugins.local.md` before anything else can read it:
 
    ```bash
-   "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" check "<guard-dir>"
+   "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" check "<guard-dir>" "<guard-digest>"
    ```
 
    Exit `0`: unchanged. Exit `3` (changed and restored) or `4` (restore
-   failed): print this PR's row, then
+   failed, or the snapshot failed its digest check; the live config was not
+   touched): print this PR's row, then
    `[review:resolve-stack] aborted at PR #<PR#>: yellow-plugins.local.md changed during the resolve`
    with the script's `changed:` / `restore failed:` lines. List the PR under
    Needs manual attention as `ignored config changed (restored)` or `ignored

@@ -519,7 +519,8 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   [ -n "$snap" ] && [ "$snap" -lt "$walk" ]
   text=$(flat "$RESOLVE_STACK")
   [[ "$text" == *'guard-local-config" snapshot'* ]]
-  [[ "$text" == *'guard-local-config" check "<guard-dir>"'* ]]
+  [[ "$text" == *'guard-local-config" check "<guard-dir>" "<guard-digest>"'* ]]
+  [[ "$text" == *'`digest=<hex>`'* ]]
   [[ "$text" == *'guard-local-config" clear "<guard-dir>"'* ]]
   [[ "$text" == *'aborted at PR #<PR#>: yellow-plugins.local.md changed during the resolve'* ]]
   [[ "$text" == *'`not attempted (config changed)`'* ]]

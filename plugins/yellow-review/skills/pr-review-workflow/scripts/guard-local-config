@@ -5,31 +5,36 @@
 # resolve_pr.verify_command a later unattended run executes) leaves a clean
 # tree and passes every clean-tree check.
 # Usage: guard-local-config snapshot
-#        guard-local-config check <snap-dir>
+#        guard-local-config check <snap-dir> <digest>
 #        guard-local-config clear <snap-dir>
 #   snapshot: record each guarded file's state (a regular file's bytes or
-#             absence) in a private mktemp directory and print its path. Exit 2
+#             absence) in a private mktemp directory and print its path, then a
+#             line `digest=<hex>`: a digest over every entry written (the state
+#             and, for a file, the copy's content hash). The caller holds the
+#             digest; it is never stored in the snapshot directory. Exit 2
 #             when a guarded path is a symlink (its target's bytes are not
 #             snapshotted, so a rewrite through it would go unseen), a
 #             directory or another special file.
 #   check:    compare each guarded path with the snapshot. A path that changed
 #             is put back from the snapshot (a created file is deleted), then
 #             compared again. Prints `changed: <path>` per path that differed.
-#             Every snapshot entry (state, copy and the content hash recorded
-#             at snapshot time) is validated before anything is removed; an
-#             invalid snapshot exits 4 and leaves the live file untouched. The
-#             only valid states are `file` (copy and matching hash present) and
-#             `absent` (neither copy nor hash present); any other state,
-#             including `symlink:*`, is invalid, so a tampered state cannot
-#             delete the config or install a link. A restore is staged beside
-#             the file and moved in with mv -f.
-#             Residual: a process that rewrites the state AND deletes the copy
-#             and hash can make `check` remove the live config. That fails safe:
-#             no config means no verify_command to execute.
+#             <digest> is the hex value from snapshot's `digest=` line. Every
+#             snapshot entry (state, copy and the content hash recorded at
+#             snapshot time) is validated, and the digest is recomputed from
+#             the snapshot directory and compared, before anything is removed;
+#             an invalid snapshot or a digest mismatch exits 4 and leaves the
+#             live file untouched. The only valid states are `file` (copy and
+#             matching hash present) and `absent` (neither copy nor hash
+#             present); any other state, including `symlink:*`, is invalid. A
+#             restore is staged beside the file and moved in with mv -f.
+#             The snapshot is authenticated by the digest the caller holds, so
+#             a tampered state, copy or hash is refused before the live config
+#             is touched.
 #   clear:    remove the snapshot directory.
 # Exit codes: 0 nothing changed, 3 something changed and every path was
-#   restored, 4 a path could not be restored (stop; the file is tampered),
-#   2 usage, unsafe snapshot directory or a path that cannot be guarded.
+#   restored, 4 a path could not be restored or the snapshot failed validation
+#   (stop; the snapshot or file is tampered), 2 usage (including a missing or
+#   malformed digest), unsafe snapshot directory or a path that cannot be guarded.
 # Guarded paths (repository root): yellow-plugins.local.md.
 # Callers: /review:resolve-stack (Step 2b snapshot, item 3b check, Step 4 clear).
 
@@ -39,7 +44,7 @@ GUARDED=(yellow-plugins.local.md)
 
 die() { printf '[guard-local-config] Error: %s\n' "$2" >&2; exit "$1"; }
 usage() {
-    printf 'Usage: guard-local-config snapshot | check <snap-dir> | clear <snap-dir>\n' >&2
+    printf 'Usage: guard-local-config snapshot | check <snap-dir> <digest> | clear <snap-dir>\n' >&2
     exit 2
 }
 
@@ -62,15 +67,39 @@ valid_dir() {
     [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ]
 }
 
+# hash_stdin: hash of standard input (sha256sum, then shasum, then cksum).
+hash_stdin() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum | cut -d' ' -f1
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 | cut -d' ' -f1
+    else
+        cksum | tr ' ' '-'
+    fi
+}
+
 # hash_of <file>: content hash recorded at snapshot time and re-checked before a restore.
 hash_of() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum -- "$1" | cut -d' ' -f1
-    elif command -v shasum >/dev/null 2>&1; then
-        shasum -a 256 -- "$1" | cut -d' ' -f1
-    else
-        cksum <"$1" | tr ' ' '-'
-    fi
+    hash_stdin <"$1"
+}
+
+# compute_digest: digest over every snapshot entry (for each index, the state
+# value and, for a file, the copy's content hash). Recomputed from the snapshot
+# directory in `check` and compared with the value the caller holds.
+compute_digest() {
+    local i=0 rel st h acc=""
+    for rel in "${GUARDED[@]}"; do
+        [ -f "$SNAP/state.$i" ] && [ ! -L "$SNAP/state.$i" ] || return 1
+        st=$(cat -- "$SNAP/state.$i") || return 1
+        h=""
+        if [ "$st" = file ]; then
+            [ -f "$SNAP/copy.$i" ] && [ ! -L "$SNAP/copy.$i" ] || return 1
+            h=$(hash_of "$SNAP/copy.$i") || return 1
+        fi
+        acc="${acc}${i} ${st} ${h}"$'\n'
+        i=$((i + 1))
+    done
+    printf '%s' "$acc" | hash_stdin
 }
 
 # valid_entry <index>: the snapshot's state (and, for a file, its copy and the
@@ -173,11 +202,17 @@ case "$CMD" in
             fi
             i=$((i + 1))
         done
+        digest=$(compute_digest) || { rm -rf -- "$SNAP"; die 2 "could not compute the snapshot digest"; }
         printf '%s\n' "$SNAP"
+        printf 'digest=%s\n' "$digest"
         ;;
     check)
-        [ $# -eq 2 ] || usage
+        [ $# -eq 3 ] || usage
         SNAP="$2"
+        WANT_DIGEST="$3"
+        case "$WANT_DIGEST" in
+            ""|*[!0-9a-f-]*) usage ;;
+        esac
         valid_dir "$SNAP" || die 2 "snapshot directory rejected: $SNAP"
         # Prove the whole snapshot is usable before touching any live path: a
         # missing or corrupted entry must fail without modifying the config.
@@ -189,6 +224,14 @@ case "$CMD" in
             fi
             i=$((i + 1))
         done
+        # The entries can all be self-consistent after a rewrite (state,
+        # copy and hash replaced together); only the caller's digest proves the
+        # snapshot is the one snapshot wrote.
+        have_digest=$(compute_digest) || have_digest=""
+        if [ -z "$have_digest" ] || [ "$have_digest" != "$WANT_DIGEST" ]; then
+            printf 'snapshot invalid: digest mismatch\n'
+            exit 4
+        fi
         changed=0
         failed=0
         i=0

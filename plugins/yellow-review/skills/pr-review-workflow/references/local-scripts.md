@@ -23,10 +23,12 @@ callers that walk several PRs. Exit codes and markers are defined in
     (no file list); `/review:resolve-stack` runs it after a dirty resolve
     through `references/review-resolve-stack/dirty-tree-cleanup.md` and
     `/review:sweep-all` through `references/review-sweep-all/dirty-tree-cleanup.md`
-- **guard-local-config** `snapshot` | `check <snap-dir>` | `clear <snap-dir>` —
-  Snapshot the ignored `yellow-plugins.local.md`, then detect a resolver
+- **guard-local-config** `snapshot` | `check <snap-dir> <digest>` | `clear <snap-dir>` —
+  Snapshot the ignored `yellow-plugins.local.md` (prints the path, then
+  `digest=<hex>` for the caller to hold), then detect a resolver
   edit to it and put it back; exit 0 unchanged, 3 changed and restored, 4
-  restore failed; a symlinked config is refused at snapshot (exit 2).
+  restore failed or digest mismatch (live config untouched); a symlinked
+  config is refused at snapshot (exit 2).
   `/review:resolve-stack` runs it around the walk
 - **check-resolve-text** `<file>...` — Exits 2 when text looks like a
   credential or cannot be read; run it on text posted outside the resolve

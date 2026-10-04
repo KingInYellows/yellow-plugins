@@ -239,10 +239,12 @@ resolution, and sequential stack review. Graphite-native workflow.
   `--trusted` and `--unattended`). The verify gate: interactive runs ask
   first, unattended runs need `verify_unattended: true` and an untracked
   config
-- `guard-local-config snapshot | check <dir> | clear <dir>` — Snapshot the
-  ignored `yellow-plugins.local.md`, then detect and restore a resolver edit
+- `guard-local-config snapshot | check <dir> <digest> | clear <dir>` — Snapshot the
+  ignored `yellow-plugins.local.md` (printing the path and a `digest=<hex>`
+  line the caller holds), then detect and restore a resolver edit
   to it (changed, created or deleted; `git status` cannot see it); exit 3
-  means changed and restored, 4 means the restore failed, and a symlinked
+  means changed and restored, 4 means the restore failed or the snapshot
+  failed its digest check (live config untouched), and a symlinked
   config is refused at snapshot (exit 2).
   `/review:resolve-stack` snapshots before the walk and checks after each PR
 - `file-line-counts <diff-base-ref>` — Authoritative base/head line counts per
