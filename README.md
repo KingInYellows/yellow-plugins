@@ -35,7 +35,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, orchestrate plan-implement-review chains (legacy — see yellow-cursor)   | 1 agent, 9 commands, 1 skill, 1 MCP            |
 | `yellow-jules`        | Google Jules integration (experimental) — observe sessions and stage their artifacts for review; read-only in this release             | 4 commands                                     |
 | `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                                                       | 10 agents, 6 commands, 1 skill                 |
-| `yellow-goal`         | Process bridge to the yellow-goal `goal-gen` engine (setup probe, request create/validate, zero-spend stub run, approval-gated real run that may spend) | 4 commands                                     |
+| `yellow-goal`         | Process bridge to the yellow-goal `goal-gen` engine (setup/request, stub run, approval-gated real run that may spend)                  | 4 commands                                     |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents                                      | 3 agents, 9 commands, 1 skill, 1 MCP           |
 | `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                                                  | 2 commands, 1 MCP                              |
 | `yellow-research`     | Deep research with Ceramic, DeepWiki, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                                        | 2 agents, 4 commands, 2 skills, 7 MCPs         |
