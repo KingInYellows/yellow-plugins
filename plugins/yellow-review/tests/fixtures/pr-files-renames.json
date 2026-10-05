@@ -1,0 +1,5 @@
+[
+  {"filename":"src/new.ts","previous_filename":"src/old.ts","status":"renamed"},
+  {"filename":"docs/b.md","status":"modified"},
+  {"filename":"lib/moved.ts","previous_filename":"lib/orig.ts","status":"renamed"}
+]

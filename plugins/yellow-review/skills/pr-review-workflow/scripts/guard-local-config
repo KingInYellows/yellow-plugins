@@ -1,0 +1,271 @@
+#!/bin/bash
+# Snapshot, check and restore the untracked trusted-config files that a
+# resolver edit must never leave behind. `git status` cannot see them: they are
+# gitignored, so a resolver edit to yellow-plugins.local.md (whose
+# resolve_pr.verify_command a later unattended run executes) leaves a clean
+# tree and passes every clean-tree check.
+# Usage: guard-local-config snapshot
+#        guard-local-config check <snap-dir> <digest>
+#        guard-local-config clear <snap-dir>
+#   snapshot: record each guarded file's state (a regular file's bytes or
+#             absence) in a private mktemp directory and print its path, then a
+#             line `digest=<hex>`: a digest over every entry written (the state
+#             and, for a file, the copy's content hash). The caller holds the
+#             digest; it is never stored in the snapshot directory. Exit 2
+#             when a guarded path is a symlink (its target's bytes are not
+#             snapshotted, so a rewrite through it would go unseen), a
+#             directory or another special file.
+#   check:    compare each guarded path with the snapshot. A path that changed
+#             is put back from the snapshot (a created file is deleted), then
+#             compared again. A directory or other special file under a
+#             guarded name is never removed: the restore fails (exit 4) and
+#             names the path. Prints `changed: <path>` per path that differed.
+#             <digest> is the hex value from snapshot's `digest=` line. Every
+#             snapshot entry (state, copy and the content hash recorded at
+#             snapshot time) is validated, and the digest is recomputed from
+#             the snapshot directory and compared, before anything is removed;
+#             an invalid snapshot or a digest mismatch exits 4 and leaves the
+#             live file untouched. The only valid states are `file` (copy and
+#             matching hash present) and `absent` (neither copy nor hash
+#             present); any other state, including `symlink:*`, is invalid. A
+#             restore is staged beside the file and moved in with mv -f.
+#             The snapshot is authenticated by the digest the caller holds, so
+#             a tampered state, copy or hash is refused before the live config
+#             is touched.
+#   clear:    remove the snapshot directory.
+# Exit codes: 0 nothing changed, 3 something changed and every path was
+#   restored, 4 a path could not be restored or the snapshot failed validation
+#   (stop; the snapshot or file is tampered), 2 usage (including a missing or
+#   malformed digest), unsafe snapshot directory or a path that cannot be guarded.
+# Guarded paths (repository root): yellow-plugins.local.md.
+# Callers: /review:resolve-stack (per PR: item 1b snapshot, item 3b check and
+#   clear) and /review:sweep (Step 1b snapshot, Step 2b and 3a checks, one clear).
+
+set -uo pipefail
+
+GUARDED=(yellow-plugins.local.md)
+
+die() { printf '[guard-local-config] Error: %s\n' "$2" >&2; exit "$1"; }
+usage() {
+    printf 'Usage: guard-local-config snapshot | check <snap-dir> <digest> | clear <snap-dir>\n' >&2
+    exit 2
+}
+
+[ $# -ge 1 ] || usage
+CMD="$1"
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
+TMP_ROOT="${TMPDIR:-/tmp}"
+TMP_ROOT="${TMP_ROOT%/}"
+
+# The directory must be one this script minted: directly under the temp root,
+# named resolve-guard.<suffix>, owned by the caller and not a symlink.
+valid_dir() {
+    local d="$1" rest
+    rest="${d#"$TMP_ROOT"/}"
+    case "$rest" in
+        "$d"|*/*|*..*) return 1 ;;
+        resolve-guard.?*) ;;
+        *) return 1 ;;
+    esac
+    [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ]
+}
+
+# hash_stdin: hash of standard input (sha256sum, then shasum, then cksum).
+hash_stdin() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum | cut -d' ' -f1
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 | cut -d' ' -f1
+    else
+        cksum | tr ' ' '-'
+    fi
+}
+
+# hash_of <file>: content hash recorded at snapshot time and re-checked before a restore.
+hash_of() {
+    hash_stdin <"$1"
+}
+
+# compute_digest: digest over every snapshot entry (for each index, the state
+# value and, for a file, the copy's content hash). Recomputed from the snapshot
+# directory in `check` and compared with the value the caller holds.
+compute_digest() {
+    local i=0 rel st h acc=""
+    for rel in "${GUARDED[@]}"; do
+        [ -f "$SNAP/state.$i" ] && [ ! -L "$SNAP/state.$i" ] || return 1
+        st=$(cat -- "$SNAP/state.$i") || return 1
+        h=""
+        if [ "$st" = file ]; then
+            [ -f "$SNAP/copy.$i" ] && [ ! -L "$SNAP/copy.$i" ] || return 1
+            h=$(hash_of "$SNAP/copy.$i") || return 1
+        fi
+        acc="${acc}${i} ${st} ${h}"$'\n'
+        i=$((i + 1))
+    done
+    printf '%s' "$acc" | hash_stdin
+}
+
+# valid_entry <index>: the snapshot's state (and, for a file, its copy and the
+# hash recorded for it) is present and intact. A restore trusts nothing else.
+valid_entry() {
+    local i="$1" want h
+    [ -f "$SNAP/state.$i" ] && [ ! -L "$SNAP/state.$i" ] || return 1
+    want=$(cat -- "$SNAP/state.$i") || return 1
+    case "$want" in
+        absent)
+            # A genuine absent snapshot writes neither a copy nor a hash. If
+            # either exists, the state was rewritten (file -> absent) and
+            # restoring it would delete the live config.
+            [ ! -e "$SNAP/copy.$i" ] && [ ! -L "$SNAP/copy.$i" ] || return 1
+            [ ! -e "$SNAP/hash.$i" ] && [ ! -L "$SNAP/hash.$i" ] || return 1
+            ;;
+        file)
+            [ -f "$SNAP/copy.$i" ] && [ ! -L "$SNAP/copy.$i" ] || return 1
+            [ -f "$SNAP/hash.$i" ] && [ ! -L "$SNAP/hash.$i" ] || return 1
+            h=$(cat -- "$SNAP/hash.$i") || return 1
+            [ -n "$h" ] && [ "$h" = "$(hash_of "$SNAP/copy.$i")" ] || return 1
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+# restore_entry <index> <path>: put the snapshotted state back. The new entry is
+# staged in a private directory beside <path> and moved in with mv -f (a rename
+# on one filesystem), so the live path is never left half-written.
+restore_entry() {
+    local i="$1" p="$2" want stage
+    want=$(cat -- "$SNAP/state.$i") || return 1
+    # Only a regular file, a symlink or nothing is put back or removed. A
+    # directory (an editor or build can create one under the guarded name) may
+    # hold someone's work, and a socket, fifo or device is not ours to delete:
+    # leave it and fail the restore, so the caller reports it and keeps the
+    # snapshot.
+    if [ -e "$p" ] && [ ! -L "$p" ] && [ ! -f "$p" ]; then return 1; fi
+    if [ "$want" = absent ]; then
+        rm -f -- "$p" 2>/dev/null
+        return 0
+    fi
+    stage=$(mktemp -d "$(dirname -- "$p")/.guard-restore.XXXXXX" 2>/dev/null) || return 1
+    # Only `file` reaches here: valid_entry rejects every other state, and
+    # snapshot refuses symlinks, so no symlink is ever recreated.
+    if [ "$want" != file ]; then rm -rf -- "$stage"; return 1; fi
+    cp -p -- "$SNAP/copy.$i" "$stage/new" 2>/dev/null || { rm -rf -- "$stage"; return 1; }
+    # mv -f would move into a symlink to a directory instead of replacing it
+    # (a real directory was refused above).
+    if [ -L "$p" ]; then rm -f -- "$p" 2>/dev/null; fi
+    mv -f -- "$stage/new" "$p" 2>/dev/null
+    local rc=$?
+    rm -rf -- "$stage"
+    return "$rc"
+}
+
+# state_of <path>: file | absent | symlink:<target> | other
+state_of() {
+    if [ -L "$1" ]; then
+        printf 'symlink:%s\n' "$(readlink -- "$1")"
+    elif [ -f "$1" ]; then
+        printf 'file\n'
+    elif [ ! -e "$1" ]; then
+        printf 'absent\n'
+    else
+        printf 'other\n'
+    fi
+}
+
+# same_as_snapshot <index> <path>
+same_as_snapshot() {
+    local i="$1" p="$2" want now
+    want=$(cat -- "$SNAP/state.$i") || return 1
+    now=$(state_of "$p")
+    [ "$want" = "$now" ] || return 1
+    if [ "$want" = file ]; then
+        cmp -s -- "$p" "$SNAP/copy.$i" || return 1
+    fi
+    return 0
+}
+
+case "$CMD" in
+    snapshot)
+        [ $# -eq 1 ] || usage
+        SNAP=$(mktemp -d "$TMP_ROOT/resolve-guard.XXXXXX") || die 2 "could not create the snapshot directory"
+        i=0
+        for rel in "${GUARDED[@]}"; do
+            p="$TOP/$rel"
+            st=$(state_of "$p")
+            # A symlink's referent can change while its target string stays the
+            # same, so the guard would report "unchanged" after a rewrite. Fail
+            # closed instead of snapshotting through it.
+            case "$st" in
+                other)
+                    rm -rf -- "$SNAP"
+                    die 2 "cannot guard $rel: it is not a regular file or absent"
+                    ;;
+                symlink:*)
+                    rm -rf -- "$SNAP"
+                    die 2 "cannot guard $rel: it is a symlink, and a change to its target would go unseen; replace it with a regular file"
+                    ;;
+            esac
+            printf '%s\n' "$st" >|"$SNAP/state.$i"
+            if [ "$st" = file ]; then
+                cp -p -- "$p" "$SNAP/copy.$i" || { rm -rf -- "$SNAP"; die 2 "could not copy $rel"; }
+                hash_of "$SNAP/copy.$i" >|"$SNAP/hash.$i" || { rm -rf -- "$SNAP"; die 2 "could not hash $rel"; }
+            fi
+            i=$((i + 1))
+        done
+        digest=$(compute_digest) || { rm -rf -- "$SNAP"; die 2 "could not compute the snapshot digest"; }
+        printf '%s\n' "$SNAP"
+        printf 'digest=%s\n' "$digest"
+        ;;
+    check)
+        [ $# -eq 3 ] || usage
+        SNAP="$2"
+        WANT_DIGEST="$3"
+        case "$WANT_DIGEST" in
+            ""|*[!0-9a-f-]*) usage ;;
+        esac
+        valid_dir "$SNAP" || die 2 "snapshot directory rejected: $SNAP"
+        # Prove the whole snapshot is usable before touching any live path: a
+        # missing or corrupted entry must fail without modifying the config.
+        i=0
+        for rel in "${GUARDED[@]}"; do
+            if ! valid_entry "$i"; then
+                printf 'snapshot invalid: %s\n' "$rel"
+                exit 4
+            fi
+            i=$((i + 1))
+        done
+        # The entries can all be self-consistent after a rewrite (state,
+        # copy and hash replaced together); only the caller's digest proves the
+        # snapshot is the one snapshot wrote.
+        have_digest=$(compute_digest) || have_digest=""
+        if [ -z "$have_digest" ] || [ "$have_digest" != "$WANT_DIGEST" ]; then
+            printf 'snapshot invalid: digest mismatch\n'
+            exit 4
+        fi
+        changed=0
+        failed=0
+        i=0
+        for rel in "${GUARDED[@]}"; do
+            p="$TOP/$rel"
+            if ! same_as_snapshot "$i" "$p"; then
+                changed=1
+                printf 'changed: %s\n' "$rel"
+                restore_entry "$i" "$p"
+                if ! same_as_snapshot "$i" "$p"; then
+                    failed=1
+                    printf 'restore failed: %s\n' "$rel"
+                fi
+            fi
+            i=$((i + 1))
+        done
+        [ "$failed" = 0 ] || exit 4
+        [ "$changed" = 0 ] || exit 3
+        ;;
+    clear)
+        [ $# -eq 2 ] || usage
+        SNAP="$2"
+        valid_dir "$SNAP" || die 2 "snapshot directory rejected: $SNAP"
+        rm -rf -- "$SNAP"
+        ;;
+    *) usage ;;
+esac

@@ -58,12 +58,46 @@ Linear.
 | ----------------------- | ------------------------------------------------------------------------- |
 | `/review:setup`         | Validate review prerequisites and optional yellow-core integration        |
 | `/review:pr`            | Adaptive multi-agent review of a single PR with automatic fix application |
-| `/review:resolve`       | Parallel resolution of unresolved PR review comments                      |
-| `/review:resolve-stack` | Walk a Graphite stack bottom-up and run `/review:resolve` on every open PR autonomously |
+| `/review:resolve`       | Resolve every unresolved review thread (outdated included): fix, reply, resolve, file follow-up issues, and report what still blocks merge |
+| `/review:resolve-stack` | Walk a Graphite stack bottom-up and run `/review:resolve` on every open PR autonomously; stops on a dirty tree, exits 1 when anything blocks |
 | `/review:all`           | Sequential review of multiple PRs (Graphite stack, all open, or single)   |
 | `/review:sweep`         | Run `/review:pr --non-interactive` then `/review:resolve --non-interactive` on the same PR in one unattended pass |
-| `/review:sweep-all`     | Run `/review:sweep` on every open non-draft PR you authored, sequentially, with one upfront confirmation |
+| `/review:sweep-all`     | Run `/review:sweep` on every open non-draft PR you authored, sequentially, with one upfront confirmation; stops and exits 1 on a rate limit, a dirty tree or a missing `Resolve:` line |
 | `/review:triage`        | Re-verify a PR's review-findings ledger, then fix, dismiss, restore or skip each residual finding (`--non-interactive`, `--prune <PR#>`) |
+
+### Dispositions
+
+`/review:resolve` ends every unresolved thread with one of five
+dispositions, and never resolves a thread before its reply has posted (bare
+LGTM / thanks / nit threads are the one exception: they are resolved with no
+reply):
+
+| Disposition | What happens |
+| --- | --- |
+| `fixed` | New commit pushed and verified; reply cites the SHA; thread resolved |
+| `addressed` | Already handled at HEAD; reply cites checked `path:line` evidence; thread resolved |
+| `oos` | Out of this PR's scope; follow-up issue filed (GitHub, or Linear when the branch has a Linear ID); reply links it; thread resolved |
+| `disagree` / `unclear` | Reply explains; thread stays open and is listed as blocking merge |
+
+Human-reviewer threads resolve only on hard evidence by default; others are
+held open (`resolve_pr.resolve_human_threads` in `yellow-plugins.local.md`).
+Unattended runs file at most 3 issues per PR. Replies and issues carry a
+hidden marker, so a re-run skips replies and issues it already posted on
+GitHub. This is not a guarantee: a later reviewer comment can make a
+held-open thread eligible for another reply, and Linear issue deduplication
+is best-effort. The last output line is a machine summary:
+
+```text
+Resolve: 5 resolved, 2 fixed, 1 issues filed, 1 blocking, push=ok, verify=skipped, ratelimited=0
+```
+
+Optional `resolve_pr.verify_command` runs before the commit. Interactive
+runs ask first; unattended runs need `resolve_pr.verify_unattended: true`,
+an untracked `yellow-plugins.local.md`, and no runner files in the fix.
+Keep that file ignored as well as untracked (add it to `.git/info/exclude`),
+or the clean-tree check stops the run. If verify fails, the fixes are saved
+as a patch under the git common dir and reverted. The full contract is
+`references/resolve/dispositions.md`.
 
 ## Agents
 
@@ -102,31 +136,34 @@ Linear.
 | `stack-traversal`    | Internal reference for the bottom-up Graphite stack walk shared by `/review:all` and `/review:resolve-stack` |
 | `yellow-thermonuclear-review` | Portable structural-quality rubric preloaded by `thermonuclear-reviewer`; adapted from Cursor's MIT-licensed `thermo-nuclear-code-quality-review` |
 
-## Resolve scripts
+## Scripts
 
 Helpers under `skills/pr-review-workflow/scripts/` that implement the
 mechanical parts of the resolve contract in
 `references/resolve/dispositions.md`. `/review:resolve` invokes
 `get-pr-blockers`, `reply-pr-thread`, `resolve-pr-thread` and
 `file-followup-issue` per that contract; the other helpers below serve the
-fetch, verify, commit and re-pass steps.
+fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
+`file-line-counts` need `gh` and `jq`; those two read only local files.
 
-| Script | Description |
-| ------ | ----------- |
+| Script | Purpose |
+| --- | --- |
 | `get-pr-comments` | Unresolved review threads (`--include-outdated` adds outdated ones) |
 | `get-pr-blockers` | `CHANGES_REQUESTED` reviewers and conversation-resolution enforcement |
 | `pr-changed-ranges` | Changed line ranges per file in the PR, for the in-diff check |
 | `file-line-counts` | Before/after line counts per changed file, for the thermonuclear-reviewer's size rule |
 | `reply-pr-thread` | Reply to a thread with an idempotency marker |
-| `resolve-pr-thread` | Resolve a single thread |
+| `resolve-pr-thread` | Resolve one thread |
 | `file-followup-issue` | File or find the follow-up issue for an out-of-scope thread |
 | `poll-new-threads` | Bounded re-pass poll for threads that appeared after round 1 |
 | `check-resolve-text` | Refuse credential-shaped or unsafe text (image, `@` mention, foreign URL) before it is posted outside the resolve scripts (for example a Linear issue) |
 | `commit-resolve-fixes` | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files |
 | `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--unattended` skips runner files and requires `--ignored-since <marker-file>`, which refuses when a gitignored file is newer than the marker; `--revert-only` and `--revert-dirty` revert without running; `--check-ignored` runs only the gitignored-file guard) |
+| `guard-local-config` | Snapshot the gitignored `yellow-plugins.local.md` and restore it if a resolver changed, created or deleted it; refuses a symlinked config (`/review:resolve-stack` checks after each PR) |
+| `file-line-counts` | Base/head line counts per changed file for `thermonuclear-reviewer` |
 
-Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-paths.sh`,
-`gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.
+Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-gh.sh`,
+`resolve-paths.sh`, `gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.
 
 ## Opt-in: thermonuclear structural review
 

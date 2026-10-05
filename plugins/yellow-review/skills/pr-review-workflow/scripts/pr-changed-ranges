@@ -2,17 +2,26 @@
 # List the PR's changed files with their new-side line ranges, from the files
 # API (works past GitHub's diff-size limits, unlike `gh pr diff`).
 # Usage: pr-changed-ranges <pr-number>
+#        pr-changed-ranges --previous <pr-number>
 # Output: one row per file on stdout: "<path> <ranges>" where <ranges> is
 #   "10-24,58-60" (new-side lines the PR added; context lines excluded), "none" (no new-side lines) or
 #   "unknown" (the API returned no patch: binary, rename or oversized file).
 #   Only paths matching ^[A-Za-z0-9._/-]+$ are listed.
-# Exit codes: 0 ok (possibly no rows), 1 fetch or parse failure (the caller
-#             treats every range as unknown), 2 usage.
+#   --previous prints instead the previous_filename of each renamed file, one
+#   validated path per line (nothing else). A value outside the allowlist, such
+#   as a name with a newline, fails the whole call (exit 1, no output): a
+#   forged record must never reach the caller.
+# Each gh call runs under YELLOW_REVIEW_GH_TIMEOUT (default 30, max 60; needs
+#   timeout(1) or gtimeout(1)); a timeout is a fetch failure.
+# Exit codes: 0 ok (possibly no rows), 1 fetch, timeout or parse failure (the
+#             caller treats every range as unknown), 2 usage.
 # Contract: references/resolve/dispositions.md
 
 set -eu
 
-[ $# -eq 1 ] || { printf 'Usage: pr-changed-ranges <pr-number>\n' >&2; exit 2; }
+MODE=ranges
+if [ "${1:-}" = --previous ]; then MODE=previous; shift; fi
+[ $# -eq 1 ] || { printf 'Usage: pr-changed-ranges [--previous] <pr-number>\n' >&2; exit 2; }
 PR="$1"
 case "$PR" in
     ''|*[!0-9]*) printf 'Error: PR number must be numeric, got: %s\n' "$PR" >&2; exit 2 ;;
@@ -23,18 +32,38 @@ command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found.\n' >&2; exit 1; 
 WORK=$(mktemp -d) || exit 1
 trap 'rm -rf "$WORK"' EXIT
 
-gh api --paginate "repos/{owner}/{repo}/pulls/$PR/files?per_page=100" >"$WORK/files" 2>"$WORK/err" || {
+# shellcheck source=../../../lib/resolve-gh.sh
+. "$(dirname -- "$0")/../../../lib/resolve-gh.sh"
+
+rg_gh api --paginate "repos/{owner}/{repo}/pulls/$PR/files?per_page=100" >"$WORK/files" 2>"$WORK/err" || {
     printf 'Error: could not list files of PR #%s: %s\n' "$PR" "$(cat "$WORK/err")" >&2
     exit 1
 }
+
+if [ "$MODE" = previous ]; then
+    # \A and \z anchor the whole string, so a trailing newline cannot slip
+    # through; any unsafe value raises an error and nothing is printed.
+    jq -r '
+      [ .[] | (.previous_filename // empty) ] as $p
+      | if all($p[]; test("\\A[A-Za-z0-9._/-]+\\z")) then $p[] else error("unsafe previous_filename") end
+    ' "$WORK/files" >"$WORK/rows" 2>"$WORK/err" || {
+        printf 'Error: could not read previous filenames of PR #%s: %s\n' "$PR" "$(cat "$WORK/err")" >&2
+        exit 1
+    }
+    cat "$WORK/rows"
+    exit 0
+fi
 
 # Walk each patch: a hunk header "@@ -a,b +<start>,c @@" sets the new-side line
 # counter, "+" lines are PR-added (recorded, counter advances), context lines
 # advance the counter, "-" and "\ No newline" lines do not. Consecutive added
 # lines collapse into one range; context lines are never reported.
+# The path filter anchors with \A and \z, not ^ and $: jq's $ also matches
+# before a trailing newline, and a file name may contain one (git permits it),
+# which would forge a second output row. Unsafe paths are dropped, never listed.
 jq -r '
   .[]
-  | select(.filename | test("^[A-Za-z0-9._/-]+$"))
+  | select(.filename | test("\\A[A-Za-z0-9._/-]+\\z"))
   | [ .filename,
       ( if (.patch // "") == "" then "unknown"
         else

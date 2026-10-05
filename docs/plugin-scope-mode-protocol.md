@@ -31,11 +31,23 @@ flag accept responsibility for pushes and skipped confirmation prompts.
 | Parsing | split on whitespace; remove the flag token; any OTHER `--`-prefixed token is a hard error (`unknown flag`) |
 | Default | OFF |
 | Effect (`/review:pr`) | suppresses the push-confirmation prompt and the "save learnings" prompt (P2 memory writes are skipped, not prompted) — the command file's flag handling names the exact gate steps |
-| Effect (`/review:resolve`) | suppresses the spawn-cap, CONFLICT, and push-confirmation gates |
+| Effect (`/review:resolve`) | suppresses the spawn-cap, CONFLICT, issue-filing, verify-command, and push-confirmation gates; each falls back to an unattended rule: the spawn-cap, CONFLICT, and push rules live in `plugins/yellow-review/commands/review/resolve-pr.md` Steps 4-6, while the issue-filing and verify-command write rules live in `plugins/yellow-review/references/resolve/dispositions.md` |
 
 Defined identically in
 `plugins/yellow-review/commands/review/review-pr.md` Step 1 and
 `plugins/yellow-review/commands/review/resolve-pr.md` Step 1.
+
+Unattended issue creation is deliberate and capped: under the flag,
+`/review:resolve` files a follow-up issue only for a thread its resolver
+marked out of scope with a one-line reason, at most 3 per PR per run (the
+rest stay open as blocking), deduped by a marker in the issue body. It is
+the first non-interactive `gh issue create` in the repo; every other issue
+path (for example `yellow-browser-test`'s `test-reporter`) stays gated.
+Likewise `resolve_pr.verify_command` runs unattended only when
+`resolve_pr.verify_unattended: true` is set, `yellow-plugins.local.md` is
+untracked and ignored (so a committed config value is never executed without
+a human, and the file does not trip the clean-tree check), and the fix
+touches no runner files.
 
 Known gap (current behavior, recorded not resolved — see the non-goal
 above): `--non-interactive` does NOT suppress `/review:pr` Step 9a's

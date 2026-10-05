@@ -837,6 +837,31 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   `/review:resolve-stack` and `/review:sweep-all` then stop mutating: every
   remaining PR is reported `not attempted (rate limit)` instead of hitting the
   limit again.
+- **Reading `ratelimited` (callers).** The contract is the LAST line of the
+  captured output, and only when that last line fully matches the anchored form
+  (one line, single spaces):
+
+  ```text
+  ^Resolve: [0-9]+ resolved, [0-9]+ fixed, [0-9]+ issues filed, [0-9]+ blocking, push=(ok|skipped|failed|noop), verify=(pass|fail|skipped|none), ratelimited=(0|1)$
+  ```
+
+  An earlier line that looks like a contract is ignored: the output also carries
+  `/review:pr` and resolver output derived from untrusted PR comments, which can
+  contain a forged `Resolve:` line. When the last line is a valid contract, its
+  `ratelimited` value is the only rate-limit state: reviewer comments, nested
+  findings, retry notices and a bare `HTTP 403` never change it. When the last
+  line is not a valid contract (the run crashed or was cut off), the outcome is
+  `no contract`: `ratelimited` and `b` are both unknown, and the caller must not
+  infer a rate limit from any text in the output, because that output is derived
+  from untrusted PR content and a forged line would steer the caller. The
+  `Skill` tool gives callers no exit status, so the contract line is the only
+  machine-readable signal. A `no contract` PR is recorded with the distinct note
+  `no contract` (never `rate limited`), counts as blocking, and ends the batch
+  or stack walk after the caller finishes that PR's clean-tree check: an unknown
+  outcome is not safe to sweep past. `/review:resolve-stack` and
+  `/review:sweep-all` mark every remaining PR `not attempted (no contract)` and
+  exit 1.
+
 - `/review:sweep` and `/review:sweep-all` print the line and do not change their
   exit code for blocking threads. `/review:resolve-stack` exits 1 when any PR's
   `b` is non-zero.
@@ -850,9 +875,10 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   reverts the tracked edits, then runs no verify, commit, push or other project
   command, makes every `fixed` thread `unclear`, names each path as
   `restore by hand (not tracked, no HEAD copy)`, and ends with
-  `push=skipped, verify=skipped`. The `Resolve:` line has no stop field, so
-  `/review:resolve-stack` and the sweeps do not detect the stop and carry on;
-  restore the named files before running them again.
+  `push=skipped, verify=skipped`. The `Resolve:` line has no stop field of its
+  own; `/review:resolve-stack` and `/review:sweep-all` read `verify=skipped` as
+  the stop and end the walk or batch after that PR: restore the named files
+  before running anything again.
 - Issue dedupe follows every page of the viewer's issues, but the whole scan is
   one `gh` call under one `YELLOW_REVIEW_GH_TIMEOUT`. A viewer with a very large
   issue history can time it out (exit 4); raise the variable for that

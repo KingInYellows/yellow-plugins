@@ -539,7 +539,7 @@ Decisions from the brainstorm and the planning round:
 
 ### Phase 3: Callers and shared docs
 
-- [ ] 3.1: `commands/review/resolve-stack.md`:
+- [x] 3.1: `commands/review/resolve-stack.md`:
   - Self-verify uses `get-pr-comments --include-outdated` and parses the
     `Resolve:` line. `jq length` stays only as a cross-check and flags
     disagreement.
@@ -563,25 +563,26 @@ Decisions from the brainstorm and the planning round:
 > The Skill tool returns no machine status (`:198`), so keep the `jq length`
 > cross-check mandatory, not optional.
 <!-- /deepen-plan -->
-- [ ] 3.2: `commands/review/sweep.md`:
+- [x] 3.2: `commands/review/sweep.md`:
   - Update the gate list at lines 131–135.
   - Replace the stale "posts a false-positive response" prose around lines
     143–145.
   - Step 4 prints the `Resolve:` line verbatim, with the existing fallback.
   - Blocking threads do not change the exit code.
-- [ ] 3.3: `commands/review/sweep-all.md`:
+- [x] 3.3: `commands/review/sweep-all.md`:
   - Add a `Blocking` column.
   - The confirmation shows the worst-case added wait: PR count × the
     `repass_wait_seconds` value.
   - Keep the clean-tree-between-PRs assumption at lines 319–325 true.
-- [ ] 3.4: `skills/pr-review-workflow/SKILL.md`:
+- [x] 3.4: `skills/pr-review-workflow/SKILL.md`:
   - Update the commit convention (lines 308–339): resolve uses
-    `git add` + `gt modify -c`; `/review:pr` and `/review:all` still amend,
+    `commit-resolve-fixes` (explicit `git add`, then a new commit through
+    the provider); `/review:pr` and `/review:all` still amend,
     and a follow-up issue tracks that.
   - Update the GraphQL Scripts section (lines 403–412) for the new scripts
     and flag.
   - Replace the duplicated Verification Loop with a pointer to the reference.
-- [ ] 3.5: `docs/plugin-scope-mode-protocol.md` Interface 1:
+- [x] 3.5: `docs/plugin-scope-mode-protocol.md` Interface 1:
   - Update line 34's gate list.
   - Note that unattended issue creation is deliberate and capped. It is the
     first non-interactive `gh issue create` in the repo; `test-reporter`
@@ -595,7 +596,7 @@ Decisions from the brainstorm and the planning round:
 
 ### Phase 4: Docs, release, follow-ups
 
-- [ ] 4.1: `plugins/yellow-review/CLAUDE.md`:
+- [x] 4.1: `plugins/yellow-review/CLAUDE.md`:
   - Scripts heading: 3 → 9, with one line per script (see the note below).
   - `get-pr-comments` wording.
   - The Testing section lists the new bats files.
@@ -613,12 +614,12 @@ Decisions from the brainstorm and the planning round:
 > `commit-resolve-fixes` and `run-verify-command` land. `validate-doc-counts.js` checks only root docs, so no
 > validator will catch this.
 <!-- /deepen-plan -->
-- [ ] 4.2: `plugins/yellow-review/README.md`: the command table and the
+- [x] 4.2: `plugins/yellow-review/README.md`: the command table and the
   scripts table, plus a short "Dispositions" section for users.
-- [ ] 4.3: Changesets:
+- [x] 4.3: Changesets:
   - `.changeset/review-resolve-hardening.md`, `'yellow-review': minor`;
   - `.changeset/local-config-resolve-keys.md`, `'yellow-core': patch`.
-- [ ] 4.4: Validate:
+- [x] 4.4: Validate:
   - `pnpm validate:agents`
   - `pnpm lint:plugins`
   - `pnpm validate:shell-compat`
@@ -627,15 +628,45 @@ Decisions from the brainstorm and the planning round:
   - `cd plugins/yellow-review && bats tests/`
   - `pnpm test:integration`, since the push-detector parity test must be
     untouched.
-- [ ] 4.5: Manual end-to-end on a scratch PR in a test repo with both a bot
-  thread and a human thread. Cover:
+- [x] 4.5: Manual end-to-end on a scratch PR in a test repo with bot threads
+  (bot-only coverage by decision). The human-reviewer lane was not exercised
+  (out of scope: no second account) and relies on review of the lane table.
+  Cover:
   - `fixed`, `addressed`, `oos` and `disagree`;
   - an outdated thread;
   - one LGTM;
   - a re-run (no duplicate replies or issues);
   - `--non-interactive` with 4 `oos` candidates (3 filed, 1 blocking);
   - a failing `verify_command`, where a patch is saved and the tree is clean.
-- [ ] 4.6: File the follow-up issues:
+  - **2026-09-30 run on this stack's own PRs #950 and #952** (Codex bot
+    threads; worktree scripts and resolver body, Graphite provider):
+    covered `fixed`, `addressed`, `disagree`, `unclear` (malformed THREAD
+    line and failed evidence), the outdated lane (4 outdated threads,
+    resolved via GraphQL), a re-run posting no duplicates, a runner-rule
+    refusal followed by `--revert-dirty` and patch restore, and new-commit
+    semantics. Not covered (no such threads): `oos` and issue filing, the
+    3-issue unattended cap, LGTM, human threads, a failing
+    `verify_command`. Found and fixed: the unattended `*/scripts/*` runner
+    rule was too broad (now root `scripts/` only), and a post-hook commit
+    mismatch now undoes the local commit.
+  - **2026-10-01 run on scratch PR KingInYellows/yellow-review-e2e#1**
+    (worktree scripts and resolver body, Graphite provider, two
+    `--non-interactive` runs, `verify_unattended: true` with an untracked
+    config). Run 1 (`verify_command: exit 1`): LGTM dropped and resolved
+    with no reply; 3 `oos` threads filed issues #2–#4 with the thread link
+    and marker, replied and resolved; a suspicious `.github/` request got
+    the fixed `disagree` reply and stayed open; verify failed, saved a 0600
+    patch, left the tree clean and held the `fixed` thread open. Run 2
+    (`verify_command: true`, 4 new `oos` asks): verify passed, the fix
+    landed as a new commit (`PUSHED`), the `fixed` reply cited its SHA and
+    resolved; 3 issues (#5–#7) filed and the 4th got the over-cap reply
+    and stayed blocking; the repeated `disagree` reply was skipped as
+    `already-replied`; the 20 s re-pass found no new threads. Not covered:
+    human-reviewer threads — every seeded comment came from the resolving
+    account, which the lane rule treats as bot, and a second account is
+    out of scope by decision; the human lane relies on review of the lane
+    table. Scratch PR and issues closed afterwards.
+- [x] 4.6: File the follow-up issues (#957–#966):
   - `review-pr.md:1047` and `review-all.md:376` `gt modify -m` → stage + `-c`;
   - a sticky blocking-threads PR comment for repos without enforcement;
   - the CodeRabbit `@coderabbitai resolve` handoff;
@@ -834,5 +865,5 @@ Decisions from the brainstorm and the planning round:
 <!-- Updated by flow:work. Do not edit manually. -->
 - [x] 1. agent/feat/resolve-thread-scripts (completed 2026-09-30)
 - [x] 2. agent/feat/resolve-commit-verify-scripts (completed 2026-09-30)
-- [ ] 3. agent/fix/resolve-dispositions
-- [ ] 4. agent/feat/resolve-stack-callers
+- [x] 3. agent/fix/resolve-dispositions (completed 2026-09-30)
+- [x] 4. agent/feat/resolve-stack-callers (completed 2026-10-01)
