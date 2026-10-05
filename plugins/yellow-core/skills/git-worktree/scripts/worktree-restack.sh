@@ -1104,6 +1104,7 @@ on_exit() {
       [ "$rc" -ne 0 ] || rc=$X_PAUSED
     else
       local busy
+      load_worktrees || true
       if busy=$(wt_busy "$S_RUN"); then
         # No conflict marker yet, but the provider's rebase is mid-flight in
         # the run worktree: restoring now would drop the recovery record.
@@ -1111,6 +1112,20 @@ on_exit() {
         write_state || true
         lock_mark_paused
         err "interrupted while the provider's rebase is still in progress in $(v "$S_RUN") ($busy); finish or abort that rebase, then run /worktree:restack --continue or --abort"
+        [ "$rc" -ne 0 ] || rc=$X_PAUSED
+      elif busy=$(chain_rebase_worktree); then
+        # gh-stack rebases in the branch-owning worktree, which need not be S_RUN.
+        lock_detached_entries
+        write_state || true
+        lock_mark_paused
+        err "interrupted while the provider's rebase is still in progress in $(v "$busy"); finish or abort that rebase, then run /worktree:restack --continue or --abort"
+        [ "$rc" -ne 0 ] || rc=$X_PAUSED
+      elif [ "$S_PROVIDER" = github ] && [ "${#E_PATH[@]}" -eq 0 ] && [ -e "$STATE_FILE" ]; then
+        # gh-stack leaves no detached entries; a signal may kill the provider
+        # child and clear rebase markers before this handler runs.
+        write_state || true
+        lock_mark_paused
+        err "interrupted during a GitHub restack; run /worktree:restack --status, then --continue or --abort"
         [ "$rc" -ne 0 ] || rc=$X_PAUSED
       else
         err "interrupted; restoring worktrees"

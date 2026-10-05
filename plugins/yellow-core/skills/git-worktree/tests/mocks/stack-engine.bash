@@ -50,6 +50,9 @@ eng_run() {
     ptip=$(g rev-parse "refs/heads/$parent")
     [ "$base" != "$ptip" ] || continue
     if [ "$mode" = owner ]; then where=$(owner_of "$b"); else where=$PWD; fi
+    if [ -n "${STUB_SLEEP_ON:-}" ] && [ "$b" = "$STUB_SLEEP_ON" ]; then
+      sleep "${STUB_SLEEP:-3}"
+    fi
     if g -C "$where" rebase --onto "refs/heads/$parent" "$base" "$b" >|"$STUB_DIR/rebase.out" 2>&1; then
       g rev-parse "refs/heads/$parent" >|"$(base_file "$b")"
       echo "Restacked $b on $parent." >&2

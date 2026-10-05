@@ -713,6 +713,22 @@ JSEOF
   assert_all_restored
 }
 
+@test "github: a SIGTERM during restack keeps state when nothing is detached" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  STUB_GH_VERSION=v0.2.1 STUB_SLEEP_ON=a STUB_SLEEP=5 bash "$SCRIPT" start --provider github >"$T/out" 2>&1 &
+  pid=$!
+  for _ in $(seq 50); do [ -e "$SD/state" ] && break; sleep 0.1; done
+  [ -e "$SD/state" ]
+  sleep 0.2
+  kill -TERM "$pid"
+  rc=0
+  wait "$pid" || rc=$?
+  [ "$rc" -eq 143 ]
+  [ -e "$SD/state" ]
+  [[ "$(cat "$T/out")" == *"interrupted during a GitHub restack"* ]]
+}
+
 @test "a SIGTERM during the restack restores every worktree" {
   mk_stack
   STUB_GT_SLEEP=3 bash "$SCRIPT" start --provider graphite >"$T/out" 2>&1 &
