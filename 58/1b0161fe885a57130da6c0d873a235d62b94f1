@@ -1,0 +1,25 @@
+docs/solutions/logic-errors/empty-assoc-key-and-awk-process-subst-silent-fail.md
+  s_9628bdf4e65021::t_a8b038a203711a 48-51,58-64
+plans/shells/yellow-council-v2-four-cli-05-evidence-verification-and-finalization.md
+  s_9628bdf4e65021::t_a5661b0f4c1d66 48-52,220-223
+plugins/yellow-core/CLAUDE.md
+  s_9628bdf4e65021::t_6ce505989942c9 372-390
+plugins/yellow-core/README.md
+  s_9628bdf4e65021::t_f9031125e22691 150-151,155-187
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "581b0161fe885a57130da6c0d873a235d62b94f1",
+  "prompts": {},
+  "sessions": {
+    "s_9628bdf4e65021": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "39e116b5-960d-4a92-a722-0e387498ad7a",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
