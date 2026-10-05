@@ -49,6 +49,7 @@ declare -A QG_QUEUED=()
 declare -a QG_PENDING_RAW=()
 declare -A QG_FILE_LINE=()
 declare -A QG_FILE_LOADED=()
+declare -A QG_PATH_CLASS=()
 
 qg_root() {
   local top
@@ -183,6 +184,30 @@ qg_ensure_lines() {
   done < <(awk '{ printf "%d\t%s\n", NR, $0 }' "$full")
 }
 
+# Classify one relative path. Sets QG_ONE_CLASS to ok, missing, or
+# unsafe-path. The same path is validated once per process; a later row
+# reuses that result and still does not open a rejected path.
+qg_path_class() {
+  local file="$1" full
+  if [ "${QG_PATH_CLASS["$file"]+set}" = set ]; then
+    QG_ONE_CLASS=${QG_PATH_CLASS["$file"]}
+    return 0
+  fi
+  if ! validate_file_path "$file" "$QG_ROOT"; then
+    QG_ONE_CLASS=unsafe-path
+  else
+    full="${QG_ROOT}/${file}"
+    if [ ! -e "$full" ] || [ ! -r "$full" ]; then
+      QG_ONE_CLASS=missing
+    elif [ ! -f "$full" ]; then
+      QG_ONE_CLASS=unsafe-path
+    else
+      QG_ONE_CLASS=ok
+    fi
+  fi
+  QG_PATH_CLASS["$file"]=$QG_ONE_CLASS
+}
+
 # Search [line-radius, line+radius]. Norms for the quote and those lines
 # must already be cached. Sets QG_MATCHED on success.
 qg_search() {
@@ -231,18 +256,13 @@ qg_classify_ready() {
     QG_CLASS=ungrounded
     return 0
   fi
-  if ! validate_file_path "$file" "$QG_ROOT"; then
-    QG_CLASS=unsafe-path
-    return 0
-  fi
-  if [ ! -e "${QG_ROOT}/${file}" ] || [ ! -r "${QG_ROOT}/${file}" ]; then
-    QG_CLASS=missing
-    return 0
-  fi
-  if [ ! -f "${QG_ROOT}/${file}" ]; then
-    QG_CLASS=unsafe-path
-    return 0
-  fi
+  qg_path_class "$file"
+  case "$QG_ONE_CLASS" in
+    unsafe-path | missing)
+      QG_CLASS=$QG_ONE_CLASS
+      return 0
+      ;;
+  esac
   qnorm=${QG_NORM_CACHE["$quote"]}
   if qg_too_short "$qnorm"; then
     QG_CLASS=too-short
@@ -318,16 +338,12 @@ qg_check() {
   if ! qg_is_line "$line" || ! qg_is_uint "$radius"; then
     exit 2
   fi
-  if ! validate_file_path "$file" "$QG_ROOT"; then
-    exit 1
-  fi
+  qg_path_class "$file"
+  case "$QG_ONE_CLASS" in
+    unsafe-path) exit 1 ;;
+    missing) exit 2 ;;
+  esac
   full="${QG_ROOT}/${file}"
-  if [ ! -e "$full" ] || [ ! -r "$full" ]; then
-    exit 2
-  fi
-  if [ ! -f "$full" ]; then
-    exit 1
-  fi
   qg_queue "$quote"
   qg_flush
   qg_ensure_lines "$file" "$full"
@@ -394,8 +410,73 @@ qg_load_rows() {
   ' "$decoded")
 }
 
+# Read every still-pending file once. A read error exits 2. An empty
+# file is loaded and simply has no line entries.
+qg_load_pending_files() {
+  local i file list out key text
+  local -A seen=()
+  list=$(mktemp) || {
+    printf 'quote-ground: could not create a temp file\n' >&2
+    exit 2
+  }
+  out=$(mktemp) || {
+    rm -f "$list"
+    printf 'quote-ground: could not create a temp file\n' >&2
+    exit 2
+  }
+  for i in "${!B_ID[@]}"; do
+    [ "${B_CLASS[$i]}" = pending ] || continue
+    file=${B_FILE[$i]}
+    if [ "${seen["$file"]+set}" = set ]; then
+      continue
+    fi
+    seen["$file"]=1
+    if [ "${QG_FILE_LOADED["$file"]+set}" = set ]; then
+      continue
+    fi
+    printf '%s\0%s\0' "$file" "${QG_ROOT}/${file}" >>"$list"
+  done
+  if [ ! -s "$list" ]; then
+    rm -f "$list" "$out"
+    return 0
+  fi
+  if ! awk '
+    function load(rel, full,    line, n, rc, saved) {
+      saved = RS
+      RS = "\n"
+      n = 0
+      while ((rc = (getline line < full)) > 0) {
+        n++
+        printf "%s#%d\0%s\0", rel, n, line
+      }
+      close(full)
+      RS = saved
+      if (rc < 0) exit 2
+    }
+    BEGIN { RS = "\0" }
+    NR % 2 == 1 { rel = $0; next }
+    { load(rel, $0) }
+  ' "$list" >"$out"; then
+    rm -f "$list" "$out"
+    printf 'quote-ground: failed to read cited files\n' >&2
+    exit 2
+  fi
+  for file in "${!seen[@]}"; do
+    QG_FILE_LOADED["$file"]=1
+  done
+  while IFS= read -r -d '' key; do
+    if ! IFS= read -r -d '' text; then
+      rm -f "$list" "$out"
+      printf 'quote-ground: short file-line record\n' >&2
+      exit 2
+    fi
+    QG_FILE_LINE["$key"]=$text
+  done <"$out"
+  rm -f "$list" "$out"
+}
+
 qg_batch() {
-  local decoded id file line quote full class i qnorm
+  local decoded id file line quote class i qnorm
   local -a B_ID=() B_FILE=() B_LINE=() B_QUOTE=() B_CLASS=() B_MATCH=()
   declare -a QG_OUT_ID=() QG_OUT_RESULT=() QG_OUT_MATCH=()
   command -v jq >/dev/null 2>&1 || exit 2
@@ -432,19 +513,17 @@ qg_batch() {
       B_CLASS[$i]=ungrounded
       continue
     fi
-    if ! validate_file_path "$file" "$QG_ROOT"; then
-      B_CLASS[$i]=unsafe-path
-      continue
-    fi
-    full="${QG_ROOT}/${file}"
-    if [ ! -e "$full" ] || [ ! -r "$full" ]; then
-      B_CLASS[$i]=missing
-      continue
-    fi
-    if [ ! -f "$full" ]; then
-      B_CLASS[$i]=unsafe-path
-      continue
-    fi
+    qg_path_class "$file"
+    case "$QG_ONE_CLASS" in
+      unsafe-path)
+        B_CLASS[$i]=unsafe-path
+        continue
+        ;;
+      missing)
+        B_CLASS[$i]=missing
+        continue
+        ;;
+    esac
     qg_queue "$quote"
     B_CLASS[$i]=pending
   done
@@ -455,9 +534,11 @@ qg_batch() {
     qnorm=${QG_NORM_CACHE["${B_QUOTE[$i]}"]}
     if qg_too_short "$qnorm"; then
       B_CLASS[$i]=too-short
-      continue
     fi
-    qg_ensure_lines "${B_FILE[$i]}" "${QG_ROOT}/${B_FILE[$i]}"
+  done
+  qg_load_pending_files
+  for i in "${!B_ID[@]}"; do
+    [ "${B_CLASS[$i]}" = pending ] || continue
     qg_queue_window "${B_FILE[$i]}" "${B_LINE[$i]}" 3
   done
   qg_flush

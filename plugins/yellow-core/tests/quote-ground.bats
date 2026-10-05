@@ -13,9 +13,9 @@ setup() {
 }
 
 teardown() {
-  cd / || true
+  cd / || return 1
   if [ -n "${BASE:-}" ] && [ -d "$BASE" ]; then
-    rm -rf "$BASE"
+    rm -rf "$BASE" || return 1
   fi
 }
 
@@ -258,7 +258,10 @@ line_quote() {
   bash "$QG" batch <"$payload" >"$out"
   end=$(date +%s%N)
   elapsed=$(((end - start) / 1000000))
-  [ "$elapsed" -lt 2000 ]
+  if [ "$elapsed" -ge 2000 ]; then
+    printf 'batch elapsed %s ms\n' "$elapsed" >&2
+    return 1
+  fi
   jq -e -s '
     length == 100
     and all(.result == "grounded" and ((.matched_line | tostring) == (.id | split("-")[1])))
