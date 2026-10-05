@@ -1,0 +1,30 @@
+.changeset/resolve-runner-git-trust.md
+  h_6000354274ce50 1-7
+plugins/yellow-review/CLAUDE.md
+  h_6000354274ce50 243-247
+plugins/yellow-review/README.md
+  h_6000354274ce50 173-176
+plugins/yellow-review/lib/resolve-paths.sh
+  h_6000354274ce50 13-120,129,136,202,253,344,347,489,585,588,616
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  h_6000354274ce50 197-334,338-339,344,347,349,474-476,525-528,551-553,579-580,582,584,1207
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  h_6000354274ce50 153-290,294-295,300,303,305,325-331
+plugins/yellow-review/tests/commit-resolve-fixes.bats
+  h_6000354274ce50 2570-2800
+plugins/yellow-review/tests/resolve-paths.bats
+  h_6000354274ce50 1053-1161
+plugins/yellow-review/tests/run-verify-command.bats
+  h_6000354274ce50 1923-2133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "304cb15fe8cc22670890f84f85b0cd6fc2e973a7",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
