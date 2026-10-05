@@ -327,6 +327,39 @@ now_ms() {
   jq -e '.result == "grounded" and .matched_line == 5' <<<"$output" >/dev/null
 }
 
+@test "a literal private-key body row never grounds, even when the window starts inside the block" {
+  local k body
+  k="-----BEGIN RSA PRIVATE"
+  body="MIIEvQIBADANBgkqhkiG9w0BAQEFAASC"
+  {
+    printf 'before the key block\n'
+    printf '%s KEY-----\n' "$k"
+    printf '%s\n' "$body"
+    printf '%s\n' '-----END RSA PRIVATE KEY-----'
+    printf 'after the key block text\n'
+  } >src/k.txt
+  run bash "$QG" check src/k.txt 3 0 <<<"$body"
+  [ "$status" -eq 1 ]
+  run bash "$QG" check src/k.txt 3 3 <<<"$body"
+  [ "$status" -eq 1 ]
+  run bash "$QG" batch <<<"$(row a src/k.txt 3 "$body")"
+  [ "$status" -eq 0 ]
+  jq -e '.result == "ungrounded" and .matched_line == null' <<<"$output" >/dev/null
+  run bash "$QG" check src/k.txt 5 3 <<<"after the key block text"
+  [ "$status" -eq 0 ]
+  [ "$output" = "5" ]
+}
+
+@test "a private-key block on one row does not swallow the rows after it" {
+  {
+    printf '%s %s\n' '-----BEGIN RSA PRIVATE KEY-----' 'AAAA-----END RSA PRIVATE KEY-----'
+    printf 'the row after a one-line key block\n'
+  } >src/k.txt
+  run bash "$QG" check src/k.txt 2 0 <<<"the row after a one-line key block"
+  [ "$status" -eq 0 ]
+  [ "$output" = "2" ]
+}
+
 @test "batch reports every id and still grounds the safe sibling" {
   local payload
   printf '%s\n' "short $Q26" >src/a.txt

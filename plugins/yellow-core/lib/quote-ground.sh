@@ -35,7 +35,9 @@
 # process memory and pipes only. Substring comparison is a quoted bash case
 # match, not awk -v, so backslashes stay literal. Lines that cannot start the
 # private-key sed range are redacted together; a BEGIN/END line is redacted
-# alone so the range cannot collapse later line numbers. Only the cited
+# alone so the range cannot collapse later line numbers. Lines inside a
+# private-key block (BEGIN through END) are tracked while the file loads and
+# count as [REDACTED] without a redaction pass. Only the cited
 # windows of each file are loaded, and the window loops stop at the last
 # loaded line, so a large radius or line number costs no more than a small one.
 
@@ -77,6 +79,7 @@ declare -A QG_NORM_CACHE=()   # k:<raw line or quote> -> redacted, normalized te
 declare -A QG_QUEUED=()       # k:<raw> -> 1 while waiting for qg_flush
 declare -a QG_PENDING_RAW=()
 declare -A QG_FILE_LINE=()    # <file>#<n> -> raw line
+declare -A QG_FILE_KEY=()     # <file>#<n> -> 1 for a line inside a private-key block
 declare -A QG_FILE_LOADED=()  # f:<file> -> 1
 declare -A QG_FILE_COUNT=()   # f:<file> -> last loaded line number
 declare -A QG_FILE_LO=()      # f:<file> -> first line any row needs
@@ -208,14 +211,29 @@ qg_flush() {
 # Load lines lo..hi of one file. A read failure exits 2: a process
 # substitution would hide awk's status, and an unread file would then look
 # like an ungrounded quote. QG_FILE_COUNT records the last line loaded, which
-# is where the window loops stop.
+# is where the window loops stop. awk also tracks the private-key range from
+# line 1, as cs_redact_secrets' sed range does, and flags every line from
+# BEGIN through END (a line holding both is a block on its own). Those lines
+# are never matched as text: qg_search treats them as [REDACTED], so a key
+# body row cannot ground and the block keeps its line numbers.
 qg_ensure_lines() {
-  local file="$1" full="$2" lo="$3" hi="$4" recs rec num text
+  local file="$1" full="$2" lo="$3" hi="$4" recs rec num flag text
   if [ "${QG_FILE_LOADED["f:$file"]+set}" = set ]; then
     return 0
   fi
-  if ! recs=$(awk -v lo="$lo" -v hi="$hi" \
-    'NR >= lo { printf "%d\t%s\n", NR, $0 } NR >= hi { exit }' "$full"); then
+  if ! recs=$(awk -v lo="$lo" -v hi="$hi" '
+    {
+      flag = 0
+      if (inkey) {
+        flag = 1
+        if ($0 ~ /-----END.*PRIVATE KEY-----/) inkey = 0
+      } else if ($0 ~ /-----BEGIN.*PRIVATE KEY-----/) {
+        flag = 1
+        if ($0 !~ /-----END.*PRIVATE KEY-----/) inkey = 1
+      }
+    }
+    NR >= lo { printf "%d\t%d\t%s\n", NR, flag, $0 }
+    NR >= hi { exit }' "$full"); then
     printf 'quote-ground: failed to read cited file\n' >&2
     exit 2
   fi
@@ -225,8 +243,13 @@ qg_ensure_lines() {
   while IFS= read -r rec; do
     num=${rec%%$'\t'*}
     text=${rec#*$'\t'}
+    flag=${text%%$'\t'*}
+    text=${text#*$'\t'}
     QG_FILE_COUNT["f:$file"]=$num
     QG_FILE_LINE["${file}#${num}"]=$text
+    if [ "$flag" = 1 ]; then
+      QG_FILE_KEY["${file}#${num}"]=1
+    fi
   done <<<"$recs"
 }
 
@@ -274,7 +297,7 @@ qg_clamp_window() {
 # Search one row's window. Norms for the quote and those lines must already
 # be cached. Sets QG_MATCHED on success.
 qg_search() {
-  local file="$1" line="$2" radius="$3" quote="$4" n raw
+  local file="$1" line="$2" radius="$3" quote="$4" n raw norm
   QG_MATCHED=
   qg_bounds "$line" "$radius"
   qg_clamp_window "$file"
@@ -282,8 +305,13 @@ qg_search() {
     if [ "${QG_FILE_LINE["${file}#${n}"]+set}" != set ]; then
       continue
     fi
-    raw=${QG_FILE_LINE["${file}#${n}"]}
-    if qg_contains "$quote" "${QG_NORM_CACHE["k:$raw"]}"; then
+    if [ "${QG_FILE_KEY["${file}#${n}"]+set}" = set ]; then
+      norm='[REDACTED]'
+    else
+      raw=${QG_FILE_LINE["${file}#${n}"]}
+      norm=${QG_NORM_CACHE["k:$raw"]}
+    fi
+    if qg_contains "$quote" "$norm"; then
       QG_MATCHED=$n
       return 0
     fi
@@ -296,7 +324,8 @@ qg_queue_window() {
   qg_bounds "$line" "$radius"
   qg_clamp_window "$file"
   for ((n = QG_WIN_START; n <= QG_WIN_END; n++)); do
-    if [ "${QG_FILE_LINE["${file}#${n}"]+set}" = set ]; then
+    if [ "${QG_FILE_LINE["${file}#${n}"]+set}" = set ] \
+      && [ "${QG_FILE_KEY["${file}#${n}"]+set}" != set ]; then
       qg_queue "${QG_FILE_LINE["${file}#${n}"]}"
     fi
   done

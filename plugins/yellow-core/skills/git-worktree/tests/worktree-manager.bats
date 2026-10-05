@@ -33,7 +33,7 @@ teardown() {
         if [ ! -e "$REPO" ]; then
             return 0
         fi
-        if rm -rf "$REPO"; then
+        if rm -rf "$REPO" && [ ! -e "$REPO" ]; then
             return 0
         fi
     done
