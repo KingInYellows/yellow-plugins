@@ -959,6 +959,12 @@ restore_entries() {
 # Returns 0 on a full restore, 1 when entries remain (state rewritten).
 restore_and_clear() {
   if restore_entries; then
+    if [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; then
+      write_state || err "could not rewrite the state file"
+      lock_mark_paused
+      err "a GitHub restack conflict is still paused; use --continue or --abort first"
+      return 1
+    fi
     clear_state
     release_lock
     return 0
@@ -1468,6 +1474,8 @@ cmd_restore() {
   need_lock
   if [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; then
     note "warning: a conflict is still paused; restoring now strands the provider's own --continue. Prefer /worktree:restack --continue or --abort"
+  elif [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; then
+    note "warning: a GitHub restack conflict is still paused; restore will not clear state while gh-stack-rebase-state exists. Prefer /worktree:restack --continue or --abort"
   fi
   report_all_floating
   if restore_and_clear; then
