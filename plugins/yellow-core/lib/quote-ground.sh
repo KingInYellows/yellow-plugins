@@ -9,11 +9,15 @@
 #   quote-ground.sh batch                          # JSONL on stdin
 #
 # check exits 0 and prints the matched line number, 1 for ungrounded,
-# too-short, or unsafe-path, and 2 for usage, a missing target file, or
-# a missing validate-fs.sh / compound-staging.sh. batch writes one JSON
-# object per id: {id, result, matched_line}. result is grounded,
-# ungrounded, too-short, or unsafe-path. A missing file is exit 2 in
-# check mode; in batch that row is ungrounded and is not opened.
+# too-short, or unsafe-path, and 2 for usage, a missing target file, a
+# file that cannot be read, or a missing validate-fs.sh /
+# compound-staging.sh. batch writes one JSON object per id: {id, result,
+# matched_line}. result is grounded, ungrounded, too-short, or
+# unsafe-path. A missing file is exit 2 in check mode; in batch that row is
+# ungrounded and is not opened. batch exits 2 with no result rows when jq is
+# missing, when any input row is not an object with a string-or-number id,
+# a string file, a string quote and a number-or-string line, when a field
+# holds U+0000, or when a cited file cannot be read.
 #
 # Substring comparison is a quoted bash case match, not awk -v, so
 # backslashes stay literal. Lines that cannot start the private-key sed
@@ -98,15 +102,17 @@ qg_contains() {
   return 1
 }
 
+# Cache keys carry a "k:" prefix. Bash rejects an empty associative-array
+# subscript, and a blank source line or an empty quote is the empty string.
 qg_queue() {
   local raw="$1"
-  if [ "${QG_NORM_CACHE["$raw"]+set}" = set ]; then
+  if [ "${QG_NORM_CACHE["k:$raw"]+set}" = set ]; then
     return 0
   fi
-  if [ "${QG_QUEUED["$raw"]+set}" = set ]; then
+  if [ "${QG_QUEUED["k:$raw"]+set}" = set ]; then
     return 0
   fi
-  QG_QUEUED["$raw"]=1
+  QG_QUEUED["k:$raw"]=1
   QG_PENDING_RAW+=("$raw")
 }
 
@@ -116,7 +122,7 @@ qg_store_norm() {
     printf 'quote-ground: placeholder canonicalization failed\n' >&2
     exit 2
   fi
-  QG_NORM_CACHE["$raw"]=$(qg_normalize_line "$norm")
+  QG_NORM_CACHE["k:$raw"]=$(qg_normalize_line "$norm")
 }
 
 qg_redact_one() {
@@ -158,7 +164,7 @@ qg_flush() {
     mapfile -t safe_out <"$redact_out"
     if [ "${#safe_out[@]}" -eq "${#safe_raw[@]}" ]; then
       for idx in "${!safe_raw[@]}"; do
-        QG_NORM_CACHE["${safe_raw[$idx]}"]=$(qg_normalize_line "${safe_out[$idx]}")
+        QG_NORM_CACHE["k:${safe_raw[$idx]}"]=$(qg_normalize_line "${safe_out[$idx]}")
       done
     else
       for raw in "${safe_raw[@]}"; do
@@ -171,17 +177,25 @@ qg_flush() {
   declare -gA QG_QUEUED=()
 }
 
+# Load every line of one file. A read failure exits 2: a process
+# substitution would hide awk's status, and an unread file would then look
+# like an ungrounded quote. An empty file is loaded and has no line entries.
 qg_ensure_lines() {
-  local file="$1" full="$2" rec num text
-  if [ "${QG_FILE_LOADED["$file"]+set}" = set ]; then
+  local file="$1" full="$2" recs rec num text
+  if [ "${QG_FILE_LOADED["f:$file"]+set}" = set ]; then
     return 0
   fi
-  QG_FILE_LOADED["$file"]=1
+  if ! recs=$(awk '{ printf "%d\t%s\n", NR, $0 }' "$full"); then
+    printf 'quote-ground: failed to read cited file\n' >&2
+    exit 2
+  fi
+  QG_FILE_LOADED["f:$file"]=1
+  [ -n "$recs" ] || return 0
   while IFS= read -r rec; do
     num=${rec%%$'\t'*}
     text=${rec#*$'\t'}
     QG_FILE_LINE["${file}#${num}"]=$text
-  done < <(awk '{ printf "%d\t%s\n", NR, $0 }' "$full")
+  done <<<"$recs"
 }
 
 # Classify one relative path. Sets QG_ONE_CLASS to ok, missing, or
@@ -189,8 +203,8 @@ qg_ensure_lines() {
 # reuses that result and still does not open a rejected path.
 qg_path_class() {
   local file="$1" full
-  if [ "${QG_PATH_CLASS["$file"]+set}" = set ]; then
-    QG_ONE_CLASS=${QG_PATH_CLASS["$file"]}
+  if [ "${QG_PATH_CLASS["p:$file"]+set}" = set ]; then
+    QG_ONE_CLASS=${QG_PATH_CLASS["p:$file"]}
     return 0
   fi
   if ! validate_file_path "$file" "$QG_ROOT"; then
@@ -205,7 +219,7 @@ qg_path_class() {
       QG_ONE_CLASS=ok
     fi
   fi
-  QG_PATH_CLASS["$file"]=$QG_ONE_CLASS
+  QG_PATH_CLASS["p:$file"]=$QG_ONE_CLASS
 }
 
 # Search [line-radius, line+radius]. Norms for the quote and those lines
@@ -224,7 +238,7 @@ qg_search() {
       continue
     fi
     raw=${QG_FILE_LINE["${file}#${n}"]}
-    norm=${QG_NORM_CACHE["$raw"]}
+    norm=${QG_NORM_CACHE["k:$raw"]}
     if qg_contains "$quote" "$norm"; then
       QG_MATCHED=$n
       return 0
@@ -263,7 +277,7 @@ qg_classify_ready() {
       return 0
       ;;
   esac
-  qnorm=${QG_NORM_CACHE["$quote"]}
+  qnorm=${QG_NORM_CACHE["k:$quote"]}
   if qg_too_short "$qnorm"; then
     QG_CLASS=too-short
     return 0
@@ -360,150 +374,66 @@ qg_check() {
   esac
 }
 
+# Decode the JSONL rows with one jq pass into NUL-framed fields in a temp
+# file. A row of the wrong shape, or a field holding U+0000 (which would
+# shift the framing), makes jq fail and the whole batch exit 2. The status is
+# read from jq itself, never from a process substitution.
 qg_load_rows() {
-  local decoded="$1" id file line quote
-  while IFS= read -r -d '' id || [ -n "$id" ]; do
-    IFS= read -r -d '' file || return 2
-    IFS= read -r -d '' line || return 2
-    IFS= read -r -d '' quote || return 2
+  local framed id file line quote
+  framed=$(mktemp) || {
+    printf 'quote-ground: could not create a temp file\n' >&2
+    return 2
+  }
+  if ! jq -j '
+    if ((.id | type) == "string" or (.id | type) == "number")
+      and (.file | type) == "string"
+      and (.quote | type) == "string"
+      and ((.line | type) == "number" or (.line | type) == "string")
+    then
+      [(.id | tostring), .file, (.line | tostring), .quote] as $f
+      | if any($f[]; contains("\u0000")) then error("nul in field")
+        else $f[] + "\u0000" end
+    else
+      error("invalid row")
+    end
+  ' >"$framed"; then
+    rm -f "$framed"
+    printf 'quote-ground: invalid batch input\n' >&2
+    return 2
+  fi
+  while IFS= read -r -d '' id; do
+    if ! IFS= read -r -d '' file || ! IFS= read -r -d '' line || ! IFS= read -r -d '' quote; then
+      rm -f "$framed"
+      printf 'quote-ground: short batch record\n' >&2
+      return 2
+    fi
     B_ID+=("$id")
     B_FILE+=("$file")
     B_LINE+=("$line")
     B_QUOTE+=("$quote")
     B_CLASS+=("")
     B_MATCH+=("")
-  done < <(awk '
-    function jdec(s,    i, n, c, out, hex, code) {
-      n = length(s)
-      if (n < 2 || substr(s, 1, 1) != "\"") return ""
-      out = ""
-      i = 2
-      while (i < n) {
-        c = substr(s, i, 1)
-        if (c == "\\") {
-          i++
-          if (i >= n) break
-          c = substr(s, i, 1)
-          if (c == "n") out = out "\n"
-          else if (c == "r") out = out "\r"
-          else if (c == "t") out = out "\t"
-          else if (c == "\"" || c == "\\" || c == "/") out = out c
-          else if (c == "u") {
-            hex = substr(s, i + 1, 4)
-            code = strtonum("0x" hex)
-            if (code < 128) out = out sprintf("%c", code)
-            else if (code < 2048)
-              out = out sprintf("%c%c", 192 + int(code / 64), 128 + (code % 64))
-            else
-              out = out sprintf("%c%c%c", 224 + int(code / 4096), 128 + int((code % 4096) / 64), 128 + (code % 64))
-            i += 4
-          } else out = out c
-        } else out = out c
-        i++
-      }
-      return out
-    }
-    BEGIN { FS = "\t" }
-    {
-      printf "%s\0%s\0%s\0%s\0", jdec($1), jdec($2), jdec($3), jdec($4)
-    }
-  ' "$decoded")
+  done <"$framed"
+  rm -f "$framed"
 }
 
-# Read every still-pending file once. A read error exits 2. An empty
-# file is loaded and simply has no line entries.
+# Load every still-pending file once. qg_ensure_lines skips a loaded file
+# and exits 2 on a read error.
 qg_load_pending_files() {
-  local i file list out key text
-  local -A seen=()
-  list=$(mktemp) || {
-    printf 'quote-ground: could not create a temp file\n' >&2
-    exit 2
-  }
-  out=$(mktemp) || {
-    rm -f "$list"
-    printf 'quote-ground: could not create a temp file\n' >&2
-    exit 2
-  }
+  local i file
   for i in "${!B_ID[@]}"; do
     [ "${B_CLASS[$i]}" = pending ] || continue
     file=${B_FILE[$i]}
-    if [ "${seen["$file"]+set}" = set ]; then
-      continue
-    fi
-    seen["$file"]=1
-    if [ "${QG_FILE_LOADED["$file"]+set}" = set ]; then
-      continue
-    fi
-    printf '%s\0%s\0' "$file" "${QG_ROOT}/${file}" >>"$list"
+    qg_ensure_lines "$file" "${QG_ROOT}/${file}"
   done
-  if [ ! -s "$list" ]; then
-    rm -f "$list" "$out"
-    return 0
-  fi
-  if ! awk '
-    function load(rel, full,    line, n, rc, saved) {
-      saved = RS
-      RS = "\n"
-      n = 0
-      while ((rc = (getline line < full)) > 0) {
-        n++
-        printf "%s#%d\0%s\0", rel, n, line
-      }
-      close(full)
-      RS = saved
-      if (rc < 0) exit 2
-    }
-    BEGIN { RS = "\0" }
-    NR % 2 == 1 { rel = $0; next }
-    { load(rel, $0) }
-  ' "$list" >"$out"; then
-    rm -f "$list" "$out"
-    printf 'quote-ground: failed to read cited files\n' >&2
-    exit 2
-  fi
-  for file in "${!seen[@]}"; do
-    QG_FILE_LOADED["$file"]=1
-  done
-  while IFS= read -r -d '' key; do
-    if ! IFS= read -r -d '' text; then
-      rm -f "$list" "$out"
-      printf 'quote-ground: short file-line record\n' >&2
-      exit 2
-    fi
-    QG_FILE_LINE["$key"]=$text
-  done <"$out"
-  rm -f "$list" "$out"
 }
 
 qg_batch() {
-  local decoded id file line quote class i qnorm
+  local file line quote class i qnorm
   local -a B_ID=() B_FILE=() B_LINE=() B_QUOTE=() B_CLASS=() B_MATCH=()
   declare -a QG_OUT_ID=() QG_OUT_RESULT=() QG_OUT_MATCH=()
   command -v jq >/dev/null 2>&1 || exit 2
-  decoded=$(mktemp)
-  jq -rc '
-    if ((.id | type) == "string" or (.id | type) == "number")
-      and (.file | type) == "string"
-      and (.quote | type) == "string"
-      and ((.line | type) == "number" or (.line | type) == "string")
-    then
-      [(.id | tostring | @json), (.file | @json), (.line | tostring | @json), (.quote | @json)] | join("\t")
-    else
-      "INVALID"
-    end
-  ' >"$decoded" || {
-    rm -f "$decoded"
-    exit 2
-  }
-  if grep -qx 'INVALID' "$decoded"; then
-    rm -f "$decoded"
-    exit 2
-  fi
-  qg_load_rows "$decoded" || {
-    rm -f "$decoded"
-    exit 2
-  }
-  rm -f "$decoded"
+  qg_load_rows || exit 2
 
   for i in "${!B_ID[@]}"; do
     file=${B_FILE[$i]}
@@ -531,7 +461,7 @@ qg_batch() {
 
   for i in "${!B_ID[@]}"; do
     [ "${B_CLASS[$i]}" = pending ] || continue
-    qnorm=${QG_NORM_CACHE["${B_QUOTE[$i]}"]}
+    qnorm=${QG_NORM_CACHE["k:${B_QUOTE[$i]}"]}
     if qg_too_short "$qnorm"; then
       B_CLASS[$i]=too-short
     fi
@@ -545,7 +475,7 @@ qg_batch() {
 
   for i in "${!B_ID[@]}"; do
     [ "${B_CLASS[$i]}" = pending ] || continue
-    qnorm=${QG_NORM_CACHE["${B_QUOTE[$i]}"]}
+    qnorm=${QG_NORM_CACHE["k:${B_QUOTE[$i]}"]}
     if qg_search "${B_FILE[$i]}" "${B_LINE[$i]}" 3 "$qnorm"; then
       B_CLASS[$i]=grounded
       B_MATCH[$i]=$QG_MATCHED

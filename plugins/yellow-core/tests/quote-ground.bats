@@ -268,3 +268,69 @@ line_quote() {
   ' <"$out" >/dev/null
   rm -f "$payload" "$out"
 }
+
+@test "check and batch ground a quote when a blank line sits inside the window" {
+  printf 'alpha line one\n\nthe quoted target line\nomega\n' >src/a.txt
+  run bash "$QG" check src/a.txt 3 <<<"the quoted target line"
+  [ "$status" -eq 0 ]
+  [ "$output" = "3" ]
+  run bash "$QG" batch <<<'{"id":"b","file":"src/a.txt","line":3,"quote":"the quoted target line"}'
+  [ "$status" -eq 0 ]
+  jq -e '.id == "b" and .result == "grounded" and .matched_line == 3' <<<"$output" >/dev/null
+}
+
+@test "an empty or blank quote is too-short and does not abort its sibling rows" {
+  local payload
+  printf 'alpha line one\n\nthe quoted target line\nomega\n' >src/a.txt
+  run bash "$QG" check src/a.txt 3 <<<""
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+  payload="$(
+    printf '%s\n' '{"id":"empty","file":"src/a.txt","line":3,"quote":""}'
+    printf '%s\n' '{"id":"blank","file":"src/a.txt","line":3,"quote":"   "}'
+    printf '%s\n' '{"id":"good","file":"src/a.txt","line":3,"quote":"the quoted target line"}'
+  )"
+  run bash "$QG" batch <<<"$payload"
+  [ "$status" -eq 0 ]
+  jq -e -s '
+    length == 3
+    and (map(select(.id == "empty"))[0].result == "too-short")
+    and (map(select(.id == "blank"))[0].result == "too-short")
+    and (map(select(.id == "good"))[0].result == "grounded")
+  ' <<<"$output" >/dev/null
+}
+
+@test "an empty file path is rejected without aborting the script" {
+  run bash "$QG" check '' 1 3 <<<"abcdefghijklmnopqrstuvwxyz"
+  [ "$status" -ne 0 ]
+  [[ "$output" != *"bad array subscript"* ]]
+  run bash "$QG" batch <<<'{"id":"e","file":"","line":1,"quote":"abcdefghijklmnopqrstuvwxyz"}'
+  [ "$status" -eq 0 ]
+  jq -e '.id == "e" and .result != "grounded"' <<<"$output" >/dev/null
+}
+
+@test "batch grounds under mawk as the awk on PATH" {
+  local mawk shim
+  mawk="$(command -v mawk)" || skip "mawk is not installed"
+  shim="${BASE}/shim"
+  mkdir -p "$shim"
+  ln -s "$mawk" "$shim/awk"
+  printf 'alpha line one\nthe quoted target line\nomega\n' >src/a.txt
+  PATH="$shim:$PATH" run bash "$QG" batch <<<'{"id":"m","file":"src/a.txt","line":2,"quote":"the quoted target line"}'
+  [ "$status" -eq 0 ]
+  jq -e '.id == "m" and .result == "grounded" and .matched_line == 2' <<<"$output" >/dev/null
+}
+
+@test "batch exits 2 with no result rows on a malformed row or a NUL in a field" {
+  printf '%s\n' 'abcdefghijklmnopqrstuvwxyz' >src/a.txt
+  run bash "$QG" batch <<<'{"id":"x","file":"src/a.txt","line":null,"quote":"abcdefghijklmnopqrstuvwxyz"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<'{"id":"x\u0000y","file":"src/a.txt","line":1,"quote":"abcdefghijklmnopqrstuvwxyz"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<'{"id":"ok","file":"src/a.txt","line":1,"quote":"abcdefghijklmnopqrstuvwxyz"}
+{"id":"x","file":"src/a.txt","quote":"abcdefghijklmnopqrstuvwxyz"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+}
