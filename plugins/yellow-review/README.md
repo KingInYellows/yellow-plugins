@@ -170,6 +170,10 @@ fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
 | `guard-local-config` | Snapshot the gitignored `yellow-plugins.local.md` and restore it if a resolver changed, created or deleted it; refuses a symlinked config (`/review:resolve-stack` checks after each PR) |
 | `file-line-counts` | Base/head line counts per changed file for `thermonuclear-reviewer` |
 
+`commit-resolve-fixes` and `run-verify-command` refuse a `git`, `gh`, or
+`jq` whose canonical file is inside the worktree, and they exec only the
+absolute path outside it.
+
 Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-gh.sh`,
 `resolve-paths.sh`, `gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.
 

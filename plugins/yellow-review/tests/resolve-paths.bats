@@ -1050,3 +1050,144 @@ commit_repo() {
   [[ "$output" == *"'src/*'"* ]]
   [[ "$output" != *real.txt* ]]
 }
+
+# --- git is one absolute path outside the worktree ---
+
+# trust_canary <marker>: an executable git inside this repo that records a run.
+trust_canary() {
+  local marker="$1" dir="$PWD/canary-bin"
+  mkdir -p "$dir"
+  cat >| "$dir/git" <<EOF
+#!/bin/sh
+touch "$marker"
+exit 99
+EOF
+  chmod +x "$dir/git"
+  printf '%s' "$dir"
+}
+
+# trust_assert_absolute <log>: every recorded argv starts with an absolute $0.
+trust_assert_absolute() {
+  local line
+  [ -s "$1" ] || { echo "empty argv log $1"; return 1; }
+  while IFS= read -r line; do
+    case "$line" in
+      bare|exported) echo "bad argv line: $line"; return 1 ;;
+      /*) ;;
+      *) echo "not absolute: $line"; return 1 ;;
+    esac
+  done < "$1"
+}
+
+@test "trust: an in-worktree git canary is not executed" {
+  local marker="$BATS_TEST_TMPDIR/canary-ran" dir
+  rm -f "$marker"
+  unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ
+  dir=$(trust_canary "$marker")
+  case "$(cd "$dir" && pwd -P)" in
+    "$(pwd -P)"/*) ;;
+    *) echo "canary directory is not inside the worktree"; return 1 ;;
+  esac
+  PATH="$dir:$PATH" run lgit status --porcelain
+  [ "$status" -ne 0 ]
+  [ "$status" -ne 99 ]
+  [ ! -e "$marker" ]
+}
+
+@test "trust: a symlink outside the worktree whose target is an in-worktree git canary is not executed" {
+  local marker="$BATS_TEST_TMPDIR/canary-ran" dir link="$BATS_TEST_TMPDIR/linkbin" link_dir repo_dir
+  rm -f "$marker"
+  unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ
+  dir=$(trust_canary "$marker")
+  mkdir -p "$link"
+  ln -s "$dir/git" "$link/git"
+  link_dir=$(cd "$link" && pwd -P)
+  repo_dir=$(pwd -P)
+  case "$link_dir" in
+    "$repo_dir"|"$repo_dir"/*) echo "symlink directory is inside the worktree"; return 1 ;;
+  esac
+  PATH="$link:$PATH" run lgit status --porcelain
+  [ "$status" -ne 0 ]
+  [ "$status" -ne 99 ]
+  [ ! -e "$marker" ]
+}
+
+@test "trust: in-worktree readlink and dirname canaries do not run during the trust check" {
+  local marker="$BATS_TEST_TMPDIR/canary-ran" dir="$PWD/canary-bin" link="$BATS_TEST_TMPDIR/linkbin" real tool
+  rm -f "$marker"
+  unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ
+  real=$(type -P git) || skip "git not found on PATH"
+  mkdir -p "$dir" "$link" sub
+  for tool in readlink dirname; do
+    printf '#!/bin/sh\ntouch "%s"\nexit 99\n' "$marker" >| "$dir/$tool"
+    chmod +x "$dir/$tool"
+  done
+  ln -s "$real" "$link/git"
+  cd sub
+  PATH="$dir:$link:$PATH" run lgit rev-parse --git-dir
+  [ "$status" -eq 0 ]
+  [ ! -e "$marker" ]
+}
+
+@test "trust: yr_inside_root matches an ancestor that is the worktree under another spelling" {
+  local root="$BATS_TEST_TMPDIR/repo"
+  mkdir -p "$root/bin" "$BATS_TEST_TMPDIR/outside"
+  : >| "$root/bin/git"
+  : >| "$BATS_TEST_TMPDIR/outside/git"
+  yr_inside_root "$root" "$root"
+  yr_inside_root "$root/bin/git" "$root"
+  yr_inside_root "$BATS_TEST_TMPDIR/./repo/bin/git" "$root"
+  yr_inside_root "$BATS_TEST_TMPDIR//repo/bin/git" "$root"
+  run yr_inside_root "$BATS_TEST_TMPDIR/outside/git" "$root"
+  [ "$status" -eq 1 ]
+  run yr_inside_root "$BATS_TEST_TMPDIR/repo-sibling/git" "$root"
+  [ "$status" -eq 1 ]
+}
+
+@test "trust: lgit execs only an absolute git and keeps its flags" {
+  local marker="$BATS_TEST_TMPDIR/canary-ran" log="$BATS_TEST_TMPDIR/git-argv.log"
+  local real dest dir
+  rm -f "$marker" "$log"
+  unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ
+  real=$(type -P git) || skip "git not found on PATH"
+  dest=$(mkdir -p "$BATS_TEST_TMPDIR/doubles" && cd "$BATS_TEST_TMPDIR/doubles" && pwd -P)
+  cat >| "$dest/git" <<EOF
+#!/bin/sh
+if [ -n "\${YELLOW_REVIEW_GIT:-}\${YELLOW_REVIEW_GH:-}\${YELLOW_REVIEW_JQ:-}" ]; then
+  printf 'exported\n' >> "$log"
+  exit 98
+fi
+{
+  printf '%s' "\$0"
+  for a in "\$@"; do
+    printf ' '
+    printf '%s' "\$a" | tr '\n' ' '
+  done
+  printf '\n'
+} >> "$log"
+case "\$0" in
+  /*) ;;
+  *) printf 'bare\n' >> "$log"; exit 97 ;;
+esac
+exec "$real" "\$@"
+EOF
+  chmod +x "$dest/git"
+  PATH="$dest:$PATH"
+  lgit status --porcelain
+  lgit_nohooks status --porcelain
+  trust_assert_absolute "$log"
+  grep -F -- "-c core.fsmonitor=false" "$log" >/dev/null
+  grep -F -- "-c core.untrackedCache=false" "$log" >/dev/null
+  grep -F -- "--literal-pathspecs" "$log" >/dev/null
+  grep -F -- "-c core.hooksPath=/dev/null" "$log" >/dev/null
+  # A later call reuses the resolved path: a canary now first on PATH does not run.
+  dir=$(trust_canary "$marker")
+  PATH="$dir:$PATH"
+  lgit status --porcelain
+  [ ! -e "$marker" ]
+  trust_assert_absolute "$log"
+  case "$YELLOW_REVIEW_GIT" in
+    "$dest/git") ;;
+    *) echo "resolved $YELLOW_REVIEW_GIT"; return 1 ;;
+  esac
+}
