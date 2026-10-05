@@ -407,7 +407,9 @@ strips invisible/control characters, redacts recognized credential forms,
 and quotes fence and role-prefix lines. Failed redaction suppresses the
 write. The pending JSONL file is owner-only inside a private directory under
 `~/.claude/projects/<main-checkout-slug>/compound-staging/`; repeat reviews
-of the same repository/PR replace its pending entry. The existing drain
+of the same repository/PR replace its pending entry. IDs outside the
+promoter's 64-character alphanumeric/underscore/hyphen contract are hashed
+with SHA-256 before writing. The existing drain
 still treats the narrative as untrusted reference data when scoring it.
 This store is separate from the review-findings ledger and is never pushed.
 

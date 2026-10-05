@@ -170,7 +170,7 @@ cs_redact_secrets() {
 #
 # Args:
 #   $1 — cwd whose project slug selects the staging dir
-#   $2 — session id; sanitised to [A-Za-z0-9._-], and a repeat overwrites
+#   $2 — session id; non-promotable IDs are hashed, and a repeat overwrites
 #   $3 — file holding the narrative (read, never echoed)
 # Returns: 0 staged, 1 bad args, 2 jq missing, 3 sanitisation failed,
 #          4 write failed.
@@ -180,10 +180,27 @@ cs_stage_entry() {
   if [ -z "$cwd" ] || [ -z "$src" ] || [ ! -f "$src" ] || [ ! -r "$src" ]; then
     return 1
   fi
-  sid=$(printf '%s' "$sid" | tr -c 'A-Za-z0-9._-' '_')
   case "$sid" in
     '' | . | ..) return 1 ;;
   esac
+  # Match staging-promoter's [A-Za-z0-9_-]{1,64} contract. Hash the raw
+  # identifier when it is not already valid, retaining stable overwrite
+  # semantics without collisions between dotted and underscored repo names.
+  case "$sid" in
+    *[!A-Za-z0-9_-]*) hash=1 ;;
+    *) hash=0 ;;
+  esac
+  if [ "$hash" -eq 1 ] || [ "${#sid}" -gt 64 ]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+      sid=$(printf '%s' "$sid" | sha256sum | cut -d' ' -f1) || return 1
+    elif command -v shasum >/dev/null 2>&1; then
+      sid=$(printf '%s' "$sid" | shasum -a 256 | cut -d' ' -f1) || return 1
+    else
+      return 1
+    fi
+    case "$sid" in '' | *[!a-f0-9]*) return 1 ;; esac
+    [ "${#sid}" -eq 64 ] || return 1
+  fi
   command -v jq >/dev/null 2>&1 || return 2
 
   # The whole sanitise pipeline runs byte-wise (LC_ALL=C): in a UTF-8 locale

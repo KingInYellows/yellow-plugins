@@ -102,12 +102,14 @@ ys_project_dir() {
 # numbers belong to), else the origin URL, else a fixed placeholder. The gh
 # call is time-boxed so a stalled network cannot hang an unattended sweep.
 ys_repo_key() {
-  local name
+  local name=""
   if command -v timeout >/dev/null 2>&1; then
     name=$(timeout 10 gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
-  else
-    name=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
+  elif command -v gtimeout >/dev/null 2>&1; then
+    name=$(gtimeout 10 gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
   fi
+  # With no timeout utility, use the local origin rather than an unbounded
+  # network request (notably on macOS without GNU coreutils).
   if [ -z "$name" ]; then
     name=$(git remote get-url origin 2>/dev/null \
       | sed -E -e 's#\.git$##' -e 's#^.*[:/]([^/:]+)/([^/]+)$#\1/\2#')

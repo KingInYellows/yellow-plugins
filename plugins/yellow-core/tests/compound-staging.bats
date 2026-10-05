@@ -298,11 +298,11 @@ sha256_of() {
   [ "$(find "$HOME/.claude/projects" -name '*.jsonl' | wc -l | tr -d ' ')" = "2" ]
 }
 
-@test "stage_entry sanitises the session id and rejects empty, dot and dotdot" {
+@test "stage_entry hashes non-promotable session ids and rejects empty, dot and dotdot" {
   stage_setup
   printf 'x\n' >"$NARRATIVE"
   cs_stage_entry "$STAGE_CWD" "../x y" "$NARRATIVE"
-  [ -n "$(staged_file '.._x_y')" ]
+  [ -f "$(staged_file "$(sha256_of '../x y')")" ]
   for bad in '' '.' '..'; do
     run cs_stage_entry "$STAGE_CWD" "$bad" "$NARRATIVE"
     [ "$status" -eq 1 ]
@@ -474,4 +474,29 @@ sha256_of() {
   . "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
   . "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
   [ "${_COMPOUND_STAGING_LOADED:-}" = "1" ]
+}
+
+@test "stage_entry keeps all content when the newline is byte 8193" {
+  stage_setup
+  head -c 8192 /dev/zero | tr '\000' 'a' >"$NARRATIVE"
+  printf '\nnext line\n' >>"$NARRATIVE"
+  cs_stage_entry "$STAGE_CWD" "s1" "$NARRATIVE"
+  tail_text=$(jq -r .transcript_tail "$(staged_file s1)")
+  [ "${#tail_text}" -eq 8192 ]
+  [ "$tail_text" = "$(head -c 8192 /dev/zero | tr '\000' 'a')" ]
+}
+
+@test "stage_entry bounds long IDs and keeps distinct invalid IDs distinct" {
+  stage_setup
+  printf 'finding\n' >"$NARRATIVE"
+  long_id=$(head -c 100 /dev/zero | tr '\000' 'a')
+  for sid in 'review-pr-o-widget.js-7' 'review-pr-o-widget_js-7' "$long_id"; do
+    cs_stage_entry "$STAGE_CWD" "$sid" "$NARRATIVE"
+  done
+  [ "$(find "$HOME/.claude/projects" -name '*.jsonl' | wc -l | tr -d ' ')" = 3 ]
+  for f in "$(dirname "$(staged_file "$(sha256_of "$long_id")")")"/*.jsonl; do
+    jq -e '.session_id | test("^[A-Za-z0-9_-]{1,64}$")' "$f"
+  done
+  cs_stage_entry "$STAGE_CWD" "$long_id" "$NARRATIVE"
+  [ "$(find "$HOME/.claude/projects" -name '*.jsonl' | wc -l | tr -d ' ')" = 3 ]
 }

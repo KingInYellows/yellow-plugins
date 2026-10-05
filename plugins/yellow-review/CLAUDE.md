@@ -363,7 +363,9 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
 - `lib/stage-learning.sh tmpfile | stage <pr> <file>` — stages an unattended
   `/review:pr` run's outcome narrative (Step 9a under `--non-interactive`) in
   yellow-core's compound-staging ledger via `cs_stage_entry`, as
-  `review-pr-<owner>-<repo>-<pr>` under the main checkout's project slug, for
+  `review-pr-<owner>-<repo>-<pr>` (hashed when outside the promoter's
+  64-character alphanumeric/underscore/hyphen contract) under the main
+  checkout's project slug, for
   the drain to score and promote at a later session start. It replaces the
   `knowledge-compounder` spawn, whose confirmation gate stalls unattended.
   The `stage` subcommand always exits 0 with one success or

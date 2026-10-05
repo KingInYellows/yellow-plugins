@@ -234,3 +234,36 @@ slug_of() {
   run -2 "$YS" bogus
   [[ "$output" == usage:* ]] || false
 }
+
+@test "repo key skips gh when neither timeout utility is available" {
+  source "$YS"
+  git remote add origin git@github.com:octo/local.git
+  command() {
+    case "$*" in
+      '-v timeout' | '-v gtimeout') return 1 ;;
+      *) builtin command "$@" ;;
+    esac
+  }
+  gh() { printf 'unexpected-network-call\n'; }
+  run ys_repo_key
+  [ "$status" -eq 0 ]
+  [ "$output" = "octo-local" ]
+}
+
+@test "repo key uses gtimeout when timeout is unavailable" {
+  source "$YS"
+  command() {
+    case "$*" in
+      '-v timeout') return 1 ;;
+      *) builtin command "$@" ;;
+    esac
+  }
+  gtimeout() {
+    [ "$1" = 10 ] || return 1
+    shift
+    "$@"
+  }
+  run ys_repo_key
+  [ "$status" -eq 0 ]
+  [ "$output" = "acme-widgets" ]
+}
