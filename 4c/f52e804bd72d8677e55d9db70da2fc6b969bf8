@@ -1,0 +1,37 @@
+docs/security.md
+  s_9debf6a8e6c9cc::t_24a8a3a916138c 396-413
+plans/stage-unattended-sweep-learnings.md
+  s_9debf6a8e6c9cc::t_056c23aa7c2cae 3-11
+plugins/yellow-core/README.md
+  s_9debf6a8e6c9cc::t_742520b823c227 150-159
+plugins/yellow-review/CLAUDE.md
+  s_9debf6a8e6c9cc::t_3bc8d2950fa150 369-371
+plugins/yellow-review/README.md
+  s_9debf6a8e6c9cc::t_7ac9ad3545e5ab 102-109
+plugins/yellow-review/commands/review/sweep-all.md
+  s_9debf6a8e6c9cc::t_a0fea1c1161d2d 19-20,375-376
+plugins/yellow-review/lib/stage-learning.sh
+  s_9debf6a8e6c9cc::t_ba91f98e784ec8 7-8,152,164
+plugins/yellow-review/references/review-pr/knowledge-compounding.md
+  s_9debf6a8e6c9cc::t_97323276c4d43c 52-53
+plugins/yellow-review/tests/skill-content.bats
+  s_9debf6a8e6c9cc::t_da731624832376 1195
+plugins/yellow-review/tests/stage-learning.bats
+  s_9debf6a8e6c9cc::t_cb78e084eb61c7 51,54-56,65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4cf52e804bd72d8677e55d9db70da2fc6b969bf8",
+  "prompts": {},
+  "sessions": {
+    "s_9debf6a8e6c9cc": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a10b16-2f12-7580-a10b-dea67e1c98e2",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
