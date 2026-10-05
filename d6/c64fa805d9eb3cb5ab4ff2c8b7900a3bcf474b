@@ -1,0 +1,33 @@
+.changeset/stage-unattended-sweep-learnings.md
+  s_614b8b07ae5e06::t_1da3e0952324fe 1-17
+plans/stage-unattended-sweep-learnings.md
+  s_614b8b07ae5e06::t_4d751c95b571a8 524,553
+plugins/yellow-core/lib/compound-staging.sh
+  s_614b8b07ae5e06::t_87e85bb157099c 179,189-191,194-199,201,204-215
+plugins/yellow-core/tests/compound-staging.bats
+  s_614b8b07ae5e06::t_b069263ce6dcad 249-250,252-254,355-378,410-419
+plugins/yellow-review/lib/stage-learning.sh
+  s_614b8b07ae5e06::t_b905468c09d6d4 102-103,106-110
+plugins/yellow-review/references/review-pr/knowledge-compounding.md
+  s_614b8b07ae5e06::t_04321f8afcce0d 24
+plugins/yellow-review/tests/skill-content.bats
+  s_614b8b07ae5e06::t_ab6773ed575d49 403-404
+plugins/yellow-review/tests/stage-learning.bats
+  s_614b8b07ae5e06::t_8b988c578b8fc1 63,77,139-146,228,233
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d6c64fa805d9eb3cb5ab4ff2c8b7900a3bcf474b",
+  "prompts": {},
+  "sessions": {
+    "s_614b8b07ae5e06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "611b6fca-8946-4a0e-adeb-9e50ac8cad85",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
