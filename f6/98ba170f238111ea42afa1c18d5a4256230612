@@ -1,0 +1,19 @@
+docs/solutions/build-errors/empty-bats-test-blocks-cause-syntax-errors-in-bats.md
+  s_06846d9415fcc5::t_d5fdff0bb1bb7f 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f698ba170f238111ea42afa1c18d5a4256230612",
+  "prompts": {},
+  "sessions": {
+    "s_06846d9415fcc5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d4b8f538-1a25-4732-b17e-58d12f300613",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
