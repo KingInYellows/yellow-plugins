@@ -47,4 +47,20 @@ describe('SchemaValidator.validateCompatibility', () => {
     expect(result.status).toBe(ValidationStatus.SUCCESS);
     expect(result.errors).toHaveLength(0);
   });
+
+  it('accepts node versions equal to the inclusive bounds', () => {
+    const atMin = validator.validateCompatibility(
+      { nodeMin: '22.22.0', nodeMax: '24.0.0' },
+      { ...baseEnvironment, nodeVersion: '22.22.0' }
+    );
+    const atMax = validator.validateCompatibility(
+      { nodeMin: '22.22.0', nodeMax: '24.0.0' },
+      { ...baseEnvironment, nodeVersion: '24.0.0' }
+    );
+
+    expect(atMin.status).toBe(ValidationStatus.SUCCESS);
+    expect(atMin.errors).toHaveLength(0);
+    expect(atMax.status).toBe(ValidationStatus.SUCCESS);
+    expect(atMax.errors).toHaveLength(0);
+  });
 });
