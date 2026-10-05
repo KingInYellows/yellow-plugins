@@ -500,6 +500,22 @@ now_ms() {
   [[ "$output" != *'"result"'* ]]
 }
 
+@test "batch rejects a blank or whitespace-only line but accepts the final newline" {
+  local a b
+  printf '%s\n' "$Q26" >src/a.txt
+  a="$(row a src/a.txt 1 "$Q26")"
+  b="$(row b src/a.txt 1 "$Q26")"
+  run bash "$QG" batch < <(printf '%s\n%s\n' "$a" "$b")
+  [ "$status" -eq 0 ]
+  [ "$(wc -l <<<"$output")" -eq 2 ]
+  run bash "$QG" batch < <(printf '%s\n\n%s\n' "$a" "$b")
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch < <(printf '%s\n \t\r\n%s\n' "$a" "$b")
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+}
+
 @test "batch keeps ids exactly, emits valid JSON for control characters, and preserves numeric id types" {
   local payload
   printf 'alpha line one\nthe quoted target line\nomega\n' >src/a.txt

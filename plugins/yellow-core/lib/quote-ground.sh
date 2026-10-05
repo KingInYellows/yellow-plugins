@@ -23,8 +23,8 @@
 # ungrounded and does not affect its siblings. A cited file with a NUL byte in
 # the lines up to its last cited window is never matched: its rows are
 # ungrounded (check exits 1), because bash would silently drop the byte. batch
-# exits 2 with no result rows when jq is missing, when a row is not JSON, when
-# a row has no usable id (a string or number without U+0000), when a cited
+# exits 2 with no result rows when jq is missing, when a line is blank or not
+# JSON, when a row has no usable id (a string or number without U+0000), when a cited
 # file cannot be read, or when redaction fails.
 #
 # Redaction runs per line before matching, and every [REDACTED] or
@@ -215,8 +215,9 @@ qg_flush() {
 # like an ungrounded quote. QG_FILE_COUNT records the last line loaded, which
 # is where the window loops stop. awk also tracks the private-key range from
 # line 1, as cs_redact_secrets' sed range does, and flags every line from
-# BEGIN through END. A line holding both markers still opens the range, since
-# sed checks END only from the next line, so it runs to a later END or EOF.
+# BEGIN through END. A line holding both markers is a block on its own and
+# closes at once, deliberately unlike sed, which would run to a later END or
+# EOF, so the rows after it keep their numbers and stay matchable.
 # Those lines are never matched as text: qg_search treats them as [REDACTED],
 # so a key body row cannot ground and the block keeps its line numbers.
 qg_ensure_lines() {
@@ -244,7 +245,7 @@ qg_ensure_lines() {
         if ($0 ~ /-----END.*PRIVATE KEY-----/) inkey = 0
       } else if ($0 ~ /-----BEGIN.*PRIVATE KEY-----/) {
         flag = 1
-        inkey = 1
+        if ($0 !~ /-----END.*PRIVATE KEY-----/) inkey = 1
       }
     }
     NR >= lo { printf "%d\t%d\t%s\n", NR, flag, $0 }
@@ -455,8 +456,10 @@ qg_check() {
 # Read the JSONL rows through one jq pass. jq prints the row count and then
 # four NUL-terminated fields per row only after every row parsed, so a jq
 # failure leaves the count unread and this function fails; the read never
-# depends on a process substitution's exit status. A row that is not JSON, or
-# has no usable id, fails the whole batch. A row with a usable id and a bad
+# depends on a process substitution's exit status. jq reads raw lines (-R) and
+# parses each one, so a blank or whitespace-only line fails the batch like any
+# other non-JSON line; the newline that ends the last row is not a line. A row
+# that is not JSON, or has no usable id, fails the whole batch. A row with a usable id and a bad
 # file, line or quote (wrong type, or U+0000 that would shift the framing)
 # becomes line 0, which classifies as ungrounded. The id carries a type tag:
 # n for a JSON number, s for a string.
@@ -481,7 +484,8 @@ qg_load_rows() {
       B_CLASS+=("")
       B_MATCH+=("")
     done
-  } < <(jq -nj '
+  } < <(jq -nRj '
+    def parse: if test("^[ \t\r]*$") then error("blank record") else fromjson end;
     def hasnul: type == "string" and contains("\u0000");
     def tag: if type == "number" then "n" + tostring else "s" + . end;
     def row:
@@ -494,7 +498,7 @@ qg_load_rows() {
         then [(.id | tag), .file, (.line | tostring), .quote]
       else [(.id | tag), "", "0", ""]
       end;
-    [inputs | row] as $rows
+    [inputs | parse | row] as $rows
     | ($rows | length | tostring) + "\u0000", ($rows[][] + "\u0000")
   ')
 }
