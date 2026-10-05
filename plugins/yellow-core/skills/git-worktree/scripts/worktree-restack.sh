@@ -35,7 +35,8 @@
 #   30 restack failed; worktrees restored (or: nothing had been changed yet)
 #   31 a provider step failed and the state is KEPT: worktrees may still be detached;
 #      run status, then --continue, --abort or restore
-#   40 partial restore: some worktree is still detached (per-entry lines say why)
+#   40 restore did not finish; state kept (a worktree is still detached, or a
+#      GitHub restack is still paused — the script's own reason says which)
 #   50 restack incomplete (ancestry check failed); worktrees restored, no submit
 #   60 restack finished and restored, but submit failed
 #
@@ -959,6 +960,12 @@ restore_entries() {
 # Returns 0 on a full restore, 1 when entries remain (state rewritten).
 restore_and_clear() {
   if restore_entries; then
+    if [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; then
+      write_state || err "could not rewrite the state file"
+      lock_mark_paused
+      err "a GitHub restack conflict is still paused; use --continue or --abort first"
+      return 1
+    fi
     clear_state
     release_lock
     return 0
@@ -1468,6 +1475,8 @@ cmd_restore() {
   need_lock
   if [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; then
     note "warning: a conflict is still paused; restoring now strands the provider's own --continue. Prefer /worktree:restack --continue or --abort"
+  elif [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; then
+    note "warning: a GitHub restack conflict is still paused; restore will not clear state while gh-stack-rebase-state exists. Prefer /worktree:restack --continue or --abort"
   fi
   report_all_floating
   if restore_and_clear; then

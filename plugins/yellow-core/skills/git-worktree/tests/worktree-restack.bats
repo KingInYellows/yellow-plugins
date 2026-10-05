@@ -614,6 +614,18 @@ forge() {
   assert_all_restored
 }
 
+@test "github: restore during a paused conflict keeps state and the gh-stack marker, exit 40" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack b
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  run bash "$SCRIPT" restore
+  [ "$status" -eq 40 ]
+  [[ $output == *"GitHub restack conflict is still paused"* ]]
+  [ -e "$SD/state" ]
+  [ -e "$COMMON/gh-stack-rebase-state" ]
+}
+
 @test "github: a failed provider abort keeps the state and the gh-stack marker, exit 31" {
   command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
   mk_stack b

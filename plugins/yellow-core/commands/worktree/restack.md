@@ -221,7 +221,7 @@ the `git worktree unlock` line to run after restoring it).
 | `20` | Preflight refused | Show the `REFUSE` reasons; nothing was touched |
 | `30` | Restack failed, nothing left detached | Worktrees were restored (or nothing had changed yet); show the provider output |
 | `31` | A step failed and the state is kept | Worktrees may still be detached. Run `--status`, then `--continue`, `--abort` or the Recovery `restore` call |
-| `40` | Partial restore | Some worktree is still detached; show each per-entry line and its `checkout` fix, then re-run `--continue` or `--abort` |
+| `40` | Restore did not finish; state kept | Follow the script's own reason. A GitHub restack still paused means `--continue` or `--abort` (nothing is detached). Otherwise some worktree is still detached: show each per-entry line and its `checkout` fix, then re-run `--continue` or `--abort` |
 | `50` | Restack incomplete | The ancestry check found a branch that was not restacked; worktrees are restored and nothing was submitted |
 | `60` | Submit failed | The restack and restore are done; re-run `/worktree:restack --submit` (the restack is then a no-op and it only submits) |
 | `129`, `130`, `143` | The script was interrupted | Read its "interrupted" line, then run `--status` to see whether it paused or restored |
