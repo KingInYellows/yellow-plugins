@@ -1,7 +1,7 @@
 ---
 name: goal:run-stub
 # prettier-ignore
-description: 'Run one zero-spend, deterministic Provider Protocol v1 stub scenario (success | failed | budget-exhausted | await-cancel) through the pinned goal-gen engine and report the validated terminal summary. Use when verifying the engine process contract or a request packet end to end without any real executor.'
+description: 'Run one zero-spend, deterministic Provider Protocol v2 stub scenario (success | failed | budget-exhausted | await-cancel) through the pinned goal-gen engine and report the validated terminal summary. Use when verifying the engine process contract or a request packet end to end without any real executor.'
 argument-hint:
   '<request-file> [--scenario success|failed|budget-exhausted|await-cancel]
   [--timeout-ms <n>] [--yes]'
@@ -9,11 +9,11 @@ allowed-tools:
   - Bash
 ---
 
-# Run a stub Provider Protocol v1 scenario
+# Run a stub Provider Protocol v2 scenario
 
 Spawn the pinned `goal-gen` engine as a **process** with a fixed argument
 vector:
-`run --executor stub --protocol v1 --stub-scenario <scenario> [--timeout-ms <n>] [--yes] -- <request-file>`.
+`run --executor stub --protocol v2 --stub-scenario <scenario> [--timeout-ms <n>] [--yes] -- <request-file>`.
 The consumer exposes no executor, protocol, target, provider, raw-argv, or
 environment selector. The stub executor is zero-spend and never touches the
 request's target repository. Never invoke `run --executor claude-code`,
@@ -102,7 +102,7 @@ node "$CLI" "${ARGS[@]}" -- "$REQUEST_FILE"
 ```
 
 The plugin spawns the engine with an argument array and `shell: false`. It
-probes `version --json` and `capabilities --json` against the pin before the run
+probes `version --json` and `capabilities --json --protocol v2` against the pin before the run
 and refuses incompatible engines, streams the engine's JSON Lines events with
 bounded memory, keeps only the validated terminal summary, and forwards
 SIGINT/SIGTERM to the engine.

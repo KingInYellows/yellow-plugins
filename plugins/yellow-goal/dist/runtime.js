@@ -4,6 +4,7 @@ exports.setup = setup;
 exports.requestCreate = requestCreate;
 exports.requestValidate = requestValidate;
 exports.runStub = runStub;
+exports.runReal = runReal;
 const node_fs_1 = require("node:fs");
 const errors_js_1 = require("./errors.js");
 const pin_js_1 = require("./pin.js");
@@ -364,7 +365,7 @@ async function runStubPhases(deps, input, scratchDir, lifecycle) {
     const engineVersion = (0, provider_protocol_js_1.validateVersionProbe)((0, provider_protocol_js_1.parseSingleJsonObject)(versionResult.stdout, 'version probe', provider_protocol_js_1.CONSUMER_LIMITS.bootstrapMaxStdoutBytes), pin_js_1.PINNED_ENGINE_VERSION);
     checkNotCancelled();
     // Phase 2: capabilities.
-    const capabilitiesResult = await runChild(['capabilities', '--json'], BOOTSTRAP_LIMITS);
+    const capabilitiesResult = await runChild(['capabilities', '--json', '--protocol', 'v2'], BOOTSTRAP_LIMITS);
     probeOutcome(capabilitiesResult, 'capabilities');
     if (capabilitiesResult.stdout.length === 0) {
         throw (0, provider_protocol_js_1.classifyPreflightFailure)({
@@ -388,7 +389,7 @@ async function runStubPhases(deps, input, scratchDir, lifecycle) {
         '--executor',
         'stub',
         '--protocol',
-        'v1',
+        'v2',
         '--stub-scenario',
         input.scenario,
         ...(input.timeoutMs !== undefined
@@ -518,4 +519,318 @@ async function runStubPhases(deps, input, scratchDir, lifecycle) {
         terminationReason: snapshot.summary?.terminationReason,
         gateKind: snapshot.gateKind,
     });
+}
+function requireRealText(value, flag) {
+    if (value.length === 0)
+        runStubUsageError(`missing required flag ${flag}`);
+}
+function validateRealInput(input) {
+    requireRealText(input.request, '<request>');
+    requireRealText(input.approvalPath, '--approval');
+    requireRealText(input.profile, '--profile');
+    requireRealText(input.maxTurns, '--max-turns');
+    requireRealText(input.perActionUsd, '--per-action-usd');
+    requireRealText(input.totalUsd, '--total-usd');
+    requireRealText(input.authMode, '--auth-mode');
+    requireRealText(input.bundleDir, '--bundle-dir');
+    requireRealText(input.spendLedger, '--spend-ledger');
+    if (input.allowedTools.length === 0) {
+        runStubUsageError('at least one --allowed-tool is required');
+    }
+    if (input.allowedTools.some((tool) => tool.length === 0)) {
+        runStubUsageError('--allowed-tool must be a nonempty string');
+    }
+}
+/** Flags shared by `run manifest` and the real run. Never `--yes`. */
+function realRunFlagArgv(input) {
+    const argv = [
+        '--profile',
+        input.profile,
+        '--max-turns',
+        input.maxTurns,
+        '--per-action-usd',
+        input.perActionUsd,
+        '--total-usd',
+        input.totalUsd,
+        '--auth-mode',
+        input.authMode,
+    ];
+    for (const tool of input.allowedTools)
+        argv.push('--allowed-tool', tool);
+    argv.push('--bundle-dir', input.bundleDir, '--spend-ledger', input.spendLedger);
+    if (input.model !== undefined && input.model.length > 0) {
+        argv.push('--model', input.model);
+    }
+    if (input.actionTimeoutMs !== undefined) {
+        argv.push('--action-timeout-ms', input.actionTimeoutMs);
+    }
+    if (input.runWallClockMs !== undefined) {
+        argv.push('--run-wall-clock-ms', input.runWallClockMs);
+    }
+    if (input.expiresInMinutes !== undefined) {
+        argv.push('--expires-in-minutes', input.expiresInMinutes);
+    }
+    for (const tool of input.disallowedTools ?? []) {
+        argv.push('--disallowed-tool', tool);
+    }
+    return argv;
+}
+function assertForwardingOnly(argv) {
+    if (argv.includes('--yes') || argv.includes('approve')) {
+        throw new errors_js_1.GoalEngineError('GOAL_INVALID_INPUT', 'real-run cannot pass --yes or mint an approval');
+    }
+}
+async function runReal(deps, input) {
+    validateRealInput(input);
+    const scratch = (0, provider_process_js_1.createOperationScratchDir)(deps.env);
+    try {
+        return await runRealInScratch(deps, input, scratch.path);
+    }
+    finally {
+        if (scratch.owned) {
+            try {
+                (0, node_fs_1.rmSync)(scratch.path, { recursive: true, force: true });
+            }
+            catch {
+                // Cleanup must never mask the run outcome.
+            }
+        }
+    }
+}
+async function runRealInScratch(deps, input, scratchDir) {
+    const controller = new AbortController();
+    let localCause;
+    const deadlineAt = Date.now() + (input.deadlineMs ?? DEFAULT_DEADLINE_BASE_MS);
+    const recordLocalCause = (cause) => {
+        if (localCause === undefined)
+            localCause = cause;
+    };
+    const onCallerAbort = () => {
+        recordLocalCause('caller-cancelled');
+        controller.abort();
+    };
+    if (input.signal !== undefined) {
+        if (input.signal.aborted)
+            onCallerAbort();
+        else
+            input.signal.addEventListener('abort', onCallerAbort, { once: true });
+    }
+    try {
+        return await runRealPhases(deps, input, scratchDir, {
+            controller,
+            deadlineAt,
+            localCause: () => localCause,
+            recordLocalCause,
+        });
+    }
+    finally {
+        input.signal?.removeEventListener('abort', onCallerAbort);
+    }
+}
+async function runRealPhases(deps, input, scratchDir, lifecycle) {
+    const { controller, deadlineAt, recordLocalCause } = lifecycle;
+    function checkNotCancelled() {
+        const cause = lifecycle.localCause();
+        if (cause !== undefined)
+            throw localCauseError(cause);
+        if (Date.now() >= deadlineAt) {
+            recordLocalCause('deadline');
+            controller.abort();
+            throw localCauseError('deadline');
+        }
+    }
+    checkNotCancelled();
+    const bin = (0, spawn_js_1.resolveEngineBin)(deps.env);
+    const env = (0, provider_process_js_1.buildChildEnv)({
+        sourceEnv: deps.env,
+        scratchDir,
+        childEnvOverride: deps.childEnvOverride,
+    });
+    function runChild(argv, limits, onStdout) {
+        assertForwardingOnly(argv);
+        return (0, provider_process_js_1.spawnProtocolChild)({
+            bin,
+            argv,
+            env,
+            deadlineAt,
+            signal: controller.signal,
+            limits,
+            ...(onStdout !== undefined ? { onStdout } : {}),
+        });
+    }
+    const versionResult = await runChild(['version', '--json'], BOOTSTRAP_LIMITS);
+    probeOutcome(versionResult, 'version');
+    if (versionResult.stdout.length === 0) {
+        throw (0, provider_protocol_js_1.classifyPreflightFailure)({
+            exitCode: versionResult.exitCode,
+            signal: versionResult.signal,
+            stdout: versionResult.stdout,
+            stderr: versionResult.stderr,
+        });
+    }
+    const engineVersion = (0, provider_protocol_js_1.validateVersionProbe)((0, provider_protocol_js_1.parseSingleJsonObject)(versionResult.stdout, 'version probe', provider_protocol_js_1.CONSUMER_LIMITS.bootstrapMaxStdoutBytes), pin_js_1.PINNED_ENGINE_VERSION);
+    checkNotCancelled();
+    const capabilitiesResult = await runChild(['capabilities', '--json', '--protocol', 'v2'], BOOTSTRAP_LIMITS);
+    probeOutcome(capabilitiesResult, 'capabilities');
+    if (capabilitiesResult.stdout.length === 0) {
+        throw (0, provider_protocol_js_1.classifyPreflightFailure)({
+            exitCode: capabilitiesResult.exitCode,
+            signal: capabilitiesResult.signal,
+            stdout: capabilitiesResult.stdout,
+            stderr: capabilitiesResult.stderr,
+        });
+    }
+    const capabilities = (0, provider_protocol_js_1.validateCapabilities)((0, provider_protocol_js_1.parseSingleJsonObject)(capabilitiesResult.stdout, 'capabilities probe', provider_protocol_js_1.CONSUMER_LIMITS.bootstrapMaxStdoutBytes), pin_js_1.PINNED_ENGINE_VERSION);
+    checkNotCancelled();
+    const flags = realRunFlagArgv(input);
+    const manifestArgv = [
+        'run',
+        'manifest',
+        ...flags,
+        '--json',
+        '--',
+        input.request,
+    ];
+    const manifestResult = await runChild(manifestArgv, BOOTSTRAP_LIMITS);
+    probeOutcome(manifestResult, 'manifest');
+    if (manifestResult.stdout.length === 0) {
+        throw (0, provider_protocol_js_1.classifyPreflightFailure)({
+            exitCode: manifestResult.exitCode,
+            signal: manifestResult.signal,
+            stdout: manifestResult.stdout,
+            stderr: manifestResult.stderr,
+        });
+    }
+    const manifest = (0, provider_protocol_js_1.parseSingleJsonObject)(manifestResult.stdout, 'run manifest', provider_protocol_js_1.CONSUMER_LIMITS.bootstrapMaxStdoutBytes);
+    if (manifestResult.exitCode !== 0) {
+        throw (0, provider_protocol_js_1.classifyPreflightFailure)({
+            exitCode: manifestResult.exitCode,
+            signal: manifestResult.signal,
+            stdout: Buffer.alloc(0),
+            stderr: manifestResult.stderr,
+        });
+    }
+    checkNotCancelled();
+    const runArgv = [
+        'run',
+        '--protocol',
+        'v2',
+        '--executor',
+        'agx-claude-code',
+        ...flags,
+        '--approval',
+        input.approvalPath,
+        '--',
+        input.request,
+    ];
+    const framer = new provider_protocol_js_1.JsonLinesFramer({
+        maxRecordBytes: Math.min(provider_protocol_js_1.CONSUMER_LIMITS.maxEventBytes, capabilities.limits.maxEventBytes),
+        maxTotalBytes: provider_protocol_js_1.CONSUMER_LIMITS.maxStdoutBytes,
+    });
+    const validator = new provider_protocol_js_1.RealRunStreamValidator();
+    const onStdout = (chunk) => {
+        for (const record of framer.push(chunk))
+            validator.accept(record);
+    };
+    let runResult;
+    try {
+        runResult = await runChild(runArgv, {
+            maxStdoutBytes: provider_protocol_js_1.CONSUMER_LIMITS.maxStdoutBytes,
+            maxStderrBytes: provider_protocol_js_1.CONSUMER_LIMITS.maxStderrBytes,
+        }, onStdout);
+    }
+    catch (err) {
+        attachRunDiagnostics(err, validator.snapshot.runId, validator.snapshot.eventCount);
+    }
+    if (!runResult.forcedKill &&
+        runResult.localCause !== undefined &&
+        isExpectedCancellationClose(runResult.signal) &&
+        framer.bytesConsumed === 0) {
+        recordLocalCause(runResult.localCause);
+        throw localCauseError(runResult.localCause);
+    }
+    if (runResult.forcedKill || runResult.signal !== null) {
+        throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_TRANSPORT', 'run did not close cleanly', {
+            runId: validator.snapshot.runId,
+            eventCount: validator.snapshot.eventCount,
+            localCause: runResult.localCause,
+        });
+    }
+    const base = {
+        engineVersion,
+        protocolVersion: capabilities.protocolVersion,
+        manifest,
+    };
+    if (framer.bytesConsumed === 0) {
+        if (runResult.exitCode === 1 &&
+            (0, provider_protocol_js_1.isEngineStdoutTransportFailure)(runResult.stderr)) {
+            throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_TRANSPORT', 'engine reported stdout transport failure before any event');
+        }
+        if (runResult.exitCode === 2) {
+            throw (0, provider_protocol_js_1.classifyPreflightFailure)({
+                exitCode: runResult.exitCode,
+                signal: runResult.signal,
+                stdout: Buffer.alloc(0),
+                stderr: runResult.stderr,
+            });
+        }
+        const refusal = (0, provider_protocol_js_1.validateRealRunRefusal)(runResult.stderr);
+        return {
+            ...base,
+            outcome: 'refused',
+            eventCount: 0,
+            refusalCode: refusal.code,
+            refusalMessage: refusal.message,
+            ...(refusal.approvalId !== undefined
+                ? { approvalId: refusal.approvalId }
+                : {}),
+        };
+    }
+    try {
+        framer.finish();
+        validator.finish();
+    }
+    catch (err) {
+        if (runResult.localCause !== undefined) {
+            throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_TRANSPORT', 'run stream was incomplete after cancellation', {
+                runId: validator.snapshot.runId,
+                eventCount: validator.snapshot.eventCount,
+                localCause: runResult.localCause,
+            });
+        }
+        attachRunDiagnostics(err, validator.snapshot.runId, validator.snapshot.eventCount);
+    }
+    const snapshot = validator.snapshot;
+    if (snapshot.summary === undefined || snapshot.runId === undefined) {
+        throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_INVALID', 'real-run stream ended without a validated summary', { runId: snapshot.runId, eventCount: snapshot.eventCount });
+    }
+    try {
+        (0, provider_protocol_js_1.validateRealRunTerminalAgreement)({
+            exitCode: runResult.exitCode,
+            signal: runResult.signal,
+            stderr: runResult.stderr,
+            summary: snapshot.summary,
+        });
+    }
+    catch (err) {
+        attachRunDiagnostics(err, snapshot.runId, snapshot.eventCount);
+    }
+    if (runResult.localCause !== undefined) {
+        recordLocalCause(runResult.localCause);
+        throw localCauseError(runResult.localCause, {
+            runId: snapshot.runId,
+            eventCount: snapshot.eventCount,
+        });
+    }
+    return {
+        ...base,
+        outcome: snapshot.summary.outcome,
+        eventCount: snapshot.eventCount,
+        runId: snapshot.runId,
+        approvalId: snapshot.summary.approvalId,
+        ...(snapshot.spend !== undefined ? { spend: snapshot.spend } : {}),
+        ...(snapshot.summary.bundleDir !== undefined
+            ? { bundleDir: snapshot.summary.bundleDir }
+            : {}),
+    };
 }

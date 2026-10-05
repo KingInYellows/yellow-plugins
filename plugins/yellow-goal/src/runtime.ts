@@ -12,16 +12,21 @@ import {
 import {
   CONSUMER_LIMITS,
   JsonLinesFramer,
+  RealRunStreamValidator,
   STUB_SCENARIOS,
   RunStreamValidator,
   classifyPreflightFailure,
   isEngineStdoutTransportFailure,
   parseSingleJsonObject,
   validateCapabilities,
+  validateRealRunRefusal,
+  validateRealRunTerminalAgreement,
   validateTerminalAgreement,
   validateVersionProbe,
+  type RealRunOutcomeKind,
   type RunStreamSnapshot,
   type StubScenario,
+  type ValidatedRealSpend,
   type ValidatedSummary,
 } from './provider-protocol.js';
 import type { SpawnEngine, SpawnResult } from './spawn.js';
@@ -269,7 +274,7 @@ export function requestValidate(
 }
 
 // ---------------------------------------------------------------------------
-// runStub — async fixed-authority Provider Protocol v1 lifecycle
+// runStub — async fixed-authority Provider Protocol v2 stub lifecycle
 // ---------------------------------------------------------------------------
 
 export interface ProtocolRuntimeDeps {
@@ -610,7 +615,7 @@ async function runStubPhases(
 
   // Phase 2: capabilities.
   const capabilitiesResult = await runChild(
-    ['capabilities', '--json'],
+    ['capabilities', '--json', '--protocol', 'v2'],
     BOOTSTRAP_LIMITS
   );
   probeOutcome(capabilitiesResult, 'capabilities');
@@ -649,7 +654,7 @@ async function runStubPhases(
     '--executor',
     'stub',
     '--protocol',
-    'v1',
+    'v2',
     '--stub-scenario',
     input.scenario,
     ...(input.timeoutMs !== undefined
@@ -825,4 +830,441 @@ async function runStubPhases(
     terminationReason: snapshot.summary?.terminationReason,
     gateKind: snapshot.gateKind,
   });
+}
+
+// ---------------------------------------------------------------------------
+// runReal — user-supplied approval, no mint, no --yes
+// ---------------------------------------------------------------------------
+
+export interface RunRealInput {
+  readonly request: string;
+  readonly approvalPath: string;
+  readonly profile: string;
+  readonly maxTurns: string;
+  readonly perActionUsd: string;
+  readonly totalUsd: string;
+  readonly authMode: string;
+  readonly allowedTools: readonly string[];
+  readonly bundleDir: string;
+  readonly spendLedger: string;
+  readonly model?: string;
+  readonly actionTimeoutMs?: string;
+  readonly runWallClockMs?: string;
+  readonly expiresInMinutes?: string;
+  readonly disallowedTools?: readonly string[];
+  readonly deadlineMs?: number;
+  readonly signal?: AbortSignal;
+}
+
+export interface RunRealResult {
+  readonly engineVersion: string;
+  readonly protocolVersion: string;
+  /** Body returned by `run manifest --json`, unchanged. */
+  readonly manifest: Record<string, unknown>;
+  readonly outcome: RealRunOutcomeKind | 'refused';
+  readonly eventCount: number;
+  readonly runId?: string;
+  readonly approvalId?: string;
+  readonly spend?: ValidatedRealSpend;
+  readonly bundleDir?: string;
+  readonly refusalCode?: string;
+  readonly refusalMessage?: string;
+}
+
+function requireRealText(value: string, flag: string): void {
+  if (value.length === 0) runStubUsageError(`missing required flag ${flag}`);
+}
+
+function validateRealInput(input: RunRealInput): void {
+  requireRealText(input.request, '<request>');
+  requireRealText(input.approvalPath, '--approval');
+  requireRealText(input.profile, '--profile');
+  requireRealText(input.maxTurns, '--max-turns');
+  requireRealText(input.perActionUsd, '--per-action-usd');
+  requireRealText(input.totalUsd, '--total-usd');
+  requireRealText(input.authMode, '--auth-mode');
+  requireRealText(input.bundleDir, '--bundle-dir');
+  requireRealText(input.spendLedger, '--spend-ledger');
+  if (input.allowedTools.length === 0) {
+    runStubUsageError('at least one --allowed-tool is required');
+  }
+  if (input.allowedTools.some((tool) => tool.length === 0)) {
+    runStubUsageError('--allowed-tool must be a nonempty string');
+  }
+}
+
+/** Flags shared by `run manifest` and the real run. Never `--yes`. */
+function realRunFlagArgv(input: RunRealInput): string[] {
+  const argv = [
+    '--profile',
+    input.profile,
+    '--max-turns',
+    input.maxTurns,
+    '--per-action-usd',
+    input.perActionUsd,
+    '--total-usd',
+    input.totalUsd,
+    '--auth-mode',
+    input.authMode,
+  ];
+  for (const tool of input.allowedTools) argv.push('--allowed-tool', tool);
+  argv.push(
+    '--bundle-dir',
+    input.bundleDir,
+    '--spend-ledger',
+    input.spendLedger
+  );
+  if (input.model !== undefined && input.model.length > 0) {
+    argv.push('--model', input.model);
+  }
+  if (input.actionTimeoutMs !== undefined) {
+    argv.push('--action-timeout-ms', input.actionTimeoutMs);
+  }
+  if (input.runWallClockMs !== undefined) {
+    argv.push('--run-wall-clock-ms', input.runWallClockMs);
+  }
+  if (input.expiresInMinutes !== undefined) {
+    argv.push('--expires-in-minutes', input.expiresInMinutes);
+  }
+  for (const tool of input.disallowedTools ?? []) {
+    argv.push('--disallowed-tool', tool);
+  }
+  return argv;
+}
+
+function assertForwardingOnly(argv: readonly string[]): void {
+  if (argv.includes('--yes') || argv.includes('approve')) {
+    throw new GoalEngineError(
+      'GOAL_INVALID_INPUT',
+      'real-run cannot pass --yes or mint an approval'
+    );
+  }
+}
+
+export async function runReal(
+  deps: ProtocolRuntimeDeps,
+  input: RunRealInput
+): Promise<RunRealResult> {
+  validateRealInput(input);
+  const scratch = createOperationScratchDir(deps.env);
+  try {
+    return await runRealInScratch(deps, input, scratch.path);
+  } finally {
+    if (scratch.owned) {
+      try {
+        rmSync(scratch.path, { recursive: true, force: true });
+      } catch {
+        // Cleanup must never mask the run outcome.
+      }
+    }
+  }
+}
+
+async function runRealInScratch(
+  deps: ProtocolRuntimeDeps,
+  input: RunRealInput,
+  scratchDir: string
+): Promise<RunRealResult> {
+  const controller = new AbortController();
+  let localCause: GoalErrorLocalCause | undefined;
+  const deadlineAt = Date.now() + (input.deadlineMs ?? DEFAULT_DEADLINE_BASE_MS);
+  const recordLocalCause = (cause: GoalErrorLocalCause): void => {
+    if (localCause === undefined) localCause = cause;
+  };
+  const onCallerAbort = (): void => {
+    recordLocalCause('caller-cancelled');
+    controller.abort();
+  };
+  if (input.signal !== undefined) {
+    if (input.signal.aborted) onCallerAbort();
+    else input.signal.addEventListener('abort', onCallerAbort, { once: true });
+  }
+  try {
+    return await runRealPhases(deps, input, scratchDir, {
+      controller,
+      deadlineAt,
+      localCause: () => localCause,
+      recordLocalCause,
+    });
+  } finally {
+    input.signal?.removeEventListener('abort', onCallerAbort);
+  }
+}
+
+async function runRealPhases(
+  deps: ProtocolRuntimeDeps,
+  input: RunRealInput,
+  scratchDir: string,
+  lifecycle: RunStubLifecycle
+): Promise<RunRealResult> {
+  const { controller, deadlineAt, recordLocalCause } = lifecycle;
+
+  function checkNotCancelled(): void {
+    const cause = lifecycle.localCause();
+    if (cause !== undefined) throw localCauseError(cause);
+    if (Date.now() >= deadlineAt) {
+      recordLocalCause('deadline');
+      controller.abort();
+      throw localCauseError('deadline');
+    }
+  }
+
+  checkNotCancelled();
+  const bin = resolveEngineBin(deps.env);
+  const env = buildChildEnv({
+    sourceEnv: deps.env,
+    scratchDir,
+    childEnvOverride: deps.childEnvOverride,
+  });
+  function runChild(
+    argv: readonly string[],
+    limits: ProtocolChildLimits,
+    onStdout?: (chunk: Buffer) => void
+  ): Promise<ProtocolChildResult> {
+    assertForwardingOnly(argv);
+    return spawnProtocolChild({
+      bin,
+      argv,
+      env,
+      deadlineAt,
+      signal: controller.signal,
+      limits,
+      ...(onStdout !== undefined ? { onStdout } : {}),
+    });
+  }
+
+  const versionResult = await runChild(['version', '--json'], BOOTSTRAP_LIMITS);
+  probeOutcome(versionResult, 'version');
+  if (versionResult.stdout.length === 0) {
+    throw classifyPreflightFailure({
+      exitCode: versionResult.exitCode,
+      signal: versionResult.signal,
+      stdout: versionResult.stdout,
+      stderr: versionResult.stderr,
+    });
+  }
+  const engineVersion = validateVersionProbe(
+    parseSingleJsonObject(
+      versionResult.stdout,
+      'version probe',
+      CONSUMER_LIMITS.bootstrapMaxStdoutBytes
+    ),
+    PINNED_ENGINE_VERSION
+  );
+
+  checkNotCancelled();
+  const capabilitiesResult = await runChild(
+    ['capabilities', '--json', '--protocol', 'v2'],
+    BOOTSTRAP_LIMITS
+  );
+  probeOutcome(capabilitiesResult, 'capabilities');
+  if (capabilitiesResult.stdout.length === 0) {
+    throw classifyPreflightFailure({
+      exitCode: capabilitiesResult.exitCode,
+      signal: capabilitiesResult.signal,
+      stdout: capabilitiesResult.stdout,
+      stderr: capabilitiesResult.stderr,
+    });
+  }
+  const capabilities = validateCapabilities(
+    parseSingleJsonObject(
+      capabilitiesResult.stdout,
+      'capabilities probe',
+      CONSUMER_LIMITS.bootstrapMaxStdoutBytes
+    ),
+    PINNED_ENGINE_VERSION
+  );
+
+  checkNotCancelled();
+  const flags = realRunFlagArgv(input);
+  const manifestArgv = [
+    'run',
+    'manifest',
+    ...flags,
+    '--json',
+    '--',
+    input.request,
+  ];
+  const manifestResult = await runChild(manifestArgv, BOOTSTRAP_LIMITS);
+  probeOutcome(manifestResult, 'manifest');
+  if (manifestResult.stdout.length === 0) {
+    throw classifyPreflightFailure({
+      exitCode: manifestResult.exitCode,
+      signal: manifestResult.signal,
+      stdout: manifestResult.stdout,
+      stderr: manifestResult.stderr,
+    });
+  }
+  const manifest = parseSingleJsonObject(
+    manifestResult.stdout,
+    'run manifest',
+    CONSUMER_LIMITS.bootstrapMaxStdoutBytes
+  );
+  if (manifestResult.exitCode !== 0) {
+    throw classifyPreflightFailure({
+      exitCode: manifestResult.exitCode,
+      signal: manifestResult.signal,
+      stdout: Buffer.alloc(0),
+      stderr: manifestResult.stderr,
+    });
+  }
+
+  checkNotCancelled();
+  const runArgv = [
+    'run',
+    '--protocol',
+    'v2',
+    '--executor',
+    'agx-claude-code',
+    ...flags,
+    '--approval',
+    input.approvalPath,
+    '--',
+    input.request,
+  ];
+  const framer = new JsonLinesFramer({
+    maxRecordBytes: Math.min(
+      CONSUMER_LIMITS.maxEventBytes,
+      capabilities.limits.maxEventBytes
+    ),
+    maxTotalBytes: CONSUMER_LIMITS.maxStdoutBytes,
+  });
+  const validator = new RealRunStreamValidator();
+  const onStdout = (chunk: Buffer): void => {
+    for (const record of framer.push(chunk)) validator.accept(record);
+  };
+  let runResult: ProtocolChildResult;
+  try {
+    runResult = await runChild(
+      runArgv,
+      {
+        maxStdoutBytes: CONSUMER_LIMITS.maxStdoutBytes,
+        maxStderrBytes: CONSUMER_LIMITS.maxStderrBytes,
+      },
+      onStdout
+    );
+  } catch (err) {
+    attachRunDiagnostics(
+      err,
+      validator.snapshot.runId,
+      validator.snapshot.eventCount
+    );
+  }
+
+  if (
+    !runResult.forcedKill &&
+    runResult.localCause !== undefined &&
+    isExpectedCancellationClose(runResult.signal) &&
+    framer.bytesConsumed === 0
+  ) {
+    recordLocalCause(runResult.localCause);
+    throw localCauseError(runResult.localCause);
+  }
+  if (runResult.forcedKill || runResult.signal !== null) {
+    throw new GoalEngineError(
+      'GOAL_PROTOCOL_TRANSPORT',
+      'run did not close cleanly',
+      {
+        runId: validator.snapshot.runId,
+        eventCount: validator.snapshot.eventCount,
+        localCause: runResult.localCause,
+      }
+    );
+  }
+
+  const base = {
+    engineVersion,
+    protocolVersion: capabilities.protocolVersion,
+    manifest,
+  };
+
+  if (framer.bytesConsumed === 0) {
+    if (
+      runResult.exitCode === 1 &&
+      isEngineStdoutTransportFailure(runResult.stderr)
+    ) {
+      throw new GoalEngineError(
+        'GOAL_PROTOCOL_TRANSPORT',
+        'engine reported stdout transport failure before any event'
+      );
+    }
+    if (runResult.exitCode === 2) {
+      throw classifyPreflightFailure({
+        exitCode: runResult.exitCode,
+        signal: runResult.signal,
+        stdout: Buffer.alloc(0),
+        stderr: runResult.stderr,
+      });
+    }
+    const refusal = validateRealRunRefusal(runResult.stderr);
+    return {
+      ...base,
+      outcome: 'refused',
+      eventCount: 0,
+      refusalCode: refusal.code,
+      refusalMessage: refusal.message,
+      ...(refusal.approvalId !== undefined
+        ? { approvalId: refusal.approvalId }
+        : {}),
+    };
+  }
+
+  try {
+    framer.finish();
+    validator.finish();
+  } catch (err) {
+    if (runResult.localCause !== undefined) {
+      throw new GoalEngineError(
+        'GOAL_PROTOCOL_TRANSPORT',
+        'run stream was incomplete after cancellation',
+        {
+          runId: validator.snapshot.runId,
+          eventCount: validator.snapshot.eventCount,
+          localCause: runResult.localCause,
+        }
+      );
+    }
+    attachRunDiagnostics(
+      err,
+      validator.snapshot.runId,
+      validator.snapshot.eventCount
+    );
+  }
+
+  const snapshot = validator.snapshot;
+  if (snapshot.summary === undefined || snapshot.runId === undefined) {
+    throw new GoalEngineError(
+      'GOAL_PROTOCOL_INVALID',
+      'real-run stream ended without a validated summary',
+      { runId: snapshot.runId, eventCount: snapshot.eventCount }
+    );
+  }
+  try {
+    validateRealRunTerminalAgreement({
+      exitCode: runResult.exitCode,
+      signal: runResult.signal,
+      stderr: runResult.stderr,
+      summary: snapshot.summary,
+    });
+  } catch (err) {
+    attachRunDiagnostics(err, snapshot.runId, snapshot.eventCount);
+  }
+  if (runResult.localCause !== undefined) {
+    recordLocalCause(runResult.localCause);
+    throw localCauseError(runResult.localCause, {
+      runId: snapshot.runId,
+      eventCount: snapshot.eventCount,
+    });
+  }
+  return {
+    ...base,
+    outcome: snapshot.summary.outcome,
+    eventCount: snapshot.eventCount,
+    runId: snapshot.runId,
+    approvalId: snapshot.summary.approvalId,
+    ...(snapshot.spend !== undefined ? { spend: snapshot.spend } : {}),
+    ...(snapshot.summary.bundleDir !== undefined
+      ? { bundleDir: snapshot.summary.bundleDir }
+      : {}),
+  };
 }

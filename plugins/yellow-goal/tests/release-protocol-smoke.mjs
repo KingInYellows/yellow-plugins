@@ -165,7 +165,7 @@ try {
     assert.equal(body.ok, true);
     assert.equal(body.operation, 'run-stub');
     assert.equal(body.engineVersion, PINNED_ENGINE_VERSION);
-    assert.equal(body.protocolVersion, 'yellow-goal/provider-protocol/v1');
+    assert.equal(body.protocolVersion, 'yellow-goal/provider-protocol/v2');
     assert.ok(typeof body.runId === 'string' && body.runId.length > 0);
     assert.ok(Number.isSafeInteger(body.eventCount) && body.eventCount > 1);
     assert.equal(body.summary.status, 'succeeded');

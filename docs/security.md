@@ -558,19 +558,24 @@ child process and never imports it. Containment assumptions:
 
 - **Executable**: resolved once per operation from `PATH` (or the test-only
   `GOAL_GEN_BIN` override); every operation first probes `version --json` and
-  `capabilities --json` and refuses an engine whose identity, version or
-  capabilities disagree with the pin. **The locally installed executable is a
-  trusted boundary**: the operator installs the verified release asset and
-  controls `PATH`; the runtime probes validate an already trusted binary and do
-  not claim to authenticate an arbitrary replacement (Provider Protocol v1,
-  PP-11). Release-asset provenance is enforced by the SHA-256 check in the
-  blocking CI gate, not at every spawn.
+  `capabilities --json --protocol v2` and refuses an engine whose identity,
+  version or capabilities disagree with the pin. **The locally installed
+  executable is a trusted boundary**: the operator installs the verified
+  release asset and controls `PATH`; the runtime probes validate an already
+  trusted binary and do not claim to authenticate an arbitrary replacement.
+  Release-asset provenance is enforced by the SHA-256 check in the blocking CI
+  gate, not at every spawn.
 - **Authority**: `/goal:setup` and `/goal:request` are read-only;
   `/goal:run-stub` spawns exactly
-  `run --executor stub --protocol v1 --stub-scenario <scenario> [--timeout-ms n] [--yes] -- <request>`.
-  No executor, protocol, target, provider or raw-argv selector is exposed; the
-  stub executor is zero-spend and never touches the request's target repository,
-  and the consumer rejects a nonzero reported cost.
+  `run --executor stub --protocol v2 --stub-scenario <scenario> [--timeout-ms n] [--yes] -- <request>`.
+  Callers cannot select an executor, protocol, target, provider, or raw argv.
+  The stub executor is zero-spend and never touches the request's target
+  repository, and the consumer rejects a nonzero reported cost.
+  `/goal:run-real` is user-only. It displays the engine `run manifest` body,
+  then spawns
+  `run --protocol v2 --executor agx-claude-code` with the operator's approval
+  path. It never passes `--yes`, never runs `run approve`, and never lets the
+  caller choose `claude-code` or a protocol.
 - **Environment**: the child receives only `PATH`, `LANG`/`LC_ALL` and a
   disposable `HOME`/`TMPDIR`/`XDG_*` under a per-operation scratch directory
   that is removed afterwards; ambient credentials and `NODE_OPTIONS` are never

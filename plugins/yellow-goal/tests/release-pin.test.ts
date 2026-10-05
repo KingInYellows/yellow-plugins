@@ -56,11 +56,39 @@ describe('released engine pin provenance', () => {
 
   it('agrees with the blocking public-artifact gate script', () => {
     expect(shellConstant('PINNED_ENGINE_VERSION')).toBe(PINNED_ENGINE_VERSION);
+    expect(shellConstant('PINNED_ENGINE_TAG')).toBe(PINNED_ENGINE_TAG);
+    expect(shellConstant('PINNED_ENGINE_COMMIT')).toBe(PINNED_ENGINE_COMMIT);
     expect(shellConstant('PINNED_ENGINE_ASSET_URL')).toBe(
       PINNED_ENGINE_ASSET_URL
     );
     expect(shellConstant('PINNED_ENGINE_ASSET_SHA256')).toBe(
       PINNED_ENGINE_ASSET_SHA256
+    );
+  });
+
+  it('names the released goal-gen 0.3.0 asset and nothing newer', () => {
+    expect(PINNED_ENGINE_VERSION).toBe('0.3.0');
+    expect(PINNED_ENGINE_TAG).toBe('v0.3.0');
+    expect(PINNED_ENGINE_COMMIT).toBe(
+      '2f336d548523f795fef95f43fb03d751c2d65b80'
+    );
+    expect(PINNED_ENGINE_ASSET_NAME).toBe('goal-gen-0.3.0.tgz');
+    expect(PINNED_ENGINE_ASSET_URL).toBe(
+      'https://github.com/KingInYellows/yellow-goal/releases/download/v0.3.0/goal-gen-0.3.0.tgz'
+    );
+    expect(PINNED_ENGINE_ASSET_SHA256).toBe(
+      '16e9d4b84f8b771ca1c368c886da70ef0d29c5e2af5ba68a51094c20f0a5db23'
+    );
+    expect(shellConstant('PINNED_ENGINE_VERSION')).toBe('0.3.0');
+    expect(shellConstant('PINNED_ENGINE_TAG')).toBe('v0.3.0');
+    expect(shellConstant('PINNED_ENGINE_COMMIT')).toBe(
+      '2f336d548523f795fef95f43fb03d751c2d65b80'
+    );
+    expect(shellConstant('PINNED_ENGINE_ASSET_URL')).toBe(
+      'https://github.com/KingInYellows/yellow-goal/releases/download/v0.3.0/goal-gen-0.3.0.tgz'
+    );
+    expect(shellConstant('PINNED_ENGINE_ASSET_SHA256')).toBe(
+      '16e9d4b84f8b771ca1c368c886da70ef0d29c5e2af5ba68a51094c20f0a5db23'
     );
   });
 

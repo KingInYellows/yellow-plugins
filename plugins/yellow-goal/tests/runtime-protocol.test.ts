@@ -123,7 +123,7 @@ describe('runStub — happy paths', () => {
   it('runs the success scenario end to end', async () => {
     const result = await runStub(makeDeps(), baseInput());
     expect(result.engineVersion).toBe(PINNED_ENGINE_VERSION);
-    expect(result.protocolVersion).toBe('yellow-goal/provider-protocol/v1');
+    expect(result.protocolVersion).toBe('yellow-goal/provider-protocol/v2');
     expect(typeof result.runId).toBe('string');
     expect(result.eventCount).toBe(2);
     expect(result.summary).toMatchObject({ status: 'succeeded' });
@@ -193,7 +193,7 @@ describe('runStub — happy paths', () => {
       '--executor',
       'stub',
       '--protocol',
-      'v1',
+      'v2',
       '--stub-scenario',
       'success',
       '--timeout-ms',
@@ -202,6 +202,12 @@ describe('runStub — happy paths', () => {
       '--',
       '-weird --path with spaces',
     ]);
+    expect(
+      readCapture().find((entry) => entry.argv[0] === 'version')?.argv
+    ).toEqual(['version', '--json']);
+    expect(
+      readCapture().find((entry) => entry.argv[0] === 'capabilities')?.argv
+    ).toEqual(['capabilities', '--json', '--protocol', 'v2']);
   });
 
   it('sanitizes the child environment (stdin is ignored by the transport)', async () => {
@@ -421,14 +427,13 @@ describe('runStub — cancellation and deadlines', () => {
 
   it('cancels during the version probe and spawns nothing further', async () => {
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), 50);
-    const err = await expectGoalError(
-      runStub(
-        makeDeps({ FAKE_PROVIDER_VERSION_DELAY_MS: '2000' }),
-        baseInput({ signal: controller.signal })
-      ),
-      'GOAL_RUN_CANCELLED'
+    const promise = runStub(
+      makeDeps({ FAKE_PROVIDER_VERSION_DELAY_MS: '5000' }),
+      baseInput({ signal: controller.signal })
     );
+    await waitUntilInvoked('version');
+    controller.abort();
+    const err = await expectGoalError(promise, 'GOAL_RUN_CANCELLED');
     expect(err.localCause).toBe('caller-cancelled');
     expect(verbsInvoked()).toEqual(['version']);
   });

@@ -9,8 +9,8 @@
 //     preload runs, so the verb is recovered via basename(), same as
 //     fake-engine.mjs's FAKE_GOAL_CLI_PATH sibling technique.
 import { randomUUID } from 'node:crypto';
-import { appendFileSync } from 'node:fs';
-import { basename } from 'node:path';
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const KNOWN_VERBS = ['version', 'capabilities', 'run'];
@@ -20,7 +20,9 @@ const args = isPreloadMode
   ? [verbCandidate, ...process.argv.slice(2)]
   : process.argv.slice(2);
 
-const PROTOCOL_VERSION = 'yellow-goal/provider-protocol/v1';
+const PROTOCOL_V1 = 'yellow-goal/provider-protocol/v1';
+const PROTOCOL_V2 = 'yellow-goal/provider-protocol/v2';
+const PROTOCOL_VERSION = PROTOCOL_V1;
 const CAPABILITIES_SCHEMA_VERSION = 'yellow-goal/provider-capabilities/v1';
 const REQUEST_SCHEMA_VERSION = 'yellow-goal/request/v1';
 const RUN_EVENT_SCHEMA_VERSION = 'yellow-goal/run-event/v1';
@@ -145,7 +147,7 @@ async function handleVersion() {
   installIgnoreSigterm();
   maybeSelfSignal();
   await maybeCancellableDelay('FAKE_PROVIDER_VERSION_DELAY_MS');
-  const version = process.env.FAKE_PROVIDER_VERSION || '0.2.0';
+  const version = process.env.FAKE_PROVIDER_VERSION || '0.3.0';
   const mode = process.env.FAKE_PROVIDER_VERSION_MODE || 'ok';
   if (mode === 'empty') process.exit(1);
   if (mode === 'usage-error') {
@@ -182,15 +184,27 @@ async function handleVersion() {
 // capabilities
 // ---------------------------------------------------------------------------
 
+function wantsProtocolV2() {
+  return argOf('--protocol') === 'v2';
+}
+
 function baseCapabilities(version) {
+  const v2 = wantsProtocolV2();
   return {
     schemaVersion: CAPABILITIES_SCHEMA_VERSION,
-    protocolVersion: PROTOCOL_VERSION,
+    protocolVersion: v2 ? PROTOCOL_V2 : PROTOCOL_V1,
+    ...(v2 ? { supportedProtocols: [PROTOCOL_V1, PROTOCOL_V2] } : {}),
     engineVersion: version,
     requestSchemaVersion: REQUEST_SCHEMA_VERSION,
     runEventSchemaVersion: RUN_EVENT_SCHEMA_VERSION,
     operations: [...REQUIRED_OPERATIONS],
-    capabilities: [...REQUIRED_CAPABILITIES],
+    capabilities: v2
+      ? [
+          'run.cancel.os-signal',
+          'run.executor.agx-claude-code',
+          ...REQUIRED_CAPABILITIES.filter((item) => item !== 'run.cancel.os-signal'),
+        ]
+      : [...REQUIRED_CAPABILITIES],
     stubScenarios: [...STUB_SCENARIOS],
     limits: {
       maxEventBytes: 1_048_576,
@@ -257,7 +271,7 @@ async function handleCapabilities() {
   installIgnoreSigterm();
   maybeSelfSignal();
   await maybeCancellableDelay('FAKE_PROVIDER_CAPABILITIES_DELAY_MS');
-  const version = process.env.FAKE_PROVIDER_VERSION || '0.2.0';
+  const version = process.env.FAKE_PROVIDER_VERSION || '0.3.0';
   const mode = process.env.FAKE_PROVIDER_CAPABILITIES_MODE || 'ok';
   if (mode === 'empty') process.exit(1);
   if (mode === 'usage-error') {
@@ -352,7 +366,193 @@ async function writeOut(text) {
   }
 }
 
+function selectedProtocolId() {
+  return wantsProtocolV2() ? PROTOCOL_V2 : PROTOCOL_V1;
+}
+
+function writeBundleRecord(name, value) {
+  const bundle = argOf('--bundle-dir');
+  if (!bundle) return;
+  mkdirSync(bundle, { recursive: true });
+  writeFileSync(join(bundle, name), JSON.stringify(value));
+}
+
+async function handleManifest() {
+  captureInvocation();
+  const version = process.env.FAKE_PROVIDER_VERSION || '0.3.0';
+  const body = {
+    manifest: {
+      schemaVersion: 'yellow-goal/run-manifest/v1',
+      protocolId: PROTOCOL_V2,
+      engineVersion: version,
+      profile: {
+        id: argOf('--profile') || 'config-repair',
+        version: '2',
+        digest: 'ab'.repeat(32),
+      },
+    },
+    manifestHash: 'cd'.repeat(32),
+    challenge: 'cdcd-cdcd',
+  };
+  writeBundleRecord('fake-manifest.json', { body, argv: args });
+  await emit(body);
+  process.exit(0);
+}
+
+async function handleRealRun() {
+  captureInvocation();
+  if (args.includes('--yes') || args.some((arg) => arg.startsWith('--yes='))) {
+    await writeStderr({
+      code: 'USAGE_ERROR',
+      message: '--yes is rejected on a real run',
+    });
+    process.exit(2);
+    return;
+  }
+  const approval = argOf('--approval') || '';
+  const approvalBase = basename(approval);
+  const mode = approvalBase.startsWith('mode-')
+    ? approvalBase.slice('mode-'.length).replace(/\.json$/, '')
+    : 'verified';
+  const approvalId = '11111111-1111-4111-8111-111111111111';
+  const bundleDir = argOf('--bundle-dir');
+  const runId = process.env.FAKE_PROVIDER_RUN_ID || randomUUID();
+  const event = makeEventFactory(runId);
+  const startPayload = {
+    protocolVersion: PROTOCOL_V2,
+    executor: 'agx-claude-code',
+    simulation: mode === 'simulation-true',
+    targetRepositoryHonored: mode === 'target-honored',
+    manifestHash: 'cd'.repeat(32),
+    profile: {
+      id: 'config-repair',
+      version: '2',
+      digest: 'ab'.repeat(32),
+    },
+    caps: { perActionUsd: 1, totalUsd: 5 },
+  };
+  if (mode !== 'missing-approval') startPayload.approvalId = approvalId;
+  const start = () => event('run.start', startPayload);
+  const spend = () =>
+    event('run.spend', {
+      approvalId,
+      costUsd: 0.25,
+      turns: 3,
+      durationMs: 40,
+      exitClass: 'success',
+    });
+  const summary = (outcome, extra = {}) =>
+    event('run.summary', {
+      outcome,
+      approvalId,
+      targetRepositoryHonored: false,
+      ...extra,
+    });
+
+  let records = [];
+  let stderrError = null;
+  let exitCode = 0;
+  if (mode === 'verification-rejected') {
+    records = [
+      start(),
+      spend(),
+      summary('verification-rejected', {
+        bundleDir,
+        reasons: ['mismatch'],
+        outOfScopeChanges: [],
+      }),
+    ];
+    stderrError = {
+      code: 'RUN_VERIFICATION_REJECTED',
+      message: 'verification rejected the candidate: mismatch',
+      approvalId,
+    };
+    exitCode = 1;
+  } else if (mode === 'worker-failed') {
+    records = [
+      start(),
+      spend(),
+      summary('worker-failed', {
+        reason: 'error-result',
+        evidence: { stage: 'worker' },
+      }),
+    ];
+    stderrError = {
+      code: 'RUN_WORKER_FAILED',
+      message: 'worker run failed: error-result',
+      approvalId,
+    };
+    exitCode = 1;
+  } else if (mode === 'pre-spawn') {
+    records = [
+      start(),
+      summary('worker-failed', {
+        reason: 'wall-clock',
+        evidence: { stage: 'before-spawn' },
+      }),
+    ];
+    stderrError = {
+      code: 'RUN_WORKER_FAILED',
+      message: 'worker run failed: wall-clock',
+      approvalId,
+    };
+    exitCode = 1;
+  } else if (mode === 'refusal') {
+    stderrError = {
+      code: 'APPROVAL_MISSING',
+      message: 'approval file is missing',
+    };
+    exitCode = 1;
+  } else if (mode === 'refusal-known') {
+    stderrError = {
+      code: 'APPROVAL_CONSUMED',
+      message: 'approval was already consumed',
+      approvalId,
+    };
+    exitCode = 1;
+  } else if (mode === 'double-spend') {
+    records = [
+      start(),
+      spend(),
+      spend(),
+      summary('verified', { bundleDir, outOfScopeChanges: [] }),
+    ];
+  } else {
+    records = [
+      start(),
+      spend(),
+      summary('verified', { bundleDir, outOfScopeChanges: [] }),
+    ];
+  }
+  writeBundleRecord('fake-run.json', {
+    argv: args,
+    events: records,
+    stderr: stderrError,
+  });
+  if (records.length > 0) await writeOut(serializeRecords(records));
+  if (stderrError) await writeStderr(stderrError);
+  process.exit(exitCode);
+}
+
 async function handleRun() {
+  if (args[1] === 'manifest') {
+    await handleManifest();
+    return;
+  }
+  if (args[1] === 'approve') {
+    captureInvocation();
+    writeBundleRecord('fake-run.json', { argv: args, events: [], stderr: null });
+    await writeStderr({
+      code: 'USAGE_ERROR',
+      message: 'run approve is not a consumer operation',
+    });
+    process.exit(2);
+    return;
+  }
+  if (argOf('--executor') === 'agx-claude-code') {
+    await handleRealRun();
+    return;
+  }
   captureInvocation();
   installIgnoreSigterm();
   maybeSelfSignal();
@@ -384,7 +584,7 @@ async function handleRun() {
 
   const startEvent = () =>
     event('run.start', {
-      protocolVersion: PROTOCOL_VERSION,
+      protocolVersion: selectedProtocolId(),
       executor: 'stub',
       stubScenario: scenario,
       simulation: true,

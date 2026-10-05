@@ -781,7 +781,7 @@ prefixes and are not in the recorded probe list.
 **yellow-goal:**
 
 - READY: `/goal:setup` (or `node ${CLAUDE_PLUGIN_ROOT}/dist/cli.js setup`)
-  reports `ok:true` with `engineVersion` equal to the pin `0.2.0`
+  reports `ok:true` with `engineVersion` equal to the pin `0.3.0`
 - PARTIAL: never — missing binary or version mismatch is fail-closed
 - NEEDS SETUP: `goal-gen` missing from PATH OR version probe fails
   (`GOAL_ENGINE_MISSING` / `GOAL_ENGINE_VERSION_MISMATCH` /

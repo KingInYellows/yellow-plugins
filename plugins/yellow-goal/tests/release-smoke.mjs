@@ -77,7 +77,7 @@ try {
   // guards (never a copied engine schema).
   const capabilities = invoke(
     bin,
-    ['capabilities', '--json'],
+    ['capabilities', '--json', '--protocol', 'v2'],
     {},
     { raw: true }
   );
@@ -92,7 +92,11 @@ try {
     PINNED_ENGINE_VERSION
   );
   assert.equal(validated.engineVersion, PINNED_ENGINE_VERSION);
-  assert.equal(validated.protocolVersion, 'yellow-goal/provider-protocol/v1');
+  assert.equal(validated.protocolVersion, 'yellow-goal/provider-protocol/v2');
+  assert.ok(validated.supportedProtocols.includes('yellow-goal/provider-protocol/v1'));
+  assert.ok(validated.supportedProtocols.includes('yellow-goal/provider-protocol/v2'));
+  assert.ok(validated.capabilities.includes('run.executor.agx-claude-code'));
+  assert.ok(!validated.capabilities.includes('run.executor.claude-code'));
   const capabilitiesUsage = invoke(bin, ['capabilities', 'extra']);
   assert.equal(capabilitiesUsage.status, 2);
   assert.equal(capabilitiesUsage.stdout, '');

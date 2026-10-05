@@ -395,3 +395,221 @@ describe('run-stub scratch hygiene', () => {
     expect(fs.existsSync(pinned)).toBe(false);
   });
 });
+
+describe('run-real against the portable fake provider engine', () => {
+  const providerFixturePath = path.join(
+    packageRoot,
+    'tests',
+    'fixtures',
+    'fake-provider-engine.mjs'
+  );
+
+  function realArgs(name: string, approval: string): {
+    args: string[];
+    bundle: string;
+  } {
+    const bundle = path.join(scratch, `bundle-${name}`);
+    fs.mkdirSync(bundle, { recursive: true });
+    return {
+      bundle,
+      args: [
+        'run-real',
+        'req.json',
+        '--approval',
+        approval,
+        '--profile',
+        'config-repair',
+        '--max-turns',
+        '4',
+        '--per-action-usd',
+        '1',
+        '--total-usd',
+        '5',
+        '--auth-mode',
+        'subscription',
+        '--allowed-tool',
+        'Read',
+        '--bundle-dir',
+        bundle,
+        '--spend-ledger',
+        path.join(bundle, 'spend.jsonl'),
+      ],
+    };
+  }
+
+  function readJson(file: string): Record<string, unknown> {
+    return JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+  }
+
+  it('shows the engine manifest, forwards the approval, and reports spend and bundle path', async () => {
+    const approval = path.join(scratch, 'operator-approval.json');
+    fs.writeFileSync(approval, '{}\n');
+    const { args, bundle } = realArgs('verified', approval);
+    const result = await runCli(args, { GOAL_GEN_BIN: providerFixturePath });
+    expect(result.exitCode).toBe(0);
+    const body = parseSingleJsonLine(result.stdout) as {
+      ok: boolean;
+      operation: string;
+      outcome: string;
+      manifest: Record<string, unknown>;
+      spend: { costUsd: number; approvalId: string };
+      bundleDir: string;
+    };
+    const recordedManifest = readJson(path.join(bundle, 'fake-manifest.json'));
+    const recordedRun = readJson(path.join(bundle, 'fake-run.json')) as {
+      argv: string[];
+      events: { type: string; payload: Record<string, unknown> }[];
+    };
+    expect(body.ok).toBe(true);
+    expect(body.operation).toBe('run-real');
+    expect(body.outcome).toBe('verified');
+    expect(body.manifest).toEqual(recordedManifest['body']);
+    const spend = recordedRun.events.find((event) => event.type === 'run.spend');
+    const summary = recordedRun.events.find(
+      (event) => event.type === 'run.summary'
+    );
+    expect(body.spend).toEqual(spend?.payload);
+    expect(body.bundleDir).toBe(summary?.payload['bundleDir']);
+    expect(recordedRun.argv).toContain('--approval');
+    expect(recordedRun.argv[recordedRun.argv.indexOf('--approval') + 1]).toBe(
+      approval
+    );
+    expect(recordedRun.argv).toEqual(
+      expect.arrayContaining([
+        '--protocol',
+        'v2',
+        '--executor',
+        'agx-claude-code',
+      ])
+    );
+    expect(recordedRun.argv).not.toContain('--yes');
+    expect(recordedRun.argv).not.toContain('approve');
+    const manifestArgv = recordedManifest['argv'] as string[];
+    expect(manifestArgv[0]).toBe('run');
+    expect(manifestArgv[1]).toBe('manifest');
+    expect(manifestArgv).not.toContain('--yes');
+    expect(manifestArgv).not.toContain('approve');
+  });
+
+  it('reports spend and no bundle path when the worker fails after spawn', async () => {
+    const { args, bundle } = realArgs(
+      'worker-failed',
+      path.join(scratch, 'mode-worker-failed.json')
+    );
+    const result = await runCli(args, { GOAL_GEN_BIN: providerFixturePath });
+    expect(result.exitCode).toBe(1);
+    const body = parseSingleJsonLine(result.stdout) as {
+      ok: boolean;
+      outcome: string;
+      spend?: { costUsd: number };
+      bundleDir?: string;
+    };
+    const recordedRun = readJson(path.join(bundle, 'fake-run.json')) as {
+      events: { type: string; payload: { costUsd?: number } }[];
+    };
+    const spend = recordedRun.events.find((event) => event.type === 'run.spend');
+    expect(body.ok).toBe(false);
+    expect(body.outcome).toBe('worker-failed');
+    expect(body.spend?.costUsd).toBe(spend?.payload.costUsd);
+    expect(body.bundleDir).toBeUndefined();
+  });
+
+  it('accepts a pre-spawn failure with neither spend nor a bundle path', async () => {
+    const { args } = realArgs(
+      'pre-spawn',
+      path.join(scratch, 'mode-pre-spawn.json')
+    );
+    const result = await runCli(args, { GOAL_GEN_BIN: providerFixturePath });
+    expect(result.exitCode).toBe(1);
+    const body = parseSingleJsonLine(result.stdout) as {
+      outcome: string;
+      eventCount: number;
+      spend?: unknown;
+      bundleDir?: unknown;
+    };
+    expect(body.outcome).toBe('worker-failed');
+    expect(body.eventCount).toBe(2);
+    expect(body.spend).toBeUndefined();
+    expect(body.bundleDir).toBeUndefined();
+  });
+
+  it('reports a refusal with no run.start, spend, or bundle', async () => {
+    const unread = await runCli(
+      realArgs('refusal', path.join(scratch, 'mode-refusal.json')).args,
+      { GOAL_GEN_BIN: providerFixturePath }
+    );
+    expect(unread.exitCode).toBe(1);
+    const unreadBody = parseSingleJsonLine(unread.stdout) as {
+      outcome: string;
+      eventCount: number;
+      runId?: string;
+      approvalId?: string;
+      spend?: unknown;
+      bundleDir?: unknown;
+      refusalCode: string;
+    };
+    expect(unreadBody.outcome).toBe('refused');
+    expect(unreadBody.eventCount).toBe(0);
+    expect(unreadBody.runId).toBeUndefined();
+    expect(unreadBody.approvalId).toBeUndefined();
+    expect(unreadBody.spend).toBeUndefined();
+    expect(unreadBody.bundleDir).toBeUndefined();
+    expect(unreadBody.refusalCode).toBe('APPROVAL_MISSING');
+
+    const known = await runCli(
+      realArgs(
+        'refusal-known',
+        path.join(scratch, 'mode-refusal-known.json')
+      ).args,
+      { GOAL_GEN_BIN: providerFixturePath }
+    );
+    const knownBody = parseSingleJsonLine(known.stdout) as {
+      outcome: string;
+      approvalId?: string;
+      spend?: unknown;
+      bundleDir?: unknown;
+    };
+    const recorded = readJson(
+      path.join(scratch, 'bundle-refusal-known', 'fake-run.json')
+    ) as { stderr: { approvalId?: string } };
+    expect(knownBody.outcome).toBe('refused');
+    expect(knownBody.approvalId).toBe(recorded.stderr.approvalId);
+    expect(knownBody.spend).toBeUndefined();
+    expect(knownBody.bundleDir).toBeUndefined();
+  });
+
+  it.each(['simulation-true', 'missing-approval', 'target-honored'])(
+    'rejects a real-run stream with %s',
+    async (mode) => {
+      const { args } = realArgs(
+        mode,
+        path.join(scratch, `mode-${mode}.json`)
+      );
+      const result = await runCli(args, { GOAL_GEN_BIN: providerFixturePath });
+      expect(result.exitCode).toBe(1);
+      expect(parseSingleJsonLine(result.stdout)).toMatchObject({
+        ok: false,
+        error: { code: 'GOAL_PROTOCOL_INVALID' },
+      });
+    }
+  );
+
+  it.each([
+    ['--yes'],
+    ['--executor', 'claude-code'],
+    ['--protocol', 'v1'],
+    ['approve'],
+  ])('refuses %j before spawning the engine', async (...extra) => {
+    const { args, bundle } = realArgs('refused-flag', path.join(scratch, 'a.json'));
+    const result = await runCli([...args, ...extra], {
+      GOAL_GEN_BIN: providerFixturePath,
+    });
+    expect(result.exitCode).toBe(2);
+    expect(parseSingleJsonLine(result.stdout)).toMatchObject({
+      ok: false,
+      error: { code: 'GOAL_INVALID_INPUT' },
+    });
+    expect(fs.existsSync(path.join(bundle, 'fake-run.json'))).toBe(false);
+    expect(fs.existsSync(path.join(bundle, 'fake-manifest.json'))).toBe(false);
+  });
+});

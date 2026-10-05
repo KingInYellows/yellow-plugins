@@ -1,5 +1,5 @@
 /**
- * Pure unit coverage for the Provider Protocol v1 validators. No child
+ * Pure unit coverage for the Provider Protocol validators. No child
  * processes, no filesystem: only buffers and plain objects.
  */
 import { describe, expect, it } from 'vitest';
@@ -9,17 +9,22 @@ import {
   CAPABILITIES_SCHEMA_VERSION,
   CONSUMER_LIMITS,
   JsonLinesFramer,
+  PROTOCOL_V1,
   PROTOCOL_VERSION,
+  REAL_RUN_EXECUTOR_CAPABILITY,
   REQUEST_SCHEMA_VERSION,
   REQUIRED_CAPABILITIES,
   REQUIRED_OPERATIONS,
   RUN_EVENT_SCHEMA_VERSION,
+  RealRunStreamValidator,
   RunStreamValidator,
   STUB_SCENARIOS,
   boundedString,
   classifyPreflightFailure,
   parseSingleJsonObject,
   validateCapabilities,
+  validateRealRunRefusal,
+  validateRealRunTerminalAgreement,
   validateTerminalAgreement,
   validateVersionProbe,
   type ValidatedSummary,
@@ -46,11 +51,12 @@ function makeCapabilities(
   return {
     schemaVersion: CAPABILITIES_SCHEMA_VERSION,
     protocolVersion: PROTOCOL_VERSION,
+    supportedProtocols: [PROTOCOL_V1, PROTOCOL_VERSION],
     engineVersion: PIN,
     requestSchemaVersion: REQUEST_SCHEMA_VERSION,
     runEventSchemaVersion: RUN_EVENT_SCHEMA_VERSION,
     operations: [...REQUIRED_OPERATIONS],
-    capabilities: [...REQUIRED_CAPABILITIES],
+    capabilities: [...REQUIRED_CAPABILITIES, REAL_RUN_EXECUTOR_CAPABILITY],
     stubScenarios: [...STUB_SCENARIOS],
     limits: {
       maxEventBytes: 1_048_576,
@@ -260,7 +266,11 @@ describe('validateCapabilities', () => {
       makeCapabilities({
         somethingNew: true,
         operations: [...REQUIRED_OPERATIONS, 'future.operation'],
-        capabilities: [...REQUIRED_CAPABILITIES, 'future.capability'],
+        capabilities: [
+          ...REQUIRED_CAPABILITIES,
+          REAL_RUN_EXECUTOR_CAPABILITY,
+          'future.capability',
+        ],
         stubScenarios: [...STUB_SCENARIOS, 'future-scenario'],
         limits: {
           maxEventBytes: 1_048_576,
@@ -275,6 +285,58 @@ describe('validateCapabilities', () => {
     expect(result.capabilities).toContain('future.capability');
     expect(result.stubScenarios).toContain('future-scenario');
     expect(Reflect.has(result, 'somethingNew')).toBe(false);
+  });
+
+  it('requires v2 identity, both supported protocols, and the real-run capability', () => {
+    const result = validateCapabilities(makeCapabilities(), PIN);
+    expect(result.protocolVersion).toBe('yellow-goal/provider-protocol/v2');
+    expect(result.supportedProtocols).toEqual(
+      expect.arrayContaining([
+        'yellow-goal/provider-protocol/v1',
+        'yellow-goal/provider-protocol/v2',
+      ])
+    );
+    expect(result.capabilities).toContain(REAL_RUN_EXECUTOR_CAPABILITY);
+    expect(result.capabilities).not.toContain('run.executor.claude-code');
+  });
+
+  it('rejects a v2 document that omits v1 from supportedProtocols', () => {
+    expectGoalError(
+      () =>
+        validateCapabilities(
+          makeCapabilities({ supportedProtocols: [PROTOCOL_VERSION] }),
+          PIN
+        ),
+      'GOAL_PROTOCOL_INCOMPATIBLE'
+    );
+  });
+
+  it('rejects capabilities that omit the real-run executor', () => {
+    expectGoalError(
+      () =>
+        validateCapabilities(
+          makeCapabilities({ capabilities: [...REQUIRED_CAPABILITIES] }),
+          PIN
+        ),
+      'GOAL_PROTOCOL_INCOMPATIBLE'
+    );
+  });
+
+  it('rejects capabilities that advertise the legacy claude-code executor', () => {
+    expectGoalError(
+      () =>
+        validateCapabilities(
+          makeCapabilities({
+            capabilities: [
+              ...REQUIRED_CAPABILITIES,
+              REAL_RUN_EXECUTOR_CAPABILITY,
+              'run.executor.claude-code',
+            ],
+          }),
+          PIN
+        ),
+      'GOAL_PROTOCOL_INCOMPATIBLE'
+    );
   });
 });
 
@@ -1378,5 +1440,312 @@ describe('GoalEngineError diagnostics extras (errors.ts additive)', () => {
     expect(err.retryable).toBe(expectedRetryable);
     expect(typeof err.recoveryAction).toBe('string');
     expect(err.recoveryAction.length).toBeGreaterThan(0);
+  });
+});
+
+describe('real-run stream validation', () => {
+  const approvalId = '11111111-1111-4111-8111-111111111111';
+
+  function envelope(
+    sequence: number,
+    type: string,
+    payload: Record<string, unknown>
+  ): Record<string, unknown> {
+    return {
+      schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+      runId: 'run-real',
+      sequence,
+      timestamp: `2026-01-01T00:00:0${sequence}.000Z`,
+      type,
+      payload,
+    };
+  }
+
+  function start(
+    overrides: Record<string, unknown> = {}
+  ): Record<string, unknown> {
+    return envelope(0, 'run.start', {
+      protocolVersion: PROTOCOL_VERSION,
+      executor: 'agx-claude-code',
+      simulation: false,
+      targetRepositoryHonored: false,
+      approvalId,
+      ...overrides,
+    });
+  }
+
+  function spend(sequence: number): Record<string, unknown> {
+    return envelope(sequence, 'run.spend', {
+      approvalId,
+      costUsd: 0.25,
+      turns: 2,
+      durationMs: 10,
+      exitClass: 'success',
+    });
+  }
+
+  function summary(
+    sequence: number,
+    outcome: string,
+    extra: Record<string, unknown> = {}
+  ): Record<string, unknown> {
+    return envelope(sequence, 'run.summary', {
+      outcome,
+      approvalId,
+      targetRepositoryHonored: false,
+      ...extra,
+    });
+  }
+
+  function acceptAll(records: Record<string, unknown>[]): RealRunStreamValidator {
+    const validator = new RealRunStreamValidator();
+    for (const record of records) validator.accept(record);
+    validator.finish();
+    return validator;
+  }
+
+  function stderrFor(code: string): Buffer {
+    return Buffer.from(
+      `${JSON.stringify({
+        error: { code, message: code, approvalId },
+      })}\n`
+    );
+  }
+
+  it('rejects a real-run start that lacks approvalId', () => {
+    const validator = new RealRunStreamValidator();
+    const payload = {
+      protocolVersion: PROTOCOL_VERSION,
+      executor: 'agx-claude-code',
+      simulation: false,
+      targetRepositoryHonored: false,
+    };
+    expectGoalError(
+      () => validator.accept(envelope(0, 'run.start', payload)),
+      'GOAL_PROTOCOL_INVALID'
+    );
+  });
+
+  it('rejects simulation true', () => {
+    const validator = new RealRunStreamValidator();
+    expectGoalError(
+      () => validator.accept(start({ simulation: true })),
+      'GOAL_PROTOCOL_INVALID'
+    );
+  });
+
+  it('rejects targetRepositoryHonored true', () => {
+    const validator = new RealRunStreamValidator();
+    expectGoalError(
+      () => validator.accept(start({ targetRepositoryHonored: true })),
+      'GOAL_PROTOCOL_INVALID'
+    );
+  });
+
+  it('accepts a pre-spawn failure with no spend and no bundle path', () => {
+    const validator = acceptAll([
+      start(),
+      summary(1, 'worker-failed', {
+        reason: 'wall-clock',
+        evidence: { stage: 'before-spawn' },
+      }),
+    ]);
+    expect(validator.snapshot.spend).toBeUndefined();
+    expect(validator.snapshot.summary?.bundleDir).toBeUndefined();
+    expect(validator.snapshot.summary?.outcome).toBe('worker-failed');
+    expect(() =>
+      validateRealRunTerminalAgreement({
+        exitCode: 1,
+        signal: null,
+        stderr: stderrFor('RUN_WORKER_FAILED'),
+        summary: validator.snapshot.summary!,
+      })
+    ).not.toThrow();
+  });
+
+  it('accepts worker-failed spend after spawn and rejects a bundle path on it', () => {
+    const spawned = acceptAll([
+      start(),
+      spend(1),
+      summary(2, 'worker-failed', {
+        reason: 'error-result',
+        evidence: { stage: 'worker' },
+      }),
+    ]);
+    expect(spawned.snapshot.spend?.costUsd).toBe(0.25);
+    expect(spawned.snapshot.summary?.bundleDir).toBeUndefined();
+    const rejected = new RealRunStreamValidator();
+    rejected.accept(start());
+    rejected.accept(spend(1));
+    expectGoalError(
+      () =>
+        rejected.accept(
+          summary(2, 'worker-failed', {
+            reason: 'error-result',
+            evidence: {},
+            bundleDir: '/tmp/bundle',
+          })
+        ),
+      'GOAL_PROTOCOL_INVALID'
+    );
+  });
+
+  it('requires one spend and a bundle path for verified and verification-rejected', () => {
+    const verified = acceptAll([
+      start(),
+      spend(1),
+      summary(2, 'verified', { bundleDir: '/evidence/bundle' }),
+    ]);
+    expect(verified.snapshot.summary?.bundleDir).toBe('/evidence/bundle');
+    expect(verified.snapshot.spend).toBeDefined();
+    expect(() =>
+      validateRealRunTerminalAgreement({
+        exitCode: 0,
+        signal: null,
+        stderr: Buffer.alloc(0),
+        summary: verified.snapshot.summary!,
+      })
+    ).not.toThrow();
+
+    const rejected = acceptAll([
+      start(),
+      spend(1),
+      summary(2, 'verification-rejected', {
+        bundleDir: '/evidence/bundle',
+        reasons: ['mismatch'],
+      }),
+    ]);
+    expect(rejected.snapshot.summary?.bundleDir).toBe('/evidence/bundle');
+    expect(() =>
+      validateRealRunTerminalAgreement({
+        exitCode: 1,
+        signal: null,
+        stderr: stderrFor('RUN_VERIFICATION_REJECTED'),
+        summary: rejected.snapshot.summary!,
+      })
+    ).not.toThrow();
+
+    const missingSpend = new RealRunStreamValidator();
+    missingSpend.accept(start());
+    missingSpend.accept(summary(1, 'verified', { bundleDir: '/evidence/bundle' }));
+    expectGoalError(() => missingSpend.finish(), 'GOAL_PROTOCOL_INVALID');
+
+    const missingBundle = new RealRunStreamValidator();
+    missingBundle.accept(start());
+    missingBundle.accept(spend(1));
+    expectGoalError(
+      () => missingBundle.accept(summary(2, 'verified')),
+      'GOAL_PROTOCOL_INVALID'
+    );
+  });
+
+  it('rejects a second spend and a spend before run.start', () => {
+    const twice = new RealRunStreamValidator();
+    twice.accept(start());
+    twice.accept(spend(1));
+    expectGoalError(() => twice.accept(spend(2)), 'GOAL_PROTOCOL_INVALID');
+    const early = new RealRunStreamValidator();
+    expectGoalError(() => early.accept(spend(0)), 'GOAL_PROTOCOL_INVALID');
+  });
+
+  it('accepts a refusal with approvalId only when the error carries one', () => {
+    const unread = validateRealRunRefusal(
+      Buffer.from(
+        `${JSON.stringify({
+          error: {
+            code: 'APPROVAL_MISSING',
+            message: 'approval file is missing',
+          },
+        })}\n`
+      )
+    );
+    expect(unread.approvalId).toBeUndefined();
+    expect(unread.code).toBe('APPROVAL_MISSING');
+    const read = validateRealRunRefusal(
+      Buffer.from(
+        `${JSON.stringify({
+          error: {
+            code: 'APPROVAL_CONSUMED',
+            message: 'approval was already consumed',
+            approvalId,
+          },
+        })}\n`
+      )
+    );
+    expect(read.approvalId).toBe(approvalId);
+    expectGoalError(
+      () =>
+        validateRealRunRefusal(
+          Buffer.from(
+            `${JSON.stringify({
+              error: {
+                code: 'APPROVAL_CONSUMED',
+                message: 'approval was already consumed',
+                approvalId: '',
+              },
+            })}\n`
+          )
+        ),
+      'GOAL_PROTOCOL_INVALID'
+    );
+    expectGoalError(
+      () =>
+        validateRealRunRefusal(
+          Buffer.from(
+            `${JSON.stringify({
+              error: {
+                code: 'APPROVAL_MISSING',
+                message: 'approval file is missing',
+                bundleDir: '/evidence/bundle',
+              },
+            })}\n`
+          )
+        ),
+      'GOAL_PROTOCOL_INVALID'
+    );
+  });
+
+  it('does not reject a stub stream whose simulation flag is true', () => {
+    const stubStart = {
+      schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+      runId: 'run-stub',
+      sequence: 0,
+      timestamp: '2026-01-01T00:00:00.000Z',
+      type: 'run.start',
+      payload: {
+        protocolVersion: PROTOCOL_VERSION,
+        executor: 'stub',
+        stubScenario: 'success',
+        simulation: true,
+        targetRepositoryHonored: false,
+      },
+    };
+    const stubSummary = {
+      schemaVersion: RUN_EVENT_SCHEMA_VERSION,
+      runId: 'run-stub',
+      sequence: 1,
+      timestamp: '2026-01-01T00:00:01.000Z',
+      type: 'run.summary',
+      payload: {
+        status: 'succeeded',
+        goalText: 'goal',
+        costUsd: 0,
+        replans: 0,
+        reextractions: 0,
+        actions: [],
+        reason: 'done',
+      },
+    };
+    const stub = new RunStreamValidator();
+    stub.accept(stubStart);
+    stub.accept(stubSummary);
+    stub.finish();
+    expect(stub.snapshot.start).toMatchObject({
+      simulation: true,
+      executor: 'stub',
+      protocolVersion: 'yellow-goal/provider-protocol/v2',
+    });
+    const real = new RealRunStreamValidator();
+    expectGoalError(() => real.accept(stubStart), 'GOAL_PROTOCOL_INVALID');
   });
 });

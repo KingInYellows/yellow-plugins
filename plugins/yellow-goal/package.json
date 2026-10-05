@@ -2,7 +2,7 @@
   "name": "yellow-goal",
   "version": "0.2.2",
   "private": true,
-  "description": "yellow-goal engine bridge — spawn goal-gen as a process (read-only requests plus stub-only runs), never import it",
+  "description": "yellow-goal engine bridge — spawn goal-gen as a process (read-only requests, protocol v2 stub runs, and a user-only approval-gated real run), never import it",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
