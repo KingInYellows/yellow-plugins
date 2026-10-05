@@ -1,0 +1,21 @@
+plugins/yellow-core/lib/quote-ground.sh
+  s_84157c8c7db51c::t_634222af45c426 26-27,218-220,248,459-462,487-488,501
+plugins/yellow-core/tests/quote-ground.bats
+  s_84157c8c7db51c::t_f199419d46f444 503-518
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ed9001c3b900b92402c89f530f2bc7b09e9cfe1d",
+  "prompts": {},
+  "sessions": {
+    "s_84157c8c7db51c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-abf25d04065c20213",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
