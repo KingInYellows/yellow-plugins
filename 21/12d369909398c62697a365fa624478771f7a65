@@ -1,0 +1,14 @@
+plugins/yellow-core/skills/git-worktree/tests/worktree-manager.bats
+  h_6000354274ce50 27-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2112d369909398c62697a365fa624478771f7a65",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

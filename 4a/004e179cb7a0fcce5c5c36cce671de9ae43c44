@@ -1,0 +1,16 @@
+plugins/yellow-core/lib/quote-ground.sh
+  h_6000354274ce50 52,187-210,259-265,341-345,413-477,479,516-526,538-541
+plugins/yellow-core/tests/quote-ground.bats
+  h_6000354274ce50 16,18,261-264
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4a004e179cb7a0fcce5c5c36cce671de9ae43c44",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
