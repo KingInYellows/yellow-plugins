@@ -38,6 +38,12 @@ row() {
     '{id:$id,file:$file,line:$line,quote:$quote}'
 }
 
+# Sets TIMEOUT_BIN to timeout or gtimeout (stock macOS has neither), else skips.
+need_timeout() {
+  TIMEOUT_BIN=$(command -v timeout || command -v gtimeout || true)
+  [ -n "$TIMEOUT_BIN" ] || skip "timeout/gtimeout not available"
+}
+
 # Milliseconds from a clock that exists on bash 4.4 and later.
 now_ms() {
   if [ -n "${EPOCHREALTIME:-}" ]; then
@@ -93,10 +99,11 @@ now_ms() {
 }
 
 @test "check validates its arguments before it reads stdin" {
+  need_timeout
   printf '%s\n' "$Q26" >src/a.txt
-  run timeout 5 bash "$QG" check src/a.txt abc </dev/zero
+  run "$TIMEOUT_BIN" 5 bash "$QG" check src/a.txt abc </dev/zero
   [ "$status" -eq 2 ]
-  run timeout 5 bash "$QG" check src/a.txt 1 x </dev/zero
+  run "$TIMEOUT_BIN" 5 bash "$QG" check src/a.txt 1 x </dev/zero
   [ "$status" -eq 2 ]
 }
 
@@ -308,14 +315,15 @@ now_ms() {
 }
 
 @test "check returns promptly for a very large radius or line number" {
+  need_timeout
   printf 'alpha line one\nthe quoted target line\nomega\n' >src/a.txt
-  run timeout 10 bash "$QG" check src/a.txt 1 999999999 <<<"a quote that is not in the file"
+  run "$TIMEOUT_BIN" 10 bash "$QG" check src/a.txt 1 999999999 <<<"a quote that is not in the file"
   [ "$status" -eq 1 ]
   [ -z "$output" ]
-  run timeout 10 bash "$QG" check src/a.txt 3 999999999 <<<"the quoted target line"
+  run "$TIMEOUT_BIN" 10 bash "$QG" check src/a.txt 3 999999999 <<<"the quoted target line"
   [ "$status" -eq 0 ]
   [ "$output" = "2" ]
-  run timeout 10 bash "$QG" check src/a.txt 999999999 3 <<<"the quoted target line"
+  run "$TIMEOUT_BIN" 10 bash "$QG" check src/a.txt 999999999 3 <<<"the quoted target line"
   [ "$status" -eq 1 ]
 }
 

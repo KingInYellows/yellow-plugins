@@ -289,7 +289,9 @@ qg_path_class() {
     QG_ONE_CLASS=${QG_PATH_CLASS["p:$file"]}
     return 0
   fi
-  if [[ "$file" == -* || "$file" == */-* ]]; then
+  # Option-shaped segments and any control character (tab, newline, ESC, DEL)
+  # are refused before the path reaches validate_file_path or a file test.
+  if [[ "$file" == -* || "$file" == */-* || "$file" == *[[:cntrl:]]* ]]; then
     QG_ONE_CLASS=unsafe-path
   elif ! validate_file_path "$file" "$QG_ROOT"; then
     # A directory without search permission also fails validation.
