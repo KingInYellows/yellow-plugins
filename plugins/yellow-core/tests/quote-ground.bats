@@ -334,3 +334,38 @@ line_quote() {
   [ "$status" -eq 2 ]
   [[ "$output" != *'"result"'* ]]
 }
+
+@test "batch keeps ids exactly, emits valid JSON for control characters, and preserves numeric id types" {
+  local payload
+  printf 'alpha line one\nthe quoted target line\nomega\n' >src/a.txt
+  payload="$(jq -cn '
+    [42, "42", -7, "-dash", "ctl\u001fx", "b\bf\fz", "one\u0001two", "q\"uote\\slash"][]
+    | {id: ., file: "src/a.txt", line: 2, quote: "the quoted target line"}
+  ')"
+  run bash "$QG" batch <<<"$payload"
+  [ "$status" -eq 0 ]
+  jq -e -s '
+    length == 8
+    and all(.result == "grounded" and .matched_line == 2)
+    and (.[0].id == 42 and (.[0].id | type) == "number")
+    and (.[1].id == "42" and (.[1].id | type) == "string")
+    and (.[2].id == -7)
+    and (.[3].id == "-dash")
+    and (.[4].id == "ctl\u001fx")
+    and (.[5].id == "b\bf\fz")
+    and (.[6].id == "one\u0001two")
+    and (.[7].id == "q\"uote\\slash")
+  ' <<<"$output" >/dev/null
+}
+
+@test "check returns promptly for a very large radius or line number" {
+  printf 'alpha line one\nthe quoted target line\nomega\n' >src/a.txt
+  run timeout 10 bash "$QG" check src/a.txt 1 999999999 <<<"a quote that is not in the file"
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+  run timeout 10 bash "$QG" check src/a.txt 3 999999999 <<<"the quoted target line"
+  [ "$status" -eq 0 ]
+  [ "$output" = "2" ]
+  run timeout 10 bash "$QG" check src/a.txt 999999999 3 <<<"the quoted target line"
+  [ "$status" -eq 1 ]
+}
