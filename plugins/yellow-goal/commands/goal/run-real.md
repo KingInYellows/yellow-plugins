@@ -64,16 +64,20 @@ approval (a missing flag changes the manifest hash):
 
 Refuse `--yes`, `--executor`, `--protocol`, `approve`, and any unknown flag.
 
-### Step 3: Validate the request and approval paths in code
+### Step 3: Validate the request, approval, and output paths in code
 
-Treat both paths as untrusted data. Enforce the allowlist in executable Bash
-before any invocation using yellow-core's canonical validator
-(`validate_file_path` rejects empty paths, `..`, absolute and `~` paths,
-embedded newlines, symlinks whose target escapes the root, and broken
-intermediate symlinks). Each path must be **relative to the current working
-directory** and resolve inside it; a leading hyphen and any character outside
-`[A-Za-z0-9._/-]` are rejected separately, before the canonical check.
-yellow-core is a required dependency of this plugin.
+Treat the request, approval, `--bundle-dir`, and `--spend-ledger` paths as
+untrusted data. Enforce the allowlist in executable Bash before any invocation
+using yellow-core's canonical validator (`validate_file_path` rejects empty
+paths, `..`, absolute and `~` paths, embedded newlines, symlinks whose target
+escapes the root, and broken intermediate symlinks). Each path must be
+**relative to the current working directory** and resolve inside it; a leading
+hyphen and any character outside `[A-Za-z0-9._/-]` are rejected separately,
+before the canonical check. Request and approval must already exist as files.
+`--bundle-dir` and `--spend-ledger` may be missing their final component;
+`validate_file_path` walks up to the nearest existing ancestor and still
+requires that ancestor to stay inside `$PWD`. yellow-core is a required
+dependency of this plugin.
 
 ```bash
 HELPER="${CLAUDE_PLUGIN_ROOT:-}/../yellow-core/lib/validate-fs.sh"
@@ -96,13 +100,20 @@ validate_goal_path() {
     printf 'ERROR: %s must be a relative path inside %s\n' "$label" "$PWD" >&2
     exit 2
   fi
+}
+validate_goal_existing_file() {
+  local label="$1"
+  local candidate="$2"
+  validate_goal_path "$label" "$candidate"
   if [ ! -f "$candidate" ]; then
     printf 'ERROR: %s not found\n' "$label" >&2
     exit 2
   fi
 }
-validate_goal_path "request path" "$REQUEST_FILE"
-validate_goal_path "approval path" "$APPROVAL"
+validate_goal_existing_file "request path" "$REQUEST_FILE"
+validate_goal_existing_file "approval path" "$APPROVAL"
+validate_goal_path "bundle-dir" "$BUNDLE_DIR"
+validate_goal_path "spend-ledger" "$SPEND_LEDGER"
 ```
 
 `$MAX_TURNS`, `$ACTION_TIMEOUT_MS`, `$RUN_WALL_CLOCK_MS`, and

@@ -591,9 +591,11 @@ child process and never imports it. Containment assumptions:
   only the validated terminal summary plus bounded scalar diagnostics — never
   raw engine output, request contents or environment.
 - **Request path**: `/goal:run-stub` validates the request path, and
-  `/goal:run-real` validates the request path and the approval path, with
-  yellow-core's `validate_file_path` (relative, inside the working directory, no
-  symlink escape) before invoking the engine.
+  `/goal:run-real` validates the request path, the approval path, and the
+  `--bundle-dir` / `--spend-ledger` write destinations, with yellow-core's
+  `validate_file_path` (relative, inside the working directory, no symlink
+  escape; output paths may omit a nonexistent final component) before invoking
+  the engine.
 - **CI**: the blocking `Released Goal Engine Compatibility` job verifies the
   public asset's SHA-256 before installing it with lifecycle scripts ignored and
   drives every stub scenario with failing `claude`/`codex` traps first on
