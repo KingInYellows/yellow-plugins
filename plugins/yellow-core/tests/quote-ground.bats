@@ -180,6 +180,15 @@ now_ms() {
   [ "$output" = "1" ]
 }
 
+@test "a NUL byte in the cited window never grounds a quote that spans it" {
+  printf 'abcd\0efgh\n' >src/a.txt
+  run bash "$QG" check src/a.txt 1 <<<"abcdefgh"
+  [ "$status" -eq 1 ]
+  run bash "$QG" batch <<<"$(row nul src/a.txt 1 abcdefgh)"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r .result <<<"$output")" = "ungrounded" ]
+}
+
 @test "check grounds non-ASCII text after space squeezing" {
   printf '%s\n' 'café    résumé token value' >src/a.txt
   run bash "$QG" check src/a.txt 1 <<<"café résumé token value"
@@ -418,6 +427,17 @@ now_ms() {
   run bash "$QG" batch </dev/null
   [ "$status" -eq 0 ]
   [ -z "$output" ]
+}
+
+@test "an unreadable cited file exits 2 in check and in batch, never ungrounded" {
+  [ "$(id -u)" -ne 0 ] || skip "root reads every file"
+  printf '%s\n' "$Q26" >src/a.txt
+  chmod 000 src/a.txt
+  run bash "$QG" check src/a.txt 1 <<<"$Q26"
+  [ "$status" -eq 2 ]
+  run bash "$QG" batch <<<"$(row locked src/a.txt 1 "$Q26")"
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
 }
 
 @test "a malformed row is ungrounded and does not affect its siblings" {

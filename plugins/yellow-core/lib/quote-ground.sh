@@ -20,10 +20,12 @@
 # string id stays a string. batch always uses radius 3. A missing file is
 # exit 2 in check mode; in batch that row is ungrounded and is not opened. A
 # row whose file, line or quote has the wrong type, or holds U+0000, is
-# ungrounded and does not affect its siblings. batch exits 2 with no result
-# rows when jq is missing, when a row is not JSON, when a row has no usable id
-# (a string or number without U+0000), when a cited file cannot be read, or
-# when redaction fails.
+# ungrounded and does not affect its siblings. A cited file with a NUL byte in
+# the lines up to its last cited window is never matched: its rows are
+# ungrounded (check exits 1), because bash would silently drop the byte. batch
+# exits 2 with no result rows when jq is missing, when a row is not JSON, when
+# a row has no usable id (a string or number without U+0000), when a cited
+# file cannot be read, or when redaction fails.
 #
 # Redaction runs per line before matching, and every [REDACTED] or
 # [REDACTED:<type>] token is canonicalized to [REDACTED] on both sides. A
@@ -84,7 +86,7 @@ declare -A QG_FILE_LOADED=()  # f:<file> -> 1
 declare -A QG_FILE_COUNT=()   # f:<file> -> last loaded line number
 declare -A QG_FILE_LO=()      # f:<file> -> first line any row needs
 declare -A QG_FILE_HI=()      # f:<file> -> last line any row needs
-declare -A QG_PATH_CLASS=()   # p:<file> -> ok | missing | unsafe-path
+declare -A QG_PATH_CLASS=()   # p:<file> -> ok | missing | unreadable | unsafe-path
 
 # One row per finding, shared by check (one row) and batch.
 declare -a B_ID=() B_FILE=() B_LINE=() B_QUOTE=() B_RADIUS=() B_CLASS=() B_MATCH=()
@@ -217,8 +219,20 @@ qg_flush() {
 # are never matched as text: qg_search treats them as [REDACTED], so a key
 # body row cannot ground and the block keeps its line numbers.
 qg_ensure_lines() {
-  local file="$1" full="$2" lo="$3" hi="$4" recs rec num flag text
+  local file="$1" full="$2" lo="$3" hi="$4" recs rec num flag text nuls
   if [ "${QG_FILE_LOADED["f:$file"]+set}" = set ]; then
+    return 0
+  fi
+  # Bash drops NUL bytes from a command substitution, which would join the text
+  # either side of one and ground a quote the file does not hold. A file with a
+  # NUL in the lines up to hi loads no lines, so its rows are ungrounded.
+  if ! nuls=$(head -n "$hi" -- "$full" | LC_ALL=C tr -dc '\0' | wc -c); then
+    printf 'quote-ground: failed to read cited file\n' >&2
+    exit 2
+  fi
+  if [ $((nuls)) -gt 0 ]; then
+    QG_FILE_LOADED["f:$file"]=1
+    QG_FILE_COUNT["f:$file"]=0
     return 0
   fi
   if ! recs=$(awk -v lo="$lo" -v hi="$hi" '
@@ -253,7 +267,7 @@ qg_ensure_lines() {
   done <<<"$recs"
 }
 
-# Classify one relative path. Sets QG_ONE_CLASS to ok, missing, or
+# Classify one relative path. Sets QG_ONE_CLASS to ok, missing, unreadable, or
 # unsafe-path. The same path is validated once per process; a later row
 # reuses that result and still does not open a rejected path.
 qg_path_class() {
@@ -266,10 +280,12 @@ qg_path_class() {
     QG_ONE_CLASS=unsafe-path
   else
     full="${QG_ROOT}/${file}"
-    if [ ! -e "$full" ] || [ ! -r "$full" ]; then
+    if [ ! -e "$full" ]; then
       QG_ONE_CLASS=missing
     elif [ ! -f "$full" ]; then
       QG_ONE_CLASS=unsafe-path
+    elif [ ! -r "$full" ]; then
+      QG_ONE_CLASS=unreadable
     else
       QG_ONE_CLASS=ok
     fi
@@ -346,6 +362,10 @@ qg_ground_rows() {
       unsafe-path | missing)
         B_CLASS[i]=$QG_ONE_CLASS
         continue
+        ;;
+      unreadable)
+        printf 'quote-ground: failed to read cited file\n' >&2
+        exit 2
         ;;
     esac
     qg_queue "${B_QUOTE[$i]}"
@@ -516,7 +536,7 @@ case "${1:-}" in
     qg_path_class "$file"
     case "$QG_ONE_CLASS" in
       unsafe-path) exit 1 ;;
-      missing) exit 2 ;;
+      missing | unreadable) exit 2 ;;
     esac
     quote=$(cat)
     qg_check "$file" "$line" "$radius" "$quote"
