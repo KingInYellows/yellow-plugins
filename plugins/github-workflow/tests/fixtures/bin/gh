@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Fake `gh` for github-stack-runtime.js tests. Behavior controlled by env
-# vars: FAKE_GH_EXIT (exit code), FAKE_GH_STDOUT/FAKE_GH_STDERR (%b-expanded).
+# vars: FAKE_GH_EXIT (exit code), FAKE_GH_STDOUT/FAKE_GH_STDERR (%b-expanded),
+# FAKE_GH_SLEEP (seconds to sleep instead of answering).
+# FAKE_GH_SLEEP=<seconds>: exec sleep, so a spawn timeout kills the sleeper
+# itself and does not wait for an orphaned child that holds the pipes.
+if [ -n "${FAKE_GH_SLEEP:-}" ]; then
+  exec sleep "$FAKE_GH_SLEEP"
+fi
 if [ -n "${FAKE_GH_STDOUT:-}" ]; then
   printf '%b' "$FAKE_GH_STDOUT"
 fi
