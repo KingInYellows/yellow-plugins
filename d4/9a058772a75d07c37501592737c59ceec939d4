@@ -1,0 +1,31 @@
+plugins/yellow-core/lib/quote-ground.sh
+  s_4dea7a2b915137::t_97fba1715231f7 24-25
+  s_4dea7a2b915137::t_6eff90e6571d87 366-369
+  s_4dea7a2b915137::t_8e79332b61bd43 222,226-235,237
+  s_4dea7a2b915137::t_477aacd1f06dae 270
+  s_4dea7a2b915137::t_890d49272d662a 539
+  s_4dea7a2b915137::t_1aab408f50b918 89
+  s_4dea7a2b915137::t_8e78f11060128b 283,287-288
+  s_4dea7a2b915137::t_7a2922e6bd7b07 26-28
+  s_4dea7a2b915137::t_c386189aa7cdbc 23
+  s_4dea7a2b915137::t_e59f81c05bf251 236
+plugins/yellow-core/tests/quote-ground.bats
+  s_4dea7a2b915137::t_f15cfa88a114f5 183-191
+  s_4dea7a2b915137::t_fdc2e20a4b60fb 432-442
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d49a058772a75d07c37501592737c59ceec939d4",
+  "prompts": {},
+  "sessions": {
+    "s_4dea7a2b915137": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "87a2dd5d-2b29-41a0-8294-3f5034ff7209",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
