@@ -1920,3 +1920,214 @@ cred_name() { printf 'src/token-%s%s.txt' "ghp_" "abcdefghijklmnopqrstuvwxyz0123
   [ -s "$patch" ]
   grep -q 'src/token-notes.txt' "$patch"
 }
+
+# --- git, gh, and jq are absolute paths outside the worktree ---
+
+# trust_canary <marker>: executable git inside the fixture repo. Prints its dir.
+trust_canary() {
+  local marker="$1" dir="$REPO/canary-bin"
+  mkdir -p "$dir"
+  cat >| "$dir/git" <<EOF
+#!/bin/sh
+touch "$marker"
+exit 99
+EOF
+  chmod +x "$dir/git"
+  printf '%s' "$dir"
+}
+
+# Stubs call git by name. Point those calls at the real binary so the double
+# is only what the script under test execs.
+trust_shield_stubs() {
+  python3 - "$1" "$STUB_BIN" <<'PY'
+import os, sys
+real, stub = sys.argv[1], sys.argv[2]
+fn = 'git() { "%s" "$@"; }\n' % real
+for name in os.listdir(stub):
+    path = os.path.join(stub, name)
+    if not os.path.isfile(path):
+        continue
+    with open(path) as fh:
+        lines = fh.readlines()
+    if not lines or not lines[0].startswith("#!"):
+        continue
+    if "bin/sh" not in lines[0] and "bash" not in lines[0]:
+        continue
+    out = [lines[0], fn]
+    for line in lines[1:]:
+        if line.startswith("exec git "):
+            line = 'exec "%s" %s' % (real, line[len("exec git "):])
+        out.append(line)
+    with open(path, "w") as fh:
+        fh.writelines(out)
+PY
+}
+
+# trust_install_doubles: git, gh, jq, and timeout outside the worktree.
+# git/gh/jq exit 97 and record "bare" when $0 is not absolute. timeout logs
+# its argv and execs the real binary (its own PATH lookup stays by name).
+trust_install_doubles() {
+  local real_git="$1" real_jq="$2" real_timeout="$3" stub_gh="$4"
+  TRUST_BIN=$(mkdir -p "$BATS_TEST_TMPDIR/trust-bin" && cd "$BATS_TEST_TMPDIR/trust-bin" && pwd -P)
+  TRUST_GIT_LOG="$BATS_TEST_TMPDIR/trust-git.log"
+  TRUST_GH_LOG="$BATS_TEST_TMPDIR/trust-gh.log"
+  TRUST_JQ_LOG="$BATS_TEST_TMPDIR/trust-jq.log"
+  TRUST_TIMEOUT_LOG="$BATS_TEST_TMPDIR/trust-timeout.log"
+  : >| "$TRUST_GIT_LOG"
+  : >| "$TRUST_GH_LOG"
+  : >| "$TRUST_JQ_LOG"
+  : >| "$TRUST_TIMEOUT_LOG"
+  cat >| "$TRUST_BIN/git" <<EOF
+#!/bin/sh
+if [ -n "\${YELLOW_REVIEW_GIT:-}\${YELLOW_REVIEW_GH:-}\${YELLOW_REVIEW_JQ:-}" ]; then
+  printf 'exported\n' >> "$TRUST_GIT_LOG"
+  exit 98
+fi
+{
+  printf '%s' "\$0"
+  for a in "\$@"; do
+    printf ' '
+    printf '%s' "\$a" | tr '\n' ' '
+  done
+  printf '\n'
+} >> "$TRUST_GIT_LOG"
+case "\$0" in
+  /*) ;;
+  *) printf 'bare\n' >> "$TRUST_GIT_LOG"; exit 97 ;;
+esac
+exec "$real_git" "\$@"
+EOF
+  cat >| "$TRUST_BIN/gh" <<EOF
+#!/bin/sh
+if [ -n "\${YELLOW_REVIEW_GIT:-}\${YELLOW_REVIEW_GH:-}\${YELLOW_REVIEW_JQ:-}" ]; then
+  printf 'exported\n' >> "$TRUST_GH_LOG"
+  exit 98
+fi
+{
+  printf '%s' "\$0"
+  for a in "\$@"; do
+    printf ' '
+    printf '%s' "\$a" | tr '\n' ' '
+  done
+  printf '\n'
+} >> "$TRUST_GH_LOG"
+case "\$0" in
+  /*) ;;
+  *) printf 'bare\n' >> "$TRUST_GH_LOG"; exit 97 ;;
+esac
+exec "$stub_gh" "\$@"
+EOF
+  cat >| "$TRUST_BIN/jq" <<EOF
+#!/bin/sh
+if [ -n "\${YELLOW_REVIEW_GIT:-}\${YELLOW_REVIEW_GH:-}\${YELLOW_REVIEW_JQ:-}" ]; then
+  printf 'exported\n' >> "$TRUST_JQ_LOG"
+  exit 98
+fi
+{
+  printf '%s' "\$0"
+  for a in "\$@"; do
+    printf ' '
+    printf '%s' "\$a" | tr '\n' ' '
+  done
+  printf '\n'
+} >> "$TRUST_JQ_LOG"
+case "\$0" in
+  /*) ;;
+  *) printf 'bare\n' >> "$TRUST_JQ_LOG"; exit 97 ;;
+esac
+exec "$real_jq" "\$@"
+EOF
+  cat >| "$TRUST_BIN/timeout" <<EOF
+#!/bin/sh
+{
+  printf '%s' "\$0"
+  for a in "\$@"; do
+    printf ' '
+    printf '%s' "\$a" | tr '\n' ' '
+  done
+  printf '\n'
+} >> "$TRUST_TIMEOUT_LOG"
+exec "$real_timeout" "\$@"
+EOF
+  chmod +x "$TRUST_BIN/git" "$TRUST_BIN/gh" "$TRUST_BIN/jq" "$TRUST_BIN/timeout"
+}
+
+trust_assert_absolute() {
+  local line
+  [ -s "$1" ] || { echo "empty argv log $1"; return 1; }
+  while IFS= read -r line; do
+    case "$line" in
+      bare|exported) echo "bad argv line in $1: $line"; return 1 ;;
+      /*) ;;
+      *) echo "not absolute in $1: $line"; return 1 ;;
+    esac
+  done < "$1"
+}
+
+@test "trust: an in-worktree git canary is not executed" {
+  local marker="$BATS_TEST_TMPDIR/canary-ran" dir repo_dir
+  rm -f "$marker"
+  unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ
+  dir=$(trust_canary "$marker")
+  repo_dir=$(pwd -P)
+  case "$(cd "$dir" && pwd -P)" in
+    "$repo_dir"/*) ;;
+    *) echo "canary directory is not inside the worktree"; return 1 ;;
+  esac
+  PATH="$dir:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --timeout 5 --command-file "$CMD" --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [ ! -e "$marker" ]
+  [[ "$stderr" == *"git resolves to"* ]]
+  [[ "$stderr" == *"inside the repository"* ]]
+  [[ "$stderr" == *"the tree is untouched"* ]]
+  unset YELLOW_REVIEW_GIT
+  export YELLOW_REVIEW_GIT="$dir/git"
+  run --separate-stderr "$SCRIPT" --pr 7
+  [ ! -e "$marker" ]
+  unset YELLOW_REVIEW_GIT
+}
+
+@test "trust: a symlink outside the worktree whose target is an in-worktree git canary is not executed" {
+  local marker="$BATS_TEST_TMPDIR/canary-ran" dir link="$BATS_TEST_TMPDIR/linkbin" link_dir repo_dir
+  rm -f "$marker"
+  unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ
+  dir=$(trust_canary "$marker")
+  mkdir -p "$link"
+  ln -s "$dir/git" "$link/git"
+  link_dir=$(cd "$link" && pwd -P)
+  repo_dir=$(pwd -P)
+  case "$link_dir" in
+    "$repo_dir"|"$repo_dir"/*) echo "symlink directory is inside the worktree"; return 1 ;;
+  esac
+  PATH="$link:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --timeout 5 --command-file "$CMD" --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [ ! -e "$marker" ]
+  [[ "$stderr" == *"inside the repository"* ]]
+  [[ "$stderr" == *"the tree is untouched"* ]]
+}
+
+@test "trust: git, gh, and jq run only as absolute paths, with hash-object --no-filters and timeout --kill-after=5" {
+  local real_git="/usr/bin/git" real_jq="/usr/bin/jq" real_timeout="/usr/bin/timeout" line
+  [ -x "$real_git" ] && [ -x "$real_jq" ] && [ -x "$real_timeout" ]
+  "$real_timeout" --kill-after=1 1 true
+  in_repo_plugin_init
+  trust_shield_stubs "$real_git"
+  trust_install_doubles "$real_git" "$real_jq" "$real_timeout" "$STUB_BIN/gh"
+  PATH="$TRUST_BIN:$PATH" verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ] || { printf '%s\n' "$stderr" >&2; return 1; }
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  trust_assert_absolute "$TRUST_GIT_LOG"
+  trust_assert_absolute "$TRUST_GH_LOG"
+  trust_assert_absolute "$TRUST_JQ_LOG"
+  grep -F -- "hash-object" "$TRUST_GIT_LOG" >| "$BATS_TEST_TMPDIR/trust-hash.txt"
+  [ -s "$BATS_TEST_TMPDIR/trust-hash.txt" ]
+  while IFS= read -r line; do
+    case "$line" in
+      *"--no-filters"*) ;;
+      *) echo "dropped --no-filters: $line"; return 1 ;;
+    esac
+  done < "$BATS_TEST_TMPDIR/trust-hash.txt"
+  grep -F -- "--kill-after=1 1 true" "$TRUST_TIMEOUT_LOG" >/dev/null
+  grep -F -- "--kill-after=5 30 $TRUST_BIN/gh" "$TRUST_TIMEOUT_LOG" >/dev/null
+  grep -F -- "--kill-after=10" "$TRUST_TIMEOUT_LOG" >/dev/null
+}

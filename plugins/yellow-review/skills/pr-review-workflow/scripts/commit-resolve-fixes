@@ -194,20 +194,159 @@ MAX_CHANGED_LINES=50
 # (--no-filters: a clean filter in .git/config would run a command). A lib
 # directory outside the repository (the installed cache) is not judged; a
 # repository that cannot be read here is left to the checks below.
+# Same walk as yr_canon_path in lib/resolve-paths.sh. Inline because
+# check_lib_integrity runs before that file is sourced: a function that
+# exists only there cannot resolve the first git. A caller-supplied path is
+# ignored. The result stays in the shell; it is not written to a file.
+unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ
+yr_canon_path() {
+    local input="$1" hops=0
+    local cur="" rest comp next target
+    [ -n "$input" ] || return 1
+    case "$input" in
+        /*) ;;
+        *) input="$(pwd -P)/$input" || return 1 ;;
+    esac
+    rest="${input#/}"
+    while [ -n "$rest" ]; do
+        comp="${rest%%/*}"
+        case "$rest" in
+            */*) rest="${rest#*/}" ;;
+            *) rest="" ;;
+        esac
+        case "$comp" in
+            ''|.) continue ;;
+            ..)
+                case "$cur" in
+                    ""|/) cur="" ;;
+                    /*/*) cur="${cur%/*}" ;;
+                    /*) cur="" ;;
+                esac
+                continue
+                ;;
+        esac
+        case "$cur" in
+            "") next="/$comp" ;;
+            *) next="$cur/$comp" ;;
+        esac
+        if [ -L "$next" ]; then
+            hops=$((hops + 1))
+            [ "$hops" -le 40 ] || return 1
+            target=$(readlink -- "$next") || return 1
+            case "$target" in
+                /*)
+                    cur=""
+                    rest="${target#/}${rest:+/$rest}"
+                    ;;
+                *) rest="${target}${rest:+/$rest}" ;;
+            esac
+            continue
+        fi
+        cur="$next"
+    done
+    [ -n "$cur" ] || return 1
+    printf '%s\n' "$cur"
+}
+
+# yr_worktree_root: the directory that contains .git, walking up from the
+# physical cwd. Does not execute git (the candidate may be the file under test).
+yr_worktree_root() {
+    local d
+    d=$(pwd -P) || return 1
+    while [ -n "$d" ]; do
+        if [ -e "$d/.git" ]; then
+            printf '%s\n' "$d"
+            return 0
+        fi
+        [ "$d" = / ] && return 1
+        d=$(dirname -- "$d")
+    done
+    return 1
+}
+
+# yr_resolve_tool <name>: print one absolute path whose canonical file is
+# outside the worktree. Return 1 when <name> is not on PATH, 2 when that
+# canonical file is inside the worktree, 3 when the path cannot be
+# canonicalized. Does not execute the tool. A caller that already resolved
+# git stores it in YELLOW_REVIEW_GIT; yr_git reuses that and does not look
+# up PATH again. The variable is not written to a file.
+# The printed path is the absolute PATH hit, not the final symlink target:
+# git-ai's canonical file ignores git commands unless argv[0] is named git.
+yr_resolve_tool() {
+    local name="$1" bin canon root invoke
+    bin=$(type -P "$name" 2>/dev/null) || return 1
+    [ -n "$bin" ] || return 1
+    case "$bin" in
+        /*) invoke="$bin" ;;
+        *) invoke="$(pwd -P)/$bin" || return 3 ;;
+    esac
+    canon=$(yr_canon_path "$invoke") || return 3
+    [ -f "$canon" ] || return 3
+    root=$(yr_worktree_root || true)
+    if [ -n "$root" ]; then
+        case "$canon" in
+            "$root"|"$root"/*) return 2 ;;
+        esac
+        case "$invoke" in
+            "$root"|"$root"/*) return 2 ;;
+        esac
+    fi
+    printf '%s\n' "$invoke"
+}
+
+# yr_bind_outside <name> <varname>: set <varname> to the absolute path whose
+# canonical file is outside the worktree. Return 1 when <name> is not on
+# PATH. Exit 3 without executing it when the canonical file is inside
+# the worktree or cannot be resolved.
+yr_bind_outside() {
+    local name="$1" dest="$2" path rc=0
+    # A failed if with no else exits 0, which would hide return 2. Keep the
+    # resolver's status.
+    path=$(yr_resolve_tool "$name") && rc=0 || rc=$?
+    case "$rc" in
+        0) printf -v "$dest" '%s' "$path"; return 0 ;;
+        1) return 1 ;;
+        2)
+            printf '[commit-resolve-fixes] Error: %s resolves to a path inside the repository, where a resolver can replace it; remove that directory from PATH; nothing committed\n' "$name" >&2
+            exit 3
+            ;;
+        *)
+            printf '[commit-resolve-fixes] Error: cannot resolve %s to a canonical path outside the repository; nothing committed\n' "$name" >&2
+            exit 3
+            ;;
+    esac
+}
+_yr_rc=0
+YELLOW_REVIEW_GIT=$(yr_resolve_tool git) || _yr_rc=$?
+case "$_yr_rc" in
+    0) git() { "$YELLOW_REVIEW_GIT" "$@"; } ;;
+    1) YELLOW_REVIEW_GIT="" ;;
+    2)
+        printf '[commit-resolve-fixes] Error: git resolves to a path inside the repository, where a resolver can replace it; remove that directory from PATH; nothing committed\n' >&2
+        exit 3
+        ;;
+    *)
+        printf '[commit-resolve-fixes] Error: cannot resolve git to a canonical path outside the repository; nothing committed\n' >&2
+        exit 3
+        ;;
+esac
+unset _yr_rc
+
 check_lib_integrity() {
     local libdir top rel name st blob
     libdir=$(cd -- "$(dirname -- "$0")/../../../lib" 2>/dev/null && pwd -P) || return 0
-    top=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+    [ -n "${YELLOW_REVIEW_GIT:-}" ] || return 0
+    top=$("$YELLOW_REVIEW_GIT" rev-parse --show-toplevel 2>/dev/null) || return 0
     top=$(cd -- "$top" 2>/dev/null && pwd -P) || { printf '[commit-resolve-fixes] Error: cannot resolve the repository root to verify the plugin libraries; nothing committed\n' >&2; return 1; }
     case "$libdir" in "$top"/*) ;; *) return 0 ;; esac
     rel="${libdir#"$top"/}"
     for name in resolve-paths.sh sibling-plugin.sh resolve-text.sh verify-run.sh; do
-        st=$(git -C "$top" -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs \
+        st=$("$YELLOW_REVIEW_GIT" -C "$top" -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs \
                 ls-files -v --error-unmatch -- "$rel/$name" 2>/dev/null) \
             && [ "${st:0:2}" = "H " ] \
-            && blob=$(git -C "$top" rev-parse --verify --quiet "HEAD:$rel/$name" 2>/dev/null) \
+            && blob=$("$YELLOW_REVIEW_GIT" -C "$top" rev-parse --verify --quiet "HEAD:$rel/$name" 2>/dev/null) \
             && [ -n "$blob" ] \
-            && [ "$(git -C "$top" hash-object --no-filters -- "$libdir/$name" 2>/dev/null)" = "$blob" ] \
+            && [ "$("$YELLOW_REVIEW_GIT" -C "$top" hash-object --no-filters -- "$libdir/$name" 2>/dev/null)" = "$blob" ] \
             || { printf '[commit-resolve-fixes] Error: %s is not tracked and unmodified (modified, untracked or hidden from git status); refusing to source it; nothing committed\n' "$rel/$name" >&2; return 1; }
     done
 }
@@ -332,9 +471,9 @@ out_of_range_spans() {
 # --- Check-only mode: report out-of-range files, change nothing ---
 if [ "$CHECK_RANGES" = 1 ]; then
     [ -n "$RANGES_FROM" ] || die 2 "--check-ranges needs --ranges-from"
-    for tool in git jq; do
-        command -v "$tool" >/dev/null 2>&1 || die 2 "$tool not found"
-    done
+    [ -n "${YELLOW_REVIEW_GIT:-}" ] || die 2 "git not found"
+    yr_bind_outside jq YELLOW_REVIEW_JQ || die 2 "jq not found"
+    jq() { "$YELLOW_REVIEW_JQ" "$@"; }
     TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
     cd -- "$TOP"
     REPORT='{"out_of_range":[]}'
@@ -383,9 +522,10 @@ if [ "$MSG_RC" -ne 0 ]; then
     die 2 "--message looks like it contains a credential, an image, a mention or a foreign URL, or could not be scanned; nothing committed"
 fi
 
-for tool in git gh jq; do
-    command -v "$tool" >/dev/null 2>&1 || die 2 "$tool not found"
-done
+[ -n "${YELLOW_REVIEW_GIT:-}" ] || die 2 "git not found"
+yr_bind_outside gh YELLOW_REVIEW_GH || die 2 "gh not found"
+yr_bind_outside jq YELLOW_REVIEW_JQ || die 2 "jq not found"
+jq() { "$YELLOW_REVIEW_JQ" "$@"; }
 
 # Bound every network call. Without a usable timeout binary (macOS without
 # coreutils) calls run unbounded, with one warning before the first of them.
@@ -408,8 +548,9 @@ bounded() {
         "$@"
     fi
 }
-GH_BIN=$(command -v gh)
-# Shadows gh for this script and the sourced rp_pr_files.
+# The one absolute gh resolved above. bounded passes it to timeout, so a
+# PATH lookup cannot replace it. Shadows gh for this script and rp_pr_files.
+GH_BIN=$YELLOW_REVIEW_GH
 gh() { bounded "$NET_TIMEOUT" "$GH_BIN" "$@"; }
 
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
@@ -435,10 +576,12 @@ check_tools_outside_repo() {
         esac
     done
 }
+# gh and jq were bound above to a canonical file outside the worktree.
+# gt and node stay on this directory check; their argv is not rewritten.
 if [ "$PROVIDER" = github ]; then
-    check_tools_outside_repo gh jq node
+    check_tools_outside_repo node
 else
-    check_tools_outside_repo gt gh jq
+    check_tools_outside_repo gt
 fi
 BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || die 2 "HEAD is detached; check out the PR branch"
 
@@ -1061,7 +1204,7 @@ esac
 # Every push URL must show the new head: a push goes to all of them.
 for PUSH_URL in "${PUSH_URLS[@]}"; do
     LS_RC=0
-    LS_OUT=$(bounded "$NET_TIMEOUT" git ls-remote -- "$PUSH_URL" "refs/heads/$BRANCH" 2>"$NET_ERR") || LS_RC=$?
+    LS_OUT=$(bounded "$NET_TIMEOUT" "$YELLOW_REVIEW_GIT" ls-remote -- "$PUSH_URL" "refs/heads/$BRANCH" 2>"$NET_ERR") || LS_RC=$?
     REMOTE=$(printf '%s\n' "$LS_OUT" | awk 'NR == 1 { print $1 }')
     if [ "$REMOTE" != "$SHA" ]; then
         why=$(last_err)

@@ -10,6 +10,114 @@
 # shellcheck source=sibling-plugin.sh
 . "$(dirname -- "${BASH_SOURCE[0]}")/sibling-plugin.sh"
 
+# yr_canon_path <path>: absolute path with every symlink followed, at most
+# 40 hops. A component walk, not dirname and not realpath: a directory
+# symlink and the final file both count. Prints the path. Returns 1 on a
+# loop or an unreadable link. Does not execute the path and writes nothing.
+yr_canon_path() {
+    local input="$1" hops=0
+    local cur="" rest comp next target
+    [ -n "$input" ] || return 1
+    case "$input" in
+        /*) ;;
+        *) input="$(pwd -P)/$input" || return 1 ;;
+    esac
+    rest="${input#/}"
+    while [ -n "$rest" ]; do
+        comp="${rest%%/*}"
+        case "$rest" in
+            */*) rest="${rest#*/}" ;;
+            *) rest="" ;;
+        esac
+        case "$comp" in
+            ''|.) continue ;;
+            ..)
+                case "$cur" in
+                    ""|/) cur="" ;;
+                    /*/*) cur="${cur%/*}" ;;
+                    /*) cur="" ;;
+                esac
+                continue
+                ;;
+        esac
+        case "$cur" in
+            "") next="/$comp" ;;
+            *) next="$cur/$comp" ;;
+        esac
+        if [ -L "$next" ]; then
+            hops=$((hops + 1))
+            [ "$hops" -le 40 ] || return 1
+            target=$(readlink -- "$next") || return 1
+            case "$target" in
+                /*)
+                    cur=""
+                    rest="${target#/}${rest:+/$rest}"
+                    ;;
+                *) rest="${target}${rest:+/$rest}" ;;
+            esac
+            continue
+        fi
+        cur="$next"
+    done
+    [ -n "$cur" ] || return 1
+    printf '%s\n' "$cur"
+}
+
+# yr_worktree_root: the directory that contains .git, walking up from the
+# physical cwd. Does not execute git (the candidate may be the file under test).
+yr_worktree_root() {
+    local d
+    d=$(pwd -P) || return 1
+    while [ -n "$d" ]; do
+        if [ -e "$d/.git" ]; then
+            printf '%s\n' "$d"
+            return 0
+        fi
+        [ "$d" = / ] && return 1
+        d=$(dirname -- "$d")
+    done
+    return 1
+}
+
+# yr_resolve_tool <name>: print one absolute path whose canonical file is
+# outside the worktree. Return 1 when <name> is not on PATH, 2 when that
+# canonical file is inside the worktree, 3 when the path cannot be
+# canonicalized. Does not execute the tool. A caller that already resolved
+# git stores it in YELLOW_REVIEW_GIT; yr_git reuses that and does not look
+# up PATH again. The variable is not written to a file.
+# The printed path is the absolute PATH hit, not the final symlink target:
+# git-ai's canonical file ignores git commands unless argv[0] is named git.
+yr_resolve_tool() {
+    local name="$1" bin canon root invoke
+    bin=$(type -P "$name" 2>/dev/null) || return 1
+    [ -n "$bin" ] || return 1
+    case "$bin" in
+        /*) invoke="$bin" ;;
+        *) invoke="$(pwd -P)/$bin" || return 3 ;;
+    esac
+    canon=$(yr_canon_path "$invoke") || return 3
+    [ -f "$canon" ] || return 3
+    root=$(yr_worktree_root || true)
+    if [ -n "$root" ]; then
+        case "$canon" in
+            "$root"|"$root"/*) return 2 ;;
+        esac
+        case "$invoke" in
+            "$root"|"$root"/*) return 2 ;;
+        esac
+    fi
+    printf '%s\n' "$invoke"
+}
+
+# yr_git: the one git binary. Reuses YELLOW_REVIEW_GIT when a caller resolved
+# it before this file was sourced; otherwise resolves it once.
+yr_git() {
+    if [ -z "${YELLOW_REVIEW_GIT:-}" ]; then
+        YELLOW_REVIEW_GIT=$(yr_resolve_tool git) || return $?
+    fi
+    "$YELLOW_REVIEW_GIT" "$@"
+}
+
 # Git with listed paths taken literally (no globs or pathspec magic). A
 # per-call flag, not GIT_LITERAL_PATHSPECS, so hooks, gt and the verify
 # command never inherit it.
@@ -18,14 +126,14 @@
 # it on a status, diff or index refresh. A resolver can set it in .git/config,
 # which no change check lists, so every lgit call overrides it (and the
 # untracked cache it feeds) before any guard has run.
-lgit() { git -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs "$@"; }
+lgit() { yr_git -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs "$@"; }
 
 # lgit with every git hook disabled (core.hooksPath=/dev/null overrides
 # .git/hooks and any configured hooks directory). For the rollback paths: a
 # resolver can plant or edit an ignored hook that rp_tree_changes does not
 # list, and a file checkout, an index write or a status refresh would run it
 # (post-checkout, post-index-change).
-lgit_nohooks() { git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs "$@"; }
+lgit_nohooks() { yr_git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs "$@"; }
 
 rp_lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 
@@ -91,7 +199,7 @@ rp_runtime_override_rels() {
     local p="${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-}" top cur rest c next t hops=0 raw=0
     [ "${1:-}" = raw ] && raw=1
     [ -n "$p" ] || return 0
-    top=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+    top=$(yr_git rev-parse --show-toplevel 2>/dev/null) || return 0
     top=$(cd -- "$top" 2>/dev/null && pwd -P) || return 0
     case "$p" in
         /*) cur=/ ;;
@@ -142,7 +250,7 @@ rp_runtime_override_rels() {
 rp_runtime_override_untrusted() {
     local top rels rel st
     [ -n "${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-}" ] || return 1
-    top=$(git rev-parse --show-toplevel 2>/dev/null) || return 2
+    top=$(yr_git rev-parse --show-toplevel 2>/dev/null) || return 2
     top=$(cd -- "$top" 2>/dev/null && pwd -P) || return 2
     rels=$(rp_runtime_override_rels raw 2>/dev/null) || return 2
     while IFS= read -r rel; do
@@ -233,10 +341,10 @@ rp_runner() {
     # Exit 1 is "unset". Any other failure (unreadable or invalid config)
     # means the hooks directory is unknown, so treat every path as a runner.
     rc=0
-    hooks=$(git config --get core.hooksPath 2>/dev/null) || rc=$?
+    hooks=$(yr_git config --get core.hooksPath 2>/dev/null) || rc=$?
     [ "$rc" -eq 0 ] || [ "$rc" -eq 1 ] || return 0
     if [ -n "$hooks" ]; then
-        top=$(git rev-parse --show-toplevel 2>/dev/null || true)
+        top=$(yr_git rev-parse --show-toplevel 2>/dev/null || true)
         # Normalise to a path relative to the toplevel: strip an absolute
         # toplevel prefix, leading ./ segments and trailing slashes. Git
         # resolves a relative hooksPath from the toplevel too.
@@ -378,7 +486,7 @@ rp_ignored_changed_since() {
     marker="$mdir/$(basename -- "$marker")"
     (
         local top f out p l rc lrc symlist n=0 hits=""
-        top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 2
+        top=$(yr_git rev-parse --show-toplevel 2>/dev/null) || exit 2
         cd -- "$top" 2>/dev/null || exit 2
         symlist=$(mktemp) || exit 2
         trap 'rm -f -- "$symlist"' EXIT
@@ -474,10 +582,10 @@ rp_ignored_changed_since() {
 rp_hooks_untracked() {
     (
         local hp top gitdir rel cur rest c next kind spec=()
-        top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 2
+        top=$(yr_git rev-parse --show-toplevel 2>/dev/null) || exit 2
         cd -- "$top" 2>/dev/null || exit 2
         top=$(pwd -P) || exit 2
-        hp=$(git rev-parse --git-path hooks 2>/dev/null) || exit 2
+        hp=$(yr_git rev-parse --git-path hooks 2>/dev/null) || exit 2
         [ -n "$hp" ] || exit 2
         [ -d "$hp" ] || exit 1
         # Walk the path as the kernel does: cur is always a physical directory,
@@ -505,7 +613,7 @@ rp_hooks_untracked() {
             fi
         done
         hp=$(cd -- "$hp" 2>/dev/null && pwd -P) || exit 2
-        gitdir=$(git rev-parse --git-common-dir 2>/dev/null) || exit 2
+        gitdir=$(yr_git rev-parse --git-common-dir 2>/dev/null) || exit 2
         gitdir=$(cd -- "$gitdir" 2>/dev/null && pwd -P) || exit 2
         # A hooks directory Git does not list (the git directory) or that lies
         # outside the working tree cannot be judged by tracked state, and a

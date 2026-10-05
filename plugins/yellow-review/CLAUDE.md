@@ -240,6 +240,11 @@ resolution, and sequential stack review. Graphite-native workflow.
   `--trusted` and `--unattended`). The verify gate: interactive runs ask
   first, unattended runs need `verify_unattended: true` and an untracked
   config
+
+`commit-resolve-fixes` and `run-verify-command` refuse a `git`, `gh`, or
+`jq` whose canonical file is inside the worktree, and they exec only the
+absolute path outside it.
+
 - `guard-local-config snapshot | check <dir> <digest> | clear <dir>` — Snapshot the
   ignored `yellow-plugins.local.md` (printing the path and a `digest=<hex>`
   line the caller holds), then detect and restore a resolver edit
