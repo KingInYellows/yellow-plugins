@@ -48,10 +48,12 @@ slug_of() {
   printf '%s' "$1" | tr '/' '-'
 }
 
-@test "tmpfile prints a fresh, not-yet-created path under TMPDIR" {
+@test "tmpfile creates a private empty file under TMPDIR" {
   run "$YS" tmpfile
   [ "$status" -eq 0 ]
-  [ ! -e "$output" ]
+  [ -f "$output" ]
+  [ ! -s "$output" ]
+  [ "$(stat -c %a "$output" 2>/dev/null || stat -f %Lp "$output")" = 600 ]
   [ "$(dirname "$output")" = "$(cd "$TMPDIR" && pwd -P)" ]
   case "$(basename "$output")" in yr-stage.*) ;; *) false ;; esac
 }
@@ -60,7 +62,7 @@ slug_of() {
   p=$(narrative)
   run "$YS" stage 42 "$p"
   [ "$status" -eq 0 ]
-  [ "$output" = "[review:pr] Staged learnings for PR #42; they drain at the next session started in $MAIN." ]
+  [ "$output" = "[review:pr] Staged learnings for PR #42; eligible to drain at a later session in $MAIN (count/age thresholds apply)." ]
   [ ! -e "$p" ]
   f=$(staged review-pr-acme-widgets-42)
   [ -n "$f" ]

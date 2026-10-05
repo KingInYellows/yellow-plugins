@@ -366,8 +366,9 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   `review-pr-<owner>-<repo>-<pr>` under the main checkout's project slug, for
   the drain to score and promote at a later session start. It replaces the
   `knowledge-compounder` spawn, whose confirmation gate stalls unattended.
-  Always exits 0 with one success or `learning staging skipped (<reason>)`
-  line. The compound-staging ledger
+  The `stage` subcommand always exits 0 with one success or
+  `learning staging skipped (<reason>)` line; `tmpfile` creates a private
+  empty file that must be read before Write populates it. The compound-staging ledger
   (`~/.claude/projects/<slug>/compound-staging/`) and the review-findings
   ledger above are separate stores; this script never touches the latter.
 

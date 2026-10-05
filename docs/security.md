@@ -393,6 +393,24 @@ prompt; an interactive run asks before filing an issue. The controls
   enforcement and at least one remains unknown; both exit 0. Without either
   binary installed, no timeout applies.
 
+### Unattended Review Learning Staging (yellow-review / yellow-core)
+
+Unattended reviews write a short model-authored narrative into an empty
+owner-only temporary file created by `stage-learning.sh tmpfile`. The
+command reads it before using the Write tool; narrative text never becomes
+shell source. `stage` accepts only regular, non-symlink `yr-stage.*` files
+directly under the canonical temporary directory and deletes the accepted
+file after the attempt, including failed staging attempts.
+
+Before persistence, `cs_stage_entry` caps input at an 8 KiB line boundary,
+strips invisible/control characters, redacts recognized credential forms,
+and quotes fence and role-prefix lines. Failed redaction suppresses the
+write. The pending JSONL file is owner-only inside a private directory under
+`~/.claude/projects/<main-checkout-slug>/compound-staging/`; repeat reviews
+of the same repository/PR replace its pending entry. The existing drain
+still treats the narrative as untrusted reference data when scoring it.
+This store is separate from the review-findings ledger and is never pushed.
+
 ### Context Observer Persistence (yellow-core)
 
 `/statusline:setup` Step 5b (or `/statusline:setup observer`) offers an

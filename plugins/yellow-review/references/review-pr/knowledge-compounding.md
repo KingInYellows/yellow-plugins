@@ -49,7 +49,8 @@ when done.
    If it prints nothing, log `[review:pr] Warning: learning staging skipped
    (no temp path)` and skip to Step 9b.
 
-3. Write the narrative to the printed path with the Write tool. Never pass
+3. Read the empty file at the printed path, then write the narrative with
+   the Write tool. The helper creates it with owner-only permissions. Never pass
    it through a shell command. Include at most 5 findings: applied ones
    first, then by severity. The format:
 

@@ -16,7 +16,8 @@ each one sequentially with no per-PR prompts. A single upfront
 `AskUserQuestion` confirms the PR list before any work begins; the loop
 runs unattended after that. Failures on individual PRs are logged and
 skipped — the loop never pauses and never aborts on a per-PR failure; only
-the dirty-tree, rate-limit and no-contract stops in Step 4 end it early. Each PR's
+the dirty-tree, rate-limit, no-contract and verify-skipped stops in Step 4
+end it early. Each PR's
 `/review:pr --non-interactive` stages its learnings for yellow-core's
 compound-staging drain; sweep-all runs no compounding pass of its own.
 
@@ -371,8 +372,8 @@ or `applied` (fixed locally, not yet published); attention findings are
 Truncate long titles at ~30 characters with `…` if needed for table
 readability. Both the table and the totals line are required.
 
-Learnings staged by each PR's `/review:pr` drain at the next session started
-in the main checkout; the per-PR sweep output carries the staging line.
+Learnings staged by each PR's `/review:pr` become eligible to drain at later
+sessions in the main checkout once the count or age threshold is met; the per-PR sweep output carries the staging line.
 
 **Final exit (every path, including zero attempts):** read `pending-exit-1`.
 If set, the command exits `1`; otherwise (`pending-exit-1` unset), exit `0`.

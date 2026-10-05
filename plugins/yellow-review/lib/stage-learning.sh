@@ -4,8 +4,8 @@
 #
 # Usage:
 #   stage-learning.sh tmpfile
-#       Print a fresh, not-yet-created narrative path (mktemp -u: the Write
-#       tool can create a new file but will not overwrite one it never read).
+#       Create a private narrative file and print its path. Read the empty
+#       file before using the Write tool to populate it.
 #   stage-learning.sh stage <pr> <narrative_file>
 #       Stage the narrative as review-pr-<owner>-<repo>-<pr> under the main
 #       checkout's compound-staging ledger, then delete the file.
@@ -149,7 +149,7 @@ ys_stage_validated() {
   cs_stage_entry "$project" "review-pr-$(ys_repo_key)-$pr" "$src"
   rc=$?
   case "$rc" in
-    0) printf '[review:pr] Staged learnings for PR #%s; they drain at the next session started in %s.\n' "$pr" "$project" ;;
+    0) printf '[review:pr] Staged learnings for PR #%s; eligible to drain at a later session in %s (count/age thresholds apply).\n' "$pr" "$project" ;;
     2) ys_warn 'jq missing' ;;
     3) ys_warn 'redaction failed' ;;
     4) ys_warn 'write failed' ;;
@@ -161,7 +161,7 @@ ys_main() {
   case "${1:-}" in
     tmpfile)
       local root
-      root=$(ys_tmp_root) && mktemp -u "$root/yr-stage.XXXXXX"
+      root=$(ys_tmp_root) && mktemp "$root/yr-stage.XXXXXX"
       ;;
     stage)
       shift

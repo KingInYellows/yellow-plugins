@@ -1,5 +1,14 @@
 # Feature: Stage unattended sweep learnings
 
+## Implementation status
+
+Implemented and restacked onto current main. The implementation preserves
+sweep-all's dirty-tree, rate-limit, missing-contract, and verify-skipped
+stops. `tmpfile` creates an empty owner-only file; Read precedes Write.
+Staging messages describe count/age eligibility rather than promising a
+drain at the next session. The design discussion below records the original
+planning context.
+
 ## Problem Statement
 
 `knowledge-compounder` always stops at its M3 `AskUserQuestion` gate before

@@ -147,3 +147,13 @@ you want richer library docs:
 ## License
 
 MIT
+
+### Unattended review learnings
+
+The compound-staging ledger also accepts outcome narratives from
+`yellow-review` through `cs_stage_entry`. These entries share the Stop-hook
+schema and the existing scoring, deduplication, and promotion flow. They
+are stored under the main checkout's project slug so removing a review
+worktree does not orphan its learnings. A later session in that checkout
+can drain them once the count or age threshold is met; use
+`/compound:review-staged` to request a manual drain.

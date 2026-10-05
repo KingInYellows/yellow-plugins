@@ -99,6 +99,14 @@ or the clean-tree check stops the run. If verify fails, the fixes are saved
 as a patch under the git common dir and reverted. The full contract is
 `references/resolve/dispositions.md`.
 
+Unattended `/review:pr` runs stage up to five P0–P2 findings for yellow-core's
+background compounding drain instead of starting an interactive compounding
+agent. Each finding retains its outcome label; staging never claims test
+verification. `/review:sweep-all` relies on this per-PR staging and has no
+end-of-loop compounding pass. Entries use the main checkout's project slug
+and become eligible for draining at later sessions there, subject to the
+drain thresholds; interactive review behavior is unchanged.
+
 ## Agents
 
 ### Review (16)

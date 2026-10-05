@@ -1192,8 +1192,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 }
 
 @test "sweep-all: no project command after a verify-skipped stop" {
-  flat=$(tr '
-' ' ' <"$SWEEP_ALL" | tr -s ' ')
+  flat=$(tr '\n' ' ' <"$SWEEP_ALL" | tr -s ' ')
   grep -qF 'no project command may run while that file is on disk.' <<<"$flat"
   run grep -n 'flow:compound' "$SWEEP_ALL"
   [ "$status" -eq 1 ]
