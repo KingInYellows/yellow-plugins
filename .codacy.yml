@@ -18,18 +18,22 @@
 # frontmatter followed by a prose summary, never a top-level heading.
 # markdownlint MD041 ("first line should be a top-level heading") is a
 # structural false positive on every changeset. Consumed + deleted on
-# release. The first five paths below mirror .codacy/codacy.yaml's local
+# release. All four paths below mirror .codacy/codacy.yaml's local
 # excludes (that file already lists .changeset/** too).
 #
-# docs/solutions/**: agent-written knowledge docs with long prose lines.
+# docs/solutions/** is scoped to markdownlint, not a global exclude:
+# other Codacy analyzers should still see those durable docs.
 # markdownlint MD013 (120 columns) fires on most of them and is not a
 # defect there; the frontmatter-title MD025 false positive is handled in
 # .markdownlint.json instead.
+engines:
+  markdownlint:
+    exclude_paths:
+      - "docs/solutions/**"
 exclude_paths:
   - ".changeset/**"
   - "plans/**"
   - "docs/brainstorms/**"
-  - "docs/solutions/**"
   - "RESEARCH/**"
   # Hand-rolled shell lexer for the PreToolUse git-push backstop — high
   # cyclomatic complexity is inherent; parity tests gate behaviour instead.
