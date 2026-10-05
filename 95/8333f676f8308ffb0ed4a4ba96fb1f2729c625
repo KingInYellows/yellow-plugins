@@ -1,0 +1,23 @@
+plugins/yellow-goal/src/cli.ts
+  s_1b3727ca723959::t_dab566ce2fd1c3 17,23-24,127-129,172-295,316-320,381-383,385-389
+plugins/yellow-goal/src/runtime.ts
+  s_1b3727ca723959::t_34b5f6ca35c596 15,22-23,26,29,277,618,657,834-1270
+plugins/yellow-goal/tests/fixtures/fake-engine.mjs
+  s_1b3727ca723959::t_75e0b773026bda 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "958333f676f8308ffb0ed4a4ba96fb1f2729c625",
+  "prompts": {},
+  "sessions": {
+    "s_1b3727ca723959": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c5403a84-1dc1-456b-a735-2bf1bf44aee4",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
