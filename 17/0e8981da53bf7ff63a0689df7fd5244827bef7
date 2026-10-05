@@ -1,0 +1,16 @@
+plugins/yellow-core/lib/quote-ground.sh
+  h_6000354274ce50 113-118,123-126,133,138,151-157,168
+plugins/yellow-core/skills/git-worktree/tests/worktree-manager.bats
+  h_6000354274ce50 27-30,33-35,40-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "170e8981da53bf7ff63a0689df7fd5244827bef7",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
