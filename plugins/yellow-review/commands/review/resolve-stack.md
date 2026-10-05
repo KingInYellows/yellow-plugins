@@ -268,8 +268,8 @@ residual comments, PRs skipped (no open PR / draft / checkout failure).
 
 Finally, a **Needs manual attention** section listing every PR with: residual
 unresolved comments (`>0` from step 3), a restack conflict, a push failure,
-an inconclusive self-verify, or a `skipped (cluster cap)` note
-surfaced by `/review:resolve`. If that section is empty, print
+an inconclusive self-verify, or a `not attempted (cluster cap)` or
+`not attempted (rate limit)` note surfaced by `/review:resolve`. If that section is empty, print
 `[review:resolve-stack] All open PRs in the stack are fully resolved.`
 
 **Exit code contract.** Exit `0` only when every walked PR is fully resolved —

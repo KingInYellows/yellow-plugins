@@ -13,10 +13,12 @@
 #   and {"exists":false} when the viewer has none.
 # Exit codes: 1 other failure, including a transient gh failure,
 #             2 usage, or a thread that belongs to a different pull request,
-#             3 the thread does not exist,
-#             4 rate limited or a gh call timed out (no retry here; the
-#               caller stops mutating; a timed-out create or duplicate close may
-#               have changed state, and a re-run finds the issue by its marker),
+#             3 the thread does not exist (stderr carries a reason=not-found
+#               line),
+#             4 rate limited or a gh call timed out (stderr carries a
+#               reason=rate-limit|timeout line; no retry here; the caller stops
+#               mutating; a timed-out create or duplicate close may have
+#               changed state, and a re-run finds the issue by its marker),
 #             6 text refused: the title or body looks like a credential, has
 #               an image, an @mention or a foreign URL, or could not be
 #               scanned. A refusal prints a `resolve-text:` line, never the
@@ -25,8 +27,9 @@
 #               the line is detail, the code is the signal,
 #             7 permanent refusal: not authenticated (HTTP 401), not permitted
 #               to file (HTTP 403, a token without issue-write) or Issues are
-#               disabled for the repository. Retrying gets the same answer, so
-#               the caller leaves the thread open instead.
+#               disabled for the repository (stderr carries a
+#               reason=auth|permission|issues-disabled line). Retrying gets the
+#               same answer, so the caller leaves the thread open instead.
 # Dedupe: the scan follows every page of the viewer's issues (GraphQL
 #   filterBy.createdBy, server-side, never the lagging search index), so it has
 #   no window to fill.
@@ -34,9 +37,10 @@
 #   rescan (the newest RESCAN_LIMIT issues) and duplicate close only cover two
 #   runs filing for the same thread at the same moment (two sessions on one
 #   PR); a single session never needs them.
-# Env: YELLOW_REVIEW_GH_TIMEOUT (default 30) — seconds per gh call; needs
-#      timeout(1) or gtimeout(1), skipped when neither is installed
-#      (lib/resolve-gh.sh).
+# Env: YELLOW_REVIEW_GH_TIMEOUT (default 30, clamped to 60) — seconds per gh
+#      call; needs timeout(1) or gtimeout(1), skipped when neither is installed
+#      (lib/resolve-gh.sh). At most six gh calls (viewer, issue scan, thread
+#      link, create, post-create scan, duplicate close), so 6 x 60 = 360 s.
 # Contract: references/resolve/dispositions.md
 
 set -eu
@@ -132,19 +136,19 @@ ERR="$WORK_DIR/err"
 gh_fail() {
     _rc=${2:-$?}
     if [ "$_rc" -eq 124 ]; then
-        printf 'Error: gh timed out after %s s on %s.\n' "$RG_GH_TIMEOUT" "$1" >&2
+        printf 'Error: gh timed out after %s s on %s.\nreason=timeout\n' "$RG_GH_TIMEOUT" "$1" >&2
         exit 4
     fi
     if rg_is_rate_limited "$ERR"; then
-        printf 'Error: GitHub rate limit on %s.\n' "$1" >&2
+        printf 'Error: GitHub rate limit on %s.\nreason=rate-limit\n' "$1" >&2
         exit 4
     fi
     if rg_is_auth_failure "$ERR"; then
-        printf 'Error: GitHub rejected the credentials on %s; sign in again.\n' "$1" >&2
+        printf 'Error: GitHub rejected the credentials on %s; sign in again.\nreason=auth\n' "$1" >&2
         exit 7
     fi
     if rg_is_permission_denied "$ERR"; then
-        printf 'Error: not permitted on %s, or Issues are disabled for %s: %s\n' "$1" "$REPO" "$(head -c 300 "$ERR" | tr '\n' ' ')" >&2
+        printf 'Error: not permitted on %s, or Issues are disabled for %s: %s\nreason=permission\n' "$1" "$REPO" "$(head -c 300 "$ERR" | tr '\n' ' ')" >&2
         exit 7
     fi
     printf 'Error: %s failed: %s\n' "$1" "$(head -c 300 "$ERR")" >&2
@@ -234,14 +238,14 @@ fi
 
 # With Issues off, a create fails anyway; say so before the thread lookup.
 if [ "$(cat "$WORK_DIR/issues-enabled")" != true ]; then
-    printf 'Error: Issues are disabled for %s; not filing.\n' "$REPO" >&2
+    printf 'Error: Issues are disabled for %s; not filing.\nreason=issues-disabled\n' "$REPO" >&2
     exit 7
 fi
 
 # A thread that does not exist is not a transient failure: filing an issue for
 # it would leave an orphan.
 thread_not_found() {
-    printf 'Error: Thread %s was not found; refusing to file an issue for it.\n' "$THREAD_ID" >&2
+    printf 'Error: Thread %s was not found; refusing to file an issue for it.\nreason=not-found\n' "$THREAD_ID" >&2
     exit 3
 }
 

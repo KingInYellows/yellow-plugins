@@ -63,8 +63,9 @@ resolution, and sequential stack review. Graphite-native workflow.
   push-confirmation prompt and its Step 9b "save learnings" prompt (used by
   `/review:sweep`)
 - `/review:resolve` — Parallel resolution of unresolved PR review comments via
-  GraphQL. Accepts `--non-interactive` to suppress its spawn-cap, CONFLICT, and
-  push-confirmation gates (used by `/review:resolve-stack` and `/review:sweep`)
+  GraphQL. Accepts `--non-interactive` to suppress its five gates: spawn-cap,
+  CONFLICT, issue-filing, verify-command and push-confirmation (used by
+  `/review:resolve-stack` and `/review:sweep`)
 - `/review:resolve-stack` — Walk the current Graphite stack bottom-up and run
   `/review:resolve --non-interactive` on every open PR fully autonomously (no
   prompts), pushing and restacking as it goes
@@ -149,8 +150,9 @@ resolution, and sequential stack review. Graphite-native workflow.
 
 **Workflow** — orchestration helpers:
 
-- `pr-comment-resolver` — Implements fix for a single review comment (spawned in
-  parallel)
+- `pr-comment-resolver` — Implements one fix per cluster of review comments
+  (spawned in parallel) and proposes a per-thread disposition; it has no Bash
+  tool, and the orchestrator validates and writes everything to GitHub
 
 ### Skills (3)
 
@@ -164,37 +166,51 @@ resolution, and sequential stack review. Graphite-native workflow.
   rails and inline MIT attribution so the rules survive on hosts with no
   tool restriction (not user-invocable)
 
-### Scripts (9)
+### Scripts (11)
 
 - `get-pr-comments [--include-outdated] <owner/repo> <pr>` — Fetch unresolved
   PR review threads via GitHub GraphQL API; outdated threads are excluded
   unless `--include-outdated` is passed; exits 3 (partial array on stdout)
-  when the thread list is truncated; each thread carries `commentsTruncated`
+  when the thread list is truncated (page cap, missing cursor or the 270 s
+  fetch deadline); each thread carries `commentsTruncated`
   (true past the 50 comments fetched), and such a thread is never resolved
 - `get-pr-blockers <owner/repo> <pr>` — Report CHANGES_REQUESTED reviews,
   `reviewDecision`, whether conversation resolution is enforced (read from the
   base branch and the default branch), and `lookupReason` when a lookup failed
 - `reply-pr-thread <PRRT_id> <disposition> <body-file>` — Reply to a review
-  thread with an idempotency marker; skips threads already replied to. Not yet
-  invoked by `/review:resolve`; see `references/resolve/dispositions.md`
-- `resolve-pr-thread` — Resolve a single review thread via GitHub GraphQL
-  mutation
+  thread with an idempotency marker; skips threads already replied to
+  (`/review:resolve` write phase; see `references/resolve/dispositions.md`)
+- `resolve-pr-thread <PRRT_id>` — Resolve a single review thread via GitHub
+  GraphQL mutation; exit 3 (`reason=permission|not-found`) and 4 (rate limit,
+  or a timed-out `gh` call, which may have changed state; same for
+  `reply-pr-thread`, whose re-run skips via its pre-check) are distinct from
+  exit 1
 - `file-followup-issue <owner/repo> <pr> <PRRT_id> <title-file> <body-file>` —
   File (or find) the follow-up issue for an out-of-scope thread, deduped by a
-  viewer-authored marker. `--find <owner/repo> <PRRT_id>` only looks, never
-  files. Not yet invoked by `/review:resolve`; see
-  `references/resolve/dispositions.md`
+  viewer-authored marker; `--find <owner/repo> <PRRT_id>` only looks, never
+  files. The issue gate asks per candidate when interactive; unattended
+  runs file at most 3 per PR per run (`/review:resolve` Step 5; see
+  `references/resolve/dispositions.md`)
 - `check-resolve-text <file>...` — Refuse resolver-written text that looks
   like a credential, or has an image, an `@` mention or a foreign URL (for
   text posted outside the resolve scripts); exits 6
 - `commit-resolve-fixes` — Stage the resolver files, add a new commit and
   verify the result; refuses paths outside the PR, deny-listed paths,
-  credential-shaped added lines and (`--unattended`) runner files. Not yet
-  invoked by `/review:resolve`; see `references/resolve/dispositions.md`
+  credential-shaped added lines and (`--unattended`) runner files; exits 2, 3
+  and 4 are refusals and 5 and 6 keep the local commit (`/review:resolve`
+  Step 6; see `references/resolve/dispositions.md`)
 - `run-verify-command` — Run `resolve_pr.verify_command` under a timeout; on
   failure save a patch and revert the files (`--unattended` skips runner
-  files; `--revert-only`, `--revert-dirty`). Not yet invoked by
-  `/review:resolve`; see `references/resolve/dispositions.md`
+  files and requires `--ignored-since <marker-file>`, which refuses when a
+  gitignored file is newer than the marker; `--revert-only`, `--revert-dirty`;
+  `--check-ignored --ignored-since <marker-file>` runs only that guard, for a
+  resolve with no verify command). The verify gate: interactive runs
+  ask first, unattended runs need `verify_unattended: true` and an untracked
+  config (`/review:resolve` Step 6; see `references/resolve/dispositions.md`)
+- `pr-changed-ranges <pr>` — The PR's changed files and new-side line ranges
+  from the files API (`/review:resolve` resolver envelope)
+- `poll-new-threads --wait <s> ...` — Step 8 re-pass poll for threads that
+  appeared after round 1; always fetches at least once
 - `file-line-counts <diff-base-ref>` — Authoritative base/head line counts per
   changed file for `thermonuclear-reviewer`'s size-threshold rule; the
   header and footer rows are its completeness signal
@@ -203,12 +219,21 @@ resolution, and sequential stack review. Graphite-native workflow.
 `lib/resolve-text.sh` (text screen) before posting and exit 6 on a refusal.
 `reply-pr-thread` and `file-followup-issue` exit 7 on a permanent GitHub
 refusal (not authenticated; for the issue script also no permission or Issues
-disabled).
+disabled). `reply-pr-thread` and `resolve-pr-thread` also source
+`lib/gh-graphql.sh`.
 `commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`
 and `lib/verify-run.sh`.
 
 All live at `skills/pr-review-workflow/scripts/` and are invoked as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`.
+
+### Resolve references
+
+`references/resolve/` holds the `/review:resolve` mechanics loaded by step:
+`dispositions.md` (the contract: vocabulary, downgrade and evidence rules,
+lanes, write order, issue cap, `Resolve:` line), `clusters.md` (clustering and
+the one edit-bounds table), `envelope.md` (resolver prompt and sanitization),
+`branch-check.md` and `memory-recall.md`.
 
 ### Library
 
@@ -225,20 +250,25 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
   failed` when the scan did not run. The posting scripts exit 6 on a refusal;
   callers key on the code and keep the line as detail. The one URL host
   allowed is `RT_ALLOWED_HOST`, else `GH_HOST`, else `github.com`.
-- `lib/resolve-gh.sh` (POSIX sh, sourced by `reply-pr-thread`,
-  `file-followup-issue` and `get-pr-blockers`) — runs `gh` through `rg_gh`
-  under `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s) and returns 124 on a
-  timeout, but only when `timeout(1)` or `gtimeout(1)` is installed; without
+- `lib/resolve-gh.sh` (POSIX sh, sourced by `file-followup-issue`,
+  `get-pr-blockers` and `get-pr-comments`) — runs `gh` through `rg_gh` under
+  `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s, clamped to 60 s) and returns 124 on
+  a timeout, but only when `timeout(1)` or `gtimeout(1)` is installed; without
   either `gh` runs unbounded. It also holds the failure classifiers
   (`rg_is_rate_limited`, `rg_is_auth_failure`, `rg_is_permission_denied`) the
   scripts share; test a rate limit before a permission failure, since a
   secondary rate limit is also an HTTP 403.
+- `lib/gh-graphql.sh` (POSIX sh, sourced by `reply-pr-thread` and
+  `resolve-pr-thread`) — one GraphQL call helper with rate-limit and
+  not-found/permission classification, so both scripts agree on exit codes.
 - `lib/resolve-paths.sh` (bash, sourced by `commit-resolve-fixes` and
   `run-verify-command`) — canonical-path check, the case-insensitive resolver
-  deny list, and the runner-file list (files a git hook or verify command
-  would execute)
+  deny list (agent-tool config dirs and instruction files included), the
+  runner-file list (files a git hook or verify command would execute) and
+  `rp_tree_changes`; a `git config` failure other than exit 1 fails closed
 - `lib/verify-run.sh` (bash, sourced by `run-verify-command`) — timeout,
-  process-group and redacted-log helpers for the verify run
+  process-group and redacted-log helpers for the verify run; `vr_timeout_bin`
+  accepts only a `timeout`/`gtimeout` that supports `--kill-after`
 - `lib/sibling-plugin.sh` (bash, sourced by `review-ledger.sh` and
   `resolve-paths.sh`) — `sp_sibling_file`, the one lookup of a file in a
   sibling plugin: the source tree first, then the newest numeric version in
@@ -299,8 +329,9 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
 - **`/review:pr`** — Review a single PR with adaptive agent selection. Best for
   focused reviews of individual changes.
 - **`/review:resolve`** — Address pending review comments on a single PR. Run
-  after receiving feedback to fix and mark threads resolved. Keeps its
-  spawn-cap and push-confirmation gates for interactive use.
+  after receiving feedback to fix and mark threads resolved. Keeps all five
+  gates (spawn-cap, CONFLICT, issue-filing, verify-command and
+  push-confirmation) for interactive use.
 - **`/review:resolve-stack`** — Resolve comments across an entire Graphite
   stack in one unattended pass. Walks base → tip, runs `/review:resolve` per PR
   with gates suppressed, pushes and restacks autonomously. Best when you have
@@ -382,6 +413,14 @@ with `cache_read_input_tokens` in the transcript (Ctrl-O) on a second
 
 ### MCP Tool Integration
 
+- **yellow-linear** (optional) — `/review:resolve` files out-of-scope follow-up
+  issues through yellow-linear's `save_issue`, `list_issues` and `list_teams`
+  when ToolSearch finds `save_issue` and the branch name carries a Linear
+  issue ID; the issue holds a generated title, the resolver's `oos_reason`, a
+  thread link and a dedupe marker, never the reviewer's comment text.
+  Otherwise, or when Linear fails, it files once on GitHub (the Resolve report
+  names the tracker, e.g. `tracker=github (linear unavailable)`).
+
 - **ruvector** — Recall past learnings at workflow start; tiered remember at
   workflow end (Auto for P0/P1 findings, Prompted for P2). Graceful skip if
   yellow-ruvector not installed.
@@ -420,10 +459,10 @@ explicit-invocation wording live in the skill body and description.
 `bats tests/` from the plugin directory — `get-pr-comments.bats`,
 `get-pr-blockers.bats`, `reply-pr-thread.bats`, `file-followup-issue.bats`,
 `check-resolve-text.bats`, `resolve-paths.bats`, `commit-resolve-fixes.bats`,
-`run-verify-command.bats`, `resolve-pr-thread.bats` (GraphQL fixtures in
-`tests/fixtures/`, fake `gh` in `tests/mocks/gh`), `file-line-counts.bats`
-(pins the thermonuclear line-count invariant alongside
-`skills/pr-review-workflow/scripts/file-line-counts`),
+`run-verify-command.bats`, `pr-changed-ranges.bats`, `poll-new-threads.bats`,
+`resolve-pr-thread.bats` (GraphQL fixtures in `tests/fixtures/`, fake `gh` in
+`tests/mocks/gh`), `file-line-counts.bats` (pins the thermonuclear line-count
+invariant alongside `skills/pr-review-workflow/scripts/file-line-counts`),
 `review-ledger.bats` (throwaway repositories with a bare origin, built by
 `tests/helpers/ledger-repo.bash`; the universal-ctags case skips when ctags is
 absent), `session-start.bats` (the hook's counts, orphan and stale-state

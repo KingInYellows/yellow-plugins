@@ -1437,7 +1437,9 @@ jobs:
     runs-on: ubuntu-latest
     # The required suites took 3m18s before yellow-review's ledger suite
     # (~1 min, builds throwaway git repos per case) landed; 5 left no room.
-    timeout-minutes: 10
+    # The resolve suites later pushed the job to 7-10 min (a run hit the
+    # 10-minute cap in its last advisory step), so 15 keeps headroom.
+    timeout-minutes: 15
     needs: [validate-schemas]
 
     steps:

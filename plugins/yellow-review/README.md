@@ -23,6 +23,35 @@ resolution, and sequential stack review.
 Run `/review:setup` after install to verify the local prerequisites and optional
 yellow-core integration before reviewing real PRs.
 
+## Optional integrations
+
+### yellow-linear (follow-up issues)
+
+`yellow-linear` is an optional dependency. `/review:resolve` files a follow-up
+issue for each out-of-scope review thread. By default it files on GitHub through
+`file-followup-issue`. When the yellow-linear plugin is installed (its
+`save_issue` tool is discoverable) and the branch name matches
+`[A-Z]{2,5}-[0-9]{1,6}`, it files through Linear instead, with the team taken
+from the ID prefix. That means running `/review:resolve` may write to Linear
+through the yellow-linear MCP server (`https://mcp.linear.app/mcp`, OAuth
+browser login on first use; see the yellow-linear README).
+
+- **Dedupe:** every candidate is checked first with `file-followup-issue
+  --find`, so an issue an earlier run filed on GitHub is found. For Linear the
+  command then looks for the thread's marker in the thread's last
+  viewer-authored comment or with a Linear text search, and reuses a hit only
+  when its identifier, URL and marker match. Linear dedupe is best effort; see
+  "Known limits" in `references/resolve/dispositions.md`.
+- **Fallback:** a Linear failure, a response that fails those checks, or an
+  unresolvable team falls back to GitHub once and is reported as
+  `tracker=github (linear unavailable)`.
+- **Text screening:** the resolver's issue title and description go through
+  `check-resolve-text` before `save_issue`. Credential-shaped text is refused,
+  and the issue gets a plain title and body with no resolver text.
+
+Without yellow-linear, or on a branch with no Linear ID, nothing is written to
+Linear.
+
 ## Commands
 
 | Command                 | Description                                                               |
@@ -63,7 +92,7 @@ yellow-core integration before reviewing real PRs.
 
 | Agent                 | Description                                |
 | --------------------- | ------------------------------------------ |
-| `pr-comment-resolver` | Implements fix for a single review comment |
+| `pr-comment-resolver` | Implements one fix per cluster of review comments and proposes a disposition for each thread (no Bash) |
 
 ## Skills
 
@@ -77,19 +106,27 @@ yellow-core integration before reviewing real PRs.
 
 Helpers under `skills/pr-review-workflow/scripts/` that implement the
 mechanical parts of the resolve contract in
-`references/resolve/dispositions.md`. `/review:resolve` does not invoke the
-new ones yet; wiring lands in a later PR of this stack.
+`references/resolve/dispositions.md`. `/review:resolve` invokes
+`get-pr-blockers`, `reply-pr-thread`, `resolve-pr-thread` and
+`file-followup-issue` per that contract; the other helpers below serve the
+fetch, verify, commit and re-pass steps.
 
 | Script | Description |
 | ------ | ----------- |
 | `get-pr-comments` | Unresolved review threads (`--include-outdated` adds outdated ones) |
 | `get-pr-blockers` | `CHANGES_REQUESTED` reviewers and conversation-resolution enforcement |
+| `pr-changed-ranges` | Changed line ranges per file in the PR, for the in-diff check |
+| `file-line-counts` | Before/after line counts per changed file, for the thermonuclear-reviewer's size rule |
 | `reply-pr-thread` | Reply to a thread with an idempotency marker |
 | `resolve-pr-thread` | Resolve a single thread |
 | `file-followup-issue` | File or find the follow-up issue for an out-of-scope thread |
+| `poll-new-threads` | Bounded re-pass poll for threads that appeared after round 1 |
 | `check-resolve-text` | Refuse credential-shaped or unsafe text (image, `@` mention, foreign URL) before it is posted outside the resolve scripts (for example a Linear issue) |
 | `commit-resolve-fixes` | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files |
-| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--unattended` skips runner files; `--revert-only` and `--revert-dirty` revert without running) |
+| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--unattended` skips runner files and requires `--ignored-since <marker-file>`, which refuses when a gitignored file is newer than the marker; `--revert-only` and `--revert-dirty` revert without running; `--check-ignored` runs only the gitignored-file guard) |
+
+Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-paths.sh`,
+`gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.
 
 ## Opt-in: thermonuclear structural review
 

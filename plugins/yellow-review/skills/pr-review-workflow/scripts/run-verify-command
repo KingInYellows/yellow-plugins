@@ -7,6 +7,7 @@
 #                           [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-dirty
+#        run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>
 #   --trusted:     required to run a command. The caller sets it only after
 #                  confirming the command came from an untracked config file
 #                  (unattended) or after the user approved it (interactive).
@@ -32,6 +33,15 @@
 #                  failure. Attended runs may omit it. The revert modes ignore
 #                  it. Ignored changes are refused, never reported as a clean
 #                  tree: treeClean covers tracked and untracked-unignored files.
+#   --check-ignored: run nothing and revert nothing; only the --ignored-since
+#                  guard, for a resolve run that has no verify command (the
+#                  commit still runs hooks, and an ignored file edited by a
+#                  resolver outlives the run). Requires --ignored-since. Prints
+#                  {"result":"clean","patch":null,"log":null} (no "treeClean": it
+#                  never inspects the tree, so the caller keeps its own
+#                  dirty-tree check) and exits 0 when no ignored file is
+#                  newer than the marker; otherwise exits 2 as --ignored-since
+#                  does, and the caller reverts and downgrades `fixed` threads.
 #   --revert-only: run nothing; save the patch and revert the listed files
 #                  (result "reverted"). Deny-listed paths may be reverted. A
 #                  listed file without changes is skipped and named in
@@ -185,6 +195,7 @@ gh() {
 }
 usage() {
     printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] [--ignored-since <marker-file>] | --revert-only | --revert-dirty) [--files-from <file>] [-- <files...>]\n' >&2
+    printf '       run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>\n' >&2
     printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required with --unattended\n' >&2
     exit 2
 }
@@ -208,6 +219,7 @@ while [ $# -gt 0 ]; do
         --unattended) UNATTENDED=1; shift ;;
         --revert-only) [ "$MODE" = revert-dirty ] || MODE=revert-only; shift ;;
         --revert-dirty) MODE=revert-dirty; shift ;;
+        --check-ignored) MODE=check-ignored; shift ;;
         --files-from)
             [ $# -ge 2 ] || usage
             rp_read_file_list "$2" || die 2 "--files-from not readable: $2"
@@ -223,6 +235,14 @@ if [ "$MODE" != run ] && { [ -n "$TIMEOUT$COMMAND_FILE" ] || [ "$TRUSTED$UNATTEN
 fi
 
 [[ "$PR" =~ ^[1-9][0-9]*$ ]] || die 2 "--pr must be a positive integer"
+if [ "$MODE" = check-ignored ]; then
+    [ -n "$IGNORED_SINCE" ] || die 2 "--check-ignored requires --ignored-since <marker-file>"
+    [ "${#FILES[@]}" -eq 0 ] || die 2 "--check-ignored takes no file list"
+    [ -f "$IGNORED_SINCE" ] && [ ! -L "$IGNORED_SINCE" ] && [ -r "$IGNORED_SINCE" ] \
+        || die 2 "--ignored-since marker is not a readable regular file: $IGNORED_SINCE"
+    IGNORED_SINCE=$(cd -- "$(dirname -- "$IGNORED_SINCE")" && pwd)/$(basename -- "$IGNORED_SINCE") \
+        || die 2 "cannot resolve --ignored-since: $IGNORED_SINCE"
+fi
 if [ "$MODE" = run ]; then
     [ "$TRUSTED" = 1 ] || die 2 "refusing to run an untrusted verify command (pass --trusted only after the tracked-file check or user approval)"
     [[ "$TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "--timeout must be a positive integer (seconds)"
@@ -281,6 +301,20 @@ list_tree_changes() {
     [ -n "$CHANGES_FILE" ] || CHANGES_FILE=$(mktemp) || return 1
     rp_tree_changes "$CHANGES_FILE"
 }
+
+if [ "$MODE" = check-ignored ]; then
+    IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"
+    IGN_RC=0
+    IGN_HITS=$(rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH") || IGN_RC=$?
+    case "$IGN_RC" in
+        # No treeClean: this guard never looks at tracked or untracked-unignored
+        # changes (the resolver edits are in the tree by design), so claiming
+        # a clean tree would let the caller skip its own dirty-tree stop.
+        0) jq -nc '{result: "clean", patch: null, log: null}'; exit 0 ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored file): ${IGN_HITS//$'\n'/, }" ;;
+        *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
+    esac
+fi
 
 if [ "$MODE" != revert-only ]; then
     list_tree_changes || die 2 "cannot list tree changes"

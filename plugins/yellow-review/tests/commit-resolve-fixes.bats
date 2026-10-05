@@ -180,7 +180,9 @@ STUB
   [ "$(git log -1 --format=%s)" = "$MSG" ]
   [ "$(git show --name-only --format= HEAD | sort | tr '\n' ' ')" = "src/a.txt src/b.txt " ]
   [ -z "$(git status --porcelain)" ]
-  grep -q '^gt submit --no-interactive --no-edit$' "$STUB_LOG"
+  # --stack publishes the upstack that the commit restacked locally.
+  grep -q '^gt submit --stack --no-interactive --no-edit$' "$STUB_LOG"
+  ! grep -q '^gt submit --no-interactive' "$STUB_LOG"
 }
 
 @test "refuses a leading-dash filename (exit 2) and commits nothing" {
@@ -383,6 +385,167 @@ STUB
   [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
 }
 
+# --- Changed-range bound (--ranges-from) ---
+# src/a.txt at HEAD is "one\nfeature\n": the PR added line 2.
+
+@test "--ranges-from accepts a hunk inside the changed range" {
+  printf 'one\nfeature2\n' >| src/a.txt
+  printf 'src/a.txt 2-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+}
+
+@test "--ranges-from accepts an insertion just after the changed range" {
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  printf 'src/a.txt 2-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+}
+
+@test "--ranges-from refuses a hunk outside the changed range (exit 3, nothing committed)" {
+  seq 1 30 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file" && git push -q origin feature 2>/dev/null
+  base=$(git rev-parse HEAD)
+  sed -i.bak 's/^25$/changed/' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt 1-5\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"outside the PR's changed line ranges: src/a.txt (old lines 25-25)"* ]]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+  [ -z "$(git diff --cached --name-only)" ]
+}
+
+@test "--ranges-from refuses a hunk that straddles the edge of a range" {
+  seq 1 30 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file" && git push -q origin feature 2>/dev/null
+  sed -i.bak '4,10d' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt 1-5\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 3 ]
+}
+
+@test "--ranges-from refuses a file whose row is none, unknown or missing" {
+  printf 'one\nfeature2\n' >| src/a.txt
+  for row in 'src/a.txt none' 'src/a.txt unknown' 'src/b.txt 1-2'; do
+    printf '%s\n' "$row" >| "$BATS_TEST_TMPDIR/ranges"
+    run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+    [ "$status" -eq 3 ]
+  done
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
+@test "--ranges-from with an empty ranges file refuses every file" {
+  printf 'one\nfeature2\n' >| src/a.txt
+  : >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 3 ]
+}
+
+@test "--ranges-from checks every listed file, not just the first" {
+  printf 'one\nfeature2\n' >| src/a.txt
+  printf 'two\nfeature\nextra\nextra\nextra\nextra\nextra\nextra\n' >| src/b.txt
+  printf 'src/a.txt 2-2\nsrc/b.txt 2-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt src/b.txt
+  [ "$status" -eq 0 ]
+}
+
+@test "--ranges-from rejects a malformed or unreadable ranges file (exit 2)" {
+  printf 'src/a.txt 2-\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"malformed row"* ]]
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/nope" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"--ranges-from not readable"* ]]
+}
+
+# --- Check-only mode (--check-ranges) ---
+
+run_check() { run --separate-stderr "$SCRIPT" --check-ranges "$@"; }
+
+@test "--check-ranges prints an empty list when every hunk is inside" {
+  printf 'one\nfeature2\n' >| src/a.txt
+  printf 'src/a.txt 2-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$output" = '{"out_of_range":[]}' ]
+}
+
+@test "--check-ranges lists an out-of-range file with its old-line span" {
+  seq 1 30 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file"
+  sed -i.bak 's/^25$/changed/' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt 1-5\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(jq -c . <<<"$output")" = '{"out_of_range":[{"path":"src/a.txt","old_lines":["25-25"]}]}' ]
+}
+
+@test "--check-ranges lists every out-of-range span of a file" {
+  seq 1 40 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file"
+  sed -i.bak -e 's/^20$/x/' -e 's/^30$/y/' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt 1-5\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(jq -c '.out_of_range[0].old_lines' <<<"$output")" = '["20-20","30-30"]' ]
+}
+
+@test "--check-ranges lists only the offending file among several" {
+  seq 1 30 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file"
+  sed -i.bak 's/^25$/changed/' src/a.txt && rm -f src/a.txt.bak
+  printf 'two\nfeature2\n' >| src/b.txt
+  printf 'src/a.txt 1-5\nsrc/b.txt 2-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  printf 'src/a.txt\nsrc/b.txt\n' >| "$BATS_TEST_TMPDIR/files"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.out_of_range | map(.path) | join(",")' <<<"$output")" = "src/a.txt" ]
+}
+
+@test "--check-ranges lists a file whose row is none, unknown or missing" {
+  printf 'one\nfeature2\n' >| src/a.txt
+  for row in 'src/a.txt none' 'src/a.txt unknown' 'src/b.txt 1-2'; do
+    printf '%s\n' "$row" >| "$BATS_TEST_TMPDIR/ranges"
+    run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+    [ "$status" -eq 0 ]
+    [ "$(jq -r '.out_of_range[0].path' <<<"$output")" = "src/a.txt" ]
+  done
+}
+
+@test "--check-ranges stages and commits nothing and needs no provider" {
+  seq 1 30 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file"
+  base=$(git rev-parse HEAD)
+  sed -i.bak 's/^25$/changed/' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt 1-5\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+  [ -z "$(git diff --cached --name-only)" ]
+  [ "$(git diff --name-only)" = "src/a.txt" ]
+  [ ! -s "$STUB_LOG" ]
+}
+
+@test "--check-ranges needs --ranges-from and rejects a bad ranges file (exit 2)" {
+  run_check -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"--check-ranges needs --ranges-from"* ]]
+  printf 'src/a.txt 2-\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"malformed row"* ]]
+  run_check --ranges-from "$BATS_TEST_TMPDIR/nope" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"--ranges-from not readable"* ]]
+}
+
+@test "--check-ranges rejects a non-canonical path (exit 2)" {
+  printf 'src/a.txt 2-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- ./src/a.txt
+  [ "$status" -eq 2 ]
+}
+
 @test "an unreadable PR file list refuses the commit (exit 3)" {
   printf 'one\nfeature\nfix\n' >| src/a.txt
   export STUB_PR_FILES_FAIL=1
@@ -512,6 +675,98 @@ STUB
   [ -z "$(git diff --cached --name-only)" ]
   [ "$(git status --porcelain | sort | tr '\n' ' ')" = " M src/a.txt  M src/b.txt " ]
   ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+@test "a hook that edits a listed file outside the changed range makes the commit undo itself (exit 4)" {
+  seq 1 30 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file" && git push -q origin feature 2>/dev/null
+  printf '#!/bin/sh\nsed -i.bak "s/^25$/changed/" src/a.txt && rm -f src/a.txt.bak && git add src/a.txt\n' >| .git/hooks/pre-commit
+  chmod +x .git/hooks/pre-commit
+  track_git_hooks pre-commit
+  sed -i.bak 's/^3$/three/' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt 1-5\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 4 ]
+  [[ "$stderr" == *"committed change outside the PR's changed line ranges: src/a.txt (old lines 25-25; a hook changed it)"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ -z "$(git diff --cached --name-only)" ]
+  ! grep -q '^gt submit' "$STUB_LOG"
+}
+
+# --- The changed-line cap (MAX_CHANGED_LINES = 50) ---
+
+# long_file: src/a.txt of 100 lines, committed and pushed; every line is in the changed range.
+long_file() {
+  seq 1 100 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file" && git push -q origin feature 2>/dev/null
+  printf 'src/a.txt 1-100\n' >| "$BATS_TEST_TMPDIR/ranges"
+}
+
+@test "--ranges-from refuses an insertion longer than the 50-line cap even inside the range (exit 3)" {
+  long_file
+  base=$(git rev-parse HEAD)
+  { head -n 5 src/a.txt; seq 1000 1050; tail -n +6 src/a.txt; } >| "$BATS_TEST_TMPDIR/new.txt" && cp "$BATS_TEST_TMPDIR/new.txt" src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"exceeds the 50-line cap"* ]]
+  [ "$(git rev-parse HEAD)" = "$base" ]
+  [ -z "$(git diff --cached --name-only)" ]
+}
+
+@test "--ranges-from accepts an insertion of exactly 50 lines" {
+  long_file
+  { head -n 5 src/a.txt; seq 1000 1049; tail -n +6 src/a.txt; } >| "$BATS_TEST_TMPDIR/new.txt" && cp "$BATS_TEST_TMPDIR/new.txt" src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+}
+
+@test "--ranges-from counts many small hunks together against the cap" {
+  long_file
+  sed -i.bak -e 's/^\([0-9]*[0-5]\)$/x\1/' src/a.txt && rm -f src/a.txt.bak
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"exceeds the 50-line cap"* ]]
+}
+
+@test "the cap is shared by every listed file, and without --ranges-from it does not apply" {
+  long_file
+  seq 1 100 >| src/b.txt
+  git add src/b.txt && git commit -q -m "chore: second file" && git push -q origin feature 2>/dev/null
+  printf 'src/a.txt 1-100\nsrc/b.txt 1-100\n' >| "$BATS_TEST_TMPDIR/ranges"
+  sed -i.bak -e '1,30s/$/x/' src/a.txt && sed -i.bak -e '1,30s/$/x/' src/b.txt && rm -f src/a.txt.bak src/b.txt.bak
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt src/b.txt
+  [ "$status" -eq 3 ]
+  [[ "$stderr" == *"exceeds the 50-line cap"* ]]
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt src/b.txt
+  [ "$status" -eq 0 ]
+}
+
+@test "--check-ranges marks every listed file over-cap when the total exceeds 50 changed lines" {
+  long_file
+  seq 1 100 >| src/b.txt
+  git add src/b.txt && git commit -q -m "chore: second file"
+  printf 'src/a.txt 1-100\nsrc/b.txt 1-100\n' >| "$BATS_TEST_TMPDIR/ranges"
+  sed -i.bak -e '1,30s/$/x/' src/a.txt && sed -i.bak -e '1,30s/$/x/' src/b.txt && rm -f src/a.txt.bak src/b.txt.bak
+  printf 'src/a.txt\nsrc/b.txt\n' >| "$BATS_TEST_TMPDIR/files"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$status" -eq 0 ]
+  [ "$(jq -c '[.out_of_range[] | [.path, .old_lines]]' <<<"$output")" = '[["src/a.txt",["over-cap"]],["src/b.txt",["over-cap"]]]' ]
+  # a file that is also out of range keeps its span and gains the marker
+  printf 'src/a.txt 1-5\nsrc/b.txt 1-100\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" --files-from "$BATS_TEST_TMPDIR/files"
+  [ "$(jq -c '.out_of_range[0].old_lines' <<<"$output")" = '["1-30","over-cap"]' ]
+}
+
+@test "a hook that adds more than 50 lines to a listed file in range makes the commit undo itself (exit 4)" {
+  long_file
+  printf '#!/bin/sh\nseq 2000 2060 >> src/a.txt && git add src/a.txt\n' >| .git/hooks/pre-commit
+  chmod +x .git/hooks/pre-commit
+  track_git_hooks pre-commit
+  printf 'src/a.txt 1-200\n' >| "$BATS_TEST_TMPDIR/ranges"
+  sed -i.bak 's/^3$/three/' src/a.txt && rm -f src/a.txt.bak
+  run_crf --provider graphite --pr 7 --message "$MSG" --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 4 ]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
 }
 
 @test "a rejected graphite commit restacks the upstack back onto the reset branch" {

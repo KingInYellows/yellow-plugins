@@ -311,11 +311,14 @@ rp_tree_changes() {
 # is hidden behind a directory that cannot be searched. Run it from the working
 # tree root with a path that does not begin with `-`.
 rp_link_target_changed() {
-    local l="$1" marker="$2" t p d out rc=0
+    local l="$1" marker="$2" t p d out skip="" rc=0
     if [ -e "$l" ]; then
         if [ -d "$l" ]; then
+            # The root `.ruvector` link: skip its session log as the literal
+            # directory scan does (see rp_ignored_changed_since).
+            case "$l" in .ruvector|./.ruvector) skip="$l/coedit-sessions" ;; esac
             out=$(set -o pipefail
-                find -H "$l" -name .git -prune -o -type f -newer "$marker" -print 2>/dev/null \
+                find -H "$l" -name .git -prune -o -path "$skip" -prune -o -type f -newer "$marker" -print 2>/dev/null \
                     | head -n 1) || rc=$?
             [ -z "$out" ] || return 0
             [ "$rc" -eq 0 ] || return 2
@@ -358,7 +361,9 @@ rp_link_target_changed() {
 # write through the link leaves the link's mtime alone: see
 # rp_link_target_changed. Every ignored symlink is examined, those inside
 # ignored directories included. `.git` is skipped as a walked directory, not
-# as a link target. Prints up to 20
+# as a link target. `.ruvector/coedit-sessions` (the session log yellow-ruvector's
+# PostToolUse hook rewrites on every resolver Edit) is skipped entirely: it is
+# data nothing executes, and counting it would refuse every verify run. Prints up to 20
 # repository-relative paths, one per line (control characters shown as `?`,
 # never file contents), and returns 1 when any file changed; a symlink is named
 # by its own path. Returns 0 when none did and 2 when it cannot tell: the
@@ -380,6 +385,7 @@ rp_ignored_changed_since() {
         lgit ls-files --others --ignored --exclude-standard --directory -z >|"$scratch" 2>/dev/null || exit 2
         while IFS= read -r -d '' f; do
             case "$f" in .git|.git/*|*/.git|*/.git/*) continue ;; esac
+            case "$f" in .ruvector/coedit-sessions|.ruvector/coedit-sessions/) continue ;; esac
             out=""
             rc=0
             if [ "${f%/}" != "$f" ]; then
@@ -387,11 +393,11 @@ rp_ignored_changed_since() {
                 # tree rewritten end to end cannot fill memory; a find that
                 # fails with nothing found is "cannot tell".
                 out=$(set -o pipefail
-                    find "./$f" -name .git -prune -o \( -type f -o -type l \) -newer "$marker" -print 2>/dev/null \
+                    find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o \( -type f -o -type l \) -newer "$marker" -print 2>/dev/null \
                         | head -n 20) || rc=$?
                 if [ -z "$out" ] && [ "$rc" -eq 0 ]; then
                     # Nothing newer: judge the target of each symlink inside.
-                    find "./$f" -name .git -prune -o -type l -print0 >|"$symlist" 2>/dev/null || exit 2
+                    find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o -type l -print0 >|"$symlist" 2>/dev/null || exit 2
                     while IFS= read -r -d '' l; do
                         lrc=0
                         rp_link_target_changed "$l" "$marker" || lrc=$?

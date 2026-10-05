@@ -9,17 +9,31 @@
 #   the thread has more comments than the 50 fetched), isOutdated,
 #   viewerCanResolve, viewerCanReply, originalLine and originalStartLine (the
 #   anchor when the comment was made; line is null once a thread is outdated)
-#   and diffHunk (the first comment's hunk, only for an outdated thread, else
+#   and diffHunk (the first comment's hunk, capped at 2000 characters, else
 #   null). diffHunk is repository text, not reviewer prose, but a resolver
 #   treats it as untrusted data all the same.
 # Errors: Exit 1 with a message to stderr for every failure, usage errors
 #   included; callers key on zero vs non-zero and the rate-limit wording.
-# Truncation: when the thread list hits the page cap or GitHub returns no
-#   cursor, the script exits 3 with a message on stderr and the threads
-#   fetched so far on stdout (still a plain array), so a partial list is
-#   never mistaken for the full one. A caller that stops on any non-zero
-#   exit needs no change. Per-thread comment truncation (more than 50
-#   comments) is the commentsTruncated field, not an exit code.
+# Truncation: when the thread list hits the page cap, GitHub returns no
+#   cursor, or the wall-clock deadline below expires, the script exits 3 with
+#   a message on stderr and the threads fetched so far on stdout (still a
+#   plain array), so a partial list is never mistaken for the full one. A
+#   caller that stops on any non-zero exit needs no change. Per-thread
+#   comment truncation (more than 50 comments) is the commentsTruncated
+#   field, not an exit code.
+# Time bounds: every gh call runs under timeout(1) or gtimeout(1) when one is
+#   installed (lib/resolve-gh.sh: YELLOW_REVIEW_GH_TIMEOUT, default 30,
+#   clamped to 60 s per call; a killed call exits 1 as "gh timed out").
+#   Without either binary gh runs unbounded and a note goes to stderr. An
+#   overall deadline is checked before each page: YELLOW_REVIEW_FETCH_DEADLINE
+#   (seconds, default 270, clamped to 1..270; a non-number, 0 or a value over
+#   4 digits falls back to 270). On expiry the script stops paginating,
+#   prints "get-pr-comments: deadline reached" on stderr and exits 3 with the
+#   partial array. From page 2 on each call's limit is also cut to the time
+#   the deadline has left (a call killed that way counts as the deadline),
+#   so the worst case is the deadline plus jq and startup, inside the
+#   300000 ms Bash tool timeout resolve-pr.md gives the call
+#   (references/resolve/dispositions.md, "Bash timeouts").
 
 set -euo pipefail
 
@@ -77,6 +91,28 @@ esac
 MAX_PAGES=10
 PAGE_SIZE=100
 
+# --- Bounded gh calls (rg_gh, RG_GH_TIMEOUT) ---
+RG_LIB="$(dirname -- "$0")/../../../lib/resolve-gh.sh"
+if [ ! -r "$RG_LIB" ]; then
+    printf 'Error: lib/resolve-gh.sh not readable: %s\n' "$RG_LIB" >&2
+    exit 1
+fi
+# shellcheck source=../../../lib/resolve-gh.sh
+. "$RG_LIB"
+GH_CALL_CAP=$RG_GH_TIMEOUT
+
+# Overall wall-clock deadline in seconds (see header). 0, a non-number or a
+# value over 4 digits falls back to the 270 s default; a larger valid value is
+# clamped to it, so the Bash tool timeout always covers the worst case.
+MAX_DEADLINE=270
+FETCH_DEADLINE="${YELLOW_REVIEW_FETCH_DEADLINE:-$MAX_DEADLINE}"
+case "$FETCH_DEADLINE" in ''|*[!0-9]*) FETCH_DEADLINE=$MAX_DEADLINE ;; esac
+[ "${#FETCH_DEADLINE}" -le 4 ] || FETCH_DEADLINE=$MAX_DEADLINE
+[ "$FETCH_DEADLINE" -gt 0 ] 2>/dev/null || FETCH_DEADLINE=$MAX_DEADLINE
+[ "$FETCH_DEADLINE" -le "$MAX_DEADLINE" ] || FETCH_DEADLINE=$MAX_DEADLINE
+# Force base 10: a zero-padded value ("08", "010") is octal inside $((...)).
+FETCH_DEADLINE=$((10#$FETCH_DEADLINE))
+
 # --- GraphQL query with cursor pagination ---
 # shellcheck disable=SC2016
 QUERY='
@@ -122,8 +158,24 @@ TRUNCATED=false
 _STDERR_FILE=$(mktemp)
 trap 'rm -f "$_STDERR_FILE"' EXIT
 
+START_TS=$(date +%s)
 while true; do
+    # Deadline check before every page after the first: stop with what we have.
+    _ELAPSED=$(($(date +%s) - START_TS))
+    if [ "$PAGE" -ge 1 ] && [ "$_ELAPSED" -ge "$FETCH_DEADLINE" ]; then
+        printf 'get-pr-comments: deadline reached\n' >&2
+        TRUNCATED=true
+        break
+    fi
     PAGE=$((PAGE + 1))
+    # From page 2 on, cut this call's limit to the time the deadline has left
+    # (at least 1 s). Page 1 always gets the full per-call limit.
+    RG_GH_TIMEOUT=$GH_CALL_CAP
+    if [ "$PAGE" -gt 1 ]; then
+        _LEFT=$((FETCH_DEADLINE - _ELAPSED))
+        [ "$_LEFT" -ge 1 ] || _LEFT=1
+        [ "$_LEFT" -ge "$RG_GH_TIMEOUT" ] || RG_GH_TIMEOUT=$_LEFT
+    fi
 
     # Execute query — separate stdout from stderr to avoid gh warnings poisoning JSON
     # Use && ... || to capture exit code without triggering set -e on failure
@@ -132,7 +184,7 @@ while true; do
     else
         CURSOR_ARGS=(-f cursor="$CURSOR")
     fi
-    RESPONSE=$(gh api graphql \
+    RESPONSE=$(rg_gh api graphql \
         -f owner="$OWNER" \
         -f name="$NAME" \
         -F "number=$PR_NUMBER" \
@@ -140,9 +192,20 @@ while true; do
         -F "pageSize=$PAGE_SIZE" \
         -f query="$QUERY" 2>"$_STDERR_FILE") && _GH_EXIT=0 || _GH_EXIT=$?
     _GH_STDERR=$(cat "$_STDERR_FILE")
+    if [ "$_GH_EXIT" -eq 124 ] && [ -n "$RG_TIMEOUT_BIN" ]; then
+        # A call cut short by the deadline after page 1 is the deadline.
+        if [ "$PAGE" -gt 1 ] && [ $(($(date +%s) - START_TS)) -ge "$FETCH_DEADLINE" ]; then
+            printf 'get-pr-comments: deadline reached\n' >&2
+            TRUNCATED=true
+            break
+        fi
+        printf 'Error: gh timed out after %ss (page %d). Retry later.\n' "$RG_GH_TIMEOUT" "$PAGE" >&2
+        exit 1
+    fi
     if [ "$_GH_EXIT" -ne 0 ]; then
         # Parse error category from stderr. Rate limits come first: GitHub
-        # reports a secondary rate limit as HTTP 403. Status codes match only
+        # reports a secondary rate limit as HTTP 403, and callers
+        # (poll-new-threads) detect it by the "rate limit" wording. Status codes match only
         # as "HTTP <code>", so digits elsewhere in the text do not classify.
         _GH_LC=$(printf '%s' "$_GH_STDERR" | tr '[:upper:]' '[:lower:]')
         case "$_GH_LC" in
@@ -257,7 +320,7 @@ OUTPUT=$(printf '%s' "$ALL_THREADS" | jq --argjson includeOutdated "$INCLUDE_OUT
         viewerCanReply: (.viewerCanReply // false),
         originalLine: (.originalLine // null),
         originalStartLine: (.originalStartLine // null),
-        diffHunk: (if (.isOutdated // false) then (.comments.nodes[0].diffHunk // null) else null end)
+        diffHunk: ((.comments.nodes[0].diffHunk // null) | if type == "string" then .[0:2000] else null end)
       }
   ]') || {
     printf 'Error: Failed to transform GraphQL response.\n' >&2

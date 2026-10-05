@@ -451,7 +451,7 @@ Decisions from the brainstorm and the planning round:
 
 ### Phase 2: Resolver agent and `/review:resolve`
 
-- [ ] 2.1: Update `agents/workflow/pr-comment-resolver.md`.
+- [x] 2.1: Update `agents/workflow/pr-comment-resolver.md`.
   - Add the per-thread `THREAD` lines after the existing output block. Keep
     `Status`, `CONFLICT:` and `Files modified` unchanged.
   - Add these rules:
@@ -462,7 +462,7 @@ Decisions from the brainstorm and the planning round:
     - never reply, resolve or file.
   - Point to `references/resolve/dispositions.md` rather than restating it.
     Stay under 300 lines.
-- [ ] 2.2: Update `commands/review/resolve-pr.md` Steps 1–4.
+- [x] 2.2: Update `commands/review/resolve-pr.md` Steps 1–4.
   - Step 1: add the issue-filing prompt to the gates that `--non-interactive`
     suppresses.
   - Step 3: call `get-pr-comments --include-outdated`. Run `get-pr-blockers`
@@ -478,7 +478,7 @@ Decisions from the brainstorm and the planning round:
 > 3d/4/5/6/7/8"). A PR with only LGTM threads must still reach the write phase,
 > resolve them, and print the `Resolve:` line.
 <!-- /deepen-plan -->
-- [ ] 2.3: Replace Steps 5–9 of `resolve-pr.md` with:
+- [x] 2.3: Replace Steps 5–9 of `resolve-pr.md` with:
   - **Step 5, Dispositions:**
     - parse `THREAD` lines and apply the downgrade and evidence rules;
     - apply the human-thread and `viewerCanResolve` lanes;
@@ -524,15 +524,15 @@ Decisions from the brainstorm and the planning round:
 > exit (5). Add a `gh pr view --json state` check before the write phase and
 > again before the re-pass.
 <!-- /deepen-plan -->
-- [ ] 2.4: Update `plugins/yellow-core/skills/local-config/SKILL.md`. Document
+- [x] 2.4: Update `plugins/yellow-core/skills/local-config/SKILL.md`. Document
   these keys, each with a default, validation rule and warning fallback:
   - `resolve_pr.cluster_cap` (currently undocumented);
   - `resolve_pr.verify_command` (string);
   - `resolve_pr.verify_unattended` (default `false`, boolean; any value other
     than `true` warns and is treated as `false`, so unattended runs skip
     verify);
-  - `resolve_pr.verify_timeout_seconds` (default 600);
-  - `resolve_pr.repass_wait_seconds` (default 120, range 0–600);
+  - `resolve_pr.verify_timeout_seconds` (default 540, range 1–540);
+  - `resolve_pr.repass_wait_seconds` (default 120, range 0–480);
   - `resolve_pr.resolve_human_threads` (`evidence|never|all`).
 
   Note that unattended runs skip `verify_command` when the file is tracked.
@@ -833,6 +833,6 @@ Decisions from the brainstorm and the planning round:
 ## Stack Progress
 <!-- Updated by flow:work. Do not edit manually. -->
 - [x] 1. agent/feat/resolve-thread-scripts (completed 2026-09-30)
-- [ ] 2. agent/feat/resolve-commit-verify-scripts
+- [x] 2. agent/feat/resolve-commit-verify-scripts (completed 2026-09-30)
 - [ ] 3. agent/fix/resolve-dispositions
 - [ ] 4. agent/feat/resolve-stack-callers

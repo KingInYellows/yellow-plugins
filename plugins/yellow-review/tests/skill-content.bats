@@ -217,7 +217,8 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   grep -q 'Never print the full fold' "$TRIAGE"
   tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'Never put a title, reason or other stored'
   grep -q '"\$RL" resolve-path <PR> <finding_id> --head <headRefOid>' "$TRIAGE"
-  ! grep -q 'validate-path anchor <headRefOid> "<file>"' "$TRIAGE"
+  run grep -q 'validate-path anchor <headRefOid> "<file>"' "$TRIAGE"
+  [ "$status" -eq 1 ]
   grep -q -- '--reason "$(cat <reason-file>)"' "$TRIAGE"
 }
 
@@ -253,7 +254,8 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   cards=$(grep -n '"\$RL" cards <PR>' "$TRIAGE" | cut -d: -f1)
   [ "$rec" -lt "$cards" ]
   grep -q '"\$RL" prune <PR>' "$TRIAGE"
-  ! grep -q 'rm -' "$TRIAGE"
+  run grep -q 'rm -' "$TRIAGE"
+  [ "$status" -eq 1 ]
 }
 
 @test "triage: a closed PR's ledger is never pruned unattended; attended prune asks first" {
@@ -262,7 +264,8 @@ TRIAGE="$COMMANDS_DIR/triage.md"
   grep -qF 'ask one AskUserQuestion, "Delete the ledger for closed PR #<n>?", with the options "Delete" and "Keep"; after a failed refresh, append "(state not recorded, exit <N>)" to the question. Run Step 2 only on "Delete"; either way, stop.' <<<"$step3"
   # Step 2 (prune) is named only by those two bullets
   [ "$(grep -o 'Step 2' <<<"$step3" | wc -l)" -eq 2 ]
-  ! grep -q 'run Step 2 and stop' "$TRIAGE"
+  run grep -q 'run Step 2 and stop' "$TRIAGE"
+  [ "$status" -eq 1 ]
 }
 
 @test "triage: a closed PR's state is recorded before the prune question" {
@@ -316,8 +319,10 @@ assert_head_ref_checkout() {
   [ "$(printf '%s' "$block" | grep -n 'case "$head_ref"' | cut -d: -f1)" -lt \
     "$(printf '%s' "$block" | grep -n 'check-ref-format' | cut -d: -f1)" ]
   # the value is never templated into command text anywhere in the file
-  ! grep -qE '"<headRefName>"|"<branch>"' "$f"
-  ! grep -qE '(gt|git) checkout <(headRefName|branch)>' "$f"
+  run grep -qE '"<headRefName>"|"<branch>"' "$f"
+  [ "$status" -eq 1 ]
+  run grep -qE '(gt|git) checkout <(headRefName|branch)>' "$f"
+  [ "$status" -eq 1 ]
 }
 
 @test "review-pr: headRefName is captured into a variable and validated before any command" {
@@ -355,7 +360,8 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   grep -qF 'Always, whatever step 1 did:** print' <<<"$block"
   grep -qF '[review:sweep-all] No open non-draft PRs found. Nothing to sweep.' <<<"$block"
   # the exit is not conjoined with the prune condition
-  ! grep -q 'empty (`\[\]` or length 0) and the prune list' <<<"$block"
+  run grep -q 'empty (`\[\]` or length 0) and the prune list' <<<"$block"
+  [ "$status" -eq 1 ]
 }
 
 @test "sweep: unattended triage never prunes a PR that closed after the state check" {
@@ -375,7 +381,8 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   grep -q "jq 'length')\" -lt 1000 \] || { printf 'skip" "$SWEEP_ALL"
   grep -q '`--prune <PR#>`' "$SWEEP_ALL"
   # the prune query covers every author, not the --author @me sweep list
-  ! grep -q 'gh pr list --state open --limit 1000 --json number.*--author' "$SWEEP_ALL"
+  run grep -q 'gh pr list --state open --limit 1000 --json number.*--author' "$SWEEP_ALL"
+  [ "$status" -eq 1 ]
 }
 
 @test "sweep-all: the summary table carries a Residual column from the ledger" {
@@ -403,6 +410,347 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   grep -q 'only when the value is exactly' "$REVIEW_PR"
   grep -q '/tmp/council-codex-fenced-<suffix>.txt' "$REVIEW_PR"
   grep -q 'never unlinked' "$REVIEW_PR"
+}
+
+# --- resolve write phase (contract tokens) ----------------------------------
+
+RESOLVE_PR="$COMMANDS_DIR/resolve-pr.md"
+RESOLVE_REFS="$BATS_TEST_DIRNAME/../references/resolve"
+RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
+
+@test "resolve-pr: HEAD check precedes the fetch and the write phase" {
+  head_check=$(grep -n '^### Step 2c: Verify HEAD Matches the PR Head' "$RESOLVE_PR" | cut -d: -f1)
+  fetch=$(grep -n '^### Step 3: Fetch Unresolved Comments' "$RESOLVE_PR" | cut -d: -f1)
+  [ "$head_check" -lt "$fetch" ]
+  grep -q 'headRefOid' "$RESOLVE_PR"
+}
+
+@test "resolve-pr: steps run in order dispositions, verify/commit/push, write, re-pass, report" {
+  s5=$(grep -n '^### Step 5: Dispositions' "$RESOLVE_PR" | cut -d: -f1)
+  s6=$(grep -n '^### Step 6: Verify, Commit and Push' "$RESOLVE_PR" | cut -d: -f1)
+  s7=$(grep -n '^### Step 7: Write Phase' "$RESOLVE_PR" | cut -d: -f1)
+  s8=$(grep -n '^### Step 8: Bounded Re-pass' "$RESOLVE_PR" | cut -d: -f1)
+  s9=$(grep -n '^### Step 9: Report' "$RESOLVE_PR" | cut -d: -f1)
+  [ "$s5" -lt "$s6" ] && [ "$s6" -lt "$s7" ] && [ "$s7" -lt "$s8" ] && [ "$s8" -lt "$s9" ]
+}
+
+@test "resolve-pr: write phase invokes every script with its load-bearing flags" {
+  grep -qF 'scripts/run-verify-command" --pr "<PR#>" --timeout' "$RESOLVE_PR"
+  grep -q -- '--revert-dirty' "$RESOLVE_PR"
+  grep -q -- '--revert-only --files-from' "$RESOLVE_PR"
+  grep -qF 'scripts/commit-resolve-fixes" --provider "<graphite|github>"' "$RESOLVE_PR"
+  grep -q -- '--allow-credential-shaped' "$RESOLVE_PR"
+  grep -qF -- '--ranges-from "<ranges-file>"' "$RESOLVE_PR"
+  grep -q 'scripts/file-followup-issue"' "$RESOLVE_PR"
+  grep -q 'scripts/reply-pr-thread"' "$RESOLVE_PR"
+  grep -q 'scripts/resolve-pr-thread"' "$RESOLVE_PR"
+  grep -q 'scripts/poll-new-threads"' "$RESOLVE_PR"
+}
+
+@test "resolve-pr: only a PUSHED result keeps fixed threads fixed; refusals revert" {
+  grep -q '`PUSHED` → `push=ok`' "$RESOLVE_PR"
+  grep -q 'Only `PUSHED`' "$RESOLVE_PR"
+  grep -q 'a refused edit must not stay' "$RESOLVE_PR"
+  grep -q 'never substitute `git rev-parse`' "$RESOLVE_PR"
+}
+
+@test "resolve-pr: Resolve line and blockers unknown are reported" {
+  grep -q 'ends with a Resolve: line' "$RESOLVE_PR"
+  grep -q 'CHANGES_REQUESTED unknown' "$RESOLVE_PR"
+  grep -q 'not attempted (cluster cap)' "$RESOLVE_PR"
+  grep -q 'not attempted (rate limit)' "$RESOLVE_PR"
+}
+
+@test "resolve-stack: keys on the not attempted tokens /review:resolve emits" {
+  grep -q 'not attempted (cluster cap)' "$RESOLVE_STACK"
+  grep -q 'not attempted (rate limit)' "$RESOLVE_STACK"
+  run grep -q 'skipped (cluster cap)' "$RESOLVE_STACK"
+  [ "$status" -eq 1 ]
+}
+
+@test "resolver agent: no Bash tool, and edit bounds point at clusters.md" {
+  tools=$(sed -n '/^tools:/,/^---$/p' "$RESOLVER_AGENT")
+  run grep -q 'Bash' <<<"$tools"
+  [ "$status" -eq 1 ]
+  grep -q 'references/resolve/clusters.md' "$RESOLVER_AGENT"
+  grep -q 'Edit bounds' "$RESOLVE_REFS/clusters.md"
+}
+
+@test "resolve-pr: the ignored-file guard also runs when there is no verify command" {
+  text=$(flat "$RESOLVE_PR")
+  [[ "$text" == *'run-verify-command --pr "<PR#>" --check-ignored --ignored-since "$MARK_DIR/ignored-marker"'* ]]
+  [[ "$text" == *'`verify=none` after the `--check-ignored` guard'* ]]
+  disp=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$disp" == *'`run-verify-command --check-ignored --ignored-since <marker-file>`'* ]]
+}
+
+@test "resolver agent: a read deny list names secret paths and bars quoting file content" {
+  text=$(flat "$RESOLVER_AGENT")
+  [[ "$text" == *'Read, Grep or Glob secrets, credentials or files outside the repository'* ]]
+  [[ "$text" == *'`.env*`, `*.pem`, `*.key`'* ]]
+  [[ "$text" == *'they name a `path:line` and never copy file content'* ]]
+  disp=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$disp" == *'**Resolver read bounds.**'* ]]
+}
+
+@test "resolve-pr: Step 5 cancel reverts the unscreened edits and Step 6 drops unchanged paths from the file set" {
+  step5=$(sed -n '/^### Step 5: Dispositions/,/^### Step 6/p' "$RESOLVE_PR")
+  printf '%s\n' "$step5" | tr '\n' ' ' | tr -s ' ' | grep -q 'Cancel runs `run-verify-command --pr "<PR#>" --revert-dirty`'
+  step6=$(sed -n '/^### Step 6: Verify, Commit and Push/,/^### Step 7/p' "$RESOLVE_PR")
+  printf '%s\n' "$step6" | tr '\n' ' ' | tr -s ' ' | grep -q 'git status --porcelain --untracked-files=all'
+  printf '%s\n' "$step6" | tr '\n' ' ' | tr -s ' ' | grep -q 'never put a resolver path on a command line'
+}
+
+@test "resolve-pr: Step 5 conflict rollback includes shared files and downgrades the other clusters on them" {
+  step5=$(sed -n '/^### Step 5: Dispositions/,/^### Step 6/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  printf '%s\n' "$step5" | grep -q 'list every file the conflicted cluster modified, shared or not'
+  printf '%s\n' "$step5" | grep -q 'Every other cluster that modified a listed file loses its edits with the revert'
+  ! printf '%s\n' "$step5" | grep -q 'keeps its edits and the conflicted'
+}
+
+# Collapse line wraps so a phrase can be matched across them.
+flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
+
+@test "resolve-pr: ratelimited=1 is tied to reason=rate-limit only; a timeout keeps it 0" {
+  text=$(flat "$RESOLVE_PR")
+  [[ "$text" == *'For `reason=rate-limit` mark the rest `not attempted (rate limit)` and set `ratelimited=1`'* ]]
+  [[ "$text" == *'For `reason=timeout` mark the rest `not attempted (gh timeout)`, count them blocking, and keep `ratelimited=0`'* ]]
+  [[ "$text" == *'Treat a missing or unrecognized reason as `rate-limit`'* ]]
+  # The old unconditional rule must be gone.
+  [[ "$text" != *'After any exit 4, stop mutating and mark the rest `not attempted (rate limit)`'* ]]
+}
+
+@test "dispositions: ratelimited=1 only for reason=rate-limit, a timeout leaves it 0" {
+  text=$(flat "${BATS_TEST_DIRNAME}/../references/resolve/dispositions.md")
+  [[ "$text" == *'exited 4 with `reason=rate-limit` (or no recognizable reason)'* ]]
+  [[ "$text" == *'`reason=timeout` stops mutations too but leaves `ratelimited=0`'* ]]
+  [[ "$text" == *'A missing or unrecognized reason is treated as `rate-limit`'* ]]
+}
+
+@test "resolver agent: no rule permits editing when PR-changed ranges are unknown" {
+  text=$(flat "$RESOLVER_AGENT")
+  # The old exception (edit the cluster File when PR files is unknown) must be gone.
+  [[ "$text" != *"edit only the cluster's \`File\`"* ]]
+  # Both surviving rules say: unknown means no edit and unclear, never oos.
+  [[ "$text" == *'(when it is `unknown`, edit nothing and propose `unclear`)'* ]]
+  [[ "$text" == *'When the bound is `none` or absent'* ]]
+  [[ "$text" == *'do not edit: propose `oos` for the thread'* ]]
+  [[ "$text" == *'propose `unclear` with evidence `PR ranges unavailable`, never `oos`'* ]]
+  clusters=$(flat "$RESOLVE_REFS/clusters.md")
+  [[ "$clusters" == *'When the value is `none`, or the path has no range'* ]]
+  [[ "$clusters" == *'When the value is `unknown`'* ]]
+  [[ "$clusters" == *'proposes `unclear` with evidence `PR ranges unavailable`'* ]]
+  text=$(flat "$RESOLVE_PR")
+  [[ "$text" == *'pass `unknown` for both, so the resolver edits nothing and proposes `unclear`'* ]]
+  disp=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$disp" == *'`PR-changed lines` `unknown` and the proposal is `fixed`, `addressed` or `oos`'* ]]
+  [[ "$disp" == *'it becomes `unclear` with evidence `PR ranges unavailable`'* ]]
+  [[ "$disp" != *'`unknown` and the proposal is `oos`: it becomes'* ]]
+}
+
+@test "resolve-pr: Step 6 pre-checks the edit range before verify, per file, in both modes" {
+  text=$(flat "$RESOLVE_PR")
+  pre=$(grep -n '^\*\*Range pre-check\.\*\*' "$RESOLVE_PR" | cut -d: -f1)
+  ver=$(grep -n '^\*\*Verify\.\*\*' "$RESOLVE_PR" | cut -d: -f1)
+  [ -n "$pre" ] && [ -n "$ver" ] && [ "$pre" -lt "$ver" ]
+  grep -qF -- 'commit-resolve-fixes" --check-ranges --ranges-from "<ranges-file>" --files-from "<files-file>"' "$RESOLVE_PR"
+  [[ "$text" == *'**Non-interactive:** revert the listed files'* ]]
+  [[ "$text" == *'**Interactive:** one `AskUserQuestion`'* ]]
+  [[ "$text" == *'"Include them / Revert them"'* ]]
+  [[ "$text" == *'drops `--ranges-from` from this run'* ]]
+  [[ "$text" == *'`unclear` with evidence `edit outside PR-changed lines`'* ]]
+  [[ "$text" == *'dropping files afterwards would commit an unverified subset'* ]]
+  # The commit call keeps the whole-commit refusal as a backstop.
+  [[ "$text" == *'It is a backstop that does not fire after a clean pre-check'* ]]
+}
+
+@test "edit range: resolver prompt, clusters.md and the script state the same numeric margin" {
+  margin=$(sed -n 's/^RANGE_MARGIN=\([0-9][0-9]*\)$/\1/p' "$SKILLS_DIR/pr-review-workflow/scripts/commit-resolve-fixes")
+  [ "$margin" = 3 ]
+  agent=$(flat "$RESOLVER_AGENT")
+  [[ "$agent" == *"plus at most $margin adjacent lines (\`RANGE_MARGIN\`)"* ]]
+  [[ "$agent" == *'propose `oos` with an `oos_reason` naming the needed change'* ]]
+  clusters=$(flat "$RESOLVE_REFS/clusters.md")
+  [[ "$clusters" == *"plus at most $margin adjacent lines (\`RANGE_MARGIN\` in \`commit-resolve-fixes\`)"* ]]
+  [[ "$clusters" == *'the resolver proposes `oos` with an `oos_reason` naming the needed change'* ]]
+  [[ "$clusters" != *'minimal adjacent lines'* ]]
+  disp=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$disp" == *'widened by `RANGE_MARGIN` (3, a constant in `commit-resolve-fixes`)'* ]]
+  [[ "$disp" == *'Non-interactive never includes an out-of-range edit'* ]]
+}
+
+@test "dispositions: a reused Linear hit passes the same response checks as save_issue" {
+  text=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$text" == *'reuse a hit only when it passes the **Linear response checks** below'* ]]
+  [[ "$text" == *'A hit that fails any check is ignored, as if the search found nothing'* ]]
+  [[ "$text" == *'accept its response only when it passes the same checks'* ]]
+  # The checks are stated once, with all three conditions.
+  [ "$(grep -c '^- \*\*Linear response checks\.\*\*' "$RESOLVE_REFS/dispositions.md")" -eq 1 ]
+  [[ "$text" == *'Apply to every `list_issues` hit before reuse and to the `save_issue` response before use'* ]]
+  [[ "$text" == *'the identifier matches `^<PREFIX>-[0-9]{1,6}$`'* ]]
+  [[ "$text" == *'`^https://linear\.app/[A-Za-z0-9_-]+/issue/<ID>(/[A-Za-z0-9_-]*)?$`'* ]]
+  [[ "$text" == *'the description carries the full marker'* ]]
+  # The old unvalidated reuse must be gone.
+  [[ "$text" != *'reuse a hit whose description carries the full marker'* ]]
+  # resolve-pr.md references the checks instead of restating them.
+  text=$(flat "$RESOLVE_PR")
+  [[ "$text" == *'"Linear response checks", which every reused `list_issues` hit and the `save_issue` response must pass'* ]]
+}
+
+@test "resolve-pr: the ignored-file marker is minted before resolvers spawn and passed to the unattended verify" {
+  mint=$(grep -n '^### Step 3f: Mint the Ignored-File Marker' "$RESOLVE_PR" | cut -d: -f1)
+  clean=$(grep -n '^### Step 2: Check Working Directory' "$RESOLVE_PR" | cut -d: -f1)
+  spawn=$(grep -n '^### Step 4: Spawn Parallel Resolvers' "$RESOLVE_PR" | cut -d: -f1)
+  [ -n "$mint" ]
+  [ "$clean" -lt "$mint" ]
+  [ "$mint" -lt "$spawn" ]
+  step3f=$(sed -n '/^### Step 3f/,/^### Step 4/p' "$RESOLVE_PR")
+  printf '%s\n' "$step3f" | grep -qF 'mktemp -d'
+  printf '%s\n' "$step3f" | grep -qF 'touch "$MARK_DIR/ignored-marker"'
+  # No trap in the minting call: the trap lives in the consuming call.
+  run grep -q '^trap ' <<<"$step3f"
+  [ "$status" -eq 1 ]
+  step6=$(sed -n '/^### Step 6: Verify, Commit and Push/,/^### Step 7/p' "$RESOLVE_PR")
+  printf '%s\n' "$step6" | grep -qF -- '--ignored-since "$MARK_DIR/ignored-marker"'
+  printf '%s\n' "$step6" | grep -qF "trap 'rm -rf -- \"\$MARK_DIR\"' EXIT"
+  step6flat=$(printf '%s\n' "$step6" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step6flat" == *'`--ignored-since` with Step 3f'* ]]
+  [[ "$step6flat" == *'required unattended'* ]]
+  [[ "$step6flat" == *'**Marker cleanup.**'* ]]
+  flat "$RESOLVE_REFS/dispositions.md" | grep -qF -- '`--ignored-since <marker-file>` is required'
+}
+
+@test "resolve-pr: a timeout stop is recorded in Step 7 and blocks the Step 8 re-pass" {
+  text=$(flat "$RESOLVE_PR")
+  [[ "$text" == *'keep `ratelimited=0`, but also record `write_stopped=timeout` so Step 8 does not run'* ]]
+  [[ "$text" == *'no exit 4 stopped the write phase (neither `ratelimited=1` nor `write_stopped=timeout`)'* ]]
+  [[ "$text" == *'report that the re-pass was skipped because the write phase stopped on a timeout'* ]]
+  # The old entry condition keyed on a rate limit alone.
+  [[ "$text" != *'Run only when the tree is clean, no rate limit was hit,'* ]]
+}
+
+@test "dispositions: the re-pass is skipped after any exit 4, rate limit or timeout" {
+  text=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$text" == *'The re-pass (Step 8) runs only when no exit 4 stopped the write phase'* ]]
+  [[ "$text" == *'(`write_stopped=timeout`) it is skipped'* ]]
+  [[ "$text" == *'the re-pass was skipped because the write phase stopped on a timeout'* ]]
+}
+
+@test "README: documents the optional yellow-linear routing, dedupe, fallback and text check" {
+  text=$(flat "${BATS_TEST_DIRNAME}/../README.md")
+  [[ "$text" == *'`yellow-linear` is an optional dependency'* ]]
+  [[ "$text" == *'the branch name matches `[A-Z]{2,5}-[0-9]{1,6}`'* ]]
+  [[ "$text" == *'may write to Linear through the yellow-linear MCP server'* ]]
+  [[ "$text" == *'falls back to GitHub once'* ]]
+  [[ "$text" == *'`tracker=github (linear unavailable)`'* ]]
+  [[ "$text" == *'`check-resolve-text` before `save_issue`'* ]]
+}
+
+@test "dispositions: the prose allowlist is the single source for evidence and oos_reason" {
+  text=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$text" == *'**Prose allowlist.** This is the single source.'* ]]
+  [[ "$text" == *'before any reply, issue or resolve helper runs'* ]]
+  [[ "$text" == *'every character is an ASCII letter, a digit, a space, or one of `. , : ; ! ? '"'"' " ( ) / _ # + -`'* ]]
+  [[ "$text" == *'The class has no `@`, backtick, `<`, `>`, `[`, `]`, `{`, `}`, `|`, `\`, `*` or `~`'* ]]
+  [[ "$text" == *'contains `://`, `www.`, `mailto:`, `![` or `](` fails'* ]]
+  [[ "$text" == *'1 to 200 characters on one line'* ]]
+  # Fixed replacement texts and the downgrades that follow them.
+  [[ "$text" == *'`evidence` becomes `see the PR diff`'* ]]
+  [[ "$text" == *'`oos_reason` becomes `no reason given`'* ]]
+  [[ "$text" == *'`addressed` then becomes `unclear`'* ]]
+  [[ "$text" == *'`oos` with the replaced reason becomes `unclear`'* ]]
+  [[ "$text" == *'says the value was withheld by the prose allowlist; it never prints the value'* ]]
+}
+
+@test "dispositions: the known-limits bullet no longer claims mentions can appear in resolver prose" {
+  text=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$text" != *'can still carry `@` mentions'* ]]
+  [[ "$text" == *'The prose allowlist (see Resolver line) is the mitigation'* ]]
+  [[ "$text" == *'mentions, external URLs and markdown images cannot appear in resolver prose'* ]]
+}
+
+@test "resolve-pr and the resolver agent point at the dispositions prose allowlist" {
+  pr=$(flat "$RESOLVE_PR")
+  [[ "$pr" == *"against the contract's prose allowlist before any helper in Step 7 runs"* ]]
+  [[ "$pr" == *'report a withheld value by thread, never by content'* ]]
+  # The allowlist is stated once, in dispositions.md, not copied here.
+  [[ "$pr" != *'mailto:'* ]]
+  agent=$(flat "$RESOLVER_AGENT")
+  [[ "$agent" == *'including its prose allowlist'* ]]
+  [[ "$agent" == *'with no `@`, links, backticks, brackets or Markdown'* ]]
+}
+
+@test "write-phase Bash budget covers the worst case at the per-call gh timeout cap" {
+  lib="$BATS_TEST_DIRNAME/../lib"
+  scripts="$BATS_TEST_DIRNAME/../skills/pr-review-workflow/scripts"
+  # The cap is 60 s in every place that parses YELLOW_REVIEW_GH_TIMEOUT.
+  grep -q '^GG_MAX_TIMEOUT=60$' "$lib/gh-graphql.sh"
+  grep -q '^RG_MAX_TIMEOUT=60$' "$lib/resolve-gh.sh"
+  # poll-new-threads bounds a fetch by get-pr-comments' own deadline (below the
+  # 60 s hard cap), so --wait + 60 s holds without a per-call timeout.
+  grep -q '^FETCH_WINDOW=60$' "$scripts/poll-new-threads"
+  grep -q '^FETCH_DEADLINE=55$' "$scripts/poll-new-threads"
+  # The outer budget is stated once with its arithmetic, and the command uses it.
+  budget=420000
+  refs=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$refs" == *"own Bash call with a \`timeout\` of $budget ms"* ]]
+  [[ "$refs" == *'clamped to 60 s per `gh` call'* ]]
+  [[ "$refs" == *'= 280 s'* ]]
+  [[ "$refs" == *'= 220 s'* ]]
+  [[ "$refs" == *'= 360 s'* ]]
+  [[ "$refs" == *'The largest is 360 s; 420 s adds 60 s'* ]]
+  pr=$(flat "$RESOLVE_PR")
+  [[ "$pr" == *"own Bash call with a \`timeout\` of $budget ms"* ]]
+  [[ "$pr" != *'240000'* ]]
+  [[ "$refs" != *'240000'* ]]
+  # Worst case (file-followup-issue: six calls at the cap) plus margin fits
+  # the budget, and the budget fits the Bash tool's 600000 ms maximum.
+  worst=$((6 * 60))
+  [ "$((worst * 1000))" -lt "$budget" ]
+  [ "$budget" -le 600000 ]
+  # The six-call count matches the script's own header.
+  grep -q 'six gh calls' "$scripts/file-followup-issue"
+}
+
+@test "resolve-pr: the read-only fetch calls get a Bash timeout that covers their capped gh calls" {
+  text=$(tr '\n' ' ' <"$RESOLVE_PR" | tr -s ' ')
+  [[ "$text" == *'Give both of these read-only calls a Bash tool `timeout` of 300000 ms'* ]]
+  [[ "$text" == *'bounded at 60 s apiece'* ]]
+}
+
+@test "resolve-pr: the marker mint strips a trailing slash from TMPDIR so Step 6 accepts the path" {
+  step3f=$(sed -n '/^### Step 3f/,/^### Step 4/p' "$RESOLVE_PR")
+  block=$(printf '%s\n' "$step3f" | sed -n '/^```bash$/,/^```$/p' | sed '1d;$d')
+  mkdir -p "$BATS_TEST_TMPDIR/tmp"
+  TMPDIR="$BATS_TEST_TMPDIR/tmp/" run bash -c "$block"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "$BATS_TEST_TMPDIR/tmp/resolve-marker."* ]]
+  [[ "$output" != *"//"* ]]
+  [ -f "$output/ignored-marker" ]
+  # The same prefix strip Step 6 applies must leave a plain resolve-marker.* name.
+  [ "${output#"$BATS_TEST_TMPDIR/tmp"/}" != "$output" ]
+  case "${output#"$BATS_TEST_TMPDIR/tmp"/}" in */*) false ;; esac
+}
+
+@test "resolve-pr: a refusal reverts only reported files and asks before touching other changes" {
+  step6flat=$(sed -n '/^### Step 6/,/^### Step 7/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step6flat" == *'--revert-only --files-from "<file>"` (patch saved) on every file a cluster reported under `Files modified`'* ]]
+  [[ "$step6flat" == *'not proven to be a resolver'* ]]
+  [[ "$step6flat" == *'"Revert them / Leave them"'* ]]
+  [[ "$step6flat" == *'left in place'* ]]
+}
+
+@test "resolve-pr: keeping the partial edits of a conflicted cluster stops the run and reverts nothing" {
+  step5flat=$(sed -n '/^### Step 5/,/^### Step 6/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step5flat" == *"Keep the resolver's partial edits and stop"* ]]
+  [[ "$step5flat" == *'Keep stops the same way but reverts nothing'* ]]
+}
+
+@test "resolve-pr: a rate-limited blocker lookup stops before any dispatch or write" {
+  step3=$(sed -n '/^### Step 3: /,/^### Step 3b/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step3" == *'`lookupReason` or `resolutionLookupReason` is `rate_limited`'* ]]
+  [[ "$step3" == *'without a resolver dispatch, commit, push, reply or issue'* ]]
+  [[ "$step3" == *'`push=skipped, verify=none, ratelimited=1`'* ]]
 }
 
 @test "dispositions: the addressed path:line evidence refuses an option-shaped path segment" {
