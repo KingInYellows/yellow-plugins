@@ -110,25 +110,32 @@ qg_queue() {
 }
 
 qg_store_norm() {
-  local raw="$1" canon="$2"
-  canon=$(printf '%s' "$canon" | sed -E 's/\[REDACTED(:[^]]*)?\]/[REDACTED]/g')
-  QG_NORM_CACHE["$raw"]=$(qg_normalize_line "$canon")
+  local raw="$1" canon="$2" norm
+  if ! norm=$(printf '%s' "$canon" | sed -E 's/\[REDACTED(:[^]]*)?\]/[REDACTED]/g'); then
+    printf 'quote-ground: placeholder canonicalization failed\n' >&2
+    exit 2
+  fi
+  QG_NORM_CACHE["$raw"]=$(qg_normalize_line "$norm")
 }
 
 qg_redact_one() {
   local raw="$1" canon
-  canon=$(printf '%s\n' "$raw" | cs_redact_secrets || true)
+  if ! canon=$(printf '%s\n' "$raw" | cs_redact_secrets); then
+    printf 'quote-ground: secret redaction failed\n' >&2
+    exit 2
+  fi
   qg_store_norm "$raw" "$canon"
 }
 
 # One sed over every queued line that cannot arm the private-key range.
 # A count mismatch falls back to one process per line.
 qg_flush() {
-  local raw canon safe_file idx
+  local raw safe_file redact_out idx
   local -a safe_raw=()
   local -a safe_out=()
   [ "${#QG_PENDING_RAW[@]}" -gt 0 ] || return 0
   safe_file=$(mktemp)
+  redact_out=$(mktemp)
   for raw in "${QG_PENDING_RAW[@]}"; do
     case "$raw" in
       *PRIVATE\ KEY* | *-----BEGIN* | *-----END*)
@@ -141,7 +148,13 @@ qg_flush() {
     esac
   done
   if [ "${#safe_raw[@]}" -gt 0 ]; then
-    mapfile -t safe_out < <(cs_redact_secrets <"$safe_file" | sed -E 's/\[REDACTED(:[^]]*)?\]/[REDACTED]/g' || true)
+    if ! cs_redact_secrets <"$safe_file" \
+      | sed -E 's/\[REDACTED(:[^]]*)?\]/[REDACTED]/g' >"$redact_out"; then
+      rm -f "$safe_file" "$redact_out"
+      printf 'quote-ground: secret redaction failed\n' >&2
+      exit 2
+    fi
+    mapfile -t safe_out <"$redact_out"
     if [ "${#safe_out[@]}" -eq "${#safe_raw[@]}" ]; then
       for idx in "${!safe_raw[@]}"; do
         QG_NORM_CACHE["${safe_raw[$idx]}"]=$(qg_normalize_line "${safe_out[$idx]}")
@@ -152,7 +165,7 @@ qg_flush() {
       done
     fi
   fi
-  rm -f "$safe_file"
+  rm -f "$safe_file" "$redact_out"
   QG_PENDING_RAW=()
   declare -gA QG_QUEUED=()
 }

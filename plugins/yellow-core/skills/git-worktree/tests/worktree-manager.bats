@@ -24,18 +24,23 @@ setup() {
 }
 
 teardown() {
-    cd / || true
-    # git can recreate files under .git while rm walks it, so a single
-    # rm -rf sometimes exits with "Directory not empty". Retry, then
-    # tolerate a leftover so teardown does not fail the test.
+    cd / || return 1
+    [ -n "${REPO:-}" ] || return 0
+    # git can recreate a file under .git during the walk. Retry a few
+    # times. A directory that is still present fails the test.
     local attempt
     for attempt in 1 2 3 4 5; do
+        if [ ! -e "$REPO" ]; then
+            return 0
+        fi
         if rm -rf "$REPO"; then
             return 0
         fi
-        sleep 0.1
     done
-    rm -rf "$REPO" || true
+    if [ -e "$REPO" ]; then
+        printf 'teardown: failed to remove %s\n' "$REPO" >&2
+        return 1
+    fi
 }
 
 # Initialize a fake .ruvector/ DB in the main repo.
