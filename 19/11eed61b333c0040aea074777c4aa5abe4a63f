@@ -1,0 +1,28 @@
+docs/security.md
+  h_6000354274ce50 579,581-586,592-593
+plugins/yellow-goal/commands/goal/run-real.md
+  h_6000354274ce50 55-62,66-109,111,113-118,121-144,147-150,152
+plugins/yellow-goal/dist/provider-process.js
+  h_6000354274ce50 183-187,189-197,200,211-220
+plugins/yellow-goal/dist/runtime.js
+  h_6000354274ce50 3,7,159-180,567-569,630-631,676
+plugins/yellow-goal/src/provider-process.ts
+  h_6000354274ce50 260-275,279-287,290,302-310
+plugins/yellow-goal/src/runtime.ts
+  h_6000354274ce50 309-335,921-923,1000-1002,1050-1051
+plugins/yellow-goal/tests/provider-process.test.ts
+  h_6000354274ce50 322-360
+plugins/yellow-goal/tests/runtime-protocol.test.ts
+  h_6000354274ce50 21-22,25,702-852
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1911eed61b333c0040aea074777c4aa5abe4a63f",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
