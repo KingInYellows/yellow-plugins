@@ -1,0 +1,19 @@
+plugins/yellow-core/tests/quote-ground.bats
+  s_9628bdf4e65021::t_b7286604056739 337-371
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "aa7fe60990cd003e888f189f46e8eacbd959937b",
+  "prompts": {},
+  "sessions": {
+    "s_9628bdf4e65021": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "39e116b5-960d-4a92-a722-0e387498ad7a",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
