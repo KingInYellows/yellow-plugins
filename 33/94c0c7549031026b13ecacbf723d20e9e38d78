@@ -1,0 +1,19 @@
+plans/complete/yellow-jules-integration-02-runtime-provider-and-claude-routing.md
+  s_27b93aa9f73ab6::t_6ef7e86c9c008a 738
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3394c0c7549031026b13ecacbf723d20e9e38d78",
+  "prompts": {},
+  "sessions": {
+    "s_27b93aa9f73ab6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "27245f45-1d26-4de0-8f4f-ad9fe7b86fac",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
