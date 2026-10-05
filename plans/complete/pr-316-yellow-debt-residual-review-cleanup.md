@@ -277,4 +277,4 @@ The work is structured as **3 PRs** (PR0 prerequisite + PR1 + PR2) with PR3 as a
 - [ ] 1. docs/pr-316-review-learnings (PR0) — open as PR #318 on `agent/docs/pr-316-review-learnings`; mark complete and record the merge SHA when it lands on `main`.
 - [ ] 2. chore/pr-316-cross-doc-cleanup (PR1) — open as PR #319 on `agent/chore/pr-316-cross-doc-cleanup`; depends on PR0 merging first. 16 of 17 tasks drafted (skipped 2.15 — false-premise finding). Mark complete and record the merge SHA when it lands.
 - [ ] 3. fix/pr-316-bash-hardening (PR2) — open as PR #320 on `agent/fix/pr-316-bash-hardening`; depends on PR1. Mark complete and record the merge SHA when it lands.
-- [ ] 4. (gated) refactor/pr-316-dual-read-removal (PR3) — deferred; requires `/workflows:brainstorm` per plan Phase 4
+- [x] 4. (gated) refactor/pr-316-dual-read-removal (PR3) — landed as PR #440 (squash `2d71b33916041afb1bf3a7b240a463de803c33e9` on `main`); see `plans/complete/yellow-debt-remove-v1-dual-read.md`

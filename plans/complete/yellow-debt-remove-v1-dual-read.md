@@ -129,7 +129,7 @@ Single PR, branched off `main`. Type: `refactor`. Changeset bump: `patch` for ye
 
 ### Phase 5: Post-submit
 
-- [ ] 5.1 (post-merge) Update `plans/complete/pr-316-yellow-debt-residual-review-cleanup.md` Phase 4 / Stack Progress section: mark task 4. as completed and record the merge SHA when this PR lands. (Optional — the parent plan is already archived; this is bookkeeping only.)
+- [x] 5.1 (post-merge) Update `plans/complete/pr-316-yellow-debt-residual-review-cleanup.md` Phase 4 / Stack Progress section: mark task 4. as completed and record the merge SHA when this PR lands. (Optional — the parent plan is already archived; this is bookkeeping only.)
 - [ ] 5.2 (contingency, not a scheduled task) If the brainstorm's three open questions surface real consumers post-merge (e.g., a downstream tool starts emitting errors), revert via `git revert` and switch to Approach B (keep with TODO + tracker issue).
 
 ## Technical Specifications
