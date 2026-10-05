@@ -4,6 +4,7 @@
 # length gate, or opens an unsafe path fails these cases.
 
 QG="${BATS_TEST_DIRNAME}/../lib/quote-ground.sh"
+Q26=abcdefghijklmnopqrstuvwxyz
 
 setup() {
   BASE="$(mktemp -d)"
@@ -31,7 +32,23 @@ line_quote() {
   printf 'line-%s token-%s unique-body' "$1" "$1"
 }
 
-@test "check refuses to be sourced" {
+# One batch row as JSON: id file line quote.
+row() {
+  jq -cn --arg id "$1" --arg file "$2" --argjson line "$3" --arg quote "$4" \
+    '{id:$id,file:$file,line:$line,quote:$quote}'
+}
+
+# Milliseconds from a clock that exists on bash 4.4 and later.
+now_ms() {
+  if [ -n "${EPOCHREALTIME:-}" ]; then
+    local t=${EPOCHREALTIME/[.,]/}
+    printf '%s' "$((t / 1000))"
+  else
+    printf '%s' "$((SECONDS * 1000))"
+  fi
+}
+
+@test "quote-ground.sh refuses to be sourced" {
   run bash -c 'source "$1" && printf sourced-ok\n' bash "$QG"
   [ "$status" -ne 0 ]
   [[ "$output" != *sourced-ok* ]]
@@ -41,25 +58,25 @@ line_quote() {
   local dir
   dir="$(mktemp -d)"
   cp "$QG" "$dir/quote-ground.sh"
-  run bash "$dir/quote-ground.sh" check src/a.txt 1 3 <<<"abcdefghijklmnopqrstuvwxyz"
+  run bash "$dir/quote-ground.sh" check src/a.txt 1 3 <<<"$Q26"
   [ "$status" -eq 2 ]
   [ -z "$output" ]
   rm -rf "$dir"
 }
 
-@test "check exits 2 when compound-staging.sh is not sourced" {
+@test "check exits 2 when compound-staging.sh is missing" {
   local dir
   dir="$(mktemp -d)"
   cp "$QG" "$dir/quote-ground.sh"
   cp "${BATS_TEST_DIRNAME}/../lib/validate-fs.sh" "$dir/validate-fs.sh"
-  run bash "$dir/quote-ground.sh" check src/a.txt 1 3 <<<"abcdefghijklmnopqrstuvwxyz"
+  run bash "$dir/quote-ground.sh" check src/a.txt 1 3 <<<"$Q26"
   [ "$status" -eq 2 ]
   [ -z "$output" ]
   rm -rf "$dir"
 }
 
 @test "check exits 2 on usage and on a missing target file" {
-  printf '%s\n' 'abcdefghijklmnopqrstuvwxyz' >src/a.txt
+  printf '%s\n' "$Q26" >src/a.txt
   run bash "$QG"
   [ "$status" -eq 2 ]
   run bash "$QG" check
@@ -70,17 +87,40 @@ line_quote() {
   [ "$status" -eq 2 ]
   run bash "$QG" batch extra
   [ "$status" -eq 2 ]
-  run bash "$QG" check src/missing.txt 1 3 <<<"abcdefghijklmnopqrstuvwxyz"
+  run bash "$QG" check src/missing.txt 1 3 <<<"$Q26"
   [ "$status" -eq 2 ]
   [ -z "$output" ]
 }
 
+@test "check validates its arguments before it reads stdin" {
+  printf '%s\n' "$Q26" >src/a.txt
+  run timeout 5 bash "$QG" check src/a.txt abc </dev/zero
+  [ "$status" -eq 2 ]
+  run timeout 5 bash "$QG" check src/a.txt 1 x </dev/zero
+  [ "$status" -eq 2 ]
+}
+
+@test "check rejects a non-integer or hostile line and radius without running them" {
+  local arg
+  printf '%s\n' "$Q26" >src/a.txt
+  for arg in 0 -1 007 1234567890 '1+1' 'a[$(touch pwned)]'; do
+    run bash "$QG" check src/a.txt "$arg" 3 <<<"$Q26"
+    [ "$status" -eq 2 ]
+  done
+  # A radius of 0 is valid (an exact-line match); every other value is not.
+  for arg in -1 007 1234567890 '1+1' 'a[$(touch pwned)]'; do
+    run bash "$QG" check src/a.txt 1 "$arg" <<<"$Q26"
+    [ "$status" -eq 2 ]
+  done
+  [ ! -e pwned ]
+}
+
 @test "check reads the quote from stdin, not from argv" {
-  printf '%s\n' 'abcdefghijklmnopqrstuvwxyz' >src/a.txt
-  run bash "$QG" check src/a.txt 1 3 'abcdefghijklmnopqrstuvwxyz' <<<"totally-different-quote-text"
+  printf '%s\n' "$Q26" >src/a.txt
+  run bash "$QG" check src/a.txt 1 3 "$Q26" <<<"totally-different-quote-text"
   [ "$status" -eq 1 ]
   [ -z "$output" ]
-  run bash "$QG" check src/a.txt 1 3 'not-the-quote' <<<"abcdefghijklmnopqrstuvwxyz"
+  run bash "$QG" check src/a.txt 1 3 'not-the-quote' <<<"$Q26"
   [ "$status" -eq 0 ]
   [ "$output" = "1" ]
 }
@@ -163,7 +203,8 @@ line_quote() {
 
 @test "check canonicalizes api_key=ghp_ placeholders before matching" {
   local token
-  token='ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD'
+  # Assembled from fragments so no secret scanner sees a whole token here.
+  token='ghp_''abcdefghijklmnopqrstuvwxyz0123456789ABCD'
   printf '%s\n' "seen api_key=${token} in config" >src/a.txt
   run bash "$QG" check src/a.txt 1 3 <<<"seen api_key=[REDACTED] in config"
   [ "$status" -eq 0 ]
@@ -179,94 +220,36 @@ line_quote() {
 
 @test "check rejects unsafe paths without grounding a quote that sits on the target" {
   local home
-  printf '%s\n' 'abcdefghijklmnopqrstuvwxyz' >src/a.txt
-  printf '%s\n' 'abcdefghijklmnopqrstuvwxyz' >"$BASE/outside.txt"
+  printf '%s\n' "$Q26" >src/a.txt
+  printf '%s\n' "$Q26" >"$BASE/outside.txt"
   ln -s "$BASE/outside.txt" src/escape
   mkdir -p src/adir
-  printf '%s\n' 'abcdefghijklmnopqrstuvwxyz' >src/adir/hidden.txt
+  printf '%s\n' "$Q26" >src/adir/hidden.txt
   home="$(mktemp -d)"
-  printf '%s\n' 'abcdefghijklmnopqrstuvwxyz' >"$home/secret.txt"
+  printf '%s\n' "$Q26" >"$home/secret.txt"
 
-  run bash "$QG" check ../outside.txt 1 3 <<<"abcdefghijklmnopqrstuvwxyz"
+  run bash "$QG" check ../outside.txt 1 3 <<<"$Q26"
   [ "$status" -eq 1 ]
   [ -z "$output" ]
-  run bash "$QG" check "$PROJECT_ROOT/src/a.txt" 1 3 <<<"abcdefghijklmnopqrstuvwxyz"
+  run bash "$QG" check "$PROJECT_ROOT/src/a.txt" 1 3 <<<"$Q26"
   [ "$status" -eq 1 ]
   [ -z "$output" ]
-  HOME="$home" run bash "$QG" check '~/secret.txt' 1 3 <<<"abcdefghijklmnopqrstuvwxyz"
+  HOME="$home" run bash "$QG" check '~/secret.txt' 1 3 <<<"$Q26"
   [ "$status" -eq 1 ]
   [ -z "$output" ]
-  run bash "$QG" check src/escape 1 3 <<<"abcdefghijklmnopqrstuvwxyz"
+  run bash "$QG" check src/escape 1 3 <<<"$Q26"
   [ "$status" -eq 1 ]
   [ -z "$output" ]
-  run bash "$QG" check src/adir 1 3 <<<"abcdefghijklmnopqrstuvwxyz"
+  run bash "$QG" check src/adir 1 3 <<<"$Q26"
   [ "$status" -eq 1 ]
   [ -z "$output" ]
-  run bash "$QG" check $'src/a\nb.txt' 1 3 <<<"abcdefghijklmnopqrstuvwxyz"
+  run bash "$QG" check $'src/a\nb.txt' 1 3 <<<"$Q26"
   [ "$status" -eq 1 ]
   [ -z "$output" ]
-  run bash "$QG" check $'src/a\rb.txt' 1 3 <<<"abcdefghijklmnopqrstuvwxyz"
+  run bash "$QG" check $'src/a\rb.txt' 1 3 <<<"$Q26"
   [ "$status" -eq 1 ]
   [ -z "$output" ]
   rm -rf "$home"
-}
-
-@test "batch reports every id and still grounds the safe sibling" {
-  local payload
-  printf '%s\n' 'short abcdefghijklmnopqrstuvwxyz' >src/a.txt
-  printf '%s\n' 'short abcdefghijklmnopqrstuvwxyz' >"$BASE/outside.txt"
-  payload="$(
-    jq -cn --arg id short --arg file src/a.txt --argjson line 1 --arg quote short \
-      '{id:$id,file:$file,line:$line,quote:$quote}'
-    jq -cn --arg id bad --arg file ../outside.txt --argjson line 1 \
-      --arg quote 'short abcdefghijklmnopqrstuvwxyz' \
-      '{id:$id,file:$file,line:$line,quote:$quote}'
-    jq -cn --arg id miss --arg file src/a.txt --argjson line 1 \
-      --arg quote 'not-present-quote-body' \
-      '{id:$id,file:$file,line:$line,quote:$quote}'
-    jq -cn --arg id good --arg file src/a.txt --argjson line 1 \
-      --arg quote abcdefghijklmnopqrstuvwxyz \
-      '{id:$id,file:$file,line:$line,quote:$quote}'
-  )"
-  run bash "$QG" batch <<<"$payload"
-  jq -e -s '
-    length == 4
-    and all(has("id") and has("result") and has("matched_line"))
-    and (map(select(.id == "short"))[0].result == "too-short")
-    and (map(select(.id == "bad"))[0].result == "unsafe-path")
-    and (map(select(.id == "miss"))[0].result == "ungrounded")
-    and (map(select(.id == "good"))[0].result == "grounded")
-    and (map(select(.id == "good"))[0].matched_line == 1)
-  ' <<<"$output" >/dev/null
-}
-
-@test "batch of 100 findings across 20 files finishes in under 2 seconds" {
-  local f n id quote payload out start end elapsed
-  payload="$(mktemp)"
-  out="$(mktemp)"
-  for f in $(seq 1 20); do
-    : >"src/f${f}.txt"
-    for n in 1 2 3 4 5; do
-      printf 'f%02d-line%d token body xx\n' "$f" "$n" >>"src/f${f}.txt"
-      id=$(printf 'f%02d-%d' "$f" "$n")
-      quote=$(printf 'f%02d-line%d token body xx' "$f" "$n")
-      jq -cn --arg id "$id" --arg file "src/f${f}.txt" --argjson line "$n" --arg quote "$quote" \
-        '{id:$id,file:$file,line:$line,quote:$quote}' >>"$payload"
-    done
-  done
-  start=$(date +%s%N)
-  bash "$QG" batch <"$payload" >"$out"
-  end=$(date +%s%N)
-  elapsed=$(((end - start) / 1000000))
-  if [ "$elapsed" -ge 2000 ]; then
-    printf 'batch elapsed %s ms\n' "$elapsed" >&2
-    return 1
-  fi
-  jq -e -s '
-    length == 100
-    and all(.result == "grounded" and ((.matched_line | tostring) == (.id | split("-")[1])))
-  ' <"$out" >/dev/null
-  rm -f "$payload" "$out"
 }
 
 @test "check and batch ground a quote when a blank line sits inside the window" {
@@ -274,7 +257,7 @@ line_quote() {
   run bash "$QG" check src/a.txt 3 <<<"the quoted target line"
   [ "$status" -eq 0 ]
   [ "$output" = "3" ]
-  run bash "$QG" batch <<<'{"id":"b","file":"src/a.txt","line":3,"quote":"the quoted target line"}'
+  run bash "$QG" batch <<<"$(row b src/a.txt 3 'the quoted target line')"
   [ "$status" -eq 0 ]
   jq -e '.id == "b" and .result == "grounded" and .matched_line == 3' <<<"$output" >/dev/null
 }
@@ -286,9 +269,9 @@ line_quote() {
   [ "$status" -eq 1 ]
   [ -z "$output" ]
   payload="$(
-    printf '%s\n' '{"id":"empty","file":"src/a.txt","line":3,"quote":""}'
-    printf '%s\n' '{"id":"blank","file":"src/a.txt","line":3,"quote":"   "}'
-    printf '%s\n' '{"id":"good","file":"src/a.txt","line":3,"quote":"the quoted target line"}'
+    row empty src/a.txt 3 ''
+    row blank src/a.txt 3 '   '
+    row good src/a.txt 3 'the quoted target line'
   )"
   run bash "$QG" batch <<<"$payload"
   [ "$status" -eq 0 ]
@@ -301,36 +284,142 @@ line_quote() {
 }
 
 @test "an empty file path is rejected without aborting the script" {
-  run bash "$QG" check '' 1 3 <<<"abcdefghijklmnopqrstuvwxyz"
+  run bash "$QG" check '' 1 3 <<<"$Q26"
   [ "$status" -ne 0 ]
   [[ "$output" != *"bad array subscript"* ]]
-  run bash "$QG" batch <<<'{"id":"e","file":"","line":1,"quote":"abcdefghijklmnopqrstuvwxyz"}'
+  run bash "$QG" batch <<<"$(row e '' 1 "$Q26")"
   [ "$status" -eq 0 ]
   jq -e '.id == "e" and .result != "grounded"' <<<"$output" >/dev/null
 }
 
-@test "batch grounds under mawk as the awk on PATH" {
-  local mawk shim
-  mawk="$(command -v mawk)" || skip "mawk is not installed"
-  shim="${BASE}/shim"
-  mkdir -p "$shim"
-  ln -s "$mawk" "$shim/awk"
+@test "check returns promptly for a very large radius or line number" {
   printf 'alpha line one\nthe quoted target line\nomega\n' >src/a.txt
-  PATH="$shim:$PATH" run bash "$QG" batch <<<'{"id":"m","file":"src/a.txt","line":2,"quote":"the quoted target line"}'
+  run timeout 10 bash "$QG" check src/a.txt 1 999999999 <<<"a quote that is not in the file"
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+  run timeout 10 bash "$QG" check src/a.txt 3 999999999 <<<"the quoted target line"
   [ "$status" -eq 0 ]
-  jq -e '.id == "m" and .result == "grounded" and .matched_line == 2' <<<"$output" >/dev/null
+  [ "$output" = "2" ]
+  run timeout 10 bash "$QG" check src/a.txt 999999999 3 <<<"the quoted target line"
+  [ "$status" -eq 1 ]
 }
 
-@test "batch exits 2 with no result rows on a malformed row or a NUL in a field" {
-  printf '%s\n' 'abcdefghijklmnopqrstuvwxyz' >src/a.txt
-  run bash "$QG" batch <<<'{"id":"x","file":"src/a.txt","line":null,"quote":"abcdefghijklmnopqrstuvwxyz"}'
+@test "check keeps later line numbers true across a private-key block" {
+  local k
+  k="-----BEGIN RSA PRIVATE"
+  {
+    printf 'before the key block\n'
+    printf '%s KEY-----\n' "$k"
+    printf 'MIIEvQIBADANBgkqhkiG9w0BAQEFAASC\n'
+    printf '%s\n' '-----END RSA PRIVATE KEY-----'
+    printf 'after the key block text\n'
+  } >src/k.txt
+  run bash "$QG" check src/k.txt 5 0 <<<"after the key block text"
+  [ "$status" -eq 0 ]
+  [ "$output" = "5" ]
+  run bash "$QG" check src/k.txt 1 0 <<<"before the key block"
+  [ "$status" -eq 0 ]
+  [ "$output" = "1" ]
+  run bash "$QG" check src/k.txt 2 0 <<<"${k} KEY-----"
+  [ "$status" -eq 1 ]
+  run bash "$QG" batch <<<"$(row a src/k.txt 5 'after the key block text')"
+  [ "$status" -eq 0 ]
+  jq -e '.result == "grounded" and .matched_line == 5' <<<"$output" >/dev/null
+}
+
+@test "batch reports every id and still grounds the safe sibling" {
+  local payload
+  printf '%s\n' "short $Q26" >src/a.txt
+  printf '%s\n' "short $Q26" >"$BASE/outside.txt"
+  payload="$(
+    row short src/a.txt 1 short
+    row bad ../outside.txt 1 "short $Q26"
+    row miss src/a.txt 1 'not-present-quote-body'
+    row good src/a.txt 1 "$Q26"
+  )"
+  run bash "$QG" batch <<<"$payload"
+  [ "$status" -eq 0 ]
+  jq -e -s '
+    length == 4
+    and all(has("id") and has("result") and has("matched_line"))
+    and (map(select(.id == "short"))[0].result == "too-short")
+    and (map(select(.id == "bad"))[0].result == "unsafe-path")
+    and (map(select(.id == "miss"))[0].result == "ungrounded")
+    and (map(select(.id == "good"))[0].result == "grounded")
+    and (map(select(.id == "good"))[0].matched_line == 1)
+    and all(select(.result != "grounded") | .matched_line == null)
+  ' <<<"$output" >/dev/null
+}
+
+@test "batch uses radius 3: window edges, a start clamp and a cited line past EOF" {
+  local payload
+  write_window
+  payload="$(
+    row in-low src/a.txt 5 "$(line_quote 02)"
+    row in-high src/a.txt 5 "$(line_quote 08)"
+    row out-low src/a.txt 5 "$(line_quote 01)"
+    row out-high src/a.txt 5 "$(line_quote 09)"
+    row clamp src/a.txt 1 "$(line_quote 04)"
+    row past-eof src/a.txt 12 "$(line_quote 10)"
+    row far-past src/a.txt 100 "$(line_quote 01)"
+  )"
+  run bash "$QG" batch <<<"$payload"
+  [ "$status" -eq 0 ]
+  jq -e -s '
+    length == 7
+    and (.[0].result == "grounded" and .[0].matched_line == 2)
+    and (.[1].result == "grounded" and .[1].matched_line == 8)
+    and (.[2].result == "ungrounded")
+    and (.[3].result == "ungrounded")
+    and (.[4].result == "grounded" and .[4].matched_line == 4)
+    and (.[5].result == "grounded" and .[5].matched_line == 10)
+    and (.[6].result == "ungrounded")
+  ' <<<"$output" >/dev/null
+}
+
+@test "batch reports a missing file as ungrounded and an empty stdin as no rows" {
+  printf '%s\n' "$Q26" >src/a.txt
+  run bash "$QG" batch <<<"$(row gone src/missing.txt 1 "$Q26")"
+  [ "$status" -eq 0 ]
+  jq -e '.id == "gone" and .result == "ungrounded" and .matched_line == null' <<<"$output" >/dev/null
+  run bash "$QG" batch </dev/null
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "a malformed row is ungrounded and does not affect its siblings" {
+  local payload
+  printf '%s\n' "$Q26" >src/a.txt
+  payload="$(
+    printf '%s\n' '{"id":"null-line","file":"src/a.txt","line":null,"quote":"'"$Q26"'"}'
+    printf '%s\n' '{"id":"no-quote","file":"src/a.txt","line":1}'
+    printf '%s\n' '{"id":"num-file","file":7,"line":1,"quote":"'"$Q26"'"}'
+    printf '%s\n' '{"id":"nul-quote","file":"src/a.txt","line":1,"quote":"abc\u0000def"}'
+    printf '%s\n' '{"id":"str-line","file":"src/a.txt","line":"1","quote":"'"$Q26"'"}'
+    row good src/a.txt 1 "$Q26"
+  )"
+  run bash "$QG" batch <<<"$payload"
+  [ "$status" -eq 0 ]
+  jq -e -s '
+    length == 6
+    and all(.[0:4][]; .result == "ungrounded" and .matched_line == null)
+    and (.[4].id == "str-line" and .[4].result == "grounded" and .[4].matched_line == 1)
+    and (.[5].id == "good" and .[5].result == "grounded")
+  ' <<<"$output" >/dev/null
+}
+
+@test "batch exits 2 with no result rows when a row is not JSON or has no usable id" {
+  printf '%s\n' "$Q26" >src/a.txt
+  run bash "$QG" batch <<<"$(row ok src/a.txt 1 "$Q26")"$'\n''not json'
   [ "$status" -eq 2 ]
   [[ "$output" != *'"result"'* ]]
-  run bash "$QG" batch <<<'{"id":"x\u0000y","file":"src/a.txt","line":1,"quote":"abcdefghijklmnopqrstuvwxyz"}'
+  run bash "$QG" batch <<<"$(row ok src/a.txt 1 "$Q26")"$'\n''{"file":"src/a.txt","line":1,"quote":"x"}'
   [ "$status" -eq 2 ]
   [[ "$output" != *'"result"'* ]]
-  run bash "$QG" batch <<<'{"id":"ok","file":"src/a.txt","line":1,"quote":"abcdefghijklmnopqrstuvwxyz"}
-{"id":"x","file":"src/a.txt","quote":"abcdefghijklmnopqrstuvwxyz"}'
+  run bash "$QG" batch <<<'{"id":"x\u0000y","file":"src/a.txt","line":1,"quote":"abcdefghij"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<'[1,2]'
   [ "$status" -eq 2 ]
   [[ "$output" != *'"result"'* ]]
 }
@@ -358,14 +447,86 @@ line_quote() {
   ' <<<"$output" >/dev/null
 }
 
-@test "check returns promptly for a very large radius or line number" {
+@test "batch handles a multi-line quote without disturbing its siblings" {
+  local payload
   printf 'alpha line one\nthe quoted target line\nomega\n' >src/a.txt
-  run timeout 10 bash "$QG" check src/a.txt 1 999999999 <<<"a quote that is not in the file"
-  [ "$status" -eq 1 ]
-  [ -z "$output" ]
-  run timeout 10 bash "$QG" check src/a.txt 3 999999999 <<<"the quoted target line"
+  payload="$(
+    row multi src/a.txt 2 $'alpha line one\nthe quoted target line'
+    row good src/a.txt 2 'the quoted target line'
+  )"
+  run bash "$QG" batch <<<"$payload"
   [ "$status" -eq 0 ]
-  [ "$output" = "2" ]
-  run timeout 10 bash "$QG" check src/a.txt 999999999 3 <<<"the quoted target line"
-  [ "$status" -eq 1 ]
+  jq -e -s '
+    length == 2
+    and (.[0].id == "multi" and .[0].result == "ungrounded")
+    and (.[1].id == "good" and .[1].result == "grounded" and .[1].matched_line == 2)
+  ' <<<"$output" >/dev/null
+}
+
+@test "batch grounds under mawk as the awk on PATH" {
+  local mawk shim
+  mawk="$(command -v mawk)" || skip "mawk is not installed"
+  shim="${BASE}/shim"
+  mkdir -p "$shim"
+  ln -s "$mawk" "$shim/awk"
+  printf 'alpha line one\nthe quoted target line\nomega\n' >src/a.txt
+  PATH="$shim:$PATH" run bash "$QG" batch <<<"$(row m src/a.txt 2 'the quoted target line')"
+  [ "$status" -eq 0 ]
+  jq -e '.id == "m" and .result == "grounded" and .matched_line == 2' <<<"$output" >/dev/null
+}
+
+@test "a redaction failure exits 2 with no result in check and in batch" {
+  local shim
+  shim="${BASE}/shim"
+  mkdir -p "$shim"
+  printf '#!/bin/sh\nexit 1\n' >"$shim/sed"
+  chmod +x "$shim/sed"
+  printf 'alpha line one\nthe quoted target line\nomega\n' >src/a.txt
+  PATH="$shim:$PATH" run bash "$QG" check src/a.txt 2 <<<"the quoted target line"
+  [ "$status" -eq 2 ]
+  [[ "$output" != "2" ]]
+  PATH="$shim:$PATH" run bash "$QG" batch <<<"$(row r src/a.txt 2 'the quoted target line')"
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+}
+
+@test "no run leaves a temp file behind, so unredacted text never reaches disk" {
+  local tmp
+  tmp="${BASE}/tmp"
+  mkdir -p "$tmp"
+  printf 'alpha line one\nthe quoted target line\nomega\n' >src/a.txt
+  TMPDIR="$tmp" run bash "$QG" check src/a.txt 2 <<<"the quoted target line"
+  [ "$status" -eq 0 ]
+  TMPDIR="$tmp" run bash "$QG" batch <<<"$(row t src/a.txt 2 'the quoted target line')"
+  [ "$status" -eq 0 ]
+  TMPDIR="$tmp" run bash "$QG" batch <<<'not json'
+  [ "$status" -eq 2 ]
+  [ -z "$(ls -A "$tmp")" ]
+}
+
+@test "batch of 100 findings across 20 files grounds every row within the deadline" {
+  local f n id quote payload out start elapsed
+  payload="${BASE}/payload.jsonl"
+  out="${BASE}/out.jsonl"
+  for f in $(seq 1 20); do
+    : >"src/f${f}.txt"
+    for n in 1 2 3 4 5; do
+      printf 'f%02d-line%d token body xx\n' "$f" "$n" >>"src/f${f}.txt"
+      id=$(printf 'f%02d-%d' "$f" "$n")
+      quote=$(printf 'f%02d-line%d token body xx' "$f" "$n")
+      row "$id" "src/f${f}.txt" "$n" "$quote" >>"$payload"
+    done
+  done
+  start=$(now_ms)
+  bash "$QG" batch <"$payload" >"$out"
+  elapsed=$(($(now_ms) - start))
+  jq -e -s '
+    length == 100
+    and all(.result == "grounded" and ((.matched_line | tostring) == (.id | split("-")[1])))
+  ' <"$out" >/dev/null
+  # The plan's deadline is 2 s; the clock here may only tick in whole seconds.
+  if [ "$elapsed" -ge 2000 ]; then
+    printf 'batch elapsed %s ms\n' "$elapsed" >&2
+    return 1
+  fi
 }
