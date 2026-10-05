@@ -1209,7 +1209,8 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   KC="$BATS_TEST_DIRNAME/../references/review-pr/knowledge-compounding.md"
   step9a=$(awk '/^## Step 9a:/ { p = 1; next } /^## Step 9b:/ { p = 0 } p' "$KC")
   grep -qF '**In non-interactive mode**, do not spawn any agent' <<<"$step9a"
-  grep -qF '"$RL" fold <PR> | jq -c '"'"'[.findings[] | {finding_id, state, fix_sha}]'"'" <<<"$step9a"
+  grep -qF '| {finding_id, state, fix_sha}]'"'" <<<"$step9a"
+  grep -qF 'select(.state != "dismissed" and .state != "stale")' <<<"$step9a"
   grep -qF 'lib/stage-learning.sh" tmpfile' <<<"$step9a"
   grep -qF 'lib/stage-learning.sh" stage <PR> <path>' <<<"$step9a"
   grep -qF 'Never write "verified" or "tests pass"' <<<"$(tr '\n' ' ' <<<"$step9a" | tr -s ' ')"

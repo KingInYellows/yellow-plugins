@@ -521,7 +521,7 @@ PR already stages at Step 9a.
 
   <!-- /deepen-plan -->
 
-- [ ] 4.4: Run the scorer sample gate before locking the template.
+- [x] 4.4: Run the scorer sample gate before locking the template.
   - Hand-score two sample narratives against the `staging-scorer.md` rubric
     (lines 58–107): one with an applied P1, one unresolved-only.
   - If the applied sample would not clear 0.7, revise the template before
@@ -550,7 +550,7 @@ PR already stages at Step 9a.
     `pnpm test:shell-compat`.
   - `pnpm validate:agents`, `pnpm lint:plugins`, `pnpm validate:schemas`.
   - `bats tests/` in both `plugins/yellow-core` and `plugins/yellow-review`.
-- [ ] 4.6: Changesets: `yellow-core: minor` (new helper, ASIA redaction) and
+- [x] 4.6: Changesets: `yellow-core: minor` (new helper, ASIA redaction) and
       `yellow-review: minor` (unattended Step 9a now stages; sweep-all Step 6
       removed).
 

@@ -176,7 +176,7 @@ cs_redact_secrets() {
 #          4 write failed.
 cs_stage_entry() {
   local cwd="${1:-}" sid="${2:-}" src="${3:-}"
-  local size capped redacted text invisible hash ts slug staging entry
+  local size capped stripped redacted text invisible hash ts slug staging entry
   if [ -z "$cwd" ] || [ -z "$src" ] || [ ! -f "$src" ] || [ ! -r "$src" ]; then
     return 1
   fi
@@ -186,21 +186,33 @@ cs_stage_entry() {
   esac
   command -v jq >/dev/null 2>&1 || return 2
 
+  # The whole sanitise pipeline runs byte-wise (LC_ALL=C): in a UTF-8 locale
+  # an invalid byte stops `.` from matching, so a PEM header carrying one
+  # would escape the redaction range.
   size=$(wc -c <"$src" | tr -d ' ')
   if [ "${size:-0}" -gt 8192 ] 2>/dev/null; then
-    capped=$(head -c 8192 "$src" | sed '$d')
+    # The last kept line is whole when byte 8192 or 8193 is a newline;
+    # otherwise the cap cut it mid-way and it is dropped.
+    case "$(head -c 8193 "$src" | tail -c 2 | od -An -c)" in
+      *'\n'*) capped=$(head -c 8192 "$src" | tr -d '\000') ;;
+      *) capped=$(head -c 8192 "$src" | LC_ALL=C sed '$d' | tr -d '\000') ;;
+    esac
   else
-    capped=$(cat -- "$src")
+    capped=$(tr -d '\000' <"$src")
   fi
 
-  # UTF-8 byte sequences, matched under LC_ALL=C: U+200B-200F, U+202A-202E,
-  # U+2060-2064, U+2066-2069, U+FEFF and the tag block U+E0000-E007F.
-  invisible=$(printf '\342\200[\213-\217\252-\256]|\342\201[\240-\244\246-\251]|\357\273\277|\363\240[\200\201][\200-\277]')
-  redacted=$(printf '%s\n' "$capped" \
-    | tr -d '\000-\010\013\014\016-\037\177' \
-    | LC_ALL=C sed -E -e "s/${invisible}//g" \
-    | cs_redact_secrets 2>/dev/null) || return 3
-  text=$(printf '%s\n' "$redacted" | sed -E \
+  # Invisible or line-breaking characters, as UTF-8 bytes: U+00AD, C1
+  # controls (incl. NEL), U+034F, U+061C, U+180E, U+200B-200F, U+2028-202E,
+  # U+2060-2064, U+2066-2069, U+FE00-FE0F, U+FEFF, tags U+E0000-E007F.
+  # CR becomes a newline so a CR-hidden `---` line is neutralised below.
+  invisible=$(printf '\302[\200-\237\255]|\315\217|\330\234|\341\240\216|\342\200[\213-\217\250-\256]|\342\201[\240-\244\246-\251]|\357\270[\200-\217]|\357\273\277|\363\240[\200\201][\200-\277]')
+  stripped=$(printf '%s\n' "$capped" \
+    | tr '\015' '\012' \
+    | tr -d '\001-\010\013\014\016-\037\177' \
+    | LC_ALL=C sed -E -e "s/${invisible}//g") || return 3
+  redacted=$(printf '%s\n' "$stripped" \
+    | (LC_ALL=C; export LC_ALL; cs_redact_secrets) 2>/dev/null) || return 3
+  text=$(printf '%s\n' "$redacted" | LC_ALL=C sed -E \
     -e '/^[[:space:]]*(---|```|~~~)/s/^/> /' \
     -e '/^[[:space:]]*([Ss][Yy][Ss][Tt][Ee][Mm]|[Aa][Ss][Ss][Ii][Ss][Tt][Aa][Nn][Tt]|[Hh][Uu][Mm][Aa][Nn]|[Uu][Ss][Ee][Rr])[[:space:]]*:/s/^/> /') \
     || return 3

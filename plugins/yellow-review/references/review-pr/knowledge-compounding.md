@@ -21,7 +21,7 @@ when done.
 
    ```bash
    RL="${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh"
-   "$RL" fold <PR> | jq -c '[.findings[] | {finding_id, state, fix_sha}]'
+   "$RL" fold <PR> | jq -c '[.findings[] | select(.state != "dismissed" and .state != "stale") | {finding_id, state, fix_sha}]'
    ```
 
    Match this run's P0/P1/P2 findings by the finding ids kept after Steps 6

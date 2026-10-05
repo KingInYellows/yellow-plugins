@@ -60,7 +60,7 @@ slug_of() {
   p=$(narrative)
   run "$YS" stage 42 "$p"
   [ "$status" -eq 0 ]
-  [[ "$output" == "[review:pr] Staged learnings for PR #42; they drain at the next session started in $MAIN." ]]
+  [ "$output" = "[review:pr] Staged learnings for PR #42; they drain at the next session started in $MAIN." ]
   [ ! -e "$p" ]
   f=$(staged review-pr-acme-widgets-42)
   [ -n "$f" ]
@@ -74,7 +74,7 @@ slug_of() {
   run "$YS" stage 7 "$p"
   [ "$status" -eq 0 ]
   f=$(staged review-pr-acme-widgets-7)
-  [[ "$f" == *"/$(slug_of "$(cd "$MAIN" && pwd -P)")/compound-staging/pending/"* ]]
+  [[ "$f" == *"/$(slug_of "$(cd "$MAIN" && pwd -P)")/compound-staging/pending/"* ]] || false
   jq -e --arg m "$(cd "$MAIN" && pwd -P)" '.cwd == $m' "$f"
 }
 
@@ -134,6 +134,14 @@ slug_of() {
   run "$YS" stage 9 "$misnamed"
   [ "$output" = "[review:pr] Warning: learning staging skipped (invalid input)" ]
   [ -f "$misnamed" ]
+}
+
+@test "a yr-stage.* file outside TMPDIR is refused and never deleted" {
+  outside="$BATS_TEST_TMPDIR/yr-stage.abc"
+  printf 'x\n' >|"$outside"
+  run "$YS" stage 9 "$outside"
+  [ "$output" = "[review:pr] Warning: learning staging skipped (invalid input)" ]
+  [ -f "$outside" ]
 }
 
 @test "a symlinked narrative is refused and left alone" {
@@ -217,10 +225,10 @@ slug_of() {
 @test "the narrative is never echoed" {
   p=$(narrative 'NARRATIVE-CANARY body text')
   run "$YS" stage 14 "$p"
-  [[ "$output" != *NARRATIVE-CANARY* ]]
+  [[ "$output" != *NARRATIVE-CANARY* ]] || false
 }
 
 @test "an unknown subcommand prints usage and exits 2" {
   run -2 "$YS" bogus
-  [[ "$output" == usage:* ]]
+  [[ "$output" == usage:* ]] || false
 }
