@@ -39,12 +39,14 @@ const fixturePath = path.join(
 
 let scratchBase: string;
 let captureFile: string;
+let readyFile: string;
 
 beforeEach(() => {
   scratchBase = fs.mkdtempSync(
     path.join(os.tmpdir(), 'yellow-goal-runtime-protocol-')
   );
   captureFile = path.join(scratchBase, 'capture.jsonl');
+  readyFile = path.join(scratchBase, 'ready.txt');
 });
 
 afterEach(() => {
@@ -60,6 +62,7 @@ function makeDeps(extraEnv: Record<string, string> = {}): ProtocolRuntimeDeps {
     },
     childEnvOverride: {
       FAKE_PROVIDER_CAPTURE: captureFile,
+      FAKE_PROVIDER_READY: readyFile,
       ...extraEnv,
     },
   };
@@ -83,25 +86,29 @@ function verbsInvoked(): string[] {
   return readCapture().map((entry) => entry.argv[0] as string);
 }
 
+function verbsReady(): string[] {
+  if (!fs.existsSync(readyFile)) return [];
+  return fs
+    .readFileSync(readyFile, 'utf8')
+    .split('\n')
+    .filter((line) => line.length > 0);
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Polls the capture file until `verb` was invoked, then waits a small
- *  buffer for that child's own async SIGTERM-listener registration (writes
- *  the argv capture synchronously before any signal handling is wired up),
- *  so a signal sent right after this resolves is guaranteed cooperative
- *  rather than racing the child's own startup. */
+/** Polls until `verb` was captured and the fixture has marked ready after
+ *  installing its SIGTERM listener (or choosing default disposition). */
 async function waitUntilInvoked(verb: string, timeoutMs = 4000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    if (verbsInvoked().includes(verb)) {
-      await sleep(150);
+    if (verbsInvoked().includes(verb) && verbsReady().includes(verb)) {
       return;
     }
     await sleep(5);
   }
-  throw new Error(`timed out waiting for "${verb}" to be invoked`);
+  throw new Error(`timed out waiting for "${verb}" to be ready`);
 }
 
 function baseInput(overrides: Partial<RunStubInput> = {}): RunStubInput {
@@ -725,6 +732,7 @@ function realDeps(source: Record<string, string> = {}): ProtocolRuntimeDeps {
     },
     childEnvOverride: {
       FAKE_PROVIDER_CAPTURE: captureFile,
+      FAKE_PROVIDER_READY: readyFile,
     },
   };
 }
@@ -808,7 +816,7 @@ describe('runReal — deadline and child environment', () => {
     }
   });
 
-  it('forwards ANTHROPIC_API_KEY only when the approved auth mode is api-key', async () => {
+  it('forwards ANTHROPIC_API_KEY only when --auth-mode is api-key', async () => {
     const operatorHome = path.join(scratchBase, 'operator-home');
     await runReal(
       realDeps({
@@ -830,6 +838,46 @@ describe('runReal — deadline and child environment', () => {
       expect(invocation.env['CLAUDE_CODE_OAUTH_TOKEN']).toBeUndefined();
       expect(invocation.env['HOME']).toBe(operatorHome);
     }
+  });
+
+  it('forwards a request or approval path named approve', async () => {
+    const approvalPath = path.join(scratchBase, 'approve');
+    fs.writeFileSync(approvalPath, '{}\n');
+    await runReal(
+      realDeps(),
+      realInput({ request: 'approve', approvalPath })
+    );
+    const runInvocation = readCapture().find((entry) =>
+      entry.argv.includes('agx-claude-code')
+    );
+    expect(runInvocation?.argv).toContain('--approval');
+    expect(runInvocation?.argv).toContain(approvalPath);
+    expect(runInvocation?.argv.at(-1)).toBe('approve');
+    expect(runInvocation?.argv[1]).not.toBe('approve');
+  });
+
+  it('rejects a refusal that exits with a status other than 1', async () => {
+    const err = await expectGoalError(
+      runReal(
+        {
+          env: {
+            ...process.env,
+            GOAL_GEN_BIN: fixturePath,
+            GOAL_GEN_SCRATCH: path.join(scratchBase, 'op'),
+          },
+          childEnvOverride: {
+            FAKE_PROVIDER_CAPTURE: captureFile,
+            FAKE_PROVIDER_READY: readyFile,
+            FAKE_PROVIDER_EXIT_CODE: '3',
+          },
+        },
+        realInput({
+          approvalPath: path.join(scratchBase, 'mode-refusal.json'),
+        })
+      ),
+      'GOAL_PROTOCOL_INVALID'
+    );
+    expect(err.message).toContain('refusal requires exit 1');
   });
 
   it('keeps a source API key out of the stub child', async () => {

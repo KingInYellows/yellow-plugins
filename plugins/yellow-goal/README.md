@@ -1,8 +1,9 @@
 # yellow-goal
 
-Claude Code bridge to the yellow-goal engine: read-only request operations plus
-a zero-spend stub run. Installs as `yellow-goal@yellow-plugins` and talks to
-`goal-gen` **as a process**.
+Claude Code bridge to the yellow-goal engine: read-only request operations, a
+zero-spend stub run, and a user-only approval-gated real run that can spend.
+Installs as `yellow-goal@yellow-plugins` and talks to `goal-gen` **as a
+process**.
 
 ## Installation
 

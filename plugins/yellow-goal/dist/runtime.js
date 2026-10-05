@@ -603,7 +603,7 @@ function realRunFlagArgv(input) {
     return argv;
 }
 function assertForwardingOnly(argv) {
-    if (argv.includes('--yes') || argv.includes('approve')) {
+    if (argv.includes('--yes') || (argv[0] === 'run' && argv[1] === 'approve')) {
         throw new errors_js_1.GoalEngineError('GOAL_INVALID_INPUT', 'real-run cannot pass --yes or mint an approval');
     }
 }
@@ -731,14 +731,6 @@ async function runRealPhases(deps, input, scratchDir, lifecycle) {
         });
     }
     const manifest = (0, provider_protocol_js_1.parseSingleJsonObject)(manifestResult.stdout, 'run manifest', provider_protocol_js_1.CONSUMER_LIMITS.bootstrapMaxStdoutBytes);
-    if (manifestResult.exitCode !== 0) {
-        throw (0, provider_protocol_js_1.classifyPreflightFailure)({
-            exitCode: manifestResult.exitCode,
-            signal: manifestResult.signal,
-            stdout: Buffer.alloc(0),
-            stderr: manifestResult.stderr,
-        });
-    }
     checkNotCancelled();
     const runArgv = [
         'run',
@@ -802,6 +794,9 @@ async function runRealPhases(deps, input, scratchDir, lifecycle) {
                 stdout: Buffer.alloc(0),
                 stderr: runResult.stderr,
             });
+        }
+        if (runResult.exitCode !== 1) {
+            throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_INVALID', `refusal requires exit 1, received ${String(runResult.exitCode)}`);
         }
         const refusal = (0, provider_protocol_js_1.validateRealRunRefusal)(runResult.stderr);
         return {

@@ -192,9 +192,10 @@ function copyNonEmpty(env, source, key) {
  * NODE_OPTIONS are never forwarded from `sourceEnv`.
  *
  * A real run keeps the disposable TMPDIR and XDG config/cache, and instead
- * forwards the operator HOME and XDG_STATE_HOME so the engine's consumption
- * marker and the subscription credential directory survive scratch cleanup.
- * `ANTHROPIC_API_KEY` is copied only for `api-key`.
+ * forwards the operator HOME (and USERPROFILE, with USERPROFILE as the
+ * HOME fallback) and XDG_STATE_HOME so the engine's consumption marker
+ * and the subscription credential directory survive scratch cleanup.
+ * `ANTHROPIC_API_KEY` is copied only when `--auth-mode` is `api-key`.
  */
 function buildChildEnv(input) {
     const { sourceEnv, scratchDir, childEnvOverride, realRunAuthMode } = input;
@@ -213,6 +214,10 @@ function buildChildEnv(input) {
     }
     else {
         copyNonEmpty(env, sourceEnv, 'HOME');
+        copyNonEmpty(env, sourceEnv, 'USERPROFILE');
+        if (env['HOME'] === undefined && env['USERPROFILE'] !== undefined) {
+            env['HOME'] = env['USERPROFILE'];
+        }
         copyNonEmpty(env, sourceEnv, 'XDG_STATE_HOME');
         if (realRunAuthMode === 'api-key') {
             copyNonEmpty(env, sourceEnv, 'ANTHROPIC_API_KEY');

@@ -1,4 +1,4 @@
-// Explicit released-artifact Provider Protocol v1 smoke through the consumer
+// Explicit released-artifact Provider Protocol v2 smoke through the consumer
 // CLI. Not discovered by the fake-only unit suite. Drives only the fixed
 // `run-stub` operation against the installed public engine: every scenario,
 // the noninteractive DoD gate, the engine timeout and a consumer-forwarded

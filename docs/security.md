@@ -582,8 +582,9 @@ child process and never imports it. Containment assumptions:
   forwarded on that path. A real-run child keeps the disposable `TMPDIR` and
   forwards the operator `HOME` and `XDG_STATE_HOME` so the consumption marker
   and subscription credential directory are not deleted with the scratch tree.
-  `ANTHROPIC_API_KEY` is forwarded only when the approved auth mode is
-  `api-key`. Stdin is closed.
+  `ANTHROPIC_API_KEY` forwarding follows the supplied `--auth-mode` flag; a
+  mismatched approval does not prevent sending the key to the engine. Stdin is
+  closed.
 - **Bounds**: stdout/stderr are byte-bounded before buffering, the JSON Lines
   stream is validated incrementally, one absolute deadline and AbortSignal span
   all phases, cancellation is SIGTERM then SIGKILL after 5 s, and results carry

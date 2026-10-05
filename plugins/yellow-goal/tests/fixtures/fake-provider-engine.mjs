@@ -54,6 +54,12 @@ function captureInvocation() {
   appendFileSync(capturePath, line);
 }
 
+function markReady() {
+  const readyPath = process.env.FAKE_PROVIDER_READY;
+  if (!readyPath) return;
+  appendFileSync(readyPath, `${args[0]}\n`);
+}
+
 /** Writes to a piped stdout/stderr are asynchronous on POSIX; awaiting the
  *  write callback (not just the synchronous `.write()` return) is required
  *  before a following `process.exit()`, or the write can be truncated. */
@@ -108,6 +114,7 @@ async function raceSignalOrTimeout(ms) {
       resolve('signal');
     };
     if (!ignoreSigterm) process.once('SIGTERM', onSigterm);
+    markReady();
   });
 }
 
@@ -502,7 +509,7 @@ async function handleRealRun() {
       code: 'APPROVAL_MISSING',
       message: 'approval file is missing',
     };
-    exitCode = 1;
+    exitCode = Number(process.env.FAKE_PROVIDER_EXIT_CODE || '1');
   } else if (mode === 'refusal-known') {
     stderrError = {
       code: 'APPROVAL_CONSUMED',

@@ -259,9 +259,10 @@ export interface ChildEnvInput {
   readonly childEnvOverride?: NodeJS.ProcessEnv;
   /**
    * Real-run only. Stub children stay credential-free. A real run must see
-   * the operator HOME (subscription credentials and `os.homedir()`), the
-   * operator `XDG_STATE_HOME` (approval consumption markers), and
-   * `ANTHROPIC_API_KEY` only when the approved auth mode is `api-key`.
+   * the operator HOME (subscription credentials and `os.homedir()`; on
+   * Windows, `USERPROFILE` is forwarded and used as the HOME fallback),
+   * the operator `XDG_STATE_HOME` (approval consumption markers), and
+   * `ANTHROPIC_API_KEY` only when `--auth-mode` is `api-key`.
    */
   readonly realRunAuthMode?: 'subscription' | 'api-key';
 }
@@ -282,9 +283,10 @@ function copyNonEmpty(
  * NODE_OPTIONS are never forwarded from `sourceEnv`.
  *
  * A real run keeps the disposable TMPDIR and XDG config/cache, and instead
- * forwards the operator HOME and XDG_STATE_HOME so the engine's consumption
- * marker and the subscription credential directory survive scratch cleanup.
- * `ANTHROPIC_API_KEY` is copied only for `api-key`.
+ * forwards the operator HOME (and USERPROFILE, with USERPROFILE as the
+ * HOME fallback) and XDG_STATE_HOME so the engine's consumption marker
+ * and the subscription credential directory survive scratch cleanup.
+ * `ANTHROPIC_API_KEY` is copied only when `--auth-mode` is `api-key`.
  */
 export function buildChildEnv(input: ChildEnvInput): NodeJS.ProcessEnv {
   const { sourceEnv, scratchDir, childEnvOverride, realRunAuthMode } = input;
@@ -303,6 +305,10 @@ export function buildChildEnv(input: ChildEnvInput): NodeJS.ProcessEnv {
     env['HOME'] = home;
   } else {
     copyNonEmpty(env, sourceEnv, 'HOME');
+    copyNonEmpty(env, sourceEnv, 'USERPROFILE');
+    if (env['HOME'] === undefined && env['USERPROFILE'] !== undefined) {
+      env['HOME'] = env['USERPROFILE'];
+    }
     copyNonEmpty(env, sourceEnv, 'XDG_STATE_HOME');
     if (realRunAuthMode === 'api-key') {
       copyNonEmpty(env, sourceEnv, 'ANTHROPIC_API_KEY');

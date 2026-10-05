@@ -72,7 +72,7 @@ try {
     ),
     PINNED_ENGINE_VERSION
   );
-  // Provider Protocol v1 discovery handshake against the public artifact:
+  // Provider Protocol v2 discovery handshake against the public artifact:
   // static, offline, and validated by the consumer's own observable-data
   // guards (never a copied engine schema).
   const capabilities = invoke(

@@ -963,7 +963,7 @@ function realRunFlagArgv(input: RunRealInput): string[] {
 }
 
 function assertForwardingOnly(argv: readonly string[]): void {
-  if (argv.includes('--yes') || argv.includes('approve')) {
+  if (argv.includes('--yes') || (argv[0] === 'run' && argv[1] === 'approve')) {
     throw new GoalEngineError(
       'GOAL_INVALID_INPUT',
       'real-run cannot pass --yes or mint an approval'
@@ -1134,14 +1134,6 @@ async function runRealPhases(
     'run manifest',
     CONSUMER_LIMITS.bootstrapMaxStdoutBytes
   );
-  if (manifestResult.exitCode !== 0) {
-    throw classifyPreflightFailure({
-      exitCode: manifestResult.exitCode,
-      signal: manifestResult.signal,
-      stdout: Buffer.alloc(0),
-      stderr: manifestResult.stderr,
-    });
-  }
 
   checkNotCancelled();
   const runArgv = [
@@ -1229,6 +1221,12 @@ async function runRealPhases(
         stdout: Buffer.alloc(0),
         stderr: runResult.stderr,
       });
+    }
+    if (runResult.exitCode !== 1) {
+      throw new GoalEngineError(
+        'GOAL_PROTOCOL_INVALID',
+        `refusal requires exit 1, received ${String(runResult.exitCode)}`
+      );
     }
     const refusal = validateRealRunRefusal(runResult.stderr);
     return {

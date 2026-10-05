@@ -14,8 +14,9 @@ allowed-tools:
 # Run an approval-gated real run
 
 This command is user-only. Spawn the pinned `goal-gen` engine as a **process**.
-The consumer first runs `run manifest` and displays that body, then forwards
-the operator's approval path:
+The consumer CLI runs `run manifest` and then the real run in one invocation.
+After that CLI returns, display the returned `manifest` body first. The engine
+argv for the real run is:
 
 `run <request> --protocol v2 --executor agx-claude-code <manifest flags> --approval <path>`.
 

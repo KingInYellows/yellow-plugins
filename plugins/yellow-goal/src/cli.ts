@@ -187,11 +187,6 @@ function refuseRealRunSelector(rest: readonly string[]): void {
   if (rest.some((arg) => arg === '--yes' || arg.startsWith('--yes='))) {
     throw new UsageError('refusing --yes; an approval replaces confirmation');
   }
-  if (rest.includes('approve')) {
-    throw new UsageError(
-      'refusing approve; run-real cannot mint an approval'
-    );
-  }
 }
 
 function requirePositiveInt(value: string, flag: string): string {
@@ -376,8 +371,9 @@ async function main(): Promise<void> {
   }
 
   try {
-    // Only the async run-stub lifecycle listens to the controller; the
-    // synchronous setup/request paths keep Node's default signal behavior.
+    // Only the async run-stub and run-real lifecycles listen to the
+    // controller; the synchronous setup/request paths keep Node's default
+    // signal behavior.
     if (operation === 'run-stub' || operation === 'run-real') {
       installSignalForwarding();
     }

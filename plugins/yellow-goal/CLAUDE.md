@@ -35,11 +35,12 @@ second source of truth.
 - `/goal:run-stub` — fixed-authority Provider Protocol v2 stub run:
   `run --executor stub --protocol v2 --stub-scenario <scenario> [--timeout-ms <n>] [--yes] -- <request>`.
   Zero spend, no target mutation. User flags still cannot select an executor or protocol.
-- `/goal:run-real` — user-only (`disable-model-invocation: true`). Displays the
-  engine `run manifest` body, forwards an operator-supplied `--approval` path on
-  `run --protocol v2 --executor agx-claude-code`, never passes `--yes`, and never
-  mints an approval (`run approve` is not invoked). Reports spend and the bundle
-  path when the outcome has them.
+- `/goal:run-real` — user-only (`disable-model-invocation: true`). One CLI
+  invocation runs `run manifest` then the real run, forwards an operator-supplied
+  `--approval` path on `run --protocol v2 --executor agx-claude-code`, never
+  passes `--yes`, and never mints an approval (`run approve` is not invoked).
+  After the CLI returns, report the `manifest` body first, then spend and the
+  bundle path when the outcome has them.
 
 Out of scope: inspect / analyze / compile / the legacy `claude-code` executor.
 Callers cannot select an executor, protocol, target, provider, raw argv, or

@@ -358,6 +358,27 @@ describe('buildChildEnv', () => {
     }
   });
 
+  it('forwards USERPROFILE and uses it as the HOME fallback on real runs', () => {
+    const scratchDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'yellow-goal-env-userprofile-')
+    );
+    const operatorProfile = path.join(scratchDir, 'operator-profile');
+    try {
+      const env = buildChildEnv({
+        sourceEnv: {
+          PATH: '/usr/bin',
+          USERPROFILE: operatorProfile,
+        },
+        scratchDir,
+        realRunAuthMode: 'subscription',
+      });
+      expect(env['USERPROFILE']).toBe(operatorProfile);
+      expect(env['HOME']).toBe(operatorProfile);
+    } finally {
+      fs.rmSync(scratchDir, { recursive: true, force: true });
+    }
+  });
+
   it('omits LANG/LC_ALL when absent from the source environment', () => {
     const scratchDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'yellow-goal-env-nolang-')

@@ -563,6 +563,7 @@ describe('run-real against the portable fake provider engine', () => {
       ).args,
       { GOAL_GEN_BIN: providerFixturePath }
     );
+    expect(known.exitCode).toBe(1);
     const knownBody = parseSingleJsonLine(known.stdout) as {
       outcome: string;
       approvalId?: string;
