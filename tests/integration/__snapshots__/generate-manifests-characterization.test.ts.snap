@@ -87,7 +87,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.5.2",
+      "version": "3.5.3",
       "author": {
         "name": "KingInYellows"
       },
@@ -187,7 +187,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-codex",
       "description": "OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration",
-      "version": "0.2.17",
+      "version": "0.3.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -197,7 +197,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-council",
       "description": "On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
-      "version": "0.4.1",
+      "version": "0.5.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -432,7 +432,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-codex/.claude-plugin/p
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-codex",
-  "version": "0.2.17",
+  "version": "0.3.0",
   "description": "OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration",
   "author": {
     "name": "KingInYellows",
@@ -550,7 +550,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-council/.claude-plugin
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-council",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
   "author": {
     "name": "KingInYellows",
@@ -985,7 +985,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-review/.claude-plugin/
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-review",
-  "version": "3.5.2",
+  "version": "3.5.3",
   "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review. Graphite-native workflow.",
   "author": {
     "name": "KingInYellows",

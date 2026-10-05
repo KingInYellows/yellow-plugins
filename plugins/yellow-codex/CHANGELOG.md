@@ -1,5 +1,51 @@
 # yellow-codex
 
+## 0.3.0
+
+### Minor Changes
+
+- [`136afa0`](https://github.com/KingInYellows/yellow-plugins/commit/136afa03eb943407c11dff8c56d4a7fd6fe4a28b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - feat:
+  quota-exhaustion handling and OpenCode fourth-lineage routing for the
+  four-reviewer council.
+  - `yellow-council`: a new `QUOTA_EXHAUSTED` verdict, excluded from synthesis
+    like `UNAVAILABLE`, returned by each reviewer with the parsed reset ETA,
+    `confidence=N/A`, `fenced_output_path=/dev/null` and an empty findings
+    block. The headline reads `<reviewer> quota exhausted (<ETA>)`. Detection is
+    error-string driven: gemini matches `RESOURCE_EXHAUSTED` only, opencode
+    matches provider quota text and HTTP 402, and `/council` classifies a failed
+    claude spawn against Claude's session, weekly and Opus limit strings.
+    Transient rate limits and HTTP 529 stay `ERROR`. `/dev/null` is accepted
+    only under this verdict at the Step 7 appendix, and the unlink loops skip
+    it.
+  - `yellow-council`: `COUNCIL_OPENCODE_MODEL` selects the OpenCode model by
+    presence. Unset routes to `openrouter/deepseek/deepseek-v4-pro`, set but
+    empty passes no `--model` (V1), and a non-empty value is passed verbatim. A
+    missing model, an unauthenticated provider or HTTP 401 returns `UNAVAILABLE`
+    naming the fix (other statuses, including 403, stay `ERROR`). `/council`
+    Step 2b (after mode dispatch, so help and `fleet` never start opencode)
+    prints each slot's resolved model and lineage, warns without blocking on a
+    lineage collision or a missing OpenRouter credential, and the report header
+    carries a `Models` row. `/council:setup` checks for an OpenRouter
+    credential. The routing spike on opencode 1.18.34 is recorded in
+    `docs/spikes/opencode-cli-format-json-2026-05-04.md`.
+  - Upgrade note: with `COUNCIL_OPENCODE_MODEL` unset the OpenCode slot now
+    needs OpenRouter auth (`opencode auth login --provider openrouter`). Without
+    it the slot returns `UNAVAILABLE` where V1 ran. Set
+    `COUNCIL_OPENCODE_MODEL=""` to keep V1 behaviour, or
+    `COUNCIL_OPENCODE_MODEL=opencode/deepseek-v4-pro` for OpenCode Zen.
+  - `yellow-codex`: `codex-reviewer` returns `QUOTA_EXHAUSTED` for
+    `insufficient_quota`, `model_cap_exceeded`, `usage_limit_reached` and the
+    ChatGPT-plan "hit your usage limit" wording, checked before the transient
+    `rate_limit_exceeded` arm. Compatibility: the verdict and its `/dev/null`
+    path are read by `yellow-review` and `yellow-council`, so release those with
+    (or before) this `yellow-codex` version. A `/review:pr` from before this
+    change reads the stub's empty findings pair as "Codex found nothing" and
+    would try to `rm -f` `/dev/null`.
+  - `yellow-review`: `/review:pr` treats a codex `QUOTA_EXHAUSTED` as a skipped
+    reviewer and unlinks only an exact `/tmp/council-codex-fenced-*.txt` path,
+    never `/dev/null`.
+
 ## 0.2.17
 
 ### Patch Changes
