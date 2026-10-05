@@ -18,8 +18,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GoalEngineError } from '../src/errors.js';
 import { PINNED_ENGINE_VERSION } from '../src/pin.js';
 import {
+  realRunConsumerDeadlineMs,
+  runReal,
   runStub,
   type ProtocolRuntimeDeps,
+  type RunRealInput,
   type RunStubInput,
 } from '../src/runtime.js';
 
@@ -693,6 +696,157 @@ describe('runStub zero-spend invariant and cooperative pre-admission closes', ()
     controller.abort();
     const err = await expectGoalError(promise, 'GOAL_RUN_CANCELLED');
     expect(err.localCause).toBe('caller-cancelled');
+  });
+});
+
+function realInput(overrides: Partial<RunRealInput> = {}): RunRealInput {
+  return {
+    request: 'req.json',
+    approvalPath: path.join(scratchBase, 'operator-approval.json'),
+    profile: 'config-repair',
+    maxTurns: '4',
+    perActionUsd: '1',
+    totalUsd: '5',
+    authMode: 'subscription',
+    allowedTools: ['Read'],
+    bundleDir: path.join(scratchBase, 'bundle'),
+    spendLedger: path.join(scratchBase, 'spend.jsonl'),
+    ...overrides,
+  };
+}
+
+function realDeps(source: Record<string, string> = {}): ProtocolRuntimeDeps {
+  return {
+    env: {
+      ...process.env,
+      GOAL_GEN_BIN: fixturePath,
+      GOAL_GEN_SCRATCH: path.join(scratchBase, 'op'),
+      ...source,
+    },
+    childEnvOverride: {
+      FAKE_PROVIDER_CAPTURE: captureFile,
+    },
+  };
+}
+
+async function parentTimerDelays(
+  run: () => Promise<unknown>
+): Promise<number[]> {
+  const delays: number[] = [];
+  const original = global.setTimeout;
+  global.setTimeout = ((
+    handler: TimerHandler,
+    timeout?: number,
+    ...args: unknown[]
+  ) => {
+    if (typeof timeout === 'number') delays.push(timeout);
+    return original(handler, timeout, ...(args as []));
+  }) as unknown as typeof setTimeout;
+  try {
+    await run();
+    return delays;
+  } finally {
+    global.setTimeout = original;
+  }
+}
+
+describe('runReal — deadline and child environment', () => {
+  it('computes bootstrap slack plus the released 600000ms wall clock', () => {
+    expect(realRunConsumerDeadlineMs(undefined)).toBe(120_000 + 600_000);
+    expect(realRunConsumerDeadlineMs('600000')).toBe(120_000 + 600_000);
+    expect(realRunConsumerDeadlineMs('3600000')).toBe(120_000 + 3_600_000);
+  });
+
+  it('arms that deadline on the children runReal spawns', async () => {
+    const delays = await parentTimerDelays(() =>
+      runReal(realDeps(), realInput())
+    );
+    const longest = Math.max(...delays);
+    expect(longest).toBeGreaterThanOrEqual(120_000 + 600_000 - 5_000);
+    expect(longest).toBeLessThanOrEqual(120_000 + 600_000);
+  });
+
+  it('uses an operator wall clock instead of the 600000ms default', async () => {
+    const delays = await parentTimerDelays(() =>
+      runReal(realDeps(), realInput({ runWallClockMs: '1000' }))
+    );
+    const longest = Math.max(...delays);
+    expect(longest).toBeGreaterThanOrEqual(120_000 + 1_000 - 5_000);
+    expect(longest).toBeLessThan(120_000 + 60_000);
+  });
+
+  it('rejects a wall clock above the engine ceiling before spawning', async () => {
+    await expectGoalError(
+      runReal(realDeps(), realInput({ runWallClockMs: '3600001' })),
+      'GOAL_INVALID_INPUT'
+    );
+    expect(verbsInvoked()).toEqual([]);
+  });
+
+  it('spawns the real-run child with the operator home and no API key under subscription', async () => {
+    const operatorHome = path.join(scratchBase, 'operator-home');
+    const operatorState = path.join(scratchBase, 'operator-state');
+    await runReal(
+      realDeps({
+        HOME: operatorHome,
+        XDG_STATE_HOME: operatorState,
+        ANTHROPIC_API_KEY: 'test-api-key',
+        GH_TOKEN: 'gh-secret',
+      }),
+      realInput({ authMode: 'subscription' })
+    );
+    const invocations = readCapture();
+    expect(invocations.length).toBeGreaterThan(0);
+    for (const invocation of invocations) {
+      expect(invocation.env['HOME']).toBe(operatorHome);
+      expect(invocation.env['XDG_STATE_HOME']).toBe(operatorState);
+      expect(invocation.env['ANTHROPIC_API_KEY']).toBeUndefined();
+      expect(invocation.env['GH_TOKEN']).toBeUndefined();
+      expect(invocation.env['HOME']).not.toContain(
+        path.join(scratchBase, 'op', 'home')
+      );
+    }
+  });
+
+  it('forwards ANTHROPIC_API_KEY only when the approved auth mode is api-key', async () => {
+    const operatorHome = path.join(scratchBase, 'operator-home');
+    await runReal(
+      realDeps({
+        HOME: operatorHome,
+        ANTHROPIC_API_KEY: 'test-api-key',
+        CLAUDE_CODE_OAUTH_TOKEN: 'oauth-secret',
+      }),
+      realInput({ authMode: 'api-key' })
+    );
+    const invocations = readCapture();
+    expect(invocations.some((entry) => entry.argv[1] === 'manifest')).toBe(
+      true
+    );
+    expect(
+      invocations.some((entry) => entry.argv.includes('agx-claude-code'))
+    ).toBe(true);
+    for (const invocation of invocations) {
+      expect(invocation.env['ANTHROPIC_API_KEY']).toBe('test-api-key');
+      expect(invocation.env['CLAUDE_CODE_OAUTH_TOKEN']).toBeUndefined();
+      expect(invocation.env['HOME']).toBe(operatorHome);
+    }
+  });
+
+  it('keeps a source API key out of the stub child', async () => {
+    const operatorHome = path.join(scratchBase, 'operator-home');
+    await runStub(
+      realDeps({
+        HOME: operatorHome,
+        ANTHROPIC_API_KEY: 'test-api-key',
+      }),
+      baseInput()
+    );
+    for (const invocation of readCapture()) {
+      expect(invocation.env['ANTHROPIC_API_KEY']).toBeUndefined();
+      expect(invocation.env['HOME']).toBe(
+        path.join(scratchBase, 'op', 'home')
+      );
+    }
   });
 });
 

@@ -319,6 +319,45 @@ describe('buildChildEnv', () => {
     }
   });
 
+  it('forwards operator HOME and XDG_STATE_HOME, and the API key only for api-key', () => {
+    const scratchDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'yellow-goal-env-real-')
+    );
+    const operatorHome = path.join(scratchDir, 'operator-home');
+    const operatorState = path.join(scratchDir, 'operator-state');
+    try {
+      const shared = {
+        PATH: '/usr/bin',
+        HOME: operatorHome,
+        XDG_STATE_HOME: operatorState,
+        ANTHROPIC_API_KEY: 'test-api-key',
+        GH_TOKEN: 'gh-secret',
+      };
+      const subscription = buildChildEnv({
+        sourceEnv: shared,
+        scratchDir,
+        realRunAuthMode: 'subscription',
+      });
+      expect(subscription['HOME']).toBe(operatorHome);
+      expect(subscription['XDG_STATE_HOME']).toBe(operatorState);
+      expect(subscription['ANTHROPIC_API_KEY']).toBeUndefined();
+      expect(subscription['GH_TOKEN']).toBeUndefined();
+      expect(subscription['TMPDIR']).toBe(path.join(scratchDir, 'tmp'));
+
+      const apiKey = buildChildEnv({
+        sourceEnv: shared,
+        scratchDir,
+        realRunAuthMode: 'api-key',
+      });
+      expect(apiKey['HOME']).toBe(operatorHome);
+      expect(apiKey['XDG_STATE_HOME']).toBe(operatorState);
+      expect(apiKey['ANTHROPIC_API_KEY']).toBe('test-api-key');
+      expect(apiKey['GH_TOKEN']).toBeUndefined();
+    } finally {
+      fs.rmSync(scratchDir, { recursive: true, force: true });
+    }
+  });
+
   it('omits LANG/LC_ALL when absent from the source environment', () => {
     const scratchDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'yellow-goal-env-nolang-')

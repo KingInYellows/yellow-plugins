@@ -257,16 +257,37 @@ export interface ChildEnvInput {
   /** Test-only injection seam (e.g. a NODE_OPTIONS preload); production
    *  callers never set this. */
   readonly childEnvOverride?: NodeJS.ProcessEnv;
+  /**
+   * Real-run only. Stub children stay credential-free. A real run must see
+   * the operator HOME (subscription credentials and `os.homedir()`), the
+   * operator `XDG_STATE_HOME` (approval consumption markers), and
+   * `ANTHROPIC_API_KEY` only when the approved auth mode is `api-key`.
+   */
+  readonly realRunAuthMode?: 'subscription' | 'api-key';
+}
+
+function copyNonEmpty(
+  env: NodeJS.ProcessEnv,
+  source: NodeJS.ProcessEnv,
+  key: string
+): void {
+  const value = source[key];
+  if (typeof value === 'string' && value.length > 0) env[key] = value;
 }
 
 /**
- * Allowlisted, credential-free child environment: PATH, LANG/LC_ALL when
- * present, and a disposable HOME/TMPDIR/XDG_CONFIG_HOME/XDG_CACHE_HOME under
- * `scratchDir`. Ambient provider credentials and NODE_OPTIONS are never
- * forwarded from `sourceEnv`.
+ * Allowlisted child environment. Stub runs (no `realRunAuthMode`) get PATH,
+ * LANG/LC_ALL when present, and a disposable HOME/TMPDIR/XDG_CONFIG_HOME/
+ * XDG_CACHE_HOME under `scratchDir`. Ambient provider credentials and
+ * NODE_OPTIONS are never forwarded from `sourceEnv`.
+ *
+ * A real run keeps the disposable TMPDIR and XDG config/cache, and instead
+ * forwards the operator HOME and XDG_STATE_HOME so the engine's consumption
+ * marker and the subscription credential directory survive scratch cleanup.
+ * `ANTHROPIC_API_KEY` is copied only for `api-key`.
  */
 export function buildChildEnv(input: ChildEnvInput): NodeJS.ProcessEnv {
-  const { sourceEnv, scratchDir, childEnvOverride } = input;
+  const { sourceEnv, scratchDir, childEnvOverride, realRunAuthMode } = input;
   const home = join(scratchDir, 'home');
   const tmp = join(scratchDir, 'tmp');
   mkdirSync(home, { recursive: true });
@@ -274,11 +295,19 @@ export function buildChildEnv(input: ChildEnvInput): NodeJS.ProcessEnv {
 
   const env: NodeJS.ProcessEnv = {
     PATH: sourceEnv['PATH'] ?? '',
-    HOME: home,
     TMPDIR: tmp,
     XDG_CONFIG_HOME: join(home, '.config'),
     XDG_CACHE_HOME: join(home, '.cache'),
   };
+  if (realRunAuthMode === undefined) {
+    env['HOME'] = home;
+  } else {
+    copyNonEmpty(env, sourceEnv, 'HOME');
+    copyNonEmpty(env, sourceEnv, 'XDG_STATE_HOME');
+    if (realRunAuthMode === 'api-key') {
+      copyNonEmpty(env, sourceEnv, 'ANTHROPIC_API_KEY');
+    }
+  }
   const lang = sourceEnv['LANG'];
   if (lang !== undefined) env['LANG'] = lang;
   const lcAll = sourceEnv['LC_ALL'];

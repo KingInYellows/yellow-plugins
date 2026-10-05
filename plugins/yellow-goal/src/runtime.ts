@@ -306,6 +306,33 @@ export interface RunStubResult {
 const DEFAULT_DEADLINE_BASE_MS = 120_000;
 const MIN_TIMEOUT_MS = 1;
 const MAX_TIMEOUT_MS = 3_600_000;
+/**
+ * Released engine defaults (goal-gen `REAL_RUN_WALL_CLOCK_MS` /
+ * `RUN_WALL_CLOCK_MS`). The consumer deadline is the stub bootstrap slack
+ * plus this budget. The action timeout sits inside the wall clock and is
+ * not added again.
+ */
+export const REAL_RUN_DEFAULT_WALL_CLOCK_MS = 600_000;
+export const REAL_RUN_MAX_WALL_CLOCK_MS = 3_600_000;
+
+/** Bootstrap slack plus the engine wall clock. Omitted flag uses 600000ms. */
+export function realRunConsumerDeadlineMs(
+  runWallClockMs: string | undefined
+): number {
+  if (runWallClockMs === undefined) {
+    return DEFAULT_DEADLINE_BASE_MS + REAL_RUN_DEFAULT_WALL_CLOCK_MS;
+  }
+  if (!/^[1-9][0-9]*$/.test(runWallClockMs)) {
+    runStubUsageError('--run-wall-clock-ms must be a positive decimal integer');
+  }
+  const wall = Number(runWallClockMs);
+  if (!Number.isSafeInteger(wall) || wall > REAL_RUN_MAX_WALL_CLOCK_MS) {
+    runStubUsageError(
+      `--run-wall-clock-ms must be <= ${REAL_RUN_MAX_WALL_CLOCK_MS}`
+    );
+  }
+  return DEFAULT_DEADLINE_BASE_MS + wall;
+}
 
 function runStubUsageError(message: string): never {
   throw new GoalEngineError('GOAL_INVALID_INPUT', message);
@@ -891,6 +918,9 @@ function validateRealInput(input: RunRealInput): void {
   if (input.allowedTools.some((tool) => tool.length === 0)) {
     runStubUsageError('--allowed-tool must be a nonempty string');
   }
+  if (input.authMode !== 'subscription' && input.authMode !== 'api-key') {
+    runStubUsageError('--auth-mode must be subscription or api-key');
+  }
 }
 
 /** Flags shared by `run manifest` and the real run. Never `--yes`. */
@@ -967,7 +997,9 @@ async function runRealInScratch(
 ): Promise<RunRealResult> {
   const controller = new AbortController();
   let localCause: GoalErrorLocalCause | undefined;
-  const deadlineAt = Date.now() + (input.deadlineMs ?? DEFAULT_DEADLINE_BASE_MS);
+  const deadlineAt =
+    Date.now() +
+    (input.deadlineMs ?? realRunConsumerDeadlineMs(input.runWallClockMs));
   const recordLocalCause = (cause: GoalErrorLocalCause): void => {
     if (localCause === undefined) localCause = cause;
   };
@@ -1015,6 +1047,8 @@ async function runRealPhases(
     sourceEnv: deps.env,
     scratchDir,
     childEnvOverride: deps.childEnvOverride,
+    realRunAuthMode:
+      input.authMode === 'api-key' ? 'api-key' : 'subscription',
   });
   function runChild(
     argv: readonly string[],

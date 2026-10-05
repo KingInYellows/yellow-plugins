@@ -576,16 +576,21 @@ child process and never imports it. Containment assumptions:
   `run --protocol v2 --executor agx-claude-code` with the operator's approval
   path. It never passes `--yes`, never runs `run approve`, and never lets the
   caller choose `claude-code` or a protocol.
-- **Environment**: the child receives only `PATH`, `LANG`/`LC_ALL` and a
+- **Environment**: a stub child receives only `PATH`, `LANG`/`LC_ALL` and a
   disposable `HOME`/`TMPDIR`/`XDG_*` under a per-operation scratch directory
-  that is removed afterwards; ambient credentials and `NODE_OPTIONS` are never
-  forwarded; stdin is closed.
+  that is removed afterwards. Ambient credentials and `NODE_OPTIONS` are never
+  forwarded on that path. A real-run child keeps the disposable `TMPDIR` and
+  forwards the operator `HOME` and `XDG_STATE_HOME` so the consumption marker
+  and subscription credential directory are not deleted with the scratch tree.
+  `ANTHROPIC_API_KEY` is forwarded only when the approved auth mode is
+  `api-key`. Stdin is closed.
 - **Bounds**: stdout/stderr are byte-bounded before buffering, the JSON Lines
   stream is validated incrementally, one absolute deadline and AbortSignal span
   all phases, cancellation is SIGTERM then SIGKILL after 5 s, and results carry
   only the validated terminal summary plus bounded scalar diagnostics — never
   raw engine output, request contents or environment.
-- **Request path**: `/goal:run-stub` validates the request path with
+- **Request path**: `/goal:run-stub` validates the request path, and
+  `/goal:run-real` validates the request path and the approval path, with
   yellow-core's `validate_file_path` (relative, inside the working directory, no
   symlink escape) before invoking the engine.
 - **CI**: the blocking `Released Goal Engine Compatibility` job verifies the
