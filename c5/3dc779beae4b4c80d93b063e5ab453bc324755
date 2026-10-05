@@ -1,0 +1,29 @@
+docs/security.md
+  s_9debf6a8e6c9cc::t_8aa31d424cdc08 410-412
+plugins/yellow-core/lib/compound-staging.sh
+  s_9debf6a8e6c9cc::t_2cc88a4659a821 173,186-203
+plugins/yellow-core/tests/compound-staging.bats
+  s_9debf6a8e6c9cc::t_b0970fa0f79396 301,305,478-502
+plugins/yellow-review/CLAUDE.md
+  s_9debf6a8e6c9cc::t_74d834f954c8a2 366-368
+plugins/yellow-review/lib/stage-learning.sh
+  s_9debf6a8e6c9cc::t_51a48de726b96d 105,108-109,111-112
+plugins/yellow-review/tests/stage-learning.bats
+  s_9debf6a8e6c9cc::t_a4300b6ec3faee 237-269
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c53dc779beae4b4c80d93b063e5ab453bc324755",
+  "prompts": {},
+  "sessions": {
+    "s_9debf6a8e6c9cc": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a10b16-2f12-7580-a10b-dea67e1c98e2",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
