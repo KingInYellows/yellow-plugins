@@ -1,0 +1,19 @@
+.changeset/worktree-restack-github-pause-restore.md
+  s_350761cc46eb8b::t_abe36a033a489e 1-10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f660c3cb4a5c78c999985ccff75841b986735e59",
+  "prompts": {},
+  "sessions": {
+    "s_350761cc46eb8b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e10bf3ea-2f61-49ee-a89f-1150bf77d57f",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
