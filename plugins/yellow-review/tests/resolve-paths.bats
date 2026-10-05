@@ -1129,6 +1129,21 @@ trust_assert_absolute() {
   [ ! -e "$marker" ]
 }
 
+@test "trust: yr_inside_root matches an ancestor that is the worktree under another spelling" {
+  local root="$BATS_TEST_TMPDIR/repo"
+  mkdir -p "$root/bin" "$BATS_TEST_TMPDIR/outside"
+  : >| "$root/bin/git"
+  : >| "$BATS_TEST_TMPDIR/outside/git"
+  yr_inside_root "$root" "$root"
+  yr_inside_root "$root/bin/git" "$root"
+  yr_inside_root "$BATS_TEST_TMPDIR/./repo/bin/git" "$root"
+  yr_inside_root "$BATS_TEST_TMPDIR//repo/bin/git" "$root"
+  run yr_inside_root "$BATS_TEST_TMPDIR/outside/git" "$root"
+  [ "$status" -eq 1 ]
+  run yr_inside_root "$BATS_TEST_TMPDIR/repo-sibling/git" "$root"
+  [ "$status" -eq 1 ]
+}
+
 @test "trust: lgit execs only an absolute git and keeps its flags" {
   local marker="$BATS_TEST_TMPDIR/canary-ran" log="$BATS_TEST_TMPDIR/git-argv.log"
   local real dest dir

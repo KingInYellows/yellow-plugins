@@ -237,6 +237,26 @@ yr_worktree_root() {
     return 1
 }
 
+# yr_inside_root <path> <root>: succeed when <path> is <root> or below it,
+# by spelling or by identity. The spelling test alone misses a path that
+# reaches the worktree under different casing on a case-insensitive
+# filesystem (macOS volumes, WSL mounts), so every ancestor is also compared
+# with the root through the filesystem (-ef, same device and inode).
+yr_inside_root() {
+    local p="$1" root="$2" d
+    case "$p" in
+        "$root"|"$root"/*) return 0 ;;
+    esac
+    d="$p"
+    while [ -n "$d" ] && [ "$d" != / ]; do
+        if [ "$d" -ef "$root" ]; then
+            return 0
+        fi
+        d=${d%/*}
+    done
+    return 1
+}
+
 # yr_resolve_tool <name>: print one absolute path whose canonical file is
 # outside the worktree. Return 1 when <name> is not on PATH, 2 when that
 # canonical file is inside the worktree, 3 when the path cannot be
@@ -257,12 +277,8 @@ yr_resolve_tool() {
     [ -f "$canon" ] || return 3
     root=$(yr_worktree_root || true)
     if [ -n "$root" ]; then
-        case "$canon" in
-            "$root"|"$root"/*) return 2 ;;
-        esac
-        case "$invoke" in
-            "$root"|"$root"/*) return 2 ;;
-        esac
+        yr_inside_root "$canon" "$root" && return 2
+        yr_inside_root "$invoke" "$root" && return 2
     fi
     printf '%s\n' "$invoke"
 }
