@@ -18,8 +18,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GoalEngineError } from '../src/errors.js';
 import { PINNED_ENGINE_VERSION } from '../src/pin.js';
 import {
+  realRunConsumerDeadlineMs,
+  runReal,
   runStub,
   type ProtocolRuntimeDeps,
+  type RunRealInput,
   type RunStubInput,
 } from '../src/runtime.js';
 
@@ -36,12 +39,14 @@ const fixturePath = path.join(
 
 let scratchBase: string;
 let captureFile: string;
+let readyFile: string;
 
 beforeEach(() => {
   scratchBase = fs.mkdtempSync(
     path.join(os.tmpdir(), 'yellow-goal-runtime-protocol-')
   );
   captureFile = path.join(scratchBase, 'capture.jsonl');
+  readyFile = path.join(scratchBase, 'ready.txt');
 });
 
 afterEach(() => {
@@ -57,6 +62,7 @@ function makeDeps(extraEnv: Record<string, string> = {}): ProtocolRuntimeDeps {
     },
     childEnvOverride: {
       FAKE_PROVIDER_CAPTURE: captureFile,
+      FAKE_PROVIDER_READY: readyFile,
       ...extraEnv,
     },
   };
@@ -80,25 +86,29 @@ function verbsInvoked(): string[] {
   return readCapture().map((entry) => entry.argv[0] as string);
 }
 
+function verbsReady(): string[] {
+  if (!fs.existsSync(readyFile)) return [];
+  return fs
+    .readFileSync(readyFile, 'utf8')
+    .split('\n')
+    .filter((line) => line.length > 0);
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Polls the capture file until `verb` was invoked, then waits a small
- *  buffer for that child's own async SIGTERM-listener registration (writes
- *  the argv capture synchronously before any signal handling is wired up),
- *  so a signal sent right after this resolves is guaranteed cooperative
- *  rather than racing the child's own startup. */
+/** Polls until `verb` was captured and the fixture has marked ready after
+ *  installing its SIGTERM listener (or choosing default disposition). */
 async function waitUntilInvoked(verb: string, timeoutMs = 4000): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    if (verbsInvoked().includes(verb)) {
-      await sleep(150);
+    if (verbsInvoked().includes(verb) && verbsReady().includes(verb)) {
       return;
     }
     await sleep(5);
   }
-  throw new Error(`timed out waiting for "${verb}" to be invoked`);
+  throw new Error(`timed out waiting for "${verb}" to be ready`);
 }
 
 function baseInput(overrides: Partial<RunStubInput> = {}): RunStubInput {
@@ -123,7 +133,7 @@ describe('runStub — happy paths', () => {
   it('runs the success scenario end to end', async () => {
     const result = await runStub(makeDeps(), baseInput());
     expect(result.engineVersion).toBe(PINNED_ENGINE_VERSION);
-    expect(result.protocolVersion).toBe('yellow-goal/provider-protocol/v1');
+    expect(result.protocolVersion).toBe('yellow-goal/provider-protocol/v2');
     expect(typeof result.runId).toBe('string');
     expect(result.eventCount).toBe(2);
     expect(result.summary).toMatchObject({ status: 'succeeded' });
@@ -193,7 +203,7 @@ describe('runStub — happy paths', () => {
       '--executor',
       'stub',
       '--protocol',
-      'v1',
+      'v2',
       '--stub-scenario',
       'success',
       '--timeout-ms',
@@ -202,6 +212,12 @@ describe('runStub — happy paths', () => {
       '--',
       '-weird --path with spaces',
     ]);
+    expect(
+      readCapture().find((entry) => entry.argv[0] === 'version')?.argv
+    ).toEqual(['version', '--json']);
+    expect(
+      readCapture().find((entry) => entry.argv[0] === 'capabilities')?.argv
+    ).toEqual(['capabilities', '--json', '--protocol', 'v2']);
   });
 
   it('sanitizes the child environment (stdin is ignored by the transport)', async () => {
@@ -421,14 +437,13 @@ describe('runStub — cancellation and deadlines', () => {
 
   it('cancels during the version probe and spawns nothing further', async () => {
     const controller = new AbortController();
-    setTimeout(() => controller.abort(), 50);
-    const err = await expectGoalError(
-      runStub(
-        makeDeps({ FAKE_PROVIDER_VERSION_DELAY_MS: '2000' }),
-        baseInput({ signal: controller.signal })
-      ),
-      'GOAL_RUN_CANCELLED'
+    const promise = runStub(
+      makeDeps({ FAKE_PROVIDER_VERSION_DELAY_MS: '5000' }),
+      baseInput({ signal: controller.signal })
     );
+    await waitUntilInvoked('version');
+    controller.abort();
+    const err = await expectGoalError(promise, 'GOAL_RUN_CANCELLED');
     expect(err.localCause).toBe('caller-cancelled');
     expect(verbsInvoked()).toEqual(['version']);
   });
@@ -688,6 +703,198 @@ describe('runStub zero-spend invariant and cooperative pre-admission closes', ()
     controller.abort();
     const err = await expectGoalError(promise, 'GOAL_RUN_CANCELLED');
     expect(err.localCause).toBe('caller-cancelled');
+  });
+});
+
+function realInput(overrides: Partial<RunRealInput> = {}): RunRealInput {
+  return {
+    request: 'req.json',
+    approvalPath: path.join(scratchBase, 'operator-approval.json'),
+    profile: 'config-repair',
+    maxTurns: '4',
+    perActionUsd: '1',
+    totalUsd: '5',
+    authMode: 'subscription',
+    allowedTools: ['Read'],
+    bundleDir: path.join(scratchBase, 'bundle'),
+    spendLedger: path.join(scratchBase, 'spend.jsonl'),
+    ...overrides,
+  };
+}
+
+function realDeps(source: Record<string, string> = {}): ProtocolRuntimeDeps {
+  return {
+    env: {
+      ...process.env,
+      GOAL_GEN_BIN: fixturePath,
+      GOAL_GEN_SCRATCH: path.join(scratchBase, 'op'),
+      ...source,
+    },
+    childEnvOverride: {
+      FAKE_PROVIDER_CAPTURE: captureFile,
+      FAKE_PROVIDER_READY: readyFile,
+    },
+  };
+}
+
+async function parentTimerDelays(
+  run: () => Promise<unknown>
+): Promise<number[]> {
+  const delays: number[] = [];
+  const original = global.setTimeout;
+  global.setTimeout = ((
+    handler: TimerHandler,
+    timeout?: number,
+    ...args: unknown[]
+  ) => {
+    if (typeof timeout === 'number') delays.push(timeout);
+    return original(handler, timeout, ...(args as []));
+  }) as unknown as typeof setTimeout;
+  try {
+    await run();
+    return delays;
+  } finally {
+    global.setTimeout = original;
+  }
+}
+
+describe('runReal — deadline and child environment', () => {
+  it('computes bootstrap slack plus the released 600000ms wall clock', () => {
+    expect(realRunConsumerDeadlineMs(undefined)).toBe(120_000 + 600_000);
+    expect(realRunConsumerDeadlineMs('600000')).toBe(120_000 + 600_000);
+    expect(realRunConsumerDeadlineMs('3600000')).toBe(120_000 + 3_600_000);
+  });
+
+  it('arms that deadline on the children runReal spawns', async () => {
+    const delays = await parentTimerDelays(() =>
+      runReal(realDeps(), realInput())
+    );
+    const longest = Math.max(...delays);
+    expect(longest).toBeGreaterThanOrEqual(120_000 + 600_000 - 5_000);
+    expect(longest).toBeLessThanOrEqual(120_000 + 600_000);
+  });
+
+  it('uses an operator wall clock instead of the 600000ms default', async () => {
+    const delays = await parentTimerDelays(() =>
+      runReal(realDeps(), realInput({ runWallClockMs: '1000' }))
+    );
+    const longest = Math.max(...delays);
+    expect(longest).toBeGreaterThanOrEqual(120_000 + 1_000 - 5_000);
+    expect(longest).toBeLessThan(120_000 + 60_000);
+  });
+
+  it('rejects a wall clock above the engine ceiling before spawning', async () => {
+    await expectGoalError(
+      runReal(realDeps(), realInput({ runWallClockMs: '3600001' })),
+      'GOAL_INVALID_INPUT'
+    );
+    expect(verbsInvoked()).toEqual([]);
+  });
+
+  it('spawns the real-run child with the operator home and no API key under subscription', async () => {
+    const operatorHome = path.join(scratchBase, 'operator-home');
+    const operatorState = path.join(scratchBase, 'operator-state');
+    await runReal(
+      realDeps({
+        HOME: operatorHome,
+        XDG_STATE_HOME: operatorState,
+        ANTHROPIC_API_KEY: 'test-api-key',
+        GH_TOKEN: 'gh-secret',
+      }),
+      realInput({ authMode: 'subscription' })
+    );
+    const invocations = readCapture();
+    expect(invocations.length).toBeGreaterThan(0);
+    for (const invocation of invocations) {
+      expect(invocation.env['HOME']).toBe(operatorHome);
+      expect(invocation.env['XDG_STATE_HOME']).toBe(operatorState);
+      expect(invocation.env['ANTHROPIC_API_KEY']).toBeUndefined();
+      expect(invocation.env['GH_TOKEN']).toBeUndefined();
+      expect(invocation.env['HOME']).not.toContain(
+        path.join(scratchBase, 'op', 'home')
+      );
+    }
+  });
+
+  it('forwards ANTHROPIC_API_KEY only when --auth-mode is api-key', async () => {
+    const operatorHome = path.join(scratchBase, 'operator-home');
+    await runReal(
+      realDeps({
+        HOME: operatorHome,
+        ANTHROPIC_API_KEY: 'test-api-key',
+        CLAUDE_CODE_OAUTH_TOKEN: 'oauth-secret',
+      }),
+      realInput({ authMode: 'api-key' })
+    );
+    const invocations = readCapture();
+    expect(invocations.some((entry) => entry.argv[1] === 'manifest')).toBe(
+      true
+    );
+    expect(
+      invocations.some((entry) => entry.argv.includes('agx-claude-code'))
+    ).toBe(true);
+    for (const invocation of invocations) {
+      expect(invocation.env['ANTHROPIC_API_KEY']).toBe('test-api-key');
+      expect(invocation.env['CLAUDE_CODE_OAUTH_TOKEN']).toBeUndefined();
+      expect(invocation.env['HOME']).toBe(operatorHome);
+    }
+  });
+
+  it('forwards a request or approval path named approve', async () => {
+    const approvalPath = path.join(scratchBase, 'approve');
+    fs.writeFileSync(approvalPath, '{}\n');
+    await runReal(
+      realDeps(),
+      realInput({ request: 'approve', approvalPath })
+    );
+    const runInvocation = readCapture().find((entry) =>
+      entry.argv.includes('agx-claude-code')
+    );
+    expect(runInvocation?.argv).toContain('--approval');
+    expect(runInvocation?.argv).toContain(approvalPath);
+    expect(runInvocation?.argv.at(-1)).toBe('approve');
+    expect(runInvocation?.argv[1]).not.toBe('approve');
+  });
+
+  it('rejects a refusal that exits with a status other than 1', async () => {
+    const err = await expectGoalError(
+      runReal(
+        {
+          env: {
+            ...process.env,
+            GOAL_GEN_BIN: fixturePath,
+            GOAL_GEN_SCRATCH: path.join(scratchBase, 'op'),
+          },
+          childEnvOverride: {
+            FAKE_PROVIDER_CAPTURE: captureFile,
+            FAKE_PROVIDER_READY: readyFile,
+            FAKE_PROVIDER_EXIT_CODE: '3',
+          },
+        },
+        realInput({
+          approvalPath: path.join(scratchBase, 'mode-refusal.json'),
+        })
+      ),
+      'GOAL_PROTOCOL_INVALID'
+    );
+    expect(err.message).toContain('refusal requires exit 1');
+  });
+
+  it('keeps a source API key out of the stub child', async () => {
+    const operatorHome = path.join(scratchBase, 'operator-home');
+    await runStub(
+      realDeps({
+        HOME: operatorHome,
+        ANTHROPIC_API_KEY: 'test-api-key',
+      }),
+      baseInput()
+    );
+    for (const invocation of readCapture()) {
+      expect(invocation.env['ANTHROPIC_API_KEY']).toBeUndefined();
+      expect(invocation.env['HOME']).toBe(
+        path.join(scratchBase, 'op', 'home')
+      );
+    }
   });
 });
 

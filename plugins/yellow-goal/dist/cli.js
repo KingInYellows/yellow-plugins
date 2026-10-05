@@ -47,7 +47,7 @@ const errors_js_1 = require("./errors.js");
 const provider_protocol_js_1 = require("./provider-protocol.js");
 const runtime = __importStar(require("./runtime.js"));
 const spawn_js_1 = require("./spawn.js");
-const KNOWN_OPERATIONS = ['setup', 'request', 'run-stub'];
+const KNOWN_OPERATIONS = ['setup', 'request', 'run-stub', 'run-real'];
 function printJson(value) {
     process.stdout.write(`${JSON.stringify(value)}\n`);
 }
@@ -114,7 +114,7 @@ function dispatchRunStub(rest, deps, controller) {
         throw new UsageError('refusing --executor; run-stub always uses the stub executor');
     }
     if (rest.some((arg) => arg === '--protocol' || arg.startsWith('--protocol='))) {
-        throw new UsageError('refusing --protocol; run-stub always uses v1');
+        throw new UsageError('refusing --protocol; run-stub always uses protocol v2');
     }
     const { values, positionals } = (0, node_util_1.parseArgs)({
         args: rest,
@@ -152,6 +152,96 @@ function dispatchRunStub(rest, deps, controller) {
         signal: controller.signal,
     });
 }
+function refuseRealRunSelector(rest) {
+    if (rest.some((arg) => arg === '--executor' || arg.startsWith('--executor='))) {
+        throw new UsageError('refusing --executor; run-real always uses agx-claude-code');
+    }
+    if (rest.some((arg) => arg === '--protocol' || arg.startsWith('--protocol='))) {
+        throw new UsageError('refusing --protocol; run-real always uses protocol v2');
+    }
+    if (rest.some((arg) => arg === '--yes' || arg.startsWith('--yes='))) {
+        throw new UsageError('refusing --yes; an approval replaces confirmation');
+    }
+}
+function requirePositiveInt(value, flag) {
+    if (!/^[1-9][0-9]*$/.test(value)) {
+        throw new UsageError(`${flag} must be a positive decimal integer`);
+    }
+    return value;
+}
+function requireUsd(value, flag) {
+    if (!/^\d+(\.\d+)?$/.test(value)) {
+        throw new UsageError(`${flag} must be a decimal USD amount`);
+    }
+    return value;
+}
+function dispatchRunReal(rest, deps, controller) {
+    refuseRealRunSelector(rest);
+    const { values, positionals } = (0, node_util_1.parseArgs)({
+        args: rest,
+        options: {
+            approval: { type: 'string' },
+            profile: { type: 'string' },
+            'max-turns': { type: 'string' },
+            'per-action-usd': { type: 'string' },
+            'total-usd': { type: 'string' },
+            'auth-mode': { type: 'string' },
+            'allowed-tool': { type: 'string', multiple: true },
+            'bundle-dir': { type: 'string' },
+            'spend-ledger': { type: 'string' },
+            model: { type: 'string' },
+            'action-timeout-ms': { type: 'string' },
+            'run-wall-clock-ms': { type: 'string' },
+            'expires-in-minutes': { type: 'string' },
+            'disallowed-tool': { type: 'string', multiple: true },
+        },
+        strict: true,
+        allowPositionals: true,
+    });
+    const request = positionals[0];
+    if (positionals.length !== 1 ||
+        typeof request !== 'string' ||
+        request.length === 0) {
+        throw new UsageError('run-real requires exactly one <request> argument');
+    }
+    const authMode = requireString(values['auth-mode'], '--auth-mode');
+    if (authMode !== 'subscription' && authMode !== 'api-key') {
+        throw new UsageError('--auth-mode must be subscription or api-key');
+    }
+    const allowedTools = values['allowed-tool'] ?? [];
+    if (allowedTools.length === 0) {
+        throw new UsageError('at least one --allowed-tool is required');
+    }
+    const actionTimeout = values['action-timeout-ms'];
+    const wallClock = values['run-wall-clock-ms'];
+    const expires = values['expires-in-minutes'];
+    return runtime.runReal(deps, {
+        request,
+        approvalPath: requireString(values.approval, '--approval'),
+        profile: requireString(values.profile, '--profile'),
+        maxTurns: requirePositiveInt(requireString(values['max-turns'], '--max-turns'), '--max-turns'),
+        perActionUsd: requireUsd(requireString(values['per-action-usd'], '--per-action-usd'), '--per-action-usd'),
+        totalUsd: requireUsd(requireString(values['total-usd'], '--total-usd'), '--total-usd'),
+        authMode,
+        allowedTools,
+        bundleDir: requireString(values['bundle-dir'], '--bundle-dir'),
+        spendLedger: requireString(values['spend-ledger'], '--spend-ledger'),
+        ...(values.model !== undefined ? { model: values.model } : {}),
+        ...(actionTimeout !== undefined
+            ? { actionTimeoutMs: requirePositiveInt(actionTimeout, '--action-timeout-ms') }
+            : {}),
+        ...(wallClock !== undefined
+            ? { runWallClockMs: requirePositiveInt(wallClock, '--run-wall-clock-ms') }
+            : {}),
+        ...(expires !== undefined
+            ? { expiresInMinutes: requirePositiveInt(expires, '--expires-in-minutes') }
+            : {}),
+        ...(values['disallowed-tool'] !== undefined
+            ? { disallowedTools: values['disallowed-tool'] }
+            : {}),
+        signal: controller.signal,
+    });
+}
 async function dispatch(operation, rest, deps, controller) {
     switch (operation) {
         case 'setup': {
@@ -166,6 +256,11 @@ async function dispatch(operation, rest, deps, controller) {
             const { GOAL_GEN_SCRATCH: _testOnlyScratch, ...productionEnv } = deps.env;
             void _testOnlyScratch;
             return dispatchRunStub(rest, { env: productionEnv }, controller);
+        }
+        case 'run-real': {
+            const { GOAL_GEN_SCRATCH: _testOnlyScratch, ...productionEnv } = deps.env;
+            void _testOnlyScratch;
+            return dispatchRunReal(rest, { env: productionEnv }, controller);
         }
         default:
             throw new UsageError(`unknown subcommand "${operation}"; expected one of: ${KNOWN_OPERATIONS.join(', ')}`);
@@ -213,11 +308,18 @@ async function main() {
         process.off('SIGTERM', forwardSignal);
     }
     try {
-        // Only the async run-stub lifecycle listens to the controller; the
-        // synchronous setup/request paths keep Node's default signal behavior.
-        if (operation === 'run-stub')
+        // Only the async run-stub and run-real lifecycles listen to the
+        // controller; the synchronous setup/request paths keep Node's default
+        // signal behavior.
+        if (operation === 'run-stub' || operation === 'run-real') {
             installSignalForwarding();
+        }
         const result = await dispatch(operation, rest, buildDeps(), controller);
+        if ('outcome' in result && result.outcome !== 'verified') {
+            printJson({ ok: false, operation: resolvedOperation, ...result });
+            process.exitCode = 1;
+            return;
+        }
         printJson({ ok: true, operation: resolvedOperation, ...result });
     }
     catch (err) {

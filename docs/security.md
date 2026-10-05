@@ -578,31 +578,44 @@ child process and never imports it. Containment assumptions:
 
 - **Executable**: resolved once per operation from `PATH` (or the test-only
   `GOAL_GEN_BIN` override); every operation first probes `version --json` and
-  `capabilities --json` and refuses an engine whose identity, version or
-  capabilities disagree with the pin. **The locally installed executable is a
-  trusted boundary**: the operator installs the verified release asset and
-  controls `PATH`; the runtime probes validate an already trusted binary and do
-  not claim to authenticate an arbitrary replacement (Provider Protocol v1,
-  PP-11). Release-asset provenance is enforced by the SHA-256 check in the
-  blocking CI gate, not at every spawn.
+  `capabilities --json --protocol v2` and refuses an engine whose identity,
+  version or capabilities disagree with the pin. **The locally installed
+  executable is a trusted boundary**: the operator installs the verified
+  release asset and controls `PATH`; the runtime probes validate an already
+  trusted binary and do not claim to authenticate an arbitrary replacement.
+  Release-asset provenance is enforced by the SHA-256 check in the blocking CI
+  gate, not at every spawn.
 - **Authority**: `/goal:setup` and `/goal:request` are read-only;
   `/goal:run-stub` spawns exactly
-  `run --executor stub --protocol v1 --stub-scenario <scenario> [--timeout-ms n] [--yes] -- <request>`.
-  No executor, protocol, target, provider or raw-argv selector is exposed; the
-  stub executor is zero-spend and never touches the request's target repository,
-  and the consumer rejects a nonzero reported cost.
-- **Environment**: the child receives only `PATH`, `LANG`/`LC_ALL` and a
+  `run --executor stub --protocol v2 --stub-scenario <scenario> [--timeout-ms n] [--yes] -- <request>`.
+  Callers cannot select an executor, protocol, target, provider, or raw argv.
+  The stub executor is zero-spend and never touches the request's target
+  repository, and the consumer rejects a nonzero reported cost.
+  `/goal:run-real` is user-only. It displays the engine `run manifest` body,
+  then spawns
+  `run --protocol v2 --executor agx-claude-code` with the operator's approval
+  path. It never passes `--yes`, never runs `run approve`, and never lets the
+  caller choose `claude-code` or a protocol.
+- **Environment**: a stub child receives only `PATH`, `LANG`/`LC_ALL` and a
   disposable `HOME`/`TMPDIR`/`XDG_*` under a per-operation scratch directory
-  that is removed afterwards; ambient credentials and `NODE_OPTIONS` are never
-  forwarded; stdin is closed.
+  that is removed afterwards. Ambient credentials and `NODE_OPTIONS` are never
+  forwarded on that path. A real-run child keeps the disposable `TMPDIR` and
+  forwards the operator `HOME` and `XDG_STATE_HOME` so the consumption marker
+  and subscription credential directory are not deleted with the scratch tree.
+  `ANTHROPIC_API_KEY` forwarding follows the supplied `--auth-mode` flag; a
+  mismatched approval does not prevent sending the key to the engine. Stdin is
+  closed.
 - **Bounds**: stdout/stderr are byte-bounded before buffering, the JSON Lines
   stream is validated incrementally, one absolute deadline and AbortSignal span
   all phases, cancellation is SIGTERM then SIGKILL after 5 s, and results carry
   only the validated terminal summary plus bounded scalar diagnostics — never
   raw engine output, request contents or environment.
-- **Request path**: `/goal:run-stub` validates the request path with
-  yellow-core's `validate_file_path` (relative, inside the working directory, no
-  symlink escape) before invoking the engine.
+- **Request path**: `/goal:run-stub` validates the request path, and
+  `/goal:run-real` validates the request path, the approval path, and the
+  `--bundle-dir` / `--spend-ledger` write destinations, with yellow-core's
+  `validate_file_path` (relative, inside the working directory, no symlink
+  escape; output paths may omit a nonexistent final component) before invoking
+  the engine.
 - **CI**: the blocking `Released Goal Engine Compatibility` job verifies the
   public asset's SHA-256 before installing it with lifecycle scripts ignored and
   drives every stub scenario with failing `claude`/`codex` traps first on

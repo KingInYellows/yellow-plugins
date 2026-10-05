@@ -1,4 +1,4 @@
-// Explicit released-artifact Provider Protocol v1 smoke through the consumer
+// Explicit released-artifact Provider Protocol v2 smoke through the consumer
 // CLI. Not discovered by the fake-only unit suite. Drives only the fixed
 // `run-stub` operation against the installed public engine: every scenario,
 // the noninteractive DoD gate, the engine timeout and a consumer-forwarded
@@ -165,7 +165,7 @@ try {
     assert.equal(body.ok, true);
     assert.equal(body.operation, 'run-stub');
     assert.equal(body.engineVersion, PINNED_ENGINE_VERSION);
-    assert.equal(body.protocolVersion, 'yellow-goal/provider-protocol/v1');
+    assert.equal(body.protocolVersion, 'yellow-goal/provider-protocol/v2');
     assert.ok(typeof body.runId === 'string' && body.runId.length > 0);
     assert.ok(Number.isSafeInteger(body.eventCount) && body.eventCount > 1);
     assert.equal(body.summary.status, 'succeeded');

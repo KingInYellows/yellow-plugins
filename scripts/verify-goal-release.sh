@@ -7,9 +7,23 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 : "${TMPDIR:?Set TMPDIR to the isolated runtime directory}"
 
-PINNED_ENGINE_VERSION="0.2.0"
-PINNED_ENGINE_ASSET_URL="https://github.com/KingInYellows/yellow-goal/releases/download/v0.2.0/goal-gen-0.2.0.tgz"
-PINNED_ENGINE_ASSET_SHA256="7ad266b22603007552b582b83349464cc67f4976eca63bf4db56ffacc4e1663a"
+PINNED_ENGINE_VERSION="0.3.0"
+PINNED_ENGINE_TAG="v0.3.0"
+PINNED_ENGINE_COMMIT="2f336d548523f795fef95f43fb03d751c2d65b80"
+PINNED_ENGINE_ASSET_URL="https://github.com/KingInYellows/yellow-goal/releases/download/v0.3.0/goal-gen-0.3.0.tgz"
+PINNED_ENGINE_ASSET_SHA256="16e9d4b84f8b771ca1c368c886da70ef0d29c5e2af5ba68a51094c20f0a5db23"
+
+case "$PINNED_ENGINE_ASSET_URL" in
+  *"/releases/download/${PINNED_ENGINE_TAG}/goal-gen-${PINNED_ENGINE_VERSION}.tgz") ;;
+  *)
+    echo "released goal-gen pin URL does not match ${PINNED_ENGINE_TAG} / ${PINNED_ENGINE_VERSION}" >&2
+    exit 1
+    ;;
+esac
+if [ "${#PINNED_ENGINE_COMMIT}" -ne 40 ]; then
+  echo "pinned engine commit must be 40 characters" >&2
+  exit 1
+fi
 
 consumer="$(mktemp -d "$TMPDIR/goal-release-consumer.XXXXXX")"
 trap 'rm -rf -- "$consumer"' EXIT

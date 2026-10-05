@@ -180,25 +180,49 @@ function spawnProtocolChild(opts) {
         child.on('close', onClose);
     });
 }
+function copyNonEmpty(env, source, key) {
+    const value = source[key];
+    if (typeof value === 'string' && value.length > 0)
+        env[key] = value;
+}
 /**
- * Allowlisted, credential-free child environment: PATH, LANG/LC_ALL when
- * present, and a disposable HOME/TMPDIR/XDG_CONFIG_HOME/XDG_CACHE_HOME under
- * `scratchDir`. Ambient provider credentials and NODE_OPTIONS are never
- * forwarded from `sourceEnv`.
+ * Allowlisted child environment. Stub runs (no `realRunAuthMode`) get PATH,
+ * LANG/LC_ALL when present, and a disposable HOME/TMPDIR/XDG_CONFIG_HOME/
+ * XDG_CACHE_HOME under `scratchDir`. Ambient provider credentials and
+ * NODE_OPTIONS are never forwarded from `sourceEnv`.
+ *
+ * A real run keeps the disposable TMPDIR and XDG config/cache, and instead
+ * forwards the operator HOME (and USERPROFILE, with USERPROFILE as the
+ * HOME fallback) and XDG_STATE_HOME so the engine's consumption marker
+ * and the subscription credential directory survive scratch cleanup.
+ * `ANTHROPIC_API_KEY` is copied only when `--auth-mode` is `api-key`.
  */
 function buildChildEnv(input) {
-    const { sourceEnv, scratchDir, childEnvOverride } = input;
+    const { sourceEnv, scratchDir, childEnvOverride, realRunAuthMode } = input;
     const home = (0, node_path_1.join)(scratchDir, 'home');
     const tmp = (0, node_path_1.join)(scratchDir, 'tmp');
     (0, node_fs_1.mkdirSync)(home, { recursive: true });
     (0, node_fs_1.mkdirSync)(tmp, { recursive: true });
     const env = {
         PATH: sourceEnv['PATH'] ?? '',
-        HOME: home,
         TMPDIR: tmp,
         XDG_CONFIG_HOME: (0, node_path_1.join)(home, '.config'),
         XDG_CACHE_HOME: (0, node_path_1.join)(home, '.cache'),
     };
+    if (realRunAuthMode === undefined) {
+        env['HOME'] = home;
+    }
+    else {
+        copyNonEmpty(env, sourceEnv, 'HOME');
+        copyNonEmpty(env, sourceEnv, 'USERPROFILE');
+        if (env['HOME'] === undefined && env['USERPROFILE'] !== undefined) {
+            env['HOME'] = env['USERPROFILE'];
+        }
+        copyNonEmpty(env, sourceEnv, 'XDG_STATE_HOME');
+        if (realRunAuthMode === 'api-key') {
+            copyNonEmpty(env, sourceEnv, 'ANTHROPIC_API_KEY');
+        }
+    }
     const lang = sourceEnv['LANG'];
     if (lang !== undefined)
         env['LANG'] = lang;

@@ -35,7 +35,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, orchestrate plan-implement-review chains (legacy — see yellow-cursor)   | 1 agent, 9 commands, 1 skill, 1 MCP            |
 | `yellow-jules`        | Google Jules integration (experimental) — observe sessions and stage their artifacts for review; read-only in this release             | 4 commands                                     |
 | `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                                                       | 10 agents, 6 commands, 1 skill                 |
-| `yellow-goal`         | Process bridge to the yellow-goal `goal-gen` engine (setup probe, request create/validate, zero-spend stub run)                        | 3 commands                                     |
+| `yellow-goal`         | Process bridge to the yellow-goal `goal-gen` engine (setup/request, stub run, approval-gated real run that may spend)                  | 4 commands                                     |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents                                      | 3 agents, 9 commands, 1 skill, 1 MCP           |
 | `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                                                  | 2 commands, 1 MCP                              |
 | `yellow-research`     | Deep research with Ceramic, DeepWiki, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                                        | 2 agents, 4 commands, 2 skills, 7 MCPs         |
@@ -201,6 +201,16 @@ the ~90MB embedding model). Requires Node.js 20+. No external services or API
 keys required. Run `/ruvector:setup` to install ahead of time and initialize
 the project's `.ruvector/` store.
 
+### yellow-goal (process bridge)
+
+`/goal:setup`, `/goal:request`, and `/goal:run-stub` stay zero-spend. The
+fourth command, `/goal:run-real`, is user-only: it displays the engine
+manifest, forwards an operator-supplied approval path, and may spend. Default
+`--auth-mode subscription` uses the operator Claude Code login.
+`--auth-mode api-key` forwards `ANTHROPIC_API_KEY` from the environment.
+Never commit that key. Put the pinned `goal-gen` binary on PATH, then run
+`/goal:setup`.
+
 ## Usage
 
 After installing, use `/plugin install <name>@yellow-plugins` to activate
@@ -283,7 +293,7 @@ yellow-plugins/
 │   ├── yellow-debt/           # Debt audit (7 agents, 6 commands, 1 skill, 1 hook)
 │   ├── yellow-devin/          # Devin.AI, legacy (1 agent, 9 commands, 1 skill, 1 MCP)
 │   ├── yellow-docs/           # Documentation (10 agents, 6 commands, 1 skill)
-│   ├── yellow-goal/           # yellow-goal engine bridge (3 commands)
+│   ├── yellow-goal/           # yellow-goal engine bridge (4 commands)
 │   ├── yellow-jules/          # Google Jules, experimental, read-only (4 commands)
 │   ├── yellow-linear/         # Linear PM (3 agents, 9 commands, 1 skill, 1 MCP)
 │   ├── yellow-morph/          # Morph code editing and search (2 commands, 1 MCP)

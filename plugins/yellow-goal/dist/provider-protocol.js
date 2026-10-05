@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RunStreamValidator = exports.JsonLinesFramer = exports.CONSUMER_LIMITS = exports.STUB_SCENARIOS = exports.REQUIRED_CAPABILITIES = exports.REQUIRED_OPERATIONS = exports.RUN_EVENT_SCHEMA_VERSION = exports.REQUEST_SCHEMA_VERSION = exports.CAPABILITIES_SCHEMA_VERSION = exports.PROTOCOL_VERSION = void 0;
+exports.RealRunStreamValidator = exports.REAL_RUN_OUTCOMES = exports.RunStreamValidator = exports.JsonLinesFramer = exports.CONSUMER_LIMITS = exports.STUB_SCENARIOS = exports.REQUIRED_CAPABILITIES = exports.REQUIRED_OPERATIONS = exports.RUN_EVENT_SCHEMA_VERSION = exports.REQUEST_SCHEMA_VERSION = exports.CAPABILITIES_SCHEMA_VERSION = exports.REAL_RUN_EXECUTOR_CAPABILITY = exports.SUPPORTED_PROTOCOLS = exports.PROTOCOL_VERSION = exports.PROTOCOL_V1 = void 0;
 exports.boundedString = boundedString;
 exports.parseSingleJsonObject = parseSingleJsonObject;
 exports.validateVersionProbe = validateVersionProbe;
@@ -8,14 +8,23 @@ exports.validateCapabilities = validateCapabilities;
 exports.isEngineStdoutTransportFailure = isEngineStdoutTransportFailure;
 exports.validateTerminalAgreement = validateTerminalAgreement;
 exports.classifyPreflightFailure = classifyPreflightFailure;
+exports.validateRealRunRefusal = validateRealRunRefusal;
+exports.validateRealRunTerminalAgreement = validateRealRunTerminalAgreement;
 /**
- * Pure Provider Protocol v1 validators (PP-01..PP-11,
- * yellow-goal/goal-gen/plans/specs/provider-protocol-v1.md). No I/O, no
- * child_process, no imports from yellow-goal source: these are consumer
- * guards over observable JSON/bytes, not a copy of the engine's schemas.
+ * Pure Provider Protocol validators. Stub streams are the v1 run-event
+ * contract with the v2 protocol id (PP-01..PP-11 plus R23). Real-run streams
+ * are the v2 `agx-claude-code` contract (R24, R29). No I/O, no child_process,
+ * no imports from yellow-goal source: these are consumer guards over
+ * observable JSON/bytes, not a copy of the engine's schemas.
  */
 const errors_js_1 = require("./errors.js");
-exports.PROTOCOL_VERSION = 'yellow-goal/provider-protocol/v1';
+exports.PROTOCOL_V1 = 'yellow-goal/provider-protocol/v1';
+/** Every consumer command that selects a protocol speaks v2. */
+exports.PROTOCOL_VERSION = 'yellow-goal/provider-protocol/v2';
+exports.SUPPORTED_PROTOCOLS = [exports.PROTOCOL_V1, exports.PROTOCOL_VERSION];
+exports.REAL_RUN_EXECUTOR_CAPABILITY = 'run.executor.agx-claude-code';
+/** Advertised by neither v1 nor v2. v2 must not grow this legacy id. */
+const FORBIDDEN_CAPABILITIES = ['run.executor.claude-code'];
 exports.CAPABILITIES_SCHEMA_VERSION = 'yellow-goal/provider-capabilities/v1';
 exports.REQUEST_SCHEMA_VERSION = 'yellow-goal/request/v1';
 exports.RUN_EVENT_SCHEMA_VERSION = 'yellow-goal/run-event/v1';
@@ -210,6 +219,7 @@ function validateCapabilities(value, pinnedVersion) {
         invalid('capabilities must be a JSON object');
     const schemaVersion = value['schemaVersion'];
     const protocolVersion = value['protocolVersion'];
+    const supportedProtocols = value['supportedProtocols'];
     const engineVersion = value['engineVersion'];
     const requestSchemaVersion = value['requestSchemaVersion'];
     const runEventSchemaVersion = value['runEventSchemaVersion'];
@@ -222,6 +232,9 @@ function validateCapabilities(value, pinnedVersion) {
     }
     if (!isNonEmptyString(protocolVersion)) {
         invalid('capabilities.protocolVersion must be a nonempty string');
+    }
+    if (!isUniqueNonEmptyStringArray(supportedProtocols)) {
+        invalid('capabilities.supportedProtocols must be unique nonempty strings');
     }
     if (!isNonEmptyString(engineVersion)) {
         invalid('capabilities.engineVersion must be a nonempty string');
@@ -263,6 +276,9 @@ function validateCapabilities(value, pinnedVersion) {
     if (protocolVersion !== exports.PROTOCOL_VERSION) {
         incompatible('unexpected protocolVersion', extras);
     }
+    if (!containsAll(supportedProtocols, exports.SUPPORTED_PROTOCOLS)) {
+        incompatible('capabilities.supportedProtocols is missing v1 or v2', extras);
+    }
     if (requestSchemaVersion !== exports.REQUEST_SCHEMA_VERSION) {
         incompatible('unexpected requestSchemaVersion', extras);
     }
@@ -277,6 +293,12 @@ function validateCapabilities(value, pinnedVersion) {
     }
     if (!containsAll(capabilities, exports.REQUIRED_CAPABILITIES)) {
         incompatible('capabilities is missing a required capability', extras);
+    }
+    if (!containsAll(capabilities, [exports.REAL_RUN_EXECUTOR_CAPABILITY])) {
+        incompatible('capabilities is missing run.executor.agx-claude-code', extras);
+    }
+    if (capabilities.some((item) => FORBIDDEN_CAPABILITIES.includes(item))) {
+        incompatible('capabilities advertises run.executor.claude-code', extras);
     }
     if (!containsAll(stubScenarios, exports.STUB_SCENARIOS)) {
         incompatible('capabilities is missing a required stub scenario', extras);
@@ -293,6 +315,7 @@ function validateCapabilities(value, pinnedVersion) {
     return Object.freeze({
         schemaVersion: exports.CAPABILITIES_SCHEMA_VERSION,
         protocolVersion: exports.PROTOCOL_VERSION,
+        supportedProtocols: Object.freeze([...supportedProtocols]),
         engineVersion,
         requestSchemaVersion: exports.REQUEST_SCHEMA_VERSION,
         runEventSchemaVersion: exports.RUN_EVENT_SCHEMA_VERSION,
@@ -722,4 +745,303 @@ function classifyPreflightFailure(input) {
         return new errors_js_1.GoalEngineError('GOAL_ENGINE_FAILED', boundedString(composed, 400) ?? composed);
     }
     return new errors_js_1.GoalEngineError('GOAL_PROTOCOL_INVALID', `unexpected preflight exit code ${String(exitCode)}`);
+}
+// ---------------------------------------------------------------------------
+// Real-run stream (protocol v2, executor agx-claude-code)
+// ---------------------------------------------------------------------------
+exports.REAL_RUN_OUTCOMES = [
+    'worker-failed',
+    'verification-rejected',
+    'verified',
+];
+function hasBundleField(payload) {
+    return 'bundleDir' in payload || 'bundlePath' in payload;
+}
+/**
+ * Validates one v2 real-run JSON-Lines stream. A stub stream (simulation
+ * true, executor stub) is not this contract and is rejected here; the stub
+ * {@link RunStreamValidator} still accepts it.
+ *
+ * Phase evidence (R24): spend occurs at most once and only after `run.start`;
+ * a bundle path is present only on `verification-rejected` and `verified`;
+ * `worker-failed` may carry the one post-spawn spend and never a bundle path.
+ * A pre-spawn failure is `worker-failed` with no spend and no bundle path.
+ */
+class RealRunStreamValidator {
+    runId;
+    eventCount = 0;
+    nextSeq = 0;
+    start;
+    spend;
+    summary;
+    summarySeen = false;
+    get snapshot() {
+        return {
+            ...(this.runId !== undefined ? { runId: this.runId } : {}),
+            eventCount: this.eventCount,
+            nextSequence: this.nextSeq,
+            ...(this.start !== undefined ? { start: this.start } : {}),
+            ...(this.spend !== undefined ? { spend: this.spend } : {}),
+            ...(this.summary !== undefined ? { summary: this.summary } : {}),
+        };
+    }
+    accept(record) {
+        if (this.summarySeen)
+            invalid('event received after run.summary');
+        if (!isPlainObject(record))
+            invalid('event envelope must be a JSON object');
+        const schemaVersion = record['schemaVersion'];
+        const runId = record['runId'];
+        const sequence = record['sequence'];
+        const timestamp = record['timestamp'];
+        const type = record['type'];
+        const payload = record['payload'];
+        if (schemaVersion !== exports.RUN_EVENT_SCHEMA_VERSION) {
+            invalid('unexpected envelope schemaVersion');
+        }
+        if (!isNonEmptyString(runId)) {
+            invalid('envelope runId must be a nonempty string');
+        }
+        if (this.runId === undefined)
+            this.runId = runId;
+        else if (this.runId !== runId)
+            invalid('envelope runId changed mid-stream');
+        if (!isNonNegativeSafeInteger(sequence)) {
+            invalid('envelope sequence must be a nonnegative safe integer');
+        }
+        if (sequence !== this.nextSeq) {
+            invalid('envelope sequence is not contiguous from zero');
+        }
+        this.nextSeq += 1;
+        if (!isRfc3339Timestamp(timestamp)) {
+            invalid('envelope timestamp must be a valid RFC3339 string');
+        }
+        if (!isNonEmptyString(type)) {
+            invalid('envelope type must be a nonempty string');
+        }
+        if (payload !== undefined && !isPlainObject(payload)) {
+            invalid('envelope payload must be an object when present');
+        }
+        this.eventCount += 1;
+        if (type === 'run.start') {
+            if (this.start !== undefined)
+                invalid('duplicate run.start');
+            this.start = this.validateStartPayload(payload);
+            return;
+        }
+        if (this.start === undefined)
+            invalid('first event must be run.start');
+        if (type === 'run.spend') {
+            if (this.spend !== undefined)
+                invalid('run.spend occurs more than once');
+            this.spend = this.validateSpendPayload(payload);
+            return;
+        }
+        if (type === 'run.summary') {
+            this.summary = this.validateSummaryPayload(payload);
+            this.summarySeen = true;
+            return;
+        }
+        if (type === 'gate.required') {
+            invalid('real-run stream must not carry gate.required');
+        }
+    }
+    finish() {
+        if (this.start === undefined)
+            invalid('stream ended without run.start');
+        if (this.summary === undefined)
+            invalid('stream ended without run.summary');
+        if (this.summary.outcome === 'worker-failed')
+            return;
+        if (this.spend === undefined) {
+            invalid(`${this.summary.outcome} outcome requires one spend event after spawn`);
+        }
+    }
+    validateStartPayload(payload) {
+        if (!isPlainObject(payload))
+            invalid('run.start payload must be an object');
+        if (payload['protocolVersion'] !== exports.PROTOCOL_VERSION) {
+            invalid('run.start protocolVersion mismatch');
+        }
+        if (payload['executor'] !== 'agx-claude-code') {
+            invalid('run.start executor must be agx-claude-code');
+        }
+        if (payload['simulation'] !== false) {
+            invalid('run.start simulation must be false');
+        }
+        if (payload['targetRepositoryHonored'] !== false) {
+            invalid('run.start targetRepositoryHonored must be false');
+        }
+        if (!isNonEmptyString(payload['approvalId'])) {
+            invalid('run.start approvalId must be a nonempty string');
+        }
+        if (hasBundleField(payload)) {
+            invalid('run.start must not carry a bundle path');
+        }
+        return {
+            protocolVersion: exports.PROTOCOL_VERSION,
+            executor: 'agx-claude-code',
+            simulation: false,
+            targetRepositoryHonored: false,
+            approvalId: payload['approvalId'],
+        };
+    }
+    validateSpendPayload(payload) {
+        if (!isPlainObject(payload))
+            invalid('run.spend payload must be an object');
+        if (this.start === undefined)
+            invalid('run.spend before run.start');
+        if (payload['approvalId'] !== this.start.approvalId) {
+            invalid('run.spend approvalId mismatch');
+        }
+        const costUsd = payload['costUsd'];
+        if (costUsd !== null && !isFiniteNonNegativeNumber(costUsd)) {
+            invalid('run.spend costUsd must be null or a finite nonnegative number');
+        }
+        const turns = payload['turns'];
+        if (turns !== null && !isNonNegativeSafeInteger(turns)) {
+            invalid('run.spend turns must be null or a nonnegative safe integer');
+        }
+        if (!isNonNegativeSafeInteger(payload['durationMs'])) {
+            invalid('run.spend durationMs must be a nonnegative safe integer');
+        }
+        if (!isNonEmptyString(payload['exitClass'])) {
+            invalid('run.spend exitClass must be a nonempty string');
+        }
+        if (hasBundleField(payload)) {
+            invalid('run.spend must not carry a bundle path');
+        }
+        return {
+            approvalId: this.start.approvalId,
+            costUsd,
+            turns,
+            durationMs: payload['durationMs'],
+            exitClass: payload['exitClass'],
+        };
+    }
+    validateSummaryPayload(payload) {
+        if (!isPlainObject(payload)) {
+            invalid('run.summary payload must be an object');
+        }
+        if (this.start === undefined)
+            invalid('run.summary before run.start');
+        const outcome = payload['outcome'];
+        if (outcome !== 'worker-failed' &&
+            outcome !== 'verification-rejected' &&
+            outcome !== 'verified') {
+            invalid('run.summary outcome is unknown');
+        }
+        if (payload['approvalId'] !== this.start.approvalId) {
+            invalid('run.summary approvalId mismatch');
+        }
+        if (payload['targetRepositoryHonored'] !== false) {
+            invalid('run.summary targetRepositoryHonored must be false');
+        }
+        if ('bundlePath' in payload) {
+            invalid('bundle path must be carried as bundleDir');
+        }
+        const bundleDir = payload['bundleDir'];
+        if (outcome === 'worker-failed') {
+            if (bundleDir !== undefined) {
+                invalid('worker-failed outcome must not carry a bundle path');
+            }
+            if (!isNonEmptyString(payload['reason'])) {
+                invalid('worker-failed reason must be a nonempty string');
+            }
+            if (!isPlainObject(payload['evidence'])) {
+                invalid('worker-failed evidence must be an object');
+            }
+            return {
+                outcome,
+                approvalId: this.start.approvalId,
+                targetRepositoryHonored: false,
+                reason: payload['reason'],
+            };
+        }
+        if (!isNonEmptyString(bundleDir)) {
+            invalid(`${outcome} outcome requires a bundle path`);
+        }
+        if (outcome === 'verification-rejected') {
+            const reasons = payload['reasons'];
+            if (!Array.isArray(reasons) ||
+                !reasons.every((reason) => typeof reason === 'string')) {
+                invalid('verification-rejected reasons must be an array of strings');
+            }
+        }
+        return {
+            outcome,
+            approvalId: this.start.approvalId,
+            targetRepositoryHonored: false,
+            bundleDir,
+        };
+    }
+}
+exports.RealRunStreamValidator = RealRunStreamValidator;
+/**
+ * A refusal is one structured stderr error and no stdout events. `approvalId`
+ * is present only when the engine read a valid approval (R6); both shapes
+ * are accepted. A bundle path on the error is rejected.
+ */
+function validateRealRunRefusal(stderr) {
+    const parsed = parseSingleJsonObject(stderr, 'stderr', exports.CONSUMER_LIMITS.maxStderrBytes);
+    const errorField = parsed['error'];
+    if (!isPlainObject(errorField)) {
+        invalid('refusal stderr is missing a structured error object');
+    }
+    const code = errorField['code'];
+    const message = errorField['message'];
+    if (!isNonEmptyString(code) || typeof message !== 'string') {
+        invalid('refusal stderr error has an invalid code/message shape');
+    }
+    if (hasBundleField(errorField)) {
+        invalid('refusal must not carry a bundle path');
+    }
+    const approvalId = errorField['approvalId'];
+    if (approvalId === undefined)
+        return { code, message };
+    if (!isNonEmptyString(approvalId)) {
+        invalid('refusal approvalId must be a nonempty string when present');
+    }
+    return { code, message, approvalId };
+}
+/** Exit and stderr must agree with the terminal outcome. Spend is not here. */
+function validateRealRunTerminalAgreement(input) {
+    const { exitCode, signal, stderr, summary } = input;
+    if (signal !== null) {
+        invalid('process terminated by a signal, not a protocol terminal');
+    }
+    if (exitCode === 1 && stderr.length > 0 && isEngineStdoutTransportFailure(stderr)) {
+        throw new errors_js_1.GoalEngineError('GOAL_PROTOCOL_TRANSPORT', 'engine reported stdout transport failure after the summary');
+    }
+    if (summary.outcome === 'verified') {
+        if (exitCode !== 0)
+            invalid('verified outcome requires exit 0');
+        if (stderr.length !== 0)
+            invalid('verified outcome requires empty stderr');
+        return;
+    }
+    if (exitCode !== 1)
+        invalid(`${summary.outcome} outcome requires exit 1`);
+    const errorObject = parseSingleJsonObject(stderr, 'stderr', exports.CONSUMER_LIMITS.maxStderrBytes);
+    const errorField = errorObject['error'];
+    if (!isPlainObject(errorField)) {
+        invalid('stderr error envelope is missing its error object');
+    }
+    const engineCode = errorField['code'];
+    const message = errorField['message'];
+    if (typeof engineCode !== 'string' || typeof message !== 'string') {
+        invalid('stderr error envelope has an invalid code/message shape');
+    }
+    const expected = summary.outcome === 'worker-failed'
+        ? 'RUN_WORKER_FAILED'
+        : 'RUN_VERIFICATION_REJECTED';
+    if (engineCode !== expected) {
+        invalid('stderr error code disagrees with the real-run outcome');
+    }
+    if (errorField['approvalId'] !== summary.approvalId) {
+        invalid('stderr approvalId disagrees with the summary');
+    }
+    if (hasBundleField(errorField)) {
+        invalid('stderr error must not carry a bundle path');
+    }
 }
