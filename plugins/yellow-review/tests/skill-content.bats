@@ -403,6 +403,15 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   tr '\n' ' ' <"$TRIAGE" | tr -s ' ' | grep -q 'show it with `git diff` and no path argument'
 }
 
+@test "review-pr: a codex QUOTA_EXHAUSTED is a skipped reviewer and only an exact council fenced path is unlinked" {
+  # The stub's findings pair is empty, so reading it as "no findings" would say
+  # Codex reviewed and found nothing.
+  grep -q 'TIMEOUT`, `ERROR` or `QUOTA_EXHAUSTED`' "$REVIEW_PR"
+  grep -q 'only when the value is exactly' "$REVIEW_PR"
+  grep -q '/tmp/council-codex-fenced-<suffix>.txt' "$REVIEW_PR"
+  grep -q 'never unlinked' "$REVIEW_PR"
+}
+
 # --- resolve write phase (contract tokens) ----------------------------------
 
 RESOLVE_PR="$COMMANDS_DIR/resolve-pr.md"
