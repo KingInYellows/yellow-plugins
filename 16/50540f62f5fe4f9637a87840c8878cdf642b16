@@ -1,0 +1,23 @@
+.github/workflows/validate-schemas.yml
+  s_771064b1487eb8::t_bc30f1b1e326cf 1440-1442
+plugins/yellow-review/skills/pr-review-workflow/scripts/guard-local-config
+  s_771064b1487eb8::t_d77ee8f16c2968 20-22,138-143,145,153-155
+plugins/yellow-review/tests/guard-local-config.bats
+  s_771064b1487eb8::t_df3690b570926b 305-339
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1650540f62f5fe4f9637a87840c8878cdf642b16",
+  "prompts": {},
+  "sessions": {
+    "s_771064b1487eb8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "344118bf-2aa9-4d5a-a9e5-a6b94995fa25",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
