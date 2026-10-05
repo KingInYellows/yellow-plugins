@@ -451,7 +451,7 @@ detail):**
   unattended `/review:pr` Step 9a uses it (through `lib/stage-learning.sh`)
   instead of spawning the M3-gated `knowledge-compounder`. It caps the text
   at 8 KiB, strips control and invisible characters, redacts, then prefixes
-  `> ` to lines that could forge a fence or role turn (`---`, code fences,
+  a `>` and a space to lines that could forge a fence or role turn (`---`, code fences,
   `system:`), in that order; returns 0 staged, 1 bad args, 2 no jq,
   3 sanitisation failed, 4 write failed.
 - SessionStart hook checks thresholds (`count >= 5` OR `oldest > 48h`),
