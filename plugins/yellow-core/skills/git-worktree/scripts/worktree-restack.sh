@@ -35,7 +35,8 @@
 #   30 restack failed; worktrees restored (or: nothing had been changed yet)
 #   31 a provider step failed and the state is KEPT: worktrees may still be detached;
 #      run status, then --continue, --abort or restore
-#   40 partial restore: some worktree is still detached (per-entry lines say why)
+#   40 restore did not finish; state kept (a worktree is still detached, or a
+#      GitHub restack is still paused — the script's own reason says which)
 #   50 restack incomplete (ancestry check failed); worktrees restored, no submit
 #   60 restack finished and restored, but submit failed
 #

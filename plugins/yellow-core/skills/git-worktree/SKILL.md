@@ -224,7 +224,9 @@ Safety rules the script holds:
 
 Exit codes are documented in the script header and in the `/worktree:restack`
 command's exit table. Exit `31` means a provider step failed with the state
-kept: run `status`, then `continue`, `abort` or `restore`.
+kept: run `status`, then `continue`, `abort` or `restore`. Exit `40` means
+restore kept the state: remaining detached worktrees, or a GitHub restack
+still paused (nothing detached; `--continue` or `--abort`).
 
 The restack engine depends on the stacked-PR providers (and, for GitHub, Node,
 `jq` and the github-workflow adapter); `worktree-manager.sh` does not.
