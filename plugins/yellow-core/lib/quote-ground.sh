@@ -31,6 +31,13 @@ fi
 
 set -uo pipefail
 
+# declare -A, declare -gA and mapfile need bash 4.2 or newer; macOS ships 3.2.
+if [ "${BASH_VERSINFO[0]}" -lt 4 ] ||
+  { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -lt 2 ]; }; then
+  printf 'quote-ground.sh requires bash 4.2 or newer (found %s)\n' "$BASH_VERSION" >&2
+  exit 2
+fi
+
 lib_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 2
 
 if [ ! -f "$lib_dir/validate-fs.sh" ]; then
@@ -299,43 +306,22 @@ qg_json_escape() {
 }
 
 qg_emit_all() {
-  local i tmp
-  tmp=$(mktemp)
+  local i
+  local -a args=()
   for i in "${!QG_OUT_ID[@]}"; do
-    printf '%s\x1e%s\x1e%s\n' \
-      "$(qg_json_escape "${QG_OUT_ID[$i]}")" \
-      "$(qg_json_escape "${QG_OUT_RESULT[$i]}")" \
-      "$(qg_json_escape "${QG_OUT_MATCH[$i]}")" >>"$tmp"
+    args+=("i${QG_OUT_ID[$i]}" "r${QG_OUT_RESULT[$i]}" "m${QG_OUT_MATCH[$i]}")
   done
-  awk '
-    function unescape(s) {
-      gsub(/\\\\/, "\x01", s)
-      gsub(/\\n/, "\n", s)
-      gsub(/\\r/, "\r", s)
-      gsub(/\\e/, "\x1e", s)
-      gsub(/\x01/, "\\", s)
-      return s
-    }
-    function jesc(s) {
-      gsub(/\\/, "\\\\", s)
-      gsub(/"/, "\\\"", s)
-      gsub(/\t/, "\\t", s)
-      gsub(/\r/, "\\r", s)
-      gsub(/\n/, "\\n", s)
-      return s
-    }
-    BEGIN { FS = "\x1e" }
-    {
-      id = jesc(unescape($1))
-      result = jesc(unescape($2))
-      matched = unescape($3)
-      if (matched ~ /^[0-9]+$/)
-        printf "{\"id\":\"%s\",\"result\":\"%s\",\"matched_line\":%s}\n", id, result, matched
-      else
-        printf "{\"id\":\"%s\",\"result\":\"%s\",\"matched_line\":null}\n", id, result
-    }
-  ' "$tmp"
-  rm -f "$tmp"
+  [ "${#args[@]}" -gt 0 ] || return 0
+  # Each value carries a one-character prefix that jq strips, so an id that
+  # starts with "-" is never read as an option and jq escapes every control
+  # character itself.
+  jq -nc '$ARGS.positional as $a | range(0; ($a | length); 3) as $i
+    | {id: $a[$i][1:], result: $a[$i + 1][1:],
+       matched_line: ($a[$i + 2][1:] | if test("^[0-9]+$") then tonumber else null end)}' \
+    --args "${args[@]}" || {
+    printf 'quote-ground: could not write batch output\n' >&2
+    exit 2
+  }
 }
 
 qg_batch_label() {
