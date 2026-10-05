@@ -1,0 +1,19 @@
+plugins/yellow-core/CLAUDE.md
+  s_9debf6a8e6c9cc::t_e476dfb2c5d925 454
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "365af4edec76b32938498cb84a7a3d51c432e6ff",
+  "prompts": {},
+  "sessions": {
+    "s_9debf6a8e6c9cc": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a10b16-2f12-7580-a10b-dea67e1c98e2",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
