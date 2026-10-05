@@ -107,11 +107,19 @@ If `PR_JSON` is empty after error handling, classify the issue as `gh-error`
 and skip it from transition candidates (report in summary as "skipped — gh
 error").
 
+Graphite's merge queue closes PRs that landed. Before the first `CLOSED` PR, run
+the fetch block of "Merged-PR detection" in the `linear-workflows` skill once,
+and reuse its `trunk_ref` for every PR. Check each `CLOSED` PR whose `mergedAt`
+is null with that skill's per-PR block, using the PR `number` from `PR_JSON`.
+
 Classify each issue:
-- **PR merged** (`state: MERGED` or `mergedAt` present) → propose transition to the
-  status whose `type` is `completed` (Done equivalent)
-- **PR closed without merge** (`state: CLOSED`, `mergedAt` null) → propose transition
-  to `cancelled` or `backlog` type status; surface both options
+- **PR merged** (`state: MERGED`, `mergedAt` present, or `CLOSED` with
+  `landed=yes`) → propose transition to the status whose `type` is `completed`
+  (Done equivalent)
+- **PR closed without merge** (`state: CLOSED`, `mergedAt` null, `landed=no`) →
+  propose transition to `cancelled` or `backlog` type status; surface both options
+- **PR closed, landing unverified** (`state: CLOSED`, `mergedAt` null,
+  `landed=unknown`) → no suggestion; report "closed, landing unverified"
 - **PR open** (`state: OPEN`) → no change; note as "PR open, no action"
 - **No PR found** → flag as "potentially stale — no associated PR"; surface to user
   but make no suggestion

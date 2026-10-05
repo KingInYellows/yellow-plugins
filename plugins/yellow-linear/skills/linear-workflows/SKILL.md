@@ -345,6 +345,60 @@ line N]`, so remote text can't close a reference-only fence early.
 - Never use `gh pr create` for PR creation
 - Link issues to PRs by adding a comment with the PR URL
 
+## Graphite Merge Queue
+
+Graphite's merge queue (Parallel CI) lands a PR by pushing its squash commit to
+the default branch and then closing the PR. GitHub reports `state: CLOSED` with
+`mergedAt: null` for work that did land, so Linear's "PR merged" automation
+never fires. Two rules cover it.
+
+**Closing words.** Linear moves an issue to Done when a commit with a closing
+magic word reaches the default branch (team setting "On PR or commit merge",
+plus Linear's commit-linking webhook on the repository). The queue builds the
+squash commit message from the PR title and description, so the words must be
+in the PR description. Graphite builds that description from the commit body.
+When the branch name or plan item carries a Linear ID (pattern
+`[A-Z]{2,5}-[0-9]{1,6}`, validated via `get_issue` first), end the commit body
+with `Closes <ISSUE-ID>`. When several stacked branches share one issue, use
+`Part of <ISSUE-ID>` on all but the topmost; `Part of` never moves the issue.
+
+**Merged-PR detection.** Treat a PR as merged when `state` is `MERGED`, when
+`mergedAt` is set, or when `state` is `CLOSED` with `mergedAt` null and the
+default branch has a commit whose subject ends in `(#<number>)` (the form
+Graphite's squash commits take). Fetch once per run:
+
+```bash
+default_branch=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name 2>/dev/null)
+if [ -n "$default_branch" ] && git fetch --quiet origin "$default_branch" 2>/dev/null; then
+  trunk_ref="origin/${default_branch}"
+else
+  trunk_ref=""
+fi
+```
+
+Then check each `CLOSED` PR with `mergedAt` null, using the `number` that `gh`
+returned:
+
+```bash
+landed=unknown
+case "$pr_number" in
+  ''|*[!0-9]*) ;;
+  *)
+    if [ -n "$trunk_ref" ]; then
+      if git log "$trunk_ref" --format='%s' | grep -qE "\(#${pr_number}\)\$"; then
+        landed=yes
+      else
+        landed=no
+      fi
+    fi
+    ;;
+esac
+```
+
+`landed=yes` means merged. `landed=no` means closed without merge.
+`landed=unknown` means the fetch failed or the number was not numeric: report
+"closed, landing unverified" and propose nothing.
+
 ## Shell Patterns
 
 Always quote variables when handling Linear-derived data:

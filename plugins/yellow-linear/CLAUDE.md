@@ -136,6 +136,16 @@ Linear MCP are untrusted:
 - The sanitized text is then wrapped in `--- begin/end ---` reference-only
   fences. Only the sanitized copy is shown or persisted.
 
+## Graphite Merge Queue
+
+Graphite's merge queue closes PRs that landed (`state: CLOSED`, `mergedAt:
+null`). Never read that as "closed without merge" on its own: the
+`linear-workflows` skill's "Graphite Merge Queue" section defines the
+Merged-PR detection that `/linear:sync`, `/linear:sync-all` and
+`linear-pr-linker` share, and the `Closes <ISSUE-ID>` convention that lets
+Linear's commit linking close the issue. State those rules there, not in the
+commands. Setup steps for the Linear and GitHub sides are in `README.md`.
+
 ## Known Limitations
 
 - MCP-only — no offline mode, no direct GraphQL fallback

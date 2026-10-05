@@ -360,10 +360,21 @@ in order from bottom (item 1) to top:
 
    Use the **Write tool** (not Bash, not a heredoc — Write takes content as
    a structured parameter, never shell-parsed) to create the file at the
-   literal `$msgfile` path just printed, with content exactly `<type>:
-   <description>`. `mktemp -u` only mints the name — the file doesn't
+   literal `$msgfile` path just printed, with content `<type>:
+   <description>` plus the Linear closing line below when it applies.
+   `mktemp -u` only mints the name — the file doesn't
    exist yet, so Write can create it directly without needing to Read it
    first.
+
+   **Linear closing line.** When the stack item's `Linear:` field (or the
+   branch name) carries an issue ID matching `[A-Z]{2,5}-[0-9]{1,6}`, write the
+   file as `<type>: <description>`, a blank line, then `Closes <ISSUE-ID>`. If
+   a later stack item sharing that ID sits above this branch, write
+   `Part of <ISSUE-ID>` instead. Graphite turns the commit body into the PR
+   description and the merge queue builds the squash commit from it, which is
+   how Linear learns the issue is done (`linear-workflows` skill, "Graphite
+   Merge Queue"). Keep the line in every later message you write for the same
+   branch, because amending with `-m` rewrites the message.
 
    Then, in a fresh Bash call, re-declare `msgfile=<the literal path
    printed above>` (Bash variables don't survive across separate tool
@@ -667,6 +678,8 @@ Phase 3 (Quality Check) in stack summary mode.
      - `docs(scope): update documentation`
    - Keep commits atomic and focused
    - Include context in commit body if needed
+   - Keep the Linear closing line (`Closes <ISSUE-ID>`) in the body when the
+     stack item has one (see Phase 1b step 5)
 
 4. **Test Continuously:**
    - Run tests after each change

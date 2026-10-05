@@ -72,8 +72,12 @@ found or the call fails, report this to the user and stop without calling
 Fetch PR details for the current branch:
 
 ```bash
-gh pr view --json url,title,state,mergedAt 2>/dev/null
+gh pr view --json url,title,state,mergedAt,number 2>/dev/null
 ```
+
+Graphite's merge queue closes PRs that landed. For a `CLOSED` PR with `mergedAt`
+null, check it with "Merged-PR detection" in the `linear-workflows` skill before
+treating it as closed without merge.
 
 If no PR exists:
 
@@ -101,7 +105,8 @@ Query valid statuses via `list_issue_statuses` for the issue's team.
 Determine suggested transition based on PR state:
 
 - PR **open** → suggest "In Review"
-- PR **merged** → suggest "Done"
+- PR **merged** (including a `CLOSED` PR with `landed=yes`) → suggest "Done"
+- PR **closed**, `landed=no` or `unknown` → say so; suggest no transition
 
 **IMPORTANT: DO NOT auto-update without explicit user consent.**
 

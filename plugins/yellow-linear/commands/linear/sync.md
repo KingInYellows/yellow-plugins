@@ -73,10 +73,13 @@ and display them for context.
 Check if a pull request exists for the current branch:
 
 ```bash
-gh pr view --json url,title,state 2>/dev/null
+gh pr view --json url,title,state,mergedAt,number 2>/dev/null
 ```
 
 Note: This works for Graphite-created PRs since they are GitHub PRs underneath.
+Graphite's merge queue closes PRs that landed, so a `CLOSED` PR with `mergedAt`
+null may be merged: check it with "Merged-PR detection" in the `linear-workflows`
+skill before calling it closed.
 
 - **If PR exists:** Check the comments fetched in Step 3 for an existing PR link
   comment matching this PR URL. If already linked, skip. Otherwise, add via
@@ -96,7 +99,8 @@ Query valid workflow statuses via
 Determine the appropriate status transition:
 
 - If PR exists and is **open** → suggest "In Review" status
-- If PR exists and is **merged** → suggest "Done" status
+- If PR exists and is **merged** (including a `CLOSED` PR with `landed=yes`) →
+  suggest "Done" status
 - If no PR and status is early (Backlog/Triage) → suggest "In Progress" status
 
 **Two-tier safety model** (see `linear-workflows` skill):
