@@ -1,0 +1,46 @@
+plugins/yellow-linear/commands/linear/sync.md
+  s_fcb87d62bab002::t_91b77c35374bc3 102-103
+  s_fcb87d62bab002::t_9c30474fa5945d 76,80-82
+plugins/yellow-linear/README.md
+  s_fcb87d62bab002::t_90c6250e2b4000 71-93
+plugins/yellow-linear/CLAUDE.md
+  s_fcb87d62bab002::t_719bce1f897668 139-148
+plugins/yellow-linear/agents/workflow/linear-pr-linker.md
+  s_fcb87d62bab002::t_2a578446784a78 108-109
+  s_fcb87d62bab002::t_8e5477f0f49443 75,78-80
+  s_fcb87d62bab002::t_2098d25c4aad10 81
+plugins/gt-workflow/skills/gt-amend/SKILL.md
+  s_fcb87d62bab002::t_2b32e3b6fdaa75 190-193
+plugins/yellow-linear/commands/linear/sync-all.md
+  s_fcb87d62bab002::t_24127cd2b72181 110-114,116-122
+plugins/yellow-core/commands/flow/work.md
+  s_fcb87d62bab002::t_c19d113bd9a778 681-682
+  s_fcb87d62bab002::t_a13d21399870f2 363-365,369-377
+  s_fcb87d62bab002::t_7ef42612ed309c 378
+plugins/gt-workflow/skills/smart-submit/SKILL.md
+  s_fcb87d62bab002::t_24ebc1844ac17c 247-254
+plugins/yellow-linear/skills/linear-workflows/SKILL.md
+  s_fcb87d62bab002::t_7998c50fe539a0 348-401
+.changeset/graphite-queue-linear-closing.md
+  s_fcb87d62bab002::t_a98b14b59d2008 1-15
+plugins/gt-workflow/codex/skills/gt-amend/SKILL.md
+  s_fcb87d62bab002::t_b8218700813a37 189-192
+plugins/gt-workflow/codex/skills/smart-submit/SKILL.md
+  s_fcb87d62bab002::t_4f333b5aad1de7 246-253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ae2b43b813e22eeff90e007f9b46626be2772d74",
+  "prompts": {},
+  "sessions": {
+    "s_fcb87d62bab002": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e5a69731-0952-4d20-9ff6-75094c034e1c",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
