@@ -1,0 +1,21 @@
+plans/complete/pr-316-yellow-debt-residual-review-cleanup.md
+  s_1b85233d86c5f4::t_557e9d742f2b0b 280
+plans/complete/yellow-debt-remove-v1-dual-read.md
+  s_1b85233d86c5f4::t_557e9d742f2b0b 132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "77c5bc87b07e7b2a11351195efb678252b1d59c6",
+  "prompts": {},
+  "sessions": {
+    "s_1b85233d86c5f4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d4a1ac10-8d49-4bf0-b157-507bf9e56d9e",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
