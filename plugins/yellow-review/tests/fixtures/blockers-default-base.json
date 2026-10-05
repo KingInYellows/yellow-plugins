@@ -1,0 +1,19 @@
+{
+  "data": {
+    "repository": {
+      "defaultBranchRef": {
+        "name": "main"
+      },
+      "pullRequest": {
+        "baseRefName": "main",
+        "reviewDecision": "REVIEW_REQUIRED",
+        "latestOpinionatedReviews": {
+          "pageInfo": {
+            "hasNextPage": false
+          },
+          "nodes": []
+        }
+      }
+    }
+  }
+}

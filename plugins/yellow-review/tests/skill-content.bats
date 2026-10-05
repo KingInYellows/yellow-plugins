@@ -404,3 +404,9 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   grep -q '/tmp/council-codex-fenced-<suffix>.txt' "$REVIEW_PR"
   grep -q 'never unlinked' "$REVIEW_PR"
 }
+
+@test "dispositions: the addressed path:line evidence refuses an option-shaped path segment" {
+  DISP="$BATS_TEST_DIRNAME/../references/resolve/dispositions.md"
+  tr '\n' ' ' <"$DISP" | tr -s ' ' | grep -q 'no `\.`, `\.\.` or empty segment and no segment starting with `-`'
+  tr '\n' ' ' <"$DISP" | tr -s ' ' | grep -q '`-config.yml` is refused'
+}

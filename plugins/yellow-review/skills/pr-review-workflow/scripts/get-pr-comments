@@ -1,8 +1,25 @@
 #!/bin/bash
-# Fetch unresolved, non-outdated PR review threads via GitHub GraphQL API.
-# Usage: get-pr-comments <owner/repo> <pr-number>
-# Output: JSON array of thread objects to stdout.
-# Errors: Exit 1 with message to stderr.
+# Fetch unresolved PR review threads via GitHub GraphQL API. Outdated threads
+# are excluded unless --include-outdated is passed.
+# Usage: get-pr-comments [--include-outdated] <owner/repo> <pr-number>
+#   --include-outdated  also return unresolved threads whose anchor is outdated
+# Output: JSON array of thread objects to stdout. Each thread has threadId,
+#   path, line, startLine, comments[] (author, body, id, createdAt,
+#   viewerDidAuthor, authorType), commentCount, commentsTruncated (true when
+#   the thread has more comments than the 50 fetched), isOutdated,
+#   viewerCanResolve, viewerCanReply, originalLine and originalStartLine (the
+#   anchor when the comment was made; line is null once a thread is outdated)
+#   and diffHunk (the first comment's hunk, only for an outdated thread, else
+#   null). diffHunk is repository text, not reviewer prose, but a resolver
+#   treats it as untrusted data all the same.
+# Errors: Exit 1 with a message to stderr for every failure, usage errors
+#   included; callers key on zero vs non-zero and the rate-limit wording.
+# Truncation: when the thread list hits the page cap or GitHub returns no
+#   cursor, the script exits 3 with a message on stderr and the threads
+#   fetched so far on stdout (still a plain array), so a partial list is
+#   never mistaken for the full one. A caller that stops on any non-zero
+#   exit needs no change. Per-thread comment truncation (more than 50
+#   comments) is the commentsTruncated field, not an exit code.
 
 set -euo pipefail
 
@@ -11,13 +28,26 @@ command -v gh >/dev/null 2>&1 || { printf 'Error: gh CLI not found. Install from
 command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found. Install from https://jqlang.github.io/jq\n' >&2; exit 1; }
 
 # --- Input validation ---
-if [ $# -lt 2 ]; then
-    printf 'Usage: get-pr-comments <owner/repo> <pr-number>\n' >&2
+INCLUDE_OUTDATED=false
+POSITIONAL=()
+for arg in "$@"; do
+    case "$arg" in
+        --include-outdated) INCLUDE_OUTDATED=true ;;
+        --*)
+            printf 'Error: Unknown flag: %s\n' "$arg" >&2
+            exit 1
+            ;;
+        *) POSITIONAL+=("$arg") ;;
+    esac
+done
+
+if [ "${#POSITIONAL[@]}" -ne 2 ]; then
+    printf 'Usage: get-pr-comments [--include-outdated] <owner/repo> <pr-number>\n' >&2
     exit 1
 fi
 
-REPO="$1"
-PR_NUMBER="$2"
+REPO="${POSITIONAL[0]}"
+PR_NUMBER="${POSITIONAL[1]}"
 
 # Validate owner/repo format
 case "$REPO" in
@@ -59,13 +89,22 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String, $pageSize
           id
           isResolved
           isOutdated
+          viewerCanResolve
+          viewerCanReply
           path
           line
           startLine
+          originalLine
+          originalStartLine
           comments(first: 50) {
+            totalCount
             nodes {
-              author { login }
+              id
+              author { __typename login }
               body
+              createdAt
+              viewerDidAuthor
+              diffHunk
             }
           }
         }
@@ -78,6 +117,7 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String, $pageSize
 ALL_PAGES=()
 CURSOR=""
 PAGE=0
+TRUNCATED=false
 
 _STDERR_FILE=$(mktemp)
 trap 'rm -f "$_STDERR_FILE"' EXIT
@@ -88,39 +128,37 @@ while true; do
     # Execute query — separate stdout from stderr to avoid gh warnings poisoning JSON
     # Use && ... || to capture exit code without triggering set -e on failure
     if [ -z "$CURSOR" ]; then
-        RESPONSE=$(gh api graphql \
-            -f owner="$OWNER" \
-            -f name="$NAME" \
-            -F "number=$PR_NUMBER" \
-            -F cursor=null \
-            -F "pageSize=$PAGE_SIZE" \
-            -f query="$QUERY" 2>"$_STDERR_FILE") && _GH_EXIT=0 || _GH_EXIT=$?
+        CURSOR_ARGS=(-F cursor=null)
     else
-        RESPONSE=$(gh api graphql \
-            -f owner="$OWNER" \
-            -f name="$NAME" \
-            -F "number=$PR_NUMBER" \
-            -f cursor="$CURSOR" \
-            -F "pageSize=$PAGE_SIZE" \
-            -f query="$QUERY" 2>"$_STDERR_FILE") && _GH_EXIT=0 || _GH_EXIT=$?
+        CURSOR_ARGS=(-f cursor="$CURSOR")
     fi
+    RESPONSE=$(gh api graphql \
+        -f owner="$OWNER" \
+        -f name="$NAME" \
+        -F "number=$PR_NUMBER" \
+        "${CURSOR_ARGS[@]}" \
+        -F "pageSize=$PAGE_SIZE" \
+        -f query="$QUERY" 2>"$_STDERR_FILE") && _GH_EXIT=0 || _GH_EXIT=$?
     _GH_STDERR=$(cat "$_STDERR_FILE")
     if [ "$_GH_EXIT" -ne 0 ]; then
-        # Parse error category from stderr
-        case "$_GH_STDERR" in
-            *"401"*|*"Bad credentials"*|*"authentication"*)
-                printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
-                ;;
-            *"403"*|*"Forbidden"*|*"permission"*|*"insufficient permissions"*)
-                printf 'Error: Insufficient permissions for this repo.\n' >&2
-                ;;
-            *"Could not resolve"*|*"not found"*|*"NOT_FOUND"*)
-                printf 'Error: Repository or PR not found: %s #%s\n' "$REPO" "$PR_NUMBER" >&2
-                ;;
-            *"rate limit"*|*"429"*)
+        # Parse error category from stderr. Rate limits come first: GitHub
+        # reports a secondary rate limit as HTTP 403. Status codes match only
+        # as "HTTP <code>", so digits elsewhere in the text do not classify.
+        _GH_LC=$(printf '%s' "$_GH_STDERR" | tr '[:upper:]' '[:lower:]')
+        case "$_GH_LC" in
+            *"rate limit"*|*"http 429"*)
                 printf 'Error: GitHub API rate limit exceeded. Wait and retry.\n' >&2
                 ;;
-            *"5xx"*|*"5XX"*|*"Server Error"*|*"server error"*|*"500"*|*"502"*|*"503"*)
+            *"http 401"*|*"bad credentials"*|*"authentication"*)
+                printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
+                ;;
+            *"http 403"*|*"forbidden"*|*"permission"*|*"resource not accessible"*)
+                printf 'Error: Insufficient permissions for this repo.\n' >&2
+                ;;
+            *"could not resolve"*|*"http 404"*|*"not found"*|*"not_found"*)
+                printf 'Error: Repository or PR not found: %s #%s\n' "$REPO" "$PR_NUMBER" >&2
+                ;;
+            *"http 5"[0-9][0-9]*|*"server error"*)
                 printf 'Error: GitHub server error. Retry in a few minutes.\n' >&2
                 ;;
             *)
@@ -163,7 +201,8 @@ while true; do
     CURSOR=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor // empty')
     if [ -z "$CURSOR" ]; then
         # Inconsistent state: hasNextPage=true but no cursor to continue
-        printf '[get-pr-comments] Warning: pagination truncated — hasNextPage=true but no endCursor (page %d). Results may be incomplete.\n' "$PAGE" >&2
+        printf '[get-pr-comments] Error: pagination truncated — hasNextPage=true but no endCursor (page %d). Exiting 3 with the threads fetched so far.\n' "$PAGE" >&2
+        TRUNCATED=true
         break
     fi
 
@@ -177,7 +216,8 @@ while true; do
 
     if [ "$PAGE" -ge "$MAX_PAGES" ]; then
         TOTAL=$((PAGE * PAGE_SIZE))
-        printf 'Warning: Reached pagination limit (%d pages, ~%d threads). Results may be truncated.\n' "$MAX_PAGES" "$TOTAL" >&2
+        printf '[get-pr-comments] Error: Reached pagination limit (%d pages, ~%d threads). Exiting 3 with the threads fetched so far.\n' "$MAX_PAGES" "$TOTAL" >&2
+        TRUNCATED=true
         break
     fi
 done
@@ -189,10 +229,11 @@ ALL_THREADS=$(printf '%s\n' "${ALL_PAGES[@]}" | jq -s 'add // []') || {
 }
 
 # --- Filter and transform ---
-OUTPUT=$(printf '%s' "$ALL_THREADS" | jq '
+# Existing fields keep their order; new fields are appended after them.
+OUTPUT=$(printf '%s' "$ALL_THREADS" | jq --argjson includeOutdated "$INCLUDE_OUTDATED" '
   [
     .[]
-    | select(.isResolved == false and .isOutdated == false)
+    | select(.isResolved == false and ($includeOutdated or .isOutdated == false))
     | {
         threadId: .id,
         path: .path,
@@ -200,8 +241,23 @@ OUTPUT=$(printf '%s' "$ALL_THREADS" | jq '
         startLine: .startLine,
         comments: [
           (.comments.nodes // [])[]
-          | { author: (.author.login // "ghost"), body: .body }
-        ]
+          | {
+              author: (.author.login // "ghost"),
+              body: .body,
+              id: .id,
+              createdAt: .createdAt,
+              viewerDidAuthor: (.viewerDidAuthor // false),
+              authorType: (.author.__typename // null)
+            }
+        ],
+        commentCount: (.comments.totalCount // ((.comments.nodes // []) | length)),
+        commentsTruncated: ((.comments.totalCount // 0) > ((.comments.nodes // []) | length)),
+        isOutdated: (.isOutdated // false),
+        viewerCanResolve: (.viewerCanResolve // false),
+        viewerCanReply: (.viewerCanReply // false),
+        originalLine: (.originalLine // null),
+        originalStartLine: (.originalStartLine // null),
+        diffHunk: (if (.isOutdated // false) then (.comments.nodes[0].diffHunk // null) else null end)
       }
   ]') || {
     printf 'Error: Failed to transform GraphQL response.\n' >&2
@@ -209,3 +265,5 @@ OUTPUT=$(printf '%s' "$ALL_THREADS" | jq '
 }
 
 printf '%s\n' "$OUTPUT"
+# Exit 3 after printing: stdout holds the partial list, the status says it is partial.
+if [ "$TRUNCATED" = true ]; then exit 3; fi

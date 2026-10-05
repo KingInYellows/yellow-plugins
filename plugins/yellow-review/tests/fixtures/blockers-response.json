@@ -1,0 +1,43 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "baseRefName": "main",
+        "reviewDecision": "CHANGES_REQUESTED",
+        "latestOpinionatedReviews": {
+          "pageInfo": { "hasNextPage": false },
+          "nodes": [
+            {
+              "id": "PRR_alice",
+              "state": "CHANGES_REQUESTED",
+              "submittedAt": "2026-09-30T09:00:00Z",
+              "author": { "__typename": "User", "login": "alice" },
+              "commit": { "oid": "aaaaaaa" }
+            },
+            {
+              "id": "PRR_bot",
+              "state": "CHANGES_REQUESTED",
+              "submittedAt": "2026-09-30T09:05:00Z",
+              "author": { "__typename": "Bot", "login": "reviewer-app[bot]" },
+              "commit": { "oid": "aaaaaaa" }
+            },
+            {
+              "id": "PRR_carol",
+              "state": "DISMISSED",
+              "submittedAt": "2026-09-30T09:10:00Z",
+              "author": { "__typename": "User", "login": "carol" },
+              "commit": { "oid": "aaaaaaa" }
+            },
+            {
+              "id": "PRR_dave",
+              "state": "APPROVED",
+              "submittedAt": "2026-09-30T09:15:00Z",
+              "author": { "__typename": "User", "login": "dave" },
+              "commit": { "oid": "aaaaaaa" }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

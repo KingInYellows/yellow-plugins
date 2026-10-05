@@ -325,6 +325,50 @@ back into later reviewer prompts. The boundary:
   `system:` or `assistant:`. Reviewers treat the block as reference data,
   never as instructions.
 
+### Review-Thread Replies and Follow-Up Issues (yellow-review)
+
+Unlike the ledger, `reply-pr-thread` and `file-followup-issue` (under
+`skills/pr-review-workflow/scripts/`) publish resolver-generated text to
+GitHub under the user's `gh` credentials: a reply on a PR review thread, or a
+new issue in the same repository. `/review:resolve` does not call them yet;
+once wired, they run without a per-post prompt. The controls
+(`references/resolve/dispositions.md`):
+
+- **Text screen, fail closed.** Every body passes `lib/resolve-text.sh`
+  before posting. A private-key header, a
+  `NAME_KEY`/`_TOKEN`/`_SECRET`/`_PASSWORD` assignment with a literal value,
+  a keyword assigned a quoted value, or a known token prefix is refused,
+  never redacted and posted. So are a markdown image, an `@` mention and a URL
+  on a host other than the repository's (`RT_ALLOWED_HOST`, else `GH_HOST`,
+  else `github.com`). A scan that did not run also refuses. The scripts exit 6
+  on a refusal or a scan that did not run, and the caller leaves the thread
+  open or posts the plain outcome sentence. An unreadable or missing input
+  file is a usage error and exits 2, not 6; in `check-resolve-text` a refusal
+  wins over an unreadable file when both occur.
+- **Bounded text.** A reply body is capped at 1000 characters. The
+  orchestrator checks resolver evidence against fixed patterns and never
+  places it on a command line.
+- **Deduplication.** Each post carries a hidden marker keyed to the thread
+  ID. A reply is skipped when the viewer's newest comment among the last 20
+  carries the marker and no human has commented since. An issue is skipped
+  when a viewer-authored issue already carries the marker; that scan reads
+  every page of the viewer's issues. Markers by other authors are ignored.
+- **Scope.** Issues are filed only in the PR's repository, and the script
+  refuses a thread that does not belong to the PR. No new network
+  destination is added beyond `gh`'s GitHub API.
+- **Bounded waits.** Rate limits wait at most 90 seconds (one retry in
+  `reply-pr-thread`), then exit 4. Each `gh` call in `reply-pr-thread`,
+  `file-followup-issue` and `get-pr-blockers` runs under `timeout(1)` or
+  `gtimeout(1)` (`YELLOW_REVIEW_GH_TIMEOUT`, default 30 seconds). A timeout
+  exits 4 without a retry in the first two, since the post may have landed;
+  a re-run finds it by its marker. In `get-pr-blockers` a timeout of the
+  review lookup sets `lookupFailed` true, while a timeout of the
+  branch-protection or ruleset lookup leaves that source unknown. The
+  combined `conversationResolution` is still `enforced` if the other source
+  requires resolution, and is `unknown` only when neither source confirms
+  enforcement and at least one remains unknown; both exit 0. Without either
+  binary installed, no timeout applies.
+
 ### Context Observer Persistence (yellow-core)
 
 `/statusline:setup` Step 5b (or `/statusline:setup observer`) offers an

@@ -1,0 +1,352 @@
+#!/bin/sh
+# File (or find) the GitHub follow-up issue for an out-of-scope review thread.
+# Usage: file-followup-issue <owner/repo> <pr-number> <PRRT_id> <title-file> <body-file>
+#        file-followup-issue --find <owner/repo> <PRRT_id>
+#   title-file: first line is the issue title (at most 256 characters)
+#   body-file:  issue text; a link to the thread and the marker are appended
+#   --find:     look only, never file: use it to drop dedupe hits before
+#               approval and before counting toward a created-issue cap
+# Output: JSON to stdout: {"number":N,"url":"...","created":true|false}
+#   created=false means an issue the viewer authored already carries this
+#   thread's marker (dedupe hit); no new issue is filed.
+#   --find prints {"exists":true,"number":N,"url":"..."} for such an issue
+#   and {"exists":false} when the viewer has none.
+# Exit codes: 1 other failure, including a transient gh failure,
+#             2 usage, or a thread that belongs to a different pull request,
+#             3 the thread does not exist,
+#             4 rate limited or a gh call timed out (no retry here; the
+#               caller stops mutating; a timed-out create or duplicate close may
+#               have changed state, and a re-run finds the issue by its marker),
+#             6 text refused: the title or body looks like a credential, has
+#               an image, an @mention or a foreign URL, or could not be
+#               scanned. A refusal prints a `resolve-text:` line, never the
+#               text: `refused rule=<rule> line=<n> in=<title|body>` for a
+#               hit, `scan failed in=<title|body>` when the scan did not run;
+#               the line is detail, the code is the signal,
+#             7 permanent refusal: not authenticated (HTTP 401), not permitted
+#               to file (HTTP 403, a token without issue-write) or Issues are
+#               disabled for the repository. Retrying gets the same answer, so
+#               the caller leaves the thread open instead.
+# Dedupe: the scan follows every page of the viewer's issues (GraphQL
+#   filterBy.createdBy, server-side, never the lagging search index), so it has
+#   no window to fill.
+# Concurrency: the dedupe scan and the create are not atomic. The post-create
+#   rescan (the newest RESCAN_LIMIT issues) and duplicate close only cover two
+#   runs filing for the same thread at the same moment (two sessions on one
+#   PR); a single session never needs them.
+# Env: YELLOW_REVIEW_GH_TIMEOUT (default 30) — seconds per gh call; needs
+#      timeout(1) or gtimeout(1), skipped when neither is installed
+#      (lib/resolve-gh.sh).
+# Contract: references/resolve/dispositions.md
+
+set -eu
+
+MAX_TITLE_CHARS=256
+# Newest issues the post-create rescan reads: our own new issue is the newest,
+# so a concurrent twin filed in the same moment is among them.
+RESCAN_LIMIT=20
+
+usage() {
+    printf 'Usage: file-followup-issue <owner/repo> <pr-number> <PRRT_id> <title-file> <body-file>\n' >&2
+    printf '       file-followup-issue --find <owner/repo> <PRRT_id>\n' >&2
+    exit 2
+}
+
+command -v gh >/dev/null 2>&1 || { printf 'Error: gh CLI not found.\n' >&2; exit 1; }
+command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found.\n' >&2; exit 1; }
+
+# shellcheck source=../../../lib/resolve-gh.sh
+. "$(dirname -- "$0")/../../../lib/resolve-gh.sh"
+
+FIND_ONLY=0
+if [ "${1:-}" = --find ]; then
+    [ $# -eq 3 ] || usage
+    FIND_ONLY=1
+    REPO="$2"
+    THREAD_ID="$3"
+else
+    [ $# -eq 5 ] || usage
+    REPO="$1"
+    PR_NUMBER="$2"
+    THREAD_ID="$3"
+    TITLE_FILE="$4"
+    BODY_FILE="$5"
+fi
+
+case "$REPO" in
+    */*/*|/*|*/) printf 'Error: Invalid repo format. Expected owner/repo, got: %s\n' "$REPO" >&2; exit 2 ;;
+    */*) OWNER="${REPO%%/*}"; NAME="${REPO#*/}" ;;
+    *) printf 'Error: Invalid repo format. Expected owner/repo, got: %s\n' "$REPO" >&2; exit 2 ;;
+esac
+case "$THREAD_ID" in
+    PRRT_*) ;;
+    *) printf 'Error: Invalid thread ID format. Expected PRRT_ prefix, got: %s\n' "$THREAD_ID" >&2; exit 2 ;;
+esac
+case "${THREAD_ID#PRRT_}" in
+    ''|*[!A-Za-z0-9_-]*) printf 'Error: Invalid characters in thread ID: %s\n' "$THREAD_ID" >&2; exit 2 ;;
+esac
+
+if [ "$FIND_ONLY" -eq 0 ]; then
+    case "$PR_NUMBER" in
+        ''|*[!0-9]*) printf 'Error: PR number must be numeric, got: %s\n' "$PR_NUMBER" >&2; exit 2 ;;
+    esac
+    for f in "$TITLE_FILE" "$BODY_FILE"; do
+        [ -f "$f" ] && [ -r "$f" ] || { printf 'Error: File not readable: %s\n' "$f" >&2; exit 2; }
+    done
+
+    TITLE=$(head -n 1 "$TITLE_FILE" | tr -d '\r' | jq -Rr 'gsub("^\\s+|\\s+$"; "")')
+    if [ -z "$TITLE" ]; then
+        printf 'Error: Title file is empty.\n' >&2
+        exit 2
+    fi
+    if [ "$(printf '%s' "$TITLE" | jq -Rs 'length')" -gt "$MAX_TITLE_CHARS" ]; then
+        printf 'Error: Title exceeds %s characters.\n' "$MAX_TITLE_CHARS" >&2
+        exit 2
+    fi
+    if [ "$(jq -Rs 'sub("\\s+$"; "") | length' <"$BODY_FILE")" -eq 0 ]; then
+        printf 'Error: Body file is empty.\n' >&2
+        exit 2
+    fi
+
+    # shellcheck source=../../../lib/resolve-text.sh
+    . "$(dirname -- "$0")/../../../lib/resolve-text.sh"
+    if ! rt_text_clean "$TITLE_FILE"; then
+        rt_report_refusal title
+        printf 'Error: Issue text looks like it contains a credential, an image, a mention or a foreign URL, or could not be scanned; refusing to file it.\n' >&2
+        exit 6
+    fi
+    if ! rt_text_clean "$BODY_FILE"; then
+        rt_report_refusal body
+        printf 'Error: Issue text looks like it contains a credential, an image, a mention or a foreign URL, or could not be scanned; refusing to file it.\n' >&2
+        exit 6
+    fi
+fi
+
+WORK_DIR=$(mktemp -d) || { printf 'Error: mktemp failed.\n' >&2; exit 1; }
+trap 'rm -rf "$WORK_DIR"' EXIT
+ERR="$WORK_DIR/err"
+
+# gh_fail <what> [status]: exit 4 on a rate limit or a timed-out gh call
+# (status 124), 7 on a permanent refusal (credentials, permission, Issues
+# disabled), else 1. The status defaults to that of the failed command.
+gh_fail() {
+    _rc=${2:-$?}
+    if [ "$_rc" -eq 124 ]; then
+        printf 'Error: gh timed out after %s s on %s.\n' "$RG_GH_TIMEOUT" "$1" >&2
+        exit 4
+    fi
+    if rg_is_rate_limited "$ERR"; then
+        printf 'Error: GitHub rate limit on %s.\n' "$1" >&2
+        exit 4
+    fi
+    if rg_is_auth_failure "$ERR"; then
+        printf 'Error: GitHub rejected the credentials on %s; sign in again.\n' "$1" >&2
+        exit 7
+    fi
+    if rg_is_permission_denied "$ERR"; then
+        printf 'Error: not permitted on %s, or Issues are disabled for %s: %s\n' "$1" "$REPO" "$(head -c 300 "$ERR" | tr '\n' ' ')" >&2
+        exit 7
+    fi
+    printf 'Error: %s failed: %s\n' "$1" "$(head -c 300 "$ERR")" >&2
+    exit 1
+}
+
+# App logins appear as "app/<name>" in `gh issue list` and "<name>[bot]" in
+# GraphQL; compare on the bare name.
+# shellcheck disable=SC2016
+NORMALIZE='sub("^app/"; "") | sub("\\[bot\\]$"; "")'
+
+RAW_VIEWER=$(rg_gh api graphql -f query='query FollowupViewer { viewer { login } }' \
+    --jq '.data.viewer.login' 2>"$ERR") || gh_fail 'viewer lookup'
+VIEWER=$(printf '%s' "$RAW_VIEWER" | jq -Rr "$NORMALIZE")
+[ -n "$VIEWER" ] || { printf 'Error: Could not determine the viewer login.\n' >&2; exit 1; }
+
+# GraphQL createdBy filters on a user login. An App's login is not known to
+# take it, so an App viewer lists every issue and first_marker_issue selects
+# on the author instead (slower, still complete).
+FILTER_BY_LOGIN=1
+case "$RAW_VIEWER" in
+    app/*|*\[bot\]) FILTER_BY_LOGIN=0 ;;
+esac
+
+# The trailing " disposition=" keeps PRRT_ab from matching PRRT_abc.
+MARKER="<!-- yellow-review:resolve v1 thread=$THREAD_ID disposition=oos -->"
+
+# list_viewer_issues <out-file> [newest-n]: the viewer's issues, any state, as
+# one JSON array of {number,url,body,author}. Without newest-n it follows every
+# page; with it, it reads only that many of the newest. filterBy.createdBy
+# filters server-side (not the lagging search index), so other users' issues
+# cannot push ours out of view. Also writes true or false to
+# $WORK_DIR/issues-enabled (hasIssuesEnabled; GraphQL lists nothing, with no
+# error, for a repository whose Issues are off).
+# shellcheck disable=SC2016
+LIST_QUERY='
+query FollowupIssues($owner: String!, $name: String!, $login: String, $first: Int!, $endCursor: String) {
+  repository(owner: $owner, name: $name) {
+    hasIssuesEnabled
+    issues(first: $first, after: $endCursor, filterBy: {createdBy: $login},
+           orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes { number url body author { login } }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}'
+list_viewer_issues() {
+    _first=100
+    _paginate=--paginate
+    if [ -n "${2:-}" ]; then _first=$2; _paginate=""; fi
+    if [ "$FILTER_BY_LOGIN" -eq 1 ]; then _lflag=-f; _lval="login=$VIEWER"; else _lflag=-F; _lval="login=null"; fi
+    # $_paginate is empty or one flag; it must word-split.
+    # shellcheck disable=SC2086
+    rg_gh api graphql $_paginate -f owner="$OWNER" -f name="$NAME" "$_lflag" "$_lval" \
+        -F "first=$_first" -f query="$LIST_QUERY" >"$WORK_DIR/pages.json" 2>"$ERR" || return $?
+    jq -s '[.[] | .data.repository.issues.nodes[]?]' "$WORK_DIR/pages.json" >"$1" 2>>"$ERR" || return 1
+    jq -s 'all(.[]; .data.repository.hasIssuesEnabled != false)' "$WORK_DIR/pages.json" >"$WORK_DIR/issues-enabled" 2>>"$ERR" || return 1
+}
+
+# first_marker_issue <issues-file>: the lowest-numbered viewer-authored issue
+# whose body ends with the marker, as {number,url,created:false}; empty when
+# there is none. One predicate serves the pre-create and post-create scans.
+first_marker_issue() {
+    jq -c --arg viewer "$VIEWER" --arg marker "$MARKER" '
+        [ .[]
+          | select(((.author.login // "") | '"$NORMALIZE"') == $viewer)
+          | select((.body // "") | sub("\\s+$"; "") | endswith($marker)) ]
+        | sort_by(.number) | first // empty
+        | {number, url, created: false}' "$1"
+}
+
+# --- Dedupe: scan every issue the viewer authored ---
+list_viewer_issues "$WORK_DIR/issues.json" || gh_fail 'issue list'
+EXISTING=$(first_marker_issue "$WORK_DIR/issues.json")
+if [ -n "$EXISTING" ]; then
+    if [ "$FIND_ONLY" -eq 1 ]; then
+        printf '%s\n' "$EXISTING" | jq -c '{exists: true, number, url}'
+    else
+        printf '%s\n' "$EXISTING"
+    fi
+    exit 0
+fi
+if [ "$FIND_ONLY" -eq 1 ]; then
+    printf '{"exists":false}\n'
+    exit 0
+fi
+
+# With Issues off, a create fails anyway; say so before the thread lookup.
+if [ "$(cat "$WORK_DIR/issues-enabled")" != true ]; then
+    printf 'Error: Issues are disabled for %s; not filing.\n' "$REPO" >&2
+    exit 7
+fi
+
+# A thread that does not exist is not a transient failure: filing an issue for
+# it would leave an orphan.
+thread_not_found() {
+    printf 'Error: Thread %s was not found; refusing to file an issue for it.\n' "$THREAD_ID" >&2
+    exit 3
+}
+
+# --- Link back to the thread (first comment URL; PR URL as a fallback) ---
+# The thread's own pullRequest.url carries the host, so a GitHub Enterprise
+# default host needs no GH_HOST. A node that returns no PR URL falls back to
+# a link built from GH_HOST or github.com.
+LINK="https://${GH_HOST:-github.com}/$REPO/pull/$PR_NUMBER"
+# shellcheck disable=SC2016
+if THREAD_INFO=$(rg_gh api graphql -f threadId="$THREAD_ID" \
+        -f query='query FollowupThreadUrl($threadId: ID!) { node(id: $threadId) { ... on PullRequestReviewThread { pullRequest { url } comments(first: 1) { nodes { url } } } } }' \
+        --jq 'if .data.node == null then "NOTFOUND" else ((.data.node.pullRequest.url // "-") + " " + (.data.node.comments.nodes[0].url // "-")) end' 2>"$ERR"); then
+    [ "$THREAD_INFO" != NOTFOUND ] || thread_not_found
+    THREAD_PR_URL=${THREAD_INFO%% *}
+    THREAD_URL=${THREAD_INFO#* }
+    [ "$THREAD_PR_URL" != - ] || THREAD_PR_URL=""
+    [ "$THREAD_URL" != - ] || THREAD_URL=""
+    if [ -z "$THREAD_PR_URL" ]; then
+        printf 'Note: no thread URL returned; linking the PR instead.\n' >&2
+    else
+        # Compare the path only, case-insensitively: GitHub returns the
+        # canonical owner/repo casing and the host is whatever the thread says.
+        THREAD_PR_PATH=/${THREAD_PR_URL#*://*/}
+        THREAD_PR_PATH_LC=$(printf '%s' "$THREAD_PR_PATH" | tr '[:upper:]' '[:lower:]')
+        WANT_PATH_LC=$(printf '/%s/pull/%s' "$REPO" "$PR_NUMBER" | tr '[:upper:]' '[:lower:]')
+        if [ "$THREAD_PR_PATH_LC" != "$WANT_PATH_LC" ]; then
+            printf 'Error: Thread %s does not belong to %s#%s (it is on %s).\n' \
+                "$THREAD_ID" "$REPO" "$PR_NUMBER" "$THREAD_PR_URL" >&2
+            exit 2
+        fi
+        LINK="$THREAD_PR_URL"
+        if [ -n "$THREAD_URL" ]; then
+            LINK="$THREAD_URL"
+        else
+            printf 'Note: no thread URL returned; linking the PR instead.\n' >&2
+        fi
+    fi
+else
+    LOOKUP_RC=$?
+    # The lookup itself failed, so no failure here falls back to the PR URL
+    # (only a successful lookup with no comment URL does, above). A rate limit,
+    # a timeout or a permanent refusal stops the caller through gh_fail.
+    if [ "$LOOKUP_RC" -eq 124 ] || rg_is_rate_limited "$ERR" || rg_is_auth_failure "$ERR" \
+            || rg_is_permission_denied "$ERR"; then
+        gh_fail 'thread link lookup' "$LOOKUP_RC"
+    fi
+    if grep -qiE 'Could not resolve to a node|NOT_FOUND' "$ERR"; then
+        thread_not_found
+    fi
+    # Any other failure leaves the thread unverified: filing could attach an
+    # issue to a thread of another pull request. Only a lookup that succeeded
+    # and returned no comment URL falls back to the PR link (above).
+    printf 'Error: thread link lookup failed (%s); not filing an issue for an unverified thread.\n' "$(head -c 200 "$ERR" | tr '\n' ' ')" >&2
+    exit 1
+fi
+
+ISSUE_BODY="$WORK_DIR/issue-body.md"
+jq -Rrs --arg link "$LINK" --arg pr "$PR_NUMBER" --arg marker "$MARKER" \
+    'sub("\\s+$"; "") + "\n\nFollow-up from review thread on #" + $pr + ": " + $link + "\n\n" + $marker' \
+    <"$BODY_FILE" >"$ISSUE_BODY"
+
+URL=$(rg_gh issue create --repo "$REPO" --title "$TITLE" --body-file "$ISSUE_BODY" 2>"$ERR") \
+    || gh_fail 'issue create'
+URL=$(printf '%s\n' "$URL" | grep -E '^https://[^ ]+/issues/[0-9]+$' | tail -n 1 || true)
+if [ -z "$URL" ]; then
+    printf 'Error: issue create returned no issue URL; an issue may already exist. Re-running finds it by its thread marker.\n' >&2
+    exit 1
+fi
+
+# The dedupe scan and the create are not atomic. Re-scan after creating: if a
+# concurrent run filed first, the lowest-numbered marker issue wins; close ours
+# as a duplicate (best effort) and report the winner.
+MY_NUMBER=${URL##*/}
+if list_viewer_issues "$WORK_DIR/issues-after.json" "$RESCAN_LIMIT"; then
+    if ! WINNER=$(first_marker_issue "$WORK_DIR/issues-after.json" 2>/dev/null); then
+        printf 'Note: could not read the post-create issue list; a concurrent duplicate of #%s, if any, was not checked.\n' "$MY_NUMBER" >&2
+        WINNER=""
+    fi
+    if [ -n "$WINNER" ] && [ "$(printf '%s\n' "$WINNER" | jq -r '.number')" != "$MY_NUMBER" ]; then
+        # Ordinary close failures are best effort; a timeout may have changed
+        # state, and a rate limit leaves the duplicate open; both stop the
+        # caller (exit 4) like any other timed-out or rate-limited call.
+        if rg_gh issue close "$URL" --reason 'not planned' \
+                --comment "Duplicate of #$(printf '%s\n' "$WINNER" | jq -r '.number'), filed concurrently for the same review thread." \
+                >/dev/null 2>"$ERR"; then
+            :
+        else
+            CLOSE_RC=$?
+            if [ "$CLOSE_RC" -eq 124 ] || grep -qiE 'rate limit|abuse|HTTP 429' "$ERR"; then
+                gh_fail 'duplicate issue close' "$CLOSE_RC"
+            fi
+            printf 'Note: could not close duplicate issue #%s (%s); close it by hand.\n' \
+                "$MY_NUMBER" "$(head -c 200 "$ERR" | tr '\n' ' ')" >&2
+        fi
+        printf '%s\n' "$WINNER"
+        exit 0
+    fi
+else
+    RESCAN_RC=$?
+    # The issue exists, but the contract requires exit 4 after any rate limit
+    # or timeout. Re-running finds the created issue by its thread marker.
+    if [ "$RESCAN_RC" -eq 124 ] || grep -qiE 'rate limit|abuse|HTTP 429' "$ERR"; then
+        gh_fail 'post-create issue list' "$RESCAN_RC"
+    fi
+    printf 'Note: post-create issue list failed; a concurrent duplicate of #%s, if any, was not checked.\n' "$MY_NUMBER" >&2
+fi
+
+jq -nc --arg url "$URL" '{number: ($url | sub(".*/issues/"; "") | tonumber), url: $url, created: true}'

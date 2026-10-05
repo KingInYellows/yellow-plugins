@@ -164,21 +164,63 @@ resolution, and sequential stack review. Graphite-native workflow.
   rails and inline MIT attribution so the rules survive on hosts with no
   tool restriction (not user-invocable)
 
-### Scripts (3)
+### Scripts (7)
 
-- `get-pr-comments` — Fetch unresolved, non-outdated PR review threads via
-  GitHub GraphQL API
+- `get-pr-comments [--include-outdated] <owner/repo> <pr>` — Fetch unresolved
+  PR review threads via GitHub GraphQL API; outdated threads are excluded
+  unless `--include-outdated` is passed; exits 3 (partial array on stdout)
+  when the thread list is truncated; each thread carries `commentsTruncated`
+  (true past the 50 comments fetched), and such a thread is never resolved
+- `get-pr-blockers <owner/repo> <pr>` — Report CHANGES_REQUESTED reviews,
+  `reviewDecision`, whether conversation resolution is enforced (read from the
+  base branch and the default branch), and `lookupReason` when a lookup failed
+- `reply-pr-thread <PRRT_id> <disposition> <body-file>` — Reply to a review
+  thread with an idempotency marker; skips threads already replied to. Not yet
+  invoked by `/review:resolve`; see `references/resolve/dispositions.md`
 - `resolve-pr-thread` — Resolve a single review thread via GitHub GraphQL
   mutation
+- `file-followup-issue <owner/repo> <pr> <PRRT_id> <title-file> <body-file>` —
+  File (or find) the follow-up issue for an out-of-scope thread, deduped by a
+  viewer-authored marker. `--find <owner/repo> <PRRT_id>` only looks, never
+  files. Not yet invoked by `/review:resolve`; see
+  `references/resolve/dispositions.md`
+- `check-resolve-text <file>...` — Refuse resolver-written text that looks
+  like a credential, or has an image, an `@` mention or a foreign URL (for
+  text posted outside the resolve scripts); exits 6
 - `file-line-counts <diff-base-ref>` — Authoritative base/head line counts per
   changed file for `thermonuclear-reviewer`'s size-threshold rule; the
   header and footer rows are its completeness signal
+
+`reply-pr-thread`, `file-followup-issue` and `check-resolve-text` source
+`lib/resolve-text.sh` (text screen) before posting and exit 6 on a refusal.
+`reply-pr-thread` and `file-followup-issue` exit 7 on a permanent GitHub
+refusal (not authenticated; for the issue script also no permission or Issues
+disabled).
 
 All live at `skills/pr-review-workflow/scripts/` and are invoked as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`.
 
 ### Library
 
+- `lib/resolve-text.sh` (POSIX sh, sourced by `reply-pr-thread`,
+  `file-followup-issue` and `check-resolve-text`) — the text screen for
+  resolver-written text; a match means the text is never posted. One function,
+  `rt_text_clean <file>`, returns 0 only when the scan ran and found nothing,
+  1 for a credential shape, markdown image, `@` mention or foreign URL, and 2
+  when the scan did not run (unreadable file, awk failing). On 1 it sets
+  `RT_HIT_RULE` and `RT_HIT_LINE`, and `rt_report_refusal` prints a
+  `resolve-text:` stderr line (never the text): `refused rule=<rule> line=<n>`
+  for a hit, `scan failed` when the scan did not run. The scripts exit 6 on a
+  refusal; callers key on the code and keep the line as detail. The one URL
+  host allowed is `RT_ALLOWED_HOST`, else `GH_HOST`, else `github.com`.
+- `lib/resolve-gh.sh` (POSIX sh, sourced by `reply-pr-thread`,
+  `file-followup-issue` and `get-pr-blockers`) — runs `gh` through `rg_gh`
+  under `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s) and returns 124 on a
+  timeout, but only when `timeout(1)` or `gtimeout(1)` is installed; without
+  either `gh` runs unbounded. It also holds the failure classifiers
+  (`rg_is_rate_limited`, `rg_is_auth_failure`, `rg_is_permission_denied`) the
+  scripts share; test a rate limit before a permission failure, since a
+  secondary rate limit is also an HTTP 403.
 - `lib/review-ledger.sh <subcommand>` — the durable review-findings ledger
   (plans/review-findings-ledger.md): an append-only JSONL file per PR at
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`,
@@ -353,9 +395,11 @@ explicit-invocation wording live in the skill body and description.
 ## Testing
 
 `bats tests/` from the plugin directory — `get-pr-comments.bats`,
-`resolve-pr-thread.bats` (GraphQL fixtures in `tests/fixtures/`, fake `gh` in
-`tests/mocks/gh`), `file-line-counts.bats` (pins the thermonuclear line-count
-invariant alongside `skills/pr-review-workflow/scripts/file-line-counts`),
+`get-pr-blockers.bats`, `reply-pr-thread.bats`, `file-followup-issue.bats`,
+`check-resolve-text.bats`, `resolve-pr-thread.bats` (GraphQL fixtures in
+`tests/fixtures/`, fake `gh` in `tests/mocks/gh`), `file-line-counts.bats`
+(pins the thermonuclear line-count invariant alongside
+`skills/pr-review-workflow/scripts/file-line-counts`),
 `review-ledger.bats` (throwaway repositories with a bare origin, built by
 `tests/helpers/ledger-repo.bash`; the universal-ctags case skips when ctags is
 absent), `session-start.bats` (the hook's counts, orphan and stale-state

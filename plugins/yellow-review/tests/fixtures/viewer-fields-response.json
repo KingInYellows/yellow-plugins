@@ -1,0 +1,574 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewThreads": {
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": null
+          },
+          "nodes": [
+            {
+              "id": "PRRT_v1",
+              "isResolved": false,
+              "isOutdated": false,
+              "viewerCanResolve": true,
+              "viewerCanReply": false,
+              "path": "a.ts",
+              "line": 1,
+              "startLine": null,
+              "comments": {
+                "totalCount": 1,
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "mine",
+                    "id": "PRRC_v1",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_v2",
+              "isResolved": false,
+              "isOutdated": false,
+              "path": "b.ts",
+              "line": 2,
+              "startLine": null,
+              "comments": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "rev"
+                    },
+                    "body": "bare"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_v3",
+              "isResolved": false,
+              "isOutdated": false,
+              "viewerCanResolve": true,
+              "viewerCanReply": true,
+              "path": "c.ts",
+              "line": 3,
+              "startLine": null,
+              "comments": {
+                "totalCount": 51,
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x0",
+                    "id": "PRRC_0",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x1",
+                    "id": "PRRC_1",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x2",
+                    "id": "PRRC_2",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x3",
+                    "id": "PRRC_3",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x4",
+                    "id": "PRRC_4",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x5",
+                    "id": "PRRC_5",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x6",
+                    "id": "PRRC_6",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x7",
+                    "id": "PRRC_7",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x8",
+                    "id": "PRRC_8",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x9",
+                    "id": "PRRC_9",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x10",
+                    "id": "PRRC_10",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x11",
+                    "id": "PRRC_11",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x12",
+                    "id": "PRRC_12",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x13",
+                    "id": "PRRC_13",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x14",
+                    "id": "PRRC_14",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x15",
+                    "id": "PRRC_15",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x16",
+                    "id": "PRRC_16",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x17",
+                    "id": "PRRC_17",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x18",
+                    "id": "PRRC_18",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x19",
+                    "id": "PRRC_19",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x20",
+                    "id": "PRRC_20",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x21",
+                    "id": "PRRC_21",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x22",
+                    "id": "PRRC_22",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x23",
+                    "id": "PRRC_23",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x24",
+                    "id": "PRRC_24",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x25",
+                    "id": "PRRC_25",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x26",
+                    "id": "PRRC_26",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x27",
+                    "id": "PRRC_27",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x28",
+                    "id": "PRRC_28",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x29",
+                    "id": "PRRC_29",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x30",
+                    "id": "PRRC_30",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x31",
+                    "id": "PRRC_31",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x32",
+                    "id": "PRRC_32",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x33",
+                    "id": "PRRC_33",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x34",
+                    "id": "PRRC_34",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x35",
+                    "id": "PRRC_35",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x36",
+                    "id": "PRRC_36",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x37",
+                    "id": "PRRC_37",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x38",
+                    "id": "PRRC_38",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x39",
+                    "id": "PRRC_39",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x40",
+                    "id": "PRRC_40",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x41",
+                    "id": "PRRC_41",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x42",
+                    "id": "PRRC_42",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x43",
+                    "id": "PRRC_43",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x44",
+                    "id": "PRRC_44",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x45",
+                    "id": "PRRC_45",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x46",
+                    "id": "PRRC_46",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x47",
+                    "id": "PRRC_47",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x48",
+                    "id": "PRRC_48",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  },
+                  {
+                    "author": {
+                      "login": "rev",
+                      "__typename": "User"
+                    },
+                    "body": "x49",
+                    "id": "PRRC_49",
+                    "createdAt": "2026-09-30T10:00:00Z",
+                    "viewerDidAuthor": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
