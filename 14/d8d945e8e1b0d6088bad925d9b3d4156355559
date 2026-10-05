@@ -1,0 +1,14 @@
+packages/infrastructure/src/validation/validator.test.ts
+  h_6000354274ce50 50-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "14d8d945e8e1b0d6088bad925d9b3d4156355559",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
