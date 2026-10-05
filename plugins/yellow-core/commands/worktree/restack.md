@@ -211,7 +211,7 @@ the `git worktree unlock` line to run after restoring it).
 ## Exit codes
 
 | Exit | Meaning | Tell the user |
-|---|---|---|
+| --- | --- | --- |
 | `0` | Done | The stack is restacked and every worktree is back on its branch; if `--submit`, the provider submitted it. For `--continue` / `--abort` with "no restack in progress", nothing was done |
 | `2` | Usage error | Show the message; fix the arguments |
 | `3` | Restack already in progress, or the lock is held | Run `--status`, then `--continue` or `--abort`. If the message says no restack is running, remove the lock directory it names |

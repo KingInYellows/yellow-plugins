@@ -188,7 +188,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-restack.sh" \
 ```
 
 | Subcommand | Does |
-|---|---|
+| --- | --- |
 | `preflight` | Read-only. Prints the run worktree, the stack, the worktrees to detach and any `REFUSE` reasons |
 | `start` | Lock, detach, restack, verify ancestry, restore; `--submit` submits after |
 | `continue` | Resumes a paused conflict, then verifies and restores |
