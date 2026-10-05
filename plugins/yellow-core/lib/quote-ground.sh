@@ -23,6 +23,9 @@
 # backslashes stay literal. Lines that cannot start the private-key sed
 # range are redacted together; a BEGIN/END line is redacted alone so the
 # range cannot collapse later line numbers.
+#
+# The window loops stop at the last line of the loaded file, so a large
+# radius or line number costs no more than a small one.
 
 if [ "${BASH_SOURCE[0]}" != "$0" ]; then
   printf 'quote-ground.sh must be executed, not sourced\n' >&2
@@ -60,6 +63,7 @@ declare -A QG_QUEUED=()
 declare -a QG_PENDING_RAW=()
 declare -A QG_FILE_LINE=()
 declare -A QG_FILE_LOADED=()
+declare -A QG_FILE_COUNT=()
 declare -A QG_PATH_CLASS=()
 
 qg_root() {
@@ -197,10 +201,12 @@ qg_ensure_lines() {
     exit 2
   fi
   QG_FILE_LOADED["f:$file"]=1
+  QG_FILE_COUNT["f:$file"]=0
   [ -n "$recs" ] || return 0
   while IFS= read -r rec; do
     num=${rec%%$'\t'*}
     text=${rec#*$'\t'}
+    QG_FILE_COUNT["f:$file"]=$num
     QG_FILE_LINE["${file}#${num}"]=$text
   done <<<"$recs"
 }
@@ -233,13 +239,17 @@ qg_path_class() {
 # must already be cached. Sets QG_MATCHED on success.
 qg_search() {
   local file="$1" line="$2" radius="$3" quote="$4"
-  local start end n raw norm
+  local start end last n raw norm
   QG_MATCHED=
   start=$((line - radius))
   if [ "$start" -lt 1 ]; then
     start=1
   fi
   end=$((line + radius))
+  last=${QG_FILE_COUNT["f:$file"]:-0}
+  if [ "$end" -gt "$last" ]; then
+    end=$last
+  fi
   for ((n = start; n <= end; n++)); do
     if [ "${QG_FILE_LINE["${file}#${n}"]+set}" != set ]; then
       continue
@@ -255,12 +265,16 @@ qg_search() {
 }
 
 qg_queue_window() {
-  local file="$1" line="$2" radius="$3" start end n
+  local file="$1" line="$2" radius="$3" start end last n
   start=$((line - radius))
   if [ "$start" -lt 1 ]; then
     start=1
   fi
   end=$((line + radius))
+  last=${QG_FILE_COUNT["f:$file"]:-0}
+  if [ "$end" -gt "$last" ]; then
+    end=$last
+  fi
   for ((n = start; n <= end; n++)); do
     if [ "${QG_FILE_LINE["${file}#${n}"]+set}" = set ]; then
       qg_queue "${QG_FILE_LINE["${file}#${n}"]}"
@@ -314,9 +328,12 @@ qg_emit_all() {
   [ "${#args[@]}" -gt 0 ] || return 0
   # Each value carries a one-character prefix that jq strips, so an id that
   # starts with "-" is never read as an option and jq escapes every control
-  # character itself.
+  # character itself. An id also carries a type tag after that prefix (n for
+  # a JSON number, s for a string), so a numeric id is emitted as a number
+  # and the string "42" stays a string.
   jq -nc '$ARGS.positional as $a | range(0; ($a | length); 3) as $i
-    | {id: $a[$i][1:], result: $a[$i + 1][1:],
+    | {id: ($a[$i][1:] | if .[0:1] == "n" then (.[1:] | tonumber) else .[1:] end),
+       result: $a[$i + 1][1:],
        matched_line: ($a[$i + 2][1:] | if test("^[0-9]+$") then tonumber else null end)}' \
     --args "${args[@]}" || {
     printf 'quote-ground: could not write batch output\n' >&2
@@ -376,7 +393,8 @@ qg_load_rows() {
       and (.quote | type) == "string"
       and ((.line | type) == "number" or (.line | type) == "string")
     then
-      [(.id | tostring), .file, (.line | tostring), .quote] as $f
+      [(if (.id | type) == "number" then "n" + (.id | tostring) else "s" + .id end),
+       .file, (.line | tostring), .quote] as $f
       | if any($f[]; contains("\u0000")) then error("nul in field")
         else $f[] + "\u0000" end
     else
