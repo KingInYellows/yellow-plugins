@@ -1,0 +1,23 @@
+.markdownlint.json
+  s_4dea7a2b915137::t_fd4835e0166733 15
+.codacy.yml
+  s_4dea7a2b915137::t_8b17f2c33c02d7 21,23-27,32
+.codacy/codacy.yaml
+  s_4dea7a2b915137::t_cbc111c37cc737 14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "42961ab7c47a6e353a460dc71691c4c505f183d0",
+  "prompts": {},
+  "sessions": {
+    "s_4dea7a2b915137": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "87a2dd5d-2b29-41a0-8294-3f5034ff7209",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
