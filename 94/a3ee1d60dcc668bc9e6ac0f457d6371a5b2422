@@ -1,0 +1,31 @@
+docs/solutions/workflow/compounder-m3-gate-non-interactive.md
+  s_614b8b07ae5e06::t_4b6545a5fa853c 79-93
+plans/stage-unattended-sweep-learnings.md
+  s_614b8b07ae5e06::t_18dbce9d255473 395,415,428,434,438,509
+plugins/yellow-core/CLAUDE.md
+  s_614b8b07ae5e06::t_bae2a141e904c0 330-331,333-334,449-456
+plugins/yellow-review/CLAUDE.md
+  s_614b8b07ae5e06::t_2f36eb421fca41 363-372
+plugins/yellow-review/commands/review/sweep-all.md
+  s_614b8b07ae5e06::t_8d01221ec82b7d 20-21,27,374-375
+plugins/yellow-review/commands/review/sweep.md
+  s_614b8b07ae5e06::t_dbdc26efb8ad47 26-28
+plugins/yellow-review/tests/skill-content.bats
+  s_614b8b07ae5e06::t_0a265aa5251848 462,1208-1235
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "94a3ee1d60dcc668bc9e6ac0f457d6371a5b2422",
+  "prompts": {},
+  "sessions": {
+    "s_614b8b07ae5e06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "611b6fca-8946-4a0e-adeb-9e50ac8cad85",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

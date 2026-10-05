@@ -1,0 +1,21 @@
+docs/brainstorms/2026-09-30-stage-unattended-sweep-learnings-brainstorm.md
+  s_614b8b07ae5e06::t_d6cb0c9bc8fe7e 1-117
+plans/stage-unattended-sweep-learnings.md
+  s_614b8b07ae5e06::t_2c01ad656f51c5 1-734
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8079ac60a4d3d8338b1c6bd1f27145faa32d5db0",
+  "prompts": {},
+  "sessions": {
+    "s_614b8b07ae5e06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "611b6fca-8946-4a0e-adeb-9e50ac8cad85",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

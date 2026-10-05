@@ -1,0 +1,23 @@
+plans/stage-unattended-sweep-learnings.md
+  s_614b8b07ae5e06::t_62a671eb133817 270,485
+plugins/yellow-review/lib/stage-learning.sh
+  s_614b8b07ae5e06::t_4bf01d9eeb6eff 1-174
+plugins/yellow-review/tests/stage-learning.bats
+  s_614b8b07ae5e06::t_6b6968b59313d9 1-226
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1cdfa672391a7d4b95dbb4238d7c8ef6eb4295bf",
+  "prompts": {},
+  "sessions": {
+    "s_614b8b07ae5e06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "611b6fca-8946-4a0e-adeb-9e50ac8cad85",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
