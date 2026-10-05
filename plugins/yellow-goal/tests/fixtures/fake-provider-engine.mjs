@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Portable fake Provider Protocol v1 engine for yellow-goal tests only. Runs
+// Portable fake Provider Protocol v1/v2 engine for yellow-goal tests only. Runs
 // two ways, both handled below, and never proxies to a real engine:
 //  1. Directly executable — GOAL_GEN_BIN points straight at this file, so
 //     argv is [thisFile, verb, ...flags].
@@ -22,7 +22,6 @@ const args = isPreloadMode
 
 const PROTOCOL_V1 = 'yellow-goal/provider-protocol/v1';
 const PROTOCOL_V2 = 'yellow-goal/provider-protocol/v2';
-const PROTOCOL_VERSION = PROTOCOL_V1;
 const CAPABILITIES_SCHEMA_VERSION = 'yellow-goal/provider-capabilities/v1';
 const REQUEST_SCHEMA_VERSION = 'yellow-goal/request/v1';
 const RUN_EVENT_SCHEMA_VERSION = 'yellow-goal/run-event/v1';
