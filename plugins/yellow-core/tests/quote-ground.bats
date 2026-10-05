@@ -189,6 +189,12 @@ now_ms() {
   [ "$(jq -r .result <<<"$output")" = "ungrounded" ]
 }
 
+@test "check never grounds a quote that holds a NUL byte" {
+  printf 'abcdefgh\n' >src/a.txt
+  run bash -c 'printf "abcd\0efgh" | bash "$0" check src/a.txt 1' "$QG"
+  [ "$status" -eq 1 ]
+}
+
 @test "check grounds non-ASCII text after space squeezing" {
   printf '%s\n' 'café    résumé token value' >src/a.txt
   run bash "$QG" check src/a.txt 1 <<<"café résumé token value"
@@ -438,6 +444,23 @@ now_ms() {
   run bash "$QG" batch <<<"$(row locked src/a.txt 1 "$Q26")"
   [ "$status" -eq 2 ]
   [[ "$output" != *'"result"'* ]]
+}
+
+@test "a leading-hyphen path is unsafe even when the file exists" {
+  printf '%s\n' "$Q26" >./-evidence.txt
+  run bash "$QG" check -evidence.txt 1 3 <<<"$Q26"
+  [ "$status" -eq 1 ]
+  [ -z "$output" ]
+}
+
+@test "a file under a directory without search permission exits 2, not unsafe-path" {
+  [ "$(id -u)" -ne 0 ] || skip "root searches every directory"
+  mkdir -p src/locked
+  printf '%s\n' "$Q26" >src/locked/a.txt
+  chmod 000 src/locked
+  run bash "$QG" check src/locked/a.txt 1 <<<"$Q26"
+  chmod 755 src/locked
+  [ "$status" -eq 2 ]
 }
 
 @test "a malformed row is ungrounded and does not affect its siblings" {

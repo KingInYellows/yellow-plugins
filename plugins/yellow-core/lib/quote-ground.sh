@@ -215,9 +215,10 @@ qg_flush() {
 # like an ungrounded quote. QG_FILE_COUNT records the last line loaded, which
 # is where the window loops stop. awk also tracks the private-key range from
 # line 1, as cs_redact_secrets' sed range does, and flags every line from
-# BEGIN through END (a line holding both is a block on its own). Those lines
-# are never matched as text: qg_search treats them as [REDACTED], so a key
-# body row cannot ground and the block keeps its line numbers.
+# BEGIN through END. A line holding both markers still opens the range, since
+# sed checks END only from the next line, so it runs to a later END or EOF.
+# Those lines are never matched as text: qg_search treats them as [REDACTED],
+# so a key body row cannot ground and the block keeps its line numbers.
 qg_ensure_lines() {
   local file="$1" full="$2" lo="$3" hi="$4" recs rec num flag text nuls
   if [ "${QG_FILE_LOADED["f:$file"]+set}" = set ]; then
@@ -243,7 +244,7 @@ qg_ensure_lines() {
         if ($0 ~ /-----END.*PRIVATE KEY-----/) inkey = 0
       } else if ($0 ~ /-----BEGIN.*PRIVATE KEY-----/) {
         flag = 1
-        if ($0 !~ /-----END.*PRIVATE KEY-----/) inkey = 1
+        inkey = 1
       }
     }
     NR >= lo { printf "%d\t%d\t%s\n", NR, flag, $0 }
@@ -267,6 +268,17 @@ qg_ensure_lines() {
   done <<<"$recs"
 }
 
+qg_ancestor_blocked() {
+  local d="${QG_ROOT}/$1"
+  case "$1" in *..* | /*) return 1 ;; esac
+  d=${d%/*}
+  while [ "${#d}" -gt "${#QG_ROOT}" ]; do
+    if [ -d "$d" ] && [ ! -x "$d" ]; then return 0; fi
+    d=${d%/*}
+  done
+  return 1
+}
+
 # Classify one relative path. Sets QG_ONE_CLASS to ok, missing, unreadable, or
 # unsafe-path. The same path is validated once per process; a later row
 # reuses that result and still does not open a rejected path.
@@ -276,8 +288,15 @@ qg_path_class() {
     QG_ONE_CLASS=${QG_PATH_CLASS["p:$file"]}
     return 0
   fi
-  if ! validate_file_path "$file" "$QG_ROOT"; then
+  if [[ "$file" == -* || "$file" == */-* ]]; then
     QG_ONE_CLASS=unsafe-path
+  elif ! validate_file_path "$file" "$QG_ROOT"; then
+    # A directory without search permission also fails validation.
+    if qg_ancestor_blocked "$file"; then
+      QG_ONE_CLASS=unreadable
+    else
+      QG_ONE_CLASS=unsafe-path
+    fi
   else
     full="${QG_ROOT}/${file}"
     if [ ! -e "$full" ]; then
@@ -538,7 +557,12 @@ case "${1:-}" in
       unsafe-path) exit 1 ;;
       missing | unreadable) exit 2 ;;
     esac
-    quote=$(cat)
+    # read -d '' returns 0 only when it meets a NUL; a command substitution
+    # would drop the byte and join the text either side of it.
+    if IFS= read -r -d '' quote; then
+      exit 1
+    fi
+    while [[ "$quote" == *$'\n' ]]; do quote=${quote%$'\n'}; done
     qg_check "$file" "$line" "$radius" "$quote"
     ;;
   batch)
