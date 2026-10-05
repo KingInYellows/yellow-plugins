@@ -735,7 +735,7 @@ and `shell-binary-downloader-security-patterns.md` (install path),
   `pnpm test:shell-compat`, `bats tests/` in `plugins/yellow-linear` and
   `plugins/yellow-core`; `rg -l $'\r' plugins/yellow-jules scripts/validate-jules.js`
   empty (LF only). Report any pre-existing failure verbatim.
-- [ ] Step 5.6: Amend the checkpoint stack into the single PR through the
+- [x] Step 5.6: Amend the checkpoint stack into the single PR through the
   active provider's commands, tick every enumeration-site checklist item in
   the PR description, list follow-ups (shell 03: `delegate`/`reply`/`approve`
   runtime paths and wrappers, `authorize`, R38 handoff doc, Linear live
