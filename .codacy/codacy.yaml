@@ -11,6 +11,7 @@ tools:
 exclude_paths:
     - "plans/**"
     - "docs/brainstorms/**"
+    - "docs/solutions/**"
     - "RESEARCH/**"
     # Changeset files are an ephemeral, fixed format: YAML frontmatter
     # followed by a prose summary, never a top-level heading. markdownlint
