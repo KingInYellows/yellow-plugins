@@ -2107,8 +2107,10 @@ trust_assert_absolute() {
 }
 
 @test "trust: git, gh, and jq run only as absolute paths, with hash-object --no-filters and timeout --kill-after=5" {
-  local real_git="/usr/bin/git" real_jq="/usr/bin/jq" real_timeout="/usr/bin/timeout" line
-  [ -x "$real_git" ] && [ -x "$real_jq" ] && [ -x "$real_timeout" ]
+  local real_git real_jq real_timeout line
+  real_git=$(type -P git) || skip "git not found on PATH"
+  real_jq=$(type -P jq) || skip "jq not found on PATH"
+  real_timeout=$(type -P timeout) || skip "timeout not found on PATH"
   "$real_timeout" --kill-after=1 1 true
   in_repo_plugin_init
   trust_shield_stubs "$real_git"

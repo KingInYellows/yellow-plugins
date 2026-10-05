@@ -1112,12 +1112,29 @@ trust_assert_absolute() {
   [ ! -e "$marker" ]
 }
 
+@test "trust: in-worktree readlink and dirname canaries do not run during the trust check" {
+  local marker="$BATS_TEST_TMPDIR/canary-ran" dir="$PWD/canary-bin" link="$BATS_TEST_TMPDIR/linkbin" real tool
+  rm -f "$marker"
+  unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ
+  real=$(type -P git) || skip "git not found on PATH"
+  mkdir -p "$dir" "$link" sub
+  for tool in readlink dirname; do
+    printf '#!/bin/sh\ntouch "%s"\nexit 99\n' "$marker" >| "$dir/$tool"
+    chmod +x "$dir/$tool"
+  done
+  ln -s "$real" "$link/git"
+  cd sub
+  PATH="$dir:$link:$PATH" run lgit rev-parse --git-dir
+  [ "$status" -eq 0 ]
+  [ ! -e "$marker" ]
+}
+
 @test "trust: lgit execs only an absolute git and keeps its flags" {
   local marker="$BATS_TEST_TMPDIR/canary-ran" log="$BATS_TEST_TMPDIR/git-argv.log"
-  local real="/usr/bin/git" dest dir
+  local real dest dir
   rm -f "$marker" "$log"
   unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ
-  [ -x "$real" ]
+  real=$(type -P git) || skip "git not found on PATH"
   dest=$(mkdir -p "$BATS_TEST_TMPDIR/doubles" && cd "$BATS_TEST_TMPDIR/doubles" && pwd -P)
   cat >| "$dest/git" <<EOF
 #!/bin/sh

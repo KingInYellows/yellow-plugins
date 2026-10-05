@@ -10,13 +10,27 @@
 # shellcheck source=sibling-plugin.sh
 . "$(dirname -- "${BASH_SOURCE[0]}")/sibling-plugin.sh"
 
+# yr_helper <name>: a helper the trust check itself must run (readlink). Looked
+# up in fixed system directories, never on PATH: a PATH directory inside the
+# worktree could hold a planted one that runs before any check. Fails closed
+# when none of the fixed locations has it.
+yr_helper() {
+    local name="$1" cand
+    for cand in "/usr/bin/$name" "/bin/$name" "/run/current-system/sw/bin/$name"; do
+        if [ -f "$cand" ] && [ -x "$cand" ]; then
+            printf '%s\n' "$cand"
+            return 0
+        fi
+    done
+    return 1
+}
 # yr_canon_path <path>: absolute path with every symlink followed, at most
 # 40 hops. A component walk, not dirname and not realpath: a directory
 # symlink and the final file both count. Prints the path. Returns 1 on a
 # loop or an unreadable link. Does not execute the path and writes nothing.
 yr_canon_path() {
     local input="$1" hops=0
-    local cur="" rest comp next target
+    local cur="" rest comp next target rl
     [ -n "$input" ] || return 1
     case "$input" in
         /*) ;;
@@ -47,7 +61,8 @@ yr_canon_path() {
         if [ -L "$next" ]; then
             hops=$((hops + 1))
             [ "$hops" -le 40 ] || return 1
-            target=$(readlink -- "$next") || return 1
+            rl=$(yr_helper readlink) || return 1
+            target=$("$rl" -- "$next") || return 1
             case "$target" in
                 /*)
                     cur=""
@@ -64,7 +79,8 @@ yr_canon_path() {
 }
 
 # yr_worktree_root: the directory that contains .git, walking up from the
-# physical cwd. Does not execute git (the candidate may be the file under test).
+# physical cwd. Does not execute git (the candidate may be the file under test)
+# or any PATH helper: the parent is taken with parameter expansion.
 yr_worktree_root() {
     local d
     d=$(pwd -P) || return 1
@@ -74,7 +90,8 @@ yr_worktree_root() {
             return 0
         fi
         [ "$d" = / ] && return 1
-        d=$(dirname -- "$d")
+        d=${d%/*}
+        [ -n "$d" ] || d=/
     done
     return 1
 }
