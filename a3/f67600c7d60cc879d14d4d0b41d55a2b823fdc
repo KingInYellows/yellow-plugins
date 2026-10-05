@@ -1,0 +1,24 @@
+.changeset/quote-ground-window-match.md
+  h_6000354274ce50 1-9
+plans/shells/yellow-council-v2-four-cli-05-evidence-verification-and-finalization.md
+  h_6000354274ce50 100-101,281-284
+plugins/yellow-core/CLAUDE.md
+  h_6000354274ce50 20-21,371-380,527
+plugins/yellow-core/README.md
+  h_6000354274ce50 147-156
+plugins/yellow-core/lib/quote-ground.sh
+  h_6000354274ce50 1-500
+plugins/yellow-core/tests/quote-ground.bats
+  h_6000354274ce50 1-267
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a3f67600c7d60cc879d14d4d0b41d55a2b823fdc",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
