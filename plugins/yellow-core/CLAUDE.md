@@ -369,14 +369,25 @@ cross-plugin pattern:
   sourced first. Used by `session-handoff`'s `measure` and `context`
 
 `lib/quote-ground.sh` is not one of those sourced helpers. Execute it with
-bash. `check <file> <line> [radius]` reads the quote from stdin only (a
-missing radius is 3) and prints the matched line number when the redacted,
-placeholder-canonicalized, whitespace-normalized quote is a substring of a
-line in the inclusive window. `batch` reads JSONL `{id, file, line, quote}`
-and writes one object per id with `id`, `result`, and `matched_line`. The
-script sources `validate-fs.sh` and `compound-staging.sh` itself. Do not
-source `quote-ground.sh`, and do not add it to the Tier 4 dual-shell list.
-Bats coverage is `tests/quote-ground.bats`.
+bash 4.4 or newer (`batch` also needs jq). `check <file> <line> [radius]` reads
+the quote from stdin only (a missing radius is 3) and prints the matched line
+number when the redacted, placeholder-canonicalized, whitespace-normalized
+quote is a substring of a line in the inclusive window; it exits 0 grounded, 1
+for `ungrounded`, `too-short` or `unsafe-path`, and 2 for usage, a bad line or
+radius, a missing or unreadable file, or a redaction failure. `batch` reads
+JSONL `{id, file, line, quote}` and writes one object per input row, in input
+order, with `id`, `result` (`grounded`, `ungrounded`, `too-short`,
+`unsafe-path`) and `matched_line` (a number for `grounded`, otherwise `null`);
+it always uses radius 3, reports a missing file as `ungrounded` and a row with
+a usable id but a bad field as `ungrounded`, and exits 2 with no rows when a
+line is not JSON, a row has no usable id, or a cited file cannot be read. A
+quote with fewer than 8 characters outside `[REDACTED]` placeholders is
+`too-short`; a placeholder matches any secret the line held. The script writes
+no temp files, so unredacted text stays in memory and pipes. It sources
+`validate-fs.sh` and `compound-staging.sh` itself. Do not source
+`quote-ground.sh`, and do not add it to the Tier 4 dual-shell list. Bats
+coverage is `tests/quote-ground.bats`; the contract is also in the README's
+"Quote grounding" section.
 
 ### Optional Plugin Dependencies
 

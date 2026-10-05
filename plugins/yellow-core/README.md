@@ -147,12 +147,43 @@ you want richer library docs:
 ## Quote grounding
 
 `lib/quote-ground.sh` grounds a single-line quote inside a cited window.
-Run it with bash. Do not source it, and it is not a dual-shell library.
-`check` reads the quote from stdin and prints the matched line number.
-`batch` reads JSONL findings (`id`, `file`, `line`, `quote`) and writes one
-result object per id. The later council shell 05 PR calls
+Run it with bash 4.4 or newer (jq is also needed for `batch`). Do not source
+it, and it is not a dual-shell library. The later council shell 05 PR calls
 `quote-ground.sh batch` for its Tier 1 check and adds the yellow-core catalog
 dependency.
+
+```bash
+printf '%s' "$quote" | bash lib/quote-ground.sh check <file> <line> [radius]
+bash lib/quote-ground.sh batch < findings.jsonl
+```
+
+- **Window.** A quote is grounded when, after per-line secret redaction,
+  `[REDACTED:<type>]` canonicalization and whitespace normalization (tabs to
+  spaces, CR dropped, spaces squeezed and trimmed), it is a substring of a
+  normalized line in `[line - radius, line + radius]`. `check` defaults the
+  radius to 3; `batch` always uses 3. Paths resolve against the repository
+  root and go through `validate_file_path` before any read.
+- **Too short.** A quote with fewer than 8 characters outside `[REDACTED]`
+  placeholders is `too-short` and never grounds. A placeholder matches whatever
+  secret the line held, so a quote can ground even when the text it hid differs
+  from the source.
+- **`check`.** The quote is stdin only. It prints the matched line number and
+  exits 0, exits 1 for `ungrounded`, `too-short` or `unsafe-path`, and exits 2
+  for usage, an invalid line or radius, a missing or unreadable target file, a
+  redaction failure, or a missing helper library. It validates its arguments
+  before it reads stdin.
+- **`batch`.** Input is JSONL, one object per line with `id` (string or
+  number), `file`, `line` (number or string) and `quote`. Output is one object
+  per input row, in input order: `{"id", "result", "matched_line"}`. `result`
+  is `grounded`, `ungrounded`, `too-short` or `unsafe-path`; `matched_line` is
+  a number only for `grounded` and `null` otherwise. A numeric id stays a
+  number. A missing file is `ungrounded` and is never opened; an unsafe path is
+  never read. A row with a usable id but a wrong-typed field is `ungrounded`
+  and does not affect its siblings. `batch` exits 2 with no result rows when a
+  line is not JSON, a row has no usable id, a cited file cannot be read, or
+  redaction fails.
+- **No temp files.** Unredacted source lines and quotes stay in process memory
+  and pipes.
 
 ## License
 

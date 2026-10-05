@@ -45,17 +45,23 @@ did not, and both were reproduced locally.
 1. Prefix every associative-array key built from data with a non-empty sentinel
    (`k:$line`, `p:$file`, `f:$file`). An empty quote or blank line is then a
    valid subscript.
-2. Do not decode through a process substitution. One `jq -j` pass writes the
-   NUL-framed fields to a temp file and its own exit status is checked. Reject a
-   field that contains U+0000 inside jq, because it would shift the framing.
+2. Do not decode through a process substitution whose status you ignore. One
+   `jq` pass decodes the rows, and a row that jq cannot decode fails the whole
+   input before any row is printed. Reject a field that contains U+0000 inside
+   jq, because it would shift the NUL framing.
 3. Read each file through a command substitution (`recs=$(awk ...) || exit 2`)
    instead of `< <(awk ...)`, so a read failure exits 2 rather than reporting an
    ungrounded quote.
 4. Emit output objects with one `jq -nc ... --args` call so jq escapes every
    control character; prefix each value with one character that jq strips so an
    id starting with `-` is never read as an option.
-5. Add a fail-fast `BASH_VERSINFO` guard (4.2 or newer) before the first
-   `declare -A`, and clamp the window loops to the loaded file's line count.
+5. Add a fail-fast `BASH_VERSINFO` guard (4.4 or newer, because an empty array
+   under `set -u` is an error before 4.4) before the first `declare -A`, and
+   clamp the window loops to the loaded file's line count.
+6. Keep unredacted text off disk: feed the redactor through a pipe, read the
+   decoded rows from a process substitution that prints a row count first (a
+   failed jq leaves the count unread, so the failure cannot hide), and use no
+   temp files at all, so there is nothing to clean up on `exit 2` or a signal.
 
 ## Why This Works
 

@@ -45,9 +45,11 @@ depends_on:
 ## Context
 
 The riskiest and final shell. Tier 1-2 evidence verification makes the council's
-citations mechanically checked instead of self-asserted: Tier 1 mode-dependent
-exact match (committed line for review mode, working tree with fallback for
-plan/debug/question modes), Tier 2 fuzzy similarity ≥85 via an optional
+citations mechanically checked instead of self-asserted: Tier 1 window match
+through `quote-ground.sh batch` (the cited line plus or minus 3 on the
+working-tree file, after redaction and whitespace normalization; the helper
+takes no ref, so a caller that needs a committed line checks that ref out
+first, and contexts with no checkout skip to Tier 2), Tier 2 fuzzy similarity ≥85 via an optional
 `rapidfuzz` dependency. Verification classifies findings into the five-bucket
 synthesis structure (never gates or discards), rewires the rubric's "correctness
 of cited evidence" dimension from self-assessed to verification-backed
@@ -215,9 +217,10 @@ Deferred out of shell 03. Each is a step below; do not drop them at expand time.
   leading/trailing `*`/`_` runs from any non-path word, so bare `__init__`,
   `_private_fn` or `*ptr` in prose become `init`, `private_fn`, `ptr` — which
   can break a finding's claim text that a reader relies on. F4 applies only to
-  the synthesis-side normalized copy; `verify_finding()` must compare the
-  verbatim cited excerpt against the source line (R22), so do not run F4 (or any
-  other normalizer pass) on the excerpt passed to verification. F4 narrows spec
+  the synthesis-side normalized copy; `verify_finding()` passes the
+  verbatim cited excerpt to `quote-ground.sh batch` (R22), which redacts and
+  whitespace-normalizes both the excerpt and the source line itself, so do not
+  run F4 (or any other normalizer pass) on the excerpt passed to verification. F4 narrows spec
   R10 (shell 03 stripped every edge emphasis run): a single word wrapped in
   underscore runs keeps its markers, so those leave a small style fingerprint;
   accepted because a lost identifier breaks evidence while a kept marker only
