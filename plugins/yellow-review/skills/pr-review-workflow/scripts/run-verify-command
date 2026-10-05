@@ -1,0 +1,809 @@
+#!/bin/bash
+# Run resolve_pr.verify_command before resolver fixes are committed. On
+# failure, timeout or interruption, save the resolver diff as a patch, revert
+# the listed files and report whether the tree is clean again.
+# Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted
+#                           [--unattended] [--ignored-since <marker-file>]
+#                           [--files-from <file>] [-- <files...>]
+#        run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]
+#        run-verify-command --pr <N> --revert-dirty
+#   --trusted:     required to run a command. The caller sets it only after
+#                  confirming the command came from an untracked config file
+#                  (unattended) or after the user approved it (interactive).
+#   --unattended:  also refuse to run the command when a file is a runner file
+#                  (a file a git hook, package manager or verify command would
+#                  execute); report result "skipped". Every run, attended or
+#                  not, skips when a file is outside the PR's changed files.
+#                  Requires --ignored-since (usage error, exit 2, without it).
+#   --ignored-since <marker-file>: guard for gitignored files, which the tree
+#                  listing cannot see (a resolver edit to an ignored executable
+#                  such as node_modules/.bin/<runner> would run with the
+#                  command). The caller touches <marker-file> before the
+#                  resolvers start; before running, any ignored regular file or
+#                  symlink with an mtime newer than the marker makes the run
+#                  refuse (exit 2, up to 20 paths named, never contents). An
+#                  ignored symlink is judged by its target too (a write through
+#                  it leaves the link's own mtime alone): a target file, or a
+#                  file inside a target directory, newer than the marker
+#                  refuses, a dangling target does not, and a target that cannot
+#                  be examined refuses (fail closed). A
+#                  marker that is missing, unreadable, a symlink or not a
+#                  regular file also refuses (fail closed), as does a listing
+#                  failure. Attended runs may omit it. The revert modes ignore
+#                  it. Ignored changes are refused, never reported as a clean
+#                  tree: treeClean covers tracked and untracked-unignored files.
+#   --revert-only: run nothing; save the patch and revert the listed files
+#                  (result "reverted"). Deny-listed paths may be reverted. A
+#                  listed file without changes is skipped and named in
+#                  "reason"; a gitignored or unverifiable one still aborts the
+#                  whole call (exit 2, nothing reverted). Reverting deletes a
+#                  listed file that is untracked and not ignored, whoever
+#                  created it: the pre-resolve state is not recorded (issue
+#                  #973), so pass only files a resolver edited. The patch saved
+#                  first holds its content unless the credential screen
+#                  withheld the patch. The screen also reads the file names in
+#                  the patch, so a credential-shaped name withholds it too.
+#                  A listed directory is removed only where HEAD has a regular
+#                  file (a replaced file); a tracked directory, a gitlink or an
+#                  untracked directory is refused (exit 2) so its untracked
+#                  files survive. The directory is removed after the recovery
+#                  patch is saved, and the patch holds the regular files and
+#                  symlinks inside it (as new files, after the deletion of the
+#                  replaced file), so they are recoverable unless the credential
+#                  screen withholds the patch.
+#   --revert-dirty: like --revert-only for every change in the tree, listed
+#                  by git itself (for refusals: never trust resolver text).
+#   --timeout, --command-file, --trusted and --unattended apply only when
+#   running a command; with either revert flag they are a usage error (exit 2).
+#   Running a command also requires the tree to have no changes outside the
+#   listed files.
+#   files:     repo-root-relative paths the resolvers modified, one per line
+#              in --files-from and/or after --; a path listed more than once
+#              counts once (first-seen order), so the recovery patch holds one
+#              diff per file and re-applies. When running a command, each
+#              must have changes, must not be gitignored and must not be on the
+#              resolver deny list (it is about to be executed and, on failure,
+#              reverted). Under --revert-only only the deny-list check is
+#              waived; --revert-dirty takes no list.
+# Output: JSON to stdout:
+#   {"result":"pass|fail|timeout|skipped|reverted","patch":"<path>|null",
+#    "log":"<path>|null","treeClean":true|false[,"reason":"..."]}
+#   "reason" explains a skipped run, a withheld patch, an interrupted run, a
+#   failed revert step, a log that is withheld or may be incomplete, a
+#   --revert-only entry skipped as unchanged, or a tree that is not clean.
+#   The revert modes run nothing and report "log": null. A passing command
+#   that left changes outside the listed files reports result "pass" with
+#   treeClean false and a reason; nothing is reverted.
+# Exit codes: 0 ran (read "result"), 2 refused or could not start: usage
+#   error (including run-only flags next to a revert flag, and --unattended
+#   without --ignored-since), no --trusted,
+#   unreadable --command-file or --files-from, not in a git repository, a
+#   refused path (not canonical, deny-listed when running, gitignored or
+#   unverifiable, or without changes when running), a change outside the
+#   listed files, an ignored file changed since the --ignored-since marker (or
+#   a marker or ignored-file listing that cannot be read), a tree listing or
+#   setup failure (library, output directory,
+#   log, temp file or pipe), or a recovery patch that could not be screened
+#   for credentials (nothing is reverted).
+# Signals: TERM, HUP and INT stop the command and its process group, then the
+#   resolver edits are saved and reverted as for a failure (result "fail",
+#   exit 0, reason names the signal). A signal while the pre-verification
+#   snapshot is written, before the command starts, removes the partial patch
+#   and exits 128+signal with the tree untouched.
+# Libraries: lib/resolve-paths.sh, sibling-plugin.sh, resolve-text.sh and
+#   verify-run.sh are sourced before any tree check. When the plugin's lib
+#   directory is inside the repository's working tree (a source checkout), each
+#   must be tracked, show tag H in `git ls-files -v` (not assume-unchanged or
+#   skip-worktree) and equal its blob in HEAD, else exit 2 naming the file and
+#   nothing is touched. Outside the repository (the installed cache) they are
+#   not judged.
+# Files: $(git rev-parse --git-common-dir)/yellow-review/resolve-patches/
+#        <pr>-<UTC ts>-<pid>.patch and .log, mode 0600; the newest 10 of each
+#        per PR are kept (other PRs' files are never pruned).
+#        The verifier's output is redacted on its way to disk: a FIFO feeds
+#        vr_redact_stream (which first cuts the stream into records of at most
+#        64 KiB, so no redaction filter buffers more than one record; a cut
+#        can sever a credential from its value, so if any record was cut the
+#        log is withheld with a notice instead of published), then tail
+#        keeps the last 1 MiB plus 64 KiB of context of the REDACTED stream in
+#        a private mktemp file (mode 0600) outside the git directory. The extra
+#        context keeps a credential label (`password: |`) that sits just before
+#        the 1 MiB boundary in view of the final scan of its value.
+#        Only after the final credential scan of that whole buffer are the last
+#        1 MiB of it (a partial first line dropped) copied to the .log path, so
+#        that path never holds raw output (an empty file until then), even
+#        across a crash. Residual: a SIGKILL or host loss mid-run cannot run the
+#        EXIT cleanup and leaves that 0600 temp file behind; it holds redacted
+#        text that has not passed the final scan, never the raw stream.
+# Env: YELLOW_REVIEW_NO_TIMEOUT_BIN=1 forces the watchdog fallback (tests).
+#      YELLOW_REVIEW_NET_TIMEOUT=<s> bounds the gh call that lists the PR's
+#      files (default 30); on expiry the run is skipped.
+# Contract: references/resolve/dispositions.md
+
+set -uo pipefail
+
+KILL_AFTER=10
+LOG_CAP_BYTES=1048576
+# Extra redacted bytes kept before the cap so the final scan sees a credential
+# label whose value starts the published suffix.
+LOG_CONTEXT_BYTES=65536
+KEEP=10
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd) || exit 2
+PLUGIN_ROOT=$(cd -- "$SCRIPT_DIR/../../.." && pwd) || exit 2
+
+# The libraries below run before any tree check. In a source checkout they sit
+# inside the repository's working tree, where a resolver can edit one, or hide
+# the edit with `git update-index --assume-unchanged|--skip-worktree`. So each
+# must be tracked, show the plain "H" tag in `ls-files -v` and equal its blob in
+# HEAD. Inline and plain git plumbing, because nothing is sourced yet
+# (--no-filters: a clean filter in .git/config would run a command). A lib
+# directory outside the repository (the installed cache) is not judged; a
+# repository that cannot be read here is left to the checks below.
+check_lib_integrity() {
+    local libdir top rel name st blob
+    libdir=$(cd -- "$PLUGIN_ROOT/lib" 2>/dev/null && pwd -P) || return 0
+    top=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+    top=$(cd -- "$top" 2>/dev/null && pwd -P) || { printf '[run-verify-command] Error: cannot resolve the repository root to verify the plugin libraries\n' >&2; return 1; }
+    case "$libdir" in "$top"/*) ;; *) return 0 ;; esac
+    rel="${libdir#"$top"/}"
+    for name in resolve-paths.sh sibling-plugin.sh resolve-text.sh verify-run.sh; do
+        st=$(git -C "$top" -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs \
+                ls-files -v --error-unmatch -- "$rel/$name" 2>/dev/null) \
+            && [ "${st:0:2}" = "H " ] \
+            && blob=$(git -C "$top" rev-parse --verify --quiet "HEAD:$rel/$name" 2>/dev/null) \
+            && [ -n "$blob" ] \
+            && [ "$(git -C "$top" hash-object --no-filters -- "$libdir/$name" 2>/dev/null)" = "$blob" ] \
+            || { printf '[run-verify-command] Error: %s is not tracked and unmodified (modified, untracked or hidden from git status); refusing to source it; the tree is untouched\n' "$rel/$name" >&2; return 1; }
+    done
+}
+check_lib_integrity || exit 2
+
+# shellcheck source=../../../lib/resolve-paths.sh
+. "$PLUGIN_ROOT/lib/resolve-paths.sh" || { printf '[run-verify-command] Error: cannot load lib/resolve-paths.sh\n' >&2; exit 2; }
+# shellcheck source=../../../lib/resolve-text.sh
+. "$PLUGIN_ROOT/lib/resolve-text.sh" || { printf '[run-verify-command] Error: cannot load lib/resolve-text.sh\n' >&2; exit 2; }
+# shellcheck source=../../../lib/verify-run.sh
+. "$PLUGIN_ROOT/lib/verify-run.sh" || { printf '[run-verify-command] Error: cannot load lib/verify-run.sh\n' >&2; exit 2; }
+
+die() { printf '[run-verify-command] Error: %s\n' "$2" >&2; exit "$1"; }
+
+# Bound the gh call that lists the PR's files (shadows gh for the sourced
+# rp_pr_files). Without a timeout binary it runs unbounded, as in
+# commit-resolve-fixes. A timeout fails the listing, which skips the run.
+NET_TIMEOUT="${YELLOW_REVIEW_NET_TIMEOUT:-30}"
+[[ "$NET_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "YELLOW_REVIEW_NET_TIMEOUT must be a positive integer"
+GH_BIN=$(command -v gh || true)
+gh() {
+    local t
+    [ -n "$GH_BIN" ] || return 127
+    if t=$(vr_timeout_bin); then
+        "$t" --kill-after=5 "$NET_TIMEOUT" "$GH_BIN" "$@"
+    else
+        "$GH_BIN" "$@"
+    fi
+}
+usage() {
+    printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] [--ignored-since <marker-file>] | --revert-only | --revert-dirty) [--files-from <file>] [-- <files...>]\n' >&2
+    printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required with --unattended\n' >&2
+    exit 2
+}
+
+# MODE: run (run the verify command), revert-only (revert the listed files) or
+# revert-dirty (revert every change git lists).
+MODE=run
+PR=""
+TIMEOUT=""
+COMMAND_FILE=""
+TRUSTED=0
+UNATTENDED=0
+IGNORED_SINCE=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --pr) [ $# -ge 2 ] || usage; PR="$2"; shift 2 ;;
+        --ignored-since) [ $# -ge 2 ] || usage; IGNORED_SINCE="$2"; shift 2 ;;
+        --timeout) [ $# -ge 2 ] || usage; TIMEOUT="$2"; shift 2 ;;
+        --command-file) [ $# -ge 2 ] || usage; COMMAND_FILE="$2"; shift 2 ;;
+        --trusted) TRUSTED=1; shift ;;
+        --unattended) UNATTENDED=1; shift ;;
+        --revert-only) [ "$MODE" = revert-dirty ] || MODE=revert-only; shift ;;
+        --revert-dirty) MODE=revert-dirty; shift ;;
+        --files-from)
+            [ $# -ge 2 ] || usage
+            rp_read_file_list "$2" || die 2 "--files-from not readable: $2"
+            shift 2
+            ;;
+        --) shift; RP_FILES+=("$@"); break ;;
+        *) usage ;;
+    esac
+done
+FILES=(${RP_FILES[@]+"${RP_FILES[@]}"})
+if [ "$MODE" != run ] && { [ -n "$TIMEOUT$COMMAND_FILE" ] || [ "$TRUSTED$UNATTENDED" != 00 ]; }; then
+    die 2 "--timeout, --command-file, --trusted and --unattended do not apply to --revert-only or --revert-dirty"
+fi
+
+[[ "$PR" =~ ^[1-9][0-9]*$ ]] || die 2 "--pr must be a positive integer"
+if [ "$MODE" = run ]; then
+    [ "$TRUSTED" = 1 ] || die 2 "refusing to run an untrusted verify command (pass --trusted only after the tracked-file check or user approval)"
+    [[ "$TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "--timeout must be a positive integer (seconds)"
+    [ -f "$COMMAND_FILE" ] && [ -r "$COMMAND_FILE" ] || die 2 "--command-file not readable: $COMMAND_FILE"
+    [ -n "$(tr -d '[:space:]' <"$COMMAND_FILE")" ] || die 2 "--command-file is empty"
+    COMMAND_FILE=$(cd -- "$(dirname -- "$COMMAND_FILE")" && pwd)/$(basename -- "$COMMAND_FILE")
+    # Unattended, nothing else sees resolver edits to gitignored files, so the
+    # marker is required. Resolve it now: the script changes directory below.
+    if [ "$UNATTENDED" = 1 ] && [ -z "$IGNORED_SINCE" ]; then
+        printf '[run-verify-command] Error: --unattended requires --ignored-since <marker-file> (touch the file before the resolvers start)\n' >&2
+        exit 2
+    fi
+    if [ -n "$IGNORED_SINCE" ]; then
+        [ -f "$IGNORED_SINCE" ] && [ ! -L "$IGNORED_SINCE" ] && [ -r "$IGNORED_SINCE" ] \
+            || die 2 "--ignored-since marker is not a readable regular file: $IGNORED_SINCE"
+        IGNORED_SINCE=$(cd -- "$(dirname -- "$IGNORED_SINCE")" && pwd)/$(basename -- "$IGNORED_SINCE") \
+            || die 2 "cannot resolve --ignored-since: $IGNORED_SINCE"
+    fi
+fi
+
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
+cd -- "$TOP" || die 2 "cannot enter $TOP"
+
+REASON=""
+add_reason() { REASON="${REASON:+$REASON; }$1"; }
+
+# Temp files and the output pipe; removed on every exit.
+CHANGES_FILE=""
+ADDED_FILE=""
+TEXT_FILE=""
+FIFO=""
+MARKER=""
+STREAM_FILE=""
+IGNORED_SCRATCH=""
+DIR_LIST=""
+# The snapshot is provisional until it is complete and credential-screened: any
+# exit before then (a signal, a die, a failed screen) removes it, so no
+# unscreened patch stays under .git.
+PATCH=""
+PATCH_PROVISIONAL=0
+cleanup() {
+    local f
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST"; do
+        [ -z "$f" ] || rm -f -- "$f"
+    done
+    if [ "$PATCH_PROVISIONAL" = 1 ] && [ -n "$PATCH" ]; then
+        rm -f -- "$PATCH"
+    fi
+}
+trap cleanup EXIT
+
+# Every change in the tree, as git lists it (rp_tree_changes: NUL-delimited,
+# fail-closed). Written to a 0600 temp file: a listing failure must stop the
+# run, never read as "clean".
+list_tree_changes() {
+    [ -n "$CHANGES_FILE" ] || CHANGES_FILE=$(mktemp) || return 1
+    rp_tree_changes "$CHANGES_FILE"
+}
+
+if [ "$MODE" != revert-only ]; then
+    list_tree_changes || die 2 "cannot list tree changes"
+fi
+
+if [ "$MODE" = revert-dirty ]; then
+    [ "${#FILES[@]}" -eq 0 ] || die 2 "--revert-dirty takes no file list"
+    while IFS= read -r -d '' f; do
+        [ -n "$f" ] && FILES+=("$f")
+    done <"$CHANGES_FILE"
+else
+    # KEEP_FILES is the deduplicated list (first-seen order). A path listed
+    # twice, in --files-from and/or after --, would otherwise put its diff into
+    # the recovery patch twice, and `git apply` rejects the second copy. A
+    # canonical path has one spelling, so an exact match is the same path.
+    KEEP_FILES=()
+    SEEN_FILES=()
+    for f in ${FILES[@]+"${FILES[@]}"}; do
+        rp_canonical "$f" || die 2 "path must be canonical and repo-relative: $f"
+        SEEN=0
+        for p in ${SEEN_FILES[@]+"${SEEN_FILES[@]}"}; do
+            [ "$p" = "$f" ] && { SEEN=1; break; }
+        done
+        [ "$SEEN" = 0 ] || continue
+        SEEN_FILES+=("$f")
+        # Reverting is always safe; the deny list only stops running and committing.
+        [ "$MODE" = run ] && rp_denied "$f" && die 2 "refusing a deny-listed path: $f"
+        # Fail closed unless check-ignore positively says "not ignored" (exit 1).
+        IGN=0
+        git check-ignore -q -- "$f" || IGN=$?
+        [ "$IGN" = 1 ] || die 2 "refusing a gitignored (or unverifiable) path: $f"
+        if [ -z "$(lgit_nohooks status --porcelain --untracked-files=all -- "$f")" ]; then
+            [ "$MODE" = run ] && die 2 "listed file has no changes: $f"
+            # Nothing to revert: do not abort the other files' revert.
+            add_reason "skipped, no changes: $f"
+            continue
+        fi
+        KEEP_FILES+=("$f")
+    done
+    FILES=(${KEEP_FILES[@]+"${KEEP_FILES[@]}"})
+fi
+
+if [ "$MODE" = run ]; then
+    # Never run a command while the tree has changes the list does not name.
+    d=$(rp_assert_only_listed "$CHANGES_FILE" ${FILES[@]+"${FILES[@]}"}) \
+        || die 2 "change outside the listed files: $d"
+
+    # Never run a command while a gitignored file is newer than the marker: the
+    # tree listing above cannot see ignored files, and one may be an executable
+    # the command runs (node_modules/.bin/<runner>). Exit 1 means files changed,
+    # exit 2 means the check could not tell; both refuse.
+    if [ -n "$IGNORED_SINCE" ]; then
+        IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"
+        IGN_RC=0
+        IGN_HITS=$(rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH") || IGN_RC=$?
+        rm -f -- "$IGNORED_SCRATCH"
+        case "$IGN_RC" in
+            0) ;;
+            1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: ${IGN_HITS//$'\n'/, }" ;;
+            *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
+        esac
+    fi
+
+    # Never execute files outside the PR (the resolver's list is untrusted),
+    # attended or not. Unattended also never runs runner files.
+    skip() {
+        jq -nc --arg why "$1" '{result: "skipped", patch: null, log: null, treeClean: true, reason: $why}'
+        exit 0
+    }
+    PR_FILES=$(rp_pr_files "$PR" 2>/dev/null) || skip "could not list the PR's changed files"
+    for f in ${FILES[@]+"${FILES[@]}"}; do
+        [ "$UNATTENDED" = 1 ] && rp_runner "$f" && skip "runner files changed: $f"
+        grep -qxF -- "$f" <<<"$PR_FILES" || skip "not one of the PR's changed files: $f"
+    done
+fi
+
+# Only a regular file or a symlink may reach `git diff` below: a FIFO blocks it
+# before any watchdog starts, and a socket, device or directory is no edit to
+# keep. Running refuses; the revert modes delete the entry without opening it,
+# so refusal cleanup still completes.
+TOP_REAL=$(pwd -P)
+TO_REMOVE=()
+DIR_REMOVE=()
+for f in ${FILES[@]+"${FILES[@]}"}; do
+    if [ -L "$f" ] || [ -f "$f" ] || [ ! -e "$f" ]; then
+        continue
+    fi
+    [ "$MODE" != run ] || die 2 "refusing a path that is not a regular file or symlink: $f"
+    if [ -d "$f" ] && [ ! -L "$f" ]; then
+        # A real directory (a resolver replaced a file with one): `rm -f` cannot
+        # remove it. Delete it recursively only after its physical path is
+        # confirmed inside the repo and is neither the root nor .git; rm -r
+        # never follows a symlink, and a symlinked parent that escapes the repo
+        # fails the containment check.
+        REAL=$(cd -P -- "$f" 2>/dev/null && pwd -P) \
+            || die 2 "cannot resolve the directory at: $f"
+        case "$REAL" in
+            "$TOP_REAL"|"$TOP_REAL/.git"|"$TOP_REAL/.git/"*) die 2 "refusing to remove a directory that is the repo root or .git: $f" ;;
+            "$TOP_REAL/"*) ;;
+            *) die 2 "refusing to remove a directory outside the repository: $f" ;;
+        esac
+        # An untracked nested repository, or a submodule's worktree (it holds a
+        # .git file), is listed as a single directory; its history and any
+        # untracked files in it are not ours to delete, so refuse rather than
+        # remove it.
+        NESTED=$(find -- "$f" -name .git -print -quit 2>/dev/null) \
+            || die 2 "cannot scan the directory for a nested repository: $f"
+        [ -z "$NESTED" ] || die 2 "refusing to remove a directory that contains a nested git repository: $f"
+        # Only a directory standing where HEAD has a regular file is a replaced
+        # file. A tracked directory (tree), a gitlink or nothing at HEAD holds
+        # work that `git checkout HEAD` would not bring back (untracked
+        # siblings), so refuse rather than remove it.
+        HEAD_TYPE=$(git cat-file -t "HEAD:$f" 2>/dev/null) || HEAD_TYPE=""
+        [ "$HEAD_TYPE" = blob ] \
+            || die 2 "refusing to remove a directory that is not a replaced file (HEAD has ${HEAD_TYPE:-nothing} there): $f"
+    fi
+    # Validated; the removal waits until the output setup below has succeeded,
+    # so a setup failure exits before anything is deleted that the checkout
+    # restoring the tracked file would never reach. A directory waits longer:
+    # the recovery patch must hold its files first (save_patch).
+    if [ -d "$f" ] && [ ! -L "$f" ]; then
+        DIR_REMOVE+=("$f")
+    else
+        TO_REMOVE+=("$f")
+    fi
+done
+
+# cwd is the top level, so the relative common dir resolves correctly (and
+# works on git older than 2.31, which lacks --path-format).
+COMMON=$(cd -- "$(git rev-parse --git-common-dir)" && pwd) || die 2 "cannot resolve the git common dir"
+OUT_DIR="$COMMON/yellow-review/resolve-patches"
+(umask 077 && mkdir -p -- "$OUT_DIR") || die 2 "cannot create $OUT_DIR"
+chmod 700 -- "$OUT_DIR" 2>/dev/null || true
+STAMP="$PR-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+PATCH="$OUT_DIR/$STAMP.patch"
+# Only a run has output to log; the revert modes report "log": null and leave
+# the kept logs of earlier runs alone.
+LOG=""
+if [ "$MODE" = run ]; then
+    LOG="$OUT_DIR/$STAMP.log"
+    (umask 077 && : >"$LOG") || die 2 "cannot create $LOG"
+fi
+
+# Setup succeeded: now remove the entries validated above.
+for f in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
+    rm -f -- "$f" 2>/dev/null
+    if [ -e "$f" ] || [ -L "$f" ]; then
+        die 2 "cannot remove a path that is not a regular file or symlink: $f"
+    fi
+    add_reason "removed without reading, not a regular file or symlink: $f"
+done
+
+RC=0
+TIMED_OUT=0
+LOG_WITHHELD=0
+SIGNALED=""
+CMD_PID=""
+WD_PID=""
+TAIL_PID=""
+
+# Stop the command's process group and the watchdog, then carry on to the
+# patch and revert steps. Repeat signals are ignored while it runs.
+on_signal() {
+    trap '' TERM HUP INT
+    [ -n "$SIGNALED" ] || SIGNALED="$1"
+    [ -z "$WD_PID" ] || kill -s TERM -- "-$WD_PID" 2>/dev/null
+    vr_stop_group "$CMD_PID" "$KILL_AFTER"
+}
+
+# Run the verify command in its own process group (set -m) with its output
+# streamed through a FIFO and the redactor into a private file that never holds
+# more than the cap, so a chatty command can neither fill the disk nor get
+# SIGPIPE. Sets RC, TIMED_OUT, SIGNALED and LOG_WITHHELD.
+run_verify() {
+    local cmd T start
+    cmd=$(cat -- "$COMMAND_FILE") || die 2 "cannot read --command-file: $COMMAND_FILE"
+    # Load the redactor before the verifier starts: the copy checked here is the
+    # copy that filters the stream. Unavailable: vr_redact_stream emits a notice.
+    vr_load_redactor "$PLUGIN_ROOT" || true
+    # Outside OUT_DIR on purpose: nothing under .git/yellow-review is written
+    # before redaction and the final scan.
+    STREAM_FILE=$(umask 077 && mktemp) || die 2 "cannot create the log temp file"
+    FIFO="$OUT_DIR/.$STAMP.fifo"
+    MARKER="$OUT_DIR/.$STAMP.timed-out"
+    rm -f -- "$MARKER"
+    (umask 077 && mkfifo "$FIFO") || die 2 "cannot create the output pipe"
+    trap 'on_signal TERM' TERM
+    trap 'on_signal HUP' HUP
+    trap 'on_signal INT' INT
+    set -m
+    # The redactor always drains the FIFO and tail holds at most the cap, so
+    # the command never blocks or gets SIGPIPE however much it prints. tail
+    # keeps the last bytes of the redacted stream (failures usually print last)
+    # and writes them when the stream ends: the cap plus LOG_CONTEXT_BYTES, so
+    # the final scan in vr_publish_log sees a credential label that precedes
+    # the published suffix. The subshell is its own job group,
+    # so vr_drain_log can kill redactor and tail together. The redactor cuts the
+    # stream into records of at most 64 KiB before its line-buffered sed passes
+    # (see vr_redact_filter), so memory is bounded by one record per filter, not
+    # by the tail cap, which sits downstream of them and bounds only the file.
+    ( vr_redact_stream <"$FIFO" | tail -c $((LOG_CAP_BYTES + LOG_CONTEXT_BYTES)) >|"$STREAM_FILE" ) &
+    TAIL_PID=$!
+    start=$SECONDS
+    if T=$(vr_timeout_bin); then
+        "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" bash -c "$cmd" >"$FIFO" 2>&1 </dev/null &
+        CMD_PID=$!
+    else
+        bash -c "$cmd" >"$FIFO" 2>&1 </dev/null &
+        CMD_PID=$!
+        ( vr_watchdog "$CMD_PID" "$TIMEOUT" "$MARKER" "$KILL_AFTER" ) &
+        WD_PID=$!
+    fi
+    set +m
+    # A signal that arrived before the group existed.
+    [ -z "$SIGNALED" ] || on_signal "$SIGNALED"
+    wait "$CMD_PID" || RC=$?
+    while [ -n "$SIGNALED" ] && kill -0 "$CMD_PID" 2>/dev/null; do
+        wait "$CMD_PID" || RC=$?
+    done
+    if [ -n "$SIGNALED" ]; then
+        [ "$RC" -ne 0 ] || RC=143
+    elif [ -z "$WD_PID" ]; then
+        # timeout(1) exits 124 on expiry, or 137 when it had to send KILL; the
+        # command can exit with either code itself, so also require the time.
+        case "$RC" in
+            124|137) [ $((SECONDS - start)) -ge "$TIMEOUT" ] && TIMED_OUT=1 ;;
+        esac
+    elif [ -e "$MARKER" ]; then
+        TIMED_OUT=1
+    fi
+    if [ -n "$WD_PID" ]; then
+        # After a real timeout let the watchdog finish its KILL escalation so
+        # a descendant that ignored TERM is dead before cleanup continues.
+        [ "$TIMED_OUT" = 1 ] || kill -s TERM -- "-$WD_PID" 2>/dev/null
+        wait "$WD_PID" 2>/dev/null
+    fi
+    # Stop anything the command left running in its group, even a process that
+    # redirected its output away from the FIFO: it must not outlive the
+    # cleanliness check and race the commit that follows.
+    vr_stop_group "$CMD_PID" "$KILL_AFTER"
+    # Anything in another session can still hold the log open.
+    vr_drain_log "$TAIL_PID" "$CMD_PID" "$LOG"
+    case $? in
+        1) LOG_WITHHELD=1; add_reason "log withheld: a process kept the output open after the command exited" ;;
+        2) add_reason "log may be incomplete: the output stream failed" ;;
+    esac
+    # The command is done: a later signal must not turn a pass into a fail.
+    trap '' TERM HUP INT
+    return 0
+}
+
+# Save the resolver diff before the command runs: a verifier that rewrites or
+# deletes a listed file and then fails must not change what the recovery patch
+# holds, because the revert below discards the tree. Every git call must
+# succeed, or the revert would destroy edits the patch does not hold.
+# `git diff --no-index` exits 1 when files differ. A file is a tracked edit
+# when it is in the index or in HEAD (a staged deletion is in HEAD only).
+# <fmt> is --binary for the kept patch and --text for the credential screen:
+# a binary-marked file still hides text a --binary patch would keep.
+# A listed directory standing where HEAD has a file (DIR_REMOVE) is still in
+# place: its deletion of the file blob is followed by the diff of every regular
+# file and symlink inside it, so the patch re-applies on HEAD. A file inside it
+# that is listed itself (--revert-dirty) has its own entry and is not repeated.
+save_patch() {
+    local out="$1" fmt="$2" f rc c p
+    umask 077
+    : >"$out" || return 1
+    for f in ${FILES[@]+"${FILES[@]}"}; do
+        # Fixed flags so the patch re-applies whatever the user's diff config.
+        if lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
+            || git cat-file -e "HEAD:$f" 2>/dev/null; then
+            lgit_nohooks diff --no-color --no-ext-diff --no-textconv "$fmt" \
+                --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$out" || return 1
+        elif [ -L "$f" ] || [ -f "$f" ]; then
+            # -L: a dangling symlink has no -e but is still an edit to keep.
+            # Never a FIFO or other special file: git diff would open it.
+            rc=0
+            git diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
+                --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$f" >>"$out" || rc=$?
+            [ "$rc" -le 1 ] || return 1
+        fi
+        if [ -d "$f" ] && [ ! -L "$f" ]; then
+            find "$f" \( -type f -o -type l \) -print0 | LC_ALL=C sort -z >|"$DIR_LIST" || return 1
+            while IFS= read -r -d '' c; do
+                for p in ${FILES[@]+"${FILES[@]}"}; do
+                    [ "$p" = "$c" ] && continue 2
+                done
+                rc=0
+                git diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
+                    --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$c" >>"$out" || rc=$?
+                [ "$rc" -le 1 ] || return 1
+            done <"$DIR_LIST"
+        fi
+    done
+}
+TEXT_FILE=$(mktemp) || die 2 "mktemp failed"
+DIR_LIST=$(mktemp) || die 2 "mktemp failed"
+ADDED_FILE=$(mktemp) || die 2 "mktemp failed"
+SAVE_BIN_OK=0 SAVE_TEXT_OK=0
+PATCH_OUT="$PATCH"
+PATCH_SCREENED=0
+
+# A resolver can paste a credential into a listed file. Do not archive it: drop
+# the patch and still revert, so the secret leaves the disk. The resolver's
+# edit is regenerable; a credential must not persist under .git. Screen a
+# forced-text diff with the FULL credential rules (including the keyword rules),
+# and treat a screen that cannot answer as a hit. A keyword-shaped value such as
+# `password = "hunter22"` would otherwise stay in the archived patch under .git
+# after the later commit scan refuses it; that refusal does not delete the patch.
+# A run screens the snapshot before the verifier starts, so a SIGKILL or a host
+# death during the verifier cannot leave an unscreened patch under .git. The
+# verifier's own output is screened separately, on its way to the log.
+# Every hunk line is screened, not only the added ones: a resolver that removes
+# a credential, or edits beside one, leaves it in a removed or context line of
+# the patch. Diff headers (index, ---/+++, mode and rename lines) are skipped by
+# position, as rt_added_lines does. The one header line that is kept is
+# diff --git: it names every path in the patch (replacement-directory files
+# included), and a credential in a file name would otherwise stay under .git.
+# The credential rules anchor a token prefix (ghp_, sk-, ...) at the start of a
+# word, and a path word starts with its directory, so the path is also emitted
+# once per suffix that follows a non-alphanumeric character, which gives a token
+# embedded in a name that anchor. The rules themselves are unchanged.
+# A hunk header keeps its trailing section text, which is file content.
+patch_hunk_lines() {
+    awk '
+        /^diff --git / {
+            h = 0
+            s = substr($0, 12)
+            n = length(s)
+            # "a/P b/P": screen P once, not twice.
+            if (n >= 5 && n % 2 == 1) {
+                pl = (n - 5) / 2
+                if (substr(s, 1, 2) == "a/" && substr(s, pl + 3, 3) == " b/" && substr(s, 3, pl) == substr(s, n - pl + 1)) s = substr(s, 3, pl)
+            }
+            print s
+            n = length(s)
+            for (i = 1; i < n; i++) if (substr(s, i, 1) !~ /[A-Za-z0-9]/) print substr(s, i + 1)
+            next
+        }
+        /^@@/ { h = 1; s = $0; if (sub(/^@@[^@]*@@ ?/, "", s) && s != "") print s; next }
+        h && /^[-+ ]/ { print substr($0, 2) }
+    '
+}
+screen_patch() {
+    if [ "$SAVE_TEXT_OK" != 1 ] || ! patch_hunk_lines <"$TEXT_FILE" >"$ADDED_FILE"; then
+        rm -f -- "$PATCH"
+        die 2 "cannot screen the recovery patch; the command was not run and the tree is untouched"
+    fi
+    rt_code_clean "$ADDED_FILE"
+    case $? in
+        0) ;;
+        1)
+            rm -f -- "$PATCH"
+            PATCH_OUT=""
+            add_reason "recovery patch withheld: patch lines or file names look like a credential"
+            ;;
+        *)
+            rm -f -- "$PATCH"
+            PATCH_OUT=""
+            add_reason "recovery patch withheld: the credential screen failed"
+            ;;
+    esac
+    PATCH_SCREENED=1
+}
+# A signal before the verify command starts (for example while a large diff is
+# written) leaves the tree untouched, so stop here: EXIT removes the provisional
+# patch. run_verify replaces these handlers once the command is running.
+early_signal() {
+    trap '' TERM HUP INT
+    exit $((128 + $1))
+}
+trap 'early_signal 15' TERM
+trap 'early_signal 1' HUP
+trap 'early_signal 2' INT
+PATCH_PROVISIONAL=1
+if [ "$MODE" = run ]; then
+    # Both snapshots must exist before the verifier runs: it may overwrite or
+    # delete a listed edit and fail, and the revert below needs a patch that
+    # still holds the resolver's work. Abort with the tree untouched.
+    (save_patch "$PATCH" --binary) && SAVE_BIN_OK=1
+    (save_patch "$TEXT_FILE" --text) && SAVE_TEXT_OK=1
+    if [ "$SAVE_BIN_OK" != 1 ] || [ "$SAVE_TEXT_OK" != 1 ]; then
+        rm -f -- "$PATCH"
+        die 2 "could not snapshot the listed files before the verify command; the command was not run and the tree is untouched"
+    fi
+    screen_patch
+    # Which listed paths exist now: a verifier that deletes or recreates one
+    # has lost the resolver's edit (checked after a passing run).
+    PRE_PRESENT=()
+    for f in ${FILES[@]+"${FILES[@]}"}; do
+        if [ -e "$f" ] || [ -L "$f" ]; then PRE_PRESENT+=("$f"); fi
+    done
+    run_verify
+fi
+
+# Publish the redacted, bounded stream to the log path after the final
+# credential scan. A log the stream job withheld already holds its notice.
+if [ -n "$LOG" ] && [ "$LOG_WITHHELD" != 1 ]; then
+    PUBLISH_RC=0
+    vr_publish_log "$STREAM_FILE" "$LOG" "$LOG_CAP_BYTES" || PUBLISH_RC=$?
+    [ "$PUBLISH_RC" -ne 3 ] || add_reason "log withheld: output had a record longer than 64 KiB"
+fi
+
+if [ "$MODE" = run ] && [ "$RC" -eq 0 ] && [ "$TIMED_OUT" = 0 ] && [ -z "$SIGNALED" ]; then
+    vr_prune "$OUT_DIR" "$PR" log "$KEEP"
+    # The command may have written files the resolvers did not list; the
+    # caller would then refuse to commit and revert verified fixes. Say so.
+    CLEAN=true
+    if ! list_tree_changes; then
+        CLEAN=false
+        add_reason "could not list tree changes after the verify command"
+    elif ! EXTRA=$(rp_assert_only_listed "$CHANGES_FILE" ${FILES[@]+"${FILES[@]}"}); then
+        CLEAN=false
+        add_reason "the verify command changed files outside the listed files: $EXTRA"
+    fi
+    # A verifier that restored or deleted a listed file and exited 0 has lost
+    # the resolver's edit; the snapshot is then the only copy. Fail closed: a
+    # status that cannot be read counts as lost.
+    LOST=""
+    for f in ${FILES[@]+"${FILES[@]}"}; do
+        if ! ST=$(lgit_nohooks status --porcelain --untracked-files=all -- "$f" 2>/dev/null) || [ -z "$ST" ]; then
+            LOST="${LOST:+$LOST, }$f"
+            continue
+        fi
+        PRESENT=0
+        [ -e "$f" ] || [ -L "$f" ] && PRESENT=1
+        WAS=0
+        for p in ${PRE_PRESENT[@]+"${PRE_PRESENT[@]}"}; do
+            [ "$p" = "$f" ] && WAS=1
+        done
+        [ "$PRESENT" = "$WAS" ] || LOST="${LOST:+$LOST, }$f"
+    done
+    if [ -z "$LOST" ]; then
+        jq -nc --arg log "$LOG" --arg why "$REASON" --argjson clean "$CLEAN" \
+            '{result: "pass", patch: null, log: $log, treeClean: $clean}
+             + (if $why == "" then {} else {reason: $why} end)'
+        rm -f -- "$PATCH" "$TEXT_FILE"
+        exit 0
+    fi
+    # Keep the snapshot and take the failure path: it screens and keeps the
+    # patch, reverts the listed files and reports "reverted".
+    VERIFY_LOST=1
+    add_reason "the verify command removed listed edits: $LOST"
+fi
+
+RESULT=fail
+[ "$TIMED_OUT" = 1 ] && RESULT=timeout
+[ "$MODE" != run ] && RESULT=reverted
+[ -z "${VERIFY_LOST:-}" ] || RESULT=reverted
+[ -z "$SIGNALED" ] || add_reason "interrupted by SIG$SIGNALED; the verify command was stopped"
+
+# Nothing may interrupt the save and the revert.
+trap '' TERM HUP INT
+
+# --- Save the resolver diff (tracked and untracked listed files) ---
+# In run mode the diff was saved before the command ran (see above), so a
+# verifier that rewrites or deletes a listed file cannot change what the
+# recovery patch holds. The other modes save it now.
+if [ "$MODE" != run ]; then
+    SAVE_BIN_OK=0 SAVE_TEXT_OK=0
+    (save_patch "$PATCH" --binary) && SAVE_BIN_OK=1
+    (save_patch "$TEXT_FILE" --text) && SAVE_TEXT_OK=1
+fi
+if [ "$SAVE_BIN_OK" != 1 ]; then
+    rm -f -- "$PATCH"
+    jq -nc --arg r "$RESULT" --arg log "$LOG" --arg why "$REASON" \
+        '{result: $r, patch: null, log: (if $log == "" then null else $log end), treeClean: false,
+          reason: (($why | if . == "" then "" else . + "; " end) + "could not save the recovery patch; nothing was reverted")}'
+    exit 0
+fi
+
+# Run mode screened the snapshot before the verifier started; the other modes
+# screen it now.
+[ "$PATCH_SCREENED" = 1 ] || screen_patch
+# Screened: a clean patch is kept, a flagged one is already removed.
+PATCH_PROVISIONAL=0
+
+# --- Revert the listed files ---
+REVERT_FAILS=()
+# The patch now holds the files of each replacement directory (save_patch), so
+# the directories can go; the checkout below restores the file in their place.
+for f in ${DIR_REMOVE[@]+"${DIR_REMOVE[@]}"}; do
+    rm -rf -- "$f" 2>/dev/null
+    if [ -e "$f" ] || [ -L "$f" ]; then
+        REVERT_FAILS+=("rm -r $f")
+    else
+        add_reason "removed a directory standing where a file was (its files are in the recovery patch): $f"
+    fi
+done
+for f in ${FILES[@]+"${FILES[@]}"}; do
+    if git cat-file -e "HEAD:$f" 2>/dev/null; then
+        # Hooks off: post-checkout and post-index-change would run any hook a
+        # resolver planted, including an ignored one under core.hooksPath.
+        lgit_nohooks checkout -q HEAD -- "$f" >/dev/null 2>&1 || REVERT_FAILS+=("git checkout $f")
+    else
+        # New file (untracked or only staged): drop it from the index too.
+        lgit_nohooks rm -q --cached --ignore-unmatch -- "$f" >/dev/null 2>&1 || REVERT_FAILS+=("git rm --cached $f")
+        rm -f -- "$f" 2>/dev/null || REVERT_FAILS+=("rm $f")
+    fi
+done
+if [ "${#REVERT_FAILS[@]}" -gt 0 ]; then
+    FAIL_LIST=""
+    n=0
+    for f in "${REVERT_FAILS[@]}"; do
+        n=$((n + 1))
+        [ "$n" -le 5 ] && FAIL_LIST="${FAIL_LIST:+$FAIL_LIST, }$f"
+    done
+    [ "$n" -le 5 ] || FAIL_LIST="$FAIL_LIST (+$((n - 5)) more)"
+    add_reason "revert failed: $FAIL_LIST"
+fi
+
+# The caller starts from a clean tree, so any remaining change (tracked or
+# untracked) means the revert did not fully restore it. A status that cannot
+# be read is not clean.
+CLEAN=true
+if ! STATUS=$(git -c core.hooksPath=/dev/null status --porcelain --untracked-files=all 2>/dev/null) || [ -n "$STATUS" ]; then
+    CLEAN=false
+    [ "${#REVERT_FAILS[@]}" -gt 0 ] || add_reason "changes remain after the revert"
+fi
+
+[ -z "$LOG" ] || vr_prune "$OUT_DIR" "$PR" log "$KEEP"
+vr_prune "$OUT_DIR" "$PR" patch "$KEEP"
+jq -nc --arg r "$RESULT" --arg p "$PATCH_OUT" --arg log "$LOG" --arg why "$REASON" --argjson clean "$CLEAN" \
+    '{result: $r, patch: (if $p == "" then null else $p end), log: (if $log == "" then null else $log end), treeClean: $clean}
+     + (if $why == "" then {} else {reason: $why} end)'
+exit 0

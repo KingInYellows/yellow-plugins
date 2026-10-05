@@ -164,7 +164,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   rails and inline MIT attribution so the rules survive on hosts with no
   tool restriction (not user-invocable)
 
-### Scripts (7)
+### Scripts (9)
 
 - `get-pr-comments [--include-outdated] <owner/repo> <pr>` — Fetch unresolved
   PR review threads via GitHub GraphQL API; outdated threads are excluded
@@ -187,6 +187,14 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `check-resolve-text <file>...` — Refuse resolver-written text that looks
   like a credential, or has an image, an `@` mention or a foreign URL (for
   text posted outside the resolve scripts); exits 6
+- `commit-resolve-fixes` — Stage the resolver files, add a new commit and
+  verify the result; refuses paths outside the PR, deny-listed paths,
+  credential-shaped added lines and (`--unattended`) runner files. Not yet
+  invoked by `/review:resolve`; see `references/resolve/dispositions.md`
+- `run-verify-command` — Run `resolve_pr.verify_command` under a timeout; on
+  failure save a patch and revert the files (`--unattended` skips runner
+  files; `--revert-only`, `--revert-dirty`). Not yet invoked by
+  `/review:resolve`; see `references/resolve/dispositions.md`
 - `file-line-counts <diff-base-ref>` — Authoritative base/head line counts per
   changed file for `thermonuclear-reviewer`'s size-threshold rule; the
   header and footer rows are its completeness signal
@@ -196,6 +204,8 @@ resolution, and sequential stack review. Graphite-native workflow.
 `reply-pr-thread` and `file-followup-issue` exit 7 on a permanent GitHub
 refusal (not authenticated; for the issue script also no permission or Issues
 disabled).
+`commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`
+and `lib/verify-run.sh`.
 
 All live at `skills/pr-review-workflow/scripts/` and are invoked as
 `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/<name>`.
@@ -204,15 +214,17 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
 
 - `lib/resolve-text.sh` (POSIX sh, sourced by `reply-pr-thread`,
   `file-followup-issue` and `check-resolve-text`) — the text screen for
-  resolver-written text; a match means the text is never posted. One function,
-  `rt_text_clean <file>`, returns 0 only when the scan ran and found nothing,
-  1 for a credential shape, markdown image, `@` mention or foreign URL, and 2
-  when the scan did not run (unreadable file, awk failing). On 1 it sets
-  `RT_HIT_RULE` and `RT_HIT_LINE`, and `rt_report_refusal` prints a
-  `resolve-text:` stderr line (never the text): `refused rule=<rule> line=<n>`
-  for a hit, `scan failed` when the scan did not run. The scripts exit 6 on a
-  refusal; callers key on the code and keep the line as detail. The one URL
-  host allowed is `RT_ALLOWED_HOST`, else `GH_HOST`, else `github.com`.
+  resolver-written text; a match means the text is never posted. Two functions
+  share one convention (0 clean, 1 a hit, 2 the scan did not run):
+  `rt_text_clean <file>` for text posted publicly (credential shapes plus a
+  markdown image, `@` mention or foreign URL) and `rt_code_clean [--strict]
+  <file>` for code, diffs and logs, where those are ordinary (credential rules
+  only; `--strict` keeps the high-precision ones). On 1 they set `RT_HIT_RULE`
+  and `RT_HIT_LINE`, and `rt_report_refusal` prints a `resolve-text:` stderr
+  line (never the text): `refused rule=<rule> line=<n>` for a hit, `scan
+  failed` when the scan did not run. The posting scripts exit 6 on a refusal;
+  callers key on the code and keep the line as detail. The one URL host
+  allowed is `RT_ALLOWED_HOST`, else `GH_HOST`, else `github.com`.
 - `lib/resolve-gh.sh` (POSIX sh, sourced by `reply-pr-thread`,
   `file-followup-issue` and `get-pr-blockers`) — runs `gh` through `rg_gh`
   under `YELLOW_REVIEW_GH_TIMEOUT` (default 30 s) and returns 124 on a
@@ -221,6 +233,17 @@ All live at `skills/pr-review-workflow/scripts/` and are invoked as
   (`rg_is_rate_limited`, `rg_is_auth_failure`, `rg_is_permission_denied`) the
   scripts share; test a rate limit before a permission failure, since a
   secondary rate limit is also an HTTP 403.
+- `lib/resolve-paths.sh` (bash, sourced by `commit-resolve-fixes` and
+  `run-verify-command`) — canonical-path check, the case-insensitive resolver
+  deny list, and the runner-file list (files a git hook or verify command
+  would execute)
+- `lib/verify-run.sh` (bash, sourced by `run-verify-command`) — timeout,
+  process-group and redacted-log helpers for the verify run
+- `lib/sibling-plugin.sh` (bash, sourced by `review-ledger.sh` and
+  `resolve-paths.sh`) — `sp_sibling_file`, the one lookup of a file in a
+  sibling plugin: the source tree first, then the newest numeric version in
+  the installed cache. `review-ledger.sh` checks `RL_CORE_LIB` before calling
+  it; the helper itself has no override.
 - `lib/review-ledger.sh <subcommand>` — the durable review-findings ledger
   (plans/review-findings-ledger.md): an append-only JSONL file per PR at
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`,
@@ -396,7 +419,8 @@ explicit-invocation wording live in the skill body and description.
 
 `bats tests/` from the plugin directory — `get-pr-comments.bats`,
 `get-pr-blockers.bats`, `reply-pr-thread.bats`, `file-followup-issue.bats`,
-`check-resolve-text.bats`, `resolve-pr-thread.bats` (GraphQL fixtures in
+`check-resolve-text.bats`, `resolve-paths.bats`, `commit-resolve-fixes.bats`,
+`run-verify-command.bats`, `resolve-pr-thread.bats` (GraphQL fixtures in
 `tests/fixtures/`, fake `gh` in `tests/mocks/gh`), `file-line-counts.bats`
 (pins the thermonuclear line-count invariant alongside
 `skills/pr-review-workflow/scripts/file-line-counts`),

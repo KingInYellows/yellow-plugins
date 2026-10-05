@@ -41,3 +41,6 @@ print a `resolve-text: refused rule=... line=...` line, never the text) and
 `lib/resolve-gh.sh` (`YELLOW_REVIEW_GH_TIMEOUT` and the shared failure
 classifiers for `reply-pr-thread`, `file-followup-issue` and
 `get-pr-blockers`).
+
+The ledger's yellow-core lookup and the path rules' sibling-plugin lookup share
+one helper, `lib/sibling-plugin.sh` (`sp_sibling_file`), instead of two copies.

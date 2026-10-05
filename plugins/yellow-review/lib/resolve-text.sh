@@ -1,6 +1,6 @@
 # shell-compat: library
-# Shared by reply-pr-thread, file-followup-issue and check-resolve-text
-# (POSIX sh; sourced).
+# Shared by reply-pr-thread, file-followup-issue, check-resolve-text and
+# commit-resolve-fixes (POSIX sh; sourced).
 # Resolver-written text is posted publicly under the user's account, and a
 # review comment can steer the resolver into quoting a file it read. Refuse
 # (never redact-and-post) anything that looks like a credential.
@@ -9,28 +9,24 @@
 # (lib/review-ledger.sh): those redact text that is then kept, and yellow-core
 # is not a dependency of the resolve scripts. This one answers a different
 # question (refuse or not), so it flags broader shapes (URL userinfo,
-# Authorization/Bearer, NAME_KEY=value) and fails closed. When a vendor
+# Authorization/Bearer, NAME_KEY=value, DEVIN_ORG_ID=value) and fails closed. When a vendor
 # prefix is added to one scanner, check the other.
 # shellcheck shell=sh
 
-# rt_text_clean <file>: exit 0 only when the scan ran and found nothing to
-# refuse. Status 1 means the text has a credential shape or a shape unsafe to
-# post publicly (markdown image, @mention, foreign URL); status 2 means the
-# scan did not run (unreadable file, awk missing or erroring). A caller that
-# refuses on non-zero fails closed instead of posting unscanned text. On
-# status 1, RT_HIT_RULE and RT_HIT_LINE name the rule and line that matched
-# (see rt_report_refusal); both are empty otherwise.
-# A missing or unreadable file returns 2 before the scan: the failed
-# `< "$1"` redirect below would otherwise leave an awk-style status that
-# reads as clean.
-# RT_ALLOWED_HOST (default GH_HOST, else github.com) is the one host a URL in
-# the text may name.
-rt_text_clean() {
+# _rt_scan <strict> <file>: exit 0 when the file contains a credential shape.
+# strict=0 applies every rule; strict=1 only the high-precision ones (private
+# key blocks, known token prefixes, long mixed-case tokens), so code that
+# merely assigns to a variable named password or token does not match.
+# 1 means clean, anything else means the scan itself failed. On a hit,
+# RT_HIT_RULE and RT_HIT_LINE name the rule and line that matched (see
+# rt_report_refusal). A missing or unreadable file returns 2: the failed
+# `< "$2"` redirect below would otherwise leave status 1, which reads as clean.
+_rt_scan() {
     RT_HIT_RULE=""
     RT_HIT_LINE=""
-    [ -f "$1" ] && [ -r "$1" ] || return 2
+    [ -f "$2" ] && [ -r "$2" ] || return 2
     _rt_awk_rc=0
-    _rt_out=$(awk '
+    _rt_out=$(awk -v strict="$1" '
         # flag(rule): the first hit wins; END reports its rule and line,
         # never the matched text.
         # An optional line names the line a multi-line value started on.
@@ -271,7 +267,12 @@ rt_text_clean() {
         # suffix list already covers the uppercase compounds: `SECRET_KEY`,
         # `PRIVATE_KEY` and `ACCESS_KEY` end in `_KEY`, `CLIENT_SECRET` and
         # `API_SECRET` in `_SECRET`.
-        /(^|[^A-Za-z0-9_])[A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_PASSWORD|_PASS_?PHRASE|_PASS_?CODE)[ \t]*[=:][ \t]*["\047]?[A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-]/ { flag("name-key-assignment") }
+        !strict && /(^|[^A-Za-z0-9_])[A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_PASSWORD|_PASS_?PHRASE|_PASS_?CODE)[ \t]*[=:][ \t]*["\047]?[A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-]/ { flag("name-key-assignment") }
+        # DEVIN_ORG_ID=value, same literal-looking rule. AGENTS.md prohibits
+        # committing that exact name; `_ID` names in general (USER_ID=12345678)
+        # are ordinary code, so no `_ID` suffix rule (the log redactor in
+        # lib/verify-run.sh blanks every `_ID`, but it redacts, this refuses).
+        !strict && /(^|[^A-Za-z0-9_])DEVIN_ORG_ID[ \t]*[=:][ \t]*["\047]?[A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-]/ { flag("name-key-assignment") }
         {
             # A CRLF file leaves \r on the token, which would hide an
             # all-letter literal from the value rules below.
@@ -302,7 +303,7 @@ rt_text_clean() {
             # "string"` is not. The keyword must start a word, as in the
             # unquoted branch below: `bypass="false"` is not a `pass`
             # keyword, but camelCase `userPassword="..."` is.
-            r = l
+            r = strict ? "" : l
             base = 0
             while (match(r, kw "[\"\047]?[ \t]*[=:][ \t]*[\"\047]")) {
                 start = base + RSTART
@@ -332,7 +333,7 @@ rt_text_clean() {
             # before it disqualifies it unless the keyword itself starts with
             # a capital (camelCase `userPassword`). A value with a digit is
             # flagged either way.
-            r = l
+            r = strict ? "" : l
             base = 0
             while (match(r, kw "[ \t]*[=:][ \t]*[^ \t\"\047,;)]+")) {
                 seg = substr(r, RSTART, RLENGTH)
@@ -476,7 +477,9 @@ rt_text_clean() {
                     mv = length(v)
                     if (v ~ /^(ghp|gho|ghu|ghs|ghr)_/ && mv >= 24) flag("token-prefix")
                     if (v ~ /^github_pat_/ && mv >= 30) flag("token-prefix")
-                    if (v ~ /^AKIA[0-9A-Z]/ && mv >= 20) flag("token-prefix")
+                    if (v ~ /^(AKIA|ASIA)[0-9A-Z]/ && mv >= 20) flag("token-prefix")
+                    if (v ~ /^glpat-/ && mv >= 26) flag("token-prefix")
+                    if (v ~ /^AIza[0-9A-Za-z_-]/ && mv >= 39) flag("token-prefix")
                     if (v ~ /^xox[abprs]-/ && mv >= 14) flag("token-prefix")
                     if (v ~ /^sk-/ && mv >= 23) flag("token-prefix")
                     if (v ~ /^(sk|rk|pk)_live_/ && mv >= 24) flag("token-prefix")
@@ -528,16 +531,58 @@ rt_text_clean() {
             if (hit) print hitrule, hitline
             exit hit ? 0 : 1
         }
-    ' < "$1") || _rt_awk_rc=$?
-    case "$_rt_awk_rc" in
-        0)
-            RT_HIT_RULE=${_rt_out%% *}
-            RT_HIT_LINE=${_rt_out##* }
-            return 1
-            ;;
-        1) ;;
+    ' < "$2") || _rt_awk_rc=$?
+    if [ "$_rt_awk_rc" -eq 0 ]; then
+        RT_HIT_RULE=${_rt_out%% *}
+        RT_HIT_LINE=${_rt_out##* }
+    fi
+    return "$_rt_awk_rc"
+}
+
+# rt_report_refusal [label]: after rt_text_clean (or rt_code_clean) returned
+# non-zero, print the one stderr
+# token every resolve script uses for refused text, so a caller can tell it
+# from a usage error that also exits 2. It names the rule and the line,
+# never the text. A scan that did not run reports `scan failed`.
+rt_report_refusal() {
+    if [ -n "${RT_HIT_RULE:-}" ]; then
+        printf 'resolve-text: refused rule=%s line=%s%s\n' "$RT_HIT_RULE" "$RT_HIT_LINE" "${1:+ in=$1}" >&2
+    else
+        printf 'resolve-text: scan failed%s\n' "${1:+ in=$1}" >&2
+    fi
+}
+
+# rt_code_clean [--strict] <file>: the credential rules alone, for code, diffs
+# and logs, where an @, a URL or an image is ordinary. Exit 0 only when the scan
+# ran and found no credential shape; 1 for a credential shape; 2 when the scan
+# did not run (unreadable file, awk missing or erroring). --strict applies only
+# the high-precision rules (private key blocks, known token prefixes, long
+# mixed-case tokens), so a variable merely assigned to a name such as password
+# or token does not match. On status 1, RT_HIT_RULE and RT_HIT_LINE name the
+# rule and line that matched; both are empty otherwise.
+# The status is captured explicitly, so a bare call under `set -e` returns it.
+rt_code_clean() {
+    _rt_strict=0
+    if [ "${1:-}" = --strict ]; then _rt_strict=1; shift; fi
+    _rt_rc=0
+    _rt_scan "$_rt_strict" "$1" || _rt_rc=$?
+    case "$_rt_rc" in
+        0) return 1 ;;
+        1) return 0 ;;
         *) return 2 ;;
     esac
+}
+
+# rt_text_clean <file>: exit 0 only when the scan ran and found nothing to
+# refuse. Status 1 means the text has a credential shape or a shape unsafe to
+# post publicly (markdown image, @mention, foreign URL); status 2 means the
+# scan did not run. A caller that refuses on non-zero fails closed instead of
+# posting unscanned text. On status 1, RT_HIT_RULE and RT_HIT_LINE name the rule
+# and line that matched (see rt_report_refusal); both are empty otherwise.
+# RT_ALLOWED_HOST (default GH_HOST, else github.com) is the one host a URL in
+# the text may name. For code and logs use rt_code_clean.
+rt_text_clean() {
+    rt_code_clean "$1" || return $?
     # No credential shape. The text is also posted publicly under the user's
     # account, so refuse the shapes that notify people or load remote content.
     _rt_awk_rc=0
@@ -606,14 +651,10 @@ rt_text_clean() {
     esac
 }
 
-# rt_report_refusal [label]: after rt_text_clean returned non-zero, print the one stderr
-# token every resolve script uses for refused text, so a caller can tell it
-# from a usage error that also exits 2. It names the rule and the line,
-# never the text. A scan that did not run reports `scan failed`.
-rt_report_refusal() {
-    if [ -n "${RT_HIT_RULE:-}" ]; then
-        printf 'resolve-text: refused rule=%s line=%s%s\n' "$RT_HIT_RULE" "$RT_HIT_LINE" "${1:+ in=$1}" >&2
-    else
-        printf 'resolve-text: scan failed%s\n' "${1:+ in=$1}" >&2
-    fi
+# rt_added_lines: read a unified diff on stdin, print its added lines without
+# the leading "+". Only lines inside hunks count (a file header is skipped by
+# position, so an added "++ x" line is still printed). Feed the output to
+# rt_code_clean.
+rt_added_lines() {
+    awk '/^diff --git / { h = 0; next } /^@@/ { h = 1; next } h && /^\+/ { print substr($0, 2) }'
 }

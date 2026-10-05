@@ -34,6 +34,8 @@ RL_EXIT_CLOSED=5
 RL_EXIT_UNVERIFIABLE=6
 
 RL_SELF_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
+# shellcheck source=sibling-plugin.sh
+. "$RL_SELF_DIR/sibling-plugin.sh"
 RL_VOCAB="${RL_VOCAB:-$RL_SELF_DIR/review-ledger-vocab.json}"
 RL_LOCK_WAIT="${RL_LOCK_WAIT:-10}"
 RL_CTAGS_TIMEOUT="${RL_CTAGS_TIMEOUT:-2}"
@@ -278,32 +280,17 @@ rl_writer_gate() {
 # --- redaction (P3) ---------------------------------------------------------
 
 # Locate yellow-core's compound-staging.sh. RL_CORE_LIB, when set, is the
-# only candidate (tests use it to simulate a missing dependency). Otherwise:
-# the repository layout (plugins/<name>/ siblings), then the installed cache
-# layout (cache/<marketplace>/<plugin>/<version>/), newest version first —
-# `${CLAUDE_PLUGIN_ROOT}/../yellow-core` alone never resolves in the cache.
+# only candidate (tests use it to simulate a missing dependency). Otherwise
+# sp_sibling_file looks in the repository layout (plugins/<name>/ siblings),
+# then the installed cache layout (cache/<marketplace>/<plugin>/<version>/),
+# newest version first — `${CLAUDE_PLUGIN_ROOT}/../yellow-core` alone never
+# resolves in the cache.
 rl_core_lib_path() {
-  local root cand ver
   if [ -n "${RL_CORE_LIB+x}" ]; then
     [ -f "$RL_CORE_LIB" ] && printf '%s' "$RL_CORE_LIB"
     return
   fi
-  root="${CLAUDE_PLUGIN_ROOT:-$RL_SELF_DIR/..}"
-  cand="$root/../yellow-core/lib/compound-staging.sh"
-  if [ -f "$cand" ]; then
-    printf '%s' "$cand"
-    return
-  fi
-  if [ -d "$root/../../yellow-core" ]; then
-    ver=$(for cand in "$root/../../yellow-core"/*/; do
-      cand=$(basename -- "$cand")
-      [[ "$cand" =~ ^[0-9]+(\.[0-9]+)*$ ]] && printf '%s\n' "$cand"
-    done | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)
-    cand="$root/../../yellow-core/$ver/lib/compound-staging.sh"
-    if [ -n "$ver" ] && [ -f "$cand" ]; then
-      printf '%s' "$cand"
-    fi
-  fi
+  sp_sibling_file "${CLAUDE_PLUGIN_ROOT:-$RL_SELF_DIR/..}" yellow-core lib/compound-staging.sh || true
 }
 
 RL_CORE_STATE=''

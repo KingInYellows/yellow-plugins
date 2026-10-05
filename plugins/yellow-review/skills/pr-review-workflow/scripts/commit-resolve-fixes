@@ -1,0 +1,906 @@
+#!/bin/bash
+# Stage the resolver-touched files, commit them as a NEW commit, submit via
+# the active stacked-PR provider, and verify the remote head.
+# Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg>
+#                             [--unattended] [--allow-credential-shaped]
+#                             [--files-from <file>] [-- <files...>]
+#   files:   repo-root-relative paths the resolvers modified, one per line in
+#            --files-from and/or after --. Resolver output is untrusted, so
+#            callers pass it through --files-from, never on a command line.
+#            Paths must be canonical, on the PR's changed-file list and off
+#            the deny list; --unattended also refuses runner files, which the
+#            commit's git hooks would execute (lib/resolve-paths.sh). With
+#            no files and a clean tree the result is NOOP.
+#   Added lines that look like a credential are refused (exit 3, stderr
+#   "credential-shaped") unless --allow-credential-shaped is passed, which an
+#   interactive caller does only after the user confirms a second time.
+#   The same check runs again on the commit itself: a credential a git hook
+#   added is refused with exit 4 (the commit is undone), not 3. The override
+#   excuses only the added lines the user approved (those of the pre-commit
+#   staged diff); any other added line in the commit is scanned and refused.
+#   --allow-credential-shaped together with --unattended is a usage error
+#   (exit 2): the override needs a human.
+#   message: one line starting with a conventional `fix` prefix; carries
+#            counts and paths only, never reviewer text. It is screened like
+#            public text (rt_text_clean: credential shapes, images, mentions,
+#            foreign URLs) before anything is staged; a hit is exit 2 with the
+#            `resolve-text: refused rule=... line=...` token on stderr, never
+#            the text. --allow-credential-shaped does not excuse it.
+# Output: JSON to stdout: {"status":"PUSHED|NOOP","sha":"...","branch":"..."}
+# Exit codes: 2 usage (including --allow-credential-shaped with
+#             --unattended and a message that fails the screen above),
+#             3 a plugin library that is modified or hidden (see Libraries),
+#             a repository-local transport command or a tool on PATH inside
+#             the repository (see Transport commands, Tools),
+#             staged mismatch, refused path,
+#             pre-commit credential-shaped refusal, an untracked or ignored
+#             hook file, a hooks path through an in-tree symlink, or a remote that does not push to the PR's head
+#             repository (unparseable push URL, other scheme, host or
+#             owner/repo; nothing committed), 4 commit failed
+#             (or no new commit appeared, changes remain staged, the
+#             commit's files or added lines differ from the checked set
+#             (including a credential a hook added), or the tree is dirty
+#             after it, e.g. a hook changed or created files; the commit is
+#             then undone and its changes left unstaged for the caller's
+#             revert; on Graphite the upstack is restacked back onto the
+#             reset branch, or stderr tells the user to run `gt restack`),
+#             5 submit failed or timed out, 6 verify mismatch or a
+#             verify call timed out. After 5 or 6 the commit exists locally:
+#             resubmit through the provider rather than re-running this
+#             script (a re-run sees a clean tree: NOOP).
+# Env: YELLOW_REVIEW_GITHUB_STACK_RUNTIME — path to github-stack-runtime.js
+#        (default: the sibling github-workflow plugin).
+#      YELLOW_REVIEW_VERIFY_BACKOFF (default "2 4 8 16") — seconds between
+#        PR head checks after the first.
+#      YELLOW_REVIEW_SUBMIT_TIMEOUT (default 300) and
+#      YELLOW_REVIEW_NET_TIMEOUT (default 30) — seconds allowed for the
+#        provider submit and for each gh / git ls-remote call, enforced with
+#        the timeout binary lib/verify-run.sh's vr_timeout_bin finds (timeout
+#        or gtimeout, one that supports --kill-after; the same detector
+#        run-verify-command uses). Without one the calls run unbounded and
+#        one warning is printed before the first network call. Worst case
+#        with the defaults is under 600 s, the caller's Bash budget.
+#      YELLOW_REVIEW_NO_TIMEOUT_BIN=1 — treat no timeout binary as found
+#        (tests).
+# Provider calls, pinned to plugins/yellow-core/lib/stack-operation-registry.js
+# (no validator scans scripts, so change both together):
+#   commitOrAmend  graphite `gt modify -c -m` (registry: `gt modify -m`, plus
+#                  -c for a new commit); github `git commit -m`
+#   submitStack    graphite `gt submit --no-interactive` (+ --no-edit);
+#                  github runtime `submit` (the runtime adds --auto itself)
+#   rebaseUpstack  graphite `gt restack --upstack` (registry: `gt restack`; the
+#                  flag limits it to the branches above the reset one)
+#   abortConflict  graphite `gt abort`
+# Remote: resolved before anything is staged, and its push URL
+# (`git remote get-url --push --all`; https, http, ssh, git or scp-style,
+# case-insensitive, .git optional) must name the PR's head repository on the
+# active GitHub host, else exit 3. A remote with several push URLs pushes to all
+# of them, so every one must pass the host, port and repository checks, and the
+# post-push `git ls-remote` runs against every one (a stale one exits 6). A
+# branch pushRemote or remote.pushDefault that is "." or not the name of a
+# configured remote (a URL, say) exits 3 before staging, whatever the provider. The active host is GH_HOST when set, else
+# the host of the PR's URL (ssh.github.com and www.github.com count as
+# github.com); none known fails closed. Any other scheme (file, ext, ftp ...)
+# and a URL that cannot be parsed fail closed too; no message prints a URL.
+# Hooks: the commit and the submit run with git hooks disabled
+# (core.hooksPath=/dev/null through GIT_CONFIG_COUNT, checked, one stderr note)
+# unless YELLOW_REVIEW_COMMIT_HOOKS=1: a tracked hook, even one equal to HEAD, is
+# code the PR controls and would run with submission authority. With the opt-in
+# the checks that follow apply. The effective hooks directory (core.hooksPath
+# honoured) must not hold
+# untracked or ignored files when it lies inside the working tree, else exit 3
+# before anything is staged: the commit would run them and the dirty-set check
+# cannot see them (lib/resolve-paths.sh rp_hooks_untracked). A hooks path that
+# passes through a symlink located inside the working tree (a symlinked
+# .hooks, or .git/hooks) is refused the same way, whatever it points to. A
+# hook file in .git/hooks or in a hooks directory outside the working tree
+# cannot be verified, so the commit and the submit run with git hooks disabled
+# (GIT_CONFIG_COUNT override, checked) and a note on stderr. So do they when a
+# tracked file in an in-tree hooks directory is hidden from status
+# (assume-unchanged or skip-worktree: `ls-files -v` tag other than H).
+# core.fsmonitor and core.untrackedCache are forced off for every git call,
+# including the commit and the child gt and git (GIT_CONFIG_COUNT override,
+# checked), because a resolver can set an fsmonitor command in .git/config.
+# Commit signing is forced off the same way (commit.gpgSign=false, checked, one
+# note on stderr) when the repository's local or worktree config sets
+# commit.gpgsign (to anything but false) or any gpg.* key, because signing runs
+# gpg.program (or gpg.<format>.program) from that config; push.gpgSign and
+# log.showSignature, which can run it in the submit step's git, are forced off
+# with it. A signing config from the user's global or system config alone is
+# left untouched.
+# Transport commands: a repository-local or worktree-scope core.sshCommand,
+# core.askPass, core.gitProxy or credential.helper (also credential.<url>.helper)
+# or filter.<driver>.clean|smudge|process (the stock git-lfs commands excepted)
+# would be run by the submit step, `git add` or a checkout with submission
+# authority, so exit 3 naming
+# the key (never the value) before any network call; nothing is committed. The
+# user's global or system config is not judged, and no key is overridden with an
+# empty value, which would also disable the user's own credential helper.
+# Tools: gt (graphite) or node (github), gh and jq are found through PATH. One
+# whose canonical directory lies inside the repository's working tree (an
+# ignored <repo>/node_modules/.bin, say) could be replaced by a resolver without
+# a tracked change, so exit 3 naming the tool and directory, nothing committed.
+# A tool outside the repository is not judged; one that cannot be found keeps
+# the "<tool> not found" handling. The check runs before any of them is called.
+# Libraries: lib/resolve-paths.sh, sibling-plugin.sh, resolve-text.sh and
+# verify-run.sh are sourced before any dirty-set check. When the plugin's lib
+# directory is inside the repository's working tree (a source checkout), each
+# must be tracked, show tag H in `git ls-files -v` (not assume-unchanged or
+# skip-worktree) and equal its blob in HEAD, else exit 3 naming the file and
+# nothing is committed. Outside the repository (the installed cache) they are
+# not judged. The check is plain git, inline, before the first source.
+# Network diagnostics in the verify messages (git ls-remote, gh pr view
+# stderr) and the Graphite submit's own output go through the credential
+# redactor lib/verify-run.sh loads (vr_load_redactor); with no redactor the
+# diagnostic is withheld.
+# --unattended also refuses the YELLOW_REVIEW_GITHUB_STACK_RUNTIME file when it
+# is inside the repository and listed (rp_runner). With the github provider,
+# whichever runtime will run (override or default sibling) that lies inside the
+# repository must be tracked, unmodified and not hidden from status.
+# The github runtime is given --remote only for an explicit choice
+# (branch pushRemote, remote.pushDefault, or the sole remote); otherwise it
+# refuses an ambiguous setup itself (status INVALID_ARGS, exit 5). Graphite
+# pushes to `gt repo remote` (default origin), not git's pushRemote.
+# Contract: references/resolve/dispositions.md. This script never pushes
+# directly; the provider's submit is the only publish path.
+
+set -euo pipefail
+
+MAX_MESSAGE_CHARS=200
+
+# The libraries below run before any dirty-set check. In a source checkout they
+# sit inside the repository's working tree, where a resolver can edit one, or
+# hide the edit with `git update-index --assume-unchanged|--skip-worktree`. So
+# each must be tracked, show the plain "H" tag in `ls-files -v` and equal its
+# blob in HEAD. Inline and plain git plumbing, because nothing is sourced yet
+# (--no-filters: a clean filter in .git/config would run a command). A lib
+# directory outside the repository (the installed cache) is not judged; a
+# repository that cannot be read here is left to the checks below.
+check_lib_integrity() {
+    local libdir top rel name st blob
+    libdir=$(cd -- "$(dirname -- "$0")/../../../lib" 2>/dev/null && pwd -P) || return 0
+    top=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+    top=$(cd -- "$top" 2>/dev/null && pwd -P) || { printf '[commit-resolve-fixes] Error: cannot resolve the repository root to verify the plugin libraries; nothing committed\n' >&2; return 1; }
+    case "$libdir" in "$top"/*) ;; *) return 0 ;; esac
+    rel="${libdir#"$top"/}"
+    for name in resolve-paths.sh sibling-plugin.sh resolve-text.sh verify-run.sh; do
+        st=$(git -C "$top" -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs \
+                ls-files -v --error-unmatch -- "$rel/$name" 2>/dev/null) \
+            && [ "${st:0:2}" = "H " ] \
+            && blob=$(git -C "$top" rev-parse --verify --quiet "HEAD:$rel/$name" 2>/dev/null) \
+            && [ -n "$blob" ] \
+            && [ "$(git -C "$top" hash-object --no-filters -- "$libdir/$name" 2>/dev/null)" = "$blob" ] \
+            || { printf '[commit-resolve-fixes] Error: %s is not tracked and unmodified (modified, untracked or hidden from git status); refusing to source it; nothing committed\n' "$rel/$name" >&2; return 1; }
+    done
+}
+check_lib_integrity || exit 3
+
+# shellcheck source=../../../lib/resolve-paths.sh
+. "$(dirname -- "$0")/../../../lib/resolve-paths.sh"
+# shellcheck source=../../../lib/resolve-text.sh
+. "$(dirname -- "$0")/../../../lib/resolve-text.sh"
+# shellcheck source=../../../lib/verify-run.sh
+. "$(dirname -- "$0")/../../../lib/verify-run.sh" || { printf '[commit-resolve-fixes] Error: cannot load lib/verify-run.sh\n' >&2; exit 2; }
+
+die() { printf '[commit-resolve-fixes] Error: %s\n' "$2" >&2; exit "$1"; }
+
+# Resolved before the script changes directory: $0 may be relative.
+PLUGIN_ROOT=$(cd -- "$(dirname -- "$0")/../../.." && pwd) || { printf '[commit-resolve-fixes] Error: cannot resolve the plugin root\n' >&2; exit 2; }
+
+usage() {
+    printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--unattended] [--allow-credential-shaped] [--files-from <file>] [-- <files...>]\n' >&2
+    exit 2
+}
+
+PROVIDER=""
+PR=""
+MESSAGE=""
+UNATTENDED=0
+ALLOW_CREDENTIAL=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --provider) [ $# -ge 2 ] || usage; PROVIDER="$2"; shift 2 ;;
+        --pr) [ $# -ge 2 ] || usage; PR="$2"; shift 2 ;;
+        --message) [ $# -ge 2 ] || usage; MESSAGE="$2"; shift 2 ;;
+        --unattended) UNATTENDED=1; shift ;;
+        --allow-credential-shaped) ALLOW_CREDENTIAL=1; shift ;;
+        --files-from)
+            [ $# -ge 2 ] || usage
+            rp_read_file_list "$2" || die 2 "--files-from not readable: $2"
+            shift 2
+            ;;
+        --) shift; RP_FILES+=("$@"); break ;;
+        *) usage ;;
+    esac
+done
+FILES=(${RP_FILES[@]+"${RP_FILES[@]}"})
+
+case "$PROVIDER" in
+    graphite|github) ;;
+    *) die 2 "--provider must be graphite or github" ;;
+esac
+[[ "$PR" =~ ^[1-9][0-9]*$ ]] || die 2 "--pr must be a positive integer"
+[[ "$MESSAGE" =~ ^fix(\([a-z0-9._/-]+\))?!?:\ [^[:cntrl:]]+$ ]] \
+    || die 2 "--message must be one line starting with 'fix:' or 'fix(<scope>):'"
+[ "${#MESSAGE}" -le "$MAX_MESSAGE_CHARS" ] || die 2 "--message exceeds $MAX_MESSAGE_CHARS characters"
+[ "$UNATTENDED" = 1 ] && [ "$ALLOW_CREDENTIAL" = 1 ] \
+    && die 2 "--allow-credential-shaped needs a human confirmation; never pass it with --unattended"
+
+# The diff scans below never see the message, which is committed and pushed
+# too: screen it as public text before anything is staged. No override excuses
+# it; the caller's messages carry counts and paths only.
+MSG_FILE=$(mktemp) || die 2 "mktemp failed"
+printf '%s\n' "$MESSAGE" >|"$MSG_FILE" || { rm -f "$MSG_FILE"; die 2 "cannot write the message for the credential scan"; }
+MSG_RC=0
+rt_text_clean "$MSG_FILE" || MSG_RC=$?
+rm -f "$MSG_FILE"
+if [ "$MSG_RC" -ne 0 ]; then
+    rt_report_refusal message
+    die 2 "--message looks like it contains a credential, an image, a mention or a foreign URL, or could not be scanned; nothing committed"
+fi
+
+for tool in git gh jq; do
+    command -v "$tool" >/dev/null 2>&1 || die 2 "$tool not found"
+done
+
+# Bound every network call. Without a usable timeout binary (macOS without
+# coreutils) calls run unbounded, with one warning before the first of them.
+# A timeout exits 124 (137 after KILL), which every caller below already
+# treats as a failure of that step.
+SUBMIT_TIMEOUT="${YELLOW_REVIEW_SUBMIT_TIMEOUT:-300}"
+NET_TIMEOUT="${YELLOW_REVIEW_NET_TIMEOUT:-30}"
+[[ "$SUBMIT_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "YELLOW_REVIEW_SUBMIT_TIMEOUT must be a positive integer"
+[[ "$NET_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "YELLOW_REVIEW_NET_TIMEOUT must be a positive integer"
+TIMEOUT_BIN=$(vr_timeout_bin || true)
+# TERM first, then KILL after a short grace so a process that traps TERM
+# cannot outlive the bound.
+KILL_GRACE=5
+bounded() {
+    local secs="$1"
+    shift
+    if [ -n "$TIMEOUT_BIN" ]; then
+        "$TIMEOUT_BIN" --kill-after="$KILL_GRACE" "$secs" "$@"
+    else
+        "$@"
+    fi
+}
+GH_BIN=$(command -v gh)
+# Shadows gh for this script and the sourced rp_pr_files.
+gh() { bounded "$NET_TIMEOUT" "$GH_BIN" "$@"; }
+
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
+cd -- "$TOP"
+
+# gt, gh, jq and node are found through PATH. A PATH entry inside the working
+# tree (an ignored <repo>/node_modules/.bin, say) lets a resolver replace one
+# with no tracked change, and the first call would run it with submission
+# authority. Refuse a tool whose canonical directory is inside the repository;
+# a tool outside it (the normal case) is not judged, and one that cannot be
+# resolved is left to the "not found" handling. No tool has run before this.
+check_tools_outside_repo() {
+    local real_top tool bin dir
+    real_top=$(pwd -P) || die 3 "cannot resolve the repository root to verify the tools on PATH; nothing committed"
+    for tool in "$@"; do
+        # type -P: the file on PATH, not the gh function defined above.
+        bin=$(type -P "$tool" 2>/dev/null) || continue
+        [ -n "$bin" ] || continue
+        dir=$(cd -- "$(dirname -- "$bin")" 2>/dev/null && pwd -P) \
+            || die 3 "cannot resolve the directory of $tool; nothing committed"
+        case "$dir" in
+            "$real_top"/*|"$real_top") die 3 "$tool resolves to $dir inside the repository, where a resolver can replace it; remove that directory from PATH; nothing committed" ;;
+        esac
+    done
+}
+if [ "$PROVIDER" = github ]; then
+    check_tools_outside_repo gh jq node
+else
+    check_tools_outside_repo gt gh jq
+fi
+BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || die 2 "HEAD is detached; check out the PR branch"
+
+# A core.fsmonitor command a resolver wrote into .git/config would run on any
+# later git call that refreshes the index: the plain `git commit` below, and
+# the git that gt and the submit step spawn. lgit overrides it per call; this
+# overrides it for the rest of the process tree. It is environment config
+# (GIT_CONFIG_COUNT), appended to the caller's, and verified, failing closed on
+# a git too old to read it.
+harden_git_config() {
+    local n="${GIT_CONFIG_COUNT:-0}"
+    case "$n" in ''|*[!0-9]*) die 3 "GIT_CONFIG_COUNT is not a number, so core.fsmonitor cannot be disabled; nothing committed" ;; esac
+    n=$((10#$n))
+    export "GIT_CONFIG_KEY_$n=core.fsmonitor" "GIT_CONFIG_VALUE_$n=false" \
+        "GIT_CONFIG_KEY_$((n + 1))=core.untrackedCache" "GIT_CONFIG_VALUE_$((n + 1))=false" \
+        "GIT_CONFIG_COUNT=$((n + 2))"
+    [ "$(git config --get core.fsmonitor 2>/dev/null)" = false ] \
+        && [ "$(git config --get core.untrackedCache 2>/dev/null)" = false ] \
+        || die 3 "could not disable core.fsmonitor; nothing committed"
+    # A repository-local or worktree-scope transport command is run by the
+    # submit step's git (and gt, gh) with submission authority: refuse it,
+    # naming the key only. Global and system scopes are not judged, and the
+    # values are never overridden, which would also disable the user's own
+    # credential helper.
+    local tcfg trc=0 tkey
+    # A clean, smudge or process filter runs on `git add` and on checkout, so a
+    # repository-local one is judged the same way; the three stock Git LFS
+    # commands (`git lfs install --local`) are allowed by exact value.
+    tcfg=$(git config --show-scope --get-regexp '^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process))$' 2>/dev/null) || trc=$?
+    case "$trc" in 0|1) ;; *) die 3 "could not read the git transport config; nothing committed" ;; esac
+    tkey=$(printf '%s\n' "$tcfg" | awk -F'\t' '
+        ($1 == "local" || $1 == "worktree") {
+            k = $2; v = $2; sub(/ .*/, "", k); sub(/^[^ ]* /, "", v)
+            if (k ~ /^filter\.lfs\.(clean|smudge|process)$/ && (v == "git-lfs clean -- %f" || v == "git-lfs smudge -- %f" || v == "git-lfs filter-process" || v == "git-lfs smudge --skip -- %f" || v == "git-lfs filter-process --skip")) next
+            print k; exit
+        }')
+    # A credential URL can carry userinfo: name the key without it.
+    case "$tkey" in credential.?*.helper) tkey="credential.<url>.helper" ;; filter.*) tkey="filter.<driver>.${tkey##*.}" ;; esac
+    [ -z "$tkey" ] || die 3 "the repository config sets $tkey, which would run a command with submission authority; remove it from the repository config (a global or system config is fine); nothing committed"
+    # A resolver can also write commit.gpgSign and gpg.program (or
+    # gpg.<format>.program) into the repository's own config: signing the commit
+    # would run that program. Only the local and worktree scopes are judged
+    # (includes resolved, which --show-scope does), so the user's own global or
+    # system signing config keeps working. A local commit.gpgsign=false is no
+    # signing config.
+    local cfg rc=0 hit
+    cfg=$(git config --show-scope --get-regexp '^(commit\.gpgsign|gpg\.)' 2>/dev/null) || rc=$?
+    case "$rc" in 0|1) ;; *) die 3 "could not read the git signing config; nothing committed" ;; esac
+    hit=$(printf '%s\n' "$cfg" | awk -F'\t' '($1 == "local" || $1 == "worktree") && tolower($2) !~ /^commit\.gpgsign (false|no|off|0)$/ { print "y"; exit }')
+    [ -n "$hit" ] || return 0
+    n=$((n + 2))
+    # push.gpgSign and log.showSignature reach gpg.program in the child git of
+    # the submit step, so they are forced off with commit signing.
+    export "GIT_CONFIG_KEY_$n=commit.gpgSign" "GIT_CONFIG_VALUE_$n=false" \
+        "GIT_CONFIG_KEY_$((n + 1))=push.gpgSign" "GIT_CONFIG_VALUE_$((n + 1))=false" \
+        "GIT_CONFIG_KEY_$((n + 2))=log.showSignature" "GIT_CONFIG_VALUE_$((n + 2))=false" \
+        "GIT_CONFIG_COUNT=$((n + 3))"
+    [ "$(git config --bool --get commit.gpgsign 2>/dev/null)" = false ] \
+        && [ "$(git config --bool --get push.gpgsign 2>/dev/null)" = false ] \
+        && [ "$(git config --bool --get log.showsignature 2>/dev/null)" = false ] \
+        || die 3 "could not disable commit signing; nothing committed"
+    printf '[commit-resolve-fixes] Note: the repository'"'"'s own config sets commit signing (commit.gpgsign or gpg.*), which could run a program, so the commit is made unsigned\n' >&2
+}
+harden_git_config
+
+# The github-workflow runtime sits beside this plugin: plugins/<name>/ in the
+# source tree, <marketplace>/<name>/<version>/ in the installed cache.
+find_runtime() {
+    local root
+    root=$(cd -- "$(dirname -- "$0")/../../.." && pwd) || return 1
+    sp_sibling_file "$root" github-workflow lib/github-stack-runtime.js
+}
+
+if [ "$PROVIDER" = github ]; then
+    RUNTIME="${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-$(find_runtime || true)}"
+    command -v node >/dev/null 2>&1 || die 2 "node not found"
+    [ -n "$RUNTIME" ] && [ -f "$RUNTIME" ] || die 2 "github-stack-runtime.js not found (is github-workflow installed?)"
+fi
+
+# --- Validate the expected set ---
+# Arrays are expanded as ${a[@]+"${a[@]}"} so an empty one survives set -u
+# under bash 3.2.
+EXPECTED=()
+for f in ${FILES[@]+"${FILES[@]}"}; do
+    rp_canonical "$f" || die 2 "path must be canonical and repo-relative: $f"
+    rp_denied "$f" && die 3 "refusing to commit a deny-listed path: $f"
+    if [ "$UNATTENDED" = 1 ] && rp_runner "$f"; then
+        die 3 "refusing to commit a runner file unattended (git hooks would execute it): $f"
+    fi
+    [ -z "$(lgit status --porcelain --untracked-files=all -- "$f")" ] \
+        && die 3 "listed file has no changes: $f"
+    EXPECTED+=("$f")
+done
+
+# Only files the PR already changes may be committed.
+if [ "${#EXPECTED[@]}" -gt 0 ]; then
+    PR_FILES=$(rp_pr_files "$PR" 2>/dev/null) || die 3 "could not list PR #$PR's changed files"
+    for f in "${EXPECTED[@]}"; do
+        grep -qxF -- "$f" <<<"$PR_FILES" || die 3 "not one of PR #$PR's changed files: $f"
+    done
+    # The checked-out branch must be PR <N>'s own head branch (in this
+    # repository, not a fork), or the submit below would publish an unrelated
+    # branch before the head check can fail. PR_REPO (owner/name, lowercase)
+    # is the head repository the chosen remote is compared with later;
+    # PR_URL_HOST is the host of the PR's own URL, the active GitHub host
+    # unless GH_HOST says otherwise. It is last, so an empty value is safe
+    # for read.
+    PR_META=$(gh pr view "$PR" --json headRefName,isCrossRepository,headRepository,headRepositoryOwner,url 2>/dev/null \
+        | jq -r '[.headRefName // "", (.isCrossRepository // false | tostring), (((.headRepositoryOwner.login // "") + "/" + (.headRepository.name // "")) | ascii_downcase), ((.url // "") | ltrimstr("https://") | ltrimstr("http://") | split("/")[0])] | join(" ")' 2>/dev/null) \
+        || die 3 "could not read PR #$PR's head branch"
+    read -r PR_BRANCH PR_CROSS PR_REPO PR_URL_HOST <<<"$PR_META"
+    [ "$PR_BRANCH $PR_CROSS" = "$BRANCH false" ] \
+        || die 3 "checked-out branch '$BRANCH' is not the head branch of PR #$PR (or the PR is from a fork); nothing committed"
+fi
+
+# Tracked or untracked changes outside the expected set would ride along in
+# the commit (or be left behind): refuse before staging anything.
+DIRTY_FILE=$(mktemp) || die 2 "mktemp failed"
+NET_ERR=$(mktemp) || die 2 "mktemp failed"
+# ADDED: the added lines of the staged diff, then of the commit. APPROVED: the
+# "<path><TAB><line>" records the user saw and approved (override only).
+# REMAINING: the commit's records, filtered into ADDED for the scan.
+ADDED=$(mktemp) || die 2 "mktemp failed"
+APPROVED=$(mktemp) || die 2 "mktemp failed"
+REMAINING=$(mktemp) || die 2 "mktemp failed"
+trap 'rm -f "$DIRTY_FILE" "$NET_ERR" "$ADDED" "$APPROVED" "$REMAINING"' EXIT
+# redact_line: stdin (one line) to stdout through the plugin's credential
+# redactor (vr_load_redactor, then vr_redact_filter, as run-verify-command's
+# log stream uses). Fails when the redactor cannot be loaded or run, or the
+# filter withheld the text, so a caller never prints an unscreened line.
+redact_line() {
+    local out
+    vr_load_redactor "$PLUGIN_ROOT" || return 1
+    declare -F cs_redact_secrets >/dev/null 2>&1 || return 1
+    command -v fold >/dev/null 2>&1 || return 1
+    out=$(set -o pipefail; vr_redact_filter) || return 1
+    case "$out" in *"$VR_FOLD_SENTINEL"*) return 1 ;; esac
+    printf '%s' "$out"
+}
+# last_err: the first line of the last network call's stderr, for a message.
+# One line, control characters dropped, credentials in URLs masked, then the
+# credential redactor applied (a token assignment or Authorization header that
+# a credential helper printed is not URL userinfo), capped. When the redactor
+# is unavailable the diagnostic is withheld, not printed raw.
+#
+# With an argument, last_err screens that text (stderr a caller captured in a
+# shell variable, so no raw diagnostic is ever written to disk). With none it
+# reads the $NET_ERR file, which holds a network tool's raw stderr until the
+# EXIT trap removes it (a SIGKILL skips the trap).
+last_err() {
+    local line raw
+    if [ "$#" -gt 0 ]; then
+        raw=$1
+    else
+        [ -s "$NET_ERR" ] || return 0
+        raw=$(head -c 8192 "$NET_ERR" 2>/dev/null) || true
+    fi
+    # Bounded before screening: the text is a network tool's raw stderr.
+    line=$(printf '%s\n' "$raw" | head -c 8192 | head -n 1 | tr -d '[:cntrl:]' | sed 's#://[^/@ ]*@#://***@#g') || true
+    [ -n "$line" ] || return 0
+    if ! line=$(printf '%s\n' "$line" | redact_line 2>/dev/null); then
+        printf '%s' '[diagnostic withheld: credential redaction unavailable]'
+        return 0
+    fi
+    printf '%s' "$line" | tr -d '[:cntrl:]' | cut -c1-200
+}
+# print_submit_output: the provider's submit output ($NET_ERR) on stderr, in the
+# same screening as last_err (control characters dropped, URL userinfo masked,
+# the redactor), last 40 lines, 300 columns. When the redactor is unavailable
+# the output is withheld, not printed raw. The scratch file is emptied after.
+print_submit_output() {
+    local out
+    [ -s "$NET_ERR" ] || return 0
+    if out=$(tr -d '\000-\010\013-\037\177' <"$NET_ERR" | sed 's#://[^/@ ]*@#://***@#g' | redact_line 2>/dev/null); then
+        printf '%s\n' "$out" | tail -n 40 | cut -c1-300 >&2
+    else
+        printf '%s\n' '[submit output withheld: credential redaction unavailable]' >&2
+    fi
+    : >|"$NET_ERR"
+}
+rp_tree_changes "$DIRTY_FILE" || die 3 "cannot list tree changes"
+d=$(rp_assert_only_listed "$DIRTY_FILE" ${EXPECTED[@]+"${EXPECTED[@]}"}) \
+    || die 3 "change outside the expected set: $d"
+
+emit() {
+    jq -nc --arg s "$1" --arg sha "$2" --arg b "$BRANCH" '{status: $s, sha: $sha, branch: $b}'
+}
+
+if [ "${#EXPECTED[@]}" -eq 0 ]; then
+    emit NOOP "$(git rev-parse HEAD)"
+    exit 0
+fi
+
+if [ -z "$TIMEOUT_BIN" ]; then
+    printf '[commit-resolve-fixes] Warning: no timeout binary with --kill-after found (timeout or gtimeout); network calls run without a time limit\n' >&2
+fi
+
+# norm_host <host[:port]>: print the lowercase host name, without userinfo or
+# port; fail when what is left is not a plain host name. Never prints a URL.
+norm_host() {
+    local h="${1##*@}"
+    [[ "$h" =~ ^([^:]+):[0-9]*$ ]] && h="${BASH_REMATCH[1]}"
+    h=$(printf '%s' "$h" | tr '[:upper:]' '[:lower:]')
+    [[ "$h" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || return 1
+    printf '%s\n' "$h"
+}
+
+# norm_port <host[:port]> <scheme>: print the explicit port of an authority, or
+# "-" when it has none or spells out the scheme's default (https 443, http 80,
+# ssh 22), so a spelled-out default equals an absent one. Fails for a port
+# above 65535. Never prints a URL.
+norm_port() {
+    local h="${1##*@}" p="" d=""
+    if [[ "$h" =~ ^[^:]+:([0-9]+)$ ]]; then
+        p=$((10#${BASH_REMATCH[1]}))
+        [ "$p" -le 65535 ] || return 1
+    fi
+    case "$2" in https) d=443 ;; http) d=80 ;; ssh) d=22 ;; esac
+    if [ -z "$p" ] || [ "$p" = "$d" ]; then p=-; fi
+    printf '%s\n' "$p"
+}
+
+# remote_parse <push-url>: print "<host> <owner/repo> <port>", host and repo
+# lowercase and port from norm_port ("-" for the scheme default), for an
+# https, http, ssh or git URL or an scp-style (user@host:owner/repo) one, with
+# or without .git. Fails for any other scheme (file, ext, ftp ...), a local
+# path or anything else unparseable. Never prints the URL.
+remote_parse() {
+    local url="$1" scheme=ssh auth rest host port
+    case "$url" in
+        *://*)
+            scheme=$(printf '%s' "${url%%://*}" | tr '[:upper:]' '[:lower:]')
+            case "$scheme" in https|http|ssh|git) ;; *) return 1 ;; esac
+            rest="${url#*://}"
+            [[ "$rest" == */* ]] || return 1
+            auth="${rest%%/*}"
+            rest="${rest#*/}"
+            ;;
+        *)
+            [[ "$url" =~ ^([^/@:]+@)?([^/@:]+):(.+)$ ]] || return 1
+            auth="${BASH_REMATCH[2]}"
+            rest="${BASH_REMATCH[3]}"
+            ;;
+    esac
+    host=$(norm_host "$auth") || return 1
+    port=$(norm_port "$auth" "$scheme") || return 1
+    rest="${rest#"${rest%%[!/]*}"}"
+    rest="${rest%"${rest##*[!/]}"}"
+    rest="${rest%.git}"
+    [[ "$rest" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]] || return 1
+    printf '%s %s %s\n' "$host" "$(printf '%s' "$rest" | tr '[:upper:]' '[:lower:]')" "$port"
+}
+
+# host_matches <active-host> <push-host>: the same host, or, for github.com
+# only, one of its documented aliases (ssh.github.com serves ssh on port 443;
+# www.github.com).
+host_matches() {
+    [ "$1" = "$2" ] && return 0
+    [ "$1" = github.com ] || return 1
+    case "$2" in ssh.github.com|www.github.com) return 0 ;; esac
+    return 1
+}
+
+# port_matches <active-host> <active-port> <push-host> <push-port>: the same
+# port after norm_port, or the documented alias: ssh.github.com serves ssh on
+# port 443 for github.com. Any other port is a different endpoint.
+port_matches() {
+    [ "$2" = "$4" ] && return 0
+    [ "$1" = github.com ] && [ "$3" = ssh.github.com ] && [ "$2" = - ] && [ "$4" = 443 ]
+}
+
+# safe_name <text>: a remote name for a message. One line, control characters
+# dropped, anything before an @ masked (a pushRemote can hold a URL), capped.
+safe_name() {
+    printf '%s' "$1" | tr -d '[:cntrl:]' | sed 's#[^/[:space:]]*@#***@#g' | cut -c1-80
+}
+
+# safe_remote <text>: a remote for a message. Printed only when it is the name
+# of a configured remote; a pushRemote or pushDefault can hold a URL, and a URL
+# can carry a credential outside userinfo (query string, fragment, path token),
+# so any other value is withheld rather than masked.
+safe_remote() {
+    if [ -n "$1" ] && printf '%s\n' "$REMOTES" | grep -qxF -- "$1"; then
+        safe_name "$1"
+    else
+        printf '%s' '[configured remote value withheld]'
+    fi
+}
+
+# --- Resolve the remote once ---
+# Submit and verification must agree on one remote.
+# github: the runtime's own default would pick remote.pushDefault over a
+#   branch-specific pushRemote, and it refuses an ambiguous setup. So pass
+#   --remote only for an explicit choice (pushRemote, pushDefault or the sole
+#   remote, whatever its name) and let the runtime refuse the rest.
+# graphite: gt pushes to `gt repo remote` (default origin), not git's
+#   pushRemote; the name is used only when it is a configured remote.
+# It is resolved before staging, so a remote that is not the PR's head
+# repository is refused before anything is committed or submitted.
+REMOTE_NAME=$(git config --get "branch.$BRANCH.pushRemote" 2>/dev/null \
+    || git config --get remote.pushDefault 2>/dev/null || true)
+REMOTE_EXPLICIT=0
+REMOTES=$(git remote 2>/dev/null || true)
+REMOTE_COUNT=$(printf '%s' "$REMOTES" | grep -c . || true)
+UPSTREAM_REMOTE=$(git config --get "branch.$BRANCH.remote" 2>/dev/null || true)
+# An explicit push remote must name a configured remote. "." (this repository)
+# or a URL is not one: git would push there, but the checks below and the
+# provider's --remote read configured remotes only, so refuse before staging.
+if [ -n "$REMOTE_NAME" ] && { [ "$REMOTE_NAME" = . ] || ! printf '%s\n' "$REMOTES" | grep -qxF -- "$REMOTE_NAME"; }; then
+    die 3 "the push remote configured for branch '$(safe_name "$BRANCH")' (pushRemote or remote.pushDefault) is '.' or not a configured remote; nothing committed"
+fi
+if [ -n "$REMOTE_NAME" ]; then
+    REMOTE_EXPLICIT=1
+elif [ "$REMOTE_COUNT" -eq 1 ]; then
+    REMOTE_NAME="$REMOTES"
+    REMOTE_EXPLICIT=1
+elif [ -n "$UPSTREAM_REMOTE" ] && [ "$UPSTREAM_REMOTE" != . ]; then
+    # "." is a local upstream (common for stacked branches). A configured
+    # upstream remote is good enough to verify against, not to submit to.
+    REMOTE_NAME="$UPSTREAM_REMOTE"
+else
+    REMOTE_NAME=origin
+fi
+if [ "$PROVIDER" = graphite ]; then
+    GT_REMOTE=$(gt repo remote 2>/dev/null | awk 'END { print $1 }' || true)
+    if [ -n "$GT_REMOTE" ] && git remote get-url -- "$GT_REMOTE" >/dev/null 2>&1; then
+        REMOTE_NAME="$GT_REMOTE"
+    fi
+fi
+
+# The active GitHub host: GH_HOST when set, else the host of the PR's URL.
+# Neither known fails closed.
+ACTIVE_HOST=$(norm_host "${GH_HOST:-$PR_URL_HOST}") \
+    || die 3 "could not determine the active GitHub host (set GH_HOST); nothing committed"
+# Captured once: the head check after the push queries these same URLs, since a
+# remote's fetch URL (what `git ls-remote <name>` reads) can differ from it.
+# A remote can have several push URLs (remote.<name>.pushurl, multi-valued) and
+# a push goes to every one, so each must pass every check below.
+PUSH_URLS=()
+PUSH_PARSEDS=()
+PUSH_URL_LIST=$(git remote get-url --push --all -- "$REMOTE_NAME" 2>/dev/null || true)
+while IFS= read -r PUSH_URL; do
+    PUSH_PARSED=$(remote_parse "$PUSH_URL") \
+        || die 3 "cannot tell which repository remote '$(safe_remote "$REMOTE_NAME")' pushes to (unreadable, unparseable or unsupported push URL); nothing committed"
+    PUSH_URLS+=("$PUSH_URL")
+    PUSH_PARSEDS+=("$PUSH_PARSED")
+done <<<"$PUSH_URL_LIST"
+case "$PR_REPO" in
+    ?*/?*) ;;
+    *) die 3 "could not read PR #$PR's head repository; nothing committed" ;;
+esac
+ACTIVE_PORT=$(norm_port "${GH_HOST:-$PR_URL_HOST}" https) \
+    || die 3 "could not determine the active GitHub host's port (set GH_HOST); nothing committed"
+for PUSH_PARSED in "${PUSH_PARSEDS[@]}"; do
+    read -r PUSH_HOST PUSH_SLUG PUSH_PORT <<<"$PUSH_PARSED"
+    host_matches "$ACTIVE_HOST" "$PUSH_HOST" \
+        || die 3 "remote '$(safe_remote "$REMOTE_NAME")' does not push to the active GitHub host; nothing committed"
+    port_matches "$ACTIVE_HOST" "$ACTIVE_PORT" "$PUSH_HOST" "$PUSH_PORT" \
+        || die 3 "remote '$(safe_remote "$REMOTE_NAME")' pushes to a different port than the active GitHub host; nothing committed"
+    [ "$PUSH_SLUG" = "$PR_REPO" ] \
+        || die 3 "remote '$(safe_remote "$REMOTE_NAME")' does not push to PR #$PR's head repository; nothing committed"
+done
+
+# The commit runs the effective git hooks. An untracked or ignored file in a
+# hooks directory inside the working tree is invisible to the dirty-set check
+# above, so a resolver could have planted or edited one: refuse before staging.
+# (A hooks directory whose in-tree files are all tracked runs as before; see
+# rp_hooks_untracked.) A hooks path that goes
+# through a symlink inside the working tree is refused too: a resolver can edit
+# the hooks through the link with no change Git reports.
+# A hook in .git/hooks or in a directory outside the working tree has no
+# tracked state to judge, and a resolver can rewrite an existing one (or point
+# core.hooksPath at such a directory); a tracked in-tree hook hidden with
+# assume-unchanged or skip-worktree can be rewritten unseen too. So the commit
+# runs with every git hook disabled instead. The override is environment config
+# (GIT_CONFIG_COUNT), so gt and the submit step inherit it; it is verified,
+# failing closed on a git too old to read it.
+disable_git_hooks() {
+    local n="${GIT_CONFIG_COUNT:-0}"
+    case "$n" in ''|*[!0-9]*) die 3 "GIT_CONFIG_COUNT is not a number, so git hooks cannot be disabled; nothing committed" ;; esac
+    n=$((10#$n))
+    export "GIT_CONFIG_KEY_$n=core.hooksPath" "GIT_CONFIG_VALUE_$n=/dev/null" "GIT_CONFIG_COUNT=$((n + 1))"
+    [ "$(git config --get core.hooksPath 2>/dev/null)" = /dev/null ] \
+        || die 3 "could not disable git hooks for the commit; nothing committed"
+    if [ "$1" = default ]; then
+        printf '[commit-resolve-fixes] Note: git hooks are disabled for the commit and the submit (a hook in the PR is code the PR controls; set YELLOW_REVIEW_COMMIT_HOOKS=1 to run verified tracked hooks)\n' >&2
+    else
+        printf '[commit-resolve-fixes] Note: the git hooks in the %s hooks directory are not verified, so the commit and the submit run with git hooks disabled\n' "$1" >&2
+    fi
+}
+HOOKS_RC=0
+# Hooks are off unless the caller opts in: a tracked hook, even one equal to
+# HEAD, is code the PR controls, and the commit runs it with submission
+# authority. The checks below judge hooks only for that opt-in.
+if [ "${YELLOW_REVIEW_COMMIT_HOOKS:-0}" != 1 ]; then
+    disable_git_hooks default
+    HOOKS_RC=1
+else
+HOOKS_DIR=$(rp_hooks_untracked "$DIRTY_FILE") || HOOKS_RC=$?
+case "$HOOKS_RC" in
+    4) disable_git_hooks "$HOOKS_DIR" ;;
+    0) die 3 "refusing to commit: git hooks directory '$(safe_name "$HOOKS_DIR")' holds untracked or ignored files that the commit would run; nothing committed" ;;
+    3) die 3 "refusing to commit: the git hooks path goes through the symlink '$(safe_name "$HOOKS_DIR")' inside the working tree, so hook edits would be invisible to the change check; nothing committed" ;;
+    1) ;;
+    *) die 3 "could not inspect the git hooks directory; nothing committed" ;;
+esac
+fi
+
+# The runtime that will run ($RUNTIME: the override, else the sibling
+# find_runtime picked) runs with submission authority. When it resolves inside
+# the repository, an ignored or assume-unchanged one can be rewritten without
+# showing in the tree-change check. Judge the file itself: it must be tracked
+# and unmodified (ignored, untracked, hidden and modified are refused, with
+# the path and never the contents). A runtime outside the repository (the
+# usual installed-cache sibling) is not judged. The override's checker reads
+# the variable, so it is pointed at $RUNTIME for the call (in a subshell, so
+# the caller's environment is untouched). <failer> is die-compatible: `die 3`
+# before the commit, undo_commit after it.
+runtime_override_check() {
+    local failer="$1" tail="$2" bad rc=0 what="github-stack-runtime override"
+    [ -n "${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-}" ] || what="default github-stack-runtime"
+    bad=$(YELLOW_REVIEW_GITHUB_STACK_RUNTIME="$RUNTIME"; export YELLOW_REVIEW_GITHUB_STACK_RUNTIME; rp_runtime_override_untrusted) || rc=$?
+    case "$rc" in
+        0) set -- "refusing to run the $what '$(safe_name "$bad")': inside the repository it must be tracked and unmodified (it is ignored, untracked, hidden from status or modified); $tail" ;;
+        1) return 0 ;;
+        *) set -- "could not verify the $what${bad:+ '$(safe_name "$bad")'}; $tail" ;;
+    esac
+    if [ "$failer" = die ]; then die 3 "$1"; else "$failer" "$1"; fi
+}
+[ "$PROVIDER" != github ] || runtime_override_check die "nothing committed"
+
+# --- Stage and compare ---
+lgit add -- "${EXPECTED[@]}" || die 3 "git add failed"
+STAGED=$(git diff --cached --no-renames --name-only -z | tr '\0' '\n' | LC_ALL=C sort) || {
+    lgit reset -q -- "${EXPECTED[@]}" || true
+    die 3 "could not list the staged files; nothing committed"
+}
+WANT=$(printf '%s\n' "${EXPECTED[@]}" | LC_ALL=C sort -u)
+if [ "$STAGED" != "$WANT" ]; then
+    printf '[commit-resolve-fixes] expected:\n%s\n[commit-resolve-fixes] staged:\n%s\n' "$WANT" "$STAGED" >&2
+    die 3 "staged set does not match the expected set"
+fi
+
+# A review comment can steer a resolver into pasting a secret it read into a
+# file the PR already changes. Scan only added lines inside hunks (a header
+# is skipped by position, so an added "++ x" line is still scanned), with
+# --text so binary-attributed files are not hidden.
+if ! git diff --cached --no-renames --no-color --no-ext-diff --no-textconv --text -U0 \
+    | rt_added_lines >|"$ADDED"; then
+    lgit reset -q -- "${EXPECTED[@]}" || true
+    die 3 "could not extract the added lines from the staged changes for the credential scan; nothing committed"
+fi
+if [ "$ALLOW_CREDENTIAL" = 0 ] && ! rt_code_clean "$ADDED"; then
+    lgit reset -q -- "${EXPECTED[@]}"
+    die 3 "credential-shaped: staged changes look like they contain a credential, or could not be scanned; nothing committed"
+fi
+# With the override, remember what was approved so the post-commit scan can
+# still refuse anything a hook adds.
+# Each record is "<path><TAB><added line>", so the post-commit exemption is
+# per file and per occurrence. git quotes a path that holds a tab or newline,
+# so the first tab always ends the path.
+added_by_path() {
+    awk '/^diff --git / { h = 0; f = ""; next }
+         !h && /^\+\+\+ / { f = substr($0, 5); next }
+         /^@@/ { h = 1; next }
+         h && /^\+/ { printf "%s\t%s\n", f, substr($0, 2) }'
+}
+if [ "$ALLOW_CREDENTIAL" = 1 ]; then
+    git diff --cached --no-renames --no-color --no-ext-diff --no-textconv --text -U0 \
+        | added_by_path >|"$APPROVED" || {
+        lgit reset -q -- "${EXPECTED[@]}" || true
+        die 3 "could not record the approved added lines; nothing committed"
+    }
+fi
+
+# --- Commit (always a new commit; never amend) ---
+BEFORE=$(git rev-parse HEAD)
+SHA=""
+# Undo the new commit (changes left unstaged) and exit 4, so nothing is
+# submitted and a later submit — for example of an upstack branch — cannot
+# publish it. gt modify -c already restacked the upstack branches onto the
+# rejected commit, so on the Graphite path restack them back onto the reset
+# branch; a failure is aborted with `gt abort` and reported, and the user
+# retries `gt restack` themselves.
+undo_commit() {
+    git reset -q "$BEFORE" || printf '[commit-resolve-fixes] Warning: could not undo commit %s\n' "${SHA:-HEAD}" >&2
+    if [ "$PROVIDER" = graphite ] && ! gt restack --upstack --no-interactive >&2; then
+        # A conflicting restack leaves the repository mid-rebase; abort it so
+        # the tree is not left in a state a plain rerun cannot recover.
+        gt abort >&2 || printf '[commit-resolve-fixes] Warning: gt abort failed; the repository may be mid-rebase, run `gt abort` or `git rebase --abort`\n' >&2
+        printf '[commit-resolve-fixes] Warning: could not restack the upstack branches after undoing the commit; the failed restack was aborted. Resolve any conflicts and retry `gt restack` before submitting\n' >&2
+    fi
+    die 4 "$1"
+}
+case "$PROVIDER" in
+    graphite) gt modify -c -m "$MESSAGE" --no-interactive >&2 || die 4 "gt modify -c failed" ;;
+    github) git commit -q -m "$MESSAGE" >&2 || die 4 "git commit failed" ;;
+esac
+SHA=$(git rev-parse HEAD)
+[ "$(git rev-parse HEAD^)" = "$BEFORE" ] || undo_commit "no new commit was created on top of the previous HEAD"
+git diff --cached --quiet || undo_commit "changes remain staged after the commit"
+
+# A pre-commit hook can stage more files or edit listed ones after the checks
+# above, so compare what the commit actually holds.
+# NUL separates records; an embedded newline is mapped to \001 so one path
+# containing newlines cannot masquerade as several expected paths (expected
+# paths are canonical and never hold control characters).
+COMMITTED=$(git diff --no-renames --name-only -z "$BEFORE" "$SHA" | tr '\0\n' '\n\001' | LC_ALL=C sort) \
+    || undo_commit "could not list the committed files; nothing submitted"
+if [ "$COMMITTED" != "$WANT" ]; then
+    printf '[commit-resolve-fixes] expected:\n%s\n[commit-resolve-fixes] committed:\n%s\n' "$WANT" "$COMMITTED" >&2
+    undo_commit "committed set does not match the expected set (a hook changed it); nothing submitted"
+fi
+git diff --no-renames --no-color --no-ext-diff --no-textconv --text -U0 "$BEFORE" "$SHA" \
+    | rt_added_lines >|"$ADDED" \
+    || undo_commit "could not extract the added lines from the commit for the credential scan; nothing submitted"
+# With the override, drop only added lines the user approved, matched by path
+# and occurrence: each approved "<path><TAB><line>" record cancels one
+# identical record in the commit, so a hook that moves or duplicates an approved
+# line into another file, or repeats it, leaves the extra occurrence to be
+# scanned as usual.
+SCAN_FILE="$ADDED"
+if [ "$ALLOW_CREDENTIAL" = 1 ]; then
+    git diff --no-renames --no-color --no-ext-diff --no-textconv --text -U0 "$BEFORE" "$SHA" \
+        | added_by_path >|"$REMAINING" \
+        || undo_commit "could not extract the added lines from the commit for the credential scan; nothing submitted"
+    # Test FILENAME, not NR == FNR: an empty first file would make the second
+    # one look like the first.
+    LC_ALL=C awk 'FILENAME == ARGV[1] { n[$0]++; next }
+                  n[$0] > 0 { n[$0]--; next }
+                  { print substr($0, index($0, "\t") + 1) }' "$APPROVED" "$REMAINING" >|"$ADDED" \
+        || undo_commit "could not filter the approved lines for the credential scan; nothing submitted"
+fi
+if ! rt_code_clean "$SCAN_FILE"; then
+    undo_commit "credential-shaped: the commit looks like it contains a credential, or could not be scanned (a hook may have added it); nothing submitted"
+fi
+# A hook can also leave edits or new files unstaged or untracked. Check before
+# submitting, so a dirty tree is never reported after the push has happened.
+rp_tree_changes "$DIRTY_FILE" || undo_commit "could not list tree changes after the commit; nothing submitted"
+if [ -s "$DIRTY_FILE" ]; then
+    undo_commit "the working tree is not clean after the commit (a hook left changes behind); nothing submitted"
+fi
+
+# --- Submit ---
+case "$PROVIDER" in
+    graphite)
+        # No --update-only: it has not been shown to leave the set of
+        # submitted stack branches unchanged, and the PR already exists.
+        # Its output can carry a credential (a remote URL, a token in an error):
+        # it goes to the scratch file, then to stderr through the redactor only.
+        SUBMIT_RC=0
+        bounded "$SUBMIT_TIMEOUT" gt submit --no-interactive --no-edit >|"$NET_ERR" 2>&1 || SUBMIT_RC=$?
+        print_submit_output
+        [ "$SUBMIT_RC" -eq 0 ] || die 5 "gt submit failed or timed out after ${SUBMIT_TIMEOUT}s"
+        ;;
+    github)
+        # The runtime always exits 0 and reports through its JSON status.
+        # Judged again right before it runs: a commit hook has run since the
+        # first check, and the commit is undone (exit 4) if it fails.
+        runtime_override_check undo_commit "nothing submitted"
+        REMOTE_ARGS=()
+        [ "$REMOTE_EXPLICIT" = 1 ] && REMOTE_ARGS=(--remote "$REMOTE_NAME")
+        OUT=$(bounded "$SUBMIT_TIMEOUT" node "$RUNTIME" submit ${REMOTE_ARGS[@]+"${REMOTE_ARGS[@]}"}) \
+            || die 5 "github-stack-runtime submit crashed or timed out after ${SUBMIT_TIMEOUT}s"
+        ST=$(printf '%s' "$OUT" | jq -r '.status // empty' 2>/dev/null || true)
+        if [ "$ST" != SUCCESS ]; then
+            printf '%s\n' "$OUT" >&2
+            die 5 "github-stack-runtime submit returned status '${ST:-unparseable}'"
+        fi
+        ;;
+esac
+
+# --- Verify the published head ---
+# Read from the validated push URL, not the remote name: with separate fetch
+# and push URLs (fork setups) the name resolves to the fetch URL.
+# The branch ref is updated synchronously by the submit; the PR's
+# headRefOid can lag, so only that check backs off.
+# Every push URL must show the new head: a push goes to all of them.
+for PUSH_URL in "${PUSH_URLS[@]}"; do
+    LS_RC=0
+    LS_OUT=$(bounded "$NET_TIMEOUT" git ls-remote -- "$PUSH_URL" "refs/heads/$BRANCH" 2>"$NET_ERR") || LS_RC=$?
+    REMOTE=$(printf '%s\n' "$LS_OUT" | awk 'NR == 1 { print $1 }')
+    if [ "$REMOTE" != "$SHA" ]; then
+        why=$(last_err)
+        [ "$LS_RC" -eq 124 ] || [ "$LS_RC" -eq 137 ] && why="ls-remote timed out after ${NET_TIMEOUT}s"
+        die 6 "head not verified: local=$SHA remote=${REMOTE:-none}${why:+ ($why)}"
+    fi
+done
+PR_HEAD=""
+PR_RC=0
+PR_ERR=""
+for delay in 0 ${YELLOW_REVIEW_VERIFY_BACKOFF:-2 4 8 16}; do
+    [ "$delay" -gt 0 ] && sleep "$delay"
+    PR_RC=0
+    # stderr (possibly credential-bearing) is captured in memory, never on
+    # disk; stdout (the head OID, not sensitive) goes to the $NET_ERR scratch
+    # file. >| because the file exists and the shell may have noclobber set.
+    PR_ERR=$(gh pr view "$PR" --json headRefOid 2>&1 >|"$NET_ERR") || PR_RC=$?
+    PR_JSON=$(cat "$NET_ERR" 2>/dev/null || true)
+    PR_HEAD=$(printf '%s' "$PR_JSON" | jq -r '.headRefOid // empty' 2>/dev/null || true)
+    [ "$PR_HEAD" = "$SHA" ] && break
+done
+if [ "$PR_HEAD" != "$SHA" ]; then
+    why=$(last_err "$PR_ERR")
+    [ "$PR_RC" -eq 124 ] || [ "$PR_RC" -eq 137 ] && why="gh pr view timed out after ${NET_TIMEOUT}s"
+    die 6 "head not verified: local=$SHA pr=${PR_HEAD:-none}${why:+ ($why)}"
+fi
+
+emit PUSHED "$SHA"

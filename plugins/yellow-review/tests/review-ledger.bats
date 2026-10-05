@@ -363,6 +363,19 @@ setup() {
   [ "$output" = "$cache/yellow-review/3.5.0/../../yellow-core/2.10.1/lib/compound-staging.sh" ]
 }
 
+@test "RL_CORE_LIB beats the shared sibling lookup, and an empty value means missing" {
+  source "$RL"
+  cache="$BATS_TEST_TMPDIR/cache/mkt"
+  mkdir -p "$cache/yellow-review/3.5.0" "$cache/yellow-core/2.10.1/lib"
+  : >|"$cache/yellow-core/2.10.1/lib/compound-staging.sh"
+  export CLAUDE_PLUGIN_ROOT="$cache/yellow-review/3.5.0"
+  RL_CORE_LIB="$BATS_TEST_TMPDIR/missing/compound-staging.sh" run rl_core_lib_path
+  [ -z "$output" ]
+  : >|"$BATS_TEST_TMPDIR/override.sh"
+  RL_CORE_LIB="$BATS_TEST_TMPDIR/override.sh" run rl_core_lib_path
+  [ "$output" = "$BATS_TEST_TMPDIR/override.sh" ]
+}
+
 # --- path validation (CLAUDE-45) --------------------------------------------
 
 @test "CLAUDE-45: valid tracked names are accepted, hostile ones rejected, write == triage" {
