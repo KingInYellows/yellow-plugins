@@ -183,17 +183,18 @@ with `'<branch>' is already used by worktree at <path>`. Use `/worktree:restack`
 (or the script directly) instead of restacking worktree by worktree:
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-restack.sh" <subcommand> [--provider graphite|github] [--submit]
+bash "${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-restack.sh" \
+  <subcommand> [--provider graphite|github] [--submit]
 ```
 
 | Subcommand | Does |
 |---|---|
 | `preflight` | Read-only. Prints the run worktree, the stack, the worktrees to detach and any `REFUSE` reasons |
-| `start` | Takes a lock, records state, detaches, restacks, verifies ancestry, restores, clears state; `--submit` submits afterwards |
+| `start` | Lock, detach, restack, verify ancestry, restore; `--submit` submits after |
 | `continue` | Resumes a paused conflict, then verifies and restores |
 | `abort` | Aborts the provider's restack (Graphite rolls back the whole restack), then restores |
 | `status` | Shows the recorded restack, or a worktree stranded detached at a branch tip |
-| `restore` | Restore only, no restack. Recovery after a partial restore, a failed abort, a provider mismatch, or after finishing the provider's own continue by hand |
+| `restore` | Restore only after partial restore, failed abort, mismatch, or hand finish |
 
 Run it from the worktree whose branch starts the restack; the restack set is
 that branch plus everything stacked on it. Graphite detaches the other stack

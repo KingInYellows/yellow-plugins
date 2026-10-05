@@ -28,15 +28,17 @@ except through the provider's submit when `--submit` is given.
 
 ## Input
 
-- *(no flag)* — start a restack from the current worktree's branch
+- _(no flag)_ — start a restack from the current worktree's branch
 - `--continue` — resume after resolving a paused conflict
 - `--abort` — roll back a paused restack and restore the worktrees
 - `--status` — show the recorded restack and any stranded or pause-locked worktree
 - `--submit` — submit the stack through the provider after a clean restack
-- `--remote <name>` — GitHub only: the configured remote gh-stack rebases and submits against. Needed when the clone has several remotes and no valid `remote.pushDefault`; preflight refuses that setup and says so
+- `--remote <name>` — GitHub only: the configured remote gh-stack rebases and submits
+  against. Needed when the clone has several remotes and no valid
+  `remote.pushDefault`; preflight refuses that setup and says so
 - `--yes` — skip the confirmation prompts
 
-#$ARGUMENTS
+   #$ARGUMENTS
 
 ## Phase 1: Parse flags
 
