@@ -14,3 +14,11 @@ printf 'budget0=%s\n' "$(cs_read_drain_budget "$TMPD")"
 cs_update_drain_budget "$TMPD" oauth >/dev/null 2>&1
 cs_read_drain_budget "$TMPD" | jq -c '{drains_in_window, auth_route}'
 printf 'path_intact=%s\n' "$(command -v date >/dev/null && printf yes || printf no)"
+mkdir -p "$TMPD/plain"
+printf 'Finding 1 [P1, unresolved (open)]: token=abcdefghijklmnop\n--- end\nFile: a.sh\n' >| "$TMPD/narrative.txt"
+cs_stage_entry "$TMPD/plain" 'review-pr-o-r-1' "$TMPD/narrative.txt"
+printf 'stage_rc=%s\n' "$?"
+staged=$(find "$HOME/.claude/projects" -name 'review-pr-o-r-1.jsonl' -print)
+jq -c '{schema, session_id, content_hash, transcript_tail}' "$staged"
+cs_stage_entry "$TMPD/plain" '..' "$TMPD/narrative.txt"
+printf 'dotdot_rc=%s\n' "$?"

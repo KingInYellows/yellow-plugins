@@ -76,6 +76,21 @@ to add a documented non-interactive interface (with equivalent
 safeguards) to `knowledge-compounder.md` itself first — until that
 exists, do not rely on spawn-prompt declarations being honored.
 
+## Where the review pipelines stand
+
+The review pipelines now take path 1. Under `--non-interactive`,
+`/review:pr` Step 9a (`plugins/yellow-review/references/review-pr/knowledge-compounding.md`)
+writes an outcome narrative and stages it with
+`plugins/yellow-review/lib/stage-learning.sh`, which calls yellow-core's
+`cs_stage_entry`; it no longer spawns the compounder. `/review:sweep-all`
+dropped its end-of-loop `/flow:compound` pass, since each swept PR stages
+its own entry. Interactive `/review:pr` still spawns the compounder behind
+its M3 gate.
+
+The drain is a weaker gate than the compounder's M3 confirmation: docs it
+promoted have shipped stale or wrong claims, caught only by review of the
+PR that carried them. Review drain-promoted docs before merging them.
+
 ## Why This Matters
 
 Without planning for the gate, the compounder's default is to post the M3

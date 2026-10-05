@@ -23,7 +23,9 @@ human comment threads in a single unattended invocation. Use `/review:pr`
 directly (without the flag) to keep its push-confirmation gate, or
 `/review:resolve` directly to keep all of its gates. For
 batch sweeping every open PR you authored, use `/review:sweep-all`. For
-multi-PR or stack-wide pipelines with compounding, use `/review:all`.
+multi-PR or stack-wide pipelines with attended compounding, use
+`/review:all`. Unattended, the inner `/review:pr` stages its learnings for
+the compound-staging drain instead.
 
 ## Workflow
 

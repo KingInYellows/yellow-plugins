@@ -124,7 +124,7 @@ cs_redact_secrets() {
     -e 's/ghp_[A-Za-z0-9_]{36,255}/[REDACTED:github-token]/g' \
     -e 's/ghs_[A-Za-z0-9_]{36,255}/[REDACTED:github-token]/g' \
     -e 's/github_pat_[A-Za-z0-9_]{22,255}/[REDACTED:github-pat]/g' \
-    -e 's/AKIA[0-9A-Z]{16}/[REDACTED:aws-access-key]/g' \
+    -e 's/(AKIA|ASIA|ABIA|ACCA)[0-9A-Z]{16}/[REDACTED:aws-access-key]/g' \
     -e 's/(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]{40}/\1=[REDACTED:aws-secret]/g' \
     -e 's/sk-ant-api[A-Za-z0-9_-]{20,}/[REDACTED:anthropic-key]/g' \
     -e 's/sk-(admin|proj|svcacct)-[A-Za-z0-9_-]{20,}/[REDACTED:openai-key]/g' \
@@ -149,6 +149,122 @@ cs_redact_secrets() {
     printf '[REDACTED: sanitization failed]\n'
     return 1
   }
+}
+
+# Stage one entry that is not a session transcript (an unattended review's
+# outcome narrative, say) in the pending ledger. The entry has the Stop
+# hook's shape, so the drain treats both producers alike.
+#
+# The narrative is untrusted text that the drain later embeds in a fenced
+# scorer prompt, so it is sanitised in a fixed order:
+#   1. cap at 8 KiB, cut at a line boundary (a mid-line cut could split a
+#      secret past the redaction patterns);
+#   2. strip control, zero-width, bidi and Unicode-tag characters — before
+#      redaction, because an invisible character inside a token defeats the
+#      patterns and stripping it afterwards would reassemble the secret;
+#   3. redact;
+#   4. neutralise lines that could forge a fence or a role turn (`---`,
+#      backtick/tilde fences, `system:`-style prefixes) by prefixing `> `.
+#      This runs after redaction because PEM markers begin with `-----` and
+#      the redaction range needs them intact.
+#
+# Args:
+#   $1 — cwd whose project slug selects the staging dir
+#   $2 — session id; non-promotable IDs are hashed, and a repeat overwrites
+#   $3 — file holding the narrative (read, never echoed)
+# Returns: 0 staged, 1 bad args, 2 jq missing, 3 sanitisation failed,
+#          4 write failed.
+cs_stage_entry() {
+  local cwd="${1:-}" sid="${2:-}" src="${3:-}"
+  local size capped stripped redacted text invisible hash ts slug staging entry
+  if [ -z "$cwd" ] || [ -z "$src" ] || [ ! -f "$src" ] || [ ! -r "$src" ]; then
+    return 1
+  fi
+  case "$sid" in
+    '' | . | ..) return 1 ;;
+  esac
+  # Match staging-promoter's [A-Za-z0-9_-]{1,64} contract. Hash the raw
+  # identifier when it is not already valid, retaining stable overwrite
+  # semantics without collisions between dotted and underscored repo names.
+  case "$sid" in
+    *[!A-Za-z0-9_-]*) hash=1 ;;
+    *) hash=0 ;;
+  esac
+  if [ "$hash" -eq 1 ] || [ "${#sid}" -gt 64 ]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+      sid=$(printf '%s' "$sid" | sha256sum | cut -d' ' -f1) || return 1
+    elif command -v shasum >/dev/null 2>&1; then
+      sid=$(printf '%s' "$sid" | shasum -a 256 | cut -d' ' -f1) || return 1
+    else
+      return 1
+    fi
+    case "$sid" in '' | *[!a-f0-9]*) return 1 ;; esac
+    [ "${#sid}" -eq 64 ] || return 1
+  fi
+  command -v jq >/dev/null 2>&1 || return 2
+
+  # The whole sanitise pipeline runs byte-wise (LC_ALL=C): in a UTF-8 locale
+  # an invalid byte stops `.` from matching, so a PEM header carrying one
+  # would escape the redaction range.
+  size=$(wc -c <"$src" | tr -d ' ')
+  if [ "${size:-0}" -gt 8192 ] 2>/dev/null; then
+    # The last kept line is whole when byte 8192 or 8193 is a newline;
+    # otherwise the cap cut it mid-way and it is dropped.
+    case "$(head -c 8193 "$src" | tail -c 2 | od -An -c)" in
+      *'\n'*) capped=$(head -c 8192 "$src" | tr -d '\000') ;;
+      *) capped=$(head -c 8192 "$src" | LC_ALL=C sed '$d' | tr -d '\000') ;;
+    esac
+  else
+    capped=$(tr -d '\000' <"$src")
+  fi
+
+  # Invisible or line-breaking characters, as UTF-8 bytes: U+00AD, C1
+  # controls (incl. NEL), U+034F, U+061C, U+180E, U+200B-200F, U+2028-202E,
+  # U+2060-2064, U+2066-2069, U+FE00-FE0F, U+FEFF, tags U+E0000-E007F.
+  # CR becomes a newline so a CR-hidden `---` line is neutralised below.
+  invisible=$(printf '\302[\200-\237\255]|\315\217|\330\234|\341\240\216|\342\200[\213-\217\250-\256]|\342\201[\240-\244\246-\251]|\357\270[\200-\217]|\357\273\277|\363\240[\200\201][\200-\277]')
+  stripped=$(printf '%s\n' "$capped" \
+    | tr '\015' '\012' \
+    | tr -d '\001-\010\013\014\016-\037\177' \
+    | LC_ALL=C sed -E -e "s/${invisible}//g") || return 3
+  redacted=$(printf '%s\n' "$stripped" \
+    | (LC_ALL=C; export LC_ALL; cs_redact_secrets) 2>/dev/null) || return 3
+  text=$(printf '%s\n' "$redacted" | LC_ALL=C sed -E \
+    -e '/^[[:space:]]*(---|```|~~~)/s/^/> /' \
+    -e '/^[[:space:]]*([Ss][Yy][Ss][Tt][Ee][Mm]|[Aa][Ss][Ss][Ii][Ss][Tt][Aa][Nn][Tt]|[Hh][Uu][Mm][Aa][Nn]|[Uu][Ss][Ee][Rr])[[:space:]]*:/s/^/> /') \
+    || return 3
+  [ -n "$text" ] || return 1
+
+  hash=""
+  if command -v sha256sum >/dev/null 2>&1; then
+    hash=$(printf '%s' "$text" | sha256sum 2>/dev/null | cut -d' ' -f1)
+  elif command -v shasum >/dev/null 2>&1; then
+    hash=$(printf '%s' "$text" | shasum -a 256 2>/dev/null | cut -d' ' -f1)
+  fi
+  ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+  # cs_staging_dir_for_slug does not check HOME; an unset HOME would stage
+  # under /.claude.
+  [ -n "${HOME:-}" ] || return 4
+  slug=$(cs_derive_project_slug "$cwd")
+  staging=$(cs_staging_dir_for_slug "$slug") || return 4
+  entry=$(jq -nc \
+    --arg ts "$ts" \
+    --arg sid "$sid" \
+    --arg hash "$hash" \
+    --arg cwd "$cwd" \
+    --arg tail "$text" \
+    '{
+       schema: "1",
+       schema_min_reader: "1",
+       timestamp: $ts,
+       session_id: $sid,
+       content_hash: $hash,
+       cwd: $cwd,
+       transcript_tail: $tail
+     }') || return 4
+  cs_atomic_jsonl_write "${staging}/pending/${sid}.jsonl" "${entry}
+" || return 4
 }
 
 # Read the drain-budget JSON file. Emits a single-line JSON object on stdout.
