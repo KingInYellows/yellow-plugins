@@ -74,10 +74,12 @@ CLAUDE-48, CLAUDE-49.
   signing off, `safe.bareRepository=explicit`.
 - `--ignored-since` becomes required in attended runs too; every interactive
   caller in `resolve-pr.md` already passes it.
-- Vendor prefixes: add `tvly-` and `pplx-` (confirmed in vendor docs). Leave
-  `sgp_` out until a source confirms it, and record that.
-- CLAUDE-74 `--abort`: abort the detected worktree's rebase first, re-check
-  every stack worktree, and stop with `X_KEPT` only if a marker remains.
+- Vendor prefixes: add `tvly-` and `pplx-` (vendor docs) and `sgp_`
+  (repo-documented in yellow-semgrep as `^sgp_[a-zA-Z0-9]{20,}$`; no public
+  Semgrep format, so record that).
+- CLAUDE-74 `--abort`: bounded detect-and-abort loop over every rebasing
+  stack worktree, then one final all-worktree check; stop with `X_KEPT` only
+  if a marker remains.
 - The `$ARGUMENTS` heredoc convention (CLAUDE-74, second paragraph) is a
   framework limitation: document it as won't-fix, no script change.
 
@@ -193,8 +195,11 @@ only yellow-core and may be unstacked to reduce restack risk.
   paths once, before the first git call (`commit-resolve-fixes` L200,
   `run-verify-command` L156). Canonicalise the binary with `cd -P`/`pwd -P`
   plus a bounded `readlink` loop (precedent at `resolve-paths.sh:121`), never
-  bare `realpath`. Before git can report the repo top, test containment
-  against the canonical `$PWD`; test against the git toplevel once known.
+  bare `realpath`. Before git can report the repo top, reject a binary inside
+  the containing worktree: walk ancestors of canonical `$PWD` for a `.git`
+  file or directory without invoking git, or pick git from an independently
+  trusted location. `$PWD` alone is not enough — a launch from `/repo/subdir`
+  lets `/repo/bin/git` through. Test against the git toplevel once known.
   Drop empty and relative PATH entries. Call the resolved absolute paths.
 - [ ] 2.3: `run-verify-command` L833: use `lgit_nohooks status`. Audit the other
   plain-`git` calls (`diff --no-index` L595/L606, `check-ignore` L347,
@@ -205,7 +210,8 @@ only yellow-core and may be unstacked to reduce restack risk.
   L797–806. If the snapshot cannot be written, delete nothing and refuse.
 - [ ] 2.6: Tests (`tests/commit-resolve-fixes.bats`, `tests/run-verify-command.bats`),
   each failing on `main` and passing after: a hostile `git` earlier on PATH
-  and one inside the repo write a canary that must not appear; a symlink in
+  and one inside the repo write a canary that must not appear (invoke the
+  in-repo canary from a subdirectory of the repository root); a symlink in
   an outside directory to an ignored in-tree executable is refused; a
   `core.fsmonitor` canary during the rollback status; a FIFO in the revert
   list (wrap in `timeout`, never open it); attended run without
@@ -228,6 +234,8 @@ only yellow-core and may be unstacked to reduce restack risk.
 > that spawn git. (c) `check_tools_outside_repo` already exists
 > (`commit-resolve-fixes:424-437`, test at `commit-resolve-fixes.bats:2413`);
 > it covers gt, gh, jq and node but not git, and canonicalises only `dirname`.
+> It also treats `pwd -P` as the repository root, so a subdirectory launch
+> has the same `/repo/bin/git` hole; the ancestor `.git` walk belongs there.
 > `run-verify-command` has no equivalent (only `GH_BIN` at L186). Extend it,
 > don't rebuild. (d) Task 2.5 lacks a rationale: `save_patch` (L581-610)
 > handles only symlinks, regular files and directories, so a FIFO leaves
@@ -317,12 +325,14 @@ Start from a base that includes `stage-unattended-learnings` and PR 3.
   planted ASCII credential after a bare keyword is still flagged under both
   awks.
 - [ ] 5.2: L450–461: keep the Bearer floor at 20; give `Authorization: Basic`
-  a floor of 12 with a decodable `user:pass` shape. Boundary tests at 11/12,
-  plus a realistic-text test ("Authentication") that must not flag.
-- [ ] 5.3: L478–490: add `tvly-` and `pplx-` with a floor chosen from vendor
-  key lengths (use 16 if none is documented). Skip `sgp_` and record why. Add
-  the same prefixes to yellow-core `cs_redact_secrets`
-  (`compound-staging.sh` L118–150), or document the deliberate gap.
+  the minimum valid encoded length (4, `YTpi` = `a:b`) plus a decodable
+  `user:pass` shape. Boundary tests at 4 and 8; do not assert that length 11
+  stays clean. Keep the realistic-text test ("Authentication") that must
+  not flag.
+- [ ] 5.3: L478–490: add `tvly-`, `pplx-`, and repo-documented `sgp_`
+  (`^sgp_[a-zA-Z0-9]{20,}$` in `plugins/yellow-semgrep/CLAUDE.md:80`) with
+  floors from those in-repo formats. Add the same prefixes to yellow-core
+  `cs_redact_secrets` (`compound-staging.sh` L118–150).
 - [ ] 5.4: `scripts/reply-pr-thread` L215–217: allow `oos → fixed` and
   `oos → addressed`; keep `oos → oos` idempotent. Update the header
   (L14–16), `dispositions.md` (L650–653), and `plugins/yellow-review/CLAUDE.md`.
@@ -340,17 +350,17 @@ Start from a base that includes `stage-unattended-learnings` and PR 3.
 > 5.2.1 under `C.UTF-8`, and `_rt_scan` does not pin `LC_ALL` (L24-29), so a
 > fatal awk exit would read as a scan failure. `c !~ /^[\001-\177]/` and `c >
 > "\177"` gave identical results in gawk and mawk (tested on `Él`, `él`, `Ab`,
-> `ab`, `日本`). (b) A Basic floor of 12 alone cannot pass the plan's
+> `ab`, `日本`). (b) A length floor alone cannot pass the plan's
 > "Authentication must not flag" test, because "Authentication" is 14
 > characters; the scan lowercases input (`l = tolower($0)`, L280 and L609), so
-> a base64 shape check must use the original `$0`. (c) The repo already
+> a base64 shape check must use the original `$0`. The 4-character minimum
+> plus that shape is what keeps prose clean. (c) The repo already
 > documents vendor formats: Tavily `^tvly-[a-zA-Z0-9_-]{20,}$`
 > (`yellow-research/commands/research/setup.md:199`), Perplexity
 > `^pplx-[a-zA-Z0-9_-]{40,}$` (`setup.md:212`), Semgrep
 > `^sgp_[a-zA-Z0-9]{20,}$` (`yellow-semgrep/CLAUDE.md:80`,
-> `skills/semgrep-conventions/SKILL.md:49`). Use these floors instead of the
-> fallback of 16; they contradict "skip `sgp_`", but see the external note
-> below. (d) `cs_redact_secrets` is at `compound-staging.sh:118-150` and the
+> `skills/semgrep-conventions/SKILL.md:49`). Use these floors; keep `sgp_`
+> as repo-documented (see the external note). (d) `cs_redact_secrets` is at `compound-staging.sh:118-150` and the
 > staging branch already edits L124, so expect an adjacent merge conflict. (e)
 > `check-resolve-text.bats` has only a `failbin/awk` stub (L140-143, L405-408)
 > that makes awk fail; there is no gawk or mawk selector, so task 5.5 must
@@ -366,9 +376,9 @@ Start from a base that includes `stage-unattended-learnings` and PR 3.
 > https://docs.tavily.com/documentation/enterprise/generate-keys; allow an
 > optional `dev-` or `prod-` segment. Semgrep: no vendor or scanner documents
 > an `sgp_` prefix (https://docs.semgrep.dev/deployment/tokens publishes no
-> format), so the in-repo claim is unverified outside this repo; if kept,
-> record it as repo-documented and keep `SEMGREP_APP_TOKEN` name-based
-> matching. Over-flagging is the safe direction for a redaction scan, so the
+> format), so the in-repo claim is unverified outside this repo. Keep `sgp_`
+> as repo-documented and keep `SEMGREP_APP_TOKEN` name-based matching.
+> Over-flagging is the safe direction for a redaction scan, so the
 > lower in-repo floors are acceptable. Sources:
 > https://github.com/gitleaks/gitleaks/blob/master/cmd/generate/config/rules/perplexity.go
 > and
@@ -378,11 +388,13 @@ Start from a base that includes `stage-unattended-learnings` and PR 3.
 ### Phase 6: PR 6 — `fix(yellow-core)`: `/worktree:restack --abort` checks every stack worktree (CLAUDE-74)
 
 - [ ] 6.1: `skills/git-worktree/scripts/worktree-restack.sh` `cmd_abort` (L1433–1461):
-  call `chain_rebase_worktree` (L1376–1391) before `restore_and_clear`. If a
-  stack worktree is mid-rebase, run `git rebase --abort` in that worktree
-  through the fail-closed wrapper, then re-check every stack worktree with
-  `git rev-parse --path-format=absolute --git-path rebase-merge` and
-  `rebase-apply`. Stop with `X_KEPT` (exit 31) if any marker remains. A second
+  before `restore_and_clear`, run a bounded detect-and-abort loop.
+  `chain_rebase_worktree` (L1376–1391) returns only the first match, so keep
+  calling it and running `git rebase --abort` in that worktree through the
+  fail-closed wrapper until it returns none or the bound is hit. Then one
+  final all-worktree check with `git rev-parse --path-format=absolute
+  --git-path rebase-merge` and `rebase-apply` (or `wt_busy` across
+  `WT_PATH`). Stop with `X_KEPT` (exit 31) if any marker remains. A second
   `--abort` must work.
 - [ ] 6.2: Tests in `skills/git-worktree/tests/worktree-restack.bats`, modelled on
   the `--continue` test at L809–820: rebase paused in a non-run worktree;
@@ -474,8 +486,9 @@ None new at runtime. CI gains `universal-ctags` (apt) in the new job.
    unreadable PR state stops the batch; no `/flow:compound` after an
    unknown-tree stop (or the task is recorded as not applicable).
 5. PR 5: planted ASCII credentials are flagged under gawk and mawk;
-   non-English prose is not; Basic 11/12 boundary holds; `tvly-` and `pplx-`
-   flagged; `oos → fixed/addressed` works and `oos → oos` stays idempotent.
+   non-English prose is not; Basic 4- and 8-character encoded credentials
+   flag and "Authentication" does not; `tvly-`, `pplx-`, and `sgp_` flagged;
+   `oos → fixed/addressed` works and `oos → oos` stays idempotent.
 6. PR 6: `--abort` never reports success while any stack worktree holds a
    rebase marker, and is safe to repeat.
 7. Phase 7: five Linear issues closed only after the user confirms the
