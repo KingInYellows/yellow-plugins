@@ -144,6 +144,16 @@ you want richer library docs:
 /plugin install context7@upstash
 ```
 
+## Quote grounding
+
+`lib/quote-ground.sh` grounds a single-line quote inside a cited window.
+Run it with bash. Do not source it, and it is not a dual-shell library.
+`check` reads the quote from stdin and prints the matched line number.
+`batch` reads JSONL findings (`id`, `file`, `line`, `quote`) and writes one
+result object per id. The later council shell 05 PR calls
+`quote-ground.sh batch` for its Tier 1 check and adds the yellow-core catalog
+dependency.
+
 ## License
 
 MIT

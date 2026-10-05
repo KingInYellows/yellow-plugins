@@ -17,6 +17,8 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   keep them that way — `tests/shell-compat/` runs them under bash and zsh.
   Bash-only code goes in a `bash /dev/fd/3 3<<'__YELLOW_CORE_BASH__'` wrapper
   (as in `staging-reviewer`); see CONTRIBUTING.md "Bash and zsh".
+  `lib/quote-ground.sh` is executed with bash and is never sourced. It is
+  not a dual-shell library and is not registered in `tests/shell-compat/`.
 - Review agents (`security-sentinel`, `security-reviewer`, `security-lens`,
   `architecture-strategist`, `polyglot-reviewer`, `test-coverage-analyst`,
   `pattern-recognition-specialist`, `code-simplicity-reviewer`,
@@ -366,6 +368,16 @@ cross-plugin pattern:
   shared jq validator for that object. Runs no git; needs `compound-staging.sh`
   sourced first. Used by `session-handoff`'s `measure` and `context`
 
+`lib/quote-ground.sh` is not one of those sourced helpers. Execute it with
+bash. `check <file> <line> [radius]` reads the quote from stdin only (a
+missing radius is 3) and prints the matched line number when the redacted,
+placeholder-canonicalized, whitespace-normalized quote is a substring of a
+line in the inclusive window. `batch` reads JSONL `{id, file, line, quote}`
+and writes one object per id with `id`, `result`, and `matched_line`. The
+script sources `validate-fs.sh` and `compound-staging.sh` itself. Do not
+source `quote-ground.sh`, and do not add it to the Tier 4 dual-shell list.
+Bats coverage is `tests/quote-ground.bats`.
+
 ### Optional Plugin Dependencies
 
 - **gt-workflow** — `/flow:work` delegates to `/smart-submit` for
@@ -512,7 +524,7 @@ inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
 `bats tests/` from the plugin directory (`compound-session-start-hook`,
 `compound-staging`, `compound-stop-hook`, `context-observer`,
 `credential-status`, `handoff`, `plan-commands`, `plan-status-parity`,
-`plugin-identity`, `pre-compact-hook`, `repo-profile`,
+`plugin-identity`, `pre-compact-hook`, `quote-ground`, `repo-profile`,
 `setup-all-ruvector-probe`, `validate-fs`) plus `skills/git-worktree/tests/` (`worktree-manager.bats`,
 `worktree-restack.bats` with stub `gt` / `gh` / `git` shims under `tests/mocks/`).
 Manifest hook budgets: Stop 5s, SessionStart 3s, PreCompact 3s

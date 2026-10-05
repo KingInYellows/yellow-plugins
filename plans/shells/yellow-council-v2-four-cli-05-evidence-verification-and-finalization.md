@@ -97,6 +97,8 @@ changing the synthesis shell's mechanical combination rule.
   yellow-council-v2-four-cli-04-quota-and-opencode-routing)
 - Council mode dispatch (review / plan / debug / question) that Tier 1 keys its
   lookup target on (from existing codebase)
+- `plugins/yellow-core/lib/quote-ground.sh batch` is the Tier 1 check. The
+  yellow-core catalog dependency is added in the later shell 05 PR.
 
 ## Covers Spec Requirements
 
@@ -276,9 +278,10 @@ always names a step of `plugins/yellow-council/commands/council/council.md`.
    `council_normalize_text` per "Carried follow-ups", with their golden cases in
    `plugins/yellow-council/tests/synthesis.bats`; verify them with
    `bats tests/synthesis.bats` from `plugins/yellow-council`.
-2. **Verification helper** — Tier 1 mode-dependent exact match with the
-   skip-to-Tier-2 rule for unknown/non-checkout contexts; Tier 2 fuzzy ratio
-   ≥85; three-state result.
+2. **Verification helper** — Tier 1 calls `quote-ground.sh batch` for the
+   window match, with the skip-to-Tier-2 rule for unknown/non-checkout
+   contexts. The yellow-core catalog dependency is added in the later shell
+   05 PR. Tier 2 fuzzy ratio ≥85; three-state result.
 3. **Optional dependency handling** — import probe, soft-skip with warning,
    documented as optional.
 4. **Five-bucket synthesis reorganization** — apply the deterministic precedence
