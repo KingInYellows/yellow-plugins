@@ -1,0 +1,14 @@
+plans/complete/fix-hooks-json-mirror-double-registration.md
+  h_6000354274ce50 3-8,179-181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "70c70563eb1fe8167ae982d0ab2284bc66a61b54",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
