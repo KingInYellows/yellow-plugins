@@ -665,6 +665,43 @@ now_ms() {
   jq -e '.id == "\uD800\uDC00" and .result == "grounded"' <<<"$output" >/dev/null
 }
 
+@test "batch rejects an unpaired surrogate escape in a top-level quote" {
+  printf '%s\n' "$Q26" >src/a.txt
+  run bash "$QG" batch <<<'{"id":"ok","file":"src/a.txt","line":1,"quote":"abcdefgh\uDC00ijkl"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<"$(row ok src/a.txt 1 "$Q26")"$'\n''{"id":"bad","file":"src/a.txt","line":1,"quote":"abcdefgh\uDC00ijkl"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<'{"id":"ok","file":"src/a.txt","line":1,"quote":"abcdefgh\uD800ijkl"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<'{"id":"ok","file":"src/a.txt","line":1,"quote":"\uD800\uDC00"}'
+  [ "$status" -eq 0 ]
+  jq -e '.result == "ungrounded" or .result == "too-short"' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<'{"id":"ok","file":"src/a.txt","line":1,"quote":"abcdefgh\uDC00ijkl","quote":"'"$Q26"'"}'
+  [ "$status" -eq 0 ]
+  jq -e '.id == "ok" and .result == "grounded" and .matched_line == 1' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<'{"id":"ok","file":"src/a.txt","line":1,"quote":"'"$Q26"'","quote":"abcdefgh\uDC00ijkl"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<'{"id":"ok","nested":{"quote":"abcdefgh\uDC00ijkl"},"file":"src/a.txt","line":1,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 0 ]
+  jq -e '.id == "ok" and .result == "grounded" and .matched_line == 1' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<'{"id":"ok","file":"src/a.txt","line":1,"\u0071uote":"abcdefgh\uDC00ijkl"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  # Eight characters so the ordinary escape is long enough to ground.
+  printf '%s\n' 'abcadefx' >src/a.txt
+  run bash "$QG" batch <<<'{"id":"ok","file":"src/a.txt","line":1,"quote":"abc\u0061defx"}'
+  [ "$status" -eq 0 ]
+  jq -e '.result == "grounded" and .matched_line == 1' <<<"$output" >/dev/null
+  printf '%s\n' 'abc\uDC00def' >src/a.txt
+  run bash "$QG" batch <<<'{"id":"ok","file":"src/a.txt","line":1,"quote":"abc\\uDC00def"}'
+  [ "$status" -eq 0 ]
+  jq -e '.result == "grounded" and .matched_line == 1' <<<"$output" >/dev/null
+}
+
 @test "batch emits non-integer numeric ids as their original lexeme" {
   printf '%s\n' "keep 1e400 $Q26" >src/a.txt
   run bash "$QG" batch <<<"{\"id\":9007199254740993.0,\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"keep 1e400 $Q26\"}"

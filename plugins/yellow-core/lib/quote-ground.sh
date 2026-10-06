@@ -21,8 +21,8 @@
 # a larger integer fails the batch. Any other numeric id is emitted as its
 # original lexeme, never through tonumber or fromjson. A decoded string id
 # that cs_redact_secrets would change fails the batch, as does an unpaired
-# surrogate escape in that id; the id is not printed. Numeric ids are not
-# redaction-checked. batch always uses radius 3. A missing file is
+# surrogate escape in that id or in the top-level quote; neither is printed.
+# Numeric ids are not redaction-checked. batch always uses radius 3. A missing file is
 # exit 2 in check mode; in batch that row is ungrounded and is not opened. A
 # row whose file, line or quote has the wrong type, or holds U+0000, is
 # ungrounded and does not affect its siblings. A cited file with a NUL byte in
@@ -31,8 +31,8 @@
 # exits 2 with no result rows when jq or iconv is missing, when a line is blank
 # or not JSON, when a row has no usable id (a string or number without U+0000,
 # an integer outside ±2^53, a credential-bearing string, or an unpaired
-# surrogate escape), when a cited file cannot be read, or when
-# redaction fails.
+# surrogate escape in the id or the top-level quote), when a cited file
+# cannot be read, or when redaction fails.
 #
 # Redaction runs per line before matching, and every [REDACTED] or
 # [REDACTED:<type>] token is canonicalized to [REDACTED] on both sides. A
@@ -537,8 +537,10 @@ qg_reject_credential_ids() {
 # lexeme must be emitted unchanged. An integer id outside ±2^53 fails the
 # batch before fromjson, by comparing the raw digit string, not tonumber.
 # A string id is rejected before fromjson when its raw lexeme holds an
-# unpaired surrogate escape: iconv only sees the UTF-8 bytes, so `\uDC00`
-# would otherwise pass and jq 1.7 would replace it with U+FFFD. The raw bytes
+# unpaired surrogate escape, and an unpaired surrogate escape in the top-level
+# quote fails the batch the same way. iconv only sees the UTF-8 bytes, so
+# `\uDC00` would otherwise pass and jq 1.7 would replace it with U+FFFD. The
+# last top-level quote wins; a nested quote is not checked. The raw bytes
 # first pass through iconv, which fails on invalid UTF-8 that jq would
 # otherwise replace with U+FFFD and so change an id. iconv is required
 # for batch, like jq: a missing iconv exits 2 and names the dependency before
@@ -583,8 +585,9 @@ qg_load_rows() {
     # lexeme back. Escaped keys are decoded with fromjson. Only the top-level
     # id is checked (object depth 1). A repeated top-level id fails the batch.
     # A string id is judged from its raw lexeme, before fromjson, so an
-    # unpaired surrogate fails closed. Braces inside a string do not change
-    # depth.
+    # unpaired surrogate fails closed. An unpaired surrogate escape in the
+    # top-level quote fails the batch the same way. The last top-level quote
+    # wins. Braces inside a string do not change depth.
     def int_abs_ok:
       (if startswith("-") then .[1:] else . end) as $d
       | ($d | length) as $len
@@ -608,7 +611,8 @@ qg_load_rows() {
     def colon_only: "^[ \\t\\r]*:[ \\t\\r]*$";
     def id_scan:
       reduce scan("\"(?:[^\"\\\\]|\\\\.)*\"|[^\\\"]+") as $tok (
-        {prev: null, depth: 0, bad: false, lex: null, want: false, seen: false, out: ""};
+        {prev: null, depth: 0, bad: false, lex: null, want: false, seen: false,
+         want_quote: false, quote_bad: false, out: ""};
         if .bad then .out += $tok
         elif .want then
           .want = false
@@ -618,6 +622,16 @@ qg_load_rows() {
               | .bad = ($tok | has_unpaired_surrogate)
             else
               .depth += brace_delta($tok)
+            end
+          | .out += $tok
+        elif .want_quote then
+          .want_quote = false
+          | .prev = null
+          | if ($tok | startswith("\"")) then
+              .quote_bad = ($tok | has_unpaired_surrogate)
+            else
+              .quote_bad = false
+              | .depth += brace_delta($tok)
             end
           | .out += $tok
         elif ($tok | startswith("\"")) then
@@ -645,6 +659,11 @@ qg_load_rows() {
           | .depth += brace_delta($tok)
           | .prev = null
           | .out += $tok
+        elif ((.prev == "quote") and .depth == 1 and ($tok | test(colon_only))) then
+          .want_quote = true
+          | .depth += brace_delta($tok)
+          | .prev = null
+          | .out += $tok
         else
           .depth += brace_delta($tok)
           | .prev = null
@@ -654,7 +673,7 @@ qg_load_rows() {
     def parse:
       if test("^[ \t\r]*$") then error("blank record")
       else id_scan as $info
-      | if $info.bad then error("row has no usable id")
+      | if ($info.bad or $info.quote_bad) then error("row has no usable id")
         elif strict then
           [(if $info.lex == null then . else $info.out end | fromjson), $info.lex]
         else error("not strict JSON") end
