@@ -1,0 +1,20 @@
+plugins/yellow-core/lib/quote-ground.sh
+  s_99030e4253364c::t_e1d3d75590c134 514-519,521-523,533-540,542
+  s_99030e4253364c::t_e7c312992f50c9 166-169,172-173
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d349d61b58d5fd57273b2f632b013d9802c61e64",
+  "prompts": {},
+  "sessions": {
+    "s_99030e4253364c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9d071984-2c60-4c4a-b608-cc31f4d4e675",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
