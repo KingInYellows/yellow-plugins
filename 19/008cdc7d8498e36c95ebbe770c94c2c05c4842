@@ -1,0 +1,19 @@
+plans/yellow-rtk-plugin.md
+  s_df8d7231d1f6b5::t_9c254ac37b436f 3-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "19008cdc7d8498e36c95ebbe770c94c2c05c4842",
+  "prompts": {},
+  "sessions": {
+    "s_df8d7231d1f6b5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7e5d86f-3b2b-4423-b601-e40b54efe5c2",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
