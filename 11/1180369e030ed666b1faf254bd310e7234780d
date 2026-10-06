@@ -1,0 +1,28 @@
+plugins/yellow-core/commands/plan/complete.md
+  s_7ff5563f37cf8c::t_843305e7b791dd 263-273,275,277-281
+  s_7ff5563f37cf8c::t_0091b31e52715b 658-661
+  s_7ff5563f37cf8c::t_1e1e465ac29739 173-181,188-190
+  s_7ff5563f37cf8c::t_900169a3bc81ac 284-285,287-300
+  s_7ff5563f37cf8c::t_3c3513b25086e5 216-222
+  s_7ff5563f37cf8c::t_4ef7826932f5f8 274,276
+  s_7ff5563f37cf8c::t_2b8de6363d571b 224,239-246,249,253
+  s_7ff5563f37cf8c::t_7ddd55e7bf516b 626-633,636-637
+  s_7ff5563f37cf8c::t_0aaeeb79a00a22 3
+  s_7ff5563f37cf8c::t_0702ce6d0c7419 27-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "111180369e030ed666b1faf254bd310e7234780d",
+  "prompts": {},
+  "sessions": {
+    "s_7ff5563f37cf8c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d05e76fc-81b7-4e79-b4ae-f69e4b52dd96",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
