@@ -1,0 +1,22 @@
+.changeset/quote-ground-window-match.md
+  h_6000354274ce50 10-11
+plugins/yellow-core/CLAUDE.md
+  h_6000354274ce50 372-390
+plugins/yellow-core/README.md
+  h_6000354274ce50 150-153,182-184
+plugins/yellow-core/lib/quote-ground.sh
+  h_6000354274ce50 26-28,481-486,490
+plugins/yellow-core/tests/quote-ground.bats
+  h_6000354274ce50 518-533
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a740f3aaeb7768d880e1409976e3b1ef720c0f55",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
