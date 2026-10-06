@@ -337,7 +337,8 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   the installed cache. `review-ledger.sh` checks `RL_CORE_LIB` before calling
   it; the helper itself has no override.
 - `lib/review-ledger.sh <subcommand>` — the durable review-findings ledger
-  (plans/review-findings-ledger.md): an append-only JSONL file per PR at
+  (plans/complete/review-findings-ledger.md): an append-only JSONL file
+  per PR at
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`,
   shared by every worktree of the clone. Subcommands `observe`, `transition`,
   `fold`, `dismissed-context`, `reverify`, `publication`, `validate-path`,

@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 # Behavioural tests for lib/review-ledger.sh, the durable review-findings
-# ledger (plans/review-findings-ledger.md, Stage 1). Every case builds a
-# throwaway repository under $BATS_TEST_TMPDIR; the ledger lives in that
-# repository's own .git, never in this checkout's.
+# ledger (plans/complete/review-findings-ledger.md, Stage 1). Every case
+# builds a throwaway repository under $BATS_TEST_TMPDIR; the ledger lives
+# in that repository's own .git, never in this checkout's.
 
 bats_require_minimum_version 1.5.0
 

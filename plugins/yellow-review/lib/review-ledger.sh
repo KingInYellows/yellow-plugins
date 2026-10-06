@@ -9,7 +9,7 @@
 # (one per finding per run) and `transition` (a lifecycle change). Readers
 # fold in file order and take the latest transition per finding_id. Design:
 # docs/brainstorms/2026-09-23-review-findings-ledger-brainstorm.md and
-# plans/review-findings-ledger.md.
+# plans/complete/review-findings-ledger.md.
 #
 # Command prose invokes this file as an executable; shell state does not
 # survive between a command file's Bash calls. Bats sources it for unit
