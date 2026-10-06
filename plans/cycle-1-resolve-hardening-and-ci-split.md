@@ -1,12 +1,14 @@
 # Feature: Cycle 1 — resolve-flow hardening, CI split, restack abort guard
 
 > **Status (2026-10-06):** reviewed and refreshed; still valid in direction.
-> 5 of 40 boxes are now `[x]` (work already on `main`), 1 is `[-]`, 34 are
+> 2 of 40 boxes are now `[x]` (work already on `main`), 1 is `[-]`, 37 are
 > open. Five of the six PRs are still needed: PR 1 (CI split), PR 3, PR 4,
-> PR 5 and PR 6 are unchanged in substance. PR 2 is mostly done by
-> #1025 (`refuse in-worktree git, gh, and jq`): tasks 2.2 and 2.3 are `[x]`, and
-> 2.1, 2.4, 2.5 and 2.6 are rescoped to what remains. Task 4.4 is not
-> applicable. `main` has moved about 20 commits past the `38d5d5d25` baseline,
+> PR 5 and PR 6 are unchanged in substance. PR 2 is partly done by
+> #1025 (`refuse in-worktree git, gh, and jq`): git, gh and jq are bound,
+> but 2.2 and 2.3 stay open, and 2.1, 2.4, 2.5 and 2.6 stay rescoped to
+> what remains. Task 4.4 is not applicable. Task 7.2 stays open: Linear
+> already shows the five issues Done, and the mapping and confirm step
+> were not recorded. `main` has moved about 20 commits past the `38d5d5d25` baseline,
 > including #1014 (stage-unattended-learnings) and #1032 (restack pause state);
 > the PR 6 targets (`cmd_abort`, `chain_rebase_worktree`) are unchanged.
 > Linear: CLAUDE-70 to 75 are still In Progress with no open PR;
@@ -213,9 +215,11 @@ only yellow-core and may be unstacked to reduce restack risk.
   `die`, since the two scripts use different exit codes. Move the transport
   and filter refusals, signing-off and fsmonitor/untrackedCache overrides out
   of `commit-resolve-fixes` (L451–504) into it. Both scripts call it.
-- [x] 2.2: (done by #1025 (`e7992d9c0`): `yr_resolve_tool` resolves git, gh and
-  jq to absolute paths whose canonical file is outside the worktree, before
-  `check_lib_integrity`, and refuses a symlink that resolves into the tree.) Resolve `git`, `gh`, `jq` (plus the existing `gt`, `node`) to absolute
+- [ ] 2.2: (rescoped 2026-10-06: #1025 (`e7992d9c0`) binds git, gh and jq
+  through `yr_resolve_tool` before `check_lib_integrity`. `gt` and `node`
+  still use `check_tools_outside_repo`, which canonicalises only the
+  containing directory, and the script invokes them by bare name, so an
+  outside PATH symlink to an in-tree executable still passes.) Resolve `git`, `gh`, `jq` (plus the existing `gt`, `node`) to absolute
   paths once, before the first git call (`commit-resolve-fixes` L200,
   `run-verify-command` L156). Canonicalise the binary with `cd -P`/`pwd -P`
   plus a bounded `readlink` loop (precedent at `resolve-paths.sh:121`), never
@@ -225,10 +229,11 @@ only yellow-core and may be unstacked to reduce restack risk.
   trusted location. `$PWD` alone is not enough — a launch from `/repo/subdir`
   lets `/repo/bin/git` through. Test against the git toplevel once known.
   Drop empty and relative PATH entries. Call the resolved absolute paths.
-- [x] 2.3: (done: no bare `git status` remains in `run-verify-command`; every
-  status call uses `lgit_nohooks`, which sets `core.fsmonitor=false` and
-  `core.untrackedCache=false`; other git calls use the absolute git from
-  #1025.) `run-verify-command` L833: use `lgit_nohooks status`. Audit the other
+- [ ] 2.3: (still open 2026-10-06: per-file status uses `lgit_nohooks`. The
+  final rollback status is still `git -c core.hooksPath=/dev/null status`
+  and does not set `core.fsmonitor=false` or `core.untrackedCache=false`.
+  The `git()` shadow from #1025 makes that binary absolute; it does not
+  add those overrides.) `run-verify-command` L833: use `lgit_nohooks status`. Audit the other
   plain-`git` calls (`diff --no-index` L595/L606, `check-ignore` L347,
   `cat-file` L430/L588/L808).
 - [ ] 2.4: (verified still open 2026-10-06: `run-verify-command` requires
@@ -456,9 +461,10 @@ Start from a base that includes `stage-unattended-learnings` and PR 3.
   occurrences (46); each row of the decision table in
   `plans/complete/review-findings-ledger.md` (~L248–300) (48); the ctags
   path now running in CI (49).
-- [x] 7.2: (outcome observed 2026-10-06: Linear shows CLAUDE-44, 45, 46, 48 and
-  49 as Done (2026-10-05); the mapping and confirm step were not recorded, so
-  7.1 still stands.) Show the mapping and the merged PR numbers to the user and confirm
+- [ ] 7.2: (still open 2026-10-06: Linear shows CLAUDE-44, 45, 46, 48 and
+  49 as Done (2026-10-05). That state is not this task's confirmation:
+  the mapping, ownership check and closing comment were not recorded, so
+  7.1 still stands. Do not transition them again.) Show the mapping and the merged PR numbers to the user and confirm
   before any Linear write. Check each issue for an active owner or branch.
   Then post the mapping as the closing comment and move the five issues to
   Done (a confirmed Tier 2 transition). Leave CLAUDE-47 alone.
