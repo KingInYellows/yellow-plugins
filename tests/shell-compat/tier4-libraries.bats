@@ -86,10 +86,52 @@ assert_same_under_all_profiles() {
 
 @test "yellow-core plan-gate-provenance.sh behaves the same in bash and zsh" {
   assert_same_under_all_profiles plugins/yellow-core/lib/plan-gate-provenance.sh
-  [[ "$LIB_OUTPUT" == *"subject[x (#494) (#556)]=556 rc=0"* ]]
-  [[ "$LIB_OUTPUT" == *"scenario[ok] rc=0 PASS|pr=#42 sha=<ok> via=commit-subject|base=main"* ]]
-  [[ "$LIB_OUTPUT" == *"scenario[stacked] rc=0 PASS|pr=#42 sha=<ok> via=commit-subject|base=feat/parent"* ]]
-  [[ "$LIB_OUTPUT" == *"scenario[plan-only] rc=1 NO-EVIDENCE"* && "$LIB_OUTPUT" == *"commit[gone] rc=1 NO-EVIDENCE"* ]]
+  # Pin every scenario by its exact outcome: agreement between shells alone
+  # would still pass if both produced the same wrong answer.
+  local want
+  local wants=(
+    'subject[x (#494) (#556)]=556 rc=0'
+    'subject[x (#12) y]= rc=1'
+    'subject[Revert "x (#9)" (#10)]= rc=1'
+    'sha_full[0123456789ABCDEF0123456789ABCDEF01234567]=1'
+    'class[API rate limit exceeded (HTTP 403)]=rate-limited'
+    'scenario[ok] rc=0 PASS|pr=#42 sha=<ok> via=commit-subject|base=main'
+    'scenario[stacked] rc=0 PASS|pr=#42 sha=<ok> via=commit-subject|base=feat/parent'
+    'scenario[paginated] rc=0 PASS|pr=#42 sha=<ok> via=commit-subject|base=main'
+    'scenario[open] rc=1 NO-EVIDENCE|pull request #42 is still open; retry shortly'
+    'scenario[notfound] rc=1 NO-EVIDENCE|pull request #42 could not be found in this repository'
+    'scenario[ratelimit] rc=1 NO-EVIDENCE|GitHub rate limit reached fetching pull request #42'
+    'scenario[auth] rc=1 NO-EVIDENCE|gh is not authenticated; cannot fetch pull request #42'
+    'scenario[files-notfound] rc=1 NO-EVIDENCE|the files of pull request #42 could not be found in this repository'
+    'scenario[badjson] rc=1 NO-EVIDENCE|files list of pull request #42 could not be parsed'
+    'scenario[plan-only] rc=1 NO-EVIDENCE|pull request #42 changes only plans/ files; no delivered work'
+    'scenario[blob-mismatch] rc=1 NO-EVIDENCE|plan content in pull request #42 differs from trunk at <ok>'
+    'scenario[other-mismatch] rc=1 NO-EVIDENCE|pull request #42 has no non-plan file that matches commit <ok>'
+    'scenario[null-sha] rc=1 NO-EVIDENCE|pull request #42 lists the plan without a blob sha; cannot verify'
+    'scenario[removed] rc=1 NO-EVIDENCE|pull request #42 does not add or change the plan'
+    'scenario[archive-rename] rc=1 NO-EVIDENCE|pull request #42 does not add or change the plan'
+    'scenario[newline-name] rc=1 NO-EVIDENCE|pull request #42 does not add or change the plan'
+    'scenario[truncated] rc=1 NO-EVIDENCE|files list of pull request #42 is truncated and does not show the plan'
+    'commit[nonum] rc=1 NO-EVIDENCE|commit subject has no trailing (#N) pull request number'
+    'commit[revert] rc=1 NO-EVIDENCE|commit subject has no trailing (#N) pull request number'
+    'commit[gone] rc=1 NO-EVIDENCE|plan no longer exists on trunk at <gone>; already archived?'
+    'commit[short] rc=1 NO-EVIDENCE|commit id is not a full 40-hex SHA'
+    'shallow[ok] rc=0 PASS|pr=#42 sha=<ok> via=commit-subject|base=main'
+    'repo[../..] rc=1 NO-EVIDENCE|owner/repo could not be resolved'
+    'repo[o/..] rc=1 NO-EVIDENCE|owner/repo could not be resolved'
+    'plan[plans/../x.md] rc=1 NO-EVIDENCE|plan path is not a plain relative path'
+    'leaked_tmp=0'
+    'opts_unchanged'
+  )
+  for want in "${wants[@]}"; do
+    [[ "$LIB_OUTPUT" == *"$want"* ]] || { printf 'driver output is missing: %s\n' "$want" >&2; return 1; }
+  done
+  # The hang scenario only runs where timeout(1)/gtimeout exists.
+  if command -v timeout >/dev/null 2>&1 || command -v gtimeout >/dev/null 2>&1; then
+    [[ "$LIB_OUTPUT" == *"scenario[hang] rc=1 NO-EVIDENCE|gh timed out fetching the files of pull request #42"* ]]
+  fi
+  # The shared PR-number rule must never diverge from complete.md's inline grep.
+  [[ "$LIB_OUTPUT" != *"DIVERGE"* ]]
 }
 
 @test "yellow-core compound-staging.sh behaves the same in bash and zsh" {

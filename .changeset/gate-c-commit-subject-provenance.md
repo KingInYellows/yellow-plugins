@@ -8,7 +8,7 @@ lookup returned nothing and every archive needed a manual override. When the
 lookup succeeds with an empty result, the provenance tier reads the PR number
 from the commit subject (new `lib/plan-gate-provenance.sh`) and passes only if
 that PR is closed, lists the plan with the same blob as trunk, and changed a
-file outside `plans/`; the trailer is `Plan-Verifier-FileProvenance:` with
+file outside `plans/` whose blob matches the commit's; the trailer is `Plan-Verifier-FileProvenance:` with
 `via=commit-subject`. The provenance tier is also skipped when the plan no
 longer exists on trunk at the commit (a stale checkout of an already-archived
 plan), and Phase 4 clears stale temp files at its start.

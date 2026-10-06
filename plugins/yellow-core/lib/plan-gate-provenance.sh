@@ -20,8 +20,9 @@
 # PRs; base is recorded, not gated, because stacked PRs have their parent
 # branch as base); PR N's files list has the plan with a status other than
 # removed and a blob sha equal to the one at <file-sha>; and the PR changed at
-# least one file outside plans/. Every other outcome is NO-EVIDENCE so the
-# caller falls through to the strict, loose and override paths.
+# least one file outside plans/ whose blob at <file-sha> equals the PR's, which
+# ties the PR to that commit's own content. Every other outcome is NO-EVIDENCE
+# so the caller falls through to the strict, loose and override paths.
 #
 # Subjects, titles and file names are untrusted: only digits, the validated
 # SHA and fixed text reach stdout. Error classification mirrors
@@ -39,15 +40,15 @@ _PLAN_GATE_PROVENANCE_LOADED=1
 # Same rule as the override validator in complete.md Phase 4:
 # ^[1-9][0-9]{0,9}$. Callers strip CR/LF first.
 pgp_pr_num_is_valid() {
-  case ${1:-} in
+  case "${1:-}" in
     '' | *[!0-9]* | 0*) return 1 ;;
   esac
   [ "${#1}" -le 10 ]
 }
 
 pgp_sha_is_full() {
-  case ${1:-} in
-    '' | *[!0-9a-f]*) return 1 ;;
+  case "${1:-}" in
+    '' | *[!0123456789abcdef]*) return 1 ;;
   esac
   [ "${#1}" -eq 40 ]
 }
@@ -56,20 +57,20 @@ pgp_sha_is_full() {
 # Reapply and merge-commit subjects, control characters and every other shape
 # yield nothing (return 1).
 pgp_pr_from_subject() {
-  _pgp_s=${1:-}
-  case $_pgp_s in
+  _pgp_ss=${1:-}
+  case "$_pgp_ss" in
     *[[:cntrl:]]*) return 1 ;;
     'Revert "'* | 'Reapply "'* | 'Merge '*) return 1 ;;
   esac
-  _pgp_s=${_pgp_s%"${_pgp_s##*[! ]}"}
-  case $_pgp_s in
+  _pgp_ss=${_pgp_ss%"${_pgp_ss##*[! ]}"}
+  case "$_pgp_ss" in
     *' (#'[0-9]*')') ;;
     *) return 1 ;;
   esac
-  _pgp_n=${_pgp_s##*' (#'}
-  _pgp_n=${_pgp_n%')'}
-  pgp_pr_num_is_valid "$_pgp_n" || return 1
-  printf '%s\n' "$_pgp_n"
+  _pgp_sn=${_pgp_ss##*' (#'}
+  _pgp_sn=${_pgp_sn%')'}
+  pgp_pr_num_is_valid "$_pgp_sn" || return 1
+  printf '%s\n' "$_pgp_sn"
 }
 
 pgp_gh_error_class() {
@@ -107,7 +108,7 @@ _pgp_gh_fail() {
     _pgp_no "gh timed out fetching $3"
     return 0
   fi
-  case $(pgp_gh_error_class "${2:-}") in
+  case "$(pgp_gh_error_class "${2:-}")" in
     rate-limited) _pgp_no "GitHub rate limit reached fetching $3" ;;
     auth) _pgp_no "gh is not authenticated; cannot fetch $3" ;;
     not-found) _pgp_no "$3 could not be found in this repository" ;;
@@ -126,28 +127,35 @@ _pgp_check() {
     _pgp_no 'commit id is not a full 40-hex SHA'
     return 1
   fi
-  if ! printf '%s' "$_pgp_repo" | grep -qE '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$'; then
-    _pgp_no 'owner/repo could not be resolved'
-    return 1
-  fi
-  case $_pgp_plan in
+  case "$_pgp_repo" in
+    '' | */*/* | */ | /* | *[!A-Za-z0-9._/-]* | . | .. | ./* | ../* | */. | */..)
+      _pgp_no 'owner/repo could not be resolved'
+      return 1
+      ;;
+    */*) ;;
+    *)
+      _pgp_no 'owner/repo could not be resolved'
+      return 1
+      ;;
+  esac
+  case "$_pgp_plan" in
     plans/*.md) ;;
     *)
       _pgp_no 'plan path is not under plans/'
       return 1
       ;;
   esac
-  case $_pgp_plan in
+  case "$_pgp_plan" in
     *..* | *[[:cntrl:]]*)
       _pgp_no 'plan path is not a plain relative path'
       return 1
       ;;
   esac
-  if ! git cat-file -e "$_pgp_sha:$_pgp_plan" 2>/dev/null; then
+  if ! git cat-file -e "${_pgp_sha}:${_pgp_plan}" 2>/dev/null; then
     _pgp_no "plan no longer exists on trunk at $_pgp_sha; already archived?"
     return 1
   fi
-  _pgp_blob=$(git rev-parse "$_pgp_sha:$_pgp_plan" 2>/dev/null) || _pgp_blob=''
+  _pgp_blob=$(git rev-parse "${_pgp_sha}:${_pgp_plan}" 2>/dev/null) || _pgp_blob=''
   if [ -z "$_pgp_blob" ]; then
     _pgp_no "could not read the plan blob at $_pgp_sha"
     return 1
@@ -168,7 +176,7 @@ _pgp_check() {
   fi
   _pgp_state=$(sed -n 1p "$_pgp_out" | cut -f1)
   _pgp_base=$(sed -n 1p "$_pgp_out" | cut -f2 | tr -d '[:cntrl:]' | cut -c1-100)
-  case $_pgp_state in
+  case "$_pgp_state" in
     closed) ;;
     open)
       _pgp_no "pull request #$_pgp_n is still open; retry shortly"
@@ -181,10 +189,18 @@ _pgp_check() {
   esac
 
   _pgp_files=$_pgp_wd/files
-  if pgp_gh api --paginate "repos/$_pgp_repo/pulls/$_pgp_n/files?per_page=100" >| "$_pgp_files" 2>| "$_pgp_err"; then
+  # Keep only the fields the verdict needs: every file entry otherwise carries
+  # its full diff patch. The files endpoint pages 100 at a time (3000 cap), so
+  # this call gets its own, longer timeout than a single-object fetch.
+  if PGP_GH_TIMEOUT=${PGP_GH_FILES_TIMEOUT:-120} pgp_gh api --paginate "repos/$_pgp_repo/pulls/$_pgp_n/files?per_page=100" \
+    --jq '[.[] | {filename, status, sha}]' >| "$_pgp_files" 2>| "$_pgp_err"; then
     :
   else
     _pgp_gh_fail "$?" "$_pgp_err" "the files of pull request #$_pgp_n"
+    return 1
+  fi
+  if ! command -v jq >/dev/null 2>&1; then
+    _pgp_no 'jq is not installed; cannot read the files list'
     return 1
   fi
   _pgp_verdict=$(jq -s -r --arg p "$_pgp_plan" --arg b "$_pgp_blob" '
@@ -197,7 +213,7 @@ _pgp_check() {
           elif ([ $f[] | select((.filename | startswith("plans/")) | not) ] | length) == 0 then "plan-only"
           else "ok" end
       end' "$_pgp_files" 2>/dev/null) || _pgp_verdict='bad-json'
-  case $_pgp_verdict in
+  case "$_pgp_verdict" in
     ok) ;;
     truncated)
       _pgp_no "files list of pull request #$_pgp_n is truncated and does not show the plan"
@@ -224,6 +240,25 @@ _pgp_check() {
       return 1
       ;;
   esac
+  # Tie PR N to this commit: at least one non-plans file of the PR must have
+  # the same blob at <file-sha>. The plan's text alone is public and could be
+  # carried by an unrelated closed PR. Checks at most 20 files; a mismatch
+  # (for example a queue rebase over a concurrent change) is NO-EVIDENCE.
+  _pgp_others=$_pgp_wd/others
+  jq -s -r '(add // []) | [ .[] | select((.filename | startswith("plans/") | not) and .status != "removed" and .sha != null) ] | .[0:20][] | [.sha, .filename] | @tsv' "$_pgp_files" >| "$_pgp_others" 2>/dev/null || :
+  _pgp_tied=0
+  _pgp_tab=$(printf '\t')
+  while IFS=$_pgp_tab read -r _pgp_osha _pgp_ofile; do
+    [ -n "$_pgp_ofile" ] || continue
+    if [ "$(git rev-parse --verify --quiet "${_pgp_sha}:${_pgp_ofile}" 2>/dev/null)" = "$_pgp_osha" ]; then
+      _pgp_tied=1
+      break
+    fi
+  done < "$_pgp_others"
+  if [ "$_pgp_tied" -ne 1 ]; then
+    _pgp_no "pull request #$_pgp_n has no non-plan file that matches commit $_pgp_sha"
+    return 1
+  fi
   printf 'PASS\npr=#%s sha=%s via=commit-subject\nbase=%s\n' "$_pgp_n" "$_pgp_sha" "$_pgp_base"
 }
 
@@ -232,8 +267,8 @@ pgp_provenance_via_subject() {
     _pgp_no 'could not create a temp directory'
     return 1
   }
-  _pgp_check "$_pgp_tmp" "${1:-}" "${2:-}" "${3:-}"
-  _pgp_rc=$?
+  # `&& rc=0 || rc=$?` keeps a caller's errexit from skipping the cleanup.
+  _pgp_check "$_pgp_tmp" "${1:-}" "${2:-}" "${3:-}" && _pgp_rc=0 || _pgp_rc=$?
   rm -rf "$_pgp_tmp"
   return "$_pgp_rc"
 }

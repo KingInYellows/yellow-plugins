@@ -466,8 +466,10 @@ these hold:
   as `base` (#952, #955, #1033);
 - PR N's paginated files list has the plan with a status other than `removed`
   and a blob `sha` equal to `git rev-parse <sha>:plans/<file>`;
-- PR N also changed a file outside `plans/`, so plans-only PRs such as bulk
-  checkbox rewrites (#956, #1055) fall through. A PR that adds the plan
+- PR N also changed a file outside `plans/` whose blob at the trunk commit
+  equals the PR's. That ties the PR to the commit's own content (the plan's
+  text alone is public and could be carried by an unrelated closed PR), and
+  plans-only PRs such as bulk checkbox rewrites (#956, #1055) fall through. A PR that adds the plan
   together with non-plan docs still passes: #1042 (a plan plus brainstorms)
   does. Gate A's unchecked-box scan is the remaining guard against archiving a
   plan that was only written, never implemented.

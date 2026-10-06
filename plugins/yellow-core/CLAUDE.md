@@ -134,7 +134,8 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   the commit; when that lookup succeeds with an empty result,
   `lib/plan-gate-provenance.sh` reads the PR number from the commit subject
   and passes only if that PR is closed, lists the plan with the trunk blob,
-  and changed a file outside `plans/` (trailer `via=commit-subject`). When
+  and changed a file outside `plans/` whose blob matches the commit's
+  (trailer `via=commit-subject`). When
   provenance finds no commit or an ambiguous PR set, a strict tier
   (server-side `--state merged` + `--jq` word-boundary post-filter of
   the full slug on `headRefName`) runs, then a loose tier scoring the
@@ -346,9 +347,9 @@ cross-plugin pattern:
   <owner/repo> <file-sha> <plans/file.md>` reads the trailing ` (#N)` of the
   commit subject and passes (`PASS` plus a `via=commit-subject` trailer line)
   only when PR N is closed, lists the plan with the trunk blob, and changed a
-  file outside `plans/`; every other outcome prints `NO-EVIDENCE` and a
-  reason. Dual-shell (Tier 4), idempotent via `_PLAN_GATE_PROVENANCE_LOADED`.
-  Coverage in `tests/shell-compat/` (driver with a stub `gh`) and
+  file outside `plans/` whose blob matches the commit's; every other outcome
+  prints `NO-EVIDENCE` and a reason. Dual-shell (Tier 4), idempotent via
+  `_PLAN_GATE_PROVENANCE_LOADED`. Coverage in `tests/shell-compat/` (driver with a stub `gh`) and
   `tests/plan-commands.bats`
 - `validate-fs.sh` — `validate_file_path()` and `canonicalize_project_dir()`
   path-traversal validators (consumed by yellow-ci, yellow-ruvector,
