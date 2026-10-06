@@ -1,13 +1,27 @@
 # Feature: yellow-rtk Plugin (Phase 1 of context-management strategy)
 
-> **Status (2026-10-06):** Not started, 0 of 31 boxes. No `plugins/yellow-rtk/`
-> directory, catalog entry or changeset exists on `main`; the only merged PR is
-> the plan and research (#463). No open PR touches it. Stale: tasks 1.2 and 6.1
-> hand-edit `plugin.json` and `.claude-plugin/marketplace.json`, which are now
-> generated from `catalog/` (`pnpm generate:manifests`); task 6.3 names a
-> `COMMAND_PLUGIN_MAP` that `scripts/validate-setup-all.js` no longer has (it
-> parses the mapping from `setup/all.md`); `yellow-mempalace` (line 24) is not a
-> plugin in this repo. Not ready to archive.
+> **Status (2026-10-06):** evaluating — deferred until pilot use. Not
+> abandoned and not scheduled. 0 of 31 boxes. No `plugins/yellow-rtk/`
+> directory, catalog entry or changeset exists; the only merged PR is the plan
+> and research (#463). No open PR touches it. Do not start Phase 1 until the
+> pilot below says RTK is worth shipping.
+>
+> **Pilot gate:** install RTK locally with `RTK_TELEMETRY=0`, use it for about a
+> week, read `rtk gain`, then decide. Also check: (1) compressed output does not
+> break scripts that parse command output (`git status --porcelain`,
+> `git diff --name-status`, bats TAP, `gh --json`); (2) test-runner failure
+> detail survives compression; (3) the `gt-workflow`, `github-workflow` and
+> `yellow-ruvector` PreToolUse guards still fire next to RTK's rewrite.
+>
+> **If it proceeds, rewrite this plan first** (review of 2026-10-06). Since RTK
+> v0.37.2 the hook is a native command, `rtk hook claude`; a plugin can register
+> it inline in `plugin.json` instead of editing `~/.claude/settings.json`, which
+> would drop the `jq` settings write, the orphan-on-uninstall caveat and most of
+> Phase 3 (untested). Stale today: tasks 1.2 and 6.1 hand-edit `plugin.json` and
+> `.claude-plugin/marketplace.json`, which are now generated from `catalog/`
+> (`pnpm generate:manifests`); task 6.3 names a `COMMAND_PLUGIN_MAP` that
+> `scripts/validate-setup-all.js` no longer has; the `yellow-mempalace` mention
+> (line 24) is not a plugin in this repo.
 
 ## Overview
 
