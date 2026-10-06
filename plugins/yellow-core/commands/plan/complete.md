@@ -1,6 +1,6 @@
 ---
 name: plan:complete
-description: 'Archive a completed plan with two safety gates: Gate A scans for unchecked task boxes; Gate C verifies merged-PR evidence via file-commit provenance, then a strict slug match, then a loose token-coverage fallback. Use when a plan is fully shipped and ready to move from plans/ to plans/complete/.'
+description: 'Archive a completed plan with two safety gates: Gate A scans for unchecked task boxes; Gate C verifies merged-PR evidence via file-commit provenance (with a commit-subject fallback for merge-queue PRs), then a strict slug match, then a loose token-coverage fallback. Use when a plan is fully shipped and ready to move from plans/ to plans/complete/.'
 argument-hint: '<plan-filename>'
 allowed-tools:
   - Bash
@@ -24,7 +24,11 @@ Archives a single open plan from `plans/<arg>.md` to
   file on the repo's trunk branch and looks up the merged PR(s) GitHub
   associates with that commit — exact, not fuzzy. A unique match passes without
   prompting, recorded via a `Plan-Verifier-FileProvenance:` commit
-  trailer. When that tier finds no commit or an ambiguous set of PRs
+  trailer. PRs landed by Graphite's merge queue stay closed, never
+  merged, so GitHub associates none with the commit; for those the
+  provenance tier falls back to the PR number in the commit subject,
+  confirmed closed and touching the plan (trailer `via=commit-subject`).
+  When that tier finds no commit or an ambiguous set of PRs
   (rare — e.g. history rewrites, cherry-picks), the strict tier queries
   GitHub for a merged PR whose title and branch contain the full slug
   with word boundaries. When it also finds nothing (branch names rarely
@@ -166,12 +170,24 @@ only 4 of the slug's 7 tokens and fails even the loose tier's threshold.
 The commit that added or last modified the plan file IS the evidence in
 that case; no heuristic scoring needed.
 
+Graphite merge-queue PRs are the exception to the association lookup: the
+queue fast-forwards trunk to a commit it built itself and leaves the PR
+`closed` with `merged: false` permanently, so `commits/{sha}/pulls` returns
+nothing for them. When that lookup succeeds with an empty result, the block
+reads the PR number from the commit subject (`... (#N)`) through
+`lib/plan-gate-provenance.sh` and passes only if PR N is closed, lists the
+plan with the same blob as trunk, and changed a file outside `plans/`.
+Anything less prints the reason and falls through.
+
 ```bash
 set -euo pipefail
 ARG="$ARGUMENTS"
 CLEAN_ARG="${ARG#plans/}"
 GIT_TMP=$(git rev-parse --git-path tmp)
 mkdir -p "$GIT_TMP"
+# This block writes plan-complete.provenance only on a pass. Clear leftovers
+# so a stale file from an aborted run can never reach the Phase 7 trailer.
+rm -f "$GIT_TMP/plan-complete.count" "$GIT_TMP/plan-complete.override" "$GIT_TMP/plan-complete.loose" "$GIT_TMP/plan-complete.provenance"
 OWNERREPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)
 # Resolve the repo's actual trunk instead of assuming 'main' — same
 # fallback chain as Phase 6 (gt, then gh, then main), but via the
@@ -197,7 +213,15 @@ if ! git fetch origin "$TRUNK" --quiet 2>/dev/null; then
 else
   FILE_SHA=$(git log -1 --format=%H "origin/$TRUNK" -- "plans/$CLEAN_ARG" 2>/dev/null || true)
 fi
+# A stale local checkout can still hold a plan that trunk already archived;
+# then FILE_SHA is the archive commit and its PR is not evidence of delivery.
+# The plan must exist at FILE_SHA, or the whole provenance tier is skipped.
+if [ -n "$FILE_SHA" ] && ! git cat-file -e "$FILE_SHA:plans/$CLEAN_ARG" 2>/dev/null; then
+  printf '[plan:complete] WARNING: plans/%s no longer exists on %s at %s (already archived?); provenance tier skipped\n' "$CLEAN_ARG" "$TRUNK" "$FILE_SHA" >&2
+  FILE_SHA=
+fi
 PCOUNT=0
+COMMITS_API_OK=0
 if [ -n "$FILE_SHA" ] && [ -n "$OWNERREPO" ]; then
   GH_ERR=$(mktemp)
   # GitHub's commits/{sha}/pulls endpoint returns every PR a commit is
@@ -212,15 +236,21 @@ if [ -n "$FILE_SHA" ] && [ -n "$OWNERREPO" ]; then
   # commits don't land on trunk under that same SHA (barring the
   # rebase/cherry-pick edge case, which the PCOUNT>=2 ambiguous
   # fallback below already treats as unsafe to auto-pass).
-  PULLS=$(gh api "repos/$OWNERREPO/commits/$FILE_SHA/pulls" \
-    --jq '[.[] | select(.state == "closed") | {number, title, url: .html_url}]' 2>|"$GH_ERR") || {
+  # Graphite merge-queue PRs are the exception: GitHub never associates
+  # the landed commit with them at all (empty result, permanently), which
+  # the commit-subject path below handles. COMMITS_API_OK separates that
+  # empty-but-successful result from a failed lookup.
+  if PULLS=$(gh api "repos/$OWNERREPO/commits/$FILE_SHA/pulls" \
+    --jq '[.[] | select(.state == "closed") | {number, title, url: .html_url}]' 2>|"$GH_ERR"); then
+    COMMITS_API_OK=1
+  else
     printf '[plan:complete] WARNING: gh api commits/pulls lookup failed: %s\n' "$(cat "$GH_ERR")" >&2
     PULLS='[]'
-  }
+  fi
   rm -f "$GH_ERR"
   PCOUNT=$(printf '%s' "$PULLS" | jq 'length' 2>/dev/null || printf '0')
 fi
-printf '[plan:complete] Gate C provenance tier: %d merged PR(s) associated with the commit that last touched plans/%s\n' "$PCOUNT" "$CLEAN_ARG"
+printf '[plan:complete] Gate C provenance tier: %d closed PR(s) associated with the commit that last touched plans/%s\n' "$PCOUNT" "$CLEAN_ARG"
 if [ "$PCOUNT" -ge 1 ]; then
   # Strip control characters from GitHub-controlled title/url fields
   # before they hit the terminal — an untrusted PR title could otherwise
@@ -230,19 +260,44 @@ fi
 if [ "$PCOUNT" -eq 1 ]; then
   printf '%s\n' "$PULLS" | jq -r --arg sha "$FILE_SHA" '.[0] | "pr=#\(.number) sha=\($sha)"' >| "$GIT_TMP/plan-complete.provenance"
 fi
+# Commit-subject path: only after a SUCCESSFUL lookup that returned nothing.
+# A failed lookup (COMMITS_API_OK=0) and PCOUNT >= 2 never reach it.
+if [ "$COMMITS_API_OK" -eq 1 ] && [ "$PCOUNT" -eq 0 ]; then
+  if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -r "${CLAUDE_PLUGIN_ROOT}/lib/plan-gate-provenance.sh" ]; then
+    . "${CLAUDE_PLUGIN_ROOT}/lib/plan-gate-provenance.sh"
+    PGP_RESULT=$(pgp_provenance_via_subject "$OWNERREPO" "$FILE_SHA" "plans/$CLEAN_ARG" || true)
+    PGP_INFO=$(printf '%s\n' "$PGP_RESULT" | sed -n 2p)
+    # Re-validate before anything reaches the commit trailer.
+    if [ "$(printf '%s\n' "$PGP_RESULT" | sed -n 1p)" = PASS ] \
+      && printf '%s' "$PGP_INFO" | grep -qE '^pr=#[1-9][0-9]{0,9} sha=[0-9a-f]{40} via=commit-subject$'; then
+      printf '%s\n' "$PGP_INFO" >| "$GIT_TMP/plan-complete.provenance"
+      printf '[plan:complete] Gate C provenance PASS (commit-subject): %s %s repo=%s\n' "$PGP_INFO" "$(printf '%s\n' "$PGP_RESULT" | sed -n 3p | tr -d '[:cntrl:]')" "$(printf '%s' "$OWNERREPO" | tr -d '[:cntrl:]')"
+    else
+      printf '[plan:complete] Gate C commit-subject path: no evidence (%s) repo=%s\n' "$(printf '%s\n' "${PGP_INFO:-lookup failed}" | tr -d '[:cntrl:]')" "$(printf '%s' "$OWNERREPO" | tr -d '[:cntrl:]')"
+    fi
+  else
+    printf '[plan:complete] WARNING: lib/plan-gate-provenance.sh not found under CLAUDE_PLUGIN_ROOT; commit-subject path skipped\n' >&2
+  fi
+fi
 ```
 
-**If `PCOUNT == 1` (Gate C provenance PASS): skip the strict tier, the
+**If `PCOUNT == 1`, or the block printed `Gate C provenance PASS
+(commit-subject)` (Gate C provenance PASS): skip the strict tier, the
 loose tier, and the AskUserQuestion below entirely — proceed directly to
-Phase 5.** A single merged PR associated with the file's last-touching
-commit is direct evidence, stronger than any slug heuristic.
+Phase 5.** A single closed PR associated with the file's last-touching
+commit is direct evidence, stronger than any slug heuristic. The
+commit-subject pass is the same evidence for a Graphite merge-queue PR,
+checked through the PR named in the subject instead of GitHub's
+association.
 
-**If `PCOUNT == 0`** (no local commit found for the file — e.g. it is
-uncommitted, or `git fetch`/`gh api` failed) **or `PCOUNT >= 2`** (the
-commit is associated with more than one merged PR — rare, e.g. a
-rebase/cherry-pick history), **fall through to the strict tier below.**
-Multiple associated PRs is not a safe auto-pass; uniqueness is what makes
-this tier trustworthy, same as the loose tier's own safety valve.
+**If `PCOUNT == 0` without a commit-subject PASS** (no local commit found
+for the file — e.g. it is uncommitted, `git fetch`/`gh api` failed, or the
+commit-subject path printed `no evidence` with its reason) **or
+`PCOUNT >= 2`** (the commit is associated with more than one closed PR —
+rare, e.g. a rebase/cherry-pick history), **fall through to the strict
+tier below.** Multiple associated PRs is not a safe auto-pass, and the
+commit-subject path never runs for them; uniqueness is what makes this
+tier trustworthy, same as the loose tier's own safety valve.
 
 Server-side `--state merged` is preferred over reading `mergedAt`: per
 `docs/solutions/integration-issues/merge-queue-closed-pr-null-mergedat-detection.md`,
@@ -568,9 +623,18 @@ if [ -f "$GIT_TMP/plan-complete.override" ]; then
 Plan-Verifier-Override: user-confirmed-no-pr-evidence (pr=#$OVERRIDE_PR_NUM)"
 elif [ -f "$GIT_TMP/plan-complete.provenance" ]; then
   PROVENANCE_INFO=$(cat "$GIT_TMP/plan-complete.provenance")
-  BODY="Verified by /plan:complete: unique file-provenance match — the merged PR GitHub associates with the commit that last touched this plan file.
+  case $PROVENANCE_INFO in
+    *' via=commit-subject')
+      BODY="Verified by /plan:complete: file-provenance match via commit subject — the PR numbered in the subject of the commit that last touched this plan file, confirmed closed and touching the plan (Graphite merge-queue PRs stay closed, never merged).
 
 Plan-Verifier-FileProvenance: $PROVENANCE_INFO"
+      ;;
+    *)
+      BODY="Verified by /plan:complete: unique file-provenance match — the merged PR GitHub associates with the commit that last touched this plan file.
+
+Plan-Verifier-FileProvenance: $PROVENANCE_INFO"
+      ;;
+  esac
 elif [ -f "$GIT_TMP/plan-complete.loose" ]; then
   LOOSE_INFO=$(cat "$GIT_TMP/plan-complete.loose")
   BODY="Verified by /plan:complete: unique loose match — all-but-one slug-token coverage on a recent merged PR's branch+title.
@@ -591,7 +655,10 @@ rm -f "$GIT_TMP/plan-complete.count" "$GIT_TMP/plan-complete.override" "$GIT_TMP
 
 The `Plan-Verifier-Override:`, `Plan-Verifier-LooseMatch:`, and
 `Plan-Verifier-FileProvenance:` trailers are grep-discoverable via
-`git log --grep='Plan-Verifier-'` for future audit. The default (Gate C
+`git log --grep='Plan-Verifier-'` for future audit. A
+`Plan-Verifier-FileProvenance:` trailer with no `via=` field came from
+GitHub's commit-to-PR association; `via=commit-subject` came from the PR
+number in the commit subject (Graphite merge-queue PRs). The default (Gate C
 strict PASS) path omits any trailer.
 
 ## Phase 8: Submit
