@@ -1,0 +1,23 @@
+docs/brainstorms/2026-04-01-symphony-plugin-brainstorm.md
+  s_df8d7231d1f6b5::t_658e6d2e595422 4
+docs/solutions/code-quality/skill-frontmatter-attribute-and-format-requirements.md
+  s_df8d7231d1f6b5::t_2a9d7e1ffd6fe4 397-398
+plans/complete/yellow-symphony-plugin.md
+  s_df8d7231d1f6b5::t_04ca7b84237469 3-14,65,85,102,106,108,120,175,198,244,253,257,270,278,304-305,307-308
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "179fef1c533ec95c375d4fe9683b5ce13c10276c",
+  "prompts": {},
+  "sessions": {
+    "s_df8d7231d1f6b5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7e5d86f-3b2b-4423-b601-e40b54efe5c2",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
