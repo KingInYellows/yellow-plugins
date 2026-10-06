@@ -1,5 +1,12 @@
 # Feature: Audit Followups — 2026-05-07
 
+> Boxes ticked at archive cleanup (2026-10-05). The plan's six PRs shipped as
+> #436, #437, #438, #439, #441, and #442. PR 2 is `40f6767 chore(audit): apply
+> mechanical followups (C-02, M-01 reactive, M-02, C-01) (#437)`. Items marked
+> `[-]` were not done as written (3.5, 4.2.2, 4.2.3, 4.4.3, 5.3.2-5.3.4);
+> each carries its reason inline. Other items carry inline notes where the
+> shipped work differs from the plan.
+
 ## Overview
 
 Implement the 11 "apply" decisions from the 2026-05-07 audit followups
@@ -167,7 +174,7 @@ only one with an explicit external gate.
 **Plugins touched:** none (scripts/ only)
 **Changeset required:** no
 
-- [ ] 1.1: Read `scripts/validate-agent-authoring.js` end-to-end; locate
+- [x] 1.1: Read `scripts/validate-agent-authoring.js` end-to-end; locate
   the `subagent_type:` matching logic and the function that scans CHANGELOG
   paths. Identify the `extractFrontmatter` helper at line 67 — confirm
   whether the current matcher uses it or scans the full file body.
@@ -207,9 +214,9 @@ only one with an explicit external gate.
   Body-code-block validation, inline `Task(subagent_type=...)`
   validation, and frontmatter validation all preserved. See
   `docs/solutions/build-errors/validate-agent-authoring-changelog-skip.md`.
-- [ ] 1.3: Run `pnpm release:check` — verify the false-positive ERROR on
+- [x] 1.3: Run `pnpm release:check` — verify the false-positive ERROR on
   `plugins/yellow-review/CHANGELOG.md` no longer fires.
-- [ ] 1.4: Add regression coverage at
+- [x] 1.4: Add regression coverage at
   `tests/integration/validate-agent-authoring-changelog-skip.test.ts`
   (Vitest integration test, not a static fixture). Three cases:
   1. CHANGELOG.md containing a deleted-agent `subagent_type:` reference →
@@ -218,9 +225,9 @@ only one with an explicit external gate.
      validator STILL flags it.
   3. Both files present → only the non-CHANGELOG file is flagged; CHANGELOG
      remains silent.
-- [ ] 1.5: Run `pnpm test:unit && pnpm validate:schemas`.
-- [ ] 1.6: Commit with `fix(scripts): restrict subagent_type validator to frontmatter`.
-- [ ] 1.7: `gt submit` → PR 1.
+- [x] 1.5: Run `pnpm test:unit && pnpm validate:schemas`.
+- [x] 1.6: Landed as `cceea2e` with subject `fix(scripts): skip CHANGELOG.md in subagent_type validator (X-02) (#436)`. The proposed subject `restrict subagent_type validator to frontmatter` was not used; step 1.2 rejected frontmatter-only matching.
+- [x] 1.7: `gt submit` → PR 1.
 
 **Acceptance criteria:**
 - `pnpm release:check` exits 0 with no ERROR or unrelated WARNING from
@@ -239,28 +246,28 @@ only one with an explicit external gate.
 
 #### 2.1 — C-02: legacy subagent_types in plan.md
 
-- [ ] 2.1.1: Edit `plugins/yellow-core/commands/workflows/plan.md`:
+- [x] 2.1.1: Edit `plugins/yellow-core/commands/workflows/plan.md`:
   - Line 90: `yellow-core:repo-research-analyst` → `yellow-core:research:repo-research-analyst`
   - Line 98: `yellow-core:best-practices-researcher` → `yellow-core:research:best-practices-researcher`
   - Line 132: `yellow-core:spec-flow-analyzer` → `yellow-core:workflow:spec-flow-analyzer`
-- [ ] 2.1.2: Run `pnpm validate:agents` — confirm the three INFO warnings
+- [x] 2.1.2: Run `pnpm validate:agents` — confirm the three INFO warnings
   on these lines are gone.
 
 #### 2.2 — M-01 reactive: plugin count drift
 
-- [ ] 2.2.1: Edit `CLAUDE.md` line 8 — `"14 plugins"` → `"18 plugins"`.
-- [ ] 2.2.2: Edit `README.md` line 3 — `"17 plugins"` → `"18 plugins"`.
+- [x] 2.2.1: Edit `CLAUDE.md` line 8 — `"14 plugins"` → `"18 plugins"`.
+- [x] 2.2.2: Edit `README.md` line 3 — `"17 plugins"` → `"18 plugins"`.
   *(Bonus finding: README.md was not in the brainstorm but has the same
   drift; the lint in PR 6 will require both to be correct anyway.)*
 
 #### 2.3 — M-02: chmod +x prewarm hook
 
-- [ ] 2.3.1: `chmod +x plugins/yellow-morph/hooks/scripts/prewarm-morph.sh`
-- [ ] 2.3.2: Run `pnpm validate:schemas` — confirm the WARNING is gone.
+- [x] 2.3.1: `chmod +x plugins/yellow-morph/hooks/scripts/prewarm-morph.sh`
+- [x] 2.3.2: Run `pnpm validate:schemas` — confirm the WARNING is gone.
 
 #### 2.4 — C-01: gt-workflow namespace exception (doc note)
 
-- [ ] 2.4.1: Open `plugins/gt-workflow/CLAUDE.md`. Add a `## Namespace
+- [x] 2.4.1: Open `plugins/gt-workflow/CLAUDE.md`. Add a `## Namespace
   exception` section after any existing top-level intro section (preserve
   existing structure). Section content must cover the three points from
   the brainstorm:
@@ -270,20 +277,22 @@ only one with an explicit external gate.
      is generic and no observed conflict.
   3. Future contributors and auditors should not re-flag without a
      concrete trigger (real collision or incoming clashing plugin).
-- [ ] 2.4.2: Skip the changeset bump on `gt-workflow` per the brainstorm
-  recommendation — CLAUDE.md is documentation of an existing convention,
-  not a behavior change. (If the CI changeset gate complains, add a patch
-  bump retroactively.)
+- [x] 2.4.2: #437 shipped a three-plugin patch changeset
+  (gt-workflow, yellow-core, yellow-morph) in
+  `.changeset/audit-mechanical-followups.md` (`40f6767`), including the
+  gt-workflow `CLAUDE.md` namespace note. The brainstorm recommended
+  skipping the gt-workflow bump; the landed PR did not.
 
 #### 2.5 — Validation, changeset, commit, submit
 
-- [ ] 2.5.1: Run `pnpm validate:schemas && pnpm validate:agents`.
-- [ ] 2.5.2: `pnpm changeset` — patch bump on `yellow-core` and `yellow-morph`
-  (gt-workflow only if the gate insists; otherwise skip per 2.4.2).
-- [ ] 2.5.3: Normalize line endings on any new/edited files: `sed -i 's/\r$//' <files>`
+- [x] 2.5.1: Run `pnpm validate:schemas && pnpm validate:agents`.
+- [x] 2.5.2: `pnpm changeset` — the changeset that landed is patch bumps
+  on yellow-core, yellow-morph, and gt-workflow
+  (`.changeset/audit-mechanical-followups.md`, #437).
+- [x] 2.5.3: Normalize line endings on any new/edited files: `sed -i 's/\r$//' <files>`
   (WSL2 hygiene per project memory).
-- [ ] 2.5.4: Commit with `chore(audit): apply mechanical followups (C-02, M-01 reactive, M-02, C-01 doc)`.
-- [ ] 2.5.5: `gt submit` → PR 2.
+- [x] 2.5.4: Commit with `chore(audit): apply mechanical followups (C-02, M-01 reactive, M-02, C-01 doc)`.
+- [x] 2.5.5: `gt submit` → PR 2.
 
 **Acceptance criteria:**
 - `pnpm validate:agents` shows zero INFO warnings on `plan.md` lines 90/98/132.
@@ -301,7 +310,7 @@ only one with an explicit external gate.
 **Plugins touched:** yellow-morph
 **Changeset required:** yes (patch bump)
 
-- [ ] 3.1: Read `plugins/yellow-morph/hooks/scripts/prewarm-morph.sh`
+- [x] 3.1: Read `plugins/yellow-morph/hooks/scripts/prewarm-morph.sh`
   in full. Identify:
   - The `json_exit` helper at top
   - Where the prewarm work begins (likely after sourcing `lib/`)
@@ -317,7 +326,7 @@ only one with an explicit external gate.
 > `( ... ) & disown` and moves `json_exit` (no-arg, success) to immediately
 > follow the disown line.
 <!-- /deepen-plan -->
-- [ ] 3.2: Refactor to fork-and-disown:
+- [x] 3.2: Refactor to fork-and-disown:
   - Wrap the actual prewarm work in `( prewarm_work ) & disown`
   - Print `{"continue": true}` and exit on the parent immediately after
     spawning the background subshell — within hundreds of milliseconds, not
@@ -351,26 +360,26 @@ only one with an explicit external gate.
 > Sources: bash(1) man page (`disown`, job control, SIGHUP behavior); POSIX
 > signal semantics (zombie reaping via init reparenting).
 <!-- /deepen-plan -->
-- [ ] 3.3: Add a comment block in the script documenting the trade-off:
+- [x] 3.3: Add a comment block in the script documenting the trade-off:
   "If the user invokes a morph tool within ~30s of session start on a slow
   connection, they may still hit a cold cache. This is the accepted
   trade-off — the alternative blocks every cold session by 30s."
-- [ ] 3.4: Edit `plugins/yellow-morph/.claude-plugin/plugin.json`:
+- [x] 3.4: Edit `plugins/yellow-morph/.claude-plugin/plugin.json`:
   - Lower `hooks.SessionStart[0].hooks[0].timeout` from `30` to `5`.
-- [ ] 3.5: Manual smoke test:
+- [-] 3.5: (partial — #438 / `9977b28` records only the parent timing: `<10ms`, and `time bash hooks/scripts/prewarm-morph.sh` returned `0.007s`. The yellow-morph changelog records the same `<10ms` parent yield. Background-install completion and the zombie `ps` check are not in that commit, the changelog, or elsewhere in the repo) Manual smoke test:
   - Run the script directly: `bash plugins/yellow-morph/hooks/scripts/prewarm-morph.sh`
-  - Confirm parent returns in <1s
-  - Confirm the background prewarm completes (check installed package)
-  - Confirm no zombie children: `ps -ef | grep prewarm` after parent exits
-- [ ] 3.6: Run `pnpm validate:schemas`.
-- [ ] 3.7: `pnpm changeset` — patch bump on `yellow-morph`.
-- [ ] 3.8: Normalize line endings: `sed -i 's/\r$//' plugins/yellow-morph/hooks/scripts/prewarm-morph.sh`.
-- [ ] 3.9: Commit with `perf(yellow-morph): run prewarm in detached background to unblock session start`.
-- [ ] 3.10: `gt submit` → PR 3.
+  - Confirm parent returns in <1s — recorded
+  - Confirm the background prewarm completes (check installed package) — not recorded
+  - Confirm no zombie children: `ps -ef | grep prewarm` after parent exits — not recorded
+- [x] 3.6: Run `pnpm validate:schemas`.
+- [x] 3.7: `pnpm changeset` — patch bump on `yellow-morph`.
+- [x] 3.8: Normalize line endings: `sed -i 's/\r$//' plugins/yellow-morph/hooks/scripts/prewarm-morph.sh`.
+- [x] 3.9: Commit with `perf(yellow-morph): run prewarm in detached background to unblock session start`.
+- [x] 3.10: `gt submit` → PR 3.
 
 **Acceptance criteria:**
-- Manual run shows parent process exits in <1s.
-- Background subshell completes successfully without zombies.
+- Manual run shows parent process exits in <1s (recorded in #438 as `0.007s` / `<10ms`).
+- Background-install completion and the zombie-process check are not recorded.
 - `pnpm validate:schemas` passes.
 - `plugin.json` SessionStart timeout is 5.
 
@@ -384,22 +393,23 @@ only one with an explicit external gate.
 **Changeset required:** yes (patch bumps on all three plugins)
 
 <!-- deepen-plan: codebase -->
-> **Codebase BLOCKER:** `schemas/plugin.schema.json` lines 296-327 already
-> define a `dependencies` array with `{name: string, version: semver-range}`
-> items. The brainstorm's proposed `{plugin, reason}` shape **directly
-> conflicts** with the existing definition. `validate-plugin.js` line 26
-> explicitly notes that schema-shape validation for `dependencies` is
-> AJV-delegated to the schema. The schema is locked by `additionalProperties: false`
-> at line 329.
+> **Codebase BLOCKER:** `schemas/plugin.schema.json` lines 284-325 already
+> define a top-level `dependencies` array. Items are non-empty strings or
+> objects. Object entries require `name`; `version` is an optional semver
+> range (`pattern` plus `semverRange: true`), and the object sets
+> `additionalProperties: false`. The brainstorm's proposed `{plugin, reason}`
+> shape **conflicts** with that definition (`plugin` is not a property).
+> Schema-shape validation for `dependencies` is AJV-delegated to the schema.
+> The manifest root sets `additionalProperties: false` at line 327.
 >
 > **Rule numbering confirmed:** highest existing rule in `validate-plugin.js`
 > is RULE 10 (line 876). The new cross-marketplace check should be RULE 11.
 > `monitors` (schema lines 228-263) is the closest array-of-objects precedent.
 >
 > **Required reconciliation BEFORE coding** — pick one:
-> 1. **(Recommended)** Extend the existing `{name, version}` shape with
->    optional `optional: boolean` and `reason: string` fields (see external
->    annotation below for prior art).
+> 1. **(Recommended)** Extend the existing object shape (`name` required,
+>    `version` optional) with optional `optional: boolean` and `reason:
+>    string` fields (see external annotation below for prior art).
 > 2. Introduce a separate `softDependencies` array — increases maintenance
 >    surface, splits intent across two fields.
 > 3. Replace the existing definition — breaks any existing manifests that
@@ -434,10 +444,12 @@ only one with an explicit external gate.
 > ]
 > ```
 >
-> Schema changes (apply to existing definition, lines 296-327):
+> Schema changes (apply to the existing definition, lines 284-325):
+> - Items are already a non-empty string or an object
+> - Object entries already require `name`; `version` is already optional
 > - Add optional `optional: boolean` (default `false`) to each dep object
 > - Add optional `reason: string` (informational, no validation enforcement)
-> - Keep `name` + `version` required; preserve existing semver-range validator
+> - Preserve the existing semver-range check on `version` when it is present
 >
 > Validator behavior (RULE 11 in `validate-plugin.js`):
 > - For each `dependencies` entry where `optional !== true`, cross-check
@@ -454,55 +466,56 @@ only one with an explicit external gate.
 
 #### 4.1 — Schema extension
 
-- [ ] 4.1.1: ⚠️ **REVISED per codebase finding:** the `dependencies` field
-  already exists in `schemas/plugin.schema.json` (lines 296-327) with shape
-  `{name: string, version: semver-range}`. **Extend** the existing definition
-  rather than creating a new field:
+- [x] 4.1.1: ⚠️ **REVISED per codebase finding:** the top-level `dependencies`
+  field already exists in `schemas/plugin.schema.json` (lines 284-325).
+  Items may be non-empty strings or objects. Object entries require `name`;
+  `version` is optional (`minLength: 1`, `pattern` `^[~^>=<*xXvV0-9]`, and
+  `semverRange: true`). `optional` and `reason` are optional. Object entries
+  set `additionalProperties: false`. **Extend** that definition rather than
+  creating a new field:
   ```json
-  // Existing item shape (lines 296-327) — keep name + version required
+  // Existing object shape (lines 293-320) — name required; version optional
   {
     "type": "object",
+    "required": ["name"],
     "properties": {
-      "name": { "type": "string" },
-      "version": { "type": "string", "format": "semverRange" },
-      "optional": {
-        "type": "boolean",
-        "default": false,
-        "description": "When true, validator does not warn if dep is missing from marketplace catalog"
-      },
-      "reason": {
+      "name": { "type": "string", "minLength": 1 },
+      "version": {
         "type": "string",
-        "description": "Informational — explains why this plugin is required. Not validated."
-      }
+        "minLength": 1,
+        "pattern": "^[~^>=<*xXvV0-9]",
+        "semverRange": true
+      },
+      "optional": { "type": "boolean", "default": false },
+      "reason": { "type": "string", "minLength": 1 }
     },
-    "required": ["name", "version"],
     "additionalProperties": false
   }
   ```
-- [ ] 4.1.2: Confirm `additionalProperties: false` at the manifest top level
+- [x] 4.1.2: Confirm `additionalProperties: false` at the manifest top level
   is unchanged (the field already exists there); only the per-item object
   schema needs the additions.
 
 #### 4.2 — Validator soft-warn
 
-- [ ] 4.2.1: Edit `scripts/validate-plugin.js`. Add RULE 11 (verified — current
+- [x] 4.2.1: Edit `scripts/validate-plugin.js`. Add RULE 11 (verified — current
   highest is RULE 10 at line 876):
   - For each plugin manifest, if `dependencies` is present, iterate each
     entry's `name` field (NOT `plugin` — the existing schema field is `name`)
   - Skip entries where `optional === true` (matches npm `peerDependenciesMeta`
     semantics: declared but not enforced)
   - Cross-check against the marketplace catalog (`.claude-plugin/marketplace.json`)
-  - If declared (non-optional) dep not present in catalog: WARNING (not ERROR)
-    with message naming the consuming plugin, the missing dep `name`, the
-    declared `version`, and the `reason` field for context if present
-- [ ] 4.2.2: Add a unit test fixture: a manifest declaring `dependencies:
-  [{plugin: "non-existent-plugin", reason: "..."}]` — expect WARNING.
-- [ ] 4.2.3: Add a positive test: declaring `yellow-linear` as a dep
+  - If declared (non-optional) dep not present in catalog: WARNING (not ERROR).
+    The shipped `ruleDependencies()` message names the consuming plugin and
+    the missing dep `name`, and appends `reason` when present. It does not
+    include the declared `version` (`dep.version` is never read).
+- [-] 4.2.2: (not done — no RULE 11 test exists in tests/) Add a unit test fixture: a manifest declaring `dependencies: [{"name": "non-existent-plugin", "reason": "..."}]` — expect WARNING. `plugin` is not a schema property; omitting `version` is valid because `version` is optional.
+- [-] 4.2.3: (not done — no RULE 11 test exists in tests/) Add a positive test: declaring `yellow-linear` as a dep
   → no warning.
 
 #### 4.3 — Manifest declarations
 
-- [ ] 4.3.1: Edit `plugins/yellow-debt/.claude-plugin/plugin.json`:
+- [x] 4.3.1: Edit `plugins/yellow-debt/.claude-plugin/plugin.json`:
   ```json
   "dependencies": [
     {
@@ -513,7 +526,7 @@ only one with an explicit external gate.
     }
   ]
   ```
-- [ ] 4.3.2: Edit `plugins/yellow-ci/.claude-plugin/plugin.json`:
+- [x] 4.3.2: Edit `plugins/yellow-ci/.claude-plugin/plugin.json`:
   ```json
   "dependencies": [
     {
@@ -524,7 +537,7 @@ only one with an explicit external gate.
     }
   ]
   ```
-- [ ] 4.3.3: Edit `plugins/yellow-chatprd/.claude-plugin/plugin.json`:
+- [x] 4.3.3: (shipped in `13bc50d` (#442), including yellow-chatprd; the plugin was removed later in #580) Edit `plugins/yellow-chatprd/.claude-plugin/plugin.json`:
   ```json
   "dependencies": [
     {
@@ -545,19 +558,19 @@ only one with an explicit external gate.
 
 #### 4.4 — Validation, changeset, smoke gate, submit
 
-- [ ] 4.4.1: Run `pnpm validate:schemas` and `pnpm test:unit`.
-- [ ] 4.4.2: `pnpm changeset` — patch bumps on `yellow-debt`, `yellow-ci`,
+- [x] 4.4.1: Run `pnpm validate:schemas` and `pnpm test:unit`.
+- [x] 4.4.2: `pnpm changeset` — patch bumps on `yellow-debt`, `yellow-ci`,
   `yellow-chatprd`. The schemas/scripts changes do not require a changeset.
-- [ ] 4.4.3: ⚠️ **External gate — do NOT tag a release until this passes:**
+- [-] 4.4.3: (not verifiable from the repo — no record of the clean-install smoke test) ⚠️ **External gate — do NOT tag a release until this passes:**
   Fresh `claude plugin install` on a clean machine for at least one of the
   three modified plugins. Confirm Claude Code's remote validator accepts
-  the new `dependencies` field. Local CI passing does NOT guarantee
+  the extended `dependencies` field. Local CI passing does NOT guarantee
   acceptance (per project memory: "Local CI ≠ remote validation").
   - If remote rejects: rework the field shape, do NOT silently strip the
     field; document the rejection mode in `docs/solutions/build-errors/`.
-- [ ] 4.4.4: Normalize line endings: `sed -i 's/\r$//' <touched JSON files>`.
-- [ ] 4.4.5: Commit with `feat(plugins): declare cross-plugin MCP dependencies (X-01)`.
-- [ ] 4.4.6: `gt submit` → PR 4.
+- [x] 4.4.4: Normalize line endings: `sed -i 's/\r$//' <touched JSON files>`.
+- [x] 4.4.5: Commit with `feat(plugins): declare cross-plugin MCP dependencies (X-01)`.
+- [x] 4.4.6: `gt submit` → PR 4.
 
 **Acceptance criteria:**
 - `pnpm validate:schemas` passes; new dep field validates against schema.
@@ -565,7 +578,8 @@ only one with an explicit external gate.
   fictional dep; passes silently when deps are valid.
 - All three modified manifests declare `yellow-linear` as a dep with
   human-readable reason text.
-- Fresh-install smoke test passes before any release tag.
+- Fresh-install smoke test is not verified: no clean-install result is
+  in the repo (see 4.4.3).
 
 ---
 
@@ -595,12 +609,12 @@ For each file below, change `model: inherit` (currently line 4 in all
 five) to `model: opus` (bare string, matching `architecture-strategist.md`
 precedent):
 
-- [ ] 5.1.1: `plugins/yellow-core/agents/review/security-sentinel.md` → `model: opus`
-- [ ] 5.1.2: `plugins/yellow-core/agents/review/performance-oracle.md` → `model: opus`
-- [ ] 5.1.3: `plugins/yellow-review/agents/review/adversarial-reviewer.md` → `model: opus`
-- [ ] 5.1.4: `plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md` → `model: opus`
-- [ ] 5.1.5: `plugins/yellow-review/agents/review/agent-native-reviewer.md` → `model: opus`
-- [ ] 5.1.6: Run `pnpm validate:agents` — clean; each frontmatter has a
+- [x] 5.1.1: `plugins/yellow-core/agents/review/security-sentinel.md` → `model: opus`
+- [x] 5.1.2: `plugins/yellow-core/agents/review/performance-oracle.md` → `model: opus`
+- [x] 5.1.3: `plugins/yellow-review/agents/review/adversarial-reviewer.md` → `model: opus`
+- [x] 5.1.4: `plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md` → `model: opus`
+- [x] 5.1.5: `plugins/yellow-review/agents/review/agent-native-reviewer.md` → `model: opus`
+- [x] 5.1.6: Run `pnpm validate:agents` — clean; each frontmatter has a
   single-line `model:` field.
 
 #### 5.2 — A-02 Phase 1: tool restrictions on read-only research agents
@@ -617,15 +631,16 @@ precedent):
 > | `spec-flow-analyzer` | `Read, Grep, Glob, Bash` | `[Read, Grep, Glob]` | **Keep Bash** → `[Read, Grep, Glob, Bash]` |
 > | `code-researcher` | `Read, Grep, Glob, Bash, ToolSearch, 4× MCP` | `[Read, Grep, Glob]` | **Far too narrow — keep ToolSearch + MCP tools**; A-02 is a no-op for this agent |
 > | `codex-analyst` | `Bash, Read, Grep, Glob` | `[Read, Grep, Glob, Bash]` | Plan correct |
-> | `linear-explorer` | `Bash, ToolSearch, 5× MCP` (no Read/Grep/Glob) | `[Read, Grep, Glob, ToolSearch, mcp__*]` | **Verify Read/Grep/Glob are used in body before adding** — if not used, leave unchanged |
+> | `linear-explorer` | `Bash, ToolSearch, 5× MCP` (no Read/Grep/Glob) | `[Read, Grep, Glob, ToolSearch, mcp__*]` | **Leave unchanged.** Body inspection: `tools:` is Bash, ToolSearch, and five `list_*` MCP tools. The body never calls Read, Grep, or Glob (the only "Read" hit is the prose word "Read-only"). |
 >
 > **Net effect:** A-02 P1 is mostly a confirmation/audit pass, not a
 > restriction pass. Only `git-history-analyzer` and `codex-analyst` exactly
 > match the brainstorm's restriction list. `learnings-researcher` is already
-> minimal. The other five require per-body verification and produce
-> narrower changes than the brainstorm anticipated. The hardening value is
-> still present — it codifies "no Edit/Write" on agents that don't have it
-> — but the diff per agent is small or empty.
+> minimal. The other five need per-body verification and produce
+> narrower changes than the brainstorm anticipated. `linear-explorer`'s
+> check is recorded above: `Read`, `Grep`, and `Glob` stay off. The
+> hardening value is still present — it codifies "no Edit/Write" on
+> agents that don't have it — but the diff per agent is small or empty.
 <!-- /deepen-plan -->
 
 For each agent below, update the frontmatter `tools:` field. The
@@ -636,32 +651,31 @@ to confirm the change is a strict narrowing (no functional regression):
 
 **Per-agent actions (revised per codebase findings above):**
 
-- [ ] 5.2.1: `plugins/yellow-core/agents/research/learnings-researcher.md`
+- [x] 5.2.1: (done — the audit confirmed the existing tool set and shipped no edit; #439, yellow-core CHANGELOG A-02 Phase 1) `plugins/yellow-core/agents/research/learnings-researcher.md`
   → **No-op** (already `[Read, Grep, Glob]`); document in commit message
   that this agent was audited and confirmed minimal.
-- [ ] 5.2.2: `plugins/yellow-core/agents/research/repo-research-analyst.md`
+- [x] 5.2.2: (done — the audit confirmed the existing tool set and shipped no edit; #439, yellow-core CHANGELOG A-02 Phase 1) `plugins/yellow-core/agents/research/repo-research-analyst.md`
   → keep current `[Read, Grep, Glob, Bash]`; **no-op** unless body shows
   Bash is unused. Audit only.
-- [ ] 5.2.3: `plugins/yellow-core/agents/research/best-practices-researcher.md`
+- [x] 5.2.3: (done — the audit confirmed the existing tool set and shipped no edit; #439, yellow-core CHANGELOG A-02 Phase 1) `plugins/yellow-core/agents/research/best-practices-researcher.md`
   → keep `[WebSearch, WebFetch, Read, Glob, Grep]`; **no-op** unless body
   shows WebSearch/WebFetch unused. Audit only.
-- [ ] 5.2.4: `plugins/yellow-core/agents/research/git-history-analyzer.md`
+- [x] 5.2.4: (done — the audit confirmed the existing tool set and shipped no edit; #439, yellow-core CHANGELOG A-02 Phase 1) `plugins/yellow-core/agents/research/git-history-analyzer.md`
   → confirm `[Bash, Read, Grep, Glob]` is current; **no-op** (resolves
   brainstorm Open Question 2 — Bash is required and present).
-- [ ] 5.2.5: `plugins/yellow-core/agents/workflow/spec-flow-analyzer.md`
+- [x] 5.2.5: (done — the audit confirmed the existing tool set and shipped no edit; #439, yellow-core CHANGELOG A-02 Phase 1) `plugins/yellow-core/agents/workflow/spec-flow-analyzer.md`
   → keep current `[Read, Grep, Glob, Bash]`; **no-op** unless body shows
   Bash is unused. Audit only.
-- [ ] 5.2.6: `plugins/yellow-research/agents/research/code-researcher.md`
+- [x] 5.2.6: (done — the audit confirmed the existing tool set and shipped no edit; #439, yellow-core CHANGELOG A-02 Phase 1) `plugins/yellow-research/agents/research/code-researcher.md`
   → keep current full set (`Read, Grep, Glob, Bash, ToolSearch, 4× MCP`);
   **no-op** — restricting to `[Read, Grep, Glob]` would break the agent.
   Audit only.
-- [ ] 5.2.7: `plugins/yellow-codex/agents/research/codex-analyst.md`
+- [x] 5.2.7: (done — the audit confirmed the existing tool set and shipped no edit; #439, yellow-core CHANGELOG A-02 Phase 1) `plugins/yellow-codex/agents/research/codex-analyst.md`
   → confirm `[Bash, Read, Grep, Glob]` is current; **no-op** (Bash needed
   for Codex CLI invocation).
-- [ ] 5.2.8: `plugins/yellow-linear/agents/research/linear-explorer.md`
-  → read body to verify whether Read/Grep/Glob are actually used. If yes,
-  add them to the existing `[Bash, ToolSearch, mcp__*]` set. If no, leave
-  unchanged. **Decision deferred to body inspection at edit time.**
+- [x] 5.2.8: (done — body inspection recorded: `tools:` is `Bash`, `ToolSearch`, and five Linear `list_*` MCP tools; the body never calls `Read`, `Grep`, or `Glob`, so those tools were not added and no frontmatter edit shipped; #439) `plugins/yellow-linear/agents/research/linear-explorer.md`
+  → leave `[Bash, ToolSearch, mcp__*]` unchanged. The only "Read" match in
+  the file is the prose word "Read-only".
 
 **A-02 P1 is largely an audit/confirmation pass.** The brainstorm
 overestimated the restriction surface — most agents already have the
@@ -678,17 +692,21 @@ were checked for least-privilege; current tools are correct."
 
 #### 5.3 — Validation, changeset, submit
 
-- [ ] 5.3.1: Run `pnpm validate:agents && pnpm validate:schemas`.
-- [ ] 5.3.2: `pnpm changeset` — patch bumps on all five plugins:
+- [x] 5.3.1: Run `pnpm validate:agents && pnpm validate:schemas`.
+- [-] 5.3.2: (differs — #439 shipped changesets for yellow-core and yellow-review only) `pnpm changeset` — patch bumps on all five plugins:
   yellow-core, yellow-review, yellow-research, yellow-codex, yellow-linear.
-- [ ] 5.3.3: Normalize line endings on all 13 modified `.md` files.
-- [ ] 5.3.4: Commit with `feat(agents): pin opus on deep reviewers + restrict tools on read-only research agents (A-01, A-02 P1)`.
-- [ ] 5.3.5: `gt submit` → PR 5.
+- [-] 5.3.3: (differs — #439 edited 5 agent files, not 13) Normalize line endings on all 13 modified `.md` files.
+- [-] 5.3.4: (differs — shipped as `feat(agents): pin opus on deep-analysis reviewers (A-01)` (#439)) Commit with `feat(agents): pin opus on deep reviewers + restrict tools on read-only research agents (A-01, A-02 P1)`.
+- [x] 5.3.5: `gt submit` → PR 5.
 
 **Acceptance criteria:**
 - All 5 A-01 agents have `model: <opus-id>` (matching existing pinned
   pattern — read one to confirm exact string).
-- All 8 A-02 P1 agents have a narrowed `tools:` field.
+- The eight A-02 P1 agents were audited and their existing `tools:` already
+  matched least privilege (no Edit/Write), so no frontmatter edit shipped.
+  `linear-explorer` does not list or call `Read`, `Grep`, or `Glob`; those
+  tools were not added (see 5.2.8). See the yellow-core CHANGELOG A-02
+  Phase 1 table.
 - `pnpm validate:agents` passes clean.
 - No agent regressions: each restricted agent still has the tools it
   actually uses (verified by reading agent body before editing).
@@ -702,22 +720,25 @@ were checked for least-privilege; current tools are correct."
 **Plugins touched:** none (scripts/, root docs/, package.json)
 **Changeset required:** no (scripts and root docs only)
 
-- [ ] 6.1: Create `scripts/validate-doc-counts.js` (~50 lines) that:
+- [x] 6.1: Create `scripts/validate-doc-counts.js` that scans an explicit
+  file allowlist, not every root-level Markdown file:
+  - `CLAUDE.md`
+  - `README.md`
+  - `CONTRIBUTING.md`
+  - `AGENTS.md`
+    (`docs/architecture-overview.md` was not in this #441 allowlist. #840,
+    `dd88bf19`, added it later.)
   - Reads `.claude-plugin/marketplace.json` → `plugins.length` is the
     canonical count
-  - Greps `CLAUDE.md`, `README.md`, and all root-level `.md` files (not
-    inside `plugins/`, `docs/solutions/`, or `node_modules/`) for these
-    patterns:
+  - Matches only these patterns (there is no `consumers` pattern):
     - `\d+ plugins` (case-insensitive)
     - `\d+ marketplace plugins`
-    - `\d+ consumers` (audit also tracks consumer count drift)
   - For each match, parse the integer and compare to canonical
-  - Mismatch → `process.exit(1)` with a message naming the file, line
-    number, found count, and expected count
+  - Mismatch exits 1 with file, line, found, and expected
   - Match → silent success
   - `console.error` for tooling output (stderr); reserve stdout for
     machine-readable mode if needed
-- [ ] 6.2: Add unit test at `tests/integration/validate-doc-counts.test.ts`
+- [x] 6.2: Add unit test at `tests/integration/validate-doc-counts.test.ts`
   (vitest watches `tests/integration` per package.json line 19; fixture path
   in earlier draft was wrong):
   - Describe block: `describe('validate-doc-counts', ...)` matching the
@@ -741,26 +762,29 @@ were checked for least-privilege; current tools are correct."
 > describe-block named for the script, vitest auto-discovers from
 > `--dir tests/integration`.
 <!-- /deepen-plan -->
-- [ ] 6.3: Wire into `package.json`:
+- [x] 6.3: Wire into `package.json`:
   - Add script: `"validate:doc-counts": "node scripts/validate-doc-counts.js"`
   - Add to `release:check`: chain after `validate:versions` (so the
     full chain becomes `validate:schemas && validate:versions && validate:doc-counts && typecheck`)
-- [ ] 6.4: Manual sanity check:
+- [x] 6.4: Manual sanity check:
   - Run `pnpm validate:doc-counts` on the post-PR-2 tree → expect exit 0
     (PR 2 already fixed CLAUDE.md and README.md)
   - Temporarily edit CLAUDE.md to `"17 plugins"` → run again → expect exit 1
   - Restore CLAUDE.md
-- [ ] 6.5: Run full `pnpm release:check` → confirm clean.
-- [ ] 6.6: Normalize line endings on the new script: `sed -i 's/\r$//' scripts/validate-doc-counts.js`.
-- [ ] 6.7: Commit with `feat(scripts): add validate-doc-counts.js to catch narrative-doc count drift`.
-- [ ] 6.8: `gt submit` → PR 6.
+- [x] 6.5: Run full `pnpm release:check` → confirm clean.
+- [x] 6.6: Normalize line endings on the new script: `sed -i 's/\r$//' scripts/validate-doc-counts.js`.
+- [x] 6.7: Commit with `feat(scripts): add validate-doc-counts.js to catch narrative-doc count drift`.
+- [x] 6.8: `gt submit` → PR 6.
 
 **Acceptance criteria:**
 - `pnpm validate:doc-counts` exists as a standalone npm script.
 - `pnpm release:check` invokes it and fails fast on any mismatch.
 - Unit tests cover positive, negative (mismatch), and absent-claim cases.
-- Adding a fake `"99 plugins"` to any root narrative doc fails the check
-  with file/line context.
+- Adding a fake `"99 plugins"` claim to a `SCAN_FILES` document fails the
+  check with file/line context. #441 shipped four files: `CLAUDE.md`,
+  `README.md`, `CONTRIBUTING.md`, and `AGENTS.md`. #840 (`dd88bf19`) added
+  `docs/architecture-overview.md`. A Markdown file outside that list is
+  not scanned and does not fail.
 
 ---
 
@@ -778,7 +802,7 @@ were checked for least-privilege; current tools are correct."
 | 2 | `plugins/gt-workflow/CLAUDE.md` | Append `## Namespace exception` section |
 | 3 | `plugins/yellow-morph/hooks/scripts/prewarm-morph.sh` | Fork-and-disown refactor |
 | 3 | `plugins/yellow-morph/.claude-plugin/plugin.json` | `timeout: 30` → `5` |
-| 4 | `schemas/plugin.schema.json` | Add optional `dependencies` field |
+| 4 | `schemas/plugin.schema.json` | Extend the existing `dependencies` array (string or object; object `name` required, `version` optional) |
 | 4 | `scripts/validate-plugin.js` | Add cross-marketplace dep check (warn) |
 | 4 | `plugins/yellow-debt/.claude-plugin/plugin.json` | Declare `yellow-linear` dep |
 | 4 | `plugins/yellow-ci/.claude-plugin/plugin.json` | Declare `yellow-linear` dep |
@@ -801,8 +825,11 @@ schema, vitest for tests).
 
 ### API Changes
 
-**`schemas/plugin.schema.json`** gains an optional top-level `dependencies`
-array. Existing manifests without the field validate unchanged.
+**`schemas/plugin.schema.json`** already has a top-level `dependencies`
+array (lines 284-325). This work extends that array; it does not add the
+field. Items may be non-empty strings or objects. Object entries require
+`name` and may include optional `version` (semver range), `optional`, and
+`reason`. Existing manifests without the field validate unchanged.
 
 ```json
 // Before
@@ -839,7 +866,7 @@ None.
 |---|---|
 | 1 | `pnpm test:unit && pnpm validate:schemas && pnpm release:check` |
 | 2 | `pnpm validate:schemas && pnpm validate:agents` |
-| 3 | Manual smoke (parent <1s, no zombies) + `pnpm validate:schemas` |
+| 3 | Parent timing recorded in #438 (`0.007s`); zombie and background-completion checks not recorded. Plus `pnpm validate:schemas` |
 | 4 | `pnpm validate:schemas && pnpm test:unit` + ⚠️ fresh-install smoke |
 | 5 | `pnpm validate:agents && pnpm validate:schemas` |
 | 6 | `pnpm release:check` (now includes `validate:doc-counts`) |
@@ -856,12 +883,12 @@ None.
 
 ### Manual checks
 
-- **PR 3 H-01:** time `bash plugins/yellow-morph/hooks/scripts/prewarm-morph.sh`
-  → parent must exit in <1s; check `ps -ef | grep prewarm` after parent
-  exits → background subshell may still run, but no zombies (`Z` in `ps`).
+- **PR 3 H-01:** #438 records parent timing only (`0.007s` / `<10ms` in
+  `9977b28`). The background-install completion check and
+  `ps -ef | grep prewarm` zombie inspection are not recorded.
 - **PR 4 X-01 smoke gate:** fresh `claude plugin install yellow-debt`
   on a clean Claude Code install. Confirm install succeeds and the
-  remote validator does not reject the new `dependencies` field.
+  remote validator does not reject the extended `dependencies` field.
 
 ## Acceptance Criteria
 
@@ -874,11 +901,14 @@ None.
    in script.
 4. **X-01 fixed:** all three consumer plugins declare `yellow-linear` as
    a dep with human-readable reasons; validator warns on missing deps;
-   fresh-install smoke test passes.
+   the fresh-install smoke test is not verified — no clean-install
+   result is in the repo (see 4.4.3).
 5. **A-01 fixed:** all 5 deep-analysis reviewers have explicit `model:`
    pinning (opus); none on `inherit`.
-6. **A-02 P1 fixed:** all 8 read-only research agents have a narrowed
-   `tools:` field; none inherit `Edit`/`Write` they don't use.
+6. **A-02 P1 fixed:** the eight read-only research agents were audited;
+   their existing `tools:` already matched least privilege (no Edit/Write),
+   so no frontmatter edit shipped (#439). `linear-explorer`'s body does not
+   use `Read`, `Grep`, or `Glob`, so those tools stay off its `tools:` list.
 7. **M-01 fixed:** `CLAUDE.md` and `README.md` reflect 18 plugins;
    `validate-doc-counts.js` lint catches future drift; wired into
    `release:check`.
@@ -902,7 +932,7 @@ None.
   output Claude Code reads). Redirect all background output: `( prewarm_work
   >&2 2>&1 ) & disown` or similar.
 - **PR 4 — schema rejection by remote:** if Claude Code's remote
-  validator rejects the new `dependencies` field, do NOT silently strip
+  validator rejects the extended `dependencies` field, do NOT silently strip
   it. Document the rejection in `docs/solutions/build-errors/` and
   rework the field shape (e.g., move under a custom namespace or escape
   via `metadata`).
@@ -968,7 +998,7 @@ from trunk, not stacked.
 
 ### 1. agent/audit/x-02-validator-frontmatter-only
 - **Type:** fix
-- **Description:** restrict subagent_type validator to YAML frontmatter
+- **Description:** skip CHANGELOG.md in the subagent_type validator (landed `cceea2e`; frontmatter-only matching was rejected in step 1.2)
 - **Scope:** scripts/validate-agent-authoring.js, tests/integration/validate-agent-authoring/changelog-prose.fixture.md, AUDIT_REPORT.md, docs/brainstorms/2026-05-07-audit-followups-brainstorm.md, plans/audit-followups-2026-05-07.md
 - **Tasks:** 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7
 - **Depends on:** (none)
