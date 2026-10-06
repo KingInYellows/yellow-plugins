@@ -6,10 +6,10 @@ category: 'code-quality'
 
 # Feature: Agent Quality Audit — Under-Specified Files
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 8 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** shipped. The read-only audit report landed in
+> #51 (`git log --follow`; shows CLOSED, squash is on main). The P1
+> follow-up fixes shipped as #52 and later PRs. 1 item is `[-]` (4.1,
+> unverified): no per-gap issue or ticket could be found.
 
 ## Problem Statement
 
@@ -107,7 +107,7 @@ Note: One agent, likely minor gaps only
 
 ### Phase 4: Follow-up Tracking
 
-- [x] 4.1: For each P1 gap: create a GitHub issue or Linear ticket
+- [-] (unverified — no GitHub issue or Linear ticket per P1 gap found; the report links none) 4.1: For each P1 gap: create a GitHub issue or Linear ticket
 - [x] 4.2: Queue a follow-up PR to implement P1 improvements first
 
 ## Technical Details

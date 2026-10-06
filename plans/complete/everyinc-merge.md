@@ -1,9 +1,12 @@
 # Feature: EveryInc/Compound-Engineering Selective Merge
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 210 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (reconciled 2026-10-06):** shipped, with gaps. Backbone merged
+> as #273-#275 and #280-#283 (#280-#283 replaced #276-#279); Wave 3 landed via
+> the sibling plan: #287, #293, #296, #306-#308, #310-#312, #316, #403, #406,
+> #410, plus #402 (stub removal). Found via `git log origin/main` and the
+> sibling plan `everyinc-merge-wave3.md`. 24 items are `[-]`: W1 fence
+> items (superseded), Wave 2 and W3.x smoke-run "Done:" items (unverified),
+> W3.5/W3.6/W3.10/W3.11 (not done as written), W3.9 plugin-dev (n/a).
 
 **Date:** 2026-04-28
 **Source brainstorm:** `docs/brainstorms/2026-04-28-everyinc-merge-brainstorm.md`
@@ -182,7 +185,7 @@ Before each wave's implementation session begins:
   `mcp__plugin_yellow-core_context7__*` tool names anywhere in the repo.
 - [x] Six drifted agents repaired with parity to upstream patterns
   (frontmatter + body structure).
-- [x] `pr-comment-resolver` and `resolve-pr.md` fence raw PR comment text with
+- [-] (superseded by #281 — existing `--- comment begin/end (reference only) ---` fence kept after parity check vs CE #490; `pr-comment-content` delimiters never adopted) `pr-comment-resolver` and `resolve-pr.md` fence raw PR comment text with
   `--- begin pr-comment-content ---` / `--- end pr-comment-content ---`
   delimiters + advisory notice; no raw comment text reaches Edit operations.
 - [x] `pnpm test:unit` and `pnpm test:integration` green.
@@ -274,7 +277,7 @@ Before each wave's implementation session begins:
 
 - [x] **W1.4 — pr-comment-resolver untrusted-input handling (CE PR #490).**
   (`patch` yellow-review)
-  - [x] Update `plugins/yellow-review/agents/workflow/pr-comment-resolver.md`
+  - [-] (superseded by #281 — existing fence verified at parity and kept, not rewrapped in `pr-comment-content` delimiters) Update `plugins/yellow-review/agents/workflow/pr-comment-resolver.md`
     body: every PR comment text reference must be wrapped in
     `--- begin pr-comment-content (untrusted) ---` /
     `--- end pr-comment-content ---` delimiters with the standard advisory.
@@ -344,18 +347,18 @@ Before each wave's implementation session begins:
   injection block); non-empty result is injected as
   `--- begin learnings-context (reference only) ---` fenced block into all
   dispatched reviewer agents' Task prompts.
-- [x] All 5 new persona agents are dispatched in a controlled smoke-test PR
+- [-] (unverified — personas and dispatch table shipped in #283; no smoke-PR run recorded) All 5 new persona agents are dispatched in a controlled smoke-test PR
   (small PR with diff > 100 lines).
-- [x] Confidence rubric is applied: at least one finding suppressed as FP per
+- [-] (unverified — rubric aggregation shipped in #283; no smoke-run record of a suppressed FP) Confidence rubric is applied: at least one finding suppressed as FP per
   the rubric in the smoke-test run.
 - [x] Base branch is fetched (PR #544 hardening) before any reviewer reads
   changed files.
-- [x] `review-all` inlines the new pipeline steps; smoke-test on a 2-PR queue
+- [-] (unverified — inlining shipped in #283; 2-PR smoke run not recorded) `review-all` inlines the new pipeline steps; smoke-test on a 2-PR queue
   confirms both PRs are reviewed by the new pipeline.
-- [x] `code-reviewer` is renamed to `project-compliance-reviewer`; all
+- [x] (stub shipped in #283, removed by #402 as planned) `code-reviewer` is renamed to `project-compliance-reviewer`; all
   in-repo `subagent_type` references updated; deprecation stub left in place
   for one minor-version cycle.
-- [x] Orchestrator graceful-degradation guard: missing agent = log to stderr +
+- [-] (unverified — guard exists in review-pr.md; omit-one-persona smoke run not recorded) Orchestrator graceful-degradation guard: missing agent = log to stderr +
   continue; verified by smoke-test that omits one persona via
   `yellow-plugins.local.md` config.
 - [x] All new persona agents and `learnings-researcher` use the standard
@@ -565,7 +568,7 @@ Before each wave's implementation session begins:
   - [x] Narrow body scope: focus on CLAUDE.md/AGENTS.md compliance, naming
     conventions, project-pattern adherence; remove general-correctness language
     (now handled by `correctness-reviewer`).
-  - [x] Leave a deprecation stub at the old path
+  - [x] (shipped in #283, removed by #402 as planned) Leave a deprecation stub at the old path
     `plugins/yellow-review/agents/review/code-reviewer.md`: a 5-line agent that
     prints "DEPRECATED: invoke `project-compliance-reviewer` instead. This
     stub will be removed in the next minor version." and otherwise no-ops.
@@ -582,7 +585,7 @@ Before each wave's implementation session begins:
     `review:pr` Step 3a/3d/4/5/6 structure.
   - [x] Add a comment at the inline section: `<!-- This block must mirror
     review:pr.md Steps 3a-6. When updating either file, update both. -->`.
-  - [x] Smoke test: invoke `review-all` against a 2-PR queue; verify both PRs
+  - [-] (unverified — smoke run not recorded) Smoke test: invoke `review-all` against a 2-PR queue; verify both PRs
     receive the learnings pre-pass and at least one persona dispatch.
 
 - [x] **W2.7 — Define `yellow-plugins.local.md` minimum schema.** (`minor`
@@ -638,7 +641,7 @@ Before each wave's implementation session begins:
 
 - [x] Per-component acceptance: each component below has its own done-state
   enumerated in its task block.
-- [x] All Wave 3 PRs are reviewed by the Wave 2 pipeline (validate by inspecting
+- [-] (unverified — no review log kept to inspect) All Wave 3 PRs are reviewed by the Wave 2 pipeline (validate by inspecting
   the review log).
 - [x] No Wave 3 PR introduces new Bash in any reviewer agent (Wave 1 rule
   applies).
@@ -668,7 +671,7 @@ Before each wave's implementation session begins:
     learnings pre-pass + confidence rubric + compact return + graceful
     degradation pattern. (Resolves MG-7: same orchestration, different
     targets.)
-  - [x] Done: `/yellow-docs:docs:review docs/brainstorms/<sample>.md` returns
+  - [-] (unverified — no record of a synthetic smoke run; deliverable itself shipped) Done: `/yellow-docs:docs:review docs/brainstorms/<sample>.md` returns
     persona findings in the standard schema with at least one finding from
     each invoked persona on a synthetic test doc.
 
@@ -692,7 +695,7 @@ Before each wave's implementation session begins:
   - [x] Add Step 4.5 (after recall, before resolver dispatch) for actionability
     filter per CE PR #461: drop comments matching `^(LGTM|nit:|👍|thanks?$)`
     and similar non-actionable patterns; report the dropped count to user.
-  - [x] Done: smoke-test a synthetic PR with 5 comments (2 actionable, 2 nit,
+  - [-] (unverified — no record of a synthetic smoke run; deliverable itself shipped) Done: smoke-test a synthetic PR with 5 comments (2 actionable, 2 nit,
     1 LGTM) — only 2 resolver tasks spawned.
 
 - [x] **W3.4 — `git-worktree` skill fixes (CE PR #312).** (`patch`
@@ -712,26 +715,26 @@ Before each wave's implementation session begins:
     `plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md`.
   - [x] Adopt `ce-agent-native-reviewer` →
     `plugins/yellow-review/agents/review/agent-native-reviewer.md`.
-  - [x] Adopt `ce-agent-native-architecture` and `ce-agent-native-audit` skills
+  - [x] (adopted under yellow-core via #403; plugin-dev not created) Adopt `ce-agent-native-architecture` and `ce-agent-native-audit` skills
     → `plugins/plugin-dev/skills/agent-native-architecture/SKILL.md` and
     `plugins/plugin-dev/skills/agent-native-audit/SKILL.md` (note:
     `plugin-dev` plugin does not exist — create it as a new plugin if not
     present, or adopt skills under yellow-core if plugin-dev creation is out
     of scope).
-  - [x] Wire the three new reviewers into `review:pr` dispatch table when
+  - [-] (partially done — dispatch table auto-fires on plugin-authoring diff paths, but no `focus_areas: agent-native` or `agent_native_focus` trigger exists in review-pr.md) Wire the three new reviewers into `review:pr` dispatch table when
     `focus_areas` (from W2.7) includes `agent-native` OR when the PR diff
     touches `plugins/*/agents/`, `plugins/*/skills/`, or `plugins/*/commands/`
     (auto-detect plugin-authoring PRs).
-  - [x] Done: a synthetic plugin-authoring PR triggers all three reviewers
+  - [-] (unverified — no record of a synthetic smoke run; deliverable itself shipped) Done: a synthetic plugin-authoring PR triggers all three reviewers
     automatically.
 
-- [x] **W3.6 — yellow-plugins.local.md schema expansion.** (`patch`
+- [-] (partially done — schema documented, but see the unmet "Done:" item below) **W3.6 — yellow-plugins.local.md schema expansion.** (`patch`
   yellow-core)
   - [x] Expand the W2.7 minimum schema with full keys: `stack` (TS/Py/Rust/Go),
     `agent_native_focus` (boolean), `confidence_threshold` override.
   - [x] Document complete schema in `plugins/yellow-core/skills/local-config/
     SKILL.md`.
-  - [x] Done: skill documents every key; review:pr reads each.
+  - [-] (not done — keys are documented, but review:pr does not read `stack`, `agent_native_focus` or `confidence_threshold`) Done: skill documents every key; review:pr reads each.
 
 - [x] **W3.7 — yellow-codex expansion evaluation.** (`patch` yellow-codex)
   - [x] Read `codex-reviewer.md`, `codex-rescue.md`, `codex-executor.md`
@@ -767,9 +770,9 @@ Before each wave's implementation session begins:
       entries by moving to `docs/solutions/archived/<original-category>/`
       (do NOT delete; preserve history).
   - [x] Read upstream `ce-compound-refresh` snapshot from Phase 0.
-  - [x] Frontmatter must include `user-invokable: true` (note the "k") and
+  - [-] (superseded — shipped with the canonical `user-invocable: true` key) Frontmatter must include `user-invokable: true` (note the "k") and
     standard `## What It Does`, `## When to Use`, `## Usage` headings.
-  - [x] Done: skill detects stale and overlapping entries on a synthetic
+  - [-] (unverified — no record of a synthetic smoke run; deliverable itself shipped) Done: skill detects stale and overlapping entries on a synthetic
     fixture (5 known-stale + 1 known-overlap); consolidation hand-off produces
     a valid merged entry.
 
@@ -817,12 +820,12 @@ Before each wave's implementation session begins:
     "yellow-core:brainstorm-orchestrator"` and the selected approach as task
     content. (Note: `/workflows:brainstorm` is a command, not a skill — must
     invoke its underlying agent via Task, not via the Skill tool.)
-  - [x] Frontmatter `allowed-tools:` must include `Task` (for spawning
+  - [-] (not done — SKILL.md frontmatter has no `allowed-tools:`; the body spawns via the `Agent` tool and `AskUserQuestion`) Frontmatter `allowed-tools:` must include `Task` (for spawning
     brainstorm-orchestrator) and `AskUserQuestion` (for the ranked-list
     selection and subject gate).
   - [x] Read upstream `ce-ideate` v2 snapshot from Phase 0 (v2.68.0 #588 +
     warrant contract #671 + HITL review-loop #580).
-  - [x] Done: invoking with vague input ("better error handling") produces
+  - [-] (unverified — no record of a synthetic smoke run; deliverable itself shipped) Done: invoking with vague input ("better error handling") produces
     2–3 warranted approaches and routes the selected one into brainstorm.
 
 <!-- deepen-plan: external -->
@@ -895,7 +898,7 @@ Before each wave's implementation session begins:
     #534).
   - [x] Standard prompt-injection fencing for any session content the agent
     processes (transcripts may contain user-supplied text).
-  - [x] Done: query returns timestamped results from all available backends,
+  - [-] (unverified — no record of a synthetic smoke run; deliverable itself shipped) Done: query returns timestamped results from all available backends,
     each tagged with source vendor.
 
 <!-- deepen-plan: external -->
@@ -949,7 +952,7 @@ Before each wave's implementation session begins:
     (security/performance ≥0.8, correctness ≥0.7, style ≥0.6).
   - [x] Read upstream `ce-adversarial-reviewer` snapshot from Phase 0 for
     failure-scenario framing.
-  - [x] Done: synthetic codebase produces structured + calibrated +
+  - [-] (unverified — no record of a synthetic smoke run; deliverable itself shipped) Done: synthetic codebase produces structured + calibrated +
     deduplicated output identical in shape to Wave 2 review:pr (modulo
     `failure_scenario` field).
 
@@ -995,7 +998,7 @@ Before each wave's implementation session begins:
   - [x] Read upstream `ce-optimize` snapshot from Phase 0 (v2.66.0 #446)
     INCLUDING the `schema.yaml` and README — adopt verbatim or adapt at
     authoring time per OQ-C.
-  - [x] Done: skill executes a synthetic 2-candidate experiment and produces
+  - [-] (unverified — no record of a synthetic smoke run; deliverable itself shipped) Done: skill executes a synthetic 2-candidate experiment and produces
     ranked judge output with scores and rationale.
 
 - [x] **W3.15 — `plugin-contract-reviewer` (renamed from CE
@@ -1036,7 +1039,7 @@ Before each wave's implementation session begins:
     framework, drop REST-specific examples.
   - [x] Standard prompt-injection fencing for any untrusted PR/diff content
     the agent receives in its prompt.
-  - [x] Done: synthetic plugin-modifying PR with one rename (e.g., agent
+  - [-] (unverified — no record of a synthetic smoke run; deliverable itself shipped) Done: synthetic plugin-modifying PR with one rename (e.g., agent
     `name:` change) and one signature change (e.g., MCP tool removal)
     triggers the reviewer; both findings appear in structured schema with
     `breaking_change_class` and `migration_path` populated.
@@ -1107,7 +1110,7 @@ Before each wave's implementation session begins:
     agent-native reviewers + new plugin-contract-reviewer from W3.15).
   - [x] yellow-debt: `minor` (scanner calibration + audit-synthesizer
     update).
-  - [x] plugin-dev (if created): `minor` (initial release).
+  - [-] (not applicable — plugin-dev was never created; skills went under yellow-core) plugin-dev (if created): `minor` (initial release).
   - [x] yellow-codex / yellow-composio: no version bump (research-only).
 
 ## Technical Specifications
@@ -1259,7 +1262,7 @@ None.
 - [x] All three waves: confirm CHANGESET entries are present per affected plugin.
 - [x] Wave 2: confirm `yellow-review` major-bump rationale is documented in
   the changeset description and CHANGELOG entry.
-- [x] After Wave 2 merges to main: install yellow-plugins fresh on a clean
+- [-] (unverified — the sign-off table in docs/operations/post-w3-functional-smoke-test.md is blank) After Wave 2 merges to main: install yellow-plugins fresh on a clean
   Claude Code instance and run `/plugin marketplace add KingInYellows/yellow-plugins`
   → confirm review:pr works end-to-end.
 
@@ -1765,9 +1768,9 @@ The work is structured as **7 linear backbone PRs (Phase 0 prep + Wave 1 + Wave 
 - [x] 1. docs/everyinc-merge-plan (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/273)
 - [x] 2. chore/remove-context7-mcp (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/274 — *unbundle + repoint to user-level context7*)
 - [x] 3. chore/strip-bash-from-reviewers (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/275 — *13 stripped, codex-reviewer keeps Bash with documented exception*)
-- [x] 4. refactor/repair-drifted-agents (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/276 — *4 agents repaired with Phase 0 additions, performance + security each split into 2-3 specialized agents*)
-- [x] 5. fix/pr-comment-fence-verify-and-validation (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/277 — *fence parity verified vs CE PR #490 (yellow stronger), resolve-pr Step 4 fence-on-spawn rule, validate-agent-authoring W1.5 Rule X added with codex-reviewer allowlist + 5 vitest fixtures. **Wave 1 complete.***)
-- [x] 6. feat/knowledge-compounder-track-schema (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/278 — *track/problem schema added to knowledge-compounder, context-budget precheck (>200 lines), idempotent backfill script applied to 45/51 entries; 2 legacy entries got new YAML frontmatter; 1 audit doc manually classified as knowledge-track*)
-- [x] 7. feat/review-pr-keystone-rewrite (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/279 — *learnings-researcher pre-pass + 5 personas (correctness, maintainability, reliability, project-standards, adversarial), code-reviewer renamed to project-compliance-reviewer with deprecation stub, review-pr.md rewrite with confidence-rubric aggregation, review-all parity, yellow-plugins.local.md schema, self-referential docs/solutions entry. **Wave 2 keystone backbone complete.***)
+- [x] (shipped as #280, replacing #276) 4. refactor/repair-drifted-agents (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/276 — *4 agents repaired with Phase 0 additions, performance + security each split into 2-3 specialized agents*)
+- [x] (shipped as #281, replacing #277) 5. fix/pr-comment-fence-verify-and-validation (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/277 — *fence parity verified vs CE PR #490 (yellow stronger), resolve-pr Step 4 fence-on-spawn rule, validate-agent-authoring W1.5 Rule X added with codex-reviewer allowlist + 5 vitest fixtures. **Wave 1 complete.***)
+- [x] (shipped as #282, replacing #278) 6. feat/knowledge-compounder-track-schema (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/278 — *track/problem schema added to knowledge-compounder, context-budget precheck (>200 lines), idempotent backfill script applied to 45/51 entries; 2 legacy entries got new YAML frontmatter; 1 audit doc manually classified as knowledge-track*)
+- [x] (shipped as #283, replacing #279) 7. feat/review-pr-keystone-rewrite (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/279 — *learnings-researcher pre-pass + 5 personas (correctness, maintainability, reliability, project-standards, adversarial), code-reviewer renamed to project-compliance-reviewer with deprecation stub, review-pr.md rewrite with confidence-rubric aggregation, review-all parity, yellow-plugins.local.md schema, self-referential docs/solutions entry. **Wave 2 keystone backbone complete.***)
 
 

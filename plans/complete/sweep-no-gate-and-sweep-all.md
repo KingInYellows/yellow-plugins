@@ -8,10 +8,10 @@ brainstorm: docs/brainstorms/2026-05-18-sweep-command-human-gate-removal-brainst
 
 # Feature: Gateless `/review:sweep` + new `/review:sweep-all`
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 25 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (reconciled 2026-10-06): shipped.** Merged as #539 (found via
+> `gh`; squash 1d79b35fc is on main). #1014 later changed sweep-all (squash
+> 6e38bc01a on main, `gh` shows it CLOSED via merge queue). 1 item is
+> `[-]`: 3.2, whose per-PR `review:sweep` call and compound pass are gone.
 
 ## Problem Statement
 
@@ -164,7 +164,7 @@ None — this is a self-directed feature.
     - Skill
   ---
   ```
-- [x] **3.2 — Write `## Workflow` body with these sections:**
+- [-] (partly superseded by #1014 — sweep-all now runs review:pr and review:resolve directly and drops the Step 6 compound pass, staging learnings for the background drain instead) **3.2 — Write `## Workflow` body with these sections:**
   - **`### Step 1: Pre-flight checks`** — verify `gh` installed, `gh auth
     status` succeeds, `jq` installed, `git status --porcelain` empty. Each
     check exits non-zero with a named `[review:sweep-all] Error: ...` message.

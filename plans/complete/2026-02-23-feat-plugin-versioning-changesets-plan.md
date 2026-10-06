@@ -8,10 +8,13 @@ brainstorm: docs/brainstorms/2026-02-23-plugin-versioning-brainstorm.md
 
 # feat: Per-Plugin Versioning with Changesets + Catalog Release
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 40 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06): partially shipped.** PR #47 landed all four phases
+> (2026-02-24); #66 removed the `changelog` plugin.json key after the remote
+> validator rejected it, #118 made the changeset check blocking and automated
+> version PRs, and #160 merged publish-release.yml into version-packages.yml.
+> Found via `git log`; the PRs show CLOSED but their squashes are on origin/main.
+> 11 items are `[-]`: Phases 2, 3, 4, and the Acceptance, Non-Functional and
+> Quality Gates sections.
 
 ## Enhancement Summary
 
@@ -597,9 +600,9 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
   if (errors.length > 0 && !DRY_RUN) process.exit(1);
   ```
 
-- [x] **Extend RULE 6 in `validate-marketplace.js`** to three-way check (`package.json == plugin.json == marketplace.json`). Add RULE 7: fail if any plugin directory has a `package.json` but no corresponding `marketplace.json` entry. Update RULE 6 to use the same logic as `validate-versions.js` to avoid parallel divergent implementations.
+- [-] (not done as written — RULE 6 stayed format-only and RULE 7 is version presence; the three-way check lives in validate-versions.js) **Extend RULE 6 in `validate-marketplace.js`** to three-way check (`package.json == plugin.json == marketplace.json`). Add RULE 7: fail if any plugin directory has a `package.json` but no corresponding `marketplace.json` entry. Update RULE 6 to use the same logic as `validate-versions.js` to avoid parallel divergent implementations.
 
-- [x] **Add `validate-versions` job to `.github/workflows/validate-schemas.yml`** — sequential job (not matrix), targeting under 5 seconds:
+- [x] (now runs on ubuntu-latest) **Add `validate-versions` job to `.github/workflows/validate-schemas.yml`** — sequential job (not matrix), targeting under 5 seconds:
 
   ```yaml
   validate-versions:
@@ -626,7 +629,7 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
 
   Add `validate-versions` to the `needs:` list of the `ci-status` gate job.
 
-- [x] **Add warning-only changeset check** — a separate CI job that warns on PRs without changesets but never blocks:
+- [-] (superseded by #118 — `changeset-check` is now blocking, not advisory) **Add warning-only changeset check** — a separate CI job that warns on PRs without changesets but never blocks:
 
   ```yaml
   changeset-check:
@@ -687,7 +690,7 @@ The hardened script above addresses all four.
 
   The root `CHANGELOG.md` at the repo root should KEEP the Keep-a-Changelog format (it's written manually as catalog release notes, not by changesets).
 
-- [x] **Update `schemas/plugin.schema.json`** — add optional `changelog` string property with `format: "uri"` and domain restriction pattern. The `ajv-formats` library is already installed (see AJV strict mode solution); the `-c ajv-formats` flag must be present in every CI invocation of `ajv validate --strict=true`:
+- [-] (superseded by #66 — the `changelog` schema property was removed; the remote validator rejected the key) **Update `schemas/plugin.schema.json`** — add optional `changelog` string property with `format: "uri"` and domain restriction pattern. The `ajv-formats` library is already installed (see AJV strict mode solution); the `-c ajv-formats` flag must be present in every CI invocation of `ajv validate --strict=true`:
 
   ```json
   "changelog": {
@@ -700,12 +703,12 @@ The hardened script above addresses all four.
 
   The pattern restriction prevents arbitrary URLs from being placed in the field (security L2 finding).
 
-- [x] **Add `changelog` field to all 11 `plugin.json` files** (conditional on Phase 3 validator test passing):
+- [-] (not done — #66 removed the `changelog` key from all plugin.json files) **Add `changelog` field to all 11 `plugin.json` files** (conditional on Phase 3 validator test passing):
   ```json
   "changelog": "https://github.com/KingInYellows/yellow-plugins/blob/main/plugins/yellow-devin/CHANGELOG.md"
   ```
 
-- [x] **Update `sync-manifests.js`** — add the `changelog` URL to the set of fields the sync script preserves (it should not overwrite or delete the `changelog` field when syncing versions).
+- [-] (moot after #66 — no `changelog` field to preserve) **Update `sync-manifests.js`** — add the `changelog` URL to the set of fields the sync script preserves (it should not overwrite or delete the `changelog` field when syncing versions).
 
 - [x] **Update root `CHANGELOG.md`** — add a header clarifying it is catalog-level release notes. Per-plugin changelogs live in `plugins/<name>/CHANGELOG.md`.
 
@@ -733,7 +736,7 @@ This is NOT Keep-a-Changelog format. Do not put initial `## [1.0.0] - 2026-02-18
 
 **Tasks:**
 
-- [x] **Update `publish-release.yml`** — multiple changes:
+- [-] (partially — publish-release.yml was merged into version-packages.yml by #160; it runs `validate:versions` not `sync-manifests --verify`, and workflow permissions are not `{}`) **Update `publish-release.yml`** — multiple changes:
 
   1. Add `--verify` step after checkout: `node scripts/sync-manifests.js --verify` to confirm no drift exists at tag time (exits 1 if any mismatch detected)
   2. Replace the awk changelog extraction with `scripts/generate-release-notes.js` which can include per-plugin excerpts
@@ -769,7 +772,7 @@ This is NOT Keep-a-Changelog format. Do not put initial `## [1.0.0] - 2026-02-18
   8. Tag: `git tag v1.x.x && git push --tags`
   ```
 
-- [x] **Add changeset status check to CI** (warn-only, as specified in Phase 2 above).
+- [-] (superseded by #118 — the CI check is blocking, not warn-only) **Add changeset status check to CI** (warn-only, as specified in Phase 2 above).
 
 ### Research Insights: Missing Commit Step
 
@@ -784,24 +787,24 @@ The original developer workflow showed `pnpm version` then `git tag` with no com
 - [x] `pnpm changeset` prompts the developer to select plugins and enter a summary
 - [x] `pnpm changeset` prompt lists only the 11 plugins (NOT `@yellow-plugins/cli` etc.)
 - [x] `pnpm apply:changesets` bumps `plugins/<name>/package.json`, writes `CHANGELOG.md` entries, and syncs `plugin.json` + `marketplace.json` in one command
-- [x] `pnpm validate:schemas` fails if `package.json`, `plugin.json`, and `marketplace.json` versions disagree for any plugin
+- [-] (not as written — `validate:schemas` does not run the version check; `validate:versions` and the CI `validate-versions` job do) `pnpm validate:schemas` fails if `package.json`, `plugin.json`, and `marketplace.json` versions disagree for any plugin
 - [x] CI `validate-versions` job blocks a PR with mismatched versions (exit 1)
-- [x] Each plugin has a `CHANGELOG.md` and (pending validator test) a `changelog` URL in `plugin.json`
+- [x] (CHANGELOG.md files only; the `changelog` URL was removed by #66) Each plugin has a `CHANGELOG.md` and (pending validator test) a `changelog` URL in `plugin.json`
 - [x] Root `CHANGELOG.md` has a `1.1.0` entry (unblocks `publish-release.yml`)
 - [x] `node scripts/catalog-version.js minor` bumps root `package.json` + `marketplace.json metadata.version` together
 
 ### Non-Functional
 
 - [x] `pnpm install` still succeeds (no version conflicts from adding 11 private workspace packages)
-- [x] `validate-versions` CI job completes in under 10 seconds
+- [-] (unverified — no recorded job duration) `validate-versions` CI job completes in under 10 seconds
 - [x] No changes to how Claude Code installs or updates plugins (transparent to users)
-- [x] `pnpm -r publish --dry-run` does NOT attempt to publish any private plugin package (verify before Phase 1 merges)
+- [-] (unverified — no record of a `pnpm -r publish --dry-run` check) `pnpm -r publish --dry-run` does NOT attempt to publish any private plugin package (verify before Phase 1 merges)
 
 ### Quality Gates
 
 - [x] All existing `pnpm validate:schemas` + `pnpm test:unit` + `pnpm test:integration` still pass
 - [x] `schemas/plugin.schema.json` schema update doesn't break AJV strict mode (`ajv-formats` already installed)
-- [x] **Phase 3 gate:** `changelog` field accepted by Claude Code remote validator (test on fresh machine before merging)
+- [-] (not met — Claude Code's remote validator rejected `changelog`; removed by #66) **Phase 3 gate:** `changelog` field accepted by Claude Code remote validator (test on fresh machine before merging)
 
 ---
 

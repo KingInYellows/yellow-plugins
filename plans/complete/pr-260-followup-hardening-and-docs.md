@@ -1,9 +1,9 @@
 # Feature: PR #260 Follow-Up — Validator/Schema Hardening + Doc Sync
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 37 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (reconciled 2026-10-06):** shipped. Merged PRs: #360, #362, #364, #365
+> (squash commits 3eeefe78a, be0fa07a7, 22b5e5670, e04055460 are on origin/main;
+> `gh` reports all four as CLOSED, not MERGED, so they were found via `git log`).
+> 2 items are `[-]`, both in Phase 1: 1.3 and 1.9.
 
 ## Problem Statement
 
@@ -101,7 +101,7 @@ scope is clarified in the SKILL.md.
       invalid name fails, missing version is allowed (only
       invalid-format fails), hooks-string anti-pattern logs warning,
       hooks-inline-object passes.
-- [x] 1.3: Extract `hasInlineHooks(manifest)` predicate at module
+- [-] 1.3: (not done as written — #360 left `hasInlineHooks` a local const in validate-plugin.js, not a module-scope predicate; main now uses `collectInlineHooks` in scripts/lib/plugin-paths.js) Extract `hasInlineHooks(manifest)` predicate at module
       scope (lines 226, 329, 449 currently duplicated). Replace
       three call sites.
 - [x] 1.4: Extract `addError(errors, msg)` helper. Canonical message
@@ -118,7 +118,7 @@ scope is clarified in the SKILL.md.
       `resolvePluginPath` containment, shebang, and `set -e` checks.
 - [x] 1.8: Refactor RULE 6 inline-object branch to call the new
       helper.
-- [x] 1.9: **Array-form hooks fix.** When `hooks` is an array,
+- [-] 1.9: (not done — no one-time INFO note about array-form `hooks` in #360 or on main) **Array-form hooks fix.** When `hooks` is an array,
       iterate elements: string elements receive
       `validateHookScriptPath` checks; object elements pass
       through (same as inline-object form). Emit a one-time

@@ -1,9 +1,12 @@
 # Feature: ruvector Worktree DB Symlink
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 29 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (reconciled 2026-10-06): shipped.** Merged as #366 (squash
+> commit 1b5b38362 on main, found via `git log`; `gh` shows the PR CLOSED
+> because it landed through the merge queue). Every task has a deliverable
+> on main; 0 items are `[-]`. The helpers were later renamed and extended
+> (`cleanup_ruvector_link` is now `unlink_ruvector_link` plus
+> `restore_ruvector_link`; the `cleanup.md` pre-remove covers only the
+> no-`--force` paths).
 
 > **Status: Implemented (archived)** — Shipped in repo. The implementation now
 > includes `get_main_repo_root`, `link_ruvector_db`, and

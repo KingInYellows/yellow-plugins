@@ -7,10 +7,11 @@ deepened: 2026-02-22
 
 # feat: Add /workflows:compound to yellow-core
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 17 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** partially shipped. Added in #39 (`fae4306b5`),
+> then renamed `/flow:compound` (#704) with logic moved into the
+> `knowledge-compounder` agent (now 6 subagents; CLAUDE.md lists 19
+> commands). Found via `git log`. 2 `[-]` items, both under Acceptance
+> Criteria: the MEMORY.md line guard and Phase 3.
 
 ## Enhancement Summary
 
@@ -75,10 +76,10 @@ No changes to `plugin.json` — auto-discovery picks up any `.md` file in
 - [x] Phase 2 writes `docs/solutions/<category>/<slug>.md` when routing says so
 - [x] Phase 2 checks for doc file collision before Write; appends `-2`, `-3` suffix on collision
 - [x] Phase 2 appends to MEMORY.md when routing says so, in a single sequential Edit
-- [x] Phase 2 checks MEMORY.md line count before writing; warns if > 185 lines
+- [-] (not done — the > 185 line guard from #39 is gone; knowledge-compounder has no MEMORY.md line check) Phase 2 checks MEMORY.md line count before writing; warns if > 185 lines
 - [x] MEMORY.md path is derived at runtime from `$(pwd)`; resolved path shown in M3 confirmation
 - [x] Both category AND slug fail with an error (not fallback) if validation fails
-- [x] Phase 3 invokes yellow-core agents (not compound-engineering agents) in parallel
+- [-] (not done — Phase 3 was deferred in #39 and does not exist in /flow:compound or knowledge-compounder) Phase 3 invokes yellow-core agents (not compound-engineering agents) in parallel
 - [x] Category validated against explicit 6-item enum, not just regex
 - [x] Conversation excerpts passed to subagents use "sandwich" injection fencing (advisory before AND after)
 - [x] `plugins/yellow-core/CLAUDE.md` lists 4 commands including the new one

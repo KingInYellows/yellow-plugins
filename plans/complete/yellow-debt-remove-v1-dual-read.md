@@ -1,9 +1,10 @@
 # Feature: Remove yellow-debt v1.0 Dual-Read Code Path
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 2 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** shipped. The dual-read removal landed in #440
+> (`git log --grep`; shows CLOSED, squash 2d71b3391 is on main). The
+> greps for `_migrated_from`, `migrated_from_v1`, dual-read and Schema
+> Migration all come back empty outside CHANGELOG. 2 items are `[-]`, both
+> in Phase 5 (5.1 not done, 5.2 contingency).
 
 **Status:** Retrospective — implementation shipped in PR #440 on 2026-05-07. Phases 1–4 task boxes reflect post-implementation state. Phase 5 boxes remain unchecked (5.1 is post-merge bookkeeping; 5.2 is a contingency, not a scheduled task).
 **Date:** 2026-05-07
@@ -134,8 +135,8 @@ Single PR, branched off `main`. Type: `refactor`. Changeset bump: `patch` for ye
 
 ### Phase 5: Post-submit
 
-- [x] 5.1 (post-merge) Update `plans/complete/pr-316-yellow-debt-residual-review-cleanup.md` Phase 4 / Stack Progress section: mark task 4. as completed and record the merge SHA when this PR lands. (Optional — the parent plan is already archived; this is bookkeeping only.)
-- [x] 5.2 (contingency, not a scheduled task) If the brainstorm's three open questions surface real consumers post-merge (e.g., a downstream tool starts emitting errors), revert via `git revert` and switch to Approach B (keep with TODO + tracker issue).
+- [-] (not done — on origin/main the parent plan's Phase 4 is unticked and never cites #440) 5.1 (post-merge) Update `plans/complete/pr-316-yellow-debt-residual-review-cleanup.md` Phase 4 / Stack Progress section: mark task 4. as completed and record the merge SHA when this PR lands. (Optional — the parent plan is already archived; this is bookkeeping only.)
+- [-] (not applicable — contingency only, not a scheduled task; no evidence it triggered) 5.2 (contingency, not a scheduled task) If the brainstorm's three open questions surface real consumers post-merge (e.g., a downstream tool starts emitting errors), revert via `git revert` and switch to Approach B (keep with TODO + tracker issue).
 
 ## Technical Specifications
 

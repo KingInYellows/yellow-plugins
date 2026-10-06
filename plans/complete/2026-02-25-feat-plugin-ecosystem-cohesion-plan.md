@@ -1,9 +1,9 @@
 # Feature: Plugin Ecosystem Cohesion & Structural Fixes
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 39 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (reconciled 2026-10-06):** shipped, with later churn. Merged PRs (found via
+> `git log origin/main`): #69 (PR 1), #70-#76 (PRs 2-8; landed together in rescue
+> squash 0db152612 after a Graphite re-targeting race). 7 items are `[-]`: 1.2,
+> 1.3, 4.3, 5.1, 5.3 (artifact later removed or replaced), 3.7 and 7.3 (never done).
 
 ## Enhancement Summary
 
@@ -81,8 +81,8 @@ These are independent one-liner changes that can ship together.
 
 - [x] **1.1** Edit `plugins/yellow-ci/.claude-plugin/plugin.json` line 22:
   change `"timeout": 3000` to `"timeout": 3`
-- [x] **1.2** Also fix `plugins/yellow-ci/hooks/hooks.json` — same `"timeout": 3000` → `3`
-- [x] **1.3** Add independence comment to `plugins/yellow-ci/hooks/scripts/session-start.sh` header:
+- [-] **1.2** (superseded by #797 — fixed in #69; hooks/hooks.json mirror later removed) Also fix `plugins/yellow-ci/hooks/hooks.json` — same `"timeout": 3000` → `3`
+- [-] **1.3** (superseded by #664 — comment shipped in #69; session-start.sh later replaced by a node entrypoint) Add independence comment to `plugins/yellow-ci/hooks/scripts/session-start.sh` header:
   `# NOTE: SessionStart hooks run in parallel across plugins. This hook must be independent.`
 - [x] **1.4** Add same comment to `plugins/yellow-ruvector/hooks/scripts/session-start.sh` header
 - [x] **1.5** Edit `plugins/yellow-browser-test/agents/testing/test-reporter.md` Step 4:
@@ -228,7 +228,7 @@ and delete `learning-compounder`.
   - On failure, log to stderr with `[review:all] Warning: knowledge compounding failed`
 - [x] **3.6** Expand ghost reference sweep: grep for `learning-compounder` across ALL files
   including README.md, CLAUDE.md, and plugin.json — not just the ones listed
-- [x] **3.7** If yellow-ruvector wants to hook into knowledge compounding, document in
+- [-] **3.7** (not done — #71/#76 added no compound guidance to plugins/yellow-ruvector/CLAUDE.md) If yellow-ruvector wants to hook into knowledge compounding, document in
   `plugins/yellow-ruvector/CLAUDE.md`: "After `/workflows:compound` completes, call
   `hooks_remember` with a summary (type: reflexion)" — this keeps the coupling in the right place
 - [x] **3.8** Run `pnpm validate:schemas`
@@ -299,7 +299,7 @@ and delete `learning-compounder`.
   - Add `"hooks"` section with inline SessionStart definition
   - Timeout: 2 (seconds)
   - Matcher: `"*"`
-- [x] **4.3** Also create/update `plugins/yellow-debt/hooks/hooks.json` to match plugin.json
+- [-] **4.3** (superseded by #797 — hooks.json shipped in #72, mirror later removed) Also create/update `plugins/yellow-debt/hooks/hooks.json` to match plugin.json
   (keep both files consistent)
 - [x] **4.4** Run `pnpm validate:schemas` (verify hooks schema accepts inline format)
 
@@ -342,7 +342,7 @@ and delete `learning-compounder`.
 
 **PR 5: Add gt-workflow PostToolUse commit validation hook**
 
-- [x] **5.1** Create `plugins/gt-workflow/hooks/check-commit-message.sh`:
+- [-] **5.1** (superseded by #661 — shell script shipped in #73, replaced by a node entrypoint and lib/policy-check-commit-message.js) Create `plugins/gt-workflow/hooks/check-commit-message.sh`:
   - Budget: 50ms (no network, no file I/O beyond stdin)
   - Use `set -uo pipefail` (without `-e`)
   - Read stdin JSON, extract `.tool_input.command` (**NOT `.command`** — PostToolUse schema
@@ -366,7 +366,7 @@ and delete `learning-compounder`.
   - Add `"PostToolUse"` key alongside existing `"PreToolUse"`
   - Matcher: `"Bash"`
   - Add explicit `"timeout": 1` (1 second, generous for 50ms budget)
-- [x] **5.3** Update `plugins/gt-workflow/hooks/hooks.json` to match plugin.json
+- [-] **5.3** (superseded by #797 — hooks.json shipped in #73, mirror later removed) Update `plugins/gt-workflow/hooks/hooks.json` to match plugin.json
   - Document hook's role in hooks.json for discoverability
 - [x] **5.4** Run `pnpm validate:schemas`
 
@@ -537,7 +537,7 @@ Written after all structural fixes land. Content based on the cross-plugin workf
     `/gt-sync` → `/gt-nav` → `/gt-amend` or `/smart-submit`
   - Each chain gets a named anchor heading for cross-linking
   - Include "No Linear" variants for users without Linear integration
-- [x] **7.3** Add cross-references from plugin READMEs where appropriate
+- [-] **7.3** (not done — no plugin README links to docs/guides/common-workflows.md) Add cross-references from plugin READMEs where appropriate
 
 **Files:**
 - `docs/guides/common-workflows.md` (new)

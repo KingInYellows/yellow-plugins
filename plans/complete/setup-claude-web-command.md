@@ -1,9 +1,10 @@
 # Feature: `setup:claude-web` Command
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 14 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** shipped. `/setup:claude-web` landed in #545
+> (found via `gh pr list --search` and `git log --follow`); the command,
+> and the CLAUDE.md and README entries are on origin/main.
+> 2 items are `[-]` (unverified): the 2.2.2 fixture check and the 3.6
+> manual smoke test. Every other tick was checked against the merged PR.
 
 **Plan date:** 2026-05-18
 **Brainstorm:** `docs/brainstorms/2026-05-18-setup-claude-web-command-brainstorm.md`
@@ -226,7 +227,7 @@ scripts_dir_is_file: yes | no               (scripts/ exists but is not a direct
 
 - [x] **2.2.1** Write the audit Bash block (one fenced code block, single
       `tool: Bash` call in the command body).
-- [x] **2.2.2** Verify the audit produces clean key-value output on a
+- [-] (unverified — no record of the empty/partial/full fixture run; only the command itself shipped) **2.2.2** Verify the audit produces clean key-value output on a
       fixture: an empty git repo, a partially-configured repo, and a
       fully-configured repo. Adjust outputs to use consistent vocabulary.
 
@@ -636,7 +637,7 @@ common cause of subsequent CI failures.
       - `pnpm lint`
 - [x] **3.5** CRLF normalize: `sed -i 's/\r$//'
       plugins/yellow-core/commands/setup/claude-web.md`
-- [x] **3.6** Manual smoke test on a fresh fixture repo (see test
+- [-] (unverified — manual smoke test on a fixture repo left no evidence) **3.6** Manual smoke test on a fresh fixture repo (see test
       matrix below): minimum two scenarios from Phase 4 (fresh repo +
       fully-configured repo) before commit.
 - [x] **3.7** Commit: `gt commit create -m "feat(yellow-core): add

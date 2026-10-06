@@ -7,10 +7,12 @@ deepened: 2026-02-18
 
 # Migrate yellow-devin Plugin to Devin V3 API
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 36 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06): shipped, since demoted to legacy.** Verified against
+> origin/main. The V3 migration landed as #31 and the permissions/messaging
+> follow-up as #113 (`git log origin/main --follow`; both show CLOSED on
+> GitHub but their squash commits are on main). Later changes: #578, #677,
+> #741 (`user-invokable` renamed), #726 (plugin marked legacy). 4 of the 36
+> boxes are `[-]`, all in the Acceptance Criteria sections.
 
 ## Enhancement Summary
 
@@ -879,7 +881,7 @@ input. The cursor is managed internally by the pagination loop.
 - [x] `/devin:tag` manages tags (add/remove/list)
 - [x] Orchestrator agent works with V3 status values, PR arrays, and suspended
   auto-resume
-- [x] Wiki command tested with `cog_` token auth
+- [-] (not done — `plugins/yellow-devin/CLAUDE.md` Known Limitations still lists MCP auth with `cog_` tokens as unverified) Wiki command tested with `cog_` token auth
 - [x] No `/devin:schedule` command (UI-only, documented in Known Limitations)
 
 ### Security Requirements (from Audit + V3-Specific)
@@ -896,7 +898,7 @@ input. The cursor is managed internally by the pagination loop.
 - [x] S1: `create_as_user_id` never used
 - [x] S2: `session_secrets` never used (use `secret_ids` only)
 - [x] S3: Enterprise list always filters by `org_ids`
-- [x] S4: ACU data excluded from error context dumps
+- [-] (unverified — no rule excluding ACU data from error context dumps found in plugins/yellow-devin) S4: ACU data excluded from error context dumps
 
 ### Quality Gates
 
@@ -904,9 +906,9 @@ input. The cursor is managed internally by the pagination loop.
 - [x] All command frontmatter has correct `allowed-tools` lists
 - [x] All descriptions have "Use when..." trigger clauses
 - [x] Skill descriptions are single-line (not YAML folded scalars)
-- [x] Skill uses `user-invokable` (with k)
+- [-] (superseded by #741 — RULE 20 renamed the key to `user-invocable`) Skill uses `user-invokable` (with k)
 - [x] LF line endings (`.gitattributes` enforced)
-- [x] Agent under 120 lines
+- [-] (not done — `devin-orchestrator.md` is 247 lines on main, 171 when #31 landed) Agent under 120 lines
 - [x] `repository` in plugin.json is plain string
 
 ## Dependencies & Prerequisites

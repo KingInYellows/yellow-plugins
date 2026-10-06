@@ -6,10 +6,12 @@ date: 2026-02-18
 
 # Public Release Audit
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 52 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06): partially shipped.** PRs #23, #24 and #30 (found via
+> `gh pr view` and `git log`) landed the cleanup, READMEs, CONTRIBUTING and CI
+> fixes, CHANGELOG 1.0.0 and plugin bumps (all merged 2026-02-18). Not done: no
+> `v1.0.0` tag or release exists (first tag is v1.1.0), and the `user-invokable`
+> rule was reversed by #741. 14 items are marked `[-]`: Phases 1, 2, 3, 4 and 7,
+> plus the Acceptance and Non-Functional sections.
 
 ## Overview
 
@@ -133,8 +135,8 @@ Internal docs:
 
 **Tasks:**
 
-- [x] Create `development` branch from current main HEAD
-- [x] Remove listed internal files from main (single commit:
+- [-] (unverified — #24/#30 say a `development` branch was pushed; origin has no `development` branch today) Create `development` branch from current main HEAD
+- [x] (done in #24 and #30, not one commit; AGENTS.md and docs/brainstorms/ were later reintroduced) Remove listed internal files from main (single commit:
       `chore: archive internal development docs to development branch`)
 - [x] Verify CI still passes after removal (no broken path references)
 
@@ -195,7 +197,7 @@ MIT
 
 - [x] Read plugin.json + CLAUDE.md for each of the 6 plugins
 - [x] Write `plugins/yellow-browser-test/README.md`
-- [x] Write `plugins/yellow-chatprd/README.md`
+- [-] (superseded by #580 — README written in #24, plugin removed from the marketplace) Write `plugins/yellow-chatprd/README.md`
 - [x] Write `plugins/yellow-core/README.md`
 - [x] Write `plugins/yellow-devin/README.md`
 - [x] Write `plugins/yellow-linear/README.md`
@@ -233,9 +235,9 @@ external contributors' PRs won't have access to self-hosted runners.
 **Fix options (choose during execution):**
 
 - [x] Change to `ubuntu-latest` for all jobs, OR
-- [x] Keep `self-hosted` but add a comment explaining this is for the
+- [-] (not done — option not chosen; #30 switched to `ubuntu-latest`) Keep `self-hosted` but add a comment explaining this is for the
       maintainer's CI only
-- [x] Add separate workflow for `ubuntu-latest` on external PRs (most robust but
+- [-] (not done here — #30 chose option 1; `validate-schemas-fork.yml` exists but was added later) Add separate workflow for `ubuntu-latest` on external PRs (most robust but
       complex)
 
 **Other CI considerations:**
@@ -260,7 +262,7 @@ clean baseline.
 - [x] Run `pnpm typecheck` — fix any TypeScript errors
 - [x] Run `pnpm lint` — fix any ESLint errors
 - [x] Run `pnpm format:check` — fix any formatting issues
-- [x] Run `pnpm release:check` — the full release gate
+- [-] (unverified — #24 CI was green but no `release:check` run is recorded) Run `pnpm release:check` — the full release gate
 
 **Success criteria:** `pnpm release:check` exits 0.
 
@@ -314,7 +316,7 @@ pass.
   - Plugin descriptions and component counts
   - Validation infrastructure
   - CI pipeline
-- [x] Bump `package.json` version to `1.0.0` if not already
+- [x] (root `package.json` was already 1.1.0; no bump needed) Bump `package.json` version to `1.0.0` if not already
 - [x] Verify `marketplace.json` metadata version matches
 - [x] Bump any plugins still at `0.1.0` to `1.0.0` (yellow-ruvector,
       yellow-browser-test, yellow-debt, yellow-ci) — or leave at 0.x if they're
@@ -325,13 +327,13 @@ pass.
 
 #### Phase 7: Final Validation & Tag
 
-- [x] Run `pnpm release:check` — full gate
-- [x] Manual spot-check: install a plugin from the marketplace via Claude Code
+- [-] (unverified — no `release:check` run recorded) Run `pnpm release:check` — full gate
+- [-] (unverified — no record of a manual install spot-check) Manual spot-check: install a plugin from the marketplace via Claude Code
       to verify the install flow works
-- [x] Review README.md one final time for tone (currently says "Personal Claude
+- [-] (not done — README.md still opens "Personal Claude Code plugin marketplace") Review README.md one final time for tone (currently says "Personal Claude
       Code plugin marketplace" — may want to adjust)
-- [x] Tag: `git tag v1.0.0`
-- [x] Push tag and main branch
+- [-] (not done — no `v1.0.0` tag on origin; first tag is v1.1.0) Tag: `git tag v1.0.0`
+- [-] (partially — main updated via #24/#30; no tag was pushed) Push tag and main branch
 
 **Success criteria:** Clean `pnpm release:check`, all 10 plugins installable,
 v1.0.0 tagged.
@@ -340,20 +342,20 @@ v1.0.0 tagged.
 
 ### Functional Requirements
 
-- [x] All 10 plugins have README.md with install command, prerequisites, and
+- [x] (true at release via #24; all 20 current plugins have a README, yellow-chatprd was removed in #580) All 10 plugins have README.md with install command, prerequisites, and
       component tables
-- [x] No internal development artifacts on main branch (brainstorms, plans,
+- [x] (PRD.md and .codemachine/ removed in #24/#30; AGENTS.md and docs/brainstorms/ later reintroduced) No internal development artifacts on main branch (brainstorms, plans,
       reviews, PRD)
-- [x] `pnpm release:check` passes
+- [-] (unverified — no `release:check` run recorded) `pnpm release:check` passes
 - [x] CONTRIBUTING.md references only scripts that exist in package.json
-- [x] Full multi-agent audit completed with P1 findings resolved
-- [x] v1.0.0 tagged
+- [x] (per the #24 description, Phase 5 multi-agent audit) Full multi-agent audit completed with P1 findings resolved
+- [-] (not done — no `v1.0.0` tag or release on origin) v1.0.0 tagged
 
 ### Non-Functional Requirements
 
-- [x] All SKILL.md frontmatter uses `user-invokable` (not `user-invocable`)
+- [-] (superseded by #741 — renamed back to `user-invocable`, RULE 20) All SKILL.md frontmatter uses `user-invokable` (not `user-invocable`)
 - [x] All SKILL.md descriptions are single-line (no YAML folded scalars)
-- [x] All files use LF line endings
+- [-] (unverified — #23 checked plugin files only; 5 non-plugin tracked files are CRLF in the index today) All files use LF line endings
 - [x] No hardcoded secrets in plugin files
 - [x] CI workflow functional for the repository (self-hosted or ubuntu-latest
       decision made)

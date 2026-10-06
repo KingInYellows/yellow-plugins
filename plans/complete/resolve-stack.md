@@ -1,9 +1,9 @@
 # Feature: `/review:resolve-stack` — Autonomous Stack-Wide Comment Resolution
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 20 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** shipped. Merged as #528 (`git log origin/main
+> --diff-filter=A` on resolve-stack.md); extended by #716, #723, #950 and
+> #955. All 20 items verified on this tree; 0 `[-]`. Later PRs changed
+> mechanics (commit-resolve-fixes script, provider router, summary columns).
 
 ## Problem Statement
 

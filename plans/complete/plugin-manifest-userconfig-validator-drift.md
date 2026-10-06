@@ -1,9 +1,10 @@
 # Feature: Plugin manifest userConfig validator drift fix
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 24 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** shipped. Merged as #386 (`git log
+> origin/main --grep=userConfig`). 23 of 24 items verified on this tree
+> (manifests, schema, RULE 9, solution doc). 1 `[-]`: 5.1, unverified.
+> Later drift: `devin_org_id` is now `sensitive: true` (#555) and the
+> schema `allOf` gained `directory`/`file` branches.
 
 ## Problem Statement
 
@@ -97,7 +98,7 @@ For each entry, add `"type": "string"` and `"title": "<label>"` immediately abov
 
 ### Phase 5: Memory + CLAUDE.md updates
 
-- [x] 5.1: Update auto-memory file `.claude/projects/-home-kinginyellow-projects-yellow-plugins/memory/MEMORY.md` "Plugin Manifest Validation" section with one-line entry pointing to the new solutions doc
+- [-] 5.1: (unverified — the auto-memory MEMORY.md is outside the repo) Update auto-memory file `.claude/projects/-home-kinginyellow-projects-yellow-plugins/memory/MEMORY.md` "Plugin Manifest Validation" section with one-line entry pointing to the new solutions doc
 - [x] 5.2: No `plugins/<name>/CLAUDE.md` updates needed — the plugin docs reference `userConfig` in narrative form, not field-by-field, so no stale references to fix.
 
 ### Phase 6: Validation, changeset, submit

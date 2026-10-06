@@ -8,10 +8,10 @@ deepened: 2026-02-21
 
 # feat: Add yellow-research Plugin
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 17 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** shipped. Added in #33 (`fb227d710`), found via
+> `git log`; commands, agents and 7 MCP servers are on main. 2 `[-]`
+> items under Acceptance Criteria: the `/mcp` visibility check
+> (unverified) and the `user-invokable` key (superseded by #741).
 
 ## Enhancement Summary
 
@@ -474,14 +474,14 @@ In `.claude-plugin/marketplace.json`, add to `plugins` array:
 - [x] Missing `docs/research/` directory is created automatically
 - [x] Slug collision appends `-2`, `-3` suffix
 - [x] If any MCP is unavailable, plugin degrades gracefully (continues with rest)
-- [x] All 4 MCPs visible in `/mcp` after plugin install
+- [-] (unverified — the runtime /mcp check can't be reproduced here; plugin.json declares perplexity, tavily, exa and parallel, plus ceramic, deepwiki and ast-grep) All 4 MCPs visible in `/mcp` after plugin install
 
 ### Quality Gates
 
 - [x] All `.md` files use LF line endings (critical on WSL2 — `sed -i 's/\r$//'`)
-- [x] Agent files under 120 lines each
+- [x] (held at #33 with 56 and 102 lines; now 126 and 242) Agent files under 120 lines each
 - [x] All agent/command descriptions are single-line (no YAML folded scalars)
-- [x] `skill` frontmatter uses `user-invokable` (with k), not `user-invocable`
+- [-] (superseded by #741 — the key was renamed to user-invocable under RULE 20; research-patterns now uses it) `skill` frontmatter uses `user-invokable` (with k), not `user-invocable`
 - [x] `plugin.json` `repository` field is a plain string URL (not object)
 - [x] No unknown keys in `marketplace.json` (no `id` field)
 - [x] `pnpm validate:schemas` passes

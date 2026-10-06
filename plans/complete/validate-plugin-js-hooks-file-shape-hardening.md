@@ -1,9 +1,10 @@
 # Feature: validate-plugin.js — fail CI on broken `hooks/hooks.json` shape
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 6 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** shipped, then superseded. The shape check and
+> tests landed in #391 (`git log --follow`; shows CLOSED, squash is on
+> main). #797 and #798 then removed all hooks/hooks.json mirrors and made
+> RULE 7 reject the file outright. 2 items are `[-]` (1.1, 1.2); the CI
+> gate and submit steps stay `[x]`. Phase 3 was deferred in the plan.
 
 ## Problem Statement
 
@@ -69,7 +70,7 @@ Wire-up via a new ajv-cli step in `validate-schemas.yml` per-plugin matrix targe
 
 ### Phase 1: Validator hardening (Item 1)
 
-- [x] **1.1** Edit `scripts/validate-plugin.js`:
+- [-] (superseded by #798 — shipped in #391, then RULE 7 changed to reject any hooks/hooks.json, so the shape and parse checks are gone) **1.1** Edit `scripts/validate-plugin.js`:
   - Move the `fs.existsSync(hooksJsonPath)` block out of the `if (hasInlineHooks)` guard at line 691 — wrap it in its own `if (fs.existsSync(...))` so the shape gate runs unconditionally when the file is present.
   - **Hoist `hooksJsonPath`:** the `const hooksJsonPath = path.join(pluginDir, 'hooks', 'hooks.json')` at line 692 is currently scoped *inside* the `if (hasInlineHooks)` branch. To run the shape check when `hasInlineHooks` is false, move the `const` declaration above the `if (hasInlineHooks)` line so both branches can read it.
   - After `JSON.parse`, before `hooksJson.hooks || {}`: assert `typeof hooksJson.hooks === 'object' && hooksJson.hooks !== null && !Array.isArray(hooksJson.hooks)`. If not, `addError(errors, 'hooks/hooks.json: top-level "hooks" key is required and must be a non-null object — Claude Code 2.1.131+ rejects plugins with a different shape')`.
@@ -80,7 +81,7 @@ Wire-up via a new ajv-cli step in `validate-schemas.yml` per-plugin matrix targe
 > **Codebase:** `inlineHooks` (line 628), `hasInlineHooks` (line 629), `errors`, and `pluginDir` are all in scope at the proposed insertion point — no further hoisting is needed beyond `hooksJsonPath`. The `errors[]` array passed to `addError(errors, msg)` is the same function-local array `validatePlugin()` returns; pushing to it from the new block correctly drives the exit code at line 947 (`if (!result.valid) hasErrors = true`) and `process.exit(1)` at line 958.
 <!-- /deepen-plan -->
 
-- [x] **1.2** Add three test cases to `tests/integration/validate-plugin.test.ts`:
+- [-] (superseded by #798 — the three shape tests were replaced by presence-error tests) **1.2** Add three test cases to `tests/integration/validate-plugin.test.ts`:
   - **Negative — missing wrapper:** `hooks/hooks.json` = `{"PostToolUse": [...]}` → expect `status > 0`, stderr matches `/top-level "hooks" key is required/`.
   - **Negative — unparseable:** `hooks/hooks.json` = `{not valid json` → expect `status > 0`, stderr matches `/cannot parse/`.
   - **Positive — runs even without inline hooks:** plugin.json with no `hooks` field, `hooks/hooks.json` = `{"hooks": {"PostToolUse": [...]}}` → expect `status === 0` (file is well-formed regardless of plugin.json).

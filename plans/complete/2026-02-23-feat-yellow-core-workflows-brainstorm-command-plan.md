@@ -1,9 +1,10 @@
 # Feature: yellow-core workflows:brainstorm Command
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 4 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** shipped. The skill, orchestrator agent and
+> command landed in #45 (`git log --follow`; shows CLOSED, squash is on
+> main). The command has since been renamed `/flow:brainstorm` (#108) and
+> now lives at commands/flow/brainstorm.md. 0 items are `[-]`; the 4.1
+> counts have drifted since, as expected.
 
 ## Problem Statement
 

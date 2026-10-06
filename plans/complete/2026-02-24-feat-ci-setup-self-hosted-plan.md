@@ -1,9 +1,8 @@
 # Plan: ci:setup-self-hosted Command
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 17 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** shipped. Added in #50 (`5f4b078ef`), found via
+> `git log`; command and agent still on main. They have since evolved
+> (org-level runners, `Agent` tool, haiku/low-effort agent). 0 `[-]` items.
 
 **Date:** 2026-02-24
 **Plugin:** `yellow-ci`

@@ -8,10 +8,11 @@ deepened: 2026-02-22
 
 # feat: ruvector UserPromptSubmit hook and workflow integration
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 12 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** partially shipped, then superseded. The hook
+> and mandates landed in #41 (`git log --follow`; shows CLOSED, squash is
+> on main). #888 later deleted `user-prompt-submit.sh` and its bats and
+> rewrote post-tool-use.sh; #108 replaced the review handoff. 10 items
+> are `[-]` (superseded), all in Acceptance Criteria; 2 stay `[x]`.
 
 ## Enhancement Summary
 
@@ -346,25 +347,25 @@ field already uses `oneOf: [string, object]` with no event-key enumeration.
 
 ## Acceptance Criteria
 
-- [x] New session: type a task description → context from ruvector appears in
+- [-] (superseded by #888 — UserPromptSubmit hook removed; SessionStart semantic recall replaced it) New session: type a task description → context from ruvector appears in
   Claude's first response (visible via session-start output)
-- [x] Short prompts (< 20 chars, e.g., "gt sync") → no ruvector call; no
+- [-] (superseded by #888 — hook and its 20-char guard removed) Short prompts (< 20 chars, e.g., "gt sync") → no ruvector call; no
   latency added
-- [x] Project without `.ruvector/` initialized → UserPromptSubmit hook exits
+- [-] (superseded by #888 — hook removed) Project without `.ruvector/` initialized → UserPromptSubmit hook exits
   silently with `{"continue": true}`, no errors surfaced to user
-- [x] `npx ruvector hooks recall` unavailable → hook exits gracefully, not
+- [-] (superseded by #888 — hook removed) `npx ruvector hooks recall` unavailable → hook exits gracefully, not
   crashing Claude Code
-- [x] `npx --no ruvector hooks recall` completes in < 1s on warm npm cache
+- [-] (superseded by #888 — hook removed; no per-prompt recall remains) `npx --no ruvector hooks recall` completes in < 1s on warm npm cache
   (verify with `time npx --no ruvector hooks recall --top-k 3 "test"`)
-- [x] JSON output from hook is always valid (test with `| jq .` — never empty
+- [-] (superseded by #888 — hook removed) JSON output from hook is always valid (test with `| jq .` — never empty
   stdout, never malformed JSON from code-containing memories)
-- [x] After `/workflows:work` completes and `gt stack submit` is called →
+- [-] (superseded by #108 — /flow:work Phase 5 now hands off to /review:pr; the ruvector CLAUDE.md mandate is gone) After `/workflows:work` completes and `gt stack submit` is called →
   agent automatically invokes `/workflows:review`
-- [x] `post-tool-use.sh`: ruvector CLI failure now logs to stderr with error
+- [-] (superseded by #888 — post-tool-use.sh rewritten; it no longer calls the ruvector CLI) `post-tool-use.sh`: ruvector CLI failure now logs to stderr with error
   reason (not just "failed") instead of silently swallowing
-- [x] `pnpm validate:schemas` passes with new UserPromptSubmit hook entries in
+- [-] (superseded by #888 — UserPromptSubmit entries removed from hooks.json and plugin.json) `pnpm validate:schemas` passes with new UserPromptSubmit hook entries in
   both `hooks.json` and `plugin.json`
-- [x] Bats tests: `user-prompt-submit.bats` has at least 6 tests covering:
+- [-] (superseded by #888 — user-prompt-submit.bats deleted with the hook) Bats tests: `user-prompt-submit.bats` has at least 6 tests covering:
   no-ruvector-dir skip, short-prompt skip, npx-unavailable skip, success path
   with fenced systemMessage, 19-char boundary, missing-field graceful exit
 - [x] `post-tool-use.bats` stale tests fixed to match current implementation

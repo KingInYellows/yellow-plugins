@@ -1,16 +1,16 @@
 # Feature: yellow-council Plugin (GodModeSkill Integration V1)
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 37 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (reconciled 2026-10-06):** shipped. Merged PRs: #328, #329, #330 (squash
+> commits 955cf03a9, ca9b4c8ae, 962753706 are on origin/main; `gh` reports these
+> three as CLOSED, not MERGED, so they were found via `git log`); #331 compounded
+> learnings. 8 items are `[-]`: 3.10, 4.1-4.6 and 4.9 are manual test runs only
+> shipped as a checklist (docs/testing/yellow-council-manual-tests.md), no results.
 
 > **Status: Implemented (PRs #328, #329, #330, merged)** — Plugin shipped at
 > `plugins/yellow-council/` with manifest/package metadata, `/council`,
 > `/council:setup`, Gemini and OpenCode reviewer agents, `council-patterns`,
 > README, CLAUDE.md, and changelog entries. Stack progress at the bottom marks
-> the three implementation PRs complete. Unchecked task boxes in the body are
-> stale historical planning state, not remaining work.
+> the three implementation PRs complete.
 
 **Source brainstorm:** `docs/brainstorms/2026-05-03-godmodeskill-integration-brainstorm.md`
 **Source investigation:** `research/GodModeSkill Integration Investigation.md`
@@ -336,19 +336,19 @@ The command is the orchestrator; agents are reviewer wrappers. The skill (`counc
 - [x] **3.7: `--paths` cap enforcement.** If user passes `--paths file1,file2,file3,file4`, reject with `[council] Error: --paths limit is 3 files in V1 (got 4). Override via COUNCIL_PATH_MAX_FILES env var.`
 - [x] **3.8: File content cap enforcement.** Per file, truncate to 8K chars and append `\n[... truncated for council, original was N chars]`. Document in the pack template that truncation occurred.
 - [x] **3.9: Stale OpenCode session cleanup safety.** If `opencode session delete` fails, log to stderr but do not fail the review. Sessions accumulate but are not corruption-causing.
-- [x] **3.10: Redaction completeness audit.** Run a synthetic test: feed each CLI a prompt that asks it to output `sk-test-1234567890`, `AIza` + 35 chars, `sk-ant-test`, `ses_test123`, a fake PEM block, and a fake `Bearer` token. Verify all five appear redacted in the captured output. (Document test procedure in `docs/spikes/`.)
+- [-] **3.10: (unverified — redaction audit shipped as Phase 4 of docs/testing/yellow-council-manual-tests.md, not docs/spikes/; no run results recorded) Redaction completeness audit.** Run a synthetic test: feed each CLI a prompt that asks it to output `sk-test-1234567890`, `AIza` + 35 chars, `sk-ant-test`, `ses_test123`, a fake PEM block, and a fake `Bearer` token. Verify all five appear redacted in the captured output. (Document test procedure in `docs/spikes/`.)
 
 ### Phase 4: Testing & Documentation
 
-- [x] **4.1: Manual end-to-end test — review mode.** On a small test branch with a known diff, run `/council review`. Verify all three reviewers return verdicts within 300 seconds. Verify report file is written. Verify M3 gate appears. Verify cancel path works.
-- [x] **4.2: Manual end-to-end test — plan mode.** Run `/council plan docs/brainstorms/2026-05-03-godmodeskill-integration-brainstorm.md` against this very plan's source. Verify reviewers produce thoughtful planning critiques.
-- [x] **4.3: Manual end-to-end test — debug mode.** Run `/council debug "TypeError: undefined is not a function" --paths plugins/yellow-codex/agents/review/codex-reviewer.md`. Verify debug-specific context (recent git log on cited paths) appears in pack.
-- [x] **4.4: Manual end-to-end test — question mode.** Run `/council question "Should yellow-council ship a bundled Codex fallback when yellow-codex is absent?"`. This is meta — the council answers a question about itself. Useful as a smoke test for question mode.
-- [x] **4.5: Manual timeout test.** Set `COUNCIL_TIMEOUT=10` and run `/council review` against a large diff. Verify all three reviewers timeout and report partial results (or zero results) without crashing.
-- [x] **4.6: Manual yellow-codex absent test.** Temporarily disable yellow-codex (rename its `plugin.json`), run `/council review`. Verify the report shows "Codex not available" without erroring the whole council.
+- [-] **4.1: (unverified — #330 shipped a manual checklist only; no run results recorded) Manual end-to-end test — review mode.** On a small test branch with a known diff, run `/council review`. Verify all three reviewers return verdicts within 300 seconds. Verify report file is written. Verify M3 gate appears. Verify cancel path works.
+- [-] **4.2: (unverified — #330 shipped a manual checklist only; no run results recorded) Manual end-to-end test — plan mode.** Run `/council plan docs/brainstorms/2026-05-03-godmodeskill-integration-brainstorm.md` against this very plan's source. Verify reviewers produce thoughtful planning critiques.
+- [-] **4.3: (unverified — #330 shipped a manual checklist only; no run results recorded) Manual end-to-end test — debug mode.** Run `/council debug "TypeError: undefined is not a function" --paths plugins/yellow-codex/agents/review/codex-reviewer.md`. Verify debug-specific context (recent git log on cited paths) appears in pack.
+- [-] **4.4: (unverified — #330 shipped a manual checklist only; no run results recorded) Manual end-to-end test — question mode.** Run `/council question "Should yellow-council ship a bundled Codex fallback when yellow-codex is absent?"`. This is meta — the council answers a question about itself. Useful as a smoke test for question mode.
+- [-] **4.5: (unverified — #330 shipped a manual checklist only; no run results recorded) Manual timeout test.** Set `COUNCIL_TIMEOUT=10` and run `/council review` against a large diff. Verify all three reviewers timeout and report partial results (or zero results) without crashing.
+- [-] **4.6: (unverified — #330 shipped a manual checklist only; no run results recorded) Manual yellow-codex absent test.** Temporarily disable yellow-codex (rename its `plugin.json`), run `/council review`. Verify the report shows "Codex not available" without erroring the whole council.
 - [x] **4.7: Documentation update — root README.md.** Add yellow-council to the plugin list (currently 16 plugins → 17). Update if the README has a count mismatch.
 - [x] **4.8: Documentation update — plugin CLAUDE.md polish.** Review for completeness against yellow-codex's CLAUDE.md as the gold standard.
-- [x] **4.9: CI green confirmation + fresh-machine install test.** `pnpm validate:schemas`, `pnpm validate:plugins`, `pnpm validate:versions`, `pnpm validate:agents` all pass. Local CI passes does NOT guarantee Claude Code's remote validator accepts the plugin (per MEMORY.md `Claude Code Plugin Manifest Validation Errors`) — perform the 8-step fresh-machine install test below before declaring the PR mergeable:
+- [-] **4.9: (unverified — #330 body reports validators passed; fresh-machine install test left as a manual checklist with no results) CI green confirmation + fresh-machine install test.** `pnpm validate:schemas`, `pnpm validate:plugins`, `pnpm validate:versions`, `pnpm validate:agents` all pass. Local CI passes does NOT guarantee Claude Code's remote validator accepts the plugin (per MEMORY.md `Claude Code Plugin Manifest Validation Errors`) — perform the 8-step fresh-machine install test below before declaring the PR mergeable:
 
   <!-- deepen-plan: codebase -->
   > **Codebase (2nd pass):** No CI job exists in `.github/workflows/` for fresh-machine plugin install testing. There is no `pnpm test:install` script, no `claude plugin install` step in any workflow, and no automated verification that Claude Code's runtime accepts the manifest. Fresh-install testing is necessarily manual. Concrete 8-step procedure:

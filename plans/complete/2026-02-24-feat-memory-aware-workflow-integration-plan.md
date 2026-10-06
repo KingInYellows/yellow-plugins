@@ -8,10 +8,11 @@ brainstorm: docs/brainstorms/2026-02-24-memory-aware-workflow-integration-brains
 
 # feat: Memory-aware workflow integration (ruvector reads + learning loop)
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 23 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** shipped, then partly superseded. Merged as #49
+> (`git log origin/main --follow` on learning-compounder.md). The write
+> side was replaced by #71 (knowledge-compounder, Step 9b record; landed
+> via rescue merge 0db152612) and #888 removed the post-edit hook guard.
+> 13 of 23 items verified; 10 `[-]` in Acceptance Criteria.
 
 ## Enhancement Summary
 
@@ -632,22 +633,22 @@ an issue.
 
 ### Functional Requirements
 
-- [x] `learning-compounder` creates a `reflexion` namespace entry in ruvector
+- [-] (superseded by #71 — agent removed; review Step 9b now calls hooks_remember with a `type`) `learning-compounder` creates a `reflexion` namespace entry in ruvector
   after writing each new solution doc
-- [x] Reflexion entry metadata includes `trigger`, `insight`, `action`, `context`,
+- [-] (superseded by #71 — no metadata schema or reflexion namespace in Step 9b) Reflexion entry metadata includes `trigger`, `insight`, `action`, `context`,
   `severity`, `timestamp` (aligned with `ruvector-conventions` schema)
-- [x] `learning-compounder` skips storage if cosine similarity > 0.82 in reflexion
+- [-] (superseded by #71 — 0.82 dedup kept in Step 9b but without `namespace: "reflexion"`) `learning-compounder` skips storage if cosine similarity > 0.82 in reflexion
   namespace (dedup check specifies `namespace: "reflexion"`)
-- [x] `learning-compounder` gracefully skips if ruvector is not installed
+- [-] (superseded by #71 — agent removed; Step 9b keeps the ToolSearch and MCP-error skips) `learning-compounder` gracefully skips if ruvector is not installed
   (ToolSearch returns nothing) or if MCP server is not running (execution error)
-- [x] `learning-compounder` distinguishes and reports skip reasons (not available /
+- [-] (superseded by #71 — agent removed; Step 9b has no named skip-reason report) `learning-compounder` distinguishes and reports skip reasons (not available /
   MCP unavailable / section-not-found / too-short / near-duplicate)
-- [x] `/review:pr` (standalone) spawns `learning-compounder` (with
+- [-] (superseded by #71 — Step 9a now dispatches knowledge-compounder, or stages findings when non-interactive) `/review:pr` (standalone) spawns `learning-compounder` (with
   `subagent_type: "yellow-review:workflow:learning-compounder"`) when P1/P2
   findings exist, with fenced input
-- [x] `/review:pr` Task spawn failure for compounder is caught and logged; review
+- [-] (superseded by #71 — equivalent "knowledge compounding failed" handler now covers knowledge-compounder) `/review:pr` Task spawn failure for compounder is caught and logged; review
   does not abort
-- [x] `/review:pr` surfaces relevant past patterns as XML-fenced advisory context
+- [-] (superseded — Step 3b exists, but injection now targets the Wave-2 personas and security-sentinel, not code-reviewer) `/review:pr` surfaces relevant past patterns as XML-fenced advisory context
   in Step 3b (after metadata fetch); injected into `code-reviewer` and
   `security-sentinel` Task prompts only
 - [x] `/review:pr` Step 3b is skipped: (a) if `.ruvector/` does not exist,
@@ -665,7 +666,7 @@ an issue.
 
 ### Non-Functional Requirements
 
-- [x] PostToolUse hook budget unchanged (<50ms) — no hook script changes (unless
+- [-] (unverified — no latency measurement; #49 did patch post-tool-use.sh, and #888 later rewrote it) PostToolUse hook budget unchanged (<50ms) — no hook script changes (unless
   Phase 0 determines `post-tool-use.sh` must be patched)
 - [x] Memory query adds negligible latency when ruvector is not installed:
   `.ruvector/` presence check is 0ms; ToolSearch is the first real call only if
@@ -679,7 +680,7 @@ an issue.
 
 - [x] `pnpm validate:plugins` passes
 - [x] `pnpm validate:schemas` passes
-- [x] All modified `.md` agent files under 120 lines
+- [-] (not met — learning-compounder.md, the only agent file modified, was 158 lines after #49; later deleted by #71) All modified `.md` agent files under 120 lines
 - [x] Conventional commit:
   `feat(memory): close learning loop and inject memory context into review and work workflows`
 
