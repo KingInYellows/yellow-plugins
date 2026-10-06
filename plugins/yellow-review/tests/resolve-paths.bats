@@ -1043,6 +1043,29 @@ commit_repo() {
   done
 }
 
+@test "harden_git_config returns and forces fsmonitor, untrackedCache and safe.bareRepository" {
+  marker="$BATS_TEST_TMPDIR/fsm-ran"
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$BATS_TEST_TMPDIR/fsm.sh"
+  chmod +x "$BATS_TEST_TMPDIR/fsm.sh"
+  git config core.fsmonitor "$BATS_TEST_TMPDIR/fsm.sh"
+  set -e
+  harden_git_config 2>"$BATS_TEST_TMPDIR/harden.err"
+  [ "$(git config --get core.fsmonitor)" = false ]
+  [ "$(git config --get core.untrackedCache)" = false ]
+  [ "$(git config --get safe.bareRepository)" = explicit ]
+  [ -z "$(git config --get core.hooksPath 2>/dev/null || true)" ]
+  [ ! -s "$BATS_TEST_TMPDIR/harden.err" ]
+  git status --porcelain >/dev/null
+  [ ! -e "$marker" ]
+  GIT_CONFIG_COUNT=zz
+  if harden_git_config; then
+    echo "a non-numeric GIT_CONFIG_COUNT returned success"
+    return 1
+  fi
+  set +e
+  [[ "$YR_HARDEN_MSG" == *"GIT_CONFIG_COUNT is not a number, so core.fsmonitor cannot be disabled"* ]]
+}
+
 @test "lgit_nohooks keeps pathspecs literal" {
   mkdir -p src && printf 'a\n' >| 'src/*' && printf 'b\n' >| src/real.txt
   run lgit_nohooks add -n -- 'src/*'

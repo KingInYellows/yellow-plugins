@@ -166,13 +166,16 @@ fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
 | `poll-new-threads` | Bounded re-pass poll for threads that appeared after round 1 |
 | `check-resolve-text` | Refuse credential-shaped or unsafe text (image, `@` mention, foreign URL) before it is posted outside the resolve scripts (for example a Linear issue) |
 | `commit-resolve-fixes` | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files |
-| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--unattended` skips runner files and requires `--ignored-since <marker-file>`, which refuses when a gitignored file is newer than the marker; `--revert-only` and `--revert-dirty` revert without running; `--check-ignored` runs only the gitignored-file guard) |
+| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--ignored-since <marker-file>` is required for every run and refuses when a gitignored file is newer than the marker; `--unattended` also skips runner files; `--revert-only` and `--revert-dirty` revert without running and ignore the marker; `--check-ignored` runs only the gitignored-file guard) |
 | `guard-local-config` | Snapshot the gitignored `yellow-plugins.local.md` and restore it if a resolver changed, created or deleted it; refuses a symlinked config (`/review:resolve-stack` checks after each PR) |
 | `file-line-counts` | Base/head line counts per changed file for `thermonuclear-reviewer` |
 
 `commit-resolve-fixes` and `run-verify-command` refuse a `git`, `gh`, or
 `jq` whose canonical file is inside the worktree, and they exec only the
-absolute path outside it.
+absolute path outside it. `commit-resolve-fixes` also refuses a `gt` or
+`node` whose canonical file is inside the worktree, including a symlink
+outside the worktree that points at one, and drops empty or relative `PATH`
+entries before that check.
 
 Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-gh.sh`,
 `resolve-paths.sh`, `gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.

@@ -226,8 +226,9 @@ resolution, and sequential stack review. Graphite-native workflow.
   exits 2, 3 and 4 are refusals and 5 and 6 keep the local commit
 - `run-verify-command` — Run `resolve_pr.verify_command` under a timeout;
   on failure save a patch, revert the files and report the tree state
-  (`--unattended` skips runner files and requires `--ignored-since
-  <marker-file>`, which refuses when a gitignored file is newer than the marker;
+  (`--ignored-since <marker-file>` is required for every run, attended or
+  not, and refuses when a gitignored file is newer than the marker;
+  `--unattended` also skips runner files;
   `--revert-only` reverts the listed files; `--revert-dirty` reverts every change in the tree and takes no
   file list; `--check-ignored --ignored-since <marker-file>` runs only the
   gitignored-file guard, for a resolve with no verify command.
@@ -243,7 +244,10 @@ resolution, and sequential stack review. Graphite-native workflow.
 
 `commit-resolve-fixes` and `run-verify-command` refuse a `git`, `gh`, or
 `jq` whose canonical file is inside the worktree, and they exec only the
-absolute path outside it.
+absolute path outside it. `commit-resolve-fixes` also refuses a `gt` or
+`node` whose canonical file is inside the worktree, including a symlink
+outside the worktree that points at one, and drops empty or relative `PATH`
+entries before that check.
 
 - `guard-local-config snapshot | check <dir> <digest> | clear <dir>` — Snapshot the
   ignored `yellow-plugins.local.md` (printing the path and a `digest=<hex>`
@@ -299,8 +303,11 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   `run-verify-command`) — canonical-path check, the case-insensitive
   resolver deny list (agent-tool config dirs and instruction files
   included), the runner-file list (files a git hook or verify command would
-  execute) and `rp_tree_changes`; a `git config` failure other than exit 1
-  fails closed
+  execute), `rp_tree_changes`, and `harden_git_config` (forces
+  `core.fsmonitor` and `core.untrackedCache` off and
+  `safe.bareRepository=explicit` for the process tree; does not set
+  `core.hooksPath`; returns a code instead of exiting); a `git config`
+  failure other than exit 1 fails closed
 - `lib/resolve-text.sh` (POSIX sh, sourced by `reply-pr-thread`,
   `file-followup-issue`, `check-resolve-text`, `commit-resolve-fixes` and
   `run-verify-command`) — the text screen for

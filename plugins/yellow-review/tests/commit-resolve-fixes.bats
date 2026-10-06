@@ -2426,6 +2426,38 @@ crf_refuses_untouched() {
   done
 }
 
+@test "a symlink outside the worktree to an in-tree gt or node is refused before it runs" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/tool-canary"
+  rm -f "$marker"
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 99\n' "$marker" >| "$REPO/tools/canary"
+  chmod +x "$REPO/tools/canary"
+  ln -s canary "$REPO/tools/gt"
+  ln -s canary "$REPO/tools/node"
+  link="$BATS_TEST_TMPDIR/linkbin"
+  mkdir -p "$link"
+  ln -s "$REPO/tools/gt" "$link/gt"
+  ln -s "$REPO/tools/node" "$link/node"
+  link_dir=$(cd "$link" && pwd -P)
+  repo_dir=$(pwd -P)
+  case "$link_dir" in
+    "$repo_dir"|"$repo_dir"/*) echo "symlink directory is inside the worktree"; return 1 ;;
+  esac
+  for spec in "graphite gt" "github node"; do
+    provider=${spec%% *}
+    tool=${spec#* }
+    rm -f "$marker"
+    PATH="$link:$old_path"
+    crf_refuses_untouched "$provider" || { PATH="$old_path"; echo "not refused: $spec" >&2; return 1; }
+    PATH="$old_path"
+    [ ! -e "$marker" ]
+    [[ "$stderr" == *"$tool resolves to"* ]]
+    [[ "$stderr" == *"inside the repository"* ]]
+    [[ "$stderr" == *"nothing committed"* ]]
+  done
+}
+
 @test "tools outside the repository still work" {
   for provider in graphite github; do
     printf 'one\nfeature\nfix-%s\n' "$provider" >| src/a.txt

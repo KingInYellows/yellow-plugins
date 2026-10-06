@@ -15,7 +15,6 @@
 #                  (a file a git hook, package manager or verify command would
 #                  execute); report result "skipped". Every run, attended or
 #                  not, skips when a file is outside the PR's changed files.
-#                  Requires --ignored-since (usage error, exit 2, without it).
 #   --ignored-since <marker-file>: guard for gitignored files, which the tree
 #                  listing cannot see (a resolver edit to an ignored executable
 #                  such as node_modules/.bin/<runner> would run with the
@@ -30,9 +29,10 @@
 #                  be examined refuses (fail closed). A
 #                  marker that is missing, unreadable, a symlink or not a
 #                  regular file also refuses (fail closed), as does a listing
-#                  failure. Attended runs may omit it. The revert modes ignore
-#                  it. Ignored changes are refused, never reported as a clean
-#                  tree: treeClean covers tracked and untracked-unignored files.
+#                  failure. Every run requires it (usage error, exit 2, without
+#                  it). The revert modes ignore it. Ignored changes are refused,
+#                  never reported as a clean tree: treeClean covers tracked and
+#                  untracked-unignored files.
 #   --check-ignored: run nothing and revert nothing; only the --ignored-since
 #                  guard, for a resolve run that has no verify command (the
 #                  commit still runs hooks, and an ignored file edited by a
@@ -85,7 +85,7 @@
 #   that left changes outside the listed files reports result "pass" with
 #   treeClean false and a reason; nothing is reverted.
 # Exit codes: 0 ran (read "result"), 2 refused or could not start: usage
-#   error (including run-only flags next to a revert flag, and --unattended
+#   error (including run-only flags next to a revert flag, and a run
 #   without --ignored-since), no --trusted,
 #   unreadable --command-file or --files-from, not in a git repository, a
 #   refused path (not canonical, deny-listed when running, gitignored or
@@ -374,7 +374,7 @@ gh() {
 usage() {
     printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] [--ignored-since <marker-file>] | --revert-only | --revert-dirty) [--files-from <file>] [-- <files...>]\n' >&2
     printf '       run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>\n' >&2
-    printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required with --unattended\n' >&2
+    printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required for every run; revert modes ignore it\n' >&2
     exit 2
 }
 
@@ -427,22 +427,24 @@ if [ "$MODE" = run ]; then
     [ -f "$COMMAND_FILE" ] && [ -r "$COMMAND_FILE" ] || die 2 "--command-file not readable: $COMMAND_FILE"
     [ -n "$(tr -d '[:space:]' <"$COMMAND_FILE")" ] || die 2 "--command-file is empty"
     COMMAND_FILE=$(cd -- "$(dirname -- "$COMMAND_FILE")" && pwd)/$(basename -- "$COMMAND_FILE")
-    # Unattended, nothing else sees resolver edits to gitignored files, so the
-    # marker is required. Resolve it now: the script changes directory below.
-    if [ "$UNATTENDED" = 1 ] && [ -z "$IGNORED_SINCE" ]; then
-        printf '[run-verify-command] Error: --unattended requires --ignored-since <marker-file> (touch the file before the resolvers start)\n' >&2
+    # Every run, attended or not: nothing else sees resolver edits to
+    # gitignored files, so the marker is required. Resolve it now: the script
+    # changes directory below. Revert modes do not enter this block.
+    if [ -z "$IGNORED_SINCE" ]; then
+        printf '[run-verify-command] Error: --ignored-since <marker-file> is required (touch the file before the resolvers start)\n' >&2
         exit 2
     fi
-    if [ -n "$IGNORED_SINCE" ]; then
-        [ -f "$IGNORED_SINCE" ] && [ ! -L "$IGNORED_SINCE" ] && [ -r "$IGNORED_SINCE" ] \
-            || die 2 "--ignored-since marker is not a readable regular file: $IGNORED_SINCE"
-        IGNORED_SINCE=$(cd -- "$(dirname -- "$IGNORED_SINCE")" && pwd)/$(basename -- "$IGNORED_SINCE") \
-            || die 2 "cannot resolve --ignored-since: $IGNORED_SINCE"
-    fi
+    [ -f "$IGNORED_SINCE" ] && [ ! -L "$IGNORED_SINCE" ] && [ -r "$IGNORED_SINCE" ] \
+        || die 2 "--ignored-since marker is not a readable regular file: $IGNORED_SINCE"
+    IGNORED_SINCE=$(cd -- "$(dirname -- "$IGNORED_SINCE")" && pwd)/$(basename -- "$IGNORED_SINCE") \
+        || die 2 "cannot resolve --ignored-since: $IGNORED_SINCE"
 fi
 
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
 cd -- "$TOP" || die 2 "cannot enter $TOP"
+# Every mode, including revert: a resolver-planted fsmonitor would run on the
+# status below. Hooks stay out of this override.
+harden_git_config || die 2 "$YR_HARDEN_MSG; the tree is untouched"
 
 REASON=""
 add_reason() { REASON="${REASON:+$REASON; }$1"; }
@@ -521,8 +523,10 @@ else
         # Reverting is always safe; the deny list only stops running and committing.
         [ "$MODE" = run ] && rp_denied "$f" && die 2 "refusing a deny-listed path: $f"
         # Fail closed unless check-ignore positively says "not ignored" (exit 1).
+        # check-ignore rejects --literal-pathspecs, so this is not lgit; the
+        # two -c overrides are what stop a planted fsmonitor on this call.
         IGN=0
-        git check-ignore -q -- "$f" || IGN=$?
+        yr_git -c core.fsmonitor=false -c core.untrackedCache=false check-ignore -q -- "$f" || IGN=$?
         [ "$IGN" = 1 ] || die 2 "refusing a gitignored (or unverifiable) path: $f"
         if [ -z "$(lgit_nohooks status --porcelain --untracked-files=all -- "$f")" ]; then
             [ "$MODE" = run ] && die 2 "listed file has no changes: $f"
@@ -605,7 +609,7 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         # file. A tracked directory (tree), a gitlink or nothing at HEAD holds
         # work that `git checkout HEAD` would not bring back (untracked
         # siblings), so refuse rather than remove it.
-        HEAD_TYPE=$(git cat-file -t "HEAD:$f" 2>/dev/null) || HEAD_TYPE=""
+        HEAD_TYPE=$(lgit cat-file -t "HEAD:$f" 2>/dev/null) || HEAD_TYPE=""
         [ "$HEAD_TYPE" = blob ] \
             || die 2 "refusing to remove a directory that is not a replaced file (HEAD has ${HEAD_TYPE:-nothing} there): $f"
     fi
@@ -748,7 +752,7 @@ run_verify() {
 # deletes a listed file and then fails must not change what the recovery patch
 # holds, because the revert below discards the tree. Every git call must
 # succeed, or the revert would destroy edits the patch does not hold.
-# `git diff --no-index` exits 1 when files differ. A file is a tracked edit
+# `lgit diff --no-index` exits 1 when files differ. A file is a tracked edit
 # when it is in the index or in HEAD (a staged deletion is in HEAD only).
 # <fmt> is --binary for the kept patch and --text for the credential screen:
 # a binary-marked file still hides text a --binary patch would keep.
@@ -763,14 +767,14 @@ save_patch() {
     for f in ${FILES[@]+"${FILES[@]}"}; do
         # Fixed flags so the patch re-applies whatever the user's diff config.
         if lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
-            || git cat-file -e "HEAD:$f" 2>/dev/null; then
+            || lgit cat-file -e "HEAD:$f" 2>/dev/null; then
             lgit_nohooks diff --no-color --no-ext-diff --no-textconv "$fmt" \
                 --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$out" || return 1
         elif [ -L "$f" ] || [ -f "$f" ]; then
             # -L: a dangling symlink has no -e but is still an edit to keep.
             # Never a FIFO or other special file: git diff would open it.
             rc=0
-            git diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
+            lgit diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
                 --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$f" >>"$out" || rc=$?
             [ "$rc" -le 1 ] || return 1
         fi
@@ -781,7 +785,7 @@ save_patch() {
                     [ "$p" = "$c" ] && continue 2
                 done
                 rc=0
-                git diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
+                lgit diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
                     --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$c" >>"$out" || rc=$?
                 [ "$rc" -le 1 ] || return 1
             done <"$DIR_LIST"
@@ -983,7 +987,7 @@ for f in ${DIR_REMOVE[@]+"${DIR_REMOVE[@]}"}; do
     fi
 done
 for f in ${FILES[@]+"${FILES[@]}"}; do
-    if git cat-file -e "HEAD:$f" 2>/dev/null; then
+    if lgit cat-file -e "HEAD:$f" 2>/dev/null; then
         # Hooks off: post-checkout and post-index-change would run any hook a
         # resolver planted, including an ignored one under core.hooksPath.
         lgit_nohooks checkout -q HEAD -- "$f" >/dev/null 2>&1 || REVERT_FAILS+=("git checkout $f")
@@ -1008,7 +1012,7 @@ fi
 # untracked) means the revert did not fully restore it. A status that cannot
 # be read is not clean.
 CLEAN=true
-if ! STATUS=$(git -c core.hooksPath=/dev/null status --porcelain --untracked-files=all 2>/dev/null) || [ -n "$STATUS" ]; then
+if ! STATUS=$(lgit_nohooks status --porcelain --untracked-files=all 2>/dev/null) || [ -n "$STATUS" ]; then
     CLEAN=false
     [ "${#REVERT_FAILS[@]}" -gt 0 ] || add_reason "changes remain after the revert"
 fi

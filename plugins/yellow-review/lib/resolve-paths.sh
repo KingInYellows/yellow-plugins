@@ -168,6 +168,88 @@ lgit() { yr_git -c core.fsmonitor=false -c core.untrackedCache=false --literal-p
 # (post-checkout, post-index-change).
 lgit_nohooks() { yr_git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs "$@"; }
 
+# harden_git_config: force core.fsmonitor and core.untrackedCache off, and
+# safe.bareRepository=explicit, for this process and its children
+# (GIT_CONFIG_COUNT, appended to the caller's). Refuse a local or worktree
+# transport command, credential helper, or non-LFS filter. Force signing off
+# only when local or worktree gpg config exists. Does not set core.hooksPath
+# (that stays in the commit script's disable_git_hooks) and does not exit:
+# return 0, or 1 with YR_HARDEN_MSG set. When signing is forced off, the
+# unsigned-commit note goes to stderr and the return is still 0.
+# YR_HARDEN_MSG is read by the caller after a non-zero return.
+# shellcheck disable=SC2034
+harden_git_config() {
+    local n="${GIT_CONFIG_COUNT:-0}"
+    YR_HARDEN_MSG=""
+    case "$n" in
+        ''|*[!0-9]*)
+            YR_HARDEN_MSG="GIT_CONFIG_COUNT is not a number, so core.fsmonitor cannot be disabled"
+            return 1
+            ;;
+    esac
+    n=$((10#$n))
+    export "GIT_CONFIG_KEY_$n=core.fsmonitor" "GIT_CONFIG_VALUE_$n=false" \
+        "GIT_CONFIG_KEY_$((n + 1))=core.untrackedCache" "GIT_CONFIG_VALUE_$((n + 1))=false" \
+        "GIT_CONFIG_KEY_$((n + 2))=safe.bareRepository" "GIT_CONFIG_VALUE_$((n + 2))=explicit" \
+        "GIT_CONFIG_COUNT=$((n + 3))"
+    [ "$(git config --get core.fsmonitor 2>/dev/null)" = false ] \
+        && [ "$(git config --get core.untrackedCache 2>/dev/null)" = false ] \
+        && [ "$(git config --get safe.bareRepository 2>/dev/null)" = explicit ] \
+        || { YR_HARDEN_MSG="could not disable core.fsmonitor"; return 1; }
+    # A repository-local or worktree-scope transport command is run by the
+    # submit step's git (and gt, gh) with submission authority: refuse it,
+    # naming the key only. Global and system scopes are not judged, and the
+    # values are never overridden, which would also disable the user's own
+    # credential helper.
+    local tcfg trc=0 tkey
+    # A clean, smudge or process filter runs on `git add` and on checkout, so a
+    # repository-local one is judged the same way; the three stock Git LFS
+    # commands (`git lfs install --local`) are allowed by exact value.
+    tcfg=$(git config --show-scope --get-regexp '^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process))$' 2>/dev/null) || trc=$?
+    case "$trc" in
+        0|1) ;;
+        *) YR_HARDEN_MSG="could not read the git transport config"; return 1 ;;
+    esac
+    tkey=$(printf '%s\n' "$tcfg" | awk -F'\t' '
+        ($1 == "local" || $1 == "worktree") {
+            k = $2; v = $2; sub(/ .*/, "", k); sub(/^[^ ]* /, "", v)
+            if (k ~ /^filter\.lfs\.(clean|smudge|process)$/ && (v == "git-lfs clean -- %f" || v == "git-lfs smudge -- %f" || v == "git-lfs filter-process" || v == "git-lfs smudge --skip -- %f" || v == "git-lfs filter-process --skip")) next
+            print k; exit
+        }')
+    # A credential URL can carry userinfo: name the key without it.
+    case "$tkey" in
+        credential.?*.helper) tkey="credential.<url>.helper" ;;
+        filter.*) tkey="filter.<driver>.${tkey##*.}" ;;
+    esac
+    [ -z "$tkey" ] || { YR_HARDEN_MSG="the repository config sets $tkey, which would run a command with submission authority; remove it from the repository config (a global or system config is fine)"; return 1; }
+    # A resolver can also write commit.gpgSign and gpg.program (or
+    # gpg.<format>.program) into the repository's own config: signing the commit
+    # would run that program. Only the local and worktree scopes are judged
+    # (includes resolved, which --show-scope does), so the user's own global or
+    # system signing config keeps working. A local commit.gpgsign=false is no
+    # signing config.
+    local cfg rc=0 hit
+    cfg=$(git config --show-scope --get-regexp '^(commit\.gpgsign|gpg\.)' 2>/dev/null) || rc=$?
+    case "$rc" in
+        0|1) ;;
+        *) YR_HARDEN_MSG="could not read the git signing config"; return 1 ;;
+    esac
+    hit=$(printf '%s\n' "$cfg" | awk -F'\t' '($1 == "local" || $1 == "worktree") && tolower($2) !~ /^commit\.gpgsign (false|no|off|0)$/ { print "y"; exit }')
+    [ -n "$hit" ] || return 0
+    n=$((n + 3))
+    # push.gpgSign and log.showSignature reach gpg.program in the child git of
+    # the submit step, so they are forced off with commit signing.
+    export "GIT_CONFIG_KEY_$n=commit.gpgSign" "GIT_CONFIG_VALUE_$n=false" \
+        "GIT_CONFIG_KEY_$((n + 1))=push.gpgSign" "GIT_CONFIG_VALUE_$((n + 1))=false" \
+        "GIT_CONFIG_KEY_$((n + 2))=log.showSignature" "GIT_CONFIG_VALUE_$((n + 2))=false" \
+        "GIT_CONFIG_COUNT=$((n + 3))"
+    [ "$(git config --bool --get commit.gpgsign 2>/dev/null)" = false ] \
+        && [ "$(git config --bool --get push.gpgsign 2>/dev/null)" = false ] \
+        && [ "$(git config --bool --get log.showsignature 2>/dev/null)" = false ] \
+        || { YR_HARDEN_MSG="could not disable commit signing"; return 1; }
+    printf 'Note: the repository'"'"'s own config sets commit signing (commit.gpgsign or gpg.*), which could run a program, so the commit is made unsigned\n' >&2
+}
+
 rp_lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 
 # rp_canonical <path>: repo-relative with no empty, `.` or `..` segment, no
