@@ -1,0 +1,20 @@
+plugins/yellow-core/CLAUDE.md
+  h_6000354274ce50 384-385
+plugins/yellow-core/README.md
+  h_6000354274ce50 180-185
+plugins/yellow-core/lib/quote-ground.sh
+  h_6000354274ce50 20-21,28-30,481-482,519-546,549
+plugins/yellow-core/tests/quote-ground.bats
+  h_6000354274ce50 591-612
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e8d6884a28e38ed1f6ae757fa9260523e596409d",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
