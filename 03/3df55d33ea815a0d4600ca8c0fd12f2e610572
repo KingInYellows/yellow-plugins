@@ -1,0 +1,19 @@
+plans/yellow-ruvector-live-verification-followups.md
+  s_7117acb1d3fade::t_aec745c9f8c9c9 3-7,27,36-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "033df55d33ea815a0d4600ca8c0fd12f2e610572",
+  "prompts": {},
+  "sessions": {
+    "s_7117acb1d3fade": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "63ad41d1-8d93-4d0c-b57e-d5370fdef6ec",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
