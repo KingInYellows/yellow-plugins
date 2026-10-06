@@ -554,7 +554,7 @@ PR already stages at Step 9a.
 
   <!-- /deepen-plan -->
 
-- [ ] 4.5: Run the gates:
+- [x] 4.5: Run the gates:
   - `pnpm validate:shell-compat`, `pnpm check:shell-parse`,
     `pnpm test:shell-compat`.
   - `pnpm validate:agents`, `pnpm lint:plugins`, `pnpm validate:schemas`.
