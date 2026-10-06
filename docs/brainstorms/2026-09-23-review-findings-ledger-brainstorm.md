@@ -1,5 +1,13 @@
 # Durable Review-Findings Ledger for yellow-review
 
+> **Status (2026-10-05): resolved and shipped.** The open questions in this
+> brainstorm were settled in `plans/review-findings-ledger.md` and landed in
+> #867, #869, #870, #873 and #883. Where this document disagrees with that plan
+> or with `plugins/yellow-review/lib/review-ledger.sh`, the plan and the code
+> win. Known stale points: the "head or base tree" rule for `depends_on` paths,
+> the ASCII path allowlist in triage, the fingerprint definition, and the
+> scope-canonicalization rule ("each segment occurs in the file").
+
 **Date:** 2026-09-23 **Research basis:**
 `docs/research/review-findings-persistence.md` (~70 sources + GitHits OSS-code
 addendum) **Motivating failure:** `/review:sweep-all` on yellow-plugins PR #840
