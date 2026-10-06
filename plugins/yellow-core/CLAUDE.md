@@ -381,7 +381,8 @@ per input row, in input order, with `id`, `result` (`grounded`, `ungrounded`,
 otherwise `null`); it always uses radius 3, reports a missing file as
 `ungrounded` and a row with a usable id but a bad field as `ungrounded`, and
 exits 2 with no rows when jq or iconv is missing, a line is not JSON, a row
-has no usable id, or a cited file cannot be read. A quote with fewer than 8
+has no usable id (including an integer outside ±2^53), or a cited file cannot
+be read. A quote with fewer than 8
 characters outside `[REDACTED]` placeholders is `too-short`; a placeholder
 matches any secret the line held. The script writes no temp files, so
 unredacted text stays in memory and pipes. It sources `validate-fs.sh` and

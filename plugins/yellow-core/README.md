@@ -177,11 +177,12 @@ bash lib/quote-ground.sh batch < findings.jsonl
   per input row, in input order: `{"id", "result", "matched_line"}`. `result`
   is `grounded`, `ungrounded`, `too-short` or `unsafe-path`; `matched_line` is
   a number only for `grounded` and `null` otherwise. A numeric id stays a
-  number. A missing file is `ungrounded` and is never opened; an unsafe path is
-  never read. A row with a usable id but a wrong-typed field is `ungrounded`
-  and does not affect its siblings. `batch` exits 2 with no result rows when
-  jq or iconv is missing, a line is not JSON, a row has no usable id, a cited
-  file cannot be read, or redaction fails.
+  number. An integer id outside ±2^53 is not usable. A missing file is
+  `ungrounded` and is never opened; an unsafe path is never read. A row with a
+  usable id but a wrong-typed field is `ungrounded` and does not affect its
+  siblings. `batch` exits 2 with no result rows when jq or iconv is missing, a
+  line is not JSON, a row has no usable id (including an integer outside
+  ±2^53), a cited file cannot be read, or redaction fails.
 - **No temp files.** Unredacted source lines and quotes stay in process memory
   and pipes.
 

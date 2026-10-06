@@ -590,6 +590,28 @@ now_ms() {
   ' <<<"$output" >/dev/null
 }
 
+@test "batch rejects an integer id outside ±2^53 and still emits a safe one" {
+  printf '%s\n' "$Q26" >src/a.txt
+  run bash "$QG" batch <<<"{\"id\":9007199254740992,\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"$Q26\"}"
+  [ "$status" -eq 0 ]
+  jq -e '.id == 9007199254740992 and (.id | type) == "number"' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<"$(row ok src/a.txt 1 "$Q26")"$'\n''{"id":9007199254740993,"file":"src/a.txt","line":1,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<"{\"id\":-9007199254740993,\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"$Q26\"}"
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<"{\"id\":1.5,\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"$Q26\"}"
+  [ "$status" -eq 0 ]
+  jq -e '.id == 1.5 and (.id | type) == "number"' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<"{\"id\":1E5,\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"$Q26\"}"
+  [ "$status" -eq 0 ]
+  jq -e '.id == 100000 and (.id | type) == "number"' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<"{\"id\":\"9007199254740993\",\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"seen \\\"id\\\":9007199254740993 $Q26\"}"
+  [ "$status" -eq 0 ]
+  jq -e '.id == "9007199254740993" and (.id | type) == "string"' <<<"$output" >/dev/null
+}
+
 @test "batch handles a multi-line quote without disturbing its siblings" {
   local payload
   printf 'alpha line one\nthe quoted target line\nomega\n' >src/a.txt

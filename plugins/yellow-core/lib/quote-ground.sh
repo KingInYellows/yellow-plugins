@@ -17,15 +17,17 @@
 # one object per input row, in input order: {id, result, matched_line}. result
 # is grounded, ungrounded, too-short, or unsafe-path; matched_line is a number
 # only for grounded and null otherwise. A numeric id stays a number and a
-# string id stays a string. batch always uses radius 3. A missing file is
+# string id stays a string. An integer id is usable only at or inside ±2^53;
+# a larger integer fails the batch. batch always uses radius 3. A missing file is
 # exit 2 in check mode; in batch that row is ungrounded and is not opened. A
 # row whose file, line or quote has the wrong type, or holds U+0000, is
 # ungrounded and does not affect its siblings. A cited file with a NUL byte in
 # the lines up to its last cited window is never matched: its rows are
 # ungrounded (check exits 1), because bash would silently drop the byte. batch
 # exits 2 with no result rows when jq or iconv is missing, when a line is blank
-# or not JSON, when a row has no usable id (a string or number without U+0000),
-# when a cited file cannot be read, or when redaction fails.
+# or not JSON, when a row has no usable id (a string or number without U+0000,
+# or an integer outside ±2^53), when a cited file cannot be read, or when
+# redaction fails.
 #
 # Redaction runs per line before matching, and every [REDACTED] or
 # [REDACTED:<type>] token is canonicalized to [REDACTED] on both sides. A
@@ -476,7 +478,8 @@ qg_check() {
 # that is not JSON, or has no usable id, fails the whole batch. A row with a usable id and a bad
 # file, line or quote (wrong type, or U+0000 that would shift the framing)
 # becomes line 0, which classifies as ungrounded. The id carries a type tag:
-# n for a JSON number, s for a string.
+# n for a JSON number, s for a string. An integer id outside ±2^53 fails the
+# batch before fromjson, by comparing the raw digit string, not tonumber.
 # The raw bytes first pass through iconv, which fails on invalid UTF-8 that jq
 # would otherwise replace with U+FFFD and so change an id. iconv is required
 # for batch, like jq: a missing iconv exits 2 and names the dependency before
@@ -513,8 +516,37 @@ qg_load_rows() {
     def strict:
       gsub("\"(?:[^\"\\\\]|\\\\.)*\""; "\"\"")
       | test("^(?:[\\[\\]{}:,\" \\t\\r]|(?:true|false|null|-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)(?![0-9A-Za-z.+-]))*$");
+    # Integer ids are usable only at or inside ±2^53. Compare the raw digit
+    # string: fromjson on jq 1.6 would already have rounded the value. A key
+    # inside a string does not match, because those quotes are escaped. The
+    # character after the digits must not continue a non-integer number.
+    def int_abs_ok:
+      (if startswith("-") then .[1:] else . end) as $d
+      | ($d | length) as $len
+      | if $len <= 15 then true
+        elif $len == 16 then $d <= "9007199254740992"
+        else false end;
+    def unsafe_int_id:
+      reduce scan("\"(?:[^\"\\\\]|\\\\.)*\"|[^\\\"]+") as $tok (
+        {prev: null, bad: false};
+        if .bad then .
+        elif ($tok | startswith("\"")) then .prev = $tok
+        elif ((.prev == "\"id\"") and ($tok | test("^[ \\t\\r]*:[ \\t\\r]*-?(?:0|[1-9][0-9]*)(?![0-9.eE])"))) then
+          .bad = (
+            $tok
+            | capture("^[ \\t\\r]*:[ \\t\\r]*(?<n>-?(?:0|[1-9][0-9]*))")
+            | .n
+            | int_abs_ok
+            | not
+          )
+          | .prev = null
+        else .prev = null
+        end
+      )
+      | .bad;
     def parse:
       if test("^[ \t\r]*$") then error("blank record")
+      elif unsafe_int_id then error("row has no usable id")
       elif strict then fromjson
       else error("not strict JSON") end;
     def hasnul: type == "string" and contains("\u0000");
