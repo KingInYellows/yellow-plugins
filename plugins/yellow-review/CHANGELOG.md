@@ -1,5 +1,36 @@
 # Changelog
 
+## 3.7.0
+
+### Minor Changes
+
+- [`6e38bc0`](https://github.com/KingInYellows/yellow-plugins/commit/6e38bc01a2528bf3d01fbd6a249eb0a0cfc7a8f1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Unattended
+  reviews now capture learnings instead of stalling. Under `--non-interactive`,
+  `/review:pr` Step 9a no longer spawns the `knowledge-compounder` (its
+  confirmation gate cannot be answered unattended, so it planned and wrote
+  nothing). It writes an outcome narrative — each P0–P2 finding labelled with
+  its ledger state, never claimed as test-verified — and stages it with the new
+  `lib/stage-learning.sh` for yellow-core's compound-staging drain, under the
+  main checkout's project slug. `/review:sweep-all` drops its end-of-loop
+  `/flow:compound` pass. yellow-core adds `cs_stage_entry`, which caps, strips
+  invisible characters, redacts and neutralises fence and role lines before
+  writing a Stop-hook-shaped entry, and `cs_redact_secrets` now also redacts
+  `ASIA`, `ABIA` and `ACCA` AWS key IDs. Interactive `/review:pr` is unchanged.
+
+### Patch Changes
+
+- [`e7992d9`](https://github.com/KingInYellows/yellow-plugins/commit/e7992d9c062f0770d7514a53397bcd9dbd721515)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `commit-resolve-fixes` and `run-verify-command` refuse a `git`, `gh`, or `jq`
+  whose canonical file is inside the worktree, and they exec only the absolute
+  path outside it.
+
+- [`3a7c6ae`](https://github.com/KingInYellows/yellow-plugins/commit/3a7c6aed609827278d58a1b3ecd55aed42794fac)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Point the
+  review-findings ledger design citations at the archived plan
+  `plans/complete/review-findings-ledger.md`.
+
 ## 3.6.0
 
 ### Minor Changes

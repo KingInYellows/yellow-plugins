@@ -34,7 +34,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.7.0",
+      "version": "2.8.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -84,7 +84,7 @@
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.6.0",
+      "version": "3.7.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -204,7 +204,7 @@
     {
       "name": "yellow-goal",
       "description": "yellow-goal engine bridge — probe a pinned goal-gen process, create/validate request packets, run zero-spend stub scenarios, and forward a user-only approval-gated real run. Never imports the engine.",
-      "version": "0.2.2",
+      "version": "0.3.0",
       "author": {
         "name": "KingInYellows"
       },
