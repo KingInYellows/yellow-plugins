@@ -1,0 +1,14 @@
+plans/complete/audit-followups-2026-05-07.md
+  h_6000354274ce50 280-284,289-291,577-578,891-892,895-897
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4431dbc3fe18b7b05f981daef0d9654bb89cfaad",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
