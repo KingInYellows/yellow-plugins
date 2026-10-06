@@ -477,8 +477,18 @@ qg_check() {
 # file, line or quote (wrong type, or U+0000 that would shift the framing)
 # becomes line 0, which classifies as ungrounded. The id carries a type tag:
 # n for a JSON number, s for a string.
+# The raw bytes first pass through iconv, which fails on invalid UTF-8 that jq
+# would otherwise replace with U+FFFD and so change an id; a failure appends a
+# non-JSON line, so the batch ends as for any other non-JSON input (iconv is
+# required, like jq). jq's stderr is discarded because its parse diagnostics
+# quote the whole row, credential-shaped text included; only the generic
+# message below reaches stderr.
 qg_load_rows() {
   local n i id file line quote
+  if ! command -v iconv >/dev/null 2>&1; then
+    printf 'quote-ground: invalid batch input\n' >&2
+    return 2
+  fi
   {
     if ! IFS= read -r -d '' n || [[ ! "$n" =~ ^[0-9]+$ ]]; then
       printf 'quote-ground: invalid batch input\n' >&2
@@ -498,7 +508,7 @@ qg_load_rows() {
       B_CLASS+=("")
       B_MATCH+=("")
     done
-  } < <(jq -nRj '
+  } < <({ iconv -f UTF-8 -t UTF-8 2>/dev/null || printf '\n!\n'; } | jq -nRj '
     def strict:
       gsub("\"(?:[^\"\\\\]|\\\\.)*\""; "\"\"")
       | test("^(?:[\\[\\]{}:,\" \\t\\r]|(?:true|false|null|-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)(?![0-9A-Za-z.+-]))*$");
@@ -520,7 +530,7 @@ qg_load_rows() {
       end;
     [inputs | parse | row] as $rows
     | ($rows | length | tostring) + "\u0000", ($rows[][] + "\u0000")
-  ')
+  ' 2>/dev/null)
 }
 
 # One jq call writes every result object, so jq escapes every control

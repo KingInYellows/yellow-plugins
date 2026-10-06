@@ -506,6 +506,13 @@ now_ms() {
   run bash "$QG" batch <<<'[1,2]'
   [ "$status" -eq 2 ]
   [[ "$output" != *'"result"'* ]]
+  # invalid UTF-8 in an id is rejected, and a malformed row's text stays off stderr
+  run bash "$QG" batch < <(printf '{"id":"a\377b","file":"src/a.txt","line":1,"quote":"abcdefghij"}\n')
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<'{"id":"x","file":"src/a.txt","line":1,"quote":"ghp_abcdefghijklmnopqrstuvwxyz0123456789"'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *ghp_* ]]
 }
 
 @test "batch rejects non-JSON numeric forms but accepts valid JSON numbers" {
