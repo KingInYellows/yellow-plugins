@@ -98,7 +98,9 @@ Server-side `--state merged` is preferred over reading `mergedAt`:
 per [merge-queue-closed-pr-null-mergedat-detection.md](../integration-issues/merge-queue-closed-pr-null-mergedat-detection.md),
 `mergedAt` can be null for recently MQ-merged PRs during propagation
 lag. `--state merged` filters on PR state, which is authoritative
-once the upstream API has caught up.
+once the upstream API has caught up. (Graphite merge-queue PRs never reach
+`merged`, so no amount of waiting helps them; see the 2026-10-06 update at the
+end of this document.)
 
 ### `Plan-Verifier-Override:` commit trailer
 
@@ -230,7 +232,9 @@ API call, no agent:
 Gate C is now three tiers, evaluated in order: **provenance → strict →
 loose → AskUserQuestion override**, with provenance and loose short-circuiting
 only on unique matches; strict passes on any match. At most one of the three
-trailers appears per archival commit.
+trailers appears per archival commit. (2026-10-06: still three tiers; the
+provenance tier gained a commit-subject fallback that records `via=commit-subject`
+in the same trailer.)
 
 ---
 
@@ -265,7 +269,8 @@ landed-content check below before using the override.
   inference, not a finding of
   [merge-queue-closed-pr-null-mergedat-detection.md](../integration-issues/merge-queue-closed-pr-null-mergedat-detection.md),
   which describes null `mergedAt` as ambiguous rather than permanent. Whether
-  the association would appear later was not tested.
+  the association would appear later was not tested. (Resolved 2026-10-06: it
+  never appears; see the update at the end of this document.)
 - **Strict tier** (`gh pr list --state merged` slug search) — 0 matches.
   `--state merged` filters on PR *state*; an MQ-closed PR's state is
   `closed`, not `merged` (as observed for #808), independent of slug/title.
@@ -309,7 +314,10 @@ This is corroborating evidence, not proof — treat it as sufficient only when
 paired with an independently-known candidate PR number, never as a blind
 filter to search for "which PR merged" among candidates with no other
 supporting reason. Record the result through Gate C's existing override path
-(`Plan-Verifier-Override: user-confirmed-no-pr-evidence (pr=#<N>)`).
+(`Plan-Verifier-Override: user-confirmed-no-pr-evidence (pr=#<N>)`). Since
+2026-10-06 Gate C auto-passes the common queue-landed case through its
+commit-subject path; keep this check for rebase-merged or otherwise unmatched
+cases that still reach the override prompt.
 
 ### Stale main-clone trunk: Phase 6 warns, Phase 8 `gt submit` fails (not a Graphite API outage)
 
@@ -417,3 +425,74 @@ shows closed with a null `mergedAt` and no linked commit, that is very likely
 this known Graphite-direct-push case, not a new failure mode** — confirm the
 commit is on `origin/main` and use the existing `Plan-Verifier-Override`
 trailer, not a new one.
+
+**Superseded 2026-10-06:** the commit-subject path described in the update
+below now handles the Graphite-landed case automatically. The override and its
+trailer remain for the cases it cannot pass (rebase-merge or merge-commit
+history, an open or plan-only PR, a blob mismatch).
+
+---
+
+## Update — 2026-10-06
+
+### Graphite merge-queue PRs never become `merged`; Gate C now reads the PR number from the commit subject
+
+The 2026-09-18 update left open whether GitHub's commit-to-PR association
+would appear later for a queue-landed commit. It does not. Graphite documents
+the outcome as intended: the queue fast-forwards trunk to the head of a
+temporary draft PR (a `gtmq_` branch) that it built itself, and the original PR
+is "marked as closed in GitHub instead of merged"
+([Graphite docs](https://graphite.com/docs/merge-queue-optimizations)). Checked
+2026-10-06: PRs #808, #846, #1029, #1030 and #1049 are all still
+`state: closed`, `merged: false`, `merged_at: null`, with a `merge_commit_sha`
+that is not in the repo, and `commits/{sha}/pulls` returns `[]` for the last six
+plan-archive squash commits on `origin/main`. This is a class of PR, not
+propagation lag. About 38 of the last 300 commits on `origin/main` were plan
+archives, so each one paid a manual override.
+
+**What Gate C does now.** When the commits lookup succeeds with an empty
+result, the provenance tier reads the trailing ` (#N)` of the subject of the
+commit that last touched the plan
+(`plugins/yellow-core/lib/plan-gate-provenance.sh`) and passes only when all of
+these hold:
+
+- the plan still exists at that commit (`git cat-file -e <sha>:plans/<file>`);
+  the same guard now protects the whole tier from an already-archived plan in a
+  stale checkout;
+- the subject yields N: the last trailing ` (#N)`, matching
+  `^[1-9][0-9]{0,9}$`, and not a `Revert "`, `Reapply "` or `Merge ` subject;
+- PR N is `closed`. `merged` is not consulted, because it is permanently false
+  here. `base` is recorded but not gated: stacked PRs have their parent branch
+  as `base` (#952, #955, #1033);
+- PR N's paginated files list has the plan with a status other than `removed`
+  and a blob `sha` equal to `git rev-parse <sha>:plans/<file>`;
+- PR N also changed a file outside `plans/`, so plan-creation and
+  checkbox-rewrite PRs (#1042, #956, #1055) fall through.
+
+A pass records `Plan-Verifier-FileProvenance: pr=#N sha=<sha> via=commit-subject`;
+a trailer with no `via=` came from the commits API. Anything else (no `(#N)` in
+the subject, an open PR, a 404, a rate limit, a truncated files list, a null or
+mismatched blob) prints its reason and falls through to the strict and loose
+tiers and the override prompt.
+
+**The subject is a hint, not proof.** GitHub documents the number only for its
+PR-title squash formats; for a single-commit PR the default documents commit
+title and message, an API merge can set any `commit_title`, and Graphite does
+not document its subject. Issue and PR numbers share one sequence, and a
+cherry-pick carries the original number. The files check is what makes it
+evidence. 145 of the last 4000 `origin/main` subjects have no trailing `(#N)`
+(direct pushes, archives, merge commits), and those correctly fall through.
+
+**`gh` gotchas found along the way.**
+
+- `gh api --paginate --jq` runs the filter once per page, and gh rejects
+  `--slurp` together with `--jq`. Write the output to a file and use `jq -s`.
+  Piping into `grep -q` under `pipefail` can report a false miss, because
+  `grep` exits early and `gh` takes SIGPIPE.
+- The files endpoint caps at 3000 files, and `sha` can be null (for example a
+  submodule). Treat a null `sha` as "cannot verify".
+- `gh pr view --json merged` is not a valid field. Use
+  `gh api repos/{owner}/{repo}/pulls/{number} --jq .merged`.
+
+The Phase 6 stale main-clone failure (a `gt submit` collision that surfaces
+only at Phase 8) is a separate problem and is unchanged.

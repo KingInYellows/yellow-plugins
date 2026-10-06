@@ -12,8 +12,9 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - Prefer explicit over implicit. Name things clearly
 - Write tests for non-trivial logic
 - **Shell libraries and zsh:** Markdown blocks run under the user's shell,
-  often zsh with `noclobber`. `lib/compound-staging.sh`, `lib/repo-profile.sh`
-  and `lib/validate-fs.sh` are dual-shell (Tier 4) and are sourced directly;
+  often zsh with `noclobber`. `lib/compound-staging.sh`,
+  `lib/plan-gate-provenance.sh`, `lib/repo-profile.sh` and `lib/validate-fs.sh`
+  are dual-shell (Tier 4) and are sourced directly;
   keep them that way — `tests/shell-compat/` runs them under bash and zsh.
   Bash-only code goes in a `bash /dev/fd/3 3<<'__YELLOW_CORE_BASH__'` wrapper
   (as in `staging-reviewer`); see CONTRIBUTING.md "Bash and zsh".
@@ -128,7 +129,12 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   passes without prompting, captured in a `Plan-Verifier-FileProvenance:`
   commit trailer. This catches the routine case where a plan was
   expanded from a shell and implemented in the same PR, so the branch
-  name carries too few slug tokens for either slug-match tier. When
+  name carries too few slug tokens for either slug-match tier. Graphite
+  merge-queue PRs stay closed and unmerged, so GitHub associates none with
+  the commit; when that lookup succeeds with an empty result,
+  `lib/plan-gate-provenance.sh` reads the PR number from the commit subject
+  and passes only if that PR is closed, lists the plan with the trunk blob,
+  and changed a file outside `plans/` (trailer `via=commit-subject`). When
   provenance finds no commit or an ambiguous PR set, a strict tier
   (server-side `--state merged` + `--jq` word-boundary post-filter of
   the full slug on `headRefName`) runs, then a loose tier scoring the
@@ -334,6 +340,16 @@ cross-plugin pattern:
   yellow-core's `hooks/scripts/stop.sh`, `session-start.sh`,
   `_stop-capture-subshell.sh`, and the `/compound:review-staged` command, and
   by yellow-review's `lib/stage-learning.sh` and `lib/review-ledger.sh`
+- `plan-gate-provenance.sh` — `/plan:complete` Gate C commit-subject fallback
+  for Graphite merge-queue PRs (closed, `merged: false`, so GitHub's
+  commit-to-PR lookup returns nothing). `pgp_provenance_via_subject
+  <owner/repo> <file-sha> <plans/file.md>` reads the trailing ` (#N)` of the
+  commit subject and passes (`PASS` plus a `via=commit-subject` trailer line)
+  only when PR N is closed, lists the plan with the trunk blob, and changed a
+  file outside `plans/`; every other outcome prints `NO-EVIDENCE` and a
+  reason. Dual-shell (Tier 4), idempotent via `_PLAN_GATE_PROVENANCE_LOADED`.
+  Coverage in `tests/shell-compat/` (driver with a stub `gh`) and
+  `tests/plan-commands.bats`
 - `validate-fs.sh` — `validate_file_path()` and `canonicalize_project_dir()`
   path-traversal validators (consumed by yellow-ci, yellow-ruvector,
   yellow-debt; yellow-debt declares it as a required dependency). Idempotent
