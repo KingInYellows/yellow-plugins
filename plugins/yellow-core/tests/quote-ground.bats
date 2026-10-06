@@ -492,6 +492,47 @@ now_ms() {
   ' <<<"$output" >/dev/null
 }
 
+@test "batch keeps a numeric line as its raw lexeme so jq cannot round it" {
+  printf '%s\n' "$Q26" >src/a.txt
+  run bash "$QG" batch <<<'{"id":"bad","file":"src/a.txt","line":1.0000000000000001,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 0 ]
+  jq -e '.id == "bad" and .result == "ungrounded" and .matched_line == null' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<"$(row ok src/a.txt 1 "$Q26")"$'\n''{"id":"bad","file":"src/a.txt","line":1.0000000000000001,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 0 ]
+  jq -e -s '
+    length == 2
+    and (.[0].id == "ok" and .[0].result == "grounded" and .[0].matched_line == 1)
+    and (.[1].id == "bad" and .[1].result == "ungrounded" and .[1].matched_line == null)
+  ' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<'{"id":"bad","file":"src/a.txt","line":1.0,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 0 ]
+  jq -e '.result == "ungrounded" and .matched_line == null' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<'{"id":"bad","file":"src/a.txt","line":1e2,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 0 ]
+  jq -e '.result == "ungrounded" and .matched_line == null' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<'{"id":"bad","file":"src/a.txt","line":1E1,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 0 ]
+  jq -e '.result == "ungrounded" and .matched_line == null' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<'{"id":"ok","file":"src/a.txt","line":1.0000000000000001,"line":1,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 0 ]
+  jq -e '.result == "grounded" and .matched_line == 1' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<'{"id":"bad","file":"src/a.txt","line":1,"line":1.0000000000000001,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 0 ]
+  jq -e '.result == "ungrounded" and .matched_line == null' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<'{"id":"ok","file":"src/a.txt","line":1,"nested":{"line":1.0000000000000001},"quote":"'"$Q26"'"}'
+  [ "$status" -eq 0 ]
+  jq -e '.result == "grounded" and .matched_line == 1' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<'{"id":"bad","file":"src/a.txt","\u006cine":1.0000000000000001,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 0 ]
+  jq -e '.result == "ungrounded" and .matched_line == null' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<'{"id":"ok","file":"src/a.txt","line":1.0000000000000001,"line":"1","quote":"'"$Q26"'"}'
+  [ "$status" -eq 0 ]
+  jq -e '.result == "grounded" and .matched_line == 1' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<'{"id":"str-line","file":"src/a.txt","line":"1","quote":"'"$Q26"'"}'
+  [ "$status" -eq 0 ]
+  jq -e '.id == "str-line" and .result == "grounded" and .matched_line == 1' <<<"$output" >/dev/null
+}
+
 @test "batch exits 2 with no result rows when a row is not JSON or has no usable id" {
   printf '%s\n' "$Q26" >src/a.txt
   run bash "$QG" batch <<<"$(row ok src/a.txt 1 "$Q26")"$'\n''not json'

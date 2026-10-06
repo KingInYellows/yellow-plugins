@@ -19,7 +19,8 @@
 # only for grounded and null otherwise. A numeric id stays a number and a
 # string id stays a string. An integer id is usable only at or inside ±2^53;
 # a larger integer fails the batch. Any other numeric id is emitted as its
-# original lexeme, never through tonumber or fromjson. A decoded string id
+# original lexeme, never through tonumber or fromjson. A numeric line is the
+# raw lexeme, so jq cannot round it into a line qg_is_line accepts. A decoded string id
 # that cs_redact_secrets would change fails the batch, as does an unpaired
 # surrogate escape in that id or in the top-level quote; neither is printed.
 # Numeric ids are not redaction-checked. batch always uses radius 3. A missing file is
@@ -534,7 +535,8 @@ qg_reject_credential_ids() {
 # file, line or quote (wrong type, or U+0000 that would shift the framing)
 # becomes line 0, which classifies as ungrounded. The id carries a type tag:
 # n for a JSON number, s for a string, l for a non-integer number whose raw
-# lexeme must be emitted unchanged. An integer id outside ±2^53 fails the
+# lexeme must be emitted unchanged. A numeric line is the raw lexeme, so jq
+# cannot round it into a line qg_is_line accepts. An integer id outside ±2^53 fails the
 # batch before fromjson, by comparing the raw digit string, not tonumber.
 # A string id is rejected before fromjson when its raw lexeme holds an
 # unpaired surrogate escape, and an unpaired surrogate escape in the top-level
@@ -587,7 +589,8 @@ qg_load_rows() {
     # A string id is judged from its raw lexeme, before fromjson, so an
     # unpaired surrogate fails closed. An unpaired surrogate escape in the
     # top-level quote fails the batch the same way. The last top-level quote
-    # wins. Braces inside a string do not change depth.
+    # wins. A numeric line is the raw lexeme, so jq cannot round it into a
+    # line qg_is_line accepts. Braces inside a string do not change depth.
     def int_abs_ok:
       (if startswith("-") then .[1:] else . end) as $d
       | ($d | length) as $len
@@ -612,7 +615,8 @@ qg_load_rows() {
     def id_scan:
       reduce scan("\"(?:[^\"\\\\]|\\\\.)*\"|[^\\\"]+") as $tok (
         {prev: null, depth: 0, bad: false, lex: null, want: false, seen: false,
-         want_quote: false, quote_bad: false, out: ""};
+         want_quote: false, quote_bad: false, want_line: false, line_num: false,
+         line_lex: null, out: ""};
         if .bad then .out += $tok
         elif .want then
           .want = false
@@ -631,6 +635,17 @@ qg_load_rows() {
               .quote_bad = ($tok | has_unpaired_surrogate)
             else
               .quote_bad = false
+              | .depth += brace_delta($tok)
+            end
+          | .out += $tok
+        elif .want_line then
+          .want_line = false
+          | .prev = null
+          | if ($tok | startswith("\"")) then
+              .line_num = false
+              | .line_lex = null
+            else
+              .line_num = false
               | .depth += brace_delta($tok)
             end
           | .out += $tok
@@ -664,6 +679,18 @@ qg_load_rows() {
           | .depth += brace_delta($tok)
           | .prev = null
           | .out += $tok
+        elif ((.prev == "line") and .depth == 1 and ($tok | test(num_at))) then
+          ($tok | capture(num_cap)) as $c
+          | .line_num = true
+          | .line_lex = $c.n
+          | .depth += brace_delta($tok)
+          | .prev = null
+          | .out += $tok
+        elif ((.prev == "line") and .depth == 1 and ($tok | test(colon_only))) then
+          .want_line = true
+          | .depth += brace_delta($tok)
+          | .prev = null
+          | .out += $tok
         else
           .depth += brace_delta($tok)
           | .prev = null
@@ -675,21 +702,23 @@ qg_load_rows() {
       else id_scan as $info
       | if ($info.bad or $info.quote_bad) then error("row has no usable id")
         elif strict then
-          [(if $info.lex == null then . else $info.out end | fromjson), $info.lex]
+          [(if $info.lex == null then . else $info.out end | fromjson), $info.lex,
+           (if $info.line_num then $info.line_lex else null end)]
         else error("not strict JSON") end
       end;
     def hasnul: type == "string" and contains("\u0000");
     def tag: if type == "number" then "n" + tostring else "s" + . end;
     def row:
-      .[0] as $o | .[1] as $lex
+      .[0] as $o | .[1] as $lex | .[2] as $ll
       | (if $lex != null then "l" + $lex else ($o.id | tag) end) as $ident
+      | (if $ll != null then $ll else ($o.line | tostring) end) as $ln
       | if ($o | type) != "object" then error("row is not an object")
         elif $lex == null and ((($o.id | type) != "string" and ($o.id | type) != "number") or ($o.id | hasnul))
           then error("row has no usable id")
         elif (($o.file | type) == "string") and (($o.quote | type) == "string")
           and (($o.line | type) == "number" or ($o.line | type) == "string")
-          and (([$o.file, $o.quote, ($o.line | tostring)] | any(hasnul)) | not)
-          then [$ident, $o.file, ($o.line | tostring), $o.quote]
+          and (([$o.file, $o.quote, $ln] | any(hasnul)) | not)
+          then [$ident, $o.file, $ln, $o.quote]
         else [$ident, "", "0", ""]
         end;
     [inputs | parse | row] as $rows
