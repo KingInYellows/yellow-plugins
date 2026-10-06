@@ -277,16 +277,18 @@ only one with an explicit external gate.
      is generic and no observed conflict.
   3. Future contributors and auditors should not re-flag without a
      concrete trigger (real collision or incoming clashing plugin).
-- [x] 2.4.2: Skip the changeset bump on `gt-workflow` per the brainstorm
-  recommendation — CLAUDE.md is documentation of an existing convention,
-  not a behavior change. (If the CI changeset gate complains, add a patch
-  bump retroactively.)
+- [x] 2.4.2: #437 shipped a three-plugin patch changeset
+  (gt-workflow, yellow-core, yellow-morph) in
+  `.changeset/audit-mechanical-followups.md` (`40f6767`), including the
+  gt-workflow `CLAUDE.md` namespace note. The brainstorm recommended
+  skipping the gt-workflow bump; the landed PR did not.
 
 #### 2.5 — Validation, changeset, commit, submit
 
 - [x] 2.5.1: Run `pnpm validate:schemas && pnpm validate:agents`.
-- [x] 2.5.2: `pnpm changeset` — patch bump on `yellow-core` and `yellow-morph`
-  (gt-workflow only if the gate insists; otherwise skip per 2.4.2).
+- [x] 2.5.2: `pnpm changeset` — the changeset that landed is patch bumps
+  on yellow-core, yellow-morph, and gt-workflow
+  (`.changeset/audit-mechanical-followups.md`, #437).
 - [x] 2.5.3: Normalize line endings on any new/edited files: `sed -i 's/\r$//' <files>`
   (WSL2 hygiene per project memory).
 - [x] 2.5.4: Commit with `chore(audit): apply mechanical followups (C-02, M-01 reactive, M-02, C-01 doc)`.
@@ -572,7 +574,8 @@ only one with an explicit external gate.
   fictional dep; passes silently when deps are valid.
 - All three modified manifests declare `yellow-linear` as a dep with
   human-readable reason text.
-- Fresh-install smoke test passes before any release tag.
+- Fresh-install smoke test is not verified: no clean-install result is
+  in the repo (see 4.4.3).
 
 ---
 
@@ -885,11 +888,13 @@ None.
    in script.
 4. **X-01 fixed:** all three consumer plugins declare `yellow-linear` as
    a dep with human-readable reasons; validator warns on missing deps;
-   fresh-install smoke test passes.
+   the fresh-install smoke test is not verified — no clean-install
+   result is in the repo (see 4.4.3).
 5. **A-01 fixed:** all 5 deep-analysis reviewers have explicit `model:`
    pinning (opus); none on `inherit`.
-6. **A-02 P1 fixed:** all 8 read-only research agents have a narrowed
-   `tools:` field; none inherit `Edit`/`Write` they don't use.
+6. **A-02 P1 fixed:** the eight read-only research agents were audited;
+   their existing `tools:` already matched least privilege (no Edit/Write),
+   so no frontmatter edit shipped (#439).
 7. **M-01 fixed:** `CLAUDE.md` and `README.md` reflect 18 plugins;
    `validate-doc-counts.js` lint catches future drift; wired into
    `release:check`.
