@@ -1,5 +1,19 @@
 # Feature: Cycle 1 — resolve-flow hardening, CI split, restack abort guard
 
+> **Status (2026-10-06):** reviewed and refreshed; still valid in direction.
+> 5 of 40 boxes are now `[x]` (work already on `main`), 1 is `[-]`, 34 are
+> open. Five of the six PRs are still needed: PR 1 (CI split), PR 3, PR 4,
+> PR 5 and PR 6 are unchanged in substance. PR 2 is mostly done by
+> #1025 (`refuse in-worktree git, gh, and jq`): tasks 2.2 and 2.3 are `[x]`, and
+> 2.1, 2.4, 2.5 and 2.6 are rescoped to what remains. Task 4.4 is not
+> applicable. `main` has moved about 20 commits past the `38d5d5d25` baseline,
+> including #1014 (stage-unattended-learnings) and #1032 (restack pause state);
+> the PR 6 targets (`cmd_abort`, `chain_rebase_worktree`) are unchanged.
+> Linear: CLAUDE-70 to 75 are still In Progress with no open PR;
+> CLAUDE-44, 45, 46, 48 and 49 are Done. Open risk: `agent/fix/astra-bridge`
+> edits the same `ci-status` block as task 1.3. Line numbers in the tasks have
+> drifted; re-find them by name.
+
 ## Overview
 
 Six code fixes from the Cycle 1 Linear follow-ups, delivered as a linear stack
@@ -111,10 +125,13 @@ only yellow-core and may be unstacked to reduce restack risk.
 ### Phase 0: Prerequisites
 
 - [ ] 0.1: Run `/stack:status`; proceed only on `READY_GRAPHITE` or `READY_GITHUB`.
-- [ ] 0.2: Confirm `agent/feat/stage-unattended-learnings` has merged (or is
+- [x] 0.2: (done 2026-10-06: `stage-unattended-learnings` merged as #1014. Still
+  branch from the current `main` when the stack starts; it has moved about 20
+  commits past `38d5d5d25`.) Confirm `agent/feat/stage-unattended-learnings` has merged (or is
   about to). Rebase this stack on the current `main`; `38d5d5d25` is a
   version-packages merge, so package baselines just moved.
-- [ ] 0.3: Re-read `sweep-all.md` after that merge; its end-of-loop
+- [x] 0.3: (done 2026-10-06: #1014 removed `sweep-all.md` Step 6 and the
+  `/flow:compound` pass, so 4.4 is not applicable.) Re-read `sweep-all.md` after that merge; its end-of-loop
   `/flow:compound` pass is being dropped, which changes task 4.4.
 
 <!-- deepen-plan: codebase -->
@@ -138,7 +155,9 @@ only yellow-core and may be unstacked to reduce restack risk.
 - [ ] 1.2: Remove the yellow-review step (~L1498) from `plugin-shell-tests`.
   Keep `plugins/yellow-review/tests` in the advisory loop `case` skip
   (~L1521–1531) so it does not run twice; update the comment at ~L1514–1518.
-- [ ] 1.3: Wire `ci-status`: `needs:` list (~L1741–1755), result env var
+- [ ] 1.3: (coordinate: the unpushed `agent/fix/astra-bridge` branch also edits
+  the `ci-status` needs list and gate (it adds `goal-engine-compat`); whichever
+  lands second restacks.) Wire `ci-status`: `needs:` list (~L1741–1755), result env var
   (~L1760–1771), the AND gate (~L1773–1784), and the failure echo (~L1796).
   Check what `report-metrics` consumes before deciding whether it lists the
   new job.
@@ -186,12 +205,17 @@ only yellow-core and may be unstacked to reduce restack risk.
 
 ### Phase 2: PR 2 — `fix(yellow-review)`: close git/PATH/fsmonitor trust gaps (CLAUDE-71)
 
-- [ ] 2.1: In `lib/resolve-paths.sh` (next to `lgit` L21 and `lgit_nohooks` L28)
+- [ ] 2.1: (rescoped 2026-10-06: #1025 already resolves git, gh and jq inline
+  before the lib integrity check, so only the shared hardening function is left.
+  `harden_git_config` still lives only in `commit-resolve-fixes`; move it to
+  `resolve-paths.sh` and call it from `run-verify-command` too.) In `lib/resolve-paths.sh` (next to `lgit` L21 and `lgit_nohooks` L28)
   add a shared hardening function. It returns codes rather than calling
   `die`, since the two scripts use different exit codes. Move the transport
   and filter refusals, signing-off and fsmonitor/untrackedCache overrides out
   of `commit-resolve-fixes` (L451–504) into it. Both scripts call it.
-- [ ] 2.2: Resolve `git`, `gh`, `jq` (plus the existing `gt`, `node`) to absolute
+- [x] 2.2: (done by #1025 (`e7992d9c0`): `yr_resolve_tool` resolves git, gh and
+  jq to absolute paths whose canonical file is outside the worktree, before
+  `check_lib_integrity`, and refuses a symlink that resolves into the tree.) Resolve `git`, `gh`, `jq` (plus the existing `gt`, `node`) to absolute
   paths once, before the first git call (`commit-resolve-fixes` L200,
   `run-verify-command` L156). Canonicalise the binary with `cd -P`/`pwd -P`
   plus a bounded `readlink` loop (precedent at `resolve-paths.sh:121`), never
@@ -201,14 +225,23 @@ only yellow-core and may be unstacked to reduce restack risk.
   trusted location. `$PWD` alone is not enough — a launch from `/repo/subdir`
   lets `/repo/bin/git` through. Test against the git toplevel once known.
   Drop empty and relative PATH entries. Call the resolved absolute paths.
-- [ ] 2.3: `run-verify-command` L833: use `lgit_nohooks status`. Audit the other
+- [x] 2.3: (done: no bare `git status` remains in `run-verify-command`; every
+  status call uses `lgit_nohooks`, which sets `core.fsmonitor=false` and
+  `core.untrackedCache=false`; other git calls use the absolute git from
+  #1025.) `run-verify-command` L833: use `lgit_nohooks status`. Audit the other
   plain-`git` calls (`diff --no-index` L595/L606, `check-ignore` L347,
   `cat-file` L430/L588/L808).
-- [ ] 2.4: Make `--ignored-since` required in attended runs (L254–263).
-- [ ] 2.5: Defer deletion of FIFO/socket/device entries (`TO_REMOVE`, L461–468)
+- [ ] 2.4: (verified still open 2026-10-06: `run-verify-command` requires
+  `--ignored-since` only when `--unattended`.) Make `--ignored-since` required in attended runs (L254–263).
+- [ ] 2.5: (verified still open 2026-10-06: `TO_REMOVE` entries are deleted
+  before `save_patch`, while `DIR_REMOVE` is deferred. Decide first whether to
+  keep today's behaviour; see the correction note under Phase 2.) Defer deletion of FIFO/socket/device entries (`TO_REMOVE`, L461–468)
   until `save_patch` has written the snapshot, as `DIR_REMOVE` does at
   L797–806. If the snapshot cannot be written, delete nothing and refuse.
-- [ ] 2.6: Tests (`tests/commit-resolve-fixes.bats`, `tests/run-verify-command.bats`),
+- [ ] 2.6: (rescoped 2026-10-06: #1025's nine `trust:` bats cases already cover
+  a hostile `git` on PATH and an outside symlink to an in-tree executable.
+  Remaining: the `core.fsmonitor` canary in the rollback status, attended run
+  without `--ignored-since`, and the FIFO and snapshot-failure cases.) Tests (`tests/commit-resolve-fixes.bats`, `tests/run-verify-command.bats`),
   each failing on `main` and passing after: a hostile `git` earlier on PATH
   and one inside the repo write a canary that must not appear (invoke the
   in-repo canary from a subdirectory of the repository root); a symlink in
@@ -296,7 +329,8 @@ Start from a base that includes `stage-unattended-learnings` and PR 3.
   read the command inline (`skill-content.bats` ~L568–614, L714–722,
   L772–783, L1181+) and keep the L756–770 invariants (no inline
   `--revert-dirty`, no cross-command reference directory).
-- [ ] 4.4: `sweep-all.md` Step 6 (L376–398): skip `/flow:compound` after any early
+- [-] 4.4: (not applicable 2026-10-06: #1014 removed `sweep-all.md` Step 6 and
+  the `/flow:compound` pass. Note it on CLAUDE-73.) `sweep-all.md` Step 6 (L376–398): skip `/flow:compound` after any early
   stop that left tree state unknown, including the no-contract stop. If the
   merged staging branch already removed that pass, mark this task not
   applicable and note it on CLAUDE-73.
@@ -422,12 +456,16 @@ Start from a base that includes `stage-unattended-learnings` and PR 3.
   occurrences (46); each row of the decision table in
   `plans/complete/review-findings-ledger.md` (~L248–300) (48); the ctags
   path now running in CI (49).
-- [ ] 7.2: Show the mapping and the merged PR numbers to the user and confirm
+- [x] 7.2: (outcome observed 2026-10-06: Linear shows CLAUDE-44, 45, 46, 48 and
+  49 as Done (2026-10-05); the mapping and confirm step were not recorded, so
+  7.1 still stands.) Show the mapping and the merged PR numbers to the user and confirm
   before any Linear write. Check each issue for an active owner or branch.
   Then post the mapping as the closing comment and move the five issues to
   Done (a confirmed Tier 2 transition). Leave CLAUDE-47 alone.
 - [ ] 7.3: Note on CLAUDE-72 that sub-claim 2 was already fixed.
-- [ ] 7.4: Docs-only follow-up: add a "resolved, see
+- [ ] 7.4: (partly done: the ledger brainstorm already has its "resolved and
+  shipped" banner; the anchor-only re-verify limit is still not stated in
+  `references/review-pr/ledger.md`.) Docs-only follow-up: add a "resolved, see
   `plans/complete/review-findings-ledger.md`" banner to
   `docs/brainstorms/2026-09-23-review-findings-ledger-brainstorm.md`
   and state the anchor-only re-verify limit in `references/review-pr/ledger.md`
