@@ -601,9 +601,10 @@ qg_load_rows() {
       ([$s | scan("\\{")] | length) - ([$s | scan("\\}")] | length);
     def high_surr: "\\\\u[Dd][89ABab][0-9A-Fa-f]{2}";
     def low_surr: "\\\\u[Dd][C-Fc-f][0-9A-Fa-f]{2}";
-    # Drop escaped-backslash pairs first, so a literal \\uDC00 is not an escape.
+    # Replace each escaped-backslash pair with _, so a literal \\uDC00 is not
+    # an escape and replacing a pair does not join two escapes.
     def has_unpaired_surrogate:
-      gsub("\\\\\\\\"; "")
+      gsub("\\\\\\\\"; "_")
       | test(high_surr + "(?!" + low_surr + ")")
         or test("(?<!" + high_surr + ")" + low_surr);
     def num_re: "-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?";

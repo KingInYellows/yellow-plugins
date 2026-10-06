@@ -706,6 +706,19 @@ now_ms() {
   jq -e '.id == "\uD800\uDC00" and .result == "grounded"' <<<"$output" >/dev/null
 }
 
+@test "batch rejects surrogates that a literal backslash would otherwise join" {
+  printf '%s\n' "$Q26" >src/a.txt
+  run bash "$QG" batch <<<'{"id":"\uD800\\\uDC00","file":"src/a.txt","line":1,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<"$(row ok src/a.txt 1 "$Q26")"$'\n''{"id":"\uD800\\\uDC00","file":"src/a.txt","line":1,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<'{"id":"ok","file":"src/a.txt","line":1,"quote":"\uD800\\\uDC00"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+}
+
 @test "batch rejects an unpaired surrogate escape in a top-level quote" {
   printf '%s\n' "$Q26" >src/a.txt
   run bash "$QG" batch <<<'{"id":"ok","file":"src/a.txt","line":1,"quote":"abcdefgh\uDC00ijkl"}'
