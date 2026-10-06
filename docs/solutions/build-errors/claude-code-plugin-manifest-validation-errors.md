@@ -206,4 +206,4 @@ is a separate, generated Codex contract and is unaffected. See also the
 "Update — 2026-07-16" section in
 [ci-schema-drift-hooks-inline-vs-string.md](./ci-schema-drift-hooks-inline-vs-string.md)
 for the string-path vs inline-object history, and
-`plans/fix-hooks-json-mirror-double-registration.md`.
+`plans/complete/fix-hooks-json-mirror-double-registration.md`.

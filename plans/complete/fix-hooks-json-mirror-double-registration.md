@@ -1,5 +1,11 @@
 # Fix: remove `hooks/hooks.json` mirrors that Claude Code now auto-loads
 
+> **Status (2026-10-06):** shipped in #797 (`3812fc66e`, on `main`; `gh` shows
+> the merge-queue PR as CLOSED). All six `hooks/hooks.json` mirrors are gone and
+> the plugin validator rejects any that return. 3.5, the live check, was run on
+> 2026-10-06 against the installed plugins and passed (see the item for what
+> was counted). All boxes are done.
+
 ## Problem Statement
 
 On startup, Claude Code 2.1.272 prints one warning per enabled plugin:
@@ -170,7 +176,15 @@ Alternatives rejected:
       `pnpm validate:schemas`, `pnpm test:integration`, `pnpm lint`,
       `pnpm typecheck`. `validate:generated` is unaffected (mirrors are not
       catalog-sourced) — confirm it still passes.
-- [ ] 3.5 Live verification on the enabled stack provider only (gt-workflow
+- [x] 3.5 (verified live 2026-10-06 — headless `claude -p` session in a scratch
+      repo against the installed gt-workflow 2.0.6, yellow-ci 1.5.6, yellow-debt
+      1.8.0, yellow-morph 1.3.3 and yellow-ruvector 2.0.1: zero `unknown key`
+      warnings and no `hooks.json` read for any of them; 11 SessionStart handlers
+      fired once each, matching the 10 declared by enabled plugins plus 1 in user
+      settings, so none is doubled; the `git push` guard fired once and blocked
+      the push. The `RuVector Intelligence Layer Active` banner in (b) no longer
+      exists after #888, so the SessionStart-once count stands in for it.
+      github-workflow is not installed, so only gt-workflow was checked) Live verification on the enabled stack provider only (gt-workflow
       or github-workflow — never both): reinstall the marketplace, then
       `claude plugin validate plugins/<name>` for the six plugins, start a
       session and confirm (a) zero `unknown key` warnings, (b) the
