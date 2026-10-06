@@ -1,5 +1,10 @@
 # Feature: PR #507 Residual Review Follow-ups
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 18 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 **Status:** Implemented in PR #507 (commit `650f3fc3`, 2026-05-11).
 Retrospective document; task checkboxes preserve original phase structure.
 "Current state" claims and acceptance criteria below describe the
@@ -65,7 +70,7 @@ trim/coverage items; Phase 3 (P3 hygiene) handles the artifacts.
 
 ### Phase 1: P2 Cross-Reviewer Findings
 
-- [ ] **1.1: Reconcile CONTRIBUTING.md user-invokable:false carve-out with
+- [x] **1.1: Reconcile CONTRIBUTING.md user-invokable:false carve-out with
       this audit's actual trims.** Current text says budget pressure is not
       a valid trim reason for `user-invokable: false` skills, while the PR
       changeset cites the ~250-char threshold (budget framing) as rationale
@@ -84,7 +89,7 @@ trim/coverage items; Phase 3 (P3 hygiene) handles the artifacts.
       - Files: `CONTRIBUTING.md:415-419` (Option A) or
         `.changeset/skill-description-audit.md` (Option B).
 
-- [ ] **1.2: Fix `agent-native-audit` description WHEN clause.** Current
+- [x] **1.2: Fix `agent-native-audit` description WHEN clause.** Current
       description ends with "Use when auditing for agent-native readiness
       or deciding whether to extract orchestration logic from a workflow
       tool." The second clause maps to body Step 4 content (`Usage` →
@@ -103,7 +108,7 @@ trim/coverage items; Phase 3 (P3 hygiene) handles the artifacts.
 
 ### Phase 2: P3 Surface Cleanups
 
-- [ ] **2.1: Trim `agent-native-architecture` description from 314 → ~270
+- [x] **2.1: Trim `agent-native-architecture` description from 314 → ~270
       chars.** This is the repo's longest post-audit description, flagged
       by both `project-compliance-reviewer` and `adversarial-reviewer`.
       Plan Phase 3.2 deliberately exempted it as "five-principle
@@ -115,13 +120,13 @@ trim/coverage items; Phase 3 (P3 hygiene) handles the artifacts.
       - Files: `plugins/yellow-core/skills/agent-native-architecture/SKILL.md:3`.
       - Verify char count after trim.
 
-- [ ] **2.2: Trim `debugging` description from ~260 → ~230 chars.** Still
+- [x] **2.2: Trim `debugging` description from ~260 → ~230 chars.** Still
       above the ~250 positional threshold targeted by this audit. Drop
       "then optionally implement a test-first fix" — it blurs debugging
       into the fix-it surface and is recoverable from the body.
       - Files: `plugins/yellow-core/skills/debugging/SKILL.md:3`.
 
-- [ ] **2.3: Document the "inspected, no trim" decisions for coverage
+- [x] **2.3: Document the "inspected, no trim" decisions for coverage
       gaps.** Three `user-invokable: false` skills sit above the 200-char
       inspection threshold but were not enumerated in plan Phase 3/4:
       `security-fencing` (241), `local-config` (231),
@@ -131,7 +136,7 @@ trim/coverage items; Phase 3 (P3 hygiene) handles the artifacts.
       inspected and cleared.
       - Files: PR description only (no file changes).
 
-- [ ] **2.4: Sync changeset before/after counts to actual HEAD values.**
+- [x] **2.4: Sync changeset before/after counts to actual HEAD values.**
       `ideation` (claimed 202 / actual 204), `optimize` (claimed 234 /
       actual 238), `session-history` (claimed 242 / actual 243) drift by
       1-4 chars. Update the changeset table for accuracy.
@@ -139,14 +144,14 @@ trim/coverage items; Phase 3 (P3 hygiene) handles the artifacts.
 
 ### Phase 3: P3 Hygiene
 
-- [ ] **3.1: Move the plan to `plans/complete/`.** Every other completed
+- [x] **3.1: Move the plan to `plans/complete/`.** Every other completed
       plan lives under `plans/complete/`. The skill-description-audit plan
       is now done. Two-reviewer agreement (code-simplicity, comment-analyzer)
       flagged the placement inconsistency.
       - `git mv plans/skill-description-audit.md plans/complete/skill-description-audit.md`
       - Update any references in `docs/brainstorms/...` if present.
 
-- [ ] **3.2: Strip `<!-- deepen-plan: ... -->` annotation blocks from the
+- [x] **3.2: Strip `<!-- deepen-plan: ... -->` annotation blocks from the
       plan.** Six blocks of inline research scaffolding (~130 lines)
       served the implementation agent and are inert post-merge. Strip
       them after the move in step 3.1. Do not promote them to plan body
@@ -155,7 +160,7 @@ trim/coverage items; Phase 3 (P3 hygiene) handles the artifacts.
       - Files: `plans/complete/skill-description-audit.md` (post-move).
       - Verify a quick `grep '<!-- deepen-plan' plans/complete/skill-description-audit.md` returns empty.
 
-- [ ] **3.3: Annotate external-issue references with a captured-at date.**
+- [x] **3.3: Annotate external-issue references with a captured-at date.**
       The plan, brainstorm, and CONTRIBUTING.md cite `claude-code#44780`
       and related issues. If those issues are closed/dismissed by
       Anthropic, the references become stale and misleading. Add an
@@ -164,7 +169,7 @@ trim/coverage items; Phase 3 (P3 hygiene) handles the artifacts.
       `plans/complete/` — no edit needed there.
       - Files: `CONTRIBUTING.md:408`, `docs/brainstorms/2026-05-09-claude-code-skill-bloat-brainstorm.md`.
 
-- [ ] **3.4: Close brainstorm open questions OR mark brainstorm as
+- [x] **3.4: Close brainstorm open questions OR mark brainstorm as
       closed.** Brainstorm has three open questions whose answers are not
       recorded in the plan or PR body. Either append a `## Decisions Made`
       section that closes each one in a sentence, or add a `Status:
@@ -172,7 +177,7 @@ trim/coverage items; Phase 3 (P3 hygiene) handles the artifacts.
       the document is no longer active.
       - Files: `docs/brainstorms/2026-05-09-claude-code-skill-bloat-brainstorm.md`.
 
-- [ ] **3.5: Scope the budget-section preamble to `description:` only.**
+- [x] **3.5: Scope the budget-section preamble to `description:` only.**
       CONTRIBUTING.md line 385 currently says "Each individual skill's
       combined `description` + `when_to_use` is officially capped at
       **1,536 characters**", but the surrounding guidance discusses only
@@ -182,7 +187,7 @@ trim/coverage items; Phase 3 (P3 hygiene) handles the artifacts.
       adopted in a future PR, revisit the budget arithmetic."
       - Files: `CONTRIBUTING.md:385-386`.
 
-- [ ] **3.6: Document the revert-atomicity caveat in the PR description
+- [x] **3.6: Document the revert-atomicity caveat in the PR description
       OR in CONTRIBUTING.md.** PR body says trim is "reversible via
       single-file revert + new patch changeset", but the combined
       changeset makes per-file revert require cherry-pick + new patch
@@ -193,18 +198,18 @@ trim/coverage items; Phase 3 (P3 hygiene) handles the artifacts.
 
 ### Phase 4: Validation & Submit
 
-- [ ] **4.1: `pnpm validate:schemas` — must pass with zero new violations.**
+- [x] **4.1: `pnpm validate:schemas` — must pass with zero new violations.**
 
-- [ ] **4.2: `grep -E '^description:' plugins/*/skills/*/SKILL.md | awk '{ print length($0), $0 }' | sort -n` — verify
+- [x] **4.2: `grep -E '^description:' plugins/*/skills/*/SKILL.md | awk '{ print length($0), $0 }' | sort -n` — verify
       no description regressed above 270 chars after edits.**
 
-- [ ] **4.3: Format guard.** Re-run the audit greps:
+- [x] **4.3: Format guard.** Re-run the audit greps:
       ```bash
       grep -rE '^description: [>|][-+]?$' plugins/*/agents/*.md plugins/*/skills/*/*.md  # must return empty
       grep -L 'Use when' plugins/yellow-core/skills/{agent-native-audit,debugging}/SKILL.md  # must return empty
       ```
 
-- [ ] **4.4: Add a `patch` changeset entry.** `.changeset/<slug>.md`
+- [x] **4.4: Add a `patch` changeset entry.** `.changeset/<slug>.md`
       should cover both yellow-core and yellow-council (matching the
       existing changeset's scope) with a one-line summary referencing
       this follow-up. Decision: include in the existing
@@ -212,11 +217,11 @@ trim/coverage items; Phase 3 (P3 hygiene) handles the artifacts.
       creating a sibling changeset, to keep the audit work as one
       versioned unit.
 
-- [ ] **4.5: `gt modify -m "fix(docs): apply PR #507 review followups (carve-out, description trims, plan move)"`** then
+- [x] **4.5: `gt modify -m "fix(docs): apply PR #507 review followups (carve-out, description trims, plan move)"`** then
       `gt submit --no-interactive --force` (branch will need force due
       to prior amend lineage).
 
-- [ ] **4.6: Final `gh pr view 507 --json reviewDecision` sanity check.**
+- [x] **4.6: Final `gh pr view 507 --json reviewDecision` sanity check.**
       Confirm no new automated review threads were generated by gemini /
       copilot / codeant after the push.
 

@@ -1,5 +1,10 @@
 # Plan: ci:setup-self-hosted Command
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 17 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 **Date:** 2026-02-24
 **Plugin:** `yellow-ci`
 **Brainstorm:** `docs/brainstorms/2026-02-24-ci-setup-self-hosted-brainstorm.md`
@@ -47,17 +52,17 @@ Architecture mirrors the existing `diagnose` → `failure-analyst` pattern.
 
 ### Phase 1: Runner Inventory Command
 
-- [ ] **1.1** Create `plugins/yellow-ci/commands/ci/setup-self-hosted.md`
+- [x] **1.1** Create `plugins/yellow-ci/commands/ci/setup-self-hosted.md`
   - Frontmatter: `model: sonnet`, `allowed-tools: [Bash, AskUserQuestion, Task]`
   - `argument-hint: ''` (no arguments — operates on current repo)
 
-- [ ] **1.2** Prerequisites (Step 1 in command body)
+- [x] **1.2** Prerequisites (Step 1 in command body)
   - Validate `gh auth status`; if not authenticated: "Run `gh auth login` first"
   - Derive `OWNER/REPO` from `git remote get-url origin`; reject if no GitHub
     remote; validate `OWNER/REPO` format via `validate_repo_slug` pattern
     `^[a-zA-Z0-9_-]{1,39}\/[a-zA-Z0-9._-]{1,100}$`
 
-- [ ] **1.3** GitHub API runner fetch (Step 2)
+- [x] **1.3** GitHub API runner fetch (Step 2)
   - Fetch with pagination and reassemble into a JSON array:
     ```bash
     RUNNERS_JSON=$(timeout 15 gh api --paginate \
@@ -86,7 +91,7 @@ Architecture mirrors the existing `diagnose` → `failure-analyst` pattern.
     from recommendations`
   - Handle API rate limit (429): forward `gh` error and exit
 
-- [ ] **1.4** SSH health check (Step 3, conditional)
+- [x] **1.4** SSH health check (Step 3, conditional)
   - Check if `.claude/yellow-ci.local.md` exists; if absent: skip SSH, set all
     runners to `load_score: 50` (unknown/neutral), continue
   - For each online Linux runner (labels include `linux` or `Linux`): SSH with
@@ -110,7 +115,7 @@ Architecture mirrors the existing `diagnose` → `failure-analyst` pattern.
     PIDs, `wait`). Cap at `max_parallel_ssh` from SSH config defaults (default
     5). No three-tier batching logic.
 
-- [ ] **1.5** Build fenced inventory and spawn agent (Step 4)
+- [x] **1.5** Build fenced inventory and spawn agent (Step 4)
   - Assemble runner inventory as JSON:
     ```json
     {"runners": [{"name": "...", "labels": [...], "load_score": 90,
@@ -134,7 +139,7 @@ Architecture mirrors the existing `diagnose` → `failure-analyst` pattern.
 
 ### Phase 2: Runner Assignment Agent
 
-- [ ] **2.1** Create `plugins/yellow-ci/agents/ci/runner-assignment.md`
+- [x] **2.1** Create `plugins/yellow-ci/agents/ci/runner-assignment.md`
   - Frontmatter: `name: runner-assignment`, `model: inherit`, `color: yellow`
   - `allowed-tools: [Read, Glob, Grep, Edit, AskUserQuestion]`
     (no `Bash` — YAML verification is LLM re-read; `Grep` for signal detection)
@@ -142,7 +147,7 @@ Architecture mirrors the existing `diagnose` → `failure-analyst` pattern.
   - Agent body opening line: `**Reference:** Follow conventions in the
     ci-conventions skill.`
 
-- [ ] **2.2** Workflow discovery + parsing (Step 1)
+- [x] **2.2** Workflow discovery + parsing (Step 1)
   - `Glob: .github/workflows/*.yml` and `.yaml`
   - If none found: "No workflow files found in `.github/workflows/`"
   - **Validate each Glob-returned path** before reading: verify the canonical
@@ -158,7 +163,7 @@ Architecture mirrors the existing `diagnose` → `failure-analyst` pattern.
     ```
   - Enumerate all jobs with their `runs-on` values from the fenced content
 
-- [ ] **2.3** Classify each job's `runs-on` value (Step 2)
+- [x] **2.3** Classify each job's `runs-on` value (Step 2)
   - **Simple string** (e.g., `ubuntu-latest`, `self-hosted`, `runner-01`):
     eligible for recommendation
   - **Label array** (e.g., `[self-hosted, linux, gpu]`): add to "Skipped —
@@ -173,7 +178,7 @@ Architecture mirrors the existing `diagnose` → `failure-analyst` pattern.
     "Job `{job}` in `{file}` is pinned to `{runner}` which is currently OFFLINE
     — this job will not run until the runner comes back online"
 
-- [ ] **2.4** Job requirement inference (Step 3)
+- [x] **2.4** Job requirement inference (Step 3)
   Use Grep and Read on the fenced file content. Examine each eligible job's
   `steps[].uses`, `steps[].run`, `env`, and `name` fields for these signals:
 
@@ -189,7 +194,7 @@ Architecture mirrors the existing `diagnose` → `failure-analyst` pattern.
 
   If no signals found for a job: inferred requirements = empty set.
 
-- [ ] **2.5** Scoring algorithm (Step 4)
+- [x] **2.5** Scoring algorithm (Step 4)
   For each eligible job against each runner in the inventory:
 
   1. **OS filter** (binary, hard disqualifier — applied symmetrically):
@@ -214,7 +219,7 @@ Architecture mirrors the existing `diagnose` → `failure-analyst` pattern.
     required labels + OS label as an array:
     `runs-on: [self-hosted, linux, gpu]`
 
-- [ ] **2.6** Present recommendation table (Step 5)
+- [x] **2.6** Present recommendation table (Step 5)
 
   Format (no "Label Score" column — eligibility is binary):
   ```
@@ -243,7 +248,7 @@ Architecture mirrors the existing `diagnose` → `failure-analyst` pattern.
 
   Sort rows by file path, then by job order within file.
 
-- [ ] **2.7** AskUserQuestion confirmation (Step 6)
+- [x] **2.7** AskUserQuestion confirmation (Step 6)
   Options:
   - **Apply all recommendations** — apply every row with a recommended value
   - **Select individually** — present a re-numbered list of only the
@@ -258,7 +263,7 @@ Architecture mirrors the existing `diagnose` → `failure-analyst` pattern.
   "Select individually" path resolves to Cancel): output "No changes made." and
   stop immediately. Do not proceed to step 2.8.
 
-- [ ] **2.8** TOCTOU re-check + apply edits (Step 7)
+- [x] **2.8** TOCTOU re-check + apply edits (Step 7)
   Before applying any edits:
   1. Re-read the runner inventory context to identify runner names referenced in
      confirmed recommendations. For each referenced runner: check its current
@@ -282,7 +287,7 @@ Architecture mirrors the existing `diagnose` → `failure-analyst` pattern.
      to that file only, continue with remaining files. Report which files were
      partially edited in the completion message.
 
-- [ ] **2.9** Completion message (Step 8)
+- [x] **2.9** Completion message (Step 8)
   - Summary: "Applied N recommendations across M workflow files"
   - If any files were partially edited: list them with the count of applied vs
     skipped edits
@@ -293,17 +298,17 @@ Architecture mirrors the existing `diagnose` → `failure-analyst` pattern.
 
 ### Phase 3: Plugin Integration
 
-- [ ] **3.1** Update `plugins/yellow-ci/CLAUDE.md`
+- [x] **3.1** Update `plugins/yellow-ci/CLAUDE.md`
   - Add `/ci:setup-self-hosted` to the Commands section (now 5 → 6)
   - Add `runner-assignment` to the Agents section (now 3 → 4)
   - Add "When to use" entry: "When runner assignments look suboptimal or after
     registering new self-hosted runners"
 
-- [ ] **3.2** Update `plugins/yellow-ci/.claude-plugin/plugin.json`
+- [x] **3.2** Update `plugins/yellow-ci/.claude-plugin/plugin.json`
   - Register `/ci:setup-self-hosted` in any `commands` array if present
   - Confirm no new tools or MCP servers are required (none needed)
 
-- [ ] **3.3** Validate plugin manifests
+- [x] **3.3** Validate plugin manifests
   - `pnpm validate:schemas` — confirm no new errors
 
 ---

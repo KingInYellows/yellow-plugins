@@ -1,5 +1,10 @@
 # Feature: ruvector Worktree DB Symlink
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 29 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 > **Status: Implemented (archived)** — Shipped in repo. The implementation now
 > includes `get_main_repo_root`, `link_ruvector_db`, and
 > `cleanup_ruvector_link` in `worktree-manager.sh`; create/copy-env/cleanup
@@ -70,7 +75,7 @@ each of its 5 `git worktree remove` call sites (categories 3, 4, 5, 6, 7).
 
 ### Phase 1: Shell helpers and cmd_create wire-up
 
-- [ ] 1.1: Add `get_main_repo_root()` helper to `worktree-manager.sh`.
+- [x] 1.1: Add `get_main_repo_root()` helper to `worktree-manager.sh`.
   `git rev-parse --git-common-dir` output is asymmetric (confirmed via
   git's t1500-rev-parse.sh test suite): returns `.git` (literal, relative)
   from main repo root, `../../.git` (relative) from a subdir of main, an
@@ -100,7 +105,7 @@ each of its 5 `git worktree remove` call sites (categories 3, 4, 5, 6, 7).
   branch resolves any unusual shape (bare repo, nested setups) by `cd`-ing
   to it. Sources: git-rev-parse docs + `t/t1500-rev-parse.sh` + pre-commit
   PR #2252 (the git<2.5 fallback precedent).
-- [ ] 1.2: Add `link_ruvector_db(main_root, worktree_path)` helper. Order:
+- [x] 1.2: Add `link_ruvector_db(main_root, worktree_path)` helper. Order:
   (1) if `[ -L "$worktree_path/.ruvector" ]` → `info` already linked, return 0;
   (2) if `[ -e "$worktree_path/.ruvector" ] && [ ! -L ... ]` → real
   directory present, `warning` and return 0 (do NOT overwrite);
@@ -108,36 +113,36 @@ each of its 5 `git worktree remove` call sites (categories 3, 4, 5, 6, 7).
   found at $main_root; skipping symlink"` and return 0;
   (4) `ln -s -- "$main_root/.ruvector" "$worktree_path/.ruvector"` or
   `error` on failure.
-- [ ] 1.3: Add `cleanup_ruvector_link(worktree_path)` helper. Body:
+- [x] 1.3: Add `cleanup_ruvector_link(worktree_path)` helper. Body:
   `link="${worktree_path}/.ruvector"`; if `[ -L "$link" ]` then
   `rm -- "$link" || warning "Failed to remove .ruvector symlink at $link"`.
   Never aborts cleanup loop.
-- [ ] 1.4: Wire `link_ruvector_db` into `cmd_create` immediately after
+- [x] 1.4: Wire `link_ruvector_db` into `cmd_create` immediately after
   `copy_env_files` (line 139). Use `get_main_repo_root` (not `repo_root`
   from line 120) to derive the target.
-- [ ] 1.5: Wire `link_ruvector_db` into `cmd_copy_env` after the existing
+- [x] 1.5: Wire `link_ruvector_db` into `cmd_copy_env` after the existing
   `copy_env_files` call. Same `get_main_repo_root` usage.
-- [ ] 1.6: Wire `cleanup_ruvector_link` into `cmd_cleanup` immediately
+- [x] 1.6: Wire `cleanup_ruvector_link` into `cmd_cleanup` immediately
   before `git worktree remove "$path"` (line 251).
-- [ ] 1.7: Normalize line endings: `sed -i 's/\r$//' worktree-manager.sh`
+- [x] 1.7: Normalize line endings: `sed -i 's/\r$//' worktree-manager.sh`
   after editing on WSL2.
 
 ### Phase 2: cleanup.md command parity
 
-- [ ] 2.1: Locate the 5 `git worktree remove` call sites in
+- [x] 2.1: Locate the 5 `git worktree remove` call sites in
   `commands/worktree/cleanup.md` (lines ~343, 353, 387 + the two `--force`
   paths inside categories 6 and 7). Insert
   `[ -L "$WT_PATH/.ruvector" ] && rm -- "$WT_PATH/.ruvector"` before each.
-- [ ] 2.2: Add an 8th success criterion to the success block (line ~492):
+- [x] 2.2: Add an 8th success criterion to the success block (line ~492):
   "`.ruvector` symlink removed from each worktree directory before
   `git worktree remove` is called."
-- [ ] 2.3: Add a code comment near the symlink removal step pointing at
+- [x] 2.3: Add a code comment near the symlink removal step pointing at
   `worktree-manager.sh#cleanup_ruvector_link` as the canonical source —
   any logic change there must be mirrored here.
 
 ### Phase 3: Tests (bats)
 
-- [ ] 3.1: Create `plugins/yellow-core/skills/git-worktree/tests/`
+- [x] 3.1: Create `plugins/yellow-core/skills/git-worktree/tests/`
   directory and `worktree-manager.bats` (yellow-core has no existing bats
   fixture — bootstrap the convention used by `yellow-ruvector/tests/`).
   File header (matching `yellow-ruvector/tests/post-tool-use.bats:1-3`):
@@ -147,10 +152,10 @@ each of its 5 `git worktree remove` call sites (categories 3, 4, 5, 6, 7).
   ```
   No shared `helper.bash` exists in any other plugin — keep this file
   self-contained.
-- [ ] 3.2: `setup()` builds a tmp git repo with `git init`, configures user
+- [x] 3.2: `setup()` builds a tmp git repo with `git init`, configures user
   identity, makes an initial commit on `main`, creates `.ruvector/` with a
   fixture `intelligence.json`, and adds `**/.ruvector/` to `.gitignore`.
-- [ ] 3.3: Test cases (corresponds to AC-1 … AC-6 below):
+- [x] 3.3: Test cases (corresponds to AC-1 … AC-6 below):
   - `create: symlink exists, target is main .ruvector` (AC-1).
   - `create: main .ruvector missing → no symlink, warning to stderr` (AC-2).
   - `create: [ -d worktree/.ruvector ] is true via the symlink` (AC-3).
@@ -164,7 +169,7 @@ each of its 5 `git worktree remove` call sites (categories 3, 4, 5, 6, 7).
   - `cleanup: symlink removed before git worktree remove; main
     .ruvector/intelligence.json intact` (AC-6, the safety-critical case).
   - `cleanup: pre-fix worktree with no .ruvector → no error` (P1-E).
-- [ ] 3.4: Verify tests pass: `cd plugins/yellow-core && bats
+- [x] 3.4: Verify tests pass: `cd plugins/yellow-core && bats
   skills/git-worktree/tests/worktree-manager.bats`.
 
 ### Phase 3.5: Wire bats into CI (closes a pre-existing gap)
@@ -181,67 +186,67 @@ pre-existing problem (good leverage) but expands the PR scope beyond the
 ruvector worktree feature. If we defer it, the new suite still runs
 locally via `bats tests/`; just not in CI.
 
-- [ ] 3.5.1: Add `"test": "bats skills/git-worktree/tests/"` to
+- [x] 3.5.1: Add `"test": "bats skills/git-worktree/tests/"` to
   `plugins/yellow-core/package.json` `scripts` block (currently `{}`).
-- [ ] 3.5.2: Add new `plugin-shell-tests` job in
+- [x] 3.5.2: Add new `plugin-shell-tests` job in
   `.github/workflows/validate-schemas.yml`. Steps: `apt-get install -y
   bats` (Ubuntu runner), `bats plugins/*/tests/ plugins/*/skills/*/tests/`
   glob to cover yellow-core's nested `tests/` dir AND the four orphaned
   suites in one job.
-- [ ] 3.5.3: Add `plugin-shell-tests` to `report-metrics.needs` (line
+- [x] 3.5.3: Add `plugin-shell-tests` to `report-metrics.needs` (line
   ~806) and `ci-status.needs` (line ~900) arrays so the gating logic
   blocks merge on shell-test failure.
-- [ ] 3.5.4: Local sanity: confirm the orphaned suites still pass before
+- [x] 3.5.4: Local sanity: confirm the orphaned suites still pass before
   merging — they may have rotted. If any fail, capture the failure as a
   follow-up issue rather than blocking this PR.
 
 ### Phase 4: Documentation + changeset
 
-- [ ] 4.1: Update `plugins/yellow-core/skills/git-worktree/SKILL.md`: add
+- [x] 4.1: Update `plugins/yellow-core/skills/git-worktree/SKILL.md`: add
   `### ruvector DB Sharing` subsection under `## Usage`. Cover: symlink
   created at create time; absolute target; conditional skip when main DB
   absent; cleanup safety; **MCP-spawn-time qualifier** (the symlink only
   helps when Claude Code is launched from inside the worktree, since
   `RUVECTOR_STORAGE_PATH` resolves at MCP spawn).
-- [ ] 4.2: Update `plugins/yellow-core/CLAUDE.md` git-worktree skill
+- [x] 4.2: Update `plugins/yellow-core/CLAUDE.md` git-worktree skill
   description to mention `.ruvector` symlink lifecycle.
-- [ ] 4.3: Update `plugins/yellow-ruvector/CLAUDE.md` line 134 from the
+- [x] 4.3: Update `plugins/yellow-ruvector/CLAUDE.md` line 134 from the
   aspirational note to: "`.ruvector/` is shared across worktrees via a
   symlink injected by yellow-core's `worktree-manager.sh` at create time.
   Concurrent worktree sessions writing to the same DB may race; the
   ruvector CLI's internal session queue provides partial serialization
   but is not documented as cross-process-safe."
-- [ ] 4.4: Create `docs/solutions/integration-issues/ruvector-worktree-db-symlink.md`
+- [x] 4.4: Create `docs/solutions/integration-issues/ruvector-worktree-db-symlink.md`
   capturing: confirmed root cause with file/line evidence, the fix, the
   three footguns (trailing-slash `rm -rf`, dangling symlink hook
   semantics, MCP-spawn-time path resolution), the security analysis of
   the symlink target derivation (P2-C: no injection vector), and the
   rollback note (P2-D: leftover symlinks resolve correctly until
   `git worktree remove` cleans them up).
-- [ ] 4.5: Add a troubleshooting entry (if `troubleshooting.md` exists in
+- [x] 4.5: Add a troubleshooting entry (if `troubleshooting.md` exists in
   the git-worktree skill, or inline in SKILL.md): "`.ruvector/` symlink
   missing in worktree → cause: ruvector not initialized before worktree
   was created → fix: initialize ruvector in main, run
   `worktree-manager.sh copy-env <name>`."
-- [ ] 4.6: Run `pnpm changeset` and write a `minor` bump for `yellow-core`
+- [x] 4.6: Run `pnpm changeset` and write a `minor` bump for `yellow-core`
   describing the symlink lifecycle. (Yellow-ruvector CLAUDE.md change is
   doc-only; no functional yellow-ruvector change so no changeset needed
   there per CLAUDE.md bump guide.)
 
 ### Phase 5: Validation
 
-- [ ] 5.1: `pnpm validate:schemas`.
-- [ ] 5.2: `pnpm typecheck && pnpm lint && pnpm test:unit`.
-- [ ] 5.3: Manual end-to-end smoke: create a worktree in this repo via
+- [x] 5.1: `pnpm validate:schemas`.
+- [x] 5.2: `pnpm typecheck && pnpm lint && pnpm test:unit`.
+- [x] 5.3: Manual end-to-end smoke: create a worktree in this repo via
   `worktree-manager.sh create test-ruvector-link from main`, confirm
   `readlink .worktrees/test-ruvector-link/.ruvector` returns the main
   repo path, run `/ruvector:status` from inside the worktree and confirm
   the same totalMemories count as from main, then `cleanup` and verify
   main `.ruvector/intelligence.json` size is unchanged.
-- [ ] 5.4: Conventional-commit message: `feat(git-worktree): symlink
+- [x] 5.4: Conventional-commit message: `feat(git-worktree): symlink
   .ruvector into worktrees for ruvector DB sharing` — passes the
   `gt-workflow:check-commit-message` regex.
-- [ ] 5.5: `gt commit create -m "..."` then `gt stack submit`.
+- [x] 5.5: `gt commit create -m "..."` then `gt stack submit`.
 
 ## Technical Specifications
 

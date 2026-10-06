@@ -1,5 +1,10 @@
 # Feature: yellow-mempalace Plugin
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 19 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Problem Statement
 
 MemPalace is a new open-source AI memory system (14.2k stars, MIT license) that
@@ -59,7 +64,7 @@ ships.
 
 ### Phase 1: Scaffold & MCP Server
 
-- [ ] 1.1: Create directory structure
+- [x] 1.1: Create directory structure
   ```
   plugins/yellow-mempalace/
   ├── .claude-plugin/plugin.json
@@ -72,7 +77,7 @@ ships.
   └── scripts/
   ```
 
-- [ ] 1.2: Write `plugin.json` with MCP server config
+- [x] 1.2: Write `plugin.json` with MCP server config
   ```json
   {
     "name": "yellow-mempalace",
@@ -116,9 +121,9 @@ ships.
 > existing plugins as de facto convention.
 <!-- /deepen-plan -->
 
-- [ ] 1.3: Write `package.json` (name, version, private: true)
+- [x] 1.3: Write `package.json` (name, version, private: true)
 
-- [ ] 1.4: Write `scripts/install-mempalace.sh`
+- [x] 1.4: Write `scripts/install-mempalace.sh`
   - `set -Eeuo pipefail`, color helpers, cleanup trap
   - Check if `mempalace` already installed + version check
   - pipx-first: `pipx install mempalace`
@@ -142,7 +147,7 @@ ships.
 
 ### Phase 2: Setup Command
 
-- [ ] 2.1: Write `commands/mempalace/setup.md`
+- [x] 2.1: Write `commands/mempalace/setup.md`
   - Step 0: Check if `mempalace` CLI is installed
   - Step 0b: If not found, AskUserQuestion to offer install, run install script
   - Step 1: Validate prerequisites (python3 required, curl optional)
@@ -154,25 +159,25 @@ ships.
 
 ### Phase 3: Core Commands
 
-- [ ] 3.1: Write `commands/mempalace/status.md`
+- [x] 3.1: Write `commands/mempalace/status.md`
   - Call `mempalace_status` MCP tool
   - Display palace overview: wing count, room count, drawer count, KG stats
   - Show storage path and version
 
-- [ ] 3.2: Write `commands/mempalace/search.md`
+- [x] 3.2: Write `commands/mempalace/search.md`
   - Accept query argument
   - Optional: `--wing`, `--room`, `--hall` filters
   - Call `mempalace_search` (or `search_wing`/`search_room`/`search_hall`)
   - Display results with similarity scores and source references
   - Limit default to 5 results
 
-- [ ] 3.3: Write `commands/mempalace/mine.md`
+- [x] 3.3: Write `commands/mempalace/mine.md`
   - Accept path argument (directory to mine)
   - Optional: `--mode` (projects|convos|general)
   - Call `mempalace_mine` MCP tool or fallback to CLI `mempalace mine`
   - Show progress and summary (drawers created, wings/rooms populated)
 
-- [ ] 3.4: Write `commands/mempalace/kg.md`
+- [x] 3.4: Write `commands/mempalace/kg.md`
   - Subcommand-style: query, add, invalidate, timeline
   - `query`: entity lookup with optional `--as-of` date filter
   - `add`: create triple (subject, predicate, object, valid_from)
@@ -180,7 +185,7 @@ ships.
   - `timeline`: chronological entity history
   - Call corresponding `mempalace_kg_*` MCP tools
 
-- [ ] 3.5: Write `commands/mempalace/navigate.md`
+- [x] 3.5: Write `commands/mempalace/navigate.md`
   - Browse palace structure: list wings → rooms → drawers
   - Traverse connections between wings via tunnels
   - Call `mempalace_list_wings`, `mempalace_list_rooms`,
@@ -188,13 +193,13 @@ ships.
 
 ### Phase 4: Agents
 
-- [ ] 4.1: Write `agents/mempalace/palace-navigator.md`
+- [x] 4.1: Write `agents/mempalace/palace-navigator.md`
   - Triggers: "browse palace", "show wings", "what rooms exist",
     "find connections between X and Y"
   - Tools: ToolSearch, Read + mempalace read/search/graph MCP tools
   - Navigates palace structure and presents information
 
-- [ ] 4.2: Write `agents/mempalace/memory-archivist.md`
+- [x] 4.2: Write `agents/mempalace/memory-archivist.md`
   - Triggers: "save to palace", "file this memory", "record this decision",
     "add to knowledge graph"
   - Tools: ToolSearch, Read, Grep, AskUserQuestion + mempalace write/KG MCP
@@ -215,7 +220,7 @@ ships.
 
 ### Phase 5: Skills & CLAUDE.md
 
-- [ ] 5.1: Write `skills/mempalace-conventions/SKILL.md` (frontmatter: `user-invokable: false`)
+- [x] 5.1: Write `skills/mempalace-conventions/SKILL.md` (frontmatter: `user-invokable: false`)
   - MCP tool naming: `mcp__plugin_yellow-mempalace_mempalace__*`
   - Palace structure terminology (wings, rooms, halls, tunnels, closets,
     drawers)
@@ -226,14 +231,14 @@ ships.
   - Error handling catalog
   - Graceful degradation patterns
 
-- [ ] 5.2: Write `skills/palace-protocol/SKILL.md` (frontmatter: `user-invokable: false`)
+- [x] 5.2: Write `skills/palace-protocol/SKILL.md` (frontmatter: `user-invokable: false`)
   - The Palace Protocol: call `status` first, query before asserting, verify
     facts, record learnings
   - AAAK dialect reference (for diary entries, optional)
   - L0-L3 memory stack usage guidance
   - When to use search vs KG vs navigation
 
-- [ ] 5.3: Write `CLAUDE.md`
+- [x] 5.3: Write `CLAUDE.md`
   - Plugin overview, MCP server details, conventions
   - Components table (commands, agents, skills)
   - When to use what (search vs KG vs navigate vs mine)
@@ -241,7 +246,7 @@ ships.
   - Known limitations
   - Maintenance (install/upgrade/uninstall)
 
-- [ ] 5.4: Write `README.md`
+- [x] 5.4: Write `README.md`
   - User-facing quickstart: install, init, mine, search
   - Prerequisites (Python 3.10+; 3.11+ recommended)
   - Available commands
@@ -249,7 +254,7 @@ ships.
 
 ### Phase 6: Registration & Validation
 
-- [ ] 6.1: Register in `.claude-plugin/marketplace.json`
+- [x] 6.1: Register in `.claude-plugin/marketplace.json`
   - Add entry: name, description, version 1.0.0, category "development",
     source "./plugins/yellow-mempalace"
 
@@ -262,13 +267,13 @@ ships.
 > all existing entries use `"./plugins/<name>"` format.
 <!-- /deepen-plan -->
 
-- [ ] 6.2: Run validation
+- [x] 6.2: Run validation
   ```bash
   pnpm validate:schemas
   node scripts/validate-agent-authoring.js
   ```
 
-- [ ] 6.3: Create changeset
+- [x] 6.3: Create changeset
   ```bash
   pnpm changeset  # select yellow-mempalace, minor bump
   ```

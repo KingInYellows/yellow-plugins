@@ -1,5 +1,10 @@
 # Feature: Model Selection & Effort Frontmatter Rollout
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 54 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Overview
 
 Add explicit `model:` and `effort:` frontmatter to ~30 yellow-plugins agents,
@@ -51,31 +56,31 @@ Code quality is preserved because:
 
 Branch: `agent/feat/model-explicit-phase-1`
 
-- [ ] 1.1: `gt branch create agent/feat/model-explicit-phase-1`
-- [ ] 1.2: Edit `plugins/yellow-docs/agents/review/product-lens-reviewer.md` —
+- [x] 1.1: `gt branch create agent/feat/model-explicit-phase-1`
+- [x] 1.2: Edit `plugins/yellow-docs/agents/review/product-lens-reviewer.md` —
   add `model: sonnet` (insert between `description:` and `background:`)
-- [ ] 1.3: Edit `plugins/yellow-council/agents/review/gemini-reviewer.md` —
+- [x] 1.3: Edit `plugins/yellow-council/agents/review/gemini-reviewer.md` —
   add `model: haiku` and `effort: low`
-- [ ] 1.4: Edit `plugins/yellow-council/agents/review/opencode-reviewer.md` —
+- [x] 1.4: Edit `plugins/yellow-council/agents/review/opencode-reviewer.md` —
   add `model: haiku` and `effort: low`
-- [ ] 1.5: Edit `plugins/yellow-core/agents/research/learnings-researcher.md` —
+- [x] 1.5: Edit `plugins/yellow-core/agents/research/learnings-researcher.md` —
   add `model: haiku` and `effort: low`
-- [ ] 1.6: Edit `plugins/yellow-ci/agents/ci/runner-assignment.md` — add
+- [x] 1.6: Edit `plugins/yellow-ci/agents/ci/runner-assignment.md` — add
   `model: haiku` and `effort: low`
-- [ ] 1.7: Edit `plugins/yellow-debt/agents/synthesis/audit-synthesizer.md` —
+- [x] 1.7: Edit `plugins/yellow-debt/agents/synthesis/audit-synthesizer.md` —
   add `effort: high` (model already `opus`)
-- [ ] 1.8: Edit
+- [x] 1.8: Edit
   `plugins/yellow-research/agents/research/research-conductor.md` — add
   `effort: high` (model already `opus`)
-- [ ] 1.9: Edit
+- [x] 1.9: Edit
   `plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md` — add
   `model: sonnet` and `effort: high`
-- [ ] 1.10: Run `pnpm validate:schemas && pnpm validate:agents && pnpm validate:plugins`
-- [ ] 1.11: WSL2 normalize: `for f in <edited files>; do sed -i 's/\r$//' "$f"; done`
-- [ ] 1.12: `pnpm changeset` — single file, `patch` bumps for `yellow-docs`,
+- [x] 1.10: Run `pnpm validate:schemas && pnpm validate:agents && pnpm validate:plugins`
+- [x] 1.11: WSL2 normalize: `for f in <edited files>; do sed -i 's/\r$//' "$f"; done`
+- [x] 1.12: `pnpm changeset` — single file, `patch` bumps for `yellow-docs`,
   `yellow-council`, `yellow-core`, `yellow-ci`, `yellow-debt`, `yellow-research`
-- [ ] 1.13: `gt commit create -m "feat: add explicit model/effort to 8 phase-1 agents"`
-- [ ] 1.14: `gt stack submit`
+- [x] 1.13: `gt commit create -m "feat: add explicit model/effort to 8 phase-1 agents"`
+- [x] 1.14: `gt stack submit`
 
 **Acceptance criteria for PR 1:**
 - 8 agent files modified; 0 other plugin files touched.
@@ -89,23 +94,23 @@ Branch: `agent/feat/model-explicit-phase-1`
 
 Branch: `agent/feat/model-explicit-phase-2` (stacked on PR 1)
 
-- [ ] 2.1: `gt branch create agent/feat/model-explicit-phase-2`
-- [ ] 2.2: Edit 5 `plugins/yellow-debt/agents/scanners/{ai-pattern,complexity,duplication,architecture,security-debt}-scanner.md` —
+- [x] 2.1: `gt branch create agent/feat/model-explicit-phase-2`
+- [x] 2.2: Edit 5 `plugins/yellow-debt/agents/scanners/{ai-pattern,complexity,duplication,architecture,security-debt}-scanner.md` —
   add `model: sonnet` and `effort: low` to each
-- [ ] 2.3: Edit `plugins/yellow-debt/agents/remediation/debt-fixer.md` —
+- [x] 2.3: Edit `plugins/yellow-debt/agents/remediation/debt-fixer.md` —
   add `model: sonnet`. Spot-check first: confirm frontmatter has no
   `isolation:` or `permissionMode:` value that would interact with the
   downgrade. (No effort field added.)
-- [ ] 2.4: Edit `plugins/yellow-core/agents/workflow/knowledge-compounder.md` —
+- [x] 2.4: Edit `plugins/yellow-core/agents/workflow/knowledge-compounder.md` —
   add `model: sonnet`
-- [ ] 2.5: Edit `plugins/yellow-core/agents/workflow/session-historian.md` —
+- [x] 2.5: Edit `plugins/yellow-core/agents/workflow/session-historian.md` —
   add `model: sonnet`
-- [ ] 2.6: Run `pnpm validate:schemas && pnpm validate:agents && pnpm validate:plugins`
-- [ ] 2.7: WSL2 normalize edited files
-- [ ] 2.8: `pnpm changeset` — **one file**, `patch` bumps for **both**
+- [x] 2.6: Run `pnpm validate:schemas && pnpm validate:agents && pnpm validate:plugins`
+- [x] 2.7: WSL2 normalize edited files
+- [x] 2.8: `pnpm changeset` — **one file**, `patch` bumps for **both**
   `yellow-debt` AND `yellow-core` (mirrors PR A-01 precedent from 2026-05-07)
-- [ ] 2.9: `gt commit create -m "feat: tier yellow-debt scanners and yellow-core workflow agents"`
-- [ ] 2.10: `gt stack submit`
+- [x] 2.9: `gt commit create -m "feat: tier yellow-debt scanners and yellow-core workflow agents"`
+- [x] 2.10: `gt stack submit`
 
 **Acceptance criteria for PR 2:**
 - 8 files modified across 2 plugins.
@@ -119,8 +124,8 @@ Branch: `agent/feat/model-explicit-phase-2` (stacked on PR 1)
 
 Branch: `agent/feat/model-explicit-phase-3a` (stacked on PR 2)
 
-- [ ] 3.1: `gt branch create agent/feat/model-explicit-phase-3a`
-- [ ] 3.2: Edit 13 yellow-review agents — add `model: sonnet`:
+- [x] 3.1: `gt branch create agent/feat/model-explicit-phase-3a`
+- [x] 3.2: Edit 13 yellow-review agents — add `model: sonnet`:
   - `correctness-reviewer.md`
   - `maintainability-reviewer.md`
   - `project-standards-reviewer.md`
@@ -134,11 +139,11 @@ Branch: `agent/feat/model-explicit-phase-3a` (stacked on PR 2)
   - `plugin-contract-reviewer.md`
   - `cli-readiness-reviewer.md`
   - `agents/workflow/pr-comment-resolver.md`
-- [ ] 3.3: Run `pnpm validate:schemas && pnpm validate:agents && pnpm validate:plugins`
-- [ ] 3.4: WSL2 normalize edited files
-- [ ] 3.5: `pnpm changeset` — single `patch` bump for `yellow-review`
-- [ ] 3.6: `gt commit create -m "feat(yellow-review): tier 13 reviewer agents to sonnet"`
-- [ ] 3.7: `gt stack submit`
+- [x] 3.3: Run `pnpm validate:schemas && pnpm validate:agents && pnpm validate:plugins`
+- [x] 3.4: WSL2 normalize edited files
+- [x] 3.5: `pnpm changeset` — single `patch` bump for `yellow-review`
+- [x] 3.6: `gt commit create -m "feat(yellow-review): tier 13 reviewer agents to sonnet"`
+- [x] 3.7: `gt stack submit`
 
 **Acceptance criteria for PR 3:**
 - 13 files modified, all in `plugins/yellow-review/agents/`.
@@ -156,8 +161,8 @@ brainstorm's Phase 3 table additionally lists 3 yellow-core "stays on opus"
 rows and 3 yellow-docs already-correct siblings — those are documentation
 confirmations, not edits.
 
-- [ ] 4.1: `gt branch create agent/feat/model-explicit-phase-3b`
-- [ ] 4.2: Edit 8 yellow-core agents — add `model: sonnet`:
+- [x] 4.1: `gt branch create agent/feat/model-explicit-phase-3b`
+- [x] 4.2: Edit 8 yellow-core agents — add `model: sonnet`:
   - `agents/review/code-simplicity-reviewer.md`
   - `agents/review/pattern-recognition-specialist.md`
   - `agents/review/test-coverage-analyst.md`
@@ -166,21 +171,21 @@ confirmations, not edits.
   - `agents/review/security-reviewer.md`
   - `agents/review/performance-reviewer.md`
   - `agents/workflow/spec-flow-analyzer.md`
-- [ ] 4.3: Edit `plugins/yellow-docs/agents/review/feasibility-reviewer.md` —
+- [x] 4.3: Edit `plugins/yellow-docs/agents/review/feasibility-reviewer.md` —
   add `model: sonnet`
-- [ ] 4.4: Edit
+- [x] 4.4: Edit
   `plugins/yellow-docs/agents/review/adversarial-document-reviewer.md` — add
   `model: sonnet` and `effort: high`
-- [ ] 4.5: Run `pnpm validate:schemas && pnpm validate:agents && pnpm validate:plugins`
-- [ ] 4.6: WSL2 normalize edited files
-- [ ] 4.7: `pnpm changeset` — one file, `patch` bumps for `yellow-core` AND
+- [x] 4.5: Run `pnpm validate:schemas && pnpm validate:agents && pnpm validate:plugins`
+- [x] 4.6: WSL2 normalize edited files
+- [x] 4.7: `pnpm changeset` — one file, `patch` bumps for `yellow-core` AND
   `yellow-docs`
-- [ ] 4.8: PR description must include "Already-correct (no edit) siblings:
+- [x] 4.8: PR description must include "Already-correct (no edit) siblings:
   `design-lens-reviewer`, `scope-guardian-reviewer`, `security-lens-reviewer`
   in `plugins/yellow-docs/agents/review/`" — closes the documentation gap
   surfaced in spec-flow analysis.
-- [ ] 4.9: `gt commit create -m "feat: tier yellow-core personas and yellow-docs reviewers"`
-- [ ] 4.10: `gt stack submit`
+- [x] 4.9: `gt commit create -m "feat: tier yellow-core personas and yellow-docs reviewers"`
+- [x] 4.10: `gt stack submit`
 
 **Acceptance criteria for PR 4:**
 - 10 files modified across 2 plugins.
@@ -194,11 +199,11 @@ Branch: `agent/feat/model-effort-validator-rules` (stacked on PR 4)
 **No changeset required** — modifies only `scripts/` and
 `tests/integration/`, not under `plugins/[^/]+/`.
 
-- [ ] 5.1: `gt branch create agent/feat/model-effort-validator-rules`
+- [x] 5.1: `gt branch create agent/feat/model-effort-validator-rules`
 
 #### 5a: Warnings infrastructure scaffold
 
-- [ ] 5.2: Edit `scripts/validate-agent-authoring.js`:
+- [x] 5.2: Edit `scripts/validate-agent-authoring.js`:
   - Add `yellow: '\x1b[33m'` to the `colors` object (currently lines 40–45)
   - Add `logWarning(msg)` helper paralleling `logError`/`logInfo` — yellow
     color + `⚠ WARN:` prefix
@@ -209,7 +214,7 @@ Branch: `agent/feat/model-effort-validator-rules` (stacked on PR 4)
 
 #### 5b: V1 effort enum (hard error)
 
-- [ ] 5.3: Add inside the main per-file loop:
+- [x] 5.3: Add inside the main per-file loop:
   ```js
   const effortVal = parseScalar(frontmatter, 'effort');
   if (effortVal !== null && !['low','medium','high','xhigh','max'].includes(effortVal)) {
@@ -223,7 +228,7 @@ Branch: `agent/feat/model-effort-validator-rules` (stacked on PR 4)
 
 #### 5c: V2 model enum (hard error)
 
-- [ ] 5.4: Add inside the main per-file loop:
+- [x] 5.4: Add inside the main per-file loop:
   ```js
   const modelVal = parseScalar(frontmatter, 'model');
   if (modelVal !== null && !/^(haiku|sonnet|opus|inherit)(-\d+(-\d+)?)?$/.test(modelVal)) {
@@ -235,7 +240,7 @@ Branch: `agent/feat/model-effort-validator-rules` (stacked on PR 4)
 
 #### 5d: V3 inheritance advisory (warning) — with shared allowlist
 
-- [ ] 5.5: Add a `MODEL_RULE_ALLOWLIST` constant near the top of the file:
+- [x] 5.5: Add a `MODEL_RULE_ALLOWLIST` constant near the top of the file:
   ```js
   // Files exempt from V3/V4 advisory warnings — intentional inheritance.
   const MODEL_RULE_ALLOWLIST = new Set([
@@ -244,7 +249,7 @@ Branch: `agent/feat/model-effort-validator-rules` (stacked on PR 4)
     'plugins/yellow-core/agents/workflow/devin-orchestrator.md',
   ]);
   ```
-- [ ] 5.6: Inside the main per-file loop, after V2:
+- [x] 5.6: Inside the main per-file loop, after V2:
   ```js
   if (modelVal === 'inherit' && !MODEL_RULE_ALLOWLIST.has(relPath)) {
     const isScannerOrCi = relSegments.includes('scanners') ||
@@ -258,7 +263,7 @@ Branch: `agent/feat/model-effort-validator-rules` (stacked on PR 4)
 
 #### 5e: V4 effort:high advisory (warning) — name-field match + shared allowlist
 
-- [ ] 5.7: Inside the main per-file loop, after V3:
+- [x] 5.7: Inside the main per-file loop, after V3:
   ```js
   const nameVal = parseScalar(frontmatter, 'name') || '';
   const effortHigh = effortVal === 'high' || effortVal === 'max' || effortVal === 'xhigh';
@@ -272,7 +277,7 @@ Branch: `agent/feat/model-effort-validator-rules` (stacked on PR 4)
 
 #### 5f: Tests
 
-- [ ] 5.8: Create `tests/integration/validate-agent-authoring-model-effort-rules.test.ts`
+- [x] 5.8: Create `tests/integration/validate-agent-authoring-model-effort-rules.test.ts`
   with one `describe` block per rule. Pattern mirrors
   `tests/integration/validate-agent-authoring-review-rule.test.ts` —
   `VALIDATE_PLUGINS_DIR` env var, temp fixture trees, child-process
@@ -293,11 +298,11 @@ Branch: `agent/feat/model-effort-validator-rules` (stacked on PR 4)
   - **Exit-code semantics:** Fixture with V1 error AND V3 warning → status
     nonzero (errors win), both messages appear in output.
 
-- [ ] 5.9: Run `pnpm test:integration -- validate-agent-authoring-model-effort-rules`
-- [ ] 5.10: Run full CI baseline: `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck`
-- [ ] 5.11: WSL2 normalize: `sed -i 's/\r$//' scripts/validate-agent-authoring.js tests/integration/validate-agent-authoring-model-effort-rules.test.ts`
-- [ ] 5.12: `gt commit create -m "feat(validator): add V1-V4 model/effort lint rules"`
-- [ ] 5.13: `gt stack submit`
+- [x] 5.9: Run `pnpm test:integration -- validate-agent-authoring-model-effort-rules`
+- [x] 5.10: Run full CI baseline: `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck`
+- [x] 5.11: WSL2 normalize: `sed -i 's/\r$//' scripts/validate-agent-authoring.js tests/integration/validate-agent-authoring-model-effort-rules.test.ts`
+- [x] 5.12: `gt commit create -m "feat(validator): add V1-V4 model/effort lint rules"`
+- [x] 5.13: `gt stack submit`
 
 **Acceptance criteria for PR 5:**
 - No changeset file (validator-only PR).

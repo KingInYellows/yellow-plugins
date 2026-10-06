@@ -1,5 +1,10 @@
 # Feature: yellow-core workflows:brainstorm Command
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 4 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Problem Statement
 
 The yellow-core plugin's workflow cycle (`brainstorm → plan → work → review → compound`)
@@ -38,7 +43,7 @@ Plus one update:
 
 ### Phase 1: Brainstorming Skill
 
-- [ ] 1.1: Create `plugins/yellow-core/skills/brainstorming/SKILL.md`
+- [x] 1.1: Create `plugins/yellow-core/skills/brainstorming/SKILL.md`
   - Frontmatter: `name: brainstorming`, `user-invokable: false` (reference only — avoids
     conflict with compound-engineering's brainstorming skill when both are installed)
   - Section: **Question techniques** — one question at a time, multiple choice when
@@ -56,7 +61,7 @@ Plus one update:
 
 ### Phase 2: Brainstorm-Orchestrator Agent
 
-- [ ] 2.1: Create `plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md`
+- [x] 2.1: Create `plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md`
   - Frontmatter:
     ```yaml
     name: brainstorm-orchestrator
@@ -139,7 +144,7 @@ Plus one update:
 
 ### Phase 3: Brainstorm Command
 
-- [ ] 3.1: Create `plugins/yellow-core/commands/workflows/brainstorm.md`
+- [x] 3.1: Create `plugins/yellow-core/commands/workflows/brainstorm.md`
   - Frontmatter:
     ```yaml
     name: workflows:brainstorm
@@ -166,7 +171,7 @@ Plus one update:
 
 ### Phase 4: CLAUDE.md Update
 
-- [ ] 4.1: Update `plugins/yellow-core/CLAUDE.md`:
+- [x] 4.1: Update `plugins/yellow-core/CLAUDE.md`:
   - Agents section: `(10)` → `(11)`, add `brainstorm-orchestrator` under **Workflow**
   - Commands section: `(4)` → `(5)`, add `/workflows:brainstorm` entry
   - Skills section: `(2)` → `(3)`, add `brainstorming` entry

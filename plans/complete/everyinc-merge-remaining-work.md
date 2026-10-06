@@ -1,5 +1,10 @@
 # Plan: EveryInc Merge — Remaining Work
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 55 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 **Source brainstorm:** `docs/brainstorms/2026-05-06-everyinc-merge-remaining-work-brainstorm.md`
 **Source plans:** `plans/everyinc-merge.md` (backbone), `plans/everyinc-merge-wave3.md`
 **Status:** Wave 1 + Wave 2 shipped. Wave 3: 9 of 12 items done. 3 W3 items + 2 backbone loose threads + 1 closure gate remain.
@@ -54,12 +59,12 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
 
 #### Tasks
 
-- [ ] 1.1 Sync trunk: `gt repo sync`; create branch via `gt branch create chore/everyinc-merge-backbone-loose-threads`.
-- [ ] 1.2 BT-1a: manually add YAML frontmatter to the two broken files so the backfill script can later process them:
+- [x] 1.1 Sync trunk: `gt repo sync`; create branch via `gt branch create chore/everyinc-merge-backbone-loose-threads`.
+- [x] 1.2 BT-1a: manually add YAML frontmatter to the two broken files so the backfill script can later process them:
   - `docs/solutions/archived/README.md` (currently starts with `# Archived Solution Entries` and no `---` block)
   - `docs/solutions/security-issues/docs-snippet-path-traversal-and-lex-sort.md` (currently starts with `# Documentation Snippet...` and no `---` block)
   - Use the same frontmatter shape as a sibling file in `docs/solutions/<category>/`. For the archived README, use a minimal stub (`title`, `category: archived`).
-- [ ] 1.3 BT-1b: run the backfill script in non-check mode:
+- [x] 1.3 BT-1b: run the backfill script in non-check mode:
   - `node scripts/backfill-solution-frontmatter.js`
   - Confirm 5 target files now carry `track` and/or `problem` fields:
     - `frontmatter-sweep-and-canonical-skill-drift.md`
@@ -67,25 +72,25 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
     - `shell-tool-detection-helper-pair-pattern.md`
     - `json-schema-typeof-array-bypass.md`
     - `printf-percent-b-terminal-escape-injection.md`
-- [ ] 1.4 BT-1c verify: `node scripts/backfill-solution-frontmatter.js --check` exits 0.
-- [ ] 1.5 BT-2a: delete `plugins/yellow-review/agents/review/code-reviewer.md`.
-- [ ] 1.6 BT-2b: excise stub references from `plugins/yellow-review/commands/review/review-pr.md`. There is NO dispatch-table row to remove — `code-reviewer` is referenced only in prose. Apply 4 textual edits:
+- [x] 1.4 BT-1c verify: `node scripts/backfill-solution-frontmatter.js --check` exits 0.
+- [x] 1.5 BT-2a: delete `plugins/yellow-review/agents/review/code-reviewer.md`.
+- [x] 1.6 BT-2b: excise stub references from `plugins/yellow-review/commands/review/review-pr.md`. There is NO dispatch-table row to remove — `code-reviewer` is referenced only in prose. Apply 4 textual edits:
   - **Line 362:** delete the parenthetical `(or its \`code-reviewer\` deprecation stub for older installs)`. Result: `- Always include: \`project-compliance-reviewer\`, \`correctness-reviewer\`, \`maintainability-reviewer\`.`
   - **Lines 365–368:** delete the entire 3-line explanatory sentence beginning "Without `correctness-reviewer`..." through "...`code-reviewer` is now a no-op deprecation stub so projects activating the escape hatch must retain that coverage from the persona reviewers directly." Preceding sentence about always-including the three personas is sufficient.
   - **Lines 527–529:** delete `, and the \`code-reviewer\` deprecation stub` from the trailing portion of the pre-Wave-2 prose-format list (`- yellow-review own: \`pr-test-analyzer\`, \`comment-analyzer\`, \`code-simplifier\`, \`type-design-analyzer\`, \`silent-failure-hunter\`...`).
   - **Line 566:** read the surrounding context first; the same deletion pattern applies if the list repeats here.
-- [ ] 1.7 BT-2c: excise stub reference from `plugins/yellow-review/commands/review/review-all.md`. NO dispatch table exists in this file — the only reference is a single phrase in a prose list. Apply 1 textual edit:
+- [x] 1.7 BT-2c: excise stub reference from `plugins/yellow-review/commands/review/review-all.md`. NO dispatch table exists in this file — the only reference is a single phrase in a prose list. Apply 1 textual edit:
   - **Line 157:** delete the phrase `the \`code-reviewer\` deprecation stub, and ` from the parenthetical pre-Wave-2 list at Step 7 (compact-return pass 1). Result: `Pre-Wave-2 agents (\`pr-test-analyzer\`, \`comment-analyzer\`, \`type-design-analyzer\`, \`silent-failure-hunter\`, the cross-plugin reviewers \`architecture-strategist\`, ...) return legacy prose format`.
-- [ ] 1.8 BT-2d verify: `git grep 'code-reviewer' -- plugins/yellow-review/commands/ plugins/yellow-review/agents/` returns zero hits (the pathspec scopes the grep to the live-dispatch surfaces only; CHANGELOG.md and prose "renamed from `code-reviewer`" mentions in CLAUDE.md/README.md/SKILL.md/project-standards-reviewer.md are acceptable historical references and out of scope for this scoped grep). Additionally, `git grep 'yellow-review:review:code-reviewer'` returns matches ONLY in CHANGELOG files (no live dispatch).
+- [x] 1.8 BT-2d verify: `git grep 'code-reviewer' -- plugins/yellow-review/commands/ plugins/yellow-review/agents/` returns zero hits (the pathspec scopes the grep to the live-dispatch surfaces only; CHANGELOG.md and prose "renamed from `code-reviewer`" mentions in CLAUDE.md/README.md/SKILL.md/project-standards-reviewer.md are acceptable historical references and out of scope for this scoped grep). Additionally, `git grep 'yellow-review:review:code-reviewer'` returns matches ONLY in CHANGELOG files (no live dispatch).
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Second-pass research confirmed the stub is referenced only in prose, not table rows. `review-pr.md` lines 362, 365–368, 527–529, 566 hold the references; `review-all.md` line 157 holds a single phrase reference. The earlier plan-version's "remove the stub's row" instruction was incorrect — there is no row. The 5 textual edits above are exhaustive.
 <!-- /deepen-plan -->
-- [ ] 1.9 Run validation gates: `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck`.
-- [ ] 1.10 Run `pnpm validate:agents` to confirm no orphan `subagent_type` strings remain after deletion.
-- [ ] 1.11 WSL2 normalize any modified text files: `find docs/solutions plugins/yellow-review -name '*.md' -newer .git/HEAD -exec sed -i 's/\r$//' {} +`.
-- [ ] 1.12 `pnpm changeset` — create one changeset with `yellow-review: major` (BT-2 removal). BT-1 is repo-internal docs, no changeset needed.
-- [ ] 1.13 `gt commit create -m "chore: complete W2 backbone loose threads (BT-1 backfill, BT-2 stub removal)"` then `gt stack submit`.
+- [x] 1.9 Run validation gates: `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck`.
+- [x] 1.10 Run `pnpm validate:agents` to confirm no orphan `subagent_type` strings remain after deletion.
+- [x] 1.11 WSL2 normalize any modified text files: `find docs/solutions plugins/yellow-review -name '*.md' -newer .git/HEAD -exec sed -i 's/\r$//' {} +`.
+- [x] 1.12 `pnpm changeset` — create one changeset with `yellow-review: major` (BT-2 removal). BT-1 is repo-internal docs, no changeset needed.
+- [x] 1.13 `gt commit create -m "chore: complete W2 backbone loose threads (BT-1 backfill, BT-2 stub removal)"` then `gt stack submit`.
 
 #### Done state
 
@@ -105,16 +110,16 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
 
 #### Tasks
 
-- [ ] 2.1 `gt branch create feat/yellow-debt-scanner-v2-emission` off `main`.
-- [ ] 2.2 Audit-only: read each scanner's "Output Requirements" section to confirm it cites `debt-conventions` v2.0 schema. Second-pass research confirmed all 5 already do. If any has drifted, update the cite to match the canonical phrasing: `"Write results to \`.debt/scanner-output/<scanner>.json\` per the v2.0 schema in \`debt-conventions\`."` Lines verified:
+- [x] 2.1 `gt branch create feat/yellow-debt-scanner-v2-emission` off `main`.
+- [x] 2.2 Audit-only: read each scanner's "Output Requirements" section to confirm it cites `debt-conventions` v2.0 schema. Second-pass research confirmed all 5 already do. If any has drifted, update the cite to match the canonical phrasing: `"Write results to \`.debt/scanner-output/<scanner>.json\` per the v2.0 schema in \`debt-conventions\`."` Lines verified:
   - `ai-pattern-scanner.md` line 98–99 → v2.0 ✓
   - `architecture-scanner.md` line 104–106 → v2.0 ✓
   - `complexity-scanner.md` line 123–125 → v2.0 ✓
   - `duplication-scanner.md` line 122–124 → v2.0 ✓
   - `security-debt-scanner.md` line 105–107 → v2.0 ✓
-- [ ] 2.3 Confirm `failure_scenario` field guidance is present in each scanner (each currently has a multi-sentence block specifying how to construct it). If any scanner is missing this guidance, add it.
-- [ ] 2.4 Re-read `plugins/yellow-debt/skills/debt-conventions/SKILL.md` end-to-end. If the v2.0 schema definition or migration mapping has any gaps relative to the scanner output references, fix in this PR. Otherwise no edit.
-- [ ] 2.5 Audit `audit-synthesizer.md` — no edits expected; it already dual-reads. Confirm by reading lines 34–167.
+- [x] 2.3 Confirm `failure_scenario` field guidance is present in each scanner (each currently has a multi-sentence block specifying how to construct it). If any scanner is missing this guidance, add it.
+- [x] 2.4 Re-read `plugins/yellow-debt/skills/debt-conventions/SKILL.md` end-to-end. If the v2.0 schema definition or migration mapping has any gaps relative to the scanner output references, fix in this PR. Otherwise no edit.
+- [x] 2.5 Audit `audit-synthesizer.md` — no edits expected; it already dual-reads. Confirm by reading lines 34–167.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** `audit-synthesizer.md` line 39–48 confirms the dual-read uses an explicit `schema_version` field check (`"2.0"` pass-through; `"1.0"` or missing → migrate). Migration mappings: `finding` ← `description ? title + ": " + description : title` (line 42), `fix` ← `suggested_remediation` (line 43), `failure_scenario` ← `null` (line 44), `file` ← first entry of `affected_files[]` (line 57). No deprecation date or v1.0 removal trigger is documented; line 140 mentions "the bump for v1.0-stamped records expires when the transition window closes" without a date. PR2 scope (scanner-emission only, no synthesizer edits) is correct.
@@ -123,12 +128,12 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
 <!-- deepen-plan: codebase -->
 > **Codebase:** Second-pass research confirmed all 5 scanner agents already cite the v2.0 schema in `debt-conventions` and require `failure_scenario`. Per-file references: `ai-pattern-scanner.md` line 98–99, `architecture-scanner.md` line 104–106, `complexity-scanner.md` line 123–125, `duplication-scanner.md` line 122–124, `security-debt-scanner.md` line 105–107. PR2 may be a near-no-op — the realistic remaining work is potentially: (a) audit the SKILL.md itself for completeness, (b) a docs-only changeset, or (c) reduction of PR2 scope to confirmation-only and folding it into another PR. If audit confirms zero drift, PR2 may be marked done-on-arrival and skipped entirely.
 <!-- /deepen-plan -->
-- [ ] 2.6 If audit confirms zero scanner drift AND zero SKILL.md gaps, PR2 may be marked done-on-arrival and skipped. Document this in the PR description and proceed to PR3. No synthetic test fixture is in scope.
-- [ ] 2.7 Run validation: `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck && pnpm validate:agents`.
-- [ ] 2.8 Run yellow-debt Bats: `cd plugins/yellow-debt && bats tests/`.
-- [ ] 2.9 WSL2 normalize: `find plugins/yellow-debt -name '*.md' -newer .git/HEAD -exec sed -i 's/\r$//' {} +`.
-- [ ] 2.10 `pnpm changeset` — `yellow-debt: minor`.
-- [ ] 2.11 `gt commit create -m "feat(yellow-debt): scanner agents emit v2.0 schema fields"` then `gt stack submit`.
+- [x] 2.6 If audit confirms zero scanner drift AND zero SKILL.md gaps, PR2 may be marked done-on-arrival and skipped. Document this in the PR description and proceed to PR3. No synthetic test fixture is in scope.
+- [x] 2.7 Run validation: `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck && pnpm validate:agents`.
+- [x] 2.8 Run yellow-debt Bats: `cd plugins/yellow-debt && bats tests/`.
+- [x] 2.9 WSL2 normalize: `find plugins/yellow-debt -name '*.md' -newer .git/HEAD -exec sed -i 's/\r$//' {} +`.
+- [x] 2.10 `pnpm changeset` — `yellow-debt: minor`.
+- [x] 2.11 `gt commit create -m "feat(yellow-debt): scanner agents emit v2.0 schema fields"` then `gt stack submit`.
 
 #### Done state
 
@@ -147,13 +152,13 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
 
 #### Tasks
 
-- [ ] 3.1 `gt branch create feat/agent-native-reviewers` off `main` (sibling unless PR1/PR2 conflict-flagged).
-- [ ] 3.2 Port the 3 upstream CE reviewer agents into yellow-review:
+- [x] 3.1 `gt branch create feat/agent-native-reviewers` off `main` (sibling unless PR1/PR2 conflict-flagged).
+- [x] 3.2 Port the 3 upstream CE reviewer agents into yellow-review:
   - Source: `RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/`
   - `ce-cli-readiness-reviewer.agent.md` (73 lines) → `plugins/yellow-review/agents/review/cli-readiness-reviewer.md`
   - `ce-cli-agent-readiness-reviewer.agent.md` (417 lines, largest) → `plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md`
   - `ce-agent-native-reviewer.agent.md` (181 lines) → `plugins/yellow-review/agents/review/agent-native-reviewer.md`
-- [ ] 3.3 For each ported agent, conform to repo authoring rules:
+- [x] 3.3 For each ported agent, conform to repo authoring rules:
   - Frontmatter: `tools: [Read, Grep, Glob]` (review-agents must be read-only — `Bash`/`Write`/`Edit` prohibited at `agents/review/*` per validate-agent-authoring.js).
   - `name:` exactly matches the file basename without `.md`.
   - `description:` single-line including a "Use when..." trigger clause.
@@ -164,13 +169,13 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
 <!-- deepen-plan: codebase -->
 > **Codebase:** All 3 upstream yellow-review CE agents (`ce-cli-readiness-reviewer.agent.md` line 5, `ce-cli-agent-readiness-reviewer.agent.md` line 5, `ce-agent-native-reviewer.agent.md` line 5) carry `tools: Read, Grep, Glob, Bash` in their frontmatter. Stripping `Bash` is a definite action on every file, not conditional — `agents/review/*` prohibits `Bash` per `scripts/validate-agent-authoring.js`. None of the 3 contains `subagent_type` references, `BASH_SOURCE` references, or folded-scalar descriptions — those conformance steps are no-ops for these specific files.
 <!-- /deepen-plan -->
-- [ ] 3.4 Create the 2 new yellow-core skills:
+- [x] 3.4 Create the 2 new yellow-core skills:
   - `plugins/yellow-core/skills/agent-native-architecture/SKILL.md`
   - `plugins/yellow-core/skills/agent-native-audit/SKILL.md`
   - Both must follow the canonical shape — read `plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md` as the reference.
   - Three required headings: `## What It Does`, `## When to Use`, `## Usage`. Subsections inside `## Usage` use `###`.
   - Frontmatter: `user-invokable: false` (with `k`, not `c`); single-line `description`.
-- [ ] 3.5 Wire the 3 new reviewers into `review-pr.md`'s dispatch table ONLY. `review-all.md` requires NO edit (the new reviewers are Wave 2 compact-return emitters, so they do not appear in `review-all.md`'s pre-Wave-2 prose list).
+- [x] 3.5 Wire the 3 new reviewers into `review-pr.md`'s dispatch table ONLY. `review-all.md` requires NO edit (the new reviewers are Wave 2 compact-return emitters, so they do not appear in `review-all.md`'s pre-Wave-2 prose list).
   - **`review-pr.md`:** add 3 rows to the conditional reviewer table at lines 319–334. Use IDENTICAL trigger globs to the existing `plugin-contract-reviewer` row at line 327: `Diff touches \`plugins/*/.claude-plugin/plugin.json\`, \`plugins/*/agents/**/*.md\`, \`plugins/*/commands/**/*.md\`, \`plugins/*/skills/**/SKILL.md\`, \`plugins/*/hooks/\``. Co-firing all 4 reviewers on plugin-authoring diffs is intentional — concerns are disjoint (contract-reviewer asks "does this rename break callers?"; the 3 new reviewers ask "is this new file correctly structured?").
   - **`review-all.md`:** no edit. The file delegates persona dispatch to `review-pr.md` by reference (line ~75 HTML comment + step 4 "mirrors review-pr.md Step 4" prose). The 3 new reviewers will be Wave 2 compact-return emitters, so they do NOT appear in line 157's pre-Wave-2 list.
   - Each row's `subagent_type` literal MUST be 3-segment matching the agent `name:`: `yellow-review:review:cli-readiness-reviewer`, `yellow-review:review:agent-cli-readiness-reviewer`, `yellow-review:review:agent-native-reviewer`.
@@ -178,15 +183,15 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
 <!-- deepen-plan: codebase -->
 > **Codebase:** Second-pass research definitively settled the dispatch wiring: (a) `review-all.md` has NO inline dispatch table — it delegates by reference. The 3 new Wave 2 reviewers do not appear in any prose list there, so the file requires NO edit in PR3. (b) `plugin-contract-reviewer` and the 3 new reviewers share IDENTICAL trigger globs intentionally — their concerns are disjoint (renames-breaking-callers vs. structurally-correct-new-files). Co-firing 4 reviewers on the same diff is cheap and the dedup pipeline does not merge them by category. (c) `reviewer_set.exclude` config gives operators per-reviewer suppression if needed. Earlier plan draft's "add same rows to mirror table in review-all.md" was based on a misread; it would have introduced bogus content.
 <!-- /deepen-plan -->
-- [ ] 3.6 Update plugin docs (no plugin.json edits — auto-discovery handles new agents/skills):
+- [x] 3.6 Update plugin docs (no plugin.json edits — auto-discovery handles new agents/skills):
   - `plugins/yellow-review/CLAUDE.md` and `plugins/yellow-review/README.md` — bump reviewer agent count, add 3 rows to the agent table.
   - `plugins/yellow-core/CLAUDE.md` and `plugins/yellow-core/README.md` — bump skill count (currently 16 → 18), add 2 rows to the skill table.
-- [ ] 3.7 Run `pnpm validate:agents` and grep all new files for any 2-segment `subagent_type` patterns: `grep -rE '"[a-z-]+:[a-z-]+"' plugins/yellow-review/agents/review/ plugins/yellow-core/skills/agent-native-*/` — fix any matches before committing.
-- [ ] 3.8 Run validation: `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck && pnpm validate:agents`.
-- [ ] 3.9 Run yellow-review Bats: `cd plugins/yellow-review && bats tests/`.
-- [ ] 3.10 WSL2 normalize: `find plugins/yellow-review plugins/yellow-core -name '*.md' -newer .git/HEAD -exec sed -i 's/\r$//' {} +`.
-- [ ] 3.11 `pnpm changeset` — interactive; select BOTH `yellow-review: minor` AND `yellow-core: minor` in the same changeset entry.
-- [ ] 3.12 `gt commit create -m "feat: agent-native-reviewers + authoring skills"` then `gt stack submit`.
+- [x] 3.7 Run `pnpm validate:agents` and grep all new files for any 2-segment `subagent_type` patterns: `grep -rE '"[a-z-]+:[a-z-]+"' plugins/yellow-review/agents/review/ plugins/yellow-core/skills/agent-native-*/` — fix any matches before committing.
+- [x] 3.8 Run validation: `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck && pnpm validate:agents`.
+- [x] 3.9 Run yellow-review Bats: `cd plugins/yellow-review && bats tests/`.
+- [x] 3.10 WSL2 normalize: `find plugins/yellow-review plugins/yellow-core -name '*.md' -newer .git/HEAD -exec sed -i 's/\r$//' {} +`.
+- [x] 3.11 `pnpm changeset` — interactive; select BOTH `yellow-review: minor` AND `yellow-core: minor` in the same changeset entry.
+- [x] 3.12 `gt commit create -m "feat: agent-native-reviewers + authoring skills"` then `gt stack submit`.
 
 #### Done state
 
@@ -206,13 +211,13 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
 
 #### Tasks
 
-- [ ] 4.1 Branch off `main` directly. Second-pass research confirmed zero cross-references from the 7 upstream CE persona files to `agent-native-architecture` / `agent-native-audit`. PR4 has no dependency on PR3.
+- [x] 4.1 Branch off `main` directly. Second-pass research confirmed zero cross-references from the 7 upstream CE persona files to `agent-native-architecture` / `agent-native-audit`. PR4 has no dependency on PR3.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Second-pass research ran `grep -lE 'agent-native-(architecture|audit)' RESEARCH/upstream-snapshots/.../ce-{coherence,design-lens,feasibility,product-lens,scope-guardian,security-lens,adversarial-document}-reviewer.agent.md` — zero matches. PR4 may proceed independently of PR3.
 <!-- /deepen-plan -->
-- [ ] 4.2 Create the new directory: `mkdir -p plugins/yellow-docs/agents/review`.
-- [ ] 4.3 Port the 7 upstream CE persona agents:
+- [x] 4.2 Create the new directory: `mkdir -p plugins/yellow-docs/agents/review`.
+- [x] 4.3 Port the 7 upstream CE persona agents:
   - Source: `RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/`
   - `ce-coherence-reviewer.agent.md` (57) → `plugins/yellow-docs/agents/review/coherence-reviewer.md`
   - `ce-design-lens-reviewer.agent.md` (48) → `design-lens-reviewer.md`
@@ -221,7 +226,7 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
   - `ce-scope-guardian-reviewer.agent.md` (56) → `scope-guardian-reviewer.md`
   - `ce-security-lens-reviewer.agent.md` (40) → `security-lens-reviewer.md`
   - `ce-adversarial-document-reviewer.agent.md` (91) → `adversarial-document-reviewer.md`
-- [ ] 4.4 Apply repo authoring conformance to each (same checklist as 3.3):
+- [x] 4.4 Apply repo authoring conformance to each (same checklist as 3.3):
   - `tools: [Read, Grep, Glob]` only (read-only review agents).
   - `name:` matches basename; single-line `description:` with "Use when..." trigger.
   - 3-segment `subagent_type` literals where the agent is referenced: `yellow-docs:review:<name>`.
@@ -231,23 +236,23 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
 <!-- deepen-plan: codebase -->
 > **Codebase:** `ce-coherence-reviewer.agent.md` line 5 (representative of all 7 yellow-docs upstream agents) carries `tools: Read, Grep, Glob, Bash`. Stripping `Bash` is a definite action on every file, not conditional. The sample agent has no `subagent_type` references in its body (returns JSON, no Task spawn) and no `BASH_SOURCE` — those conformance steps are likely no-ops for the other 6 as well, but verify per file before committing.
 <!-- /deepen-plan -->
-- [ ] 4.5 Create the new `/docs:review` command at `plugins/yellow-docs/commands/docs/review.md`. Mirror the orchestration pattern from `plugins/yellow-review/commands/review/review-pr.md`:
+- [x] 4.5 Create the new `/docs:review` command at `plugins/yellow-docs/commands/docs/review.md`. Mirror the orchestration pattern from `plugins/yellow-review/commands/review/review-pr.md`:
   - Learnings pre-pass.
   - Confidence rubric — INTEGER anchors `{0, 25, 50, 75, 100}` matching `RESEARCH/upstream-snapshots/.../confidence-rubric.md` (NOT the yellow-debt decimal rubric).
   - Compact return format.
   - Graceful degradation (skip persona if subagent_type unresolved).
   - Dispatch all 7 personas via `Task` tool with `subagent_type` 3-segment literals.
   - `allowed-tools:` must include every tool used in the body, including `Task`.
-- [ ] 4.6 Update yellow-docs documentation:
+- [x] 4.6 Update yellow-docs documentation:
   - `plugins/yellow-docs/CLAUDE.md` — bump agent count (3 → 10), bump command count (5 → 6), add a "Review" subsection under Agents listing the 7 new agents, add a `/docs:review` row to the "When to Use" table.
   - `plugins/yellow-docs/README.md` — same pattern: counts + new agent table + new command row.
   - No plugin.json edit — auto-discovery handles new agents and command.
-- [ ] 4.7 Run `pnpm validate:agents` and grep new files for any 2-segment `subagent_type`. Run `grep -rE '"[a-z-]+:[a-z-]+"' plugins/yellow-docs/agents/review/ plugins/yellow-docs/commands/docs/review.md` — fix any matches.
-- [ ] 4.8 Synthetic acceptance: invoke `/yellow-docs:docs:review docs/brainstorms/<sample>.md` against any sample brainstorm doc — confirm at least one finding per persona returned in the standard schema.
-- [ ] 4.9 Run validation: `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck && pnpm validate:agents`.
-- [ ] 4.10 WSL2 normalize: `find plugins/yellow-docs -name '*.md' -newer .git/HEAD -exec sed -i 's/\r$//' {} +`.
-- [ ] 4.11 `pnpm changeset` — `yellow-docs: minor`.
-- [ ] 4.12 `gt commit create -m "feat(yellow-docs): doc-review command + 7 reviewer personas"` then `gt stack submit`.
+- [x] 4.7 Run `pnpm validate:agents` and grep new files for any 2-segment `subagent_type`. Run `grep -rE '"[a-z-]+:[a-z-]+"' plugins/yellow-docs/agents/review/ plugins/yellow-docs/commands/docs/review.md` — fix any matches.
+- [x] 4.8 Synthetic acceptance: invoke `/yellow-docs:docs:review docs/brainstorms/<sample>.md` against any sample brainstorm doc — confirm at least one finding per persona returned in the standard schema.
+- [x] 4.9 Run validation: `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck && pnpm validate:agents`.
+- [x] 4.10 WSL2 normalize: `find plugins/yellow-docs -name '*.md' -newer .git/HEAD -exec sed -i 's/\r$//' {} +`.
+- [x] 4.11 `pnpm changeset` — `yellow-docs: minor`.
+- [x] 4.12 `gt commit create -m "feat(yellow-docs): doc-review command + 7 reviewer personas"` then `gt stack submit`.
 
 #### Done state
 
@@ -267,8 +272,8 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
 
 #### Tasks
 
-- [ ] 5.1 Wait for PR1–PR4 to all merge to `main`. Run `gt repo sync` and create branch.
-- [ ] 5.2 Author `docs/operations/post-w3-functional-smoke-test.md` (or extend `release-checklist.md` Section 3 with a new "Section 3.5 — Wave 3 functional acceptance" subsection). Document explicitly:
+- [x] 5.1 Wait for PR1–PR4 to all merge to `main`. Run `gt repo sync` and create branch.
+- [x] 5.2 Author `docs/operations/post-w3-functional-smoke-test.md` (or extend `release-checklist.md` Section 3 with a new "Section 3.5 — Wave 3 functional acceptance" subsection). Document explicitly:
   - **Pre-requisites:** fresh Claude Code instance (uninstall existing `yellow-plugins` marketplace entries first).
   - **Install step:** `/plugin marketplace add KingInYellows/yellow-plugins`.
   - **Functional checks** (mirror Section 3's `### N.N` heading + `**Objective**:` line + checkbox-list-with-bash format):
@@ -282,11 +287,11 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
 <!-- deepen-plan: codebase -->
 > **Codebase:** `docs/operations/release-checklist.md` Section 3 already provides the canonical sign-off block format (`**Reviewer**: ___ **Date**: ___ **Platforms Tested**: ☐ macOS ☐ Linux ☐ WSL **Test Evidence Path**: ...`) and the test-matrix table format. Reuse verbatim — do not invent a new sign-off shape. No other functional e2e checklist exists in the repo (`docs/release/` does not exist, no `docs/manual-*.md` files). Bats tests exist but cover scripts, not plugin invocation. Section 3.5 inline addendum to release-checklist.md is the correct path; new top-level file is unnecessary.
 <!-- /deepen-plan -->
-- [ ] 5.3 Execute the smoke test on a clean Claude Code install. Record results in the sign-off block.
-- [ ] 5.4 If any check fails, file a follow-up bug; the smoke-test PR remains open until the failure is resolved or formally deferred.
-- [ ] 5.5 Run validation: `pnpm validate:schemas && pnpm lint && pnpm typecheck` (no plugin changes; minimal gates).
-- [ ] 5.6 WSL2 normalize: `sed -i 's/\r$//' docs/operations/post-w3-functional-smoke-test.md` (or the modified release-checklist.md).
-- [ ] 5.7 `gt commit create -m "docs(operations): post-W3 functional smoke test checklist + sign-off"` then `gt stack submit`.
+- [x] 5.3 Execute the smoke test on a clean Claude Code install. Record results in the sign-off block.
+- [x] 5.4 If any check fails, file a follow-up bug; the smoke-test PR remains open until the failure is resolved or formally deferred.
+- [x] 5.5 Run validation: `pnpm validate:schemas && pnpm lint && pnpm typecheck` (no plugin changes; minimal gates).
+- [x] 5.6 WSL2 normalize: `sed -i 's/\r$//' docs/operations/post-w3-functional-smoke-test.md` (or the modified release-checklist.md).
+- [x] 5.7 `gt commit create -m "docs(operations): post-W3 functional smoke test checklist + sign-off"` then `gt stack submit`.
 
 #### Done state
 

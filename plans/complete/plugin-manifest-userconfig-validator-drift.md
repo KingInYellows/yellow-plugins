@@ -1,5 +1,10 @@
 # Feature: Plugin manifest userConfig validator drift fix
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 24 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Problem Statement
 
 `claude doctor` reports 4 plugins with invalid `userConfig` blocks:
@@ -50,40 +55,40 @@ Reviewed files:
 
 ### Phase 1: Branch setup
 
-- [ ] 1.1: `gt repo sync` — sync trunk
-- [ ] 1.2: `gt branch create fix/plugin-manifest-userconfig-validator-drift`
+- [x] 1.1: `gt repo sync` — sync trunk
+- [x] 1.2: `gt branch create fix/plugin-manifest-userconfig-validator-drift`
 
 ### Phase 2: Manifest patches (4 files)
 
 For each entry, add `"type": "string"` and `"title": "<label>"` immediately above the existing `description`.
 
-- [ ] 2.1: `plugins/yellow-devin/.claude-plugin/plugin.json`
+- [x] 2.1: `plugins/yellow-devin/.claude-plugin/plugin.json`
   - `devin_service_user_token` → title `"Devin service user token"`
   - `devin_org_id` → title `"Devin organization ID"` (keep `sensitive: false`)
-- [ ] 2.2: `plugins/yellow-research/.claude-plugin/plugin.json`
+- [x] 2.2: `plugins/yellow-research/.claude-plugin/plugin.json`
   - `perplexity_api_key` → title `"Perplexity API key"`
   - `tavily_api_key` → title `"Tavily API key"`
   - `exa_api_key` → title `"Exa API key"`
-- [ ] 2.3: `plugins/yellow-morph/.claude-plugin/plugin.json`
+- [x] 2.3: `plugins/yellow-morph/.claude-plugin/plugin.json`
   - `morph_api_key` → title `"Morph API key"`
-- [ ] 2.4: `plugins/yellow-semgrep/.claude-plugin/plugin.json`
+- [x] 2.4: `plugins/yellow-semgrep/.claude-plugin/plugin.json`
   - `semgrep_app_token` → title `"Semgrep app token"`
-- [ ] 2.5: Verify each file with `jq empty plugins/<name>/.claude-plugin/plugin.json` — catches any trailing-comma error post-edit
-- [ ] 2.6: WSL2 line-ending check — `file plugins/*/.claude-plugin/plugin.json | grep -v 'JSON text data' || true`. If any show CRLF, run `sed -i 's/\r$//'` on them.
+- [x] 2.5: Verify each file with `jq empty plugins/<name>/.claude-plugin/plugin.json` — catches any trailing-comma error post-edit
+- [x] 2.6: WSL2 line-ending check — `file plugins/*/.claude-plugin/plugin.json | grep -v 'JSON text data' || true`. If any show CRLF, run `sed -i 's/\r$//'` on them.
 
 ### Phase 3: Schema tightening (`schemas/plugin.schema.json`)
 
-- [ ] 3.1: In `definitions.userConfigEntry.properties.type`, extend the enum: `["string", "number", "boolean", "directory", "file"]`. Remove the `default: "string"` field — defaults are now meaningless because `type` is required.
-- [ ] 3.2: In `definitions.userConfigEntry.properties`, add `"title": { "type": "string", "minLength": 1 }`. Verify `sensitive`, `description`, `default`, `required` properties remain unchanged.
-- [ ] 3.3: Remove the `label` property entirely (unused, replaced by `title`). Confirmed via `rg '"label"' plugins/` returns no hits inside any `userConfigEntry` block.
-- [ ] 3.4: Add `"required": ["type", "title"]` to `userConfigEntry`. Place after `properties` and before `additionalProperties`.
-- [ ] 3.5: Update the `allOf` block: the fourth branch (`if not required type`) becomes dead code — remove it. Keep the three type-specific default-constraint branches.
-- [ ] 3.6: Update the `userConfig` top-level description (currently mentions `label` at line 249) — change `"declare type, label, description, default, required, sensitive"` to `"declare type, title, description, default, required, sensitive"`.
-- [ ] 3.7: `jq empty schemas/plugin.schema.json` — verify no trailing comma after property removal.
+- [x] 3.1: In `definitions.userConfigEntry.properties.type`, extend the enum: `["string", "number", "boolean", "directory", "file"]`. Remove the `default: "string"` field — defaults are now meaningless because `type` is required.
+- [x] 3.2: In `definitions.userConfigEntry.properties`, add `"title": { "type": "string", "minLength": 1 }`. Verify `sensitive`, `description`, `default`, `required` properties remain unchanged.
+- [x] 3.3: Remove the `label` property entirely (unused, replaced by `title`). Confirmed via `rg '"label"' plugins/` returns no hits inside any `userConfigEntry` block.
+- [x] 3.4: Add `"required": ["type", "title"]` to `userConfigEntry`. Place after `properties` and before `additionalProperties`.
+- [x] 3.5: Update the `allOf` block: the fourth branch (`if not required type`) becomes dead code — remove it. Keep the three type-specific default-constraint branches.
+- [x] 3.6: Update the `userConfig` top-level description (currently mentions `label` at line 249) — change `"declare type, label, description, default, required, sensitive"` to `"declare type, title, description, default, required, sensitive"`.
+- [x] 3.7: `jq empty schemas/plugin.schema.json` — verify no trailing comma after property removal.
 
 ### Phase 4: Solutions doc
 
-- [ ] 4.1: Create `docs/solutions/build-errors/userconfig-type-title-remote-validator-drift.md` documenting:
+- [x] 4.1: Create `docs/solutions/build-errors/userconfig-type-title-remote-validator-drift.md` documenting:
   - Symptom: `claude doctor` errors with `type: Invalid option` and `title: Invalid input: expected string, received undefined`
   - Root cause: local schema permitted absent `type` and used `label` instead of `title`
   - Fix: 2 fields added per entry + schema tightening
@@ -92,17 +97,17 @@ For each entry, add `"type": "string"` and `"title": "<label>"` immediately abov
 
 ### Phase 5: Memory + CLAUDE.md updates
 
-- [ ] 5.1: Update auto-memory file `.claude/projects/-home-kinginyellow-projects-yellow-plugins/memory/MEMORY.md` "Plugin Manifest Validation" section with one-line entry pointing to the new solutions doc
-- [ ] 5.2: No `plugins/<name>/CLAUDE.md` updates needed — the plugin docs reference `userConfig` in narrative form, not field-by-field, so no stale references to fix.
+- [x] 5.1: Update auto-memory file `.claude/projects/-home-kinginyellow-projects-yellow-plugins/memory/MEMORY.md` "Plugin Manifest Validation" section with one-line entry pointing to the new solutions doc
+- [x] 5.2: No `plugins/<name>/CLAUDE.md` updates needed — the plugin docs reference `userConfig` in narrative form, not field-by-field, so no stale references to fix.
 
 ### Phase 6: Validation, changeset, submit
 
-- [ ] 6.1: `pnpm validate:schemas` — must pass
-- [ ] 6.2: `pnpm validate:versions` — must pass (no version changes yet, but confirms baseline)
-- [ ] 6.3: `pnpm test:unit` — must pass (validates schema-test fixtures still align)
-- [ ] 6.4: `pnpm changeset` — select `patch` for: `yellow-devin`, `yellow-research`, `yellow-morph`, `yellow-semgrep`. Summary: `fix(plugin-manifests): add type and title to userConfig entries — fixes claude doctor remote-validator rejection`
-- [ ] 6.5: `gt commit create -m "fix(plugin-manifests): add type and title to userConfig entries"`
-- [ ] 6.6: `gt stack submit`
+- [x] 6.1: `pnpm validate:schemas` — must pass
+- [x] 6.2: `pnpm validate:versions` — must pass (no version changes yet, but confirms baseline)
+- [x] 6.3: `pnpm test:unit` — must pass (validates schema-test fixtures still align)
+- [x] 6.4: `pnpm changeset` — select `patch` for: `yellow-devin`, `yellow-research`, `yellow-morph`, `yellow-semgrep`. Summary: `fix(plugin-manifests): add type and title to userConfig entries — fixes claude doctor remote-validator rejection`
+- [x] 6.5: `gt commit create -m "fix(plugin-manifests): add type and title to userConfig entries"`
+- [x] 6.6: `gt stack submit`
 
 ## Technical Specifications
 

@@ -7,6 +7,11 @@ deepened: 2026-02-22
 
 # feat: Add /workflows:compound to yellow-core
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 17 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Enhancement Summary
 
 **Deepened on:** 2026-02-22
@@ -60,23 +65,23 @@ No changes to `plugin.json` — auto-discovery picks up any `.md` file in
 
 ## Acceptance Criteria
 
-- [ ] `/workflows:compound` is invocable (auto-discovered from filesystem)
-- [ ] Phase 1 runs 5 parallel subagents; each returns TEXT ONLY (no file writes)
-- [ ] Phase 1 subagents do NOT have Write/Edit in their allowed-tools
-- [ ] **Orchestrator** (not Context Analyzer) produces the final routing decision after seeing all 5 Phase 1 results
-- [ ] Context Analyzer produces a routing *hint* only; orchestrator decides
-- [ ] M3 confirmation via `AskUserQuestion` shows resolved paths (not template placeholders), routing rationale, and MEMORY.md section title
-- [ ] "Adjust routing" branch opens a Level 2 AskUserQuestion with 3 routing options; proceeds directly to Phase 2 after selection (no third dialog)
-- [ ] Phase 2 writes `docs/solutions/<category>/<slug>.md` when routing says so
-- [ ] Phase 2 checks for doc file collision before Write; appends `-2`, `-3` suffix on collision
-- [ ] Phase 2 appends to MEMORY.md when routing says so, in a single sequential Edit
-- [ ] Phase 2 checks MEMORY.md line count before writing; warns if > 185 lines
-- [ ] MEMORY.md path is derived at runtime from `$(pwd)`; resolved path shown in M3 confirmation
-- [ ] Both category AND slug fail with an error (not fallback) if validation fails
-- [ ] Phase 3 invokes yellow-core agents (not compound-engineering agents) in parallel
-- [ ] Category validated against explicit 6-item enum, not just regex
-- [ ] Conversation excerpts passed to subagents use "sandwich" injection fencing (advisory before AND after)
-- [ ] `plugins/yellow-core/CLAUDE.md` lists 4 commands including the new one
+- [x] `/workflows:compound` is invocable (auto-discovered from filesystem)
+- [x] Phase 1 runs 5 parallel subagents; each returns TEXT ONLY (no file writes)
+- [x] Phase 1 subagents do NOT have Write/Edit in their allowed-tools
+- [x] **Orchestrator** (not Context Analyzer) produces the final routing decision after seeing all 5 Phase 1 results
+- [x] Context Analyzer produces a routing *hint* only; orchestrator decides
+- [x] M3 confirmation via `AskUserQuestion` shows resolved paths (not template placeholders), routing rationale, and MEMORY.md section title
+- [x] "Adjust routing" branch opens a Level 2 AskUserQuestion with 3 routing options; proceeds directly to Phase 2 after selection (no third dialog)
+- [x] Phase 2 writes `docs/solutions/<category>/<slug>.md` when routing says so
+- [x] Phase 2 checks for doc file collision before Write; appends `-2`, `-3` suffix on collision
+- [x] Phase 2 appends to MEMORY.md when routing says so, in a single sequential Edit
+- [x] Phase 2 checks MEMORY.md line count before writing; warns if > 185 lines
+- [x] MEMORY.md path is derived at runtime from `$(pwd)`; resolved path shown in M3 confirmation
+- [x] Both category AND slug fail with an error (not fallback) if validation fails
+- [x] Phase 3 invokes yellow-core agents (not compound-engineering agents) in parallel
+- [x] Category validated against explicit 6-item enum, not just regex
+- [x] Conversation excerpts passed to subagents use "sandwich" injection fencing (advisory before AND after)
+- [x] `plugins/yellow-core/CLAUDE.md` lists 4 commands including the new one
 
 ---
 

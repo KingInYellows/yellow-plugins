@@ -1,5 +1,10 @@
 # Feature: AST-Grep Integration Across Yellow-Plugins Ecosystem
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 13 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 > **Status: Implemented (archived)** — Historical record of delivered work. Unchecked items below were deprioritized or absorbed into other work.
 
 ## Problem Statement
@@ -42,7 +47,7 @@ vs. Grep.
 
 ### Phase 1: Setup Pipeline Fixes (PR 1)
 
-- [ ] **1.1: Add `--python 3.13` to plugin.json MCP config**
+- [x] **1.1: Add `--python 3.13` to plugin.json MCP config**
 
   File: `plugins/yellow-research/.claude-plugin/plugin.json` (lines 59-66)
 
@@ -89,7 +94,7 @@ vs. Grep.
 > See: https://docs.astral.sh/uv/guides/tools/
 <!-- /deepen-plan -->
 
-- [ ] **1.2: Add `uv` installation to install-ast-grep.sh**
+- [x] **1.2: Add `uv` installation to install-ast-grep.sh**
 
   File: `plugins/yellow-research/scripts/install-ast-grep.sh`
 
@@ -154,7 +159,7 @@ vs. Grep.
 > `~/.config/uv/uv.toml` for `python-downloads = "manual"`.
 <!-- /deepen-plan -->
 
-- [ ] **1.3: Remove Python 3.13 system check from research:setup**
+- [x] **1.3: Remove Python 3.13 system check from research:setup**
 
   File: `plugins/yellow-research/commands/research/setup.md`
 
@@ -205,7 +210,7 @@ vs. Grep.
   uv manages Python 3.13 automatically — no system Python upgrade needed.
   ```
 
-- [ ] **1.4: Update setup:all dashboard and classification**
+- [x] **1.4: Update setup:all dashboard and classification**
 
   File: `plugins/yellow-core/commands/setup/all.md`
 
@@ -237,7 +242,7 @@ vs. Grep.
 > automatically.
 <!-- /deepen-plan -->
 
-- [ ] **1.5: Update yellow-research CLAUDE.md**
+- [x] **1.5: Update yellow-research CLAUDE.md**
 
   File: `plugins/yellow-research/CLAUDE.md`
 
@@ -256,7 +261,7 @@ vs. Grep.
   ### ast-grep — No API key (requires `ast-grep` binary and `uv`)
   ```
 
-- [ ] **1.6: Validate and test**
+- [x] **1.6: Validate and test**
 
   Run `pnpm validate:schemas` to verify plugin.json changes.
   Manually test: unset Python 3.13 from system, run `/research:setup`, confirm
@@ -264,7 +269,7 @@ vs. Grep.
 
 ### Phase 2: Selective Agent Expansion (PR 2)
 
-- [ ] **2.1: Add ast-grep tools to silent-failure-hunter**
+- [x] **2.1: Add ast-grep tools to silent-failure-hunter**
 
   File: `plugins/yellow-review/agents/review/silent-failure-hunter.md`
 
@@ -329,7 +334,7 @@ vs. Grep.
 > See: https://ast-grep.github.io/guide/rule-config.html
 <!-- /deepen-plan -->
 
-- [ ] **2.2: Add ast-grep tools to type-design-analyzer**
+- [x] **2.2: Add ast-grep tools to type-design-analyzer**
 
   File: `plugins/yellow-review/agents/review/type-design-analyzer.md`
 
@@ -365,7 +370,7 @@ vs. Grep.
   - Documentation and JSDoc type annotations
   ```
 
-- [ ] **2.3: Add ast-grep tools to duplication-scanner**
+- [x] **2.3: Add ast-grep tools to duplication-scanner**
 
   File: `plugins/yellow-debt/agents/scanners/duplication-scanner.md`
 
@@ -419,7 +424,7 @@ vs. Grep.
   - Simple line-count based size comparisons
   ```
 
-- [ ] **2.4: Add ast-grep tools to complexity-scanner**
+- [x] **2.4: Add ast-grep tools to complexity-scanner**
 
   File: `plugins/yellow-debt/agents/scanners/complexity-scanner.md`
 
@@ -456,21 +461,21 @@ vs. Grep.
   - Simple keyword frequency (number of `if`/`else`/`switch` keywords)
   ```
 
-- [ ] **2.5: Validate agent frontmatter**
+- [x] **2.5: Validate agent frontmatter**
 
   Run `node scripts/validate-agent-authoring.js` to verify all modified agents
   have valid frontmatter.
 
 ### Phase 3: Quality
 
-- [ ] **3.1: Run validation suite**
+- [x] **3.1: Run validation suite**
 
   ```bash
   pnpm validate:schemas
   node scripts/validate-agent-authoring.js
   ```
 
-- [ ] **3.2: Create changesets**
+- [x] **3.2: Create changesets**
 
   PR 1 touches yellow-research (minor — setup pipeline improvement) and
   yellow-core (patch — fix sg binary check in dashboard).

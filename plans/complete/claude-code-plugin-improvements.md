@@ -1,5 +1,10 @@
 # Feature: Claude Code Plugin System — Efficiency and Quality Improvements
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 27 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Overview
 
 A prioritized, staged improvement pass on the yellow-plugins monorepo (16
@@ -147,7 +152,7 @@ Three staged approaches, each independently shippable:
 > See: https://code.claude.com/docs/en/sub-agents
 <!-- /deepen-plan -->
 
-- [ ] **1.1** Add `background: true` to 7 yellow-core review agents:
+- [x] **1.1** Add `background: true` to 7 yellow-core review agents:
   - `plugins/yellow-core/agents/review/security-sentinel.md`
   - `plugins/yellow-core/agents/review/performance-oracle.md`
   - `plugins/yellow-core/agents/review/architecture-strategist.md`
@@ -155,7 +160,7 @@ Three staged approaches, each independently shippable:
   - `plugins/yellow-core/agents/review/code-simplicity-reviewer.md`
   - `plugins/yellow-core/agents/review/test-coverage-analyst.md`
   - `plugins/yellow-core/agents/review/pattern-recognition-specialist.md`
-- [ ] **1.2** Add `background: true` to 6 yellow-review review agents:
+- [x] **1.2** Add `background: true` to 6 yellow-review review agents:
   - `plugins/yellow-review/agents/review/code-reviewer.md`
   - `plugins/yellow-review/agents/review/pr-test-analyzer.md`
   - `plugins/yellow-review/agents/review/comment-analyzer.md`
@@ -169,20 +174,20 @@ Three staged approaches, each independently shippable:
 > string about slug derivation — not the fencing block.)
 <!-- /deepen-plan -->
 
-- [ ] **1.3** Add `CRITICAL SECURITY RULES` + content fencing block to 5
+- [x] **1.3** Add `CRITICAL SECURITY RULES` + content fencing block to 5
   yellow-debt scanners that read untrusted code:
   - `plugins/yellow-debt/agents/scanners/ai-pattern-scanner.md`
   - `plugins/yellow-debt/agents/scanners/architecture-scanner.md`
   - `plugins/yellow-debt/agents/scanners/duplication-scanner.md`
   - `plugins/yellow-debt/agents/scanners/security-debt-scanner.md`
   - `plugins/yellow-debt/agents/scanners/complexity-scanner.md`
-- [ ] **1.4** Add `CRITICAL SECURITY RULES` + content fencing to 4 yellow-ci
+- [x] **1.4** Add `CRITICAL SECURITY RULES` + content fencing to 4 yellow-ci
   agents that read untrusted logs/configs:
   - `plugins/yellow-ci/agents/ci/failure-analyst.md`
   - `plugins/yellow-ci/agents/ci/workflow-optimizer.md`
   - `plugins/yellow-ci/agents/ci/runner-assignment.md`
   - `plugins/yellow-ci/agents/maintenance/runner-diagnostics.md`
-- [ ] **1.5** Add `memory: project` to workflow orchestrators (NOT `memory: true`):
+- [x] **1.5** Add `memory: project` to workflow orchestrators (NOT `memory: true`):
   - `plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md`
   - `plugins/yellow-core/agents/workflow/knowledge-compounder.md`
   - `plugins/yellow-core/agents/workflow/spec-flow-analyzer.md`
@@ -202,15 +207,15 @@ Three staged approaches, each independently shippable:
 > confirm behavior.
 > See: https://code.claude.com/docs/en/sub-agents, https://code.claude.com/docs/en/memory
 <!-- /deepen-plan -->
-- [ ] **1.6** Sharpen `description:` trigger clauses for overlap pairs:
+- [x] **1.6** Sharpen `description:` trigger clauses for overlap pairs:
   - `code-simplicity-reviewer` (yellow-core) vs `code-simplifier` (yellow-review)
     — lead with "pre-fix" vs "post-fix" trigger condition.
   - `security-sentinel` (yellow-core) vs `security-debt-scanner` (yellow-debt)
     — lead with "active vulnerability" vs "debt pattern" trigger.
-- [ ] **1.7** Add `.changeset/*.md` entries for each affected plugin (minor
+- [x] **1.7** Add `.changeset/*.md` entries for each affected plugin (minor
   bump: yellow-core, yellow-review, yellow-debt, yellow-ci, yellow-devin;
   patch bump where only descriptions changed).
-- [ ] **1.8** Run `pnpm validate:schemas` to confirm no manifest drift.
+- [x] **1.8** Run `pnpm validate:schemas` to confirm no manifest drift.
 
 ### Phase 2: Approach B — Shared Infrastructure Layer
 
@@ -227,7 +232,7 @@ Three staged approaches, each independently shippable:
 > https://github.com/anthropics/claude-code/issues/19141
 <!-- /deepen-plan -->
 
-- [ ] **2.1** Create `plugins/yellow-core/skills/security-fencing/SKILL.md`
+- [x] **2.1** Create `plugins/yellow-core/skills/security-fencing/SKILL.md`
   (internal, `user-invocable: false`) containing the canonical `CRITICAL
   SECURITY RULES` + content fencing block.
 
@@ -252,10 +257,10 @@ Three staged approaches, each independently shippable:
 > "eliminate duplication" framing suggests.
 > See: https://github.com/anthropics/claude-code/issues/21891
 <!-- /deepen-plan -->
-- [ ] **2.2** Migrate all 25 current consumers (16 existing + 9 added in Phase 1)
+- [x] **2.2** Migrate all 25 current consumers (16 existing + 9 added in Phase 1)
   to reference `security-fencing` via `skills:` frontmatter; delete inline
   blocks.
-- [ ] **2.3** Split `plugins/yellow-core/skills/mcp-integration-patterns/` into
+- [x] **2.3** Split `plugins/yellow-core/skills/mcp-integration-patterns/` into
   three focused sub-skills:
   - `memory-recall-pattern` — Recall-Before-Act
   - `memory-remember-pattern` — Tiered-Remember-After-Act
@@ -273,12 +278,12 @@ Three staged approaches, each independently shippable:
 > in `allowed-tools`. Splitting the skill file changes documentation only
 > unless consumers simultaneously migrate to `skills:` frontmatter references.
 <!-- /deepen-plan -->
-- [ ] **2.4** ~~Add `schemas/plugin.schema.json`~~ **Extend** existing
+- [x] **2.4** ~~Add `schemas/plugin.schema.json`~~ **Extend** existing
   `schemas/plugin.schema.json` if it does not already cover `hooks`,
   `outputStyles`, `mcpServers`, `userConfig` fields. Existing
   `scripts/validate-plugin.js` uses `ajv` programmatically — add new field
   validation rules there rather than introducing `ajv-cli`.
-- [ ] **2.5** ~~Add CI step~~ **Verify** existing
+- [x] **2.5** ~~Add CI step~~ **Verify** existing
   `.github/workflows/validate-schemas.yml` runs against the updated schema
   across its four matrix targets (`marketplace`, `plugins`, `contracts`,
   `examples`).
@@ -302,7 +307,7 @@ Three staged approaches, each independently shippable:
 > covers all of these before extending.
 > See: https://code.claude.com/docs/en/plugins-reference
 <!-- /deepen-plan -->
-- [ ] **2.6** Document structured subagent-failure convention in
+- [x] **2.6** Document structured subagent-failure convention in
   `plugins/yellow-core/skills/create-agent-skills/SKILL.md`: agents that fail
   write a structured JSON result to `${CLAUDE_PLUGIN_DATA}/agent-result.json`
   (status, findings, errors) before exiting; orchestrators read the file
@@ -323,15 +328,15 @@ Three staged approaches, each independently shippable:
 > See: https://github.com/anthropics/claude-code/issues/25818,
 > https://github.com/anthropics/claude-code/issues/24181
 <!-- /deepen-plan -->
-- [ ] **2.7** Update `review-pr.md` and `work.md` orchestrators to parse
+- [x] **2.7** Update `review-pr.md` and `work.md` orchestrators to parse
   structured failure blobs and surface them in the user-facing summary.
-- [ ] **2.8** Add agent archetype table to `create-agent-skills/SKILL.md`
+- [x] **2.8** Add agent archetype table to `create-agent-skills/SKILL.md`
   (reviewer / orchestrator / scanner / research archetypes — required fields
   per archetype).
 
 ### Phase 3: Approach C — Routing + Observability
 
-- [ ] **3.1** Identify 3–5 agents that clearly warrant deliberate model
+- [x] **3.1** Identify 3–5 agents that clearly warrant deliberate model
   routing. Candidate initial set:
   - `model: haiku` for pure display/status: `ci/status.md` (already done),
     `debt/status.md`, `semgrep/status.md`.
@@ -352,13 +357,13 @@ Three staged approaches, each independently shippable:
 > See: https://github.com/anthropics/claude-code/issues/14863,
 > https://github.com/anthropics/claude-code/issues/29768
 <!-- /deepen-plan -->
-- [ ] **3.2** Add per-plugin `scripts/lint-plugin.sh` that validates
+- [x] **3.2** Add per-plugin `scripts/lint-plugin.sh` that validates
   frontmatter completeness (name, description, model, tools present),
   skill references resolve, and required sections exist. Start with
   yellow-core and yellow-review.
-- [ ] **3.3** Wire lint scripts into CI via a shared
+- [x] **3.3** Wire lint scripts into CI via a shared
   `.github/workflows/lint-plugins.yml`.
-- [ ] **3.4** Explore a session-end summary hook. **Prefer consolidating
+- [x] **3.4** Explore a session-end summary hook. **Prefer consolidating
   into yellow-ruvector's existing Stop hook array rather than registering
   a separate hook from yellow-core** — cross-plugin hook ordering is not
   guaranteed. Spike first; ship only if the hook API supports it cleanly.
@@ -393,24 +398,24 @@ Three staged approaches, each independently shippable:
 > See: https://github.com/anthropics/claude-code/issues/24115,
 > https://github.com/anthropics/claude-code/issues/4784
 <!-- /deepen-plan -->
-- [ ] **3.5** Investigate ruvector session-scoped warmup: set a session flag
+- [x] **3.5** Investigate ruvector session-scoped warmup: set a session flag
   on first `hooks_recall` so subsequent commands skip `hooks_capabilities`.
   Requires ruvector MCP-server support or a convention in
   `mcp-integration-patterns`.
-- [ ] **3.6** Measure token cost of `CRITICAL SECURITY RULES` block empirically
+- [x] **3.6** Measure token cost of `CRITICAL SECURITY RULES` block empirically
   (per-agent spawn) to confirm or refute the ~240-token estimate; use the
   number to prioritize shared-skill extraction or additional consolidation.
 
 ### Phase 4: Testing & Validation
 
-- [ ] **4.1** Manual smoke test of `/review:pr` on a sample branch after
+- [x] **4.1** Manual smoke test of `/review:pr` on a sample branch after
   Phase 1 — confirm multi-agent parallelism by observing wall time vs the
   current baseline.
-- [ ] **4.2** Manual smoke test of `/debt:audit` after Phase 1 — confirm
+- [x] **4.2** Manual smoke test of `/debt:audit` after Phase 1 — confirm
   scanner outputs are unchanged (security block is additive, not behavioral).
-- [ ] **4.3** Run `pnpm validate:schemas` after every phase.
-- [ ] **4.4** Lint-plugin self-test run after Phase 3.2.
-- [ ] **4.5** Ship each phase as a separate PR via Graphite (`gt create` +
+- [x] **4.3** Run `pnpm validate:schemas` after every phase.
+- [x] **4.4** Lint-plugin self-test run after Phase 3.2.
+- [x] **4.5** Ship each phase as a separate PR via Graphite (`gt create` +
   `gt submit --no-edit`) for reviewability.
 
 ---

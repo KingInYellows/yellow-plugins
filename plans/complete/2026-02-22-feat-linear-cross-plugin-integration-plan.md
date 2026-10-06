@@ -7,6 +7,11 @@ brainstorm: docs/brainstorms/2026-02-22-linear-cross-plugin-integration-brainsto
 
 # feat: Linear Cross-Plugin Integration
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 32 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Overview
 
 Four targeted additions that close the gap between Linear issues and the rest of the workflow toolchain. Architecture: caller-owns pattern — changes live in the plugin that initiates the workflow. No new plugin.
@@ -373,44 +378,44 @@ The existing `debt:sync` uses `yq` for frontmatter parsing. This dependency shou
 ## Acceptance Criteria
 
 ### `/debt:sync` (fixed)
-- [ ] Calls `mcp__plugin_linear_linear__list_teams` as Step 1; fails fast if yellow-linear not installed
-- [ ] Resolves team by name (case-insensitive) via `list_teams`; prompts if no match
-- [ ] Resolves project by name via `list_projects`; prompts if no match
-- [ ] Resolves "technical-debt" label via `list_issue_labels`; offers to create if missing
-- [ ] Dedup check: `list_issues` filtered by label + title match before creating
-- [ ] Creates issue via `create_issue` with real response extraction
-- [ ] Writes real `linear_issue_id` back to todo frontmatter via `yq`
-- [ ] Rollback prompt via `AskUserQuestion` (not printf) on mid-batch failure
-- [ ] `allowed-tools` includes all `mcp__plugin_linear_linear__*` tools called
+- [x] Calls `mcp__plugin_linear_linear__list_teams` as Step 1; fails fast if yellow-linear not installed
+- [x] Resolves team by name (case-insensitive) via `list_teams`; prompts if no match
+- [x] Resolves project by name via `list_projects`; prompts if no match
+- [x] Resolves "technical-debt" label via `list_issue_labels`; offers to create if missing
+- [x] Dedup check: `list_issues` filtered by label + title match before creating
+- [x] Creates issue via `create_issue` with real response extraction
+- [x] Writes real `linear_issue_id` back to todo frontmatter via `yq`
+- [x] Rollback prompt via `AskUserQuestion` (not printf) on mid-batch failure
+- [x] `allowed-tools` includes all `mcp__plugin_linear_linear__*` tools called
 
 ### `/linear:sync-all`
-- [ ] Fetches active statuses dynamically (no hardcoded status names)
-- [ ] Detects PR merge/close via `gh pr list` by issue identifier pattern
-- [ ] Presents proposed transitions table before any writes
-- [ ] H1 TOCTOU re-fetch + conflict detection before each `update_issue`
-- [ ] Rate limiting: 200ms delay between writes, exponential backoff on 429
-- [ ] Description is single-line string (not folded scalar)
+- [x] Fetches active statuses dynamically (no hardcoded status names)
+- [x] Detects PR merge/close via `gh pr list` by issue identifier pattern
+- [x] Presents proposed transitions table before any writes
+- [x] H1 TOCTOU re-fetch + conflict detection before each `update_issue`
+- [x] Rate limiting: 200ms delay between writes, exponential backoff on 429
+- [x] Description is single-line string (not folded scalar)
 
 ### `/linear:delegate`
-- [ ] Validates `DEVIN_SERVICE_USER_TOKEN` (`cog_` prefix) and `DEVIN_ORG_ID` before any work
-- [ ] C1: calls `get_issue` to validate issue exists before proceeding
-- [ ] Enriched prompt includes repo, branch convention, title, description, AC
-- [ ] Creates session via Devin REST API (curl), not MCP tools
-- [ ] Dedup: checks `list_comments` before posting comment
-- [ ] M3: `AskUserQuestion` before `create_comment`
-- [ ] M3: `AskUserQuestion` before `update_issue` status transition
-- [ ] Graceful degradation message includes install instructions for yellow-devin
-- [ ] Description is single-line string
+- [x] Validates `DEVIN_SERVICE_USER_TOKEN` (`cog_` prefix) and `DEVIN_ORG_ID` before any work
+- [x] C1: calls `get_issue` to validate issue exists before proceeding
+- [x] Enriched prompt includes repo, branch convention, title, description, AC
+- [x] Creates session via Devin REST API (curl), not MCP tools
+- [x] Dedup: checks `list_comments` before posting comment
+- [x] M3: `AskUserQuestion` before `create_comment`
+- [x] M3: `AskUserQuestion` before `update_issue` status transition
+- [x] Graceful degradation message includes install instructions for yellow-devin
+- [x] Description is single-line string
 
 ### `/ci:report-linear`
-- [ ] Step 1: `list_teams` as graceful degradation check
-- [ ] Delegates to `failure-analyst` agent via Task
-- [ ] Dedup check: searches existing "ci-failure" issues before creating
-- [ ] M3: proposes full issue content via `AskUserQuestion` before `create_issue`
-- [ ] Finds or creates "ci-failure" label
-- [ ] Returns Linear issue URL at completion
-- [ ] Description is single-line string
-- [ ] `Task` in allowed-tools (required for failure-analyst delegation)
+- [x] Step 1: `list_teams` as graceful degradation check
+- [x] Delegates to `failure-analyst` agent via Task
+- [x] Dedup check: searches existing "ci-failure" issues before creating
+- [x] M3: proposes full issue content via `AskUserQuestion` before `create_issue`
+- [x] Finds or creates "ci-failure" label
+- [x] Returns Linear issue URL at completion
+- [x] Description is single-line string
+- [x] `Task` in allowed-tools (required for failure-analyst delegation)
 
 ## Dependencies & Risks
 

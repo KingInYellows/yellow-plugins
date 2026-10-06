@@ -7,6 +7,11 @@ deepened: 2026-02-18
 
 # Migrate yellow-devin Plugin to Devin V3 API
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 36 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Enhancement Summary
 
 **Deepened on:** 2026-02-18
@@ -859,50 +864,50 @@ input. The cursor is managed internally by the pagination loop.
 
 ### Functional Requirements
 
-- [ ] All 5 existing commands work with V3 endpoints
-- [ ] Token validation accepts `cog_` prefix, rejects `apk_` with migration
+- [x] All 5 existing commands work with V3 endpoints
+- [x] Token validation accepts `cog_` prefix, rejects `apk_` with migration
   message
-- [ ] Org ID validated on every API call
-- [ ] `/devin:delegate` auto-generates title, supports --tags and --max-acu
-- [ ] `/devin:delegate` checks for duplicate active sessions by title
-- [ ] `/devin:status` shows ACUs, tags, PR table, archived badge, title
-- [ ] `/devin:status` uses cursor-based pagination with "Show more?" prompt
-- [ ] `/devin:status` supports --tag, --status, --archived filter flags
-- [ ] `/devin:message` auto-resumes suspended sessions with clear UX
-- [ ] `/devin:cancel` uses DELETE method with TOCTOU protection
-- [ ] `/devin:archive` archives sessions via confirmed endpoint
-- [ ] `/devin:tag` manages tags (add/remove/list)
-- [ ] Orchestrator agent works with V3 status values, PR arrays, and suspended
+- [x] Org ID validated on every API call
+- [x] `/devin:delegate` auto-generates title, supports --tags and --max-acu
+- [x] `/devin:delegate` checks for duplicate active sessions by title
+- [x] `/devin:status` shows ACUs, tags, PR table, archived badge, title
+- [x] `/devin:status` uses cursor-based pagination with "Show more?" prompt
+- [x] `/devin:status` supports --tag, --status, --archived filter flags
+- [x] `/devin:message` auto-resumes suspended sessions with clear UX
+- [x] `/devin:cancel` uses DELETE method with TOCTOU protection
+- [x] `/devin:archive` archives sessions via confirmed endpoint
+- [x] `/devin:tag` manages tags (add/remove/list)
+- [x] Orchestrator agent works with V3 status values, PR arrays, and suspended
   auto-resume
-- [ ] Wiki command tested with `cog_` token auth
-- [ ] No `/devin:schedule` command (UI-only, documented in Known Limitations)
+- [x] Wiki command tested with `cog_` token auth
+- [x] No `/devin:schedule` command (UI-only, documented in Known Limitations)
 
 ### Security Requirements (from Audit + V3-Specific)
 
-- [ ] C1: No `-v` or `--trace` in any curl call
-- [ ] C2/C4: `validate_session_id()` used before every API call with session ID
-- [ ] C3: Orchestrator has TOCTOU state validation before every action
-- [ ] C5: Error messages sanitize `cog_` tokens via sed
-- [ ] C6: Exponential backoff on 429 (max 5 retries, max 300s total wait)
-- [ ] H2: Cancel command re-validates state after user confirmation
-- [ ] H5: Message command verifies send success
-- [ ] H6: Token format validated (not just non-empty check)
-- [ ] H9: curl exit code checked on every API call
-- [ ] S1: `create_as_user_id` never used
-- [ ] S2: `session_secrets` never used (use `secret_ids` only)
-- [ ] S3: Enterprise list always filters by `org_ids`
-- [ ] S4: ACU data excluded from error context dumps
+- [x] C1: No `-v` or `--trace` in any curl call
+- [x] C2/C4: `validate_session_id()` used before every API call with session ID
+- [x] C3: Orchestrator has TOCTOU state validation before every action
+- [x] C5: Error messages sanitize `cog_` tokens via sed
+- [x] C6: Exponential backoff on 429 (max 5 retries, max 300s total wait)
+- [x] H2: Cancel command re-validates state after user confirmation
+- [x] H5: Message command verifies send success
+- [x] H6: Token format validated (not just non-empty check)
+- [x] H9: curl exit code checked on every API call
+- [x] S1: `create_as_user_id` never used
+- [x] S2: `session_secrets` never used (use `secret_ids` only)
+- [x] S3: Enterprise list always filters by `org_ids`
+- [x] S4: ACU data excluded from error context dumps
 
 ### Quality Gates
 
-- [ ] `pnpm validate:plugins` passes
-- [ ] All command frontmatter has correct `allowed-tools` lists
-- [ ] All descriptions have "Use when..." trigger clauses
-- [ ] Skill descriptions are single-line (not YAML folded scalars)
-- [ ] Skill uses `user-invokable` (with k)
-- [ ] LF line endings (`.gitattributes` enforced)
-- [ ] Agent under 120 lines
-- [ ] `repository` in plugin.json is plain string
+- [x] `pnpm validate:plugins` passes
+- [x] All command frontmatter has correct `allowed-tools` lists
+- [x] All descriptions have "Use when..." trigger clauses
+- [x] Skill descriptions are single-line (not YAML folded scalars)
+- [x] Skill uses `user-invokable` (with k)
+- [x] LF line endings (`.gitattributes` enforced)
+- [x] Agent under 120 lines
+- [x] `repository` in plugin.json is plain string
 
 ## Dependencies & Prerequisites
 
