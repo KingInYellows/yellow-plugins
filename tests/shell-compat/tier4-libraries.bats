@@ -84,6 +84,14 @@ assert_same_under_all_profiles() {
   [[ "$LIB_OUTPUT" == *"get1=MISS"* && "$LIB_OUTPUT" == *"put_rc=0"* && "$LIB_OUTPUT" == *"get2=HIT"* ]]
 }
 
+@test "yellow-core plan-gate-provenance.sh behaves the same in bash and zsh" {
+  assert_same_under_all_profiles plugins/yellow-core/lib/plan-gate-provenance.sh
+  [[ "$LIB_OUTPUT" == *"subject[x (#494) (#556)]=556 rc=0"* ]]
+  [[ "$LIB_OUTPUT" == *"scenario[ok] rc=0 PASS|pr=#42 sha=<ok> via=commit-subject|base=main"* ]]
+  [[ "$LIB_OUTPUT" == *"scenario[stacked] rc=0 PASS|pr=#42 sha=<ok> via=commit-subject|base=feat/parent"* ]]
+  [[ "$LIB_OUTPUT" == *"scenario[plan-only] rc=1 NO-EVIDENCE"* && "$LIB_OUTPUT" == *"commit[gone] rc=1 NO-EVIDENCE"* ]]
+}
+
 @test "yellow-core compound-staging.sh behaves the same in bash and zsh" {
   assert_same_under_all_profiles plugins/yellow-core/lib/compound-staging.sh
   [[ "$LIB_OUTPUT" == *'content={"x":2}'* && "$LIB_OUTPUT" == *"path_intact=yes"* ]]

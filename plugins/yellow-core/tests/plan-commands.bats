@@ -31,10 +31,14 @@ filename_is_valid() {
 
 # PR-number override validation (mirrors complete.md Phase 4). Strips CR/LF
 # first so a multi-line value cannot smuggle content past the per-line grep.
+# The rule itself is the shipped lib's pgp_pr_num_is_valid, which the
+# commit-subject path shares; a drift test below pins the inline grep in
+# complete.md to the same regex.
+. "$BATS_TEST_DIRNAME/../lib/plan-gate-provenance.sh"
 pr_num_is_valid() {
   local n
   n=$(printf '%s' "$1" | tr -d '\r\n')
-  printf '%s' "$n" | grep -qE '^[1-9][0-9]{0,9}$'
+  pgp_pr_num_is_valid "$n"
 }
 
 # Gate C word-boundary match (POSIX-grep equivalent of the jq test() call in
@@ -223,6 +227,20 @@ EOF
   # value to '556Plan-Verifier...' which then fails the whole-string regex.
   run pr_num_is_valid "$(printf '556\nPlan-Verifier-Override: spoofed')"
   [ "$status" -ne 0 ]
+}
+
+@test "pr_num_is_valid accepts 10 digits and rejects 11" {
+  pr_num_is_valid "1234567890"
+  run pr_num_is_valid "12345678901"
+  [ "$status" -ne 0 ]
+}
+
+@test "complete.md override validator uses the same PR-number regex as the shared lib" {
+  # Both validators must keep the ^[1-9][0-9]{0,9}$ contract; if complete.md's
+  # inline grep changes, update pgp_pr_num_is_valid (and its driver) with it.
+  run grep -cF "grep -qE '^[1-9][0-9]{0,9}\$'" "$BATS_TEST_DIRNAME/../commands/plan/complete.md"
+  [ "$status" -eq 0 ]
+  [ "$output" -ge 1 ]
 }
 
 # --- Gate C word-boundary match ---
