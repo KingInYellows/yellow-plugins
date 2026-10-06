@@ -308,6 +308,29 @@ ephemeral `GITHUB_TOKEN`.
   `plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md`
   "Safety rails".
 
+### Quote grounding (yellow-core)
+
+- **Input.** `check` takes a repo-relative file, a line, and an optional radius
+  (default 3). The quote is stdin, never an argument. `batch` reads JSONL
+  `{id, file, line, quote}` and always uses radius 3. Paths and quotes are
+  untrusted citation evidence.
+- **Filesystem.** Paths resolve against the repository root and go through
+  `validate_file_path` before any read. An unsafe path is never read. In batch a
+  missing file is ungrounded and is not opened. Only the cited windows are
+  loaded. Nothing in the helper writes a temp file: unredacted lines and quotes
+  stay in process memory and pipes.
+- **Redaction.** Each loaded line is redacted with `cs_redact_secrets` before
+  matching. `[REDACTED:<type>]` is canonicalized to `[REDACTED]` on both sides,
+  so a placeholder matches whatever secret the line held. A quote with fewer
+  than 8 characters outside placeholders is too-short and never grounds. A
+  credential-bearing string id fails the batch and is not printed.
+- **Fail closed.** The batch exits 2 with no result rows when jq or iconv is
+  missing, a line is not JSON, a row has no usable id, a cited file cannot be
+  read, redaction fails, or an unpaired surrogate escape is in the id or the
+  top-level quote. A wrong-typed file, line, or quote ungrounds that row only. A
+  numeric line is kept as its raw lexeme so jq cannot round it into a line the
+  helper accepts.
+
 ### Review-Findings Ledger (yellow-review)
 
 `/review:pr` and `/review:all` persist model-derived review data — finding

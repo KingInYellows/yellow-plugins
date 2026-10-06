@@ -24,8 +24,23 @@ setup() {
 }
 
 teardown() {
-    cd /
-    rm -rf "$REPO"
+    cd / || return 1
+    [ -n "${REPO:-}" ] || return 0
+    # git can recreate a file under .git during the walk. Retry a few
+    # times. A directory that is still present fails the test.
+    local attempt
+    for attempt in 1 2 3 4 5; do
+        if [ ! -e "$REPO" ]; then
+            return 0
+        fi
+        if rm -rf "$REPO" && [ ! -e "$REPO" ]; then
+            return 0
+        fi
+    done
+    if [ -e "$REPO" ]; then
+        printf 'teardown: failed to remove %s\n' "$REPO" >&2
+        return 1
+    fi
 }
 
 # Initialize a fake .ruvector/ DB in the main repo.
