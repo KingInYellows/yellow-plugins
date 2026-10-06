@@ -1,8 +1,9 @@
 # Feature: Audit Followups — 2026-05-07
 
-> Boxes ticked at archive cleanup (2026-10-05): the six PRs shipped as #436,
-> #438, #439, #441 and #442 (plus the mechanical PR 2 edits). Task 4.3.3
-> (`yellow-chatprd` dependency) is moot — that plugin was removed in #580.
+> Boxes ticked at archive cleanup (2026-10-05). The plan's six PRs shipped as five
+> (#436, #438, #439, #441, #442); the PR 2 mechanical edits were verified by end state,
+> with no single commit found. Items marked `[-]` were not done as written; each
+> carries its reason inline.
 
 ## Overview
 
@@ -499,9 +500,9 @@ only one with an explicit external gate.
   - If declared (non-optional) dep not present in catalog: WARNING (not ERROR)
     with message naming the consuming plugin, the missing dep `name`, the
     declared `version`, and the `reason` field for context if present
-- [x] 4.2.2: Add a unit test fixture: a manifest declaring `dependencies:
+- [-] 4.2.2: (not done — no RULE 11 test exists in tests/) Add a unit test fixture: a manifest declaring `dependencies:
   [{plugin: "non-existent-plugin", reason: "..."}]` — expect WARNING.
-- [x] 4.2.3: Add a positive test: declaring `yellow-linear` as a dep
+- [-] 4.2.3: (not done — no RULE 11 test exists in tests/) Add a positive test: declaring `yellow-linear` as a dep
   → no warning.
 
 #### 4.3 — Manifest declarations
@@ -528,7 +529,7 @@ only one with an explicit external gate.
     }
   ]
   ```
-- [x] 4.3.3: Edit `plugins/yellow-chatprd/.claude-plugin/plugin.json`:
+- [-] 4.3.3: (moot — yellow-chatprd was removed in #580) Edit `plugins/yellow-chatprd/.claude-plugin/plugin.json`:
   ```json
   "dependencies": [
     {
@@ -552,7 +553,7 @@ only one with an explicit external gate.
 - [x] 4.4.1: Run `pnpm validate:schemas` and `pnpm test:unit`.
 - [x] 4.4.2: `pnpm changeset` — patch bumps on `yellow-debt`, `yellow-ci`,
   `yellow-chatprd`. The schemas/scripts changes do not require a changeset.
-- [x] 4.4.3: ⚠️ **External gate — do NOT tag a release until this passes:**
+- [-] 4.4.3: (not verifiable from the repo — no record of the clean-install smoke test) ⚠️ **External gate — do NOT tag a release until this passes:**
   Fresh `claude plugin install` on a clean machine for at least one of the
   three modified plugins. Confirm Claude Code's remote validator accepts
   the new `dependencies` field. Local CI passing does NOT guarantee
@@ -640,29 +641,29 @@ to confirm the change is a strict narrowing (no functional regression):
 
 **Per-agent actions (revised per codebase findings above):**
 
-- [x] 5.2.1: `plugins/yellow-core/agents/research/learnings-researcher.md`
+- [-] 5.2.1: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-core/agents/research/learnings-researcher.md`
   → **No-op** (already `[Read, Grep, Glob]`); document in commit message
   that this agent was audited and confirmed minimal.
-- [x] 5.2.2: `plugins/yellow-core/agents/research/repo-research-analyst.md`
+- [-] 5.2.2: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-core/agents/research/repo-research-analyst.md`
   → keep current `[Read, Grep, Glob, Bash]`; **no-op** unless body shows
   Bash is unused. Audit only.
-- [x] 5.2.3: `plugins/yellow-core/agents/research/best-practices-researcher.md`
+- [-] 5.2.3: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-core/agents/research/best-practices-researcher.md`
   → keep `[WebSearch, WebFetch, Read, Glob, Grep]`; **no-op** unless body
   shows WebSearch/WebFetch unused. Audit only.
-- [x] 5.2.4: `plugins/yellow-core/agents/research/git-history-analyzer.md`
+- [-] 5.2.4: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-core/agents/research/git-history-analyzer.md`
   → confirm `[Bash, Read, Grep, Glob]` is current; **no-op** (resolves
   brainstorm Open Question 2 — Bash is required and present).
-- [x] 5.2.5: `plugins/yellow-core/agents/workflow/spec-flow-analyzer.md`
+- [-] 5.2.5: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-core/agents/workflow/spec-flow-analyzer.md`
   → keep current `[Read, Grep, Glob, Bash]`; **no-op** unless body shows
   Bash is unused. Audit only.
-- [x] 5.2.6: `plugins/yellow-research/agents/research/code-researcher.md`
+- [-] 5.2.6: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-research/agents/research/code-researcher.md`
   → keep current full set (`Read, Grep, Glob, Bash, ToolSearch, 4× MCP`);
   **no-op** — restricting to `[Read, Grep, Glob]` would break the agent.
   Audit only.
-- [x] 5.2.7: `plugins/yellow-codex/agents/research/codex-analyst.md`
+- [-] 5.2.7: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-codex/agents/research/codex-analyst.md`
   → confirm `[Bash, Read, Grep, Glob]` is current; **no-op** (Bash needed
   for Codex CLI invocation).
-- [x] 5.2.8: `plugins/yellow-linear/agents/research/linear-explorer.md`
+- [-] 5.2.8: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-linear/agents/research/linear-explorer.md`
   → read body to verify whether Read/Grep/Glob are actually used. If yes,
   add them to the existing `[Bash, ToolSearch, mcp__*]` set. If no, leave
   unchanged. **Decision deferred to body inspection at edit time.**
@@ -683,10 +684,10 @@ were checked for least-privilege; current tools are correct."
 #### 5.3 — Validation, changeset, submit
 
 - [x] 5.3.1: Run `pnpm validate:agents && pnpm validate:schemas`.
-- [x] 5.3.2: `pnpm changeset` — patch bumps on all five plugins:
+- [-] 5.3.2: (differs — #439 shipped changesets for yellow-core and yellow-review only) `pnpm changeset` — patch bumps on all five plugins:
   yellow-core, yellow-review, yellow-research, yellow-codex, yellow-linear.
-- [x] 5.3.3: Normalize line endings on all 13 modified `.md` files.
-- [x] 5.3.4: Commit with `feat(agents): pin opus on deep reviewers + restrict tools on read-only research agents (A-01, A-02 P1)`.
+- [-] 5.3.3: (differs — #439 edited 5 agent files, not 13) Normalize line endings on all 13 modified `.md` files.
+- [-] 5.3.4: (differs — shipped as `feat(agents): pin opus on deep-analysis reviewers (A-01)` (#439)) Commit with `feat(agents): pin opus on deep reviewers + restrict tools on read-only research agents (A-01, A-02 P1)`.
 - [x] 5.3.5: `gt submit` → PR 5.
 
 **Acceptance criteria:**
