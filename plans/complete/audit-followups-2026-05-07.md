@@ -1,9 +1,9 @@
 # Feature: Audit Followups — 2026-05-07
 
-> Boxes ticked at archive cleanup (2026-10-05). The plan's six PRs shipped as five
-> (#436, #438, #439, #441, #442); the PR 2 mechanical edits were verified by end state,
-> with no single commit found. Items marked `[-]` were not done as written; each
-> carries its reason inline.
+> Boxes ticked at archive cleanup (2026-10-05). The plan's six PRs shipped as #436,
+> #437, #438, #439, #441 and #442. Items marked `[-]` were not done as written
+> (4.2.2, 4.2.3, 4.4.3, 5.3.2-5.3.4); each carries its reason inline. Other items
+> carry inline notes where the shipped work differs from the plan.
 
 ## Overview
 
@@ -529,7 +529,7 @@ only one with an explicit external gate.
     }
   ]
   ```
-- [-] 4.3.3: (moot — yellow-chatprd was removed in #580) Edit `plugins/yellow-chatprd/.claude-plugin/plugin.json`:
+- [x] 4.3.3: (done in #442; yellow-chatprd was removed later in #580) Edit `plugins/yellow-chatprd/.claude-plugin/plugin.json`:
   ```json
   "dependencies": [
     {
@@ -641,29 +641,29 @@ to confirm the change is a strict narrowing (no functional regression):
 
 **Per-agent actions (revised per codebase findings above):**
 
-- [-] 5.2.1: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-core/agents/research/learnings-researcher.md`
+- [x] 5.2.1: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-core/agents/research/learnings-researcher.md`
   → **No-op** (already `[Read, Grep, Glob]`); document in commit message
   that this agent was audited and confirmed minimal.
-- [-] 5.2.2: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-core/agents/research/repo-research-analyst.md`
+- [x] 5.2.2: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-core/agents/research/repo-research-analyst.md`
   → keep current `[Read, Grep, Glob, Bash]`; **no-op** unless body shows
   Bash is unused. Audit only.
-- [-] 5.2.3: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-core/agents/research/best-practices-researcher.md`
+- [x] 5.2.3: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-core/agents/research/best-practices-researcher.md`
   → keep `[WebSearch, WebFetch, Read, Glob, Grep]`; **no-op** unless body
   shows WebSearch/WebFetch unused. Audit only.
-- [-] 5.2.4: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-core/agents/research/git-history-analyzer.md`
+- [x] 5.2.4: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-core/agents/research/git-history-analyzer.md`
   → confirm `[Bash, Read, Grep, Glob]` is current; **no-op** (resolves
   brainstorm Open Question 2 — Bash is required and present).
-- [-] 5.2.5: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-core/agents/workflow/spec-flow-analyzer.md`
+- [x] 5.2.5: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-core/agents/workflow/spec-flow-analyzer.md`
   → keep current `[Read, Grep, Glob, Bash]`; **no-op** unless body shows
   Bash is unused. Audit only.
-- [-] 5.2.6: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-research/agents/research/code-researcher.md`
+- [x] 5.2.6: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-research/agents/research/code-researcher.md`
   → keep current full set (`Read, Grep, Glob, Bash, ToolSearch, 4× MCP`);
   **no-op** — restricting to `[Read, Grep, Glob]` would break the agent.
   Audit only.
-- [-] 5.2.7: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-codex/agents/research/codex-analyst.md`
+- [x] 5.2.7: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-codex/agents/research/codex-analyst.md`
   → confirm `[Bash, Read, Grep, Glob]` is current; **no-op** (Bash needed
   for Codex CLI invocation).
-- [-] 5.2.8: (not done — A-02 Phase 1 was an audit-only no-op (see yellow-core and yellow-review changelogs)) `plugins/yellow-linear/agents/research/linear-explorer.md`
+- [x] 5.2.8: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-linear/agents/research/linear-explorer.md`
   → read body to verify whether Read/Grep/Glob are actually used. If yes,
   add them to the existing `[Bash, ToolSearch, mcp__*]` set. If no, leave
   unchanged. **Decision deferred to body inspection at edit time.**
@@ -707,7 +707,7 @@ were checked for least-privilege; current tools are correct."
 **Plugins touched:** none (scripts/, root docs/, package.json)
 **Changeset required:** no (scripts and root docs only)
 
-- [x] 6.1: Create `scripts/validate-doc-counts.js` (~50 lines) that:
+- [x] 6.1: (shipped narrower: explicit file allowlist and two patterns, `plugins` and `marketplace plugins`; no `consumers` pattern) Create `scripts/validate-doc-counts.js` (~50 lines) that:
   - Reads `.claude-plugin/marketplace.json` → `plugins.length` is the
     canonical count
   - Greps `CLAUDE.md`, `README.md`, and all root-level `.md` files (not
