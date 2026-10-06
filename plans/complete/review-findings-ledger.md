@@ -4,7 +4,8 @@
 > boxes done across merged #867, #868, #869, #870, #871, #872, #873 and #883
 > (all on `main`; `gh` shows the merge-queue PRs as CLOSED) plus version PR
 > #877. 6.5b is `[-]`: a measurement that waits on the first ten real
-> `/review:pr` runs, tracked in issue #881 (OPEN). No stale paths found.
+> `/review:pr` runs, tracked in issue #881 (OPEN). Live references now
+> point at this archived path.
 
 ## Overview
 

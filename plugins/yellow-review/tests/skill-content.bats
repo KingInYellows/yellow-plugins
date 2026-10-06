@@ -47,7 +47,7 @@ REVIEW_ALL="$COMMANDS_DIR/review-all.md"
 # --- review-findings ledger: rule and scope in the compact-return schema ----
 # Every compact-return producer must emit `rule` and `scope`, or its
 # findings reach the ledger defaulted to unclassified/unscoped and lose
-# their identity key (plans/review-findings-ledger.md Stage 2).
+# their identity key (plans/complete/review-findings-ledger.md Stage 2).
 
 REVIEW_PR="$COMMANDS_DIR/review-pr.md"
 WORKFLOW_SKILL="$SKILLS_DIR/pr-review-workflow/SKILL.md"

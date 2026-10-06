@@ -420,15 +420,16 @@ Start from a base that includes `stage-unattended-learnings` and PR 3.
   per-issue brainstorm doc to a named bats test in `review-ledger.bats`. Check
   specifically: tracked names with spaces/Unicode (45); three-plus identical
   occurrences (46); each row of the decision table in
-  `plans/review-findings-ledger.md` (~L248–300) (48); the ctags path now
-  running in CI (49).
+  `plans/complete/review-findings-ledger.md` (~L248–300) (48); the ctags
+  path now running in CI (49).
 - [ ] 7.2: Show the mapping and the merged PR numbers to the user and confirm
   before any Linear write. Check each issue for an active owner or branch.
   Then post the mapping as the closing comment and move the five issues to
   Done (a confirmed Tier 2 transition). Leave CLAUDE-47 alone.
 - [ ] 7.3: Note on CLAUDE-72 that sub-claim 2 was already fixed.
-- [ ] 7.4: Docs-only follow-up: add a "resolved, see `plans/review-findings-ledger.md`"
-  banner to `docs/brainstorms/2026-09-23-review-findings-ledger-brainstorm.md`
+- [ ] 7.4: Docs-only follow-up: add a "resolved, see
+  `plans/complete/review-findings-ledger.md`" banner to
+  `docs/brainstorms/2026-09-23-review-findings-ledger-brainstorm.md`
   and state the anchor-only re-verify limit in `references/review-pr/ledger.md`
   if it appears only in the plan.
 - [ ] 7.5: Capture the process lesson (check the code before decomposing a
@@ -532,7 +533,7 @@ attended runs; a caller that omits it now fails with a clear refusal.
 ## References
 
 - `docs/brainstorms/2026-10-05-CLAUDE-cycle-1-stack-brainstorm.md` and the sibling `CLAUDE-NN` docs
-- `plans/review-findings-ledger.md`
+- `plans/complete/review-findings-ledger.md`
 - `docs/solutions/logic-errors/review-ledger-awk-cache-and-reparse-bugs.md`
 - `docs/solutions/logic-errors/resolve-stack-state-stale-after-fix-commit-push.md`
 - `docs/solutions/logic-errors/early-exit-before-per-item-cleanup.md`
