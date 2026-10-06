@@ -1,0 +1,27 @@
+.changeset/ruvector-install-wait-default.md
+  s_7117acb1d3fade::t_0f75ce18ba820e 5-7
+plans/yellow-ruvector-live-verification-followups.md
+  s_7117acb1d3fade::t_b6b180b085e821 3-11
+plugins/yellow-ruvector/CLAUDE.md
+  s_7117acb1d3fade::t_e3cc35a2071ac6 18-22
+plugins/yellow-ruvector/README.md
+  s_7117acb1d3fade::t_2b97b4591a24f5 123
+plugins/yellow-ruvector/bin/start-ruvector.sh
+  s_7117acb1d3fade::t_7632c30c41eb52 47-49,87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d83d4a384eb7450b238bdd93eab65cce6832285b",
+  "prompts": {},
+  "sessions": {
+    "s_7117acb1d3fade": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "63ad41d1-8d93-4d0c-b57e-d5370fdef6ec",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
