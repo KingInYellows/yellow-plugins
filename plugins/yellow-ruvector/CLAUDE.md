@@ -13,8 +13,13 @@ ruvector.
      dir if missing — `npm ci --ignore-scripts` into `install-<lockhash12>/`,
      then an atomic `current` symlink swap, keeping the previous install so
      a running server is never pulled out from under itself. It waits up to
-     `RUVECTOR_INSTALL_WAIT` (25) seconds for a live installer (the prewarm
-     hook) before failing with a hint;
+     `RUVECTOR_INSTALL_WAIT` (20) seconds for a live installer (the prewarm
+     hook) before failing with a hint. Claude Code's MCP startup timeout with
+     `MCP_TIMEOUT` unset measured about 26 s from server spawn (Claude Code
+     2.1.291, 2026-10-06: a server that slept 26 s before its handshake
+     connected, 27 s failed), so the default leaves about 6 s for the exec and
+     handshake after the budget. Raise both `MCP_TIMEOUT` (ms) and
+     `RUVECTOR_INSTALL_WAIT` together for slow networks;
   2. `cd`s to the git toplevel (ruvector's `getIntelPath()` only looks at
      `process.cwd()`) after healing a linked worktree's `.ruvector` symlink,
      so subdirectory launches and new worktrees use the right store in the

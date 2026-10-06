@@ -120,6 +120,7 @@ external services or API keys required.
 | Old memories missing after upgrading | A store in a subdirectory from older sessions — `/ruvector:status` lists it as `nested store:` |
 | Empty search results | Run `/ruvector:index` first                              |
 | Slow first search    | Normal — MCP cold start takes 300-1500ms                 |
+| MCP server fails to start on a first install ("timed out after 20s waiting for another ruvector install") | Claude Code gives an MCP server about 26 s to handshake when `MCP_TIMEOUT` is unset (measured on 2.1.291), and the launcher stays under that with `RUVECTOR_INSTALL_WAIT` (default 20 s). Run `/ruvector:setup` to install first, or on a slow network raise both `MCP_TIMEOUT` (milliseconds, e.g. `60000`) and `RUVECTOR_INSTALL_WAIT` (seconds, e.g. `50`) |
 | Queue growing large  | Check `/ruvector:status`; ask the `ruvector-memory-manager` agent to flush it (no hook drains the queue) |
 | Cursor blocks Shell / edits | Re-run `/ruvector:setup`, then start a new Cursor session |
 | `hooks_remember` refused / "store is hash-embedded" at session start | Run `/ruvector:status` — `PROVENANCE: MISMATCH` / `UNSTAMPED` prints the `hooks reembed` + restart steps (status diagnoses; the reembed + restart is the fix) |

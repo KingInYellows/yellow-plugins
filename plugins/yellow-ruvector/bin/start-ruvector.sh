@@ -19,7 +19,7 @@
 #
 # Env: CLAUDE_PLUGIN_ROOT (required), CLAUDE_PLUGIN_DATA (optional; XDG
 # fallback), RUVECTOR_MCP_ALLOW (tool allowlist from the manifest),
-# RUVECTOR_INSTALL_WAIT (seconds to wait for a running install, default 25).
+# RUVECTOR_INSTALL_WAIT (seconds to wait for a running install, default 20).
 set -euo pipefail
 
 # One line per message: paths inside (data dir, install) are flattened
@@ -38,14 +38,16 @@ if ! ruvector_node_ok; then
 fi
 yellow_ruvector_validate_paths || exit 1
 
-wait_secs="${RUVECTOR_INSTALL_WAIT:-25}"
-case "$wait_secs" in ''|*[!0-9]*) wait_secs=25 ;; esac
+wait_secs="${RUVECTOR_INSTALL_WAIT:-20}"
+case "$wait_secs" in ''|*[!0-9]*) wait_secs=20 ;; esac
 # Base 10 ("08" is not octal) and at most 6 digits (no arithmetic overflow).
-[ "${#wait_secs}" -le 6 ] || wait_secs=25
+[ "${#wait_secs}" -le 6 ] || wait_secs=20
 wait_secs=$((10#$wait_secs))
 # Everything before the MCP handshake (lock waits, warm-up) shares one
-# budget of wait_secs, kept under Claude Code's MCP startup timeout; only a
-# first `npm ci` can run past it.
+# budget of wait_secs, kept under Claude Code's MCP startup timeout (measured
+# 2026-10-06 on 2.1.291 with MCP_TIMEOUT unset: ~26 s from server spawn; the
+# default leaves room for exec and the handshake); only a first `npm ci` can
+# run past it.
 t0=$SECONDS
 budget_left() { echo $(( wait_secs - (SECONDS - t0) )); }
 
