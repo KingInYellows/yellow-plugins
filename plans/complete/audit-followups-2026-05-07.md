@@ -3,9 +3,9 @@
 > Boxes ticked at archive cleanup (2026-10-05). The plan's six PRs shipped as
 > #436, #437, #438, #439, #441, and #442. PR 2 is `40f6767 chore(audit): apply
 > mechanical followups (C-02, M-01 reactive, M-02, C-01) (#437)`. Items marked
-> `[-]` were not done as written (4.2.2, 4.2.3, 4.4.3, 5.3.2-5.3.4); each
-> carries its reason inline. Other items carry inline notes where the shipped
-> work differs from the plan.
+> `[-]` were not done as written (3.5, 4.2.2, 4.2.3, 4.4.3, 5.3.2-5.3.4);
+> each carries its reason inline. Other items carry inline notes where the
+> shipped work differs from the plan.
 
 ## Overview
 
@@ -366,11 +366,11 @@ only one with an explicit external gate.
   trade-off — the alternative blocks every cold session by 30s."
 - [x] 3.4: Edit `plugins/yellow-morph/.claude-plugin/plugin.json`:
   - Lower `hooks.SessionStart[0].hooks[0].timeout` from `30` to `5`.
-- [x] 3.5: Manual smoke test:
+- [-] 3.5: (partial — #438 / `9977b28` records only the parent timing: `<10ms`, and `time bash hooks/scripts/prewarm-morph.sh` returned `0.007s`. The yellow-morph changelog records the same `<10ms` parent yield. Background-install completion and the zombie `ps` check are not in that commit, the changelog, or elsewhere in the repo) Manual smoke test:
   - Run the script directly: `bash plugins/yellow-morph/hooks/scripts/prewarm-morph.sh`
-  - Confirm parent returns in <1s
-  - Confirm the background prewarm completes (check installed package)
-  - Confirm no zombie children: `ps -ef | grep prewarm` after parent exits
+  - Confirm parent returns in <1s — recorded
+  - Confirm the background prewarm completes (check installed package) — not recorded
+  - Confirm no zombie children: `ps -ef | grep prewarm` after parent exits — not recorded
 - [x] 3.6: Run `pnpm validate:schemas`.
 - [x] 3.7: `pnpm changeset` — patch bump on `yellow-morph`.
 - [x] 3.8: Normalize line endings: `sed -i 's/\r$//' plugins/yellow-morph/hooks/scripts/prewarm-morph.sh`.
@@ -378,8 +378,8 @@ only one with an explicit external gate.
 - [x] 3.10: `gt submit` → PR 3.
 
 **Acceptance criteria:**
-- Manual run shows parent process exits in <1s.
-- Background subshell completes successfully without zombies.
+- Manual run shows parent process exits in <1s (recorded in #438 as `0.007s` / `<10ms`).
+- Background-install completion and the zombie-process check are not recorded.
 - `pnpm validate:schemas` passes.
 - `plugin.json` SessionStart timeout is 5.
 
@@ -505,9 +505,10 @@ only one with an explicit external gate.
   - Skip entries where `optional === true` (matches npm `peerDependenciesMeta`
     semantics: declared but not enforced)
   - Cross-check against the marketplace catalog (`.claude-plugin/marketplace.json`)
-  - If declared (non-optional) dep not present in catalog: WARNING (not ERROR)
-    with message naming the consuming plugin, the missing dep `name`, the
-    declared `version`, and the `reason` field for context if present
+  - If declared (non-optional) dep not present in catalog: WARNING (not ERROR).
+    The shipped `ruleDependencies()` message names the consuming plugin and
+    the missing dep `name`, and appends `reason` when present. It does not
+    include the declared `version` (`dep.version` is never read).
 - [-] 4.2.2: (not done — no RULE 11 test exists in tests/) Add a unit test fixture: a manifest declaring `dependencies: [{"name": "non-existent-plugin", "reason": "..."}]` — expect WARNING. `plugin` is not a schema property; omitting `version` is valid because `version` is optional.
 - [-] 4.2.3: (not done — no RULE 11 test exists in tests/) Add a positive test: declaring `yellow-linear` as a dep
   → no warning.
@@ -725,7 +726,8 @@ were checked for least-privilege; current tools are correct."
   - `README.md`
   - `CONTRIBUTING.md`
   - `AGENTS.md`
-  - `docs/architecture-overview.md`
+    (`docs/architecture-overview.md` was not in this #441 allowlist. #840,
+    `dd88bf19`, added it later.)
   - Reads `.claude-plugin/marketplace.json` → `plugins.length` is the
     canonical count
   - Matches only these patterns (there is no `consumers` pattern):
@@ -779,10 +781,10 @@ were checked for least-privilege; current tools are correct."
 - `pnpm release:check` invokes it and fails fast on any mismatch.
 - Unit tests cover positive, negative (mismatch), and absent-claim cases.
 - Adding a fake `"99 plugins"` claim to a `SCAN_FILES` document fails the
-  check with file/line context. The allowlist is only `CLAUDE.md`,
-  `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, and
-  `docs/architecture-overview.md`. A root Markdown file outside that list
-  is not scanned and does not fail.
+  check with file/line context. #441 shipped four files: `CLAUDE.md`,
+  `README.md`, `CONTRIBUTING.md`, and `AGENTS.md`. #840 (`dd88bf19`) added
+  `docs/architecture-overview.md`. A Markdown file outside that list is
+  not scanned and does not fail.
 
 ---
 
@@ -864,7 +866,7 @@ None.
 |---|---|
 | 1 | `pnpm test:unit && pnpm validate:schemas && pnpm release:check` |
 | 2 | `pnpm validate:schemas && pnpm validate:agents` |
-| 3 | Manual smoke (parent <1s, no zombies) + `pnpm validate:schemas` |
+| 3 | Parent timing recorded in #438 (`0.007s`); zombie and background-completion checks not recorded. Plus `pnpm validate:schemas` |
 | 4 | `pnpm validate:schemas && pnpm test:unit` + ⚠️ fresh-install smoke |
 | 5 | `pnpm validate:agents && pnpm validate:schemas` |
 | 6 | `pnpm release:check` (now includes `validate:doc-counts`) |
@@ -881,9 +883,9 @@ None.
 
 ### Manual checks
 
-- **PR 3 H-01:** time `bash plugins/yellow-morph/hooks/scripts/prewarm-morph.sh`
-  → parent must exit in <1s; check `ps -ef | grep prewarm` after parent
-  exits → background subshell may still run, but no zombies (`Z` in `ps`).
+- **PR 3 H-01:** #438 records parent timing only (`0.007s` / `<10ms` in
+  `9977b28`). The background-install completion check and
+  `ps -ef | grep prewarm` zombie inspection are not recorded.
 - **PR 4 X-01 smoke gate:** fresh `claude plugin install yellow-debt`
   on a clean Claude Code install. Confirm install succeeds and the
   remote validator does not reject the extended `dependencies` field.
