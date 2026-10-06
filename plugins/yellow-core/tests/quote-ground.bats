@@ -610,6 +610,15 @@ now_ms() {
   run bash "$QG" batch <<<"{\"id\":\"9007199254740993\",\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"seen \\\"id\\\":9007199254740993 $Q26\"}"
   [ "$status" -eq 0 ]
   jq -e '.id == "9007199254740993" and (.id | type) == "string"' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<"$(row ok src/a.txt 1 "$Q26")"$'\n''{"\u0069d":9007199254740993,"file":"src/a.txt","line":1,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<"{\"\\u0069d\":42,\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"$Q26\"}"
+  [ "$status" -eq 0 ]
+  jq -e '.id == 42 and (.id | type) == "number"' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<"{\"id\":\"ok\",\"nested\":{\"id\":9007199254740993},\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"$Q26\"}"
+  [ "$status" -eq 0 ]
+  jq -e '.id == "ok" and (.id | type) == "string"' <<<"$output" >/dev/null
 }
 
 @test "batch handles a multi-line quote without disturbing its siblings" {

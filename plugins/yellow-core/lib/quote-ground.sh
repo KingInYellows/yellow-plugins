@@ -517,21 +517,24 @@ qg_load_rows() {
       gsub("\"(?:[^\"\\\\]|\\\\.)*\""; "\"\"")
       | test("^(?:[\\[\\]{}:,\" \\t\\r]|(?:true|false|null|-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)(?![0-9A-Za-z.+-]))*$");
     # Integer ids are usable only at or inside ±2^53. Compare the raw digit
-    # string: fromjson on jq 1.6 would already have rounded the value. A key
-    # inside a string does not match, because those quotes are escaped. The
-    # character after the digits must not continue a non-integer number.
+    # string: fromjson on the number would already have rounded it on jq 1.6.
+    # Escaped keys are decoded with fromjson, and only the top-level id is
+    # checked (object depth 1). Braces inside a string do not change depth.
+    # The character after the digits must not continue a non-integer number.
     def int_abs_ok:
       (if startswith("-") then .[1:] else . end) as $d
       | ($d | length) as $len
       | if $len <= 15 then true
         elif $len == 16 then $d <= "9007199254740992"
         else false end;
+    def brace_delta($s):
+      ([$s | scan("\\{")] | length) - ([$s | scan("\\}")] | length);
     def unsafe_int_id:
       reduce scan("\"(?:[^\"\\\\]|\\\\.)*\"|[^\\\"]+") as $tok (
-        {prev: null, bad: false};
+        {prev: null, depth: 0, bad: false};
         if .bad then .
-        elif ($tok | startswith("\"")) then .prev = $tok
-        elif ((.prev == "\"id\"") and ($tok | test("^[ \\t\\r]*:[ \\t\\r]*-?(?:0|[1-9][0-9]*)(?![0-9.eE])"))) then
+        elif ($tok | startswith("\"")) then .prev = ($tok | fromjson)
+        elif ((.prev == "id") and .depth == 1 and ($tok | test("^[ \\t\\r]*:[ \\t\\r]*-?(?:0|[1-9][0-9]*)(?![0-9.eE])"))) then
           .bad = (
             $tok
             | capture("^[ \\t\\r]*:[ \\t\\r]*(?<n>-?(?:0|[1-9][0-9]*))")
@@ -539,8 +542,11 @@ qg_load_rows() {
             | int_abs_ok
             | not
           )
+          | .depth += brace_delta($tok)
           | .prev = null
-        else .prev = null
+        else
+          .depth += brace_delta($tok)
+          | .prev = null
         end
       )
       | .bad;
