@@ -683,6 +683,19 @@ now_ms() {
   [[ "$output" == *'"id":42,'* ]]
 }
 
+@test "batch rejects a repeated top-level id so an earlier lexeme cannot win" {
+  printf '%s\n' "$Q26" >src/a.txt
+  run bash "$QG" batch <<<"{\"id\":1.5,\"id\":\"safe\",\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"$Q26\"}"
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<"{\"id\":1.5,\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"$Q26\"}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"id":1.5,'* ]]
+  run bash "$QG" batch <<<"{\"id\":\"safe\",\"nested\":{\"id\":1.5},\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"$Q26\"}"
+  [ "$status" -eq 0 ]
+  jq -e '.id == "safe" and (.id | type) == "string"' <<<"$output" >/dev/null
+}
+
 @test "batch handles a multi-line quote without disturbing its siblings" {
   local payload
   printf 'alpha line one\nthe quoted target line\nomega\n' >src/a.txt

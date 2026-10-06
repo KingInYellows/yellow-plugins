@@ -581,9 +581,10 @@ qg_load_rows() {
     # Any other top-level numeric id keeps that lexeme. The value is rewritten
     # to 0 before fromjson so jq 1.6 cannot change it, and emit writes the
     # lexeme back. Escaped keys are decoded with fromjson. Only the top-level
-    # id is checked (object depth 1). A string id is judged from its raw
-    # lexeme, before fromjson, so an unpaired surrogate fails closed. Braces
-    # inside a string do not change depth.
+    # id is checked (object depth 1). A repeated top-level id fails the batch.
+    # A string id is judged from its raw lexeme, before fromjson, so an
+    # unpaired surrogate fails closed. Braces inside a string do not change
+    # depth.
     def int_abs_ok:
       (if startswith("-") then .[1:] else . end) as $d
       | ($d | length) as $len
@@ -607,13 +608,14 @@ qg_load_rows() {
     def colon_only: "^[ \\t\\r]*:[ \\t\\r]*$";
     def id_scan:
       reduce scan("\"(?:[^\"\\\\]|\\\\.)*\"|[^\\\"]+") as $tok (
-        {prev: null, depth: 0, bad: false, lex: null, want: false, out: ""};
+        {prev: null, depth: 0, bad: false, lex: null, want: false, seen: false, out: ""};
         if .bad then .out += $tok
         elif .want then
           .want = false
           | .prev = null
           | if ($tok | startswith("\"")) then
-              .bad = ($tok | has_unpaired_surrogate)
+              .seen = true
+              | .bad = ($tok | has_unpaired_surrogate)
             else
               .depth += brace_delta($tok)
             end
@@ -621,8 +623,14 @@ qg_load_rows() {
         elif ($tok | startswith("\"")) then
           .prev = ($tok | fromjson)
           | .out += $tok
+        elif ((.prev == "id") and .depth == 1 and .seen) then
+          .bad = true
+          | .lex = null
+          | .prev = null
+          | .out += $tok
         elif ((.prev == "id") and .depth == 1 and ($tok | test(num_at))) then
           ($tok | capture(num_cap)) as $c
+          | .seen = true
           | if ($c.n | test("^" + int_re + "$")) then
               .bad = ($c.n | int_abs_ok | not)
               | .out += $tok
