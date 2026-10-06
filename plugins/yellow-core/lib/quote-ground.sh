@@ -294,9 +294,13 @@ qg_path_class() {
     QG_ONE_CLASS=${QG_PATH_CLASS["p:$file"]}
     return 0
   fi
-  # Option-shaped segments and any control character (tab, newline, ESC, DEL)
-  # are refused before the path reaches validate_file_path or a file test.
-  if [[ "$file" == -* || "$file" == */-* || "$file" == *[[:cntrl:]]* ]]; then
+  # Allowlist (ASCII, C locale): letters, digits, space and . _ / + @ = , ~ ( ) [ ] -
+  # Anything else (shell metacharacters, quotes, control characters, non-ASCII)
+  # and option-shaped segments are refused before the path reaches
+  # validate_file_path or a file test.
+  local LC_ALL=C
+  local path_re='^[][A-Za-z0-9 ._/+@=,~()-]+$'
+  if [[ ! "$file" =~ $path_re || "$file" == -* || "$file" == */-* ]]; then
     QG_ONE_CLASS=unsafe-path
   elif ! validate_file_path "$file" "$QG_ROOT"; then
     # A directory without search permission also fails validation.
@@ -465,7 +469,10 @@ qg_check() {
 # failure leaves the count unread and this function fails; the read never
 # depends on a process substitution's exit status. jq reads raw lines (-R) and
 # parses each one, so a blank or whitespace-only line fails the batch like any
-# other non-JSON line; the newline that ends the last row is not a line. A row
+# other non-JSON line; the newline that ends the last row is not a line. Each
+# line must also be strict JSON: with its strings removed, only structure,
+# true, false, null and RFC 8259 numbers may remain, because fromjson alone
+# accepts Infinity, NaN, 01 and 1. and would change an id. A row
 # that is not JSON, or has no usable id, fails the whole batch. A row with a usable id and a bad
 # file, line or quote (wrong type, or U+0000 that would shift the framing)
 # becomes line 0, which classifies as ungrounded. The id carries a type tag:
@@ -492,7 +499,13 @@ qg_load_rows() {
       B_MATCH+=("")
     done
   } < <(jq -nRj '
-    def parse: if test("^[ \t\r]*$") then error("blank record") else fromjson end;
+    def strict:
+      gsub("\"(?:[^\"\\\\]|\\\\.)*\""; "\"\"")
+      | test("^(?:[\\[\\]{}:,\" \\t\\r]|(?:true|false|null|-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)(?![0-9A-Za-z.+-]))*$");
+    def parse:
+      if test("^[ \t\r]*$") then error("blank record")
+      elif strict then fromjson
+      else error("not strict JSON") end;
     def hasnul: type == "string" and contains("\u0000");
     def tag: if type == "number" then "n" + tostring else "s" + . end;
     def row:

@@ -508,6 +508,26 @@ now_ms() {
   [[ "$output" != *'"result"'* ]]
 }
 
+@test "batch rejects non-JSON numeric forms but accepts valid JSON numbers" {
+  local lit
+  printf '%s\n' "$Q26" >src/a.txt
+  for lit in Infinity -Infinity NaN nan 01 1. .5 +1 1e 0x1; do
+    run bash "$QG" batch <<<"{\"id\":$lit,\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"$Q26\"}"
+    [ "$status" -eq 2 ]
+    [[ "$output" != *'"result"'* ]]
+  done
+  run bash "$QG" batch <<<"{\"id\":1,\"file\":\"src/a.txt\",\"line\":Infinity,\"quote\":\"$Q26\"}"
+  [ "$status" -eq 2 ]
+  for lit in 0 -0 7 1.5 -2.5e+3 1E5 true; do
+    run bash "$QG" batch <<<"{\"id\":\"s\",\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"Infinity 01 \\\"x\\\" $Q26\",\"n\":$lit}"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"id":"s"'* ]]
+  done
+  run bash "$QG" batch <<<"{\"id\":42,\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"$Q26\"}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"id":42,'* ]]
+}
+
 @test "batch rejects a blank or whitespace-only line but accepts the final newline" {
   local a b
   printf '%s\n' "$Q26" >src/a.txt
