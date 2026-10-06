@@ -515,6 +515,22 @@ now_ms() {
   [[ "$output" != *ghp_* ]]
 }
 
+@test "batch exits 2 when iconv is not on PATH and names that dependency" {
+  local shim src cmd bash_bin
+  shim="${BASE}/bin"
+  bash_bin="$(command -v bash)"
+  mkdir -p "$shim"
+  for cmd in dirname jq; do
+    src="$(command -v "$cmd")" || skip "$cmd is not installed"
+    ln -s "$src" "$shim/$cmd"
+  done
+  printf '%s\n' "$Q26" >src/a.txt
+  PATH="$shim" run "$bash_bin" "$QG" batch <<<"$(row ok src/a.txt 1 "$Q26")"
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  [[ "$output" == *'batch requires iconv'* ]]
+}
+
 @test "batch rejects non-JSON numeric forms but accepts valid JSON numbers" {
   local lit
   printf '%s\n' "$Q26" >src/a.txt

@@ -147,10 +147,10 @@ you want richer library docs:
 ## Quote grounding
 
 `lib/quote-ground.sh` grounds a single-line quote inside a cited window.
-Run it with bash 4.4 or newer (jq is also needed for `batch`). Do not source
-it, and it is not a dual-shell library. The later council shell 05 PR calls
-`quote-ground.sh batch` for its Tier 1 check and adds the yellow-core catalog
-dependency.
+Run it with bash 4.4 or newer (`batch` also needs jq and iconv). Do not
+source it, and it is not a dual-shell library. The later council shell 05 PR
+calls `quote-ground.sh batch` for its Tier 1 check and adds the yellow-core
+catalog dependency.
 
 ```bash
 printf '%s' "$quote" | bash lib/quote-ground.sh check <file> <line> [radius]
@@ -179,9 +179,9 @@ bash lib/quote-ground.sh batch < findings.jsonl
   a number only for `grounded` and `null` otherwise. A numeric id stays a
   number. A missing file is `ungrounded` and is never opened; an unsafe path is
   never read. A row with a usable id but a wrong-typed field is `ungrounded`
-  and does not affect its siblings. `batch` exits 2 with no result rows when a
-  line is not JSON, a row has no usable id, a cited file cannot be read, or
-  redaction fails.
+  and does not affect its siblings. `batch` exits 2 with no result rows when
+  jq or iconv is missing, a line is not JSON, a row has no usable id, a cited
+  file cannot be read, or redaction fails.
 - **No temp files.** Unredacted source lines and quotes stay in process memory
   and pipes.
 

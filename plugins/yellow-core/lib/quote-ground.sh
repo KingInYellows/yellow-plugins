@@ -23,9 +23,9 @@
 # ungrounded and does not affect its siblings. A cited file with a NUL byte in
 # the lines up to its last cited window is never matched: its rows are
 # ungrounded (check exits 1), because bash would silently drop the byte. batch
-# exits 2 with no result rows when jq is missing, when a line is blank or not
-# JSON, when a row has no usable id (a string or number without U+0000), when a cited
-# file cannot be read, or when redaction fails.
+# exits 2 with no result rows when jq or iconv is missing, when a line is blank
+# or not JSON, when a row has no usable id (a string or number without U+0000),
+# when a cited file cannot be read, or when redaction fails.
 #
 # Redaction runs per line before matching, and every [REDACTED] or
 # [REDACTED:<type>] token is canonicalized to [REDACTED] on both sides. A
@@ -478,15 +478,16 @@ qg_check() {
 # becomes line 0, which classifies as ungrounded. The id carries a type tag:
 # n for a JSON number, s for a string.
 # The raw bytes first pass through iconv, which fails on invalid UTF-8 that jq
-# would otherwise replace with U+FFFD and so change an id; a failure appends a
-# non-JSON line, so the batch ends as for any other non-JSON input (iconv is
-# required, like jq). jq's stderr is discarded because its parse diagnostics
-# quote the whole row, credential-shaped text included; only the generic
-# message below reaches stderr.
+# would otherwise replace with U+FFFD and so change an id. iconv is required
+# for batch, like jq: a missing iconv exits 2 and names the dependency before
+# any row is parsed. An iconv failure on invalid UTF-8 appends a non-JSON
+# line, so the batch ends as for any other non-JSON input. jq's stderr is
+# discarded because its parse diagnostics quote the whole row, credential-shaped
+# text included; only the generic message below reaches stderr.
 qg_load_rows() {
   local n i id file line quote
   if ! command -v iconv >/dev/null 2>&1; then
-    printf 'quote-ground: invalid batch input\n' >&2
+    printf 'quote-ground: batch requires iconv\n' >&2
     return 2
   fi
   {
