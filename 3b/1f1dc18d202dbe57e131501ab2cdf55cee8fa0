@@ -1,0 +1,19 @@
+plans/complete/stage-unattended-sweep-learnings.md
+  s_1b85233d86c5f4::t_460c0a8a58cc41 557
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3b1f1dc18d202dbe57e131501ab2cdf55cee8fa0",
+  "prompts": {},
+  "sessions": {
+    "s_1b85233d86c5f4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d4a1ac10-8d49-4bf0-b157-507bf9e56d9e",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
