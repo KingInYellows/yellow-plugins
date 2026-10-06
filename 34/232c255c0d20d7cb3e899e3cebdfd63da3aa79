@@ -1,0 +1,101 @@
+plans/complete/2026-02-18-feat-devin-v3-api-migration-plan.md
+  s_df8d7231d1f6b5::t_75d18baef06274 10-15,884,901,909,911
+plans/complete/2026-02-18-feat-public-release-audit-plan.md
+  s_df8d7231d1f6b5::t_7f61a5164abc51 9-14,138-139,200,238,240,265,319,330-331,333,335-336,345,347,349,351-352,356,358
+plans/complete/2026-02-21-feat-yellow-research-plugin-plan.md
+  s_df8d7231d1f6b5::t_44bb3575a86a1c 11-14,477,482,484
+plans/complete/2026-02-22-feat-add-workflows-compound-to-yellow-core-plan.md
+  s_df8d7231d1f6b5::t_c7c99a1eb0f12d 10-14,79,82
+plans/complete/2026-02-22-feat-linear-cross-plugin-integration-plan.md
+  s_df8d7231d1f6b5::t_e11ffb88c12402 10-14,401,404,407-408
+plans/complete/2026-02-22-feat-ruvector-userpromptsubmit-hook-and-workflow-integration-plan.md
+  s_df8d7231d1f6b5::t_6eff2f4fad89af 11-15,350,352,354,356,358,360,362,364,366,368
+plans/complete/2026-02-23-feat-plugin-versioning-changesets-plan.md
+  s_df8d7231d1f6b5::t_3aa2e0b728fe86 11-17,603,605,632,693,706,711,739,775,790,792,799,801,807
+plans/complete/2026-02-23-feat-yellow-core-workflows-brainstorm-command-plan.md
+  s_df8d7231d1f6b5::t_a30fd36273ab7e 3-7
+plans/complete/2026-02-24-feat-agent-quality-audit-plan.md
+  s_df8d7231d1f6b5::t_e21c1ad035772a 9-12,110
+plans/complete/2026-02-24-feat-ci-setup-self-hosted-plan.md
+  s_df8d7231d1f6b5::t_957d785199f127 3-5
+plans/complete/2026-02-24-feat-memory-aware-workflow-integration-plan.md
+  s_df8d7231d1f6b5::t_801785e0ab8e59 11-15,636,638,640,642,644,646,649,651,669,683
+plans/complete/2026-02-25-feat-plugin-ecosystem-cohesion-plan.md
+  s_df8d7231d1f6b5::t_de5caa2730c772 3-6,84-85,231,302,345,369,540
+plans/complete/2026-05-08-doctor-fix-rollback-userconfig-pattern.md
+  s_df8d7231d1f6b5::t_17e4aae1b94c52 3-7,183,193,206,219,224-226
+plans/complete/ast-grep-integration.md
+  s_df8d7231d1f6b5::t_0c4a21924421bb 3-7,265
+plans/complete/background-compounding-triggers.md
+  s_df8d7231d1f6b5::t_64cf8d33dd4250 3-7,344,418,520,536,539,594,598,639,642,645,647,650,653,655
+plans/complete/claude-code-plugin-improvements.md
+  s_df8d7231d1f6b5::t_b6403d76cfc056 3-7,164,261,264,282,311,332,361,367,402,412,415
+plans/complete/compound-staging-review-followups.md
+  s_df8d7231d1f6b5::t_3eb23583beaaf7 3-6,68,73,107,109,121,144,147
+plans/complete/everyinc-merge-remaining-work.md
+  s_df8d7231d1f6b5::t_dae0802222ee90 3-8,137,253,292-293
+plans/complete/everyinc-merge.md
+  s_df8d7231d1f6b5::t_1cd0a12f5c6f80 3-9,188,280,350,352,356,358,361,571,588,644,674,698,718,724,728,731,737,773,775,823,828,901,955,1001,1042,1113,1265,1771-1774
+plans/complete/library-context-skill.md
+  s_df8d7231d1f6b5::t_2e975a0ee0e7ed 3-6,119,228-230
+plans/complete/model-explicit-coverage-gaps.md
+  s_df8d7231d1f6b5::t_a98ae8101ac324 3-6,223
+plans/complete/model-selection-frontmatter-rollout.md
+  s_df8d7231d1f6b5::t_840f913c0ac157 3-7
+plans/complete/plugin-install-resilience.md
+  s_df8d7231d1f6b5::t_41b6da8a81ecae 3-7,223,252,292,303,322,325,328,333,338,364,431,452,467,484,489,493,497,505,526,604,606,608,611,613,615,843,845
+plans/complete/plugin-manifest-userconfig-validator-drift.md
+  s_df8d7231d1f6b5::t_5d5d404b7f1bd2 3-7,101
+plans/complete/pr-260-followup-hardening-and-docs.md
+  s_df8d7231d1f6b5::t_7e80d8bf4b9cb7 3-6,104,121
+plans/complete/pr-316-yellow-debt-residual-review-cleanup.md
+  s_df8d7231d1f6b5::t_f2260f1b4aadbf 3-9,63-64,85-87,91,95-101,105-108,112,116,122-125,131,135,141-142,146,149,197-201,205,207,213-214,285-288
+plans/complete/resolve-stack.md
+  s_df8d7231d1f6b5::t_23eb0d35f740ca 3-6
+plans/complete/ruvector-worktree-db-symlink.md
+  s_df8d7231d1f6b5::t_a0a6665f020613 3-9
+plans/complete/setup-claude-web-command.md
+  s_df8d7231d1f6b5::t_4e78a78510b2c8 3-7,230,640
+plans/complete/skill-description-audit-followups.md
+  s_df8d7231d1f6b5::t_becc9f5aa1f277 3-6,129,139,212,224
+plans/complete/skill-description-audit.md
+  s_df8d7231d1f6b5::t_de217f5bb714a3 3-6,98,166
+plans/complete/sweep-no-gate-and-sweep-all.md
+  s_df8d7231d1f6b5::t_801e3e13b57f34 11-14,167
+plans/complete/userconfig-pattern-enforcement.md
+  s_df8d7231d1f6b5::t_05cf052a4f12bc 3-7,160,169,213,215,224,239,270,275,286,309,330,346,369,371,387,393,395,399,404
+plans/complete/validate-plugin-js-hooks-file-shape-hardening.md
+  s_df8d7231d1f6b5::t_5e812ed2c413f3 3-7,73,84
+plans/complete/yellow-council-godmodeskill-integration.md
+  s_df8d7231d1f6b5::t_70f9f0e1fcba60 3-7,13,339,343-348,351
+plans/complete/yellow-debt-remove-v1-dual-read.md
+  s_df8d7231d1f6b5::t_c9add1fc7186a1 3-7,138-139
+plans/complete/yellow-mempalace-plugin.md
+  s_df8d7231d1f6b5::t_f4e62eee063f05 3-8,69,82,126,128,152,164,169,176,182,190,198,204,225,236,243,251,259,272,278
+plans/review-findings-ledger.md
+  s_df8d7231d1f6b5::t_4701623ed4cf6d 3-9
+plans/yellow-rtk-plugin.md
+  s_df8d7231d1f6b5::t_26dde144e00719 3-11
+plans/yellow-ruvector-hook-contract-a.md
+  s_df8d7231d1f6b5::t_a772a819bbac42 3-11
+plans/yellow-ruvector-live-verification-followups.md
+  s_df8d7231d1f6b5::t_fca014282b0740 3-11
+plans/yellow-symphony-plugin.md
+  s_df8d7231d1f6b5::t_72aa726976ea2a 3-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "34232c255c0d20d7cb3e899e3cebdfd63da3aa79",
+  "prompts": {},
+  "sessions": {
+    "s_df8d7231d1f6b5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7e5d86f-3b2b-4423-b601-e40b54efe5c2",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
