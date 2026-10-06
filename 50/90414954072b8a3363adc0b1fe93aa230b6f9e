@@ -1,0 +1,19 @@
+plans/complete/audit-followups-2026-05-07.md
+  s_1277c1e9fd4c0b::t_7dcf35b05ac8a5 3-6,174,214,216,225-227,246,250,255-256,262-263,267,277,284-285,287,289-290,308,324,358,362,364,369-373,461,486,492,502,504,509,520,531,552-553,555,562-564,602-607,643,646,649,652,655,658,662,665,685-686,688-690,709,724,748,752,757-760
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5090414954072b8a3363adc0b1fe93aa230b6f9e",
+  "prompts": {},
+  "sessions": {
+    "s_1277c1e9fd4c0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c7ef5607-898b-451f-9e78-e1c9f8a31252",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
