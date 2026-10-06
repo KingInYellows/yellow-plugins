@@ -756,6 +756,29 @@ now_ms() {
   jq -e '.result == "grounded" and .matched_line == 1' <<<"$output" >/dev/null
 }
 
+@test "a later non-string top-level quote clears a surrogate and stays ungrounded" {
+  printf '%s\n' "$Q26" >src/a.txt
+  run bash "$QG" batch <<<'{"id":"bad","file":"src/a.txt","line":1,"quote":"abcdefgh\uDC00ijkl","quote":null}'
+  [ "$status" -eq 0 ]
+  jq -e '.id == "bad" and .result == "ungrounded" and .matched_line == null' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<"$(row ok src/a.txt 1 "$Q26")"$'\n''{"id":"bad","file":"src/a.txt","line":1,"quote":"abcdefgh\uDC00ijkl","quote":null}'
+  [ "$status" -eq 0 ]
+  jq -e -s '
+    length == 2
+    and (.[0].id == "ok" and .[0].result == "grounded" and .[0].matched_line == 1)
+    and (.[1].id == "bad" and .[1].result == "ungrounded" and .[1].matched_line == null)
+  ' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<'{"id":"bad","file":"src/a.txt","line":1,"quote":null,"quote":"abcdefgh\uDC00ijkl"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<'{"id":"bad","file":"src/a.txt","line":1,"quote":"abcdefgh\uDC00ijkl","quote":1}'
+  [ "$status" -eq 0 ]
+  jq -e '.id == "bad" and .result == "ungrounded" and .matched_line == null' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<'{"id":"bad","quote":"abcdefgh\uDC00ijkl","nested":{"quote":null},"file":"src/a.txt","line":1}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+}
+
 @test "batch emits non-integer numeric ids as their original lexeme" {
   printf '%s\n' "keep 1e400 $Q26" >src/a.txt
   run bash "$QG" batch <<<"{\"id\":9007199254740993.0,\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"keep 1e400 $Q26\"}"

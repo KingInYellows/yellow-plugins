@@ -589,8 +589,10 @@ qg_load_rows() {
     # A string id is judged from its raw lexeme, before fromjson, so an
     # unpaired surrogate fails closed. An unpaired surrogate escape in the
     # top-level quote fails the batch the same way. The last top-level quote
-    # wins. A numeric line is the raw lexeme, so jq cannot round it into a
-    # line qg_is_line accepts. Braces inside a string do not change depth.
+    # wins, and a non-string value clears the surrogate flag so the row is
+    # ungrounded instead of failing the batch. A numeric line is the raw
+    # lexeme, so jq cannot round it into a line qg_is_line accepts. Braces
+    # inside a string do not change depth.
     def int_abs_ok:
       (if startswith("-") then .[1:] else . end) as $d
       | ($d | length) as $len
@@ -677,6 +679,11 @@ qg_load_rows() {
           | .out += $tok
         elif ((.prev == "quote") and .depth == 1 and ($tok | test(colon_only))) then
           .want_quote = true
+          | .depth += brace_delta($tok)
+          | .prev = null
+          | .out += $tok
+        elif ((.prev == "quote") and .depth == 1) then
+          .quote_bad = false
           | .depth += brace_delta($tok)
           | .prev = null
           | .out += $tok
