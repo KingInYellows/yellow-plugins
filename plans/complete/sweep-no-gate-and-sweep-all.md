@@ -8,6 +8,11 @@ brainstorm: docs/brainstorms/2026-05-18-sweep-command-human-gate-removal-brainst
 
 # Feature: Gateless `/review:sweep` + new `/review:sweep-all`
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 25 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Problem Statement
 
 `/review:sweep` currently pauses at a Step 3 `AskUserQuestion` boundary gate
@@ -76,26 +81,26 @@ None — this is a self-directed feature.
 
 ### Phase 1: `/review:pr` `--non-interactive` flag
 
-- [ ] **1.1 — Update `review-pr.md` frontmatter:**
+- [x] **1.1 — Update `review-pr.md` frontmatter:**
   - Line 4 `argument-hint`: change `'[PR# | URL | branch]'` →
     `'[PR# | URL | branch] [--non-interactive]'`
-- [ ] **1.2 — Update Step 1 (lines 32–49) to parse `--non-interactive`:**
+- [x] **1.2 — Update Step 1 (lines 32–49) to parse `--non-interactive`:**
   - Add a "Flag parsing" preamble that splits `$ARGUMENTS` on whitespace,
     extracts `--non-interactive` if present, sets non-interactive mode ON,
     and removes it from the token list. Unknown `--` tokens become a
     `[review:pr] Error: unknown flag <token>.` and stop.
   - Mirror the exact prose pattern from `resolve-pr.md:30–53` for consistency.
-- [ ] **1.3 — Guard Step 9 (lines 710–723) on non-interactive mode:**
+- [x] **1.3 — Guard Step 9 (lines 710–723) on non-interactive mode:**
   - Wrap the `AskUserQuestion` at line 715 with: "If non-interactive mode is
     ON, skip the AskUserQuestion and proceed directly to the push commands
     below (gt modify + gt submit). If non-interactive mode is OFF, run the
     AskUserQuestion as currently specified."
-- [ ] **1.4 — Guard Step 9b's optional P2-only prompt (lines 762–763):**
+- [x] **1.4 — Guard Step 9b's optional P2-only prompt (lines 762–763):**
   - The conditional "If P2 findings exist but no P0/P1: use AskUserQuestion"
     becomes: "If P2 findings exist but no P0/P1: in non-interactive mode,
     skip (do not record). In interactive mode, use AskUserQuestion as
     specified."
-- [ ] **1.5 — Add a "Non-interactive mode" prose block** after Step 1's flag
+- [x] **1.5 — Add a "Non-interactive mode" prose block** after Step 1's flag
   parsing, mirroring `resolve-pr.md:48–53`:
   > "Non-interactive mode suppresses the Step 9 push-confirmation gate and
   > the Step 9b P2-only 'save learnings' prompt — so the command runs
@@ -103,42 +108,42 @@ None — this is a self-directed feature.
   > command; an interactive user can also pass `--non-interactive`
   > explicitly. When the flag is absent, every gate behaves exactly as
   > before."
-- [ ] **1.6 — Verify `AskUserQuestion` remains in `allowed-tools`:**
+- [x] **1.6 — Verify `AskUserQuestion` remains in `allowed-tools`:**
   - It is still used in the interactive code path. Do not remove from
     frontmatter.
 
 ### Phase 2: `/review:sweep` gate removal + flag forwarding
 
-- [ ] **2.1 — Remove Step 3 (sweep.md lines 100–126) entirely:**
+- [x] **2.1 — Remove Step 3 (sweep.md lines 100–126) entirely:**
   - Delete the heading `### Step 3: Confirm clean completion (failure-boundary
     gate)` and all body content through the "Then stop. Do not proceed to
     Step 4 or Step 5." sentence.
-- [ ] **2.2 — Renumber remaining steps:**
+- [x] **2.2 — Renumber remaining steps:**
   - Current Step 4 → Step 3 (`/review:resolve` invocation)
   - Current Step 5 → Step 4 (final summary)
-- [ ] **2.3 — Update Step 2 (`/review:pr` invocation, ~line 93)** to pass the
+- [x] **2.3 — Update Step 2 (`/review:pr` invocation, ~line 93)** to pass the
   flag: `Skill(skill: "review:pr", args: "<PR#> --non-interactive")`. Add a
   one-sentence comment matching the existing review:resolve comment block
   pattern (sweep.md:131–134): "The `--non-interactive` flag suppresses
   /review:pr's Step 9 push prompt and Step 9b 'save learnings' prompt so the
   wrapper runs unattended."
-- [ ] **2.4 — Update Step 3 (was Step 4, `/review:resolve` invocation, ~lines
+- [x] **2.4 — Update Step 3 (was Step 4, `/review:resolve` invocation, ~lines
   130–134)** to pass the flag: `Skill(skill: "review:resolve", args: "<PR#>
   --non-interactive")`. The existing block already names the flag's effects;
   expand its rationale to mention that sweep's removed gate is what justifies
   the unattended invocation.
-- [ ] **2.5 — Fix Step 4 (was Step 5, ~lines 144–145) preamble:**
+- [x] **2.5 — Fix Step 4 (was Step 5, ~lines 144–145) preamble:**
   - Replace "Reached only when the user selected **Proceed** at Step 3 and
     Step 4 ran." with "Reached after Step 2 (/review:pr) and Step 3
     (/review:resolve) have run."
-- [ ] **2.6 — Remove the stale error-handling bullet (~lines 173–175):**
+- [x] **2.6 — Remove the stale error-handling bullet (~lines 173–175):**
   - Delete the bullet referring to "`/review:pr` failed or push declined ...
     surfaced via the user-confirmed Step 3 gate."
-- [ ] **2.7 — Update Step 1 dirty-tree rationale comment (~line 70):**
+- [x] **2.7 — Update Step 1 dirty-tree rationale comment (~line 70):**
   - Replace "eliminates the ambiguity at the Step 3 gate before it appears"
     with prose framing the check as a pre-flight guard for the unattended
     pipeline.
-- [ ] **2.8 — Drop `AskUserQuestion` from `allowed-tools` (sweep.md:8):**
+- [x] **2.8 — Drop `AskUserQuestion` from `allowed-tools` (sweep.md:8):**
   - The only usage was the removed Step 3 gate. Verify with
     `grep -n AskUserQuestion plugins/yellow-review/commands/review/sweep.md`
     after the edit (expect zero matches in the body, only the changelog/git
@@ -146,7 +151,7 @@ None — this is a self-directed feature.
 
 ### Phase 3: New `/review:sweep-all` command
 
-- [ ] **3.1 — Create `plugins/yellow-review/commands/review/sweep-all.md`** with
+- [x] **3.1 — Create `plugins/yellow-review/commands/review/sweep-all.md`** with
   frontmatter:
   ```yaml
   ---
@@ -159,7 +164,7 @@ None — this is a self-directed feature.
     - Skill
   ---
   ```
-- [ ] **3.2 — Write `## Workflow` body with these sections:**
+- [x] **3.2 — Write `## Workflow` body with these sections:**
   - **`### Step 1: Pre-flight checks`** — verify `gh` installed, `gh auth
     status` succeeds, `jq` installed, `git status --porcelain` empty. Each
     check exits non-zero with a named `[review:sweep-all] Error: ...` message.
@@ -228,14 +233,14 @@ None — this is a self-directed feature.
   - **`## Error Handling`** — table of pre-flight failure codes, plus a note:
     "Running sweep-all concurrently with another sweep or review command may
     cause dirty-tree failures inside the loop; avoid concurrent invocations."
-- [ ] **3.3 — Normalize line endings** (WSL2 Write tool produces CRLF):
+- [x] **3.3 — Normalize line endings** (WSL2 Write tool produces CRLF):
   ```bash
   sed -i 's/\r$//' plugins/yellow-review/commands/review/sweep-all.md
   ```
 
 ### Phase 4: Documentation updates
 
-- [ ] **4.1 — Update `plugins/yellow-review/CLAUDE.md`:**
+- [x] **4.1 — Update `plugins/yellow-review/CLAUDE.md`:**
   - Commands header: `### Commands (6)` → `### Commands (7)`
   - Rewrite the `/review:sweep` entry — remove "with a user-confirmed boundary
     gate between them"; new text: "Wrapper that runs `/review:pr
@@ -254,20 +259,20 @@ None — this is a self-directed feature.
   - Add a `/review:sweep-all` row to the "When to Use What" section after
     the `/review:sweep` row.
 
-- [ ] **4.2 — Update `plugins/yellow-review/README.md` command table** — add
+- [x] **4.2 — Update `plugins/yellow-review/README.md` command table** — add
   a row for `/review:sweep-all` after `/review:sweep`. Match the existing
   pipe-table format.
 
-- [ ] **4.3 — No change to `plugins/yellow-core/commands/setup/all.md`:** this
+- [x] **4.3 — No change to `plugins/yellow-core/commands/setup/all.md`:** this
   is an internal yellow-review command, not a new plugin. Verified.
 
-- [ ] **4.4 — No change to `plugins/yellow-review/.claude-plugin/plugin.json`
+- [x] **4.4 — No change to `plugins/yellow-review/.claude-plugin/plugin.json`
   `commands` array:** the plugin uses filesystem auto-discovery; no `commands`
   field exists. Verified.
 
 ### Phase 5: Validation, changeset, commit, submit
 
-- [ ] **5.1 — Run validators:**
+- [x] **5.1 — Run validators:**
   ```bash
   pnpm validate:agents
   pnpm validate:plugins
@@ -276,17 +281,17 @@ None — this is a self-directed feature.
   pnpm lint
   pnpm typecheck
   ```
-- [ ] **5.2 — Create changeset:** `pnpm changeset` — select `yellow-review`,
+- [x] **5.2 — Create changeset:** `pnpm changeset` — select `yellow-review`,
   choose **minor** (new command + sweep behavior change are both additive
   from the user's perspective; no breaking interface change).
   Suggested changeset summary:
   > "Remove the human gate from /review:sweep and add /review:sweep-all for
   > unattended batch sweeping of all open PRs. /review:pr gains a
   > `--non-interactive` flag (used internally by sweep)."
-- [ ] **5.3 — Verify three-way version sync after `pnpm apply:changesets`:**
+- [x] **5.3 — Verify three-way version sync after `pnpm apply:changesets`:**
   `package.json` → `plugin.json` → `marketplace.json` all at `3.2.0`. Run
   `pnpm validate:versions`.
-- [ ] **5.4 — `gt commit create -m "feat(yellow-review): ..."` + `gt stack
+- [x] **5.4 — `gt commit create -m "feat(yellow-review): ..."` + `gt stack
   submit`.** Use the gt-workflow `smart-submit` skill if a multi-agent audit
   is desired before submission.
 

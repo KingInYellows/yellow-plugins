@@ -1,5 +1,10 @@
 # Feature: Close Model/Effort Tier Coverage Gaps (M-A-05)
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 19 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Problem Statement
 
 The M-A-01 through M-A-04 stack (PRs #467, #469, #470, #471, #477) tiered 39
@@ -141,10 +146,10 @@ the most thorough deliberation possible (none of the M-A-05 agents qualify).
 
 ### Phase 1: Foundation
 
-- [ ] 1.1: `gt branch create agent/feat/model-explicit-coverage-gaps`
+- [x] 1.1: `gt branch create agent/feat/model-explicit-coverage-gaps`
   (stacks on `main`, NOT on the M-A-01..M-A-04 stack — all five upstream
   PRs are merge-pending)
-- [ ] 1.2: Confirm none of the 9 agents have changed since this plan was
+- [x] 1.2: Confirm none of the 9 agents have changed since this plan was
   written: `git diff main -- <9 paths>`. If any have changed, refresh the
   Current State table before edits.
 
@@ -157,9 +162,9 @@ Each edit inserts `model:` (and optionally `effort:`) immediately after
 `docs/solutions/code-quality/subagent-frontmatter-field-catalog.md`; the
 M-A-01..M-A-04 rollout plan that originated it has been archived.
 
-- [ ] 2.1: `plugins/yellow-core/agents/research/best-practices-researcher.md`
+- [x] 2.1: `plugins/yellow-core/agents/research/best-practices-researcher.md`
   — replace `model: inherit` with `model: sonnet` (no `effort:` added)
-- [ ] 2.2: `plugins/yellow-core/agents/research/git-history-analyzer.md`
+- [x] 2.2: `plugins/yellow-core/agents/research/git-history-analyzer.md`
   — `model: inherit` → `model: sonnet`
 
   <!-- deepen-plan: codebase -->
@@ -171,33 +176,33 @@ M-A-01..M-A-04 rollout plan that originated it has been archived.
   > changeset so reviewers don't expect runtime behavior changes.
   <!-- /deepen-plan -->
 
-- [ ] 2.3: `plugins/yellow-core/agents/research/repo-research-analyst.md`
+- [x] 2.3: `plugins/yellow-core/agents/research/repo-research-analyst.md`
   — `model: inherit` → `model: sonnet`
-- [ ] 2.4: `plugins/yellow-docs/agents/analysis/doc-auditor.md`
+- [x] 2.4: `plugins/yellow-docs/agents/analysis/doc-auditor.md`
   — `model: inherit` → `model: sonnet`
-- [ ] 2.5: `plugins/yellow-docs/agents/generation/diagram-architect.md`
+- [x] 2.5: `plugins/yellow-docs/agents/generation/diagram-architect.md`
   — `model: inherit` → `model: sonnet`
-- [ ] 2.6: `plugins/yellow-docs/agents/generation/doc-generator.md`
+- [x] 2.6: `plugins/yellow-docs/agents/generation/doc-generator.md`
   — `model: inherit` → `model: sonnet`
-- [ ] 2.7: `plugins/yellow-review/agents/review/adversarial-reviewer.md`
+- [x] 2.7: `plugins/yellow-review/agents/review/adversarial-reviewer.md`
   — keep `model: opus`; add `effort: xhigh` directly after the `model:` line
-- [ ] 2.8: `plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md`
+- [x] 2.8: `plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md`
   — keep `model: opus`; add `effort: high`
-- [ ] 2.9: `plugins/yellow-review/agents/review/agent-native-reviewer.md`
+- [x] 2.9: `plugins/yellow-review/agents/review/agent-native-reviewer.md`
   — keep `model: opus`; add `effort: high`
 
 ### Phase 3: Validation
 
-- [ ] 3.1: Run `pnpm validate:agents` — must exit 0 with no warnings.
+- [x] 3.1: Run `pnpm validate:agents` — must exit 0 with no warnings.
   On the current branch (PR #477 not merged), the validator checks tool
   allowlists and `subagent_type` references only — no V3/V4 model/effort
   warnings are emitted. After PR #477 lands: V3 will fire as inapplicable
   (none in scanners/ or ci/), V4 will fire as inapplicable (none match the
   synthesizer regex). If any warning fires post-merge, the assumption in the
   Current State section is wrong; re-evaluate.
-- [ ] 3.2: Run `pnpm validate:schemas` — must pass.
-- [ ] 3.3: Run `pnpm test:unit` — must pass.
-- [ ] 3.4: Run `pnpm typecheck && pnpm lint` — must pass.
+- [x] 3.2: Run `pnpm validate:schemas` — must pass.
+- [x] 3.3: Run `pnpm test:unit` — must pass.
+- [x] 3.4: Run `pnpm typecheck && pnpm lint` — must pass.
 
 ### Phase 4: Plan-doc update + changeset
 
@@ -207,18 +212,18 @@ M-A-01..M-A-04 rollout plan that originated it has been archived.
   the prior `plans/model-selection-frontmatter-rollout.md` was archived,
   so its "Per-Agent Assignment Table" responsibility has migrated here.
 
-- [ ] 4.2: `pnpm changeset` — patch bumps for `yellow-core`, `yellow-docs`,
+- [x] 4.2: `pnpm changeset` — patch bumps for `yellow-core`, `yellow-docs`,
   `yellow-review`. Include the `xhigh` rationale paragraph in the changeset
   body so future tiers have a precedent reference.
-- [ ] 4.3: Normalize CRLF on edited files: `for f in <9 paths>; do sed -i
+- [x] 4.3: Normalize CRLF on edited files: `for f in <9 paths>; do sed -i
   's/\r$//' "$f"; done`
 
 ### Phase 5: Commit + submit
 
-- [ ] 5.1: `gt commit create -m "feat(agents): close model/effort coverage
+- [x] 5.1: `gt commit create -m "feat(agents): close model/effort coverage
   gaps for 9 agents (M-A-05)"` with a body summarizing the 3-plugin patch
   bumps + `xhigh` precedent rationale
-- [ ] 5.2: `gt stack submit` (creates a new PR off `main`, independent of
+- [x] 5.2: `gt stack submit` (creates a new PR off `main`, independent of
   the M-A-01..M-A-04 stack)
 
 ## Technical Specifications

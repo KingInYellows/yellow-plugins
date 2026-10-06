@@ -1,5 +1,10 @@
 # Feature: `/review:resolve-stack` — Autonomous Stack-Wide Comment Resolution
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 20 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Problem Statement
 
 A reviewer leaves comments across a multi-PR Graphite stack. Today the author
@@ -131,12 +136,12 @@ resolve-stack:
 
 ### Phase 1: Shared `stack-traversal` skill
 
-- [ ] **1.1** Create `plugins/yellow-review/skills/stack-traversal/SKILL.md`.
+- [x] **1.1** Create `plugins/yellow-review/skills/stack-traversal/SKILL.md`.
   Frontmatter: `name: stack-traversal`, single-line double-quoted
   `description:` with a "Use when..." clause, `user-invokable: false`. Three
   mandatory headings (`## What It Does`, `## When to Use`, `## Usage`);
   `###` subsections inside `## Usage`.
-- [ ] **1.2** Document the canonical traversal in the skill, lifting the prose
+- [x] **1.2** Document the canonical traversal in the skill, lifting the prose
   from `review-all.md` Steps 1–3 + Step 4 sub-steps 1 & 13: `gt log short
   --no-interactive` parsing (strip graph chars), `gh pr view <branch> --json
   number,state` open-PR filter, base-to-tip ordering, `gt track` adoption with
@@ -144,7 +149,7 @@ resolve-stack:
   <branch>` per PR, `gt upstack restack` after each PR's action with
   conflict handling, and the "no PRs found" exit. Explicitly mark which parts
   are traversal (shared) vs. per-command action (not shared).
-- [ ] **1.3** Update `review-all.md` to cite the skill as the source of truth
+- [x] **1.3** Update `review-all.md` to cite the skill as the source of truth
   for the traversal steps — add a mirror-comment referencing
   `skills/stack-traversal/SKILL.md` section headers. **Keep `review-all.md`'s
   behavior byte-for-byte equivalent** — this is a documentation/reference
@@ -168,7 +173,7 @@ resolve-stack:
 
 ### Phase 2: `resolve-pr` non-interactive mode
 
-- [ ] **2.1** Add `--non-interactive` to `resolve-pr.md`'s `argument-hint` and
+- [x] **2.1** Add `--non-interactive` to `resolve-pr.md`'s `argument-hint` and
   Step 1 argument parsing (`$ARGUMENTS` may now be `<PR#>` or
   `<PR#> --non-interactive`; validate the flag token explicitly).
 
@@ -183,11 +188,11 @@ resolve-stack:
 > simply bypassed when called from the stack walk.
 <!-- /deepen-plan -->
 
-- [ ] **2.2** Step 4: when `--non-interactive`, skip the M3 `AskUserQuestion`
+- [x] **2.2** Step 4: when `--non-interactive`, skip the M3 `AskUserQuestion`
   and instead apply a hard cluster cap — if cluster count exceeds the cap
   (default 20), dispatch the first 20 and record the rest as
   `skipped (cluster cap)` for the caller's summary. Document the cap.
-- [ ] **2.3** Step 6: when `--non-interactive`, skip the push `AskUserQuestion`
+- [x] **2.3** Step 6: when `--non-interactive`, skip the push `AskUserQuestion`
   and run `gt modify -m "fix: resolve PR #<PR#> review comments"` +
   `gt submit --no-interactive` directly.
 
@@ -201,16 +206,16 @@ resolve-stack:
 > and needs no change.
 <!-- /deepen-plan -->
 
-- [ ] **2.4** Confirm no other step branches on interactivity; the CONFLICT
+- [x] **2.4** Confirm no other step branches on interactivity; the CONFLICT
   sentinel surfacing in Step 5 stays (logged, not prompted, in non-interactive
   mode — see 2.5).
-- [ ] **2.5** Step 5: when `--non-interactive`, a `CONFLICT:` sentinel from a
+- [x] **2.5** Step 5: when `--non-interactive`, a `CONFLICT:` sentinel from a
   resolver is logged to the report (not surfaced via `AskUserQuestion`); the
   conflicting cluster's threads are left unresolved for the summary.
 
 ### Phase 3: `resolve-stack` command
 
-- [ ] **3.1** Create `plugins/yellow-review/commands/review/resolve-stack.md`.
+- [x] **3.1** Create `plugins/yellow-review/commands/review/resolve-stack.md`.
   Frontmatter: `name: review:resolve-stack`, `argument-hint: ''` (always the
   current stack — no scope argument), single-line double-quoted `description:`
   with a "Use when..." clause. `allowed-tools`: `Bash, Read, Grep, Glob, Edit,
@@ -231,15 +236,15 @@ resolve-stack:
 > comment explaining any retained-but-unused entry.
 <!-- /deepen-plan -->
 
-- [ ] **3.2** Step 1 — Pre-flight, fail fast with clear messages:
+- [x] **3.2** Step 1 — Pre-flight, fail fast with clear messages:
   `command -v gt`, `command -v gh` + `gh auth status`, confirm a Graphite stack
   exists (`gt log short --no-interactive` returns >0 branches), `git status
   --porcelain` clean check. As executable steps, not prose.
-- [ ] **3.3** Step 2 — Build the PR list using the `stack-traversal` skill's
+- [x] **3.3** Step 2 — Build the PR list using the `stack-traversal` skill's
   documented procedure (inline the steps, cite the skill). Open-PR filter,
   base-to-tip order, `gt track` adoption. Skip branches with no associated open
   PR (log one line each). Skip draft PRs (log one line each).
-- [ ] **3.4** Step 3 — Walk loop, per PR bottom-up: `gt checkout <branch>` →
+- [x] **3.4** Step 3 — Walk loop, per PR bottom-up: `gt checkout <branch>` →
   `Skill(skill: "review:resolve", args: "<PR#> --non-interactive")` → re-run
   `${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-comments
   "<owner/repo>" "<PR#>"` to count remaining unresolved threads → `gt upstack
@@ -255,36 +260,36 @@ resolve-stack:
 > column — `0` → "complete", `>0` → flag into "Needs manual attention".
 <!-- /deepen-plan -->
 
-- [ ] **3.5** Step 4 — Final aggregate summary: a table of `PR# | comments
+- [x] **3.5** Step 4 — Final aggregate summary: a table of `PR# | comments
   found | clusters resolved | remaining unresolved | push status | restack
   status`, totals, and a **"Needs manual attention"** section listing PRs with
   residual unresolved comments, restack conflicts, `gt submit` failures, or
   cluster-cap skips.
-- [ ] **3.6** Optional ruvector recall at the top of Step 1 (best-effort,
+- [x] **3.6** Optional ruvector recall at the top of Step 1 (best-effort,
   guarded, mirrors `resolve-pr.md` Step 3b) — skip silently if `.ruvector/`
   absent or MCP warmup fails.
 
 ### Phase 4: Docs, validation, submit
 
-- [ ] **4.1** Update `plugins/yellow-review/CLAUDE.md`: bump "Commands (5)" →
+- [x] **4.1** Update `plugins/yellow-review/CLAUDE.md`: bump "Commands (5)" →
   "(6)" and add the `/review:resolve-stack` entry; bump "Skills (1)" → "(2)"
   and add the `stack-traversal` entry; add a "When to Use What" bullet
   distinguishing `resolve-stack` (resolve-only, whole stack, autonomous) from
   `review:all` (review+resolve per PR) and `review:resolve` (single PR,
   interactive).
-- [ ] **4.2** Update `plugins/yellow-review/README.md`: add a Commands-table
+- [x] **4.2** Update `plugins/yellow-review/README.md`: add a Commands-table
   row for `/review:resolve-stack` and a Skills row for `stack-traversal`.
-- [ ] **4.3** Normalize line endings on every new/modified file:
+- [x] **4.3** Normalize line endings on every new/modified file:
   `sed -i 's/\r$//' <file>` (WSL2 CRLF gotcha).
-- [ ] **4.4** Run the validation gate:
+- [x] **4.4** Run the validation gate:
   `pnpm validate:agents && pnpm validate:plugins && pnpm validate:schemas &&
   pnpm validate:versions && pnpm lint:plugins`, then the CI baseline
   `pnpm lint && pnpm typecheck && pnpm test:unit`. From inside
   `plugins/yellow-review/`, run `bats tests/` to confirm no script regressions.
-- [ ] **4.5** `pnpm changeset` — select `yellow-review`, **`minor`** bump (new
+- [x] **4.5** `pnpm changeset` — select `yellow-review`, **`minor`** bump (new
   command + new skill = additive). Body in conventional-commit style:
   `feat(yellow-review): resolve-stack command + stack-traversal skill`.
-- [ ] **4.6** `gt branch create feat/review-resolve-stack` (or work in the
+- [x] **4.6** `gt branch create feat/review-resolve-stack` (or work in the
   existing `feat+resolve-stack` worktree branch), `gt commit create`, `gt stack
   submit`.
 

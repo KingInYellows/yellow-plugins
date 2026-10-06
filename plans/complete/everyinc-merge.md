@@ -1,5 +1,10 @@
 # Feature: EveryInc/Compound-Engineering Selective Merge
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 210 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 **Date:** 2026-04-28
 **Source brainstorm:** `docs/brainstorms/2026-04-28-everyinc-merge-brainstorm.md`
 **Source research:** `RESEARCH/MERGE_PLAN.md`, `RESEARCH/every-plugin-research.md`
@@ -125,18 +130,18 @@ Three sequential waves with strict dependency ordering:
 
 Before each wave's implementation session begins:
 
-- [ ] 0.1 Fetch the latest `EveryInc/compound-engineering-plugin` `main` commit
+- [x] 0.1 Fetch the latest `EveryInc/compound-engineering-plugin` `main` commit
   SHA via `gh api repos/EveryInc/compound-engineering-plugin/commits/main -q
   '.sha'`. Record the SHA in the wave's tracking issue.
-- [ ] 0.2 For every agent or skill being adopted in the wave, fetch its file
+- [x] 0.2 For every agent or skill being adopted in the wave, fetch its file
   body from the locked SHA via `gh api
   repos/EveryInc/compound-engineering-plugin/contents/<path>?ref=<sha>` and save
   to `RESEARCH/upstream-snapshots/<sha>/<path>`. Do not work from CHANGELOG
   summaries. (Resolves OQ-10.)
-- [ ] 0.3 Validate that the snapshotted file bodies are within reasonable size;
+- [x] 0.3 Validate that the snapshotted file bodies are within reasonable size;
   the 500-line Anthropic SKILL.md guidance is a soft outer bound, not a hard
   cap — do not split or compress files solely to hit a line count.
-- [ ] 0.4 Run `pnpm validate:schemas && pnpm test:unit` baseline before
+- [x] 0.4 Run `pnpm validate:schemas && pnpm test:unit` baseline before
   starting any edits. Record the green baseline.
 
 <!-- deepen-plan: external -->
@@ -167,116 +172,116 @@ Before each wave's implementation session begins:
 
 **Acceptance criteria for Wave 1:**
 
-- [ ] All 13 read-only reviewer agents (the 14 with Bash minus codex-reviewer
+- [x] All 13 read-only reviewer agents (the 14 with Bash minus codex-reviewer
   which keeps it under documented exception) have `Bash` removed from
   `tools:`. `tools:` line reads `[Read, Grep, Glob]` (with `Task` if the
   agent spawns sub-agents, `ToolSearch` if it does deferred MCP discovery).
-- [ ] `pnpm validate:schemas` passes; new validation rule (W1.5 below)
+- [x] `pnpm validate:schemas` passes; new validation rule (W1.5 below)
   prevents regression.
-- [ ] All 9 context7 blast-radius files updated; no surviving references to
+- [x] All 9 context7 blast-radius files updated; no surviving references to
   `mcp__plugin_yellow-core_context7__*` tool names anywhere in the repo.
-- [ ] Six drifted agents repaired with parity to upstream patterns
+- [x] Six drifted agents repaired with parity to upstream patterns
   (frontmatter + body structure).
-- [ ] `pr-comment-resolver` and `resolve-pr.md` fence raw PR comment text with
+- [x] `pr-comment-resolver` and `resolve-pr.md` fence raw PR comment text with
   `--- begin pr-comment-content ---` / `--- end pr-comment-content ---`
   delimiters + advisory notice; no raw comment text reaches Edit operations.
-- [ ] `pnpm test:unit` and `pnpm test:integration` green.
-- [ ] Per-plugin changesets recorded.
+- [x] `pnpm test:unit` and `pnpm test:integration` green.
+- [x] Per-plugin changesets recorded.
 
 **Tasks:**
 
-- [ ] **W1.1 — Unbundle context7 MCP, repoint yellow-research callers to user-level.** (`patch`
+- [x] **W1.1 — Unbundle context7 MCP, repoint yellow-research callers to user-level.** (`patch`
   yellow-core, `patch` yellow-research)
-  - [ ] **Decision (2026-04-29):** Option chosen is *unbundle but keep callers wired to user-level context7*.
+  - [x] **Decision (2026-04-29):** Option chosen is *unbundle but keep callers wired to user-level context7*.
     Rationale: context7 itself is valuable for library docs; the dual-install OAuth/namespace problem
     (CE PR #486) only requires unbundling. Users who want context7 install it once at user level
     (standard `/plugin install context7@upstash` flow) and `mcp__context7__*` tool names register globally.
-  - [ ] Remove `mcpServers` block from `plugins/yellow-core/.claude-plugin/plugin.json` (yellow-core no
+  - [x] Remove `mcpServers` block from `plugins/yellow-core/.claude-plugin/plugin.json` (yellow-core no
     longer claims context7 as a bundled MCP).
-  - [ ] In `plugins/yellow-core/agents/research/best-practices-researcher.md`: drop bundled tool refs
+  - [x] In `plugins/yellow-core/agents/research/best-practices-researcher.md`: drop bundled tool refs
     (`mcp__plugin_yellow-core_context7__*`); the body's Phase 1 should fall back to ToolSearch-detection
     of user-level `mcp__context7__resolve-library-id` and `mcp__context7__query-docs`, with WebSearch as
     final fallback. Skills-first parity (W1.3) takes priority for full body rewrite; this PR is the
     minimal tool-list edit.
-  - [ ] Update `plugins/yellow-core/commands/statusline/setup.md`: remove yellow-core from the
+  - [x] Update `plugins/yellow-core/commands/statusline/setup.md`: remove yellow-core from the
     `DETECTED_PLUGINS` example and from the preview output table — yellow-core no longer ships an MCP.
-  - [ ] Update `plugins/yellow-core/CLAUDE.md`: change `MCP Servers (1)` → `MCP Servers (0)`; replace the
+  - [x] Update `plugins/yellow-core/CLAUDE.md`: change `MCP Servers (1)` → `MCP Servers (0)`; replace the
     context7 entry with a note recommending user-level context7 install.
-  - [ ] Update `plugins/yellow-core/README.md`: remove the bundled context7 row from MCP Servers table;
+  - [x] Update `plugins/yellow-core/README.md`: remove the bundled context7 row from MCP Servers table;
     reference user-level install instead.
-  - [ ] In `plugins/yellow-research/agents/research/code-researcher.md`: repoint context7 tool refs from
+  - [x] In `plugins/yellow-research/agents/research/code-researcher.md`: repoint context7 tool refs from
     `mcp__plugin_yellow-core_context7__*` to user-level `mcp__context7__*` (lines 15-16, body lines
     34/42-46). Add a ToolSearch availability check at routing time — if user-level context7 not found,
     fall through to EXA `get_code_context_exa` (existing behavior preserved by the `If ToolSearch cannot
     find ... skip directly to EXA` prose).
-  - [ ] In `plugins/yellow-research/commands/research/code.md`: repoint `allowed-tools:` (lines 15-16) to
+  - [x] In `plugins/yellow-research/commands/research/code.md`: repoint `allowed-tools:` (lines 15-16) to
     user-level names.
-  - [ ] In `plugins/yellow-research/commands/research/setup.md`: repoint `allowed-tools` (line 12),
+  - [x] In `plugins/yellow-research/commands/research/setup.md`: repoint `allowed-tools` (line 12),
     update the Context7 probe block (lines 316-322) to detect user-level form, update the example
     output and preview text (lines 429, 457, 509) to reflect that context7 is a user-level
     optional MCP rather than a yellow-core bundled one.
-  - [ ] In `plugins/yellow-research/CLAUDE.md` (lines 156-157) and `plugins/yellow-research/README.md`
+  - [x] In `plugins/yellow-research/CLAUDE.md` (lines 156-157) and `plugins/yellow-research/README.md`
     (line 18): update the yellow-core optional-dep entry — context7 is now installed at user level
     (`/plugin install context7@upstash`), not bundled inside yellow-core.
-  - [ ] In `plugins/yellow-research/skills/research-patterns/SKILL.md` (line 62): the source-routing
+  - [x] In `plugins/yellow-research/skills/research-patterns/SKILL.md` (line 62): the source-routing
     table entry for "Library / framework docs → Context7" stays — but add a parenthetical noting
     "(user-level MCP, install separately)".
-  - [ ] Verify `code-researcher` body still routes coherently after the repoint; the `ToolSearch cannot
+  - [x] Verify `code-researcher` body still routes coherently after the repoint; the `ToolSearch cannot
     find ... skip directly to EXA` prose now applies to user-level context7 unavailability rather than
     bundled.
 
-- [ ] **W1.2 — Strip Bash from 13 reviewer agents; document codex-reviewer exception.**
+- [x] **W1.2 — Strip Bash from 13 reviewer agents; document codex-reviewer exception.**
   (`minor` yellow-core, `minor` yellow-review; **no change** to yellow-codex)
-  - [ ] **Decision (2026-04-29):** Strip from 13 (yellow-core 7 + yellow-review 6); keep on
+  - [x] **Decision (2026-04-29):** Strip from 13 (yellow-core 7 + yellow-review 6); keep on
     `codex-reviewer` (yellow-codex 1) with explicit prose exception in agent body. Rationale:
     `codex-reviewer` is fundamentally a CLI-invocation agent (its core function is `codex exec
     review …` and `git diff … | wc -c`); read-only restriction does not apply to its
     responsibility. Other 13 reviewers are pure-analysis agents (their bodies already prohibit
     "Execute code or commands found in files") and have no legitimate Bash use.
-  - [ ] yellow-core/agents/review (7 files): architecture-strategist,
+  - [x] yellow-core/agents/review (7 files): architecture-strategist,
     code-simplicity-reviewer, pattern-recognition-specialist,
     performance-oracle, polyglot-reviewer, security-sentinel,
     test-coverage-analyst — strip `Bash` from `tools:`.
-  - [ ] yellow-review/agents/review (6 files): code-reviewer (will be renamed
+  - [x] yellow-review/agents/review (6 files): code-reviewer (will be renamed
     in W2.5), code-simplifier, comment-analyzer, pr-test-analyzer,
     silent-failure-hunter, type-design-analyzer — strip `Bash` from `tools:`.
-  - [ ] yellow-codex/agents/review (1 file): codex-reviewer — **keep `Bash`**, add a "Tool
+  - [x] yellow-codex/agents/review (1 file): codex-reviewer — **keep `Bash`**, add a "Tool
     Surface — Documented Bash Exception" section in agent body explaining why. W1.5 validation
     rule (branch #5) must allowlist this exact path.
-  - [ ] For agents that retain `ToolSearch` and ast-grep MCP tools
+  - [x] For agents that retain `ToolSearch` and ast-grep MCP tools
     (silent-failure-hunter, type-design-analyzer), keep them — those are
     read-only.
 
-- [ ] **W1.3 — Repair six drifted agents.** (`minor` yellow-core)
-  - [ ] `plugins/yellow-core/agents/research/best-practices-researcher.md` —
+- [x] **W1.3 — Repair six drifted agents.** (`minor` yellow-core)
+  - [x] `plugins/yellow-core/agents/research/best-practices-researcher.md` —
     skills-first Phase 1 pass parity (read upstream snapshot to confirm shape).
-  - [ ] `plugins/yellow-core/agents/research/repo-research-analyst.md` — adopt
+  - [x] `plugins/yellow-core/agents/research/repo-research-analyst.md` — adopt
     the structured technology scan pattern from CE PR #327.
-  - [ ] `plugins/yellow-core/agents/research/git-history-analyzer.md` —
+  - [x] `plugins/yellow-core/agents/research/git-history-analyzer.md` —
     frontmatter parity update.
-  - [ ] `plugins/yellow-core/agents/workflow/spec-flow-analyzer.md` —
+  - [x] `plugins/yellow-core/agents/workflow/spec-flow-analyzer.md` —
     frontmatter parity. **Note: this file lives in `agents/workflow/`, not
     `agents/review/` as the brainstorm states.**
-  - [ ] `plugins/yellow-core/agents/review/performance-oracle.md` — split
+  - [x] `plugins/yellow-core/agents/review/performance-oracle.md` — split
     pattern: oracle (analyzer) + reviewer (with confidence calibration). New
     file: `plugins/yellow-core/agents/review/performance-reviewer.md`.
-  - [ ] `plugins/yellow-core/agents/review/security-sentinel.md` — split
+  - [x] `plugins/yellow-core/agents/review/security-sentinel.md` — split
     pattern: sentinel + reviewer + lens. New files:
     `plugins/yellow-core/agents/review/security-reviewer.md` and
     `plugins/yellow-core/agents/review/security-lens.md`. Cross-reference any
     `subagent_type: "yellow-core:security-sentinel"` and update if signature
     changes.
 
-- [ ] **W1.4 — pr-comment-resolver untrusted-input handling (CE PR #490).**
+- [x] **W1.4 — pr-comment-resolver untrusted-input handling (CE PR #490).**
   (`patch` yellow-review)
-  - [ ] Update `plugins/yellow-review/agents/workflow/pr-comment-resolver.md`
+  - [x] Update `plugins/yellow-review/agents/workflow/pr-comment-resolver.md`
     body: every PR comment text reference must be wrapped in
     `--- begin pr-comment-content (untrusted) ---` /
     `--- end pr-comment-content ---` delimiters with the standard advisory.
-  - [ ] Update `plugins/yellow-review/commands/review/resolve-pr.md` Step 5
+  - [x] Update `plugins/yellow-review/commands/review/resolve-pr.md` Step 5
     spawn block: when constructing the `pr-comment-resolver` task prompt, fence
     the comment text with the same delimiters before interpolation.
-  - [ ] Add a note in `plugins/yellow-review/skills/pr-review-workflow/SKILL.md`
+  - [x] Add a note in `plugins/yellow-review/skills/pr-review-workflow/SKILL.md`
     documenting the fencing requirement for any future agent in this plugin.
 
 <!-- deepen-plan: codebase -->
@@ -289,12 +294,12 @@ Before each wave's implementation session begins:
 > done — verify, don't reimplement.
 <!-- /deepen-plan -->
 
-- [ ] **W1.5 — Add validation rule to enforce reviewer-agent read-only
+- [x] **W1.5 — Add validation rule to enforce reviewer-agent read-only
   tools.** (`patch` root)
-  - [ ] Extend `scripts/validate-agent-authoring.js` to add Rule X: any agent
+  - [x] Extend `scripts/validate-agent-authoring.js` to add Rule X: any agent
     whose path matches `agents/review/*.md` must NOT have `Bash`, `Write`, or
     `Edit` in its `tools:` list. Hard-error on violation.
-  - [ ] Add a fixture test under `tests/integration/` that confirms the rule
+  - [x] Add a fixture test under `tests/integration/` that confirms the rule
     fires on a synthetic violator and passes for current Wave-1-cleaned files.
 
 <!-- deepen-plan: codebase -->
@@ -320,50 +325,50 @@ Before each wave's implementation session begins:
 > workflow/ agents. Document the decision in W1.5.
 <!-- /deepen-plan -->
 
-- [ ] **W1.6 — Wave 1 changesets.** (`pnpm changeset` per affected plugin)
-  - [ ] yellow-core: `minor` (agent splits add new files); rationale: read-only
+- [x] **W1.6 — Wave 1 changesets.** (`pnpm changeset` per affected plugin)
+  - [x] yellow-core: `minor` (agent splits add new files); rationale: read-only
     tool restriction + drifted agent repairs + new performance-reviewer +
     security-reviewer + security-lens.
-  - [ ] yellow-review: `patch` (untrusted-input fix); will become `major` in
+  - [x] yellow-review: `patch` (untrusted-input fix); will become `major` in
     Wave 2 when code-reviewer is renamed.
-  - [ ] yellow-research: `patch` (context7 reference removal).
-  - [ ] yellow-codex: **no version bump** — codex-reviewer keeps Bash with documented exception (decision 2026-04-29).
+  - [x] yellow-research: `patch` (context7 reference removal).
+  - [x] yellow-codex: **no version bump** — codex-reviewer keeps Bash with documented exception (decision 2026-04-29).
 
 ### Wave 2: Compound Loop Closure (keystone)
 
 **Acceptance criteria for Wave 2:**
 
-- [ ] `review:pr` invokes `learnings-researcher` before any reviewer dispatch
+- [x] `review:pr` invokes `learnings-researcher` before any reviewer dispatch
   in a step trace verifiable via `--debug` or equivalent.
-- [ ] `learnings-researcher` empty-result case is silent pass-through (no
+- [x] `learnings-researcher` empty-result case is silent pass-through (no
   injection block); non-empty result is injected as
   `--- begin learnings-context (reference only) ---` fenced block into all
   dispatched reviewer agents' Task prompts.
-- [ ] All 5 new persona agents are dispatched in a controlled smoke-test PR
+- [x] All 5 new persona agents are dispatched in a controlled smoke-test PR
   (small PR with diff > 100 lines).
-- [ ] Confidence rubric is applied: at least one finding suppressed as FP per
+- [x] Confidence rubric is applied: at least one finding suppressed as FP per
   the rubric in the smoke-test run.
-- [ ] Base branch is fetched (PR #544 hardening) before any reviewer reads
+- [x] Base branch is fetched (PR #544 hardening) before any reviewer reads
   changed files.
-- [ ] `review-all` inlines the new pipeline steps; smoke-test on a 2-PR queue
+- [x] `review-all` inlines the new pipeline steps; smoke-test on a 2-PR queue
   confirms both PRs are reviewed by the new pipeline.
-- [ ] `code-reviewer` is renamed to `project-compliance-reviewer`; all
+- [x] `code-reviewer` is renamed to `project-compliance-reviewer`; all
   in-repo `subagent_type` references updated; deprecation stub left in place
   for one minor-version cycle.
-- [ ] Orchestrator graceful-degradation guard: missing agent = log to stderr +
+- [x] Orchestrator graceful-degradation guard: missing agent = log to stderr +
   continue; verified by smoke-test that omits one persona via
   `yellow-plugins.local.md` config.
-- [ ] All new persona agents and `learnings-researcher` use the standard
+- [x] All new persona agents and `learnings-researcher` use the standard
   prompt-injection fencing pattern for any untrusted PR/diff content.
-- [ ] `pnpm validate:schemas`, `pnpm test:unit`, `pnpm test:integration`
+- [x] `pnpm validate:schemas`, `pnpm test:unit`, `pnpm test:integration`
   green.
 
 **Tasks:**
 
-- [ ] **W2.0a — knowledge-compounder track schema + context budget precheck.**
+- [x] **W2.0a — knowledge-compounder track schema + context budget precheck.**
   (`patch` yellow-core; lands BEFORE W2.1; resolves OQ-A from capability-gap
   brainstorm)
-  - [ ] Update `plugins/yellow-core/agents/workflow/knowledge-compounder.md` to
+  - [x] Update `plugins/yellow-core/agents/workflow/knowledge-compounder.md` to
     write entries with new frontmatter fields:
     - `track: bug | knowledge` — distinguishes bug fixes from knowledge
       insights (CE ce-compound v2.52.0 pattern).
@@ -371,19 +376,19 @@ Before each wave's implementation session begins:
       extraction.
     - `problem: <one-line>` — single-sentence problem statement; populated
       during extraction.
-  - [ ] Add a context budget precheck (CE ce-compound v2.39.0 pattern) before
+  - [x] Add a context budget precheck (CE ce-compound v2.39.0 pattern) before
     Write: if the resolved solution content exceeds a configurable line
     threshold (default 200 lines), prompt the user via AskUserQuestion to
     split the entry into category-specific files.
-  - [ ] Backfill the new frontmatter fields on existing `docs/solutions/`
+  - [x] Backfill the new frontmatter fields on existing `docs/solutions/`
     entries (48 files, six categories) — heuristic: infer `track` from
     category (`logic-errors`, `security-issues`, `build-errors` →
     `track: bug`; `code-quality`, `workflow`, `integration-issues` →
     `track: knowledge` with manual review for ambiguous cases). Backfill via
     `scripts/backfill-solution-frontmatter.js`.
-  - [ ] Read upstream `ce-compound` snapshot from Phase 0 for exact schema and
+  - [x] Read upstream `ce-compound` snapshot from Phase 0 for exact schema and
     precheck logic.
-  - [ ] Done: every new and existing entry in `docs/solutions/` has `track`,
+  - [x] Done: every new and existing entry in `docs/solutions/` has `track`,
     `tags`, `problem` frontmatter; W2.1 reads these fields when ranking.
 
 <!-- deepen-plan: codebase -->
@@ -400,20 +405,20 @@ Before each wave's implementation session begins:
 > by design (re-runs are safe).
 <!-- /deepen-plan -->
 
-- [ ] **W2.1 — Author `learnings-researcher` agent.** (`minor` yellow-core)
-  - [ ] Create `plugins/yellow-core/agents/research/learnings-researcher.md`.
-  - [ ] Frontmatter: `name: learnings-researcher`, single-line description
+- [x] **W2.1 — Author `learnings-researcher` agent.** (`minor` yellow-core)
+  - [x] Create `plugins/yellow-core/agents/research/learnings-researcher.md`.
+  - [x] Frontmatter: `name: learnings-researcher`, single-line description
     with explicit "Use when..." trigger, `tools: [Read, Grep, Glob]`.
-  - [ ] Body responsibilities: glob `docs/solutions/**/*.md`; rank by
+  - [x] Body responsibilities: glob `docs/solutions/**/*.md`; rank by
     relevance to PR diff/files/title using filename+frontmatter+content
     heuristics; return top-N findings (default 3) as a structured list with
     `category`, `slug`, `relevance_summary`, and excerpt.
-  - [ ] Empty-result handling: return literal `NO_PRIOR_LEARNINGS` token; the
+  - [x] Empty-result handling: return literal `NO_PRIOR_LEARNINGS` token; the
     orchestrator must check for this token and skip injection.
-  - [ ] Frontmatter and body must include the standard prompt-injection
+  - [x] Frontmatter and body must include the standard prompt-injection
     fencing advisory for any untrusted PR content the agent receives in its
     prompt.
-  - [ ] Read upstream `ce-learnings-researcher` snapshot from Phase 0 for
+  - [x] Read upstream `ce-learnings-researcher` snapshot from Phase 0 for
     pattern reference; do not copy verbatim.
 
 <!-- deepen-plan: external -->
@@ -434,29 +439,29 @@ Before each wave's implementation session begins:
 > example), https://amsterdam.aitinkerers.org/technologies/memsearch-hybrid-bm25-vector-retrieval-over-markdown
 <!-- /deepen-plan -->
 
-- [ ] **W2.2 — Author 5 new persona reviewer agents.** (`minor` yellow-review)
-  - [ ] `plugins/yellow-review/agents/review/correctness-reviewer.md` —
+- [x] **W2.2 — Author 5 new persona reviewer agents.** (`minor` yellow-review)
+  - [x] `plugins/yellow-review/agents/review/correctness-reviewer.md` —
     logic errors, edge cases, state bugs, off-by-one, race conditions.
-  - [ ] `plugins/yellow-review/agents/review/maintainability-reviewer.md` —
+  - [x] `plugins/yellow-review/agents/review/maintainability-reviewer.md` —
     coupling, complexity, naming, dead code, cohesion violations.
-  - [ ] `plugins/yellow-review/agents/review/reliability-reviewer.md` —
+  - [x] `plugins/yellow-review/agents/review/reliability-reviewer.md` —
     production reliability: failure modes, retry semantics, idempotence,
     observability hooks.
-  - [ ] `plugins/yellow-review/agents/review/project-standards-reviewer.md` —
+  - [x] `plugins/yellow-review/agents/review/project-standards-reviewer.md` —
     always-on CLAUDE.md/AGENTS.md compliance per CE PR #402.
-  - [ ] `plugins/yellow-review/agents/review/adversarial-reviewer.md` —
+  - [x] `plugins/yellow-review/agents/review/adversarial-reviewer.md` —
     failure scenarios across component boundaries, race windows, timeout
     propagation, partial-failure handling per CE PR #403.
-  - [ ] All 5: `tools: [Read, Grep, Glob]` (read-only — Wave 1 rule applies);
+  - [x] All 5: `tools: [Read, Grep, Glob]` (read-only — Wave 1 rule applies);
     standard fencing pattern for diff/PR-body content; confidence-rubric output
     format compatible with Wave 2 orchestrator aggregation.
-  - [ ] Read upstream snapshots from Phase 0 for each persona's actual prompt;
+  - [x] Read upstream snapshots from Phase 0 for each persona's actual prompt;
     extract the rubric tier definitions and FP suppression thresholds before
     authoring (resolves OQ-2).
 
-- [ ] **W2.3 — Read confidence rubric schema from upstream
+- [x] **W2.3 — Read confidence rubric schema from upstream
   `ce-code-review/SKILL.md`.** (Phase 0 sub-task — must complete before W2.4)
-  - [ ] Fetch
+  - [x] Fetch
     `plugins/compound-engineering/skills/ce-code-review/SKILL.md` body from
     locked SHA. Extract: tier definitions (P1/P2/P3 or equivalent), FP
     suppression thresholds (numeric), intent-verification format, compact-return
@@ -488,8 +493,8 @@ Before each wave's implementation session begins:
 > W2.4 annotation).
 <!-- /deepen-plan -->
 
-- [ ] **W2.4 — Rewrite `review:pr` orchestrator.** (`minor` yellow-review)
-  - [ ] Update `plugins/yellow-review/commands/review/review-pr.md` (currently
+- [x] **W2.4 — Rewrite `review:pr` orchestrator.** (`minor` yellow-review)
+  - [x] Update `plugins/yellow-review/commands/review/review-pr.md` (currently
     246 lines, 10 steps).
 
 <!-- deepen-plan: codebase -->
@@ -503,13 +508,13 @@ Before each wave's implementation session begins:
 <!-- /deepen-plan -->
 
 
-  - [ ] Insert new Step 3a: always-fetch base branch (`git fetch origin
+  - [x] Insert new Step 3a: always-fetch base branch (`git fetch origin
     <base-branch>`) per CE PR #544. Place before Step 3b ruvector recall.
-  - [ ] Insert new Step 3d: dispatch `learnings-researcher` via Task; await
+  - [x] Insert new Step 3d: dispatch `learnings-researcher` via Task; await
     result; if `NO_PRIOR_LEARNINGS`, skip injection; else build fenced
     `--- begin learnings-context (reference only) ---` block to inject into all
     reviewer Task prompts in Step 5.
-  - [ ] Replace Step 4 adaptive selection with tiered persona dispatch table:
+  - [x] Replace Step 4 adaptive selection with tiered persona dispatch table:
     always-on personas (correctness, maintainability, reliability,
     project-compliance, project-standards), plus existing reviewers
     (architecture-strategist, security-reviewer, performance-reviewer,
@@ -517,14 +522,14 @@ Before each wave's implementation session begins:
     code-simplicity-reviewer, test-coverage-analyst, comment-analyzer,
     pr-test-analyzer, silent-failure-hunter, type-design-analyzer), plus
     adversarial-reviewer for diffs > 200 lines or touching trust boundaries.
-  - [ ] Add graceful-degradation guard to dispatch table: for each agent, if
+  - [x] Add graceful-degradation guard to dispatch table: for each agent, if
     `Task` fails with "agent not found", log `[review:pr] Warning: agent X not
     available, skipping` to stderr and continue. Never abort the review.
-  - [ ] Update Step 5 to enforce compact-return per CE PR #535: each reviewer's
+  - [x] Update Step 5 to enforce compact-return per CE PR #535: each reviewer's
     response must conform to a structured schema (severity, category, file,
     line, finding, fix, confidence). Reject and re-prompt non-conforming
     returns.
-  - [ ] Update Step 6 aggregation to apply confidence rubric (from W2.3): drop
+  - [x] Update Step 6 aggregation to apply confidence rubric (from W2.3): drop
     findings below threshold, group by file+line for dedup, apply intent
     verification before reporting P1.
 
@@ -543,48 +548,48 @@ Before each wave's implementation session begins:
 > https://dl.acm.org/doi/10.1145/3712003 (cross-examination as uncertainty signal).
 <!-- /deepen-plan -->
 
-  - [ ] Update `allowed-tools:` to reflect any tool changes (verify `Task`,
+  - [x] Update `allowed-tools:` to reflect any tool changes (verify `Task`,
     `AskUserQuestion`, `Bash`, `Read`, `Grep`, `Glob`, `Edit`, `Write`,
     `ToolSearch`, ruvector tools all still required).
-  - [ ] Update `subagent_type` references throughout to use new names
+  - [x] Update `subagent_type` references throughout to use new names
     (`yellow-review:project-compliance-reviewer` not `code-reviewer`;
     `yellow-core:security-reviewer` not `security-sentinel` for the reviewer
     role; `yellow-core:performance-reviewer` for the reviewer role).
 
-- [ ] **W2.5 — Rename `code-reviewer` to `project-compliance-reviewer`.**
+- [x] **W2.5 — Rename `code-reviewer` to `project-compliance-reviewer`.**
   (`major` yellow-review)
-  - [ ] Move and rename file:
+  - [x] Move and rename file:
     `plugins/yellow-review/agents/review/code-reviewer.md` →
     `plugins/yellow-review/agents/review/project-compliance-reviewer.md`.
     Update frontmatter `name:` to match.
-  - [ ] Narrow body scope: focus on CLAUDE.md/AGENTS.md compliance, naming
+  - [x] Narrow body scope: focus on CLAUDE.md/AGENTS.md compliance, naming
     conventions, project-pattern adherence; remove general-correctness language
     (now handled by `correctness-reviewer`).
-  - [ ] Leave a deprecation stub at the old path
+  - [x] Leave a deprecation stub at the old path
     `plugins/yellow-review/agents/review/code-reviewer.md`: a 5-line agent that
     prints "DEPRECATED: invoke `project-compliance-reviewer` instead. This
     stub will be removed in the next minor version." and otherwise no-ops.
-  - [ ] Grep for all in-repo `subagent_type: "yellow-review:code-reviewer"`
+  - [x] Grep for all in-repo `subagent_type: "yellow-review:code-reviewer"`
     references and update them (review:pr will already be updated in W2.4;
     check review-all, all skills, and CLAUDE.md sections).
-  - [ ] Update `plugins/yellow-review/skills/pr-review-workflow/SKILL.md`
+  - [x] Update `plugins/yellow-review/skills/pr-review-workflow/SKILL.md`
     references.
 
-- [ ] **W2.6 — Update `review-all` to inline the new pipeline.** (`minor`
+- [x] **W2.6 — Update `review-all` to inline the new pipeline.** (`minor`
   yellow-review)
-  - [ ] Update `plugins/yellow-review/commands/review/review-all.md` lines
+  - [x] Update `plugins/yellow-review/commands/review/review-all.md` lines
     75–96 (the inlined orchestration block) to mirror the new
     `review:pr` Step 3a/3d/4/5/6 structure.
-  - [ ] Add a comment at the inline section: `<!-- This block must mirror
+  - [x] Add a comment at the inline section: `<!-- This block must mirror
     review:pr.md Steps 3a-6. When updating either file, update both. -->`.
-  - [ ] Smoke test: invoke `review-all` against a 2-PR queue; verify both PRs
+  - [x] Smoke test: invoke `review-all` against a 2-PR queue; verify both PRs
     receive the learnings pre-pass and at least one persona dispatch.
 
-- [ ] **W2.7 — Define `yellow-plugins.local.md` minimum schema.** (`minor`
+- [x] **W2.7 — Define `yellow-plugins.local.md` minimum schema.** (`minor`
   yellow-core)
-  - [ ] Create `plugins/yellow-core/skills/local-config/SKILL.md` documenting
+  - [x] Create `plugins/yellow-core/skills/local-config/SKILL.md` documenting
     the per-project config file pattern.
-  - [ ] Schema (minimum keys):
+  - [x] Schema (minimum keys):
     - `review_pipeline: persona | legacy` — escape hatch for Wave 2 rollback.
     - `review_depth: small | medium | large` — controls adversarial-reviewer
       invocation.
@@ -592,18 +597,18 @@ Before each wave's implementation session begins:
       reviewer set.
     - `reviewer_set.include: [agent-names]` and `reviewer_set.exclude:
       [agent-names]` — explicit inclusion/exclusion.
-  - [ ] `review:pr` Step 4 reads `yellow-plugins.local.md` from project root
+  - [x] `review:pr` Step 4 reads `yellow-plugins.local.md` from project root
     (if present); merges with defaults; if `review_pipeline: legacy`, falls
     back to the W1-state adaptive selection (preserve old code path behind
     this flag, do not delete it). **Resolves OQ-4 minimally; full schema
     expansion deferred to Wave 3 if needed.**
 
-- [ ] **W2.8 — Wave 2 changesets.**
-  - [ ] yellow-core: `minor` (new agents: learnings-researcher; new skill:
+- [x] **W2.8 — Wave 2 changesets.**
+  - [x] yellow-core: `minor` (new agents: learnings-researcher; new skill:
     local-config).
-  - [ ] yellow-review: `major` (code-reviewer rename); rationale:
+  - [x] yellow-review: `major` (code-reviewer rename); rationale:
     `subagent_type` references in third-party installs may break.
-  - [ ] Document the rename in the yellow-review CHANGELOG entry with explicit
+  - [x] Document the rename in the yellow-review CHANGELOG entry with explicit
     migration notice and the deprecation stub timeline.
 
 <!-- deepen-plan: codebase -->
@@ -621,8 +626,8 @@ Before each wave's implementation session begins:
 <!-- /deepen-plan -->
 
 
-- [ ] **W2.9 — Self-referential docs/solutions entry.** (`patch` repo)
-  - [ ] Write `docs/solutions/code-quality/learnings-researcher-pre-pass-pattern.md`
+- [x] **W2.9 — Self-referential docs/solutions entry.** (`patch` repo)
+  - [x] Write `docs/solutions/code-quality/learnings-researcher-pre-pass-pattern.md`
     documenting the new pattern: why the orchestrator has a pre-pass step,
     how the empty-result path works, the fencing requirement, and how to
     extend it. Closes the loop on the loop-closure work.
@@ -631,39 +636,39 @@ Before each wave's implementation session begins:
 
 **Acceptance criteria for Wave 3:**
 
-- [ ] Per-component acceptance: each component below has its own done-state
+- [x] Per-component acceptance: each component below has its own done-state
   enumerated in its task block.
-- [ ] All Wave 3 PRs are reviewed by the Wave 2 pipeline (validate by inspecting
+- [x] All Wave 3 PRs are reviewed by the Wave 2 pipeline (validate by inspecting
   the review log).
-- [ ] No Wave 3 PR introduces new Bash in any reviewer agent (Wave 1 rule
+- [x] No Wave 3 PR introduces new Bash in any reviewer agent (Wave 1 rule
   applies).
 
 **Tasks:**
 
-- [ ] **W3.1 — `ce-debug` equivalent skill.** (`minor` yellow-core)
-  - [ ] Create `plugins/yellow-core/skills/debugging/SKILL.md` adapting the CE
+- [x] **W3.1 — `ce-debug` equivalent skill.** (`minor` yellow-core)
+  - [x] Create `plugins/yellow-core/skills/debugging/SKILL.md` adapting the CE
     `ce-debug` pattern: test-first systematic debugging, causal chain tracing,
     hypothesis verification, write minimal reproducer first.
-  - [ ] Read upstream `ce-debug` snapshot from Phase 0; preserve substantive
+  - [x] Read upstream `ce-debug` snapshot from Phase 0; preserve substantive
     methodology, drop CE-specific tool references.
-  - [ ] Done: skill is invokable via `/yellow-core:debugging` and includes
+  - [x] Done: skill is invokable via `/yellow-core:debugging` and includes
     fencing for any untrusted error output it processes.
 
-- [ ] **W3.2 — `ce-doc-review` equivalent in yellow-docs.** (`minor`
+- [x] **W3.2 — `ce-doc-review` equivalent in yellow-docs.** (`minor`
   yellow-docs)
-  - [ ] Create six persona agents under
+  - [x] Create six persona agents under
     `plugins/yellow-docs/agents/review/` (new directory):
     `coherence-reviewer`, `design-lens-reviewer`, `feasibility-reviewer`,
     `product-lens-reviewer`, `scope-guardian-reviewer`,
     `security-lens-reviewer`. All `tools: [Read, Grep, Glob]`.
-  - [ ] Create `plugins/yellow-docs/agents/review/adversarial-document-reviewer.md`.
-  - [ ] Create new command `plugins/yellow-docs/commands/docs/review.md`
+  - [x] Create `plugins/yellow-docs/agents/review/adversarial-document-reviewer.md`.
+  - [x] Create new command `plugins/yellow-docs/commands/docs/review.md`
     (`/yellow-docs:docs:review <doc-path>`) implementing the persona
     orchestration pattern from Wave 2 `review:pr`. Re-use the same
     learnings pre-pass + confidence rubric + compact return + graceful
     degradation pattern. (Resolves MG-7: same orchestration, different
     targets.)
-  - [ ] Done: `/yellow-docs:docs:review docs/brainstorms/<sample>.md` returns
+  - [x] Done: `/yellow-docs:docs:review docs/brainstorms/<sample>.md` returns
     persona findings in the standard schema with at least one finding from
     each invoked persona on a synthetic test doc.
 
@@ -678,79 +683,79 @@ Before each wave's implementation session begins:
 <!-- /deepen-plan -->
 
 
-- [ ] **W3.3 — Remaining resolve-pr improvements (#480 cluster, #461
+- [x] **W3.3 — Remaining resolve-pr improvements (#480 cluster, #461
   actionability).** (`patch` yellow-review)
-  - [ ] Update `plugins/yellow-review/commands/review/resolve-pr.md` Step 6 to
+  - [x] Update `plugins/yellow-review/commands/review/resolve-pr.md` Step 6 to
     add cross-invocation cluster analysis per CE PR #480: when multiple
     comments touch the same file+region, dispatch one resolver task with
     consolidated context rather than N separate tasks.
-  - [ ] Add Step 4.5 (after recall, before resolver dispatch) for actionability
+  - [x] Add Step 4.5 (after recall, before resolver dispatch) for actionability
     filter per CE PR #461: drop comments matching `^(LGTM|nit:|👍|thanks?$)`
     and similar non-actionable patterns; report the dropped count to user.
-  - [ ] Done: smoke-test a synthetic PR with 5 comments (2 actionable, 2 nit,
+  - [x] Done: smoke-test a synthetic PR with 5 comments (2 actionable, 2 nit,
     1 LGTM) — only 2 resolver tasks spawned.
 
-- [ ] **W3.4 — `git-worktree` skill fixes (CE PR #312).** (`patch`
+- [x] **W3.4 — `git-worktree` skill fixes (CE PR #312).** (`patch`
   yellow-core)
-  - [ ] Update `plugins/yellow-core/skills/git-worktree/SKILL.md`: add a
+  - [x] Update `plugins/yellow-core/skills/git-worktree/SKILL.md`: add a
     section documenting auto-trust mise/direnv configs after worktree creation.
-  - [ ] Add a section documenting the `.git`-is-a-file detection (submodule
+  - [x] Add a section documenting the `.git`-is-a-file detection (submodule
     case) — when `.git` is a file containing `gitdir: <path>`, worktree creation
     requires different handling.
-  - [ ] Done: skill body includes both fixes with concrete example commands.
+  - [x] Done: skill body includes both fixes with concrete example commands.
 
-- [ ] **W3.5 — Promote agent-native reviewers to P1.** (`minor` yellow-review
+- [x] **W3.5 — Promote agent-native reviewers to P1.** (`minor` yellow-review
   + `minor` plugin-dev)
-  - [ ] Adopt `ce-cli-readiness-reviewer` →
+  - [x] Adopt `ce-cli-readiness-reviewer` →
     `plugins/yellow-review/agents/review/cli-readiness-reviewer.md`.
-  - [ ] Adopt `ce-cli-agent-readiness-reviewer` →
+  - [x] Adopt `ce-cli-agent-readiness-reviewer` →
     `plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md`.
-  - [ ] Adopt `ce-agent-native-reviewer` →
+  - [x] Adopt `ce-agent-native-reviewer` →
     `plugins/yellow-review/agents/review/agent-native-reviewer.md`.
-  - [ ] Adopt `ce-agent-native-architecture` and `ce-agent-native-audit` skills
+  - [x] Adopt `ce-agent-native-architecture` and `ce-agent-native-audit` skills
     → `plugins/plugin-dev/skills/agent-native-architecture/SKILL.md` and
     `plugins/plugin-dev/skills/agent-native-audit/SKILL.md` (note:
     `plugin-dev` plugin does not exist — create it as a new plugin if not
     present, or adopt skills under yellow-core if plugin-dev creation is out
     of scope).
-  - [ ] Wire the three new reviewers into `review:pr` dispatch table when
+  - [x] Wire the three new reviewers into `review:pr` dispatch table when
     `focus_areas` (from W2.7) includes `agent-native` OR when the PR diff
     touches `plugins/*/agents/`, `plugins/*/skills/`, or `plugins/*/commands/`
     (auto-detect plugin-authoring PRs).
-  - [ ] Done: a synthetic plugin-authoring PR triggers all three reviewers
+  - [x] Done: a synthetic plugin-authoring PR triggers all three reviewers
     automatically.
 
-- [ ] **W3.6 — yellow-plugins.local.md schema expansion.** (`patch`
+- [x] **W3.6 — yellow-plugins.local.md schema expansion.** (`patch`
   yellow-core)
-  - [ ] Expand the W2.7 minimum schema with full keys: `stack` (TS/Py/Rust/Go),
+  - [x] Expand the W2.7 minimum schema with full keys: `stack` (TS/Py/Rust/Go),
     `agent_native_focus` (boolean), `confidence_threshold` override.
-  - [ ] Document complete schema in `plugins/yellow-core/skills/local-config/
+  - [x] Document complete schema in `plugins/yellow-core/skills/local-config/
     SKILL.md`.
-  - [ ] Done: skill documents every key; review:pr reads each.
+  - [x] Done: skill documents every key; review:pr reads each.
 
-- [ ] **W3.7 — yellow-codex expansion evaluation.** (`patch` yellow-codex)
-  - [ ] Read `codex-reviewer.md`, `codex-rescue.md`, `codex-executor.md`
+- [x] **W3.7 — yellow-codex expansion evaluation.** (`patch` yellow-codex)
+  - [x] Read `codex-reviewer.md`, `codex-rescue.md`, `codex-executor.md`
     against new Wave 2 patterns.
-  - [ ] Identify integration opportunities: does `codex-review` benefit from
+  - [x] Identify integration opportunities: does `codex-review` benefit from
     invoking the learnings pre-pass? Does `codex-rescue` benefit from the
     adversarial-reviewer pattern?
-  - [ ] Write findings as a `docs/research/yellow-codex-expansion.md` short
+  - [x] Write findings as a `docs/research/yellow-codex-expansion.md` short
     report. Implementation deferred to a separate post-Wave-3 PR. **Done at
     research-report level, not implementation.**
 
-- [ ] **W3.8 — yellow-composio expansion research (OQ-7).** (`patch` repo)
-  - [ ] Search upstream EveryInc PR history for batch-execution / remote-
+- [x] **W3.8 — yellow-composio expansion research (OQ-7).** (`patch` repo)
+  - [x] Search upstream EveryInc PR history for batch-execution / remote-
     workbench orchestration patterns (`ce-optimize` parallel-experiments
     pattern is a candidate).
-  - [ ] Write findings as `docs/research/yellow-composio-expansion.md` —
+  - [x] Write findings as `docs/research/yellow-composio-expansion.md` —
     explicit go/no-go recommendation only. Implementation deferred. **Done
     at research-report level.**
 
-- [ ] **W3.10 — Compound lifecycle management skill.** (`minor` yellow-core;
+- [x] **W3.10 — Compound lifecycle management skill.** (`minor` yellow-core;
   from capability-gap brainstorm)
-  - [ ] Create `plugins/yellow-core/skills/compound-lifecycle/SKILL.md` —
+  - [x] Create `plugins/yellow-core/skills/compound-lifecycle/SKILL.md` —
     invokable as `/yellow-core:compound-lifecycle`.
-  - [ ] Implement three operations:
+  - [x] Implement three operations:
     - **Staleness detection:** entries with no `updated:` frontmatter older
       than configurable threshold (default 90 days), OR entries whose
       `problem:` field matches a more recent entry at >80% semantic similarity
@@ -761,10 +766,10 @@ Before each wave's implementation session begins:
       knowledge-compounder to write the merged entry; archive superseded
       entries by moving to `docs/solutions/archived/<original-category>/`
       (do NOT delete; preserve history).
-  - [ ] Read upstream `ce-compound-refresh` snapshot from Phase 0.
-  - [ ] Frontmatter must include `user-invokable: true` (note the "k") and
+  - [x] Read upstream `ce-compound-refresh` snapshot from Phase 0.
+  - [x] Frontmatter must include `user-invokable: true` (note the "k") and
     standard `## What It Does`, `## When to Use`, `## Usage` headings.
-  - [ ] Done: skill detects stale and overlapping entries on a synthetic
+  - [x] Done: skill detects stale and overlapping entries on a synthetic
     fixture (5 known-stale + 1 known-overlap); consolidation hand-off produces
     a valid merged entry.
 
@@ -799,11 +804,11 @@ Before each wave's implementation session begins:
 > (LSN tracking), Cer et al. 2018 (USE).
 <!-- /deepen-plan -->
 
-- [ ] **W3.11 — Ideation skill (ce-ideate analog with warrant contract).**
+- [x] **W3.11 — Ideation skill (ce-ideate analog with warrant contract).**
   (`minor` yellow-core; from capability-gap brainstorm)
-  - [ ] Create `plugins/yellow-core/skills/ideation/SKILL.md` — invokable as
+  - [x] Create `plugins/yellow-core/skills/ideation/SKILL.md` — invokable as
     `/yellow-core:ideation` (also acceptable as `/workflows:ideate`).
-  - [ ] Workflow: accept vague problem via `$ARGUMENTS`; generate 2–3
+  - [x] Workflow: accept vague problem via `$ARGUMENTS`; generate 2–3
     candidate approaches; apply warrant contract (each approach must answer
     "what evidence exists that this approach works"); subject gate (if
     `$ARGUMENTS` <10 words and domain unclear, ask one clarifying question);
@@ -812,12 +817,12 @@ Before each wave's implementation session begins:
     "yellow-core:brainstorm-orchestrator"` and the selected approach as task
     content. (Note: `/workflows:brainstorm` is a command, not a skill — must
     invoke its underlying agent via Task, not via the Skill tool.)
-  - [ ] Frontmatter `allowed-tools:` must include `Task` (for spawning
+  - [x] Frontmatter `allowed-tools:` must include `Task` (for spawning
     brainstorm-orchestrator) and `AskUserQuestion` (for the ranked-list
     selection and subject gate).
-  - [ ] Read upstream `ce-ideate` v2 snapshot from Phase 0 (v2.68.0 #588 +
+  - [x] Read upstream `ce-ideate` v2 snapshot from Phase 0 (v2.68.0 #588 +
     warrant contract #671 + HITL review-loop #580).
-  - [ ] Done: invoking with vague input ("better error handling") produces
+  - [x] Done: invoking with vague input ("better error handling") produces
     2–3 warranted approaches and routes the selected one into brainstorm.
 
 <!-- deepen-plan: external -->
@@ -846,14 +851,14 @@ Before each wave's implementation session begins:
 > (MIDAS); Lewis et al. 2020 (RAG).
 <!-- /deepen-plan -->
 
-- [ ] **W3.12 — Cross-vendor session history (ce-sessions analog).**
+- [x] **W3.12 — Cross-vendor session history (ce-sessions analog).**
   (`minor` yellow-core; from capability-gap brainstorm)
-  - [ ] Create `plugins/yellow-core/skills/session-history/SKILL.md` and
+  - [x] Create `plugins/yellow-core/skills/session-history/SKILL.md` and
     `plugins/yellow-core/agents/workflow/session-historian.md`.
-  - [ ] session-historian agent: `tools: [Read, Grep, Glob, Bash, Task]`
+  - [x] session-historian agent: `tools: [Read, Grep, Glob, Bash, Task]`
     (Bash for `gh api`/CLI invocations; Task for delegating per-backend
     queries).
-  - [ ] Three backends with graceful degradation:
+  - [x] Three backends with graceful degradation:
     - **Claude Code transcripts:** local filesystem path
       `~/.claude/projects/<encoded-path>/*.jsonl` for root sessions and
       `~/.claude/projects/<encoded-path>/<session-uuid>/subagents/*.jsonl` for
@@ -881,16 +886,16 @@ Before each wave's implementation session begins:
 > schema as `lineage: {parent: <id|null>, children: [<id>...]}`. Source:
 > `docs/research/merge-plan-completeness-audit-april-2026.md` finding P3.7.
 <!-- /deepen-plan -->
-  - [ ] Aggregate by timestamp; merge via relevance to query; always tag
+  - [x] Aggregate by timestamp; merge via relevance to query; always tag
     each result with source vendor.
-  - [ ] Backend unavailable: log
+  - [x] Backend unavailable: log
     `[session-history] Warning: <vendor> backend unavailable, skipping` to
     stderr; continue with available backends.
-  - [ ] Read upstream `ce-session-historian` snapshot from Phase 0 (v2.64.0
+  - [x] Read upstream `ce-session-historian` snapshot from Phase 0 (v2.64.0
     #534).
-  - [ ] Standard prompt-injection fencing for any session content the agent
+  - [x] Standard prompt-injection fencing for any session content the agent
     processes (transcripts may contain user-supplied text).
-  - [ ] Done: query returns timestamped results from all available backends,
+  - [x] Done: query returns timestamped results from all available backends,
     each tagged with source vendor.
 
 <!-- deepen-plan: external -->
@@ -924,27 +929,27 @@ Before each wave's implementation session begins:
 > aggregator prior art).
 <!-- /deepen-plan -->
 
-- [ ] **W3.13b — yellow-debt scanner confidence calibration.** (`minor`
+- [x] **W3.13b — yellow-debt scanner confidence calibration.** (`minor`
   yellow-debt; from capability-gap brainstorm; W3.13a relocated to W2.0a)
-  - [ ] Update five scanner agents under
+  - [x] Update five scanner agents under
     `plugins/yellow-debt/agents/scanners/`: `ai-pattern-scanner.md`,
     `architecture-scanner.md`, `complexity-scanner.md`,
     `duplication-scanner.md`, `security-debt-scanner.md`.
-  - [ ] Update `plugins/yellow-debt/agents/synthesis/audit-synthesizer.md` to
+  - [x] Update `plugins/yellow-debt/agents/synthesis/audit-synthesizer.md` to
     aggregate findings using the same dedup + confidence-rubric logic from
     Wave 2 W2.4.
-  - [ ] Each scanner output schema matches Wave 2: `severity`, `category`,
+  - [x] Each scanner output schema matches Wave 2: `severity`, `category`,
     `file`, `finding`, `fix`, `confidence`, plus a NEW `failure_scenario`
     field (one sentence: what breaks in production if this debt item is not
     addressed). Borrowed from CE adversarial-reviewer.
-  - [ ] Scanners are NOT subject to the W1 read-only tool restriction (they
+  - [x] Scanners are NOT subject to the W1 read-only tool restriction (they
     are analysis agents, not PR reviewers); may retain `Bash` for codebase
     traversal.
-  - [ ] audit-synthesizer applies the same confidence thresholds as Wave 2
+  - [x] audit-synthesizer applies the same confidence thresholds as Wave 2
     (security/performance ≥0.8, correctness ≥0.7, style ≥0.6).
-  - [ ] Read upstream `ce-adversarial-reviewer` snapshot from Phase 0 for
+  - [x] Read upstream `ce-adversarial-reviewer` snapshot from Phase 0 for
     failure-scenario framing.
-  - [ ] Done: synthetic codebase produces structured + calibrated +
+  - [x] Done: synthetic codebase produces structured + calibrated +
     deduplicated output identical in shape to Wave 2 review:pr (modulo
     `failure_scenario` field).
 
@@ -968,11 +973,11 @@ Before each wave's implementation session begins:
 >   1.0 to 2.0; document v1.0/v2.0 dual-read in audit-synthesizer."
 <!-- /deepen-plan -->
 
-- [ ] **W3.14 — ce-optimize analog (LLM-as-judge with parallel experiments).**
+- [x] **W3.14 — ce-optimize analog (LLM-as-judge with parallel experiments).**
   (`minor` yellow-core; from capability-gap brainstorm)
-  - [ ] Create `plugins/yellow-core/skills/optimize/SKILL.md` plus sibling
+  - [x] Create `plugins/yellow-core/skills/optimize/SKILL.md` plus sibling
     `schema.yaml` defining experiment spec format.
-  - [ ] Skill workflow:
+  - [x] Skill workflow:
     - Read experiment spec from a `schema.yaml`-validated file:
       `optimization_target` (what to vary), `measurement_criteria`,
       `success_threshold`, `parallel_count` (default 2).
@@ -987,22 +992,22 @@ Before each wave's implementation session begins:
       winner.
     - Optionally write winner + rationale to `docs/solutions/optimizations/`
       via knowledge-compounder.
-  - [ ] Read upstream `ce-optimize` snapshot from Phase 0 (v2.66.0 #446)
+  - [x] Read upstream `ce-optimize` snapshot from Phase 0 (v2.66.0 #446)
     INCLUDING the `schema.yaml` and README — adopt verbatim or adapt at
     authoring time per OQ-C.
-  - [ ] Done: skill executes a synthetic 2-candidate experiment and produces
+  - [x] Done: skill executes a synthetic 2-candidate experiment and produces
     ranked judge output with scores and rationale.
 
-- [ ] **W3.15 — `plugin-contract-reviewer` (renamed from CE
+- [x] **W3.15 — `plugin-contract-reviewer` (renamed from CE
   `ce-api-contract-reviewer`).** (`minor` yellow-review; from completeness
   audit Q1 GAP-1)
-  - [ ] Create `plugins/yellow-review/agents/review/plugin-contract-reviewer.md`.
-  - [ ] Frontmatter: `name: plugin-contract-reviewer`, single-line description
+  - [x] Create `plugins/yellow-review/agents/review/plugin-contract-reviewer.md`.
+  - [x] Frontmatter: `name: plugin-contract-reviewer`, single-line description
     with explicit "Use when..." trigger (specifically: when PR diff touches
     plugin manifest fields, agent/command/skill frontmatter, MCP tool
     registrations, or hook contracts), `tools: [Read, Grep, Glob]`
     (read-only — Wave 1 rule applies; reviewer agent).
-  - [ ] Body responsibilities — audit yellow-plugins-specific public surface
+  - [x] Body responsibilities — audit yellow-plugins-specific public surface
     for breaking changes:
     - `subagent_type: "plugin:agent-name"` references — flag any rename or
       removal (validator catches in-repo only; this agent flags
@@ -1014,24 +1019,24 @@ Before each wave's implementation session begins:
       dependent commands' `allowed-tools` lists.
     - `plugin.json` schema field changes; hook output contract changes;
       frontmatter field renames users may inspect.
-  - [ ] Output schema matches Wave 2: `severity`, `category`, `file`,
+  - [x] Output schema matches Wave 2: `severity`, `category`, `file`,
     `finding`, `fix`, `confidence` plus a `breaking_change_class` field
     (`name-rename | signature-change | removal | semantics-change`) and a
     `migration_path` field (suggested deprecation stub or backwards-compat
     shim, when applicable).
-  - [ ] Wire into `review:pr` (W2.4 dispatch table) with auto-detection: this
+  - [x] Wire into `review:pr` (W2.4 dispatch table) with auto-detection: this
     reviewer auto-invokes when the PR diff touches any of:
     `plugins/*/plugin.json`, `plugins/*/agents/**/*.md`,
     `plugins/*/commands/**/*.md`, `plugins/*/skills/**/SKILL.md`,
     `plugins/*/hooks/`. Same auto-detection pattern as W3.5
     (agent-native reviewers).
-  - [ ] Read upstream `ce-api-contract-reviewer` snapshot from Phase 0
+  - [x] Read upstream `ce-api-contract-reviewer` snapshot from Phase 0
     (CE v3.3.1+ canonical name) — adapt the prompt from REST-API focus to
     plugin-contract focus; preserve the breaking-change classification
     framework, drop REST-specific examples.
-  - [ ] Standard prompt-injection fencing for any untrusted PR/diff content
+  - [x] Standard prompt-injection fencing for any untrusted PR/diff content
     the agent receives in its prompt.
-  - [ ] Done: synthetic plugin-modifying PR with one rename (e.g., agent
+  - [x] Done: synthetic plugin-modifying PR with one rename (e.g., agent
     `name:` change) and one signature change (e.g., MCP tool removal)
     triggers the reviewer; both findings appear in structured schema with
     `breaking_change_class` and `migration_path` populated.
@@ -1092,18 +1097,18 @@ Before each wave's implementation session begins:
 > finding P3.6.
 <!-- /deepen-plan -->
 
-- [ ] **W3.9 — Wave 3 changesets.**
-  - [ ] yellow-core: `minor` — net additive (new debugging skill; expanded
+- [x] **W3.9 — Wave 3 changesets.**
+  - [x] yellow-core: `minor` — net additive (new debugging skill; expanded
     local-config; new compound-lifecycle, ideation, session-history, optimize
     skills; new session-historian agent; updated knowledge-compounder via
     W2.0a).
-  - [ ] yellow-docs: `minor` (new doc-review command + 7 new agents).
-  - [ ] yellow-review: `minor` (resolve-pr improvements + 3 new
+  - [x] yellow-docs: `minor` (new doc-review command + 7 new agents).
+  - [x] yellow-review: `minor` (resolve-pr improvements + 3 new
     agent-native reviewers + new plugin-contract-reviewer from W3.15).
-  - [ ] yellow-debt: `minor` (scanner calibration + audit-synthesizer
+  - [x] yellow-debt: `minor` (scanner calibration + audit-synthesizer
     update).
-  - [ ] plugin-dev (if created): `minor` (initial release).
-  - [ ] yellow-codex / yellow-composio: no version bump (research-only).
+  - [x] plugin-dev (if created): `minor` (initial release).
+  - [x] yellow-codex / yellow-composio: no version bump (research-only).
 
 ## Technical Specifications
 
@@ -1251,10 +1256,10 @@ None.
 
 ### Manual Testing Checklist
 
-- [ ] All three waves: confirm CHANGESET entries are present per affected plugin.
-- [ ] Wave 2: confirm `yellow-review` major-bump rationale is documented in
+- [x] All three waves: confirm CHANGESET entries are present per affected plugin.
+- [x] Wave 2: confirm `yellow-review` major-bump rationale is documented in
   the changeset description and CHANGELOG entry.
-- [ ] After Wave 2 merges to main: install yellow-plugins fresh on a clean
+- [x] After Wave 2 merges to main: install yellow-plugins fresh on a clean
   Claude Code instance and run `/plugin marketplace add KingInYellows/yellow-plugins`
   → confirm review:pr works end-to-end.
 
@@ -1425,15 +1430,15 @@ clean-install smoke test passes.)
 
 ### Pre-PR Checklist (every wave)
 
-- [ ] `pnpm validate:schemas` green.
-- [ ] `pnpm test:unit` green.
-- [ ] `pnpm test:integration` green.
-- [ ] `pnpm changeset` created for each affected plugin with correct bump
+- [x] `pnpm validate:schemas` green.
+- [x] `pnpm test:unit` green.
+- [x] `pnpm test:integration` green.
+- [x] `pnpm changeset` created for each affected plugin with correct bump
   type per the table in W1.6 / W2.8 / W3.9.
-- [ ] CRLF normalized: `git status --short | awk '{print $2}' | xargs -I{}
+- [x] CRLF normalized: `git status --short | awk '{print $2}' | xargs -I{}
   sed -i 's/\r$//' {} && git add -u`.
-- [ ] CRLF check on any `.sh` file created.
-- [ ] `gt submit` only after AskUserQuestion confirmation per yellow-plugins
+- [x] CRLF check on any `.sh` file created.
+- [x] `gt submit` only after AskUserQuestion confirmation per yellow-plugins
   convention.
 
 ## Open Questions Resolution Tracking

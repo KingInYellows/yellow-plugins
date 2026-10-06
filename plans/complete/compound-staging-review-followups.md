@@ -1,5 +1,10 @@
 # Feature: compound-staging stack — review follow-on hardening
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 21 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Problem Statement
 
 The PR #540-544 stack review (this session, 2026-05-19) surfaced 4 design-decision
@@ -60,22 +65,22 @@ The PR is branch `agent/fix/compound-staging-review-followups`, expected size
 
 **Goal**: close the lock-orphan window and the processing/ requeue race.
 
-- [ ] 1.1: Move `mkdir "${STAGING_DIR}/.drain-lock"` into the subshell as the
+- [x] 1.1: Move `mkdir "${STAGING_DIR}/.drain-lock"` into the subshell as the
   FIRST statement, before the `trap` registration. The same shell that creates
   the lock now owns the cleanup; no orphan window exists. Update the lock
   contention check to be "if mkdir fails inside subshell, exit cleanly without
   attempting drain" rather than testing for lock existence in the parent.
-- [ ] 1.2: Move the `processing/` requeue loop (currently lines 125-140 in
+- [x] 1.2: Move the `processing/` requeue loop (currently lines 125-140 in
   `session-start.sh`) to *inside* the disowned subshell, AFTER the lock is
   acquired. This makes requeue serialized with respect to other drains.
-- [ ] 1.3: Update `cs_update_drain_budget` call site to remain inside the
+- [x] 1.3: Update `cs_update_drain_budget` call site to remain inside the
   subshell at the end (already correct — verify no regression).
-- [ ] 1.4: Add bats test: "lock orphan window closed — parent killed before
+- [x] 1.4: Add bats test: "lock orphan window closed — parent killed before
   subshell starts cannot leave a stranded lock" (use a stub that mimics the
   race).
-- [ ] 1.5: Add bats test: "concurrent SessionStart cannot double-requeue
+- [x] 1.5: Add bats test: "concurrent SessionStart cannot double-requeue
   processing/ entries — second invocation finds lock and exits".
-- [ ] 1.6: Update inline comments referencing the old ordering.
+- [x] 1.6: Update inline comments referencing the old ordering.
 
 **Files**: `plugins/yellow-core/hooks/scripts/session-start.sh`,
 `plugins/yellow-core/tests/compound-session-start-hook.bats`.
@@ -85,23 +90,23 @@ The PR is branch `agent/fix/compound-staging-review-followups`, expected size
 **Goal**: per-section SUPERSEDED markers so partial readers can't act on stale
 designs.
 
-- [ ] 2.1: Add `> **SUPERSEDED by plan D1**: bash subshells cannot invoke
+- [x] 2.1: Add `> **SUPERSEDED by plan D1**: bash subshells cannot invoke
   Agent/Task; see plan §Architecture (Option C, pure-shell capture).`
   callout immediately above the ASCII architecture diagram (around line 108
   of the brainstorm).
-- [ ] 2.2: Add `> **SUPERSEDED by plan D8**: knowledge-compounder is NOT
+- [x] 2.2: Add `> **SUPERSEDED by plan D8**: knowledge-compounder is NOT
   modified; staging-promoter agent is used instead.` callout under the
   "Decision 3" heading (around line 233-237).
-- [ ] 2.3: Add `> **SUPERSEDED by plan D context**: 48h base threshold (was
+- [x] 2.3: Add `> **SUPERSEDED by plan D context**: 48h base threshold (was
   24h in this brainstorm).` inline note next to the `age > 24h` reference
   on line 245.
-- [ ] 2.4: Add `> **SUPERSEDED by plan §JSONL Schema**: transcript_tail-only
+- [x] 2.4: Add `> **SUPERSEDED by plan §JSONL Schema**: transcript_tail-only
   schema; no candidate_text/priority/tags in the Stop-hook write — those are
   generated at drain time by staging-scorer.` callout above the JSONL Schema
   heading (around line 168).
-- [ ] 2.5: Resolve the "Open Questions" entries that the plan has answered:
+- [x] 2.5: Resolve the "Open Questions" entries that the plan has answered:
   add `**Resolved: see plan D5**` (etc.) inline notes for Q2, Q3, Q6, Q7.
-- [ ] 2.6: Update the brainstorm's deepen-validation doc (Q1/Q5 "BLOCKER"
+- [x] 2.6: Update the brainstorm's deepen-validation doc (Q1/Q5 "BLOCKER"
   status) to "RESOLVED by Option C — pure-shell Stop hook + disowned drain
   subshell".
 
@@ -113,7 +118,7 @@ designs.
 **Goal**: close the regex false-negative window and add CI coverage so
 regressions are detectable.
 
-- [ ] 3.1: Replace RULE 14b's disjoint-boolean checks with proximity regex:
+- [x] 3.1: Replace RULE 14b's disjoint-boolean checks with proximity regex:
   ```javascript
   const namesCoreRules =
     /[Nn]ever (?:modif|write|touch)[^.\n]{0,80}CORE_RULES/.test(body) ||
@@ -122,12 +127,12 @@ regressions are detectable.
   Apply same pattern to `USER_PREFERENCES` and `KNOWN_PROJECTS`. The 80-char
   proximity window catches the protective "Never modify ... CORE_RULES" prose
   but rejects unrelated mentions.
-- [ ] 3.2: Make RULE 14b's frontmatter strip CRLF-tolerant (match the
+- [x] 3.2: Make RULE 14b's frontmatter strip CRLF-tolerant (match the
   `extractFrontmatter()` regex). Currently `/^---\n/` misses WSL2-created files.
-- [ ] 3.3: Extend RULE 14 to also enforce `disallowedTools: [AskUserQuestion]`
+- [x] 3.3: Extend RULE 14 to also enforce `disallowedTools: [AskUserQuestion]`
   on `staging-reviewer.md` (currently only `staging-promoter.md`). Both agents
   run non-interactively.
-- [ ] 3.4: Create `tests/integration/validate-agent-authoring-rule14.test.ts`
+- [x] 3.4: Create `tests/integration/validate-agent-authoring-rule14.test.ts`
   (mirrors existing pattern in `validate-agent-authoring-review-rule.test.ts`):
   - Fixture: staging-promoter without `disallowedTools` → expect exit 1
   - Fixture: staging-promoter with proper frontmatter → expect exit 0
@@ -136,10 +141,10 @@ regressions are detectable.
   - Fixture: body with "Never modify" elsewhere but missing CORE_RULES proximity
     → expect exit 1 (catches the false-negative)
   - Fixture: body satisfying all checks → expect exit 0
-- [ ] 3.5: Document RULE 14b's heuristic-vs-AST nature in
+- [x] 3.5: Document RULE 14b's heuristic-vs-AST nature in
   `scripts/validate-agent-authoring.js` header comment — explicitly call out
   the V2-AST upgrade as a tracked TODO with reference to this plan.
-- [ ] 3.6: Update CLAUDE.md (root) to note RULE 14/14b exist and what they
+- [x] 3.6: Update CLAUDE.md (root) to note RULE 14/14b exist and what they
   enforce.
 
 **Files**: `scripts/validate-agent-authoring.js`,
@@ -151,18 +156,18 @@ regressions are detectable.
 **Goal**: align plan documentation with implemented behavior; surface the
 "raw transcript bytes" preview as an intentional design choice.
 
-- [ ] 4.1: Rewrite plan Phase 5.1 step 3 to explicitly state: "Preview shows
+- [x] 4.1: Rewrite plan Phase 5.1 step 3 to explicitly state: "Preview shows
   the first 80 chars of `transcript_tail` (raw, post-redaction). The
   human-readable `candidate_text` is not yet computed at this point — it is
   generated by `staging-scorer` during the drain itself. If the preview is
   unintelligible, the user can either (a) approve and let the drain run to
   see the scored output in `drain-logs/`, or (b) cancel and let the auto-drain
   fire on next SessionStart."
-- [ ] 4.2: Add a UX-mitigation note: optionally show the entry's metadata
+- [x] 4.2: Add a UX-mitigation note: optionally show the entry's metadata
   (`session_id`, `cwd`, file modification time) alongside the
   transcript_tail snippet so a user with no readable preview content can
   still identify *which* session is being drained.
-- [ ] 4.3: Update the `/compound:review-staged` command's Step 3 preview block
+- [x] 4.3: Update the `/compound:review-staged` command's Step 3 preview block
   to render the metadata line (in addition to the existing
   `basename: title` line).
 

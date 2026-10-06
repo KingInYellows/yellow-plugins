@@ -1,5 +1,10 @@
 # Feature: Plugin Install Resilience — Cache Detection, Env Fallback Parity, and Multi-Host Sync
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 46 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Overview
 
 Three pain points are blocking clean plugin installs across fleets:
@@ -196,9 +201,9 @@ Four coordinated workstreams, each independently shippable:
 
 ### Phase 1: Status-File Protocol Foundation
 
-- [ ] 1.1 Author `docs/plugin-credential-status-protocol.md` documenting the
+- [x] 1.1 Author `docs/plugin-credential-status-protocol.md` documenting the
        schema, invalidation rules, and reader/writer responsibilities.
-- [ ] 1.2 Add a reusable Bash helper at
+- [x] 1.2 Add a reusable Bash helper at
        `plugins/yellow-core/lib/credential-status.sh` exposing
        `write_credential_status(plugin, version, fields_json)` for hooks to
        call. Source from `${CLAUDE_PLUGIN_ROOT}/lib/credential-status.sh`.
@@ -214,36 +219,36 @@ Four coordinated workstreams, each independently shippable:
 > Adopters that need yellow-core-independent install must copy the helper
 > inline (also called out in the protocol doc's writer contract).
 <!-- /deepen-plan -->
-- [ ] 1.3 Unit test the helper with bats: file absent → write succeeds;
+- [x] 1.3 Unit test the helper with bats: file absent → write succeeds;
        file present + new schema → overwrite preserves valid JSON; jq
        missing → falls back to printf-based JSON construction with
        conservative defaults.
-- [ ] 1.4 Add reference snippet to `AGENTS.md` "Credential Status Protocol"
+- [x] 1.4 Add reference snippet to `AGENTS.md` "Credential Status Protocol"
        section so future plugins follow the same shape.
 
 ### Phase 2: yellow-semgrep Env-Fallback Fix (lowest-risk, highest-value)
 
-- [ ] 2.1 Add `plugins/yellow-semgrep/bin/start-semgrep.sh` mirroring the
+- [x] 2.1 Add `plugins/yellow-semgrep/bin/start-semgrep.sh` mirroring the
        `start-perplexity.sh` pattern:
        userConfig wins → shell env fallback → unset empty before exec.
-- [ ] 2.2 Update `plugins/yellow-semgrep/.claude-plugin/plugin.json`:
+- [x] 2.2 Update `plugins/yellow-semgrep/.claude-plugin/plugin.json`:
        - Replace `"command": "semgrep", "args": ["mcp"]` with
          `"command": "${CLAUDE_PLUGIN_ROOT}/bin/start-semgrep.sh"`
        - Replace `"SEMGREP_APP_TOKEN": "${user_config.semgrep_app_token}"`
          with `_USERCONFIG` + bare-env-passthrough pair
-- [ ] 2.3 Add SessionStart hook `hooks/write-credential-status.sh` invoking
+- [x] 2.3 Add SessionStart hook `hooks/write-credential-status.sh` invoking
        the lib helper. Wire in `plugin.json.hooks.SessionStart`.
-- [ ] 2.4 Mark `chmod +x bin/start-semgrep.sh hooks/write-credential-status.sh`;
+- [x] 2.4 Mark `chmod +x bin/start-semgrep.sh hooks/write-credential-status.sh`;
        add to `.gitattributes` LF rule.
-- [ ] 2.5 Update `plugins/yellow-semgrep/CLAUDE.md` documenting the env-var
+- [x] 2.5 Update `plugins/yellow-semgrep/CLAUDE.md` documenting the env-var
        contract and that `SEMGREP_APP_TOKEN` env now takes effect as a
        fallback when userConfig is empty.
-- [ ] 2.6 Bats test: wrapper exec env where userConfig empty + shell env
+- [x] 2.6 Bats test: wrapper exec env where userConfig empty + shell env
        set → `SEMGREP_APP_TOKEN` non-empty in exec environment.
 
 ### Phase 3: yellow-composio Stdio Conversion + Env Fallback
 
-- [ ] 3.1 Spike: verify `@composio/mcp` (or equivalent) exposes a stdio MCP
+- [x] 3.1 Spike: verify `@composio/mcp` (or equivalent) exposes a stdio MCP
        relay accepting `--url` and `--header` flags. If not, write
        `plugins/yellow-composio/bin/composio-proxy.mjs` (60–120 LoC stdio↔HTTPS
        proxy using Node's built-in `https` and `process.stdin`/`stdout`; see
@@ -283,7 +288,7 @@ Four coordinated workstreams, each independently shippable:
 > a new pattern; document the rationale prominently in
 > `plugins/yellow-composio/CLAUDE.md` for future maintainers.
 <!-- /deepen-plan -->
-- [ ] 3.2 Convert `plugins/yellow-composio/.claude-plugin/plugin.json`
+- [x] 3.2 Convert `plugins/yellow-composio/.claude-plugin/plugin.json`
        `mcpServers.composio-server`:
        - `"type": "stdio"` (or omit; stdio is default for command-type)
        - `"command": "${CLAUDE_PLUGIN_ROOT}/bin/start-composio.sh"`
@@ -294,7 +299,7 @@ Four coordinated workstreams, each independently shippable:
        - Drop `"required": true` from both userConfig fields (per research:
          required fires at startup not install; wrapper handles graceful
          OFFLINE state)
-- [ ] 3.3 Author `plugins/yellow-composio/bin/start-composio.sh`:
+- [x] 3.3 Author `plugins/yellow-composio/bin/start-composio.sh`:
        - Resolve userConfig → shell env precedence for both URL and API key
        - If URL is empty OR non-HTTPS → printf clear error to stderr and
          `exit 1` (blocks MCP start, no cascade to `claude doctor`)
@@ -313,34 +318,34 @@ Four coordinated workstreams, each independently shippable:
 > Codex, Vercel AI SDK, and OpenClaw integration docs. Proxy can use plain
 > Node 18+ `fetch()` with `await response.json()`.
 <!-- /deepen-plan -->
-- [ ] 3.4 Update `plugins/yellow-composio/hooks/check-mcp-url.sh` to also
+- [x] 3.4 Update `plugins/yellow-composio/hooks/check-mcp-url.sh` to also
        write the status file (or replace with a single SessionStart hook
        that does both warning + status emission).
-- [ ] 3.5 Update `plugins/yellow-composio/CLAUDE.md`, README, and the
+- [x] 3.5 Update `plugins/yellow-composio/CLAUDE.md`, README, and the
        command surface (`/composio:setup`, `/composio:status`) to reflect
        the new env-var contract (`COMPOSIO_MCP_URL`, `COMPOSIO_API_KEY`).
-- [ ] 3.6 Migration note in changeset: existing users with a working
+- [x] 3.6 Migration note in changeset: existing users with a working
        userConfig install will be unaffected. Users on legacy install
        paths with `type: http` cached must run
        `/plugin disable yellow-composio && /plugin enable yellow-composio`
        after update.
-- [ ] 3.7 Bats test: wrapper blocks startup with empty URL; wrapper resolves
+- [x] 3.7 Bats test: wrapper blocks startup with empty URL; wrapper resolves
        shell env when userConfig empty; wrapper rejects non-HTTPS URL.
 
 ### Phase 4: yellow-research Status File (env detection upgrade)
 
-- [ ] 4.1 Add SessionStart hook at
+- [x] 4.1 Add SessionStart hook at
        `plugins/yellow-research/hooks/write-credential-status.sh` emitting
        status for all 3 keys (perplexity, tavily, exa) + ceramic OAuth
        state + parallel OAuth state + ast-grep availability.
-- [ ] 4.2 No `plugin.json` changes needed (3-element fallback is already in
+- [x] 4.2 No `plugin.json` changes needed (3-element fallback is already in
        place). Just wire the hook.
-- [ ] 4.3 Verify the SessionStart hook reads `CLAUDE_PLUGIN_OPTION_*` for
+- [x] 4.3 Verify the SessionStart hook reads `CLAUDE_PLUGIN_OPTION_*` for
        userConfig presence detection without needing the keychain.
 
 ### Phase 5: `/setup:all` Dashboard Updates
 
-- [ ] 5.1 Add a Step 1 sub-block (after env-var probes) that reads each
+- [x] 5.1 Add a Step 1 sub-block (after env-var probes) that reads each
        credential-bearing plugin's status file:
        ```bash
        for plugin in yellow-research yellow-composio yellow-semgrep yellow-morph; do
@@ -352,16 +357,16 @@ Four coordinated workstreams, each independently shippable:
          fi
        done
        ```
-- [ ] 5.2 Update yellow-research classification block (lines 304-320 of
+- [x] 5.2 Update yellow-research classification block (lines 304-320 of
        `commands/setup/all.md`): READY = (status file shows ≥6/6 sources
        present) OR (legacy fallback to current shell-env-only check).
-- [ ] 5.3 Update yellow-composio classification block (lines 370-375):
+- [x] 5.3 Update yellow-composio classification block (lines 370-375):
        NEEDS SETUP = status file shows URL absent OR file absent.
        PARTIAL = URL present, API key absent.
        READY = both present + ToolSearch confirms `mcp__plugin_yellow-composio_*` visible.
-- [ ] 5.4 Add yellow-semgrep classification using status file (currently
+- [x] 5.4 Add yellow-semgrep classification using status file (currently
        relies on shell env probe only).
-- [ ] 5.5 Add Step 1.7 (new): version-drift check via
+- [x] 5.5 Add Step 1.7 (new): version-drift check via
        `claude plugin list --json --available 2>/dev/null | jq ...`
        cached to `~/.claude/plugins/data/yellow-core/version-check-cache.json`
        with 24h TTL. On miss/staleness, run live. Report per-plugin:
@@ -394,7 +399,7 @@ Four coordinated workstreams, each independently shippable:
 > here, not at a different location.
 <!-- /deepen-plan -->
 
-- [ ] 5.6 Update yellow-browser-test classification (lines 359-364):
+- [x] 5.6 Update yellow-browser-test classification (lines 359-364):
        run web-app heuristic scan FIRST. If no signals AND
        `.claude/yellow-browser-test.local.md` absent → omit from dashboard
        entirely (no PARTIAL/NEEDS SETUP row). If signals present + file
@@ -422,7 +427,7 @@ Four coordinated workstreams, each independently shippable:
 > classification and discovery in sync.
 <!-- /deepen-plan -->
 
-- [ ] 5.7 Add a Step 4 (new): consolidated remediation block. If any
+- [x] 5.7 Add a Step 4 (new): consolidated remediation block. If any
        outdated plugins, print one consolidated `/plugin update <name>`
        command list. If any drift-detector status files show
        newly-added userConfig fields, print one consolidated
@@ -430,7 +435,7 @@ Four coordinated workstreams, each independently shippable:
 
 ### Phase 6: Multi-Host SKILL.md
 
-- [ ] 6.1 Create `plugins/yellow-core/skills/multi-host-fleet/SKILL.md` with
+- [x] 6.1 Create `plugins/yellow-core/skills/multi-host-fleet/SKILL.md` with
        three standard headings:
        - `## What It Does`: Document env-var contract for fleet-deployable
          plugins.
@@ -443,7 +448,7 @@ Four coordinated workstreams, each independently shippable:
          - `### Secrets managers (1Password CLI op run, Vault envconsul,
            Doppler, generic env-file pattern)` — tool-agnostic; brief
            per-tool example
-- [ ] 6.2 Include canonical env-var contract table for all credential-bearing
+- [x] 6.2 Include canonical env-var contract table for all credential-bearing
        plugins:
        | Plugin | Env Var | userConfig field | Type |
        |--------|---------|------------------|------|
@@ -456,9 +461,9 @@ Four coordinated workstreams, each independently shippable:
        | yellow-composio | `COMPOSIO_MCP_URL` | `composio_mcp_url` | non-sensitive |
        | yellow-composio | `COMPOSIO_API_KEY` | `composio_api_key` | sensitive |
        | yellow-devin | `DEVIN_SERVICE_USER_TOKEN`, `DEVIN_ORG_ID` | (none) | sensitive (env-only) |
-- [ ] 6.3 Add an `## Examples` subsection with a complete `.envrc` and
+- [x] 6.3 Add an `## Examples` subsection with a complete `.envrc` and
        `.zshrc` snippet (commented, so users can selectively enable).
-- [ ] 6.4 Cross-reference: mention in
+- [x] 6.4 Cross-reference: mention in
        `plugins/yellow-core/skills/mcp-health-probe/SKILL.md` and
        `plugins/yellow-research/CLAUDE.md`, README files.
 
@@ -475,28 +480,28 @@ Four coordinated workstreams, each independently shippable:
 > alongside a `${VAR:-}` passthrough = warning).
 <!-- /deepen-plan -->
 
-- [ ] 7.1 Add a `validate-plugin.js` rule (warning only):
+- [x] 7.1 Add a `validate-plugin.js` rule (warning only):
        userConfig fields marked `required: true` AND `sensitive: true` SHOULD
        have an associated wrapper script + env-passthrough block. Emit
        `[warn] yellow-composio: composio_api_key is required+sensitive but no
        shell env fallback found — consider 3-element fallback pattern.`
-- [ ] 7.2 Add a `validate-plugin.js` rule (warning only):
+- [x] 7.2 Add a `validate-plugin.js` rule (warning only):
        MCP server `command` blocks that interpolate `${user_config.X}`
        directly (not via wrapper script) miss the empty-string-unset
        safety. Recommend wrapper indirection.
-- [ ] 7.3 Test fixtures in `tests/unit/validate-plugin/`:
+- [x] 7.3 Test fixtures in `tests/unit/validate-plugin/`:
        - `fixture-required-no-fallback.json` (expects 1 warning)
        - `fixture-required-with-wrapper.json` (expects 0 warnings)
        - `fixture-direct-substitution.json` (expects 1 warning)
-- [ ] 7.4 Update `docs/plugin-validation-guide.md` documenting the two new
+- [x] 7.4 Update `docs/plugin-validation-guide.md` documenting the two new
        warning categories.
 
 ### Phase 8: Migration, Documentation, Release
 
-- [ ] 8.1 Add `docs/solutions/build-errors/userconfig-required-fires-at-startup-not-install.md`
+- [x] 8.1 Add `docs/solutions/build-errors/userconfig-required-fires-at-startup-not-install.md`
        documenting the GH #39827 + #39455 behavior and the wrapper-pattern
        workaround.
-- [ ] 8.2 Update `AGENTS.md` "Critical Agent Authoring Rules" with a new
+- [x] 8.2 Update `AGENTS.md` "Critical Agent Authoring Rules" with a new
        entry: "Credential-bearing MCPs must use the 3-element wrapper
        pattern; see multi-host-fleet SKILL.md."
 
@@ -510,16 +515,16 @@ Four coordinated workstreams, each independently shippable:
 > `config.json` (no pending changesets), and the per-plugin changeset
 > shape follows `@changesets/changelog-github` format.
 <!-- /deepen-plan -->
-- [ ] 8.3 Per-plugin changesets:
+- [x] 8.3 Per-plugin changesets:
        - yellow-semgrep: minor (env-fallback added)
        - yellow-composio: minor (env-fallback + stdio conversion;
          migration note in changeset)
        - yellow-research: patch (SessionStart hook only; no behavioral
          change)
        - yellow-core: minor (setup:all enhancements + new SKILL.md)
-- [ ] 8.4 Update root `README.md` if env-var contract belongs on the
+- [x] 8.4 Update root `README.md` if env-var contract belongs on the
        front page (skip if it's discoverable via the skill).
-- [ ] 8.5 Run `pnpm release:check` and `pnpm validate:setup-all` per Phase.
+- [x] 8.5 Run `pnpm release:check` and `pnpm validate:setup-all` per Phase.
 
 ## Technical Specifications
 
@@ -595,18 +600,18 @@ N/A.
 
 ### Manual Testing Checklist
 
-- [ ] Fresh install on Linux WSL2 with no shell env, answer userConfig
+- [x] Fresh install on Linux WSL2 with no shell env, answer userConfig
        prompts for all credential-bearing plugins → all READY
-- [ ] Fresh install with all shell env vars exported, dismiss all userConfig
+- [x] Fresh install with all shell env vars exported, dismiss all userConfig
        prompts → all READY (env-fallback works end-to-end)
-- [ ] Upgrade from yellow-composio v1.2.x (`type: http`) to v1.3.0
+- [x] Upgrade from yellow-composio v1.2.x (`type: http`) to v1.3.0
        (`type: stdio`) → MCP still works after `/plugin update` +
        Claude Code restart; status file populated after first SessionStart
-- [ ] Dotfiles repo (no web app) → yellow-browser-test omitted from
+- [x] Dotfiles repo (no web app) → yellow-browser-test omitted from
        dashboard entirely; no NEEDS SETUP banner
-- [ ] React project with no `.claude/yellow-browser-test.local.md` →
+- [x] React project with no `.claude/yellow-browser-test.local.md` →
        RECOMMENDED banner with "/browser-test:setup" suggestion
-- [ ] Stale plugin install (version drift detected) → consolidated
+- [x] Stale plugin install (version drift detected) → consolidated
        `/plugin update` list shown in Step 4
 
 ## Acceptance Criteria

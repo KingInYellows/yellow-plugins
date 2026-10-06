@@ -1,5 +1,10 @@
 # Feature: PR #260 Follow-Up — Validator/Schema Hardening + Doc Sync
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 37 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Problem Statement
 
 PR #260 (`docs/subagent-conventions`) introduces the Agent Archetypes table,
@@ -86,51 +91,51 @@ scope is clarified in the SKILL.md.
 `tests/integration/validate-plugin.test.ts`,
 `.changeset/pr260-validator-hardening.md`.
 
-- [ ] 1.1: Mirror `validate-agent-authoring-review-rule.test.ts`
+- [x] 1.1: Mirror `validate-agent-authoring-review-rule.test.ts`
       structure. Create `tests/integration/validate-plugin.test.ts`
       with `mkdtempSync` per test, `spawnSync` of
       `node scripts/validate-plugin.js` against the temp dir, and
       assertions on exit code + stderr.
-- [ ] 1.2: Add fixture coverage for **current** behavior before
+- [x] 1.2: Add fixture coverage for **current** behavior before
       changing anything (regression net): valid manifest passes,
       invalid name fails, missing version is allowed (only
       invalid-format fails), hooks-string anti-pattern logs warning,
       hooks-inline-object passes.
-- [ ] 1.3: Extract `hasInlineHooks(manifest)` predicate at module
+- [x] 1.3: Extract `hasInlineHooks(manifest)` predicate at module
       scope (lines 226, 329, 449 currently duplicated). Replace
       three call sites.
-- [ ] 1.4: Extract `addError(errors, msg)` helper. Canonical message
+- [x] 1.4: Extract `addError(errors, msg)` helper. Canonical message
       form is the longer one (RULE 1 currently has push: short,
       log: longer; the longer form wins). Replace pervasive
       `errors.push(msg); logError(msg);` pairs.
-- [ ] 1.5: Convert `VALID_HOOK_EVENTS` from array to module-scope
+- [x] 1.5: Convert `VALID_HOOK_EVENTS` from array to module-scope
       `Set<string>`. Replace `.includes()` with `.has()`.
-- [ ] 1.6: Add `'SessionStart'` to `DECISION_PROTOCOL_EVENTS` Set
+- [x] 1.6: Add `'SessionStart'` to `DECISION_PROTOCOL_EVENTS` Set
       (line 454). Cross-check against MEMORY.md PR #72 documented
       requirement.
-- [ ] 1.7: Extract `validateHookScriptPath(scriptPath, pluginDir,
+- [x] 1.7: Extract `validateHookScriptPath(scriptPath, pluginDir,
       errors)` per-script-path helper. Centralizes existence,
       `resolvePluginPath` containment, shebang, and `set -e` checks.
-- [ ] 1.8: Refactor RULE 6 inline-object branch to call the new
+- [x] 1.8: Refactor RULE 6 inline-object branch to call the new
       helper.
-- [ ] 1.9: **Array-form hooks fix.** When `hooks` is an array,
+- [x] 1.9: **Array-form hooks fix.** When `hooks` is an array,
       iterate elements: string elements receive
       `validateHookScriptPath` checks; object elements pass
       through (same as inline-object form). Emit a one-time
       INFO-level note: "array-form `hooks` is supported but
       undocumented — prefer inline-object form".
-- [ ] 1.10: Apply `resolvePluginPath` in the string-form `hooks`
+- [x] 1.10: Apply `resolvePluginPath` in the string-form `hooks`
       branch (line 313). Currently only checks the known
       anti-pattern; should also catch path escape and missing files.
-- [ ] 1.11: **outputStyles directory-vs-file decision.** Tighten
+- [x] 1.11: **outputStyles directory-vs-file decision.** Tighten
       RULE 5b to enforce directory-only (matches current
       validator) and update schema description in PR-B accordingly.
       Reject `.md` file paths with a clear error.
-- [ ] 1.12: Add fixture tests for each new behavior: array-form
+- [x] 1.12: Add fixture tests for each new behavior: array-form
       hooks-script-paths checked, string-form hooks
       path-existence checked, outputStyles file-vs-dir error,
       addError drift fix verified by inspecting captured stderr.
-- [ ] 1.13: `pnpm test:integration && pnpm validate:schemas`
+- [x] 1.13: `pnpm test:integration && pnpm validate:schemas`
       green; commit; `gt submit --no-interactive`.
 
 **Acceptance:** `pnpm test:integration` adds ≥10 new test cases.
@@ -145,45 +150,45 @@ pnpm lint && pnpm typecheck`) green.
 (new), `packages/infrastructure/src/validation/ajvFactory.ts`,
 `.changeset/pr260-schema-tightening.md`.
 
-- [ ] 2.1: **`pathPathsOrInline` array-item tightening.** Replace
+- [x] 2.1: **`pathPathsOrInline` array-item tightening.** Replace
       bare `{ "type": "object" }` in array items with a constraint
       requiring at minimum the inline-hooks shape (event-keyed
       object) — accepts the same shapes the inline-object branch
       accepts, no looser. Same change applies to the array form.
-- [ ] 2.2: **`userConfig` per-entry tightening.** Set
+- [x] 2.2: **`userConfig` per-entry tightening.** Set
       `additionalProperties: false` on the entry schema. Enumerate
       allowed keys (`type`, `label`, `description`, `default`,
       `required`, `sensitive`).
-- [ ] 2.3: **Type-conditional `default` enforcement** via nested
+- [x] 2.3: **Type-conditional `default` enforcement** via nested
       `if/then/else` (NOT `oneOf` — see best-practices research).
       `if type === "string"` → `default: { type: "string" }`;
       else `if type === "number"` → `default: { type: "number" }`;
       else `default: { type: "boolean" }`.
-- [ ] 2.4: **`monitors` `additionalProperties: false` → `true`** on
+- [x] 2.4: **`monitors` `additionalProperties: false` → `true`** on
       the inline-array-element shape. Required fields stay
       required. Forward-compat with whatever Claude Code adds.
-- [ ] 2.5: Add `dependencies[].version` validation. Two-layer:
+- [x] 2.5: Add `dependencies[].version` validation. Two-layer:
       lightweight regex pattern in JSON Schema (`^[~^>=<*xX0-9]`
       gatekeep) + new AJV custom keyword
       `semverRange` calling `semver.validRange()` for full
       semantic check. Add `semver` dependency to root
       `package.json` if not already present.
-- [ ] 2.6: Tighten `outputStyles` schema description to "directories
+- [x] 2.6: Tighten `outputStyles` schema description to "directories
       containing .md files" (matches RULE 5b after PR-A).
-- [ ] 2.7: **Update `examples/plugin-extended.example.json`.**
+- [x] 2.7: **Update `examples/plugin-extended.example.json`.**
       Replace `"hooks": "./hooks/hooks.json"` (string anti-pattern
       that RULE 6 warns against) with inline-object form. Update
       `userConfig` block to satisfy the tightened schema (boolean
       defaults must be boolean, etc.). Add a `_comment`-style
       header noting the file is a schema-coverage fixture.
-- [ ] 2.8: Add CI hook reference. Either: (a) add a comment in
+- [x] 2.8: Add CI hook reference. Either: (a) add a comment in
       `validate-schemas.yml` explicitly globbing the example, OR
       (b) add a Vitest test in `tests/integration/` that
       AJV-validates every file under `examples/` against
       `plugin.schema.json`. (b) is preferred — turns it from a
       silent orphan into a tested fixture.
-- [ ] 2.9: Run `pnpm validate:schemas`; example must pass.
-- [ ] 2.10: Commit; `gt submit --no-interactive`.
+- [x] 2.9: Run `pnpm validate:schemas`; example must pass.
+- [x] 2.10: Commit; `gt submit --no-interactive`.
 
 **Acceptance:** `examples/plugin-extended.example.json` passes
 tightened schema. New AJV custom keyword exercised by at least
@@ -195,29 +200,29 @@ includes a test that AJV-validates every file under `examples/`.
 **Files:** `plugins/yellow-core/commands/workflows/work.md`,
 `.changeset/pr260-rundir-hardening.md`.
 
-- [ ] 3.1: **Shell-variable isolation fix.** Restructure Phase 3
+- [x] 3.1: **Shell-variable isolation fix.** Restructure Phase 3
       step 3a so `RUN_DIR=$(mktemp -d -t run-XXXXXXXX)` is
       derived in the same prose-step as the Task spawn, OR the
       orchestrator is instructed to capture stdout and substitute
       the literal path inline. Reference MEMORY.md
       `bash-block-subshell-isolation-in-command-files.md`
       anti-pattern.
-- [ ] 3.2: **Empty-RUN_DIR error path.** After mktemp, prose
+- [x] 3.2: **Empty-RUN_DIR error path.** After mktemp, prose
       instruction: "If `$RUN_DIR` is empty (mktemp failed),
       report the error to the user and stop — do not spawn
       reviewer agents without a valid run directory."
-- [ ] 3.3: **Atomic write convention.** Update SKILL.md
+- [x] 3.3: **Atomic write convention.** Update SKILL.md
       Subagent Failure Convention to specify
       `agent-result-<name>.tmp` → `mv` to `.json` rename
       (POSIX rename atomicity). Orchestrator globs `*.json`
       only, never `*.tmp`. Best-practices research validated
       this pattern in the barkain orchestration plugin.
-- [ ] 3.4: **Cleanup step.** Add prose instruction at the end
+- [x] 3.4: **Cleanup step.** Add prose instruction at the end
       of Phase 3: "After findings are aggregated, remove
       `$RUN_DIR` (`rm -rf "$RUN_DIR"`). Result files may
       contain diff excerpts with secrets — retention in /tmp
       is a data-residue risk."
-- [ ] 3.5: `pnpm validate:schemas` green; commit; submit.
+- [x] 3.5: `pnpm validate:schemas` green; commit; submit.
 
 **Acceptance:** `work.md` Phase 3 reads cleanly when followed by
 an LLM with no prior context. Reviewers can verify by reading
@@ -233,30 +238,30 @@ prose-instruction form.
 `plugins/yellow-review/commands/review/review-pr.md`,
 `.changeset/pr260-doc-sync.md`.
 
-- [ ] 4.1: **Refresh security-fencing consumer count.** Update the
+- [x] 4.1: **Refresh security-fencing consumer count.** Update the
       "currently inlined in 25 agents" claim to reflect actual
       count (36 confirmed by `rg -l 'CRITICAL SECURITY RULES'
       plugins/`). Re-enumerate consumers from the live grep,
       excluding the canonical SKILL.md itself and the
       `yellow-core/CLAUDE.md` reference.
-- [ ] 4.2: **Add machine-verifiable count one-liner** alongside
+- [x] 4.2: **Add machine-verifiable count one-liner** alongside
       the prose: ``rg -l 'CRITICAL SECURITY RULES' plugins/ |
       grep -v 'security-fencing/SKILL.md' | grep -v
       'CLAUDE.md' | wc -l`` so future drift is self-correcting.
-- [ ] 4.3: **Add the 7 Wave-2 yellow-review personas** to the
+- [x] 4.3: **Add the 7 Wave-2 yellow-review personas** to the
       consumer list (`correctness-reviewer`,
       `maintainability-reviewer`, `project-compliance-reviewer`,
       `project-standards-reviewer`, `reliability-reviewer`,
       `adversarial-reviewer`, `plugin-contract-reviewer`).
       Annotate the deprecated `code-reviewer` stub as such.
-- [ ] 4.4: **Fix `quick-reference.md:79`** yellow-browser-test
+- [x] 4.4: **Fix `quick-reference.md:79`** yellow-browser-test
       reference. Verified: `yellow-browser-test` does not use
       the `.claude/<plugin>.local.md` pattern; it uses
       `.claude/browser-test-auth.json`. Replace with a working
       reference (yellow-plugins.local.md schema in `local-config`
       skill) OR remove the specific plugin reference and link
       to the `local-config` skill generically.
-- [ ] 4.5: **Add Subagent Failure Convention scope clarification**
+- [x] 4.5: **Add Subagent Failure Convention scope clarification**
       to `create-agent-skills/SKILL.md`. New paragraph in the
       §Subagent Failure Convention section:
 
@@ -271,7 +276,7 @@ prose-instruction form.
   duplicate the signal.
   ```
 
-- [ ] 4.6: **Add comment block to `review-pr.md` Step 5**
+- [x] 4.6: **Add comment block to `review-pr.md` Step 5**
       explaining the architectural choice:
 
   ```text
@@ -283,13 +288,13 @@ prose-instruction form.
   prose-emitting orchestrators like `work.md` Phase 3.
   ```
 
-- [ ] 4.7: Update `create-agent-skills/SKILL.md` Subagent Failure
+- [x] 4.7: Update `create-agent-skills/SKILL.md` Subagent Failure
       Convention to use the atomic-write `.tmp` → `mv`
       convention (forward-link to PR-C item 3.3).
-- [ ] 4.8: Categories list at SKILL.md:204 was already corrected
+- [x] 4.8: Categories list at SKILL.md:204 was already corrected
       on PR #260 by the in-scope fix; verify still correct, no
       action needed.
-- [ ] 4.9: `pnpm validate:agents && pnpm validate:plugins` green;
+- [x] 4.9: `pnpm validate:agents && pnpm validate:plugins` green;
       commit; submit.
 
 **Acceptance:** `rg -l 'CRITICAL SECURITY RULES' plugins/ |

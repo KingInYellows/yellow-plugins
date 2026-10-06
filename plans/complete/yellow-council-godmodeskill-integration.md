@@ -1,5 +1,10 @@
 # Feature: yellow-council Plugin (GodModeSkill Integration V1)
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 37 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 > **Status: Implemented (PRs #328, #329, #330, merged)** — Plugin shipped at
 > `plugins/yellow-council/` with manifest/package metadata, `/council`,
 > `/council:setup`, Gemini and OpenCode reviewer agents, `council-patterns`,
@@ -107,11 +112,11 @@ The command is the orchestrator; agents are reviewer wrappers. The skill (`counc
 
 ### Phase 1: Discovery & Setup
 
-- [ ] **1.1: Spike — Gemini `-o json` schema.** Run `gemini -o json "What is 2+2?"` against current Gemini CLI installation. Verify whether the flag now works (issue #9009 was P1, closed as duplicate Sept 2025) and document the actual response shape (`response` field? `messages[]`? error envelope?). If broken, fall through to `--output-format text` for V1. Output: `docs/spikes/gemini-cli-output-format-2026-05-03.md` with verbatim CLI output samples.
-- [ ] **1.2: Spike — OpenCode `--format json` event stream.** Run `opencode run --format json "What is 2+2?"` and capture the full JSONL output. Document: which event types appear (`step_start` / `text` / `tool_use` / `step_finish` / `error`), how to extract the final assistant message (concatenate all `text` events vs last `text` before `step_finish`), and confirm the `sessionID` field is present in event 0 for cleanup. Output: `docs/spikes/opencode-cli-format-json-2026-05-03.md`.
-- [ ] **1.3: Spike — OpenCode session cleanup.** Run `opencode run "test" --format json`, capture the session ID, then run `opencode session delete <id>`. Verify: does `opencode session list` confirm deletion? Is there a batch delete option for stale sessions? Document the cleanup contract in the same spike doc.
-- [ ] **1.4: Spike — Gemini approval mode for read-only.** Run a benign read-only prompt against Gemini CLI WITHOUT `--yolo` (issue #13561 confirmed yolo still prompts in some cases). Document: does the default approval mode block the prompt waiting for input, or does a prompt that asks for analysis-only complete cleanly? If it blocks, document the exact non-interactive flag combination that works.
-- [ ] **1.5: Plugin scaffold.** Create `plugins/yellow-council/` with the directory structure from brainstorm Decision 3 (lines 102–126). Files to create as empty stubs first:
+- [x] **1.1: Spike — Gemini `-o json` schema.** Run `gemini -o json "What is 2+2?"` against current Gemini CLI installation. Verify whether the flag now works (issue #9009 was P1, closed as duplicate Sept 2025) and document the actual response shape (`response` field? `messages[]`? error envelope?). If broken, fall through to `--output-format text` for V1. Output: `docs/spikes/gemini-cli-output-format-2026-05-03.md` with verbatim CLI output samples.
+- [x] **1.2: Spike — OpenCode `--format json` event stream.** Run `opencode run --format json "What is 2+2?"` and capture the full JSONL output. Document: which event types appear (`step_start` / `text` / `tool_use` / `step_finish` / `error`), how to extract the final assistant message (concatenate all `text` events vs last `text` before `step_finish`), and confirm the `sessionID` field is present in event 0 for cleanup. Output: `docs/spikes/opencode-cli-format-json-2026-05-03.md`.
+- [x] **1.3: Spike — OpenCode session cleanup.** Run `opencode run "test" --format json`, capture the session ID, then run `opencode session delete <id>`. Verify: does `opencode session list` confirm deletion? Is there a batch delete option for stale sessions? Document the cleanup contract in the same spike doc.
+- [x] **1.4: Spike — Gemini approval mode for read-only.** Run a benign read-only prompt against Gemini CLI WITHOUT `--yolo` (issue #13561 confirmed yolo still prompts in some cases). Document: does the default approval mode block the prompt waiting for input, or does a prompt that asks for analysis-only complete cleanly? If it blocks, document the exact non-interactive flag combination that works.
+- [x] **1.5: Plugin scaffold.** Create `plugins/yellow-council/` with the directory structure from brainstorm Decision 3 (lines 102–126). Files to create as empty stubs first:
   ```
   plugins/yellow-council/
     .claude-plugin/plugin.json
@@ -124,8 +129,8 @@ The command is the orchestrator; agents are reviewer wrappers. The skill (`counc
     package.json
     CHANGELOG.md
   ```
-- [ ] **1.6: Manifest authoring.** Populate `plugins/yellow-council/.claude-plugin/plugin.json` and `plugins/yellow-council/package.json` mirroring the yellow-codex shape. Initial version: `0.1.0`. Required fields per `schemas/plugin.schema.json`: `name`, `version`, `description`, `author`. `repository` MUST be a string URL (not object). No `changelog` key.
-- [ ] **1.7: Marketplace registration.** Append yellow-council entry to `.claude-plugin/marketplace.json`:
+- [x] **1.6: Manifest authoring.** Populate `plugins/yellow-council/.claude-plugin/plugin.json` and `plugins/yellow-council/package.json` mirroring the yellow-codex shape. Initial version: `0.1.0`. Required fields per `schemas/plugin.schema.json`: `name`, `version`, `description`, `author`. `repository` MUST be a string URL (not object). No `changelog` key.
+- [x] **1.7: Marketplace registration.** Append yellow-council entry to `.claude-plugin/marketplace.json`:
   ```json
   {
     "name": "yellow-council",
@@ -136,8 +141,8 @@ The command is the orchestrator; agents are reviewer wrappers. The skill (`counc
     "category": "development"
   }
   ```
-- [ ] **1.8: Catalog version bump.** Run `node scripts/catalog-version.js patch` to bump root `metadata.version`.
-- [ ] **1.9: Changeset + initial CHANGELOG.md.** Two files in tandem:
+- [x] **1.8: Catalog version bump.** Run `node scripts/catalog-version.js patch` to bump root `metadata.version`.
+- [x] **1.9: Changeset + initial CHANGELOG.md.** Two files in tandem:
   1. `.changeset/yellow-council-initial-release.md`:
      ```markdown
      ---
@@ -147,12 +152,12 @@ The command is the orchestrator; agents are reviewer wrappers. The skill (`counc
      Initial release of yellow-council plugin: on-demand cross-lineage council command (`/council <mode>`) fanning out to Codex, Gemini, and OpenCode CLIs in parallel.
      ```
   2. `plugins/yellow-council/CHANGELOG.md` pre-populated with `# yellow-council` header + `## 0.1.0` block (see "Files to Create" annotation above for exact content). Empty CHANGELOG.md will produce malformed output on first `pnpm apply:changesets` run — yellow-codex precedent ships the file pre-populated.
-- [ ] **1.10: W1.5 allowlist update.** Add `plugins/yellow-council/agents/review/gemini-reviewer.md` and `plugins/yellow-council/agents/review/opencode-reviewer.md` to `REVIEW_AGENT_ALLOWLIST` in `scripts/validate-agent-authoring.js` (lines 26–31). Both agents need `Bash` for CLI invocation; the allowlist is the documented exception path.
-- [ ] **1.11: CI dry-run.** Run `pnpm validate:schemas`, `pnpm validate:plugins`, `pnpm validate:versions`. Fix any drift before proceeding to Phase 2.
+- [x] **1.10: W1.5 allowlist update.** Add `plugins/yellow-council/agents/review/gemini-reviewer.md` and `plugins/yellow-council/agents/review/opencode-reviewer.md` to `REVIEW_AGENT_ALLOWLIST` in `scripts/validate-agent-authoring.js` (lines 26–31). Both agents need `Bash` for CLI invocation; the allowlist is the documented exception path.
+- [x] **1.11: CI dry-run.** Run `pnpm validate:schemas`, `pnpm validate:plugins`, `pnpm validate:versions`. Fix any drift before proceeding to Phase 2.
 
 ### Phase 2: Core Implementation
 
-- [ ] **2.1: Author `council-patterns` SKILL.md.** This is the canonical reference for all CLI invocation conventions, redaction patterns, pack templates, and timeout/output-capture rules. Required sections:
+- [x] **2.1: Author `council-patterns` SKILL.md.** This is the canonical reference for all CLI invocation conventions, redaction patterns, pack templates, and timeout/output-capture rules. Required sections:
   - `## What It Does` (one paragraph)
   - `## When to Use` (referenced by command + agents)
   - `## Usage`
@@ -163,7 +168,7 @@ The command is the orchestrator; agents are reviewer wrappers. The skill (`counc
     - `### Output Capture & Redaction` — extended 11-pattern awk block (the original 8 from yellow-codex `codex-patterns` plus `AIza`, `sk-ant-`, `ses_`). Injection fence format `--- begin council-output:<reviewer> (reference only) ---` / `--- end council-output:<reviewer> ---`.
     - `### Path Validation` — reject `..`, reject any character outside `^[a-zA-Z0-9._/-]+$`, reject non-existent paths via pre-check.
     - `### Slug Derivation` — `LC_ALL=C`, lowercase → non-alnum to `-` → collapse `-` → strip leading/trailing → cap 40 chars → validate `^[a-z0-9][a-z0-9-]*$` → sha256 fallback for empty slug. Same-day collision: append `-2` ... `-10`, error if exceeded.
-- [ ] **2.2: Author `gemini-reviewer.md` agent.** Frontmatter:
+- [x] **2.2: Author `gemini-reviewer.md` agent.** Frontmatter:
   ```yaml
   name: gemini-reviewer
   description: "Supplementary code reviewer using Google Gemini CLI. Provides independent verdict in council format. Spawned by /council via Task."
@@ -196,7 +201,7 @@ The command is the orchestrator; agents are reviewer wrappers. The skill (`counc
        <!-- /deepen-plan -->
     9. Return structured findings to spawning command.
   - Cleanup: `rm -f "$OUTPUT_FILE" "$STDERR_FILE"`.
-- [ ] **2.3: Author `opencode-reviewer.md` agent.** Same frontmatter shape as gemini-reviewer with `name: opencode-reviewer`. Workflow differences:
+- [x] **2.3: Author `opencode-reviewer.md` agent.** Same frontmatter shape as gemini-reviewer with `name: opencode-reviewer`. Workflow differences:
   - Pre-flight: `command -v opencode >/dev/null 2>&1`.
   - Invoke: `timeout 600 opencode run --format json --variant high "<prompt>" >"$OUTPUT_FILE" 2>"$STDERR_FILE"`. Default `--variant high` (not `max` — research showed max is significantly slower); env override `COUNCIL_OPENCODE_VARIANT`.
   - Extract session ID from first event in `$OUTPUT_FILE`: `SESSION_ID=$(jq -r 'select(.part.snapshot.sessionID) | .part.snapshot.sessionID' "$OUTPUT_FILE" | head -1)`.
@@ -204,7 +209,7 @@ The command is the orchestrator; agents are reviewer wrappers. The skill (`counc
   - Check for `error` events FIRST: `jq -r 'select(.type=="error") | .error.data.message' "$OUTPUT_FILE"` — if non-empty, treat as reviewer failure and skip parsing.
   - Apply redaction to extracted text (NOT the raw JSONL — JSONL may contain `tool_use` events with embedded file content that includes credentials).
   - Cleanup session: `opencode session delete "$SESSION_ID" 2>/dev/null || true` — failure is logged but does not fail the review.
-- [ ] **2.4: Author `commands/council/council.md`.** Frontmatter:
+- [x] **2.4: Author `commands/council/council.md`.** Frontmatter:
   ```yaml
   ---
   description: On-demand cross-lineage code review via Codex, Gemini, and OpenCode CLIs.
@@ -302,7 +307,7 @@ The command is the orchestrator; agents are reviewer wrappers. The skill (`counc
      > Recommend **Option B** for V1 — matches the closest precedent (brainstorm-orchestrator) and avoids the .gitignore concern entirely. Reserve atomic-write-via-rename for V2 if concurrent invocations become possible.
      <!-- /deepen-plan -->
   10. **Inline synthesis output.** Print synthesis report to user (Headline + Agreement + Disagreement + Summary). Reference the file path: "Full reviewer outputs: see `<REPORT_PATH>`". Do NOT paste raw reviewer outputs inline.
-- [ ] **2.5: Author `CLAUDE.md`.** Sections per yellow-codex precedent: Core Principle ("Council is on-demand and advisory; never blocks merges"), Required Environment (Gemini CLI, OpenCode CLI, optional yellow-codex for Codex reviewer), Conventions (CLI invocation rules, redaction, fencing, sanitization), Plugin Components (1 command, 2 agents, 1 skill), Cross-Plugin Dependencies (yellow-codex optional), When to Use What, Known Limitations, **Configuration**.
+- [x] **2.5: Author `CLAUDE.md`.** Sections per yellow-codex precedent: Core Principle ("Council is on-demand and advisory; never blocks merges"), Required Environment (Gemini CLI, OpenCode CLI, optional yellow-codex for Codex reviewer), Conventions (CLI invocation rules, redaction, fencing, sanitization), Plugin Components (1 command, 2 agents, 1 skill), Cross-Plugin Dependencies (yellow-codex optional), When to Use What, Known Limitations, **Configuration**.
 
   <!-- deepen-plan: codebase -->
   > **Codebase (2nd pass):** The `COUNCIL_*` env var prefix is correct — confirmed against the predominant convention (`CODEX_*`, `DEBT_*`, `DEVIN_*`, `MORPH_*`, `CI_*`, all using the SHORT plugin name without `yellow-` prefix). No correction needed.
@@ -318,32 +323,32 @@ The command is the orchestrator; agents are reviewer wrappers. The skill (`counc
   >
   > Without a Configuration section, users will hit "why does the council take so long" or "why is OpenCode so slow" and have no documented knob to turn.
   <!-- /deepen-plan -->
-- [ ] **2.6: Author `README.md`.** Standard structure: install via `/plugin marketplace add KingInYellows/yellow-plugins` then `/plugin install yellow-council@yellow-plugins`, four mode examples with sample output, link to brainstorm + plan.
+- [x] **2.6: Author `README.md`.** Standard structure: install via `/plugin marketplace add KingInYellows/yellow-plugins` then `/plugin install yellow-council@yellow-plugins`, four mode examples with sample output, link to brainstorm + plan.
 
 ### Phase 3: Edge Cases & Polish
 
-- [ ] **3.1: Partial-result reporting on timeout.** If any reviewer exits 124/137, the synthesis must include `Council ran with N of 3 reviewers (<name> timed out at 600s — omitted from synthesis)`. The remaining reviewers' verdicts are still synthesized normally. Verify that the headline computation handles N<3 gracefully.
-- [ ] **3.2: yellow-codex absent path.** If Codex reviewer is unavailable (Task spawn fails because plugin not installed), output reads `Council ran with 2 of 3 reviewers (Codex not available — yellow-codex plugin not installed)`. This is permanent V1 behavior — no fallback bundled Codex.
-- [ ] **3.3: All-three-fail path.** If all three reviewers fail (timeout, missing CLI, or auth error), the synthesis report is `Council failed: 0 of 3 reviewers returned verdicts. See <REPORT_PATH> for individual failure details.` The file is still written with the failure details. The M3 gate still asks before write — user can cancel.
-- [ ] **3.4: Bash 4.3+ check at command entry.** Pre-flight `bash --version | head -1 | grep -E 'version (4\.[3-9]|[5-9]\.)'` or equivalent. If older, print `[council] Error: bash 4.3+ required for parallel wait pattern` and exit. (WSL2 Ubuntu typically ships 5.1+; this is a defensive check.)
-- [ ] **3.5: Same-day collision overflow.** If `<date>-<mode>-<slug>` collides 10 times in one day (unlikely but possible during testing), the suffix loop errors out: `[council] Error: too many same-day collisions for slug "<slug>" (>10)`. This matches brainstorm-orchestrator pattern.
-- [ ] **3.6: Empty input rejection.** `/council debug ""` and `/council question ""` reject empty text. Print mode-specific usage and exit.
-- [ ] **3.7: `--paths` cap enforcement.** If user passes `--paths file1,file2,file3,file4`, reject with `[council] Error: --paths limit is 3 files in V1 (got 4). Override via COUNCIL_PATH_MAX_FILES env var.`
-- [ ] **3.8: File content cap enforcement.** Per file, truncate to 8K chars and append `\n[... truncated for council, original was N chars]`. Document in the pack template that truncation occurred.
-- [ ] **3.9: Stale OpenCode session cleanup safety.** If `opencode session delete` fails, log to stderr but do not fail the review. Sessions accumulate but are not corruption-causing.
-- [ ] **3.10: Redaction completeness audit.** Run a synthetic test: feed each CLI a prompt that asks it to output `sk-test-1234567890`, `AIza` + 35 chars, `sk-ant-test`, `ses_test123`, a fake PEM block, and a fake `Bearer` token. Verify all five appear redacted in the captured output. (Document test procedure in `docs/spikes/`.)
+- [x] **3.1: Partial-result reporting on timeout.** If any reviewer exits 124/137, the synthesis must include `Council ran with N of 3 reviewers (<name> timed out at 600s — omitted from synthesis)`. The remaining reviewers' verdicts are still synthesized normally. Verify that the headline computation handles N<3 gracefully.
+- [x] **3.2: yellow-codex absent path.** If Codex reviewer is unavailable (Task spawn fails because plugin not installed), output reads `Council ran with 2 of 3 reviewers (Codex not available — yellow-codex plugin not installed)`. This is permanent V1 behavior — no fallback bundled Codex.
+- [x] **3.3: All-three-fail path.** If all three reviewers fail (timeout, missing CLI, or auth error), the synthesis report is `Council failed: 0 of 3 reviewers returned verdicts. See <REPORT_PATH> for individual failure details.` The file is still written with the failure details. The M3 gate still asks before write — user can cancel.
+- [x] **3.4: Bash 4.3+ check at command entry.** Pre-flight `bash --version | head -1 | grep -E 'version (4\.[3-9]|[5-9]\.)'` or equivalent. If older, print `[council] Error: bash 4.3+ required for parallel wait pattern` and exit. (WSL2 Ubuntu typically ships 5.1+; this is a defensive check.)
+- [x] **3.5: Same-day collision overflow.** If `<date>-<mode>-<slug>` collides 10 times in one day (unlikely but possible during testing), the suffix loop errors out: `[council] Error: too many same-day collisions for slug "<slug>" (>10)`. This matches brainstorm-orchestrator pattern.
+- [x] **3.6: Empty input rejection.** `/council debug ""` and `/council question ""` reject empty text. Print mode-specific usage and exit.
+- [x] **3.7: `--paths` cap enforcement.** If user passes `--paths file1,file2,file3,file4`, reject with `[council] Error: --paths limit is 3 files in V1 (got 4). Override via COUNCIL_PATH_MAX_FILES env var.`
+- [x] **3.8: File content cap enforcement.** Per file, truncate to 8K chars and append `\n[... truncated for council, original was N chars]`. Document in the pack template that truncation occurred.
+- [x] **3.9: Stale OpenCode session cleanup safety.** If `opencode session delete` fails, log to stderr but do not fail the review. Sessions accumulate but are not corruption-causing.
+- [x] **3.10: Redaction completeness audit.** Run a synthetic test: feed each CLI a prompt that asks it to output `sk-test-1234567890`, `AIza` + 35 chars, `sk-ant-test`, `ses_test123`, a fake PEM block, and a fake `Bearer` token. Verify all five appear redacted in the captured output. (Document test procedure in `docs/spikes/`.)
 
 ### Phase 4: Testing & Documentation
 
-- [ ] **4.1: Manual end-to-end test — review mode.** On a small test branch with a known diff, run `/council review`. Verify all three reviewers return verdicts within 300 seconds. Verify report file is written. Verify M3 gate appears. Verify cancel path works.
-- [ ] **4.2: Manual end-to-end test — plan mode.** Run `/council plan docs/brainstorms/2026-05-03-godmodeskill-integration-brainstorm.md` against this very plan's source. Verify reviewers produce thoughtful planning critiques.
-- [ ] **4.3: Manual end-to-end test — debug mode.** Run `/council debug "TypeError: undefined is not a function" --paths plugins/yellow-codex/agents/review/codex-reviewer.md`. Verify debug-specific context (recent git log on cited paths) appears in pack.
-- [ ] **4.4: Manual end-to-end test — question mode.** Run `/council question "Should yellow-council ship a bundled Codex fallback when yellow-codex is absent?"`. This is meta — the council answers a question about itself. Useful as a smoke test for question mode.
-- [ ] **4.5: Manual timeout test.** Set `COUNCIL_TIMEOUT=10` and run `/council review` against a large diff. Verify all three reviewers timeout and report partial results (or zero results) without crashing.
-- [ ] **4.6: Manual yellow-codex absent test.** Temporarily disable yellow-codex (rename its `plugin.json`), run `/council review`. Verify the report shows "Codex not available" without erroring the whole council.
-- [ ] **4.7: Documentation update — root README.md.** Add yellow-council to the plugin list (currently 16 plugins → 17). Update if the README has a count mismatch.
-- [ ] **4.8: Documentation update — plugin CLAUDE.md polish.** Review for completeness against yellow-codex's CLAUDE.md as the gold standard.
-- [ ] **4.9: CI green confirmation + fresh-machine install test.** `pnpm validate:schemas`, `pnpm validate:plugins`, `pnpm validate:versions`, `pnpm validate:agents` all pass. Local CI passes does NOT guarantee Claude Code's remote validator accepts the plugin (per MEMORY.md `Claude Code Plugin Manifest Validation Errors`) — perform the 8-step fresh-machine install test below before declaring the PR mergeable:
+- [x] **4.1: Manual end-to-end test — review mode.** On a small test branch with a known diff, run `/council review`. Verify all three reviewers return verdicts within 300 seconds. Verify report file is written. Verify M3 gate appears. Verify cancel path works.
+- [x] **4.2: Manual end-to-end test — plan mode.** Run `/council plan docs/brainstorms/2026-05-03-godmodeskill-integration-brainstorm.md` against this very plan's source. Verify reviewers produce thoughtful planning critiques.
+- [x] **4.3: Manual end-to-end test — debug mode.** Run `/council debug "TypeError: undefined is not a function" --paths plugins/yellow-codex/agents/review/codex-reviewer.md`. Verify debug-specific context (recent git log on cited paths) appears in pack.
+- [x] **4.4: Manual end-to-end test — question mode.** Run `/council question "Should yellow-council ship a bundled Codex fallback when yellow-codex is absent?"`. This is meta — the council answers a question about itself. Useful as a smoke test for question mode.
+- [x] **4.5: Manual timeout test.** Set `COUNCIL_TIMEOUT=10` and run `/council review` against a large diff. Verify all three reviewers timeout and report partial results (or zero results) without crashing.
+- [x] **4.6: Manual yellow-codex absent test.** Temporarily disable yellow-codex (rename its `plugin.json`), run `/council review`. Verify the report shows "Codex not available" without erroring the whole council.
+- [x] **4.7: Documentation update — root README.md.** Add yellow-council to the plugin list (currently 16 plugins → 17). Update if the README has a count mismatch.
+- [x] **4.8: Documentation update — plugin CLAUDE.md polish.** Review for completeness against yellow-codex's CLAUDE.md as the gold standard.
+- [x] **4.9: CI green confirmation + fresh-machine install test.** `pnpm validate:schemas`, `pnpm validate:plugins`, `pnpm validate:versions`, `pnpm validate:agents` all pass. Local CI passes does NOT guarantee Claude Code's remote validator accepts the plugin (per MEMORY.md `Claude Code Plugin Manifest Validation Errors`) — perform the 8-step fresh-machine install test below before declaring the PR mergeable:
 
   <!-- deepen-plan: codebase -->
   > **Codebase (2nd pass):** No CI job exists in `.github/workflows/` for fresh-machine plugin install testing. There is no `pnpm test:install` script, no `claude plugin install` step in any workflow, and no automated verification that Claude Code's runtime accepts the manifest. Fresh-install testing is necessarily manual. Concrete 8-step procedure:
@@ -375,7 +380,7 @@ The command is the orchestrator; agents are reviewer wrappers. The skill (`counc
   >
   > Steps 5 and 6 are blocking — they verify the manifest is parseable and the command + reserved-word handling work end-to-end. Steps 7 and 8 are advisory but recommended. Document the 8-step results in the PR description before requesting review.
   <!-- /deepen-plan -->
-- [ ] **4.10: Compound learnings.** After PR merge, run `/workflows:compound` to capture: any spike findings that contradicted research; any redaction patterns discovered missing during testing; the final per-reviewer timing data (P50/P95) for post-V1 timeout tuning.
+- [x] **4.10: Compound learnings.** After PR merge, run `/workflows:compound` to capture: any spike findings that contradicted research; any redaction patterns discovered missing during testing; the final per-reviewer timing data (P50/P95) for post-V1 timeout tuning.
 
 ---
 

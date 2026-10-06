@@ -8,6 +8,11 @@ brainstorm: docs/brainstorms/2026-02-23-plugin-versioning-brainstorm.md
 
 # feat: Per-Plugin Versioning with Changesets + Catalog Release
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 40 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Enhancement Summary
 
 **Deepened on:** 2026-02-23
@@ -172,7 +177,7 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
 
 **Tasks:**
 
-- [ ] **Create `plugins/<name>/package.json` for all 11 plugins** — `private: true`, `name` matches plugin name, `version` matches current `plugin.json` version. All 11 files + the `pnpm-workspace.yaml` edit MUST be committed together in one commit to prevent broken `pnpm install` states.
+- [x] **Create `plugins/<name>/package.json` for all 11 plugins** — `private: true`, `name` matches plugin name, `version` matches current `plugin.json` version. All 11 files + the `pnpm-workspace.yaml` edit MUST be committed together in one commit to prevent broken `pnpm install` states.
 
   ```json
   {
@@ -196,7 +201,7 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
   - yellow-review@1.0.0
   - yellow-ruvector@1.0.0
 
-- [ ] **Update `pnpm-workspace.yaml`** — add `'plugins/*'` to packages array:
+- [x] **Update `pnpm-workspace.yaml`** — add `'plugins/*'` to packages array:
   ```yaml
   packages:
     - 'packages/cli'
@@ -206,12 +211,12 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
     - 'plugins/*'
   ```
 
-- [ ] **Install `@changesets/cli` and `@changesets/changelog-github`** as root devDependencies:
+- [x] **Install `@changesets/cli` and `@changesets/changelog-github`** as root devDependencies:
   ```sh
   pnpm add -Dw @changesets/cli @changesets/changelog-github
   ```
 
-- [ ] **Initialize Changesets** — create `.changeset/config.json` with the complete configuration:
+- [x] **Initialize Changesets** — create `.changeset/config.json` with the complete configuration:
 
   ```json
   {
@@ -239,7 +244,7 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
 
   **Note:** `"access": "restricted"` is an npm registry directive (no npm publish attempted). The `privatePackages.tag: true` creates git tags without publishing.
 
-- [ ] **Add scripts to root `package.json`**:
+- [x] **Add scripts to root `package.json`**:
   ```json
   "changeset": "changeset",
   "apply:changesets": "changeset version && node scripts/sync-manifests.js",
@@ -249,7 +254,7 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
   "validate:versions:dry": "node scripts/validate-versions.js --dry-run"
   ```
 
-- [ ] **Create `docs/operations/versioning.md`** — developer guide with semver decision table. **This must be created in Phase 1, not Phase 4.** Developers cannot use `pnpm changeset` correctly without the bump rules.
+- [x] **Create `docs/operations/versioning.md`** — developer guide with semver decision table. **This must be created in Phase 1, not Phase 4.** Developers cannot use `pnpm changeset` correctly without the bump rules.
 
   Semver decision table:
   | Change type | Bump |
@@ -263,11 +268,11 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
   | `CLAUDE.md` update, documentation only | patch |
   | Permission scope added to `plugin.json` | minor |
 
-- [ ] **Regenerate `pnpm-lock.yaml`** — run `pnpm install` after all 11 `package.json` files are created and commit the updated lockfile in the same PR. CI uses `--frozen-lockfile`; a stale lockfile will fail every CI run.
+- [x] **Regenerate `pnpm-lock.yaml`** — run `pnpm install` after all 11 `package.json` files are created and commit the updated lockfile in the same PR. CI uses `--frozen-lockfile`; a stale lockfile will fail every CI run.
 
-- [ ] **CRLF normalization** — on WSL2, all files created via the Write tool get CRLF. After creating any new file, run `sed -i 's/\r$//' <path>` before staging.
+- [x] **CRLF normalization** — on WSL2, all files created via the Write tool get CRLF. After creating any new file, run `sed -i 's/\r$//' <path>` before staging.
 
-- [ ] **Upgrade `pnpm/action-setup@v2` to `@v4`** in both `validate-schemas.yml` and `publish-release.yml`. The v2 version is outdated and misses compatibility improvements and auto-`packageManager` detection:
+- [x] **Upgrade `pnpm/action-setup@v2` to `@v4`** in both `validate-schemas.yml` and `publish-release.yml`. The v2 version is outdated and misses compatibility improvements and auto-`packageManager` detection:
 
   ```yaml
   # Before
@@ -293,7 +298,7 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
 
 **Tasks:**
 
-- [ ] **Create `scripts/sync-manifests.js`** — reads all `plugins/*/package.json` versions, updates corresponding `plugin.json` and `marketplace.json` entries. The script must be written with hardened error handling, path validation, and atomic writes:
+- [x] **Create `scripts/sync-manifests.js`** — reads all `plugins/*/package.json` versions, updates corresponding `plugin.json` and `marketplace.json` entries. The script must be written with hardened error handling, path validation, and atomic writes:
 
   ```js
   // scripts/sync-manifests.js
@@ -438,7 +443,7 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
   console.log(`[sync-manifests] ${DRY_RUN ? 'Dry run complete' : 'Complete'}: ${foundCount} plugins checked, ${syncedPlugins} plugin.json synced, ${syncedMarketplace} marketplace entries synced`);
   ```
 
-- [ ] **Create `scripts/catalog-version.js`** — bumps root `package.json` version and `marketplace.json metadata.version`. Validate both input and output:
+- [x] **Create `scripts/catalog-version.js`** — bumps root `package.json` version and `marketplace.json metadata.version`. Validate both input and output:
 
   ```js
   // scripts/catalog-version.js
@@ -494,7 +499,7 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
   console.log(`[catalog-version] marketplace.json metadata.version: → ${newVersion}`);
   ```
 
-- [ ] **Create `scripts/validate-versions.js`** — standalone three-way consistency check used by CI and pre-flight gates:
+- [x] **Create `scripts/validate-versions.js`** — standalone three-way consistency check used by CI and pre-flight gates:
 
   > **Note:** All scripts should use consistent ESM module syntax (`import`/`export`). The `validate-versions.js` example below uses CommonJS (`require`) for illustration — update to ESM syntax (matching `sync-manifests.js` and `catalog-version.js`) before implementation.
 
@@ -592,9 +597,9 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
   if (errors.length > 0 && !DRY_RUN) process.exit(1);
   ```
 
-- [ ] **Extend RULE 6 in `validate-marketplace.js`** to three-way check (`package.json == plugin.json == marketplace.json`). Add RULE 7: fail if any plugin directory has a `package.json` but no corresponding `marketplace.json` entry. Update RULE 6 to use the same logic as `validate-versions.js` to avoid parallel divergent implementations.
+- [x] **Extend RULE 6 in `validate-marketplace.js`** to three-way check (`package.json == plugin.json == marketplace.json`). Add RULE 7: fail if any plugin directory has a `package.json` but no corresponding `marketplace.json` entry. Update RULE 6 to use the same logic as `validate-versions.js` to avoid parallel divergent implementations.
 
-- [ ] **Add `validate-versions` job to `.github/workflows/validate-schemas.yml`** — sequential job (not matrix), targeting under 5 seconds:
+- [x] **Add `validate-versions` job to `.github/workflows/validate-schemas.yml`** — sequential job (not matrix), targeting under 5 seconds:
 
   ```yaml
   validate-versions:
@@ -621,7 +626,7 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
 
   Add `validate-versions` to the `needs:` list of the `ci-status` gate job.
 
-- [ ] **Add warning-only changeset check** — a separate CI job that warns on PRs without changesets but never blocks:
+- [x] **Add warning-only changeset check** — a separate CI job that warns on PRs without changesets but never blocks:
 
   ```yaml
   changeset-check:
@@ -649,7 +654,7 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
           fi
   ```
 
-- [ ] **Fix current version drift** — add `## [1.1.0] - 2026-02-23` entry to root `CHANGELOG.md` so `publish-release.yml` awk extraction works for a `v1.1.0` tag.
+- [x] **Fix current version drift** — add `## [1.1.0] - 2026-02-23` entry to root `CHANGELOG.md` so `publish-release.yml` awk extraction works for a `v1.1.0` tag.
 
 **Validation:** `pnpm changeset` → select yellow-ci, patch, "fix typo" → `.changeset/*.md` created. `pnpm apply:changesets` → `plugins/yellow-ci/package.json` bumps to `1.0.1`, `plugin.json` and `marketplace.json` sync. `pnpm validate:schemas` passes. `node scripts/validate-versions.js` exits 0.
 
@@ -672,7 +677,7 @@ The hardened script above addresses all four.
 
 **Tasks:**
 
-- [ ] **Create `plugins/<name>/CHANGELOG.md` for all 11 plugins** — use changesets auto-format (NOT Keep-a-Changelog). The initial seed file should be minimal; `changeset version` will prepend entries automatically on first run:
+- [x] **Create `plugins/<name>/CHANGELOG.md` for all 11 plugins** — use changesets auto-format (NOT Keep-a-Changelog). The initial seed file should be minimal; `changeset version` will prepend entries automatically on first run:
 
   ```markdown
   # yellow-devin
@@ -682,7 +687,7 @@ The hardened script above addresses all four.
 
   The root `CHANGELOG.md` at the repo root should KEEP the Keep-a-Changelog format (it's written manually as catalog release notes, not by changesets).
 
-- [ ] **Update `schemas/plugin.schema.json`** — add optional `changelog` string property with `format: "uri"` and domain restriction pattern. The `ajv-formats` library is already installed (see AJV strict mode solution); the `-c ajv-formats` flag must be present in every CI invocation of `ajv validate --strict=true`:
+- [x] **Update `schemas/plugin.schema.json`** — add optional `changelog` string property with `format: "uri"` and domain restriction pattern. The `ajv-formats` library is already installed (see AJV strict mode solution); the `-c ajv-formats` flag must be present in every CI invocation of `ajv validate --strict=true`:
 
   ```json
   "changelog": {
@@ -695,14 +700,14 @@ The hardened script above addresses all four.
 
   The pattern restriction prevents arbitrary URLs from being placed in the field (security L2 finding).
 
-- [ ] **Add `changelog` field to all 11 `plugin.json` files** (conditional on Phase 3 validator test passing):
+- [x] **Add `changelog` field to all 11 `plugin.json` files** (conditional on Phase 3 validator test passing):
   ```json
   "changelog": "https://github.com/KingInYellows/yellow-plugins/blob/main/plugins/yellow-devin/CHANGELOG.md"
   ```
 
-- [ ] **Update `sync-manifests.js`** — add the `changelog` URL to the set of fields the sync script preserves (it should not overwrite or delete the `changelog` field when syncing versions).
+- [x] **Update `sync-manifests.js`** — add the `changelog` URL to the set of fields the sync script preserves (it should not overwrite or delete the `changelog` field when syncing versions).
 
-- [ ] **Update root `CHANGELOG.md`** — add a header clarifying it is catalog-level release notes. Per-plugin changelogs live in `plugins/<name>/CHANGELOG.md`.
+- [x] **Update root `CHANGELOG.md`** — add a header clarifying it is catalog-level release notes. Per-plugin changelogs live in `plugins/<name>/CHANGELOG.md`.
 
 **Validation:** `pnpm validate:schemas` passes with new `changelog` field. All 11 plugin.json files have valid URLs matching the pattern. **Critical:** test `plugin marketplace add` on a fresh machine before merging.
 
@@ -728,7 +733,7 @@ This is NOT Keep-a-Changelog format. Do not put initial `## [1.0.0] - 2026-02-18
 
 **Tasks:**
 
-- [ ] **Update `publish-release.yml`** — multiple changes:
+- [x] **Update `publish-release.yml`** — multiple changes:
 
   1. Add `--verify` step after checkout: `node scripts/sync-manifests.js --verify` to confirm no drift exists at tag time (exits 1 if any mismatch detected)
   2. Replace the awk changelog extraction with `scripts/generate-release-notes.js` which can include per-plugin excerpts
@@ -743,14 +748,14 @@ This is NOT Keep-a-Changelog format. Do not put initial `## [1.0.0] - 2026-02-18
   5. Pin `softprops/action-gh-release` to a commit SHA rather than the mutable `@v1` tag
   6. Add explicit `permissions: {}` at workflow level + per-job grants
 
-- [ ] **Create `scripts/generate-release-notes.js`** — replaces the fragile `awk` pattern for extracting changelog entries. Aggregates root `CHANGELOG.md` section + per-plugin CHANGELOG excerpts for any plugin with an entry for the release version:
+- [x] **Create `scripts/generate-release-notes.js`** — replaces the fragile `awk` pattern for extracting changelog entries. Aggregates root `CHANGELOG.md` section + per-plugin CHANGELOG excerpts for any plugin with an entry for the release version:
 
   ```js
   // Usage: node scripts/generate-release-notes.js --version 1.2.0 --output release-notes.md
   // Extracts root changelog section + per-plugin changelog sections for the given version
   ```
 
-- [ ] **Update `docs/operations/release-checklist.md`** — replace manual version bump steps with Changesets workflow, including the explicit git commit step:
+- [x] **Update `docs/operations/release-checklist.md`** — replace manual version bump steps with Changesets workflow, including the explicit git commit step:
 
   ```
   Pre-release checklist:
@@ -764,7 +769,7 @@ This is NOT Keep-a-Changelog format. Do not put initial `## [1.0.0] - 2026-02-18
   8. Tag: `git tag v1.x.x && git push --tags`
   ```
 
-- [ ] **Add changeset status check to CI** (warn-only, as specified in Phase 2 above).
+- [x] **Add changeset status check to CI** (warn-only, as specified in Phase 2 above).
 
 ### Research Insights: Missing Commit Step
 
@@ -776,27 +781,27 @@ The original developer workflow showed `pnpm version` then `git tag` with no com
 
 ### Functional
 
-- [ ] `pnpm changeset` prompts the developer to select plugins and enter a summary
-- [ ] `pnpm changeset` prompt lists only the 11 plugins (NOT `@yellow-plugins/cli` etc.)
-- [ ] `pnpm apply:changesets` bumps `plugins/<name>/package.json`, writes `CHANGELOG.md` entries, and syncs `plugin.json` + `marketplace.json` in one command
-- [ ] `pnpm validate:schemas` fails if `package.json`, `plugin.json`, and `marketplace.json` versions disagree for any plugin
-- [ ] CI `validate-versions` job blocks a PR with mismatched versions (exit 1)
-- [ ] Each plugin has a `CHANGELOG.md` and (pending validator test) a `changelog` URL in `plugin.json`
-- [ ] Root `CHANGELOG.md` has a `1.1.0` entry (unblocks `publish-release.yml`)
-- [ ] `node scripts/catalog-version.js minor` bumps root `package.json` + `marketplace.json metadata.version` together
+- [x] `pnpm changeset` prompts the developer to select plugins and enter a summary
+- [x] `pnpm changeset` prompt lists only the 11 plugins (NOT `@yellow-plugins/cli` etc.)
+- [x] `pnpm apply:changesets` bumps `plugins/<name>/package.json`, writes `CHANGELOG.md` entries, and syncs `plugin.json` + `marketplace.json` in one command
+- [x] `pnpm validate:schemas` fails if `package.json`, `plugin.json`, and `marketplace.json` versions disagree for any plugin
+- [x] CI `validate-versions` job blocks a PR with mismatched versions (exit 1)
+- [x] Each plugin has a `CHANGELOG.md` and (pending validator test) a `changelog` URL in `plugin.json`
+- [x] Root `CHANGELOG.md` has a `1.1.0` entry (unblocks `publish-release.yml`)
+- [x] `node scripts/catalog-version.js minor` bumps root `package.json` + `marketplace.json metadata.version` together
 
 ### Non-Functional
 
-- [ ] `pnpm install` still succeeds (no version conflicts from adding 11 private workspace packages)
-- [ ] `validate-versions` CI job completes in under 10 seconds
-- [ ] No changes to how Claude Code installs or updates plugins (transparent to users)
-- [ ] `pnpm -r publish --dry-run` does NOT attempt to publish any private plugin package (verify before Phase 1 merges)
+- [x] `pnpm install` still succeeds (no version conflicts from adding 11 private workspace packages)
+- [x] `validate-versions` CI job completes in under 10 seconds
+- [x] No changes to how Claude Code installs or updates plugins (transparent to users)
+- [x] `pnpm -r publish --dry-run` does NOT attempt to publish any private plugin package (verify before Phase 1 merges)
 
 ### Quality Gates
 
-- [ ] All existing `pnpm validate:schemas` + `pnpm test:unit` + `pnpm test:integration` still pass
-- [ ] `schemas/plugin.schema.json` schema update doesn't break AJV strict mode (`ajv-formats` already installed)
-- [ ] **Phase 3 gate:** `changelog` field accepted by Claude Code remote validator (test on fresh machine before merging)
+- [x] All existing `pnpm validate:schemas` + `pnpm test:unit` + `pnpm test:integration` still pass
+- [x] `schemas/plugin.schema.json` schema update doesn't break AJV strict mode (`ajv-formats` already installed)
+- [x] **Phase 3 gate:** `changelog` field accepted by Claude Code remote validator (test on fresh machine before merging)
 
 ---
 

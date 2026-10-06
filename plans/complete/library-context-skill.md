@@ -1,5 +1,10 @@
 # Feature: `library-context` Skill
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 26 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Problem Statement
 
 Two existing agents — `plugins/yellow-research/agents/research/code-researcher.md`
@@ -109,9 +114,9 @@ the SKILL.md and the two initial consumers.
 
 ### Phase 1: Skill scaffold
 
-- [ ] 1.1 Create `plugins/yellow-research/skills/library-context/SKILL.md` with frontmatter (`name: library-context`, `user-invokable: true`, single-line `description:` containing a "Use when" clause, no `disable-model-invocation` field — setting it true would silently block `skills:` preload)
-- [ ] 1.2 Author the three standard sections: `## What It Does` (≤6 lines), `## When to Use` (decision rules + non-use cases), `## Usage` (numbered runtime steps + chain variants + disambiguation rule + citation format + sentinel phrase + cache-compatibility wording)
-- [ ] 1.3 Verify SKILL.md body stays ≤120 lines so `skills:` preload remains lightweight; if the runtime content exceeds that, move examples to `reference.md`
+- [x] 1.1 Create `plugins/yellow-research/skills/library-context/SKILL.md` with frontmatter (`name: library-context`, `user-invokable: true`, single-line `description:` containing a "Use when" clause, no `disable-model-invocation` field — setting it true would silently block `skills:` preload)
+- [x] 1.2 Author the three standard sections: `## What It Does` (≤6 lines), `## When to Use` (decision rules + non-use cases), `## Usage` (numbered runtime steps + chain variants + disambiguation rule + citation format + sentinel phrase + cache-compatibility wording)
+- [x] 1.3 Verify SKILL.md body stays ≤120 lines so `skills:` preload remains lightweight; if the runtime content exceeds that, move examples to `reference.md`
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** No SKILL.md in this repo currently hits a 120-line target.
@@ -123,13 +128,13 @@ the SKILL.md and the two initial consumers.
 > clear runtime instructions is fine — the discipline is "move non-runtime
 > reference content out," not "hit a magic line count."
 <!-- /deepen-plan -->
-- [ ] 1.4 Create `plugins/yellow-research/skills/library-context/reference.md` with distribution rationale, consumer enumeration, RULE 13 grep + Unicode codepoint note, and stale-figure clarifications
-- [ ] 1.5 Confirm both candidate context7 tool names appear in SKILL.md: `mcp__context7__query-docs` (current, used in this repo) and `mcp__context7__get-library-docs` (legacy, seen in external docs); include ToolSearch verification instruction
+- [x] 1.4 Create `plugins/yellow-research/skills/library-context/reference.md` with distribution rationale, consumer enumeration, RULE 13 grep + Unicode codepoint note, and stale-figure clarifications
+- [x] 1.5 Confirm both candidate context7 tool names appear in SKILL.md: `mcp__context7__query-docs` (current, used in this repo) and `mcp__context7__get-library-docs` (legacy, seen in external docs); include ToolSearch verification instruction
 
 ### Phase 2: Refactor within-plugin consumer
 
-- [ ] 2.1 Add `skills:` frontmatter to `plugins/yellow-research/agents/research/code-researcher.md`: `skills: [library-context]`
-- [ ] 2.2 Remove the inline context7/fallback prose from `code-researcher.md`'s "Source Routing" section (the SKILL.md content is injected at spawn — keeping both creates conflicting instructions)
+- [x] 2.1 Add `skills:` frontmatter to `plugins/yellow-research/agents/research/code-researcher.md`: `skills: [library-context]`
+- [x] 2.2 Remove the inline context7/fallback prose from `code-researcher.md`'s "Source Routing" section (the SKILL.md content is injected at spawn — keeping both creates conflicting instructions)
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Exact prose to remove is `code-researcher.md` lines 42–51 on
@@ -141,8 +146,8 @@ the SKILL.md and the two initial consumers.
 > rephrase that row to `| Library/framework docs | preloaded via library-context skill |`
 > so the table still indexes the routing concern without duplicating chain detail.
 <!-- /deepen-plan -->
-- [ ] 2.3 Leave the `mcp__context7__*` entries in the agent's `tools:` list untouched — the SKILL.md body must only reference tools already in the agent's tool list, but the agent still needs them to execute
-- [ ] 2.4 Confirm `validate-agent-authoring.js` skill-reference rule passes for the agent (the rule requires that backtick-wrapped skill name mentions in the body have a matching `skills:` preload — adding `library-context` to `skills:` satisfies this)
+- [x] 2.3 Leave the `mcp__context7__*` entries in the agent's `tools:` list untouched — the SKILL.md body must only reference tools already in the agent's tool list, but the agent still needs them to execute
+- [x] 2.4 Confirm `validate-agent-authoring.js` skill-reference rule passes for the agent (the rule requires that backtick-wrapped skill name mentions in the body have a matching `skills:` preload — adding `library-context` to `skills:` satisfies this)
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Rule lives at `scripts/validate-agent-authoring.js:210` —
@@ -154,12 +159,12 @@ the SKILL.md and the two initial consumers.
 > agent — not a meaningful pass/fail check. Consider dropping it or
 > reframing as "spot-check `validate:schemas` passes after the refactor."
 <!-- /deepen-plan -->
-- [ ] 2.5 Verify the agent's chain prose, where retained, still aligns with the SKILL.md (no contradictions; if any prose stays in the agent, it should defer to the skill)
+- [x] 2.5 Verify the agent's chain prose, where retained, still aligns with the SKILL.md (no contradictions; if any prose stays in the agent, it should defer to the skill)
 
 ### Phase 3: Refactor cross-plugin consumer
 
-- [ ] 3.1 Read the "Cross-plugin safe chain" block from the SKILL.md verbatim
-- [ ] 3.2 Replace the existing context7 block in `plugins/yellow-core/agents/research/best-practices-researcher.md`'s "Phase 1: Curated Knowledge Check" section with the inlined safe-chain block
+- [x] 3.1 Read the "Cross-plugin safe chain" block from the SKILL.md verbatim
+- [x] 3.2 Replace the existing context7 block in `plugins/yellow-core/agents/research/best-practices-researcher.md`'s "Phase 1: Curated Knowledge Check" section with the inlined safe-chain block
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Phase 1 on main spans lines 58–68 and contains THREE items,
@@ -172,9 +177,9 @@ the SKILL.md and the two initial consumers.
 > inlined block — they describe how to phrase queries and which sources to
 > prefer, which the inlined block does not cover.
 <!-- /deepen-plan -->
-- [ ] 3.3 Confirm the inlined block contains the exact sentinel `context7 unavailable — falling back to` (em dash U+2014, not hyphens)
-- [ ] 3.4 Confirm the inlined block references ONLY context7 + built-in `WebSearch` — NO `mcp__plugin_yellow-research_*` tools (yellow-core does not declare yellow-research as a dependency; the safe chain protects consumers without yellow-research installed)
-- [ ] 3.5 Add a one-line "Inlined from yellow-research:library-context — keep in sync; verified <date>" annotation above the block so future maintainers can trace the canonical source
+- [x] 3.3 Confirm the inlined block contains the exact sentinel `context7 unavailable — falling back to` (em dash U+2014, not hyphens)
+- [x] 3.4 Confirm the inlined block references ONLY context7 + built-in `WebSearch` — NO `mcp__plugin_yellow-research_*` tools (yellow-core does not declare yellow-research as a dependency; the safe chain protects consumers without yellow-research installed)
+- [x] 3.5 Add a one-line "Inlined from yellow-research:library-context — keep in sync; verified <date>" annotation above the block so future maintainers can trace the canonical source
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** This "Inlined from … — keep in sync" annotation does not
@@ -188,7 +193,7 @@ the SKILL.md and the two initial consumers.
 
 ### Phase 4: Validation + changesets
 
-- [ ] 4.1 Run `pnpm validate:schemas && pnpm validate:agents` — must pass with no new errors
+- [x] 4.1 Run `pnpm validate:schemas && pnpm validate:agents` — must pass with no new errors
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** `pnpm validate:schemas` already chains
@@ -197,10 +202,10 @@ the SKILL.md and the two initial consumers.
 > validation twice. Harmless but redundant. Simplify to `pnpm validate:schemas`
 > alone, or keep both if you want explicit signal in the CI log.
 <!-- /deepen-plan -->
-- [ ] 4.2 Run `pnpm test:unit` — must pass
-- [ ] 4.3 Run `pnpm lint && pnpm typecheck` — must pass
-- [ ] 4.4 Run `pnpm validate:setup-all` — must pass (skills aren't listed in `setup:all.md` or `marketplace.json`, but verify no regression)
-- [ ] 4.5 `pnpm changeset` — add **two** entries:
+- [x] 4.2 Run `pnpm test:unit` — must pass
+- [x] 4.3 Run `pnpm lint && pnpm typecheck` — must pass
+- [x] 4.4 Run `pnpm validate:setup-all` — must pass (skills aren't listed in `setup:all.md` or `marketplace.json`, but verify no regression)
+- [x] 4.5 `pnpm changeset` — add **two** entries:
   - `yellow-research` minor (new skill + `code-researcher.md` refactor)
   - `yellow-core` minor (`best-practices-researcher.md` refactor)
 
@@ -214,15 +219,15 @@ the SKILL.md and the two initial consumers.
 > reads as "added library-context skill" + "best-practices-researcher inlines
 > library-context" rather than blending with the other pending entries.
 <!-- /deepen-plan -->
-- [ ] 4.6 Normalize LF endings on any new `.md` files created on WSL2: `sed -i 's/\r$//' <new-files>`
-- [ ] 4.7 Confirm the sentinel grep returns ≥2 matches: `rg 'context7 unavailable — falling back to' plugins/` should hit the SKILL.md and `best-practices-researcher.md`
-- [ ] 4.8 `gt commit create -m "feat(yellow-research): library-context skill + refactor 2 consumers"` then `gt stack submit`
+- [x] 4.6 Normalize LF endings on any new `.md` files created on WSL2: `sed -i 's/\r$//' <new-files>`
+- [x] 4.7 Confirm the sentinel grep returns ≥2 matches: `rg 'context7 unavailable — falling back to' plugins/` should hit the SKILL.md and `best-practices-researcher.md`
+- [x] 4.8 `gt commit create -m "feat(yellow-research): library-context skill + refactor 2 consumers"` then `gt stack submit`
 
 ### Phase 5: Follow-up tracking (not in this PR)
 
-- [ ] 5.1 Open issue: "validate-agent-authoring.js RULE 13 — context7 drift-detection lint" referencing the grep one-liner in `reference.md`; should land within 2 PRs of this one, before any opt-in adoption PRs for the other 8 plugins
-- [ ] 5.2 Open issue: "context7 cache hook" — the SessionStart hook deferred from Decision 4; cache contract (path, key format, TTL) defined by the hook PR, not pre-specified
-- [ ] 5.3 Open issue: "library-context opt-in adoption" — track adoption for yellow-debt, yellow-semgrep, yellow-codex, yellow-docs, yellow-review, yellow-council, yellow-devin, yellow-browser-test
+- [x] 5.1 Open issue: "validate-agent-authoring.js RULE 13 — context7 drift-detection lint" referencing the grep one-liner in `reference.md`; should land within 2 PRs of this one, before any opt-in adoption PRs for the other 8 plugins
+- [x] 5.2 Open issue: "context7 cache hook" — the SessionStart hook deferred from Decision 4; cache contract (path, key format, TTL) defined by the hook PR, not pre-specified
+- [x] 5.3 Open issue: "library-context opt-in adoption" — track adoption for yellow-debt, yellow-semgrep, yellow-codex, yellow-docs, yellow-review, yellow-council, yellow-devin, yellow-browser-test
 
 ## Technical Details
 

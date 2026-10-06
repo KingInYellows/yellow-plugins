@@ -1,5 +1,10 @@
 # Feature: Roll back `userConfigEntry.pattern` and document skill-budget workaround
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 39 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Problem Statement
 
 `claude doctor` on a fresh install of the yellow-plugins marketplace surfaces
@@ -171,63 +176,63 @@ Documents the user-side workaround for the skill-budget warning:
 
 ### Phase 1: PR1 hotfix (ship today)
 
-- [ ] 1.1: `gt branch create fix/yellow-composio-strip-userconfig-pattern`
-- [ ] 1.2: Edit `plugins/yellow-composio/.claude-plugin/plugin.json` — remove
+- [x] 1.1: `gt branch create fix/yellow-composio-strip-userconfig-pattern`
+- [x] 1.2: Edit `plugins/yellow-composio/.claude-plugin/plugin.json` — remove
   `pattern` line; append api_key description note
-- [ ] 1.3: Create `plugins/yellow-composio/hooks/check-mcp-url.sh`
+- [x] 1.3: Create `plugins/yellow-composio/hooks/check-mcp-url.sh`
   (SessionStart hook, advisory warning on non-HTTPS); wire in `plugin.json`
   `hooks.SessionStart`. CRLF-strip via `sed -i 's/\r$//'`.
-- [ ] 1.4: Edit `plugins/yellow-composio/skills/composio-patterns/SKILL.md`
+- [x] 1.4: Edit `plugins/yellow-composio/skills/composio-patterns/SKILL.md`
   Security section
-- [ ] 1.5: `pnpm validate:schemas && pnpm validate:plugins` — confirm green
-- [ ] 1.6: `pnpm changeset` — patch bump yellow-composio with summary
-- [ ] 1.7: `gt commit create -m "fix(yellow-composio): strip non-standard
+- [x] 1.5: `pnpm validate:schemas && pnpm validate:plugins` — confirm green
+- [x] 1.6: `pnpm changeset` — patch bump yellow-composio with summary
+- [x] 1.7: `gt commit create -m "fix(yellow-composio): strip non-standard
   userConfig.pattern; remote validator rejects it"`
-- [ ] 1.8: `gt stack submit`
-- [ ] 1.9: Manual install probe — `claude doctor` on fresh install confirms
+- [x] 1.8: `gt stack submit`
+- [x] 1.9: Manual install probe — `claude doctor` on fresh install confirms
   `yellow-composio` loads cleanly. Record outcome in PR description.
 
 ### Phase 2: PR2 ecosystem drift removal (sibling on main)
 
-- [ ] 2.1: `gt branch create chore/remove-userconfig-pattern-schema`
-- [ ] 2.2: Edit `schemas/plugin.schema.json` — remove L31–34 + L60–63
-- [ ] 2.3: Edit `scripts/validate-plugin.js` — remove L79–82 + L919–1003
-- [ ] 2.4: Delete `tests/integration/validate-plugin.test.ts` L647–916
-- [ ] 2.5: Delete `tests/integration/example-files-schema.test.ts` L176–310
-- [ ] 2.6: Edit `examples/plugin-extended.example.json` — remove L59
-- [ ] 2.7: Edit `docs/solutions/build-errors/userconfig-pattern-field-schema-extension.md`
+- [x] 2.1: `gt branch create chore/remove-userconfig-pattern-schema`
+- [x] 2.2: Edit `schemas/plugin.schema.json` — remove L31–34 + L60–63
+- [x] 2.3: Edit `scripts/validate-plugin.js` — remove L79–82 + L919–1003
+- [x] 2.4: Delete `tests/integration/validate-plugin.test.ts` L647–916
+- [x] 2.5: Delete `tests/integration/example-files-schema.test.ts` L176–310
+- [x] 2.6: Edit `examples/plugin-extended.example.json` — remove L59
+- [x] 2.7: Edit `docs/solutions/build-errors/userconfig-pattern-field-schema-extension.md`
   — frontmatter `status: reverted` + prepend `## Outcome` section
-- [ ] 2.8: Update MEMORY.md L92 entry → one-line pointer
-- [ ] 2.9: `pnpm validate:schemas && pnpm test:unit && pnpm test:integration
+- [x] 2.8: Update MEMORY.md L92 entry → one-line pointer
+- [x] 2.9: `pnpm validate:schemas && pnpm test:unit && pnpm test:integration
   && pnpm lint && pnpm typecheck` all green
-- [ ] 2.10: Confirm no `.changeset/*.md` required; note absence in PR body
-- [ ] 2.11: `gt commit create -m "chore: remove userConfig.pattern schema +
+- [x] 2.10: Confirm no `.changeset/*.md` required; note absence in PR body
+- [x] 2.11: `gt commit create -m "chore: remove userConfig.pattern schema +
   validator + tests (remote validator rejects)"`
-- [ ] 2.12: `gt stack submit`
+- [x] 2.12: `gt stack submit`
 
 ### Phase 3: PR3 CI hardening (sibling, P1)
 
-- [ ] 3a.1: `gt branch create feat/plugin-json-schema-pointer-probe`
-- [ ] 3a.2: Add `$schema` to `plugins/yellow-core/.claude-plugin/plugin.json`
-- [ ] 3a.3: Changeset patch-bump yellow-core, commit, submit
-- [ ] 3a.4: Manual install probe on merge — `claude doctor` clean?
-- [ ] 3a.5: GATE — proceed to 3b only on probe success
-- [ ] 3b.1: `gt branch create feat/plugin-json-schema-pointer-rollout`
-- [ ] 3b.2: Add `$schema` to remaining 17 plugin.json files
-- [ ] 3b.3: Bulk changeset (17 patches), commit, submit
-- [ ] 3c.1: `gt branch create feat/ci-claude-plugin-validate`
-- [ ] 3c.2: Add `claude plugin validate` job to validate-schemas.yml
-- [ ] 3c.3: Time the CI run delta; gate on PR-only if >60s
-- [ ] 3d.1: Update CONTRIBUTING.md with local/remote divergence + probe recipe
+- [x] 3a.1: `gt branch create feat/plugin-json-schema-pointer-probe`
+- [x] 3a.2: Add `$schema` to `plugins/yellow-core/.claude-plugin/plugin.json`
+- [x] 3a.3: Changeset patch-bump yellow-core, commit, submit
+- [x] 3a.4: Manual install probe on merge — `claude doctor` clean?
+- [x] 3a.5: GATE — proceed to 3b only on probe success
+- [x] 3b.1: `gt branch create feat/plugin-json-schema-pointer-rollout`
+- [x] 3b.2: Add `$schema` to remaining 17 plugin.json files
+- [x] 3b.3: Bulk changeset (17 patches), commit, submit
+- [x] 3c.1: `gt branch create feat/ci-claude-plugin-validate`
+- [x] 3c.2: Add `claude plugin validate` job to validate-schemas.yml
+- [x] 3c.3: Time the CI run delta; gate on PR-only if >60s
+- [x] 3d.1: Update CONTRIBUTING.md with local/remote divergence + probe recipe
 
 ### Phase 4: PR4 skill-budget docs (P2, no urgency)
 
-- [ ] 4.1: `gt branch create docs/skill-listing-budget-troubleshooting`
-- [ ] 4.2: Add `## Troubleshooting > Skill listing budget` to README.md
-- [ ] 4.3: Cross-link from CONTRIBUTING.md
-- [ ] 4.4: NO skill description changes; verify with `git status`
-- [ ] 4.5: No changeset required (no `plugins/**` touched)
-- [ ] 4.6: Commit + submit
+- [x] 4.1: `gt branch create docs/skill-listing-budget-troubleshooting`
+- [x] 4.2: Add `## Troubleshooting > Skill listing budget` to README.md
+- [x] 4.3: Cross-link from CONTRIBUTING.md
+- [x] 4.4: NO skill description changes; verify with `git status`
+- [x] 4.5: No changeset required (no `plugins/**` touched)
+- [x] 4.6: Commit + submit
 
 ## Technical Specifications
 
