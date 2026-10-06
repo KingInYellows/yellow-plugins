@@ -1,5 +1,11 @@
 # Fix: remove `hooks/hooks.json` mirrors that Claude Code now auto-loads
 
+> **Status (2026-10-06):** shipped in #797 (`3812fc66e`, on `main`; `gh` shows
+> the merge-queue PR as CLOSED). All six `hooks/hooks.json` mirrors are gone and
+> the plugin validator rejects any that return. 3.5 is `[-]`: `claude plugin
+> validate` passes for all six plugins, but the live banner-once and guard-once
+> checks were not run.
+
 ## Problem Statement
 
 On startup, Claude Code 2.1.272 prints one warning per enabled plugin:
@@ -170,7 +176,9 @@ Alternatives rejected:
       `pnpm validate:schemas`, `pnpm test:integration`, `pnpm lint`,
       `pnpm typecheck`. `validate:generated` is unaffected (mirrors are not
       catalog-sourced) — confirm it still passes.
-- [ ] 3.5 Live verification on the enabled stack provider only (gt-workflow
+- [-] 3.5 (partially verified 2026-10-06 — `claude plugin validate` passes for
+      all six plugins with no hooks warnings; banner-once and guard-once checks
+      not run live) Live verification on the enabled stack provider only (gt-workflow
       or github-workflow — never both): reinstall the marketplace, then
       `claude plugin validate plugins/<name>` for the six plugins, start a
       session and confirm (a) zero `unknown key` warnings, (b) the
