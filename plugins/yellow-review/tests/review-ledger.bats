@@ -764,9 +764,17 @@ pr_with_finding() {
   [ "$(fold | jq -r '[.findings[].obs.scope_status] | unique | join(",")')" = unscoped ]
 }
 
+# A missing universal-ctags skips locally. CI installs it in
+# yellow-review-shell-tests, so a skip there would hide these two cases.
+require_universal_ctags() {
+  rl_ctags_usable && return 0
+  [ -z "${CI:-}" ] || { echo "universal-ctags is required in CI"; return 1; }
+  skip "universal-ctags not installed"
+}
+
 @test "CLAUDE-49: with universal-ctags, swapped claims resolve to the true scope" {
   source "$RL"
-  rl_ctags_usable || skip "universal-ctags not installed"
+  require_universal_ctags
   printf 'class Admin:\n    def create_user(self):\n        run(x)\n\nclass Handlers:\n    def create_user(self):\n        run(x)\n' >|u.py
   H=$(commit_all py)
   observe "$H" "[$(finding u.py 3 '{"scope":"Handlers.create_user"}'), $(finding u.py 7 '{"scope":"Admin.create_user"}')]" >/dev/null
@@ -777,7 +785,7 @@ pr_with_finding() {
 
 @test "CLAUDE-49: ctags cache is keyed by filename, not just content" {
   source "$RL"
-  rl_ctags_usable || skip "universal-ctags not installed"
+  require_universal_ctags
   printf 'def run():\n    pass\n' >|blob.content
   content="$PWD/blob.content"
   r=$(rl_ctags_scope "$content" a.py 1 run)

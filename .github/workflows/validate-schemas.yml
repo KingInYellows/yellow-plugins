@@ -1429,16 +1429,18 @@ jobs:
 
   # ============================================================================
   # PLUGIN SHELL TESTS (bats) — blocking for yellow-core, yellow-council,
-  # yellow-review, and yellow-codex; advisory for others
+  # and yellow-codex; advisory for others. yellow-review is its own
+  # required job (yellow-review-shell-tests) so this one stays inside
+  # the 15-minute cap.
   # ============================================================================
   plugin-shell-tests:
     name: Plugin Shell Tests
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     # The required suites took 3m18s before yellow-review's ledger suite
-    # (~1 min, builds throwaway git repos per case) landed; 5 left no room.
-    # The resolve suites later pushed the job to 7-10 min (a run hit the
-    # 10-minute cap in its last advisory step), so 15 keeps headroom.
+    # landed. Resolve suites later pushed the combined job to 7-11 min
+    # against a 15-minute cap, so yellow-review moved to its own job.
+    # 15 still covers the remaining required suites plus the advisory loop.
     timeout-minutes: 15
     needs: [validate-schemas]
 
@@ -1487,16 +1489,6 @@ jobs:
         # which defeats the point of having written it.
         run: bats plugins/yellow-council/tests/
 
-      - name: Run yellow-review bats suite (required)
-        # Required, not advisory. file-line-counts.bats is the only
-        # executable guard on the file-line-counts script the
-        # thermonuclear-reviewer size rule depends on for authoritative
-        # before/after line counts — a regression there (rename handling,
-        # merge-base resolution, the 500-file cap, the forged-path guards)
-        # previously could not fail CI at all, since the suite only ran
-        # under the advisory `continue-on-error` loop below.
-        run: bats plugins/yellow-review/tests/
-
       - name: Run yellow-codex redaction bats suite (required)
         # Required, not advisory, for the same reason as yellow-council's:
         # redaction.bats pins the redact-before-truncate order at
@@ -1512,10 +1504,11 @@ jobs:
           set -uo pipefail
           STATUS=0
           # Both top-level and nested test dirs. yellow-core's suites,
-          # yellow-council's redaction suite, yellow-review's suite and
-          # yellow-codex's redaction suite are run as required steps above, and
-          # yellow-debt's in shell-compat-tests; skip them here to avoid double
-          # execution and to keep the advisory status accurate.
+          # yellow-council's redaction suite and yellow-codex's redaction
+          # suite are required steps above. yellow-review's suite is required
+          # in yellow-review-shell-tests, and yellow-debt's in
+          # shell-compat-tests. Skip them here to avoid double execution and
+          # to keep the advisory status accurate.
           for d in plugins/*/tests plugins/*/skills/*/tests; do
             [ -d "$d" ] || continue
             case "$d" in
@@ -1536,6 +1529,48 @@ jobs:
           if [ $STATUS -ne 0 ]; then
             echo "::warning::One or more advisory bats suites failed. Track as follow-up; not blocking this PR."
           fi
+
+  # ============================================================================
+  # YELLOW-REVIEW SHELL TESTS (bats) — required, split out of
+  # plugin-shell-tests so that job stays inside its 15-minute cap.
+  # ============================================================================
+  yellow-review-shell-tests:
+    name: Plugin Shell Tests (yellow-review)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [validate-schemas]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          clean: true
+
+      - name: Install bats
+        # Pin via npm: ubuntu 22.04 apt ships bats 1.2.1 which lacks the
+        # bats_require_minimum_version helper (>=1.5.0) used in this repo.
+        run: sudo npm install -g bats@1.11.0
+
+      - name: Install gawk, zsh and universal-ctags
+        # gawk and zsh match plugin-shell-tests: suites that find awk or
+        # zsh by binary name never exercise that path on mawk-only images.
+        # universal-ctags is not preinstalled. /usr/bin/ctags is only an
+        # alternatives link, and rl_ctags_usable accepts a binary only when
+        # `ctags --version` contains "Universal Ctags".
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gawk zsh universal-ctags
+          ctags --version | grep -q 'Universal Ctags'
+
+      - name: Run yellow-review bats suite (required)
+        # Required, not advisory. file-line-counts.bats is the only
+        # executable guard on the file-line-counts script the
+        # thermonuclear-reviewer size rule depends on for authoritative
+        # before/after line counts. The two CLAUDE-49 ctags cases fail
+        # when CI is set and universal-ctags is missing, so this job is
+        # where they run.
+        run: bats plugins/yellow-review/tests/
 
   # ============================================================================
   # YELLOW-RUVECTOR SHELL TESTS (bats) — advisory, like the loop above
@@ -1750,6 +1785,7 @@ jobs:
         build,
         changeset-check,
         plugin-shell-tests,
+        yellow-review-shell-tests,
         shell-compat-tests,
         goal-engine-compat,
       ]
@@ -1765,6 +1801,7 @@ jobs:
           CONTRACT_DRIFT_RESULT: ${{ needs.contract-drift.result }}
           SECURITY_AUDIT_RESULT: ${{ needs.security-audit.result }}
           PLUGIN_SHELL_TESTS_RESULT: ${{ needs.plugin-shell-tests.result }}
+          YELLOW_REVIEW_SHELL_TESTS_RESULT: ${{ needs.yellow-review-shell-tests.result }}
           SHELL_COMPAT_RESULT: ${{ needs.shell-compat-tests.result }}
           BUILD_RESULT: ${{ needs.build.result }}
           GOAL_ENGINE_COMPAT_RESULT: ${{ needs.goal-engine-compat.result }}
@@ -1778,6 +1815,7 @@ jobs:
              [ "$CONTRACT_DRIFT_RESULT" == "success" ] && \
              [ "$SECURITY_AUDIT_RESULT" == "success" ] && \
              [ "$PLUGIN_SHELL_TESTS_RESULT" == "success" ] && \
+             [ "$YELLOW_REVIEW_SHELL_TESTS_RESULT" == "success" ] && \
              [ "$SHELL_COMPAT_RESULT" == "success" ] && \
              [ "$BUILD_RESULT" == "success" ] && \
              [ "$GOAL_ENGINE_COMPAT_RESULT" == "success" ] && \
@@ -1794,6 +1832,7 @@ jobs:
             echo "Contract Drift: $CONTRACT_DRIFT_RESULT"
             echo "Security Audit: $SECURITY_AUDIT_RESULT"
             echo "Plugin Shell Tests: $PLUGIN_SHELL_TESTS_RESULT"
+            echo "Plugin Shell Tests (yellow-review): $YELLOW_REVIEW_SHELL_TESTS_RESULT"
             echo "Shell Compatibility: $SHELL_COMPAT_RESULT"
             echo "Build Verification: $BUILD_RESULT"
             echo "Released Goal Engine Compatibility: $GOAL_ENGINE_COMPAT_RESULT"
