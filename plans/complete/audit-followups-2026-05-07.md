@@ -1,9 +1,11 @@
 # Feature: Audit Followups — 2026-05-07
 
-> Boxes ticked at archive cleanup (2026-10-05). The plan's six PRs shipped as #436,
-> #437, #438, #439, #441 and #442. Items marked `[-]` were not done as written
-> (4.2.2, 4.2.3, 4.4.3, 5.3.2-5.3.4); each carries its reason inline. Other items
-> carry inline notes where the shipped work differs from the plan.
+> Boxes ticked at archive cleanup (2026-10-05). The plan's six PRs shipped as
+> #436, #437, #438, #439, #441, and #442. PR 2 is `40f6767 chore(audit): apply
+> mechanical followups (C-02, M-01 reactive, M-02, C-01) (#437)`. Items marked
+> `[-]` were not done as written (4.2.2, 4.2.3, 4.4.3, 5.3.2-5.3.4); each
+> carries its reason inline. Other items carry inline notes where the shipped
+> work differs from the plan.
 
 ## Overview
 
@@ -529,7 +531,7 @@ only one with an explicit external gate.
     }
   ]
   ```
-- [x] 4.3.3: (done in #442; yellow-chatprd was removed later in #580) Edit `plugins/yellow-chatprd/.claude-plugin/plugin.json`:
+- [x] 4.3.3: (shipped in `13bc50d` (#442), including yellow-chatprd; the plugin was removed later in #580) Edit `plugins/yellow-chatprd/.claude-plugin/plugin.json`:
   ```json
   "dependencies": [
     {
@@ -641,29 +643,29 @@ to confirm the change is a strict narrowing (no functional regression):
 
 **Per-agent actions (revised per codebase findings above):**
 
-- [x] 5.2.1: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-core/agents/research/learnings-researcher.md`
+- [x] 5.2.1: (done — the audit confirmed the existing tool set and shipped no edit; #439, yellow-core CHANGELOG A-02 Phase 1) `plugins/yellow-core/agents/research/learnings-researcher.md`
   → **No-op** (already `[Read, Grep, Glob]`); document in commit message
   that this agent was audited and confirmed minimal.
-- [x] 5.2.2: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-core/agents/research/repo-research-analyst.md`
+- [x] 5.2.2: (done — the audit confirmed the existing tool set and shipped no edit; #439, yellow-core CHANGELOG A-02 Phase 1) `plugins/yellow-core/agents/research/repo-research-analyst.md`
   → keep current `[Read, Grep, Glob, Bash]`; **no-op** unless body shows
   Bash is unused. Audit only.
-- [x] 5.2.3: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-core/agents/research/best-practices-researcher.md`
+- [x] 5.2.3: (done — the audit confirmed the existing tool set and shipped no edit; #439, yellow-core CHANGELOG A-02 Phase 1) `plugins/yellow-core/agents/research/best-practices-researcher.md`
   → keep `[WebSearch, WebFetch, Read, Glob, Grep]`; **no-op** unless body
   shows WebSearch/WebFetch unused. Audit only.
-- [x] 5.2.4: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-core/agents/research/git-history-analyzer.md`
+- [x] 5.2.4: (done — the audit confirmed the existing tool set and shipped no edit; #439, yellow-core CHANGELOG A-02 Phase 1) `plugins/yellow-core/agents/research/git-history-analyzer.md`
   → confirm `[Bash, Read, Grep, Glob]` is current; **no-op** (resolves
   brainstorm Open Question 2 — Bash is required and present).
-- [x] 5.2.5: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-core/agents/workflow/spec-flow-analyzer.md`
+- [x] 5.2.5: (done — the audit confirmed the existing tool set and shipped no edit; #439, yellow-core CHANGELOG A-02 Phase 1) `plugins/yellow-core/agents/workflow/spec-flow-analyzer.md`
   → keep current `[Read, Grep, Glob, Bash]`; **no-op** unless body shows
   Bash is unused. Audit only.
-- [x] 5.2.6: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-research/agents/research/code-researcher.md`
+- [x] 5.2.6: (done — the audit confirmed the existing tool set and shipped no edit; #439, yellow-core CHANGELOG A-02 Phase 1) `plugins/yellow-research/agents/research/code-researcher.md`
   → keep current full set (`Read, Grep, Glob, Bash, ToolSearch, 4× MCP`);
   **no-op** — restricting to `[Read, Grep, Glob]` would break the agent.
   Audit only.
-- [x] 5.2.7: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-codex/agents/research/codex-analyst.md`
+- [x] 5.2.7: (done — the audit confirmed the existing tool set and shipped no edit; #439, yellow-core CHANGELOG A-02 Phase 1) `plugins/yellow-codex/agents/research/codex-analyst.md`
   → confirm `[Bash, Read, Grep, Glob]` is current; **no-op** (Bash needed
   for Codex CLI invocation).
-- [x] 5.2.8: (audited; no edit needed — see the A-02 Phase 1 entry in the yellow-core changelog) `plugins/yellow-linear/agents/research/linear-explorer.md`
+- [x] 5.2.8: (done — the audit confirmed the existing tool set and shipped no edit; #439, yellow-core CHANGELOG A-02 Phase 1) `plugins/yellow-linear/agents/research/linear-explorer.md`
   → read body to verify whether Read/Grep/Glob are actually used. If yes,
   add them to the existing `[Bash, ToolSearch, mcp__*]` set. If no, leave
   unchanged. **Decision deferred to body inspection at edit time.**
@@ -693,7 +695,9 @@ were checked for least-privilege; current tools are correct."
 **Acceptance criteria:**
 - All 5 A-01 agents have `model: <opus-id>` (matching existing pinned
   pattern — read one to confirm exact string).
-- All 8 A-02 P1 agents have a narrowed `tools:` field.
+- The eight A-02 P1 agents were audited and their existing `tools:` already
+  matched least privilege (no Edit/Write), so no frontmatter edit shipped.
+  See the yellow-core CHANGELOG A-02 Phase 1 table.
 - `pnpm validate:agents` passes clean.
 - No agent regressions: each restricted agent still has the tools it
   actually uses (verified by reading agent body before editing).
@@ -707,18 +711,20 @@ were checked for least-privilege; current tools are correct."
 **Plugins touched:** none (scripts/, root docs/, package.json)
 **Changeset required:** no (scripts and root docs only)
 
-- [x] 6.1: (shipped narrower: explicit file allowlist and two patterns, `plugins` and `marketplace plugins`; no `consumers` pattern) Create `scripts/validate-doc-counts.js` (~50 lines) that:
+- [x] 6.1: Create `scripts/validate-doc-counts.js` that scans an explicit
+  file allowlist, not every root-level Markdown file:
+  - `CLAUDE.md`
+  - `README.md`
+  - `CONTRIBUTING.md`
+  - `AGENTS.md`
+  - `docs/architecture-overview.md`
   - Reads `.claude-plugin/marketplace.json` → `plugins.length` is the
     canonical count
-  - Greps `CLAUDE.md`, `README.md`, and all root-level `.md` files (not
-    inside `plugins/`, `docs/solutions/`, or `node_modules/`) for these
-    patterns:
+  - Matches only these patterns (there is no `consumers` pattern):
     - `\d+ plugins` (case-insensitive)
     - `\d+ marketplace plugins`
-    - `\d+ consumers` (audit also tracks consumer count drift)
   - For each match, parse the integer and compare to canonical
-  - Mismatch → `process.exit(1)` with a message naming the file, line
-    number, found count, and expected count
+  - Mismatch exits 1 with file, line, found, and expected
   - Match → silent success
   - `console.error` for tooling output (stderr); reserve stdout for
     machine-readable mode if needed
