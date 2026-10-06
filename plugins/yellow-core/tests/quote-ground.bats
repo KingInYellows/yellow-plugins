@@ -621,6 +621,68 @@ now_ms() {
   jq -e '.id == "ok" and (.id | type) == "string"' <<<"$output" >/dev/null
 }
 
+@test "batch rejects a credential-bearing string id and still accepts ordinary ids" {
+  local tok
+  printf '%s\n' "$Q26" >src/a.txt
+  tok='ghp_abcdefghijklmnopqrstuvwxyz0123456789'
+  [ "${#tok}" -eq 40 ]
+  run bash "$QG" batch <<<"$(row "$tok" src/a.txt 1 "$Q26")"
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  [[ "$output" != *ghp_* ]]
+  [[ "$output" != *REDACTED* ]]
+  run bash "$QG" batch <<<"$(row ok src/a.txt 1 "$Q26")"$'\n'"$(row "$tok" src/a.txt 1 "$Q26")"
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  [[ "$output" != *ghp_* ]]
+  run bash "$QG" batch <<<"$(row finding-1 src/a.txt 1 "$Q26")"
+  [ "$status" -eq 0 ]
+  jq -e '.id == "finding-1" and (.id | type) == "string"' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<"$(row 42 src/a.txt 1 "$Q26")"
+  [ "$status" -eq 0 ]
+  jq -e '.id == "42" and (.id | type) == "string"' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<"{\"id\":42,\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"$Q26\"}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"id":42,'* ]]
+}
+
+@test "batch rejects an unpaired surrogate escape in a string id" {
+  printf '%s\n' "$Q26" >src/a.txt
+  run bash "$QG" batch <<<'{"id":"a\uDC00b","file":"src/a.txt","line":1,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<"$(row ok src/a.txt 1 "$Q26")"$'\n''{"id":"a\uDC00b","file":"src/a.txt","line":1,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<'{"id":"\uD800b","file":"src/a.txt","line":1,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 2 ]
+  [[ "$output" != *'"result"'* ]]
+  run bash "$QG" batch <<<'{"id":"\u0061","file":"src/a.txt","line":1,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 0 ]
+  jq -e '.id == "a" and (.id | type) == "string"' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<'{"id":"\uD800\uDC00","file":"src/a.txt","line":1,"quote":"'"$Q26"'"}'
+  [ "$status" -eq 0 ]
+  jq -e '.id == "\uD800\uDC00" and .result == "grounded"' <<<"$output" >/dev/null
+}
+
+@test "batch emits non-integer numeric ids as their original lexeme" {
+  printf '%s\n' "keep 1e400 $Q26" >src/a.txt
+  run bash "$QG" batch <<<"{\"id\":9007199254740993.0,\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"keep 1e400 $Q26\"}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"id":9007199254740993.0,'* ]]
+  run bash "$QG" batch <<<"{\"id\":1e400,\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"keep 1e400 $Q26\"}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"id":1e400,'* ]]
+  [[ "$output" != *'"id":1E+'* ]]
+  jq -e '.result == "grounded" and .matched_line == 1' <<<"$output" >/dev/null
+  run bash "$QG" batch <<<"{\"id\":1.5,\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"keep 1e400 $Q26\"}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"id":1.5,'* ]]
+  run bash "$QG" batch <<<"{\"id\":42,\"file\":\"src/a.txt\",\"line\":1,\"quote\":\"keep 1e400 $Q26\"}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"id":42,'* ]]
+}
+
 @test "batch handles a multi-line quote without disturbing its siblings" {
   local payload
   printf 'alpha line one\nthe quoted target line\nomega\n' >src/a.txt

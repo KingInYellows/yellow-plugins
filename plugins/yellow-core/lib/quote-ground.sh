@@ -18,7 +18,11 @@
 # is grounded, ungrounded, too-short, or unsafe-path; matched_line is a number
 # only for grounded and null otherwise. A numeric id stays a number and a
 # string id stays a string. An integer id is usable only at or inside ±2^53;
-# a larger integer fails the batch. batch always uses radius 3. A missing file is
+# a larger integer fails the batch. Any other numeric id is emitted as its
+# original lexeme, never through tonumber or fromjson. A decoded string id
+# that cs_redact_secrets would change fails the batch, as does an unpaired
+# surrogate escape in that id; the id is not printed. Numeric ids are not
+# redaction-checked. batch always uses radius 3. A missing file is
 # exit 2 in check mode; in batch that row is ungrounded and is not opened. A
 # row whose file, line or quote has the wrong type, or holds U+0000, is
 # ungrounded and does not affect its siblings. A cited file with a NUL byte in
@@ -26,7 +30,8 @@
 # ungrounded (check exits 1), because bash would silently drop the byte. batch
 # exits 2 with no result rows when jq or iconv is missing, when a line is blank
 # or not JSON, when a row has no usable id (a string or number without U+0000,
-# or an integer outside ±2^53), when a cited file cannot be read, or when
+# an integer outside ±2^53, a credential-bearing string, or an unpaired
+# surrogate escape), when a cited file cannot be read, or when
 # redaction fails.
 #
 # Redaction runs per line before matching, and every [REDACTED] or
@@ -466,6 +471,56 @@ qg_check() {
   esac
 }
 
+# True when this decoded string id is credential-bearing, or redaction itself
+# failed. The id and any redacted form stay in the shell; the caller prints
+# only a generic error. Numeric ids are not passed here.
+qg_string_id_changed() {
+  local raw=$1 redacted
+  if ! redacted=$(printf '%s\n' "$raw" | cs_redact_secrets && printf 'X'); then
+    return 0
+  fi
+  redacted=${redacted%X}
+  redacted=${redacted%$'\n'}
+  [ "$redacted" != "$raw" ]
+}
+
+# Reject the batch when any decoded string id would change under
+# cs_redact_secrets. Single-line ids share one pass, one id per line, which
+# matches a per-id check for the line-oriented patterns. An id that itself
+# contains a newline is checked alone, so two ids cannot form one range.
+# Nothing from either stream is written to stdout or stderr.
+qg_reject_credential_ids() {
+  local tagged raw blob redacted
+  local -a singles=()
+  for tagged in "${B_ID[@]}"; do
+    [ "${tagged:0:1}" = s ] || continue
+    raw=${tagged:1}
+    if [[ "$raw" == *$'\n'* ]]; then
+      if qg_string_id_changed "$raw"; then
+        printf 'quote-ground: invalid batch input\n' >&2
+        return 2
+      fi
+    else
+      singles+=("$raw")
+    fi
+  done
+  [ "${#singles[@]}" -gt 0 ] || return 0
+  if ! blob=$(printf '%s\n' "${singles[@]}" && printf 'X'); then
+    printf 'quote-ground: invalid batch input\n' >&2
+    return 2
+  fi
+  blob=${blob%X}
+  if ! redacted=$(printf '%s\n' "${singles[@]}" | cs_redact_secrets && printf 'X'); then
+    printf 'quote-ground: invalid batch input\n' >&2
+    return 2
+  fi
+  redacted=${redacted%X}
+  if [ "$redacted" != "$blob" ]; then
+    printf 'quote-ground: invalid batch input\n' >&2
+    return 2
+  fi
+}
+
 # Read the JSONL rows through one jq pass. jq prints the row count and then
 # four NUL-terminated fields per row only after every row parsed, so a jq
 # failure leaves the count unread and this function fails; the read never
@@ -478,10 +533,14 @@ qg_check() {
 # that is not JSON, or has no usable id, fails the whole batch. A row with a usable id and a bad
 # file, line or quote (wrong type, or U+0000 that would shift the framing)
 # becomes line 0, which classifies as ungrounded. The id carries a type tag:
-# n for a JSON number, s for a string. An integer id outside ±2^53 fails the
+# n for a JSON number, s for a string, l for a non-integer number whose raw
+# lexeme must be emitted unchanged. An integer id outside ±2^53 fails the
 # batch before fromjson, by comparing the raw digit string, not tonumber.
-# The raw bytes first pass through iconv, which fails on invalid UTF-8 that jq
-# would otherwise replace with U+FFFD and so change an id. iconv is required
+# A string id is rejected before fromjson when its raw lexeme holds an
+# unpaired surrogate escape: iconv only sees the UTF-8 bytes, so `\uDC00`
+# would otherwise pass and jq 1.7 would replace it with U+FFFD. The raw bytes
+# first pass through iconv, which fails on invalid UTF-8 that jq would
+# otherwise replace with U+FFFD and so change an id. iconv is required
 # for batch, like jq: a missing iconv exits 2 and names the dependency before
 # any row is parsed. An iconv failure on invalid UTF-8 appends a non-JSON
 # line, so the batch ends as for any other non-JSON input. jq's stderr is
@@ -512,15 +571,19 @@ qg_load_rows() {
       B_CLASS+=("")
       B_MATCH+=("")
     done
+    qg_reject_credential_ids || return 2
   } < <({ iconv -f UTF-8 -t UTF-8 2>/dev/null || printf '\n!\n'; } | jq -nRj '
     def strict:
       gsub("\"(?:[^\"\\\\]|\\\\.)*\""; "\"\"")
       | test("^(?:[\\[\\]{}:,\" \\t\\r]|(?:true|false|null|-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)(?![0-9A-Za-z.+-]))*$");
     # Integer ids are usable only at or inside ±2^53. Compare the raw digit
     # string: fromjson on the number would already have rounded it on jq 1.6.
-    # Escaped keys are decoded with fromjson, and only the top-level id is
-    # checked (object depth 1). Braces inside a string do not change depth.
-    # The character after the digits must not continue a non-integer number.
+    # Any other top-level numeric id keeps that lexeme. The value is rewritten
+    # to 0 before fromjson so jq 1.6 cannot change it, and emit writes the
+    # lexeme back. Escaped keys are decoded with fromjson. Only the top-level
+    # id is checked (object depth 1). A string id is judged from its raw
+    # lexeme, before fromjson, so an unpaired surrogate fails closed. Braces
+    # inside a string do not change depth.
     def int_abs_ok:
       (if startswith("-") then .[1:] else . end) as $d
       | ($d | length) as $len
@@ -529,44 +592,79 @@ qg_load_rows() {
         else false end;
     def brace_delta($s):
       ([$s | scan("\\{")] | length) - ([$s | scan("\\}")] | length);
-    def unsafe_int_id:
+    def high_surr: "\\\\u[Dd][89ABab][0-9A-Fa-f]{2}";
+    def low_surr: "\\\\u[Dd][C-Fc-f][0-9A-Fa-f]{2}";
+    # Drop escaped-backslash pairs first, so a literal \\uDC00 is not an escape.
+    def has_unpaired_surrogate:
+      gsub("\\\\\\\\"; "")
+      | test(high_surr + "(?!" + low_surr + ")")
+        or test("(?<!" + high_surr + ")" + low_surr);
+    def num_re: "-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?";
+    def int_re: "-?(?:0|[1-9][0-9]*)";
+    def num_at: "^[ \\t\\r]*:[ \\t\\r]*" + num_re + "(?![0-9A-Za-z.+-])";
+    def num_cap: "^[ \\t\\r]*:[ \\t\\r]*(?<n>" + num_re + ")";
+    def num_prefix: "^[ \\t\\r]*:[ \\t\\r]*" + num_re;
+    def colon_only: "^[ \\t\\r]*:[ \\t\\r]*$";
+    def id_scan:
       reduce scan("\"(?:[^\"\\\\]|\\\\.)*\"|[^\\\"]+") as $tok (
-        {prev: null, depth: 0, bad: false};
-        if .bad then .
-        elif ($tok | startswith("\"")) then .prev = ($tok | fromjson)
-        elif ((.prev == "id") and .depth == 1 and ($tok | test("^[ \\t\\r]*:[ \\t\\r]*-?(?:0|[1-9][0-9]*)(?![0-9.eE])"))) then
-          .bad = (
-            $tok
-            | capture("^[ \\t\\r]*:[ \\t\\r]*(?<n>-?(?:0|[1-9][0-9]*))")
-            | .n
-            | int_abs_ok
-            | not
-          )
+        {prev: null, depth: 0, bad: false, lex: null, want: false, out: ""};
+        if .bad then .out += $tok
+        elif .want then
+          .want = false
+          | .prev = null
+          | if ($tok | startswith("\"")) then
+              .bad = ($tok | has_unpaired_surrogate)
+            else
+              .depth += brace_delta($tok)
+            end
+          | .out += $tok
+        elif ($tok | startswith("\"")) then
+          .prev = ($tok | fromjson)
+          | .out += $tok
+        elif ((.prev == "id") and .depth == 1 and ($tok | test(num_at))) then
+          ($tok | capture(num_cap)) as $c
+          | if ($c.n | test("^" + int_re + "$")) then
+              .bad = ($c.n | int_abs_ok | not)
+              | .out += $tok
+            else
+              .lex = $c.n
+              | .out += ($tok | sub(num_prefix; ":0"))
+            end
           | .depth += brace_delta($tok)
           | .prev = null
+        elif ((.prev == "id") and .depth == 1 and ($tok | test(colon_only))) then
+          .want = true
+          | .depth += brace_delta($tok)
+          | .prev = null
+          | .out += $tok
         else
           .depth += brace_delta($tok)
           | .prev = null
+          | .out += $tok
         end
-      )
-      | .bad;
+      );
     def parse:
       if test("^[ \t\r]*$") then error("blank record")
-      elif unsafe_int_id then error("row has no usable id")
-      elif strict then fromjson
-      else error("not strict JSON") end;
+      else id_scan as $info
+      | if $info.bad then error("row has no usable id")
+        elif strict then
+          [(if $info.lex == null then . else $info.out end | fromjson), $info.lex]
+        else error("not strict JSON") end
+      end;
     def hasnul: type == "string" and contains("\u0000");
     def tag: if type == "number" then "n" + tostring else "s" + . end;
     def row:
-      if type != "object" then error("row is not an object")
-      elif ((.id | type) != "string" and (.id | type) != "number") or (.id | hasnul)
-        then error("row has no usable id")
-      elif ((.file | type) == "string") and ((.quote | type) == "string")
-        and ((.line | type) == "number" or (.line | type) == "string")
-        and (([.file, .quote, (.line | tostring)] | any(hasnul)) | not)
-        then [(.id | tag), .file, (.line | tostring), .quote]
-      else [(.id | tag), "", "0", ""]
-      end;
+      .[0] as $o | .[1] as $lex
+      | (if $lex != null then "l" + $lex else ($o.id | tag) end) as $ident
+      | if ($o | type) != "object" then error("row is not an object")
+        elif $lex == null and ((($o.id | type) != "string" and ($o.id | type) != "number") or ($o.id | hasnul))
+          then error("row has no usable id")
+        elif (($o.file | type) == "string") and (($o.quote | type) == "string")
+          and (($o.line | type) == "number" or ($o.line | type) == "string")
+          and (([$o.file, $o.quote, ($o.line | tostring)] | any(hasnul)) | not)
+          then [$ident, $o.file, ($o.line | tostring), $o.quote]
+        else [$ident, "", "0", ""]
+        end;
     [inputs | parse | row] as $rows
     | ($rows | length | tostring) + "\u0000", ($rows[][] + "\u0000")
   ' 2>/dev/null)
@@ -578,7 +676,12 @@ qg_load_rows() {
 # the id are escaped as \\ and \n so one row stays three lines, and jq undoes
 # that. Each value carries a one-character prefix that jq strips, so an id
 # that starts with "-" is never misread; the id also keeps its type tag, so a
-# numeric id is emitted as a number and the string "42" stays a string.
+# safe integer is emitted as a number and the string "42" stays a string. A
+# non-integer number is tagged l and spliced back as its original lexeme,
+# after the same JSON number grammar the strict parser allows, with no
+# tonumber or fromjson on that token. The jq flags are -nRc -r: -R keeps
+# each field line raw, and a separate -r is required so that text is not
+# quoted a second time. -nRc alone is -R, not raw output.
 qg_emit_all() {
   local i result match id
   local bs='\'
@@ -596,12 +699,26 @@ qg_emit_all() {
     id=${id//"$bs"/"$bs$bs"}
     id=${id//$'\n'/"${bs}n"}
     printf '%s\n%s\n%s\n' "i${id}" "r${result}" "m${match}"
-  done | jq -nRc '
+  done | jq -nRc -r '
     def unesc: gsub("\\\\(?<c>[\\\\n])"; if .c == "n" then "\n" else "\\" end);
-    [inputs] as $a | range(0; ($a | length); 3) as $i
-    | {id: ($a[$i][1:] | unesc | if .[0:1] == "n" then (.[1:] | tonumber) else .[1:] end),
-       result: $a[$i + 1][1:],
-       matched_line: ($a[$i + 2][1:] | if test("^[0-9]+$") then tonumber else null end)}' || {
+    def num: "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$";
+    [inputs] as $a
+    | [ range(0; ($a | length); 3) as $i
+        | ($a[$i][1:] | unesc) as $id
+        | ($a[$i + 1][1:]) as $result
+        | ($a[$i + 2][1:]) as $ml
+        | (if ($ml | test("^[0-9]+$")) then $ml else "null" end) as $mljson
+        | if $id[0:1] == "l" then
+            if ($id[1:] | test(num)) then
+              "{\"id\":" + $id[1:] + ",\"result\":" + ($result | tojson) + ",\"matched_line\":" + $mljson + "}"
+            else error("bad id lexeme") end
+          else
+            ({id: (if $id[0:1] == "n" then ($id[1:] | tonumber) else $id[1:] end),
+              result: $result,
+              matched_line: (if $mljson == "null" then null else ($mljson | tonumber) end)}
+             | tojson)
+          end
+      ][]' || {
     printf 'quote-ground: could not write batch output\n' >&2
     exit 2
   }
