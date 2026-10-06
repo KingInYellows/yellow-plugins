@@ -1,0 +1,14 @@
+plans/complete/review-findings-ledger.md
+  h_6000354274ce50 3-7,1185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a529451015eb7e52cda2d1d97c1a205a09dd4c54",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
