@@ -1,11 +1,10 @@
 # Feature: Durable Review-Findings Ledger for yellow-review
 
-> **Status (2026-10-06):** In progress, 50 of 51 boxes done. Shipped across
-> merged #867, #868, #869, #870, #871, #872, #873 and #883 (all on `main`;
-> `gh` shows the merge-queue PRs as CLOSED) plus version PR #877. The only open
-> box is 6.5b, a measurement that waits on the first ten real `/review:pr` runs
-> and is tracked in issue #881 (OPEN). Not ready to archive until 6.5b is
-> recorded. No stale paths found.
+> **Status (2026-10-06):** shipped; archived with one item deferred. 50 of 51
+> boxes done across merged #867, #868, #869, #870, #871, #872, #873 and #883
+> (all on `main`; `gh` shows the merge-queue PRs as CLOSED) plus version PR
+> #877. 6.5b is `[-]`: a measurement that waits on the first ten real
+> `/review:pr` runs, tracked in issue #881 (OPEN). No stale paths found.
 
 ## Overview
 
@@ -1183,7 +1182,7 @@ yellow-core changes. Each stage carries its own changeset.
       gap came out of it: `/review:triage` on a closed PR does not refresh
       `<pr>.state` (fix:
       [#883](https://github.com/KingInYellows/yellow-plugins/pull/883)).
-- [ ] 6.5b: After the first ten real `/review:pr` runs, record the
+- [-] 6.5b: (deferred — measurement tracked in #881, still open) After the first ten real `/review:pr` runs, record the
       `category_split` value (the measurement the brainstorm asks for), summed
       over those PRs. (For reference, the 6.5a scratch PR gave 2; it does not
       count toward the ten.) Tracked in
