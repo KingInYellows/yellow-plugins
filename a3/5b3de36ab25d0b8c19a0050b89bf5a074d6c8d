@@ -1,0 +1,19 @@
+plans/complete/fix-hooks-json-mirror-double-registration.md
+  s_df8d7231d1f6b5::t_2f40c01d1b56ab 5-7,179-187
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a35b3de36ab25d0b8c19a0050b89bf5a074d6c8d",
+  "prompts": {},
+  "sessions": {
+    "s_df8d7231d1f6b5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7e5d86f-3b2b-4423-b601-e40b54efe5c2",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
