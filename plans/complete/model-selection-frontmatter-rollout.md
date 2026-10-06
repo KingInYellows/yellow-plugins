@@ -1,9 +1,10 @@
 # Feature: Model Selection & Effort Frontmatter Rollout
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 54 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** shipped. Phases 1-5 landed as #467, #469, #470,
+> #471 and #477 (via `git log origin/main`; `gh` shows them CLOSED because
+> of the merge queue). Every edited agent carries the planned `model:` and
+> `effort:`, and the V1-V4 rules and test file exist. 0 items are `[-]`. The
+> validator has since widened (fable and `claude-*` IDs, 4-entry allowlist).
 
 ## Overview
 

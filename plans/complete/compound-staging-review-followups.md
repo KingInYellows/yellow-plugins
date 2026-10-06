@@ -1,9 +1,9 @@
 # Feature: compound-staging stack — review follow-on hardening
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 21 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** partially shipped. Merged as #547 (`git log
+> origin/main --grep=compound-staging`) on top of the #540-#544 stack.
+> 14 of 21 items verified on this tree. 7 `[-]`: Phase 1 items 1.1-1.2
+> (different design shipped), 2.5-2.6, 3.1, 3.5 and 3.6.
 
 ## Problem Statement
 
@@ -65,12 +65,12 @@ The PR is branch `agent/fix/compound-staging-review-followups`, expected size
 
 **Goal**: close the lock-orphan window and the processing/ requeue race.
 
-- [x] 1.1: Move `mkdir "${STAGING_DIR}/.drain-lock"` into the subshell as the
+- [-] 1.1: (superseded by #547 — mkdir stays in the parent; a parent-side EXIT trap with LOCK_OWNED_BY_PARENT closes the orphan window instead) Move `mkdir "${STAGING_DIR}/.drain-lock"` into the subshell as the
   FIRST statement, before the `trap` registration. The same shell that creates
   the lock now owns the cleanup; no orphan window exists. Update the lock
   contention check to be "if mkdir fails inside subshell, exit cleanly without
   attempting drain" rather than testing for lock existence in the parent.
-- [x] 1.2: Move the `processing/` requeue loop (currently lines 125-140 in
+- [-] 1.2: (superseded by #547 — requeue now runs after lock acquisition in the parent shell, not inside the subshell) Move the `processing/` requeue loop (currently lines 125-140 in
   `session-start.sh`) to *inside* the disowned subshell, AFTER the lock is
   acquired. This makes requeue serialized with respect to other drains.
 - [x] 1.3: Update `cs_update_drain_budget` call site to remain inside the
@@ -104,9 +104,9 @@ designs.
   schema; no candidate_text/priority/tags in the Stop-hook write — those are
   generated at drain time by staging-scorer.` callout above the JSONL Schema
   heading (around line 168).
-- [x] 2.5: Resolve the "Open Questions" entries that the plan has answered:
+- [-] 2.5: (not done — no "Resolved: see plan D5" notes under Open Questions in the brainstorm) Resolve the "Open Questions" entries that the plan has answered:
   add `**Resolved: see plan D5**` (etc.) inline notes for Q2, Q3, Q6, Q7.
-- [x] 2.6: Update the brainstorm's deepen-validation doc (Q1/Q5 "BLOCKER"
+- [-] 2.6: (not done — BLOCKER rows remain in the deepen-validation doc; #547 did not touch it) Update the brainstorm's deepen-validation doc (Q1/Q5 "BLOCKER"
   status) to "RESOLVED by Option C — pure-shell Stop hook + disowned drain
   subshell".
 
@@ -118,7 +118,7 @@ designs.
 **Goal**: close the regex false-negative window and add CI coverage so
 regressions are detectable.
 
-- [x] 3.1: Replace RULE 14b's disjoint-boolean checks with proximity regex:
+- [-] 3.1: (superseded by #547 — shipped as paragraph-based co-location, not the 80-char proximity regex) Replace RULE 14b's disjoint-boolean checks with proximity regex:
   ```javascript
   const namesCoreRules =
     /[Nn]ever (?:modif|write|touch)[^.\n]{0,80}CORE_RULES/.test(body) ||
@@ -141,10 +141,10 @@ regressions are detectable.
   - Fixture: body with "Never modify" elsewhere but missing CORE_RULES proximity
     → expect exit 1 (catches the false-negative)
   - Fixture: body satisfying all checks → expect exit 0
-- [x] 3.5: Document RULE 14b's heuristic-vs-AST nature in
+- [-] 3.5: (not done as written — header says "Full AST lint deferred to V2" but carries no tracked TODO referencing this plan) Document RULE 14b's heuristic-vs-AST nature in
   `scripts/validate-agent-authoring.js` header comment — explicitly call out
   the V2-AST upgrade as a tracked TODO with reference to this plan.
-- [x] 3.6: Update CLAUDE.md (root) to note RULE 14/14b exist and what they
+- [-] 3.6: (not done — root CLAUDE.md does not mention RULE 14/14b; only plugins/yellow-core/CLAUDE.md does) Update CLAUDE.md (root) to note RULE 14/14b exist and what they
   enforce.
 
 **Files**: `scripts/validate-agent-authoring.js`,

@@ -1,5 +1,14 @@
 # Feature: yellow-rtk Plugin (Phase 1 of context-management strategy)
 
+> **Status (2026-10-06):** Not started, 0 of 31 boxes. No `plugins/yellow-rtk/`
+> directory, catalog entry or changeset exists on `main`; the only merged PR is
+> the plan and research (#463). No open PR touches it. Stale: tasks 1.2 and 6.1
+> hand-edit `plugin.json` and `.claude-plugin/marketplace.json`, which are now
+> generated from `catalog/` (`pnpm generate:manifests`); task 6.3 names a
+> `COMMAND_PLUGIN_MAP` that `scripts/validate-setup-all.js` no longer has (it
+> parses the mapping from `setup/all.md`); `yellow-mempalace` (line 24) is not a
+> plugin in this repo. Not ready to archive.
+
 ## Overview
 
 Build a thin wrapper plugin around the [RTK (Rust Token Killer)](https://github.com/rtk-ai/rtk) CLI binary. RTK compresses the output of shell commands (git, cat, ls, test runners, linters) by 60–99% via a PreToolUse hook installed in Claude Code's settings.json. This plugin owns three commands (`/rtk:setup`, `/rtk:gain`, `/rtk:discover`) and one SessionStart hook — RTK itself owns the PreToolUse hook.

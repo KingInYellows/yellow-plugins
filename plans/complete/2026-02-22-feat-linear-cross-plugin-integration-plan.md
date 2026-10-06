@@ -7,10 +7,11 @@ brainstorm: docs/brainstorms/2026-02-22-linear-cross-plugin-integration-brainsto
 
 # feat: Linear Cross-Plugin Integration
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 32 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06): shipped, partly superseded.** All four commands
+> landed as #35 (`git log origin/main`, squash commit on main), then moved
+> to `save_issue`/`save_comment` tool names in #570-#572, and `/linear:delegate`
+> was rewritten provider-neutral in #726. 4 of the 32 boxes are `[-]`, all
+> under the `/linear:delegate` acceptance criteria (reasons inline).
 
 ## Overview
 
@@ -397,14 +398,14 @@ The existing `debt:sync` uses `yq` for frontmatter parsing. This dependency shou
 - [x] Description is single-line string (not folded scalar)
 
 ### `/linear:delegate`
-- [x] Validates `DEVIN_SERVICE_USER_TOKEN` (`cog_` prefix) and `DEVIN_ORG_ID` before any work
+- [-] (superseded by #726 — the command only probes that both env vars are non-empty to classify the provider; no `cog_` format check) Validates `DEVIN_SERVICE_USER_TOKEN` (`cog_` prefix) and `DEVIN_ORG_ID` before any work
 - [x] C1: calls `get_issue` to validate issue exists before proceeding
 - [x] Enriched prompt includes repo, branch convention, title, description, AC
-- [x] Creates session via Devin REST API (curl), not MCP tools
+- [-] (superseded by #726 — launch goes through `/devin:delegate` or the yellow-cursor CLI, not a direct curl) Creates session via Devin REST API (curl), not MCP tools
 - [x] Dedup: checks `list_comments` before posting comment
 - [x] M3: `AskUserQuestion` before `create_comment`
-- [x] M3: `AskUserQuestion` before `update_issue` status transition
-- [x] Graceful degradation message includes install instructions for yellow-devin
+- [-] (not done as written — Step 9 auto-applies the In Progress transition after an H1 re-fetch, no prompt) M3: `AskUserQuestion` before `update_issue` status transition
+- [-] (superseded by #726 — missing-tooling messages now say to install yellow-core or yellow-cursor; none names yellow-devin) Graceful degradation message includes install instructions for yellow-devin
 - [x] Description is single-line string
 
 ### `/ci:report-linear`

@@ -1,9 +1,9 @@
 # Feature: Close Model/Effort Tier Coverage Gaps (M-A-05)
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 19 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** shipped, one item partial. Merged as #483
+> (`bc3221114`; changeset released in #497), found via `git log`. All 9
+> agent frontmatter edits are on main. 1 `[-]` item: 4.1 (catalog has the
+> effort rule, not the per-agent table).
 
 ## Problem Statement
 
@@ -220,7 +220,7 @@ M-A-01..M-A-04 rollout plan that originated it has been archived.
 
 ### Phase 5: Commit + submit
 
-- [x] 5.1: `gt commit create -m "feat(agents): close model/effort coverage
+- [-] (partly done — #483 added the high/xhigh/max rule to the catalog, but the 9 per-agent tier assignments are not in it) 5.1: `gt commit create -m "feat(agents): close model/effort coverage
   gaps for 9 agents (M-A-05)"` with a body summarizing the 3-plugin patch
   bumps + `xhigh` precedent rationale
 - [x] 5.2: `gt stack submit` (creates a new PR off `main`, independent of

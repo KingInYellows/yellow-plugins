@@ -1,9 +1,10 @@
 # Feature: Plugin Install Resilience — Cache Detection, Env Fallback Parity, and Multi-Host Sync
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 46 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06): partially shipped.** PRs #510 (landed via merge queue
+> as ccdccce27; the PR shows CLOSED), #511, #512, #513, #514, #515 and #516 all
+> merged 2026-05-13 (found via `gh pr view` and `git log`). The composio stdio
+> proxy of Phase 3 was reverted by #845. 20 items are marked `[-]`: all of
+> Phase 3, the manual checklist, and gaps in 1.3, 4.1, 5.3, 5.7, 6.4, 7.2, 7.3.
 
 ## Overview
 
@@ -219,7 +220,7 @@ Four coordinated workstreams, each independently shippable:
 > Adopters that need yellow-core-independent install must copy the helper
 > inline (also called out in the protocol doc's writer contract).
 <!-- /deepen-plan -->
-- [x] 1.3 Unit test the helper with bats: file absent → write succeeds;
+- [-] (partially — 18 bats tests, none for the jq-missing printf fallback) 1.3 Unit test the helper with bats: file absent → write succeeds;
        file present + new schema → overwrite preserves valid JSON; jq
        missing → falls back to printf-based JSON construction with
        conservative defaults.
@@ -248,7 +249,7 @@ Four coordinated workstreams, each independently shippable:
 
 ### Phase 3: yellow-composio Stdio Conversion + Env Fallback
 
-- [x] 3.1 Spike: verify `@composio/mcp` (or equivalent) exposes a stdio MCP
+- [-] (superseded by #845 — stdio proxy shipped in #512, then replaced by native HTTP + browser OAuth) 3.1 Spike: verify `@composio/mcp` (or equivalent) exposes a stdio MCP
        relay accepting `--url` and `--header` flags. If not, write
        `plugins/yellow-composio/bin/composio-proxy.mjs` (60–120 LoC stdio↔HTTPS
        proxy using Node's built-in `https` and `process.stdin`/`stdout`; see
@@ -288,7 +289,7 @@ Four coordinated workstreams, each independently shippable:
 > a new pattern; document the rationale prominently in
 > `plugins/yellow-composio/CLAUDE.md` for future maintainers.
 <!-- /deepen-plan -->
-- [x] 3.2 Convert `plugins/yellow-composio/.claude-plugin/plugin.json`
+- [-] (superseded by #845 — stdio proxy shipped in #512, then replaced by native HTTP + browser OAuth) 3.2 Convert `plugins/yellow-composio/.claude-plugin/plugin.json`
        `mcpServers.composio-server`:
        - `"type": "stdio"` (or omit; stdio is default for command-type)
        - `"command": "${CLAUDE_PLUGIN_ROOT}/bin/start-composio.sh"`
@@ -299,7 +300,7 @@ Four coordinated workstreams, each independently shippable:
        - Drop `"required": true` from both userConfig fields (per research:
          required fires at startup not install; wrapper handles graceful
          OFFLINE state)
-- [x] 3.3 Author `plugins/yellow-composio/bin/start-composio.sh`:
+- [-] (superseded by #845 — stdio proxy shipped in #512, then replaced by native HTTP + browser OAuth) 3.3 Author `plugins/yellow-composio/bin/start-composio.sh`:
        - Resolve userConfig → shell env precedence for both URL and API key
        - If URL is empty OR non-HTTPS → printf clear error to stderr and
          `exit 1` (blocks MCP start, no cascade to `claude doctor`)
@@ -318,23 +319,23 @@ Four coordinated workstreams, each independently shippable:
 > Codex, Vercel AI SDK, and OpenClaw integration docs. Proxy can use plain
 > Node 18+ `fetch()` with `await response.json()`.
 <!-- /deepen-plan -->
-- [x] 3.4 Update `plugins/yellow-composio/hooks/check-mcp-url.sh` to also
+- [-] (superseded by #845 — stdio proxy shipped in #512, then replaced by native HTTP + browser OAuth) 3.4 Update `plugins/yellow-composio/hooks/check-mcp-url.sh` to also
        write the status file (or replace with a single SessionStart hook
        that does both warning + status emission).
-- [x] 3.5 Update `plugins/yellow-composio/CLAUDE.md`, README, and the
+- [-] (superseded by #845 — stdio proxy shipped in #512, then replaced by native HTTP + browser OAuth) 3.5 Update `plugins/yellow-composio/CLAUDE.md`, README, and the
        command surface (`/composio:setup`, `/composio:status`) to reflect
        the new env-var contract (`COMPOSIO_MCP_URL`, `COMPOSIO_API_KEY`).
-- [x] 3.6 Migration note in changeset: existing users with a working
+- [-] (superseded by #845 — stdio proxy shipped in #512, then replaced by native HTTP + browser OAuth) 3.6 Migration note in changeset: existing users with a working
        userConfig install will be unaffected. Users on legacy install
        paths with `type: http` cached must run
        `/plugin disable yellow-composio && /plugin enable yellow-composio`
        after update.
-- [x] 3.7 Bats test: wrapper blocks startup with empty URL; wrapper resolves
+- [-] (superseded by #845 — stdio proxy shipped in #512, then replaced by native HTTP + browser OAuth) 3.7 Bats test: wrapper blocks startup with empty URL; wrapper resolves
        shell env when userConfig empty; wrapper rejects non-HTTPS URL.
 
 ### Phase 4: yellow-research Status File (env detection upgrade)
 
-- [x] 4.1 Add SessionStart hook at
+- [-] (partially — hook emits only perplexity/tavily/exa; no ceramic, parallel or ast-grep status, by design) 4.1 Add SessionStart hook at
        `plugins/yellow-research/hooks/write-credential-status.sh` emitting
        status for all 3 keys (perplexity, tavily, exa) + ceramic OAuth
        state + parallel OAuth state + ast-grep availability.
@@ -360,7 +361,7 @@ Four coordinated workstreams, each independently shippable:
 - [x] 5.2 Update yellow-research classification block (lines 304-320 of
        `commands/setup/all.md`): READY = (status file shows ≥6/6 sources
        present) OR (legacy fallback to current shell-env-only check).
-- [x] 5.3 Update yellow-composio classification block (lines 370-375):
+- [-] (superseded by #845 — /setup:all now classifies yellow-composio from MCP tool visibility, not a status file) 5.3 Update yellow-composio classification block (lines 370-375):
        NEEDS SETUP = status file shows URL absent OR file absent.
        PARTIAL = URL present, API key absent.
        READY = both present + ToolSearch confirms `mcp__plugin_yellow-composio_*` visible.
@@ -427,7 +428,7 @@ Four coordinated workstreams, each independently shippable:
 > classification and discovery in sync.
 <!-- /deepen-plan -->
 
-- [x] 5.7 Add a Step 4 (new): consolidated remediation block. If any
+- [-] (not done — no consolidated Step 4 remediation block in all.md; only per-plugin `/plugin update` and disable/enable hints) 5.7 Add a Step 4 (new): consolidated remediation block. If any
        outdated plugins, print one consolidated `/plugin update <name>`
        command list. If any drift-detector status files show
        newly-added userConfig fields, print one consolidated
@@ -448,7 +449,7 @@ Four coordinated workstreams, each independently shippable:
          - `### Secrets managers (1Password CLI op run, Vault envconsul,
            Doppler, generic env-file pattern)` — tool-agnostic; brief
            per-tool example
-- [x] 6.2 Include canonical env-var contract table for all credential-bearing
+- [x] (ceramic and composio rows later removed by #893 and #845) 6.2 Include canonical env-var contract table for all credential-bearing
        plugins:
        | Plugin | Env Var | userConfig field | Type |
        |--------|---------|------------------|------|
@@ -463,7 +464,7 @@ Four coordinated workstreams, each independently shippable:
        | yellow-devin | `DEVIN_SERVICE_USER_TOKEN`, `DEVIN_ORG_ID` | (none) | sensitive (env-only) |
 - [x] 6.3 Add an `## Examples` subsection with a complete `.envrc` and
        `.zshrc` snippet (commented, so users can selectively enable).
-- [x] 6.4 Cross-reference: mention in
+- [-] (not done — #516 did not touch mcp-health-probe, yellow-research CLAUDE.md or plugin READMEs) 6.4 Cross-reference: mention in
        `plugins/yellow-core/skills/mcp-health-probe/SKILL.md` and
        `plugins/yellow-research/CLAUDE.md`, README files.
 
@@ -480,20 +481,20 @@ Four coordinated workstreams, each independently shippable:
 > alongside a `${VAR:-}` passthrough = warning).
 <!-- /deepen-plan -->
 
-- [x] 7.1 Add a `validate-plugin.js` rule (warning only):
+- [x] (done as RULE 12 in #515: flags env interpolation lacking a `${KEY:-}` passthrough, not required+sensitive) 7.1 Add a `validate-plugin.js` rule (warning only):
        userConfig fields marked `required: true` AND `sensitive: true` SHOULD
        have an associated wrapper script + env-passthrough block. Emit
        `[warn] yellow-composio: composio_api_key is required+sensitive but no
        shell env fallback found — consider 3-element fallback pattern.`
-- [x] 7.2 Add a `validate-plugin.js` rule (warning only):
+- [-] (not done — no separate rule; RULE 12 covers env interpolation, not command-arg interpolation) 7.2 Add a `validate-plugin.js` rule (warning only):
        MCP server `command` blocks that interpolate `${user_config.X}`
        directly (not via wrapper script) miss the empty-string-unset
        safety. Recommend wrapper indirection.
-- [x] 7.3 Test fixtures in `tests/unit/validate-plugin/`:
+- [-] (not done — no `tests/unit/validate-plugin/` fixtures and no RULE 12 test in tests/) 7.3 Test fixtures in `tests/unit/validate-plugin/`:
        - `fixture-required-no-fallback.json` (expects 1 warning)
        - `fixture-required-with-wrapper.json` (expects 0 warnings)
        - `fixture-direct-substitution.json` (expects 1 warning)
-- [x] 7.4 Update `docs/plugin-validation-guide.md` documenting the two new
+- [x] (documents one category, Rule 12, not two) 7.4 Update `docs/plugin-validation-guide.md` documenting the two new
        warning categories.
 
 ### Phase 8: Migration, Documentation, Release
@@ -501,7 +502,7 @@ Four coordinated workstreams, each independently shippable:
 - [x] 8.1 Add `docs/solutions/build-errors/userconfig-required-fires-at-startup-not-install.md`
        documenting the GH #39827 + #39455 behavior and the wrapper-pattern
        workaround.
-- [x] 8.2 Update `AGENTS.md` "Critical Agent Authoring Rules" with a new
+- [x] (landed in #510, AGENTS.md) 8.2 Update `AGENTS.md` "Critical Agent Authoring Rules" with a new
        entry: "Credential-bearing MCPs must use the 3-element wrapper
        pattern; see multi-host-fleet SKILL.md."
 
@@ -522,7 +523,7 @@ Four coordinated workstreams, each independently shippable:
        - yellow-research: patch (SessionStart hook only; no behavioral
          change)
        - yellow-core: minor (setup:all enhancements + new SKILL.md)
-- [x] 8.4 Update root `README.md` if env-var contract belongs on the
+- [x] (skipped per the item's own condition; root README unchanged) 8.4 Update root `README.md` if env-var contract belongs on the
        front page (skip if it's discoverable via the skill).
 - [x] 8.5 Run `pnpm release:check` and `pnpm validate:setup-all` per Phase.
 
@@ -600,18 +601,18 @@ N/A.
 
 ### Manual Testing Checklist
 
-- [x] Fresh install on Linux WSL2 with no shell env, answer userConfig
+- [-] (unverified — no record of a manual run; the PR test plans are empty) Fresh install on Linux WSL2 with no shell env, answer userConfig
        prompts for all credential-bearing plugins → all READY
-- [x] Fresh install with all shell env vars exported, dismiss all userConfig
+- [-] (unverified — no record of a manual run; the PR test plans are empty) Fresh install with all shell env vars exported, dismiss all userConfig
        prompts → all READY (env-fallback works end-to-end)
-- [x] Upgrade from yellow-composio v1.2.x (`type: http`) to v1.3.0
+- [-] (unverified — no record of a manual run; the PR test plans are empty) Upgrade from yellow-composio v1.2.x (`type: http`) to v1.3.0
        (`type: stdio`) → MCP still works after `/plugin update` +
        Claude Code restart; status file populated after first SessionStart
-- [x] Dotfiles repo (no web app) → yellow-browser-test omitted from
+- [-] (unverified — no record of a manual run; the PR test plans are empty) Dotfiles repo (no web app) → yellow-browser-test omitted from
        dashboard entirely; no NEEDS SETUP banner
-- [x] React project with no `.claude/yellow-browser-test.local.md` →
+- [-] (unverified — no record of a manual run; the PR test plans are empty) React project with no `.claude/yellow-browser-test.local.md` →
        RECOMMENDED banner with "/browser-test:setup" suggestion
-- [x] Stale plugin install (version drift detected) → consolidated
+- [-] (unverified — no record of a manual run; the PR test plans are empty) Stale plugin install (version drift detected) → consolidated
        `/plugin update` list shown in Step 4
 
 ## Acceptance Criteria
@@ -839,9 +840,9 @@ behind 1 in a Graphite stack; PRs 4–8 sequential.
 
 ## Stack Progress
 <!-- Updated by workflows:work. Do not edit manually. -->
-- [x] 1. agent/feat/credential-status-protocol (completed 2026-05-13, PR #510)
+- [x] (PR #510 shows CLOSED but its squash ccdccce27 is on main via merge queue) 1. agent/feat/credential-status-protocol (completed 2026-05-13, PR #510)
 - [x] 2. agent/fix/yellow-semgrep-env-fallback (completed 2026-05-13, PR #511)
-- [x] 3. agent/feat/yellow-composio-stdio-fallback (completed 2026-05-13, PR #512)
+- [x] (merged; the transport change was later reverted by #845) 3. agent/feat/yellow-composio-stdio-fallback (completed 2026-05-13, PR #512)
 - [x] 4. agent/feat/yellow-research-status-hook (completed 2026-05-13, PR #513)
 - [x] 5. agent/feat/setup-all-status-classification (completed 2026-05-13, PR #514)
 - [x] 6. agent/feat/validate-plugin-credential-warnings (completed 2026-05-13, PR #515)

@@ -1,9 +1,10 @@
 # Feature: AST-Grep Integration Across Yellow-Plugins Ecosystem
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 13 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** shipped. PR 1 landed as #219 and PR 2 as #220
+> (squash commits on origin/main, found via `git log --grep` and `gh`;
+> both show CLOSED because of the merge queue). plugin.json `--python 3.13`,
+> install-script uv step, setup and CLAUDE.md edits and the four agent
+> tool additions are on the tree. 1 item is `[-]` (1.6, manual test).
 
 > **Status: Implemented (archived)** — Historical record of delivered work. Unchecked items below were deprioritized or absorbed into other work.
 
@@ -261,7 +262,7 @@ vs. Grep.
   ### ast-grep — No API key (requires `ast-grep` binary and `uv`)
   ```
 
-- [x] **1.6: Validate and test**
+- [-] (unverified — validation ran in the PR, but the manual no-Python-3.13 /research:setup test left no evidence) **1.6: Validate and test**
 
   Run `pnpm validate:schemas` to verify plugin.json changes.
   Manually test: unset Python 3.13 from system, run `/research:setup`, confirm

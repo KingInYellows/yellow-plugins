@@ -1,5 +1,14 @@
 # yellow-ruvector 2.0.0 — open verification follow-ups
 
+> **Status (2026-10-06):** Not started, 0 of 2 boxes. Opened by #908 and #910
+> (merged); no PR since has measured either item. F1 is still open:
+> `RUVECTOR_INSTALL_WAIT` defaults to 25 in
+> `plugins/yellow-ruvector/bin/start-ruvector.sh:41` and no timeout measurement
+> is recorded in the plugin docs. F2 is still open: `tests/pre-tool-use.bats`
+> still has the single-run "stays fast against a 5000-pair file" test and no p95
+> number is recorded. Both need a live Claude Code and a representative
+> machine. No open PR. Not ready to archive.
+
 Two checks from `plans/complete/yellow-ruvector-0-3-3-plugin-managed-install.md`
 that shipped unverified. Both need an environment the implementation sessions
 did not have.

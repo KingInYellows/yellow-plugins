@@ -1,5 +1,12 @@
 # Feature: Durable Review-Findings Ledger for yellow-review
 
+> **Status (2026-10-06):** In progress, 50 of 51 boxes done. Shipped across
+> merged #867, #868, #869, #870, #871, #872, #873 and #883 (all on `main`;
+> `gh` shows the merge-queue PRs as CLOSED) plus version PR #877. The only open
+> box is 6.5b, a measurement that waits on the first ten real `/review:pr` runs
+> and is tracked in issue #881 (OPEN). Not ready to archive until 6.5b is
+> recorded. No stale paths found.
+
 ## Overview
 
 `/review:pr` reports residual findings (P2/P3 `safe_auto`, `gated_auto`,

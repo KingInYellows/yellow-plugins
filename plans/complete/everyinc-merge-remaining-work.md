@@ -1,9 +1,11 @@
 # Plan: EveryInc Merge — Remaining Work
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 55 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06):** partially shipped. All five PRs landed on main
+> (#402, #403, #406, #410, #412; found via `git log origin/main` and `gh`,
+> which shows them CLOSED because of the merge queue). The deliverables
+> exist on this tree. 4 items are `[-]`: the `yellow-debt` changeset bump
+> (2.10), the `/docs:review` acceptance run (4.8), and the never-executed
+> smoke test (5.3, 5.4).
 
 **Source brainstorm:** `docs/brainstorms/2026-05-06-everyinc-merge-remaining-work-brainstorm.md`
 **Source plans:** `plans/everyinc-merge.md` (backbone), `plans/everyinc-merge-wave3.md`
@@ -132,7 +134,7 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
 - [x] 2.7 Run validation: `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck && pnpm validate:agents`.
 - [x] 2.8 Run yellow-debt Bats: `cd plugins/yellow-debt && bats tests/`.
 - [x] 2.9 WSL2 normalize: `find plugins/yellow-debt -name '*.md' -newer .git/HEAD -exec sed -i 's/\r$//' {} +`.
-- [x] 2.10 `pnpm changeset` — `yellow-debt: minor`.
+- [-] (not done as written — #406 shipped a `yellow-debt: patch` changeset, not minor) 2.10 `pnpm changeset` — `yellow-debt: minor`.
 - [x] 2.11 `gt commit create -m "feat(yellow-debt): scanner agents emit v2.0 schema fields"` then `gt stack submit`.
 
 #### Done state
@@ -248,7 +250,7 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
   - `plugins/yellow-docs/README.md` — same pattern: counts + new agent table + new command row.
   - No plugin.json edit — auto-discovery handles new agents and command.
 - [x] 4.7 Run `pnpm validate:agents` and grep new files for any 2-segment `subagent_type`. Run `grep -rE '"[a-z-]+:[a-z-]+"' plugins/yellow-docs/agents/review/ plugins/yellow-docs/commands/docs/review.md` — fix any matches.
-- [x] 4.8 Synthetic acceptance: invoke `/yellow-docs:docs:review docs/brainstorms/<sample>.md` against any sample brainstorm doc — confirm at least one finding per persona returned in the standard schema.
+- [-] (unverified — no record of the manual /docs:review run against a sample brainstorm) 4.8 Synthetic acceptance: invoke `/yellow-docs:docs:review docs/brainstorms/<sample>.md` against any sample brainstorm doc — confirm at least one finding per persona returned in the standard schema.
 - [x] 4.9 Run validation: `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck && pnpm validate:agents`.
 - [x] 4.10 WSL2 normalize: `find plugins/yellow-docs -name '*.md' -newer .git/HEAD -exec sed -i 's/\r$//' {} +`.
 - [x] 4.11 `pnpm changeset` — `yellow-docs: minor`.
@@ -287,8 +289,8 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
 <!-- deepen-plan: codebase -->
 > **Codebase:** `docs/operations/release-checklist.md` Section 3 already provides the canonical sign-off block format (`**Reviewer**: ___ **Date**: ___ **Platforms Tested**: ☐ macOS ☐ Linux ☐ WSL **Test Evidence Path**: ...`) and the test-matrix table format. Reuse verbatim — do not invent a new sign-off shape. No other functional e2e checklist exists in the repo (`docs/release/` does not exist, no `docs/manual-*.md` files). Bats tests exist but cover scripts, not plugin invocation. Section 3.5 inline addendum to release-checklist.md is the correct path; new top-level file is unnecessary.
 <!-- /deepen-plan -->
-- [x] 5.3 Execute the smoke test on a clean Claude Code install. Record results in the sign-off block.
-- [x] 5.4 If any check fails, file a follow-up bug; the smoke-test PR remains open until the failure is resolved or formally deferred.
+- [-] (not done — post-w3-functional-smoke-test.md sign-off block is still blank, PASS / FAIL cells unfilled) 5.3 Execute the smoke test on a clean Claude Code install. Record results in the sign-off block.
+- [-] (not applicable — the smoke test was never executed, so no failure was filed) 5.4 If any check fails, file a follow-up bug; the smoke-test PR remains open until the failure is resolved or formally deferred.
 - [x] 5.5 Run validation: `pnpm validate:schemas && pnpm lint && pnpm typecheck` (no plugin changes; minimal gates).
 - [x] 5.6 WSL2 normalize: `sed -i 's/\r$//' docs/operations/post-w3-functional-smoke-test.md` (or the modified release-checklist.md).
 - [x] 5.7 `gt commit create -m "docs(operations): post-W3 functional smoke test checklist + sign-off"` then `gt stack submit`.

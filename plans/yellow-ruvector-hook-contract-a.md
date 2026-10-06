@@ -1,5 +1,14 @@
 # yellow-ruvector hook contract (Deliverable A)
 
+> **Status (2026-10-06):** Handoff report with 0 task boxes, not a task list.
+> Its subject shipped: the hook-payload and MCP-allowlist fixes landed as #839
+> (on `main`; `gh` shows it CLOSED via the merge queue), and the 0.3.3 upgrade it
+> was blocked on landed as #888. Stale: the State and "Upgrade decision" lines
+> (`READY_FOR_SUBMISSION_APPROVAL`, `ruvector@0.2.34` pin, the unlanded store
+> path) predate #888, which pins `ruvector` 0.3.3 and deleted
+> `user-prompt-submit.sh` and `stop.sh`; the worktree and branch in Baseline no
+> longer exist. No open PR. Safe to archive as a record.
+
 State: `READY_FOR_SUBMISSION_APPROVAL` for the plugin fixes.
 Upgrade decision: `UPGRADE_BLOCKED_UPSTREAM` (RuVector #995). The
 shipping pin stays `ruvector@0.2.34`.

@@ -1,9 +1,9 @@
 # Feature: `library-context` Skill
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 26 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (reconciled 2026-10-06): shipped.** Merged as #536 (found via
+> `gh`), then extended by #537/#538/#598 (cache hook and reader) and #597
+> (RULE 13 lint). 4 items are `[-]`: 1.3 and 5.1-5.3, each with its reason
+> inline. `gh` found no issues for the Phase 5 follow-ups.
 
 ## Problem Statement
 
@@ -116,7 +116,7 @@ the SKILL.md and the two initial consumers.
 
 - [x] 1.1 Create `plugins/yellow-research/skills/library-context/SKILL.md` with frontmatter (`name: library-context`, `user-invokable: true`, single-line `description:` containing a "Use when" clause, no `disable-model-invocation` field — setting it true would silently block `skills:` preload)
 - [x] 1.2 Author the three standard sections: `## What It Does` (≤6 lines), `## When to Use` (decision rules + non-use cases), `## Usage` (numbered runtime steps + chain variants + disambiguation rule + citation format + sentinel phrase + cache-compatibility wording)
-- [x] 1.3 Verify SKILL.md body stays ≤120 lines so `skills:` preload remains lightweight; if the runtime content exceeds that, move examples to `reference.md`
+- [-] 1.3 (not met — SKILL.md is 244 lines after the #538/#598 cache wiring; the 120 target was advisory) Verify SKILL.md body stays ≤120 lines so `skills:` preload remains lightweight; if the runtime content exceeds that, move examples to `reference.md`
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** No SKILL.md in this repo currently hits a 120-line target.
@@ -225,9 +225,9 @@ the SKILL.md and the two initial consumers.
 
 ### Phase 5: Follow-up tracking (not in this PR)
 
-- [x] 5.1 Open issue: "validate-agent-authoring.js RULE 13 — context7 drift-detection lint" referencing the grep one-liner in `reference.md`; should land within 2 PRs of this one, before any opt-in adoption PRs for the other 8 plugins
-- [x] 5.2 Open issue: "context7 cache hook" — the SessionStart hook deferred from Decision 4; cache contract (path, key format, TTL) defined by the hook PR, not pre-specified
-- [x] 5.3 Open issue: "library-context opt-in adoption" — track adoption for yellow-debt, yellow-semgrep, yellow-codex, yellow-docs, yellow-review, yellow-council, yellow-devin, yellow-browser-test
+- [-] 5.1 (superseded by #597 — RULE 13 shipped directly, no issue found) Open issue: "validate-agent-authoring.js RULE 13 — context7 drift-detection lint" referencing the grep one-liner in `reference.md`; should land within 2 PRs of this one, before any opt-in adoption PRs for the other 8 plugins
+- [-] 5.2 (superseded by #537/#538/#598 — cache hook shipped, no issue found) Open issue: "context7 cache hook" — the SessionStart hook deferred from Decision 4; cache contract (path, key format, TTL) defined by the hook PR, not pre-specified
+- [-] 5.3 (unverified — no opt-in adoption issue found via gh search) Open issue: "library-context opt-in adoption" — track adoption for yellow-debt, yellow-semgrep, yellow-codex, yellow-docs, yellow-review, yellow-council, yellow-devin, yellow-browser-test
 
 ## Technical Details
 

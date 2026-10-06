@@ -1,9 +1,9 @@
 # Feature: Skill Description Audit (yellow-core focus)
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 30 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (2026-10-06): shipped.** Merged as #507 (`gh pr view`, squash
+> commit 0cae8920e on main); the plan's own Status line below agrees. Review
+> follow-ups are in `skill-description-audit-followups.md`. 2 of the 30
+> boxes are `[-]`: 1.4 (unverified) and 4.2 (yellow-mempalace removed by #784).
 
 **Status:** Implemented in PR #507 (2026-05-11). All 6 phases shipped; task
 checkboxes below preserve the original plan structure as a retrospective.
@@ -95,7 +95,7 @@ The skill bodies and runtime behavior are unchanged.
       - The selection-accuracy concern is the load-bearing principle;
         budget pressure is a secondary signal that may motivate a quality
         review but is not itself a justification to trim
-- [x] 1.4: Verify the `create-agent-skills` SKILL.md examples (lines ~160-170)
+- [-] 1.4: (unverified — #507 did not edit `create-agent-skills` and its body does not record the check) Verify the `create-agent-skills` SKILL.md examples (lines ~160-170)
       still reflect the updated guidance. The current examples already match
       ("good: tight WHAT + WHEN" / "bad: missing WHEN, vague WHAT, or
       verbose without WHEN"), so this is a check, not an edit. Confirm in
@@ -163,7 +163,7 @@ Time-boxed pass. Read descriptions, edit only if a cuttable pattern is
 obvious. Plugins to inspect (in priority order by description length):
 
 - [x] 4.1: `yellow-council/skills/council-patterns` (285 chars)
-- [x] 4.2: `yellow-mempalace/skills/palace-protocol` and
+- [-] 4.2: (superseded by #784 — yellow-mempalace was removed from the marketplace; #507 edited no mempalace skill) `yellow-mempalace/skills/palace-protocol` and
       `yellow-mempalace/skills/mempalace-conventions` (~230 avg)
 - [x] 4.3: `yellow-ci/skills/ci-conventions` and
       `yellow-ci/skills/diagnose-ci` (~198 avg)

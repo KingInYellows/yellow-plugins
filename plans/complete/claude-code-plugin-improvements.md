@@ -1,9 +1,10 @@
 # Feature: Claude Code Plugin System — Efficiency and Quality Improvements
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 27 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (reconciled 2026-10-06): partially shipped.** Merged as #253
+> (1.1, 1.2), #254 (1.3, 1.4), #255 (1.5, 1.6), #257 (2.1, plus the
+> schema work of closed #256), #258 (2.3 split), #260 and #261 (2.6-2.8,
+> Phase 3 lint and routing), found via `git log` and `gh`. 8 items are
+> `[-]`: 2.2, 2.3, 2.7, 3.2, 3.4, 3.5, 4.1 and 4.2, each with its reason inline.
 
 ## Overview
 
@@ -160,7 +161,7 @@ Three staged approaches, each independently shippable:
   - `plugins/yellow-core/agents/review/code-simplicity-reviewer.md`
   - `plugins/yellow-core/agents/review/test-coverage-analyst.md`
   - `plugins/yellow-core/agents/review/pattern-recognition-specialist.md`
-- [x] **1.2** Add `background: true` to 6 yellow-review review agents:
+- [x] **1.2** (code-reviewer.md was later deleted in #402; the other 5 still carry the flag) Add `background: true` to 6 yellow-review review agents:
   - `plugins/yellow-review/agents/review/code-reviewer.md`
   - `plugins/yellow-review/agents/review/pr-test-analyzer.md`
   - `plugins/yellow-review/agents/review/comment-analyzer.md`
@@ -257,10 +258,10 @@ Three staged approaches, each independently shippable:
 > "eliminate duplication" framing suggests.
 > See: https://github.com/anthropics/claude-code/issues/21891
 <!-- /deepen-plan -->
-- [x] **2.2** Migrate all 25 current consumers (16 existing + 9 added in Phase 1)
+- [-] **2.2** (superseded by #257 — security-fencing kept as a documentation skill; inline blocks stay, only staging-reviewer lists it in skills: (Issue #21891 token cost)) Migrate all 25 current consumers (16 existing + 9 added in Phase 1)
   to reference `security-fencing` via `skills:` frontmatter; delete inline
   blocks.
-- [x] **2.3** Split `plugins/yellow-core/skills/mcp-integration-patterns/` into
+- [-] **2.3** (partly done — the 3-way split shipped in #258, but no command declares the sub-skills in frontmatter) Split `plugins/yellow-core/skills/mcp-integration-patterns/` into
   three focused sub-skills:
   - `memory-recall-pattern` — Recall-Before-Act
   - `memory-remember-pattern` — Tiered-Remember-After-Act
@@ -278,7 +279,7 @@ Three staged approaches, each independently shippable:
 > in `allowed-tools`. Splitting the skill file changes documentation only
 > unless consumers simultaneously migrate to `skills:` frontmatter references.
 <!-- /deepen-plan -->
-- [x] **2.4** ~~Add `schemas/plugin.schema.json`~~ **Extend** existing
+- [x] **2.4** (landed via #257; stacked #256 shows CLOSED) ~~Add `schemas/plugin.schema.json`~~ **Extend** existing
   `schemas/plugin.schema.json` if it does not already cover `hooks`,
   `outputStyles`, `mcpServers`, `userConfig` fields. Existing
   `scripts/validate-plugin.js` uses `ajv` programmatically — add new field
@@ -307,7 +308,7 @@ Three staged approaches, each independently shippable:
 > covers all of these before extending.
 > See: https://code.claude.com/docs/en/plugins-reference
 <!-- /deepen-plan -->
-- [x] **2.6** Document structured subagent-failure convention in
+- [x] **2.6** (shipped in #260/#261; result files live under a per-run dir, not CLAUDE_PLUGIN_DATA) Document structured subagent-failure convention in
   `plugins/yellow-core/skills/create-agent-skills/SKILL.md`: agents that fail
   write a structured JSON result to `${CLAUDE_PLUGIN_DATA}/agent-result.json`
   (status, findings, errors) before exiting; orchestrators read the file
@@ -328,7 +329,7 @@ Three staged approaches, each independently shippable:
 > See: https://github.com/anthropics/claude-code/issues/25818,
 > https://github.com/anthropics/claude-code/issues/24181
 <!-- /deepen-plan -->
-- [x] **2.7** Update `review-pr.md` and `work.md` orchestrators to parse
+- [-] **2.7** (partly done — work.md wired; review-pr.md deliberately collects via TaskOutput, not RUN_DIR) Update `review-pr.md` and `work.md` orchestrators to parse
   structured failure blobs and surface them in the user-facing summary.
 - [x] **2.8** Add agent archetype table to `create-agent-skills/SKILL.md`
   (reviewer / orchestrator / scanner / research archetypes — required fields
@@ -357,13 +358,13 @@ Three staged approaches, each independently shippable:
 > See: https://github.com/anthropics/claude-code/issues/14863,
 > https://github.com/anthropics/claude-code/issues/29768
 <!-- /deepen-plan -->
-- [x] **3.2** Add per-plugin `scripts/lint-plugin.sh` that validates
+- [-] **3.2** (superseded by #261 — one repo-wide scripts/lint-plugins.sh instead of per-plugin scripts/lint-plugin.sh) Add per-plugin `scripts/lint-plugin.sh` that validates
   frontmatter completeness (name, description, model, tools present),
   skill references resolve, and required sections exist. Start with
   yellow-core and yellow-review.
 - [x] **3.3** Wire lint scripts into CI via a shared
   `.github/workflows/lint-plugins.yml`.
-- [x] **3.4** Explore a session-end summary hook. **Prefer consolidating
+- [-] **3.4** (not done — punted per Stack Decomposition #8; no session-summary hook shipped, yellow-ruvector has no stop.sh now) Explore a session-end summary hook. **Prefer consolidating
   into yellow-ruvector's existing Stop hook array rather than registering
   a separate hook from yellow-core** — cross-plugin hook ordering is not
   guaranteed. Spike first; ship only if the hook API supports it cleanly.
@@ -398,7 +399,7 @@ Three staged approaches, each independently shippable:
 > See: https://github.com/anthropics/claude-code/issues/24115,
 > https://github.com/anthropics/claude-code/issues/4784
 <!-- /deepen-plan -->
-- [x] **3.5** Investigate ruvector session-scoped warmup: set a session flag
+- [-] **3.5** (not done — punted per Stack Decomposition #8; no session-flag warmup, memory-recall-pattern still calls hooks_capabilities) Investigate ruvector session-scoped warmup: set a session flag
   on first `hooks_recall` so subsequent commands skip `hooks_capabilities`.
   Requires ruvector MCP-server support or a convention in
   `mcp-integration-patterns`.
@@ -408,10 +409,10 @@ Three staged approaches, each independently shippable:
 
 ### Phase 4: Testing & Validation
 
-- [x] **4.1** Manual smoke test of `/review:pr` on a sample branch after
+- [-] **4.1** (unverified — no record of the manual /review:pr smoke test) Manual smoke test of `/review:pr` on a sample branch after
   Phase 1 — confirm multi-agent parallelism by observing wall time vs the
   current baseline.
-- [x] **4.2** Manual smoke test of `/debt:audit` after Phase 1 — confirm
+- [-] **4.2** (unverified — no record of the manual /debt:audit smoke test) Manual smoke test of `/debt:audit` after Phase 1 — confirm
   scanner outputs are unchanged (security block is additive, not behavioral).
 - [x] **4.3** Run `pnpm validate:schemas` after every phase.
 - [x] **4.4** Lint-plugin self-test run after Phase 3.2.

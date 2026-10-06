@@ -1,9 +1,10 @@
 # Feature: Roll back `userConfigEntry.pattern` and document skill-budget workaround
 
-> **Archive note (2026-10-06):** archived before the `/plan:complete`
-> unchecked-box gate landed (2026-05-29, #557). Its 39 open task boxes
-> were bulk-closed to satisfy that gate; the ticks record archival, not
-> per-item verification.
+> **Status (reconciled 2026-10-06):** partially shipped. Merged PRs (found via
+> `git log origin/main` and `gh`): #457 (PR1 strip `pattern`), #458 (PR2 schema/
+> validator/test removal), #459 (PR4 docs), #460 ($schema probe), #461 ($schema
+> rollout + CONTRIBUTING). 7 items are `[-]`: 1.3 (hook later removed by #845),
+> 1.9, 2.8, 3a.4 (unverified), 3c.1-3c.3 (CI step deferred, never added).
 
 ## Problem Statement
 
@@ -179,7 +180,7 @@ Documents the user-side workaround for the skill-budget warning:
 - [x] 1.1: `gt branch create fix/yellow-composio-strip-userconfig-pattern`
 - [x] 1.2: Edit `plugins/yellow-composio/.claude-plugin/plugin.json` — remove
   `pattern` line; append api_key description note
-- [x] 1.3: Create `plugins/yellow-composio/hooks/check-mcp-url.sh`
+- [-] 1.3: (superseded by #845 — hook shipped in #457, removed by the Composio browser-OAuth rewrite; not on main) Create `plugins/yellow-composio/hooks/check-mcp-url.sh`
   (SessionStart hook, advisory warning on non-HTTPS); wire in `plugin.json`
   `hooks.SessionStart`. CRLF-strip via `sed -i 's/\r$//'`.
 - [x] 1.4: Edit `plugins/yellow-composio/skills/composio-patterns/SKILL.md`
@@ -189,7 +190,7 @@ Documents the user-side workaround for the skill-budget warning:
 - [x] 1.7: `gt commit create -m "fix(yellow-composio): strip non-standard
   userConfig.pattern; remote validator rejects it"`
 - [x] 1.8: `gt stack submit`
-- [x] 1.9: Manual install probe — `claude doctor` on fresh install confirms
+- [-] 1.9: (unverified — no doctor output recorded in PR #457) Manual install probe — `claude doctor` on fresh install confirms
   `yellow-composio` loads cleanly. Record outcome in PR description.
 
 ### Phase 2: PR2 ecosystem drift removal (sibling on main)
@@ -202,7 +203,7 @@ Documents the user-side workaround for the skill-budget warning:
 - [x] 2.6: Edit `examples/plugin-extended.example.json` — remove L59
 - [x] 2.7: Edit `docs/solutions/build-errors/userconfig-pattern-field-schema-extension.md`
   — frontmatter `status: reverted` + prepend `## Outcome` section
-- [x] 2.8: Update MEMORY.md L92 entry → one-line pointer
+- [-] 2.8: (unverified — auto-memory MEMORY.md is outside the repo; #458 body claims it) Update MEMORY.md L92 entry → one-line pointer
 - [x] 2.9: `pnpm validate:schemas && pnpm test:unit && pnpm test:integration
   && pnpm lint && pnpm typecheck` all green
 - [x] 2.10: Confirm no `.changeset/*.md` required; note absence in PR body
@@ -215,14 +216,14 @@ Documents the user-side workaround for the skill-budget warning:
 - [x] 3a.1: `gt branch create feat/plugin-json-schema-pointer-probe`
 - [x] 3a.2: Add `$schema` to `plugins/yellow-core/.claude-plugin/plugin.json`
 - [x] 3a.3: Changeset patch-bump yellow-core, commit, submit
-- [x] 3a.4: Manual install probe on merge — `claude doctor` clean?
+- [-] 3a.4: (unverified — no probe outcome recorded; #461 proceeded) Manual install probe on merge — `claude doctor` clean?
 - [x] 3a.5: GATE — proceed to 3b only on probe success
 - [x] 3b.1: `gt branch create feat/plugin-json-schema-pointer-rollout`
 - [x] 3b.2: Add `$schema` to remaining 17 plugin.json files
 - [x] 3b.3: Bulk changeset (17 patches), commit, submit
-- [x] 3c.1: `gt branch create feat/ci-claude-plugin-validate`
-- [x] 3c.2: Add `claude plugin validate` job to validate-schemas.yml
-- [x] 3c.3: Time the CI run delta; gate on PR-only if >60s
+- [-] 3c.1: (not done — #461 states the CI step was deferred; no `claude plugin validate` in .github/workflows) `gt branch create feat/ci-claude-plugin-validate`
+- [-] 3c.2: (not done — no `claude plugin validate` job in .github/workflows) Add `claude plugin validate` job to validate-schemas.yml
+- [-] 3c.3: (not done — no CI step was added to time) Time the CI run delta; gate on PR-only if >60s
 - [x] 3d.1: Update CONTRIBUTING.md with local/remote divergence + probe recipe
 
 ### Phase 4: PR4 skill-budget docs (P2, no urgency)

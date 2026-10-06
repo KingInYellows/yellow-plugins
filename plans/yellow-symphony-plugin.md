@@ -1,5 +1,12 @@
 # Feature: yellow-symphony — Thin Management Layer for Symphony Orchestration
 
+> **Status (2026-10-06):** Not started, 0 of 17 boxes, matching the existing
+> "Draft -- not started" line. No `plugins/yellow-symphony/` directory or catalog
+> entry exists on `main`; the only merged PR is the brainstorm and plan (#240).
+> No open PR. Stale: task 1.4 hand-edits `.claude-plugin/marketplace.json`,
+> which is now generated from `catalog/`; plugin `plugin.json` is generated too.
+> Its OpenClaw-side dependency is unbuilt. Not ready to archive.
+
 **Status:** Draft -- not started
 
 ## Problem Statement
