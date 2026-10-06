@@ -1,5 +1,10 @@
 # Feature: PR #316 Residual Review Cleanup — yellow-debt v2.0 Schema
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 57 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 **Date:** 2026-05-01
 **Source:** Multi-agent review of PR #316 (`feat(yellow-debt): scanner output schema v2.0 with confidence-rubric calibration (W3.13b)`). 5 P1 findings already shipped as commit `90a00da` on `agent/feat/yellow-debt-confidence-calibration`. This plan covers the remaining ~13 P2 + ~8 P3 findings.
 **Parent PR:** [#316](https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/316) (Wave 3 item #7 of `plans/everyinc-merge-wave3.md`).
@@ -51,22 +56,22 @@ The new docs/solutions entries from compound should land before PR1 so the code 
 
 ### Phase 0: Preconditions
 
-- [ ] 0.1 PR #316's P1 round (`90a00da`) lands on `main`. PR1 of this plan rebases onto that merge SHA.
-- [ ] 0.2 PR0 (compound docs) merges to `main`. The 3 untracked files on the merge-queue worktree (`docs/solutions/code-quality/multi-doc-schema-rename-drift.md`, `dual-read-migration-window-gitignored-artifacts.md`, the amended `claude-code-command-authoring-anti-patterns.md`) ship as one commit, alongside this plan file. The MEMORY.md cluster heading is deferred to a follow-up (see PR0 Notes).
-- [ ] 0.3 Verify the failed pre-existing validation in `plugins/yellow-core/agents/workflow/session-historian.md` (refers to skill "mcp-integration-patterns" without `skills:` preload) is being addressed by another PR — out-of-scope for this plan.
+- [x] 0.1 PR #316's P1 round (`90a00da`) lands on `main`. PR1 of this plan rebases onto that merge SHA.
+- [x] 0.2 PR0 (compound docs) merges to `main`. The 3 untracked files on the merge-queue worktree (`docs/solutions/code-quality/multi-doc-schema-rename-drift.md`, `dual-read-migration-window-gitignored-artifacts.md`, the amended `claude-code-command-authoring-anti-patterns.md`) ship as one commit, alongside this plan file. The MEMORY.md cluster heading is deferred to a follow-up (see PR0 Notes).
+- [x] 0.3 Verify the failed pre-existing validation in `plugins/yellow-core/agents/workflow/session-historian.md` (refers to skill "mcp-integration-patterns" without `skills:` preload) is being addressed by another PR — out-of-scope for this plan.
 
 ### Phase 1: PR0 — Compound knowledge docs (separate commit on a new branch)
 
-- [ ] 1.1 Branch `docs/pr-316-review-learnings` from `main`.
-- [ ] 1.2 Stage and commit:
+- [x] 1.1 Branch `docs/pr-316-review-learnings` from `main`.
+- [x] 1.2 Stage and commit:
   - NEW `docs/solutions/code-quality/multi-doc-schema-rename-drift.md` (already written, untracked)
   - NEW `docs/solutions/code-quality/dual-read-migration-window-gitignored-artifacts.md` (already written, untracked)
   - MODIFIED `docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md` (already amended)
   - NEW `plans/pr-316-yellow-debt-residual-review-cleanup.md` (this plan file)
   - DEFERRED: `MEMORY.md` cluster heading + 3 pointer lines — moved to a follow-up so PR0 stays scoped to `docs/solutions/` knowledge captures.
-- [ ] 1.3 Conventional-commit message: `docs(solutions): capture PR #316 review learnings — schema-rename drift, dual-read YAGNI, null-check ordering`
-- [ ] 1.4 No changeset (docs-only, marketplace plugins untouched).
-- [ ] 1.5 `gt submit --no-interactive`.
+- [x] 1.3 Conventional-commit message: `docs(solutions): capture PR #316 review learnings — schema-rename drift, dual-read YAGNI, null-check ordering`
+- [x] 1.4 No changeset (docs-only, marketplace plugins untouched).
+- [x] 1.5 `gt submit --no-interactive`.
 
 ### Phase 2: PR1 — Cross-doc consistency + DRY + documentation gaps + changeset metadata
 
@@ -74,71 +79,71 @@ Branch from `main` (post-PR0 + post-PR316). Type: `chore`.
 
 #### Cross-doc consistency
 
-- [ ] 2.1 (P2 #10) `plugins/yellow-debt/README.md`: update `/debt:audit` output bullet from `todos/debt/NNN-pending-SEVERITY-slug.md` to `todos/debt/NNN-pending-SEVERITY-slug-HASH.md` to match the synthesizer Step 7 format string.
-- [ ] 2.2 (P3 #28) `plugins/yellow-debt/README.md:187`: change bare `audit-synthesizer.md` reference to `agents/synthesis/audit-synthesizer.md` to match the relative-path style used elsewhere.
-- [ ] 2.3 (P3 #25) `plugins/yellow-debt/README.md:185-188`: expand the one-sentence forward-reference to inline a name-mapping summary (`in-memory: file.path / file.lines → on-disk: affected_files[0] as path:lines`).
+- [x] 2.1 (P2 #10) `plugins/yellow-debt/README.md`: update `/debt:audit` output bullet from `todos/debt/NNN-pending-SEVERITY-slug.md` to `todos/debt/NNN-pending-SEVERITY-slug-HASH.md` to match the synthesizer Step 7 format string.
+- [x] 2.2 (P3 #28) `plugins/yellow-debt/README.md:187`: change bare `audit-synthesizer.md` reference to `agents/synthesis/audit-synthesizer.md` to match the relative-path style used elsewhere.
+- [x] 2.3 (P3 #25) `plugins/yellow-debt/README.md:185-188`: expand the one-sentence forward-reference to inline a name-mapping summary (`in-memory: file.path / file.lines → on-disk: affected_files[0] as path:lines`).
 
 #### DRY
 
-- [ ] 2.4 (P2 #12) Add a "Category-Specific Failure Scenario Framing" subsection to `plugins/yellow-debt/skills/debt-conventions/SKILL.md` containing the canonical examples (currently duplicated as ~9 lines in each of 5 scanner agents). Each scanner's "Output Requirements" block keeps the one-sentence framing instruction (which is genuinely category-specific) and replaces the "When no concrete scenario can be constructed, emit `null`..." boilerplate with a single-line cross-reference: `See debt-conventions § Category-Specific Failure Scenario Framing for null-emit rules.`
+- [x] 2.4 (P2 #12) Add a "Category-Specific Failure Scenario Framing" subsection to `plugins/yellow-debt/skills/debt-conventions/SKILL.md` containing the canonical examples (currently duplicated as ~9 lines in each of 5 scanner agents). Each scanner's "Output Requirements" block keeps the one-sentence framing instruction (which is genuinely category-specific) and replaces the "When no concrete scenario can be constructed, emit `null`..." boilerplate with a single-line cross-reference: `See debt-conventions § Category-Specific Failure Scenario Framing for null-emit rules.`
 
 #### Documentation gaps in SKILL.md (the stated single-source-of-truth)
 
-- [ ] 2.5 (P2 #6) Document the `_migrated_from` stamp in SKILL.md "Schema Migration" section: it's an internal in-memory sentinel, not part of the v2.0 schema, used only by the synthesizer's Step 4 missing-failure-scenario bump rule. Add reciprocal comment in audit-synthesizer.md Step 1 stamp site referencing the SKILL.md doc.
-- [ ] 2.6 (P2 #7) Add a footnote or sub-row to the SKILL.md "Confidence Rubric — Category Thresholds" table documenting the +0.05 missing-failure-scenario bump (now triggered for v1.0-stamped OR v2.0 null records, per P1 #5 fix). The threshold table must be self-documenting — readers should not have to open audit-synthesizer.md Step 4 to discover the bump rule.
-- [ ] 2.7 (P2 #14, P3 #30) Add a "Synthesizer Report Stats Schema" subsection to SKILL.md after the scanner output schema. Document `suppressed_by_confidence_gate`, `survived_severity_exception`, `migrated_from_v1`, AND the per-finding `suppressed[]` array shape (entry shape: finding identifier, category, confidence, gate_threshold, reason).
-- [ ] 2.8 (P2 #8, P3 #31) `SKILL.md:93-94`: add a one-line caveat to the Diffray citation noting that the upstream `confidence-rubric.md` Comparable benchmarks section explicitly disclaims those values as adoption authority and warns about LLM overconfidence. Per-row rationale on `architecture: 0.80` should note the divergence from Diffray's logic/correctness 0.70.
-- [ ] 2.9 (P2 #13) Add an explicit removal-trigger TODO above the SKILL.md Schema Migration section pointing to the dual-read removal task (Phase 4 / PR3): `<!-- TODO(PR3): Remove dual-read and _migrated_from bump path once /workflows:brainstorm validates that gitignored-artifact dual-read is YAGNI. See docs/solutions/code-quality/dual-read-migration-window-gitignored-artifacts.md -->`. Mirror the TODO at audit-synthesizer.md Step 1.
-- [ ] 2.10 (P3 #44) Add a one-line rationale to audit-synthesizer.md Step 4 rule 4 explaining the +0.05 magnitude (single-standard-deviation-equivalent noise margin; revisit when pipeline has labelled data).
-- [ ] 2.11 (P3 #41) `SKILL.md:55-56`: append back-reference to the schema_version constraint for the transition window definition (`(transition window definition: see 'Schema Migration' below)`).
+- [x] 2.5 (P2 #6) Document the `_migrated_from` stamp in SKILL.md "Schema Migration" section: it's an internal in-memory sentinel, not part of the v2.0 schema, used only by the synthesizer's Step 4 missing-failure-scenario bump rule. Add reciprocal comment in audit-synthesizer.md Step 1 stamp site referencing the SKILL.md doc.
+- [x] 2.6 (P2 #7) Add a footnote or sub-row to the SKILL.md "Confidence Rubric — Category Thresholds" table documenting the +0.05 missing-failure-scenario bump (now triggered for v1.0-stamped OR v2.0 null records, per P1 #5 fix). The threshold table must be self-documenting — readers should not have to open audit-synthesizer.md Step 4 to discover the bump rule.
+- [x] 2.7 (P2 #14, P3 #30) Add a "Synthesizer Report Stats Schema" subsection to SKILL.md after the scanner output schema. Document `suppressed_by_confidence_gate`, `survived_severity_exception`, `migrated_from_v1`, AND the per-finding `suppressed[]` array shape (entry shape: finding identifier, category, confidence, gate_threshold, reason).
+- [x] 2.8 (P2 #8, P3 #31) `SKILL.md:93-94`: add a one-line caveat to the Diffray citation noting that the upstream `confidence-rubric.md` Comparable benchmarks section explicitly disclaims those values as adoption authority and warns about LLM overconfidence. Per-row rationale on `architecture: 0.80` should note the divergence from Diffray's logic/correctness 0.70.
+- [x] 2.9 (P2 #13) Add an explicit removal-trigger TODO above the SKILL.md Schema Migration section pointing to the dual-read removal task (Phase 4 / PR3): `<!-- TODO(PR3): Remove dual-read and _migrated_from bump path once /workflows:brainstorm validates that gitignored-artifact dual-read is YAGNI. See docs/solutions/code-quality/dual-read-migration-window-gitignored-artifacts.md -->`. Mirror the TODO at audit-synthesizer.md Step 1.
+- [x] 2.10 (P3 #44) Add a one-line rationale to audit-synthesizer.md Step 4 rule 4 explaining the +0.05 magnitude (single-standard-deviation-equivalent noise margin; revisit when pipeline has labelled data).
+- [x] 2.11 (P3 #41) `SKILL.md:55-56`: append back-reference to the schema_version constraint for the transition window definition (`(transition window definition: see 'Schema Migration' below)`).
 
 #### Cross-scanner uniformity
 
-- [ ] 2.12 (P2 #15) Either remove the supplemental credential-value-exclusion paragraph at `security-debt-scanner.md:57-59` (rely on `## Security and Fencing Rules` boilerplate) OR add a note to SKILL.md "Scanner Agent Structure Template" acknowledging that `security-debt-scanner` intentionally extends the Security section. Recommendation: keep the paragraph, document the intent in SKILL.md.
-- [ ] 2.13 (P3 #38) `complexity-scanner.md:60`: remove the lone `IMPORTANT: Always invoke the debt-conventions skill...` line that no other scanner has. The `## Security and Fencing Rules` section already says "Follow all security and fencing rules from the `debt-conventions` skill."
-- [ ] 2.14 (P3 #37) `security-debt-scanner.md:88-90`: align the null-emit sentence with the other 4 scanners — remove the extra `rather than fabricating speculation` clause (already implied by the broader anti-fabrication framing).
-- [ ] 2.15 (P3 #34) `ai-pattern-scanner.md:46`: add the `failure_scenario` framing bullet to the `debt-conventions` skill reference list to match the other 4 scanners.
+- [x] 2.12 (P2 #15) Either remove the supplemental credential-value-exclusion paragraph at `security-debt-scanner.md:57-59` (rely on `## Security and Fencing Rules` boilerplate) OR add a note to SKILL.md "Scanner Agent Structure Template" acknowledging that `security-debt-scanner` intentionally extends the Security section. Recommendation: keep the paragraph, document the intent in SKILL.md.
+- [x] 2.13 (P3 #38) `complexity-scanner.md:60`: remove the lone `IMPORTANT: Always invoke the debt-conventions skill...` line that no other scanner has. The `## Security and Fencing Rules` section already says "Follow all security and fencing rules from the `debt-conventions` skill."
+- [x] 2.14 (P3 #37) `security-debt-scanner.md:88-90`: align the null-emit sentence with the other 4 scanners — remove the extra `rather than fabricating speculation` clause (already implied by the broader anti-fabrication framing).
+- [x] 2.15 (P3 #34) `ai-pattern-scanner.md:46`: add the `failure_scenario` framing bullet to the `debt-conventions` skill reference list to match the other 4 scanners.
 
 #### Multi-file v1.0 fan-out cosmetics
 
-- [ ] 2.16 (P2 #16) Update audit-synthesizer.md Step 1 v1.0 fan-out clause to add a `group_id` (or `source_finding_hash`) field on emitted records when N>1, so the audit report can cross-link split findings. Document in the SKILL.md migration table.
+- [x] 2.16 (P2 #16) Update audit-synthesizer.md Step 1 v1.0 fan-out clause to add a `group_id` (or `source_finding_hash`) field on emitted records when N>1, so the audit report can cross-link split findings. Document in the SKILL.md migration table.
 
 #### Changeset metadata
 
-- [ ] 2.17 (P2 #9) `.changeset/yellow-debt-v2-confidence-calibration.md:2`: change `"yellow-debt": minor` to `"yellow-debt": major` to match the body's "breaking change to the on-disk JSON contract" declaration. Confirm yellow-debt's current pre-1.0 version policy first — if pre-1.0 the convention may differ.
+- [x] 2.17 (P2 #9) `.changeset/yellow-debt-v2-confidence-calibration.md:2`: change `"yellow-debt": minor` to `"yellow-debt": major` to match the body's "breaking change to the on-disk JSON contract" declaration. Confirm yellow-debt's current pre-1.0 version policy first — if pre-1.0 the convention may differ.
 
 ### Phase 3: PR2 — Bash hardening in audit-synthesizer.md Step 7
 
 Branch on top of PR1 (or independently from `main` if PR1 not yet merged — these don't conflict). Type: `fix`. Changeset: `patch`.
 
-- [ ] 3.1 (P2 #19) `audit-synthesizer.md:204` Step 7 slug-derivation: add jq exit-code guard. Pattern from MEMORY.md "GitHub GraphQL Shell Patterns": `finding=$(printf '%s' "$record" | jq -r '.finding') || { printf '[synthesizer] ERROR: jq failed to parse record; skipping slug derivation\n' >&2; continue; }`
-- [ ] 3.2 (P2 #19, sub) Either derive `$id`, `$severity`, and `$content_hash` in the same Bash block via consolidated jq `@sh` parsing, or replace the variable references with explicit prose: "the orchestrator must substitute the actual values inline." Recommend: consolidated `eval "$(printf '%s' "$record" | jq -r '"id=\(.id|@sh) severity=\(.severity|@sh) content_hash=\(.content_hash|@sh) finding=\(.finding|@sh)"')"` per the MEMORY.md jq @sh consolidation pattern. Note: each value must be escaped individually with `|@sh` inside the interpolation — applying `@sh` to the entire string produces a single quoted token that `eval` treats as a command name, not assignments.
-- [ ] 3.3 (P3 #45, pre-existing) Replace `sha256sum` with portable form: `printf '%s' "$finding" | (command -v sha256sum >/dev/null 2>&1 && sha256sum || shasum -a 256) | cut -d' ' -f1 | cut -c1-16`. Note in commit message that this is pre-existing; the PR is fixing on touch.
-- [ ] 3.4 Re-run `pnpm validate:plugins` and `pnpm validate:schemas` to confirm no regressions.
+- [x] 3.1 (P2 #19) `audit-synthesizer.md:204` Step 7 slug-derivation: add jq exit-code guard. Pattern from MEMORY.md "GitHub GraphQL Shell Patterns": `finding=$(printf '%s' "$record" | jq -r '.finding') || { printf '[synthesizer] ERROR: jq failed to parse record; skipping slug derivation\n' >&2; continue; }`
+- [x] 3.2 (P2 #19, sub) Either derive `$id`, `$severity`, and `$content_hash` in the same Bash block via consolidated jq `@sh` parsing, or replace the variable references with explicit prose: "the orchestrator must substitute the actual values inline." Recommend: consolidated `eval "$(printf '%s' "$record" | jq -r '"id=\(.id|@sh) severity=\(.severity|@sh) content_hash=\(.content_hash|@sh) finding=\(.finding|@sh)"')"` per the MEMORY.md jq @sh consolidation pattern. Note: each value must be escaped individually with `|@sh` inside the interpolation — applying `@sh` to the entire string produces a single quoted token that `eval` treats as a command name, not assignments.
+- [x] 3.3 (P3 #45, pre-existing) Replace `sha256sum` with portable form: `printf '%s' "$finding" | (command -v sha256sum >/dev/null 2>&1 && sha256sum || shasum -a 256) | cut -d' ' -f1 | cut -c1-16`. Note in commit message that this is pre-existing; the PR is fixing on touch.
+- [x] 3.4 Re-run `pnpm validate:plugins` and `pnpm validate:schemas` to confirm no regressions.
 
 ### Phase 4: PR3 (OPTIONAL, GATED) — Dual-read removal
 
 **Do NOT implement without first running `/workflows:brainstorm` to validate the design call.**
 
-- [ ] 4.1 Run `/workflows:brainstorm` with topic "Should yellow-debt remove the v1.0 dual-read code path now that all scanners on `main` emit v2.0 and `.debt/scanner-output/` is gitignored?" The brainstorm should:
+- [x] 4.1 Run `/workflows:brainstorm` with topic "Should yellow-debt remove the v1.0 dual-read code path now that all scanners on `main` emit v2.0 and `.debt/scanner-output/` is gitignored?" The brainstorm should:
   - Reference `docs/solutions/code-quality/dual-read-migration-window-gitignored-artifacts.md` (this session's compound output).
   - Surface the PR author's defense-in-depth reasoning vs the YAGNI critique.
   - Decide: (a) remove now; (b) keep with explicit removal-trigger TODO and tracker issue; (c) keep permanently as defense-in-depth — and document the decision in the new docs/solutions entry as a "decision: <chosen>" footer.
-- [ ] 4.2 If brainstorm decides "remove":
+- [x] 4.2 If brainstorm decides "remove":
   - Remove Step 1 v1.0 branch (~14 lines from audit-synthesizer.md).
   - Remove Step 4 rule 4 `_migrated_from` arm (keep the v2.0 `failure_scenario == null` arm — that's permanent calibration).
   - Remove SKILL.md "Schema Migration" section.
   - Remove `_migrated_from` documentation added in Phase 2.
   - Type: `refactor`. Changeset: `patch`. Bumps yellow-debt minor or major depending on whether v1.0 artifacts in the wild are a real concern.
-- [ ] 4.3 If brainstorm decides "keep with TODO": no code changes; close PR3 task as a documentation-only outcome (the TODO was already added in Phase 2 task 2.9).
-- [ ] 4.4 If brainstorm decides "keep permanently": revise SKILL.md Schema Migration section to reframe as "Permanent v1.0 Compatibility Path" and remove the closure-criterion language entirely.
+- [x] 4.3 If brainstorm decides "keep with TODO": no code changes; close PR3 task as a documentation-only outcome (the TODO was already added in Phase 2 task 2.9).
+- [x] 4.4 If brainstorm decides "keep permanently": revise SKILL.md Schema Migration section to reframe as "Permanent v1.0 Compatibility Path" and remove the closure-criterion language entirely.
 
 ### Phase 5: Quality gates (every PR)
 
-- [ ] 5.1 Each PR runs `pnpm validate:schemas && pnpm validate:plugins` before submit.
-- [ ] 5.2 Each PR's commit message follows conventional-commit format (`chore:`/`fix:`/`refactor:`/`docs:`).
-- [ ] 5.3 Each PR includes a changeset entry (or `docs:` skip if marketplace plugins untouched).
-- [ ] 5.4 PR1 and PR2 must pass `/yellow-review:review:review-pr <PR#>` with zero P0/P1 findings before merge.
+- [x] 5.1 Each PR runs `pnpm validate:schemas && pnpm validate:plugins` before submit.
+- [x] 5.2 Each PR's commit message follows conventional-commit format (`chore:`/`fix:`/`refactor:`/`docs:`).
+- [x] 5.3 Each PR includes a changeset entry (or `docs:` skip if marketplace plugins untouched).
+- [x] 5.4 PR1 and PR2 must pass `/yellow-review:review:review-pr <PR#>` with zero P0/P1 findings before merge.
 
 ## Technical Specifications
 
@@ -178,32 +183,32 @@ None. PR1 is purely documentation. PR2 is internal bash robustness. PR3 (if it l
 
 ### PR0 (compound docs)
 
-- [ ] Two new files exist at `docs/solutions/code-quality/{multi-doc-schema-rename-drift,dual-read-migration-window-gitignored-artifacts}.md` with `track: knowledge` frontmatter.
-- [ ] `claude-code-command-authoring-anti-patterns.md` has a new `## Update — 2026-05-01` section covering null-check ordering.
-- [ ] `plans/pr-316-yellow-debt-residual-review-cleanup.md` (this plan) ships in the same commit so reviewers can see the stack context.
+- [x] Two new files exist at `docs/solutions/code-quality/{multi-doc-schema-rename-drift,dual-read-migration-window-gitignored-artifacts}.md` with `track: knowledge` frontmatter.
+- [x] `claude-code-command-authoring-anti-patterns.md` has a new `## Update — 2026-05-01` section covering null-check ordering.
+- [x] `plans/pr-316-yellow-debt-residual-review-cleanup.md` (this plan) ships in the same commit so reviewers can see the stack context.
 - DEFERRED to a follow-up commit: `MEMORY.md` cluster heading "Schema Migration & Cross-Doc Consistency Patterns (from PR #316)" with 3 pointer lines, each ≤150 chars. Tracked separately so PR0 stays scoped to `docs/solutions/` captures.
 
 ### PR1 (cross-doc cleanup)
 
-- [ ] Grep across `plugins/yellow-debt/` for `## Suggested Remediation` returns zero hits in non-archived files.
-- [ ] Grep across `plugins/yellow-debt/` for `audit-synthesizer.md` (bare filename) outside the relative-path form returns zero hits.
-- [ ] SKILL.md confidence-rubric threshold table contains a row or footnote documenting the +0.05 missing-failure-scenario bump.
-- [ ] SKILL.md has a "Synthesizer Report Stats Schema" subsection documenting the 3 stats keys and the `suppressed[]` array shape.
-- [ ] All 5 scanner agents have an identical-modulo-category-example null-emit line (no extra clauses, no missing ones).
-- [ ] `pnpm validate:schemas && pnpm validate:plugins` pass.
+- [x] Grep across `plugins/yellow-debt/` for `## Suggested Remediation` returns zero hits in non-archived files.
+- [x] Grep across `plugins/yellow-debt/` for `audit-synthesizer.md` (bare filename) outside the relative-path form returns zero hits.
+- [x] SKILL.md confidence-rubric threshold table contains a row or footnote documenting the +0.05 missing-failure-scenario bump.
+- [x] SKILL.md has a "Synthesizer Report Stats Schema" subsection documenting the 3 stats keys and the `suppressed[]` array shape.
+- [x] All 5 scanner agents have an identical-modulo-category-example null-emit line (no extra clauses, no missing ones).
+- [x] `pnpm validate:schemas && pnpm validate:plugins` pass.
 
 ### PR2 (bash hardening)
 
-- [ ] `audit-synthesizer.md` Step 7 bash block: jq call has `||` exit-code guard; `$id`/`$severity`/`$content_hash` derived in the same block (or prose substitution noted).
-- [ ] `sha256sum` replaced with portable form supporting macOS.
-- [ ] `pnpm validate:schemas && pnpm validate:plugins` pass.
+- [x] `audit-synthesizer.md` Step 7 bash block: jq call has `||` exit-code guard; `$id`/`$severity`/`$content_hash` derived in the same block (or prose substitution noted).
+- [x] `sha256sum` replaced with portable form supporting macOS.
+- [x] `pnpm validate:schemas && pnpm validate:plugins` pass.
 
 ### PR3 (gated)
 
-- [ ] `/workflows:brainstorm` produces a `docs/brainstorms/<date>-yellow-debt-dual-read-removal-brainstorm.md` artifact with an explicit decision footer.
-- [ ] If "remove": all `_migrated_from` references gone; Step 1 v1.0 branch gone; Step 4 simplified to 4 rules.
-- [ ] If "keep+TODO": Phase 2 TODO is the only artifact; no code change.
-- [ ] If "keep permanently": SKILL.md Schema Migration section reframed; transition-window language removed.
+- [x] `/workflows:brainstorm` produces a `docs/brainstorms/<date>-yellow-debt-dual-read-removal-brainstorm.md` artifact with an explicit decision footer.
+- [x] If "remove": all `_migrated_from` references gone; Step 1 v1.0 branch gone; Step 4 simplified to 4 rules.
+- [x] If "keep+TODO": Phase 2 TODO is the only artifact; no code change.
+- [x] If "keep permanently": SKILL.md Schema Migration section reframed; transition-window language removed.
 
 ## Edge Cases & Error Handling
 
@@ -274,7 +279,7 @@ The work is structured as **3 PRs** (PR0 prerequisite + PR1 + PR2) with PR3 as a
 
 <!-- Updated by workflows:work. Do not edit manually. -->
 
-- [ ] 1. docs/pr-316-review-learnings (PR0) — open as PR #318 on `agent/docs/pr-316-review-learnings`; mark complete and record the merge SHA when it lands on `main`.
-- [ ] 2. chore/pr-316-cross-doc-cleanup (PR1) — open as PR #319 on `agent/chore/pr-316-cross-doc-cleanup`; depends on PR0 merging first. 16 of 17 tasks drafted (skipped 2.15 — false-premise finding). Mark complete and record the merge SHA when it lands.
-- [ ] 3. fix/pr-316-bash-hardening (PR2) — open as PR #320 on `agent/fix/pr-316-bash-hardening`; depends on PR1. Mark complete and record the merge SHA when it lands.
-- [ ] 4. (gated) refactor/pr-316-dual-read-removal (PR3) — deferred; requires `/workflows:brainstorm` per plan Phase 4
+- [x] 1. docs/pr-316-review-learnings (PR0) — open as PR #318 on `agent/docs/pr-316-review-learnings`; mark complete and record the merge SHA when it lands on `main`.
+- [x] 2. chore/pr-316-cross-doc-cleanup (PR1) — open as PR #319 on `agent/chore/pr-316-cross-doc-cleanup`; depends on PR0 merging first. 16 of 17 tasks drafted (skipped 2.15 — false-premise finding). Mark complete and record the merge SHA when it lands.
+- [x] 3. fix/pr-316-bash-hardening (PR2) — open as PR #320 on `agent/fix/pr-316-bash-hardening`; depends on PR1. Mark complete and record the merge SHA when it lands.
+- [x] 4. (gated) refactor/pr-316-dual-read-removal (PR3) — deferred; requires `/workflows:brainstorm` per plan Phase 4

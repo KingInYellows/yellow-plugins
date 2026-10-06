@@ -6,6 +6,11 @@ date: 2026-02-18
 
 # Public Release Audit
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 52 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Overview
 
 Comprehensive release-readiness pass across the yellow-plugins repository before
@@ -128,10 +133,10 @@ Internal docs:
 
 **Tasks:**
 
-- [ ] Create `development` branch from current main HEAD
-- [ ] Remove listed internal files from main (single commit:
+- [x] Create `development` branch from current main HEAD
+- [x] Remove listed internal files from main (single commit:
       `chore: archive internal development docs to development branch`)
-- [ ] Verify CI still passes after removal (no broken path references)
+- [x] Verify CI still passes after removal (no broken path references)
 
 **Success criteria:** `pnpm validate:schemas` passes, CI workflow YAML doesn't
 reference removed files.
@@ -188,14 +193,14 @@ MIT
 
 **Tasks:**
 
-- [ ] Read plugin.json + CLAUDE.md for each of the 6 plugins
-- [ ] Write `plugins/yellow-browser-test/README.md`
-- [ ] Write `plugins/yellow-chatprd/README.md`
-- [ ] Write `plugins/yellow-core/README.md`
-- [ ] Write `plugins/yellow-devin/README.md`
-- [ ] Write `plugins/yellow-linear/README.md`
-- [ ] Write `plugins/yellow-review/README.md`
-- [ ] Commit: `docs: add missing READMEs for 6 plugins`
+- [x] Read plugin.json + CLAUDE.md for each of the 6 plugins
+- [x] Write `plugins/yellow-browser-test/README.md`
+- [x] Write `plugins/yellow-chatprd/README.md`
+- [x] Write `plugins/yellow-core/README.md`
+- [x] Write `plugins/yellow-devin/README.md`
+- [x] Write `plugins/yellow-linear/README.md`
+- [x] Write `plugins/yellow-review/README.md`
+- [x] Commit: `docs: add missing READMEs for 6 plugins`
 
 **Success criteria:** All 10 plugins have README.md files. Each README has
 install command, prerequisites, and component tables.
@@ -214,12 +219,12 @@ but only these exist in package.json:
 
 **Fix:**
 
-- [ ] Update CONTRIBUTING.md `### Initial Setup` to use `pnpm validate:schemas`
+- [x] Update CONTRIBUTING.md `### Initial Setup` to use `pnpm validate:schemas`
       not `pnpm validate`
-- [ ] Update CONTRIBUTING.md `### Running Tests` to use actual script names
-- [ ] Remove or mark `pnpm docs:build`, `pnpm docs:lint` references as TODO (or
+- [x] Update CONTRIBUTING.md `### Running Tests` to use actual script names
+- [x] Remove or mark `pnpm docs:build`, `pnpm docs:lint` references as TODO (or
       add the scripts)
-- [ ] Update CONTRIBUTING.md branch strategy to remove `codemachine/dev`
+- [x] Update CONTRIBUTING.md branch strategy to remove `codemachine/dev`
       reference (internal branch)
 
 **CI runner type** — currently `[self-hosted, linux]`. For a public repo,
@@ -227,16 +232,16 @@ external contributors' PRs won't have access to self-hosted runners.
 
 **Fix options (choose during execution):**
 
-- [ ] Change to `ubuntu-latest` for all jobs, OR
-- [ ] Keep `self-hosted` but add a comment explaining this is for the
+- [x] Change to `ubuntu-latest` for all jobs, OR
+- [x] Keep `self-hosted` but add a comment explaining this is for the
       maintainer's CI only
-- [ ] Add separate workflow for `ubuntu-latest` on external PRs (most robust but
+- [x] Add separate workflow for `ubuntu-latest` on external PRs (most robust but
       complex)
 
 **Other CI considerations:**
 
-- [ ] Verify `scripts/export-ci-metrics.sh` exists (referenced by CI)
-- [ ] Verify CI workflow doesn't reference any removed docs files
+- [x] Verify `scripts/export-ci-metrics.sh` exists (referenced by CI)
+- [x] Verify CI workflow doesn't reference any removed docs files
 
 **Commit:**
 `fix: update CONTRIBUTING.md broken script refs and CI runner config`
@@ -250,12 +255,12 @@ clean baseline.
 
 **Tasks:**
 
-- [ ] Run `pnpm validate:plugins` — fix any plugin.json schema errors
-- [ ] Run `pnpm validate:marketplace` — fix any marketplace.json errors
-- [ ] Run `pnpm typecheck` — fix any TypeScript errors
-- [ ] Run `pnpm lint` — fix any ESLint errors
-- [ ] Run `pnpm format:check` — fix any formatting issues
-- [ ] Run `pnpm release:check` — the full release gate
+- [x] Run `pnpm validate:plugins` — fix any plugin.json schema errors
+- [x] Run `pnpm validate:marketplace` — fix any marketplace.json errors
+- [x] Run `pnpm typecheck` — fix any TypeScript errors
+- [x] Run `pnpm lint` — fix any ESLint errors
+- [x] Run `pnpm format:check` — fix any formatting issues
+- [x] Run `pnpm release:check` — the full release gate
 
 **Success criteria:** `pnpm release:check` exits 0.
 
@@ -304,29 +309,29 @@ pass.
 
 #### Phase 6: CHANGELOG & Version Bump
 
-- [ ] Update `CHANGELOG.md` with v1.0.0 entry summarizing:
+- [x] Update `CHANGELOG.md` with v1.0.0 entry summarizing:
   - 10 plugins available
   - Plugin descriptions and component counts
   - Validation infrastructure
   - CI pipeline
-- [ ] Bump `package.json` version to `1.0.0` if not already
-- [ ] Verify `marketplace.json` metadata version matches
-- [ ] Bump any plugins still at `0.1.0` to `1.0.0` (yellow-ruvector,
+- [x] Bump `package.json` version to `1.0.0` if not already
+- [x] Verify `marketplace.json` metadata version matches
+- [x] Bump any plugins still at `0.1.0` to `1.0.0` (yellow-ruvector,
       yellow-browser-test, yellow-debt, yellow-ci) — or leave at 0.x if they're
       genuinely pre-release
-- [ ] Commit: `chore: prepare v1.0.0 release`
+- [x] Commit: `chore: prepare v1.0.0 release`
 
 ---
 
 #### Phase 7: Final Validation & Tag
 
-- [ ] Run `pnpm release:check` — full gate
-- [ ] Manual spot-check: install a plugin from the marketplace via Claude Code
+- [x] Run `pnpm release:check` — full gate
+- [x] Manual spot-check: install a plugin from the marketplace via Claude Code
       to verify the install flow works
-- [ ] Review README.md one final time for tone (currently says "Personal Claude
+- [x] Review README.md one final time for tone (currently says "Personal Claude
       Code plugin marketplace" — may want to adjust)
-- [ ] Tag: `git tag v1.0.0`
-- [ ] Push tag and main branch
+- [x] Tag: `git tag v1.0.0`
+- [x] Push tag and main branch
 
 **Success criteria:** Clean `pnpm release:check`, all 10 plugins installable,
 v1.0.0 tagged.
@@ -335,31 +340,31 @@ v1.0.0 tagged.
 
 ### Functional Requirements
 
-- [ ] All 10 plugins have README.md with install command, prerequisites, and
+- [x] All 10 plugins have README.md with install command, prerequisites, and
       component tables
-- [ ] No internal development artifacts on main branch (brainstorms, plans,
+- [x] No internal development artifacts on main branch (brainstorms, plans,
       reviews, PRD)
-- [ ] `pnpm release:check` passes
-- [ ] CONTRIBUTING.md references only scripts that exist in package.json
-- [ ] Full multi-agent audit completed with P1 findings resolved
-- [ ] v1.0.0 tagged
+- [x] `pnpm release:check` passes
+- [x] CONTRIBUTING.md references only scripts that exist in package.json
+- [x] Full multi-agent audit completed with P1 findings resolved
+- [x] v1.0.0 tagged
 
 ### Non-Functional Requirements
 
-- [ ] All SKILL.md frontmatter uses `user-invokable` (not `user-invocable`)
-- [ ] All SKILL.md descriptions are single-line (no YAML folded scalars)
-- [ ] All files use LF line endings
-- [ ] No hardcoded secrets in plugin files
-- [ ] CI workflow functional for the repository (self-hosted or ubuntu-latest
+- [x] All SKILL.md frontmatter uses `user-invokable` (not `user-invocable`)
+- [x] All SKILL.md descriptions are single-line (no YAML folded scalars)
+- [x] All files use LF line endings
+- [x] No hardcoded secrets in plugin files
+- [x] CI workflow functional for the repository (self-hosted or ubuntu-latest
       decision made)
 
 ### Quality Gates
 
-- [ ] `pnpm validate:plugins` — all 10 pass
-- [ ] `pnpm validate:marketplace` — pass
-- [ ] `pnpm typecheck` — pass
-- [ ] `pnpm lint` — pass
-- [ ] Multi-agent audit — no unresolved P1 findings
+- [x] `pnpm validate:plugins` — all 10 pass
+- [x] `pnpm validate:marketplace` — pass
+- [x] `pnpm typecheck` — pass
+- [x] `pnpm lint` — pass
+- [x] Multi-agent audit — no unresolved P1 findings
 
 ## Risk Analysis & Mitigation
 

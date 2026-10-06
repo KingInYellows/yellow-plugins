@@ -1,5 +1,10 @@
 # Feature: `setup:claude-web` Command
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 14 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 **Plan date:** 2026-05-18
 **Brainstorm:** `docs/brainstorms/2026-05-18-setup-claude-web-command-brainstorm.md`
 **Research:** `docs/research/how-claude-code-web-works-and-repository.md`
@@ -107,9 +112,9 @@ idempotency is the invariant.
 
 ### Phase 1: Foundation
 
-- [ ] **1.1** Branch off main via Graphite:
+- [x] **1.1** Branch off main via Graphite:
       `gt branch create agent/feat/setup-claude-web-command`
-- [ ] **1.2** Create `plugins/yellow-core/commands/setup/claude-web.md`
+- [x] **1.2** Create `plugins/yellow-core/commands/setup/claude-web.md`
       with frontmatter only (no body yet) to confirm validator passes
       before filling in step content:
       ```yaml
@@ -124,10 +129,10 @@ idempotency is the invariant.
         - AskUserQuestion
       ---
       ```
-- [ ] **1.3** Run `pnpm validate:agents` against the empty-body file
+- [x] **1.3** Run `pnpm validate:agents` against the empty-body file
       to confirm frontmatter is accepted. Expected: passes (no rules
       apply to command-body content yet).
-- [ ] **1.4** Normalize line endings: `sed -i 's/\r$//'
+- [x] **1.4** Normalize line endings: `sed -i 's/\r$//'
       plugins/yellow-core/commands/setup/claude-web.md`
 
 ### Phase 2: Command Body Implementation
@@ -219,9 +224,9 @@ scripts_dir_is_file: yes | no               (scripts/ exists but is not a direct
 - File-size guard on `.gitignore` / `.gitattributes`: skip pattern checks
   if file is > 1 MiB and emit `gitignore_size: too_large`.
 
-- [ ] **2.2.1** Write the audit Bash block (one fenced code block, single
+- [x] **2.2.1** Write the audit Bash block (one fenced code block, single
       `tool: Bash` call in the command body).
-- [ ] **2.2.2** Verify the audit produces clean key-value output on a
+- [x] **2.2.2** Verify the audit produces clean key-value output on a
       fixture: an empty git repo, a partially-configured repo, and a
       fully-configured repo. Adjust outputs to use consistent vocabulary.
 
@@ -612,31 +617,31 @@ common cause of subsequent CI failures.
 
 ### Phase 3: Quality & Documentation
 
-- [ ] **3.1** Update `plugins/yellow-core/CLAUDE.md` "Commands" count
+- [x] **3.1** Update `plugins/yellow-core/CLAUDE.md` "Commands" count
       and list (e.g., `### Commands (8)` → `### Commands (9)`, add the
       new bullet).
-- [ ] **3.2** Update `plugins/yellow-core/README.md` Commands table
+- [x] **3.2** Update `plugins/yellow-core/README.md` Commands table
       (add a new row).
-- [ ] **3.3** Run `pnpm changeset`:
+- [x] **3.3** Run `pnpm changeset`:
       - Plugin: `yellow-core`
       - Bump: `minor`
       - Message: `feat(yellow-core): add /setup:claude-web command to
         scaffold Claude Code Web readiness in any repo`
-- [ ] **3.4** Run validators:
+- [x] **3.4** Run validators:
       - `pnpm validate:agents` (must pass)
       - `pnpm validate:plugins`
       - `pnpm validate:setup-all` (confirm no failure from absence)
       - `pnpm test:unit`
       - `pnpm typecheck`
       - `pnpm lint`
-- [ ] **3.5** CRLF normalize: `sed -i 's/\r$//'
+- [x] **3.5** CRLF normalize: `sed -i 's/\r$//'
       plugins/yellow-core/commands/setup/claude-web.md`
-- [ ] **3.6** Manual smoke test on a fresh fixture repo (see test
+- [x] **3.6** Manual smoke test on a fresh fixture repo (see test
       matrix below): minimum two scenarios from Phase 4 (fresh repo +
       fully-configured repo) before commit.
-- [ ] **3.7** Commit: `gt commit create -m "feat(yellow-core): add
+- [x] **3.7** Commit: `gt commit create -m "feat(yellow-core): add
       /setup:claude-web command"`
-- [ ] **3.8** Submit: `gt stack submit`
+- [x] **3.8** Submit: `gt stack submit`
 
 ---
 

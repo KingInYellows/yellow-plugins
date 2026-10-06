@@ -1,5 +1,10 @@
 # Feature: Plugin Ecosystem Cohesion & Structural Fixes
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 39 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Enhancement Summary
 
 **Deepened on:** 2026-02-25
@@ -74,18 +79,18 @@ guides.
 
 These are independent one-liner changes that can ship together.
 
-- [ ] **1.1** Edit `plugins/yellow-ci/.claude-plugin/plugin.json` line 22:
+- [x] **1.1** Edit `plugins/yellow-ci/.claude-plugin/plugin.json` line 22:
   change `"timeout": 3000` to `"timeout": 3`
-- [ ] **1.2** Also fix `plugins/yellow-ci/hooks/hooks.json` — same `"timeout": 3000` → `3`
-- [ ] **1.3** Add independence comment to `plugins/yellow-ci/hooks/scripts/session-start.sh` header:
+- [x] **1.2** Also fix `plugins/yellow-ci/hooks/hooks.json` — same `"timeout": 3000` → `3`
+- [x] **1.3** Add independence comment to `plugins/yellow-ci/hooks/scripts/session-start.sh` header:
   `# NOTE: SessionStart hooks run in parallel across plugins. This hook must be independent.`
-- [ ] **1.4** Add same comment to `plugins/yellow-ruvector/hooks/scripts/session-start.sh` header
-- [ ] **1.5** Edit `plugins/yellow-browser-test/agents/testing/test-reporter.md` Step 4:
+- [x] **1.4** Add same comment to `plugins/yellow-ruvector/hooks/scripts/session-start.sh` header
+- [x] **1.5** Edit `plugins/yellow-browser-test/agents/testing/test-reporter.md` Step 4:
   add explicit handler for "Let me review the report first" option — output the report file path
   and instruct: "When user is ready, re-run with the findings to create issues"
-- [ ] **1.6** Remove `changelog` key from any plugin.json that has it (remote validator rejects it
+- [x] **1.6** Remove `changelog` key from any plugin.json that has it (remote validator rejects it
   — see `docs/solutions/build-errors/plugin-json-changelog-key-schema-drift-remote-validator.md`)
-- [ ] **1.7** Run `pnpm validate:schemas` to verify no schema regressions
+- [x] **1.7** Run `pnpm validate:schemas` to verify no schema regressions
 
 **Files:**
 - `plugins/yellow-ci/.claude-plugin/plugin.json`
@@ -120,10 +125,10 @@ These are independent one-liner changes that can ship together.
 Create the missing agent, drop `agent-native-reviewer`, and update all
 `compound-engineering:review:*` references to use yellow-core agents.
 
-- [ ] **2.1** Verify yellow-core's `plugin.json` `name` field value before writing `subagent_type`
+- [x] **2.1** Verify yellow-core's `plugin.json` `name` field value before writing `subagent_type`
   references — the Task tool format is `<plugin-name>:<subdir>:<agent-name>` where plugin-name
   comes from `plugin.json` `name:` field
-- [ ] **2.2** Create `plugins/yellow-core/agents/review/pattern-recognition-specialist.md`
+- [x] **2.2** Create `plugins/yellow-core/agents/review/pattern-recognition-specialist.md`
   - Color: yellow, Model: inherit
   - Focus: code duplication, near-duplicates, anti-pattern detection, naming convention violations
   - Optimize for plugin authoring context (CLAUDE.md patterns, conventional commits, hook patterns)
@@ -131,22 +136,22 @@ Create the missing agent, drop `agent-native-reviewer`, and update all
   - Include CRITICAL SECURITY RULES block (per PR #56 pattern across yellow-review agents)
   - Hardcode MEMORY.md anti-pattern table inline (don't reference external files)
   - Target ~180 lines (under 200-line quality threshold)
-- [ ] **2.3** Update `plugins/yellow-review/skills/pr-review-workflow/SKILL.md`:
+- [x] **2.3** Update `plugins/yellow-review/skills/pr-review-workflow/SKILL.md`:
   - Lines 198-202: change `compound-engineering:review:<name>` to `yellow-core:review:<name>`
     (which maps to agent `name:` field — verify the exact Task subagent_type format)
   - Lines 79-85: remove `agent-native-reviewer` selection rule
   - Verify all remaining agent names match yellow-core's `name:` frontmatter values
-- [ ] **2.4** Update `plugins/yellow-review/commands/review/review-pr.md`:
+- [x] **2.4** Update `plugins/yellow-review/commands/review/review-pr.md`:
   - Line 76 area: update cross-plugin agent Task spawning to use yellow-core names
   - Remove `agent-native-reviewer` from the agent selection list
-- [ ] **2.5** Update `plugins/yellow-review/CLAUDE.md` cross-plugin agent section:
+- [x] **2.5** Update `plugins/yellow-review/CLAUDE.md` cross-plugin agent section:
   - Change "available via Compound Engineering plugin" to "available via yellow-core plugin"
   - Document: "yellow-review requires yellow-core for full review coverage. Without it,
     cross-plugin agents (security-sentinel, architecture-strategist, performance-oracle,
     pattern-recognition-specialist) silently degrade."
-- [ ] **2.6** Run cascade grep before executing: `rg 'compound-engineering:review' plugins/` to
+- [x] **2.6** Run cascade grep before executing: `rg 'compound-engineering:review' plugins/` to
   find ALL references, not just the ones listed above
-- [ ] **2.7** Run `pnpm validate:schemas` + verify agent auto-discovery
+- [x] **2.7** Run `pnpm validate:schemas` + verify agent auto-discovery
 
 **Files:**
 - `plugins/yellow-core/agents/review/pattern-recognition-specialist.md` (new)
@@ -183,7 +188,7 @@ Create the missing agent, drop `agent-native-reviewer`, and update all
 Convert `/workflows:compound` logic into a yellow-core agent, keep the command as a thin wrapper,
 and delete `learning-compounder`.
 
-- [ ] **3.1** Create `plugins/yellow-core/agents/workflow/knowledge-compounder.md`
+- [x] **3.1** Create `plugins/yellow-core/agents/workflow/knowledge-compounder.md`
   - Color: green, Model: inherit, Target: ~250 lines
   - Extract the 5-subagent pipeline from `plugins/yellow-core/commands/workflows/compound.md`:
     context analyzer, solution extractor, related docs finder, prevention strategist, category
@@ -208,25 +213,25 @@ and delete `learning-compounder`.
   - Add ToolSearch as runtime MCP availability check (not just `command -v`)
   - Add explicit prose after every Bash `exit 1`: "If the above exits non-zero, stop. Do not
     proceed to the next step."
-- [ ] **3.2** Simplify `plugins/yellow-core/commands/workflows/compound.md` to a thin wrapper:
+- [x] **3.2** Simplify `plugins/yellow-core/commands/workflows/compound.md` to a thin wrapper:
   - Parse `$ARGUMENTS` for context/topic with injection fencing on $ARGUMENTS
   - `allowed-tools: [Bash, Task]` only — the agent owns its own tool list
   - Spawn `knowledge-compounder` agent via Task
   - Report results
-- [ ] **3.3** Delete `plugins/yellow-review/agents/workflow/learning-compounder.md`
-- [ ] **3.4** Update `plugins/yellow-review/commands/review/review-all.md`:
+- [x] **3.3** Delete `plugins/yellow-review/agents/workflow/learning-compounder.md`
+- [x] **3.4** Update `plugins/yellow-review/commands/review/review-all.md`:
   - Line 92-93: replace `learning-compounder` spawn with Task call to `knowledge-compounder`
     agent (using the new yellow-core agent's `name:` value)
   - Line 109-110: update summary bullet to reference knowledge compounding
-- [ ] **3.5** Update `plugins/yellow-review/commands/review/review-all.md` Step 5:
+- [x] **3.5** Update `plugins/yellow-review/commands/review/review-all.md` Step 5:
   - After the knowledge-compounder Task completes, check success/failure
   - On failure, log to stderr with `[review:all] Warning: knowledge compounding failed`
-- [ ] **3.6** Expand ghost reference sweep: grep for `learning-compounder` across ALL files
+- [x] **3.6** Expand ghost reference sweep: grep for `learning-compounder` across ALL files
   including README.md, CLAUDE.md, and plugin.json — not just the ones listed
-- [ ] **3.7** If yellow-ruvector wants to hook into knowledge compounding, document in
+- [x] **3.7** If yellow-ruvector wants to hook into knowledge compounding, document in
   `plugins/yellow-ruvector/CLAUDE.md`: "After `/workflows:compound` completes, call
   `hooks_remember` with a summary (type: reflexion)" — this keeps the coupling in the right place
-- [ ] **3.8** Run `pnpm validate:schemas`
+- [x] **3.8** Run `pnpm validate:schemas`
 
 **Files:**
 - `plugins/yellow-core/agents/workflow/knowledge-compounder.md` (new)
@@ -273,7 +278,7 @@ and delete `learning-compounder`.
 
 **PR 4: Add yellow-debt SessionStart hook**
 
-- [ ] **4.1** Create `plugins/yellow-debt/hooks/scripts/session-start.sh`:
+- [x] **4.1** Create `plugins/yellow-debt/hooks/scripts/session-start.sh`:
   - Budget: 2s
   - Use `set -uo pipefail` (without `-e` — hooks must control their own exit paths)
   - Add `command -v jq >/dev/null 2>&1 || { printf '{"continue":true}\n'; exit 0; }` guard
@@ -290,13 +295,13 @@ and delete `learning-compounder`.
   - All error paths exit `{"continue": true}` silently with component-prefixed stderr logging:
     `printf '[yellow-debt] Error: %s\n' "description" >&2`
   - CRLF normalization: `sed -i 's/\r$//'` after creating the script (WSL2 Write tool issue)
-- [ ] **4.2** Update `plugins/yellow-debt/.claude-plugin/plugin.json`:
+- [x] **4.2** Update `plugins/yellow-debt/.claude-plugin/plugin.json`:
   - Add `"hooks"` section with inline SessionStart definition
   - Timeout: 2 (seconds)
   - Matcher: `"*"`
-- [ ] **4.3** Also create/update `plugins/yellow-debt/hooks/hooks.json` to match plugin.json
+- [x] **4.3** Also create/update `plugins/yellow-debt/hooks/hooks.json` to match plugin.json
   (keep both files consistent)
-- [ ] **4.4** Run `pnpm validate:schemas` (verify hooks schema accepts inline format)
+- [x] **4.4** Run `pnpm validate:schemas` (verify hooks schema accepts inline format)
 
 **Files:**
 - `plugins/yellow-debt/hooks/scripts/session-start.sh` (new)
@@ -337,7 +342,7 @@ and delete `learning-compounder`.
 
 **PR 5: Add gt-workflow PostToolUse commit validation hook**
 
-- [ ] **5.1** Create `plugins/gt-workflow/hooks/check-commit-message.sh`:
+- [x] **5.1** Create `plugins/gt-workflow/hooks/check-commit-message.sh`:
   - Budget: 50ms (no network, no file I/O beyond stdin)
   - Use `set -uo pipefail` (without `-e`)
   - Read stdin JSON, extract `.tool_input.command` (**NOT `.command`** — PostToolUse schema
@@ -357,13 +362,13 @@ and delete `learning-compounder`.
   - Never exit 2 (warn only, not blocking)
   - Bound stdin to 64KB: `head -c 65536` before parsing
   - CRLF normalization after creation
-- [ ] **5.2** Update `plugins/gt-workflow/.claude-plugin/plugin.json`:
+- [x] **5.2** Update `plugins/gt-workflow/.claude-plugin/plugin.json`:
   - Add `"PostToolUse"` key alongside existing `"PreToolUse"`
   - Matcher: `"Bash"`
   - Add explicit `"timeout": 1` (1 second, generous for 50ms budget)
-- [ ] **5.3** Update `plugins/gt-workflow/hooks/hooks.json` to match plugin.json
+- [x] **5.3** Update `plugins/gt-workflow/hooks/hooks.json` to match plugin.json
   - Document hook's role in hooks.json for discoverability
-- [ ] **5.4** Run `pnpm validate:schemas`
+- [x] **5.4** Run `pnpm validate:schemas`
 
 **Files:**
 - `plugins/gt-workflow/hooks/check-commit-message.sh` (new)
@@ -410,7 +415,7 @@ shell function. The triage command must be written as **prose instructions to Cl
 bash code. Counting variables are **LLM context state**, not shell variables (shell variables
 don't persist across separate Bash tool calls — each call is a new subprocess).
 
-- [ ] **6.1** Update `plugins/yellow-debt/lib/validate.sh` `transition_todo_state()`:
+- [x] **6.1** Update `plugins/yellow-debt/lib/validate.sh` `transition_todo_state()`:
   - Add optional 3rd argument for defer reason: `transition_todo_state <path> <state> [reason]`
   - When state is `deferred` and reason is provided, append `defer_reason: <reason>` and
     `defer_until: <date>` (optional) to the todo frontmatter
@@ -420,10 +425,10 @@ don't persist across separate Bash tool calls — each call is a new subprocess)
     `[ -z "${2:-}" ] || printf '%s' "${2:-}" | grep -q '^--'`
   - Add `command -v yq` prerequisite check
   - Maintain backward compatibility: if no reason provided, transition without adding fields
-- [ ] **6.2** Update `plugins/yellow-debt/skills/debt-conventions/SKILL.md`:
+- [x] **6.2** Update `plugins/yellow-debt/skills/debt-conventions/SKILL.md`:
   - Add `defer_reason` and `defer_until` to the todo frontmatter schema documentation
   - Document the deferred state includes these optional fields
-- [ ] **6.3** Rewrite `plugins/yellow-debt/commands/debt/triage.md` as **prose instructions**:
+- [x] **6.3** Rewrite `plugins/yellow-debt/commands/debt/triage.md` as **prose instructions**:
   - Remove Write from `allowed-tools` (triage reviews, does not create files)
   - Anchor `find` to git root: `find "$(git rev-parse --show-toplevel)/todos/debt" ...`
   - **Pre-loop overview (M3 pattern):** If >20 findings, first present count + severity
@@ -451,9 +456,9 @@ don't persist across separate Bash tool calls — each call is a new subprocess)
     naturally in its conversation context — no shell variables needed)
   - **Final summary:** Present totals: "Triage complete: N accepted, M rejected, P deferred.
     Run /debt:fix to begin remediation of accepted findings."
-- [ ] **6.4** Fix line 33 `BASH_SOURCE[0]` anti-pattern: change to
+- [x] **6.4** Fix line 33 `BASH_SOURCE[0]` anti-pattern: change to
   `${CLAUDE_PLUGIN_ROOT}/lib/validate.sh` per MEMORY.md conventions
-- [ ] **6.5** Run `pnpm validate:schemas`
+- [x] **6.5** Run `pnpm validate:schemas`
 
 **Files:**
 - `plugins/yellow-debt/lib/validate.sh`
@@ -506,8 +511,8 @@ don't persist across separate Bash tool calls — each call is a new subprocess)
 
 Written after all structural fixes land. Content based on the cross-plugin workflow map.
 
-- [ ] **7.1** Create `docs/guides/` directory
-- [ ] **7.2** Write `docs/guides/common-workflows.md` with these sections:
+- [x] **7.1** Create `docs/guides/` directory
+- [x] **7.2** Write `docs/guides/common-workflows.md` with these sections:
   - **Prerequisites**: Which plugins are needed. Document minimum viable install (yellow-core
     only) vs full install (all 11 plugins). List graceful degradation behavior for each missing
     plugin.
@@ -532,7 +537,7 @@ Written after all structural fixes land. Content based on the cross-plugin workf
     `/gt-sync` → `/gt-nav` → `/gt-amend` or `/smart-submit`
   - Each chain gets a named anchor heading for cross-linking
   - Include "No Linear" variants for users without Linear integration
-- [ ] **7.3** Add cross-references from plugin READMEs where appropriate
+- [x] **7.3** Add cross-references from plugin READMEs where appropriate
 
 **Files:**
 - `docs/guides/common-workflows.md` (new)
@@ -560,7 +565,7 @@ Written after all structural fixes land. Content based on the cross-plugin workf
 
 **PR 8: Create docs/guides/advanced-workflows.md**
 
-- [ ] **8.1** Write `docs/guides/advanced-workflows.md` with these sections:
+- [x] **8.1** Write `docs/guides/advanced-workflows.md` with these sections:
   - **Product → Code Pipeline**:
     `/chatprd:setup` → `/chatprd:create` → `/chatprd:link-linear` → `/linear:delegate` →
     `/devin:status`

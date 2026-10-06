@@ -1,5 +1,10 @@
 # Feature: `userConfigEntry.pattern` schema field for input regex constraints
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 20 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 **Status:** **REVERTED (2026-05-08).** Implemented via PR #409 (`d49ce331 feat(schema): add pattern regex field to userConfigEntry + RULE 10`), then rolled back via PR #458 (`d6053407 chore: remove userConfig.pattern schema/RULE 10/tests (remote validator rejects)`) on 2026-05-08. Claude Code's remote validator emits `Unrecognized key: "pattern"` on install (`claude doctor`); the official schema permits only `{type, title, description, sensitive, required, default, multiple, min, max}`. Decision **D3** ("local enforcement only — remote may silently ignore") was empirically falsified: the remote actively rejects the key, breaking install. Composio cleartext-credential mitigation (the motivating P1 from PR #396) shipped via PR #457 stripping `pattern` from `composio_mcp_url` and falling back to a SessionStart hook + prose advisory. **Do not re-attempt** unless the official Anthropic plugin schema adds `pattern` to `userConfigEntry`.
 
 **Outcome doc:** [`docs/solutions/build-errors/userconfig-pattern-field-schema-extension.md`](../docs/solutions/build-errors/userconfig-pattern-field-schema-extension.md) (`## Outcome` section).
@@ -151,7 +156,7 @@ PR #396 merging first. Document this ordering.
 
 ### Phase 1: Schema change
 
-- [ ] **1.1** — In `schemas/plugin.schema.json` `definitions.userConfigEntry.properties`,
+- [x] **1.1** — In `schemas/plugin.schema.json` `definitions.userConfigEntry.properties`,
   add a `pattern` property:
   ```json
   "pattern": {
@@ -160,7 +165,7 @@ PR #396 merging first. Document this ordering.
     "description": "Regular expression (JavaScript syntax) the user-supplied value must match. Enforced at install time by the Claude Code remote validator (when supported) AND locally by scripts/validate-plugin.js RULE 10. Only valid when type is one of: string, directory, file."
   }
   ```
-- [ ] **1.2** — Extend the `allOf` block with an `if/then` rule rejecting
+- [x] **1.2** — Extend the `allOf` block with an `if/then` rule rejecting
   `pattern` when `type ∈ {number, boolean}`:
   ```json
   {
@@ -204,9 +209,9 @@ PR #396 merging first. Document this ordering.
 > See: <https://ajv.js.org/json-schema.html#if-then-else>
 <!-- /deepen-plan -->
 
-- [ ] **1.3** — Run `jq empty schemas/plugin.schema.json` to confirm valid JSON
+- [x] **1.3** — Run `jq empty schemas/plugin.schema.json` to confirm valid JSON
   (no trailing-comma drift on `additionalProperties: false` block).
-- [ ] **1.4** — Run `pnpm validate:schemas` and confirm it passes (no
+- [x] **1.4** — Run `pnpm validate:schemas` and confirm it passes (no
   existing manifest is invalidated; pattern is purely additive).
 
 **Verification:** `pnpm test:integration -- example-files-schema` continues to
@@ -215,7 +220,7 @@ as accepted.
 
 ### Phase 2: Hand-rolled RULE 10 in `validate-plugin.js`
 
-- [ ] **2.1** — Read the full RULE 9 source at
+- [x] **2.1** — Read the full RULE 9 source at
   `scripts/validate-plugin.js:856–878` to extract the `validateUserConfigEntries`
   helper signature and structure.
 
@@ -230,7 +235,7 @@ as accepted.
 > in the References section, before reading those files during work.
 <!-- /deepen-plan -->
 
-- [ ] **2.2** — Add RULE 10 inside `validateUserConfigEntries` (or as a sibling
+- [x] **2.2** — Add RULE 10 inside `validateUserConfigEntries` (or as a sibling
   helper called from the same loop). For each entry:
   - If `pattern` is present:
     - Reject if `typeof pattern !== 'string'` or `pattern.length === 0`.
@@ -261,12 +266,12 @@ as accepted.
 > format is exactly the right shape.
 <!-- /deepen-plan -->
 
-- [ ] **2.3** — Wire calls in both invocations (top-level
+- [x] **2.3** — Wire calls in both invocations (top-level
   `validateUserConfigEntries(manifest.userConfig, 'userConfig')` at
   `scripts/validate-plugin.js:903` and the `channels[i].userConfig` loop
   at `scripts/validate-plugin.js:908`, both inside the RULE 9 region
   ending at line 911 — see codebase annotation on Phase 2.1).
-- [ ] **2.4** — Update the "RULE 9: userConfig entries must declare `type` and
+- [x] **2.4** — Update the "RULE 9: userConfig entries must declare `type` and
   `title`" leading comment block to also mention RULE 10's pattern semantics
   so a future maintainer sees both rules together.
 
@@ -277,7 +282,7 @@ RULE 10 must reject it.
 
 ### Phase 3: Integration tests
 
-- [ ] **3.1** — In `tests/integration/validate-plugin.test.ts`, add a
+- [x] **3.1** — In `tests/integration/validate-plugin.test.ts`, add a
   describe block "PR-B: userConfig pattern field (RULE 10)" with the
   following cases (mirror the PR-A fixture-based pattern):
   - Accept: `type: "string"` + `pattern: "^https://"` + `default: "https://example.com"` — exit 0
@@ -300,7 +305,7 @@ RULE 10 must reject it.
 > case from `{ ...VALID_BASE_MANIFEST, userConfig: { ... } }`.
 <!-- /deepen-plan -->
 
-- [ ] **3.2** — In `tests/integration/example-files-schema.test.ts` (or the
+- [x] **3.2** — In `tests/integration/example-files-schema.test.ts` (or the
   AJV-loaded fixture path it covers), add at minimum one positive case
   exercising the schema's accept-pattern path so we know AJV is loading
   the new property.
@@ -321,7 +326,7 @@ RULE 10 must reject it.
 > block does.
 <!-- /deepen-plan -->
 
-- [ ] **3.3** — Run `pnpm test:integration` and confirm both files pass.
+- [x] **3.3** — Run `pnpm test:integration` and confirm both files pass.
 
 ### Phase 4: Apply to PR #396 (sibling commit on this branch)
 
@@ -337,7 +342,7 @@ If PR #396 is still open when this branch is ready:
 If PR #396 has merged:
 - Apply the change directly here on this branch.
 
-- [ ] **4.1** — Decide based on PR #396 merge state at implementation time.
+- [x] **4.1** — Decide based on PR #396 merge state at implementation time.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** This branch (`agent/feat/userconfig-pattern-enforcement`)
@@ -360,14 +365,14 @@ If PR #396 has merged:
 > to merge) — Phases 1–3 stand on their own as a schema-features patch.
 <!-- /deepen-plan -->
 
-- [ ] **4.2** — Apply the pattern to `plugins/yellow-composio/.claude-plugin/plugin.json`
+- [x] **4.2** — Apply the pattern to `plugins/yellow-composio/.claude-plugin/plugin.json`
   (`composio_mcp_url.pattern = "^https://"`).
-- [ ] **4.3** — Re-run `pnpm validate:plugins` to confirm the pattern is
+- [x] **4.3** — Re-run `pnpm validate:plugins` to confirm the pattern is
   accepted now that the schema supports it.
 
 ### Phase 5: Solutions doc + memory
 
-- [ ] **5.1** — Write
+- [x] **5.1** — Write
   `docs/solutions/build-errors/userconfig-pattern-field-schema-extension.md`
   documenting:
   - The motivating cleartext-credential incident (PR #396 review).
@@ -378,24 +383,24 @@ If PR #396 has merged:
     confirmed).
   - The migration recipe for existing plugins to add `pattern` if they
     want input enforcement.
-- [ ] **5.2** — Append a one-line entry to the
+- [x] **5.2** — Append a one-line entry to the
   `Plugin Manifest Validation` section of the auto-memory `MEMORY.md`
   index pointing to the new solutions doc.
 
 ### Phase 6: Changeset, validation, commit
 
-- [ ] **6.1** — Run `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck`
+- [x] **6.1** — Run `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck`
   (the CI baseline gate).
-- [ ] **6.2** — `pnpm changeset` — bump type `patch` for any plugins whose
+- [x] **6.2** — `pnpm changeset` — bump type `patch` for any plugins whose
   manifests change in Phase 4 (just `yellow-composio` if applied here).
   No changeset for the schema/script change alone (those are repo-root
   files, not versioned plugins).
-- [ ] **6.3** — Create the commit(s):
+- [x] **6.3** — Create the commit(s):
   - One commit for Phase 1+2+3 (schema + validator + tests).
   - One commit for Phase 4 (composio pattern application) if applied here.
   - One commit for Phase 5 (solutions doc + memory).
   - One commit for Phase 6.2 (changeset).
-- [ ] **6.4** — `gt submit --no-interactive`.
+- [x] **6.4** — `gt submit --no-interactive`.
 
 ## Technical Specifications
 

@@ -8,6 +8,11 @@ deepened: 2026-02-22
 
 # feat: ruvector UserPromptSubmit hook and workflow integration
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 12 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Enhancement Summary
 
 **Deepened on:** 2026-02-22
@@ -341,29 +346,29 @@ field already uses `oneOf: [string, object]` with no event-key enumeration.
 
 ## Acceptance Criteria
 
-- [ ] New session: type a task description → context from ruvector appears in
+- [x] New session: type a task description → context from ruvector appears in
   Claude's first response (visible via session-start output)
-- [ ] Short prompts (< 20 chars, e.g., "gt sync") → no ruvector call; no
+- [x] Short prompts (< 20 chars, e.g., "gt sync") → no ruvector call; no
   latency added
-- [ ] Project without `.ruvector/` initialized → UserPromptSubmit hook exits
+- [x] Project without `.ruvector/` initialized → UserPromptSubmit hook exits
   silently with `{"continue": true}`, no errors surfaced to user
-- [ ] `npx ruvector hooks recall` unavailable → hook exits gracefully, not
+- [x] `npx ruvector hooks recall` unavailable → hook exits gracefully, not
   crashing Claude Code
-- [ ] `npx --no ruvector hooks recall` completes in < 1s on warm npm cache
+- [x] `npx --no ruvector hooks recall` completes in < 1s on warm npm cache
   (verify with `time npx --no ruvector hooks recall --top-k 3 "test"`)
-- [ ] JSON output from hook is always valid (test with `| jq .` — never empty
+- [x] JSON output from hook is always valid (test with `| jq .` — never empty
   stdout, never malformed JSON from code-containing memories)
-- [ ] After `/workflows:work` completes and `gt stack submit` is called →
+- [x] After `/workflows:work` completes and `gt stack submit` is called →
   agent automatically invokes `/workflows:review`
-- [ ] `post-tool-use.sh`: ruvector CLI failure now logs to stderr with error
+- [x] `post-tool-use.sh`: ruvector CLI failure now logs to stderr with error
   reason (not just "failed") instead of silently swallowing
-- [ ] `pnpm validate:schemas` passes with new UserPromptSubmit hook entries in
+- [x] `pnpm validate:schemas` passes with new UserPromptSubmit hook entries in
   both `hooks.json` and `plugin.json`
-- [ ] Bats tests: `user-prompt-submit.bats` has at least 6 tests covering:
+- [x] Bats tests: `user-prompt-submit.bats` has at least 6 tests covering:
   no-ruvector-dir skip, short-prompt skip, npx-unavailable skip, success path
   with fenced systemMessage, 19-char boundary, missing-field graceful exit
-- [ ] `post-tool-use.bats` stale tests fixed to match current implementation
-- [ ] All `.sh` and `.bats` files have LF line endings (not CRLF) — verify
+- [x] `post-tool-use.bats` stale tests fixed to match current implementation
+- [x] All `.sh` and `.bats` files have LF line endings (not CRLF) — verify
   with `file user-prompt-submit.sh` on WSL2
 
 ---

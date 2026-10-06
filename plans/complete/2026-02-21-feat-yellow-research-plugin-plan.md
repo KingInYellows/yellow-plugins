@@ -8,6 +8,11 @@ deepened: 2026-02-21
 
 # feat: Add yellow-research Plugin
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 17 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Enhancement Summary
 
 **Deepened on:** 2026-02-21
@@ -462,26 +467,26 @@ In `.claude-plugin/marketplace.json`, add to `plugins` array:
 
 ### Functional
 
-- [ ] `/research:code <query>` returns inline synthesis using EXA `get_code_context_exa` + Context7
-- [ ] `/research:deep <topic>` saves markdown to `docs/research/<slug>.md`
-- [ ] Conductor routes simple queries to 1 source, complex to 3+ in parallel
-- [ ] Parallel Task MCP fires for complex topics; `get_result` retrieves async report
-- [ ] Missing `docs/research/` directory is created automatically
-- [ ] Slug collision appends `-2`, `-3` suffix
-- [ ] If any MCP is unavailable, plugin degrades gracefully (continues with rest)
-- [ ] All 4 MCPs visible in `/mcp` after plugin install
+- [x] `/research:code <query>` returns inline synthesis using EXA `get_code_context_exa` + Context7
+- [x] `/research:deep <topic>` saves markdown to `docs/research/<slug>.md`
+- [x] Conductor routes simple queries to 1 source, complex to 3+ in parallel
+- [x] Parallel Task MCP fires for complex topics; `get_result` retrieves async report
+- [x] Missing `docs/research/` directory is created automatically
+- [x] Slug collision appends `-2`, `-3` suffix
+- [x] If any MCP is unavailable, plugin degrades gracefully (continues with rest)
+- [x] All 4 MCPs visible in `/mcp` after plugin install
 
 ### Quality Gates
 
-- [ ] All `.md` files use LF line endings (critical on WSL2 — `sed -i 's/\r$//'`)
-- [ ] Agent files under 120 lines each
-- [ ] All agent/command descriptions are single-line (no YAML folded scalars)
-- [ ] `skill` frontmatter uses `user-invokable` (with k), not `user-invocable`
-- [ ] `plugin.json` `repository` field is a plain string URL (not object)
-- [ ] No unknown keys in `marketplace.json` (no `id` field)
-- [ ] `pnpm validate:schemas` passes
-- [ ] MCP tool names verified with `ToolSearch` after install; update `allowed-tools` if needed
-- [ ] No `allowed-tools` wildcards (`mcp__*`) — all tools listed explicitly
+- [x] All `.md` files use LF line endings (critical on WSL2 — `sed -i 's/\r$//'`)
+- [x] Agent files under 120 lines each
+- [x] All agent/command descriptions are single-line (no YAML folded scalars)
+- [x] `skill` frontmatter uses `user-invokable` (with k), not `user-invocable`
+- [x] `plugin.json` `repository` field is a plain string URL (not object)
+- [x] No unknown keys in `marketplace.json` (no `id` field)
+- [x] `pnpm validate:schemas` passes
+- [x] MCP tool names verified with `ToolSearch` after install; update `allowed-tools` if needed
+- [x] No `allowed-tools` wildcards (`mcp__*`) — all tools listed explicitly
 
 ---
 

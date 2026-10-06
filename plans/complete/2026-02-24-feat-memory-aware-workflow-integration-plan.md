@@ -8,6 +8,11 @@ brainstorm: docs/brainstorms/2026-02-24-memory-aware-workflow-integration-brains
 
 # feat: Memory-aware workflow integration (ruvector reads + learning loop)
 
+> **Archive note (2026-10-06):** archived before the `/plan:complete`
+> unchecked-box gate landed (2026-05-29, #557). Its 23 open task boxes
+> were bulk-closed to satisfy that gate; the ticks record archival, not
+> per-item verification.
+
 ## Enhancement Summary
 
 **Deepened on:** 2026-02-24
@@ -627,55 +632,55 @@ an issue.
 
 ### Functional Requirements
 
-- [ ] `learning-compounder` creates a `reflexion` namespace entry in ruvector
+- [x] `learning-compounder` creates a `reflexion` namespace entry in ruvector
   after writing each new solution doc
-- [ ] Reflexion entry metadata includes `trigger`, `insight`, `action`, `context`,
+- [x] Reflexion entry metadata includes `trigger`, `insight`, `action`, `context`,
   `severity`, `timestamp` (aligned with `ruvector-conventions` schema)
-- [ ] `learning-compounder` skips storage if cosine similarity > 0.82 in reflexion
+- [x] `learning-compounder` skips storage if cosine similarity > 0.82 in reflexion
   namespace (dedup check specifies `namespace: "reflexion"`)
-- [ ] `learning-compounder` gracefully skips if ruvector is not installed
+- [x] `learning-compounder` gracefully skips if ruvector is not installed
   (ToolSearch returns nothing) or if MCP server is not running (execution error)
-- [ ] `learning-compounder` distinguishes and reports skip reasons (not available /
+- [x] `learning-compounder` distinguishes and reports skip reasons (not available /
   MCP unavailable / section-not-found / too-short / near-duplicate)
-- [ ] `/review:pr` (standalone) spawns `learning-compounder` (with
+- [x] `/review:pr` (standalone) spawns `learning-compounder` (with
   `subagent_type: "yellow-review:workflow:learning-compounder"`) when P1/P2
   findings exist, with fenced input
-- [ ] `/review:pr` Task spawn failure for compounder is caught and logged; review
+- [x] `/review:pr` Task spawn failure for compounder is caught and logged; review
   does not abort
-- [ ] `/review:pr` surfaces relevant past patterns as XML-fenced advisory context
+- [x] `/review:pr` surfaces relevant past patterns as XML-fenced advisory context
   in Step 3b (after metadata fetch); injected into `code-reviewer` and
   `security-sentinel` Task prompts only
-- [ ] `/review:pr` Step 3b is skipped: (a) if `.ruvector/` does not exist,
+- [x] `/review:pr` Step 3b is skipped: (a) if `.ruvector/` does not exist,
   (b) if ToolSearch finds no tool, (c) if hooks_recall execution errors,
   (d) if no results have similarity ≥ 0.5
-- [ ] `/workflows:work` queries ruvector at Step 2b after parsing the plan
-- [ ] `/workflows:work` Step 2b uses plan Overview text as the query (not raw
+- [x] `/workflows:work` queries ruvector at Step 2b after parsing the plan
+- [x] `/workflows:work` Step 2b uses plan Overview text as the query (not raw
   task description argument)
-- [ ] `/workflows:work` Step 2b is skipped silently if `.ruvector/` absent,
+- [x] `/workflows:work` Step 2b is skipped silently if `.ruvector/` absent,
   ToolSearch finds nothing, or hooks_recall execution errors
-- [ ] `yellow-ruvector` CLAUDE.md Workflow Integration section updated to defer to
+- [x] `yellow-ruvector` CLAUDE.md Workflow Integration section updated to defer to
   `work.md` Step 2b for `/workflows:work` (no duplicate query at session start)
-- [ ] `docs/solutions/` entries do not appear in `code` namespace (`.ruvectorignore`
+- [x] `docs/solutions/` entries do not appear in `code` namespace (`.ruvectorignore`
   applied, `post-edit` behavior verified in Phase 0)
 
 ### Non-Functional Requirements
 
-- [ ] PostToolUse hook budget unchanged (<50ms) — no hook script changes (unless
+- [x] PostToolUse hook budget unchanged (<50ms) — no hook script changes (unless
   Phase 0 determines `post-tool-use.sh` must be patched)
-- [ ] Memory query adds negligible latency when ruvector is not installed:
+- [x] Memory query adds negligible latency when ruvector is not installed:
   `.ruvector/` presence check is 0ms; ToolSearch is the first real call only if
   `.ruvector/` exists
-- [ ] Injected context uses XML-fenced block with `<advisory>` tag and closing
+- [x] Injected context uses XML-fenced block with `<advisory>` tag and closing
   re-anchor — four-component sandwich pattern
-- [ ] Injected context capped at top 3 results / ≤ 800 characters total
-- [ ] Only results with similarity ≥ 0.5 are injected
+- [x] Injected context capped at top 3 results / ≤ 800 characters total
+- [x] Only results with similarity ≥ 0.5 are injected
 
 ### Quality Gates
 
-- [ ] `pnpm validate:plugins` passes
-- [ ] `pnpm validate:schemas` passes
-- [ ] All modified `.md` agent files under 120 lines
-- [ ] Conventional commit:
+- [x] `pnpm validate:plugins` passes
+- [x] `pnpm validate:schemas` passes
+- [x] All modified `.md` agent files under 120 lines
+- [x] Conventional commit:
   `feat(memory): close learning loop and inject memory context into review and work workflows`
 
 ## Dependencies & Prerequisites
