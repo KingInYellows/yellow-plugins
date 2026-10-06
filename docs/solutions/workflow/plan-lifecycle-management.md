@@ -466,8 +466,14 @@ these hold:
   as `base` (#952, #955, #1033);
 - PR N's paginated files list has the plan with a status other than `removed`
   and a blob `sha` equal to `git rev-parse <sha>:plans/<file>`;
-- PR N also changed a file outside `plans/`, so plan-creation and
-  checkbox-rewrite PRs (#1042, #956, #1055) fall through.
+- PR N also changed a file outside `plans/`, so plans-only PRs such as bulk
+  checkbox rewrites (#956, #1055) fall through. A PR that adds the plan
+  together with non-plan docs still passes: #1042 (a plan plus brainstorms)
+  does. Gate A's unchecked-box scan is the remaining guard against archiving a
+  plan that was only written, never implemented.
+
+Checked live on 2026-10-06 against real PRs: #808 passes; #952 and #955
+(stacked, so `base` is the parent branch) pass; #956 and #1055 fall through.
 
 A pass records `Plan-Verifier-FileProvenance: pr=#N sha=<sha> via=commit-subject`;
 a trailer with no `via=` came from the commits API. Anything else (no `(#N)` in
