@@ -237,19 +237,11 @@ EOF
 
 @test "complete.md still ships the inline PR-number grep that the shared lib mirrors" {
   # Guard against the inline override validator changing without the lib. The
-  # behavioural agreement is the next test; this one pins the literal.
+  # behavioural agreement table lives in the shell-compat driver, which runs
+  # it under bash and zsh.
   run grep -cF "grep -qE '^[1-9][0-9]{0,9}\$'" "$BATS_TEST_DIRNAME/../commands/plan/complete.md"
   [ "$status" -eq 0 ]
   [ "$output" -ge 1 ]
-}
-
-@test "inline override grep and pgp_pr_num_is_valid agree on a table of values" {
-  local v g p
-  for v in 1 9 10 1234567890 12345678901 0 01 007 '' 12a ' 1' '1 ' -1 +1 1e3; do
-    g=0; printf '%s' "$v" | grep -qE '^[1-9][0-9]{0,9}$' || g=$?
-    p=0; pgp_pr_num_is_valid "$v" || p=$?
-    [ "$g" -eq "$p" ] || { printf 'diverge on [%s]: grep=%s lib=%s\n' "$v" "$g" "$p" >&2; return 1; }
-  done
 }
 
 # --- Gate C word-boundary match ---

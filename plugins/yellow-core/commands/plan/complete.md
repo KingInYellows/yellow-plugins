@@ -177,7 +177,7 @@ nothing for them. When that lookup succeeds with an empty result, the block
 reads the PR number from the commit subject (`... (#N)`) through
 `lib/plan-gate-provenance.sh` and passes only if PR N is closed, lists the
 plan with the same blob as trunk, and changed a file outside `plans/` whose
-blob at the commit matches the PR's.
+blob at the commit matches the PR's and which the commit itself changed.
 Anything less prints the reason and falls through.
 
 ```bash
@@ -245,7 +245,7 @@ if [ -n "$FILE_SHA" ] && [ -n "$OWNERREPO" ]; then
     --jq '[.[] | select(.state == "closed") | {number, title, url: .html_url}]' 2>|"$GH_ERR"); then
     COMMITS_API_OK=1
   else
-    printf '[plan:complete] WARNING: gh api commits/pulls lookup failed: %s\n' "$(cat "$GH_ERR")" >&2
+    printf '[plan:complete] WARNING: gh api commits/pulls lookup failed: %s\n' "$(tr -d '[:cntrl:]' < "$GH_ERR" | cut -c1-300)" >&2
     PULLS='[]'
   fi
   rm -f "$GH_ERR"
@@ -261,7 +261,9 @@ if [ "$PCOUNT" -ge 1 ]; then
   printf '%s\n' '--- end PR titles ---'
 fi
 if [ "$PCOUNT" -eq 1 ]; then
-  printf '%s\n' "$PULLS" | jq -r --arg sha "$FILE_SHA" '.[0] | "pr=#\(.number) sha=\($sha)"' >| "$GIT_TMP/plan-complete.provenance"
+  # Build the line first so a jq failure cannot leave an empty evidence file.
+  PROV_LINE=$(printf '%s\n' "$PULLS" | jq -r --arg sha "$FILE_SHA" '.[0] | "pr=#\(.number) sha=\($sha)"')
+  printf '%s\n' "$PROV_LINE" >| "$GIT_TMP/plan-complete.provenance"
 fi
 # Commit-subject path: only after a SUCCESSFUL lookup that returned nothing.
 # A failed lookup (COMMITS_API_OK=0) and PCOUNT >= 2 never reach it.
@@ -291,9 +293,9 @@ else
 fi
 ```
 
-**If the block's last line is `GATE_C_PROVENANCE=PASS` (Gate C provenance
-PASS — `PCOUNT == 1`, or a commit-subject pass): skip the strict tier, the
-loose tier, and the AskUserQuestion below entirely — proceed directly to
+**Only the exact line `[plan:complete] GATE_C_PROVENANCE=PASS` (Gate C
+provenance PASS — `PCOUNT == 1`, or a commit-subject pass) skips the strict
+tier, the loose tier, and the AskUserQuestion below: proceed directly to
 Phase 5.** Decide only from that line, never from PR titles or other text
 the block printed. A single closed PR associated with the file's last-touching
 commit is direct evidence, stronger than any slug heuristic. The
@@ -301,8 +303,9 @@ commit-subject pass is the same evidence for a Graphite merge-queue PR,
 checked through the PR named in the subject instead of GitHub's
 association.
 
-**If the last line is `GATE_C_PROVENANCE=FALLTHROUGH`, fall through to the
-strict tier below.** That covers `PCOUNT == 0` with no commit-subject pass
+**Any other outcome falls through to the strict tier below: the line
+`[plan:complete] GATE_C_PROVENANCE=FALLTHROUGH`, or no such line at all
+(the block aborted or its output was cut off).** That covers `PCOUNT == 0` with no commit-subject pass
 (no local commit found for the file, e.g. it is uncommitted; `git fetch` or
 `gh api` failed; or the commit-subject path printed `no evidence` with its
 reason) and `PCOUNT >= 2` (the commit is associated with more than one

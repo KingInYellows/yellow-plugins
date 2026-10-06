@@ -20,9 +20,14 @@
 # PRs; base is recorded, not gated, because stacked PRs have their parent
 # branch as base); PR N's files list has the plan with a status other than
 # removed and a blob sha equal to the one at <file-sha>; and the PR changed at
-# least one file outside plans/ whose blob at <file-sha> equals the PR's, which
-# ties the PR to that commit's own content. Every other outcome is NO-EVIDENCE
-# so the caller falls through to the strict, loose and override paths.
+# least one file outside plans/ whose blob at <file-sha> equals the PR's and
+# which that commit itself changed (its parent's blob differs), which ties the
+# PR to the commit's own work. Every other outcome is NO-EVIDENCE so the caller
+# falls through to the strict, loose and override paths.
+#
+# Timeouts (seconds, under timeout(1)/gtimeout): PGP_GH_TIMEOUT (20) for a
+# single-object fetch, PGP_GH_FILES_TIMEOUT (60) for the paginated files list.
+# Worst case stays under the Bash tool's 2-minute limit.
 #
 # Subjects, titles and file names are untrusted: only digits, the validated
 # SHA and fixed text reach stdout. Error classification mirrors
@@ -60,7 +65,7 @@ pgp_pr_from_subject() {
   _pgp_ss=${1:-}
   case "$_pgp_ss" in
     *[[:cntrl:]]*) return 1 ;;
-    'Revert "'* | 'Reapply "'* | 'Merge '*) return 1 ;;
+    'Revert "'* | 'Reapply "'* | 'Merge pull request '* | 'Merge branch '*) return 1 ;;
   esac
   _pgp_ss=${_pgp_ss%"${_pgp_ss##*[! ]}"}
   case "$_pgp_ss" in
@@ -87,15 +92,21 @@ pgp_gh_error_class() {
   fi
 }
 
-# gh under timeout(1)/gtimeout when available; PGP_GH_TIMEOUT seconds (30).
-pgp_gh() {
+# pgp_gh_t <seconds> <gh args...>: gh under timeout(1)/gtimeout when available.
+pgp_gh_t() {
+  _pgp_secs=${1:-20}
+  shift
   if command -v timeout >/dev/null 2>&1; then
-    timeout "${PGP_GH_TIMEOUT:-30}" gh "$@"
+    timeout "$_pgp_secs" gh "$@"
   elif command -v gtimeout >/dev/null 2>&1; then
-    gtimeout "${PGP_GH_TIMEOUT:-30}" gh "$@"
+    gtimeout "$_pgp_secs" gh "$@"
   else
     gh "$@"
   fi
+}
+
+pgp_gh() {
+  pgp_gh_t "${PGP_GH_TIMEOUT:-20}" "$@"
 }
 
 _pgp_no() {
@@ -123,6 +134,10 @@ _pgp_check() {
   _pgp_repo=$2
   _pgp_sha=$3
   _pgp_plan=$4
+  if ! command -v jq >/dev/null 2>&1; then
+    _pgp_no 'jq is not installed; cannot read the files list'
+    return 1
+  fi
   if ! pgp_sha_is_full "$_pgp_sha"; then
     _pgp_no 'commit id is not a full 40-hex SHA'
     return 1
@@ -192,15 +207,11 @@ _pgp_check() {
   # Keep only the fields the verdict needs: every file entry otherwise carries
   # its full diff patch. The files endpoint pages 100 at a time (3000 cap), so
   # this call gets its own, longer timeout than a single-object fetch.
-  if PGP_GH_TIMEOUT=${PGP_GH_FILES_TIMEOUT:-120} pgp_gh api --paginate "repos/$_pgp_repo/pulls/$_pgp_n/files?per_page=100" \
+  if pgp_gh_t "${PGP_GH_FILES_TIMEOUT:-60}" api --paginate "repos/$_pgp_repo/pulls/$_pgp_n/files?per_page=100" \
     --jq '[.[] | {filename, status, sha}]' >| "$_pgp_files" 2>| "$_pgp_err"; then
     :
   else
     _pgp_gh_fail "$?" "$_pgp_err" "the files of pull request #$_pgp_n"
-    return 1
-  fi
-  if ! command -v jq >/dev/null 2>&1; then
-    _pgp_no 'jq is not installed; cannot read the files list'
     return 1
   fi
   _pgp_verdict=$(jq -s -r --arg p "$_pgp_plan" --arg b "$_pgp_blob" '
@@ -241,16 +252,24 @@ _pgp_check() {
       ;;
   esac
   # Tie PR N to this commit: at least one non-plans file of the PR must have
-  # the same blob at <file-sha>. The plan's text alone is public and could be
-  # carried by an unrelated closed PR. Checks at most 20 files; a mismatch
-  # (for example a queue rebase over a concurrent change) is NO-EVIDENCE.
+  # the same blob at <file-sha> and be changed by that commit. The plan's text
+  # alone is public and could be carried by an unrelated closed PR. Checks at
+  # most 20 files; a mismatch (for example a queue rebase over a concurrent
+  # change) is NO-EVIDENCE. @tsv escapes tabs, newlines and backslashes in file
+  # names, so such names never match: a false negative, never a false pass.
   _pgp_others=$_pgp_wd/others
   jq -s -r '(add // []) | [ .[] | select((.filename | startswith("plans/") | not) and .status != "removed" and .sha != null) ] | .[0:20][] | [.sha, .filename] | @tsv' "$_pgp_files" >| "$_pgp_others" 2>/dev/null || :
   _pgp_tied=0
   _pgp_tab=$(printf '\t')
   while IFS=$_pgp_tab read -r _pgp_osha _pgp_ofile; do
     [ -n "$_pgp_ofile" ] || continue
-    if [ "$(git rev-parse --verify --quiet "${_pgp_sha}:${_pgp_ofile}" 2>/dev/null)" = "$_pgp_osha" ]; then
+    pgp_sha_is_full "$_pgp_osha" || continue
+    # Same blob at the commit AND the commit changed it (the parent's blob
+    # differs; a root or shallow commit has none). A file that merely sits
+    # unchanged on trunk proves nothing about this commit.
+    _pgp_here=$(git rev-parse --verify --quiet "${_pgp_sha}:${_pgp_ofile}" 2>/dev/null || :)
+    _pgp_before=$(git rev-parse --verify --quiet "${_pgp_sha}^:${_pgp_ofile}" 2>/dev/null || :)
+    if [ "$_pgp_here" = "$_pgp_osha" ] && [ "$_pgp_before" != "$_pgp_osha" ]; then
       _pgp_tied=1
       break
     fi

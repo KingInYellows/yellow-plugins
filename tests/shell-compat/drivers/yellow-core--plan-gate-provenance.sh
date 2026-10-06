@@ -40,10 +40,18 @@ git -c user.email=t@example.com -c user.name=t commit -q --allow-empty -m 'chore
 SHA_NONUM=$(git rev-parse HEAD)
 git -c user.email=t@example.com -c user.name=t commit -q --allow-empty -m 'Revert "feat: deliver demo (#42)" (#43)' || exit 1
 SHA_REVERT=$(git rev-parse HEAD)
+# A commit that changes only the plan: a non-plan file unchanged on trunk must
+# not tie a PR to this commit.
+printf 'demo plan v2\n' >| plans/demo.md
+git add plans/demo.md
+git -c user.email=t@example.com -c user.name=t commit -q -m 'docs: tweak demo plan (#42)' || exit 1
+SHA_TWEAK=$(git rev-parse HEAD)
+TWEAK_BLOB=$(git rev-parse "${SHA_TWEAK}:plans/demo.md")
 git rm -q plans/demo.md
 git -c user.email=t@example.com -c user.name=t commit -q -m 'docs: archive demo (#42)' || exit 1
 SHA_GONE=$(git rev-parse HEAD)
-export PGP_BLOB=$(git rev-parse "${SHA_OK}:plans/demo.md")
+OK_BLOB=$(git rev-parse "${SHA_OK}:plans/demo.md")
+export PGP_BLOB="$OK_BLOB"
 export PGP_OBLOB=$(git rev-parse "${SHA_OK}:src/a.txt")
 
 mkdir -p "$TMPD/bin"
@@ -81,11 +89,12 @@ GH_EOF
 chmod +x "$TMPD/bin/gh"
 PATH="$TMPD/bin:$PATH"
 
-mask() { sed -e "s/$SHA_OK/<ok>/g" -e "s/$SHA_NONUM/<nonum>/g" -e "s/$SHA_REVERT/<revert>/g" -e "s/$SHA_GONE/<gone>/g"; }
+mask() { sed -e "s/$SHA_OK/<ok>/g" -e "s/$SHA_NONUM/<nonum>/g" -e "s/$SHA_REVERT/<revert>/g" -e "s/$SHA_GONE/<gone>/g" -e "s/$SHA_TWEAK/<tweak>/g"; }
 
 run_scenario() { # $1 = scenario name understood by the gh stub
   export PGP_SCENARIO="$1" PGP_GH_TIMEOUT=30 PGP_GH_FILES_TIMEOUT=30
-  [ "$1" = hang ] && export PGP_GH_TIMEOUT=1 PGP_GH_FILES_TIMEOUT=1
+  # Only the files fetch hangs, so only PGP_GH_FILES_TIMEOUT can cut it off.
+  [ "$1" = hang ] && export PGP_GH_FILES_TIMEOUT=1
   out=$(pgp_provenance_via_subject o/r "$SHA_OK" plans/demo.md) && rc=0 || rc=$?
   printf 'scenario[%s] rc=%s %s\n' "$1" "$rc" "$(printf '%s' "$out" | tr '\n' '|' | mask)"
 }
@@ -105,6 +114,10 @@ for pair in "nonum:$SHA_NONUM" "revert:$SHA_REVERT" "gone:$SHA_GONE" "short:abc1
   out=$(pgp_provenance_via_subject o/r "$sha" plans/demo.md) && rc=0 || rc=$?
   printf 'commit[%s] rc=%s %s\n' "$label" "$rc" "$(printf '%s' "$out" | tr '\n' '|' | mask)"
 done
+export PGP_BLOB="$TWEAK_BLOB"
+out=$(pgp_provenance_via_subject o/r "$SHA_TWEAK" plans/demo.md) && rc=0 || rc=$?
+printf 'commit[tweak] rc=%s %s\n' "$rc" "$(printf '%s' "$out" | tr '\n' '|' | mask)"
+export PGP_BLOB="$OK_BLOB"
 git branch at-ok "$SHA_OK"
 git clone -q --depth 1 --branch at-ok "file://$TMPD/repo" "$TMPD/shallow" 2>/dev/null || exit 1
 (
