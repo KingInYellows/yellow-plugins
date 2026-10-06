@@ -20,6 +20,16 @@
 # structural false positive on every changeset. Consumed + deleted on
 # release. All four paths below mirror .codacy/codacy.yaml's local
 # excludes (that file already lists .changeset/** too).
+#
+# docs/solutions/** is scoped to markdownlint, not a global exclude:
+# other Codacy analyzers should still see those durable docs.
+# markdownlint MD013 (120 columns) fires on most of them and is not a
+# defect there; the frontmatter-title MD025 false positive is handled in
+# .markdownlint.json instead.
+engines:
+  markdownlint:
+    exclude_paths:
+      - "docs/solutions/**"
 exclude_paths:
   - ".changeset/**"
   - "plans/**"
