@@ -1,13 +1,17 @@
 # Feature: yellow-symphony — Thin Management Layer for Symphony Orchestration
 
-> **Status (2026-10-06):** Not started, 0 of 17 boxes, matching the existing
-> "Draft -- not started" line. No `plugins/yellow-symphony/` directory or catalog
-> entry exists on `main`; the only merged PR is the brainstorm and plan (#240).
-> No open PR. Stale: task 1.4 hand-edits `.claude-plugin/marketplace.json`,
-> which is now generated from `catalog/`; plugin `plugin.json` is generated too.
-> Its OpenClaw-side dependency is unbuilt. Not ready to archive.
+> **Status (2026-10-06):** abandoned, never built. 0 of 17 boxes done; all are
+> `[-]`. Only #240 (the brainstorm and this plan) merged; no
+> `plugins/yellow-symphony/` directory or catalog entry exists. The plan was a
+> thin SSH layer over a Symphony daemon hosted as an OpenClaw plugin on a
+> Proxmox VM, and this repo holds no trace that the daemon was built.
+> `docs/research/2026-09-17-loop-graph-vs-yellow-harness.md` rules out
+> yellow-symphony as the control plane, and remote-agent delegation now lives
+> in `yellow-cursor`, `yellow-devin`, `yellow-jules` and `/linear:delegate`.
+> The SSH-dispatch lessons from #240's review live on in
+> `docs/solutions/security-issues/ssh-daemon-command-dispatch-security-patterns.md`.
 
-**Status:** Draft -- not started
+**Status:** Abandoned -- not started
 
 ## Problem Statement
 
@@ -58,7 +62,7 @@ yellow-ci's runner-health command. Config stored in
 
 ### Phase 1: Scaffold and Setup
 
-- [ ] 1.1: Create plugin directory structure
+- [-] 1.1: (abandoned — never built) Create plugin directory structure
 
   ```text
   plugins/yellow-symphony/
@@ -78,7 +82,7 @@ yellow-ci's runner-health command. Config stored in
       SKILL.md
   ```
 
-- [ ] 1.2: Write `plugin.json` manifest
+- [-] 1.2: (abandoned — never built) Write `plugin.json` manifest
   - Fields: name, version (0.1.0), description, author, homepage, repository,
     license, keywords
   - No hooks or mcpServers — pure command plugin
@@ -95,13 +99,13 @@ yellow-ci's runner-health command. Config stored in
 
 <!-- /deepen-plan -->
 
-- [ ] 1.3: Write `package.json`
+- [-] 1.3: (abandoned — never built) Write `package.json`
   - Minimal: name (`yellow-symphony`), version (`0.1.0`), private: true,
     description
 
-- [ ] 1.4: Register in `.claude-plugin/marketplace.json`
+- [-] 1.4: (abandoned — never built) Register in `.claude-plugin/marketplace.json`
 
-- [ ] 1.5: Write `CLAUDE.md`
+- [-] 1.5: (abandoned — never built) Write `CLAUDE.md`
   - Architecture overview (thin management layer, not orchestrator)
   - Component inventory (commands, skill, template)
   - SSH conventions (reuse yellow-ci patterns)
@@ -113,7 +117,7 @@ yellow-ci's runner-health command. Config stored in
 > since all 6 commands are thin SSH wrappers (each under 20 lines), implementing
 > them together is lower risk than maintaining a partial release.
 
-- [ ] 2.1: Write `commands/symphony/setup.md`
+- [-] 2.1: (abandoned — never built) Write `commands/symphony/setup.md`
   - **Prereq checks (before any AskUserQuestion):**
     - `ssh` binary exists (hard)
     - `jq` exists (soft — warn, degrade gracefully)
@@ -168,7 +172,7 @@ yellow-ci's runner-health command. Config stored in
 
 - **Final report:** PASS/PARTIAL/FAIL with next-step menu
 
-- [ ] 2.2: Write `commands/symphony/status.md`
+- [-] 2.2: (abandoned — never built) Write `commands/symphony/status.md`
   - Frontmatter: `model: haiku` (pure data retrieval)
   - Read config from `.claude/yellow-symphony.local.md`
   - Define common SSH invocation (reused by all commands):
@@ -191,7 +195,7 @@ yellow-ci's runner-health command. Config stored in
 - Show queue depth, last completion, daemon uptime
 - If SSH fails: clear error with "run /symphony:setup" suggestion
 
-- [ ] 2.3: Write `commands/symphony/config.md`
+- [-] 2.3: (abandoned — never built) Write `commands/symphony/config.md`
   - Check for `SYMPHONY.md` in repo root
   - If missing: offer to scaffold via Write tool (template embedded in command)
   - If present: parse YAML front matter, validate required fields using upstream
@@ -237,7 +241,7 @@ yellow-ci's runner-health command. Config stored in
 
 <!-- /deepen-plan -->
 
-- [ ] 2.4: Write `commands/symphony/pause.md`
+- [-] 2.4: (abandoned — never built) Write `commands/symphony/pause.md`
   - Frontmatter: `model: haiku` (pure data retrieval, same as status)
   - Read config, SSH to daemon (two separate calls for clarity):
     `ssh ... "$daemon_ctl pause"` then `ssh ... "$daemon_ctl status --json"`
@@ -246,11 +250,11 @@ yellow-ci's runner-health command. Config stored in
   - Two separate commands (pause.md + resume.md) for discoverability. Each is
     <20 lines; minor duplication is acceptable for trivial commands.
 
-- [ ] 2.5: Write `commands/symphony/resume.md`
+- [-] 2.5: (abandoned — never built) Write `commands/symphony/resume.md`
   - Frontmatter: `model: haiku` (mirror of pause.md)
   - Mirror of pause.md with `resume` subcommand
 
-- [ ] 2.6: Write `commands/symphony/logs.md`
+- [-] 2.6: (abandoned — never built) Write `commands/symphony/logs.md`
   - Frontmatter: `model: haiku` (pure data retrieval)
   - Argument: issue ID (e.g., `ENG-123`)
   - Validate issue ID before SSH: `^[A-Z]{2,5}-[0-9]{1,6}$` (repo-standard Linear format)
@@ -263,7 +267,7 @@ yellow-ci's runner-health command. Config stored in
 
 ### Phase 3: Skill and Template
 
-- [ ] 3.1: Write `skills/symphony-conventions/SKILL.md`
+- [-] 3.1: (abandoned — never built) Write `skills/symphony-conventions/SKILL.md`
   - `user-invocable: false` (internal reference for commands)
   - SYMPHONY.md schema documentation (all fields, types, defaults, constraints)
   - SSH connection conventions (BatchMode, ConnectTimeout, fencing)
@@ -271,7 +275,7 @@ yellow-ci's runner-health command. Config stored in
     expose)
   - Error handling patterns (SSH failure, daemon down, parse errors)
 
-- [ ] 3.2: Embed `SYMPHONY.md` starter template in `config.md` command
+- [-] 3.2: (abandoned — never built) Embed `SYMPHONY.md` starter template in `config.md` command
   - Replaces brainstorm's standalone `SYMPHONY.md.example` deliverable —
     embedding avoids introducing a `templates/` directory pattern that no
     existing plugin uses
@@ -297,11 +301,11 @@ yellow-ci's runner-health command. Config stored in
 
 ### Phase 4: Quality
 
-- [ ] 4.1: Run `pnpm validate:schemas` — verify plugin.json + agent authoring
-- [ ] 4.2: Test `/symphony:setup` manually (will fail SSH since no daemon yet —
+- [-] 4.1: (abandoned — never built) Run `pnpm validate:schemas` — verify plugin.json + agent authoring
+- [-] 4.2: (abandoned — never built) Test `/symphony:setup` manually (will fail SSH since no daemon yet —
       that's expected)
-- [ ] 4.3: Test `/symphony:config` with the example template copied to repo root
-- [ ] 4.4: Create changeset: `pnpm changeset` (minor — new plugin)
+- [-] 4.3: (abandoned — never built) Test `/symphony:config` with the example template copied to repo root
+- [-] 4.4: (abandoned — never built) Create changeset: `pnpm changeset` (minor — new plugin)
 
 ## Technical Specifications
 

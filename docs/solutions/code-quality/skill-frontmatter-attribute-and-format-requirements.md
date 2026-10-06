@@ -394,7 +394,8 @@ ignored: all 59 skills declared `user-invokable: false` still appeared in the
    plugin `CLAUDE.md` files, `create-agent-skills`, the
    pattern-recognition-specialist lint row, `emit-codex.js` comment, test
    fixtures), and the not-yet-started plans under `plans/` that teach the key
-   (`plans/yellow-symphony-plugin.md` step 3.1) — following a live plan must
+   (`plans/yellow-symphony-plugin.md` step 3.1, since retired to
+   `plans/complete/`) — following a live plan must
    not produce a skill that RULE 20 rejects. Historical records
    (`docs/research`, `docs/brainstorms`, `plans/complete`, and the earlier
    sections of this doc) keep the old spelling on purpose.
