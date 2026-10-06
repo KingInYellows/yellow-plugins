@@ -1,10 +1,14 @@
 # yellow-ruvector 2.0.0 — open verification follow-ups
 
-> **Status (2026-10-06):** Done, 2 of 2 boxes. F1 measured Claude Code's MCP
-> startup timeout at about 26 s and lowered `RUVECTOR_INSTALL_WAIT`'s default
-> from 25 to 20 s; F2 measured the co-edit lookup at p95 73 ms against the
-> 150 ms target with no code change. Results are under each task. Ready to
-> archive once the PR merges.
+> **Status (2026-10-06):** Done, 2 of 2 boxes; results under each task. F1
+> lowered `RUVECTOR_INSTALL_WAIT`'s default from 25 to 20 s, F2 needed no code
+> change. Archive after the PR merges.
+
+**Follow-ups noted, not done:** `acquire_model_lock` in
+`plugins/yellow-ruvector/lib/install-ruvector.sh` bounds its wait by loop count,
+not wall time, so a 15 s wait can run to about 19 s on WSL2; the install-lock
+wait in `bin/start-ruvector.sh` keeps no 2 s handshake reserve; no test asserts
+the 20 s default.
 
 Two checks from `plans/complete/yellow-ruvector-0-3-3-plugin-managed-install.md`
 that shipped unverified. Both need an environment the implementation sessions

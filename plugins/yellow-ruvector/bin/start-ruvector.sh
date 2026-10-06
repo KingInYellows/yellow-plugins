@@ -44,10 +44,9 @@ case "$wait_secs" in ''|*[!0-9]*) wait_secs=20 ;; esac
 [ "${#wait_secs}" -le 6 ] || wait_secs=20
 wait_secs=$((10#$wait_secs))
 # Everything before the MCP handshake (lock waits, warm-up) shares one
-# budget of wait_secs, kept under Claude Code's MCP startup timeout (measured
-# 2026-10-06 on 2.1.291 with MCP_TIMEOUT unset: ~26 s from server spawn; the
-# default leaves room for exec and the handshake); only a first `npm ci` can
-# run past it.
+# budget of wait_secs, kept under Claude Code's default MCP startup timeout
+# (about 26 s; see the plugin CLAUDE.md); an `npm ci` (first install or
+# repair) and its smoke test can run past it.
 t0=$SECONDS
 budget_left() { echo $(( wait_secs - (SECONDS - t0) )); }
 
@@ -85,7 +84,7 @@ ensure_pinned_install() {
       wait=$(budget_left); [ "$wait" -ge 1 ] || wait=1
       if ! yellow_ruvector_acquire_install_lock "$wait"; then
         log "timed out after ${wait_secs}s waiting for another ruvector install (${RUVECTOR_DATA}/.install.lock)."
-        log "Run /ruvector:setup, or raise MCP_TIMEOUT (ms) if first installs are slow on this network."
+        log "Run /ruvector:setup, or on a slow network raise MCP_TIMEOUT (ms) and RUVECTOR_INSTALL_WAIT (s) together."
         exit 1
       fi
       yellow_ruvector_trap_release
