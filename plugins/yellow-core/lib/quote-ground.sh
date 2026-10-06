@@ -163,9 +163,14 @@ qg_queue() {
 
 qg_redact_one() {
   local raw="$1" canon
-  if ! canon=$(printf '%s\n' "$raw" | cs_redact_secrets | qg_canon_placeholders); then
+  # The trailing x keeps the command substitution from trimming newlines that
+  # belong to the text, so a quote ending in LF stays different from its line.
+  if ! canon=$(printf '%s\n' "$raw" | cs_redact_secrets | qg_canon_placeholders \
+    || exit 1; printf x); then
     qg_fail_redaction
   fi
+  canon=${canon%x}
+  canon=${canon%$'\n'}
   qg_normalize_line "$canon"
   QG_NORM_CACHE["k:$raw"]=$QG_NORM_OUT
 }
@@ -506,13 +511,16 @@ qg_load_rows() {
 }
 
 # One jq call writes every result object, so jq escapes every control
-# character. Each value carries a one-character prefix that jq strips, so an
-# id that starts with "-" is never read as an option; the id also keeps its
-# type tag, so a numeric id is emitted as a number and the string "42" stays
-# a string.
+# character. The fields reach jq over stdin, three lines per row, never as
+# arguments, so a long id cannot exceed ARG_MAX. A backslash and a newline in
+# the id are escaped as \\ and \n so one row stays three lines, and jq undoes
+# that. Each value carries a one-character prefix that jq strips, so an id
+# that starts with "-" is never misread; the id also keeps its type tag, so a
+# numeric id is emitted as a number and the string "42" stays a string.
 qg_emit_all() {
-  local i result match
-  local -a args=()
+  local i result match id
+  local bs='\'
+  [ "${#B_ID[@]}" -gt 0 ] || return 0
   for i in "${!B_ID[@]}"; do
     result=${B_CLASS[$i]}
     if [ "$result" = missing ]; then
@@ -522,14 +530,16 @@ qg_emit_all() {
     if [ "$result" = grounded ]; then
       match=${B_MATCH[$i]}
     fi
-    args+=("i${B_ID[$i]}" "r${result}" "m${match}")
-  done
-  [ "${#args[@]}" -gt 0 ] || return 0
-  jq -nc '$ARGS.positional as $a | range(0; ($a | length); 3) as $i
-    | {id: ($a[$i][1:] | if .[0:1] == "n" then (.[1:] | tonumber) else .[1:] end),
+    id=${B_ID[$i]}
+    id=${id//"$bs"/"$bs$bs"}
+    id=${id//$'\n'/"${bs}n"}
+    printf '%s\n%s\n%s\n' "i${id}" "r${result}" "m${match}"
+  done | jq -nRc '
+    def unesc: gsub("\\\\(?<c>[\\\\n])"; if .c == "n" then "\n" else "\\" end);
+    [inputs] as $a | range(0; ($a | length); 3) as $i
+    | {id: ($a[$i][1:] | unesc | if .[0:1] == "n" then (.[1:] | tonumber) else .[1:] end),
        result: $a[$i + 1][1:],
-       matched_line: ($a[$i + 2][1:] | if test("^[0-9]+$") then tonumber else null end)}' \
-    --args "${args[@]}" || {
+       matched_line: ($a[$i + 2][1:] | if test("^[0-9]+$") then tonumber else null end)}' || {
     printf 'quote-ground: could not write batch output\n' >&2
     exit 2
   }
