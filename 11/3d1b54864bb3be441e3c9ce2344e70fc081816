@@ -13,12 +13,12 @@ plugins/yellow-review/references/resolve/dispositions.md
 plugins/yellow-review/lib/resolve-paths.sh
   h_6000354274ce50 171-252
 plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
-  h_6000354274ce50 32-35,88,377,430-434,437-440,445-447,529,612,755,770,777,788,990,1015
+  h_6000354274ce50 32-35,88,377,430-434,437-440,445-447,526-527,529,612,755,770,777,788,990,1015
   h_6000354274ce50 526-527
 plugins/yellow-review/tests/commit-resolve-fixes.bats
   h_6000354274ce50 2429-2460
 plugins/yellow-review/tests/run-verify-command.bats
-  h_6000354274ce50 29,37-39,475,632,647,800,843,853,894,1031,1141,1412-1413,1420-1434,1436-1437
+  h_6000354274ce50 29,37-39,475,632,647,800,843,853,894,1031,1141,1412-1413,1420-1434,1436-1437,1672-1674
   h_6000354274ce50 1672-1674
 ---
 {
