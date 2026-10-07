@@ -244,10 +244,11 @@ For each iteration:
    `skipped — not attempted (rate limit)`, record `pending-exit-1` and go to
    `### Step 5: End-of-loop summary table` (item 5's stop). When `exit` is
    non-zero and `ratelimited` is not `1`, the state is unknown for another
-   reason: record `state unreadable` in this PR's `Notes`, mark every
-   remaining PR `skipped — not attempted (state unreadable)`, record
-   `pending-exit-1` and go to `### Step 5: End-of-loop summary table`. Do not
-   continue to the next PR. When `exit` is `0` and `state` is not `OPEN`,
+   reason: record `state unreadable` in this PR's `Notes`, set this PR's
+   `Outcome` to `skipped` with `Skip Reason` `state unreadable` (it counts as
+   skipped in the totals, not attempted), mark every remaining PR
+   `skipped — not attempted (state unreadable)`, record `pending-exit-1` and go
+   to `### Step 5: End-of-loop summary table`. Do not continue to the next PR. When `exit` is `0` and `state` is not `OPEN`,
    record `skipped — PR closed before sweep` and do NOT invoke the Skill: go
    to item 6. Only `exit=0` with `state=OPEN` proceeds to item 2. A stop
    inside the sweep that this check cannot foresee (for example a branch
