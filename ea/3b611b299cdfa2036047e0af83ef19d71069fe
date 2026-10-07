@@ -1,0 +1,19 @@
+docs/solutions/security-issues/pr-1079-review-findings-for-yellow-review-resolve.md
+  s_4d7dc63ca1a5b3::t_2bea04fd24a015 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ea3b611b299cdfa2036047e0af83ef19d71069fe",
+  "prompts": {},
+  "sessions": {
+    "s_4d7dc63ca1a5b3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f49e9c04-e7e7-4286-8732-7d114f7f40bc",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
