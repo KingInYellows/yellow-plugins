@@ -268,7 +268,7 @@ fi
 # Commit-subject path: only after a SUCCESSFUL lookup that returned nothing.
 # A failed lookup (COMMITS_API_OK=0) and PCOUNT >= 2 never reach it.
 if [ "$COMMITS_API_OK" -eq 1 ] && [ "$PCOUNT" -eq 0 ]; then
-  if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -r "${CLAUDE_PLUGIN_ROOT}/lib/plan-gate-provenance.sh" ] \
+  if [ -n "${CLAUDE_PLUGIN_ROOT}" ] && [ -r "${CLAUDE_PLUGIN_ROOT}/lib/plan-gate-provenance.sh" ] \
     && . "${CLAUDE_PLUGIN_ROOT}/lib/plan-gate-provenance.sh"; then
     PGP_RESULT=$(pgp_provenance_via_subject "$OWNERREPO" "$FILE_SHA" "plans/$CLEAN_ARG" || true)
     PGP_INFO=$(printf '%s\n' "$PGP_RESULT" | sed -n 2p)
