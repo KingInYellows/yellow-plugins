@@ -137,8 +137,13 @@ case "$HEAD_SHA" in *[!0-9a-f]*|'') head_fail ;; esac
 [ "${#HEAD_SHA}" -eq 40 ] || [ "${#HEAD_SHA}" -eq 64 ] || head_fail
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
 [ -n "$TOP" ] || head_fail
-git -C "$TOP" fetch -q --no-tags -- origin "refs/pull/<PR#>/head" || head_fail
-GOT=$(git -C "$TOP" rev-parse -q --verify FETCH_HEAD 2>/dev/null) || GOT=""
+GOT=""
+for delay in 0 1 2 4 8 16; do
+  sleep "$delay"
+  git -C "$TOP" fetch -q --no-tags -- origin "refs/pull/<PR#>/head" 2>/dev/null || continue
+  GOT=$(git -C "$TOP" rev-parse -q --verify FETCH_HEAD 2>/dev/null) || GOT=""
+  [ "$GOT" = "$HEAD_SHA" ] && break
+done
 [ "$GOT" = "$HEAD_SHA" ] || head_fail
 if git -C "$TOP" cat-file -e "${GOT}:yellow-plugins.local.md" 2>/dev/null; then
   printf 'head=tracked\n'
@@ -157,12 +162,21 @@ else
 fi
 ```
 
-Snapshot when the work-tree probe printed `ignored` or this probe printed
-`head=ignored`. Otherwise log
+When the work-tree probe printed `tracked` and this probe printed
+`head=ignored`, do not snapshot: the snapshot would keep the tracked
+repository bytes, the checkout would remove them, and Step 2b would restore
+them as an ignored, untracked config that `/review:resolve` trusts. Print
+`[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md is tracked on this branch but ignored on the PR head; rerun /review:sweep from the PR's branch`
+and stop before Step 2, with no `Sweep:` or `Resolve:` line, so
+`/review:sweep-all` records `no contract` and stops the batch.
+
+Otherwise snapshot when the work-tree probe printed `ignored`, or when it
+printed `unignored` and this probe printed `head=ignored` (the file is absent
+or untracked on this branch). If neither holds, log
 `[review:sweep] PR #<PR#>: yellow-plugins.local.md is not an ignored untracked file; not guarded`,
 set `<guard-dir>` to `none`, and skip every `guard-local-config` call below
-(`/review:resolve` treats a tracked config as untrusted). When either probe
-says the file is ignored, snapshot now, before Step 2:
+(`/review:resolve` treats a tracked config as untrusted). When the snapshot
+condition holds, snapshot now, before Step 2:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" snapshot
