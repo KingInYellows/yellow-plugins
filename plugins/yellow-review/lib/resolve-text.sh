@@ -183,6 +183,49 @@ _rt_scan() {
             for (j = 1; j <= np; j++) if (!benignword(parts[j])) return 1
             return 0
         }
+        # b64digit / basiccred: Basic-auth tokens are judged on the original
+        # bytes. The line scan lowercases, and base64 is case-sensitive.
+        # `YTpi` is `a:b`, the shortest `user:pass`. Padding is only `=` at
+        # the end. A decoded value with a colon that is not first or last is
+        # a credential; prose such as `Authentication` is not.
+        function b64digit(c) {
+            if (c >= "A" && c <= "Z") return index("ABCDEFGHIJKLMNOPQRSTUVWXYZ", c) - 1
+            if (c >= "a" && c <= "z") return index("abcdefghijklmnopqrstuvwxyz", c) - 1 + 26
+            if (c >= "0" && c <= "9") return index("0123456789", c) - 1 + 52
+            if (c == "+") return 62
+            if (c == "/") return 63
+            return -1
+        }
+        function basiccred(tok,    n, i, eq, a, b, c, d, va, vb, vc, vd, out, byte, p) {
+            n = length(tok)
+            if (n < 4 || n % 4 != 0) return 0
+            eq = index(tok, "=")
+            if (eq && eq < n - 1) return 0
+            if (eq == n - 1 && substr(tok, n, 1) != "=") return 0
+            out = ""
+            for (i = 1; i <= n; i += 4) {
+                a = substr(tok, i, 1); b = substr(tok, i + 1, 1)
+                c = substr(tok, i + 2, 1); d = substr(tok, i + 3, 1)
+                if (c == "=" && d != "=") return 0
+                if ((c == "=" || d == "=") && i + 4 <= n) return 0
+                va = b64digit(a); vb = b64digit(b)
+                vc = (c == "=") ? 0 : b64digit(c)
+                vd = (d == "=") ? 0 : b64digit(d)
+                if (va < 0 || vb < 0 || vc < 0 || vd < 0) return 0
+                byte = int(va * 4 + int(vb / 16))
+                out = out sprintf("%c", byte)
+                if (c != "=") {
+                    byte = int((vb % 16) * 16 + int(vc / 4))
+                    out = out sprintf("%c", byte)
+                }
+                if (d != "=") {
+                    byte = int((vc % 4) * 64 + vd)
+                    out = out sprintf("%c", byte)
+                }
+            }
+            p = index(out, ":")
+            return (p > 1 && p < length(out)) ? 1 : 0
+        }
         # Multi-line quoted value. A credential keyword whose value opens a
         # quote that does not close on its line starts a carry (mqo): the
         # following lines are joined with a space until the closing quote,
@@ -390,17 +433,20 @@ _rt_scan() {
                     rraw = r
                     sub(/[ \t]+#.*$/, "", r)
                     valueline(r, carryin, carry == 1, rraw, carrypin)
-                    # A plain-carry value line of 3+ unquoted words that does
-                    # not start with a capital (`password:` then `my correct
-                    # horse battery staple`) is judged whole, like a same-line
-                    # assignment (wordcred). Sentence-case prose
-                    # (`Rotation is scheduled for Friday`) and a two-word
-                    # line stay clean; a capitalised passphrase of 3+ words
-                    # is the accepted residual.
+                    # A plain-carry value line of 3+ unquoted words is judged
+                    # whole (wordcred), like a same-line assignment. Sentence-case
+                    # prose (`Rotation is scheduled for Friday`) and a two-word
+                    # line stay clean; a capitalised passphrase of 3+ ASCII words
+                    # is the accepted residual. The first character must also be
+                    # ASCII. Under gawk in UTF-8, substr returns one character,
+                    # so a non-ASCII first character (including a lowercase
+                    # accented word) is prose and stays clean. An ASCII
+                    # credential after a bare keyword still flags.
                     if (carry == 1 && !carryin && !hit) {
                         o = $0
                         sub(/^[ \t]*(-[ \t]*)?/, "", o)
-                        if (substr(o, 1, 1) !~ /["\047A-Z]/ && split(r, wparts, /[ \t]+/) >= 3 && wordcred(r)) flag("unquoted-keyword-value")
+                        c = substr(o, 1, 1)
+                        if (c !~ /["\047A-Z]/ && c ~ /^[\001-\177]/ && split(r, wparts, /[ \t]+/) >= 3 && wordcred(r)) flag("unquoted-keyword-value")
                     }
                     if (carry == 2 && !carryin && ind > hind) {
                         t = l
@@ -447,18 +493,39 @@ _rt_scan() {
                 if (seg ~ /^%[a-z_][a-z0-9_]*%$/ || seg ~ /^%[0-9]*[a-z]$/ || seg ~ /^%\([a-z_][a-z0-9_]*\)[a-z]$/) continue
                 flag("url-userinfo")
             }
-            # Authorization header or Bearer/Basic scheme with an opaque
-            # token of 20+ characters; `Authorization: none` stays clean.
-            # Strip only the header name and scheme: a greedy strip through
-            # the last `=` would empty a base64 token padded with `==`.
+            # Authorization header or Bearer/Basic scheme. Bearer and a bare
+            # Authorization token keep the floor of 20. `Authorization: Basic`
+            # also flags a token of 4+ characters when the original bytes
+            # (not this lowercased line) are base64 for `user:pass`
+            # (`YTpi` is `a:b`). A length floor alone would flag prose such
+            # as `Authentication` (14 characters). `Authorization: none`
+            # stays clean. Strip only the header name and scheme: a greedy
+            # strip through the last `=` would empty a base64 token padded
+            # with `==`.
             r = l
+            oline = $0
             while (match(r, /(authorization[ \t]*[=:][ \t]*([a-z]+[ \t]+)?|(bearer|basic)[ \t]+)[a-z0-9._~+\/=-]+/)) {
                 seg = substr(r, RSTART, RLENGTH)
+                segorig = substr(oline, RSTART, RLENGTH)
                 if (++nauth > 200) { flag("too-many-matches"); break }
                 r = substr(r, RSTART + RLENGTH)
-                sub(/^authorization[ \t]*[=:][ \t]*/, "", seg)
-                sub(/^[a-z]+[ \t]+/, "", seg)
-                if (length(seg) >= 20) flag("authorization-header")
+                oline = substr(oline, RSTART + RLENGTH)
+                if (match(seg, /^authorization[ \t]*[=:][ \t]*/)) {
+                    seg = substr(seg, RLENGTH + 1)
+                    segorig = substr(segorig, RLENGTH + 1)
+                }
+                scheme = ""
+                if (match(seg, /^(bearer|basic)[ \t]+/)) {
+                    scheme = substr(seg, 1, RLENGTH)
+                    sub(/[ \t]+$/, "", scheme)
+                    seg = substr(seg, RLENGTH + 1)
+                    segorig = substr(segorig, RLENGTH + 1)
+                } else if (match(seg, /^[a-z]+[ \t]+/)) {
+                    seg = substr(seg, RLENGTH + 1)
+                    segorig = substr(segorig, RLENGTH + 1)
+                }
+                if (scheme == "basic" && length(segorig) >= 4 && basiccred(segorig)) flag("authorization-header")
+                else if (length(seg) >= 20) flag("authorization-header")
             }
             # split() keeps this linear on very long (minified) lines.
             n = split($0, ws, /[^A-Za-z0-9+\/_=-]+/)
@@ -484,6 +551,10 @@ _rt_scan() {
                     if (v ~ /^sk-/ && mv >= 23) flag("token-prefix")
                     if (v ~ /^(sk|rk|pk)_live_/ && mv >= 24) flag("token-prefix")
                     if (v ~ /^glpat-/ && mv >= 26) flag("token-prefix")
+                    # In-repo floors: tvly- plus 20, pplx- plus 40, sgp_ plus 20.
+                    if (v ~ /^tvly-[A-Za-z0-9_-]/ && mv >= 25) flag("token-prefix")
+                    if (v ~ /^pplx-[A-Za-z0-9_-]/ && mv >= 45) flag("token-prefix")
+                    if (v ~ /^sgp_[A-Za-z0-9]/ && mv >= 24) flag("token-prefix")
                     # hooks.slack.com/services/T<id>/B<id>/<secret>: the dot
                     # splits the host off, and the slashes would otherwise earn
                     # the path exemption below.

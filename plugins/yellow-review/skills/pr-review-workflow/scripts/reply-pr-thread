@@ -12,8 +12,10 @@
 #     not count as a marker, so a bot account's own acknowledgement cannot
 #     hide it, but a later comment from our own human account is new input.
 #     The one exception: a prior disagree or unclear marker never blocks a
-#     fixed, addressed or oos reply, because that reply carries the evidence
-#     the later resolve needs. A caller resolves after a skip only when
+#     fixed, addressed or oos reply, and a prior oos marker never blocks a
+#     fixed or addressed reply, because that reply carries the evidence the
+#     later resolve needs. A prior oos marker still blocks another oos reply.
+#     A caller resolves after a skip only when
 #     "disposition" equals the one it asked for.)
 # Concurrency: the marker makes re-runs idempotent, not the pre-check and
 #   the reply atomic. Two runs as the same viewer that reach one thread at
@@ -213,7 +215,7 @@ if ! PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
     exit 1
 fi
 case "$PRIOR_DISPOSITION:$DISPOSITION" in
-    disagree:fixed|disagree:addressed|disagree:oos|unclear:fixed|unclear:addressed|unclear:oos)
+    disagree:fixed|disagree:addressed|disagree:oos|unclear:fixed|unclear:addressed|unclear:oos|oos:fixed|oos:addressed)
         PRIOR_DISPOSITION="" ;;
 esac
 if [ -n "$PRIOR_DISPOSITION" ]; then

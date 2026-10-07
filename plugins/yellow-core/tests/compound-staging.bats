@@ -150,6 +150,39 @@ teardown() {
   ! echo "$result" | grep -q 'user:pass'
 }
 
+@test "redact_secrets strips tavily, perplexity and semgrep tokens at their floors" {
+  tv=$(printf 'tv%s-' 'ly')
+  px=$(printf 'pp%s-' 'lx')
+  sg=$(printf 'sg%s_' 'p')
+  s20=$(printf 'a%.0s' $(seq 1 20))
+  s19=$(printf 'a%.0s' $(seq 1 19))
+  s40=$(printf 'a%.0s' $(seq 1 40))
+  s39=$(printf 'a%.0s' $(seq 1 39))
+  out="$STAGING_TEST_ROOT/redact-out"
+  result=$(printf 'saw %s%s and %s%s and %s%s in the log\n' "$tv" "$s20" "$px" "$s40" "$sg" "$s20" | cs_redact_secrets)
+  printf '%s\n' "$result" >| "$out"
+  run grep -F 'REDACTED:tavily-key' "$out"
+  [ "$status" -eq 0 ]
+  run grep -F 'REDACTED:perplexity-key' "$out"
+  [ "$status" -eq 0 ]
+  run grep -F 'REDACTED:semgrep-token' "$out"
+  [ "$status" -eq 0 ]
+  run grep -F "${tv}${s20}" "$out"
+  [ "$status" -eq 1 ]
+  run grep -F "${px}${s40}" "$out"
+  [ "$status" -eq 1 ]
+  run grep -F "${sg}${s20}" "$out"
+  [ "$status" -eq 1 ]
+  result=$(printf 'saw %s%s and %s%s and %s%s in the log\n' "$tv" "$s19" "$px" "$s39" "$sg" "$s19" | cs_redact_secrets)
+  printf '%s\n' "$result" >| "$out"
+  run grep -F "${tv}${s19}" "$out"
+  [ "$status" -eq 0 ]
+  run grep -F "${px}${s39}" "$out"
+  [ "$status" -eq 0 ]
+  run grep -F "${sg}${s19}" "$out"
+  [ "$status" -eq 0 ]
+}
+
 @test "redact_secrets passes innocuous text through unchanged" {
   result=$(printf 'hello world\n' | cs_redact_secrets)
   [ "$result" = "hello world" ]

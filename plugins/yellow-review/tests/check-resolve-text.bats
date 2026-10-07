@@ -154,7 +154,8 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   # prefix:floor (token length including the prefix)
   for spec in 'gh''p_:24' 'gh''o_:24' 'gh''u_:24' 'gh''s_:24' 'gh''r_:24' \
               'github''_pat_:30' 'AK''IA:20' 'xo''xb-:14' 'xo''xp-:14' \
-              'sk''-:23' 'sk''_live_:24' 'rk''_live_:24' 'pk''_live_:24'; do
+              'sk''-:23' 'sk''_live_:24' 'rk''_live_:24' 'pk''_live_:24' \
+              'tv''ly-:25' 'pp''lx-:45' 'sg''p_:24'; do
     prefix=${spec%:*}
     floor=${spec##*:}
     printf 'x %s%s y\n' "$prefix" "$(pad $((floor - ${#prefix})))" >| "$A"
@@ -1364,4 +1365,45 @@ rule=forged line=9.txt"
   stays_clean 'password:\n  optional string or number\n'
   stays_clean 'bypass:\n  my correct horse battery staple\n'
   stays_clean 'password:\n\nNext paragraph of prose.\n'
+}
+
+@test "prose, basic auth and vendor prefixes agree under gawk and mawk" {
+  # PATH shim: the scanner calls `awk`, so each binary is exposed under that name.
+  with_awk() { # <binary> <expected status> <text>
+    dir="${BATS_TEST_TMPDIR}/awkbin-$1"
+    mkdir -p "$dir"
+    ln -sfn "$(command -v "$1")" "$dir/awk"
+    printf '%b' "$3" >| "$A"
+    PATH="$dir:${PATH}" run "$SCRIPT" "$A"
+    [ "$status" -eq "$2" ] || { echo "$1: want $2 got $status for [$3]"; false; }
+  }
+  tok4=$(printf 'a:b' | base64 | tr -d '\n')
+  tok8=$(printf 'ab:cde' | base64 | tr -d '\n')
+  tv=$(printf 'tv%s-' 'ly')
+  px=$(printf 'pp%s-' 'lx')
+  sg=$(printf 'sg%s_' 'p')
+  a20=$(printf 'A%.0s' $(seq 1 20))
+  a19=$(printf 'A%.0s' $(seq 1 19))
+  a40=$(printf 'A%.0s' $(seq 1 40))
+  a39=$(printf 'A%.0s' $(seq 1 39))
+  for bin in gawk mawk; do
+    command -v "$bin" >/dev/null 2>&1 || { echo "missing $bin"; false; }
+    with_awk "$bin" 6 'password:\n  my correct horse battery staple\n'
+    with_awk "$bin" 0 'password:\n  Rotation is scheduled for Friday\n'
+    with_awk "$bin" 0 'password:\n  Élève a trois mots ici\n'
+    with_awk "$bin" 0 'password:\n  élève a trois mots ici\n'
+    with_awk "$bin" 6 "Authorization: Basic ${tok4}\n"
+    with_awk "$bin" 6 "Authorization: Basic ${tok8}\n"
+    with_awk "$bin" 0 'Authorization: Basic AAAA\n'
+    with_awk "$bin" 0 'Authorization: Basic Authentication\n'
+    with_awk "$bin" 0 'Authorization: Authentication\n'
+    with_awk "$bin" 6 "Authorization: Bearer $(pad 20)\n"
+    with_awk "$bin" 0 "Authorization: Bearer $(pad 19)\n"
+    with_awk "$bin" 6 "x ${tv}${a20} y\n"
+    with_awk "$bin" 0 "x ${tv}${a19} y\n"
+    with_awk "$bin" 6 "x ${px}${a40} y\n"
+    with_awk "$bin" 0 "x ${px}${a39} y\n"
+    with_awk "$bin" 6 "x ${sg}${a20} y\n"
+    with_awk "$bin" 0 "x ${sg}${a19} y\n"
+  done
 }
