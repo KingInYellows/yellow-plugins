@@ -184,6 +184,12 @@ commit made in a detached worktree during the pause (SHA and a rescue line)
 before they do anything else. With no recorded restack they print "no restack
 in progress" and exit `0`; that is not a completed restack.
 
+`--abort` also aborts a git rebase of a recorded stack branch in any of this
+stack's worktrees, not only the run worktree, and then restores. If one of
+those rebases is still in progress, it keeps the state (exit `31`) and
+restores nothing; run `--abort` again after that rebase can be cleared. A
+rebase in a worktree outside this stack is left alone.
+
 ## Recovery
 
 Restore only. When the exit table points here, run the script's `restore`
@@ -220,7 +226,7 @@ the `git worktree unlock` line to run after restoring it).
 | `10` | Paused on a conflict | List the conflicted files and, for Graphite, the detached, locked worktrees. Do not commit in a detached worktree. Resolve the files, `git add` them, then `/worktree:restack --continue` (or `--abort`) |
 | `20` | Preflight refused | Show the `REFUSE` reasons; nothing was touched |
 | `30` | Restack failed, nothing left detached | Worktrees were restored (or nothing had changed yet); show the provider output |
-| `31` | A step failed and the state is kept | Worktrees may still be detached. Run `--status`, then `--continue`, `--abort` or the Recovery `restore` call |
+| `31` | A step failed and the state is kept | Worktrees may still be detached, or an in-chain rebase is still in progress. Run `--status`, then `--continue`, `--abort` or the Recovery `restore` call |
 | `40` | Restore did not finish; state kept | Follow the script's own reason. A GitHub restack still paused means `--continue` or `--abort` (nothing is detached). Otherwise some worktree is still detached: show each per-entry line and its `checkout` fix, then re-run `--continue` or `--abort` |
 | `50` | Restack incomplete | The ancestry check found a branch that was not restacked; worktrees are restored and nothing was submitted |
 | `60` | Submit failed | The restack and restore are done; re-run `/worktree:restack --submit` (the restack is then a no-op and it only submits) |

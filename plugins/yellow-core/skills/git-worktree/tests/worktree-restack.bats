@@ -90,6 +90,33 @@ assert_stacked() {
   git -C "$REPO" merge-base --is-ancestor b c
 }
 
+# plant_rebase WT BRANCH ONTO: a rebase marker `git rebase --abort` can clear.
+plant_rebase() {
+  local wt=$1 br=$2 onto=$3 gd
+  gd=$(git -C "$wt" rev-parse --path-format=absolute --git-dir)
+  mkdir -p "$gd/rebase-merge"
+  printf 'refs/heads/%s\n' "$br" >"$gd/rebase-merge/head-name"
+  git -C "$wt" rev-parse "refs/heads/$br" >"$gd/rebase-merge/orig-head"
+  git -C "$wt" rev-parse "$onto" >"$gd/rebase-merge/onto"
+  printf '1\n' >"$gd/rebase-merge/msgnum"
+  printf '1\n' >"$gd/rebase-merge/end"
+}
+
+# plant_stuck_rebase WT BRANCH: head-name only. `git rebase --abort` fails
+# and the marker stays.
+plant_stuck_rebase() {
+  local wt=$1 br=$2 gd
+  gd=$(git -C "$wt" rev-parse --path-format=absolute --git-dir)
+  mkdir -p "$gd/rebase-merge"
+  printf 'refs/heads/%s\n' "$br" >"$gd/rebase-merge/head-name"
+}
+
+rebase_marker() {
+  local gd
+  gd=$(git -C "$1" rev-parse --path-format=absolute --git-dir)
+  [ -e "$gd/rebase-merge" ] || [ -e "$gd/rebase-apply" ]
+}
+
 # --- success -----------------------------------------------------------------
 
 @test "start: clean stack restacks, restores every worktree, clears state and lock" {
@@ -909,15 +936,87 @@ JSEOF
   assert_stacked
 }
 
-@test "--abort refuses to report aborted while a rebase is still in progress" {
+@test "--abort clears an in-chain rebase the provider no longer records, then restores" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
   [ "$status" -eq 10 ]
   rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
   run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  [[ $output == *"aborted"* ]]
+  assert_all_restored
+  run rebase_marker "$(wtp a)"
+  [ "$status" -eq 1 ]
+}
+
+@test "--abort clears a rebase paused in a non-run worktree when the provider marker is gone" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack b
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  rebase_marker "$(wtp b)"
+  run rebase_marker "$(wtp a)"
+  [ "$status" -eq 1 ]
+  rm -f "$COMMON/gh-stack-rebase-state"
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" abort --provider github
+  [ "$status" -eq 0 ]
+  [[ $output == *"aborted"* ]]
+  assert_all_restored
+  run rebase_marker "$(wtp b)"
+  [ "$status" -eq 1 ]
+}
+
+@test "--abort clears in-chain rebases in the run worktree and another worktree" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
+  plant_rebase "$(wtp c)" c b
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  [[ $output == *"aborted"* ]]
+  assert_all_restored
+  run rebase_marker "$(wtp a)"
+  [ "$status" -eq 1 ]
+  run rebase_marker "$(wtp c)"
+  [ "$status" -eq 1 ]
+}
+
+@test "a second --abort finishes an in-chain rebase the first abort left behind" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
+  plant_stuck_rebase "$(wtp c)" c
+  run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 31 ]
   [[ $output == *"still in progress"* ]]
   [ -e "$SD/state" ]
+  run rebase_marker "$(wtp a)"
+  [ "$status" -eq 1 ]
+  rebase_marker "$(wtp c)"
+  rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
+  plant_rebase "$(wtp c)" c b
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  [[ $output == *"aborted"* ]]
+  assert_all_restored
+  run rebase_marker "$(wtp c)"
+  [ "$status" -eq 1 ]
+}
+
+@test "--abort ignores a rebase in a worktree outside the recorded stack" {
+  mk_stack b
+  git -C "$REPO" branch side main
+  git -C "$REPO" worktree add -q "$T/wt-side" side
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  plant_stuck_rebase "$T/wt-side" side
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  [[ $output == *"aborted"* ]]
+  assert_all_restored
+  rebase_marker "$T/wt-side"
 }
 
 @test "a rejected state file (exit 4) still lists pause-locked worktrees" {
