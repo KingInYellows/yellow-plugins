@@ -1,0 +1,25 @@
+docs/solutions/security-issues/review-of-pr-1077-yellow-review-revert-denied-mode.md
+  s_1b256595feccb5::t_42a71442df59d5 1-23
+docs/solutions/security-issues/shell-git-hardening-in-yellow-review-has-recurring.md
+  s_1b256595feccb5::t_05ab38cf560992 1-23
+docs/solutions/workflow/stale-git-lock-recovery-for-gt-submit-a-0-byte-ind.md
+  s_1b256595feccb5::t_2d8628290e17ea 1-22
+docs/solutions/security-issues/quote-ground-sh-batch-mode-must-validate-utf-8-and.md
+  s_1b256595feccb5::t_2eef9d613289fb 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0371e5d7b1034c06a2186eb80dcae20a247d970b",
+  "prompts": {},
+  "sessions": {
+    "s_1b256595feccb5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e7885894-f14b-4afe-b948-2dd62977690f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
