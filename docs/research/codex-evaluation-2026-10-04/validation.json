@@ -1,0 +1,112 @@
+{
+  "date": "2026-10-04",
+  "timezone": "America/Chicago",
+  "sourceRevision": "cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0",
+  "worktree": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04",
+  "branchState": "detached HEAD",
+  "runtime": {
+    "node": "22.22.0",
+    "pnpm": "8.15.0",
+    "codex": "0.157.0",
+    "execution": "Ubuntu-24.04 WSL"
+  },
+  "checks": [
+    {
+      "command": "pnpm install --frozen-lockfile --ignore-scripts",
+      "exitCode": 0,
+      "result": "692 reused, 0 downloaded; tracked lockfile unchanged"
+    },
+    {
+      "command": "pnpm validate:schemas",
+      "exitCode": 0,
+      "result": "Includes generated artifacts, Codex exposure, roster, doc counts and shell compatibility; authoring advisories remain"
+    },
+    {
+      "command": "pnpm validate:versions:dry",
+      "exitCode": 0,
+      "result": "All 20 versions explicitly reported in sync"
+    },
+    {
+      "command": "pnpm validate:versions",
+      "exitCode": 0,
+      "result": "All 20 versions in sync"
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "result": "Root, Cursor, Goal and Jules pass"
+    },
+    {
+      "command": "pnpm test:unit",
+      "exitCode": 0,
+      "result": "787 passed: 3 + 125 + 323 + 336"
+    },
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "result": "ESLint passes"
+    },
+    {
+      "command": "pnpm test:integration (initial)",
+      "exitCode": 1,
+      "result": "1 lock-recovery test failed; 1732 passed, 1 skipped",
+      "log": "/tmp/yellow-codex-eval-integration-2026-10-04.log"
+    },
+    {
+      "command": "pnpm exec vitest run tests/integration/install-ruvector.test.ts",
+      "exitCode": 0,
+      "result": "32 passed",
+      "log": "/tmp/yellow-codex-eval-ruvector-focused-2026-10-04.log"
+    },
+    {
+      "command": "pnpm test:integration (rerun)",
+      "exitCode": 0,
+      "result": "54 files; 1733 passed, 1 skipped",
+      "log": "/tmp/yellow-codex-eval-integration-repeat-2026-10-04.log"
+    },
+    {
+      "command": "pnpm exec prettier --check plans/codex-compatibility-expansion.md docs/research/codex-evaluation-2026-10-04/evaluation.md",
+      "exitCode": 0,
+      "result": "Both authored documents pass"
+    },
+    {
+      "command": "pnpm validate:plans",
+      "exitCode": 0,
+      "result": "No archived-plan diff; active plan is outside this validator's archival scope"
+    },
+    {
+      "command": "isolated codex plugin marketplace add; add four plugins; list --json",
+      "exitCode": 0,
+      "result": "All four installed/enabled, expected versions; 23 declared installed skill files verified"
+    },
+    {
+      "command": "local Markdown link and JSON artifact checks",
+      "exitCode": 0,
+      "result": "Authored-document local links resolve; all JSON artifacts parse"
+    },
+    {
+      "command": "git diff --check; git diff --quiet; git diff --cached --quiet",
+      "exitCode": 0,
+      "result": "No tracked-file edits; only evaluation artifacts and plan untracked"
+    }
+  ],
+  "integrationCaveat": "Initial lock-recovery failure did not reproduce in focused or full reruns; timing cause not proven. Preserve evidence.",
+  "originalCheckout": {
+    "revision": "136afa03eb943407c11dff8c56d4a7fd6fe4a28b",
+    "gitClean": true,
+    "commitsBehindFetchedMain": 6,
+    "dependenciesRefreshed": false,
+    "readinessFailures": [
+      "Ignored RuVector intelligence file triggers council roster validator",
+      "Jules SDK absent in old dependency tree; typecheck/unit failures"
+    ]
+  },
+  "notVerified": [
+    "Model-driven installed skill invocation",
+    "MCP server startup/authentication",
+    "Live plugin hook execution/trust lifecycle",
+    "Windows desktop local marketplace/runtime behavior",
+    "Public publication acceptance"
+  ],
+  "publicationOrRealProfileChanges": false
+}

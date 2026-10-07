@@ -1,0 +1,111 @@
+{
+  "recordedAt": "2026-10-06T15:15:56.010656+00:00",
+  "dirtySolutionsExplicitlyValidated": [
+    "M\tdocs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md",
+    "A\tdocs/solutions/integration-issues/codex-command-migration-bypasses-skill-allowlist.md"
+  ],
+  "checks": [
+    {
+      "command": [
+        "pnpm",
+        "validate:schemas"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/yellow-completion-check-0.log",
+      "tail": "de-reviewer.md: 407 lines (agent ceiling 300) \u2014 delete prose that does not change behaviour, then move late-sequence detail into references/ behind an imperative load stub.\n\u001b[33m\u26a0 WARN:\u001b[0m [RULE 21 advisory] plugins/yellow-council/agents/review/gemini-reviewer.md: 897 lines (agent ceiling 300) \u2014 delete prose that does not change behaviour, then move late-sequence detail into references/ behind an imperative load stub.\n\u001b[33m\u26a0 WARN:\u001b[0m [RULE 21 advisory] plugins/yellow-council/agents/review/opencode-reviewer.md: 957 lines (agent ceiling 300) \u2014 delete prose that does not change behaviour, then move late-sequence detail into references/ behind an imperative load stub.\n\u001b[33m\u26a0 WARN:\u001b[0m [RULE 21 advisory] plugins/yellow-debt/agents/remediation/debt-fixer.md: 303 lines (agent ceiling 300) \u2014 delete prose that does not change behaviour, then move late-sequence detail into references/ behind an imperative load stub.\n\u001b[33m\u26a0 WARN:\u001b[0m [RULE 21 advisory] plugins/yellow-debt/agents/synthesis/audit-synthesizer.md: 386 lines (agent ceiling 300) \u2014 delete prose that does not change behaviour, then move late-sequence detail into references/ behind an imperative load stub.\n\u001b[32m\u2713 PASS:\u001b[0m Validated 78 agents and 443 markdown files\n[lint-error-codes] \u2713 no scripts/ file re-implements any of the 70 catalog error codes\n[sync-shell-snippets] \u2713 all 3 install scripts are in sync with scripts/snippets/\n[validate-solutions] no docs/solutions/ changes in diff \u2014 nothing to validate\n[generate-manifests] All 85 generated files match catalog/ sources\n[validate-provider-groups] OK: 2 capability group(s) verified \u2014 stacked-pr (graphite, github); remote-agent (cursor, devin, jules)\n[validate-codex] \u2713 9 Codex-enabled plugin(s) pass artifact validation and the exposure lint\n[validate-cursor] \u2713 2 Cursor-enabled plugin(s) pass artifact validation, the exposure lint, and the lifecycle non-emission scan\n[validate-jules] OK: 7 replica unit(s) match yellow-cursor\n[validate-flow-namespace] \u2713 no `workflows:` references remain outside permanent pins (36 pinned references across 10 permanent files)\n[validate-provider-neutral-commands] OK: 627 markdown file(s) scanned, no unallowlisted mutating gt/gh-stack references outside provider-owned or historical paths.\n\u001b[32m\u2713 PASS:\u001b[0m council roster consistent (4 reviewers, 3 CLI, epoch 1efa59b3)\n\u001b[32m\u2713 PASS:\u001b[0m doc counts match marketplace canonical (20 plugins)\n[validate-shell-compat] OK: 385 markdown and 54 shell file(s) scanned, 0 allowlisted finding(s).\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "validate:versions"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/yellow-completion-check-1.log",
+      "tail": "\n> yellow-plugins-root@2.1.16 validate:versions /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> node scripts/validate-versions.js\n\n[validate-versions] OK: 20 plugins \u2014 all versions in sync\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "validate:generated"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/yellow-completion-check-2.log",
+      "tail": "\n> yellow-plugins-root@2.1.16 validate:generated /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> node scripts/generate-manifests.js --check\n\n[generate-manifests] All 85 generated files match catalog/ sources\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "validate:solutions"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/yellow-completion-check-3.log",
+      "tail": "\n> yellow-plugins-root@2.1.16 validate:solutions /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> node scripts/validate-solutions.js\n\n\n[validate-solutions] checked 2 file(s); 0 error(s)\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--check",
+        "plans/codex-compatibility-expansion.md",
+        "docs/research/codex-phases-2-5-2026-10-06/report.md",
+        "docs/research/codex-phases-2-5-2026-10-06/continuation.md",
+        "docs/research/codex-phases-2-5-2026-10-06/phase3.md",
+        "docs/research/codex-phases-2-5-2026-10-06/waves1-2.md",
+        "docs/research/codex-phases-2-5-2026-10-06/waves3-4.md",
+        "docs/research/codex-phases-2-5-2026-10-06/waves5-6.md",
+        "docs/research/codex-phases-2-5-2026-10-06/phase5.md",
+        "docs/research/codex-phases-2-5-2026-10-06/acceptance-audit.json",
+        "plugins/yellow-ci/README.md",
+        "plugins/gt-workflow/README.md",
+        "docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md",
+        "schemas/catalog-plugin.schema.json"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/yellow-completion-check-4.log",
+      "tail": "Checking formatting...\nAll matched files use Prettier code style!\n"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/yellow-completion-check-5.log",
+      "tail": ""
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--check",
+        "docs/research/codex-phases-2-5-2026-10-06/report.md",
+        "docs/research/codex-phases-2-5-2026-10-06/continuation.md",
+        "docs/research/codex-phases-2-5-2026-10-06/waves5-6.md",
+        "docs/research/codex-phases-2-5-2026-10-06/acceptance-audit.json",
+        "docs/research/codex-phases-2-5-2026-10-06/changed-files.md",
+        "plans/codex-compatibility-expansion.md",
+        "tests/fixtures/codex-expansion/codex-missing-auth-final.json"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/yellow-final-artifact-check-0.log",
+      "tail": "Checking formatting...\nAll matched files use Prettier code style!\n"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/yellow-final-artifact-check-1.log",
+      "tail": ""
+    }
+  ],
+  "installedExposedArtifactsMatchCurrentSource": true,
+  "artifactMismatches": [],
+  "status": "passed",
+  "finalAuthAbsenceCase": "codex-missing-auth-final.json; passed"
+}

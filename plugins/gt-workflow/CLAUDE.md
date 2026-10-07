@@ -262,10 +262,13 @@ Behavior (tokenised detector since 2026-09-17; PostToolUse unchanged):
 
 Hooks are carried into the generated Codex manifest
 (`hooks/codex-hooks.json`, `targets.codex.includeHooks` left at its default
-of `true` — unlike yellow-core, which opts out) but currently **never
-fire** on Codex: `plugin_hooks` is stage `removed` on codex-cli 0.144.1 (see
-the manifest-and-hook-contract doc's "Update — 2026-07-20" section). This is
-schema/unit-tested but not live end-to-end verifiable right now.
+of `true` — unlike yellow-core, which opts out). On Codex 0.157.0, the
+disposable lifecycle test verifies PreToolUse denial before a push stub runs
+and PostToolUse warning after a modify stub runs. Untrusted controls execute
+both stubs and no hooks. The earlier 0.144.x inert behavior is historical;
+review/trust of the current installed definition is required. These are host
+events under mocked model responses, not semantic workflow or authenticated
+Graphite proof. See the [canonical doc](../../docs/codex-distribution.md).
 
 ## Testing
 
@@ -304,6 +307,10 @@ executed as a script, and cannot be exercised in bats.
 
 ## Codex Distribution
 
+The generated Codex manifest sets `commands: []` to prevent automatic
+conversion of Claude command wrappers into additional skills. Codex exposes
+only the skills selected by the catalog allowlist.
+
 `targets.codex.enabled: true` in `catalog/plugins/gt-workflow.json` — the
 second plugin in this repo (after yellow-core) to enable Codex. Unlike
 yellow-core's narrow read-only allowlist, gt-workflow exposes its **entire**
@@ -314,7 +321,7 @@ skill surface: all eleven skills are allowlisted —
 Claude-only logic of their own (contrast yellow-core, which excludes 19 of
 its 22 skills along with all 21 agents and both hooks). `includeHooks` is
 left at its default (`true`, not `false` like yellow-core) — see "Hooks"
-above for why they're carried but currently inert.
+above for the verified 0.157.0 lifecycle and trust boundary.
 
 Generated artifacts (`pnpm generate:manifests`, never hand-edited):
 `.codex-plugin/plugin.json`, `hooks/codex-hooks.json`,
@@ -365,3 +372,15 @@ the other.
   (e.g., `/flow:work`). Graceful skip if yellow-ruvector not installed.
 - **morph** — Not applicable. gt-workflow operates on git/Graphite CLI, not
   file editing.
+
+## Setup Skill References
+
+gt-setup loads three flat, skill-local references by phase: prerequisites,
+agent-settings, and convention-files. A prerequisite-only request stops before
+settings and file generation. The prompts and overwrite/skip decisions remain in
+their phase references. Resolve them relative to the active SKILL.md, including
+inside an installed plugin; do not preload all phases.
+
+The pilot progressive-disclosure integration suite runs the prerequisite block
+with fake local tools under bash and zsh and verifies that it performs no
+settings, auth, or repository-initialization mutation.

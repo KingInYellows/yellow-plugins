@@ -151,6 +151,21 @@ If a source MCP is unavailable (key not set, rate limited, connection error),
 the plugin skips that source and continues with the rest. Research never fails
 completely if at least one source is reachable.
 
+## Shared public repository skill
+
+`research-public-repo` answers one question about an indexed public GitHub
+repository using the existing DeepWiki HTTP endpoint. It returns inline JSON
+with evidence links and indexing limits. It discovers actual tool names, uses
+only repository Q&A/wiki reads, and needs no API key or agent dispatcher.
+Private repositories, local-code uploads, saved reports and other research
+providers are outside this slice. Missing tools and authentication challenges
+produce explicit statuses without login or credential inspection.
+
+Codex support is limited to this skill and the DeepWiki server after installed
+runtime acceptance. Claude's other MCP servers, userConfig substitution and
+credential-status hook are not exported for this workflow. Windows desktop and
+WSL CLI tool availability must be verified separately.
+
 ## Native Connector Overlap
 
 Tavily and EXA may also be reachable via claude.ai native connectors
@@ -158,3 +173,7 @@ Tavily and EXA may also be reachable via claude.ai native connectors
 The bundled servers are preferred; see
 [`docs/research-connector-overlap.md`](../../docs/research-connector-overlap.md)
 for the priority order and rationale.
+
+Installed Codex acceptance passed for the selected skill, including safe
+failure and unrelated controls. Other plugin components remain excluded.
+See [integrated evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md).

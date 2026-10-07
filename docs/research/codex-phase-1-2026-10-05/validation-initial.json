@@ -1,0 +1,71 @@
+{
+  "date": "2026-10-05",
+  "node": "22.22.0",
+  "pnpm": "8.15.0",
+  "codexCli": "0.157.0",
+  "windowsDesktopPackage": "OpenAI.Codex 26.930.3930.0",
+  "checks": [
+    {
+      "command": "pnpm validate:schemas",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm validate:versions",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm lint",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0
+    },
+    {
+      "command": "pnpm lint:plugins",
+      "exitCode": 0,
+      "errors": 0,
+      "warnings": 0
+    },
+    {
+      "command": "pnpm test:unit --maxWorkers=2 --minWorkers=1",
+      "exitCode": 0,
+      "passed": 787
+    },
+    {
+      "command": "pnpm test:integration --maxWorkers=2 --minWorkers=1",
+      "exitCode": 0,
+      "passed": 1769,
+      "skipped": 1,
+      "filesPassed": 55
+    },
+    {
+      "command": "node scripts/smoke-codex-plugin-install.js --ci",
+      "exitCode": 0,
+      "installedPlugins": 4,
+      "loadedPluginSkills": 23,
+      "untrustedHooks": 3
+    },
+    {
+      "command": "pnpm validate:generated",
+      "exitCode": 0
+    },
+    {
+      "command": "VALIDATE_SOLUTIONS_DIFF=<new solution path> pnpm validate:solutions",
+      "exitCode": 0,
+      "checked": 1
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "resolvedFailures": [
+    "Initial integration assertion required Codex commands field to be absent; corrected to require empty array."
+  ],
+  "runtimeUntested": [
+    "model-driven skill activation",
+    "trusted/untrusted hook lifecycle",
+    "installed MCP registration/connection/authentication"
+  ]
+}

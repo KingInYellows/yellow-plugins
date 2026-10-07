@@ -1,0 +1,326 @@
+[
+  {
+    "plugin": "gt-workflow",
+    "codexEnabled": true,
+    "allowlist": [
+      "gt-setup",
+      "gt-nav",
+      "gt-stack-plan",
+      "gt-sync",
+      "smart-submit",
+      "gt-amend",
+      "gt-cleanup",
+      "audit-review",
+      "stack-decomposition-format",
+      "stack-plan-style",
+      "gt-merge"
+    ],
+    "includeHooks": true,
+    "sourceSkills": 11,
+    "commands": 8,
+    "agents": 0,
+    "mcpServers": "./.mcp.json",
+    "credentialFields": [],
+    "hookEvents": [
+      "PreToolUse",
+      "PostToolUse"
+    ]
+  },
+  {
+    "plugin": "github-workflow",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 9,
+    "commands": 9,
+    "agents": 0,
+    "mcpServers": null,
+    "credentialFields": [],
+    "hookEvents": [
+      "PreToolUse",
+      "PostToolUse"
+    ]
+  },
+  {
+    "plugin": "yellow-core",
+    "codexEnabled": true,
+    "allowlist": [
+      "agent-native-architecture",
+      "agent-native-audit",
+      "plan-status"
+    ],
+    "includeHooks": false,
+    "sourceSkills": 22,
+    "commands": 18,
+    "agents": 21,
+    "mcpServers": null,
+    "credentialFields": [],
+    "hookEvents": [
+      "Stop",
+      "SessionStart",
+      "PreCompact"
+    ]
+  },
+  {
+    "plugin": "yellow-linear",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 1,
+    "commands": 9,
+    "agents": 3,
+    "mcpServers": [
+      "linear"
+    ],
+    "credentialFields": [],
+    "hookEvents": []
+  },
+  {
+    "plugin": "yellow-cursor",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 1,
+    "commands": 10,
+    "agents": 0,
+    "mcpServers": null,
+    "credentialFields": [],
+    "hookEvents": []
+  },
+  {
+    "plugin": "yellow-devin",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 1,
+    "commands": 10,
+    "agents": 1,
+    "mcpServers": [
+      "devin"
+    ],
+    "credentialFields": [
+      "devin_service_user_token",
+      "devin_org_id"
+    ],
+    "hookEvents": []
+  },
+  {
+    "plugin": "yellow-jules",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 0,
+    "commands": 4,
+    "agents": 0,
+    "mcpServers": null,
+    "credentialFields": [],
+    "hookEvents": []
+  },
+  {
+    "plugin": "yellow-review",
+    "codexEnabled": true,
+    "allowlist": [
+      "yellow-thermonuclear-review"
+    ],
+    "includeHooks": false,
+    "sourceSkills": 3,
+    "commands": 8,
+    "agents": 17,
+    "mcpServers": null,
+    "credentialFields": [],
+    "hookEvents": [
+      "SessionStart"
+    ]
+  },
+  {
+    "plugin": "yellow-ruvector",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 3,
+    "commands": 8,
+    "agents": 2,
+    "mcpServers": [
+      "ruvector"
+    ],
+    "credentialFields": [],
+    "hookEvents": [
+      "PreToolUse",
+      "SessionStart",
+      "PostToolUse"
+    ]
+  },
+  {
+    "plugin": "yellow-browser-test",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 2,
+    "commands": 4,
+    "agents": 3,
+    "mcpServers": null,
+    "credentialFields": [],
+    "hookEvents": []
+  },
+  {
+    "plugin": "yellow-debt",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 1,
+    "commands": 6,
+    "agents": 7,
+    "mcpServers": null,
+    "credentialFields": [],
+    "hookEvents": [
+      "SessionStart"
+    ]
+  },
+  {
+    "plugin": "yellow-ci",
+    "codexEnabled": true,
+    "allowlist": [
+      "ci-setup",
+      "ci-setup-runner-targets",
+      "ci-status",
+      "ci-diagnose",
+      "ci-lint-workflows",
+      "ci-runner-health",
+      "ci-conventions",
+      "diagnose-ci"
+    ],
+    "includeHooks": true,
+    "sourceSkills": 8,
+    "commands": 9,
+    "agents": 4,
+    "mcpServers": null,
+    "credentialFields": [],
+    "hookEvents": [
+      "SessionStart"
+    ]
+  },
+  {
+    "plugin": "yellow-composio",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 1,
+    "commands": 2,
+    "agents": 0,
+    "mcpServers": [
+      "composio-server"
+    ],
+    "credentialFields": [],
+    "hookEvents": []
+  },
+  {
+    "plugin": "yellow-research",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 2,
+    "commands": 4,
+    "agents": 2,
+    "mcpServers": [
+      "perplexity",
+      "tavily",
+      "exa",
+      "parallel",
+      "ceramic",
+      "deepwiki",
+      "ast-grep"
+    ],
+    "credentialFields": [
+      "perplexity_api_key",
+      "tavily_api_key",
+      "exa_api_key"
+    ],
+    "hookEvents": [
+      "SessionStart"
+    ]
+  },
+  {
+    "plugin": "yellow-morph",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 0,
+    "commands": 2,
+    "agents": 0,
+    "mcpServers": [
+      "morph"
+    ],
+    "credentialFields": [
+      "morph_api_key"
+    ],
+    "hookEvents": [
+      "SessionStart"
+    ]
+  },
+  {
+    "plugin": "yellow-semgrep",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 1,
+    "commands": 5,
+    "agents": 2,
+    "mcpServers": [
+      "semgrep"
+    ],
+    "credentialFields": [
+      "semgrep_app_token"
+    ],
+    "hookEvents": [
+      "SessionStart"
+    ]
+  },
+  {
+    "plugin": "yellow-docs",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 1,
+    "commands": 6,
+    "agents": 10,
+    "mcpServers": null,
+    "credentialFields": [],
+    "hookEvents": []
+  },
+  {
+    "plugin": "yellow-codex",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 1,
+    "commands": 4,
+    "agents": 3,
+    "mcpServers": null,
+    "credentialFields": [],
+    "hookEvents": []
+  },
+  {
+    "plugin": "yellow-council",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 1,
+    "commands": 2,
+    "agents": 3,
+    "mcpServers": null,
+    "credentialFields": [],
+    "hookEvents": []
+  },
+  {
+    "plugin": "yellow-goal",
+    "codexEnabled": false,
+    "allowlist": [],
+    "includeHooks": true,
+    "sourceSkills": 0,
+    "commands": 3,
+    "agents": 0,
+    "mcpServers": null,
+    "credentialFields": [],
+    "hookEvents": []
+  }
+]

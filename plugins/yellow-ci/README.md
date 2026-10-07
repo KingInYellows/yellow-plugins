@@ -10,6 +10,17 @@ self-hosted GitHub Actions runners.
 /plugin install yellow-ci@yellow-plugins
 ```
 
+Codex exposes the eight catalog-selected skills. Its generated manifest sets
+`commands: []` so Claude command wrappers are not converted into extra skills.
+See [Codex distribution](../../docs/codex-distribution.md).
+
+Codex 0.157.0 delivers the trusted installed SessionStart hook in the disposable
+lifecycle fixture. Untrusted hooks stay idle. The fixture uses an
+unauthenticated GitHub CLI stub. Installed model tasks verify ci-diagnose
+reference loading and fixture diagnosis, missing-auth behavior, runner SSH
+refusal and unrelated nonactivation. Live CI data and runner SSH health remain
+unverified.
+
 ### Prerequisites
 
 - [GitHub CLI](https://cli.github.com/) installed and authenticated
@@ -190,3 +201,21 @@ ssh-keyscan -H 192.168.1.50 >> ~/.ssh/known_hosts
 - SSH uses `StrictHostKeyChecking=accept-new` and `BatchMode=yes`
 - Cleanup operations always require explicit user confirmation
 - Runner state is re-checked after confirmation to prevent TOCTOU races
+
+## Pilot Skill References
+
+ci-diagnose and ci-runner-health use concise workflow entrypoints with three
+flat, skill-local references each. Load the current step's reference relative to
+its SKILL.md in either source or installed plugins. Config validation,
+redaction, fixed-token OS/error classification, and executable SSH blocks live
+in those references; each probe rebuilds its own target bindings and hardened
+options. The runner-health entrypoint keeps the preview and confirmation gate
+before any SSH connection. Deep-investigation commands outside that preview need
+their own confirmation.
+
+The focused integration suite
+tests/integration/ci-pilot-progressive-disclosure.test.ts executes the moved
+blocks with local fake GitHub/SSH tools under bash and zsh. It checks data
+validation, redaction, fencing, stream bounds, independent shell scope, and
+fail-closed retrieval/portability paths. Model confirmation and installed
+reference resolution require separate installed-session evidence.

@@ -84,10 +84,19 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
 - `codex-executor` — Rescue/debug agent spawned by `flow:work` on task failure
 - `codex-analyst` — Codebase research and analysis agent
 
-### Skills (1)
+### Skills (2)
 
 - `codex-patterns` — CLI invocation patterns, output parsing, approval/sandbox
   modes, error catalog, security conventions (not user-invocable)
+- `codex-readiness` — host-neutral local CLI/login-status check, user-invocable;
+  sanitized output and flat host reference, with no model invocation, credential
+  file access or memory persistence. The Codex target enables only this skill after installed-cache
+  activation acceptance. It never dispatches `codex exec` from a Codex host or another context.
+
+The readiness skill probes version and login status at most once each, with
+15-second deadlines and no retry. Capture native login stdout/stderr privately
+and print only its classification because CLI text may contain key fragments.
+Report authenticated local state separately from unverified remote execution.
 
 ### Schemas (1)
 
@@ -168,3 +177,7 @@ in step with it.
 - **Codex config is TOML** — `~/.codex/config.toml` (not JSON or YAML)
 - **Exit code ambiguity** — Codex may exit 0 on SIGTERM. Use `timeout`
   utility's exit 124 for timeout detection.
+
+Installed Codex acceptance passed for the selected skill, including safe
+failure and unrelated controls. Other plugin components remain excluded.
+See [integrated evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md).

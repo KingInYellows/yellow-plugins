@@ -1,10 +1,26 @@
 {
   "name": "yellow-core",
   "version": "2.8.0",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "license": "MIT",
+  "keywords": [
+    "code-review",
+    "research",
+    "typescript",
+    "python",
+    "rust",
+    "go"
+  ],
   "interface": {
     "displayName": "Yellow Core",
-    "category": "Developer Tools"
+    "category": "Developer Tools",
+    "developerName": "KingInYellows",
+    "websiteURL": "https://github.com/KingInYellows/yellow-plugins#yellow-core"
   },
-  "description": "Three read-only reference and dashboard skills — agent-native architecture principles, an agent-native audit checklist, and a plan-status dashboard. Excludes all of yellow-core's commands, agents, hooks, and other skills.",
+  "description": "Four read-only skills: agent-native architecture and audit references, plan-status dashboard, and existing-worktree inventory. Excludes commands, agents, hooks and all other skills.",
+  "commands": [],
   "skills": "./codex/skills"
 }

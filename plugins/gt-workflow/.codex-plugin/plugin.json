@@ -1,11 +1,31 @@
 {
   "name": "gt-workflow",
   "version": "2.0.6",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "license": "MIT",
+  "keywords": [
+    "graphite",
+    "graphite-cli",
+    "gt",
+    "git",
+    "stacked-prs",
+    "smart-commits",
+    "sync",
+    "conventional-commits",
+    "workflow",
+    "pull-requests"
+  ],
   "interface": {
     "displayName": "Graphite Workflow",
-    "category": "Developer Tools"
+    "category": "Developer Tools",
+    "developerName": "KingInYellows",
+    "websiteURL": "https://github.com/KingInYellows/yellow-plugins/tree/main/plugins/gt-workflow"
   },
   "description": "Graphite-native workflow skills for stacked PR development — commit auditing, stack planning, sync, and navigation, invoked as Codex skills through the gt CLI.",
+  "commands": [],
   "skills": "./codex/skills",
   "hooks": "./hooks/codex-hooks.json",
   "mcpServers": "./.mcp.json"

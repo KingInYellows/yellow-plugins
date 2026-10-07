@@ -1,0 +1,152 @@
+{
+  "status": "failed",
+  "recordedAt": "2026-10-06T00:06:06.271Z",
+  "harnessSha256": "2a812b1f420b589be2a2c151e22638b1039a149467bc1180499c2bd156446b98",
+  "scratch": "/tmp/yellow-codex-activation-5XSNqV",
+  "credentialHandling": "CLI-native-read-only-bind; no credential copy or harness read",
+  "cases": [
+    {
+      "id": "direct",
+      "prompt": "Use the installed plan-status skill to show this fixture's open and archived plan progress.",
+      "attachedSkill": true,
+      "threadId": "01a10e88-2e5b-7353-b71d-20a2bebdbe11",
+      "output": "I couldn’t read the fixture: the tool host returned `code-mode host is disabled`, preventing access to `fixture_list` and `fixture_read`. Plan progress remains unverified.",
+      "reads": [],
+      "events": [
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "userMessage",
+              "id": "01a10e88-3714-7030-bd23-5af88798753e",
+              "clientId": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Use the installed plan-status skill to show this fixture's open and archived plan progress.",
+                  "text_elements": []
+                },
+                {
+                  "type": "skill",
+                  "name": "yellow-core:plan-status",
+                  "path": "/tmp/yellow-codex-activation-5XSNqV/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/plan-status/SKILL.md"
+                }
+              ]
+            },
+            "threadId": "01a10e88-2e5b-7353-b71d-20a2bebdbe11",
+            "turnId": "01a10e88-2e7f-7ac0-9f33-758b3f818b0b",
+            "completedAtMs": 1791245170453
+          },
+          "emittedAtMs": 1791245170454
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "agentMessage",
+              "id": "msg_0c493afd69764703016ac43b73faa08196a57eb4d216f802a6",
+              "text": "I’ll use the installed plan-status skill to count task checkboxes in open and archived plans.",
+              "phase": "commentary",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            },
+            "threadId": "01a10e88-2e5b-7353-b71d-20a2bebdbe11",
+            "turnId": "01a10e88-2e7f-7ac0-9f33-758b3f818b0b",
+            "completedAtMs": 1791245172425
+          },
+          "emittedAtMs": 1791245172426
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "reasoning",
+              "id": "rs_0c493afd69764703016ac43b793d6c81968d9b39b20c80e24c",
+              "summary": [],
+              "content": []
+            },
+            "threadId": "01a10e88-2e5b-7353-b71d-20a2bebdbe11",
+            "turnId": "01a10e88-2e7f-7ac0-9f33-758b3f818b0b",
+            "completedAtMs": 1791245177246
+          },
+          "emittedAtMs": 1791245177246
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "agentMessage",
+              "id": "msg_0c493afd69764703016ac43b795d30819696d354cc304ecb6a",
+              "text": "I couldn’t read the fixture: the tool host returned `code-mode host is disabled`, preventing access to `fixture_list` and `fixture_read`. Plan progress remains unverified.",
+              "phase": "final_answer",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            },
+            "threadId": "01a10e88-2e5b-7353-b71d-20a2bebdbe11",
+            "turnId": "01a10e88-2e7f-7ac0-9f33-758b3f818b0b",
+            "completedAtMs": 1791245178252
+          },
+          "emittedAtMs": 1791245178252
+        },
+        {
+          "method": "turn/completed",
+          "params": {
+            "threadId": "01a10e88-2e5b-7353-b71d-20a2bebdbe11",
+            "turn": {
+              "id": "01a10e88-2e7f-7ac0-9f33-758b3f818b0b",
+              "items": [
+                {
+                  "type": "agentMessage",
+                  "id": "msg_0c493afd69764703016ac43b795d30819696d354cc304ecb6a",
+                  "text": "I couldn’t read the fixture: the tool host returned `code-mode host is disabled`, preventing access to `fixture_list` and `fixture_read`. Plan progress remains unverified.",
+                  "phase": "final_answer",
+                  "memoryCitation": null,
+                  "delivery": null,
+                  "questions": null
+                }
+              ],
+              "itemsView": "summary",
+              "status": "completed",
+              "error": null,
+              "startedAt": 1791245168,
+              "completedAt": 1791245178,
+              "durationMs": 10061
+            }
+          },
+          "emittedAtMs": 1791245178322
+        }
+      ],
+      "unchanged": true
+    }
+  ],
+  "cliVersion": "0.157.0",
+  "revision": "cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0",
+  "install": {
+    "pluginId": "yellow-core@yellow-plugins",
+    "name": "yellow-core",
+    "marketplaceName": "yellow-plugins",
+    "version": "2.6.2",
+    "installedPath": "/tmp/yellow-codex-activation-5XSNqV/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2",
+    "authPolicy": "ON_INSTALL"
+  },
+  "fixtureBefore": {
+    "plans/complete/shipped.md": "d47d9a21eaabd0357c3de1cd33c7855d83fceab91fc4be6b79d950284bdfdb66",
+    "plans/in-flight.md": "af623e438209773e365fd22338b3e64672646b032f054f0ccba527515ee29fc7",
+    "plans/ready.md": "b6bb0f269ed95846029074dce3e8b88d4685d850d55551cca9dd41ec23ef48c9",
+    "plans/research.md": "e4665f1e5539c267c19f8b11a403172d3a15c42d3b9d345f317962ff351fa46a"
+  },
+  "skill": {
+    "name": "yellow-core:plan-status",
+    "description": "Show a per-file checkbox progress dashboard of plans/ (open) and plans/complete/ (archived) plan documents. Use when reviewing which plans are ready to archive or checking work-in-flight at a glance.",
+    "path": "/tmp/yellow-codex-activation-5XSNqV/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/plan-status/SKILL.md",
+    "scope": "user",
+    "enabled": true,
+    "pluginId": "yellow-core@yellow-plugins"
+  },
+  "model": "gpt-6-astra",
+  "modelProvider": "openai",
+  "failure": "Malformed model/CLI JSON",
+  "scratchRetained": true
+}

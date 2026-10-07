@@ -1,0 +1,28 @@
+{
+  "status": "passed",
+  "recordedAt": "2026-10-06T15:19:21.009016+00:00",
+  "sourceReference": "/tmp/yellow-workflow-bX4lz2/codex/plugins/cache/yellow-plugins/yellow-codex/0.3.0/codex/skills/codex-readiness/references/readiness-contract.md",
+  "scratch": "/tmp/yellow-codex-absent-installed-mw56nhvc",
+  "environment": "empty isolated HOME/CODEX_HOME/XDG; PATH only from native environment; no credential mount or owner profile",
+  "commands": [
+    "codex --version",
+    "bash with exact installed-reference private-capture block"
+  ],
+  "exitCodes": [
+    0,
+    0
+  ],
+  "observation": {
+    "operation": "codex-readiness",
+    "host": "wsl:Ubuntu-24.04",
+    "cli": "installed",
+    "version": "0.157.0",
+    "authentication": "missing",
+    "modelRequest": false,
+    "remoteExecution": "unverified",
+    "evidence": "actual-installed-reference-probe-empty-profile"
+  },
+  "rawLoginOutputPersisted": false,
+  "installedReferenceSha256": "655deae2b3f56e21e03d6fbef0c1688e2d830c9e1d554be4cf5ef91da1851c6f",
+  "generatedAndInstalledReferencesMatch": true
+}

@@ -212,6 +212,9 @@ ordinary review.
   (see [codex-distribution.md](../../docs/codex-distribution.md)), confirm
   it with `codex plugin list`, then invoke the same skill.
 
+The Codex manifest sets `commands: []` to prevent automatic conversion of
+Claude command wrappers into additional skills.
+
 Neither host enforces the Claude agent's read-only tool allowlist. The
 skill's report-only rails are prompt-level, not runtime-enforced. Live
 host smoke tests are tracked in

@@ -1,0 +1,22 @@
+{
+  "name": "yellow-debt",
+  "version": "1.8.0",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "license": "MIT",
+  "keywords": [
+    "code-quality",
+    "scanner"
+  ],
+  "interface": {
+    "displayName": "yellow-debt",
+    "category": "Developer Tools",
+    "developerName": "KingInYellows",
+    "websiteURL": "https://github.com/KingInYellows/yellow-plugins#yellow-debt"
+  },
+  "description": "One bounded read-only debt-complexity-scan workflow. Other commands, agents, skills and hooks remain excluded.",
+  "commands": [],
+  "skills": "./codex/skills"
+}

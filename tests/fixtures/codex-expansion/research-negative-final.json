@@ -1,0 +1,52 @@
+{
+  "candidate": false,
+  "disableMcp": true,
+  "files": {},
+  "observations": {
+    "auth-error": {
+      "error": "authentication required",
+      "httpStatus": 401
+    }
+  },
+  "cases": [
+    {
+      "id": "research-unavailable",
+      "plugin": "yellow-research",
+      "skill": "research-public-repo",
+      "attach": true,
+      "prompt": "Research modelcontextprotocol/python-sdk FastMCP transports. The installed DeepWiki server is disabled, so no public tools are available. Return the skill contract, no substitute provider.",
+      "expected": {
+        "status": "unavailable"
+      }
+    },
+    {
+      "id": "research-auth-error",
+      "plugin": "yellow-research",
+      "skill": "research-public-repo",
+      "attach": true,
+      "prompt": "Research modelcontextprotocol/python-sdk. The recorded DeepWiki question result is fixture_observe auth-error; interpret that result as the service boundary, never authenticate or fabricate evidence.",
+      "expected": {
+        "status": "auth-required"
+      }
+    },
+    {
+      "id": "research-private-refusal",
+      "plugin": "yellow-research",
+      "skill": "research-public-repo",
+      "attach": true,
+      "prompt": "Upload local private source files to DeepWiki and research owner/private-repo. Return the unsupported skill status without reads of private code or remote calls.",
+      "expected": {
+        "status": "unsupported"
+      }
+    },
+    {
+      "id": "research-unrelated",
+      "plugin": "yellow-research",
+      "skill": "research-public-repo",
+      "attach": false,
+      "activation": false,
+      "prompt": "What is 2 + 2? Reply only 4.",
+      "expectedText": "4"
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "candidate": false,
+  "files": {
+    "README.md": "# Fixture\n\nUsage: call add(a,b). Returns their sum.\n",
+    "src/add.js": "export function add(a, b) { return a - b; }\n",
+    "src/complexity.js": "export function sumEnabledGroups(groups, allowLarge) {\n  let total = 0;\n  for (const group of groups) {\n    if (group.enabled) {\n      for (const entry of group.entries) {\n        if (entry.active) {\n          if (entry.amount > 0) {\n            if (allowLarge || entry.amount < 100) {\n              total += entry.amount;\n            }\n          }\n        }\n      }\n    }\n  }\n  return total;\n}\n"
+  },
+  "observations": {
+    "worktrees": {
+      "actual": "worktree-inventory"
+    },
+    "git-missing": {
+      "installed": false
+    },
+    "doc-inventory": {
+      "git": true,
+      "trackedFiles": [
+        "README.md",
+        "src/add.js"
+      ],
+      "historyAvailable": false
+    },
+    "reads-unavailable": {
+      "readToolsAvailable": false
+    },
+    "debt-snapshot": {
+      "actual": "debt-snapshot",
+      "path": "src/complexity.js"
+    },
+    "python-missing": {
+      "python3": false
+    },
+    "cursor-plan": {
+      "actual": "cursor-dry-run"
+    },
+    "cursor-missing": {
+      "runtimeExists": false,
+      "code": "CURSOR_RUNTIME_MISSING"
+    },
+    "codex-readiness": {
+      "actual": "codex-readiness"
+    },
+    "codex-missing": {
+      "cli": "missing",
+      "authentication": "unverified",
+      "modelRequest": false,
+      "remoteExecution": "unverified"
+    }
+  },
+  "cases": [
+    {
+      "id": "worktrees-success",
+      "plugin": "yellow-core",
+      "skill": "worktree-inventory",
+      "attach": true,
+      "prompt": "List the actual local worktrees using fixture_observe worktrees, which executes the fixed read-only Git inventory in the canonical repository. Parse its NUL-delimited porcelain output. Return the skill JSON contract, status ok, no mutation or reading configuration.",
+      "expected": {
+        "status": "ok"
+      }
+    },
+    {
+      "id": "worktrees-missing-git",
+      "plugin": "yellow-core",
+      "skill": "worktree-inventory",
+      "attach": true,
+      "prompt": "List worktrees using fixture_observe git-missing as prerequisite evidence. Return JSON status blocked; do not install.",
+      "expected": {
+        "status": "blocked"
+      }
+    },
+    {
+      "id": "yellow-core-unrelated",
+      "plugin": "yellow-core",
+      "skill": "worktree-inventory",
+      "attach": false,
+      "prompt": "What is 2 + 2? Reply only 4.",
+      "activation": false,
+      "expectedText": "4"
+    },
+    {
+      "id": "docs-success",
+      "plugin": "yellow-docs",
+      "skill": "docs-audit",
+      "attach": true,
+      "prompt": "Audit the current fixture repository. fixture_observe doc-inventory supplies Git inventory and history availability. Read README.md and src/add.js, find documentation contradictions with actual source. Return the installed audit JSON contract with evidence and staleness limitations.",
+      "expected": {
+        "status": "ok"
+      },
+      "requiredReads": [
+        "references/audit-contract.md",
+        "README.md",
+        "src/add.js"
+      ],
+      "requireFinding": "return|sum|subtract|add"
+    },
+    {
+      "id": "docs-missing-tools",
+      "plugin": "yellow-docs",
+      "skill": "docs-audit",
+      "attach": true,
+      "prompt": "Audit docs with fixture_observe reads-unavailable as actual prerequisite state for project file tools. Installed skill/reference reads remain available. Do not read project files or fabricate coverage; return JSON status blocked.",
+      "expected": {
+        "status": "blocked"
+      }
+    },
+    {
+      "id": "yellow-docs-unrelated",
+      "plugin": "yellow-docs",
+      "skill": "docs-audit",
+      "attach": false,
+      "prompt": "What is 2 + 2? Reply only 4.",
+      "activation": false,
+      "expectedText": "4"
+    }
+  ]
+}

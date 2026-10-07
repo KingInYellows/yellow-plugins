@@ -1,0 +1,2841 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "plugin-eval",
+    "version": "0.1.0"
+  },
+  "createdAt": "2026-10-05T00:50:08.687Z",
+  "target": {
+    "kind": "plugin",
+    "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci",
+    "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json",
+    "name": "yellow-ci",
+    "relativePath": "plugins/yellow-ci"
+  },
+  "summary": {
+    "score": 0,
+    "grade": "F",
+    "riskLevel": "high",
+    "riskReasons": [
+      "Contains 13 failing error checks (deferred_cost_tokens-budget-high, interface-missing-capabilities, interface-missing-defaultPrompt).",
+      "Overall score is below 70, which the evaluator treats as high risk."
+    ],
+    "scoreBreakdown": {
+      "startingScore": 100,
+      "totalDeductions": 209.25,
+      "finalScore": 0,
+      "gradeThresholds": {
+        "A": 93,
+        "B": 85,
+        "C": 70,
+        "D": 55
+      }
+    },
+    "checkCounts": {
+      "total": 20,
+      "pass": 0,
+      "warn": 6,
+      "fail": 13,
+      "info": 2,
+      "error": 13,
+      "warning": 6
+    },
+    "deductions": [
+      {
+        "id": "deferred_cost_tokens-budget-high",
+        "category": "budget",
+        "severity": "error",
+        "status": "fail",
+        "message": "deferred_cost_tokens is excessive relative to the current Codex baseline.",
+        "penalty": 14,
+        "remediation": [
+          "Reduce repeated instruction text and move detail into deferred supporting files."
+        ],
+        "source": "core"
+      },
+      {
+        "id": "interface-missing-capabilities",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `capabilities`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.capabilities to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci"
+      },
+      {
+        "id": "interface-missing-defaultPrompt",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `defaultPrompt`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.defaultPrompt to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci"
+      },
+      {
+        "id": "interface-missing-developerName",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `developerName`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.developerName to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci"
+      },
+      {
+        "id": "interface-missing-longDescription",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `longDescription`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.longDescription to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci"
+      },
+      {
+        "id": "interface-missing-privacyPolicyURL",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `privacyPolicyURL`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.privacyPolicyURL to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci"
+      },
+      {
+        "id": "interface-missing-shortDescription",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `shortDescription`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.shortDescription to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci"
+      },
+      {
+        "id": "interface-missing-termsOfServiceURL",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `termsOfServiceURL`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.termsOfServiceURL to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci"
+      },
+      {
+        "id": "interface-missing-websiteURL",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `websiteURL`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.websiteURL to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci"
+      },
+      {
+        "id": "invoke_cost_tokens-budget-high",
+        "category": "budget",
+        "severity": "error",
+        "status": "fail",
+        "message": "invoke_cost_tokens is excessive relative to the current Codex baseline.",
+        "penalty": 14,
+        "remediation": [
+          "Reduce repeated instruction text and move detail into deferred supporting files."
+        ],
+        "source": "core"
+      },
+      {
+        "id": "manifest-missing-author",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json is missing the required `author` field.",
+        "penalty": 14,
+        "remediation": [
+          "Add `author` to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci"
+      },
+      {
+        "id": "skill:ci-runner-health:broken-relative-links",
+        "category": "skill-structure",
+        "severity": "error",
+        "status": "fail",
+        "message": "The skill contains relative links that do not resolve inside the skill directory.",
+        "penalty": 14,
+        "remediation": [
+          "Fix or remove broken links in SKILL.md."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci/codex/skills/ci-runner-health"
+      },
+      {
+        "id": "skill:ci-runner-health:skill-too-large",
+        "category": "budget",
+        "severity": "error",
+        "status": "fail",
+        "message": "SKILL.md is extremely large for an always-loaded invocation surface.",
+        "penalty": 14,
+        "remediation": [
+          "Move large details into references/ and keep SKILL.md focused on the core workflow."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci/codex/skills/ci-runner-health"
+      },
+      {
+        "id": "skill:ci-conventions:description-trigger-weak",
+        "category": "best-practice",
+        "severity": "warning",
+        "status": "warn",
+        "message": "The description does not clearly advertise when the skill should trigger.",
+        "penalty": 4.5,
+        "remediation": [
+          "Rewrite the description to include a clear 'Use when ...' trigger sentence."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci/codex/skills/ci-conventions"
+      },
+      {
+        "id": "skill:ci-diagnose:progressive-disclosure-missing",
+        "category": "best-practice",
+        "severity": "warning",
+        "status": "warn",
+        "message": "The skill is getting large without using references for progressive disclosure.",
+        "penalty": 4.5,
+        "remediation": [
+          "Move deep detail or edge-case variants into references/ and link them from SKILL.md."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci/codex/skills/ci-diagnose"
+      },
+      {
+        "id": "skill:ci-diagnose:skill-large",
+        "category": "budget",
+        "severity": "warning",
+        "status": "warn",
+        "message": "SKILL.md exceeds the recommended compact size for progressive disclosure.",
+        "penalty": 4.5,
+        "remediation": [
+          "Trim repetitive detail and move long variants into references/."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci/codex/skills/ci-diagnose"
+      },
+      {
+        "id": "skill:ci-runner-health:progressive-disclosure-missing",
+        "category": "best-practice",
+        "severity": "warning",
+        "status": "warn",
+        "message": "The skill is getting large without using references for progressive disclosure.",
+        "penalty": 4.5,
+        "remediation": [
+          "Move deep detail or edge-case variants into references/ and link them from SKILL.md."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci/codex/skills/ci-runner-health"
+      },
+      {
+        "id": "skill:diagnose-ci:description-trigger-weak",
+        "category": "best-practice",
+        "severity": "warning",
+        "status": "warn",
+        "message": "The description does not clearly advertise when the skill should trigger.",
+        "penalty": 4.5,
+        "remediation": [
+          "Rewrite the description to include a clear 'Use when ...' trigger sentence."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-ci/codex/skills/diagnose-ci"
+      },
+      {
+        "id": "trigger_cost_tokens-budget-high",
+        "category": "budget",
+        "severity": "warning",
+        "status": "warn",
+        "message": "trigger_cost_tokens is heavy relative to the current Codex baseline.",
+        "penalty": 4.5,
+        "remediation": [
+          "Reduce repeated instruction text and move detail into deferred supporting files."
+        ],
+        "source": "core"
+      },
+      {
+        "id": "coverage-artifacts-unavailable",
+        "category": "coverage",
+        "severity": "info",
+        "status": "info",
+        "message": "No coverage artifacts were found for this target.",
+        "penalty": 0.25,
+        "remediation": [
+          "Generate `lcov.info`, `coverage.xml`, or an Istanbul coverage JSON file if you want coverage scoring."
+        ],
+        "source": "core"
+      }
+    ],
+    "categoryDeductions": [
+      {
+        "category": "manifest",
+        "totalPenalty": 126,
+        "checks": 9
+      },
+      {
+        "category": "budget",
+        "totalPenalty": 51,
+        "checks": 5
+      },
+      {
+        "category": "best-practice",
+        "totalPenalty": 18,
+        "checks": 4
+      },
+      {
+        "category": "skill-structure",
+        "totalPenalty": 14,
+        "checks": 1
+      },
+      {
+        "category": "coverage",
+        "totalPenalty": 0.25,
+        "checks": 1
+      }
+    ],
+    "topRecommendations": [
+      "Add `author` to plugin.json.",
+      "Add interface.shortDescription to plugin.json.",
+      "Add interface.longDescription to plugin.json.",
+      "Add interface.developerName to plugin.json.",
+      "Add interface.capabilities to plugin.json."
+    ],
+    "whyBullets": [
+      "13 failing error checks are driving the highest-confidence problems.",
+      "6 warning signals still need cleanup before this feels polished.",
+      "manifest is the largest source of score loss at -126 points.",
+      "Active budget pressure is high enough that token cost may dominate the user experience.",
+      "No observed usage is attached yet, so budget conclusions are still based on static estimates."
+    ],
+    "fixFirst": [
+      {
+        "id": "interface-missing-capabilities",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `capabilities`.",
+        "why": "Manifest issues reduce trust because Codex may not discover or represent the plugin correctly.",
+        "remediation": [
+          "Add interface.capabilities to plugin.json."
+        ],
+        "penalty": 14,
+        "source": "core",
+        "targetPath": "plugins/yellow-ci"
+      },
+      {
+        "id": "interface-missing-defaultPrompt",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `defaultPrompt`.",
+        "why": "Manifest issues reduce trust because Codex may not discover or represent the plugin correctly.",
+        "remediation": [
+          "Add interface.defaultPrompt to plugin.json."
+        ],
+        "penalty": 14,
+        "source": "core",
+        "targetPath": "plugins/yellow-ci"
+      },
+      {
+        "id": "interface-missing-developerName",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `developerName`.",
+        "why": "Manifest issues reduce trust because Codex may not discover or represent the plugin correctly.",
+        "remediation": [
+          "Add interface.developerName to plugin.json."
+        ],
+        "penalty": 14,
+        "source": "core",
+        "targetPath": "plugins/yellow-ci"
+      }
+    ],
+    "watchNext": [
+      {
+        "id": "interface-missing-longDescription",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `longDescription`.",
+        "why": "Manifest issues reduce trust because Codex may not discover or represent the plugin correctly.",
+        "remediation": [
+          "Add interface.longDescription to plugin.json."
+        ],
+        "penalty": 14,
+        "source": "core",
+        "targetPath": "plugins/yellow-ci"
+      },
+      {
+        "id": "interface-missing-privacyPolicyURL",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `privacyPolicyURL`.",
+        "why": "Manifest issues reduce trust because Codex may not discover or represent the plugin correctly.",
+        "remediation": [
+          "Add interface.privacyPolicyURL to plugin.json."
+        ],
+        "penalty": 14,
+        "source": "core",
+        "targetPath": "plugins/yellow-ci"
+      },
+      {
+        "id": "interface-missing-shortDescription",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `shortDescription`.",
+        "why": "Manifest issues reduce trust because Codex may not discover or represent the plugin correctly.",
+        "remediation": [
+          "Add interface.shortDescription to plugin.json."
+        ],
+        "penalty": 14,
+        "source": "core",
+        "targetPath": "plugins/yellow-ci"
+      }
+    ]
+  },
+  "budgets": {
+    "method": "estimated-static",
+    "invocation_policy": {
+      "implicit_skill_count": 8,
+      "explicit_only_skill_count": 0,
+      "implicit_skills": [
+        "ci-conventions",
+        "ci-diagnose",
+        "ci-lint-workflows",
+        "ci-runner-health",
+        "ci-setup",
+        "ci-setup-runner-targets",
+        "ci-status",
+        "diagnose-ci"
+      ],
+      "explicit_only_skills": []
+    },
+    "trigger_cost_tokens": {
+      "value": 499,
+      "band": "heavy",
+      "thresholds": {
+        "goodMax": 66,
+        "moderateMax": 254,
+        "heavyMax": 614
+      },
+      "components": [
+        {
+          "label": "plugin-description",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json",
+          "tokens": 53,
+          "note": "Plugin marketplace summary"
+        },
+        {
+          "label": "default-prompts",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json",
+          "tokens": 0,
+          "note": "Starter prompts visible in the UI"
+        },
+        {
+          "label": "ci-conventions-description",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-conventions/SKILL.md",
+          "tokens": 59,
+          "note": "Skill trigger description exposed through the plugin"
+        },
+        {
+          "label": "ci-diagnose-description",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md",
+          "tokens": 73,
+          "note": "Skill trigger description exposed through the plugin"
+        },
+        {
+          "label": "ci-lint-workflows-description",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-lint-workflows/SKILL.md",
+          "tokens": 48,
+          "note": "Skill trigger description exposed through the plugin"
+        },
+        {
+          "label": "ci-runner-health-description",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md",
+          "tokens": 54,
+          "note": "Skill trigger description exposed through the plugin"
+        },
+        {
+          "label": "ci-setup-description",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-setup/SKILL.md",
+          "tokens": 48,
+          "note": "Skill trigger description exposed through the plugin"
+        },
+        {
+          "label": "ci-setup-runner-targets-description",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-setup-runner-targets/SKILL.md",
+          "tokens": 58,
+          "note": "Skill trigger description exposed through the plugin"
+        },
+        {
+          "label": "ci-status-description",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-status/SKILL.md",
+          "tokens": 37,
+          "note": "Skill trigger description exposed through the plugin"
+        },
+        {
+          "label": "diagnose-ci-description",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/diagnose-ci/SKILL.md",
+          "tokens": 69,
+          "note": "Skill trigger description exposed through the plugin"
+        }
+      ]
+    },
+    "invoke_cost_tokens": {
+      "value": 36810,
+      "band": "excessive",
+      "thresholds": {
+        "goodMax": 462,
+        "moderateMax": 4493,
+        "heavyMax": 17204
+      },
+      "components": [
+        {
+          "label": "plugin-manifest",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json",
+          "tokens": 110,
+          "note": "Manifest load cost"
+        },
+        {
+          "label": "ci-conventions-skill-file",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-conventions/SKILL.md",
+          "tokens": 1699,
+          "note": "Implicit skill invocation cost ceiling"
+        },
+        {
+          "label": "ci-diagnose-skill-file",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md",
+          "tokens": 9050,
+          "note": "Implicit skill invocation cost ceiling"
+        },
+        {
+          "label": "ci-lint-workflows-skill-file",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-lint-workflows/SKILL.md",
+          "tokens": 3386,
+          "note": "Implicit skill invocation cost ceiling"
+        },
+        {
+          "label": "ci-runner-health-skill-file",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md",
+          "tokens": 13884,
+          "note": "Implicit skill invocation cost ceiling"
+        },
+        {
+          "label": "ci-setup-skill-file",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-setup/SKILL.md",
+          "tokens": 2251,
+          "note": "Implicit skill invocation cost ceiling"
+        },
+        {
+          "label": "ci-setup-runner-targets-skill-file",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-setup-runner-targets/SKILL.md",
+          "tokens": 4221,
+          "note": "Implicit skill invocation cost ceiling"
+        },
+        {
+          "label": "ci-status-skill-file",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-status/SKILL.md",
+          "tokens": 1316,
+          "note": "Implicit skill invocation cost ceiling"
+        },
+        {
+          "label": "diagnose-ci-skill-file",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/diagnose-ci/SKILL.md",
+          "tokens": 893,
+          "note": "Implicit skill invocation cost ceiling"
+        }
+      ]
+    },
+    "deferred_cost_tokens": {
+      "value": 97503,
+      "band": "excessive",
+      "thresholds": {
+        "goodMax": 27,
+        "moderateMax": 7622,
+        "heavyMax": 58894
+      },
+      "components": [
+        {
+          "label": ".claude-plugin/plugin.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.claude-plugin/plugin.json",
+          "tokens": 275,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "CHANGELOG.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/CHANGELOG.md",
+          "tokens": 7348,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "CLAUDE.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/CLAUDE.md",
+          "tokens": 3188,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "README.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/README.md",
+          "tokens": 1232,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/ci/failure-analyst.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/agents/ci/failure-analyst.md",
+          "tokens": 1591,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/ci/runner-assignment.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/agents/ci/runner-assignment.md",
+          "tokens": 3620,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/ci/workflow-optimizer.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/agents/ci/workflow-optimizer.md",
+          "tokens": 1143,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/maintenance/runner-diagnostics.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/agents/maintenance/runner-diagnostics.md",
+          "tokens": 1387,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/ci/diagnose.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/diagnose.md",
+          "tokens": 194,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/ci/lint-workflows.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/lint-workflows.md",
+          "tokens": 207,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/ci/report-linear.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/report-linear.md",
+          "tokens": 1590,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/ci/runner-cleanup.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/runner-cleanup.md",
+          "tokens": 1203,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/ci/runner-health.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/runner-health.md",
+          "tokens": 259,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/ci/setup-runner-targets.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/setup-runner-targets.md",
+          "tokens": 559,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/ci/setup-self-hosted.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/setup-self-hosted.md",
+          "tokens": 2658,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/ci/setup.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/setup.md",
+          "tokens": 421,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/ci/status.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/status.md",
+          "tokens": 133,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "hooks/codex-hooks.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/codex-hooks.json",
+          "tokens": 97,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "hooks/scripts/entrypoint-claude.js",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/entrypoint-claude.js",
+          "tokens": 223,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "hooks/scripts/entrypoint-codex.js",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/entrypoint-codex.js",
+          "tokens": 303,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "hooks/scripts/lib/envelope.js",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/lib/envelope.js",
+          "tokens": 504,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "hooks/scripts/lib/redact.sh",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/lib/redact.sh",
+          "tokens": 3200,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "hooks/scripts/lib/resolve-runner-targets.sh",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/lib/resolve-runner-targets.sh",
+          "tokens": 5106,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "hooks/scripts/lib/run-hook.js",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/lib/run-hook.js",
+          "tokens": 905,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "hooks/scripts/lib/session-start-core.js",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/lib/session-start-core.js",
+          "tokens": 6676,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "hooks/scripts/lib/validate.sh",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/lib/validate.sh",
+          "tokens": 10951,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "package.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/package.json",
+          "tokens": 49,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/failure-patterns.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/references/failure-patterns.md",
+          "tokens": 1562,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/linter-rules.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/references/linter-rules.md",
+          "tokens": 1362,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/security-patterns.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/references/security-patterns.md",
+          "tokens": 1319,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "schemas/runner-targets.schema.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/schemas/runner-targets.schema.json",
+          "tokens": 824,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "skills/ci-conventions/SKILL.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/ci-conventions/SKILL.md",
+          "tokens": 1705,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "skills/ci-diagnose/SKILL.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/ci-diagnose/SKILL.md",
+          "tokens": 9056,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "skills/ci-lint-workflows/SKILL.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/ci-lint-workflows/SKILL.md",
+          "tokens": 3392,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "skills/ci-runner-health/SKILL.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/ci-runner-health/SKILL.md",
+          "tokens": 13890,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "skills/ci-setup-runner-targets/SKILL.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/ci-setup-runner-targets/SKILL.md",
+          "tokens": 4227,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "skills/ci-setup/SKILL.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/ci-setup/SKILL.md",
+          "tokens": 2257,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "skills/ci-status/SKILL.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/ci-status/SKILL.md",
+          "tokens": 1322,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "skills/diagnose-ci/SKILL.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/diagnose-ci/SKILL.md",
+          "tokens": 899,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/hooks/cache-hit.golden.txt",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/cache-hit.golden.txt",
+          "tokens": 111,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/hooks/cache-miss-failures.golden.txt",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/cache-miss-failures.golden.txt",
+          "tokens": 112,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/hooks/gh-missing.golden.txt",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/gh-missing.golden.txt",
+          "tokens": 66,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/hooks/gh-unauthed.golden.txt",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/gh-unauthed.golden.txt",
+          "tokens": 66,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/hooks/legacy-cache-not-trusted.golden.txt",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/legacy-cache-not-trusted.golden.txt",
+          "tokens": 66,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/hooks/malformed-gh-json.golden.txt",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/malformed-gh-json.golden.txt",
+          "tokens": 81,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/hooks/no-workflows.golden.txt",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/no-workflows.golden.txt",
+          "tokens": 16,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/hooks/rate-limited-gh.golden.txt",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/rate-limited-gh.golden.txt",
+          "tokens": 66,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/hooks/routing-summary-absent.golden.txt",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/routing-summary-absent.golden.txt",
+          "tokens": 16,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/hooks/routing-summary-present.golden.txt",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/routing-summary-present.golden.txt",
+          "tokens": 66,
+          "note": "Deferred supporting file"
+        }
+      ]
+    },
+    "explicit_only_invoke_cost_tokens": {
+      "value": 0,
+      "band": "good",
+      "thresholds": {
+        "goodMax": 462,
+        "moderateMax": 4493,
+        "heavyMax": 17204
+      },
+      "components": []
+    },
+    "total_tokens": {
+      "value": 134812,
+      "band": "excessive"
+    }
+  },
+  "observedUsage": null,
+  "checks": [
+    {
+      "id": "manifest-missing-author",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json is missing the required `author` field.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add `author` to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci"
+    },
+    {
+      "id": "interface-missing-shortDescription",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `shortDescription`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.shortDescription to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci"
+    },
+    {
+      "id": "interface-missing-longDescription",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `longDescription`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.longDescription to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci"
+    },
+    {
+      "id": "interface-missing-developerName",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `developerName`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.developerName to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci"
+    },
+    {
+      "id": "interface-missing-capabilities",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `capabilities`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.capabilities to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci"
+    },
+    {
+      "id": "interface-missing-websiteURL",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `websiteURL`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.websiteURL to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci"
+    },
+    {
+      "id": "interface-missing-privacyPolicyURL",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `privacyPolicyURL`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.privacyPolicyURL to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci"
+    },
+    {
+      "id": "interface-missing-termsOfServiceURL",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `termsOfServiceURL`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.termsOfServiceURL to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci"
+    },
+    {
+      "id": "interface-missing-defaultPrompt",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `defaultPrompt`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.defaultPrompt to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci"
+    },
+    {
+      "id": "skill:ci-conventions:description-trigger-weak",
+      "category": "best-practice",
+      "severity": "warning",
+      "status": "warn",
+      "message": "The description does not clearly advertise when the skill should trigger.",
+      "evidence": [
+        "Descriptions are the primary auto-load surface in Codex."
+      ],
+      "remediation": [
+        "Rewrite the description to include a clear 'Use when ...' trigger sentence."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-conventions"
+    },
+    {
+      "id": "skill:ci-diagnose:skill-large",
+      "category": "budget",
+      "severity": "warning",
+      "status": "warn",
+      "message": "SKILL.md exceeds the recommended compact size for progressive disclosure.",
+      "evidence": [
+        "Line count: 612"
+      ],
+      "remediation": [
+        "Trim repetitive detail and move long variants into references/."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-diagnose"
+    },
+    {
+      "id": "skill:ci-diagnose:progressive-disclosure-missing",
+      "category": "best-practice",
+      "severity": "warning",
+      "status": "warn",
+      "message": "The skill is getting large without using references for progressive disclosure.",
+      "evidence": [
+        "Large skills are easier to maintain when variants live under references/."
+      ],
+      "remediation": [
+        "Move deep detail or edge-case variants into references/ and link them from SKILL.md."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-diagnose"
+    },
+    {
+      "id": "skill:ci-runner-health:skill-too-large",
+      "category": "budget",
+      "severity": "error",
+      "status": "fail",
+      "message": "SKILL.md is extremely large for an always-loaded invocation surface.",
+      "evidence": [
+        "Line count: 995"
+      ],
+      "remediation": [
+        "Move large details into references/ and keep SKILL.md focused on the core workflow."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-runner-health"
+    },
+    {
+      "id": "skill:ci-runner-health:progressive-disclosure-missing",
+      "category": "best-practice",
+      "severity": "warning",
+      "status": "warn",
+      "message": "The skill is getting large without using references for progressive disclosure.",
+      "evidence": [
+        "Large skills are easier to maintain when variants live under references/."
+      ],
+      "remediation": [
+        "Move deep detail or edge-case variants into references/ and link them from SKILL.md."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-runner-health"
+    },
+    {
+      "id": "skill:ci-runner-health:broken-relative-links",
+      "category": "skill-structure",
+      "severity": "error",
+      "status": "fail",
+      "message": "The skill contains relative links that do not resolve inside the skill directory.",
+      "evidence": [
+        "[A-Za-z0-9-]*[A-Za-z0-9]"
+      ],
+      "remediation": [
+        "Fix or remove broken links in SKILL.md."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-runner-health"
+    },
+    {
+      "id": "skill:diagnose-ci:description-trigger-weak",
+      "category": "best-practice",
+      "severity": "warning",
+      "status": "warn",
+      "message": "The description does not clearly advertise when the skill should trigger.",
+      "evidence": [
+        "Descriptions are the primary auto-load surface in Codex."
+      ],
+      "remediation": [
+        "Rewrite the description to include a clear 'Use when ...' trigger sentence."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/diagnose-ci"
+    },
+    {
+      "id": "trigger_cost_tokens-budget-high",
+      "category": "budget",
+      "severity": "warning",
+      "status": "warn",
+      "message": "trigger_cost_tokens is heavy relative to the current Codex baseline.",
+      "evidence": [
+        "Value: 499 tokens",
+        "Baseline samples: skills=5, plugins=176"
+      ],
+      "remediation": [
+        "Reduce repeated instruction text and move detail into deferred supporting files."
+      ],
+      "source": "core"
+    },
+    {
+      "id": "invoke_cost_tokens-budget-high",
+      "category": "budget",
+      "severity": "error",
+      "status": "fail",
+      "message": "invoke_cost_tokens is excessive relative to the current Codex baseline.",
+      "evidence": [
+        "Value: 36810 tokens",
+        "Baseline samples: skills=5, plugins=176"
+      ],
+      "remediation": [
+        "Reduce repeated instruction text and move detail into deferred supporting files."
+      ],
+      "source": "core"
+    },
+    {
+      "id": "deferred_cost_tokens-budget-high",
+      "category": "budget",
+      "severity": "error",
+      "status": "fail",
+      "message": "deferred_cost_tokens is excessive relative to the current Codex baseline.",
+      "evidence": [
+        "Value: 97503 tokens",
+        "Baseline samples: skills=5, plugins=176"
+      ],
+      "remediation": [
+        "Reduce repeated instruction text and move detail into deferred supporting files."
+      ],
+      "source": "core"
+    },
+    {
+      "id": "coverage-artifacts-unavailable",
+      "category": "coverage",
+      "severity": "info",
+      "status": "info",
+      "message": "No coverage artifacts were found for this target.",
+      "evidence": [
+        "plugins/yellow-ci"
+      ],
+      "remediation": [
+        "Generate `lcov.info`, `coverage.xml`, or an Istanbul coverage JSON file if you want coverage scoring."
+      ],
+      "source": "core"
+    }
+  ],
+  "metrics": [
+    {
+      "id": "skill:ci-conventions:skill_line_count",
+      "category": "budget",
+      "value": 155,
+      "unit": "lines",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-conventions"
+    },
+    {
+      "id": "skill:ci-conventions:description_length_chars",
+      "category": "budget",
+      "value": 235,
+      "unit": "chars",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-conventions"
+    },
+    {
+      "id": "skill:ci-conventions:relative_link_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "links",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-conventions"
+    },
+    {
+      "id": "skill:ci-conventions:code_fence_count",
+      "category": "readability",
+      "value": 0,
+      "unit": "blocks",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-conventions"
+    },
+    {
+      "id": "skill:ci-conventions:support_file_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "files",
+      "band": "info",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-conventions"
+    },
+    {
+      "id": "skill:ci-diagnose:skill_line_count",
+      "category": "budget",
+      "value": 612,
+      "unit": "lines",
+      "band": "heavy",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-diagnose"
+    },
+    {
+      "id": "skill:ci-diagnose:description_length_chars",
+      "category": "budget",
+      "value": 292,
+      "unit": "chars",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-diagnose"
+    },
+    {
+      "id": "skill:ci-diagnose:relative_link_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "links",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-diagnose"
+    },
+    {
+      "id": "skill:ci-diagnose:code_fence_count",
+      "category": "readability",
+      "value": 7,
+      "unit": "blocks",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-diagnose"
+    },
+    {
+      "id": "skill:ci-diagnose:support_file_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "files",
+      "band": "info",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-diagnose"
+    },
+    {
+      "id": "skill:ci-lint-workflows:skill_line_count",
+      "category": "budget",
+      "value": 298,
+      "unit": "lines",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-lint-workflows"
+    },
+    {
+      "id": "skill:ci-lint-workflows:description_length_chars",
+      "category": "budget",
+      "value": 191,
+      "unit": "chars",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-lint-workflows"
+    },
+    {
+      "id": "skill:ci-lint-workflows:relative_link_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "links",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-lint-workflows"
+    },
+    {
+      "id": "skill:ci-lint-workflows:code_fence_count",
+      "category": "readability",
+      "value": 3,
+      "unit": "blocks",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-lint-workflows"
+    },
+    {
+      "id": "skill:ci-lint-workflows:support_file_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "files",
+      "band": "info",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-lint-workflows"
+    },
+    {
+      "id": "skill:ci-runner-health:skill_line_count",
+      "category": "budget",
+      "value": 995,
+      "unit": "lines",
+      "band": "heavy",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-runner-health"
+    },
+    {
+      "id": "skill:ci-runner-health:description_length_chars",
+      "category": "budget",
+      "value": 216,
+      "unit": "chars",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-runner-health"
+    },
+    {
+      "id": "skill:ci-runner-health:relative_link_count",
+      "category": "documentation",
+      "value": 1,
+      "unit": "links",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-runner-health"
+    },
+    {
+      "id": "skill:ci-runner-health:code_fence_count",
+      "category": "readability",
+      "value": 7,
+      "unit": "blocks",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-runner-health"
+    },
+    {
+      "id": "skill:ci-runner-health:support_file_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "files",
+      "band": "info",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-runner-health"
+    },
+    {
+      "id": "skill:ci-setup:skill_line_count",
+      "category": "budget",
+      "value": 206,
+      "unit": "lines",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-setup"
+    },
+    {
+      "id": "skill:ci-setup:description_length_chars",
+      "category": "budget",
+      "value": 190,
+      "unit": "chars",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-setup"
+    },
+    {
+      "id": "skill:ci-setup:relative_link_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "links",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-setup"
+    },
+    {
+      "id": "skill:ci-setup:code_fence_count",
+      "category": "readability",
+      "value": 3,
+      "unit": "blocks",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-setup"
+    },
+    {
+      "id": "skill:ci-setup:support_file_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "files",
+      "band": "info",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-setup"
+    },
+    {
+      "id": "skill:ci-setup-runner-targets:skill_line_count",
+      "category": "budget",
+      "value": 337,
+      "unit": "lines",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-setup-runner-targets"
+    },
+    {
+      "id": "skill:ci-setup-runner-targets:description_length_chars",
+      "category": "budget",
+      "value": 230,
+      "unit": "chars",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-setup-runner-targets"
+    },
+    {
+      "id": "skill:ci-setup-runner-targets:relative_link_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "links",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-setup-runner-targets"
+    },
+    {
+      "id": "skill:ci-setup-runner-targets:code_fence_count",
+      "category": "readability",
+      "value": 2,
+      "unit": "blocks",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-setup-runner-targets"
+    },
+    {
+      "id": "skill:ci-setup-runner-targets:support_file_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "files",
+      "band": "info",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-setup-runner-targets"
+    },
+    {
+      "id": "skill:ci-status:skill_line_count",
+      "category": "budget",
+      "value": 116,
+      "unit": "lines",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-status"
+    },
+    {
+      "id": "skill:ci-status:description_length_chars",
+      "category": "budget",
+      "value": 146,
+      "unit": "chars",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-status"
+    },
+    {
+      "id": "skill:ci-status:relative_link_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "links",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-status"
+    },
+    {
+      "id": "skill:ci-status:code_fence_count",
+      "category": "readability",
+      "value": 2,
+      "unit": "blocks",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-status"
+    },
+    {
+      "id": "skill:ci-status:support_file_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "files",
+      "band": "info",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/ci-status"
+    },
+    {
+      "id": "skill:diagnose-ci:skill_line_count",
+      "category": "budget",
+      "value": 101,
+      "unit": "lines",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/diagnose-ci"
+    },
+    {
+      "id": "skill:diagnose-ci:description_length_chars",
+      "category": "budget",
+      "value": 274,
+      "unit": "chars",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/diagnose-ci"
+    },
+    {
+      "id": "skill:diagnose-ci:relative_link_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "links",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/diagnose-ci"
+    },
+    {
+      "id": "skill:diagnose-ci:code_fence_count",
+      "category": "readability",
+      "value": 0,
+      "unit": "blocks",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/diagnose-ci"
+    },
+    {
+      "id": "skill:diagnose-ci:support_file_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "files",
+      "band": "info",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci/codex/skills/diagnose-ci"
+    },
+    {
+      "id": "plugin_skill_count",
+      "category": "manifest",
+      "value": 8,
+      "unit": "skills",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci"
+    },
+    {
+      "id": "plugin_keyword_count",
+      "category": "manifest",
+      "value": 0,
+      "unit": "keywords",
+      "band": "info",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci"
+    },
+    {
+      "id": "plugin_default_prompt_count",
+      "category": "manifest",
+      "value": 0,
+      "unit": "prompts",
+      "band": "moderate",
+      "source": "core",
+      "targetPath": "plugins/yellow-ci"
+    },
+    {
+      "id": "trigger_cost_tokens",
+      "category": "budget",
+      "value": 499,
+      "unit": "tokens",
+      "band": "heavy",
+      "source": "core"
+    },
+    {
+      "id": "invoke_cost_tokens",
+      "category": "budget",
+      "value": 36810,
+      "unit": "tokens",
+      "band": "excessive",
+      "source": "core"
+    },
+    {
+      "id": "deferred_cost_tokens",
+      "category": "budget",
+      "value": 97503,
+      "unit": "tokens",
+      "band": "excessive",
+      "source": "core"
+    },
+    {
+      "id": "explicit_only_invoke_cost_tokens",
+      "category": "budget",
+      "value": 0,
+      "unit": "tokens",
+      "band": "good",
+      "source": "core"
+    },
+    {
+      "id": "coverage_artifact_count",
+      "category": "coverage",
+      "value": 0,
+      "unit": "files",
+      "band": "info",
+      "source": "core"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "skill:ci-conventions:skill-link-inventory",
+      "type": "inventory",
+      "label": "Skill relative links",
+      "description": "Relative links found in SKILL.md.",
+      "source": "core",
+      "data": {
+        "links": []
+      }
+    },
+    {
+      "id": "skill:ci-diagnose:skill-link-inventory",
+      "type": "inventory",
+      "label": "Skill relative links",
+      "description": "Relative links found in SKILL.md.",
+      "source": "core",
+      "data": {
+        "links": []
+      }
+    },
+    {
+      "id": "skill:ci-lint-workflows:skill-link-inventory",
+      "type": "inventory",
+      "label": "Skill relative links",
+      "description": "Relative links found in SKILL.md.",
+      "source": "core",
+      "data": {
+        "links": []
+      }
+    },
+    {
+      "id": "skill:ci-runner-health:skill-link-inventory",
+      "type": "inventory",
+      "label": "Skill relative links",
+      "description": "Relative links found in SKILL.md.",
+      "source": "core",
+      "data": {
+        "links": [
+          "[A-Za-z0-9-]*[A-Za-z0-9]"
+        ]
+      }
+    },
+    {
+      "id": "skill:ci-setup:skill-link-inventory",
+      "type": "inventory",
+      "label": "Skill relative links",
+      "description": "Relative links found in SKILL.md.",
+      "source": "core",
+      "data": {
+        "links": []
+      }
+    },
+    {
+      "id": "skill:ci-setup-runner-targets:skill-link-inventory",
+      "type": "inventory",
+      "label": "Skill relative links",
+      "description": "Relative links found in SKILL.md.",
+      "source": "core",
+      "data": {
+        "links": []
+      }
+    },
+    {
+      "id": "skill:ci-status:skill-link-inventory",
+      "type": "inventory",
+      "label": "Skill relative links",
+      "description": "Relative links found in SKILL.md.",
+      "source": "core",
+      "data": {
+        "links": []
+      }
+    },
+    {
+      "id": "skill:diagnose-ci:skill-link-inventory",
+      "type": "inventory",
+      "label": "Skill relative links",
+      "description": "Relative links found in SKILL.md.",
+      "source": "core",
+      "data": {
+        "links": []
+      }
+    },
+    {
+      "id": "plugin-skill-inventory",
+      "type": "inventory",
+      "label": "Plugin skills",
+      "description": "Discoverable skills under the plugin.",
+      "source": "core",
+      "data": {
+        "skills": [
+          "codex/skills/ci-conventions",
+          "codex/skills/ci-diagnose",
+          "codex/skills/ci-lint-workflows",
+          "codex/skills/ci-runner-health",
+          "codex/skills/ci-setup",
+          "codex/skills/ci-setup-runner-targets",
+          "codex/skills/ci-status",
+          "codex/skills/diagnose-ci"
+        ]
+      }
+    },
+    {
+      "id": "budget-breakdown",
+      "type": "budget",
+      "label": "Budget breakdown",
+      "description": "Trigger, invoke, and deferred token budget analysis.",
+      "source": "core",
+      "data": {
+        "budgets": {
+          "method": "estimated-static",
+          "invocation_policy": {
+            "implicit_skill_count": 8,
+            "explicit_only_skill_count": 0,
+            "implicit_skills": [
+              "ci-conventions",
+              "ci-diagnose",
+              "ci-lint-workflows",
+              "ci-runner-health",
+              "ci-setup",
+              "ci-setup-runner-targets",
+              "ci-status",
+              "diagnose-ci"
+            ],
+            "explicit_only_skills": []
+          },
+          "trigger_cost_tokens": {
+            "value": 499,
+            "band": "heavy",
+            "thresholds": {
+              "goodMax": 66,
+              "moderateMax": 254,
+              "heavyMax": 614
+            },
+            "components": [
+              {
+                "label": "plugin-description",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json",
+                "tokens": 53,
+                "note": "Plugin marketplace summary"
+              },
+              {
+                "label": "default-prompts",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json",
+                "tokens": 0,
+                "note": "Starter prompts visible in the UI"
+              },
+              {
+                "label": "ci-conventions-description",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-conventions/SKILL.md",
+                "tokens": 59,
+                "note": "Skill trigger description exposed through the plugin"
+              },
+              {
+                "label": "ci-diagnose-description",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md",
+                "tokens": 73,
+                "note": "Skill trigger description exposed through the plugin"
+              },
+              {
+                "label": "ci-lint-workflows-description",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-lint-workflows/SKILL.md",
+                "tokens": 48,
+                "note": "Skill trigger description exposed through the plugin"
+              },
+              {
+                "label": "ci-runner-health-description",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md",
+                "tokens": 54,
+                "note": "Skill trigger description exposed through the plugin"
+              },
+              {
+                "label": "ci-setup-description",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-setup/SKILL.md",
+                "tokens": 48,
+                "note": "Skill trigger description exposed through the plugin"
+              },
+              {
+                "label": "ci-setup-runner-targets-description",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-setup-runner-targets/SKILL.md",
+                "tokens": 58,
+                "note": "Skill trigger description exposed through the plugin"
+              },
+              {
+                "label": "ci-status-description",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-status/SKILL.md",
+                "tokens": 37,
+                "note": "Skill trigger description exposed through the plugin"
+              },
+              {
+                "label": "diagnose-ci-description",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/diagnose-ci/SKILL.md",
+                "tokens": 69,
+                "note": "Skill trigger description exposed through the plugin"
+              }
+            ]
+          },
+          "invoke_cost_tokens": {
+            "value": 36810,
+            "band": "excessive",
+            "thresholds": {
+              "goodMax": 462,
+              "moderateMax": 4493,
+              "heavyMax": 17204
+            },
+            "components": [
+              {
+                "label": "plugin-manifest",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json",
+                "tokens": 110,
+                "note": "Manifest load cost"
+              },
+              {
+                "label": "ci-conventions-skill-file",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-conventions/SKILL.md",
+                "tokens": 1699,
+                "note": "Implicit skill invocation cost ceiling"
+              },
+              {
+                "label": "ci-diagnose-skill-file",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md",
+                "tokens": 9050,
+                "note": "Implicit skill invocation cost ceiling"
+              },
+              {
+                "label": "ci-lint-workflows-skill-file",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-lint-workflows/SKILL.md",
+                "tokens": 3386,
+                "note": "Implicit skill invocation cost ceiling"
+              },
+              {
+                "label": "ci-runner-health-skill-file",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md",
+                "tokens": 13884,
+                "note": "Implicit skill invocation cost ceiling"
+              },
+              {
+                "label": "ci-setup-skill-file",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-setup/SKILL.md",
+                "tokens": 2251,
+                "note": "Implicit skill invocation cost ceiling"
+              },
+              {
+                "label": "ci-setup-runner-targets-skill-file",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-setup-runner-targets/SKILL.md",
+                "tokens": 4221,
+                "note": "Implicit skill invocation cost ceiling"
+              },
+              {
+                "label": "ci-status-skill-file",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/ci-status/SKILL.md",
+                "tokens": 1316,
+                "note": "Implicit skill invocation cost ceiling"
+              },
+              {
+                "label": "diagnose-ci-skill-file",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/codex/skills/diagnose-ci/SKILL.md",
+                "tokens": 893,
+                "note": "Implicit skill invocation cost ceiling"
+              }
+            ]
+          },
+          "deferred_cost_tokens": {
+            "value": 97503,
+            "band": "excessive",
+            "thresholds": {
+              "goodMax": 27,
+              "moderateMax": 7622,
+              "heavyMax": 58894
+            },
+            "components": [
+              {
+                "label": ".claude-plugin/plugin.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.claude-plugin/plugin.json",
+                "tokens": 275,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "CHANGELOG.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/CHANGELOG.md",
+                "tokens": 7348,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "CLAUDE.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/CLAUDE.md",
+                "tokens": 3188,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "README.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/README.md",
+                "tokens": 1232,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/ci/failure-analyst.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/agents/ci/failure-analyst.md",
+                "tokens": 1591,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/ci/runner-assignment.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/agents/ci/runner-assignment.md",
+                "tokens": 3620,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/ci/workflow-optimizer.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/agents/ci/workflow-optimizer.md",
+                "tokens": 1143,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/maintenance/runner-diagnostics.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/agents/maintenance/runner-diagnostics.md",
+                "tokens": 1387,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/ci/diagnose.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/diagnose.md",
+                "tokens": 194,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/ci/lint-workflows.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/lint-workflows.md",
+                "tokens": 207,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/ci/report-linear.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/report-linear.md",
+                "tokens": 1590,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/ci/runner-cleanup.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/runner-cleanup.md",
+                "tokens": 1203,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/ci/runner-health.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/runner-health.md",
+                "tokens": 259,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/ci/setup-runner-targets.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/setup-runner-targets.md",
+                "tokens": 559,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/ci/setup-self-hosted.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/setup-self-hosted.md",
+                "tokens": 2658,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/ci/setup.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/setup.md",
+                "tokens": 421,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/ci/status.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/commands/ci/status.md",
+                "tokens": 133,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "hooks/codex-hooks.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/codex-hooks.json",
+                "tokens": 97,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "hooks/scripts/entrypoint-claude.js",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/entrypoint-claude.js",
+                "tokens": 223,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "hooks/scripts/entrypoint-codex.js",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/entrypoint-codex.js",
+                "tokens": 303,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "hooks/scripts/lib/envelope.js",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/lib/envelope.js",
+                "tokens": 504,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "hooks/scripts/lib/redact.sh",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/lib/redact.sh",
+                "tokens": 3200,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "hooks/scripts/lib/resolve-runner-targets.sh",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/lib/resolve-runner-targets.sh",
+                "tokens": 5106,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "hooks/scripts/lib/run-hook.js",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/lib/run-hook.js",
+                "tokens": 905,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "hooks/scripts/lib/session-start-core.js",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/lib/session-start-core.js",
+                "tokens": 6676,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "hooks/scripts/lib/validate.sh",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/hooks/scripts/lib/validate.sh",
+                "tokens": 10951,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "package.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/package.json",
+                "tokens": 49,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/failure-patterns.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/references/failure-patterns.md",
+                "tokens": 1562,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/linter-rules.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/references/linter-rules.md",
+                "tokens": 1362,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/security-patterns.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/references/security-patterns.md",
+                "tokens": 1319,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "schemas/runner-targets.schema.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/schemas/runner-targets.schema.json",
+                "tokens": 824,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "skills/ci-conventions/SKILL.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/ci-conventions/SKILL.md",
+                "tokens": 1705,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "skills/ci-diagnose/SKILL.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/ci-diagnose/SKILL.md",
+                "tokens": 9056,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "skills/ci-lint-workflows/SKILL.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/ci-lint-workflows/SKILL.md",
+                "tokens": 3392,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "skills/ci-runner-health/SKILL.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/ci-runner-health/SKILL.md",
+                "tokens": 13890,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "skills/ci-setup-runner-targets/SKILL.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/ci-setup-runner-targets/SKILL.md",
+                "tokens": 4227,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "skills/ci-setup/SKILL.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/ci-setup/SKILL.md",
+                "tokens": 2257,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "skills/ci-status/SKILL.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/ci-status/SKILL.md",
+                "tokens": 1322,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "skills/diagnose-ci/SKILL.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/skills/diagnose-ci/SKILL.md",
+                "tokens": 899,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/hooks/cache-hit.golden.txt",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/cache-hit.golden.txt",
+                "tokens": 111,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/hooks/cache-miss-failures.golden.txt",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/cache-miss-failures.golden.txt",
+                "tokens": 112,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/hooks/gh-missing.golden.txt",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/gh-missing.golden.txt",
+                "tokens": 66,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/hooks/gh-unauthed.golden.txt",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/gh-unauthed.golden.txt",
+                "tokens": 66,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/hooks/legacy-cache-not-trusted.golden.txt",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/legacy-cache-not-trusted.golden.txt",
+                "tokens": 66,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/hooks/malformed-gh-json.golden.txt",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/malformed-gh-json.golden.txt",
+                "tokens": 81,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/hooks/no-workflows.golden.txt",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/no-workflows.golden.txt",
+                "tokens": 16,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/hooks/rate-limited-gh.golden.txt",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/rate-limited-gh.golden.txt",
+                "tokens": 66,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/hooks/routing-summary-absent.golden.txt",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/routing-summary-absent.golden.txt",
+                "tokens": 16,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/hooks/routing-summary-present.golden.txt",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/tests/fixtures/hooks/routing-summary-present.golden.txt",
+                "tokens": 66,
+                "note": "Deferred supporting file"
+              }
+            ]
+          },
+          "explicit_only_invoke_cost_tokens": {
+            "value": 0,
+            "band": "good",
+            "thresholds": {
+              "goodMax": 462,
+              "moderateMax": 4493,
+              "heavyMax": 17204
+            },
+            "components": []
+          },
+          "total_tokens": {
+            "value": 134812,
+            "band": "excessive"
+          }
+        },
+        "baselineEvidence": {
+          "skillSamples": 5,
+          "pluginSamples": 176,
+          "sourceRoots": [
+            "../../../../../.codex/skills",
+            "../../../../../.codex/plugins/cache/openai-curated",
+            "../../../../../.codex/.tmp/plugins/plugins"
+          ]
+        }
+      }
+    },
+    {
+      "id": "measurement-plan",
+      "type": "measurement-plan",
+      "label": "Measurement plan",
+      "description": "Recommended toolsets for measuring the real-world effect of this skill or plugin.",
+      "source": "core",
+      "data": {
+        "recommendedToolsets": [
+          "token-usage-observer",
+          "task-outcome-scorecard",
+          "tool-call-audit",
+          "latency-efficiency"
+        ],
+        "toolsets": [
+          {
+            "id": "token-usage-observer",
+            "label": "Token Usage Observer",
+            "priority": "high",
+            "goal": "Measure how many tokens the skill or plugin actually burns in representative runs.",
+            "why": "Static estimates are useful guardrails, but observed usage is what tells you whether a real workflow is affordable and whether caching or reasoning changes the picture.",
+            "signals": [
+              "observed_usage_sample_count",
+              "observed_input_tokens_avg",
+              "observed_total_tokens_avg",
+              "estimate_vs_observed_input_ratio"
+            ],
+            "evidenceSources": [
+              "Responses API usage logs",
+              "Codex-like session exports",
+              "JSONL traces captured from local benchmarking harnesses"
+            ],
+            "starterPack": {
+              "manifestName": "token-usage-pack",
+              "focus": "Validate sample size, cold-start versus warm-cache behavior, and estimate drift over time."
+            }
+          },
+          {
+            "id": "task-outcome-scorecard",
+            "label": "Task Outcome Scorecard",
+            "priority": "high",
+            "goal": "Measure whether the skill helps users finish the intended job with fewer retries and less cleanup.",
+            "why": "A low-token skill is still a miss if it fails the task, and a verbose skill may be worth it if it consistently improves first-pass success.",
+            "signals": [
+              "task_success_rate",
+              "first_pass_success_rate",
+              "retry_rate",
+              "human_override_rate"
+            ],
+            "evidenceSources": [
+              "Task run logs",
+              "Structured user acceptance checklist",
+              "Before/after comparison runs on the same prompts"
+            ],
+            "starterPack": {
+              "manifestName": "task-outcomes-pack",
+              "focus": "Score success, retries, and manual intervention across a fixed prompt set."
+            }
+          },
+          {
+            "id": "tool-call-audit",
+            "label": "Tool Call Audit",
+            "priority": "high",
+            "goal": "Check whether the agent uses the right tools, arguments, and sequencing when the skill is active.",
+            "why": "For Codex plugins and many higher-agency skills, tool correctness is often the real determinant of user value.",
+            "signals": [
+              "tool_call_success_rate",
+              "invalid_tool_argument_rate",
+              "recoverable_tool_failure_rate"
+            ],
+            "evidenceSources": [
+              "Tool invocation traces",
+              "Recorded sessions",
+              "Golden-path scenario replays"
+            ],
+            "starterPack": {
+              "manifestName": "tool-audit-pack",
+              "focus": "Flag wrong tool selection, malformed args, and missing follow-up calls."
+            }
+          },
+          {
+            "id": "latency-efficiency",
+            "label": "Latency And Efficiency",
+            "priority": "high",
+            "goal": "Track whether the skill speeds users up enough to justify its cost.",
+            "why": "DX improvements usually win when they reduce waiting or rework, not only when they reduce absolute token counts.",
+            "signals": [
+              "p50_time_to_first_acceptable_answer_seconds",
+              "p95_time_to_task_completion_seconds",
+              "tokens_per_successful_run"
+            ],
+            "evidenceSources": [
+              "Benchmark harness timings",
+              "Manual stopwatch runs on canonical tasks",
+              "Responses API timestamps combined with usage logs"
+            ],
+            "starterPack": {
+              "manifestName": "latency-efficiency-pack",
+              "focus": "Measure time-to-value and cost-per-success on a stable prompt suite."
+            }
+          },
+          {
+            "id": "human-rubric-review",
+            "label": "Human Rubric Review",
+            "priority": "medium",
+            "goal": "Capture clarity, trust, and usefulness signals that automated checks will miss.",
+            "why": "The best skills often reduce confusion and editing effort in ways that do not show up in static lint-like checks.",
+            "signals": [
+              "clarity_score_avg",
+              "confidence_score_avg",
+              "follow_up_question_rate"
+            ],
+            "evidenceSources": [
+              "Reviewer scorecards",
+              "Team rubric sheets",
+              "Annotated transcripts"
+            ],
+            "starterPack": {
+              "manifestName": "human-rubric-pack",
+              "focus": "Collect 1 to 5 scores for clarity, trust, and edit burden across a small evaluator panel."
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "extensions": [],
+  "measurementPlan": {
+    "kind": "measurement-plan",
+    "createdAt": "2026-10-05T00:50:11.075Z",
+    "target": {
+      "kind": "plugin",
+      "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci",
+      "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json",
+      "name": "yellow-ci",
+      "relativePath": "plugins/yellow-ci"
+    },
+    "title": "Measurement plan for yellow-ci",
+    "summary": "Combine cost, outcome, and trust signals so you can tell whether the skill or plugin is genuinely helping instead of only looking well-structured on paper.",
+    "recommendedToolsets": [
+      "token-usage-observer",
+      "task-outcome-scorecard",
+      "tool-call-audit",
+      "latency-efficiency"
+    ],
+    "toolsets": [
+      {
+        "id": "token-usage-observer",
+        "label": "Token Usage Observer",
+        "priority": "high",
+        "goal": "Measure how many tokens the skill or plugin actually burns in representative runs.",
+        "why": "Static estimates are useful guardrails, but observed usage is what tells you whether a real workflow is affordable and whether caching or reasoning changes the picture.",
+        "signals": [
+          "observed_usage_sample_count",
+          "observed_input_tokens_avg",
+          "observed_total_tokens_avg",
+          "estimate_vs_observed_input_ratio"
+        ],
+        "evidenceSources": [
+          "Responses API usage logs",
+          "Codex-like session exports",
+          "JSONL traces captured from local benchmarking harnesses"
+        ],
+        "starterPack": {
+          "manifestName": "token-usage-pack",
+          "focus": "Validate sample size, cold-start versus warm-cache behavior, and estimate drift over time."
+        }
+      },
+      {
+        "id": "task-outcome-scorecard",
+        "label": "Task Outcome Scorecard",
+        "priority": "high",
+        "goal": "Measure whether the skill helps users finish the intended job with fewer retries and less cleanup.",
+        "why": "A low-token skill is still a miss if it fails the task, and a verbose skill may be worth it if it consistently improves first-pass success.",
+        "signals": [
+          "task_success_rate",
+          "first_pass_success_rate",
+          "retry_rate",
+          "human_override_rate"
+        ],
+        "evidenceSources": [
+          "Task run logs",
+          "Structured user acceptance checklist",
+          "Before/after comparison runs on the same prompts"
+        ],
+        "starterPack": {
+          "manifestName": "task-outcomes-pack",
+          "focus": "Score success, retries, and manual intervention across a fixed prompt set."
+        }
+      },
+      {
+        "id": "tool-call-audit",
+        "label": "Tool Call Audit",
+        "priority": "high",
+        "goal": "Check whether the agent uses the right tools, arguments, and sequencing when the skill is active.",
+        "why": "For Codex plugins and many higher-agency skills, tool correctness is often the real determinant of user value.",
+        "signals": [
+          "tool_call_success_rate",
+          "invalid_tool_argument_rate",
+          "recoverable_tool_failure_rate"
+        ],
+        "evidenceSources": [
+          "Tool invocation traces",
+          "Recorded sessions",
+          "Golden-path scenario replays"
+        ],
+        "starterPack": {
+          "manifestName": "tool-audit-pack",
+          "focus": "Flag wrong tool selection, malformed args, and missing follow-up calls."
+        }
+      },
+      {
+        "id": "latency-efficiency",
+        "label": "Latency And Efficiency",
+        "priority": "high",
+        "goal": "Track whether the skill speeds users up enough to justify its cost.",
+        "why": "DX improvements usually win when they reduce waiting or rework, not only when they reduce absolute token counts.",
+        "signals": [
+          "p50_time_to_first_acceptable_answer_seconds",
+          "p95_time_to_task_completion_seconds",
+          "tokens_per_successful_run"
+        ],
+        "evidenceSources": [
+          "Benchmark harness timings",
+          "Manual stopwatch runs on canonical tasks",
+          "Responses API timestamps combined with usage logs"
+        ],
+        "starterPack": {
+          "manifestName": "latency-efficiency-pack",
+          "focus": "Measure time-to-value and cost-per-success on a stable prompt suite."
+        }
+      },
+      {
+        "id": "human-rubric-review",
+        "label": "Human Rubric Review",
+        "priority": "medium",
+        "goal": "Capture clarity, trust, and usefulness signals that automated checks will miss.",
+        "why": "The best skills often reduce confusion and editing effort in ways that do not show up in static lint-like checks.",
+        "signals": [
+          "clarity_score_avg",
+          "confidence_score_avg",
+          "follow_up_question_rate"
+        ],
+        "evidenceSources": [
+          "Reviewer scorecards",
+          "Team rubric sheets",
+          "Annotated transcripts"
+        ],
+        "starterPack": {
+          "manifestName": "human-rubric-pack",
+          "focus": "Collect 1 to 5 scores for clarity, trust, and edit burden across a small evaluator panel."
+        }
+      }
+    ],
+    "artifact": {
+      "id": "measurement-plan",
+      "type": "measurement-plan",
+      "label": "Measurement plan",
+      "description": "Recommended toolsets for measuring the real-world effect of this skill or plugin.",
+      "source": "core",
+      "data": {
+        "recommendedToolsets": [
+          "token-usage-observer",
+          "task-outcome-scorecard",
+          "tool-call-audit",
+          "latency-efficiency"
+        ],
+        "toolsets": [
+          {
+            "id": "token-usage-observer",
+            "label": "Token Usage Observer",
+            "priority": "high",
+            "goal": "Measure how many tokens the skill or plugin actually burns in representative runs.",
+            "why": "Static estimates are useful guardrails, but observed usage is what tells you whether a real workflow is affordable and whether caching or reasoning changes the picture.",
+            "signals": [
+              "observed_usage_sample_count",
+              "observed_input_tokens_avg",
+              "observed_total_tokens_avg",
+              "estimate_vs_observed_input_ratio"
+            ],
+            "evidenceSources": [
+              "Responses API usage logs",
+              "Codex-like session exports",
+              "JSONL traces captured from local benchmarking harnesses"
+            ],
+            "starterPack": {
+              "manifestName": "token-usage-pack",
+              "focus": "Validate sample size, cold-start versus warm-cache behavior, and estimate drift over time."
+            }
+          },
+          {
+            "id": "task-outcome-scorecard",
+            "label": "Task Outcome Scorecard",
+            "priority": "high",
+            "goal": "Measure whether the skill helps users finish the intended job with fewer retries and less cleanup.",
+            "why": "A low-token skill is still a miss if it fails the task, and a verbose skill may be worth it if it consistently improves first-pass success.",
+            "signals": [
+              "task_success_rate",
+              "first_pass_success_rate",
+              "retry_rate",
+              "human_override_rate"
+            ],
+            "evidenceSources": [
+              "Task run logs",
+              "Structured user acceptance checklist",
+              "Before/after comparison runs on the same prompts"
+            ],
+            "starterPack": {
+              "manifestName": "task-outcomes-pack",
+              "focus": "Score success, retries, and manual intervention across a fixed prompt set."
+            }
+          },
+          {
+            "id": "tool-call-audit",
+            "label": "Tool Call Audit",
+            "priority": "high",
+            "goal": "Check whether the agent uses the right tools, arguments, and sequencing when the skill is active.",
+            "why": "For Codex plugins and many higher-agency skills, tool correctness is often the real determinant of user value.",
+            "signals": [
+              "tool_call_success_rate",
+              "invalid_tool_argument_rate",
+              "recoverable_tool_failure_rate"
+            ],
+            "evidenceSources": [
+              "Tool invocation traces",
+              "Recorded sessions",
+              "Golden-path scenario replays"
+            ],
+            "starterPack": {
+              "manifestName": "tool-audit-pack",
+              "focus": "Flag wrong tool selection, malformed args, and missing follow-up calls."
+            }
+          },
+          {
+            "id": "latency-efficiency",
+            "label": "Latency And Efficiency",
+            "priority": "high",
+            "goal": "Track whether the skill speeds users up enough to justify its cost.",
+            "why": "DX improvements usually win when they reduce waiting or rework, not only when they reduce absolute token counts.",
+            "signals": [
+              "p50_time_to_first_acceptable_answer_seconds",
+              "p95_time_to_task_completion_seconds",
+              "tokens_per_successful_run"
+            ],
+            "evidenceSources": [
+              "Benchmark harness timings",
+              "Manual stopwatch runs on canonical tasks",
+              "Responses API timestamps combined with usage logs"
+            ],
+            "starterPack": {
+              "manifestName": "latency-efficiency-pack",
+              "focus": "Measure time-to-value and cost-per-success on a stable prompt suite."
+            }
+          },
+          {
+            "id": "human-rubric-review",
+            "label": "Human Rubric Review",
+            "priority": "medium",
+            "goal": "Capture clarity, trust, and usefulness signals that automated checks will miss.",
+            "why": "The best skills often reduce confusion and editing effort in ways that do not show up in static lint-like checks.",
+            "signals": [
+              "clarity_score_avg",
+              "confidence_score_avg",
+              "follow_up_question_rate"
+            ],
+            "evidenceSources": [
+              "Reviewer scorecards",
+              "Team rubric sheets",
+              "Annotated transcripts"
+            ],
+            "starterPack": {
+              "manifestName": "human-rubric-pack",
+              "focus": "Collect 1 to 5 scores for clarity, trust, and edit burden across a small evaluator panel."
+            }
+          }
+        ]
+      }
+    },
+    "nextAction": {
+      "label": "Start with Token Usage Observer",
+      "why": "Measure how many tokens the skill or plugin actually burns in representative runs.",
+      "command": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --request 'What should I run next?' --format markdown",
+      "chatPrompt": "What should I run next?",
+      "toolsetId": "token-usage-observer"
+    }
+  },
+  "improvementBrief": {
+    "title": "Improve yellow-ci",
+    "target": {
+      "kind": "plugin",
+      "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci",
+      "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json",
+      "name": "yellow-ci",
+      "relativePath": "plugins/yellow-ci"
+    },
+    "summary": "Raise the evaluation from grade F (0/100) with a focus on the highest-signal structural and budget issues first.",
+    "goals": [
+      "Add `author` to plugin.json.",
+      "Add interface.shortDescription to plugin.json.",
+      "Add interface.longDescription to plugin.json.",
+      "Add interface.developerName to plugin.json.",
+      "Add interface.capabilities to plugin.json."
+    ],
+    "measurementGoals": [
+      "token-usage-observer",
+      "task-outcome-scorecard",
+      "tool-call-audit",
+      "latency-efficiency"
+    ],
+    "requiredFixes": [
+      {
+        "id": "manifest-missing-author",
+        "message": "plugin.json is missing the required `author` field.",
+        "remediation": [
+          "Add `author` to plugin.json."
+        ]
+      },
+      {
+        "id": "interface-missing-shortDescription",
+        "message": "plugin.json interface is missing `shortDescription`.",
+        "remediation": [
+          "Add interface.shortDescription to plugin.json."
+        ]
+      },
+      {
+        "id": "interface-missing-longDescription",
+        "message": "plugin.json interface is missing `longDescription`.",
+        "remediation": [
+          "Add interface.longDescription to plugin.json."
+        ]
+      },
+      {
+        "id": "interface-missing-developerName",
+        "message": "plugin.json interface is missing `developerName`.",
+        "remediation": [
+          "Add interface.developerName to plugin.json."
+        ]
+      },
+      {
+        "id": "interface-missing-capabilities",
+        "message": "plugin.json interface is missing `capabilities`.",
+        "remediation": [
+          "Add interface.capabilities to plugin.json."
+        ]
+      }
+    ],
+    "recommendedFixes": [
+      {
+        "id": "skill:ci-conventions:description-trigger-weak",
+        "message": "The description does not clearly advertise when the skill should trigger.",
+        "remediation": [
+          "Rewrite the description to include a clear 'Use when ...' trigger sentence."
+        ]
+      },
+      {
+        "id": "skill:ci-diagnose:skill-large",
+        "message": "SKILL.md exceeds the recommended compact size for progressive disclosure.",
+        "remediation": [
+          "Trim repetitive detail and move long variants into references/."
+        ]
+      },
+      {
+        "id": "skill:ci-diagnose:progressive-disclosure-missing",
+        "message": "The skill is getting large without using references for progressive disclosure.",
+        "remediation": [
+          "Move deep detail or edge-case variants into references/ and link them from SKILL.md."
+        ]
+      },
+      {
+        "id": "skill:ci-runner-health:progressive-disclosure-missing",
+        "message": "The skill is getting large without using references for progressive disclosure.",
+        "remediation": [
+          "Move deep detail or edge-case variants into references/ and link them from SKILL.md."
+        ]
+      },
+      {
+        "id": "skill:diagnose-ci:description-trigger-weak",
+        "message": "The description does not clearly advertise when the skill should trigger.",
+        "remediation": [
+          "Rewrite the description to include a clear 'Use when ...' trigger sentence."
+        ]
+      }
+    ],
+    "suggestedPrompt": "Use the skill-creator guidance to improve yellow-ci. Keep the structure compact and move bulky details into references or scripts. Define success measures with these toolsets: token-usage-observer, task-outcome-scorecard, tool-call-audit, latency-efficiency. Address manifest-missing-author: plugin.json is missing the required `author` field. Address interface-missing-shortDescription: plugin.json interface is missing `shortDescription`. Address interface-missing-longDescription: plugin.json interface is missing `longDescription`. Address interface-missing-developerName: plugin.json interface is missing `developerName`. Address interface-missing-capabilities: plugin.json interface is missing `capabilities`. Address interface-missing-websiteURL: plugin.json interface is missing `websiteURL`. Address interface-missing-privacyPolicyURL: plugin.json interface is missing `privacyPolicyURL`. Address interface-missing-termsOfServiceURL: plugin.json interface is missing `termsOfServiceURL`."
+  },
+  "nextAction": {
+    "label": "Fix structural issues first",
+    "why": "Failing manifest or skill structure issues reduce trust and can invalidate later measurements.",
+    "command": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --request 'What should I fix first?' --format markdown",
+    "chatPrompt": "What should I fix first?"
+  },
+  "workflowGuide": {
+    "kind": "workflow-guide",
+    "createdAt": "2026-10-05T00:50:11.079Z",
+    "target": {
+      "kind": "plugin",
+      "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci",
+      "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.codex-plugin/plugin.json",
+      "name": "yellow-ci",
+      "relativePath": "plugins/yellow-ci"
+    },
+    "requestedGoal": "evaluate",
+    "requestedChatPrompt": null,
+    "requestRouting": null,
+    "recommendedWorkflowId": "evaluate",
+    "recommendedWorkflow": {
+      "id": "evaluate",
+      "label": "Evaluate Plugin",
+      "chatPrompt": "Evaluate this plugin.",
+      "summary": "Start here when you want the overall report for a plugin, including structure, budgets, and code checks.",
+      "firstCommand": "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --format markdown",
+      "commands": [
+        "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --format markdown"
+      ],
+      "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --request 'Evaluate this plugin.' --format markdown"
+    },
+    "workflowStatus": {
+      "hasBenchmarkConfig": false,
+      "hasUsageLog": false
+    },
+    "beginnerSummary": "Start with a natural chat request, then let plugin-eval show the exact local command sequence behind it.",
+    "startHere": {
+      "chatPrompt": "Evaluate this plugin.",
+      "label": "Evaluate Plugin",
+      "summary": "Start here when you want the overall report for a plugin, including structure, budgets, and code checks.",
+      "routingExplanation": "Plugin Eval recommended Evaluate Plugin from the current local state for this plugin.",
+      "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --request 'Evaluate this plugin.' --format markdown",
+      "firstCommand": "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --format markdown",
+      "commands": [
+        "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --format markdown"
+      ]
+    },
+    "entrypoints": [
+      {
+        "id": "analysis",
+        "label": "Full Plugin Analysis",
+        "chatPrompt": "Give me a full analysis of this plugin, including benchmark setup.",
+        "summary": "Use this when you want the full report and starter benchmark setup for this plugin in one guided path.",
+        "firstCommand": "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --format markdown",
+        "commands": [
+          "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --format markdown",
+          "plugin-eval init-benchmark ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci",
+          "plugin-eval benchmark ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --config ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.plugin-eval/benchmark.json"
+        ],
+        "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --request 'Give me a full analysis of this plugin, including benchmark setup.' --format markdown"
+      },
+      {
+        "id": "evaluate",
+        "label": "Evaluate Plugin",
+        "chatPrompt": "Evaluate this plugin.",
+        "summary": "Start here when you want the overall report for a plugin, including structure, budgets, and code checks.",
+        "firstCommand": "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --format markdown",
+        "commands": [
+          "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --format markdown"
+        ],
+        "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --request 'Evaluate this plugin.' --format markdown"
+      },
+      {
+        "id": "budget",
+        "label": "Explain Token Budget",
+        "chatPrompt": "Explain the token budget for this plugin.",
+        "summary": "Use this when the main question is why the plugin feels expensive before you collect any live measurements.",
+        "firstCommand": "plugin-eval explain-budget ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --format markdown",
+        "commands": [
+          "plugin-eval explain-budget ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --format markdown"
+        ],
+        "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --request 'Explain the token budget for this plugin.' --format markdown"
+      },
+      {
+        "id": "measure",
+        "label": "Measure Real Token Usage",
+        "chatPrompt": "Measure the real token usage of this plugin.",
+        "summary": "Use this when you want real token usage instead of only the static estimate.",
+        "firstCommand": "plugin-eval init-benchmark ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci",
+        "commands": [
+          "plugin-eval init-benchmark ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci",
+          "plugin-eval benchmark ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --config ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.plugin-eval/benchmark.json",
+          "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --observed-usage ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci/.plugin-eval/benchmark-usage.jsonl --format markdown"
+        ],
+        "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --request 'Measure the real token usage of this plugin.' --format markdown"
+      },
+      {
+        "id": "benchmark",
+        "label": "Benchmark With Starter Scenarios",
+        "chatPrompt": "Help me benchmark this plugin.",
+        "summary": "Use this when you want starter scenarios and a repeatable real-Codex benchmark run for this plugin.",
+        "firstCommand": "plugin-eval init-benchmark ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci",
+        "commands": [
+          "plugin-eval init-benchmark ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci"
+        ],
+        "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --request 'Help me benchmark this plugin.' --format markdown"
+      },
+      {
+        "id": "next",
+        "label": "Start Here",
+        "chatPrompt": "What should I run next?",
+        "summary": "If you are new to plugin-eval, start with the overall evaluation report for this plugin.",
+        "firstCommand": "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --format markdown",
+        "commands": [
+          "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --format markdown"
+        ],
+        "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --request 'What should I run next?' --format markdown"
+      }
+    ],
+    "nextSteps": [
+      "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --format markdown"
+    ],
+    "nextAction": {
+      "label": "Evaluate Plugin",
+      "why": "Plugin Eval recommended Evaluate Plugin from the current local state for this plugin.",
+      "command": "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-ci --format markdown",
+      "chatPrompt": "Evaluate this plugin."
+    }
+  }
+}

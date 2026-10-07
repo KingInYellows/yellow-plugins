@@ -1,0 +1,464 @@
+[
+  {
+    "method": "remoteControl/status/changed",
+    "params": {
+      "status": "disabled",
+      "serverName": "A8",
+      "installationId": "c41259b4-013e-4684-97cf-054406efd799",
+      "environmentId": null
+    },
+    "emittedAtMs": 1791245879383
+  },
+  {
+    "method": "thread/started",
+    "params": {
+      "thread": {
+        "id": "01a10e93-0b58-7853-9c82-401921935d27",
+        "environments": [
+          {
+            "environmentId": "local",
+            "cwd": "/tmp/yellow-codex-lifecycle-Kzi7Ft/project",
+            "runtimeWorkspaceRoots": [
+              "/tmp/yellow-codex-lifecycle-Kzi7Ft/project"
+            ]
+          }
+        ],
+        "extra": null,
+        "sessionId": "01a10e93-0b58-7853-9c82-401921935d27",
+        "forkedFromId": null,
+        "parentThreadId": null,
+        "preview": "",
+        "ephemeral": true,
+        "section": null,
+        "sectionEnteredAt": null,
+        "projectId": null,
+        "historyMode": "legacy",
+        "modelProvider": "fixture",
+        "model": "fixture",
+        "reasoningEffort": null,
+        "createdAt": 1791245880,
+        "updatedAt": 1791245880,
+        "recencyAt": 1791245880,
+        "status": {
+          "type": "idle"
+        },
+        "path": null,
+        "cwd": "/tmp/yellow-codex-lifecycle-Kzi7Ft/project",
+        "cliVersion": "0.157.0",
+        "originator": "yellow_lifecycle_smoke",
+        "source": "vscode",
+        "canAcceptDirectInput": true,
+        "threadSource": null,
+        "agentNickname": null,
+        "agentRole": null,
+        "gitInfo": null,
+        "name": null,
+        "daybreakEnabled": null,
+        "turns": []
+      }
+    },
+    "emittedAtMs": 1791245880843
+  },
+  {
+    "method": "warning",
+    "params": {
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "message": "Model metadata for `fixture` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."
+    },
+    "emittedAtMs": 1791245880971
+  },
+  {
+    "method": "thread/status/changed",
+    "params": {
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "status": {
+        "type": "active",
+        "activeFlags": []
+      }
+    },
+    "emittedAtMs": 1791245881113
+  },
+  {
+    "method": "turn/started",
+    "params": {
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "turn": {
+        "id": "01a10e93-0e52-71e3-89e7-e2b52d2a7e55",
+        "items": [],
+        "itemsView": "notLoaded",
+        "status": "inProgress",
+        "error": null,
+        "startedAt": 1791245880,
+        "completedAt": null,
+        "durationMs": null
+      }
+    },
+    "emittedAtMs": 1791245881114
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "item": {
+        "type": "userMessage",
+        "id": "01a10e93-0fb5-7041-a034-bce3d4f519c0",
+        "clientId": null,
+        "content": [
+          {
+            "type": "text",
+            "text": "Run the two disposable control commands.",
+            "text_elements": []
+          }
+        ]
+      },
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "turnId": "01a10e93-0e52-71e3-89e7-e2b52d2a7e55",
+      "startedAtMs": 1791245881270
+    },
+    "emittedAtMs": 1791245881278
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "item": {
+        "type": "userMessage",
+        "id": "01a10e93-0fb5-7041-a034-bce3d4f519c0",
+        "clientId": null,
+        "content": [
+          {
+            "type": "text",
+            "text": "Run the two disposable control commands.",
+            "text_elements": []
+          }
+        ]
+      },
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "turnId": "01a10e93-0e52-71e3-89e7-e2b52d2a7e55",
+      "completedAtMs": 1791245881272
+    },
+    "emittedAtMs": 1791245881289
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "item": {
+        "type": "commandExecution",
+        "id": "call_fixture_0",
+        "pluginId": null,
+        "scriptPath": null,
+        "command": "/usr/bin/bash -c 'git push'",
+        "cwd": "/tmp/yellow-codex-lifecycle-Kzi7Ft/project",
+        "processId": "82934",
+        "source": "unifiedExecStartup",
+        "status": "inProgress",
+        "commandActions": [
+          {
+            "type": "unknown",
+            "command": "git push"
+          }
+        ],
+        "aggregatedOutput": null,
+        "exitCode": null,
+        "durationMs": null
+      },
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "turnId": "01a10e93-0e52-71e3-89e7-e2b52d2a7e55",
+      "startedAtMs": 1791245882208
+    },
+    "emittedAtMs": 1791245882270
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "item": {
+        "type": "commandExecution",
+        "id": "call_fixture_0",
+        "pluginId": null,
+        "scriptPath": null,
+        "command": "/usr/bin/bash -c 'git push'",
+        "cwd": "/tmp/yellow-codex-lifecycle-Kzi7Ft/project",
+        "processId": "82934",
+        "source": "unifiedExecStartup",
+        "status": "completed",
+        "commandActions": [
+          {
+            "type": "unknown",
+            "command": "git push"
+          }
+        ],
+        "aggregatedOutput": "DISPOSABLE_STUB\n",
+        "exitCode": 0,
+        "durationMs": 0
+      },
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "turnId": "01a10e93-0e52-71e3-89e7-e2b52d2a7e55",
+      "completedAtMs": 1791245882213
+    },
+    "emittedAtMs": 1791245882315
+  },
+  {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "turnId": "01a10e93-0e52-71e3-89e7-e2b52d2a7e55",
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 2,
+          "inputTokens": 1,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 1,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 2,
+          "inputTokens": 1,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 1,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      }
+    },
+    "emittedAtMs": 1791245882315
+  },
+  {
+    "method": "account/rateLimits/updated",
+    "params": {
+      "rateLimits": {
+        "limitId": "codex",
+        "limitName": null,
+        "normalModelSlug": null,
+        "primary": null,
+        "secondary": null,
+        "credits": null,
+        "individualLimit": null,
+        "spendControlReached": null,
+        "planType": null,
+        "rateLimitReachedType": null
+      }
+    },
+    "emittedAtMs": 1791245882316
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "item": {
+        "type": "commandExecution",
+        "id": "call_fixture_1",
+        "pluginId": null,
+        "scriptPath": null,
+        "command": "/usr/bin/bash -c 'gt modify -m \"bad message\"'",
+        "cwd": "/tmp/yellow-codex-lifecycle-Kzi7Ft/project",
+        "processId": "57937",
+        "source": "unifiedExecStartup",
+        "status": "inProgress",
+        "commandActions": [
+          {
+            "type": "unknown",
+            "command": "gt modify -m \"bad message\""
+          }
+        ],
+        "aggregatedOutput": null,
+        "exitCode": null,
+        "durationMs": null
+      },
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "turnId": "01a10e93-0e52-71e3-89e7-e2b52d2a7e55",
+      "startedAtMs": 1791245882504
+    },
+    "emittedAtMs": 1791245882505
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "item": {
+        "type": "commandExecution",
+        "id": "call_fixture_1",
+        "pluginId": null,
+        "scriptPath": null,
+        "command": "/usr/bin/bash -c 'gt modify -m \"bad message\"'",
+        "cwd": "/tmp/yellow-codex-lifecycle-Kzi7Ft/project",
+        "processId": "57937",
+        "source": "unifiedExecStartup",
+        "status": "completed",
+        "commandActions": [
+          {
+            "type": "unknown",
+            "command": "gt modify -m \"bad message\""
+          }
+        ],
+        "aggregatedOutput": "DISPOSABLE_STUB\n",
+        "exitCode": 0,
+        "durationMs": 0
+      },
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "turnId": "01a10e93-0e52-71e3-89e7-e2b52d2a7e55",
+      "completedAtMs": 1791245882506
+    },
+    "emittedAtMs": 1791245882510
+  },
+  {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "turnId": "01a10e93-0e52-71e3-89e7-e2b52d2a7e55",
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 4,
+          "inputTokens": 2,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 2,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 2,
+          "inputTokens": 1,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 1,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      }
+    },
+    "emittedAtMs": 1791245882511
+  },
+  {
+    "method": "account/rateLimits/updated",
+    "params": {
+      "rateLimits": {
+        "limitId": "codex",
+        "limitName": null,
+        "normalModelSlug": null,
+        "primary": null,
+        "secondary": null,
+        "credits": null,
+        "individualLimit": null,
+        "spendControlReached": null,
+        "planType": null,
+        "rateLimitReachedType": null
+      }
+    },
+    "emittedAtMs": 1791245882511
+  },
+  {
+    "method": "item/started",
+    "params": {
+      "item": {
+        "type": "agentMessage",
+        "id": "msg_fixture_2",
+        "text": "Fixture complete.",
+        "phase": null,
+        "memoryCitation": null,
+        "delivery": null,
+        "questions": null
+      },
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "turnId": "01a10e93-0e52-71e3-89e7-e2b52d2a7e55",
+      "startedAtMs": 1791245882527
+    },
+    "emittedAtMs": 1791245882528
+  },
+  {
+    "method": "item/completed",
+    "params": {
+      "item": {
+        "type": "agentMessage",
+        "id": "msg_fixture_2",
+        "text": "Fixture complete.",
+        "phase": null,
+        "memoryCitation": null,
+        "delivery": null,
+        "questions": null
+      },
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "turnId": "01a10e93-0e52-71e3-89e7-e2b52d2a7e55",
+      "completedAtMs": 1791245882529
+    },
+    "emittedAtMs": 1791245882532
+  },
+  {
+    "method": "thread/tokenUsage/updated",
+    "params": {
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "turnId": "01a10e93-0e52-71e3-89e7-e2b52d2a7e55",
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 6,
+          "inputTokens": 3,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 3,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 2,
+          "inputTokens": 1,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 1,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      }
+    },
+    "emittedAtMs": 1791245882532
+  },
+  {
+    "method": "account/rateLimits/updated",
+    "params": {
+      "rateLimits": {
+        "limitId": "codex",
+        "limitName": null,
+        "normalModelSlug": null,
+        "primary": null,
+        "secondary": null,
+        "credits": null,
+        "individualLimit": null,
+        "spendControlReached": null,
+        "planType": null,
+        "rateLimitReachedType": null
+      }
+    },
+    "emittedAtMs": 1791245882532
+  },
+  {
+    "method": "thread/status/changed",
+    "params": {
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "status": {
+        "type": "idle"
+      }
+    },
+    "emittedAtMs": 1791245882547
+  },
+  {
+    "method": "turn/completed",
+    "params": {
+      "threadId": "01a10e93-0b58-7853-9c82-401921935d27",
+      "turn": {
+        "id": "01a10e93-0e52-71e3-89e7-e2b52d2a7e55",
+        "items": [
+          {
+            "type": "agentMessage",
+            "id": "msg_fixture_2",
+            "text": "Fixture complete.",
+            "phase": null,
+            "memoryCitation": null,
+            "delivery": null,
+            "questions": null
+          }
+        ],
+        "itemsView": "summary",
+        "status": "completed",
+        "error": null,
+        "startedAt": 1791245880,
+        "completedAt": 1791245882,
+        "durationMs": 1572
+      }
+    },
+    "emittedAtMs": 1791245882550
+  }
+]

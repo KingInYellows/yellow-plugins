@@ -234,7 +234,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `plan-status` — canonical read-only dashboard of `plans/` (open) and
   `plans/complete/` (archived) with per-file checkbox progress; the
   `/plan:status` command is a thin wrapper over this skill. One of
-  yellow-core's three Codex-distributed skills (see "Codex Distribution"
+  yellow-core's four Codex-distributed skills (see "Codex Distribution"
   below)
 - `security-fencing` — canonical prompt-injection hardening block for agents that analyze untrusted content (source code, CI logs, workflow files); single source of truth for the inlined `CRITICAL SECURITY RULES` block (internal)
 - `session-handoff` — write a handoff note at
@@ -258,11 +258,16 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 ### Codex Distribution
 
+The generated Codex manifest sets `commands: []` to prevent automatic
+conversion of Claude command wrappers into additional skills. Codex exposes
+only the skills selected by the catalog allowlist.
+
 yellow-core is the first plugin in this repo to set `targets.codex.enabled:
 true` (`catalog/plugins/yellow-core.json`) — the first non-empty Codex
 marketplace state (`.agents/plugins/marketplace.json`). Its Codex exposure
-is a deliberately narrow, read-only allowlist of exactly three skills:
-`agent-native-architecture`, `agent-native-audit`, and `plan-status`. Every
+is a deliberately narrow, read-only allowlist of exactly four skills:
+`agent-native-architecture`, `agent-native-audit`, `plan-status`, and
+`worktree-inventory`. Every
 other component — all 21 agents, all three hooks (SessionStart, Stop,
 PreCompact), background compounding, `setup:all`, statusline setup, MCP
 helpers, `lib/` executables, and the remaining skills — is excluded.
@@ -583,3 +588,10 @@ Manifest hook budgets: Stop 5s, SessionStart 3s, PreCompact 3s
   NOT delete `~/.claude/projects/<slug>/compound-staging/` or any
   pending/processing entries. Manually `rm -rf` the staging dir to
   reclaim disk; the directory is inert without the hooks installed.
+
+## Codex compatibility expansion
+
+The shared worktree-inventory skill provides a bounded read-only workflow. Installed
+Codex acceptance and exact support are recorded in the canonical
+[Codex distribution](../../docs/codex-distribution.md) table. Other commands,
+agents and hooks retain their existing host contracts.

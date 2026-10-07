@@ -1,0 +1,47 @@
+{
+  "recordedAt": "2026-10-06T15:02:46.249642+00:00",
+  "checks": [
+    {
+      "command": [
+        "pnpm",
+        "test:integration",
+        "--maxWorkers=2",
+        "--minWorkers=1"
+      ],
+      "exitCode": 0,
+      "seconds": 33.76,
+      "log": "/tmp/yellow-postfix-check-0.log",
+      "tail": "s.test.ts  (4 tests) 507ms\n \u2713 tests/integration/validate-plugin-characterization.test.ts  (29 tests) 26ms\n \u2713 tests/integration/codex-waves-remote-orchestration.test.ts  (11 tests) 290ms\n \u2713 tests/integration/validate-flow-namespace-error-codes.test.ts  (5 tests) 4ms\n \u2713 tests/integration/sync-manifests.test.ts  (3 tests) 1428ms\n \u2713 tests/integration/validate-agent-authoring-rule17.test.ts  (6 tests) 467ms\n \u2713 tests/integration/validate-agent-authoring-rule19.test.ts  (7 tests) 498ms\n \u2713 tests/integration/smoke-codex-skill-activation.test.ts  (11 tests) 66ms\n \u2713 tests/integration/shell-compat-hook-parity.test.ts  (75 tests) 74ms\n \u2713 tests/integration/validate-agent-authoring-subagent-refs.test.ts  (7 tests) 1985ms\n \u2713 tests/integration/smoke-codex-plugin-lifecycle.test.ts  (11 tests) 92ms\n \u2713 tests/integration/smoke-codex-plugin-install.test.ts  (29 tests) 6951ms\n \u2713 tests/integration/validate-agent-authoring-changelog-skip.test.ts  (3 tests) 198ms\n \u2713 tests/integration/validate-agent-authoring-rule21.test.ts  (5 tests) 318ms\n \u2713 tests/integration/smoke-plugin-install.test.ts  (8 tests) 313ms\n \u2713 tests/integration/validate-catalog-track.test.ts  (6 tests) 3ms\n \u2713 tests/integration/generate-manifests-characterization.test.ts  (22 tests) 7ms\n \u2713 tests/integration/validate-agent-authoring-rule20.test.ts  (4 tests) 220ms\n \u2713 tests/integration/smoke-codex-graphite-auth.test.ts  (5 tests) 5ms\n\n Test Files  62 passed (62)\n      Tests  1876 passed | 1 skipped (1877)\n   Start at  10:01:44\n   Duration  33.20s (transform 642ms, setup 3ms, collect 4.08s, tests 51.55s, environment 10ms, prepare 3.66s)\n\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "lint"
+      ],
+      "exitCode": 0,
+      "seconds": 20.63,
+      "log": "/tmp/yellow-postfix-check-1.log",
+      "tail": "\n> yellow-plugins-root@2.1.16 lint /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> eslint . --ext .js,.ts\n\n\n/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/tests/fixtures/codex-waves-analysis-integration/src/complexity.js\n  1:8  warning  Missing return type on function  @typescript-eslint/explicit-function-return-type\n\n\u2716 1 problem (0 errors, 1 warning)\n\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "seconds": 4.02,
+      "log": "/tmp/yellow-postfix-check-2.log",
+      "tail": "\n> yellow-plugins-root@2.1.16 typecheck /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> tsc --noEmit && pnpm --filter yellow-cursor run typecheck && pnpm --filter yellow-goal run typecheck && pnpm --filter yellow-jules run typecheck\n\n\n> yellow-cursor@0.2.4 typecheck /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-cursor\n> tsc --noEmit -p tsconfig.json\n\n\n> yellow-goal@0.2.2 typecheck /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-goal\n> tsc --noEmit -p tsconfig.json\n\n\n> yellow-jules@0.2.0 typecheck /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-jules\n> tsc --noEmit -p tsconfig.json\n\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "validate:schemas"
+      ],
+      "exitCode": 0,
+      "seconds": 2.07,
+      "log": "/tmp/yellow-postfix-check-3.log",
+      "tail": "imperative load stub.\n\u001b[33m\u26a0 WARN:\u001b[0m [RULE 21 advisory] plugins/yellow-debt/agents/synthesis/audit-synthesizer.md: 386 lines (agent ceiling 300) \u2014 delete prose that does not change behaviour, then move late-sequence detail into references/ behind an imperative load stub.\n\u001b[32m\u2713 PASS:\u001b[0m Validated 78 agents and 443 markdown files\n[lint-error-codes] \u2713 no scripts/ file re-implements any of the 70 catalog error codes\n[sync-shell-snippets] \u2713 all 3 install scripts are in sync with scripts/snippets/\n[validate-solutions] no docs/solutions/ changes in diff \u2014 nothing to validate\n[generate-manifests] All 85 generated files match catalog/ sources\n[validate-provider-groups] OK: 2 capability group(s) verified \u2014 stacked-pr (graphite, github); remote-agent (cursor, devin, jules)\n[validate-codex] \u2713 9 Codex-enabled plugin(s) pass artifact validation and the exposure lint\n[validate-cursor] \u2713 2 Cursor-enabled plugin(s) pass artifact validation, the exposure lint, and the lifecycle non-emission scan\n[validate-jules] OK: 7 replica unit(s) match yellow-cursor\n[validate-flow-namespace] \u2713 no `workflows:` references remain outside permanent pins (36 pinned references across 10 permanent files)\n[validate-provider-neutral-commands] OK: 625 markdown file(s) scanned, no unallowlisted mutating gt/gh-stack references outside provider-owned or historical paths.\n\u001b[32m\u2713 PASS:\u001b[0m council roster consistent (4 reviewers, 3 CLI, epoch 1efa59b3)\n\u001b[32m\u2713 PASS:\u001b[0m doc counts match marketplace canonical (20 plugins)\n[validate-shell-compat] OK: 385 markdown and 54 shell file(s) scanned, 0 allowlisted finding(s).\n"
+    }
+  ]
+}

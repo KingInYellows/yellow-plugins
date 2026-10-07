@@ -157,6 +157,52 @@ describe('Codex enablement filtering', () => {
   });
 });
 
+describe('Codex command migration opt-out', () => {
+  it('emits an empty command allowlist while preserving Claude command discovery', () => {
+    const root = makeCodexFixtureRoot([
+      {
+        name: 'skill-only-plugin',
+        codexEnabled: true,
+        skillAllowlist: ['reference'],
+        skills: { reference: { name: 'reference', description: 'Reference skill' } },
+      },
+    ]);
+    const sourcePath = join(root, 'catalog', 'plugins', 'skill-only-plugin.json');
+    const source = JSON.parse(readFileSync(sourcePath, 'utf8'));
+    source.targets.codex.enabled = false;
+    writeJson(sourcePath, source);
+    const commandPath = join(root, 'plugins', 'skill-only-plugin', 'commands', 'legacy.md');
+    mkdirSync(join(root, 'plugins', 'skill-only-plugin', 'commands'));
+    const command = '---\ndescription: Claude command\n---\nUse the Skill tool.\n';
+    writeFileSync(commandPath, command);
+    expect(generateManifests({ mode: 'apply', rootDir: root }).status).toBe('ok');
+    const claudePath = join(root, 'plugins', 'skill-only-plugin', '.claude-plugin', 'plugin.json');
+    const claudeBefore = readFileSync(claudePath, 'utf8');
+
+    source.targets.codex.enabled = true;
+    writeJson(sourcePath, source);
+    expect(generateManifests({ mode: 'apply', rootDir: root }).status).toBe('ok');
+    const manifest = JSON.parse(
+      readFileSync(join(root, 'plugins', 'skill-only-plugin', '.codex-plugin', 'plugin.json'), 'utf8')
+    );
+    expect(manifest.commands).toEqual([]);
+    expect(manifest.skills).toBe('./codex/skills');
+    expect(readFileSync(claudePath, 'utf8')).toBe(claudeBefore);
+    expect(JSON.parse(claudeBefore)).not.toHaveProperty('commands');
+    expect(readFileSync(commandPath, 'utf8')).toBe(command);
+  });
+
+  it('emits the opt-out even when the Codex skill allowlist is empty', () => {
+    const root = makeCodexFixtureRoot([{ name: 'empty-plugin', codexEnabled: true }]);
+    expect(generateManifests({ mode: 'apply', rootDir: root }).status).toBe('ok');
+    const manifest = JSON.parse(
+      readFileSync(join(root, 'plugins', 'empty-plugin', '.codex-plugin', 'plugin.json'), 'utf8')
+    );
+    expect(manifest.commands).toEqual([]);
+    expect(manifest).not.toHaveProperty('skills');
+  });
+});
+
 describe('empty-state marketplace', () => {
   it('emits plugins: [] when no plugin is Codex-enabled, and is byte-identical on regeneration', () => {
     const root = makeCodexFixtureRoot([{ name: 'claude-only-plugin', codexEnabled: false }]);
@@ -1589,5 +1635,24 @@ describe('stale sweep symlink hardening (dangling hooks/hooks.json, symlinked ho
     expect(applied.status).toBe('ok');
     expect(JSON.parse(readFileSync(manifest, 'utf8')).name).toBe('tmp-leftover');
     expect(() => lstatSync(manifest + '.tmp')).toThrow();
+  });
+});
+
+describe('invocation policy generated drift', () => {
+  it('detects changed policy bytes and sweeps a removed policy resource', () => {
+    const root = makeCodexFixtureRoot([{ name: 'alpha', codexEnabled: true,
+      skillAllowlist: ['safe'], skills: { safe: { name: 'safe', description: 'Safe' } } }]);
+    const agents = join(root, 'plugins/alpha/skills/safe/agents');
+    mkdirSync(agents);
+    writeFileSync(join(agents, 'openai.yaml'), 'policy:\n  allow_implicit_invocation: false\n');
+    expect(generateManifests({ rootDir: root, mode: 'apply' }).status).toBe('ok');
+    const generated = join(root, 'plugins/alpha/codex/skills/safe/agents/openai.yaml');
+    writeFileSync(generated, 'policy:\n  allow_implicit_invocation: true\n');
+    expect(generateManifests({ rootDir: root, mode: 'check' }).diffs.length).toBeGreaterThan(0);
+    expect(generateManifests({ rootDir: root, mode: 'apply' }).status).toBe('ok');
+    rmSync(agents, { recursive: true });
+    expect(generateManifests({ rootDir: root, mode: 'check' }).diffs.length).toBeGreaterThan(0);
+    expect(generateManifests({ rootDir: root, mode: 'apply' }).status).toBe('ok');
+    expect(existsSync(generated)).toBe(false);
   });
 });

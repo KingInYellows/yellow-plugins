@@ -2,11 +2,11 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://kingin-yellows.dev/schemas/codex-plugin.schema.json",
   "title": "Codex Plugin Manifest Schema",
-  "description": "Schema for the generated plugins/<name>/.codex-plugin/plugin.json — the Codex-target counterpart to plugins/<name>/.claude-plugin/plugin.json (R6).",
-  "$comment": "Repo-derived schema, not an official OpenAI schema, from the July 2026 Codex plugin contract. required name/interface.displayName/interface.category/version/description come from R6 directly. The 'skills' manifest-relative path field implements R7 ('an explicit manifest-relative choice, not an assumed convention') using this repo's existing Claude-side field name for the analogous concept (schemas/plugin.schema.json's 'skills' property). The 'hooks' string-path field is empirically confirmed accepted by the Codex manifest parser (docs/research/2026-07-16-codex-plugin-contract-spike.md finding (d)), though hook execution itself is currently inert (plugin_hooks feature 'removed' on codex-cli 0.144.1) — the field is still emitted for forward compatibility per R20. The 'mcpServers' shape is not independently spiked for Codex in this shell (no plugin enables Codex yet; gt-workflow's MCP wiring is shell 04's concern) and is left permissive pending that verification. Re-verify all of the above against a real `codex plugin add` + `codex plugin list --json` round-trip in the Step 15 CI job and correct this schema if the live CLI disagrees.",
+  "description": "Schema for the generated plugins/<name>/.codex-plugin/plugin.json \u2014 the Codex-target counterpart to plugins/<name>/.claude-plugin/plugin.json (R6).",
+  "$comment": "Repository exposure schema, not an official OpenAI schema. Codex CLI 0.157.0 install/list and app-server skills/list verify the generated skill paths. commands must be [] to suppress compatibility migration of Claude commands. hooks/list verifies registration and untrusted state only; hook execution and authenticated MCP use require separate runtime checks. See docs/runtime-install-smoke.md and docs/research/codex-phase-1-2026-10-05/report.md.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["name", "version", "interface", "description"],
+  "required": ["name", "version", "interface", "description", "commands"],
   "properties": {
     "name": {
       "type": "string",
@@ -24,14 +24,33 @@
       "additionalProperties": false,
       "required": ["displayName", "category"],
       "properties": {
-        "displayName": { "type": "string", "minLength": 1 },
-        "category": { "type": "string", "minLength": 1 }
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1
+        },
+        "developerName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "websiteURL": {
+          "type": "string",
+          "format": "uri"
+        }
       }
     },
     "description": {
       "type": "string",
       "minLength": 1,
       "description": "Target-specific description override from the catalog when present, else the shared description (R6)."
+    },
+    "commands": {
+      "type": "array",
+      "maxItems": 0,
+      "description": "Repository exposure policy: require an explicit empty list to suppress Codex compatibility migration of Claude commands into extra skills. Verified with codex-cli 0.157.0; see https://github.com/openai/codex/blob/rust-v0.157.0/codex-rs/core-plugins/src/command_migration/plugin.rs. Omission enables commands/ discovery, bypassing the catalog skill allowlist."
     },
     "skills": {
       "type": "string",
@@ -43,10 +62,80 @@
       "type": "string",
       "minLength": 1,
       "pattern": "^(?:\\./)?(?!.*\\.\\.)[A-Za-z0-9._/-]+\\.[A-Za-z0-9]+$",
-      "description": "Manifest-relative path to the Codex hook config file, e.g. './hooks/codex-hooks.json'. Codex-only — never an inline object (R20). Currently inert pending upstream plugin_hooks support; emitted for forward compatibility. File-path pattern mirrored from schemas/plugin.schema.json's 'relativeFile' definition (no absolute prefixes, no '..' traversal)."
+      "description": "Generated local hook config path. Pinned 0.157.0 lifecycle execution is separately tested with exact disposable trust."
     },
     "mcpServers": {
-      "description": "Pass-through, not independently validated by this schema in this shell — see $comment."
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^(?:\\./)(?!.*\\.\\.)[A-Za-z0-9._/-]+\\.json$"
+        },
+        {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_-]*$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["url"],
+            "properties": {
+              "url": {
+                "type": "string",
+                "pattern": "^https://[^@?#$\\s]+$"
+              },
+              "enabled_tools": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 4,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "ask_wiki_question",
+                    "ask_question",
+                    "read_wiki_structure",
+                    "read_wiki_contents"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "description": "Explicit file reference or target-selected public HTTPS URL-only map. No Claude userConfig, headers, credential environment or substitutions."
+    },
+    "author": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        }
+      },
+      "description": "Shared catalog attribution. The legacy 0.157.0 parser ignores this top-level metadata; interface.developerName carries runtime presentation."
+    },
+    "license": {
+      "type": "string",
+      "minLength": 1
+    },
+    "keywords": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9-]+$"
+      }
     }
   }
 }

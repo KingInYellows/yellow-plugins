@@ -1,0 +1,131 @@
+{
+  "recordedAt": "2026-10-06T15:03:12.998602+00:00",
+  "suites": [
+    {
+      "name": "policy",
+      "command": [
+        "node",
+        "scripts/smoke-codex-workflow-acceptance.js",
+        "--use-existing-login",
+        "--corpus",
+        "tests/fixtures/codex-expansion/policy.json"
+      ],
+      "exitCode": 0,
+      "seconds": 27.02,
+      "status": "passed",
+      "receipt": "policy-final.json"
+    },
+    {
+      "name": "developer-docs",
+      "command": [
+        "node",
+        "scripts/smoke-codex-workflow-acceptance.js",
+        "--use-existing-login",
+        "--corpus",
+        "tests/fixtures/codex-expansion/developer-docs-final.json"
+      ],
+      "exitCode": 0,
+      "seconds": 93.02,
+      "status": "passed",
+      "receipt": "developer-docs-final.json"
+    },
+    {
+      "name": "analysis",
+      "command": [
+        "node",
+        "scripts/smoke-codex-workflow-acceptance.js",
+        "--use-existing-login",
+        "--corpus",
+        "tests/fixtures/codex-expansion/analysis-final.json"
+      ],
+      "exitCode": 0,
+      "seconds": 71.14,
+      "status": "passed",
+      "receipt": "analysis-final.json"
+    },
+    {
+      "name": "remote-orchestration",
+      "command": [
+        "node",
+        "scripts/smoke-codex-workflow-acceptance.js",
+        "--use-existing-login",
+        "--corpus",
+        "tests/fixtures/codex-expansion/remote-orchestration-final.json"
+      ],
+      "exitCode": 0,
+      "seconds": 133.39,
+      "status": "passed",
+      "receipt": "remote-orchestration-final.json"
+    },
+    {
+      "name": "research",
+      "command": [
+        "node",
+        "scripts/smoke-codex-workflow-acceptance.js",
+        "--use-existing-login",
+        "--corpus",
+        "tests/fixtures/codex-expansion/research-final.json"
+      ],
+      "exitCode": 0,
+      "seconds": 37.95,
+      "status": "passed",
+      "receipt": "research-final.json"
+    },
+    {
+      "name": "research-negative",
+      "command": [
+        "node",
+        "scripts/smoke-codex-workflow-acceptance.js",
+        "--use-existing-login",
+        "--corpus",
+        "tests/fixtures/codex-expansion/research-negative-final.json"
+      ],
+      "exitCode": 0,
+      "seconds": 72.55,
+      "status": "passed",
+      "receipt": "research-negative-final.json"
+    },
+    {
+      "name": "gt-after",
+      "command": [
+        "node",
+        "scripts/smoke-codex-workflow-acceptance.js",
+        "--use-existing-login",
+        "--corpus",
+        "tests/fixtures/codex-expansion/gt-final.json"
+      ],
+      "exitCode": 0,
+      "seconds": 34.16,
+      "status": "passed",
+      "receipt": "gt-after-final.json"
+    },
+    {
+      "name": "pilot-after",
+      "command": [
+        "node",
+        "scripts/smoke-codex-workflow-acceptance.js",
+        "--use-existing-login",
+        "--corpus",
+        "tests/fixtures/codex-pilot-tasks/cases.json"
+      ],
+      "exitCode": 0,
+      "seconds": 85.91,
+      "status": "passed",
+      "receipt": "pilot-after-final.json"
+    },
+    {
+      "name": "codex-missing-auth",
+      "command": [
+        "node",
+        "scripts/smoke-codex-workflow-acceptance.js",
+        "--use-existing-login",
+        "--corpus",
+        "tests/fixtures/codex-expansion/codex-missing-auth-final.json"
+      ],
+      "exitCode": 0,
+      "status": "passed",
+      "receipt": "codex-missing-auth-final.json",
+      "nativeEvidenceReceipt": "codex-absent-auth-native.json"
+    }
+  ]
+}

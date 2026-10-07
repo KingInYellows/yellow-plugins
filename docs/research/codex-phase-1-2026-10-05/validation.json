@@ -1,0 +1,199 @@
+{
+  "recordedAt": "2026-10-06T00:16:48.321960+00:00",
+  "checks": [
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/codex-schema-examples.test.ts",
+        "tests/integration/generate-manifests-codex.test.ts",
+        "tests/integration/smoke-codex-plugin-install.test.ts",
+        "tests/integration/smoke-codex-plugin-lifecycle.test.ts",
+        "tests/integration/smoke-codex-skill-activation.test.ts",
+        "tests/integration/smoke-codex-graphite-auth.test.ts",
+        "--maxWorkers=2",
+        "--minWorkers=1"
+      ],
+      "exitCode": 0,
+      "seconds": 92.45,
+      "log": "/tmp/yellow-phase1-completion-check-0.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "validate:schemas"
+      ],
+      "exitCode": 0,
+      "seconds": 6.01,
+      "log": "/tmp/yellow-phase1-completion-check-1.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "validate:versions"
+      ],
+      "exitCode": 0,
+      "seconds": 0.62,
+      "log": "/tmp/yellow-phase1-completion-check-2.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "lint"
+      ],
+      "exitCode": 0,
+      "seconds": 31.44,
+      "log": "/tmp/yellow-phase1-postfix-1.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "seconds": 5.7,
+      "log": "/tmp/yellow-phase1-completion-check-4.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "test:unit"
+      ],
+      "exitCode": 0,
+      "seconds": 65.82,
+      "log": "/tmp/yellow-phase1-completion-check-5.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "test:integration",
+        "--maxWorkers=2",
+        "--minWorkers=1"
+      ],
+      "exitCode": 0,
+      "seconds": 90.27,
+      "log": "/tmp/yellow-phase1-completion-check-6.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "lint:plugins"
+      ],
+      "exitCode": 0,
+      "seconds": 6.8,
+      "log": "/tmp/yellow-phase1-completion-check-7.log"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "seconds": 0.07,
+      "log": "/tmp/yellow-phase1-completion-check-8.log"
+    }
+  ],
+  "runtime": [
+    {
+      "command": [
+        "node",
+        "scripts/smoke-codex-plugin-install.js",
+        "--ci",
+        "--timeout-ms",
+        "60000"
+      ],
+      "exitCode": 0,
+      "status": "passed",
+      "failure": [],
+      "receipt": "/tmp/yellow-discovery-repeat.json"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/smoke-codex-skill-activation.js",
+        "--use-existing-login",
+        "--keep-temp"
+      ],
+      "exitCode": 0,
+      "status": "passed",
+      "failure": null,
+      "receipt": "/tmp/yellow-activation-repeat.json"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/smoke-codex-graphite-auth.js",
+        "--use-existing-login"
+      ],
+      "exitCode": 0,
+      "status": "passed",
+      "failure": null,
+      "receipt": "/tmp/yellow-graphite-auth-repeat.json"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/smoke-codex-plugin-lifecycle.js",
+        "--keep-temp"
+      ],
+      "exitCode": 0,
+      "status": "passed",
+      "receipt": "lifecycle-final.json"
+    }
+  ],
+  "completedAt": "2026-10-06T00:24:18.062257+00:00",
+  "status": "passed",
+  "counts": {
+    "unitPassed": 787,
+    "integrationPassed": 1796,
+    "integrationSkipped": 1,
+    "newAcceptanceRegressionPassed": 16,
+    "earlierUnchangedHookBatsPassed": 393,
+    "focusedPassed": 147
+  },
+  "intermediateFailures": "validation-completion-initial.json; discovery-timeout.json; activation-path-guard-failure.json; activation-initial-failure.json",
+  "note": "Full integration included the final 11 activation and 5 authentication tests. Import ordering repair and exact relative fixture path handling are covered by the post-fix focused pass; no plugin hook/skill source changed after the prior 393 Bats pass.",
+  "postFixChecks": [
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/codex-schema-examples.test.ts",
+        "tests/integration/generate-manifests-codex.test.ts",
+        "tests/integration/smoke-codex-plugin-install.test.ts",
+        "tests/integration/smoke-codex-plugin-lifecycle.test.ts",
+        "tests/integration/smoke-codex-skill-activation.test.ts",
+        "tests/integration/smoke-codex-graphite-auth.test.ts",
+        "--maxWorkers=2",
+        "--minWorkers=1"
+      ],
+      "exitCode": 0,
+      "seconds": 10.16,
+      "log": "/tmp/yellow-phase1-postfix-0.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "lint"
+      ],
+      "exitCode": 0,
+      "seconds": 31.44,
+      "log": "/tmp/yellow-phase1-postfix-1.log"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "seconds": 0.03,
+      "log": "/tmp/yellow-phase1-postfix-2.log"
+    }
+  ]
+}

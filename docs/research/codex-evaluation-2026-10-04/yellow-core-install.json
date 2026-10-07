@@ -1,0 +1,8 @@
+{
+  "pluginId": "yellow-core@yellow-plugins",
+  "name": "yellow-core",
+  "marketplaceName": "yellow-plugins",
+  "version": "2.6.2",
+  "installedPath": "/tmp/yellow-codex-eval-eXZKFV/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2",
+  "authPolicy": "ON_INSTALL"
+}

@@ -5,14 +5,14 @@
 All remote MCP servers used by plugins in this marketplace. Review before
 enterprise deployment.
 
-| Plugin          | Server Key | Endpoint                                         | Transport | Auth                        | Data Sent                     |
-| --------------- | ---------- | ------------------------------------------------ | --------- | --------------------------- | ----------------------------- |
-| yellow-core     | context7   | `https://mcp.context7.com/mcp`                   | HTTP      | None                        | Library names, search queries |
-| yellow-linear   | linear     | `https://mcp.linear.app/mcp`                     | HTTP      | OAuth (browser popup)       | Issue data, team info         |
-| yellow-composio | composio-server | `https://connect.composio.dev/mcp`          | HTTP      | OAuth (browser); headless consumer key is plaintext | Connected-app tool calls |
-| yellow-research | deepwiki   | `https://mcp.deepwiki.com/mcp`                   | HTTP      | None                        | Repo names, search queries    |
-| yellow-devin    | devin      | `https://mcp.devin.ai/mcp`                       | HTTP      | TBD (may require API token) | Code, task prompts            |
-| yellow-ruvector | ruvector   | Local stdio (`bin/start-ruvector.sh` → plugin-managed `ruvector@0.3.3 mcp start`) | stdio     | None (local)                | Code embeddings (local only)  |
+| Plugin          | Server Key      | Endpoint                                                                          | Transport | Auth                                                | Data Sent                     |
+| --------------- | --------------- | --------------------------------------------------------------------------------- | --------- | --------------------------------------------------- | ----------------------------- |
+| yellow-core     | context7        | `https://mcp.context7.com/mcp`                                                    | HTTP      | None                                                | Library names, search queries |
+| yellow-linear   | linear          | `https://mcp.linear.app/mcp`                                                      | HTTP      | OAuth (browser popup)                               | Issue data, team info         |
+| yellow-composio | composio-server | `https://connect.composio.dev/mcp`                                                | HTTP      | OAuth (browser); headless consumer key is plaintext | Connected-app tool calls      |
+| yellow-research | deepwiki        | `https://mcp.deepwiki.com/mcp`                                                    | HTTP      | None                                                | Repo names, search queries    |
+| yellow-devin    | devin           | `https://mcp.devin.ai/mcp`                                                        | HTTP      | TBD (may require API token)                         | Code, task prompts            |
+| yellow-ruvector | ruvector        | Local stdio (`bin/start-ruvector.sh` → plugin-managed `ruvector@0.3.3 mcp start`) | stdio     | None (local)                                        | Code embeddings (local only)  |
 
 The `ruvector` stdio server is network-free once the plugin-managed install
 exists in the plugin data dir and the ONNX model is cached. The first session
@@ -22,9 +22,40 @@ plugin's committed `package-lock.json`, see
 downloads all-MiniLM-L6-v2 from huggingface.co. The SessionStart prewarm hook
 does both in the background; `/ruvector:setup` does them in the foreground.
 
+The Codex `gt-workflow` package also declares a local stdio MCP server named
+`graphite`, launched as `gt mcp` from `.mcp.json`. Its installed declaration is
+covered by the Codex smoke gate; server startup, authentication and remote
+operations are separate runtime checks, not established by plugin installation.
+
+### Codex discovery smoke boundary
+
+The
+[Codex smoke harness](runtime-install-smoke.md#codex-installation-and-loaded-discovery)
+isolates profile paths and uses an environment allowlist without copying
+credentials. It disables remote plugin discovery and never starts a thread,
+model turn, hook execution or MCP connection. Discovered hooks must remain
+untrusted. The CLI and PATH executables are trusted inputs; this is not a
+network sandbox. Generated `commands: []` prevents implicit migration of Claude
+command wrappers beyond the catalog's Codex skill allowlist.
+
+The optional `smoke:codex:lifecycle` fixture adds user/mount/PID/network
+isolation through `unshare` and `bwrap`. Only loopback is brought up; the real
+home, profile, credentials and desktop buses are absent from the sandbox. Fixed
+Responses calls reach disposable git/gt/gh stubs, with the system Git entrypoint
+overlaid too. Graphite MCP is disabled by plugin policy during both hook
+controls. Only the three exact disposable hook definition hashes are trusted,
+after installed hook/config bytes match source.
+
+A separate no-model-turn MCP probe enables the installed Graphite registration
+and launches actual Graphite CLI code read-only. Its wrapper accepts only
+`gt mcp`; Git repository paths/version/empty refs are synthetic and other reads
+fail. MCP tool discovery is observed without invoking tools. No account
+credential is supplied, copied or read. A connected stdio server and
+`authStatus: unsupported` do not prove Graphite account authentication. The
+receipt marks Phase 1 acceptance partial even when these controls pass.
+
 ### Plugins Without MCP Servers
 
-- **gt-workflow** — Pure CLI wrapper for Graphite, no network calls
 - **yellow-review** — Ships no MCP server; uses `gh` CLI (GitHub CLI) for
   GraphQL API calls. When yellow-linear's `save_issue` tool is discoverable and
   the branch name carries a Linear issue ID, `/review:resolve` files follow-up
@@ -32,8 +63,8 @@ does both in the background; `/ruvector:setup` does them in the foreground.
   `save_issue`) under that server's OAuth grant. The issue holds a generated
   title (`Follow-up from PR #N: <path or "review">`), the resolver's
   `oos_reason`, a link to the thread, and a dedupe marker; the reviewer's
-  comment text is never sent. Otherwise, or when Linear fails or its team
-  cannot be resolved, it files once on GitHub and the report says so
+  comment text is never sent. Otherwise, or when Linear fails or its team cannot
+  be resolved, it files once on GitHub and the report says so
   (`tracker=github (linear unavailable)`).
 - **yellow-browser-test** — Uses `agent-browser` CLI locally, no MCP
 - **yellow-debt** — Pure local analysis, no network calls
@@ -51,8 +82,8 @@ Code handles credentials natively through OAuth and shell environment variables.
 
 These plugins use browser-based OAuth managed entirely by Claude Code:
 
-1. On first MCP tool call, or from `/mcp` → Authenticate, Claude Code opens
-   a browser login
+1. On first MCP tool call, or from `/mcp` → Authenticate, Claude Code opens a
+   browser login
 2. Authenticate with the provider (Linear, or Composio at
    `https://connect.composio.dev/mcp`)
 3. Token is stored securely in your operating system's credential manager (macOS
@@ -61,9 +92,9 @@ These plugins use browser-based OAuth managed entirely by Claude Code:
    authentication"
 
 No API keys in the plugin manifest. Will not work in headless SSH sessions
-(browser required for OAuth flow). A headless Composio host can instead
-register a user-level server with a For You consumer key; that stores the
-key in plaintext in `~/.claude.json`. See `/composio:setup`.
+(browser required for OAuth flow). A headless Composio host can instead register
+a user-level server with a For You consumer key; that stores the key in
+plaintext in `~/.claude.json`. See `/composio:setup`.
 
 ### API token servers (yellow-devin)
 
@@ -95,9 +126,9 @@ These servers require no configuration. They work immediately after plugin
 installation:
 
 - **context7** (yellow-core) — public library documentation endpoint
-- **ruvector** (yellow-ruvector) — local stdio server, no auth configuration
-  (on first use its launcher, `bin/start-ruvector.sh`, installs the pinned
-  ruvector from the npm registry and downloads the ONNX model — see
+- **ruvector** (yellow-ruvector) — local stdio server, no auth configuration (on
+  first use its launcher, `bin/start-ruvector.sh`, installs the pinned ruvector
+  from the npm registry and downloads the ONNX model — see
   [MCP Servers Inventory](#mcp-servers-inventory) above)
 - **deepwiki** (yellow-research) — public repository documentation endpoint
 
@@ -168,21 +199,21 @@ These plugins work entirely offline with no external network calls:
 
 Ten plugins execute hooks — yellow-ruvector, yellow-debt, yellow-core,
 yellow-morph, yellow-research, yellow-semgrep, and yellow-review are shell;
-yellow-ci, gt-workflow, and github-workflow run a dependency-free Node
-runtime (only one of gt-workflow / github-workflow is enabled at a time):
+yellow-ci, gt-workflow, and github-workflow run a dependency-free Node runtime
+(only one of gt-workflow / github-workflow is enabled at a time):
 
-| Plugin          | Hook Events                                       | Purpose                                                                                  |
-| --------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| yellow-ruvector | PreToolUse, PostToolUse, SessionStart             | Install prewarm, memory recall, co-edit tracking                                         |
-| yellow-ci       | SessionStart                                      | Check for recent CI failures (Node runtime, cached, 3s budget)                           |
-| yellow-debt     | SessionStart                                      | Remind about high/critical debt findings                                                 |
-| gt-workflow     | PreToolUse, PostToolUse                           | Block `git push`, validate commit messages                                               |
-| github-workflow | PreToolUse, PostToolUse                           | Block `git push`, validate commit messages (same Node entrypoint as gt-workflow)         |
-| yellow-core     | SessionStart, Stop, PreCompact                    | Staging-queue drain; transcript-tail capture; compaction-preservation instruction        |
-| yellow-morph    | SessionStart                                      | Pre-warm `@morphllm/morphmcp` install for fast first tool call                           |
-| yellow-research | SessionStart                                      | Pre-warm context7 docs cache; emit `credential-status.json` for `/setup:all`             |
-| yellow-semgrep  | SessionStart                                      | Emit `credential-status.json` for `/setup:all`                                           |
-| yellow-review   | SessionStart                                      | Report pending review-ledger findings (counts and PR numbers only)                       |
+| Plugin          | Hook Events                           | Purpose                                                                           |
+| --------------- | ------------------------------------- | --------------------------------------------------------------------------------- |
+| yellow-ruvector | PreToolUse, PostToolUse, SessionStart | Install prewarm, memory recall, co-edit tracking                                  |
+| yellow-ci       | SessionStart                          | Check for recent CI failures (Node runtime, cached, 3s budget)                    |
+| yellow-debt     | SessionStart                          | Remind about high/critical debt findings                                          |
+| gt-workflow     | PreToolUse, PostToolUse               | Block `git push`, validate commit messages                                        |
+| github-workflow | PreToolUse, PostToolUse               | Block `git push`, validate commit messages (same Node entrypoint as gt-workflow)  |
+| yellow-core     | SessionStart, Stop, PreCompact        | Staging-queue drain; transcript-tail capture; compaction-preservation instruction |
+| yellow-morph    | SessionStart                          | Pre-warm `@morphllm/morphmcp` install for fast first tool call                    |
+| yellow-research | SessionStart                          | Pre-warm context7 docs cache; emit `credential-status.json` for `/setup:all`      |
+| yellow-semgrep  | SessionStart                          | Emit `credential-status.json` for `/setup:all`                                    |
+| yellow-review   | SessionStart                          | Report pending review-ledger findings (counts and PR numbers only)                |
 
 **yellow-ci SessionStart (Node port).** Ported from `session-start.sh` to a
 dependency-free Node runtime (`hooks/scripts/`); byte/semantic parity is gated
@@ -191,42 +222,43 @@ by `tests/hook-parity.bats`. It is **fail-open** — always emits valid
 relocated to a plugin-data dir
 (`${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ci}`) with a
 read-only fallback to the legacy `${HOME}/.cache/yellow-ci`. The hook is carried
-into the generated Codex manifest (`hooks/codex-hooks.json`) but is **inert on
-Codex** — `plugin_hooks` is `removed` on codex-cli 0.144.x — so its Codex-side
-behavior is schema/unit/parity-tested, not live-verified.
+into the generated Codex manifest (`hooks/codex-hooks.json`). The disconnected
+Codex 0.157.0 fixture verifies trusted SessionStart delivery and untrusted
+non-execution with a GitHub CLI stub. Historical 0.144.x inert observations
+remain version-specific; live CI authentication/data are not established.
 
 **yellow-review SessionStart.** `hooks/scripts/session-start.sh` reads the
 review-findings ledger's `<pr>.pending` and `<pr>.state` sidecars under
-`$(git rev-parse --git-common-dir)/yellow-review/findings/`, a directory
-shared by every worktree of the clone and written only by
-`lib/review-ledger.sh`. The ledger holds model-authored finding text derived
-from untrusted PR content, so the hook never emits it: `systemMessage` and
-`additionalContext` carry integers and PR numbers only. It is read-only (no
-network, no writes), takes each ledger lock shared with a 0.2 s wait, caps
-its fallback fold at 1.5 s, stops starting new PRs at a single 2.3 s overall
-deadline inside the 3 s catalog timeout, and always exits with valid
-`{"continue": true}` JSON, so a busy or corrupt ledger can block nothing. It is not carried into the Codex or Cursor manifests.
+`$(git rev-parse --git-common-dir)/yellow-review/findings/`, a directory shared
+by every worktree of the clone and written only by `lib/review-ledger.sh`. The
+ledger holds model-authored finding text derived from untrusted PR content, so
+the hook never emits it: `systemMessage` and `additionalContext` carry integers
+and PR numbers only. It is read-only (no network, no writes), takes each ledger
+lock shared with a 0.2 s wait, caps its fallback fold at 1.5 s, stops starting
+new PRs at a single 2.3 s overall deadline inside the 3 s catalog timeout, and
+always exits with valid `{"continue": true}` JSON, so a busy or corrupt ledger
+can block nothing. It is not carried into the Codex or Cursor manifests.
 
 **yellow-core PreCompact.** `hooks/scripts/pre-compact.sh` prints a plain-text
 compaction-preservation instruction that Claude Code appends to the compaction
-prompt. It is read-only — no network, no file writes — and always exits 0, so
-it can never block a compaction (exit 2 would). The instruction requires
-every preserved item (plan tasks, modified files, user decisions, open
-questions, failing-command output, branch/PR names) to have detected secrets
-replaced with `--- redacted credential at line N ---` and then be wrapped in
-the untrusted-content fence, so neither credentials nor instruction-like text
-can re-enter as trusted context after compaction.
+prompt. It is read-only — no network, no file writes — and always exits 0, so it
+can never block a compaction (exit 2 would). The instruction requires every
+preserved item (plan tasks, modified files, user decisions, open questions,
+failing-command output, branch/PR names) to have detected secrets replaced with
+`--- redacted credential at line N ---` and then be wrapped in the
+untrusted-content fence, so neither credentials nor instruction-like text can
+re-enter as trusted context after compaction.
 
 ### yellow-ruvector Hooks (detailed)
 
 yellow-ruvector has the most hooks. Its shell scripts:
 
-| Hook               | Event            | Script                  | Time Budget | What It Does                                           |
-| ------------------ | ---------------- | ----------------------- | ----------- | ------------------------------------------------------ |
-| pre-tool-use       | PreToolUse       | `pre-tool-use.sh`       | 1s          | Fenced co-edit suggestions (jq only; partners re-validated as files under the root) |
-| prewarm            | SessionStart     | `prewarm.sh`            | 5s          | Background install + ONNX model download (detached)    |
-| session-start      | SessionStart     | `session-start.sh`      | 6s          | Worktree store-heal, one semantic recall into additionalContext |
-| post-tool-use      | PostToolUse      | `post-tool-use.sh`      | 1s          | Record co-edit pairs in `.ruvector/coedit.json` (jq only) |
+| Hook          | Event        | Script             | Time Budget | What It Does                                                                        |
+| ------------- | ------------ | ------------------ | ----------- | ----------------------------------------------------------------------------------- |
+| pre-tool-use  | PreToolUse   | `pre-tool-use.sh`  | 1s          | Fenced co-edit suggestions (jq only; partners re-validated as files under the root) |
+| prewarm       | SessionStart | `prewarm.sh`       | 5s          | Background install + ONNX model download (detached)                                 |
+| session-start | SessionStart | `session-start.sh` | 6s          | Worktree store-heal, one semantic recall into additionalContext                     |
+| post-tool-use | PostToolUse  | `post-tool-use.sh` | 1s          | Record co-edit pairs in `.ruvector/coedit.json` (jq only)                           |
 
 **Security properties:**
 
@@ -242,8 +274,8 @@ yellow-ruvector has the most hooks. Its shell scripts:
   from `git rev-parse --git-common-dir` (never user input); a pre-existing
   non-symlink path (directory or regular file) is never replaced (warn-only)
 - Queue files are append-only JSONL with `flock` for concurrency safety
-- No network calls in any hook script except `prewarm.sh`'s detached
-  background install (`npm ci`) and model download
+- No network calls in any hook script except `prewarm.sh`'s detached background
+  install (`npm ci`) and model download
 - Scripts run with user's permissions (no escalation)
 
 ### Hook Review Process
@@ -298,15 +330,14 @@ ephemeral `GITHUB_TOKEN`.
 - yellow-review uses `gh` CLI which reads user's GitHub auth state
 - yellow-debt reads codebase files but only writes to `todos/` directory
 - **yellow-review's Codex copy is a trust-boundary downgrade, not a
-  data-residency one.** Codex CLI runs locally like `gh` or `gt`, so the
-  "all processing happens locally" guarantee above still holds for it.
-  Claude's `thermonuclear-reviewer` agent is restricted by `tools:`
-  frontmatter (read-only); the generated Codex copy of
-  `yellow-thermonuclear-review` has no equivalent allowlist and relies on
-  the skill body's report-only rails instead — a prompt-level control, not
-  runtime enforcement. See
-  `plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md`
-  "Safety rails".
+  data-residency one.** Codex CLI runs locally like `gh` or `gt`, so the "all
+  processing happens locally" guarantee above still holds for it. Claude's
+  `thermonuclear-reviewer` agent is restricted by `tools:` frontmatter
+  (read-only); the generated Codex copy of `yellow-thermonuclear-review` has no
+  equivalent allowlist and relies on the skill body's report-only rails instead
+  — a prompt-level control, not runtime enforcement. See
+  `plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md` "Safety
+  rails".
 
 ### Quote grounding (yellow-core)
 
@@ -334,87 +365,86 @@ ephemeral `GITHUB_TOKEN`.
 ### Review-Findings Ledger (yellow-review)
 
 `/review:pr` and `/review:all` persist model-derived review data — finding
-titles, suggested fixes, reasons and anchor snippets — and feed part of it
-back into later reviewer prompts. The boundary:
+titles, suggested fixes, reasons and anchor snippets — and feed part of it back
+into later reviewer prompts. The boundary:
 
 - **Storage.** The ledger lives under
   `$(git rev-parse --git-common-dir)/yellow-review/findings/`: inside the Git
-  directory, so it is never committed or pushed, and shared by every worktree
-  of the clone. `lib/review-ledger.sh` creates the directory 0700 and every
-  file 0600 (`umask 077`). Nothing is posted to GitHub.
-- **Redaction before persistence.** Every model-authored string passes
-  through yellow-core's `cs_redact_secrets`, then a fail-closed pass that
-  replaces env-style `*_KEY` / `*_TOKEN` / `*_SECRET` / `*_ID` / `*_PASSWORD`
-  assignments and long high-entropy tokens with
-  `[withheld: possible credential]`. Without yellow-core, or when redaction
-  fails, the string is withheld rather than stored raw; an anchor line that
-  fails redaction keeps only its hash and line hint.
+  directory, so it is never committed or pushed, and shared by every worktree of
+  the clone. `lib/review-ledger.sh` creates the directory 0700 and every file
+  0600 (`umask 077`). Nothing is posted to GitHub.
+- **Redaction before persistence.** Every model-authored string passes through
+  yellow-core's `cs_redact_secrets`, then a fail-closed pass that replaces
+  env-style `*_KEY` / `*_TOKEN` / `*_SECRET` / `*_ID` / `*_PASSWORD` assignments
+  and long high-entropy tokens with `[withheld: possible credential]`. Without
+  yellow-core, or when redaction fails, the string is withheld rather than
+  stored raw; an anchor line that fails redaction keeps only its hash and line
+  hint.
 - **Prompt re-entry.** Dismissals that still apply are re-injected into later
   reviewer prompts as a `--- begin dismissed-findings (reference only) ---`
   block. The library substitutes that block's delimiters and the neighbouring
-  context blocks' delimiters out of every value, XML-escapes them, and drops
-  any entry whose title or reason starts a line with `IGNORE PREVIOUS`,
-  `system:` or `assistant:`. Reviewers treat the block as reference data,
-  never as instructions.
+  context blocks' delimiters out of every value, XML-escapes them, and drops any
+  entry whose title or reason starts a line with `IGNORE PREVIOUS`, `system:` or
+  `assistant:`. Reviewers treat the block as reference data, never as
+  instructions.
 
 ### Review-Thread Replies and Follow-Up Issues (yellow-review)
 
 Unlike the ledger, `reply-pr-thread` and `file-followup-issue` (under
-`skills/pr-review-workflow/scripts/`) publish resolver-generated text to
-GitHub under the user's `gh` credentials: a reply on a PR review thread, or a
-new issue in the same repository. `/review:resolve` calls them, and an
-unattended run (`--non-interactive`, `/review:sweep`) posts without a per-post
-prompt; an interactive run asks before filing an issue. The controls
+`skills/pr-review-workflow/scripts/`) publish resolver-generated text to GitHub
+under the user's `gh` credentials: a reply on a PR review thread, or a new issue
+in the same repository. `/review:resolve` calls them, and an unattended run
+(`--non-interactive`, `/review:sweep`) posts without a per-post prompt; an
+interactive run asks before filing an issue. The controls
 (`references/resolve/dispositions.md`):
 
-- **Text screen, fail closed.** Every body passes `lib/resolve-text.sh`
-  before posting. A private-key header, a
-  `NAME_KEY`/`_TOKEN`/`_SECRET`/`_PASSWORD` assignment with a literal value,
-  a keyword assigned a quoted value, or a known token prefix is refused,
-  never redacted and posted. So are a markdown image, an `@` mention and a URL
-  on a host other than the repository's (`RT_ALLOWED_HOST`, else `GH_HOST`,
-  else `github.com`). A scan that did not run also refuses. The scripts exit 6
-  on a refusal or a scan that did not run, and the caller leaves the thread
-  open or posts the plain outcome sentence. An unreadable or missing input
-  file is a usage error and exits 2, not 6; in `check-resolve-text` a refusal
-  wins over an unreadable file when both occur.
-- **Bounded text.** A reply body is capped at 1000 characters. The
-  orchestrator checks resolver evidence against fixed patterns and never
-  places it on a command line.
-- **Deduplication.** Each post carries a hidden marker keyed to the thread
-  ID. A reply is skipped when the viewer's newest marked comment among the
-  last 10 carries the marker and only Bot authors have commented since. An issue is skipped
-  when a viewer-authored issue already carries the marker; that scan reads
-  every page of the viewer's issues. Markers by other authors are ignored.
+- **Text screen, fail closed.** Every body passes `lib/resolve-text.sh` before
+  posting. A private-key header, a `NAME_KEY`/`_TOKEN`/`_SECRET`/`_PASSWORD`
+  assignment with a literal value, a keyword assigned a quoted value, or a known
+  token prefix is refused, never redacted and posted. So are a markdown image,
+  an `@` mention and a URL on a host other than the repository's
+  (`RT_ALLOWED_HOST`, else `GH_HOST`, else `github.com`). A scan that did not
+  run also refuses. The scripts exit 6 on a refusal or a scan that did not run,
+  and the caller leaves the thread open or posts the plain outcome sentence. An
+  unreadable or missing input file is a usage error and exits 2, not 6; in
+  `check-resolve-text` a refusal wins over an unreadable file when both occur.
+- **Bounded text.** A reply body is capped at 1000 characters. The orchestrator
+  checks resolver evidence against fixed patterns and never places it on a
+  command line.
+- **Deduplication.** Each post carries a hidden marker keyed to the thread ID. A
+  reply is skipped when the viewer's newest marked comment among the last 10
+  carries the marker and only Bot authors have commented since. An issue is
+  skipped when a viewer-authored issue already carries the marker; that scan
+  reads every page of the viewer's issues. Markers by other authors are ignored.
 - **Scope.** The scripts file GitHub issues only in the PR's repository and
-  refuse a thread that does not belong to the PR; their only network
-  destination is `gh`'s GitHub API. `/review:resolve` can also file an
-  out-of-scope follow-up in Linear through the yellow-linear MCP server (OAuth
-  under the user's Linear account) when that plugin is available; the text
-  passes the same screen first, an ambiguous failure falls back to GitHub, and
-  Linear dedupe is best effort (see Known limits in the contract). Unattended
-  runs file at most 3 issues per PR.
+  refuse a thread that does not belong to the PR; their only network destination
+  is `gh`'s GitHub API. `/review:resolve` can also file an out-of-scope
+  follow-up in Linear through the yellow-linear MCP server (OAuth under the
+  user's Linear account) when that plugin is available; the text passes the same
+  screen first, an ambiguous failure falls back to GitHub, and Linear dedupe is
+  best effort (see Known limits in the contract). Unattended runs file at most 3
+  issues per PR.
 - **Edit range.** A hunk outside a file's PR-changed lines plus `RANGE_MARGIN`,
-  or more than 50 changed lines in total (an insertion counts its length),
-  never reaches a commit unattended: `commit-resolve-fixes --check-ranges`
-  reverts the file before verify and `--ranges-from` refuses it at commit, so a
-  steered resolver cannot commit edits to unrelated parts of a PR file. An
-  interactive run can include such edits only after the user says so. Rule and
-  recovery: `references/resolve/dispositions.md`. Residual: the bound is the
-  PR's changed lines, not one thread's lines, and the `mktemp` ranges file is
-  not integrity-checked against a model that calls Write.
+  or more than 50 changed lines in total (an insertion counts its length), never
+  reaches a commit unattended: `commit-resolve-fixes --check-ranges` reverts the
+  file before verify and `--ranges-from` refuses it at commit, so a steered
+  resolver cannot commit edits to unrelated parts of a PR file. An interactive
+  run can include such edits only after the user says so. Rule and recovery:
+  `references/resolve/dispositions.md`. Residual: the bound is the PR's changed
+  lines, not one thread's lines, and the `mktemp` ranges file is not
+  integrity-checked against a model that calls Write.
 - **Bounded waits.** Rate limits wait at most 90 seconds (one retry in
   `reply-pr-thread`), then exit 4. Each `gh` call in `reply-pr-thread`,
   `file-followup-issue` and `get-pr-blockers` runs under `timeout(1)` or
   `gtimeout(1)` (`YELLOW_REVIEW_GH_TIMEOUT`, default 30 seconds). A timeout
-  exits 4 without a retry in the first two, since the post may have landed;
-  a re-run finds it by its marker. In `get-pr-blockers` a timeout of the
-  review lookup sets `lookupFailed` true, while a timeout of the
-  branch-protection or ruleset lookup leaves that source unknown. The
-  combined `conversationResolution` is still `enforced` if the other source
-  requires resolution, and is `unknown` only when neither source confirms
-  enforcement and at least one remains unknown; both exit 0. Without either
-  binary installed, no timeout applies.
+  exits 4 without a retry in the first two, since the post may have landed; a
+  re-run finds it by its marker. In `get-pr-blockers` a timeout of the review
+  lookup sets `lookupFailed` true, while a timeout of the branch-protection or
+  ruleset lookup leaves that source unknown. The combined
+  `conversationResolution` is still `enforced` if the other source requires
+  resolution, and is `unknown` only when neither source confirms enforcement and
+  at least one remains unknown; both exit 0. Without either binary installed, no
+  timeout applies.
 
 ### Unattended Review Learning Staging (yellow-review / yellow-core)
 
@@ -438,69 +468,67 @@ This store is separate from the review-findings ledger and is never pushed.
 
 ### Context Observer Persistence (yellow-core)
 
-`/statusline:setup` Step 5b (or `/statusline:setup observer`) offers an
-opt-in statusline stage, `lib/context-observer.py`, that persists one
-session-bound observation derived from externally supplied statusline
-fields (working directory, session context metrics). The boundary:
+`/statusline:setup` Step 5b (or `/statusline:setup observer`) offers an opt-in
+statusline stage, `lib/context-observer.py`, that persists one session-bound
+observation derived from externally supplied statusline fields (working
+directory, session context metrics). The boundary:
 
 - **Opt-in only.** Default is No. `lib/statusline-settings.py` composes
-  `{ command -v python3 >/dev/null && [ -r <observer> ] && exec python3
-  <observer>; exec cat; } | <existing statusLine command>`, where
-  `<observer>` is `${CLAUDE_CONFIG_DIR:-~/.claude}/yellow-context-observer.py`
-  (the `exec cat` fallback keeps a missing observer or `python3` from
-  blanking the statusline), backing up `settings.json` before each change
-  (`.pre-observer.backup`, with a numeric suffix when an earlier backup
-  differs; an identical earlier backup is reused) and rewriting only
-  `statusLine.command` — no other settings key is touched. Resetting an
-  invalid `settings.json` (`statusline-settings.py statusline`) keeps the
-  original, which can hold secrets, as `.corrupt.backup` (numbered, capped
-  like the other backups) next to the `settings.json` path, beside the link
-  when it is a symlink.
+  `{ command -v python3 >/dev/null && [ -r <observer> ] && exec python3 <observer>; exec cat; } | <existing statusLine command>`,
+  where `<observer>` is
+  `${CLAUDE_CONFIG_DIR:-~/.claude}/yellow-context-observer.py` (the `exec cat`
+  fallback keeps a missing observer or `python3` from blanking the statusline),
+  backing up `settings.json` before each change (`.pre-observer.backup`, with a
+  numeric suffix when an earlier backup differs; an identical earlier backup is
+  reused) and rewriting only `statusLine.command` — no other settings key is
+  touched. Resetting an invalid `settings.json`
+  (`statusline-settings.py statusline`) keeps the original, which can hold
+  secrets, as `.corrupt.backup` (numbered, capped like the other backups) next
+  to the `settings.json` path, beside the link when it is a symlink.
   `statusline-settings.py remove` (offered as "Disable it" by
   `/statusline:setup observer`) strips the stage and restores the wrapped
   command.
 - **Storage.** One record per session at
   `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/<slug>/context-observations/<session_id>.json`,
-  written through a temp file plus atomic rename. The directory is created
-  0700 and the file 0600. Stored fields: `session_id`, `observed_at`,
-  `transcript_present` (a boolean; the transcript path itself is never
-  stored), context-window percentages/size, and advisory-watermark
-  crossings. `session_id` is allowlisted to `[A-Za-z0-9_-]{1,128}`, and the
-  slug is derived only from an absolute `project_dir` (or `cwd`) with no
-  `.`/`..` component or control character; anything else writes nothing.
-- **No side channels.** The observer does no network calls, spawns no
-  subprocess and runs no git. On stdout it prints only the byte-for-byte
-  pass-through of its stdin payload, which it writes and releases before any
-  other work, or, run with `--help` or a terminal on stdin, its usage text
-  instead of reading a payload. On stderr it writes one line saying why
-  nothing was recorded, and only when `CONTEXT_OBSERVER_DEBUG=1`.
+  written through a temp file plus atomic rename. The directory is created 0700
+  and the file 0600. Stored fields: `session_id`, `observed_at`,
+  `transcript_present` (a boolean; the transcript path itself is never stored),
+  context-window percentages/size, and advisory-watermark crossings.
+  `session_id` is allowlisted to `[A-Za-z0-9_-]{1,128}`, and the slug is derived
+  only from an absolute `project_dir` (or `cwd`) with no `.`/`..` component or
+  control character; anything else writes nothing.
+- **No side channels.** The observer does no network calls, spawns no subprocess
+  and runs no git. On stdout it prints only the byte-for-byte pass-through of
+  its stdin payload, which it writes and releases before any other work, or, run
+  with `--help` or a terminal on stdin, its usage text instead of reading a
+  payload. On stderr it writes one line saying why nothing was recorded, and
+  only when `CONTEXT_OBSERVER_DEBUG=1`.
 - **Latency.** The composed stage `exec`s the observer so no shell keeps the
-  pipe open: the statusline script sees EOF and computes its output while
-  the observer records. Claude Code shows the statusline only once the whole
-  command exits, which waits for the record write. Recording has a 100 ms
-  latency target; the R22 bats test is a looser regression guard (best of
-  five runs against a limit well above the target), not a check of the
-  target itself. Recording also has a 2 s deadline
-  (`DEADLINE_SECONDS`) armed once the payload is read; a filesystem call
-  that cannot be interrupted can outlast it. A new statusline update that
-  arrives while a stalled write holds the command cancels that run, so a
-  persistently stalled filesystem can keep the statusline from refreshing.
+  pipe open: the statusline script sees EOF and computes its output while the
+  observer records. Claude Code shows the statusline only once the whole command
+  exits, which waits for the record write. Recording has a 100 ms latency
+  target; the R22 bats test is a looser regression guard (best of five runs
+  against a limit well above the target), not a check of the target itself.
+  Recording also has a 2 s deadline (`DEADLINE_SECONDS`) armed once the payload
+  is read; a filesystem call that cannot be interrupted can outlast it. A new
+  statusline update that arrives while a stalled write holds the command cancels
+  that run, so a persistently stalled filesystem can keep the statusline from
+  refreshing.
 - **Read path treats the record as untrusted.** The reader
-  (`lib/context-observer.sh`'s `co_read_observation`, wired into
-  session-handoff to fill `context_at_capture`) revalidates
-  `session_id`, `observer_format`, and an anchored `observed_at` timestamp;
-  returns `unknown` for anything stale (> 300 s, either direction),
-  malformed, cross-session, or out of range; and exposes only six known
-  fields into the handoff note — five numbers or timestamps (each nulled
-  when outside the range the observer writes) and the `advisory_state` enum.
-  `cwd` is never stored (it can carry credential-bearing path components);
-  it only keys the slug when `project_dir` is absent. The reader always takes the newest
-  `projects/*/context-observations/<sid>.json` for the session id, since a
-  linked worktree or subdirectory launch can key the write under a
-  different slug than the read.
+  (`lib/context-observer.sh`'s `co_read_observation`, wired into session-handoff
+  to fill `context_at_capture`) revalidates `session_id`, `observer_format`, and
+  an anchored `observed_at` timestamp; returns `unknown` for anything stale (>
+  300 s, either direction), malformed, cross-session, or out of range; and
+  exposes only six known fields into the handoff note — five numbers or
+  timestamps (each nulled when outside the range the observer writes) and the
+  `advisory_state` enum. `cwd` is never stored (it can carry credential-bearing
+  path components); it only keys the slug when `project_dir` is absent. The
+  reader always takes the newest `projects/*/context-observations/<sid>.json`
+  for the session id, since a linked worktree or subdirectory launch can key the
+  write under a different slug than the read.
 - **Retention.** Nothing prunes records automatically.
-  `statusline-settings.py prune [--older-than-days N] [--dry-run]` (default
-  30 days) deletes old records and stale part files on demand, and reports
+  `statusline-settings.py prune [--older-than-days N] [--dry-run]` (default 30
+  days) deletes old records and stale part files on demand, and reports
   `prune_incomplete` when a file cannot be removed. Deleting a project's
   `context-observations/` directory also clears its history, and
   `statusline-settings.py remove` disables the observer entirely.
@@ -553,20 +581,19 @@ boundary:
 - **yellow-review's Cursor copy is both a trust-boundary downgrade and a
   data-residency downgrade — it does not have the "all processing happens
   locally" guarantee from Local Execution above.** Cursor plugins installed
-  through Cursor's Cloud/Background Agents run in Cursor's remote
-  environment, not the user's local machine; a `yellow-thermonuclear-review`
-  invocation started from a Cloud Agent processes the repository off-machine,
-  under Cursor's data handling, not this repository's. The same skill can
-  also run inside the local Cursor editor (see
-  `docs/cursor-distribution.md` "Local Cursor loading procedure"), where the
-  local-processing guarantee does hold — the boundary depends on which
-  Cursor surface invokes it, not on the plugin itself.
-- As with the Codex copy, the generated Cursor skill has no `tools:`
-  allowlist equivalent to the Claude agent's read-only restriction and
-  relies entirely on the skill body's report-only rails (prompt-level, not
-  runtime-enforced). See
-  `plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md`
-  "Safety rails".
+  through Cursor's Cloud/Background Agents run in Cursor's remote environment,
+  not the user's local machine; a `yellow-thermonuclear-review` invocation
+  started from a Cloud Agent processes the repository off-machine, under
+  Cursor's data handling, not this repository's. The same skill can also run
+  inside the local Cursor editor (see `docs/cursor-distribution.md` "Local
+  Cursor loading procedure"), where the local-processing guarantee does hold —
+  the boundary depends on which Cursor surface invokes it, not on the plugin
+  itself.
+- As with the Codex copy, the generated Cursor skill has no `tools:` allowlist
+  equivalent to the Claude agent's read-only restriction and relies entirely on
+  the skill body's report-only rails (prompt-level, not runtime-enforced). See
+  `plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md` "Safety
+  rails".
 
 ### Remote API and Local Artifacts (yellow-jules)
 
@@ -674,9 +701,9 @@ either pattern above:
 
 #### Synthesis staging directory (yellow-council)
 
-`council.md` Steps 5a-5e stage reviewer text for the blind two-pass synthesis
-in a `/tmp/council-synth-XXXXXX` directory. That directory is a separate
-trust boundary from the pack and fenced-output files above:
+`council.md` Steps 5a-5e stage reviewer text for the blind two-pass synthesis in
+a `/tmp/council-synth-XXXXXX` directory. That directory is a separate trust
+boundary from the pack and fenced-output files above:
 
 - **Contents**: `.token`, `labels.txt` (the S1-S4 label map),
   `forward.txt`/`reverse.txt` (normalized, already-redacted reviewer text,
@@ -708,9 +735,9 @@ trust boundary from the pack and fenced-output files above:
   Checkouts where `.git` is a file (linked worktrees) are unsupported, as with
   `.git/council-state.tsv`, and the state claim needs a filesystem with hard
   links.
-- **Known residual (Write)**: the state file removes the relayed-literal
-  vector, not a deliberate forgery. The orchestrator holds `Write`, which is
-  not path-scoped at runtime, so a prompt-injected orchestrator could write a
+- **Known residual (Write)**: the state file removes the relayed-literal vector,
+  not a deliberate forgery. The orchestrator holds `Write`, which is not
+  path-scoped at runtime, so a prompt-injected orchestrator could write a
   matching state file and `.token` for a directory it chose and steer 5e's
   `rm -rf` to it. The shape checks bound that to a `/tmp/council-synth-*`
   directory the user owns. Any model-driven write channel can do the same, a
@@ -729,8 +756,8 @@ trust boundary from the pack and fenced-output files above:
   `/council` reclaimed therefore finds the new run's valid claim on resume and
   can print that run's label map, release its claim, and delete the new run's
   staging directory, disrupting that run. Binding those steps to a directory
-  recorded at 5a needs either a relayed value or an owner PID in the state
-  file, so it is left open as protocol design work.
+  recorded at 5a needs either a relayed value or an owner PID in the state file,
+  so it is left open as protocol design work.
 - **Known residual (pathname unlink after validation)**: the final unlink in
   `council_rm_synth_state` is by pathname after validation, so a reclaim that
   lands between the check and the `rm` can remove another run's fresh claim.
@@ -740,24 +767,23 @@ trust boundary from the pack and fenced-output files above:
   first (unlink the state file) and only then remove the directory. The state
   file is authenticated with the directory's `.token`, and a `rm -rf` that fails
   partway can delete `.token` yet leave the directory, after which the file
-  could no longer be authenticated and would block the next run for up to a
-  day; so the file goes while `.token` is intact, and a directory that cannot be
+  could no longer be authenticated and would block the next run for up to a day;
+  so the file goes while `.token` is intact, and a directory that cannot be
   removed does not block a new run once its state claim is unlinked. If the
   release itself fails and cleanup leaves a directory younger than 24 hours, 5a
-  still refuses to start. A file that fails authentication is still
-  never unlinked, and a symlink is never followed. When `rm -rf` fails (a
-  non-writable directory),
-  they run `chmod -R u+rwx` on the directory and retry once, only for a real
-  directory the user owns under `/tmp/council-synth-*`; if it still cannot be
-  removed they print the exact `chmod -R u+rwx <dir> && rm -rf <dir>` command
-  to run by hand. Step 7 early exit and Step 9 cleanup remove the state file
-  only, and only when this run's 5a claimed it AND the file is still this run's
-  claim (`council_rm_synth_state`: a regular, non-symlink file
-  owned by the user whose line 1 equals the `COUNCIL_SYNTH_DIR` this run's 5a
-  printed and, while that directory exists, whose token equals its `.token`).
-  A missing file is success. A symlink (never followed or removed), a foreign
-  owner, another run's directory or a token mismatch leaves the path alone with
-  a one-line note: this covers a run whose 5a refused, a 5e that already removed
+  still refuses to start. A file that fails authentication is still never
+  unlinked, and a symlink is never followed. When `rm -rf` fails (a non-writable
+  directory), they run `chmod -R u+rwx` on the directory and retry once, only
+  for a real directory the user owns under `/tmp/council-synth-*`; if it still
+  cannot be removed they print the exact `chmod -R u+rwx <dir> && rm -rf <dir>`
+  command to run by hand. Step 7 early exit and Step 9 cleanup remove the state
+  file only, and only when this run's 5a claimed it AND the file is still this
+  run's claim (`council_rm_synth_state`: a regular, non-symlink file owned by
+  the user whose line 1 equals the `COUNCIL_SYNTH_DIR` this run's 5a printed
+  and, while that directory exists, whose token equals its `.token`). A missing
+  file is success. A symlink (never followed or removed), a foreign owner,
+  another run's directory or a token mismatch leaves the path alone with a
+  one-line note: this covers a run whose 5a refused, a 5e that already removed
   the file (it prints that this run's claim is released) and a paused run whose
   stale state another `/council` reclaimed. The relayed `COUNCIL_SYNTH_DIR` is
   only compared, never deleted; a wrong or missing literal fails closed. A
@@ -767,53 +793,55 @@ trust boundary from the pack and fenced-output files above:
   state file can no longer prove which directory is this run's: only when this
   run's 5a claimed the file (`SYNTH_STATE_CLAIMED=1`) and `SYNTH_OWN_DIR` passes
   the shape check (`/tmp/council-synth-*`, no `..`, no extra `/`), the state
-  file is a regular non-symlink file of the user whose line 1 equals it and whose
-  line 2 is a 32-character hex token, and the directory is real, not a symlink,
-  owned by the user, with a regular non-symlink `.token` equal to that token. It
-  then releases the claim and removes the directory (same `chmod -R u+rwx`
-  retry and manual-command warning as 5e). A run that claimed nothing, a
-  symlinked or unowned directory, or a path outside the shape is never removed.
-  24 hours is the eligibility threshold for the 5a sweep, not a maximum
-  retention: the sweep runs only when a later `/council` invocation reaches 5a,
-  and then deletes `/tmp/council-synth-*` directories older than 24 hours
-  (with the same chmod-then-remove for an owned directory). An interrupted run
-  leaves redacted, normalized reviewer text in `/tmp` until that later run, or
-  until you remove it. A `.git/council-synth.state` left by such a run stays
-  until a later 5a reclaims it (directory gone or over 24 hours old; before
-  that 5a refuses to start another synthesis in the checkout) or you remove it
-  by hand.
+  file is a regular non-symlink file of the user whose line 1 equals it and
+  whose line 2 is a 32-character hex token, and the directory is real, not a
+  symlink, owned by the user, with a regular non-symlink `.token` equal to that
+  token. It then releases the claim and removes the directory (same
+  `chmod -R u+rwx` retry and manual-command warning as 5e). A run that claimed
+  nothing, a symlinked or unowned directory, or a path outside the shape is
+  never removed. 24 hours is the eligibility threshold for the 5a sweep, not a
+  maximum retention: the sweep runs only when a later `/council` invocation
+  reaches 5a, and then deletes `/tmp/council-synth-*` directories older than 24
+  hours (with the same chmod-then-remove for an owned directory). An interrupted
+  run leaves redacted, normalized reviewer text in `/tmp` until that later run,
+  or until you remove it. A `.git/council-synth.state` left by such a run stays
+  until a later 5a reclaims it (directory gone or over 24 hours old; before that
+  5a refuses to start another synthesis in the checkout) or you remove it by
+  hand.
 - **Prompt-injection boundary**: all staged reviewer text is untrusted. It is
   redacted in Step 4, normalized, fenced with `[ESCAPED]` delimiter handling,
   and read from files rather than large Bash results. Labels hide reviewer
   identity until 5e de-anonymizes.
-- **Known residual**: the older `CLAUDE_FENCED_FILE` handoff (Steps
-  5b/7/8/9) still relays its path through the model. It is guarded by a shape
-  check on `/tmp/council-claude-fenced-*.txt` plus identity with the minted
-  literal; converting it to a state file is a follow-up.
+- **Known residual**: the older `CLAUDE_FENCED_FILE` handoff (Steps 5b/7/8/9)
+  still relays its path through the model. It is guarded by a shape check on
+  `/tmp/council-claude-fenced-*.txt` plus identity with the minted literal;
+  converting it to a state file is a follow-up.
 
 ### OpenCode default route and quota stubs (yellow-council)
 
 With `COUNCIL_OPENCODE_MODEL` unset, `opencode-reviewer` routes to
 `openrouter/deepseek/deepseek-v4-pro`, which needs an OpenRouter credential.
-`/council:setup` and `/council` Step 2b probe for it with `opencode auth list
---pure` (run from `/tmp`, bounded by a kill timer), which names the provider and
-prints no key; neither reads, prompts for or prints the key. The model value is
-validated as a plain slug before it becomes an argv item, because a leading `-`
-would be read as an opencode flag. Provider error text that reaches `summary=`
-(including the `--print-logs` stderr excerpt) is flattened, stripped of control
-characters and URLs, has the common short credential shapes (AWS AKIA/ASIA key ids, Bearer
-values, `sk-`/`gh*_`/`AIza`/`ses_` prefixed tokens, `github_pat_`) and long token runs
-masked and is length-capped; it does not go through the full 11-pattern redaction
-block (no PEM handling), so other short credential-shaped strings could survive
-(recorded residual).
+`/council:setup` and `/council` Step 2b probe for it with
+`opencode auth list --pure` (run from `/tmp`, bounded by a kill timer), which
+names the provider and prints no key; neither reads, prompts for or prints the
+key. The model value is validated as a plain slug before it becomes an argv
+item, because a leading `-` would be read as an opencode flag. Provider error
+text that reaches `summary=` (including the `--print-logs` stderr excerpt) is
+flattened, stripped of control characters and URLs, has the common short
+credential shapes (AWS AKIA/ASIA key ids, Bearer values,
+`sk-`/`gh*_`/`AIza`/`ses_` prefixed tokens, `github_pat_`) and long token runs
+masked and is length-capped; it does not go through the full 11-pattern
+redaction block (no PEM handling), so other short credential-shaped strings
+could survive (recorded residual).
 
-A reviewer whose provider reports quota exhaustion returns `fenced_output_path=/dev/null`
-with `verdict=QUOTA_EXHAUSTED`. The path is accepted only under that verdict
-(Step 7 appendix), is never read, and the unlink loops skip it. The claude slot's
-quota verdict is synthesized by `council.md`, never accepted from the agent, only
-for a real spawn failure, and its ETA is echoed only when it is a plain time or
-duration. Gemini, opencode and codex `QUOTA_EXHAUSTED` summaries are staged for 5b
-like the other excluded-slot summaries (see the staging directory above).
+A reviewer whose provider reports quota exhaustion returns
+`fenced_output_path=/dev/null` with `verdict=QUOTA_EXHAUSTED`. The path is
+accepted only under that verdict (Step 7 appendix), is never read, and the
+unlink loops skip it. The claude slot's quota verdict is synthesized by
+`council.md`, never accepted from the agent, only for a real spawn failure, and
+its ETA is echoed only when it is a plain time or duration. Gemini, opencode and
+codex `QUOTA_EXHAUSTED` summaries are staged for 5b like the other excluded-slot
+summaries (see the staging directory above).
 
 ### In-Process Reviewer (yellow-council `claude-reviewer`)
 
@@ -857,16 +885,16 @@ the agent's own "Tool Surface — Documented Exception" section.
 
 Plugins that execute shell commands:
 
-| Plugin              | Commands Used                                | Purpose                                           |
-| ------------------- | -------------------------------------------- | ------------------------------------------------- |
-| yellow-linear       | `git`, `gh`                                  | Branch detection, PR context                      |
-| yellow-devin        | `curl`, `jq`, `git`, `gh`                    | Devin API calls, JSON construction                |
-| yellow-review       | `gt`, `gh`, `git`, `jq`                      | PR management, GraphQL queries                    |
+| Plugin              | Commands Used                                | Purpose                                                    |
+| ------------------- | -------------------------------------------- | ---------------------------------------------------------- |
+| yellow-linear       | `git`, `gh`                                  | Branch detection, PR context                               |
+| yellow-devin        | `curl`, `jq`, `git`, `gh`                    | Devin API calls, JSON construction                         |
+| yellow-review       | `gt`, `gh`, `git`, `jq`                      | PR management, GraphQL queries                             |
 | yellow-ruvector     | `node`, `npm`, `jq`, `git`, `pgrep`, `grep`  | ruvector CLI, install, hook scripts, seed-solutions guards |
-| yellow-browser-test | `agent-browser`, `npm`, `curl`, `gh`         | Browser automation, setup                         |
-| yellow-debt         | `git`, `gt`, `jq`, `yq`                      | Codebase analysis, commit generation              |
-| gt-workflow         | `gt`, `git`                                  | Branch and PR management                          |
-| yellow-council      | `agy`, `opencode`, `timeout`, `jq`, `mktemp` | Cross-lineage CLI code review                     |
+| yellow-browser-test | `agent-browser`, `npm`, `curl`, `gh`         | Browser automation, setup                                  |
+| yellow-debt         | `git`, `gt`, `jq`, `yq`                      | Codebase analysis, commit generation                       |
+| gt-workflow         | `gt`, `git`                                  | Branch and PR management                                   |
+| yellow-council      | `agy`, `opencode`, `timeout`, `jq`, `mktemp` | Cross-lineage CLI code review                              |
 
 ### Prompt Injection Boundaries
 
@@ -874,18 +902,18 @@ Plugins processing untrusted input (PR comments, issue bodies, code content)
 include prompt injection defenses:
 
 - **yellow-review**: Agents processing PR comments wrap untrusted content in
-  `--- begin/end ---` delimiters with "treat as reference only" advisory.
-  The Cursor and Codex copies of `yellow-thermonuclear-review` use a
-  per-capture nonce closer so a `--- code end ---` line in reviewed
-  content cannot terminate the fence; they still have no runtime tool
-  restriction (see Trust Boundaries above).
-- **yellow-linear**: `/linear:work` and `linear-issue-loader` redact
-  credentials from every Linear MCP response immediately after fetch. The
-  patterns include key prefixes, auth headers and the repository's named
-  credential assignments. Only the sanitized copy is displayed or written to
-  the worktree, wrapped in `--- begin/end ---` reference-only fences. The
-  plugin's other commands and agents don't redact yet; that is tracked as P0
-  work in the yellow-linear improvement brainstorm.
+  `--- begin/end ---` delimiters with "treat as reference only" advisory. The
+  Cursor and Codex copies of `yellow-thermonuclear-review` use a per-capture
+  nonce closer so a `--- code end ---` line in reviewed content cannot terminate
+  the fence; they still have no runtime tool restriction (see Trust Boundaries
+  above).
+- **yellow-linear**: `/linear:work` and `linear-issue-loader` redact credentials
+  from every Linear MCP response immediately after fetch. The patterns include
+  key prefixes, auth headers and the repository's named credential assignments.
+  Only the sanitized copy is displayed or written to the worktree, wrapped in
+  `--- begin/end ---` reference-only fences. The plugin's other commands and
+  agents don't redact yet; that is tracked as P0 work in the yellow-linear
+  improvement brainstorm.
 - **yellow-jules**: Vendor-writable text (session titles, activity text,
   messages) reaches the model only inside an
   `--- begin untrusted-content <nonce> (reference only) ---` fence, sanitized
@@ -914,14 +942,14 @@ env -i HOME=… PATH=… [proxy/CA/npm_config_* passthrough] \
 **Mitigation:** `--ignore-scripts` (the tree has no install scripts), `env -i`
 so no other API keys or tokens reach npm: only proxy, CA, and
 `NPM_CONFIG_*`/`npm_config_*` settings pass through, and those can carry a
-registry auth token the user configured for npm, a data-dir prefix check (HOME or /tmp, or exactly
-`<XDG_DATA_HOME>/yellow-ruvector` for a user-set, non-system absolute
-`XDG_DATA_HOME` when `CLAUDE_PLUGIN_DATA` is unset, or a host-provided
-`CLAUDE_PLUGIN_DATA` under a non-system `<CLAUDE_CONFIG_DIR>/plugins/data/`), one
-install dir per lockfile hash with an atomic `current` symlink, and a
+registry auth token the user configured for npm, a data-dir prefix check (HOME
+or /tmp, or exactly `<XDG_DATA_HOME>/yellow-ruvector` for a user-set, non-system
+absolute `XDG_DATA_HOME` when `CLAUDE_PLUGIN_DATA` is unset, or a host-provided
+`CLAUDE_PLUGIN_DATA` under a non-system `<CLAUDE_CONFIG_DIR>/plugins/data/`),
+one install dir per lockfile hash with an atomic `current` symlink, and a
 `ruvector mcp start --help` smoke test before the swap. The MCP server and all
-hooks run this one install, so there is no second (global or npx) copy to
-drift from the pin. Bats and vitest tests pin the package.json/lockfile sync.
+hooks run this one install, so there is no second (global or npx) copy to drift
+from the pin. Bats and vitest tests pin the package.json/lockfile sync.
 
 ### yellow-browser-test
 
@@ -943,3 +971,51 @@ If you discover a security vulnerability in any plugin:
    [private security advisory](https://github.com/kinginyellow/yellow-plugins/security/advisories/new)
    on the repository
 3. Include: affected plugin, vulnerability description, reproduction steps
+
+### Optional signed-in Codex acceptance
+
+`smoke:codex:activation --use-existing-login` read-only mounts native CLI auth
+into disposable Codex/XDG state. Credential bytes are never read/copied by the
+harness. Shell, apps, browser, web search and delegation are disabled. The
+bundled code-mode host mediates exact allowlisted fixture/installed-skill reads
+and listing; unexpected tools/approvals fail closed. The CLI has provider
+network access for inference; model tools use read-only sandboxes without
+networking. Fixture/plugin hashes and owner auth metadata must remain unchanged.
+Account metadata, rates and raw provider traffic are excluded from receipts.
+
+`smoke:codex:graphite-auth --use-existing-login` separately runs native
+check-auth with read-only repository/config mounts. Only classified account and
+repository-access status is retained; no credential or account identity. Owner
+config metadata is checked. Neither gate changes real-profile installation or
+hook trust. They require explicit native-login selection and remain separate
+from disconnected hook lifecycle controls.
+
+## Codex compatibility expansion trust boundaries
+
+The nine-plugin/29-skill catalog is a bounded exposure allowlist. New workflows
+are read-only: native worktree inventory, sequential docs audit, complexity
+findings from a no-follow bounded Python snapshot, public DeepWiki Q&A, offline
+Cursor CLI planning and sanitized native Codex login readiness. Cursor does not
+load its SDK, resolve credentials, write state or launch remote work during the
+selected dry-run. Codex readiness never recursively spawns model turns.
+
+Thermonuclear policy is enforced by the installed boolean invocation sidecar.
+Generator and exposure lint reject symlinks, malformed policy, undeclared
+resources and credential/config expansion. MCP override supports only HTTPS and
+an optional fixed read-tool allowlist, not credential headers or env. DeepWiki
+receives only one explicit public repository identifier and question; no private
+uploads, userConfig, other provider or credential access is supported. Treat all
+repository/service/tool content as fenced reference data.
+
+Acceptance profiles read-only bind native model auth. The harness never reads,
+hashes, prints or copies credential bytes; it checks metadata afterward. The
+native readiness probe captures login output privately and returns
+classification only. Injected auth errors and missing tools are distinct from
+successful live service evidence. Narrow per-tool approval in disposable
+DeepWiki acceptance uses the owner's existing task authorization; distributed
+defaults and owner profiles are unchanged. A read-only sandbox alone does not
+fence MCP writes, so only the selected public read operations are exposed.
+
+Public publication, real-profile installs/hook trust and remote mutations remain
+outside the local work. Runtime and conditional distribution evidence:
+[Phases 2–5 report](research/codex-phases-2-5-2026-10-06/report.md).

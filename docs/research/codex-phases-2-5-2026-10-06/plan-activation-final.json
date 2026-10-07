@@ -1,0 +1,927 @@
+{
+  "status": "passed",
+  "recordedAt": "2026-10-06T15:02:55.945Z",
+  "harnessSha256": "e22b3e181eb5bdfd8bcb7a54f102235861d39bd5bfa262d7020cde9894754f4f",
+  "scratch": "/tmp/yellow-codex-activation-E6MgaM",
+  "credentialHandling": "CLI-native-read-only-bind; no credential copy or harness read",
+  "cases": [
+    {
+      "id": "direct",
+      "prompt": "Use the installed plan-status skill to show this fixture's open and archived plan progress.",
+      "attachedSkill": true,
+      "threadId": "01a111bd-4073-7d70-855d-3acd146e16f1",
+      "output": "{\n  \"open\": {\n    \"plans/in-flight.md\": {\"checked\": 1, \"total\": 3, \"ready\": false},\n    \"plans/ready.md\": {\"checked\": 2, \"total\": 2, \"ready\": true},\n    \"plans/research.md\": {\"checked\": 0, \"total\": 0, \"ready\": false}\n  },\n  \"archived\": {\n    \"plans/complete/shipped.md\": {\"checked\": 1, \"total\": 1, \"ready\": false}\n  },\n  \"archivedCount\": 1\n}",
+      "reads": [
+        "/tmp/yellow-codex-activation-E6MgaM/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/plan-status/SKILL.md",
+        "/tmp/yellow-codex-activation-E6MgaM/project/plans/in-flight.md",
+        "/tmp/yellow-codex-activation-E6MgaM/project/plans/ready.md",
+        "/tmp/yellow-codex-activation-E6MgaM/project/plans/research.md",
+        "/tmp/yellow-codex-activation-E6MgaM/project/plans/complete/shipped.md"
+      ],
+      "events": [
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "userMessage",
+              "id": "01a111bd-4405-72f0-b40d-b55c358b39c9",
+              "clientId": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Use the installed plan-status skill to show this fixture's open and archived plan progress.",
+                  "text_elements": []
+                },
+                {
+                  "type": "skill",
+                  "name": "yellow-core:plan-status",
+                  "path": "/tmp/yellow-codex-activation-E6MgaM/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/plan-status/SKILL.md"
+                }
+              ]
+            },
+            "threadId": "01a111bd-4073-7d70-855d-3acd146e16f1",
+            "turnId": "01a111bd-4079-7622-bd08-c9e33ff73270",
+            "completedAtMs": 1791298978821
+          },
+          "emittedAtMs": 1791298978822
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "agentMessage",
+              "id": "msg_0154b9d4de1747e8016ac50da5ac7087d18afa2edec06d1080",
+              "text": "I’m using the installed plan-status skill to count task checkboxes in the open and archived plans.",
+              "phase": "commentary",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            },
+            "threadId": "01a111bd-4073-7d70-855d-3acd146e16f1",
+            "turnId": "01a111bd-4079-7622-bd08-c9e33ff73270",
+            "completedAtMs": 1791298982358
+          },
+          "emittedAtMs": 1791298982359
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_list"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-34f8e643-9ab5-4290-9a22-f24512b7f18b",
+              "namespace": null,
+              "tool": "fixture_list",
+              "arguments": {},
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "[\"/tmp/yellow-codex-activation-E6MgaM/project/plans/complete/shipped.md\",\"/tmp/yellow-codex-activation-E6MgaM/project/plans/in-flight.md\",\"/tmp/yellow-codex-activation-E6MgaM/project/plans/ready.md\",\"/tmp/yellow-codex-activation-E6MgaM/project/plans/research.md\"]"
+                }
+              ],
+              "success": true,
+              "durationMs": 1
+            },
+            "threadId": "01a111bd-4073-7d70-855d-3acd146e16f1",
+            "turnId": "01a111bd-4079-7622-bd08-c9e33ff73270",
+            "completedAtMs": 1791298983650
+          },
+          "emittedAtMs": 1791298983651
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_read",
+            "path": "/tmp/yellow-codex-activation-E6MgaM/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/plan-status/SKILL.md"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-08301a15-9f94-4480-b175-d8a1ffff4c4b",
+              "namespace": null,
+              "tool": "fixture_read",
+              "arguments": {
+                "path": "/tmp/yellow-codex-activation-E6MgaM/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/plan-status/SKILL.md"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "---\nname: plan-status\ndescription: Show a per-file checkbox progress dashboard of plans/ (open) and plans/complete/ (archived) plan documents. Use when reviewing which plans are ready to archive or checking work-in-flight at a glance.\n---\n\n## What It Does\n\nRead-only dashboard of the local plan corpus. Walks `plans/*.md` (open) and\n`plans/complete/*.md` (archived), counts checked/unchecked task boxes in each\nfile, and renders a plain-text table. Open plans at 100% completion are\nannotated `-- ready to complete` so the next archival step is obvious.\n\n## When to Use\n\n- Reviewing which plans are ready to archive.\n- Checking work-in-flight across the plan corpus at a glance.\n- Confirming a plan has no remaining unchecked boxes before starting its\n  archival workflow.\n\n## Usage\n\n### Phase 1: Open plans\n\n```bash\nset -euo pipefail\nif ! ls plans/*.md >/dev/null 2>&1; then\n  printf 'plans/ is empty (no open plans).\\n\\n'\n  exit 0\nfi\nprintf 'Open plans (plans/):\\n'\nprintf '%-60s %s\\n' 'File' 'Progress'\nprintf '%-60s %s\\n' '----' '--------'\nfor f in plans/*.md; do\n  [ -f \"$f\" ] || continue\n  checked=$(grep -ciE '^[[:space:]]*- \\[x\\]' \"$f\" 2>/dev/null || true)\n  unchecked=$(grep -cE '^[[:space:]]*- \\[ \\]' \"$f\" 2>/dev/null || true)\n  : \"${checked:=0}\"\n  : \"${unchecked:=0}\"\n  total=$((checked + unchecked))\n  annotation=''\n  if [ \"$total\" -gt 0 ] && [ \"$unchecked\" -eq 0 ]; then\n    annotation='  -- ready to complete'\n  fi\n  printf '%-60s [ %d/%d ]%s\\n' \"$f\" \"$checked\" \"$total\" \"$annotation\"\ndone\nprintf '\\n'\n```\n\n### Phase 2: Archived plans\n\nEach Bash code block runs in its own subprocess — variables from Phase 1\ndo not survive. Re-derive locally.\n\n```bash\nset -euo pipefail\nif [ ! -d plans/complete ]; then\n  printf 'Archived plans (plans/complete/): (0) — directory does not exist yet.\\n'\n  exit 0\nfi\ncount=$(find plans/complete -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')\nif [ \"$count\" -eq 0 ]; then\n  printf 'Archived plans (plans/complete/): (0)\\n'\n  exit 0\nfi\nprintf 'Archived plans (plans/complete/): (%d)\\n' \"$count\"\nprintf '%-60s %s\\n' 'File' 'Progress'\nprintf '%-60s %s\\n' '----' '--------'\nfor f in plans/complete/*.md; do\n  [ -f \"$f\" ] || continue\n  checked=$(grep -ciE '^[[:space:]]*- \\[x\\]' \"$f\" 2>/dev/null || true)\n  unchecked=$(grep -cE '^[[:space:]]*- \\[ \\]' \"$f\" 2>/dev/null || true)\n  : \"${checked:=0}\"\n  : \"${unchecked:=0}\"\n  total=$((checked + unchecked))\n  printf '%-60s [ %d/%d ]\\n' \"$f\" \"$checked\" \"$total\"\ndone\n```\n\n### Notes\n\n- The `[ 0/0 ]` rendering for zero-task plans is intentional and surfaces\n  prose-style or research-style plan files that have no task list.\n- The `-- ready to complete` annotation appears ONLY on files in `plans/`\n  (not on already-archived files). It is purely advisory — running the\n  plan-completion workflow is the explicit archival action.\n- Archived files with stray `- [ ]` lines are visible in this dashboard\n  but are NOT blocked: PR-diff-scoped validation only checks files newly\n  added or modified by the current PR. The dashboard exists to surface\n  those cases for opportunistic cleanup.\n"
+                }
+              ],
+              "success": true,
+              "durationMs": 2
+            },
+            "threadId": "01a111bd-4073-7d70-855d-3acd146e16f1",
+            "turnId": "01a111bd-4079-7622-bd08-c9e33ff73270",
+            "completedAtMs": 1791298983653
+          },
+          "emittedAtMs": 1791298983654
+        },
+        {
+          "method": "thread/tokenUsage/updated",
+          "params": {
+            "threadId": "01a111bd-4073-7d70-855d-3acd146e16f1",
+            "turnId": "01a111bd-4079-7622-bd08-c9e33ff73270",
+            "tokenUsage": {
+              "total": {
+                "totalTokens": 11401,
+                "inputTokens": 11280,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 121,
+                "reasoningOutputTokens": 0
+              },
+              "last": {
+                "totalTokens": 11401,
+                "inputTokens": 11280,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 121,
+                "reasoningOutputTokens": 0
+              },
+              "modelContextWindow": 258400
+            }
+          },
+          "emittedAtMs": 1791298983691
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_read",
+            "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/in-flight.md"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-d1960a9a-52e7-450b-8ed7-1c882d7fab5b",
+              "namespace": null,
+              "tool": "fixture_read",
+              "arguments": {
+                "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/in-flight.md"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "# In flight\n\n- [x] First task\n- [ ] Second task\n- [ ] Third task\n"
+                }
+              ],
+              "success": true,
+              "durationMs": 1
+            },
+            "threadId": "01a111bd-4073-7d70-855d-3acd146e16f1",
+            "turnId": "01a111bd-4079-7622-bd08-c9e33ff73270",
+            "completedAtMs": 1791298988563
+          },
+          "emittedAtMs": 1791298988563
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_read",
+            "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/ready.md"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-bb46f207-db1a-419c-a108-d450219ccd2c",
+              "namespace": null,
+              "tool": "fixture_read",
+              "arguments": {
+                "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/ready.md"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "# Ready\n\n- [x] First task\n- [x] Second task\n"
+                }
+              ],
+              "success": true,
+              "durationMs": 0
+            },
+            "threadId": "01a111bd-4073-7d70-855d-3acd146e16f1",
+            "turnId": "01a111bd-4079-7622-bd08-c9e33ff73270",
+            "completedAtMs": 1791298988564
+          },
+          "emittedAtMs": 1791298988564
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_read",
+            "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/research.md"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-39a4ac2b-52d8-4800-8fbe-25eebe60c787",
+              "namespace": null,
+              "tool": "fixture_read",
+              "arguments": {
+                "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/research.md"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "# Research\n\nThis plan has no task checklist.\n"
+                }
+              ],
+              "success": true,
+              "durationMs": 0
+            },
+            "threadId": "01a111bd-4073-7d70-855d-3acd146e16f1",
+            "turnId": "01a111bd-4079-7622-bd08-c9e33ff73270",
+            "completedAtMs": 1791298988565
+          },
+          "emittedAtMs": 1791298988565
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_read",
+            "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/complete/shipped.md"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-b8598f9e-9cec-465a-9850-adb4d89207c4",
+              "namespace": null,
+              "tool": "fixture_read",
+              "arguments": {
+                "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/complete/shipped.md"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "# Shipped\n\n- [x] Archived task\n"
+                }
+              ],
+              "success": true,
+              "durationMs": 0
+            },
+            "threadId": "01a111bd-4073-7d70-855d-3acd146e16f1",
+            "turnId": "01a111bd-4079-7622-bd08-c9e33ff73270",
+            "completedAtMs": 1791298988565
+          },
+          "emittedAtMs": 1791298988566
+        },
+        {
+          "method": "thread/tokenUsage/updated",
+          "params": {
+            "threadId": "01a111bd-4073-7d70-855d-3acd146e16f1",
+            "turnId": "01a111bd-4079-7622-bd08-c9e33ff73270",
+            "tokenUsage": {
+              "total": {
+                "totalTokens": 24020,
+                "inputTokens": 23812,
+                "cachedInputTokens": 11136,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 208,
+                "reasoningOutputTokens": 0
+              },
+              "last": {
+                "totalTokens": 12619,
+                "inputTokens": 12532,
+                "cachedInputTokens": 11136,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 87,
+                "reasoningOutputTokens": 0
+              },
+              "modelContextWindow": 258400
+            }
+          },
+          "emittedAtMs": 1791298988594
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "agentMessage",
+              "id": "msg_0154b9d4de1747e8016ac50daf059c87d1b671a0774b9f6f44",
+              "text": "{\n  \"open\": {\n    \"plans/in-flight.md\": {\"checked\": 1, \"total\": 3, \"ready\": false},\n    \"plans/ready.md\": {\"checked\": 2, \"total\": 2, \"ready\": true},\n    \"plans/research.md\": {\"checked\": 0, \"total\": 0, \"ready\": false}\n  },\n  \"archived\": {\n    \"plans/complete/shipped.md\": {\"checked\": 1, \"total\": 1, \"ready\": false}\n  },\n  \"archivedCount\": 1\n}",
+              "phase": "final_answer",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            },
+            "threadId": "01a111bd-4073-7d70-855d-3acd146e16f1",
+            "turnId": "01a111bd-4079-7622-bd08-c9e33ff73270",
+            "completedAtMs": 1791298992710
+          },
+          "emittedAtMs": 1791298992710
+        },
+        {
+          "method": "thread/tokenUsage/updated",
+          "params": {
+            "threadId": "01a111bd-4073-7d70-855d-3acd146e16f1",
+            "turnId": "01a111bd-4079-7622-bd08-c9e33ff73270",
+            "tokenUsage": {
+              "total": {
+                "totalTokens": 36926,
+                "inputTokens": 36590,
+                "cachedInputTokens": 23552,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 336,
+                "reasoningOutputTokens": 0
+              },
+              "last": {
+                "totalTokens": 12906,
+                "inputTokens": 12778,
+                "cachedInputTokens": 12416,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 128,
+                "reasoningOutputTokens": 0
+              },
+              "modelContextWindow": 258400
+            }
+          },
+          "emittedAtMs": 1791298992714
+        },
+        {
+          "method": "turn/completed",
+          "params": {
+            "threadId": "01a111bd-4073-7d70-855d-3acd146e16f1",
+            "turn": {
+              "id": "01a111bd-4079-7622-bd08-c9e33ff73270",
+              "items": [
+                {
+                  "type": "agentMessage",
+                  "id": "msg_0154b9d4de1747e8016ac50daf059c87d1b671a0774b9f6f44",
+                  "text": "{\n  \"open\": {\n    \"plans/in-flight.md\": {\"checked\": 1, \"total\": 3, \"ready\": false},\n    \"plans/ready.md\": {\"checked\": 2, \"total\": 2, \"ready\": true},\n    \"plans/research.md\": {\"checked\": 0, \"total\": 0, \"ready\": false}\n  },\n  \"archived\": {\n    \"plans/complete/shipped.md\": {\"checked\": 1, \"total\": 1, \"ready\": false}\n  },\n  \"archivedCount\": 1\n}",
+                  "phase": "final_answer",
+                  "memoryCitation": null,
+                  "delivery": null,
+                  "questions": null
+                }
+              ],
+              "itemsView": "summary",
+              "status": "completed",
+              "error": null,
+              "startedAt": 1791298977,
+              "completedAt": 1791298992,
+              "durationMs": 14800
+            }
+          },
+          "emittedAtMs": 1791298992715
+        }
+      ],
+      "unchanged": true,
+      "status": "passed",
+      "activation": "attached-installed-skill",
+      "outputCorrect": true
+    },
+    {
+      "id": "indirect",
+      "prompt": "Show which local plans are in flight and which are ready to archive, plus the archived plan count and progress.",
+      "attachedSkill": false,
+      "threadId": "01a111bd-7a5d-7573-be96-054fe6769bda",
+      "output": "{\n  \"open\": {\n    \"plans/in-flight.md\": {\"checked\": 1, \"total\": 3, \"ready\": false},\n    \"plans/ready.md\": {\"checked\": 2, \"total\": 2, \"ready\": true},\n    \"plans/research.md\": {\"checked\": 0, \"total\": 0, \"ready\": false}\n  },\n  \"archived\": {\n    \"plans/complete/shipped.md\": {\"checked\": 1, \"total\": 1, \"ready\": false}\n  },\n  \"archivedCount\": 1\n}",
+      "reads": [
+        "/tmp/yellow-codex-activation-E6MgaM/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/plan-status/SKILL.md",
+        "/tmp/yellow-codex-activation-E6MgaM/project/plans/in-flight.md",
+        "/tmp/yellow-codex-activation-E6MgaM/project/plans/ready.md",
+        "/tmp/yellow-codex-activation-E6MgaM/project/plans/research.md",
+        "/tmp/yellow-codex-activation-E6MgaM/project/plans/complete/shipped.md"
+      ],
+      "events": [
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "userMessage",
+              "id": "01a111bd-7ddd-7c00-95f6-8063d7268e14",
+              "clientId": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Show which local plans are in flight and which are ready to archive, plus the archived plan count and progress.",
+                  "text_elements": []
+                }
+              ]
+            },
+            "threadId": "01a111bd-7a5d-7573-be96-054fe6769bda",
+            "turnId": "01a111bd-7a62-7f02-920e-4af730df2cf8",
+            "completedAtMs": 1791298993629
+          },
+          "emittedAtMs": 1791298993629
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "agentMessage",
+              "id": "msg_01f6f87db34b5da2016ac50db4d52081939dca2c9c684b1f24",
+              "text": "I’ll use the yellow-core:plan-status skill to check local plan progress and archive readiness.",
+              "phase": "commentary",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            },
+            "threadId": "01a111bd-7a5d-7573-be96-054fe6769bda",
+            "turnId": "01a111bd-7a62-7f02-920e-4af730df2cf8",
+            "completedAtMs": 1791298996679
+          },
+          "emittedAtMs": 1791298996679
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_list"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-1c278b02-1fcf-49dc-828c-55956b31a6f7",
+              "namespace": null,
+              "tool": "fixture_list",
+              "arguments": {},
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "[\"/tmp/yellow-codex-activation-E6MgaM/project/plans/complete/shipped.md\",\"/tmp/yellow-codex-activation-E6MgaM/project/plans/in-flight.md\",\"/tmp/yellow-codex-activation-E6MgaM/project/plans/ready.md\",\"/tmp/yellow-codex-activation-E6MgaM/project/plans/research.md\"]"
+                }
+              ],
+              "success": true,
+              "durationMs": 0
+            },
+            "threadId": "01a111bd-7a5d-7573-be96-054fe6769bda",
+            "turnId": "01a111bd-7a62-7f02-920e-4af730df2cf8",
+            "completedAtMs": 1791298999596
+          },
+          "emittedAtMs": 1791298999597
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_read",
+            "path": "/tmp/yellow-codex-activation-E6MgaM/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/plan-status/SKILL.md"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-0a03cae7-8ccd-4fb9-8656-e02d70c33b42",
+              "namespace": null,
+              "tool": "fixture_read",
+              "arguments": {
+                "path": "/tmp/yellow-codex-activation-E6MgaM/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/plan-status/SKILL.md"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "---\nname: plan-status\ndescription: Show a per-file checkbox progress dashboard of plans/ (open) and plans/complete/ (archived) plan documents. Use when reviewing which plans are ready to archive or checking work-in-flight at a glance.\n---\n\n## What It Does\n\nRead-only dashboard of the local plan corpus. Walks `plans/*.md` (open) and\n`plans/complete/*.md` (archived), counts checked/unchecked task boxes in each\nfile, and renders a plain-text table. Open plans at 100% completion are\nannotated `-- ready to complete` so the next archival step is obvious.\n\n## When to Use\n\n- Reviewing which plans are ready to archive.\n- Checking work-in-flight across the plan corpus at a glance.\n- Confirming a plan has no remaining unchecked boxes before starting its\n  archival workflow.\n\n## Usage\n\n### Phase 1: Open plans\n\n```bash\nset -euo pipefail\nif ! ls plans/*.md >/dev/null 2>&1; then\n  printf 'plans/ is empty (no open plans).\\n\\n'\n  exit 0\nfi\nprintf 'Open plans (plans/):\\n'\nprintf '%-60s %s\\n' 'File' 'Progress'\nprintf '%-60s %s\\n' '----' '--------'\nfor f in plans/*.md; do\n  [ -f \"$f\" ] || continue\n  checked=$(grep -ciE '^[[:space:]]*- \\[x\\]' \"$f\" 2>/dev/null || true)\n  unchecked=$(grep -cE '^[[:space:]]*- \\[ \\]' \"$f\" 2>/dev/null || true)\n  : \"${checked:=0}\"\n  : \"${unchecked:=0}\"\n  total=$((checked + unchecked))\n  annotation=''\n  if [ \"$total\" -gt 0 ] && [ \"$unchecked\" -eq 0 ]; then\n    annotation='  -- ready to complete'\n  fi\n  printf '%-60s [ %d/%d ]%s\\n' \"$f\" \"$checked\" \"$total\" \"$annotation\"\ndone\nprintf '\\n'\n```\n\n### Phase 2: Archived plans\n\nEach Bash code block runs in its own subprocess — variables from Phase 1\ndo not survive. Re-derive locally.\n\n```bash\nset -euo pipefail\nif [ ! -d plans/complete ]; then\n  printf 'Archived plans (plans/complete/): (0) — directory does not exist yet.\\n'\n  exit 0\nfi\ncount=$(find plans/complete -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')\nif [ \"$count\" -eq 0 ]; then\n  printf 'Archived plans (plans/complete/): (0)\\n'\n  exit 0\nfi\nprintf 'Archived plans (plans/complete/): (%d)\\n' \"$count\"\nprintf '%-60s %s\\n' 'File' 'Progress'\nprintf '%-60s %s\\n' '----' '--------'\nfor f in plans/complete/*.md; do\n  [ -f \"$f\" ] || continue\n  checked=$(grep -ciE '^[[:space:]]*- \\[x\\]' \"$f\" 2>/dev/null || true)\n  unchecked=$(grep -cE '^[[:space:]]*- \\[ \\]' \"$f\" 2>/dev/null || true)\n  : \"${checked:=0}\"\n  : \"${unchecked:=0}\"\n  total=$((checked + unchecked))\n  printf '%-60s [ %d/%d ]\\n' \"$f\" \"$checked\" \"$total\"\ndone\n```\n\n### Notes\n\n- The `[ 0/0 ]` rendering for zero-task plans is intentional and surfaces\n  prose-style or research-style plan files that have no task list.\n- The `-- ready to complete` annotation appears ONLY on files in `plans/`\n  (not on already-archived files). It is purely advisory — running the\n  plan-completion workflow is the explicit archival action.\n- Archived files with stray `- [ ]` lines are visible in this dashboard\n  but are NOT blocked: PR-diff-scoped validation only checks files newly\n  added or modified by the current PR. The dashboard exists to surface\n  those cases for opportunistic cleanup.\n"
+                }
+              ],
+              "success": true,
+              "durationMs": 1
+            },
+            "threadId": "01a111bd-7a5d-7573-be96-054fe6769bda",
+            "turnId": "01a111bd-7a62-7f02-920e-4af730df2cf8",
+            "completedAtMs": 1791298999598
+          },
+          "emittedAtMs": 1791298999598
+        },
+        {
+          "method": "thread/tokenUsage/updated",
+          "params": {
+            "threadId": "01a111bd-7a5d-7573-be96-054fe6769bda",
+            "turnId": "01a111bd-7a62-7f02-920e-4af730df2cf8",
+            "tokenUsage": {
+              "total": {
+                "totalTokens": 10413,
+                "inputTokens": 10292,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 121,
+                "reasoningOutputTokens": 0
+              },
+              "last": {
+                "totalTokens": 10413,
+                "inputTokens": 10292,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 121,
+                "reasoningOutputTokens": 0
+              },
+              "modelContextWindow": 258400
+            }
+          },
+          "emittedAtMs": 1791298999670
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_read",
+            "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/in-flight.md"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-06948499-2b6a-4120-8ba6-868d5088da40",
+              "namespace": null,
+              "tool": "fixture_read",
+              "arguments": {
+                "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/in-flight.md"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "# In flight\n\n- [x] First task\n- [ ] Second task\n- [ ] Third task\n"
+                }
+              ],
+              "success": true,
+              "durationMs": 0
+            },
+            "threadId": "01a111bd-7a5d-7573-be96-054fe6769bda",
+            "turnId": "01a111bd-7a62-7f02-920e-4af730df2cf8",
+            "completedAtMs": 1791299011627
+          },
+          "emittedAtMs": 1791299011627
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_read",
+            "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/ready.md"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-19b70793-f40a-4e93-bc33-b4bf0940cc7d",
+              "namespace": null,
+              "tool": "fixture_read",
+              "arguments": {
+                "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/ready.md"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "# Ready\n\n- [x] First task\n- [x] Second task\n"
+                }
+              ],
+              "success": true,
+              "durationMs": 0
+            },
+            "threadId": "01a111bd-7a5d-7573-be96-054fe6769bda",
+            "turnId": "01a111bd-7a62-7f02-920e-4af730df2cf8",
+            "completedAtMs": 1791299011627
+          },
+          "emittedAtMs": 1791299011628
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_read",
+            "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/research.md"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-e3871da8-c211-414a-ab9a-0dc78977a33f",
+              "namespace": null,
+              "tool": "fixture_read",
+              "arguments": {
+                "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/research.md"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "# Research\n\nThis plan has no task checklist.\n"
+                }
+              ],
+              "success": true,
+              "durationMs": 0
+            },
+            "threadId": "01a111bd-7a5d-7573-be96-054fe6769bda",
+            "turnId": "01a111bd-7a62-7f02-920e-4af730df2cf8",
+            "completedAtMs": 1791299011628
+          },
+          "emittedAtMs": 1791299011628
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_read",
+            "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/complete/shipped.md"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-36adb66a-845a-4d47-809d-96c7485dbadd",
+              "namespace": null,
+              "tool": "fixture_read",
+              "arguments": {
+                "path": "/tmp/yellow-codex-activation-E6MgaM/project/plans/complete/shipped.md"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "# Shipped\n\n- [x] Archived task\n"
+                }
+              ],
+              "success": true,
+              "durationMs": 0
+            },
+            "threadId": "01a111bd-7a5d-7573-be96-054fe6769bda",
+            "turnId": "01a111bd-7a62-7f02-920e-4af730df2cf8",
+            "completedAtMs": 1791299011629
+          },
+          "emittedAtMs": 1791299011629
+        },
+        {
+          "method": "thread/tokenUsage/updated",
+          "params": {
+            "threadId": "01a111bd-7a5d-7573-be96-054fe6769bda",
+            "turnId": "01a111bd-7a62-7f02-920e-4af730df2cf8",
+            "tokenUsage": {
+              "total": {
+                "totalTokens": 22832,
+                "inputTokens": 22616,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 216,
+                "reasoningOutputTokens": 0
+              },
+              "last": {
+                "totalTokens": 12419,
+                "inputTokens": 12324,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 95,
+                "reasoningOutputTokens": 0
+              },
+              "modelContextWindow": 258400
+            }
+          },
+          "emittedAtMs": 1791299011666
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "agentMessage",
+              "id": "msg_01f6f87db34b5da2016ac50dd12e148193b6a1389592899848",
+              "text": "{\n  \"open\": {\n    \"plans/in-flight.md\": {\"checked\": 1, \"total\": 3, \"ready\": false},\n    \"plans/ready.md\": {\"checked\": 2, \"total\": 2, \"ready\": true},\n    \"plans/research.md\": {\"checked\": 0, \"total\": 0, \"ready\": false}\n  },\n  \"archived\": {\n    \"plans/complete/shipped.md\": {\"checked\": 1, \"total\": 1, \"ready\": false}\n  },\n  \"archivedCount\": 1\n}",
+              "phase": "final_answer",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            },
+            "threadId": "01a111bd-7a5d-7573-be96-054fe6769bda",
+            "turnId": "01a111bd-7a62-7f02-920e-4af730df2cf8",
+            "completedAtMs": 1791299026232
+          },
+          "emittedAtMs": 1791299026232
+        },
+        {
+          "method": "thread/tokenUsage/updated",
+          "params": {
+            "threadId": "01a111bd-7a5d-7573-be96-054fe6769bda",
+            "turnId": "01a111bd-7a62-7f02-920e-4af730df2cf8",
+            "tokenUsage": {
+              "total": {
+                "totalTokens": 35538,
+                "inputTokens": 35194,
+                "cachedInputTokens": 12160,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 344,
+                "reasoningOutputTokens": 0
+              },
+              "last": {
+                "totalTokens": 12706,
+                "inputTokens": 12578,
+                "cachedInputTokens": 12160,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 128,
+                "reasoningOutputTokens": 0
+              },
+              "modelContextWindow": 258400
+            }
+          },
+          "emittedAtMs": 1791299026278
+        },
+        {
+          "method": "turn/completed",
+          "params": {
+            "threadId": "01a111bd-7a5d-7573-be96-054fe6769bda",
+            "turn": {
+              "id": "01a111bd-7a62-7f02-920e-4af730df2cf8",
+              "items": [
+                {
+                  "type": "agentMessage",
+                  "id": "msg_01f6f87db34b5da2016ac50dd12e148193b6a1389592899848",
+                  "text": "{\n  \"open\": {\n    \"plans/in-flight.md\": {\"checked\": 1, \"total\": 3, \"ready\": false},\n    \"plans/ready.md\": {\"checked\": 2, \"total\": 2, \"ready\": true},\n    \"plans/research.md\": {\"checked\": 0, \"total\": 0, \"ready\": false}\n  },\n  \"archived\": {\n    \"plans/complete/shipped.md\": {\"checked\": 1, \"total\": 1, \"ready\": false}\n  },\n  \"archivedCount\": 1\n}",
+                  "phase": "final_answer",
+                  "memoryCitation": null,
+                  "delivery": null,
+                  "questions": null
+                }
+              ],
+              "itemsView": "summary",
+              "status": "completed",
+              "error": null,
+              "startedAt": 1791298992,
+              "completedAt": 1791299026,
+              "durationMs": 32513
+            }
+          },
+          "emittedAtMs": 1791299026278
+        }
+      ],
+      "unchanged": true,
+      "status": "passed",
+      "activation": "model-requested-installed-skill-read",
+      "outputCorrect": true
+    },
+    {
+      "id": "unrelated",
+      "prompt": "What is 2 + 2? Reply with only the number.",
+      "attachedSkill": false,
+      "threadId": "01a111bd-fd7a-7bb1-86ff-5c2578099411",
+      "output": "4",
+      "reads": [],
+      "events": [
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "userMessage",
+              "id": "01a111be-0323-7bc2-92ec-47194a024b0b",
+              "clientId": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "What is 2 + 2? Reply with only the number.",
+                  "text_elements": []
+                }
+              ]
+            },
+            "threadId": "01a111bd-fd7a-7bb1-86ff-5c2578099411",
+            "turnId": "01a111bd-fda4-76a1-8a8c-869952c4b5ad",
+            "completedAtMs": 1791299027747
+          },
+          "emittedAtMs": 1791299027747
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "agentMessage",
+              "id": "msg_01db83eb38e97709016ac50dd78a0087d1934050a7de88c888",
+              "text": "4",
+              "phase": "final_answer",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            },
+            "threadId": "01a111bd-fd7a-7bb1-86ff-5c2578099411",
+            "turnId": "01a111bd-fda4-76a1-8a8c-869952c4b5ad",
+            "completedAtMs": 1791299031723
+          },
+          "emittedAtMs": 1791299031723
+        },
+        {
+          "method": "thread/tokenUsage/updated",
+          "params": {
+            "threadId": "01a111bd-fd7a-7bb1-86ff-5c2578099411",
+            "turnId": "01a111bd-fda4-76a1-8a8c-869952c4b5ad",
+            "tokenUsage": {
+              "total": {
+                "totalTokens": 17828,
+                "inputTokens": 17823,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 5,
+                "reasoningOutputTokens": 0
+              },
+              "last": {
+                "totalTokens": 17828,
+                "inputTokens": 17823,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 5,
+                "reasoningOutputTokens": 0
+              },
+              "modelContextWindow": 258400
+            }
+          },
+          "emittedAtMs": 1791299031729
+        },
+        {
+          "method": "turn/completed",
+          "params": {
+            "threadId": "01a111bd-fd7a-7bb1-86ff-5c2578099411",
+            "turn": {
+              "id": "01a111bd-fda4-76a1-8a8c-869952c4b5ad",
+              "items": [
+                {
+                  "type": "agentMessage",
+                  "id": "msg_01db83eb38e97709016ac50dd78a0087d1934050a7de88c888",
+                  "text": "4",
+                  "phase": "final_answer",
+                  "memoryCitation": null,
+                  "delivery": null,
+                  "questions": null
+                }
+              ],
+              "itemsView": "summary",
+              "status": "completed",
+              "error": null,
+              "startedAt": 1791299026,
+              "completedAt": 1791299031,
+              "durationMs": 4360
+            }
+          },
+          "emittedAtMs": 1791299031730
+        }
+      ],
+      "unchanged": true,
+      "status": "passed",
+      "activation": "none",
+      "outputCorrect": true
+    }
+  ],
+  "cliVersion": "0.157.0",
+  "revision": "cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0",
+  "install": {
+    "pluginId": "yellow-core@yellow-plugins",
+    "name": "yellow-core",
+    "marketplaceName": "yellow-plugins",
+    "version": "2.6.2",
+    "installedPath": "/tmp/yellow-codex-activation-E6MgaM/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2",
+    "authPolicy": "ON_INSTALL"
+  },
+  "fixtureBefore": {
+    "plans/complete/shipped.md": "d47d9a21eaabd0357c3de1cd33c7855d83fceab91fc4be6b79d950284bdfdb66",
+    "plans/in-flight.md": "af623e438209773e365fd22338b3e64672646b032f054f0ccba527515ee29fc7",
+    "plans/ready.md": "b6bb0f269ed95846029074dce3e8b88d4685d850d55551cca9dd41ec23ef48c9",
+    "plans/research.md": "e4665f1e5539c267c19f8b11a403172d3a15c42d3b9d345f317962ff351fa46a"
+  },
+  "skill": {
+    "name": "yellow-core:plan-status",
+    "description": "Show a per-file checkbox progress dashboard of plans/ (open) and plans/complete/ (archived) plan documents. Use when reviewing which plans are ready to archive or checking work-in-flight at a glance.",
+    "path": "/tmp/yellow-codex-activation-E6MgaM/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/plan-status/SKILL.md",
+    "scope": "user",
+    "enabled": true,
+    "pluginId": "yellow-core@yellow-plugins"
+  },
+  "model": "gpt-6-astra",
+  "modelProvider": "openai",
+  "ownerAuthMetadataUnchanged": true,
+  "fixtureAfter": {
+    "plans/complete/shipped.md": "d47d9a21eaabd0357c3de1cd33c7855d83fceab91fc4be6b79d950284bdfdb66",
+    "plans/in-flight.md": "af623e438209773e365fd22338b3e64672646b032f054f0ccba527515ee29fc7",
+    "plans/ready.md": "b6bb0f269ed95846029074dce3e8b88d4685d850d55551cca9dd41ec23ef48c9",
+    "plans/research.md": "e4665f1e5539c267c19f8b11a403172d3a15c42d3b9d345f317962ff351fa46a"
+  },
+  "scratchRetained": true
+}

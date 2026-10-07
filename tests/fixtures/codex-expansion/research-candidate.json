@@ -1,0 +1,23 @@
+{
+  "candidate": true,
+  "mcpServer": "deepwiki",
+  "files": {},
+  "observations": {},
+  "cases": [
+    {
+      "id": "deepwiki-live-success",
+      "plugin": "yellow-research",
+      "skill": "research-public-repo",
+      "attach": true,
+      "prompt": "Research the public modelcontextprotocol/python-sdk repository: what transport options does FastMCP support? Use the actual installed public DeepWiki MCP tools and their advertised schemas. Return the skill JSON contract including sources and indexing limitations, no files or credentials.",
+      "expected": {
+        "status": "success",
+        "repository": "modelcontextprotocol/python-sdk"
+      },
+      "requiredReads": [
+        "references/deepwiki-contract.md"
+      ],
+      "requireMcp": true
+    }
+  ]
+}
