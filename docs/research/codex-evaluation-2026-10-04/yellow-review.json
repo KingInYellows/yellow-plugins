@@ -1,0 +1,2535 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "plugin-eval",
+    "version": "0.1.0"
+  },
+  "createdAt": "2026-10-05T00:50:03.166Z",
+  "target": {
+    "kind": "plugin",
+    "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review",
+    "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json",
+    "name": "yellow-review",
+    "relativePath": "plugins/yellow-review"
+  },
+  "summary": {
+    "score": 0,
+    "grade": "F",
+    "riskLevel": "high",
+    "riskReasons": [
+      "Contains 10 failing error checks (deferred_cost_tokens-budget-high, interface-missing-capabilities, interface-missing-defaultPrompt).",
+      "Overall score is below 70, which the evaluator treats as high risk."
+    ],
+    "scoreBreakdown": {
+      "startingScore": 100,
+      "totalDeductions": 153.75,
+      "finalScore": 0,
+      "gradeThresholds": {
+        "A": 93,
+        "B": 85,
+        "C": 70,
+        "D": 55
+      }
+    },
+    "checkCounts": {
+      "total": 14,
+      "pass": 0,
+      "warn": 3,
+      "fail": 10,
+      "info": 2,
+      "error": 10,
+      "warning": 3
+    },
+    "deductions": [
+      {
+        "id": "deferred_cost_tokens-budget-high",
+        "category": "budget",
+        "severity": "error",
+        "status": "fail",
+        "message": "deferred_cost_tokens is excessive relative to the current Codex baseline.",
+        "penalty": 14,
+        "remediation": [
+          "Reduce repeated instruction text and move detail into deferred supporting files."
+        ],
+        "source": "core"
+      },
+      {
+        "id": "interface-missing-capabilities",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `capabilities`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.capabilities to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-review"
+      },
+      {
+        "id": "interface-missing-defaultPrompt",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `defaultPrompt`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.defaultPrompt to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-review"
+      },
+      {
+        "id": "interface-missing-developerName",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `developerName`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.developerName to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-review"
+      },
+      {
+        "id": "interface-missing-longDescription",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `longDescription`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.longDescription to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-review"
+      },
+      {
+        "id": "interface-missing-privacyPolicyURL",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `privacyPolicyURL`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.privacyPolicyURL to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-review"
+      },
+      {
+        "id": "interface-missing-shortDescription",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `shortDescription`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.shortDescription to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-review"
+      },
+      {
+        "id": "interface-missing-termsOfServiceURL",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `termsOfServiceURL`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.termsOfServiceURL to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-review"
+      },
+      {
+        "id": "interface-missing-websiteURL",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `websiteURL`.",
+        "penalty": 14,
+        "remediation": [
+          "Add interface.websiteURL to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-review"
+      },
+      {
+        "id": "manifest-missing-author",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json is missing the required `author` field.",
+        "penalty": 14,
+        "remediation": [
+          "Add `author` to plugin.json."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-review"
+      },
+      {
+        "id": "invoke_cost_tokens-budget-high",
+        "category": "budget",
+        "severity": "warning",
+        "status": "warn",
+        "message": "invoke_cost_tokens is heavy relative to the current Codex baseline.",
+        "penalty": 4.5,
+        "remediation": [
+          "Reduce repeated instruction text and move detail into deferred supporting files."
+        ],
+        "source": "core"
+      },
+      {
+        "id": "skill:yellow-thermonuclear-review:description-trigger-weak",
+        "category": "best-practice",
+        "severity": "warning",
+        "status": "warn",
+        "message": "The description does not clearly advertise when the skill should trigger.",
+        "penalty": 4.5,
+        "remediation": [
+          "Rewrite the description to include a clear 'Use when ...' trigger sentence."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-review/codex/skills/yellow-thermonuclear-review"
+      },
+      {
+        "id": "skill:yellow-thermonuclear-review:progressive-disclosure-missing",
+        "category": "best-practice",
+        "severity": "warning",
+        "status": "warn",
+        "message": "The skill is getting large without using references for progressive disclosure.",
+        "penalty": 4.5,
+        "remediation": [
+          "Move deep detail or edge-case variants into references/ and link them from SKILL.md."
+        ],
+        "source": "core",
+        "targetPath": "plugins/yellow-review/codex/skills/yellow-thermonuclear-review"
+      },
+      {
+        "id": "coverage-artifacts-unavailable",
+        "category": "coverage",
+        "severity": "info",
+        "status": "info",
+        "message": "No coverage artifacts were found for this target.",
+        "penalty": 0.25,
+        "remediation": [
+          "Generate `lcov.info`, `coverage.xml`, or an Istanbul coverage JSON file if you want coverage scoring."
+        ],
+        "source": "core"
+      }
+    ],
+    "categoryDeductions": [
+      {
+        "category": "manifest",
+        "totalPenalty": 126,
+        "checks": 9
+      },
+      {
+        "category": "budget",
+        "totalPenalty": 18.5,
+        "checks": 2
+      },
+      {
+        "category": "best-practice",
+        "totalPenalty": 9,
+        "checks": 2
+      },
+      {
+        "category": "coverage",
+        "totalPenalty": 0.25,
+        "checks": 1
+      }
+    ],
+    "topRecommendations": [
+      "Add `author` to plugin.json.",
+      "Add interface.shortDescription to plugin.json.",
+      "Add interface.longDescription to plugin.json.",
+      "Add interface.developerName to plugin.json.",
+      "Add interface.capabilities to plugin.json."
+    ],
+    "whyBullets": [
+      "10 failing error checks are driving the highest-confidence problems.",
+      "3 warning signals still need cleanup before this feels polished.",
+      "manifest is the largest source of score loss at -126 points.",
+      "Active budget pressure is high enough that token cost may dominate the user experience.",
+      "No observed usage is attached yet, so budget conclusions are still based on static estimates."
+    ],
+    "fixFirst": [
+      {
+        "id": "interface-missing-capabilities",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `capabilities`.",
+        "why": "Manifest issues reduce trust because Codex may not discover or represent the plugin correctly.",
+        "remediation": [
+          "Add interface.capabilities to plugin.json."
+        ],
+        "penalty": 14,
+        "source": "core",
+        "targetPath": "plugins/yellow-review"
+      },
+      {
+        "id": "interface-missing-defaultPrompt",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `defaultPrompt`.",
+        "why": "Manifest issues reduce trust because Codex may not discover or represent the plugin correctly.",
+        "remediation": [
+          "Add interface.defaultPrompt to plugin.json."
+        ],
+        "penalty": 14,
+        "source": "core",
+        "targetPath": "plugins/yellow-review"
+      },
+      {
+        "id": "interface-missing-developerName",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `developerName`.",
+        "why": "Manifest issues reduce trust because Codex may not discover or represent the plugin correctly.",
+        "remediation": [
+          "Add interface.developerName to plugin.json."
+        ],
+        "penalty": 14,
+        "source": "core",
+        "targetPath": "plugins/yellow-review"
+      }
+    ],
+    "watchNext": [
+      {
+        "id": "interface-missing-longDescription",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `longDescription`.",
+        "why": "Manifest issues reduce trust because Codex may not discover or represent the plugin correctly.",
+        "remediation": [
+          "Add interface.longDescription to plugin.json."
+        ],
+        "penalty": 14,
+        "source": "core",
+        "targetPath": "plugins/yellow-review"
+      },
+      {
+        "id": "interface-missing-privacyPolicyURL",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `privacyPolicyURL`.",
+        "why": "Manifest issues reduce trust because Codex may not discover or represent the plugin correctly.",
+        "remediation": [
+          "Add interface.privacyPolicyURL to plugin.json."
+        ],
+        "penalty": 14,
+        "source": "core",
+        "targetPath": "plugins/yellow-review"
+      },
+      {
+        "id": "interface-missing-shortDescription",
+        "category": "manifest",
+        "severity": "error",
+        "status": "fail",
+        "message": "plugin.json interface is missing `shortDescription`.",
+        "why": "Manifest issues reduce trust because Codex may not discover or represent the plugin correctly.",
+        "remediation": [
+          "Add interface.shortDescription to plugin.json."
+        ],
+        "penalty": 14,
+        "source": "core",
+        "targetPath": "plugins/yellow-review"
+      }
+    ]
+  },
+  "budgets": {
+    "method": "estimated-static",
+    "invocation_policy": {
+      "implicit_skill_count": 1,
+      "explicit_only_skill_count": 0,
+      "implicit_skills": [
+        "yellow-thermonuclear-review"
+      ],
+      "explicit_only_skills": []
+    },
+    "trigger_cost_tokens": {
+      "value": 207,
+      "band": "moderate",
+      "thresholds": {
+        "goodMax": 66,
+        "moderateMax": 254,
+        "heavyMax": 614
+      },
+      "components": [
+        {
+          "label": "plugin-description",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json",
+          "tokens": 122,
+          "note": "Plugin marketplace summary"
+        },
+        {
+          "label": "default-prompts",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json",
+          "tokens": 0,
+          "note": "Starter prompts visible in the UI"
+        },
+        {
+          "label": "yellow-thermonuclear-review-description",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/codex/skills/yellow-thermonuclear-review/SKILL.md",
+          "tokens": 85,
+          "note": "Skill trigger description exposed through the plugin"
+        }
+      ]
+    },
+    "invoke_cost_tokens": {
+      "value": 5257,
+      "band": "heavy",
+      "thresholds": {
+        "goodMax": 462,
+        "moderateMax": 4493,
+        "heavyMax": 17204
+      },
+      "components": [
+        {
+          "label": "plugin-manifest",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json",
+          "tokens": 171,
+          "note": "Manifest load cost"
+        },
+        {
+          "label": "yellow-thermonuclear-review-skill-file",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/codex/skills/yellow-thermonuclear-review/SKILL.md",
+          "tokens": 5086,
+          "note": "Implicit skill invocation cost ceiling"
+        }
+      ]
+    },
+    "deferred_cost_tokens": {
+      "value": 235808,
+      "band": "excessive",
+      "thresholds": {
+        "goodMax": 27,
+        "moderateMax": 7622,
+        "heavyMax": 58894
+      },
+      "components": [
+        {
+          "label": ".claude-plugin/plugin.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.claude-plugin/plugin.json",
+          "tokens": 361,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": ".cursor-plugin/plugin.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.cursor-plugin/plugin.json",
+          "tokens": 234,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "CHANGELOG.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/CHANGELOG.md",
+          "tokens": 24669,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "CLAUDE.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/CLAUDE.md",
+          "tokens": 8120,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "README.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/README.md",
+          "tokens": 5163,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/adversarial-reviewer.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/adversarial-reviewer.md",
+          "tokens": 2404,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/agent-cli-readiness-reviewer.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md",
+          "tokens": 3048,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/agent-native-reviewer.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/agent-native-reviewer.md",
+          "tokens": 2490,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/cli-readiness-reviewer.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/cli-readiness-reviewer.md",
+          "tokens": 2048,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/code-simplifier.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/code-simplifier.md",
+          "tokens": 988,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/comment-analyzer.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/comment-analyzer.md",
+          "tokens": 1006,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/correctness-reviewer.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/correctness-reviewer.md",
+          "tokens": 1514,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/maintainability-reviewer.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/maintainability-reviewer.md",
+          "tokens": 1557,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/plugin-contract-reviewer.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/plugin-contract-reviewer.md",
+          "tokens": 3421,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/pr-test-analyzer.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/pr-test-analyzer.md",
+          "tokens": 1023,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/project-compliance-reviewer.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/project-compliance-reviewer.md",
+          "tokens": 1883,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/project-standards-reviewer.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/project-standards-reviewer.md",
+          "tokens": 2318,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/reliability-reviewer.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/reliability-reviewer.md",
+          "tokens": 1539,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/silent-failure-hunter.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/silent-failure-hunter.md",
+          "tokens": 1542,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/thermonuclear-reviewer.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/thermonuclear-reviewer.md",
+          "tokens": 2162,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/review/type-design-analyzer.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/type-design-analyzer.md",
+          "tokens": 1220,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "agents/workflow/pr-comment-resolver.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/workflow/pr-comment-resolver.md",
+          "tokens": 3549,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/review/resolve-pr.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/resolve-pr.md",
+          "tokens": 9440,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/review/resolve-stack.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/resolve-stack.md",
+          "tokens": 6437,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/review/review-all.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/review-all.md",
+          "tokens": 5527,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/review/review-pr.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/review-pr.md",
+          "tokens": 15109,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/review/setup.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/setup.md",
+          "tokens": 1627,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/review/sweep-all.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/sweep-all.md",
+          "tokens": 5885,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/review/sweep.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/sweep.md",
+          "tokens": 5810,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "commands/review/triage.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/triage.md",
+          "tokens": 3258,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "cursor/skills/yellow-thermonuclear-review/SKILL.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/cursor/skills/yellow-thermonuclear-review/SKILL.md",
+          "tokens": 5086,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "hooks/scripts/session-start.sh",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/hooks/scripts/session-start.sh",
+          "tokens": 1660,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "lib/gh-graphql.sh",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/gh-graphql.sh",
+          "tokens": 1779,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "lib/resolve-gh.sh",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/resolve-gh.sh",
+          "tokens": 630,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "lib/resolve-paths.sh",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/resolve-paths.sh",
+          "tokens": 7168,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "lib/resolve-text.sh",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/resolve-text.sh",
+          "tokens": 9332,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "lib/review-ledger-vocab.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/review-ledger-vocab.json",
+          "tokens": 565,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "lib/review-ledger.sh",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/review-ledger.sh",
+          "tokens": 26752,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "lib/sibling-plugin.sh",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/sibling-plugin.sh",
+          "tokens": 287,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "lib/verify-run.sh",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/verify-run.sh",
+          "tokens": 3158,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "output-styles/pr-findings.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/output-styles/pr-findings.md",
+          "tokens": 131,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "package.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/package.json",
+          "tokens": 51,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/resolve/branch-check.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/resolve/branch-check.md",
+          "tokens": 563,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/resolve/clusters.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/resolve/clusters.md",
+          "tokens": 1065,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/resolve/dispositions.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/resolve/dispositions.md",
+          "tokens": 17272,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/resolve/envelope.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/resolve/envelope.md",
+          "tokens": 1181,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/resolve/memory-recall.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/resolve/memory-recall.md",
+          "tokens": 415,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/review-pr/knowledge-compounding.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-pr/knowledge-compounding.md",
+          "tokens": 725,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/review-pr/ledger.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-pr/ledger.md",
+          "tokens": 2583,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/review-pr/legacy-fallback.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-pr/legacy-fallback.md",
+          "tokens": 871,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/review-resolve-stack/dirty-tree-cleanup.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-resolve-stack/dirty-tree-cleanup.md",
+          "tokens": 1452,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/review-resolve-stack/resolve-contract.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-resolve-stack/resolve-contract.md",
+          "tokens": 766,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/review-sweep-all/dirty-tree-cleanup.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-sweep-all/dirty-tree-cleanup.md",
+          "tokens": 1452,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/review-sweep-all/resolve-contract.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-sweep-all/resolve-contract.md",
+          "tokens": 766,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "references/review-sweep/resolve-contract.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-sweep/resolve-contract.md",
+          "tokens": 766,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "skills/pr-review-workflow/SKILL.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/skills/pr-review-workflow/SKILL.md",
+          "tokens": 5287,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "skills/pr-review-workflow/references/local-scripts.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/skills/pr-review-workflow/references/local-scripts.md",
+          "tokens": 616,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "skills/stack-traversal/SKILL.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/skills/stack-traversal/SKILL.md",
+          "tokens": 2148,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "skills/yellow-thermonuclear-review/SKILL.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md",
+          "tokens": 5092,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/blockers-approved.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-approved.json",
+          "tokens": 159,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/blockers-default-base.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-default-base.json",
+          "tokens": 89,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/blockers-ghost.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-ghost.json",
+          "tokens": 143,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/blockers-malformed.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-malformed.json",
+          "tokens": 75,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/blockers-next-page.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-next-page.json",
+          "tokens": 163,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/blockers-no-policy.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-no-policy.json",
+          "tokens": 70,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/blockers-null-pr.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-null-pr.json",
+          "tokens": 52,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/blockers-response.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-response.json",
+          "tokens": 341,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/blockers-slash-branch.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-slash-branch.json",
+          "tokens": 165,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/blockers-stacked.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-stacked.json",
+          "tokens": 90,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/empty-threads-response.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/empty-threads-response.json",
+          "tokens": 51,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/graphql-error-response.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/graphql-error-response.json",
+          "tokens": 38,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/issue-list-response.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/issue-list-response.json",
+          "tokens": 258,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/multi-page-response-page1.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/multi-page-response-page1.json",
+          "tokens": 244,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/multi-page-response-page2.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/multi-page-response-page2.json",
+          "tokens": 240,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/null-cursor-response.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/null-cursor-response.json",
+          "tokens": 148,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/outdated-anchor-response.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/outdated-anchor-response.json",
+          "tokens": 1240,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/pr-files-newline-names.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/pr-files-newline-names.json",
+          "tokens": 63,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/pr-files-notarray.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/pr-files-notarray.json",
+          "tokens": 5,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/pr-files-ranges.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/pr-files-ranges.json",
+          "tokens": 65,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/pr-files-renames-newline.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/pr-files-renames-newline.json",
+          "tokens": 65,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/pr-files-renames.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/pr-files-renames.json",
+          "tokens": 54,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/pr-files-response.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/pr-files-response.json",
+          "tokens": 144,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/pr-files-unsafe.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/pr-files-unsafe.json",
+          "tokens": 38,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/resolve-success-response.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/resolve-success-response.json",
+          "tokens": 35,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/single-page-response.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/single-page-response.json",
+          "tokens": 855,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/thermonuclear/README.md",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/thermonuclear/README.md",
+          "tokens": 1087,
+          "note": "Deferred supporting file"
+        },
+        {
+          "label": "tests/fixtures/viewer-fields-response.json",
+          "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/viewer-fields-response.json",
+          "tokens": 4860,
+          "note": "Deferred supporting file"
+        }
+      ]
+    },
+    "explicit_only_invoke_cost_tokens": {
+      "value": 0,
+      "band": "good",
+      "thresholds": {
+        "goodMax": 462,
+        "moderateMax": 4493,
+        "heavyMax": 17204
+      },
+      "components": []
+    },
+    "total_tokens": {
+      "value": 241272,
+      "band": "excessive"
+    }
+  },
+  "observedUsage": null,
+  "checks": [
+    {
+      "id": "manifest-missing-author",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json is missing the required `author` field.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add `author` to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-review"
+    },
+    {
+      "id": "interface-missing-shortDescription",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `shortDescription`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.shortDescription to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-review"
+    },
+    {
+      "id": "interface-missing-longDescription",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `longDescription`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.longDescription to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-review"
+    },
+    {
+      "id": "interface-missing-developerName",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `developerName`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.developerName to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-review"
+    },
+    {
+      "id": "interface-missing-capabilities",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `capabilities`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.capabilities to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-review"
+    },
+    {
+      "id": "interface-missing-websiteURL",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `websiteURL`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.websiteURL to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-review"
+    },
+    {
+      "id": "interface-missing-privacyPolicyURL",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `privacyPolicyURL`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.privacyPolicyURL to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-review"
+    },
+    {
+      "id": "interface-missing-termsOfServiceURL",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `termsOfServiceURL`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.termsOfServiceURL to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-review"
+    },
+    {
+      "id": "interface-missing-defaultPrompt",
+      "category": "manifest",
+      "severity": "error",
+      "status": "fail",
+      "message": "plugin.json interface is missing `defaultPrompt`.",
+      "evidence": [
+        "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json"
+      ],
+      "remediation": [
+        "Add interface.defaultPrompt to plugin.json."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-review"
+    },
+    {
+      "id": "skill:yellow-thermonuclear-review:description-trigger-weak",
+      "category": "best-practice",
+      "severity": "warning",
+      "status": "warn",
+      "message": "The description does not clearly advertise when the skill should trigger.",
+      "evidence": [
+        "Descriptions are the primary auto-load surface in Codex."
+      ],
+      "remediation": [
+        "Rewrite the description to include a clear 'Use when ...' trigger sentence."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-review/codex/skills/yellow-thermonuclear-review"
+    },
+    {
+      "id": "skill:yellow-thermonuclear-review:progressive-disclosure-missing",
+      "category": "best-practice",
+      "severity": "warning",
+      "status": "warn",
+      "message": "The skill is getting large without using references for progressive disclosure.",
+      "evidence": [
+        "Large skills are easier to maintain when variants live under references/."
+      ],
+      "remediation": [
+        "Move deep detail or edge-case variants into references/ and link them from SKILL.md."
+      ],
+      "source": "core",
+      "targetPath": "plugins/yellow-review/codex/skills/yellow-thermonuclear-review"
+    },
+    {
+      "id": "invoke_cost_tokens-budget-high",
+      "category": "budget",
+      "severity": "warning",
+      "status": "warn",
+      "message": "invoke_cost_tokens is heavy relative to the current Codex baseline.",
+      "evidence": [
+        "Value: 5257 tokens",
+        "Baseline samples: skills=5, plugins=176"
+      ],
+      "remediation": [
+        "Reduce repeated instruction text and move detail into deferred supporting files."
+      ],
+      "source": "core"
+    },
+    {
+      "id": "deferred_cost_tokens-budget-high",
+      "category": "budget",
+      "severity": "error",
+      "status": "fail",
+      "message": "deferred_cost_tokens is excessive relative to the current Codex baseline.",
+      "evidence": [
+        "Value: 235808 tokens",
+        "Baseline samples: skills=5, plugins=176"
+      ],
+      "remediation": [
+        "Reduce repeated instruction text and move detail into deferred supporting files."
+      ],
+      "source": "core"
+    },
+    {
+      "id": "coverage-artifacts-unavailable",
+      "category": "coverage",
+      "severity": "info",
+      "status": "info",
+      "message": "No coverage artifacts were found for this target.",
+      "evidence": [
+        "plugins/yellow-review"
+      ],
+      "remediation": [
+        "Generate `lcov.info`, `coverage.xml`, or an Istanbul coverage JSON file if you want coverage scoring."
+      ],
+      "source": "core"
+    }
+  ],
+  "metrics": [
+    {
+      "id": "skill:yellow-thermonuclear-review:skill_line_count",
+      "category": "budget",
+      "value": 414,
+      "unit": "lines",
+      "band": "moderate",
+      "source": "core",
+      "targetPath": "plugins/yellow-review/codex/skills/yellow-thermonuclear-review"
+    },
+    {
+      "id": "skill:yellow-thermonuclear-review:description_length_chars",
+      "category": "budget",
+      "value": 339,
+      "unit": "chars",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-review/codex/skills/yellow-thermonuclear-review"
+    },
+    {
+      "id": "skill:yellow-thermonuclear-review:relative_link_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "links",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-review/codex/skills/yellow-thermonuclear-review"
+    },
+    {
+      "id": "skill:yellow-thermonuclear-review:code_fence_count",
+      "category": "readability",
+      "value": 5,
+      "unit": "blocks",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-review/codex/skills/yellow-thermonuclear-review"
+    },
+    {
+      "id": "skill:yellow-thermonuclear-review:support_file_count",
+      "category": "documentation",
+      "value": 0,
+      "unit": "files",
+      "band": "info",
+      "source": "core",
+      "targetPath": "plugins/yellow-review/codex/skills/yellow-thermonuclear-review"
+    },
+    {
+      "id": "plugin_skill_count",
+      "category": "manifest",
+      "value": 1,
+      "unit": "skills",
+      "band": "good",
+      "source": "core",
+      "targetPath": "plugins/yellow-review"
+    },
+    {
+      "id": "plugin_keyword_count",
+      "category": "manifest",
+      "value": 0,
+      "unit": "keywords",
+      "band": "info",
+      "source": "core",
+      "targetPath": "plugins/yellow-review"
+    },
+    {
+      "id": "plugin_default_prompt_count",
+      "category": "manifest",
+      "value": 0,
+      "unit": "prompts",
+      "band": "moderate",
+      "source": "core",
+      "targetPath": "plugins/yellow-review"
+    },
+    {
+      "id": "trigger_cost_tokens",
+      "category": "budget",
+      "value": 207,
+      "unit": "tokens",
+      "band": "moderate",
+      "source": "core"
+    },
+    {
+      "id": "invoke_cost_tokens",
+      "category": "budget",
+      "value": 5257,
+      "unit": "tokens",
+      "band": "heavy",
+      "source": "core"
+    },
+    {
+      "id": "deferred_cost_tokens",
+      "category": "budget",
+      "value": 235808,
+      "unit": "tokens",
+      "band": "excessive",
+      "source": "core"
+    },
+    {
+      "id": "explicit_only_invoke_cost_tokens",
+      "category": "budget",
+      "value": 0,
+      "unit": "tokens",
+      "band": "good",
+      "source": "core"
+    },
+    {
+      "id": "coverage_artifact_count",
+      "category": "coverage",
+      "value": 0,
+      "unit": "files",
+      "band": "info",
+      "source": "core"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "skill:yellow-thermonuclear-review:skill-link-inventory",
+      "type": "inventory",
+      "label": "Skill relative links",
+      "description": "Relative links found in SKILL.md.",
+      "source": "core",
+      "data": {
+        "links": []
+      }
+    },
+    {
+      "id": "plugin-skill-inventory",
+      "type": "inventory",
+      "label": "Plugin skills",
+      "description": "Discoverable skills under the plugin.",
+      "source": "core",
+      "data": {
+        "skills": [
+          "codex/skills/yellow-thermonuclear-review"
+        ]
+      }
+    },
+    {
+      "id": "budget-breakdown",
+      "type": "budget",
+      "label": "Budget breakdown",
+      "description": "Trigger, invoke, and deferred token budget analysis.",
+      "source": "core",
+      "data": {
+        "budgets": {
+          "method": "estimated-static",
+          "invocation_policy": {
+            "implicit_skill_count": 1,
+            "explicit_only_skill_count": 0,
+            "implicit_skills": [
+              "yellow-thermonuclear-review"
+            ],
+            "explicit_only_skills": []
+          },
+          "trigger_cost_tokens": {
+            "value": 207,
+            "band": "moderate",
+            "thresholds": {
+              "goodMax": 66,
+              "moderateMax": 254,
+              "heavyMax": 614
+            },
+            "components": [
+              {
+                "label": "plugin-description",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json",
+                "tokens": 122,
+                "note": "Plugin marketplace summary"
+              },
+              {
+                "label": "default-prompts",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json",
+                "tokens": 0,
+                "note": "Starter prompts visible in the UI"
+              },
+              {
+                "label": "yellow-thermonuclear-review-description",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/codex/skills/yellow-thermonuclear-review/SKILL.md",
+                "tokens": 85,
+                "note": "Skill trigger description exposed through the plugin"
+              }
+            ]
+          },
+          "invoke_cost_tokens": {
+            "value": 5257,
+            "band": "heavy",
+            "thresholds": {
+              "goodMax": 462,
+              "moderateMax": 4493,
+              "heavyMax": 17204
+            },
+            "components": [
+              {
+                "label": "plugin-manifest",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json",
+                "tokens": 171,
+                "note": "Manifest load cost"
+              },
+              {
+                "label": "yellow-thermonuclear-review-skill-file",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/codex/skills/yellow-thermonuclear-review/SKILL.md",
+                "tokens": 5086,
+                "note": "Implicit skill invocation cost ceiling"
+              }
+            ]
+          },
+          "deferred_cost_tokens": {
+            "value": 235808,
+            "band": "excessive",
+            "thresholds": {
+              "goodMax": 27,
+              "moderateMax": 7622,
+              "heavyMax": 58894
+            },
+            "components": [
+              {
+                "label": ".claude-plugin/plugin.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.claude-plugin/plugin.json",
+                "tokens": 361,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": ".cursor-plugin/plugin.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.cursor-plugin/plugin.json",
+                "tokens": 234,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "CHANGELOG.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/CHANGELOG.md",
+                "tokens": 24669,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "CLAUDE.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/CLAUDE.md",
+                "tokens": 8120,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "README.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/README.md",
+                "tokens": 5163,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/adversarial-reviewer.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/adversarial-reviewer.md",
+                "tokens": 2404,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/agent-cli-readiness-reviewer.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md",
+                "tokens": 3048,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/agent-native-reviewer.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/agent-native-reviewer.md",
+                "tokens": 2490,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/cli-readiness-reviewer.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/cli-readiness-reviewer.md",
+                "tokens": 2048,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/code-simplifier.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/code-simplifier.md",
+                "tokens": 988,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/comment-analyzer.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/comment-analyzer.md",
+                "tokens": 1006,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/correctness-reviewer.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/correctness-reviewer.md",
+                "tokens": 1514,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/maintainability-reviewer.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/maintainability-reviewer.md",
+                "tokens": 1557,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/plugin-contract-reviewer.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/plugin-contract-reviewer.md",
+                "tokens": 3421,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/pr-test-analyzer.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/pr-test-analyzer.md",
+                "tokens": 1023,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/project-compliance-reviewer.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/project-compliance-reviewer.md",
+                "tokens": 1883,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/project-standards-reviewer.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/project-standards-reviewer.md",
+                "tokens": 2318,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/reliability-reviewer.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/reliability-reviewer.md",
+                "tokens": 1539,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/silent-failure-hunter.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/silent-failure-hunter.md",
+                "tokens": 1542,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/thermonuclear-reviewer.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/thermonuclear-reviewer.md",
+                "tokens": 2162,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/review/type-design-analyzer.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/review/type-design-analyzer.md",
+                "tokens": 1220,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "agents/workflow/pr-comment-resolver.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/agents/workflow/pr-comment-resolver.md",
+                "tokens": 3549,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/review/resolve-pr.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/resolve-pr.md",
+                "tokens": 9440,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/review/resolve-stack.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/resolve-stack.md",
+                "tokens": 6437,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/review/review-all.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/review-all.md",
+                "tokens": 5527,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/review/review-pr.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/review-pr.md",
+                "tokens": 15109,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/review/setup.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/setup.md",
+                "tokens": 1627,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/review/sweep-all.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/sweep-all.md",
+                "tokens": 5885,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/review/sweep.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/sweep.md",
+                "tokens": 5810,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "commands/review/triage.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/commands/review/triage.md",
+                "tokens": 3258,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "cursor/skills/yellow-thermonuclear-review/SKILL.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/cursor/skills/yellow-thermonuclear-review/SKILL.md",
+                "tokens": 5086,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "hooks/scripts/session-start.sh",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/hooks/scripts/session-start.sh",
+                "tokens": 1660,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "lib/gh-graphql.sh",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/gh-graphql.sh",
+                "tokens": 1779,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "lib/resolve-gh.sh",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/resolve-gh.sh",
+                "tokens": 630,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "lib/resolve-paths.sh",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/resolve-paths.sh",
+                "tokens": 7168,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "lib/resolve-text.sh",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/resolve-text.sh",
+                "tokens": 9332,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "lib/review-ledger-vocab.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/review-ledger-vocab.json",
+                "tokens": 565,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "lib/review-ledger.sh",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/review-ledger.sh",
+                "tokens": 26752,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "lib/sibling-plugin.sh",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/sibling-plugin.sh",
+                "tokens": 287,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "lib/verify-run.sh",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/lib/verify-run.sh",
+                "tokens": 3158,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "output-styles/pr-findings.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/output-styles/pr-findings.md",
+                "tokens": 131,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "package.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/package.json",
+                "tokens": 51,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/resolve/branch-check.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/resolve/branch-check.md",
+                "tokens": 563,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/resolve/clusters.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/resolve/clusters.md",
+                "tokens": 1065,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/resolve/dispositions.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/resolve/dispositions.md",
+                "tokens": 17272,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/resolve/envelope.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/resolve/envelope.md",
+                "tokens": 1181,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/resolve/memory-recall.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/resolve/memory-recall.md",
+                "tokens": 415,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/review-pr/knowledge-compounding.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-pr/knowledge-compounding.md",
+                "tokens": 725,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/review-pr/ledger.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-pr/ledger.md",
+                "tokens": 2583,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/review-pr/legacy-fallback.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-pr/legacy-fallback.md",
+                "tokens": 871,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/review-resolve-stack/dirty-tree-cleanup.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-resolve-stack/dirty-tree-cleanup.md",
+                "tokens": 1452,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/review-resolve-stack/resolve-contract.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-resolve-stack/resolve-contract.md",
+                "tokens": 766,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/review-sweep-all/dirty-tree-cleanup.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-sweep-all/dirty-tree-cleanup.md",
+                "tokens": 1452,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/review-sweep-all/resolve-contract.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-sweep-all/resolve-contract.md",
+                "tokens": 766,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "references/review-sweep/resolve-contract.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/references/review-sweep/resolve-contract.md",
+                "tokens": 766,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "skills/pr-review-workflow/SKILL.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/skills/pr-review-workflow/SKILL.md",
+                "tokens": 5287,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "skills/pr-review-workflow/references/local-scripts.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/skills/pr-review-workflow/references/local-scripts.md",
+                "tokens": 616,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "skills/stack-traversal/SKILL.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/skills/stack-traversal/SKILL.md",
+                "tokens": 2148,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "skills/yellow-thermonuclear-review/SKILL.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/skills/yellow-thermonuclear-review/SKILL.md",
+                "tokens": 5092,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/blockers-approved.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-approved.json",
+                "tokens": 159,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/blockers-default-base.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-default-base.json",
+                "tokens": 89,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/blockers-ghost.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-ghost.json",
+                "tokens": 143,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/blockers-malformed.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-malformed.json",
+                "tokens": 75,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/blockers-next-page.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-next-page.json",
+                "tokens": 163,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/blockers-no-policy.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-no-policy.json",
+                "tokens": 70,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/blockers-null-pr.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-null-pr.json",
+                "tokens": 52,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/blockers-response.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-response.json",
+                "tokens": 341,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/blockers-slash-branch.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-slash-branch.json",
+                "tokens": 165,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/blockers-stacked.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/blockers-stacked.json",
+                "tokens": 90,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/empty-threads-response.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/empty-threads-response.json",
+                "tokens": 51,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/graphql-error-response.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/graphql-error-response.json",
+                "tokens": 38,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/issue-list-response.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/issue-list-response.json",
+                "tokens": 258,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/multi-page-response-page1.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/multi-page-response-page1.json",
+                "tokens": 244,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/multi-page-response-page2.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/multi-page-response-page2.json",
+                "tokens": 240,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/null-cursor-response.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/null-cursor-response.json",
+                "tokens": 148,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/outdated-anchor-response.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/outdated-anchor-response.json",
+                "tokens": 1240,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/pr-files-newline-names.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/pr-files-newline-names.json",
+                "tokens": 63,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/pr-files-notarray.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/pr-files-notarray.json",
+                "tokens": 5,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/pr-files-ranges.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/pr-files-ranges.json",
+                "tokens": 65,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/pr-files-renames-newline.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/pr-files-renames-newline.json",
+                "tokens": 65,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/pr-files-renames.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/pr-files-renames.json",
+                "tokens": 54,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/pr-files-response.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/pr-files-response.json",
+                "tokens": 144,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/pr-files-unsafe.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/pr-files-unsafe.json",
+                "tokens": 38,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/resolve-success-response.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/resolve-success-response.json",
+                "tokens": 35,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/single-page-response.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/single-page-response.json",
+                "tokens": 855,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/thermonuclear/README.md",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/thermonuclear/README.md",
+                "tokens": 1087,
+                "note": "Deferred supporting file"
+              },
+              {
+                "label": "tests/fixtures/viewer-fields-response.json",
+                "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/tests/fixtures/viewer-fields-response.json",
+                "tokens": 4860,
+                "note": "Deferred supporting file"
+              }
+            ]
+          },
+          "explicit_only_invoke_cost_tokens": {
+            "value": 0,
+            "band": "good",
+            "thresholds": {
+              "goodMax": 462,
+              "moderateMax": 4493,
+              "heavyMax": 17204
+            },
+            "components": []
+          },
+          "total_tokens": {
+            "value": 241272,
+            "band": "excessive"
+          }
+        },
+        "baselineEvidence": {
+          "skillSamples": 5,
+          "pluginSamples": 176,
+          "sourceRoots": [
+            "../../../../../.codex/skills",
+            "../../../../../.codex/plugins/cache/openai-curated",
+            "../../../../../.codex/.tmp/plugins/plugins"
+          ]
+        }
+      }
+    },
+    {
+      "id": "measurement-plan",
+      "type": "measurement-plan",
+      "label": "Measurement plan",
+      "description": "Recommended toolsets for measuring the real-world effect of this skill or plugin.",
+      "source": "core",
+      "data": {
+        "recommendedToolsets": [
+          "token-usage-observer",
+          "task-outcome-scorecard",
+          "tool-call-audit",
+          "latency-efficiency"
+        ],
+        "toolsets": [
+          {
+            "id": "token-usage-observer",
+            "label": "Token Usage Observer",
+            "priority": "high",
+            "goal": "Measure how many tokens the skill or plugin actually burns in representative runs.",
+            "why": "Static estimates are useful guardrails, but observed usage is what tells you whether a real workflow is affordable and whether caching or reasoning changes the picture.",
+            "signals": [
+              "observed_usage_sample_count",
+              "observed_input_tokens_avg",
+              "observed_total_tokens_avg",
+              "estimate_vs_observed_input_ratio"
+            ],
+            "evidenceSources": [
+              "Responses API usage logs",
+              "Codex-like session exports",
+              "JSONL traces captured from local benchmarking harnesses"
+            ],
+            "starterPack": {
+              "manifestName": "token-usage-pack",
+              "focus": "Validate sample size, cold-start versus warm-cache behavior, and estimate drift over time."
+            }
+          },
+          {
+            "id": "task-outcome-scorecard",
+            "label": "Task Outcome Scorecard",
+            "priority": "high",
+            "goal": "Measure whether the skill helps users finish the intended job with fewer retries and less cleanup.",
+            "why": "A low-token skill is still a miss if it fails the task, and a verbose skill may be worth it if it consistently improves first-pass success.",
+            "signals": [
+              "task_success_rate",
+              "first_pass_success_rate",
+              "retry_rate",
+              "human_override_rate"
+            ],
+            "evidenceSources": [
+              "Task run logs",
+              "Structured user acceptance checklist",
+              "Before/after comparison runs on the same prompts"
+            ],
+            "starterPack": {
+              "manifestName": "task-outcomes-pack",
+              "focus": "Score success, retries, and manual intervention across a fixed prompt set."
+            }
+          },
+          {
+            "id": "tool-call-audit",
+            "label": "Tool Call Audit",
+            "priority": "high",
+            "goal": "Check whether the agent uses the right tools, arguments, and sequencing when the skill is active.",
+            "why": "For Codex plugins and many higher-agency skills, tool correctness is often the real determinant of user value.",
+            "signals": [
+              "tool_call_success_rate",
+              "invalid_tool_argument_rate",
+              "recoverable_tool_failure_rate"
+            ],
+            "evidenceSources": [
+              "Tool invocation traces",
+              "Recorded sessions",
+              "Golden-path scenario replays"
+            ],
+            "starterPack": {
+              "manifestName": "tool-audit-pack",
+              "focus": "Flag wrong tool selection, malformed args, and missing follow-up calls."
+            }
+          },
+          {
+            "id": "latency-efficiency",
+            "label": "Latency And Efficiency",
+            "priority": "high",
+            "goal": "Track whether the skill speeds users up enough to justify its cost.",
+            "why": "DX improvements usually win when they reduce waiting or rework, not only when they reduce absolute token counts.",
+            "signals": [
+              "p50_time_to_first_acceptable_answer_seconds",
+              "p95_time_to_task_completion_seconds",
+              "tokens_per_successful_run"
+            ],
+            "evidenceSources": [
+              "Benchmark harness timings",
+              "Manual stopwatch runs on canonical tasks",
+              "Responses API timestamps combined with usage logs"
+            ],
+            "starterPack": {
+              "manifestName": "latency-efficiency-pack",
+              "focus": "Measure time-to-value and cost-per-success on a stable prompt suite."
+            }
+          },
+          {
+            "id": "human-rubric-review",
+            "label": "Human Rubric Review",
+            "priority": "medium",
+            "goal": "Capture clarity, trust, and usefulness signals that automated checks will miss.",
+            "why": "The best skills often reduce confusion and editing effort in ways that do not show up in static lint-like checks.",
+            "signals": [
+              "clarity_score_avg",
+              "confidence_score_avg",
+              "follow_up_question_rate"
+            ],
+            "evidenceSources": [
+              "Reviewer scorecards",
+              "Team rubric sheets",
+              "Annotated transcripts"
+            ],
+            "starterPack": {
+              "manifestName": "human-rubric-pack",
+              "focus": "Collect 1 to 5 scores for clarity, trust, and edit burden across a small evaluator panel."
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "extensions": [],
+  "measurementPlan": {
+    "kind": "measurement-plan",
+    "createdAt": "2026-10-05T00:50:05.466Z",
+    "target": {
+      "kind": "plugin",
+      "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review",
+      "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json",
+      "name": "yellow-review",
+      "relativePath": "plugins/yellow-review"
+    },
+    "title": "Measurement plan for yellow-review",
+    "summary": "Combine cost, outcome, and trust signals so you can tell whether the skill or plugin is genuinely helping instead of only looking well-structured on paper.",
+    "recommendedToolsets": [
+      "token-usage-observer",
+      "task-outcome-scorecard",
+      "tool-call-audit",
+      "latency-efficiency"
+    ],
+    "toolsets": [
+      {
+        "id": "token-usage-observer",
+        "label": "Token Usage Observer",
+        "priority": "high",
+        "goal": "Measure how many tokens the skill or plugin actually burns in representative runs.",
+        "why": "Static estimates are useful guardrails, but observed usage is what tells you whether a real workflow is affordable and whether caching or reasoning changes the picture.",
+        "signals": [
+          "observed_usage_sample_count",
+          "observed_input_tokens_avg",
+          "observed_total_tokens_avg",
+          "estimate_vs_observed_input_ratio"
+        ],
+        "evidenceSources": [
+          "Responses API usage logs",
+          "Codex-like session exports",
+          "JSONL traces captured from local benchmarking harnesses"
+        ],
+        "starterPack": {
+          "manifestName": "token-usage-pack",
+          "focus": "Validate sample size, cold-start versus warm-cache behavior, and estimate drift over time."
+        }
+      },
+      {
+        "id": "task-outcome-scorecard",
+        "label": "Task Outcome Scorecard",
+        "priority": "high",
+        "goal": "Measure whether the skill helps users finish the intended job with fewer retries and less cleanup.",
+        "why": "A low-token skill is still a miss if it fails the task, and a verbose skill may be worth it if it consistently improves first-pass success.",
+        "signals": [
+          "task_success_rate",
+          "first_pass_success_rate",
+          "retry_rate",
+          "human_override_rate"
+        ],
+        "evidenceSources": [
+          "Task run logs",
+          "Structured user acceptance checklist",
+          "Before/after comparison runs on the same prompts"
+        ],
+        "starterPack": {
+          "manifestName": "task-outcomes-pack",
+          "focus": "Score success, retries, and manual intervention across a fixed prompt set."
+        }
+      },
+      {
+        "id": "tool-call-audit",
+        "label": "Tool Call Audit",
+        "priority": "high",
+        "goal": "Check whether the agent uses the right tools, arguments, and sequencing when the skill is active.",
+        "why": "For Codex plugins and many higher-agency skills, tool correctness is often the real determinant of user value.",
+        "signals": [
+          "tool_call_success_rate",
+          "invalid_tool_argument_rate",
+          "recoverable_tool_failure_rate"
+        ],
+        "evidenceSources": [
+          "Tool invocation traces",
+          "Recorded sessions",
+          "Golden-path scenario replays"
+        ],
+        "starterPack": {
+          "manifestName": "tool-audit-pack",
+          "focus": "Flag wrong tool selection, malformed args, and missing follow-up calls."
+        }
+      },
+      {
+        "id": "latency-efficiency",
+        "label": "Latency And Efficiency",
+        "priority": "high",
+        "goal": "Track whether the skill speeds users up enough to justify its cost.",
+        "why": "DX improvements usually win when they reduce waiting or rework, not only when they reduce absolute token counts.",
+        "signals": [
+          "p50_time_to_first_acceptable_answer_seconds",
+          "p95_time_to_task_completion_seconds",
+          "tokens_per_successful_run"
+        ],
+        "evidenceSources": [
+          "Benchmark harness timings",
+          "Manual stopwatch runs on canonical tasks",
+          "Responses API timestamps combined with usage logs"
+        ],
+        "starterPack": {
+          "manifestName": "latency-efficiency-pack",
+          "focus": "Measure time-to-value and cost-per-success on a stable prompt suite."
+        }
+      },
+      {
+        "id": "human-rubric-review",
+        "label": "Human Rubric Review",
+        "priority": "medium",
+        "goal": "Capture clarity, trust, and usefulness signals that automated checks will miss.",
+        "why": "The best skills often reduce confusion and editing effort in ways that do not show up in static lint-like checks.",
+        "signals": [
+          "clarity_score_avg",
+          "confidence_score_avg",
+          "follow_up_question_rate"
+        ],
+        "evidenceSources": [
+          "Reviewer scorecards",
+          "Team rubric sheets",
+          "Annotated transcripts"
+        ],
+        "starterPack": {
+          "manifestName": "human-rubric-pack",
+          "focus": "Collect 1 to 5 scores for clarity, trust, and edit burden across a small evaluator panel."
+        }
+      }
+    ],
+    "artifact": {
+      "id": "measurement-plan",
+      "type": "measurement-plan",
+      "label": "Measurement plan",
+      "description": "Recommended toolsets for measuring the real-world effect of this skill or plugin.",
+      "source": "core",
+      "data": {
+        "recommendedToolsets": [
+          "token-usage-observer",
+          "task-outcome-scorecard",
+          "tool-call-audit",
+          "latency-efficiency"
+        ],
+        "toolsets": [
+          {
+            "id": "token-usage-observer",
+            "label": "Token Usage Observer",
+            "priority": "high",
+            "goal": "Measure how many tokens the skill or plugin actually burns in representative runs.",
+            "why": "Static estimates are useful guardrails, but observed usage is what tells you whether a real workflow is affordable and whether caching or reasoning changes the picture.",
+            "signals": [
+              "observed_usage_sample_count",
+              "observed_input_tokens_avg",
+              "observed_total_tokens_avg",
+              "estimate_vs_observed_input_ratio"
+            ],
+            "evidenceSources": [
+              "Responses API usage logs",
+              "Codex-like session exports",
+              "JSONL traces captured from local benchmarking harnesses"
+            ],
+            "starterPack": {
+              "manifestName": "token-usage-pack",
+              "focus": "Validate sample size, cold-start versus warm-cache behavior, and estimate drift over time."
+            }
+          },
+          {
+            "id": "task-outcome-scorecard",
+            "label": "Task Outcome Scorecard",
+            "priority": "high",
+            "goal": "Measure whether the skill helps users finish the intended job with fewer retries and less cleanup.",
+            "why": "A low-token skill is still a miss if it fails the task, and a verbose skill may be worth it if it consistently improves first-pass success.",
+            "signals": [
+              "task_success_rate",
+              "first_pass_success_rate",
+              "retry_rate",
+              "human_override_rate"
+            ],
+            "evidenceSources": [
+              "Task run logs",
+              "Structured user acceptance checklist",
+              "Before/after comparison runs on the same prompts"
+            ],
+            "starterPack": {
+              "manifestName": "task-outcomes-pack",
+              "focus": "Score success, retries, and manual intervention across a fixed prompt set."
+            }
+          },
+          {
+            "id": "tool-call-audit",
+            "label": "Tool Call Audit",
+            "priority": "high",
+            "goal": "Check whether the agent uses the right tools, arguments, and sequencing when the skill is active.",
+            "why": "For Codex plugins and many higher-agency skills, tool correctness is often the real determinant of user value.",
+            "signals": [
+              "tool_call_success_rate",
+              "invalid_tool_argument_rate",
+              "recoverable_tool_failure_rate"
+            ],
+            "evidenceSources": [
+              "Tool invocation traces",
+              "Recorded sessions",
+              "Golden-path scenario replays"
+            ],
+            "starterPack": {
+              "manifestName": "tool-audit-pack",
+              "focus": "Flag wrong tool selection, malformed args, and missing follow-up calls."
+            }
+          },
+          {
+            "id": "latency-efficiency",
+            "label": "Latency And Efficiency",
+            "priority": "high",
+            "goal": "Track whether the skill speeds users up enough to justify its cost.",
+            "why": "DX improvements usually win when they reduce waiting or rework, not only when they reduce absolute token counts.",
+            "signals": [
+              "p50_time_to_first_acceptable_answer_seconds",
+              "p95_time_to_task_completion_seconds",
+              "tokens_per_successful_run"
+            ],
+            "evidenceSources": [
+              "Benchmark harness timings",
+              "Manual stopwatch runs on canonical tasks",
+              "Responses API timestamps combined with usage logs"
+            ],
+            "starterPack": {
+              "manifestName": "latency-efficiency-pack",
+              "focus": "Measure time-to-value and cost-per-success on a stable prompt suite."
+            }
+          },
+          {
+            "id": "human-rubric-review",
+            "label": "Human Rubric Review",
+            "priority": "medium",
+            "goal": "Capture clarity, trust, and usefulness signals that automated checks will miss.",
+            "why": "The best skills often reduce confusion and editing effort in ways that do not show up in static lint-like checks.",
+            "signals": [
+              "clarity_score_avg",
+              "confidence_score_avg",
+              "follow_up_question_rate"
+            ],
+            "evidenceSources": [
+              "Reviewer scorecards",
+              "Team rubric sheets",
+              "Annotated transcripts"
+            ],
+            "starterPack": {
+              "manifestName": "human-rubric-pack",
+              "focus": "Collect 1 to 5 scores for clarity, trust, and edit burden across a small evaluator panel."
+            }
+          }
+        ]
+      }
+    },
+    "nextAction": {
+      "label": "Start with Token Usage Observer",
+      "why": "Measure how many tokens the skill or plugin actually burns in representative runs.",
+      "command": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --request 'What should I run next?' --format markdown",
+      "chatPrompt": "What should I run next?",
+      "toolsetId": "token-usage-observer"
+    }
+  },
+  "improvementBrief": {
+    "title": "Improve yellow-review",
+    "target": {
+      "kind": "plugin",
+      "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review",
+      "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json",
+      "name": "yellow-review",
+      "relativePath": "plugins/yellow-review"
+    },
+    "summary": "Raise the evaluation from grade F (0/100) with a focus on the highest-signal structural and budget issues first.",
+    "goals": [
+      "Add `author` to plugin.json.",
+      "Add interface.shortDescription to plugin.json.",
+      "Add interface.longDescription to plugin.json.",
+      "Add interface.developerName to plugin.json.",
+      "Add interface.capabilities to plugin.json."
+    ],
+    "measurementGoals": [
+      "token-usage-observer",
+      "task-outcome-scorecard",
+      "tool-call-audit",
+      "latency-efficiency"
+    ],
+    "requiredFixes": [
+      {
+        "id": "manifest-missing-author",
+        "message": "plugin.json is missing the required `author` field.",
+        "remediation": [
+          "Add `author` to plugin.json."
+        ]
+      },
+      {
+        "id": "interface-missing-shortDescription",
+        "message": "plugin.json interface is missing `shortDescription`.",
+        "remediation": [
+          "Add interface.shortDescription to plugin.json."
+        ]
+      },
+      {
+        "id": "interface-missing-longDescription",
+        "message": "plugin.json interface is missing `longDescription`.",
+        "remediation": [
+          "Add interface.longDescription to plugin.json."
+        ]
+      },
+      {
+        "id": "interface-missing-developerName",
+        "message": "plugin.json interface is missing `developerName`.",
+        "remediation": [
+          "Add interface.developerName to plugin.json."
+        ]
+      },
+      {
+        "id": "interface-missing-capabilities",
+        "message": "plugin.json interface is missing `capabilities`.",
+        "remediation": [
+          "Add interface.capabilities to plugin.json."
+        ]
+      }
+    ],
+    "recommendedFixes": [
+      {
+        "id": "skill:yellow-thermonuclear-review:description-trigger-weak",
+        "message": "The description does not clearly advertise when the skill should trigger.",
+        "remediation": [
+          "Rewrite the description to include a clear 'Use when ...' trigger sentence."
+        ]
+      },
+      {
+        "id": "skill:yellow-thermonuclear-review:progressive-disclosure-missing",
+        "message": "The skill is getting large without using references for progressive disclosure.",
+        "remediation": [
+          "Move deep detail or edge-case variants into references/ and link them from SKILL.md."
+        ]
+      },
+      {
+        "id": "invoke_cost_tokens-budget-high",
+        "message": "invoke_cost_tokens is heavy relative to the current Codex baseline.",
+        "remediation": [
+          "Reduce repeated instruction text and move detail into deferred supporting files."
+        ]
+      }
+    ],
+    "suggestedPrompt": "Use the skill-creator guidance to improve yellow-review. Keep the structure compact and move bulky details into references or scripts. Define success measures with these toolsets: token-usage-observer, task-outcome-scorecard, tool-call-audit, latency-efficiency. Address manifest-missing-author: plugin.json is missing the required `author` field. Address interface-missing-shortDescription: plugin.json interface is missing `shortDescription`. Address interface-missing-longDescription: plugin.json interface is missing `longDescription`. Address interface-missing-developerName: plugin.json interface is missing `developerName`. Address interface-missing-capabilities: plugin.json interface is missing `capabilities`. Address interface-missing-websiteURL: plugin.json interface is missing `websiteURL`. Address interface-missing-privacyPolicyURL: plugin.json interface is missing `privacyPolicyURL`. Address interface-missing-termsOfServiceURL: plugin.json interface is missing `termsOfServiceURL`."
+  },
+  "nextAction": {
+    "label": "Fix structural issues first",
+    "why": "Failing manifest or skill structure issues reduce trust and can invalidate later measurements.",
+    "command": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --request 'What should I fix first?' --format markdown",
+    "chatPrompt": "What should I fix first?"
+  },
+  "workflowGuide": {
+    "kind": "workflow-guide",
+    "createdAt": "2026-10-05T00:50:05.468Z",
+    "target": {
+      "kind": "plugin",
+      "path": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review",
+      "entryPath": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.codex-plugin/plugin.json",
+      "name": "yellow-review",
+      "relativePath": "plugins/yellow-review"
+    },
+    "requestedGoal": "evaluate",
+    "requestedChatPrompt": null,
+    "requestRouting": null,
+    "recommendedWorkflowId": "evaluate",
+    "recommendedWorkflow": {
+      "id": "evaluate",
+      "label": "Evaluate Plugin",
+      "chatPrompt": "Evaluate this plugin.",
+      "summary": "Start here when you want the overall report for a plugin, including structure, budgets, and code checks.",
+      "firstCommand": "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --format markdown",
+      "commands": [
+        "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --format markdown"
+      ],
+      "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --request 'Evaluate this plugin.' --format markdown"
+    },
+    "workflowStatus": {
+      "hasBenchmarkConfig": false,
+      "hasUsageLog": false
+    },
+    "beginnerSummary": "Start with a natural chat request, then let plugin-eval show the exact local command sequence behind it.",
+    "startHere": {
+      "chatPrompt": "Evaluate this plugin.",
+      "label": "Evaluate Plugin",
+      "summary": "Start here when you want the overall report for a plugin, including structure, budgets, and code checks.",
+      "routingExplanation": "Plugin Eval recommended Evaluate Plugin from the current local state for this plugin.",
+      "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --request 'Evaluate this plugin.' --format markdown",
+      "firstCommand": "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --format markdown",
+      "commands": [
+        "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --format markdown"
+      ]
+    },
+    "entrypoints": [
+      {
+        "id": "analysis",
+        "label": "Full Plugin Analysis",
+        "chatPrompt": "Give me a full analysis of this plugin, including benchmark setup.",
+        "summary": "Use this when you want the full report and starter benchmark setup for this plugin in one guided path.",
+        "firstCommand": "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --format markdown",
+        "commands": [
+          "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --format markdown",
+          "plugin-eval init-benchmark ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review",
+          "plugin-eval benchmark ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --config ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.plugin-eval/benchmark.json"
+        ],
+        "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --request 'Give me a full analysis of this plugin, including benchmark setup.' --format markdown"
+      },
+      {
+        "id": "evaluate",
+        "label": "Evaluate Plugin",
+        "chatPrompt": "Evaluate this plugin.",
+        "summary": "Start here when you want the overall report for a plugin, including structure, budgets, and code checks.",
+        "firstCommand": "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --format markdown",
+        "commands": [
+          "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --format markdown"
+        ],
+        "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --request 'Evaluate this plugin.' --format markdown"
+      },
+      {
+        "id": "budget",
+        "label": "Explain Token Budget",
+        "chatPrompt": "Explain the token budget for this plugin.",
+        "summary": "Use this when the main question is why the plugin feels expensive before you collect any live measurements.",
+        "firstCommand": "plugin-eval explain-budget ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --format markdown",
+        "commands": [
+          "plugin-eval explain-budget ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --format markdown"
+        ],
+        "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --request 'Explain the token budget for this plugin.' --format markdown"
+      },
+      {
+        "id": "measure",
+        "label": "Measure Real Token Usage",
+        "chatPrompt": "Measure the real token usage of this plugin.",
+        "summary": "Use this when you want real token usage instead of only the static estimate.",
+        "firstCommand": "plugin-eval init-benchmark ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review",
+        "commands": [
+          "plugin-eval init-benchmark ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review",
+          "plugin-eval benchmark ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --config ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.plugin-eval/benchmark.json",
+          "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --observed-usage ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review/.plugin-eval/benchmark-usage.jsonl --format markdown"
+        ],
+        "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --request 'Measure the real token usage of this plugin.' --format markdown"
+      },
+      {
+        "id": "benchmark",
+        "label": "Benchmark With Starter Scenarios",
+        "chatPrompt": "Help me benchmark this plugin.",
+        "summary": "Use this when you want starter scenarios and a repeatable real-Codex benchmark run for this plugin.",
+        "firstCommand": "plugin-eval init-benchmark ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review",
+        "commands": [
+          "plugin-eval init-benchmark ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review"
+        ],
+        "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --request 'Help me benchmark this plugin.' --format markdown"
+      },
+      {
+        "id": "next",
+        "label": "Start Here",
+        "chatPrompt": "What should I run next?",
+        "summary": "If you are new to plugin-eval, start with the overall evaluation report for this plugin.",
+        "firstCommand": "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --format markdown",
+        "commands": [
+          "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --format markdown"
+        ],
+        "startCommand": "plugin-eval start ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --request 'What should I run next?' --format markdown"
+      }
+    ],
+    "nextSteps": [
+      "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --format markdown"
+    ],
+    "nextAction": {
+      "label": "Evaluate Plugin",
+      "why": "Plugin Eval recommended Evaluate Plugin from the current local state for this plugin.",
+      "command": "plugin-eval analyze ~/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-review --format markdown",
+      "chatPrompt": "Evaluate this plugin."
+    }
+  }
+}

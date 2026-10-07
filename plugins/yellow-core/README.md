@@ -10,6 +10,11 @@ TypeScript, Python, Rust, and Go.
 /plugin install yellow-core@yellow-plugins
 ```
 
+Codex exposes only `agent-native-architecture`, `agent-native-audit`, and
+`plan-status`. Its generated manifest sets `commands: []` to prevent extra
+skills from Claude command wrappers. See
+[Codex distribution](../../docs/codex-distribution.md).
+
 ## Prerequisites
 
 - Git
@@ -203,3 +208,10 @@ are stored under the main checkout's project slug so removing a review
 worktree does not orphan its learnings. A later session in that checkout
 can drain them once the count or age threshold is met; use
 `/compound:review-staged` to request a manual drain.
+
+## Codex compatibility expansion
+
+The shared worktree-inventory skill provides a bounded read-only workflow. Installed
+Codex acceptance and exact support are recorded in the canonical
+[Codex distribution](../../docs/codex-distribution.md) table. Other commands,
+agents and hooks retain their existing host contracts.

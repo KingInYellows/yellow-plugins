@@ -1,0 +1,22 @@
+{
+  "status": "failed",
+  "cliVersion": "0.157.0",
+  "marketplace": "yellow-plugins",
+  "plugins": [
+    "gt-workflow",
+    "yellow-core",
+    "yellow-review",
+    "yellow-ci"
+  ],
+  "runtime": {
+    "skillInvocation": "not-tested",
+    "hookExecution": "not-tested",
+    "mcpConnection": "not-tested",
+    "authentication": "not-tested"
+  },
+  "failures": [
+    "CLI command timed out"
+  ],
+  "scratch": "/tmp/yellow-codex-smoke-7xGUzC",
+  "scratchRetained": false
+}

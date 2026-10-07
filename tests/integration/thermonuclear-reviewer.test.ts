@@ -545,10 +545,8 @@ describe('cross-host distribution', () => {
       'yellow-thermonuclear-review',
     ]);
     // The generator copies only SKILL.md plus a flat references/*.md from
-    // inside skills/<name>/, so an over-broad allowlist is the only way
-    // extra surface leaks out; assert the host tree holds nothing but the
-    // one skill directory and that the manifest exposes no agents or
-    // commands.
+    // inside skills/<name>/. Also suppress Codex command migration: an
+    // explicit skills path alone does not prevent extra loaded wrappers.
     const hostRoot = resolve(REPO_ROOT, `plugins/yellow-review/${dir}`);
     expect(readdirSync(hostRoot).sort()).toEqual(['skills']);
     const tree = readdirSync(resolve(hostRoot, 'skills')).sort();
@@ -561,7 +559,8 @@ describe('cross-host distribution', () => {
     ) as Record<string, unknown>;
     expect(manifest.skills).toBe(`./${dir}/skills`);
     expect(manifest).not.toHaveProperty('agents');
-    expect(manifest).not.toHaveProperty('commands');
+    if (dir === 'codex') expect(manifest.commands).toEqual([]);
+    else expect(manifest).not.toHaveProperty('commands');
     // Frontmatter must be normalised to name + description only: any other
     // key (user-invocable, tools, model) is a Claude-only contract leaking.
     const fm = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(

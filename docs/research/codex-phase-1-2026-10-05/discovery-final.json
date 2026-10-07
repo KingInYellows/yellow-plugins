@@ -1,0 +1,358 @@
+{
+  "status": "passed",
+  "cliVersion": "0.157.0",
+  "marketplace": "yellow-plugins",
+  "plugins": [
+    "gt-workflow",
+    "yellow-core",
+    "yellow-review",
+    "yellow-ci"
+  ],
+  "runtime": {
+    "skillInvocation": "not-tested",
+    "hookExecution": "not-tested",
+    "mcpConnection": "not-tested",
+    "authentication": "not-tested"
+  },
+  "failures": [],
+  "sourceRevision": "cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0",
+  "sourceDirty": true,
+  "environment": {
+    "platform": "linux",
+    "architecture": "x64",
+    "node": "v22.22.0"
+  },
+  "installed": [
+    {
+      "pluginId": "gt-workflow@yellow-plugins",
+      "version": "2.0.6",
+      "installedPath": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6",
+      "expected": [
+        {
+          "name": "gt-workflow:audit-review",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/audit-review/SKILL.md"
+        },
+        {
+          "name": "gt-workflow:gt-amend",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-amend/SKILL.md"
+        },
+        {
+          "name": "gt-workflow:gt-cleanup",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-cleanup/SKILL.md"
+        },
+        {
+          "name": "gt-workflow:gt-merge",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-merge/SKILL.md"
+        },
+        {
+          "name": "gt-workflow:gt-nav",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-nav/SKILL.md"
+        },
+        {
+          "name": "gt-workflow:gt-setup",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/SKILL.md"
+        },
+        {
+          "name": "gt-workflow:gt-stack-plan",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-stack-plan/SKILL.md"
+        },
+        {
+          "name": "gt-workflow:gt-sync",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-sync/SKILL.md"
+        },
+        {
+          "name": "gt-workflow:smart-submit",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/smart-submit/SKILL.md"
+        },
+        {
+          "name": "gt-workflow:stack-decomposition-format",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/stack-decomposition-format/SKILL.md"
+        },
+        {
+          "name": "gt-workflow:stack-plan-style",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/stack-plan-style/SKILL.md"
+        }
+      ],
+      "hookExpectations": [
+        {
+          "eventName": "preToolUse",
+          "sourcePath": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/hooks/codex-hooks.json",
+          "matcher": "Bash",
+          "command": "node \"/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/hooks/scripts/entrypoint-codex.js\" --hook check-git-push",
+          "timeoutSec": 5
+        },
+        {
+          "eventName": "postToolUse",
+          "sourcePath": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/hooks/codex-hooks.json",
+          "matcher": "Bash",
+          "command": "node \"/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/hooks/scripts/entrypoint-codex.js\" --hook check-commit-message",
+          "timeoutSec": 5
+        }
+      ],
+      "mcp": {
+        "declared": "./.mcp.json",
+        "serverNames": [
+          "graphite"
+        ],
+        "registration": "not-tested",
+        "connection": "not-tested",
+        "authentication": "not-tested"
+      },
+      "manifestAndSkillSha256": "2699aa0084f75dc8a4018e4c8f1b654eb579f0631c7b2763d04917d35affe07f"
+    },
+    {
+      "pluginId": "yellow-core@yellow-plugins",
+      "version": "2.6.2",
+      "installedPath": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2",
+      "expected": [
+        {
+          "name": "yellow-core:agent-native-architecture",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/agent-native-architecture/SKILL.md"
+        },
+        {
+          "name": "yellow-core:agent-native-audit",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/agent-native-audit/SKILL.md"
+        },
+        {
+          "name": "yellow-core:plan-status",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/plan-status/SKILL.md"
+        }
+      ],
+      "hookExpectations": [],
+      "mcp": null,
+      "manifestAndSkillSha256": "e22113f9a65e7f66354fa6d12ece808431dccf54d7f24a188113355be96a5187"
+    },
+    {
+      "pluginId": "yellow-review@yellow-plugins",
+      "version": "3.5.3",
+      "installedPath": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-review/3.5.3",
+      "expected": [
+        {
+          "name": "yellow-review:yellow-thermonuclear-review",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-review/3.5.3/codex/skills/yellow-thermonuclear-review/SKILL.md"
+        }
+      ],
+      "hookExpectations": [],
+      "mcp": null,
+      "manifestAndSkillSha256": "d3e7247b15b6497faf330f70744ac5fccff4a19783bb928718fad165b0a32eba"
+    },
+    {
+      "pluginId": "yellow-ci@yellow-plugins",
+      "version": "1.5.6",
+      "installedPath": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6",
+      "expected": [
+        {
+          "name": "yellow-ci:ci-conventions",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/ci-conventions/SKILL.md"
+        },
+        {
+          "name": "yellow-ci:ci-diagnose",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/ci-diagnose/SKILL.md"
+        },
+        {
+          "name": "yellow-ci:ci-lint-workflows",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/ci-lint-workflows/SKILL.md"
+        },
+        {
+          "name": "yellow-ci:ci-runner-health",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/ci-runner-health/SKILL.md"
+        },
+        {
+          "name": "yellow-ci:ci-setup",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/ci-setup/SKILL.md"
+        },
+        {
+          "name": "yellow-ci:ci-setup-runner-targets",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/ci-setup-runner-targets/SKILL.md"
+        },
+        {
+          "name": "yellow-ci:ci-status",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/ci-status/SKILL.md"
+        },
+        {
+          "name": "yellow-ci:diagnose-ci",
+          "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/diagnose-ci/SKILL.md"
+        }
+      ],
+      "hookExpectations": [
+        {
+          "eventName": "sessionStart",
+          "sourcePath": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/hooks/codex-hooks.json",
+          "matcher": "*",
+          "command": "node \"/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/hooks/scripts/entrypoint-codex.js\"",
+          "timeoutSec": 3
+        }
+      ],
+      "mcp": null,
+      "manifestAndSkillSha256": "4168c3e0505f8f41ec900d21290214658f51de463c64950f962fbb4a9ad45575"
+    }
+  ],
+  "loadedSkills": [
+    {
+      "name": "gt-workflow:audit-review",
+      "pluginId": "gt-workflow@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/audit-review/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "gt-workflow:gt-amend",
+      "pluginId": "gt-workflow@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-amend/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "gt-workflow:gt-cleanup",
+      "pluginId": "gt-workflow@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-cleanup/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "gt-workflow:gt-merge",
+      "pluginId": "gt-workflow@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-merge/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "gt-workflow:gt-nav",
+      "pluginId": "gt-workflow@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-nav/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "gt-workflow:gt-setup",
+      "pluginId": "gt-workflow@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "gt-workflow:gt-stack-plan",
+      "pluginId": "gt-workflow@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-stack-plan/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "gt-workflow:gt-sync",
+      "pluginId": "gt-workflow@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-sync/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "gt-workflow:smart-submit",
+      "pluginId": "gt-workflow@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/smart-submit/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "gt-workflow:stack-decomposition-format",
+      "pluginId": "gt-workflow@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/stack-decomposition-format/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "gt-workflow:stack-plan-style",
+      "pluginId": "gt-workflow@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/stack-plan-style/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "yellow-ci:ci-conventions",
+      "pluginId": "yellow-ci@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/ci-conventions/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "yellow-ci:ci-diagnose",
+      "pluginId": "yellow-ci@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/ci-diagnose/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "yellow-ci:ci-lint-workflows",
+      "pluginId": "yellow-ci@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/ci-lint-workflows/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "yellow-ci:ci-runner-health",
+      "pluginId": "yellow-ci@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/ci-runner-health/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "yellow-ci:ci-setup",
+      "pluginId": "yellow-ci@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/ci-setup/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "yellow-ci:ci-setup-runner-targets",
+      "pluginId": "yellow-ci@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/ci-setup-runner-targets/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "yellow-ci:ci-status",
+      "pluginId": "yellow-ci@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/ci-status/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "yellow-ci:diagnose-ci",
+      "pluginId": "yellow-ci@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/codex/skills/diagnose-ci/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "yellow-core:agent-native-architecture",
+      "pluginId": "yellow-core@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/agent-native-architecture/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "yellow-core:agent-native-audit",
+      "pluginId": "yellow-core@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/agent-native-audit/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "yellow-core:plan-status",
+      "pluginId": "yellow-core@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/plan-status/SKILL.md",
+      "enabled": true
+    },
+    {
+      "name": "yellow-review:yellow-thermonuclear-review",
+      "pluginId": "yellow-review@yellow-plugins",
+      "path": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-review/3.5.3/codex/skills/yellow-thermonuclear-review/SKILL.md",
+      "enabled": true
+    }
+  ],
+  "hooks": [
+    {
+      "pluginId": "gt-workflow@yellow-plugins",
+      "eventName": "preToolUse",
+      "enabled": true,
+      "trustStatus": "untrusted",
+      "sourcePath": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/hooks/codex-hooks.json",
+      "currentHash": "sha256:5f8e73ba0f9270c4316b492302303640bdcbe17787d6379ceb5e5df4cc9ca2cd"
+    },
+    {
+      "pluginId": "gt-workflow@yellow-plugins",
+      "eventName": "postToolUse",
+      "enabled": true,
+      "trustStatus": "untrusted",
+      "sourcePath": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/hooks/codex-hooks.json",
+      "currentHash": "sha256:23e255c0c4891e6a19521fd88ed37436f9b3747553ecdc51cbd5b7773e8e99a6"
+    },
+    {
+      "pluginId": "yellow-ci@yellow-plugins",
+      "eventName": "sessionStart",
+      "enabled": true,
+      "trustStatus": "untrusted",
+      "sourcePath": "/tmp/yellow-codex-smoke-wakOXL/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/hooks/codex-hooks.json",
+      "currentHash": "sha256:e7ef7b0cedc85a6421109a51c689d324a0e5ce2e6574c7c8e4d9e38eb0c05358"
+    }
+  ],
+  "scratch": "/tmp/yellow-codex-smoke-wakOXL",
+  "scratchRetained": false
+}

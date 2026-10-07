@@ -93,6 +93,19 @@ describe('codex-plugin.schema.json — negative cases', () => {
     expect(factory.validate('codex-plugin', base).valid).toBe(true);
   });
 
+  it('requires an explicit empty command list to prevent compatibility migration', () => {
+    expect(factory.validate('codex-plugin', { ...base, commands: [] }).valid).toBe(true);
+    const { commands: _commands, ...withoutCommands } = base;
+    expect(factory.validate('codex-plugin', withoutCommands).valid).toBe(false);
+  });
+
+  it.each([null, './commands', ['./commands/legacy.md'], {}])(
+    'rejects a command declaration that can expose Claude wrappers: %j',
+    (commands) => {
+      expect(factory.validate('codex-plugin', { ...base, commands }).valid).toBe(false);
+    }
+  );
+
   it('rejects a manifest missing interface.category', () => {
     const d = { ...base, interface: { displayName: 'Hello World' } };
     expect(factory.validate('codex-plugin', d).valid).toBe(false);

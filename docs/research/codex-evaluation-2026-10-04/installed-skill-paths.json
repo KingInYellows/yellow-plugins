@@ -1,0 +1,61 @@
+[
+  {
+    "plugin": "gt-workflow",
+    "version": "2.0.6",
+    "manifestSkillsPath": "./codex/skills",
+    "installedSkills": [
+      "audit-review",
+      "gt-amend",
+      "gt-cleanup",
+      "gt-merge",
+      "gt-nav",
+      "gt-setup",
+      "gt-stack-plan",
+      "gt-sync",
+      "smart-submit",
+      "stack-decomposition-format",
+      "stack-plan-style"
+    ],
+    "skillCount": 11,
+    "allSkillFilesRegular": true
+  },
+  {
+    "plugin": "yellow-ci",
+    "version": "1.5.6",
+    "manifestSkillsPath": "./codex/skills",
+    "installedSkills": [
+      "ci-conventions",
+      "ci-diagnose",
+      "ci-lint-workflows",
+      "ci-runner-health",
+      "ci-setup",
+      "ci-setup-runner-targets",
+      "ci-status",
+      "diagnose-ci"
+    ],
+    "skillCount": 8,
+    "allSkillFilesRegular": true
+  },
+  {
+    "plugin": "yellow-core",
+    "version": "2.6.2",
+    "manifestSkillsPath": "./codex/skills",
+    "installedSkills": [
+      "agent-native-architecture",
+      "agent-native-audit",
+      "plan-status"
+    ],
+    "skillCount": 3,
+    "allSkillFilesRegular": true
+  },
+  {
+    "plugin": "yellow-review",
+    "version": "3.5.3",
+    "manifestSkillsPath": "./codex/skills",
+    "installedSkills": [
+      "yellow-thermonuclear-review"
+    ],
+    "skillCount": 1,
+    "allSkillFilesRegular": true
+  }
+]

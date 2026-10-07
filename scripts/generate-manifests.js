@@ -354,6 +354,15 @@ function validateCodexTarget(name, codex, errors) {
       );
     }
   }
+  if ('mcpServers' in codex) {
+    try {
+      require('./lib/generate/skill-policy').validatePublicMcp(
+        codex.mcpServers
+      );
+    } catch (error) {
+      errors.push('catalog/plugins/' + name + '.json: ' + error.message);
+    }
+  }
   // buildCodexSkillTree() copies every allowlisted skill, but
   // buildCodexPluginManifest() only emits the manifest's "skills" field when
   // componentPaths.skills is set AND the allowlist is non-empty — without
@@ -685,7 +694,12 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   // Versions come from plugins/<name>/package.json only (R3). Matched by
   // explicit name key: pkg.name must equal the catalog source name.
   const pkgs = {};
-  const refusedRoots = symlinkedPluginRoots(catalog.pluginOrder, pluginsRoot, result, errors);
+  const refusedRoots = symlinkedPluginRoots(
+    catalog.pluginOrder,
+    pluginsRoot,
+    result,
+    errors
+  );
   for (const name of catalog.pluginOrder) {
     if (refusedRoots.has(name)) continue;
     const errorsBeforeValidate = errors.length;
@@ -1093,6 +1107,31 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
         for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
           if (entry.isDirectory()) {
             staleCandidates.push(join(skillsDir, entry.name, 'SKILL.md'));
+            const agentsDir = join(skillsDir, entry.name, 'agents');
+            try {
+              const stat = lstatSync(agentsDir);
+              if (!stat.isDirectory() || stat.isSymbolicLink()) {
+                errors.push(
+                  'Unexpected or symlinked generated agents directory: ' +
+                    agentsDir
+                );
+              } else {
+                for (const resource of readdirSync(agentsDir, {
+                  withFileTypes: true,
+                })) {
+                  if (!resource.isFile() || resource.name !== 'openai.yaml') {
+                    errors.push(
+                      'Unexpected generated policy resource: ' +
+                        join(agentsDir, resource.name)
+                    );
+                  } else staleCandidates.push(join(agentsDir, resource.name));
+                }
+              }
+            } catch (error) {
+              if (error.code !== 'ENOENT')
+                errors.push('Cannot inspect generated policy: ' + agentsDir);
+            }
+
             // Reference sidecars: emit-codex.js writes flat *.md copies
             // under <skill>/references/. The SKILL.md push above never
             // descends, so a reference removed or renamed at the source
@@ -1187,7 +1226,15 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
         }
       }
     }
-    queueStaleUnlinks(staleCandidates, pluginRoot, pluginsRoot, expectedPaths, targets, errors, rootDir);
+    queueStaleUnlinks(
+      staleCandidates,
+      pluginRoot,
+      pluginsRoot,
+      expectedPaths,
+      targets,
+      errors,
+      rootDir
+    );
     if (errors.length > sweepErrorsBefore) {
       result.results[name] = 'error';
     }
@@ -1224,10 +1271,18 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     // A symlinked plugins/<name> is visited too: the forbidden file is
     // only reported here (never unlinked), and validate-plugin refuses
     // the symlinked root itself.
-    if ((!entry.isDirectory() && !entry.isSymbolicLink()) || catalogedPlugins.has(entry.name)) {
+    if (
+      (!entry.isDirectory() && !entry.isSymbolicLink()) ||
+      catalogedPlugins.has(entry.name)
+    ) {
       continue;
     }
-    const orphanHooksJson = join(pluginsRoot, entry.name, 'hooks', 'hooks.json');
+    const orphanHooksJson = join(
+      pluginsRoot,
+      entry.name,
+      'hooks',
+      'hooks.json'
+    );
     if (lexistsSync(orphanHooksJson)) {
       result.diffs.push({
         path: relative(rootDir, orphanHooksJson),
@@ -1404,7 +1459,15 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
         }
       }
     }
-    queueStaleUnlinks(staleCandidates, pluginRoot, pluginsRoot, expectedPaths, targets, errors, rootDir);
+    queueStaleUnlinks(
+      staleCandidates,
+      pluginRoot,
+      pluginsRoot,
+      expectedPaths,
+      targets,
+      errors,
+      rootDir
+    );
     if (errors.length > sweepErrorsBefore) {
       result.results[name] = 'error';
     }
@@ -1422,17 +1485,27 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   // here.
   const rootRealCache = new Map();
   const containerRealFor = (container) => {
-    if (!rootRealCache.has(container)) rootRealCache.set(container, resolvePluginRootReal(container, errors));
+    if (!rootRealCache.has(container))
+      rootRealCache.set(container, resolvePluginRootReal(container, errors));
     return rootRealCache.get(container);
   };
   for (const target of targets) {
     const underPlugins = target.path.startsWith(pluginsRoot + sep);
     if (underPlugins && target.bytes === null) continue;
-    const name = underPlugins ? relative(pluginsRoot, target.path).split(sep)[0] : null;
+    const name = underPlugins
+      ? relative(pluginsRoot, target.path).split(sep)[0]
+      : null;
     const container = name === null ? rootDir : join(pluginsRoot, name);
-    const problem = sweepCandidateProblem(target.path, container, containerRealFor(container), rootDir);
+    const problem = sweepCandidateProblem(
+      target.path,
+      container,
+      containerRealFor(container),
+      rootDir
+    );
     if (problem !== null) {
-      errors.push(`refusing to ${target.bytes === null ? 'sweep' : 'write'} ${relative(rootDir, target.path)}: ${problem}`);
+      errors.push(
+        `refusing to ${target.bytes === null ? 'sweep' : 'write'} ${relative(rootDir, target.path)}: ${problem}`
+      );
       if (name !== null) result.results[name] = 'error';
     }
   }

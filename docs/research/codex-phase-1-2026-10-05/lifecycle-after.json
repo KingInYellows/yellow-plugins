@@ -1,0 +1,298 @@
+{
+  "status": "passed",
+  "cliVersion": "0.157.0",
+  "scratch": "/tmp/yellow-codex-lifecycle-Lq1vOX",
+  "installed": [
+    {
+      "pluginId": "gt-workflow@yellow-plugins",
+      "name": "gt-workflow",
+      "marketplaceName": "yellow-plugins",
+      "version": "2.0.6",
+      "installedPath": "/tmp/yellow-codex-lifecycle-Lq1vOX/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6",
+      "authPolicy": "ON_INSTALL"
+    },
+    {
+      "pluginId": "yellow-ci@yellow-plugins",
+      "name": "yellow-ci",
+      "marketplaceName": "yellow-plugins",
+      "version": "1.5.6",
+      "installedPath": "/tmp/yellow-codex-lifecycle-Lq1vOX/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6",
+      "authPolicy": "ON_INSTALL"
+    }
+  ],
+  "artifacts": [
+    {
+      "pluginId": "gt-workflow@yellow-plugins",
+      "hookAndMcpSha256": "27ecde053e6685fa7e5b4552a82919468d63e92c17a0d9f6d88607792f0e8346"
+    },
+    {
+      "pluginId": "yellow-ci@yellow-plugins",
+      "hookAndMcpSha256": "442af667cbd7d2ee7fdf4dd59e5d978da9ffa5117a1d05636eab6c9cc17cc0b6"
+    }
+  ],
+  "controls": [
+    {
+      "trusted": false,
+      "pushStubCalls": 1,
+      "modifyStubCalls": 1,
+      "hookStarted": 0,
+      "hookCompleted": 0,
+      "commands": [
+        {
+          "type": "commandExecution",
+          "id": "call_fixture_0",
+          "pluginId": null,
+          "scriptPath": null,
+          "command": "/usr/bin/bash -c 'git push'",
+          "cwd": "/tmp/yellow-codex-lifecycle-Lq1vOX/project",
+          "processId": "5391",
+          "source": "unifiedExecStartup",
+          "status": "completed",
+          "commandActions": [
+            {
+              "type": "unknown",
+              "command": "git push"
+            }
+          ],
+          "aggregatedOutput": "DISPOSABLE_STUB\n",
+          "exitCode": 0,
+          "durationMs": 0
+        },
+        {
+          "type": "commandExecution",
+          "id": "call_fixture_1",
+          "pluginId": null,
+          "scriptPath": null,
+          "command": "/usr/bin/bash -c 'gt modify -m \"bad message\"'",
+          "cwd": "/tmp/yellow-codex-lifecycle-Lq1vOX/project",
+          "processId": "23253",
+          "source": "unifiedExecStartup",
+          "status": "completed",
+          "commandActions": [
+            {
+              "type": "unknown",
+              "command": "gt modify -m \"bad message\""
+            }
+          ],
+          "aggregatedOutput": "DISPOSABLE_STUB\n",
+          "exitCode": 0,
+          "durationMs": 0
+        }
+      ],
+      "requestedCommands": [
+        {
+          "name": "exec_command",
+          "command": "git push"
+        },
+        {
+          "name": "exec_command",
+          "command": "gt modify -m \"bad message\""
+        }
+      ]
+    },
+    {
+      "trusted": true,
+      "pushStubCalls": 0,
+      "modifyStubCalls": 1,
+      "hookStarted": 4,
+      "hookCompleted": 4,
+      "commands": [
+        {
+          "type": "commandExecution",
+          "id": "call_fixture_1",
+          "pluginId": null,
+          "scriptPath": null,
+          "command": "/usr/bin/bash -c 'gt modify -m \"bad message\"'",
+          "cwd": "/tmp/yellow-codex-lifecycle-Lq1vOX/project",
+          "processId": "9254",
+          "source": "unifiedExecStartup",
+          "status": "completed",
+          "commandActions": [
+            {
+              "type": "unknown",
+              "command": "gt modify -m \"bad message\""
+            }
+          ],
+          "aggregatedOutput": "DISPOSABLE_STUB\n",
+          "exitCode": 0,
+          "durationMs": 0
+        }
+      ],
+      "requestedCommands": [
+        {
+          "name": "exec_command",
+          "command": "git push"
+        },
+        {
+          "name": "exec_command",
+          "command": "gt modify -m \"bad message\""
+        }
+      ]
+    }
+  ],
+  "skillActivation": "not-tested",
+  "authentication": "not-tested",
+  "network": "disconnected-loopback-only",
+  "hookDefinitions": [
+    {
+      "key": "gt-workflow@yellow-plugins:hooks/codex-hooks.json:pre_tool_use:0:0",
+      "eventName": "preToolUse",
+      "handlerType": "command",
+      "command": "node \"/tmp/yellow-codex-lifecycle-Lq1vOX/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/hooks/scripts/entrypoint-codex.js\" --hook check-git-push",
+      "async": false,
+      "matcher": "Bash",
+      "timeoutSec": 5,
+      "statusMessage": null,
+      "additionalContextLimit": null,
+      "sourcePath": "/tmp/yellow-codex-lifecycle-Lq1vOX/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/hooks/codex-hooks.json",
+      "source": "plugin",
+      "pluginId": "gt-workflow@yellow-plugins",
+      "displayOrder": 0,
+      "enabled": true,
+      "isManaged": false,
+      "currentHash": "sha256:5f8e73ba0f9270c4316b492302303640bdcbe17787d6379ceb5e5df4cc9ca2cd",
+      "trustStatus": "untrusted"
+    },
+    {
+      "key": "gt-workflow@yellow-plugins:hooks/codex-hooks.json:post_tool_use:0:0",
+      "eventName": "postToolUse",
+      "handlerType": "command",
+      "command": "node \"/tmp/yellow-codex-lifecycle-Lq1vOX/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/hooks/scripts/entrypoint-codex.js\" --hook check-commit-message",
+      "async": false,
+      "matcher": "Bash",
+      "timeoutSec": 5,
+      "statusMessage": null,
+      "additionalContextLimit": null,
+      "sourcePath": "/tmp/yellow-codex-lifecycle-Lq1vOX/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/hooks/codex-hooks.json",
+      "source": "plugin",
+      "pluginId": "gt-workflow@yellow-plugins",
+      "displayOrder": 1,
+      "enabled": true,
+      "isManaged": false,
+      "currentHash": "sha256:23e255c0c4891e6a19521fd88ed37436f9b3747553ecdc51cbd5b7773e8e99a6",
+      "trustStatus": "untrusted"
+    },
+    {
+      "key": "yellow-ci@yellow-plugins:hooks/codex-hooks.json:session_start:0:0",
+      "eventName": "sessionStart",
+      "handlerType": "command",
+      "command": "node \"/tmp/yellow-codex-lifecycle-Lq1vOX/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/hooks/scripts/entrypoint-codex.js\"",
+      "async": false,
+      "matcher": "*",
+      "timeoutSec": 3,
+      "statusMessage": null,
+      "additionalContextLimit": null,
+      "sourcePath": "/tmp/yellow-codex-lifecycle-Lq1vOX/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/hooks/codex-hooks.json",
+      "source": "plugin",
+      "pluginId": "yellow-ci@yellow-plugins",
+      "displayOrder": 2,
+      "enabled": true,
+      "isManaged": false,
+      "currentHash": "sha256:e7ef7b0cedc85a6421109a51c689d324a0e5ce2e6574c7c8e4d9e38eb0c05358",
+      "trustStatus": "untrusted"
+    }
+  ],
+  "graphite": {
+    "version": "1.7.20",
+    "executableSha256": "dba7cb4b7dcc724af80343c075712b5c168628983be0b81e91c1291375d4449d"
+  },
+  "mcp": {
+    "registration": "observed",
+    "executable": "actual-installed-gt-cli",
+    "gitContext": "synthetic-version-repository-paths-and-empty-refs; other-reads-fail",
+    "profile": "disposable-no-credentials",
+    "network": "disconnected",
+    "launches": [
+      {
+        "command": "gt mcp",
+        "executable": "/runtime/graphite/graphite.js"
+      },
+      {
+        "command": "gt mcp",
+        "executable": "/runtime/graphite/graphite.js"
+      }
+    ],
+    "status": {
+      "name": "graphite",
+      "runtimeStatus": "connected",
+      "pluginId": "gt-workflow@yellow-plugins",
+      "httpOrigin": null,
+      "serverInfo": {
+        "name": "gt",
+        "title": null,
+        "version": "0.0.1",
+        "description": null,
+        "icons": null,
+        "websiteUrl": null
+      },
+      "serverCapabilities": {
+        "tools": {
+          "listChanged": true
+        }
+      },
+      "tools": {
+        "run_gt_cmd": {
+          "name": "run_gt_cmd",
+          "description": "Graphite (gt) simplifies the entire code authoring & reviewing lifecycle.\nIt enables stacking PRs on top of each other to keep you unblocked & your changes small, focused, and reviewable.\n\nUSAGE\n  $ gt <command> [flags]\n\nTERMS\n  stack:     A sequence of pull requests, each building off of its parent. (ex: main <- PR \"add API\" <- PR \"update frontend\" <- PR \"docs\")\n  trunk:     The branch that stacks are merged into. (ex: main)\n  downstack: The PRs below the given PR in a stack, i.e. its ancestors.\n  upstack:   The PRs above the given PR in a stack, i.e. its descendants.\n\nCORE COMMANDS\n  gt init: Initializes your Git repo to work with Graphite\n  gt create: Creates a new branch and commit your changes\n  gt submit: Submits the current branch & all downstack branches to Graphite\n  gt submit --stack: Submits your current stack to Graphite\n  gt modify: Amends your current branch with new changes and rebases all PRs above it\n  gt restack: Rebases every PR in a stack to have the latest changes\n  gt sync: Pulls the latest trunk branch, rebases all open PRs/stacks on top of the latest changes, and prompts to delete any stale/old/merged branches\n  gt checkout: Interactively checks out any of your branches\n  gt state: Prints out the state of the repository\n  gt up: Checks out the branch directly upstack\n  gt down: Checks out the branch directly downstack\n\nCORE WORKFLOW\n  Run the learn tool to learn how to use gt.\n\nTo run a `gt` command, call this tool. This tool is part of plugin `Graphite Workflow`.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The arguments to pass to gt. For example, to run `gt create -m \"feat: foo\"` pass in the arguments: [\"create\", \"-m\", \"feat: foo\"]. "
+              },
+              "cwd": {
+                "type": "string",
+                "description": "The root working directory of the project. Must be an absolute path."
+              },
+              "why": {
+                "type": "string",
+                "description": "A one line description of why you're running this command."
+              }
+            },
+            "required": [
+              "args",
+              "cwd",
+              "why"
+            ],
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        },
+        "learn_gt": {
+          "name": "learn_gt",
+          "description": "Learn about stacking PRs with Graphite (gt). This tool is part of plugin `Graphite Workflow`.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        }
+      },
+      "toolsError": null,
+      "resources": [],
+      "resourceTemplates": [],
+      "authStatus": "unsupported"
+    },
+    "authentication": "not-proven",
+    "toolInvocation": "not-tested"
+  },
+  "phase1Acceptance": "partial",
+  "remaining": [
+    "model-driven direct/indirect/negative skill activation",
+    "authenticated Graphite availability"
+  ],
+  "recordedAt": "2026-10-05T23:42:29.197Z",
+  "harnessSha256": "8af5a4b99388a340d4a171a8879df780486edbe7223103be1ab14b1828ed4f98",
+  "sourceRevision": "cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0",
+  "sourceDirty": true,
+  "environment": {
+    "node": "v22.22.0",
+    "platform": "linux"
+  },
+  "scratchRetained": true
+}

@@ -8,10 +8,7 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-debt",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
-  "keywords": [
-    "code-quality",
-    "scanner"
-  ],
+  "keywords": ["code-quality", "scanner"],
   "outputStyles": "./output-styles",
   "hooks": {
     "SessionStart": [
@@ -49,7 +46,17 @@
   "targets": {
     "claude": true,
     "codex": {
-      "enabled": false
+      "enabled": true,
+      "includeHooks": false,
+      "interface": {
+        "displayName": "yellow-debt",
+        "category": "Developer Tools"
+      },
+      "skillAllowlist": ["debt-complexity-scan"],
+      "componentPaths": {
+        "skills": "./codex/skills"
+      },
+      "description": "One bounded read-only debt-complexity-scan workflow. Other commands, agents, skills and hooks remain excluded."
     }
   }
 }

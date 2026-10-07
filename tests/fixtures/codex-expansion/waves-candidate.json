@@ -1,0 +1,260 @@
+{
+  "candidate": true,
+  "files": {
+    "README.md": "# Fixture\n\nUsage: call add(a,b). Returns their sum.\n",
+    "src/add.js": "export function add(a, b) { return a - b; }\n",
+    "src/complexity.js": "export function sumEnabledGroups(groups, allowLarge) {\n  let total = 0;\n  for (const group of groups) {\n    if (group.enabled) {\n      for (const entry of group.entries) {\n        if (entry.active) {\n          if (entry.amount > 0) {\n            if (allowLarge || entry.amount < 100) {\n              total += entry.amount;\n            }\n          }\n        }\n      }\n    }\n  }\n  return total;\n}\n"
+  },
+  "observations": {
+    "worktrees": {
+      "command": "git worktree list --porcelain -z",
+      "stdout": "worktree /fixture/main\nHEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nbranch refs/heads/main\n\nworktree /fixture/isolated\nHEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ndetached\nlocked owner review\n\n"
+    },
+    "git-missing": {
+      "installed": false
+    },
+    "doc-inventory": {
+      "git": true,
+      "trackedFiles": [
+        "README.md",
+        "src/add.js"
+      ],
+      "historyAvailable": false
+    },
+    "reads-unavailable": {
+      "readToolsAvailable": false
+    },
+    "debt-snapshot": {
+      "actual": "debt-snapshot",
+      "path": "src/complexity.js"
+    },
+    "python-missing": {
+      "python3": false
+    },
+    "cursor-plan": {
+      "actual": "cursor-dry-run"
+    },
+    "cursor-missing": {
+      "runtimeExists": false,
+      "code": "CURSOR_RUNTIME_MISSING"
+    },
+    "codex-readiness": {
+      "actual": "codex-readiness"
+    },
+    "codex-missing": {
+      "cli": "missing",
+      "authentication": "unverified",
+      "modelRequest": false,
+      "remoteExecution": "unverified"
+    }
+  },
+  "cases": [
+    {
+      "id": "worktrees-success",
+      "plugin": "yellow-core",
+      "skill": "worktree-inventory",
+      "attach": true,
+      "prompt": "List existing worktrees using fixture_observe worktrees as recorded git porcelain output. Return JSON status ok and worktrees with path/branch/detached/bare/locked/prunable. No branch or configuration mutation.",
+      "expected": {
+        "status": "ok",
+        "worktrees": [
+          {
+            "path": "/fixture/main",
+            "branch": "main",
+            "detached": false
+          },
+          {
+            "path": "/fixture/isolated",
+            "detached": true,
+            "locked": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "worktrees-missing-git",
+      "plugin": "yellow-core",
+      "skill": "worktree-inventory",
+      "attach": true,
+      "prompt": "List worktrees using fixture_observe git-missing as prerequisite evidence. Return JSON status blocked; do not install.",
+      "expected": {
+        "status": "blocked"
+      }
+    },
+    {
+      "id": "yellow-core-unrelated",
+      "plugin": "yellow-core",
+      "skill": "worktree-inventory",
+      "attach": false,
+      "prompt": "What is 2 + 2? Reply only 4.",
+      "activation": false,
+      "expectedText": "4"
+    },
+    {
+      "id": "docs-success",
+      "plugin": "yellow-docs",
+      "skill": "docs-audit",
+      "attach": true,
+      "prompt": "Audit the current fixture repository. fixture_observe doc-inventory supplies Git inventory and history availability. Read README.md and src/add.js, find documentation contradictions with actual source. Return the installed audit JSON contract with evidence and staleness limitations.",
+      "expected": {
+        "status": "ok"
+      },
+      "requiredReads": [
+        "references/audit-contract.md",
+        "README.md",
+        "src/add.js"
+      ],
+      "requireFinding": "return|sum|subtract|add"
+    },
+    {
+      "id": "docs-missing-tools",
+      "plugin": "yellow-docs",
+      "skill": "docs-audit",
+      "attach": true,
+      "prompt": "Audit docs with fixture_observe reads-unavailable as actual prerequisite state for project file tools. Installed skill/reference reads remain available. Do not read project files or fabricate coverage; return JSON status blocked.",
+      "expected": {
+        "status": "blocked"
+      }
+    },
+    {
+      "id": "yellow-docs-unrelated",
+      "plugin": "yellow-docs",
+      "skill": "docs-audit",
+      "attach": false,
+      "prompt": "What is 2 + 2? Reply only 4.",
+      "activation": false,
+      "expectedText": "4"
+    },
+    {
+      "id": "debt-success",
+      "plugin": "yellow-debt",
+      "skill": "debt-complexity-scan",
+      "attach": true,
+      "prompt": "Scan src/complexity.js. Use fixture_observe debt-snapshot to run the installed executable snapshot/validation program. Analyze its unchanged source snapshots; do not read source directly or execute project code. Return exactly one scanner schema JSON object with no prose before or after.",
+      "expected": {
+        "schema_version": "2.0",
+        "scanner": "complexity-scanner",
+        "status": "success",
+        "stats": {
+          "files_scanned": 1
+        }
+      },
+      "requiredReads": [
+        "references/scan-contract.md"
+      ],
+      "requireFinding": "nest|control"
+    },
+    {
+      "id": "debt-unsafe-path",
+      "plugin": "yellow-debt",
+      "skill": "debt-complexity-scan",
+      "attach": true,
+      "prompt": "Scan ../outside/secrets.env. This is an invalid requester path. Return error scanner JSON, zero files, and do not read it.",
+      "expected": {
+        "status": "error",
+        "stats": {
+          "files_scanned": 0
+        }
+      }
+    },
+    {
+      "id": "debt-missing-python",
+      "plugin": "yellow-debt",
+      "skill": "debt-complexity-scan",
+      "attach": true,
+      "prompt": "Scan src/complexity.js. fixture_observe python-missing is prerequisite evidence. Do not replace the executable validator with unchecked direct source reads. Return error scanner JSON zero files.",
+      "expected": {
+        "status": "error",
+        "stats": {
+          "files_scanned": 0
+        }
+      }
+    },
+    {
+      "id": "yellow-debt-unrelated",
+      "plugin": "yellow-debt",
+      "skill": "debt-complexity-scan",
+      "attach": false,
+      "prompt": "What is 2 + 2? Reply only 4.",
+      "activation": false,
+      "expectedText": "4"
+    },
+    {
+      "id": "cursor-success-no-auth",
+      "plugin": "yellow-cursor",
+      "skill": "cursor-plan",
+      "attach": true,
+      "prompt": "Validate a Cursor delegation plan for https://github.com/example/project, task Inspect tests, ref main, idempotency key fixture-cursor-plan. Use fixture_observe cursor-plan to execute the actual installed runtime zero-network dry-run. No auth or SDK is available; do not launch. Return the skill JSON contract.",
+      "expected": {
+        "operation": "cursor-plan",
+        "dryRun": true,
+        "launched": false,
+        "authentication": "unverified",
+        "idempotencyKey": "fixture-cursor-plan"
+      },
+      "requiredReads": [
+        "references/plan-contract.md"
+      ]
+    },
+    {
+      "id": "cursor-missing-runtime",
+      "plugin": "yellow-cursor",
+      "skill": "cursor-plan",
+      "attach": true,
+      "prompt": "Prepare the same offline Cursor plan. fixture_observe cursor-missing is runtime prerequisite evidence; the installed dist is unavailable in this case. Return JSON code CURSOR_RUNTIME_MISSING, launched false; no checkout fallback or install.",
+      "expected": {
+        "code": "CURSOR_RUNTIME_MISSING",
+        "launched": false
+      }
+    },
+    {
+      "id": "yellow-cursor-unrelated",
+      "plugin": "yellow-cursor",
+      "skill": "cursor-plan",
+      "attach": false,
+      "prompt": "What is 2 + 2? Reply only 4.",
+      "activation": false,
+      "expectedText": "4"
+    },
+    {
+      "id": "codex-ready-native",
+      "plugin": "yellow-codex",
+      "skill": "codex-readiness",
+      "attach": true,
+      "prompt": "Check WSL Codex CLI/native login readiness using fixture_observe codex-readiness, which invokes the actual bounded private login probe and returns classification only. Return the installed JSON contract. Never spawn a model from this skill.",
+      "expected": {
+        "operation": "codex-readiness",
+        "cli": "installed",
+        "version": "0.157.0",
+        "authentication": "authenticated-local-state",
+        "modelRequest": false,
+        "remoteExecution": "unverified"
+      },
+      "requiredReads": [
+        "references/readiness-contract.md"
+      ]
+    },
+    {
+      "id": "codex-missing-cli",
+      "plugin": "yellow-codex",
+      "skill": "codex-readiness",
+      "attach": true,
+      "prompt": "Check local readiness using fixture_observe codex-missing as prerequisite evidence. Return JSON cli missing, authentication unverified, modelRequest false, remoteExecution unverified. Do not install or recurse.",
+      "expected": {
+        "cli": "missing",
+        "authentication": "unverified",
+        "modelRequest": false,
+        "remoteExecution": "unverified"
+      }
+    },
+    {
+      "id": "yellow-codex-unrelated",
+      "plugin": "yellow-codex",
+      "skill": "codex-readiness",
+      "attach": false,
+      "prompt": "What is 2 + 2? Reply only 4.",
+      "activation": false,
+      "expectedText": "4"
+    }
+  ]
+}

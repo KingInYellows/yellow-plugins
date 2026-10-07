@@ -1,0 +1,36 @@
+{
+  "candidate": false,
+  "files": {
+    "README.md": "# Isolated readiness fixture\n"
+  },
+  "observations": {
+    "codex-missing-auth": {
+      "operation": "codex-readiness",
+      "host": "wsl:Ubuntu-24.04",
+      "cli": "installed",
+      "version": "0.157.0",
+      "authentication": "missing",
+      "modelRequest": false,
+      "remoteExecution": "unverified",
+      "evidence": "actual-installed-reference-probe-empty-profile"
+    }
+  },
+  "cases": [
+    {
+      "id": "codex-missing-auth-native-evidence",
+      "plugin": "yellow-codex",
+      "skill": "codex-readiness",
+      "attach": true,
+      "prompt": "Check WSL local Codex readiness. fixture_observe codex-missing-auth provides the sanitized result of the actual installed-reference private-capture login probe in an empty isolated HOME/CODEX_HOME with no credentials or owner profile. Return the skill JSON contract using that evidence; do not login, install, retry or spawn a model.",
+      "expected": {
+        "operation": "codex-readiness",
+        "cli": "installed",
+        "version": "0.157.0",
+        "authentication": "missing",
+        "modelRequest": false,
+        "remoteExecution": "unverified"
+      },
+      "requiredReads": ["references/readiness-contract.md"]
+    }
+  ]
+}

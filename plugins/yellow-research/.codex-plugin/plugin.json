@@ -1,0 +1,40 @@
+{
+  "name": "yellow-research",
+  "version": "4.2.3",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "license": "MIT",
+  "keywords": [
+    "research",
+    "deep-research",
+    "ceramic",
+    "deepwiki",
+    "perplexity",
+    "exa",
+    "tavily",
+    "ast-grep",
+    "mcp"
+  ],
+  "interface": {
+    "displayName": "yellow-research",
+    "category": "Developer Tools",
+    "developerName": "KingInYellows",
+    "websiteURL": "https://github.com/KingInYellows/yellow-plugins#yellow-research"
+  },
+  "description": "One bounded read-only research-public-repo workflow. Other commands, agents, skills and hooks remain excluded.",
+  "commands": [],
+  "skills": "./codex/skills",
+  "mcpServers": {
+    "deepwiki": {
+      "url": "https://mcp.deepwiki.com/mcp",
+      "enabled_tools": [
+        "ask_wiki_question",
+        "ask_question",
+        "read_wiki_structure",
+        "read_wiki_contents"
+      ]
+    }
+  }
+}

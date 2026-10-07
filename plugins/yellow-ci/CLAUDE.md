@@ -90,7 +90,8 @@ reaches the skill directly), plus the two reference skills:
   `session-start.sh` to a dependency-free Node runtime shared across hosts
   (`entrypoint-claude.js` / `entrypoint-codex.js` → `lib/run-hook.js` →
   `lib/session-start-core.js`); see "Codex Distribution" below. Carried into the
-  Codex manifest but inert on Codex today (`plugin_hooks` removed).
+  Codex manifest. Codex 0.157.0 executes it after exact-definition trust;
+  untrusted controls remain idle (see the canonical distribution doc).
 
 ## When to Use What
 
@@ -230,6 +231,10 @@ runner-targets YAML.
 
 ## Codex Distribution
 
+The generated Codex manifest sets `commands: []` to prevent automatic
+conversion of Claude command wrappers into additional skills. Codex exposes
+only the skills selected by the catalog allowlist.
+
 `targets.codex.enabled: true` in `catalog/plugins/yellow-ci.json` — Codex-enabled
 in the canonical order `[gt-workflow, yellow-core, yellow-review, yellow-ci]`.
 See the canonical
@@ -240,7 +245,7 @@ See the canonical
 `ci-runner-health`, `ci-conventions`, `diagnose-ci`. Each operational skill is
 the shared implementation; its `/ci:*` command is a thin wrapper (Claude-side
 surface). `includeHooks` is left default (`true`) so the SessionStart hook
-carries — but see the inertness note below.
+carries — see the version-specific lifecycle evidence below.
 
 **Deferred / absent from Codex (R33):** the `/ci:runner-cleanup`,
 `/ci:setup-self-hosted`, and `/ci:report-linear` commands, the
@@ -264,8 +269,12 @@ Node runtime (`hooks/scripts/`), replicated per-plugin, verified byte/semantic
 parity against the deleted `session-start.sh` via `tests/hook-parity.bats`. Cache
 writes relocated to a plugin-data dir with a read-only legacy fallback (see
 "Cache Locations"). The hook is carried into `hooks/codex-hooks.json` (with a
-`commandWindows` twin) but **inert on Codex today** — `plugin_hooks` is `removed`
-on codex-cli 0.144.x.
+`commandWindows` twin). Codex 0.157.0 now verifies SessionStart execution
+after trusting only the disposable installed definition hash. Its untrusted
+control produces no hook events. The fixture uses an unauthenticated `gh`
+stub and proves lifecycle delivery/fail-open startup; live CI account/data
+behavior remains separate. The earlier 0.144.x inert observation is historical.
+See the [Phase 1 receipts](../../docs/research/codex-phase-1-2026-10-05/report.md).
 
 **`allow_implicit_invocation` deferral (A9):** on codex-cli 0.144.6 Codex *does*
 honor `skills/<name>/agents/openai.yaml` `policy.allow_implicit_invocation`
@@ -280,3 +289,21 @@ Generated artifacts (`pnpm generate:manifests`, never hand-edited):
 `codex/skills/<8>/SKILL.md`. `ci-conventions`'s `references/` were relocated to
 `plugins/yellow-ci/references/` (loaded by the Claude-only agents via
 `${CLAUDE_PLUGIN_ROOT}`) so its skill dir is SKILL.md-only and generator-clean.
+
+## Pilot Skill References
+
+ci-diagnose and ci-runner-health use concise workflow entrypoints with three
+flat, skill-local references each. Load the current step's reference relative to
+its SKILL.md in either source or installed plugins. Config validation,
+redaction, fixed-token OS/error classification, and executable SSH blocks live
+in those references; each probe rebuilds its own target bindings and hardened
+options. The runner-health entrypoint keeps the preview and confirmation gate
+before any SSH connection. Deep-investigation commands outside that preview need
+their own confirmation.
+
+The focused integration suite
+tests/integration/ci-pilot-progressive-disclosure.test.ts executes the moved
+blocks with local fake GitHub/SSH tools under bash and zsh. It checks data
+validation, redaction, fencing, stream bounds, independent shell scope, and
+fail-closed retrieval/portability paths. Model confirmation and installed
+reference resolution require separate installed-session evidence.

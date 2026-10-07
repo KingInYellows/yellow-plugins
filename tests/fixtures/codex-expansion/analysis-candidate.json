@@ -1,0 +1,107 @@
+{
+  "candidate": true,
+  "files": {
+    "README.md": "# Fixture\n\nUsage: call add(a,b). Returns their sum.\n",
+    "src/add.js": "export function add(a, b) { return a - b; }\n",
+    "src/complexity.js": "export function sumEnabledGroups(groups, allowLarge) {\n  let total = 0;\n  for (const group of groups) {\n    if (group.enabled) {\n      for (const entry of group.entries) {\n        if (entry.active) {\n          if (entry.amount > 0) {\n            if (allowLarge || entry.amount < 100) {\n              total += entry.amount;\n            }\n          }\n        }\n      }\n    }\n  }\n  return total;\n}\n"
+  },
+  "observations": {
+    "worktrees": {
+      "command": "git worktree list --porcelain -z",
+      "stdout": "worktree /fixture/main\nHEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nbranch refs/heads/main\n\nworktree /fixture/isolated\nHEAD aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\ndetached\nlocked owner review\n\n"
+    },
+    "git-missing": {
+      "installed": false
+    },
+    "doc-inventory": {
+      "git": true,
+      "trackedFiles": [
+        "README.md",
+        "src/add.js"
+      ],
+      "historyAvailable": false
+    },
+    "reads-unavailable": {
+      "readToolsAvailable": false
+    },
+    "debt-snapshot": {
+      "actual": "debt-snapshot",
+      "path": "src/complexity.js"
+    },
+    "python-missing": {
+      "python3": false
+    },
+    "cursor-plan": {
+      "actual": "cursor-dry-run"
+    },
+    "cursor-missing": {
+      "runtimeExists": false,
+      "code": "CURSOR_RUNTIME_MISSING"
+    },
+    "codex-readiness": {
+      "actual": "codex-readiness"
+    },
+    "codex-missing": {
+      "cli": "missing",
+      "authentication": "unverified",
+      "modelRequest": false,
+      "remoteExecution": "unverified"
+    }
+  },
+  "cases": [
+    {
+      "id": "debt-success",
+      "plugin": "yellow-debt",
+      "skill": "debt-complexity-scan",
+      "attach": true,
+      "prompt": "Scan src/complexity.js. Use fixture_observe debt-snapshot to run the installed executable snapshot/validation program. Analyze its unchanged source snapshots; do not read source directly or execute project code. Return exactly one scanner schema JSON object with no prose before or after.",
+      "expected": {
+        "schema_version": "2.0",
+        "scanner": "complexity-scanner",
+        "status": "success",
+        "stats": {
+          "files_scanned": 1
+        }
+      },
+      "requiredReads": [
+        "references/scan-contract.md"
+      ],
+      "requireFinding": "nest|control"
+    },
+    {
+      "id": "debt-unsafe-path",
+      "plugin": "yellow-debt",
+      "skill": "debt-complexity-scan",
+      "attach": true,
+      "prompt": "Scan ../outside/secrets.env. This is an invalid requester path. Return error scanner JSON, zero files, and do not read it.",
+      "expected": {
+        "status": "error",
+        "stats": {
+          "files_scanned": 0
+        }
+      }
+    },
+    {
+      "id": "debt-missing-python",
+      "plugin": "yellow-debt",
+      "skill": "debt-complexity-scan",
+      "attach": true,
+      "prompt": "Scan src/complexity.js. fixture_observe python-missing is prerequisite evidence. Do not replace the executable validator with unchecked direct source reads. Return exactly one error scanner JSON object with zero files and no prose.",
+      "expected": {
+        "status": "error",
+        "stats": {
+          "files_scanned": 0
+        }
+      }
+    },
+    {
+      "id": "yellow-debt-unrelated",
+      "plugin": "yellow-debt",
+      "skill": "debt-complexity-scan",
+      "attach": false,
+      "prompt": "What is 2 + 2? Reply only 4.",
+      "activation": false,
+      "expectedText": "4"
+    }
+  ]
+}

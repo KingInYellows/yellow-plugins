@@ -1,0 +1,45 @@
+{
+  "candidate": false,
+  "files": {
+    "change.diff": "diff --git a/src/add.js b/src/add.js\n--- a/src/add.js\n+++ b/src/add.js\n@@ -0,0 +1 @@\n+export const add = (a, b) => a + b;\n"
+  },
+  "cases": [
+    {
+      "id": "thermonuclear-explicit",
+      "plugin": "yellow-review",
+      "skill": "yellow-thermonuclear-review",
+      "attach": true,
+      "prompt": "Use the attached yellow-thermonuclear-review skill to review only change.diff. Return the rubric JSON; no edits. This entire addition is supplied, no history or size crossing is inferred.",
+      "expected": {
+        "reviewer": "thermonuclear",
+        "findings": [],
+        "residual_risks": [],
+        "testing_gaps": []
+      },
+      "requiredReads": [
+        "change.diff"
+      ]
+    },
+    {
+      "id": "thermonuclear-implicit-control",
+      "plugin": "yellow-review",
+      "skill": "yellow-thermonuclear-review",
+      "attach": false,
+      "prompt": "Review change.diff for structural quality, code-judo simplification and spaghetti growth. Read only change.diff and return JSON {\"reviewed\":true,\"edits\":false}.",
+      "expected": {
+        "reviewed": true,
+        "edits": false
+      },
+      "activation": false
+    },
+    {
+      "id": "yellow-review-unrelated",
+      "plugin": "yellow-review",
+      "skill": "yellow-thermonuclear-review",
+      "attach": false,
+      "prompt": "What is 2 + 2? Reply only 4.",
+      "activation": false,
+      "expectedText": "4"
+    }
+  ]
+}

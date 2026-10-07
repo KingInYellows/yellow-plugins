@@ -1,0 +1,36 @@
+{
+  "status": "failed",
+  "recordedAt": "2026-10-06T00:18:12.972Z",
+  "harnessSha256": "65745d56aab51ccd27d3a23b8bcd13d906b14e4451e5619ded0173f33bcb350d",
+  "scratch": "/tmp/yellow-codex-activation-TBaLSV",
+  "credentialHandling": "CLI-native-read-only-bind; no credential copy or harness read",
+  "cases": [],
+  "cliVersion": "0.157.0",
+  "revision": "cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0",
+  "install": {
+    "pluginId": "yellow-core@yellow-plugins",
+    "name": "yellow-core",
+    "marketplaceName": "yellow-plugins",
+    "version": "2.6.2",
+    "installedPath": "/tmp/yellow-codex-activation-TBaLSV/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2",
+    "authPolicy": "ON_INSTALL"
+  },
+  "fixtureBefore": {
+    "plans/complete/shipped.md": "d47d9a21eaabd0357c3de1cd33c7855d83fceab91fc4be6b79d950284bdfdb66",
+    "plans/in-flight.md": "af623e438209773e365fd22338b3e64672646b032f054f0ccba527515ee29fc7",
+    "plans/ready.md": "b6bb0f269ed95846029074dce3e8b88d4685d850d55551cca9dd41ec23ef48c9",
+    "plans/research.md": "e4665f1e5539c267c19f8b11a403172d3a15c42d3b9d345f317962ff351fa46a"
+  },
+  "skill": {
+    "name": "yellow-core:plan-status",
+    "description": "Show a per-file checkbox progress dashboard of plans/ (open) and plans/complete/ (archived) plan documents. Use when reviewing which plans are ready to archive or checking work-in-flight at a glance.",
+    "path": "/tmp/yellow-codex-activation-TBaLSV/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/plan-status/SKILL.md",
+    "scope": "user",
+    "enabled": true,
+    "pluginId": "yellow-core@yellow-plugins"
+  },
+  "model": "gpt-6-astra",
+  "modelProvider": "openai",
+  "failure": "Dynamic request outside fixture allowlist",
+  "scratchRetained": true
+}

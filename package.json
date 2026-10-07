@@ -42,6 +42,7 @@
     "validate:council-roster": "node scripts/validate-council-roster.js",
     "check:pins": "node scripts/check-upstream-pins.js",
     "smoke:install": "bash scripts/smoke-plugin-install.sh",
+    "smoke:codex": "node scripts/smoke-codex-plugin-install.js",
     "test:lint-plugins": "bats tests/lint-plugins.bats",
     "lint:plugins": "bash scripts/lint-plugins.sh",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
@@ -53,7 +54,11 @@
     "tag": "changeset tag",
     "catalog:version": "node scripts/catalog-version.js",
     "validate:versions": "node scripts/validate-versions.js",
-    "validate:versions:dry": "node scripts/validate-versions.js --dry-run"
+    "validate:versions:dry": "node scripts/validate-versions.js --dry-run",
+    "smoke:codex:lifecycle": "node scripts/smoke-codex-plugin-lifecycle.js",
+    "smoke:codex:activation": "node scripts/smoke-codex-skill-activation.js",
+    "smoke:codex:graphite-auth": "node scripts/smoke-codex-graphite-auth.js",
+    "smoke:codex:workflows": "node scripts/smoke-codex-workflow-acceptance.js"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.2",

@@ -26,22 +26,31 @@ Add the marketplace, then install individual plugins:
 | `github-workflow`     | GitHub-native stacked-PR provider — full command surface (setup, status, plan, submit, amend, sync, nav, cleanup, merge)               | 9 commands, 9 skills, 2 hooks                  |
 | `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting                                    | 3 agents, 4 commands, 2 skills                 |
 | `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners                            | 4 agents, 9 commands, 8 skills, 1 hook         |
-| `yellow-codex`        | OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration                                             | 3 agents, 4 commands, 1 skill                  |
+| `yellow-codex`        | OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration                                             | 3 agents, 4 commands, 2 skills                 |
 | `yellow-composio`     | Composio MCP integration with usage tracking and budget guardrails                                                                     | 2 commands, 1 skill, 1 MCP                     |
-| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                                               | 21 agents, 19 commands, 22 skills              |
+| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                                               | 21 agents, 19 commands, 23 skills              |
 | `yellow-council`      | On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel | 3 agents, 2 commands, 1 skill                  |
-| `yellow-cursor`       | Cursor Cloud Agent delegation — launch, track, and manage remote coding agents via a typed CLI (pilot Cursor distribution target)      | 10 commands, 1 skill                           |
-| `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns                                       | 7 agents, 6 commands, 1 skill, 1 hook          |
+| `yellow-cursor`       | Cursor Cloud Agent delegation — launch, track, and manage remote coding agents via a typed CLI (pilot Cursor distribution target)      | 10 commands, 2 skills                          |
+| `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns                                       | 7 agents, 6 commands, 2 skills, 1 hook         |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, orchestrate plan-implement-review chains (legacy — see yellow-cursor)   | 1 agent, 9 commands, 1 skill, 1 MCP            |
 | `yellow-jules`        | Google Jules integration (experimental) — delegate, supervise, and review sessions under owner-written grants (Codex reference skills)  | 10 commands, 2 skills                          |
-| `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                                                       | 10 agents, 6 commands, 1 skill                 |
+| `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                                                       | 10 agents, 6 commands, 2 skills                |
 | `yellow-goal`         | Process bridge to the yellow-goal `goal-gen` engine (setup/request, stub run, approval-gated real run that may spend)                  | 4 commands                                     |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents                                      | 3 agents, 9 commands, 1 skill, 1 MCP           |
 | `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                                                  | 2 commands, 1 MCP                              |
-| `yellow-research`     | Deep research with Ceramic, DeepWiki, Perplexity, Tavily, EXA, and Parallel Task MCPs                                                  | 2 agents, 4 commands, 2 skills, 6 MCPs         |
+| `yellow-research`     | Deep research with Ceramic, DeepWiki, Perplexity, Tavily, EXA, and Parallel Task MCPs                                                  | 2 agents, 4 commands, 3 skills, 6 MCPs         |
 | `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review                                     | 16 agents, 8 commands, 2 skills                |
 | `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                                                  | 2 agents, 8 commands, 3 skills, 4 hooks, 1 MCP |
 | `yellow-semgrep`      | Semgrep security finding remediation — fetch, fix, and verify "to fix" findings from the Semgrep platform                              | 2 agents, 5 commands, 1 skill, 1 MCP           |
+
+## Codex Distribution
+
+The private/local Codex catalog selects ten plugins and 31 skills. The six new
+workflow slices are worktree inventory, documentation audit, complexity scan,
+public DeepWiki research, offline Cursor planning and local Codex readiness. See
+the exact support, setup, cache-refresh and unsupported states in
+[Codex distribution](docs/codex-distribution.md). WSL CLI evidence does not
+establish Windows desktop support. Claude command/setup behavior stays separate.
 
 ## Cursor Distribution (pilot)
 
@@ -49,30 +58,30 @@ Add the marketplace, then install individual plugins:
 (`.cursor-plugin/plugin.json` + a listing in the root
 `.cursor-plugin/marketplace.json`), alongside its normal Claude Code install
 path. `yellow-review` is the second Cursor-enabled plugin, exposing a single
-read-only skill (`yellow-thermonuclear-review`) and nothing else. Cursor
-support is **explicit opt-in per plugin** — this repo does not claim
-repository-wide Cursor support. See [docs/cursor-distribution.md](docs/cursor-distribution.md)
+read-only skill (`yellow-thermonuclear-review`) and nothing else. Cursor support
+is **explicit opt-in per plugin** — this repo does not claim repository-wide
+Cursor support. See [docs/cursor-distribution.md](docs/cursor-distribution.md)
 for the full opt-in model, generated-artifact shape, and verification status.
 
 ## MCP Servers & Authentication
 
 Eight plugins bundle MCP servers. Authentication requirements vary by server.
 
-| Plugin            | MCP Server | Auth                                                                                                              |
-| ----------------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |
-| `gt-workflow`     | Graphite   | Local stdio (`gt mcp`) — requires Graphite CLI login                                                              |
+| Plugin            | MCP Server | Auth                                                                                                                                         |
+| ----------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gt-workflow`     | Graphite   | Local stdio (`gt mcp`) — requires Graphite CLI login                                                                                         |
 | `yellow-composio` | Composio   | Browser OAuth on `https://connect.composio.dev/mcp` (native HTTP, no API key). Headless `claude mcp add` with a consumer key is the fallback |
-| `yellow-devin`    | Devin      | `DEVIN_SERVICE_USER_TOKEN` & `DEVIN_ORG_ID` required                                                              |
-| `yellow-linear`   | Linear     | OAuth (browser popup on first use)                                                                                |
-| `yellow-morph`    | Morph      | `MORPH_API_KEY` required                                                                                          |
-| `yellow-research` | Ceramic    | OAuth (browser popup on first `ceramic_search` use)                                                               |
-| `yellow-research` | DeepWiki   | None (public repos only)                                                                                          |
-| `yellow-research` | Perplexity | `PERPLEXITY_API_KEY` required                                                                                     |
-| `yellow-research` | Tavily     | `TAVILY_API_KEY` required                                                                                         |
-| `yellow-research` | EXA        | `EXA_API_KEY` required                                                                                            |
-| `yellow-research` | Parallel   | No API key — auto-authenticated by Claude Code                                                                    |
-| `yellow-ruvector` | ruvector   | Local stdio — no auth required                                                                                    |
-| `yellow-semgrep`  | semgrep    | `SEMGREP_APP_TOKEN` required                                                                                      |
+| `yellow-devin`    | Devin      | `DEVIN_SERVICE_USER_TOKEN` & `DEVIN_ORG_ID` required                                                                                         |
+| `yellow-linear`   | Linear     | OAuth (browser popup on first use)                                                                                                           |
+| `yellow-morph`    | Morph      | `MORPH_API_KEY` required                                                                                                                     |
+| `yellow-research` | Ceramic    | OAuth (browser popup on first `ceramic_search` use)                                                                                          |
+| `yellow-research` | DeepWiki   | None (public repos only)                                                                                                                     |
+| `yellow-research` | Perplexity | `PERPLEXITY_API_KEY` required                                                                                                                |
+| `yellow-research` | Tavily     | `TAVILY_API_KEY` required                                                                                                                    |
+| `yellow-research` | EXA        | `EXA_API_KEY` required                                                                                                                       |
+| `yellow-research` | Parallel   | No API key — auto-authenticated by Claude Code                                                                                               |
+| `yellow-ruvector` | ruvector   | Local stdio — no auth required                                                                                                               |
+| `yellow-semgrep`  | semgrep    | `SEMGREP_APP_TOKEN` required                                                                                                                 |
 
 `yellow-review` bundles no MCP server but can reach one. When the optional
 `yellow-linear` plugin is installed, its `save_issue` tool is discoverable, and
@@ -216,8 +225,8 @@ Runs locally as a stdio MCP server through the plugin's own launcher, which
 installs the pinned ruvector into the plugin data directory on first use (no
 global or `npx` install; the first run needs network for the npm packages and
 the ~90MB embedding model). Requires Node.js 20+. No external services or API
-keys required. Run `/ruvector:setup` to install ahead of time and initialize
-the project's `.ruvector/` store.
+keys required. Run `/ruvector:setup` to install ahead of time and initialize the
+project's `.ruvector/` store.
 
 ### yellow-goal (process bridge)
 

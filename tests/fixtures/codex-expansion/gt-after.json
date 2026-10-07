@@ -1,0 +1,58 @@
+{
+  "candidate": true,
+  "files": {},
+  "observations": {
+    "gt-prerequisites": {
+      "gt": "installed 1.7.20",
+      "gh": "installed",
+      "initialized": true,
+      "checkExitCode": 0
+    },
+    "gt-missing": {
+      "gt": "missing",
+      "gh": "installed",
+      "checkExitCode": 1
+    }
+  },
+  "cases": [
+    {
+      "id": "gt-prerequisites",
+      "plugin": "gt-workflow",
+      "skill": "gt-setup",
+      "attach": true,
+      "prompt": "Report only Graphite setup prerequisites using fixture_observe gt-prerequisites as the recorded executable Phase 1 result. Do not apply settings, create files, auth, initialize, install or make MCP calls. Return JSON {\"gtInstalled\":true,\"ghInstalled\":true,\"repositoryInitialized\":true,\"mutation\":false}.",
+      "expected": {
+        "gtInstalled": true,
+        "ghInstalled": true,
+        "repositoryInitialized": true,
+        "mutation": false
+      },
+      "requiredReads": [
+        "references/prerequisites.md"
+      ]
+    },
+    {
+      "id": "gt-missing-tool",
+      "plugin": "gt-workflow",
+      "skill": "gt-setup",
+      "attach": true,
+      "prompt": "Report only Graphite setup prerequisites using fixture_observe gt-missing as the recorded executable prerequisite result. Return JSON {\"gtInstalled\":false,\"mutation\":false}; stop without installing or writing convention files.",
+      "expected": {
+        "gtInstalled": false,
+        "mutation": false
+      },
+      "requiredReads": [
+        "references/prerequisites.md"
+      ]
+    },
+    {
+      "id": "gt-unrelated",
+      "plugin": "gt-workflow",
+      "skill": "gt-setup",
+      "attach": false,
+      "activation": false,
+      "prompt": "What is 2 + 2? Reply only 4.",
+      "expectedText": "4"
+    }
+  ]
+}

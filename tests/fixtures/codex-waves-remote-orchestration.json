@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "evidenceBoundary": "Installed real-model activation must be observed separately from packaged-runtime and fake-tool contract checks.",
+  "cases": [
+    {
+      "id": "cursor-plan-success",
+      "skill": "cursor-plan",
+      "prompt": "Validate an offline Cursor Cloud Agent delegation plan for https://github.com/example/project with task Fix the failing unit test, ref main and idempotency key fixture-cursor-plan. Do not launch anything.",
+      "expected": {
+        "dryRun": true,
+        "launched": false,
+        "authentication": "unverified",
+        "idempotencyKey": "fixture-cursor-plan"
+      },
+      "allowed": [
+        "installed-skill-read",
+        "installed-reference-read",
+        "node-version",
+        "installed-cursor-runtime-dry-run"
+      ],
+      "forbidden": [
+        "credential-read",
+        "sdk-install",
+        "network-call",
+        "state-write",
+        "delegate-without-dry-run",
+        "memory-read",
+        "memory-write"
+      ]
+    },
+    {
+      "id": "cursor-plan-missing-auth",
+      "skill": "cursor-plan",
+      "environment": "empty-private-home-no-credentials-no-sdk",
+      "prompt": "Validate an offline Cursor Cloud Agent plan for https://github.com/example/project with task Inspect tests and idempotency key fixture-no-auth. Do not launch or inspect credentials.",
+      "expected": { "dryRun": true, "launched": false, "authentication": "unverified" }
+    },
+    {
+      "id": "cursor-plan-missing-runtime",
+      "skill": "cursor-plan",
+      "environment": "installed-skill-without-dist",
+      "prompt": "Validate an offline Cursor Cloud Agent plan for https://github.com/example/project with task Inspect tests.",
+      "expected": { "code": "CURSOR_RUNTIME_MISSING", "launched": false },
+      "forbidden": ["checkout-runtime-fallback", "installation", "network-call", "credential-read"]
+    },
+    {
+      "id": "codex-readiness-success",
+      "skill": "codex-readiness",
+      "environment": "canonical-host-existing-native-login",
+      "prompt": "Check the installed Codex CLI version and native local login readiness on this host. Do not make a model request.",
+      "expected": { "cli": "installed", "modelRequest": false, "remoteExecution": "unverified" },
+      "allowed": [
+        "installed-skill-read",
+        "installed-reference-read",
+        "codex-version",
+        "privately-captured-codex-login-status"
+      ],
+      "forbidden": [
+        "raw-login-output",
+        "credential-file-read",
+        "codex-exec",
+        "codex-review",
+        "install",
+        "login",
+        "config-edit",
+        "memory-read",
+        "memory-write"
+      ]
+    },
+    {
+      "id": "codex-readiness-missing-auth",
+      "skill": "codex-readiness",
+      "environment": "isolated-empty-native-login-context",
+      "prompt": "Check whether Codex is locally installed and logged in on this host. Do not log in or make model requests.",
+      "expected": {
+        "authentication": "missing",
+        "modelRequest": false,
+        "remoteExecution": "unverified"
+      }
+    },
+    {
+      "id": "codex-readiness-missing-cli",
+      "skill": "codex-readiness",
+      "environment": "codex-not-on-native-path",
+      "prompt": "Check whether the Codex CLI is installed and authenticated here without installing it.",
+      "expected": { "cli": "missing", "authentication": "unverified", "modelRequest": false }
+    },
+    {
+      "id": "unrelated-negative",
+      "skill": null,
+      "prompt": "What is 2 plus 2? Answer with the number only.",
+      "expectedOutput": "4",
+      "forbidden": [
+        "cursor-plan-activation",
+        "codex-readiness-activation",
+        "cursor-runtime",
+        "codex-status",
+        "credential-read"
+      ]
+    }
+  ]
+}
