@@ -1,0 +1,19 @@
+plugins/yellow-core/commands/plan/complete.md
+  s_9cba14aa6edb3d::t_1975dfab93032f 271
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c2a3fe4cc1f2a618e0a65636004364912c63750a",
+  "prompts": {},
+  "sessions": {
+    "s_9cba14aa6edb3d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f934a4bf-ee84-4c3d-8832-a24566a904ff",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
