@@ -1,0 +1,19 @@
+docs/solutions/workflow/plan-lifecycle-management.md
+  s_7ff5563f37cf8c::t_9675544819a0e7 469-476
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8daa7c4e278d38f0c6a3c80c1bc83b7ea36101ca",
+  "prompts": {},
+  "sessions": {
+    "s_7ff5563f37cf8c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d05e76fc-81b7-4e79-b4ae-f69e4b52dd96",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

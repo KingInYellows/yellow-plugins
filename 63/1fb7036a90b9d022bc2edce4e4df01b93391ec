@@ -1,0 +1,32 @@
+tests/shell-compat/tier4-libraries.bats
+  s_7ff5563f37cf8c::t_00a89bb1fc8f63 87-94
+plugins/yellow-core/lib/plan-gate-provenance.sh
+  s_7ff5563f37cf8c::t_a1b0d4d48ca13a 1-112,114-239
+  s_7ff5563f37cf8c::t_3c768be45164af 113
+scripts/shell-compat-config.json
+  s_7ff5563f37cf8c::t_b94724c76df514 13
+tests/shell-compat/drivers/yellow-core--plan-gate-provenance.sh
+  s_7ff5563f37cf8c::t_2bec4eb6f6b0ac 1-54,58-78,82-91,99-106
+  s_7ff5563f37cf8c::t_de4de28cf0f1a3 92-98
+  s_7ff5563f37cf8c::t_577ede68e5027e 55,57,79-81
+  s_7ff5563f37cf8c::t_4a9f8e562623be 56
+plugins/yellow-core/tests/plan-commands.bats
+  s_7ff5563f37cf8c::t_47bd5c0b61e7b7 34-37,41
+  s_7ff5563f37cf8c::t_96cb68441f3c51 232-245
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "631fb7036a90b9d022bc2edce4e4df01b93391ec",
+  "prompts": {},
+  "sessions": {
+    "s_7ff5563f37cf8c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d05e76fc-81b7-4e79-b4ae-f69e4b52dd96",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
