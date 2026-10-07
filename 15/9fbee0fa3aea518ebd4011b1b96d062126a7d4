@@ -1,0 +1,127 @@
+docs/research/codex-phase-1-2026-10-05/activation-after.json
+  s_1b85233d86c5f4::t_348c3d82b808bd 1-738
+docs/research/codex-phase-1-2026-10-05/activation-path-guard-failure.json
+  s_1b85233d86c5f4::t_feb91179317b52 1-36
+docs/research/codex-phase-1-2026-10-05/continuation.md
+  s_1b85233d86c5f4::t_c22b7b7327ab3c 1-37
+docs/research/codex-phase-1-2026-10-05/discovery-final.json
+  s_1b85233d86c5f4::t_2543706348ad2d 1-358
+docs/research/codex-phase-1-2026-10-05/discovery-timeout.json
+  s_1b85233d86c5f4::t_dba4cab14a25e0 1-22
+docs/research/codex-phase-1-2026-10-05/graphite-auth.json
+  s_1b85233d86c5f4::t_26343f221848fd 1-18
+docs/research/codex-phase-1-2026-10-05/lifecycle-final.json
+  s_1b85233d86c5f4::t_9ab1af831cb246 1-298
+docs/research/codex-phase-1-2026-10-05/report.md
+  s_1b85233d86c5f4::t_b630ea173982be 1-218
+docs/research/codex-phase-1-2026-10-05/runtime/hooks-trusted.json
+  s_1b85233d86c5f4::t_0971b46aaee10f 1-68
+docs/research/codex-phase-1-2026-10-05/runtime/hooks-untrusted.json
+  s_1b85233d86c5f4::t_20981bb991cf58 1-68
+docs/research/codex-phase-1-2026-10-05/runtime/install.json
+  s_1b85233d86c5f4::t_4f9b071912562f 1-18
+docs/research/codex-phase-1-2026-10-05/runtime/mcp-events.json
+  s_1b85233d86c5f4::t_8b77301db13979 1-84
+docs/research/codex-phase-1-2026-10-05/runtime/mcp-launch.jsonl
+  s_1b85233d86c5f4::t_60b0bdf4f34ec7 1-2
+docs/research/codex-phase-1-2026-10-05/runtime/mcp-status.json
+  s_1b85233d86c5f4::t_c47894055592ea 1-71
+docs/research/codex-phase-1-2026-10-05/runtime/mcp-stubs.json
+  s_1b85233d86c5f4::t_2daa0527392d84 1-126
+docs/research/codex-phase-1-2026-10-05/runtime/result.json
+  s_1b85233d86c5f4::t_11ff7db1307024 1-289
+docs/research/codex-phase-1-2026-10-05/runtime/trusted-events.json
+  s_1b85233d86c5f4::t_bc695b88845f90 1-608
+docs/research/codex-phase-1-2026-10-05/runtime/trusted-stubs.json
+  s_1b85233d86c5f4::t_75b162b7582d59 1-27
+docs/research/codex-phase-1-2026-10-05/runtime/untrusted-events.json
+  s_1b85233d86c5f4::t_7fcac58ee5723f 1-464
+docs/research/codex-phase-1-2026-10-05/runtime/untrusted-stubs.json
+  s_1b85233d86c5f4::t_90e372c9817fd1 1-26
+docs/research/codex-phase-1-2026-10-05/validation-completion-initial.json
+  s_1b85233d86c5f4::t_9cfb5a234532dc 1-152
+docs/research/codex-phase-1-2026-10-05/validation-pre-activation.json
+  s_1b85233d86c5f4::t_33ec1e1f400832 1-132
+tests/fixtures/codex-activation/cases.json
+  s_99030e4253364c::t_01b3fea2cfed51 1-61
+docs/research/codex-phase-1-2026-10-05/acceptance-audit.json
+  s_1b85233d86c5f4::t_84434de9af6ab8 1-65
+docs/research/codex-phase-1-2026-10-05/discovery-after.json
+  s_8b9f52218ea88e::t_fcc9057085d7ff 1-358
+docs/research/codex-phase-1-2026-10-05/validation.json
+  s_1b85233d86c5f4::t_a40f29c84a79c0 1-199
+plugins/yellow-review/skills/yellow-thermonuclear-review/agents/openai.yaml
+  s_37184c997339ea::t_0433425b0fe732 1-2
+tests/integration/codex-schema-examples.test.ts
+  s_9628bdf4e65021::t_fc04c3439ae932 96-108
+tests/integration/smoke-codex-graphite-auth.test.ts
+  s_10c298f9395306::t_c1492436f83c80 1-36
+tests/integration/smoke-codex-plugin-lifecycle.test.ts
+  s_b25021c2279fa6::t_22a801e36e04b5 1-142
+tests/integration/smoke-codex-skill-activation.test.ts
+  s_99030e4253364c::t_335be992967d86 1-166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "159fbee0fa3aea518ebd4011b1b96d062126a7d4",
+  "prompts": {},
+  "sessions": {
+    "s_10c298f9395306": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a44dff38f27bc9fba",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_1b85233d86c5f4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d4a1ac10-8d49-4bf0-b157-507bf9e56d9e",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_37184c997339ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-adab8df8915ff853d",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_8b9f52218ea88e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ad50665efd40ca1c4",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_9628bdf4e65021": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "39e116b5-960d-4a92-a722-0e387498ad7a",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_99030e4253364c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9d071984-2c60-4c4a-b608-cc31f4d4e675",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_b25021c2279fa6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a2777c203c0af774c",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
