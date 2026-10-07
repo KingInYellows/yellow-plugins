@@ -1,0 +1,42 @@
+plugins/yellow-core/commands/plan/complete.md
+  s_7ff5563f37cf8c::t_50e0365f2e9550 220
+  s_7ff5563f37cf8c::t_1d386873f06dfe 259,261,269-270,282,285-291,294-295,297-298
+  s_7ff5563f37cf8c::t_a59c3d5268bab2 638-645
+  s_7ff5563f37cf8c::t_30abe875902356 304-312
+  s_7ff5563f37cf8c::t_6454abab96ac86 179-180
+plugins/yellow-core/tests/plan-commands.bats
+  s_7ff5563f37cf8c::t_3b29dd8ca5a4a7 238-240,246-252
+  s_7ff5563f37cf8c::t_33b3832cf66af5 253-254
+tests/shell-compat/drivers/yellow-core--plan-gate-provenance.sh
+  s_7ff5563f37cf8c::t_6ccf92fe5fb238 6,24-29,57,59-62,64,66-67,97-98,100-101,115,123-130
+  s_7ff5563f37cf8c::t_50e0365f2e9550 46-47
+  s_7ff5563f37cf8c::t_c386787a8597b5 86-88,90-95,99
+.changeset/gate-c-commit-subject-provenance.md
+  s_7ff5563f37cf8c::t_6454abab96ac86 11
+docs/solutions/workflow/plan-lifecycle-management.md
+  s_7ff5563f37cf8c::t_6454abab96ac86 469-472
+plugins/yellow-core/lib/plan-gate-provenance.sh
+  s_7ff5563f37cf8c::t_1581238dd4337d 23-25,43,50-51,60-61,65-66,70-73,111,130-141,148,179,192-196,202-205,216,243-252,254-261,270-271
+  s_7ff5563f37cf8c::t_50e0365f2e9550 154,158,253
+plugins/yellow-core/CLAUDE.md
+  s_7ff5563f37cf8c::t_6454abab96ac86 137-138,350
+  s_7ff5563f37cf8c::t_68f3e06c1eb8e1 351-352
+tests/shell-compat/tier4-libraries.bats
+  s_7ff5563f37cf8c::t_3b29dd8ca5a4a7 89-134
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "27e21c6475e21c40103b72639b6307f192b5813e",
+  "prompts": {},
+  "sessions": {
+    "s_7ff5563f37cf8c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d05e76fc-81b7-4e79-b4ae-f69e4b52dd96",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

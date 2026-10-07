@@ -1,0 +1,54 @@
+plans/gate-c-merge-queue-commit-subject-provenance.md
+  s_7ff5563f37cf8c::t_dae9111c87a848 147-155
+  s_7ff5563f37cf8c::t_444799abae6468 404-419
+  s_7ff5563f37cf8c::t_75e0e667e33fde 378-383
+  s_7ff5563f37cf8c::t_9c7e3e6a6aae5a 206
+  s_7ff5563f37cf8c::t_f769d67f8f1b3a 278-288
+  s_7ff5563f37cf8c::t_d9cfd9bf0e3486 223
+  s_7ff5563f37cf8c::t_324542d5a48583 203
+  s_7ff5563f37cf8c::t_5ab092c75810d1 144
+  s_7ff5563f37cf8c::t_9af4388b27f9d5 198
+  s_7ff5563f37cf8c::t_10d7a3972780db 184-192
+  s_7ff5563f37cf8c::t_5f4c7221953d2d 98
+  s_7ff5563f37cf8c::t_125f014c094476 195
+  s_7ff5563f37cf8c::t_879840516146f9 218
+  s_7ff5563f37cf8c::t_00ea2241dc8c69 175
+  s_7ff5563f37cf8c::t_566db5978c052a 211-217
+  s_7ff5563f37cf8c::t_d9cba19434a76c 162-174
+  s_7ff5563f37cf8c::t_f64ff32c1c7d95 106
+  s_7ff5563f37cf8c::t_7e5f169ab70b81 102
+  s_7ff5563f37cf8c::t_c903117b8bdbff 233-253
+  s_7ff5563f37cf8c::t_e7b24fd5c4aacc 177
+  s_7ff5563f37cf8c::t_fb4a8cd96e9698 111-141
+  s_7ff5563f37cf8c::t_c1d2978bb128fd 325-346
+  s_7ff5563f37cf8c::t_9caedd534b389b 1-12,25-40,49-72,86-97,99-101,103-105,107,109-110,142-143,145-146,157-158,160-161,176,178-179,181-183,193-194,196-197,199-202,204-205,207-210,219-222,224,226-229,231-232,254-277,289-324,347-377,384-403
+  s_7ff5563f37cf8c::t_d275eb062fd6a8 13-24
+  s_7ff5563f37cf8c::t_b0db7c528e5994 230
+  s_7ff5563f37cf8c::t_7cacccf309d38a 180
+  s_7ff5563f37cf8c::t_aff56f3c932d9a 225
+  s_7ff5563f37cf8c::t_c3330999a3c393 156
+  s_7ff5563f37cf8c::t_1e637b3ff0b355 41-48
+  s_7ff5563f37cf8c::t_da9238b6514c8c 73-85
+  s_7ff5563f37cf8c::t_59329854a86209 159
+  s_7ff5563f37cf8c::t_76b4311d3b3580 108
+docs/brainstorms/2026-10-06-gate-c-merge-queue-closed-prs-brainstorm.md
+  s_7ff5563f37cf8c::t_3089e5e55a3937 1-92
+.changeset/gate-c-commit-subject-provenance.md
+  s_7ff5563f37cf8c::t_d2f68a4282934e 1-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7b3792aa69e7ae04688bedf5d32e5f42763ff33e",
+  "prompts": {},
+  "sessions": {
+    "s_7ff5563f37cf8c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d05e76fc-81b7-4e79-b4ae-f69e4b52dd96",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
