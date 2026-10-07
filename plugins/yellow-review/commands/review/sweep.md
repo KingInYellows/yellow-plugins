@@ -18,12 +18,8 @@ spawn-cap, CONFLICT-surfacing, issue-filing, verify-command, or push gates.
 Both skills run against the same PR with no human gates anywhere — sweep is
 fire-and-forget by design.
 
-Use when you want both an AI review pass and cleanup of any open bot or
-human comment threads in a single unattended invocation. Use `/review:pr`
-directly (without the flag) to keep its push-confirmation gate, or
-`/review:resolve` directly to keep all of its gates. For
-batch sweeping every open PR you authored, use `/review:sweep-all`. For
-multi-PR or stack-wide pipelines with attended compounding, use
+Use `/review:pr` or `/review:resolve` directly to keep their gates. Batch
+every open PR with `/review:sweep-all`; stack-wide attended compounding is
 `/review:all`. Unattended, the inner `/review:pr` stages its learnings for
 the compound-staging drain instead.
 
@@ -106,8 +102,8 @@ contract and stops the batch as `no contract`.
 `resolve_pr.verify_command` is run without confirmation by the unattended
 `/review:resolve`. An untrusted PR can steer `/review:pr`'s fix `Edit` into
 that file, so snapshot it before `/review:pr` and validate it before resolve
-reads it. This is `/review:resolve-stack` item 1b: classify the file after the
-checkout, never from an earlier result:
+reads it. Classify this work tree first. Step 2b classifies again after the
+checkout and does not reuse this result:
 
 ```bash
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
@@ -123,10 +119,50 @@ case "$rc" in
 esac
 ```
 
-Only `ignored` is guarded. For any other result, log
+The PR head can ignore the file when this branch does not. Classify it before
+Step 2's checkout. Once that head ignores the file, `/review:pr` can write it.
+`git check-ignore` reads this work tree, so fetch `refs/pull/<PR#>/head` into
+`FETCH_HEAD` (no checkout) and point `--work-tree` at a temp directory holding
+only that commit's root `.gitignore`. Use `--no-index` and the `-q` exit
+(`0` ignored, `1` not): this branch's index can still track the file, and
+`-v` exits `0` for a negation too. On failure, before any snapshot, print
+`[review:sweep] Error: could not read the PR head ignore rules.` and stop
+with no skip line.
+
+```bash
+set -u
+head_fail() { printf '[review:sweep] Error: could not read the PR head ignore rules.\n' >&2; exit 2; }
+HEAD_SHA=$(gh pr view <PR#> --json headRefOid -q .headRefOid 2>/dev/null) || HEAD_SHA=""
+case "$HEAD_SHA" in *[!0-9a-f]*|'') head_fail ;; esac
+[ "${#HEAD_SHA}" -eq 40 ] || [ "${#HEAD_SHA}" -eq 64 ] || head_fail
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
+[ -n "$TOP" ] || head_fail
+git -C "$TOP" fetch -q --no-tags -- origin "refs/pull/<PR#>/head" || head_fail
+GOT=$(git -C "$TOP" rev-parse -q --verify FETCH_HEAD 2>/dev/null) || GOT=""
+[ "$GOT" = "$HEAD_SHA" ] || head_fail
+if git -C "$TOP" cat-file -e "${GOT}:yellow-plugins.local.md" 2>/dev/null; then
+  printf 'head=tracked\n'
+else
+  WT=$(mktemp -d) || head_fail
+  if git -C "$TOP" cat-file -e "${GOT}:.gitignore" 2>/dev/null; then
+    git -C "$TOP" show "${GOT}:.gitignore" > "$WT/.gitignore" || { rm -rf -- "$WT"; head_fail; }
+  fi
+  git -C "$TOP" --work-tree="$WT" check-ignore -q --no-index -- yellow-plugins.local.md
+  rc=$?
+  rm -rf -- "$WT"
+  if [ "$rc" -eq 0 ]; then printf 'head=ignored\n'
+  elif [ "$rc" -eq 1 ]; then printf 'head=unignored\n'
+  else head_fail
+  fi
+fi
+```
+
+Snapshot when the work-tree probe printed `ignored` or this probe printed
+`head=ignored`. Otherwise log
 `[review:sweep] PR #<PR#>: yellow-plugins.local.md is not an ignored untracked file; not guarded`,
 set `<guard-dir>` to `none`, and skip every `guard-local-config` call below
-(`/review:resolve` treats a tracked config as untrusted). For `ignored`:
+(`/review:resolve` treats a tracked config as untrusted). When either probe
+says the file is ignored, snapshot now, before Step 2:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" snapshot
@@ -148,14 +184,6 @@ or `3`).
 Invoke the `Skill` tool with `skill: "review:pr"`. Pass the args string
 `<PR#> --non-interactive` (literal — substitute the actual PR number;
 the `--non-interactive` flag is fixed text). Wait for it to complete.
-
-The `--non-interactive` flag suppresses `/review:pr`'s Step 9
-push-confirmation prompt and its Step 9b "save learnings to memory"
-prompt — so the review runs unattended end-to-end. `/review:pr` still
-runs its full pipeline (adaptive agent selection, parallel multi-agent
-review, autonomous P0/P1 fix application, auto-push via the resolved
-stacked-PR provider,
-final report); only the human prompts are suppressed.
 
 ### Step 2a: Verify branch alignment
 

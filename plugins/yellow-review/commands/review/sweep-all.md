@@ -214,8 +214,9 @@ fails, stop and report the path.
 
 For each PR in the sorted list, in order from lowest PR number to
 highest, do the following. **No pauses anywhere in this loop** — log
-per-PR failures and continue, except where item 4 (dirty tree), item 5
-(rate limit), item 5b (no contract) or item 5c (verify skipped) ends the loop.
+per-PR failures and continue, except where item 1b (state unreadable), item 4
+(dirty tree), item 5 (rate limit), item 5b (no contract) or item 5c (verify
+skipped) ends the loop.
 
 For each iteration:
 
@@ -241,12 +242,16 @@ For each iteration:
    When `ratelimited=1`, the next `gh` call would hit the same limit: record
    `rate limited` in this PR's `Notes`, mark every remaining PR
    `skipped — not attempted (rate limit)`, record `pending-exit-1` and go to
-   `### Step 5: End-of-loop summary table` (item 5's stop). Otherwise, when
-   `exit` is non-zero, record `skipped — state unreadable`. When it is `0`
-   and `state` is not `OPEN`, record `skipped — PR closed before sweep`. Either
-   way do NOT invoke the Skill: go to item 6. Only `exit=0` with `state=OPEN`
-   proceeds to item 2. A stop inside the sweep that this check cannot foresee
-   (for example a branch mismatch) still reaches item 5b.
+   `### Step 5: End-of-loop summary table` (item 5's stop). When `exit` is
+   non-zero and `ratelimited` is not `1`, the state is unknown for another
+   reason: record `state unreadable` in this PR's `Notes`, mark every
+   remaining PR `skipped — not attempted (state unreadable)`, record
+   `pending-exit-1` and go to `### Step 5: End-of-loop summary table`. Do not
+   continue to the next PR. When `exit` is `0` and `state` is not `OPEN`,
+   record `skipped — PR closed before sweep` and do NOT invoke the Skill: go
+   to item 6. Only `exit=0` with `state=OPEN` proceeds to item 2. A stop
+   inside the sweep that this check cannot foresee (for example a branch
+   mismatch) still reaches item 5b.
 2. **Invoke sweep** — invoke the `Skill` tool with `skill: "review:sweep"`
    and `args: "<PR#>"`. The skill name is `review:sweep` (the value of
    the `name:` frontmatter field in `sweep.md`) — do NOT use
@@ -318,8 +323,8 @@ For each iteration:
    `### Step 5: End-of-loop summary table`: no project command may run while
    that file is on disk. Record `pending-exit-1` (this stop forces the final
    exit; see the Final exit below). The command exits `1` after the summary.
-6. **Continue** to the next PR otherwise. Unless item 4, 5, 5b or 5c stopped the
-   loop, do not pause, do not prompt, and do not abort on per-PR failures.
+6. **Continue** to the next PR otherwise. Unless item 1b, 4, 5, 5b or 5c stopped
+   the loop, do not pause, do not prompt, and do not abort on per-PR failures.
 
 The PR number and title for each iteration must be substituted as
 literal values in the announce print and the Skill invocation. Bash
@@ -390,8 +395,14 @@ If set, the command exits `1`; otherwise (`pending-exit-1` unset), exit `0`.
 - **User cancels at the M3 gate**: exit 0 with the `Cancelled.` message.
   No sweeps run.
 - **Per-PR sweep failure mid-loop**: marked `skipped` in the summary
-  with a short reason. The loop continues unless Step 4 item 4, 5, 5b or 5c
-  stops it. The user can re-run `/review:sweep <PR#>` manually to inspect.
+  with a short reason. The loop continues unless Step 4 item 1b, 4, 5, 5b or
+  5c stops it. The user can re-run `/review:sweep <PR#>` manually to inspect.
+- **Open-PR pre-check could not read the PR** (Step 4 item 1b, `exit`
+  non-zero and not a rate limit): the loop stops, this PR is noted
+  `state unreadable`, every remaining PR is
+  `skipped — not attempted (state unreadable)`, the summary is printed, and
+  the command exits `1`. A closed PR stays a per-PR skip
+  (`skipped — PR closed before sweep`) and the loop continues.
 - **Dirty tree after a sweep** (Step 4 item 4): the loop stops after
   reverting the sweep's own edits, marks every remaining PR `skipped —
   working tree dirty after PR #<PR#>`, prints the summary, and exits `1`.

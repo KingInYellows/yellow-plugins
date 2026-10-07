@@ -382,6 +382,12 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   step2a=$(awk '/^### Step 2a:/ { p = 1; next } /^### Step 2b:/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
   step3=$(awk '/^### Step 3: Run \/review:resolve/ { p = 1; next } /^### Step 3a:/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
   [[ "$step1b" == *'first runs the guard exit check in Step 3a'* ]]
+  # The PR head is classified before the snapshot, which stays before /review:pr.
+  head=$(grep -n 'refs/pull/<PR#>/head' "$SWEEP" | head -1 | cut -d: -f1)
+  [ -n "$head" ] && [ "$head" -lt "$snap" ]
+  [[ "$step1b" == *'--work-tree="$WT" check-ignore -q --no-index'* ]]
+  [[ "$step1b" == *'head=ignored'* ]]
+  [[ "$step1b" == *'could not read the PR head ignore rules'* ]]
   [[ "$step2a" == *'Exit 2 means `gh pr view` or `git rev-parse` failed or printed nothing, so no mismatch was established'* ]]
   [[ "$step2a" == *'print no `Sweep:` or `Resolve:` line, so `/review:sweep-all` records `no contract`'* ]]
   # Only a read-and-differ comparison reaches the skip line; a failed read exits 2 first.
@@ -916,12 +922,15 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -qF '`/review:sweep-all` treats it as `no contract`' <<<"$flat_sweep"
 }
 
-@test "sweep-all: an open-PR pre-check skips a closed or unreadable PR before the no-contract stop can misread it" {
+@test "sweep-all: an open-PR pre-check skips a closed PR and stops when the state is unreadable" {
   step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
   flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
   grep -qF '**Open-PR pre-check**' <<<"$flat4"
   grep -qF 'gh pr view <PR#> --json state -q .state' <<<"$flat4"
-  grep -qF 'record `skipped — state unreadable`' <<<"$flat4"
+  grep -qF 'record `state unreadable`' <<<"$flat4"
+  grep -qF 'skipped — not attempted (state unreadable)' <<<"$flat4"
+  run grep -qF 'record `skipped — state unreadable`' <<<"$flat4"
+  [ "$status" -eq 1 ]
   grep -qF 'record `skipped — PR closed before sweep`' <<<"$flat4"
   grep -qF 'do NOT invoke the Skill: go to item 6' <<<"$flat4"
   # the pre-check precedes the Skill invocation
@@ -1220,7 +1229,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$flat" == *'`blocking` count `<b>`, `verify` and `ratelimited`'* ]]
   [[ "$flat" == *'5c. **Verify-skipped stop** — only after item 4'* ]]
   [[ "$flat" == *'`skipped — not attempted (verify skipped)`'* ]]
-  [[ "$flat" == *'Unless item 4, 5, 5b or 5c stopped the loop'* ]]
+  [[ "$flat" == *'Unless item 1b, 4, 5, 5b or 5c stopped the loop'* ]]
 }
 
 @test "sweep-all: no project command after a verify-skipped stop" {
