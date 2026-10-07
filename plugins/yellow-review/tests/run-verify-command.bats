@@ -258,6 +258,31 @@ has_kill_after() {
   [ "$status" -eq 2 ]
 }
 
+@test "--revert-denied reverts a deny-listed path and leaves other changes" {
+  printf 'secret\n' >| CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = false ]
+  [ ! -e CLAUDE.md ]
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+@test "--revert-denied takes no file list and leaves a tree with no denied path" {
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied -- src/a.txt
+  [ "$status" -eq 2 ]
+  grep -q 'resolver edit' src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = false ]
+  [ "$(printf '%s' "$output" | jq -r .patch)" = null ]
+  [[ "$output" == *'no deny-listed changes to revert'* ]]
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
 @test "--revert-only may revert a deny-listed path" {
   mkdir -p .claude
   printf '{}\n' >| .claude/settings.json
@@ -742,6 +767,9 @@ SECRET_COMMAND='echo "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789"; ec
     [ "$status" -eq 2 ]
     # shellcheck disable=SC2086
     run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty $flag
+    [ "$status" -eq 2 ]
+    # shellcheck disable=SC2086
+    run --separate-stderr "$SCRIPT" --pr 7 --revert-denied $flag
     [ "$status" -eq 2 ]
   done
   grep -q 'resolver edit' src/a.txt

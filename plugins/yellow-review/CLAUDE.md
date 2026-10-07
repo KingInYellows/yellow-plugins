@@ -230,6 +230,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   not, and refuses when a gitignored file is newer than the marker;
   `--unattended` also skips runner files;
   `--revert-only` reverts the listed files; `--revert-dirty` reverts every change in the tree and takes no
+  file list; `--revert-denied` reverts only deny-listed dirty paths and takes no
   file list; `--check-ignored --ignored-since <marker-file>` runs only the
   gitignored-file guard, for a resolve with no verify command.
   `/review:resolve-stack` and `/review:sweep-all` run it after a

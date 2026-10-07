@@ -171,11 +171,14 @@ would stay open without a report. Then:
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-blockers" "<owner/repo>" "<PR#>"
 ```
 
-Give both of these read-only calls a Bash tool `timeout` of 300000 ms: each
-makes several `gh` calls bounded at 60 s apiece, so the 120 s default could
-kill a slow lookup. `get-pr-comments` can fetch 10 pages, so it also stops
-paginating at a 270 s deadline and ends inside that budget. The contract's
-"Bash timeouts" is the single source for these numbers.
+Give `get-pr-comments` a Bash tool `timeout` of 300000 ms and `get-pr-blockers`
+its own of 360000 ms: each makes several `gh` calls bounded at 60 s apiece, so
+the 120 s default could kill a slow lookup. `get-pr-comments` can fetch 10
+pages, so it also stops paginating at a 270 s deadline and ends inside that
+budget. `get-pr-blockers` makes one GraphQL call, then reads classic protection
+and rules for the PR base and again for the default branch when the two differ:
+five calls at 60 s is 300 s, inside 360000 ms. The contract's "Bash timeouts"
+is the single source for these numbers.
 
 It never fails the run; keep its JSON (`changesRequested`,
 `conversationResolution`, `lookupFailed`) for Step 9. When `lookupReason` or
@@ -436,9 +439,13 @@ script exit 2, 3 or 4 (exit 4 also covers a failed commit or hook; a
 `skipped` verify — make every `fixed` thread `unclear` and roll back what the
 resolvers are known to have changed: a refused edit must not stay on disk. Run
 `run-verify-command --pr "<PR#>" --revert-only --files-from "<file>"` (patch
-saved) on every file a cluster reported under `Files modified`. A changed path
-that no cluster reported is not proven to be a resolver's: it can be work done
-in this tree after Step 2. Interactive: name those paths in one
+saved) on every file a cluster reported under `Files modified`. Then run
+`run-verify-command --pr "<PR#>" --revert-denied` (no file list; patch saved).
+It reverts only dirty paths on the contract deny list in `lib/resolve-paths.sh`:
+a deny-listed file would be trusted by the next session, and Step 6 still
+never puts a resolver path on a command line. A changed path that no cluster
+reported and that is not on that deny list is not proven to be a resolver's:
+it can be work done in this tree after Step 2. Interactive: name those paths in one
 `AskUserQuestion` with "Revert them / Leave them"; Revert runs
 `run-verify-command --pr "<PR#>" --revert-dirty` (patch saved). Non-interactive:
 leave them in place and report each in Step 9 under Blocking merge as

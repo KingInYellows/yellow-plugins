@@ -512,8 +512,10 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   the credential screen withheld it (a pre-resolve baseline is tracked in #973).
   `--revert-dirty` does the same for every change in the tree. It rejects a file
   list: git itself lists the changes (`git diff --name-only HEAD` plus
-  `git ls-files --others --exclude-standard`), never resolver text. Either
-  revert flag combined with `--timeout`, `--command-file`, `--trusted` or
+  `git ls-files --others --exclude-standard`), never resolver text.
+  `--revert-denied` uses that same listing and reverts only paths on the
+  resolver deny list; other dirty paths stay, and a file list is rejected.
+  A revert flag combined with `--timeout`, `--command-file`, `--trusted` or
   `--unattended` exits 2. The patch is written and checked before anything is
   reverted. If any patch command fails (full disk, unsupported entry), nothing
   is reverted and the result carries `patch: null`, `treeClean: false` and a
@@ -576,11 +578,14 @@ to commit.) A refused edit must not stay on disk: a deny-listed file such as
 a change outside the set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify
 `skipped` — the orchestrator runs `run-verify-command --pr <N> --revert-only`
 on the files the clusters reported under `Files modified`, which saves a patch
-first. Step 2 guarantees a clean start, but not a quiet tree: a changed path no
-cluster reported is not proven to be a resolver's edit, so it is never reverted
-unasked. An interactive run asks (`--revert-dirty` on "Revert them", patch
-saved); an unattended run leaves it in place and Step 9 names it under Blocking
-merge. Exit 4 leaves no new commit behind, so the revert only has to clear the tree;
+first. Then `--revert-denied` (no file list) reverts dirty paths on the
+contract deny list without asking: a deny-listed file such as
+`.claude/settings.json` would be trusted by the next session. Step 2
+guarantees a clean start, but not a quiet tree: a changed path no cluster
+reported and that is not on that deny list is not proven to be a resolver's
+edit, so it is never reverted unasked. An interactive run asks (`--revert-dirty`
+on "Revert them", patch saved); an unattended run leaves it in place and Step 9
+names it under Blocking merge. Exit 4 leaves no new commit behind, so the revert only has to clear the tree;
 `fixed` threads become `unclear` and the write phase still runs for the other
 threads (exit 4 here is a refusal, not a rate limit). The interactive "push
 rejected" path is the only one that leaves edits in place. After exit 5 or 6 the
@@ -610,6 +615,7 @@ and the budget is derived from that cap:
 | `reply-pr-thread`     | pre-check, mutation and one retry (3 calls, 180 s) + 90 s rate-limit wait + 10 s pacing = 280 s                                |
 | `resolve-pr-thread`   | mutation and one retry (2 calls, 120 s) + 90 s wait + 10 s pacing = 220 s                                                      |
 | `file-followup-issue` | viewer lookup, issue list, thread link, create, post-create list and duplicate close (6 calls, never waits or retries) = 360 s |
+| `get-pr-blockers`     | review GraphQL, then classic protection and rules for the PR base and, when it differs, the default branch (5 calls, 300 s)          |
 
 The largest is 360 s; 420 s adds 60 s for `jq`, the credential scan and startup,
 and stays under the Bash tool's 600 s maximum. Change the cap and this budget
@@ -624,7 +630,7 @@ hard cap and the `--wait` + 60 s bound do not hold: the script prints a note and
 fetches run with no time limit, so only the between-page deadline applies and a
 hung `gh` call is not cut short.
 
-`get-pr-comments` (Step 3, with `get-pr-blockers`) gets a `timeout` of 300000
+`get-pr-comments` (Step 3) gets a `timeout` of 300000
 ms. It can fetch 10 pages, so it adds a wall-clock deadline to the per-call cap:
 `YELLOW_REVIEW_FETCH_DEADLINE` (default 270 s, clamped to 1..270; a non-number,
 0 or over-4-digit value falls back to 270), checked before each page. On expiry
@@ -633,7 +639,11 @@ array, the same as a page-cap truncation. From page 2 on each `gh` call's limit
 is also cut to the time left, so the worst case is the 270 s deadline plus `jq`
 and startup, inside 300000 ms. Page 1 gets the full per-call limit; a call
 killed by it exits 1 (`gh timed out`). Without `timeout` or `gtimeout` the calls
-run unbounded, as in the other scripts.
+run unbounded, as in the other scripts. `get-pr-blockers` (Step 3) gets its
+own `timeout` of 360000 ms. The worst case is five `gh` calls: the review
+GraphQL query, then classic protection and rules for the PR base, and the
+same two reads for the default branch when the two differ. Five calls at the
+60 s cap is 300 s, inside 360000 ms.
 
 `commit-resolve-fixes` and `run-verify-command` bound their network calls with a
 `timeout`/`gtimeout` binary that supports `--kill-after`; without one the calls

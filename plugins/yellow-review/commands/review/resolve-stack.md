@@ -281,7 +281,8 @@ stop or item 3b's dirty-tree or config stop ends the walk.
    script output to a temp file and check its exit code *before* parsing —
    piping straight into `jq` would mask a non-zero exit from `get-pr-comments`
    (an auth / 429 / network failure that emits empty output would otherwise
-   look like "0 unresolved = fully resolved"). This block is self-contained:
+   look like "0 unresolved = fully resolved"). Give this block a Bash tool
+   `timeout` of 300000 ms. This block is self-contained:
 
    ```bash
    PC_OUT=$(mktemp)

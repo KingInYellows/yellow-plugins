@@ -1129,8 +1129,15 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 
 @test "resolve-pr: the read-only fetch calls get a Bash timeout that covers their capped gh calls" {
   text=$(tr '\n' ' ' <"$RESOLVE_PR" | tr -s ' ')
-  [[ "$text" == *'Give both of these read-only calls a Bash tool `timeout` of 300000 ms'* ]]
+  [[ "$text" == *'Give `get-pr-comments` a Bash tool `timeout` of 300000 ms'* ]]
+  [[ "$text" == *'`get-pr-blockers` its own of 360000 ms'* ]]
   [[ "$text" == *'bounded at 60 s apiece'* ]]
+  [[ "$text" == *'five calls at 60 s is 300 s, inside 360000 ms'* ]]
+  refs=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')
+  [[ "$refs" == *'`get-pr-blockers` (Step 3) gets its own `timeout` of 360000 ms'* ]]
+  [[ "$refs" == *'five `gh` calls'* ]]
+  stack=$(tr '\n' ' ' <"$RESOLVE_STACK" | tr -s ' ')
+  [[ "$stack" == *'Give this block a Bash tool `timeout` of 300000 ms'* ]]
 }
 
 @test "resolve-pr: the marker mint strips a trailing slash from TMPDIR so Step 6 accepts the path" {
@@ -1150,9 +1157,14 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 @test "resolve-pr: a refusal reverts only reported files and asks before touching other changes" {
   step6flat=$(sed -n '/^### Step 6/,/^### Step 7/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
   [[ "$step6flat" == *'--revert-only --files-from "<file>"` (patch saved) on every file a cluster reported under `Files modified`'* ]]
+  [[ "$step6flat" == *'--revert-denied'* ]]
+  [[ "$step6flat" == *'only dirty paths on the contract deny list'* ]]
   [[ "$step6flat" == *'not proven to be a resolver'* ]]
   [[ "$step6flat" == *'"Revert them / Leave them"'* ]]
   [[ "$step6flat" == *'left in place'* ]]
+  dispo=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')
+  [[ "$dispo" == *'--revert-denied'* ]]
+  [[ "$dispo" == *'reverts only paths on the resolver deny list'* ]]
 }
 
 @test "resolve-pr: keeping the partial edits of a conflicted cluster stops the run and reverts nothing" {

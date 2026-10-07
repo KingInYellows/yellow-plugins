@@ -7,6 +7,7 @@
 #                           [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-dirty
+#        run-verify-command --pr <N> --revert-denied
 #        run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>
 #   --trusted:     required to run a command. The caller sets it only after
 #                  confirming the command came from an untracked config file
@@ -63,8 +64,12 @@
 #                  screen withholds the patch.
 #   --revert-dirty: like --revert-only for every change in the tree, listed
 #                  by git itself (for refusals: never trust resolver text).
+#   --revert-denied: like --revert-dirty, but only dirty paths on the
+#                  resolver deny list. Other dirty paths stay. Takes no file
+#                  list: git lists the changes, so a resolver path never
+#                  reaches the command line.
 #   --timeout, --command-file, --trusted and --unattended apply only when
-#   running a command; with either revert flag they are a usage error (exit 2).
+#   running a command; with a revert flag they are a usage error (exit 2).
 #   Running a command also requires the tree to have no changes outside the
 #   listed files.
 #   files:     repo-root-relative paths the resolvers modified, one per line
@@ -74,7 +79,8 @@
 #              must have changes, must not be gitignored and must not be on the
 #              resolver deny list (it is about to be executed and, on failure,
 #              reverted). Under --revert-only only the deny-list check is
-#              waived; --revert-dirty takes no list.
+#              waived; --revert-dirty and --revert-denied take no list.
+#              --revert-denied reverts only the deny-listed dirty paths.
 # Output: JSON to stdout:
 #   {"result":"pass|fail|timeout|skipped|reverted","patch":"<path>|null",
 #    "log":"<path>|null","treeClean":true|false[,"reason":"..."]}
@@ -377,14 +383,15 @@ gh() {
     fi
 }
 usage() {
-    printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] --ignored-since <marker-file> | --revert-only | --revert-dirty) [--files-from <file>] [-- <files...>]\n' >&2
+    printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] --ignored-since <marker-file> | --revert-only | --revert-dirty | --revert-denied) [--files-from <file>] [-- <files...>]\n' >&2
     printf '       run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>\n' >&2
     printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required for every run; revert modes ignore it\n' >&2
     exit 2
 }
 
-# MODE: run (run the verify command), revert-only (revert the listed files) or
-# revert-dirty (revert every change git lists).
+# MODE: run (run the verify command), revert-only (revert the listed files),
+# revert-dirty (revert every change git lists) or revert-denied (revert only
+# the deny-listed changes git lists).
 MODE=run
 PR=""
 TIMEOUT=""
@@ -402,6 +409,15 @@ while [ $# -gt 0 ]; do
         --unattended) UNATTENDED=1; shift ;;
         --revert-only) [ "$MODE" = revert-dirty ] || MODE=revert-only; shift ;;
         --revert-dirty) MODE=revert-dirty; shift ;;
+        # Narrower than the other revert modes: a later --revert-only or
+        # --revert-dirty replaces it, and it does not replace them.
+        --revert-denied)
+            case "$MODE" in
+                revert-dirty|revert-only) ;;
+                *) MODE=revert-denied ;;
+            esac
+            shift
+            ;;
         --check-ignored) MODE=check-ignored; shift ;;
         --files-from)
             [ $# -ge 2 ] || usage
@@ -414,7 +430,7 @@ while [ $# -gt 0 ]; do
 done
 FILES=(${RP_FILES[@]+"${RP_FILES[@]}"})
 if [ "$MODE" != run ] && { [ -n "$TIMEOUT$COMMAND_FILE" ] || [ "$TRUSTED$UNATTENDED" != 00 ]; }; then
-    die 2 "--timeout, --command-file, --trusted and --unattended do not apply to --revert-only or --revert-dirty"
+    die 2 "--timeout, --command-file, --trusted and --unattended do not apply to --revert-only, --revert-dirty or --revert-denied"
 fi
 
 [[ "$PR" =~ ^[1-9][0-9]*$ ]] || die 2 "--pr must be a positive integer"
@@ -517,6 +533,13 @@ if [ "$MODE" = revert-dirty ]; then
     [ "${#FILES[@]}" -eq 0 ] || die 2 "--revert-dirty takes no file list"
     while IFS= read -r -d '' f; do
         [ -n "$f" ] && FILES+=("$f")
+    done <"$CHANGES_FILE"
+elif [ "$MODE" = revert-denied ]; then
+    # Git lists the paths. Only the deny list is reverted; the caller never
+    # passes resolver-derived paths on the command line.
+    [ "${#FILES[@]}" -eq 0 ] || die 2 "--revert-denied takes no file list"
+    while IFS= read -r -d '' f; do
+        [ -n "$f" ] && rp_denied "$f" && FILES+=("$f")
     done <"$CHANGES_FILE"
 else
     # KEEP_FILES is the deduplicated list (first-seen order). A path listed
@@ -977,6 +1000,13 @@ if [ "$SAVE_BIN_OK" != 1 ]; then
         '{result: $r, patch: null, log: (if $log == "" then null else $log end), treeClean: false,
           reason: (($why | if . == "" then "" else . + "; " end) + "could not save the recovery patch; nothing was reverted")}'
     exit 0
+fi
+# Nothing on the deny list: do not archive an empty patch.
+if [ "$MODE" = revert-denied ] && [ "${#FILES[@]}" -eq 0 ]; then
+    rm -f -- "$PATCH"
+    PATCH_OUT=""
+    PATCH_SCREENED=1
+    add_reason "no deny-listed changes to revert"
 fi
 
 # Run mode screened the snapshot before the verifier started; the other modes

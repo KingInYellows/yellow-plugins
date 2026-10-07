@@ -25,6 +25,8 @@ callers that walk several PRs. Exit codes and markers are defined in
     (no file list); `/review:resolve-stack` runs it after a dirty resolve
     through `references/review-resolve-stack/dirty-tree-cleanup.md` and
     `/review:sweep-all` through `references/review-sweep-all/dirty-tree-cleanup.md`
+  - `--pr <N> --revert-denied` reverts only dirty paths on the resolver deny
+    list (no file list; other dirty paths stay)
 - **guard-local-config** `snapshot` | `check <snap-dir> <digest>` | `clear <snap-dir>` —
   Snapshot the ignored `yellow-plugins.local.md` (prints the path, then
   `digest=<hex>` for the caller to hold), then detect a resolver
