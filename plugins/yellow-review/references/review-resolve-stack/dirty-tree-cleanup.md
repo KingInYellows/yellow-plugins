@@ -47,17 +47,18 @@ A path is **owned** when it is one of:
   `.claude/agent-memory/` rules. If this call fails, no `previous_filename` is
   known and original paths stay unrecognized;
 - a **trusted-config path**, which a refused resolver edit must never leave on
-  disk: any path the resolver deny list (`rp_denied` in
-  `${CLAUDE_PLUGIN_ROOT}/lib/resolve-paths.sh`) blocks for its instruction and
-  tooling-config names, matched case-insensitively at any depth, because a
-  nested file steers tooling as the root one does. That covers a path inside,
-  or equal to, a `.claude`, `.cursor`, `.codex`, `.agents`, `.gemini`,
-  `.windsurf`, `.cline`, `.vscode`, `.devcontainer` or `.idea` directory, and
-  a file named `yellow-plugins.local.md`, `CLAUDE.md`, `AGENTS.md`,
-  `GEMINI.md`, `.mcp.json`, `.cursorrules`, `.windsurfrules`, `.clinerules` or
+  disk: a path `rp_trusted_config` in
+  `${CLAUDE_PLUGIN_ROOT}/lib/resolve-paths.sh` accepts. It is the one
+  predicate for this policy; `/review:resolve`'s `--revert-denied` uses it
+  too. It matches case-insensitively at any depth, because a nested file
+  steers tooling as the root one does: a path inside, or equal to, a
+  `.claude`, `.cursor`, `.codex`, `.agents`, `.gemini`, `.windsurf`, `.cline`,
+  `.vscode`, `.devcontainer` or `.idea` directory, and a file named
+  `yellow-plugins.local.md`, `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`,
+  `.mcp.json`, `.cursorrules`, `.windsurfrules`, `.clinerules` or
   `copilot-instructions.md`, except `.claude/agent-memory/` at the
-  repository root (described below). Read the list from
-  `rp_denied` when it changes; do not trust this copy to be current.
+  repository root (described below). The function is authoritative; this
+  copy is for classifying, and step 3 never passes it on a command line.
 
 `.claude/agent-memory/` is excluded because agents with `memory: project`
 write learnings there as a normal part of a run. Those writes are not
@@ -89,27 +90,29 @@ JSON before acting. Exit `2` means it refused and reverted nothing.
   `treeClean: false`, or an incomplete-revert `reason` (below) is
   `revert incomplete`.
 - **Any dirty path is unrecognized** — do NOT run `--revert-dirty`. Revert
-  only the trusted-config paths among them, passing the exact paths from step
-  1 after `--`:
+  only the trusted-config paths; the script lists them itself with
+  `rp_trusted_config`, so no path goes on the command line:
 
   ```bash
-  "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-only -- <trusted-config paths>
+  "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-denied
   ```
 
-  Skip the call when there are none. A non-zero exit or an incomplete-revert
-  `reason` (below) is `revert incomplete`; `treeClean` stays `false` here
-  because the unrecognized paths remain, so do not read it as a failure.
-  Report the unrecognized paths as `unrecognized changes left in place`.
+  Skip the call when step 2 found no trusted-config path. A non-zero exit,
+  `deniedClean: false`, or an incomplete-revert `reason` (below) is
+  `revert incomplete`; `result: "noop"` means nothing needed reverting.
+  `treeClean` stays `false` here because the unrecognized paths remain, so do
+  not read it as a failure. Report the unrecognized paths as
+  `unrecognized changes left in place`.
 
 An **incomplete-revert `reason`** is a `reason` in the JSON containing
 `nothing was reverted` (patch save failed) or `revert failed:` (a checkout or
 delete failed). The script exits `0` for both, so check `reason` even after a
 zero exit.
 
-`--revert-only` deletes a listed file that is untracked and not ignored,
-whoever created it, because the pre-resolve state is not recorded (tracked
-in #973). A gitignored listed path makes the call exit `2` with nothing
-reverted.
+`--revert-dirty` and `--revert-denied` delete an untracked, non-ignored file
+they revert, whoever created it, because the pre-resolve state is not
+recorded (tracked in #973). Neither lists a gitignored file, so a gitignored
+trusted-config edit stays on disk.
 
 The caller says what to do with the outcome: the patch path, `revert
 incomplete`, and `unrecognized changes left in place` all feed its summary.

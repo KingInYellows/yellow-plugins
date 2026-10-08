@@ -343,6 +343,36 @@ rp_denied() {
     return 1
 }
 
+# rp_trusted_config <path>: the subset of rp_denied a later agent session
+# trusts as instructions or tool config, matched the same way. These are the
+# only dirty paths a refusal cleanup reverts without asking (--revert-denied,
+# the stack and sweep dirty-tree cleanup); other deny-listed paths (.env*,
+# keys, CI and Docker files) can hold the user's own work and are asked about
+# or left in place. .claude/agent-memory/ at the repository root is excluded:
+# agents with `memory: project` write there during a normal run.
+rp_trusted_config() {
+    local l
+    l=$(rp_lower "$1")
+    case "$l" in
+        .claude/agent-memory|.claude/agent-memory/*) return 1 ;;
+        .claude|*/.claude|.claude/*|*/.claude/*) return 0 ;;
+        .vscode|*/.vscode|.vscode/*|*/.vscode/*) return 0 ;;
+        .devcontainer|*/.devcontainer|.devcontainer/*|*/.devcontainer/*) return 0 ;;
+        .idea|*/.idea|.idea/*|*/.idea/*) return 0 ;;
+        .cursor|*/.cursor|.cursor/*|*/.cursor/*) return 0 ;;
+        .codex|*/.codex|.codex/*|*/.codex/*) return 0 ;;
+        .agents|*/.agents|.agents/*|*/.agents/*) return 0 ;;
+        .gemini|*/.gemini|.gemini/*|*/.gemini/*) return 0 ;;
+        .windsurf|*/.windsurf|.windsurf/*|*/.windsurf/*) return 0 ;;
+        .cline|*/.cline|.cline/*|*/.cline/*) return 0 ;;
+    esac
+    case "${l##*/}" in
+        yellow-plugins.local.md|claude.md|agents.md|gemini.md|.mcp.json) return 0 ;;
+        .cursorrules|.windsurfrules|.clinerules|copilot-instructions.md) return 0 ;;
+    esac
+    return 1
+}
+
 # rp_runtime_override_rels: the repository-relative, lowercased path(s) that
 # YELLOW_REVIEW_GITHUB_STACK_RUNTIME names, one per line. The path is walked
 # component by component as the kernel does, and every node on the way that

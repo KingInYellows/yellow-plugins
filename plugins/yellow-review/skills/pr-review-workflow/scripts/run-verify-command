@@ -64,13 +64,21 @@
 #                  screen withholds the patch.
 #   --revert-dirty: like --revert-only for every change in the tree, listed
 #                  by git itself (for refusals: never trust resolver text).
-#   --revert-denied: like --revert-dirty, but only dirty paths on the
-#                  resolver deny list. Other dirty paths stay. Takes no file
+#   --revert-denied: like --revert-dirty, but only dirty trusted-config
+#                  paths (rp_trusted_config in lib/resolve-paths.sh: the
+#                  agent instruction and tool-config names of the deny list,
+#                  without .claude/agent-memory/). "Deny-listed" in its output
+#                  means that subset. Other dirty paths, including the rest of
+#                  the deny list (.env*, keys, CI and Docker files), stay for
+#                  the caller to ask about or leave. Takes no file
 #                  list: git lists the changes, so a resolver path never
-#                  reaches the command line. It deletes an untracked
-#                  deny-listed file whoever created it; the recovery patch
-#                  holds the content unless the credential screen withholds
-#                  it. With nothing on the deny list it writes no patch and
+#                  reaches the command line. Gitignored files are not listed;
+#                  the caller guards them with --check-ignored. It deletes an
+#                  untracked trusted-config file whoever created it; the
+#                  recovery patch holds the content unless the credential
+#                  screen withholds it. An untracked nested git repository is
+#                  left in place, named in "reason", and the other paths are
+#                  still reverted. With nothing to revert it writes no patch and
 #                  reports result "noop". Read "deniedClean" for success:
 #                  "treeClean" covers the whole tree, so it is false whenever
 #                  the other (kept) changes remain.
@@ -88,7 +96,7 @@
 #              resolver deny list (it is about to be executed and, on failure,
 #              reverted). Under --revert-only only the deny-list check is
 #              waived; --revert-dirty and --revert-denied take no list.
-#              --revert-denied reverts only the deny-listed dirty paths.
+#              --revert-denied reverts only the trusted-config dirty paths.
 # Output: JSON to stdout:
 #   {"result":"pass|fail|timeout|skipped|reverted|noop","patch":"<path>|null",
 #    "log":"<path>|null","treeClean":true|false[,"reason":"..."]}
@@ -102,7 +110,8 @@
 #   --revert-only entry skipped as unchanged, or a tree that is not clean.
 #   Reasons seen only with --revert-denied: "no deny-listed changes to
 #   revert", "deny-listed changes remain after the revert", "reverted list
-#   withheld: ..." and "reverted list shows the first 20 of N". The usual
+#   withheld: ...", "reverted list shows the first 20 of N" and "left a
+#   nested git repository in place: <path>". The usual
 #   "changes remain after the revert" is not used there: the kept changes
 #   are expected.
 #   The revert modes run nothing and report "log": null. A passing command
@@ -558,11 +567,11 @@ if [ "$MODE" = revert-dirty ]; then
         [ -n "$f" ] && FILES+=("$f")
     done <"$CHANGES_FILE"
 elif [ "$MODE" = revert-denied ]; then
-    # Git lists the paths. Only the deny list is reverted; the caller never
-    # passes resolver-derived paths on the command line.
+    # Git lists the paths. Only trusted-config paths are reverted; the caller
+    # never passes resolver-derived paths on the command line.
     [ "${#FILES[@]}" -eq 0 ] || die 2 "--revert-denied takes no file list"
     while IFS= read -r -d '' f; do
-        [ -n "$f" ] && rp_denied "$f" && FILES+=("$f")
+        [ -n "$f" ] && rp_trusted_config "$f" && FILES+=("$f")
     done <"$CHANGES_FILE"
 else
     # KEEP_FILES is the deduplicated list (first-seen order). A path listed
@@ -637,6 +646,7 @@ fi
 TOP_REAL=$(pwd -P)
 TO_REMOVE=()
 DIR_REMOVE=()
+NESTED_KEPT=()
 for f in ${FILES[@]+"${FILES[@]}"}; do
     if [ -L "$f" ] || [ -f "$f" ] || [ ! -e "$f" ]; then
         continue
@@ -661,7 +671,15 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         # remove it.
         NESTED=$(find -- "$f" -name .git -print -quit 2>/dev/null) \
             || die 2 "cannot scan the directory for a nested repository: $f"
-        [ -z "$NESTED" ] || die 2 "refusing to remove a directory that contains a nested git repository: $f"
+        if [ -n "$NESTED" ]; then
+            # --revert-denied judges each trusted-config path on its own, so a
+            # repository it must not delete does not stop the other reverts.
+            [ "$MODE" = revert-denied ] \
+                || die 2 "refusing to remove a directory that contains a nested git repository: $f"
+            add_reason "left a nested git repository in place: $f"
+            NESTED_KEPT+=("$f")
+            continue
+        fi
         # Only a directory standing where HEAD has a regular file is a replaced
         # file. A tracked directory (tree), a gitlink or nothing at HEAD holds
         # work that `git checkout HEAD` would not bring back (untracked
@@ -680,6 +698,18 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         TO_REMOVE+=("$f")
     fi
 done
+# A kept nested repository leaves the patch and the revert below.
+if [ "${#NESTED_KEPT[@]}" -gt 0 ]; then
+    KEEP_FILES=()
+    for f in "${FILES[@]}"; do
+        KEPT=0
+        for p in "${NESTED_KEPT[@]}"; do
+            [ "$p" = "$f" ] && { KEPT=1; break; }
+        done
+        [ "$KEPT" = 1 ] || KEEP_FILES+=("$f")
+    done
+    FILES=(${KEEP_FILES[@]+"${KEEP_FILES[@]}"})
+fi
 
 # cwd is the top level, so the relative common dir resolves correctly (and
 # works on git older than 2.31, which lacks --path-format).
@@ -1032,9 +1062,16 @@ if [ "$MODE" = revert-denied ] && [ "${#FILES[@]}" -eq 0 ]; then
     rm -f -- "$PATCH"
     NOOP_CLEAN=true
     [ ! -s "$CHANGES_FILE" ] || NOOP_CLEAN=false
-    jq -nc --argjson clean "$NOOP_CLEAN" \
-        '{result: "noop", patch: null, log: null, treeClean: $clean, deniedClean: true, reverted: [], revertedCount: 0,
-          reason: "no deny-listed changes to revert"}'
+    # A kept nested repository is a trusted-config change that remains.
+    NOOP_DENIED=true
+    if [ "${#NESTED_KEPT[@]}" -gt 0 ]; then
+        NOOP_DENIED=false
+    else
+        add_reason "no deny-listed changes to revert"
+    fi
+    jq -nc --argjson clean "$NOOP_CLEAN" --argjson dc "$NOOP_DENIED" --arg why "$REASON" \
+        '{result: "noop", patch: null, log: null, treeClean: $clean, deniedClean: $dc, reverted: [], revertedCount: 0,
+          reason: $why}'
     exit 0
 fi
 
@@ -1099,7 +1136,7 @@ if [ "$MODE" = revert-denied ]; then
     REMAINING=()
     if list_tree_changes; then
         while IFS= read -r -d '' f; do
-            [ -n "$f" ] && rp_denied "$f" && REMAINING+=("$f")
+            [ -n "$f" ] && rp_trusted_config "$f" && REMAINING+=("$f")
         done <"$CHANGES_FILE"
     else
         DENIED_CLEAN=false

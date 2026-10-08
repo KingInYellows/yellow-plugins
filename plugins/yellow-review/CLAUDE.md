@@ -230,13 +230,13 @@ resolution, and sequential stack review. Graphite-native workflow.
   not, and refuses when a gitignored file is newer than the marker;
   `--unattended` also skips runner files;
   `--revert-only` reverts the listed files; `--revert-dirty` reverts every change in the tree and takes no
-  file list; `--revert-denied` reverts only deny-listed dirty paths and takes no
-  file list; `--check-ignored --ignored-since <marker-file>` runs only the
+  file list; `--revert-denied` reverts only trusted-config dirty paths
+  (`rp_trusted_config`, a subset of the deny list) and takes no file list; `--check-ignored --ignored-since <marker-file>` runs only the
   gitignored-file guard, for a resolve with no verify command.
   `/review:resolve-stack` and `/review:sweep-all` run it after a
   dirty resolve only when every dirty path is owned by the run (a PR file
-  or trusted-config path); otherwise they run `--revert-only` on the owned
-  trusted-config paths, which leaves unrecognized changes in place, so the
+  or trusted-config path); otherwise they run `--revert-denied`, which reverts
+  only the trusted-config paths and leaves unrecognized changes in place, so the
   tree can stay dirty and the walk stops
   (`references/review-resolve-stack/dirty-tree-cleanup.md`); every revert flag rejects `--timeout`,
   `--command-file`, `--trusted` and `--unattended`, and only one mode flag may be given). The verify gate: interactive runs ask

@@ -71,6 +71,29 @@ setup() {
   done
 }
 
+@test "rp_trusted_config matches instruction and tool-config paths at any depth, case-insensitively" {
+  for p in .claude/settings.json .Claude/x .vscode/tasks.json .devcontainer/devcontainer.json \
+           .idea/x.xml .cursor/rules/a.mdc .codex/config.toml .agents/skills/x.md \
+           .gemini/settings.json .windsurf/rules/a.md .cline/x.md yellow-plugins.local.md \
+           CLAUDE.md AGENTS.md GEMINI.md .mcp.json .cursorrules .windsurfrules .clinerules \
+           copilot-instructions.md a/b/.claude/settings.json docs/AGENTS.md pkg/.cursor/x \
+           .claude docs/.claude/agent-memory/x.md; do
+    rp_trusted_config "$p" || { echo "not trusted config: $p"; false; }
+    rp_denied "$p" || { echo "trusted config outside the deny list: $p"; false; }
+  done
+}
+
+@test "rp_trusted_config leaves the rest of the deny list and root agent memory to the caller" {
+  for p in .github/workflows/ci.yml .circleci/config.yml .git/config .gitlab-ci.yml Jenkinsfile \
+           Dockerfile deploy/Dockerfile docker-compose.yml compose.yaml .env .env.local \
+           config/.env.prod secrets.yaml keys/a.key keys/server.PEM certs/a.p12 infra/prod.tfvars \
+           .claude/agent-memory .claude/agent-memory/notes.md .Claude/Agent-Memory/x.md \
+           src/a.ts README.md src/my.claude/a; do
+    run rp_trusted_config "$p"
+    [ "$status" -ne 0 ] || { echo "trusted config: $p"; false; }
+  done
+}
+
 @test "rp_runner flags files hooks or verify commands execute" {
   for p in package.json web/package.json pnpm-lock.yaml Makefile conftest.py tests/conftest.py \
            vitest.config.ts .pre-commit-config.yaml lefthook.yml .lintstagedrc.json \

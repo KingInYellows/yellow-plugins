@@ -25,8 +25,9 @@ callers that walk several PRs. Exit codes and markers are defined in
     (no file list); `/review:resolve-stack` runs it after a dirty resolve
     through `references/review-resolve-stack/dirty-tree-cleanup.md` and
     `/review:sweep-all` through `references/review-sweep-all/dirty-tree-cleanup.md`
-  - `--pr <N> --revert-denied` reverts only dirty paths on the resolver deny
-    list (no file list; other dirty paths stay) and reports `deniedClean`,
+  - `--pr <N> --revert-denied` reverts only dirty trusted-config paths
+    (`rp_trusted_config`, a subset of the resolver deny list; no file list;
+    other dirty paths and gitignored files stay) and reports `deniedClean`,
     `reverted` and `revertedCount`; nothing to revert is `result: "noop"`.
     Give exactly one of the revert flags and `--check-ignored`; a second one
     exits 2

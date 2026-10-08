@@ -514,9 +514,14 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   list: git itself lists the changes (`git diff --name-only HEAD` plus
   `git ls-files --others --exclude-standard`), never resolver text.
   `--revert-denied` uses that same listing and reverts only paths on the
-  resolver deny list; other dirty paths stay, and a file list is rejected. It
-  deletes an untracked deny-listed file whoever created it (the saved patch
-  holds the content unless the credential screen withheld it). It reports
+  resolver deny list that are trusted config (`rp_trusted_config`: agent
+  instruction and tool-config names, without `.claude/agent-memory/`); other
+  dirty paths stay, the rest of the deny list (`.env*`, keys, CI and Docker
+  files) included, and a file list is rejected. It deletes an untracked
+  trusted-config file whoever created it (the saved patch holds the content
+  unless the credential screen withheld it), and leaves an untracked nested
+  git repository in place, named in `reason`, while still reverting the other
+  paths. It lists no gitignored file. It reports
   `deniedClean` (no deny-listed change remains), `reverted` (at most 20 paths,
   screened like the patch) and `revertedCount`; an empty match is
   `result: "noop"` with no patch. `treeClean` still covers the whole tree and is
@@ -584,11 +589,14 @@ to commit.) A refused edit must not stay on disk: a deny-listed file such as
 a change outside the set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify
 `skipped` — the orchestrator runs `run-verify-command --pr <N> --revert-only`
 on the files the clusters reported under `Files modified`, which saves a patch
-first. Then `--revert-denied` (no file list) reverts dirty paths on the
-contract deny list without asking. Step 2
+first. Then `--revert-denied` (no file list) reverts dirty trusted-config
+paths on the contract deny list without asking, and while the `--ignored-since`
+marker still exists a `--check-ignored` call guards the gitignored files (a hit
+is the ignored-file stop). Step 2
 guarantees a clean start, but not a quiet tree: a changed path no cluster
-reported and that is not on that deny list is not proven to be a resolver's
-edit, so it is never reverted unasked. An interactive run asks (`--revert-dirty`
+reported and that is not trusted config (`.env*`, keys, CI and Docker files
+included) is not proven to be a resolver's edit, so it is never reverted
+unasked. An interactive run asks (`--revert-dirty`
 on "Revert them", patch saved); an unattended run leaves it in place and Step 9
 names it under Blocking merge. Exit 4 leaves no new commit behind, so the revert only has to clear the tree;
 `fixed` threads become `unclear` and the write phase still runs for the other

@@ -304,7 +304,7 @@ has_kill_after() {
   [ -f src/new.txt ]
 }
 
-@test "--revert-denied reverts tracked-modified, deleted, staged-only, nested and case-varied deny-listed paths" {
+@test "--revert-denied reverts tracked-modified, deleted, staged-only, nested and case-varied trusted-config paths" {
   mkdir -p .claude docs/.claude
   printf '{}\n' >| .claude/settings.json
   printf '{}\n' >| .mcp.json
@@ -312,11 +312,11 @@ has_kill_after() {
   git commit -q -m "add denied files"
   printf '{"edited":true}\n' >| .claude/settings.json
   rm -f .mcp.json
-  mkdir -p .github/workflows .GitHub/workflows
-  printf 'on: push\n' >| .github/workflows/ci.yml
-  printf 'on: push\n' >| .GitHub/workflows/x.yml
-  printf 'FROM scratch\n' >| Dockerfile
-  git add Dockerfile
+  mkdir -p .cursor/rules .Cursor/rules
+  printf 'rule\n' >| .cursor/rules/a.mdc
+  printf 'rule\n' >| .Cursor/rules/b.mdc
+  printf 'be helpful\n' >| AGENTS.md
+  git add AGENTS.md
   printf '{"nested":true}\n' >| docs/.claude/settings.json
   run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
   [ "$status" -eq 0 ]
@@ -325,19 +325,81 @@ has_kill_after() {
   [ "$(printf '%s' "$output" | jq -r .revertedCount)" = 6 ]
   [ "$(cat .claude/settings.json)" = '{}' ]
   [ "$(cat .mcp.json)" = '{}' ]
-  [ ! -e .github/workflows/ci.yml ]
-  [ ! -e .GitHub/workflows/x.yml ]
-  [ ! -e Dockerfile ]
+  [ ! -e .cursor/rules/a.mdc ]
+  [ ! -e .Cursor/rules/b.mdc ]
+  [ ! -e AGENTS.md ]
   [ ! -e docs/.claude/settings.json ]
-  # Nothing on the deny list is staged any more, and the kept edits survive.
+  # Nothing trusted is staged any more, and the kept edits survive.
   [ -z "$(git diff --cached --name-only)" ]
   grep -q 'resolver edit' src/a.txt
   [ -f src/new.txt ]
 }
 
+@test "--revert-denied leaves deny-listed paths that are not trusted config, and agent memory, for the caller" {
+  mkdir -p .github/workflows .claude/agent-memory
+  printf 'on: push\n' >| .github/workflows/ci.yml
+  printf 'FROM scratch\n' >| Dockerfile
+  printf 'TOKEN=user-work\n' >| .env.local
+  printf 'k\n' >| deploy.key
+  printf 'learned\n' >| .claude/agent-memory/notes.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = noop ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  [ "$(printf '%s' "$output" | jq -r .patch)" = null ]
+  [ -f .github/workflows/ci.yml ]
+  [ -f Dockerfile ]
+  [ -f .env.local ]
+  [ -f deploy.key ]
+  [ -f .claude/agent-memory/notes.md ]
+}
+
+@test "--revert-denied leaves an untracked nested repository in place and still reverts the other trusted-config paths" {
+  mkdir -p .cursor/vendored
+  git -C .cursor/vendored init -q
+  printf 'x\n' >| .cursor/vendored/file
+  printf 'secret\n' >| CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ ! -e CLAUDE.md ]
+  [ "$(printf '%s' "$output" | jq -c .reverted)" = '["CLAUDE.md"]' ]
+  [ -d .cursor/vendored/.git ]
+  [ -f .cursor/vendored/file ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'left a nested git repository in place: .cursor/vendored/'* ]]
+}
+
+@test "--revert-denied with only a nested repository is a noop that is not deniedClean" {
+  mkdir -p .cursor/vendored
+  git -C .cursor/vendored init -q
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = noop ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ "$(printf '%s' "$output" | jq -r .patch)" = null ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'left a nested git repository in place'* ]]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" != *'no deny-listed changes to revert'* ]]
+  [ -d .cursor/vendored/.git ]
+}
+
+@test "a gitignored trusted-config edit escapes --revert-denied and is caught by --check-ignored" {
+  mkdir -p .claude
+  printf '.claude/settings.local.json\n' >> .git/info/exclude
+  touch -t 202001010000 "$IGN_MARKER"
+  printf '{"permissions":"planted"}\n' >| .claude/settings.local.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 0 ]
+  [ -f .claude/settings.local.json ]
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'gitignored files changed since'* ]]
+  [[ "$stderr" == *'.claude/settings.local.json'* ]]
+}
+
 @test "--revert-denied lists at most 20 reverted paths and still counts them all" {
-  mkdir -p .github/workflows
-  for i in $(seq 1 22); do printf 'on: push\n' >| ".github/workflows/w$i.yml"; done
+  mkdir -p .cursor/rules
+  for i in $(seq 1 22); do printf 'rule\n' >| ".cursor/rules/r$i.mdc"; done
   run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .revertedCount)" = 22 ]
@@ -348,11 +410,11 @@ has_kill_after() {
 @test "--revert-denied reports deniedClean false and keeps the reason when a deny-listed revert fails" {
   printf 'secret\n' >| CLAUDE.md
   # A directory standing on a path the revert cannot delete: a read-only parent.
-  mkdir -p .github/workflows
-  printf 'on: push\n' >| .github/workflows/ci.yml
-  chmod a-w .github/workflows
+  mkdir -p .cursor/rules
+  printf 'rule\n' >| .cursor/rules/a.mdc
+  chmod a-w .cursor/rules
   run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
-  chmod u+w .github/workflows
+  chmod u+w .cursor/rules
   if [ "$(id -u)" = 0 ]; then skip "root ignores directory permissions"; fi
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]

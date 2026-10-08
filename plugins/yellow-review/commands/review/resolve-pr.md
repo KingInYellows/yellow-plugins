@@ -439,16 +439,23 @@ resolvers are known to have changed: a refused edit must not stay on disk. Run
 `run-verify-command --pr "<PR#>" --revert-only --files-from "<file>"` (patch
 saved) on every file a cluster reported under `Files modified`. Then run
 `run-verify-command --pr "<PR#>" --revert-denied` (no file list; patch saved).
-It reverts only dirty paths on the contract deny list in `lib/resolve-paths.sh`:
-a deny-listed file would be trusted by the next session, and Step 6 still
-never puts a resolver path on a command line. Read its JSON like the
+It reverts only dirty paths on the contract deny list that are trusted config
+(`rp_trusted_config` in `lib/resolve-paths.sh`: agent instruction and
+tool-config names): such a file would be trusted by the next session, and
+Step 6 still never puts a resolver path on a command line. Read its JSON like the
 per-file revert: a non-zero exit, or a `reason` containing `revert failed:` or
 `nothing was reverted`, means a deny-listed edit may still be on disk; report
-each remaining deny-listed dirty path in Step 9 under Blocking merge as
+each remaining trusted-config dirty path in Step 9 under Blocking merge as
 `<path>: deny-listed edit left on disk (revert incomplete)`. `deniedClean` is
 the success signal, and `treeClean` is false whenever the other changes remain,
-so it is not one; `noop` means no deny-listed path had changed. A changed path
-that no cluster reported and that is not on that deny list is not proven to be
+so it is not one; `noop` means no trusted-config path had changed. It lists
+no gitignored file: when the marker still exists (the refusal came before the
+verify or `--check-ignored` call below removed it), finish the rollback with
+the `--check-ignored` call under No verify command, in its re-validated call
+with its trap; exit 2 with `gitignored files changed since` is the
+**ignored-file stop**. A changed path
+that no cluster reported and that is not trusted config (the rest of the deny
+list, such as `.env*`, keys, CI and Docker files, included) is not proven to be
 a resolver's:
 it can be work done in this tree after Step 2. Interactive: name those paths in one
 `AskUserQuestion` with "Revert them / Leave them"; Revert runs
@@ -536,9 +543,11 @@ contract's `Resolve:` line (`push=skipped`, `verify=skipped`). The run is a
 stop: callers must not continue past it until the files are restored.
 
 **Marker cleanup.** When no call ran at all (a stop before this step, or a
-declined command), run the same re-validation, then `rm -rf -- "$MARK_DIR"`
-instead of the script, before Step 9; a rejected path is left for the OS temp
-sweep, never deleted.
+declined command) and resolvers ran, run the `--check-ignored` call above
+before Step 9 (its trap removes the marker): exit 2 with `gitignored files
+changed since` is the ignored-file stop. When no resolver ran, run the same
+re-validation, then `rm -rf -- "$MARK_DIR"` instead of the script. A rejected
+path is left for the OS temp sweep, never deleted.
 
 `pass` → `verify=pass`. No `verify_command`, or an unattended run that has not
 opted in → `verify=none` after the `--check-ignored` guard above, and the
