@@ -76,10 +76,11 @@ Done. The squash commit still lands on the default branch with the PR number
 appended, and its message is the PR title plus description. Two things make
 Linear follow it:
 
-1. **Closing words in the commit body.** `smart-submit`, `gt-amend` and
-   `/flow:work` end the commit body with `Closes <ISSUE-ID>` when the branch or
-   stack item carries a Linear ID (`Part of <ISSUE-ID>` on lower branches that
-   share an issue). Graphite copies the body into the PR description.
+1. **Closing words in the commit body.** `smart-submit` and `/flow:work` end the
+   commit body with `Part of <ISSUE-ID>`, or `Closes <ISSUE-ID>` on the commit
+   that completes the issue, when the branch name or stack item carries a Linear
+   ID. `gt-amend` keeps an existing line and never adds one. Graphite copies the
+   body into the PR description.
 2. **One-time setup, per Linear's GitHub integration docs.** In Linear,
    Settings > Integrations > GitHub, turn on "Link commits to issues with magic
    words" and copy the webhook URL and secret. In the GitHub repository,
@@ -89,7 +90,8 @@ Linear follow it:
 
 `/linear:sync`, `/linear:sync-all` and the `linear-pr-linker` agent also treat a
 `CLOSED` PR as merged when its `(#<number>)` squash commit is on the default
-branch, so a missed closing word is caught on the next sync.
+branch (`scripts/pr-landed.sh`; a heuristic, so every status change stays behind
+your confirmation), so a missed closing word is caught on the next sync.
 
 ## Limitations
 

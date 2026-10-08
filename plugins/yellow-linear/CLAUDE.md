@@ -138,13 +138,11 @@ Linear MCP are untrusted:
 
 ## Graphite Merge Queue
 
-Graphite's merge queue closes PRs that landed (`state: CLOSED`, `mergedAt:
-null`). Never read that as "closed without merge" on its own: the
-`linear-workflows` skill's "Graphite Merge Queue" section defines the
-Merged-PR detection that `/linear:sync`, `/linear:sync-all` and
-`linear-pr-linker` share, and the `Closes <ISSUE-ID>` convention that lets
-Linear's commit linking close the issue. State those rules there, not in the
-commands. Setup steps for the Linear and GitHub sides are in `README.md`.
+Graphite's merge queue closes PRs that landed, so a `CLOSED` PR is not
+"closed without merge" on its own. The `linear-workflows` skill's "Graphite
+Merge Queue" section is the single source for the closing-line rule and the
+merged-PR mapping (`scripts/pr-landed.sh`, covered by `tests/pr-landed.bats`);
+state those rules there, not in the commands. Setup steps are in `README.md`.
 
 ## Known Limitations
 

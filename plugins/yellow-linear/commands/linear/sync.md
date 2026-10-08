@@ -78,16 +78,20 @@ gh pr view --json url,title,state,mergedAt,number 2>/dev/null
 
 Note: This works for Graphite-created PRs since they are GitHub PRs underneath.
 Graphite's merge queue closes PRs that landed, so a `CLOSED` PR with `mergedAt`
-null may be merged: check it with "Merged-PR detection" in the `linear-workflows`
-skill before calling it closed.
+null may be merged. Before calling it closed, run the `linear-workflows` skill's
+"Merged-PR detection": `scripts/pr-landed.sh` with the repository
+(`gh repo view --json nameWithOwner --jq .nameWithOwner`) and the `number` from
+the output above, both written as literals in the call, and bind `landed` from
+the `landed=` line it prints.
 
 - **If PR exists:** Check the comments fetched in Step 3 for an existing PR link
   comment matching this PR URL. If already linked, skip. Otherwise, add via
   `mcp__plugin_yellow-linear_linear__save_comment`, passing the issue `id` as
   `issueId` and this text as `body`:
   ```
-  PR linked: [PR Title](PR URL) — State: open/merged
+  PR linked: [PR Title](PR URL) — State: open/merged/closed
   ```
+  (a `CLOSED` PR with `landed=yes` is shown as merged)
 - **If no PR:** Note that no PR exists yet. Suggest creating one via the
   active stacked-PR provider (see `/stack:status`).
 
@@ -101,6 +105,9 @@ Determine the appropriate status transition:
 - If PR exists and is **open** → suggest "In Review" status
 - If PR exists and is **merged** (including a `CLOSED` PR with `landed=yes`) →
   suggest "Done" status
+- If PR exists and is **closed** with `landed=no` or `landed=unknown` → say so
+  ("closed without merge" or "closed, landing unverified" with the script's
+  reason); suggest no transition
 - If no PR and status is early (Backlog/Triage) → suggest "In Progress" status
 
 **Two-tier safety model** (see `linear-workflows` skill):

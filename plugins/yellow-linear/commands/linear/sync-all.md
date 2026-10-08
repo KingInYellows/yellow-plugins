@@ -6,6 +6,7 @@ allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
+  - Skill
   - mcp__plugin_yellow-linear_linear__list_teams
   - mcp__plugin_yellow-linear_linear__list_issue_statuses
   - mcp__plugin_yellow-linear_linear__list_issues
@@ -81,6 +82,7 @@ sleep 0.2
 
 PR_JSON=$(gh pr list \
   --repo "$REPO" \
+  --state all \
   --search "${IDENTIFIER_LOWER} in:title" \
   --json number,state,mergedAt,title,headRefName \
   --limit 5 2>&1) || {
@@ -88,7 +90,7 @@ PR_JSON=$(gh pr list \
   if printf '%s' "$PR_JSON" | grep -qi 'rate limit'; then
     printf '[sync-all] Rate limited — waiting 60s\n' >&2
     sleep 60
-    PR_JSON=$(gh pr list --repo "$REPO" \
+    PR_JSON=$(gh pr list --repo "$REPO" --state all \
       --search "${IDENTIFIER_LOWER} in:title" \
       --json number,state,mergedAt,title,headRefName --limit 5 2>&1) || {
       printf '[sync-all] ERROR: gh pr list failed for %s: %s\n' \
@@ -107,10 +109,15 @@ If `PR_JSON` is empty after error handling, classify the issue as `gh-error`
 and skip it from transition candidates (report in summary as "skipped — gh
 error").
 
-Graphite's merge queue closes PRs that landed. Before the first `CLOSED` PR, run
-the fetch block of "Merged-PR detection" in the `linear-workflows` skill once,
-and reuse its `trunk_ref` for every PR. Check each `CLOSED` PR whose `mergedAt`
-is null with that skill's per-PR block, using the PR `number` from `PR_JSON`.
+`--state all` is required: `gh pr list` returns only open PRs by default, so a
+closed or landed PR would never reach the classification below.
+
+Graphite's merge queue closes PRs that landed. Load the `linear-workflows`
+skill with the Skill tool and apply its "Merged-PR detection" to each `CLOSED`
+PR whose `mergedAt` is null: one `scripts/pr-landed.sh` call per PR, with the
+`$REPO` value and the PR `number` from `PR_JSON` written as literals in that
+call (each Bash call is a fresh shell). When it prints `landed=unknown`, carry
+its stderr reason into the summary line.
 
 Classify each issue:
 - **PR merged** (`state: MERGED`, `mergedAt` present, or `CLOSED` with

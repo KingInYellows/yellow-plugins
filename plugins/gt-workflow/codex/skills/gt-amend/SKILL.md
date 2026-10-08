@@ -186,9 +186,11 @@ If the user wants to update the commit message too, ask via `AskUserQuestion`:
 gt commit amend -m "<new message>"
 ```
 
-If the current message ends with a Linear closing line (`Closes <ISSUE-ID>` or
-`Part of <ISSUE-ID>`), carry it into the new message; dropping it stops Linear
-from closing the issue when the merge queue lands the PR.
+Before writing the new message, read the current one with `git log -1
+--format=%B` and keep any trailing Linear closing line (`Closes <ISSUE-ID>` or
+`Part of <ISSUE-ID>`) in the new message; dropping it stops Linear from closing
+the issue when the merge queue lands the PR. This skill only keeps an existing
+line and never adds one.
 
 ### Phase 4: Re-submit
 

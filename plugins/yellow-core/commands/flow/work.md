@@ -366,15 +366,17 @@ in order from bottom (item 1) to top:
    exist yet, so Write can create it directly without needing to Read it
    first.
 
-   **Linear closing line.** When the stack item's `Linear:` field (or the
-   branch name) carries an issue ID matching `[A-Z]{2,5}-[0-9]{1,6}`, write the
-   file as `<type>: <description>`, a blank line, then `Closes <ISSUE-ID>`. If
-   a later stack item sharing that ID sits above this branch, write
-   `Part of <ISSUE-ID>` instead. Graphite turns the commit body into the PR
+   **Linear closing line.** Take the Linear ID only from the last path segment of the branch name, which must start with `[A-Z]{2,5}-[0-9]{1,6}` followed by `-` or the end of the name, or from the stack item's `Linear:` field; ignore IDs mentioned anywhere else.
+   When an ID qualifies, write the file as `<type>: <description>`, a blank
+   line, then `Closes <ISSUE-ID>` on the topmost stack item that carries the ID
+   and `Part of <ISSUE-ID>` on every item below it (the plan lists the whole
+   stack, so this is known up front). Graphite turns the commit body into the PR
    description and the merge queue builds the squash commit from it, which is
-   how Linear learns the issue is done (`linear-workflows` skill, "Graphite
-   Merge Queue"). Keep the line in every later message you write for the same
-   branch, because amending with `-m` rewrites the message.
+   how Linear learns the issue is done. When yellow-linear is installed, the
+   `yellow-linear:linear-workflows` skill ("Graphite Merge Queue") is the
+   source of this rule. Keep the line in every later message you write for the
+   same branch, because amending with `-m` rewrites the message. The Phase 4
+   fallback commits below use this rule too.
 
    Then, in a fresh Bash call, re-declare `msgfile=<the literal path
    printed above>` (Bash variables don't survive across separate tool
@@ -678,8 +680,6 @@ Phase 3 (Quality Check) in stack summary mode.
      - `docs(scope): update documentation`
    - Keep commits atomic and focused
    - Include context in commit body if needed
-   - Keep the Linear closing line (`Closes <ISSUE-ID>`) in the body when the
-     stack item has one (see Phase 1b step 5)
 
 4. **Test Continuously:**
    - Run tests after each change
@@ -952,7 +952,8 @@ step 5. Phase 4 becomes a summary phase:
    plugin not installed, or any error), generate a conventional commit message
    from the changes and submit directly:
 
-   1. Generate a conventional commit message summarizing the work done.
+   1. Generate a conventional commit message summarizing the work done, with
+      the Linear closing line from Phase 1b step 5 when it applies.
    2. Stage changed files safely — same NUL-delimited array pattern as
       Phase 1b step 5 (never interpolate filenames as literal text):
       ```bash
@@ -976,7 +977,8 @@ step 5. Phase 4 becomes a summary phase:
    github-workflow plugin not installed, or any error), generate a
    conventional commit message from the changes and submit directly:
 
-   1. Generate a conventional commit message summarizing the work done.
+   1. Generate a conventional commit message summarizing the work done, with
+      the Linear closing line from Phase 1b step 5 when it applies.
    2. Stage changed files safely — same NUL-delimited array pattern as
       Phase 1b step 5:
       ```bash

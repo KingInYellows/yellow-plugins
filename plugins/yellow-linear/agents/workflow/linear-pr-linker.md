@@ -76,8 +76,11 @@ gh pr view --json url,title,state,mergedAt,number 2>/dev/null
 ```
 
 Graphite's merge queue closes PRs that landed. For a `CLOSED` PR with `mergedAt`
-null, check it with "Merged-PR detection" in the `linear-workflows` skill before
-treating it as closed without merge.
+null, run the `linear-workflows` skill's "Merged-PR detection" before treating
+it as closed without merge: `scripts/pr-landed.sh` with the repository
+(`gh repo view --json nameWithOwner --jq .nameWithOwner`) and the `number` from
+the output above, both written as literals in the call, then bind `landed` from
+the `landed=` line it prints.
 
 If no PR exists:
 
@@ -95,8 +98,10 @@ If no existing PR link comment, add one via `save_comment` (pass the issue
 `id` as `issueId` and the text below as `body`):
 
 ```
-PR linked: [PR Title](PR URL) — State: open/merged
+PR linked: [PR Title](PR URL) — State: open/merged/closed
 ```
+
+Render a `CLOSED` PR with `landed=yes` as merged.
 
 ### Step 5: Suggest Status Update
 
@@ -105,7 +110,8 @@ Query valid statuses via `list_issue_statuses` for the issue's team.
 Determine suggested transition based on PR state:
 
 - PR **open** → suggest "In Review"
-- PR **merged** (including a `CLOSED` PR with `landed=yes`) → suggest "Done"
+- PR **merged**, or **closed** with `landed=yes` (the skill's mapping; nothing
+  else counts as merged) → suggest "Done"
 - PR **closed**, `landed=no` or `unknown` → say so; suggest no transition
 
 **IMPORTANT: DO NOT auto-update without explicit user consent.**
