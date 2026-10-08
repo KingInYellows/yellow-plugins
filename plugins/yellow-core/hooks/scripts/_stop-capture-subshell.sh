@@ -91,3 +91,14 @@ PENDING_PATH="${STAGING_DIR}/pending/${SESSION_ID}.jsonl"
 # caller is responsible for line termination.
 cs_atomic_jsonl_write "$PENDING_PATH" "${ENTRY}
 " || exit 0
+
+# Optional Jev shadow pre-filter (off unless COMPOUND_JEV_PREFILTER=shadow and
+# TYPESAFE_API_KEY are set). Runs after the pending entry is written, so it
+# cannot change what gets staged; it only appends a decision to
+# jev-shadow.jsonl for later comparison with staging-scorer outcomes.
+if [ -f "${SCRIPT_DIR}/../../lib/jev-prefilter.sh" ]; then
+  # shellcheck source=../../lib/jev-prefilter.sh
+  . "${SCRIPT_DIR}/../../lib/jev-prefilter.sh"
+  printf '%s' "$TAIL_REDACTED" \
+    | jev_prefilter_shadow "$STAGING_DIR" "$SESSION_ID" "$CONTENT_HASH"
+fi
