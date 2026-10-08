@@ -11,7 +11,6 @@ allowed-tools:
   - mcp__plugin_yellow-morph_morph__codebase_search
   - mcp__filesystem-with-morph__codebase_search
   - mcp__plugin_yellow-research_deepwiki__read_wiki_structure
-  - mcp__plugin_yellow-research_ast-grep__find_code
 ---
 
 # Set Up yellow-research
@@ -25,21 +24,20 @@ gracefully and continues with whichever sources are available.
 
 ### Step 0: Install ast-grep (if missing)
 
-Check if the ast-grep CLI is already installed (`@ast-grep/cli` provides both
-`sg` and `ast-grep` binaries):
+Check if the optional ast-grep CLI is installed. Agents call it by the name
+`ast-grep` through Bash; `sg` is not checked because it collides with
+shadow-utils on Linux:
 
 ```bash
 if command -v ast-grep >/dev/null 2>&1; then
   printf '[yellow-research] ast-grep: ok (%s)\n' "$(ast-grep --version 2>/dev/null)"
-elif command -v sg >/dev/null 2>&1 && sg --version 2>&1 | grep -qi 'ast-grep'; then
-  printf '[yellow-research] ast-grep (sg): ok (%s)\n' "$(sg --version 2>/dev/null)"
 fi
 ```
 
-If neither `sg` nor `ast-grep` is found, use AskUserQuestion:
+If `ast-grep` is not found, use AskUserQuestion:
 
 > "ast-grep binary not found. Install it now? (Enables AST-based code search
-> in /research:code and /research:deep)"
+> in /research:code and the yellow-debt scanners)"
 >
 > Options: "Yes, install ast-grep" / "No, I'll install manually"
 
@@ -82,18 +80,10 @@ Run a single Bash call to check tools and all three API keys:
 printf '=== Prerequisites ===\n'
 command -v curl     >/dev/null 2>&1 && printf 'curl:      ok\n' || printf 'curl:      NOT FOUND\n'
 command -v jq       >/dev/null 2>&1 && printf 'jq:        ok\n' || printf 'jq:        NOT FOUND\n'
-command -v git      >/dev/null 2>&1 && printf 'git:       ok\n' || printf 'git:       NOT FOUND (needed for ast-grep MCP via uvx)\n'
 if command -v ast-grep >/dev/null 2>&1; then
   printf 'ast-grep:  ok\n'
-elif command -v sg >/dev/null 2>&1 && sg --version 2>&1 | grep -qi 'ast-grep'; then
-  printf 'ast-grep:  ok (via sg)\n'
 else
-  printf 'ast-grep:  NOT FOUND (needed for ast-grep MCP)\n'
-fi
-if command -v uv >/dev/null 2>&1; then
-  printf 'uv:        ok (%s) — manages Python 3.13 for ast-grep MCP\n' "$(uv --version 2>/dev/null)"
-else
-  printf 'uv:        NOT FOUND (needed for ast-grep MCP — install: curl -LsSf https://astral.sh/uv/install.sh | sh)\n'
+  printf 'ast-grep:  NOT FOUND (optional — AST code search in /research:code)\n'
 fi
 
 printf '\n=== API Keys ===\n'
@@ -676,7 +666,7 @@ If user skips testing: all format-valid keys show `PRESENT (untested)`.
 ### Step 3.5: MCP Source Health Checks
 
 This step runs unconditionally — MCP calls have no quota cost and require no
-user opt-in. Check each of the seven MCP sources using a ToolSearch probe
+user opt-in. Check each of the six MCP sources using a ToolSearch probe
 followed by a lightweight test call (except Parallel Task and Ceramic, which
 use ToolSearch-only).
 
@@ -738,18 +728,9 @@ Tool name: mcp__plugin_yellow-research_deepwiki__read_wiki_structure
 Test call: mcp__plugin_yellow-research_deepwiki__read_wiki_structure with repoName: "facebook/react"
 ```
 
-**ast-grep MCP** (bundled stdio — AST structural code search):
-
-```text
-ToolSearch keyword: "ast-grep__find_code"
-Tool name: mcp__plugin_yellow-research_ast-grep__find_code
-Test call: mcp__plugin_yellow-research_ast-grep__find_code with pattern: "function $NAME() {}", lang: "javascript"
-```
-
-Note: The ast-grep MCP server starts even without the `ast-grep` binary
-installed (lazy check). ToolSearch finding the tool does NOT confirm the binary
-is available. If the test call fails with "Command 'ast-grep' not found", record
-status as `FAIL` with a note to install the `ast-grep` binary.
+**ast-grep CLI** (optional local binary, not an MCP server): no probe call.
+Report `ACTIVE` when Step 1 printed `ast-grep:  ok`, otherwise `UNAVAILABLE`.
+Agents run it through Bash on demand, so a fresh install needs no restart.
 
 **Parallel Task MCP** (bundled HTTP — async research orchestration):
 
@@ -779,7 +760,7 @@ first use, token cached and auto-refreshed thereafter — same UX as Parallel
 Task). If the tool appears in ToolSearch results, record status as
 `ACTIVE (ToolSearch only — server reachability and OAuth state not verified)`.
 
-Run all seven ToolSearch probes. For sources that are found, run their test
+Run all six ToolSearch probes. For sources that are found, run their test
 calls (except Parallel Task and Ceramic, which use ToolSearch-only). Record
 each source's status for the Step 4 report table.
 
@@ -832,14 +813,16 @@ MCP Sources (no API key required — always available if plugin/MCP installed)
   Grep MCP       (global)              ACTIVE
   WarpGrep       (global)              UNAVAILABLE
   DeepWiki       (bundled)             ACTIVE
-  ast-grep       (bundled)             ACTIVE
   Parallel Task  (bundled)             ACTIVE (ToolSearch only — server reachability not verified)
   Ceramic        (bundled)             ACTIVE (ToolSearch only — server reachability and OAuth state not verified)
 
 Capability summary:
   /research:deep    PARTIAL (2/3 API sources — Perplexity inactive)
   /research:code    PARTIAL (2/3 API sources — Perplexity inactive)
-  MCP sources:      6/7 available
+  MCP sources:      5/6 available
+
+Local tools
+  ast-grep CLI   ACTIVE
 ```
 
 Adjust the capability summary based on how many functional API keys are
@@ -905,12 +888,13 @@ Counts:
 - 1-2 active: `PARTIAL (N/3 API sources)`
 - 0 active: `MINIMAL (Parallel Task + Ceramic OAuth only — no API key sources)`
 
-Adjust the MCP sources line based on how many MCP sources are ACTIVE (now
-seven — Context7, Grep, WarpGrep, DeepWiki, ast-grep, Parallel Task, Ceramic):
+Adjust the MCP sources line based on how many MCP sources are ACTIVE (six —
+Context7, Grep, WarpGrep, DeepWiki, Parallel Task, Ceramic). The ast-grep CLI
+is reported on its own line under "Local tools" and is not counted:
 
-- 7 active: `MCP sources: 7/7 available`
-- 1-6 active: `MCP sources: N/7 available`
-- 0 active: `MCP sources: 0/7 available — install plugins or configure MCPs`
+- 6 active: `MCP sources: 6/6 available`
+- 1-5 active: `MCP sources: N/6 available`
+- 0 active: `MCP sources: 0/6 available — install plugins or configure MCPs`
 
 ### Step 5: Setup Instructions (for absent or invalid keys)
 
@@ -955,22 +939,18 @@ For `UNVERIFIED (shell key passed; …)` say instead: the shell key works, but a
 userConfig key may take precedence and cannot be inspected without `jq`; install
 `jq` and re-run, or check the key in plugin settings.
 
-If ast-grep prerequisites are missing (`ast-grep` or `uv`), show this block:
+If the ast-grep CLI is UNAVAILABLE, show this block:
 
 ```text
-To enable ast-grep MCP (AST structural code search):
+To enable AST structural code search (optional; agents fall back to Grep):
 
-  ast-grep:  npm install -g @ast-grep/cli
-             brew install ast-grep
-             cargo install ast-grep --locked
-             pip install ast-grep-cli
-  uv:        curl -LsSf https://astral.sh/uv/install.sh | sh
+  npm install -g @ast-grep/cli
+  brew install ast-grep
+  cargo install ast-grep --locked
+  pip install ast-grep-cli
 
-uv manages Python 3.13 automatically — no system Python upgrade needed.
-Both are needed for the ast-grep MCP server. Other MCP servers are unaffected.
+The binary must be on PATH as `ast-grep`. No restart is needed.
 ```
-
-Only show this block if at least one ast-grep prerequisite is missing.
 
 If any MCP sources are `UNAVAILABLE` or `FAIL`, show this block:
 
@@ -982,7 +962,6 @@ To enable missing MCP sources:
   WarpGrep:   Install yellow-morph — /plugin marketplace add KingInYellows/yellow-plugins (select yellow-morph)
               Or configure filesystem-with-morph MCP globally in Claude Code MCP settings
   DeepWiki:   Bundled — public repos only; no install needed. If FAIL, restart Claude Code
-  ast-grep:   Bundled — install prerequisites: ast-grep binary and uv (see above)
   Parallel:   Bundled — OAuth auto-managed; if FAIL, restart Claude Code
   Ceramic:    Bundled, OAuth only (no API key) — authenticate via /mcp → ceramic → Authenticate,
               or on WSL/headless: claude mcp login plugin:yellow-research:ceramic --no-browser
@@ -993,7 +972,7 @@ If a source shows FAIL (installed but test failed), try restarting Claude Code.
 ToolSearch results reflect session-start state — restart after installing new plugins.
 ```
 
-Only show the lines for MCP sources that are UNAVAILABLE or FAIL (not all seven
+Only show the lines for MCP sources that are UNAVAILABLE or FAIL (not all six
 if some are already working).
 
 ### Step 6: Next Steps

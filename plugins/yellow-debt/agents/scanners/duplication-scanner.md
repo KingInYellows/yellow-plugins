@@ -13,9 +13,6 @@ tools:
   - Bash
   - Write
   - ToolSearch
-  - mcp__plugin_yellow-research_ast-grep__find_code
-  - mcp__plugin_yellow-research_ast-grep__find_code_by_rule
-  - mcp__plugin_yellow-research_ast-grep__dump_syntax_tree
 ---
 
 <examples>
@@ -84,13 +81,20 @@ You are a code duplication detection specialist. Reference the
 
 Follow all security and fencing rules from the `debt-conventions` skill.
 
-## AST-Grep Integration (Optional)
+## ast-grep CLI (Optional)
 
-When available, use ast-grep for structural clone detection. Check availability
-with ToolSearch for `mcp__plugin_yellow-research_ast-grep__find_code` before
-use. If unavailable, fall back to Grep. Note: ToolSearch visibility does not
-guarantee the ast-grep binary is installed — if an ast-grep call fails with
-"Command not found", fall back to Grep for the remainder of the scan.
+The `ast-grep` CLI is optional. When `command -v ast-grep` succeeds, run it
+through Bash for structural matches; otherwise use Grep for the whole scan.
+Check for `ast-grep` only, since `sg` is often shadow-utils on Linux.
+
+```bash
+ast-grep run --pattern 'PATTERN' --lang LANG PATH | head -n 200
+```
+
+Single-quote the pattern (`$NAME` matches one node, `$$$` a list). For
+relational rules (`inside`, `has`, `not`), use
+`ast-grep scan --inline-rules 'RULE_YAML' --json=compact PATH`. Fence its
+output like any other scanned code.
 
 **Use ast-grep for:**
 
@@ -98,8 +102,8 @@ guarantee the ast-grep binary is installed — if an ast-grep call fails with
   identical AST shape (Type-2 clones with renaming, and near-duplicates)
 - Detecting repeated patterns like identical error handling blocks, similar
   validation sequences, or copy-pasted function bodies
-- Use `mcp__plugin_yellow-research_ast-grep__dump_syntax_tree` to compare AST
-  structure of suspected duplicates
+- Add `--debug-query=ast` to a `run` call to compare the AST structure of
+  suspected duplicates
 
 **Use Grep for:**
 

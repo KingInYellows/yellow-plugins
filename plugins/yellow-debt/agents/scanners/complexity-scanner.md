@@ -13,8 +13,6 @@ tools:
   - Bash
   - Write
   - ToolSearch
-  - mcp__plugin_yellow-research_ast-grep__find_code
-  - mcp__plugin_yellow-research_ast-grep__find_code_by_rule
 ---
 
 <examples>
@@ -85,14 +83,20 @@ Follow all security and fencing rules from the `debt-conventions` skill.
 
 IMPORTANT: Always invoke the `debt-conventions` skill at the start of every scan. Security and fencing rules from that skill are mandatory — do not proceed without reading them first.
 
-## AST-Grep Integration (Optional)
+## ast-grep CLI (Optional)
 
-When available, use ast-grep for more accurate complexity detection. Check
-availability with ToolSearch for
-`mcp__plugin_yellow-research_ast-grep__find_code` before use. If unavailable,
-fall back to Grep. Note: ToolSearch visibility does not guarantee the ast-grep
-binary is installed — if an ast-grep call fails with "Command not found", fall
-back to Grep for the remainder of the scan.
+The `ast-grep` CLI is optional. When `command -v ast-grep` succeeds, run it
+through Bash for structural matches; otherwise use Grep for the whole scan.
+Check for `ast-grep` only, since `sg` is often shadow-utils on Linux.
+
+```bash
+ast-grep run --pattern 'PATTERN' --lang LANG PATH | head -n 200
+```
+
+Single-quote the pattern (`$NAME` matches one node, `$$$` a list). For
+relational rules (`inside`, `has`, `not`), use
+`ast-grep scan --inline-rules 'RULE_YAML' --json=compact PATH`. Fence its
+output like any other scanned code.
 
 **Use ast-grep for:**
 
