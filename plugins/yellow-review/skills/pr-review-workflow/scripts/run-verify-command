@@ -478,6 +478,9 @@ MARKER=""
 STREAM_FILE=""
 IGNORED_SCRATCH=""
 DIR_LIST=""
+# Missing on purpose: save_patch points GIT_INDEX_FILE here so a special file's
+# deletion is diffed against an empty index. A read-only diff never creates it.
+NOINDEX=""
 # The snapshot is provisional until it is complete and credential-screened: any
 # exit before then (a signal, a die, a failed screen) removes it, so no
 # unscreened patch stays under .git.
@@ -485,7 +488,7 @@ PATCH=""
 PATCH_PROVISIONAL=0
 cleanup() {
     local f
-    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST"; do
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST" "$NOINDEX"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
     if [ "$PATCH_PROVISIONAL" = 1 ] && [ -n "$PATCH" ]; then
@@ -593,10 +596,12 @@ if [ "$MODE" = run ]; then
     done
 fi
 
-# Only a regular file or a symlink may reach `git diff` below: a FIFO blocks it
-# before any watchdog starts, and a socket, device or directory is no edit to
-# keep. Running refuses; the revert modes delete the entry without opening it,
-# so refusal cleanup still completes.
+# Only a regular file or a symlink may reach `git diff` of the worktree below:
+# a FIFO blocks it before any watchdog starts, and a socket, device or
+# directory is no edit to keep. Running refuses. The revert modes do not open
+# the entry and do not remove it yet: save_patch records a tracked one's
+# deletion from HEAD against an empty index, and the removal waits until that
+# recovery patch is saved and screened.
 TOP_REAL=$(pwd -P)
 TO_REMOVE=()
 DIR_REMOVE=()
@@ -633,10 +638,12 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         [ "$HEAD_TYPE" = blob ] \
             || die 2 "refusing to remove a directory that is not a replaced file (HEAD has ${HEAD_TYPE:-nothing} there): $f"
     fi
-    # Validated; the removal waits until the output setup below has succeeded,
-    # so a setup failure exits before anything is deleted that the checkout
-    # restoring the tracked file would never reach. A directory waits longer:
-    # the recovery patch must hold its files first (save_patch).
+    # Validated. The removal waits until the recovery patch is saved and
+    # screened, so a setup failure or a patch that cannot be saved exits
+    # before anything is deleted that the checkout restoring the tracked file
+    # would never reach. save_patch records a special file's deletion from
+    # HEAD against an empty index and does not open the entry; a directory's
+    # files are diffed in place.
     if [ -d "$f" ] && [ ! -L "$f" ]; then
         DIR_REMOVE+=("$f")
     else
@@ -660,14 +667,10 @@ if [ "$MODE" = run ]; then
     (umask 077 && : >"$LOG") || die 2 "cannot create $LOG"
 fi
 
-# Setup succeeded: now remove the entries validated above.
-for f in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
-    rm -f -- "$f" 2>/dev/null
-    if [ -e "$f" ] || [ -L "$f" ]; then
-        die 2 "cannot remove a path that is not a regular file or symlink: $f"
-    fi
-    add_reason "removed without reading, not a regular file or symlink: $f"
-done
+# A missing file is an empty index. Clear a leftover so the deletion diff below
+# is taken against nothing; the diff itself never creates this path.
+NOINDEX="$OUT_DIR/.$STAMP.noindex"
+rm -f -- "$NOINDEX"
 
 RC=0
 TIMED_OUT=0
@@ -780,12 +783,41 @@ run_verify() {
 # place: its deletion of the file blob is followed by the diff of every regular
 # file and symlink inside it, so the patch re-applies on HEAD. A file inside it
 # that is listed itself (--revert-dirty) has its own entry and is not repeated.
+# A listed FIFO, socket or device (TO_REMOVE) is still in place and is not
+# opened. A tracked one is the deletion of the blob at HEAD, taken with
+# `diff --cached HEAD` against an empty index (GIT_INDEX_FILE names a path
+# that does not exist, and this read-only diff does not create it). An
+# untracked one is skipped. The entry is removed only after the patch is
+# saved and screened.
+# True when <path> is a special file whose removal waits on the saved patch.
+in_to_remove() {
+    local p
+    for p in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
+        [ "$p" = "$1" ] && return 0
+    done
+    return 1
+}
 save_patch() {
     local out="$1" fmt="$2" f rc c p
     umask 077
     : >"$out" || return 1
     for f in ${FILES[@]+"${FILES[@]}"}; do
         # Fixed flags so the patch re-applies whatever the user's diff config.
+        if in_to_remove "$f"; then
+            # Do not open the entry. A tracked path is recorded as deleted;
+            # an untracked special file is not an edit to keep.
+            if lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
+                || git cat-file -e "HEAD:$f" 2>/dev/null; then
+                # In a subshell: the empty index must not leak into the next
+                # file's diff, and a caller's GIT_INDEX_FILE stays as it was.
+                (
+                    export GIT_INDEX_FILE="$NOINDEX"
+                    lgit_nohooks diff --cached --no-color --no-ext-diff --no-textconv "$fmt" \
+                        --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f"
+                ) >>"$out" || return 1
+            fi
+            continue
+        fi
         if lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
             || git cat-file -e "HEAD:$f" 2>/dev/null; then
             lgit_nohooks diff --no-color --no-ext-diff --no-textconv "$fmt" \
@@ -1006,7 +1038,25 @@ for f in ${DIR_REMOVE[@]+"${DIR_REMOVE[@]}"}; do
         add_reason "removed a directory standing where a file was (its files are in the recovery patch): $f"
     fi
 done
+# The patch now holds each special file's deletion (save_patch, empty index),
+# so the entry can go without being opened. A removal that fails stays in
+# REVERT_FAILS; the per-file loop must not let git open what is still there.
+for f in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
+    rm -f -- "$f" 2>/dev/null
+    if [ -e "$f" ] || [ -L "$f" ]; then
+        REVERT_FAILS+=("rm $f")
+    else
+        add_reason "removed without reading, not a regular file or symlink: $f"
+    fi
+done
 for f in ${FILES[@]+"${FILES[@]}"}; do
+    # Removal failed: the special file is still there. Skip it so git never
+    # opens it (a FIFO would block). The failure is already in REVERT_FAILS.
+    if in_to_remove "$f"; then
+        if [ -e "$f" ] || [ -L "$f" ]; then
+            continue
+        fi
+    fi
     if git cat-file -e "HEAD:$f" 2>/dev/null; then
         # Hooks off: post-checkout and post-index-change would run any hook a
         # resolver planted, including an ignored one under core.hooksPath.

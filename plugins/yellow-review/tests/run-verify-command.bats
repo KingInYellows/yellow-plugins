@@ -2195,3 +2195,39 @@ install_evil_filter() {
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .treeClean)" = true ]
 }
+
+@test "#952 4179906611: a FIFO replacing a tracked file is kept when the recovery patch cannot be saved" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  rm -f src/a.txt && mkfifo src/a.txt
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v git)
+  {
+    printf '#!/bin/bash\n'
+    printf 'for a in "$@"; do [ "$a" = --binary ] && exit 128; done\n'
+    printf 'exec "%s" "$@"\n' "$real"
+  } >| "$shim/git"
+  chmod +x "$shim/git"
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"nothing was reverted"* ]]
+  [ -p src/a.txt ]
+  [ -f src/new.txt ]
+}
+
+@test "#952 4179906611: the recovery patch records the deletion of a tracked file replaced by a FIFO" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  rm -f src/a.txt && mkfifo src/a.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ -f "$patch" ]
+  grep -q '^deleted file mode' "$patch"
+  grep -q '^diff --git a/src/a.txt b/src/a.txt' "$patch"
+  [ ! -p src/a.txt ] && [ -f src/a.txt ]
+  git apply "$patch"
+  [ ! -e src/a.txt ]
+  [ -f src/new.txt ]
+}
