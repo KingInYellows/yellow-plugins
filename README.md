@@ -191,6 +191,20 @@ The plugin also expects the `semgrep` CLI, `curl`, `jq`, and Graphite CLI
 (`gt`). Run `/semgrep:setup` to validate credentials, detect your deployment
 slug, and verify MCP tools.
 
+### Jev shadow pre-filter (yellow-core, optional)
+
+yellow-core's Stop hook can ask TypeSafe's Jev model whether a finished session
+looks worth staging for knowledge capture, and log the answer without changing
+what is staged. It is off unless both variables are set in the environment
+Claude Code's hooks inherit, and it sends redacted session text to TypeSafe:
+
+```bash
+export COMPOUND_JEV_PREFILTER=shadow
+export TYPESAFE_API_KEY="..."
+```
+
+See `docs/security.md` "Jev Shadow Pre-Filter" for exactly what is sent.
+
 ### ruvector (yellow-ruvector)
 
 Runs locally as a stdio MCP server through the plugin's own launcher, which
