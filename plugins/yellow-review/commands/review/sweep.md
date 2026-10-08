@@ -125,7 +125,8 @@ Step 2's checkout. Once that head ignores the file, `/review:pr` can write it.
 `FETCH_HEAD` (no checkout) and point `--work-tree` at a temp directory holding
 only that commit's root `.gitignore`. Use `--no-index` and the `-q` exit
 (`0` ignored, `1` not): this branch's index can still track the file, and
-`-v` exits `0` for a negation too. On failure, before any snapshot, print
+`-v` exits `0` for a negation too. The remote is `origin`, else the sole
+remote; several remotes without `origin` is a failure. On failure, before any snapshot, print
 `[review:sweep] Error: could not read the PR head ignore rules.` and stop
 with no skip line.
 
@@ -137,10 +138,13 @@ case "$HEAD_SHA" in *[!0-9a-f]*|'') head_fail ;; esac
 [ "${#HEAD_SHA}" -eq 40 ] || [ "${#HEAD_SHA}" -eq 64 ] || head_fail
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
 [ -n "$TOP" ] || head_fail
+REMOTE=origin
+git -C "$TOP" remote get-url origin >/dev/null 2>&1 || REMOTE=$(git -C "$TOP" remote 2>/dev/null)
+case "$REMOTE" in ''|-*|*[!A-Za-z0-9._-]*) head_fail ;; esac
 GOT=""
 for delay in 0 1 2 4 8 16; do
   sleep "$delay"
-  git -C "$TOP" fetch -q --no-tags -- origin "refs/pull/<PR#>/head" 2>/dev/null || continue
+  git -C "$TOP" fetch -q --no-tags -- "$REMOTE" "refs/pull/<PR#>/head" 2>/dev/null || continue
   GOT=$(git -C "$TOP" rev-parse -q --verify FETCH_HEAD 2>/dev/null) || GOT=""
   [ "$GOT" = "$HEAD_SHA" ] && break
 done
