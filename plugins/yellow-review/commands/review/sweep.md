@@ -345,8 +345,9 @@ Then read the counts:
 "${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh" summary <PR#>
 ```
 
-The output is `{"<PR#>": {"pending": N, "attention": M}}`, or `{}` when the
-PR has no ledger. Keep both numbers for Step 4.
+The output is `{"<PR#>": {"pending": N, "attention": M, "merge_blocking": K}}`,
+or `{}` when the PR has no ledger. `merge_blocking` counts the pending findings
+of severity P0, P1 or P2. Keep all three numbers for Step 4.
 
 ### Step 4: Final summary
 
@@ -360,10 +361,16 @@ Reached after Step 2 (`/review:pr`), Step 3 (`/review:resolve`) and Step
             e.g. "5 resolved, 2 fixed, 1 issues filed, 1 blocking,
             push=ok, verify=skipped, ratelimited=0">
   Ledger:  <pending> pending, <attention> need attention — /review:triage <PR#>
+  Merge:   not ready — <merge_blocking> pending P0-P2 findings; /review:triage <PR#> before merging
 ```
 
 Print `Ledger:  none` when `summary` returned `{}`, and
-`Ledger:  unavailable` when it failed.
+`Ledger:  unavailable` when it failed. The `Merge:` row reads `ready (no
+pending P0-P2 findings)` when `merge_blocking` is 0 or the PR has no ledger,
+and `unknown (ledger unavailable)` when `summary` failed or Step 3b was
+skipped. Findings left pending at merge are stranded: the ledger refuses
+writes to a closed PR, so they can only be fixed in a follow-up PR. The row
+reports the ledger only; it never changes the exit code or the contract line.
 
 Read the contract from the nested `/review:resolve` output by the rule in
 `references/review-sweep/resolve-contract.md` ("Reading `ratelimited` (callers)"): it

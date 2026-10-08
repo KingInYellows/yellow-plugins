@@ -349,10 +349,13 @@ aggregation rules change there, propagate the same change here.
 
 9. **Apply fixes pass 1** (mirrors review-pr.md Step 7): for surviving
    **P0/P1** findings with `autofix_class: safe_auto → review-fixer` and a
-   concrete `suggested_fix`, apply sequentially via Edit. P2/P3 findings
-   are not auto-applied here — they go through the resolve-PR flow at
-   Step 12 instead. Parity rule with `review-pr.md` Step 7. Record each
-   applied fix with ledger.md "Step 7".
+   concrete `suggested_fix`, apply sequentially via Edit. Then apply the
+   high-confidence P2 tier exactly as `review-pr.md` Step 7 defines it (up
+   to 5 P2 `safe_auto` findings at anchor 100, each re-checked for line
+   accuracy and skim-FP first). Other P2/P3 findings are not auto-applied
+   here — they go through the resolve-PR flow at Step 12 instead. Parity
+   rule with `review-pr.md` Step 7. Record each applied fix with
+   ledger.md "Step 7".
 
 10. **Code simplifier pass 2** (mirrors review-pr.md Step 8): launch
     `code-simplifier` on the now-modified code. Normalize its prose

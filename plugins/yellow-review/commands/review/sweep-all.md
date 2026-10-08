@@ -333,7 +333,7 @@ Read every PR's residual ledger counts in one call:
 "${CLAUDE_PLUGIN_ROOT}/lib/review-ledger.sh" summary --all
 ```
 
-It prints `{"<PR#>": {"pending": N, "attention": M}, …}` for every ledger
+It prints `{"<PR#>": {"pending": N, "attention": M, "merge_blocking": K}, …}` for every ledger
 in this clone. A ledger that fails to fold emits `"<PR#>": null` for that
 entry while the command still exits 0 — a per-row failure, not a call
 failure. For each row, the `Residual` cell is `<pending>/<attention>`,
@@ -368,6 +368,17 @@ blocking. Blocking threads do not change the exit code — re-run
 `Residual` is `pending/attention`: pending findings are `open`, `reopened`
 or `applied` (fixed locally, not yet published); attention findings are
 `report_only` or `stale`. Work them down with `/review:triage <PR#>`.
+
+After the totals line, print one line naming the PRs whose `merge_blocking`
+is above 0, or nothing when there are none:
+
+```text
+Not merge-ready (pending P0-P2 findings): #123 (2), #127 (1) — run /review:triage <PR#> before merging
+```
+
+Findings left pending when a PR merges are stranded, because the ledger
+refuses writes to a closed PR. The line is a report only and never changes
+the exit code.
 
 Truncate long titles at ~30 characters with `…` if needed for table
 readability. Both the table and the totals line are required.

@@ -994,14 +994,24 @@ For surviving P0/P1 findings with `autofix_class: safe_auto` and a
 non-null `suggested_fix`: apply sequentially using Edit tool. Review each
 change for correctness before proceeding to next.
 
-**Severity gate is deliberate.** P2 / P3 `safe_auto` findings are NOT
-auto-applied even though the reviewer marked them safe — they route to
-the Residual Actionable Work section. Wave 2 chose the conservative gate
-(P0/P1 only) because P2/P3 findings tend to be style or maintenance
-preferences where the cost of churn from auto-applied changes can
-outweigh the fix value. To auto-apply a P2 `safe_auto` finding, an
-orchestrator must promote it to P1 based on additional evidence; the
-default is human review.
+**High-confidence P2 tier.** Also apply, after the P0/P1 fixes, up to 5
+surviving P2 findings that have `autofix_class: safe_auto`, a non-null
+`suggested_fix` and anchor 100 after Step 6 (a lone reviewer at 100, or two
+reviewers at 75 promoted by sub-step 3). Take them in Step 6's sort order and
+run the line-accuracy and skim-FP quality gates on each before applying it;
+drop one that fails. The rest of the P2 `safe_auto` findings go to Residual
+Actionable Work. This tier applies in both modes: interactive runs still
+confirm the push in Step 9.
+
+**Severity gate is deliberate below that tier.** P3 `safe_auto` findings and
+P2 `safe_auto` findings below anchor 100 or past the cap are NOT auto-applied
+even though the reviewer marked them safe: they route to the Residual
+Actionable Work section, because low-confidence and low-severity findings tend
+to be style or maintenance preferences where the churn of an auto-applied
+change can outweigh the fix value. The ledger keeps them, and `/review:sweep`
+reports a PR with pending P0-P2 findings as not merge-ready. To auto-apply one
+of them, an orchestrator must promote it to P1 based on additional evidence;
+the default is human review.
 
 For `gated_auto`/`manual` findings: do not apply automatically. List in
 the Residual Actionable Work section of the report.
