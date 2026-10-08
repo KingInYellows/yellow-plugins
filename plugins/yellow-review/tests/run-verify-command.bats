@@ -2316,3 +2316,44 @@ devin_org_id_lines() {
   [ -f "$log" ]
   run ! grep -q 'org-1234567890' "$log"
 }
+
+# git config allows a newline in a value. The line-oriented --get-regexp view
+# put the rest of such a value on its own unscoped line, so a stock Git LFS
+# command on the first line hid a second command that git then ran.
+# $1: cli-clean, raw-smudge (a "\n" escape in the config file) or cli-process.
+set_newline_lfs_filter() {
+  git config --remove-section filter.lfs 2>/dev/null || true
+  case "$1" in
+    cli-clean) git config filter.lfs.clean "git-lfs clean -- %f
+touch $BATS_TEST_TMPDIR/payload-ran; cat" ;;
+    raw-smudge) printf '[filter "lfs"]\n\tsmudge = "git-lfs smudge -- %%f\\ntouch %s; cat"\n' "$BATS_TEST_TMPDIR/payload-ran" >> .git/config ;;
+    cli-process) git config filter.lfs.process "git-lfs filter-process
+touch $BATS_TEST_TMPDIR/payload-ran" ;;
+  esac
+}
+
+@test "#952 4222875785: a stock Git LFS filter value with a second line is refused in --revert-only, --revert-dirty and a trusted run (exit 2)" {
+  mkdir -p .git/info
+  echo '* filter=lfs' >> .git/info/attributes
+  for variant in cli-clean raw-smudge cli-process; do
+    set_newline_lfs_filter "$variant"
+    run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+    [ "$status" -eq 2 ] || { echo "--revert-only accepted $variant (exit $status)" >&2; return 1; }
+    [[ "$stderr" == *"filter.<driver>."* ]]
+    [[ "$stderr" != *payload-ran* ]]
+    [ ! -e "$BATS_TEST_TMPDIR/payload-ran" ]
+    grep -q 'resolver edit' src/a.txt
+    [ -e src/new.txt ]
+    run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+    [ "$status" -eq 2 ] || { echo "--revert-dirty accepted $variant (exit $status)" >&2; return 1; }
+    [[ "$stderr" != *payload-ran* ]]
+    [ ! -e "$BATS_TEST_TMPDIR/payload-ran" ]
+    grep -q 'resolver edit' src/a.txt
+    [ -e src/new.txt ]
+    verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+    [ "$status" -eq 2 ] || { echo "trusted run accepted $variant (exit $status)" >&2; return 1; }
+    [[ "$stderr" == *"filter.<driver>."* ]]
+    [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+    [ ! -e "$BATS_TEST_TMPDIR/payload-ran" ]
+  done
+}

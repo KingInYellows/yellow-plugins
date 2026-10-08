@@ -458,17 +458,25 @@ cd -- "$TOP" || die 2 "cannot enter $TOP"
 # every mode, including --revert-only, --revert-dirty and --check-ignored.
 # Judge it before any of those calls. The stock Git LFS commands are allowed
 # by exact value. Global and system scopes are not judged, and neither the
-# value nor the driver name is printed.
+# value nor the driver name is printed. A value may hold a newline, so the
+# config is read NUL-delimited (-z: scope NUL key LF value NUL) and turned into
+# one line for the scope and one for the key, with the value's newlines (and
+# the key/value separator) as \001: a multi-line value never matches an
+# allowed command, so it is refused.
 fcfg=""
 frc=0
-fcfg=$(git config --show-scope --get-regexp '^filter\..*\.(clean|smudge|process)$' 2>/dev/null) || frc=$?
+fcfg=$(git config -z --show-scope --get-regexp '^filter\..*\.(clean|smudge|process)$' 2>/dev/null \
+    | tr '\n\000' '\001\n'; exit "${PIPESTATUS[0]}") || frc=$?
 case "$frc" in 0|1) ;; *) die 2 "could not read the git filter config; the tree is untouched" ;; esac
-fkey=$(printf '%s\n' "$fcfg" | awk -F'\t' '
-    ($1 == "local" || $1 == "worktree") {
-        k = $2; v = $2; sub(/ .*/, "", k); sub(/^[^ ]* /, "", v)
+fkey=$(printf '%s\n' "$fcfg" | awk '
+    NR % 2 == 1 { s = $0; next }
+    s == "local" || s == "worktree" {
+        k = $0; v = ""; i = index($0, "\001")
+        if (i) { k = substr($0, 1, i - 1); v = substr($0, i + 1) }
         if (k ~ /^filter\.lfs\.(clean|smudge|process)$/ && (v == "git-lfs clean -- %f" || v == "git-lfs smudge -- %f" || v == "git-lfs filter-process" || v == "git-lfs smudge --skip -- %f" || v == "git-lfs filter-process --skip")) next
-        print k; exit
-    }')
+        print k; bad = 1; exit
+    }
+    END { if (!bad && NR % 2 == 1 && s != "") print "filter.<unreadable>.config" }')
 case "$fkey" in filter.*) fkey="filter.<driver>.${fkey##*.}" ;; esac
 [ -z "$fkey" ] || die 2 "the repository config sets $fkey, which would run a command with the runner's authority; remove it from the repository config (a global or system config is fine); the tree is untouched"
 unset fcfg

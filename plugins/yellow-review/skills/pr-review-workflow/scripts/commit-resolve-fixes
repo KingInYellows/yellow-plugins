@@ -647,15 +647,23 @@ harden_git_config() {
     local tcfg trc=0 tkey
     # A clean, smudge or process filter runs on `git add` and on checkout, so a
     # repository-local one is judged the same way; the three stock Git LFS
-    # commands (`git lfs install --local`) are allowed by exact value.
-    tcfg=$(git config --show-scope --get-regexp '^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process))$' 2>/dev/null) || trc=$?
+    # commands (`git lfs install --local`) are allowed by exact value. A value
+    # may hold a newline, so the config is read NUL-delimited (-z: scope NUL
+    # key LF value NUL) and turned into one line for the scope and one for the
+    # key, with the value's newlines (and the key/value separator) as \001: a
+    # multi-line value never matches an allowed command, so it is refused.
+    tcfg=$(git config -z --show-scope --get-regexp '^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process))$' 2>/dev/null \
+        | tr '\n\000' '\001\n'; exit "${PIPESTATUS[0]}") || trc=$?
     case "$trc" in 0|1) ;; *) die 3 "could not read the git transport config; nothing committed" ;; esac
-    tkey=$(printf '%s\n' "$tcfg" | awk -F'\t' '
-        ($1 == "local" || $1 == "worktree") {
-            k = $2; v = $2; sub(/ .*/, "", k); sub(/^[^ ]* /, "", v)
+    tkey=$(printf '%s\n' "$tcfg" | awk '
+        NR % 2 == 1 { s = $0; next }
+        s == "local" || s == "worktree" {
+            k = $0; v = ""; i = index($0, "\001")
+            if (i) { k = substr($0, 1, i - 1); v = substr($0, i + 1) }
             if (k ~ /^filter\.lfs\.(clean|smudge|process)$/ && (v == "git-lfs clean -- %f" || v == "git-lfs smudge -- %f" || v == "git-lfs filter-process" || v == "git-lfs smudge --skip -- %f" || v == "git-lfs filter-process --skip")) next
-            print k; exit
-        }')
+            print k; bad = 1; exit
+        }
+        END { if (!bad && NR % 2 == 1 && s != "") print "filter.<unreadable>.config" }')
     # A credential URL can carry userinfo: name the key without it.
     case "$tkey" in credential.?*.helper) tkey="credential.<url>.helper" ;; filter.*) tkey="filter.<driver>.${tkey##*.}" ;; esac
     [ -z "$tkey" ] || die 3 "the repository config sets $tkey, which would run a command with submission authority; remove it from the repository config (a global or system config is fine); nothing committed"

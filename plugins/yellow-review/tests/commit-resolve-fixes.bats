@@ -2904,3 +2904,38 @@ LINES
   run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ "$status" -eq 0 ] || { echo "$stderr" >&2; return 1; }
 }
+
+# git config allows a newline in a value. The line-oriented --get-regexp view
+# put the rest of such a value on its own unscoped line, so a stock Git LFS
+# command on the first line hid a second command that `git add` then ran.
+@test "#952 4222875785: a stock Git LFS filter value with a second line is refused before committing (exit 3)" {
+  mkdir -p .git/info
+  echo '* filter=lfs' >> .git/info/attributes
+  can="$BATS_TEST_TMPDIR/payload-ran"
+  for provider in graphite github; do
+    for variant in cli-clean raw-smudge cli-process; do
+      git config --remove-section filter.lfs 2>/dev/null || true
+      case "$variant" in
+        cli-clean) git config filter.lfs.clean "git-lfs clean -- %f
+touch $can; cat" ;;
+        raw-smudge) printf '[filter "lfs"]\n\tsmudge = "git-lfs smudge -- %%f\\ntouch %s; cat"\n' "$can" >> .git/config ;;
+        cli-process) git config filter.lfs.process "git-lfs filter-process
+touch $can" ;;
+      esac
+      crf_refuses_untouched "$provider" || { echo "not refused: $variant $provider" >&2; return 1; }
+      [[ "$stderr" == *"repository config sets filter.<driver>."* ]]
+      [[ "$stderr" != *payload-ran* ]]
+      [ ! -e "$can" ] || { echo "payload ran: $variant $provider" >&2; return 1; }
+    done
+  done
+  # Control: the single-line stock values are still allowed (no attribute
+  # routes a path through them, as git-lfs is not installed here).
+  git config --remove-section filter.lfs
+  grep -v '^\* filter=lfs$' .git/info/attributes >| "$BATS_TEST_TMPDIR/attr" || true
+  cp "$BATS_TEST_TMPDIR/attr" .git/info/attributes
+  git config filter.lfs.clean "git-lfs clean -- %f"
+  git config filter.lfs.process "git-lfs filter-process"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+}
