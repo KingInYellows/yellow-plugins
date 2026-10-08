@@ -1252,3 +1252,8 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 @test "sweep-all: prints a not-merge-ready line from merge_blocking" {
   grep -q '^Not merge-ready (pending P0-P2 findings): ' "$SWEEP_ALL"
 }
+
+@test "sweep: a missing ledger is never reported merge-ready" {
+  grep -q 'pending P0-P2 findings)` only when an existing ledger was read and' "$SWEEP"
+  grep -q 'It reads `unknown (no ledger)` when `summary` returned' "$SWEEP"
+}
