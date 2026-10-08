@@ -661,6 +661,7 @@ if [ "$PROVIDER" = github ]; then
     check_tools_outside_repo node timeout gtimeout
 else
     check_tools_outside_repo gt timeout gtimeout
+    [ -n "$TOOL_BIN_gt" ] || die 2 "gt not found"
 fi
 gt() { "${TOOL_BIN_gt:-gt}" "$@"; }
 TIMEOUT_BIN=$(vr_timeout_bin || true)

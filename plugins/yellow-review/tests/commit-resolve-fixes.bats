@@ -2426,6 +2426,14 @@ crf_refuses_untouched() {
   done
 }
 
+@test "a missing gt is a clear exit 2 under the graphite provider" {
+  rm -f "$STUB_BIN/gt"
+  if PATH="$PATH" command -v gt >/dev/null 2>&1; then skip "a real gt is on PATH"; fi
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"gt not found"* ]]
+}
+
 @test "a symlink outside the worktree to an in-tree gt or node is refused before it runs" {
   old_path="$PATH"
   marker="$BATS_TEST_TMPDIR/tool-canary"
