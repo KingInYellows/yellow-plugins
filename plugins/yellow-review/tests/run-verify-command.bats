@@ -2133,3 +2133,17 @@ trust_assert_absolute() {
   grep -F -- "--kill-after=5 30 $TRUST_BIN/gh" "$TRUST_TIMEOUT_LOG" >/dev/null
   grep -F -- "--kill-after=10" "$TRUST_TIMEOUT_LOG" >/dev/null
 }
+
+@test "#952 4179814361: a core.fsmonitor command in the local config is not run by --revert-only or --revert-dirty" {
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$BATS_TEST_TMPDIR/fsmon-ran" >| "$BATS_TEST_TMPDIR/fsmon"
+  chmod +x "$BATS_TEST_TMPDIR/fsmon"
+  git config core.fsmonitor "$BATS_TEST_TMPDIR/fsmon"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/fsmon-ran" ]
+  printf 'x\n' >> src/b.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/fsmon-ran" ]
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = true ]
+}

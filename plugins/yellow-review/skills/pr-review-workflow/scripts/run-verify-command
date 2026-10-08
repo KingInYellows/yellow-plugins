@@ -521,8 +521,10 @@ else
         # Reverting is always safe; the deny list only stops running and committing.
         [ "$MODE" = run ] && rp_denied "$f" && die 2 "refusing a deny-listed path: $f"
         # Fail closed unless check-ignore positively says "not ignored" (exit 1).
+        # core.fsmonitor forced off: this index read would run a command set in
+        # .git/config. Not lgit: check-ignore rejects --literal-pathspecs.
         IGN=0
-        git check-ignore -q -- "$f" || IGN=$?
+        git -c core.fsmonitor=false -c core.untrackedCache=false check-ignore -q -- "$f" || IGN=$?
         [ "$IGN" = 1 ] || die 2 "refusing a gitignored (or unverifiable) path: $f"
         if [ -z "$(lgit_nohooks status --porcelain --untracked-files=all -- "$f")" ]; then
             [ "$MODE" = run ] && die 2 "listed file has no changes: $f"
@@ -1007,8 +1009,9 @@ fi
 # The caller starts from a clean tree, so any remaining change (tracked or
 # untracked) means the revert did not fully restore it. A status that cannot
 # be read is not clean.
+# lgit_nohooks forces core.fsmonitor off: this status would run a command set in .git/config.
 CLEAN=true
-if ! STATUS=$(git -c core.hooksPath=/dev/null status --porcelain --untracked-files=all 2>/dev/null) || [ -n "$STATUS" ]; then
+if ! STATUS=$(lgit_nohooks status --porcelain --untracked-files=all 2>/dev/null) || [ -n "$STATUS" ]; then
     CLEAN=false
     [ "${#REVERT_FAILS[@]}" -gt 0 ] || add_reason "changes remain after the revert"
 fi
