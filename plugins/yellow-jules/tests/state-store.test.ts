@@ -597,3 +597,54 @@ describe('read-state, external records, deviations, retention', () => {
     ).resolves.toBe('JULES_NOT_FOUND');
   });
 });
+
+describe('updateJournal change detection', () => {
+  it('a mutation that replaces nothing does not rewrite the file', async () => {
+    await reserveOperation(dataDir, createInput('req-a'));
+    const file = resolveJournalPath(dataDir);
+    const before = fs.statSync(file, { bigint: true }).mtimeNs;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const { updateJournal } = await import('../src/state.js');
+    await updateJournal(dataDir, () => undefined);
+    expect(fs.statSync(file, { bigint: true }).mtimeNs).toBe(before);
+  });
+
+  it('replacing, adding, or deleting a record is written', async () => {
+    const { updateJournal } = await import('../src/state.js');
+    await reserveOperation(dataDir, createInput('req-a'));
+    await reserveOperation(
+      dataDir,
+      createInput('req-b', { requestedBranch: 'other' })
+    );
+    await updateJournal(dataDir, (operations) => {
+      delete operations['req-a'];
+    });
+    expect(Object.keys((await readJournal(dataDir)).operations)).toEqual([
+      'req-b',
+    ]);
+
+    await updateJournal(dataDir, (operations) => {
+      const record = operations['req-b'];
+      if (record !== undefined)
+        operations['req-b'] = { ...record, condition: 'working' };
+    });
+    expect((await readJournal(dataDir)).operations['req-b']?.condition).toBe(
+      'working'
+    );
+  });
+
+  it('only a changed record is secret-scanned: a secret-shaped change is still refused', async () => {
+    const { updateJournal } = await import('../src/state.js');
+    await reserveOperation(dataDir, createInput('req-a'));
+    await expect(
+      updateJournal(dataDir, (operations) => {
+        const record = operations['req-a'];
+        if (record !== undefined)
+          operations['req-a'] = {
+            ...record,
+            condition: 'Bearer abcdefghijklmnop',
+          };
+      })
+    ).rejects.toThrow(/secret-shaped/);
+  });
+});

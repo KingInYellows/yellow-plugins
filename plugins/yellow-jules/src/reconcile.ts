@@ -51,11 +51,37 @@ export const RESERVATION_SETTLE_MS = 260_000;
 export const RECONCILE_SESSIONS_PAGE_SIZE = 100;
 export const RECONCILE_SESSIONS_PAGE_CAP = 5;
 
+/** The fields reconcile reads from a listed session; outputs and generated files (patch text) are dropped as pages arrive. */
+type SessionProjection = Pick<
+  AdapterSession,
+  | 'sessionResource'
+  | 'title'
+  | 'vendorState'
+  | 'createTime'
+  | 'sourceResource'
+  | 'startingBranch'
+>;
+
+function project(s: AdapterSession): SessionProjection {
+  return {
+    sessionResource: s.sessionResource,
+    title: s.title,
+    vendorState: s.vendorState,
+    ...(s.createTime !== undefined ? { createTime: s.createTime } : {}),
+    ...(s.sourceResource !== undefined
+      ? { sourceResource: s.sourceResource }
+      : {}),
+    ...(s.startingBranch !== undefined
+      ? { startingBranch: s.startingBranch }
+      : {}),
+  };
+}
+
 interface Resolution {
   readonly record: OperationRecord;
   readonly outcome: ReconcileOutcome;
   readonly reason?: string;
-  readonly session?: AdapterSession;
+  readonly session?: SessionProjection;
   readonly deviation?: string;
 }
 
@@ -90,7 +116,7 @@ function rethrowIfAuth(err: unknown): void {
 // ---------------------------------------------------------------------------
 
 interface SessionsWalk {
-  readonly sessions: readonly AdapterSession[];
+  readonly sessions: readonly SessionProjection[];
   readonly complete: boolean;
   readonly stopReason?: string;
 }
@@ -106,7 +132,7 @@ async function walkSessions(
   ).toISOString();
   let filter: string | undefined = `create_time > "${since}"`;
   let pageToken: string | undefined;
-  const sessions: AdapterSession[] = [];
+  const sessions: SessionProjection[] = [];
   for (let pages = 0; ; ) {
     if (pages >= RECONCILE_SESSIONS_PAGE_CAP) {
       return { sessions, complete: false, stopReason: 'page-cap' };
@@ -141,7 +167,7 @@ async function walkSessions(
       throw err;
     }
     pages += 1;
-    sessions.push(...page.sessions);
+    for (const session of page.sessions) sessions.push(project(session));
     if (page.nextPageToken === undefined) return { sessions, complete: true };
     pageToken = page.nextPageToken;
   }

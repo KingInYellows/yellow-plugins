@@ -28,6 +28,20 @@ const validate_js_1 = require("./validate.js");
 exports.RESERVATION_SETTLE_MS = 260_000;
 exports.RECONCILE_SESSIONS_PAGE_SIZE = 100;
 exports.RECONCILE_SESSIONS_PAGE_CAP = 5;
+function project(s) {
+    return {
+        sessionResource: s.sessionResource,
+        title: s.title,
+        vendorState: s.vendorState,
+        ...(s.createTime !== undefined ? { createTime: s.createTime } : {}),
+        ...(s.sourceResource !== undefined
+            ? { sourceResource: s.sourceResource }
+            : {}),
+        ...(s.startingBranch !== undefined
+            ? { startingBranch: s.startingBranch }
+            : {}),
+    };
+}
 function entryOf(r) {
     const sessionResource = r.session?.sessionResource ?? r.record.sessionResource;
     return {
@@ -84,7 +98,8 @@ async function walkSessions(deps, adapter, oldestReservation, deadline) {
             throw err;
         }
         pages += 1;
-        sessions.push(...page.sessions);
+        for (const session of page.sessions)
+            sessions.push(project(session));
         if (page.nextPageToken === undefined)
             return { sessions, complete: true };
         pageToken = page.nextPageToken;

@@ -69,6 +69,21 @@ const ABORTED_RETRY_SECONDS = 60;
 const FENCED_MESSAGE_CHARS = 500;
 const FENCED_MESSAGE_COUNT = 3;
 
+type ActivityView = Pick<
+  AdapterActivity,
+  'activityId' | 'createTime' | 'type' | 'message'
+> & { readonly planId?: string };
+
+function viewOf(a: AdapterActivity): ActivityView {
+  return {
+    activityId: a.activityId,
+    createTime: a.createTime,
+    type: a.type,
+    ...(a.message !== undefined ? { message: a.message } : {}),
+    ...(a.plan !== undefined ? { planId: a.plan.planId } : {}),
+  };
+}
+
 const waitForHuman: NextCheck = {
   afterSeconds: HUMAN_WAIT_SECONDS,
   reason: 'waiting for a human',
@@ -316,8 +331,9 @@ export async function superviseOnce(
   };
 
   // Observation: the status walk, with a view of every activity it reads.
-  const newActivities: AdapterActivity[] = [];
-  const agentMessages: AdapterActivity[] = [];
+  // Only the fields below are read; plan steps and artifacts (patch text) are not kept.
+  const newActivities: ActivityView[] = [];
+  const newest: { agent?: ActivityView } = {};
   let seen: StatusResult;
   try {
     const result = await status(deps, {
@@ -325,8 +341,14 @@ export async function superviseOnce(
       reconcile: false,
       deadlineMs: Math.max(1, remainingMs(deps.clock, deadline)),
       observer: (activity, info) => {
-        if (info.isNew) newActivities.push(activity);
-        if (activity.type === 'agentMessaged') agentMessages.push(activity);
+        if (info.isNew) newActivities.push(viewOf(activity));
+        if (
+          activity.type === 'agentMessaged' &&
+          (newest.agent === undefined ||
+            compareStamp(activity, newest.agent) > 0)
+        ) {
+          newest.agent = viewOf(activity);
+        }
       },
     });
     seen = result;
@@ -409,12 +431,12 @@ export async function superviseOnce(
       ? newActivities.find(
           (a) =>
             a.type === 'planGenerated' &&
-            a.plan !== undefined &&
-            a.plan.planId !== evaluated.planId
+            a.planId !== undefined &&
+            a.planId !== evaluated.planId
         )
       : undefined;
   let pauseReason: string | undefined;
-  let pauseActivity: AdapterActivity | undefined;
+  let pauseActivity: ActivityView | undefined;
   if (swappedPlan !== undefined) {
     pauseReason = 'plan-changed-after-evaluation';
     pauseActivity = swappedPlan;
@@ -557,7 +579,7 @@ export async function superviseOnce(
   }
 
   if (condition === 'awaiting-reply') {
-    const latest = [...agentMessages].sort(compareStamp).pop();
+    const latest = newest.agent;
     if (latest?.message !== undefined) {
       fenced.question = fenceUntrusted(truncate(latest.message));
     }

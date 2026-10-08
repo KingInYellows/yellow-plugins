@@ -41,6 +41,15 @@ const HUMAN_WAIT_SECONDS = 3600;
 const ABORTED_RETRY_SECONDS = 60;
 const FENCED_MESSAGE_CHARS = 500;
 const FENCED_MESSAGE_COUNT = 3;
+function viewOf(a) {
+    return {
+        activityId: a.activityId,
+        createTime: a.createTime,
+        type: a.type,
+        ...(a.message !== undefined ? { message: a.message } : {}),
+        ...(a.plan !== undefined ? { planId: a.plan.planId } : {}),
+    };
+}
 const waitForHuman = {
     afterSeconds: HUMAN_WAIT_SECONDS,
     reason: 'waiting for a human',
@@ -190,8 +199,9 @@ async function superviseOnce(deps, args) {
         };
     };
     // Observation: the status walk, with a view of every activity it reads.
+    // Only the fields below are read; plan steps and artifacts (patch text) are not kept.
     const newActivities = [];
-    const agentMessages = [];
+    const newest = {};
     let seen;
     try {
         const result = await (0, runtime_js_1.status)(deps, {
@@ -200,9 +210,12 @@ async function superviseOnce(deps, args) {
             deadlineMs: Math.max(1, (0, deadline_js_1.remainingMs)(deps.clock, deadline)),
             observer: (activity, info) => {
                 if (info.isNew)
-                    newActivities.push(activity);
-                if (activity.type === 'agentMessaged')
-                    agentMessages.push(activity);
+                    newActivities.push(viewOf(activity));
+                if (activity.type === 'agentMessaged' &&
+                    (newest.agent === undefined ||
+                        (0, activity_walk_js_1.compareStamp)(activity, newest.agent) > 0)) {
+                    newest.agent = viewOf(activity);
+                }
             },
         });
         seen = result;
@@ -264,8 +277,8 @@ async function superviseOnce(deps, args) {
             r.createdAt >= evaluated.evaluatedAt);
     const swappedPlan = evaluated !== undefined && !repliedSinceEvaluation
         ? newActivities.find((a) => a.type === 'planGenerated' &&
-            a.plan !== undefined &&
-            a.plan.planId !== evaluated.planId)
+            a.planId !== undefined &&
+            a.planId !== evaluated.planId)
         : undefined;
     let pauseReason;
     let pauseActivity;
@@ -376,7 +389,7 @@ async function superviseOnce(deps, args) {
         });
     }
     if (condition === 'awaiting-reply') {
-        const latest = [...agentMessages].sort(activity_walk_js_1.compareStamp).pop();
+        const latest = newest.agent;
         if (latest?.message !== undefined) {
             fenced.question = (0, redact_js_1.fenceUntrusted)(truncate(latest.message));
         }

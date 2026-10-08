@@ -389,9 +389,18 @@ export async function readJournal(dataDir: string): Promise<Journal> {
 /** Atomic whole-file rewrite. Callers must hold the journal lock. */
 export async function writeJournal(
   dataDir: string,
-  journal: Journal
+  journal: Journal,
+  /** Keys of the records that changed; when given, only those are secret-scanned. */
+  changedKeys?: readonly string[]
 ): Promise<void> {
-  for (const record of Object.values(journal.operations)) {
+  const toScan =
+    changedKeys === undefined
+      ? Object.values(journal.operations)
+      : changedKeys.flatMap((key) => {
+          const record = journal.operations[key];
+          return record === undefined ? [] : [record];
+        });
+  for (const record of toScan) {
     assertNoSecretShapedValues(record);
   }
   const stateDir = resolveStateDir(dataDir);
@@ -592,11 +601,24 @@ export async function updateJournal<T>(
     dataDir,
     async () => {
       const journal = await readJournal(dataDir);
-      const before = JSON.stringify(journal);
+      // Change detection by reference, not by serializing the whole journal
+      // twice: every record type is readonly and every mutator replaces a record
+      // by assignment, so an untouched record keeps its identity.
+      const before = new Map(Object.entries(journal.operations));
+      const confirmed = journal.archiveVisibilityConfirmed;
       const result = mutate(journal.operations, journal);
-      // A mutation that changed nothing skips the fsync'd rewrite.
-      if (JSON.stringify(journal) !== before)
-        await writeJournal(dataDir, journal);
+      const changed = Object.entries(journal.operations)
+        .filter(([key, record]) => before.get(key) !== record)
+        .map(([key]) => key);
+      const expectedCount =
+        before.size + changed.filter((k) => !before.has(k)).length;
+      const unchanged =
+        changed.length === 0 &&
+        expectedCount === Object.keys(journal.operations).length &&
+        confirmed === journal.archiveVisibilityConfirmed;
+      // A mutation that changed nothing skips the fsync'd rewrite; a write only
+      // secret-scans the records it changed (the rest passed when written).
+      if (!unchanged) await writeJournal(dataDir, journal, changed);
       return result;
     },
     config
