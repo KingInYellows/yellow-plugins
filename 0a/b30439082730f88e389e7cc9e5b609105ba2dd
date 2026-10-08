@@ -1,0 +1,51 @@
+plugins/yellow-linear/commands/linear/sync.md
+  s_5a877dc01e3810::t_cc703d10a2446d 81-85,92,94,108-110
+plugins/gt-workflow/CLAUDE.md
+  s_5a877dc01e3810::t_cc703d10a2446d 358-363
+plugins/gt-workflow/skills/gt-amend/SKILL.md
+  s_5a877dc01e3810::t_cc703d10a2446d 190-194
+plugins/yellow-linear/README.md
+  s_5a877dc01e3810::t_db33e74aaf86ea 79-83,93-94
+plugins/gt-workflow/codex/skills/smart-submit/SKILL.md
+  s_5a877dc01e3810::t_cc4ee2851f434e 246-254
+plugins/yellow-core/commands/flow/work.md
+  s_5a877dc01e3810::t_db33e74aaf86ea 369-373,375-379,955-956,980-981
+plugins/yellow-linear/tests/closing-line-rule.bats
+  s_5a877dc01e3810::t_db33e74aaf86ea 1-37
+plugins/yellow-linear/skills/linear-workflows/SKILL.md
+  s_5a877dc01e3810::t_cc703d10a2446d 353-354,361-363,365,367-373,375-380,383,386-398
+.changeset/graphite-queue-linear-closing.md
+  s_5a877dc01e3810::t_db33e74aaf86ea 9-17
+plugins/yellow-linear/agents/workflow/linear-pr-linker.md
+  s_5a877dc01e3810::t_cc703d10a2446d 79-83,101,104-105,113-114
+plugins/yellow-linear/commands/linear/sync-all.md
+  s_5a877dc01e3810::t_cc703d10a2446d 9,85,93,112-120
+plugins/gt-workflow/codex/skills/gt-amend/SKILL.md
+  s_5a877dc01e3810::t_cc4ee2851f434e 189-193
+plugins/yellow-linear/CLAUDE.md
+  s_5a877dc01e3810::t_db33e74aaf86ea 141-145
+plugins/gt-workflow/skills/smart-submit/SKILL.md
+  s_5a877dc01e3810::t_cc703d10a2446d 247-255
+plugins/yellow-linear/scripts/pr-landed.sh
+  s_5a877dc01e3810::t_f6187e147328b2 1-106
+plugins/yellow-linear/tests/pr-landed.bats
+  s_5a877dc01e3810::t_66fe6265bd8129 6-7
+  s_5a877dc01e3810::t_d2005dedab4bcf 1-5,8-90,92-114
+  s_5a877dc01e3810::t_a181dae2e16502 91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0ab30439082730f88e389e7cc9e5b609105ba2dd",
+  "prompts": {},
+  "sessions": {
+    "s_5a877dc01e3810": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6401b8c8-03bf-423a-a3e5-81d4258d52d9",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
