@@ -416,7 +416,7 @@ through the generator and documenting the single-controller handoff procedure.
 
 ### Phase H: docs, smoke procedure, release
 
-- [ ] Step 34: Update `plugins/yellow-jules/CLAUDE.md`.
+- [x] Step 34: Update `plugins/yellow-jules/CLAUDE.md`.
   - **Commands:** refresh the catalog (4 → 10 commands) and the skills list. Drop the "read-only surface only" paragraph.
   - **Security model:** grants only, the TTY trust root, the ceilings, and the residual same-UID forgery risk (Open Question 5 decision).
   - **Single-controller handoff procedure (R38):**
@@ -428,12 +428,12 @@ through the generator and documenting the single-controller handoff procedure.
     6. Delete the source host's controller file, so the source copy fails loud.
     7. Run `status --reconcile` on the new host before any write.
   - **Out-of-band containment procedure (R39),** usable without a grant: vendor console stop, source-connection revocation, API-key rotation.
-- [ ] Step 35: Update `plugins/yellow-jules/README.md`. Cover the mutating commands, `authorize` usage from a terminal, the defaults and ceilings, supervision, and Codex availability.
-- [ ] Step 36: Update the Codex distribution docs (R28).
+- [x] Step 35: Update `plugins/yellow-jules/README.md`. Cover the mutating commands, `authorize` usage from a terminal, the defaults and ceilings, supervision, and Codex availability.
+- [x] Step 36: Update the Codex distribution docs (R28).
   - `docs/codex-distribution.md`: "Four" → "Five" plugins, the canonical order list, and the jules note in the host-neutral skills and known constraints sections.
   - Also check `docs/cursor-distribution.md`, root `README.md`, and `AGENTS.md:327-330` (the Codex-enabled list) and its component counts.
   - Run `node scripts/validate-doc-counts.js`.
-- [ ] Step 37: Write the R53 human smoke materials.
+- [x] Step 37: Write the R53 human smoke materials.
   - **`docs/yellow-jules/smoke-procedure.md`** follows the `docs/operations/post-w3-functional-smoke-test.md` shape: prerequisites, an isolated scratch branch, a grant from a terminal bound to that branch only, and a checklist with `Expected:` lines. The checklist covers:
     - one session created;
     - plan inspected;
@@ -444,10 +444,10 @@ through the generator and documenting the single-controller handoff procedure.
     - no merge;
     - archive-visibility observation with an unfiltered sessions walk.
   - **`docs/yellow-jules/smoke-result.template.md`** carries the frontmatter `result: pass|fail`, `archiveVisibilityConfirmed: true|false`, `vendorPrObserved: true|false`, date, and operator. It is a template only; the real `smoke-result.md` is committed after the smoke, so shell 04's gate cannot pass on a template.
-- [ ] Step 38: Add the changesets.
+- [x] Step 38: Add the changesets.
   - `.changeset/yellow-jules-authority-supervision-codex.md` with `'yellow-jules': minor`.
   - `.changeset/yellow-linear-jules-live-delegate.md` with `'yellow-linear': minor`. The live provider branch is a new capability, so it is minor.
-- [ ] Step 39: Run the validators: `pnpm validate:agents`, `pnpm lint:plugins`, `pnpm validate:shell-compat` and `pnpm check:shell-parse`. Then hand-grep the skill bodies for `AskUserQuestion|Task|Skill|/jules:|CLAUDE_` (exposure-lint blind spots). Fix any CRLF line endings.
+- [x] Step 39: Run the validators: `pnpm validate:agents`, `pnpm lint:plugins`, `pnpm validate:shell-compat` and `pnpm check:shell-parse`. Then hand-grep the skill bodies for `AskUserQuestion|Task|Skill|/jules:|CLAUDE_` (exposure-lint blind spots). Fix any CRLF line endings.
 - [ ] Step 40: Submit through the enabled stacked-PR provider.
   - Run `/stack:status` and continue only on `READY_GRAPHITE`/`READY_GITHUB`.
   - The commit order keeps the Step 28 baseline before the Step 29 flip.

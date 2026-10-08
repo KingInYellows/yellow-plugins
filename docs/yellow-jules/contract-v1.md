@@ -419,7 +419,10 @@ being read, parsed, or used to extract plan or artifact state by `status`,
 later `(createTime, activityId)` than the journal's stored `pendingPlan`
 replaces it (`{ planId, steps, activityCreateTime }`); `planApproved` clears it;
 an empty delta never clears it. `status` therefore renders the newest plan the
-runtime has observed, and `approve` compares against the same field.
+runtime has observed, and `approve` compares against the same field. A partial
+walk reports why it stopped as `activities.stopReason` (`page-cap`,
+`page-failure`, `deadline`, or `unmapped`), which `supervise` uses to tell a
+transient failure from an undetermined one.
 
 - `setup [--install-sdk]` →
   `{ credentialSource: "env" | "none", sdkResolution: "workspace" | "data-dir" | "missing", sdkVersion?, sdkIntegrity?, sdkEntrySha256?, sourcesReachable: CapabilityResult<{ count, truncated }> }`
@@ -444,8 +447,9 @@ runtime has observed, and `approve` compares against the same field.
   →
   `{ localRequestId, localId, sessionResource, vendorState, condition, repository, requestedBranch, observedHead?, sourceResource }`;
   on failure the envelope carries `localRequestId` and `localId` so a
-  reservation can be reconciled. `--dry-run` performs validation and the source
-  read only and returns a distinct shape,
+  reservation can be reconciled. `vendorState` and `condition` are the state at
+  creation (`queued`, `starting`), not a fresh read. `--dry-run` performs
+  validation and the source read only and returns a distinct shape,
   `{ localRequestId, localId, repository, requestedBranch, observedHead?, sourceResource, dryRun: true }`
   — no `sessionResource`, `vendorState`, or `condition`, because no session
   exists and no reservation is written; the confirmation binding is described
@@ -516,8 +520,10 @@ runtime has observed, and `approve` compares against the same field.
 - `reply --session <ref> --message <text> [--request-id <id>] [--dry-run] [--grant-id <id>]`
   → `{ localRequestId, localId, sessionResource, sent: true }`. `--dry-run`
   validates, performs one `info()`, and returns the same fields with
-  `sent: false, dryRun: true`. A dry-run never reports `sent: true`, because it
-  issues no POST. The real call is one POST, non-blocking (R9).
+  `sent: false, dryRun: true`, plus `repository`, `requestedBranch`, and
+  `taskRef` of the session when this plugin created it (the scope a covering
+  grant must match). A dry-run never reports `sent: true`, because it issues no
+  POST. The real call is one POST, non-blocking (R9).
 - `approve --session <ref> --plan-id <evaluated plan id> [--request-id <id>] [--dry-run] [--grant-id <id>]`
   →
   `{ localRequestId, localId, sessionResource, approvedPlanId, observedPlanIdAfter: string | null, verificationDeferred: bool, verification: { pages: n, partialPagination: bool }, policyDeviation? }`.
@@ -527,7 +533,7 @@ runtime has observed, and `approve` compares against the same field.
   `pendingPlan` in the journal is `JULES_INVALID_STATE`, recovery "run
   `status`"), **not** at the watermark, so the plan is always re-read fresh from
   the vendor and the read stays bounded when the filter is honoured; it returns
-  `{ localRequestId, localId, sessionResource, dryRun: true, observedPlanId }`,
+  `{ localRequestId, localId, sessionResource, dryRun: true, observedPlanId, repository?, requestedBranch?, taskRef? }`,
   where `observedPlanId` is the plan id the confirmation binds to. The dry-run
   envelope carries neither `approvedPlanId` nor the post-POST verification
   fields (`observedPlanIdAfter`, `verificationDeferred`, `verification`),
@@ -573,7 +579,7 @@ runtime has observed, and `approve` compares against the same field.
   smoke), staging stops, remaining artifacts are listed in `skipped` with
   `aggregate-cap-reached`, and `partialStaging: true` is set. Never touches a
   checkout (R40).
-- `authorize --repo <owner/repo> --branch <ref|pattern> [--source <resource>] --task-ref <id> [--task-ref <id> ...] --operations <create,reply,approve,collect> [--max-active-sessions <n>] [--max-total-tasks <n>] [--max-corrective-rounds <n>] [--ttl-minutes <n>] --owner <name> [--take-over]`
+- `authorize --repo <owner/repo> --branch <ref|pattern> [--source <resource>] --task-ref <id> [--task-ref <id> ...] --operations <create,reply,approve,collect> [--max-active-sessions <n>] [--max-total-tasks <n>] [--max-corrective-rounds <n>] [--ttl-minutes <n>] --owner <name>`
   →
   `{ grantId, repository, sourceResource, branchPattern, taskRefs, operations, limits: { maxActiveSessions, maxTotalTasks, maxCorrectiveRounds }, expiresAt, controllerId, epoch }`.
   The runtime opens `/dev/tty` itself (see "Confirmation token"), so a caller
@@ -584,8 +590,10 @@ runtime has observed, and `approve` compares against the same field.
   minutes); a value above a ceiling is `JULES_INVALID_INPUT`. `authorize` takes
   no `--grant-id` and refuses when `YELLOW_JULES_ACTIVE_GRANT` is set, so a
   grant is never created or widened from inside a supervised session.
-  `--take-over` is the R38 handoff (see "Local state"): it writes epoch+1 for
-  this host and data-dir path and rewrites every grant's epoch reference.
+- `authorize --take-over` → `{ controllerId, epoch, dataDir, grantsRebound }`.
+  The R38 handoff (see "Local state"), standalone: it takes no grant flags and
+  is TTY-confirmed. It writes epoch+1 for this host and the canonical data-dir
+  path, then rewrites every grant's controller id and epoch reference.
 - `authorize --list` →
   `{ grants: [{ grantId, repository, sourceResource, branchPattern, taskRefs, operations, limits, usage, expiresAt, expired, revoked }] }`.
   Read-only; no TTY.
@@ -665,7 +673,7 @@ until the engine milestone introduces the versioned process interface
 { "ok": true, "operation": "<subcommand>", ...result fields,
   "requiresAttention"?: true, "attention"?: ["<flag-or-outcome>", ...] }
 { "ok": false, "operation": "<subcommand>", "localRequestId"?: "...",
-  "localId"?: "...",
+  "localId"?: "...", "details"?: { ... },
   "error": { "code": "JULES_*", "message": "...", "retryable": bool,
              "requestId"?: "...", "recoveryAction": "..." } }
 ```
@@ -689,6 +697,12 @@ reconcile outcome has one disposition:
 | `policy-deviation`    | kept            | `attention`, top-level `policyDeviation: true`; `supervise` stops acting (R33) | reconcile by hand before any further write           |
 | `unknown-outcome`     | kept            | `attention`                                                                    | rerun `status --reconcile` later                     |
 | `not-reached`         | kept            | `attention`                                                                    | rerun with a larger `--deadline-ms`                  |
+
+`details` appears on a few mutating failures and is structured data, never
+prose: `runningSessions: ["sessions/<id>", ...]` on `JULES_GRANT_EXPIRED` (the
+sessions under the grant that may still be running, R39), and `sessionResource`
+(plus `journalRecorded: false` when the local bookkeeping itself failed) on
+`JULES_UNKNOWN_OUTCOME`.
 
 `operation` is the subcommand name, or the literal `"unknown"` on a usage error
 where no valid subcommand was given (mirrors `yellow-cursor`). `localRequestId`
@@ -923,7 +937,13 @@ as remote termination (R39).
   reference. Trial defaults: 1 active session, 3 tasks, 2 corrective rounds, 2
   hours. Documented ceilings, enforced by `authorize`: 3 active sessions, 10
   tasks, 3 corrective rounds, 24 hours. Never widened by the runtime or from
-  within a session under a grant.
+  within a session under a grant. Counters (R31): reserved and unknown-outcome
+  operations count; a `create` takes an active-session slot and, unless it is a
+  repair, one task; a repair `create` and a corrective `reply` spend one
+  corrective round instead. The slot is freed when the session is observed
+  terminal, or by reconcile `released`, `abandon`, or a clean rejection (a
+  rejection the vendor answered, or a failure before anything was sent); tasks
+  and corrective rounds never decrement.
 - **Single controller host** (R38): one data directory is the only writer; a
   local lock serializes it; stale locks fail loud; the copy-detection control is
   in Local state; the manual handoff procedure lives in

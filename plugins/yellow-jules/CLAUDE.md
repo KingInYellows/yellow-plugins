@@ -5,17 +5,18 @@ Google Jules integration, **experimental**, the third member of the
 integration lives in a typed TypeScript CLI (`src/` → compiled `dist/cli.js`);
 command markdown files are thin wrappers with no API logic.
 
-This release ships the **read-only** surface only: `setup`, `list`, `status`,
-`collect`. `delegate`, `reply`, and `approve` arrive together with `authorize`
-in a later release; until then `/linear:delegate` recognizes Jules but stops
-before contacting it. The binding contract — subcommands, JSON shapes, error
-catalog, redaction layers, identifier allowlist, local state — is
+The CLI reads sessions (`setup`, `list`, `status`, `collect`), writes to them
+under a grant (`delegate`, `reply`, `approve`), and supervises them in bounded
+passes (`supervise`). Grants are written only by `authorize`, which the owner
+confirms on a terminal (see "Security model"). `/linear:delegate` launches
+through it under a covering grant. The binding contract — subcommands, JSON
+shapes, error catalog, redaction layers, identifier allowlist, local state — is
 [`docs/yellow-jules/contract-v1.md`](../../docs/yellow-jules/contract-v1.md);
 this file does not restate it.
 
 ## Architecture
 
-```
+```text
 plugins/yellow-jules/
   package.json          # private; @google/jules-sdk "0.2.0" (exact); engines.node >=22.22
   tsconfig.json         # extends ../../tsconfig.base.json, module node16 (CJS emit)
@@ -23,6 +24,15 @@ plugins/yellow-jules/
   src/
     cli.ts              # entry: strict parseArgs, one JSON line on stdout, exit 0/1/2
     runtime.ts          # setup / list / status / collect over an injected SdkAdapter
+    runtime-support.ts  # RuntimeDeps, withAdapter, bounded read, status vocabulary
+    mutations.ts        # delegate / reply / approve / abandon: one POST each, never retried
+    write-gate.ts       # the R31 authority critical section and the settle helpers
+    reconcile.ts        # status --reconcile: one shared sessions walk, per-session resolution
+    supervise.ts        # one bounded supervision pass; --clear-pause
+    authorize.ts        # create / list / revoke grants; --take-over
+    authority.ts        # grants.json, evaluateAuthority (pure), counters
+    controller.ts       # R38 authority file outside the data dir, epoch, takeover
+    tty-confirm.ts      # the runtime-owned /dev/tty challenge (the only trust root)
     activity-walk.ts    # the single bounded activity-walk unit
     sdk-adapter.ts      # ONLY file touching the SDK API (plus the resolver's location work)
     sdk-resolver.ts     # locate, verify, and dynamically import the ESM-only SDK
@@ -33,22 +43,29 @@ plugins/yellow-jules/
     deadline.ts         # absolute deadlines + bounded read retry
     errors.ts redact.ts validate.ts types.ts
   dist/                 # committed compiled CJS; drift-checked in CI
-  commands/jules/       # setup, list, status, collect
-  tests/                # vitest; fake adapter, fake HTTP server, packed-SDK suite
+  commands/jules/       # setup, list, status, collect, delegate, reply, approve, authorize, abandon, supervise
+  skills/               # jules-delegation, jules-supervision (host-neutral; also exposed to Codex)
+  codex/skills/         # generated Codex copies of the two skills; never hand-edit
+  tests/                # vitest; fake adapter, fake HTTP server, packed-SDK suite, compiled-CLI e2e
 ```
 
 ### sdk-adapter boundary
 
 `sdk-adapter.ts` is the only file that uses the SDK API (R2); `sdk-resolver.ts`
-only locates and loads the package. `runtime.ts` depends on the `SdkAdapter`
-port in `types.ts`, which exposes **reads only** in this release — adding a
-mutating method is PR3 work and changes the adapter prototype test in
-`unsupported-capability.test.ts`. The adapter builds the client with
-`config.requestTimeoutMs: 60000`, `config.rateLimitRetry.maxRetryTimeMs: 0`
-(nested — a top-level key is silently ignored), and a recording in-memory
-`storageFactory` whose bindings it asserts after `connect()` and on first
-per-session use. `buildCreateSessionConfig` is a pure builder used only by the
-packed-SDK tests.
+only locates and loads the package. The runtime depends on the `SdkAdapter` port
+in `types.ts`. It exposes the reads plus exactly three writes — `createSession`,
+`sendMessage`, `approvePlan` — each one POST and never retried. A write failure
+carries `AdapterError.dispatched`, taken from the fetch guard's POST counter:
+before dispatch it maps like a read; after dispatch only a clear rejection keeps
+its code and everything else is `JULES_UNKNOWN_OUTCOME`. With no counter wired,
+every write failure counts as dispatched. There is no cancel, pause, resume,
+`run`, `all`, `result`, `ask`, or `waitFor`; adding a method changes the adapter
+prototype test in `unsupported-capability.test.ts`. The adapter builds the
+client with `config.requestTimeoutMs: 60000`,
+`config.rateLimitRetry.maxRetryTimeMs: 0` (nested — a top-level key is silently
+ignored), and a recording in-memory `storageFactory` whose bindings it asserts
+after `connect()` and on first per-session use. `buildCreateSessionConfig` is a
+pure builder used only by the packed-SDK tests.
 
 ### SDK pin policy
 
@@ -82,19 +99,113 @@ data dir, `state/`, `sdk-scratch/`, or `runtime/` is refused with
 `state/.lock`, `artifacts/<local-id>/`, `sdk-scratch/` (must stay empty),
 `runtime/`. A corrupt journal is never replaced (`JULES_JOURNAL_CORRUPT`); a
 stale lock is never taken over (`JULES_STALE_LOCK`) — both need a human.
+`state/grants.json` follows the same rules (a corrupt file is never read as
+empty). Outside the data directory, `<controllerDir>/<controllerId>.json`
+(`YELLOW_JULES_CONTROLLER_DIR` > `$XDG_STATE_HOME/yellow-jules-controller` >
+`~/.local/state/yellow-jules-controller`) records the epoch and the canonical
+data-directory path this host may write from.
+
+## Security model
+
+- **Grants only.** Every real write (`delegate`, `reply`, `approve`, and what
+  `supervise` triggers) needs `--grant-id`. There is no per-operation
+  confirmation token. A grant fixes one repository, a branch or branch prefix,
+  task refs, a subset of `create`/`reply`/`approve`/`collect`, limits, an
+  expiry, and a controller epoch. Defaults: 1 active session, 3 tasks, 2
+  corrective rounds, 120 minutes. Ceilings `authorize` enforces: 3 active
+  sessions, 10 tasks, 3 corrective rounds, 24 hours. A grant can only narrow
+  under the runtime: counters go up, slots free up, nothing widens.
+- **`authorize` is the only trust root.** The runtime opens `/dev/tty` itself,
+  prints the grant, and requires the owner to type back a random 6-character
+  code. A caller with no controlling terminal — the agent's Bash tool, the Codex
+  sandbox, a closed-stdin engine, CI — is refused with
+  `JULES_CONFIRMATION_REQUIRED`. Whether stdin is a TTY is never consulted, and
+  the code appears in no envelope, argv, journal, or log. `abandon`,
+  `supervise --clear-pause`, and `authorize --take-over` are gated the same way,
+  because each widens effective authority. `authorize --list` and `--revoke`
+  need no terminal.
+- **The Claude wrappers add a preview, not the enforcement.** Each wrapper shows
+  a fenced preview and asks via `AskUserQuestion` before using a grant (R8), but
+  the enforcement is the grant. The `authorize`, `abandon`, and `--clear-pause`
+  wrappers only print the command for the owner to run in a separate terminal
+  window; running it through Claude Code would put the TUI between the owner and
+  the prompt.
+- **Counters (R31).** Reserved and unknown-outcome operations count. A `create`
+  takes an active-session slot (freed when the session is observed terminal, or
+  by reconcile `released`, `abandon`, or a clean rejection) and, unless it is a
+  repair, one task. A repair `create` and a corrective `reply` spend a
+  corrective round instead. Tasks and rounds never decrement.
+- **One critical section (R31).** Controller authority, grant lookup, authority
+  evaluation, the R36 duplicate lookup, the charge, and the reservation happen
+  under one lock, so two processes racing for a one-session grant create one
+  session. `grants.json` is written before `journal.json`: a crash between them
+  leaks a slot, which can only make a grant stricter.
+- **Residual risks — read these.**
+  - A process running as the same UID can read and rewrite `state/grants.json`
+    and the controller file. There is no grant MAC, because any key the runtime
+    can read the same UID can read. Integrity rests on `0600` permissions, the
+    separate grants file, the controller epoch and path binding, and grants that
+    only narrow.
+  - The terminal challenge defeats a caller that has no controlling terminal. A
+    same-UID process that can allocate a pseudo-terminal of its own (`script`,
+    Python's `pty`, `expect`) gets one, can read the code, and can answer it.
+    The controls against that are the host's sandbox and what the agent is
+    allowed to run, not this plugin.
+  - Expiry and pause do not stop remote work; see the containment procedure.
+
+## Single-controller handoff (R38)
+
+One data directory is the only writer. To move it to another host or path:
+
+1. Quiesce the source writer: no `delegate`, `reply`, `approve`, or `supervise`
+   process running.
+2. Run `status --reconcile` until no `reserved` or `unknown-outcome` operation
+   remains (or settle them with `abandon`).
+3. Revoke the grants on the source with `authorize --revoke`, or let them
+   expire.
+4. Copy the data directory to the new host.
+5. On the new host, in a terminal, run `authorize --take-over`. It writes
+   epoch+1 for that host and its canonical data-directory path and rebinds every
+   grant.
+6. Delete the source host's controller file, so the source copy fails loud with
+   `JULES_CONTROLLER_MISMATCH` instead of writing in parallel.
+7. Run `status --reconcile` on the new host before any write.
+
+A copied or restored data directory with no matching controller file cannot
+write.
+
+## Out-of-band containment (R39)
+
+Usable without any grant. Grant expiry, a deadline, a pause, and revocation do
+**not** stop a Jules session that is already running, and the plugin never
+claims they do. Errors that follow an expired grant list the sessions that may
+still be running. To contain them:
+
+1. Stop the session in the Jules console.
+2. Revoke the repository's source connection in Jules.
+3. Rotate `JULES_API_KEY` if the key may have leaked.
 
 ## Testing
 
 `pnpm --filter yellow-jules test` (also run by root `pnpm test:unit`). Layers:
 
-- fake-adapter suites (`runtime-*.test.ts`) over `tests/fake-sdk.ts`;
+- fake-adapter suites (`runtime-*.test.ts`, `authority.test.ts`,
+  `controller.test.ts`, `tty-confirm.test.ts`, `supervise.test.ts`) over
+  `tests/fake-sdk.ts` and an in-memory terminal (`tests/support/grants.ts`);
 - `packed-sdk-transport.test.ts` — installs the real `0.2.0` artifact through
   the shipped `npm ci` path (needs npm registry access) and drives it against
-  `tests/fake-http-server.ts`; the only place the SDK's mutating surface runs;
+  `tests/fake-http-server.ts`, including the shipped adapter's three writes;
 - `cli-json-contract.test.ts` and `offline-coverage.test.ts` — the CLI built
   with `tsc --outDir <mkdtemp>` into a temp "plugin cache", spawned with
-  `tests/support/loopback-preload.cjs`; includes the negative test that every
-  shipped subcommand issues zero POST/PATCH/PUT/DELETE.
+  `tests/support/loopback-preload.cjs`; includes the negative test that the
+  read-only subcommands issue zero POST/PATCH/PUT/DELETE and that every mutating
+  subcommand refuses before sending anything without a grant or a terminal;
+- `cli-mutations-e2e.test.ts` — compiled CLI processes under a seeded grant: two
+  processes racing for one slot create one session, a copied data directory
+  cannot write, a lost response is reconciled and never replayed. A real
+  `/dev/tty` cannot exist in CI, so the terminal is a fake, and the real
+  `/dev/tty` path is exercised only in the manual smoke
+  (`docs/yellow-jules/smoke-procedure.md`).
 
 Real tools on `PATH` are replaced by failing traps
 (`tests/support/path-traps.ts`). Fake-server response bodies are illustrative: a
@@ -112,11 +223,30 @@ plugins; `pnpm validate:jules` fails on drift. Change both sides together.
 
 ## Component catalog
 
-### Commands (4)
+### Commands (10)
 
 - `/jules:setup` — credential presence, SDK location and verification, a
   one-page sources probe; installs the pinned SDK only with consent
 - `/jules:list` — one page of sessions with normalized condition and local ids
-- `/jules:status` — fresh session read plus a bounded activity walk
+- `/jules:status` — fresh session read plus a bounded activity walk; with
+  `--reconcile`, resolves reservations whose outcome was unknown
 - `/jules:collect` — stage patches, generated files, and PR references under
   `artifacts/<local-id>/`; never touches a checkout
+- `/jules:delegate` — dry-run, find a covering grant, preview, confirm, launch
+- `/jules:reply` — the same flow for one non-blocking message
+- `/jules:approve` — re-read the plan completely, confirm, approve once
+- `/jules:authorize` — list and revoke grants; prints the terminal command to
+  write one or to take over the controller
+- `/jules:abandon` — prints the terminal command to give up an unresolved
+  operation
+- `/jules:supervise` — one bounded pass; at most one reply or approval
+
+### Skills (2)
+
+- `jules-delegation` — host-neutral lifecycle, CLI contract, and grant rules
+- `jules-supervision` — host-neutral one-pass semantics and the decision table
+
+Both are `user-invocable: false`, exposed to Codex through
+`targets.codex.skillAllowlist`, and deliberately free of slash commands, host
+environment variables, and host tool names. Their names differ from the
+commands' on purpose.
