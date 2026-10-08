@@ -1,0 +1,28 @@
+plugins/yellow-core/skills/git-worktree/scripts/worktree-restack.sh
+  s_5a877dc01e3810::t_847836d1a9024b 1414-1417,1419,1422,1443-1446,1448-1449,1451-1459,1467-1469,1471,1490,1549,1576,1578-1579
+plugins/yellow-core/skills/git-worktree/SKILL.md
+  s_5a877dc01e3810::t_847836d1a9024b 195,211-215,229-232
+.changeset/yellow-core-restack-abort-worktrees.md
+  s_5a877dc01e3810::t_e9b9a440c181e0 5
+plugins/yellow-core/skills/git-worktree/tests/worktree-restack.bats
+  s_5a877dc01e3810::t_4f3cf8846202a9 999-1003,1005-1007,1035-1080
+  s_5a877dc01e3810::t_6e967126c1ea60 1081
+plugins/yellow-core/commands/worktree/restack.md
+  s_5a877dc01e3810::t_847836d1a9024b 175-177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "31c7971b15e4090a9ea30a699379c6da2ce8804f",
+  "prompts": {},
+  "sessions": {
+    "s_5a877dc01e3810": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6401b8c8-03bf-423a-a3e5-81d4258d52d9",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
