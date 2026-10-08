@@ -192,7 +192,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-restack.sh" \
 | `preflight` | Read-only. Prints the run worktree, the stack, the worktrees to detach and any `REFUSE` reasons |
 | `start` | Lock, detach, restack, verify ancestry, restore; `--submit` submits after |
 | `continue` | Resumes a paused conflict, then verifies and restores |
-| `abort` | Aborts the provider's restack (Graphite rolls back the whole restack), then restores |
+| `abort` | Aborts the provider's restack (Graphite rolls back the whole restack) and any in-chain git rebase in a stack worktree, returns the run worktree to the start branch, then restores |
 | `status` | Shows the recorded restack, or a worktree stranded detached at a branch tip |
 | `restore` | Restore only after partial restore, failed abort, mismatch, or hand finish |
 
@@ -208,8 +208,11 @@ Safety rules the script holds:
   in progress. An untracked `.ruvector` symlink does not count as dirty.
 - Its own git calls never force a checkout, stash, hard-reset or pass
   `--ignore-other-worktrees` (Graphite's abort, which the script runs on
-  `--abort`, still rolls the whole restack back). A worktree that cannot be restored stays detached
-  and the script prints the `git -C <path> checkout <branch>` line.
+  `--abort`, still rolls the whole restack back, and `--abort` also runs
+  `git rebase --abort` in any stack worktree holding an in-chain rebase,
+  discarding that rebase's in-progress state). A worktree that cannot be
+  restored stays detached and the script prints the
+  `git -C <path> checkout <branch>` line.
 - A conflict pauses the run (exit 10). Graphite: the stack worktrees stay
   detached and are `git worktree lock`ed with a reason. Do not commit in them;
   a commit there lands on no branch, and the script reports it and refuses to
@@ -223,8 +226,10 @@ Safety rules the script holds:
   constrained to this repository's worktrees and the recorded stack branches.
 
 Exit codes are documented in the script header and in the `/worktree:restack`
-command's exit table. Exit `31` means a provider step failed with the state
-kept: run `status`, then `continue`, `abort` or `restore`. Exit `40` means
+command's exit table. Exit `31` means a step failed with the state kept (a
+provider step failed, a worktree may still be detached, or an in-chain rebase
+or other operation is still in progress): run `status`, then `continue`,
+`abort` or `restore`. Exit `40` means
 restore kept the state: remaining detached worktrees, or a GitHub restack
 still paused (nothing detached; `--continue` or `--abort`).
 

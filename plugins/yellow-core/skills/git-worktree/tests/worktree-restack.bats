@@ -996,8 +996,15 @@ JSEOF
   plant_stuck_rebase "$(wtp c)" c
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 31 ]
-  [[ $output == *"still in progress"* ]]
+  [[ $output == *"still in progress in $(wtp c)"* ]]
+  [[ $output == *"git -C $(wtp c) rebase --abort"* ]]
+  [[ $output == *"did not clear the rebase in $(wtp c)"* ]]
+  # Nothing was restored: the state and the lock are kept and the stack
+  # worktrees are still detached.
   [ -e "$SD/state" ]
+  [ -d "$SD/lock.d" ]
+  [ -z "$(branch_of "$(wtp b)")" ]
+  [ -z "$(branch_of "$(wtp c)")" ]
   run rebase_marker "$(wtp a)"
   [ "$status" -eq 1 ]
   rebase_marker "$(wtp c)"
@@ -1023,6 +1030,53 @@ JSEOF
   [[ $output == *"aborted"* ]]
   assert_all_restored
   rebase_marker "$T/wt-side"
+}
+
+@test "--abort keeps state while a non-rebase operation runs in a stack worktree, then finishes" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  gd=$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)
+  git -C "$(wtp c)" rev-parse HEAD >"$gd/MERGE_HEAD"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"MERGE_HEAD operation is still in progress in $(wtp c)"* ]]
+  [ -e "$SD/state" ]
+  [ -d "$SD/lock.d" ]
+  [ -z "$(branch_of "$(wtp c)")" ]
+  rm -f "$gd/MERGE_HEAD"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "--abort ignores a non-rebase operation in a worktree outside the recorded stack" {
+  mk_stack b
+  git -C "$REPO" branch side main
+  git -C "$REPO" worktree add -q "$T/wt-side" side
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  gd=$(git -C "$T/wt-side" rev-parse --path-format=absolute --git-dir)
+  git -C "$T/wt-side" rev-parse HEAD >"$gd/MERGE_HEAD"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  [[ $output == *"aborted"* ]]
+  assert_all_restored
+}
+
+@test "--abort drops a recorded worktree that was removed during the pause instead of exiting 31 forever" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  git -C "$REPO" worktree unlock "$(wtp c)"
+  git -C "$REPO" worktree remove --force "$(wtp c)"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  [[ $output == *"dropped: $(wtp c) is no longer a worktree"* ]]
+  [ ! -e "$SD/state" ]
+  [ ! -d "$SD/lock.d" ]
+  [ "$(branch_of "$(wtp a)")" = a ]
+  [ "$(branch_of "$(wtp b)")" = b ]
 }
 
 @test "a rejected state file (exit 4) still lists pause-locked worktrees" {

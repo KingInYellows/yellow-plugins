@@ -1411,26 +1411,15 @@ chain_rebase_worktree() {
   return 1
 }
 
-# abort_in_chain_rebase PATH: git rebase --abort in PATH. Nonzero when the
-# command fails or an in-chain rebase marker is still present.
-abort_in_chain_rebase() {
-  git -C "$1" rebase --abort >/dev/null 2>&1 || return 1
-  if worktree_in_chain_rebase "$1"; then
-    return 1
-  fi
-  return 0
-}
-
-# release_run_worktree: `git rebase --abort` leaves the run worktree on the
-# branch it was rebasing. Check the recorded start branch back out so that
-# branch's own worktree can be restored. A non-stack branch is left as it is.
+# release_run_worktree START: `git rebase --abort` leaves the run worktree on
+# the branch it was rebasing. Check the recorded start branch START back out so
+# that branch's own worktree can be restored. A non-stack branch is left as it
+# is.
 release_run_worktree() {
-  local cur start head line
-  start=${S_CHAIN[1]:-}
+  local start=$1 cur head line
   [ -n "$start" ] || return 0
   cur=$(git -C "$S_RUN" branch --show-current 2>/dev/null) || cur=""
-  [ "$cur" = "$start" ] && return 0
-  if [ -n "$cur" ] && ! in_chain "$cur"; then
+  if [ "$cur" = "$start" ] || { [ -n "$cur" ] && ! in_chain "$cur"; }; then
     return 0
   fi
   if [ -z "$cur" ]; then
@@ -1451,12 +1440,23 @@ release_run_worktree() {
 
 # abort_in_chain_rebases: clear every in-chain rebase. Each worktree is tried
 # once, so a marker that will not clear cannot spin and cannot hide the
-# abortable rebases in later worktrees. Nonzero when any attempt failed.
+# abortable rebases in later worktrees. A failed attempt prints git's first
+# line and sets ABORT_STUCK to the first worktree that is still mid-rebase.
+# Nonzero when any attempt failed.
+ABORT_STUCK=""
 abort_in_chain_rebases() {
-  local i rc=0
+  local i p out why rc=0
+  ABORT_STUCK=""
   for ((i = 0; i < ${#WT_PATH[@]}; i++)); do
-    worktree_in_chain_rebase "${WT_PATH[i]}" || continue
-    abort_in_chain_rebase "${WT_PATH[i]}" || rc=1
+    p=${WT_PATH[i]}
+    worktree_in_chain_rebase "$p" || continue
+    if out=$(git -C "$p" rebase --abort 2>&1) && ! worktree_in_chain_rebase "$p"; then
+      continue
+    fi
+    rc=1
+    [ -n "$ABORT_STUCK" ] || ABORT_STUCK=$p
+    why=$(printf '%s' "$out" | head -n 1 | tr -d '\000-\037\177')
+    err "git rebase --abort did not clear the rebase in $(v "$p"): ${why:-the rebase marker is still present}"
   done
   return "$rc"
 }
@@ -1464,9 +1464,11 @@ abort_in_chain_rebases() {
 # in_chain_busy: print "<operation>\t<path>" and return 0 when the run worktree,
 # a recorded detached entry, or a worktree checked out on a recorded stack
 # branch is mid-operation. Return 2 when the worktree list cannot be read.
-# Other worktrees are not checked: wt_busy treats an unreadable one as busy.
+# Unrelated worktrees are skipped on purpose: wt_busy reports an unreadable
+# worktree as busy, so scanning a broken one outside the stack would block the
+# abort over something the restack never touched.
 in_chain_busy() {
-  local i j p b busy skip wi
+  local i p b busy wi
   local -a paths=()
   load_worktrees || return 2
   paths+=("$S_RUN")
@@ -1485,17 +1487,10 @@ in_chain_busy() {
       paths+=("${WT_PATH[i]}")
     fi
   done
+  # wt_busy only reads, so a path listed twice is simply probed twice.
   for ((i = 0; i < ${#paths[@]}; i++)); do
     p=${paths[i]}
     [ -n "$p" ] || continue
-    skip=0
-    for ((j = 0; j < i; j++)); do
-      if [ "${paths[j]}" = "$p" ]; then
-        skip=1
-        break
-      fi
-    done
-    [ "$skip" -eq 0 ] || continue
     if busy=$(wt_busy "$p"); then
       printf '%s\t%s' "$busy" "$p"
       return 0
@@ -1551,7 +1546,7 @@ cmd_abort() {
   load_state_or_exit
   need_lock
   report_all_floating
-  local provider_aborted=0 left
+  local provider_aborted=0 left start=${S_CHAIN[1]:-}
   if [ "$S_PROVIDER" = graphite ]; then
     command -v gt >/dev/null 2>&1 || die "$X_KEPT" "gt (Graphite CLI) is not installed; state kept"
     if gt_paused "$S_RUN"; then
@@ -1578,13 +1573,10 @@ cmd_abort() {
   # in-chain git rebase (a stack branch, in whichever worktree holds it),
   # then refuse to restore while one of those worktrees is still busy.
   if ! abort_in_chain_rebases; then
-    if left=$(chain_rebase_worktree); then
-      die "$X_KEPT" "a rebase operation is still in progress in $(v "$left"); state kept, nothing restored. Finish or abort it, then run --abort again"
-    fi
-    die "$X_KEPT" "could not abort an in-chain rebase; state kept, nothing restored"
+    die "$X_KEPT" "a rebase operation is still in progress in $(v "$ABORT_STUCK"); state kept, nothing restored. Finish or abort it (git -C $(q "$ABORT_STUCK") rebase --abort), then run --abort again"
   fi
-  if ! release_run_worktree; then
-    die "$X_KEPT" "could not return the run worktree to $(v "${S_CHAIN[1]:-}"); state kept, nothing restored"
+  if ! release_run_worktree "$start"; then
+    die "$X_KEPT" "could not return the run worktree to $(v "$start"); state kept, nothing restored"
   fi
   local busy_line rc busy_name busy_path
   busy_line=$(in_chain_busy) || rc=$?

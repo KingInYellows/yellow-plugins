@@ -172,8 +172,9 @@ every call below; never run a call with a provider the router did not report.
 
 For `--abort`, unless `yes=1`, confirm with `AskUserQuestion`: "Abort the
 restack? With Graphite, aborting rolls back the whole restack, including
-branches that had already restacked cleanly." with options "Abort" and
-"Cancel".
+branches that had already restacked cleanly. It also aborts any git rebase of
+a stack branch in the other stack worktrees, discarding that rebase's
+in-progress work." with options "Abort" and "Cancel".
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-restack.sh" continue --provider <provider>
