@@ -374,10 +374,10 @@ through the generator and documenting the single-controller handoff procedure.
   - Set `{ enabled: true, includeHooks: false, interface: { displayName: "Jules", category: "Developer Tools" }, skillAllowlist: ["jules-delegation","jules-supervision"], componentPaths: { skills: "./codex/skills" } }`.
   - Run `pnpm generate:manifests` and commit `plugins/yellow-jules/codex/skills/**`, `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json`.
   - Refresh the characterization snapshot with `vitest -u`, then run `pnpm validate:codex` and `pnpm validate:versions`.
-- [ ] Step 30: Discover the Codex tools (spec Open Question 2).
+- [x] Step 30: Discover the Codex tools (spec Open Question 2).
   - Record `codex --version` and the research and review tools available to a Codex session.
   - Add a "Codex supervision capabilities" table to `docs/yellow-jules/capability-matrix.md`, with evidence labels.
-  - Run a manual Codex host smoke covering: skill discovery, `status` through the skill, a `delegate --dry-run`, and refusal of a real `delegate` without a grant.
+  - Run a manual Codex host smoke covering: skill discovery, `status` through the skill, a `delegate --dry-run`, and refusal of a real `delegate` without a grant. *Done as far as it can be without the owner's credentials: discovery was verified in an isolated `CODEX_HOME` through `codex debug prompt-input`, and the CLI checks were run from a shell with no terminal. A live Codex model session was not run (it needs the owner's Codex login and `JULES_API_KEY`); that part is left to the owner and listed in `docs/yellow-jules/capability-matrix.md`.*
   - Record the result in the PR description.
 
 ### Phase G: tests (R52 PR3 scenarios, by name)
