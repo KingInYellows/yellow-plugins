@@ -92,10 +92,16 @@ pattern=$(cat <<'AST_GREP_PATTERN'
 PATTERN
 AST_GREP_PATTERN
 )
-lang='LANG'
-target='PATH'
+lang=$(cat <<'AST_GREP_LANG'
+LANG
+AST_GREP_LANG
+)
+target=$(cat <<'AST_GREP_TARGET'
+PATH
+AST_GREP_TARGET
+)
 case "$lang" in *[!A-Za-z0-9_-]*|'') lang='' ;; esac
-case "$target" in /*|*..*|-*|'') target='' ;; esac
+case "$target" in /*|*..*|-*|*[!A-Za-z0-9._/-]*|'') target='' ;; esac
 if [ -n "$lang" ] && [ -n "$target" ]; then
   ast-grep run --pattern "$pattern" --lang "$lang" -- "$target" | head -n 200
 else
@@ -103,9 +109,11 @@ else
 fi
 ```
 
-Put the pattern verbatim inside the quoted heredoc (`$NAME` matches one
-node, `$$$` a list) and keep the `lang` and `target` guards, so nothing from
-the scanned code reaches the command line. For relational rules (`inside`,
+Put each value verbatim inside its quoted heredoc (`$NAME` matches one
+node, `$$$` a list) and keep the guards, so nothing from the scanned repo
+reaches the command line. `target` must be a repo-relative path of letters,
+digits, `.`, `_`, `-`, and `/`; scan any other file with Grep. If output
+reaches 200 lines, treat it as truncated and narrow the pattern or path. For relational rules (`inside`,
 `has`, `not`), load the YAML through the same kind of heredoc into `rule`
 and run `ast-grep scan --inline-rules "$rule" --json=compact -- "$target"`.
 Fence its output like any other scanned code.

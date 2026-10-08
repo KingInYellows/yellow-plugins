@@ -98,6 +98,7 @@ run `/compound` to add to institutional knowledge.
 | Server | Package | Purpose |
 |--------|---------|---------|
 | Ceramic | `mcp.ceramic.ai` | Lexical web search, ~$0.05/1K queries |
+| DeepWiki | `mcp.deepwiki.com` | AI docs for public GitHub repos, no key |
 | Perplexity | `@perplexity-ai/mcp-server` | Web-grounded research and reasoning |
 | Tavily | `tavily-mcp` | Fast web search and page extraction |
 | EXA | `exa-mcp-server` | Neural web search, code examples |
