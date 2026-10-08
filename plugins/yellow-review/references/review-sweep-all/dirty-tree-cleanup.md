@@ -94,10 +94,13 @@ JSON before acting. Exit `2` means it refused and reverted nothing.
   `rp_trusted_config`, so no path goes on the command line:
 
   ```bash
-  "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-denied
+  "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-denied --no-ignored-guard
   ```
 
-  Skip the call when step 2 found no trusted-config path. A non-zero exit,
+  `--no-ignored-guard` is required here: this cleanup holds no
+  `--ignored-since` marker, and `/review:resolve` already guarded the
+  gitignored files of its own run. Skip the call when step 2 found no
+  trusted-config path. A non-zero exit,
   `deniedClean: false`, or an incomplete-revert `reason` (below) is
   `revert incomplete`; `result: "noop"` means nothing needed reverting.
   `treeClean` stays `false` here because the unrecognized paths remain, so do

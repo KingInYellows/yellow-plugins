@@ -728,7 +728,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-dirty' "$DIRTY_REF"
   # The unrecognized branch reverts trusted config through the shared predicate,
   # never a model-built path list.
-  grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-denied' "$DIRTY_REF"
+  grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-denied --no-ignored-guard' "$DIRTY_REF"
   run ! grep -qF -- '--revert-only -- ' "$DIRTY_REF"
   grep -qF 'rp_trusted_config' "$DIRTY_REF"
   grep -q 'deniedClean: false' "$DIRTY_REF"
@@ -1168,7 +1168,11 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$step6flat" == *'"Revert them / Leave them"'* ]]
   [[ "$step6flat" == *'left in place'* ]]
   # The per-file revert comes first, then --revert-denied with no argument.
-  [[ "$step6flat" == *'--revert-only --files-from "<file>"'*'--revert-denied` (no file list; patch saved)'* ]]
+  [[ "$step6flat" == *'--revert-only --files-from "<file>"'*'--revert-denied --ignored-since "$MARK_DIR/ignored-marker"` (no file list; patch saved)'* ]]
+  # The marker outlives the verify call, so every refusal can pass it.
+  [[ "$step6flat" == *'the marker lives until Marker cleanup, so every refusal has it'* ]]
+  [[ "$step6flat" == *'`gitignored trusted-config files changed since`'* ]]
+  [[ "$step6flat" == *'with `--no-ignored-guard` in place of `--ignored-since`'* ]]
   # The refusal path judges --revert-denied's JSON and names what stays on disk.
   [[ "$step6flat" == *'`deniedClean` is the success signal'* ]]
   [[ "$step6flat" == *'deny-listed edit left on disk (revert incomplete)'* ]]
@@ -1176,8 +1180,8 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   # about or left, and a refusal before the verify call still guards ignored files.
   [[ "$step6flat" == *'`rp_trusted_config` in `lib/resolve-paths.sh`'* ]]
   [[ "$step6flat" == *'the rest of the deny list, such as `.env*`, keys, CI and Docker files, included'* ]]
-  [[ "$step6flat" == *'finish the rollback with the `--check-ignored` call under No verify command'* ]]
-  [[ "$step6flat" == *'When no call ran at all (a stop before this step, or a declined command) and resolvers ran, run the `--check-ignored` call above'* ]]
+  [[ "$step6flat" == *'When the refusal came before the verify or `--check-ignored` call below, run that `--check-ignored` call too'* ]]
+  [[ "$step6flat" == *'When no call ran at all (a stop before this step, or a declined command) and resolvers ran, first run the `--check-ignored` call above'* ]]
   step9flat=$(sed -n '/^### Step 9/,/^## Error Handling/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
   [[ "$step9flat" == *'**Reverted deny-listed paths**'* ]]
   dispo=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')

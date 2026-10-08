@@ -720,9 +720,12 @@ rp_link_target_changed() {
 # marker is missing, unreadable, not a regular file or a symlink, git or find
 # fails, or a symlink's target cannot be examined. A caller must treat 2 as a
 # refusal. Whole ignored directories are walked with find; the caller owns
-# <scratch>, a scratch file for git's NUL-delimited listing.
+# <scratch>, a scratch file for git's NUL-delimited listing. An optional third
+# argument names a path predicate (rp_trusted_config): only paths it accepts
+# count, and a directory walk filters before its 20-path cut.
 rp_ignored_changed_since() {
-    local marker="$1" scratch="$2" safe
+    local marker="$1" scratch="$2" keep="${3:-}" safe
+    [ -z "$keep" ] || declare -F -- "$keep" >/dev/null || return 2
     [ -f "$marker" ] && [ ! -L "$marker" ] && [ -r "$marker" ] || return 2
     # find, head, mktemp and the rest run by name after the resolvers wrote
     # the tree, so the walk uses the worktree-free PATH, as yr_git does.
@@ -733,6 +736,8 @@ rp_ignored_changed_since() {
         local mdir top f out p l rc lrc symlist n=0 hits=""
         mdir=$(cd -- "$(dirname -- "$marker")" 2>/dev/null && pwd) || exit 2
         marker="$mdir/$(basename -- "$marker")"
+        # kept <path>: no predicate, or the predicate accepts the path.
+        kept() { [ -z "$keep" ] || "$keep" "${1#./}"; }
         top=$(yr_git rev-parse --show-toplevel 2>/dev/null) || exit 2
         cd -- "$top" 2>/dev/null || exit 2
         symlist=$(mktemp) || exit 2
@@ -749,6 +754,7 @@ rp_ignored_changed_since() {
                 # fails with nothing found is "cannot tell".
                 out=$(set -o pipefail
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o \( -type f -o -type l \) -newer "$marker" -print 2>/dev/null \
+                        | while IFS= read -r p; do if kept "$p"; then printf '%s\n' "$p"; fi; done \
                         | head -n 20) || rc=$?
                 if [ -z "$out" ] && [ "$rc" -eq 0 ]; then
                     # Nothing newer: judge the target of each symlink inside.
@@ -757,7 +763,7 @@ rp_ignored_changed_since() {
                         lrc=0
                         rp_link_target_changed "$l" "$marker" || lrc=$?
                         case "$lrc" in
-                            0) out="$l"; break ;;
+                            0) if kept "$l"; then out="$l"; break; fi ;;
                             1) ;;
                             *) exit 2 ;;
                         esac
@@ -765,17 +771,18 @@ rp_ignored_changed_since() {
                 fi
             elif [ -L "./$f" ]; then
                 out=$(find "./$f" -type l -newer "$marker" -print 2>/dev/null) || rc=$?
+                kept "$f" || out=""
                 if [ -z "$out" ] && [ "$rc" -eq 0 ]; then
                     lrc=0
                     rp_link_target_changed "./$f" "$marker" || lrc=$?
                     case "$lrc" in
-                        0) out="./$f" ;;
+                        0) kept "$f" && out="./$f" ;;
                         1) ;;
                         *) exit 2 ;;
                     esac
                 fi
             elif [ -f "./$f" ]; then
-                [ "./$f" -nt "$marker" ] && out="./$f"
+                [ "./$f" -nt "$marker" ] && kept "$f" && out="./$f"
             fi
             if [ -z "$out" ]; then
                 [ "$rc" -eq 0 ] || exit 2
