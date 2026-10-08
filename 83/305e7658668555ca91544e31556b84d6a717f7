@@ -1,0 +1,22 @@
+.changeset/yellow-core-restack-abort-worktrees.md
+  h_6000354274ce50 1-5
+plugins/yellow-core/CLAUDE.md
+  h_6000354274ce50 586-590
+plugins/yellow-core/commands/worktree/restack.md
+  h_6000354274ce50 187-192,229
+plugins/yellow-core/skills/git-worktree/scripts/worktree-restack.sh
+  h_6000354274ce50 36-37,1380-1395,1400,1402-1473,1476-1480,1543-1564
+plugins/yellow-core/skills/git-worktree/tests/worktree-restack.bats
+  h_6000354274ce50 93-119,939-985,990,995-1019
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "83305e7658668555ca91544e31556b84d6a717f7",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
