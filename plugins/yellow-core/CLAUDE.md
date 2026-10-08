@@ -511,8 +511,8 @@ it: `compound-staging/jev-shadow/<session_id>.json` holds session id, content
 hash, the `durable` choice with confidence and probabilities, the
 `has_instruction` probability, latency and a `would_skip` flag (trivial or
 routine at confidence >= 0.9 and instruction probability <= 0.2). No transcript
-text is logged. Each accepted answer is also appended to
-`jev-shadow/predictions.jsonl`, because a drain can score an entry before a
+text is logged. Every valid answer, even one that lands after a newer turn, is
+also appended to `jev-shadow/predictions.jsonl`, because a drain can score an entry before a
 later turn replaces the per-session file. When `jev-shadow/` exists, the staging-reviewer drain also
 appends each scorer verdict (session id, content hash, verdict, priority) to
 `jev-shadow/outcomes.jsonl`, the join key for that comparison. The key reaches curl as a config on fd 3 and the body on stdin,

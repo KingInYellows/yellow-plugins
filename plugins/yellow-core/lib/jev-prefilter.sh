@@ -128,18 +128,27 @@ jev_current_hash() {
 # pid, so the lock and its owner appear in one atomic step. Waits up to
 # ~2 s; returns 1 if not acquired. A lock whose owner has exited is reaped
 # under a reaper mutex, and only if it still names that same owner, so two
-# waiters cannot both reap and one delete the other's fresh lock.
+# waiters cannot both reap and one delete the other's fresh lock. The mutex
+# is a pid symlink too, so one left by a reaper that died mid-reap is
+# cleared the same way instead of blocking every later turn.
 jev_lock() {
-  local lock="$1" owner i=0
+  local lock="$1" owner reaper i=0
   until ln -sn "${BASHPID:-$$}" "$lock" 2>/dev/null; do
     i=$((i + 1))
     [ "$i" -le 40 ] || return 1
     owner=$(readlink "$lock" 2>/dev/null)
-    if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null \
-      && mkdir "${lock}.reap" 2>/dev/null; then
-      [ "$(readlink "$lock" 2>/dev/null)" = "$owner" ] && rm -f -- "$lock"
-      rmdir -- "${lock}.reap" 2>/dev/null
-      continue
+    if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
+      if ln -sn "${BASHPID:-$$}" "${lock}.reap" 2>/dev/null; then
+        [ "$(readlink "$lock" 2>/dev/null)" = "$owner" ] && rm -f -- "$lock"
+        rm -f -- "${lock}.reap" 2>/dev/null
+        continue
+      fi
+      reaper=$(readlink "${lock}.reap" 2>/dev/null)
+      if [ -n "$reaper" ] && ! kill -0 "$reaper" 2>/dev/null; then
+        [ "$(readlink "${lock}.reap" 2>/dev/null)" = "$reaper" ] \
+          && rm -f -- "${lock}.reap" 2>/dev/null
+        continue
+      fi
     fi
     sleep 0.05
   done
@@ -253,14 +262,14 @@ JEVCFG
 
   lock="${dir}/.${sid}.lock"
   if jev_lock "$lock"; then
+    # Every valid answer is appended to predictions.jsonl, the join side of
+    # outcomes.jsonl, even one that arrives after a newer turn: a drain may
+    # already have scored this hash. Only the per-session file is limited to
+    # the current entry. touch first: zsh's noclobber refuses >> to a new file.
+    ( umask 077; touch -- "${dir}/predictions.jsonl" ) 2>/dev/null \
+      && printf '%s\n' "$line" >> "${dir}/predictions.jsonl" 2>/dev/null
     current=$(jev_current_hash "$staging" "$sid")
     if [ "$current" = "$hash" ]; then
-      # The per-session file holds only the latest answer, and a drain can
-      # score this entry before a newer turn replaces it, so every accepted
-      # answer is also appended to predictions.jsonl, the join side of
-      # outcomes.jsonl. touch first: zsh's noclobber refuses >> to a new file.
-      ( umask 077; touch -- "${dir}/predictions.jsonl" ) 2>/dev/null \
-        && printf '%s\n' "$line" >> "${dir}/predictions.jsonl" 2>/dev/null
       mv -f -- "$tmp" "${dir}/${sid}.json" 2>/dev/null
     fi
     rm -f -- "$lock" 2>/dev/null

@@ -170,7 +170,10 @@ _capture() {
   [ "$status" -eq 0 ]
   [ -f "$MOCK_JEV_BODY" ]
   [ "$(cat "$STAGING/jev-shadow/$SESSION_ID.json")" = "$before" ]
-  [ "$(wc -l < "$STAGING/jev-shadow/predictions.jsonl")" -eq 1 ]
+  # The late answer is still archived, joinable by its own hash.
+  [ "$(wc -l < "$STAGING/jev-shadow/predictions.jsonl")" -eq 2 ]
+  jq -e 'select(.content_hash == "stale-hash") | .durable == "durable-lesson"' \
+    "$STAGING/jev-shadow/predictions.jsonl"
 }
 
 @test "over the cap, the newest dialogue is kept" {
@@ -254,15 +257,18 @@ _shadow_direct() {
   . "$BATS_TEST_DIRNAME/../lib/jev-prefilter.sh"
   lock="$BATS_TEST_TMPDIR/sess.lock"
   ln -s 999999 "$lock"
-  # Another waiter is mid-reap: the mutex is held, so this one must not reap.
-  mkdir "$lock.reap"
+  # Another live waiter is mid-reap: the mutex is held, so this one must not reap.
+  ln -s "$$" "$lock.reap"
   run jev_lock "$lock"
   [ "$status" -eq 1 ]
   [ "$(readlink "$lock")" = "999999" ]
-  rmdir "$lock.reap"
+  # A reaper that died mid-reap leaves its mutex; it is cleared, then the lock.
+  rm -f "$lock.reap"
+  ln -s 999998 "$lock.reap"
   run jev_lock "$lock"
   [ "$status" -eq 0 ]
   [ "$(readlink "$lock")" != "999999" ]
+  [ ! -L "$lock.reap" ]
 }
 
 @test "response metadata cannot carry text into the record" {
