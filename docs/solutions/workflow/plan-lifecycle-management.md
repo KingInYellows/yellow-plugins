@@ -492,7 +492,7 @@ Checked live on 2026-10-06 against real PRs: #808 passes; #952 and #955
 
 A pass records `Plan-Verifier-FileProvenance: pr=#N sha=<sha> via=commit-subject`;
 a trailer with no `via=` came from the commits API. Anything else (no `(#N)` in
-the subject, an open PR, a 404, a rate limit, a truncated files list, a null or
+the subject, a 404, a truncated files list, a null or
 mismatched blob) prints a fixed reason token and a reason line and falls
 through to the strict and loose tiers and the override prompt. The transient
 tokens (`gh-timeout`, `rate-limited`, `pr-open`) instead stop the command with
