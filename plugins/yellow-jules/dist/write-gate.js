@@ -15,11 +15,9 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.reserveUnderGrant = reserveUnderGrant;
-exports.authorizeCommandFor = authorizeCommandFor;
 exports.confirmationRequired = confirmationRequired;
 exports.settleAccepted = settleAccepted;
 exports.settleFailure = settleFailure;
-exports.persistenceUnknown = persistenceUnknown;
 exports.settleAcceptedOrUnknown = settleAcceptedOrUnknown;
 exports.settleExpiredBeforeWrite = settleExpiredBeforeWrite;
 exports.loadAuthorizedGrant = loadAuthorizedGrant;
@@ -29,7 +27,7 @@ const controller_js_1 = require("./controller.js");
 const errors_js_1 = require("./errors.js");
 const runtime_support_js_1 = require("./runtime-support.js");
 const state_js_1 = require("./state.js");
-/** Vendor conditions that mean a session is no longer working (R39 `runningSessions`). */
+/** Sessions under a grant that may still be running (R39 `runningSessions`). */
 function runningSessionsUnder(journal, grantId) {
     return Object.values(journal.operations)
         .filter((r) => r.grantId === grantId &&
@@ -39,6 +37,14 @@ function runningSessionsUnder(journal, grantId) {
         r.status !== 'rejected' &&
         !(0, runtime_support_js_1.isTerminalCondition)(r.condition))
         .map((r) => r.sessionResource);
+}
+function hasPlainLaunch(journal, grantId, taskRef) {
+    return Object.values(journal.operations).some((r) => r.kind === 'create' &&
+        r.grantId === grantId &&
+        r.taskRef === taskRef &&
+        r.correction !== true &&
+        r.status !== 'failed' &&
+        r.status !== 'rejected');
 }
 function denialError(denial, grant, journal, ids) {
     const context = {
@@ -89,10 +95,42 @@ async function reserveUnderGrant(deps, gate) {
         if (owner !== undefined && (0, state_js_1.hasUnreconciledDeviation)(owner)) {
             throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_POLICY_DEVIATION', `${owner.sessionResource ?? 'this session'} has an unreconciled policy deviation`), ids);
         }
+        // A repair spends a corrective round, not a task, so it must follow a plain
+        // launch of the same task under this grant; otherwise corrective rounds
+        // would mint sessions for task refs that were never launched.
+        if (gate.authority.operation === 'create' &&
+            gate.authority.correction === true &&
+            !hasPlainLaunch(journal, grant.grantId, gate.authority.taskRef)) {
+            throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_AUTHORITY_DENIED', `no earlier launch of task ${gate.authority.taskRef ?? '(none)'} under this grant; --correction repairs an existing task`, {
+                recoveryAction: 'Launch the task without --correction first, or write a grant that covers a new task.',
+            }), ids);
+        }
         // R36 lookup + reservation (mutates the in-memory journal only).
-        const record = (0, state_js_1.applyReservation)(journal.operations, journal, gate.reservation, now);
-        (0, authority_js_1.writeGrants)(deps.dataDir, (0, authority_js_1.updateGrant)(grants, grant.grantId, (g) => (0, authority_js_1.chargeGrant)(g, gate.charge)));
-        await (0, state_js_1.writeJournal)(deps.dataDir, journal);
+        const { authority } = gate;
+        const record = (0, state_js_1.applyReservation)(journal.operations, journal, {
+            ...gate.reservation,
+            kind: authority.operation,
+            repository: authority.repository,
+            requestedBranch: authority.branch,
+            sourceResource: authority.sourceResource,
+            ...(authority.taskRef !== undefined
+                ? { taskRef: authority.taskRef }
+                : {}),
+            grantId: grant.grantId,
+            ...(authority.operation === 'create' && authority.correction === true
+                ? { correction: true }
+                : {}),
+        }, now);
+        const charge = {
+            operation: authority.operation,
+            localRequestId: gate.reservation.localRequestId,
+            ...(authority.taskRef !== undefined
+                ? { taskRef: authority.taskRef }
+                : {}),
+            correction: authority.correction === true,
+        };
+        (0, authority_js_1.writeGrants)(deps.dataDir, (0, authority_js_1.updateGrant)(grants, grant.grantId, (g) => (0, authority_js_1.chargeGrant)(g, charge)));
+        await (0, state_js_1.writeJournal)(deps.dataDir, journal, [record.localRequestId]);
         return record;
     });
 }
@@ -176,11 +214,20 @@ async function settleFailure(deps, record, error, options) {
             },
         });
     }
-    await (0, state_js_1.markOperation)(deps.dataDir, record.localRequestId, 'failed', {}, (0, runtime_support_js_1.nowFn)(deps));
-    if (record.kind === 'create' && record.grantId !== undefined) {
-        await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId);
+    // The vendor's verdict must reach the caller even when the bookkeeping fails;
+    // the reservation then stays `reserved`, which reconcile still resolves.
+    let journalRecorded = true;
+    try {
+        await (0, state_js_1.markOperation)(deps.dataDir, record.localRequestId, 'failed', {}, (0, runtime_support_js_1.nowFn)(deps));
+        if (record.kind === 'create' && record.grantId !== undefined) {
+            await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId);
+        }
     }
-    throw new errors_js_1.MutationErrorException(app, ids);
+    catch (bookkeepingError) {
+        journalRecorded = false;
+        process.stderr.write(`warning: could not settle ${record.localRequestId} after a rejection: ${bookkeepingError instanceof Error ? bookkeepingError.name : 'error'}\n`);
+    }
+    throw new errors_js_1.MutationErrorException(app, journalRecorded ? ids : { ...ids, details: { journalRecorded: false } });
 }
 /** Journal persistence failed after a 2xx: the write happened, the record did not land (R16). */
 function persistenceUnknown(record, sessionResource, reconcileHint) {
@@ -216,6 +263,6 @@ function loadAuthorizedGrant(deps, grantId) {
     const ctx = (0, runtime_support_js_1.resolveControllerContext)(deps);
     const grants = (0, authority_js_1.loadGrants)(deps.dataDir);
     const grant = (0, authority_js_1.requireGrant)(grants, grantId);
-    (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef);
+    (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef, ctx.controllerId);
     return { grants, grant };
 }

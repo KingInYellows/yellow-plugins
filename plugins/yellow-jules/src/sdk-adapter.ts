@@ -163,6 +163,28 @@ function kindForApiStatus(status: number, url: string): AdapterErrorKind {
 }
 
 /**
+ * A failure of the connection itself (aborted, timed out, `fetch failed`, a
+ * socket error code), as opposed to a mapper throw on a body that arrived.
+ * Looks down the `cause` chain because the SDK wraps what the transport threw.
+ */
+function isTransportFailure(err: unknown): boolean {
+  for (let e: unknown = err, i = 0; e instanceof Error && i < 5; i++) {
+    const code = (e as { code?: unknown }).code;
+    if (
+      e.name === 'AbortError' ||
+      e.name === 'TimeoutError' ||
+      (e instanceof TypeError && e.message === 'fetch failed') ||
+      (typeof code === 'string' &&
+        /^(ECONN|ETIMEDOUT|ENOTFOUND|EAI_|EPIPE|UND_ERR_)/.test(code))
+    ) {
+      return true;
+    }
+    e = e.cause;
+  }
+  return false;
+}
+
+/**
  * SDK error -> transport-neutral AdapterError. Message text is never used to
  * classify, and it is redacted and cut to 512 bytes before it leaves here
  * (JulesApiError embeds the response body in its message).
@@ -197,6 +219,7 @@ export function toAdapterError(
   if (err instanceof sdk.JulesNetworkError) return make('network');
   if (err instanceof sdk.InvalidStateError) return make('invalid-state');
   if (err instanceof sdk.TimeoutError) return make('timeout');
+  if (isTransportFailure(err)) return make('network');
   return make('malformed');
 }
 
@@ -588,6 +611,8 @@ export class JulesSdkAdapter implements SdkAdapter {
       // Our own refusals are never downgraded to an "unmappable SDK type" signal.
       if (err instanceof AppErrorException || err instanceof FetchGuardRefusal)
         throw err;
+      // A dropped connection is a retryable read failure, not an unmappable type.
+      if (isTransportFailure(err)) return this.fail(err);
       return { activities: [], unmappedActivity: true };
     }
     // An activity the SDK mapped but whose ids fail the allowlist, or a page
@@ -664,6 +689,7 @@ export class JulesSdkAdapter implements SdkAdapter {
       // Our own refusals are never downgraded to an "unmappable SDK type" signal.
       if (err instanceof AppErrorException || err instanceof FetchGuardRefusal)
         throw err;
+      if (isTransportFailure(err)) return this.fail(err);
       unsupportedReason =
         'a connected source has a type the pinned SDK cannot map';
     }

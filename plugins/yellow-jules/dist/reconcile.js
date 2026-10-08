@@ -15,7 +15,6 @@
  * candidate, and the journal's `archiveVisibilityConfirmed` flag.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RECONCILE_SESSIONS_PAGE_CAP = exports.RECONCILE_SESSIONS_PAGE_SIZE = exports.RESERVATION_SETTLE_MS = void 0;
 exports.reconcile = reconcile;
 const activity_walk_js_1 = require("./activity-walk.js");
 const authority_js_1 = require("./authority.js");
@@ -25,9 +24,9 @@ const runtime_support_js_1 = require("./runtime-support.js");
 const state_js_1 = require("./state.js");
 const validate_js_1 = require("./validate.js");
 /** Longer than any write deadline (cli MAX_DEADLINE_MS 200 s) plus a minute of slack. */
-exports.RESERVATION_SETTLE_MS = 260_000;
-exports.RECONCILE_SESSIONS_PAGE_SIZE = 100;
-exports.RECONCILE_SESSIONS_PAGE_CAP = 5;
+const RESERVATION_SETTLE_MS = 260_000;
+const RECONCILE_SESSIONS_PAGE_SIZE = 100;
+const RECONCILE_SESSIONS_PAGE_CAP = 5;
 function project(s) {
     return {
         sessionResource: s.sessionResource,
@@ -68,7 +67,7 @@ async function walkSessions(deps, adapter, oldestReservation, deadline) {
     let pageToken;
     const sessions = [];
     for (let pages = 0;;) {
-        if (pages >= exports.RECONCILE_SESSIONS_PAGE_CAP) {
+        if (pages >= RECONCILE_SESSIONS_PAGE_CAP) {
             return { sessions, complete: false, stopReason: 'page-cap' };
         }
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
@@ -77,7 +76,7 @@ async function walkSessions(deps, adapter, oldestReservation, deadline) {
         let page;
         try {
             page = await (0, runtime_support_js_1.read)(deps, deadline, () => adapter.listSessions({
-                pageSize: exports.RECONCILE_SESSIONS_PAGE_SIZE,
+                pageSize: RECONCILE_SESSIONS_PAGE_SIZE,
                 ...(pageToken !== undefined ? { pageToken } : {}),
                 ...(filter !== undefined ? { filter } : {}),
             }));
@@ -323,7 +322,7 @@ async function reconcile(deps, journal, sessionResource, deadline) {
     // reconcile can never free (and then be overwritten by) a live write.
     const nowMs = deps.clock.now();
     const inFlight = targets.filter((r) => r.status === 'reserved' &&
-        nowMs - Date.parse(r.createdAt) < exports.RESERVATION_SETTLE_MS);
+        nowMs - Date.parse(r.createdAt) < RESERVATION_SETTLE_MS);
     const settled = targets.filter((r) => !inFlight.includes(r));
     const early = inFlight.map((record) => notReached(record, 'the reservation may still be in flight; try again shortly'));
     const creates = settled.filter((r) => r.kind === 'create');
@@ -362,12 +361,26 @@ async function reconcile(deps, journal, sessionResource, deadline) {
     // A young reservation is reported but not recorded: `not-reached` would make
     // it abandonable while its write may still be in flight.
     await persist(deps, resolutions.filter((r) => !early.includes(r)));
+    // One failed release must not hide the others or the report; the slot stays
+    // held, which only makes the grant stricter, and the entry says so.
+    const slotStuck = new Set();
     for (const r of resolutions) {
         if (r.outcome === 'released' &&
             r.record.kind === 'create' &&
             r.record.grantId !== undefined) {
-            await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, r.record.grantId, r.record.localRequestId);
+            try {
+                await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, r.record.grantId, r.record.localRequestId);
+            }
+            catch (err) {
+                slotStuck.add(r.record.localRequestId);
+                process.stderr.write(`warning: could not release the grant slot of ${r.record.localRequestId}: ${err instanceof Error ? err.name : 'error'}\n`);
+            }
         }
     }
-    return resolutions.map(entryOf);
+    return resolutions.map((r) => slotStuck.has(r.record.localRequestId)
+        ? entryOf({
+            ...r,
+            reason: `${r.reason ?? 'released'}; the grant slot could not be released (revoke and rewrite the grant to reclaim it)`,
+        })
+        : entryOf(r));
 }

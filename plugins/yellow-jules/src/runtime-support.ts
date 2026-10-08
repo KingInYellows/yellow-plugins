@@ -68,7 +68,7 @@ export const REAL_CLOCK: Clock = {
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 };
 
-export function nowFn(deps: RuntimeDeps): () => Date {
+export function nowFn(deps: Pick<RuntimeDeps, 'clock'>): () => Date {
   return () => new Date(deps.clock.now());
 }
 
@@ -148,7 +148,6 @@ const CONDITION_BY_STATE: Readonly<Record<string, string>> = Object.freeze({
   completed: 'remote-completed',
 });
 
-/** Unknown states — including `unspecified` — are never placed in a completed bucket. */
 /** A session in one of these conditions is no longer working: it holds no active-session slot. */
 export function isTerminalCondition(condition: string | undefined): boolean {
   return condition === 'remote-completed' || condition === 'failed';
@@ -294,16 +293,19 @@ export function resolveControllerContext(
     controllerId: validateControllerId(
       deps.controllerId ?? defaultControllerId()
     ),
-    now: nowFn(deps as RuntimeDeps),
+    now: nowFn(deps),
   };
 }
 
-export function refuseInsideSupervisedSession(env: NodeJS.ProcessEnv): void {
+export function refuseInsideSupervisedSession(
+  env: NodeJS.ProcessEnv,
+  command = 'authorize'
+): void {
   const active = env[ACTIVE_GRANT_ENV];
   if (active !== undefined && active !== '') {
     throwAppError(
       'JULES_AUTHORITY_DENIED',
-      'authorize cannot run inside a supervised session; a grant is never created or widened from under another grant',
+      `${command} cannot run inside a supervised session; a grant is never created or widened from under another grant`,
       {
         recoveryAction:
           'End the supervised session and run authorize yourself in a terminal.',

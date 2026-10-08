@@ -257,6 +257,8 @@ export interface OperationRecord {
   readonly grantId?: string;
   /** Set only by a yellow create; `false` makes an observed vendor PR a policy deviation (R13). */
   readonly autoPrRequested?: boolean;
+  /** A `delegate --correction` repair launch; it needs an earlier plain launch of the same task under the grant. */
+  readonly correction?: boolean;
   readonly promptDigest?: string;
   readonly observedPlanId?: string;
   readonly vendorState?: string;

@@ -279,9 +279,10 @@ function isValidRecord(key, value) {
         if (value[field] !== undefined && !(0, validate_js_1.isValidPageToken)(value[field]))
             return false;
     }
-    if (value['autoPrRequested'] !== undefined &&
-        typeof value['autoPrRequested'] !== 'boolean') {
-        return false;
+    for (const field of ['autoPrRequested', 'correction']) {
+        if (value[field] !== undefined && typeof value[field] !== 'boolean') {
+            return false;
+        }
     }
     if (!(0, shape_js_1.isStringArray)(value['recentActivityIds']))
         return false;
@@ -668,8 +669,8 @@ async function markOperation(dataDir, localRequestId, status, extra = {}, now = 
     }, config);
 }
 /**
- * First sight of a session with no journal row (PR2: every observable
- * session was created outside yellow): mint a local id and record it with
+ * First sight of a session with no journal row (it was created outside
+ * yellow, or by another copy of this data): mint a local id and record it with
  * `origin: "external"`. Returns the existing record when one is bound.
  */
 async function ensureObservedRecord(dataDir, sessionResource, now = () => new Date(), config = exports.DEFAULT_LOCK_CONFIG) {
@@ -895,11 +896,12 @@ async function recordDeviation(dataDir, localRequestId, deviation, now = () => n
 function hasUnreconciledDeviation(record) {
     return record.deviations.some((d) => !d.reconciled);
 }
-/** Merges a patch into the session's supervision state; written only by `supervise` (R32, R33). */
+/** `undefined` keeps the stored value, `null` clears it, anything else sets it. */
 function keep(key, previous, patch) {
     const value = patch === undefined ? previous : (patch ?? undefined);
     return value === undefined ? {} : { [key]: value };
 }
+/** Merges a patch into the session's supervision state; written only by `supervise` (R32, R33). */
 async function updateSupervision(dataDir, localRequestId, patch, now = () => new Date(), config = exports.DEFAULT_LOCK_CONFIG) {
     return updateJournal(dataDir, (operations) => {
         const current = requireRecord(operations, localRequestId);

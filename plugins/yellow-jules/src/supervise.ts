@@ -45,6 +45,7 @@ import {
   isOwningCreate,
   type OwningCreate,
   readJournal,
+  updateJournal,
   updateSupervision,
   type SupervisionPatch,
 } from './state.js';
@@ -59,7 +60,7 @@ import type {
 import { validateGrantId } from './validate.js';
 import { loadAuthorizedGrant } from './write-gate.js';
 
-export const BACKOFF_BASE_SECONDS = 60;
+const BACKOFF_BASE_SECONDS = 60;
 export const BACKOFF_CAP_SECONDS = 3600;
 const STARTING_CHECK_SECONDS = 120;
 const WORKING_CHECK_SECONDS = 600;
@@ -578,6 +579,20 @@ export async function superviseOnce(
     );
   }
 
+  if (condition === 'awaiting-approval') {
+    // The vendor wants an approval but no plan could be read: a human looks.
+    return finish(
+      'escalate',
+      {
+        reason: 'awaiting-approval-without-plan',
+        nextCheck: waitForHuman,
+        allowedActions: [],
+      },
+      {},
+      ['planUnavailable']
+    );
+  }
+
   if (condition === 'awaiting-reply') {
     const latest = newest.agent;
     if (latest?.message !== undefined) {
@@ -705,7 +720,7 @@ export async function clearPause(
   deps: WriteDeps,
   args: ClearPauseArgs
 ): Promise<ClearPauseResult> {
-  refuseInsideSupervisedSession(deps.env);
+  refuseInsideSupervisedSession(deps.env, 'supervise --clear-pause');
   prepare(deps);
   const journal = await readJournal(deps.dataDir);
   const sessionResource = resolveSessionResource(journal, args.session);
@@ -740,12 +755,36 @@ export async function clearPause(
       'Supervised writes under the grant resume for this session.',
     ].join('\n')
   );
-  await updateSupervision(
-    deps.dataDir,
-    owner.localRequestId,
-    { paused: null, outsideSeen: null },
-    nowFn(deps)
-  );
+  // The owner typed the code for THIS pause. A pass that recorded a different
+  // pause or newer outside activity during the wait must not be cleared by it.
+  await updateJournal(deps.dataDir, (operations) => {
+    const current = operations[owner.localRequestId];
+    const state = current?.supervision;
+    if (
+      current === undefined ||
+      state?.paused?.observedAt !== paused.observedAt ||
+      state.paused.reason !== paused.reason ||
+      state.outsideSeen?.activityId !==
+        owner.supervision?.outsideSeen?.activityId ||
+      current.lastCompleteWalkAt === undefined ||
+      current.lastCompleteWalkAt <= paused.observedAt
+    ) {
+      return throwAppError(
+        'JULES_INVALID_STATE',
+        'the supervision state changed while the confirmation was open; nothing was cleared',
+        {
+          recoveryAction:
+            'Run status for this session, inspect it, then retry.',
+        }
+      );
+    }
+    const { paused: _paused, outsideSeen: _outside, ...rest } = state;
+    operations[owner.localRequestId] = {
+      ...current,
+      supervision: rest,
+      updatedAt: nowFn(deps)().toISOString(),
+    };
+  });
   return {
     operation: 'supervise',
     localId: owner.localId,

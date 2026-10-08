@@ -606,7 +606,9 @@ transient failure from an undetermined one.
   `needs-answer`, `needs-verification`, `escalate`, `paused` (R33). Vendor text
   appears only inside `fenced`. While R43 verification tooling is absent (before
   PR4), `needs-verification` reports `verification: "unavailable"` and the only
-  permitted verdicts are correction or escalate, never accept.
+  permitted verdicts are correction or escalate, never accept. An
+  `awaiting-approval` session whose plan could not be read is `escalate` with
+  `reason: "awaiting-approval-without-plan"` and attention `planUnavailable`.
 - `supervise --clear-pause --session <ref>` → `{ localId, cleared: true }`.
   TTY-confirmed; requires a complete `status` walk since the pause, otherwise
   `JULES_INVALID_STATE` with recovery "run `status` first".
@@ -943,7 +945,13 @@ as remote termination (R39).
   corrective round instead. The slot is freed when the session is observed
   terminal, or by reconcile `released`, `abandon`, or a clean rejection (a
   rejection the vendor answered, or a failure before anything was sent); tasks
-  and corrective rounds never decrement.
+  and corrective rounds never decrement. A repair `create` is allowed only after
+  a plain (non-repair) launch of the same task ref under the same grant that did
+  not fail or get abandoned; otherwise it is `JULES_AUTHORITY_DENIED`, so
+  corrective rounds cannot mint sessions for tasks that were never launched.
+  Copying a home directory to a host with a different host name does not carry
+  the right to write; two hosts that share a host name (a cloned VM) still look
+  identical to this check.
 - **Single controller host** (R38): one data directory is the only writer; a
   local lock serializes it; stale locks fail loud; the copy-detection control is
   in Local state; the manual handoff procedure lives in
@@ -1007,12 +1015,13 @@ owner-owned. `<controllerDir>` is `YELLOW_JULES_CONTROLLER_DIR` >
 outside `<dataDir>` by canonical path (otherwise `JULES_DATA_DIR`). The
 controller id defaults to the host name. Every grant carries
 `epochRef: { controllerId, epoch }`. The file is re-read and matched on every
-write; a missing file, a different epoch, or a different canonical data-dir path
-fails loud with `JULES_CONTROLLER_MISMATCH`, so a copied or restored data
-directory cannot write in parallel. The first `authorize` on a host with no
-controller file and no grants writes epoch 1; `authorize --take-over` writes
-epoch+1 for this host and path and rewrites every grant's `epochRef` under the
-lock. The handoff procedure lives in `plugins/yellow-jules/CLAUDE.md`.
+write; a grant whose `controllerId` is not this host's, a missing file, a
+different epoch, or a different canonical data-dir path fails loud with
+`JULES_CONTROLLER_MISMATCH`, so a copied or restored data directory cannot write
+in parallel. The first `authorize` on a host with no controller file and no
+grants writes epoch 1; `authorize --take-over` writes epoch+1 for this host and
+path and rewrites every grant's `epochRef` under the lock. The handoff procedure
+lives in `plugins/yellow-jules/CLAUDE.md`.
 
 The SDK's own storage is the per-process memory factory; the runtime never
 creates `.jules/` anywhere and treats a populated `sdk-scratch/` as

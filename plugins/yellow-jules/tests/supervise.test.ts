@@ -1,3 +1,6 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadGrants, revokeGrant } from '../src/authority.js';
@@ -139,6 +142,17 @@ describe('needs-plan-review', () => {
     const body = r.fenced.plan as string;
     expect(body.split(FENCE_END)).toHaveLength(2);
     expect(body.indexOf(FENCE_END)).toBe(body.length - FENCE_END.length);
+  });
+
+  it('an approval-awaiting session with no readable plan escalates to a human', async () => {
+    setVendorState(h, session.sessionResource, 'awaitingPlanApproval');
+    const r = await sup();
+    expect(r).toMatchObject({
+      decision: 'escalate',
+      reason: 'awaiting-approval-without-plan',
+      allowedActions: [],
+      requiresAttention: true,
+    });
   });
 
   it('only offers the operations the grant permits', async () => {
@@ -564,6 +578,35 @@ describe('--clear-pause', () => {
       expect((await ownerRecord())?.supervision?.paused).toBeDefined();
     }
   );
+
+  it('does not clear a different pause recorded while the confirmation was open', async () => {
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const racing = {
+      ...h.deps,
+      openTty: () => {
+        // A concurrent pass pauses again for a new reason during the wait.
+        const record = h.deps.dataDir;
+        const file = path.join(record, 'state', 'journal.json');
+        const journal = JSON.parse(fs.readFileSync(file, 'utf8'));
+        for (const r of Object.values(journal.operations) as any[]) {
+          if (r.supervision?.paused !== undefined) {
+            r.supervision.paused = {
+              reason: 'plan-changed-after-evaluation',
+              observedAt: new Date(h.deps.clock.now() + 1000).toISOString(),
+            };
+          }
+        }
+        fs.writeFileSync(file, JSON.stringify(journal), { mode: 0o600 });
+        return h.tty.openTty();
+      },
+    };
+    expect(
+      await codeOf(() => clearPause(racing, { session: session.localId }))
+    ).toBe('JULES_INVALID_STATE');
+    expect((await ownerRecord())?.supervision?.paused?.reason).toBe(
+      'plan-changed-after-evaluation'
+    );
+  });
 
   it('an unpaused session is JULES_INVALID_STATE', async () => {
     await status(h.deps, { session: session.localId, reconcile: false });

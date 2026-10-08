@@ -151,7 +151,13 @@ function initControllerAuthority(ctx, dataDir) {
  * `JULES_CONTROLLER_MISMATCH` when the file is missing, the epoch differs from
  * the grant's reference, or the canonical data-directory path differs.
  */
-function assertControllerAuthority(controllerDir, dataDir, epochRef) {
+function assertControllerAuthority(controllerDir, dataDir, epochRef, hostControllerId) {
+    // A home directory copied or mounted onto another host carries the first
+    // host's authority file at the same path; only this host's id tells them apart.
+    if (hostControllerId !== undefined &&
+        hostControllerId !== epochRef.controllerId) {
+        return mismatch(`the grant belongs to controller ${epochRef.controllerId}, not this host (${hostControllerId})`);
+    }
     const authority = readControllerAuthority(controllerDir, epochRef.controllerId);
     if (authority === undefined) {
         return mismatch(`no controller authority for ${epochRef.controllerId} on this host`);

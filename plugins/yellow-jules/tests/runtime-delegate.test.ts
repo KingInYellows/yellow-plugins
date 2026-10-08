@@ -323,6 +323,42 @@ describe('task limits', () => {
     expect(h.adapter.callsTo('createSession')).toHaveLength(3);
   });
 
+  it('a repair delegate needs an earlier plain launch of the same task under the grant', async () => {
+    const grantId = await createGrant(h, { maxActiveSessions: 3 });
+    expect(
+      await codeOf(() => delegate(h.deps, args({ grantId, correction: true })))
+    ).toBe('JULES_AUTHORITY_DENIED');
+    expect(h.adapter.callsTo('createSession')).toHaveLength(0);
+    expect(
+      loadGrants(h.dataDir).grants[grantId]?.usage.correctiveRounds
+    ).toEqual({});
+    await delegate(h.deps, args({ grantId, branch: 'scratch/plain' }));
+    await delegate(
+      h.deps,
+      args({ grantId, branch: 'scratch/fix', correction: true })
+    );
+    expect(h.adapter.callsTo('createSession')).toHaveLength(2);
+  });
+
+  it('a failed plain launch does not license a repair', async () => {
+    const grantId = await createGrant(h, { maxActiveSessions: 3 });
+    h.adapter.createSessionImpl = async () => {
+      throw new AdapterError('invalid-request', 'rejected', {
+        dispatched: true,
+      });
+    };
+    await codeOf(() => delegate(h.deps, args({ grantId })));
+    h.adapter.restoreWrites();
+    expect(
+      await codeOf(() =>
+        delegate(
+          h.deps,
+          args({ grantId, branch: 'scratch/fix', correction: true })
+        )
+      )
+    ).toBe('JULES_AUTHORITY_DENIED');
+  });
+
   it('--correction needs a task ref', async () => {
     const grantId = await createGrant(h);
     expect(
@@ -509,20 +545,7 @@ describe('crash recovery', () => {
         taskRef: 't1',
         operation: 'create',
       },
-      reservation: {
-        localRequestId: 'crashed-req',
-        kind: 'create',
-        repository: 'acme/widgets',
-        requestedBranch: 'scratch/one',
-        sourceResource: 'sources/github/acme/widgets',
-        taskRef: 't1',
-        grantId,
-      },
-      charge: {
-        operation: 'create',
-        localRequestId: 'crashed-req',
-        taskRef: 't1',
-      },
+      reservation: { localRequestId: 'crashed-req' },
     });
     expect(await codeOf(() => delegate(h.deps, args({ grantId })))).toBe(
       'JULES_DUPLICATE_LAUNCH'
@@ -583,6 +606,15 @@ describe('controller binding (R38)', () => {
     fs.rmSync(controllerFilePath(h.controllerDir, 'testhost'));
     h.adapter.calls.length = 0;
     expect(await codeOf(() => delegate(h.deps, args({ grantId })))).toBe(
+      'JULES_CONTROLLER_MISMATCH'
+    );
+    expect(h.adapter.writeCount()).toBe(0);
+  });
+
+  it('a grant bound to another host cannot write here, even at the same data path', async () => {
+    const grantId = await createGrant(h);
+    const deps = { ...h.deps, controllerId: 'otherhost' };
+    expect(await codeOf(() => delegate(deps, args({ grantId })))).toBe(
       'JULES_CONTROLLER_MISMATCH'
     );
     expect(h.adapter.writeCount()).toBe(0);

@@ -47,9 +47,9 @@ import type {
 import { extractTitleTag } from './validate.js';
 
 /** Longer than any write deadline (cli MAX_DEADLINE_MS 200 s) plus a minute of slack. */
-export const RESERVATION_SETTLE_MS = 260_000;
-export const RECONCILE_SESSIONS_PAGE_SIZE = 100;
-export const RECONCILE_SESSIONS_PAGE_CAP = 5;
+const RESERVATION_SETTLE_MS = 260_000;
+const RECONCILE_SESSIONS_PAGE_SIZE = 100;
+const RECONCILE_SESSIONS_PAGE_CAP = 5;
 
 /** The fields reconcile reads from a listed session; outputs and generated files (patch text) are dropped as pages arrive. */
 type SessionProjection = Pick<
@@ -510,18 +510,37 @@ export async function reconcile(
     deps,
     resolutions.filter((r) => !early.includes(r))
   );
+  // One failed release must not hide the others or the report; the slot stays
+  // held, which only makes the grant stricter, and the entry says so.
+  const slotStuck = new Set<string>();
   for (const r of resolutions) {
     if (
       r.outcome === 'released' &&
       r.record.kind === 'create' &&
       r.record.grantId !== undefined
     ) {
-      await releaseSlotInStore(
-        deps.dataDir,
-        r.record.grantId,
-        r.record.localRequestId
-      );
+      try {
+        await releaseSlotInStore(
+          deps.dataDir,
+          r.record.grantId,
+          r.record.localRequestId
+        );
+      } catch (err) {
+        slotStuck.add(r.record.localRequestId);
+        process.stderr.write(
+          `warning: could not release the grant slot of ${r.record.localRequestId}: ${
+            err instanceof Error ? err.name : 'error'
+          }\n`
+        );
+      }
     }
   }
-  return resolutions.map(entryOf);
+  return resolutions.map((r) =>
+    slotStuck.has(r.record.localRequestId)
+      ? entryOf({
+          ...r,
+          reason: `${r.reason ?? 'released'}; the grant slot could not be released (revoke and rewrite the grant to reclaim it)`,
+        })
+      : entryOf(r)
+  );
 }

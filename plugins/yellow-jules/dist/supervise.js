@@ -19,7 +19,7 @@
  * delegate or escalation — never acceptance.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BACKOFF_CAP_SECONDS = exports.BACKOFF_BASE_SECONDS = void 0;
+exports.BACKOFF_CAP_SECONDS = void 0;
 exports.superviseOnce = superviseOnce;
 exports.clearPause = clearPause;
 const activity_walk_js_1 = require("./activity-walk.js");
@@ -32,7 +32,7 @@ const runtime_js_1 = require("./runtime.js");
 const state_js_1 = require("./state.js");
 const validate_js_1 = require("./validate.js");
 const write_gate_js_1 = require("./write-gate.js");
-exports.BACKOFF_BASE_SECONDS = 60;
+const BACKOFF_BASE_SECONDS = 60;
 exports.BACKOFF_CAP_SECONDS = 3600;
 const STARTING_CHECK_SECONDS = 120;
 const WORKING_CHECK_SECONDS = 600;
@@ -81,7 +81,7 @@ function planText(plan) {
         .join('\n');
 }
 function backoffSeconds(failures) {
-    return Math.min(exports.BACKOFF_BASE_SECONDS * 2 ** Math.max(0, failures - 1), exports.BACKOFF_CAP_SECONDS);
+    return Math.min(BACKOFF_BASE_SECONDS * 2 ** Math.max(0, failures - 1), exports.BACKOFF_CAP_SECONDS);
 }
 /** Failures a pass maps to `check-failed`: transient vendor, network, or credential trouble. */
 const CHECK_FAILED_CODES = new Set([
@@ -388,6 +388,14 @@ async function superviseOnce(deps, args) {
             },
         });
     }
+    if (condition === 'awaiting-approval') {
+        // The vendor wants an approval but no plan could be read: a human looks.
+        return finish('escalate', {
+            reason: 'awaiting-approval-without-plan',
+            nextCheck: waitForHuman,
+            allowedActions: [],
+        }, {}, ['planUnavailable']);
+    }
     if (condition === 'awaiting-reply') {
         const latest = newest.agent;
         if (latest?.message !== undefined) {
@@ -475,7 +483,7 @@ async function superviseOnce(deps, args) {
  * "new" to the next pass.
  */
 async function clearPause(deps, args) {
-    (0, runtime_support_js_1.refuseInsideSupervisedSession)(deps.env);
+    (0, runtime_support_js_1.refuseInsideSupervisedSession)(deps.env, 'supervise --clear-pause');
     (0, runtime_support_js_1.prepare)(deps);
     const journal = await (0, state_js_1.readJournal)(deps.dataDir);
     const sessionResource = (0, runtime_support_js_1.resolveSessionResource)(journal, args.session);
@@ -500,7 +508,29 @@ async function clearPause(deps, args) {
         '',
         'Supervised writes under the grant resume for this session.',
     ].join('\n'));
-    await (0, state_js_1.updateSupervision)(deps.dataDir, owner.localRequestId, { paused: null, outsideSeen: null }, (0, runtime_support_js_1.nowFn)(deps));
+    // The owner typed the code for THIS pause. A pass that recorded a different
+    // pause or newer outside activity during the wait must not be cleared by it.
+    await (0, state_js_1.updateJournal)(deps.dataDir, (operations) => {
+        const current = operations[owner.localRequestId];
+        const state = current?.supervision;
+        if (current === undefined ||
+            state?.paused?.observedAt !== paused.observedAt ||
+            state.paused.reason !== paused.reason ||
+            state.outsideSeen?.activityId !==
+                owner.supervision?.outsideSeen?.activityId ||
+            current.lastCompleteWalkAt === undefined ||
+            current.lastCompleteWalkAt <= paused.observedAt) {
+            return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'the supervision state changed while the confirmation was open; nothing was cleared', {
+                recoveryAction: 'Run status for this session, inspect it, then retry.',
+            });
+        }
+        const { paused: _paused, outsideSeen: _outside, ...rest } = state;
+        operations[owner.localRequestId] = {
+            ...current,
+            supervision: rest,
+            updatedAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString(),
+        };
+    });
     return {
         operation: 'supervise',
         localId: owner.localId,

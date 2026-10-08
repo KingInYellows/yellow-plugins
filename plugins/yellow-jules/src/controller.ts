@@ -160,8 +160,19 @@ export function initControllerAuthority(
 export function assertControllerAuthority(
   controllerDir: string,
   dataDir: string,
-  epochRef: EpochRef
+  epochRef: EpochRef,
+  hostControllerId?: string
 ): ControllerAuthority {
+  // A home directory copied or mounted onto another host carries the first
+  // host's authority file at the same path; only this host's id tells them apart.
+  if (
+    hostControllerId !== undefined &&
+    hostControllerId !== epochRef.controllerId
+  ) {
+    return mismatch(
+      `the grant belongs to controller ${epochRef.controllerId}, not this host (${hostControllerId})`
+    );
+  }
   const authority = readControllerAuthority(
     controllerDir,
     epochRef.controllerId

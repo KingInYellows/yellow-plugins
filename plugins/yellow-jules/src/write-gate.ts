@@ -59,6 +59,9 @@ import type {
   OperationRecord,
 } from './types.js';
 
+/** The writes that go through the authority critical section. */
+export type GateOperation = 'create' | 'reply' | 'approve';
+
 export interface GateRequest {
   /**
    * The create record that owns the session a `reply` or `approve` targets.
@@ -68,13 +71,21 @@ export interface GateRequest {
    */
   readonly ownerRequestId?: string;
   readonly grantId: string;
-  readonly authority: AuthorityRequest;
-  readonly reservation: ReservationInput;
-  readonly charge: Charge;
+  /** The scope the grant must cover; the reservation and the charge are derived from it. */
+  readonly authority: AuthorityRequest & { readonly operation: GateOperation };
+  /** The ids and the per-operation extras the reservation records. */
+  readonly reservation: Pick<
+    ReservationInput,
+    | 'localRequestId'
+    | 'localId'
+    | 'sessionResource'
+    | 'autoPrRequested'
+    | 'promptDigest'
+    | 'observedPlanId'
+  >;
 }
 
-/** Vendor conditions that mean a session is no longer working (R39 `runningSessions`). */
-
+/** Sessions under a grant that may still be running (R39 `runningSessions`). */
 function runningSessionsUnder(journal: Journal, grantId: string): string[] {
   return Object.values(journal.operations)
     .filter(
@@ -87,6 +98,22 @@ function runningSessionsUnder(journal: Journal, grantId: string): string[] {
         !isTerminalCondition(r.condition)
     )
     .map((r) => r.sessionResource as string);
+}
+
+function hasPlainLaunch(
+  journal: Journal,
+  grantId: string,
+  taskRef: string | undefined
+): boolean {
+  return Object.values(journal.operations).some(
+    (r) =>
+      r.kind === 'create' &&
+      r.grantId === grantId &&
+      r.taskRef === taskRef &&
+      r.correction !== true &&
+      r.status !== 'failed' &&
+      r.status !== 'rejected'
+  );
 }
 
 function denialError(
@@ -176,18 +203,60 @@ export async function reserveUnderGrant(
         ids
       );
     }
+    // A repair spends a corrective round, not a task, so it must follow a plain
+    // launch of the same task under this grant; otherwise corrective rounds
+    // would mint sessions for task refs that were never launched.
+    if (
+      gate.authority.operation === 'create' &&
+      gate.authority.correction === true &&
+      !hasPlainLaunch(journal, grant.grantId, gate.authority.taskRef)
+    ) {
+      throw new MutationErrorException(
+        makeAppError(
+          'JULES_AUTHORITY_DENIED',
+          `no earlier launch of task ${gate.authority.taskRef ?? '(none)'} under this grant; --correction repairs an existing task`,
+          {
+            recoveryAction:
+              'Launch the task without --correction first, or write a grant that covers a new task.',
+          }
+        ),
+        ids
+      );
+    }
     // R36 lookup + reservation (mutates the in-memory journal only).
+    const { authority } = gate;
     const record = applyReservation(
       journal.operations,
       journal,
-      gate.reservation,
+      {
+        ...gate.reservation,
+        kind: authority.operation,
+        repository: authority.repository,
+        requestedBranch: authority.branch,
+        sourceResource: authority.sourceResource,
+        ...(authority.taskRef !== undefined
+          ? { taskRef: authority.taskRef }
+          : {}),
+        grantId: grant.grantId,
+        ...(authority.operation === 'create' && authority.correction === true
+          ? { correction: true }
+          : {}),
+      },
       now
     );
+    const charge: Charge = {
+      operation: authority.operation,
+      localRequestId: gate.reservation.localRequestId,
+      ...(authority.taskRef !== undefined
+        ? { taskRef: authority.taskRef }
+        : {}),
+      correction: authority.correction === true,
+    };
     writeGrants(
       deps.dataDir,
-      updateGrant(grants, grant.grantId, (g) => chargeGrant(g, gate.charge))
+      updateGrant(grants, grant.grantId, (g) => chargeGrant(g, charge))
     );
-    await writeJournal(deps.dataDir, journal);
+    await writeJournal(deps.dataDir, journal, [record.localRequestId]);
     return record;
   });
 }
@@ -200,7 +269,7 @@ function shellQuote(value: string): string {
  * The exact terminal command a caller without a grant must run. Every value
  * was validated against an allowlist before it reaches here.
  */
-export function authorizeCommandFor(parts: {
+function authorizeCommandFor(parts: {
   readonly repository: string;
   readonly branch: string;
   readonly taskRef?: string;
@@ -334,25 +403,40 @@ export async function settleFailure(
       }
     );
   }
-  await markOperation(
-    deps.dataDir,
-    record.localRequestId,
-    'failed',
-    {},
-    nowFn(deps)
-  );
-  if (record.kind === 'create' && record.grantId !== undefined) {
-    await releaseSlotInStore(
+  // The vendor's verdict must reach the caller even when the bookkeeping fails;
+  // the reservation then stays `reserved`, which reconcile still resolves.
+  let journalRecorded = true;
+  try {
+    await markOperation(
       deps.dataDir,
-      record.grantId,
-      record.localRequestId
+      record.localRequestId,
+      'failed',
+      {},
+      nowFn(deps)
+    );
+    if (record.kind === 'create' && record.grantId !== undefined) {
+      await releaseSlotInStore(
+        deps.dataDir,
+        record.grantId,
+        record.localRequestId
+      );
+    }
+  } catch (bookkeepingError) {
+    journalRecorded = false;
+    process.stderr.write(
+      `warning: could not settle ${record.localRequestId} after a rejection: ${
+        bookkeepingError instanceof Error ? bookkeepingError.name : 'error'
+      }\n`
     );
   }
-  throw new MutationErrorException(app, ids);
+  throw new MutationErrorException(
+    app,
+    journalRecorded ? ids : { ...ids, details: { journalRecorded: false } }
+  );
 }
 
 /** Journal persistence failed after a 2xx: the write happened, the record did not land (R16). */
-export function persistenceUnknown(
+function persistenceUnknown(
   record: OperationRecord,
   sessionResource: string | undefined,
   reconcileHint: string
@@ -425,6 +509,11 @@ export function loadAuthorizedGrant(
   const ctx = resolveControllerContext(deps);
   const grants = loadGrants(deps.dataDir);
   const grant = requireGrant(grants, grantId);
-  assertControllerAuthority(ctx.controllerDir, deps.dataDir, grant.epochRef);
+  assertControllerAuthority(
+    ctx.controllerDir,
+    deps.dataDir,
+    grant.epochRef,
+    ctx.controllerId
+  );
   return { grants, grant };
 }

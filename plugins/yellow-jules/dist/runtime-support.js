@@ -130,7 +130,6 @@ const CONDITION_BY_STATE = Object.freeze({
     failed: 'failed',
     completed: 'remote-completed',
 });
-/** Unknown states — including `unspecified` — are never placed in a completed bucket. */
 /** A session in one of these conditions is no longer working: it holds no active-session slot. */
 function isTerminalCondition(condition) {
     return condition === 'remote-completed' || condition === 'failed';
@@ -218,10 +217,10 @@ function resolveControllerContext(deps) {
         now: nowFn(deps),
     };
 }
-function refuseInsideSupervisedSession(env) {
+function refuseInsideSupervisedSession(env, command = 'authorize') {
     const active = env[exports.ACTIVE_GRANT_ENV];
     if (active !== undefined && active !== '') {
-        (0, errors_js_1.throwAppError)('JULES_AUTHORITY_DENIED', 'authorize cannot run inside a supervised session; a grant is never created or widened from under another grant', {
+        (0, errors_js_1.throwAppError)('JULES_AUTHORITY_DENIED', `${command} cannot run inside a supervised session; a grant is never created or widened from under another grant`, {
             recoveryAction: 'End the supervised session and run authorize yourself in a terminal.',
         });
     }

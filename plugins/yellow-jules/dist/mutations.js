@@ -182,20 +182,8 @@ async function delegateInner(deps, args, ids) {
             reservation: {
                 localRequestId: ids.localRequestId,
                 localId: ids.localId,
-                kind: 'create',
-                repository,
-                requestedBranch: branch,
-                sourceResource,
-                ...(taskRef !== undefined ? { taskRef } : {}),
-                grantId,
                 autoPrRequested: false,
                 promptDigest: (0, state_js_1.messageDigest)(prompt),
-            },
-            charge: {
-                operation: 'create',
-                localRequestId: ids.localRequestId,
-                ...(taskRef !== undefined ? { taskRef } : {}),
-                correction: args.correction,
             },
         });
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
@@ -323,20 +311,8 @@ async function replyInner(deps, args, ids) {
             reservation: {
                 localRequestId: ids.localRequestId,
                 localId: ids.localId,
-                kind: 'reply',
                 sessionResource: target.sessionResource,
-                repository: owner.repository,
-                requestedBranch: owner.requestedBranch,
-                sourceResource: owner.sourceResource,
-                ...(owner.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
-                grantId,
                 promptDigest: (0, state_js_1.messageDigest)(message),
-            },
-            charge: {
-                operation: 'reply',
-                localRequestId: ids.localRequestId,
-                ...(owner.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
-                correction: args.correction,
             },
         });
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
@@ -410,10 +386,6 @@ async function approveInner(deps, args, ids) {
         createTime: pending.activityCreateTime,
         activityId: pending.activityId,
     };
-    const pendingStamp = {
-        createTime: pending.activityCreateTime,
-        activityId: pending.activityId,
-    };
     return (0, runtime_support_js_1.withAdapter)(deps, async (adapter) => {
         const session = await (0, runtime_support_js_1.read)(deps, deadline, () => adapter.getSession(target.sessionResource));
         if (session.vendorState !== 'awaitingPlanApproval') {
@@ -473,21 +445,13 @@ async function approveInner(deps, args, ids) {
             reservation: {
                 localRequestId: ids.localRequestId,
                 localId: ids.localId,
-                kind: 'approve',
                 sessionResource: target.sessionResource,
-                repository: owner.repository,
-                requestedBranch: owner.requestedBranch,
-                sourceResource: owner.sourceResource,
-                ...(owner.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
-                grantId,
                 observedPlanId: planId,
             },
-            charge: {
-                operation: 'approve',
-                localRequestId: ids.localRequestId,
-                ...(owner.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
-            },
         });
+        if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
+            return (0, write_gate_js_1.settleExpiredBeforeWrite)(deps, reservation, SESSION_RECONCILE);
+        }
         try {
             await adapter.approvePlan(target.sessionResource);
         }
@@ -499,7 +463,7 @@ async function approveInner(deps, args, ids) {
         await (0, write_gate_js_1.settleAcceptedOrUnknown)(deps, reservation, { sessionResource: target.sessionResource }, { what: 'plan approved', reconcileHint: SESSION_RECONCILE });
         // The POST was answered 2xx. Everything below is verification and can never
         // turn the success into a failure envelope.
-        const verified = await verifyApproval(deps, adapter, target.sessionResource, start, pendingStamp, deadline);
+        const verified = await verifyApproval(deps, adapter, target.sessionResource, start, deadline);
         let deviated = false;
         let deviationUnrecorded = false;
         if (verified.observedPlanIdAfter !== null &&
@@ -541,7 +505,7 @@ async function approveInner(deps, args, ids) {
     });
 }
 /** Post-POST re-read from the same start: which plan did the vendor record as approved? */
-async function verifyApproval(deps, adapter, sessionResource, start, pendingStamp, deadline) {
+async function verifyApproval(deps, adapter, sessionResource, start, deadline) {
     let approvedPlanId;
     let approvedStamp;
     try {
@@ -556,7 +520,7 @@ async function verifyApproval(deps, adapter, sessionResource, start, pendingStam
             onActivity: (activity) => {
                 if (activity.type === 'planApproved' &&
                     activity.approvedPlanId !== undefined &&
-                    (0, activity_walk_js_1.compareStamp)(activity, pendingStamp) > 0 &&
+                    (0, activity_walk_js_1.compareStamp)(activity, start) > 0 &&
                     (approvedStamp === undefined ||
                         (0, activity_walk_js_1.compareStamp)(activity, approvedStamp) > 0)) {
                     approvedStamp = {
@@ -576,16 +540,15 @@ async function verifyApproval(deps, adapter, sessionResource, start, pendingStam
             pages: walk.pages,
         };
     }
-    catch (err) {
-        if (err instanceof errors_js_1.AdapterError || err instanceof errors_js_1.AppErrorException) {
-            return {
-                observedPlanIdAfter: null,
-                deferred: true,
-                partial: true,
-                pages: 0,
-            };
-        }
-        throw err;
+    catch {
+        // The approval already happened: whatever broke here, verification is
+        // deferred, never a failure envelope.
+        return {
+            observedPlanIdAfter: null,
+            deferred: true,
+            partial: true,
+            pages: 0,
+        };
     }
 }
 function abandonable(record, id) {
@@ -611,7 +574,7 @@ function abandonable(record, id) {
  * grant-confirmed.
  */
 async function abandon(deps, args) {
-    (0, runtime_support_js_1.refuseInsideSupervisedSession)(deps.env);
+    (0, runtime_support_js_1.refuseInsideSupervisedSession)(deps.env, 'abandon');
     const requestId = (0, validate_js_1.validateRequestId)(args.requestId);
     (0, runtime_support_js_1.prepare)(deps);
     const first = abandonable((await (0, state_js_1.readJournal)(deps.dataDir)).operations[requestId], requestId);
@@ -646,7 +609,7 @@ async function abandon(deps, args) {
             const loaded = (0, authority_js_1.loadGrants)(deps.dataDir);
             const grant = loaded.grants[record.grantId];
             if (grant !== undefined) {
-                (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef);
+                (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef, ctx.controllerId);
                 if (grant.usage.activeSessionRefs.includes(record.localRequestId)) {
                     grants = loaded;
                     grantId = grant.grantId;
@@ -661,7 +624,7 @@ async function abandon(deps, args) {
             abandonReason: reason,
             updatedAt: now,
         });
-        await (0, state_js_1.writeJournal)(deps.dataDir, journal);
+        await (0, state_js_1.writeJournal)(deps.dataDir, journal, [requestId]);
         // Journal first: a crash before the next line leaks a slot, which only
         // makes the grant stricter.
         let slotReleased = false;

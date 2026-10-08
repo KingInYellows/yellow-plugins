@@ -315,20 +315,8 @@ async function delegateInner(
       reservation: {
         localRequestId: ids.localRequestId,
         localId: ids.localId,
-        kind: 'create',
-        repository,
-        requestedBranch: branch,
-        sourceResource,
-        ...(taskRef !== undefined ? { taskRef } : {}),
-        grantId,
         autoPrRequested: false,
         promptDigest: messageDigest(prompt),
-      },
-      charge: {
-        operation: 'create',
-        localRequestId: ids.localRequestId,
-        ...(taskRef !== undefined ? { taskRef } : {}),
-        correction: args.correction,
       },
     });
 
@@ -547,20 +535,8 @@ async function replyInner(
       reservation: {
         localRequestId: ids.localRequestId,
         localId: ids.localId,
-        kind: 'reply',
         sessionResource: target.sessionResource,
-        repository: owner.repository,
-        requestedBranch: owner.requestedBranch,
-        sourceResource: owner.sourceResource,
-        ...(owner.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
-        grantId,
         promptDigest: messageDigest(message),
-      },
-      charge: {
-        operation: 'reply',
-        localRequestId: ids.localRequestId,
-        ...(owner.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
-        correction: args.correction,
       },
     });
 
@@ -706,10 +682,6 @@ async function approveInner(
     createTime: pending.activityCreateTime,
     activityId: pending.activityId,
   };
-  const pendingStamp = {
-    createTime: pending.activityCreateTime,
-    activityId: pending.activityId,
-  };
 
   return withAdapter(deps, async (adapter) => {
     const session = await read(deps, deadline, () =>
@@ -785,21 +757,14 @@ async function approveInner(
       reservation: {
         localRequestId: ids.localRequestId,
         localId: ids.localId,
-        kind: 'approve',
         sessionResource: target.sessionResource,
-        repository: owner.repository,
-        requestedBranch: owner.requestedBranch,
-        sourceResource: owner.sourceResource,
-        ...(owner.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
-        grantId,
         observedPlanId: planId,
       },
-      charge: {
-        operation: 'approve',
-        localRequestId: ids.localRequestId,
-        ...(owner.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
-      },
     });
+
+    if (isExpired(deps.clock, deadline)) {
+      return settleExpiredBeforeWrite(deps, reservation, SESSION_RECONCILE);
+    }
 
     try {
       await adapter.approvePlan(target.sessionResource);
@@ -822,7 +787,6 @@ async function approveInner(
       adapter,
       target.sessionResource,
       start,
-      pendingStamp,
       deadline
     );
     let deviated = false;
@@ -894,7 +858,6 @@ async function verifyApproval(
     readonly createTime: string;
     readonly activityId: string;
   },
-  pendingStamp: { readonly createTime: string; readonly activityId: string },
   deadline: Deadline
 ): Promise<Verification> {
   let approvedPlanId: string | undefined;
@@ -912,7 +875,7 @@ async function verifyApproval(
         if (
           activity.type === 'planApproved' &&
           activity.approvedPlanId !== undefined &&
-          compareStamp(activity, pendingStamp) > 0 &&
+          compareStamp(activity, start) > 0 &&
           (approvedStamp === undefined ||
             compareStamp(activity, approvedStamp) > 0)
         ) {
@@ -932,16 +895,15 @@ async function verifyApproval(
       partial: walk.partialPagination,
       pages: walk.pages,
     };
-  } catch (err) {
-    if (err instanceof AdapterError || err instanceof AppErrorException) {
-      return {
-        observedPlanIdAfter: null,
-        deferred: true,
-        partial: true,
-        pages: 0,
-      };
-    }
-    throw err;
+  } catch {
+    // The approval already happened: whatever broke here, verification is
+    // deferred, never a failure envelope.
+    return {
+      observedPlanIdAfter: null,
+      deferred: true,
+      partial: true,
+      pages: 0,
+    };
   }
 }
 
@@ -1001,7 +963,7 @@ export async function abandon(
   deps: WriteDeps,
   args: AbandonArgs
 ): Promise<AbandonResult> {
-  refuseInsideSupervisedSession(deps.env);
+  refuseInsideSupervisedSession(deps.env, 'abandon');
   const requestId = validateRequestId(args.requestId);
   prepare(deps);
   const first = abandonable(
@@ -1047,7 +1009,8 @@ export async function abandon(
         assertControllerAuthority(
           ctx.controllerDir,
           deps.dataDir,
-          grant.epochRef
+          grant.epochRef,
+          ctx.controllerId
         );
         if (grant.usage.activeSessionRefs.includes(record.localRequestId)) {
           grants = loaded;
@@ -1063,7 +1026,7 @@ export async function abandon(
       abandonReason: reason,
       updatedAt: now,
     });
-    await writeJournal(deps.dataDir, journal);
+    await writeJournal(deps.dataDir, journal, [requestId]);
     // Journal first: a crash before the next line leaks a slot, which only
     // makes the grant stricter.
     let slotReleased = false;

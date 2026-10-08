@@ -126,8 +126,8 @@ GRANT_ID=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO" --arg branch "$BRANCH"
              | if ($g.branchPattern | endswith("*"))
                then ($branch | startswith($g.branchPattern[0:-1]))
                else $g.branchPattern == $branch end))
-  ] | sort_by([((.usage.activeSessionRefs | length) < .limits.maxActiveSessions
-                and .usage.totalTasks < .limits.maxTotalTasks), .expiresAt])
+  ] | sort_by([((.usage.activeSessionRefs | length) < .maxActiveSessions
+                and .usage.totalTasks < .maxTotalTasks), .expiresAt])
     | last | .grantId // empty')
 if [ -z "$GRANT_ID" ]; then
   printf 'grant_id=NONE\n'

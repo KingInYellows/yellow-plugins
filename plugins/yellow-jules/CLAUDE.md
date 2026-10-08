@@ -168,6 +168,15 @@ data-directory path this host may write from.
   - `YELLOW_JULES_ACTIVE_GRANT` is a hint the agent could unset, not a control;
     the control is the terminal challenge.
   - Expiry and pause do not stop remote work; see the containment procedure.
+  - Only `reply --correction` spends a corrective round, and the caller sets
+    that flag. A plain reply is not counted, so a grant bounds repair sessions
+    and approvals but not the number of messages sent to a session it covers.
+  - A prompt or message travels as a command-line argument, which other local
+    users can read in `/proc/<pid>/cmdline` for as long as the call runs (unless
+    `/proc` is mounted with `hidepid`). Do not put secrets in a prompt on a
+    shared host. Very long multi-byte prompts can exceed the per-argument limit.
+  - The controller id is the host name. A cloned VM or container that keeps the
+    host name and a copied home directory looks like the same controller.
 
 ## Single-controller handoff (R38)
 

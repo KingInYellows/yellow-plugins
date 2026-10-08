@@ -280,11 +280,10 @@ function isValidRecord(key: string, value: unknown): value is OperationRecord {
     if (value[field] !== undefined && !isValidPageToken(value[field]))
       return false;
   }
-  if (
-    value['autoPrRequested'] !== undefined &&
-    typeof value['autoPrRequested'] !== 'boolean'
-  ) {
-    return false;
+  for (const field of ['autoPrRequested', 'correction'] as const) {
+    if (value[field] !== undefined && typeof value[field] !== 'boolean') {
+      return false;
+    }
   }
   if (!isStringArray(value['recentActivityIds'])) return false;
   if (!isNonNegativeInt(value['activityCount'])) return false;
@@ -720,6 +719,7 @@ export interface ReservationInput {
   readonly taskRef?: string;
   readonly grantId?: string;
   readonly autoPrRequested?: boolean;
+  readonly correction?: boolean;
   readonly promptDigest?: string;
   readonly observedPlanId?: string;
 }
@@ -843,8 +843,8 @@ export async function markOperation(
 }
 
 /**
- * First sight of a session with no journal row (PR2: every observable
- * session was created outside yellow): mint a local id and record it with
+ * First sight of a session with no journal row (it was created outside
+ * yellow, or by another copy of this data): mint a local id and record it with
  * `origin: "external"`. Returns the existing record when one is bound.
  */
 export async function ensureObservedRecord(
@@ -1212,7 +1212,7 @@ export interface SupervisionPatch {
   > | null;
 }
 
-/** Merges a patch into the session's supervision state; written only by `supervise` (R32, R33). */
+/** `undefined` keeps the stored value, `null` clears it, anything else sets it. */
 function keep<K extends string, V>(
   key: K,
   previous: V | undefined,
@@ -1222,6 +1222,7 @@ function keep<K extends string, V>(
   return value === undefined ? {} : ({ [key]: value } as { [P in K]?: V });
 }
 
+/** Merges a patch into the session's supervision state; written only by `supervise` (R32, R33). */
 export async function updateSupervision(
   dataDir: string,
   localRequestId: string,

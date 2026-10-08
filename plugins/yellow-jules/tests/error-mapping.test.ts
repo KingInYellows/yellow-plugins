@@ -253,6 +253,29 @@ describe('classifyAdapterError: every SDK class by phase (contract table)', () =
     expect(toAdapterError(sdk, err).kind).toBe('rate-limited');
   });
 
+  it.each([
+    ['a dropped fetch', () => new TypeError('fetch failed')],
+    [
+      'an aborted request',
+      () => Object.assign(new Error('aborted'), { name: 'AbortError' }),
+    ],
+    [
+      'a wrapped socket reset',
+      () =>
+        new Error('wrapped', {
+          cause: Object.assign(new Error('reset'), { code: 'ECONNRESET' }),
+        }),
+    ],
+  ])('classifies %s as a network failure, not a malformed body', (_n, make) => {
+    expect(toAdapterError(sdk, make()).kind).toBe('network');
+  });
+
+  it('still calls an unrecognised error malformed', () => {
+    expect(toAdapterError(sdk, new Error('mapper broke')).kind).toBe(
+      'malformed'
+    );
+  });
+
   it('redacts and truncates vendor error text', () => {
     process.env['JULES_API_KEY'] = 'live-key-for-redaction-test';
     try {
