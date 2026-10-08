@@ -131,6 +131,13 @@ Classify each issue:
 - **No PR found** → flag as "potentially stale — no associated PR"; surface to user
   but make no suggestion
 
+An issue can match several PRs (for example an abandoned closed PR and its open
+replacement). Decide once per issue, in this order: any `OPEN` PR wins ("PR
+open, no action", and drop every closed-PR suggestion); else any `MERGED` PR or
+`CLOSED` with `landed=yes` → Done; else `CLOSED` with `landed=no` →
+cancelled/backlog; else "closed, landing unverified". Run `pr-landed.sh` only
+for an issue with no `OPEN` and no `MERGED` PR.
+
 ### Step 5: Present Proposed Transitions
 
 Display a table summarising findings:

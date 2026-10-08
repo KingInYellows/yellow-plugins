@@ -72,6 +72,12 @@ setup() {
   [[ $stderr == *"shallow"* ]]
 }
 
+@test "the origin-versus-repo comparison ignores case" {
+  run --separate-stderr "$SCRIPT" O/R 7
+  [ "$status" -eq 0 ]
+  [ "$output" = "landed=yes" ]
+}
+
 @test "origin that is a different repository is landed=unknown and its URL is not printed" {
   git remote set-url origin "https://user:s3cret@example.invalid/other/repo.git"
   run --separate-stderr "$SCRIPT" o/r 7
@@ -92,6 +98,7 @@ setup() {
   run --separate-stderr "$SCRIPT" o/r 7
   [ "$output" = "landed=unknown" ]
   [[ $stderr == *"git fetch origin main failed"* ]]
+  [[ $stderr != *"$T"* && $stderr != *fatal* ]]
 }
 
 @test "a ref that does not resolve after the fetch is landed=unknown, not no" {

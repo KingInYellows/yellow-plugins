@@ -50,11 +50,6 @@ unknown() {
   exit 0
 }
 
-# first_line <text>: the first line, printable characters only, capped.
-first_line() {
-  printf '%s\n' "$1" | head -n 1 | tr -cd '[:print:]' | cut -c1-160
-}
-
 # t <command...>: bounded when timeout(1)/gtimeout exists.
 t() {
   if command -v timeout >/dev/null 2>&1; then
@@ -69,8 +64,11 @@ t() {
 # The fetch and the log read origin, so origin must be the repository the PR
 # came from. The URL is never printed: it can carry credentials.
 origin_url=$(git remote get-url origin 2>/dev/null) || unknown 'no origin remote'
-case "$origin_url" in
-  *"/$repo" | *"/$repo.git" | *":$repo" | *":$repo.git") ;;
+# GitHub paths are case-insensitive, so compare lowercased copies.
+origin_lc=$(printf '%s' "$origin_url" | tr '[:upper:]' '[:lower:]')
+repo_lc=$(printf '%s' "$repo" | tr '[:upper:]' '[:lower:]')
+case "$origin_lc" in
+  *"/$repo_lc" | *"/$repo_lc.git" | *":$repo_lc" | *":$repo_lc.git") ;;
   *) unknown "origin is not $repo, so the default-branch check would read a different repository" ;;
 esac
 
@@ -86,8 +84,9 @@ if [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" != false ]; then
   unknown 'this clone is shallow (or its depth cannot be read); history may be truncated'
 fi
 
-fetch_out=$(GIT_TERMINAL_PROMPT=0 t git fetch --quiet origin "$default_branch" 2>&1) \
-  || unknown "git fetch origin $default_branch failed: $(first_line "$fetch_out")"
+# git's own error text can carry the remote URL, so only fixed text is reported.
+GIT_TERMINAL_PROMPT=0 t git fetch --quiet origin "$default_branch" >/dev/null 2>&1 \
+  || unknown "git fetch origin $default_branch failed"
 
 ref="refs/remotes/origin/$default_branch"
 git rev-parse --verify --quiet "$ref^{commit}" >/dev/null 2>&1 || unknown "$ref does not resolve after the fetch"
@@ -95,8 +94,8 @@ git rev-parse --verify --quiet "$ref^{commit}" >/dev/null 2>&1 || unknown "$ref 
 # --grep narrows the scan to commits that mention the number at all; the exact
 # check below is on the subject, so a body line ending in the number does not
 # count. The log's own status is checked: a git failure is never "no match".
-matches=$(git log "$ref" --fixed-strings --grep="(#${pr})" --format=%s 2>&1) \
-  || unknown "git log failed: $(first_line "$matches")"
+matches=$(git log "$ref" --fixed-strings --grep="(#${pr})" --format=%s 2>/dev/null) \
+  || unknown 'git log failed'
 
 # No -q: grep must read all input, or pipefail would turn SIGPIPE into a miss.
 if printf '%s\n' "$matches" | grep -E "\(#${pr}\)[[:space:]]*\$" >/dev/null; then
