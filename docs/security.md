@@ -465,8 +465,9 @@ third party, TypeSafe AI (`https://api.typesafe.ai/v1/systemone`):
   probabilities, recorded only when every value is in range (choice from the
   fixed set, numbers in [0, 1]); it is never executed or fed back to Claude.
 - **Local record.** `compound-staging/jev-shadow/<session_id>.json`, replaced
-  atomically each turn (an answer whose content hash no longer matches the
-  pending entry is dropped), holds the session id, content hash, choice,
+  atomically each turn under a per-session lock (an answer whose content
+  hash no longer matches the session's pending, or else processing, entry is
+  dropped), holds the session id, content hash, choice,
   probabilities, latency and token count, never transcript text. It sits in
   the same owner-only staging directory as the pending queue.
 - **Failure mode.** Fail-open and shadow only: it runs after the pending entry

@@ -206,3 +206,40 @@ _capture() {
   [[ "$output" == *"NEWEST_TAIL" ]]
   [ "$(printf '%s' "$output" | wc -c)" -le 24000 ]
 }
+
+_shadow_direct() {
+  env COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 \
+    bash -c '. "$1"; . "$2"; jev_prefilter_shadow "$3" "$4" "$5" < "$6"' _ \
+    "$BATS_TEST_DIRNAME/../lib/compound-staging.sh" \
+    "$BATS_TEST_DIRNAME/../lib/jev-prefilter.sh" \
+    "$STAGING" "$SESSION_ID" "$1" "$TRANSCRIPT_FILE"
+}
+
+@test "an entry a drain moved to processing/ still gets its record" {
+  COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
+  hash=$(jq -r '.content_hash' "$STAGING/pending/$SESSION_ID.jsonl")
+  rm -rf "$STAGING/jev-shadow"
+  mkdir -p "$STAGING/processing"
+  mv "$STAGING/pending/$SESSION_ID.jsonl" "$STAGING/processing/"
+  _shadow_direct "$hash"
+  jq -e --arg h "$hash" '.content_hash == $h' "$STAGING/jev-shadow/$SESSION_ID.json"
+}
+
+@test "a lock left by a dead process is cleared; a live one is waited on" {
+  COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
+  hash=$(jq -r '.content_hash' "$STAGING/pending/$SESSION_ID.jsonl")
+  rm -f "$STAGING/jev-shadow/$SESSION_ID.json"
+  mkdir "$STAGING/jev-shadow/.$SESSION_ID.lock"
+  printf '999999' > "$STAGING/jev-shadow/.$SESSION_ID.lock/pid"
+  _shadow_direct "$hash"
+  [ -f "$STAGING/jev-shadow/$SESSION_ID.json" ]
+  [ ! -e "$STAGING/jev-shadow/.$SESSION_ID.lock" ]
+
+  rm -f "$STAGING/jev-shadow/$SESSION_ID.json"
+  mkdir "$STAGING/jev-shadow/.$SESSION_ID.lock"
+  printf '%s' "$$" > "$STAGING/jev-shadow/.$SESSION_ID.lock/pid"
+  _shadow_direct "$hash"
+  [ ! -e "$STAGING/jev-shadow/$SESSION_ID.json" ]
+  [ -z "$(ls -A "$STAGING/jev-shadow" | grep -v '^\.' )" ]
+  [ -z "$(ls -A "$STAGING/jev-shadow" | grep '^\.tmp')" ]
+}

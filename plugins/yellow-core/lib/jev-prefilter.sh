@@ -182,20 +182,38 @@ JEVCFG
   [ -n "$line" ] || return 0
 
   # Captures are detached per turn, so a slow answer can land after a newer
-  # turn's. Keep it only while it still matches the pending entry's hash.
-  local current
-  current=$(jq -r '.content_hash // empty' \
-    "${staging}/pending/${sid}.jsonl" 2>/dev/null | tail -n 1)
-  [ "$current" = "$hash" ] || return 0
-
-  # Atomic replace of this session's record (tmp + rename in the same dir).
-  local dir="${staging}/jev-shadow" tmp
+  # turn's. Under a per-session lock, keep it only while it still matches
+  # the session's current entry: pending/ if present, else processing/ (a
+  # drain may have claimed it mid-request). Check and rename share the lock,
+  # so a newer turn's record cannot be replaced by an older answer.
+  local dir="${staging}/jev-shadow" tmp lock owner current i=0
   ( umask 077; mkdir -p "$dir" ) 2>/dev/null || return 0
   tmp=$(mktemp "${dir}/.tmp.XXXXXX" 2>/dev/null) || return 0
-  if printf '%s\n' "$line" > "$tmp" 2>/dev/null \
-    && mv -f -- "$tmp" "${dir}/${sid}.json" 2>/dev/null; then
-    return 0
+  printf '%s\n' "$line" > "$tmp" 2>/dev/null || { rm -f -- "$tmp"; return 0; }
+
+  lock="${dir}/.${sid}.lock"
+  until mkdir "$lock" 2>/dev/null; do
+    owner=$(cat "${lock}/pid" 2>/dev/null)
+    if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
+      rm -rf -- "$lock" 2>/dev/null
+      continue
+    fi
+    i=$((i + 1))
+    if [ "$i" -gt 40 ]; then
+      rm -f -- "$tmp" 2>/dev/null
+      return 0
+    fi
+    sleep 0.05
+  done
+  printf '%s' "${BASHPID:-$$}" > "${lock}/pid" 2>/dev/null
+
+  local entry="${staging}/pending/${sid}.jsonl"
+  [ -f "$entry" ] || entry="${staging}/processing/${sid}.jsonl"
+  current=$(jq -r '.content_hash // empty' "$entry" 2>/dev/null | tail -n 1)
+  if [ "$current" = "$hash" ]; then
+    mv -f -- "$tmp" "${dir}/${sid}.json" 2>/dev/null
   fi
   rm -f -- "$tmp" 2>/dev/null
+  rm -rf -- "$lock" 2>/dev/null
   return 0
 }
