@@ -730,7 +730,11 @@ Test call: mcp__plugin_yellow-research_deepwiki__read_wiki_structure with repoNa
 
 **ast-grep CLI** (optional local binary, not an MCP server): no probe call.
 Report `ACTIVE` when Step 1 printed `ast-grep:  ok`, otherwise `UNAVAILABLE`.
-Agents run it through Bash on demand, so a fresh install needs no restart.
+Agents run it through Bash on demand, so a fresh install needs no restart,
+unless the installer fell back to `~/.local/bin` and printed that the
+directory is not in PATH. Then Step 1 still reports it missing: tell the user
+to add the printed `export PATH=...` line to their shell profile and restart
+Claude Code.
 
 **Parallel Task MCP** (bundled HTTP — async research orchestration):
 
@@ -949,7 +953,8 @@ To enable AST structural code search (optional; agents fall back to Grep):
   cargo install ast-grep --locked
   pip install ast-grep-cli
 
-The binary must be on PATH as `ast-grep`. No restart is needed.
+The binary must be on PATH as `ast-grep`. No restart is needed unless you
+had to add its directory to PATH; then restart Claude Code.
 ```
 
 If any MCP sources are `UNAVAILABLE` or `FAIL`, show this block:

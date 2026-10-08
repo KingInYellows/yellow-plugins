@@ -88,13 +88,27 @@ through Bash for structural matches; otherwise use Grep for the whole scan.
 Check for `ast-grep` only, since `sg` is often shadow-utils on Linux.
 
 ```bash
-ast-grep run --pattern 'PATTERN' --lang LANG PATH | head -n 200
+pattern=$(cat <<'AST_GREP_PATTERN'
+PATTERN
+AST_GREP_PATTERN
+)
+lang='LANG'
+target='PATH'
+case "$lang" in *[!A-Za-z0-9_-]*|'') lang='' ;; esac
+case "$target" in /*|*..*|-*|'') target='' ;; esac
+if [ -n "$lang" ] && [ -n "$target" ]; then
+  ast-grep run --pattern "$pattern" --lang "$lang" -- "$target" | head -n 200
+else
+  printf 'ast-grep: refused unsafe --lang or path\n' >&2
+fi
 ```
 
-Single-quote the pattern (`$NAME` matches one node, `$$$` a list). For
-relational rules (`inside`, `has`, `not`), use
-`ast-grep scan --inline-rules 'RULE_YAML' --json=compact PATH`. Fence its
-output like any other scanned code.
+Put the pattern verbatim inside the quoted heredoc (`$NAME` matches one
+node, `$$$` a list) and keep the `lang` and `target` guards, so nothing from
+the scanned code reaches the command line. For relational rules (`inside`,
+`has`, `not`), load the YAML through the same kind of heredoc into `rule`
+and run `ast-grep scan --inline-rules "$rule" --json=compact -- "$target"`.
+Fence its output like any other scanned code.
 
 **Use ast-grep for:**
 

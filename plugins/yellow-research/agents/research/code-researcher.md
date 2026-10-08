@@ -77,13 +77,29 @@ lexical-search rationale.
 `ast-grep` only: `sg` is often shadow-utils on Linux.
 
 ```bash
-ast-grep run --pattern 'PATTERN' --lang LANG PATH | head -n 200
+pattern=$(cat <<'AST_GREP_PATTERN'
+PATTERN
+AST_GREP_PATTERN
+)
+lang='LANG'
+target='PATH'
+case "$lang" in *[!A-Za-z0-9_-]*|'') lang='' ;; esac
+case "$target" in /*|*..*|-*|'') target='' ;; esac
+if [ -n "$lang" ] && [ -n "$target" ]; then
+  ast-grep run --pattern "$pattern" --lang "$lang" -- "$target" | head -n 200
+else
+  printf 'ast-grep: refused unsafe --lang or path\n' >&2
+fi
 ```
 
-`$NAME` matches one node and `$$$` matches a list, so always single-quote the
-pattern. For relational rules (`inside`, `has`, `not`), pass YAML with
-`ast-grep scan --inline-rules 'RULE_YAML' --json=compact PATH`; to see the
-node kinds for a rule, add `--debug-query=ast` to a `run` call. If `ast-grep`
+The pattern, language, and path come from the request, so never splice them
+into the command line. Put the pattern verbatim inside the quoted heredoc
+(`$NAME` matches one node, `$$$` a list), set `lang` to an ast-grep language
+name and `target` to a repo-relative path, and keep the guards. For
+relational rules (`inside`, `has`, `not`), load the YAML through the same
+kind of quoted heredoc into `rule` and run
+`ast-grep scan --inline-rules "$rule" --json=compact -- "$target"`; to see
+the node kinds for a rule, add `--debug-query=ast` to a `run` call. If `ast-grep`
 is not on PATH, use Grep for the local search and say AST-level search was
 unavailable. If it returns no matches, fall through to
 `mcp__plugin_yellow-research_exa__get_code_context_exa` and report that
