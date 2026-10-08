@@ -342,7 +342,7 @@ through the generator and documenting the single-controller handoff procedure.
 
 ### Phase F: host-neutral skills and Codex
 
-- [ ] Step 26: Create `plugins/yellow-jules/skills/jules-delegation/SKILL.md`.
+- [x] Step 26: Create `plugins/yellow-jules/skills/jules-delegation/SKILL.md`.
   - **Frontmatter:** `name`, a single-line description containing "Use when", and `user-invocable: false`.
   - **Sections:** What It Does / When to Use / Usage.
   - **Content:**
@@ -356,7 +356,7 @@ through the generator and documenting the single-controller handoff procedure.
     - an Inputs section with a "no input supplied" branch;
     - the verbatim untrusted-content fencing block.
   - **Exclusions:** no slash commands, `CLAUDE_*` variables, AskUserQuestion, `Task`/`Skill`, or repo-relative paths.
-- [ ] Step 27: Create `plugins/yellow-jules/skills/jules-supervision/SKILL.md`.
+- [x] Step 27: Create `plugins/yellow-jules/skills/jules-supervision/SKILL.md`.
   - **Body:**
     - one-pass semantics;
     - the decision table from Step 19;
@@ -367,7 +367,7 @@ through the generator and documenting the single-controller handoff procedure.
     - the verbatim fencing block;
     - R47 reporting: every pass report lists the research and review capabilities it used and those unavailable on the current host, and never names Claude-only sibling plugins as tools.
   - **Exclusions:** the same as Step 26.
-- [ ] Step 28: Baseline the Codex manifests before the flip, as a separate commit.
+- [x] Step 28: Baseline the Codex manifests before the flip, as a separate commit.
   - Run `pnpm vitest run tests/integration/generate-manifests-codex.test.ts tests/integration/generate-manifests-characterization.test.ts` on the unflipped catalog and record that it passes.
   - Add a fixture case in `generate-manifests-codex.test.ts` for a plugin with an enabled interface, a two-skill allowlist and `includeHooks: false`, matching the jules shape.
 - [ ] Step 29: Flip Codex on in `catalog/plugins/yellow-jules.json` `targets.codex`, in a separate commit.
