@@ -448,7 +448,7 @@ through the generator and documenting the single-controller handoff procedure.
   - `.changeset/yellow-jules-authority-supervision-codex.md` with `'yellow-jules': minor`.
   - `.changeset/yellow-linear-jules-live-delegate.md` with `'yellow-linear': minor`. The live provider branch is a new capability, so it is minor.
 - [x] Step 39: Run the validators: `pnpm validate:agents`, `pnpm lint:plugins`, `pnpm validate:shell-compat` and `pnpm check:shell-parse`. Then hand-grep the skill bodies for `AskUserQuestion|Task|Skill|/jules:|CLAUDE_` (exposure-lint blind spots). Fix any CRLF line endings.
-- [ ] Step 40: Submit through the enabled stacked-PR provider.
+- [x] Step 40: Submit through the enabled stacked-PR provider.
   - Run `/stack:status` and continue only on `READY_GRAPHITE`/`READY_GITHUB`.
   - The commit order keeps the Step 28 baseline before the Step 29 flip.
   - The PR description lists the follow-ups:
