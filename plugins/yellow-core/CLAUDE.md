@@ -354,6 +354,9 @@ cross-plugin pattern:
   idempotent via `_PLAN_GATE_PROVENANCE_LOADED`. Coverage in
   `tests/shell-compat/` (driver with stub `gh` and `timeout`),
   `tests/plan-gate-tier.bats` and `tests/plan-commands.bats`
+- `jev-prefilter.sh` — opt-in TypeSafe Jev shadow pre-filter for compound
+  staging (see "Jev shadow pre-filter" under Compound Staging). Sourced only by
+  `_stop-capture-subshell.sh`
 - `validate-fs.sh` — `validate_file_path()` and `canonicalize_project_dir()`
   path-traversal validators (consumed by yellow-ci, yellow-ruvector,
   yellow-debt; yellow-debt declares it as a required dependency). Idempotent
@@ -515,6 +518,29 @@ detail):**
   hard-deny (D8 in the plan). RULE 14 in
   `scripts/validate-agent-authoring.js` blocks any removal of this deny.
 
+**Jev shadow pre-filter (opt-in, log only):** with
+`COMPOUND_JEV_PREFILTER=shadow` and `TYPESAFE_API_KEY` set in the environment
+the hooks inherit, the capture subshell sends the redacted tail's user and
+assistant text (tool calls and results dropped, capped at the newest 24,000
+bytes) to TypeSafe's Jev, fenced as untrusted reference data (`jev-1.13.0`
+unless `COMPOUND_JEV_MODEL` is set; timeout `COMPOUND_JEV_TIMEOUT_S`, default 5
+s). It runs after the pending entry is written and never changes what is staged.
+Like the pending entry, the record is per session and each turn's answer
+atomically replaces the last unless a newer turn's pending entry has superseded
+it: `compound-staging/jev-shadow/<session_id>.json` holds session id, content
+hash, the `durable` choice with confidence and probabilities, the
+`has_instruction` probability, latency and a `would_skip` flag (trivial or
+routine at confidence >= 0.9 and instruction probability <= 0.2). No transcript
+text is logged. Every valid answer, even one that lands after a newer turn, is
+also appended to `jev-shadow/predictions.jsonl`, because a drain can score an entry before a
+later turn replaces the per-session file. When `jev-shadow/` exists, the staging-reviewer drain also
+appends each scorer verdict (session id, content hash, verdict, priority) to
+`jev-shadow/outcomes.jsonl`, the join key for that comparison. The key reaches curl as a config on fd 3 and the body on stdin,
+so neither is in argv, and every failure is silent. The log exists to compare
+against staging-scorer outcomes before any skip behaviour ships; this sends
+session text to a third party, so leave it unset unless you accept that (trust
+boundary: `docs/security.md` "Jev Shadow Pre-Filter").
+
 **Manual override:** `/compound:review-staged` triggers a drain
 immediately (skips threshold check) with an `AskUserQuestion` M3
 confirmation gate showing pending count + sample titles.
@@ -555,7 +581,7 @@ inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
 
 `bats tests/` from the plugin directory (`compound-session-start-hook`,
 `compound-staging`, `compound-stop-hook`, `context-observer`,
-`credential-status`, `handoff`, `plan-commands`, `plan-status-parity`,
+`credential-status`, `handoff`, `jev-prefilter`, `plan-commands`, `plan-status-parity`,
 `plan-gate-tier`, `plugin-identity`, `pre-compact-hook`, `quote-ground`, `repo-profile`,
 `setup-all-ruvector-probe`, `validate-fs`) plus `skills/git-worktree/tests/` (`worktree-manager.bats`,
 `worktree-restack.bats` with stub `gt` / `gh` / `git` shims under `tests/mocks/`).

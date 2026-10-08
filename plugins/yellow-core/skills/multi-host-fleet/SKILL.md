@@ -59,6 +59,7 @@ dismissing or skipping it is safe when the shell env var is set.
 | yellow-semgrep | `SEMGREP_APP_TOKEN` | `semgrep_app_token` | yes | `sgp_` prefix |
 | yellow-devin | `DEVIN_SERVICE_USER_TOKEN` | `devin_service_user_token` | yes | HTTP MCP; commands read shell env directly |
 | yellow-devin | `DEVIN_ORG_ID` | `devin_org_id` | no | HTTP MCP; commands read shell env directly |
+| yellow-core | `TYPESAFE_API_KEY` | — | yes | Optional; Stop hook only, needs `COMPOUND_JEV_PREFILTER=shadow` too; sends redacted session text to TypeSafe |
 
 The userConfig path uses the system keychain when available (macOS,
 Windows) or `~/.claude/.credentials.json` (0600 perms) on minimal Linux.
@@ -201,6 +202,10 @@ The wrapper scripts inside each plugin will pick them up.
 # yellow-devin
 # export DEVIN_SERVICE_USER_TOKEN="$(cat ~/.secrets/devin 2>/dev/null)"
 # export DEVIN_ORG_ID="your-org-id"
+
+# yellow-core Jev shadow pre-filter (optional; sends redacted session text)
+# export COMPOUND_JEV_PREFILTER=shadow
+# export TYPESAFE_API_KEY="$(cat ~/.secrets/typesafe 2>/dev/null)"
 ```
 
 ### Verifying credentials resolve correctly

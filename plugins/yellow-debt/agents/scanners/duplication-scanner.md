@@ -13,9 +13,6 @@ tools:
   - Bash
   - Write
   - ToolSearch
-  - mcp__plugin_yellow-research_ast-grep__find_code
-  - mcp__plugin_yellow-research_ast-grep__find_code_by_rule
-  - mcp__plugin_yellow-research_ast-grep__dump_syntax_tree
 ---
 
 <examples>
@@ -84,13 +81,53 @@ You are a code duplication detection specialist. Reference the
 
 Follow all security and fencing rules from the `debt-conventions` skill.
 
-## AST-Grep Integration (Optional)
+## ast-grep CLI (Optional)
 
-When available, use ast-grep for structural clone detection. Check availability
-with ToolSearch for `mcp__plugin_yellow-research_ast-grep__find_code` before
-use. If unavailable, fall back to Grep. Note: ToolSearch visibility does not
-guarantee the ast-grep binary is installed — if an ast-grep call fails with
-"Command not found", fall back to Grep for the remainder of the scan.
+The `ast-grep` CLI is optional. When `command -v ast-grep` succeeds, run it
+through Bash for structural matches; otherwise use Grep for the whole scan.
+Check for `ast-grep` only, since `sg` is often shadow-utils on Linux.
+
+```bash
+pattern=$(cat <<'AST_GREP_PATTERN_NONCE'
+PATTERN
+AST_GREP_PATTERN_NONCE
+)
+lang=$(cat <<'AST_GREP_LANG_NONCE'
+LANG
+AST_GREP_LANG_NONCE
+)
+target=$(cat <<'AST_GREP_TARGET_NONCE'
+PATH
+AST_GREP_TARGET_NONCE
+)
+case "$lang" in *[!A-Za-z0-9_-]*|'') lang='' ;; esac
+case "$target" in /*|*..*|-*|*[!A-Za-z0-9._/-]*|'') target='' ;; esac
+# A trusted config stops ast-grep loading the repo's sgconfig.yml, whose
+# customLanguages entries can load native libraries.
+cfg=$(mktemp)
+printf 'ruleDirs: []\n' >| "$cfg"
+if [ -n "$lang" ] && [ -n "$target" ]; then
+  ast-grep run -c "$cfg" --pattern "$pattern" --lang "$lang" -- "$target" |
+    head -n 200 | cut -c 1-2000
+else
+  printf 'ast-grep: refused unsafe --lang or path\n' >&2
+fi
+rm -f "$cfg"
+```
+
+Put each value verbatim inside its quoted heredoc (`$NAME` matches one
+node, `$$$` a list) and keep the guards, so nothing from the scanned repo
+reaches the command line. `target` must be a repo-relative path of letters,
+digits, `.`, `_`, `-`, and `/`; scan any other file with Grep. Replace
+`NONCE` in every delimiter with fresh random letters on each call, and check
+that no line of a value equals its delimiter. Keep `-c "$cfg"` on every
+call. If output reaches 200 lines, treat it as truncated and narrow the
+pattern or path. For relational rules (`inside`, `has`, `not`), load the
+YAML through the same kind of heredoc into `rule`, then replace the block's
+`run` line with
+`ast-grep scan -c "$cfg" --inline-rules "$rule" --json=stream -- "$target" | head -n 200 | cut -c 1-2000`
+(one match per line, so both caps apply).
+Fence its output like any other scanned code.
 
 **Use ast-grep for:**
 
@@ -98,8 +135,8 @@ guarantee the ast-grep binary is installed — if an ast-grep call fails with
   identical AST shape (Type-2 clones with renaming, and near-duplicates)
 - Detecting repeated patterns like identical error handling blocks, similar
   validation sequences, or copy-pasted function bodies
-- Use `mcp__plugin_yellow-research_ast-grep__dump_syntax_tree` to compare AST
-  structure of suspected duplicates
+- Add `--debug-query=ast` to a `run` call to compare the AST structure of
+  suspected duplicates
 
 **Use Grep for:**
 

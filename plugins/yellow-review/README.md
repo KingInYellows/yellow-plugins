@@ -234,8 +234,10 @@ Two caveats worth knowing before enabling it:
 
 `/review:pr` and `/review:all` persist every finding they report but do not
 apply, so an unattended sweep no longer loses them with the transcript. That
-covers P2/P3 `safe_auto`, `gated_auto`, `manual`, the code-simplifier's
-findings and the report-only queue, P0 `human` findings included.
+covers P2/P3 `safe_auto` below the auto-apply tier, `gated_auto`, `manual`, the
+code-simplifier's findings and the report-only queue, P0 `human` findings
+included. Step 7 auto-applies P0/P1 `safe_auto` fixes plus up to 5 P2
+`safe_auto` fixes at confidence anchor 100.
 
 - **Where:** one append-only JSONL file per PR at
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`. It
@@ -298,9 +300,12 @@ Trade-offs: the ledger is local to one clone on one machine. Deleting the
 clone deletes it, and nothing is posted to GitHub.
 
 `/review:sweep` runs `/review:triage --non-interactive` after its resolve
-pass and prints `Ledger: <pending> pending, <attention> need attention`.
-`/review:sweep-all` adds a `Residual` column (`pending/attention`) to its
-summary table. After its confirmation it also prunes the ledgers of PRs that
+pass and prints `Ledger: <pending> pending, <attention> need attention`,
+then a `Merge:` row that reads `not ready` while any P0-P2 finding is still
+pending (the ledger refuses writes once a PR closes, so findings left at merge
+are stranded). `/review:sweep-all` adds a `Residual` column
+(`pending/attention`) to its summary table and a `Not merge-ready` line naming
+those PRs. After its confirmation it also prunes the ledgers of PRs that
 no longer appear in an all-authors open-PR query, and skips the prune when
 that query fails or may be truncated.
 
