@@ -270,13 +270,17 @@ Kept `inherit`, with the reason recorded:
       line 341 next to `DRAIN_TIMEOUT_S`, add:
 
       ```sh
-      DRAIN_MODEL="${COMPOUND_DRAIN_MODEL:-sonnet}"
+      DRAIN_MODEL="${COMPOUND_DRAIN_MODEL-sonnet}"
       case "$DRAIN_MODEL" in
         ''|*[!a-z0-9-]*) DRAIN_MODEL_REJECTED=1 ;;
         haiku|sonnet|opus|claude-*) DRAIN_MODEL_REJECTED=0 ;;
         *) DRAIN_MODEL_REJECTED=1 ;;
       esac
       ```
+
+      The default uses `-` (no colon). Unset silently defaults to sonnet with
+      no warning; set-but-empty (`COMPOUND_DRAIN_MODEL=`) reaches the `''` arm
+      and is rejected and logged.
 
       Put the block after `DRAIN_LOG` is created (`:314-316`). When
       `DRAIN_MODEL_REJECTED=1`, append a warning to `DRAIN_LOG` before
@@ -312,9 +316,10 @@ Kept `inherit`, with the reason recorded:
 
 - [ ] 1.3.2: In `plugins/yellow-core/tests/compound-session-start-hook.bats`,
       add tests that grep the stub's recorded argv:
-  - `--model sonnet` by default.
+  - `--model sonnet` by default (unset, no rejection warning).
   - `COMPOUND_DRAIN_MODEL=haiku` gives `--model haiku`.
-  - An invalid value (`'x; rm'`, `claude-x; rm`, empty) falls back to
+  - An invalid value (`'x; rm'`, `claude-x; rm`, set-but-empty
+    `COMPOUND_DRAIN_MODEL=`) falls back to
     `--model sonnet`, and the rejection warning is in `DRAIN_LOG`.
   - `--bare` is absent and `--max-turns 50` is still present.
 
@@ -334,8 +339,10 @@ Kept `inherit`, with the reason recorded:
 <!-- /deepen-plan -->
 
 - [ ] 1.3.3: Run one real drain against a non-empty staging dir. Pass means
-      items are processed, the exit code is 0, and `DRAIN_LOG` holds valid
-      JSON. Record the result in the PR.
+      items are processed, the exit code is 0, the JSON result line in
+      `DRAIN_LOG` parses (`grep -m1 '^{' "$DRAIN_LOG" | jq -e .`;
+      `--output-format json` emits one line), the `[compound-drain] claude
+      exited 0` line is present, and there is no rejection warning. Record the result in the PR.
 - [ ] 1.3.4: In `.github/workflows/claude-code-review.yml` (`with:` near line
       40), add
       `claude_args: --model sonnet  # model pin: docs/<policy doc>`.
