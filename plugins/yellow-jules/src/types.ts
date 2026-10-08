@@ -323,7 +323,7 @@ export interface EpochRef {
 }
 
 export interface GrantUsage {
-  /** Session resources (or reservation request ids before binding) holding an active-session slot. */
+  /** Local request ids of the creates holding an active-session slot (stable from reservation to release). */
   readonly activeSessionRefs: readonly string[];
   /** Never decrements (R31). */
   readonly totalTasks: number;

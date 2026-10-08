@@ -46,6 +46,8 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_util_1 = require("node:util");
+const authority_js_1 = require("./authority.js");
+const authorize_js_1 = require("./authorize.js");
 const config_js_1 = require("./config.js");
 const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
@@ -56,13 +58,18 @@ const sdk_adapter_js_1 = require("./sdk-adapter.js");
 const sdk_resolver_js_1 = require("./sdk-resolver.js");
 const test_seam_js_1 = require("./test-seam.js");
 const validate_js_1 = require("./validate.js");
-const KNOWN_OPERATIONS = ['setup', 'list', 'status', 'collect'];
+const KNOWN_OPERATIONS = [
+    'setup',
+    'list',
+    'status',
+    'collect',
+    'authorize',
+];
 const UNSUPPORTED_OPERATIONS = ['cancel', 'pause', 'resume', 'cost'];
 const LATER_OPERATIONS = [
     'delegate',
     'reply',
     'approve',
-    'authorize',
     'supervise',
     'integrate',
 ];
@@ -189,6 +196,76 @@ async function dispatch(operation, rest, deps) {
             return runtime.collect(deps, {
                 session: requireString(values.session, '--session'),
                 deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_COLLECT_DEADLINE_MS),
+            });
+        }
+        case 'authorize': {
+            const { values } = (0, node_util_1.parseArgs)({
+                args: [...rest],
+                options: {
+                    repo: { type: 'string' },
+                    branch: { type: 'string' },
+                    source: { type: 'string' },
+                    'task-ref': { type: 'string', multiple: true },
+                    operations: { type: 'string' },
+                    'max-active-sessions': { type: 'string' },
+                    'max-total-tasks': { type: 'string' },
+                    'max-corrective-rounds': { type: 'string' },
+                    'ttl-minutes': { type: 'string' },
+                    owner: { type: 'string' },
+                    'take-over': { type: 'boolean', default: false },
+                    list: { type: 'boolean', default: false },
+                    revoke: { type: 'string' },
+                    ...deadline,
+                },
+                strict: true,
+                allowPositionals: false,
+            });
+            const modes = [
+                values.list === true,
+                typeof values.revoke === 'string',
+                values['take-over'] === true,
+            ].filter(Boolean).length;
+            const creationFlags = [
+                values.repo,
+                values.branch,
+                values.source,
+                values['task-ref'],
+                values.operations,
+                values['max-active-sessions'],
+                values['max-total-tasks'],
+                values['max-corrective-rounds'],
+                values['ttl-minutes'],
+                values.owner,
+            ].some((v) => v !== undefined);
+            if (modes > 1 || (modes === 1 && creationFlags)) {
+                throw new UsageError('authorize takes exactly one of: grant-creation flags, --list, --revoke <grant-id>, or --take-over');
+            }
+            if (values.list === true)
+                return (0, authorize_js_1.authorizeList)(deps);
+            if (typeof values.revoke === 'string') {
+                return (0, authorize_js_1.authorizeRevoke)(deps, values.revoke);
+            }
+            if (values['take-over'] === true)
+                return (0, authorize_js_1.authorizeTakeOver)(deps);
+            const intFlag = (raw, flag, min, max) => typeof raw === 'string'
+                ? (0, validate_js_1.validatePositiveInt)(raw, flag, min, max)
+                : undefined;
+            const maxActiveSessions = intFlag(values['max-active-sessions'], '--max-active-sessions', 1, authority_js_1.GRANT_CEILINGS.maxActiveSessions);
+            const maxTotalTasks = intFlag(values['max-total-tasks'], '--max-total-tasks', 1, authority_js_1.GRANT_CEILINGS.maxTotalTasks);
+            const maxCorrectiveRounds = intFlag(values['max-corrective-rounds'], '--max-corrective-rounds', 0, authority_js_1.GRANT_CEILINGS.maxCorrectiveRounds);
+            const ttlMinutes = intFlag(values['ttl-minutes'], '--ttl-minutes', 1, authority_js_1.GRANT_CEILINGS.ttlMinutes);
+            return (0, authorize_js_1.authorizeCreate)(deps, {
+                repo: requireString(values.repo, '--repo'),
+                branch: requireString(values.branch, '--branch'),
+                ...(typeof values.source === 'string' ? { source: values.source } : {}),
+                taskRefs: values['task-ref'] ?? [],
+                operations: requireString(values.operations, '--operations'),
+                owner: requireString(values.owner, '--owner'),
+                ...(maxActiveSessions !== undefined ? { maxActiveSessions } : {}),
+                ...(maxTotalTasks !== undefined ? { maxTotalTasks } : {}),
+                ...(maxCorrectiveRounds !== undefined ? { maxCorrectiveRounds } : {}),
+                ...(ttlMinutes !== undefined ? { ttlMinutes } : {}),
+                deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_READ_DEADLINE_MS),
             });
         }
         default:

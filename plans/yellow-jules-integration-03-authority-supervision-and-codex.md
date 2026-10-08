@@ -190,14 +190,14 @@ through the generator and documenting the single-controller handoff procedure.
 
 ### Phase B: controller authority, grants, TTY gate
 
-- [ ] Step 7: Create `src/controller.ts` with `readControllerAuthority`, `initControllerAuthority`, `assertControllerAuthority` and `takeOverController`.
+- [x] Step 7: Create `src/controller.ts` with `readControllerAuthority`, `initControllerAuthority`, `assertControllerAuthority` and `takeOverController`.
   - **`readControllerAuthority(controllerDir, controllerId)`** reads `<controllerDir>/<controllerId>.json` = `{ controllerId, epoch, dataDir: <canonical realpath>, updatedAt }`. It shape-validates the file and requires it to be `0600` and owner-owned.
   - **`initControllerAuthority`** runs on the first `authorize` when no file and no grants exist. It writes epoch 1.
   - **`assertControllerAuthority(dataDir, epochRef)`** throws `JULES_CONTROLLER_MISMATCH` in three cases: the file is missing, the epoch differs, or the canonical data-dir path differs.
   - **`takeOverController`** serves the handoff: it writes epoch+1 for this host and path, then rewrites every grant's `epochRef` under the lock. It runs only inside a TTY-confirmed `authorize --take-over`.
   - The controller id defaults to `os.hostname()` and is validated.
   - The module takes no `process.env` reads, only injected deps.
-- [ ] Step 8: Create `src/authority.ts` with `loadGrants`, `evaluateAuthority`, `chargeGrant`, `releaseGrant`, `listGrants` and `revokeGrant`.
+- [x] Step 8: Create `src/authority.ts` with `loadGrants`, `evaluateAuthority`, `chargeGrant`, `releaseGrant`, `listGrants` and `revokeGrant`.
   - **`loadGrants`** shape-validates the file. A corrupt grants file returns `JULES_JOURNAL_CORRUPT`; it is never treated as empty.
   - **`evaluateAuthority(grant, request, now)`** is pure. It returns `ok` or a typed denial in this order:
     1. revoked
@@ -213,7 +213,7 @@ through the generator and documenting the single-controller handoff procedure.
     - `releaseGrant` is callable only from reconcile and abandon paths, never from a write path.
     - `totalTasks` never decrements.
   - **`listGrants` and `revokeGrant`.** Revocation needs no TTY because it only narrows authority.
-- [ ] Step 9: Create `src/tty-confirm.ts` with `confirmOnTty`.
+- [x] Step 9: Create `src/tty-confirm.ts` with `confirmOnTty`.
   - **`confirmOnTty({ summary, deadlineMs, openTty = defaultOpenTty })`** opens `/dev/tty` read-write.
     - `ENXIO`, `ENOENT` or `EACCES` → `JULES_CONFIRMATION_REQUIRED`, with recovery "run this command yourself in a terminal on the controller host".
     - On `win32` → `JULES_UNSUPPORTED_CAPABILITY`.
@@ -221,7 +221,7 @@ through the generator and documenting the single-controller handoff procedure.
   - **Response.** It reads one line within the deadline and compares in constant time. A mismatch or EOF → `JULES_AUTHORITY_DENIED`.
   - **Output channels.** Nothing goes to stdout or stderr, and the code is never logged.
   - **Tests.** They inject a fake `openTty`; the real `/dev/tty` path is exercised only in the manual smoke.
-- [ ] Step 10: Add `authorize` in a new `src/authorize.ts`, with its CLI case in `cli.ts`.
+- [x] Step 10: Add `authorize` in a new `src/authorize.ts`, with its CLI case in `cli.ts`.
   - **Flags:** `authorize --repo --branch <ref|pattern> --source? --task-ref (repeatable) --operations create,reply,approve,collect --max-active-sessions --max-total-tasks --max-corrective-rounds --ttl-minutes --owner [--take-over]`.
   - **Defaults (R30):** 1 active session, 3 tasks, 2 corrective rounds, 120 minutes.
   - **Documented ceilings** (constants in `authority.ts`, stated in the contract and README): 3 active sessions, 10 tasks, 3 corrective rounds, 24 hours. Anything over a ceiling → `JULES_INVALID_INPUT`.

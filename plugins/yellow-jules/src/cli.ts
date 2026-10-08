@@ -13,6 +13,13 @@
 
 import { parseArgs } from 'node:util';
 
+import { GRANT_CEILINGS } from './authority.js';
+import {
+  authorizeCreate,
+  authorizeList,
+  authorizeRevoke,
+  authorizeTakeOver,
+} from './authorize.js';
 import { resolveDataDir } from './config.js';
 import {
   DEFAULT_COLLECT_DEADLINE_MS,
@@ -32,13 +39,18 @@ import { resolveSdk } from './sdk-resolver.js';
 import { getTestTransport } from './test-seam.js';
 import { validatePositiveInt } from './validate.js';
 
-const KNOWN_OPERATIONS = ['setup', 'list', 'status', 'collect'] as const;
+const KNOWN_OPERATIONS = [
+  'setup',
+  'list',
+  'status',
+  'collect',
+  'authorize',
+] as const;
 const UNSUPPORTED_OPERATIONS = ['cancel', 'pause', 'resume', 'cost'] as const;
 const LATER_OPERATIONS = [
   'delegate',
   'reply',
   'approve',
-  'authorize',
   'supervise',
   'integrate',
 ] as const;
@@ -102,7 +114,11 @@ type OperationResult =
   | runtime.SetupResult
   | runtime.ListResult
   | runtime.StatusResult
-  | runtime.CollectResult;
+  | runtime.CollectResult
+  | Awaited<ReturnType<typeof authorizeCreate>>
+  | ReturnType<typeof authorizeList>
+  | Awaited<ReturnType<typeof authorizeRevoke>>
+  | Awaited<ReturnType<typeof authorizeTakeOver>>;
 
 async function dispatch(
   operation: string,
@@ -202,6 +218,106 @@ async function dispatch(
         deadlineMs: deadlineFlag(
           values['deadline-ms'],
           DEFAULT_COLLECT_DEADLINE_MS
+        ),
+      });
+    }
+
+    case 'authorize': {
+      const { values } = parseArgs({
+        args: [...rest],
+        options: {
+          repo: { type: 'string' },
+          branch: { type: 'string' },
+          source: { type: 'string' },
+          'task-ref': { type: 'string', multiple: true },
+          operations: { type: 'string' },
+          'max-active-sessions': { type: 'string' },
+          'max-total-tasks': { type: 'string' },
+          'max-corrective-rounds': { type: 'string' },
+          'ttl-minutes': { type: 'string' },
+          owner: { type: 'string' },
+          'take-over': { type: 'boolean', default: false },
+          list: { type: 'boolean', default: false },
+          revoke: { type: 'string' },
+          ...deadline,
+        },
+        strict: true,
+        allowPositionals: false,
+      });
+      const modes = [
+        values.list === true,
+        typeof values.revoke === 'string',
+        values['take-over'] === true,
+      ].filter(Boolean).length;
+      const creationFlags = [
+        values.repo,
+        values.branch,
+        values.source,
+        values['task-ref'],
+        values.operations,
+        values['max-active-sessions'],
+        values['max-total-tasks'],
+        values['max-corrective-rounds'],
+        values['ttl-minutes'],
+        values.owner,
+      ].some((v) => v !== undefined);
+      if (modes > 1 || (modes === 1 && creationFlags)) {
+        throw new UsageError(
+          'authorize takes exactly one of: grant-creation flags, --list, --revoke <grant-id>, or --take-over'
+        );
+      }
+      if (values.list === true) return authorizeList(deps);
+      if (typeof values.revoke === 'string') {
+        return authorizeRevoke(deps, values.revoke);
+      }
+      if (values['take-over'] === true) return authorizeTakeOver(deps);
+      const intFlag = (
+        raw: unknown,
+        flag: string,
+        min: number,
+        max: number
+      ): number | undefined =>
+        typeof raw === 'string'
+          ? validatePositiveInt(raw, flag, min, max)
+          : undefined;
+      const maxActiveSessions = intFlag(
+        values['max-active-sessions'],
+        '--max-active-sessions',
+        1,
+        GRANT_CEILINGS.maxActiveSessions
+      );
+      const maxTotalTasks = intFlag(
+        values['max-total-tasks'],
+        '--max-total-tasks',
+        1,
+        GRANT_CEILINGS.maxTotalTasks
+      );
+      const maxCorrectiveRounds = intFlag(
+        values['max-corrective-rounds'],
+        '--max-corrective-rounds',
+        0,
+        GRANT_CEILINGS.maxCorrectiveRounds
+      );
+      const ttlMinutes = intFlag(
+        values['ttl-minutes'],
+        '--ttl-minutes',
+        1,
+        GRANT_CEILINGS.ttlMinutes
+      );
+      return authorizeCreate(deps, {
+        repo: requireString(values.repo, '--repo'),
+        branch: requireString(values.branch, '--branch'),
+        ...(typeof values.source === 'string' ? { source: values.source } : {}),
+        taskRefs: values['task-ref'] ?? [],
+        operations: requireString(values.operations, '--operations'),
+        owner: requireString(values.owner, '--owner'),
+        ...(maxActiveSessions !== undefined ? { maxActiveSessions } : {}),
+        ...(maxTotalTasks !== undefined ? { maxTotalTasks } : {}),
+        ...(maxCorrectiveRounds !== undefined ? { maxCorrectiveRounds } : {}),
+        ...(ttlMinutes !== undefined ? { ttlMinutes } : {}),
+        deadlineMs: deadlineFlag(
+          values['deadline-ms'],
+          DEFAULT_READ_DEADLINE_MS
         ),
       });
     }

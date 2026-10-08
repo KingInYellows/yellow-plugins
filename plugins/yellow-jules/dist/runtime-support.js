@@ -1,0 +1,156 @@
+"use strict";
+/**
+ * Helpers shared by runtime.ts, mutations.ts, reconcile.ts, supervise.ts and
+ * authorize.ts: the dependency bag, the one-adapter-per-invocation wrapper,
+ * the bounded read, the status vocabulary, session resolution, and the R13
+ * policy check. Split out of runtime.ts so the new write-side modules can use
+ * them without importing the (large) operation layer back.
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.REAL_CLOCK = void 0;
+exports.nowFn = nowFn;
+exports.prepare = prepare;
+exports.withAdapter = withAdapter;
+exports.read = read;
+exports.conditionOf = conditionOf;
+exports.attentionOf = attentionOf;
+exports.resolveSessionResource = resolveSessionResource;
+exports.boundRecord = boundRecord;
+exports.checkPolicyDeviation = checkPolicyDeviation;
+const config_js_1 = require("./config.js");
+const deadline_js_1 = require("./deadline.js");
+const errors_js_1 = require("./errors.js");
+const state_js_1 = require("./state.js");
+const validate_js_1 = require("./validate.js");
+exports.REAL_CLOCK = {
+    now: () => Date.now(),
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+};
+function nowFn(deps) {
+    return () => new Date(deps.clock.now());
+}
+function prepare(deps) {
+    (0, config_js_1.prepareDataDir)(deps.dataDir, {
+        pluginRoot: deps.pluginRoot ?? (0, config_js_1.resolvePluginRoot)(),
+        cwd: deps.cwd ?? process.cwd(),
+    });
+}
+/** Every vendor read goes through one adapter per invocation, closed (scratch tripwire) before returning. */
+async function withAdapter(deps, fn) {
+    const adapter = await deps.adapterFactory();
+    let result;
+    try {
+        result = await fn(adapter);
+    }
+    catch (err) {
+        try {
+            await adapter.close();
+        }
+        catch (closeErr) {
+            // A scratch-tripwire violation is the more severe invariant failure; it outranks the operation's own error.
+            if (closeErr instanceof errors_js_1.AppErrorException &&
+                closeErr.appError.code === 'JULES_SDK_INTEGRITY')
+                throw closeErr;
+        }
+        throw err;
+    }
+    await adapter.close();
+    return result;
+}
+/** Adapter failures on a read are mapped with the pre-dispatch/read column; nothing here is after dispatch. */
+async function read(deps, deadline, fn) {
+    if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
+        return (0, errors_js_1.throwAppError)('JULES_DEADLINE_EXCEEDED', 'the operation deadline expired before the read', {
+            recoveryAction: 'Retry with a larger --deadline-ms.',
+        });
+    }
+    try {
+        return await (0, deadline_js_1.withReadRetry)(fn, { clock: deps.clock, deadline });
+    }
+    catch (err) {
+        if (err instanceof errors_js_1.AdapterError) {
+            const app = (0, errors_js_1.mapAdapterError)(err, 'read');
+            return (0, errors_js_1.throwAppError)(app.code, app.message, {
+                ...(app.requestId !== undefined ? { requestId: app.requestId } : {}),
+            });
+        }
+        throw err;
+    }
+}
+// ---------------------------------------------------------------------------
+// Status vocabulary (R10) and the attention envelope
+// ---------------------------------------------------------------------------
+const CONDITION_BY_STATE = Object.freeze({
+    queued: 'starting',
+    planning: 'starting',
+    awaitingPlanApproval: 'awaiting-approval',
+    awaitingUserFeedback: 'awaiting-reply',
+    inProgress: 'working',
+    paused: 'paused',
+    failed: 'failed',
+    completed: 'remote-completed',
+});
+/** Unknown states — including `unspecified` — are never placed in a completed bucket. */
+function conditionOf(vendorState) {
+    return Object.prototype.hasOwnProperty.call(CONDITION_BY_STATE, vendorState)
+        ? CONDITION_BY_STATE[vendorState]
+        : 'needs-inspection';
+}
+function attentionOf(flags) {
+    return flags.length > 0 ? { requiresAttention: true, attention: flags } : {};
+}
+// ---------------------------------------------------------------------------
+// shared: session resolution and the R13 policy check
+// ---------------------------------------------------------------------------
+function resolveSessionResource(journal, ref) {
+    const parsed = (0, validate_js_1.parseSessionRef)(ref);
+    if (parsed.kind === 'resource')
+        return parsed.sessionResource;
+    const record = (0, state_js_1.findByLocalId)(journal, parsed.localId);
+    if (record === undefined) {
+        return (0, errors_js_1.throwAppError)('JULES_NOT_FOUND', `no journal record for local id ${parsed.localId}`);
+    }
+    if (record.sessionResource === undefined) {
+        return (0, errors_js_1.throwAppError)('JULES_NOT_FOUND', `local id ${parsed.localId} has no bound session yet`, {
+            recoveryAction: 'Run status --reconcile to bind or release the reservation.',
+        });
+    }
+    return record.sessionResource;
+}
+async function boundRecord(deps, journal, sessionResource) {
+    return ((0, state_js_1.findBySessionResource)(journal, sessionResource) ??
+        (await (0, state_js_1.ensureObservedRecord)(deps.dataDir, sessionResource, nowFn(deps))));
+}
+/**
+ * R13: a vendor PR on a session whose create requested `autoPr: false` is a
+ * policy deviation. Independently of that request, a PR value that fails
+ * `validatePullRequestUrl` is always a deviation (contract: invalid values are
+ * reported as `policy-deviation`). The reason carries only the validator's
+ * fixed reason string; the vendor-writable URL is never echoed.
+ */
+async function checkPolicyDeviation(deps, record, session) {
+    let current = record;
+    for (const output of session.outputs) {
+        if (output.type !== 'pullRequest')
+            continue;
+        const source = record.sourceResource ?? session.sourceResource;
+        const check = source !== undefined
+            ? (0, validate_js_1.validatePullRequestUrl)(output.url, source)
+            : { valid: false, reason: 'session source unknown' };
+        if (!check.valid) {
+            current = await (0, state_js_1.recordDeviation)(deps.dataDir, record.localRequestId, {
+                kind: 'policy-deviation',
+                reason: `vendor pull request reference failed validation: ${check.reason}`,
+            }, nowFn(deps));
+            continue;
+        }
+        if (record.autoPrRequested !== false)
+            continue;
+        current = await (0, state_js_1.recordDeviation)(deps.dataDir, record.localRequestId, {
+            kind: 'policy-deviation',
+            reason: 'vendor pull request observed on a session created with autoPr: false',
+            prUrl: check.url,
+        }, nowFn(deps));
+    }
+    return current;
+}
