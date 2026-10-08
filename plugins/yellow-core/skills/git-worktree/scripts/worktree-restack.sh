@@ -1445,17 +1445,16 @@ release_run_worktree() {
   git -C "$S_RUN" checkout --quiet "$start" -- >/dev/null 2>&1
 }
 
-# abort_in_chain_rebases: clear every in-chain rebase. One attempt per recorded
-# chain entry, then stop, so a marker that will not clear cannot spin.
+# abort_in_chain_rebases: clear every in-chain rebase. Each worktree is tried
+# once, so a marker that will not clear cannot spin and cannot hide the
+# abortable rebases in later worktrees. Nonzero when any attempt failed.
 abort_in_chain_rebases() {
-  local n=0 bound busy
-  bound=${#S_CHAIN[@]}
-  while busy=$(chain_rebase_worktree); do
-    [ "$n" -lt "$bound" ] || return 1
-    n=$((n + 1))
-    abort_in_chain_rebase "$busy" || return 1
+  local i rc=0
+  for ((i = 0; i < ${#WT_PATH[@]}; i++)); do
+    worktree_in_chain_rebase "${WT_PATH[i]}" || continue
+    abort_in_chain_rebase "${WT_PATH[i]}" || rc=1
   done
-  return 0
+  return "$rc"
 }
 
 # in_chain_busy: print "<operation>\t<path>" and return 0 when the run worktree,
