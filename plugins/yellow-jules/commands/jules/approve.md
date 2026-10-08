@@ -49,6 +49,7 @@ SESSION='YELLOW_TODO_session'
 PLAN_ID='YELLOW_TODO_plan_id'
 REQUEST_ID='YELLOW_TODO_request_id_or_empty'
 DEADLINE='YELLOW_TODO_deadline_or_empty'
+case "$SESSION$PLAN_ID$REQUEST_ID$DEADLINE" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 [ -f "$CLI" ] || { printf 'ERROR: yellow-jules CLI not found at %s. Reinstall the plugin.\n' "$CLI" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { printf 'ERROR: jq required. Install: https://jqlang.github.io/jq/download/\n' >&2; exit 1; }
@@ -73,6 +74,7 @@ Read the plan under review so the preview shows what will start executing:
 ```bash
 set -uo pipefail
 SESSION='YELLOW_TODO_session'
+case "$SESSION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 OUTPUT=$(node "$CLI" status --session "$SESSION")
 printf '%s\n' "$OUTPUT" | jq '{ok, vendorState, condition, pendingPlan: (if .pendingPlan then {planId: .pendingPlan.planId, stepCount: (.pendingPlan.steps | length)} else null end)} | with_entries(select(.value != null))'
@@ -80,7 +82,7 @@ printf '%s\n' "$OUTPUT" | jq '{ok, vendorState, condition, pendingPlan: (if .pen
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
 printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
-printf '%s\n' "$OUTPUT" | jq -r 'def safe: tostring | gsub("[\u0000-\u001f\u007f-\u009f­͏᠎​-‏ -‮⁠-⁯﻿]"; " ") | gsub("[\\p{Pd}─-╿−-]+"; "-") | .[0:300]; (.pendingPlan.steps // [])[] | "\(.index + 1). \(.title | safe)" + (if .description then "\n   \(.description | safe)" else "" end)'
+printf '%s\n' "$OUTPUT" | jq -r 'def safe: tostring | gsub("[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | gsub("[\\p{Pd}\u2500-\u257f\u2e3a\u2e3b\u30fc\u2043\u207b\u208b\u02d7\u2796\ufe31\ufe32\u2212\ufe58\ufe63\uff0d-]+"; "-") | gsub("-(\\s*-)+"; "-") | .[0:300]; (.pendingPlan.steps // [])[] | "\(.index + 1). \(.title | safe)" + (if .description then "\n   \(.description | safe)" else "" end)'
 printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
 ```
 
@@ -95,6 +97,7 @@ set -uo pipefail
 REPO='YELLOW_TODO_repository'
 BRANCH='YELLOW_TODO_requested_branch'
 TASK_REF='YELLOW_TODO_task_ref'
+case "$REPO$BRANCH$TASK_REF" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 LIST=$(node "$CLI" authorize --list)
 if [ "$(printf '%s' "$LIST" | jq -r '.ok // false')" != true ]; then
@@ -145,6 +148,7 @@ PLAN_ID='YELLOW_TODO_plan_id'
 GRANT_ID='YELLOW_TODO_grant_id'
 REQUEST_ID='YELLOW_TODO_request_id'
 DEADLINE='YELLOW_TODO_deadline_or_empty'
+case "$SESSION$PLAN_ID$GRANT_ID$REQUEST_ID$DEADLINE" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 [ -f "$CLI" ] || { printf 'ERROR: yellow-jules CLI not found at %s. Reinstall the plugin.\n' "$CLI" >&2; exit 1; }
 args=(approve --session "$SESSION" --plan-id "$PLAN_ID" --grant-id "$GRANT_ID" --request-id "$REQUEST_ID")
@@ -156,7 +160,7 @@ printf '%s\n' "$OUTPUT" | jq '{ok, operation, localRequestId, localId, sessionRe
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
 printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
-printf '%s\n' "$OUTPUT" | jq -r 'def safe: tostring | gsub("[\u0000-\u001f\u007f-\u009f]"; " ") | .[0:300]; if .error then "error: \(.error.message | safe)", "recovery: \(.error.recoveryAction | safe)" else empty end'
+printf '%s\n' "$OUTPUT" | jq -r 'def safe: tostring | gsub("[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | gsub("[\\p{Pd}\u2500-\u257f\u2e3a\u2e3b\u30fc\u2043\u207b\u208b\u02d7\u2796\ufe31\ufe32\u2212\ufe58\ufe63\uff0d-]+"; "-") | gsub("-(\\s*-)+"; "-") | .[0:300]; if .error then "error: \(.error.message | safe)", "recovery: \(.error.recoveryAction | safe)" else empty end'
 printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
 ```
 

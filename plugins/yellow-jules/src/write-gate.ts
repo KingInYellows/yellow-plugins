@@ -31,11 +31,13 @@ import { assertControllerAuthority } from './controller.js';
 import {
   AdapterError,
   AppErrorException,
+  errorLabel,
   makeAppError,
   mapAdapterError,
   MutationErrorException,
   phaseOfWrite,
 } from './errors.js';
+import { assertNoSecretShapedValues } from './redact.js';
 import {
   isTerminalCondition,
   nowFn,
@@ -136,19 +138,29 @@ function denialError(
       { ...context, details: { runningSessions: running } }
     );
   }
+  const details = { reason: denial.reason };
   if (denial.code === 'JULES_AUTHORITY_DENIED') {
     return new MutationErrorException(
       makeAppError('JULES_AUTHORITY_DENIED', denial.message, {
         recoveryAction:
           'The grant does not cover this call. List grants with authorize --list, or create a covering grant with authorize in a terminal.',
       }),
-      context
+      { ...context, details }
     );
   }
-  return new MutationErrorException(
-    makeAppError(denial.code, denial.message),
-    context
-  );
+  if (denial.reason === 'active-sessions-exhausted') {
+    return new MutationErrorException(
+      makeAppError(denial.code, denial.message, {
+        recoveryAction:
+          'The grant has no free session slot. A slot frees when a session under it finishes or is reconciled: run status --reconcile, then retry. Write a new grant only if you need more concurrent sessions.',
+      }),
+      { ...context, details }
+    );
+  }
+  return new MutationErrorException(makeAppError(denial.code, denial.message), {
+    ...context,
+    details,
+  });
 }
 
 export async function reserveUnderGrant(
@@ -158,6 +170,26 @@ export async function reserveUnderGrant(
   const now = nowFn(deps);
   return withJournalLock(deps.dataDir, async () => {
     const journal = await readJournal(deps.dataDir);
+    // A recorded request id is answered before the grant is judged, so an agent
+    // that lost the reply to a launch that landed is not told to write a new grant.
+    if (journal.operations[gate.reservation.localRequestId] !== undefined) {
+      throw new MutationErrorException(
+        makeAppError(
+          'JULES_DUPLICATE_LAUNCH',
+          `request id ${gate.reservation.localRequestId} is already recorded`,
+          {
+            recoveryAction:
+              'Run status --reconcile to see what that request did. A recorded request id is spent: retry with a new one only after confirming nothing was created.',
+          }
+        ),
+        {
+          localRequestId: gate.reservation.localRequestId,
+          ...(gate.reservation.localId !== undefined
+            ? { localId: gate.reservation.localId }
+            : {}),
+        }
+      );
+    }
     const { grants, grant } = loadAuthorizedGrant(deps, gate.grantId);
     const verdict = evaluateAuthority(grant, gate.authority, now(), {
       unreconciledDeviation: grantHasUnreconciledDeviation(
@@ -183,6 +215,26 @@ export async function reserveUnderGrant(
         ? { localId: gate.reservation.localId }
         : {}),
     };
+    // reply and approve act on a session this plugin created; a missing owner
+    // must not turn the pause and deviation checks below into no-ops.
+    if (gate.authority.operation !== 'create' && owner === undefined) {
+      throw new MutationErrorException(
+        makeAppError(
+          'JULES_AUTHORITY_DENIED',
+          'the session this write targets has no owning launch record'
+        ),
+        ids
+      );
+    }
+    if (owner?.supervision?.outsideSeen !== undefined) {
+      throw new MutationErrorException(
+        makeAppError(
+          'JULES_SUPERVISION_PAUSED',
+          `outside activity was recorded on ${owner.sessionResource ?? 'this session'}; no grant-backed write is allowed until supervise --clear-pause`
+        ),
+        ids
+      );
+    }
     if (owner?.supervision?.paused !== undefined) {
       throw new MutationErrorException(
         makeAppError(
@@ -199,6 +251,28 @@ export async function reserveUnderGrant(
         makeAppError(
           'JULES_POLICY_DEVIATION',
           `${owner.sessionResource ?? 'this session'} has an unreconciled policy deviation`
+        ),
+        ids
+      );
+    }
+    // A repair creates a new session, so the owner pause is checked on the
+    // task's earlier launches instead of an owner record.
+    if (
+      gate.authority.operation === 'create' &&
+      gate.authority.correction === true &&
+      Object.values(journal.operations).some(
+        (r) =>
+          r.kind === 'create' &&
+          r.grantId === grant.grantId &&
+          r.taskRef === gate.authority.taskRef &&
+          (r.supervision?.paused !== undefined ||
+            r.supervision?.outsideSeen !== undefined)
+      )
+    ) {
+      throw new MutationErrorException(
+        makeAppError(
+          'JULES_SUPERVISION_PAUSED',
+          `a session for task ${gate.authority.taskRef ?? '(none)'} is paused or has unreviewed outside activity; no repair launch is allowed`
         ),
         ids
       );
@@ -252,11 +326,27 @@ export async function reserveUnderGrant(
         : {}),
       correction: authority.correction === true,
     };
+    // Everything that can refuse the record runs before the charge, so a
+    // rejected input never spends grant budget.
+    assertNoSecretShapedValues(record);
     writeGrants(
       deps.dataDir,
       updateGrant(grants, grant.grantId, (g) => chargeGrant(g, charge))
     );
-    await writeJournal(deps.dataDir, journal, [record.localRequestId]);
+    try {
+      await writeJournal(deps.dataDir, journal, [record.localRequestId]);
+    } catch (err) {
+      // Undo the charge while the lock is held; only a hard crash between the
+      // two writes can leak a slot.
+      try {
+        writeGrants(deps.dataDir, grants);
+      } catch (undoError) {
+        process.stderr.write(
+          `warning: could not undo the grant charge after a failed reservation: ${errorLabel(undoError)}\n`
+        );
+      }
+      throw err;
+    }
     return record;
   });
 }
@@ -290,7 +380,7 @@ function authorizeCommandFor(parts: {
     '--operations',
     shellQuote(parts.operations.join(',')),
     '--owner',
-    '<your-name>',
+    'YOUR_NAME',
   ].join(' ');
 }
 
@@ -298,7 +388,9 @@ function authorizeCommandFor(parts: {
 export function confirmationRequired(
   deps: Pick<WriteDeps, 'pluginRoot'>,
   scope: {
-    readonly operation: GrantOperation;
+    readonly operation?: GrantOperation;
+    /** The operations the printed grant should cover; defaults to `operation`. */
+    readonly operations?: readonly GrantOperation[];
     readonly repository?: string;
     readonly requestedBranch?: string;
     readonly taskRef?: string;
@@ -309,7 +401,7 @@ export function confirmationRequired(
     repository: scope.repository ?? '<owner/repo>',
     branch: scope.requestedBranch ?? '<branch>',
     ...(scope.taskRef !== undefined ? { taskRef: scope.taskRef } : {}),
-    operations: [scope.operation],
+    operations: scope.operations ?? (scope.operation ? [scope.operation] : []),
     ...(deps.pluginRoot !== undefined ? { pluginRoot: deps.pluginRoot } : {}),
   });
   return new MutationErrorException(
@@ -387,9 +479,9 @@ export async function settleFailure(
       // reported either way, with the failed bookkeeping made visible.
       journalRecorded = false;
       process.stderr.write(
-        `warning: could not mark ${record.localRequestId} unknown-outcome: ${
-          markError instanceof Error ? markError.name : 'error'
-        }\n`
+        `warning: could not mark ${record.localRequestId} unknown-outcome: ${errorLabel(
+          markError
+        )}\n`
       );
     }
     throw new MutationErrorException(
@@ -403,9 +495,11 @@ export async function settleFailure(
       }
     );
   }
-  // The vendor's verdict must reach the caller even when the bookkeeping fails;
-  // the reservation then stays `reserved`, which reconcile still resolves.
-  let journalRecorded = true;
+  // The vendor's verdict must reach the caller even when the bookkeeping fails.
+  // Marking the record and freeing the slot are separate steps with separate
+  // failure modes, and the envelope says which one did not land.
+  const details: Record<string, unknown> = {};
+  let marked = true;
   try {
     await markOperation(
       deps.dataDir,
@@ -414,24 +508,37 @@ export async function settleFailure(
       {},
       nowFn(deps)
     );
-    if (record.kind === 'create' && record.grantId !== undefined) {
+  } catch (markError) {
+    // The record stays `reserved`, which reconcile still resolves.
+    marked = false;
+    details['journalRecorded'] = false;
+    process.stderr.write(
+      `warning: could not mark ${record.localRequestId} failed after a rejection: ${errorLabel(markError)}\n`
+    );
+  }
+  if (marked && record.kind === 'create' && record.grantId !== undefined) {
+    try {
       await releaseSlotInStore(
         deps.dataDir,
         record.grantId,
         record.localRequestId
       );
+    } catch (releaseError) {
+      // The record is `failed`, so nothing will retry this: the slot stays held.
+      details['slotReleased'] = false;
+      process.stderr.write(
+        `warning: could not release the grant slot of ${record.localRequestId}: ${errorLabel(releaseError)}\n`
+      );
     }
-  } catch (bookkeepingError) {
-    journalRecorded = false;
-    process.stderr.write(
-      `warning: could not settle ${record.localRequestId} after a rejection: ${
-        bookkeepingError instanceof Error ? bookkeepingError.name : 'error'
-      }\n`
-    );
   }
   throw new MutationErrorException(
-    app,
-    journalRecorded ? ids : { ...ids, details: { journalRecorded: false } }
+    Object.keys(details).length > 0
+      ? {
+          ...app,
+          recoveryAction: `${app.recoveryAction} The local bookkeeping did not complete (see details); revoke and rewrite the grant to reclaim a held slot.`,
+        }
+      : app,
+    Object.keys(details).length > 0 ? { ...ids, details } : ids
   );
 }
 
@@ -473,9 +580,9 @@ export async function settleAcceptedOrUnknown(
     await settleAccepted(deps, record, extra);
   } catch (err) {
     process.stderr.write(
-      `warning: ${options.what} but the journal write failed: ${
-        err instanceof Error ? err.name : 'error'
-      }\n`
+      `warning: ${options.what} but the journal write failed: ${errorLabel(
+        err
+      )}\n`
     );
     throw persistenceUnknown(
       record,

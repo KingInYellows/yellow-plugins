@@ -10,8 +10,10 @@
  * of this plugin's own messages, a plan that changed under an evaluation with
  * no reply of ours in between, or a partial walk that leaves outside activity
  * undetermined — pauses the session. A pause blocks every later grant-backed
- * write (JULES_SUPERVISION_PAUSED) until `--clear-pause`, which is TTY-confirmed
- * because it widens effective authority.
+ * `reply` or `approve` on the session, and a repair `delegate` for its task
+ * (JULES_SUPERVISION_PAUSED), until `--clear-pause`, which is TTY-confirmed
+ * because it widens effective authority. Outside activity that `status` merely
+ * recorded blocks those writes the same way.
  *
  * Verification (R43) ships in PR4: a completed session reports
  * `verification: "unavailable"`, and the only verdicts offered are a repair
@@ -58,7 +60,7 @@ import type {
   SupervisionDecision,
 } from './types.js';
 import { validateGrantId } from './validate.js';
-import { loadAuthorizedGrant } from './write-gate.js';
+import { confirmationRequired, loadAuthorizedGrant } from './write-gate.js';
 
 const BACKOFF_BASE_SECONDS = 60;
 export const BACKOFF_CAP_SECONDS = 3600;
@@ -98,7 +100,8 @@ export type AllowedAction =
 
 export interface SuperviseArgs {
   readonly session: string;
-  readonly grantId: string;
+  /** Required to run a pass; absent, the call answers with the `authorize` command to run. */
+  readonly grantId?: string;
   readonly deadlineMs?: number;
 }
 
@@ -119,8 +122,11 @@ export interface SuperviseResult extends Attention {
   readonly nextCheck: NextCheck;
   readonly allowedActions: readonly AllowedAction[];
   readonly correctiveRoundsLeft: number;
+  readonly repository: string;
+  readonly requestedBranch: string;
+  readonly taskRef?: string;
   readonly observedPlanId?: string;
-  /** `needs-verification` only; R43 tooling ships in PR4. */
+  /** `needs-verification`, and `escalate` with `corrective-rounds-exhausted`; R43 tooling ships in PR4. */
   readonly verification?: 'unavailable';
   readonly artifacts?: {
     readonly noSupportedArtifact: boolean;
@@ -203,7 +209,8 @@ export async function superviseOnce(
   deps: WriteDeps,
   args: SuperviseArgs
 ): Promise<SuperviseResult> {
-  const grantId = validateGrantId(args.grantId);
+  const suppliedGrantId =
+    args.grantId !== undefined ? validateGrantId(args.grantId) : undefined;
   prepare(deps);
   const deadline = deadlineIn(
     deps.clock,
@@ -214,6 +221,19 @@ export async function superviseOnce(
   let journal = await readJournal(deps.dataDir);
   const sessionResource = resolveSessionResource(journal, args.session);
   const owner = owns(journal, sessionResource);
+  if (suppliedGrantId === undefined) {
+    throw confirmationRequired(
+      deps,
+      {
+        operations: ['collect', 'reply', 'approve'],
+        repository: owner.repository,
+        requestedBranch: owner.requestedBranch,
+        ...(owner.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
+      },
+      { localRequestId: owner.localRequestId, localId: owner.localId }
+    );
+  }
+  const grantId = suppliedGrantId;
 
   // Gate: the grant exists, is bound to this controller, and covers the session's scope.
   const { grant } = loadAuthorizedGrant(deps, grantId);
@@ -228,9 +248,23 @@ export async function superviseOnce(
     now()
   );
   const grantExpired = !scope.ok && scope.reason === 'expired';
-  if (!scope.ok && !grantExpired) {
+  // An expired grant may still drive an escalation, but only for a session it
+  // covered: the scope is judged again at the instant before it expired.
+  const coverage = grantExpired
+    ? evaluateScope(
+        grant,
+        {
+          repository: owner.repository,
+          sourceResource: owner.sourceResource,
+          branch: owner.requestedBranch,
+          ...(owner.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
+        },
+        new Date(Date.parse(grant.expiresAt) - 1)
+      )
+    : scope;
+  if (!coverage.ok) {
     throw new AppErrorException(
-      makeAppError(scope.code, scope.message, {
+      makeAppError(coverage.code, coverage.message, {
         recoveryAction:
           'The grant does not cover this session. List grants with authorize --list, or create a covering grant with authorize in a terminal.',
       })
@@ -242,6 +276,10 @@ export async function superviseOnce(
     localId: owner.localId,
     sessionResource,
     correctiveRoundsLeft: correctiveRoundsLeft(grant, owner.taskRef),
+    // What a repair delegate needs to name the task it repairs.
+    repository: owner.repository,
+    requestedBranch: owner.requestedBranch,
+    ...(owner.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
   };
   const persist = (patch: SupervisionPatch): Promise<OperationRecord> =>
     updateSupervision(deps.dataDir, owner.localRequestId, patch, now);
@@ -427,20 +465,26 @@ export async function superviseOnce(
         r.kind === 'reply' &&
         r.createdAt >= evaluated.evaluatedAt
     );
-  const swappedPlan =
+  // A swap is caught whether this pass or an earlier plain `status` consumed
+  // the new plan: the plan now pending is compared with the one evaluated.
+  const swappedActivityId =
     evaluated !== undefined && !repliedSinceEvaluation
-      ? newActivities.find(
+      ? (newActivities.find(
           (a) =>
             a.type === 'planGenerated' &&
             a.planId !== undefined &&
             a.planId !== evaluated.planId
-        )
+        )?.activityId ??
+        (seen.pendingPlan !== undefined &&
+        seen.pendingPlan.planId !== evaluated.planId
+          ? seen.pendingPlan.activityId
+          : undefined))
       : undefined;
   let pauseReason: string | undefined;
-  let pauseActivity: ActivityView | undefined;
-  if (swappedPlan !== undefined) {
+  let pauseActivityId: string | undefined;
+  if (swappedActivityId !== undefined) {
     pauseReason = 'plan-changed-after-evaluation';
-    pauseActivity = swappedPlan;
+    pauseActivityId = swappedActivityId;
   } else if (walk.partialPagination) {
     pauseReason =
       walk.stopReason === 'unmapped'
@@ -451,9 +495,7 @@ export async function superviseOnce(
     const pause = {
       reason: pauseReason,
       observedAt: now().toISOString(),
-      ...(pauseActivity !== undefined
-        ? { activityId: pauseActivity.activityId }
-        : {}),
+      ...(pauseActivityId !== undefined ? { activityId: pauseActivityId } : {}),
     };
     await persist({ paused: pause, backoff: null, ...decided('paused') });
     return {
@@ -751,6 +793,11 @@ export async function clearPause(
       `  session:     ${sessionResource}`,
       `  paused for:  ${paused.reason}`,
       `  paused at:   ${paused.observedAt}`,
+      ...(owner.supervision?.outsideSeen !== undefined
+        ? [
+            `  outside activity: ${owner.supervision.outsideSeen.activityId} (seen ${owner.supervision.outsideSeen.observedAt}) - inspect it first; clearing forgets it`,
+          ]
+        : []),
       '',
       'Supervised writes under the grant resume for this session.',
     ].join('\n')

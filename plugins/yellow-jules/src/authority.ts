@@ -4,7 +4,7 @@
  * path into `state/grants.json`; the runtime can only narrow it (revoke,
  * charge counters, release slots), never widen it.
  *
- * `evaluateAuthority` is pure. The callers in mutations.ts run it, together
+ * `evaluateAuthority` is pure. `reserveUnderGrant` in write-gate.ts runs it, together
  * with `assertControllerAuthority`, the R36 lookup, `chargeGrant` and the
  * reservation write, as one critical section under the journal lock (R31).
  *

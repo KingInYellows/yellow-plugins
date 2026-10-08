@@ -18,7 +18,7 @@ import {
   ensureOwnerOnlyDir,
   writeFileAtomicOwnerOnly,
 } from './config.js';
-import { throwAppError } from './errors.js';
+import { AppErrorException, throwAppError } from './errors.js';
 import { isPlainObject } from './shape.js';
 import type { ControllerAuthority, EpochRef, GrantsFile } from './types.js';
 import { validateControllerId } from './validate.js';
@@ -100,6 +100,15 @@ function parseAuthority(
   return { controllerId, epoch, dataDir, updatedAt };
 }
 
+/** An unreadable authority file is a mismatch, never a raw filesystem error. */
+function failClosed(err: unknown): never {
+  if (err instanceof AppErrorException) throw err;
+  const code = (err as { code?: unknown } | null)?.code;
+  return mismatch(
+    `the controller authority file could not be read${typeof code === 'string' ? ` (${code})` : ''}`
+  );
+}
+
 /**
  * Reads and shape-validates `<controllerDir>/<controllerId>.json`.
  * `undefined` means the file does not exist; every other problem throws.
@@ -113,9 +122,15 @@ export function readControllerAuthority(
     assertAuthorityFileSafe(file);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-    throw err;
+    return failClosed(err);
   }
-  return parseAuthority(fs.readFileSync(file, 'utf8'), file, controllerId);
+  let raw: string;
+  try {
+    raw = fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    return failClosed(err);
+  }
+  return parseAuthority(raw, file, controllerId);
 }
 
 function writeAuthority(

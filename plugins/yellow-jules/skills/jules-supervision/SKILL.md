@@ -69,10 +69,13 @@ After a write the pass is over: do not start another in the same turn.
 A pause means something happened that supervision did not do: a user message
 that is none of the plugin's own, a plan that changed under an evaluation with
 no reply of yours since, or a walk too incomplete to rule outside activity out.
-A paused session refuses every grant-backed write. The operator inspects the
-session with `status` and then clears the pause on their terminal with
-`supervise --clear-pause --session <ref>`, which asks for a typed code. You
-cannot clear it.
+A paused session refuses grant-backed `reply` and `approve`, and a repair
+delegate for its task. Outside activity that a plain `status` recorded counts
+the same way, so a teammate commenting on the session stops writes until the
+operator clears it. The operator inspects the session with `status` and then
+clears the pause on their terminal with
+`supervise --clear-pause --session <ref>`, which lists the outside activity and
+asks for a typed code. You cannot clear it.
 
 ### Corrections
 

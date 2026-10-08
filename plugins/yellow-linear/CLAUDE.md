@@ -120,6 +120,9 @@ going through commands. Bundled-server tool names carry the plugin prefix:
   previews it, and asks before launching. It can run `authorize --list` but never
   grant creation: with no covering grant it prints the exact terminal command and
   stops, sending nothing and posting no Linear comment.
+  The Jules branch needs the yellow-jules release that ships `delegate` and
+  `authorize --list` (the grants release); an older read-only install fails
+  the dry run with a usage error and sends nothing.
 
 ## Testing
 

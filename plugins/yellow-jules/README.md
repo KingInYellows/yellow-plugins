@@ -34,18 +34,18 @@ Then run `/jules:setup`.
 
 ## Commands
 
-| Command            | What it does                                                                       |
-| ------------------ | ---------------------------------------------------------------------------------- |
-| `/jules:setup`     | Check the credential and SDK, probe connected sources, install with consent        |
-| `/jules:list`      | One page of Jules sessions with a normalized condition                             |
-| `/jules:status`    | One session's live state, new activities, pending plan, and outputs; `--reconcile` |
-| `/jules:collect`   | Stage a session's patches and generated files for review                           |
-| `/jules:delegate`  | Launch a session: dry-run, covering grant, preview, confirm, launch                |
-| `/jules:reply`     | Send one message to a session (`--correction` spends a corrective round)           |
-| `/jules:approve`   | Re-read the pending plan completely, confirm, approve it once                      |
-| `/jules:authorize` | List or revoke grants; prints the terminal command that writes one                 |
-| `/jules:abandon`   | Prints the terminal command that gives up an operation whose outcome is unknown    |
-| `/jules:supervise` | One bounded supervision pass; at most one reply or approval, never a loop          |
+| Command            | What it does                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------- |
+| `/jules:setup`     | Check the credential and SDK, probe connected sources, install with consent                 |
+| `/jules:list`      | One page of Jules sessions with a normalized condition                                      |
+| `/jules:status`    | One session's live state, new activities, pending plan, and outputs; `--reconcile`          |
+| `/jules:collect`   | Stage a session's patches and generated files for review                                    |
+| `/jules:delegate`  | Launch a session: dry-run, covering grant, preview, confirm, launch                         |
+| `/jules:reply`     | Send one message to a session (`--correction` spends a corrective round)                    |
+| `/jules:approve`   | Re-read the pending plan completely, confirm, approve it once                               |
+| `/jules:authorize` | List or revoke grants; prints the terminal command that writes one                          |
+| `/jules:abandon`   | Prints the terminal command that gives up an operation whose outcome is unknown             |
+| `/jules:supervise` | One bounded supervision pass; at most one reply, approval, or repair delegate, never a loop |
 
 `--session` accepts a local id (`jl-…`, minted the first time the plugin sees a
 session) or a vendor `sessions/<id>`.

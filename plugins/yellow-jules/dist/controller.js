@@ -108,6 +108,13 @@ function parseAuthority(raw, file, controllerId) {
     }
     return { controllerId, epoch, dataDir, updatedAt };
 }
+/** An unreadable authority file is a mismatch, never a raw filesystem error. */
+function failClosed(err) {
+    if (err instanceof errors_js_1.AppErrorException)
+        throw err;
+    const code = err?.code;
+    return mismatch(`the controller authority file could not be read${typeof code === 'string' ? ` (${code})` : ''}`);
+}
 /**
  * Reads and shape-validates `<controllerDir>/<controllerId>.json`.
  * `undefined` means the file does not exist; every other problem throws.
@@ -120,9 +127,16 @@ function readControllerAuthority(controllerDir, controllerId) {
     catch (err) {
         if (err.code === 'ENOENT')
             return undefined;
-        throw err;
+        return failClosed(err);
     }
-    return parseAuthority(fs.readFileSync(file, 'utf8'), file, controllerId);
+    let raw;
+    try {
+        raw = fs.readFileSync(file, 'utf8');
+    }
+    catch (err) {
+        return failClosed(err);
+    }
+    return parseAuthority(raw, file, controllerId);
 }
 function writeAuthority(ctx, authority) {
     const file = controllerFilePath(ctx.controllerDir, ctx.controllerId);

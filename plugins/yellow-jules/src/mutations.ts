@@ -37,6 +37,7 @@ import {
   AppErrorException,
   MutationErrorException,
   makeAppError,
+  errorLabel,
   rethrowWithContext,
   throwAppError,
 } from './errors.js';
@@ -249,10 +250,12 @@ async function delegateInner(
     args.title !== undefined ? validateTitle(args.title) : undefined;
   const taskRef =
     args.taskRef !== undefined ? validateTaskRef(args.taskRef) : undefined;
-  if (args.correction && taskRef === undefined) {
+  if (taskRef === undefined) {
     throwAppError(
       'JULES_INVALID_INPUT',
-      '--correction needs the --task-ref of the task being repaired (R44)'
+      args.correction
+        ? '--correction needs the --task-ref of the task being repaired (R44)'
+        : 'a delegate needs --task-ref: grants cover named tasks only'
     );
   }
   prepare(deps);
@@ -813,9 +816,9 @@ async function approveInner(
         // The deviation is still reported, with the missed bookkeeping flagged.
         deviationUnrecorded = true;
         process.stderr.write(
-          `warning: plan approved but the deviation could not be recorded: ${
-            err instanceof Error ? err.name : 'error'
-          }\n`
+          `warning: plan approved but the deviation could not be recorded: ${errorLabel(
+            err
+          )}\n`
         );
       }
     }
@@ -895,9 +898,12 @@ async function verifyApproval(
       partial: walk.partialPagination,
       pages: walk.pages,
     };
-  } catch {
+  } catch (err) {
     // The approval already happened: whatever broke here, verification is
-    // deferred, never a failure envelope.
+    // deferred, never a failure envelope. The label says why.
+    process.stderr.write(
+      `warning: plan approved but verification could not complete: ${errorLabel(err)}\n`
+    );
     return {
       observedPlanIdAfter: null,
       deferred: true,
@@ -1031,13 +1037,21 @@ export async function abandon(
     // makes the grant stricter.
     let slotReleased = false;
     if (grants !== undefined && grantId !== undefined) {
-      writeGrants(
-        deps.dataDir,
-        updateGrant(grants, grantId, (g) =>
-          releaseGrant(g, record.localRequestId)
-        )
-      );
-      slotReleased = true;
+      try {
+        writeGrants(
+          deps.dataDir,
+          updateGrant(grants, grantId, (g) =>
+            releaseGrant(g, record.localRequestId)
+          )
+        );
+        slotReleased = true;
+      } catch (err) {
+        // The abandon already took effect; report it with the slot still held
+        // instead of an error a retry could not act on.
+        process.stderr.write(
+          `warning: abandoned ${record.localRequestId} but could not release its grant slot: ${errorLabel(err)}\n`
+        );
+      }
     }
     return {
       operation: 'abandon' as const,

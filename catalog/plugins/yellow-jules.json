@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "description": "Google Jules integration (experimental) — observe Jules remote-agent sessions and stage their artifacts for local review",
+  "description": "Google Jules integration (experimental) — delegate, supervise, and review Jules remote-agent sessions under owner-written grants",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"

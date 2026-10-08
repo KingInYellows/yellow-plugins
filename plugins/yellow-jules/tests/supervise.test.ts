@@ -473,6 +473,19 @@ describe('outside activity pauses (R32)', () => {
     });
   });
 
+  it('a plan swap consumed by an intervening plain status still pauses', async () => {
+    addPlan(h, session.sessionResource, 'plan-1');
+    expect((await sup()).decision).toBe('needs-plan-review');
+    h.deps.clock.time += 30_000;
+    addPlanNow(h, session.sessionResource, 'plan-2');
+    // A plain status reads the new plan, so the next pass sees it as old news.
+    await status(h.deps, { session: session.localId, reconcile: false });
+    expect(await sup()).toMatchObject({
+      decision: 'paused',
+      reason: 'plan-changed-after-evaluation',
+    });
+  });
+
   it('a new plan after OUR corrective reply is reviewed, not paused', async () => {
     addPlan(h, session.sessionResource, 'plan-1');
     await sup();
@@ -523,6 +536,18 @@ describe('outside activity pauses (R32)', () => {
       decision: 'paused',
       reason: 'partial-walk-unmapped-activity',
     });
+  });
+});
+
+describe('an expired grant', () => {
+  it('cannot drive a session it never covered', async () => {
+    const other = await createGrant(h, { branch: 'other/*' });
+    h.deps.clock.time += 3 * 60 * 60_000;
+    expect(
+      await codeOf(() =>
+        superviseOnce(h.deps, { session: session.localId, grantId: other })
+      )
+    ).toBe('JULES_AUTHORITY_DENIED');
   });
 });
 

@@ -381,7 +381,9 @@ async function dispatch(
       }
       return superviseOnce(deps, {
         session: requireString(values.session, '--session'),
-        grantId: requireString(values['grant-id'], '--grant-id'),
+        ...(typeof values['grant-id'] === 'string'
+          ? { grantId: values['grant-id'] }
+          : {}),
         deadlineMs: deadlineFlag(
           values['deadline-ms'],
           DEFAULT_MUTATION_DEADLINE_MS

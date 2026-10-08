@@ -188,6 +188,7 @@ CLASSIFICATION=$(printf '%s' "$_plugin_list_json" | node -e '
 ' "$YELLOW_CORE_ROOT/lib/remote-agent-provider-state.js" "$repo_root" "$TOOLING_CURSOR" "$TOOLING_DEVIN" "$TOOLING_JULES")
 
 printf 'yellow_cursor_root: %s\n' "${YELLOW_CURSOR_ROOT:-NONE}"
+printf 'yellow_jules_root: %s\n' "${YELLOW_JULES_ROOT:-NONE}"
 printf 'classification:\n%s\n' "$CLASSIFICATION"
 ```
 
@@ -693,7 +694,7 @@ REQUEST_ID="jr-linear-${KEY}"
 
 if [ "$MODE" = "launch" ]; then
   case "$GRANT_ID" in jg-????????????????????????????????) ;; *) printf 'ERROR: bad grant id "%s".\n' "$GRANT_ID" >&2; exit 1 ;; esac
-  OUTPUT=$(node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" --prompt "$(cat -- "$PACKET_FILE")" --request-id "$REQUEST_ID" --grant-id "$GRANT_ID")
+  OUTPUT=$(node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" "--prompt=$(cat -- "$PACKET_FILE")" --request-id "$REQUEST_ID" --grant-id "$GRANT_ID")
   printf 'exit=%s\n' "$?"
   printf '%s\n' "$OUTPUT" | jq '{ok, localRequestId, localId, sessionResource, vendorState, condition, repository, requestedBranch, details, requiresAttention, attention, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
   # Vendor-writable text only inside a fence with a random tag.
@@ -706,7 +707,7 @@ if [ "$MODE" = "launch" ]; then
   exit 0
 fi
 
-OUTPUT=$(node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" --prompt "$(cat -- "$PACKET_FILE")" --request-id "$REQUEST_ID" --dry-run)
+OUTPUT=$(node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" "--prompt=$(cat -- "$PACKET_FILE")" --request-id "$REQUEST_ID" --dry-run)
 printf 'dry_run_exit=%s\n' "$?"
 printf '%s\n' "$OUTPUT" | jq '{ok, localRequestId, repository, requestedBranch, taskRef, dryRun, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
 if [ "$(printf '%s' "$OUTPUT" | jq -r '.ok')" != "true" ]; then

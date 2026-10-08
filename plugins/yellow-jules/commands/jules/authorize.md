@@ -79,8 +79,8 @@ is immediate and cannot be undone; the remote sessions it covered keep running.
 Do not run `authorize` for these. Print the exact command for the owner to run
 in **a separate terminal window on this machine** — not through Claude Code,
 whose own input handling would swallow the confirmation code. Replace each
-`YELLOW_TODO_` token inside its single quotes with the validated value; repeat
-the `--task-ref` pair per task; drop optional flags that were not given.
+`YELLOW_TODO_` token inside its single quotes with the validated value: task
+refs go one per line, and an optional value you were not given becomes empty.
 
 ```bash
 set -uo pipefail
@@ -89,8 +89,23 @@ REPO='YELLOW_TODO_repo'
 BRANCH='YELLOW_TODO_branch_or_pattern'
 OPERATIONS='YELLOW_TODO_operations'
 OWNER='YELLOW_TODO_owner'
+TASK_REFS='YELLOW_TODO_task_refs_one_per_line'
+MAX_SESSIONS='YELLOW_TODO_max_active_sessions_or_empty'
+MAX_TASKS='YELLOW_TODO_max_total_tasks_or_empty'
+MAX_ROUNDS='YELLOW_TODO_max_corrective_rounds_or_empty'
+TTL='YELLOW_TODO_ttl_minutes_or_empty'
+SOURCE='YELLOW_TODO_source_or_empty'
+case "$REPO$BRANCH$OPERATIONS$OWNER$TASK_REFS$MAX_SESSIONS$MAX_TASKS$MAX_ROUNDS$TTL$SOURCE" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+case "$MAX_SESSIONS$MAX_TASKS$MAX_ROUNDS$TTL" in *[!0-9]*) printf 'ERROR: the limits must be whole numbers.\n' >&2; exit 1 ;; esac
+REFS=$(printf '%s\n' "$TASK_REFS" | sed "s/.*/--task-ref '&' /" | tr -d '\n')
+CMD="node '$CLI' authorize --repo '$REPO' --branch '$BRANCH' ${REFS}--operations '$OPERATIONS' --owner '$OWNER'"
+[ -n "$MAX_SESSIONS" ] && CMD="$CMD --max-active-sessions $MAX_SESSIONS"
+[ -n "$MAX_TASKS" ] && CMD="$CMD --max-total-tasks $MAX_TASKS"
+[ -n "$MAX_ROUNDS" ] && CMD="$CMD --max-corrective-rounds $MAX_ROUNDS"
+[ -n "$TTL" ] && CMD="$CMD --ttl-minutes $TTL"
+[ -n "$SOURCE" ] && CMD="$CMD --source '$SOURCE'"
 printf 'Run this yourself in a separate terminal on the controller host:\n\n'
-printf '  node %s authorize --repo %s --branch %s --task-ref %s --operations %s --owner %s\n\n' "'$CLI'" "'$REPO'" "'$BRANCH'" "'YELLOW_TODO_task_ref'" "'$OPERATIONS'" "'$OWNER'"
+printf '  %s\n\n' "$CMD"
 printf 'It prints the grant and a six-character code. Type the code to write the grant.\n'
 printf 'Then give me the grant id from its output, or run /jules:authorize --list.\n'
 ```

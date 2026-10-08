@@ -603,7 +603,7 @@ function baseRecord(fields, nowIso) {
  * The pure core of the reservation (R36): refuses a recorded request id and,
  * for a create, any unresolved operation on the same repository and branch,
  * then adds the `reserved` record. Callers hold the journal lock;
- * `reserveOperation` wraps it for the one-file case and `mutations.ts` runs it
+ * `reserveOperation` wraps it for the one-file case and `write-gate.ts` runs it
  * inside the larger authority critical section (R31).
  */
 function applyReservation(operations, journal, input, now = () => new Date()) {
@@ -901,7 +901,7 @@ function keep(key, previous, patch) {
     const value = patch === undefined ? previous : (patch ?? undefined);
     return value === undefined ? {} : { [key]: value };
 }
-/** Merges a patch into the session's supervision state; written only by `supervise` (R32, R33). */
+/** Merges a patch into the session's supervision state; written by `supervise` and, for `outsideSeen`, by `status` (R32, R33). */
 async function updateSupervision(dataDir, localRequestId, patch, now = () => new Date(), config = exports.DEFAULT_LOCK_CONFIG) {
     return updateJournal(dataDir, (operations) => {
         const current = requireRecord(operations, localRequestId);

@@ -396,3 +396,19 @@ export function rethrowWithContext(
   }
   throw err;
 }
+
+/**
+ * A short, safe label for a caught error in a stderr warning: the JULES_ code
+ * for our own errors, the errno code for filesystem errors, else the error name.
+ * Never the message, which can carry paths or vendor text.
+ */
+export function errorLabel(err: unknown): string {
+  if (err instanceof AppErrorException) return err.appError.code;
+  if (err instanceof Error) {
+    const code = (err as { code?: unknown }).code;
+    return typeof code === 'string' && /^[A-Z0-9_]{1,40}$/.test(code)
+      ? code
+      : err.name;
+  }
+  return 'error';
+}

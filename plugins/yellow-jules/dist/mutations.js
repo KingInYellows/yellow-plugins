@@ -134,8 +134,10 @@ async function delegateInner(deps, args, ids) {
     const prompt = validateText(args.prompt, '--prompt', PROMPT_MAX_CHARS);
     const title = args.title !== undefined ? validateTitle(args.title) : undefined;
     const taskRef = args.taskRef !== undefined ? (0, validate_js_1.validateTaskRef)(args.taskRef) : undefined;
-    if (args.correction && taskRef === undefined) {
-        (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', '--correction needs the --task-ref of the task being repaired (R44)');
+    if (taskRef === undefined) {
+        (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', args.correction
+            ? '--correction needs the --task-ref of the task being repaired (R44)'
+            : 'a delegate needs --task-ref: grants cover named tasks only');
     }
     (0, runtime_support_js_1.prepare)(deps);
     const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, args.deadlineMs ?? deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS);
@@ -480,7 +482,7 @@ async function approveInner(deps, args, ids) {
                 // The approval already happened; never turn it into a failure envelope.
                 // The deviation is still reported, with the missed bookkeeping flagged.
                 deviationUnrecorded = true;
-                process.stderr.write(`warning: plan approved but the deviation could not be recorded: ${err instanceof Error ? err.name : 'error'}\n`);
+                process.stderr.write(`warning: plan approved but the deviation could not be recorded: ${(0, errors_js_1.errorLabel)(err)}\n`);
             }
         }
         return {
@@ -540,9 +542,10 @@ async function verifyApproval(deps, adapter, sessionResource, start, deadline) {
             pages: walk.pages,
         };
     }
-    catch {
+    catch (err) {
         // The approval already happened: whatever broke here, verification is
-        // deferred, never a failure envelope.
+        // deferred, never a failure envelope. The label says why.
+        process.stderr.write(`warning: plan approved but verification could not complete: ${(0, errors_js_1.errorLabel)(err)}\n`);
         return {
             observedPlanIdAfter: null,
             deferred: true,
@@ -629,8 +632,15 @@ async function abandon(deps, args) {
         // makes the grant stricter.
         let slotReleased = false;
         if (grants !== undefined && grantId !== undefined) {
-            (0, authority_js_1.writeGrants)(deps.dataDir, (0, authority_js_1.updateGrant)(grants, grantId, (g) => (0, authority_js_1.releaseGrant)(g, record.localRequestId)));
-            slotReleased = true;
+            try {
+                (0, authority_js_1.writeGrants)(deps.dataDir, (0, authority_js_1.updateGrant)(grants, grantId, (g) => (0, authority_js_1.releaseGrant)(g, record.localRequestId)));
+                slotReleased = true;
+            }
+            catch (err) {
+                // The abandon already took effect; report it with the slot still held
+                // instead of an error a retry could not act on.
+                process.stderr.write(`warning: abandoned ${record.localRequestId} but could not release its grant slot: ${(0, errors_js_1.errorLabel)(err)}\n`);
+            }
         }
         return {
             operation: 'abandon',

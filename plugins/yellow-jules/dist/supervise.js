@@ -11,8 +11,10 @@
  * of this plugin's own messages, a plan that changed under an evaluation with
  * no reply of ours in between, or a partial walk that leaves outside activity
  * undetermined — pauses the session. A pause blocks every later grant-backed
- * write (JULES_SUPERVISION_PAUSED) until `--clear-pause`, which is TTY-confirmed
- * because it widens effective authority.
+ * `reply` or `approve` on the session, and a repair `delegate` for its task
+ * (JULES_SUPERVISION_PAUSED), until `--clear-pause`, which is TTY-confirmed
+ * because it widens effective authority. Outside activity that `status` merely
+ * recorded blocks those writes the same way.
  *
  * Verification (R43) ships in PR4: a completed session reports
  * `verification: "unavailable"`, and the only verdicts offered are a repair
@@ -92,13 +94,22 @@ const CHECK_FAILED_CODES = new Set([
     'JULES_MALFORMED_RESPONSE',
 ]);
 async function superviseOnce(deps, args) {
-    const grantId = (0, validate_js_1.validateGrantId)(args.grantId);
+    const suppliedGrantId = args.grantId !== undefined ? (0, validate_js_1.validateGrantId)(args.grantId) : undefined;
     (0, runtime_support_js_1.prepare)(deps);
     const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, args.deadlineMs ?? deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS);
     const now = (0, runtime_support_js_1.nowFn)(deps);
     let journal = await (0, state_js_1.readJournal)(deps.dataDir);
     const sessionResource = (0, runtime_support_js_1.resolveSessionResource)(journal, args.session);
     const owner = owns(journal, sessionResource);
+    if (suppliedGrantId === undefined) {
+        throw (0, write_gate_js_1.confirmationRequired)(deps, {
+            operations: ['collect', 'reply', 'approve'],
+            repository: owner.repository,
+            requestedBranch: owner.requestedBranch,
+            ...(owner.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
+        }, { localRequestId: owner.localRequestId, localId: owner.localId });
+    }
+    const grantId = suppliedGrantId;
     // Gate: the grant exists, is bound to this controller, and covers the session's scope.
     const { grant } = (0, write_gate_js_1.loadAuthorizedGrant)(deps, grantId);
     const scope = (0, authority_js_1.evaluateScope)(grant, {
@@ -108,8 +119,18 @@ async function superviseOnce(deps, args) {
         ...(owner.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
     }, now());
     const grantExpired = !scope.ok && scope.reason === 'expired';
-    if (!scope.ok && !grantExpired) {
-        throw new errors_js_1.AppErrorException((0, errors_js_1.makeAppError)(scope.code, scope.message, {
+    // An expired grant may still drive an escalation, but only for a session it
+    // covered: the scope is judged again at the instant before it expired.
+    const coverage = grantExpired
+        ? (0, authority_js_1.evaluateScope)(grant, {
+            repository: owner.repository,
+            sourceResource: owner.sourceResource,
+            branch: owner.requestedBranch,
+            ...(owner.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
+        }, new Date(Date.parse(grant.expiresAt) - 1))
+        : scope;
+    if (!coverage.ok) {
+        throw new errors_js_1.AppErrorException((0, errors_js_1.makeAppError)(coverage.code, coverage.message, {
             recoveryAction: 'The grant does not cover this session. List grants with authorize --list, or create a covering grant with authorize in a terminal.',
         }));
     }
@@ -118,6 +139,10 @@ async function superviseOnce(deps, args) {
         localId: owner.localId,
         sessionResource,
         correctiveRoundsLeft: correctiveRoundsLeft(grant, owner.taskRef),
+        // What a repair delegate needs to name the task it repairs.
+        repository: owner.repository,
+        requestedBranch: owner.requestedBranch,
+        ...(owner.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
     };
     const persist = (patch) => (0, state_js_1.updateSupervision)(deps.dataDir, owner.localRequestId, patch, now);
     const decided = (decision) => ({
@@ -275,16 +300,22 @@ async function superviseOnce(deps, args) {
         Object.values(journal.operations).some((r) => r.sessionResource === sessionResource &&
             r.kind === 'reply' &&
             r.createdAt >= evaluated.evaluatedAt);
-    const swappedPlan = evaluated !== undefined && !repliedSinceEvaluation
-        ? newActivities.find((a) => a.type === 'planGenerated' &&
+    // A swap is caught whether this pass or an earlier plain `status` consumed
+    // the new plan: the plan now pending is compared with the one evaluated.
+    const swappedActivityId = evaluated !== undefined && !repliedSinceEvaluation
+        ? (newActivities.find((a) => a.type === 'planGenerated' &&
             a.planId !== undefined &&
-            a.planId !== evaluated.planId)
+            a.planId !== evaluated.planId)?.activityId ??
+            (seen.pendingPlan !== undefined &&
+                seen.pendingPlan.planId !== evaluated.planId
+                ? seen.pendingPlan.activityId
+                : undefined))
         : undefined;
     let pauseReason;
-    let pauseActivity;
-    if (swappedPlan !== undefined) {
+    let pauseActivityId;
+    if (swappedActivityId !== undefined) {
         pauseReason = 'plan-changed-after-evaluation';
-        pauseActivity = swappedPlan;
+        pauseActivityId = swappedActivityId;
     }
     else if (walk.partialPagination) {
         pauseReason =
@@ -296,9 +327,7 @@ async function superviseOnce(deps, args) {
         const pause = {
             reason: pauseReason,
             observedAt: now().toISOString(),
-            ...(pauseActivity !== undefined
-                ? { activityId: pauseActivity.activityId }
-                : {}),
+            ...(pauseActivityId !== undefined ? { activityId: pauseActivityId } : {}),
         };
         await persist({ paused: pause, backoff: null, ...decided('paused') });
         return {
@@ -505,6 +534,11 @@ async function clearPause(deps, args) {
         `  session:     ${sessionResource}`,
         `  paused for:  ${paused.reason}`,
         `  paused at:   ${paused.observedAt}`,
+        ...(owner.supervision?.outsideSeen !== undefined
+            ? [
+                `  outside activity: ${owner.supervision.outsideSeen.activityId} (seen ${owner.supervision.outsideSeen.observedAt}) - inspect it first; clearing forgets it`,
+            ]
+            : []),
         '',
         'Supervised writes under the grant resume for this session.',
     ].join('\n'));

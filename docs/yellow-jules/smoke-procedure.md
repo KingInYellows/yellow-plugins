@@ -154,7 +154,10 @@ replayed.
 - [ ] Try to launch the same repository and branch again.
   - Expected: `JULES_DUPLICATE_LAUNCH`, and the console still shows at most one
     session.
-- [ ] `/jules:status --reconcile`.
+- [ ] Wait at least 260 seconds after the kill, then
+      `/jules:status --reconcile`. A reservation younger than that is reported
+      `not-reached` and left unrecorded, because its write may still be in
+      flight.
   - Expected: if the session was created, outcome `bound`; if not, outcome
     `ambiguous-reconcile` with `reason: "archive-visibility-unverified"` (it is
     never `released` until Section G is recorded and acted on).

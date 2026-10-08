@@ -334,7 +334,9 @@ async function dispatch(operation, rest, deps) {
             }
             return (0, supervise_js_1.superviseOnce)(deps, {
                 session: requireString(values.session, '--session'),
-                grantId: requireString(values['grant-id'], '--grant-id'),
+                ...(typeof values['grant-id'] === 'string'
+                    ? { grantId: values['grant-id'] }
+                    : {}),
                 deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS),
             });
         }

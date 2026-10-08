@@ -200,7 +200,7 @@ async function checkPolicyDeviation(deps, record, session) {
 // ---------------------------------------------------------------------------
 // Write-path deps shared by authorize, mutations, supervise and write-gate
 // ---------------------------------------------------------------------------
-/** Set by the supervision skill for the duration of a pass; `authorize` refuses while it is set (R30). */
+/** Set by the supervision skill for the duration of a pass; the owner-only commands (`authorize`, `--take-over`, `abandon`, `--clear-pause`) refuse while it is set (R30). */
 exports.ACTIVE_GRANT_ENV = 'YELLOW_JULES_ACTIVE_GRANT';
 /** Host name made safe for the controller-id allowlist, then validated. */
 function defaultControllerId(hostname = os.hostname) {

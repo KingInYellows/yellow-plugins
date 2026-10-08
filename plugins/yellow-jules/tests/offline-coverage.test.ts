@@ -600,7 +600,6 @@ describe('mutating subcommands refuse before sending anything (PR3)', () => {
     [['approve', '--session', 'sessions/s1'], 'approve'],
     [['abandon'], 'abandon'],
     [['supervise'], 'supervise'],
-    [['supervise', '--session', 'sessions/s1'], 'supervise'],
     [
       [
         'supervise',

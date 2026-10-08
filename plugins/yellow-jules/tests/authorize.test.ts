@@ -80,7 +80,7 @@ describe('authorize (create)', () => {
     expect(h.adapter.callsTo('getSource')).toHaveLength(1);
   });
 
-  it('with no terminal: JULES_CONFIRMATION_REQUIRED, no grant, no controller file, no vendor call', async () => {
+  it('with no terminal: JULES_CONFIRMATION_REQUIRED, no grant, no controller file, no vendor write', async () => {
     const noTty = makeHarness('no-tty');
     try {
       expect(await codeOfAsync(() => authorizeCreate(noTty.deps, BASE))).toBe(
@@ -90,7 +90,8 @@ describe('authorize (create)', () => {
       expect(
         fs.existsSync(controllerFilePath(noTty.controllerDir, 'testhost'))
       ).toBe(false);
-      expect(noTty.adapter.calls).toEqual([]);
+      // The source is read before the prompt; nothing is written.
+      expect(noTty.adapter.writeCount()).toBe(0);
     } finally {
       noTty.cleanup();
     }
@@ -103,7 +104,7 @@ describe('authorize (create)', () => {
       try {
         await expect(authorizeCreate(bad.deps, BASE)).rejects.toThrow();
         expect(fs.existsSync(resolveGrantsPath(bad.dataDir))).toBe(false);
-        expect(bad.adapter.callsTo('getSource')).toEqual([]);
+        expect(bad.adapter.writeCount()).toBe(0);
       } finally {
         bad.cleanup();
       }

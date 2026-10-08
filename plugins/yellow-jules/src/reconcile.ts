@@ -21,7 +21,7 @@ import {
 } from './activity-walk.js';
 import { releaseSlotInStore } from './authority.js';
 import { type Deadline, isExpired } from './deadline.js';
-import { AppErrorException } from './errors.js';
+import { AppErrorException, errorLabel } from './errors.js';
 import {
   type RuntimeDeps,
   nowFn,
@@ -352,8 +352,10 @@ async function resolveOnOwnSession(
 async function persist(
   deps: RuntimeDeps,
   resolutions: readonly Resolution[]
-): Promise<void> {
+): Promise<ReadonlySet<string>> {
   const now = nowFn(deps)().toISOString();
+  // The requests this pass actually moved to `failed`: only those give up a slot.
+  const released = new Set<string>();
   await updateJournal(deps.dataDir, (operations) => {
     for (const r of resolutions) {
       const current = operations[r.record.localRequestId];
@@ -381,6 +383,7 @@ async function persist(
         };
       } else if (r.outcome === 'released') {
         next = { ...next, status: 'failed' };
+        released.add(current.localRequestId);
       } else if (
         r.outcome === 'unknown-outcome' &&
         current.status === 'reserved'
@@ -409,6 +412,7 @@ async function persist(
       operations[current.localRequestId] = applyRetention(next);
     }
   });
+  return released;
 }
 
 /**
@@ -506,7 +510,7 @@ export async function reconcile(
 
   // A young reservation is reported but not recorded: `not-reached` would make
   // it abandonable while its write may still be in flight.
-  await persist(
+  const released = await persist(
     deps,
     resolutions.filter((r) => !early.includes(r))
   );
@@ -516,6 +520,7 @@ export async function reconcile(
   for (const r of resolutions) {
     if (
       r.outcome === 'released' &&
+      released.has(r.record.localRequestId) &&
       r.record.kind === 'create' &&
       r.record.grantId !== undefined
     ) {
@@ -528,19 +533,20 @@ export async function reconcile(
       } catch (err) {
         slotStuck.add(r.record.localRequestId);
         process.stderr.write(
-          `warning: could not release the grant slot of ${r.record.localRequestId}: ${
-            err instanceof Error ? err.name : 'error'
-          }\n`
+          `warning: could not release the grant slot of ${r.record.localRequestId}: ${errorLabel(err)}\n`
         );
       }
     }
   }
   return resolutions.map((r) =>
     slotStuck.has(r.record.localRequestId)
-      ? entryOf({
-          ...r,
-          reason: `${r.reason ?? 'released'}; the grant slot could not be released (revoke and rewrite the grant to reclaim it)`,
-        })
+      ? {
+          ...entryOf({
+            ...r,
+            reason: `${r.reason ?? 'released'}; the grant slot could not be released (revoke and rewrite the grant to reclaim it)`,
+          }),
+          slotStuck: true as const,
+        }
       : entryOf(r)
   );
 }

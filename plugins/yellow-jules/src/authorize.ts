@@ -143,7 +143,7 @@ function summaryOf(
     `  task refs:   ${grant.taskRefs.join(', ')}`,
     `  operations:  ${grant.operations.join(', ')}`,
     `  limits:      ${grant.maxActiveSessions} active session(s), ${grant.maxTotalTasks} task(s), ${grant.maxCorrectiveRounds} corrective round(s) per task`,
-    `  expires:     ${grant.expiresAt} (${ttlMinutes} minutes)`,
+    `  expires:     ${ttlMinutes} minutes after you confirm (about ${grant.expiresAt})`,
     `  owner:       ${grant.owner}`,
     `  controller:  ${grant.controllerId}`,
     '',
@@ -206,32 +206,10 @@ export async function authorizeCreate(
 
   prepare(deps);
   const ctx = resolveControllerContext(deps);
-  const createdAt = nowFn(deps)().toISOString();
-  const expiresAt = new Date(
-    deps.clock.now() + ttlMinutes * 60_000
-  ).toISOString();
 
-  await confirmOwner(
-    deps,
-    summaryOf(
-      {
-        repository,
-        sourceResource,
-        branchPattern,
-        taskRefs,
-        operations,
-        maxActiveSessions,
-        maxTotalTasks,
-        maxCorrectiveRounds,
-        expiresAt,
-        owner,
-        controllerId: ctx.controllerId,
-      },
-      ttlMinutes
-    )
-  );
-
-  // R17: the source is discovered through the adapter, never synthesized.
+  // R17: the source is discovered through the adapter, never synthesized. The
+  // read runs before the prompt so a missing key or an unreachable repository
+  // fails before the owner types a code.
   const deadline = deadlineIn(
     deps.clock,
     args.deadlineMs ?? DEFAULT_READ_DEADLINE_MS
@@ -245,6 +223,33 @@ export async function authorizeCreate(
       'the discovered source does not match the requested repository'
     );
   }
+
+  await confirmOwner(
+    deps,
+    summaryOf(
+      {
+        repository,
+        sourceResource,
+        branchPattern,
+        taskRefs,
+        operations,
+        maxActiveSessions,
+        maxTotalTasks,
+        maxCorrectiveRounds,
+        expiresAt: new Date(
+          deps.clock.now() + ttlMinutes * 60_000
+        ).toISOString(),
+        owner,
+        controllerId: ctx.controllerId,
+      },
+      ttlMinutes
+    )
+  );
+  // The grant's clock starts when the owner confirms, not when the prompt opened.
+  const createdAt = nowFn(deps)().toISOString();
+  const expiresAt = new Date(
+    deps.clock.now() + ttlMinutes * 60_000
+  ).toISOString();
 
   return withJournalLock(deps.dataDir, async () => {
     const grants = loadGrants(deps.dataDir);

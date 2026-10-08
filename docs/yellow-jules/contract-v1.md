@@ -1,6 +1,7 @@
 # yellow-jules provider CLI contract, version 1
 
-**Version:** 1 **Status:** Accepted (PR2 landed read-only surface, 2026-09-29)
+**Version:** 1 **Status:** Accepted (PR2 landed the read-only surface,
+2026-09-29; PR3 landed the grants-only mutating surface, 2026-10-08)
 **Reconciled to:** `main` `8baa0bdd` (2026-09-10); PR2 revisions below **Spec:**
 `plans/specs/yellow-jules-integration.md` **Evidence:**
 [sdk-investigation.md](sdk-investigation.md),
@@ -43,13 +44,15 @@ mechanism, and none widens a guarantee.
   with it (complete walk, restart, or terminal retention), so newest-first
   listings interrupted between an approval and its older plan do not leave the
   plan pending.
-- **External sessions.** PR2 ships no `delegate`, so every session it can
-  observe was created outside yellow. `status` and `collect` on a
-  `sessions/{id}` absent from the journal mint a local id and write an operation
-  record with `origin: "external"`, `kind: "observe"`, and `status: "observed"`.
-  R13's `policy-deviation` applies only to records whose create requested
-  `autoPr: false`, which PR2 reaches only through test-planted create records;
-  an external session's vendor PR is an external reference (R42).
+- **External sessions.** (As of PR2, historical: before `delegate` existed,
+  every observable session was created outside yellow. Sessions this plugin
+  creates now carry `origin: "yellow"`; the rules below still govern the rest.)
+  `status` and `collect` on a `sessions/{id}` absent from the journal mint a
+  local id and write an operation record with `origin: "external"`,
+  `kind: "observe"`, and `status: "observed"`. R13's `policy-deviation` applies
+  only to records whose create requested `autoPr: false`, which PR2 reaches only
+  through test-planted create records; an external session's vendor PR is an
+  external reference (R42).
 - **Runtime lockfile location.** The data-dir install manifest and lockfile ship
   as `plugins/yellow-jules/runtime/package.json` and `runtime/package-lock.json`
   (outside the pnpm workspace glob); `setup --install-sdk` copies both into
@@ -82,10 +85,9 @@ mechanism, and none widens a guarantee.
   is stale (`JULES_STALE_LOCK`, never taken over). A live holder is waited on
   for at most 15 s, then the call fails with `JULES_STALE_LOCK`,
   `retryable: true`, and a recovery action that names the contention.
-- **`status --reconcile` in PR2.** With no reachable reservation it returns
-  `reconciled: []`. A hand-planted unresolved record is reported as
-  `not-reached` with `reason: "reconcile ships with delegate in PR3"` rather
-  than ignored.
+- **`status --reconcile`.** With no reachable reservation it returns
+  `reconciled: []`. (PR2 reported a hand-planted unresolved record as
+  `not-reached`; reconcile now resolves reservations, see `status`.)
 - **Title tags in `list`.** The `[yellow:<local-id>]` tag is vendor-writable, so
   `list` strips it from the displayed title but surfaces a `localId` only when
   the journal binds that id to the same session. Reconcile (PR3) still matches
@@ -113,9 +115,9 @@ mechanism, and none widens a guarantee.
   dropped, since both are rendered bare and persisted. A plan activity without a
   usable timestamp stops the walk as `unmappedActivity`.
 - **Unsupported subcommands.** `cancel`, `pause`, `resume`, and `cost` are
-  recognized and answer `JULES_UNSUPPORTED_CAPABILITY` (exit 1); `delegate`,
-  `reply`, `approve`, `authorize`, `supervise`, and `integrate` are usage errors
-  (exit 2) until they ship.
+  recognized and answer `JULES_UNSUPPORTED_CAPABILITY` (exit 1); `integrate` is
+  a usage error (exit 2) until PR4. `delegate`, `reply`, `approve`, `authorize`,
+  `abandon`, and `supervise` ship in PR3.
 
 ## Motivation
 
@@ -333,19 +335,19 @@ remaining unknown until the R53 smoke.
 
 `node dist/cli.js <subcommand> [flags]`. Ships: PR2 unless marked.
 
-| Subcommand  | Runtime op                                                          | Authority      | Confirm                           | Ships |
-| ----------- | ------------------------------------------------------------------- | -------------- | --------------------------------- | ----- |
-| `setup`     | probe credentials, resolve SDK, probe sources                       | none           | install consent only              | PR2   |
-| `delegate`  | validate packet, reserve, create session (R12)                      | grant          | grant                             | PR3   |
-| `list`      | one page of fresh session reads, page-scoped journal match          | none           | no                                | PR2   |
-| `status`    | fresh session read, watermarked activity paging, optional reconcile | none           | no                                | PR2   |
-| `reply`     | send message                                                        | grant          | grant                             | PR3   |
-| `approve`   | approve after complete re-fetch (R34)                               | grant          | grant                             | PR3   |
-| `collect`   | bounded artifact read, stage to disk                                | none           | no                                | PR2   |
-| `authorize` | write, list, or revoke a grant (R30); `--take-over` (R38)           | owner, TTY     | TTY challenge (create, take-over) | PR3   |
-| `supervise` | one R33 pass; may call reply/approve/collect under grant            | grant required | per grant                         | PR3   |
-| `abandon`   | mark an ambiguous or unreached reservation terminal `failed`        | owner, TTY     | TTY challenge                     | PR3   |
-| `integrate` | base check, worktree, apply, verify, stack handoff (R41)            | interactive    | yes                               | PR4   |
+| Subcommand  | Runtime op                                                                           | Authority      | Confirm                           | Ships |
+| ----------- | ------------------------------------------------------------------------------------ | -------------- | --------------------------------- | ----- |
+| `setup`     | probe credentials, resolve SDK, probe sources                                        | none           | install consent only              | PR2   |
+| `delegate`  | validate packet, reserve, create session (R12)                                       | grant          | grant                             | PR3   |
+| `list`      | one page of fresh session reads, page-scoped journal match                           | none           | no                                | PR2   |
+| `status`    | fresh session read, watermarked activity paging, optional reconcile                  | none           | no                                | PR2   |
+| `reply`     | send message                                                                         | grant          | grant                             | PR3   |
+| `approve`   | approve after complete re-fetch (R34)                                                | grant          | grant                             | PR3   |
+| `collect`   | bounded artifact read, stage to disk                                                 | none           | no                                | PR2   |
+| `authorize` | write, list, or revoke a grant (R30); `--take-over` (R38)                            | owner, TTY     | TTY challenge (create, take-over) | PR3   |
+| `supervise` | one R33 pass; stages artifacts via collect, returns allowedActions (the caller acts) | grant required | per grant                         | PR3   |
+| `abandon`   | mark an ambiguous or unreached reservation terminal `failed`                         | owner, TTY     | TTY challenge                     | PR3   |
+| `integrate` | base check, worktree, apply, verify, stack handoff (R41)                             | interactive    | yes                               | PR4   |
 
 `delegate`, `reply`, and `approve` ship in PR3 together with `authorize` (Open
 Question 6 decision, see "Confirmation token"), so PR2 ships no mutating
@@ -360,12 +362,12 @@ ships `delegate`; PR2's fixture and test for it cover only the empty
 Flags are `parseArgs` strict, no positionals. `<local-id>` is the locally minted
 id (see "Identifier allowlist"); `--session` accepts a local id or a vendor
 `sessions/{id}` resource and resolves it through the journal. Every subcommand
-accepts `--deadline-ms <n>` (absolute operation deadline; defaults 120 000 for
-reads, 180 000 for `delegate`, `reply`, `approve`, and `collect`). The deadline,
-not a page cap, is the binding limit under slow responses: four 30 s reads
-exhaust a 120 s deadline. `title` values returned by `list` and `status` have
-the reconcile tag stripped for display; the tag is surfaced as `localId`
-instead.
+accepts `--deadline-ms <n>` (except `abandon`; absolute operation deadline;
+defaults 120 000 for reads, 180 000 for `delegate`, `reply`, `approve`, and
+`collect`). The deadline, not a page cap, is the binding limit under slow
+responses: four 30 s reads exhaust a 120 s deadline. `title` values returned by
+`list` and `status` have the reconcile tag stripped for display; the tag is
+surfaced as `localId` instead.
 
 **Activity walk (used by `status`, `approve`, and `collect`; only `status`
 writes journal read-state).** The walk is one unit in the runtime, parameterised
@@ -443,14 +445,14 @@ transient failure from an undetermined one.
   verified against its lockfile hash as it is installed, and `runtime/pin.json`
   records that set for the resolver to re-check; `docs/upstream-pins.md` carries
   the pinned tree from PR2.
-- `delegate --repo <owner/repo> --branch <ref> --prompt <text> [--title <text>] [--task-ref <id>] [--request-id <local-request-id>] [--dry-run] [--grant-id <id>]`
+- `delegate --repo <owner/repo> --branch <ref> --prompt <text> --task-ref <id> [--title <text>] [--correction] [--request-id <local-request-id>] [--dry-run] [--grant-id <id>]`
   →
-  `{ localRequestId, localId, sessionResource, vendorState, condition, repository, requestedBranch, observedHead?, sourceResource }`;
+  `{ localRequestId, localId, sessionResource, vendorState, condition, repository, requestedBranch, sourceResource }`;
   on failure the envelope carries `localRequestId` and `localId` so a
   reservation can be reconciled. `vendorState` and `condition` are the state at
   creation (`queued`, `starting`), not a fresh read. `--dry-run` performs
   validation and the source read only and returns a distinct shape,
-  `{ localRequestId, localId, repository, requestedBranch, observedHead?, sourceResource, dryRun: true }`
+  `{ localRequestId, localId, repository, requestedBranch, sourceResource, dryRun: true }`
   — no `sessionResource`, `vendorState`, or `condition`, because no session
   exists and no reservation is written; the confirmation binding is described
   under "Confirmation token". The real call always resolves the source through
@@ -462,10 +464,9 @@ transient failure from an undetermined one.
   `[yellow:` is `JULES_INVALID_INPUT`. R36 duplicate-launch refusal has no
   automatic override: the recovery is `status --reconcile`, whose `released`
   outcome (reachable only once archive visibility is confirmed, see `status`)
-  frees the repository and branch. A confirmation-gated `abandon` path, which
+  frees the repository and branch. The TTY-confirmed `abandon` subcommand below
   marks a reservation reconcile left `ambiguous-reconcile` or `not-reached` as
-  terminal `failed`, ships with `delegate` in PR3 as the `abandon` subcommand
-  below.
+  terminal `failed`.
 - `list [--limit <n>] [--page-token <token>]` →
   `{ sessions: [{ localId?, sessionResource, vendorState, condition, title, createTime }], nextPageToken?, journalOnly: [{ localId, sessionResource?, condition }] }`.
   One `GET sessions` page (`pageSize` = `--limit`, default 20, max 100,
@@ -517,7 +518,7 @@ transient failure from an undetermined one.
   complete walk leaves `unknown-outcome`, and a partial walk leaves
   `not-reached`. Operations the deadline prevented from being checked are
   reported as `not-reached`, never as resolved.
-- `reply --session <ref> --message <text> [--request-id <id>] [--dry-run] [--grant-id <id>]`
+- `reply --session <ref> --message <text> [--correction] [--request-id <id>] [--dry-run] [--grant-id <id>]`
   → `{ localRequestId, localId, sessionResource, sent: true }`. `--dry-run`
   validates, performs one `info()`, and returns the same fields with
   `sent: false, dryRun: true`, plus `repository`, `requestedBranch`, and
@@ -609,13 +610,17 @@ transient failure from an undetermined one.
   permitted verdicts are correction or escalate, never accept. An
   `awaiting-approval` session whose plan could not be read is `escalate` with
   `reason: "awaiting-approval-without-plan"` and attention `planUnavailable`.
-- `supervise --clear-pause --session <ref>` → `{ localId, cleared: true }`.
-  TTY-confirmed; requires a complete `status` walk since the pause, otherwise
-  `JULES_INVALID_STATE` with recovery "run `status` first".
+- `supervise --clear-pause --session <ref>` →
+  `{ operation, localId, sessionResource, cleared: true }`. TTY-confirmed;
+  requires a complete `status` walk since the pause, otherwise
+  `JULES_INVALID_STATE` with recovery "run `status` first". The prompt lists any
+  recorded outside activity (clearing forgets it), and the clear is refused if
+  the pause or that activity changed while the prompt was open.
 - `abandon --request-id <id>` →
   `{ localRequestId, localId, abandoned: true, released: {...} }`.
   TTY-confirmed. Accepts only an operation whose last reconcile outcome was
-  `ambiguous-reconcile` or `not-reached`; anything else is
+  `ambiguous-reconcile` or `not-reached` (or, for a `reply` or `approve`,
+  `unknown-outcome`, which a complete walk can leave for good); anything else is
   `JULES_INVALID_STATE`. Marks the operation terminal `failed` with
   `abandonedAt` and `abandonReason`; no new status is added.
 - `integrate` (PR4): R41; shape fixed in shell 04.
@@ -734,8 +739,8 @@ Every status-bearing result carries both `vendorState` (the SDK's
 step) are three distinct recorded states; a `condition` never advances past
 `remote-completed` without a journal record from the later step. The SDK maps
 any unknown REST state to `unspecified` (`index.mjs` L689-690), so the adapter
-also carries the raw REST string when it differs, and `unspecified` always lands
-in `needs-inspection`, never in a completed bucket.
+does not carry the raw string, and `unspecified` always lands in
+`needs-inspection`, never in a completed bucket.
 
 ## Error catalog
 
@@ -978,10 +983,11 @@ are enforced at open; a non-owned or group- or world-writable data directory,
 **every** invocation that reads state or resolves the SDK (not only
 grant-consuming ones), because `runtime/node_modules/` is executable code loaded
 into the process. Layout: `state/journal.json` (operation records),
-`state/grants.json` (written only by `authorize`), `state/.lock`,
-`artifacts/<local-id>/`, `sdk-scratch/` (created `0700`, must stay empty), and
-`runtime/node_modules/` (the data-dir SDK install, with `sdkIntegrity` and
-`sdkEntrySha256` recorded in `runtime/pin.json`).
+`state/grants.json` (created and widened only by the TTY-confirmed `authorize`;
+the runtime only narrows it: revoke, counter charges, slot releases),
+`state/.lock`, `artifacts/<local-id>/`, `sdk-scratch/` (created `0700`, must
+stay empty), and `runtime/node_modules/` (the data-dir SDK install, with
+`sdkIntegrity` and `sdkEntrySha256` recorded in `runtime/pin.json`).
 
 Each operation record carries the R35 fields plus the activity read-state that
 makes reads bounded across processes, written only by `status` (see "Activity
@@ -1000,9 +1006,9 @@ terminal records is deferred until usage data justifies a policy (PR1 default:
 none). Journal and grant maps are built with `Object.create(null)` (or `Map`),
 never by plain property assignment, so caller-supplied keys cannot reach the
 prototype. Writes are reservation-first and atomic (temp file plus rename) under
-the lock, and the R36 unresolved-operation lookup, authority evaluation,
-confirmation consumption, counter increment, and reservation write are one
-critical section under that lock (R31); the local request id is local
+the lock, and the controller check, grant lookup, authority evaluation, the R36
+unresolved-operation lookup, the counter charge, and the reservation write are
+one critical section under that lock (R31); the local request id is local
 deduplication only, never a vendor idempotency guarantee (R36).
 
 R38 copy detection: a controller authority file lives **outside** `<dataDir>` at
@@ -1047,9 +1053,9 @@ creates `.jules/` anywhere and treats a populated `sdk-scratch/` as
 **MVP (PR1 + PR2 + PR3 + the R53 smoke; Open Question 6 decision):** an owner
 can `setup`, `delegate` with explicit flags, observe with `list`/`status`,
 `reply`, `approve`, and `collect` a patch to staging, with each mutating write
-confirmed through the confirmation-token mechanism (presented via
-AskUserQuestion; the mechanism itself is fixed in shell 03) unless a valid grant
-(R30) covers the operation; `docs/yellow-jules/smoke-result.md` exists with
-`result: pass` recording one session created, plan inspected, one reply or
-approval within authority, an interruption that did not duplicate the task, an
-independently checked patch, no vendor PR, and no merge.
+authorized by a grant (`--grant-id`, R30) that the owner wrote with the
+TTY-confirmed `authorize`; there is no per-operation confirmation token;
+`docs/yellow-jules/smoke-result.md` exists with `result: pass` recording one
+session created, plan inspected, one reply or approval within authority, an
+interruption that did not duplicate the task, an independently checked patch, no
+vendor PR, and no merge.

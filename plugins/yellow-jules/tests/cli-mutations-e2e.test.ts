@@ -202,6 +202,31 @@ describe('a covered delegate through the compiled CLI', () => {
   });
 });
 
+describe('free text that starts with a dash', () => {
+  const PROMPT = '- add the retry, then update the docs';
+
+  it('the separate-argument form is a usage error (why the wrappers pass --prompt=)', async () => {
+    const grantId = await seedGrant();
+    const args = delegateArgs(grantId, 'scratch/dash', ['--dry-run']).filter(
+      (a, i, all) => a !== '--prompt' && all[i - 1] !== '--prompt'
+    );
+    const r = await cli([...args, '--prompt', PROMPT]);
+    expect(r.code).toBe(2);
+    expect(server.mutatingCount).toBe(0);
+  });
+
+  it('the inline --prompt= form carries it through', async () => {
+    const grantId = await seedGrant();
+    const args = delegateArgs(grantId, 'scratch/dash', ['--dry-run']).filter(
+      (a, i, all) => a !== '--prompt' && all[i - 1] !== '--prompt'
+    );
+    const r = await cli([...args, `--prompt=${PROMPT}`]);
+    expect(r.code).toBe(0);
+    expect(r.json).toMatchObject({ ok: true, dryRun: true });
+    expect(server.mutatingCount).toBe(0);
+  });
+});
+
 describe('two CLI processes racing for one session slot (R31)', () => {
   it('create exactly one session: the other is JULES_GRANT_EXHAUSTED, and the server saw one POST', async () => {
     const grantId = await seedGrant({ maxActiveSessions: 1 });

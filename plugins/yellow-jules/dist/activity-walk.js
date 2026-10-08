@@ -1,7 +1,7 @@
 "use strict";
 /**
  * The single activity-walk unit (contract "Activity walk"). `status`,
- * `approve` (PR3), and `collect` differ only in the parameters they pass:
+ * `approve`, and `collect` differ only in the parameters they pass:
  * page size, start point, and whether the caller will write read-state
  * (only `status` does; this module never touches the journal).
  *

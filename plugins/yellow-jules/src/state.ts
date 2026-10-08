@@ -728,7 +728,7 @@ export interface ReservationInput {
  * The pure core of the reservation (R36): refuses a recorded request id and,
  * for a create, any unresolved operation on the same repository and branch,
  * then adds the `reserved` record. Callers hold the journal lock;
- * `reserveOperation` wraps it for the one-file case and `mutations.ts` runs it
+ * `reserveOperation` wraps it for the one-file case and `write-gate.ts` runs it
  * inside the larger authority critical section (R31).
  */
 export function applyReservation(
@@ -1199,12 +1199,12 @@ export function hasUnreconciledDeviation(record: OperationRecord): boolean {
 }
 
 export interface SupervisionPatch {
-  /** `null` clears a pause (only the TTY-confirmed `--clear-pause` does). */
+  /** Pauses are removed by `supervise --clear-pause` directly, not through this patch. */
   readonly paused?: NonNullable<SupervisionState['paused']> | null;
   /** `null` resets the check-failed backoff. */
   readonly backoff?: NonNullable<SupervisionState['backoff']> | null;
   readonly lastDecision?: NonNullable<SupervisionState['lastDecision']>;
-  /** `null` clears the recorded outside activity. */
+  /** Written by `status`; removed with the pause by `--clear-pause`. */
   readonly outsideSeen?: NonNullable<SupervisionState['outsideSeen']> | null;
   /** `null` forgets the evaluated plan. */
   readonly evaluatedPlan?: NonNullable<
@@ -1222,7 +1222,7 @@ function keep<K extends string, V>(
   return value === undefined ? {} : ({ [key]: value } as { [P in K]?: V });
 }
 
-/** Merges a patch into the session's supervision state; written only by `supervise` (R32, R33). */
+/** Merges a patch into the session's supervision state; written by `supervise` and, for `outsideSeen`, by `status` (R32, R33). */
 export async function updateSupervision(
   dataDir: string,
   localRequestId: string,

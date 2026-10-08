@@ -302,3 +302,16 @@ setup() {
   run grep -F 'resolve_plugin_root yellow-jules dist/cli.js' "$DELEGATE_MD"
   [ "$status" -eq 0 ]
 }
+
+@test "step 3 prints the jules plugin root that the jules launch block asks for" {
+  run grep -F "printf 'yellow_jules_root: %s\\n' \"\${YELLOW_JULES_ROOT:-NONE}\"" "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F "YELLOW_JULES_ROOT='YELLOW_TODO_yellow_jules_root_from_step_3'" "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+}
+
+@test "the jules launch passes the packet as an inline --prompt= so a leading dash is not a flag" {
+  run grep -cF '"--prompt=$(cat -- "$PACKET_FILE")"' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  [ "$output" -ge 2 ]
+}

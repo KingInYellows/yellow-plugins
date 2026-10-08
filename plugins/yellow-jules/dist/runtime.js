@@ -2,8 +2,8 @@
 /**
  * Operation layer: one exported async function per CLI subcommand, each
  * taking a RuntimeDeps bag (the adapter factory is injected so tests use
- * fake-sdk.ts) plus its own already-parsed args. cli.ts is the only caller —
- * it owns argv, the JSON envelope, and exit codes; this module owns the
+ * fake-sdk.ts) plus its own already-parsed args. cli.ts and supervise.ts are the
+ * callers — cli.ts owns argv, the JSON envelope, and exit codes; this module owns the
  * contract rules.
  *
  * This module holds the reads (`setup`, `list`, `status`, `collect`) and issues
@@ -311,8 +311,9 @@ async function status(deps, args) {
         journal = await (0, state_js_1.readJournal)(deps.dataDir);
     }
     const reconcileFlags = (reconciled ?? [])
-        .filter((r) => r.outcome !== 'bound' && r.outcome !== 'released')
-        .map((r) => `reconciled:${r.outcome}`);
+        .filter((r) => (r.outcome !== 'bound' && r.outcome !== 'released') ||
+        r.slotStuck === true)
+        .map((r) => r.slotStuck === true ? 'reconciled:slotStuck' : `reconciled:${r.outcome}`);
     if (sessionResource === undefined) {
         return {
             operation: 'status',

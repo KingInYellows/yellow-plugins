@@ -46,7 +46,7 @@ function summaryOf(grant, ttlMinutes) {
         `  task refs:   ${grant.taskRefs.join(', ')}`,
         `  operations:  ${grant.operations.join(', ')}`,
         `  limits:      ${grant.maxActiveSessions} active session(s), ${grant.maxTotalTasks} task(s), ${grant.maxCorrectiveRounds} corrective round(s) per task`,
-        `  expires:     ${grant.expiresAt} (${ttlMinutes} minutes)`,
+        `  expires:     ${ttlMinutes} minutes after you confirm (about ${grant.expiresAt})`,
         `  owner:       ${grant.owner}`,
         `  controller:  ${grant.controllerId}`,
         '',
@@ -77,8 +77,14 @@ async function authorizeCreate(deps, args) {
     const ttlMinutes = boundedInt(args.ttlMinutes, authority_js_1.GRANT_DEFAULTS.ttlMinutes, authority_js_1.GRANT_CEILINGS.ttlMinutes, 1, '--ttl-minutes');
     (0, runtime_support_js_1.prepare)(deps);
     const ctx = (0, runtime_support_js_1.resolveControllerContext)(deps);
-    const createdAt = (0, runtime_support_js_1.nowFn)(deps)().toISOString();
-    const expiresAt = new Date(deps.clock.now() + ttlMinutes * 60_000).toISOString();
+    // R17: the source is discovered through the adapter, never synthesized. The
+    // read runs before the prompt so a missing key or an unreachable repository
+    // fails before the owner types a code.
+    const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, args.deadlineMs ?? deadline_js_1.DEFAULT_READ_DEADLINE_MS);
+    const source = await (0, runtime_support_js_1.withAdapter)(deps, (adapter) => (0, runtime_support_js_1.read)(deps, deadline, () => adapter.getSource(repo.owner, repo.repo)));
+    if (source.sourceResource !== sourceResource) {
+        (0, errors_js_1.throwAppError)('JULES_SOURCE_ACCESS', 'the discovered source does not match the requested repository');
+    }
     await (0, runtime_support_js_1.confirmOwner)(deps, summaryOf({
         repository,
         sourceResource,
@@ -88,16 +94,13 @@ async function authorizeCreate(deps, args) {
         maxActiveSessions,
         maxTotalTasks,
         maxCorrectiveRounds,
-        expiresAt,
+        expiresAt: new Date(deps.clock.now() + ttlMinutes * 60_000).toISOString(),
         owner,
         controllerId: ctx.controllerId,
     }, ttlMinutes));
-    // R17: the source is discovered through the adapter, never synthesized.
-    const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, args.deadlineMs ?? deadline_js_1.DEFAULT_READ_DEADLINE_MS);
-    const source = await (0, runtime_support_js_1.withAdapter)(deps, (adapter) => (0, runtime_support_js_1.read)(deps, deadline, () => adapter.getSource(repo.owner, repo.repo)));
-    if (source.sourceResource !== sourceResource) {
-        (0, errors_js_1.throwAppError)('JULES_SOURCE_ACCESS', 'the discovered source does not match the requested repository');
-    }
+    // The grant's clock starts when the owner confirms, not when the prompt opened.
+    const createdAt = (0, runtime_support_js_1.nowFn)(deps)().toISOString();
+    const expiresAt = new Date(deps.clock.now() + ttlMinutes * 60_000).toISOString();
     return (0, state_js_1.withJournalLock)(deps.dataDir, async () => {
         const grants = (0, authority_js_1.loadGrants)(deps.dataDir);
         const existing = (0, controller_js_1.readControllerAuthority)(ctx.controllerDir, ctx.controllerId);

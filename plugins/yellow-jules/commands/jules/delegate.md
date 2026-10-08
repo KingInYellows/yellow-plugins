@@ -73,6 +73,7 @@ TASK_REF='YELLOW_TODO_task_ref'
 REQUEST_ID='YELLOW_TODO_request_id_or_empty'
 DEADLINE='YELLOW_TODO_deadline_or_empty'
 CORRECTION='YELLOW_TODO_1_or_0'
+case "$WORK_DIR$REPO$BRANCH$TASK_REF$REQUEST_ID$DEADLINE$CORRECTION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 case "$WORK_DIR" in
   *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
   /*/yellow-jules-delegate.??????) ;;
@@ -83,32 +84,41 @@ CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 command -v jq >/dev/null 2>&1 || { printf 'ERROR: jq required. Install: https://jqlang.github.io/jq/download/\n' >&2; exit 1; }
 [ -s "$WORK_DIR/prompt.txt" ] || { printf 'ERROR: write the prompt to %s/prompt.txt first.\n' "$WORK_DIR" >&2; exit 1; }
 
-args=(delegate --repo "$REPO" --branch "$BRANCH" --task-ref "$TASK_REF" --prompt "$(cat -- "$WORK_DIR/prompt.txt")" --dry-run)
-[ -s "$WORK_DIR/title.txt" ] && args+=(--title "$(cat -- "$WORK_DIR/title.txt")")
+args=(delegate --repo "$REPO" --branch "$BRANCH" --task-ref "$TASK_REF" "--prompt=$(cat -- "$WORK_DIR/prompt.txt")" --dry-run)
+[ -s "$WORK_DIR/title.txt" ] && args+=("--title=$(cat -- "$WORK_DIR/title.txt")")
 [ -n "$REQUEST_ID" ] && args+=(--request-id "$REQUEST_ID")
 [ -n "$DEADLINE" ] && args+=(--deadline-ms "$DEADLINE")
 [ "$CORRECTION" = 1 ] && args+=(--correction)
 OUTPUT=$(node "$CLI" "${args[@]}")
 printf 'exit=%s\n' "$?"
 printf '%s\n' "$OUTPUT" | jq '{ok, operation, localRequestId, localId, repository, requestedBranch, sourceResource, taskRef, dryRun, requiresAttention, attention, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
+FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
+[ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
+printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
+printf '%s\n' "$OUTPUT" | jq -r 'def safe: tostring | gsub("[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | gsub("[\\p{Pd}\u2500-\u257f\u2e3a\u2e3b\u30fc\u2043\u207b\u208b\u02d7\u2796\ufe31\ufe32\u2212\ufe58\ufe63\uff0d-]+"; "-") | gsub("-(\\s*-)+"; "-") | .[0:300]; if .error then "error: \(.error.message | safe)", "recovery: \(.error.recoveryAction | safe)" else empty end'
+printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
 printf 'request_id=%s\n' "$(printf '%s' "$OUTPUT" | jq -r '.localRequestId // empty')"
 ```
 
-If `ok:false`, the packet is invalid: report `error.code` and stop. Keep the
-printed `request_id` — every later call for this attempt reuses it.
+If `ok:false`, the packet is invalid: report `error.code` and the fenced
+message, and stop. Keep the printed `request_id` — every later call for this
+attempt reuses it.
 
 ### Step 4: Find a Covering Grant
 
 A grant covers this launch when it is unexpired, unrevoked, permits `create`,
 and matches the repository, task ref, and branch (an exact ref, or a prefix when
 the pattern ends in `*`). Of several, one with session and task capacity left
-wins, then the latest expiry. Use the same single-quoted substitution rule:
+wins, then the latest expiry. Use the same single-quoted substitution rule;
+`CORRECTION` is `1` for a repair launch and `0` otherwise:
 
 ```bash
 set -uo pipefail
 REPO='YELLOW_TODO_repo'
 BRANCH='YELLOW_TODO_branch'
 TASK_REF='YELLOW_TODO_task_ref'
+CORRECTION='YELLOW_TODO_1_or_0'
+case "$REPO$BRANCH$TASK_REF$CORRECTION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 LIST=$(node "$CLI" authorize --list)
 if [ "$(printf '%s' "$LIST" | jq -r '.ok // false')" != true ]; then
@@ -131,8 +141,13 @@ GRANT_ID=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO" --arg branch "$BRANCH"
     | last | .grantId // empty')
 if [ -z "$GRANT_ID" ]; then
   printf 'grant_id=NONE\n'
-  printf 'Run this yourself in a separate terminal window on this machine (not through Claude Code), then retry:\n'
-  printf '  node %s authorize --repo %s --branch %s --task-ref %s --operations create --owner YOUR_NAME\n' "'$CLI'" "'$REPO'" "'$BRANCH'" "'$TASK_REF'"
+  if [ "$CORRECTION" = 1 ]; then
+    printf 'No active grant covers this repair. A repair must run under the grant that made the first launch of this task, while it is unexpired and has corrective rounds left; a new grant cannot authorize it.\n'
+    exit 0
+  fi
+  printf 'Run this yourself in a separate terminal window on this machine (not through Claude Code), then retry.\n'
+  printf 'A launched session waits for plan approval, so the grant also lists approve and reply; drop what you do not want:\n'
+  printf '  node %s authorize --repo %s --branch %s --task-ref %s --operations create,approve,reply --owner YOUR_NAME\n' "'$CLI'" "'$REPO'" "'$BRANCH'" "'$TASK_REF'"
   exit 0
 fi
 printf 'grant_id=%s\n' "$GRANT_ID"
@@ -174,6 +189,7 @@ GRANT_ID='YELLOW_TODO_grant_id'
 REQUEST_ID='YELLOW_TODO_request_id'
 DEADLINE='YELLOW_TODO_deadline_or_empty'
 CORRECTION='YELLOW_TODO_1_or_0'
+case "$WORK_DIR$REPO$BRANCH$TASK_REF$GRANT_ID$REQUEST_ID$DEADLINE$CORRECTION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 case "$WORK_DIR" in
   *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
   /*/yellow-jules-delegate.??????) ;;
@@ -181,8 +197,8 @@ case "$WORK_DIR" in
 esac
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 [ -f "$CLI" ] || { printf 'ERROR: yellow-jules CLI not found at %s. Reinstall the plugin.\n' "$CLI" >&2; exit 1; }
-args=(delegate --repo "$REPO" --branch "$BRANCH" --task-ref "$TASK_REF" --prompt "$(cat -- "$WORK_DIR/prompt.txt")" --grant-id "$GRANT_ID" --request-id "$REQUEST_ID")
-[ -s "$WORK_DIR/title.txt" ] && args+=(--title "$(cat -- "$WORK_DIR/title.txt")")
+args=(delegate --repo "$REPO" --branch "$BRANCH" --task-ref "$TASK_REF" "--prompt=$(cat -- "$WORK_DIR/prompt.txt")" --grant-id "$GRANT_ID" --request-id "$REQUEST_ID")
+[ -s "$WORK_DIR/title.txt" ] && args+=("--title=$(cat -- "$WORK_DIR/title.txt")")
 [ -n "$DEADLINE" ] && args+=(--deadline-ms "$DEADLINE")
 [ "$CORRECTION" = 1 ] && args+=(--correction)
 OUTPUT=$(node "$CLI" "${args[@]}")
@@ -192,7 +208,7 @@ printf '%s\n' "$OUTPUT" | jq '{ok, operation, localRequestId, localId, sessionRe
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
 printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
-printf '%s\n' "$OUTPUT" | jq -r 'def safe: tostring | gsub("[\u0000-\u001f\u007f-\u009f]"; " ") | .[0:300]; if .error then "error: \(.error.message | safe)", "recovery: \(.error.recoveryAction | safe)" else empty end'
+printf '%s\n' "$OUTPUT" | jq -r 'def safe: tostring | gsub("[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | gsub("[\\p{Pd}\u2500-\u257f\u2e3a\u2e3b\u30fc\u2043\u207b\u208b\u02d7\u2796\ufe31\ufe32\u2212\ufe58\ufe63\uff0d-]+"; "-") | gsub("-(\\s*-)+"; "-") | .[0:300]; if .error then "error: \(.error.message | safe)", "recovery: \(.error.recoveryAction | safe)" else empty end'
 printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
 case "$WORK_DIR" in *..*) ;; /*/yellow-jules-delegate.??????) [ -d "$WORK_DIR" ] && [ ! -L "$WORK_DIR" ] && rm -rf -- "$WORK_DIR" ;; esac
 ```
@@ -239,5 +255,6 @@ dry-run) leaves the work directory behind. Remove it with the printed path:
 
 ```bash
 WORK_DIR='YELLOW_TODO_work_dir'
+case "$WORK_DIR" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 case "$WORK_DIR" in *..*) ;; /*/yellow-jules-delegate.??????) [ -d "$WORK_DIR" ] && [ ! -L "$WORK_DIR" ] && rm -rf -- "$WORK_DIR" ;; esac
 ```

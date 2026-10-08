@@ -192,7 +192,7 @@ export type OperationKind =
   | 'collect'
   | 'observe';
 
-/** `yellow` records come from a yellow write; `external` sessions were first seen by a read (PR2 has no `delegate`). */
+/** `yellow` records come from a yellow write; `external` sessions were first seen by a read (a yellow write is `delegate`, `reply`, or `approve`). */
 export type OperationOrigin = 'yellow' | 'external';
 
 export type OperationStatus =
@@ -283,13 +283,13 @@ export interface OperationRecord {
   readonly artifactResumeRestartCount?: number;
   readonly artifacts: readonly ArtifactRecord[];
   readonly deviations: readonly DeviationRecord[];
-  /** Written only by `status --reconcile`; `abandon` accepts only `ambiguous-reconcile` and `not-reached`. */
+  /** Written only by `status --reconcile`; `abandon` accepts `ambiguous-reconcile` and `not-reached`, and `unknown-outcome` for a reply or approve. */
   readonly lastReconcile?: {
     readonly outcome: ReconcileOutcome;
     readonly reason?: string;
     readonly observedAt: string;
   };
-  /** Written only by `supervise` (R32, R33). */
+  /** Written by `supervise` (R32, R33) and, for `outsideSeen`, by `status`. */
   readonly supervision?: SupervisionState;
   /** Set only by `abandon`, which maps onto terminal `failed` (no new status). */
   readonly abandonedAt?: string;
@@ -304,6 +304,8 @@ export interface ReconciledEntry {
   readonly outcome: ReconcileOutcome;
   readonly reason?: string;
   readonly sessionResource?: string;
+  /** The create was released but its grant slot could not be freed. */
+  readonly slotStuck?: true;
 }
 
 export type ReconcileOutcome =

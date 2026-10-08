@@ -25,6 +25,7 @@ const authority_js_1 = require("./authority.js");
 const config_js_1 = require("./config.js");
 const controller_js_1 = require("./controller.js");
 const errors_js_1 = require("./errors.js");
+const redact_js_1 = require("./redact.js");
 const runtime_support_js_1 = require("./runtime-support.js");
 const state_js_1 = require("./state.js");
 /** Sessions under a grant that may still be running (R39 `runningSessions`). */
@@ -55,17 +56,38 @@ function denialError(denial, grant, journal, ids) {
         const running = runningSessionsUnder(journal, grant.grantId);
         return new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_GRANT_EXPIRED', `${denial.message}; ${running.length} remote session(s) under it may still be running`), { ...context, details: { runningSessions: running } });
     }
+    const details = { reason: denial.reason };
     if (denial.code === 'JULES_AUTHORITY_DENIED') {
         return new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_AUTHORITY_DENIED', denial.message, {
             recoveryAction: 'The grant does not cover this call. List grants with authorize --list, or create a covering grant with authorize in a terminal.',
-        }), context);
+        }), { ...context, details });
     }
-    return new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)(denial.code, denial.message), context);
+    if (denial.reason === 'active-sessions-exhausted') {
+        return new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)(denial.code, denial.message, {
+            recoveryAction: 'The grant has no free session slot. A slot frees when a session under it finishes or is reconciled: run status --reconcile, then retry. Write a new grant only if you need more concurrent sessions.',
+        }), { ...context, details });
+    }
+    return new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)(denial.code, denial.message), {
+        ...context,
+        details,
+    });
 }
 async function reserveUnderGrant(deps, gate) {
     const now = (0, runtime_support_js_1.nowFn)(deps);
     return (0, state_js_1.withJournalLock)(deps.dataDir, async () => {
         const journal = await (0, state_js_1.readJournal)(deps.dataDir);
+        // A recorded request id is answered before the grant is judged, so an agent
+        // that lost the reply to a launch that landed is not told to write a new grant.
+        if (journal.operations[gate.reservation.localRequestId] !== undefined) {
+            throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_DUPLICATE_LAUNCH', `request id ${gate.reservation.localRequestId} is already recorded`, {
+                recoveryAction: 'Run status --reconcile to see what that request did. A recorded request id is spent: retry with a new one only after confirming nothing was created.',
+            }), {
+                localRequestId: gate.reservation.localRequestId,
+                ...(gate.reservation.localId !== undefined
+                    ? { localId: gate.reservation.localId }
+                    : {}),
+            });
+        }
         const { grants, grant } = loadAuthorizedGrant(deps, gate.grantId);
         const verdict = (0, authority_js_1.evaluateAuthority)(grant, gate.authority, now(), {
             unreconciledDeviation: (0, authority_js_1.grantHasUnreconciledDeviation)(journal, grant.grantId),
@@ -87,6 +109,14 @@ async function reserveUnderGrant(deps, gate) {
                 ? { localId: gate.reservation.localId }
                 : {}),
         };
+        // reply and approve act on a session this plugin created; a missing owner
+        // must not turn the pause and deviation checks below into no-ops.
+        if (gate.authority.operation !== 'create' && owner === undefined) {
+            throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_AUTHORITY_DENIED', 'the session this write targets has no owning launch record'), ids);
+        }
+        if (owner?.supervision?.outsideSeen !== undefined) {
+            throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_SUPERVISION_PAUSED', `outside activity was recorded on ${owner.sessionResource ?? 'this session'}; no grant-backed write is allowed until supervise --clear-pause`), ids);
+        }
         if (owner?.supervision?.paused !== undefined) {
             throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_SUPERVISION_PAUSED', `supervision of ${owner.sessionResource ?? 'this session'} is paused (${owner.supervision.paused.reason}); no grant-backed write is allowed`), ids);
         }
@@ -94,6 +124,17 @@ async function reserveUnderGrant(deps, gate) {
         // only the grant that created it.
         if (owner !== undefined && (0, state_js_1.hasUnreconciledDeviation)(owner)) {
             throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_POLICY_DEVIATION', `${owner.sessionResource ?? 'this session'} has an unreconciled policy deviation`), ids);
+        }
+        // A repair creates a new session, so the owner pause is checked on the
+        // task's earlier launches instead of an owner record.
+        if (gate.authority.operation === 'create' &&
+            gate.authority.correction === true &&
+            Object.values(journal.operations).some((r) => r.kind === 'create' &&
+                r.grantId === grant.grantId &&
+                r.taskRef === gate.authority.taskRef &&
+                (r.supervision?.paused !== undefined ||
+                    r.supervision?.outsideSeen !== undefined))) {
+            throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_SUPERVISION_PAUSED', `a session for task ${gate.authority.taskRef ?? '(none)'} is paused or has unreviewed outside activity; no repair launch is allowed`), ids);
         }
         // A repair spends a corrective round, not a task, so it must follow a plain
         // launch of the same task under this grant; otherwise corrective rounds
@@ -129,8 +170,24 @@ async function reserveUnderGrant(deps, gate) {
                 : {}),
             correction: authority.correction === true,
         };
+        // Everything that can refuse the record runs before the charge, so a
+        // rejected input never spends grant budget.
+        (0, redact_js_1.assertNoSecretShapedValues)(record);
         (0, authority_js_1.writeGrants)(deps.dataDir, (0, authority_js_1.updateGrant)(grants, grant.grantId, (g) => (0, authority_js_1.chargeGrant)(g, charge)));
-        await (0, state_js_1.writeJournal)(deps.dataDir, journal, [record.localRequestId]);
+        try {
+            await (0, state_js_1.writeJournal)(deps.dataDir, journal, [record.localRequestId]);
+        }
+        catch (err) {
+            // Undo the charge while the lock is held; only a hard crash between the
+            // two writes can leak a slot.
+            try {
+                (0, authority_js_1.writeGrants)(deps.dataDir, grants);
+            }
+            catch (undoError) {
+                process.stderr.write(`warning: could not undo the grant charge after a failed reservation: ${(0, errors_js_1.errorLabel)(undoError)}\n`);
+            }
+            throw err;
+        }
         return record;
     });
 }
@@ -156,7 +213,7 @@ function authorizeCommandFor(parts) {
         '--operations',
         shellQuote(parts.operations.join(',')),
         '--owner',
-        '<your-name>',
+        'YOUR_NAME',
     ].join(' ');
 }
 /** R29: a real write without `--grant-id` names the exact `authorize` command. */
@@ -165,7 +222,7 @@ function confirmationRequired(deps, scope, ids) {
         repository: scope.repository ?? '<owner/repo>',
         branch: scope.requestedBranch ?? '<branch>',
         ...(scope.taskRef !== undefined ? { taskRef: scope.taskRef } : {}),
-        operations: [scope.operation],
+        operations: scope.operations ?? (scope.operation ? [scope.operation] : []),
         ...(deps.pluginRoot !== undefined ? { pluginRoot: deps.pluginRoot } : {}),
     });
     return new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_CONFIRMATION_REQUIRED', 'a real write needs --grant-id from a grant written by authorize; none was given', {
@@ -204,7 +261,7 @@ async function settleFailure(deps, record, error, options) {
             // The record stays `reserved`, which is also unresolved. The outcome is
             // reported either way, with the failed bookkeeping made visible.
             journalRecorded = false;
-            process.stderr.write(`warning: could not mark ${record.localRequestId} unknown-outcome: ${markError instanceof Error ? markError.name : 'error'}\n`);
+            process.stderr.write(`warning: could not mark ${record.localRequestId} unknown-outcome: ${(0, errors_js_1.errorLabel)(markError)}\n`);
         }
         throw new errors_js_1.MutationErrorException({ ...app, recoveryAction: options.reconcileHint }, {
             ...ids,
@@ -214,20 +271,36 @@ async function settleFailure(deps, record, error, options) {
             },
         });
     }
-    // The vendor's verdict must reach the caller even when the bookkeeping fails;
-    // the reservation then stays `reserved`, which reconcile still resolves.
-    let journalRecorded = true;
+    // The vendor's verdict must reach the caller even when the bookkeeping fails.
+    // Marking the record and freeing the slot are separate steps with separate
+    // failure modes, and the envelope says which one did not land.
+    const details = {};
+    let marked = true;
     try {
         await (0, state_js_1.markOperation)(deps.dataDir, record.localRequestId, 'failed', {}, (0, runtime_support_js_1.nowFn)(deps));
-        if (record.kind === 'create' && record.grantId !== undefined) {
+    }
+    catch (markError) {
+        // The record stays `reserved`, which reconcile still resolves.
+        marked = false;
+        details['journalRecorded'] = false;
+        process.stderr.write(`warning: could not mark ${record.localRequestId} failed after a rejection: ${(0, errors_js_1.errorLabel)(markError)}\n`);
+    }
+    if (marked && record.kind === 'create' && record.grantId !== undefined) {
+        try {
             await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId);
         }
+        catch (releaseError) {
+            // The record is `failed`, so nothing will retry this: the slot stays held.
+            details['slotReleased'] = false;
+            process.stderr.write(`warning: could not release the grant slot of ${record.localRequestId}: ${(0, errors_js_1.errorLabel)(releaseError)}\n`);
+        }
     }
-    catch (bookkeepingError) {
-        journalRecorded = false;
-        process.stderr.write(`warning: could not settle ${record.localRequestId} after a rejection: ${bookkeepingError instanceof Error ? bookkeepingError.name : 'error'}\n`);
-    }
-    throw new errors_js_1.MutationErrorException(app, journalRecorded ? ids : { ...ids, details: { journalRecorded: false } });
+    throw new errors_js_1.MutationErrorException(Object.keys(details).length > 0
+        ? {
+            ...app,
+            recoveryAction: `${app.recoveryAction} The local bookkeeping did not complete (see details); revoke and rewrite the grant to reclaim a held slot.`,
+        }
+        : app, Object.keys(details).length > 0 ? { ...ids, details } : ids);
 }
 /** Journal persistence failed after a 2xx: the write happened, the record did not land (R16). */
 function persistenceUnknown(record, sessionResource, reconcileHint) {
@@ -248,7 +321,7 @@ async function settleAcceptedOrUnknown(deps, record, extra, options) {
         await settleAccepted(deps, record, extra);
     }
     catch (err) {
-        process.stderr.write(`warning: ${options.what} but the journal write failed: ${err instanceof Error ? err.name : 'error'}\n`);
+        process.stderr.write(`warning: ${options.what} but the journal write failed: ${(0, errors_js_1.errorLabel)(err)}\n`);
         throw persistenceUnknown(record, extra.sessionResource ?? record.sessionResource, options.reconcileHint);
     }
 }

@@ -69,7 +69,7 @@ export type SdkModule = typeof Sdk;
 export const CREATE_REQUEST_TIMEOUT_MS = 60_000;
 
 // ---------------------------------------------------------------------------
-// Pure builders (used by the runtime and, for create, only by tests in PR2)
+// Pure builders (used by the adapter; `buildCreateSessionConfig` is also exercised directly by the packed-SDK tests)
 // ---------------------------------------------------------------------------
 
 export interface StorageRecorder {
@@ -473,21 +473,31 @@ export class JulesSdkAdapter implements SdkAdapter {
     const previousJulesHome = process.env['JULES_HOME'];
     process.env['JULES_HOME'] = scratch;
 
-    const { options, recorder } = buildClientOptions(input.sdk, {
-      apiKey: input.apiKey,
-      ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
-    });
-    const client = input.sdk.connect(options);
-    if (
-      recorder.sessionStorages.length !== 1 ||
-      client.storage !== recorder.sessionStorages[0]
-    ) {
-      throwAppError(
-        'JULES_SDK_INTEGRITY',
-        'the SDK did not bind the injected in-memory session storage'
-      );
+    let built: ReturnType<typeof buildClientOptions>;
+    let client: ReturnType<SdkModule['connect']>;
+    try {
+      built = buildClientOptions(input.sdk, {
+        apiKey: input.apiKey,
+        ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
+      });
+      client = input.sdk.connect(built.options);
+      if (
+        built.recorder.sessionStorages.length !== 1 ||
+        client.storage !== built.recorder.sessionStorages[0]
+      ) {
+        throwAppError(
+          'JULES_SDK_INTEGRITY',
+          'the SDK did not bind the injected in-memory session storage'
+        );
+      }
+      assertScratchEmpty(scratch, 'after connect()');
+    } catch (err) {
+      // No adapter exists to close, so put the environment back here.
+      if (previousJulesHome === undefined) delete process.env['JULES_HOME'];
+      else process.env['JULES_HOME'] = previousJulesHome;
+      throw err;
     }
-    assertScratchEmpty(scratch, 'after connect()');
+    const { recorder } = built;
     return new JulesSdkAdapter(
       input.sdk,
       client,

@@ -25,7 +25,7 @@ plugins/yellow-jules/
     cli.ts              # entry: strict parseArgs, one JSON line on stdout, exit 0/1/2
     runtime.ts          # setup / list / status / collect over an injected SdkAdapter
     runtime-support.ts  # RuntimeDeps, withAdapter, bounded read, status vocabulary
-    mutations.ts        # delegate / reply / approve / abandon: one POST each, never retried
+    mutations.ts        # delegate / reply / approve (one POST each, never retried) and abandon (local settle, no vendor call)
     write-gate.ts       # the R31 authority critical section and the settle helpers
     reconcile.ts        # status --reconcile: one shared sessions walk, per-session resolution
     supervise.ts        # one bounded supervision pass; --clear-pause
@@ -41,7 +41,7 @@ plugins/yellow-jules/
     config.ts           # data dir resolution + owner-only checks
     state.ts            # journal, lock, reservations
     deadline.ts         # absolute deadlines + bounded read retry
-    errors.ts redact.ts validate.ts types.ts
+    errors.ts redact.ts validate.ts types.ts shape.ts   # shape.ts: small type guards
   dist/                 # committed compiled CJS; drift-checked in CI
   commands/jules/       # setup, list, status, collect, delegate, reply, approve, authorize, abandon, supervise
   skills/               # jules-delegation, jules-supervision (host-neutral; also exposed to Codex)
@@ -65,7 +65,8 @@ client with `config.requestTimeoutMs: 60000`,
 `config.rateLimitRetry.maxRetryTimeMs: 0` (nested — a top-level key is silently
 ignored), and a recording in-memory `storageFactory` whose bindings it asserts
 after `connect()` and on first per-session use. `buildCreateSessionConfig` is a
-pure builder used only by the packed-SDK tests.
+pure builder that `createSession` calls on every `delegate` and the packed-SDK
+tests also exercise directly.
 
 ### SDK pin policy
 
@@ -168,9 +169,10 @@ data-directory path this host may write from.
   - `YELLOW_JULES_ACTIVE_GRANT` is a hint the agent could unset, not a control;
     the control is the terminal challenge.
   - Expiry and pause do not stop remote work; see the containment procedure.
-  - Only `reply --correction` spends a corrective round, and the caller sets
-    that flag. A plain reply is not counted, so a grant bounds repair sessions
-    and approvals but not the number of messages sent to a session it covers.
+  - Only a call made with `--correction` (`reply` or `delegate`) spends a
+    corrective round, and the caller sets that flag. A plain reply is not
+    counted, so a grant bounds repair sessions and approvals but not the number
+    of messages sent to a session it covers.
   - A prompt or message travels as a command-line argument, which other local
     users can read in `/proc/<pid>/cmdline` for as long as the call runs (unless
     `/proc` is mounted with `hidepid`). Do not put secrets in a prompt on a
@@ -198,6 +200,23 @@ One data directory is the only writer. To move it to another host or path:
 
 A copied or restored data directory with no matching controller file cannot
 write.
+
+The controller id is the host name, and every grant is bound to it. If the host
+name changes (a WSL2 or homelab rename), writes under existing grants fail with
+`JULES_CONTROLLER_MISMATCH` until you run `authorize --take-over` in a terminal,
+which rebinds the grants to the new name.
+
+## Outside activity freezes writes
+
+When `status` or a supervision pass finds a message on a session that this
+plugin did not send (for example someone typed in the Jules web page), it
+records that as outside activity. While it is recorded, `reply` and `approve`
+under a grant are refused with `JULES_SUPERVISION_PAUSED`, and so is a repair
+`delegate` for that task. Only `supervise --clear-pause` removes it: it needs a
+complete `status` walk first and a typed code in a terminal, and its prompt
+lists the outside activity so you read it before you confirm. If writes start
+failing with a paused error, look at the session first; a teammate may have
+commented on it.
 
 ## Out-of-band containment (R39)
 
@@ -264,7 +283,7 @@ plugins; `pnpm validate:jules` fails on drift. Change both sides together.
   write one or to take over the controller
 - `/jules:abandon` — prints the terminal command to give up an unresolved
   operation
-- `/jules:supervise` — one bounded pass; at most one reply or approval
+- `/jules:supervise` — one bounded pass; at most one reply, approval, or repair delegate
 
 ### Skills (2)
 

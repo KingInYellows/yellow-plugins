@@ -106,7 +106,6 @@ describe('unauthorized writes', () => {
     ['the wrong repository', undefined, { repo: 'other/repo' }],
     ['the wrong branch', undefined, { branch: 'main' }],
     ['a task ref outside the grant', undefined, { taskRef: 't9' }],
-    ['no task ref', undefined, { taskRef: undefined }],
   ])(
     '%s -> JULES_AUTHORITY_DENIED with no reservation and no POST',
     async (_label, grantOverride, patch) => {
@@ -357,6 +356,16 @@ describe('task limits', () => {
         )
       )
     ).toBe('JULES_AUTHORITY_DENIED');
+  });
+
+  it('a delegate without a task ref is rejected before anything is reserved', async () => {
+    const grantId = await createGrant(h);
+    expect(
+      await codeOf(() =>
+        delegate(h.deps, args({ grantId, taskRef: undefined }))
+      )
+    ).toBe('JULES_INVALID_INPUT');
+    expect(h.adapter.writeCount()).toBe(0);
   });
 
   it('--correction needs a task ref', async () => {
