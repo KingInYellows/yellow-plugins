@@ -24,7 +24,17 @@
   "targets": {
     "claude": true,
     "codex": {
-      "enabled": false
+      "enabled": true,
+      "includeHooks": false,
+      "interface": {
+        "displayName": "Jules",
+        "category": "Developer Tools"
+      },
+      "description": "Two read-only reference skills — the Jules delegation lifecycle and CLI contract, and the one-pass supervision loop. Writes always need a grant the owner creates on a terminal. Excludes all of yellow-jules' commands.",
+      "skillAllowlist": ["jules-delegation", "jules-supervision"],
+      "componentPaths": {
+        "skills": "./codex/skills"
+      }
     }
   }
 }

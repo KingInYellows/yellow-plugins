@@ -370,7 +370,7 @@ through the generator and documenting the single-controller handoff procedure.
 - [x] Step 28: Baseline the Codex manifests before the flip, as a separate commit.
   - Run `pnpm vitest run tests/integration/generate-manifests-codex.test.ts tests/integration/generate-manifests-characterization.test.ts` on the unflipped catalog and record that it passes.
   - Add a fixture case in `generate-manifests-codex.test.ts` for a plugin with an enabled interface, a two-skill allowlist and `includeHooks: false`, matching the jules shape.
-- [ ] Step 29: Flip Codex on in `catalog/plugins/yellow-jules.json` `targets.codex`, in a separate commit.
+- [x] Step 29: Flip Codex on in `catalog/plugins/yellow-jules.json` `targets.codex`, in a separate commit.
   - Set `{ enabled: true, includeHooks: false, interface: { displayName: "Jules", category: "Developer Tools" }, skillAllowlist: ["jules-delegation","jules-supervision"], componentPaths: { skills: "./codex/skills" } }`.
   - Run `pnpm generate:manifests` and commit `plugins/yellow-jules/codex/skills/**`, `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json`.
   - Refresh the characterization snapshot with `vitest -u`, then run `pnpm validate:codex` and `pnpm validate:versions`.
