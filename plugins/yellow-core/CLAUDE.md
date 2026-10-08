@@ -502,16 +502,19 @@ detail):**
 `COMPOUND_JEV_PREFILTER=shadow` and `TYPESAFE_API_KEY` set in the environment
 the hooks inherit, the capture subshell sends the redacted tail's user and
 assistant text (tool calls and results dropped, capped at 24,000 chars) to
-TypeSafe's Jev (`jev-1.13.0` unless `COMPOUND_JEV_MODEL` is set; timeout
-`COMPOUND_JEV_TIMEOUT_S`, default 5 s). It runs after the pending entry is
-written and never changes what is staged. Each answer appends one line to
-`compound-staging/jev-shadow.jsonl`: session id, content hash, the `durable`
-choice with confidence and probabilities, the `has_instruction` probability,
-latency and a `would_skip` flag (trivial or routine at confidence >= 0.9 and
-instruction probability <= 0.2). No transcript text is logged, the key reaches
-curl on stdin rather than argv, and every failure is silent. The log exists to
-compare against staging-scorer outcomes before any skip behaviour ships; this
-sends session text to a third party, so leave it unset unless you accept that.
+TypeSafe's Jev, fenced as untrusted reference data (`jev-1.13.0` unless
+`COMPOUND_JEV_MODEL` is set; timeout `COMPOUND_JEV_TIMEOUT_S`, default 5 s). It
+runs after the pending entry is written and never changes what is staged. Like
+the pending entry, the record is per session and each turn's answer atomically
+replaces the last: `compound-staging/jev-shadow/<session_id>.json` holds session
+id, content hash, the `durable` choice with confidence and probabilities, the
+`has_instruction` probability, latency and a `would_skip` flag (trivial or
+routine at confidence >= 0.9 and instruction probability <= 0.2). No transcript
+text is logged; the key reaches curl as a config on fd 3 and the body on stdin,
+so neither is in argv, and every failure is silent. The log exists to compare
+against staging-scorer outcomes before any skip behaviour ships; this sends
+session text to a third party, so leave it unset unless you accept that (trust
+boundary: `docs/security.md` "Jev Shadow Pre-Filter").
 
 **Manual override:** `/compound:review-staged` triggers a drain
 immediately (skips threshold check) with an `AskUserQuestion` M3

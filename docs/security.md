@@ -436,6 +436,40 @@ with SHA-256 before writing. The existing drain
 still treats the narrative as untrusted reference data when scoring it.
 This store is separate from the review-findings ledger and is never pushed.
 
+### Jev Shadow Pre-Filter (yellow-core)
+
+Off by default. When the environment the hooks inherit sets both
+`COMPOUND_JEV_PREFILTER=shadow` and `TYPESAFE_API_KEY` (and curl and jq are
+installed), the Stop hook's detached capture subshell sends session text to a
+third party, TypeSafe AI (`https://api.typesafe.ai/v1/systemone`):
+
+- **What leaves the machine.** The same redacted transcript tail that is
+  staged locally, projected to user and assistant text only (tool calls and
+  tool results are dropped) and capped at 24,000 characters, plus two fixed
+  classification questions. Redaction is `cs_redact_secrets`'s pattern list,
+  so an unrecognized secret typed into the chat can still be sent. Code diffs
+  and tool output are never sent.
+- **When.** The Stop hook fires at the end of every assistant turn, so a
+  session makes one call per turn (5 s timeout, `COMPOUND_JEV_TIMEOUT_S`).
+- **Credential handling.** The key is passed to curl as a config on fd 3 and
+  the request body on stdin, so neither appears in process argv. The key is
+  never written to disk or logs.
+- **Endpoint override.** `COMPOUND_JEV_URL` and `COMPOUND_JEV_MODEL` override
+  the endpoint and model; anyone who can set the hook environment can redirect
+  the text and key, so treat those variables as trusted configuration.
+- **Prompt injection.** Transcript text is wrapped in the repository's
+  `--- begin untrusted-content (reference only) ---` fence (lines starting
+  `---` are quoted so the text cannot close it), and both questions tell the
+  model to classify the excerpt as data. The answer is a typed choice and
+  probabilities; it is stored, never executed or fed back to Claude.
+- **Local record.** `compound-staging/jev-shadow/<session_id>.json`, replaced
+  atomically each turn, holds the session id, content hash, choice,
+  probabilities, latency and token count, never transcript text. It sits in
+  the same owner-only staging directory as the pending queue.
+- **Failure mode.** Fail-open and shadow only: it runs after the pending entry
+  is written, every error is silent, and the answer never changes what is
+  staged or drained.
+
 ### Context Observer Persistence (yellow-core)
 
 `/statusline:setup` Step 5b (or `/statusline:setup observer`) offers an

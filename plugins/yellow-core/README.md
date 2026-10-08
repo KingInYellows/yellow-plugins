@@ -126,7 +126,7 @@ Three hooks run automatically once the plugin is enabled:
 - **Stop** — captures the session transcript tail into that queue. With
   `COMPOUND_JEV_PREFILTER=shadow` and `TYPESAFE_API_KEY` set, it also asks
   TypeSafe's Jev model whether the session looks worth keeping and logs the
-  answer to `jev-shadow.jsonl` without changing what is queued. This sends
+  latest answer per session under `jev-shadow/` without changing what is queued. This sends
   redacted session text to TypeSafe, so it is off unless both are set.
 - **PreCompact** — appends a compaction-preservation instruction to the
   **main-session** compaction prompt so summaries keep the active plan,
