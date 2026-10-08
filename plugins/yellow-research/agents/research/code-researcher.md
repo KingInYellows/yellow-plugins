@@ -32,7 +32,7 @@ Choose the best source based on query type:
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Library/framework docs          | See `library-context` skill (preloaded — context7 → EXA → WebSearch chain with availability detection and disambiguation)|
 | Code examples, patterns, GitHub | `mcp__plugin_yellow-research_exa__get_code_context_exa`                                                                  |
-| AST/structural code patterns    | `ast-grep` CLI via Bash (local repo; see below)                                                                           |
+| AST/structural code patterns    | `ast-grep` CLI via Bash (local repo; see below)                                                                          |
 | GitHub code search              | `mcp__grep__searchGitHub`                                                                                                |
 | Recent releases, new APIs       | `mcp__plugin_yellow-research_perplexity__perplexity_search`                                                              |
 | General web (keyword-tight)     | `mcp__plugin_yellow-research_ceramic__ceramic_search` (lexical; rewrite query first — see below)                         |
