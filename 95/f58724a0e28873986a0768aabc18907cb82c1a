@@ -1,0 +1,34 @@
+.changeset/yellow-core-redact-vendor-prefixes.md
+  h_6000354274ce50 1-5
+.changeset/yellow-review-credential-scan.md
+  h_6000354274ce50 1-5
+plugins/yellow-core/lib/compound-staging.sh
+  h_6000354274ce50 113-115,141-143
+plugins/yellow-core/tests/compound-staging.bats
+  h_6000354274ce50 153-185
+plugins/yellow-review/CLAUDE.md
+  h_6000354274ce50 199-204
+plugins/yellow-review/lib/resolve-text.sh
+  h_6000354274ce50 186-228,436-444,448-449,496-504,506,509,512-528,554-557
+plugins/yellow-review/references/resolve/dispositions.md
+  h_6000354274ce50 667-669
+plugins/yellow-review/skills/pr-review-workflow/scripts/reply-pr-thread
+  h_6000354274ce50 15-18,218
+plugins/yellow-review/tests/check-resolve-text.bats
+  h_6000354274ce50 157-158,1369-1409
+plugins/yellow-review/tests/mocks/gh
+  h_6000354274ce50 297-299
+plugins/yellow-review/tests/reply-pr-thread.bats
+  h_6000354274ce50 139-155
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "95f58724a0e28873986a0768aabc18907cb82c1a",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
