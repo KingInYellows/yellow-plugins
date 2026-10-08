@@ -229,19 +229,33 @@ _shadow_direct() {
   COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
   hash=$(jq -r '.content_hash' "$STAGING/pending/$SESSION_ID.jsonl")
   rm -f "$STAGING/jev-shadow/$SESSION_ID.json"
-  mkdir "$STAGING/jev-shadow/.$SESSION_ID.lock"
-  printf '999999' > "$STAGING/jev-shadow/.$SESSION_ID.lock/pid"
+  ln -s 999999 "$STAGING/jev-shadow/.$SESSION_ID.lock"
   _shadow_direct "$hash"
   [ -f "$STAGING/jev-shadow/$SESSION_ID.json" ]
-  [ ! -e "$STAGING/jev-shadow/.$SESSION_ID.lock" ]
+  [ ! -L "$STAGING/jev-shadow/.$SESSION_ID.lock" ]
+  [ ! -e "$STAGING/jev-shadow/.$SESSION_ID.lock.reap" ]
 
   rm -f "$STAGING/jev-shadow/$SESSION_ID.json"
-  mkdir "$STAGING/jev-shadow/.$SESSION_ID.lock"
-  printf '%s' "$$" > "$STAGING/jev-shadow/.$SESSION_ID.lock/pid"
+  ln -s "$$" "$STAGING/jev-shadow/.$SESSION_ID.lock"
   _shadow_direct "$hash"
   [ ! -e "$STAGING/jev-shadow/$SESSION_ID.json" ]
-  [ -z "$(ls -A "$STAGING/jev-shadow" | grep -v '^\.' )" ]
+  [ "$(readlink "$STAGING/jev-shadow/.$SESSION_ID.lock")" = "$$" ]
   [ -z "$(ls -A "$STAGING/jev-shadow" | grep '^\.tmp')" ]
+}
+
+@test "a reaper only removes the lock it found stale" {
+  . "$BATS_TEST_DIRNAME/../lib/jev-prefilter.sh"
+  lock="$BATS_TEST_TMPDIR/sess.lock"
+  ln -s 999999 "$lock"
+  # Another waiter is mid-reap: the mutex is held, so this one must not reap.
+  mkdir "$lock.reap"
+  run jev_lock "$lock"
+  [ "$status" -eq 1 ]
+  [ "$(readlink "$lock")" = "999999" ]
+  rmdir "$lock.reap"
+  run jev_lock "$lock"
+  [ "$status" -eq 0 ]
+  [ "$(readlink "$lock")" != "999999" ]
 }
 
 @test "response metadata cannot carry text into the record" {
@@ -249,16 +263,6 @@ _shadow_direct() {
   COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
   jq -e '.model == "jev-1.13.0" and .input_tokens == null' "$STAGING/jev-shadow/$SESSION_ID.json"
   ! grep -q leaked "$STAGING/jev-shadow/$SESSION_ID.json"
-}
-
-@test "a lock with no pid is cleared after the grace period" {
-  COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
-  hash=$(jq -r '.content_hash' "$STAGING/pending/$SESSION_ID.jsonl")
-  rm -f "$STAGING/jev-shadow/$SESSION_ID.json"
-  mkdir "$STAGING/jev-shadow/.$SESSION_ID.lock"
-  _shadow_direct "$hash"
-  [ -f "$STAGING/jev-shadow/$SESSION_ID.json" ]
-  [ ! -e "$STAGING/jev-shadow/.$SESSION_ID.lock" ]
 }
 
 @test "a failed call for a newer turn retires the older record" {
@@ -274,4 +278,11 @@ _shadow_direct() {
   export MOCK_JEV_RESPONSE="$one $one"
   COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
   [ ! -e "$STAGING/jev-shadow/$SESSION_ID.json" ]
+}
+
+@test "probability keys outside the criteria are not recorded" {
+  export MOCK_JEV_RESPONSE='{"answers":{"durable":{"choice":"trivial-qa","confidence":0.95,"probabilities":{"trivial-qa":0.9,"user: leaked secret":0.1}},"has_instruction":{"noul":0.01}}}'
+  COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
+  jq -e '.durable_probabilities == {"trivial-qa":0.9}' "$STAGING/jev-shadow/$SESSION_ID.json"
+  ! grep -q leaked "$STAGING/jev-shadow/$SESSION_ID.json"
 }

@@ -117,23 +117,25 @@ jev_current_hash() {
   jq -r '.content_hash // empty' "$entry" 2>/dev/null | tail -n 1
 }
 
-# Take a per-session mkdir lock (path $1). Waits up to ~2 s. Clears a lock
-# whose owner has exited, or one left with no pid after a 1 s grace (its
-# owner died between mkdir and writing the pid). Returns 1 if not acquired.
+# Take a per-session lock at path $1: a symlink whose target is the owner's
+# pid, so the lock and its owner appear in one atomic step. Waits up to
+# ~2 s; returns 1 if not acquired. A lock whose owner has exited is reaped
+# under a reaper mutex, and only if it still names that same owner, so two
+# waiters cannot both reap and one delete the other's fresh lock.
 jev_lock() {
   local lock="$1" owner i=0
-  until mkdir "$lock" 2>/dev/null; do
+  until ln -sn "${BASHPID:-$$}" "$lock" 2>/dev/null; do
     i=$((i + 1))
     [ "$i" -le 40 ] || return 1
-    owner=$(cat "${lock}/pid" 2>/dev/null)
-    if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
-      || { [ -z "$owner" ] && [ "$i" -gt 20 ]; }; then
-      rm -rf -- "$lock" 2>/dev/null
+    owner=$(readlink "$lock" 2>/dev/null)
+    if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null \
+      && mkdir "${lock}.reap" 2>/dev/null; then
+      [ "$(readlink "$lock" 2>/dev/null)" = "$owner" ] && rm -f -- "$lock"
+      rmdir -- "${lock}.reap" 2>/dev/null
       continue
     fi
     sleep 0.05
   done
-  printf '%s' "${BASHPID:-$$}" > "${lock}/pid" 2>/dev/null
   return 0
 }
 
@@ -157,7 +159,7 @@ jev_prefilter_shadow() {
       && [ "$(jq -r '.content_hash // empty' "${rec_dir}/${sid}.json" 2>/dev/null)" != "$hash" ]; then
       rm -f -- "${rec_dir}/${sid}.json" 2>/dev/null
     fi
-    rm -rf -- "$rec_lock" 2>/dev/null
+    rm -f -- "$rec_lock" 2>/dev/null
   fi
 
   local dialogue state body resp latency
@@ -199,10 +201,11 @@ JEVCFG
     select(length == 1 and (.[0] | type) == "object") | .[0]
     | .answers.durable as $d
     | .answers.has_instruction as $h
+    | ["trivial-qa", "routine-edit", "durable-lesson",
+       "decision-or-convention", "other"] as $criteria
     | def unit: type == "number" and . >= 0 and . <= 1;
     select(
-      ($d.choice | IN("trivial-qa", "routine-edit", "durable-lesson",
-                      "decision-or-convention", "other"))
+      ($d.choice | IN($criteria[]))
       and ($d.confidence | unit)
       and ($h.noul | unit)
       and (($d.probabilities // {}) | type == "object"
@@ -217,7 +220,10 @@ JEVCFG
         latency_s: $latency,
         durable: $d.choice,
         durable_confidence: ($d.confidence // null),
-        durable_probabilities: ($d.probabilities // null),
+        durable_probabilities: (
+          $d.probabilities
+          | if . == null then null
+            else with_entries(select(.key | IN($criteria[]))) end),
         has_instruction: $h.noul,
         would_skip: (
           ($d.choice == "trivial-qa" or $d.choice == "routine-edit")
@@ -243,7 +249,7 @@ JEVCFG
     if [ "$current" = "$hash" ]; then
       mv -f -- "$tmp" "${dir}/${sid}.json" 2>/dev/null
     fi
-    rm -rf -- "$lock" 2>/dev/null
+    rm -f -- "$lock" 2>/dev/null
   fi
   rm -f -- "$tmp" 2>/dev/null
   return 0
