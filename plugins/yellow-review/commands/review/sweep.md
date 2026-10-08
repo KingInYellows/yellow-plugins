@@ -367,10 +367,11 @@ Reached after Step 2 (`/review:pr`), Step 3 (`/review:resolve`) and Step
 Print `Ledger:  none` when `summary` returned `{}`, and
 `Ledger:  unavailable` when it failed. The `Merge:` row reads `ready (no
 pending P0-P2 findings)` only when an existing ledger was read and
-`merge_blocking` is 0. It reads `unknown (no ledger)` when `summary` returned
-`{}`, because a `/review:pr` that failed before its ledger write leaves none
-and the wrapper cannot tell that from a clean review, and `unknown (ledger
-unavailable)` when `summary` failed or Step 3b was skipped. Findings left pending at merge are stranded: the ledger refuses
+`merge_blocking` is 0. A clean review still leaves a ledger record (Step 6 observes an
+empty array), so it reads `unknown (no ledger)` when `summary` returned `{}`:
+the `/review:pr` run failed before its ledger write or never reached it. It
+reads `unknown (ledger unavailable)` when `summary` failed or Step 3b was
+skipped. Findings left pending at merge are stranded: the ledger refuses
 writes to a closed PR, so they can only be fixed in a follow-up PR. The row
 reports the ledger only; it never changes the exit code or the contract line.
 

@@ -2012,15 +2012,19 @@ cmd_summary() {
   d=$(rl_ensure_dir) || rl_die 1 "cannot create ledger directory"
   if [ -n "${1:-}" ] && [ "$1" != --all ]; then
     rl_need_pr "$1"
-    [ -f "$d/$1.jsonl" ] || { printf '{}\n'; return 0; }
+    # A review with no findings leaves only the sidecar (observe of `[]`), so
+    # either file means the PR has a ledger record.
+    [ -f "$d/$1.jsonl" ] || [ -f "$d/$1.pending" ] || { printf '{}\n'; return 0; }
     one=$(rl_summary_one "$d" "$1") || exit $?
     jq -cn --arg pr "$1" --argjson v "$one" '{($pr): $v}'
     return 0
   fi
-  for f in "$d"/*.jsonl; do
+  for f in "$d"/*.jsonl "$d"/*.pending; do
     [ -f "$f" ] || continue
-    pr=$(basename -- "$f" .jsonl)
+    pr=$(basename -- "$f")
+    pr=${pr%.*}
     rl_validate_pr "$pr" || continue
+    [ "$(jq -r --arg pr "$pr" 'has($pr)' <<<"$out")" = false ] || continue
     one=$(rl_summary_one "$d" "$pr") || one='null'
     out=$(jq -c --arg pr "$pr" --argjson v "$one" '. + {($pr): $v}' <<<"$out")
   done

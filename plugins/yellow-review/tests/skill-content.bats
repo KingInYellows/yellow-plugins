@@ -1255,5 +1255,10 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 
 @test "sweep: a missing ledger is never reported merge-ready" {
   grep -q 'pending P0-P2 findings)` only when an existing ledger was read and' "$SWEEP"
-  grep -q 'It reads `unknown (no ledger)` when `summary` returned' "$SWEEP"
+  grep -q 'empty array), so it reads `unknown (no ledger)` when `summary` returned `{}`:' "$SWEEP"
+}
+
+@test "sweep-all: PRs without a readable ledger are listed as merge readiness unknown" {
+  grep -q '^Merge readiness unknown (no readable ledger): ' "$SWEEP_ALL"
+  grep -q 'a PR is never treated as merge-ready without a ledger' "$SWEEP_ALL"
 }

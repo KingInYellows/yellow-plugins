@@ -369,11 +369,16 @@ blocking. Blocking threads do not change the exit code — re-run
 or `applied` (fixed locally, not yet published); attention findings are
 `report_only` or `stale`. Work them down with `/review:triage <PR#>`.
 
-After the totals line, print one line naming the PRs whose `merge_blocking`
-is above 0, or nothing when there are none:
+After the totals line, print one line naming the attempted PRs whose
+`merge_blocking` is above 0, and a second naming the attempted PRs with no
+`summary` entry (a `/review:pr` that failed before its ledger write leaves
+none) or a `null` entry, or whose `summary` call failed. Print neither line
+when it would be empty; a PR is never treated as merge-ready without a ledger
+that was read:
 
 ```text
 Not merge-ready (pending P0-P2 findings): #123 (2), #127 (1) — run /review:triage <PR#> before merging
+Merge readiness unknown (no readable ledger): #124
 ```
 
 Findings left pending when a PR merges are stranded, because the ledger
