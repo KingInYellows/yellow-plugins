@@ -111,14 +111,27 @@ decision_lines() { printf '%s\n' "$output" | grep -E '^\[plan:complete\] GATE_C_
   [ ! -e "$PROV" ]
 }
 
-@test "a working-tree plan that differs from the plan on trunk skips the commit-subject path" {
+@test "a working-tree plan that differs from the plan on trunk skips the whole tier, whichever path would pass" {
   printf 'demo plan, completed on an unlanded branch\n' >plans/demo.md
-  TIER_PULLS=empty tier
-  [ "$status" -eq 0 ]
-  [[ $(decision_lines) == *"GATE_C_PROVENANCE=FALLTHROUGH"*"GATE_C_REASON=wt-differs GATE_C_RETRYABLE=0"* ]]
-  [[ $output == *"commit-subject path: skipped (the working-tree plan differs"* ]]
-  [ ! -e "$PROV" ]
+  for pulls in empty one; do
+    TIER_PULLS=$pulls tier
+    [ "$status" -eq 0 ]
+    [[ $(decision_lines) == *"GATE_C_PROVENANCE=FALLTHROUGH"*"GATE_C_REASON=wt-differs GATE_C_RETRYABLE=0"* ]] || { echo "pulls=$pulls: $output"; false; }
+    [[ $output == *"working-tree plans/demo.md differs from the plan on main"* ]]
+    [[ $output == *"(lookup: skipped)"* ]]
+    [ ! -e "$PROV" ]
+  done
+  # Neither the commits lookup nor the PR was even asked for.
+  ! grep -q 'commits/' "$CALLS"
   ! grep -q '/pulls/42' "$CALLS"
+}
+
+@test "an untracked or missing working-tree plan also skips the tier" {
+  rm plans/demo.md
+  TIER_PULLS=one tier
+  [ "$status" -eq 0 ]
+  [[ $(decision_lines) == *"GATE_C_PROVENANCE=FALLTHROUGH"*"GATE_C_REASON=wt-differs"* ]]
+  [ ! -e "$PROV" ]
 }
 
 @test "a stale provenance file from an aborted run is cleared and can never pass" {

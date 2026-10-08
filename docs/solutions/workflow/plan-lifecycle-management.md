@@ -461,7 +461,9 @@ conditions) and passes only when all of these hold:
 
 - the working-tree plan has the same blob as the plan at that commit. Gate A
   reads the working tree, so a plan completed only on an unlanded branch must
-  not borrow the landed version's evidence;
+  not borrow the landed version's evidence. The tier checks this before either
+  path can pass, including the commits-API association (a plan that was only
+  created and never touched again is associated with its creation PR);
 - the plan still exists at that commit; the same guard protects the whole tier
   from an already-archived plan in a stale checkout;
 - the subject yields N: the last trailing ` (#N)`, matching

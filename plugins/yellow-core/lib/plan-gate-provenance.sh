@@ -25,19 +25,23 @@
 #   [plan:complete] GATE_C_PROVENANCE=PASS|FALLTHROUGH
 #   [plan:complete] GATE_C_REASON=<token> GATE_C_RETRYABLE=0|1
 #
-# The commit-subject pass requires ALL of:
-#   1. the working-tree plan has the same blob as the plan at <file-sha>
-#      (pgp_tier_run; Gate A reads the working tree, so a plan completed only on
-#      an unlanded branch must not borrow the landed version's evidence);
-#   2. the plan exists at <file-sha>, and the subject yields N: the last
+# Before ANY pass, commits-API or commit-subject (pgp_tier_run): the working-tree
+# plan must have the same blob as the plan at the commit that last touched it on
+# trunk. Gate A reads the working tree, so a plan completed only on an unlanded
+# branch must not borrow the evidence of the landed version (for example the PR
+# that merely created the plan). A different blob skips the whole tier (reason
+# wt-differs).
+#
+# The commit-subject pass then requires ALL of:
+#   1. the plan exists at <file-sha>, and the subject yields N: the last
 #      trailing " (#N)", with no control characters and no Revert", Reapply",
 #      "Merge pull request " or "Merge branch " subject;
-#   3. PR N is closed (merged is NOT consulted, it is permanently false for
+#   2. PR N is closed (merged is NOT consulted, it is permanently false for
 #      queue-merged PRs; the base branch is not consulted either, because
 #      stacked PRs have their parent branch as base);
-#   4. PR N's files list has the plan with a status other than removed and a
+#   3. PR N's files list has the plan with a status other than removed and a
 #      blob sha equal to the one at <file-sha>;
-#   5. the PR changed a file outside plans/ whose blob at <file-sha> equals the
+#   4. the PR changed a file outside plans/ whose blob at <file-sha> equals the
 #      PR's and which that commit itself changed (its parent's blob differs),
 #      which ties the PR to the commit's own work. Only the first 20 such files
 #      are compared; a parent commit that cannot be read (shallow boundary,
@@ -411,6 +415,19 @@ pgp_tier_run() {
     _pgt_fsha=''
     _pgt_reason=plan-archived
   fi
+  # Gate A read the working-tree plan; the evidence is about the plan on trunk.
+  # Different bytes mean the plan was completed on a branch that has not landed,
+  # so the landed version's PR proves nothing about it. This guards both the
+  # commits-API pass and the commit-subject pass.
+  if [ -n "$_pgt_fsha" ]; then
+    _pgt_wt=$(git hash-object -- "plans/$_pgt_arg" 2>/dev/null || :)
+    _pgt_tk=$(git rev-parse --verify --quiet "${_pgt_fsha}:plans/${_pgt_arg}" 2>/dev/null || :)
+    if [ -z "$_pgt_wt" ] || [ "$_pgt_wt" != "$_pgt_tk" ]; then
+      printf '[plan:complete] WARNING: the working-tree plans/%s differs from the plan on %s at %s; provenance tier skipped\n' "$_pgt_arg" "$_pgt_trunk" "$_pgt_fsha" >&2
+      _pgt_fsha=''
+      _pgt_reason=wt-differs
+    fi
+  fi
   _pgt_pcount=0
   _pgt_lookup=skipped
   _pgt_pulls='[]'
@@ -478,15 +495,7 @@ pgp_tier_run() {
   # Commit-subject path: only after a SUCCESSFUL lookup that returned nothing.
   # A failed lookup and PCOUNT >= 2 never reach it.
   if [ "$_pgt_lookup" = ok ] && [ "$_pgt_pcount" -eq 0 ]; then
-    _pgt_wt=$(git hash-object -- "plans/$_pgt_arg" 2>/dev/null || :)
-    _pgt_tk=$(git rev-parse --verify --quiet "${_pgt_fsha}:plans/${_pgt_arg}" 2>/dev/null || :)
-    if [ -z "$_pgt_wt" ] || [ "$_pgt_wt" != "$_pgt_tk" ]; then
-      # Gate A read the working-tree plan; the evidence is about the plan on
-      # trunk. Different bytes mean the plan was completed on a branch that has
-      # not landed, so the landed version's PR proves nothing about it.
-      printf '[plan:complete] Gate C commit-subject path: skipped (the working-tree plan differs from the plan on %s at %s) repo=%s\n' "$_pgt_trunk" "$_pgt_fsha" "$_pgt_ownersafe"
-      _pgt_reason=wt-differs
-    elif _pgt_res=$(pgp_provenance_via_subject "$_pgt_owner" "$_pgt_fsha" "plans/$_pgt_arg"); then
+    if _pgt_res=$(pgp_provenance_via_subject "$_pgt_owner" "$_pgt_fsha" "plans/$_pgt_arg"); then
       # Re-validate before anything reaches the commit trailer.
       if pgp_evidence_line_is_valid "$_pgt_res"; then
         printf '%s\n' "$_pgt_res" >| "$_pgt_prov"
