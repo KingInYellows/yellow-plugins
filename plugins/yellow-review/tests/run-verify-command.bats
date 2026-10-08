@@ -2230,6 +2230,30 @@ install_evil_filter() {
   [ "$(printf '%s' "$output" | jq -r .treeClean)" = true ]
 }
 
+@test "#952 4223859615: a repository-local git-lfs on PATH is refused with the stock LFS filter config (exit 2)" {
+  printf 'node_modules/\n' >> .git/info/exclude
+  mkdir -p node_modules/.bin
+  cat >| node_modules/.bin/git-lfs <<STUB
+#!/bin/sh
+touch "$BATS_TEST_TMPDIR/inrepo-ran"
+exit 0
+STUB
+  chmod +x node_modules/.bin/git-lfs
+  git config filter.lfs.clean 'git-lfs clean -- %f'
+  git config filter.lfs.smudge 'git-lfs smudge -- %f'
+  git config filter.lfs.process 'git-lfs filter-process'
+  git config filter.lfs.required true
+  mkdir -p .git/info
+  echo '* filter=lfs' >> .git/info/attributes
+  PATH="$REPO/node_modules/.bin:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"git-lfs resolves to"* ]]
+  [[ "$stderr" == *"inside the repository"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/inrepo-ran" ]
+  grep -q 'resolver edit' src/a.txt
+  [ -e src/new.txt ]
+}
+
 @test "#952 4179906611: a FIFO replacing a tracked file is kept when the recovery patch cannot be saved" {
   command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
   rm -f src/a.txt && mkfifo src/a.txt

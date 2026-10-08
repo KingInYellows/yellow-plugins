@@ -479,6 +479,12 @@ fkey=$(printf '%s\n' "$fcfg" | awk '
     END { if (!bad && NR % 2 == 1 && s != "") print "filter.<unreadable>.config" }')
 case "$fkey" in filter.*) fkey="filter.<driver>.${fkey##*.}" ;; esac
 [ -z "$fkey" ] || die 2 "the repository config sets $fkey, which would run a command with the runner's authority; remove it from the repository config (a global or system config is fine); the tree is untouched"
+# An allowed git-lfs command is still resolved through PATH when git runs the
+# filter, so a repository-local git-lfs would run with the runner's authority
+# on the first diff or status. When any filter is configured (global and system
+# scopes included), refuse a git-lfs whose canonical file is in the worktree. A
+# git-lfs that is not on PATH is left to fail on its own.
+[ -z "$fcfg" ] || yr_bind_outside git-lfs YELLOW_REVIEW_GIT_LFS || true
 unset fcfg
 
 REASON=""

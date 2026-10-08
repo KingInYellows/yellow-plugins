@@ -10,7 +10,9 @@ command; `commit-resolve-fixes` reads its filter check the same way), forces
 listed FIFO, socket or device in place until the recovery patch is saved,
 and requires `--ignored-since` for every verify run, attended or not;
 `commit-resolve-fixes` judges `gt` and `node` by their canonical file, so an
-outside-repository symlink to an in-repo executable is refused.
+outside-repository symlink to an in-repo executable is refused. `run-verify-command` likewise refuses
+a `git-lfs` whose canonical file is inside the repository when a filter is
+configured.
 `commit-resolve-fixes` also ends a URL host at `?`, `#` or `\` as well as at
 `/` and `:` (as git does), so `https://host#@github.com/...` is `host`, and
 refuses a push URL containing any of them. The commit scanner, verify-log
