@@ -25,11 +25,6 @@ import {
   updateGrant,
   writeGrants,
 } from './authority.js';
-import {
-  type AuthorizeDeps,
-  refuseInsideSupervisedSession,
-  resolveControllerContext,
-} from './authorize.js';
 import { assertControllerAuthority } from './controller.js';
 import {
   DEFAULT_MUTATION_DEADLINE_MS,
@@ -54,10 +49,17 @@ import {
   read,
   resolveSessionResource,
   withAdapter,
+  type WriteDeps,
+  refuseInsideSupervisedSession,
+  resolveControllerContext,
+  confirmOwner,
+  isTerminalCondition,
 } from './runtime-support.js';
 import {
   applyRetention,
   findBySessionResource,
+  isOwningCreate,
+  type OwningCreate,
   messageDigest,
   readJournal,
   recordDeviation,
@@ -65,7 +67,6 @@ import {
   withJournalLock,
   writeJournal,
 } from './state.js';
-import { DEFAULT_CONFIRM_DEADLINE_MS, confirmOnTty } from './tty-confirm.js';
 import type { GrantsFile, OperationRecord, SdkAdapter } from './types.js';
 import {
   mintLocalId,
@@ -78,11 +79,10 @@ import {
   validateTaskRef,
 } from './validate.js';
 import {
-  authorizeCommandFor,
   confirmationRequired,
-  persistenceUnknown,
   reserveUnderGrant,
-  settleAccepted,
+  settleAcceptedOrUnknown,
+  settleExpiredBeforeWrite,
   settleFailure,
 } from './write-gate.js';
 
@@ -221,7 +221,7 @@ export interface DelegateDryRunResult {
 }
 
 export async function delegate(
-  deps: AuthorizeDeps,
+  deps: WriteDeps,
   args: DelegateArgs
 ): Promise<DelegateResult | DelegateDryRunResult> {
   const localRequestId =
@@ -237,7 +237,7 @@ export async function delegate(
 }
 
 async function delegateInner(
-  deps: AuthorizeDeps,
+  deps: WriteDeps,
   args: DelegateArgs,
   ids: Ids
 ): Promise<DelegateResult | DelegateDryRunResult> {
@@ -264,15 +264,13 @@ async function delegateInner(
 
   if (!args.dryRun && args.grantId === undefined) {
     throw confirmationRequired(
-      authorizeCommandFor({
+      deps,
+      {
+        operation: 'create',
         repository,
-        branch,
+        requestedBranch: branch,
         ...(taskRef !== undefined ? { taskRef } : {}),
-        operations: ['create'],
-        ...(deps.pluginRoot !== undefined
-          ? { pluginRoot: deps.pluginRoot }
-          : {}),
-      }),
+      },
       ids
     );
   }
@@ -335,15 +333,7 @@ async function delegateInner(
     });
 
     if (isExpired(deps.clock, deadline)) {
-      // Reserved but nothing sent: settle as a clean failure and free the slot.
-      return settleFailure(
-        deps,
-        reservation,
-        new AdapterError('timeout', 'deadline expired before the write', {
-          dispatched: false,
-        }),
-        { reconcileHint: DELEGATE_RECONCILE }
-      );
+      return settleExpiredBeforeWrite(deps, reservation, DELEGATE_RECONCILE);
     }
 
     let created;
@@ -362,24 +352,16 @@ async function delegateInner(
     }
 
     const vendorState = 'queued';
-    try {
-      await settleAccepted(deps, reservation, {
+    await settleAcceptedOrUnknown(
+      deps,
+      reservation,
+      {
         sessionResource: created.sessionResource,
         vendorState,
         condition: conditionOf(vendorState),
-      });
-    } catch (err) {
-      process.stderr.write(
-        `warning: session created but the journal write failed: ${
-          err instanceof Error ? err.name : 'error'
-        }\n`
-      );
-      throw persistenceUnknown(
-        reservation,
-        created.sessionResource,
-        DELEGATE_RECONCILE
-      );
-    }
+      },
+      { what: 'session created', reconcileHint: DELEGATE_RECONCILE }
+    );
     return {
       operation: 'delegate' as const,
       localRequestId: ids.localRequestId,
@@ -405,7 +387,7 @@ interface SessionTarget {
 }
 
 async function resolveTarget(
-  deps: AuthorizeDeps,
+  deps: WriteDeps,
   sessionRef: string
 ): Promise<SessionTarget> {
   const journal = await readJournal(deps.dataDir);
@@ -417,22 +399,8 @@ async function resolveTarget(
 }
 
 /** Grants cover sessions created through this plugin; anything else has no repo, branch or task to match. */
-function requireOwner(
-  target: SessionTarget,
-  ids: Ids
-): OperationRecord & {
-  readonly repository: string;
-  readonly requestedBranch: string;
-  readonly sourceResource: string;
-} {
-  const owner = target.owner;
-  if (
-    owner === undefined ||
-    owner.kind !== 'create' ||
-    owner.repository === undefined ||
-    owner.requestedBranch === undefined ||
-    owner.sourceResource === undefined
-  ) {
+function requireOwner(target: SessionTarget, ids: Ids): OwningCreate {
+  if (!isOwningCreate(target.owner)) {
     throw new MutationErrorException(
       makeAppError(
         'JULES_AUTHORITY_DENIED',
@@ -445,11 +413,7 @@ function requireOwner(
       ids
     );
   }
-  return owner as OperationRecord & {
-    readonly repository: string;
-    readonly requestedBranch: string;
-    readonly sourceResource: string;
-  };
+  return target.owner;
 }
 
 // ---------------------------------------------------------------------------
@@ -499,7 +463,7 @@ function scopeOf(target: SessionTarget): {
 }
 
 export async function reply(
-  deps: AuthorizeDeps,
+  deps: WriteDeps,
   args: ReplyArgs
 ): Promise<ReplyResult> {
   const localRequestId =
@@ -515,7 +479,7 @@ export async function reply(
 }
 
 async function replyInner(
-  deps: AuthorizeDeps,
+  deps: WriteDeps,
   args: ReplyArgs,
   ids: Ids
 ): Promise<ReplyResult> {
@@ -528,17 +492,9 @@ async function replyInner(
   const target = await resolveTarget(deps, args.session);
 
   if (!args.dryRun && args.grantId === undefined) {
-    const owner = target.owner;
     throw confirmationRequired(
-      authorizeCommandFor({
-        repository: owner?.repository ?? '<owner/repo>',
-        branch: owner?.requestedBranch ?? '<branch>',
-        ...(owner?.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
-        operations: ['reply'],
-        ...(deps.pluginRoot !== undefined
-          ? { pluginRoot: deps.pluginRoot }
-          : {}),
-      }),
+      deps,
+      { operation: 'reply', ...scopeOf(target) },
       ids
     );
   }
@@ -562,10 +518,7 @@ async function replyInner(
     const owner = requireOwner(target, ids);
     // A reply to a finished session would reopen it, past the active-session
     // limit that freed its slot. A repair is a new delegate instead.
-    if (
-      owner.condition === 'remote-completed' ||
-      owner.condition === 'failed'
-    ) {
+    if (isTerminalCondition(owner.condition)) {
       throw new MutationErrorException(
         makeAppError(
           'JULES_INVALID_STATE',
@@ -612,14 +565,7 @@ async function replyInner(
     });
 
     if (isExpired(deps.clock, deadline)) {
-      return settleFailure(
-        deps,
-        reservation,
-        new AdapterError('timeout', 'deadline expired before the write', {
-          dispatched: false,
-        }),
-        { reconcileHint: SESSION_RECONCILE }
-      );
+      return settleExpiredBeforeWrite(deps, reservation, SESSION_RECONCILE);
     }
     try {
       await adapter.sendMessage(target.sessionResource, message);
@@ -628,20 +574,12 @@ async function replyInner(
         reconcileHint: SESSION_RECONCILE,
       });
     }
-    try {
-      await settleAccepted(deps, reservation);
-    } catch (err) {
-      process.stderr.write(
-        `warning: message sent but the journal write failed: ${
-          err instanceof Error ? err.name : 'error'
-        }\n`
-      );
-      throw persistenceUnknown(
-        reservation,
-        target.sessionResource,
-        SESSION_RECONCILE
-      );
-    }
+    await settleAcceptedOrUnknown(
+      deps,
+      reservation,
+      { sessionResource: target.sessionResource },
+      { what: 'message sent', reconcileHint: SESSION_RECONCILE }
+    );
     return {
       operation: 'reply' as const,
       localRequestId: ids.localRequestId,
@@ -722,7 +660,7 @@ function incompleteRefetch(walk: WalkResult): never {
  * records a deviation (R34) when the plan that was actually approved differs.
  */
 export async function approve(
-  deps: AuthorizeDeps,
+  deps: WriteDeps,
   args: ApproveArgs
 ): Promise<ApproveResult | ApproveDryRunResult> {
   const localRequestId =
@@ -738,7 +676,7 @@ export async function approve(
 }
 
 async function approveInner(
-  deps: AuthorizeDeps,
+  deps: WriteDeps,
   args: ApproveArgs,
   ids: Ids
 ): Promise<ApproveResult | ApproveDryRunResult> {
@@ -749,17 +687,9 @@ async function approveInner(
   const target = await resolveTarget(deps, args.session);
 
   if (!args.dryRun && args.grantId === undefined) {
-    const owner = target.owner;
     throw confirmationRequired(
-      authorizeCommandFor({
-        repository: owner?.repository ?? '<owner/repo>',
-        branch: owner?.requestedBranch ?? '<branch>',
-        ...(owner?.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
-        operations: ['approve'],
-        ...(deps.pluginRoot !== undefined
-          ? { pluginRoot: deps.pluginRoot }
-          : {}),
-      }),
+      deps,
+      { operation: 'approve', ...scopeOf(target) },
       ids
     );
   }
@@ -878,20 +808,12 @@ async function approveInner(
         reconcileHint: SESSION_RECONCILE,
       });
     }
-    try {
-      await settleAccepted(deps, reservation);
-    } catch (err) {
-      process.stderr.write(
-        `warning: plan approved but the journal write failed: ${
-          err instanceof Error ? err.name : 'error'
-        }\n`
-      );
-      throw persistenceUnknown(
-        reservation,
-        target.sessionResource,
-        SESSION_RECONCILE
-      );
-    }
+    await settleAcceptedOrUnknown(
+      deps,
+      reservation,
+      { sessionResource: target.sessionResource },
+      { what: 'plan approved', reconcileHint: SESSION_RECONCILE }
+    );
 
     // The POST was answered 2xx. Everything below is verification and can never
     // turn the success into a failure envelope.
@@ -964,7 +886,7 @@ interface Verification {
 
 /** Post-POST re-read from the same start: which plan did the vendor record as approved? */
 async function verifyApproval(
-  deps: AuthorizeDeps,
+  deps: WriteDeps,
   adapter: SdkAdapter,
   sessionResource: string,
   start: {
@@ -1076,7 +998,7 @@ function abandonable(
  * grant-confirmed.
  */
 export async function abandon(
-  deps: AuthorizeDeps,
+  deps: WriteDeps,
   args: AbandonArgs
 ): Promise<AbandonResult> {
   refuseInsideSupervisedSession(deps.env);
@@ -1093,8 +1015,9 @@ export async function abandon(
       : []),
   ].join(': ');
 
-  await confirmOnTty({
-    summary: [
+  await confirmOwner(
+    deps,
+    [
       'yellow-jules: ABANDON OPERATION',
       `  request id:  ${first.localRequestId}`,
       `  kind:        ${first.kind}`,
@@ -1104,10 +1027,8 @@ export async function abandon(
       '',
       'The vendor may still hold a session for this operation. Abandoning frees the',
       'repository/branch guard and the grant slot so a new delegate can run.',
-    ].join('\n'),
-    deadlineMs: deps.confirmDeadlineMs ?? DEFAULT_CONFIRM_DEADLINE_MS,
-    ...(deps.openTty !== undefined ? { openTty: deps.openTty } : {}),
-  });
+    ].join('\n')
+  );
 
   const ctx = resolveControllerContext(deps);
   return withJournalLock(deps.dataDir, async () => {
@@ -1150,7 +1071,7 @@ export async function abandon(
       writeGrants(
         deps.dataDir,
         updateGrant(grants, grantId, (g) =>
-          releaseGrant(g, record.localRequestId, 'abandon')
+          releaseGrant(g, record.localRequestId)
         )
       );
       slotReleased = true;

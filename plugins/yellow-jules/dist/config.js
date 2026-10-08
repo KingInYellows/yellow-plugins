@@ -57,6 +57,8 @@ exports.assertOwnerOnlyFile = assertOwnerOnlyFile;
 exports.ensureOwnerOnlyDir = ensureOwnerOnlyDir;
 exports.prepareDataDir = prepareDataDir;
 exports.resolveControllerDir = resolveControllerDir;
+exports.writeFileAtomicOwnerOnly = writeFileAtomicOwnerOnly;
+const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
 const os = __importStar(require("node:os"));
 const path = __importStar(require("node:path"));
@@ -335,4 +337,30 @@ function resolveControllerDir(dataDir, env = process.env, homedir = os.homedir) 
     }
     ensureOwnerOnlyDir(dir);
     return dir;
+}
+/**
+ * Atomic whole-file write for owner-only state (grants, the controller file):
+ * a sibling temp file created `wx` at 0600, fsynced, then renamed over the
+ * target. The temp file is removed if any step fails, so a failed write leaves
+ * neither a stray file nor a half-written target.
+ */
+function writeFileAtomicOwnerOnly(file, data) {
+    const tmp = `${file}.tmp-${process.pid}-${crypto.randomUUID()}`;
+    try {
+        const fd = fs.openSync(tmp, 'wx', 0o600);
+        try {
+            fs.writeFileSync(fd, data, 'utf8');
+            fs.fsyncSync(fd);
+        }
+        finally {
+            fs.closeSync(fd);
+        }
+        fs.chmodSync(tmp, 0o600);
+        fs.renameSync(tmp, file);
+    }
+    catch (err) {
+        fs.rmSync(tmp, { force: true });
+        throw err;
+    }
+    fs.chmodSync(file, 0o600);
 }

@@ -5,6 +5,7 @@
  * value itself — only whether it is present.
  */
 
+import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -359,4 +360,29 @@ export function resolveControllerDir(
   }
   ensureOwnerOnlyDir(dir);
   return dir;
+}
+
+/**
+ * Atomic whole-file write for owner-only state (grants, the controller file):
+ * a sibling temp file created `wx` at 0600, fsynced, then renamed over the
+ * target. The temp file is removed if any step fails, so a failed write leaves
+ * neither a stray file nor a half-written target.
+ */
+export function writeFileAtomicOwnerOnly(file: string, data: string): void {
+  const tmp = `${file}.tmp-${process.pid}-${crypto.randomUUID()}`;
+  try {
+    const fd = fs.openSync(tmp, 'wx', 0o600);
+    try {
+      fs.writeFileSync(fd, data, 'utf8');
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    fs.chmodSync(tmp, 0o600);
+    fs.renameSync(tmp, file);
+  } catch (err) {
+    fs.rmSync(tmp, { force: true });
+    throw err;
+  }
+  fs.chmodSync(file, 0o600);
 }

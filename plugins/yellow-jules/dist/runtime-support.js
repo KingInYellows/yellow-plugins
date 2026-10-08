@@ -6,21 +6,61 @@
  * policy check. Split out of runtime.ts so the new write-side modules can use
  * them without importing the (large) operation layer back.
  */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.REAL_CLOCK = void 0;
+exports.ACTIVE_GRANT_ENV = exports.REAL_CLOCK = void 0;
 exports.nowFn = nowFn;
 exports.prepare = prepare;
 exports.withAdapter = withAdapter;
 exports.read = read;
+exports.isTerminalCondition = isTerminalCondition;
 exports.conditionOf = conditionOf;
 exports.attentionOf = attentionOf;
 exports.resolveSessionResource = resolveSessionResource;
 exports.boundRecord = boundRecord;
 exports.checkPolicyDeviation = checkPolicyDeviation;
+exports.defaultControllerId = defaultControllerId;
+exports.resolveControllerContext = resolveControllerContext;
+exports.refuseInsideSupervisedSession = refuseInsideSupervisedSession;
+exports.confirmOwner = confirmOwner;
+const os = __importStar(require("node:os"));
 const config_js_1 = require("./config.js");
 const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
 const state_js_1 = require("./state.js");
+const tty_confirm_js_1 = require("./tty-confirm.js");
 const validate_js_1 = require("./validate.js");
 exports.REAL_CLOCK = {
     now: () => Date.now(),
@@ -91,6 +131,10 @@ const CONDITION_BY_STATE = Object.freeze({
     completed: 'remote-completed',
 });
 /** Unknown states — including `unspecified` — are never placed in a completed bucket. */
+/** A session in one of these conditions is no longer working: it holds no active-session slot. */
+function isTerminalCondition(condition) {
+    return condition === 'remote-completed' || condition === 'failed';
+}
 function conditionOf(vendorState) {
     return Object.prototype.hasOwnProperty.call(CONDITION_BY_STATE, vendorState)
         ? CONDITION_BY_STATE[vendorState]
@@ -153,4 +197,40 @@ async function checkPolicyDeviation(deps, record, session) {
         }, nowFn(deps));
     }
     return current;
+}
+// ---------------------------------------------------------------------------
+// Write-path deps shared by authorize, mutations, supervise and write-gate
+// ---------------------------------------------------------------------------
+/** Set by the supervision skill for the duration of a pass; `authorize` refuses while it is set (R30). */
+exports.ACTIVE_GRANT_ENV = 'YELLOW_JULES_ACTIVE_GRANT';
+/** Host name made safe for the controller-id allowlist, then validated. */
+function defaultControllerId(hostname = os.hostname) {
+    const cleaned = hostname()
+        .replace(/[^A-Za-z0-9._-]/g, '-')
+        .replace(/^[^A-Za-z0-9]+/, '')
+        .slice(0, 63);
+    return (0, validate_js_1.validateControllerId)(cleaned.length > 0 ? cleaned : 'host');
+}
+function resolveControllerContext(deps) {
+    return {
+        controllerDir: deps.controllerDir ?? (0, config_js_1.resolveControllerDir)(deps.dataDir, deps.env),
+        controllerId: (0, validate_js_1.validateControllerId)(deps.controllerId ?? defaultControllerId()),
+        now: nowFn(deps),
+    };
+}
+function refuseInsideSupervisedSession(env) {
+    const active = env[exports.ACTIVE_GRANT_ENV];
+    if (active !== undefined && active !== '') {
+        (0, errors_js_1.throwAppError)('JULES_AUTHORITY_DENIED', 'authorize cannot run inside a supervised session; a grant is never created or widened from under another grant', {
+            recoveryAction: 'End the supervised session and run authorize yourself in a terminal.',
+        });
+    }
+}
+/** The owner's typed confirmation on the controlling terminal (the only trust root). */
+function confirmOwner(deps, summary) {
+    return (0, tty_confirm_js_1.confirmOnTty)({
+        summary,
+        deadlineMs: deps.confirmDeadlineMs ?? tty_confirm_js_1.DEFAULT_CONFIRM_DEADLINE_MS,
+        ...(deps.openTty !== undefined ? { openTty: deps.openTty } : {}),
+    });
 }

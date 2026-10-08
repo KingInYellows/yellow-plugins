@@ -28,6 +28,7 @@ import {
 } from './config.js';
 import { throwAppError } from './errors.js';
 import { assertNoSecretShapedValues } from './redact.js';
+import { isNonNegativeInt, isPlainObject, isStringArray } from './shape.js';
 import type {
   ArtifactRecord,
   DeviationRecord,
@@ -110,18 +111,6 @@ const OPTIONAL_STRING_FIELDS = [
   'abandonedAt',
   'abandonReason',
 ] as const;
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((v) => typeof v === 'string');
-}
-
-function isNonNegativeInt(value: unknown): boolean {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
-}
 
 const ARTIFACT_KINDS = new Set(['patch', 'pr-ref', 'generated-file']);
 const ARTIFACT_VERIFICATIONS = new Set([
@@ -1202,6 +1191,15 @@ export interface SupervisionPatch {
 }
 
 /** Merges a patch into the session's supervision state; written only by `supervise` (R32, R33). */
+function keep<K extends string, V>(
+  key: K,
+  previous: V | undefined,
+  patch: V | null | undefined
+): { [P in K]?: V } {
+  const value = patch === undefined ? previous : (patch ?? undefined);
+  return value === undefined ? {} : ({ [key]: value } as { [P in K]?: V });
+}
+
 export async function updateSupervision(
   dataDir: string,
   localRequestId: string,
@@ -1214,40 +1212,13 @@ export async function updateSupervision(
     (operations) => {
       const current = requireRecord(operations, localRequestId);
       const previous: SupervisionState = current.supervision ?? {};
+      // `undefined` keeps the stored value, `null` clears it, anything else sets it.
       const next: SupervisionState = {
-        ...(patch.paused === undefined
-          ? previous.paused !== undefined
-            ? { paused: previous.paused }
-            : {}
-          : patch.paused !== null
-            ? { paused: patch.paused }
-            : {}),
-        ...(patch.backoff === undefined
-          ? previous.backoff !== undefined
-            ? { backoff: previous.backoff }
-            : {}
-          : patch.backoff !== null
-            ? { backoff: patch.backoff }
-            : {}),
-        ...(patch.lastDecision !== undefined
-          ? { lastDecision: patch.lastDecision }
-          : previous.lastDecision !== undefined
-            ? { lastDecision: previous.lastDecision }
-            : {}),
-        ...(patch.outsideSeen === undefined
-          ? previous.outsideSeen !== undefined
-            ? { outsideSeen: previous.outsideSeen }
-            : {}
-          : patch.outsideSeen !== null
-            ? { outsideSeen: patch.outsideSeen }
-            : {}),
-        ...(patch.evaluatedPlan === undefined
-          ? previous.evaluatedPlan !== undefined
-            ? { evaluatedPlan: previous.evaluatedPlan }
-            : {}
-          : patch.evaluatedPlan !== null
-            ? { evaluatedPlan: patch.evaluatedPlan }
-            : {}),
+        ...keep('paused', previous.paused, patch.paused),
+        ...keep('backoff', previous.backoff, patch.backoff),
+        ...keep('lastDecision', previous.lastDecision, patch.lastDecision),
+        ...keep('outsideSeen', previous.outsideSeen, patch.outsideSeen),
+        ...keep('evaluatedPlan', previous.evaluatedPlan, patch.evaluatedPlan),
       };
       const updated: OperationRecord = {
         ...current,
@@ -1277,4 +1248,23 @@ export function ownMessageDigests(
     }
   }
   return digests;
+}
+
+/** A create this plugin made: the only record a grant can cover (it carries the repository, branch and source). */
+export type OwningCreate = OperationRecord & {
+  readonly repository: string;
+  readonly requestedBranch: string;
+  readonly sourceResource: string;
+};
+
+export function isOwningCreate(
+  record: OperationRecord | undefined
+): record is OwningCreate {
+  return (
+    record !== undefined &&
+    record.kind === 'create' &&
+    record.repository !== undefined &&
+    record.requestedBranch !== undefined &&
+    record.sourceResource !== undefined
+  );
 }

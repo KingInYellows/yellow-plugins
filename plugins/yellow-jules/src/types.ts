@@ -19,7 +19,7 @@ export interface Clock {
 }
 
 // ---------------------------------------------------------------------------
-// Adapter port (read-only in PR2)
+// Adapter port (reads, plus three writes that are never retried)
 // ---------------------------------------------------------------------------
 
 export type AdapterOutput =

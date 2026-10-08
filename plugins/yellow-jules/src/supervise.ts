@@ -19,13 +19,7 @@
  */
 
 import { compareStamp } from './activity-walk.js';
-import { evaluateScope, loadGrants, requireGrant } from './authority.js';
-import {
-  type AuthorizeDeps,
-  refuseInsideSupervisedSession,
-  resolveControllerContext,
-} from './authorize.js';
-import { assertControllerAuthority } from './controller.js';
+import { evaluateScope } from './authority.js';
 import {
   DEFAULT_MUTATION_DEADLINE_MS,
   deadlineIn,
@@ -40,15 +34,20 @@ import {
   nowFn,
   prepare,
   resolveSessionResource,
+  type WriteDeps,
+  refuseInsideSupervisedSession,
+  confirmOwner,
+  isTerminalCondition,
 } from './runtime-support.js';
 import { collect, status, type StatusResult } from './runtime.js';
 import {
   findBySessionResource,
+  isOwningCreate,
+  type OwningCreate,
   readJournal,
   updateSupervision,
   type SupervisionPatch,
 } from './state.js';
-import { confirmOnTty, DEFAULT_CONFIRM_DEADLINE_MS } from './tty-confirm.js';
 import type {
   AdapterActivity,
   GrantOperation,
@@ -58,6 +57,7 @@ import type {
   SupervisionDecision,
 } from './types.js';
 import { validateGrantId } from './validate.js';
+import { loadAuthorizedGrant } from './write-gate.js';
 
 export const BACKOFF_BASE_SECONDS = 60;
 export const BACKOFF_CAP_SECONDS = 3600;
@@ -125,22 +125,9 @@ export interface SuperviseResult extends Attention {
   readonly pause?: { readonly reason: string; readonly observedAt: string };
 }
 
-function owns(
-  journal: Journal,
-  sessionResource: string
-): OperationRecord & {
-  readonly repository: string;
-  readonly requestedBranch: string;
-  readonly sourceResource: string;
-} {
+function owns(journal: Journal, sessionResource: string): OwningCreate {
   const owner = findBySessionResource(journal, sessionResource);
-  if (
-    owner === undefined ||
-    owner.kind !== 'create' ||
-    owner.repository === undefined ||
-    owner.requestedBranch === undefined ||
-    owner.sourceResource === undefined
-  ) {
+  if (!isOwningCreate(owner)) {
     return throwAppError(
       'JULES_AUTHORITY_DENIED',
       `${sessionResource} was not created through this plugin, so no grant covers it`,
@@ -150,7 +137,7 @@ function owns(
       }
     );
   }
-  return owner as ReturnType<typeof owns>;
+  return owner;
 }
 
 function correctiveRoundsLeft(grant: GrantRecord, taskRef?: string): number {
@@ -196,14 +183,8 @@ const CHECK_FAILED_CODES = new Set([
   'JULES_MALFORMED_RESPONSE',
 ]);
 
-interface Observed {
-  readonly status: StatusResult;
-  readonly newActivities: AdapterActivity[];
-  readonly agentMessages: AdapterActivity[];
-}
-
 export async function superviseOnce(
-  deps: AuthorizeDeps,
+  deps: WriteDeps,
   args: SuperviseArgs
 ): Promise<SuperviseResult> {
   const grantId = validateGrantId(args.grantId);
@@ -219,10 +200,7 @@ export async function superviseOnce(
   const owner = owns(journal, sessionResource);
 
   // Gate: the grant exists, is bound to this controller, and covers the session's scope.
-  const grants = loadGrants(deps.dataDir);
-  const grant = requireGrant(grants, grantId);
-  const ctx = resolveControllerContext(deps);
-  assertControllerAuthority(ctx.controllerDir, deps.dataDir, grant.epochRef);
+  const { grant } = loadAuthorizedGrant(deps, grantId);
   const scope = evaluateScope(
     grant,
     {
@@ -340,7 +318,7 @@ export async function superviseOnce(
   // Observation: the status walk, with a view of every activity it reads.
   const newActivities: AdapterActivity[] = [];
   const agentMessages: AdapterActivity[] = [];
-  let observed: Observed;
+  let seen: StatusResult;
   try {
     const result = await status(deps, {
       session: sessionResource,
@@ -351,7 +329,7 @@ export async function superviseOnce(
         if (activity.type === 'agentMessaged') agentMessages.push(activity);
       },
     });
-    observed = { status: result, newActivities, agentMessages };
+    seen = result;
   } catch (err) {
     if (err instanceof AppErrorException) {
       if (err.appError.code === 'JULES_DEADLINE_EXCEEDED') return aborted();
@@ -362,7 +340,6 @@ export async function superviseOnce(
     throw err;
   }
 
-  const seen = observed.status;
   const walk = seen.activities;
   if (walk === undefined) {
     return throwAppError(
@@ -376,7 +353,7 @@ export async function superviseOnce(
   const fresh = owns(journal, sessionResource);
   const recordedOutside = fresh.supervision?.outsideSeen;
   if (recordedOutside !== undefined) {
-    const echoed = observed.newActivities.filter(
+    const echoed = newActivities.filter(
       (a) =>
         a.activityId === recordedOutside.activityId && a.message !== undefined
     );
@@ -429,7 +406,7 @@ export async function superviseOnce(
     );
   const swappedPlan =
     evaluated !== undefined && !repliedSinceEvaluation
-      ? observed.newActivities.find(
+      ? newActivities.find(
           (a) =>
             a.type === 'planGenerated' &&
             a.plan !== undefined &&
@@ -515,7 +492,7 @@ export async function superviseOnce(
   if (grantExpired) {
     // R39: expiry never stops remote work. Without a live grant nothing can
     // be acted on, so a human decides; the reason says whether work is running.
-    const terminal = condition === 'remote-completed' || condition === 'failed';
+    const terminal = isTerminalCondition(condition);
     return finish(
       'escalate',
       {
@@ -580,7 +557,7 @@ export async function superviseOnce(
   }
 
   if (condition === 'awaiting-reply') {
-    const latest = [...observed.agentMessages].sort(compareStamp).pop();
+    const latest = [...agentMessages].sort(compareStamp).pop();
     if (latest?.message !== undefined) {
       fenced.question = fenceUntrusted(truncate(latest.message));
     }
@@ -657,7 +634,7 @@ export async function superviseOnce(
   }
 
   // starting / working: nothing to decide.
-  const newAgent = observed.newActivities
+  const newAgent = newActivities
     .filter((a) => a.type === 'agentMessaged' && a.message !== undefined)
     .slice(-FENCED_MESSAGE_COUNT);
   if (newAgent.length > 0) {
@@ -703,7 +680,7 @@ export interface ClearPauseResult {
  * "new" to the next pass.
  */
 export async function clearPause(
-  deps: AuthorizeDeps,
+  deps: WriteDeps,
   args: ClearPauseArgs
 ): Promise<ClearPauseResult> {
   refuseInsideSupervisedSession(deps.env);
@@ -730,18 +707,17 @@ export async function clearPause(
       }
     );
   }
-  await confirmOnTty({
-    summary: [
+  await confirmOwner(
+    deps,
+    [
       'yellow-jules: CLEAR SUPERVISION PAUSE',
       `  session:     ${sessionResource}`,
       `  paused for:  ${paused.reason}`,
       `  paused at:   ${paused.observedAt}`,
       '',
       'Supervised writes under the grant resume for this session.',
-    ].join('\n'),
-    deadlineMs: deps.confirmDeadlineMs ?? DEFAULT_CONFIRM_DEADLINE_MS,
-    ...(deps.openTty !== undefined ? { openTty: deps.openTty } : {}),
-  });
+    ].join('\n')
+  );
   await updateSupervision(
     deps.dataDir,
     owner.localRequestId,

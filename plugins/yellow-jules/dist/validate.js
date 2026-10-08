@@ -44,6 +44,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.GRANT_OPERATIONS = exports.GRANT_ID_RE = void 0;
 exports.validateRef = validateRef;
 exports.validateIdempotencyKey = validateIdempotencyKey;
 exports.validateRequestId = validateRequestId;
@@ -284,17 +285,17 @@ function validatePositiveInt(value, label, min, max) {
     }
     return parsed;
 }
-const GRANT_ID_RE = /^jg-[0-9a-f]{32}$/;
+exports.GRANT_ID_RE = /^jg-[0-9a-f]{32}$/;
 const CONTROLLER_ID_RE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,62})$/;
 const BRANCH_PATTERN_MAX = 200;
-const GRANT_OPERATIONS = [
+exports.GRANT_OPERATIONS = [
     'create',
     'reply',
     'approve',
     'collect',
 ];
 function validateGrantId(value, origin = 'input') {
-    return checkPattern(value, GRANT_ID_RE, 'grant id', origin);
+    return checkPattern(value, exports.GRANT_ID_RE, 'grant id', origin);
 }
 /** `jg-` + 16 random bytes hex. */
 function mintGrantId() {
@@ -337,9 +338,9 @@ function validateOperations(input) {
     const out = [];
     for (const raw of parts) {
         const part = raw.trim();
-        const op = GRANT_OPERATIONS.find((candidate) => candidate === part);
+        const op = exports.GRANT_OPERATIONS.find((candidate) => candidate === part);
         if (op === undefined) {
-            return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', `operations must be a comma-separated subset of ${GRANT_OPERATIONS.join(', ')}`);
+            return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', `operations must be a comma-separated subset of ${exports.GRANT_OPERATIONS.join(', ')}`);
         }
         if (seen.has(op)) {
             return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', `operation ${op} is listed more than once`);

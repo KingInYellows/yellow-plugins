@@ -15,18 +15,24 @@
  * from a path whose outcome is unknown.
  */
 
-import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 
 import {
   assertOwnerOnlyFile,
   ensureOwnerOnlyDir,
   resolveGrantsPath,
   resolveStateDir,
+  writeFileAtomicOwnerOnly,
 } from './config.js';
 import { throwAppError } from './errors.js';
 import { assertNoSecretShapedValues } from './redact.js';
+import {
+  isIsoTime,
+  isNonNegativeInt,
+  isPlainObject,
+  isPositiveInt,
+  isStringArray,
+} from './shape.js';
 import { hasUnreconciledDeviation, withJournalLock } from './state.js';
 import type {
   GrantOperation,
@@ -35,7 +41,12 @@ import type {
   GrantUsage,
   Journal,
 } from './types.js';
-import { branchMatchesPattern, validateGrantId } from './validate.js';
+import {
+  branchMatchesPattern,
+  GRANT_ID_RE,
+  GRANT_OPERATIONS,
+  validateGrantId,
+} from './validate.js';
 
 /** R30 trial defaults. */
 export const GRANT_DEFAULTS = Object.freeze({
@@ -72,28 +83,7 @@ export function emptyUsage(): GrantUsage {
 // Persistence
 // ---------------------------------------------------------------------------
 
-const OPERATIONS = new Set<string>(['create', 'reply', 'approve', 'collect']);
-const GRANT_ID_RE = /^jg-[0-9a-f]{32}$/;
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function isPositiveInt(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 1;
-}
-
-function isNonNegativeInt(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
-}
-
-function isIsoTime(value: unknown): value is string {
-  return typeof value === 'string' && !Number.isNaN(Date.parse(value));
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((v) => typeof v === 'string');
-}
+const OPERATIONS = new Set<string>(GRANT_OPERATIONS);
 
 function parseUsage(value: unknown): GrantUsage | undefined {
   if (!isPlainObject(value)) return undefined;
@@ -223,25 +213,7 @@ export function writeGrants(dataDir: string, grants: GrantsFile): void {
   ensureOwnerOnlyDir(stateDir);
   const file = resolveGrantsPath(dataDir);
   assertOwnerOnlyFile(file);
-  const tmp = path.join(
-    stateDir,
-    `grants.json.tmp-${process.pid}-${crypto.randomUUID()}`
-  );
-  const fd = fs.openSync(tmp, 'wx', 0o600);
-  try {
-    fs.writeFileSync(fd, `${JSON.stringify(grants, null, 2)}\n`, 'utf8');
-    fs.fsyncSync(fd);
-  } finally {
-    fs.closeSync(fd);
-  }
-  try {
-    fs.chmodSync(tmp, 0o600);
-    fs.renameSync(tmp, file);
-  } catch (err) {
-    fs.rmSync(tmp, { force: true });
-    throw err;
-  }
-  fs.chmodSync(file, 0o600);
+  writeFileAtomicOwnerOnly(file, `${JSON.stringify(grants, null, 2)}\n`);
 }
 
 // ---------------------------------------------------------------------------
@@ -291,7 +263,7 @@ function deny(
   return { ok: false, code, reason, message };
 }
 
-export function isExpired(grant: GrantRecord, now: Date): boolean {
+export function grantIsExpired(grant: GrantRecord, now: Date): boolean {
   return now.getTime() >= Date.parse(grant.expiresAt);
 }
 
@@ -312,7 +284,7 @@ export function evaluateScope(
       `grant ${grant.grantId} was revoked`
     );
   }
-  if (isExpired(grant, now)) {
+  if (grantIsExpired(grant, now)) {
     return deny(
       'JULES_GRANT_EXPIRED',
       'expired',
@@ -483,17 +455,10 @@ export function chargeGrant(grant: GrantRecord, charge: Charge): GrantRecord {
   return { ...grant, usage };
 }
 
-export type ReleaseReason =
-  | 'reconcile-released'
-  | 'abandon'
-  | 'terminal-vendor-state'
-  | 'clean-rejection';
-
 /** Frees an active-session slot only; tasks and corrective rounds are spent for good. */
 export function releaseGrant(
   grant: GrantRecord,
-  localRequestId: string,
-  _reason: ReleaseReason
+  localRequestId: string
 ): GrantRecord {
   if (!grant.usage.activeSessionRefs.includes(localRequestId)) return grant;
   return {
@@ -552,7 +517,7 @@ export function listGrants(dataDir: string, now: Date): GrantView[] {
   const file = loadGrants(dataDir);
   return Object.values(file.grants).map((grant) => ({
     ...grant,
-    expired: isExpired(grant, now),
+    expired: grantIsExpired(grant, now),
     revoked: grant.revokedAt !== undefined,
   }));
 }
@@ -593,8 +558,7 @@ export async function revokeGrant(
 export async function releaseSlotInStore(
   dataDir: string,
   grantId: string,
-  localRequestId: string,
-  reason: ReleaseReason
+  localRequestId: string
 ): Promise<boolean> {
   return withJournalLock(dataDir, async () => {
     const file = loadGrants(dataDir);
@@ -607,7 +571,7 @@ export async function releaseSlotInStore(
     }
     writeGrants(
       dataDir,
-      updateGrant(file, grantId, (g) => releaseGrant(g, localRequestId, reason))
+      updateGrant(file, grantId, (g) => releaseGrant(g, localRequestId))
     );
     return true;
   });

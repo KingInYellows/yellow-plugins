@@ -22,7 +22,6 @@ const authority_js_1 = require("./authority.js");
 const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
 const runtime_support_js_1 = require("./runtime-support.js");
-const runtime_support_js_2 = require("./runtime-support.js");
 const state_js_1 = require("./state.js");
 const validate_js_1 = require("./validate.js");
 /** Longer than any write deadline (cli MAX_DEADLINE_MS 200 s) plus a minute of slack. */
@@ -257,7 +256,7 @@ async function persist(deps, resolutions) {
                         ? {
                             sessionResource: r.session.sessionResource,
                             vendorState: r.session.vendorState,
-                            condition: (0, runtime_support_js_2.conditionOf)(r.session.vendorState),
+                            condition: (0, runtime_support_js_1.conditionOf)(r.session.vendorState),
                         }
                         : {}),
                 };
@@ -352,7 +351,7 @@ async function reconcile(deps, journal, sessionResource, deadline) {
         if (r.outcome === 'released' &&
             r.record.kind === 'create' &&
             r.record.grantId !== undefined) {
-            await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, r.record.grantId, r.record.localRequestId, 'reconcile-released');
+            await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, r.record.grantId, r.record.localRequestId);
         }
     }
     return resolutions.map(entryOf);

@@ -24,16 +24,14 @@ exports.superviseOnce = superviseOnce;
 exports.clearPause = clearPause;
 const activity_walk_js_1 = require("./activity-walk.js");
 const authority_js_1 = require("./authority.js");
-const authorize_js_1 = require("./authorize.js");
-const controller_js_1 = require("./controller.js");
 const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
 const redact_js_1 = require("./redact.js");
 const runtime_support_js_1 = require("./runtime-support.js");
 const runtime_js_1 = require("./runtime.js");
 const state_js_1 = require("./state.js");
-const tty_confirm_js_1 = require("./tty-confirm.js");
 const validate_js_1 = require("./validate.js");
+const write_gate_js_1 = require("./write-gate.js");
 exports.BACKOFF_BASE_SECONDS = 60;
 exports.BACKOFF_CAP_SECONDS = 3600;
 const STARTING_CHECK_SECONDS = 120;
@@ -49,11 +47,7 @@ const waitForHuman = {
 };
 function owns(journal, sessionResource) {
     const owner = (0, state_js_1.findBySessionResource)(journal, sessionResource);
-    if (owner === undefined ||
-        owner.kind !== 'create' ||
-        owner.repository === undefined ||
-        owner.requestedBranch === undefined ||
-        owner.sourceResource === undefined) {
+    if (!(0, state_js_1.isOwningCreate)(owner)) {
         return (0, errors_js_1.throwAppError)('JULES_AUTHORITY_DENIED', `${sessionResource} was not created through this plugin, so no grant covers it`, {
             recoveryAction: 'Supervision covers sessions created by delegate. Act on this session in the Jules console.',
         });
@@ -97,10 +91,7 @@ async function superviseOnce(deps, args) {
     const sessionResource = (0, runtime_support_js_1.resolveSessionResource)(journal, args.session);
     const owner = owns(journal, sessionResource);
     // Gate: the grant exists, is bound to this controller, and covers the session's scope.
-    const grants = (0, authority_js_1.loadGrants)(deps.dataDir);
-    const grant = (0, authority_js_1.requireGrant)(grants, grantId);
-    const ctx = (0, authorize_js_1.resolveControllerContext)(deps);
-    (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef);
+    const { grant } = (0, write_gate_js_1.loadAuthorizedGrant)(deps, grantId);
     const scope = (0, authority_js_1.evaluateScope)(grant, {
         repository: owner.repository,
         sourceResource: owner.sourceResource,
@@ -201,7 +192,7 @@ async function superviseOnce(deps, args) {
     // Observation: the status walk, with a view of every activity it reads.
     const newActivities = [];
     const agentMessages = [];
-    let observed;
+    let seen;
     try {
         const result = await (0, runtime_js_1.status)(deps, {
             session: sessionResource,
@@ -214,7 +205,7 @@ async function superviseOnce(deps, args) {
                     agentMessages.push(activity);
             },
         });
-        observed = { status: result, newActivities, agentMessages };
+        seen = result;
     }
     catch (err) {
         if (err instanceof errors_js_1.AppErrorException) {
@@ -226,7 +217,6 @@ async function superviseOnce(deps, args) {
         }
         throw err;
     }
-    const seen = observed.status;
     const walk = seen.activities;
     if (walk === undefined) {
         return (0, errors_js_1.throwAppError)('JULES_MALFORMED_RESPONSE', 'status returned no activity summary');
@@ -237,7 +227,7 @@ async function superviseOnce(deps, args) {
     const fresh = owns(journal, sessionResource);
     const recordedOutside = fresh.supervision?.outsideSeen;
     if (recordedOutside !== undefined) {
-        const echoed = observed.newActivities.filter((a) => a.activityId === recordedOutside.activityId && a.message !== undefined);
+        const echoed = newActivities.filter((a) => a.activityId === recordedOutside.activityId && a.message !== undefined);
         return pauseForOutside(recordedOutside, {
             ...(seen.condition !== undefined ? { condition: seen.condition } : {}),
             ...(seen.vendorState !== undefined
@@ -273,7 +263,7 @@ async function superviseOnce(deps, args) {
             r.kind === 'reply' &&
             r.createdAt >= evaluated.evaluatedAt);
     const swappedPlan = evaluated !== undefined && !repliedSinceEvaluation
-        ? observed.newActivities.find((a) => a.type === 'planGenerated' &&
+        ? newActivities.find((a) => a.type === 'planGenerated' &&
             a.plan !== undefined &&
             a.plan.planId !== evaluated.planId)
         : undefined;
@@ -343,7 +333,7 @@ async function superviseOnce(deps, args) {
     if (grantExpired) {
         // R39: expiry never stops remote work. Without a live grant nothing can
         // be acted on, so a human decides; the reason says whether work is running.
-        const terminal = condition === 'remote-completed' || condition === 'failed';
+        const terminal = (0, runtime_support_js_1.isTerminalCondition)(condition);
         return finish('escalate', {
             reason: terminal ? 'grant-expired' : 'grant-expired-with-remote-work',
             nextCheck: waitForHuman,
@@ -386,7 +376,7 @@ async function superviseOnce(deps, args) {
         });
     }
     if (condition === 'awaiting-reply') {
-        const latest = [...observed.agentMessages].sort(activity_walk_js_1.compareStamp).pop();
+        const latest = [...agentMessages].sort(activity_walk_js_1.compareStamp).pop();
         if (latest?.message !== undefined) {
             fenced.question = (0, redact_js_1.fenceUntrusted)(truncate(latest.message));
         }
@@ -447,7 +437,7 @@ async function superviseOnce(deps, args) {
         ]);
     }
     // starting / working: nothing to decide.
-    const newAgent = observed.newActivities
+    const newAgent = newActivities
         .filter((a) => a.type === 'agentMessaged' && a.message !== undefined)
         .slice(-FENCED_MESSAGE_COUNT);
     if (newAgent.length > 0) {
@@ -472,7 +462,7 @@ async function superviseOnce(deps, args) {
  * "new" to the next pass.
  */
 async function clearPause(deps, args) {
-    (0, authorize_js_1.refuseInsideSupervisedSession)(deps.env);
+    (0, runtime_support_js_1.refuseInsideSupervisedSession)(deps.env);
     (0, runtime_support_js_1.prepare)(deps);
     const journal = await (0, state_js_1.readJournal)(deps.dataDir);
     const sessionResource = (0, runtime_support_js_1.resolveSessionResource)(journal, args.session);
@@ -489,18 +479,14 @@ async function clearPause(deps, args) {
             recoveryAction: 'Run status for this session first, inspect it, then retry.',
         });
     }
-    await (0, tty_confirm_js_1.confirmOnTty)({
-        summary: [
-            'yellow-jules: CLEAR SUPERVISION PAUSE',
-            `  session:     ${sessionResource}`,
-            `  paused for:  ${paused.reason}`,
-            `  paused at:   ${paused.observedAt}`,
-            '',
-            'Supervised writes under the grant resume for this session.',
-        ].join('\n'),
-        deadlineMs: deps.confirmDeadlineMs ?? tty_confirm_js_1.DEFAULT_CONFIRM_DEADLINE_MS,
-        ...(deps.openTty !== undefined ? { openTty: deps.openTty } : {}),
-    });
+    await (0, runtime_support_js_1.confirmOwner)(deps, [
+        'yellow-jules: CLEAR SUPERVISION PAUSE',
+        `  session:     ${sessionResource}`,
+        `  paused for:  ${paused.reason}`,
+        `  paused at:   ${paused.observedAt}`,
+        '',
+        'Supervised writes under the grant resume for this session.',
+    ].join('\n'));
     await (0, state_js_1.updateSupervision)(deps.dataDir, owner.localRequestId, { paused: null, outsideSeen: null }, (0, runtime_support_js_1.nowFn)(deps));
     return {
         operation: 'supervise',

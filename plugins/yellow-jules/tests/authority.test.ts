@@ -287,14 +287,14 @@ describe('chargeGrant / releaseGrant', () => {
       localRequestId: 'r1',
       taskRef: 't1',
     });
-    const released = releaseGrant(charged, 'r1', 'reconcile-released');
+    const released = releaseGrant(charged, 'r1');
     expect(released.usage.activeSessionRefs).toEqual([]);
     expect(released.usage.totalTasks).toBe(1);
   });
 
   it('releasing an unknown request is a no-op', () => {
     const grant = makeGrant();
-    expect(releaseGrant(grant, 'nope', 'abandon')).toBe(grant);
+    expect(releaseGrant(grant, 'nope')).toBe(grant);
   });
 });
 

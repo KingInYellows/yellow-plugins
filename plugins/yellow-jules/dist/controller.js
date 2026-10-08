@@ -49,11 +49,11 @@ exports.readControllerAuthority = readControllerAuthority;
 exports.initControllerAuthority = initControllerAuthority;
 exports.assertControllerAuthority = assertControllerAuthority;
 exports.takeOverController = takeOverController;
-const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const config_js_1 = require("./config.js");
 const errors_js_1 = require("./errors.js");
+const shape_js_1 = require("./shape.js");
 const validate_js_1 = require("./validate.js");
 function nowIso(ctx) {
     return (ctx.now ?? (() => new Date()))().toISOString();
@@ -67,9 +67,6 @@ function mismatch(message) {
 }
 function currentUid() {
     return typeof process.getuid === 'function' ? process.getuid() : undefined;
-}
-function isPlainObject(value) {
-    return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 /**
  * The authority file must be a regular, owner-owned file with no group or
@@ -97,7 +94,7 @@ function parseAuthority(raw, file, controllerId) {
     catch {
         return mismatch(`${file} does not parse as JSON`);
     }
-    if (!isPlainObject(parsed))
+    if (!(0, shape_js_1.isPlainObject)(parsed))
         return mismatch(`${file} has an unexpected shape`);
     const { epoch, dataDir, updatedAt } = parsed;
     if (parsed['controllerId'] !== controllerId ||
@@ -130,23 +127,7 @@ function readControllerAuthority(controllerDir, controllerId) {
 function writeAuthority(ctx, authority) {
     const file = controllerFilePath(ctx.controllerDir, ctx.controllerId);
     (0, config_js_1.ensureOwnerOnlyDir)(ctx.controllerDir);
-    const tmp = `${file}.tmp-${process.pid}-${crypto.randomUUID()}`;
-    const fd = fs.openSync(tmp, 'wx', 0o600);
-    try {
-        fs.writeFileSync(fd, `${JSON.stringify(authority, null, 2)}\n`, 'utf8');
-        fs.fsyncSync(fd);
-    }
-    finally {
-        fs.closeSync(fd);
-    }
-    try {
-        fs.chmodSync(tmp, 0o600);
-        fs.renameSync(tmp, file);
-    }
-    catch (err) {
-        fs.rmSync(tmp, { force: true });
-        throw err;
-    }
+    (0, config_js_1.writeFileAtomicOwnerOnly)(file, `${JSON.stringify(authority, null, 2)}\n`);
 }
 /**
  * First `authorize` on this host: no controller file and no grants exist yet.

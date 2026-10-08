@@ -10,8 +10,6 @@
  * and write the grant atomically.
  */
 
-import * as os from 'node:os';
-
 import {
   emptyUsage,
   GRANT_CEILINGS,
@@ -22,9 +20,8 @@ import {
   revokeGrant,
   writeGrants,
 } from './authority.js';
-import { canonicalPath, resolveControllerDir } from './config.js';
+import { canonicalPath } from './config.js';
 import {
-  type ControllerContext,
   initControllerAuthority,
   readControllerAuthority,
   takeOverController,
@@ -32,24 +29,21 @@ import {
 import { DEFAULT_READ_DEADLINE_MS, deadlineIn } from './deadline.js';
 import { throwAppError } from './errors.js';
 import {
+  confirmOwner,
   nowFn,
   prepare,
   read,
-  type RuntimeDeps,
+  refuseInsideSupervisedSession,
+  resolveControllerContext,
+  type WriteDeps,
   withAdapter,
 } from './runtime-support.js';
 import { withJournalLock } from './state.js';
-import {
-  confirmOnTty,
-  DEFAULT_CONFIRM_DEADLINE_MS,
-  type OpenTty,
-} from './tty-confirm.js';
 import type { GrantOperation, GrantRecord } from './types.js';
 import {
   mintGrantId,
   sourceResourceFor,
   validateBranchPattern,
-  validateControllerId,
   validateGrantId,
   validateOperations,
   validateOwnerLabel,
@@ -58,17 +52,15 @@ import {
   validateTaskRef,
 } from './validate.js';
 
-/** Set by the supervision skill for the duration of a pass; `authorize` refuses while it is set (R30). */
-export const ACTIVE_GRANT_ENV = 'YELLOW_JULES_ACTIVE_GRANT';
-
-export interface AuthorizeDeps extends RuntimeDeps {
-  readonly openTty?: OpenTty;
-  /** Test seam; production resolves it with `resolveControllerDir`. */
-  readonly controllerDir?: string;
-  /** Test seam; production uses the sanitized host name. */
-  readonly controllerId?: string;
-  readonly confirmDeadlineMs?: number;
-}
+// The shared write-path deps and helpers live in runtime-support.ts; they are
+// re-exported here under their original names for callers of this module.
+export {
+  ACTIVE_GRANT_ENV,
+  defaultControllerId,
+  refuseInsideSupervisedSession,
+  resolveControllerContext,
+  type WriteDeps as AuthorizeDeps,
+} from './runtime-support.js';
 
 export interface AuthorizeCreateArgs {
   readonly repo: string;
@@ -123,47 +115,6 @@ export interface AuthorizeTakeOverResult {
   readonly grantsRebound: number;
 }
 
-/** Host name made safe for the controller-id allowlist, then validated. */
-export function defaultControllerId(
-  hostname: () => string = os.hostname
-): string {
-  const cleaned = hostname()
-    .replace(/[^A-Za-z0-9._-]/g, '-')
-    .replace(/^[^A-Za-z0-9]+/, '')
-    .slice(0, 63);
-  return validateControllerId(cleaned.length > 0 ? cleaned : 'host');
-}
-
-export function resolveControllerContext(
-  deps: Pick<
-    AuthorizeDeps,
-    'dataDir' | 'env' | 'controllerDir' | 'controllerId' | 'clock'
-  >
-): ControllerContext {
-  return {
-    controllerDir:
-      deps.controllerDir ?? resolveControllerDir(deps.dataDir, deps.env),
-    controllerId: validateControllerId(
-      deps.controllerId ?? defaultControllerId()
-    ),
-    now: nowFn(deps as RuntimeDeps),
-  };
-}
-
-export function refuseInsideSupervisedSession(env: NodeJS.ProcessEnv): void {
-  const active = env[ACTIVE_GRANT_ENV];
-  if (active !== undefined && active !== '') {
-    throwAppError(
-      'JULES_AUTHORITY_DENIED',
-      'authorize cannot run inside a supervised session; a grant is never created or widened from under another grant',
-      {
-        recoveryAction:
-          'End the supervised session and run authorize yourself in a terminal.',
-      }
-    );
-  }
-}
-
 function boundedInt(
   value: number | undefined,
   fallback: number,
@@ -201,7 +152,7 @@ function summaryOf(
 }
 
 export async function authorizeCreate(
-  deps: AuthorizeDeps,
+  deps: WriteDeps,
   args: AuthorizeCreateArgs
 ): Promise<AuthorizeCreateResult> {
   refuseInsideSupervisedSession(deps.env);
@@ -260,8 +211,9 @@ export async function authorizeCreate(
     deps.clock.now() + ttlMinutes * 60_000
   ).toISOString();
 
-  await confirmOnTty({
-    summary: summaryOf(
+  await confirmOwner(
+    deps,
+    summaryOf(
       {
         repository,
         sourceResource,
@@ -276,10 +228,8 @@ export async function authorizeCreate(
         controllerId: ctx.controllerId,
       },
       ttlMinutes
-    ),
-    deadlineMs: deps.confirmDeadlineMs ?? DEFAULT_CONFIRM_DEADLINE_MS,
-    ...(deps.openTty !== undefined ? { openTty: deps.openTty } : {}),
-  });
+    )
+  );
 
   // R17: the source is discovered through the adapter, never synthesized.
   const deadline = deadlineIn(
@@ -358,7 +308,7 @@ export async function authorizeCreate(
   });
 }
 
-export function authorizeList(deps: AuthorizeDeps): AuthorizeListResult {
+export function authorizeList(deps: WriteDeps): AuthorizeListResult {
   prepare(deps);
   return {
     operation: 'authorize',
@@ -367,7 +317,7 @@ export function authorizeList(deps: AuthorizeDeps): AuthorizeListResult {
 }
 
 export async function authorizeRevoke(
-  deps: AuthorizeDeps,
+  deps: WriteDeps,
   grantId: string
 ): Promise<AuthorizeRevokeResult> {
   prepare(deps);
@@ -378,24 +328,23 @@ export async function authorizeRevoke(
 
 /** R38 handoff: TTY-confirmed; writes epoch+1 for this host and path and rebinds every grant. */
 export async function authorizeTakeOver(
-  deps: AuthorizeDeps
+  deps: WriteDeps
 ): Promise<AuthorizeTakeOverResult> {
   refuseInsideSupervisedSession(deps.env);
   prepare(deps);
   const ctx = resolveControllerContext(deps);
   const dataDir = canonicalPath(deps.dataDir);
-  await confirmOnTty({
-    summary: [
+  await confirmOwner(
+    deps,
+    [
       'yellow-jules: TAKE OVER CONTROLLER',
       `  controller:  ${ctx.controllerId}`,
       `  data dir:    ${dataDir}`,
       '',
       'This host becomes the only writer. Every grant is rebound to the new epoch;',
       'any other copy of this data directory stops being able to write.',
-    ].join('\n'),
-    deadlineMs: deps.confirmDeadlineMs ?? DEFAULT_CONFIRM_DEADLINE_MS,
-    ...(deps.openTty !== undefined ? { openTty: deps.openTty } : {}),
-  });
+    ].join('\n')
+  );
   return withJournalLock(deps.dataDir, async () => {
     const grants = loadGrants(deps.dataDir);
     const result = takeOverController(ctx, deps.dataDir, grants);

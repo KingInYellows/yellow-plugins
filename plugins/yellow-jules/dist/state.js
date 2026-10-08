@@ -71,6 +71,7 @@ exports.recordDeviation = recordDeviation;
 exports.hasUnreconciledDeviation = hasUnreconciledDeviation;
 exports.updateSupervision = updateSupervision;
 exports.ownMessageDigests = ownMessageDigests;
+exports.isOwningCreate = isOwningCreate;
 const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
 const os = __importStar(require("node:os"));
@@ -79,6 +80,7 @@ const activity_walk_js_1 = require("./activity-walk.js");
 const config_js_1 = require("./config.js");
 const errors_js_1 = require("./errors.js");
 const redact_js_1 = require("./redact.js");
+const shape_js_1 = require("./shape.js");
 const validate_js_1 = require("./validate.js");
 function digestText(text) {
     return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
@@ -142,15 +144,6 @@ const OPTIONAL_STRING_FIELDS = [
     'abandonedAt',
     'abandonReason',
 ];
-function isPlainObject(value) {
-    return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-function isStringArray(value) {
-    return Array.isArray(value) && value.every((v) => typeof v === 'string');
-}
-function isNonNegativeInt(value) {
-    return typeof value === 'number' && Number.isInteger(value) && value >= 0;
-}
 const ARTIFACT_KINDS = new Set(['patch', 'pr-ref', 'generated-file']);
 const ARTIFACT_VERIFICATIONS = new Set([
     'unverified',
@@ -164,7 +157,7 @@ function hasOptionalStrings(value, fields) {
     return fields.every((f) => value[f] === undefined || typeof value[f] === 'string');
 }
 function isValidArtifact(value) {
-    if (!isPlainObject(value))
+    if (!(0, shape_js_1.isPlainObject)(value))
         return false;
     return (ARTIFACT_KINDS.has(value['kind']) &&
         typeof value['sessionResource'] === 'string' &&
@@ -180,7 +173,7 @@ function isValidArtifact(value) {
         ARTIFACT_VERIFICATIONS.has(value['verification']));
 }
 function isValidDeviation(value) {
-    if (!isPlainObject(value))
+    if (!(0, shape_js_1.isPlainObject)(value))
         return false;
     return (value['kind'] === 'policy-deviation' &&
         typeof value['reason'] === 'string' &&
@@ -189,15 +182,15 @@ function isValidDeviation(value) {
         typeof value['reconciled'] === 'boolean');
 }
 function isValidPlanStep(value) {
-    if (!isPlainObject(value))
+    if (!(0, shape_js_1.isPlainObject)(value))
         return false;
     return (typeof value['id'] === 'string' &&
         typeof value['title'] === 'string' &&
         hasOptionalStrings(value, ['description']) &&
-        isNonNegativeInt(value['index']));
+        (0, shape_js_1.isNonNegativeInt)(value['index']));
 }
 function isValidPendingPlan(value) {
-    if (!isPlainObject(value))
+    if (!(0, shape_js_1.isPlainObject)(value))
         return false;
     return (typeof value['planId'] === 'string' &&
         typeof value['activityCreateTime'] === 'string' &&
@@ -224,46 +217,46 @@ const DECISIONS = new Set([
     'paused',
 ]);
 function isValidLastReconcile(value) {
-    if (!isPlainObject(value))
+    if (!(0, shape_js_1.isPlainObject)(value))
         return false;
     return (RECONCILE_OUTCOMES.has(value['outcome']) &&
         hasOptionalStrings(value, ['reason']) &&
         typeof value['observedAt'] === 'string');
 }
 function isValidSupervision(value) {
-    if (!isPlainObject(value))
+    if (!(0, shape_js_1.isPlainObject)(value))
         return false;
     const { paused, backoff, lastDecision } = value;
     if (paused !== undefined &&
-        !(isPlainObject(paused) &&
+        !((0, shape_js_1.isPlainObject)(paused) &&
             typeof paused['reason'] === 'string' &&
             typeof paused['observedAt'] === 'string' &&
             hasOptionalStrings(paused, ['activityId'])))
         return false;
     if (backoff !== undefined &&
-        !(isPlainObject(backoff) &&
-            isNonNegativeInt(backoff['failures']) &&
+        !((0, shape_js_1.isPlainObject)(backoff) &&
+            (0, shape_js_1.isNonNegativeInt)(backoff['failures']) &&
             typeof backoff['nextCheckAt'] === 'string'))
         return false;
     const outsideSeen = value['outsideSeen'];
     if (outsideSeen !== undefined &&
-        !(isPlainObject(outsideSeen) &&
+        !((0, shape_js_1.isPlainObject)(outsideSeen) &&
             typeof outsideSeen['activityId'] === 'string' &&
             typeof outsideSeen['observedAt'] === 'string'))
         return false;
     const evaluatedPlan = value['evaluatedPlan'];
     if (evaluatedPlan !== undefined &&
-        !(isPlainObject(evaluatedPlan) &&
+        !((0, shape_js_1.isPlainObject)(evaluatedPlan) &&
             typeof evaluatedPlan['planId'] === 'string' &&
             typeof evaluatedPlan['evaluatedAt'] === 'string'))
         return false;
     return (lastDecision === undefined ||
-        (isPlainObject(lastDecision) &&
+        ((0, shape_js_1.isPlainObject)(lastDecision) &&
             DECISIONS.has(lastDecision['decision']) &&
             typeof lastDecision['decidedAt'] === 'string'));
 }
 function isValidRecord(key, value) {
-    if (!isPlainObject(value))
+    if (!(0, shape_js_1.isPlainObject)(value))
         return false;
     if (value['localRequestId'] !== key)
         return false;
@@ -290,14 +283,14 @@ function isValidRecord(key, value) {
         typeof value['autoPrRequested'] !== 'boolean') {
         return false;
     }
-    if (!isStringArray(value['recentActivityIds']))
+    if (!(0, shape_js_1.isStringArray)(value['recentActivityIds']))
         return false;
-    if (!isNonNegativeInt(value['activityCount']))
+    if (!(0, shape_js_1.isNonNegativeInt)(value['activityCount']))
         return false;
-    if (!isNonNegativeInt(value['resumeRestartCount']))
+    if (!(0, shape_js_1.isNonNegativeInt)(value['resumeRestartCount']))
         return false;
     if (value['artifactResumeRestartCount'] !== undefined &&
-        !isNonNegativeInt(value['artifactResumeRestartCount']))
+        !(0, shape_js_1.isNonNegativeInt)(value['artifactResumeRestartCount']))
         return false;
     if (!Array.isArray(value['artifacts']) ||
         !value['artifacts'].every(isValidArtifact))
@@ -309,7 +302,7 @@ function isValidRecord(key, value) {
         !isValidPendingPlan(value['pendingPlan']))
         return false;
     if (value['resumeApproval'] !== undefined &&
-        !(isPlainObject(value['resumeApproval']) &&
+        !((0, shape_js_1.isPlainObject)(value['resumeApproval']) &&
             typeof value['resumeApproval']['createTime'] === 'string' &&
             typeof value['resumeApproval']['activityId'] === 'string'))
         return false;
@@ -330,14 +323,14 @@ function parseJournal(raw) {
     catch {
         return undefined;
     }
-    if (!isPlainObject(parsed))
+    if (!(0, shape_js_1.isPlainObject)(parsed))
         return undefined;
     if (parsed['version'] !== 1)
         return undefined;
     if (typeof parsed['archiveVisibilityConfirmed'] !== 'boolean')
         return undefined;
     const ops = parsed['operations'];
-    if (!isPlainObject(ops))
+    if (!(0, shape_js_1.isPlainObject)(ops))
         return undefined;
     const operations = Object.create(null);
     for (const [key, record] of Object.entries(ops)) {
@@ -413,7 +406,7 @@ exports.DEFAULT_LOCK_CONFIG = {
 function parseLockOwner(raw) {
     try {
         const value = JSON.parse(raw);
-        if (!isPlainObject(value))
+        if (!(0, shape_js_1.isPlainObject)(value))
             return undefined;
         const { owner, pid, hostname, startedAt } = value;
         if (typeof owner !== 'string' || typeof hostname !== 'string')
@@ -883,44 +876,21 @@ function hasUnreconciledDeviation(record) {
     return record.deviations.some((d) => !d.reconciled);
 }
 /** Merges a patch into the session's supervision state; written only by `supervise` (R32, R33). */
+function keep(key, previous, patch) {
+    const value = patch === undefined ? previous : (patch ?? undefined);
+    return value === undefined ? {} : { [key]: value };
+}
 async function updateSupervision(dataDir, localRequestId, patch, now = () => new Date(), config = exports.DEFAULT_LOCK_CONFIG) {
     return updateJournal(dataDir, (operations) => {
         const current = requireRecord(operations, localRequestId);
         const previous = current.supervision ?? {};
+        // `undefined` keeps the stored value, `null` clears it, anything else sets it.
         const next = {
-            ...(patch.paused === undefined
-                ? previous.paused !== undefined
-                    ? { paused: previous.paused }
-                    : {}
-                : patch.paused !== null
-                    ? { paused: patch.paused }
-                    : {}),
-            ...(patch.backoff === undefined
-                ? previous.backoff !== undefined
-                    ? { backoff: previous.backoff }
-                    : {}
-                : patch.backoff !== null
-                    ? { backoff: patch.backoff }
-                    : {}),
-            ...(patch.lastDecision !== undefined
-                ? { lastDecision: patch.lastDecision }
-                : previous.lastDecision !== undefined
-                    ? { lastDecision: previous.lastDecision }
-                    : {}),
-            ...(patch.outsideSeen === undefined
-                ? previous.outsideSeen !== undefined
-                    ? { outsideSeen: previous.outsideSeen }
-                    : {}
-                : patch.outsideSeen !== null
-                    ? { outsideSeen: patch.outsideSeen }
-                    : {}),
-            ...(patch.evaluatedPlan === undefined
-                ? previous.evaluatedPlan !== undefined
-                    ? { evaluatedPlan: previous.evaluatedPlan }
-                    : {}
-                : patch.evaluatedPlan !== null
-                    ? { evaluatedPlan: patch.evaluatedPlan }
-                    : {}),
+            ...keep('paused', previous.paused, patch.paused),
+            ...keep('backoff', previous.backoff, patch.backoff),
+            ...keep('lastDecision', previous.lastDecision, patch.lastDecision),
+            ...keep('outsideSeen', previous.outsideSeen, patch.outsideSeen),
+            ...keep('evaluatedPlan', previous.evaluatedPlan, patch.evaluatedPlan),
         };
         const updated = {
             ...current,
@@ -942,4 +912,11 @@ function ownMessageDigests(journal, sessionResource) {
         }
     }
     return digests;
+}
+function isOwningCreate(record) {
+    return (record !== undefined &&
+        record.kind === 'create' &&
+        record.repository !== undefined &&
+        record.requestedBranch !== undefined &&
+        record.sourceResource !== undefined);
 }

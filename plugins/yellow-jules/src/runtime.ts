@@ -5,9 +5,9 @@
  * it owns argv, the JSON envelope, and exit codes; this module owns the
  * contract rules.
  *
- * PR2 ships reads only (`setup`, `list`, `status`, `collect`). No function
- * here issues a vendor-mutating request; `delegate`, `reply`, and `approve`
- * arrive with `authorize` in PR3 (contract "Open Question 6, decided").
+ * This module holds the reads (`setup`, `list`, `status`, `collect`) and issues
+ * no vendor-mutating request. The grant-gated writes live in mutations.ts, the
+ * supervision pass in supervise.ts, and reconcile in reconcile.ts.
  */
 
 import * as crypto from 'node:crypto';
@@ -680,8 +680,7 @@ export async function status(
       await releaseSlotInStore(
         deps.dataDir,
         record.grantId,
-        record.localRequestId,
-        'terminal-vendor-state'
+        record.localRequestId
       );
     }
 

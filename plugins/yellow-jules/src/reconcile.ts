@@ -27,8 +27,8 @@ import {
   nowFn,
   read,
   withAdapter,
+  conditionOf,
 } from './runtime-support.js';
-import { conditionOf } from './runtime-support.js';
 import {
   messageDigest,
   ownsSession,
@@ -493,8 +493,7 @@ export async function reconcile(
       await releaseSlotInStore(
         deps.dataDir,
         r.record.grantId,
-        r.record.localRequestId,
-        'reconcile-released'
+        r.record.localRequestId
       );
     }
   }

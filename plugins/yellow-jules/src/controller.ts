@@ -10,12 +10,16 @@
  * authority file is `JULES_CONTROLLER_MISMATCH` (fail closed).
  */
 
-import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { canonicalPath, ensureOwnerOnlyDir } from './config.js';
+import {
+  canonicalPath,
+  ensureOwnerOnlyDir,
+  writeFileAtomicOwnerOnly,
+} from './config.js';
 import { throwAppError } from './errors.js';
+import { isPlainObject } from './shape.js';
 import type { ControllerAuthority, EpochRef, GrantsFile } from './types.js';
 import { validateControllerId } from './validate.js';
 
@@ -45,10 +49,6 @@ function mismatch(message: string): never {
 
 function currentUid(): number | undefined {
   return typeof process.getuid === 'function' ? process.getuid() : undefined;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /**
@@ -124,21 +124,7 @@ function writeAuthority(
 ): void {
   const file = controllerFilePath(ctx.controllerDir, ctx.controllerId);
   ensureOwnerOnlyDir(ctx.controllerDir);
-  const tmp = `${file}.tmp-${process.pid}-${crypto.randomUUID()}`;
-  const fd = fs.openSync(tmp, 'wx', 0o600);
-  try {
-    fs.writeFileSync(fd, `${JSON.stringify(authority, null, 2)}\n`, 'utf8');
-    fs.fsyncSync(fd);
-  } finally {
-    fs.closeSync(fd);
-  }
-  try {
-    fs.chmodSync(tmp, 0o600);
-    fs.renameSync(tmp, file);
-  } catch (err) {
-    fs.rmSync(tmp, { force: true });
-    throw err;
-  }
+  writeFileAtomicOwnerOnly(file, `${JSON.stringify(authority, null, 2)}\n`);
 }
 
 /**

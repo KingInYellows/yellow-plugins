@@ -10,49 +10,12 @@
  * then under the journal lock initialize or assert the controller authority
  * and write the grant atomically.
  */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ACTIVE_GRANT_ENV = void 0;
-exports.defaultControllerId = defaultControllerId;
-exports.resolveControllerContext = resolveControllerContext;
-exports.refuseInsideSupervisedSession = refuseInsideSupervisedSession;
+exports.resolveControllerContext = exports.refuseInsideSupervisedSession = exports.defaultControllerId = exports.ACTIVE_GRANT_ENV = void 0;
 exports.authorizeCreate = authorizeCreate;
 exports.authorizeList = authorizeList;
 exports.authorizeRevoke = authorizeRevoke;
 exports.authorizeTakeOver = authorizeTakeOver;
-const os = __importStar(require("node:os"));
 const authority_js_1 = require("./authority.js");
 const config_js_1 = require("./config.js");
 const controller_js_1 = require("./controller.js");
@@ -60,33 +23,14 @@ const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
 const runtime_support_js_1 = require("./runtime-support.js");
 const state_js_1 = require("./state.js");
-const tty_confirm_js_1 = require("./tty-confirm.js");
 const validate_js_1 = require("./validate.js");
-/** Set by the supervision skill for the duration of a pass; `authorize` refuses while it is set (R30). */
-exports.ACTIVE_GRANT_ENV = 'YELLOW_JULES_ACTIVE_GRANT';
-/** Host name made safe for the controller-id allowlist, then validated. */
-function defaultControllerId(hostname = os.hostname) {
-    const cleaned = hostname()
-        .replace(/[^A-Za-z0-9._-]/g, '-')
-        .replace(/^[^A-Za-z0-9]+/, '')
-        .slice(0, 63);
-    return (0, validate_js_1.validateControllerId)(cleaned.length > 0 ? cleaned : 'host');
-}
-function resolveControllerContext(deps) {
-    return {
-        controllerDir: deps.controllerDir ?? (0, config_js_1.resolveControllerDir)(deps.dataDir, deps.env),
-        controllerId: (0, validate_js_1.validateControllerId)(deps.controllerId ?? defaultControllerId()),
-        now: (0, runtime_support_js_1.nowFn)(deps),
-    };
-}
-function refuseInsideSupervisedSession(env) {
-    const active = env[exports.ACTIVE_GRANT_ENV];
-    if (active !== undefined && active !== '') {
-        (0, errors_js_1.throwAppError)('JULES_AUTHORITY_DENIED', 'authorize cannot run inside a supervised session; a grant is never created or widened from under another grant', {
-            recoveryAction: 'End the supervised session and run authorize yourself in a terminal.',
-        });
-    }
-}
+// The shared write-path deps and helpers live in runtime-support.ts; they are
+// re-exported here under their original names for callers of this module.
+var runtime_support_js_2 = require("./runtime-support.js");
+Object.defineProperty(exports, "ACTIVE_GRANT_ENV", { enumerable: true, get: function () { return runtime_support_js_2.ACTIVE_GRANT_ENV; } });
+Object.defineProperty(exports, "defaultControllerId", { enumerable: true, get: function () { return runtime_support_js_2.defaultControllerId; } });
+Object.defineProperty(exports, "refuseInsideSupervisedSession", { enumerable: true, get: function () { return runtime_support_js_2.refuseInsideSupervisedSession; } });
+Object.defineProperty(exports, "resolveControllerContext", { enumerable: true, get: function () { return runtime_support_js_2.resolveControllerContext; } });
 function boundedInt(value, fallback, ceiling, min, label) {
     const chosen = value ?? fallback;
     if (!Number.isInteger(chosen) || chosen < min || chosen > ceiling) {
@@ -110,7 +54,7 @@ function summaryOf(grant, ttlMinutes) {
     ].join('\n');
 }
 async function authorizeCreate(deps, args) {
-    refuseInsideSupervisedSession(deps.env);
+    (0, runtime_support_js_1.refuseInsideSupervisedSession)(deps.env);
     const repo = (0, validate_js_1.validateRepoInput)(args.repo);
     const repository = `${repo.owner}/${repo.repo}`;
     const branchPattern = (0, validate_js_1.validateBranchPattern)(args.branch);
@@ -132,26 +76,22 @@ async function authorizeCreate(deps, args) {
     const maxCorrectiveRounds = boundedInt(args.maxCorrectiveRounds, authority_js_1.GRANT_DEFAULTS.maxCorrectiveRounds, authority_js_1.GRANT_CEILINGS.maxCorrectiveRounds, 0, '--max-corrective-rounds');
     const ttlMinutes = boundedInt(args.ttlMinutes, authority_js_1.GRANT_DEFAULTS.ttlMinutes, authority_js_1.GRANT_CEILINGS.ttlMinutes, 1, '--ttl-minutes');
     (0, runtime_support_js_1.prepare)(deps);
-    const ctx = resolveControllerContext(deps);
+    const ctx = (0, runtime_support_js_1.resolveControllerContext)(deps);
     const createdAt = (0, runtime_support_js_1.nowFn)(deps)().toISOString();
     const expiresAt = new Date(deps.clock.now() + ttlMinutes * 60_000).toISOString();
-    await (0, tty_confirm_js_1.confirmOnTty)({
-        summary: summaryOf({
-            repository,
-            sourceResource,
-            branchPattern,
-            taskRefs,
-            operations,
-            maxActiveSessions,
-            maxTotalTasks,
-            maxCorrectiveRounds,
-            expiresAt,
-            owner,
-            controllerId: ctx.controllerId,
-        }, ttlMinutes),
-        deadlineMs: deps.confirmDeadlineMs ?? tty_confirm_js_1.DEFAULT_CONFIRM_DEADLINE_MS,
-        ...(deps.openTty !== undefined ? { openTty: deps.openTty } : {}),
-    });
+    await (0, runtime_support_js_1.confirmOwner)(deps, summaryOf({
+        repository,
+        sourceResource,
+        branchPattern,
+        taskRefs,
+        operations,
+        maxActiveSessions,
+        maxTotalTasks,
+        maxCorrectiveRounds,
+        expiresAt,
+        owner,
+        controllerId: ctx.controllerId,
+    }, ttlMinutes));
     // R17: the source is discovered through the adapter, never synthesized.
     const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, args.deadlineMs ?? deadline_js_1.DEFAULT_READ_DEADLINE_MS);
     const source = await (0, runtime_support_js_1.withAdapter)(deps, (adapter) => (0, runtime_support_js_1.read)(deps, deadline, () => adapter.getSource(repo.owner, repo.repo)));
@@ -227,22 +167,18 @@ async function authorizeRevoke(deps, grantId) {
 }
 /** R38 handoff: TTY-confirmed; writes epoch+1 for this host and path and rebinds every grant. */
 async function authorizeTakeOver(deps) {
-    refuseInsideSupervisedSession(deps.env);
+    (0, runtime_support_js_1.refuseInsideSupervisedSession)(deps.env);
     (0, runtime_support_js_1.prepare)(deps);
-    const ctx = resolveControllerContext(deps);
+    const ctx = (0, runtime_support_js_1.resolveControllerContext)(deps);
     const dataDir = (0, config_js_1.canonicalPath)(deps.dataDir);
-    await (0, tty_confirm_js_1.confirmOnTty)({
-        summary: [
-            'yellow-jules: TAKE OVER CONTROLLER',
-            `  controller:  ${ctx.controllerId}`,
-            `  data dir:    ${dataDir}`,
-            '',
-            'This host becomes the only writer. Every grant is rebound to the new epoch;',
-            'any other copy of this data directory stops being able to write.',
-        ].join('\n'),
-        deadlineMs: deps.confirmDeadlineMs ?? tty_confirm_js_1.DEFAULT_CONFIRM_DEADLINE_MS,
-        ...(deps.openTty !== undefined ? { openTty: deps.openTty } : {}),
-    });
+    await (0, runtime_support_js_1.confirmOwner)(deps, [
+        'yellow-jules: TAKE OVER CONTROLLER',
+        `  controller:  ${ctx.controllerId}`,
+        `  data dir:    ${dataDir}`,
+        '',
+        'This host becomes the only writer. Every grant is rebound to the new epoch;',
+        'any other copy of this data directory stops being able to write.',
+    ].join('\n'));
     return (0, state_js_1.withJournalLock)(deps.dataDir, async () => {
         const grants = (0, authority_js_1.loadGrants)(deps.dataDir);
         const result = (0, controller_js_1.takeOverController)(ctx, deps.dataDir, grants);

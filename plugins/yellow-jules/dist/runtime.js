@@ -6,9 +6,9 @@
  * it owns argv, the JSON envelope, and exit codes; this module owns the
  * contract rules.
  *
- * PR2 ships reads only (`setup`, `list`, `status`, `collect`). No function
- * here issues a vendor-mutating request; `delegate`, `reply`, and `approve`
- * arrive with `authorize` in PR3 (contract "Open Question 6, decided").
+ * This module holds the reads (`setup`, `list`, `status`, `collect`) and issues
+ * no vendor-mutating request. The grant-gated writes live in mutations.ts, the
+ * supervision pass in supervise.ts, and reconcile in reconcile.ts.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -430,7 +430,7 @@ async function status(deps, args) {
         if (TERMINAL_VENDOR_STATES.has(vendorState) &&
             record.kind === 'create' &&
             record.grantId !== undefined) {
-            await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId, 'terminal-vendor-state');
+            await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId);
         }
         const flags = [];
         if (walk.partialPagination)

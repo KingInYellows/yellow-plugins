@@ -20,15 +20,16 @@ exports.confirmationRequired = confirmationRequired;
 exports.settleAccepted = settleAccepted;
 exports.settleFailure = settleFailure;
 exports.persistenceUnknown = persistenceUnknown;
+exports.settleAcceptedOrUnknown = settleAcceptedOrUnknown;
+exports.settleExpiredBeforeWrite = settleExpiredBeforeWrite;
+exports.loadAuthorizedGrant = loadAuthorizedGrant;
 const authority_js_1 = require("./authority.js");
-const authorize_js_1 = require("./authorize.js");
 const config_js_1 = require("./config.js");
 const controller_js_1 = require("./controller.js");
 const errors_js_1 = require("./errors.js");
 const runtime_support_js_1 = require("./runtime-support.js");
 const state_js_1 = require("./state.js");
 /** Vendor conditions that mean a session is no longer working (R39 `runningSessions`). */
-const TERMINAL_CONDITIONS = new Set(['failed', 'remote-completed']);
 function runningSessionsUnder(journal, grantId) {
     return Object.values(journal.operations)
         .filter((r) => r.grantId === grantId &&
@@ -36,7 +37,7 @@ function runningSessionsUnder(journal, grantId) {
         r.sessionResource !== undefined &&
         r.status !== 'failed' &&
         r.status !== 'rejected' &&
-        !TERMINAL_CONDITIONS.has(r.condition ?? ''))
+        !(0, runtime_support_js_1.isTerminalCondition)(r.condition))
         .map((r) => r.sessionResource);
 }
 function denialError(denial, grant, journal, ids) {
@@ -56,13 +57,10 @@ function denialError(denial, grant, journal, ids) {
     return new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)(denial.code, denial.message), context);
 }
 async function reserveUnderGrant(deps, gate) {
-    const ctx = (0, authorize_js_1.resolveControllerContext)(deps);
     const now = (0, runtime_support_js_1.nowFn)(deps);
     return (0, state_js_1.withJournalLock)(deps.dataDir, async () => {
         const journal = await (0, state_js_1.readJournal)(deps.dataDir);
-        const grants = (0, authority_js_1.loadGrants)(deps.dataDir);
-        const grant = (0, authority_js_1.requireGrant)(grants, gate.grantId);
-        (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef);
+        const { grants, grant } = loadAuthorizedGrant(deps, gate.grantId);
         const verdict = (0, authority_js_1.evaluateAuthority)(grant, gate.authority, now(), {
             unreconciledDeviation: (0, authority_js_1.grantHasUnreconciledDeviation)(journal, grant.grantId),
         });
@@ -124,7 +122,14 @@ function authorizeCommandFor(parts) {
     ].join(' ');
 }
 /** R29: a real write without `--grant-id` names the exact `authorize` command. */
-function confirmationRequired(command, ids) {
+function confirmationRequired(deps, scope, ids) {
+    const command = authorizeCommandFor({
+        repository: scope.repository ?? '<owner/repo>',
+        branch: scope.requestedBranch ?? '<branch>',
+        ...(scope.taskRef !== undefined ? { taskRef: scope.taskRef } : {}),
+        operations: [scope.operation],
+        ...(deps.pluginRoot !== undefined ? { pluginRoot: deps.pluginRoot } : {}),
+    });
     return new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_CONFIRMATION_REQUIRED', 'a real write needs --grant-id from a grant written by authorize; none was given', {
         recoveryAction: `Run this yourself in a terminal on the controller host, then retry with --grant-id: ${command}`,
     }), ids);
@@ -173,7 +178,7 @@ async function settleFailure(deps, record, error, options) {
     }
     await (0, state_js_1.markOperation)(deps.dataDir, record.localRequestId, 'failed', {}, (0, runtime_support_js_1.nowFn)(deps));
     if (record.kind === 'create' && record.grantId !== undefined) {
-        await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId, 'clean-rejection');
+        await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId);
     }
     throw new errors_js_1.MutationErrorException(app, ids);
 }
@@ -186,4 +191,31 @@ function persistenceUnknown(record, sessionResource, reconcileHint) {
             ? { details: { sessionResource } }
             : {}),
     });
+}
+/**
+ * The write was accepted (2xx). Record it; if the local journal write fails the
+ * write still happened, so report an unknown outcome — never a failure (R16).
+ */
+async function settleAcceptedOrUnknown(deps, record, extra, options) {
+    try {
+        await settleAccepted(deps, record, extra);
+    }
+    catch (err) {
+        process.stderr.write(`warning: ${options.what} but the journal write failed: ${err instanceof Error ? err.name : 'error'}\n`);
+        throw persistenceUnknown(record, extra.sessionResource ?? record.sessionResource, options.reconcileHint);
+    }
+}
+/** Reserved but the deadline passed before anything was sent: a clean failure that frees the guard. */
+function settleExpiredBeforeWrite(deps, record, reconcileHint) {
+    return settleFailure(deps, record, new errors_js_1.AdapterError('timeout', 'deadline expired before the write', {
+        dispatched: false,
+    }), { reconcileHint });
+}
+/** Grant lookup bound to this controller (R38): every write path starts here. */
+function loadAuthorizedGrant(deps, grantId) {
+    const ctx = (0, runtime_support_js_1.resolveControllerContext)(deps);
+    const grants = (0, authority_js_1.loadGrants)(deps.dataDir);
+    const grant = (0, authority_js_1.requireGrant)(grants, grantId);
+    (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef);
+    return { grants, grant };
 }

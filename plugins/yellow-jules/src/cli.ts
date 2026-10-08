@@ -6,9 +6,11 @@
  * subcommand, missing flag, unparseable argv), which still prints a valid
  * `{ ok: false, operation, error }` envelope (R7).
  *
- * PR2 ships the read-only surface only. `delegate`, `reply`, and `approve`
- * are usage errors until PR3; `cancel`, `pause`, `resume`, and `cost` are
- * recognized and answer JULES_UNSUPPORTED_CAPABILITY (R11).
+ * The reads (`setup`, `list`, `status`, `collect`), the grant-gated writes
+ * (`delegate`, `reply`, `approve`), `authorize`, `abandon`, and `supervise`
+ * are all wired here; a mutating failure echoes `localRequestId` and `localId`.
+ * `cancel`, `pause`, `resume`, and `cost` are recognized and answer
+ * JULES_UNSUPPORTED_CAPABILITY (R11); `integrate` is not available yet.
  */
 
 import { parseArgs } from 'node:util';
@@ -346,7 +348,7 @@ async function dispatch(
     case 'abandon': {
       const { values } = parseArgs({
         args: [...rest],
-        options: { 'request-id': { type: 'string' }, ...deadline },
+        options: { 'request-id': { type: 'string' } },
         strict: true,
         allowPositionals: false,
       });
@@ -495,7 +497,7 @@ async function dispatch(
       }
       if ((LATER_OPERATIONS as readonly string[]).includes(operation)) {
         throw new UsageError(
-          `"${operation}" is not available in this release; the read-only surface is: ${KNOWN_OPERATIONS.join(', ')}`
+          `"${operation}" is not available in this release; available: ${KNOWN_OPERATIONS.join(', ')}`
         );
       }
       throw new UsageError(

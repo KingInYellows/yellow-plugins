@@ -345,10 +345,10 @@ export function validatePositiveInt(
   return parsed;
 }
 
-const GRANT_ID_RE = /^jg-[0-9a-f]{32}$/;
+export const GRANT_ID_RE = /^jg-[0-9a-f]{32}$/;
 const CONTROLLER_ID_RE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,62})$/;
 const BRANCH_PATTERN_MAX = 200;
-const GRANT_OPERATIONS: readonly GrantOperation[] = [
+export const GRANT_OPERATIONS: readonly GrantOperation[] = [
   'create',
   'reply',
   'approve',

@@ -6,7 +6,14 @@
  * them without importing the (large) operation layer back.
  */
 
-import { prepareDataDir, resolvePluginRoot } from './config.js';
+import * as os from 'node:os';
+
+import {
+  prepareDataDir,
+  resolveControllerDir,
+  resolvePluginRoot,
+} from './config.js';
+import type { ControllerContext } from './controller.js';
 import { type Deadline, isExpired, withReadRetry } from './deadline.js';
 import {
   AdapterError,
@@ -21,6 +28,11 @@ import {
   findBySessionResource,
   recordDeviation,
 } from './state.js';
+import {
+  confirmOnTty,
+  DEFAULT_CONFIRM_DEADLINE_MS,
+  type OpenTty,
+} from './tty-confirm.js';
 import type {
   AdapterSession,
   Clock,
@@ -28,7 +40,11 @@ import type {
   OperationRecord,
   SdkAdapter,
 } from './types.js';
-import { parseSessionRef, validatePullRequestUrl } from './validate.js';
+import {
+  parseSessionRef,
+  validateControllerId,
+  validatePullRequestUrl,
+} from './validate.js';
 
 export interface RuntimeDeps {
   /** Resolves the SDK and connects lazily; only called by operations that read from the vendor. */
@@ -133,6 +149,11 @@ const CONDITION_BY_STATE: Readonly<Record<string, string>> = Object.freeze({
 });
 
 /** Unknown states — including `unspecified` — are never placed in a completed bucket. */
+/** A session in one of these conditions is no longer working: it holds no active-session slot. */
+export function isTerminalCondition(condition: string | undefined): boolean {
+  return condition === 'remote-completed' || condition === 'failed';
+}
+
 export function conditionOf(vendorState: string): string {
   return Object.prototype.hasOwnProperty.call(CONDITION_BY_STATE, vendorState)
     ? (CONDITION_BY_STATE[vendorState] as string)
@@ -232,4 +253,70 @@ export async function checkPolicyDeviation(
     );
   }
   return current;
+}
+
+// ---------------------------------------------------------------------------
+// Write-path deps shared by authorize, mutations, supervise and write-gate
+// ---------------------------------------------------------------------------
+
+/** Set by the supervision skill for the duration of a pass; `authorize` refuses while it is set (R30). */
+export const ACTIVE_GRANT_ENV = 'YELLOW_JULES_ACTIVE_GRANT';
+
+export interface WriteDeps extends RuntimeDeps {
+  readonly openTty?: OpenTty;
+  /** Test seam; production resolves it with `resolveControllerDir`. */
+  readonly controllerDir?: string;
+  /** Test seam; production uses the sanitized host name. */
+  readonly controllerId?: string;
+  readonly confirmDeadlineMs?: number;
+}
+
+/** Host name made safe for the controller-id allowlist, then validated. */
+export function defaultControllerId(
+  hostname: () => string = os.hostname
+): string {
+  const cleaned = hostname()
+    .replace(/[^A-Za-z0-9._-]/g, '-')
+    .replace(/^[^A-Za-z0-9]+/, '')
+    .slice(0, 63);
+  return validateControllerId(cleaned.length > 0 ? cleaned : 'host');
+}
+
+export function resolveControllerContext(
+  deps: Pick<
+    WriteDeps,
+    'dataDir' | 'env' | 'controllerDir' | 'controllerId' | 'clock'
+  >
+): ControllerContext {
+  return {
+    controllerDir:
+      deps.controllerDir ?? resolveControllerDir(deps.dataDir, deps.env),
+    controllerId: validateControllerId(
+      deps.controllerId ?? defaultControllerId()
+    ),
+    now: nowFn(deps as RuntimeDeps),
+  };
+}
+
+export function refuseInsideSupervisedSession(env: NodeJS.ProcessEnv): void {
+  const active = env[ACTIVE_GRANT_ENV];
+  if (active !== undefined && active !== '') {
+    throwAppError(
+      'JULES_AUTHORITY_DENIED',
+      'authorize cannot run inside a supervised session; a grant is never created or widened from under another grant',
+      {
+        recoveryAction:
+          'End the supervised session and run authorize yourself in a terminal.',
+      }
+    );
+  }
+}
+
+/** The owner's typed confirmation on the controlling terminal (the only trust root). */
+export function confirmOwner(deps: WriteDeps, summary: string): Promise<void> {
+  return confirmOnTty({
+    summary,
+    deadlineMs: deps.confirmDeadlineMs ?? DEFAULT_CONFIRM_DEADLINE_MS,
+    ...(deps.openTty !== undefined ? { openTty: deps.openTty } : {}),
+  });
 }

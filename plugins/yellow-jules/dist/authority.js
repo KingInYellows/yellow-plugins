@@ -54,7 +54,7 @@ exports.emptyGrants = emptyGrants;
 exports.emptyUsage = emptyUsage;
 exports.loadGrants = loadGrants;
 exports.writeGrants = writeGrants;
-exports.isExpired = isExpired;
+exports.grantIsExpired = grantIsExpired;
 exports.evaluateScope = evaluateScope;
 exports.evaluateAuthority = evaluateAuthority;
 exports.grantHasUnreconciledDeviation = grantHasUnreconciledDeviation;
@@ -65,12 +65,11 @@ exports.requireGrant = requireGrant;
 exports.listGrants = listGrants;
 exports.revokeGrant = revokeGrant;
 exports.releaseSlotInStore = releaseSlotInStore;
-const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
-const path = __importStar(require("node:path"));
 const config_js_1 = require("./config.js");
 const errors_js_1 = require("./errors.js");
 const redact_js_1 = require("./redact.js");
+const shape_js_1 = require("./shape.js");
 const state_js_1 = require("./state.js");
 const validate_js_1 = require("./validate.js");
 /** R30 trial defaults. */
@@ -103,49 +102,33 @@ function emptyUsage() {
 // ---------------------------------------------------------------------------
 // Persistence
 // ---------------------------------------------------------------------------
-const OPERATIONS = new Set(['create', 'reply', 'approve', 'collect']);
-const GRANT_ID_RE = /^jg-[0-9a-f]{32}$/;
-function isPlainObject(value) {
-    return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-function isPositiveInt(value) {
-    return typeof value === 'number' && Number.isInteger(value) && value >= 1;
-}
-function isNonNegativeInt(value) {
-    return typeof value === 'number' && Number.isInteger(value) && value >= 0;
-}
-function isIsoTime(value) {
-    return typeof value === 'string' && !Number.isNaN(Date.parse(value));
-}
-function isStringArray(value) {
-    return Array.isArray(value) && value.every((v) => typeof v === 'string');
-}
+const OPERATIONS = new Set(validate_js_1.GRANT_OPERATIONS);
 function parseUsage(value) {
-    if (!isPlainObject(value))
+    if (!(0, shape_js_1.isPlainObject)(value))
         return undefined;
     const { activeSessionRefs, totalTasks, correctiveRounds } = value;
-    if (!isStringArray(activeSessionRefs) || !isNonNegativeInt(totalTasks))
+    if (!(0, shape_js_1.isStringArray)(activeSessionRefs) || !(0, shape_js_1.isNonNegativeInt)(totalTasks))
         return undefined;
-    if (!isPlainObject(correctiveRounds))
+    if (!(0, shape_js_1.isPlainObject)(correctiveRounds))
         return undefined;
     const rounds = Object.create(null);
     for (const [taskRef, n] of Object.entries(correctiveRounds)) {
-        if (!isNonNegativeInt(n))
+        if (!(0, shape_js_1.isNonNegativeInt)(n))
             return undefined;
         rounds[taskRef] = n;
     }
     return { activeSessionRefs, totalTasks, correctiveRounds: rounds };
 }
 function parseGrant(key, value) {
-    if (!isPlainObject(value))
+    if (!(0, shape_js_1.isPlainObject)(value))
         return undefined;
     const v = value;
-    if (v['grantId'] !== key || !GRANT_ID_RE.test(key))
+    if (v['grantId'] !== key || !validate_js_1.GRANT_ID_RE.test(key))
         return undefined;
     const epochRef = v['epochRef'];
-    if (!isPlainObject(epochRef) ||
+    if (!(0, shape_js_1.isPlainObject)(epochRef) ||
         typeof epochRef['controllerId'] !== 'string' ||
-        !isPositiveInt(epochRef['epoch']))
+        !(0, shape_js_1.isPositiveInt)(epochRef['epoch']))
         return undefined;
     const usage = parseUsage(v['usage']);
     if (usage === undefined)
@@ -155,18 +138,18 @@ function parseGrant(key, value) {
     if (typeof v['repository'] !== 'string' ||
         typeof v['sourceResource'] !== 'string' ||
         typeof v['branchPattern'] !== 'string' ||
-        !isStringArray(taskRefs) ||
-        !isStringArray(operations) ||
+        !(0, shape_js_1.isStringArray)(taskRefs) ||
+        !(0, shape_js_1.isStringArray)(operations) ||
         operations.length === 0 ||
         !operations.every((op) => OPERATIONS.has(op)) ||
-        !isPositiveInt(v['maxActiveSessions']) ||
-        !isPositiveInt(v['maxTotalTasks']) ||
-        !isNonNegativeInt(v['maxCorrectiveRounds']) ||
-        !isIsoTime(v['expiresAt']) ||
-        !isIsoTime(v['createdAt']) ||
+        !(0, shape_js_1.isPositiveInt)(v['maxActiveSessions']) ||
+        !(0, shape_js_1.isPositiveInt)(v['maxTotalTasks']) ||
+        !(0, shape_js_1.isNonNegativeInt)(v['maxCorrectiveRounds']) ||
+        !(0, shape_js_1.isIsoTime)(v['expiresAt']) ||
+        !(0, shape_js_1.isIsoTime)(v['createdAt']) ||
         typeof v['owner'] !== 'string' ||
         typeof v['controllerId'] !== 'string' ||
-        (v['revokedAt'] !== undefined && !isIsoTime(v['revokedAt'])))
+        (v['revokedAt'] !== undefined && !(0, shape_js_1.isIsoTime)(v['revokedAt'])))
         return undefined;
     return {
         grantId: key,
@@ -200,10 +183,10 @@ function parseGrants(raw) {
     catch {
         return undefined;
     }
-    if (!isPlainObject(parsed) || parsed['version'] !== 1)
+    if (!(0, shape_js_1.isPlainObject)(parsed) || parsed['version'] !== 1)
         return undefined;
     const grantsValue = parsed['grants'];
-    if (!isPlainObject(grantsValue))
+    if (!(0, shape_js_1.isPlainObject)(grantsValue))
         return undefined;
     const grants = Object.create(null);
     for (const [key, record] of Object.entries(grantsValue)) {
@@ -247,29 +230,12 @@ function writeGrants(dataDir, grants) {
     (0, config_js_1.ensureOwnerOnlyDir)(stateDir);
     const file = (0, config_js_1.resolveGrantsPath)(dataDir);
     (0, config_js_1.assertOwnerOnlyFile)(file);
-    const tmp = path.join(stateDir, `grants.json.tmp-${process.pid}-${crypto.randomUUID()}`);
-    const fd = fs.openSync(tmp, 'wx', 0o600);
-    try {
-        fs.writeFileSync(fd, `${JSON.stringify(grants, null, 2)}\n`, 'utf8');
-        fs.fsyncSync(fd);
-    }
-    finally {
-        fs.closeSync(fd);
-    }
-    try {
-        fs.chmodSync(tmp, 0o600);
-        fs.renameSync(tmp, file);
-    }
-    catch (err) {
-        fs.rmSync(tmp, { force: true });
-        throw err;
-    }
-    fs.chmodSync(file, 0o600);
+    (0, config_js_1.writeFileAtomicOwnerOnly)(file, `${JSON.stringify(grants, null, 2)}\n`);
 }
 function deny(code, reason, message) {
     return { ok: false, code, reason, message };
 }
-function isExpired(grant, now) {
+function grantIsExpired(grant, now) {
     return now.getTime() >= Date.parse(grant.expiresAt);
 }
 /**
@@ -281,7 +247,7 @@ function evaluateScope(grant, request, now) {
     if (grant.revokedAt !== undefined) {
         return deny('JULES_AUTHORITY_DENIED', 'revoked', `grant ${grant.grantId} was revoked`);
     }
-    if (isExpired(grant, now)) {
+    if (grantIsExpired(grant, now)) {
         return deny('JULES_GRANT_EXPIRED', 'expired', `grant ${grant.grantId} expired at ${grant.expiresAt}`);
     }
     if (request.repository !== grant.repository ||
@@ -377,7 +343,7 @@ function chargeGrant(grant, charge) {
     return { ...grant, usage };
 }
 /** Frees an active-session slot only; tasks and corrective rounds are spent for good. */
-function releaseGrant(grant, localRequestId, _reason) {
+function releaseGrant(grant, localRequestId) {
     if (!grant.usage.activeSessionRefs.includes(localRequestId))
         return grant;
     return {
@@ -414,7 +380,7 @@ function listGrants(dataDir, now) {
     const file = loadGrants(dataDir);
     return Object.values(file.grants).map((grant) => ({
         ...grant,
-        expired: isExpired(grant, now),
+        expired: grantIsExpired(grant, now),
         revoked: grant.revokedAt !== undefined,
     }));
 }
@@ -443,7 +409,7 @@ async function revokeGrant(dataDir, grantId, now) {
  * that no longer exists (hand-removed file) is a no-op; a corrupt grants file
  * still fails loud.
  */
-async function releaseSlotInStore(dataDir, grantId, localRequestId, reason) {
+async function releaseSlotInStore(dataDir, grantId, localRequestId) {
     return (0, state_js_1.withJournalLock)(dataDir, async () => {
         const file = loadGrants(dataDir);
         const grant = file.grants[grantId];
@@ -451,7 +417,7 @@ async function releaseSlotInStore(dataDir, grantId, localRequestId, reason) {
             !grant.usage.activeSessionRefs.includes(localRequestId)) {
             return false;
         }
-        writeGrants(dataDir, updateGrant(file, grantId, (g) => releaseGrant(g, localRequestId, reason)));
+        writeGrants(dataDir, updateGrant(file, grantId, (g) => releaseGrant(g, localRequestId)));
         return true;
     });
 }
