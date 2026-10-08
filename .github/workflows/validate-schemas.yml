@@ -1519,7 +1519,7 @@ jobs:
               # failure whenever CI is set).
               plugins/yellow-debt/tests) continue ;;
               # Its own job below: its timing-heavy suite alone outlasts
-              # what this job's 10 minutes leave after the required suites.
+              # what this job's 15 minutes leave after the required suites.
               plugins/yellow-ruvector/tests) continue ;;
             esac
             echo "::group::bats $d"

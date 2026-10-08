@@ -760,6 +760,8 @@ pr_with_finding() {
     p=$(command -v "$b") && ln -sf "$p" "$BATS_TEST_TMPDIR/noctags/$b"
   done
   ln -sf "$BATS_TEST_DIRNAME/mocks/gh" "$BATS_TEST_TMPDIR/noctags/gh"
+  PATH="$BATS_TEST_TMPDIR/noctags" run command -v ctags
+  [ "$status" -eq 1 ]
   PATH="$BATS_TEST_TMPDIR/noctags" observe "$H" "[$(finding u.js 2 '{"scope":"handlers.createUser"}'), $(finding u.js 5 '{"scope":"admin.createUser"}')]" >/dev/null
   [ "$(fold | jq '.findings | length')" -eq 2 ]
   [ "$(fold | jq -r '[.findings[].obs.scope_status] | unique | join(",")')" = unscoped ]
@@ -782,6 +784,17 @@ require_universal_ctags() {
   RL_CTAGS_STATE=no CI= run require_universal_ctags
   [ "$status" -eq 0 ]
   [[ "$output" == "skipped: "* ]]
+}
+
+@test "CLAUDE-49: a failing ctags is reported on stderr and the scope stays unverified" {
+  source "$RL"
+  mkdir -p "$BATS_TEST_TMPDIR/badctags"
+  printf '#!/bin/sh\necho "ctags: boom" >&2\nexit 3\n' >|"$BATS_TEST_TMPDIR/badctags/ctags"
+  chmod +x "$BATS_TEST_TMPDIR/badctags/ctags"
+  printf 'def run():\n    pass\n' >|blob.content
+  RL_CTAGS_STATE=yes PATH="$BATS_TEST_TMPDIR/badctags:$PATH" run rl_ctags_scope "$PWD/blob.content" a.py 1 run
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"[review-ledger] ctags exited 3: ctags: boom"* ]]
 }
 
 @test "CLAUDE-49: with universal-ctags, swapped claims resolve to the true scope" {
