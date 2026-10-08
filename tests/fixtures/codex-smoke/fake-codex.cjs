@@ -29,9 +29,16 @@ if (args.includes('--version')) {
   process.exit(0);
 }
 assert.deepEqual(args.slice(0, 2), ['--disable', 'remote_plugin']);
+const pluginVersion = JSON.parse(
+  fs.readFileSync(
+    path.join(source, 'plugins/yellow-core/.codex-plugin/plugin.json'),
+    'utf8'
+  )
+).version;
 const installedPath = path.join(
   home,
-  'plugins/cache/yellow-plugins/yellow-core/2.6.2'
+  'plugins/cache/yellow-plugins/yellow-core',
+  pluginVersion
 );
 if (args.includes('marketplace')) {
   emit({});
@@ -71,7 +78,7 @@ if (args.includes('add')) {
   }
   emit({
     pluginId: 'yellow-core@yellow-plugins',
-    version: '2.6.2',
+    version: pluginVersion,
     installedPath:
       scenario === 'escape'
         ? path.join(source, 'plugins/yellow-core')
@@ -85,7 +92,7 @@ if (args.includes('list')) {
     installed: [
       {
         pluginId: 'yellow-core@yellow-plugins',
-        version: '2.6.2',
+        version: pluginVersion,
         installed: true,
         enabled: scenario !== 'disabled-plugin',
       },
