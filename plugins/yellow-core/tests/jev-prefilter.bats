@@ -250,3 +250,21 @@ _shadow_direct() {
   jq -e '.model == "jev-1.13.0" and .input_tokens == null' "$STAGING/jev-shadow/$SESSION_ID.json"
   ! grep -q leaked "$STAGING/jev-shadow/$SESSION_ID.json"
 }
+
+@test "a lock with no pid is cleared after the grace period" {
+  COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
+  hash=$(jq -r '.content_hash' "$STAGING/pending/$SESSION_ID.jsonl")
+  rm -f "$STAGING/jev-shadow/$SESSION_ID.json"
+  mkdir "$STAGING/jev-shadow/.$SESSION_ID.lock"
+  _shadow_direct "$hash"
+  [ -f "$STAGING/jev-shadow/$SESSION_ID.json" ]
+  [ ! -e "$STAGING/jev-shadow/.$SESSION_ID.lock" ]
+}
+
+@test "a failed call for a newer turn retires the older record" {
+  COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
+  [ -f "$STAGING/jev-shadow/$SESSION_ID.json" ]
+  printf '%s\n' '{"type":"user","message":{"content":"a newer turn"}}' >> "$TRANSCRIPT_FILE"
+  COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 MOCK_JEV_FAIL=1 _capture
+  [ ! -e "$STAGING/jev-shadow/$SESSION_ID.json" ]
+}

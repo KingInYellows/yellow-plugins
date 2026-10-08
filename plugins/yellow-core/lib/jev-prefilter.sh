@@ -109,12 +109,56 @@ jev_build_request() {
   }'
 }
 
+# Print the content hash of the session's current staging entry: pending/
+# when present, else processing/ (a drain may have claimed it).
+jev_current_hash() {
+  local entry="${1}/pending/${2}.jsonl"
+  [ -f "$entry" ] || entry="${1}/processing/${2}.jsonl"
+  jq -r '.content_hash // empty' "$entry" 2>/dev/null | tail -n 1
+}
+
+# Take a per-session mkdir lock (path $1). Waits up to ~2 s. Clears a lock
+# whose owner has exited, or one left with no pid after a 1 s grace (its
+# owner died between mkdir and writing the pid). Returns 1 if not acquired.
+jev_lock() {
+  local lock="$1" owner i=0
+  until mkdir "$lock" 2>/dev/null; do
+    i=$((i + 1))
+    [ "$i" -le 40 ] || return 1
+    owner=$(cat "${lock}/pid" 2>/dev/null)
+    if { [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; } \
+      || { [ -z "$owner" ] && [ "$i" -gt 20 ]; }; then
+      rm -rf -- "$lock" 2>/dev/null
+      continue
+    fi
+    sleep 0.05
+  done
+  printf '%s' "${BASHPID:-$$}" > "${lock}/pid" 2>/dev/null
+  return 0
+}
+
 # Ask Jev about one session and record the answer as its shadow record.
 # Args: $1 staging dir, $2 session id, $3 content hash; stdin: redacted tail.
 jev_prefilter_shadow() {
   local staging="$1" sid="$2" hash="$3"
   jev_prefilter_enabled || return 0
   [ -n "$staging" ] && [ -d "$staging" ] || return 0
+
+  # When this turn is the session's current entry, any record for an older
+  # content hash is retired now, so a failed or malformed answer below
+  # cannot leave a stale prediction beside the newer entry. A late call for
+  # an older turn finds its hash is not current and leaves the record alone.
+  local rec_dir="${staging}/jev-shadow" rec_lock
+  ( umask 077; mkdir -p "$rec_dir" ) 2>/dev/null || return 0
+  rec_lock="${rec_dir}/.${sid}.lock"
+  if jev_lock "$rec_lock"; then
+    if [ "$(jev_current_hash "$staging" "$sid")" = "$hash" ] \
+      && [ -f "${rec_dir}/${sid}.json" ] \
+      && [ "$(jq -r '.content_hash // empty' "${rec_dir}/${sid}.json" 2>/dev/null)" != "$hash" ]; then
+      rm -f -- "${rec_dir}/${sid}.json" 2>/dev/null
+    fi
+    rm -rf -- "$rec_lock" 2>/dev/null
+  fi
 
   local dialogue state body resp latency
   dialogue=$(jev_project_dialogue)
@@ -184,38 +228,21 @@ JEVCFG
   [ -n "$line" ] || return 0
 
   # Captures are detached per turn, so a slow answer can land after a newer
-  # turn's. Under a per-session lock, keep it only while it still matches
-  # the session's current entry: pending/ if present, else processing/ (a
-  # drain may have claimed it mid-request). Check and rename share the lock,
-  # so a newer turn's record cannot be replaced by an older answer.
-  local dir="${staging}/jev-shadow" tmp lock owner current i=0
-  ( umask 077; mkdir -p "$dir" ) 2>/dev/null || return 0
+  # turn's. Under the session lock, keep it only while it still matches the
+  # session's current entry: pending/ if present, else processing/ (a drain
+  # may have claimed it mid-request).
+  local dir="${staging}/jev-shadow" tmp lock current
   tmp=$(mktemp "${dir}/.tmp.XXXXXX" 2>/dev/null) || return 0
   printf '%s\n' "$line" > "$tmp" 2>/dev/null || { rm -f -- "$tmp"; return 0; }
 
   lock="${dir}/.${sid}.lock"
-  until mkdir "$lock" 2>/dev/null; do
-    owner=$(cat "${lock}/pid" 2>/dev/null)
-    if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
-      rm -rf -- "$lock" 2>/dev/null
-      continue
+  if jev_lock "$lock"; then
+    current=$(jev_current_hash "$staging" "$sid")
+    if [ "$current" = "$hash" ]; then
+      mv -f -- "$tmp" "${dir}/${sid}.json" 2>/dev/null
     fi
-    i=$((i + 1))
-    if [ "$i" -gt 40 ]; then
-      rm -f -- "$tmp" 2>/dev/null
-      return 0
-    fi
-    sleep 0.05
-  done
-  printf '%s' "${BASHPID:-$$}" > "${lock}/pid" 2>/dev/null
-
-  local entry="${staging}/pending/${sid}.jsonl"
-  [ -f "$entry" ] || entry="${staging}/processing/${sid}.jsonl"
-  current=$(jq -r '.content_hash // empty' "$entry" 2>/dev/null | tail -n 1)
-  if [ "$current" = "$hash" ]; then
-    mv -f -- "$tmp" "${dir}/${sid}.json" 2>/dev/null
+    rm -rf -- "$lock" 2>/dev/null
   fi
   rm -f -- "$tmp" 2>/dev/null
-  rm -rf -- "$lock" 2>/dev/null
   return 0
 }

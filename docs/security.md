@@ -469,7 +469,7 @@ third party, TypeSafe AI (`https://api.typesafe.ai/v1/systemone`):
 - **Local record.** `compound-staging/jev-shadow/<session_id>.json`, replaced
   atomically each turn under a per-session lock (an answer whose content
   hash no longer matches the session's pending, or else processing, entry is
-  dropped), holds the session id, content hash, choice,
+  dropped, and a newer turn retires the older record before its own call), holds the session id, content hash, choice,
   probabilities, latency and token count, never transcript text. It sits in
   the same owner-only staging directory as the pending queue.
 - **Failure mode.** Fail-open and shadow only: it runs after the pending entry
