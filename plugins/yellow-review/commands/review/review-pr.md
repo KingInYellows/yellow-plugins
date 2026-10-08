@@ -966,7 +966,9 @@ Apply the aggregation steps from
 
 #### Quality gates (intent verification)
 
-Before reporting any P0 or P1 finding:
+Before reporting any P0 or P1 finding, and before Step 7 takes a P2 finding
+into its high-confidence tier (every P2 `safe_auto` finding owned by
+`review-fixer` with a `suggested_fix` and anchor 100):
 
 - **Line accuracy.** Verify the cited line number against the file
   content. A finding pointing to the wrong line is worse than no finding;
@@ -975,7 +977,7 @@ Before reporting any P0 or P1 finding:
   deleting or adding to `.gitignore` files in `docs/brainstorms/`,
   `plans/`, `docs/solutions/`, or `docs/research/`. These are pipeline
   artifacts.
-- **Skim-FP check.** For each surviving P0/P1, verify the surrounding
+- **Skim-FP check.** For each surviving P0/P1 and tier candidate, verify the surrounding
   code was actually examined. Look for the "bug" handled elsewhere in the
   same function, the "unused import" used in a type annotation, the
   "missing null check" guarded by the caller. Drop findings that fail
@@ -994,14 +996,27 @@ For surviving P0/P1 findings with `autofix_class: safe_auto` and a
 non-null `suggested_fix`: apply sequentially using Edit tool. Review each
 change for correctness before proceeding to next.
 
-**Severity gate is deliberate.** P2 / P3 `safe_auto` findings are NOT
-auto-applied even though the reviewer marked them safe — they route to
-the Residual Actionable Work section. Wave 2 chose the conservative gate
-(P0/P1 only) because P2/P3 findings tend to be style or maintenance
-preferences where the cost of churn from auto-applied changes can
-outweigh the fix value. To auto-apply a P2 `safe_auto` finding, an
-orchestrator must promote it to P1 based on additional evidence; the
-default is human review.
+**High-confidence P2 tier.** Also apply, after the P0/P1 fixes, up to 5
+surviving P2 findings in the in-skill fixer queue (`autofix_class: safe_auto`
+and `owner: review-fixer`) that have a non-null `suggested_fix` and anchor 100
+after Step 6 (a lone reviewer at 100, or two reviewers at 75 promoted by
+sub-step 3). Take them in Step 6's sort order. They have already passed all
+three quality gates (line accuracy, protected-artifact filter, skim-FP), which
+run before the ledger write, so a dropped candidate is never recorded as
+pending. A P2 finding whose owner Step 6 narrowed to `human` or `release` is
+never in this tier. The rest of the P2 `safe_auto` findings go to Residual
+Actionable Work. This tier applies in both modes: interactive runs still
+confirm the push in Step 9.
+
+**Severity gate is deliberate below that tier.** P3 `safe_auto` findings and
+P2 `safe_auto` findings below anchor 100 or past the cap are NOT auto-applied
+even though the reviewer marked them safe: they route to the Residual
+Actionable Work section, because low-confidence and low-severity findings tend
+to be style or maintenance preferences where the churn of an auto-applied
+change can outweigh the fix value. The ledger keeps them, and `/review:sweep`
+reports a PR with pending P0-P2 findings as not merge-ready. To auto-apply one
+of them, an orchestrator must promote it to P1 based on additional evidence;
+the default is human review.
 
 For `gated_auto`/`manual` findings: do not apply automatically. List in
 the Residual Actionable Work section of the report.
