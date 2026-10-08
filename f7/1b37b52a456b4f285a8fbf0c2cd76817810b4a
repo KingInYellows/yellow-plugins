@@ -1,0 +1,25 @@
+plugins/yellow-core/lib/plan-gate-provenance.sh
+  s_5a877dc01e3810::t_5175abb4f741ae 28-36,39,42,44,418-430,498
+plugins/yellow-core/tests/plan-gate-tier.bats
+  s_5a877dc01e3810::t_5175abb4f741ae 114,116-131,133
+.changeset/gate-c-commit-subject-provenance.md
+  s_5a877dc01e3810::t_5175abb4f741ae 13-14
+docs/solutions/workflow/plan-lifecycle-management.md
+  s_5a877dc01e3810::t_5175abb4f741ae 464-466
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f71b37b52a456b4f285a8fbf0c2cd76817810b4a",
+  "prompts": {},
+  "sessions": {
+    "s_5a877dc01e3810": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6401b8c8-03bf-423a-a3e5-81d4258d52d9",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
