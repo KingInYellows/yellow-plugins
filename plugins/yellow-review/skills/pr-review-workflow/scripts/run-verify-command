@@ -88,6 +88,11 @@
 #   error (including run-only flags next to a revert flag, and a run
 #   without --ignored-since), no --trusted,
 #   unreadable --command-file or --files-from, not in a git repository, a
+#   git config harden_git_config refuses in any mode (a non-numeric
+#   GIT_CONFIG_COUNT, an override that did not take, or a repository-local
+#   or worktree non-LFS filter command; a run also refuses a local
+#   core.sshCommand, core.askPass, core.gitProxy or credential helper, which
+#   the revert and check-ignored modes leave alone; the tree is untouched), a
 #   refused path (not canonical, deny-listed when running, gitignored or
 #   unverifiable, or without changes when running), a change outside the
 #   listed files, an ignored file changed since the --ignored-since marker (or

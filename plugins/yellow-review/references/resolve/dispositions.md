@@ -475,6 +475,16 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
     the range, and a malformed ranges file is exit 2. After a clean pre-check it
     does not fire; an interactive "include them" answer omits the flag for that
     run (file-membership checks still apply);
+- `run-verify-command` hardens git before any tree check (`harden_git_config`
+  in `lib/resolve-paths.sh`) and exits 2 with the tree untouched when it
+  refuses. Every mode refuses a non-numeric `GIT_CONFIG_COUNT`, an override
+  that did not take, and a repository-local or worktree
+  `filter.<driver>.clean|smudge|process` command (the stock Git LFS commands
+  excepted), because a checkout runs it. A run also refuses a repository-local
+  or worktree `core.sshCommand`, `core.askPass`, `core.gitProxy` or
+  `credential.helper`, as `commit-resolve-fixes` does; `--revert-only`,
+  `--revert-dirty` and `--check-ignored` leave those alone, so a resolver
+  cannot block its own rollback with one. The key is named, never its value.
 - `run-verify-command` refuses gitignored files, and when running a command also
   unchanged files, and refuses to run when the tree has changes outside the
   listed files. It does not run the command when a file is outside the PR (or
