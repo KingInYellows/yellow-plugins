@@ -12,6 +12,7 @@ tags:
   - graphite
   - yellow-review
   - yellow-core
+components: [yellow-review, yellow-core]
 ---
 
 # Check the tree before decomposing a backlog item
@@ -19,18 +20,21 @@ tags:
 ## Context
 
 Cycle 1 (`plans/cycle-1-resolve-hardening-and-ci-split.md`) was decomposed from
-Linear issues CLAUDE-44 through CLAUDE-75. Several issue texts described the
-code as it was when the issue was filed. `main` had already moved.
+Linear issues CLAUDE-44 through CLAUDE-75, several of which described code that
+`main` had already changed.
 
 ## Guidance
 
 Before writing or implementing a task, re-read the function the task names and
 the tests that pin it. Treat the plan file as the source of truth when a commit
-message and the checkboxes disagree. Mark a task `[x]` when the tree already did
-the work, so progress totals count it. Reserve `[-]` for a task the tree made
+message and the checkboxes disagree: a commit message that says a task landed
+does not close the checkbox. Mark a task `[x]` when the tree already did the
+work, so progress totals count it. Reserve `[-]` for a task the tree made
 inapplicable, and say which case applies in the PR body.
 
-Checks that changed this cycle's tasks:
+Checks that changed cycle 1's tasks. This is a plan-time snapshot as of
+2026-10-06, not a statement about today's tree; re-check each against the code
+before relying on it:
 
 - `goal-engine-compat` was already a required `ci-status` job. The CI split
   added only the yellow-review bats job.
@@ -38,8 +42,9 @@ Checks that changed this cycle's tasks:
   the PATH hit so a git-ai wrapper keeps `argv[0]` equal to `git`.
 - `harden_git_config` must not set `core.hooksPath`. Hooks stay in
   `disable_git_hooks` unless `YELLOW_REVIEW_COMMIT_HOOKS=1`.
-- FIFO, socket, and device deletion stays `rm -f` of `TO_REMOVE` before the
-  verifier. `run-verify-command.bats` is the spec.
+- `run-verify-command` in run mode refuses a FIFO, socket, or device path
+  (exit 2). The revert modes delete it with `rm -f` of `TO_REMOVE` without
+  opening it. `run-verify-command.bats` is the spec.
 - `--revert-dirty` still reverts every dirty path and takes no path list. The
   deny-list mode is a separate flag, `--revert-denied`.
 - Sweep-all Step 6 was already removed. Do not put it back.
@@ -50,7 +55,3 @@ Checks that changed this cycle's tasks:
 
 - Implementing the original issue sentence after the code has moved regresses
   the later fix. The tests that encode today's behavior are the check.
-- A commit message that says a task landed does not close the checkbox. The plan
-  file does.
-- An unreadable worktree counts as busy in `wt_busy`. A restack abort that scans
-  every worktree will keep state for a rebase that is not this stack's.

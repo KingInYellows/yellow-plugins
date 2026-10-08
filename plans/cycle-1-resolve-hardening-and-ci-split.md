@@ -469,15 +469,16 @@ Start from a base that includes `stage-unattended-learnings` and PR 3.
   Then post the mapping as the closing comment and move the five issues to
   Done (a confirmed Tier 2 transition). Leave CLAUDE-47 alone.
 - [ ] 7.3: Note on CLAUDE-72 that sub-claim 2 was already fixed.
-- [ ] 7.4: (partly done: the ledger brainstorm already has its "resolved and
-  shipped" banner; the anchor-only re-verify limit is still not stated in
+- [x] 7.4: (done: the ledger brainstorm already had its "resolved and
+  shipped" banner, and the anchor-only re-verify limit is now stated in
   `references/review-pr/ledger.md`.) Docs-only follow-up: add a "resolved, see
   `plans/complete/review-findings-ledger.md`" banner to
   `docs/brainstorms/2026-09-23-review-findings-ledger-brainstorm.md`
   and state the anchor-only re-verify limit in `references/review-pr/ledger.md`
   if it appears only in the plan.
-- [ ] 7.5: Capture the process lesson (check the code before decomposing a
-  backlog item) with `/flow:compound`.
+- [x] 7.5: Capture the process lesson (check the code before decomposing a
+  backlog item) with `/flow:compound`
+  (`docs/solutions/workflow/check-the-tree-before-decomposing-a-backlog-item.md`).
 
 ## Technical Specifications
 

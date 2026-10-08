@@ -189,9 +189,8 @@ Only when Step 7 applied at least one fix and Step 9 commits it.
    (`fix-abandoned`) only when the fix commit is unreachable from every ref,
    and otherwise stays `applied` (possibly not yet published). A proved fix
    whose anchor still matches stays `applied` for `/review:triage`:
-   anchor-only re-verify cannot tell the two apart (a later revert, or an
-   additive fix above an unchanged anchor). Anything unverifiable stays
-   `applied`.
+   anchor-only re-verify cannot tell a later revert from an additive fix
+   above an unchanged anchor. Anything unverifiable stays `applied`.
 
 3. **Push declined, failed, or skipped** (the interactive gate was rejected, or
    the provider returned an error): append nothing more. The findings stay
