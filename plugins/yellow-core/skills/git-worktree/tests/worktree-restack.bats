@@ -936,20 +936,24 @@ JSEOF
   assert_stacked
 }
 
-@test "--abort clears an in-chain rebase the provider no longer records, then restores" {
+@test "--abort keeps state when the provider no longer records an in-chain rebase" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
   [ "$status" -eq 10 ]
   rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
   run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"no record of it"* ]]
+  [ -e "$SD/state" ]
+  rebase_marker "$(wtp a)"
+  git -C "$(wtp a)" rebase --abort
+  run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 0 ]
   [[ $output == *"aborted"* ]]
   assert_all_restored
-  run rebase_marker "$(wtp a)"
-  [ "$status" -eq 1 ]
 }
 
-@test "--abort clears a rebase paused in a non-run worktree when the provider marker is gone" {
+@test "--abort keeps state when gh-stack no longer records a rebase in a non-run worktree" {
   command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
   mk_stack b
   STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
@@ -959,18 +963,21 @@ JSEOF
   [ "$status" -eq 1 ]
   rm -f "$COMMON/gh-stack-rebase-state"
   STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" abort --provider github
+  [ "$status" -eq 31 ]
+  [[ $output == *"no record of it"* ]]
+  [ -e "$SD/state" ]
+  rebase_marker "$(wtp b)"
+  git -C "$(wtp b)" rebase --abort
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" abort --provider github
   [ "$status" -eq 0 ]
   [[ $output == *"aborted"* ]]
   assert_all_restored
-  run rebase_marker "$(wtp b)"
-  [ "$status" -eq 1 ]
 }
 
 @test "--abort clears in-chain rebases in the run worktree and another worktree" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
   [ "$status" -eq 10 ]
-  rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
   plant_rebase "$(wtp c)" c b
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 0 ]
@@ -986,7 +993,6 @@ JSEOF
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
   [ "$status" -eq 10 ]
-  rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
   plant_stuck_rebase "$(wtp c)" c
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 31 ]

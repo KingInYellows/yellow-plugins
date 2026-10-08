@@ -275,6 +275,9 @@ init_paths() {
   COMMON=$(common_dir) || die "$X_USAGE" "not inside a git repository"
   STATE_DIR="$COMMON/yellow-core/worktree-restack"
   STATE_FILE="$STATE_DIR/state"
+  # Present once this run's provider abort has succeeded, so a later --abort
+  # may clear leftover in-chain rebases the provider no longer records.
+  ABORTED_FILE="$STATE_DIR/provider-aborted"
   LOCK_DIR="$STATE_DIR/lock.d"
   LOCK_GUARD="$STATE_DIR/lock.guard"
 }
@@ -387,7 +390,7 @@ write_state() {
   }
 }
 
-clear_state() { rm -f -- "$STATE_FILE" "$STATE_FILE".tmp.* 2>/dev/null; }
+clear_state() { rm -f -- "$STATE_FILE" "$STATE_FILE".tmp.* "$ABORTED_FILE" 2>/dev/null; }
 
 # read_state parses the fixed-field TSV; validate_state decides whether to trust it.
 read_state() {
@@ -1296,6 +1299,7 @@ cmd_start() {
       E_SHA+=("$sha")
     done
   fi
+  rm -f -- "$ABORTED_FILE" 2>/dev/null
   write_state || {
     release_lock
     die "$X_FAILED" "could not write the state file"
@@ -1547,22 +1551,33 @@ cmd_abort() {
   load_state_or_exit
   need_lock
   report_all_floating
+  local provider_aborted=0 left
   if [ "$S_PROVIDER" = graphite ]; then
     command -v gt >/dev/null 2>&1 || die "$X_KEPT" "gt (Graphite CLI) is not installed; state kept"
     if gt_paused "$S_RUN"; then
       note "warning: aborting rolls the whole restack back, including branches that had already restacked cleanly"
       step_graphite abort
       [ "$RESULT" = ok ] || die "$X_KEPT" "the provider's abort failed; state kept, nothing restored"
+      provider_aborted=1
     fi
   elif [ -e "$COMMON/gh-stack-rebase-state" ]; then
     step_github abort
     [ "$RESULT" = ok ] || die "$X_KEPT" "the provider's abort failed; state kept"
+    provider_aborted=1
+  fi
+  if [ "$provider_aborted" = 1 ]; then
+    (umask 077 && : >|"$ABORTED_FILE") 2>/dev/null || true
+  elif ! { [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ]; } && left=$(chain_rebase_worktree); then
+    # The provider lost its record (Graphite's .gtcontinue or gh-stack's
+    # rebase state) mid-restack, so its whole-stack rollback cannot run.
+    # Aborting only this rebase would leave branches that already restacked
+    # rebased and report success; keep everything for a manual recovery.
+    die "$X_KEPT" "a rebase of a stack branch is in progress in $(v "$left") but the provider has no record of it, so its whole-stack rollback cannot run; state kept, nothing aborted or restored. Abort that rebase by hand, reset any stack branch that already restacked, then run --abort again"
   fi
   # The provider abort only clears the rebase it recorded. Abort any other
   # in-chain git rebase (a stack branch, in whichever worktree holds it),
   # then refuse to restore while one of those worktrees is still busy.
   if ! abort_in_chain_rebases; then
-    local left
     if left=$(chain_rebase_worktree); then
       die "$X_KEPT" "a rebase operation is still in progress in $(v "$left"); state kept, nothing restored. Finish or abort it, then run --abort again"
     fi

@@ -184,11 +184,20 @@ commit made in a detached worktree during the pause (SHA and a rescue line)
 before they do anything else. With no recorded restack they print "no restack
 in progress" and exit `0`; that is not a completed restack.
 
-`--abort` also aborts a git rebase of a recorded stack branch in any of this
-stack's worktrees, not only the run worktree, and then restores. If one of
-those rebases is still in progress, it keeps the state (exit `31`) and
-restores nothing; run `--abort` again after that rebase can be cleared. A
-rebase in a worktree outside this stack is left alone.
+After the provider's own abort, `--abort` also aborts a git rebase of a
+recorded stack branch in any of this stack's worktrees, not only the run
+worktree, and then restores. If one of those rebases is still in progress, it
+keeps the state (exit `31`) and restores nothing; run `--abort` again after
+that rebase can be cleared. A rebase in a worktree outside this stack is left
+alone.
+
+If the provider has lost its record of the paused restack (Graphite's
+`.gtcontinue` or gh-stack's rebase state) while a stack branch is still
+mid-rebase, `--abort` refuses: its whole-stack rollback cannot run, and
+aborting only the paused rebase would leave branches that already restacked
+rebased. It keeps the state (exit `31`) and aborts and restores nothing. Abort
+that rebase by hand, reset any stack branch that already restacked, then run
+`--abort` again.
 
 ## Recovery
 
