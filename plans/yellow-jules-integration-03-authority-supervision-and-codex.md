@@ -382,10 +382,10 @@ through the generator and documenting the single-controller handoff procedure.
 
 ### Phase G: tests (R52 PR3 scenarios, by name)
 
-- [ ] Step 31: Extend `tests/fake-http-server.ts` and `tests/fake-sdk.ts`.
+- [x] Step 31: Extend `tests/fake-http-server.ts` and `tests/fake-sdk.ts`.
   - **Fake HTTP server:** request-body capture, plus per-route failure injection: 429, 500/502/503/504, drop after dispatch, invalid 2xx.
   - **`FakeSdkAdapter`:** `createSession`, `sendMessage` and `approvePlan`, with call logging.
-- [ ] Step 32: Add the new test files.
+- [x] Step 32: Add the new test files.
   - `tests/authority.test.ts` covers `evaluateAuthority` ordering, ceilings, and charge and release rules.
   - `tests/controller.test.ts` covers:
     - a missing, mismatched-epoch, or moved data dir → `JULES_CONTROLLER_MISMATCH`;
@@ -408,7 +408,7 @@ through the generator and documenting the single-controller handoff procedure.
     - **outside-activity pause** and `--clear-pause` gating;
     - **`dedupWindowExceeded`** → `check-failed`;
     - **supervision with `verification: unavailable`** never accepts.
-- [ ] Step 33: Update the existing tests.
+- [x] Step 33: Update the existing tests.
   - In `tests/offline-coverage.test.ts:414-440`, narrow the zero-mutating-requests test to `setup`/`list`/`status`/`collect`/`authorize --list`.
   - Add offline CLI cases for each new subcommand: stdout/stderr/exit contract, usage errors exit 2, `JULES_CONFIRMATION_REQUIRED` without `--grant-id`.
   - Update the header comments in `tests/packed-sdk-transport.test.ts:11` and `tests/cli-json-contract.test.ts`.

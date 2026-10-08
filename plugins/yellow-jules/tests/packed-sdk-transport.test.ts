@@ -6,9 +6,11 @@
  * --ignore-scripts` from runtime/package-lock.json), which also exercises the
  * install and runtime/pin.json verification. Every scenario then drives the
  * real SDK against the loopback fake server and asserts the exact ordered
- * server-side request sequence. Mutating SDK calls happen only here, in test
- * code, through the adapter's pure builders: the shipped runtime compiles no
- * mutating path in PR2 (R52).
+ * server-side request sequence. The first blocks drive the SDK through the
+ * adapter's pure builders; the "writes through the shipped adapter" block (PR3)
+ * drives `JulesSdkAdapter.createSession`, `sendMessage`, and `approvePlan` —
+ * the code the runtime actually calls — and asserts the serialized request
+ * bodies, the one-POST-each count, and the dispatched-or-not classification.
  *
  * These rows prove request shape, count, and side effects against
  * illustrative response bodies — not vendor response compatibility.
@@ -831,6 +833,253 @@ describe('review regressions through the real SDK', () => {
     expect(
       server.log.filter((r) => r.path === '/v1alpha/sources').length
     ).toBeLessThanOrEqual(2);
+  });
+});
+
+async function connectAdapter(): Promise<JulesSdkAdapter> {
+  return JulesSdkAdapter.connect({
+    sdk,
+    dataDir,
+    apiKey: API_KEY,
+    baseUrl,
+    postCount: () => guard?.postCount() ?? 0,
+  });
+}
+
+const ADAPTER_CREATE = {
+  prompt: 'Investigate only. Do not change files.',
+  owner: 'octo',
+  repo: 'repo',
+  baseBranch: 'main',
+  title: `[yellow:jl-${'b'.repeat(32)}] investigate`,
+};
+
+async function failureOf(run: () => Promise<unknown>): Promise<AdapterError> {
+  try {
+    await run();
+  } catch (err) {
+    if (err instanceof AdapterError) return err;
+    throw err;
+  }
+  throw new Error('expected an AdapterError');
+}
+
+describe('writes through the shipped adapter (PR3, R9, R12, R16)', () => {
+  it('createSession sends one GET then one POST with plan approval required and auto-PR off', async () => {
+    const adapter = await connectAdapter();
+    try {
+      const created = await adapter.createSession(ADAPTER_CREATE);
+      expect(created.sessionResource).toMatch(/^sessions\/\d+$/);
+    } finally {
+      await adapter.close();
+    }
+    expect(server.paths()).toEqual([SOURCE_GET, CREATE_POST]);
+    expect(server.log[1]?.body).toMatchObject({
+      requirePlanApproval: true,
+      automationMode: 'AUTOMATION_MODE_UNSPECIFIED',
+      title: ADAPTER_CREATE.title,
+      sourceContext: {
+        source: 'sources/github/octo/repo',
+        githubRepoContext: { startingBranch: 'main' },
+      },
+    });
+    expect(server.log[1]?.body).toHaveProperty('promptDigest');
+    expect(server.log[1]?.body).not.toHaveProperty('prompt');
+    expect(server.postCount).toBe(1);
+  });
+
+  it('sendMessage sends exactly one POST to :sendMessage and does not wait for an answer', async () => {
+    server.state.sessions.set('s1', restSession('s1'));
+    const adapter = await connectAdapter();
+    try {
+      await adapter.sendMessage('sessions/s1', 'please add a test');
+    } finally {
+      await adapter.close();
+    }
+    expect(server.paths()).toEqual(['POST /v1alpha/sessions/s1:sendMessage']);
+    expect(server.log[0]?.body).toHaveProperty('promptDigest');
+    expect(server.postCount).toBe(1);
+  });
+
+  it('approvePlan sends exactly one POST to :approvePlan with an empty body', async () => {
+    server.state.sessions.set('s1', restSession('s1'));
+    const adapter = await connectAdapter();
+    try {
+      await adapter.approvePlan('sessions/s1');
+    } finally {
+      await adapter.close();
+    }
+    expect(server.paths()).toEqual(['POST /v1alpha/sessions/s1:approvePlan']);
+    expect(server.log[0]?.body ?? {}).toEqual({});
+    expect(server.postCount).toBe(1);
+  });
+
+  it.each([
+    ['a missing source', 'source-not-found'],
+    ['a 503 on the source read', 'server-error'],
+  ])(
+    '%s is a failure BEFORE dispatch: no POST, dispatched false',
+    async (label, kind) => {
+      if (kind === 'source-not-found') server.state.sources = [];
+      else {
+        server.state.overrides.push((r) =>
+          r.method === 'GET' ? { status: 503, body: {} } : undefined
+        );
+      }
+      const adapter = await connectAdapter();
+      try {
+        const err = await failureOf(() =>
+          adapter.createSession(ADAPTER_CREATE)
+        );
+        expect(err.kind).toBe(kind);
+        expect(err.dispatched).toBe(false);
+      } finally {
+        await adapter.close();
+      }
+      expect(server.postCount).toBe(0);
+      expect(label).toBeTruthy();
+    }
+  );
+
+  it.each([
+    [
+      'a 429',
+      { status: 429, body: { error: { code: 429, message: 'slow' } } },
+      'rate-limited',
+    ],
+    [
+      'a 400',
+      { status: 400, body: { error: { code: 400, message: 'bad' } } },
+      'invalid-request',
+    ],
+    [
+      'a 401',
+      { status: 401, body: { error: { code: 401, message: 'no' } } },
+      'auth',
+    ],
+    [
+      'a 500',
+      { status: 500, body: { error: { code: 500, message: 'x' } } },
+      'server-error',
+    ],
+    [
+      'a 502',
+      { status: 502, body: { error: { code: 502, message: 'x' } } },
+      'server-error',
+    ],
+    [
+      'a 503',
+      { status: 503, body: { error: { code: 503, message: 'x' } } },
+      'server-error',
+    ],
+    [
+      'a 504',
+      { status: 504, body: { error: { code: 504, message: 'x' } } },
+      'server-error',
+    ],
+    ['a dropped connection after dispatch', { lost: true as const }, 'network'],
+    ['an invalid 2xx body', { status: 200, rawBody: '{not json' }, undefined],
+  ])(
+    'createSession against %s: dispatched true, exactly one POST, never replayed',
+    async (_label, scripted, kind) => {
+      server.state.overrides.push((r) =>
+        r.method === 'POST' && r.path === '/v1alpha/sessions'
+          ? scripted
+          : undefined
+      );
+      const adapter = await connectAdapter();
+      try {
+        const err = await failureOf(() =>
+          adapter.createSession(ADAPTER_CREATE)
+        );
+        expect(err.dispatched).toBe(true);
+        if (kind !== undefined) expect(err.kind).toBe(kind);
+      } finally {
+        await adapter.close();
+      }
+      expect(server.postCount).toBe(1);
+      expect(server.paths()).toEqual([SOURCE_GET, CREATE_POST]);
+    }
+  );
+
+  it.each([
+    [
+      'sendMessage',
+      (a: JulesSdkAdapter) => a.sendMessage('sessions/s1', 'hi'),
+      ':sendMessage',
+    ],
+    [
+      'approvePlan',
+      (a: JulesSdkAdapter) => a.approvePlan('sessions/s1'),
+      ':approvePlan',
+    ],
+  ])(
+    '%s: a 503 after dispatch is dispatched true with one POST; a 404 session is a clear not-found',
+    async (_name, call, suffix) => {
+      server.state.sessions.set('s1', restSession('s1'));
+      server.state.overrides.push((r) =>
+        r.method === 'POST' && r.path.endsWith(suffix)
+          ? { status: 503, body: { error: { code: 503, message: 'x' } } }
+          : undefined
+      );
+      let adapter = await connectAdapter();
+      try {
+        const err = await failureOf(() => call(adapter));
+        expect(err.dispatched).toBe(true);
+        expect(err.kind).toBe('server-error');
+      } finally {
+        await adapter.close();
+      }
+      expect(server.postCount).toBe(1);
+
+      server.reset();
+      adapter = await connectAdapter();
+      try {
+        const err = await failureOf(() => call(adapter));
+        expect(err.dispatched).toBe(true);
+        expect(err.kind).toBe('not-found');
+      } finally {
+        await adapter.close();
+      }
+      expect(server.postCount).toBe(1);
+    }
+  );
+
+  it('without a POST counter every write failure is treated as dispatched (the safe default)', async () => {
+    server.state.sources = [];
+    const adapter = JulesSdkAdapter.connect({
+      sdk,
+      dataDir,
+      apiKey: API_KEY,
+      baseUrl,
+    });
+    try {
+      const err = await failureOf(() => adapter.createSession(ADAPTER_CREATE));
+      expect(err.dispatched).toBe(true);
+    } finally {
+      await adapter.close();
+    }
+  });
+
+  it('a full create, message, approve flow issues only the three expected writes — never a cancel, pause, resume, or delete', async () => {
+    const adapter = await connectAdapter();
+    try {
+      const created = await adapter.createSession(ADAPTER_CREATE);
+      const id = created.sessionResource.slice('sessions/'.length);
+      await adapter.sendMessage(created.sessionResource, 'ok');
+      await adapter.approvePlan(created.sessionResource);
+      expect(id).toBeTruthy();
+    } finally {
+      await adapter.close();
+    }
+    const methods = new Set(server.log.map((r) => r.method));
+    expect([...methods].sort()).toEqual(['GET', 'POST']);
+    expect(
+      server.log.some((r) =>
+        /:(cancel|pause|resume|delete)|DELETE/.test(`${r.method} ${r.path}`)
+      )
+    ).toBe(false);
+    expect(server.postCount).toBe(3);
   });
 });
 
