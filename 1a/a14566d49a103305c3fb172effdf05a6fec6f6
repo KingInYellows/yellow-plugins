@@ -1,5 +1,24 @@
 .changeset/yellow-review-revert-denied.md
   s_61e357b443f83b::t_a618426ce0cdba 1-5
+plugins/yellow-review/commands/review/resolve-stack.md
+  s_a803ba2072346f::t_ff63e8411206b2 284-285
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_a803ba2072346f::t_ff63e8411206b2 10,67-70,72,82-83,387-389,407-415,428,524-530,993-998
+  s_a803ba2072346f::t_5eb922e675e524 381
+plugins/yellow-review/CLAUDE.md
+  s_a803ba2072346f::t_ff63e8411206b2 233
+plugins/yellow-review/README.md
+  s_a803ba2072346f::t_ff63e8411206b2 169
+plugins/yellow-review/tests/skill-content.bats
+  s_a803ba2072346f::t_ff63e8411206b2 1132-1133,1135-1140,1160-1161,1165-1167
+plugins/yellow-review/skills/pr-review-workflow/references/local-scripts.md
+  s_a803ba2072346f::t_ff63e8411206b2 26-27
+plugins/yellow-review/references/resolve/dispositions.md
+  s_a803ba2072346f::t_ff63e8411206b2 505-508,571-578,608,623,632-636
+plugins/yellow-review/tests/run-verify-command.bats
+  s_a803ba2072346f::t_ff63e8411206b2 261-285,771-772
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_a803ba2072346f::t_ff63e8411206b2 174-181,442-448
 ---
 {
   "schema_version": "authorship/3.0.0",
@@ -12,6 +31,14 @@
         "tool": "claude",
         "id": "01a1136f-3de9-7031-bb1a-72979bf7d129",
         "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_a803ba2072346f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a3ef9792-3a66-4457-a831-ced6b8831557",
+        "model": "claude-opus-5-5"
       },
       "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
     }
