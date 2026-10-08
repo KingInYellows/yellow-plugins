@@ -817,10 +817,21 @@ if [ -z "$TIMEOUT_BIN" ]; then
     printf '[commit-resolve-fixes] Warning: no timeout binary with --kill-after found (timeout or gtimeout); network calls run without a time limit\n' >&2
 fi
 
+# auth_hostport <authority-text>: the host[:port] git and curl connect to. They
+# end the authority at the first '/', '?' or '#' (a backslash is cut too, as
+# some URL parsers read it as '/'), and only then drop userinfo through the
+# last '@'. Stripping through the last '@' first would read
+# git.example#@github.com as github.com while git connects to git.example.
+auth_hostport() {
+    local a="${1%%[/?#\\]*}"
+    printf '%s\n' "${a##*@}"
+}
+
 # norm_host <host[:port]>: print the lowercase host name, without userinfo or
 # port; fail when what is left is not a plain host name. Never prints a URL.
 norm_host() {
-    local h="${1##*@}"
+    local h
+    h=$(auth_hostport "$1")
     [[ "$h" =~ ^([^:]+):[0-9]*$ ]] && h="${BASH_REMATCH[1]}"
     h=$(printf '%s' "$h" | tr '[:upper:]' '[:lower:]')
     [[ "$h" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || return 1
@@ -832,7 +843,8 @@ norm_host() {
 # ssh 22), so a spelled-out default equals an absent one. Fails for a port
 # above 65535. Never prints a URL.
 norm_port() {
-    local h="${1##*@}" p="" d=""
+    local h p="" d=""
+    h=$(auth_hostport "$1")
     if [[ "$h" =~ ^[^:]+:([0-9]+)$ ]]; then
         p=$((10#${BASH_REMATCH[1]}))
         [ "$p" -le 65535 ] || return 1
@@ -849,13 +861,17 @@ norm_port() {
 # path or anything else unparseable. Never prints the URL.
 remote_parse() {
     local url="$1" scheme=ssh auth rest host port
+    # A query, a fragment or a backslash has no place in a push URL, and each
+    # one moves where git and curl end the authority (see auth_hostport):
+    # refuse it rather than guess which host the push reaches.
+    case "$url" in *[?#\\]*) return 1 ;; esac
     case "$url" in
         *://*)
             scheme=$(printf '%s' "${url%%://*}" | tr '[:upper:]' '[:lower:]')
             case "$scheme" in https|http|ssh|git) ;; *) return 1 ;; esac
             rest="${url#*://}"
             [[ "$rest" == */* ]] || return 1
-            auth="${rest%%/*}"
+            auth="${rest%%[/?#\\]*}"
             rest="${rest#*/}"
             ;;
         *)

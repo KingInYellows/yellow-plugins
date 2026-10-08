@@ -2828,3 +2828,48 @@ STUB
     rm -rf node_modules "$BATS_TEST_TMPDIR/outside-bin"
   done
 }
+
+# git and curl end a URL's authority at the first '/', '?' or '#', and only
+# then split off userinfo at the last '@'. A parser that strips through the
+# last '@' of the text before the first '/' reads
+# https://git.example#@github.com/... as github.com while git pushes to
+# git.example.
+@test "#952 4168585190: a push URL whose authority ends at ? or # before an @github.com is refused before committing (exit 3)" {
+  for url in 'https://git.example#@github.com/acme/widgets.git' \
+             'https://git.example?@github.com/acme/widgets.git' \
+             'ssh://git@git.example#@github.com/acme/widgets.git' \
+             'https://git.example/#@github.com/acme/widgets.git'; do
+    git remote remove hostcase 2>/dev/null || true
+    push_via "$url"
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted: $url" >&2; return 1; }
+    [[ "$stderr" == *"remote 'hostcase'"* ]]
+    [[ "$stderr" != *"git.example"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  done
+  ! grep -q '^node ' "$STUB_LOG"
+}
+
+@test "#952 4168585190: an active host spelled host#@github.com or host?@github.com is that host, not github.com" {
+  for active in 'git.example#@github.com' 'git.example?@github.com' 'git.example/x@github.com'; do
+    git remote remove hostcase 2>/dev/null || true
+    export GH_HOST="$active"
+    push_via https://github.com/acme/widgets.git
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted GH_HOST: $active" >&2; return 1; }
+    [[ "$stderr" == *"does not push to the active GitHub host"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  done
+  unset GH_HOST
+  for prurl in 'https://git.example#@github.com/acme/widgets/pull/7' \
+               'https://git.example?@github.com/acme/widgets/pull/7'; do
+    git remote remove hostcase 2>/dev/null || true
+    export STUB_PR_URL="$prurl"
+    push_via https://github.com/acme/widgets.git
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted PR URL: $prurl" >&2; return 1; }
+    [[ "$stderr" == *"does not push to the active GitHub host"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  done
+  ! grep -q '^node ' "$STUB_LOG"
+}
