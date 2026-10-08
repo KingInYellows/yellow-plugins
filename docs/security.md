@@ -446,9 +446,11 @@ third party, TypeSafe AI (`https://api.typesafe.ai/v1/systemone`):
 - **What leaves the machine.** The same redacted transcript tail that is
   staged locally, projected to user and assistant text only (tool calls and
   tool results are dropped) and capped at its newest 24,000 bytes, plus two
-  fixed classification questions. Redaction is `cs_redact_secrets`'s pattern list,
-  so an unrecognized secret typed into the chat can still be sent. Code diffs
-  and tool output are never sent.
+  fixed classification questions. Redaction is `cs_redact_secrets`'s pattern
+  list, so an unrecognized secret typed into the chat can still be sent. Tool
+  calls, tool results and file contents Claude reads are not sent, but text a
+  user or assistant message itself contains (a pasted diff, quoted command
+  output) is.
 - **When.** The Stop hook fires at the end of every assistant turn, so a
   session makes one call per turn (5 s timeout, `COMPOUND_JEV_TIMEOUT_S`).
 - **Credential handling.** The key is passed to curl as a config on fd 3 and

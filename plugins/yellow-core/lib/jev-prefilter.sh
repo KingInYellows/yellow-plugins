@@ -149,7 +149,8 @@ JEVCFG
     --argjson latency "$latency" \
     --argjson minconf "$JEV_SKIP_MIN_CONFIDENCE" \
     --argjson maxinst "$JEV_SKIP_MAX_INSTRUCTION" \
-    --argjson chars "${#dialogue}" '
+    --argjson chars "${#dialogue}" \
+    --arg model "${COMPOUND_JEV_MODEL:-$JEV_DEFAULT_MODEL}" '
     .answers.durable as $d
     | .answers.has_instruction as $h
     | def unit: type == "number" and . >= 0 and . <= 1;
@@ -165,7 +166,7 @@ JEVCFG
         timestamp: $ts,
         session_id: $sid,
         content_hash: $hash,
-        model: (.model // null),
+        model: $model,
         state_chars: $chars,
         latency_s: $latency,
         durable: $d.choice,
@@ -177,7 +178,8 @@ JEVCFG
           and (($d.confidence // 0) >= $minconf)
           and ($h.noul <= $maxinst)
         ),
-        input_tokens: (.usage.input_tokens // null)
+        input_tokens: (.usage.input_tokens
+          | if type == "number" then . else null end)
       }' 2>/dev/null) || return 0
   [ -n "$line" ] || return 0
 

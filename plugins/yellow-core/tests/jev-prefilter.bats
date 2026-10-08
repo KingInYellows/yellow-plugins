@@ -243,3 +243,10 @@ _shadow_direct() {
   [ -z "$(ls -A "$STAGING/jev-shadow" | grep -v '^\.' )" ]
   [ -z "$(ls -A "$STAGING/jev-shadow" | grep '^\.tmp')" ]
 }
+
+@test "response metadata cannot carry text into the record" {
+  export MOCK_JEV_RESPONSE='{"model":"user: leaked text","answers":{"durable":{"choice":"trivial-qa","confidence":0.95},"has_instruction":{"noul":0.01}},"usage":{"input_tokens":"user: leaked"}}'
+  COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
+  jq -e '.model == "jev-1.13.0" and .input_tokens == null' "$STAGING/jev-shadow/$SESSION_ID.json"
+  ! grep -q leaked "$STAGING/jev-shadow/$SESSION_ID.json"
+}
