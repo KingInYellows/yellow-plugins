@@ -22,7 +22,6 @@ import {
 import {
   loadGrants,
   releaseGrant,
-  requireGrant,
   updateGrant,
   writeGrants,
 } from './authority.js';
@@ -67,7 +66,7 @@ import {
   writeJournal,
 } from './state.js';
 import { DEFAULT_CONFIRM_DEADLINE_MS, confirmOnTty } from './tty-confirm.js';
-import type { OperationRecord, SdkAdapter } from './types.js';
+import type { GrantsFile, OperationRecord, SdkAdapter } from './types.js';
 import {
   mintLocalId,
   sourceResourceFor,
@@ -1090,6 +1089,26 @@ export async function abandon(
     const journal = await readJournal(deps.dataDir);
     // Re-check under the lock: the record may have been reconciled while the owner typed.
     const record = abandonable(journal.operations[requestId], requestId);
+    // Every check that can refuse runs BEFORE the first write, so a refusal
+    // leaves the record exactly as it was. A grant that no longer exists holds
+    // no slot, but one that does must still be bound to this controller.
+    let grants: GrantsFile | undefined;
+    let grantId: string | undefined;
+    if (record.kind === 'create' && record.grantId !== undefined) {
+      const loaded = loadGrants(deps.dataDir);
+      const grant = loaded.grants[record.grantId];
+      if (grant !== undefined) {
+        assertControllerAuthority(
+          ctx.controllerDir,
+          deps.dataDir,
+          grant.epochRef
+        );
+        if (grant.usage.activeSessionRefs.includes(record.localRequestId)) {
+          grants = loaded;
+          grantId = grant.grantId;
+        }
+      }
+    }
     const now = nowFn(deps)().toISOString();
     journal.operations[requestId] = applyRetention({
       ...record,
@@ -1099,25 +1118,17 @@ export async function abandon(
       updatedAt: now,
     });
     await writeJournal(deps.dataDir, journal);
-
+    // Journal first: a crash before the next line leaks a slot, which only
+    // makes the grant stricter.
     let slotReleased = false;
-    if (record.kind === 'create' && record.grantId !== undefined) {
-      const grants = loadGrants(deps.dataDir);
-      const grant = requireGrant(grants, record.grantId);
-      assertControllerAuthority(
-        ctx.controllerDir,
+    if (grants !== undefined && grantId !== undefined) {
+      writeGrants(
         deps.dataDir,
-        grant.epochRef
+        updateGrant(grants, grantId, (g) =>
+          releaseGrant(g, record.localRequestId, 'abandon')
+        )
       );
-      if (grant.usage.activeSessionRefs.includes(record.localRequestId)) {
-        writeGrants(
-          deps.dataDir,
-          updateGrant(grants, grant.grantId, (g) =>
-            releaseGrant(g, record.localRequestId, 'abandon')
-          )
-        );
-        slotReleased = true;
-      }
+      slotReleased = true;
     }
     return {
       operation: 'abandon' as const,

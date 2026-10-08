@@ -99,6 +99,12 @@ function deadlineFlag(value, fallback) {
 }
 function buildDeps() {
     const dataDir = (0, config_js_1.resolveDataDir)();
+    // The guard patches global fetch and can be installed once per process, but
+    // one invocation may open several adapters (reconcile, then status; status,
+    // then collect). Install on first use and share the handle: its POST counter
+    // is cumulative, and each adapter only compares samples taken within its own
+    // write, so sharing is safe.
+    let guard;
     return {
         dataDir,
         clock: runtime.REAL_CLOCK,
@@ -111,7 +117,7 @@ function buildDeps() {
             const resolved = await (0, sdk_resolver_js_1.resolveSdk)(dataDir);
             const transport = (0, test_seam_js_1.getTestTransport)();
             // Installed before the adapter exists, so no SDK request can bypass it.
-            const guard = (0, fetch_guard_js_1.installFetchGuard)({
+            guard ??= (0, fetch_guard_js_1.installFetchGuard)({
                 allowedOrigins: transport?.allowedOrigins ?? [fetch_guard_js_1.VENDOR_ORIGIN],
                 readTimeoutMs: fetch_guard_js_1.READ_TIMEOUT_MS,
             });

@@ -676,6 +676,22 @@ async function abandon(deps, args) {
         const journal = await (0, state_js_1.readJournal)(deps.dataDir);
         // Re-check under the lock: the record may have been reconciled while the owner typed.
         const record = abandonable(journal.operations[requestId], requestId);
+        // Every check that can refuse runs BEFORE the first write, so a refusal
+        // leaves the record exactly as it was. A grant that no longer exists holds
+        // no slot, but one that does must still be bound to this controller.
+        let grants;
+        let grantId;
+        if (record.kind === 'create' && record.grantId !== undefined) {
+            const loaded = (0, authority_js_1.loadGrants)(deps.dataDir);
+            const grant = loaded.grants[record.grantId];
+            if (grant !== undefined) {
+                (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef);
+                if (grant.usage.activeSessionRefs.includes(record.localRequestId)) {
+                    grants = loaded;
+                    grantId = grant.grantId;
+                }
+            }
+        }
         const now = (0, runtime_support_js_1.nowFn)(deps)().toISOString();
         journal.operations[requestId] = (0, state_js_1.applyRetention)({
             ...record,
@@ -685,15 +701,12 @@ async function abandon(deps, args) {
             updatedAt: now,
         });
         await (0, state_js_1.writeJournal)(deps.dataDir, journal);
+        // Journal first: a crash before the next line leaks a slot, which only
+        // makes the grant stricter.
         let slotReleased = false;
-        if (record.kind === 'create' && record.grantId !== undefined) {
-            const grants = (0, authority_js_1.loadGrants)(deps.dataDir);
-            const grant = (0, authority_js_1.requireGrant)(grants, record.grantId);
-            (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef);
-            if (grant.usage.activeSessionRefs.includes(record.localRequestId)) {
-                (0, authority_js_1.writeGrants)(deps.dataDir, (0, authority_js_1.updateGrant)(grants, grant.grantId, (g) => (0, authority_js_1.releaseGrant)(g, record.localRequestId, 'abandon')));
-                slotReleased = true;
-            }
+        if (grants !== undefined && grantId !== undefined) {
+            (0, authority_js_1.writeGrants)(deps.dataDir, (0, authority_js_1.updateGrant)(grants, grantId, (g) => (0, authority_js_1.releaseGrant)(g, record.localRequestId, 'abandon')));
+            slotReleased = true;
         }
         return {
             operation: 'abandon',

@@ -151,6 +151,17 @@ data-directory path this host may write from.
     Python's `pty`, `expect`) gets one, can read the code, and can answer it.
     The controls against that are the host's sandbox and what the agent is
     allowed to run, not this plugin.
+  - **Grants constrain the CLI, not the credential.** `JULES_API_KEY` is read
+    from the environment of whoever runs the CLI, so an agent whose shell holds
+    it can call the Jules API directly with `curl`: no grant, no terminal, no
+    journal entry. The fetch guard protects only the CLI's own process. Keep the
+    key out of the agent's environment (a separate UID or a keyring prompt) if
+    that matters; the plugin cannot do it for you.
+  - Inside tmux or screen, a process that can reach the owner's multiplexer
+    (`capture-pane`, `send-keys`) can read and answer the challenge on the real
+    terminal. This is the pseudo-terminal risk above by another route.
+  - `YELLOW_JULES_ACTIVE_GRANT` is a hint the agent could unset, not a control;
+    the control is the terminal challenge.
   - Expiry and pause do not stop remote work; see the containment procedure.
 
 ## Single-controller handoff (R38)

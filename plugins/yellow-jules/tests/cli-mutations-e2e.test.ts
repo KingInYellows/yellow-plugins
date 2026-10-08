@@ -476,6 +476,72 @@ describe('reply, approve and supervise through the compiled CLI', () => {
   });
 });
 
+describe('one invocation, several adapters (the fetch guard installs once)', () => {
+  it('status --session --reconcile with an unresolved reply reconciles, then reads the session, in one process', async () => {
+    const grantId = await seedGrant({ maxActiveSessions: 3 });
+    const created = await cli(
+      delegateArgs(grantId, 'scratch/one', ['--request-id', 'multi-1'])
+    );
+    expect(created.code).toBe(0);
+    const localId = String(created.json['localId']);
+
+    server.inject('POST', /:sendMessage$/, 'drop-after-accept');
+    const sent = await cli([
+      'reply',
+      '--session',
+      localId,
+      '--message',
+      'please keep it small',
+      '--grant-id',
+      grantId,
+      '--request-id',
+      'multi-reply',
+    ]);
+    expect(errorCode(sent)).toBe('JULES_UNKNOWN_OUTCOME');
+
+    // reconcile opens one adapter, the session read opens another.
+    const r = await cli(['status', '--session', localId, '--reconcile']);
+    expect(r.code).toBe(0);
+    expect(r.json['reconciled']).toEqual([
+      expect.objectContaining({ localRequestId: 'multi-reply', kind: 'reply' }),
+    ]);
+    expect(r.json['sessionResource']).toBe(created.json['sessionResource']);
+  });
+
+  it('supervise on a finished session stages artifacts (status, then collect) in one process', async () => {
+    const grantId = await seedGrant({ maxActiveSessions: 3 });
+    const created = await cli(delegateArgs(grantId, 'scratch/one'));
+    expect(created.code).toBe(0);
+    const id = String(created.json['sessionResource']).replace('sessions/', '');
+    server.state.sessions.set(id, {
+      ...(server.state.sessions.get(id) as Record<string, unknown>),
+      state: 'COMPLETED',
+    });
+    // The session's own first message, as the vendor echoes it.
+    server.state.activities.set(id, [
+      restActivity(id, 'act-1', new Date().toISOString(), {
+        userMessaged: {
+          userMessage:
+            'Implement the frobnicator exactly as the issue describes.',
+        },
+      }),
+    ]);
+    const r = await cli([
+      'supervise',
+      '--session',
+      String(created.json['localId']),
+      '--grant-id',
+      grantId,
+    ]);
+    expect(r.code).toBe(0);
+    expect(r.json).toMatchObject({
+      ok: true,
+      decision: 'needs-verification',
+      verification: 'unavailable',
+    });
+  });
+});
+
 describe('isolation', () => {
   it('nothing was written into the working directory, and no trapped tool ran', () => {
     expect(fs.readdirSync(iso.cwd)).toEqual([]);

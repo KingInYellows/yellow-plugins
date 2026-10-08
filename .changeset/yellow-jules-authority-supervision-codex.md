@@ -10,8 +10,9 @@ controller between hosts; `abandon` gives up an unresolved operation;
 `/dev/tty` itself and requires a typed challenge for `authorize`, `abandon`,
 `supervise --clear-pause`, and `authorize --take-over`, so a caller without a
 terminal cannot widen what it may do; the terminal check does not stop a
-same-UID process that allocates its own pseudo-terminal, which the README and
-CLAUDE.md state. Every write runs inside one authority critical section, a lost
+same-UID process that allocates its own pseudo-terminal, and grants do not
+constrain a process that holds `JULES_API_KEY` itself; the README and CLAUDE.md
+state both. Every write runs inside one authority critical section, a lost
 response is reported as an unknown outcome and reconciled by
 `status --reconcile` rather than replayed, and a data directory copied to
 another path cannot write. Adds six command wrappers, the host-neutral

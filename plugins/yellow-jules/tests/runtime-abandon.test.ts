@@ -1,7 +1,10 @@
+import * as fs from 'node:fs';
+
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadGrants } from '../src/authority.js';
 import { ACTIVE_GRANT_ENV } from '../src/authorize.js';
+import { controllerFilePath } from '../src/controller.js';
 import {
   AdapterError,
   AppErrorException,
@@ -171,6 +174,20 @@ describe('abandon', () => {
     expect(await codeOf(() => abandon(deps, { requestId }))).toBe(
       'JULES_AUTHORITY_DENIED'
     );
+  });
+
+  it('a controller mismatch refuses BEFORE any write: the record stays unresolved and the slot stays held', async () => {
+    await status(h.deps, { reconcile: true });
+    fs.rmSync(controllerFilePath(h.controllerDir, 'testhost'));
+    expect(await codeOf(() => abandon(h.deps, { requestId }))).toBe(
+      'JULES_CONTROLLER_MISMATCH'
+    );
+    const record = (await readJournal(h.dataDir)).operations[requestId];
+    expect(record?.status).toBe('unknown-outcome');
+    expect(record?.abandonedAt).toBeUndefined();
+    expect(
+      loadGrants(h.dataDir).grants[grantId]?.usage.activeSessionRefs
+    ).toEqual([requestId]);
   });
 
   it('a record that was already settled is not abandonable', async () => {

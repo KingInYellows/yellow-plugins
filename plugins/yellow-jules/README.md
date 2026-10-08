@@ -134,6 +134,10 @@ write grants. Writing a grant is a terminal command on any host.
   signature: a process running as your own user can edit it. The terminal code
   stops a caller with no terminal, not one that allocates its own
   pseudo-terminal. Run agents in a sandbox that matches how much you trust them.
+- Grants constrain this plugin's CLI, not your Jules credential. An agent whose
+  shell holds `JULES_API_KEY` can call the Jules API directly with no grant and
+  no terminal. Keep the key out of an agent's environment if that matters to
+  you.
 - No cancel, pause, resume, or per-session cost: the vendor API does not offer
   them, and the commands say so rather than guessing.
 - `/linear:delegate` launches through Jules only under a covering grant; with

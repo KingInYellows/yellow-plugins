@@ -28,6 +28,7 @@ import {
 } from './deadline.js';
 import { MutationErrorException, throwAppError, toAppError } from './errors.js';
 import {
+  type FetchGuardHandle,
   installFetchGuard,
   READ_TIMEOUT_MS,
   VENDOR_ORIGIN,
@@ -86,6 +87,12 @@ function deadlineFlag(value: unknown, fallback: number): number {
 
 function buildDeps(): RuntimeDeps {
   const dataDir = resolveDataDir();
+  // The guard patches global fetch and can be installed once per process, but
+  // one invocation may open several adapters (reconcile, then status; status,
+  // then collect). Install on first use and share the handle: its POST counter
+  // is cumulative, and each adapter only compares samples taken within its own
+  // write, so sharing is safe.
+  let guard: FetchGuardHandle | undefined;
   return {
     dataDir,
     clock: runtime.REAL_CLOCK,
@@ -98,7 +105,7 @@ function buildDeps(): RuntimeDeps {
       const resolved = await resolveSdk(dataDir);
       const transport = getTestTransport();
       // Installed before the adapter exists, so no SDK request can bypass it.
-      const guard = installFetchGuard({
+      guard ??= installFetchGuard({
         allowedOrigins: transport?.allowedOrigins ?? [VENDOR_ORIGIN],
         readTimeoutMs: READ_TIMEOUT_MS,
       });
