@@ -140,7 +140,7 @@ TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
 [ -n "$TOP" ] || head_fail
 REMOTE=origin
 git -C "$TOP" remote get-url origin >/dev/null 2>&1 || REMOTE=$(git -C "$TOP" remote 2>/dev/null)
-case "$REMOTE" in ''|-*|*[!A-Za-z0-9._-]*) head_fail ;; esac
+case "$REMOTE" in ''|-*|*[!A-Za-z0-9._/-]*) head_fail ;; esac
 GOT=""
 for delay in 0 1 2 4 8 16; do
   sleep "$delay"
@@ -153,9 +153,13 @@ if git -C "$TOP" cat-file -e "${GOT}:yellow-plugins.local.md" 2>/dev/null; then
   printf 'head=tracked\n'
 else
   WT=$(mktemp -d) || head_fail
-  if git -C "$TOP" cat-file -e "${GOT}:.gitignore" 2>/dev/null; then
-    git -C "$TOP" show "${GOT}:.gitignore" > "$WT/.gitignore" || { rm -rf -- "$WT"; head_fail; }
-  fi
+  GI_LS=$(git -C "$TOP" ls-tree "$GOT" -- .gitignore 2>/dev/null) || { rm -rf -- "$WT"; head_fail; }
+  GI_MODE=${GI_LS%% *}
+  case "$GI_MODE" in
+    '') ;;
+    100644|100755) git -C "$TOP" show "${GOT}:.gitignore" > "$WT/.gitignore" || { rm -rf -- "$WT"; head_fail; } ;;
+    *) rm -rf -- "$WT"; head_fail ;;
+  esac
   git -C "$TOP" --work-tree="$WT" check-ignore -q --no-index -- yellow-plugins.local.md
   rc=$?
   rm -rf -- "$WT"
