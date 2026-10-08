@@ -3,7 +3,7 @@
 # failure, timeout or interruption, save the resolver diff as a patch, revert
 # the listed files and report whether the tree is clean again.
 # Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted
-#                           [--unattended] [--ignored-since <marker-file>]
+#                           [--unattended] --ignored-since <marker-file>
 #                           [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-dirty
@@ -416,10 +416,6 @@ fi
 if [ "$MODE" = check-ignored ]; then
     [ -n "$IGNORED_SINCE" ] || die 2 "--check-ignored requires --ignored-since <marker-file>"
     [ "${#FILES[@]}" -eq 0 ] || die 2 "--check-ignored takes no file list"
-    [ -f "$IGNORED_SINCE" ] && [ ! -L "$IGNORED_SINCE" ] && [ -r "$IGNORED_SINCE" ] \
-        || die 2 "--ignored-since marker is not a readable regular file: $IGNORED_SINCE"
-    IGNORED_SINCE=$(cd -- "$(dirname -- "$IGNORED_SINCE")" && pwd)/$(basename -- "$IGNORED_SINCE") \
-        || die 2 "cannot resolve --ignored-since: $IGNORED_SINCE"
 fi
 if [ "$MODE" = run ]; then
     [ "$TRUSTED" = 1 ] || die 2 "refusing to run an untrusted verify command (pass --trusted only after the tracked-file check or user approval)"
@@ -428,12 +424,16 @@ if [ "$MODE" = run ]; then
     [ -n "$(tr -d '[:space:]' <"$COMMAND_FILE")" ] || die 2 "--command-file is empty"
     COMMAND_FILE=$(cd -- "$(dirname -- "$COMMAND_FILE")" && pwd)/$(basename -- "$COMMAND_FILE")
     # Every run, attended or not: nothing else sees resolver edits to
-    # gitignored files, so the marker is required. Resolve it now: the script
-    # changes directory below. Revert modes do not enter this block.
+    # gitignored files, so the marker is required. Revert modes do not enter
+    # this block.
     if [ -z "$IGNORED_SINCE" ]; then
         printf '[run-verify-command] Error: --ignored-since <marker-file> is required (touch the file before the resolvers start)\n' >&2
         exit 2
     fi
+fi
+# The marker is validated and resolved once for both modes that take it; the
+# script changes directory below.
+if [ "$MODE" = check-ignored ] || [ "$MODE" = run ]; then
     [ -f "$IGNORED_SINCE" ] && [ ! -L "$IGNORED_SINCE" ] && [ -r "$IGNORED_SINCE" ] \
         || die 2 "--ignored-since marker is not a readable regular file: $IGNORED_SINCE"
     IGNORED_SINCE=$(cd -- "$(dirname -- "$IGNORED_SINCE")" && pwd)/$(basename -- "$IGNORED_SINCE") \
@@ -443,8 +443,16 @@ fi
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
 cd -- "$TOP" || die 2 "cannot enter $TOP"
 # Every mode, including revert: a resolver-planted fsmonitor would run on the
-# status below. Hooks stay out of this override.
-harden_git_config || die 2 "$YR_HARDEN_MSG; the tree is untouched"
+# status below. Hooks stay out of this override. Only a run refuses a local
+# transport, credential or signing config (it is the mode that may reach a
+# submit step); the revert and check-ignored modes refuse only a non-LFS
+# filter, so a resolver cannot block its own rollback with core.sshCommand.
+# This script never commits, so the unsigned-commit note is not printed.
+if [ "$MODE" = run ]; then
+    harden_git_config full || die 2 "$YR_HARDEN_MSG; the tree is untouched"
+else
+    harden_git_config revert || die 2 "$YR_HARDEN_MSG; the tree is untouched"
+fi
 
 REASON=""
 add_reason() { REASON="${REASON:+$REASON; }$1"; }
@@ -548,17 +556,15 @@ if [ "$MODE" = run ]; then
     # tree listing above cannot see ignored files, and one may be an executable
     # the command runs (node_modules/.bin/<runner>). Exit 1 means files changed,
     # exit 2 means the check could not tell; both refuse.
-    if [ -n "$IGNORED_SINCE" ]; then
-        IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"
-        IGN_RC=0
-        IGN_HITS=$(rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH") || IGN_RC=$?
-        rm -f -- "$IGNORED_SCRATCH"
-        case "$IGN_RC" in
-            0) ;;
-            1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: ${IGN_HITS//$'\n'/, }" ;;
-            *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
-        esac
-    fi
+    IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"
+    IGN_RC=0
+    IGN_HITS=$(rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH") || IGN_RC=$?
+    rm -f -- "$IGNORED_SCRATCH"
+    case "$IGN_RC" in
+        0) ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: ${IGN_HITS//$'\n'/, }" ;;
+        *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
+    esac
 
     # Never execute files outside the PR (the resolver's list is untrusted),
     # attended or not. Unattended also never runs runner files.
@@ -701,10 +707,10 @@ run_verify() {
     TAIL_PID=$!
     start=$SECONDS
     if T=$(vr_timeout_bin); then
-        "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" bash -c "$cmd" >"$FIFO" 2>&1 </dev/null &
+        ( harden_git_config_for_verify; exec "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" bash -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
         CMD_PID=$!
     else
-        bash -c "$cmd" >"$FIFO" 2>&1 </dev/null &
+        ( harden_git_config_for_verify; exec bash -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
         CMD_PID=$!
         ( vr_watchdog "$CMD_PID" "$TIMEOUT" "$MARKER" "$KILL_AFTER" ) &
         WD_PID=$!

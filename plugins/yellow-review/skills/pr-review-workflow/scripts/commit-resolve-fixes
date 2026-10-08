@@ -572,7 +572,7 @@ SUBMIT_TIMEOUT="${YELLOW_REVIEW_SUBMIT_TIMEOUT:-300}"
 NET_TIMEOUT="${YELLOW_REVIEW_NET_TIMEOUT:-30}"
 [[ "$SUBMIT_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "YELLOW_REVIEW_SUBMIT_TIMEOUT must be a positive integer"
 [[ "$NET_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "YELLOW_REVIEW_NET_TIMEOUT must be a positive integer"
-TIMEOUT_BIN=$(vr_timeout_bin || true)
+TIMEOUT_BIN=
 # TERM first, then KILL after a short grace so a process that traps TERM
 # cannot outlive the bound.
 KILL_GRACE=5
@@ -593,16 +593,23 @@ gh() { bounded "$NET_TIMEOUT" "$GH_BIN" "$@"; }
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
 cd -- "$TOP"
 
-# gt and node are found through PATH. A PATH entry inside the working tree (an
-# ignored <repo>/node_modules/.bin, say), or a symlink outside it whose
-# canonical file is inside, lets a resolver replace one with no tracked change,
-# and the first call would run it with submission authority. Refuse that file
-# before exec. Empty and relative PATH entries are dropped and the cleaned PATH
-# is exported, so a later bare name cannot land on one this walk skipped. A
-# tool outside the worktree is not judged, and one that cannot be found is left
-# to the "not found" handling. gh and jq were bound above. No tool has run.
+# gt, node and the timeout binaries are found through PATH. A PATH entry inside
+# the working tree (an ignored <repo>/node_modules/.bin, say), or a symlink
+# outside it whose canonical file is inside, lets a resolver replace one with no
+# tracked change, and the first call would run it with submission authority.
+# This runs before anything on PATH executes (the timeout probe included):
+#   1. Empty and relative entries are dropped, and an empty result is refused,
+#      because an empty PATH makes bash search the working directory.
+#   2. Each tool is resolved through yr_resolve_tool and refused when its
+#      canonical file, or the PATH hit itself, is inside the worktree. The
+#      absolute PATH hit is kept in TOOL_BIN_<tool> and run by that path.
+#   3. Entries inside the worktree are dropped from the exported PATH, so a
+#      child lookup of any other name (git, env, gh) cannot land in a
+#      resolver-writable directory either.
+# A tool outside the worktree is not judged, and one that cannot be found is
+# left to the "not found" handling. gh and jq were bound above. No tool has run.
 check_tools_outside_repo() {
-    local tool root canon hit dir entry rest cleaned
+    local tool root canon hit rc dir entry rest cleaned kept
     root=$(yr_worktree_root) || die 3 "cannot resolve the repository root to verify the tools on PATH; nothing committed"
     cleaned=""
     rest="${PATH}:"
@@ -613,40 +620,56 @@ check_tools_outside_repo() {
             /*) cleaned="${cleaned:+$cleaned:}$entry" ;;
         esac
     done
+    [ -n "$cleaned" ] || die 3 "PATH has no absolute entry, so the tools on it cannot be verified; nothing committed"
     PATH=$cleaned
     export PATH
     hash -r 2>/dev/null || true
     for tool in "$@"; do
-        hit=""
-        rest="${PATH}:"
-        while [ -n "$rest" ]; do
-            dir="${rest%%:*}"
-            rest="${rest#*:}"
-            [ -n "$dir" ] || continue
-            if [ -f "$dir/$tool" ] && [ -x "$dir/$tool" ]; then
-                hit="$dir/$tool"
-                break
-            fi
-        done
-        [ -n "$hit" ] || continue
-        canon=$(yr_canon_path "$hit") || die 3 "cannot resolve $tool; nothing committed"
-        if yr_inside_root "$canon" "$root" || yr_inside_root "$hit" "$root"; then
-            die 3 "$tool resolves to $canon inside the repository, where a resolver can replace it; remove that directory from PATH; nothing committed"
-        fi
+        rc=0
+        hit=$(yr_resolve_tool "$tool") || rc=$?
+        case "$rc" in
+            0) printf -v "TOOL_BIN_$tool" '%s' "$hit" ;;
+            1) ;;
+            2)
+                canon=$(yr_canon_path "$(type -P "$tool")" 2>/dev/null || true)
+                die 3 "$tool resolves to ${canon:-a file} inside the repository, where a resolver can replace it; remove that directory from PATH; nothing committed"
+                ;;
+            *) die 3 "cannot resolve $tool; nothing committed" ;;
+        esac
     done
+    kept=""
+    rest="${PATH}:"
+    while [ -n "$rest" ]; do
+        dir="${rest%%:*}"
+        rest="${rest#*:}"
+        canon=$(yr_canon_path "$dir" 2>/dev/null || true)
+        if yr_inside_root "$dir" "$root" || { [ -n "$canon" ] && yr_inside_root "$canon" "$root"; }; then
+            continue
+        fi
+        kept="${kept:+$kept:}$dir"
+    done
+    [ -n "$kept" ] || die 3 "every PATH entry is inside the repository, where a resolver can replace a tool; nothing committed"
+    PATH=$kept
+    export PATH
+    hash -r 2>/dev/null || true
 }
-# gh and jq were bound above to a canonical file outside the worktree.
-# gt and node stay on this directory check; their argv is not rewritten.
+# gh and jq were bound above to a canonical file outside the worktree. gt and
+# node are bound by check_tools_outside_repo to the absolute PATH hit (argv is
+# not rewritten to the canonical file), and every call below uses that path.
+TOOL_BIN_gt="" TOOL_BIN_node=""
 if [ "$PROVIDER" = github ]; then
-    check_tools_outside_repo node
+    check_tools_outside_repo node timeout gtimeout
 else
-    check_tools_outside_repo gt
+    check_tools_outside_repo gt timeout gtimeout
 fi
+gt() { "${TOOL_BIN_gt:-gt}" "$@"; }
+TIMEOUT_BIN=$(vr_timeout_bin || true)
 BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || die 2 "HEAD is detached; check out the PR branch"
 
 # Shared with run-verify-command. Return codes only: this script's refusal is
 # exit 3 and commits nothing. Hooks stay in disable_git_hooks.
 harden_git_config || die 3 "$YR_HARDEN_MSG; nothing committed"
+[ -z "$YR_HARDEN_NOTE" ] || printf '[commit-resolve-fixes] Note: %s\n' "$YR_HARDEN_NOTE" >&2
 
 # The github-workflow runtime sits beside this plugin: plugins/<name>/ in the
 # source tree, <marketplace>/<name>/<version>/ in the installed cache.
@@ -658,7 +681,7 @@ find_runtime() {
 
 if [ "$PROVIDER" = github ]; then
     RUNTIME="${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-$(find_runtime || true)}"
-    command -v node >/dev/null 2>&1 || die 2 "node not found"
+    [ -n "$TOOL_BIN_node" ] || die 2 "node not found"
     [ -n "$RUNTIME" ] && [ -f "$RUNTIME" ] || die 2 "github-stack-runtime.js not found (is github-workflow installed?)"
 fi
 
@@ -1176,7 +1199,7 @@ case "$PROVIDER" in
         # Its output can carry a credential (a remote URL, a token in an error):
         # it goes to the scratch file, then to stderr through the redactor only.
         SUBMIT_RC=0
-        bounded "$SUBMIT_TIMEOUT" gt submit --stack --no-interactive --no-edit >|"$NET_ERR" 2>&1 || SUBMIT_RC=$?
+        bounded "$SUBMIT_TIMEOUT" "${TOOL_BIN_gt:-gt}" submit --stack --no-interactive --no-edit >|"$NET_ERR" 2>&1 || SUBMIT_RC=$?
         print_submit_output
         [ "$SUBMIT_RC" -eq 0 ] || die 5 "gt submit failed or timed out after ${SUBMIT_TIMEOUT}s"
         ;;
@@ -1187,7 +1210,7 @@ case "$PROVIDER" in
         runtime_override_check undo_commit "nothing submitted"
         REMOTE_ARGS=()
         [ "$REMOTE_EXPLICIT" = 1 ] && REMOTE_ARGS=(--remote "$REMOTE_NAME")
-        OUT=$(bounded "$SUBMIT_TIMEOUT" node "$RUNTIME" submit ${REMOTE_ARGS[@]+"${REMOTE_ARGS[@]}"}) \
+        OUT=$(bounded "$SUBMIT_TIMEOUT" "${TOOL_BIN_node:-node}" "$RUNTIME" submit ${REMOTE_ARGS[@]+"${REMOTE_ARGS[@]}"}) \
             || die 5 "github-stack-runtime submit crashed or timed out after ${SUBMIT_TIMEOUT}s"
         ST=$(printf '%s' "$OUT" | jq -r '.status // empty' 2>/dev/null || true)
         if [ "$ST" != SUCCESS ]; then

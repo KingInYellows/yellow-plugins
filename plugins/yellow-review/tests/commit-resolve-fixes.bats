@@ -2466,6 +2466,75 @@ crf_refuses_untouched() {
   done
 }
 
+@test "PATH cleaning drops empty, relative and in-worktree entries, so no planted file runs and the child sees the cleaned PATH" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/planted-ran"
+  rm -f "$marker"
+  printf 'canary-abs/\ncanary-rel/\n' >> .git/info/exclude
+  mkdir -p canary-abs canary-rel
+  # Wrappers for tools a submit-time child may call by bare name: each marks the
+  # run, then execs the real tool, so a missing drop shows up as the marker, not
+  # a failure. (awk, cat and mktemp are left out: argument handling runs them
+  # before the tool check.)
+  for tool in sed tr date sort head env; do
+    real=$(command -v "$tool") || continue
+    for d in canary-abs canary-rel; do
+      printf '#!/bin/sh\necho "%s %s" >> "%s"\nexec "%s" "$@"\n' "$d" "$tool" "$marker" "$real" >| "$d/$tool"
+      chmod +x "$d/$tool"
+    done
+  done
+  printf '#!/bin/sh\ntouch "%s"\nexit 99\n' "$marker" >| canary-rel/gt
+  printf '#!/bin/sh\ntouch "%s"\nexit 99\n' "$marker" >| canary-rel/node
+  chmod +x canary-rel/gt canary-rel/node
+  # A gt in front of the fixture stub that records the PATH its child gets.
+  rec="$BATS_TEST_TMPDIR/pathrec"
+  mkdir -p "$rec"
+  printf '#!/bin/sh\nprintf "%%s\\n" "$PATH" >> "%s/gt-path"\nexec "%s/gt" "$@"\n' "$BATS_TEST_TMPDIR" "$STUB_BIN" >| "$rec/gt"
+  chmod +x "$rec/gt"
+  for provider in graphite github; do
+    rm -f "$BATS_TEST_TMPDIR/gt-path"
+    printf 'one\nfeature\nfix-%s\n' "$provider" >| src/a.txt
+    PATH="$REPO/canary-abs::canary-rel:$rec:$old_path:" run_crf --provider "$provider" --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 0 ] || { echo "refused: $provider: $stderr" >&2; return 1; }
+    [ ! -e "$marker" ] || { echo "a planted file ran ($provider): $(sort -u "$marker" | tr '\n' ';')" >&2; return 1; }
+    [ "$provider" = graphite ] || continue
+    # The PATH gt (and so its children) was started with.
+    seen=$(cat "$BATS_TEST_TMPDIR/gt-path")
+    [[ "$seen" != *"$REPO/canary-abs"* ]]
+    [[ "$seen" != *canary-rel* ]]
+    [[ "$seen" != :* && "$seen" != *::* && "$seen" != *: ]]
+    [[ "$seen" == *"$rec"* ]]
+  done
+}
+
+@test "a timeout or gtimeout planted inside the repository is refused before the timeout probe runs it" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/planted-timeout-ran"
+  printf 'canary-abs/\n' >> .git/info/exclude
+  for tool in timeout gtimeout; do
+    rm -rf canary-abs "$marker"
+    mkdir canary-abs
+    printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "canary-abs/$tool"
+    chmod +x "canary-abs/$tool"
+    PATH="$REPO/canary-abs:$old_path"
+    crf_refuses_untouched graphite || { PATH="$old_path"; echo "not refused: $tool" >&2; return 1; }
+    PATH="$old_path"
+    [ ! -e "$marker" ]
+    [[ "$stderr" == *"$tool resolves to"* ]]
+    [[ "$stderr" == *"inside the repository"* ]]
+  done
+}
+
+@test "the signing note carries this script's prefix" {
+  git config gpg.program /nonexistent-gpg
+  git config commit.gpgsign true
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"[commit-resolve-fixes] Note: the repository's own config sets commit signing"* ]]
+  [[ "$stderr" == *"the commit is made unsigned"* ]]
+}
+
 # gt_stub_submit <stderr-line> <exit>: gt submit prints the line to stderr and
 # exits with <exit> (0 publishes as the real stub does); every other gt call
 # goes to the real stub.

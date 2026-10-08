@@ -168,19 +168,28 @@ lgit() { yr_git -c core.fsmonitor=false -c core.untrackedCache=false --literal-p
 # (post-checkout, post-index-change).
 lgit_nohooks() { yr_git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs "$@"; }
 
-# harden_git_config: force core.fsmonitor and core.untrackedCache off, and
-# safe.bareRepository=explicit, for this process and its children
-# (GIT_CONFIG_COUNT, appended to the caller's). Refuse a local or worktree
-# transport command, credential helper, or non-LFS filter. Force signing off
-# only when local or worktree gpg config exists. Does not set core.hooksPath
-# (that stays in the commit script's disable_git_hooks) and does not exit:
-# return 0, or 1 with YR_HARDEN_MSG set. When signing is forced off, the
-# unsigned-commit note goes to stderr and the return is still 0.
-# YR_HARDEN_MSG is read by the caller after a non-zero return.
+# harden_git_config [full|revert]: force core.fsmonitor and
+# core.untrackedCache off, and safe.bareRepository=explicit, for this process
+# and its children (GIT_CONFIG_COUNT, appended to the caller's). It reads
+# config through yr_git, so no caller needs a git shadow.
+# Scope `full` (the default) also refuses a local or worktree transport
+# command, credential helper, or non-LFS filter, and forces signing off only
+# when local or worktree gpg config exists. Scope `revert` is for the
+# rollback and check-ignored modes, which run no submit step: it applies the
+# three overrides and refuses only a non-LFS filter (a checkout runs a smudge
+# filter), so a resolver-set core.sshCommand cannot block its own rollback.
+# Does not set core.hooksPath (that stays in the commit script's
+# disable_git_hooks) and does not exit: return 0, or 1 with YR_HARDEN_MSG set.
+# When signing is forced off, YR_HARDEN_NOTE holds the unsigned-commit note and
+# the return is still 0; the caller prints it with its own prefix, if it
+# commits at all. YR_HARDEN_MSG is read by the caller after a non-zero return.
+# harden_git_config_for_verify then removes safe.bareRepository=explicit for the
+# user's verify command, which would otherwise inherit it.
 # shellcheck disable=SC2034
 harden_git_config() {
-    local n="${GIT_CONFIG_COUNT:-0}"
+    local scope="${1:-full}" n="${GIT_CONFIG_COUNT:-0}"
     YR_HARDEN_MSG=""
+    YR_HARDEN_NOTE=""
     case "$n" in
         ''|*[!0-9]*)
             YR_HARDEN_MSG="GIT_CONFIG_COUNT is not a number, so core.fsmonitor cannot be disabled"
@@ -188,24 +197,27 @@ harden_git_config() {
             ;;
     esac
     n=$((10#$n))
+    YR_HARDEN_FROM_N=$n
     export "GIT_CONFIG_KEY_$n=core.fsmonitor" "GIT_CONFIG_VALUE_$n=false" \
         "GIT_CONFIG_KEY_$((n + 1))=core.untrackedCache" "GIT_CONFIG_VALUE_$((n + 1))=false" \
         "GIT_CONFIG_KEY_$((n + 2))=safe.bareRepository" "GIT_CONFIG_VALUE_$((n + 2))=explicit" \
         "GIT_CONFIG_COUNT=$((n + 3))"
-    [ "$(git config --get core.fsmonitor 2>/dev/null)" = false ] \
-        && [ "$(git config --get core.untrackedCache 2>/dev/null)" = false ] \
-        && [ "$(git config --get safe.bareRepository 2>/dev/null)" = explicit ] \
+    [ "$(yr_git config --get core.fsmonitor 2>/dev/null)" = false ] \
+        && [ "$(yr_git config --get core.untrackedCache 2>/dev/null)" = false ] \
+        && [ "$(yr_git config --get safe.bareRepository 2>/dev/null)" = explicit ] \
         || { YR_HARDEN_MSG="could not disable core.fsmonitor"; return 1; }
     # A repository-local or worktree-scope transport command is run by the
     # submit step's git (and gt, gh) with submission authority: refuse it,
     # naming the key only. Global and system scopes are not judged, and the
     # values are never overridden, which would also disable the user's own
     # credential helper.
-    local tcfg trc=0 tkey
+    local tcfg trc=0 tkey tre
     # A clean, smudge or process filter runs on `git add` and on checkout, so a
     # repository-local one is judged the same way; the three stock Git LFS
     # commands (`git lfs install --local`) are allowed by exact value.
-    tcfg=$(git config --show-scope --get-regexp '^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process))$' 2>/dev/null) || trc=$?
+    tre='^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process))$'
+    [ "$scope" = revert ] && tre='^filter\..*\.(clean|smudge|process)$'
+    tcfg=$(yr_git config --show-scope --get-regexp "$tre" 2>/dev/null) || trc=$?
     case "$trc" in
         0|1) ;;
         *) YR_HARDEN_MSG="could not read the git transport config"; return 1 ;;
@@ -215,13 +227,21 @@ harden_git_config() {
             k = $2; v = $2; sub(/ .*/, "", k); sub(/^[^ ]* /, "", v)
             if (k ~ /^filter\.lfs\.(clean|smudge|process)$/ && (v == "git-lfs clean -- %f" || v == "git-lfs smudge -- %f" || v == "git-lfs filter-process" || v == "git-lfs smudge --skip -- %f" || v == "git-lfs filter-process --skip")) next
             print k; exit
-        }')
+        }') || { YR_HARDEN_MSG="could not parse the git transport config"; return 1; }
     # A credential URL can carry userinfo: name the key without it.
     case "$tkey" in
         credential.?*.helper) tkey="credential.<url>.helper" ;;
         filter.*) tkey="filter.<driver>.${tkey##*.}" ;;
     esac
-    [ -z "$tkey" ] || { YR_HARDEN_MSG="the repository config sets $tkey, which would run a command with submission authority; remove it from the repository config (a global or system config is fine)"; return 1; }
+    if [ -n "$tkey" ]; then
+        if [ "$scope" = revert ]; then
+            YR_HARDEN_MSG="the repository config sets $tkey, which a checkout would run; remove it from the repository config (a global or system config is fine)"
+        else
+            YR_HARDEN_MSG="the repository config sets $tkey, which would run a command with submission authority; remove it from the repository config (a global or system config is fine)"
+        fi
+        return 1
+    fi
+    [ "$scope" = revert ] && return 0
     # A resolver can also write commit.gpgSign and gpg.program (or
     # gpg.<format>.program) into the repository's own config: signing the commit
     # would run that program. Only the local and worktree scopes are judged
@@ -229,12 +249,13 @@ harden_git_config() {
     # system signing config keeps working. A local commit.gpgsign=false is no
     # signing config.
     local cfg rc=0 hit
-    cfg=$(git config --show-scope --get-regexp '^(commit\.gpgsign|gpg\.)' 2>/dev/null) || rc=$?
+    cfg=$(yr_git config --show-scope --get-regexp '^(commit\.gpgsign|gpg\.)' 2>/dev/null) || rc=$?
     case "$rc" in
         0|1) ;;
         *) YR_HARDEN_MSG="could not read the git signing config"; return 1 ;;
     esac
-    hit=$(printf '%s\n' "$cfg" | awk -F'\t' '($1 == "local" || $1 == "worktree") && tolower($2) !~ /^commit\.gpgsign (false|no|off|0)$/ { print "y"; exit }')
+    hit=$(printf '%s\n' "$cfg" | awk -F'\t' '($1 == "local" || $1 == "worktree") && tolower($2) !~ /^commit\.gpgsign (false|no|off|0)$/ { print "y"; exit }') \
+        || { YR_HARDEN_MSG="could not parse the git signing config"; return 1; }
     [ -n "$hit" ] || return 0
     n=$((n + 3))
     # push.gpgSign and log.showSignature reach gpg.program in the child git of
@@ -243,11 +264,35 @@ harden_git_config() {
         "GIT_CONFIG_KEY_$((n + 1))=push.gpgSign" "GIT_CONFIG_VALUE_$((n + 1))=false" \
         "GIT_CONFIG_KEY_$((n + 2))=log.showSignature" "GIT_CONFIG_VALUE_$((n + 2))=false" \
         "GIT_CONFIG_COUNT=$((n + 3))"
-    [ "$(git config --bool --get commit.gpgsign 2>/dev/null)" = false ] \
-        && [ "$(git config --bool --get push.gpgsign 2>/dev/null)" = false ] \
-        && [ "$(git config --bool --get log.showsignature 2>/dev/null)" = false ] \
+    [ "$(yr_git config --bool --get commit.gpgsign 2>/dev/null)" = false ] \
+        && [ "$(yr_git config --bool --get push.gpgsign 2>/dev/null)" = false ] \
+        && [ "$(yr_git config --bool --get log.showsignature 2>/dev/null)" = false ] \
         || { YR_HARDEN_MSG="could not disable commit signing"; return 1; }
-    printf 'Note: the repository'"'"'s own config sets commit signing (commit.gpgsign or gpg.*), which could run a program, so the commit is made unsigned\n' >&2
+    YR_HARDEN_NOTE="the repository's own config sets commit signing (commit.gpgsign or gpg.*), which could run a program, so the commit is made unsigned"
+}
+
+# harden_git_config_for_verify: drop only the safe.bareRepository=explicit pair
+# harden_git_config appended, keeping core.fsmonitor and core.untrackedCache
+# off. Run it in the subshell that starts the user's verify command: a suite
+# that clones or opens a bare repository must not fail on an override meant for
+# the commit and submit steps, while a resolver-planted fsmonitor command in
+# .git/config still must not run under the verify command's own git calls.
+harden_git_config_for_verify() {
+    [ "${YR_HARDEN_FROM_N+set}" = set ] || return 0
+    local i end="${GIT_CONFIG_COUNT:-0}" j="$YR_HARDEN_FROM_N" kv vv k v
+    for ((i = j; i < end; i++)); do
+        kv="GIT_CONFIG_KEY_$i"
+        vv="GIT_CONFIG_VALUE_$i"
+        k="${!kv-}"
+        v="${!vv-}"
+        [ "$k" = safe.bareRepository ] && continue
+        export "GIT_CONFIG_KEY_$j=$k" "GIT_CONFIG_VALUE_$j=$v"
+        j=$((j + 1))
+    done
+    for ((i = j; i < end; i++)); do
+        unset "GIT_CONFIG_KEY_$i" "GIT_CONFIG_VALUE_$i"
+    done
+    export "GIT_CONFIG_COUNT=$j"
 }
 
 rp_lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }

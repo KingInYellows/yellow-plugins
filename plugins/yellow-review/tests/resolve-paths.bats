@@ -1066,6 +1066,111 @@ commit_repo() {
   [[ "$YR_HARDEN_MSG" == *"GIT_CONFIG_COUNT is not a number, so core.fsmonitor cannot be disabled"* ]]
 }
 
+@test "harden_git_config full refuses a local transport, credential or non-LFS filter key; revert scope refuses only the filter" {
+  for kv in core.sshCommand core.askPass core.gitProxy credential.helper 'credential.https://user:pw@example.com.helper' filter.evil.clean filter.evil.smudge filter.evil.process; do
+    git config --local "$kv" 'touch /never'
+    ( rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 1 ] \
+        && [[ "$YR_HARDEN_MSG" != *"touch /never"* && "$YR_HARDEN_MSG" != *pw@* ]] ) \
+      || { echo "full did not refuse (or leaked a value): $kv"; false; }
+    case "$kv" in
+      filter.*) want=1 ;;
+      *) want=0 ;;
+    esac
+    ( rc=0; harden_git_config revert || rc=$?; [ "$rc" -eq "$want" ] ) \
+      || { echo "revert scope returned the wrong status for $kv (want $want)"; false; }
+    git config --local --unset "$kv"
+  done
+}
+
+@test "harden_git_config names a credential URL key without its userinfo" {
+  git config --local 'credential.https://user:secretpw@example.com.helper' x
+  rc=0; harden_git_config full || rc=$?
+  [ "$rc" -eq 1 ]
+  [[ "$YR_HARDEN_MSG" == *"credential.<url>.helper"* ]]
+  [[ "$YR_HARDEN_MSG" != *secretpw* ]]
+}
+
+@test "harden_git_config allows the stock Git LFS filter commands and refuses a changed one" {
+  git config --local filter.lfs.clean 'git-lfs clean -- %f'
+  git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
+  git config --local filter.lfs.process 'git-lfs filter-process'
+  ( rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 0 ] )
+  ( rc=0; harden_git_config revert || rc=$?; [ "$rc" -eq 0 ] )
+  git config --local filter.lfs.clean 'sh -c evil'
+  ( rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 1 ] )
+  ( rc=0; harden_git_config revert || rc=$?; [ "$rc" -eq 1 ] )
+}
+
+@test "harden_git_config forces signing off with a note only when local gpg config exists, in full scope" {
+  rc=0; harden_git_config full || rc=$?
+  [ "$rc" -eq 0 ]
+  [ -z "$YR_HARDEN_NOTE" ]
+  git config --local gpg.program /nonexistent-gpg
+  git config --local commit.gpgsign true
+  rc=0; harden_git_config full 2>"$BATS_TEST_TMPDIR/harden.err" || rc=$?
+  [ "$rc" -eq 0 ]
+  [[ "$YR_HARDEN_NOTE" == *"the commit is made unsigned"* ]]
+  [ ! -s "$BATS_TEST_TMPDIR/harden.err" ]
+  [ "$(git config --bool --get commit.gpgsign)" = false ]
+  [ "$(git config --bool --get push.gpgsign)" = false ]
+  [ "$(git config --bool --get log.showsignature)" = false ]
+}
+
+@test "harden_git_config revert scope leaves signing alone" {
+  git config --local gpg.program /nonexistent-gpg
+  git config --local commit.gpgsign true
+  rc=0; harden_git_config revert || rc=$?
+  [ "$rc" -eq 0 ]
+  [ -z "$YR_HARDEN_NOTE" ]
+  [ "$(git config --bool --get commit.gpgsign)" = true ]
+}
+
+@test "harden_git_config appends to a preset GIT_CONFIG_COUNT and harden_git_config_for_verify drops only safe.bareRepository" {
+  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=Preset
+  rc=0; harden_git_config revert || rc=$?
+  [ "$rc" -eq 0 ]
+  [ "$GIT_CONFIG_COUNT" -eq 4 ]
+  [ "$(git config --get user.name)" = Preset ]
+  [ "$(git config --get safe.bareRepository)" = explicit ]
+  harden_git_config_for_verify
+  [ "$GIT_CONFIG_COUNT" -eq 3 ]
+  [ "$(git config --get user.name)" = Preset ]
+  [ "$(git config --get core.fsmonitor)" = false ]
+  [ "$(git config --get core.untrackedCache)" = false ]
+  rc=0; git config --get safe.bareRepository >/dev/null || rc=$?
+  [ "$rc" -eq 1 ]
+  [ -z "${GIT_CONFIG_KEY_3:-}" ]
+}
+
+@test "harden_git_config_for_verify lets git open a bare repository that the override refuses" {
+  git init -q --bare "$BATS_TEST_TMPDIR/bare.git"
+  rc=0; harden_git_config revert || rc=$?
+  [ "$rc" -eq 0 ]
+  cd "$BATS_TEST_TMPDIR/bare.git"
+  rc=0; git rev-parse --git-dir >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ]
+  harden_git_config_for_verify
+  git rev-parse --git-dir >/dev/null
+}
+
+@test "harden_git_config fails closed when awk fails while reading the transport config" {
+  git config --local core.sshCommand x
+  mkdir -p "$BATS_TEST_TMPDIR/badawk"
+  printf '#!/bin/sh\nexit 2\n' >| "$BATS_TEST_TMPDIR/badawk/awk"
+  chmod +x "$BATS_TEST_TMPDIR/badawk/awk"
+  rc=0
+  PATH="$BATS_TEST_TMPDIR/badawk:$PATH" harden_git_config full || rc=$?
+  [ "$rc" -eq 1 ]
+  [[ "$YR_HARDEN_MSG" == *"could not parse the git transport config"* ]]
+}
+
+@test "harden_git_config reads config through yr_git, not a git shadow" {
+  git() { echo "shadow git ran" >&2; return 99; }
+  rc=0; harden_git_config revert || rc=$?
+  unset -f git
+  [ "$rc" -eq 0 ]
+}
+
 @test "lgit_nohooks keeps pathspecs literal" {
   mkdir -p src && printf 'a\n' >| 'src/*' && printf 'b\n' >| src/real.txt
   run lgit_nohooks add -n -- 'src/*'

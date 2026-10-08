@@ -1437,6 +1437,98 @@ ignored_fixture() {
   [ ! -e "$marker" ]
 }
 
+@test "a core.fsmonitor command is not run by a failing verify's patch save and rollback" {
+  marker="$BATS_TEST_TMPDIR/fsmonitor-ran"
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$BATS_TEST_TMPDIR/fsm.sh"
+  chmod +x "$BATS_TEST_TMPDIR/fsm.sh"
+  git config core.fsmonitor "$BATS_TEST_TMPDIR/fsm.sh"
+  verify 'exit 3' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["fail",true]' ]
+  [ ! -e "$marker" ]
+}
+
+@test "a core.fsmonitor command is not run by --check-ignored or by the verify command's own git" {
+  ignored_fixture
+  marker="$BATS_TEST_TMPDIR/fsmonitor-ran"
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$BATS_TEST_TMPDIR/fsm.sh"
+  chmod +x "$BATS_TEST_TMPDIR/fsm.sh"
+  git config core.fsmonitor "$BATS_TEST_TMPDIR/fsm.sh"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ ! -e "$marker" ]
+  verify 'git status --porcelain >/dev/null' --timeout 10 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  [ ! -e "$marker" ]
+}
+
+@test "the verify command does not inherit safe.bareRepository=explicit" {
+  git init -q --bare "$BATS_TEST_TMPDIR/bare.git"
+  verify 'cd "$BATS_TEST_TMPDIR/bare.git" && git rev-parse --git-dir >/dev/null' --timeout 10 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+}
+
+@test "a local core.sshCommand refuses a run but does not block --revert-only or --revert-dirty" {
+  git config core.sshCommand 'touch "$BATS_TEST_TMPDIR/ssh-ran"'
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *core.sshcommand* ]]
+  [[ "$stderr" != *ssh-ran* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  ! grep -q 'resolver edit' src/a.txt
+  printf 'again\n' >| src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ ! -e "$BATS_TEST_TMPDIR/ssh-ran" ]
+}
+
+@test "a local credential helper refuses a run, with the edit still on disk" {
+  git config credential.helper '!touch "$BATS_TEST_TMPDIR/cred-ran"'
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *credential.helper* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "a non-numeric GIT_CONFIG_COUNT refuses every mode with the edit still on disk" {
+  # git itself rejects the value at rev-parse, so the refusal is exit 2 either way.
+  ignored_fixture
+  for args in "--revert-only -- src/a.txt src/new.txt" "--revert-dirty" "--check-ignored --ignored-since $IGN_MARKER"; do
+    # shellcheck disable=SC2086
+    GIT_CONFIG_COUNT=zz run --separate-stderr "$SCRIPT" --pr 7 $args
+    [ "$status" -eq 2 ] || { echo "status $status for: $args" >&2; return 1; }
+    grep -q 'resolver edit' src/a.txt
+  done
+  printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
+  GIT_CONFIG_COUNT=zz run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "a non-LFS clean filter refuses the revert modes and a run, with the edit still on disk" {
+  git config filter.evil.clean 'touch "$BATS_TEST_TMPDIR/filter-ran"'
+  for args in "--revert-only -- src/a.txt src/new.txt" "--revert-dirty"; do
+    # shellcheck disable=SC2086
+    run --separate-stderr "$SCRIPT" --pr 7 $args
+    [ "$status" -eq 2 ] || { echo "status $status for: $args" >&2; return 1; }
+    [[ "$stderr" == *"filter.<driver>.clean"* ]]
+    grep -q 'resolver edit' src/a.txt
+  done
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  [ ! -e "$BATS_TEST_TMPDIR/filter-ran" ]
+}
+
 @test "the revert modes ignore --ignored-since" {
   ignored_fixture
   printf '#!/bin/sh\necho changed\n' >| node_modules/.bin/runner

@@ -305,8 +305,14 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   included), the runner-file list (files a git hook or verify command would
   execute), `rp_tree_changes`, and `harden_git_config` (forces
   `core.fsmonitor` and `core.untrackedCache` off and
-  `safe.bareRepository=explicit` for the process tree; does not set
-  `core.hooksPath`; returns a code instead of exiting); a `git config`
+  `safe.bareRepository=explicit` for the process tree; scope `full` also
+  refuses a repository-local transport, credential or non-LFS filter config
+  and forces signing off, scope `revert` (the rollback and check-ignored
+  modes) refuses only a non-LFS filter; reads config through `yr_git`;
+  does not set `core.hooksPath`; returns a code instead of exiting, with the
+  unsigned-commit note in `YR_HARDEN_NOTE` for the caller to print;
+  `harden_git_config_for_verify` drops `safe.bareRepository` for the user's
+  verify command); a `git config`
   failure other than exit 1 fails closed
 - `lib/resolve-text.sh` (POSIX sh, sourced by `reply-pr-thread`,
   `file-followup-issue`, `check-resolve-text`, `commit-resolve-fixes` and
