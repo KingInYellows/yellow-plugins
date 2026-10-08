@@ -1,0 +1,19 @@
+docs/solutions/workflow/check-the-tree-before-decomposing-a-backlog-item.md
+  s_9cba14aa6edb3d::t_7335886bac0fb5 29-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "00daba0b487f5fe73b66480cd71c30eb3015564b",
+  "prompts": {},
+  "sessions": {
+    "s_9cba14aa6edb3d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f934a4bf-ee84-4c3d-8832-a24566a904ff",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
