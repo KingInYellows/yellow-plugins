@@ -3,7 +3,9 @@
 ---
 
 Close the remaining #952 resolver-hardening findings: `run-verify-command`
-refuses repository-local git filter drivers (stock Git LFS allowed), forces
+refuses repository-local git filter drivers (stock Git LFS allowed, judged
+on the NUL-delimited config so a multi-line value cannot hide a second
+command; `commit-resolve-fixes` reads its filter check the same way), forces
 `core.fsmonitor` off on its rollback status and `check-ignore`, keeps a
 listed FIFO, socket or device in place until the recovery patch is saved,
 and requires `--ignored-since` for every verify run, attended or not;
