@@ -132,10 +132,9 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   name carries too few slug tokens for either slug-match tier. Graphite
   merge-queue PRs stay closed and unmerged, so GitHub associates none with
   the commit; when that lookup succeeds with an empty result,
-  `lib/plan-gate-provenance.sh` reads the PR number from the commit subject
-  and passes only if that PR is closed, lists the plan with the trunk blob,
-  and changed a file outside `plans/` whose blob matches the commit's and
-  which the commit itself changed (trailer `via=commit-subject`). When
+  `lib/plan-gate-provenance.sh` falls back to the PR number in the commit
+  subject (trailer `via=commit-subject`; its header states the pass
+  conditions once). When
   provenance finds no commit or an ambiguous PR set, a strict tier
   (server-side `--state merged` + `--jq` word-boundary post-filter of
   the full slug on `headRefName`) runs, then a loose tier scoring the
@@ -341,17 +340,20 @@ cross-plugin pattern:
   yellow-core's `hooks/scripts/stop.sh`, `session-start.sh`,
   `_stop-capture-subshell.sh`, and the `/compound:review-staged` command, and
   by yellow-review's `lib/stage-learning.sh` and `lib/review-ledger.sh`
-- `plan-gate-provenance.sh` — `/plan:complete` Gate C commit-subject fallback
-  for Graphite merge-queue PRs (closed, `merged: false`, so GitHub's
-  commit-to-PR lookup returns nothing). `pgp_provenance_via_subject
-  <owner/repo> <file-sha> <plans/file.md>` reads the trailing ` (#N)` of the
-  commit subject and passes (`PASS` plus a `via=commit-subject` trailer line)
-  only when PR N is closed, lists the plan with the trunk blob, and changed a
-  file outside `plans/` whose blob matches the commit's and which the commit
-  itself changed; every other outcome prints `NO-EVIDENCE` and a reason.
-  Dual-shell (Tier 4), idempotent via `_PLAN_GATE_PROVENANCE_LOADED`.
-  Coverage in `tests/shell-compat/` (driver with a stub `gh`) and
-  `tests/plan-commands.bats`
+- `plan-gate-provenance.sh` — `/plan:complete` Gate C file-provenance tier.
+  `pgp_tier_run <plan-file> <trunk>` is the whole Phase 4 tier: it prints the
+  log and the decision lines (`GATE_C_PROVENANCE=PASS|FALLTHROUGH`,
+  `GATE_C_REASON=<token> GATE_C_RETRYABLE=0|1`) and writes the evidence line
+  only on a pass. `pgp_provenance_via_subject <owner/repo> <file-sha>
+  <plans/file.md>` is the commit-subject fallback for Graphite merge-queue PRs
+  (closed, `merged: false`, so GitHub's commit-to-PR lookup returns nothing):
+  exit 0 with one `pr=#N sha=<sha> via=commit-subject` line, or exit 1 with a
+  reason token and a reason line. The header states the pass conditions once.
+  `pgp_evidence_line_is_valid` and `pgp_pr_num_is_valid` are the validators
+  Phase 4, the override block and Phase 7 share. Dual-shell (Tier 4),
+  idempotent via `_PLAN_GATE_PROVENANCE_LOADED`. Coverage in
+  `tests/shell-compat/` (driver with stub `gh` and `timeout`),
+  `tests/plan-gate-tier.bats` and `tests/plan-commands.bats`
 - `validate-fs.sh` — `validate_file_path()` and `canonicalize_project_dir()`
   path-traversal validators (consumed by yellow-ci, yellow-ruvector,
   yellow-debt; yellow-debt declares it as a required dependency). Idempotent
@@ -554,7 +556,7 @@ inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
 `bats tests/` from the plugin directory (`compound-session-start-hook`,
 `compound-staging`, `compound-stop-hook`, `context-observer`,
 `credential-status`, `handoff`, `plan-commands`, `plan-status-parity`,
-`plugin-identity`, `pre-compact-hook`, `quote-ground`, `repo-profile`,
+`plan-gate-tier`, `plugin-identity`, `pre-compact-hook`, `quote-ground`, `repo-profile`,
 `setup-all-ruvector-probe`, `validate-fs`) plus `skills/git-worktree/tests/` (`worktree-manager.bats`,
 `worktree-restack.bats` with stub `gt` / `gh` / `git` shims under `tests/mocks/`).
 Manifest hook budgets: Stop 5s, SessionStart 3s, PreCompact 3s

@@ -53,13 +53,16 @@ It runs only when the commits API call **succeeded** with an empty result and
 `FILE_SHA` exists. Logic lives in a dual-shell tier-4 lib sourced by
 `complete.md`.
 
-Pass requires all of:
+Pass requires all of (superseded by the review passes: the shipped conditions
+are in the header of `plugins/yellow-core/lib/plan-gate-provenance.sh`, which
+adds the working-tree blob check, the commit-tie and the unreadable-parent
+rule, and rejects only `Merge pull request ` and `Merge branch ` subjects):
 
 1. `FILE_SHA` is 40 hex and `git cat-file -e "$FILE_SHA:plans/$CLEAN_ARG"`
    succeeds (plan still exists on trunk at that commit).
 2. Subject yields N: last trailing ` (#N)`, validated with the existing
-   `^[1-9][0-9]{0,9}$` rule; `Revert "`, `Reapply "` and `Merge ` subjects
-   rejected.
+   `^[1-9][0-9]{0,9}$` rule; `Revert "`, `Reapply "`, `Merge pull request ` and
+   `Merge branch ` subjects rejected.
 3. `gh api repos/$OWNERREPO/pulls/N` reports `state == "closed"`. `merged` is
    not consulted (permanently false here). `base` is recorded, not gated:
    stacked PRs have their parent branch as `base`.
@@ -68,7 +71,9 @@ Pass requires all of:
    `.status != "removed"`, and its blob `sha` equals
    `git rev-parse "$FILE_SHA:plans/$CLEAN_ARG"`.
 5. The same file list has at least one `.filename` outside `plans/`, so plan-only
-   PRs (creation, checkbox rewrites) fall through to the override.
+   PRs (creation, checkbox rewrites) fall through to the override. As shipped,
+   that file must also tie to the commit (same blob at the commit, changed by
+   it).
 
 <!-- deepen-plan: external -->
 > **Research:** The files endpoint caps at 3000 files (`per_page` max 100, so
@@ -100,8 +105,9 @@ positives).
       `tests/shell-compat/tier4-libraries.bats`, and the `gh` mock in
       `plugins/yellow-review/tests/mocks/gh`.
 - [x] 1.2: Create `plugins/yellow-core/lib/plan-gate-provenance.sh` with
-      `pr_num_is_valid` (shared with the override validator), `pr_from_subject`,
-      and `plan_delivered_by_pr` (state, files, blob, non-plans checks). Use
+      `pgp_pr_num_is_valid` (shared with the override validator),
+      `pgp_pr_from_subject`, and `pgp_provenance_via_subject` (state, files,
+      blob, non-plans checks). Use
       `_`-prefixed names, `case` and parameter expansion, no `[[ =~ ]]`.
 - [x] 1.3: Register the lib in `scripts/shell-compat-config.json` and add its
       driver; run the extractor table under bash, zsh and zsh+noclobber.

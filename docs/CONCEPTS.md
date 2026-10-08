@@ -89,10 +89,12 @@ to a passing verdict.
 The evidence-verification gate in `/plan:complete` that confirms a plan's
 underlying work actually shipped as a merged PR before archival, evaluated
 as three deterministic tiers in order — file-provenance (the closed PR
-associated with the last trunk commit that touched the plan file, or, for a Graphite merge-queue PR that stays closed and unmerged, the PR numbered in that commit's subject once its files confirm it), strict (slug-matched merged-PR search), and
-loose (token-coverage scoring over the 100 most recent merged PRs) —
-falling through to a user-confirmed override prompt only when no tier
-meets its pass condition.
+associated with the last trunk commit that touched the plan file, or, for a
+Graphite merge-queue PR that stays closed and unmerged, the PR numbered in that
+commit's subject; the conditions are in `lib/plan-gate-provenance.sh`), strict
+(slug-matched merged-PR search), and loose (token-coverage scoring over the 100
+most recent merged PRs) — falling through to a user-confirmed override prompt
+only when no tier meets its pass condition.
 
 ## non-voting verdict
 

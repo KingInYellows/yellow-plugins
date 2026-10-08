@@ -217,10 +217,13 @@ API call, no agent:
   auto-passes without prompting — skipping strict, loose, and the
   override prompt entirely — recorded via a
   `Plan-Verifier-FileProvenance: pr=#<N> sha=<FILE_SHA>` commit
-  trailer. `PCOUNT == 0` (uncommitted file, or `git fetch`/`gh api`
-  failure) or `PCOUNT >= 2` (rebase/cherry-pick history) falls through
-  to the strict tier unchanged — uniqueness is the same safety valve
-  the loose tier already relies on.
+  trailer, which carries a ` via=commit-subject` suffix when the commit-subject
+  path (2026-10-06 update below) produced the evidence. `PCOUNT == 0` from an
+  uncommitted file or a failed `git fetch`/`gh api` falls through to the strict
+  tier unchanged, as does `PCOUNT >= 2` (rebase/cherry-pick history) —
+  uniqueness is the same safety valve the loose tier already relies on. A
+  *successful* empty lookup (`PCOUNT == 0`) is the one case that can still pass,
+  through the commit-subject path.
 
   This is still consistent with §3's original design collapse — one
   provenance lookup API call, no agent, no 8-row truth table — just
@@ -453,17 +456,21 @@ archives, so each one paid a manual override.
 **What Gate C does now.** When the commits lookup succeeds with an empty
 result, the provenance tier reads the trailing ` (#N)` of the subject of the
 commit that last touched the plan
-(`plugins/yellow-core/lib/plan-gate-provenance.sh`) and passes only when all of
-these hold:
+(`plugins/yellow-core/lib/plan-gate-provenance.sh`, whose header states the same
+conditions) and passes only when all of these hold:
 
-- the plan still exists at that commit (`git cat-file -e <sha>:plans/<file>`);
-  the same guard now protects the whole tier from an already-archived plan in a
-  stale checkout;
+- the working-tree plan has the same blob as the plan at that commit. Gate A
+  reads the working tree, so a plan completed only on an unlanded branch must
+  not borrow the landed version's evidence;
+- the plan still exists at that commit; the same guard protects the whole tier
+  from an already-archived plan in a stale checkout;
 - the subject yields N: the last trailing ` (#N)`, matching
-  `^[1-9][0-9]{0,9}$`, and not a `Revert "`, `Reapply "` or `Merge ` subject;
+  `^[1-9][0-9]{0,9}$`, and not a `Revert "`, `Reapply "`, `Merge pull request `
+  or `Merge branch ` subject (a plain `Merge ` subject is allowed);
 - PR N is `closed`. `merged` is not consulted, because it is permanently false
-  here. `base` is recorded but not gated: stacked PRs have their parent branch
-  as `base` (#952, #955, #1033);
+  here. `base` is not consulted either, and never printed: stacked PRs have
+  their parent branch as `base` (#952, #955, #1033), and the name is untrusted
+  text;
 - PR N's paginated files list has the plan with a status other than `removed`
   and a blob `sha` equal to `git rev-parse <sha>:plans/<file>`;
 - PR N also changed a file outside `plans/` whose blob at the trunk commit
@@ -472,7 +479,10 @@ these hold:
   is public and could be carried by an unrelated closed PR), and
   plans-only PRs such as bulk checkbox rewrites (#956, #1055) fall through. A PR that adds the plan
   together with non-plan docs still passes: #1042 (a plan plus brainstorms)
-  does. Gate A's unchecked-box scan is the remaining guard against archiving a
+  does. Only the first 20 non-plans files of the PR's list are compared (the
+  reason says "checked the first 20 of N"), and a parent commit that cannot be
+  read (a shallow boundary, a missing object) is no evidence rather than a
+  pass. Gate A's unchecked-box scan is the remaining guard against archiving a
   plan that was only written, never implemented.
 
 Checked live on 2026-10-06 against real PRs: #808 passes; #952 and #955
@@ -481,8 +491,10 @@ Checked live on 2026-10-06 against real PRs: #808 passes; #952 and #955
 A pass records `Plan-Verifier-FileProvenance: pr=#N sha=<sha> via=commit-subject`;
 a trailer with no `via=` came from the commits API. Anything else (no `(#N)` in
 the subject, an open PR, a 404, a rate limit, a truncated files list, a null or
-mismatched blob) prints its reason and falls through to the strict and loose
-tiers and the override prompt.
+mismatched blob) prints a fixed reason token and a reason line and falls
+through to the strict and loose tiers and the override prompt. The transient
+tokens (`gh-timeout`, `rate-limited`, `pr-open`) instead stop the command with
+`GATE_C_RETRYABLE=1`: re-run it shortly rather than overriding.
 
 **The subject is a hint, not proof.** GitHub documents the number only for its
 PR-title squash formats; for a single-commit PR the default documents commit
