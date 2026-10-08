@@ -1,0 +1,46 @@
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  s_5a877dc01e3810::t_96f41f88f5bd5d 575,596-610,612,623,628-647,649,651-654,656-659,661,663,665-666,672,684,1202,1213
+plugins/yellow-review/skills/pr-review-workflow/references/local-scripts.md
+  s_5a877dc01e3810::t_57f695eeac0cc6 15-18
+plugins/yellow-review/tests/resolve-paths.bats
+  s_5a877dc01e3810::t_0f56b918e03fdb 1145,1149-1151
+  s_5a877dc01e3810::t_9c374311a0b296 1069-1144,1146-1148,1152-1173
+plugins/yellow-review/tests/run-verify-command.bats
+  s_5a877dc01e3810::t_d5f29d4fab0aee 1440-1501,1503-1531
+  s_5a877dc01e3810::t_c5d8f46bd86304 1502
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_5a877dc01e3810::t_57f695eeac0cc6 261,479-481
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_5a877dc01e3810::t_79eaedfce6d113 6,427-428,433-436,446-455,559-567
+  s_5a877dc01e3810::t_f38174785cfc27 710,713
+plugins/yellow-review/lib/resolve-paths.sh
+  s_5a877dc01e3810::t_f38174785cfc27 186-187,274-280,282-292,295
+  s_5a877dc01e3810::t_b0b3305c580a72 171-185,190,192,200,205-207,214,218-220,230,236-244,252,257-258,267-269,271-273,281,293-294
+plugins/yellow-review/CLAUDE.md
+  s_5a877dc01e3810::t_57f695eeac0cc6 308-315
+plugins/yellow-review/tests/skill-content.bats
+  s_5a877dc01e3810::t_57f695eeac0cc6 687,705
+plugins/yellow-review/tests/commit-resolve-fixes.bats
+  s_5a877dc01e3810::t_d5f29d4fab0aee 2469-2474,2480-2481,2483-2498,2507-2537
+  s_5a877dc01e3810::t_dcbc4b14de7c55 2500-2506
+  s_5a877dc01e3810::t_b713ad1a8d44a0 2482,2499
+  s_5a877dc01e3810::t_5900707aea3b8d 2475-2479
+.changeset/yellow-review-resolve-git-trust.md
+  s_5a877dc01e3810::t_22406626a1d1b3 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a8e4c507eb483b739e5a4e6387a5bccb28869eba",
+  "prompts": {},
+  "sessions": {
+    "s_5a877dc01e3810": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6401b8c8-03bf-423a-a3e5-81d4258d52d9",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
