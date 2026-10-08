@@ -124,8 +124,11 @@ runs in CI. An AGENTS.md rule would need a second parser to get that right.
   these blocks."
 - **Logical lines:** decide "consumed" on the whole command, not one
   physical line. Join `code` lines that end in `\` or a trailing `|`, `&&`
-  or `||` before checking, so `ls -t plans/*.md \` followed by `| head -5`
-  is still flagged. Report the finding at the line holding the command word.
+  or `||`, and keep a `$(…)`, backtick or `( … )` span that opens on one
+  line open until it closes, tracking depth with the validator's existing
+  `maskShell`/`commandSubstitutions` helpers. That way both `ls -t plans/*.md \`
+  followed by `| head -5` and `x=$(` / `  ls -t plans/*.md` / `)` are
+  flagged. Report the finding at the line holding the command word.
 - **Scope:** inline blocks and Tier 4 libraries (the shared `lintShellText`
   path). `.sh` files with a shebang are not linted, as with SHC-001..009.
 
@@ -143,7 +146,8 @@ runs in CI. An AGENTS.md rule would need a second parser to get that right.
 - [ ] 1.3: Add cases to `tests/integration/validate-shell-compat.test.ts`.
       Flag: `ls -t plans/*.md | head`, `x=$(ps -p 1 -o comm=)`,
       `if ! ls a/*.md >/dev/null 2>&1`, a backtick capture, `du -sh x | cut -f1`,
-      and a pipe split across lines (`ls -t x \` then `  | head -5`).
+      a pipe split across lines (`ls -t x \` then `  | head -5`), and a
+      multiline capture (`v=$(` / `  ls -t x` / `)`).
       Pass: `command ls -t x | head`, `\ls x | head`, bare `ls -d .ruvector/`,
       `find … -exec ls -t {} +`, the same `ls` inside a `bash /dev/fd/3` wrapper
       or a quoted `ssh` heredoc, `ls` inside a string (`printf 'ls -t'`).
