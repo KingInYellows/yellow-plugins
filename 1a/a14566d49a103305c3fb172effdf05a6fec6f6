@@ -1,0 +1,19 @@
+.changeset/yellow-review-revert-denied.md
+  s_61e357b443f83b::t_a618426ce0cdba 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1aa14566d49a103305c3fb172effdf05a6fec6f6",
+  "prompts": {},
+  "sessions": {
+    "s_61e357b443f83b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01a1136f-3de9-7031-bb1a-72979bf7d129",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
