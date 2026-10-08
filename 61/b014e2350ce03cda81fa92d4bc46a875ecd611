@@ -1,0 +1,37 @@
+plugins/yellow-core/tests/compound-staging.bats
+  s_5a877dc01e3810::t_44c8d9cc984962 97-106
+.changeset/yellow-core-redact-vendor-prefixes.md
+  s_5a877dc01e3810::t_44c8d9cc984962 5
+.changeset/yellow-review-credential-scan.md
+  s_5a877dc01e3810::t_44c8d9cc984962 5
+plugins/yellow-review/skills/pr-review-workflow/scripts/reply-pr-thread
+  s_5a877dc01e3810::t_44c8d9cc984962 199-201
+plugins/yellow-review/references/resolve/dispositions.md
+  s_5a877dc01e3810::t_44c8d9cc984962 682-684,692-696
+plugins/yellow-review/tests/reply-pr-thread.bats
+  s_5a877dc01e3810::t_44c8d9cc984962 149-158
+plugins/yellow-review/tests/check-resolve-text.bats
+  s_5a877dc01e3810::t_4ff483abd684cb 153-168,348,1426-1501
+plugins/yellow-core/lib/compound-staging.sh
+  s_5a877dc01e3810::t_44c8d9cc984962 138
+plugins/yellow-review/CLAUDE.md
+  s_5a877dc01e3810::t_44c8d9cc984962 204-205
+plugins/yellow-review/lib/resolve-text.sh
+  s_5a877dc01e3810::t_266a8639583c5d 189-191,200,296-299,444-448,453-459,461,539-551
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "61b014e2350ce03cda81fa92d4bc46a875ecd611",
+  "prompts": {},
+  "sessions": {
+    "s_5a877dc01e3810": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6401b8c8-03bf-423a-a3e5-81d4258d52d9",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
