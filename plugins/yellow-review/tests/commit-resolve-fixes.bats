@@ -2800,3 +2800,31 @@ trust_assert_absolute() {
   grep -F -- "--kill-after=5 30 $TRUST_BIN/git" "$TRUST_TIMEOUT_LOG" | grep -F -- "ls-remote" >/dev/null
   grep -F -- "--kill-after=5 30 $TRUST_BIN/gh" "$TRUST_TIMEOUT_LOG" >/dev/null
 }
+
+# An outside PATH directory whose gt or node name is a symlink to an executable
+# inside the repository. The directory of the PATH hit is outside, but the
+# canonical file is inside, so the run is refused and that file never starts.
+@test "#952 4179814358: an outside-repo PATH symlink named gt or node that points into the repository is refused" {
+  old_path="$PATH"
+  printf 'node_modules/\n' >> .git/info/exclude
+  for entry in "graphite gt" "github node"; do
+    set -- $entry
+    mkdir -p node_modules/.bin
+    real=$(command -v "$2")
+    cat >| "node_modules/.bin/$2" <<STUB
+#!/bin/sh
+touch "$BATS_TEST_TMPDIR/inrepo-ran"
+exec "$real" "\$@"
+STUB
+    chmod +x "node_modules/.bin/$2"
+    mkdir -p "$BATS_TEST_TMPDIR/outside-bin"
+    ln -s "$REPO/node_modules/.bin/$2" "$BATS_TEST_TMPDIR/outside-bin/$2"
+    PATH="$BATS_TEST_TMPDIR/outside-bin:$old_path"
+    crf_refuses_untouched "$1" || { PATH="$old_path"; echo "not refused: $entry" >&2; return 1; }
+    PATH="$old_path"
+    [[ "$stderr" == *"$2 resolves to"* ]]
+    [[ "$stderr" == *"inside the repository"* ]]
+    [ ! -e "$BATS_TEST_TMPDIR/inrepo-ran" ]
+    rm -rf node_modules "$BATS_TEST_TMPDIR/outside-bin"
+  done
+}
