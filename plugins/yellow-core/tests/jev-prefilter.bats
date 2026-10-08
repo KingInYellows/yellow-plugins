@@ -268,3 +268,10 @@ _shadow_direct() {
   COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 MOCK_JEV_FAIL=1 _capture
   [ ! -e "$STAGING/jev-shadow/$SESSION_ID.json" ]
 }
+
+@test "a response with two JSON values fails open" {
+  one='{"answers":{"durable":{"choice":"trivial-qa","confidence":0.95},"has_instruction":{"noul":0.01}}}'
+  export MOCK_JEV_RESPONSE="$one $one"
+  COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
+  [ ! -e "$STAGING/jev-shadow/$SESSION_ID.json" ]
+}

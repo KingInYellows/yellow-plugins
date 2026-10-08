@@ -186,7 +186,8 @@ JEVCFG
   esac
 
   local line
-  line=$(printf '%s' "$resp" | jq -c \
+  # --slurp plus the length check accepts exactly one top-level object.
+  line=$(printf '%s' "$resp" | jq -c -s \
     --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --arg sid "$sid" \
     --arg hash "$hash" \
@@ -195,7 +196,8 @@ JEVCFG
     --argjson maxinst "$JEV_SKIP_MAX_INSTRUCTION" \
     --argjson chars "${#dialogue}" \
     --arg model "${COMPOUND_JEV_MODEL:-$JEV_DEFAULT_MODEL}" '
-    .answers.durable as $d
+    select(length == 1 and (.[0] | type) == "object") | .[0]
+    | .answers.durable as $d
     | .answers.has_instruction as $h
     | def unit: type == "number" and . >= 0 and . <= 1;
     select(
