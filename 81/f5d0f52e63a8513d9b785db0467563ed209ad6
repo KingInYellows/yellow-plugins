@@ -1,0 +1,21 @@
+plugins/yellow-core/skills/git-worktree/scripts/worktree-restack.sh
+  s_a803ba2072346f::t_a1fc793c2752db 1466,1471-1476
+  s_a803ba2072346f::t_d264aacb9833ac 1424,1432-1443
+  s_a803ba2072346f::t_4c6dfbf0400cfd 1444
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "81f5d0f52e63a8513d9b785db0467563ed209ad6",
+  "prompts": {},
+  "sessions": {
+    "s_a803ba2072346f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a3ef9792-3a66-4457-a831-ced6b8831557",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
