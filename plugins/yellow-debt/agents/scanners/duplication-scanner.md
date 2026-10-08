@@ -88,17 +88,17 @@ through Bash for structural matches; otherwise use Grep for the whole scan.
 Check for `ast-grep` only, since `sg` is often shadow-utils on Linux.
 
 ```bash
-pattern=$(cat <<'AST_GREP_PATTERN'
+pattern=$(cat <<'AST_GREP_PATTERN_NONCE'
 PATTERN
-AST_GREP_PATTERN
+AST_GREP_PATTERN_NONCE
 )
-lang=$(cat <<'AST_GREP_LANG'
+lang=$(cat <<'AST_GREP_LANG_NONCE'
 LANG
-AST_GREP_LANG
+AST_GREP_LANG_NONCE
 )
-target=$(cat <<'AST_GREP_TARGET'
+target=$(cat <<'AST_GREP_TARGET_NONCE'
 PATH
-AST_GREP_TARGET
+AST_GREP_TARGET_NONCE
 )
 case "$lang" in *[!A-Za-z0-9_-]*|'') lang='' ;; esac
 case "$target" in /*|*..*|-*|*[!A-Za-z0-9._/-]*|'') target='' ;; esac
@@ -112,7 +112,9 @@ fi
 Put each value verbatim inside its quoted heredoc (`$NAME` matches one
 node, `$$$` a list) and keep the guards, so nothing from the scanned repo
 reaches the command line. `target` must be a repo-relative path of letters,
-digits, `.`, `_`, `-`, and `/`; scan any other file with Grep. If output
+digits, `.`, `_`, `-`, and `/`; scan any other file with Grep. Replace
+`NONCE` in every delimiter with fresh random letters on each call, and check
+that no line of a value equals its delimiter. If output
 reaches 200 lines, treat it as truncated and narrow the pattern or path. For relational rules (`inside`,
 `has`, `not`), load the YAML through the same kind of heredoc into `rule`
 and run `ast-grep scan --inline-rules "$rule" --json=compact -- "$target"`.

@@ -77,17 +77,17 @@ lexical-search rationale.
 `ast-grep` only: `sg` is often shadow-utils on Linux.
 
 ```bash
-pattern=$(cat <<'AST_GREP_PATTERN'
+pattern=$(cat <<'AST_GREP_PATTERN_NONCE'
 PATTERN
-AST_GREP_PATTERN
+AST_GREP_PATTERN_NONCE
 )
-lang=$(cat <<'AST_GREP_LANG'
+lang=$(cat <<'AST_GREP_LANG_NONCE'
 LANG
-AST_GREP_LANG
+AST_GREP_LANG_NONCE
 )
-target=$(cat <<'AST_GREP_TARGET'
+target=$(cat <<'AST_GREP_TARGET_NONCE'
 PATH
-AST_GREP_TARGET
+AST_GREP_TARGET_NONCE
 )
 case "$lang" in *[!A-Za-z0-9_-]*|'') lang='' ;; esac
 case "$target" in /*|*..*|-*|*[!A-Za-z0-9._/-]*|'') target='' ;; esac
@@ -102,8 +102,9 @@ The pattern, language, and path come from the request, so never splice them
 into the command line. Put each value verbatim inside its quoted heredoc
 (`$NAME` matches one node, `$$$` a list) and keep the guards: `lang` is an
 ast-grep language name, and `target` is a repo-relative path of letters,
-digits, `.`, `_`, `-`, and `/`. Use Grep for any other path, and never use a
-value that contains a line equal to its heredoc delimiter. If output reaches
+digits, `.`, `_`, `-`, and `/`. Use Grep for any other path. Replace `NONCE`
+in every delimiter with fresh random letters on each call, and check that no
+line of a value equals its delimiter. If output reaches
 200 lines, treat it as truncated and narrow the pattern or path. For
 relational rules (`inside`, `has`, `not`), load the YAML through the same
 kind of quoted heredoc into `rule` and run
