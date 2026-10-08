@@ -2265,3 +2265,54 @@ install_evil_filter() {
   [ ! -e src/a.txt ]
   [ -f src/new.txt ]
 }
+
+# DEVIN_ORG_ID in the quoted-key forms JSON and YAML use, and in lowercase.
+devin_org_id_lines() {
+  printf '%s\n' '"DEVIN_ORG_ID": "org-1234567890"' '{"DEVIN_ORG_ID":"org-1234567890"}' \
+    'devin_org_id=org-1234567890' "'devin_org_id' : 'org-1234567890'"
+  printf '  "Devin_Org_Id"\t:\t"org-1234567890",\n'
+  printf '%s\n' 'devin-org-id: org-1234567890' 'DEVIN_ORG_ID => "org-1234567890"'
+}
+
+@test "#952 4168798358: the log redactor blanks a JSON, YAML or lowercase DEVIN_ORG_ID value" {
+  devin_org_id_lines >| "$BATS_TEST_TMPDIR/in"
+  run bash -c '
+    root=$1
+    . "$root/lib/resolve-paths.sh"
+    . "$root/lib/resolve-text.sh"
+    . "$root/lib/verify-run.sh"
+    vr_load_redactor "$root" || exit 9
+    while IFS= read -r line; do
+      out=$(printf "%s\n" "$line" | vr_redact_filter)
+      case "$out" in *org-1234567890*) echo "LEAK: $line"; exit 1 ;; esac
+      case "$out" in *"[REDACTED]"*) ;; *) echo "not redacted: $line -> $out"; exit 1 ;; esac
+    done <"$2"' _ "$BATS_TEST_DIRNAME/.." "$BATS_TEST_TMPDIR/in"
+  [ "$status" -eq 0 ] || { echo "$output" >&2; return 1; }
+}
+
+@test "#952 4168798358: the final log scan withholds an unredacted JSON, YAML or lowercase DEVIN_ORG_ID value" {
+  n=0
+  while IFS= read -r line; do
+    n=$((n + 1))
+    printf 'before\n%s\nafter\n' "$line" >| "$BATS_TEST_TMPDIR/stream$n"
+    run bash -c '
+      root=$1
+      . "$root/lib/resolve-paths.sh"
+      . "$root/lib/resolve-text.sh"
+      . "$root/lib/verify-run.sh"
+      vr_publish_log "$2" "$3" 0' _ "$BATS_TEST_DIRNAME/.." "$BATS_TEST_TMPDIR/stream$n" "$BATS_TEST_TMPDIR/out$n.log"
+    [ "$status" -eq 0 ]
+    run ! grep -q 'org-1234567890' "$BATS_TEST_TMPDIR/out$n.log"
+    grep -q '^\[withheld' "$BATS_TEST_TMPDIR/out$n.log" || { echo "published: $line" >&2; return 1; }
+  done < <(devin_org_id_lines)
+}
+
+@test "#952 4168798358: a verifier that prints a JSON or lowercase DEVIN_ORG_ID leaves it out of the retained log" {
+  devin_org_id_lines >| "$BATS_TEST_TMPDIR/ids"
+  printf 'cat "%s"; echo visible\n' "$BATS_TEST_TMPDIR/ids" >| "$CMD"
+  run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  [ -f "$log" ]
+  run ! grep -q 'org-1234567890' "$log"
+}

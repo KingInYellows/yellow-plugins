@@ -2873,3 +2873,34 @@ STUB
   done
   ! grep -q '^node ' "$STUB_LOG"
 }
+
+# The bare NAME=value rule missed the quoted-key forms JSON and YAML use, and
+# lowercase spellings, so those committed a prohibited DEVIN_ORG_ID.
+@test "#952 4168798358: a JSON, YAML or lowercase DEVIN_ORG_ID value is refused by the commit scanner (exit 3)" {
+  while IFS= read -r line; do
+    printf 'one\nfeature\n%s\n' "$line" >| src/a.txt
+    run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted: $line" >&2; return 1; }
+    [[ "$stderr" == *"credential-shaped"* ]]
+    [[ "$stderr" != *"org-1234567890"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+    [ -z "$(git diff --cached --name-only)" ]
+  done <<LINES
+"DEVIN_ORG_ID": "org-1234567890"
+{"DEVIN_ORG_ID":"org-1234567890"}
+devin_org_id=org-1234567890
+'devin_org_id' : 'org-1234567890'
+$(printf '  "Devin_Org_Id"\t:\t"org-1234567890",')
+devin-org-id: org-1234567890
+DEVIN_ORG_ID => "org-1234567890"
+LINES
+}
+
+@test "#952 4168798358: quoted-key DEVIN_ORG_ID references without a literal value stay clean" {
+  printf 'one\nfeature\n%s\n%s\n%s\n' \
+    '"devin_org_id": process.env.DEVIN_ORG_ID,' \
+    '"DEVIN_ORG_ID": "${DEVIN_ORG_ID:-}"' \
+    'user_id: 12345678' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ] || { echo "$stderr" >&2; return 1; }
+}

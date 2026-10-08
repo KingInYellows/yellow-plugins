@@ -272,7 +272,10 @@ _rt_scan() {
         # committing that exact name; `_ID` names in general (USER_ID=12345678)
         # are ordinary code, so no `_ID` suffix rule (the log redactor in
         # lib/verify-run.sh blanks every `_ID`, but it redacts, this refuses).
-        !strict && /(^|[^A-Za-z0-9_])DEVIN_ORG_ID[ \t]*[=:][ \t]*["\047]?[A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-][A-Za-z0-9+\/_=-]/ { flag("name-key-assignment") }
+        # Matched case-insensitively, with `-` or `_` separators, a quoted key
+        # and `=`, `=>` or `:`, so the JSON and YAML forms
+        # (`"DEVIN_ORG_ID": "<v>"`, `devin_org_id: <v>`) are caught too.
+        !strict && tolower($0) ~ /(^|[^a-z0-9_])devin[_-]org[_-]id["\047]?[ \t]*(=>?|:)[ \t]*["\047]?[a-z0-9+\/_=-][a-z0-9+\/_=-][a-z0-9+\/_=-][a-z0-9+\/_=-][a-z0-9+\/_=-][a-z0-9+\/_=-][a-z0-9+\/_=-][a-z0-9+\/_=-]/ { flag("name-key-assignment") }
         {
             # A CRLF file leaves \r on the token, which would hide an
             # all-letter literal from the value rules below.
