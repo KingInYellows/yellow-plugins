@@ -923,13 +923,20 @@ async function updateSupervision(dataDir, localRequestId, patch, now = () => new
         return updated;
     }, config);
 }
-/** Digests of the messages this plugin itself sent to the session: its prompt and its replies. */
+/**
+ * Digests of the messages this plugin itself sent to the session: its prompt and its replies.
+ * A cleanly rejected or released write never landed, so its digest does not count; an abandoned
+ * one might have, so it does.
+ */
 function ownMessageDigests(journal, sessionResource) {
     const digests = new Set();
     for (const record of Object.values(journal.operations)) {
+        const neverLanded = (record.status === 'failed' && record.abandonedAt === undefined) ||
+            record.status === 'rejected';
         if (record.sessionResource === sessionResource &&
             (record.kind === 'reply' || record.kind === 'create') &&
-            record.promptDigest !== undefined) {
+            record.promptDigest !== undefined &&
+            !neverLanded) {
             digests.add(record.promptDigest);
         }
     }

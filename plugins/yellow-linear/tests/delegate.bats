@@ -245,7 +245,7 @@ setup() {
 @test "with no covering grant the jules branch prints the terminal authorize command and sends nothing" {
   jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
   printf '%s\n' "$jules_block" | grep -qF 'grant_id=NONE'
-  printf '%s\n' "$jules_block" | grep -qF 'authorize --repo %s --branch %s --task-ref %s --operations create --owner YOUR_NAME'
+  printf '%s\n' "$jules_block" | grep -qF 'authorize --repo %s --branch %s --task-ref %s --operations create,approve,reply --owner YOUR_NAME'
   printf '%s\n' "$jules_block" | grep -qF 'separate terminal window'
   printf '%s\n' "$jules_block" | grep -qF 'Do not try to run `authorize` yourself'
   # The refusal path ends before any launch and posts no Linear comment.

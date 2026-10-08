@@ -299,6 +299,10 @@ async function superviseOnce(deps, args) {
     const repliedSinceEvaluation = evaluated !== undefined &&
         Object.values(journal.operations).some((r) => r.sessionResource === sessionResource &&
             r.kind === 'reply' &&
+            // A clean rejection or a failure before dispatch never reached Jules;
+            // reserved, accepted, unknown-outcome and reconciled replies might have.
+            r.status !== 'failed' &&
+            r.status !== 'rejected' &&
             r.createdAt >= evaluated.evaluatedAt);
     // A swap is caught whether this pass or an earlier plain `status` consumed
     // the new plan: the plan now pending is compared with the one evaluated.
@@ -558,7 +562,9 @@ async function clearPause(deps, args) {
                 recoveryAction: 'Run status for this session, inspect it, then retry.',
             });
         }
-        const { paused: _paused, outsideSeen: _outside, ...rest } = state;
+        // The invalidated evaluation is forgotten with the pause, so the next pass
+        // does not re-pause on the same plan swap.
+        const { paused: _paused, outsideSeen: _outside, evaluatedPlan: _evaluated, ...rest } = state;
         operations[owner.localRequestId] = {
             ...current,
             supervision: rest,

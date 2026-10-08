@@ -724,17 +724,17 @@ FOUND=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO_PATH" --arg branch "$BRANC
         and .repository == $repo
         and ((.operations | index("create")) != null)
         and ((.taskRefs | index($task)) != null)
+        and ((.usage.activeSessionRefs | length) < .maxActiveSessions)
+        and (.usage.totalTasks < .maxTotalTasks)
         and (. as $g
              | if ($g.branchPattern | endswith("*"))
                then ($branch | startswith($g.branchPattern[0:-1]))
                else $g.branchPattern == $branch end))
-  ] | sort_by([((.usage.activeSessionRefs | length) < .maxActiveSessions
-                and .usage.totalTasks < .maxTotalTasks), .expiresAt])
-    | last | .grantId // empty')
+  ] | sort_by(.expiresAt) | last | .grantId // empty')
 if [ -z "$FOUND" ]; then
   printf 'grant_id=NONE\n'
-  printf 'No grant covers %s on %s for %s. Run this yourself in a separate terminal window on this machine (not through Claude Code), then retry:\n' "$REPO_PATH" "$BRANCH" "$ISSUE_ID"
-  printf '  node %s authorize --repo %s --branch %s --task-ref %s --operations create --owner YOUR_NAME\n' "'$CLI'" "'$REPO_PATH'" "'$BRANCH'" "'$ISSUE_ID'"
+  printf 'No active grant with free session and task capacity covers %s on %s for %s. A slot frees when a session under a grant finishes; otherwise run this yourself in a separate terminal window on this machine (not through Claude Code), then retry:\n' "$REPO_PATH" "$BRANCH" "$ISSUE_ID"
+  printf '  node %s authorize --repo %s --branch %s --task-ref %s --operations create,approve,reply --owner YOUR_NAME\n' "'$CLI'" "'$REPO_PATH'" "'$BRANCH'" "'$ISSUE_ID'"
   exit 0
 fi
 printf 'grant_id=%s\n' "$FOUND"

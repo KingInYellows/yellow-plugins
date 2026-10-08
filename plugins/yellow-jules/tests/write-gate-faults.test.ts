@@ -28,6 +28,7 @@ import {
   delegateOk,
   type GrantHarness,
   makeHarness,
+  setVendorState,
 } from './support/grants.js';
 
 // Wrap the real implementations so a single call can be made to fail.
@@ -291,5 +292,20 @@ describe('reconcile releasing a create whose slot cannot be freed', () => {
     expect(result.requiresAttention).toBe(true);
     expect(result.attention).toContain('reconciled:slotStuck');
     expect(usage()?.activeSessionRefs).toEqual(['stuck-2']);
+  });
+});
+
+describe('status on a finished session when the slot cannot be released', () => {
+  it('still reads the session and flags the held slot', async () => {
+    const wide = await createGrant(h, { maxActiveSessions: 3 });
+    const session = await delegateOk(h, wide, { branch: 'scratch/done' });
+    setVendorState(h, session.sessionResource, 'completed');
+    vi.mocked(releaseSlotInStore).mockRejectedValueOnce(new Error('locked'));
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: false,
+    });
+    expect(result.requiresAttention).toBe(true);
+    expect(result.attention).toContain('slotStuck');
   });
 });

@@ -428,12 +428,23 @@ async function status(deps, args) {
         await recordOutsideActivity(deps, record, newUserMessages);
         // A session observed in a terminal vendor state no longer holds its
         // grant's active-session slot (tasks and corrective rounds stay spent).
+        // status is a read command: a failed release keeps the slot held, which
+        // only makes the grant stricter, and is reported instead of thrown.
+        let slotStuck = false;
         if (TERMINAL_VENDOR_STATES.has(vendorState) &&
             record.kind === 'create' &&
             record.grantId !== undefined) {
-            await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId);
+            try {
+                await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId);
+            }
+            catch (err) {
+                slotStuck = true;
+                process.stderr.write(`warning: could not release the grant slot of ${record.localRequestId}: ${(0, errors_js_1.errorLabel)(err)}\n`);
+            }
         }
         const flags = [];
+        if (slotStuck)
+            flags.push('slotStuck');
         if (walk.partialPagination)
             flags.push('partialPagination');
         if (walk.unmappedActivity)

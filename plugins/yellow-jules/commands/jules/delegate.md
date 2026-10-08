@@ -108,9 +108,10 @@ attempt reuses it.
 
 A grant covers this launch when it is unexpired, unrevoked, permits `create`,
 and matches the repository, task ref, and branch (an exact ref, or a prefix when
-the pattern ends in `*`). Of several, one with session and task capacity left
-wins, then the latest expiry. Use the same single-quoted substitution rule;
-`CORRECTION` is `1` for a repair launch and `0` otherwise:
+the pattern ends in `*`). A grant that is full (all session slots held or all
+tasks spent) never covers; of several that do, the latest expiry wins. Use the
+same single-quoted substitution rule; `CORRECTION` is `1` for a repair launch
+and `0` otherwise:
 
 ```bash
 set -uo pipefail
@@ -132,13 +133,13 @@ GRANT_ID=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO" --arg branch "$BRANCH"
         and .repository == $repo
         and ((.operations | index("create")) != null)
         and ((.taskRefs | index($task)) != null)
+        and ((.usage.activeSessionRefs | length) < .maxActiveSessions)
+        and (.usage.totalTasks < .maxTotalTasks)
         and (. as $g
              | if ($g.branchPattern | endswith("*"))
                then ($branch | startswith($g.branchPattern[0:-1]))
                else $g.branchPattern == $branch end))
-  ] | sort_by([((.usage.activeSessionRefs | length) < .maxActiveSessions
-                and .usage.totalTasks < .maxTotalTasks), .expiresAt])
-    | last | .grantId // empty')
+  ] | sort_by(.expiresAt) | last | .grantId // empty')
 if [ -z "$GRANT_ID" ]; then
   printf 'grant_id=NONE\n'
   if [ "$CORRECTION" = 1 ]; then

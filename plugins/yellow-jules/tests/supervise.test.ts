@@ -486,6 +486,70 @@ describe('outside activity pauses (R32)', () => {
     });
   });
 
+  it('a reply that was cleanly rejected does not hide a plan swap', async () => {
+    addPlan(h, session.sessionResource, 'plan-1');
+    expect((await sup()).decision).toBe('needs-plan-review');
+    h.deps.clock.time += 30_000;
+    h.adapter.sendMessageImpl = async () => {
+      throw new AdapterError('invalid-request', 'rejected', {
+        dispatched: true,
+      });
+    };
+    await expect(
+      reply(h.deps, {
+        session: session.localId,
+        message: 'please restructure the plan',
+        dryRun: false,
+        correction: true,
+        grantId,
+      })
+    ).rejects.toBeInstanceOf(AppErrorException);
+    h.deps.clock.time += 1_000;
+    addPlanNow(h, session.sessionResource, 'plan-2');
+    expect(await sup()).toMatchObject({
+      decision: 'paused',
+      reason: 'plan-changed-after-evaluation',
+    });
+  });
+
+  it('clearing a plan-swap pause lets the next pass review the new plan', async () => {
+    addPlan(h, session.sessionResource, 'plan-1');
+    await sup();
+    h.deps.clock.time += 30_000;
+    addPlanNow(h, session.sessionResource, 'plan-2');
+    expect((await sup()).decision).toBe('paused');
+    h.deps.clock.time += 60_000;
+    await status(h.deps, { session: session.localId, reconcile: false });
+    await clearPause(h.deps, { session: session.localId });
+    expect(await sup()).toMatchObject({
+      decision: 'needs-plan-review',
+      observedPlanId: 'plan-2',
+    });
+  });
+
+  it('a message of ours that never landed does not hide the same text typed by someone else', async () => {
+    h.adapter.sendMessageImpl = async () => {
+      throw new AdapterError('invalid-request', 'rejected', {
+        dispatched: true,
+      });
+    };
+    await expect(
+      reply(h.deps, {
+        session: session.localId,
+        message: 'please restructure the plan',
+        dryRun: false,
+        correction: false,
+        grantId,
+      })
+    ).rejects.toBeInstanceOf(AppErrorException);
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'please restructure the plan',
+    });
+    await status(h.deps, { session: session.localId, reconcile: false });
+    expect((await ownerRecord())?.supervision?.outsideSeen).toBeDefined();
+  });
+
   it('a new plan after OUR corrective reply is reviewed, not paused', async () => {
     addPlan(h, session.sessionResource, 'plan-1');
     await sup();
