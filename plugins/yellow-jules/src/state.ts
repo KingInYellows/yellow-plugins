@@ -1255,17 +1255,25 @@ export async function updateSupervision(
   );
 }
 
-/** Digests of the messages this plugin itself sent to the session: its prompt and its replies. */
+/**
+ * Digests of the messages this plugin itself sent to the session: its prompt and its replies.
+ * A cleanly rejected or released write never landed, so its digest does not count; an abandoned
+ * one might have, so it does.
+ */
 export function ownMessageDigests(
   journal: Journal,
   sessionResource: string
 ): Set<string> {
   const digests = new Set<string>();
   for (const record of Object.values(journal.operations)) {
+    const neverLanded =
+      (record.status === 'failed' && record.abandonedAt === undefined) ||
+      record.status === 'rejected';
     if (
       record.sessionResource === sessionResource &&
       (record.kind === 'reply' || record.kind === 'create') &&
-      record.promptDigest !== undefined
+      record.promptDigest !== undefined &&
+      !neverLanded
     ) {
       digests.add(record.promptDigest);
     }
