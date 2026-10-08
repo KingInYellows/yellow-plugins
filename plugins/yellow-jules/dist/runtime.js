@@ -318,6 +318,13 @@ async function status(deps, args) {
             ...(record.resumeApproval !== undefined
                 ? { approval: record.resumeApproval }
                 : {}),
+            ...(args.observer !== undefined
+                ? {
+                    onActivity: (activity, info) => {
+                        args.observer?.(activity, info);
+                    },
+                }
+                : {}),
         });
         // Restart guard: a stored token the vendor rejected, or one that yielded
         // nothing new, is discarded; the second consecutive such restart fails.
@@ -358,6 +365,9 @@ async function status(deps, args) {
             resumeApproval: resumePageToken !== null && walk.latestApproval !== undefined
                 ? walk.latestApproval
                 : null,
+            ...(walk.complete
+                ? { completeWalkAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString() }
+                : {}),
             recentActivityIds: ring,
             activityCountDelta: walk.newIds.length,
             // The walk ran unlocked: rebase against the journal record as it is
@@ -415,6 +425,9 @@ async function status(deps, args) {
                 partialPagination: walk.partialPagination,
                 dedupWindowExceeded,
                 unmappedActivity: walk.unmappedActivity,
+                ...(walk.partialPagination && walk.stopReason !== undefined
+                    ? { stopReason: walk.stopReason }
+                    : {}),
                 ...(record.resumePageToken !== undefined
                     ? { resumePageToken: record.resumePageToken }
                     : {}),

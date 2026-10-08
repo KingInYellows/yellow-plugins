@@ -192,7 +192,7 @@ async function delegateInner(deps, args, ids) {
                 ...(taskRef !== undefined ? { taskRef } : {}),
                 grantId,
                 autoPrRequested: false,
-                promptDigest: (0, state_js_1.digestText)(prompt),
+                promptDigest: (0, state_js_1.messageDigest)(prompt),
             },
             charge: {
                 operation: 'create',
@@ -255,6 +255,13 @@ async function resolveTarget(deps, sessionRef) {
         owner: (0, state_js_1.findBySessionResource)(journal, sessionResource),
     };
 }
+/** R32: a paused session takes no grant-backed write until `supervise --clear-pause`. */
+function assertNotPaused(target, ids) {
+    const paused = target.owner?.supervision?.paused;
+    if (paused !== undefined) {
+        throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_SUPERVISION_PAUSED', `supervision of ${target.sessionResource} is paused (${paused.reason}); no grant-backed write is allowed`), ids);
+    }
+}
 /** Grants cover sessions created through this plugin; anything else has no repo, branch or task to match. */
 function requireOwner(target, ids) {
     const owner = target.owner;
@@ -312,6 +319,7 @@ async function replyInner(deps, args, ids) {
         }
         const grantId = (0, validate_js_1.validateGrantId)(args.grantId);
         const owner = requireOwner(target, ids);
+        assertNotPaused(target, ids);
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline))
             return expiredBeforeWrite();
         const reservation = await (0, write_gate_js_1.reserveUnderGrant)(deps, {
@@ -478,6 +486,7 @@ async function approveInner(deps, args, ids) {
         }
         const grantId = (0, validate_js_1.validateGrantId)(args.grantId);
         const owner = requireOwner(target, ids);
+        assertNotPaused(target, ids);
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline))
             return expiredBeforeWrite();
         const reservation = await (0, write_gate_js_1.reserveUnderGrant)(deps, {

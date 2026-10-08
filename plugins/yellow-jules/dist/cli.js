@@ -57,6 +57,7 @@ const redact_js_1 = require("./redact.js");
 const runtime = __importStar(require("./runtime.js"));
 const sdk_adapter_js_1 = require("./sdk-adapter.js");
 const sdk_resolver_js_1 = require("./sdk-resolver.js");
+const supervise_js_1 = require("./supervise.js");
 const test_seam_js_1 = require("./test-seam.js");
 const validate_js_1 = require("./validate.js");
 const KNOWN_OPERATIONS = [
@@ -69,9 +70,10 @@ const KNOWN_OPERATIONS = [
     'approve',
     'authorize',
     'abandon',
+    'supervise',
 ];
 const UNSUPPORTED_OPERATIONS = ['cancel', 'pause', 'resume', 'cost'];
-const LATER_OPERATIONS = ['supervise', 'integrate'];
+const LATER_OPERATIONS = ['integrate'];
 // Deadline plus one in-flight read (up to the 60 s client timeout) plus the
 // post-walk staging and journal writes must fit inside the wrappers' 300 s
 // Bash timeout, or the run is killed mid-write.
@@ -300,6 +302,32 @@ async function dispatch(operation, rest, deps) {
             });
             return (0, mutations_js_1.abandon)(deps, {
                 requestId: requireString(values['request-id'], '--request-id'),
+            });
+        }
+        case 'supervise': {
+            const { values } = (0, node_util_1.parseArgs)({
+                args: [...rest],
+                options: {
+                    session: { type: 'string' },
+                    'grant-id': { type: 'string' },
+                    'clear-pause': { type: 'boolean', default: false },
+                    ...deadline,
+                },
+                strict: true,
+                allowPositionals: false,
+            });
+            if (values['clear-pause'] === true) {
+                if (typeof values['grant-id'] === 'string') {
+                    throw new UsageError('--clear-pause takes only --session; it is confirmed on the terminal, not by a grant');
+                }
+                return (0, supervise_js_1.clearPause)(deps, {
+                    session: requireString(values.session, '--session'),
+                });
+            }
+            return (0, supervise_js_1.superviseOnce)(deps, {
+                session: requireString(values.session, '--session'),
+                grantId: requireString(values['grant-id'], '--grant-id'),
+                deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS),
             });
         }
         case 'authorize': {

@@ -38,6 +38,7 @@ import * as runtime from './runtime.js';
 import type { RuntimeDeps } from './runtime.js';
 import { JulesSdkAdapter, type SdkModule } from './sdk-adapter.js';
 import { resolveSdk } from './sdk-resolver.js';
+import { clearPause, superviseOnce } from './supervise.js';
 import { getTestTransport } from './test-seam.js';
 import { validatePositiveInt } from './validate.js';
 
@@ -51,9 +52,10 @@ const KNOWN_OPERATIONS = [
   'approve',
   'authorize',
   'abandon',
+  'supervise',
 ] as const;
 const UNSUPPORTED_OPERATIONS = ['cancel', 'pause', 'resume', 'cost'] as const;
-const LATER_OPERATIONS = ['supervise', 'integrate'] as const;
+const LATER_OPERATIONS = ['integrate'] as const;
 // Deadline plus one in-flight read (up to the 60 s client timeout) plus the
 // post-walk staging and journal writes must fit inside the wrappers' 300 s
 // Bash timeout, or the run is killed mid-write.
@@ -123,7 +125,9 @@ type OperationResult =
   | Awaited<ReturnType<typeof delegate>>
   | Awaited<ReturnType<typeof reply>>
   | Awaited<ReturnType<typeof approve>>
-  | Awaited<ReturnType<typeof abandon>>;
+  | Awaited<ReturnType<typeof abandon>>
+  | Awaited<ReturnType<typeof superviseOnce>>
+  | Awaited<ReturnType<typeof clearPause>>;
 
 async function dispatch(
   operation: string,
@@ -341,6 +345,38 @@ async function dispatch(
       });
       return abandon(deps, {
         requestId: requireString(values['request-id'], '--request-id'),
+      });
+    }
+
+    case 'supervise': {
+      const { values } = parseArgs({
+        args: [...rest],
+        options: {
+          session: { type: 'string' },
+          'grant-id': { type: 'string' },
+          'clear-pause': { type: 'boolean', default: false },
+          ...deadline,
+        },
+        strict: true,
+        allowPositionals: false,
+      });
+      if (values['clear-pause'] === true) {
+        if (typeof values['grant-id'] === 'string') {
+          throw new UsageError(
+            '--clear-pause takes only --session; it is confirmed on the terminal, not by a grant'
+          );
+        }
+        return clearPause(deps, {
+          session: requireString(values.session, '--session'),
+        });
+      }
+      return superviseOnce(deps, {
+        session: requireString(values.session, '--session'),
+        grantId: requireString(values['grant-id'], '--grant-id'),
+        deadlineMs: deadlineFlag(
+          values['deadline-ms'],
+          DEFAULT_MUTATION_DEADLINE_MS
+        ),
       });
     }
 

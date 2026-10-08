@@ -36,6 +36,7 @@ import type {
   OperationRecord,
   OperationStatus,
   PendingPlan,
+  SupervisionState,
 } from './types.js';
 import {
   isValidPageToken,
@@ -103,6 +104,7 @@ const OPTIONAL_STRING_FIELDS = [
   'condition',
   'lastActivityCreateTime',
   'lastActivityId',
+  'lastCompleteWalkAt',
   'resumePageToken',
   'artifactResumePageToken',
   'abandonedAt',
@@ -237,6 +239,16 @@ function isValidSupervision(value: unknown): boolean {
       isPlainObject(backoff) &&
       isNonNegativeInt(backoff['failures']) &&
       typeof backoff['nextCheckAt'] === 'string'
+    )
+  )
+    return false;
+  const evaluatedPlan = value['evaluatedPlan'];
+  if (
+    evaluatedPlan !== undefined &&
+    !(
+      isPlainObject(evaluatedPlan) &&
+      typeof evaluatedPlan['planId'] === 'string' &&
+      typeof evaluatedPlan['evaluatedAt'] === 'string'
     )
   )
     return false;
@@ -861,6 +873,8 @@ export interface ReadStateUpdate {
   } | null;
   readonly recentActivityIds?: readonly string[];
   readonly activityCountDelta?: number;
+  /** Present only after a COMPLETE walk. */
+  readonly completeWalkAt?: string;
   /** `null` clears the pending plan (a `planApproved` was seen). */
   readonly pendingPlan?: PendingPlan | null;
   readonly resumeRestartCount?: number;
@@ -1030,6 +1044,9 @@ export async function upsertReadState(
               lastActivityId: watermark.activityId,
             }
           : {}),
+        ...(update.completeWalkAt !== undefined
+          ? { lastCompleteWalkAt: update.completeWalkAt }
+          : {}),
         ...(resumePageToken !== undefined ? { resumePageToken } : {}),
         ...(resumeApproval !== undefined ? { resumeApproval } : {}),
         ...(pendingPlan !== undefined ? { pendingPlan } : {}),
@@ -1156,4 +1173,69 @@ export async function recordDeviation(
 
 export function hasUnreconciledDeviation(record: OperationRecord): boolean {
   return record.deviations.some((d) => !d.reconciled);
+}
+
+export interface SupervisionPatch {
+  /** `null` clears a pause (only the TTY-confirmed `--clear-pause` does). */
+  readonly paused?: NonNullable<SupervisionState['paused']> | null;
+  /** `null` resets the check-failed backoff. */
+  readonly backoff?: NonNullable<SupervisionState['backoff']> | null;
+  readonly lastDecision?: NonNullable<SupervisionState['lastDecision']>;
+  /** `null` forgets the evaluated plan. */
+  readonly evaluatedPlan?: NonNullable<
+    SupervisionState['evaluatedPlan']
+  > | null;
+}
+
+/** Merges a patch into the session's supervision state; written only by `supervise` (R32, R33). */
+export async function updateSupervision(
+  dataDir: string,
+  localRequestId: string,
+  patch: SupervisionPatch,
+  now: () => Date = () => new Date(),
+  config: LockConfig = DEFAULT_LOCK_CONFIG
+): Promise<OperationRecord> {
+  return updateJournal(
+    dataDir,
+    (operations) => {
+      const current = requireRecord(operations, localRequestId);
+      const previous: SupervisionState = current.supervision ?? {};
+      const next: SupervisionState = {
+        ...(patch.paused === undefined
+          ? previous.paused !== undefined
+            ? { paused: previous.paused }
+            : {}
+          : patch.paused !== null
+            ? { paused: patch.paused }
+            : {}),
+        ...(patch.backoff === undefined
+          ? previous.backoff !== undefined
+            ? { backoff: previous.backoff }
+            : {}
+          : patch.backoff !== null
+            ? { backoff: patch.backoff }
+            : {}),
+        ...(patch.lastDecision !== undefined
+          ? { lastDecision: patch.lastDecision }
+          : previous.lastDecision !== undefined
+            ? { lastDecision: previous.lastDecision }
+            : {}),
+        ...(patch.evaluatedPlan === undefined
+          ? previous.evaluatedPlan !== undefined
+            ? { evaluatedPlan: previous.evaluatedPlan }
+            : {}
+          : patch.evaluatedPlan !== null
+            ? { evaluatedPlan: patch.evaluatedPlan }
+            : {}),
+      };
+      const updated: OperationRecord = {
+        ...current,
+        supervision: next,
+        updatedAt: now().toISOString(),
+      };
+      operations[localRequestId] = updated;
+      return updated;
+    },
+    config
+  );
 }

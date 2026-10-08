@@ -396,6 +396,15 @@ export interface StatusArgs {
   readonly session?: string;
   readonly reconcile: boolean;
   readonly deadlineMs?: number;
+  /**
+   * Sees every activity the observation walk reads, in page order, with
+   * whether it counted as new. `supervise` uses it to find outside activity
+   * (R32); the CLI never sets it.
+   */
+  readonly observer?: (
+    activity: AdapterActivity,
+    info: { readonly isNew: boolean }
+  ) => void;
 }
 
 export type { ReconciledEntry } from './types.js';
@@ -407,6 +416,8 @@ export interface StatusActivities {
   readonly partialPagination: boolean;
   readonly dedupWindowExceeded: boolean;
   readonly unmappedActivity: boolean;
+  /** Why a partial walk stopped. */
+  readonly stopReason?: 'page-cap' | 'page-failure' | 'deadline' | 'unmapped';
   readonly resumePageToken?: string;
 }
 
@@ -516,6 +527,13 @@ export async function status(
       ...(record.resumeApproval !== undefined
         ? { approval: record.resumeApproval }
         : {}),
+      ...(args.observer !== undefined
+        ? {
+            onActivity: (activity, info) => {
+              args.observer?.(activity, info);
+            },
+          }
+        : {}),
     });
 
     // Restart guard: a stored token the vendor rejected, or one that yielded
@@ -578,6 +596,9 @@ export async function status(
           resumePageToken !== null && walk.latestApproval !== undefined
             ? walk.latestApproval
             : null,
+        ...(walk.complete
+          ? { completeWalkAt: nowFn(deps)().toISOString() }
+          : {}),
         recentActivityIds: ring,
         activityCountDelta: walk.newIds.length,
         // The walk ran unlocked: rebase against the journal record as it is
@@ -643,6 +664,9 @@ export async function status(
         partialPagination: walk.partialPagination,
         dedupWindowExceeded,
         unmappedActivity: walk.unmappedActivity,
+        ...(walk.partialPagination && walk.stopReason !== undefined
+          ? { stopReason: walk.stopReason }
+          : {}),
         ...(record.resumePageToken !== undefined
           ? { resumePageToken: record.resumePageToken }
           : {}),

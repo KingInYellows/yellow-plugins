@@ -264,6 +264,8 @@ export interface OperationRecord {
   // Activity read-state: written only by `status` (contract "Activity walk").
   readonly lastActivityCreateTime?: string;
   readonly lastActivityId?: string;
+  /** When `status` last finished a COMPLETE walk; `supervise --clear-pause` needs one after the pause. */
+  readonly lastCompleteWalkAt?: string;
   readonly resumePageToken?: string;
   readonly recentActivityIds: readonly string[];
   readonly activityCount: number;
@@ -335,6 +337,14 @@ export interface SupervisionState {
   readonly lastDecision?: {
     readonly decision: SupervisionDecision;
     readonly decidedAt: string;
+  };
+  /**
+   * The plan a `needs-plan-review` pass presented, and when. A different plan
+   * appearing before it is approved, with no reply of ours since, pauses (R32).
+   */
+  readonly evaluatedPlan?: {
+    readonly planId: string;
+    readonly evaluatedAt: string;
   };
 }
 

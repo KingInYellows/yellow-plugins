@@ -73,8 +73,15 @@ export interface WalkParams {
     readonly createTime: string;
     readonly activityId: string;
   };
-  /** Called for every activity read, in page order (collect stages artifacts here). */
-  readonly onActivity?: (activity: AdapterActivity) => void | Promise<void>;
+  /**
+   * Called for every activity read, in page order (collect stages artifacts
+   * here). `isNew` is true when the activity was counted toward `newIds`:
+   * outside the dedup ring and after the watermark.
+   */
+  readonly onActivity?: (
+    activity: AdapterActivity,
+    info: { readonly isNew: boolean }
+  ) => void | Promise<void>;
 }
 
 export interface WalkResult {
@@ -230,6 +237,7 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
 
     for (const activity of page.activities) {
       processed += 1;
+      let isNew = false;
       if (!seenIds.has(activity.activityId)) {
         seenIds.add(activity.activityId);
         seen.push({
@@ -239,8 +247,10 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
         const afterWatermark =
           params.watermark === undefined ||
           compareStamp(activity, params.watermark) > 0;
-        if (!ring.has(activity.activityId) && afterWatermark)
+        if (!ring.has(activity.activityId) && afterWatermark) {
           newIds.push(activity.activityId);
+          isNew = true;
+        }
       }
       if (newest === undefined || compareStamp(activity, newest) > 0) {
         newest = {
@@ -281,7 +291,7 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
           };
         }
       }
-      await params.onActivity?.(activity);
+      await params.onActivity?.(activity, { isNew });
     }
 
     if (page.unmappedActivity === true) {

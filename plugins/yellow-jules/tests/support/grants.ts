@@ -232,3 +232,23 @@ export function setVendorState(
   if (session === undefined) throw new Error(`no ${sessionResource}`);
   harness.adapter.sessions.set(sessionResource, { ...session, vendorState });
 }
+
+/**
+ * A plan that arrives NOW (the fake clock), after anything already read:
+ * real activities arrive in time order, which `addPlan`'s fixed stamps do not.
+ */
+export function addPlanNow(
+  harness: GrantHarness,
+  sessionResource: string,
+  planId: string
+): AdapterActivity {
+  const activity = addActivity(harness, sessionResource, {
+    type: 'planGenerated',
+    plan: {
+      planId,
+      steps: [{ id: `st-${planId}`, title: 'Do the work', index: 0 }],
+    },
+  });
+  setVendorState(harness, sessionResource, 'awaitingPlanApproval');
+  return activity;
+}

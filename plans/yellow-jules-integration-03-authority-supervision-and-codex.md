@@ -281,7 +281,7 @@ through the generator and documenting the single-controller handoff procedure.
   - The text never says "terminated" or "stopped".
   - Add a mutating-operation deadline constant `DEFAULT_MUTATION_DEADLINE_MS = 180_000` in `src/deadline.ts`.
   - Authority is rechecked inside the critical section before each write (R14).
-- [ ] Step 18: Wire the CLI cases in `src/cli.ts` for `delegate`, `reply`, `approve`, `authorize`, `supervise` and `abandon`.
+- [x] Step 18: Wire the CLI cases in `src/cli.ts` for `delegate`, `reply`, `approve`, `authorize`, `supervise` and `abandon`.
   - Each case uses strict `parseArgs` and the contract argument shapes, plus `--correction` on delegate and reply.
   - Move these subcommands into `KNOWN_OPERATIONS`; `integrate` stays in `LATER_OPERATIONS`.
   - `localRequestId` and `localId` are echoed on every mutating failure envelope.
@@ -289,7 +289,7 @@ through the generator and documenting the single-controller handoff procedure.
 
 ### Phase D: supervision
 
-- [ ] Step 19: Create `src/supervise.ts` with `superviseOnce(deps, { session, grantId, deadlineMs, host })`. It runs one bounded pass and never loops or sleeps.
+- [x] Step 19: Create `src/supervise.ts` with `superviseOnce(deps, { session, grantId, deadlineMs, host })`. It runs one bounded pass and never loops or sleeps.
   - **Gate.** The grant must exist and permit the session's task.
   - **Observation.** It performs the `status` observation walk, using `status`'s write capability for read-state.
   - **R32 outside activity.** Pause when either of these is observed:
@@ -310,8 +310,8 @@ through the generator and documenting the single-controller handoff procedure.
 
   - **Output.** It returns `{ decision, condition, vendorState, nextCheck: { afterSeconds, reason }, allowedActions: [...], correctiveRoundsLeft, fenced: { plan?, question?, activities? }, attention? }`.
   - **Fencing.** All vendor text is passed through `fenceUntrusted` (R33).
-- [ ] Step 20: Add `supervise --clear-pause --session <ref>`. It is TTY-confirmed via `confirmOnTty`, and it requires a complete `status` walk since the pause; otherwise it fails with `JULES_INVALID_STATE` and recovery "run `status` first".
-- [ ] Step 21: Record corrections (R44). A `--correction` reply to an active session, or a `--correction` repair `delegate` on the same `--task-ref`, decrements `correctiveRoundsLeft`. The `supervise` output never suggests reopening a completed session.
+- [x] Step 20: Add `supervise --clear-pause --session <ref>`. It is TTY-confirmed via `confirmOnTty`, and it requires a complete `status` walk since the pause; otherwise it fails with `JULES_INVALID_STATE` and recovery "run `status` first".
+- [x] Step 21: Record corrections (R44). A `--correction` reply to an active session, or a `--correction` repair `delegate` on the same `--task-ref`, decrements `correctiveRoundsLeft`. The `supervise` output never suggests reopening a completed session.
 
 ### Phase E: Claude wrappers and Linear route
 

@@ -55,6 +55,7 @@ exports.emptyUsage = emptyUsage;
 exports.loadGrants = loadGrants;
 exports.writeGrants = writeGrants;
 exports.isExpired = isExpired;
+exports.evaluateScope = evaluateScope;
 exports.evaluateAuthority = evaluateAuthority;
 exports.grantHasUnreconciledDeviation = grantHasUnreconciledDeviation;
 exports.chargeGrant = chargeGrant;
@@ -272,11 +273,11 @@ function isExpired(grant, now) {
     return now.getTime() >= Date.parse(grant.expiresAt);
 }
 /**
- * Denial order (each step is checked only if the previous passed):
- * revoked, expired, repository/source, branch, task ref, operation, limits,
- * then an unreconciled policy deviation under the grant (R13).
+ * The scope checks every use of a grant shares: revoked, expired,
+ * repository/source, branch, task ref. `supervise` uses this alone (its pass
+ * is an observation, not an operation).
  */
-function evaluateAuthority(grant, request, now, context) {
+function evaluateScope(grant, request, now) {
     if (grant.revokedAt !== undefined) {
         return deny('JULES_AUTHORITY_DENIED', 'revoked', `grant ${grant.grantId} was revoked`);
     }
@@ -294,6 +295,17 @@ function evaluateAuthority(grant, request, now, context) {
         !grant.taskRefs.includes(request.taskRef)) {
         return deny('JULES_AUTHORITY_DENIED', 'task-ref-outside-grant', `grant ${grant.grantId} does not cover task ref ${request.taskRef ?? '(none)'}`);
     }
+    return { ok: true };
+}
+/**
+ * Denial order (each step is checked only if the previous passed):
+ * revoked, expired, repository/source, branch, task ref, operation, limits,
+ * then an unreconciled policy deviation under the grant (R13).
+ */
+function evaluateAuthority(grant, request, now, context) {
+    const scope = evaluateScope(grant, request, now);
+    if (!scope.ok)
+        return scope;
     if (!grant.operations.includes(request.operation)) {
         return deny('JULES_AUTHORITY_DENIED', 'operation-not-permitted', `grant ${grant.grantId} does not permit ${request.operation}`);
     }

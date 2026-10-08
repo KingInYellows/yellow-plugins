@@ -69,6 +69,7 @@ exports.upsertArtifactResumeToken = upsertArtifactResumeToken;
 exports.recordArtifacts = recordArtifacts;
 exports.recordDeviation = recordDeviation;
 exports.hasUnreconciledDeviation = hasUnreconciledDeviation;
+exports.updateSupervision = updateSupervision;
 const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
 const os = __importStar(require("node:os"));
@@ -134,6 +135,7 @@ const OPTIONAL_STRING_FIELDS = [
     'condition',
     'lastActivityCreateTime',
     'lastActivityId',
+    'lastCompleteWalkAt',
     'resumePageToken',
     'artifactResumePageToken',
     'abandonedAt',
@@ -241,6 +243,12 @@ function isValidSupervision(value) {
         !(isPlainObject(backoff) &&
             isNonNegativeInt(backoff['failures']) &&
             typeof backoff['nextCheckAt'] === 'string'))
+        return false;
+    const evaluatedPlan = value['evaluatedPlan'];
+    if (evaluatedPlan !== undefined &&
+        !(isPlainObject(evaluatedPlan) &&
+            typeof evaluatedPlan['planId'] === 'string' &&
+            typeof evaluatedPlan['evaluatedAt'] === 'string'))
         return false;
     return (lastDecision === undefined ||
         (isPlainObject(lastDecision) &&
@@ -776,6 +784,9 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
                     lastActivityId: watermark.activityId,
                 }
                 : {}),
+            ...(update.completeWalkAt !== undefined
+                ? { lastCompleteWalkAt: update.completeWalkAt }
+                : {}),
             ...(resumePageToken !== undefined ? { resumePageToken } : {}),
             ...(resumeApproval !== undefined ? { resumeApproval } : {}),
             ...(pendingPlan !== undefined ? { pendingPlan } : {}),
@@ -861,4 +872,46 @@ async function recordDeviation(dataDir, localRequestId, deviation, now = () => n
 }
 function hasUnreconciledDeviation(record) {
     return record.deviations.some((d) => !d.reconciled);
+}
+/** Merges a patch into the session's supervision state; written only by `supervise` (R32, R33). */
+async function updateSupervision(dataDir, localRequestId, patch, now = () => new Date(), config = exports.DEFAULT_LOCK_CONFIG) {
+    return updateJournal(dataDir, (operations) => {
+        const current = requireRecord(operations, localRequestId);
+        const previous = current.supervision ?? {};
+        const next = {
+            ...(patch.paused === undefined
+                ? previous.paused !== undefined
+                    ? { paused: previous.paused }
+                    : {}
+                : patch.paused !== null
+                    ? { paused: patch.paused }
+                    : {}),
+            ...(patch.backoff === undefined
+                ? previous.backoff !== undefined
+                    ? { backoff: previous.backoff }
+                    : {}
+                : patch.backoff !== null
+                    ? { backoff: patch.backoff }
+                    : {}),
+            ...(patch.lastDecision !== undefined
+                ? { lastDecision: patch.lastDecision }
+                : previous.lastDecision !== undefined
+                    ? { lastDecision: previous.lastDecision }
+                    : {}),
+            ...(patch.evaluatedPlan === undefined
+                ? previous.evaluatedPlan !== undefined
+                    ? { evaluatedPlan: previous.evaluatedPlan }
+                    : {}
+                : patch.evaluatedPlan !== null
+                    ? { evaluatedPlan: patch.evaluatedPlan }
+                    : {}),
+        };
+        const updated = {
+            ...current,
+            supervision: next,
+            updatedAt: now().toISOString(),
+        };
+        operations[localRequestId] = updated;
+        return updated;
+    }, config);
 }

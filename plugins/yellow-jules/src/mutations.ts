@@ -58,7 +58,6 @@ import {
 } from './runtime-support.js';
 import {
   applyRetention,
-  digestText,
   findBySessionResource,
   messageDigest,
   readJournal,
@@ -322,7 +321,7 @@ async function delegateInner(
         ...(taskRef !== undefined ? { taskRef } : {}),
         grantId,
         autoPrRequested: false,
-        promptDigest: digestText(prompt),
+        promptDigest: messageDigest(prompt),
       },
       charge: {
         operation: 'create',
@@ -412,6 +411,20 @@ async function resolveTarget(
     sessionResource,
     owner: findBySessionResource(journal, sessionResource),
   };
+}
+
+/** R32: a paused session takes no grant-backed write until `supervise --clear-pause`. */
+function assertNotPaused(target: SessionTarget, ids: Ids): void {
+  const paused = target.owner?.supervision?.paused;
+  if (paused !== undefined) {
+    throw new MutationErrorException(
+      makeAppError(
+        'JULES_SUPERVISION_PAUSED',
+        `supervision of ${target.sessionResource} is paused (${paused.reason}); no grant-backed write is allowed`
+      ),
+      ids
+    );
+  }
 }
 
 /** Grants cover sessions created through this plugin; anything else has no repo, branch or task to match. */
@@ -535,6 +548,7 @@ async function replyInner(
     }
     const grantId = validateGrantId(args.grantId);
     const owner = requireOwner(target, ids);
+    assertNotPaused(target, ids);
     if (isExpired(deps.clock, deadline)) return expiredBeforeWrite();
 
     const reservation = await reserveUnderGrant(deps, {
@@ -791,6 +805,7 @@ async function approveInner(
 
     const grantId = validateGrantId(args.grantId);
     const owner = requireOwner(target, ids);
+    assertNotPaused(target, ids);
     if (isExpired(deps.clock, deadline)) return expiredBeforeWrite();
 
     const reservation = await reserveUnderGrant(deps, {

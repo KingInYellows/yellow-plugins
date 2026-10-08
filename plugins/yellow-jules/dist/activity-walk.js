@@ -119,6 +119,7 @@ async function walkActivities(params) {
         firstPageOfSegment = false;
         for (const activity of page.activities) {
             processed += 1;
+            let isNew = false;
             if (!seenIds.has(activity.activityId)) {
                 seenIds.add(activity.activityId);
                 seen.push({
@@ -127,8 +128,10 @@ async function walkActivities(params) {
                 });
                 const afterWatermark = params.watermark === undefined ||
                     compareStamp(activity, params.watermark) > 0;
-                if (!ring.has(activity.activityId) && afterWatermark)
+                if (!ring.has(activity.activityId) && afterWatermark) {
                     newIds.push(activity.activityId);
+                    isNew = true;
+                }
             }
             if (newest === undefined || compareStamp(activity, newest) > 0) {
                 newest = {
@@ -166,7 +169,7 @@ async function walkActivities(params) {
                     };
                 }
             }
-            await params.onActivity?.(activity);
+            await params.onActivity?.(activity, { isNew });
         }
         if (page.unmappedActivity === true) {
             unmappedActivity = true;

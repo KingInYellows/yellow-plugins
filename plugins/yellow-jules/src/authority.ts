@@ -296,15 +296,14 @@ export function isExpired(grant: GrantRecord, now: Date): boolean {
 }
 
 /**
- * Denial order (each step is checked only if the previous passed):
- * revoked, expired, repository/source, branch, task ref, operation, limits,
- * then an unreconciled policy deviation under the grant (R13).
+ * The scope checks every use of a grant shares: revoked, expired,
+ * repository/source, branch, task ref. `supervise` uses this alone (its pass
+ * is an observation, not an operation).
  */
-export function evaluateAuthority(
+export function evaluateScope(
   grant: GrantRecord,
-  request: AuthorityRequest,
-  now: Date,
-  context: { readonly unreconciledDeviation: boolean }
+  request: Omit<AuthorityRequest, 'operation'>,
+  now: Date
 ): AuthorityVerdict {
   if (grant.revokedAt !== undefined) {
     return deny(
@@ -347,6 +346,22 @@ export function evaluateAuthority(
       `grant ${grant.grantId} does not cover task ref ${request.taskRef ?? '(none)'}`
     );
   }
+  return { ok: true };
+}
+
+/**
+ * Denial order (each step is checked only if the previous passed):
+ * revoked, expired, repository/source, branch, task ref, operation, limits,
+ * then an unreconciled policy deviation under the grant (R13).
+ */
+export function evaluateAuthority(
+  grant: GrantRecord,
+  request: AuthorityRequest,
+  now: Date,
+  context: { readonly unreconciledDeviation: boolean }
+): AuthorityVerdict {
+  const scope = evaluateScope(grant, request, now);
+  if (!scope.ok) return scope;
   if (!grant.operations.includes(request.operation)) {
     return deny(
       'JULES_AUTHORITY_DENIED',
