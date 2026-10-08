@@ -472,7 +472,9 @@ third party, TypeSafe AI (`https://api.typesafe.ai/v1/systemone`):
   hash no longer matches the session's pending, or else processing, entry is
   dropped, and a newer turn retires the older record before its own call), holds the session id, content hash, choice,
   probabilities, latency and token count, never transcript text. It sits in
-  the same owner-only staging directory as the pending queue. When that
+  the same owner-only staging directory as the pending queue. Each accepted
+  answer is also appended to `jev-shadow/predictions.jsonl`, since a drain
+  can score an entry before a later turn replaces the per-session file. When that
   directory exists, the staging-reviewer drain appends each scorer verdict
   (session id, content hash, verdict, priority) to
   `jev-shadow/outcomes.jsonl` so predictions can be joined to outcomes; it

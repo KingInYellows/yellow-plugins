@@ -255,6 +255,12 @@ JEVCFG
   if jev_lock "$lock"; then
     current=$(jev_current_hash "$staging" "$sid")
     if [ "$current" = "$hash" ]; then
+      # The per-session file holds only the latest answer, and a drain can
+      # score this entry before a newer turn replaces it, so every accepted
+      # answer is also appended to predictions.jsonl, the join side of
+      # outcomes.jsonl. touch first: zsh's noclobber refuses >> to a new file.
+      ( umask 077; touch -- "${dir}/predictions.jsonl" ) 2>/dev/null \
+        && printf '%s\n' "$line" >> "${dir}/predictions.jsonl" 2>/dev/null
       mv -f -- "$tmp" "${dir}/${sid}.json" 2>/dev/null
     fi
     rm -f -- "$lock" 2>/dev/null

@@ -400,6 +400,8 @@ fi
    # Re-paste $STAGING; set F to the entry, VERDICT and PRIORITY from step 4.
    if [ -d "$STAGING/jev-shadow" ] && [ ! -L "$STAGING/jev-shadow" ]; then
      ( umask 077
+       # touch first: zsh's noclobber refuses >> to a file that does not exist.
+       touch -- "$STAGING/jev-shadow/outcomes.jsonl" || exit 0
        jq -c --arg verdict "$VERDICT" --arg priority "${PRIORITY:-}" \
          --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
          '{session_id, content_hash, verdict: $verdict,

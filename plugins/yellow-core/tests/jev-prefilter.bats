@@ -117,9 +117,13 @@ _capture() {
   export MOCK_JEV_RESPONSE='{"model":"jev-1.13.0","answers":{"durable":{"type":"choice","choice":"durable-lesson","confidence":0.92},"has_instruction":{"type":"noul","noul":0.02}}}'
   printf '%s\n' '{"type":"user","message":{"content":"remember the cache gotcha"}}' >> "$TRANSCRIPT_FILE"
   COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
-  [ "$(ls "$STAGING/jev-shadow" | wc -l)" -eq 1 ]
+  [ "$(ls "$STAGING/jev-shadow" | grep -c '\.json$')" -eq 1 ]
   [ "$(wc -l < "$STAGING/jev-shadow/$SESSION_ID.json")" -eq 1 ]
   jq -e '.durable == "durable-lesson" and .would_skip == false' "$STAGING/jev-shadow/$SESSION_ID.json"
+  # Both answers stay joinable by hash after the per-session file moved on.
+  [ "$(wc -l < "$STAGING/jev-shadow/predictions.jsonl")" -eq 2 ]
+  [ "$(jq -r '.content_hash' "$STAGING/jev-shadow/predictions.jsonl" | sort -u | wc -l)" -eq 2 ]
+  [ "$(stat -c '%a' "$STAGING/jev-shadow/predictions.jsonl" 2>/dev/null || stat -f '%Lp' "$STAGING/jev-shadow/predictions.jsonl")" = "600" ]
 }
 
 @test "a standing-behaviour request is never marked skippable" {
@@ -166,6 +170,7 @@ _capture() {
   [ "$status" -eq 0 ]
   [ -f "$MOCK_JEV_BODY" ]
   [ "$(cat "$STAGING/jev-shadow/$SESSION_ID.json")" = "$before" ]
+  [ "$(wc -l < "$STAGING/jev-shadow/predictions.jsonl")" -eq 1 ]
 }
 
 @test "over the cap, the newest dialogue is kept" {
