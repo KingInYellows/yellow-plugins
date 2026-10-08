@@ -1236,7 +1236,9 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 
 @test "review:pr: high-confidence P2 safe_auto tier is capped and anchor-100 only" {
   grep -q '^\*\*High-confidence P2 tier\.\*\* Also apply, after the P0/P1 fixes, up to 5$' "$REVIEW_PR"
-  grep -q '`suggested_fix` and anchor 100 after Step 6' "$REVIEW_PR"
+  grep -q 'and `owner: review-fixer`) that have a non-null `suggested_fix` and anchor 100' "$REVIEW_PR"
+  grep -q '^into its high-confidence tier (every P2 `safe_auto` finding owned by$' "$REVIEW_PR"
+  grep -q 'run before the ledger write, so a dropped candidate is never recorded as' "$REVIEW_PR"
   grep -q '^P2 `safe_auto` findings below anchor 100 or past the cap are NOT auto-applied$' "$REVIEW_PR"
   grep -q 'high-confidence P2 tier exactly as `review-pr.md` Step 7 defines it' "$REVIEW_ALL"
 }

@@ -341,7 +341,9 @@ aggregation rules change there, propagate the same change here.
    11. **Sort** (severity → anchor desc → file path → line).
 
    Run intent-verification quality gates (line accuracy,
-   protected-artifact filter, skim-FP check) before any P0/P1 surfaces.
+   protected-artifact filter, skim-FP check) before any P0/P1 surfaces
+   and on every candidate for the high-confidence P2 tier, as
+   `review-pr.md` Step 6 defines them.
 
    **Ledger write** (mirrors review-pr.md "Ledger write (after
    partition)"): before sub-step 9 edits anything, run ledger.md's "After
@@ -351,8 +353,8 @@ aggregation rules change there, propagate the same change here.
    **P0/P1** findings with `autofix_class: safe_auto → review-fixer` and a
    concrete `suggested_fix`, apply sequentially via Edit. Then apply the
    high-confidence P2 tier exactly as `review-pr.md` Step 7 defines it (up
-   to 5 P2 `safe_auto` findings at anchor 100, each re-checked for line
-   accuracy and skim-FP first). Other P2/P3 findings are not auto-applied
+   to 5 P2 `safe_auto` findings owned by `review-fixer` at anchor 100, each
+   having passed the quality gates above). Other P2/P3 findings are not auto-applied
    here — they go through the resolve-PR flow at Step 12 instead. Parity
    rule with `review-pr.md` Step 7. Record each applied fix with
    ledger.md "Step 7".

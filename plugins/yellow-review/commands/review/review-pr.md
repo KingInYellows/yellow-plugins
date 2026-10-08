@@ -966,7 +966,9 @@ Apply the aggregation steps from
 
 #### Quality gates (intent verification)
 
-Before reporting any P0 or P1 finding:
+Before reporting any P0 or P1 finding, and before Step 7 takes a P2 finding
+into its high-confidence tier (every P2 `safe_auto` finding owned by
+`review-fixer` with a `suggested_fix` and anchor 100):
 
 - **Line accuracy.** Verify the cited line number against the file
   content. A finding pointing to the wrong line is worse than no finding;
@@ -975,7 +977,7 @@ Before reporting any P0 or P1 finding:
   deleting or adding to `.gitignore` files in `docs/brainstorms/`,
   `plans/`, `docs/solutions/`, or `docs/research/`. These are pipeline
   artifacts.
-- **Skim-FP check.** For each surviving P0/P1, verify the surrounding
+- **Skim-FP check.** For each surviving P0/P1 and tier candidate, verify the surrounding
   code was actually examined. Look for the "bug" handled elsewhere in the
   same function, the "unused import" used in a type annotation, the
   "missing null check" guarded by the caller. Drop findings that fail
@@ -995,11 +997,14 @@ non-null `suggested_fix`: apply sequentially using Edit tool. Review each
 change for correctness before proceeding to next.
 
 **High-confidence P2 tier.** Also apply, after the P0/P1 fixes, up to 5
-surviving P2 findings that have `autofix_class: safe_auto`, a non-null
-`suggested_fix` and anchor 100 after Step 6 (a lone reviewer at 100, or two
-reviewers at 75 promoted by sub-step 3). Take them in Step 6's sort order and
-run the line-accuracy and skim-FP quality gates on each before applying it;
-drop one that fails. The rest of the P2 `safe_auto` findings go to Residual
+surviving P2 findings in the in-skill fixer queue (`autofix_class: safe_auto`
+and `owner: review-fixer`) that have a non-null `suggested_fix` and anchor 100
+after Step 6 (a lone reviewer at 100, or two reviewers at 75 promoted by
+sub-step 3). Take them in Step 6's sort order. They have already passed all
+three quality gates (line accuracy, protected-artifact filter, skim-FP), which
+run before the ledger write, so a dropped candidate is never recorded as
+pending. A P2 finding whose owner Step 6 narrowed to `human` or `release` is
+never in this tier. The rest of the P2 `safe_auto` findings go to Residual
 Actionable Work. This tier applies in both modes: interactive runs still
 confirm the push in Step 9.
 
