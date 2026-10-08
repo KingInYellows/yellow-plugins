@@ -835,7 +835,9 @@ rl_ctags_scope() {
   if [ ! -f "$tags" ]; then
     mkdir -p -- "$dir" || return 1
     cp -- "$content" "$dir/$base" || return 1
-    (cd -- "$dir" && timeout "$RL_CTAGS_TIMEOUT" ctags --options=NONE --fields=+neKZ --output-format=json -o - -- "$base") >|"$tags" 2>/dev/null || {
+    # Universal Ctags 5.9 (the Ubuntu package) rejects `--`; `./` keeps a
+    # leading `-` in the name from reading as an option.
+    (cd -- "$dir" && timeout "$RL_CTAGS_TIMEOUT" ctags --options=NONE --fields=+neKZ --output-format=json -o - "./$base") >|"$tags" 2>/dev/null || {
       : >|"$tags"
       return 1
     }

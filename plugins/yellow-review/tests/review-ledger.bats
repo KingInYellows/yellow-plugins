@@ -219,8 +219,9 @@ setup() {
   H=$(commit_all handlers)
   observe "$H" "[$(finding h.sh 2 '{"scope":"admin_create"}'), $(finding h.sh 5 '{"scope":"handlers_create"}')]" >/dev/null
   [ "$(fold | jq '.findings | length')" -eq 2 ]
-  # re-observing both at the same head merges each into its own finding
-  out=$(observe "$H" "[$(finding h.sh 2), $(finding h.sh 5)]")
+  # re-observing both at the same head merges each into its own finding; the
+  # claims repeat because a ctags-verified scope is part of the identity
+  out=$(observe "$H" "[$(finding h.sh 2 '{"scope":"admin_create"}'), $(finding h.sh 5 '{"scope":"handlers_create"}')]")
   [ "$(printf '%s' "$out" | jq '.merged')" -eq 2 ]
 }
 
