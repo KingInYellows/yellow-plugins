@@ -81,6 +81,23 @@ ENTRY=$(jq -nc \
      transcript_tail: $tail
    }') || exit 0
 
+# Optional Jev shadow pre-filter (off unless COMPOUND_JEV_PREFILTER=shadow and
+# TYPESAFE_API_KEY are set). It runs after the pending entry is written, so it
+# cannot change what gets staged; it only records decisions under jev-shadow/
+# for comparison with staging-scorer outcomes. The directory is created before
+# the pending write: the drain records a verdict only when it exists, and a
+# drain can claim the entry as soon as it is published.
+JEV_LIB="${SCRIPT_DIR}/../../lib/jev-prefilter.sh"
+JEV_ON=0
+if [ -f "$JEV_LIB" ]; then
+  # shellcheck source=../../lib/jev-prefilter.sh
+  . "$JEV_LIB"
+  if jev_prefilter_enabled; then
+    JEV_ON=1
+    ( umask 077; mkdir -p "${STAGING_DIR}/jev-shadow" ) 2>/dev/null || true
+  fi
+fi
+
 # Atomic write: tmp/ then mv to pending/. The tmp/ and pending/ subdirs are
 # siblings under STAGING_DIR — guaranteed same filesystem — so rename(2) is
 # atomic. cs_atomic_jsonl_write handles the tmp + mv internally; we just
@@ -92,13 +109,7 @@ PENDING_PATH="${STAGING_DIR}/pending/${SESSION_ID}.jsonl"
 cs_atomic_jsonl_write "$PENDING_PATH" "${ENTRY}
 " || exit 0
 
-# Optional Jev shadow pre-filter (off unless COMPOUND_JEV_PREFILTER=shadow and
-# TYPESAFE_API_KEY are set). Runs after the pending entry is written, so it
-# cannot change what gets staged; it only records the session's latest decision
-# in jev-shadow/<session_id>.json for comparison with staging-scorer outcomes.
-if [ -f "${SCRIPT_DIR}/../../lib/jev-prefilter.sh" ]; then
-  # shellcheck source=../../lib/jev-prefilter.sh
-  . "${SCRIPT_DIR}/../../lib/jev-prefilter.sh"
+if [ "$JEV_ON" = 1 ]; then
   # Raw tail: the lib redacts the projected text itself, because redacting
   # serialized JSONL first can break a line (a URL token pattern can consume
   # the closing quote) and silently drop the newest message.

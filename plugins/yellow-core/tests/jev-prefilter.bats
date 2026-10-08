@@ -324,3 +324,14 @@ _shadow_direct() {
   printf '{"content_hash":"new"}\n' > "$STAGING/pending/$SESSION_ID.jsonl"
   [ "$(jev_current_hash "$STAGING" "$SESSION_ID")" = "new" ]
 }
+
+@test "the shadow directory exists before the pending entry is published" {
+  # A drain records outcomes only when jev-shadow/ exists, and it can claim
+  # the entry as soon as it lands in pending/. Make the pending write fail:
+  # the directory must already be there.
+  mkdir -p "$STAGING"
+  printf 'x' > "$STAGING/pending"
+  COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture || true
+  [ -d "$STAGING/jev-shadow" ]
+  [ ! -f "$MOCK_JEV_LOG" ]
+}
