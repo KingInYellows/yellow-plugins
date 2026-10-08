@@ -145,10 +145,11 @@ replayed.
 
 - [ ] Delegate a second tiny task on a **second** scratch branch pushed the same
       way (raise `--max-active-sessions` to 2 on a second grant if the first
-      slot is still held). Kill the CLI with `SIGKILL` right after it prints
-      nothing — for example run it in one terminal and, from another,
-      `kill -9 <pid>` as soon as `state/journal.json` shows a `reserved` or
-      `unknown-outcome` record.
+      slot is still held). Kill the CLI with `SIGKILL` before it prints its
+      result. The window is short, so run the delegate in one terminal and
+      poll `state/journal.json` from another; send `kill -9 <pid>` the moment a
+      `reserved` or `unknown-outcome` record appears. If the CLI finishes
+      first, repeat on a fresh branch.
   - Expected: the record is `reserved` or `unknown-outcome`; the Jules console
     shows **at most one** session for that launch.
 - [ ] Try to launch the same repository and branch again.

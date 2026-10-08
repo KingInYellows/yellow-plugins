@@ -386,6 +386,10 @@ async function status(deps, args) {
         const resumePageToken = walk.complete || noProgress ? null : (walk.resumePageToken ?? null);
         const vendorState = session.vendorState;
         const condition = (0, runtime_support_js_1.conditionOf)(vendorState);
+        // Record outside evidence BEFORE the watermark/dedup ring advances: a
+        // failure between the two then leaves the message re-detectable on the
+        // next walk instead of lost (the write gate also sees outsideSeen first).
+        await recordOutsideActivity(deps, record, newUserMessages);
         record = await (0, state_js_1.upsertReadState)(deps.dataDir, record.localRequestId, {
             vendorState,
             condition,
@@ -425,7 +429,6 @@ async function status(deps, args) {
         }, (0, runtime_support_js_1.nowFn)(deps));
         record = await (0, runtime_support_js_1.checkPolicyDeviation)(deps, record, session);
         const policyDeviation = (0, state_js_1.hasUnreconciledDeviation)(record);
-        await recordOutsideActivity(deps, record, newUserMessages);
         // A session observed in a terminal vendor state no longer holds its
         // grant's active-session slot (tasks and corrective rounds stay spent).
         // status is a read command: a failed release keeps the slot held, which

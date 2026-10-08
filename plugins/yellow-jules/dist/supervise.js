@@ -477,7 +477,12 @@ async function superviseOnce(deps, args) {
                 throw err;
             }
         }
-        const repair = permits(grant, 'create') && owner.taskRef !== undefined
+        const repair = 
+        // The write gate requires a plain launch under the SAME grant for a
+        // correction, so only advertise the repair when this grant has one.
+        permits(grant, 'create') &&
+            owner.taskRef !== undefined &&
+            (0, write_gate_js_1.hasPlainLaunch)(journal, grant.grantId, owner.taskRef)
             ? ['repair-delegate']
             : [];
         return finish('needs-verification', {

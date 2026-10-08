@@ -127,14 +127,16 @@ if [ "$(printf '%s' "$LIST" | jq -r '.ok // false')" != true ]; then
   printf '%s\n' "$LIST" | jq '{ok, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))' >&2
   exit 1
 fi
-GRANT_ID=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO" --arg branch "$BRANCH" --arg task "$TASK_REF" '
+GRANT_ID=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO" --arg branch "$BRANCH" --arg task "$TASK_REF" --argjson corr "$CORRECTION" '
   [ .grants[]?
     | select((.revoked | not) and (.expired | not)
         and .repository == $repo
         and ((.operations | index("create")) != null)
         and ((.taskRefs | index($task)) != null)
         and ((.usage.activeSessionRefs | length) < .maxActiveSessions)
-        and (.usage.totalTasks < .maxTotalTasks)
+        and (if $corr == 1
+             then ((.usage.correctiveRounds[$task] // 0) < .maxCorrectiveRounds)
+             else (.usage.totalTasks < .maxTotalTasks) end)
         and (. as $g
              | if ($g.branchPattern | endswith("*"))
                then ($branch | startswith($g.branchPattern[0:-1]))

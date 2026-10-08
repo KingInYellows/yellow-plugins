@@ -60,7 +60,11 @@ import type {
   SupervisionDecision,
 } from './types.js';
 import { validateGrantId } from './validate.js';
-import { confirmationRequired, loadAuthorizedGrant } from './write-gate.js';
+import {
+  confirmationRequired,
+  hasPlainLaunch,
+  loadAuthorizedGrant,
+} from './write-gate.js';
 
 const BACKOFF_BASE_SECONDS = 60;
 export const BACKOFF_CAP_SECONDS = 3600;
@@ -697,7 +701,11 @@ export async function superviseOnce(
       }
     }
     const repair =
-      permits(grant, 'create') && owner.taskRef !== undefined
+      // The write gate requires a plain launch under the SAME grant for a
+      // correction, so only advertise the repair when this grant has one.
+      permits(grant, 'create') &&
+      owner.taskRef !== undefined &&
+      hasPlainLaunch(journal, grant.grantId, owner.taskRef)
         ? (['repair-delegate'] as const)
         : [];
     return finish(

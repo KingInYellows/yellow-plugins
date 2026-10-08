@@ -14,6 +14,7 @@
  * make the grant stricter — never a reservation the grant did not pay for.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.hasPlainLaunch = hasPlainLaunch;
 exports.reserveUnderGrant = reserveUnderGrant;
 exports.confirmationRequired = confirmationRequired;
 exports.settleAccepted = settleAccepted;

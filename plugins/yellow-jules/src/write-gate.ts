@@ -102,7 +102,7 @@ function runningSessionsUnder(journal: Journal, grantId: string): string[] {
     .map((r) => r.sessionResource as string);
 }
 
-function hasPlainLaunch(
+export function hasPlainLaunch(
   journal: Journal,
   grantId: string,
   taskRef: string | undefined

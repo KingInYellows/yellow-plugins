@@ -89,13 +89,17 @@ no grant can cover it, so stop and say so.
 
 Use the repository, branch, and task ref the dry-run printed. A grant covers the
 reply when it is unexpired, unrevoked, permits `reply`, and matches all three.
+`CORRECTION` is `1` when the user passed `--correction` (the same value Step 6
+sends), else `0`; a corrective reply also needs a grant with corrective rounds
+left for this task.
 
 ```bash
 set -uo pipefail
 REPO='YELLOW_TODO_repository'
 BRANCH='YELLOW_TODO_requested_branch'
 TASK_REF='YELLOW_TODO_task_ref'
-case "$REPO$BRANCH$TASK_REF" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+CORRECTION='YELLOW_TODO_1_or_0'
+case "$REPO$BRANCH$TASK_REF$CORRECTION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 LIST=$(node "$CLI" authorize --list)
 if [ "$(printf '%s' "$LIST" | jq -r '.ok // false')" != true ]; then
@@ -103,12 +107,13 @@ if [ "$(printf '%s' "$LIST" | jq -r '.ok // false')" != true ]; then
   printf '%s\n' "$LIST" | jq '{ok, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))' >&2
   exit 1
 fi
-GRANT_ID=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO" --arg branch "$BRANCH" --arg task "$TASK_REF" '
+GRANT_ID=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO" --arg branch "$BRANCH" --arg task "$TASK_REF" --argjson corr "$CORRECTION" '
   [ .grants[]?
     | select((.revoked | not) and (.expired | not)
         and .repository == $repo
         and ((.operations | index("reply")) != null)
         and ((.taskRefs | index($task)) != null)
+        and ($corr == 0 or ((.usage.correctiveRounds[$task] // 0) < .maxCorrectiveRounds))
         and (. as $g
              | if ($g.branchPattern | endswith("*"))
                then ($branch | startswith($g.branchPattern[0:-1]))

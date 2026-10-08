@@ -212,6 +212,16 @@ describe('needs-verification (R43 ships in PR4)', () => {
     expect(h.adapter.writeCount()).toBe(0);
   });
 
+  it('does not offer repair-delegate under a covering grant that did not launch the session', async () => {
+    const other = await createGrant(h, { maxActiveSessions: 3 });
+    const r = await superviseOnce(h.deps, {
+      session: session.localId,
+      grantId: other,
+    });
+    expect(r.decision).toBe('needs-verification');
+    expect(r.allowedActions).toEqual(['escalate']);
+  });
+
   it('never suggests reopening a completed session (no reply action)', async () => {
     const r = await sup();
     expect(r.allowedActions).not.toContain('reply');
