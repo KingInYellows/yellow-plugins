@@ -1,0 +1,24 @@
+.changeset/yellow-review-sweep-walk.md
+  h_6000354274ce50 1-5
+plugins/yellow-review/CLAUDE.md
+  h_6000354274ce50 90-91,96-97
+plugins/yellow-review/README.md
+  h_6000354274ce50 65
+plugins/yellow-review/commands/review/sweep-all.md
+  h_6000354274ce50 217-219,245-254,326-327,398-405
+plugins/yellow-review/commands/review/sweep.md
+  h_6000354274ce50 21-22,105-106,122-161,164-165
+plugins/yellow-review/tests/skill-content.bats
+  h_6000354274ce50 385-390,920,925-928,1212
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b9608f4126b676c0a84c126c54f2fe2d746d7e91",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
