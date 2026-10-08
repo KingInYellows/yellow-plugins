@@ -1130,9 +1130,9 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 @test "resolve-pr: the read-only fetch calls get a Bash timeout that covers their capped gh calls" {
   text=$(tr '\n' ' ' <"$RESOLVE_PR" | tr -s ' ')
   [[ "$text" == *'Give `get-pr-comments` a Bash tool `timeout` of 300000 ms'* ]]
-  [[ "$text" == *'`get-pr-blockers` its own of 360000 ms'* ]]
+  [[ "$text" == *'`get-pr-blockers` a timeout of 360000 ms'* ]]
   [[ "$text" == *'bounded at 60 s apiece'* ]]
-  [[ "$text" == *'five calls at 60 s is 300 s, inside 360000 ms'* ]]
+  [[ "$text" == *'including the `get-pr-blockers` derivation'* ]]
   refs=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')
   [[ "$refs" == *'`get-pr-blockers` (Step 3) gets its own `timeout` of 360000 ms'* ]]
   [[ "$refs" == *'five `gh` calls'* ]]
@@ -1162,9 +1162,18 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$step6flat" == *'not proven to be a resolver'* ]]
   [[ "$step6flat" == *'"Revert them / Leave them"'* ]]
   [[ "$step6flat" == *'left in place'* ]]
+  # The per-file revert comes first, then --revert-denied with no argument.
+  [[ "$step6flat" == *'--revert-only --files-from "<file>"'*'--revert-denied` (no file list; patch saved)'* ]]
+  # The refusal path judges --revert-denied's JSON and names what stays on disk.
+  [[ "$step6flat" == *'`deniedClean` is the success signal'* ]]
+  [[ "$step6flat" == *'deny-listed edit left on disk (revert incomplete)'* ]]
+  step9flat=$(sed -n '/^### Step 9/,/^## Error Handling/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step9flat" == *'**Reverted deny-listed paths**'* ]]
   dispo=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')
   [[ "$dispo" == *'--revert-denied'* ]]
   [[ "$dispo" == *'reverts only paths on the resolver deny list'* ]]
+  [[ "$dispo" == *'`deniedClean` (no deny-listed change remains)'* ]]
+  [[ "$dispo" == *'an empty match is `result: "noop"` with no patch'* ]]
 }
 
 @test "resolve-pr: keeping the partial edits of a conflicted cluster stops the run and reverts nothing" {

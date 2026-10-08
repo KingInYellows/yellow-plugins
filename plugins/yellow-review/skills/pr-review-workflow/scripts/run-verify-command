@@ -67,7 +67,15 @@
 #   --revert-denied: like --revert-dirty, but only dirty paths on the
 #                  resolver deny list. Other dirty paths stay. Takes no file
 #                  list: git lists the changes, so a resolver path never
-#                  reaches the command line.
+#                  reaches the command line. It deletes an untracked
+#                  deny-listed file whoever created it; the recovery patch
+#                  holds the content unless the credential screen withholds
+#                  it. With nothing on the deny list it writes no patch and
+#                  reports result "noop". Read "deniedClean" for success:
+#                  "treeClean" covers the whole tree, so it is false whenever
+#                  the other (kept) changes remain.
+#   Exactly one of --revert-only, --revert-dirty, --revert-denied and
+#   --check-ignored may be given (exit 2 otherwise); a repeated flag is fine.
 #   --timeout, --command-file, --trusted and --unattended apply only when
 #   running a command; with a revert flag they are a usage error (exit 2).
 #   Running a command also requires the tree to have no changes outside the
@@ -82,11 +90,21 @@
 #              waived; --revert-dirty and --revert-denied take no list.
 #              --revert-denied reverts only the deny-listed dirty paths.
 # Output: JSON to stdout:
-#   {"result":"pass|fail|timeout|skipped|reverted","patch":"<path>|null",
+#   {"result":"pass|fail|timeout|skipped|reverted|noop","patch":"<path>|null",
 #    "log":"<path>|null","treeClean":true|false[,"reason":"..."]}
+#   --revert-denied adds "deniedClean" (no deny-listed change remains),
+#   "reverted" (the deny-listed paths no longer dirty, at most 20, screened
+#   like the patch, empty when withheld) and "revertedCount" (the whole count).
+#   "noop" is only reported by --revert-denied, when no deny-listed path
+#   changed.
 #   "reason" explains a skipped run, a withheld patch, an interrupted run, a
 #   failed revert step, a log that is withheld or may be incomplete, a
 #   --revert-only entry skipped as unchanged, or a tree that is not clean.
+#   Reasons seen only with --revert-denied: "no deny-listed changes to
+#   revert", "deny-listed changes remain after the revert", "reverted list
+#   withheld: ..." and "reverted list shows the first 20 of N". The usual
+#   "changes remain after the revert" is not used there: the kept changes
+#   are expected.
 #   The revert modes run nothing and report "log": null. A passing command
 #   that left changes outside the listed files reports result "pass" with
 #   treeClean false and a reason; nothing is reverted.
@@ -383,8 +401,11 @@ gh() {
     fi
 }
 usage() {
-    printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] --ignored-since <marker-file> | --revert-only | --revert-dirty | --revert-denied) [--files-from <file>] [-- <files...>]\n' >&2
+    printf 'Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted [--unattended] --ignored-since <marker-file> [--files-from <file>] [-- <files...>]\n' >&2
+    printf '       run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]\n' >&2
+    printf '       run-verify-command --pr <N> (--revert-dirty | --revert-denied)\n' >&2
     printf '       run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>\n' >&2
+    printf '  exactly one of --revert-only, --revert-dirty, --revert-denied and --check-ignored may be given; --revert-dirty and --revert-denied take no file list\n' >&2
     printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required for every run; revert modes ignore it\n' >&2
     exit 2
 }
@@ -393,6 +414,16 @@ usage() {
 # revert-dirty (revert every change git lists) or revert-denied (revert only
 # the deny-listed changes git lists).
 MODE=run
+# The mode flag given, so a second, different one is refused instead of one
+# silently winning by argument order (a repeated flag is harmless).
+MODE_FLAG=""
+set_mode() {
+    if [ -n "$MODE_FLAG" ] && [ "$MODE_FLAG" != "$1" ]; then
+        die 2 "$MODE_FLAG and $1 cannot be combined; pass exactly one of --revert-only, --revert-dirty, --revert-denied and --check-ignored"
+    fi
+    MODE_FLAG="$1"
+    MODE="$2"
+}
 PR=""
 TIMEOUT=""
 COMMAND_FILE=""
@@ -407,18 +438,10 @@ while [ $# -gt 0 ]; do
         --command-file) [ $# -ge 2 ] || usage; COMMAND_FILE="$2"; shift 2 ;;
         --trusted) TRUSTED=1; shift ;;
         --unattended) UNATTENDED=1; shift ;;
-        --revert-only) [ "$MODE" = revert-dirty ] || MODE=revert-only; shift ;;
-        --revert-dirty) MODE=revert-dirty; shift ;;
-        # Narrower than the other revert modes: a later --revert-only or
-        # --revert-dirty replaces it, and it does not replace them.
-        --revert-denied)
-            case "$MODE" in
-                revert-dirty|revert-only) ;;
-                *) MODE=revert-denied ;;
-            esac
-            shift
-            ;;
-        --check-ignored) MODE=check-ignored; shift ;;
+        --revert-only) set_mode --revert-only revert-only; shift ;;
+        --revert-dirty) set_mode --revert-dirty revert-dirty; shift ;;
+        --revert-denied) set_mode --revert-denied revert-denied; shift ;;
+        --check-ignored) set_mode --check-ignored check-ignored; shift ;;
         --files-from)
             [ $# -ge 2 ] || usage
             rp_read_file_list "$2" || die 2 "--files-from not readable: $2"
@@ -1001,12 +1024,18 @@ if [ "$SAVE_BIN_OK" != 1 ]; then
           reason: (($why | if . == "" then "" else . + "; " end) + "could not save the recovery patch; nothing was reverted")}'
     exit 0
 fi
-# Nothing on the deny list: do not archive an empty patch.
+# Nothing on the deny list: do not archive an empty patch. A distinct result,
+# so the caller does not read a no-op as a revert. treeClean still describes
+# the whole tree (the resolver edits stay by design), so it is false here
+# whenever any change is listed.
 if [ "$MODE" = revert-denied ] && [ "${#FILES[@]}" -eq 0 ]; then
     rm -f -- "$PATCH"
-    PATCH_OUT=""
-    PATCH_SCREENED=1
-    add_reason "no deny-listed changes to revert"
+    NOOP_CLEAN=true
+    [ ! -s "$CHANGES_FILE" ] || NOOP_CLEAN=false
+    jq -nc --argjson clean "$NOOP_CLEAN" \
+        '{result: "noop", patch: null, log: null, treeClean: $clean, deniedClean: true, reverted: [], revertedCount: 0,
+          reason: "no deny-listed changes to revert"}'
+    exit 0
 fi
 
 # Run mode screened the snapshot before the verifier started; the other modes
@@ -1055,12 +1084,61 @@ fi
 CLEAN=true
 if ! STATUS=$(lgit_nohooks status --porcelain --untracked-files=all 2>/dev/null) || [ -n "$STATUS" ]; then
     CLEAN=false
-    [ "${#REVERT_FAILS[@]}" -gt 0 ] || add_reason "changes remain after the revert"
+    # --revert-denied leaves the other changes in place by design, so the
+    # whole-tree status is no failure signal there: it is judged below over the
+    # deny-listed paths only.
+    [ "$MODE" = revert-denied ] || [ "${#REVERT_FAILS[@]}" -gt 0 ] || add_reason "changes remain after the revert"
+fi
+
+# --revert-denied: re-list the tree and report on the deny-listed paths alone.
+# deniedClean is the success signal; reverted names the paths no longer dirty.
+DENIED_CLEAN=true
+REVERTED_JSON='[]'
+REVERTED_COUNT=0
+if [ "$MODE" = revert-denied ]; then
+    REMAINING=()
+    if list_tree_changes; then
+        while IFS= read -r -d '' f; do
+            [ -n "$f" ] && rp_denied "$f" && REMAINING+=("$f")
+        done <"$CHANGES_FILE"
+    else
+        DENIED_CLEAN=false
+        add_reason "could not re-list the tree to check the deny-listed paths"
+    fi
+    if [ "${#REMAINING[@]}" -gt 0 ]; then
+        DENIED_CLEAN=false
+        [ "${#REVERT_FAILS[@]}" -gt 0 ] || add_reason "deny-listed changes remain after the revert"
+    fi
+    REVERTED=()
+    for f in "${FILES[@]}"; do
+        GONE=1
+        for p in ${REMAINING[@]+"${REMAINING[@]}"}; do
+            [ "$p" = "$f" ] && { GONE=0; break; }
+        done
+        [ "$GONE" = 1 ] && REVERTED+=("$f")
+    done
+    REVERTED_COUNT=${#REVERTED[@]}
+    if [ "$REVERTED_COUNT" -gt 0 ]; then
+        # File names can look like a credential: screen the list as the patch
+        # is, and bound it. The count stays whole.
+        printf '%s\n' "${REVERTED[@]}" >|"$ADDED_FILE"
+        rt_code_clean "$ADDED_FILE"
+        case $? in
+            0)
+                REVERTED_JSON=$(printf '%s\0' "${REVERTED[@]:0:20}" | jq -Rs 'split("\u0000") | .[:-1]') \
+                    || { REVERTED_JSON='[]'; add_reason "reverted list withheld: it could not be encoded"; }
+                [ "$REVERTED_COUNT" -le 20 ] || add_reason "reverted list shows the first 20 of $REVERTED_COUNT"
+                ;;
+            *) add_reason "reverted list withheld: file names look like a credential" ;;
+        esac
+    fi
 fi
 
 [ -z "$LOG" ] || vr_prune "$OUT_DIR" "$PR" log "$KEEP"
 vr_prune "$OUT_DIR" "$PR" patch "$KEEP"
 jq -nc --arg r "$RESULT" --arg p "$PATCH_OUT" --arg log "$LOG" --arg why "$REASON" --argjson clean "$CLEAN" \
+    --arg mode "$MODE" --argjson dc "$DENIED_CLEAN" --argjson rev "$REVERTED_JSON" --argjson n "$REVERTED_COUNT" \
     '{result: $r, patch: (if $p == "" then null else $p end), log: (if $log == "" then null else $log end), treeClean: $clean}
+     + (if $mode == "revert-denied" then {deniedClean: $dc, reverted: $rev, revertedCount: $n} else {} end)
      + (if $why == "" then {} else {reason: $why} end)'
 exit 0

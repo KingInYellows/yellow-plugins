@@ -258,29 +258,127 @@ has_kill_after() {
   [ "$status" -eq 2 ]
 }
 
-@test "--revert-denied reverts a deny-listed path and leaves other changes" {
-  printf 'secret\n' >| CLAUDE.md
+@test "--revert-denied reverts a deny-listed path, keeps the rest and saves a patch of only the denied content" {
+  printf 'secret-denied-content\n' >| CLAUDE.md
   run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  # treeClean covers the whole tree, so the kept edits make it false; the
+  # deny-listed remainder is what deniedClean reports.
   [ "$(printf '%s' "$output" | jq -r .treeClean)" = false ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  [ "$(printf '%s' "$output" | jq -c .reverted)" = '["CLAUDE.md"]' ]
+  [ "$(printf '%s' "$output" | jq -r .revertedCount)" = 1 ]
+  [ "$(printf '%s' "$output" | jq -r '.reason // ""')" = "" ]
   [ ! -e CLAUDE.md ]
+  grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ -f "$patch" ]
+  grep -q 'secret-denied-content' "$patch"
+  ! grep -q 'resolver edit' "$patch"
+  ! grep -q 'src/new.txt' "$patch"
+  # The patch restores the file.
+  git apply "$patch"
+  grep -q 'secret-denied-content' CLAUDE.md
+}
+
+@test "--revert-denied rejects a file list and leaves every change in place" {
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'--revert-denied takes no file list'* ]]
   grep -q 'resolver edit' src/a.txt
   [ -f src/new.txt ]
 }
 
-@test "--revert-denied takes no file list and leaves a tree with no denied path" {
-  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied -- src/a.txt
-  [ "$status" -eq 2 ]
+@test "--revert-denied with no deny-listed change is a noop: no patch, deniedClean, kept edits stay" {
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = noop ]
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = false ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  [ "$(printf '%s' "$output" | jq -r .patch)" = null ]
+  [ "$(printf '%s' "$output" | jq -c .reverted)" = '[]' ]
+  [ "$(printf '%s' "$output" | jq -r .reason)" = 'no deny-listed changes to revert' ]
   grep -q 'resolver edit' src/a.txt
+  [ -f src/new.txt ]
+}
+
+@test "--revert-denied reverts tracked-modified, deleted, staged-only, nested and case-varied deny-listed paths" {
+  mkdir -p .claude docs/.claude
+  printf '{}\n' >| .claude/settings.json
+  printf '{}\n' >| .mcp.json
+  git add .claude/settings.json .mcp.json
+  git commit -q -m "add denied files"
+  printf '{"edited":true}\n' >| .claude/settings.json
+  rm -f .mcp.json
+  mkdir -p .github/workflows .GitHub/workflows
+  printf 'on: push\n' >| .github/workflows/ci.yml
+  printf 'on: push\n' >| .GitHub/workflows/x.yml
+  printf 'FROM scratch\n' >| Dockerfile
+  git add Dockerfile
+  printf '{"nested":true}\n' >| docs/.claude/settings.json
   run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
-  [ "$(printf '%s' "$output" | jq -r .treeClean)" = false ]
-  [ "$(printf '%s' "$output" | jq -r .patch)" = null ]
-  [[ "$output" == *'no deny-listed changes to revert'* ]]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  [ "$(printf '%s' "$output" | jq -r .revertedCount)" = 6 ]
+  [ "$(cat .claude/settings.json)" = '{}' ]
+  [ "$(cat .mcp.json)" = '{}' ]
+  [ ! -e .github/workflows/ci.yml ]
+  [ ! -e .GitHub/workflows/x.yml ]
+  [ ! -e Dockerfile ]
+  [ ! -e docs/.claude/settings.json ]
+  # Nothing on the deny list is staged any more, and the kept edits survive.
+  [ -z "$(git diff --cached --name-only)" ]
   grep -q 'resolver edit' src/a.txt
   [ -f src/new.txt ]
+}
+
+@test "--revert-denied lists at most 20 reverted paths and still counts them all" {
+  mkdir -p .github/workflows
+  for i in $(seq 1 22); do printf 'on: push\n' >| ".github/workflows/w$i.yml"; done
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .revertedCount)" = 22 ]
+  [ "$(printf '%s' "$output" | jq -r '.reverted | length')" = 20 ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'first 20 of 22'* ]]
+}
+
+@test "--revert-denied reports deniedClean false and keeps the reason when a deny-listed revert fails" {
+  printf 'secret\n' >| CLAUDE.md
+  # A directory standing on a path the revert cannot delete: a read-only parent.
+  mkdir -p .github/workflows
+  printf 'on: push\n' >| .github/workflows/ci.yml
+  chmod a-w .github/workflows
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  chmod u+w .github/workflows
+  if [ "$(id -u)" = 0 ]; then skip "root ignores directory permissions"; fi
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'revert failed:'* ]]
+  [ ! -e CLAUDE.md ]
+}
+
+@test "conflicting mode flags exit 2 in either order and change nothing" {
+  printf 'secret\n' >| CLAUDE.md
+  for pair in "--revert-only --revert-denied" "--revert-denied --revert-only" \
+              "--revert-dirty --revert-denied" "--revert-denied --revert-dirty" \
+              "--revert-only --revert-dirty" "--revert-dirty --revert-only" \
+              "--check-ignored --revert-denied" "--revert-denied --check-ignored"; do
+    # shellcheck disable=SC2086
+    run --separate-stderr "$SCRIPT" --pr 7 $pair --ignored-since "$IGN_MARKER"
+    [ "$status" -eq 2 ] || { echo "not refused: $pair (status $status)" >&2; return 1; }
+    [[ "$stderr" == *'cannot be combined'* ]] || { echo "no conflict message: $pair: $stderr" >&2; return 1; }
+    [ -e CLAUDE.md ]
+    grep -q 'resolver edit' src/a.txt
+  done
+}
+
+@test "a repeated mode flag is not a conflict" {
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --revert-denied
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = noop ]
 }
 
 @test "--revert-only may revert a deny-listed path" {
@@ -603,11 +701,12 @@ assert_interrupted_and_reverted() {
   [ ! -e src/new.txt ]
 }
 
-@test "--revert-dirty and --revert-only together still revert every change" {
+@test "--revert-dirty and --revert-only together exit 2 and revert nothing" {
   run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty --revert-only
-  [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
-  [ ! -e src/new.txt ]
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'cannot be combined'* ]]
+  [ -f src/new.txt ]
+  grep -q 'resolver edit' src/a.txt
 }
 
 @test "bad arguments exit 2 before anything runs" {

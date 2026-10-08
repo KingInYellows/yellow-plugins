@@ -514,7 +514,13 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   list: git itself lists the changes (`git diff --name-only HEAD` plus
   `git ls-files --others --exclude-standard`), never resolver text.
   `--revert-denied` uses that same listing and reverts only paths on the
-  resolver deny list; other dirty paths stay, and a file list is rejected.
+  resolver deny list; other dirty paths stay, and a file list is rejected. It
+  deletes an untracked deny-listed file whoever created it (the saved patch
+  holds the content unless the credential screen withheld it). It reports
+  `deniedClean` (no deny-listed change remains), `reverted` (at most 20 paths,
+  screened like the patch) and `revertedCount`; an empty match is
+  `result: "noop"` with no patch. `treeClean` still covers the whole tree and is
+  false whenever the kept changes remain, so it is not the success signal.
   A revert flag combined with `--timeout`, `--command-file`, `--trusted` or
   `--unattended` exits 2. The patch is written and checked before anything is
   reverted. If any patch command fails (full disk, unsupported entry), nothing
@@ -579,8 +585,7 @@ a change outside the set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify
 `skipped` — the orchestrator runs `run-verify-command --pr <N> --revert-only`
 on the files the clusters reported under `Files modified`, which saves a patch
 first. Then `--revert-denied` (no file list) reverts dirty paths on the
-contract deny list without asking: a deny-listed file such as
-`.claude/settings.json` would be trusted by the next session. Step 2
+contract deny list without asking. Step 2
 guarantees a clean start, but not a quiet tree: a changed path no cluster
 reported and that is not on that deny list is not proven to be a resolver's
 edit, so it is never reverted unasked. An interactive run asks (`--revert-dirty`
@@ -615,7 +620,6 @@ and the budget is derived from that cap:
 | `reply-pr-thread`     | pre-check, mutation and one retry (3 calls, 180 s) + 90 s rate-limit wait + 10 s pacing = 280 s                                |
 | `resolve-pr-thread`   | mutation and one retry (2 calls, 120 s) + 90 s wait + 10 s pacing = 220 s                                                      |
 | `file-followup-issue` | viewer lookup, issue list, thread link, create, post-create list and duplicate close (6 calls, never waits or retries) = 360 s |
-| `get-pr-blockers`     | review GraphQL, then classic protection and rules for the PR base and, when it differs, the default branch (5 calls, 300 s)          |
 
 The largest is 360 s; 420 s adds 60 s for `jq`, the credential scan and startup,
 and stays under the Bash tool's 600 s maximum. Change the cap and this budget

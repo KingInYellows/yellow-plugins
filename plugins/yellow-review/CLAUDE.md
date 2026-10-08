@@ -238,8 +238,8 @@ resolution, and sequential stack review. Graphite-native workflow.
   or trusted-config path); otherwise they run `--revert-only` on the owned
   trusted-config paths, which leaves unrecognized changes in place, so the
   tree can stay dirty and the walk stops
-  (`references/review-resolve-stack/dirty-tree-cleanup.md`); both reject `--timeout`, `--command-file`,
-  `--trusted` and `--unattended`). The verify gate: interactive runs ask
+  (`references/review-resolve-stack/dirty-tree-cleanup.md`); every revert flag rejects `--timeout`,
+  `--command-file`, `--trusted` and `--unattended`, and only one mode flag may be given). The verify gate: interactive runs ask
   first, unattended runs need `verify_unattended: true` and an untracked
   config
 
