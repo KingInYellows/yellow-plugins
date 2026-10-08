@@ -104,11 +104,16 @@ AST_GREP_TARGET_NONCE
 )
 case "$lang" in *[!A-Za-z0-9_-]*|'') lang='' ;; esac
 case "$target" in /*|*..*|-*|*[!A-Za-z0-9._/-]*|'') target='' ;; esac
+# An empty trusted config stops ast-grep loading the repo's sgconfig.yml,
+# whose customLanguages entries can load native libraries.
+cfg=$(mktemp)
 if [ -n "$lang" ] && [ -n "$target" ]; then
-  ast-grep run --pattern "$pattern" --lang "$lang" -- "$target" | head -n 200
+  ast-grep run -c "$cfg" --pattern "$pattern" --lang "$lang" -- "$target" |
+    head -n 200
 else
   printf 'ast-grep: refused unsafe --lang or path\n' >&2
 fi
+rm -f "$cfg"
 ```
 
 Put each value verbatim inside its quoted heredoc (`$NAME` matches one
@@ -116,10 +121,13 @@ node, `$$$` a list) and keep the guards, so nothing from the scanned repo
 reaches the command line. `target` must be a repo-relative path of letters,
 digits, `.`, `_`, `-`, and `/`; scan any other file with Grep. Replace
 `NONCE` in every delimiter with fresh random letters on each call, and check
-that no line of a value equals its delimiter. If output
-reaches 200 lines, treat it as truncated and narrow the pattern or path. For relational rules (`inside`,
-`has`, `not`), load the YAML through the same kind of heredoc into `rule`
-and run `ast-grep scan --inline-rules "$rule" --json=compact -- "$target"`.
+that no line of a value equals its delimiter. Keep `-c "$cfg"` on every
+call. If output reaches 200 lines, treat it as truncated and narrow the
+pattern or path. For relational rules (`inside`, `has`, `not`), load the
+YAML through the same kind of heredoc into `rule`, then replace the block's
+`run` line with
+`ast-grep scan -c "$cfg" --inline-rules "$rule" --json=stream -- "$target" | head -n 200`
+(one match per line, so the cap applies).
 Fence its output like any other scanned code.
 
 **Use ast-grep for:**
