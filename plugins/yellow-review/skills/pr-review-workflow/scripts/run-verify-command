@@ -88,6 +88,8 @@
 #   error (including run-only flags next to a revert flag, and --unattended
 #   without --ignored-since), no --trusted,
 #   unreadable --command-file or --files-from, not in a git repository, a
+#   repository-local clean, smudge or process filter other than the stock
+#   git-lfs commands (the value and the driver name are never printed), a
 #   refused path (not canonical, deny-listed when running, gitignored or
 #   unverifiable, or without changes when running), a change outside the
 #   listed files, an ignored file changed since the --ignored-since marker (or
@@ -443,6 +445,26 @@ fi
 
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
 cd -- "$TOP" || die 2 "cannot enter $TOP"
+
+# A clean, smudge or process filter runs on status, diff, checkout and apply,
+# so a repository-local one would run a command with the runner's authority in
+# every mode, including --revert-only, --revert-dirty and --check-ignored.
+# Judge it before any of those calls. The stock Git LFS commands are allowed
+# by exact value. Global and system scopes are not judged, and neither the
+# value nor the driver name is printed.
+fcfg=""
+frc=0
+fcfg=$(git config --show-scope --get-regexp '^filter\..*\.(clean|smudge|process)$' 2>/dev/null) || frc=$?
+case "$frc" in 0|1) ;; *) die 2 "could not read the git filter config; the tree is untouched" ;; esac
+fkey=$(printf '%s\n' "$fcfg" | awk -F'\t' '
+    ($1 == "local" || $1 == "worktree") {
+        k = $2; v = $2; sub(/ .*/, "", k); sub(/^[^ ]* /, "", v)
+        if (k ~ /^filter\.lfs\.(clean|smudge|process)$/ && (v == "git-lfs clean -- %f" || v == "git-lfs smudge -- %f" || v == "git-lfs filter-process" || v == "git-lfs smudge --skip -- %f" || v == "git-lfs filter-process --skip")) next
+        print k; exit
+    }')
+case "$fkey" in filter.*) fkey="filter.<driver>.${fkey##*.}" ;; esac
+[ -z "$fkey" ] || die 2 "the repository config sets $fkey, which would run a command with the runner's authority; remove it from the repository config (a global or system config is fine); the tree is untouched"
+unset fcfg
 
 REASON=""
 add_reason() { REASON="${REASON:+$REASON; }$1"; }

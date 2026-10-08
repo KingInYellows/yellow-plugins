@@ -2147,3 +2147,51 @@ trust_assert_absolute() {
   [ ! -e "$BATS_TEST_TMPDIR/fsmon-ran" ]
   [ "$(printf '%s' "$output" | jq -r .treeClean)" = true ]
 }
+
+# Install a repository-local clean/smudge driver and attribute it onto every
+# path. After this, only `git config` is safe: status, diff and checkout would
+# run the driver.
+install_evil_filter() {
+  printf '#!/bin/sh\ntouch "%s"\ncat\n' "$BATS_TEST_TMPDIR/filter-ran" >| "$BATS_TEST_TMPDIR/evilfilter"
+  chmod +x "$BATS_TEST_TMPDIR/evilfilter"
+  git config filter.evil.clean "$BATS_TEST_TMPDIR/evilfilter"
+  git config filter.evil.smudge "$BATS_TEST_TMPDIR/evilfilter"
+  mkdir -p .git/info
+  echo '* filter=evil' >> .git/info/attributes
+}
+
+@test "#952 4179268957: a repository-local filter driver is refused before --revert-only or --revert-dirty touches the tree" {
+  install_evil_filter
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"filter.<driver>."* ]]
+  [[ "$stderr" != *"evilfilter"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/filter-ran" ]
+  grep -q 'resolver edit' src/a.txt
+  [ -e src/new.txt ]
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+  [ ! -e "$BATS_TEST_TMPDIR/filter-ran" ]
+  grep -q 'resolver edit' src/a.txt
+  [ -e src/new.txt ]
+}
+
+@test "#952 4179268957: a repository-local filter driver is refused before a trusted run" {
+  install_evil_filter
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"filter.<driver>."* ]]
+  [[ "$stderr" != *"evilfilter"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  [ ! -e "$BATS_TEST_TMPDIR/filter-ran" ]
+}
+
+@test "#952 4179268957: the stock Git LFS filter commands are allowed" {
+  git config filter.lfs.clean 'git-lfs clean -- %f'
+  git config filter.lfs.smudge 'git-lfs smudge -- %f'
+  git config filter.lfs.process 'git-lfs filter-process'
+  git config filter.lfs.required true
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = true ]
+}
