@@ -172,8 +172,8 @@ runs in CI. An AGENTS.md rule would need a second parser to get that right.
 ### Phase 3: Regression test under hostile aliases
 
 - [ ] 3.1: New `tests/shell-compat/aliases.bats`. Its setup makes a fixture
-      dir with `plans/old.md`, `plans/new.md` (`touch -d '-1 hour'`),
-      `plans/shells/`, and a prelude defining
+      dir with `plans/new.md`, `plans/old.md` aged by
+      `touch -d '-1 hour' plans/old.md`, `plans/shells/`, and a prelude defining
       `alias ls=false ps=false du=false df=false find=false`. Run each case
       under the `zsh` and `zsh-snapshot` profiles, and under bash with
       `shopt -s expand_aliases`.
