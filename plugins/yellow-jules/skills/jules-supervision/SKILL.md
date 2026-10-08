@@ -41,7 +41,8 @@ one in their own terminal and stop. Do not guess either value.
 Run `node <plugin-root>/dist/cli.js supervise --session <ref> --grant-id <id>`.
 While you work under a grant, set `YELLOW_JULES_ACTIVE_GRANT` to that grant id
 in the environment of every command you run: the CLI then refuses `authorize`,
-so a supervised session can never create or widen a grant.
+so a session started from the supervision command is refused when it tries to
+create or widen a grant. This is a guardrail, not a security boundary.
 
 The result is
 `{decision, condition, vendorState, nextCheck: {afterSeconds, reason}, allowedActions, correctiveRoundsLeft, fenced, attention?}`.

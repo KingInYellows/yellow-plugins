@@ -104,8 +104,11 @@ key. Do not resend a write on your own.
   not retry. Run `status --reconcile` (for a `delegate`) or
   `status --session <ref> --reconcile` (for a `reply` or `approve`) to learn
   what happened.
-- A clear rejection (`JULES_INVALID_INPUT`, `JULES_NOT_FOUND`,
-  `JULES_AUTH_FAILED`) is safe to fix and re-run with the same request id.
+- An error raised before the reservation (`JULES_INVALID_INPUT`,
+  `JULES_AUTHORITY_DENIED`) leaves the request id unused: fix it and re-run.
+  Once the id is in the journal it is spent, even after a clean vendor
+  rejection; confirm with `status` that nothing was created, then retry without
+  `--request-id`.
 - `JULES_DUPLICATE_LAUNCH` means an unresolved launch already exists for that
   repository and branch. Reconcile it; do not launch again.
 

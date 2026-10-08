@@ -80,7 +80,7 @@ printf '%s\n' "$OUTPUT" | jq '{ok, vendorState, condition, pendingPlan: (if .pen
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
 printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
-printf '%s\n' "$OUTPUT" | jq -r 'def safe: tostring | gsub("[\u0000-\u001f\u007f-\u009f­͏᠎​-‏ -‮⁠-⁯﻿]"; " ") | gsub("[\\p{Pd}─-╿−-]+"; "-") | .[0:300]; (.pendingPlan.steps // [])[] | "\(.index + 1). \(.title | safe)"'
+printf '%s\n' "$OUTPUT" | jq -r 'def safe: tostring | gsub("[\u0000-\u001f\u007f-\u009f­͏᠎​-‏ -‮⁠-⁯﻿]"; " ") | gsub("[\\p{Pd}─-╿−-]+"; "-") | .[0:300]; (.pendingPlan.steps // [])[] | "\(.index + 1). \(.title | safe)" + (if .description then "\n   \(.description | safe)" else "" end)'
 printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
 ```
 
@@ -97,6 +97,11 @@ BRANCH='YELLOW_TODO_requested_branch'
 TASK_REF='YELLOW_TODO_task_ref'
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 LIST=$(node "$CLI" authorize --list)
+if [ "$(printf '%s' "$LIST" | jq -r '.ok // false')" != true ]; then
+  printf 'ERROR: authorize --list failed; not treating this as "no grant".\n' >&2
+  printf '%s\n' "$LIST" | jq '{ok, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))' >&2
+  exit 1
+fi
 GRANT_ID=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO" --arg branch "$BRANCH" --arg task "$TASK_REF" '
   [ .grants[]?
     | select((.revoked | not) and (.expired | not)
@@ -183,8 +188,8 @@ action. **Never re-approve automatically.**
 | `JULES_CONTROLLER_MISMATCH`   | false     | this data directory is not the authorized controller copy; follow the handoff procedure       |
 | `JULES_NOT_FOUND`             | false     | verify the reference with `/jules:list`                                                       |
 | `JULES_AUTH_FAILED`           | false     | set `JULES_API_KEY`, then run `/jules:setup`                                                  |
-| `JULES_RATE_LIMITED`          | true      | wait at least 60 s, then ask the user before retrying with the same request id                |
-| `JULES_SERVICE_UNAVAILABLE`   | true      | retry later with the same request id                                                          |
+| `JULES_RATE_LIMITED`          | true      | wait 60 s, ask the user, check `/jules:status`, retry without `--request-id`                  |
+| `JULES_SERVICE_UNAVAILABLE`   | true      | check `/jules:status`, then retry later without `--request-id`                                |
 | `JULES_INVALID_INPUT`         | false     | fix the flagged input and retry                                                               |
 | `JULES_DEADLINE_EXCEEDED`     | false     | nothing was sent; retry with a larger `--deadline-ms`                                         |
 | `JULES_STALE_LOCK`            | false     | a crashed process left `state/.lock`; inspect it and remove it by hand                        |

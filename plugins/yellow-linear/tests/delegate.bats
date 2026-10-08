@@ -271,7 +271,7 @@ setup() {
 
 @test "the jules branch checks the branch exists on origin and the remote is github.com" {
   jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
-  printf '%s\n' "$jules_block" | grep -qF 'git ls-remote --exit-code --heads origin "$BRANCH"'
+  printf '%s\n' "$jules_block" | grep -qF 'git ls-remote --exit-code --heads origin "refs/heads/$BRANCH"'
   printf '%s\n' "$jules_block" | grep -qF 'https://github.com/*) REPO_PATH='
   printf '%s\n' "$jules_block" | grep -qF 'git@github.com:*) REPO_PATH='
 }

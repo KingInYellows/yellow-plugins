@@ -668,14 +668,14 @@ case "$REPO_URL" in
 esac
 REPO_PATH="${REPO_PATH%.git}"
 if ! printf '%s' "$REPO_PATH" | grep -qE '^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100}$'; then
-  printf 'ERROR: Jules needs a github.com repository; could not derive owner/repo from "%s".\n' "$REPO_URL" >&2
+  printf 'ERROR: Jules needs a github.com origin remote; could not derive owner/repo from it.\n' >&2
   exit 1
 fi
 if ! printf '%s' "$BRANCH" | grep -qE '^[A-Za-z0-9._/-]{1,255}$'; then
   printf 'ERROR: could not use branch "%s" (detached HEAD, or characters Jules refuses).\n' "$BRANCH" >&2
   exit 1
 fi
-if ! git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+if ! git ls-remote --exit-code --heads origin "refs/heads/$BRANCH" >/dev/null 2>&1; then
   printf 'ERROR: branch %s is not on origin. Jules clones from GitHub; push the branch first.\n' "$BRANCH" >&2
   exit 1
 fi
@@ -713,6 +713,10 @@ if [ "$(printf '%s' "$OUTPUT" | jq -r '.ok')" != "true" ]; then
   exit 1
 fi
 LIST=$(node "$CLI" authorize --list)
+if [ "$(printf '%s' "$LIST" | jq -r '.ok // false')" != true ]; then
+  printf 'ERROR: authorize --list failed; not treating this as "no grant".\n' >&2
+  exit 1
+fi
 FOUND=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO_PATH" --arg branch "$BRANCH" --arg task "$ISSUE_ID" '
   [ .grants[]?
     | select((.revoked | not) and (.expired | not)
@@ -723,7 +727,9 @@ FOUND=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO_PATH" --arg branch "$BRANC
              | if ($g.branchPattern | endswith("*"))
                then ($branch | startswith($g.branchPattern[0:-1]))
                else $g.branchPattern == $branch end))
-  ] | sort_by(.expiresAt) | last | .grantId // empty')
+  ] | sort_by([((.usage.activeSessionRefs | length) < .limits.maxActiveSessions
+                and .usage.totalTasks < .limits.maxTotalTasks), .expiresAt])
+    | last | .grantId // empty')
 if [ -z "$FOUND" ]; then
   printf 'grant_id=NONE\n'
   printf 'No grant covers %s on %s for %s. Run this yourself in a separate terminal window on this machine (not through Claude Code), then retry:\n' "$REPO_PATH" "$BRANCH" "$ISSUE_ID"
