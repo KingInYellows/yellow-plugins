@@ -22,6 +22,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BACKOFF_CAP_SECONDS = exports.BACKOFF_BASE_SECONDS = void 0;
 exports.superviseOnce = superviseOnce;
 exports.clearPause = clearPause;
+const activity_walk_js_1 = require("./activity-walk.js");
 const authority_js_1 = require("./authority.js");
 const authorize_js_1 = require("./authorize.js");
 const controller_js_1 = require("./controller.js");
@@ -42,6 +43,10 @@ const HUMAN_WAIT_SECONDS = 3600;
 const ABORTED_RETRY_SECONDS = 60;
 const FENCED_MESSAGE_CHARS = 500;
 const FENCED_MESSAGE_COUNT = 3;
+const waitForHuman = {
+    afterSeconds: HUMAN_WAIT_SECONDS,
+    reason: 'waiting for a human',
+};
 function owns(journal, sessionResource) {
     const owner = (0, state_js_1.findBySessionResource)(journal, sessionResource);
     if (owner === undefined ||
@@ -71,18 +76,6 @@ function planText(plan) {
     return plan.steps
         .map((step) => `${step.index + 1}. ${step.title}${step.description !== undefined ? `: ${step.description}` : ''}`)
         .join('\n');
-}
-/** Digests of the messages this plugin itself sent to the session: its prompt and its replies. */
-function ownMessageDigests(journal, sessionResource) {
-    const digests = new Set();
-    for (const record of Object.values(journal.operations)) {
-        if (record.sessionResource === sessionResource &&
-            (record.kind === 'reply' || record.kind === 'create') &&
-            record.promptDigest !== undefined) {
-            digests.add(record.promptDigest);
-        }
-    }
-    return digests;
 }
 function backoffSeconds(failures) {
     return Math.min(exports.BACKOFF_BASE_SECONDS * 2 ** Math.max(0, failures - 1), exports.BACKOFF_CAP_SECONDS);
@@ -147,6 +140,30 @@ async function superviseOnce(deps, args) {
             ...(0, runtime_support_js_1.attentionOf)(['paused']),
         };
     }
+    // R32: outside activity recorded by ANY earlier walk (a plain `status` runs
+    // between passes and would otherwise consume the evidence) pauses the session.
+    const pauseForOutside = async (seenOutside, extra = {}) => {
+        const pause = {
+            reason: 'outside-user-message',
+            observedAt: now().toISOString(),
+            activityId: seenOutside.activityId,
+        };
+        await persist({ paused: pause, backoff: null, ...decided('paused') });
+        return {
+            ...base,
+            decision: 'paused',
+            reason: pause.reason,
+            nextCheck: waitForHuman,
+            allowedActions: [],
+            fenced: {},
+            pause: { reason: pause.reason, observedAt: pause.observedAt },
+            ...extra,
+            ...(0, runtime_support_js_1.attentionOf)(['paused', pause.reason]),
+        };
+    };
+    const startOutside = owner.supervision?.outsideSeen;
+    if (startOutside !== undefined)
+        return pauseForOutside(startOutside);
     const aborted = () => ({
         ...base,
         decision: 'pass-aborted',
@@ -214,6 +231,28 @@ async function superviseOnce(deps, args) {
     if (walk === undefined) {
         return (0, errors_js_1.throwAppError)('JULES_MALFORMED_RESPONSE', 'status returned no activity summary');
     }
+    // The pause wins over every early return below: a deadline or a failed page
+    // must not let the evidence this walk (or an earlier one) recorded go stale.
+    journal = await (0, state_js_1.readJournal)(deps.dataDir);
+    const fresh = owns(journal, sessionResource);
+    const recordedOutside = fresh.supervision?.outsideSeen;
+    if (recordedOutside !== undefined) {
+        const echoed = observed.newActivities.filter((a) => a.activityId === recordedOutside.activityId && a.message !== undefined);
+        return pauseForOutside(recordedOutside, {
+            ...(seen.condition !== undefined ? { condition: seen.condition } : {}),
+            ...(seen.vendorState !== undefined
+                ? { vendorState: seen.vendorState }
+                : {}),
+            fenced: echoed.length > 0
+                ? {
+                    activities: (0, redact_js_1.fenceUntrusted)(echoed
+                        .slice(0, FENCED_MESSAGE_COUNT)
+                        .map((a) => `user message ${a.activityId}: ${truncate(a.message ?? '')}`)
+                        .join('\n')),
+                }
+                : {},
+        });
+    }
     if (walk.partialPagination &&
         (walk.stopReason === 'deadline' || (0, deadline_js_1.isExpired)(deps.clock, deadline))) {
         return aborted();
@@ -223,16 +262,11 @@ async function superviseOnce(deps, args) {
     }
     if (walk.dedupWindowExceeded)
         return checkFailed('dedup-window-exceeded');
-    journal = await (0, state_js_1.readJournal)(deps.dataDir);
-    const fresh = owns(journal, sessionResource);
     const condition = seen.condition ?? 'needs-inspection';
     const vendorState = seen.vendorState ?? 'unspecified';
     const fenced = {};
-    // R32: outside activity.
-    const own = ownMessageDigests(journal, sessionResource);
-    const outside = observed.newActivities.filter((a) => a.type === 'userMessaged' &&
-        a.message !== undefined &&
-        !own.has((0, state_js_1.messageDigest)(a.message)));
+    // R32: a plan that changed under an evaluation, or a walk that cannot rule
+    // outside activity out. (Outside user messages were handled above.)
     const evaluated = fresh.supervision?.evaluatedPlan;
     const repliedSinceEvaluation = evaluated !== undefined &&
         Object.values(journal.operations).some((r) => r.sessionResource === sessionResource &&
@@ -245,15 +279,7 @@ async function superviseOnce(deps, args) {
         : undefined;
     let pauseReason;
     let pauseActivity;
-    if (outside.length > 0) {
-        pauseReason = 'outside-user-message';
-        pauseActivity = outside[0];
-        fenced.activities = (0, redact_js_1.fenceUntrusted)(outside
-            .slice(0, FENCED_MESSAGE_COUNT)
-            .map((a) => `user message ${a.activityId}: ${truncate(a.message ?? '')}`)
-            .join('\n'));
-    }
-    else if (swappedPlan !== undefined) {
+    if (swappedPlan !== undefined) {
         pauseReason = 'plan-changed-after-evaluation';
         pauseActivity = swappedPlan;
     }
@@ -305,10 +331,6 @@ async function superviseOnce(deps, args) {
             ...extra,
             ...(0, runtime_support_js_1.attentionOf)(flags),
         };
-    };
-    const waitForHuman = {
-        afterSeconds: HUMAN_WAIT_SECONDS,
-        reason: 'waiting for a human',
     };
     // Escalations that need no further reading.
     if (seen.policyDeviation === true) {
@@ -364,11 +386,7 @@ async function superviseOnce(deps, args) {
         });
     }
     if (condition === 'awaiting-reply') {
-        const latest = [...observed.agentMessages]
-            .sort((a, b) => a.createTime === b.createTime
-            ? a.activityId.localeCompare(b.activityId)
-            : a.createTime.localeCompare(b.createTime))
-            .pop();
+        const latest = [...observed.agentMessages].sort(activity_walk_js_1.compareStamp).pop();
         if (latest?.message !== undefined) {
             fenced.question = (0, redact_js_1.fenceUntrusted)(truncate(latest.message));
         }
@@ -483,7 +501,7 @@ async function clearPause(deps, args) {
         deadlineMs: deps.confirmDeadlineMs ?? tty_confirm_js_1.DEFAULT_CONFIRM_DEADLINE_MS,
         ...(deps.openTty !== undefined ? { openTty: deps.openTty } : {}),
     });
-    await (0, state_js_1.updateSupervision)(deps.dataDir, owner.localRequestId, { paused: null }, (0, runtime_support_js_1.nowFn)(deps));
+    await (0, state_js_1.updateSupervision)(deps.dataDir, owner.localRequestId, { paused: null, outsideSeen: null }, (0, runtime_support_js_1.nowFn)(deps));
     return {
         operation: 'supervise',
         localId: owner.localId,

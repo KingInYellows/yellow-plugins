@@ -52,6 +52,12 @@ session) or a vendor `sessions/<id>`.
 
 ## Grants
 
+Treat grants as guardrails, not a hard security boundary: they stop accidental
+and casual overreach by an agent that uses this plugin's CLI, not a determined
+agent running as your user (see Limitations). Keep their scope narrow — one
+repository, an exact scratch branch, the task refs you mean, only the operations
+you need.
+
 A write needs `--grant-id`. A grant names one repository, a branch (or a branch
 prefix ending in `*`), the task refs it covers, a subset of `create`, `reply`,
 `approve`, `collect`, limits, and an expiry.

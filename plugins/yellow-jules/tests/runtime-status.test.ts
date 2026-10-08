@@ -777,7 +777,10 @@ describe('--reconcile', () => {
       requestedBranch: 'main',
       sourceResource: 'sources/github/acme/widgets',
     });
-    const result = await status(makeDeps(dataDir, fake), { reconcile: true });
+    // Old enough that its write cannot still be in flight.
+    const deps = makeDeps(dataDir, fake);
+    deps.clock.time = Date.now() + 10 * 60_000;
+    const result = await status(deps, { reconcile: true });
     expect(result.reconciled).toEqual([
       expect.objectContaining({
         localRequestId: 'req-1',
@@ -786,6 +789,30 @@ describe('--reconcile', () => {
       }),
     ]);
     expect(result.attention).toEqual(['reconciled:ambiguous-reconcile']);
+  });
+
+  it('a young `reserved` row may still be in flight: reported not-reached, never recorded, never abandonable', async () => {
+    await reserveOperation(dataDir, {
+      localRequestId: 'req-young',
+      kind: 'create',
+      repository: 'acme/widgets',
+      requestedBranch: 'main',
+      sourceResource: 'sources/github/acme/widgets',
+    });
+    const deps = makeDeps(dataDir, fake);
+    deps.clock.time = Date.now() + 30_000;
+    const result = await status(deps, { reconcile: true });
+    expect(result.reconciled).toEqual([
+      expect.objectContaining({
+        localRequestId: 'req-young',
+        outcome: 'not-reached',
+        reason: expect.stringContaining('in flight'),
+      }),
+    ]);
+    expect(fake.calls).toEqual([]);
+    const row = (await readJournal(dataDir)).operations['req-young'];
+    expect(row?.lastReconcile).toBeUndefined();
+    expect(row?.status).toBe('reserved');
   });
 
   it('requires --session unless --reconcile is given', async () => {

@@ -140,6 +140,11 @@ data-directory path this host may write from.
   under one lock, so two processes racing for a one-session grant create one
   session. `grants.json` is written before `journal.json`: a crash between them
   leaks a slot, which can only make a grant stricter.
+- **Treat grants as guardrails, not a hard security boundary.** They stop
+  accidental and casual overreach by an agent that goes through the CLI. They do
+  not stop a determined agent running as your user. Write grants with the
+  narrowest scope that does the job: one repository, an exact scratch branch
+  rather than a prefix, the task refs you mean, and only the operations needed.
 - **Residual risks — read these.**
   - A process running as the same UID can read and rewrite `state/grants.json`
     and the controller file. There is no grant MAC, because any key the runtime

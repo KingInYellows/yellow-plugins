@@ -330,6 +330,51 @@ describe('outside activity pauses (R32)', () => {
     );
   });
 
+  it('a plain status between passes cannot consume the evidence: the next pass still pauses', async () => {
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'actually use postgres instead',
+      originator: 'user',
+    });
+    // The shipped approve wrapper runs status itself; so does any human.
+    await status(h.deps, { session: session.localId, reconcile: false });
+    expect(
+      (await ownerRecord())?.supervision?.outsideSeen?.activityId
+    ).toBeDefined();
+    const r = await sup();
+    expect(r).toMatchObject({
+      decision: 'paused',
+      reason: 'outside-user-message',
+    });
+    expect(h.adapter.writeCount()).toBe(0);
+  });
+
+  it('the pause wins over a pass that would otherwise be check-failed or aborted', async () => {
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'stop what you are doing',
+    });
+    // This walk reads the message, then the pass fails on a later page.
+    const original = h.adapter.listActivitiesImpl;
+    let calls = 0;
+    h.adapter.listActivitiesImpl = async (resource, options) => {
+      calls += 1;
+      if (calls === 1) {
+        const page = await original(resource, { ...options, pageSize: 50 });
+        return { ...page, nextPageToken: 'p1' };
+      }
+      throw new AdapterError('server-error', 'boom', { status: 503 });
+    };
+    const r = await sup();
+    expect(r.decision).toBe('paused');
+    expect(r.reason).toBe('outside-user-message');
+  });
+
+  it('our own prompt and replies are never recorded as outside activity', async () => {
+    await status(h.deps, { session: session.localId, reconcile: false });
+    expect((await ownerRecord())?.supervision?.outsideSeen).toBeUndefined();
+  });
+
   it('our own reply, echoed back, is not outside activity', async () => {
     setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
     await reply(h.deps, {
@@ -495,6 +540,7 @@ describe('--clear-pause', () => {
     const result = await clearPause(h.deps, { session: session.localId });
     expect(result).toMatchObject({ operation: 'supervise', cleared: true });
     expect((await ownerRecord())?.supervision?.paused).toBeUndefined();
+    expect((await ownerRecord())?.supervision?.outsideSeen).toBeUndefined();
     expect((await sup()).decision).toBe('no-change');
   });
 

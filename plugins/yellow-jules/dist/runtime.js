@@ -266,6 +266,33 @@ function walkStartFor(record, token) {
     }
     return watermark ?? { kind: 'session-start' };
 }
+/**
+ * R32: a user message none of this plugin sent is recorded the moment ANY walk
+ * sees it, because `status` advances the watermark and the dedup ring and
+ * `supervise` would otherwise never see the message as new. `supervise` pauses
+ * on the record. Only sessions this plugin created have a digest set to compare
+ * against.
+ */
+async function recordOutsideActivity(deps, record, messages) {
+    if (messages.length === 0 || record.kind !== 'create')
+        return;
+    if (record.sessionResource === undefined)
+        return;
+    const journal = await (0, state_js_1.readJournal)(deps.dataDir);
+    const own = (0, state_js_1.ownMessageDigests)(journal, record.sessionResource);
+    const outside = messages.find((m) => !own.has(m.digest));
+    if (outside === undefined)
+        return;
+    const current = journal.operations[record.localRequestId]?.supervision;
+    if (current?.outsideSeen !== undefined)
+        return;
+    await (0, state_js_1.updateSupervision)(deps.dataDir, record.localRequestId, {
+        outsideSeen: {
+            activityId: outside.activityId,
+            observedAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString(),
+        },
+    }, (0, runtime_support_js_1.nowFn)(deps));
+}
 async function status(deps, args) {
     if (args.session === undefined && !args.reconcile) {
         return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', '--session is required unless --reconcile is given');
@@ -303,6 +330,7 @@ async function status(deps, args) {
                 activityId: record.lastActivityId,
             }
             : undefined;
+        const newUserMessages = [];
         const walk = await (0, activity_walk_js_1.walkActivities)({
             adapter,
             sessionResource,
@@ -318,13 +346,17 @@ async function status(deps, args) {
             ...(record.resumeApproval !== undefined
                 ? { approval: record.resumeApproval }
                 : {}),
-            ...(args.observer !== undefined
-                ? {
-                    onActivity: (activity, info) => {
-                        args.observer?.(activity, info);
-                    },
+            onActivity: (activity, info) => {
+                if (info.isNew &&
+                    activity.type === 'userMessaged' &&
+                    activity.message !== undefined) {
+                    newUserMessages.push({
+                        activityId: activity.activityId,
+                        digest: (0, state_js_1.messageDigest)(activity.message),
+                    });
                 }
-                : {}),
+                args.observer?.(activity, info);
+            },
         });
         // Restart guard: a stored token the vendor rejected, or one that yielded
         // nothing new, is discarded; the second consecutive such restart fails.
@@ -392,6 +424,7 @@ async function status(deps, args) {
         }, (0, runtime_support_js_1.nowFn)(deps));
         record = await (0, runtime_support_js_1.checkPolicyDeviation)(deps, record, session);
         const policyDeviation = (0, state_js_1.hasUnreconciledDeviation)(record);
+        await recordOutsideActivity(deps, record, newUserMessages);
         // A session observed in a terminal vendor state no longer holds its
         // grant's active-session slot (tasks and corrective rounds stay spent).
         if (TERMINAL_VENDOR_STATES.has(vendorState) &&

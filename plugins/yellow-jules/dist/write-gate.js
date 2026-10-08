@@ -74,6 +74,23 @@ async function reserveUnderGrant(deps, gate) {
                     : {}),
             });
         }
+        const owner = gate.ownerRequestId !== undefined
+            ? journal.operations[gate.ownerRequestId]
+            : undefined;
+        const ids = {
+            localRequestId: gate.reservation.localRequestId,
+            ...(gate.reservation.localId !== undefined
+                ? { localId: gate.reservation.localId }
+                : {}),
+        };
+        if (owner?.supervision?.paused !== undefined) {
+            throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_SUPERVISION_PAUSED', `supervision of ${owner.sessionResource ?? 'this session'} is paused (${owner.supervision.paused.reason}); no grant-backed write is allowed`), ids);
+        }
+        // R13: a deviation recorded on the SESSION blocks it under any grant, not
+        // only the grant that created it.
+        if (owner !== undefined && (0, state_js_1.hasUnreconciledDeviation)(owner)) {
+            throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_POLICY_DEVIATION', `${owner.sessionResource ?? 'this session'} has an unreconciled policy deviation`), ids);
+        }
         // R36 lookup + reservation (mutates the in-memory journal only).
         const record = (0, state_js_1.applyReservation)(journal.operations, journal, gate.reservation, now);
         (0, authority_js_1.writeGrants)(deps.dataDir, (0, authority_js_1.updateGrant)(grants, grant.grantId, (g) => (0, authority_js_1.chargeGrant)(g, gate.charge)));
@@ -124,13 +141,18 @@ async function settleAccepted(deps, record, extra = {}) {
  * rounds stay spent. Always throws.
  */
 async function settleFailure(deps, record, error, options) {
-    const app = (0, errors_js_1.mapAdapterError)(error, (0, errors_js_1.phaseOfWrite)(error));
+    // An AppErrorException is our own verdict (an integrity or allowlist check
+    // that ran before anything was sent), already in its final form.
+    const app = error instanceof errors_js_1.AppErrorException
+        ? error.appError
+        : (0, errors_js_1.mapAdapterError)(error, (0, errors_js_1.phaseOfWrite)(error));
     const ids = {
         localRequestId: record.localRequestId,
         localId: record.localId,
     };
     if (app.code === 'JULES_UNKNOWN_OUTCOME') {
-        const sessionResource = error.sessionResource ?? record.sessionResource;
+        const sessionResource = (error instanceof errors_js_1.AdapterError ? error.sessionResource : undefined) ??
+            record.sessionResource;
         let journalRecorded = true;
         try {
             await (0, state_js_1.markOperation)(deps.dataDir, record.localRequestId, 'unknown-outcome', sessionResource !== undefined ? { sessionResource } : {}, (0, runtime_support_js_1.nowFn)(deps));

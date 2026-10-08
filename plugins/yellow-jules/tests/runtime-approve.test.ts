@@ -8,11 +8,12 @@ import {
 } from '../src/errors.js';
 import { approve, delegate, type ApproveArgs } from '../src/mutations.js';
 import { status } from '../src/runtime.js';
-import { readJournal } from '../src/state.js';
+import { readJournal, updateSupervision } from '../src/state.js';
 
 import {
   addActivity,
   addPlan,
+  addPlanNow,
   createGrant,
   delegateOk,
   type DelegatedSession,
@@ -285,6 +286,38 @@ describe('an incomplete pre-POST re-fetch fails closed with a cause-split recove
     const result = await approve(h.deps, args());
     expect(result).toMatchObject({ approvedPlanId: 'plan-1' });
     expect(h.adapter.callsTo('approvePlan')).toHaveLength(1);
+  });
+});
+
+describe('checks that must hold at the moment of the write (inside the critical section)', () => {
+  it('a pause recorded while the plan is being re-read still stops the approval', async () => {
+    const original = h.adapter.listActivitiesImpl;
+    h.adapter.listActivitiesImpl = async (resource, options) => {
+      // The owner's supervision pauses the session mid re-read.
+      await updateSupervision(h.dataDir, session.localRequestId, {
+        paused: {
+          reason: 'outside-user-message',
+          observedAt: new Date().toISOString(),
+        },
+      });
+      return original(resource, options);
+    };
+    const err = await fails(() => approve(h.deps, args()));
+    expect(err.appError.code).toBe('JULES_SUPERVISION_PAUSED');
+    expect(h.adapter.writeCount()).toBe(0);
+  });
+
+  it('a deviation recorded on the session blocks it under a DIFFERENT grant too', async () => {
+    approvalLands('plan-9');
+    await approve(h.deps, args()); // approves a different plan than evaluated -> deviation
+    const other = await createGrant(h, { maxActiveSessions: 3 });
+    h.deps.clock.time += 1_000;
+    addPlanNow(h, session.sessionResource, 'plan-3');
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const err = await fails(() =>
+      approve(h.deps, args({ grantId: other, planId: 'plan-3' }))
+    );
+    expect(err.appError.code).toBe('JULES_POLICY_DEVIATION');
   });
 });
 

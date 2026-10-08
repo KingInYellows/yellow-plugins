@@ -15,7 +15,7 @@
  * candidate, and the journal's `archiveVisibilityConfirmed` flag.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RECONCILE_SESSIONS_PAGE_CAP = exports.RECONCILE_SESSIONS_PAGE_SIZE = void 0;
+exports.RECONCILE_SESSIONS_PAGE_CAP = exports.RECONCILE_SESSIONS_PAGE_SIZE = exports.RESERVATION_SETTLE_MS = void 0;
 exports.reconcile = reconcile;
 const activity_walk_js_1 = require("./activity-walk.js");
 const authority_js_1 = require("./authority.js");
@@ -25,6 +25,8 @@ const runtime_support_js_1 = require("./runtime-support.js");
 const runtime_support_js_2 = require("./runtime-support.js");
 const state_js_1 = require("./state.js");
 const validate_js_1 = require("./validate.js");
+/** Longer than any write deadline (cli MAX_DEADLINE_MS 200 s) plus a minute of slack. */
+exports.RESERVATION_SETTLE_MS = 260_000;
 exports.RECONCILE_SESSIONS_PAGE_SIZE = 100;
 exports.RECONCILE_SESSIONS_PAGE_CAP = 5;
 function entryOf(r) {
@@ -152,69 +154,82 @@ function resolveCreates(journal, creates, walk) {
 // ---------------------------------------------------------------------------
 // reply / approve reservations: their own session
 // ---------------------------------------------------------------------------
-async function resolveOnOwnSession(deps, adapter, record, deadline) {
-    const sessionResource = record.sessionResource;
-    if (sessionResource === undefined) {
-        return notReached(record, 'the operation has no bound session');
-    }
+/**
+ * Every unresolved reply and approve of ONE session, resolved with one `info()`
+ * and one activity walk from the earliest reservation, so ten stuck operations
+ * on a session cost one walk, not ten.
+ */
+async function resolveOnOwnSession(deps, adapter, sessionResource, records, deadline) {
     try {
         await (0, runtime_support_js_1.read)(deps, deadline, () => adapter.getSession(sessionResource));
     }
     catch (err) {
         rethrowIfAuth(err);
         if (err instanceof errors_js_1.AppErrorException) {
-            return notReached(record, `session read failed (${err.appError.code})`);
+            return records.map((record) => notReached(record, `session read failed (${err.appError.code})`));
         }
         throw err;
     }
-    const floor = Date.parse(record.createdAt) - activity_walk_js_1.OVERLAP_WINDOW_MS;
-    const matches = new Set();
-    const qualifies = (createTime) => {
-        const t = Date.parse(createTime);
-        return !Number.isNaN(t) && t >= floor;
-    };
+    const floors = new Map(records.map((r) => [
+        r.localRequestId,
+        Date.parse(r.createdAt) - activity_walk_js_1.OVERLAP_WINDOW_MS,
+    ]));
+    const matches = new Map(records.map((r) => [r.localRequestId, new Set()]));
+    const earliest = Math.min(...records.map((r) => Date.parse(r.createdAt)));
     const walk = await (0, activity_walk_js_1.walkActivities)({
         adapter,
         sessionResource,
         pageSize: activity_walk_js_1.STATUS_PAGE_SIZE,
         start: {
             kind: 'watermark',
-            createTime: record.createdAt,
+            createTime: new Date(earliest).toISOString(),
             activityId: '',
         },
         clock: deps.clock,
         deadline,
         onActivity: (activity) => {
-            if (!qualifies(activity.createTime))
+            const created = Date.parse(activity.createTime);
+            if (Number.isNaN(created))
                 return;
-            if (record.kind === 'reply' &&
-                activity.type === 'userMessaged' &&
-                activity.message !== undefined &&
-                record.promptDigest !== undefined &&
-                (0, state_js_1.messageDigest)(activity.message) === record.promptDigest) {
-                matches.add(activity.activityId);
-            }
-            if (record.kind === 'approve' &&
-                activity.type === 'planApproved' &&
-                record.observedPlanId !== undefined &&
-                activity.approvedPlanId === record.observedPlanId) {
-                matches.add(activity.activityId);
+            for (const record of records) {
+                // Only activities at or after this reservation (minus the overlap window).
+                if (created < (floors.get(record.localRequestId) ?? Infinity))
+                    continue;
+                const found = matches.get(record.localRequestId);
+                if (found === undefined)
+                    continue;
+                if (record.kind === 'reply' &&
+                    activity.type === 'userMessaged' &&
+                    activity.message !== undefined &&
+                    record.promptDigest !== undefined &&
+                    (0, state_js_1.messageDigest)(activity.message) === record.promptDigest) {
+                    found.add(activity.activityId);
+                }
+                if (record.kind === 'approve' &&
+                    activity.type === 'planApproved' &&
+                    record.observedPlanId !== undefined &&
+                    activity.approvedPlanId === record.observedPlanId) {
+                    found.add(activity.activityId);
+                }
             }
         },
     });
-    if (matches.size > 1) {
-        return {
-            record,
-            outcome: 'ambiguous-reconcile',
-            reason: 'multiple-candidates',
-        };
-    }
-    if (matches.size === 1)
-        return { record, outcome: 'bound' };
-    if (!walk.complete) {
-        return notReached(record, `activity walk incomplete (${walk.stopReason ?? 'unknown'})`);
-    }
-    return { record, outcome: 'unknown-outcome' };
+    return records.map((record) => {
+        const found = matches.get(record.localRequestId) ?? new Set();
+        if (found.size > 1) {
+            return {
+                record,
+                outcome: 'ambiguous-reconcile',
+                reason: 'multiple-candidates',
+            };
+        }
+        if (found.size === 1)
+            return { record, outcome: 'bound' };
+        if (!walk.complete) {
+            return notReached(record, `activity walk incomplete (${walk.stopReason ?? 'unknown'})`);
+        }
+        return { record, outcome: 'unknown-outcome' };
+    });
 }
 // ---------------------------------------------------------------------------
 // persistence
@@ -288,23 +303,51 @@ async function reconcile(deps, journal, sessionResource, deadline) {
         .filter((r) => sessionResource === undefined || r.sessionResource === sessionResource);
     if (targets.length === 0)
         return [];
-    const creates = targets.filter((r) => r.kind === 'create');
-    const others = targets.filter((r) => r.kind === 'reply' || r.kind === 'approve');
-    const resolutions = await (0, runtime_support_js_1.withAdapter)(deps, async (adapter) => {
-        const out = [];
-        if (creates.length > 0) {
-            const oldest = new Date(Math.min(...creates.map((r) => Date.parse(r.createdAt))));
-            const walk = await walkSessions(deps, adapter, oldest, deadline);
-            out.push(...resolveCreates(journal, creates, walk));
-        }
-        for (const record of others) {
-            out.push((0, deadline_js_1.isExpired)(deps.clock, deadline)
-                ? notReached(record, 'the deadline expired before this operation was checked')
-                : await resolveOnOwnSession(deps, adapter, record, deadline));
-        }
-        return out;
-    });
-    await persist(deps, resolutions);
+    // A `reserved` row may still have its POST in flight in another process; only
+    // an `unknown-outcome` row is certainly settled on the caller's side. A
+    // reservation younger than the longest write deadline is left alone, so
+    // reconcile can never free (and then be overwritten by) a live write.
+    const nowMs = deps.clock.now();
+    const inFlight = targets.filter((r) => r.status === 'reserved' &&
+        nowMs - Date.parse(r.createdAt) < exports.RESERVATION_SETTLE_MS);
+    const settled = targets.filter((r) => !inFlight.includes(r));
+    const early = inFlight.map((record) => notReached(record, 'the reservation may still be in flight; try again shortly'));
+    const creates = settled.filter((r) => r.kind === 'create');
+    const others = settled.filter((r) => r.kind === 'reply' || r.kind === 'approve');
+    const resolutions = [
+        ...early,
+        ...(settled.length === 0
+            ? []
+            : await (0, runtime_support_js_1.withAdapter)(deps, async (adapter) => {
+                const out = [];
+                if (creates.length > 0) {
+                    const oldest = new Date(Math.min(...creates.map((r) => Date.parse(r.createdAt))));
+                    const walk = await walkSessions(deps, adapter, oldest, deadline);
+                    out.push(...resolveCreates(journal, creates, walk));
+                }
+                const bySession = new Map();
+                for (const record of others) {
+                    if (record.sessionResource === undefined) {
+                        out.push(notReached(record, 'the operation has no bound session'));
+                        continue;
+                    }
+                    const list = bySession.get(record.sessionResource) ?? [];
+                    list.push(record);
+                    bySession.set(record.sessionResource, list);
+                }
+                for (const [session, records] of bySession) {
+                    if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
+                        out.push(...records.map((record) => notReached(record, 'the deadline expired before this operation was checked')));
+                        continue;
+                    }
+                    out.push(...(await resolveOnOwnSession(deps, adapter, session, records, deadline)));
+                }
+                return out;
+            })),
+    ];
+    // A young reservation is reported but not recorded: `not-reached` would make
+    // it abandonable while its write may still be in flight.
+    await persist(deps, resolutions.filter((r) => !early.includes(r)));
     for (const r of resolutions) {
         if (r.outcome === 'released' &&
             r.record.kind === 'create' &&

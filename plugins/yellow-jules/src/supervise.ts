@@ -18,6 +18,7 @@
  * delegate or escalation — never acceptance.
  */
 
+import { compareStamp } from './activity-walk.js';
 import { evaluateScope, loadGrants, requireGrant } from './authority.js';
 import {
   type AuthorizeDeps,
@@ -43,7 +44,6 @@ import {
 import { collect, status, type StatusResult } from './runtime.js';
 import {
   findBySessionResource,
-  messageDigest,
   readJournal,
   updateSupervision,
   type SupervisionPatch,
@@ -68,6 +68,11 @@ const HUMAN_WAIT_SECONDS = 3600;
 const ABORTED_RETRY_SECONDS = 60;
 const FENCED_MESSAGE_CHARS = 500;
 const FENCED_MESSAGE_COUNT = 3;
+
+const waitForHuman: NextCheck = {
+  afterSeconds: HUMAN_WAIT_SECONDS,
+  reason: 'waiting for a human',
+};
 
 export type AllowedAction =
   | 'approve'
@@ -175,24 +180,6 @@ function planText(plan: NonNullable<StatusResult['pendingPlan']>): string {
     .join('\n');
 }
 
-/** Digests of the messages this plugin itself sent to the session: its prompt and its replies. */
-function ownMessageDigests(
-  journal: Journal,
-  sessionResource: string
-): Set<string> {
-  const digests = new Set<string>();
-  for (const record of Object.values(journal.operations)) {
-    if (
-      record.sessionResource === sessionResource &&
-      (record.kind === 'reply' || record.kind === 'create') &&
-      record.promptDigest !== undefined
-    ) {
-      digests.add(record.promptDigest);
-    }
-  }
-  return digests;
-}
-
 function backoffSeconds(failures: number): number {
   return Math.min(
     BACKOFF_BASE_SECONDS * 2 ** Math.max(0, failures - 1),
@@ -288,6 +275,33 @@ export async function superviseOnce(
     };
   }
 
+  // R32: outside activity recorded by ANY earlier walk (a plain `status` runs
+  // between passes and would otherwise consume the evidence) pauses the session.
+  const pauseForOutside = async (
+    seenOutside: { readonly activityId: string },
+    extra: Partial<SuperviseResult> = {}
+  ): Promise<SuperviseResult> => {
+    const pause = {
+      reason: 'outside-user-message',
+      observedAt: now().toISOString(),
+      activityId: seenOutside.activityId,
+    };
+    await persist({ paused: pause, backoff: null, ...decided('paused') });
+    return {
+      ...base,
+      decision: 'paused',
+      reason: pause.reason,
+      nextCheck: waitForHuman,
+      allowedActions: [],
+      fenced: {},
+      pause: { reason: pause.reason, observedAt: pause.observedAt },
+      ...extra,
+      ...attentionOf(['paused', pause.reason]),
+    };
+  };
+  const startOutside = owner.supervision?.outsideSeen;
+  if (startOutside !== undefined) return pauseForOutside(startOutside);
+
   const aborted = (): SuperviseResult => ({
     ...base,
     decision: 'pass-aborted',
@@ -356,6 +370,37 @@ export async function superviseOnce(
       'status returned no activity summary'
     );
   }
+  // The pause wins over every early return below: a deadline or a failed page
+  // must not let the evidence this walk (or an earlier one) recorded go stale.
+  journal = await readJournal(deps.dataDir);
+  const fresh = owns(journal, sessionResource);
+  const recordedOutside = fresh.supervision?.outsideSeen;
+  if (recordedOutside !== undefined) {
+    const echoed = observed.newActivities.filter(
+      (a) =>
+        a.activityId === recordedOutside.activityId && a.message !== undefined
+    );
+    return pauseForOutside(recordedOutside, {
+      ...(seen.condition !== undefined ? { condition: seen.condition } : {}),
+      ...(seen.vendorState !== undefined
+        ? { vendorState: seen.vendorState }
+        : {}),
+      fenced:
+        echoed.length > 0
+          ? {
+              activities: fenceUntrusted(
+                echoed
+                  .slice(0, FENCED_MESSAGE_COUNT)
+                  .map(
+                    (a) =>
+                      `user message ${a.activityId}: ${truncate(a.message ?? '')}`
+                  )
+                  .join('\n')
+              ),
+            }
+          : {},
+    });
+  }
   if (
     walk.partialPagination &&
     (walk.stopReason === 'deadline' || isExpired(deps.clock, deadline))
@@ -367,20 +412,12 @@ export async function superviseOnce(
   }
   if (walk.dedupWindowExceeded) return checkFailed('dedup-window-exceeded');
 
-  journal = await readJournal(deps.dataDir);
-  const fresh = owns(journal, sessionResource);
   const condition = seen.condition ?? 'needs-inspection';
   const vendorState = seen.vendorState ?? 'unspecified';
   const fenced: { plan?: string; question?: string; activities?: string } = {};
 
-  // R32: outside activity.
-  const own = ownMessageDigests(journal, sessionResource);
-  const outside = observed.newActivities.filter(
-    (a) =>
-      a.type === 'userMessaged' &&
-      a.message !== undefined &&
-      !own.has(messageDigest(a.message))
-  );
+  // R32: a plan that changed under an evaluation, or a walk that cannot rule
+  // outside activity out. (Outside user messages were handled above.)
   const evaluated = fresh.supervision?.evaluatedPlan;
   const repliedSinceEvaluation =
     evaluated !== undefined &&
@@ -401,18 +438,7 @@ export async function superviseOnce(
       : undefined;
   let pauseReason: string | undefined;
   let pauseActivity: AdapterActivity | undefined;
-  if (outside.length > 0) {
-    pauseReason = 'outside-user-message';
-    pauseActivity = outside[0];
-    fenced.activities = fenceUntrusted(
-      outside
-        .slice(0, FENCED_MESSAGE_COUNT)
-        .map(
-          (a) => `user message ${a.activityId}: ${truncate(a.message ?? '')}`
-        )
-        .join('\n')
-    );
-  } else if (swappedPlan !== undefined) {
+  if (swappedPlan !== undefined) {
     pauseReason = 'plan-changed-after-evaluation';
     pauseActivity = swappedPlan;
   } else if (walk.partialPagination) {
@@ -473,11 +499,6 @@ export async function superviseOnce(
       ...attentionOf(flags),
     };
   };
-  const waitForHuman: NextCheck = {
-    afterSeconds: HUMAN_WAIT_SECONDS,
-    reason: 'waiting for a human',
-  };
-
   // Escalations that need no further reading.
   if (seen.policyDeviation === true) {
     return finish(
@@ -559,13 +580,7 @@ export async function superviseOnce(
   }
 
   if (condition === 'awaiting-reply') {
-    const latest = [...observed.agentMessages]
-      .sort((a, b) =>
-        a.createTime === b.createTime
-          ? a.activityId.localeCompare(b.activityId)
-          : a.createTime.localeCompare(b.createTime)
-      )
-      .pop();
+    const latest = [...observed.agentMessages].sort(compareStamp).pop();
     if (latest?.message !== undefined) {
       fenced.question = fenceUntrusted(truncate(latest.message));
     }
@@ -730,7 +745,7 @@ export async function clearPause(
   await updateSupervision(
     deps.dataDir,
     owner.localRequestId,
-    { paused: null },
+    { paused: null, outsideSeen: null },
     nowFn(deps)
   );
   return {

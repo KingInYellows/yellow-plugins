@@ -242,6 +242,16 @@ function isValidSupervision(value: unknown): boolean {
     )
   )
     return false;
+  const outsideSeen = value['outsideSeen'];
+  if (
+    outsideSeen !== undefined &&
+    !(
+      isPlainObject(outsideSeen) &&
+      typeof outsideSeen['activityId'] === 'string' &&
+      typeof outsideSeen['observedAt'] === 'string'
+    )
+  )
+    return false;
   const evaluatedPlan = value['evaluatedPlan'];
   if (
     evaluatedPlan !== undefined &&
@@ -488,16 +498,18 @@ async function acquireLock(
 ): Promise<string> {
   const owner = crypto.randomUUID();
   const deadline = Date.now() + config.timeoutMs;
-  const content: LockOwner = {
-    owner,
-    pid: process.pid,
-    hostname: os.hostname(),
-    startedAt: Date.now(),
-  };
 
   for (;;) {
     try {
       const handle = await fs.promises.open(lockPath, 'wx', 0o600);
+      // Stamped when the lock is actually taken, not when waiting began: a
+      // process that waited 14 s must not look 14 s older than it is.
+      const content: LockOwner = {
+        owner,
+        pid: process.pid,
+        hostname: os.hostname(),
+        startedAt: Date.now(),
+      };
       try {
         await handle.writeFile(JSON.stringify(content));
       } catch (writeErr) {
@@ -1181,6 +1193,8 @@ export interface SupervisionPatch {
   /** `null` resets the check-failed backoff. */
   readonly backoff?: NonNullable<SupervisionState['backoff']> | null;
   readonly lastDecision?: NonNullable<SupervisionState['lastDecision']>;
+  /** `null` clears the recorded outside activity. */
+  readonly outsideSeen?: NonNullable<SupervisionState['outsideSeen']> | null;
   /** `null` forgets the evaluated plan. */
   readonly evaluatedPlan?: NonNullable<
     SupervisionState['evaluatedPlan']
@@ -1220,6 +1234,13 @@ export async function updateSupervision(
           : previous.lastDecision !== undefined
             ? { lastDecision: previous.lastDecision }
             : {}),
+        ...(patch.outsideSeen === undefined
+          ? previous.outsideSeen !== undefined
+            ? { outsideSeen: previous.outsideSeen }
+            : {}
+          : patch.outsideSeen !== null
+            ? { outsideSeen: patch.outsideSeen }
+            : {}),
         ...(patch.evaluatedPlan === undefined
           ? previous.evaluatedPlan !== undefined
             ? { evaluatedPlan: previous.evaluatedPlan }
@@ -1238,4 +1259,22 @@ export async function updateSupervision(
     },
     config
   );
+}
+
+/** Digests of the messages this plugin itself sent to the session: its prompt and its replies. */
+export function ownMessageDigests(
+  journal: Journal,
+  sessionResource: string
+): Set<string> {
+  const digests = new Set<string>();
+  for (const record of Object.values(journal.operations)) {
+    if (
+      record.sessionResource === sessionResource &&
+      (record.kind === 'reply' || record.kind === 'create') &&
+      record.promptDigest !== undefined
+    ) {
+      digests.add(record.promptDigest);
+    }
+  }
+  return digests;
 }

@@ -339,6 +339,15 @@ export interface SupervisionState {
     readonly decidedAt: string;
   };
   /**
+   * Set by `status` (not only `supervise`) when a walk sees a user message that
+   * is none of this plugin's own, so a plain `status` can never consume the
+   * evidence before `supervise` pauses on it (R32). Cleared with the pause.
+   */
+  readonly outsideSeen?: {
+    readonly activityId: string;
+    readonly observedAt: string;
+  };
+  /**
    * The plan a `needs-plan-review` pass presented, and when. A different plan
    * appearing before it is approved, with no reply of ours since, pauses (R32).
    */

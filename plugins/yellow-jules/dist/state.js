@@ -70,6 +70,7 @@ exports.recordArtifacts = recordArtifacts;
 exports.recordDeviation = recordDeviation;
 exports.hasUnreconciledDeviation = hasUnreconciledDeviation;
 exports.updateSupervision = updateSupervision;
+exports.ownMessageDigests = ownMessageDigests;
 const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
 const os = __importStar(require("node:os"));
@@ -243,6 +244,12 @@ function isValidSupervision(value) {
         !(isPlainObject(backoff) &&
             isNonNegativeInt(backoff['failures']) &&
             typeof backoff['nextCheckAt'] === 'string'))
+        return false;
+    const outsideSeen = value['outsideSeen'];
+    if (outsideSeen !== undefined &&
+        !(isPlainObject(outsideSeen) &&
+            typeof outsideSeen['activityId'] === 'string' &&
+            typeof outsideSeen['observedAt'] === 'string'))
         return false;
     const evaluatedPlan = value['evaluatedPlan'];
     if (evaluatedPlan !== undefined &&
@@ -439,15 +446,17 @@ function staleLock(lockPath, why) {
 async function acquireLock(lockPath, config) {
     const owner = crypto.randomUUID();
     const deadline = Date.now() + config.timeoutMs;
-    const content = {
-        owner,
-        pid: process.pid,
-        hostname: os.hostname(),
-        startedAt: Date.now(),
-    };
     for (;;) {
         try {
             const handle = await fs.promises.open(lockPath, 'wx', 0o600);
+            // Stamped when the lock is actually taken, not when waiting began: a
+            // process that waited 14 s must not look 14 s older than it is.
+            const content = {
+                owner,
+                pid: process.pid,
+                hostname: os.hostname(),
+                startedAt: Date.now(),
+            };
             try {
                 await handle.writeFile(JSON.stringify(content));
             }
@@ -898,6 +907,13 @@ async function updateSupervision(dataDir, localRequestId, patch, now = () => new
                 : previous.lastDecision !== undefined
                     ? { lastDecision: previous.lastDecision }
                     : {}),
+            ...(patch.outsideSeen === undefined
+                ? previous.outsideSeen !== undefined
+                    ? { outsideSeen: previous.outsideSeen }
+                    : {}
+                : patch.outsideSeen !== null
+                    ? { outsideSeen: patch.outsideSeen }
+                    : {}),
             ...(patch.evaluatedPlan === undefined
                 ? previous.evaluatedPlan !== undefined
                     ? { evaluatedPlan: previous.evaluatedPlan }
@@ -914,4 +930,16 @@ async function updateSupervision(dataDir, localRequestId, patch, now = () => new
         operations[localRequestId] = updated;
         return updated;
     }, config);
+}
+/** Digests of the messages this plugin itself sent to the session: its prompt and its replies. */
+function ownMessageDigests(journal, sessionResource) {
+    const digests = new Set();
+    for (const record of Object.values(journal.operations)) {
+        if (record.sessionResource === sessionResource &&
+            (record.kind === 'reply' || record.kind === 'create') &&
+            record.promptDigest !== undefined) {
+            digests.add(record.promptDigest);
+        }
+    }
+    return digests;
 }

@@ -605,18 +605,22 @@ class JulesSdkAdapter {
         }
     }
     async sendMessage(sessionResource, message) {
+        // Resolved before anything can be sent: an integrity or allowlist verdict
+        // here is our own, not an SDK failure, and must not be flattened.
+        const client = this.sessionClient(sessionResource);
         const before = this.postCount?.();
         try {
-            await this.sessionClient(sessionResource).send(message);
+            await client.send(message);
         }
         catch (err) {
             throw this.writeFailure(err, before, sessionResource);
         }
     }
     async approvePlan(sessionResource) {
+        const client = this.sessionClient(sessionResource);
         const before = this.postCount?.();
         try {
-            await this.sessionClient(sessionResource).approve();
+            await client.approve();
         }
         catch (err) {
             throw this.writeFailure(err, before, sessionResource);

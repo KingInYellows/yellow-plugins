@@ -30,7 +30,8 @@ import { type AuthorizeDeps, resolveControllerContext } from './authorize.js';
 import { resolvePluginRoot } from './config.js';
 import { assertControllerAuthority } from './controller.js';
 import {
-  type AdapterError,
+  AdapterError,
+  AppErrorException,
   makeAppError,
   mapAdapterError,
   MutationErrorException,
@@ -39,6 +40,7 @@ import {
 import { nowFn } from './runtime-support.js';
 import {
   applyReservation,
+  hasUnreconciledDeviation,
   markOperation,
   readJournal,
   type ReservationInput,
@@ -53,6 +55,13 @@ import type {
 } from './types.js';
 
 export interface GateRequest {
+  /**
+   * The create record that owns the session a `reply` or `approve` targets.
+   * Its pause and deviation state is read from the fresh journal INSIDE the
+   * critical section, so a pause recorded while the caller was re-reading a
+   * plan still stops the write.
+   */
+  readonly ownerRequestId?: string;
   readonly grantId: string;
   readonly authority: AuthorityRequest;
   readonly reservation: ReservationInput;
@@ -135,6 +144,36 @@ export async function reserveUnderGrant(
           ? { localId: gate.reservation.localId }
           : {}),
       });
+    }
+    const owner =
+      gate.ownerRequestId !== undefined
+        ? journal.operations[gate.ownerRequestId]
+        : undefined;
+    const ids = {
+      localRequestId: gate.reservation.localRequestId,
+      ...(gate.reservation.localId !== undefined
+        ? { localId: gate.reservation.localId }
+        : {}),
+    };
+    if (owner?.supervision?.paused !== undefined) {
+      throw new MutationErrorException(
+        makeAppError(
+          'JULES_SUPERVISION_PAUSED',
+          `supervision of ${owner.sessionResource ?? 'this session'} is paused (${owner.supervision.paused.reason}); no grant-backed write is allowed`
+        ),
+        ids
+      );
+    }
+    // R13: a deviation recorded on the SESSION blocks it under any grant, not
+    // only the grant that created it.
+    if (owner !== undefined && hasUnreconciledDeviation(owner)) {
+      throw new MutationErrorException(
+        makeAppError(
+          'JULES_POLICY_DEVIATION',
+          `${owner.sessionResource ?? 'this session'} has an unreconciled policy deviation`
+        ),
+        ids
+      );
     }
     // R36 lookup + reservation (mutates the in-memory journal only).
     const record = applyReservation(
@@ -234,16 +273,23 @@ export interface SettleOptions {
 export async function settleFailure(
   deps: AuthorizeDeps,
   record: OperationRecord,
-  error: AdapterError,
+  error: AdapterError | AppErrorException,
   options: SettleOptions
 ): Promise<never> {
-  const app = mapAdapterError(error, phaseOfWrite(error));
+  // An AppErrorException is our own verdict (an integrity or allowlist check
+  // that ran before anything was sent), already in its final form.
+  const app =
+    error instanceof AppErrorException
+      ? error.appError
+      : mapAdapterError(error, phaseOfWrite(error));
   const ids = {
     localRequestId: record.localRequestId,
     localId: record.localId,
   };
   if (app.code === 'JULES_UNKNOWN_OUTCOME') {
-    const sessionResource = error.sessionResource ?? record.sessionResource;
+    const sessionResource =
+      (error instanceof AdapterError ? error.sessionResource : undefined) ??
+      record.sessionResource;
     let journalRecorded = true;
     try {
       await markOperation(

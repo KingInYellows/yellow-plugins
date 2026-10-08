@@ -60,11 +60,14 @@ import {
 import {
   findBySessionResource,
   hasUnreconciledDeviation,
+  messageDigest,
+  ownMessageDigests,
   ownsSession,
   readJournal,
   recordArtifacts,
   upsertArtifactResumeToken,
   upsertReadState,
+  updateSupervision,
   withJournalLock,
 } from './state.js';
 import type {
@@ -459,6 +462,39 @@ function walkStartFor(
   return watermark ?? { kind: 'session-start' };
 }
 
+/**
+ * R32: a user message none of this plugin sent is recorded the moment ANY walk
+ * sees it, because `status` advances the watermark and the dedup ring and
+ * `supervise` would otherwise never see the message as new. `supervise` pauses
+ * on the record. Only sessions this plugin created have a digest set to compare
+ * against.
+ */
+async function recordOutsideActivity(
+  deps: RuntimeDeps,
+  record: OperationRecord,
+  messages: ReadonlyArray<{ activityId: string; digest: string }>
+): Promise<void> {
+  if (messages.length === 0 || record.kind !== 'create') return;
+  if (record.sessionResource === undefined) return;
+  const journal = await readJournal(deps.dataDir);
+  const own = ownMessageDigests(journal, record.sessionResource);
+  const outside = messages.find((m) => !own.has(m.digest));
+  if (outside === undefined) return;
+  const current = journal.operations[record.localRequestId]?.supervision;
+  if (current?.outsideSeen !== undefined) return;
+  await updateSupervision(
+    deps.dataDir,
+    record.localRequestId,
+    {
+      outsideSeen: {
+        activityId: outside.activityId,
+        observedAt: nowFn(deps)().toISOString(),
+      },
+    },
+    nowFn(deps)
+  );
+}
+
 export async function status(
   deps: RuntimeDeps,
   args: StatusArgs
@@ -512,6 +548,7 @@ export async function status(
             activityId: record.lastActivityId,
           }
         : undefined;
+    const newUserMessages: Array<{ activityId: string; digest: string }> = [];
     const walk = await walkActivities({
       adapter,
       sessionResource,
@@ -527,13 +564,19 @@ export async function status(
       ...(record.resumeApproval !== undefined
         ? { approval: record.resumeApproval }
         : {}),
-      ...(args.observer !== undefined
-        ? {
-            onActivity: (activity, info) => {
-              args.observer?.(activity, info);
-            },
-          }
-        : {}),
+      onActivity: (activity, info) => {
+        if (
+          info.isNew &&
+          activity.type === 'userMessaged' &&
+          activity.message !== undefined
+        ) {
+          newUserMessages.push({
+            activityId: activity.activityId,
+            digest: messageDigest(activity.message),
+          });
+        }
+        args.observer?.(activity, info);
+      },
     });
 
     // Restart guard: a stored token the vendor rejected, or one that yielded
@@ -626,6 +669,7 @@ export async function status(
     );
     record = await checkPolicyDeviation(deps, record, session);
     const policyDeviation = hasUnreconciledDeviation(record);
+    await recordOutsideActivity(deps, record, newUserMessages);
     // A session observed in a terminal vendor state no longer holds its
     // grant's active-session slot (tasks and corrective rounds stay spent).
     if (

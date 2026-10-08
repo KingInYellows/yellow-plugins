@@ -6,10 +6,13 @@ import { loadGrants, revokeGrant } from '../src/authority.js';
 import { resolveJournalPath } from '../src/config.js';
 import {
   AdapterError,
+  AppErrorException,
+  makeAppError,
   MutationErrorException,
   type AppErrorCode,
 } from '../src/errors.js';
 import { reply, type ReplyArgs } from '../src/mutations.js';
+import { status } from '../src/runtime.js';
 import { messageDigest, readJournal } from '../src/state.js';
 
 import {
@@ -18,6 +21,7 @@ import {
   type DelegatedSession,
   type GrantHarness,
   makeHarness,
+  setVendorState,
 } from './support/grants.js';
 
 let h: GrantHarness;
@@ -219,6 +223,33 @@ describe('corrective replies (R44)', () => {
     // A non-corrective reply is still allowed.
     await reply(h.deps, args({ grantId: tight }));
     expect(h.adapter.callsTo('sendMessage')).toHaveLength(2);
+  });
+});
+
+describe('replies and finished sessions', () => {
+  it('a reply to a finished session is refused: it would reopen the session past its freed slot', async () => {
+    setVendorState(h, session.sessionResource, 'completed');
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const err = await fails(() => reply(h.deps, args()));
+    expect(err.appError.code).toBe('JULES_INVALID_STATE');
+    expect(err.appError.recoveryAction).toContain('--correction');
+    expect(h.adapter.writeCount()).toBe(0);
+  });
+});
+
+describe('our own integrity verdicts on the write path are not flattened', () => {
+  it('a pre-dispatch integrity failure keeps its code and frees the reservation', async () => {
+    h.adapter.sendMessageImpl = async () => {
+      throw new AppErrorException(
+        makeAppError('JULES_SDK_INTEGRITY', 'storage binding failed')
+      );
+    };
+    const err = await fails(() => reply(h.deps, args()));
+    expect(err.appError.code).toBe('JULES_SDK_INTEGRITY');
+    const record = (await readJournal(h.dataDir)).operations[
+      err.localRequestId as string
+    ];
+    expect(record?.status).toBe('failed');
   });
 });
 

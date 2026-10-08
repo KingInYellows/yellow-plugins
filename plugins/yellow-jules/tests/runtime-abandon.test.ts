@@ -190,6 +190,47 @@ describe('abandon', () => {
     ).toEqual([requestId]);
   });
 
+  it('a reply whose reconcile found nothing (unknown-outcome) can be abandoned, and frees no slot', async () => {
+    const { delegateOk } = await import('./support/grants.js');
+    const { reply } = await import('../src/mutations.js');
+    h.adapter.restoreWrites();
+    const roomy = await createGrant(h, { maxActiveSessions: 3 });
+    const session = await delegateOk(h, roomy, {
+      branch: 'scratch/two',
+      requestId: 'sess-2',
+    });
+    h.adapter.sendMessageImpl = async () => {
+      throw new AdapterError('network', 'reset', { dispatched: true });
+    };
+    await expect(
+      reply(h.deps, {
+        session: session.localId,
+        message: 'lost',
+        dryRun: false,
+        correction: false,
+        grantId: roomy,
+        requestId: 'stuck-reply',
+      })
+    ).rejects.toBeInstanceOf(AppErrorException);
+    h.deps.clock.time = Date.now() + 10 * 60_000;
+    const reconciled = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(reconciled.reconciled?.[0]).toMatchObject({
+      localRequestId: 'stuck-reply',
+      outcome: 'unknown-outcome',
+    });
+    const result = await abandon(h.deps, { requestId: 'stuck-reply' });
+    expect(result).toMatchObject({
+      abandoned: true,
+      released: { slotReleased: false },
+    });
+    expect(
+      (await readJournal(h.dataDir)).operations['stuck-reply']?.status
+    ).toBe('failed');
+  });
+
   it('a record that was already settled is not abandonable', async () => {
     await status(h.deps, { reconcile: true });
     await abandon(h.deps, { requestId });

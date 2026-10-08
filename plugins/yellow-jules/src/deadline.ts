@@ -86,10 +86,12 @@ async function boundByDeadline<T>(
       }
     }, remaining);
   });
-  const attempt = readAttemptSignal.run(controller.signal, fn);
-  // If the timer wins, the aborted attempt rejects later; swallow it.
-  attempt.catch(() => undefined);
+  // Started inside the try: a function that throws synchronously must still
+  // clear the timer, or it would fire later as an unhandled rejection.
   try {
+    const attempt = readAttemptSignal.run(controller.signal, fn);
+    // If the timer wins, the aborted attempt rejects later; swallow it.
+    attempt.catch(() => undefined);
     return await Promise.race([attempt, expired]);
   } finally {
     clearTimeout(timer);

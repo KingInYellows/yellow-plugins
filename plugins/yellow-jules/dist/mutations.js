@@ -107,8 +107,9 @@ function vendorTitle(localId, title, prompt) {
 }
 /** A write failure that is not already an AdapterError is, by construction, after dispatch. */
 function asWriteError(err) {
-    if (err instanceof errors_js_1.AdapterError)
+    if (err instanceof errors_js_1.AdapterError || err instanceof errors_js_1.AppErrorException) {
         return err;
+    }
     return new errors_js_1.AdapterError('malformed', err instanceof Error ? err.message : String(err), { cause: err, dispatched: true });
 }
 function expiredBeforeWrite() {
@@ -256,13 +257,6 @@ async function resolveTarget(deps, sessionRef) {
         owner: (0, state_js_1.findBySessionResource)(journal, sessionResource),
     };
 }
-/** R32: a paused session takes no grant-backed write until `supervise --clear-pause`. */
-function assertNotPaused(target, ids) {
-    const paused = target.owner?.supervision?.paused;
-    if (paused !== undefined) {
-        throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_SUPERVISION_PAUSED', `supervision of ${target.sessionResource} is paused (${paused.reason}); no grant-backed write is allowed`), ids);
-    }
-}
 /** Grants cover sessions created through this plugin; anything else has no repo, branch or task to match. */
 function requireOwner(target, ids) {
     const owner = target.owner;
@@ -334,11 +328,19 @@ async function replyInner(deps, args, ids) {
         }
         const grantId = (0, validate_js_1.validateGrantId)(args.grantId);
         const owner = requireOwner(target, ids);
-        assertNotPaused(target, ids);
+        // A reply to a finished session would reopen it, past the active-session
+        // limit that freed its slot. A repair is a new delegate instead.
+        if (owner.condition === 'remote-completed' ||
+            owner.condition === 'failed') {
+            throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_INVALID_STATE', `the session is ${owner.condition}; a reply does not reopen a finished session`, {
+                recoveryAction: 'For a repair, run delegate with --correction and the same --task-ref.',
+            }), ids);
+        }
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline))
             return expiredBeforeWrite();
         const reservation = await (0, write_gate_js_1.reserveUnderGrant)(deps, {
             grantId,
+            ownerRequestId: owner.localRequestId,
             authority: {
                 repository: owner.repository,
                 sourceResource: owner.sourceResource,
@@ -502,11 +504,11 @@ async function approveInner(deps, args, ids) {
         }
         const grantId = (0, validate_js_1.validateGrantId)(args.grantId);
         const owner = requireOwner(target, ids);
-        assertNotPaused(target, ids);
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline))
             return expiredBeforeWrite();
         const reservation = await (0, write_gate_js_1.reserveUnderGrant)(deps, {
             grantId,
+            ownerRequestId: owner.localRequestId,
             authority: {
                 repository: owner.repository,
                 sourceResource: owner.sourceResource,
@@ -551,14 +553,23 @@ async function approveInner(deps, args, ids) {
         // turn the success into a failure envelope.
         const verified = await verifyApproval(deps, adapter, target.sessionResource, start, pendingStamp, deadline);
         let deviated = false;
+        let deviationUnrecorded = false;
         if (verified.observedPlanIdAfter !== null &&
             verified.observedPlanIdAfter !== planId &&
             target.owner !== undefined) {
-            await (0, state_js_1.recordDeviation)(deps.dataDir, target.owner.localRequestId, {
-                kind: 'policy-deviation',
-                reason: 'the plan approved by the vendor differs from the plan evaluated before approval',
-            }, (0, runtime_support_js_1.nowFn)(deps));
             deviated = true;
+            try {
+                await (0, state_js_1.recordDeviation)(deps.dataDir, target.owner.localRequestId, {
+                    kind: 'policy-deviation',
+                    reason: 'the plan approved by the vendor differs from the plan evaluated before approval',
+                }, (0, runtime_support_js_1.nowFn)(deps));
+            }
+            catch (err) {
+                // The approval already happened; never turn it into a failure envelope.
+                // The deviation is still reported, with the missed bookkeeping flagged.
+                deviationUnrecorded = true;
+                process.stderr.write(`warning: plan approved but the deviation could not be recorded: ${err instanceof Error ? err.name : 'error'}\n`);
+            }
         }
         return {
             operation: 'approve',
@@ -576,6 +587,7 @@ async function approveInner(deps, args, ids) {
             ...(0, runtime_support_js_1.attentionOf)([
                 ...(verified.deferred ? ['verificationDeferred'] : []),
                 ...(deviated ? ['policyDeviation'] : []),
+                ...(deviationUnrecorded ? ['deviationUnrecorded'] : []),
             ]),
         };
     });
@@ -633,9 +645,14 @@ function abandonable(record, id) {
         return (0, errors_js_1.throwAppError)('JULES_NOT_FOUND', `no journal record for ${id}`);
     }
     const outcome = record.lastReconcile?.outcome;
+    // A reply or approve has no sessions walk to settle it: a complete walk that
+    // finds no match leaves `unknown-outcome` for good, so that outcome qualifies
+    // for it (a create is settled by `released`, never by this).
+    const stuck = (record.kind === 'reply' || record.kind === 'approve') &&
+        outcome === 'unknown-outcome';
     if (!state_js_1.UNRESOLVED_STATUSES.has(record.status) ||
-        (outcome !== 'ambiguous-reconcile' && outcome !== 'not-reached')) {
-        return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', `${id} cannot be abandoned: only an unresolved operation whose last reconcile was ambiguous-reconcile or not-reached qualifies`, { recoveryAction: 'Run status --reconcile first.' });
+        (outcome !== 'ambiguous-reconcile' && outcome !== 'not-reached' && !stuck)) {
+        return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', `${id} cannot be abandoned: only an unresolved operation whose last reconcile was ambiguous-reconcile or not-reached (or, for a reply or approve, unknown-outcome) qualifies`, { recoveryAction: 'Run status --reconcile first.' });
     }
     return record;
 }
