@@ -1,0 +1,25 @@
+docs/solutions/workflow/check-the-tree-before-decomposing-a-backlog-item.md
+  s_5a877dc01e3810::t_6c8518925c5abf 15,23-24,30-32,35-37,45-47
+.changeset/yellow-review-anchor-only-reverify.md
+  s_5a877dc01e3810::t_6c8518925c5abf 5
+plugins/yellow-review/references/review-pr/ledger.md
+  s_5a877dc01e3810::t_6c8518925c5abf 192-193
+plans/cycle-1-resolve-hardening-and-ci-split.md
+  s_5a877dc01e3810::t_6c8518925c5abf 472-473,479-481
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c7d5aded2512a1e34e5370fa4420efe7209411e0",
+  "prompts": {},
+  "sessions": {
+    "s_5a877dc01e3810": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6401b8c8-03bf-423a-a3e5-81d4258d52d9",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
