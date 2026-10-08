@@ -44,10 +44,12 @@ jev_prefilter_enabled() {
 }
 
 # Project transcript JSONL lines (stdin) to user and assistant text only,
-# dropping tool calls, tool results and metadata, then cap the length.
-# Lines that are not JSON are skipped.
+# dropping tool calls, tool results and metadata. Lines that are not JSON are
+# skipped. Over the cap, the oldest text is dropped (newest turns carry the
+# outcome) along with the partial first line the byte cut leaves.
 jev_project_dialogue() {
-  jq -Rr '
+  local all
+  all=$(jq -Rr '
     (fromjson? // empty)
     | select(.type == "user" or .type == "assistant")
     | .message.content as $c
@@ -57,7 +59,12 @@ jev_project_dialogue() {
        else "" end) as $t
     | select($t != "")
     | "\(.type): \($t)"
-  ' 2>/dev/null | head -c "$JEV_STATE_MAX_CHARS"
+  ' 2>/dev/null)
+  if [ "$(printf '%s' "$all" | wc -c)" -gt "$JEV_STATE_MAX_CHARS" ]; then
+    printf '%s' "$all" | tail -c "$JEV_STATE_MAX_CHARS" | sed '1d'
+  else
+    printf '%s' "$all"
+  fi
 }
 
 # Wrap dialogue (stdin) in the repository's untrusted-content fence. Lines that
@@ -94,7 +101,7 @@ jev_build_request() {
   }'
 }
 
-# Ask Jev about one session and append a shadow-log line.
+# Ask Jev about one session and record the answer as its shadow record.
 # Args: $1 staging dir, $2 session id, $3 content hash; stdin: redacted tail.
 jev_prefilter_shadow() {
   local staging="$1" sid="$2" hash="$3"
@@ -157,6 +164,13 @@ JEVCFG
         input_tokens: (.usage.input_tokens // null)
       }' 2>/dev/null) || return 0
   [ -n "$line" ] || return 0
+
+  # Captures are detached per turn, so a slow answer can land after a newer
+  # turn's. Keep it only while it still matches the pending entry's hash.
+  local current
+  current=$(jq -r '.content_hash // empty' \
+    "${staging}/pending/${sid}.jsonl" 2>/dev/null | tail -n 1)
+  [ "$current" = "$hash" ] || return 0
 
   # Atomic replace of this session's record (tmp + rename in the same dir).
   local dir="${staging}/jev-shadow" tmp

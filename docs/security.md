@@ -445,8 +445,8 @@ third party, TypeSafe AI (`https://api.typesafe.ai/v1/systemone`):
 
 - **What leaves the machine.** The same redacted transcript tail that is
   staged locally, projected to user and assistant text only (tool calls and
-  tool results are dropped) and capped at 24,000 characters, plus two fixed
-  classification questions. Redaction is `cs_redact_secrets`'s pattern list,
+  tool results are dropped) and capped at its newest 24,000 bytes, plus two
+  fixed classification questions. Redaction is `cs_redact_secrets`'s pattern list,
   so an unrecognized secret typed into the chat can still be sent. Code diffs
   and tool output are never sent.
 - **When.** The Stop hook fires at the end of every assistant turn, so a
@@ -463,7 +463,8 @@ third party, TypeSafe AI (`https://api.typesafe.ai/v1/systemone`):
   model to classify the excerpt as data. The answer is a typed choice and
   probabilities; it is stored, never executed or fed back to Claude.
 - **Local record.** `compound-staging/jev-shadow/<session_id>.json`, replaced
-  atomically each turn, holds the session id, content hash, choice,
+  atomically each turn (an answer whose content hash no longer matches the
+  pending entry is dropped), holds the session id, content hash, choice,
   probabilities, latency and token count, never transcript text. It sits in
   the same owner-only staging directory as the pending queue.
 - **Failure mode.** Fail-open and shadow only: it runs after the pending entry

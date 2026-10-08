@@ -501,13 +501,14 @@ detail):**
 **Jev shadow pre-filter (opt-in, log only):** with
 `COMPOUND_JEV_PREFILTER=shadow` and `TYPESAFE_API_KEY` set in the environment
 the hooks inherit, the capture subshell sends the redacted tail's user and
-assistant text (tool calls and results dropped, capped at 24,000 chars) to
-TypeSafe's Jev, fenced as untrusted reference data (`jev-1.13.0` unless
-`COMPOUND_JEV_MODEL` is set; timeout `COMPOUND_JEV_TIMEOUT_S`, default 5 s). It
-runs after the pending entry is written and never changes what is staged. Like
-the pending entry, the record is per session and each turn's answer atomically
-replaces the last: `compound-staging/jev-shadow/<session_id>.json` holds session
-id, content hash, the `durable` choice with confidence and probabilities, the
+assistant text (tool calls and results dropped, capped at the newest 24,000
+bytes) to TypeSafe's Jev, fenced as untrusted reference data (`jev-1.13.0`
+unless `COMPOUND_JEV_MODEL` is set; timeout `COMPOUND_JEV_TIMEOUT_S`, default 5
+s). It runs after the pending entry is written and never changes what is staged.
+Like the pending entry, the record is per session and each turn's answer
+atomically replaces the last unless a newer turn's pending entry has superseded
+it: `compound-staging/jev-shadow/<session_id>.json` holds session id, content
+hash, the `durable` choice with confidence and probabilities, the
 `has_instruction` probability, latency and a `would_skip` flag (trivial or
 routine at confidence >= 0.9 and instruction probability <= 0.2). No transcript
 text is logged; the key reaches curl as a config on fd 3 and the body on stdin,

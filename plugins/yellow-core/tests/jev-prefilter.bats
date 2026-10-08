@@ -151,3 +151,34 @@ _capture() {
   COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
   [ ! -f "$MOCK_JEV_LOG" ]
 }
+
+@test "an answer for a superseded turn does not replace the record" {
+  COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
+  before=$(cat "$STAGING/jev-shadow/$SESSION_ID.json")
+  export MOCK_JEV_RESPONSE='{"model":"jev-1.13.0","answers":{"durable":{"type":"choice","choice":"durable-lesson","confidence":0.99},"has_instruction":{"type":"noul","noul":0.01}}}'
+  rm -f "$MOCK_JEV_BODY"
+  run env COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 \
+    bash -c '. "$1"; . "$2"; jev_prefilter_shadow "$3" "$4" stale-hash < "$5"' _ \
+    "$BATS_TEST_DIRNAME/../lib/compound-staging.sh" \
+    "$BATS_TEST_DIRNAME/../lib/jev-prefilter.sh" \
+    "$STAGING" "$SESSION_ID" "$TRANSCRIPT_FILE"
+  [ "$status" -eq 0 ]
+  [ -f "$MOCK_JEV_BODY" ]
+  [ "$(cat "$STAGING/jev-shadow/$SESSION_ID.json")" = "$before" ]
+}
+
+@test "over the cap, the newest dialogue is kept" {
+  {
+    for i in $(seq 1 400); do
+      printf '{"type":"user","message":{"content":"old filler line %03d padded with enough text to grow the projection quickly"}}\n' "$i"
+    done
+    printf '%s\n' '{"type":"user","message":{"content":"NEWEST_REQUEST"}}'
+  } > "$TRANSCRIPT_FILE"
+  run bash -c '. "$1"; jev_project_dialogue < "$2"' _ \
+    "$BATS_TEST_DIRNAME/../lib/jev-prefilter.sh" "$TRANSCRIPT_FILE"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | wc -c)" -le 24000 ]
+  [[ "$output" == *"user: NEWEST_REQUEST" ]]
+  [[ "$output" != *"line 001 "* ]]
+  [[ "$(printf '%s\n' "$output" | head -n 1)" == "user: old filler"* ]]
+}
