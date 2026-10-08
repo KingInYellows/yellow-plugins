@@ -45,10 +45,13 @@ jev_prefilter_enabled() {
 
 # Project transcript JSONL lines (stdin) to user and assistant text only,
 # dropping tool calls, tool results and metadata. Lines that are not JSON are
-# skipped. Over the cap, the oldest text is dropped (newest turns carry the
-# outcome) along with the partial first line the byte cut leaves.
+# skipped. The projected text then goes through cs_redact_secrets (from
+# compound-staging.sh); without it, or if it fails, nothing is returned.
+# Over the cap, the oldest text is dropped (newest turns carry the outcome)
+# along with the partial first line the byte cut leaves.
 jev_project_dialogue() {
   local all
+  command -v cs_redact_secrets >/dev/null 2>&1 || return 1
   all=$(jq -Rr '
     (fromjson? // empty)
     | select(.type == "user" or .type == "assistant")
@@ -59,7 +62,7 @@ jev_project_dialogue() {
        else "" end) as $t
     | select($t != "")
     | "\(.type): \($t)"
-  ' 2>/dev/null)
+  ' 2>/dev/null | cs_redact_secrets 2>/dev/null) || return 1
   if [ "$(printf '%s' "$all" | wc -c)" -gt "$JEV_STATE_MAX_CHARS" ]; then
     local cut nl='
 '
@@ -112,9 +115,11 @@ jev_build_request() {
 # Print the content hash of the session's current staging entry: pending/
 # when present, else processing/ (a drain may have claimed it).
 jev_current_hash() {
-  local entry="${1}/pending/${2}.jsonl"
-  [ -f "$entry" ] || entry="${1}/processing/${2}.jsonl"
-  jq -r '.content_hash // empty' "$entry" 2>/dev/null | tail -n 1
+  local h
+  h=$(jq -r '.content_hash // empty' "${1}/pending/${2}.jsonl" 2>/dev/null | tail -n 1)
+  # Empty also covers a drain renaming the entry between check and open.
+  [ -n "$h" ] || h=$(jq -r '.content_hash // empty' "${1}/processing/${2}.jsonl" 2>/dev/null | tail -n 1)
+  printf '%s' "$h"
 }
 
 # Take a per-session lock at path $1: a symlink whose target is the owner's
@@ -140,7 +145,8 @@ jev_lock() {
 }
 
 # Ask Jev about one session and record the answer as its shadow record.
-# Args: $1 staging dir, $2 session id, $3 content hash; stdin: redacted tail.
+# Args: $1 staging dir, $2 session id, $3 content hash of the redacted tail;
+# stdin: the raw transcript tail (redacted after projection).
 jev_prefilter_shadow() {
   local staging="$1" sid="$2" hash="$3"
   jev_prefilter_enabled || return 0
@@ -163,7 +169,7 @@ jev_prefilter_shadow() {
   fi
 
   local dialogue state body resp latency
-  dialogue=$(jev_project_dialogue)
+  dialogue=$(jev_project_dialogue) || return 0
   [ -n "$dialogue" ] || return 0
   state=$(printf '%s\n' "$dialogue" | jev_fence_state)
   body=$(printf '%s' "$state" | jev_build_request) || return 0

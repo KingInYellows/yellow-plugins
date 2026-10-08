@@ -443,10 +443,11 @@ Off by default. When the environment the hooks inherit sets both
 installed), the Stop hook's detached capture subshell sends session text to a
 third party, TypeSafe AI (`https://api.typesafe.ai/v1/systemone`):
 
-- **What leaves the machine.** The same redacted transcript tail that is
-  staged locally, projected to user and assistant text only (tool calls and
-  tool results are dropped) and capped at its newest 24,000 bytes, plus two
-  fixed classification questions. Redaction is `cs_redact_secrets`'s pattern
+- **What leaves the machine.** The transcript tail that is staged locally,
+  projected to user and assistant text only (tool calls and tool results are
+  dropped), passed through `cs_redact_secrets` (no call if it is unavailable
+  or fails) and capped at its newest 24,000 bytes, plus two fixed
+  classification questions. Redaction is `cs_redact_secrets`'s pattern
   list, so an unrecognized secret typed into the chat can still be sent. Tool
   calls, tool results and file contents Claude reads are not sent, but text a
   user or assistant message itself contains (a pasted diff, quoted command

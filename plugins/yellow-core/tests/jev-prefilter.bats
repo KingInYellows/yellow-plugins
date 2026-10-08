@@ -175,7 +175,8 @@ _capture() {
     done
     printf '%s\n' '{"type":"user","message":{"content":"NEWEST_REQUEST"}}'
   } > "$TRANSCRIPT_FILE"
-  run bash -c '. "$1"; jev_project_dialogue < "$2"' _ \
+  run bash -c '. "$1"; . "$2"; jev_project_dialogue < "$3"' _ \
+    "$BATS_TEST_DIRNAME/../lib/compound-staging.sh" \
     "$BATS_TEST_DIRNAME/../lib/jev-prefilter.sh" "$TRANSCRIPT_FILE"
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | wc -c)" -le 24000 ]
@@ -200,7 +201,8 @@ _capture() {
 @test "one oversized final message keeps its newest bytes" {
   big=$(head -c 30000 /dev/zero | tr '\0' 'a')
   printf '{"type":"user","message":{"content":"%sNEWEST_TAIL"}}\n' "$big" > "$TRANSCRIPT_FILE"
-  run bash -c '. "$1"; jev_project_dialogue < "$2"' _ \
+  run bash -c '. "$1"; . "$2"; jev_project_dialogue < "$3"' _ \
+    "$BATS_TEST_DIRNAME/../lib/compound-staging.sh" \
     "$BATS_TEST_DIRNAME/../lib/jev-prefilter.sh" "$TRANSCRIPT_FILE"
   [ "$status" -eq 0 ]
   [[ "$output" == *"NEWEST_TAIL" ]]
@@ -285,4 +287,29 @@ _shadow_direct() {
   COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
   jq -e '.durable_probabilities == {"trivial-qa":0.9}' "$STAGING/jev-shadow/$SESSION_ID.json"
   ! grep -q leaked "$STAGING/jev-shadow/$SESSION_ID.json"
+}
+
+@test "a trailing URL token is redacted without dropping the message" {
+  printf '%s\n' '{"type":"user","message":{"content":"see https://x.test/?token=abcdef"}}' >> "$TRANSCRIPT_FILE"
+  COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
+  state=$(jq -r '.state' "$MOCK_JEV_BODY")
+  [[ "$state" == *"user: see https://x.test/?token=[REDACTED"* ]]
+  [[ "$state" != *"abcdef"* ]]
+}
+
+@test "without the redactor the projection returns nothing" {
+  run bash -c '. "$1"; jev_project_dialogue < "$2"' _ \
+    "$BATS_TEST_DIRNAME/../lib/jev-prefilter.sh" "$TRANSCRIPT_FILE"
+  [ "$status" -ne 0 ]
+  [ -z "$output" ]
+}
+
+@test "current hash falls back to processing/ when pending/ cannot be read" {
+  . "$BATS_TEST_DIRNAME/../lib/jev-prefilter.sh"
+  mkdir -p "$STAGING/processing"
+  printf '{"content_hash":"abc"}\n' > "$STAGING/processing/$SESSION_ID.jsonl"
+  [ "$(jev_current_hash "$STAGING" "$SESSION_ID")" = "abc" ]
+  mkdir -p "$STAGING/pending"
+  printf '{"content_hash":"new"}\n' > "$STAGING/pending/$SESSION_ID.jsonl"
+  [ "$(jev_current_hash "$STAGING" "$SESSION_ID")" = "new" ]
 }

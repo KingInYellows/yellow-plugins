@@ -99,6 +99,11 @@ cs_atomic_jsonl_write "$PENDING_PATH" "${ENTRY}
 if [ -f "${SCRIPT_DIR}/../../lib/jev-prefilter.sh" ]; then
   # shellcheck source=../../lib/jev-prefilter.sh
   . "${SCRIPT_DIR}/../../lib/jev-prefilter.sh"
-  printf '%s' "$TAIL_REDACTED" \
-    | jev_prefilter_shadow "$STAGING_DIR" "$SESSION_ID" "$CONTENT_HASH"
+  # Raw tail: the lib redacts the projected text itself, because redacting
+  # serialized JSONL first can break a line (a URL token pattern can consume
+  # the closing quote) and silently drop the newest message.
+  # A here-string, not a pipe: the lib often returns without reading stdin,
+  # and a pipe writer would then die of SIGPIPE (exit 141).
+  jev_prefilter_shadow "$STAGING_DIR" "$SESSION_ID" "$CONTENT_HASH" \
+    <<< "$TAIL_RAW" || true
 fi
