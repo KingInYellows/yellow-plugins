@@ -765,12 +765,23 @@ pr_with_finding() {
   [ "$(fold | jq -r '[.findings[].obs.scope_status] | unique | join(",")')" = unscoped ]
 }
 
-# A missing universal-ctags skips locally. CI installs it in
+# A missing or unusable universal-ctags skips locally. CI installs it in
 # yellow-review-shell-tests, so a skip there would hide these two cases.
 require_universal_ctags() {
   rl_ctags_usable && return 0
-  [ -z "${CI:-}" ] || { echo "universal-ctags is required in CI"; return 1; }
-  skip "universal-ctags not installed"
+  [ -z "${CI:-}" ] || { echo "universal-ctags is required in CI (missing or unusable)"; return 1; }
+  skip "universal-ctags missing or unusable"
+}
+
+@test "CLAUDE-49: require_universal_ctags fails under CI and skips locally when ctags is unusable" {
+  source "$RL"
+  skip() { echo "skipped: $*"; }
+  RL_CTAGS_STATE=no CI=1 run require_universal_ctags
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"required in CI"* ]]
+  RL_CTAGS_STATE=no CI= run require_universal_ctags
+  [ "$status" -eq 0 ]
+  [[ "$output" == "skipped: "* ]]
 }
 
 @test "CLAUDE-49: with universal-ctags, swapped claims resolve to the true scope" {

@@ -548,8 +548,9 @@ explicit-invocation wording live in the skill body and description.
 - `file-line-counts.bats` — pins the thermonuclear line-count invariant
   alongside `skills/pr-review-workflow/scripts/file-line-counts`
 - `review-ledger.bats` — throwaway repositories with a bare origin, built by
-  `tests/helpers/ledger-repo.bash`; the universal-ctags case skips when
-  ctags is absent
+  `tests/helpers/ledger-repo.bash`; the two universal-ctags cases (CLAUDE-49)
+  skip locally when ctags is absent and fail when `CI` is set, because CI
+  installs ctags in `yellow-review-shell-tests`
 - `session-start.bats` — the hook's counts, orphan and stale-state handling,
   fold fallback, held-lock and 5 MB budget
 - `skill-content.bats` — pins load-bearing command and skill text
