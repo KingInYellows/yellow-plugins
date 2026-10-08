@@ -1421,13 +1421,26 @@ abort_in_chain_rebase() {
 # branch it was rebasing. Check the recorded start branch back out so that
 # branch's own worktree can be restored. A non-stack branch is left as it is.
 release_run_worktree() {
-  local cur start
+  local cur start head line
   start=${S_CHAIN[1]:-}
   [ -n "$start" ] || return 0
   cur=$(git -C "$S_RUN" branch --show-current 2>/dev/null) || cur=""
   [ "$cur" = "$start" ] && return 0
   if [ -n "$cur" ] && ! in_chain "$cur"; then
     return 0
+  fi
+  if [ -z "$cur" ]; then
+    # A detached run worktree may hold commits no branch has. The checkout
+    # below would orphan them, so report them and refuse instead.
+    head=$(git -C "$S_RUN" rev-parse HEAD 2>/dev/null) || return 1
+    if [ -z "$(git -C "$S_RUN" for-each-ref --count=1 --contains "$head" refs/heads 2>/dev/null)" ]; then
+      err "$(v "$S_RUN") is detached at $(v "${head:0:12}"), a commit no branch holds; not checking out $(v "$start")"
+      git -C "$S_RUN" log --oneline -n "$MAX_LISTED" "$head" --not --branches 2>/dev/null | while IFS= read -r line; do
+        printf '  floating commit: %s\n' "$(v "$line")"
+      done
+      printf '  rescue: git -C %s branch <new-name> HEAD   (or cherry-pick onto %s)\n' "$(q "$S_RUN")" "$(q "$start")"
+      return 1
+    fi
   fi
   git -C "$S_RUN" checkout --quiet "$start" -- >/dev/null 2>&1
 }
@@ -1450,11 +1463,17 @@ abort_in_chain_rebases() {
 # branch is mid-operation. Return 2 when the worktree list cannot be read.
 # Other worktrees are not checked: wt_busy treats an unreadable one as busy.
 in_chain_busy() {
-  local i j p b busy skip
+  local i j p b busy skip wi
   local -a paths=()
   load_worktrees || return 2
   paths+=("$S_RUN")
   for ((i = 0; i < ${#E_PATH[@]}; i++)); do
+    # An entry whose worktree was removed or pruned during the pause is dropped
+    # by restore_entries; wt_busy would call its unreadable path busy forever.
+    wi=$(wt_index "${E_PATH[i]}")
+    if [ "$wi" -lt 0 ] || [ "${WT_PRUNABLE[wi]}" -ne 0 ]; then
+      continue
+    fi
     paths+=("${E_PATH[i]}")
   done
   for ((i = 0; i < ${#WT_PATH[@]}; i++)); do
