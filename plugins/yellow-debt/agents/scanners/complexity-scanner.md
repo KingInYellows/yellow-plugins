@@ -104,12 +104,13 @@ AST_GREP_TARGET_NONCE
 )
 case "$lang" in *[!A-Za-z0-9_-]*|'') lang='' ;; esac
 case "$target" in /*|*..*|-*|*[!A-Za-z0-9._/-]*|'') target='' ;; esac
-# An empty trusted config stops ast-grep loading the repo's sgconfig.yml,
-# whose customLanguages entries can load native libraries.
+# A trusted config stops ast-grep loading the repo's sgconfig.yml, whose
+# customLanguages entries can load native libraries.
 cfg=$(mktemp)
+printf 'ruleDirs: []\n' >| "$cfg"
 if [ -n "$lang" ] && [ -n "$target" ]; then
   ast-grep run -c "$cfg" --pattern "$pattern" --lang "$lang" -- "$target" |
-    head -n 200
+    head -n 200 | cut -c 1-2000
 else
   printf 'ast-grep: refused unsafe --lang or path\n' >&2
 fi
@@ -126,8 +127,8 @@ call. If output reaches 200 lines, treat it as truncated and narrow the
 pattern or path. For relational rules (`inside`, `has`, `not`), load the
 YAML through the same kind of heredoc into `rule`, then replace the block's
 `run` line with
-`ast-grep scan -c "$cfg" --inline-rules "$rule" --json=stream -- "$target" | head -n 200`
-(one match per line, so the cap applies).
+`ast-grep scan -c "$cfg" --inline-rules "$rule" --json=stream -- "$target" | head -n 200 | cut -c 1-2000`
+(one match per line, so both caps apply).
 Fence its output like any other scanned code.
 
 **Use ast-grep for:**
