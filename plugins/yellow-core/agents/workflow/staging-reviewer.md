@@ -390,6 +390,24 @@ fi
    }
    ```
 
+5. If `$STAGING/jev-shadow/` exists (the opt-in Jev shadow pre-filter has
+   run here), append the scorer's verdict so shadow predictions can be
+   joined to real outcomes by session and content hash. `VERDICT` is
+   `skip`, `flag`, `malformed`, or the returned `category`; `PRIORITY` is
+   the returned priority or empty. Never let this step fail the drain.
+
+   ```bash
+   # Re-paste $STAGING; set F to the entry, VERDICT and PRIORITY from step 4.
+   if [ -d "$STAGING/jev-shadow" ] && [ ! -L "$STAGING/jev-shadow" ]; then
+     ( umask 077
+       jq -c --arg verdict "$VERDICT" --arg priority "${PRIORITY:-}" \
+         --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+         '{session_id, content_hash, verdict: $verdict,
+           priority: ($priority | tonumber? // null), recorded_at: $ts}' \
+         "$F" >> "$STAGING/jev-shadow/outcomes.jsonl" ) 2>/dev/null || true
+   fi
+   ```
+
 If the response is not valid JSON or is missing required fields, log
 `[staging-reviewer] scorer returned malformed output for <session_id>` and
 move the entry to `flagged-review/`. Do not promote.

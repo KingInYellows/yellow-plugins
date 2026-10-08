@@ -6,7 +6,9 @@
 # transcript tail looks worth staging, and records the answer under
 # <staging>/jev-shadow/. Shadow mode only: the answer never changes
 # whether the pending entry is written, so the log can be compared with
-# staging-scorer's real outcomes before any skip logic ships.
+# staging-scorer's real outcomes before any skip logic ships. The
+# staging-reviewer drain appends those outcomes to jev-shadow/outcomes.jsonl,
+# keyed by session_id and content_hash like the records written here.
 #
 # The Stop hook fires at the end of every turn and the pending entry for a
 # session is overwritten each time, so the shadow record is too: one file per

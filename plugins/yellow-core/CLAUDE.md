@@ -511,7 +511,9 @@ it: `compound-staging/jev-shadow/<session_id>.json` holds session id, content
 hash, the `durable` choice with confidence and probabilities, the
 `has_instruction` probability, latency and a `would_skip` flag (trivial or
 routine at confidence >= 0.9 and instruction probability <= 0.2). No transcript
-text is logged; the key reaches curl as a config on fd 3 and the body on stdin,
+text is logged. When `jev-shadow/` exists, the staging-reviewer drain also
+appends each scorer verdict (session id, content hash, verdict, priority) to
+`jev-shadow/outcomes.jsonl`, the join key for that comparison. The key reaches curl as a config on fd 3 and the body on stdin,
 so neither is in argv, and every failure is silent. The log exists to compare
 against staging-scorer outcomes before any skip behaviour ships; this sends
 session text to a third party, so leave it unset unless you accept that (trust
