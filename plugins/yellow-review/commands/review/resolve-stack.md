@@ -497,3 +497,6 @@ is not a failure.
 - **Re-run safety** — running `/review:resolve-stack` again is safe: replies
   and issues carry idempotency markers, so a second pass posts no duplicates;
   threads left open by design are reported again as blocking.
+
+See the `pr-review-workflow` and `stack-traversal` skills for the shared
+conventions this command builds on.

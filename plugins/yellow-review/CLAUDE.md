@@ -88,7 +88,11 @@ resolution, and sequential stack review. Graphite-native workflow.
   `/review:resolve --non-interactive` on the same PR with no gates in
   between — fully unattended — then `/review:triage --non-interactive`
   (reconcile only) and a Ledger line in its summary. Before `/review:pr` it
-  snapshots `yellow-plugins.local.md` when the fetched PR head ignores it
+  snapshots `yellow-plugins.local.md` when this work tree ignores it, or when
+  the file is untracked here and the fetched PR head ignores it; a config
+  tracked here but ignored on the PR head aborts before the checkout, and an
+  unreadable PR head ignore rule set stops with exit 2 (neither prints a skip
+  line)
 - `/review:sweep-all` — Run `/review:sweep` on every open non-draft PR you
   authored sequentially, with one upfront confirmation, skip-and-continue per
   PR, end-of-loop summary (with `Blocking` and `Residual` pending/attention

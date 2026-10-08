@@ -16,8 +16,8 @@ each one sequentially with no per-PR prompts. A single upfront
 `AskUserQuestion` confirms the PR list before any work begins; the loop
 runs unattended after that. Failures on individual PRs are logged and
 skipped — the loop never pauses and never aborts on a per-PR failure; only
-the dirty-tree, rate-limit, no-contract and verify-skipped stops in Step 4
-end it early. Each PR's
+the dirty-tree, rate-limit, no-contract, verify-skipped and state-unreadable
+stops in Step 4 end it early. Each PR's
 `/review:pr --non-interactive` stages its learnings for yellow-core's
 compound-staging drain; sweep-all runs no compounding pass of its own.
 
@@ -236,6 +236,7 @@ For each iteration:
      printf 'state=unreadable exit=%s ratelimited=1\n' "$RC"
    else
      printf 'state=unreadable exit=%s ratelimited=0\n' "$RC"
+     printf 'cause=%s\n' "$(printf '%s' "$OUT" | head -n 1 | tr -cd '[:print:]' | cut -c1-120)"
    fi
    ```
 
@@ -244,15 +245,18 @@ For each iteration:
    `skipped — not attempted (rate limit)`, record `pending-exit-1` and go to
    `### Step 5: End-of-loop summary table` (item 5's stop). When `exit` is
    non-zero and `ratelimited` is not `1`, the state is unknown for another
-   reason: record `state unreadable` in this PR's `Notes`, set this PR's
-   `Outcome` to `skipped` with `Skip Reason` `state unreadable` (it counts as
-   skipped in the totals, not attempted), mark every remaining PR
+   reason: record `state unreadable: <cause>` in this PR's `Notes` (the
+   `cause=` line, a capped first line of the `gh` output with printable
+   characters only), and set this PR's row to `Outcome` `skipped`, `Skip
+   Reason` `state unreadable` and `Blocking` `?` (it counts as skipped in the
+   totals, not attempted). Mark every remaining PR
    `skipped — not attempted (state unreadable)`, record `pending-exit-1` and go
-   to `### Step 5: End-of-loop summary table`. Do not continue to the next PR. When `exit` is `0` and `state` is not `OPEN`,
-   record `skipped — PR closed before sweep` and do NOT invoke the Skill: go
-   to item 6. Only `exit=0` with `state=OPEN` proceeds to item 2. A stop
-   inside the sweep that this check cannot foresee (for example a branch
-   mismatch) still reaches item 5b.
+   to `### Step 5: End-of-loop summary table`. Do not continue to the next PR.
+   When `exit` is `0` and `state` is not `OPEN`, record
+   `skipped — PR closed before sweep` and do NOT invoke the Skill: go to
+   item 6. Only `exit=0` with `state=OPEN` proceeds to item 2. A stop inside
+   the sweep that this check cannot foresee (for example a branch mismatch)
+   still reaches item 5b.
 2. **Invoke sweep** — invoke the `Skill` tool with `skill: "review:sweep"`
    and `args: "<PR#>"`. The skill name is `review:sweep` (the value of
    the `name:` frontmatter field in `sweep.md`) — do NOT use

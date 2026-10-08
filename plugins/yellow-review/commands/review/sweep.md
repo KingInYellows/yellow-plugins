@@ -240,8 +240,9 @@ is `none`.
 
 `/review:pr` has checked out the PR head, and the PR head can treat
 `yellow-plugins.local.md` differently from the starting branch that Step 1b
-classified: the path may be tracked there, or ignored only there. Run the
-Step 1b classification probe again, unchanged, whatever `<guard-dir>` is:
+classified: the path may be tracked there, or ignored only there. Run Step
+1b's first probe (the work-tree classification, not the PR head probe) again,
+unchanged, whatever `<guard-dir>` is:
 
 ```bash
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
@@ -468,8 +469,10 @@ cut off, which stays `no contract`. `pr-not-open` is printed only when
 `gh pr view` succeeded and returned a state other than `OPEN`, and
 `branch-mismatch` only when `gh pr view` and `git rev-parse` both succeeded and
 their branch names differ. Argument errors,
-a failed PR fetch (including a rate limit, at Step 1 or Step 2a) and a dirty tree print no skip line:
-they are not specific to this PR, so the batch must still stop.
+a failed PR fetch (including a rate limit, at Step 1 or Step 2a), a dirty tree,
+unreadable PR head ignore rules and the Step 1b abort for a config tracked on
+this branch but ignored on the PR head print no skip line: they are not
+specific to this PR, or are not a benign skip, so the batch must still stop.
 
 ## Error Handling
 
@@ -481,6 +484,14 @@ they are not specific to this PR, so the batch must still stop.
   ending with `Sweep: skipped (pr-not-open)`.
 - **PR fetch failed** (including a rate limit): `[review:sweep] Error: could
   not fetch PR #<PR#>.` and stop, with no skip line.
+- **PR head ignore rules unreadable** (Step 1b): `[review:sweep] Error: could
+  not read the PR head ignore rules.` and stop with exit 2, before any
+  snapshot and with no skip line.
+- **Config tracked here, ignored on the PR head** (Step 1b): `[review:sweep]
+  aborted at PR #<PR#>: yellow-plugins.local.md is tracked on this branch but
+  ignored on the PR head; rerun /review:sweep from the PR's branch` and stop
+  before Step 2, with no `Sweep:` or `Resolve:` line, so `/review:sweep-all`
+  records `no contract`.
 - **Dirty working directory** at Step 1: `[review:sweep] Error:
   uncommitted changes detected. Commit or stash first.` and stop.
   Both downstream skills enforce this independently; the wrapper-level

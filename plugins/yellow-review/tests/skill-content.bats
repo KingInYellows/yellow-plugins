@@ -383,11 +383,21 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   step3=$(awk '/^### Step 3: Run \/review:resolve/ { p = 1; next } /^### Step 3a:/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
   [[ "$step1b" == *'first runs the guard exit check in Step 3a'* ]]
   # The PR head is classified before the snapshot, which stays before /review:pr.
-  head=$(grep -n 'refs/pull/<PR#>/head' "$SWEEP" | head -1 | cut -d: -f1)
-  [ -n "$head" ] && [ "$head" -lt "$snap" ]
+  fetchline=$(grep -n 'fetch -q --no-tags -- "$REMOTE" "refs/pull/<PR#>/head"' "$SWEEP" | head -1 | cut -d: -f1)
+  [ -n "$fetchline" ]
+  [ "$fetchline" -lt "$snap" ]
   [[ "$step1b" == *'--work-tree="$WT" check-ignore -q --no-index'* ]]
   [[ "$step1b" == *'head=ignored'* ]]
+  [[ "$step1b" == *"printf 'head=tracked\\n'"* ]]
+  [[ "$step1b" == *"printf 'head=unignored\\n'"* ]]
   [[ "$step1b" == *'could not read the PR head ignore rules'* ]]
+  # A config tracked here and ignored on the PR head is never snapshotted: the abort is pinned.
+  [[ "$step1b" == *'do not snapshot: the snapshot would keep the tracked repository bytes'* ]]
+  [[ "$step1b" == *'is tracked on this branch but ignored on the PR head; rerun /review:sweep from the PR'* ]]
+  [[ "$step1b" == *'stop before Step 2, with no `Sweep:` or `Resolve:` line'* ]]
+  # The snapshot condition itself: ignored here, or unignored here and ignored on the head.
+  [[ "$step1b" == *'snapshot when the work-tree probe printed `ignored`, or when it printed `unignored` and this probe printed `head=ignored`'* ]]
+  [[ "$step1b" == *'not an ignored untracked file; not guarded'* ]]
   [[ "$step2a" == *'Exit 2 means `gh pr view` or `git rev-parse` failed or printed nothing, so no mismatch was established'* ]]
   [[ "$step2a" == *'print no `Sweep:` or `Resolve:` line, so `/review:sweep-all` records `no contract`'* ]]
   # Only a read-and-differ comparison reaches the skip line; a failed read exits 2 first.
@@ -404,7 +414,7 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   [[ "$step2b" == *'Anything but `ignored`, and `<guard-dir>` is not `none`'* ]]
   [[ "$step2b" == *'Run no `guard-local-config` call'* ]]
   [[ "$step2b" == *'set `<guard-dir>` to `none`, and continue unguarded'* ]]
-  [[ "$step2b" == *'Run the Step 1b classification probe again'* ]]
+  [[ "$step2b" == *"Run Step 1b's first probe (the work-tree classification, not the PR head probe) again"* ]]
   [[ "$step2b" == *'git -C "$TOP" check-ignore -q -- yellow-plugins.local.md'* ]]
   [[ "$step2b" == *'**`ignored` and `<guard-dir>` is `none`:** the config was not snapshotted before the review'* ]]
   [[ "$step2b" == *'is ignored on the PR branch but was not snapshotted before the review; rerun /review:sweep from the PR'* ]]
@@ -927,7 +937,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
   grep -qF '**Open-PR pre-check**' <<<"$flat4"
   grep -qF 'gh pr view <PR#> --json state -q .state' <<<"$flat4"
-  grep -qF 'record `state unreadable`' <<<"$flat4"
+  grep -qF 'record `state unreadable: <cause>`' <<<"$flat4"
   grep -qF 'skipped — not attempted (state unreadable)' <<<"$flat4"
   run grep -qF 'record `skipped — state unreadable`' <<<"$flat4"
   [ "$status" -eq 1 ]
@@ -937,11 +947,28 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   pre=$(grep -n 'Open-PR pre-check' "$SWEEP_ALL" | head -1 | cut -d: -f1)
   inv=$(grep -n '\*\*Invoke sweep\*\*' "$SWEEP_ALL" | head -1 | cut -d: -f1)
   [ "$pre" -lt "$inv" ]
+  # Item 1b alone: the unreadable-state stop is pinned to its recording, the
+  # Step 5 jump and the no-continue rule, and the rate-limit stop stays apart.
+  item1b=${flat4#*'**Open-PR pre-check**'}
+  item1b=${item1b%%'**Invoke sweep**'*}
+  [ "$(grep -o 'record `pending-exit-1`' <<<"$item1b" | wc -l)" -eq 2 ]
+  [ "$(grep -o 'go to `### Step 5: End-of-loop summary table`' <<<"$item1b" | wc -l)" -eq 2 ]
+  grep -qF 'When `ratelimited=1`' <<<"$item1b"
+  grep -qF 'skipped — not attempted (rate limit)' <<<"$item1b"
+  grep -qF 'When `exit` is non-zero and `ratelimited` is not `1`' <<<"$item1b"
+  grep -qF '`Outcome` `skipped`, `Skip Reason` `state unreadable` and `Blocking` `?`' <<<"$item1b"
+  grep -qF 'record `state unreadable: <cause>`' <<<"$item1b"
+  grep -qF 'Do not continue to the next PR.' <<<"$item1b"
+  grep -qF "printf 'cause=%s" <<<"$item1b"
+  # The intro names the stop.
+  grep -qF 'verify-skipped and state-unreadable stops in Step 4' <<<"$(tr '\n' ' ' <"$SWEEP_ALL" | tr -s ' ')"
 }
 
 @test "sweep-all: an early stop exits 1 after the summary, even with zero attempts" {
   step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
   [ "$(grep -c 'Record `pending-exit-1`' <<<"$step4")" -eq 4 ]
+  # Item 1b records it too, in lowercase, for the rate-limit and unreadable-state stops.
+  [ "$(grep -ci 'record `pending-exit-1`' <<<"$step4")" -ge 6 ]
   grep -qF '**Final exit (every path, including zero attempts):** read `pending-exit-1`.' "$SWEEP_ALL"
   grep -qF 'If set, the command exits `1`; otherwise (`pending-exit-1` unset), exit `0`.' "$SWEEP_ALL"
 }
