@@ -235,12 +235,12 @@ through the generator and documenting the single-controller handoff procedure.
 
 ### Phase C: mutating operations
 
-- [ ] Step 11: Extend the `SdkAdapter` port in `src/types.ts` and `JulesSdkAdapter` in `src/sdk-adapter.ts` with `createSession(config)`, `sendMessage(sessionResource, message)` and `approvePlan(sessionResource)`.
+- [x] Step 11: Extend the `SdkAdapter` port in `src/types.ts` and `JulesSdkAdapter` in `src/sdk-adapter.ts` with `createSession(config)`, `sendMessage(sessionResource, message)` and `approvePlan(sessionResource)`.
   - `createSession` uses `buildCreateSessionConfig` (`:125`) with `requireApproval: true` and `autoPr: false` (R12).
   - These methods are never retried. Errors are classified by `CallPhase`, so anything after dispatch becomes `JULES_UNKNOWN_OUTCOME` while keeping any known session id (R16).
   - Do not add `run`, `all`, `result`, `ask` or `waitFor` (R9).
   - Rewrite `tests/unsupported-capability.test.ts:38` so it asserts that only these three writes exist and that there is still no cancel, pause or resume method.
-- [ ] Step 12: Create `src/mutations.ts` with `delegate(deps, input)`.
+- [x] Step 12: Create `src/mutations.ts` with `delegate(deps, input)`.
   - **Dry run:** validation plus `getSource`, returning the contract's dry-run shape with no reservation.
   - **Real run:**
     1. Require `--grant-id`, or fail with `JULES_CONFIRMATION_REQUIRED`.
@@ -249,11 +249,11 @@ through the generator and documenting the single-controller handoff procedure.
     4. On success, `markOperation('accepted')` and bind `sessionResource`.
     5. After dispatch, mark `unknown-outcome` and keep the charge (R31).
   - **Repair tasks (R44):** `--correction` charges `correctiveRounds[taskRef]` and requires a `--task-ref` already in the grant.
-- [ ] Step 13: Add `reply(deps, input)` to `src/mutations.ts`.
+- [x] Step 13: Add `reply(deps, input)` to `src/mutations.ts`.
   - Run the same critical section, with `op:'reply'`, the message `sha256` digest, and `--correction` charging a corrective round.
   - Issue one non-blocking POST (R9).
   - The dry run does one `info()` and returns `sent: false, dryRun: true`.
-- [ ] Step 14: Add `approve(deps, input)` to `src/mutations.ts`, following the contract `approve` paragraph exactly.
+- [x] Step 14: Add `approve(deps, input)` to `src/mutations.ts`, following the contract `approve` paragraph exactly.
   - **Pre-POST check:** the `info()` state must be `awaitingPlanApproval`. Run `walkActivities` from `pendingPlan.activityCreateTime` minus 5 min, within 40 % of the deadline, and it must reach the newest page.
   - **Pre-POST failures:**
     - a partial walk → `JULES_INVALID_STATE`, with the cause-split recoveryAction;
@@ -263,7 +263,7 @@ through the generator and documenting the single-controller handoff procedure.
     - a mismatch records a deviation via `recordDeviation` (R34);
     - a partial re-read gives `verificationDeferred: true`.
   - Document in the JSDoc that the endpoint takes no plan id, so compare-and-approve is not atomic.
-- [ ] Step 15: Replace `reconcileInPr2()` (`runtime.ts:631-649`) with `reconcile()` in a new `src/reconcile.ts`.
+- [x] Step 15: Replace `reconcileInPr2()` (`runtime.ts:631-649`) with `reconcile()` in a new `src/reconcile.ts`.
   - `delegate` reservations are resolved by the shared sessions walk: tag regex, 5-page cap, archive-visibility gate.
   - `reply` and `approve` are resolved on their own session, with digest or plan-id matching inside the overlap window.
   - Every outcome follows the contract `status` paragraph.
@@ -271,12 +271,12 @@ through the generator and documenting the single-controller handoff procedure.
     - `released` calls `releaseGrant`.
     - `bound` keeps the active-session charge.
     - Observing a terminal vendor state (`completed`/`failed`) on a bound session during `status` releases the active-session slot.
-- [ ] Step 16: Add `abandon --request-id <id>` in `src/mutations.ts`.
+- [x] Step 16: Add `abandon --request-id <id>` in `src/mutations.ts`.
   - It accepts only an operation whose last reconcile outcome was `ambiguous-reconcile` or `not-reached`; anything else is `JULES_INVALID_STATE`.
   - It requires `confirmOnTty`, whose summary shows the request id, repository, branch and outcome reason.
   - It marks the operation terminal `failed` with `abandonedAt` and `abandonReason`, and calls `releaseGrant`.
   - Output: `{ localRequestId, localId, abandoned: true, released: {...} }`.
-- [ ] Step 17: Enforce R39 in `evaluateAuthority` callers.
+- [x] Step 17: Enforce R39 in `evaluateAuthority` callers.
   - When a grant is expired and sessions under it are non-terminal, return `JULES_GRANT_EXPIRED` with `details.runningSessions[]` and the containment recoveryAction.
   - The text never says "terminated" or "stopped".
   - Add a mutating-operation deadline constant `DEFAULT_MUTATION_DEADLINE_MS = 180_000` in `src/deadline.ts`.

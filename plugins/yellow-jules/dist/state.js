@@ -49,15 +49,19 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEFAULT_LOCK_CONFIG = exports.UNRESOLVED_STATUSES = exports.TERMINAL_STATUSES = void 0;
 exports.digestText = digestText;
+exports.messageDigest = messageDigest;
 exports.emptyJournal = emptyJournal;
 exports.readJournal = readJournal;
 exports.writeJournal = writeJournal;
 exports.withJournalLock = withJournalLock;
 exports.updateJournal = updateJournal;
+exports.ownsSession = ownsSession;
 exports.findBySessionResource = findBySessionResource;
 exports.findByLocalId = findByLocalId;
 exports.findUnresolvedOperations = findUnresolvedOperations;
+exports.applyReservation = applyReservation;
 exports.reserveOperation = reserveOperation;
+exports.applyRetention = applyRetention;
 exports.markOperation = markOperation;
 exports.ensureObservedRecord = ensureObservedRecord;
 exports.upsertReadState = upsertReadState;
@@ -76,6 +80,10 @@ const redact_js_1 = require("./redact.js");
 const validate_js_1 = require("./validate.js");
 function digestText(text) {
     return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
+}
+/** Digest of a message for reply matching: the vendor may trim edge whitespace, so both sides are trimmed. */
+function messageDigest(text) {
+    return digestText(text.trim());
 }
 function emptyJournal() {
     return {
@@ -128,6 +136,8 @@ const OPTIONAL_STRING_FIELDS = [
     'lastActivityId',
     'resumePageToken',
     'artifactResumePageToken',
+    'abandonedAt',
+    'abandonReason',
 ];
 function isPlainObject(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -192,6 +202,51 @@ function isValidPendingPlan(value) {
         Array.isArray(value['steps']) &&
         value['steps'].every(isValidPlanStep));
 }
+const RECONCILE_OUTCOMES = new Set([
+    'bound',
+    'released',
+    'ambiguous-reconcile',
+    'policy-deviation',
+    'unknown-outcome',
+    'not-reached',
+]);
+const DECISIONS = new Set([
+    'no-change',
+    'check-failed',
+    'pass-aborted',
+    'needs-plan-review',
+    'needs-answer',
+    'needs-verification',
+    'escalate',
+    'paused',
+]);
+function isValidLastReconcile(value) {
+    if (!isPlainObject(value))
+        return false;
+    return (RECONCILE_OUTCOMES.has(value['outcome']) &&
+        hasOptionalStrings(value, ['reason']) &&
+        typeof value['observedAt'] === 'string');
+}
+function isValidSupervision(value) {
+    if (!isPlainObject(value))
+        return false;
+    const { paused, backoff, lastDecision } = value;
+    if (paused !== undefined &&
+        !(isPlainObject(paused) &&
+            typeof paused['reason'] === 'string' &&
+            typeof paused['observedAt'] === 'string' &&
+            hasOptionalStrings(paused, ['activityId'])))
+        return false;
+    if (backoff !== undefined &&
+        !(isPlainObject(backoff) &&
+            isNonNegativeInt(backoff['failures']) &&
+            typeof backoff['nextCheckAt'] === 'string'))
+        return false;
+    return (lastDecision === undefined ||
+        (isPlainObject(lastDecision) &&
+            DECISIONS.has(lastDecision['decision']) &&
+            typeof lastDecision['decidedAt'] === 'string'));
+}
 function isValidRecord(key, value) {
     if (!isPlainObject(value))
         return false;
@@ -242,6 +297,12 @@ function isValidRecord(key, value) {
         !(isPlainObject(value['resumeApproval']) &&
             typeof value['resumeApproval']['createTime'] === 'string' &&
             typeof value['resumeApproval']['activityId'] === 'string'))
+        return false;
+    if (value['lastReconcile'] !== undefined &&
+        !isValidLastReconcile(value['lastReconcile']))
+        return false;
+    if (value['supervision'] !== undefined &&
+        !isValidSupervision(value['supervision']))
         return false;
     return (typeof value['createdAt'] === 'string' &&
         typeof value['updatedAt'] === 'string');
@@ -473,8 +534,13 @@ function requireRecord(operations, localRequestId) {
 // ---------------------------------------------------------------------------
 // Lookups (pure)
 // ---------------------------------------------------------------------------
+/** Kinds that own a session's read-state; a `reply` or `approve` row only points at the session. */
+function ownsSession(record) {
+    return record.kind !== 'reply' && record.kind !== 'approve';
+}
+/** The create (or first-seen) record that owns the session; reply and approve rows never match. */
 function findBySessionResource(journal, sessionResource) {
-    return Object.values(journal.operations).find((r) => r.sessionResource === sessionResource);
+    return Object.values(journal.operations).find((r) => ownsSession(r) && r.sessionResource === sessionResource);
 }
 function findByLocalId(journal, localId) {
     return Object.values(journal.operations).find((r) => r.localId === localId);
@@ -503,46 +569,54 @@ function baseRecord(fields, nowIso) {
     };
 }
 /**
+ * The pure core of the reservation (R36): refuses a recorded request id and,
+ * for a create, any unresolved operation on the same repository and branch,
+ * then adds the `reserved` record. Callers hold the journal lock;
+ * `reserveOperation` wraps it for the one-file case and `mutations.ts` runs it
+ * inside the larger authority critical section (R31).
+ */
+function applyReservation(operations, journal, input, now = () => new Date()) {
+    (0, validate_js_1.validateRequestId)(input.localRequestId);
+    if (operations[input.localRequestId] !== undefined) {
+        return (0, errors_js_1.throwAppError)('JULES_DUPLICATE_LAUNCH', `request id ${input.localRequestId} is already recorded`, {
+            recoveryAction: 'Run status --reconcile; never reuse a request id for a new operation.',
+        });
+    }
+    if (input.kind === 'create') {
+        if (input.repository === undefined || input.requestedBranch === undefined) {
+            return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', 'a create reservation needs a repository and branch');
+        }
+        const unresolved = findUnresolvedOperations(journal, {
+            repository: input.repository,
+            requestedBranch: input.requestedBranch,
+            ...(input.taskRef !== undefined ? { taskRef: input.taskRef } : {}),
+        });
+        if (unresolved.length > 0) {
+            return (0, errors_js_1.throwAppError)('JULES_DUPLICATE_LAUNCH', `unresolved operation ${unresolved[0]?.localRequestId ?? ''} exists for ${input.repository} ${input.requestedBranch}`);
+        }
+    }
+    const { localId, ...rest } = input;
+    const record = {
+        ...baseRecord({
+            localRequestId: input.localRequestId,
+            localId: localId ?? (0, validate_js_1.mintLocalId)(),
+            kind: input.kind,
+            origin: 'yellow',
+            status: 'reserved',
+        }, now().toISOString()),
+        ...rest,
+    };
+    operations[input.localRequestId] = record;
+    return record;
+}
+/**
  * Reservation-first write (R36): the unresolved-operation lookup and the
  * reservation are one critical section, so two concurrent creates for the
  * same repository and branch cannot both reserve.
  */
 async function reserveOperation(dataDir, input, now = () => new Date(), config = exports.DEFAULT_LOCK_CONFIG) {
     (0, validate_js_1.validateRequestId)(input.localRequestId);
-    return updateJournal(dataDir, (operations, journal) => {
-        if (operations[input.localRequestId] !== undefined) {
-            return (0, errors_js_1.throwAppError)('JULES_DUPLICATE_LAUNCH', `request id ${input.localRequestId} is already recorded`, {
-                recoveryAction: 'Run status --reconcile; never reuse a request id for a new operation.',
-            });
-        }
-        if (input.kind === 'create') {
-            if (input.repository === undefined ||
-                input.requestedBranch === undefined) {
-                return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', 'a create reservation needs a repository and branch');
-            }
-            const unresolved = findUnresolvedOperations(journal, {
-                repository: input.repository,
-                requestedBranch: input.requestedBranch,
-                ...(input.taskRef !== undefined ? { taskRef: input.taskRef } : {}),
-            });
-            if (unresolved.length > 0) {
-                return (0, errors_js_1.throwAppError)('JULES_DUPLICATE_LAUNCH', `unresolved operation ${unresolved[0]?.localRequestId ?? ''} exists for ${input.repository} ${input.requestedBranch}`);
-            }
-        }
-        const { localId, ...rest } = input;
-        const record = {
-            ...baseRecord({
-                localRequestId: input.localRequestId,
-                localId: localId ?? (0, validate_js_1.mintLocalId)(),
-                kind: input.kind,
-                origin: 'yellow',
-                status: 'reserved',
-            }, now().toISOString()),
-            ...rest,
-        };
-        operations[input.localRequestId] = record;
-        return record;
-    }, config);
+    return updateJournal(dataDir, (operations, journal) => applyReservation(operations, journal, input, now), config);
 }
 /** Retention: once terminal, the dedup ring and both resume tokens are dropped. */
 function applyRetention(record) {

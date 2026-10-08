@@ -47,6 +47,11 @@ export function digestText(text: string): string {
   return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
+/** Digest of a message for reply matching: the vendor may trim edge whitespace, so both sides are trimmed. */
+export function messageDigest(text: string): string {
+  return digestText(text.trim());
+}
+
 export function emptyJournal(): Journal {
   return {
     version: 1,
@@ -100,6 +105,8 @@ const OPTIONAL_STRING_FIELDS = [
   'lastActivityId',
   'resumePageToken',
   'artifactResumePageToken',
+  'abandonedAt',
+  'abandonReason',
 ] as const;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -183,6 +190,64 @@ function isValidPendingPlan(value: unknown): value is PendingPlan {
   );
 }
 
+const RECONCILE_OUTCOMES = new Set([
+  'bound',
+  'released',
+  'ambiguous-reconcile',
+  'policy-deviation',
+  'unknown-outcome',
+  'not-reached',
+]);
+const DECISIONS = new Set([
+  'no-change',
+  'check-failed',
+  'pass-aborted',
+  'needs-plan-review',
+  'needs-answer',
+  'needs-verification',
+  'escalate',
+  'paused',
+]);
+
+function isValidLastReconcile(value: unknown): boolean {
+  if (!isPlainObject(value)) return false;
+  return (
+    RECONCILE_OUTCOMES.has(value['outcome'] as string) &&
+    hasOptionalStrings(value, ['reason']) &&
+    typeof value['observedAt'] === 'string'
+  );
+}
+
+function isValidSupervision(value: unknown): boolean {
+  if (!isPlainObject(value)) return false;
+  const { paused, backoff, lastDecision } = value;
+  if (
+    paused !== undefined &&
+    !(
+      isPlainObject(paused) &&
+      typeof paused['reason'] === 'string' &&
+      typeof paused['observedAt'] === 'string' &&
+      hasOptionalStrings(paused, ['activityId'])
+    )
+  )
+    return false;
+  if (
+    backoff !== undefined &&
+    !(
+      isPlainObject(backoff) &&
+      isNonNegativeInt(backoff['failures']) &&
+      typeof backoff['nextCheckAt'] === 'string'
+    )
+  )
+    return false;
+  return (
+    lastDecision === undefined ||
+    (isPlainObject(lastDecision) &&
+      DECISIONS.has(lastDecision['decision'] as string) &&
+      typeof lastDecision['decidedAt'] === 'string')
+  );
+}
+
 function isValidRecord(key: string, value: unknown): value is OperationRecord {
   if (!isPlainObject(value)) return false;
   if (value['localRequestId'] !== key) return false;
@@ -240,6 +305,16 @@ function isValidRecord(key: string, value: unknown): value is OperationRecord {
       typeof value['resumeApproval']['createTime'] === 'string' &&
       typeof value['resumeApproval']['activityId'] === 'string'
     )
+  )
+    return false;
+  if (
+    value['lastReconcile'] !== undefined &&
+    !isValidLastReconcile(value['lastReconcile'])
+  )
+    return false;
+  if (
+    value['supervision'] !== undefined &&
+    !isValidSupervision(value['supervision'])
   )
     return false;
   return (
@@ -533,12 +608,18 @@ function requireRecord(
 // Lookups (pure)
 // ---------------------------------------------------------------------------
 
+/** Kinds that own a session's read-state; a `reply` or `approve` row only points at the session. */
+export function ownsSession(record: OperationRecord): boolean {
+  return record.kind !== 'reply' && record.kind !== 'approve';
+}
+
+/** The create (or first-seen) record that owns the session; reply and approve rows never match. */
 export function findBySessionResource(
   journal: Journal,
   sessionResource: string
 ): OperationRecord | undefined {
   return Object.values(journal.operations).find(
-    (r) => r.sessionResource === sessionResource
+    (r) => ownsSession(r) && r.sessionResource === sessionResource
   );
 }
 
@@ -609,6 +690,67 @@ export interface ReservationInput {
 }
 
 /**
+ * The pure core of the reservation (R36): refuses a recorded request id and,
+ * for a create, any unresolved operation on the same repository and branch,
+ * then adds the `reserved` record. Callers hold the journal lock;
+ * `reserveOperation` wraps it for the one-file case and `mutations.ts` runs it
+ * inside the larger authority critical section (R31).
+ */
+export function applyReservation(
+  operations: Record<string, OperationRecord>,
+  journal: Journal,
+  input: ReservationInput,
+  now: () => Date = () => new Date()
+): OperationRecord {
+  validateRequestId(input.localRequestId);
+  if (operations[input.localRequestId] !== undefined) {
+    return throwAppError(
+      'JULES_DUPLICATE_LAUNCH',
+      `request id ${input.localRequestId} is already recorded`,
+      {
+        recoveryAction:
+          'Run status --reconcile; never reuse a request id for a new operation.',
+      }
+    );
+  }
+  if (input.kind === 'create') {
+    if (input.repository === undefined || input.requestedBranch === undefined) {
+      return throwAppError(
+        'JULES_INVALID_INPUT',
+        'a create reservation needs a repository and branch'
+      );
+    }
+    const unresolved = findUnresolvedOperations(journal, {
+      repository: input.repository,
+      requestedBranch: input.requestedBranch,
+      ...(input.taskRef !== undefined ? { taskRef: input.taskRef } : {}),
+    });
+    if (unresolved.length > 0) {
+      return throwAppError(
+        'JULES_DUPLICATE_LAUNCH',
+        `unresolved operation ${unresolved[0]?.localRequestId ?? ''} exists for ${input.repository} ${input.requestedBranch}`
+      );
+    }
+  }
+  const { localId, ...rest } = input;
+  const record: OperationRecord = {
+    ...baseRecord(
+      {
+        localRequestId: input.localRequestId,
+        localId: localId ?? mintLocalId(),
+        kind: input.kind,
+        origin: 'yellow',
+        status: 'reserved',
+      },
+      now().toISOString()
+    ),
+    ...rest,
+  };
+  operations[input.localRequestId] = record;
+  return record;
+}
+
+/**
  * Reservation-first write (R36): the unresolved-operation lookup and the
  * reservation are one critical section, so two concurrent creates for the
  * same repository and branch cannot both reserve.
@@ -622,62 +764,13 @@ export async function reserveOperation(
   validateRequestId(input.localRequestId);
   return updateJournal(
     dataDir,
-    (operations, journal) => {
-      if (operations[input.localRequestId] !== undefined) {
-        return throwAppError(
-          'JULES_DUPLICATE_LAUNCH',
-          `request id ${input.localRequestId} is already recorded`,
-          {
-            recoveryAction:
-              'Run status --reconcile; never reuse a request id for a new operation.',
-          }
-        );
-      }
-      if (input.kind === 'create') {
-        if (
-          input.repository === undefined ||
-          input.requestedBranch === undefined
-        ) {
-          return throwAppError(
-            'JULES_INVALID_INPUT',
-            'a create reservation needs a repository and branch'
-          );
-        }
-        const unresolved = findUnresolvedOperations(journal, {
-          repository: input.repository,
-          requestedBranch: input.requestedBranch,
-          ...(input.taskRef !== undefined ? { taskRef: input.taskRef } : {}),
-        });
-        if (unresolved.length > 0) {
-          return throwAppError(
-            'JULES_DUPLICATE_LAUNCH',
-            `unresolved operation ${unresolved[0]?.localRequestId ?? ''} exists for ${input.repository} ${input.requestedBranch}`
-          );
-        }
-      }
-      const { localId, ...rest } = input;
-      const record: OperationRecord = {
-        ...baseRecord(
-          {
-            localRequestId: input.localRequestId,
-            localId: localId ?? mintLocalId(),
-            kind: input.kind,
-            origin: 'yellow',
-            status: 'reserved',
-          },
-          now().toISOString()
-        ),
-        ...rest,
-      };
-      operations[input.localRequestId] = record;
-      return record;
-    },
+    (operations, journal) => applyReservation(operations, journal, input, now),
     config
   );
 }
 
 /** Retention: once terminal, the dedup ring and both resume tokens are dropped. */
-function applyRetention(record: OperationRecord): OperationRecord {
+export function applyRetention(record: OperationRecord): OperationRecord {
   if (!TERMINAL_STATUSES.has(record.status)) return record;
   const {
     resumePageToken: _r,

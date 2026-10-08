@@ -23,14 +23,16 @@ import {
 import { resolveDataDir } from './config.js';
 import {
   DEFAULT_COLLECT_DEADLINE_MS,
+  DEFAULT_MUTATION_DEADLINE_MS,
   DEFAULT_READ_DEADLINE_MS,
 } from './deadline.js';
-import { throwAppError, toAppError } from './errors.js';
+import { MutationErrorException, throwAppError, toAppError } from './errors.js';
 import {
   installFetchGuard,
   READ_TIMEOUT_MS,
   VENDOR_ORIGIN,
 } from './fetch-guard.js';
+import { abandon, approve, delegate, reply } from './mutations.js';
 import { redact, redactDeep } from './redact.js';
 import * as runtime from './runtime.js';
 import type { RuntimeDeps } from './runtime.js';
@@ -44,16 +46,14 @@ const KNOWN_OPERATIONS = [
   'list',
   'status',
   'collect',
-  'authorize',
-] as const;
-const UNSUPPORTED_OPERATIONS = ['cancel', 'pause', 'resume', 'cost'] as const;
-const LATER_OPERATIONS = [
   'delegate',
   'reply',
   'approve',
-  'supervise',
-  'integrate',
+  'authorize',
+  'abandon',
 ] as const;
+const UNSUPPORTED_OPERATIONS = ['cancel', 'pause', 'resume', 'cost'] as const;
+const LATER_OPERATIONS = ['supervise', 'integrate'] as const;
 // Deadline plus one in-flight read (up to the 60 s client timeout) plus the
 // post-walk staging and journal writes must fit inside the wrappers' 300 s
 // Bash timeout, or the run is killed mid-write.
@@ -96,7 +96,7 @@ function buildDeps(): RuntimeDeps {
       const resolved = await resolveSdk(dataDir);
       const transport = getTestTransport();
       // Installed before the adapter exists, so no SDK request can bypass it.
-      installFetchGuard({
+      const guard = installFetchGuard({
         allowedOrigins: transport?.allowedOrigins ?? [VENDOR_ORIGIN],
         readTimeoutMs: READ_TIMEOUT_MS,
       });
@@ -104,6 +104,7 @@ function buildDeps(): RuntimeDeps {
         sdk: resolved.module as SdkModule,
         dataDir,
         apiKey,
+        postCount: guard.postCount,
         ...(transport !== undefined ? { baseUrl: transport.baseUrl } : {}),
       });
     },
@@ -118,7 +119,11 @@ type OperationResult =
   | Awaited<ReturnType<typeof authorizeCreate>>
   | ReturnType<typeof authorizeList>
   | Awaited<ReturnType<typeof authorizeRevoke>>
-  | Awaited<ReturnType<typeof authorizeTakeOver>>;
+  | Awaited<ReturnType<typeof authorizeTakeOver>>
+  | Awaited<ReturnType<typeof delegate>>
+  | Awaited<ReturnType<typeof reply>>
+  | Awaited<ReturnType<typeof approve>>
+  | Awaited<ReturnType<typeof abandon>>;
 
 async function dispatch(
   operation: string,
@@ -219,6 +224,123 @@ async function dispatch(
           values['deadline-ms'],
           DEFAULT_COLLECT_DEADLINE_MS
         ),
+      });
+    }
+
+    case 'delegate': {
+      const { values } = parseArgs({
+        args: [...rest],
+        options: {
+          repo: { type: 'string' },
+          branch: { type: 'string' },
+          prompt: { type: 'string' },
+          title: { type: 'string' },
+          'task-ref': { type: 'string' },
+          'request-id': { type: 'string' },
+          'grant-id': { type: 'string' },
+          'dry-run': { type: 'boolean', default: false },
+          correction: { type: 'boolean', default: false },
+          ...deadline,
+        },
+        strict: true,
+        allowPositionals: false,
+      });
+      return delegate(deps, {
+        repo: requireString(values.repo, '--repo'),
+        branch: requireString(values.branch, '--branch'),
+        prompt: requireString(values.prompt, '--prompt'),
+        ...(typeof values.title === 'string' ? { title: values.title } : {}),
+        ...(typeof values['task-ref'] === 'string'
+          ? { taskRef: values['task-ref'] }
+          : {}),
+        ...(typeof values['request-id'] === 'string'
+          ? { requestId: values['request-id'] }
+          : {}),
+        ...(typeof values['grant-id'] === 'string'
+          ? { grantId: values['grant-id'] }
+          : {}),
+        dryRun: values['dry-run'] === true,
+        correction: values.correction === true,
+        deadlineMs: deadlineFlag(
+          values['deadline-ms'],
+          DEFAULT_MUTATION_DEADLINE_MS
+        ),
+      });
+    }
+
+    case 'reply': {
+      const { values } = parseArgs({
+        args: [...rest],
+        options: {
+          session: { type: 'string' },
+          message: { type: 'string' },
+          'request-id': { type: 'string' },
+          'grant-id': { type: 'string' },
+          'dry-run': { type: 'boolean', default: false },
+          correction: { type: 'boolean', default: false },
+          ...deadline,
+        },
+        strict: true,
+        allowPositionals: false,
+      });
+      return reply(deps, {
+        session: requireString(values.session, '--session'),
+        message: requireString(values.message, '--message'),
+        ...(typeof values['request-id'] === 'string'
+          ? { requestId: values['request-id'] }
+          : {}),
+        ...(typeof values['grant-id'] === 'string'
+          ? { grantId: values['grant-id'] }
+          : {}),
+        dryRun: values['dry-run'] === true,
+        correction: values.correction === true,
+        deadlineMs: deadlineFlag(
+          values['deadline-ms'],
+          DEFAULT_MUTATION_DEADLINE_MS
+        ),
+      });
+    }
+
+    case 'approve': {
+      const { values } = parseArgs({
+        args: [...rest],
+        options: {
+          session: { type: 'string' },
+          'plan-id': { type: 'string' },
+          'request-id': { type: 'string' },
+          'grant-id': { type: 'string' },
+          'dry-run': { type: 'boolean', default: false },
+          ...deadline,
+        },
+        strict: true,
+        allowPositionals: false,
+      });
+      return approve(deps, {
+        session: requireString(values.session, '--session'),
+        planId: requireString(values['plan-id'], '--plan-id'),
+        ...(typeof values['request-id'] === 'string'
+          ? { requestId: values['request-id'] }
+          : {}),
+        ...(typeof values['grant-id'] === 'string'
+          ? { grantId: values['grant-id'] }
+          : {}),
+        dryRun: values['dry-run'] === true,
+        deadlineMs: deadlineFlag(
+          values['deadline-ms'],
+          DEFAULT_MUTATION_DEADLINE_MS
+        ),
+      });
+    }
+
+    case 'abandon': {
+      const { values } = parseArgs({
+        args: [...rest],
+        options: { 'request-id': { type: 'string' }, ...deadline },
+        strict: true,
+        allowPositionals: false,
+      });
+      return abandon(deps, {
+        requestId: requireString(values['request-id'], '--request-id'),
       });
     }
 
@@ -389,7 +511,18 @@ async function main(): Promise<void> {
     // The message can carry vendor text; it travels only inside the JSON
     // envelope, which the wrappers fence. stderr gets the code alone.
     process.stderr.write(`${appError.code}\n`);
-    printJson({ ok: false, operation: name, error: appError });
+    // A mutating failure echoes the ids a reservation can be reconciled by.
+    const context = err instanceof MutationErrorException ? err : undefined;
+    printJson({
+      ok: false,
+      operation: name,
+      ...(context?.localRequestId !== undefined
+        ? { localRequestId: context.localRequestId }
+        : {}),
+      ...(context?.localId !== undefined ? { localId: context.localId } : {}),
+      ...(context?.details !== undefined ? { details: context.details } : {}),
+      error: appError,
+    });
     process.exitCode = 1;
   }
 }

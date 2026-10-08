@@ -34,12 +34,23 @@ export interface AdapterErrorOptions {
   readonly requestId?: string;
   readonly status?: number;
   readonly cause?: unknown;
+  /**
+   * Write calls only: a mutating POST was sent before this failure. Absent or
+   * false means nothing was dispatched (pre-dispatch); the runtime maps it with
+   * the matching `CallPhase`, so a failure after dispatch can only be a clear
+   * rejection or JULES_UNKNOWN_OUTCOME (R16).
+   */
+  readonly dispatched?: boolean;
+  /** A session id known despite the failure (kept on an unknown outcome, R16). */
+  readonly sessionResource?: string;
 }
 
 export class AdapterError extends Error {
   readonly kind: AdapterErrorKind;
   readonly requestId: string | undefined;
   readonly status: number | undefined;
+  readonly dispatched: boolean;
+  readonly sessionResource: string | undefined;
 
   constructor(
     kind: AdapterErrorKind,
@@ -54,6 +65,8 @@ export class AdapterError extends Error {
     this.kind = kind;
     this.requestId = options.requestId;
     this.status = options.status;
+    this.dispatched = options.dispatched === true;
+    this.sessionResource = options.sessionResource;
   }
 }
 
@@ -326,4 +339,60 @@ export function toAppError(err: unknown, phase: CallPhase = 'read'): AppError {
       : 'JULES_MALFORMED_RESPONSE',
     message
   );
+}
+
+/** The `CallPhase` a write failure must be mapped with: after dispatch only a clear rejection keeps its code. */
+export function phaseOfWrite(err: AdapterError): CallPhase {
+  return err.dispatched ? 'after-dispatch' : 'pre-dispatch';
+}
+
+/**
+ * An AppError that also carries what a mutating failure envelope echoes: the
+ * local request id and local id (so a reservation can be reconciled) and
+ * structured `details` (R39: `runningSessions[]` on an expired grant).
+ */
+export class MutationErrorException extends AppErrorException {
+  readonly localRequestId: string | undefined;
+  readonly localId: string | undefined;
+  readonly details: Readonly<Record<string, unknown>> | undefined;
+
+  constructor(
+    appError: AppError,
+    context: {
+      readonly localRequestId?: string;
+      readonly localId?: string;
+      readonly details?: Readonly<Record<string, unknown>>;
+    } = {}
+  ) {
+    super(appError);
+    this.name = 'MutationErrorException';
+    this.localRequestId = context.localRequestId;
+    this.localId = context.localId;
+    this.details = context.details;
+  }
+}
+
+/** Re-throws any failure with the mutation's ids attached; an existing context is kept. */
+export function rethrowWithContext(
+  err: unknown,
+  context: {
+    readonly localRequestId?: string;
+    readonly localId?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }
+): never {
+  if (err instanceof MutationErrorException) {
+    throw new MutationErrorException(err.appError, {
+      ...context,
+      ...(err.localRequestId !== undefined
+        ? { localRequestId: err.localRequestId }
+        : {}),
+      ...(err.localId !== undefined ? { localId: err.localId } : {}),
+      ...(err.details !== undefined ? { details: err.details } : {}),
+    });
+  }
+  if (err instanceof AppErrorException) {
+    throw new MutationErrorException(err.appError, context);
+  }
+  throw err;
 }

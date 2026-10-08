@@ -52,6 +52,7 @@ const config_js_1 = require("./config.js");
 const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
 const fetch_guard_js_1 = require("./fetch-guard.js");
+const mutations_js_1 = require("./mutations.js");
 const redact_js_1 = require("./redact.js");
 const runtime = __importStar(require("./runtime.js"));
 const sdk_adapter_js_1 = require("./sdk-adapter.js");
@@ -63,16 +64,14 @@ const KNOWN_OPERATIONS = [
     'list',
     'status',
     'collect',
-    'authorize',
-];
-const UNSUPPORTED_OPERATIONS = ['cancel', 'pause', 'resume', 'cost'];
-const LATER_OPERATIONS = [
     'delegate',
     'reply',
     'approve',
-    'supervise',
-    'integrate',
+    'authorize',
+    'abandon',
 ];
+const UNSUPPORTED_OPERATIONS = ['cancel', 'pause', 'resume', 'cost'];
+const LATER_OPERATIONS = ['supervise', 'integrate'];
 // Deadline plus one in-flight read (up to the 60 s client timeout) plus the
 // post-walk staging and journal writes must fit inside the wrappers' 300 s
 // Bash timeout, or the run is killed mid-write.
@@ -110,7 +109,7 @@ function buildDeps() {
             const resolved = await (0, sdk_resolver_js_1.resolveSdk)(dataDir);
             const transport = (0, test_seam_js_1.getTestTransport)();
             // Installed before the adapter exists, so no SDK request can bypass it.
-            (0, fetch_guard_js_1.installFetchGuard)({
+            const guard = (0, fetch_guard_js_1.installFetchGuard)({
                 allowedOrigins: transport?.allowedOrigins ?? [fetch_guard_js_1.VENDOR_ORIGIN],
                 readTimeoutMs: fetch_guard_js_1.READ_TIMEOUT_MS,
             });
@@ -118,6 +117,7 @@ function buildDeps() {
                 sdk: resolved.module,
                 dataDir,
                 apiKey,
+                postCount: guard.postCount,
                 ...(transport !== undefined ? { baseUrl: transport.baseUrl } : {}),
             });
         },
@@ -196,6 +196,110 @@ async function dispatch(operation, rest, deps) {
             return runtime.collect(deps, {
                 session: requireString(values.session, '--session'),
                 deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_COLLECT_DEADLINE_MS),
+            });
+        }
+        case 'delegate': {
+            const { values } = (0, node_util_1.parseArgs)({
+                args: [...rest],
+                options: {
+                    repo: { type: 'string' },
+                    branch: { type: 'string' },
+                    prompt: { type: 'string' },
+                    title: { type: 'string' },
+                    'task-ref': { type: 'string' },
+                    'request-id': { type: 'string' },
+                    'grant-id': { type: 'string' },
+                    'dry-run': { type: 'boolean', default: false },
+                    correction: { type: 'boolean', default: false },
+                    ...deadline,
+                },
+                strict: true,
+                allowPositionals: false,
+            });
+            return (0, mutations_js_1.delegate)(deps, {
+                repo: requireString(values.repo, '--repo'),
+                branch: requireString(values.branch, '--branch'),
+                prompt: requireString(values.prompt, '--prompt'),
+                ...(typeof values.title === 'string' ? { title: values.title } : {}),
+                ...(typeof values['task-ref'] === 'string'
+                    ? { taskRef: values['task-ref'] }
+                    : {}),
+                ...(typeof values['request-id'] === 'string'
+                    ? { requestId: values['request-id'] }
+                    : {}),
+                ...(typeof values['grant-id'] === 'string'
+                    ? { grantId: values['grant-id'] }
+                    : {}),
+                dryRun: values['dry-run'] === true,
+                correction: values.correction === true,
+                deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS),
+            });
+        }
+        case 'reply': {
+            const { values } = (0, node_util_1.parseArgs)({
+                args: [...rest],
+                options: {
+                    session: { type: 'string' },
+                    message: { type: 'string' },
+                    'request-id': { type: 'string' },
+                    'grant-id': { type: 'string' },
+                    'dry-run': { type: 'boolean', default: false },
+                    correction: { type: 'boolean', default: false },
+                    ...deadline,
+                },
+                strict: true,
+                allowPositionals: false,
+            });
+            return (0, mutations_js_1.reply)(deps, {
+                session: requireString(values.session, '--session'),
+                message: requireString(values.message, '--message'),
+                ...(typeof values['request-id'] === 'string'
+                    ? { requestId: values['request-id'] }
+                    : {}),
+                ...(typeof values['grant-id'] === 'string'
+                    ? { grantId: values['grant-id'] }
+                    : {}),
+                dryRun: values['dry-run'] === true,
+                correction: values.correction === true,
+                deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS),
+            });
+        }
+        case 'approve': {
+            const { values } = (0, node_util_1.parseArgs)({
+                args: [...rest],
+                options: {
+                    session: { type: 'string' },
+                    'plan-id': { type: 'string' },
+                    'request-id': { type: 'string' },
+                    'grant-id': { type: 'string' },
+                    'dry-run': { type: 'boolean', default: false },
+                    ...deadline,
+                },
+                strict: true,
+                allowPositionals: false,
+            });
+            return (0, mutations_js_1.approve)(deps, {
+                session: requireString(values.session, '--session'),
+                planId: requireString(values['plan-id'], '--plan-id'),
+                ...(typeof values['request-id'] === 'string'
+                    ? { requestId: values['request-id'] }
+                    : {}),
+                ...(typeof values['grant-id'] === 'string'
+                    ? { grantId: values['grant-id'] }
+                    : {}),
+                dryRun: values['dry-run'] === true,
+                deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS),
+            });
+        }
+        case 'abandon': {
+            const { values } = (0, node_util_1.parseArgs)({
+                args: [...rest],
+                options: { 'request-id': { type: 'string' }, ...deadline },
+                strict: true,
+                allowPositionals: false,
+            });
+            return (0, mutations_js_1.abandon)(deps, {
+                requestId: requireString(values['request-id'], '--request-id'),
             });
         }
         case 'authorize': {
@@ -323,7 +427,18 @@ async function main() {
         // The message can carry vendor text; it travels only inside the JSON
         // envelope, which the wrappers fence. stderr gets the code alone.
         process.stderr.write(`${appError.code}\n`);
-        printJson({ ok: false, operation: name, error: appError });
+        // A mutating failure echoes the ids a reservation can be reconciled by.
+        const context = err instanceof errors_js_1.MutationErrorException ? err : undefined;
+        printJson({
+            ok: false,
+            operation: name,
+            ...(context?.localRequestId !== undefined
+                ? { localRequestId: context.localRequestId }
+                : {}),
+            ...(context?.localId !== undefined ? { localId: context.localId } : {}),
+            ...(context?.details !== undefined ? { details: context.details } : {}),
+            error: appError,
+        });
         process.exitCode = 1;
     }
 }

@@ -150,7 +150,7 @@ export function resolveControllerContext(
   };
 }
 
-function refuseInsideSupervisedSession(env: NodeJS.ProcessEnv): void {
+export function refuseInsideSupervisedSession(env: NodeJS.ProcessEnv): void {
   const active = env[ACTIVE_GRANT_ENV];
   if (active !== undefined && active !== '') {
     throwAppError(

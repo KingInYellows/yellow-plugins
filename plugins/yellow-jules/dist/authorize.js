@@ -47,6 +47,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ACTIVE_GRANT_ENV = void 0;
 exports.defaultControllerId = defaultControllerId;
 exports.resolveControllerContext = resolveControllerContext;
+exports.refuseInsideSupervisedSession = refuseInsideSupervisedSession;
 exports.authorizeCreate = authorizeCreate;
 exports.authorizeList = authorizeList;
 exports.authorizeRevoke = authorizeRevoke;

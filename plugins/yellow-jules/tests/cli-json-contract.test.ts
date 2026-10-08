@@ -73,9 +73,13 @@ describe('usage errors exit 2 with a valid envelope', () => {
     [['list', 'positional'], 'list'],
     [['collect'], 'collect'],
     [['status'], 'status'],
-    [['delegate', '--repo', 'a/b'], 'unknown'],
-    [['reply'], 'unknown'],
-    [['approve'], 'unknown'],
+    [['delegate', '--repo', 'a/b'], 'delegate'],
+    [['reply'], 'reply'],
+    [['approve'], 'approve'],
+    [['abandon'], 'abandon'],
+    [['authorize', '--list', '--revoke', 'jg-x'], 'authorize'],
+    [['authorize', '--grant-id', 'jg-x'], 'authorize'],
+    [['authorize', '--repo', 'a/b'], 'authorize'],
   ])('%j -> operation %s', async (args, operation) => {
     const r = await run(args);
     expectEnvelope(r, 2, false, operation);

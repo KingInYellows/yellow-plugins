@@ -762,28 +762,30 @@ describe('policy deviation (R13)', () => {
   });
 });
 
-describe('--reconcile in PR2', () => {
+describe('--reconcile', () => {
   it('returns an empty reconciled list with no reservations', async () => {
     const result = await status(makeDeps(dataDir, fake), { reconcile: true });
     expect(result).toEqual({ operation: 'status', reconciled: [] });
     expect(fake.calls).toEqual([]);
   });
 
-  it('reports a planted reservation as not-reached rather than ignoring it', async () => {
+  it('a reservation with no candidate is never released until archive visibility is confirmed', async () => {
     await reserveOperation(dataDir, {
       localRequestId: 'req-1',
       kind: 'create',
       repository: 'acme/widgets',
       requestedBranch: 'main',
+      sourceResource: 'sources/github/acme/widgets',
     });
     const result = await status(makeDeps(dataDir, fake), { reconcile: true });
     expect(result.reconciled).toEqual([
       expect.objectContaining({
         localRequestId: 'req-1',
-        outcome: 'not-reached',
+        outcome: 'ambiguous-reconcile',
+        reason: 'archive-visibility-unverified',
       }),
     ]);
-    expect(result.attention).toEqual(['reconciled:not-reached']);
+    expect(result.attention).toEqual(['reconciled:ambiguous-reconcile']);
   });
 
   it('requires --session unless --reconcile is given', async () => {

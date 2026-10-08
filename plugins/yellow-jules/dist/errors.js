@@ -12,21 +12,27 @@
  * override `recoveryAction` with a more specific instruction.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ALL_APP_ERROR_CODES = exports.AppErrorException = exports.AdapterError = void 0;
+exports.MutationErrorException = exports.ALL_APP_ERROR_CODES = exports.AppErrorException = exports.AdapterError = void 0;
 exports.makeAppError = makeAppError;
 exports.throwAppError = throwAppError;
 exports.mapAdapterError = mapAdapterError;
 exports.toAppError = toAppError;
+exports.phaseOfWrite = phaseOfWrite;
+exports.rethrowWithContext = rethrowWithContext;
 class AdapterError extends Error {
     kind;
     requestId;
     status;
+    dispatched;
+    sessionResource;
     constructor(kind, message, options = {}) {
         super(message, options.cause !== undefined ? { cause: options.cause } : undefined);
         this.name = 'AdapterError';
         this.kind = kind;
         this.requestId = options.requestId;
         this.status = options.status;
+        this.dispatched = options.dispatched === true;
+        this.sessionResource = options.sessionResource;
     }
 }
 exports.AdapterError = AdapterError;
@@ -211,4 +217,43 @@ function toAppError(err, phase = 'read') {
     return makeAppError(phase === 'after-dispatch'
         ? 'JULES_UNKNOWN_OUTCOME'
         : 'JULES_MALFORMED_RESPONSE', message);
+}
+/** The `CallPhase` a write failure must be mapped with: after dispatch only a clear rejection keeps its code. */
+function phaseOfWrite(err) {
+    return err.dispatched ? 'after-dispatch' : 'pre-dispatch';
+}
+/**
+ * An AppError that also carries what a mutating failure envelope echoes: the
+ * local request id and local id (so a reservation can be reconciled) and
+ * structured `details` (R39: `runningSessions[]` on an expired grant).
+ */
+class MutationErrorException extends AppErrorException {
+    localRequestId;
+    localId;
+    details;
+    constructor(appError, context = {}) {
+        super(appError);
+        this.name = 'MutationErrorException';
+        this.localRequestId = context.localRequestId;
+        this.localId = context.localId;
+        this.details = context.details;
+    }
+}
+exports.MutationErrorException = MutationErrorException;
+/** Re-throws any failure with the mutation's ids attached; an existing context is kept. */
+function rethrowWithContext(err, context) {
+    if (err instanceof MutationErrorException) {
+        throw new MutationErrorException(err.appError, {
+            ...context,
+            ...(err.localRequestId !== undefined
+                ? { localRequestId: err.localRequestId }
+                : {}),
+            ...(err.localId !== undefined ? { localId: err.localId } : {}),
+            ...(err.details !== undefined ? { details: err.details } : {}),
+        });
+    }
+    if (err instanceof AppErrorException) {
+        throw new MutationErrorException(err.appError, context);
+    }
+    throw err;
 }

@@ -100,6 +100,12 @@ export interface AdapterActivity {
   readonly plan?: AdapterPlan;
   /** `planApproved` only. */
   readonly approvedPlanId?: string;
+  /**
+   * `userMessaged` / `agentMessaged` only: vendor-writable text, held in
+   * memory for digest matching (reconcile, R32) and fenced rendering
+   * (supervise); never persisted or printed unfenced.
+   */
+  readonly message?: string;
   readonly artifacts: readonly AdapterActivityArtifact[];
 }
 
@@ -135,11 +141,27 @@ export interface PageOptions {
   readonly filter?: string;
 }
 
+export interface CreateSessionRequest {
+  readonly prompt: string;
+  readonly owner: string;
+  readonly repo: string;
+  readonly baseBranch: string;
+  /** Already carries the `[yellow:<local-id>]` reconcile tag. */
+  readonly title: string;
+}
+
+export interface CreatedSession {
+  /** Validated `sessions/{id}`. */
+  readonly sessionResource: string;
+}
+
 /**
  * Dependency-injection seam: runtime.ts depends only on this interface, so
- * tests inject fake-sdk.ts instead of the real SDK wrapper. PR2 exposes no
- * mutating method at all — `session(config)`, `send()`, and `approve()` are
- * wired by PR3.
+ * tests inject fake-sdk.ts instead of the real SDK wrapper. The three write
+ * methods are never retried; a failure carries `AdapterError.dispatched`, and
+ * anything after dispatch that is not a clear rejection is an unknown outcome
+ * (R16). There is deliberately no cancel, pause, resume, run, all, result, ask
+ * or waitFor (R9, R11).
  */
 export interface SdkAdapter {
   getSession(sessionResource: string): Promise<AdapterSession>;
@@ -150,6 +172,12 @@ export interface SdkAdapter {
   ): Promise<ActivityPage>;
   getSource(owner: string, repo: string): Promise<AdapterSource>;
   listSources(options: { readonly pageSize: number }): Promise<SourcePage>;
+  /** One POST; requireApproval true and autoPr false (R12). */
+  createSession(input: CreateSessionRequest): Promise<CreatedSession>;
+  /** One non-blocking POST (R9). */
+  sendMessage(sessionResource: string, message: string): Promise<void>;
+  /** One POST; the endpoint takes no plan id, so compare-and-approve is not atomic. */
+  approvePlan(sessionResource: string): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -264,6 +292,14 @@ export interface OperationRecord {
   readonly abandonReason?: string;
   readonly createdAt: string;
   readonly updatedAt: string;
+}
+
+export interface ReconciledEntry {
+  readonly localRequestId: string;
+  readonly kind: string;
+  readonly outcome: ReconcileOutcome;
+  readonly reason?: string;
+  readonly sessionResource?: string;
 }
 
 export type ReconcileOutcome =

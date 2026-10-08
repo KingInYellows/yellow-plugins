@@ -10,11 +10,12 @@
  * silently ignored), and a recording in-memory `storageFactory` whose
  * bindings are asserted after `connect()` and on first per-session use.
  *
- * PR2 exposes reads only. `buildCreateSessionConfig` is a pure builder for
- * the packed-SDK transport suite; the runtime never calls `session(config)`,
- * `send()`, or `approve()` (shell 03 wires them). Never used here: `run`,
- * `all`, `result`, `ask`, `waitFor`, `stream`, `updates`, `history`,
- * `hydrate`, `sync` (R9).
+ * Writes are exactly three: `session(config)`, `send()` and `approve()`, each
+ * one POST and never retried. A write failure is classified by whether a POST
+ * was dispatched (the fetch guard's POST counter): before dispatch it maps like
+ * a read, after dispatch only a clear rejection keeps its code and everything
+ * else is an unknown outcome (R16). Never used here: `run`, `all`, `result`,
+ * `ask`, `waitFor`, `stream`, `updates`, `history`, `hydrate`, `sync` (R9).
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -310,6 +311,9 @@ function mapActivity(activity) {
             approvedPlanId: (0, validate_js_1.validatePlanId)(activity.planId, 'response'),
         };
     }
+    if (activity.type === 'userMessaged' || activity.type === 'agentMessaged') {
+        return { ...base, message: str(activity.message) };
+    }
     return base;
 }
 function assertScratchEmpty(scratch, when) {
@@ -333,14 +337,16 @@ class JulesSdkAdapter {
     client;
     recorder;
     scratch;
+    postCount;
     sessionClients = new Map();
     infoReads = new Map();
     previousJulesHome;
-    constructor(sdk, client, recorder, scratch, previousJulesHome) {
+    constructor(sdk, client, recorder, scratch, previousJulesHome, postCount) {
         this.sdk = sdk;
         this.client = client;
         this.recorder = recorder;
         this.scratch = scratch;
+        this.postCount = postCount;
         this.previousJulesHome = previousJulesHome;
     }
     /**
@@ -366,7 +372,7 @@ class JulesSdkAdapter {
             (0, errors_js_1.throwAppError)('JULES_SDK_INTEGRITY', 'the SDK did not bind the injected in-memory session storage');
         }
         assertScratchEmpty(scratch, 'after connect()');
-        return new JulesSdkAdapter(input.sdk, client, recorder, scratch, previousJulesHome);
+        return new JulesSdkAdapter(input.sdk, client, recorder, scratch, previousJulesHome, input.postCount);
     }
     /** Our own verdicts (an integrity or allowlist failure) pass through; SDK errors are classified. */
     fail(err) {
@@ -553,6 +559,68 @@ class JulesSdkAdapter {
             truncated,
             ...(unsupportedReason !== undefined ? { unsupportedReason } : {}),
         };
+    }
+    // -------------------------------------------------------------------------
+    // Writes: one POST each, never retried
+    // -------------------------------------------------------------------------
+    /** A POST was sent since `before` was sampled; without a counter, assume it was. */
+    dispatchedSince(before) {
+        if (this.postCount === undefined || before === undefined)
+            return true;
+        return this.postCount() > before;
+    }
+    /** SDK error -> AdapterError tagged with whether a POST had been dispatched. */
+    writeFailure(err, before, sessionResource) {
+        const base = toAdapterError(this.sdk, err);
+        return new errors_js_1.AdapterError(base.kind, base.message, {
+            ...(base.requestId !== undefined ? { requestId: base.requestId } : {}),
+            ...(base.status !== undefined ? { status: base.status } : {}),
+            cause: base.cause ?? err,
+            dispatched: this.dispatchedSince(before),
+            ...(sessionResource !== undefined ? { sessionResource } : {}),
+        });
+    }
+    /**
+     * `jules.session(config)`: the SDK reads the source (a GET) and then issues
+     * one `POST sessions` with `requirePlanApproval: true` and
+     * `automationMode: AUTOMATION_MODE_UNSPECIFIED` (R12). A throw while mapping
+     * the answer is after dispatch by construction.
+     */
+    async createSession(input) {
+        const before = this.postCount?.();
+        let created;
+        try {
+            created = await this.client.session(buildCreateSessionConfig(input));
+        }
+        catch (err) {
+            throw this.writeFailure(err, before);
+        }
+        try {
+            return {
+                sessionResource: (0, validate_js_1.validateSessionResource)(`sessions/${String(created.id)}`, 'response'),
+            };
+        }
+        catch (err) {
+            throw new errors_js_1.AdapterError('malformed', 'the created session has an unexpected shape', { cause: err, dispatched: true });
+        }
+    }
+    async sendMessage(sessionResource, message) {
+        const before = this.postCount?.();
+        try {
+            await this.sessionClient(sessionResource).send(message);
+        }
+        catch (err) {
+            throw this.writeFailure(err, before, sessionResource);
+        }
+    }
+    async approvePlan(sessionResource) {
+        const before = this.postCount?.();
+        try {
+            await this.sessionClient(sessionResource).approve();
+        }
+        catch (err) {
+            throw this.writeFailure(err, before, sessionResource);
+        }
     }
     /** Checks the scratch tripwire again before exit and restores JULES_HOME. */
     async close() {

@@ -7,7 +7,7 @@
  * exposes no Retry-After). Writes never go through this helper.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.readAttemptSignal = exports.MIN_ATTEMPT_MS = exports.READ_BACKOFF_BASE_MS = exports.READ_RETRIES = exports.DEFAULT_COLLECT_DEADLINE_MS = exports.DEFAULT_READ_DEADLINE_MS = void 0;
+exports.readAttemptSignal = exports.MIN_ATTEMPT_MS = exports.READ_BACKOFF_BASE_MS = exports.READ_RETRIES = exports.DEFAULT_MUTATION_DEADLINE_MS = exports.DEFAULT_COLLECT_DEADLINE_MS = exports.DEFAULT_READ_DEADLINE_MS = void 0;
 exports.deadlineIn = deadlineIn;
 exports.remainingMs = remainingMs;
 exports.isExpired = isExpired;
@@ -16,6 +16,8 @@ const node_async_hooks_1 = require("node:async_hooks");
 const errors_js_1 = require("./errors.js");
 exports.DEFAULT_READ_DEADLINE_MS = 120_000;
 exports.DEFAULT_COLLECT_DEADLINE_MS = 180_000;
+/** `delegate`, `reply`, `approve`, and `supervise` (contract "Argument shapes"). */
+exports.DEFAULT_MUTATION_DEADLINE_MS = 180_000;
 exports.READ_RETRIES = 2;
 exports.READ_BACKOFF_BASE_MS = 500;
 exports.MIN_ATTEMPT_MS = 5_000;

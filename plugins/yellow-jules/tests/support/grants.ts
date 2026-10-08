@@ -10,8 +10,9 @@ import * as path from 'node:path';
 
 import { emptyUsage } from '../../src/authority.js';
 import { type AuthorizeDeps, authorizeCreate } from '../../src/authorize.js';
+import { delegate, type DelegateArgs } from '../../src/mutations.js';
 import type { OpenTty, TtyHandle } from '../../src/tty-confirm.js';
-import type { GrantRecord } from '../../src/types.js';
+import type { AdapterActivity, GrantRecord } from '../../src/types.js';
 import { FakeSdkAdapter, makeDeps } from '../fake-sdk.js';
 
 export type TtyMode = 'correct' | 'wrong' | 'eof' | 'timeout' | 'no-tty';
@@ -132,4 +133,102 @@ export async function createGrant(
     ...overrides,
   });
   return result.grantId;
+}
+
+// ---------------------------------------------------------------------------
+// Session scenario helpers
+// ---------------------------------------------------------------------------
+
+export interface DelegatedSession {
+  readonly sessionResource: string;
+  readonly localId: string;
+  readonly localRequestId: string;
+}
+
+/** A real delegate under `grantId`; the fake registers the session as `queued`. */
+export async function delegateOk(
+  harness: GrantHarness,
+  grantId: string,
+  overrides: Partial<DelegateArgs> = {}
+): Promise<DelegatedSession> {
+  const result = await delegate(harness.deps, {
+    repo: 'acme/widgets',
+    branch: 'scratch/one',
+    prompt: 'Implement the change described in the task.',
+    taskRef: 't1',
+    dryRun: false,
+    correction: false,
+    grantId,
+    ...overrides,
+  });
+  if (!('sessionResource' in result)) throw new Error('expected a session');
+  return {
+    sessionResource: result.sessionResource,
+    localId: result.localId,
+    localRequestId: result.localRequestId,
+  };
+}
+
+let planSeq = 0;
+
+/**
+ * Adds a `planGenerated` activity to the fake and puts the session in the
+ * given state, newer than anything already there.
+ */
+export function addPlan(
+  harness: GrantHarness,
+  sessionResource: string,
+  planId: string,
+  state = 'awaitingPlanApproval'
+): AdapterActivity {
+  planSeq += 1;
+  const activity: AdapterActivity = {
+    activityId: `plan${String(planSeq).padStart(4, '0')}`,
+    createTime: new Date(
+      Date.parse('2026-09-29T11:00:00Z') + planSeq * 1000
+    ).toISOString(),
+    type: 'planGenerated',
+    plan: {
+      planId,
+      steps: [{ id: `st-${planSeq}`, title: 'Do the work', index: 0 }],
+    },
+    artifacts: [],
+  };
+  const list = harness.adapter.activities.get(sessionResource) ?? [];
+  harness.adapter.activities.set(sessionResource, [...list, activity]);
+  const session = harness.adapter.sessions.get(sessionResource);
+  if (session !== undefined) {
+    harness.adapter.sessions.set(sessionResource, {
+      ...session,
+      vendorState: state,
+    });
+  }
+  return activity;
+}
+
+export function addActivity(
+  harness: GrantHarness,
+  sessionResource: string,
+  activity: Partial<AdapterActivity> & { type: string }
+): AdapterActivity {
+  planSeq += 1;
+  const full: AdapterActivity = {
+    activityId: `act${String(planSeq).padStart(4, '0')}`,
+    createTime: new Date(harness.deps.clock.now()).toISOString(),
+    artifacts: [],
+    ...activity,
+  };
+  const list = harness.adapter.activities.get(sessionResource) ?? [];
+  harness.adapter.activities.set(sessionResource, [...list, full]);
+  return full;
+}
+
+export function setVendorState(
+  harness: GrantHarness,
+  sessionResource: string,
+  vendorState: string
+): void {
+  const session = harness.adapter.sessions.get(sessionResource);
+  if (session === undefined) throw new Error(`no ${sessionResource}`);
+  harness.adapter.sessions.set(sessionResource, { ...session, vendorState });
 }

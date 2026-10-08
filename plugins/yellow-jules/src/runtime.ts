@@ -22,6 +22,7 @@ import {
   walkActivities,
   type WalkStart,
 } from './activity-walk.js';
+import { releaseSlotInStore } from './authority.js';
 import {
   type CredentialSource,
   ensureOwnerOnlyDir,
@@ -36,6 +37,7 @@ import {
   remainingMs,
 } from './deadline.js';
 import { throwAppError } from './errors.js';
+import { reconcile } from './reconcile.js';
 import { redact, redactDeep, scanSecretShapes } from './redact.js';
 import {
   type Attention,
@@ -58,9 +60,9 @@ import {
 import {
   findBySessionResource,
   hasUnreconciledDeviation,
+  ownsSession,
   readJournal,
   recordArtifacts,
-  UNRESOLVED_STATUSES,
   upsertArtifactResumeToken,
   upsertReadState,
   withJournalLock,
@@ -70,9 +72,9 @@ import type {
   AdapterSession,
   ArtifactRecord,
   CapabilityResult,
-  Journal,
   OperationRecord,
   PendingPlan,
+  ReconciledEntry,
 } from './types.js';
 import {
   extractTitleTag,
@@ -316,6 +318,7 @@ export async function list(
   });
 
   const journalOnly = Object.values(journal.operations)
+    .filter(ownsSession)
     .filter(
       (r) => r.sessionResource === undefined || !onPage.has(r.sessionResource)
     )
@@ -387,25 +390,15 @@ function optionalBaseCommit(value: string): string | undefined {
 // status
 // ---------------------------------------------------------------------------
 
+const TERMINAL_VENDOR_STATES = new Set(['completed', 'failed']);
+
 export interface StatusArgs {
   readonly session?: string;
   readonly reconcile: boolean;
   readonly deadlineMs?: number;
 }
 
-export interface ReconciledEntry {
-  readonly localRequestId: string;
-  readonly kind: string;
-  readonly outcome:
-    | 'bound'
-    | 'released'
-    | 'ambiguous-reconcile'
-    | 'policy-deviation'
-    | 'unknown-outcome'
-    | 'not-reached';
-  readonly reason?: string;
-  readonly sessionResource?: string;
-}
+export type { ReconciledEntry } from './types.js';
 
 export interface StatusActivities {
   readonly processed: number;
@@ -430,33 +423,6 @@ export interface StatusResult extends Attention {
   readonly outputs?: readonly RenderedOutput[];
   readonly policyDeviation?: true;
   readonly reconciled?: readonly ReconciledEntry[];
-}
-
-/**
- * PR2 has no `delegate`, so no reservation is reachable and `--reconcile`
- * normally returns `reconciled: []`. A hand-planted unresolved record is
- * reported as `not-reached` rather than silently ignored: the reconcile
- * walk ships with `delegate` in PR3.
- */
-function reconcileInPr2(
-  journal: Journal,
-  sessionResource: string | undefined
-): ReconciledEntry[] {
-  return Object.values(journal.operations)
-    .filter((r) => UNRESOLVED_STATUSES.has(r.status))
-    .filter(
-      (r) =>
-        sessionResource === undefined || r.sessionResource === sessionResource
-    )
-    .map((r) => ({
-      localRequestId: r.localRequestId,
-      kind: r.kind,
-      outcome: 'not-reached' as const,
-      reason: 'reconcile ships with delegate in PR3',
-      ...(r.sessionResource !== undefined
-        ? { sessionResource: r.sessionResource }
-        : {}),
-    }));
 }
 
 function walkStartFor(
@@ -497,14 +463,18 @@ export async function status(
     deps.clock,
     args.deadlineMs ?? DEFAULT_READ_DEADLINE_MS
   );
-  const journal = await readJournal(deps.dataDir);
+  let journal = await readJournal(deps.dataDir);
   const sessionResource =
     args.session !== undefined
       ? resolveSessionResource(journal, args.session)
       : undefined;
   const reconciled = args.reconcile
-    ? reconcileInPr2(journal, sessionResource)
+    ? await reconcile(deps, journal, sessionResource, deadline)
     : undefined;
+  // A reconcile may have bound a reservation to its session; look it up fresh.
+  if (reconciled !== undefined && reconciled.length > 0) {
+    journal = await readJournal(deps.dataDir);
+  }
   const reconcileFlags = (reconciled ?? [])
     .filter((r) => r.outcome !== 'bound' && r.outcome !== 'released')
     .map((r) => `reconciled:${r.outcome}`);
@@ -635,6 +605,20 @@ export async function status(
     );
     record = await checkPolicyDeviation(deps, record, session);
     const policyDeviation = hasUnreconciledDeviation(record);
+    // A session observed in a terminal vendor state no longer holds its
+    // grant's active-session slot (tasks and corrective rounds stay spent).
+    if (
+      TERMINAL_VENDOR_STATES.has(vendorState) &&
+      record.kind === 'create' &&
+      record.grantId !== undefined
+    ) {
+      await releaseSlotInStore(
+        deps.dataDir,
+        record.grantId,
+        record.localRequestId,
+        'terminal-vendor-state'
+      );
+    }
 
     const flags: string[] = [];
     if (walk.partialPagination) flags.push('partialPagination');

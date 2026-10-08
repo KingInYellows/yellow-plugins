@@ -567,3 +567,33 @@ export async function revokeGrant(
     return { grantId, revokedAt };
   });
 }
+
+/**
+ * Frees one active-session slot in `state/grants.json` under the journal lock.
+ * Called only from the reconcile, abandon, terminal-vendor-state and
+ * clean-rejection paths (never from a path whose outcome is unknown). A grant
+ * that no longer exists (hand-removed file) is a no-op; a corrupt grants file
+ * still fails loud.
+ */
+export async function releaseSlotInStore(
+  dataDir: string,
+  grantId: string,
+  localRequestId: string,
+  reason: ReleaseReason
+): Promise<boolean> {
+  return withJournalLock(dataDir, async () => {
+    const file = loadGrants(dataDir);
+    const grant = file.grants[grantId];
+    if (
+      grant === undefined ||
+      !grant.usage.activeSessionRefs.includes(localRequestId)
+    ) {
+      return false;
+    }
+    writeGrants(
+      dataDir,
+      updateGrant(file, grantId, (g) => releaseGrant(g, localRequestId, reason))
+    );
+    return true;
+  });
+}

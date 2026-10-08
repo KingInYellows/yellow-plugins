@@ -55,9 +55,11 @@ const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const activity_walk_js_1 = require("./activity-walk.js");
+const authority_js_1 = require("./authority.js");
 const config_js_1 = require("./config.js");
 const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
+const reconcile_js_1 = require("./reconcile.js");
 const redact_js_1 = require("./redact.js");
 const runtime_support_js_1 = require("./runtime-support.js");
 const sdk_resolver_js_1 = require("./sdk-resolver.js");
@@ -194,6 +196,7 @@ async function list(deps, args) {
         };
     });
     const journalOnly = Object.values(journal.operations)
+        .filter(state_js_1.ownsSession)
         .filter((r) => r.sessionResource === undefined || !onPage.has(r.sessionResource))
         .map((r) => ({
         localId: r.localId,
@@ -241,26 +244,10 @@ function optionalBaseCommit(value) {
         return undefined;
     }
 }
-/**
- * PR2 has no `delegate`, so no reservation is reachable and `--reconcile`
- * normally returns `reconciled: []`. A hand-planted unresolved record is
- * reported as `not-reached` rather than silently ignored: the reconcile
- * walk ships with `delegate` in PR3.
- */
-function reconcileInPr2(journal, sessionResource) {
-    return Object.values(journal.operations)
-        .filter((r) => state_js_1.UNRESOLVED_STATUSES.has(r.status))
-        .filter((r) => sessionResource === undefined || r.sessionResource === sessionResource)
-        .map((r) => ({
-        localRequestId: r.localRequestId,
-        kind: r.kind,
-        outcome: 'not-reached',
-        reason: 'reconcile ships with delegate in PR3',
-        ...(r.sessionResource !== undefined
-            ? { sessionResource: r.sessionResource }
-            : {}),
-    }));
-}
+// ---------------------------------------------------------------------------
+// status
+// ---------------------------------------------------------------------------
+const TERMINAL_VENDOR_STATES = new Set(['completed', 'failed']);
 function walkStartFor(record, token) {
     const watermark = record.lastActivityCreateTime !== undefined &&
         record.lastActivityId !== undefined
@@ -285,13 +272,17 @@ async function status(deps, args) {
     }
     (0, runtime_support_js_1.prepare)(deps);
     const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, args.deadlineMs ?? deadline_js_1.DEFAULT_READ_DEADLINE_MS);
-    const journal = await (0, state_js_1.readJournal)(deps.dataDir);
+    let journal = await (0, state_js_1.readJournal)(deps.dataDir);
     const sessionResource = args.session !== undefined
         ? (0, runtime_support_js_1.resolveSessionResource)(journal, args.session)
         : undefined;
     const reconciled = args.reconcile
-        ? reconcileInPr2(journal, sessionResource)
+        ? await (0, reconcile_js_1.reconcile)(deps, journal, sessionResource, deadline)
         : undefined;
+    // A reconcile may have bound a reservation to its session; look it up fresh.
+    if (reconciled !== undefined && reconciled.length > 0) {
+        journal = await (0, state_js_1.readJournal)(deps.dataDir);
+    }
     const reconcileFlags = (reconciled ?? [])
         .filter((r) => r.outcome !== 'bound' && r.outcome !== 'released')
         .map((r) => `reconciled:${r.outcome}`);
@@ -391,6 +382,13 @@ async function status(deps, args) {
         }, (0, runtime_support_js_1.nowFn)(deps));
         record = await (0, runtime_support_js_1.checkPolicyDeviation)(deps, record, session);
         const policyDeviation = (0, state_js_1.hasUnreconciledDeviation)(record);
+        // A session observed in a terminal vendor state no longer holds its
+        // grant's active-session slot (tasks and corrective rounds stay spent).
+        if (TERMINAL_VENDOR_STATES.has(vendorState) &&
+            record.kind === 'create' &&
+            record.grantId !== undefined) {
+            await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId, 'terminal-vendor-state');
+        }
         const flags = [];
         if (walk.partialPagination)
             flags.push('partialPagination');

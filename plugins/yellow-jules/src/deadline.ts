@@ -13,6 +13,8 @@ import type { Clock } from './types.js';
 
 export const DEFAULT_READ_DEADLINE_MS = 120_000;
 export const DEFAULT_COLLECT_DEADLINE_MS = 180_000;
+/** `delegate`, `reply`, `approve`, and `supervise` (contract "Argument shapes"). */
+export const DEFAULT_MUTATION_DEADLINE_MS = 180_000;
 export const READ_RETRIES = 2;
 export const READ_BACKOFF_BASE_MS = 500;
 export const MIN_ATTEMPT_MS = 5_000;
