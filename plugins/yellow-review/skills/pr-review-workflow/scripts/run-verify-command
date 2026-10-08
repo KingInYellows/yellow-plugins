@@ -3,7 +3,7 @@
 # failure, timeout or interruption, save the resolver diff as a patch, revert
 # the listed files and report whether the tree is clean again.
 # Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted
-#                           [--unattended] [--ignored-since <marker-file>]
+#                           [--unattended] --ignored-since <marker-file>
 #                           [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-dirty
@@ -30,9 +30,10 @@
 #                  be examined refuses (fail closed). A
 #                  marker that is missing, unreadable, a symlink or not a
 #                  regular file also refuses (fail closed), as does a listing
-#                  failure. Attended runs may omit it. The revert modes ignore
-#                  it. Ignored changes are refused, never reported as a clean
-#                  tree: treeClean covers tracked and untracked-unignored files.
+#                  failure. Every run requires it, attended or not, and the
+#                  revert modes ignore it. Ignored changes are refused, never
+#                  reported as a clean tree: treeClean covers tracked and
+#                  untracked-unignored files.
 #   --check-ignored: run nothing and revert nothing; only the --ignored-since
 #                  guard, for a resolve run that has no verify command (the
 #                  commit still runs hooks, and an ignored file edited by a
@@ -374,9 +375,9 @@ gh() {
     fi
 }
 usage() {
-    printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] [--ignored-since <marker-file>] | --revert-only | --revert-dirty) [--files-from <file>] [-- <files...>]\n' >&2
+    printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] --ignored-since <marker-file> | --revert-only | --revert-dirty) [--files-from <file>] [-- <files...>]\n' >&2
     printf '       run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>\n' >&2
-    printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required with --unattended\n' >&2
+    printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required for every run\n' >&2
     exit 2
 }
 
@@ -429,10 +430,16 @@ if [ "$MODE" = run ]; then
     [ -f "$COMMAND_FILE" ] && [ -r "$COMMAND_FILE" ] || die 2 "--command-file not readable: $COMMAND_FILE"
     [ -n "$(tr -d '[:space:]' <"$COMMAND_FILE")" ] || die 2 "--command-file is empty"
     COMMAND_FILE=$(cd -- "$(dirname -- "$COMMAND_FILE")" && pwd)/$(basename -- "$COMMAND_FILE")
-    # Unattended, nothing else sees resolver edits to gitignored files, so the
-    # marker is required. Resolve it now: the script changes directory below.
+    # Every run needs the marker. An attended command the user approved still
+    # executes a resolver edit to an ignored executable, and nothing else sees
+    # those edits on an unattended run either. The unattended wording stays.
+    # Resolve the marker now: the script changes directory below.
     if [ "$UNATTENDED" = 1 ] && [ -z "$IGNORED_SINCE" ]; then
         printf '[run-verify-command] Error: --unattended requires --ignored-since <marker-file> (touch the file before the resolvers start)\n' >&2
+        exit 2
+    fi
+    if [ -z "$IGNORED_SINCE" ]; then
+        printf '[run-verify-command] Error: a verify run requires --ignored-since <marker-file>, attended or not (touch the file before the resolvers start)\n' >&2
         exit 2
     fi
     if [ -n "$IGNORED_SINCE" ]; then

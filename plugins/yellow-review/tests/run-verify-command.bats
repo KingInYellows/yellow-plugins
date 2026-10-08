@@ -26,14 +26,30 @@ case "$*" in
 esac
 STUB
   chmod +x "$STUB_BIN/gh"
-  # The mtime marker --ignored-since compares against (unattended runs need it).
+  # The mtime marker --ignored-since compares against (every run needs it).
   IGN_MARKER="$BATS_TEST_TMPDIR/ignored-marker"
   touch "$IGN_MARKER"
+  unset VERIFY_NO_MARKER
 }
 
 verify() {
   printf '%s\n' "$1" >| "$CMD"
   shift
+  # Every run needs the marker. Inject it unless the caller passed one, or
+  # set VERIFY_NO_MARKER=1 to test the refusal. Before the caller's args so
+  # a trailing -- stays last.
+  if [ "${VERIFY_NO_MARKER:-}" != 1 ]; then
+    local arg seen=0
+    for arg in "$@"; do
+      if [ "$arg" = --ignored-since ]; then
+        seen=1
+        break
+      fi
+    done
+    if [ "$seen" -eq 0 ]; then
+      set -- --ignored-since "$IGN_MARKER" "$@"
+    fi
+  fi
   run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" "$@"
 }
 
@@ -470,7 +486,7 @@ has_kill_after() {
 terminate_while_running() {
   printf '%s\n' 'touch "$BATS_TEST_TMPDIR/started"; sleep 31.1 & sleep 31.1; wait' >| "$CMD"
   set -m
-  "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 60 --trusted -- src/a.txt src/new.txt \
+  "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 60 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt \
     >| "$BATS_TEST_TMPDIR/out" 2>/dev/null 3>&- &
   local pid=$!
   set +m
@@ -627,7 +643,7 @@ SECRET_COMMAND='echo "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789"; ec
 @test "without yellow-core the log is withheld rather than kept raw" {
   copy=$(copy_plugin "$BATS_TEST_TMPDIR/solo/yellow-review")
   printf '%s\n' "$SECRET_COMMAND" >| "$CMD"
-  run --separate-stderr "$copy" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr "$copy" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   log=$(printf '%s' "$output" | jq -r .log)
   [ "$(cat "$log")" = '[withheld: log redaction unavailable]' ]
@@ -642,7 +658,7 @@ SECRET_COMMAND='echo "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789"; ec
   printf 'cs_redact_secrets() { cat; }\n' >| "$market/yellow-core/1.9.0/lib/compound-staging.sh"
   cp "$market/yellow-core/1.9.0/lib/compound-staging.sh" "$market/yellow-core/next/lib/"
   printf '%s\n' "$SECRET_COMMAND" >| "$CMD"
-  run --separate-stderr "$copy" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr "$copy" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   log=$(printf '%s' "$output" | jq -r .log)
   grep -q visible "$log"
@@ -795,7 +811,7 @@ redact_log() {
 
 @test "a verifier that prints a credential ID leaves it out of the retained log" {
   printf '%s\n' 'echo "DEVIN_ORG_ID=org-1234567"; echo visible' >| "$CMD"
-  run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   log=$(printf '%s' "$output" | jq -r .log)
   grep -q visible "$log"
@@ -838,7 +854,7 @@ redact_log() {
   command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
   rm -f src/new.txt && mkfifo src/new.txt
   printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
-  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"src/new.txt"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
@@ -848,7 +864,7 @@ redact_log() {
   command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
   rm -f src/a.txt && mkfifo src/a.txt
   printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
-  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"not a regular file or symlink: src/a.txt"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
@@ -889,7 +905,7 @@ exec "$real_git" "\$@"
 STUB
   chmod +x "$STUB_BIN/git"
   printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
-  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"could not snapshot"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
@@ -1026,7 +1042,7 @@ exec "$real_git" "\$@"
 STUB
   chmod +x "$STUB_BIN/git"
   printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
-  "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt \
+  "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt \
     </dev/null >"$BATS_TEST_TMPDIR/out" 2>"$BATS_TEST_TMPDIR/err" &
   pid=$!
   for i in $(seq 1 100); do
@@ -1136,7 +1152,7 @@ assert_no_raw_left() {
   secret_pieces
   STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
   printf '%s\n' "$PRINT_SECRET; sleep 4" >| "$CMD"
-  TMPDIR="$STREAM_TMP" "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 20 --trusted -- src/a.txt src/new.txt \
+  TMPDIR="$STREAM_TMP" "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 20 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt \
     >"$BATS_TEST_TMPDIR/mid.out" 2>&1 &
   pid=$!
   sleep 2
@@ -1407,19 +1423,34 @@ ignored_fixture() {
 }
 
 @test "--unattended without --ignored-since is refused before anything runs" {
-  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended -- src/a.txt src/new.txt
+  VERIFY_NO_MARKER=1 verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended -- src/a.txt src/new.txt
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"--ignored-since"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
   grep -q 'resolver edit' src/a.txt
 }
 
-@test "an attended run may omit --ignored-since" {
+@test "#952 4179906605: an attended run without --ignored-since is refused before anything runs" {
   ignored_fixture
-  printf '#!/bin/sh\necho changed\n' >| node_modules/.bin/runner
-  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
-  [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  printf '#!/bin/sh\ntouch "$BATS_TEST_TMPDIR/runner-ran"\n' >| node_modules/.bin/runner
+  chmod +x node_modules/.bin/runner
+  VERIFY_NO_MARKER=1 verify 'node_modules/.bin/runner; touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"requires --ignored-since"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  [ ! -e "$BATS_TEST_TMPDIR/runner-ran" ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "#952 4179906605: an attended run with --ignored-since refuses an ignored executable edited after the marker" {
+  ignored_fixture
+  touch -t 202001010000 "$IGN_MARKER"
+  printf '#!/bin/sh\necho pwned\n' >| node_modules/.bin/runner
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  [[ "$stderr" == *"node_modules/.bin/runner"* ]]
+  grep -q 'resolver edit' src/a.txt
 }
 
 @test "the revert modes ignore --ignored-since" {
@@ -1654,6 +1685,9 @@ hooks_fire_control() {
   printf '.hooks/\n' >> .git/info/exclude
   git config core.hooksPath .hooks
   hooks_fire_control
+  # verify() supplies --ignored-since. The planted hooks are gitignored, so
+  # the marker has to be newer than them or the guard refuses before revert.
+  touch "$IGN_MARKER"
   verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
   [ "$(printf '%s' "$output" | jq -r .result)" = fail ]
   [ "$(cat src/a.txt)" = $'one\nfeature' ]

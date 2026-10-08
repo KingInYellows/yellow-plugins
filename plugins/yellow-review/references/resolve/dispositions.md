@@ -479,13 +479,13 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   listed files. It does not run the command when a file is outside the PR (or
   the PR's file list cannot be fetched), and with `--unattended` also when a
   file is a runner file; it reports `result: skipped`; a PR file listing that
-  times out (`YELLOW_REVIEW_NET_TIMEOUT`) is skipped the same way. With
-  `--unattended`, `--ignored-since <marker-file>` is required: the command
+  times out (`YELLOW_REVIEW_NET_TIMEOUT`) is skipped the same way. For every
+  run, attended or not, `--ignored-since <marker-file>` is required: the command
   refuses when any gitignored file is newer than the marker, because the
   resolver has no shell and cannot backdate an mtime. `/review:resolve` Step 3f
   mints the marker in a private `mktemp -d` directory before any resolver runs,
-  and Step 6 passes it to every verify call (interactive runs may pass it too)
-  and removes the directory. When no verify command runs, Step 6 still calls
+  and Step 6 passes it to every verify call and removes the directory. When no
+  verify command runs, Step 6 still calls
   `run-verify-command --check-ignored --ignored-since <marker-file>`, which runs
   the same guard and nothing else; a refusal reverts and downgrades `fixed`
   threads like any other, except that a changed gitignored file is the

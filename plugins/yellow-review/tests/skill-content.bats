@@ -702,7 +702,7 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   printf '%s\n' "$step6" | grep -qF "trap 'rm -rf -- \"\$MARK_DIR\"' EXIT"
   step6flat=$(printf '%s\n' "$step6" | tr '\n' ' ' | tr -s ' ')
   [[ "$step6flat" == *'`--ignored-since` with Step 3f'* ]]
-  [[ "$step6flat" == *'required unattended'* ]]
+  [[ "$step6flat" == *'required for every run'* ]]
   [[ "$step6flat" == *'**Marker cleanup.**'* ]]
   flat "$RESOLVE_REFS/dispositions.md" | grep -qF -- '`--ignored-since <marker-file>` is required'
 }
