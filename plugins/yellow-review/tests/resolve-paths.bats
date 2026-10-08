@@ -1277,3 +1277,22 @@ EOF
     *) echo "resolved $YELLOW_REVIEW_GIT"; return 1 ;;
   esac
 }
+
+@test "rp_ignored_changed_since ignores vitest's results cache behind a symlinked .vite directory but not its siblings" {
+  ignored_repo
+  mkdir -p ext-cache/vitest node_modules
+  printf '{}\n' >| ext-cache/vitest/results.json
+  printf 'old\n' >| ext-cache/chunk.js
+  touch -t 201901010000 ext-cache/vitest/results.json ext-cache/chunk.js
+  ln -s ../ext-cache node_modules/.vite
+  touch -h -t 201901010000 node_modules/.vite
+  printf '{"version":"1.6.0","results":{}}\n' >| ext-cache/vitest/results.json
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  # A sibling file behind the same link is still code: refuse.
+  printf 'new\n' >| ext-cache/chunk.js
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$output" = node_modules/.vite ]
+}

@@ -460,7 +460,8 @@ rp_link_target_changed() {
             case "$l" in .ruvector|./.ruvector) skip="$l" ;; esac
             out=$(set -o pipefail
                 find -H "$l" -name .git -prune -o -path "$skip/coedit-sessions" -prune \
-                    -o \( -path "$skip/coedit.json" -type f \) -prune -o -type f -newer "$marker" -print 2>/dev/null \
+                    -o \( -path "$skip/coedit.json" -type f \) -prune \
+                    -o \( \( -path '*/node_modules/.vite/vitest/results.json' -o -path 'node_modules/.vite/vitest/results.json' \) -type f \) -prune -o -type f -newer "$marker" -print 2>/dev/null \
                     | head -n 1) || rc=$?
             [ -z "$out" ] || return 0
             [ "$rc" -eq 0 ] || return 2
