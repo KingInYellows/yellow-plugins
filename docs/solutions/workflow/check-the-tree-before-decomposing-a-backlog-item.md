@@ -26,8 +26,9 @@ the code as it was when the issue was filed. `main` had already moved.
 
 Before writing or implementing a task, re-read the function the task names
 and the tests that pin it. Treat the plan file as the source of truth when a
-commit message and the checkboxes disagree. Mark a task `[-]` when the tree
-already did the work or made the task inapplicable, and say so in the PR body.
+commit message and the checkboxes disagree. Mark a task `[x]` when the tree
+already did the work, so progress totals count it. Reserve `[-]` for a task the
+tree made inapplicable, and say which case applies in the PR body.
 
 Checks that changed this cycle's tasks:
 
