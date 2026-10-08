@@ -1,0 +1,18 @@
+.changeset/yellow-review-anchor-only-reverify.md
+  h_6000354274ce50 1-5
+docs/solutions/workflow/check-the-tree-before-decomposing-a-backlog-item.md
+  h_6000354274ce50 1-55
+plugins/yellow-review/references/review-pr/ledger.md
+  h_6000354274ce50 191-194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "409273f560e2d06f877712d1c0240e90a21e6912",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
