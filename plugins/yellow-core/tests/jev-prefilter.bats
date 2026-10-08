@@ -98,6 +98,7 @@ _capture() {
   ! grep -q 'test-key-123' "$MOCK_JEV_LOG"
   ! grep -q 'raw strings' "$MOCK_JEV_LOG"
   grep -q -- '--data-binary @-' "$MOCK_JEV_LOG"
+  [ "$(cut -d' ' -f1 "$MOCK_JEV_LOG")" = "-q" ]
   grep -q 'Authorization: Bearer test-key-123' "$MOCK_JEV_CFG"
 }
 
@@ -181,4 +182,27 @@ _capture() {
   [[ "$output" == *"user: NEWEST_REQUEST" ]]
   [[ "$output" != *"line 001 "* ]]
   [[ "$(printf '%s\n' "$output" | head -n 1)" == "user: old filler"* ]]
+}
+
+@test "malformed decision values fail open: no record" {
+  for bad in \
+    '{"answers":{"durable":{"choice":"trivial-qa","confidence":"invalid"},"has_instruction":{"noul":-1}}}' \
+    '{"answers":{"durable":{"choice":"trivial-qa","confidence":0.95},"has_instruction":{"noul":1.5}}}' \
+    '{"answers":{"durable":{"choice":"made-up","confidence":0.95},"has_instruction":{"noul":0.01}}}' \
+    '{"answers":{"durable":{"choice":"trivial-qa","confidence":0.95,"probabilities":{"trivial-qa":"x"}},"has_instruction":{"noul":0.01}}}'; do
+    rm -rf "$STAGING/jev-shadow"
+    export MOCK_JEV_RESPONSE="$bad"
+    COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
+    [ ! -e "$STAGING/jev-shadow/$SESSION_ID.json" ]
+  done
+}
+
+@test "one oversized final message keeps its newest bytes" {
+  big=$(head -c 30000 /dev/zero | tr '\0' 'a')
+  printf '{"type":"user","message":{"content":"%sNEWEST_TAIL"}}\n' "$big" > "$TRANSCRIPT_FILE"
+  run bash -c '. "$1"; jev_project_dialogue < "$2"' _ \
+    "$BATS_TEST_DIRNAME/../lib/jev-prefilter.sh" "$TRANSCRIPT_FILE"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"NEWEST_TAIL" ]]
+  [ "$(printf '%s' "$output" | wc -c)" -le 24000 ]
 }

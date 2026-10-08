@@ -61,7 +61,15 @@ jev_project_dialogue() {
     | "\(.type): \($t)"
   ' 2>/dev/null)
   if [ "$(printf '%s' "$all" | wc -c)" -gt "$JEV_STATE_MAX_CHARS" ]; then
-    printf '%s' "$all" | tail -c "$JEV_STATE_MAX_CHARS" | sed '1d'
+    local cut nl='
+'
+    cut=$(printf '%s' "$all" | tail -c "$JEV_STATE_MAX_CHARS")
+    # Drop the partial first line only when a complete line follows it, so
+    # one oversized final message is kept as its suffix rather than lost.
+    case "$cut" in
+      *"$nl"*) printf '%s' "$cut" | sed '1d' ;;
+      *) printf '%s' "$cut" ;;
+    esac
   else
     printf '%s' "$all"
   fi
@@ -115,9 +123,10 @@ jev_prefilter_shadow() {
   body=$(printf '%s' "$state" | jev_build_request) || return 0
 
   # Key: curl config on fd 3. Body: stdin. Neither reaches argv.
-  # -w appends curl's own total time on a final line, split off below.
+  # -q (must be first) skips the user's ~/.curlrc, which could enable trace
+  # output or --insecure for this request. -w appends curl's own total time on a final line, split off below.
   resp=$(printf '%s' "$body" \
-    | curl -sS --fail --max-time "${COMPOUND_JEV_TIMEOUT_S:-5}" \
+    | curl -q -sS --fail --max-time "${COMPOUND_JEV_TIMEOUT_S:-5}" \
         -K /dev/fd/3 \
         -H 'Content-Type: application/json' \
         --data-binary @- \
@@ -143,7 +152,14 @@ JEVCFG
     --argjson chars "${#dialogue}" '
     .answers.durable as $d
     | .answers.has_instruction as $h
-    | select(($d.choice | type) == "string" and ($h.noul | type) == "number")
+    | def unit: type == "number" and . >= 0 and . <= 1;
+    select(
+      ($d.choice | IN("trivial-qa", "routine-edit", "durable-lesson",
+                      "decision-or-convention", "other"))
+      and ($d.confidence | unit)
+      and ($h.noul | unit)
+      and (($d.probabilities // {}) | type == "object"
+           and all(.[]; unit)))
     | {
         schema: "1",
         timestamp: $ts,

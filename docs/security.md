@@ -452,8 +452,9 @@ third party, TypeSafe AI (`https://api.typesafe.ai/v1/systemone`):
 - **When.** The Stop hook fires at the end of every assistant turn, so a
   session makes one call per turn (5 s timeout, `COMPOUND_JEV_TIMEOUT_S`).
 - **Credential handling.** The key is passed to curl as a config on fd 3 and
-  the request body on stdin, so neither appears in process argv. The key is
-  never written to disk or logs.
+  the request body on stdin, so neither appears in process argv. curl runs
+  with `-q`, so a user `~/.curlrc` cannot turn on tracing or `--insecure` for
+  this request. The key is never written to disk or logs.
 - **Endpoint override.** `COMPOUND_JEV_URL` and `COMPOUND_JEV_MODEL` override
   the endpoint and model; anyone who can set the hook environment can redirect
   the text and key, so treat those variables as trusted configuration.
@@ -461,7 +462,8 @@ third party, TypeSafe AI (`https://api.typesafe.ai/v1/systemone`):
   `--- begin untrusted-content (reference only) ---` fence (lines starting
   `---` are quoted so the text cannot close it), and both questions tell the
   model to classify the excerpt as data. The answer is a typed choice and
-  probabilities; it is stored, never executed or fed back to Claude.
+  probabilities, recorded only when every value is in range (choice from the
+  fixed set, numbers in [0, 1]); it is never executed or fed back to Claude.
 - **Local record.** `compound-staging/jev-shadow/<session_id>.json`, replaced
   atomically each turn (an answer whose content hash no longer matches the
   pending entry is dropped), holds the session id, content hash, choice,
