@@ -1134,11 +1134,13 @@ REVERTED_JSON='[]'
 REVERTED_COUNT=0
 if [ "$MODE" = revert-denied ]; then
     REMAINING=()
+    RELIST_OK=1
     if list_tree_changes; then
         while IFS= read -r -d '' f; do
             [ -n "$f" ] && rp_trusted_config "$f" && REMAINING+=("$f")
         done <"$CHANGES_FILE"
     else
+        RELIST_OK=0
         DENIED_CLEAN=false
         add_reason "could not re-list the tree to check the deny-listed paths"
     fi
@@ -1146,14 +1148,17 @@ if [ "$MODE" = revert-denied ]; then
         DENIED_CLEAN=false
         [ "${#REVERT_FAILS[@]}" -gt 0 ] || add_reason "deny-listed changes remain after the revert"
     fi
+    # Without a successful re-list nothing is verified gone: report none.
     REVERTED=()
-    for f in "${FILES[@]}"; do
-        GONE=1
-        for p in ${REMAINING[@]+"${REMAINING[@]}"}; do
-            [ "$p" = "$f" ] && { GONE=0; break; }
+    if [ "$RELIST_OK" = 1 ]; then
+        for f in "${FILES[@]}"; do
+            GONE=1
+            for p in ${REMAINING[@]+"${REMAINING[@]}"}; do
+                [ "$p" = "$f" ] && { GONE=0; break; }
+            done
+            [ "$GONE" = 1 ] && REVERTED+=("$f")
         done
-        [ "$GONE" = 1 ] && REVERTED+=("$f")
-    done
+    fi
     REVERTED_COUNT=${#REVERTED[@]}
     if [ "$REVERTED_COUNT" -gt 0 ]; then
         # File names can look like a credential: screen the list as the patch
