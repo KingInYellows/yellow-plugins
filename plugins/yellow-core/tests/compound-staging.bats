@@ -94,6 +94,16 @@ teardown() {
   echo "$result" | grep -q 'api_key=\[REDACTED\]'
 }
 
+@test "redact_secrets strips an Authorization Basic token and leaves prose that says basic alone" {
+  result=$(printf 'curl -H "Authorization: Basic YWI6Y2Q=" and AUTHORIZATION: BASIC YTpi done\n' | cs_redact_secrets)
+  echo "$result" | grep -q 'Authorization: Basic \[REDACTED\]'
+  echo "$result" | grep -q 'AUTHORIZATION: BASIC \[REDACTED\]'
+  ! echo "$result" | grep -q 'YWI6Y2Q'
+  ! echo "$result" | grep -q 'YTpi'
+  result=$(printf 'the basic setup, basic usage and a Basic example\n' | cs_redact_secrets)
+  [ "$result" = 'the basic setup, basic usage and a Basic example' ]
+}
+
 @test "redact_secrets strips Bearer tokens" {
   result=$(printf 'Authorization: Bearer abc123def456ghi789jkl\n' | cs_redact_secrets)
   echo "$result" | grep -q 'Bearer \[REDACTED\]'

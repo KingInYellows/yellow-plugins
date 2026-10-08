@@ -186,8 +186,9 @@ _rt_scan() {
         # b64digit / basiccred: Basic-auth tokens are judged on the original
         # bytes. The line scan lowercases, and base64 is case-sensitive.
         # `YTpi` is `a:b`, the shortest `user:pass`. Padding is only `=` at
-        # the end. A decoded value with a colon that is not first or last is
-        # a credential; prose such as `Authentication` is not.
+        # the end, and only in the last quad; the per-quad checks below are the
+        # one place that is judged. A decoded value with a colon that is not
+        # first or last is a credential; prose such as `Authentication` is not.
         function b64digit(c) {
             if (c >= "A" && c <= "Z") return index("ABCDEFGHIJKLMNOPQRSTUVWXYZ", c) - 1
             if (c >= "a" && c <= "z") return index("abcdefghijklmnopqrstuvwxyz", c) - 1 + 26
@@ -196,12 +197,9 @@ _rt_scan() {
             if (c == "/") return 63
             return -1
         }
-        function basiccred(tok,    n, i, eq, a, b, c, d, va, vb, vc, vd, out, byte, p) {
+        function basiccred(tok,    n, i, a, b, c, d, va, vb, vc, vd, out, byte, p) {
             n = length(tok)
             if (n < 4 || n % 4 != 0) return 0
-            eq = index(tok, "=")
-            if (eq && eq < n - 1) return 0
-            if (eq == n - 1 && substr(tok, n, 1) != "=") return 0
             out = ""
             for (i = 1; i <= n; i += 4) {
                 a = substr(tok, i, 1); b = substr(tok, i + 1, 1)
@@ -295,6 +293,10 @@ _rt_scan() {
             # `secret` (the `_`, `-` or capital starts the keyword). Do not add
             # a `client`/`api` prefix here: it would start the match earlier,
             # and `myclient_secret` would then count as in-word.
+            # Leading non-ASCII punctuation or space (curly quotes, bullet,
+            # middle dot, guillemets, en and em dash, ellipsis, no-break space
+            # as its UTF-8 bytes). One regex for gawk (either locale) and mawk.
+            lead = "^(“|”|‘|’|•|·|«|»|–|—|…|\302\240)+"
             kw = "(pass([_-]?(phrase|code)|word|wd)?|pwd|secret([_ \t-]?key)?|(private|access)[_ \t-]?key|token|api[_ \t-]?key|credentials?)"
             ph =" string number integer boolean object array unknown undefined"
             ph = ph " nullable optional required redacted placeholder example"
@@ -439,14 +441,24 @@ _rt_scan() {
                     # line stay clean; a capitalised passphrase of 3+ ASCII words
                     # is the accepted residual. The first character must also be
                     # ASCII. Under gawk in UTF-8, substr returns one character,
-                    # so a non-ASCII first character (including a lowercase
-                    # accented word) is prose and stays clean. An ASCII
+                    # so a non-ASCII first letter (including a lowercase
+                    # accented word) is prose and stays clean. A leading
+                    # non-ASCII quote, bullet, guillemet, dash, ellipsis or
+                    # no-break space is not a letter: it is stripped first, so
+                    # it cannot exempt the ASCII words that follow. An ASCII
                     # credential after a bare keyword still flags.
                     if (carry == 1 && !carryin && !hit) {
                         o = $0
                         sub(/^[ \t]*(-[ \t]*)?/, "", o)
+                        r2 = r
+                        if (o !~ /^[\001-\177]/) {
+                            sub(lead, "", o)
+                            sub(lead, "", r2)
+                            sub(/^[ \t]+/, "", o)
+                            sub(/^[ \t]+/, "", r2)
+                        }
                         c = substr(o, 1, 1)
-                        if (c !~ /["\047A-Z]/ && c ~ /^[\001-\177]/ && split(r, wparts, /[ \t]+/) >= 3 && wordcred(r)) flag("unquoted-keyword-value")
+                        if (c !~ /["\047A-Z]/ && c ~ /^[\001-\177]/ && split(r2, wparts, /[ \t]+/) >= 3 && wordcred(r2)) flag("unquoted-keyword-value")
                     }
                     if (carry == 2 && !carryin && ind > hind) {
                         t = l
@@ -524,7 +536,19 @@ _rt_scan() {
                     seg = substr(seg, RLENGTH + 1)
                     segorig = substr(segorig, RLENGTH + 1)
                 }
-                if (scheme == "basic" && length(segorig) >= 4 && basiccred(segorig)) flag("authorization-header")
+                # The token class admits `. ~ -`, so a credential followed by
+                # sentence punctuation would keep it and fail the length check.
+                # Cut to the leading base64 run and pad it to a multiple of 4.
+                # A run of 20+ characters is flagged by the floor below without
+                # decoding, so a hostile long token never reaches the
+                # per-byte decoder (mawk concatenation is quadratic).
+                btok = ""
+                if (scheme == "basic" && match(segorig, /^[A-Za-z0-9+\/]+=*/)) {
+                    btok = substr(segorig, 1, RLENGTH)
+                    sub(/=+$/, "", btok)
+                    while (length(btok) % 4) btok = btok "="
+                }
+                if (scheme == "basic" && length(btok) >= 4 && length(btok) < 20 && basiccred(btok)) flag("authorization-header")
                 else if (length(seg) >= 20) flag("authorization-header")
             }
             # split() keeps this linear on very long (minified) lines.

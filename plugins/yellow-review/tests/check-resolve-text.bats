@@ -150,6 +150,22 @@ require_timeout() {
 
 pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
 
+# awk_expect <awk binary> <expected status> <text> [locale]: scan <text> (printf
+# %b escapes) with <binary> exposed as `awk`, under <locale> when given.
+awk_expect() {
+  local dir="${BATS_TEST_TMPDIR}/awkbin-$1"
+  mkdir -p "$dir"
+  ln -sfn "$(command -v "$1")" "$dir/awk"
+  printf '%b' "$3" >| "$A"
+  PATH="$dir:${PATH}" LC_ALL="${4-}" run "$SCRIPT" "$A"
+  [ "$status" -eq "$2" ] || { echo "$1 ${4:-default locale}: want $2 got $status for [$3]"; false; }
+}
+
+# locale_installed <name>: C.UTF-8 is listed as C.utf8 by `locale -a`.
+locale_installed() {
+  locale -a 2>/dev/null | tr 'A-Z' 'a-z' | grep -qx "$(printf '%s' "$1" | tr -d '-' | tr 'A-Z' 'a-z')"
+}
+
 @test "each token prefix is flagged at its length floor and clean one below" {
   # prefix:floor (token length including the prefix)
   for spec in 'gh''p_:24' 'gh''o_:24' 'gh''u_:24' 'gh''s_:24' 'gh''r_:24' \
@@ -329,7 +345,7 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
 }
 
 @test "a token prefix after an = is flagged at its length floor and clean one below" {
-  for spec in 'gh''p_:24' 'github''_pat_:30' 'AK''IA:20' 'xo''xb-:14' 'sk''-:23' 'sk''_live_:24'; do
+  for spec in 'gh''p_:24' 'github''_pat_:30' 'AK''IA:20' 'xo''xb-:14' 'sk''-:23' 'sk''_live_:24' 'tv''ly-:25' 'pp''lx-:45' 'sg''p_:24'; do
     prefix=${spec%:*}
     floor=${spec##*:}
     printf 'x auth=%s%s y\n' "$prefix" "$(pad $((floor - ${#prefix})))" >| "$A"
@@ -1405,5 +1421,81 @@ rule=forged line=9.txt"
     with_awk "$bin" 0 "x ${px}${a39} y\n"
     with_awk "$bin" 6 "x ${sg}${a20} y\n"
     with_awk "$bin" 0 "x ${sg}${a19} y\n"
+  done
+}
+
+@test "Basic tokens: padding, colon position, trailing punctuation and malformed shapes agree under gawk and mawk" {
+  one=$(printf 'ab:cd' | base64 | tr -d '\n')
+  two=$(printf 'ab:c' | base64 | tr -d '\n')
+  colonfirst=$(printf ':abc' | base64 | tr -d '\n')
+  colonlast=$(printf 'abc:' | base64 | tr -d '\n')
+  for bin in gawk mawk; do
+    command -v "$bin" >/dev/null 2>&1 || { echo "missing $bin"; false; }
+    # padded with one and with two =
+    awk_expect "$bin" 6 "Authorization: Basic ${one}\n"
+    awk_expect "$bin" 6 "Authorization: Basic ${two}\n"
+    # sentence punctuation after the token
+    awk_expect "$bin" 6 "Authorization: Basic ${two}.\n"
+    awk_expect "$bin" 6 "Authorization: Basic ${one},\n"
+    # no padding at all
+    awk_expect "$bin" 6 "Authorization: Basic ${two%%=*}\n"
+    # a colon first or last is no user:pass
+    awk_expect "$bin" 0 "Authorization: Basic ${colonfirst}\n"
+    awk_expect "$bin" 0 "Authorization: Basic ${colonlast}\n"
+    # = in the middle, and a length that cannot be base64
+    awk_expect "$bin" 0 'Authorization: Basic YW=I6Yw==\n'
+    awk_expect "$bin" 0 'Authorization: Basic YWI6Y\n'
+    awk_expect "$bin" 0 'Authorization: Basic Authentication.\n'
+  done
+}
+
+@test "Basic tokens: two on one line, an upper-case header and a bare scheme are all found" {
+  tok4=$(printf 'a:b' | base64 | tr -d '\n')
+  for bin in gawk mawk; do
+    awk_expect "$bin" 6 "see Authorization: Basic AAAA then Authorization: Basic ${tok4}\n"
+    awk_expect "$bin" 6 "AUTHORIZATION: BASIC ${tok4}\n"
+    awk_expect "$bin" 6 "got basic ${tok4} back\n"
+    awk_expect "$bin" 0 'see Authorization: Basic AAAA and Authorization: Basic AAAB\n'
+  done
+}
+
+@test "ordinary prose that follows the word basic stays clean; a bare basic token is the pinned exception" {
+  tok4=$(printf 'a:b' | base64 | tr -d '\n')
+  for bin in gawk mawk; do
+    for text in 'basic setup' 'basic usage' 'basic tests' 'This is the basic example.' \
+                'See the basic overview and the basic concepts.' 'basic configuration' 'basic authentication'; do
+      awk_expect "$bin" 0 "${text}\n"
+    done
+    awk_expect "$bin" 6 "basic ${tok4}\n"
+  done
+}
+
+@test "a leading non-ASCII quote, bullet, dash or no-break space cannot exempt a multi-word credential; accented letters stay prose" {
+  ran=0
+  for loc in C C.UTF-8; do
+    locale_installed "$loc" || continue
+    for bin in gawk mawk; do
+      ran=$((ran + 1))
+      awk_expect "$bin" 6 'password:\n  “correct horse battery staple”\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  • correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  — correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xc2\xa0correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  élève a trois mots ici\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  Élève a trois mots ici\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  “Correct horse battery staple”\n' "$loc"
+    done
+  done
+  [ "$ran" -ge 2 ]
+}
+
+@test "the tvly-, pplx- and sgp_ prefixes count - and _ in the body and end at an invalid character" {
+  body=$(printf 'A-B_%.0s' $(seq 1 12))
+  for prefix in 'tv''ly-' 'pp''lx-' 'sg''p_'; do
+    printf 'x %s%s y\n' "$prefix" "$body" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 6 ] || { echo "not flagged with - and _ in the body: $prefix"; false; }
+    printf 'x %s%s!%s y\n' "$prefix" "$(pad 10)" "$(pad 10)" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 0 ] || { echo "flagged across an invalid character: $prefix"; false; }
   done
 }

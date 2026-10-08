@@ -196,7 +196,9 @@ fi
 # a contradictory reply. The exception is an upgrade from a reply that left
 # the thread open (disagree, unclear) to one that lets the caller resolve it
 # (fixed, addressed, oos): skipping would resolve the thread with no evidence
-# posted. No match prints nothing and exits 0; a jq failure must not read as
+# posted. A prior oos also upgrades to fixed or addressed (the code was fixed
+# after all); a second oos, and an oos followed by disagree or unclear, still
+# skip. No match prints nothing and exits 0; a jq failure must not read as
 # "no marker", or the reply the marker exists to prevent would be posted.
 if ! PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
     ("<!-- yellow-review:resolve v1 thread=" + $thread + " disposition=(?<d>fixed|addressed|oos|disagree|unclear) -->$") as $re
