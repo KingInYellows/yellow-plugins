@@ -88,6 +88,11 @@ export function resolveLockPath(dataDir: string): string {
   return path.join(resolveStateDir(dataDir), '.lock');
 }
 
+/** `state/grants.json`: written only by the TTY-confirmed `authorize` path and the counters it guards. */
+export function resolveGrantsPath(dataDir: string): string {
+  return path.join(resolveStateDir(dataDir), 'grants.json');
+}
+
 export function resolveArtifactsDir(dataDir: string): string {
   return path.join(dataDir, 'artifacts');
 }
@@ -135,6 +140,11 @@ export function findGitWorkTree(start: string): string | undefined {
     if (parent === current) return undefined;
     current = parent;
   }
+}
+
+/** Canonical absolute path: symlinks resolved on the longest existing prefix. */
+export function canonicalPath(target: string): string {
+  return realpathOfExistingPrefix(target);
 }
 
 export interface DataDirLocationContext {
@@ -303,4 +313,50 @@ function isSymlink(target: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * R38: the controller authority file lives outside `<dataDir>`, so a copied
+ * or restored data directory cannot carry it along. Precedence:
+ * `YELLOW_JULES_CONTROLLER_DIR` > `$XDG_STATE_HOME/yellow-jules-controller` >
+ * `~/.local/state/yellow-jules-controller`. Created 0700.
+ *
+ * The directory and `dataDir` must not contain each other by canonical path:
+ * otherwise copying the data directory (or its parent) would also copy the
+ * file that is meant to detect the copy.
+ */
+export function resolveControllerDir(
+  dataDir: string,
+  env: NodeJS.ProcessEnv = process.env,
+  homedir: () => string = os.homedir
+): string {
+  const explicit = env['YELLOW_JULES_CONTROLLER_DIR'];
+  const xdgStateHome = env['XDG_STATE_HOME'];
+  let dir: string;
+  if (explicit && explicit.length > 0) {
+    dir = explicit;
+  } else if (xdgStateHome && xdgStateHome.length > 0) {
+    dir = path.join(xdgStateHome, 'yellow-jules-controller');
+  } else {
+    dir = path.join(homedir(), '.local', 'state', 'yellow-jules-controller');
+  }
+  if (!path.isAbsolute(dir)) {
+    return throwAppError(
+      'JULES_DATA_DIR',
+      'the controller directory must be an absolute path'
+    );
+  }
+  const realController = realpathOfExistingPrefix(dir);
+  const realData = realpathOfExistingPrefix(dataDir);
+  if (
+    isInside(realData, realController) ||
+    isInside(realController, realData)
+  ) {
+    return throwAppError(
+      'JULES_DATA_DIR',
+      'the controller directory and the data directory must not contain each other'
+    );
+  }
+  ensureOwnerOnlyDir(dir);
+  return dir;
 }

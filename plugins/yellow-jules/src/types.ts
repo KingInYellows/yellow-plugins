@@ -251,8 +251,55 @@ export interface OperationRecord {
   readonly artifactResumeRestartCount?: number;
   readonly artifacts: readonly ArtifactRecord[];
   readonly deviations: readonly DeviationRecord[];
+  /** Written only by `status --reconcile`; `abandon` accepts only `ambiguous-reconcile` and `not-reached`. */
+  readonly lastReconcile?: {
+    readonly outcome: ReconcileOutcome;
+    readonly reason?: string;
+    readonly observedAt: string;
+  };
+  /** Written only by `supervise` (R32, R33). */
+  readonly supervision?: SupervisionState;
+  /** Set only by `abandon`, which maps onto terminal `failed` (no new status). */
+  readonly abandonedAt?: string;
+  readonly abandonReason?: string;
   readonly createdAt: string;
   readonly updatedAt: string;
+}
+
+export type ReconcileOutcome =
+  | 'bound'
+  | 'released'
+  | 'ambiguous-reconcile'
+  | 'policy-deviation'
+  | 'unknown-outcome'
+  | 'not-reached';
+
+export type SupervisionDecision =
+  | 'no-change'
+  | 'check-failed'
+  | 'pass-aborted'
+  | 'needs-plan-review'
+  | 'needs-answer'
+  | 'needs-verification'
+  | 'escalate'
+  | 'paused';
+
+/** Per-session supervision memory: a pause, the check-failed backoff, and the last decision. */
+export interface SupervisionState {
+  readonly paused?: {
+    readonly reason: string;
+    readonly observedAt: string;
+    readonly activityId?: string;
+  };
+  readonly backoff?: {
+    readonly failures: number;
+    /** ISO time before which the next pass is advised to wait. */
+    readonly nextCheckAt: string;
+  };
+  readonly lastDecision?: {
+    readonly decision: SupervisionDecision;
+    readonly decidedAt: string;
+  };
 }
 
 export interface Journal {
@@ -261,4 +308,63 @@ export interface Journal {
   readonly archiveVisibilityConfirmed: boolean;
   /** Keyed by localRequestId; built with Object.create(null). */
   readonly operations: Record<string, OperationRecord>;
+}
+
+// ---------------------------------------------------------------------------
+// Grants (R30) and the controller authority (R38)
+// ---------------------------------------------------------------------------
+
+export type GrantOperation = 'create' | 'reply' | 'approve' | 'collect';
+
+/** The R38 reference every grant carries to the host-local controller authority file. */
+export interface EpochRef {
+  readonly controllerId: string;
+  readonly epoch: number;
+}
+
+export interface GrantUsage {
+  /** Session resources (or reservation request ids before binding) holding an active-session slot. */
+  readonly activeSessionRefs: readonly string[];
+  /** Never decrements (R31). */
+  readonly totalTasks: number;
+  /** Keyed by task ref; built with Object.create(null). */
+  readonly correctiveRounds: Readonly<Record<string, number>>;
+}
+
+export interface GrantRecord {
+  /** `jg-<32 hex>`. */
+  readonly grantId: string;
+  /** `owner/repo`. */
+  readonly repository: string;
+  readonly sourceResource: string;
+  /** An exact ref, or a ref ending in a single trailing `*`. */
+  readonly branchPattern: string;
+  readonly taskRefs: readonly string[];
+  readonly operations: readonly GrantOperation[];
+  readonly maxActiveSessions: number;
+  readonly maxTotalTasks: number;
+  readonly maxCorrectiveRounds: number;
+  readonly expiresAt: string;
+  readonly createdAt: string;
+  readonly owner: string;
+  readonly controllerId: string;
+  readonly epochRef: EpochRef;
+  readonly revokedAt?: string;
+  readonly usage: GrantUsage;
+}
+
+/** `state/grants.json`, written only by the TTY-confirmed `authorize` path and the counters it guards. */
+export interface GrantsFile {
+  readonly version: 1;
+  /** Keyed by grantId; built with Object.create(null). */
+  readonly grants: Record<string, GrantRecord>;
+}
+
+/** `<controllerDir>/<controllerId>.json` (R38). */
+export interface ControllerAuthority {
+  readonly controllerId: string;
+  readonly epoch: number;
+  /** Canonical realpath of the data directory this file authorizes. */
+  readonly dataDir: string;
+  readonly updatedAt: string;
 }

@@ -82,7 +82,7 @@ const CODE_TABLE = {
     },
     JULES_CONFIRMATION_REQUIRED: {
         retryable: false,
-        recoveryAction: 'Confirm through the command wrapper, or pass a grant written by authorize.',
+        recoveryAction: 'Pass --grant-id from a grant written by authorize, or run the authorize command yourself in a terminal on the controller host.',
     },
     JULES_AUTHORITY_DENIED: {
         retryable: false,
@@ -90,7 +90,7 @@ const CODE_TABLE = {
     },
     JULES_GRANT_EXPIRED: {
         retryable: false,
-        recoveryAction: 'The grant or deadline expired; the remote session may still run. Stop it from the Jules console, revoke the source connection, or rotate JULES_API_KEY.',
+        recoveryAction: 'The grant expired; remote work may still run and expiry does not stop it. Contain it out of band: stop the session from the Jules console, revoke the source connection, or rotate JULES_API_KEY.',
     },
     JULES_POLICY_DEVIATION: {
         retryable: false,
@@ -119,6 +119,18 @@ const CODE_TABLE = {
     JULES_DATA_DIR: {
         retryable: false,
         recoveryAction: 'Make the data directory owner-only (0700), owned by you, outside any git work tree and the plugin directory, with a writable sdk-scratch/.',
+    },
+    JULES_CONTROLLER_MISMATCH: {
+        retryable: false,
+        recoveryAction: 'This data directory is not the authorized controller copy; follow the handoff procedure in the plugin CLAUDE.md.',
+    },
+    JULES_GRANT_EXHAUSTED: {
+        retryable: false,
+        recoveryAction: 'Create a new grant with authorize.',
+    },
+    JULES_SUPERVISION_PAUSED: {
+        retryable: false,
+        recoveryAction: 'Inspect the session, then run supervise --clear-pause in a terminal.',
     },
 };
 // replica:makeAppError:start

@@ -79,7 +79,10 @@ export type AppErrorCode =
   | 'JULES_NO_PROGRESS'
   | 'JULES_SDK_MISSING'
   | 'JULES_SDK_INTEGRITY'
-  | 'JULES_DATA_DIR';
+  | 'JULES_DATA_DIR'
+  | 'JULES_CONTROLLER_MISMATCH'
+  | 'JULES_GRANT_EXHAUSTED'
+  | 'JULES_SUPERVISION_PAUSED';
 
 // replica:AppError:start
 export interface AppError {
@@ -156,7 +159,7 @@ const CODE_TABLE: Record<AppErrorCode, CodeDefaults> = {
   JULES_CONFIRMATION_REQUIRED: {
     retryable: false,
     recoveryAction:
-      'Confirm through the command wrapper, or pass a grant written by authorize.',
+      'Pass --grant-id from a grant written by authorize, or run the authorize command yourself in a terminal on the controller host.',
   },
   JULES_AUTHORITY_DENIED: {
     retryable: false,
@@ -166,7 +169,7 @@ const CODE_TABLE: Record<AppErrorCode, CodeDefaults> = {
   JULES_GRANT_EXPIRED: {
     retryable: false,
     recoveryAction:
-      'The grant or deadline expired; the remote session may still run. Stop it from the Jules console, revoke the source connection, or rotate JULES_API_KEY.',
+      'The grant expired; remote work may still run and expiry does not stop it. Contain it out of band: stop the session from the Jules console, revoke the source connection, or rotate JULES_API_KEY.',
   },
   JULES_POLICY_DEVIATION: {
     retryable: false,
@@ -201,6 +204,20 @@ const CODE_TABLE: Record<AppErrorCode, CodeDefaults> = {
     retryable: false,
     recoveryAction:
       'Make the data directory owner-only (0700), owned by you, outside any git work tree and the plugin directory, with a writable sdk-scratch/.',
+  },
+  JULES_CONTROLLER_MISMATCH: {
+    retryable: false,
+    recoveryAction:
+      'This data directory is not the authorized controller copy; follow the handoff procedure in the plugin CLAUDE.md.',
+  },
+  JULES_GRANT_EXHAUSTED: {
+    retryable: false,
+    recoveryAction: 'Create a new grant with authorize.',
+  },
+  JULES_SUPERVISION_PAUSED: {
+    retryable: false,
+    recoveryAction:
+      'Inspect the session, then run supervise --clear-pause in a terminal.',
   },
 };
 

@@ -45,15 +45,18 @@ exports.resolveRuntimeDir = resolveRuntimeDir;
 exports.resolveStateDir = resolveStateDir;
 exports.resolveJournalPath = resolveJournalPath;
 exports.resolveLockPath = resolveLockPath;
+exports.resolveGrantsPath = resolveGrantsPath;
 exports.resolveArtifactsDir = resolveArtifactsDir;
 exports.resolveSdkScratchDir = resolveSdkScratchDir;
 exports.resolvePluginRoot = resolvePluginRoot;
 exports.findGitWorkTree = findGitWorkTree;
+exports.canonicalPath = canonicalPath;
 exports.assertDataDirLocation = assertDataDirLocation;
 exports.assertOwnerOnlyDir = assertOwnerOnlyDir;
 exports.assertOwnerOnlyFile = assertOwnerOnlyFile;
 exports.ensureOwnerOnlyDir = ensureOwnerOnlyDir;
 exports.prepareDataDir = prepareDataDir;
+exports.resolveControllerDir = resolveControllerDir;
 const fs = __importStar(require("node:fs"));
 const os = __importStar(require("node:os"));
 const path = __importStar(require("node:path"));
@@ -114,6 +117,10 @@ function resolveJournalPath(dataDir) {
 function resolveLockPath(dataDir) {
     return path.join(resolveStateDir(dataDir), '.lock');
 }
+/** `state/grants.json`: written only by the TTY-confirmed `authorize` path and the counters it guards. */
+function resolveGrantsPath(dataDir) {
+    return path.join(resolveStateDir(dataDir), 'grants.json');
+}
 function resolveArtifactsDir(dataDir) {
     return path.join(dataDir, 'artifacts');
 }
@@ -158,6 +165,10 @@ function findGitWorkTree(start) {
             return undefined;
         current = parent;
     }
+}
+/** Canonical absolute path: symlinks resolved on the longest existing prefix. */
+function canonicalPath(target) {
+    return realpathOfExistingPrefix(target);
 }
 /**
  * R15/R35: provider state never lives under a source clone or the plugin
@@ -289,4 +300,39 @@ function isSymlink(target) {
     catch {
         return false;
     }
+}
+/**
+ * R38: the controller authority file lives outside `<dataDir>`, so a copied
+ * or restored data directory cannot carry it along. Precedence:
+ * `YELLOW_JULES_CONTROLLER_DIR` > `$XDG_STATE_HOME/yellow-jules-controller` >
+ * `~/.local/state/yellow-jules-controller`. Created 0700.
+ *
+ * The directory and `dataDir` must not contain each other by canonical path:
+ * otherwise copying the data directory (or its parent) would also copy the
+ * file that is meant to detect the copy.
+ */
+function resolveControllerDir(dataDir, env = process.env, homedir = os.homedir) {
+    const explicit = env['YELLOW_JULES_CONTROLLER_DIR'];
+    const xdgStateHome = env['XDG_STATE_HOME'];
+    let dir;
+    if (explicit && explicit.length > 0) {
+        dir = explicit;
+    }
+    else if (xdgStateHome && xdgStateHome.length > 0) {
+        dir = path.join(xdgStateHome, 'yellow-jules-controller');
+    }
+    else {
+        dir = path.join(homedir(), '.local', 'state', 'yellow-jules-controller');
+    }
+    if (!path.isAbsolute(dir)) {
+        return (0, errors_js_1.throwAppError)('JULES_DATA_DIR', 'the controller directory must be an absolute path');
+    }
+    const realController = realpathOfExistingPrefix(dir);
+    const realData = realpathOfExistingPrefix(dataDir);
+    if (isInside(realData, realController) ||
+        isInside(realController, realData)) {
+        return (0, errors_js_1.throwAppError)('JULES_DATA_DIR', 'the controller directory and the data directory must not contain each other');
+    }
+    ensureOwnerOnlyDir(dir);
+    return dir;
 }

@@ -164,7 +164,7 @@ through the generator and documenting the single-controller handoff procedure.
   - **Local state, R38:** fix the controller authority file shape and the `JULES_CONTROLLER_MISMATCH` code.
   - **Autonomy boundaries:** add the documented ceilings.
 - [x] Step 2: Annotate spec Open Questions 5 and 6 in `plans/specs/yellow-jules-integration.md` with the 2026-10-08 decisions. These are docs-only one-line "Decided" notes.
-- [ ] Step 3: Add the new types to `plugins/yellow-jules/src/types.ts`.
+- [x] Step 3: Add the new types to `plugins/yellow-jules/src/types.ts`.
   - `GrantOperation = 'create'|'reply'|'approve'|'collect'`.
   - `GrantRecord`, with these fields:
     - `grantId` (`jg-<32 hex>`), `repository`, `sourceResource`, `branchPattern`, `taskRefs[]`, `operations[]`;
@@ -174,14 +174,14 @@ through the generator and documenting the single-controller handoff procedure.
   - `GrantsFile = { version: 1, grants }`, built with `Object.create(null)`.
   - `SupervisionState` on `OperationRecord`: `{ paused?: { reason, observedAt, activityId? }, backoff?: { failures, nextCheckAt }, lastDecision? }`.
   - `abandonedAt?` and `abandonReason?` on `OperationRecord`. `abandon` maps onto terminal `failed`; no new status is added.
-- [ ] Step 4: Extend `src/validate.ts` with `validateGrantId`, `validateBranchPattern`, `validateOperations` and `validateControllerId`. Branch patterns are an exact ref or a single trailing `*` glob, anchored and length-bounded.
-- [ ] Step 5: Extend `src/config.ts` with two resolvers.
+- [x] Step 4: Extend `src/validate.ts` with `validateGrantId`, `validateBranchPattern`, `validateOperations` and `validateControllerId`. Branch patterns are an exact ref or a single trailing `*` glob, anchored and length-bounded.
+- [x] Step 5: Extend `src/config.ts` with two resolvers.
   - `resolveGrantsPath` returns `state/grants.json`.
   - `resolveControllerDir(env = process.env)`:
     - The precedence is `YELLOW_JULES_CONTROLLER_DIR` > `$XDG_STATE_HOME/yellow-jules-controller` > `~/.local/state/yellow-jules-controller`.
     - It must resolve outside `<dataDir>` by canonical path; otherwise it fails with `JULES_DATA_DIR`.
     - It is created `0700`, using `ensureOwnerOnlyDir`.
-- [ ] Step 6: Add `JULES_CONTROLLER_MISMATCH` to `src/errors.ts`, outside the `replica:` markers.
+- [x] Step 6: Add `JULES_CONTROLLER_MISMATCH` to `src/errors.ts`, outside the `replica:` markers.
   - `retryable: false`.
   - recovery: "this data directory is not the authorized controller copy; follow the handoff procedure in the plugin CLAUDE.md".
   - Also add `JULES_GRANT_EXHAUSTED`, with recovery "create a new grant with `authorize`", and `JULES_SUPERVISION_PAUSED`, with recovery "inspect the session, then run `supervise --clear-pause` in a terminal".

@@ -17,8 +17,8 @@ import {
 } from '../src/sdk-adapter.js';
 
 describe('code table', () => {
-  it('holds exactly the 22 contract codes, each with a recovery action', () => {
-    expect(ALL_APP_ERROR_CODES).toHaveLength(22);
+  it('holds exactly the 25 contract codes, each with a recovery action', () => {
+    expect(ALL_APP_ERROR_CODES).toHaveLength(25);
     for (const code of ALL_APP_ERROR_CODES) {
       expect(code).toMatch(/^JULES_[A-Z_]+$/);
       expect(makeAppError(code, 'm').recoveryAction.length).toBeGreaterThan(0);
