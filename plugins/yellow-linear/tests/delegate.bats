@@ -218,19 +218,80 @@ setup() {
   printf '%s\n' "$providers_block" | grep -qF '`cursor`, `devin`, or `jules`'
 }
 
-@test "the jules dispatch branch is a fail-closed stub" {
+@test "the jules branch launches through the yellow-jules CLI, and only with a --grant-id" {
   jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
   [ -n "$jules_block" ]
-  printf '%s\n' "$jules_block" | grep -qF 'Jules delegation is not available yet'
-  printf '%s\n' "$jules_block" | grep -qE '^exit 1$'
+  # The live path: dry-run first, then a real delegate that carries the grant.
+  printf '%s\n' "$jules_block" | grep -qF 'delegate --repo "$REPO_PATH"'
+  printf '%s\n' "$jules_block" | grep -qF -- '--dry-run)'
+  printf '%s\n' "$jules_block" | grep -qF -- '--grant-id "$GRANT_ID")'
+  printf '%s\n' "$jules_block" | grep -qF -- '--request-id "$REQUEST_ID"'
+  # The CLI comes from the resolved plugin root, never a relative guess.
+  printf '%s\n' "$jules_block" | grep -qF 'CLI="${YELLOW_JULES_ROOT}/dist/cli.js"'
+  # The old fail-closed stub is gone.
+  run grep -F 'Jules delegation is not available yet' "$DELEGATE_MD"
+  [ "$status" -eq 1 ]
 }
 
-@test "the jules branch never invokes the yellow-jules CLI or any vendor surface" {
+@test "the jules branch previews the covering grant and confirms with AskUserQuestion before launching" {
   jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
-  run bash -c 'printf "%s\n" "$1" | grep -E "dist/cli\.js|jules\.googleapis|node " ' _ "$jules_block"
+  printf '%s\n' "$jules_block" | grep -qF '`AskUserQuestion`: "Launch this Jules session'
+  printf '%s\n' "$jules_block" | grep -qF 'MODE='"'"'launch'"'"''
+  # The launch path is only reachable behind MODE=launch, after the confirmation.
+  printf '%s\n' "$jules_block" | grep -qF 'if [ "$MODE" = "launch" ]; then'
+  printf '%s\n' "$jules_block" | grep -qF 'plan approval is required'  || printf '%s\n' "$jules_block" | grep -qF 'Plan approval is required'
+}
+
+@test "with no covering grant the jules branch prints the terminal authorize command and sends nothing" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  printf '%s\n' "$jules_block" | grep -qF 'grant_id=NONE'
+  printf '%s\n' "$jules_block" | grep -qF 'authorize --repo %s --branch %s --task-ref %s --operations create --owner YOUR_NAME'
+  printf '%s\n' "$jules_block" | grep -qF 'separate terminal window'
+  printf '%s\n' "$jules_block" | grep -qF 'Do not try to run `authorize` yourself'
+  # The refusal path ends before any launch and posts no Linear comment.
+  printf '%s\n' "$jules_block" | grep -qF 'no Linear comment is posted'
+}
+
+@test "the jules branch can only ever run authorize --list, never grant creation" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  # Every executed (node ...) authorize call is --list; creation appears only inside printf text.
+  run bash -c 'printf "%s\n" "$1" | grep -E "^[[:space:]]*[A-Z_]+=\$\(node .* authorize " | grep -v -- "--list"' _ "$jules_block"
+  [ "$status" -eq 1 ]
+  run bash -c 'printf "%s\n" "$1" | grep -E "^[[:space:]]*node .* authorize "' _ "$jules_block"
+  [ "$status" -eq 1 ]
+}
+
+@test "the jules branch never talks to the vendor API directly" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  run bash -c 'printf "%s\n" "$1" | grep -E "curl|jules\.googleapis|JULES_API_KEY"' _ "$jules_block"
   [ "$status" -eq 1 ]
   run grep -F 'jules.googleapis.com' "$DELEGATE_MD"
   [ "$status" -eq 1 ]
+}
+
+@test "the jules branch checks the branch exists on origin and the remote is github.com" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  printf '%s\n' "$jules_block" | grep -qF 'git ls-remote --exit-code --heads origin "$BRANCH"'
+  printf '%s\n' "$jules_block" | grep -qF 'https://github.com/*) REPO_PATH='
+  printf '%s\n' "$jules_block" | grep -qF 'git@github.com:*) REPO_PATH='
+}
+
+@test "the jules branch substitutes values into single quotes and shape-checks the packet path" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  printf '%s\n' "$jules_block" | grep -qF "ISSUE_ID='YELLOW_TODO_issue_id'"
+  printf '%s\n' "$jules_block" | grep -qF "PACKET_FILE='YELLOW_TODO_packet_path_from_path_step'"
+  printf '%s\n' "$jules_block" | grep -qF '/*/yellow-linear-packet.??????/packet.txt) ;;'
+}
+
+@test "the intro and error table describe the live jules path" {
+  run grep -F 'cannot launch yet' "$DELEGATE_MD"
+  [ "$status" -eq 1 ]
+  run grep -F 'Provider resolves to `jules` and no grant covers the issue' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F 'Jules CLI returns `{ok:false}`' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F 'JULES_UNKNOWN_OUTCOME' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
 }
 
 @test "the classifier receives the jules tooling probe" {

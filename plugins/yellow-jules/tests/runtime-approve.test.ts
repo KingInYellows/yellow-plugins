@@ -85,6 +85,9 @@ describe('approve --dry-run (the R34 re-fetch)', () => {
       dryRun: true,
       observedPlanId: 'plan-1',
       sessionResource: session.sessionResource,
+      repository: 'acme/widgets',
+      requestedBranch: 'scratch/one',
+      taskRef: 't1',
     });
     expect(result).not.toHaveProperty('approvedPlanId');
     expect(result).not.toHaveProperty('verificationDeferred');

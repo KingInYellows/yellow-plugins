@@ -315,7 +315,7 @@ through the generator and documenting the single-controller handoff procedure.
 
 ### Phase E: Claude wrappers and Linear route
 
-- [ ] Step 22: Create `plugins/yellow-jules/commands/jules/delegate.md`, `reply.md` and `approve.md`.
+- [x] Step 22: Create `plugins/yellow-jules/commands/jules/delegate.md`, `reply.md` and `approve.md`.
   - **Pattern:** `collect.md` frontmatter and body, and the flow from cursor `delegate.md:53-130`.
   - **Frontmatter:** `allowed-tools: [Bash, AskUserQuestion]`.
   - **Body:**
@@ -326,15 +326,15 @@ through the generator and documenting the single-controller handoff procedure.
     5. Show a fenced preview and confirm with AskUserQuestion (R8).
     6. Run with `--grant-id` and the same `--request-id`. Never auto-retry, and on `JULES_UNKNOWN_OUTCOME` say "reconcile with `status --reconcile`".
   - **Error table:** include the new codes.
-- [ ] Step 23: Create `commands/jules/authorize.md` with `allowed-tools: [Bash]`.
+- [x] Step 23: Create `commands/jules/authorize.md` with `allowed-tools: [Bash]`.
   - `--list` and `--revoke` run directly.
   - Grant creation and `--take-over` validate the flags and print the exact `node <plugin-root>/dist/cli.js authorize …` command for the owner to run in their own terminal. The body explains why the agent cannot run it.
   - Create `commands/jules/abandon.md` the same way, for terminal-only use.
-- [ ] Step 24: Create `commands/jules/supervise.md` with `allowed-tools: [Bash, AskUserQuestion]`. It runs one `supervise` pass and renders the decision with the fenced vendor text.
+- [x] Step 24: Create `commands/jules/supervise.md` with `allowed-tools: [Bash, AskUserQuestion]`. It runs one `supervise` pass and renders the decision with the fenced vendor text.
   - **`needs-plan-review` or `needs-answer`:** the session evaluates or answers, then runs at most one `approve` or `reply` under the same grant. The pass then ends.
   - **Every pass:** report the decision and `nextCheck`.
   - It is not a thin `Skill` wrapper. The skill is a reference, following the cursor pattern.
-- [ ] Step 25: Replace the fail-closed `**Jules.**` branch in `plugins/yellow-linear/commands/linear/delegate.md` (about `:581-587`) with a live call. Re-anchor the line numbers.
+- [x] Step 25: Replace the fail-closed `**Jules.**` branch in `plugins/yellow-linear/commands/linear/delegate.md` (about `:581-587`) with a live call. Re-anchor the line numbers.
   - The branch dry-runs, looks up a grant, confirms via AskUserQuestion, then runs `node "$YELLOW_JULES_ROOT/dist/cli.js" delegate … --grant-id`.
   - With no grant it prints the terminal `authorize` command.
   - Update the result and error rows (about `:656`, `:674`, `:693`) and the intro (`:25-27`).

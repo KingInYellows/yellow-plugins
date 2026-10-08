@@ -79,6 +79,18 @@ describe('reply --dry-run', () => {
     expect(h.adapter.writeCount()).toBe(0);
   });
 
+  it('reports the scope a covering grant must match', async () => {
+    const result = await reply(
+      h.deps,
+      args({ dryRun: true, grantId: undefined })
+    );
+    expect(result).toMatchObject({
+      repository: 'acme/widgets',
+      requestedBranch: 'scratch/one',
+      taskRef: 't1',
+    });
+  });
+
   it('an unknown session is JULES_NOT_FOUND', async () => {
     expect(
       await codeOf(() =>

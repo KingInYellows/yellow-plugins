@@ -167,6 +167,7 @@ async function delegateInner(deps, args, ids) {
                 repository,
                 requestedBranch: branch,
                 sourceResource,
+                ...(taskRef !== undefined ? { taskRef } : {}),
                 dryRun: true,
             };
         }
@@ -276,6 +277,19 @@ function requireOwner(target, ids) {
     }
     return owner;
 }
+/** The repository, branch and task a grant must cover, when this plugin created the session. */
+function scopeOf(target) {
+    const owner = target.owner;
+    return {
+        ...(owner?.repository !== undefined
+            ? { repository: owner.repository }
+            : {}),
+        ...(owner?.requestedBranch !== undefined
+            ? { requestedBranch: owner.requestedBranch }
+            : {}),
+        ...(owner?.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
+    };
+}
 async function reply(deps, args) {
     const localRequestId = args.requestId !== undefined
         ? (0, validate_js_1.validateRequestId)(args.requestId)
@@ -315,6 +329,7 @@ async function replyInner(deps, args, ids) {
                 sessionResource: target.sessionResource,
                 sent: false,
                 dryRun: true,
+                ...scopeOf(target),
             };
         }
         const grantId = (0, validate_js_1.validateGrantId)(args.grantId);
@@ -476,6 +491,7 @@ async function approveInner(deps, args, ids) {
                 sessionResource: target.sessionResource,
                 dryRun: true,
                 observedPlanId: newest.planId,
+                ...scopeOf(target),
                 ...(0, runtime_support_js_1.attentionOf)(changed ? ['planChanged'] : []),
             };
         }

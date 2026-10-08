@@ -215,6 +215,7 @@ export interface DelegateDryRunResult {
   readonly repository: string;
   readonly requestedBranch: string;
   readonly sourceResource: string;
+  readonly taskRef?: string;
   readonly dryRun: true;
 }
 
@@ -296,6 +297,7 @@ async function delegateInner(
         repository,
         requestedBranch: branch,
         sourceResource,
+        ...(taskRef !== undefined ? { taskRef } : {}),
         dryRun: true as const,
       };
     }
@@ -485,6 +487,28 @@ export interface ReplyResult {
   readonly sessionResource: string;
   readonly sent: boolean;
   readonly dryRun?: true;
+  /** Dry run only: the scope a covering grant must match. */
+  readonly repository?: string;
+  readonly requestedBranch?: string;
+  readonly taskRef?: string;
+}
+
+/** The repository, branch and task a grant must cover, when this plugin created the session. */
+function scopeOf(target: SessionTarget): {
+  repository?: string;
+  requestedBranch?: string;
+  taskRef?: string;
+} {
+  const owner = target.owner;
+  return {
+    ...(owner?.repository !== undefined
+      ? { repository: owner.repository }
+      : {}),
+    ...(owner?.requestedBranch !== undefined
+      ? { requestedBranch: owner.requestedBranch }
+      : {}),
+    ...(owner?.taskRef !== undefined ? { taskRef: owner.taskRef } : {}),
+  };
 }
 
 export async function reply(
@@ -544,6 +568,7 @@ async function replyInner(
         sessionResource: target.sessionResource,
         sent: false,
         dryRun: true as const,
+        ...scopeOf(target),
       };
     }
     const grantId = validateGrantId(args.grantId);
@@ -643,6 +668,10 @@ export interface ApproveDryRunResult extends Attention {
   readonly dryRun: true;
   /** The plan id a confirmation binds to. */
   readonly observedPlanId: string;
+  /** The scope a covering grant must match. */
+  readonly repository?: string;
+  readonly requestedBranch?: string;
+  readonly taskRef?: string;
 }
 
 export interface ApproveResult extends Attention {
@@ -789,6 +818,7 @@ async function approveInner(
         sessionResource: target.sessionResource,
         dryRun: true as const,
         observedPlanId: newest.planId,
+        ...scopeOf(target),
         ...attentionOf(changed ? ['planChanged'] : []),
       };
     }
