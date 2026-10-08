@@ -1,0 +1,47 @@
+plugins/yellow-core/CLAUDE.md
+  s_5a877dc01e3810::t_9a0034dd9e0990 135-137,343-356
+  s_5a877dc01e3810::t_6907b300c7f10a 559
+docs/CONCEPTS.md
+  s_5a877dc01e3810::t_9a0034dd9e0990 92-97
+plugins/yellow-core/tests/plan-commands.bats
+  s_5a877dc01e3810::t_28ae06eadea501 353,385
+  s_5a877dc01e3810::t_26e72832a1feed 32-35,237-241,287-352,354-384,386-402
+tests/shell-compat/drivers/yellow-core--plan-gate-provenance.sh
+  s_5a877dc01e3810::t_4c34d5e7059578 75
+  s_5a877dc01e3810::t_0d32c6a907daba 3-4,13-14,22-32,37-38,44-48,55-56,73-74,76-80,84-86,89-90,93-102,105-106,110-124,127,129,133-134,140-147,150,153,159-160,163-172,183-190,192,199-205
+  s_5a877dc01e3810::t_05139939bd2dc2 206
+plugins/yellow-core/lib/plan-gate-provenance.sh
+  s_5a877dc01e3810::t_9a9382a9068025 2,7,12-13,15,17-22,24-26,28-46,48-61,73-77,92-102,134-143,147,149,151-155,159-163,166,168,174,178-182,193,197,202,207,214,220,224,226,231,237,243,247,251,260,267-271,278-285,289,293,297,301,305,309,313,315-336,341-342,346,352-356,359,364,372-512
+.changeset/gate-c-commit-subject-provenance.md
+  s_5a877dc01e3810::t_9a0034dd9e0990 8-16
+plugins/yellow-core/README.md
+  s_5a877dc01e3810::t_9a0034dd9e0990 33
+plugins/yellow-core/commands/plan/complete.md
+  s_5a877dc01e3810::t_d8cc9d1240a1ef 29-33,177-179,182-184,189-203,205-206,208,210,214-215,217-226,229-237,381-383,403-404,417-425,575-582,585
+  s_5a877dc01e3810::t_070a6427d6f0e6 216
+tests/shell-compat/tier4-libraries.bats
+  s_5a877dc01e3810::t_cac62f2ec1ce34 93,101-102,104,109-120,126-173,180
+docs/solutions/workflow/plan-lifecycle-management.md
+  s_5a877dc01e3810::t_9a0034dd9e0990 220-226,459-466,468-469,471-473,482-485,494-497
+plugins/yellow-core/tests/plan-gate-tier.bats
+  s_5a877dc01e3810::t_69cce5e8972e5d 151-152,154
+  s_5a877dc01e3810::t_28e7600ade8e58 1-150,153,155-167
+plans/gate-c-merge-queue-commit-subject-provenance.md
+  s_5a877dc01e3810::t_9a0034dd9e0990 56-59,64-65,74-76,108-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8a9d16561c7a5103ae443fb67b029335cc4b0255",
+  "prompts": {},
+  "sessions": {
+    "s_5a877dc01e3810": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6401b8c8-03bf-423a-a3e5-81d4258d52d9",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
