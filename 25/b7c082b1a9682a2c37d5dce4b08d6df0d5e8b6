@@ -1,0 +1,31 @@
+plugins/yellow-review/commands/review/setup.md
+  s_5a877dc01e3810::t_2bc0a231b2747a 82-84
+  s_5a877dc01e3810::t_95fe748f97e442 131-134
+.github/workflows/validate-schemas.yml
+  s_5a877dc01e3810::t_1154d425e4292d 1522
+.changeset/yellow-review-ctags-ci-fail.md
+  s_5a877dc01e3810::t_c563933fae8e6f 5
+plugins/yellow-review/tests/review-ledger.bats
+  s_5a877dc01e3810::t_530e20b499e11d 789-799
+  s_5a877dc01e3810::t_b56802870bb9f0 763-764
+plugins/yellow-review/lib/review-ledger.sh
+  s_5a877dc01e3810::t_6c5445b03ac3fc 840-842,844-848,850,853
+  s_5a877dc01e3810::t_3d6da5ae13c090 865-870
+  s_5a877dc01e3810::t_90aad0de09d8a1 830
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "25b7c082b1a9682a2c37d5dce4b08d6df0d5e8b6",
+  "prompts": {},
+  "sessions": {
+    "s_5a877dc01e3810": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6401b8c8-03bf-423a-a3e5-81d4258d52d9",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
