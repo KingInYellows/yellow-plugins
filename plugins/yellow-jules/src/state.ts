@@ -111,6 +111,7 @@ const OPTIONAL_STRING_FIELDS = [
   'artifactResumePageToken',
   'abandonedAt',
   'abandonReason',
+  'invalidatedBy',
 ] as const;
 
 const ARTIFACT_KINDS = new Set(['patch', 'pr-ref', 'generated-file']);
@@ -1332,6 +1333,23 @@ export async function claimOwnEchoes(
           },
           updatedAt: mark.observedAt,
         };
+        // Reservations already written for this session (a reply or approve
+        // between its reserve and its POST) were gated before the outside
+        // activity was seen; the pre-POST re-check reads this flag and refuses.
+        for (const r of Object.values(operations)) {
+          if (
+            r.status === 'reserved' &&
+            (r.kind === 'reply' || r.kind === 'approve') &&
+            r.sessionResource === sessionResource &&
+            r.invalidatedBy === undefined
+          ) {
+            operations[r.localRequestId] = {
+              ...r,
+              invalidatedBy: 'outside-activity',
+              updatedAt: mark.observedAt,
+            };
+          }
+        }
       }
       return outside;
     },

@@ -218,6 +218,26 @@ lists the outside activity so you read it before you confirm. If writes start
 failing with a paused error, look at the session first; a teammate may have
 commented on it.
 
+### Where the guarantee ends
+
+Revocation, expiry and outside activity are honoured up to the final local
+re-check, `assertGrantLiveBeforeWrite`, which runs just before the vendor call.
+A `reply` or `approve` that was reserved before outside activity was recorded is
+marked `invalidatedBy: 'outside-activity'` (in the same journal write as
+`outsideSeen`) and that re-check refuses it with `JULES_SUPERVISION_PAUSED`; a
+revoked grant is refused with `JULES_AUTHORITY_DENIED`. Both settle as a clean
+failure with no vendor call. Tests: `runtime-reply.test.ts` "races inside the
+write gate" (revoke after reserve; outside activity after reserve) and
+`runtime-delegate.test.ts` and `runtime-approve.test.ts` (revoke between
+reservation and POST).
+
+The residual window is between that re-check and the vendor POST: local state
+and the remote call cannot be made atomic, so a revoke or an outside message
+landing in that interval does not stop the write. `delegate` is wider: the SDK
+reads the source and sends the POST inside one `client.session()` call, so the
+re-check cannot be moved after the source read without changing the vendored
+SDK.
+
 ## Out-of-band containment (R39)
 
 Usable without any grant. Grant expiry, a deadline, a pause, and revocation do

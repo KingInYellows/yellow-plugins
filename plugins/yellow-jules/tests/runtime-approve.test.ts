@@ -19,6 +19,7 @@ import {
   type DelegatedSession,
   type GrantHarness,
   makeHarness,
+  revokeAfterReservation,
   setVendorState,
 } from './support/grants.js';
 
@@ -318,6 +319,20 @@ describe('checks that must hold at the moment of the write (inside the critical 
       approve(h.deps, args({ grantId: other, planId: 'plan-3' }))
     );
     expect(err.appError.code).toBe('JULES_POLICY_DEVIATION');
+  });
+});
+
+describe('a grant revoked between the reservation and the POST', () => {
+  it('sends nothing and settles the reservation failed', async () => {
+    const hook = revokeAfterReservation(h, grantId);
+    const err = await fails(() => approve(h.deps, args()));
+    expect(hook.fired()).toBe(true);
+    expect(err.appError.code).toBe('JULES_AUTHORITY_DENIED');
+    expect(h.adapter.callsTo('approvePlan')).toHaveLength(0);
+    const record = (await readJournal(h.dataDir)).operations[
+      err.localRequestId as string
+    ];
+    expect(record?.status).toBe('failed');
   });
 });
 

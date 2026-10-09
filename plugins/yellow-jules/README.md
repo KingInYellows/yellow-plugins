@@ -85,6 +85,11 @@ That refusal is the control: the owner, not the agent, widens what the agent may
 do. `/jules:authorize --list` shows grants and what each has used;
 `--revoke <grant-id>` ends one immediately.
 
+Revocation, expiry and outside activity are honoured up to the moment a write
+is dispatched: they are re-checked immediately before the vendor call, but not
+after it, and a change landing in the instant between that check and the call
+does not stop it.
+
 Expiry and revocation never stop a session that is already running. The error
 that follows an expired grant lists the sessions that may still be running and
 the containment steps: stop the session in the Jules console, revoke the

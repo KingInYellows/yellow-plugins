@@ -110,7 +110,10 @@ export function plainLaunchGrantIds(
 ): string[] {
   const ids = new Set<string>();
   for (const r of Object.values(journal.operations)) {
-    if (r.grantId !== undefined && hasPlainLaunch(journal, r.grantId, taskRef)) {
+    if (
+      r.grantId !== undefined &&
+      hasPlainLaunch(journal, r.grantId, taskRef)
+    ) {
       ids.add(r.grantId);
     }
   }
@@ -389,7 +392,11 @@ export async function reserveUnderGrant(
  * The last check before a vendor POST: the grant may have been revoked or may
  * have expired since the reservation (a delegate does an SDK source read in
  * between). On failure nothing was sent, so the reservation settles as a clean
- * failure and, for a create, frees its slot.
+ * failure and, for a create, frees its slot. It also refuses a reply or approve
+ * that outside activity invalidated after the reserve (`invalidatedBy`).
+ * Revocation and outside activity are honoured up to this call; the remote
+ * POST that follows cannot be made atomic with local state, so a revoke or an
+ * outside message landing in that last window is not stopped.
  */
 export async function assertGrantLiveBeforeWrite(
   deps: WriteDeps,
@@ -413,6 +420,19 @@ export async function assertGrantLiveBeforeWrite(
           `grant ${grant.grantId} expired at ${grant.expiresAt} before the write; nothing was sent`
         )
       );
+    } else {
+      // Outside activity recorded after the reserve invalidates this record.
+      const fresh = (await readJournal(deps.dataDir)).operations[
+        record.localRequestId
+      ];
+      if (fresh?.invalidatedBy !== undefined) {
+        failure = new AppErrorException(
+          makeAppError(
+            'JULES_SUPERVISION_PAUSED',
+            `outside activity was recorded on ${record.sessionResource ?? 'this session'} after the write was reserved; nothing was sent`
+          )
+        );
+      }
     }
   } catch (err) {
     if (!(err instanceof AppErrorException)) throw err;

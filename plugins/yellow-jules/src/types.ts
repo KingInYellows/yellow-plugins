@@ -294,6 +294,8 @@ export interface OperationRecord {
   /** Written by `supervise` (R32, R33) and, for `outsideSeen`, by `status`. */
   readonly supervision?: SupervisionState;
   /** Set only by `abandon`, which maps onto terminal `failed` (no new status). */
+  /** Set under the journal lock when outside activity is recorded on the session while this reply/approve is reserved but not dispatched; the pre-POST re-check refuses it. */
+  readonly invalidatedBy?: 'outside-activity';
   readonly abandonedAt?: string;
   readonly abandonReason?: string;
   readonly createdAt: string;

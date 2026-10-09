@@ -13,7 +13,16 @@ import {
 } from '../src/errors.js';
 import { reply, type ReplyArgs } from '../src/mutations.js';
 import { status } from '../src/runtime.js';
-import { markOperation, messageDigest, readJournal } from '../src/state.js';
+import {
+  claimOwnEchoes,
+  markOperation,
+  messageDigest,
+  readJournal,
+} from '../src/state.js';
+import {
+  assertGrantLiveBeforeWrite,
+  reserveUnderGrant,
+} from '../src/write-gate.js';
 
 import {
   createGrant,
@@ -341,6 +350,47 @@ describe('races inside the write gate', () => {
       err.localRequestId as string
     ];
     expect(record?.status).toBe('failed');
+  });
+
+  it('outside activity marked after the reserve invalidates the record; dispatch is refused with no adapter call', async () => {
+    const reservation = await reserveUnderGrant(h.deps, {
+      grantId,
+      ownerRequestId: session.localRequestId,
+      authority: {
+        repository: 'acme/widgets',
+        sourceResource: 'sources/github/acme/widgets',
+        branch: 'scratch/one',
+        taskRef: 't1',
+        operation: 'reply',
+      },
+      reservation: {
+        localRequestId: 'reply-race-1',
+        localId: `jl-${'a'.repeat(32)}`,
+        sessionResource: session.sessionResource,
+        promptDigest: messageDigest(MESSAGE),
+      },
+    });
+    expect(reservation.status).toBe('reserved');
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [{ activityId: 'act-outside', digest: messageDigest('someone else') }],
+      {
+        ownerRequestId: session.localRequestId,
+        observedAt: new Date(h.deps.clock.now()).toISOString(),
+      }
+    );
+    const marked = (await readJournal(h.dataDir)).operations['reply-race-1'];
+    expect(marked?.invalidatedBy).toBe('outside-activity');
+    await expect(
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+    ).rejects.toMatchObject({
+      appError: { code: 'JULES_SUPERVISION_PAUSED' },
+    });
+    expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-race-1']?.status
+    ).toBe('failed');
   });
 
   it('a terminal condition recorded after the live read is refused inside the gate', async () => {
