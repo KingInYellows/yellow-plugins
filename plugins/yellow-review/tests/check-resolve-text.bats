@@ -1517,7 +1517,7 @@ rule=forged line=9.txt"
   done
 }
 
-@test "short Basic credentials with an empty side or UTF-8 text are refused; a lone colon and binary prose are not" {
+@test "short Basic credentials with an empty side or UTF-8 text are refused; a lone colon and colon-free binary prose are not" {
   for bin in gawk mawk; do
     for cred in 'key:' ':pw' 'jörg:pw' 'ab:wörd'; do
       tok=$(printf '%s' "$cred" | base64 | tr -d '\n')
@@ -1529,9 +1529,6 @@ rule=forged line=9.txt"
     awk_expect "$bin" 0 'This handler uses Basic httpOnly mode.\n'
     # a control byte (here a tab) is not text
     tok=$(printf 'a\tb:c' | base64 | tr -d '\n')
-    awk_expect "$bin" 0 "Authorization: Basic ${tok}\n"
-    # a UTF-8 lead byte without its continuation byte is malformed
-    tok=$(printf 'ab:c\303' | base64 | tr -d '\n')
     awk_expect "$bin" 0 "Authorization: Basic ${tok}\n"
   done
 }
@@ -1574,6 +1571,65 @@ rule=forged line=9.txt"
     awk_expect "$bin" 6 'password:\n  \xf0\x9f\x94\x91 correct horse battery staple\n'
     awk_expect "$bin" 0 'password:\n  \xe2\x9c\x93 Rotation is scheduled for Friday\n'
   done
+}
+
+@test "short Basic credentials in a legacy charset (ISO-8859-1 octets) are refused, under gawk and mawk" {
+  for bin in gawk mawk; do
+    # RFC 7617 allows a non-UTF-8 charset: the decoded bytes are not valid
+    # UTF-8 but still look like user:pass, so they must not post.
+    for cred in 'j\366rg:pw' 'ab:w\366rd' 'jos\351:x' 'ab:c\303'; do
+      tok=$(printf "$cred" | base64 | tr -d '\n')
+      [ "${#tok}" -lt 20 ]
+      awk_expect "$bin" 6 "Authorization: Basic ${tok}\n"
+    done
+    # no colon, a control byte and a lone colon stay clean
+    tok=$(printf 'j\366rgpw' | base64 | tr -d '\n')
+    awk_expect "$bin" 0 "Authorization: Basic ${tok}\n"
+    tok=$(printf 'j\366\tg:pw' | base64 | tr -d '\n')
+    awk_expect "$bin" 0 "Authorization: Basic ${tok}\n"
+    awk_expect "$bin" 0 'This handler uses Basic httpOnly mode.\n'
+  done
+}
+
+@test "an all-non-ASCII leading word is prose, not decoration; symbols are still stripped, under gawk and mawk" {
+  ran=0
+  for loc in C C.UTF-8; do
+    locale_installed "$loc" || continue
+    for bin in gawk mawk; do
+      ran=$((ran + 1))
+      # CJK, Cyrillic and Greek words followed by lowercase English stay prose
+      awk_expect "$bin" 0 'password:\n  \xe5\xaf\x86\xe7\xa0\x81 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xd0\xbf\xd0\xb0\xd1\x80\xd0\xbe\xd0\xbb\xd1\x8c correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xce\xb1\xce\xb2 correct horse battery staple\n' "$loc"
+      # symbols and emoji, alone or stacked, are still decoration
+      awk_expect "$bin" 6 'password:\n  \xe2\x9c\x93 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xe2\x9a\xa0\xef\xb8\x8f \xf0\x9f\x94\x91 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xe3\x80\x8c correct horse battery staple\n' "$loc"
+    done
+  done
+  [ "$ran" -ge 2 ]
+}
+
+@test "Latin-1 multiply and divide signs are decoration; E2-lead letters (Glagolitic, Coptic, Tifinagh) are words, under gawk and mawk" {
+  ran=0
+  for loc in C C.UTF-8; do
+    locale_installed "$loc" || continue
+    for bin in gawk mawk; do
+      ran=$((ran + 1))
+      awk_expect "$bin" 6 'password:\n  \xc3\x97 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xc3\xb7 correct horse battery staple\n' "$loc"
+      # accented C3 letters stay words
+      awk_expect "$bin" 0 'password:\n  \xc3\xa9l\xc3\xa8ve correct horse battery staple\n' "$loc"
+      # Glagolitic, Coptic, Tifinagh, Georgian Supplement
+      awk_expect "$bin" 0 'password:\n  \xe2\xb0\x80\xe2\xb0\x81 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xe2\xb2\x80\xe2\xb2\x81 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xe2\xb4\xb0\xe2\xb4\xb1 correct horse battery staple\n' "$loc"
+      # real symbols and supplemental punctuation are still decoration
+      awk_expect "$bin" 6 'password:\n  \xe2\x9c\x93 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xe2\xb8\xa2 correct horse battery staple\n' "$loc"
+    done
+  done
+  [ "$ran" -ge 2 ]
 }
 
 @test "a bare Basic word needs an interior colon: Only is prose, a header keeps edge colons" {

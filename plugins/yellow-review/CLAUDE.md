@@ -240,7 +240,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   file list; `--revert-denied` reverts only trusted-config dirty paths
   (`rp_trusted_config`, a subset of the deny list), takes no file list, and
   needs `--ignored-since <marker-file>` (refusing on a changed gitignored
-  trusted-config file) or `--no-ignored-guard`; `--check-ignored --ignored-since <marker-file>` runs only the
+  trusted-config file) or `--no-ignored-guard`; a tracked trusted-config symlink whose target was written since the marker (or, with `--no-ignored-guard`, resolves outside the worktree) is reported with `deniedClean: false` (a clean link is left alone; a redirected or replaced one is restored and its HEAD target judged the same way), and a verify run refuses on one; `--check-ignored --ignored-since <marker-file>` runs only the
   gitignored-file guard, for a resolve with no verify command.
   `/review:resolve-stack` and `/review:sweep-all` run it after a
   dirty resolve only when every dirty path is owned by the run (a PR file
@@ -264,11 +264,33 @@ arguments and run on `yr_safe_path`'s result. It drops a `PATH` directory
 inside the worktree and any directory that holds a symlink, whatever its name,
 dangling or not, whose canonical target (a file or a directory) is inside the
 worktree, so the name resolves to a file outside the worktree or not at all.
-There is no name list to extend. The screen runs no `PATH` tool: it uses
-shell globs and tests, plus `find` and GNU `realpath -m` from fixed system
-directories (one `realpath` call for all ordinary directories, one `find` for
-a directory over 300 entries). Without them it canonicalizes each link in the
-shell, and a link it cannot resolve drops the directory.
+It also drops a directory with an executable script whose `#!` interpreter
+(or `env` operand) canonicalizes inside the worktree, such as a console
+script of a venv kept in the repository, and `commit-resolve-fixes` and
+`run-verify-command` refuse a `git`, `gh`, `jq`, `gt`, `node` or `awk` that is
+such a script. There is no name list to extend. The screen runs no `PATH`
+tool: it uses `find`, `awk`, GNU `realpath -m`, `sed` and `sort` from fixed
+system directories, in a handful of batched calls for all directories (about
+0.1 s). Without them it canonicalizes each link and reads each script's first
+line in the shell, and a link it cannot resolve drops the directory.
+`harden_git_config` also refuses (names the variable, never the value) an
+inherited `GIT_SSH_COMMAND`, `GIT_SSH`, `GIT_ASKPASS`, `SSH_ASKPASS`,
+`GIT_PROXY_COMMAND`, `GIT_EXTERNAL_DIFF`, `GIT_PAGER`, `PAGER`, `GIT_EDITOR`,
+`EDITOR` or `VISUAL` whose command line names the worktree, a
+`GIT_EXEC_PATH`, `GIT_TEMPLATE_DIR`, `GIT_CONFIG_GLOBAL` or `GIT_CONFIG_SYSTEM`
+inside it, and injected `GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` or
+`GIT_CONFIG_PARAMETERS` config (`core.sshCommand`, `credential.helper`,
+`gpg.program` and the like) that does; trusted values outside the worktree are
+kept. Command lines are judged whole: the raw value must not contain the
+worktree path (physical or logical spelling), no token (quotes, a leading `!`
+and `--opt=VALUE` handled) may be an absolute path, or an existing path
+relative to the current directory, that resolves inside it, and a bare first
+word must not resolve through the screened `PATH` to a script whose `#!`
+interpreter enters it, so `sh <worktree>/script` is refused. The pre-source
+bootstrap resolvers of both scripts apply the same `#!` check to the first
+`git` (and every tool). `env -S`/`--split-string` (attached or separate, also
+in a cluster such as `-vS`) and options with arguments (`-u`, `-C`, `-P`,
+`-a` and long forms) are parsed in `#!` lines.
 `run-verify-command` still gives the verify command the caller's `PATH`
 (`YR_ORIG_PATH`). Both scripts take their own directory by parameter expansion,
 not `dirname`.

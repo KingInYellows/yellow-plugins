@@ -166,7 +166,7 @@ fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
 | `poll-new-threads` | Bounded re-pass poll for threads that appeared after round 1 |
 | `check-resolve-text` | Refuse credential-shaped or unsafe text (image, `@` mention, foreign URL) before it is posted outside the resolve scripts (for example a Linear issue) |
 | `commit-resolve-fixes` | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files |
-| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--ignored-since <marker-file>` is required for every run and refuses when a gitignored file is newer than the marker; `--unattended` also skips runner files; `--revert-only` and `--revert-dirty` revert without running and ignore the marker; `--revert-denied` reverts only trusted-config dirty paths (a subset of the deny list), takes no file list, and needs `--ignored-since` (refusing on a changed gitignored trusted-config file) or `--no-ignored-guard`; `--check-ignored` runs only the gitignored-file guard) |
+| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--ignored-since <marker-file>` is required for every run and refuses when a gitignored file is newer than the marker; `--unattended` also skips runner files; `--revert-only` and `--revert-dirty` revert without running and ignore the marker; `--revert-denied` reverts only trusted-config dirty paths (a subset of the deny list), takes no file list, and needs `--ignored-since` (refusing on a changed gitignored trusted-config file) or `--no-ignored-guard`, and leaves a tracked trusted-config symlink whose target was written (or, without the marker, points outside the worktree) in place with `deniedClean` false; `--check-ignored` runs only the gitignored-file guard) |
 | `guard-local-config` | Snapshot the gitignored `yellow-plugins.local.md` and restore it if a resolver changed, created or deleted it; refuses a symlinked config (`/review:resolve-stack` checks after each PR) |
 | `file-line-counts` | Base/head line counts per changed file for `thermonuclear-reviewer` |
 
@@ -178,8 +178,13 @@ outside the worktree that points at one, and drops empty or relative `PATH`
 entries before that check. Every other tool they run by bare name, and
 every program git or its children look up through `PATH` (`grep`, `sed`,
 `ssh`, `git-credential-*`, `gpg`, pagers and so on), runs from a `PATH` that
-drops directories inside the worktree and any directory that holds a symlink
-(dangling or not) whose target is inside it, whatever the link is named.
+drops directories inside the worktree, any directory that holds a symlink
+(dangling or not) whose target is inside it, whatever the link is named, and any
+directory with an executable script whose `#!` interpreter is inside it. Both
+scripts also refuse an inherited `GIT_SSH_COMMAND`, `GIT_ASKPASS`, `GIT_PAGER`,
+`EDITOR`, `GIT_EXEC_PATH` or injected git config (`core.sshCommand`,
+`credential.helper`, ...) whose command line names a path inside the worktree
+(`sh <worktree>/script` included); values outside it keep working.
 
 Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-gh.sh`,
 `resolve-paths.sh`, `gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.

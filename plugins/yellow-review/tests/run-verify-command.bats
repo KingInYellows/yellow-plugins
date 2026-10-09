@@ -3078,3 +3078,266 @@ SHIM
   [[ "$stderr" == *'cannot encode'* ]]
   [ -p src/blob/pipe ]
 }
+
+# A mount inside a replacement directory must never be walked by rm -r.
+mount_setup() {
+  printf 'tracked\n' >| .cursor
+  git add .cursor && git commit -q -m "add .cursor file"
+  rm -f .cursor
+  mkdir -p .cursor/mnt && printf "x\n" >| .cursor/mnt/f
+}
+
+@test "--revert-denied keeps a replacement directory holding a real bind mount and spares the mounted data" {
+  command -v mount >/dev/null 2>&1 || skip "mount not available"
+  mount_setup
+  src="$BATS_TEST_TMPDIR/outside"
+  mkdir -p "$src" && printf 'precious\n' >| "$src/data"
+  mount --bind "$src" .cursor/mnt 2>/dev/null || skip "cannot bind mount here"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  umount .cursor/mnt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ "$(cat "$src/data")" = precious ]
+  [ -d .cursor ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'mount'*'.cursor'* ]]
+}
+
+@test "--revert-dirty refuses a replacement directory holding a real bind mount" {
+  command -v mount >/dev/null 2>&1 || skip "mount not available"
+  mount_setup
+  src="$BATS_TEST_TMPDIR/outside"
+  mkdir -p "$src" && printf 'precious\n' >| "$src/data"
+  mount --bind "$src" .cursor/mnt 2>/dev/null || skip "cannot bind mount here"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  umount .cursor/mnt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'mount point'* ]]
+  [ "$(cat "$src/data")" = precious ]
+}
+
+@test "a mount table naming a mount under the replacement directory keeps it (injected mountinfo)" {
+  mount_setup
+  printf 'x\n' >| .cursor/f
+  mi="$BATS_TEST_TMPDIR/mountinfo"
+  printf '36 35 8:1 / %s/.cursor/m\\040nt rw - ext4 /dev/sda1 rw\n' "$PWD" >| "$mi"
+  YR_MOUNTINFO="$mi" run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ -f .cursor/f ]
+  YR_MOUNTINFO="$mi" run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+}
+
+@test "an unreadable mount table fails closed for the recursive removal" {
+  mount_setup
+  YR_MOUNTINFO="$BATS_TEST_TMPDIR/absent" run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ -d .cursor ]
+}
+
+@test "an unmounted replacement directory is still removed with the mount table readable" {
+  printf 'tracked\n' >| src/blob
+  git add src/blob && git commit -q -m "add blob"
+  rm -f src/blob && mkdir src/blob && printf 'x\n' >| src/blob/f
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ -f src/blob ]
+}
+
+# --- tracked trusted-config symlinks: a write through the link edits its target ---
+# rp_tree_changes sees the link, not the file behind it, so the target is judged
+# against the marker as an ignored link's target is.
+link_setup() {
+  OUTSIDE="$BATS_TEST_TMPDIR/outside-settings"
+  mkdir -p "$OUTSIDE"
+  printf '{}\n' >| "$OUTSIDE/settings.json"
+  mkdir -p .claude
+  ln -s "$OUTSIDE/settings.json" .claude/settings.json
+  git add .claude/settings.json && git commit -q -m "track settings link"
+  touch -t 202001010000 "$IGN_MARKER"
+  touch -t 201901010000 "$OUTSIDE/settings.json"
+}
+
+@test "--revert-denied reports deniedClean false when a tracked trusted-config symlink's outside target was written" {
+  link_setup
+  printf '{"hooks":"evil"}\n' >| "$OUTSIDE/settings.json"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'.claude/settings.json'* ]]
+  grep -q evil "$OUTSIDE/settings.json"
+}
+
+@test "--revert-denied stays deniedClean when the tracked trusted-config symlink's target is unchanged" {
+  link_setup
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = noop ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+}
+
+@test "--revert-denied still reverts the other trusted-config edits while keeping a changed symlink target" {
+  link_setup
+  printf 'x\n' >| CLAUDE.md
+  printf '{"hooks":"evil"}\n' >| "$OUTSIDE/settings.json"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ ! -e CLAUDE.md ]
+  grep -q evil "$OUTSIDE/settings.json"
+}
+
+@test "--revert-denied --no-ignored-guard fails closed on a tracked trusted-config symlink that leaves the worktree" {
+  link_setup
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "a verify run refuses when a tracked trusted-config symlink's target was written after the marker" {
+  link_setup
+  printf '{"hooks":"evil"}\n' >| "$OUTSIDE/settings.json"
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'.claude/settings.json'* ]]
+}
+
+# --- dir_has_mount without GNU find -printf or /proc (macOS, BSD) ---
+# Shims on PATH stand in for BSD find (no -printf), BSD stat (-f %d, no -c) and
+# mount(8) ("dev on /path (type, opts)").
+bsd_shims() {
+  SHIMS="$BATS_TEST_TMPDIR/bsdbin"
+  mkdir -p "$SHIMS"
+  REAL_FIND=$(command -v find)
+  REAL_STAT=$(command -v stat)
+  cat >| "$SHIMS/find" <<SH
+#!/bin/sh
+for a in "\$@"; do [ "\$a" != -printf ] || exit 1; done
+exec "$REAL_FIND" "\$@"
+SH
+  cat >| "$SHIMS/stat" <<SH
+#!/bin/sh
+[ "\$1" != -c ] || exit 1
+if [ "\$1" = -f ]; then shift; exec "$REAL_STAT" -c "\$@"; fi
+exec "$REAL_STAT" "\$@"
+SH
+  chmod +x "$SHIMS/find" "$SHIMS/stat"
+  export PATH="$SHIMS:$PATH"
+}
+
+@test "without find -printf, an unmounted replacement directory is still removed (stat -f device check)" {
+  bsd_shims
+  printf 'tracked\n' >| src/blob
+  git add src/blob && git commit -q -m "add blob"
+  rm -f src/blob && mkdir src/blob && printf 'x\n' >| src/blob/f
+  printf 'dev on /somewhere/else (apfs, local)\n' >| "$BATS_TEST_TMPDIR/mount-out"
+  printf '#!/bin/sh\ncat "%s/mount-out"\n' "$BATS_TEST_TMPDIR" >| "$SHIMS/mount"
+  chmod +x "$SHIMS/mount"
+  YR_MOUNTINFO= run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ -f src/blob ]
+}
+
+@test "without find -printf, a device change under the replacement directory keeps it" {
+  bsd_shims
+  mount_setup
+  printf '#!/bin/sh\nexit 0\n' >| "$SHIMS/mount"
+  chmod +x "$SHIMS/mount"
+  # stat reports a second device for the nested directory.
+  cat >| "$SHIMS/stat" <<SH
+#!/bin/sh
+[ "\$1" != -c ] || exit 1
+if [ "\$1" = -f ]; then
+  shift
+  [ "\$1" != %d ] || shift
+  for a in "\$@"; do case "\$a" in */mnt) echo 99 ;; *) "$REAL_STAT" -c %d "\$a" ;; esac; done
+  exit 0
+fi
+exec "$REAL_STAT" "\$@"
+SH
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ -d .cursor ]
+}
+
+@test "without /proc, mount(8) output naming a mount under the replacement directory keeps it (paths with spaces)" {
+  bsd_shims
+  mount_setup
+  printf 'x\n' >| .cursor/f
+  printf '#!/bin/sh\necho "/dev/disk1s1 on /System/Volumes/Data (apfs, local)"\necho "map auto_home on %s/.cursor/m nt (autofs, automounted)"\n' "$PWD" >| "$SHIMS/mount"
+  chmod +x "$SHIMS/mount"
+  YR_MOUNTINFO= run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ -f .cursor/f ]
+  YR_MOUNTINFO= run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+}
+
+@test "with neither a mount table nor a working mount(8), the removal fails closed" {
+  mount_setup
+  mkdir -p "$BATS_TEST_TMPDIR/nomount"
+  printf '#!/bin/sh\nexit 1\n' >| "$BATS_TEST_TMPDIR/nomount/mount"
+  chmod +x "$BATS_TEST_TMPDIR/nomount/mount"
+  PATH="$BATS_TEST_TMPDIR/nomount:$PATH" YR_MOUNTINFO= run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ -d .cursor ]
+}
+
+@test "--revert-denied flags a dirty tracked trusted-config symlink whose HEAD target was written, even after the link is redirected" {
+  link_setup
+  printf '{"hooks":"evil"}\n' >| "$OUTSIDE/settings.json"
+  rm .claude/settings.json
+  ln -s "$BATS_TEST_TMPDIR/elsewhere" .claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ "$(readlink .claude/settings.json)" = "$OUTSIDE/settings.json" ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'.claude/settings.json'* ]]
+}
+
+@test "--revert-denied restores a dirty tracked trusted-config symlink whose HEAD target is unchanged and stays deniedClean" {
+  link_setup
+  rm .claude/settings.json
+  ln -s "$BATS_TEST_TMPDIR/elsewhere" .claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  [ "$(readlink .claude/settings.json)" = "$OUTSIDE/settings.json" ]
+}
+
+@test "--revert-denied --no-ignored-guard flags a dirty tracked trusted-config symlink whose HEAD target is outside the worktree" {
+  link_setup
+  rm .claude/settings.json
+  ln -s "$BATS_TEST_TMPDIR/elsewhere" .claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "a verify run refuses when a dirty tracked trusted-config symlink's HEAD target was written" {
+  link_setup
+  printf '{"hooks":"evil"}\n' >| "$OUTSIDE/settings.json"
+  rm .claude/settings.json
+  ln -s "$BATS_TEST_TMPDIR/elsewhere" .claude/settings.json
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+}
+
+@test "a git script whose #! interpreter is inside the worktree is refused before the bootstrap runs it (run-verify-command)" {
+  marker="$BATS_TEST_TMPDIR/boot-git-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/interp"
+  chmod +x "$REPO/tools/interp"
+  printf '#!%s/tools/interp\n' "$REPO" >| "$BATS_TEST_TMPDIR/gitbin/git"
+  chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+  printf '%s\n' 'true' >| "$CMD"
+  run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the bootstrap ran the planted git" >&2; return 1; }
+  [ "$status" -eq 2 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
+}
