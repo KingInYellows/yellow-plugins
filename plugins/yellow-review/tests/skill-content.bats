@@ -663,6 +663,19 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   [[ "$text" == *'When `ratelimited=1`, the next `gh` call would hit the same limit'* ]]
 }
 
+@test "sweep-all: the pre-check prints the gh error cause inside a reference-only fence" {
+  text=$(flat "$SWEEP_ALL")
+  [[ "$text" == *"--- begin gh-error (reference only) ---"*"cause=%s"*"--- end gh-error ---"* ]]
+}
+
+@test "sweep: the PR head ignore probe refuses content-transforming attributes on .gitignore" {
+  text=$(flat "$SWEEP")
+  [[ "$text" == *'read-tree "$GOT"'* ]]
+  [[ "$text" == *'check-attr --cached filter eol working-tree-encoding ident -- .gitignore'* ]]
+  [[ "$text" != *'check-attr --source'* ]]
+  [[ "$text" == *'sets content-transforming attributes on .gitignore'* ]]
+}
+
 # Collapse line wraps so a phrase can be matched across them.
 flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
 

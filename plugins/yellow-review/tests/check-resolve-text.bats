@@ -1506,6 +1506,10 @@ rule=forged line=9.txt"
     awk_expect "$bin" 0 'Authorization: Basic YWI6Yw===\n'
     awk_expect "$bin" 0 'Authorization: Basic YWI6Yw=\n'
     awk_expect "$bin" 6 'Authorization: Basic YWI6Yw==\n'
+    # non-zero unused bits are non-canonical base64, so malformed and clean
+    awk_expect "$bin" 0 'Authorization: Basic YWI6Yx==\n'
+    awk_expect "$bin" 6 'Authorization: Basic YTo=\n'
+    awk_expect "$bin" 0 'Authorization: Basic YTp=\n'
     # the floor counts the leading run, not the whole word
     awk_expect "$bin" 0 "x ${tv}abcdefghij+abcdefghij y\n"
     awk_expect "$bin" 0 "x ${sg}abcdefghij/abcdefghij y\n"
