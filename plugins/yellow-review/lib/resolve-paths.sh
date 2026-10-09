@@ -283,7 +283,7 @@ harden_git_config() {
     case "$tkey" in
         credential.helper) ;;
         credential.*) tkey="credential.<url>.helper" ;;
-        filter.*) tkey="filter.<driver>.${tkey##*.}" ;;
+        filter.*) tkey="filter.<driver>.clean|smudge|process" ;;
     esac
     if [ -n "$tkey" ]; then
         if [ "$scope" = revert ]; then

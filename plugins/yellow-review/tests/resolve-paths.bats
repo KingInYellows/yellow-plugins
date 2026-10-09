@@ -1098,6 +1098,16 @@ commit_repo() {
   [[ "$YR_HARDEN_MSG" != *secretpw* ]]
 }
 
+@test "harden_git_config redacts a filter key whose subsection contains whitespace" {
+  git config --local 'filter.sk-secretword x.clean' 'touch /never'
+  for scope in full revert; do
+    rc=0; harden_git_config "$scope" || rc=$?
+    [ "$rc" -eq 1 ]
+    [[ "$YR_HARDEN_MSG" == *"filter.<driver>.clean|smudge|process"* ]]
+    [[ "$YR_HARDEN_MSG" != *secretword* ]]
+  done
+}
+
 @test "harden_git_config allows the stock Git LFS filter commands and refuses a changed one" {
   git config --local filter.lfs.clean 'git-lfs clean -- %f'
   git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
