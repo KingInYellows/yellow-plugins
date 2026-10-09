@@ -245,8 +245,14 @@ setup() {
 @test "the jules launch is bound to the confirmed dry run's remote and branch" {
   jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
   printf '%s\n' "$jules_block" | grep -qF "DRY_RUN_BINDING='YELLOW_TODO_binding_from_dry_run_or_empty'"
-  printf '%s\n' "$jules_block" | grep -qF 'BIND_INPUT="${REPO_PATH}|${BRANCH}"'
-  printf '%s\n' "$jules_block" | grep -qF "printf 'binding=%s\\n' \"\$BINDING\""
+  # The binding covers repo, branch, issue, revision, packet bytes and grant.
+  printf '%s\n' "$jules_block" | grep -qF '${REPO_PATH}|${BRANCH}|${ISSUE_ID}|${DELEGATION_REV}|${PACKET_SHA}|$1'
+  printf '%s\n' "$jules_block" | grep -qF 'PACKET_SHA=$(printf '"'"'%s'"'"' "$PROMPT" | bind_hash)'
+  printf '%s\n' "$jules_block" | grep -qF 'BINDING=$(make_binding "$GRANT_ID")'
+  printf '%s\n' "$jules_block" | grep -qF "printf 'binding=%s\\n' \"\$(make_binding \"\$FOUND\")\""
+  # The dispatched prompt is the hashed variable, not a second read of the file.
+  printf '%s\n' "$jules_block" | grep -qF '"--prompt=$PROMPT"'
+  ! printf '%s\n' "$jules_block" | grep -qF '"--prompt=$(cat'
   printf '%s\n' "$jules_block" | grep -qF "grep -qE '^[0-9a-f]{64}\$'"
   printf '%s\n' "$jules_block" | grep -qF 'if [ "$DRY_RUN_BINDING" != "$BINDING" ]; then'
   printf '%s\n' "$jules_block" | grep -qF 'ask for confirmation again'
@@ -347,9 +353,11 @@ setup() {
 }
 
 @test "the jules launch passes the packet as an inline --prompt= so a leading dash is not a flag" {
-  run grep -cF '"--prompt=$(cat -- "$PACKET_FILE")"' "$DELEGATE_MD"
+  run grep -cF '"--prompt=$PROMPT"' "$DELEGATE_MD"
   [ "$status" -eq 0 ]
   [ "$output" -ge 2 ]
+  run grep -cF 'PROMPT=$(cat -- "$PACKET_FILE")' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
 }
 
 @test "Jules launch preview prints the packet inside a randomized reference-only fence" {

@@ -623,10 +623,13 @@ branch exists on GitHub (Jules clones from there), dry-runs `delegate`, and prin
 the covering grant or the terminal command. The second call (`MODE='launch'`, after
 the confirmation below) sends the launch. Replace each `YELLOW_TODO_` token with
 its concrete value. In the dry run leave `DRY_RUN_BINDING` empty; the dry run
-prints `binding=<64 hex>`, and the launch call substitutes exactly that value. The
-launch recomputes the binding from the fresh remote and branch and stops if they
-differ, so a checkout that changed during the confirmation is never launched: run a
-new dry run and ask again.
+prints `binding=<64 hex>` together with `grant_id=` (the binding covers the grant, so
+it is printed once the grant is known), and the launch call substitutes exactly that
+value. The binding is a sha256 over the repository, branch, issue id, delegation
+revision, the packet bytes and the grant id. The launch recomputes it from the fresh
+remote and branch, the packet it is about to send and the substituted `GRANT_ID`, and
+stops if it differs, so a checkout, packet, revision or grant that changed during the
+confirmation is never launched: run a new dry run and ask again.
 
 ```bash
 set -uo pipefail
@@ -766,25 +769,34 @@ else
 fi
 REQUEST_ID="jr-linear-${KEY}"
 
-# Binding of the confirmed preview: sha256 of REPO_PATH|BRANCH as read now.
-BIND_INPUT="${REPO_PATH}|${BRANCH}"
-if command -v sha256sum >/dev/null 2>&1; then
-  BINDING=$(printf '%s' "$BIND_INPUT" | sha256sum | cut -c1-64)
-else
-  BINDING=$(printf '%s' "$BIND_INPUT" | shasum -a 256 | cut -c1-64)
-fi
+# Read the packet once: the digest and the dispatched prompt are the same bytes.
+PROMPT=$(cat -- "$PACKET_FILE")
+# Binding of the confirmed preview: sha256 over the repository, branch, issue,
+# delegation revision, packet bytes and the grant that will pay for the launch.
+bind_hash() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | cut -c1-64
+  else
+    shasum -a 256 | cut -c1-64
+  fi
+}
+PACKET_SHA=$(printf '%s' "$PROMPT" | bind_hash)
+make_binding() {
+  printf '%s' "${REPO_PATH}|${BRANCH}|${ISSUE_ID}|${DELEGATION_REV}|${PACKET_SHA}|$1" | bind_hash
+}
 
 if [ "$MODE" = "launch" ]; then
   if ! printf '%s' "$DRY_RUN_BINDING" | grep -qE '^[0-9a-f]{64}$'; then
     printf 'ERROR: DRY_RUN_BINDING must be the 64-hex binding= value printed by the dry run.\n' >&2
     exit 1
   fi
+  case "$GRANT_ID" in jg-????????????????????????????????) ;; *) printf 'ERROR: bad grant id "%s".\n' "$GRANT_ID" >&2; exit 1 ;; esac
+  BINDING=$(make_binding "$GRANT_ID")
   if [ "$DRY_RUN_BINDING" != "$BINDING" ]; then
-    printf 'ERROR: the remote or branch changed since the confirmed dry run. Run a new dry run and ask for confirmation again.\n' >&2
+    printf 'ERROR: the remote, branch, packet, issue revision or grant changed since the confirmed dry run. Run a new dry run and ask for confirmation again.\n' >&2
     exit 1
   fi
-  case "$GRANT_ID" in jg-????????????????????????????????) ;; *) printf 'ERROR: bad grant id "%s".\n' "$GRANT_ID" >&2; exit 1 ;; esac
-  OUTPUT=$(node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" "--prompt=$(cat -- "$PACKET_FILE")" --request-id "$REQUEST_ID" --grant-id "$GRANT_ID")
+  OUTPUT=$(node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" "--prompt=$PROMPT" --request-id "$REQUEST_ID" --grant-id "$GRANT_ID")
   printf 'exit=%s\n' "$?"
   printf '%s\n' "$OUTPUT" | jq '{ok, localRequestId, localId, sessionResource, vendorState, condition, repository, requestedBranch, details, requiresAttention, attention, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
   # Vendor-writable text only inside a fence with a random tag.
@@ -797,13 +809,12 @@ if [ "$MODE" = "launch" ]; then
   exit 0
 fi
 
-OUTPUT=$(node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" "--prompt=$(cat -- "$PACKET_FILE")" --request-id "$REQUEST_ID" --dry-run)
+OUTPUT=$(node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" "--prompt=$PROMPT" --request-id "$REQUEST_ID" --dry-run)
 printf 'dry_run_exit=%s\n' "$?"
 printf '%s\n' "$OUTPUT" | jq '{ok, localRequestId, repository, requestedBranch, taskRef, dryRun, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
 if [ "$(printf '%s' "$OUTPUT" | jq -r '.ok')" != "true" ]; then
   exit 1
 fi
-printf 'binding=%s\n' "$BINDING"
 LIST=$(node "$CLI" authorize --list)
 if [ "$(printf '%s' "$LIST" | jq -r '.ok // false')" != true ]; then
   printf 'ERROR: authorize --list failed; not treating this as "no grant".\n' >&2
@@ -829,6 +840,7 @@ if [ -z "$FOUND" ]; then
   exit 0
 fi
 printf 'grant_id=%s\n' "$FOUND"
+printf 'binding=%s\n' "$(make_binding "$FOUND")"
 printf '%s' "$LIST" | jq --arg id "$FOUND" '.grants[] | select(.grantId == $id) | {grantId, repository, branchPattern, taskRefs, operations, expiresAt, limits: {maxActiveSessions, maxTotalTasks, maxCorrectiveRounds}, usage: {activeSessions: (.usage.activeSessionRefs | length), totalTasks: .usage.totalTasks}}'
 ```
 
