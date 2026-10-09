@@ -1,11 +1,13 @@
 #!/usr/bin/env bats
 # FU-1 regression tests for the ast-grep CLI recipe (yellow-plugins #1090,
-# finding 4213663527). Values (pattern, lang, target, rule) reach the recipe
-# only as files the agent writes with the Write tool, read back with
-# "$(cat -- file)": no value is ever shell source, so there is no heredoc
-# delimiter for a hostile pattern to close. The recipe is run end to end
-# against a stub ast-grep that records its argv, under bash and under
-# zsh -f -o noclobber.
+# finding 4213663527, and the #1112 review). Values (pattern, lang, target,
+# rule) reach the recipe only as files the agent writes with the Write tool,
+# read back with "$(cat -- file)": no value is ever shell source, so there is
+# no heredoc delimiter for a hostile pattern to close. The recipe only accepts
+# a values directory under the resolved TMPDIR that holds step 1's marker,
+# and cleans up by deleting its own files and rmdir, never rm -rf. Each doc's
+# blocks run end to end against a stub ast-grep that records its argv and the
+# config it was given, under bash and (when installed) zsh -f -o noclobber.
 
 bats_require_minimum_version 1.5.0
 
@@ -15,27 +17,44 @@ DOCS=("agents/scanners/duplication-scanner.md" "agents/scanners/complexity-scann
 setup() {
   WORK="$(mktemp -d)"
   STUB="$(mktemp -d)"
-  export ARGV_FILE="$STUB/argv"
+  # A private TMPDIR reached through a symlink, so the tests also cover the
+  # recipe resolving TMPDIR before comparing paths.
+  mkdir "$WORK/tmp-real"
+  ln -s "$WORK/tmp-real" "$WORK/tmp-link"
+  export TMPDIR="$WORK/tmp-link"
+  export ARGV_FILE="$STUB/argv" CFG_COPY="$STUB/cfg-seen" STUB_MODE=normal
   cat > "$STUB/ast-grep" <<'STUB_EOF'
 #!/bin/bash
 printf '%s\0' "$@" > "$ARGV_FILE"
-printf 'src/a.js:1:console.log(1)\n'
+prev=''
+for a in "$@"; do
+  if [ "$prev" = "-c" ]; then cat -- "$a" > "$CFG_COPY"; fi
+  prev="$a"
+done
+if [ "$STUB_MODE" = big ]; then
+  head -c 5000 /dev/zero | tr '\0' 'A'; printf '\n'
+  i=0; while [ $i -lt 500 ]; do printf 'src/a.js:%s:console.log(%s)\n' "$i" "$i"; i=$((i + 1)); done
+else
+  printf 'src/a.js:1:console.log(1)\n'
+fi
 STUB_EOF
   chmod +x "$STUB/ast-grep"
-  mkdir -p "$WORK/src" "$WORK/markers"
-  printf 'console.log(1)\n' > "$WORK/src/a.js"
-  cd "$WORK"
+  mkdir -p "$WORK/repo/src" "$WORK/repo/markers"
+  printf 'console.log(1)\n' > "$WORK/repo/src/a.js"
+  cd "$WORK/repo"
 }
 
 teardown() {
   cd /
+  chmod -R u+w "$WORK" 2>/dev/null || true
   rm -rf "$WORK" "$STUB"
 }
 
+have_zsh() { command -v zsh >/dev/null 2>&1; }
 require_zsh() {
-  command -v zsh >/dev/null 2>&1 && return 0
+  have_zsh && return 0
   [ -z "${CI:-}" ] || { echo "zsh is required in CI"; return 1; }
-  skip "zsh not installed"
+  skip "zsh not installed (bash cases above still ran)"
 }
 
 # Print the first ```bash block of $1 that contains the fixed string $2.
@@ -46,70 +65,115 @@ extract_block() {
     inb { buf = buf $0 "\n" }
   ' "$1"
 }
+step1_of() { extract_block "$1" 'ast-grep-values.XXXXXXXX'; }
+recipe_of() { extract_block "$1" 'ast-grep run'; }
 
-# Run step 1 (mktemp) and step 3 (the recipe) of doc $1 under shell $2,
-# writing the value files listed as name=value pairs in between, the way the
-# agent's Write tool would (values verbatim, plus a trailing newline).
+# Run step 1 of doc $1 under shell $2, then write the name=value pairs the
+# way the Write tool would (verbatim plus a trailing newline), then run the
+# recipe with VALUES_DIR replaced by the printed path. Sets RECIPE_DIR.
 run_recipe() {
   local doc="$1" sh="$2"; shift 2
-  local step1 recipe dir kv
-  step1="$(extract_block "$doc" 'ast-grep-values.XXXXXXXX')"
-  recipe="$(extract_block "$doc" 'ast-grep run')"
-  [ -n "$step1" ] && [ -n "$recipe" ] || { echo "recipe blocks not found in $doc"; return 1; }
-  dir="$(PATH="$STUB:$PATH" $sh -c "$step1")"
+  local step1 recipe kv
+  step1="$(step1_of "$doc")"
+  recipe="$(recipe_of "$doc")"
+  if [ -z "$step1" ] || [ -z "$recipe" ]; then
+    echo "recipe blocks not found in $doc"; return 1
+  fi
+  RECIPE_DIR="$(env PATH="$STUB:$PATH" $sh -c "$step1")"
+  if [ -z "$RECIPE_DIR" ] || [ ! -d "$RECIPE_DIR" ]; then
+    echo "step 1 printed no directory: '$RECIPE_DIR'"; return 1
+  fi
   for kv in "$@"; do
-    printf '%s\n' "${kv#*=}" > "$dir/${kv%%=*}"
+    printf '%s\n' "${kv#*=}" > "$RECIPE_DIR/${kv%%=*}"
   done
-  RECIPE_DIR="$dir"
-  run env PATH="$STUB:$PATH" $sh -c "${recipe//VALUES_DIR/$dir}"
+  run env PATH="$STUB:$PATH" $sh -c "${recipe//VALUES_DIR/$RECIPE_DIR}"
 }
 
-argv_lines() { tr '\0' '\n' < "$ARGV_FILE"; }
+argv_n() { awk -v n="$1" 'BEGIN{RS="\0"} NR==n{printf "%s", $0}' "$ARGV_FILE"; }
+expect_no_markers() {
+  if [ -n "$(ls markers)" ]; then echo "$1: payload ran: $(ls markers)"; return 1; fi
+}
+expect_refused_untouched() {
+  if [[ "$output" != *"ast-grep: refused"* ]]; then echo "$1: not refused: $output"; return 1; fi
+  if [ -f "$ARGV_FILE" ]; then echo "$1: reached ast-grep"; return 1; fi
+}
 
 # A pattern that closes the old template's static heredoc delimiter, runs a
 # command, then reopens a heredoc so the rest still parses (Critic repro).
 BREAKOUT=$'x\nAST_GREP_PATTERN_NONCE\n)\ntouch markers/HEREDOC\npattern=$(cat <<\'AST_GREP_PATTERN_NONCE\'\nx'
 
-@test "ast-grep recipe passes values through files, never through a heredoc" {
-  local doc block
-  for doc in "${DOCS[@]}"; do
-    block="$(extract_block "$PLUGIN_ROOT/$doc" 'ast-grep run')"
-    [ -n "$block" ] || { echo "no recipe in $doc"; return 1; }
-    if printf '%s' "$block" | grep -q '<<'; then
-      echo "heredoc in $doc recipe"; return 1
-    fi
-    for want in 'pattern=$(cat -- "$d/pattern")' 'lang=$(cat -- "$d/lang")' \
-      'target=$(cat -- "$d/target")' 'rule=$(cat -- "$d/rule")' \
-      "printf 'ruleDirs: []\\n' >| \"\$cfg\"" \
-      'ast-grep run -c "$cfg" --pattern "$pattern" --lang "$lang" -- "$target"' \
-      'ast-grep scan -c "$cfg" --inline-rules "$rule" --json=stream -- "$target"' \
-      'head -n 200 | cut -c 1-2000' 'rm -rf -- "$d"'; do
-      printf '%s' "$block" | grep -qF -- "$want" || { echo "$doc missing: $want"; return 1; }
-    done
-    grep -q 'AST_GREP_[A-Z]*_NONCE' "$PLUGIN_ROOT/$doc" && { echo "stale NONCE in $doc"; return 1; }
-  done
-  true
+check_breakout() {
+  local doc="$1" sh="$2" got
+  rm -f "$ARGV_FILE" "$CFG_COPY"
+  run_recipe "$doc" "$sh" "pattern=$BREAKOUT" lang=js target=src
+  [ "$status" -eq 0 ]
+  expect_no_markers "$doc/$sh"
+  [ -f "$ARGV_FILE" ]
+  got="$(argv_n 5)"
+  if [ "$got" != "$BREAKOUT" ]; then echo "$doc/$sh: pattern mangled: $got"; return 1; fi
+  [ "$(argv_n 1)" = run ]
+  [ "$(argv_n 2)" = -c ]
+  [ "$(argv_n 4)" = --pattern ]
+  [[ "$output" == *"console.log(1)"* ]]
+  [ ! -e "$RECIPE_DIR" ]
 }
 
-@test "heredoc-breakout pattern stays data under bash and zsh noclobber" {
-  require_zsh
-  local doc sh
+@test "ast-grep recipe passes values through files, never through a heredoc" {
+  local doc block want
   for doc in "${DOCS[@]}"; do
-    for sh in bash 'zsh -f -o noclobber'; do
-      rm -f "$ARGV_FILE" markers/*
-      run_recipe "$PLUGIN_ROOT/$doc" "$sh" "pattern=$BREAKOUT" lang=js target=src
-      [ "$status" -eq 0 ] || { echo "$doc/$sh: rc=$status $output"; return 1; }
-      [ -z "$(ls markers)" ] || { echo "$doc/$sh: payload ran"; return 1; }
-      [ -f "$ARGV_FILE" ] || { echo "$doc/$sh: ast-grep not called"; return 1; }
-      # The whole multi-line pattern arrives as one argv element.
-      local got
-      got="$(awk 'BEGIN{RS="\0"} NR==5{printf "%s", $0}' "$ARGV_FILE")"
-      [ "$got" = "$BREAKOUT" ] || { echo "$doc/$sh: pattern mangled: $got"; return 1; }
-      [ "$(argv_lines | head -n 4 | tr '\n' ' ')" = "run -c $RECIPE_DIR/trusted-sgconfig.yml --pattern " ] \
-        || { echo "$doc/$sh: argv $(argv_lines)"; return 1; }
-      [[ "$output" == *"console.log(1)"* ]]
-      [ ! -e "$RECIPE_DIR" ] || { echo "$doc/$sh: values dir left behind"; return 1; }
+    block="$(recipe_of "$PLUGIN_ROOT/$doc")"
+    [ -n "$block" ]
+    if printf '%s' "$block" | grep -q '<<'; then echo "heredoc in $doc recipe"; return 1; fi
+    if printf '%s' "$block" | grep -q 'rm -rf'; then echo "rm -rf in $doc recipe"; return 1; fi
+    for want in 'pattern=$(cat -- "$d/pattern")' 'lang=$(cat -- "$d/lang")' \
+      'target=$(cat -- "$d/target")' 'rule=$(cat -- "$d/rule")' \
+      'ast-grep run -c "$cfg" --pattern "$pattern" --lang "$lang" -- "$target"' \
+      'ast-grep scan -c "$cfg" --inline-rules "$rule" --json=stream -- "$target"' \
+      'rmdir -- "$d"'; do
+      if ! printf '%s' "$block" | grep -qF -- "$want"; then echo "$doc missing: $want"; return 1; fi
     done
+    if grep -q 'AST_GREP_[A-Z]*_NONCE' "$PLUGIN_ROOT/$doc"; then echo "stale NONCE in $doc"; return 1; fi
+  done
+}
+
+@test "heredoc-breakout pattern stays data (bash, then zsh noclobber)" {
+  local doc
+  for doc in "${DOCS[@]}"; do check_breakout "$PLUGIN_ROOT/$doc" bash; done
+  require_zsh
+  for doc in "${DOCS[@]}"; do check_breakout "$PLUGIN_ROOT/$doc" 'zsh -f -o noclobber'; done
+}
+
+@test "ast-grep gets the trusted config, written fresh by the recipe" {
+  local doc cfg
+  for doc in "${DOCS[@]}"; do
+    rm -f "$ARGV_FILE" "$CFG_COPY"
+    run_recipe "$PLUGIN_ROOT/$doc" bash 'pattern=console.log($A)' lang=js target=src
+    [ "$status" -eq 0 ]
+    cfg="$(argv_n 3)"
+    case "$cfg" in "$RECIPE_DIR"/trusted-sgconfig.*) ;; *) echo "$doc: -c $cfg"; return 1 ;; esac
+    [ "$(cat "$CFG_COPY")" = 'ruleDirs: []' ]
+  done
+}
+
+@test "a planted config file or symlink is never overwritten or followed" {
+  local doc recipe f
+  for doc in "${DOCS[@]}"; do
+    rm -f "$ARGV_FILE" "$CFG_COPY"
+    printf 'sentinel\n' > "$WORK/outside"
+    RECIPE_DIR="$(env PATH="$STUB:$PATH" bash -c "$(step1_of "$PLUGIN_ROOT/$doc")")"
+    printf 'console.log($A)\n' > "$RECIPE_DIR/pattern"
+    printf 'js\n' > "$RECIPE_DIR/lang"
+    printf 'src\n' > "$RECIPE_DIR/target"
+    # Plant every name a config could take, pointing outside the directory.
+    for f in trusted-sgconfig.yml trusted-sgconfig.XXXXXXXX sgconfig.yml; do
+      ln -s "$WORK/outside" "$RECIPE_DIR/$f"
+    done
+    recipe="$(recipe_of "$PLUGIN_ROOT/$doc")"
+    run env PATH="$STUB:$PATH" bash -c "${recipe//VALUES_DIR/$RECIPE_DIR}"
+    [ "$(cat "$WORK/outside")" = sentinel ]
+    [ "$(cat "$CFG_COPY")" = 'ruleDirs: []' ]
+    [ ! -L "$(argv_n 3)" ] || [ ! -e "$(argv_n 3)" ]
+    rm -rf "$RECIPE_DIR"
   done
 }
 
@@ -119,11 +183,10 @@ BREAKOUT=$'x\nAST_GREP_PATTERN_NONCE\n)\ntouch markers/HEREDOC\npattern=$(cat <<
     for v in 'lang=js; touch markers/LANG' 'target=src/$(touch markers/PATH).js' \
       "target=src/a'; touch markers/Q; '.js" 'target=--rewrite=x' 'target=../etc' \
       'target=/etc' 'lang=' 'target='; do
-      rm -f "$ARGV_FILE" markers/*
-      run_recipe "$PLUGIN_ROOT/$doc" bash pattern='console.log($A)' lang=js target=src "$v"
-      [ -z "$(ls markers)" ] || { echo "$doc: $v ran"; return 1; }
-      [ ! -f "$ARGV_FILE" ] || { echo "$doc: $v reached ast-grep"; return 1; }
-      [[ "$output" == *"ast-grep: refused"* ]] || { echo "$doc: $v not refused: $output"; return 1; }
+      rm -f "$ARGV_FILE"
+      run_recipe "$PLUGIN_ROOT/$doc" bash 'pattern=console.log($A)' lang=js target=src "$v"
+      expect_no_markers "$doc: $v"
+      expect_refused_untouched "$doc: $v"
       [ ! -e "$RECIPE_DIR" ]
     done
   done
@@ -134,25 +197,86 @@ BREAKOUT=$'x\nAST_GREP_PATTERN_NONCE\n)\ntouch markers/HEREDOC\npattern=$(cat <<
   for doc in "${DOCS[@]}"; do
     rm -f "$ARGV_FILE"
     run_recipe "$PLUGIN_ROOT/$doc" bash lang=js target=src
-    [[ "$output" == *"ast-grep: refused"* ]] && [ ! -f "$ARGV_FILE" ] && [ ! -e "$RECIPE_DIR" ]
+    expect_refused_untouched "$doc: missing pattern"
+    [ ! -e "$RECIPE_DIR" ]
     run_recipe "$PLUGIN_ROOT/$doc" bash pattern= lang=js target=src
-    [[ "$output" == *"ast-grep: refused"* ]] && [ ! -f "$ARGV_FILE" ] && [ ! -e "$RECIPE_DIR" ]
+    expect_refused_untouched "$doc: empty pattern"
+    [ ! -e "$RECIPE_DIR" ]
   done
 }
 
-@test "values directory must be the one step 1 created" {
-  local doc recipe d
+@test "a look-alike directory is refused and left untouched (no rm -rf)" {
+  local doc recipe d real
+  real="$(cd "$WORK/tmp-real" && pwd -P)"
   for doc in "${DOCS[@]}"; do
-    recipe="$(extract_block "$PLUGIN_ROOT/$doc" 'ast-grep run')"
-    # The template default and look-alike paths are refused. ($(...) stays
-    # literal inside the single quotes, then fails the character guard.)
-    for d in "$WORK" "$WORK/src" "VALUES_DIR" '/tmp/ast-grep-values.$(touch markers/D)' \
-      "$WORK/ast-grep-values.12345678/../src" '/tmp/ast-grep-values.missing1'; do
+    recipe="$(recipe_of "$PLUGIN_ROOT/$doc")"
+    # 1: the #1112 review repro, a matching name inside the repository.
+    # 2: right name under TMPDIR but no step 1 marker directory.
+    # 3: right name and marker but reached through the TMPDIR symlink.
+    mkdir -p src/ast-grep-values.abcdefgh "$real/ast-grep-values.nomarker" "$real/ast-grep-values.viaLINK1"
+    mkdir -p "$real/ast-grep-values.viaLINK1/.ast-grep-values"
+    for d in "$WORK/repo/src/ast-grep-values.abcdefgh" "$real/ast-grep-values.nomarker" \
+      "$WORK/tmp-link/ast-grep-values.viaLINK1"; do
+      printf 'keep\n' > "$d/precious.txt"
+      printf 'console.log($A)\n' > "$d/pattern"
+      printf 'js\n' > "$d/lang"
+      printf 'src\n' > "$d/target"
       rm -f "$ARGV_FILE"
       run env PATH="$STUB:$PATH" bash -c "${recipe//VALUES_DIR/$d}"
-      [[ "$output" == *"ast-grep: refused"* ]] || { echo "$doc: $d accepted: $output"; return 1; }
-      [ ! -f "$ARGV_FILE" ] && [ -z "$(ls markers)" ] && [ -f src/a.js ]
+      expect_refused_untouched "$doc: $d"
+      [ "$(cat "$d/precious.txt")" = keep ]
+      [ -f "$d/pattern" ]
     done
+    for d in "$WORK" VALUES_DIR '/tmp/ast-grep-values.$(touch markers/D)' \
+      "$real/ast-grep-values.12345678/../x"; do
+      rm -f "$ARGV_FILE"
+      run env PATH="$STUB:$PATH" bash -c "${recipe//VALUES_DIR/$d}"
+      expect_refused_untouched "$doc: $d"
+      expect_no_markers "$doc: $d"
+    done
+    [ -f src/a.js ]
+  done
+}
+
+@test "cleanup removes only the recipe's files, never extra ones" {
+  local doc
+  for doc in "${DOCS[@]}"; do
+    rm -f "$ARGV_FILE"
+    run_recipe "$PLUGIN_ROOT/$doc" bash 'pattern=console.log($A)' lang=js target=src extra=keep
+    [ "$status" -eq 0 ]
+    [ -f "$RECIPE_DIR/extra" ]
+    [ "$(ls -A "$RECIPE_DIR")" = extra ]
+    rm -rf "$RECIPE_DIR"
+  done
+}
+
+@test "step 1 refuses an unusable TMPDIR and leaves nothing behind" {
+  local doc t before
+  for doc in "${DOCS[@]}"; do
+    mkdir -p "$WORK/repo/rel" "$WORK/sp ace"
+    for t in rel "$WORK/sp ace" "$WORK/missing"; do
+      before="$(find "$WORK" -name 'ast-grep-values.*' | sort)"
+      run env TMPDIR="$t" PATH="$STUB:$PATH" bash -c "$(step1_of "$PLUGIN_ROOT/$doc")"
+      if [ -n "$output" ] && [ -d "$output" ]; then echo "$doc: TMPDIR=$t accepted: $output"; return 1; fi
+      [ "$(find "$WORK" -name 'ast-grep-values.*' | sort)" = "$before" ]
+    done
+  done
+}
+
+@test "output is capped at 200 lines of at most 2000 bytes" {
+  local doc longest
+  export STUB_MODE=big
+  for doc in "${DOCS[@]}"; do
+    run_recipe "$PLUGIN_ROOT/$doc" bash 'pattern=console.log($A)' lang=js target=src
+    [ "$status" -eq 0 ]
+    [ "${#lines[@]}" -eq 200 ]
+    longest="$(printf '%s\n' "$output" | awk '{ if (length($0) > m) m = length($0) } END { print m }')"
+    [ "$longest" -eq 2000 ]
+    run_recipe "$PLUGIN_ROOT/$doc" bash $'rule=id: r\nlanguage: js\nrule:\n  pattern: x' target=src
+    [ "$status" -eq 0 ]
+    [ "${#lines[@]}" -eq 200 ]
+    longest="$(printf '%s\n' "$output" | awk '{ if (length($0) > m) m = length($0) } END { print m }')"
+    [ "$longest" -eq 2000 ]
   done
 }
 
@@ -163,9 +287,11 @@ BREAKOUT=$'x\nAST_GREP_PATTERN_NONCE\n)\ntouch markers/HEREDOC\npattern=$(cat <<
     rm -f "$ARGV_FILE"
     run_recipe "$PLUGIN_ROOT/$doc" bash "rule=$rule" target=src
     [ "$status" -eq 0 ]
-    [ "$(argv_lines | head -n 4 | tr '\n' ' ')" = "scan -c $RECIPE_DIR/trusted-sgconfig.yml --inline-rules " ]
-    [ "$(awk 'BEGIN{RS="\0"} NR==5{printf "%s", $0}' "$ARGV_FILE")" = "$rule" ]
-    argv_lines | grep -qx -- '--json=stream'
+    [ "$(argv_n 1)" = scan ]
+    [ "$(argv_n 2)" = -c ]
+    [ "$(argv_n 4)" = --inline-rules ]
+    [ "$(argv_n 5)" = "$rule" ]
+    tr '\0' '\n' < "$ARGV_FILE" | grep -qx -- '--json=stream'
     [ ! -e "$RECIPE_DIR" ]
   done
 }
