@@ -79,10 +79,23 @@ lexical-search rationale.
 
 Values never become shell text, so there is no quoting and no heredoc
 delimiter for a hostile value to close. Each search is three steps. First,
-create a private values directory and note the path it prints:
+create a private values directory under TMPDIR and note the path it prints
+(if it prints a refusal instead, use Grep):
 
 ```bash
-mktemp -d "${TMPDIR:-/tmp}/ast-grep-values.XXXXXXXX"
+t=$(cd -- "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P) || t=''
+case "${TMPDIR:-/tmp}" in /*) ;; *) t='' ;; esac
+case "$t" in /*) ;; *) t='' ;; esac
+case "$t" in *[!A-Za-z0-9._/-]*|*..*) t='' ;; esac
+d=''
+[ -n "$t" ] && d=$(mktemp -d "$t/ast-grep-values.XXXXXXXX")
+case "$d" in "$t"/ast-grep-values.????????) ;; *) [ -n "$d" ] && rmdir -- "$d"; d='' ;; esac
+if [ -n "$d" ] && mkdir -- "$d/.ast-grep-values"; then
+  printf '%s\n' "$d"
+else
+  [ -n "$d" ] && rmdir -- "$d"
+  printf 'ast-grep: refused TMPDIR, use Grep\n' >&2
+fi
 ```
 
 Second, use the Write tool to put each value verbatim in its own file in that
@@ -96,9 +109,16 @@ exact path the first step printed (only letters, digits, `.`, `_`, `-`, and
 
 ```bash
 d='VALUES_DIR'
-case "$d" in /*/ast-grep-values.????????) ;; *) d='' ;; esac
+t=$(cd -- "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P) || t=''
+case "${TMPDIR:-/tmp}" in /*) ;; *) t='' ;; esac
+case "$t" in /*) ;; *) t='' ;; esac
+case "$t" in *[!A-Za-z0-9._/-]*|*..*) t='' ;; esac
+case "$d" in "$t"/ast-grep-values.????????) ;; *) d='' ;; esac
 case "$d" in *[!A-Za-z0-9._/-]*|*..*) d='' ;; esac
-if [ -n "$d" ] && [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ]; then
+r=''
+[ -n "$t" ] && [ -n "$d" ] && [ -d "$d" ] && [ ! -L "$d" ] && r=$(cd -- "$d" && pwd -P)
+if [ -n "$r" ] && [ "$r" = "$d" ] && [ -O "$d" ] &&
+  [ -d "$d/.ast-grep-values" ] && [ ! -L "$d/.ast-grep-values" ]; then
   pattern='' lang='' target='' rule=''
   [ -f "$d/pattern" ] && [ ! -L "$d/pattern" ] && pattern=$(cat -- "$d/pattern")
   [ -f "$d/lang" ] && [ ! -L "$d/lang" ] && lang=$(cat -- "$d/lang")
@@ -107,10 +127,13 @@ if [ -n "$d" ] && [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ]; then
   case "$lang" in *[!A-Za-z0-9_-]*|'') lang='' ;; esac
   case "$target" in /*|*..*|-*|*[!A-Za-z0-9._/-]*|'') target='' ;; esac
   # A trusted config stops ast-grep loading the repo's sgconfig.yml, whose
-  # customLanguages entries can load native libraries.
-  cfg="$d/trusted-sgconfig.yml"
-  printf 'ruleDirs: []\n' >| "$cfg"
-  if [ -n "$rule" ] && [ -n "$target" ]; then
+  # customLanguages entries can load native libraries. mktemp creates it
+  # fresh (O_EXCL), so a planted file or symlink is never written through.
+  cfg=$(mktemp "$d/trusted-sgconfig.XXXXXXXX") || cfg=''
+  [ -n "$cfg" ] && printf 'ruleDirs: []\n' >| "$cfg"
+  if [ -z "$cfg" ]; then
+    printf 'ast-grep: refused, could not create the trusted config\n' >&2
+  elif [ -n "$rule" ] && [ -n "$target" ]; then
     ast-grep scan -c "$cfg" --inline-rules "$rule" --json=stream -- "$target" |
       head -n 200 | cut -c 1-2000
   elif [ -n "$pattern" ] && [ -n "$lang" ] && [ -n "$target" ]; then
@@ -119,19 +142,25 @@ if [ -n "$d" ] && [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ]; then
   else
     printf 'ast-grep: refused missing, empty or unsafe value file\n' >&2
   fi
-  rm -rf -- "$d"
+  # Delete only this recipe's own files, then the directory if it is empty.
+  rm -f -- "$d/pattern" "$d/lang" "$d/target" "$d/rule"
+  rmdir -- "$d/.ast-grep-values"
+  [ -n "$cfg" ] && rm -f -- "$cfg"
+  rmdir -- "$d" 2>/dev/null || printf 'ast-grep: left %s (unexpected files)\n' "$d" >&2
 else
-  printf 'ast-grep: refused values directory\n' >&2
+  printf 'ast-grep: refused values directory, left it untouched\n' >&2
 fi
 ```
 
 The block reads each file with `$(cat -- file)`, which drops trailing
-newlines. It refuses a missing, empty or unsafe value, and any directory the
-first step did not make. It always passes the trusted `-c "$cfg"` config, and
-it deletes the values directory when it finishes, so start again from the
-first step for the next search. Never write values into the block itself. If
-output reaches 200 lines, treat it as truncated and narrow the pattern or
-path. To see the node kinds for a pattern, add `--debug-query=ast` to the
+newlines. It refuses a missing, empty or unsafe value. It also refuses, and
+leaves untouched, any directory that is not directly under the resolved
+TMPDIR or lacks the first step's `.ast-grep-values` marker directory. It
+always passes a freshly created trusted `-c "$cfg"` config. When it finishes
+it deletes only its own files and then the empty directory, so start again
+from the first step for the next search. Never write values into the
+block itself. If output reaches 200 lines, treat it as truncated and narrow
+the pattern or path. To see the node kinds for a pattern, add `--debug-query=ast` to the
 `run` line. If `ast-grep` is not on PATH, use Grep for the local search and
 say AST-level search was unavailable. If it returns no matches, fall through to
 `mcp__plugin_yellow-research_exa__get_code_context_exa` and report that
