@@ -16,6 +16,7 @@ import {
   addPlanNow,
   createGrant,
   delegateOk,
+  reviewedDigestOf,
   type DelegatedSession,
   type GrantHarness,
   makeHarness,
@@ -343,6 +344,31 @@ describe('the reviewed plan digest', () => {
     rewritePlanText();
     const err = await fails(() => approve(h.deps, args()));
     expect(err.appError.code).toBe('JULES_POLICY_DEVIATION');
+    expect(h.adapter.writeCount()).toBe(0);
+  });
+
+  it('refuses a plan whose review text was redacted, even with the digest of what was shown', async () => {
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      plan: {
+        planId: 'plan-1',
+        steps: [
+          {
+            id: 'st-k',
+            title: 'Call the API with AIzaSyA1234567890abcdefghijk',
+            index: 0,
+          },
+        ],
+      },
+    });
+    setVendorState(h, session.sessionResource, 'awaitingPlanApproval');
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const shown = await reviewedDigestOf(h, session.localRequestId);
+    h.adapter.calls.length = 0;
+    const err = await fails(() =>
+      approve(h.deps, args({ expectPlanDigest: shown }))
+    );
+    expect(err.appError.code).toBe('JULES_INVALID_STATE');
     expect(h.adapter.writeCount()).toBe(0);
   });
 

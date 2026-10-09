@@ -1025,6 +1025,19 @@ async function approveInner(
         ...attentionOf(changed ? ['planChanged'] : []),
       };
     }
+    // Redaction hides part of the plan from the review (and from the digest,
+    // which hashes the redacted text), so plans differing only in the hidden
+    // value would share a digest. Such a plan cannot be approved unseen.
+    if (JSON.stringify(redactDeep(newest)) !== JSON.stringify(newest)) {
+      return throwAppError(
+        'JULES_INVALID_STATE',
+        'the pending plan contains credential-shaped text that is redacted from the review; it cannot be approved unseen. Nothing was approved',
+        {
+          recoveryAction:
+            'Review and approve this plan in the Jules console, or ask for a plan without credentials.',
+        }
+      );
+    }
     if (
       newest.planId !== planId ||
       planDigest(newest.planId, redactDeep(newest).steps) !==

@@ -572,7 +572,10 @@ transient failure from an undetermined one.
   approved. The digest is required for a real call (missing or not 64
   lowercase hex is `JULES_INVALID_INPUT`, before any vendor call, but after the
   grant check); on `--dry-run` it is optional and a mismatch reports
-  `planChanged`. Only then
+  `planChanged`. A real call also refuses a newest plan whose text redaction
+  would change (a credential-shaped value hidden from the review) with
+  `JULES_INVALID_STATE`, because the digest hashes the redacted text and could
+  not tell two such plans apart. Only then
   does it issue the POST (the endpoint takes no plan id), then re-read from the
   same start point within the remaining budget and record a deviation on
   mismatch (R34). If the post-POST re-read is partial for any reason (page cap,
