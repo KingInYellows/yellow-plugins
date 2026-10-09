@@ -816,6 +816,49 @@ lgit() { yr_git -c core.fsmonitor=false -c core.untrackedCache=false --literal-p
 # (post-checkout, post-index-change).
 lgit_nohooks() { yr_git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs "$@"; }
 
+# yr_prog_enters <value> <root>: judge <value> as ONE program path, never split
+# into words (GIT_SSH, GIT_ASKPASS, SSH_ASKPASS, core.askpass, gpg.program: git
+# and ssh exec the whole string, so `dir with space/evil` is one path). Returns
+#   0  it would run a program inside <root>, or a path cannot be
+#      canonicalized or its links cannot be checked (fail closed);
+#   1  it is fine.
+# A word containing `/` skips PATH, so it is resolved against the current
+# directory and, when relative, against <root> as well (git runs transports
+# from the worktree), and refused when the existing result, its symlink target, a
+# script it names with #! or a hard link behind it is inside <root>. A bare
+# name is looked up on the screened PATH only.
+yr_prog_enters() {
+    local v="$1" root="$2" phys bin c base
+    [ -n "$v" ] || return 1
+    phys=$(pwd -P) || return 0
+    case "$v" in
+        */*)
+            for base in "$phys" "$root"; do
+                case "$v" in /*) bin="$v" ;; *) bin="$base/$v" ;; esac
+                # A path that does not exist runs nothing.
+                [ -e "$bin" ] || [ -L "$bin" ] || continue
+                c=$(yr_canon_path "$bin" 2>/dev/null) || return 0
+                yr_inside_root "$bin" "$root" && return 0
+                yr_inside_root "$c" "$root" && return 0
+                if [ -e "$c" ]; then
+                    yr_file_shebang_enters "$c" "$root" && return 0
+                    yr_hardlink_enters "$c" "$root" && return 0
+                fi
+                case "$v" in /*) break ;; esac
+            done
+            ;;
+        *)
+            bin=$(PATH=${YR_GIT_PATH:-$PATH}; type -P "$v" 2>/dev/null) || bin=""
+            if [ -n "$bin" ]; then
+                c=$(yr_canon_path "$bin" 2>/dev/null) || return 0
+                yr_inside_root "$c" "$root" && return 0
+                yr_file_shebang_enters "$c" "$root" && return 0
+            fi
+            ;;
+    esac
+    return 1
+}
+
 # yr_cmd_enters <value> <root>: judge a shell command line (GIT_SSH_COMMAND, a
 # pager or editor, a credential helper, a program-running config value). Git
 # hands it to the shell, so `sh <root>/script` and `ssh -F <root>/cfg` count,
@@ -878,13 +921,7 @@ yr_cmd_enters() {
     t=${t%[\"\']}
     case "$t" in
         ''|-*|'~'*) ;;
-        */*)
-            case "$t" in /*) bin="$t" ;; *) bin="$phys/$t" ;; esac
-            if [ -e "$bin" ]; then
-                c=$(yr_canon_path "$bin" 2>/dev/null) || return 0
-                yr_file_shebang_enters "$c" "$root" && return 0
-            fi
-            ;;
+        */*) yr_prog_enters "$t" "$root" && return 0 ;;
         *)
             bin=$(PATH=${YR_GIT_PATH:-$PATH}; type -P "$t" 2>/dev/null) || bin=""
             if [ -n "$bin" ]; then
@@ -974,6 +1011,43 @@ yr_include_key() {
     return $r
 }
 
+# yr_cfg_value_path_key <key>: succeed for the keys whose value is one program
+# path that git execs without a shell (core.askpass, gpg.program,
+# gpg.<format>.program); every other program key holds a shell command line.
+yr_cfg_value_path_key() {
+    local l
+    l=$(rp_lower "$1")
+    case "$l" in core.askpass|gpg.program|gpg.*.program) return 0 ;; esac
+    return 1
+}
+
+# yr_cfg_value_enters <key> <value> <root>: succeed when a program-running
+# config value would run something inside <root>. Used for entries from files
+# outside the worktree, whose origin is trusted but whose value can still name
+# `./evil`, which resolves against the worktree. Shell syntax this check cannot
+# judge is tolerated here (the user's own global alias or pager keeps working);
+# only a definite hit refuses.
+yr_cfg_value_enters() {
+    local k="$1" v="$2" root="$3" rc=0
+    [ -n "$v" ] || return 1
+    if yr_cfg_value_path_key "$k"; then
+        yr_prog_enters "$v" "$root"
+        return $?
+    fi
+    yr_cmd_enters "$v" "$root" || rc=$?
+    [ "$rc" -eq 0 ]
+}
+
+# yr_env_path_verdict <name> <value> <root> [note]: like yr_env_cmd_verdict for
+# a variable or key that holds one program path (never split into words).
+yr_env_path_verdict() {
+    if yr_prog_enters "$2" "$3"; then
+        YR_HARDEN_MSG="$1${4:+ $4} names a program inside the repository (or one that cannot be checked); unset it or point it outside the repository"
+        return 1
+    fi
+    return 0
+}
+
 # yr_env_cmd_verdict <name> <value> <root> [note]: run yr_cmd_enters and set
 # YR_HARDEN_MSG (variable name only, never the value) when it refuses.
 yr_env_cmd_verdict() {
@@ -1006,7 +1080,14 @@ yr_check_git_env() {
     local root name val i n k v rest
     root=$(yr_worktree_root || true)
     [ -n "$root" ] || return 0
-    for name in GIT_SSH_COMMAND GIT_SSH GIT_ASKPASS SSH_ASKPASS GIT_PROXY_COMMAND \
+    # GIT_SSH, GIT_ASKPASS and SSH_ASKPASS hold one program path that is exec'd
+    # whole, spaces included: judged unsplit.
+    for name in GIT_SSH GIT_ASKPASS SSH_ASKPASS; do
+        val="${!name-}"
+        [ -n "$val" ] || continue
+        yr_env_path_verdict "$name" "$val" "$root" || return 1
+    done
+    for name in GIT_SSH_COMMAND GIT_PROXY_COMMAND \
         GIT_EXTERNAL_DIFF GIT_PAGER PAGER GIT_EDITOR EDITOR VISUAL; do
         val="${!name-}"
         [ -n "$val" ] || continue
@@ -1058,7 +1139,11 @@ yr_check_git_env() {
             return 1
         fi
         if yr_cfg_key_runs_command "$k" "$v"; then
-            yr_env_cmd_verdict "GIT_CONFIG_VALUE_$i" "$v" "$root" "(injected config)" || return 1
+            if yr_cfg_value_path_key "$k"; then
+                yr_env_path_verdict "GIT_CONFIG_VALUE_$i" "$v" "$root" "(injected config)" || return 1
+            else
+                yr_env_cmd_verdict "GIT_CONFIG_VALUE_$i" "$v" "$root" "(injected config)" || return 1
+            fi
         fi
     done
     # GIT_CONFIG_PARAMETERS is git's own quoting: entries 'key'='value',
@@ -1086,7 +1171,11 @@ yr_check_git_env() {
             return 1
         fi
         if yr_cfg_key_runs_command "$k" "$v"; then
-            yr_env_cmd_verdict GIT_CONFIG_PARAMETERS "$v" "$root" "(injected config)" || return 1
+            if yr_cfg_value_path_key "$k"; then
+                yr_env_path_verdict GIT_CONFIG_PARAMETERS "$v" "$root" "(injected config)" || return 1
+            else
+                yr_env_cmd_verdict GIT_CONFIG_PARAMETERS "$v" "$root" "(injected config)" || return 1
+            fi
         fi
     done
     return 0
@@ -1204,7 +1293,13 @@ harden_git_config() {
                 return 1
                 ;;
         esac
-        # Global, system and other scopes: judge the file the entry came from.
+        # Global, system and other scopes: the value first (a trusted file can
+        # still name `./evil`, which resolves against the worktree), then the
+        # file the entry came from.
+        if [ -n "$oroot" ] && yr_cfg_value_enters "$tkeyname" "$tval" "$oroot"; then
+            YR_HARDEN_MSG="a global or system git config sets $(yr_cfg_key_label "$tkeyname") to a program inside the repository; point it outside the repository"
+            return 1
+        fi
         case "$trigin" in file:*) ofile=${trigin#file:} ;; *) continue ;; esac
         case "$cache" in *$'\n'"$ofile"$'\n'*) continue ;; esac
         [ -n "$oroot" ] || { cache="$cache$ofile"$'\n'; continue; }

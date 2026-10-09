@@ -1620,7 +1620,17 @@ CFG_CMD_KEYS=(
   mkdir -p tools
   printf '#!/bin/sh\nexit 0\n' >| tools/cmd
   chmod +x tools/cmd
-  for name in GIT_SSH_COMMAND GIT_SSH GIT_ASKPASS SSH_ASKPASS GIT_PROXY_COMMAND GIT_EXTERNAL_DIFF \
+  # GIT_SSH, GIT_ASKPASS and SSH_ASKPASS are one program path, judged unsplit
+  # (tests below); the multi-word forms apply to the shell command lines.
+  for name in GIT_SSH GIT_ASKPASS SSH_ASKPASS; do
+    for val in "$PWD/tools/cmd" "tools/cmd" "./tools/cmd" "../repo/tools/cmd"; do
+      for scope in full revert; do
+        rc=0; ( export "$name=$val"; harden_git_config "$scope" ) || rc=$?
+        [ "$rc" -eq 1 ] || { echo "$name=$val ($scope) rc=$rc" >&2; return 1; }
+      done
+    done
+  done
+  for name in GIT_SSH_COMMAND GIT_PROXY_COMMAND GIT_EXTERNAL_DIFF \
               GIT_PAGER PAGER GIT_EDITOR EDITOR VISUAL; do
     for val in "$PWD/tools/cmd" "$PWD/tools/cmd -o x" "\"$PWD/tools/cmd\" arg" "tools/cmd" \
                "sh $PWD/tools/cmd" "sh tools/cmd" "sh -c 'exec $PWD/tools/cmd'" "ssh -F $PWD/tools/cmd host" \
@@ -1732,7 +1742,7 @@ CFG_CMD_KEYS=(
   : >| tools/evil
   for val in '$PWD/tools/evil' '${PWD}/tools/evil' '`touch x`' '$(touch x)' 'ssh; touch x' 'ssh && true' 'ssh | cat' \
              'ssh > out' 'ssh < in' 'f() { x; }' 'ssh *' 'ssh ?' 'ssh [a]' '~root/x' 'ssh ~root/key' $'ssh\ntouch x'; do
-    for name in GIT_SSH_COMMAND GIT_PAGER EDITOR GIT_ASKPASS; do
+    for name in GIT_SSH_COMMAND GIT_PAGER EDITOR GIT_PROXY_COMMAND; do
       rc=0; ( export "$name=$val"; harden_git_config full; ) || rc=$?
       [ "$rc" -eq 1 ] || { echo "$name accepted: $val" >&2; return 1; }
     done
@@ -1812,7 +1822,7 @@ CFG_CMD_KEYS=(
 @test "harden_git_config keeps a trusted command variable, a bare name and a link to an outside file" {
   ln -s /usr/bin/true "$BATS_TEST_TMPDIR/trusted"
   for val in "/usr/bin/ssh -o BatchMode=yes" ssh "ssh -i /nonexistent/key" "$BATS_TEST_TMPDIR/trusted" "'/usr/bin/true' x" "!/usr/bin/true"; do
-    rc=0; ( export GIT_SSH_COMMAND="$val" GIT_ASKPASS="$val" EDITOR="$val"; harden_git_config full ) || rc=$?
+    rc=0; ( export GIT_SSH_COMMAND="$val" GIT_PROXY_COMMAND="$val" EDITOR="$val"; harden_git_config full ) || rc=$?
     [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
   done
 }
@@ -1857,10 +1867,13 @@ CFG_CMD_KEYS=(
   : >| tools/cmd
   for key in core.sshCommand core.askpass credential.helper credential.https://x.example.helper core.pager \
              diff.external gpg.program core.editor; do
+    # core.askpass and gpg.program hold one unsplit program path
+    pv="$PWD/tools/cmd -x"
+    case "$key" in core.askpass|gpg.program) pv="$PWD/tools/cmd" ;; esac
     rc=0; ( export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=x \
-                   GIT_CONFIG_KEY_1="$key" GIT_CONFIG_VALUE_1="$PWD/tools/cmd -x"; harden_git_config full ) || rc=$?
+                   GIT_CONFIG_KEY_1="$key" GIT_CONFIG_VALUE_1="$pv"; harden_git_config full ) || rc=$?
     [ "$rc" -eq 1 ] || { echo "KEY accepted: $key" >&2; return 1; }
-    rc=0; ( export GIT_CONFIG_PARAMETERS="'user.name'='x' '$key'='$PWD/tools/cmd -x'"; harden_git_config full ) || rc=$?
+    rc=0; ( export GIT_CONFIG_PARAMETERS="'user.name'='x' '$key'='$pv'"; harden_git_config full ) || rc=$?
     [ "$rc" -eq 1 ] || { echo "PARAMETERS accepted: $key" >&2; return 1; }
     rc=0; ( export GIT_CONFIG_PARAMETERS="'$key=$PWD/tools/cmd'"; harden_git_config full ) || rc=$?
     [ "$rc" -eq 1 ] || { echo "PARAMETERS (old form) accepted: $key" >&2; return 1; }
@@ -2116,7 +2129,7 @@ EOF
   root="$PWD"
   for val in "${root//\//\\/}/ignored/ssh" "$root/ign\\ored/ssh" 'ssh\ -F\ x' 'ssh -o a\"b' \
              "${root%?}\"${root: -1}\"/ignored/ssh" "ssh -F ${root:0:5}'${root:5}'/ignored/x" 'ssh -F a"b"c'; do
-    for name in GIT_SSH_COMMAND GIT_PAGER EDITOR GIT_ASKPASS; do
+    for name in GIT_SSH_COMMAND GIT_PAGER EDITOR GIT_PROXY_COMMAND; do
       rc=0; ( export "$name=$val"; harden_git_config full; ) || rc=$?
       [ "$rc" -eq 1 ] || { echo "$name accepted: $val" >&2; return 1; }
     done
@@ -2133,7 +2146,7 @@ EOF
   mkdir -p "dir with space"
   : >| "dir with space/evil"
   for val in "sh 'dir with space/evil'" 'sh "dir with space/evil"' "ssh -o 'StrictHostKeyChecking no'" "sh 'a b"; do
-    for name in GIT_SSH_COMMAND GIT_PAGER EDITOR GIT_ASKPASS; do
+    for name in GIT_SSH_COMMAND GIT_PAGER EDITOR GIT_PROXY_COMMAND; do
       rc=0; ( export "$name=$val"; harden_git_config full ) || rc=$?
       [ "$rc" -eq 1 ] || { echo "$name accepted: $val" >&2; return 1; }
     done
@@ -2311,4 +2324,76 @@ unprivileged() {
     rc=0; ( export GIT_CONFIG_PARAMETERS="$val"; harden_git_config full ) || rc=$?
     [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
   done
+}
+
+@test "harden_git_config refuses a global config whose program value names a file inside the worktree" {
+  mkdir -p tools "$BATS_TEST_TMPDIR/own"
+  printf '#!/bin/sh\nexit 0\n' >| tools/evil
+  chmod +x tools/evil
+  printf '#!/bin/sh\nexit 0\n' >| "$BATS_TEST_TMPDIR/own/tool"
+  chmod +x "$BATS_TEST_TMPDIR/own/tool"
+  local g="$BATS_TEST_TMPDIR/global" kv rc
+  for kv in 'core.sshCommand=./tools/evil' 'core.sshCommand=tools/evil -o x' 'core.sshCommand=ssh -F ./tools/evil host' \
+            "core.sshCommand=$PWD/tools/evil" 'core.askpass=./tools/evil' "core.askpass=$PWD/tools/evil" \
+            'core.pager=./tools/evil' 'credential.helper=./tools/evil' 'gpg.program=./tools/evil' \
+            'diff.external=./tools/evil'; do
+    : >| "$g"
+    git config -f "$g" "${kv%%=*}" "${kv#*=}"
+    for scope in full revert; do
+      rc=0; ( export GIT_CONFIG_GLOBAL="$g"; harden_git_config "$scope" ) || rc=$?
+      case "${kv%%=*}" in
+        core.sshCommand|core.askpass|core.pager|credential.helper|gpg.program|diff.external)
+          # revert judges only the checkout subset (filter.*, lfs.*)
+          if [ "$scope" = revert ]; then [ "$rc" -eq 0 ] || { echo "$kv ($scope) rc=$rc" >&2; return 1; }
+          else [ "$rc" -eq 1 ] || { echo "$kv ($scope) rc=$rc" >&2; return 1; }; fi ;;
+      esac
+    done
+    rc=0; ( export GIT_CONFIG_GLOBAL="$g"; harden_git_config full; [[ "$YR_HARDEN_MSG" != *tools/evil* ]] ) || rc=$?
+  done
+  # a filter command is in the checkout subset, so revert refuses it too
+  : >| "$g"; git config -f "$g" filter.x.smudge ./tools/evil
+  rc=0; ( export GIT_CONFIG_GLOBAL="$g"; harden_git_config revert ) || rc=$?
+  [ "$rc" -eq 1 ]
+  # a program outside the worktree keeps working
+  : >| "$g"
+  git config -f "$g" core.sshCommand "$BATS_TEST_TMPDIR/own/tool -o x"
+  git config -f "$g" core.askpass "$BATS_TEST_TMPDIR/own/tool"
+  git config -f "$g" alias.st '!git status | cat'
+  rc=0; ( export GIT_CONFIG_GLOBAL="$g"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
+@test "harden_git_config judges GIT_SSH, GIT_ASKPASS and SSH_ASKPASS as one path, spaces included" {
+  mkdir -p "dir with space" "$BATS_TEST_TMPDIR/own dir"
+  printf '#!/bin/sh\nexit 0\n' >| "dir with space/evil"
+  chmod +x "dir with space/evil"
+  printf '#!/bin/sh\nexit 0\n' >| "$BATS_TEST_TMPDIR/own dir/tool"
+  chmod +x "$BATS_TEST_TMPDIR/own dir/tool"
+  local name val rc
+  for name in GIT_SSH GIT_ASKPASS SSH_ASKPASS; do
+    for val in "dir with space/evil" "./dir with space/evil" "$PWD/dir with space/evil"; do
+      rc=0; ( export "$name=$val"; harden_git_config full ) || rc=$?
+      [ "$rc" -eq 1 ] || { echo "$name=$val rc=$rc" >&2; return 1; }
+    done
+    rc=0; ( export "$name=$BATS_TEST_TMPDIR/own dir/tool"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 0 ] || { echo "$name outside rc=$rc" >&2; return 1; }
+  done
+  # the same single-path rule for an injected core.askpass
+  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.askpass "GIT_CONFIG_VALUE_0=dir with space/evil"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+}
+
+@test "yr_prog_enters resolves a slash-containing word against the cwd and the worktree" {
+  mkdir -p sub "$BATS_TEST_TMPDIR/own"
+  printf '#!/bin/sh\nexit 0\n' >| sub/evil
+  chmod +x sub/evil
+  printf '#!/bin/sh\nexit 0\n' >| "$BATS_TEST_TMPDIR/own/tool"
+  local root="$PWD"
+  yr_prog_enters ./sub/evil "$root"
+  yr_prog_enters sub/evil "$root"
+  # cwd outside the worktree: a relative word that exists under the worktree counts
+  ( cd "$BATS_TEST_TMPDIR" && yr_prog_enters sub/evil "$root" )
+  ! yr_prog_enters "$BATS_TEST_TMPDIR/own/tool" "$root"
+  ! yr_prog_enters ssh "$root"
+  ! yr_prog_enters '' "$root"
 }
