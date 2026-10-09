@@ -82,8 +82,17 @@ printf '%s\n' "$OUTPUT" | jq '{ok, vendorState, condition, pendingPlan: (if .pen
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
 printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
-printf '%s\n' "$OUTPUT" | jq -r 'def safe: tostring | gsub("[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | gsub("[\\p{Pd}\u2500-\u257f\u2e3a\u2e3b\u30fc\u2043\u207b\u208b\u02d7\u2796\ufe31\ufe32\u2212\ufe58\ufe63\uff0d-]+"; "-") | gsub("-(\\s*-)+"; "-") | .[0:300]; (.pendingPlan.steps // [])[] | "\(.index + 1). \(.title | safe)" + (if .description then "\n   \(.description | safe)" else "" end)'
+FLAT_DEF='def flat: tostring | gsub("[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | gsub("[\\p{Pd}\u2500-\u257f\u2e3a\u2e3b\u30fc\u2043\u207b\u208b\u02d7\u2796\ufe31\ufe32\u2212\ufe58\ufe63\uff0d-]+"; "-") | gsub("-(\\s*-)+"; "-");'
+printf '%s\n' "$OUTPUT" | jq -r "$FLAT_DEF"'def safe: flat | .[0:300]; (.pendingPlan.steps // [])[] | "\(.index + 1). \(.title | safe)" + (if .description then "\n   \(.description | safe)" else "" end)'
 printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
+# The preview caps each field at 300 characters but plan_digest covers the full text:
+# approving a plan with a capped field would approve text the user never saw. Refuse.
+CAPPED=$(printf '%s\n' "$OUTPUT" | jq -r "$FLAT_DEF"'(.pendingPlan.steps // [])[] | . as $s | ("title", "description") as $f | select(($s[$f] // "") | flat | length > 300) | "step \($s.index + 1) \($f)"')
+if [ -n "$CAPPED" ]; then
+  printf 'ERROR: the preview cannot show these plan fields in full (over 300 characters): %s\n' "$(printf '%s' "$CAPPED" | paste -sd, -)" >&2
+  printf 'Refusing to bind an approval to text the user has not seen. Nothing was approved; review the full plan in the Jules UI.\n' >&2
+  exit 1
+fi
 bind_hash() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
 }
@@ -91,6 +100,9 @@ printf 'plan_digest=%s\n' "$(printf '%s\n' "$OUTPUT" | jq -c '[.pendingPlan.plan
 ```
 
 Keep the printed `plan_digest=` value: it identifies the plan the user is shown.
+If the block exits with `ERROR: the preview cannot show these plan fields in full`,
+name the listed step fields to the user, say the plan must be reviewed in full in
+the Jules UI, and stop: do not approve, and do not continue to Step 4.
 
 ### Step 4: Find a Covering Grant
 

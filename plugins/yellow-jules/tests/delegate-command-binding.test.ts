@@ -1,4 +1,6 @@
+import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -106,6 +108,52 @@ describe('/jules:approve binds the approval to the reviewed plan', () => {
     const compare = s6.indexOf('[ "$CONFIRMED_BINDING" != "$BINDING" ]');
     expect(compare).toBeGreaterThan(-1);
     expect(compare).toBeLessThan(s6.indexOf('node "$CLI" "${args[@]}"'));
+  });
+
+  describe('Step 3 refuses a plan whose preview would be capped', () => {
+    const block = /```bash\n([\s\S]*?)```/.exec(s3)?.[1] ?? '';
+    const run = (title: string, description: string) => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'jules-approve-'));
+      fs.mkdirSync(path.join(root, 'dist'));
+      const status = {
+        ok: true,
+        pendingPlan: {
+          planId: 'p1',
+          steps: [{ index: 0, title, description }],
+        },
+      };
+      fs.writeFileSync(
+        path.join(root, 'dist/cli.js'),
+        `console.log(${JSON.stringify(JSON.stringify(status))});`
+      );
+      const res = spawnSync(
+        'bash',
+        ['-c', block.replace('YELLOW_TODO_session', 'sessions/1')],
+        { env: { ...process.env, CLAUDE_PLUGIN_ROOT: root }, encoding: 'utf8' }
+      );
+      fs.rmSync(root, { recursive: true, force: true });
+      return res;
+    };
+
+    it('binds a plan that fits the preview', () => {
+      const res = run('Add tests', 'x'.repeat(300));
+      expect(res.status).toBe(0);
+      expect(res.stdout).toMatch(/plan_digest=[0-9a-f]{64}/);
+    });
+
+    it.each([
+      ['title', 'T'.repeat(301), 'short'],
+      ['description', 'short', 'D'.repeat(301)],
+    ])(
+      'exits without a digest when the %s is over 300 characters',
+      (field, title, description) => {
+        const res = run(title, description);
+        expect(res.status).toBe(1);
+        expect(res.stdout).not.toContain('plan_digest=');
+        expect(res.stderr).toContain(`step 1 ${field}`);
+        expect(res.stderr).toContain('Jules UI');
+      }
+    );
   });
 
   it('uses the same plan digest expression in Step 3 and Step 6', () => {

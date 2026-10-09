@@ -352,10 +352,10 @@ launch automatically.**
 | Code                          | Retryable | Recovery Action                                                                              |
 | ----------------------------- | --------- | -------------------------------------------------------------------------------------------- |
 | `JULES_CONFIRMATION_REQUIRED` | false     | no grant was passed; run the printed `authorize` command in a terminal, then retry           |
-| `JULES_AUTHORITY_DENIED`      | false     | the grant does not cover this launch; list grants with `authorize --list` or write a new one |
+| `JULES_AUTHORITY_DENIED`      | false     | the grant does not cover this launch; list grants with `authorize --list` or write a new one (the deviating session stays blocked) |
 | `JULES_GRANT_EXPIRED`         | false     | the grant expired; remote work may still run — see the error's containment steps             |
 | `JULES_GRANT_EXHAUSTED`       | false     | the grant's session or task limit is spent; write a new grant in a terminal                  |
-| `JULES_POLICY_DEVIATION`      | false     | a deviation was recorded under this grant; run `/jules:status --reconcile` and inspect       |
+| `JULES_POLICY_DEVIATION`      | false     | a deviation was recorded under this grant; `status --reconcile` does not clear it: inspect with `/jules:status`, then ask the owner to `/jules:authorize --revoke` the grant and write a new one (the deviating session stays blocked) |
 | `JULES_DUPLICATE_LAUNCH`      | false     | an unresolved launch exists for this repository and branch; run `/jules:status --reconcile`  |
 | `JULES_UNKNOWN_OUTCOME`       | false     | **do not retry.** A session may exist. Run `/jules:status --reconcile` to find it            |
 | `JULES_CONTROLLER_MISMATCH`   | false     | this data directory is not the authorized controller copy; follow the handoff procedure      |
