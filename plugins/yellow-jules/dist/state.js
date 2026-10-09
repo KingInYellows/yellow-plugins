@@ -291,6 +291,8 @@ function isValidSupervision(value) {
         !((0, shape_js_1.isPlainObject)(evaluatedPlan) &&
             typeof evaluatedPlan['planId'] === 'string' &&
             typeof evaluatedPlan['evaluatedAt'] === 'string' &&
+            (evaluatedPlan['planDigest'] === undefined ||
+                typeof evaluatedPlan['planDigest'] === 'string') &&
             (evaluatedPlan['evaluatedSeq'] === undefined ||
                 (0, shape_js_1.isNonNegativeInt)(evaluatedPlan['evaluatedSeq']))))
         return false;
@@ -365,6 +367,8 @@ function isValidRecord(key, value) {
             typeof value['lastGeneratedPlan']['planId'] === 'string' &&
             typeof value['lastGeneratedPlan']['activityId'] === 'string' &&
             typeof value['lastGeneratedPlan']['activityCreateTime'] === 'string' &&
+            (value['lastGeneratedPlan']['planDigest'] === undefined ||
+                typeof value['lastGeneratedPlan']['planDigest'] === 'string') &&
             (value['lastGeneratedPlan']['seq'] === undefined ||
                 (0, shape_js_1.isNonNegativeInt)(value['lastGeneratedPlan']['seq']))))
         return false;
@@ -1072,13 +1076,23 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
                     createTime: prevGen.activityCreateTime,
                     activityId: prevGen.activityId,
                 }) > 0);
+        const genDigest = gen !== undefined
+            ? planDigest(gen.planId, (0, redact_js_1.redactDeep)({ steps: gen.steps }).steps)
+            : undefined;
+        // The sequence marks when this plan CONTENT was first recorded: the same
+        // id with different steps is a new plan and takes a new sequence.
+        const sameGen = gen !== undefined &&
+            prevGen?.planId === gen.planId &&
+            prevGen.seq !== undefined &&
+            (prevGen.planDigest === undefined || prevGen.planDigest === genDigest);
         const lastGeneratedPlan = gen !== undefined && genAdvances
             ? {
                 planId: gen.planId,
                 activityId: gen.activityId,
                 activityCreateTime: gen.activityCreateTime,
-                seq: prevGen?.planId === gen.planId && prevGen.seq !== undefined
-                    ? prevGen.seq
+                ...(genDigest !== undefined ? { planDigest: genDigest } : {}),
+                seq: sameGen
+                    ? (prevGen?.seq ?? nextSeq(journal))
                     : nextSeq(journal),
             }
             : prevGen;

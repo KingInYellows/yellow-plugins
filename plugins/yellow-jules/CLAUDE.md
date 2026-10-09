@@ -296,6 +296,15 @@ whose title is not a string, or whose description is present and not a string,
 is an unmapped activity (the walk stops, supervision pauses, approval refetch
 refuses) rather than being normalized to an empty string.
 
+A plan replacement is detected by plan id or by digest: a newer `planGenerated`
+that reuses the evaluated plan id with different steps pauses like a new id
+(evaluations stored before digests compare by id only). `status` marks a plan it
+redacted (`redacted: true` on `pendingPlan`); `supervise` then offers no
+`approve` or `reply` for it, because the supervisor judged incomplete text. A
+`reply --expect-activity-id` also fails closed with `JULES_QUESTION_CHANGED`
+when a user message that is not one of this plugin's claimed echoes follows the
+question.
+
 Binding a create to a session that an `observe` row already owns (reconcile, or
 a create whose response arrived after a raw-resource `status`) folds that row
 into the create and retires its local id: deviations stay unreconciled if either

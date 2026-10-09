@@ -500,6 +500,14 @@ async function recordOutsideActivity(
   return new Set(pending);
 }
 
+/** Redacts plan text for persistence and marks a plan redaction changed, so supervision never offers it. */
+function redactedPlan(plan: PendingPlan): PendingPlan {
+  const redacted = redactDeep(plan);
+  return JSON.stringify(redacted) === JSON.stringify(plan)
+    ? redacted
+    : { ...redacted, redacted: true };
+}
+
 export async function status(
   deps: RuntimeDeps,
   args: StatusArgs
@@ -709,7 +717,9 @@ export async function status(
           ? {
               // Plan text is vendor-writable: redacted before it is persisted.
               pendingPlan:
-                walk.pendingPlan == null ? null : redactDeep(walk.pendingPlan),
+                walk.pendingPlan == null
+                  ? null
+                  : redactedPlan(walk.pendingPlan),
             }
           : {}),
         resumeRestartCount: restartCount,

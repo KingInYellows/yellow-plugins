@@ -329,6 +329,7 @@ async function assertQuestionStillOpen(deps, adapter, sessionResource, liveCondi
         return changed(`the session is ${liveCondition}, not awaiting a reply`);
     }
     let newest;
+    const userMessages = [];
     const walk = await (0, activity_walk_js_1.walkActivities)({
         adapter,
         sessionResource,
@@ -338,6 +339,12 @@ async function assertQuestionStillOpen(deps, adapter, sessionResource, liveCondi
         deadline,
         pageCap: APPROVE_PAGE_CAP,
         onActivity: (activity) => {
+            if (activity.type === 'userMessaged') {
+                userMessages.push({
+                    activityId: activity.activityId,
+                    createTime: activity.createTime,
+                });
+            }
             if (activity.type === 'agentMessaged' &&
                 (newest === undefined || (0, activity_walk_js_1.compareStamp)(activity, newest) > 0)) {
                 newest = {
@@ -367,6 +374,14 @@ async function assertQuestionStillOpen(deps, adapter, sessionResource, liveCondi
         current.activityId !== expected.activityId ||
         (0, state_js_1.messageDigest)(current.message) !== expected.digest) {
         return changed('the session no longer awaits the question the pass showed');
+    }
+    // A user message after the question that is not one of this plugin's claimed
+    // echoes is someone else answering (or steering) the session. This read does
+    // not classify it, so the reply fails closed and the next `status` records it.
+    const claimed = new Set(Object.values((await (0, state_js_1.readJournal)(deps.dataDir)).operations).flatMap((r) => r.echoActivityId !== undefined ? [r.echoActivityId] : []));
+    const question = newest;
+    if (userMessages.some((u) => !claimed.has(u.activityId) && (0, activity_walk_js_1.compareStamp)(u, question) > 0)) {
+        return changed('a user message arrived after the question and was not sent by this plugin');
     }
 }
 function validateExpectedPlan(args, haveQuestion) {

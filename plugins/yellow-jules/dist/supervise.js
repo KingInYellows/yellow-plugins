@@ -52,7 +52,12 @@ function viewOf(a) {
         createTime: a.createTime,
         type: a.type,
         ...(a.message !== undefined ? { message: a.message } : {}),
-        ...(a.plan !== undefined ? { planId: a.plan.planId } : {}),
+        ...(a.plan !== undefined
+            ? {
+                planId: a.plan.planId,
+                planDigest: (0, state_js_1.planDigest)(a.plan.planId, (0, redact_js_1.redactDeep)({ steps: a.plan.steps }).steps),
+            }
+            : {}),
     };
 }
 const waitForHuman = {
@@ -87,6 +92,18 @@ function planText(plan) {
 }
 function backoffSeconds(failures) {
     return Math.min(BACKOFF_BASE_SECONDS * 2 ** Math.max(0, failures - 1), exports.BACKOFF_CAP_SECONDS);
+}
+/**
+ * Whether a plan differs from the evaluated one: another id, or the same id
+ * with other steps. An evaluation or plan stored before digests existed is
+ * compared by id alone.
+ */
+function planDiffers(evaluated, planId, digest) {
+    if (planId !== evaluated.planId)
+        return true;
+    return (evaluated.planDigest !== undefined &&
+        digest !== undefined &&
+        digest !== evaluated.planDigest);
 }
 /**
  * Mirrors the `safe` filter in commands/jules/supervise.md, which flattens the
@@ -346,16 +363,16 @@ async function superviseOnce(deps, args) {
     const swappedActivityId = evaluated !== undefined && !repliedSinceEvaluation
         ? (newActivities.find((a) => a.type === 'planGenerated' &&
             a.planId !== undefined &&
-            a.planId !== evaluated.planId)?.activityId ??
+            planDiffers(evaluated, a.planId, a.planDigest))?.activityId ??
             (seen.pendingPlan !== undefined &&
-                seen.pendingPlan.planId !== evaluated.planId
+                planDiffers(evaluated, seen.pendingPlan.planId, (0, state_js_1.planDigest)(seen.pendingPlan.planId, (0, redact_js_1.redactDeep)({ steps: seen.pendingPlan.steps }).steps))
                 ? seen.pendingPlan.activityId
                 : undefined) ??
             // A plain status may have consumed the replacement AND its approval,
             // leaving no pending plan: the retained latest-generated plan still
             // shows the swap when it was first recorded after the evaluation.
             (fresh.lastGeneratedPlan !== undefined &&
-                fresh.lastGeneratedPlan.planId !== evaluated.planId &&
+                planDiffers(evaluated, fresh.lastGeneratedPlan.planId, fresh.lastGeneratedPlan.planDigest) &&
                 (0, state_js_1.seqBefore)(evaluated.evaluatedSeq, fresh.lastGeneratedPlan.seq)
                 ? fresh.lastGeneratedPlan.activityId
                 : undefined))
@@ -468,7 +485,12 @@ async function superviseOnce(deps, args) {
         fenced.plan = (0, redact_js_1.fenceUntrusted)(shownPlan);
         // A plan the fence rewrote (redaction, a forged delimiter) was not shown as
         // it is: it is not offered for approval or a plan-bound reply.
-        const unactionable = (0, redact_js_1.fenceAltersText)(shownPlan) || redact_js_1.HIDDEN_CHARS_RE.test(shownPlan);
+        // `status` redacts credential-shaped text before it persists the plan, so
+        // the shown text carries no trace of it: the persisted `redacted` mark is
+        // the signal. The supervisor judged incomplete text, so nothing is offered.
+        const unactionable = seen.pendingPlan.redacted === true ||
+            (0, redact_js_1.fenceAltersText)(shownPlan) ||
+            redact_js_1.HIDDEN_CHARS_RE.test(shownPlan);
         const actions = unactionable
             ? []
             : [
@@ -482,6 +504,7 @@ async function superviseOnce(deps, args) {
         }, {
             evaluatedPlan: {
                 planId: seen.pendingPlan.planId,
+                planDigest: (0, state_js_1.planDigest)(seen.pendingPlan.planId, (0, redact_js_1.redactDeep)({ steps: seen.pendingPlan.steps }).steps),
                 evaluatedAt: now().toISOString(),
             },
         }, unactionable ? ['planUnavailable'] : []);

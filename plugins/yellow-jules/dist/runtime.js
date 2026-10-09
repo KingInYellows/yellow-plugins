@@ -283,6 +283,13 @@ async function recordOutsideActivity(deps, record, messages, walkComplete, walkS
     }, pending, walkComplete);
     return new Set(pending);
 }
+/** Redacts plan text for persistence and marks a plan redaction changed, so supervision never offers it. */
+function redactedPlan(plan) {
+    const redacted = (0, redact_js_1.redactDeep)(plan);
+    return JSON.stringify(redacted) === JSON.stringify(plan)
+        ? redacted
+        : { ...redacted, redacted: true };
+}
 async function status(deps, args) {
     if (args.session === undefined && !args.reconcile) {
         return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', '--session is required unless --reconcile is given');
@@ -434,7 +441,9 @@ async function status(deps, args) {
             ...(walk.pendingPlan !== record.pendingPlan
                 ? {
                     // Plan text is vendor-writable: redacted before it is persisted.
-                    pendingPlan: walk.pendingPlan == null ? null : (0, redact_js_1.redactDeep)(walk.pendingPlan),
+                    pendingPlan: walk.pendingPlan == null
+                        ? null
+                        : redactedPlan(walk.pendingPlan),
                 }
                 : {}),
             resumeRestartCount: restartCount,

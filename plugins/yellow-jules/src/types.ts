@@ -242,6 +242,8 @@ export interface PendingPlan {
   readonly steps: readonly PlanStepRecord[];
   readonly activityCreateTime: string;
   readonly activityId: string;
+  /** Set by `status` when redaction changed the plan text it persisted; such a plan is never actionable. */
+  readonly redacted?: true;
 }
 
 export interface OperationRecord {
@@ -289,6 +291,8 @@ export interface OperationRecord {
     readonly activityId: string;
     readonly activityCreateTime: string;
     readonly seq?: number;
+    /** Digest of the plan's id and (redacted) steps; a same-id plan with other steps differs. */
+    readonly planDigest?: string;
   };
   /** Newest `planApproved` read by a partial walk, kept while `resumePageToken` is stored. */
   readonly resumeApproval?: {
@@ -407,6 +411,8 @@ export interface SupervisionState {
    */
   readonly evaluatedPlan?: {
     readonly planId: string;
+    /** Digest of the evaluated plan's id and steps; absent on evaluations written before it existed. */
+    readonly planDigest?: string;
     readonly evaluatedAt: string;
     /** Journal sequence of the evaluation; absent on evaluations written before sequences (order unknown). */
     readonly evaluatedSeq?: number;

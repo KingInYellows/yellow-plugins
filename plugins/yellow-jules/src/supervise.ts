@@ -34,7 +34,12 @@ import {
   remainingMs,
 } from './deadline.js';
 import { AppErrorException, makeAppError, throwAppError } from './errors.js';
-import { fenceAltersText, fenceUntrusted, HIDDEN_CHARS_RE } from './redact.js';
+import {
+  fenceAltersText,
+  fenceUntrusted,
+  HIDDEN_CHARS_RE,
+  redactDeep,
+} from './redact.js';
 import {
   type Attention,
   attentionOf,
@@ -53,6 +58,7 @@ import {
   isOwningCreate,
   messageDigest,
   type OwningCreate,
+  planDigest,
   readJournal,
   seqBefore,
   takeSeq,
@@ -90,7 +96,7 @@ const FENCED_MESSAGE_COUNT = 3;
 type ActivityView = Pick<
   AdapterActivity,
   'activityId' | 'createTime' | 'type' | 'message'
-> & { readonly planId?: string };
+> & { readonly planId?: string; readonly planDigest?: string };
 
 function viewOf(a: AdapterActivity): ActivityView {
   return {
@@ -98,7 +104,15 @@ function viewOf(a: AdapterActivity): ActivityView {
     createTime: a.createTime,
     type: a.type,
     ...(a.message !== undefined ? { message: a.message } : {}),
-    ...(a.plan !== undefined ? { planId: a.plan.planId } : {}),
+    ...(a.plan !== undefined
+      ? {
+          planId: a.plan.planId,
+          planDigest: planDigest(
+            a.plan.planId,
+            redactDeep({ steps: a.plan.steps }).steps
+          ),
+        }
+      : {}),
   };
 }
 
@@ -211,6 +225,24 @@ function backoffSeconds(failures: number): number {
   return Math.min(
     BACKOFF_BASE_SECONDS * 2 ** Math.max(0, failures - 1),
     BACKOFF_CAP_SECONDS
+  );
+}
+
+/**
+ * Whether a plan differs from the evaluated one: another id, or the same id
+ * with other steps. An evaluation or plan stored before digests existed is
+ * compared by id alone.
+ */
+function planDiffers(
+  evaluated: { readonly planId: string; readonly planDigest?: string },
+  planId: string,
+  digest: string | undefined
+): boolean {
+  if (planId !== evaluated.planId) return true;
+  return (
+    evaluated.planDigest !== undefined &&
+    digest !== undefined &&
+    digest !== evaluated.planDigest
   );
 }
 
@@ -539,17 +571,28 @@ export async function superviseOnce(
           (a) =>
             a.type === 'planGenerated' &&
             a.planId !== undefined &&
-            a.planId !== evaluated.planId
+            planDiffers(evaluated, a.planId, a.planDigest)
         )?.activityId ??
         (seen.pendingPlan !== undefined &&
-        seen.pendingPlan.planId !== evaluated.planId
+        planDiffers(
+          evaluated,
+          seen.pendingPlan.planId,
+          planDigest(
+            seen.pendingPlan.planId,
+            redactDeep({ steps: seen.pendingPlan.steps }).steps
+          )
+        )
           ? seen.pendingPlan.activityId
           : undefined) ??
         // A plain status may have consumed the replacement AND its approval,
         // leaving no pending plan: the retained latest-generated plan still
         // shows the swap when it was first recorded after the evaluation.
         (fresh.lastGeneratedPlan !== undefined &&
-        fresh.lastGeneratedPlan.planId !== evaluated.planId &&
+        planDiffers(
+          evaluated,
+          fresh.lastGeneratedPlan.planId,
+          fresh.lastGeneratedPlan.planDigest
+        ) &&
         seqBefore(evaluated.evaluatedSeq, fresh.lastGeneratedPlan.seq)
           ? fresh.lastGeneratedPlan.activityId
           : undefined))
@@ -700,8 +743,13 @@ export async function superviseOnce(
     fenced.plan = fenceUntrusted(shownPlan);
     // A plan the fence rewrote (redaction, a forged delimiter) was not shown as
     // it is: it is not offered for approval or a plan-bound reply.
+    // `status` redacts credential-shaped text before it persists the plan, so
+    // the shown text carries no trace of it: the persisted `redacted` mark is
+    // the signal. The supervisor judged incomplete text, so nothing is offered.
     const unactionable =
-      fenceAltersText(shownPlan) || HIDDEN_CHARS_RE.test(shownPlan);
+      seen.pendingPlan.redacted === true ||
+      fenceAltersText(shownPlan) ||
+      HIDDEN_CHARS_RE.test(shownPlan);
     const actions: AllowedAction[] = unactionable
       ? []
       : [
@@ -718,6 +766,10 @@ export async function superviseOnce(
       {
         evaluatedPlan: {
           planId: seen.pendingPlan.planId,
+          planDigest: planDigest(
+            seen.pendingPlan.planId,
+            redactDeep({ steps: seen.pendingPlan.steps }).steps
+          ),
           evaluatedAt: now().toISOString(),
         },
       },

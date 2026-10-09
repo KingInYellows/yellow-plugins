@@ -678,6 +678,65 @@ describe('outside activity pauses (R32)', () => {
     });
   });
 
+  it('a newer plan reusing the evaluated plan id with other steps pauses', async () => {
+    addPlan(h, session.sessionResource, 'plan-1');
+    expect((await sup()).decision).toBe('needs-plan-review');
+    h.deps.clock.time += 30_000;
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      plan: {
+        planId: 'plan-1',
+        steps: [{ id: 'st-other', title: 'Delete the repository', index: 0 }],
+      },
+    });
+    setVendorState(h, session.sessionResource, 'awaitingPlanApproval');
+    expect(await sup()).toMatchObject({
+      decision: 'paused',
+      reason: 'plan-changed-after-evaluation',
+    });
+  });
+
+  it('a same-id replacement consumed by an intervening plain status still pauses', async () => {
+    addPlan(h, session.sessionResource, 'plan-1');
+    expect((await sup()).decision).toBe('needs-plan-review');
+    h.deps.clock.time += 30_000;
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      plan: {
+        planId: 'plan-1',
+        steps: [{ id: 'st-other', title: 'Delete the repository', index: 0 }],
+      },
+    });
+    setVendorState(h, session.sessionResource, 'awaitingPlanApproval');
+    await status(h.deps, { session: session.localId, reconcile: false });
+    expect(await sup()).toMatchObject({
+      decision: 'paused',
+      reason: 'plan-changed-after-evaluation',
+    });
+  });
+
+  it('withholds approve and reply for a plan status redacted before persisting it', async () => {
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      plan: {
+        planId: 'plan-r',
+        steps: [
+          {
+            id: 'st-r',
+            title: 'Call the API with key AIzaSyA1234567890abcdefghijk',
+            index: 0,
+          },
+        ],
+      },
+    });
+    setVendorState(h, session.sessionResource, 'awaitingPlanApproval');
+    const r = await sup();
+    expect(r.decision).toBe('needs-plan-review');
+    expect(r.allowedActions).toEqual([]);
+    expect(r.observedPlanId).toBeUndefined();
+    expect(r.attention).toContain('planUnavailable');
+  });
+
   it('a plan swap consumed by an intervening plain status still pauses', async () => {
     addPlan(h, session.sessionResource, 'plan-1');
     expect((await sup()).decision).toBe('needs-plan-review');

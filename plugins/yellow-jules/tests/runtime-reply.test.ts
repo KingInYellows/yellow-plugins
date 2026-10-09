@@ -798,6 +798,28 @@ describe('races inside the write gate', () => {
       expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
     });
 
+    it('refuses when a user message follows the question and is not our echo', async () => {
+      const q = ask();
+      h.deps.clock.time += 1_000;
+      addActivity(h, session.sessionResource, {
+        type: 'userMessaged',
+        message: 'Use Postgres.',
+        createTime: new Date(h.deps.clock.now()).toISOString(),
+      });
+      expect(
+        await code(() =>
+          reply(
+            h.deps,
+            args({
+              expectActivityId: q.activityId,
+              expectQuestionDigest: messageDigest(QUESTION),
+            })
+          )
+        )
+      ).toBe('JULES_QUESTION_CHANGED');
+      expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    });
+
     it('refuses an expected id that is not the newest question', async () => {
       ask();
       expect(

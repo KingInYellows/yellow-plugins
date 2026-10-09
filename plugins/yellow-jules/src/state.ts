@@ -32,7 +32,7 @@ import {
   resolveStateDir,
 } from './config.js';
 import { throwAppError } from './errors.js';
-import { assertNoSecretShapedValues } from './redact.js';
+import { assertNoSecretShapedValues, redactDeep } from './redact.js';
 import { isNonNegativeInt, isPlainObject, isStringArray } from './shape.js';
 import type {
   ArtifactRecord,
@@ -305,6 +305,8 @@ function isValidSupervision(value: unknown): boolean {
       isPlainObject(evaluatedPlan) &&
       typeof evaluatedPlan['planId'] === 'string' &&
       typeof evaluatedPlan['evaluatedAt'] === 'string' &&
+      (evaluatedPlan['planDigest'] === undefined ||
+        typeof evaluatedPlan['planDigest'] === 'string') &&
       (evaluatedPlan['evaluatedSeq'] === undefined ||
         isNonNegativeInt(evaluatedPlan['evaluatedSeq']))
     )
@@ -388,6 +390,8 @@ function isValidRecord(key: string, value: unknown): value is OperationRecord {
       typeof value['lastGeneratedPlan']['planId'] === 'string' &&
       typeof value['lastGeneratedPlan']['activityId'] === 'string' &&
       typeof value['lastGeneratedPlan']['activityCreateTime'] === 'string' &&
+      (value['lastGeneratedPlan']['planDigest'] === undefined ||
+        typeof value['lastGeneratedPlan']['planDigest'] === 'string') &&
       (value['lastGeneratedPlan']['seq'] === undefined ||
         isNonNegativeInt(value['lastGeneratedPlan']['seq']))
     )
@@ -1417,16 +1421,27 @@ export async function upsertReadState(
               activityId: prevGen.activityId,
             }
           ) > 0);
+      const genDigest =
+        gen !== undefined
+          ? planDigest(gen.planId, redactDeep({ steps: gen.steps }).steps)
+          : undefined;
+      // The sequence marks when this plan CONTENT was first recorded: the same
+      // id with different steps is a new plan and takes a new sequence.
+      const sameGen =
+        gen !== undefined &&
+        prevGen?.planId === gen.planId &&
+        prevGen.seq !== undefined &&
+        (prevGen.planDigest === undefined || prevGen.planDigest === genDigest);
       const lastGeneratedPlan =
         gen !== undefined && genAdvances
           ? {
               planId: gen.planId,
               activityId: gen.activityId,
               activityCreateTime: gen.activityCreateTime,
-              seq:
-                prevGen?.planId === gen.planId && prevGen.seq !== undefined
-                  ? prevGen.seq
-                  : nextSeq(journal),
+              ...(genDigest !== undefined ? { planDigest: genDigest } : {}),
+              seq: sameGen
+                ? (prevGen?.seq ?? nextSeq(journal))
+                : nextSeq(journal),
             }
           : prevGen;
       const next: OperationRecord = applyRetention({

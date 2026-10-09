@@ -66,3 +66,8 @@ so such a plan is neither shown as reviewed nor approved. `delegate
 so a data directory inside the checkout or plugin cache is refused without
 creating anything. `supervise --clear-pause` requires this host's controller
 authority for the pause's grant.
+
+`supervise` now pauses when a newer plan reuses the evaluated plan id with
+different steps, and offers no approve or reply for a plan whose text `status`
+redacted. A question-bound `reply` is refused when a user message that this
+plugin did not send follows the question.
