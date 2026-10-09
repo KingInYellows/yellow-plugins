@@ -230,7 +230,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   exits 2, 3 and 4 are refusals and 5 and 6 keep the local commit
 - `run-verify-command` — Run `resolve_pr.verify_command` under a timeout;
   on failure save a patch, revert the files and report the tree state
-  (`--unattended` skips runner files and requires `--ignored-since
+  (`--unattended` skips runner files; every run requires `--ignored-since
   <marker-file>`, which refuses when a gitignored file is newer than the marker;
   `--revert-only` reverts the listed files; `--revert-dirty` reverts every change in the tree and takes no
   file list; `--check-ignored --ignored-since <marker-file>` runs only the

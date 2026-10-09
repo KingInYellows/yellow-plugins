@@ -26,14 +26,30 @@ case "$*" in
 esac
 STUB
   chmod +x "$STUB_BIN/gh"
-  # The mtime marker --ignored-since compares against (unattended runs need it).
+  # The mtime marker --ignored-since compares against (every run needs it).
   IGN_MARKER="$BATS_TEST_TMPDIR/ignored-marker"
   touch "$IGN_MARKER"
+  unset VERIFY_NO_MARKER
 }
 
 verify() {
   printf '%s\n' "$1" >| "$CMD"
   shift
+  # Every run needs the marker. Inject it unless the caller passed one, or
+  # set VERIFY_NO_MARKER=1 to test the refusal. Before the caller's args so
+  # a trailing -- stays last.
+  if [ "${VERIFY_NO_MARKER:-}" != 1 ]; then
+    local arg seen=0
+    for arg in "$@"; do
+      if [ "$arg" = --ignored-since ]; then
+        seen=1
+        break
+      fi
+    done
+    if [ "$seen" -eq 0 ]; then
+      set -- --ignored-since "$IGN_MARKER" "$@"
+    fi
+  fi
   run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" "$@"
 }
 
@@ -470,7 +486,7 @@ has_kill_after() {
 terminate_while_running() {
   printf '%s\n' 'touch "$BATS_TEST_TMPDIR/started"; sleep 31.1 & sleep 31.1; wait' >| "$CMD"
   set -m
-  "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 60 --trusted -- src/a.txt src/new.txt \
+  "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 60 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt \
     >| "$BATS_TEST_TMPDIR/out" 2>/dev/null 3>&- &
   local pid=$!
   set +m
@@ -627,7 +643,7 @@ SECRET_COMMAND='echo "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789"; ec
 @test "without yellow-core the log is withheld rather than kept raw" {
   copy=$(copy_plugin "$BATS_TEST_TMPDIR/solo/yellow-review")
   printf '%s\n' "$SECRET_COMMAND" >| "$CMD"
-  run --separate-stderr "$copy" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr "$copy" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   log=$(printf '%s' "$output" | jq -r .log)
   [ "$(cat "$log")" = '[withheld: log redaction unavailable]' ]
@@ -642,7 +658,7 @@ SECRET_COMMAND='echo "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789"; ec
   printf 'cs_redact_secrets() { cat; }\n' >| "$market/yellow-core/1.9.0/lib/compound-staging.sh"
   cp "$market/yellow-core/1.9.0/lib/compound-staging.sh" "$market/yellow-core/next/lib/"
   printf '%s\n' "$SECRET_COMMAND" >| "$CMD"
-  run --separate-stderr "$copy" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr "$copy" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   log=$(printf '%s' "$output" | jq -r .log)
   grep -q visible "$log"
@@ -795,7 +811,7 @@ redact_log() {
 
 @test "a verifier that prints a credential ID leaves it out of the retained log" {
   printf '%s\n' 'echo "DEVIN_ORG_ID=org-1234567"; echo visible' >| "$CMD"
-  run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   log=$(printf '%s' "$output" | jq -r .log)
   grep -q visible "$log"
@@ -838,7 +854,7 @@ redact_log() {
   command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
   rm -f src/new.txt && mkfifo src/new.txt
   printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
-  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"src/new.txt"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
@@ -848,7 +864,7 @@ redact_log() {
   command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
   rm -f src/a.txt && mkfifo src/a.txt
   printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
-  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"not a regular file or symlink: src/a.txt"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
@@ -889,7 +905,7 @@ exec "$real_git" "\$@"
 STUB
   chmod +x "$STUB_BIN/git"
   printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
-  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"could not snapshot"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
@@ -1026,7 +1042,7 @@ exec "$real_git" "\$@"
 STUB
   chmod +x "$STUB_BIN/git"
   printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
-  "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt \
+  "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt \
     </dev/null >"$BATS_TEST_TMPDIR/out" 2>"$BATS_TEST_TMPDIR/err" &
   pid=$!
   for i in $(seq 1 100); do
@@ -1136,7 +1152,7 @@ assert_no_raw_left() {
   secret_pieces
   STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
   printf '%s\n' "$PRINT_SECRET; sleep 4" >| "$CMD"
-  TMPDIR="$STREAM_TMP" "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 20 --trusted -- src/a.txt src/new.txt \
+  TMPDIR="$STREAM_TMP" "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 20 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt \
     >"$BATS_TEST_TMPDIR/mid.out" 2>&1 &
   pid=$!
   sleep 2
@@ -1407,19 +1423,34 @@ ignored_fixture() {
 }
 
 @test "--unattended without --ignored-since is refused before anything runs" {
-  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended -- src/a.txt src/new.txt
+  VERIFY_NO_MARKER=1 verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended -- src/a.txt src/new.txt
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"--ignored-since"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
   grep -q 'resolver edit' src/a.txt
 }
 
-@test "an attended run may omit --ignored-since" {
+@test "#952 4179906605: an attended run without --ignored-since is refused before anything runs" {
   ignored_fixture
-  printf '#!/bin/sh\necho changed\n' >| node_modules/.bin/runner
-  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
-  [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  printf '#!/bin/sh\ntouch "$BATS_TEST_TMPDIR/runner-ran"\n' >| node_modules/.bin/runner
+  chmod +x node_modules/.bin/runner
+  VERIFY_NO_MARKER=1 verify 'node_modules/.bin/runner; touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"requires --ignored-since"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  [ ! -e "$BATS_TEST_TMPDIR/runner-ran" ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "#952 4179906605: an attended run with --ignored-since refuses an ignored executable edited after the marker" {
+  ignored_fixture
+  touch -t 202001010000 "$IGN_MARKER"
+  printf '#!/bin/sh\necho pwned\n' >| node_modules/.bin/runner
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  [[ "$stderr" == *"node_modules/.bin/runner"* ]]
+  grep -q 'resolver edit' src/a.txt
 }
 
 @test "the revert modes ignore --ignored-since" {
@@ -1654,6 +1685,9 @@ hooks_fire_control() {
   printf '.hooks/\n' >> .git/info/exclude
   git config core.hooksPath .hooks
   hooks_fire_control
+  # verify() supplies --ignored-since. The planted hooks are gitignored, so
+  # the marker has to be newer than them or the guard refuses before revert.
+  touch "$IGN_MARKER"
   verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
   [ "$(printf '%s' "$output" | jq -r .result)" = fail ]
   [ "$(cat src/a.txt)" = $'one\nfeature' ]
@@ -2132,4 +2166,218 @@ trust_assert_absolute() {
   grep -F -- "--kill-after=1 1 true" "$TRUST_TIMEOUT_LOG" >/dev/null
   grep -F -- "--kill-after=5 30 $TRUST_BIN/gh" "$TRUST_TIMEOUT_LOG" >/dev/null
   grep -F -- "--kill-after=10" "$TRUST_TIMEOUT_LOG" >/dev/null
+}
+
+@test "#952 4179814361: a core.fsmonitor command in the local config is not run by --revert-only or --revert-dirty" {
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$BATS_TEST_TMPDIR/fsmon-ran" >| "$BATS_TEST_TMPDIR/fsmon"
+  chmod +x "$BATS_TEST_TMPDIR/fsmon"
+  git config core.fsmonitor "$BATS_TEST_TMPDIR/fsmon"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/fsmon-ran" ]
+  printf 'x\n' >> src/b.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ ! -e "$BATS_TEST_TMPDIR/fsmon-ran" ]
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = true ]
+}
+
+# Install a repository-local clean/smudge driver and attribute it onto every
+# path. After this, only `git config` is safe: status, diff and checkout would
+# run the driver.
+install_evil_filter() {
+  printf '#!/bin/sh\ntouch "%s"\ncat\n' "$BATS_TEST_TMPDIR/filter-ran" >| "$BATS_TEST_TMPDIR/evilfilter"
+  chmod +x "$BATS_TEST_TMPDIR/evilfilter"
+  git config filter.evil.clean "$BATS_TEST_TMPDIR/evilfilter"
+  git config filter.evil.smudge "$BATS_TEST_TMPDIR/evilfilter"
+  mkdir -p .git/info
+  echo '* filter=evil' >> .git/info/attributes
+}
+
+@test "#952 4179268957: a repository-local filter driver is refused before --revert-only or --revert-dirty touches the tree" {
+  install_evil_filter
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"filter.<driver>."* ]]
+  [[ "$stderr" != *"evilfilter"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/filter-ran" ]
+  grep -q 'resolver edit' src/a.txt
+  [ -e src/new.txt ]
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+  [ ! -e "$BATS_TEST_TMPDIR/filter-ran" ]
+  grep -q 'resolver edit' src/a.txt
+  [ -e src/new.txt ]
+}
+
+@test "#952 4179268957: a repository-local filter driver is refused before a trusted run" {
+  install_evil_filter
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"filter.<driver>."* ]]
+  [[ "$stderr" != *"evilfilter"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  [ ! -e "$BATS_TEST_TMPDIR/filter-ran" ]
+}
+
+@test "#952 4179268957: the stock Git LFS filter commands are allowed" {
+  git config filter.lfs.clean 'git-lfs clean -- %f'
+  git config filter.lfs.smudge 'git-lfs smudge -- %f'
+  git config filter.lfs.process 'git-lfs filter-process'
+  git config filter.lfs.required true
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = true ]
+}
+
+@test "#952 4223859615: a repository-local git-lfs on PATH is refused with the stock LFS filter config (exit 2)" {
+  printf 'node_modules/\n' >> .git/info/exclude
+  mkdir -p node_modules/.bin
+  cat >| node_modules/.bin/git-lfs <<STUB
+#!/bin/sh
+touch "$BATS_TEST_TMPDIR/inrepo-ran"
+exit 0
+STUB
+  chmod +x node_modules/.bin/git-lfs
+  git config filter.lfs.clean 'git-lfs clean -- %f'
+  git config filter.lfs.smudge 'git-lfs smudge -- %f'
+  git config filter.lfs.process 'git-lfs filter-process'
+  git config filter.lfs.required true
+  mkdir -p .git/info
+  echo '* filter=lfs' >> .git/info/attributes
+  PATH="$REPO/node_modules/.bin:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"git-lfs resolves to"* ]]
+  [[ "$stderr" == *"inside the repository"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/inrepo-ran" ]
+  grep -q 'resolver edit' src/a.txt
+  [ -e src/new.txt ]
+}
+
+@test "#952 4179906611: a FIFO replacing a tracked file is kept when the recovery patch cannot be saved" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  rm -f src/a.txt && mkfifo src/a.txt
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v git)
+  {
+    printf '#!/bin/bash\n'
+    printf 'for a in "$@"; do [ "$a" = --binary ] && exit 128; done\n'
+    printf 'exec "%s" "$@"\n' "$real"
+  } >| "$shim/git"
+  chmod +x "$shim/git"
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"nothing was reverted"* ]]
+  [ -p src/a.txt ]
+  [ -f src/new.txt ]
+}
+
+@test "#952 4179906611: the recovery patch records the deletion of a tracked file replaced by a FIFO" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  rm -f src/a.txt && mkfifo src/a.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ -f "$patch" ]
+  grep -q '^deleted file mode' "$patch"
+  grep -q '^diff --git a/src/a.txt b/src/a.txt' "$patch"
+  [ ! -p src/a.txt ] && [ -f src/a.txt ]
+  git apply "$patch"
+  [ ! -e src/a.txt ]
+  [ -f src/new.txt ]
+}
+
+# DEVIN_ORG_ID in the quoted-key forms JSON and YAML use, and in lowercase.
+devin_org_id_lines() {
+  printf '%s\n' '"DEVIN_ORG_ID": "org-1234567890"' '{"DEVIN_ORG_ID":"org-1234567890"}' \
+    'devin_org_id=org-1234567890' "'devin_org_id' : 'org-1234567890'"
+  printf '  "Devin_Org_Id"\t:\t"org-1234567890",\n'
+  printf '%s\n' 'devin-org-id: org-1234567890' 'DEVIN_ORG_ID => "org-1234567890"'
+}
+
+@test "#952 4168798358: the log redactor blanks a JSON, YAML or lowercase DEVIN_ORG_ID value" {
+  devin_org_id_lines >| "$BATS_TEST_TMPDIR/in"
+  run bash -c '
+    root=$1
+    . "$root/lib/resolve-paths.sh"
+    . "$root/lib/resolve-text.sh"
+    . "$root/lib/verify-run.sh"
+    vr_load_redactor "$root" || exit 9
+    while IFS= read -r line; do
+      out=$(printf "%s\n" "$line" | vr_redact_filter)
+      case "$out" in *org-1234567890*) echo "LEAK: $line"; exit 1 ;; esac
+      case "$out" in *"[REDACTED]"*) ;; *) echo "not redacted: $line -> $out"; exit 1 ;; esac
+    done <"$2"' _ "$BATS_TEST_DIRNAME/.." "$BATS_TEST_TMPDIR/in"
+  [ "$status" -eq 0 ] || { echo "$output" >&2; return 1; }
+}
+
+@test "#952 4168798358: the final log scan withholds an unredacted JSON, YAML or lowercase DEVIN_ORG_ID value" {
+  n=0
+  while IFS= read -r line; do
+    n=$((n + 1))
+    printf 'before\n%s\nafter\n' "$line" >| "$BATS_TEST_TMPDIR/stream$n"
+    run bash -c '
+      root=$1
+      . "$root/lib/resolve-paths.sh"
+      . "$root/lib/resolve-text.sh"
+      . "$root/lib/verify-run.sh"
+      vr_publish_log "$2" "$3" 0' _ "$BATS_TEST_DIRNAME/.." "$BATS_TEST_TMPDIR/stream$n" "$BATS_TEST_TMPDIR/out$n.log"
+    [ "$status" -eq 0 ]
+    run ! grep -q 'org-1234567890' "$BATS_TEST_TMPDIR/out$n.log"
+    grep -q '^\[withheld' "$BATS_TEST_TMPDIR/out$n.log" || { echo "published: $line" >&2; return 1; }
+  done < <(devin_org_id_lines)
+}
+
+@test "#952 4168798358: a verifier that prints a JSON or lowercase DEVIN_ORG_ID leaves it out of the retained log" {
+  devin_org_id_lines >| "$BATS_TEST_TMPDIR/ids"
+  printf 'cat "%s"; echo visible\n' "$BATS_TEST_TMPDIR/ids" >| "$CMD"
+  run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  log=$(printf '%s' "$output" | jq -r .log)
+  [ -f "$log" ]
+  run ! grep -q 'org-1234567890' "$log"
+}
+
+# git config allows a newline in a value. The line-oriented --get-regexp view
+# put the rest of such a value on its own unscoped line, so a stock Git LFS
+# command on the first line hid a second command that git then ran.
+# $1: cli-clean, raw-smudge (a "\n" escape in the config file) or cli-process.
+set_newline_lfs_filter() {
+  git config --remove-section filter.lfs 2>/dev/null || true
+  case "$1" in
+    cli-clean) git config filter.lfs.clean "git-lfs clean -- %f
+touch $BATS_TEST_TMPDIR/payload-ran; cat" ;;
+    raw-smudge) printf '[filter "lfs"]\n\tsmudge = "git-lfs smudge -- %%f\\ntouch %s; cat"\n' "$BATS_TEST_TMPDIR/payload-ran" >> .git/config ;;
+    cli-process) git config filter.lfs.process "git-lfs filter-process
+touch $BATS_TEST_TMPDIR/payload-ran" ;;
+  esac
+}
+
+@test "#952 4222875785: a stock Git LFS filter value with a second line is refused in --revert-only, --revert-dirty and a trusted run (exit 2)" {
+  mkdir -p .git/info
+  echo '* filter=lfs' >> .git/info/attributes
+  for variant in cli-clean raw-smudge cli-process; do
+    set_newline_lfs_filter "$variant"
+    run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+    [ "$status" -eq 2 ] || { echo "--revert-only accepted $variant (exit $status)" >&2; return 1; }
+    [[ "$stderr" == *"filter.<driver>."* ]]
+    [[ "$stderr" != *payload-ran* ]]
+    [ ! -e "$BATS_TEST_TMPDIR/payload-ran" ]
+    grep -q 'resolver edit' src/a.txt
+    [ -e src/new.txt ]
+    run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+    [ "$status" -eq 2 ] || { echo "--revert-dirty accepted $variant (exit $status)" >&2; return 1; }
+    [[ "$stderr" != *payload-ran* ]]
+    [ ! -e "$BATS_TEST_TMPDIR/payload-ran" ]
+    grep -q 'resolver edit' src/a.txt
+    [ -e src/new.txt ]
+    verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+    [ "$status" -eq 2 ] || { echo "trusted run accepted $variant (exit $status)" >&2; return 1; }
+    [[ "$stderr" == *"filter.<driver>."* ]]
+    [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+    [ ! -e "$BATS_TEST_TMPDIR/payload-ran" ]
+  done
 }

@@ -135,7 +135,8 @@ vr_redact_filter() {
                 | fold -b -s -w 65536 \
                 | tee >(printf 'out %s\n' "$(wc -l)" >&4) \
                 | cs_redact_secrets 2>/dev/null \
-                | sed -E 's/(^|[^A-Za-z0-9_])([A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_ID|_PASSWORD)[[:space:]]*[=:][[:space:]]*).*/\1\2[REDACTED]/'
+                | sed -E -e 's/(^|[^A-Za-z0-9_])([A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_ID|_PASSWORD)["'\'']?[[:space:]]*[=:][[:space:]]*).*/\1\2[REDACTED]/' \
+                    -e 's/(^|[^A-Za-z0-9_])([Dd][Ee][Vv][Ii][Nn][_-][Oo][Rr][Gg][_-][Ii][Dd]["'\'']?[[:space:]]*[=:][[:space:]]*).*/\1\2[REDACTED]/'
         } 4>&1 >&3
     ) || rc=$?; } 3>&1
     while read -r tag val; do

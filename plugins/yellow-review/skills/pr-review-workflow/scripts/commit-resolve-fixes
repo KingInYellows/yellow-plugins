@@ -147,10 +147,11 @@
 # user's global or system config is not judged, and no key is overridden with an
 # empty value, which would also disable the user's own credential helper.
 # Tools: gt (graphite) or node (github), gh and jq are found through PATH. One
-# whose canonical directory lies inside the repository's working tree (an
-# ignored <repo>/node_modules/.bin, say) could be replaced by a resolver without
-# a tracked change, so exit 3 naming the tool and directory, nothing committed.
-# A tool outside the repository is not judged; one that cannot be found keeps
+# whose canonical file lies inside the repository's working tree (an ignored
+# <repo>/node_modules/.bin, say, or a symlink outside the repository that
+# points at such a file) could be replaced by a resolver without a tracked
+# change, so exit 3 naming the tool, nothing committed. A tool whose canonical
+# file is outside the repository is not refused; one that cannot be found keeps
 # the "<tool> not found" handling. The check runs before any of them is called.
 # Libraries: lib/resolve-paths.sh, sibling-plugin.sh, resolve-text.sh and
 # verify-run.sh are sourced before any dirty-set check. When the plugin's lib
@@ -592,25 +593,29 @@ cd -- "$TOP"
 # gt, gh, jq and node are found through PATH. A PATH entry inside the working
 # tree (an ignored <repo>/node_modules/.bin, say) lets a resolver replace one
 # with no tracked change, and the first call would run it with submission
-# authority. Refuse a tool whose canonical directory is inside the repository;
-# a tool outside it (the normal case) is not judged, and one that cannot be
-# resolved is left to the "not found" handling. No tool has run before this.
+# authority. A PATH entry outside the repository can be a symlink whose
+# canonical file is inside the worktree, and that call would run the in-repo
+# file too. Refuse a tool whose canonical file is inside the repository; a
+# tool whose canonical file is outside it (the normal case) is not refused,
+# and one that is not on PATH is left to the "not found" handling. No tool
+# has run before this.
 check_tools_outside_repo() {
-    local real_top tool bin dir
-    real_top=$(pwd -P) || die 3 "cannot resolve the repository root to verify the tools on PATH; nothing committed"
+    local tool x rc
     for tool in "$@"; do
-        # type -P: the file on PATH, not the gh function defined above.
-        bin=$(type -P "$tool" 2>/dev/null) || continue
-        [ -n "$bin" ] || continue
-        dir=$(cd -- "$(dirname -- "$bin")" 2>/dev/null && pwd -P) \
-            || die 3 "cannot resolve the directory of $tool; nothing committed"
-        case "$dir" in
-            "$real_top"/*|"$real_top") die 3 "$tool resolves to $dir inside the repository, where a resolver can replace it; remove that directory from PATH; nothing committed" ;;
+        # A failed if with no else exits 0, which would hide return 2. Keep the
+        # resolver's status. The printed path is discarded: gt and node keep
+        # the names their callers already use.
+        x=$(yr_resolve_tool "$tool") && rc=0 || rc=$?
+        case "$rc" in
+            0) : "$x" ;;
+            1) continue ;;
+            2) die 3 "$tool resolves to a file inside the repository, where a resolver can replace it; remove that directory from PATH; nothing committed" ;;
+            *) die 3 "cannot resolve $tool to a canonical file outside the repository; nothing committed" ;;
         esac
     done
 }
 # gh and jq were bound above to a canonical file outside the worktree.
-# gt and node stay on this directory check; their argv is not rewritten.
+# gt and node stay on this canonical-file check; their argv is not rewritten.
 if [ "$PROVIDER" = github ]; then
     check_tools_outside_repo node
 else
@@ -642,15 +647,23 @@ harden_git_config() {
     local tcfg trc=0 tkey
     # A clean, smudge or process filter runs on `git add` and on checkout, so a
     # repository-local one is judged the same way; the three stock Git LFS
-    # commands (`git lfs install --local`) are allowed by exact value.
-    tcfg=$(git config --show-scope --get-regexp '^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process))$' 2>/dev/null) || trc=$?
+    # commands (`git lfs install --local`) are allowed by exact value. A value
+    # may hold a newline, so the config is read NUL-delimited (-z: scope NUL
+    # key LF value NUL) and turned into one line for the scope and one for the
+    # key, with the value's newlines (and the key/value separator) as \001: a
+    # multi-line value never matches an allowed command, so it is refused.
+    tcfg=$(git config -z --show-scope --get-regexp '^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process))$' 2>/dev/null \
+        | tr '\n\000' '\001\n'; exit "${PIPESTATUS[0]}") || trc=$?
     case "$trc" in 0|1) ;; *) die 3 "could not read the git transport config; nothing committed" ;; esac
-    tkey=$(printf '%s\n' "$tcfg" | awk -F'\t' '
-        ($1 == "local" || $1 == "worktree") {
-            k = $2; v = $2; sub(/ .*/, "", k); sub(/^[^ ]* /, "", v)
+    tkey=$(printf '%s\n' "$tcfg" | awk '
+        NR % 2 == 1 { s = $0; next }
+        s == "local" || s == "worktree" {
+            k = $0; v = ""; i = index($0, "\001")
+            if (i) { k = substr($0, 1, i - 1); v = substr($0, i + 1) }
             if (k ~ /^filter\.lfs\.(clean|smudge|process)$/ && (v == "git-lfs clean -- %f" || v == "git-lfs smudge -- %f" || v == "git-lfs filter-process" || v == "git-lfs smudge --skip -- %f" || v == "git-lfs filter-process --skip")) next
-            print k; exit
-        }')
+            print k; bad = 1; exit
+        }
+        END { if (!bad && NR % 2 == 1 && s != "") print "filter.<unreadable>.config" }')
     # A credential URL can carry userinfo: name the key without it.
     case "$tkey" in credential.?*.helper) tkey="credential.<url>.helper" ;; filter.*) tkey="filter.<driver>.${tkey##*.}" ;; esac
     [ -z "$tkey" ] || die 3 "the repository config sets $tkey, which would run a command with submission authority; remove it from the repository config (a global or system config is fine); nothing committed"
@@ -812,10 +825,21 @@ if [ -z "$TIMEOUT_BIN" ]; then
     printf '[commit-resolve-fixes] Warning: no timeout binary with --kill-after found (timeout or gtimeout); network calls run without a time limit\n' >&2
 fi
 
+# auth_hostport <authority-text>: the host[:port] git and curl connect to. They
+# end the authority at the first '/', '?' or '#' (a backslash is cut too, as
+# some URL parsers read it as '/'), and only then drop userinfo through the
+# last '@'. Stripping through the last '@' first would read
+# git.example#@github.com as github.com while git connects to git.example.
+auth_hostport() {
+    local a="${1%%[/?#\\]*}"
+    printf '%s\n' "${a##*@}"
+}
+
 # norm_host <host[:port]>: print the lowercase host name, without userinfo or
 # port; fail when what is left is not a plain host name. Never prints a URL.
 norm_host() {
-    local h="${1##*@}"
+    local h
+    h=$(auth_hostport "$1")
     [[ "$h" =~ ^([^:]+):[0-9]*$ ]] && h="${BASH_REMATCH[1]}"
     h=$(printf '%s' "$h" | tr '[:upper:]' '[:lower:]')
     [[ "$h" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || return 1
@@ -827,7 +851,8 @@ norm_host() {
 # ssh 22), so a spelled-out default equals an absent one. Fails for a port
 # above 65535. Never prints a URL.
 norm_port() {
-    local h="${1##*@}" p="" d=""
+    local h p="" d=""
+    h=$(auth_hostport "$1")
     if [[ "$h" =~ ^[^:]+:([0-9]+)$ ]]; then
         p=$((10#${BASH_REMATCH[1]}))
         [ "$p" -le 65535 ] || return 1
@@ -844,13 +869,17 @@ norm_port() {
 # path or anything else unparseable. Never prints the URL.
 remote_parse() {
     local url="$1" scheme=ssh auth rest host port
+    # A query, a fragment or a backslash has no place in a push URL, and each
+    # one moves where git and curl end the authority (see auth_hostport):
+    # refuse it rather than guess which host the push reaches.
+    case "$url" in *[?#\\]*) return 1 ;; esac
     case "$url" in
         *://*)
             scheme=$(printf '%s' "${url%%://*}" | tr '[:upper:]' '[:lower:]')
             case "$scheme" in https|http|ssh|git) ;; *) return 1 ;; esac
             rest="${url#*://}"
             [[ "$rest" == */* ]] || return 1
-            auth="${rest%%/*}"
+            auth="${rest%%[/?#\\]*}"
             rest="${rest#*/}"
             ;;
         *)

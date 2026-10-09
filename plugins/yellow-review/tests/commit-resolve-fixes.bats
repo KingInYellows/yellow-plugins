@@ -2800,3 +2800,142 @@ trust_assert_absolute() {
   grep -F -- "--kill-after=5 30 $TRUST_BIN/git" "$TRUST_TIMEOUT_LOG" | grep -F -- "ls-remote" >/dev/null
   grep -F -- "--kill-after=5 30 $TRUST_BIN/gh" "$TRUST_TIMEOUT_LOG" >/dev/null
 }
+
+# An outside PATH directory whose gt or node name is a symlink to an executable
+# inside the repository. The directory of the PATH hit is outside, but the
+# canonical file is inside, so the run is refused and that file never starts.
+@test "#952 4179814358: an outside-repo PATH symlink named gt or node that points into the repository is refused" {
+  old_path="$PATH"
+  printf 'node_modules/\n' >> .git/info/exclude
+  for entry in "graphite gt" "github node"; do
+    set -- $entry
+    mkdir -p node_modules/.bin
+    real=$(command -v "$2")
+    cat >| "node_modules/.bin/$2" <<STUB
+#!/bin/sh
+touch "$BATS_TEST_TMPDIR/inrepo-ran"
+exec "$real" "\$@"
+STUB
+    chmod +x "node_modules/.bin/$2"
+    mkdir -p "$BATS_TEST_TMPDIR/outside-bin"
+    ln -s "$REPO/node_modules/.bin/$2" "$BATS_TEST_TMPDIR/outside-bin/$2"
+    PATH="$BATS_TEST_TMPDIR/outside-bin:$old_path"
+    crf_refuses_untouched "$1" || { PATH="$old_path"; echo "not refused: $entry" >&2; return 1; }
+    PATH="$old_path"
+    [[ "$stderr" == *"$2 resolves to"* ]]
+    [[ "$stderr" == *"inside the repository"* ]]
+    [ ! -e "$BATS_TEST_TMPDIR/inrepo-ran" ]
+    rm -rf node_modules "$BATS_TEST_TMPDIR/outside-bin"
+  done
+}
+
+# git and curl end a URL's authority at the first '/', '?' or '#', and only
+# then split off userinfo at the last '@'. A parser that strips through the
+# last '@' of the text before the first '/' reads
+# https://git.example#@github.com/... as github.com while git pushes to
+# git.example.
+@test "#952 4168585190: a push URL whose authority ends at ? or # before an @github.com is refused before committing (exit 3)" {
+  for url in 'https://git.example#@github.com/acme/widgets.git' \
+             'https://git.example?@github.com/acme/widgets.git' \
+             'ssh://git@git.example#@github.com/acme/widgets.git' \
+             'https://git.example/#@github.com/acme/widgets.git'; do
+    git remote remove hostcase 2>/dev/null || true
+    push_via "$url"
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted: $url" >&2; return 1; }
+    [[ "$stderr" == *"remote 'hostcase'"* ]]
+    [[ "$stderr" != *"git.example"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  done
+  ! grep -q '^node ' "$STUB_LOG"
+}
+
+@test "#952 4168585190: an active host spelled host#@github.com or host?@github.com is that host, not github.com" {
+  for active in 'git.example#@github.com' 'git.example?@github.com' 'git.example/x@github.com'; do
+    git remote remove hostcase 2>/dev/null || true
+    export GH_HOST="$active"
+    push_via https://github.com/acme/widgets.git
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted GH_HOST: $active" >&2; return 1; }
+    [[ "$stderr" == *"does not push to the active GitHub host"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  done
+  unset GH_HOST
+  for prurl in 'https://git.example#@github.com/acme/widgets/pull/7' \
+               'https://git.example?@github.com/acme/widgets/pull/7'; do
+    git remote remove hostcase 2>/dev/null || true
+    export STUB_PR_URL="$prurl"
+    push_via https://github.com/acme/widgets.git
+    run_crf --provider github --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted PR URL: $prurl" >&2; return 1; }
+    [[ "$stderr" == *"does not push to the active GitHub host"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  done
+  ! grep -q '^node ' "$STUB_LOG"
+}
+
+# The bare NAME=value rule missed the quoted-key forms JSON and YAML use, and
+# lowercase spellings, so those committed a prohibited DEVIN_ORG_ID.
+@test "#952 4168798358: a JSON, YAML or lowercase DEVIN_ORG_ID value is refused by the commit scanner (exit 3)" {
+  while IFS= read -r line; do
+    printf 'one\nfeature\n%s\n' "$line" >| src/a.txt
+    run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "accepted: $line" >&2; return 1; }
+    [[ "$stderr" == *"credential-shaped"* ]]
+    [[ "$stderr" != *"org-1234567890"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+    [ -z "$(git diff --cached --name-only)" ]
+  done <<LINES
+"DEVIN_ORG_ID": "org-1234567890"
+{"DEVIN_ORG_ID":"org-1234567890"}
+devin_org_id=org-1234567890
+'devin_org_id' : 'org-1234567890'
+$(printf '  "Devin_Org_Id"\t:\t"org-1234567890",')
+devin-org-id: org-1234567890
+DEVIN_ORG_ID => "org-1234567890"
+LINES
+}
+
+@test "#952 4168798358: quoted-key DEVIN_ORG_ID references without a literal value stay clean" {
+  printf 'one\nfeature\n%s\n%s\n%s\n' \
+    '"devin_org_id": process.env.DEVIN_ORG_ID,' \
+    '"DEVIN_ORG_ID": "${DEVIN_ORG_ID:-}"' \
+    'user_id: 12345678' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ] || { echo "$stderr" >&2; return 1; }
+}
+
+# git config allows a newline in a value. The line-oriented --get-regexp view
+# put the rest of such a value on its own unscoped line, so a stock Git LFS
+# command on the first line hid a second command that `git add` then ran.
+@test "#952 4222875785: a stock Git LFS filter value with a second line is refused before committing (exit 3)" {
+  mkdir -p .git/info
+  echo '* filter=lfs' >> .git/info/attributes
+  can="$BATS_TEST_TMPDIR/payload-ran"
+  for provider in graphite github; do
+    for variant in cli-clean raw-smudge cli-process; do
+      git config --remove-section filter.lfs 2>/dev/null || true
+      case "$variant" in
+        cli-clean) git config filter.lfs.clean "git-lfs clean -- %f
+touch $can; cat" ;;
+        raw-smudge) printf '[filter "lfs"]\n\tsmudge = "git-lfs smudge -- %%f\\ntouch %s; cat"\n' "$can" >> .git/config ;;
+        cli-process) git config filter.lfs.process "git-lfs filter-process
+touch $can" ;;
+      esac
+      crf_refuses_untouched "$provider" || { echo "not refused: $variant $provider" >&2; return 1; }
+      [[ "$stderr" == *"repository config sets filter.<driver>."* ]]
+      [[ "$stderr" != *payload-ran* ]]
+      [ ! -e "$can" ] || { echo "payload ran: $variant $provider" >&2; return 1; }
+    done
+  done
+  # Control: the single-line stock values are still allowed (no attribute
+  # routes a path through them, as git-lfs is not installed here).
+  git config --remove-section filter.lfs
+  grep -v '^\* filter=lfs$' .git/info/attributes >| "$BATS_TEST_TMPDIR/attr" || true
+  cp "$BATS_TEST_TMPDIR/attr" .git/info/attributes
+  git config filter.lfs.clean "git-lfs clean -- %f"
+  git config filter.lfs.process "git-lfs filter-process"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+}

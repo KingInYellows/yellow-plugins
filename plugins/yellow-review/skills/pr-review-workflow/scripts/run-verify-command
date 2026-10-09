@@ -3,7 +3,7 @@
 # failure, timeout or interruption, save the resolver diff as a patch, revert
 # the listed files and report whether the tree is clean again.
 # Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted
-#                           [--unattended] [--ignored-since <marker-file>]
+#                           [--unattended] --ignored-since <marker-file>
 #                           [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-dirty
@@ -30,9 +30,10 @@
 #                  be examined refuses (fail closed). A
 #                  marker that is missing, unreadable, a symlink or not a
 #                  regular file also refuses (fail closed), as does a listing
-#                  failure. Attended runs may omit it. The revert modes ignore
-#                  it. Ignored changes are refused, never reported as a clean
-#                  tree: treeClean covers tracked and untracked-unignored files.
+#                  failure. Every run requires it, attended or not, and the
+#                  revert modes ignore it. Ignored changes are refused, never
+#                  reported as a clean tree: treeClean covers tracked and
+#                  untracked-unignored files.
 #   --check-ignored: run nothing and revert nothing; only the --ignored-since
 #                  guard, for a resolve run that has no verify command (the
 #                  commit still runs hooks, and an ignored file edited by a
@@ -88,6 +89,8 @@
 #   error (including run-only flags next to a revert flag, and --unattended
 #   without --ignored-since), no --trusted,
 #   unreadable --command-file or --files-from, not in a git repository, a
+#   repository-local clean, smudge or process filter other than the stock
+#   git-lfs commands (the value and the driver name are never printed), a
 #   refused path (not canonical, deny-listed when running, gitignored or
 #   unverifiable, or without changes when running), a change outside the
 #   listed files, an ignored file changed since the --ignored-since marker (or
@@ -372,9 +375,9 @@ gh() {
     fi
 }
 usage() {
-    printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] [--ignored-since <marker-file>] | --revert-only | --revert-dirty) [--files-from <file>] [-- <files...>]\n' >&2
+    printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] --ignored-since <marker-file> | --revert-only | --revert-dirty) [--files-from <file>] [-- <files...>]\n' >&2
     printf '       run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>\n' >&2
-    printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required with --unattended\n' >&2
+    printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required for every run\n' >&2
     exit 2
 }
 
@@ -427,10 +430,16 @@ if [ "$MODE" = run ]; then
     [ -f "$COMMAND_FILE" ] && [ -r "$COMMAND_FILE" ] || die 2 "--command-file not readable: $COMMAND_FILE"
     [ -n "$(tr -d '[:space:]' <"$COMMAND_FILE")" ] || die 2 "--command-file is empty"
     COMMAND_FILE=$(cd -- "$(dirname -- "$COMMAND_FILE")" && pwd)/$(basename -- "$COMMAND_FILE")
-    # Unattended, nothing else sees resolver edits to gitignored files, so the
-    # marker is required. Resolve it now: the script changes directory below.
+    # Every run needs the marker. An attended command the user approved still
+    # executes a resolver edit to an ignored executable, and nothing else sees
+    # those edits on an unattended run either. The unattended wording stays.
+    # Resolve the marker now: the script changes directory below.
     if [ "$UNATTENDED" = 1 ] && [ -z "$IGNORED_SINCE" ]; then
         printf '[run-verify-command] Error: --unattended requires --ignored-since <marker-file> (touch the file before the resolvers start)\n' >&2
+        exit 2
+    fi
+    if [ -z "$IGNORED_SINCE" ]; then
+        printf '[run-verify-command] Error: a verify run requires --ignored-since <marker-file>, attended or not (touch the file before the resolvers start)\n' >&2
         exit 2
     fi
     if [ -n "$IGNORED_SINCE" ]; then
@@ -444,6 +453,40 @@ fi
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
 cd -- "$TOP" || die 2 "cannot enter $TOP"
 
+# A clean, smudge or process filter runs on status, diff, checkout and apply,
+# so a repository-local one would run a command with the runner's authority in
+# every mode, including --revert-only, --revert-dirty and --check-ignored.
+# Judge it before any of those calls. The stock Git LFS commands are allowed
+# by exact value. Global and system scopes are not judged, and neither the
+# value nor the driver name is printed. A value may hold a newline, so the
+# config is read NUL-delimited (-z: scope NUL key LF value NUL) and turned into
+# one line for the scope and one for the key, with the value's newlines (and
+# the key/value separator) as \001: a multi-line value never matches an
+# allowed command, so it is refused.
+fcfg=""
+frc=0
+fcfg=$(git config -z --show-scope --get-regexp '^filter\..*\.(clean|smudge|process)$' 2>/dev/null \
+    | tr '\n\000' '\001\n'; exit "${PIPESTATUS[0]}") || frc=$?
+case "$frc" in 0|1) ;; *) die 2 "could not read the git filter config; the tree is untouched" ;; esac
+fkey=$(printf '%s\n' "$fcfg" | awk '
+    NR % 2 == 1 { s = $0; next }
+    s == "local" || s == "worktree" {
+        k = $0; v = ""; i = index($0, "\001")
+        if (i) { k = substr($0, 1, i - 1); v = substr($0, i + 1) }
+        if (k ~ /^filter\.lfs\.(clean|smudge|process)$/ && (v == "git-lfs clean -- %f" || v == "git-lfs smudge -- %f" || v == "git-lfs filter-process" || v == "git-lfs smudge --skip -- %f" || v == "git-lfs filter-process --skip")) next
+        print k; bad = 1; exit
+    }
+    END { if (!bad && NR % 2 == 1 && s != "") print "filter.<unreadable>.config" }')
+case "$fkey" in filter.*) fkey="filter.<driver>.${fkey##*.}" ;; esac
+[ -z "$fkey" ] || die 2 "the repository config sets $fkey, which would run a command with the runner's authority; remove it from the repository config (a global or system config is fine); the tree is untouched"
+# An allowed git-lfs command is still resolved through PATH when git runs the
+# filter, so a repository-local git-lfs would run with the runner's authority
+# on the first diff or status. When any filter is configured (global and system
+# scopes included), refuse a git-lfs whose canonical file is in the worktree. A
+# git-lfs that is not on PATH is left to fail on its own.
+[ -z "$fcfg" ] || yr_bind_outside git-lfs YELLOW_REVIEW_GIT_LFS || true
+unset fcfg
+
 REASON=""
 add_reason() { REASON="${REASON:+$REASON; }$1"; }
 
@@ -456,6 +499,9 @@ MARKER=""
 STREAM_FILE=""
 IGNORED_SCRATCH=""
 DIR_LIST=""
+# Missing on purpose: save_patch points GIT_INDEX_FILE here so a special file's
+# deletion is diffed against an empty index. A read-only diff never creates it.
+NOINDEX=""
 # The snapshot is provisional until it is complete and credential-screened: any
 # exit before then (a signal, a die, a failed screen) removes it, so no
 # unscreened patch stays under .git.
@@ -463,7 +509,7 @@ PATCH=""
 PATCH_PROVISIONAL=0
 cleanup() {
     local f
-    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST"; do
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST" "$NOINDEX"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
     if [ "$PATCH_PROVISIONAL" = 1 ] && [ -n "$PATCH" ]; then
@@ -521,8 +567,10 @@ else
         # Reverting is always safe; the deny list only stops running and committing.
         [ "$MODE" = run ] && rp_denied "$f" && die 2 "refusing a deny-listed path: $f"
         # Fail closed unless check-ignore positively says "not ignored" (exit 1).
+        # core.fsmonitor forced off: this index read would run a command set in
+        # .git/config. Not lgit: check-ignore rejects --literal-pathspecs.
         IGN=0
-        git check-ignore -q -- "$f" || IGN=$?
+        git -c core.fsmonitor=false -c core.untrackedCache=false check-ignore -q -- "$f" || IGN=$?
         [ "$IGN" = 1 ] || die 2 "refusing a gitignored (or unverifiable) path: $f"
         if [ -z "$(lgit_nohooks status --porcelain --untracked-files=all -- "$f")" ]; then
             [ "$MODE" = run ] && die 2 "listed file has no changes: $f"
@@ -569,10 +617,12 @@ if [ "$MODE" = run ]; then
     done
 fi
 
-# Only a regular file or a symlink may reach `git diff` below: a FIFO blocks it
-# before any watchdog starts, and a socket, device or directory is no edit to
-# keep. Running refuses; the revert modes delete the entry without opening it,
-# so refusal cleanup still completes.
+# Only a regular file or a symlink may reach `git diff` of the worktree below:
+# a FIFO blocks it before any watchdog starts, and a socket, device or
+# directory is no edit to keep. Running refuses. The revert modes do not open
+# the entry and do not remove it yet: save_patch records a tracked one's
+# deletion from HEAD against an empty index, and the removal waits until that
+# recovery patch is saved and screened.
 TOP_REAL=$(pwd -P)
 TO_REMOVE=()
 DIR_REMOVE=()
@@ -609,10 +659,12 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         [ "$HEAD_TYPE" = blob ] \
             || die 2 "refusing to remove a directory that is not a replaced file (HEAD has ${HEAD_TYPE:-nothing} there): $f"
     fi
-    # Validated; the removal waits until the output setup below has succeeded,
-    # so a setup failure exits before anything is deleted that the checkout
-    # restoring the tracked file would never reach. A directory waits longer:
-    # the recovery patch must hold its files first (save_patch).
+    # Validated. The removal waits until the recovery patch is saved and
+    # screened, so a setup failure or a patch that cannot be saved exits
+    # before anything is deleted that the checkout restoring the tracked file
+    # would never reach. save_patch records a special file's deletion from
+    # HEAD against an empty index and does not open the entry; a directory's
+    # files are diffed in place.
     if [ -d "$f" ] && [ ! -L "$f" ]; then
         DIR_REMOVE+=("$f")
     else
@@ -636,14 +688,10 @@ if [ "$MODE" = run ]; then
     (umask 077 && : >"$LOG") || die 2 "cannot create $LOG"
 fi
 
-# Setup succeeded: now remove the entries validated above.
-for f in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
-    rm -f -- "$f" 2>/dev/null
-    if [ -e "$f" ] || [ -L "$f" ]; then
-        die 2 "cannot remove a path that is not a regular file or symlink: $f"
-    fi
-    add_reason "removed without reading, not a regular file or symlink: $f"
-done
+# A missing file is an empty index. Clear a leftover so the deletion diff below
+# is taken against nothing; the diff itself never creates this path.
+NOINDEX="$OUT_DIR/.$STAMP.noindex"
+rm -f -- "$NOINDEX"
 
 RC=0
 TIMED_OUT=0
@@ -756,12 +804,41 @@ run_verify() {
 # place: its deletion of the file blob is followed by the diff of every regular
 # file and symlink inside it, so the patch re-applies on HEAD. A file inside it
 # that is listed itself (--revert-dirty) has its own entry and is not repeated.
+# A listed FIFO, socket or device (TO_REMOVE) is still in place and is not
+# opened. A tracked one is the deletion of the blob at HEAD, taken with
+# `diff --cached HEAD` against an empty index (GIT_INDEX_FILE names a path
+# that does not exist, and this read-only diff does not create it). An
+# untracked one is skipped. The entry is removed only after the patch is
+# saved and screened.
+# True when <path> is a special file whose removal waits on the saved patch.
+in_to_remove() {
+    local p
+    for p in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
+        [ "$p" = "$1" ] && return 0
+    done
+    return 1
+}
 save_patch() {
     local out="$1" fmt="$2" f rc c p
     umask 077
     : >"$out" || return 1
     for f in ${FILES[@]+"${FILES[@]}"}; do
         # Fixed flags so the patch re-applies whatever the user's diff config.
+        if in_to_remove "$f"; then
+            # Do not open the entry. A tracked path is recorded as deleted;
+            # an untracked special file is not an edit to keep.
+            if lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
+                || git cat-file -e "HEAD:$f" 2>/dev/null; then
+                # In a subshell: the empty index must not leak into the next
+                # file's diff, and a caller's GIT_INDEX_FILE stays as it was.
+                (
+                    export GIT_INDEX_FILE="$NOINDEX"
+                    lgit_nohooks diff --cached --no-color --no-ext-diff --no-textconv "$fmt" \
+                        --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f"
+                ) >>"$out" || return 1
+            fi
+            continue
+        fi
         if lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
             || git cat-file -e "HEAD:$f" 2>/dev/null; then
             lgit_nohooks diff --no-color --no-ext-diff --no-textconv "$fmt" \
@@ -982,7 +1059,25 @@ for f in ${DIR_REMOVE[@]+"${DIR_REMOVE[@]}"}; do
         add_reason "removed a directory standing where a file was (its files are in the recovery patch): $f"
     fi
 done
+# The patch now holds each special file's deletion (save_patch, empty index),
+# so the entry can go without being opened. A removal that fails stays in
+# REVERT_FAILS; the per-file loop must not let git open what is still there.
+for f in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
+    rm -f -- "$f" 2>/dev/null
+    if [ -e "$f" ] || [ -L "$f" ]; then
+        REVERT_FAILS+=("rm $f")
+    else
+        add_reason "removed without reading, not a regular file or symlink: $f"
+    fi
+done
 for f in ${FILES[@]+"${FILES[@]}"}; do
+    # Removal failed: the special file is still there. Skip it so git never
+    # opens it (a FIFO would block). The failure is already in REVERT_FAILS.
+    if in_to_remove "$f"; then
+        if [ -e "$f" ] || [ -L "$f" ]; then
+            continue
+        fi
+    fi
     if git cat-file -e "HEAD:$f" 2>/dev/null; then
         # Hooks off: post-checkout and post-index-change would run any hook a
         # resolver planted, including an ignored one under core.hooksPath.
@@ -1007,8 +1102,9 @@ fi
 # The caller starts from a clean tree, so any remaining change (tracked or
 # untracked) means the revert did not fully restore it. A status that cannot
 # be read is not clean.
+# lgit_nohooks forces core.fsmonitor off: this status would run a command set in .git/config.
 CLEAN=true
-if ! STATUS=$(git -c core.hooksPath=/dev/null status --porcelain --untracked-files=all 2>/dev/null) || [ -n "$STATUS" ]; then
+if ! STATUS=$(lgit_nohooks status --porcelain --untracked-files=all 2>/dev/null) || [ -n "$STATUS" ]; then
     CLEAN=false
     [ "${#REVERT_FAILS[@]}" -gt 0 ] || add_reason "changes remain after the revert"
 fi

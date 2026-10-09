@@ -12,8 +12,9 @@ callers that walk several PRs. Exit codes and markers are defined in
   `reason` that is non-empty when something was skipped or only partly
   reverted:
   - `--pr <N> --timeout <s> --command-file <f> --trusted [--unattended]
-    [--files-from <f>]` runs `resolve_pr.verify_command`; on failure it
-    saves a patch, reverts the files and reports whether the tree is clean
+    --ignored-since <marker> [--files-from <f>]` runs
+    `resolve_pr.verify_command`; on failure it saves a patch, reverts the
+    files and reports whether the tree is clean
   - `--pr <N> --revert-only [--files-from <f>] [-- <files...>]` saves a
     patch and reverts the listed files without running anything
   - `--pr <N> --check-ignored --ignored-since <marker>` runs only the
