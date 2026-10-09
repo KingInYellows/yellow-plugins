@@ -1509,8 +1509,7 @@ commit_repo() {
     [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
   done
   # Option operands are not the command; outside commands stay fine.
-  for shebang in "#!/usr/bin/env -C $PWD/venv sh" "#!/usr/bin/env -u $PWD/venv/python sh" "#!/usr/bin/env -S sh -c true" \
-                 "#!/usr/bin/env --chdir=$PWD/venv /usr/bin/sh"; do
+  for shebang in "#!/usr/bin/env -u $PWD/venv/python sh" "#!/usr/bin/env -S sh -c true"; do
     d="$BATS_TEST_TMPDIR/sbok"
     mkdir -p "$d"
     printf '%s\n' "$shebang" >| "$d/tool"
@@ -2067,4 +2066,39 @@ unprivileged() {
   # An empty value is still a set variable.
   rc=0; ( export GIT_CONFIG=; harden_git_config full ) || rc=$?
   [ "$rc" -eq 1 ]
+}
+
+@test "#! lines whose env has -C or --chdir (resolving the utility from another directory) drop the directory, in awk and in the shell" {
+  mkdir -p sub
+  n=0
+  for shebang in '#!/usr/bin/env -S --chdir=/tmp/wt/sub sh evil' '#!/usr/bin/env -C /tmp sh' '#!/usr/bin/env -C/tmp sh' \
+                 '#!/usr/bin/env --chdir /tmp sh' '#!/usr/bin/env --chdir=/tmp sh' '#!/usr/bin/env -vC /tmp sh' \
+                 '#!/usr/bin/env -S -C /tmp sh' '#!/usr/bin/env -S --chdir /tmp sh'; do
+    n=$((n + 1))
+    d="$BATS_TEST_TMPDIR/ec$n"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell missed: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
+  done
+}
+
+@test "harden_git_config refuses GIT_CONFIG_PARAMETERS it cannot decode exactly, naming the variable and not the value" {
+  mkdir -p tools
+  : >| tools/evil
+  q="'\\''"
+  # Git's own quoting: an embedded quote is '\''.
+  for val in "'core.sshcommand'='sh ${q}$PWD/tools/evil${q}'" "'core.sshcommand'='sh ${q}tools/evil${q}'" \
+             "'core.sshcommand'='ssh' junk" "'user.name'='x' garbage 'core.sshcommand'='ssh'" "'core.sshcommand'='ssh"; do
+    rc=0; ( export GIT_CONFIG_PARAMETERS="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "accepted: $val" >&2; return 1; }
+  done
+  ( export GIT_CONFIG_PARAMETERS="'core.sshcommand'='sh ${q}x${q}'"; harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_CONFIG_PARAMETERS "* && "$YR_HARDEN_MSG" != *sshcommand* ]] )
+  # Well-formed entries, including a key without a value, still pass.
+  for val in "'user.name'='x' 'core.sshcommand'='ssh -x'" "'credential.helper'='store'" "'user.name=x'" "'core.bare'"; do
+    rc=0; ( export GIT_CONFIG_PARAMETERS="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
+  done
 }

@@ -192,8 +192,8 @@ yr_args_enter() {
 # -S / --split-string, whose string is split into words that continue the
 # operand list (attached or separate, and inside a short cluster such as
 # -vS; a `$`, backslash or quote in that string, which env expands or decodes,
-# counts as entering, and so do a NAME=value operand and -P, which makes env
-# search a path other than PATH). A bare
+# counts as entering, and so do a NAME=value operand, -P (env searches a path
+# other than PATH) and -C/--chdir (env resolves the utility elsewhere)). A bare
 # operand is looked up on the caller's PATH (YR_ORIG_PATH), the
 # way the tool itself would be. Copies of this block (through
 # yr_file_shebang_enters) sit in the two scripts' bootstrap resolvers, which
@@ -221,7 +221,9 @@ yr_file_shebang_enters() {
                     --) idx=$((idx + 1)); continue ;;
                     --split-string) val=${w[idx + 1]-}; last=$((idx + 1)) ;;
                     --split-string=*) val=${x#*=}; last=$idx ;;
-                    --chdir|--unset|--argv0) idx=$((idx + 2)); continue ;;
+                    # env resolves the utility after a chdir: fail closed.
+                    --chdir|--chdir=*) return 0 ;;
+                    --unset|--argv0) idx=$((idx + 2)); continue ;;
                     --*) idx=$((idx + 1)); continue ;;
                     -?*)
                         cl=${x#-}
@@ -229,8 +231,9 @@ yr_file_shebang_enters() {
                         while [ "$k" -lt "${#cl}" ]; do
                             c=${cl:k:1}
                             case "$c" in
-                                P)
-                                    # env searches another path than PATH: fail closed.
+                                P|C)
+                                    # env searches another path than PATH, or
+                                    # chdirs first: fail closed.
                                     return 0
                                     ;;
                                 S)
@@ -238,7 +241,7 @@ yr_file_shebang_enters() {
                                     if [ -z "$val" ]; then val=${w[idx + 1]-}; last=$((idx + 1)); fi
                                     break
                                     ;;
-                                u|C|a)
+                                u|a)
                                     [ -n "${cl:k+1}" ] || idx=$((idx + 1))
                                     break
                                     ;;
@@ -450,7 +453,8 @@ yr_shebang_inside() {
                         if (x ~ /=/) { val = x; sub(/^[^=]*=/, "", val); last = idx }
                         else { val = w[idx + 1]; last = idx + 1 }
                     } else {
-                        if ((name == "--chdir" || name == "--unset" || name == "--argv0") && x !~ /=/) idx++
+                        if (name == "--chdir") { pr(root); return "" }
+                        if ((name == "--unset" || name == "--argv0") && x !~ /=/) idx++
                         idx++; continue
                     }
                 } else if (x ~ /^-./) {
@@ -462,8 +466,8 @@ yr_shebang_inside() {
                             if (val == "") { val = w[idx + 1]; last = idx + 1 }
                             break
                         }
-                        if (c == "P") { pr(root); return "" }
-                        if (c ~ /[uCa]/) { if (substr(cl, k + 1) == "") idx++; break }
+                        if (c == "P" || c == "C") { pr(root); return "" }
+                        if (c ~ /[ua]/) { if (substr(cl, k + 1) == "") idx++; break }
                     }
                 } else if (x ~ /=/) { pr(root); return "" }
                 else { gsub(/^["\047]|["\047]$/, "", x); return x }
@@ -859,11 +863,26 @@ yr_check_git_env() {
             yr_env_cmd_verdict "GIT_CONFIG_VALUE_$i" "$v" "$root" "(injected config)" || return 1
         fi
     done
-    # GIT_CONFIG_PARAMETERS holds 'key'='value' (or 'key=value') entries that
-    # git itself exports to child processes; judge each one the same way.
+    # GIT_CONFIG_PARAMETERS is git's own quoting: entries 'key'='value',
+    # 'key=value' or 'key', separated by blanks; an embedded quote is written
+    # '\''. Each entry is read from the start of what is left and must end at a
+    # blank or the end; anything else (an escaped quote, junk, an unterminated
+    # entry) cannot be decoded exactly and is refused, never skipped.
     rest="${GIT_CONFIG_PARAMETERS-}"
-    while [[ "$rest" =~ \'([^\'=]+)\'=\'([^\']*)\'(.*)$ || "$rest" =~ \'([^\'=]+)=([^\']*)\'(.*)$ ]]; do
-        k="${BASH_REMATCH[1]}"; v="${BASH_REMATCH[2]}"; rest="${BASH_REMATCH[3]}"
+    local re1="^[[:space:]]*'([^'=]+)'='([^']*)'(.*)\$" re2="^[[:space:]]*'([^'=]+)=([^']*)'(.*)\$" re3="^[[:space:]]*'([^']+)'(.*)\$"
+    while [[ -n "${rest//[[:space:]]/}" ]]; do
+        if [[ "$rest" =~ $re1 || "$rest" =~ $re2 ]]; then
+            k="${BASH_REMATCH[1]}"; v="${BASH_REMATCH[2]}"; rest="${BASH_REMATCH[3]}"
+        elif [[ "$rest" =~ $re3 ]]; then
+            k="${BASH_REMATCH[1]}"; v=""; rest="${BASH_REMATCH[2]}"
+        else
+            YR_HARDEN_MSG="GIT_CONFIG_PARAMETERS has an entry that cannot be decoded exactly; unset it"
+            return 1
+        fi
+        if [ -n "$rest" ] && [[ "$rest" != [[:space:]]* ]]; then
+            YR_HARDEN_MSG="GIT_CONFIG_PARAMETERS has an entry that cannot be decoded exactly; unset it"
+            return 1
+        fi
         if yr_cmd_key "$k"; then
             yr_env_cmd_verdict GIT_CONFIG_PARAMETERS "$v" "$root" "(injected config)" || return 1
         fi

@@ -275,7 +275,9 @@ inherited `GIT_SSH_COMMAND`, `GIT_SSH`, `GIT_ASKPASS`, `SSH_ASKPASS`,
 inside it, and injected `GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` or
 `GIT_CONFIG_PARAMETERS` config (`core.sshCommand`, `credential.helper`,
 `gpg.program` and the like) that does; trusted values outside the worktree are
-kept. Any inherited `GIT_CONFIG` (it makes `git config` read only that file,
+kept. `GIT_CONFIG_PARAMETERS` is decoded in git's own quoting; an entry that
+cannot be decoded exactly (an escaped quote `'\''`, junk, an unterminated
+entry) is refused. Any inherited `GIT_CONFIG` (it makes `git config` read only that file,
 hiding the repository config from the scans) is refused. Command lines are judged whole: the raw value must not contain the
 worktree path as a whole path (`<root>2` and `<root>-keys` are siblings and
 pass), no word (quotes, a leading `!` and `--opt=VALUE` handled) may be an
@@ -300,8 +302,9 @@ an `env` command's arguments are judged like command-line words.
 `-vS`) and options with arguments (`-u`, `-C`, `-P`, `-a` and long forms) are
 parsed. Fail closed: an `env` line with a `NAME=value` operand before the
 utility (`PATH=tools` changes where it is looked up), or with a `$`, backslash
-or quote after `-S` (env expands and decodes them), or with `-P` (env then
-searches another path than `PATH`), counts as entering the worktree.
+or quote after `-S` (env expands and decodes them), with `-P` (env then
+searches another path than `PATH`), or with `-C`/`--chdir` (the utility is
+resolved elsewhere), counts as entering the worktree.
 `run-verify-command` still gives the verify command the caller's `PATH`
 (`YR_ORIG_PATH`). Both scripts take their own directory by parameter expansion,
 not `dirname`.
