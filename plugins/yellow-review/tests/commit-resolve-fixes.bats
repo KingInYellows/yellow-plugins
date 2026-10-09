@@ -2590,6 +2590,109 @@ crf_refuses_untouched() {
   [ -e "$BATS_TEST_TMPDIR/good-ssh-ran" ] || { echo "ssh was never spawned: $status $stderr" >&2; return 1; }
 }
 
+# An ssh remote with no ls-remote shim, so git itself spawns ssh for the
+# post-submit check (host example.invalid, never reached).
+crf_ssh_remote() {
+  remote_with_push_url fork ssh://git@example.invalid/acme/widgets.git
+  git config branch.feature.pushRemote fork
+  printf 'one\nfeature\nfix-env\n' >| src/a.txt
+}
+
+@test "a GIT_SSH_COMMAND inside the worktree is refused before anything runs (exit 3)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/sshcmd-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/sshcmd"
+  chmod +x "$REPO/tools/sshcmd"
+  crf_ssh_remote
+  GH_HOST=example.invalid GIT_SSH_COMMAND="$REPO/tools/sshcmd -o BatchMode=yes" \
+    run --separate-stderr env "PATH=$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the planted GIT_SSH_COMMAND ran" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"GIT_SSH_COMMAND runs a program inside the repository"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
+@test "a GIT_SSH_COMMAND of the form sh <worktree script> is refused and never runs (exit 3)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/shwrap-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf 'touch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/wrapped.sh"
+  crf_ssh_remote
+  GH_HOST=example.invalid GIT_SSH_COMMAND="sh $REPO/tools/wrapped.sh" \
+    run --separate-stderr env "PATH=$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the wrapped script ran" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"GIT_SSH_COMMAND runs a program inside the repository"* ]]
+}
+
+@test "a git script whose #! interpreter is inside the worktree is refused before the bootstrap runs it (commit-resolve-fixes)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/boot-git-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/interp"
+  chmod +x "$REPO/tools/interp"
+  printf '#!%s/tools/interp\n' "$REPO" >| "$BATS_TEST_TMPDIR/gitbin/git"
+  chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+  printf 'one\nfeature\nfix-boot\n' >| src/a.txt
+  run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$old_path" "$SCRIPT" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the bootstrap ran the planted git" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
+}
+
+@test "a trusted GIT_SSH_COMMAND outside the worktree is kept and used by the ls-remote check" {
+  old_path="$PATH"
+  good="$BATS_TEST_TMPDIR/goodssh"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$BATS_TEST_TMPDIR/good-sshcmd-ran" >| "$good"
+  chmod +x "$good"
+  crf_ssh_remote
+  GH_HOST=example.invalid GIT_SSH_COMMAND="$good -o BatchMode=yes" \
+    run --separate-stderr env "PATH=$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ -e "$BATS_TEST_TMPDIR/good-sshcmd-ran" ] || { echo "not used: $status $stderr" >&2; return 1; }
+}
+
+@test "an awk script whose #! interpreter is inside the worktree is refused, so it never runs" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/shebang-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 99\n' "$marker" >| "$REPO/tools/interp"
+  chmod +x "$REPO/tools/interp"
+  link="$BATS_TEST_TMPDIR/awkbin"
+  mkdir -p "$link"
+  printf '#!%s/tools/interp\n' "$REPO" >| "$link/awk"
+  chmod +x "$link/awk"
+  printf 'one\nfeature\nfix-shebang\n' >| src/a.txt
+  run_crf_path "$link:$old_path" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the interpreter inside the worktree ran" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
+@test "an ssh script with a #! interpreter inside the worktree never runs for the ls-remote check" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/ssh-shebang-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/interp"
+  chmod +x "$REPO/tools/interp"
+  link="$BATS_TEST_TMPDIR/sshshbin"
+  mkdir -p "$link"
+  printf '#!%s/tools/interp\n' "$REPO" >| "$link/ssh"
+  chmod +x "$link/ssh"
+  crf_ssh_remote
+  GH_HOST=example.invalid run --separate-stderr env "PATH=$link:$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the planted ssh interpreter ran: $stderr" >&2; return 1; }
+}
+
 @test "an inherited YR_GIT_PATH naming a worktree directory is ignored, so a planted awk never runs" {
   marker="$BATS_TEST_TMPDIR/inherited-ran"
   rm -f "$marker"

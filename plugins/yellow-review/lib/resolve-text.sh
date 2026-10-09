@@ -199,8 +199,8 @@ _rt_scan() {
         # bytes. The line scan lowercases, and base64 is case-sensitive.
         # `YTpi` is `a:b`, the shortest `user:pass`. Padding is only `=` at
         # the end, and only in the last quad; the per-quad checks below are the
-        # one place that is judged. A decoded value of printable or well-formed
-        # UTF-8 text with a colon and at least one other byte is a credential;
+        # one place that is judged. A decoded value of control-free bytes
+        # with a colon and at least one other byte is a credential;
         # prose such as `Authentication` or `httpOnly` is not.
         function b64digit(c) {
             if (c >= "A" && c <= "Z") return index("ABCDEFGHIJKLMNOPQRSTUVWXYZ", c) - 1
@@ -210,7 +210,7 @@ _rt_scan() {
             if (c == "/") return 63
             return -1
         }
-        function basiccred(tok, bare,    n, i, a, b, c, d, va, vb, vc, vd, nb, bv, k, x, need, colon, icolon) {
+        function basiccred(tok, bare,    n, i, a, b, c, d, va, vb, vc, vd, nb, bv, k, x, colon, icolon) {
             n = length(tok)
             if (n < 4 || n % 4 != 0) return 0
             nb = 0
@@ -232,24 +232,18 @@ _rt_scan() {
                 if (d != "=") bv[++nb] = int((vc % 4) * 64 + vd)
             }
             # Decoded bytes are numeric, so no locale or %c handling is
-            # involved. Reject controls and anything that is not well-formed
-            # UTF-8 (stray continuation, C0/C1 and F5+ leads, a lead without
-            # its continuation bytes); `httpOnly` decodes to such bytes.
-            # Overlong E0/F0 and surrogate or beyond-U+10FFFF second bytes
-            # are not checked: they cost nothing to accept here.
+            # involved. Reject controls only: C0, DEL and the C1 range
+            # 0x80-0x9F. RFC 7617 lets a client use a legacy charset
+            # (ISO-8859-1 and the like), so 0xA0-0xFF is credential text
+            # whether or not it forms valid UTF-8. `httpOnly` decodes to
+            # 86 DB 69 3A 79 72, so the C1 byte 0x86 keeps it clean.
+            # Windows-1252 text using 0x80-0x9F (euro, curly quotes) is the
+            # accepted residual.
             colon = 0; icolon = 0
             for (k = 1; k <= nb; k++) {
                 x = bv[k]
-                if (x < 32 || x == 127) return 0
+                if (x < 32 || (x >= 127 && x < 160)) return 0
                 if (x == 58) { if (!colon) colon = k; if (k > 1 && k < nb) icolon = 1 }
-                if (x < 128) continue
-                if (x < 194 || x > 244) return 0
-                need = (x < 224) ? 1 : (x < 240) ? 2 : 3
-                if (k + need > nb) return 0
-                while (need-- > 0) {
-                    x = bv[++k]
-                    if (x < 128 || x > 191) return 0
-                }
             }
             # A colon is required. At either edge it still counts (an API key
             # with a blank password), but a lone `:` has no secret side.
@@ -334,6 +328,26 @@ _rt_scan() {
             # middle dot, guillemets, en and em dash, ellipsis, no-break space
             # as its UTF-8 bytes). One regex for gawk (either locale) and mawk.
             lead = "^((“|”|‘|’|•|·|«|»|–|—|…|\302\240)[ \t]*)+"
+            # symtok: a run of symbol-only non-ASCII tokens, each followed by
+            # whitespace. With a multibyte locale (gawk in UTF-8) a token is
+            # symbolic when it holds no [:alpha:] character. Byte-wise awk
+            # (mawk, BWK awk, gawk in C) cannot classify letters, so the token
+            # is matched by UTF-8 symbol blocks instead: E2 80-AF (U+2000-2BFF
+            # punctuation, arrows, dingbats, shapes), E2 B8-B9 (U+2E00-2E7F
+            # supplemental punctuation), E3 80 (CJK punctuation), EF B8
+            # (variation selectors), F0 9F (emoji), C2 (Latin-1 punctuation)
+            # and the two C3 symbols x (97) and division (B7). Every other
+            # lead byte (accented Latin, Greek, Cyrillic, CJK, Hangul, and E2
+            # B0-B7 Glagolitic/Coptic/Tifinagh) is a word. E2 BA-BF (CJK
+            # radicals, Kangxi, ideographic description) are arguably symbols
+            # but count as words: the safe side for prose.
+            if (length("\303\251") == 1) {
+                symtok = "^([^\001-\177[:alpha:]]+[ \t]+)+"
+            } else {
+                symb = "[\200-\277]"
+                symc = "(\342[\200-\257]" symb "|\342[\270\271]" symb "|\303[\227\267]|\343\200" symb "|\357\270" symb "|\360\237" symb symb "|\302" symb ")"
+                symtok = "^(" symc "+[ \t]+)+"
+            }
             kw = "(pass([_-]?(phrase|code)|word|wd)?|pwd|secret([_ \t-]?key)?|(private|access)[_ \t-]?key|token|api[_ \t-]?key|credentials?)"
             ph =" string number integer boolean object array unknown undefined"
             ph = ph " nullable optional required redacted placeholder example"
@@ -493,12 +507,12 @@ _rt_scan() {
                             sub(lead, "", r2)
                             sub(/^[ \t]+/, "", o)
                             sub(/^[ \t]+/, "", r2)
-                            # Any other standalone non-ASCII token (checkmark,
-                            # arrow, emoji) is decoration too. A non-ASCII
-                            # letter inside a word is not followed by a space,
-                            # so accented prose is untouched.
-                            sub(/^([^\001-\177]+[ \t]+)+/, "", o)
-                            sub(/^([^\001-\177]+[ \t]+)+/, "", r2)
+                            # Any other standalone symbol token (checkmark,
+                            # arrow, emoji) is decoration too. A token that
+                            # holds a non-ASCII letter or word (CJK, Cyrillic,
+                            # accented) is prose and is kept (symtok).
+                            sub(symtok, "", o)
+                            sub(symtok, "", r2)
                         }
                         c = substr(o, 1, 1)
                         if (c !~ /["\047A-Z]/ && c ~ /^[\001-\177]/ && split(r2, wparts, /[ \t]+/) >= 3 && wordcred(r2)) flag("unquoted-keyword-value")
