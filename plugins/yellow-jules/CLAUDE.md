@@ -266,6 +266,11 @@ the post-POST verifier's rule to the newest plan generated before the approval:
 a different digest (or an unorderable tie) binds the approve but records the
 policy deviation on the session's owner; an incomplete walk or no readable
 preceding plan leaves it `ambiguous-reconcile` (`approved-plan-unreadable`).
+A `planApproved` and a `planGenerated` that share a `createTime` are unordered
+(ids carry no order). The approval clears the plan only when it names that
+plan's id; a different plan stays pending, marked `ambiguous`, so `supervise`
+offers no action and `approve` / plan-bound `reply` refuse.
+
 Same-text echoes are matched as a vendor-time-ordered batch, not in arrival
 order: with several writes sharing a digest, the oldest echo goes to the
 oldest-dispatched write (by dispatch sequence, else `dispatchedAt`). Equal or

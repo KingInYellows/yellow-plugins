@@ -70,6 +70,8 @@ async function walkActivities(params) {
             ...(params.pendingPlan.ambiguous === true ? ['\0ambiguous'] : []),
         ]);
     let latestApproval = params.approval;
+    // The plan the newest approval named; unknown for a stored (resumed) approval.
+    let latestApprovalPlanId;
     let newest;
     let pages = 0;
     let processed = 0;
@@ -195,6 +197,7 @@ async function walkActivities(params) {
                         createTime: activity.createTime,
                         activityId: activity.activityId,
                     };
+                    latestApprovalPlanId = activity.approvedPlanId;
                 }
             }
             await params.onActivity?.(activity, { isNew, unseen });
@@ -219,14 +222,19 @@ async function walkActivities(params) {
     }
     // An approval newer than the newest plan clears it; an approval alone,
     // with no plan known, leaves the result undefined.
-    const pendingPlan = latestPlan !== undefined &&
-        latestApproval !== undefined &&
-        compareStamp(latestApproval, {
-            createTime: latestPlan.activityCreateTime,
-            activityId: latestPlan.activityId,
-        }) > 0
+    // Across types an equal createTime is unordered (opaque ids carry no order):
+    // an approval at the plan's own time clears it only when it names that plan's
+    // id; a different plan stays pending and the tie is marked ambiguous.
+    const approvalVsPlan = latestPlan !== undefined && latestApproval !== undefined
+        ? compareStamp({ createTime: latestApproval.createTime, activityId: '' }, { createTime: latestPlan.activityCreateTime, activityId: '' })
+        : undefined;
+    const approvalTies = approvalVsPlan === 0;
+    const approvalClears = approvalVsPlan !== undefined &&
+        (approvalVsPlan > 0 ||
+            (approvalTies && latestApprovalPlanId === latestPlan?.planId));
+    const pendingPlan = approvalClears
         ? null
-        : latestPlan !== undefined && newestPlanKeys.size > 1
+        : latestPlan !== undefined && (newestPlanKeys.size > 1 || approvalTies)
             ? { ...latestPlan, ambiguous: true }
             : latestPlan;
     return {

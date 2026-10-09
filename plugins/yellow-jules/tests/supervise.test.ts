@@ -783,6 +783,55 @@ describe('outside activity pauses (R32)', () => {
     expect(r.attention).toContain('planUnavailable');
   });
 
+  it('an approval and a different replacement plan at the same createTime keep the replacement pending, ambiguous, and withhold actions', async () => {
+    const stamp = new Date(h.deps.clock.now()).toISOString();
+    // The approval's id sorts after the plan's: id order must not decide.
+    addActivity(h, session.sessionResource, {
+      type: 'planApproved',
+      activityId: 'zzz-approved',
+      approvedPlanId: 'plan-old',
+      createTime: stamp,
+    });
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      activityId: 'aaa-replacement',
+      createTime: stamp,
+      plan: {
+        planId: 'plan-new',
+        steps: [{ id: 'st-n', title: 'Replacement work', index: 0 }],
+      },
+    });
+    setVendorState(h, session.sessionResource, 'awaitingPlanApproval');
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const pending = (await ownerRecord())?.pendingPlan;
+    expect(pending).toMatchObject({ planId: 'plan-new', ambiguous: true });
+    const r = await sup();
+    expect(r.decision).toBe('needs-plan-review');
+    expect(r.allowedActions).toEqual([]);
+    expect(r.attention).toContain('planUnavailable');
+  });
+
+  it('an approval at the same createTime that names the plan itself still clears it', async () => {
+    const stamp = new Date(h.deps.clock.now()).toISOString();
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      activityId: 'zzz-plan',
+      createTime: stamp,
+      plan: {
+        planId: 'plan-same',
+        steps: [{ id: 'st-s', title: 'Work', index: 0 }],
+      },
+    });
+    addActivity(h, session.sessionResource, {
+      type: 'planApproved',
+      activityId: 'aaa-approved',
+      approvedPlanId: 'plan-same',
+      createTime: stamp,
+    });
+    await status(h.deps, { session: session.localId, reconcile: false });
+    expect((await ownerRecord())?.pendingPlan).toBeUndefined();
+  });
+
   it('a plan swap consumed by an intervening plain status still pauses', async () => {
     addPlan(h, session.sessionResource, 'plan-1');
     expect((await sup()).decision).toBe('needs-plan-review');

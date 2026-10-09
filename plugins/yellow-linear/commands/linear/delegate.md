@@ -673,6 +673,11 @@ if [ -z "$GIT_TMP_REAL" ] || [ "$PACKET_PARENT_REAL" != "$GIT_TMP_REAL" ] \
   printf 'ERROR: PACKET_FILE "%s" is not inside a packet directory allocated under %s.\n' "$PACKET_FILE" "$GIT_TMP" >&2
   exit 1
 fi
+# From here every failure removes the validated packet directory. Only a
+# successful dry run that found a grant disarms this: it must keep the packet
+# for the confirmation and the launch.
+cleanup_packet() { rm -rf -- "$PACKET_DIR"; }
+trap cleanup_packet EXIT
 
 # Re-resolve the yellow-jules CLI from the enabled plugin's installPath here;
 # never execute a root carried over from an earlier call.
@@ -854,12 +859,13 @@ if [ -z "$FOUND" ]; then
 fi
 printf 'grant_id=%s\n' "$FOUND"
 printf 'binding=%s\n' "$(make_binding "$FOUND")"
-printf '%s' "$LIST" | jq --arg id "$FOUND" '.grants[] | select(.grantId == $id) | {grantId, repository, branchPattern, taskRefs, operations, expiresAt, limits: {maxActiveSessions, maxTotalTasks, maxCorrectiveRounds}, usage: {activeSessions: (.usage.activeSessionRefs | length), totalTasks: .usage.totalTasks}}'
+printf '%s' "$LIST" | jq --arg id "$FOUND" '.grants[] | select(.grantId == $id) | {grantId, repository, branchPattern, taskRefs, operations, expiresAt, limits: {maxActiveSessions, maxTotalTasks, maxCorrectiveRounds}, usage: {activeSessions: (.usage.activeSessionRefs | length), totalTasks: .usage.totalTasks}}' || exit 1
+# A grant covers the launch: keep the packet for the confirmation.
+trap - EXIT
 ```
 
-If the first call ends at `grant_id=NONE`, show the `authorize` command it printed,
-remove the packet directory (`rm -rf` on that exact `yellow-linear-packet.XXXXXX`
-directory only), and stop: nothing was sent, no Linear comment is posted, and the
+If the first call ends at `grant_id=NONE`, show the `authorize` command it printed
+(the block already removed the packet directory on exit), and stop: nothing was sent, no Linear comment is posted, and the
 issue is unchanged. Do not try to run `authorize` yourself.
 
 **Confirm.** Show the repository, branch, issue id (not the title), and the grant

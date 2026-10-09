@@ -464,3 +464,44 @@ run_preview_block_text() {
   launch_line=$(printf '%s\n' "$jules_block" | grep -nF 'node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" "--prompt=$PROMPT"' | head -1 | cut -d: -f1)
   [ "$cmp_line" -lt "$launch_line" ]
 }
+
+@test "Jules block arms a packet-dir EXIT trap after validation and disarms it only once a grant covers the launch" {
+  block=$(awk '/^```bash$/{buf="";inb=1;next} /^```$/{if(inb && buf ~ /dry-run_or_launch/){printf "%s", buf; exit} inb=0;next} inb{buf=buf $0 "\n"}' "$DELEGATE_MD")
+  arm=$(printf '%s\n' "$block" | grep -nF 'trap cleanup_packet EXIT' | cut -d: -f1 | head -1)
+  validated=$(printf '%s\n' "$block" | grep -nF 'is not inside a packet directory allocated under' | cut -d: -f1 | head -1)
+  resolve=$(printf '%s\n' "$block" | grep -nF 'claude plugin list --json' | cut -d: -f1 | head -1)
+  disarm=$(printf '%s\n' "$block" | grep -nF 'trap - EXIT' | cut -d: -f1 | head -1)
+  found=$(printf '%s\n' "$block" | grep -nF "printf 'grant_id=%s" | cut -d: -f1 | head -1)
+  [ -n "$arm" ] && [ -n "$disarm" ]
+  [ "$arm" -gt "$validated" ]
+  [ "$arm" -lt "$resolve" ]
+  [ "$disarm" -gt "$found" ]
+  [ "$(printf '%s\n' "$block" | grep -cF 'trap - EXIT')" -eq 1 ]
+}
+
+@test "Jules block removes the packet directory when it exits early" {
+  block=$(awk '/^```bash$/{buf="";inb=1;next} /^```$/{if(inb && buf ~ /dry-run_or_launch/){printf "%s", buf; exit} inb=0;next} inb{buf=buf $0 "\n"}' "$DELEGATE_MD")
+  repo="$BATS_TEST_TMPDIR/repo"
+  mkdir -p "$repo" "$BATS_TEST_TMPDIR/bin"
+  git -C "$repo" init -q
+  mkdir -p "$repo/.git/tmp"
+  packet_dir=$(mktemp -d "$repo/.git/tmp/yellow-linear-packet.XXXXXX")
+  printf 'packet body\n' > "$packet_dir/packet.txt"
+  # `claude plugin list` fails: the CLI cannot be resolved, an early exit.
+  printf '#!/bin/sh\nexit 1\n' > "$BATS_TEST_TMPDIR/bin/claude"
+  chmod +x "$BATS_TEST_TMPDIR/bin/claude"
+  script="$BATS_TEST_TMPDIR/block.sh"
+  printf '%s\n' "$block" \
+    | sed -e "s|^MODE=.*|MODE='dry-run'|" \
+          -e "s|^ISSUE_ID=.*|ISSUE_ID='ENG-1'|" \
+          -e "s|^DELEGATION_REV=.*|DELEGATION_REV='0'|" \
+          -e "s|^PACKET_FILE=.*|PACKET_FILE='$packet_dir/packet.txt'|" \
+          -e "s|^GRANT_ID=.*|GRANT_ID=''|" \
+          -e "s|^DRY_RUN_BINDING=.*|DRY_RUN_BINDING=''|" \
+          -e "s|^PREVIEW_PACKET_SHA=.*|PREVIEW_PACKET_SHA=''|" > "$script"
+  cd "$repo"
+  PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$script"
+  [ "$status" -ne 0 ]
+  [ ! -e "$packet_dir" ]
+  [ -d "$repo/.git/tmp" ]
+}

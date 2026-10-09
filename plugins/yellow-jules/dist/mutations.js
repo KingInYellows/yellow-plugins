@@ -529,7 +529,7 @@ async function assertPlanStillPending(deps, adapter, target, liveCondition, expe
     });
     if (!walk.complete)
         return incompleteRefetch(walk);
-    if (newestPlanAmbiguous(plans)) {
+    if (newestPlanAmbiguous(plans) || walk.pendingPlan?.ambiguous === true) {
         return changed('two different plans share the newest timestamp, so the current one cannot be told');
     }
     const current = walk.pendingPlan;
@@ -775,7 +775,7 @@ async function approveInner(deps, args, ids) {
         });
         if (!refetch.complete)
             return incompleteRefetch(refetch);
-        const ambiguous = newestPlanAmbiguous(plans);
+        const ambiguous = newestPlanAmbiguous(plans) || refetch.pendingPlan?.ambiguous === true;
         const steered = await hasUnclaimedUserMessage(deps, target.sessionResource, userMessages, start);
         const newest = refetch.pendingPlan;
         if (newest === null || newest === undefined) {
