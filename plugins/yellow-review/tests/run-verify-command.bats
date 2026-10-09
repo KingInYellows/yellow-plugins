@@ -166,6 +166,26 @@ has_kill_after() {
   [ "$(cat "$seen")" = "$caller" ]
 }
 
+@test "a bare git helper name in a command variable is judged on the PATH the verify command gets" {
+  mkdir -p node_modules/.bin
+  printf 'node_modules/\n' >> .git/info/exclude
+  printf '#!/bin/sh\ntouch "%s/ssh-ran"\nexit 1\n' "$BATS_TEST_TMPDIR" >| node_modules/.bin/ssh
+  chmod +x node_modules/.bin/ssh
+  touch -t 201901010000 node_modules/.bin/ssh
+  printf '%s\n' 'touch "$BATS_TEST_TMPDIR/verify-ran"' >| "$CMD"
+  caller="$REPO/node_modules/.bin:$PATH"
+  for name in GIT_SSH_COMMAND GIT_SSH GIT_ASKPASS GIT_PAGER EDITOR; do
+    run --separate-stderr env "PATH=$caller" "$name=ssh" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt src/new.txt
+    [ "$status" -eq 2 ] || { echo "$name: status $status: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"$name"* ]]
+    [ ! -e "$BATS_TEST_TMPDIR/verify-ran" ]
+    [ ! -e "$BATS_TEST_TMPDIR/ssh-ran" ]
+  done
+  # the same name resolving outside the worktree is fine
+  run --separate-stderr env "PATH=$PATH" "GIT_SSH_COMMAND=ssh" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ] || { echo "status $status: $stderr" >&2; return 1; }
+}
+
 @test "a tr symlinked into the worktree never runs in the revert modes (rp_lower runs tr by name)" {
   mkdir -p ignored "$BATS_TEST_TMPDIR/outbin"
   printf '#!/bin/sh\ntouch "%s/tr-ran"\ncat\n' "$BATS_TEST_TMPDIR" >| ignored/helper
