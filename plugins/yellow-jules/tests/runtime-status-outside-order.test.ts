@@ -128,6 +128,48 @@ describe('status classifies unseen messages that sort at or before the watermark
     expect(record?.supervision?.outsideSeen?.activityId).toBe('aaa-user');
   });
 
+  it('several outside messages tied on the newest createTime are all kept in the marker', async () => {
+    const grantId = await createGrant(h, { maxActiveSessions: 3 });
+    const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
+    setVendorState(h, session.sessionResource, 'inProgress');
+    const stamp = '2030-01-01T00:00:00.000Z';
+    for (const id of ['mmm-user', 'zzz-user', 'aaa-user']) {
+      addActivity(h, session.sessionResource, {
+        type: 'userMessaged',
+        message: `steer ${id}`,
+        originator: 'user',
+        activityId: id,
+        createTime: stamp,
+      });
+    }
+    await status(h.deps, { session: session.localId, reconcile: false });
+    let record = (await readJournal(h.dataDir)).operations[
+      session.localRequestId
+    ];
+    const marker = record?.supervision?.outsideSeen;
+    expect(marker?.activityId).toBe('zzz-user');
+    expect(marker?.alsoActivityIds).toEqual(['aaa-user', 'mmm-user']);
+
+    // A later walk finding another tie at the same time widens the marker.
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'steer bbb-user',
+      originator: 'user',
+      activityId: 'bbb-user',
+      createTime: stamp,
+    });
+    await status(h.deps, { session: session.localId, reconcile: false });
+    record = (await readJournal(h.dataDir)).operations[session.localRequestId];
+    const widened = record?.supervision?.outsideSeen;
+    const all = [widened?.activityId, ...(widened?.alsoActivityIds ?? [])];
+    expect(all.sort()).toEqual([
+      'aaa-user',
+      'bbb-user',
+      'mmm-user',
+      'zzz-user',
+    ]);
+  });
+
   it('an already-seen message is not reclassified after the watermark passes it', async () => {
     const grantId = await createGrant(h, { maxActiveSessions: 3 });
     const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });

@@ -334,8 +334,8 @@ delegate for its task. Clearing it widens what the agent may do, so it is
 confirmed on the terminal like `authorize`. Ask the owner to run
 `/jules:status --session <ref>` first — the CLI refuses until a complete status
 walk has happened since the pause — then print this for the owner to run in a
-separate terminal window. Its prompt lists any outside activity, which clearing
-forgets:
+separate terminal window. Its prompt lists every outside message (tied ones included), which
+clearing forgets:
 
 ```bash
 set -uo pipefail

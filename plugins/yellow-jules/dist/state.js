@@ -1386,7 +1386,17 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
         // `compareStamp` uses: vendor list order is unverified, so neither the
         // first nor the last message visited can stand for it.
         let newestOutside;
+        // Every outside id sharing that newest createTime: equal times are
+        // unordered, so the marker must cover all of them, not just one.
+        let newestTied = new Set();
         const noteOutside = (message) => {
+            const byTime = newestOutside === undefined
+                ? 1
+                : (0, activity_walk_js_1.compareStamp)({ createTime: message.createTime ?? '', activityId: '' }, { createTime: newestOutside.createTime ?? '', activityId: '' });
+            if (byTime > 0)
+                newestTied = new Set();
+            if (byTime >= 0)
+                newestTied.add(message.activityId);
             if (newestOutside === undefined ||
                 (0, activity_walk_js_1.compareStamp)({
                     createTime: message.createTime ?? '',
@@ -1559,12 +1569,25 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
                 ? newestOutside
                 : undefined;
         if (evidence !== undefined && mark !== undefined && owner !== undefined) {
+            const tiedIds = new Set(newestTied);
+            // A stored marker at the same createTime is unordered against this
+            // evidence: keep its ids too, so clearing covers every tied message.
+            if (stored !== undefined &&
+                (0, activity_walk_js_1.compareStamp)({ createTime: evidence.createTime ?? '', activityId: '' }, { createTime: stored.createTime ?? '', activityId: '' }) === 0) {
+                tiedIds.add(stored.activityId);
+                for (const id of stored.alsoActivityIds ?? [])
+                    tiedIds.add(id);
+            }
+            tiedIds.delete(evidence.activityId);
             operations[mark.ownerRequestId] = {
                 ...owner,
                 supervision: {
                     ...(owner.supervision ?? {}),
                     outsideSeen: {
                         activityId: evidence.activityId,
+                        ...(tiedIds.size > 0
+                            ? { alsoActivityIds: [...tiedIds].sort() }
+                            : {}),
                         observedAt: mark.observedAt,
                         ...(evidence.createTime !== undefined
                             ? { createTime: evidence.createTime }

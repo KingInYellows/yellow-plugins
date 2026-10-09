@@ -390,6 +390,11 @@ export interface SupervisionState {
    */
   readonly outsideSeen?: {
     readonly activityId: string;
+    /**
+     * Other outside messages tied with `activityId` on the newest `createTime`.
+     * Equal times are unordered, so clearing the pause must cover all of them.
+     */
+    readonly alsoActivityIds?: readonly string[];
     readonly observedAt: string;
     /**
      * The message's vendor `createTime`; with `activityId` it is the stamp the

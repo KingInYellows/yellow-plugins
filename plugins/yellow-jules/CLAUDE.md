@@ -339,13 +339,13 @@ skew of it.
 A swap pause in `supervise` is suppressed by our own reply only when that reply
 has positive landing evidence and its echo's vendor `createTime` (recorded as
 `echoCreateTime`) is strictly before the differing `planGenerated` activity's.
-The local dispatch clock is a different clock, so without an echo it counts only
-when it precedes the plan by more than the dispatch-skew window; an equal or
-earlier plan still pauses.
+The local dispatch clock is never compared with the vendor's: a reply without an
+echo `createTime` explains no plan swap, and the swap pauses.
 
-Outside-activity markers treat an equal `createTime` as unordered: a second
-outside message at the marker's time, whatever its id, replaces the marker so a
-`--clear-pause` confirmed against the old id is refused. `approve` rejects any
+Outside-activity markers treat an equal `createTime` as unordered: outside
+messages tied on the newest time are all kept (`alsoActivityIds` beside
+`activityId`, merged across walks), so the `--clear-pause` prompt lists every
+one and a confirmation against a narrower set is refused. `approve` rejects any
 observed unclaimed steering message regardless of the pause state it cached when
 it resolved the session (`JULES_SUPERVISION_PAUSED` if that state already
 recorded outside activity, else `JULES_INVALID_STATE`).

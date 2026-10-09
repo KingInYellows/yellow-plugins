@@ -20,7 +20,7 @@
  * delegate or escalation — never acceptance.
  */
 
-import { compareStamp, DISPATCH_SKEW_MS } from './activity-walk.js';
+import { compareStamp } from './activity-walk.js';
 import {
   evaluateScope,
   grantHasUnreconciledDeviation,
@@ -500,9 +500,12 @@ export async function superviseOnce(
   const fresh = owns(journal, sessionResource);
   const recordedOutside = fresh.supervision?.outsideSeen;
   if (recordedOutside !== undefined) {
+    const outsideIds = new Set([
+      recordedOutside.activityId,
+      ...(recordedOutside.alsoActivityIds ?? []),
+    ]);
     const echoed = newActivities.filter(
-      (a) =>
-        a.activityId === recordedOutside.activityId && a.message !== undefined
+      (a) => outsideIds.has(a.activityId) && a.message !== undefined
     );
     return pauseForOutside(recordedOutside, {
       ...(seen.condition !== undefined ? { condition: seen.condition } : {}),
@@ -567,21 +570,16 @@ export async function superviseOnce(
         );
   // The reply must also precede the differing plan it would explain. The plan
   // stamp is the vendor's clock, so the reply is ordered by its echo's vendor
-  // stamp, strictly before. The local dispatch clock counts only when there is
-  // no echo and the gap clears the dispatch-skew window. Anything else fails
-  // closed to the pause.
+  // stamp, strictly before. Without an echo time there is no vendor-clock proof
+  // of order, and the local clock is never compared to the vendor's, so the
+  // swap fails closed to the pause.
   const explainedByReply = (planCreateTime: string | undefined): boolean => {
     const planMs = Date.parse(planCreateTime ?? '');
     if (Number.isNaN(planMs)) return false;
     return landedReplies.some((r) => {
-      if (r.echoActivityId !== undefined) {
-        const echoMs = Date.parse(r.echoCreateTime ?? '');
-        return !Number.isNaN(echoMs) && echoMs < planMs;
-      }
-      const dispatchMs = Date.parse(r.dispatchedAt ?? '');
-      return (
-        !Number.isNaN(dispatchMs) && dispatchMs + DISPATCH_SKEW_MS < planMs
-      );
+      if (r.echoActivityId === undefined) return false;
+      const echoMs = Date.parse(r.echoCreateTime ?? '');
+      return !Number.isNaN(echoMs) && echoMs < planMs;
     });
   };
   // A swap is caught whether this pass or an earlier plain `status` consumed
@@ -1114,7 +1112,7 @@ export async function clearPause(
       `  evidence at: ${paused.observedAt}`,
       ...(owner.supervision?.outsideSeen !== undefined
         ? [
-            `  outside activity: ${owner.supervision.outsideSeen.activityId} (seen ${owner.supervision.outsideSeen.observedAt}) - inspect it first; clearing forgets it`,
+            `  outside activity: ${[owner.supervision.outsideSeen.activityId, ...(owner.supervision.outsideSeen.alsoActivityIds ?? [])].join(', ')} (seen ${owner.supervision.outsideSeen.observedAt}) - inspect it first; clearing forgets it`,
           ]
         : []),
       '',
@@ -1137,6 +1135,8 @@ export async function clearPause(
       effectivePause(state)?.reason !== paused.reason ||
       state.outsideSeen?.activityId !==
         owner.supervision?.outsideSeen?.activityId ||
+      (state.outsideSeen?.alsoActivityIds ?? []).join('\n') !==
+        (owner.supervision?.outsideSeen?.alsoActivityIds ?? []).join('\n') ||
       !walkFollowsPause(current, paused)
     ) {
       return throwAppError(

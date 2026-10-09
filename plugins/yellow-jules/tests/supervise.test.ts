@@ -953,6 +953,36 @@ describe('outside activity pauses (R32)', () => {
     });
   });
 
+  it('a replacement plan after an unechoed reply pauses: the local clock never orders it', async () => {
+    addPlan(h, session.sessionResource, 'plan-1');
+    await sup();
+    h.deps.clock.time += 30_000;
+    await reply(h.deps, {
+      session: session.localId,
+      message: 'please restructure the plan',
+      dryRun: false,
+      correction: true,
+      grantId,
+    });
+    const dispatched = h.deps.clock.now();
+    // No echo of the reply exists. The plan is stamped well after the local
+    // dispatch time, which the old skew fallback accepted as proof of order.
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      createTime: new Date(dispatched + 120_000).toISOString(),
+      plan: {
+        planId: 'plan-2',
+        steps: [{ id: 'st-2', title: 'Different work', index: 0 }],
+      },
+    });
+    setVendorState(h, session.sessionResource, 'awaitingPlanApproval');
+    h.deps.clock.time += 130_000;
+    expect(await sup()).toMatchObject({
+      decision: 'paused',
+      reason: 'plan-changed-after-evaluation',
+    });
+  });
+
   it('a new plan after OUR corrective reply is reviewed, not paused', async () => {
     addPlan(h, session.sessionResource, 'plan-1');
     await sup();
