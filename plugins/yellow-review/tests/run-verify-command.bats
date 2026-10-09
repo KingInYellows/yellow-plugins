@@ -2348,3 +2348,18 @@ trust_assert_absolute() {
   grep -F -- "--kill-after=5 30 $TRUST_BIN/gh" "$TRUST_TIMEOUT_LOG" >/dev/null
   grep -F -- "--kill-after=10" "$TRUST_TIMEOUT_LOG" >/dev/null
 }
+
+@test "a git script whose #! interpreter is inside the worktree is refused before the bootstrap runs it (run-verify-command)" {
+  marker="$BATS_TEST_TMPDIR/boot-git-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/interp"
+  chmod +x "$REPO/tools/interp"
+  printf '#!%s/tools/interp\n' "$REPO" >| "$BATS_TEST_TMPDIR/gitbin/git"
+  chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+  printf '%s\n' 'true' >| "$CMD"
+  run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the bootstrap ran the planted git" >&2; return 1; }
+  [ "$status" -eq 2 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
+}

@@ -266,12 +266,21 @@ line in the shell, and a link it cannot resolve drops the directory.
 `harden_git_config` also refuses (names the variable, never the value) an
 inherited `GIT_SSH_COMMAND`, `GIT_SSH`, `GIT_ASKPASS`, `SSH_ASKPASS`,
 `GIT_PROXY_COMMAND`, `GIT_EXTERNAL_DIFF`, `GIT_PAGER`, `PAGER`, `GIT_EDITOR`,
-`EDITOR` or `VISUAL` whose first word resolves inside the worktree, a
+`EDITOR` or `VISUAL` whose command line names the worktree, a
 `GIT_EXEC_PATH`, `GIT_TEMPLATE_DIR`, `GIT_CONFIG_GLOBAL` or `GIT_CONFIG_SYSTEM`
 inside it, and injected `GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` or
 `GIT_CONFIG_PARAMETERS` config (`core.sshCommand`, `credential.helper`,
 `gpg.program` and the like) that does; trusted values outside the worktree are
-kept. Only the first word is judged, so `sh -c '...'` wrappers are not.
+kept. Command lines are judged whole: the raw value must not contain the
+worktree path (physical or logical spelling), no token (quotes, a leading `!`
+and `--opt=VALUE` handled) may be an absolute path, or an existing path
+relative to the current directory, that resolves inside it, and a bare first
+word must not resolve through the screened `PATH` to a script whose `#!`
+interpreter enters it, so `sh <worktree>/script` is refused. The pre-source
+bootstrap resolvers of both scripts apply the same `#!` check to the first
+`git` (and every tool). `env -S`/`--split-string` (attached or separate, also
+in a cluster such as `-vS`) and options with arguments (`-u`, `-C`, `-P`,
+`-a` and long forms) are parsed in `#!` lines.
 `run-verify-command` still gives the verify command the caller's `PATH`
 (`YR_ORIG_PATH`). Both scripts take their own directory by parameter expansion,
 not `dirname`.

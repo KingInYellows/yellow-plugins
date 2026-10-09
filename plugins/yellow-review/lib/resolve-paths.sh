@@ -119,12 +119,17 @@ yr_inside_root() {
 # yr_file_shebang_enters <file> <root>: succeed when <file> starts with a #!
 # line whose interpreter, or the program `env` is asked to run, is inside
 # <root> by canonical path or identity, or cannot be canonicalized (fail
-# closed). The interpreter comes from the first line only and is never run. A
-# bare `env` operand is looked up on the caller's PATH (YR_ORIG_PATH), the way
-# the tool itself would be.
+# closed). The interpreter comes from the first line only and is never run.
+# `env` operands follow env(1): options with an argument (-u, -C, -P, -a and
+# their long forms), NAME=value words, and -S / --split-string, whose string is
+# split into words that continue the operand list (attached or separate, and
+# inside a short cluster such as -vS). A bare operand is looked up on the
+# caller's PATH (YR_ORIG_PATH), the way the tool itself would be. Copies of
+# this function sit in the two scripts' bootstrap resolvers, which run before
+# this library is sourced; keep them identical.
 yr_file_shebang_enters() {
-    local f="$1" root="$2" line rest i x skip=0 p c
-    local -a w=()
+    local f="$1" root="$2" line rest i x idx last k c cl val p
+    local -a w=() v=() nw=()
     [ -f "$f" ] || return 1
     IFS= read -r -n 512 line <"$f" 2>/dev/null || true
     case "$line" in '#!'*) ;; *) return 1 ;; esac
@@ -135,15 +140,53 @@ yr_file_shebang_enters() {
     case "$i" in
         env|*/env)
             i=""
-            for x in ${w[@]+"${w[@]:1}"}; do
-                if [ "$skip" -eq 1 ]; then skip=0; continue; fi
+            idx=1
+            while [ "$idx" -lt "${#w[@]}" ]; do
+                x=${w[idx]}
+                val=""; last=-1
                 case "$x" in
-                    -u|-C|-P) skip=1; continue ;;
-                    -*|*=*) continue ;;
+                    "") idx=$((idx + 1)); continue ;;
+                    --) idx=$((idx + 1)); continue ;;
+                    --split-string) val=${w[idx + 1]-}; last=$((idx + 1)) ;;
+                    --split-string=*) val=${x#*=}; last=$idx ;;
+                    --chdir|--unset|--argv0) idx=$((idx + 2)); continue ;;
+                    --*) idx=$((idx + 1)); continue ;;
+                    -?*)
+                        cl=${x#-}
+                        k=0
+                        while [ "$k" -lt "${#cl}" ]; do
+                            c=${cl:k:1}
+                            case "$c" in
+                                S)
+                                    val=${cl:k+1}; last=$idx
+                                    if [ -z "$val" ]; then val=${w[idx + 1]-}; last=$((idx + 1)); fi
+                                    break
+                                    ;;
+                                u|C|P|a)
+                                    [ -n "${cl:k+1}" ] || idx=$((idx + 1))
+                                    break
+                                    ;;
+                            esac
+                            k=$((k + 1))
+                        done
+                        ;;
+                    *=*) idx=$((idx + 1)); continue ;;
+                    *) i="$x"; break ;;
                 esac
-                i="$x"
-                break
+                if [ "$last" -ge 0 ]; then
+                    # Splice the -S string's words in place of the option.
+                    v=()
+                    read -r -a v <<<"$val" || true
+                    nw=()
+                    [ "$idx" -eq 0 ] || nw=("${w[@]:0:idx}")
+                    nw=(${nw[@]+"${nw[@]}"} ${v[@]+"${v[@]}"} ${w[@]+"${w[@]:last+1}"})
+                    w=(${nw[@]+"${nw[@]}"})
+                else
+                    idx=$((idx + 1))
+                fi
             done
+            i=${i#[\"\']}
+            i=${i%[\"\']}
             [ -n "$i" ] || return 1
             case "$i" in
                 */*) ;;
@@ -297,18 +340,51 @@ yr_shebang_inside() {
     shift 4
     dirs=$(IFS=:; printf '%s' "$*")
     out=$(YR_SB_DIRS="$dirs" YR_SB_CWD="$(pwd -P)" "$find" -L "$@" -maxdepth 1 -type f \( -perm -100 -o -perm -010 -o -perm -001 \) \
-        -exec "$awk" 'BEGIN { nd = split(ENVIRON["YR_SB_DIRS"], D, ":"); cwd = ENVIRON["YR_SB_CWD"] }
+        -exec "$awk" 'function splice(val, last,    m, v, j, nn, t) {
+            m = split(val, v, /[ \t]+/)
+            nn = 0
+            for (j = 1; j < idx; j++) t[++nn] = w[j]
+            for (j = 1; j <= m; j++) if (v[j] != "") t[++nn] = v[j]
+            for (j = last + 1; j <= n; j++) t[++nn] = w[j]
+            for (j = 1; j <= n; j++) delete w[j]
+            for (j = 1; j <= nn; j++) w[j] = t[j]
+            n = nn
+        }
+        function envcmd(    x, cl, k, c, val, last, name) {
+            idx = 2
+            while (idx <= n) {
+                x = w[idx]; val = ""; last = -1
+                if (x == "" || x == "--") { idx++; continue }
+                if (x ~ /^--/) {
+                    name = x; sub(/=.*/, "", name)
+                    if (name == "--split-string") {
+                        if (x ~ /=/) { val = x; sub(/^[^=]*=/, "", val); last = idx }
+                        else { val = w[idx + 1]; last = idx + 1 }
+                    } else {
+                        if ((name == "--chdir" || name == "--unset" || name == "--argv0") && x !~ /=/) idx++
+                        idx++; continue
+                    }
+                } else if (x ~ /^-./) {
+                    cl = substr(x, 2)
+                    for (k = 1; k <= length(cl); k++) {
+                        c = substr(cl, k, 1)
+                        if (c == "S") {
+                            val = substr(cl, k + 1); last = idx
+                            if (val == "") { val = w[idx + 1]; last = idx + 1 }
+                            break
+                        }
+                        if (c ~ /[uCPa]/) { if (substr(cl, k + 1) == "") idx++; break }
+                    }
+                } else if (x ~ /=/) { idx++; continue }
+                else { gsub(/^["\047]|["\047]$/, "", x); return x }
+                if (last >= 0) splice(val, last); else idx++
+            }
+            return ""
+        }
+        BEGIN { nd = split(ENVIRON["YR_SB_DIRS"], D, ":"); cwd = ENVIRON["YR_SB_CWD"] }
         FNR == 1 && substr($0, 1, 2) == "#!" {
             s = substr($0, 3); sub(/^[ \t]+/, "", s); n = split(s, w, /[ \t]+/); i = w[1]; e = ""
-            if (i ~ /(^|\/)env$/) {
-                i = ""; skip = 0
-                for (k = 2; k <= n; k++) {
-                    if (skip) { skip = 0; continue }
-                    if (w[k] ~ /^-[uCP]$/) { skip = 1; continue }
-                    if (w[k] == "" || w[k] ~ /^-/ || w[k] ~ /=/) continue
-                    i = w[k]; e = 1; break
-                }
-            }
+            if (i ~ /(^|\/)env$/) { i = envcmd(); e = 1 }
             if (i == "" || (i in seen)) next
             seen[i] = 1
             if (i ~ /\//) print (i ~ /^\// ? i : cwd "/" i)
@@ -499,27 +575,91 @@ lgit() { yr_git -c core.fsmonitor=false -c core.untrackedCache=false --literal-p
 # (post-checkout, post-index-change).
 lgit_nohooks() { yr_git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs "$@"; }
 
-# yr_cmd_enters <value> <root>: succeed when the program a command string
-# starts with resolves inside <root> (or cannot be canonicalized: fail closed).
-# The first word is read the way a shell would for the common forms: a
-# leading ! (credential helpers), single or double quotes around a path with
-# spaces, then whitespace. A bare name resolves through the screened PATH
-# (yr_git runs on it), so only a word with a slash is judged; a relative one
-# is taken from the current directory. A wrapper such as `sh -c '...'` is
-# judged by its first word only.
+# yr_cmd_enters <value> <root>: succeed when a command string would run
+# anything inside <root>, or a path cannot be canonicalized (fail closed). The
+# value is a shell command line (GIT_SSH_COMMAND, a pager or editor, a
+# credential helper, a program-running config value), so `sh <root>/script`
+# and `ssh -F <root>/cfg` count, not only a first word that is a path. It
+# fails when
+#   - the raw value contains the worktree path, spelled physically or through
+#     the logical $PWD;
+#   - any whitespace-separated token (leading ! and quotes stripped, and for
+#     --opt=VALUE both the token and VALUE) is an absolute path, or an
+#     existing path relative to the current directory, that canonicalizes
+#     inside <root> or is identical to it (tokens starting with ~ or $ are
+#     not expanded here and are skipped);
+#   - the first word is a bare name that the screened PATH (YR_GIT_PATH, else
+#     the current PATH) resolves to a script whose #! interpreter enters
+#     <root>, or to a file inside it.
+# Values that point only outside the worktree keep working.
 yr_cmd_enters() {
-    local v="$1" root="$2" w p c
-    v=${v#"${v%%[![:space:]]*}"}
-    v=${v#!}
-    case "$v" in
-        \"*) w=${v#\"}; w=${w%%\"*} ;;
-        \'*) w=${v#\'}; w=${w%%\'*} ;;
-        *) w=${v%%[[:space:]]*} ;;
+    local v="$1" root="$2" lroot="" phys tok t u bin c first=1 noglob=1
+    local -a toks=()
+    phys=$(pwd -P) || return 0
+    case "$PWD" in
+        "$phys") ;;
+        *)
+            # Logical spelling of the root: $PWD minus the part below it.
+            t=${phys#"$root"}
+            [ "$t" != "$phys" ] && case "$PWD" in *"$t") lroot=${PWD%"$t"} ;; esac
+            ;;
     esac
-    case "$w" in */*) ;; *) return 1 ;; esac
-    case "$w" in /*) p="$w" ;; *) p="$(pwd -P)/$w" ;; esac
-    c=$(yr_canon_path "$p" 2>/dev/null) || return 0
-    yr_inside_root "$c" "$root" || yr_inside_root "$p" "$root"
+    case "$v" in *"$root"*) return 0 ;; esac
+    if [ -n "$lroot" ]; then
+        case "$v" in *"$lroot"*) return 0 ;; esac
+    fi
+    case $- in *f*) noglob=0 ;; esac
+    {
+        local IFS=$' \t\n'
+        set -f
+        toks=($v)
+        [ "$noglob" -eq 0 ] || set +f
+    }
+    for tok in ${toks[@]+"${toks[@]}"}; do
+        t=${tok#!}
+        t=${t#[\"\']}
+        t=${t%[\"\']}
+        for u in "$t" "${t#*=}"; do
+            case "$u" in
+                ''|'~'*|'$'*) continue ;;
+                /*)
+                    c=$(yr_canon_path "$u" 2>/dev/null) || return 0
+                    yr_inside_root "$c" "$root" && return 0
+                    yr_inside_root "$u" "$root" && return 0
+                    ;;
+                *)
+                    [ -e "$u" ] || continue
+                    c=$(yr_canon_path "$phys/$u" 2>/dev/null) || return 0
+                    yr_inside_root "$c" "$root" && return 0
+                    ;;
+            esac
+            case "$t" in -*=*) ;; *) break ;; esac
+        done
+        if [ "$first" -eq 1 ]; then
+            first=0
+            case "$t" in
+                */*|-*) ;;
+                *)
+                    bin=$(PATH=${YR_GIT_PATH:-$PATH}; type -P "$t" 2>/dev/null) || bin=""
+                    if [ -n "$bin" ]; then
+                        c=$(yr_canon_path "$bin" 2>/dev/null) || return 0
+                        yr_inside_root "$c" "$root" && return 0
+                        yr_file_shebang_enters "$c" "$root" && return 0
+                    fi
+                    ;;
+            esac
+            case "$t" in
+                */*)
+                    case "$t" in /*) bin="$t" ;; *) bin="$phys/$t" ;; esac
+                    if [ -e "$bin" ]; then
+                        c=$(yr_canon_path "$bin" 2>/dev/null) || return 0
+                        yr_file_shebang_enters "$c" "$root" && return 0
+                    fi
+                    ;;
+            esac
+        fi
+    done
+    return 1
 }
 
 # yr_cmd_key <config key>: succeed for a config key whose value is a program

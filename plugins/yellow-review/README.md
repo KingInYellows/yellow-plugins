@@ -183,8 +183,8 @@ drops directories inside the worktree, any directory that holds a symlink
 directory with an executable script whose `#!` interpreter is inside it. Both
 scripts also refuse an inherited `GIT_SSH_COMMAND`, `GIT_ASKPASS`, `GIT_PAGER`,
 `EDITOR`, `GIT_EXEC_PATH` or injected git config (`core.sshCommand`,
-`credential.helper`, ...) that runs a program from inside the worktree; values
-outside it keep working.
+`credential.helper`, ...) whose command line names a path inside the worktree
+(`sh <worktree>/script` included); values outside it keep working.
 
 Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-gh.sh`,
 `resolve-paths.sh`, `gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.
