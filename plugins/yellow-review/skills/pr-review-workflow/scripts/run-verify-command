@@ -601,8 +601,30 @@ if [ "$MODE" = check-ignored ]; then
     esac
 fi
 
+# rp_tree_changes diffs against HEAD and cannot see an edit to a tracked file
+# marked skip-worktree or assume-unchanged. Fail closed when such a flag sits on
+# a trusted-config or deny-listed path: a clean listing would be a false "no
+# change". `ls-files -v` tags assume-unchanged paths in lowercase (skip-worktree
+# is `S`, or `s` with both flags).
+refuse_hidden_flags() {
+    local out tag f hits=""
+    out=$(mktemp) || die 2 "mktemp failed"
+    yr_git ls-files -v -z >|"$out" 2>/dev/null || { rm -f -- "$out"; die 2 "cannot check tracked files for skip-worktree or assume-unchanged flags"; }
+    while IFS= read -r -d '' f; do
+        tag="${f:0:1}"
+        f="${f:2}"
+        case "$tag" in [a-z]|S) ;; *) continue ;; esac
+        if rp_trusted_config "$f" || rp_denied "$f"; then
+            hits="${hits:+$hits$'\n'}$f"
+        fi
+    done <"$out"
+    rm -f -- "$out"
+    [ -z "$hits" ] || die 2 "tracked trusted-config or deny-listed files carry a skip-worktree or assume-unchanged flag, so edits to them are invisible to the tree check; clear the flag (git update-index --no-skip-worktree --no-assume-unchanged) and retry: $(safe_path_list "$hits")"
+}
+
 if [ "$MODE" != revert-only ]; then
     list_tree_changes || die 2 "cannot list tree changes"
+    refuse_hidden_flags
 fi
 
 if [ "$MODE" = revert-dirty ]; then

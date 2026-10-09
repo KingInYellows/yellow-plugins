@@ -2576,3 +2576,33 @@ trust_assert_absolute() {
   [[ "$stderr" != *"$tok"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
 }
+
+@test "--revert-denied refuses a tracked trusted-config file hidden by skip-worktree" {
+  mkdir -p .claude
+  printf '{}\n' >| .claude/settings.json
+  git add .claude/settings.json && git commit -q -m "chore: settings"
+  git update-index --skip-worktree .claude/settings.json
+  printf '{"planted":true}\n' >| .claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'skip-worktree or assume-unchanged'* ]]
+  [[ "$stderr" == *'.claude/settings.json'* ]]
+  grep -q planted .claude/settings.json
+}
+
+@test "a hidden-flag refusal withholds a credential-shaped path and also stops a run" {
+  tok=ghp_abcdefghijklmnopqrstuvwxyz0123456789
+  mkdir -p .cursor
+  printf 'rule\n' >| ".cursor/$tok"
+  git add ".cursor/$tok" && git commit -q -m "chore: cursor rule"
+  git update-index --assume-unchanged ".cursor/$tok"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'skip-worktree or assume-unchanged'* ]]
+  [[ "$stderr" == *'<a path withheld'* ]]
+  [[ "$stderr" != *"$tok"* ]]
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'skip-worktree or assume-unchanged'* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
