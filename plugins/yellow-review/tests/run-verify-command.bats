@@ -3341,3 +3341,211 @@ SH
   [ "$status" -eq 2 ] || { echo "status $status: $stderr" >&2; return 1; }
   [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
 }
+
+# --- a tracked trusted-config symlink to a directory holding a nested symlink ---
+dirlink_setup() {
+  EXTDIR="$BATS_TEST_TMPDIR/ext-dir"
+  EXTFILE="$BATS_TEST_TMPDIR/ext-file"
+  mkdir -p "$EXTDIR"
+  printf '{}\n' >| "$EXTFILE"
+  ln -s "$EXTFILE" "$EXTDIR/settings.json"
+  ln -s "$EXTDIR" .claude
+  git add .claude && git commit -q -m "track .claude dir link"
+  touch -t 202001010000 "$IGN_MARKER"
+  touch -t 201901010000 "$EXTFILE" "$EXTDIR"
+  touch -h -t 201901010000 "$EXTDIR/settings.json"
+}
+
+@test "--revert-denied flags a tracked trusted-config directory symlink whose nested symlink's target was written" {
+  dirlink_setup
+  printf '{"hooks":"evil"}\n' >| "$EXTFILE"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "--revert-denied stays deniedClean for a directory symlink whose nested symlink target is unchanged" {
+  dirlink_setup
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+}
+
+@test "--revert-denied fails closed on a tracked trusted-config directory symlink holding a symlink loop" {
+  dirlink_setup
+  ln -s . "$EXTDIR/loop"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+# --- the HEAD target of a dirty trusted-config link ---
+@test "a dirty root-level trusted-config symlink with a ../ target is resolved from the repository root's parent" {
+  EXT="$(dirname "$PWD")/rootlink-ext"
+  mkdir -p "$EXT"
+  printf 'x\n' >| "$EXT/settings"
+  rel="../rootlink-ext/settings"
+  rm -f CLAUDE.md && ln -s "$rel" CLAUDE.md
+  git add CLAUDE.md && git commit -q -m "root link"
+  touch -t 202001010000 "$IGN_MARKER"
+  touch -t 201901010000 "$EXT/settings"
+  printf 'new\n' >| "$EXT/settings"
+  rm CLAUDE.md && ln -s nowhere CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ "$(readlink CLAUDE.md)" = "$rel" ]
+}
+
+@test "a dirty nested trusted-config symlink with a bare-name target is resolved from its own directory" {
+  mkdir -p sub
+  printf 'x\n' >| sub/real.txt
+  ln -s real.txt sub/CLAUDE.md
+  git add sub && git commit -q -m "nested link"
+  touch -t 202001010000 "$IGN_MARKER"
+  touch -t 201901010000 sub/real.txt
+  printf 'evil\n' >| sub/real.txt
+  rm sub/CLAUDE.md && ln -s nowhere sub/CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "a staged retarget of a trusted-config symlink does not hide the committed (HEAD) target" {
+  link_setup
+  printf '{"hooks":"evil"}\n' >| "$OUTSIDE/settings.json"
+  rm .claude/settings.json
+  ln -s "$BATS_TEST_TMPDIR/elsewhere" .claude/settings.json
+  git add .claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ "$(readlink .claude/settings.json)" = "$OUTSIDE/settings.json" ]
+}
+
+# --- --no-ignored-guard: an in-worktree target must be provably covered by the tree check ---
+@test "--revert-denied --no-ignored-guard flags a tracked trusted-config symlink to .git/config" {
+  mkdir -p .claude
+  ln -s ../.git/config .claude/settings.json
+  git add -f .claude/settings.json && git commit -q -m "link into .git"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "--revert-denied --no-ignored-guard flags a tracked trusted-config symlink to a gitignored in-worktree file" {
+  mkdir -p .claude
+  printf 'ignored-target\n' >> .git/info/exclude
+  printf 'x\n' >| ignored-target
+  ln -s ../ignored-target .claude/settings.json
+  git add -f .claude/settings.json && git commit -q -m "link to ignored"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "--revert-denied --no-ignored-guard accepts a tracked trusted-config symlink to a tracked in-worktree file" {
+  mkdir -p .claude
+  ln -s ../src/a.txt .claude/settings.json
+  git add -f .claude/settings.json && git commit -q -m "link to tracked"
+  git checkout -q HEAD -- src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+}
+
+@test "--revert-denied --no-ignored-guard flags a tracked trusted-config symlink to a directory with a tracked descendant" {
+  mkdir -p config
+  printf 'x\n' >| config/placeholder
+  printf 'config/settings.local.json\n' >> .git/info/exclude
+  printf '{}\n' >| config/settings.local.json
+  ln -s config .claude
+  git add -f .claude config/placeholder && git commit -q -m "link to dir"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "--revert-denied --no-ignored-guard flags a tracked trusted-config symlink whose tracked target is modified" {
+  mkdir -p .claude config
+  printf '{}\n' >| config/settings.json
+  ln -s ../config/settings.json .claude/settings.json
+  git add -f .claude/settings.json config/settings.json && git commit -q -m "link to config"
+  printf '{"hooks":"evil"}\n' >| config/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "--revert-denied --no-ignored-guard flags a link to a tracked in-worktree target marked skip-worktree" {
+  mkdir -p .claude
+  ln -s ../src/a.txt .claude/settings.json
+  git add -f .claude/settings.json && git commit -q -m "link to tracked"
+  git checkout -q HEAD -- src/a.txt
+  git update-index --skip-worktree src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "--revert-denied --no-ignored-guard flags a link to a tracked in-worktree target marked assume-unchanged" {
+  mkdir -p .claude
+  ln -s ../src/a.txt .claude/settings.json
+  git add -f .claude/settings.json && git commit -q -m "link to tracked"
+  git checkout -q HEAD -- src/a.txt
+  git update-index --assume-unchanged src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "a git script whose #! uses env -S with a variable is refused before the bootstrap runs it (run-verify-command)" {
+  marker="$BATS_TEST_TMPDIR/boot-envs-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/interp"
+  chmod +x "$REPO/tools/interp"
+  printf '%s\n' '#!/usr/bin/env -S ${INTERP}' >| "$BATS_TEST_TMPDIR/gitbin/git"
+  chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+  printf '%s\n' 'true' >| "$CMD"
+  run --separate-stderr env "INTERP=$REPO/tools/interp" "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the bootstrap ran the planted git" >&2; return 1; }
+  [ "$status" -eq 2 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
+}
+
+@test "a git script whose #! has an env assignment or an -S escape is refused before the bootstrap runs it (run-verify-command)" {
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '%s\n' 'true' >| "$CMD"
+  for shebang in '#!/usr/bin/env -S PATH=tools git' '#!/usr/bin/env -S "/tmp/my\_repo/git"'; do
+    printf '%s\n' "$shebang" >| "$BATS_TEST_TMPDIR/gitbin/git"
+    chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt
+    [ "$status" -eq 2 ] || { echo "status $status: $shebang: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git resolves to a path inside the repository"* ]] || { echo "accepted: $shebang" >&2; return 1; }
+  done
+}
+
+@test "a git script whose #! has an env -P is refused before the bootstrap runs it (run-verify-command)" {
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '%s\n' 'true' >| "$CMD"
+  for shebang in '#!/usr/bin/env -P tools git' '#!/usr/bin/env -S -P/usr/bin git'; do
+    printf '%s\n' "$shebang" >| "$BATS_TEST_TMPDIR/gitbin/git"
+    chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt
+    [ "$status" -eq 2 ] || { echo "status $status: $shebang: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git resolves to a path inside the repository"* ]] || { echo "accepted: $shebang" >&2; return 1; }
+  done
+}
+
+@test "a git script whose #! has an env -C is refused before the bootstrap runs it (run-verify-command)" {
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '%s\n' 'true' >| "$CMD"
+  for shebang in '#!/usr/bin/env -C tools git' '#!/usr/bin/env -S --chdir=tools git'; do
+    printf '%s\n' "$shebang" >| "$BATS_TEST_TMPDIR/gitbin/git"
+    chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt
+    [ "$status" -eq 2 ] || { echo "status $status: $shebang: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git resolves to a path inside the repository"* ]] || { echo "accepted: $shebang" >&2; return 1; }
+  done
+}

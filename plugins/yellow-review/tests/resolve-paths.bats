@@ -860,6 +860,24 @@ old_link() {
   [ "$status" -eq 0 ]
 }
 
+@test "rp_ignored_changed_since with a predicate follows symlinks nested below a trusted-config link target" {
+  link_repo
+  printf '.claude/\n' >> .gitignore
+  mkdir -p "$BATS_TEST_TMPDIR/deep" .claude
+  printf 'old\n' >| "$BATS_TEST_TMPDIR/deep/file"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/deep/file"
+  ln -s "$BATS_TEST_TMPDIR/deep" real/dir/nested
+  touch -h -t 201901010000 real/dir/nested
+  touch -t 201901010000 real/dir
+  old_link ../real/dir .claude/commands
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" "" rp_trusted_config
+  [ "$status" -eq 0 ]
+  printf 'new\n' >| "$BATS_TEST_TMPDIR/deep/file"
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" "" rp_trusted_config
+  [ "$status" -eq 1 ]
+  [[ "$output" == *.claude/commands* ]]
+}
+
 @test "rp_ignored_changed_since treats a dangling symlink target as no change" {
   link_repo
   old_link /nonexistent-target-dir/tool node_modules/.bin/dangling
@@ -1491,9 +1509,123 @@ commit_repo() {
     [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
   done
   # Option operands are not the command; outside commands stay fine.
-  for shebang in "#!/usr/bin/env -C $PWD/venv sh" "#!/usr/bin/env -u $PWD/venv/python sh" "#!/usr/bin/env -S sh -c true" \
-                 "#!/usr/bin/env --chdir=$PWD/venv /usr/bin/sh"; do
+  for shebang in "#!/usr/bin/env -u $PWD/venv/python sh" "#!/usr/bin/env -S sh -c true"; do
     d="$BATS_TEST_TMPDIR/sbok"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    ! yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell false hit: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" == "$d:"* ]] || { echo "awk false hit: $shebang" >&2; return 1; }
+  done
+}
+
+@test "yr_has_root matches the worktree only as a whole path" {
+  root="$PWD"
+  yr_has_root "ssh -i $root/key" "$root"
+  yr_has_root "x '$root'" "$root"
+  yr_has_root "a=$root:b" "$root"
+  yr_has_root "$root" "$root"
+  ! yr_has_root "ssh -i ${root}-keys/id" "$root"
+  ! yr_has_root "${root}2/bin/ssh" "$root"
+  ! yr_has_root "${root}.bak/x" "$root"
+  ! yr_has_root "pre${root}/x" "$root"
+  yr_has_root "${root}2/x $root/y" "$root"
+}
+
+@test "harden_git_config does not over-refuse siblings of the worktree or a bare first word that is also a repo directory" {
+  mkdir -p "${PWD}-keys" "${PWD}2/bin" less evil
+  : >| evil/file
+  for val in "ssh -i ${PWD}-keys/id" "${PWD}2/bin/ssh -o x" "less -FRX" "less" "sh -c true"; do
+    rc=0; ( export GIT_SSH_COMMAND="$val" PAGER="$val" GIT_PAGER="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
+  done
+  rm -rf "${PWD}-keys" "${PWD}2"
+}
+
+@test "harden_git_config still checks later bare words and slash words against the current directory" {
+  : >| evil
+  mkdir -p tools
+  : >| tools/evil
+  for val in "sh evil" "sh tools/evil" "sh -e evil" "ssh -F evil host"; do
+    rc=0; ( export GIT_SSH_COMMAND="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "accepted: $val" >&2; return 1; }
+  done
+}
+
+@test "harden_git_config refuses shell syntax it cannot judge, naming the variable and not the value" {
+  mkdir -p tools
+  : >| tools/evil
+  for val in '$PWD/tools/evil' '${PWD}/tools/evil' '`touch x`' '$(touch x)' 'ssh; touch x' 'ssh && true' 'ssh | cat' \
+             'ssh > out' 'ssh < in' 'f() { x; }' 'ssh *' 'ssh ?' 'ssh [a]' '~root/x' 'ssh ~root/key' $'ssh\ntouch x'; do
+    for name in GIT_SSH_COMMAND GIT_PAGER EDITOR GIT_ASKPASS; do
+      rc=0; ( export "$name=$val"; harden_git_config full; ) || rc=$?
+      [ "$rc" -eq 1 ] || { echo "$name accepted: $val" >&2; return 1; }
+    done
+  done
+  ( export GIT_SSH_COMMAND='$PWD/tools/evil'; harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_SSH_COMMAND uses shell syntax"* && "$YR_HARDEN_MSG" != *evil* ]] )
+  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.sshCommand GIT_CONFIG_VALUE_0='$PWD/tools/evil'; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  rc=0; ( export GIT_CONFIG_PARAMETERS="'credential.helper'='!f() { x; }; f'"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  # Other config keys are not command-bearing: shell syntax there is fine.
+  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.x GIT_CONFIG_VALUE_0='!f() { x; }; f'; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
+@test "harden_git_config expands a leading ~/ to HOME and judges the result" {
+  mkdir -p "$BATS_TEST_TMPDIR/home" tools
+  : >| tools/key
+  rc=0; ( export HOME="$BATS_TEST_TMPDIR/home" GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519'; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+  rc=0; ( export HOME="$PWD" GIT_CONFIG_GLOBAL=/dev/null GIT_SSH_COMMAND='ssh -i ~/tools/key'; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+}
+
+@test "harden_git_config refuses a global git config that HOME or XDG_CONFIG_HOME puts inside the worktree" {
+  mkdir -p "$BATS_TEST_TMPDIR/home" cfg/git
+  rc=0; ( unset GIT_CONFIG_GLOBAL; export HOME="$BATS_TEST_TMPDIR/home"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+  rc=0; ( unset GIT_CONFIG_GLOBAL XDG_CONFIG_HOME; export HOME="$PWD"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  rc=0; ( unset GIT_CONFIG_GLOBAL; export HOME="$BATS_TEST_TMPDIR/home" XDG_CONFIG_HOME="$PWD/cfg"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  # An explicit GIT_CONFIG_GLOBAL replaces both derived files.
+  rc=0; ( export GIT_CONFIG_GLOBAL=/dev/null HOME="$PWD"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
+@test "harden_git_config judges the file a global-scope command came from, such as an include inside the worktree" {
+  mkdir -p tools
+  printf '[core]\n\tsshCommand = ssh -x\n' >| tools/inc.cfg
+  printf '[include]\n\tpath = %s/tools/inc.cfg\n' "$PWD" >| "$BATS_TEST_TMPDIR/global.cfg"
+  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global.cfg"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global.cfg"; harden_git_config full || [[ "$YR_HARDEN_MSG" == *"global or system git config file inside the repository"* ]] )
+  # The same command in a global file outside the worktree is the user's own.
+  printf '[core]\n\tsshCommand = ssh -x\n' >| "$BATS_TEST_TMPDIR/own.cfg"
+  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/own.cfg"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
+@test "a non-env #! optional argument or an env command's arguments that enter the worktree are caught, in awk and in the shell" {
+  mkdir -p venv
+  : >| evil
+  n=0
+  for shebang in "#!/bin/sh $PWD/venv/python" "#!/bin/sh -e $PWD/evil" "#!/bin/sh evil" "#!/bin/sh --file=$PWD/evil" \
+                 "#!/bin/sh \"$PWD/evil\"" "#!/usr/bin/env sh $PWD/evil" "#!/usr/bin/env -S sh -e $PWD/evil" "#!/bin/sh -x $PWD" \
+                 "#!/usr/bin/awk -f $PWD/evil"; do
+    n=$((n + 1))
+    d="$BATS_TEST_TMPDIR/oa$n"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell missed: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
+  done
+  for shebang in "#!/bin/sh -e" "#!/bin/sh -x ${PWD}2/evil" "#!/bin/sh -x ${PWD}-keys/id" "#!/usr/bin/env sh -e" "#!/usr/bin/awk -f" "#!/bin/sh nosuchfile"; do
+    d="$BATS_TEST_TMPDIR/oaok"
     mkdir -p "$d"
     printf '%s\n' "$shebang" >| "$d/tool"
     chmod +x "$d/tool"
@@ -1750,4 +1882,223 @@ EOF
   # Without a predicate the unexaminable target still fails closed.
   run rp_ignored_changed_since "$MARKER" "$SCRATCH"
   [ "$status" -eq 2 ]
+}
+
+@test "yr_safe_path drops a symlinked outside directory whose child links into the worktree, in find and in the shell" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/realbin" "$BATS_TEST_TMPDIR/realscript"
+  printf '#!/bin/sh\nexit 0\n' >| ignored/awk
+  chmod +x ignored/awk
+  ln -s "$PWD/ignored/awk" "$BATS_TEST_TMPDIR/realbin/awk"
+  ln -s "$BATS_TEST_TMPDIR/realbin" "$BATS_TEST_TMPDIR/linkbin"
+  out=$(PATH="$BATS_TEST_TMPDIR/linkbin:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *linkbin* ]] || { echo "kept: $out" >&2; return 1; }
+  # A symlinked directory with an in-worktree interpreter script is dropped too.
+  printf '#!%s/ignored/awk\n' "$PWD" >| "$BATS_TEST_TMPDIR/realscript/tool"
+  chmod +x "$BATS_TEST_TMPDIR/realscript/tool"
+  ln -s "$BATS_TEST_TMPDIR/realscript" "$BATS_TEST_TMPDIR/linkscript"
+  out=$(PATH="$BATS_TEST_TMPDIR/linkscript:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *linkscript* ]]
+  # The shell fallback (no GNU realpath, find or awk) walks the same children.
+  mkdir -p "$BATS_TEST_TMPDIR/okreal"
+  ln -s "$(command -v grep)" "$BATS_TEST_TMPDIR/okreal/grep"
+  ln -s "$BATS_TEST_TMPDIR/okreal" "$BATS_TEST_TMPDIR/oklink"
+  yr_links_inside "$BATS_TEST_TMPDIR/linkbin" "$PWD"
+  yr_links_inside "$BATS_TEST_TMPDIR/linkscript" "$PWD"
+  ! yr_links_inside "$BATS_TEST_TMPDIR/oklink" "$PWD"
+  # A symlinked directory with only outside children stays in the batched screen.
+  out=$(PATH="$BATS_TEST_TMPDIR/oklink:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" == "$BATS_TEST_TMPDIR/oklink:"* ]]
+}
+
+@test "#! lines whose env -S string expands a variable drop the directory, in awk and in the shell" {
+  mkdir -p venv
+  printf '#!/bin/sh\nexit 0\n' >| venv/python
+  chmod +x venv/python
+  n=0
+  for shebang in '#!/usr/bin/env -S ${INTERP}' '#!/usr/bin/env -S $INTERP -u' '#!/usr/bin/env -vS ${INTERP} x' \
+                 '#!/usr/bin/env --split-string=${INTERP}' '#!/usr/bin/env --split-string $INTERP' \
+                 '#!/usr/bin/env -S sh -c ${INTERP}' '#!/usr/bin/env -S/usr/bin/${X}/python'; do
+    n=$((n + 1))
+    d="$BATS_TEST_TMPDIR/sv$n"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell missed: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
+  done
+  # A dollar sign outside an env -S string is a literal path character.
+  d="$BATS_TEST_TMPDIR/svok"
+  mkdir -p "$d"
+  printf '#!/usr/bin/env sh\n' >| "$d/tool"
+  chmod +x "$d/tool"
+  ! yr_file_shebang_enters "$d/tool" "$PWD"
+  out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" == "$d:"* ]]
+}
+
+@test "harden_git_config refuses a backslash or a quote inside a word, naming the variable and not the value" {
+  mkdir -p ignored
+  : >| ignored/ssh
+  root="$PWD"
+  for val in "${root//\//\\/}/ignored/ssh" "$root/ign\\ored/ssh" 'ssh\ -F\ x' 'ssh -o a\"b' \
+             "${root%?}\"${root: -1}\"/ignored/ssh" "ssh -F ${root:0:5}'${root:5}'/ignored/x" 'ssh -F a"b"c'; do
+    for name in GIT_SSH_COMMAND GIT_PAGER EDITOR GIT_ASKPASS; do
+      rc=0; ( export "$name=$val"; harden_git_config full; ) || rc=$?
+      [ "$rc" -eq 1 ] || { echo "$name accepted: $val" >&2; return 1; }
+    done
+  done
+  ( export GIT_SSH_COMMAND='ssh\ x'; harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_SSH_COMMAND uses shell syntax"* && "$YR_HARDEN_MSG" != *'ssh\ x'* ]] )
+  # Quotes that wrap whole words are still judged by the existing rules and pass.
+  for val in 'ssh -i "/nonexistent/key"' "ssh -o 'StrictHostKeyChecking no'"; do
+    rc=0; ( export GIT_SSH_COMMAND="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
+  done
+}
+
+@test "harden_git_config refuses an escaped worktree path that contains a space" {
+  cd "$BATS_TEST_TMPDIR" && mkdir -p "my repo" && cd "my repo" && git init -q
+  mkdir -p ignored
+  printf '#!/bin/sh\nexit 0\n' >| ignored/ssh
+  chmod +x ignored/ssh
+  val="$PWD/ignored/ssh"
+  val=${val// /\\ }
+  rc=0; ( export GIT_SSH_COMMAND="$val"; harden_git_config full; ) || rc=$?
+  [ "$rc" -eq 1 ]
+}
+
+@test "#! lines with an env NAME=value operand or an escape or quote in an env -S string drop the directory, in awk and in the shell" {
+  mkdir -p tools
+  printf '#!/bin/sh\nexit 0\n' >| tools/evil
+  chmod +x tools/evil
+  n=0
+  for shebang in '#!/usr/bin/env -S PATH=tools evil' '#!/usr/bin/env PATH=tools evil' '#!/usr/bin/env A=1 sh' \
+                 '#!/usr/bin/env -S "/tmp/my\_repo/evil"' "#!/usr/bin/env -S '/tmp/x/evil'" \
+                 '#!/usr/bin/env -S sh\_x' '#!/usr/bin/env --split-string=/tmp/a\_b' '#!/usr/bin/env -vS "sh" x'; do
+    n=$((n + 1))
+    d="$BATS_TEST_TMPDIR/ea$n"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell missed: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
+  done
+  for shebang in '#!/usr/bin/env python3' '#!/usr/bin/env -S node --flag' '#!/usr/bin/env -S sh -c true'; do
+    d="$BATS_TEST_TMPDIR/eaok"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    ! yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell false hit: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" == "$d:"* ]] || { echo "awk false hit: $shebang" >&2; return 1; }
+  done
+}
+
+# unprivileged <script>: run a bash script as a user that directory modes bind
+# (root reads an execute-only directory anyway). Sets nothing; prints its output.
+# Returns 77 when no unprivileged user is available.
+unprivileged() {
+  if [ "$(id -u)" -ne 0 ]; then
+    bash -c "$1"
+  elif command -v setpriv >/dev/null 2>&1 && id nobody >/dev/null 2>&1; then
+    setpriv --reuid="$(id -u nobody)" --regid="$(id -g nobody)" --clear-groups bash -c "$1"
+  else
+    return 77
+  fi
+}
+
+@test "yr_safe_path drops an execute-only PATH directory it cannot list, even when it holds a link into the worktree" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/xbin" "$BATS_TEST_TMPDIR/okbin"
+  printf '#!/bin/sh\nexit 0\n' >| ignored/awk
+  chmod +x ignored/awk
+  ln -s "$PWD/ignored/awk" "$BATS_TEST_TMPDIR/xbin/awk"
+  ln -s "$(command -v grep)" "$BATS_TEST_TMPDIR/okbin/grep"
+  chmod 711 "$BATS_TEST_TMPDIR/xbin"
+  # Let the unprivileged user reach the repository and the directories.
+  p="$BATS_TEST_TMPDIR"
+  while [ "$p" != /tmp ] && [ "$p" != / ]; do chmod 755 "$p"; p=$(dirname "$p"); done
+  chmod -R a+rX "$PWD" "$BATS_TEST_TMPDIR/okbin"
+  script='export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0="*"
+    . "'"$LIB"'"; cd "'"$PWD"'"; PATH="'"$BATS_TEST_TMPDIR"'/xbin:'"$BATS_TEST_TMPDIR"'/okbin:/usr/bin:/bin" yr_safe_path'
+  rc=0; out=$(unprivileged "$script") || rc=$?
+  if [ "$rc" -eq 77 ]; then skip "no unprivileged user to run as (running as root without setpriv/nobody): chmod cannot restrict root"; fi
+  [ "$rc" -eq 0 ] || { echo "rc=$rc out=$out" >&2; return 1; }
+  [[ "$out" != *xbin* ]] || { echo "kept: $out" >&2; return 1; }
+  [[ "$out" == "$BATS_TEST_TMPDIR/okbin:"* ]]
+}
+
+@test "#! lines whose env has -P (a search path that is not PATH) drop the directory, in awk and in the shell" {
+  mkdir -p tools
+  printf '#!/bin/sh\nexit 0\n' >| tools/evil
+  chmod +x tools/evil
+  n=0
+  for shebang in '#!/usr/bin/env -P tools evil' '#!/usr/bin/env -Ptools evil' '#!/usr/bin/env -vP tools evil' \
+                 '#!/usr/bin/env -S -P tools evil' '#!/usr/bin/env -S -Ptools evil' '#!/usr/bin/env -P/usr/bin sh'; do
+    n=$((n + 1))
+    d="$BATS_TEST_TMPDIR/ep$n"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell missed: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
+  done
+  for shebang in '#!/usr/bin/env python3' '#!/usr/bin/env -S node --flag' '#!/usr/bin/env -u P sh' '#!/usr/bin/env sh -P'; do
+    d="$BATS_TEST_TMPDIR/epok"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    ! yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell false hit: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" == "$d:"* ]] || { echo "awk false hit: $shebang" >&2; return 1; }
+  done
+}
+
+@test "harden_git_config refuses an inherited GIT_CONFIG, which would hide the repository config from its scans" {
+  git config filter.evil.clean 'sh -c evil'
+  printf '[core]\n\tfsmonitor = false\n\tuntrackedCache = false\n[safe]\n\tbareRepository = explicit\n' >| "$BATS_TEST_TMPDIR/alt.conf"
+  for scope in full revert; do
+    rc=0; ( export GIT_CONFIG="$BATS_TEST_TMPDIR/alt.conf"; harden_git_config "$scope" ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "$scope accepted GIT_CONFIG" >&2; return 1; }
+  done
+  ( export GIT_CONFIG="$BATS_TEST_TMPDIR/alt.conf"; harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_CONFIG "* && "$YR_HARDEN_MSG" != *alt.conf* ]] )
+  # An empty value is still a set variable.
+  rc=0; ( export GIT_CONFIG=; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+}
+
+@test "#! lines whose env has -C or --chdir (resolving the utility from another directory) drop the directory, in awk and in the shell" {
+  mkdir -p sub
+  n=0
+  for shebang in '#!/usr/bin/env -S --chdir=/tmp/wt/sub sh evil' '#!/usr/bin/env -C /tmp sh' '#!/usr/bin/env -C/tmp sh' \
+                 '#!/usr/bin/env --chdir /tmp sh' '#!/usr/bin/env --chdir=/tmp sh' '#!/usr/bin/env -vC /tmp sh' \
+                 '#!/usr/bin/env -S -C /tmp sh' '#!/usr/bin/env -S --chdir /tmp sh'; do
+    n=$((n + 1))
+    d="$BATS_TEST_TMPDIR/ec$n"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell missed: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
+  done
+}
+
+@test "harden_git_config refuses GIT_CONFIG_PARAMETERS it cannot decode exactly, naming the variable and not the value" {
+  mkdir -p tools
+  : >| tools/evil
+  q="'\\''"
+  # Git's own quoting: an embedded quote is '\''.
+  for val in "'core.sshcommand'='sh ${q}$PWD/tools/evil${q}'" "'core.sshcommand'='sh ${q}tools/evil${q}'" \
+             "'core.sshcommand'='ssh' junk" "'user.name'='x' garbage 'core.sshcommand'='ssh'" "'core.sshcommand'='ssh"; do
+    rc=0; ( export GIT_CONFIG_PARAMETERS="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "accepted: $val" >&2; return 1; }
+  done
+  ( export GIT_CONFIG_PARAMETERS="'core.sshcommand'='sh ${q}x${q}'"; harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_CONFIG_PARAMETERS "* && "$YR_HARDEN_MSG" != *sshcommand* ]] )
+  # Well-formed entries, including a key without a value, still pass.
+  for val in "'user.name'='x' 'core.sshcommand'='ssh -x'" "'credential.helper'='store'" "'user.name=x'" "'core.bare'"; do
+    rc=0; ( export GIT_CONFIG_PARAMETERS="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
+  done
 }
