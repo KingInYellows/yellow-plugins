@@ -101,3 +101,4 @@ When an accepted reply and an unresolved one share their text and a walk sees
 more matching messages than accepted replies, the unresolved reply is no longer
 credited with the surplus message; it stays unresolved and the surplus is
 recorded as possible outside activity.
+The surplus message is consumed as outside evidence rather than held, so a later walk cannot hand it to the unresolved reply.

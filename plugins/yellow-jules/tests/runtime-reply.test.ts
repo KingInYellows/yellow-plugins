@@ -766,6 +766,13 @@ describe('races inside the write gate', () => {
       expect(journal.operations['pend-a']?.echoActivityId).toBe('act-m1');
       expect(journal.operations['pend-b']?.echoActivityId).toBeUndefined();
       expect((await owner())?.supervision?.outsideSeen).toBeDefined();
+
+      // A second walk must not hand the consumed surplus to the unresolved write.
+      await readStatus();
+      const again = await readJournal(h.dataDir);
+      expect(again.operations['pend-a']?.echoActivityId).toBe('act-m1');
+      expect(again.operations['pend-b']?.echoActivityId).toBeUndefined();
+      expect((await owner())?.supervision?.outsideSeen).toBeDefined();
     });
 
     it('a reservation stuck past its settle window no longer holds the walk', async () => {

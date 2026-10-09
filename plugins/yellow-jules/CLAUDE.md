@@ -326,7 +326,8 @@ question-bound `reply` refuse with `JULES_QUESTION_CHANGED`.
 Same-text messages are classified as a batch: when a settled write and an
 unresolved one share a digest and a walk holds more such messages than settled
 writes, the settled writes take the earliest messages, the unresolved write gets
-no landing evidence, and the surplus is held and recorded as possible outside
+no landing evidence, and the surplus is consumed (not held, so no later walk can
+reclassify it as the unresolved write's echo) and recorded as possible outside
 activity.
 
 Outside-activity markers treat an equal `createTime` as unordered: a second

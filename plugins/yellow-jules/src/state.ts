@@ -1937,8 +1937,11 @@ export async function claimOwnEchoes(
           continue;
         }
         if (surplusIds.has(message.activityId)) {
-          pendingOut?.push(message.activityId);
-          hold(message);
+          // Consumed as outside evidence, not held: once the settled write has
+          // its echo it stops being a candidate, and a held copy would then be
+          // reclassified as the unresolved write's echo on the next walk. The
+          // watermark and dedup ring move past it.
+          release(message.activityId);
           noteOutside(message);
           continue;
         }
