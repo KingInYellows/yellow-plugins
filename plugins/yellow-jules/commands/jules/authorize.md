@@ -46,7 +46,8 @@ exactly one mode and refuse anything else, quoting the offending fragment back:
   `create,reply,approve,collect`; `--owner` matching
   `^[A-Za-z0-9][A-Za-z0-9 ._@-]{0,63}$`; optional `--max-active-sessions` (1-3),
   `--max-total-tasks` (1-10), `--max-corrective-rounds` (0-3), `--ttl-minutes`
-  (1-1440), and `--source <resource>` for a pinned source
+  (1-1440), and `--source <resource>` for a pinned source matching
+  `^sources/github/[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100}$`
 
 If nothing was given, run `--list`.
 
@@ -97,6 +98,10 @@ TTL='YELLOW_TODO_ttl_minutes_or_empty'
 SOURCE='YELLOW_TODO_source_or_empty'
 case "$REPO$BRANCH$OPERATIONS$OWNER$TASK_REFS$MAX_SESSIONS$MAX_TASKS$MAX_ROUNDS$TTL$SOURCE" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 case "$MAX_SESSIONS$MAX_TASKS$MAX_ROUNDS$TTL" in *[!0-9]*) printf 'ERROR: the limits must be whole numbers.\n' >&2; exit 1 ;; esac
+if [ -n "$SOURCE" ]; then
+  case "$SOURCE" in *[!A-Za-z0-9_./-]*) printf 'ERROR: --source is not sources/github/<owner>/<repo>.\n' >&2; exit 1 ;; esac
+  printf '%s\n' "$SOURCE" | grep -Eq '^sources/github/[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100}$' || { printf 'ERROR: --source is not sources/github/<owner>/<repo>.\n' >&2; exit 1; }
+fi
 REFS=$(printf '%s\n' "$TASK_REFS" | sed "s/.*/--task-ref '&' /" | tr -d '\n')
 CMD="node '$CLI' authorize --repo '$REPO' --branch '$BRANCH' ${REFS}--operations '$OPERATIONS' --owner '$OWNER'"
 [ -n "$MAX_SESSIONS" ] && CMD="$CMD --max-active-sessions $MAX_SESSIONS"
