@@ -1669,6 +1669,30 @@ rule=forged line=9.txt"
   [ "$ran" -ge 2 ]
 }
 
+@test "a symbol attached to the first word cannot exempt a multi-word credential; letter-leading words stay prose" {
+  ran=0
+  for loc in C C.UTF-8; do
+    locale_installed "$loc" || continue
+    for bin in gawk mawk; do
+      ran=$((ran + 1))
+      # fullwidth quotation mark, curly quote, guillemet, emoji, fullwidth
+      # punctuation (EF BC 80-8F and EF BD 9B-A5), all glued to the word
+      awk_expect "$bin" 6 'password:\n  \xef\xbc\x82correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xe2\x80\x9ccorrect horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xc2\xabcorrect horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xf0\x9f\x94\x91correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xef\xbc\x81correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xef\xbd\x9bcorrect horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xef\xbd\xa5correct horse battery staple\n' "$loc"
+      # accented prose, a fullwidth digit and a fullwidth letter are words
+      awk_expect "$bin" 0 'password:\n  éclair recipe is great\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xef\xbc\x90correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xef\xbc\xa1correct horse battery staple\n' "$loc"
+    done
+  done
+  [ "$ran" -ge 2 ]
+}
+
 @test "the tvly-, pplx- and sgp_ prefixes end at an invalid character; sgp_ takes an alphanumeric body only" {
   body=$(printf 'A-B_%.0s' $(seq 1 12))
   for prefix in 'tv''ly-' 'pp''lx-'; do
