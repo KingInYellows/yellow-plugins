@@ -401,7 +401,9 @@ async function status(deps, args) {
                 walk.latestApproval !== undefined
                 ? walk.latestApproval
                 : null,
-            ...(walk.complete
+            // A walk that holds a message back has not classified it: stamping it
+            // complete would let clearPause forget an older pause over that message.
+            ...(walk.complete && !heldBack
                 ? { completeWalkAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString() }
                 : {}),
             recentActivityIds: ring.filter((id) => !held.has(id)),

@@ -509,6 +509,26 @@ describe('races inside the write gate', () => {
       expect(after?.recentActivityIds).not.toContain(activity.activityId);
     });
 
+    it('does not stamp the walk complete while it holds a message, so an older pause cannot be cleared over it', async () => {
+      const { reservation } =
+        await dispatchedReplyWithMatchingMessage('pend-stamp');
+      await readStatus();
+      expect((await owner())?.lastCompleteWalkAt).toBeUndefined();
+      await expect(
+        settleFailure(
+          h.deps,
+          reservation,
+          new AdapterError('not-found', 'gone', {
+            status: 404,
+            dispatched: true,
+          }),
+          { reconcileHint: 'reconcile' }
+        )
+      ).rejects.toBeInstanceOf(MutationErrorException);
+      await readStatus();
+      expect((await owner())?.lastCompleteWalkAt).toBeDefined();
+    });
+
     it('a clean rejection then makes the next walk record it as outside activity', async () => {
       const { reservation } =
         await dispatchedReplyWithMatchingMessage('pend-2');
