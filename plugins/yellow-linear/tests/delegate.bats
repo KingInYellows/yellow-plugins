@@ -242,6 +242,22 @@ setup() {
   printf '%s\n' "$jules_block" | grep -qF 'plan approval is required'  || printf '%s\n' "$jules_block" | grep -qF 'Plan approval is required'
 }
 
+@test "the jules launch is bound to the confirmed dry run's remote and branch" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  printf '%s\n' "$jules_block" | grep -qF "DRY_RUN_BINDING='YELLOW_TODO_binding_from_dry_run_or_empty'"
+  printf '%s\n' "$jules_block" | grep -qF 'BIND_INPUT="${REPO_PATH}|${BRANCH}"'
+  printf '%s\n' "$jules_block" | grep -qF "printf 'binding=%s\\n' \"\$BINDING\""
+  printf '%s\n' "$jules_block" | grep -qF "grep -qE '^[0-9a-f]{64}\$'"
+  printf '%s\n' "$jules_block" | grep -qF 'if [ "$DRY_RUN_BINDING" != "$BINDING" ]; then'
+  printf '%s\n' "$jules_block" | grep -qF 'ask for confirmation again'
+  # Remote and branch are still never substituted into the template.
+  ! printf '%s\n' "$jules_block" | grep -qE "(REPO_URL|REPO_PATH|BRANCH)='YELLOW_TODO"
+  # The comparison precedes the launch call.
+  cmp_line=$(printf '%s\n' "$jules_block" | grep -nF 'if [ "$DRY_RUN_BINDING" != "$BINDING" ]' | head -1 | cut -d: -f1)
+  launch_line=$(printf '%s\n' "$jules_block" | grep -nF -- '--grant-id "$GRANT_ID")' | head -1 | cut -d: -f1)
+  [ -n "$cmp_line" ] && [ -n "$launch_line" ] && [ "$cmp_line" -lt "$launch_line" ]
+}
+
 @test "with no covering grant the jules branch prints the terminal authorize command and sends nothing" {
   jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
   printf '%s\n' "$jules_block" | grep -qF 'grant_id=NONE'

@@ -622,7 +622,11 @@ Write the Step 4 packet verbatim to the printed path with the `Write` tool.
 branch exists on GitHub (Jules clones from there), dry-runs `delegate`, and prints
 the covering grant or the terminal command. The second call (`MODE='launch'`, after
 the confirmation below) sends the launch. Replace each `YELLOW_TODO_` token with
-its concrete value:
+its concrete value. In the dry run leave `DRY_RUN_BINDING` empty; the dry run
+prints `binding=<64 hex>`, and the launch call substitutes exactly that value. The
+launch recomputes the binding from the fresh remote and branch and stops if they
+differ, so a checkout that changed during the confirmation is never launched: run a
+new dry run and ask again.
 
 ```bash
 set -uo pipefail
@@ -631,6 +635,7 @@ ISSUE_ID='YELLOW_TODO_issue_id'
 DELEGATION_REV='YELLOW_TODO_delegation_rev'
 PACKET_FILE='YELLOW_TODO_packet_path_from_path_step'
 GRANT_ID='YELLOW_TODO_grant_id_for_launch_or_empty'
+DRY_RUN_BINDING='YELLOW_TODO_binding_from_dry_run_or_empty'
 
 case "$MODE" in dry-run|launch) ;; *) printf 'ERROR: MODE must be dry-run or launch.\n' >&2; exit 1 ;; esac
 if ! printf '%s' "$ISSUE_ID" | grep -qE '^[A-Z]{2,5}-[0-9]{1,6}$'; then
@@ -761,7 +766,23 @@ else
 fi
 REQUEST_ID="jr-linear-${KEY}"
 
+# Binding of the confirmed preview: sha256 of REPO_PATH|BRANCH as read now.
+BIND_INPUT="${REPO_PATH}|${BRANCH}"
+if command -v sha256sum >/dev/null 2>&1; then
+  BINDING=$(printf '%s' "$BIND_INPUT" | sha256sum | cut -c1-64)
+else
+  BINDING=$(printf '%s' "$BIND_INPUT" | shasum -a 256 | cut -c1-64)
+fi
+
 if [ "$MODE" = "launch" ]; then
+  if ! printf '%s' "$DRY_RUN_BINDING" | grep -qE '^[0-9a-f]{64}$'; then
+    printf 'ERROR: DRY_RUN_BINDING must be the 64-hex binding= value printed by the dry run.\n' >&2
+    exit 1
+  fi
+  if [ "$DRY_RUN_BINDING" != "$BINDING" ]; then
+    printf 'ERROR: the remote or branch changed since the confirmed dry run. Run a new dry run and ask for confirmation again.\n' >&2
+    exit 1
+  fi
   case "$GRANT_ID" in jg-????????????????????????????????) ;; *) printf 'ERROR: bad grant id "%s".\n' "$GRANT_ID" >&2; exit 1 ;; esac
   OUTPUT=$(node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" "--prompt=$(cat -- "$PACKET_FILE")" --request-id "$REQUEST_ID" --grant-id "$GRANT_ID")
   printf 'exit=%s\n' "$?"
@@ -782,6 +803,7 @@ printf '%s\n' "$OUTPUT" | jq '{ok, localRequestId, repository, requestedBranch, 
 if [ "$(printf '%s' "$OUTPUT" | jq -r '.ok')" != "true" ]; then
   exit 1
 fi
+printf 'binding=%s\n' "$BINDING"
 LIST=$(node "$CLI" authorize --list)
 if [ "$(printf '%s' "$LIST" | jq -r '.ok // false')" != true ]; then
   printf 'ERROR: authorize --list failed; not treating this as "no grant".\n' >&2
@@ -842,8 +864,8 @@ The text inside the fence is the packet (reference only). State: "Creates a Jule
 Plan approval is required and vendor auto-PR is off. It may run for a long time and
 is billed to your Jules account." Then `AskUserQuestion`: "Launch this Jules session
 for <ISSUE-ID> now?" with "Yes, launch" and "No, cancel". On "No", remove the packet
-directory and stop. On "Yes", run the block again with `MODE='launch'` and the
-`grant_id` from the first call, immediately and with a Bash timeout of 300000 ms.
+directory and stop. On "Yes", run the block again with `MODE='launch'`, the
+`grant_id` and the `binding=` value from the first call, immediately and with a Bash timeout of 300000 ms.
 The block removes the packet directory itself.
 
 On `{ok:true}`: capture `sessionResource`, `localId`, and `condition` (the state at
