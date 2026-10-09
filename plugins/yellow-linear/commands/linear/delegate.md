@@ -823,6 +823,7 @@ fi
 FOUND=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO_PATH" --arg branch "$BRANCH" --arg task "$ISSUE_ID" '
   [ .grants[]?
     | select((.revoked | not) and (.expired | not)
+        and (.unreconciledDeviation | not)
         and .repository == $repo
         and ((.operations | index("create")) != null)
         and ((.taskRefs | index($task)) != null)
