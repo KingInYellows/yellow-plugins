@@ -172,54 +172,186 @@ yr_prime_path() {
     YR_PATH_KEY=$key
 }
 
+# yr_split_lines <text>: set YR_LINES to the lines of <text>, split in the shell
+# (read(1) costs a syscall per byte) with globbing off for the split only.
+yr_split_lines() {
+    local noglob=1
+    case $- in *f*) noglob=0 ;; esac
+    YR_LINES=()
+    {
+        local IFS=$'\n'
+        set -f
+        YR_LINES=($1)
+        [ "$noglob" -eq 0 ] || set +f
+    }
+}
+
+# yr_any_inside <root> <list>: succeed when any line of <list> (canonical paths,
+# one per line) is inside <root>: the slow, per-line form of yr_batch_inside.
+# A name holding a newline splits into fragments; the first still starts with
+# the root when the path is inside it, so a split can only drop a directory,
+# never keep one.
+yr_any_inside() {
+    local root="$1" canon
+    yr_split_lines "$2"
+    for canon in ${YR_LINES[@]+"${YR_LINES[@]}"}; do
+        yr_inside_root "$canon" "$root" && return 0
+        [ "$canon" -ef "$root" ] && return 0
+    done
+    return 1
+}
+
+# yr_batch_inside <root> <find> <realpath> <dir>...: succeed when any symlink
+# directly in any <dir>, dangling or not (a link to a directory counts), has a
+# canonical target inside <root>. Cost is counted in shell commands, not
+# forks: the bats suites run under a DEBUG trap that makes every command
+# slow, and a per-link or per-directory shell loop (hundreds of links in
+# /usr/bin) dominated their run time. So: one find lists every link of every
+# directory and runs realpath on them, and the verdict comes from a pattern
+# match on the whole output (spelling), one more find (-samefile: a link to
+# the worktree under another spelling; GNU find) and one identity walk per distinct
+# parent directory (bind mounts, case-insensitive volumes). <find> and
+# <realpath> come from yr_helper, never PATH; sed and sort do too, and without
+# them the identity walk runs per link. A realpath error concerns a path this
+# process cannot traverse either, so it cannot reach a program it could run.
+yr_batch_inside() {
+    local root="$1" find="$2" rp="$3" out out_same par sed sort
+    shift 3
+    out=$("$find" "$@" -maxdepth 1 -type l -exec "$rp" -m -- {} + 2>/dev/null) || true
+    [ -n "$out" ] || return 1
+    case $'\n'"$out" in
+        *$'\n'"$root"|*$'\n'"$root"/*) return 0 ;;
+    esac
+    out_same=$("$find" -L "$@" -maxdepth 1 -samefile "$root" -print -quit 2>/dev/null) || true
+    [ -z "$out_same" ] || return 0
+    if sed=$(yr_helper sed) && sort=$(yr_helper sort); then
+        for par in $(printf '%s\n' "$out" | "$sed" 's,/[^/]*$,,' | "$sort" -u); do
+            yr_inside_root "$par" "$root" && return 0
+        done
+        return 1
+    fi
+    yr_any_inside "$root" "$out"
+}
+
+# yr_links_inside <dir> <root>: the fallback of yr_batch_inside for a system
+# without GNU realpath or find: succeed when any symlink directly in <dir> has
+# a canonical target (yr_canon_path) inside <root>, or cannot be canonicalized.
+yr_links_inside() {
+    local f out
+    for f in "$1"/* "$1"/.[!.]* "$1"/..?*; do
+        [ -L "$f" ] || continue
+        out=$(yr_canon_path "$f" 2>/dev/null || true)
+        if [ -z "$out" ] || yr_inside_root "$out" "$2"; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 # yr_safe_path: print PATH without empty or relative entries and without any
 # entry inside the worktree (by spelling, canonical path or identity) and
-# without an entry in which a tool this plugin runs by name is a symlink whose
-# canonical file is inside it. The tools are the ones git, yr_awk, the ignored-
-# file walk and the two scripts (commit-resolve-fixes, run-verify-command) call
-# by bare name after the resolvers have written the tree: git helpers and
-# text, file and process utilities, including grep, which decides whether a
-# path belongs to the PR. One list, one pass; a symlink is the only way an
-# outside directory reaches the worktree, so only symlinks are canonicalized
-# and a directory without one costs a few shell tests. Returns 1 when nothing
-# is left. The caller's PATH is not changed here; yr_prime_path caches the
-# result, and each script runs on it (the verify command keeps its own PATH,
-# it may need node_modules/.bin).
+# without an entry that holds a symlink, dangling or not, whose canonical
+# target is inside it. Git, its children and the two scripts look up many
+# names through PATH after the resolvers have written the tree (awk, grep,
+# true under timeout, ssh, git-credential-*, gpg, pagers, git-remote-*), so
+# no list of names can be complete: any such link makes the whole directory
+# untrustworthy. Symlinks are the only way an outside directory reaches the
+# worktree. One realpath call canonicalizes every entry and one find lists
+# and canonicalizes every link of every remaining directory (see
+# yr_batch_inside); only when that finds a link into the worktree is each
+# directory judged on its own, and a directory reached twice (/bin -> usr/bin)
+# takes the verdict of its first spelling. Returns 1 when nothing is left. The
+# caller's PATH is not changed here; yr_prime_path caches the result, and each
+# script runs on it (the verify command keeps its own PATH, it may need
+# node_modules/.bin).
+# This screen forks only find, realpath, sed, sort and readlink from fixed
+# system locations (yr_helper), never a PATH tool: it must not run a program
+# from a directory it has not judged yet. When find or a GNU realpath is
+# missing it canonicalizes each link in the shell (readlink from a fixed
+# location), and a link it cannot resolve drops the directory.
 yr_safe_path() {
-    local root rest entry canon helper hcanon kept=""
+    local root rest entry canon rp="" find="" kept="" i j k out
+    local -a pent=() pcan=() ents=() canons=() verdict=() cand=() dirs=()
     root=$(yr_worktree_root || true)
+    if [ -n "$root" ]; then
+        if rp=$(yr_helper realpath) && canon=$("$rp" -m -- / 2>/dev/null) && [ "$canon" = / ]; then
+            find=$(yr_helper find) || find=""
+        else
+            rp=""
+        fi
+    fi
     rest="${PATH}:"
     while [ -n "$rest" ]; do
         entry="${rest%%:*}"
         rest="${rest#*:}"
-        case "$entry" in /*) ;; *) continue ;; esac
-        if [ -n "$root" ]; then
+        case "$entry" in /*) pent+=("$entry") ;; esac
+    done
+    # Canonical spellings of every entry in one realpath call when its output
+    # lines up one to one (a name with a newline breaks that); else one
+    # yr_canon_path per entry.
+    if [ -n "$root" ] && [ -n "$rp" ] && [ "${#pent[@]}" -gt 0 ]; then
+        out=$("$rp" -m -- "${pent[@]}" 2>/dev/null) || true
+        yr_split_lines "$out"
+        if [ "${#YR_LINES[@]}" -eq "${#pent[@]}" ]; then
+            pcan=("${YR_LINES[@]}")
+        fi
+    fi
+    for k in "${!pent[@]}"; do
+        entry="${pent[k]}"
+        if [ -z "$root" ]; then
+            ents+=("$entry"); canons+=(""); verdict+=(k)
+            continue
+        fi
+        if [ "${#pcan[@]}" -gt 0 ]; then
+            canon="${pcan[k]}"
+        else
             canon=$(yr_canon_path "$entry" 2>/dev/null || true)
-            if yr_inside_root "$entry" "$root" || { [ -n "$canon" ] && yr_inside_root "$canon" "$root"; }; then
-                continue
-            fi
-            # Not "-e": a dangling link whose target is created later counts.
-            # true and false are listed because timeout looks up the command
-            # it runs through PATH (vr_timeout_bin probes with true).
-            for helper in awk git git-lfs bash sh env timeout gtimeout \
-                grep sed sort uniq cut tr wc head tail cat nl tee od fold \
-                mktemp mkfifo rm mv ls mkdir chmod touch find dirname basename \
-                readlink date sleep true false; do
-                [ -L "$entry/$helper" ] || continue
-                hcanon=$(yr_canon_path "$entry/$helper" 2>/dev/null || true)
-                if [ -z "$hcanon" ] || yr_inside_root "$hcanon" "$root"; then
-                    continue 2
+        fi
+        if yr_inside_root "$entry" "$root" || { [ -n "$canon" ] && yr_inside_root "$canon" "$root"; }; then
+            continue
+        fi
+        i=${#ents[@]}
+        ents+=("$entry"); canons+=("$canon")
+        # k keep, x drop, d<j> same directory as entry j.
+        verdict+=(k)
+        if [ -n "$canon" ]; then
+            for ((j = 0; j < i; j++)); do
+                if [ "${canons[j]}" = "$canon" ]; then
+                    verdict[i]="d$j"
+                    break
                 fi
             done
         fi
-        kept="${kept:+$kept:}$entry"
+        [ "${verdict[i]}" != k ] || cand+=("$i")
+    done
+    if [ "${#cand[@]}" -gt 0 ] && [ -n "$root" ]; then
+        if [ -n "$rp" ] && [ -n "$find" ]; then
+            dirs=()
+            for i in "${cand[@]}"; do dirs+=("${ents[i]}"); done
+            if yr_batch_inside "$root" "$find" "$rp" "${dirs[@]}"; then
+                for i in "${cand[@]}"; do
+                    if yr_batch_inside "$root" "$find" "$rp" "${ents[i]}"; then verdict[i]=x; fi
+                done
+            fi
+        else
+            for i in "${cand[@]}"; do
+                if yr_links_inside "${ents[i]}" "$root"; then verdict[i]=x; fi
+            done
+        fi
+    fi
+    for i in "${!ents[@]}"; do
+        case "${verdict[i]}" in
+            d*) j=${verdict[i]#d}; [ "${verdict[j]}" = k ] || continue ;;
+            x) continue ;;
+        esac
+        kept="${kept:+$kept:}${ents[i]}"
     done
     [ -n "$kept" ] || return 1
     printf '%s\n' "$kept"
 }
 
 # yr_walk_path: the PATH for the ignored-file walk (find, head, mktemp, rm,
-# dirname, basename, readlink). yr_safe_path already screens those names.
+# dirname, basename, readlink). yr_safe_path screens every directory, not names.
 yr_walk_path() {
     yr_safe_path
 }
@@ -828,6 +960,9 @@ rp_ignored_changed_since() {
                     # Nothing newer: judge the target of each symlink inside.
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o -type l -print0 >|"$symlist" 2>/dev/null || exit 2
                     while IFS= read -r -d '' l; do
+                        # A path the predicate rejects never counts, so its
+                        # target is not examined (it could abort the guard).
+                        kept "$l" || continue
                         lrc=0
                         rp_link_target_changed "$l" "$marker" || lrc=$?
                         case "$lrc" in
@@ -840,7 +975,7 @@ rp_ignored_changed_since() {
             elif [ -L "./$f" ]; then
                 find "./$f" -type l -newer "$marker" -print0 >|"$outfile" 2>/dev/null || rc=$?
                 kept "$f" || : >|"$outfile"
-                if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ]; then
+                if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ] && kept "$f"; then
                     lrc=0
                     rp_link_target_changed "./$f" "$marker" || lrc=$?
                     case "$lrc" in
