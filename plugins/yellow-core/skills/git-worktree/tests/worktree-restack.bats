@@ -1190,6 +1190,36 @@ SH
   [ -e "$SD/state" ]
 }
 
+@test "--continue after the last paused rebase was finished by hand returns the run worktree and restores" {
+  mk_stack c
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  resolve_in "$(wtp a)" c.txt
+  GIT_EDITOR=true git -C "$(wtp a)" rebase --continue >/dev/null 2>&1 || true
+  # The run worktree still holds the branch it was rebasing, which c's own
+  # worktree needs back.
+  [ "$(git -C "$(wtp a)" branch --show-current)" = c ]
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 0 ]
+  [ "$(git -C "$(wtp a)" branch --show-current)" = a ]
+  [ "$(git -C "$(wtp c)" branch --show-current)" = c ]
+  [ ! -e "$SD/state" ]
+}
+
+@test "--continue after a by-hand finish keeps state when the run worktree cannot return to the start branch" {
+  mk_stack c
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  resolve_in "$(wtp a)" c.txt
+  GIT_EDITOR=true git -C "$(wtp a)" rebase --continue >/dev/null 2>&1 || true
+  git -C "$(wtp a)" checkout -q --detach
+  git -C "$(wtp a)" commit -q --allow-empty -m floating
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"could not return the run worktree"* ]]
+  [ -e "$SD/state" ]
+}
+
 @test "--continue refuses after a successful provider abort left the cleanup unfinished" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite --submit

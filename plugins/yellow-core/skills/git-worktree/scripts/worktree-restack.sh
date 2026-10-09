@@ -1618,6 +1618,15 @@ in_chain_busy() {
   return 1
 }
 
+# continue_release_run: when the paused rebase was finished by hand, the run
+# worktree still holds the stack branch it was rebasing, so that branch's own
+# worktree cannot be restored. Check the start branch back out first; refuse,
+# keeping the state, when that would lose commits or git refuses the checkout.
+continue_release_run() {
+  release_run_worktree "${S_CHAIN[1]:-}" ||
+    die "$X_KEPT" "could not return the run worktree $(v "$S_RUN") to $(v "${S_CHAIN[1]:-}") before restoring; state kept. Check out $(v "${S_CHAIN[1]:-}") there (resolving any local changes first), then run --continue again"
+}
+
 cmd_continue() {
   parse_flags "$@"
   reject_remote
@@ -1652,12 +1661,14 @@ cmd_continue() {
       step_graphite continue
     else
       note "no conflict is paused in $(v "$S_RUN"); verifying and restoring"
+      continue_release_run
       RESULT=ok
     fi
   elif [ -e "$COMMON/gh-stack-rebase-state" ]; then
     step_github continue
   else
     note "no provider rebase is paused; verifying and restoring"
+    continue_release_run
     RESULT=ok
   fi
   drive_result
