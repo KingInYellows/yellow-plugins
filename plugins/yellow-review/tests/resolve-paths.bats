@@ -1631,6 +1631,37 @@ CFG_CMD_KEYS=(
   [ "$rc" -eq 2 ]
 }
 
+@test "a #! optional argument with expansion syntax counts as entering, in awk and in the shell" {
+  mkdir -p tools "$BATS_TEST_TMPDIR/xbin" "$BATS_TEST_TMPDIR/okx"
+  printf '#!/bin/sh\nexit 0\n' >| tools/evil
+  chmod +x tools/evil
+  n=0
+  for line in '#!/bin/sh -c $PWD/tools/evil' '#!/bin/sh -c `pwd`/tools/evil' '#!/bin/sh -c ~/tools/evil' '#!/bin/sh -c \tools/evil' \
+              '#!/usr/bin/env sh -c $PWD/tools/evil'; do
+    n=$((n + 1))
+    printf '%s\n' "$line" >| "$BATS_TEST_TMPDIR/xbin/tool$n"
+    chmod +x "$BATS_TEST_TMPDIR/xbin/tool$n"
+    yr_file_shebang_enters "$BATS_TEST_TMPDIR/xbin/tool$n" "$PWD" || { echo "shell accepted: $line" >&2; return 1; }
+    rm -f "$BATS_TEST_TMPDIR/xbin/tool$n"
+    printf '%s\n' "$line" >| "$BATS_TEST_TMPDIR/xbin/only"
+    chmod +x "$BATS_TEST_TMPDIR/xbin/only"
+    out=$(PATH="$BATS_TEST_TMPDIR/xbin:/usr/bin:/bin" yr_safe_path)
+    [[ ":$out:" != *":$BATS_TEST_TMPDIR/xbin:"* ]] || { echo "awk screen kept: $line" >&2; return 1; }
+  done
+  rm -f "$BATS_TEST_TMPDIR/xbin/only"
+  printf '#!/bin/sh -c $PWD/tools/evil\n' >| "$BATS_TEST_TMPDIR/xbin/mytool"
+  chmod +x "$BATS_TEST_TMPDIR/xbin/mytool"
+  rc=0; PATH="$BATS_TEST_TMPDIR/xbin:$PATH" yr_resolve_tool mytool >/dev/null || rc=$?
+  [ "$rc" -eq 2 ]
+  # plain optional arguments stay fine
+  printf '#!/bin/sh -e\n' >| "$BATS_TEST_TMPDIR/okx/a"
+  printf '#!/usr/bin/python3 -u -O\n' >| "$BATS_TEST_TMPDIR/okx/b"
+  printf '#!/usr/bin/env python3 -u\n' >| "$BATS_TEST_TMPDIR/okx/c"
+  chmod +x "$BATS_TEST_TMPDIR"/okx/*
+  out=$(PATH="$BATS_TEST_TMPDIR/okx:/usr/bin:/bin" yr_safe_path)
+  [[ ":$out:" == *":$BATS_TEST_TMPDIR/okx:"* ]]
+}
+
 @test "yr_safe_path judges a script reached through an outside symlink by its interpreter" {
   mkdir -p venv "$BATS_TEST_TMPDIR/lnbin" "$BATS_TEST_TMPDIR/real"
   printf '#!%s/venv/python\n' "$PWD" >| "$BATS_TEST_TMPDIR/real/tool"
