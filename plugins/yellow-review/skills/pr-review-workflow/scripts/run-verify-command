@@ -516,14 +516,32 @@ add_reason() { REASON="${REASON:+$REASON; }$1"; }
 # line as well (a `ghp_` directory name is a credential prefix only there).
 # A path with a control character (a newline can carry instruction-like text
 # into the model-visible summary) is withheld too.
+# path_is_safe <path>: success when the path has no control character and the
+# credential screen answers clean.
+path_is_safe() {
+    local t="" rc=1
+    if [[ "$1" != *[[:cntrl:]]* ]] && t=$(mktemp) && printf '%s\n' "$1" "${1//\//$'\n'}" >|"$t" && rt_code_clean "$t"; then
+        rc=0
+    fi
+    [ -z "${t:-}" ] || rm -f -- "$t"
+    return "$rc"
+}
+# safe_path_label <path>: the path for a stderr message, or a placeholder when
+# path_is_safe says no. An auto-discovered path reaches the refusal dies below
+# before any JSON reason is screened.
+safe_path_label() {
+    if path_is_safe "$1"; then
+        printf '%s' "$1"
+    else
+        printf '%s' '<a path withheld: credential-shaped or control characters>'
+    fi
+}
 add_path_reason() {
-    local t=""
-    if [[ "$2" != *[[:cntrl:]]* ]] && t=$(mktemp) && printf '%s\n' "$2" "${2//\//$'\n'}" >|"$t" && rt_code_clean "$t"; then
+    if path_is_safe "$2"; then
         add_reason "$1: $2"
     else
         add_reason "$1: <path withheld: it looks like a credential or could not be screened>"
     fi
-    [ -z "${t:-}" ] || rm -f -- "$t"
 }
 
 # Temp files and the output pipe; removed on every exit.
@@ -675,23 +693,23 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         # never follows a symlink, and a symlinked parent that escapes the repo
         # fails the containment check.
         REAL=$(cd -P -- "$f" 2>/dev/null && pwd -P) \
-            || die 2 "cannot resolve the directory at: $f"
+            || die 2 "cannot resolve the directory at: $(safe_path_label "$f")"
         case "$REAL" in
-            "$TOP_REAL"|"$TOP_REAL/.git"|"$TOP_REAL/.git/"*) die 2 "refusing to remove a directory that is the repo root or .git: $f" ;;
+            "$TOP_REAL"|"$TOP_REAL/.git"|"$TOP_REAL/.git/"*) die 2 "refusing to remove a directory that is the repo root or .git: $(safe_path_label "$f")" ;;
             "$TOP_REAL/"*) ;;
-            *) die 2 "refusing to remove a directory outside the repository: $f" ;;
+            *) die 2 "refusing to remove a directory outside the repository: $(safe_path_label "$f")" ;;
         esac
         # An untracked nested repository, or a submodule's worktree (it holds a
         # .git file), is listed as a single directory; its history and any
         # untracked files in it are not ours to delete, so refuse rather than
         # remove it.
         NESTED=$(find -- "$f" -name .git -print -quit 2>/dev/null) \
-            || die 2 "cannot scan the directory for a nested repository: $f"
+            || die 2 "cannot scan the directory for a nested repository: $(safe_path_label "$f")"
         if [ -n "$NESTED" ]; then
             # --revert-denied judges each trusted-config path on its own, so a
             # repository it must not delete does not stop the other reverts.
             [ "$MODE" = revert-denied ] \
-                || die 2 "refusing to remove a directory that contains a nested git repository: $f"
+                || die 2 "refusing to remove a directory that contains a nested git repository: $(safe_path_label "$f")"
             add_path_reason "left a nested git repository in place" "$f"
             NESTED_KEPT+=("$f")
             continue
@@ -702,7 +720,7 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         # siblings), so refuse rather than remove it.
         HEAD_TYPE=$(lgit cat-file -t "HEAD:$f" 2>/dev/null) || HEAD_TYPE=""
         [ "$HEAD_TYPE" = blob ] \
-            || die 2 "refusing to remove a directory that is not a replaced file (HEAD has ${HEAD_TYPE:-nothing} there): $f"
+            || die 2 "refusing to remove a directory that is not a replaced file (HEAD has ${HEAD_TYPE:-nothing} there): $(safe_path_label "$f")"
     fi
     # Validated; the removal waits until the output setup below has succeeded,
     # so a setup failure exits before anything is deleted that the checkout
@@ -747,7 +765,7 @@ fi
 for f in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
     rm -f -- "$f" 2>/dev/null
     if [ -e "$f" ] || [ -L "$f" ]; then
-        die 2 "cannot remove a path that is not a regular file or symlink: $f"
+        die 2 "cannot remove a path that is not a regular file or symlink: $(safe_path_label "$f")"
     fi
     add_path_reason "removed without reading, not a regular file or symlink" "$f"
 done

@@ -2533,3 +2533,20 @@ trust_assert_absolute() {
   grep -F -- "--kill-after=5 30 $TRUST_BIN/gh" "$TRUST_TIMEOUT_LOG" >/dev/null
   grep -F -- "--kill-after=10" "$TRUST_TIMEOUT_LOG" >/dev/null
 }
+
+@test "--revert-denied keeps a credential-shaped path out of stderr when a refusal die names it" {
+  tok=ghp_abcdefghijklmnopqrstuvwxyz0123456789
+  mkdir -p .cursor
+  printf 'rule\n' >| ".cursor/$tok"
+  git add ".cursor/$tok" && git commit -q -m "chore: cursor rule"
+  outside="$BATS_TEST_TMPDIR/outside"
+  mkdir -p "$outside"
+  mkdir -p "$outside/$tok"
+  printf 'x\n' >| "$outside/$tok/rule"
+  rm -rf .cursor && ln -s "$outside" .cursor
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'refusing to remove a directory outside the repository'* ]]
+  [[ "$stderr" != *"$tok"* ]]
+  [[ "$output" != *"$tok"* ]]
+}
