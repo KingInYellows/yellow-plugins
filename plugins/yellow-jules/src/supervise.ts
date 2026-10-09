@@ -75,6 +75,8 @@ const AFTER_ACTING_SECONDS = 120;
 const HUMAN_WAIT_SECONDS = 3600;
 const ABORTED_RETRY_SECONDS = 60;
 const FENCED_MESSAGE_CHARS = 500;
+/** A bound question is fenced in full up to this many characters; longer is not bound. */
+const BOUND_QUESTION_MAX_CHARS = 20_000;
 const FENCED_MESSAGE_COUNT = 3;
 
 type ActivityView = Pick<
@@ -672,15 +674,19 @@ export async function superviseOnce(
   if (condition === 'awaiting-reply') {
     const latest = newest.agent;
     if (latest?.message !== undefined) {
-      fenced.question = fenceUntrusted(truncate(latest.message));
+      fenced.question = fenceUntrusted(
+        latest.message.length <= BOUND_QUESTION_MAX_CHARS
+          ? latest.message
+          : truncate(latest.message)
+      );
     }
-    // A question that redaction altered, or that the fence truncated, was not
+    // A question that redaction altered, or that is too long to show in full, was not
     // shown in full: no binding is offered for it, so the reply cannot be
     // guarded and the operator answers.
     const bindable =
       latest?.message !== undefined &&
       redact(latest.message) === latest.message &&
-      latest.message.length <= FENCED_MESSAGE_CHARS;
+      latest.message.length <= BOUND_QUESTION_MAX_CHARS;
     return finish(
       'needs-answer',
       {

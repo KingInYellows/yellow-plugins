@@ -207,15 +207,28 @@ describe('needs-answer', () => {
     expect(r.attention).toContain('questionUnavailable');
   });
 
-  it('withholds the question bindings when the fenced question is truncated', async () => {
+  it('shows a 600-character question in full and binds it', async () => {
+    setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
+    const question = `${'Which database? '.repeat(40)}END`;
+    addActivity(h, session.sessionResource, {
+      type: 'agentMessaged',
+      message: question,
+    });
+    const r = await sup();
+    expect(r.fenced.question).toContain('END');
+    expect(r.fenced.question).not.toContain('[truncated]');
+    expect(r.observedQuestionDigest).toBe(messageDigest(question));
+    expect(r.attention ?? []).not.toContain('questionUnavailable');
+  });
+
+  it('withholds the question bindings above 20000 characters', async () => {
     setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
     addActivity(h, session.sessionResource, {
       type: 'agentMessaged',
-      message: `${'Which database? '.repeat(60)}END`,
+      message: 'q'.repeat(20001),
     });
     const r = await sup();
     expect(r.decision).toBe('needs-answer');
-    expect(r.fenced.question).toContain('[truncated]');
     expect(r.observedActivityId).toBeUndefined();
     expect(r.observedQuestionDigest).toBeUndefined();
     expect(r.attention).toContain('questionUnavailable');
