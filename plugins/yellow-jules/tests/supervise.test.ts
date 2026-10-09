@@ -14,7 +14,13 @@ import {
 import { approve, reply } from '../src/mutations.js';
 import { FENCE_BEGIN, FENCE_END } from '../src/redact.js';
 import { status } from '../src/runtime.js';
-import { readJournal, updateJournal, upsertReadState } from '../src/state.js';
+import {
+  messageDigest,
+  readJournal,
+  updateJournal,
+  upsertReadState,
+} from '../src/state.js';
+import { reserveUnderGrant } from '../src/write-gate.js';
 import {
   BACKOFF_CAP_SECONDS,
   clearPause,
@@ -558,6 +564,36 @@ describe('outside activity pauses (R32)', () => {
         grantId,
       })
     ).rejects.toBeInstanceOf(AppErrorException);
+    h.deps.clock.time += 1_000;
+    addPlanNow(h, session.sessionResource, 'plan-2');
+    expect(await sup()).toMatchObject({
+      decision: 'paused',
+      reason: 'plan-changed-after-evaluation',
+    });
+  });
+
+  it('a reply reserved but not yet dispatched does not hide a plan swap', async () => {
+    addPlan(h, session.sessionResource, 'plan-1');
+    expect((await sup()).decision).toBe('needs-plan-review');
+    h.deps.clock.time += 30_000;
+    await reserveUnderGrant(h.deps, {
+      grantId,
+      ownerRequestId: session.localRequestId,
+      authority: {
+        repository: 'acme/widgets',
+        sourceResource: 'sources/github/acme/widgets',
+        branch: 'scratch/one',
+        taskRef: 't1',
+        operation: 'reply',
+        correction: true,
+      },
+      reservation: {
+        localRequestId: 'reply-undispatched',
+        localId: `jl-${'c'.repeat(32)}`,
+        sessionResource: session.sessionResource,
+        promptDigest: messageDigest('please restructure the plan'),
+      },
+    });
     h.deps.clock.time += 1_000;
     addPlanNow(h, session.sessionResource, 'plan-2');
     expect(await sup()).toMatchObject({

@@ -471,6 +471,8 @@ export async function superviseOnce(
         // reserved, accepted, unknown-outcome and reconciled replies might have.
         r.status !== 'failed' &&
         r.status !== 'rejected' &&
+        // A reservation whose POST has not begun cannot have changed the plan.
+        !(r.status === 'reserved' && r.dispatchedAt === undefined) &&
         r.createdAt >= evaluated.evaluatedAt
     );
   // A swap is caught whether this pass or an earlier plain `status` consumed
