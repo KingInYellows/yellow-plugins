@@ -3078,3 +3078,69 @@ SHIM
   [[ "$stderr" == *'cannot encode'* ]]
   [ -p src/blob/pipe ]
 }
+
+# A mount inside a replacement directory must never be walked by rm -r.
+mount_setup() {
+  printf 'tracked\n' >| .cursor
+  git add .cursor && git commit -q -m "add .cursor file"
+  rm -f .cursor
+  mkdir -p .cursor/mnt && printf "x\n" >| .cursor/mnt/f
+}
+
+@test "--revert-denied keeps a replacement directory holding a real bind mount and spares the mounted data" {
+  command -v mount >/dev/null 2>&1 || skip "mount not available"
+  mount_setup
+  src="$BATS_TEST_TMPDIR/outside"
+  mkdir -p "$src" && printf 'precious\n' >| "$src/data"
+  mount --bind "$src" .cursor/mnt 2>/dev/null || skip "cannot bind mount here"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  umount .cursor/mnt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ "$(cat "$src/data")" = precious ]
+  [ -d .cursor ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'mount'*'.cursor'* ]]
+}
+
+@test "--revert-dirty refuses a replacement directory holding a real bind mount" {
+  command -v mount >/dev/null 2>&1 || skip "mount not available"
+  mount_setup
+  src="$BATS_TEST_TMPDIR/outside"
+  mkdir -p "$src" && printf 'precious\n' >| "$src/data"
+  mount --bind "$src" .cursor/mnt 2>/dev/null || skip "cannot bind mount here"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  umount .cursor/mnt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'mount point'* ]]
+  [ "$(cat "$src/data")" = precious ]
+}
+
+@test "a mount table naming a mount under the replacement directory keeps it (injected mountinfo)" {
+  mount_setup
+  printf 'x\n' >| .cursor/f
+  mi="$BATS_TEST_TMPDIR/mountinfo"
+  printf '36 35 8:1 / %s/.cursor/m\\040nt rw - ext4 /dev/sda1 rw\n' "$PWD" >| "$mi"
+  YR_MOUNTINFO="$mi" run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ -f .cursor/f ]
+  YR_MOUNTINFO="$mi" run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+}
+
+@test "an unreadable mount table fails closed for the recursive removal" {
+  mount_setup
+  YR_MOUNTINFO="$BATS_TEST_TMPDIR/absent" run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ -d .cursor ]
+}
+
+@test "an unmounted replacement directory is still removed with the mount table readable" {
+  printf 'tracked\n' >| src/blob
+  git add src/blob && git commit -q -m "add blob"
+  rm -f src/blob && mkdir src/blob && printf 'x\n' >| src/blob/f
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ -f src/blob ]
+}

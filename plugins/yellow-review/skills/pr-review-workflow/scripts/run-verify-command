@@ -844,9 +844,36 @@ fi
 # keep. Running refuses; the revert modes delete the entry without opening it,
 # so refusal cleanup still completes.
 TOP_REAL=$(pwd -P)
+# dir_has_mount <physical-dir>: 0 when a mount boundary sits at or under the
+# directory, 1 when none does, 2 when that cannot be told (the caller fails
+# closed). Two checks, because a same-filesystem bind mount shares st_dev: a
+# device change inside the tree, and any mount point at or under the path in
+# the mount table (YR_MOUNTINFO, default /proc/self/mountinfo; octal escapes in
+# the mount point are decoded).
+dir_has_mount() {
+    local d="$1" mi="${YR_MOUNTINFO:-/proc/self/mountinfo}" mp devs
+    [ -r "$mi" ] || return 2
+    devs=$(find -- "$d" -printf '%D\n' 2>/dev/null | LC_ALL=C sort -u | wc -l) || return 2
+    case "$devs" in
+        *[!0-9\ ]*|"") return 2 ;;
+    esac
+    [ "$((devs + 0))" -ge 1 ] || return 2
+    [ "$((devs + 0))" -le 1 ] || return 0
+    while read -r _ _ _ _ mp _; do
+        [ -n "$mp" ] || continue
+        mp=$(printf '%b' "$(printf '%s' "$mp" | sed 's/\\\([0-7][0-7][0-7]\)/\\0\1/g')x") || return 2
+        mp="${mp%x}"
+        case "$mp" in
+            "$d"|"$d/"*) return 0 ;;
+        esac
+    done <"$mi"
+    return 1
+}
+
 TO_REMOVE=()
 DIR_REMOVE=()
 NESTED_KEPT=()
+MOUNT_KEPT=()
 for f in ${BARE_KEPT[@]+"${BARE_KEPT[@]}"}; do
     add_path_reason "left a nested git repository in place" "$f"
     NESTED_KEPT+=("$f")
@@ -878,6 +905,18 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
             "$TOP_REAL/"*) ;;
             *) die 2 "refusing to remove a directory outside the repository: $(safe_path_label "$f")" ;;
         esac
+        # A mount inside the tree (bind, FUSE, ...) would be walked and emptied
+        # by the recursive removal, reaching data outside the repository.
+        MRC=0
+        dir_has_mount "$REAL" || MRC=$?
+        if [ "$MRC" -ne 1 ]; then
+            [ "$MODE" = revert-denied ] \
+                || die 2 "refusing to remove a directory that holds or sits on a mount point, or whose mounts cannot be checked: $(safe_path_label "$f")"
+            add_path_reason "left a directory holding a mount point (or unverifiable mounts) in place" "$f"
+            NESTED_KEPT+=("$f")
+            MOUNT_KEPT+=("$f")
+            continue
+        fi
         # An untracked nested repository, or a submodule's worktree (it holds a
         # .git file), is listed as a single directory; its history and any
         # untracked files in it are not ours to delete, so refuse rather than
@@ -959,6 +998,10 @@ if [ "${#NESTED_KEPT[@]}" -gt 0 ]; then
         KEPT=0
         for p in "${NESTED_KEPT[@]}"; do
             [ "$p" = "$f" ] && { KEPT=1; break; }
+        done
+        # Files listed under a kept mounted tree are mounted data, not ours.
+        for p in ${MOUNT_KEPT[@]+"${MOUNT_KEPT[@]}"}; do
+            case "$f" in "$p"/*) KEPT=1; break ;; esac
         done
         [ "$KEPT" = 1 ] || KEEP_FILES+=("$f")
     done
@@ -1354,7 +1397,7 @@ REVERT_FAILS=()
 # The patch now holds the files of each replacement directory (save_patch), so
 # the directories can go; the checkout below restores the file in their place.
 for f in ${DIR_REMOVE[@]+"${DIR_REMOVE[@]}"}; do
-    rm -rf -- "$f" 2>/dev/null
+    if rm --help 2>&1 | grep -q -- --one-file-system; then rm -rf --one-file-system -- "$f" 2>/dev/null; else rm -rf -- "$f" 2>/dev/null; fi
     if [ -e "$f" ] || [ -L "$f" ]; then
         REVERT_FAILS+=("rm -r $f")
     else
