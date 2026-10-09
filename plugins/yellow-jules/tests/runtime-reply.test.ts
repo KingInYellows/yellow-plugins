@@ -13,7 +13,7 @@ import {
 } from '../src/errors.js';
 import { reply, type ReplyArgs } from '../src/mutations.js';
 import { status } from '../src/runtime.js';
-import { messageDigest, readJournal } from '../src/state.js';
+import { markOperation, messageDigest, readJournal } from '../src/state.js';
 
 import {
   createGrant,
@@ -21,6 +21,7 @@ import {
   type DelegatedSession,
   type GrantHarness,
   makeHarness,
+  revokeAfterReservation,
   setVendorState,
 } from './support/grants.js';
 
@@ -327,4 +328,38 @@ describe('invalid input', () => {
       expect(h.adapter.calls).toEqual([]);
     }
   );
+});
+
+describe('races inside the write gate', () => {
+  it('a grant revoked between the reservation and the POST sends nothing and settles failed', async () => {
+    const hook = revokeAfterReservation(h, grantId);
+    const err = await fails(() => reply(h.deps, args()));
+    expect(hook.fired()).toBe(true);
+    expect(err.appError.code).toBe('JULES_AUTHORITY_DENIED');
+    expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    const record = (await readJournal(h.dataDir)).operations[
+      err.localRequestId as string
+    ];
+    expect(record?.status).toBe('failed');
+  });
+
+  it('a terminal condition recorded after the live read is refused inside the gate', async () => {
+    const real = h.adapter.getSessionImpl;
+    h.adapter.getSessionImpl = async (resource) => {
+      const live = await real(resource);
+      // A concurrent status records the terminal condition after this read.
+      await markOperation(
+        h.dataDir,
+        session.localRequestId,
+        'accepted',
+        { condition: 'remote-completed' },
+        () => new Date(h.deps.clock.now())
+      );
+      return live;
+    };
+    const err = await fails(() => reply(h.deps, args()));
+    expect(err.appError.code).toBe('JULES_INVALID_STATE');
+    expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    expect(h.adapter.writeCount()).toBe(0);
+  });
 });

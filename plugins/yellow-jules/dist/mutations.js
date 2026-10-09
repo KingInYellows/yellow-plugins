@@ -196,6 +196,7 @@ async function delegateInner(deps, args, ids) {
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
             return (0, write_gate_js_1.settleExpiredBeforeWrite)(deps, reservation, DELEGATE_RECONCILE);
         }
+        await (0, write_gate_js_1.assertGrantLiveBeforeWrite)(deps, reservation, DELEGATE_RECONCILE);
         let created;
         try {
             created = await adapter.createSession({
@@ -329,6 +330,7 @@ async function replyInner(deps, args, ids) {
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
             return (0, write_gate_js_1.settleExpiredBeforeWrite)(deps, reservation, SESSION_RECONCILE);
         }
+        await (0, write_gate_js_1.assertGrantLiveBeforeWrite)(deps, reservation, SESSION_RECONCILE);
         try {
             await adapter.sendMessage(target.sessionResource, message);
         }
@@ -463,6 +465,7 @@ async function approveInner(deps, args, ids) {
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
             return (0, write_gate_js_1.settleExpiredBeforeWrite)(deps, reservation, SESSION_RECONCILE);
         }
+        await (0, write_gate_js_1.assertGrantLiveBeforeWrite)(deps, reservation, SESSION_RECONCILE);
         try {
             await adapter.approvePlan(target.sessionResource);
         }

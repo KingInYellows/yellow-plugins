@@ -19,6 +19,7 @@ import {
   delegateOk,
   type GrantHarness,
   makeHarness,
+  revokeAfterReservation,
 } from './support/grants.js';
 
 let h: GrantHarness;
@@ -721,5 +722,21 @@ describe('deadline', () => {
     expect(err.appError.code).toBe('JULES_DEADLINE_EXCEEDED');
     expect(h.adapter.writeCount()).toBe(0);
     expect(Object.keys((await readJournal(h.dataDir)).operations)).toEqual([]);
+  });
+});
+
+describe('a grant revoked between the reservation and the POST', () => {
+  it('sends nothing, settles the reservation as failed, and frees the slot', async () => {
+    const grantId = await createGrant(h, { maxActiveSessions: 1 });
+    const hook = revokeAfterReservation(h, grantId);
+    const err = await fails(() => delegate(h.deps, args({ grantId })));
+    expect(hook.fired()).toBe(true);
+    expect(err.appError.code).toBe('JULES_AUTHORITY_DENIED');
+    expect(h.adapter.callsTo('createSession')).toHaveLength(0);
+    const ops = Object.values((await readJournal(h.dataDir)).operations);
+    expect(ops.map((o) => o.status)).toEqual(['failed']);
+    expect(
+      loadGrants(h.dataDir).grants[grantId]?.usage.activeSessionRefs
+    ).toEqual([]);
   });
 });

@@ -20,6 +20,7 @@ import {
   chargeGrant,
   evaluateAuthority,
   grantHasUnreconciledDeviation,
+  grantIsExpired,
   loadGrants,
   releaseSlotInStore,
   requireGrant,
@@ -240,6 +241,25 @@ export async function reserveUnderGrant(
         ids
       );
     }
+    // A concurrent `status` may have recorded a terminal condition (and freed
+    // the slot) after the caller's live read; a reply or approve would reopen it.
+    if (
+      gate.authority.operation !== 'create' &&
+      owner !== undefined &&
+      isTerminalCondition(owner.condition)
+    ) {
+      throw new MutationErrorException(
+        makeAppError(
+          'JULES_INVALID_STATE',
+          `the session is ${owner.condition}; a ${gate.authority.operation} does not reopen a finished session`,
+          {
+            recoveryAction:
+              'For a repair, run delegate with --correction and the same --task-ref.',
+          }
+        ),
+        ids
+      );
+    }
     if (owner?.supervision?.outsideSeen !== undefined) {
       throw new MutationErrorException(
         makeAppError(
@@ -363,6 +383,44 @@ export async function reserveUnderGrant(
     }
     return record;
   });
+}
+
+/**
+ * The last check before a vendor POST: the grant may have been revoked or may
+ * have expired since the reservation (a delegate does an SDK source read in
+ * between). On failure nothing was sent, so the reservation settles as a clean
+ * failure and, for a create, frees its slot.
+ */
+export async function assertGrantLiveBeforeWrite(
+  deps: WriteDeps,
+  record: OperationRecord,
+  reconcileHint: string
+): Promise<void> {
+  let failure: AppErrorException | undefined;
+  try {
+    const { grant } = loadAuthorizedGrant(deps, record.grantId ?? '');
+    if (grant.revokedAt !== undefined) {
+      failure = new AppErrorException(
+        makeAppError(
+          'JULES_AUTHORITY_DENIED',
+          `grant ${grant.grantId} was revoked before the write; nothing was sent`
+        )
+      );
+    } else if (grantIsExpired(grant, nowFn(deps)())) {
+      failure = new AppErrorException(
+        makeAppError(
+          'JULES_GRANT_EXPIRED',
+          `grant ${grant.grantId} expired at ${grant.expiresAt} before the write; nothing was sent`
+        )
+      );
+    }
+  } catch (err) {
+    if (!(err instanceof AppErrorException)) throw err;
+    failure = err;
+  }
+  if (failure !== undefined) {
+    await settleFailure(deps, record, failure, { reconcileHint });
+  }
 }
 
 function shellQuote(value: string): string {

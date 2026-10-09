@@ -8,8 +8,14 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { emptyUsage } from '../../src/authority.js';
+import {
+  emptyUsage,
+  loadGrants,
+  updateGrant,
+  writeGrants,
+} from '../../src/authority.js';
 import { type AuthorizeDeps, authorizeCreate } from '../../src/authorize.js';
+import { resolveJournalPath } from '../../src/config.js';
 import { delegate, type DelegateArgs } from '../../src/mutations.js';
 import type { OpenTty, TtyHandle } from '../../src/tty-confirm.js';
 import type { AdapterActivity, GrantRecord } from '../../src/types.js';
@@ -251,4 +257,38 @@ export function addPlanNow(
   });
   setVendorState(harness, sessionResource, 'awaitingPlanApproval');
   return activity;
+}
+
+/**
+ * Revokes the grant (synchronously, on disk) the first time the clock is read
+ * after a reservation has landed in the journal: the window between the
+ * reservation and the vendor POST.
+ */
+export function revokeAfterReservation(
+  harness: GrantHarness,
+  grantId: string
+): { fired: () => boolean } {
+  let fired = false;
+  const realNow = harness.deps.clock.now.bind(harness.deps.clock);
+  harness.deps.clock.now = () => {
+    if (!fired) {
+      const journalPath = resolveJournalPath(harness.dataDir);
+      if (
+        fs.existsSync(journalPath) &&
+        fs.readFileSync(journalPath, 'utf8').includes('"reserved"')
+      ) {
+        fired = true;
+        const file = loadGrants(harness.dataDir);
+        writeGrants(
+          harness.dataDir,
+          updateGrant(file, grantId, (g) => ({
+            ...g,
+            revokedAt: new Date(realNow()).toISOString(),
+          }))
+        );
+      }
+    }
+    return realNow();
+  };
+  return { fired: () => fired };
 }

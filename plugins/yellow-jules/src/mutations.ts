@@ -81,6 +81,7 @@ import {
 } from './validate.js';
 import {
   confirmationRequired,
+  assertGrantLiveBeforeWrite,
   plainLaunchGrantIds,
   reserveUnderGrant,
   settleAcceptedOrUnknown,
@@ -338,6 +339,7 @@ async function delegateInner(
       return settleExpiredBeforeWrite(deps, reservation, DELEGATE_RECONCILE);
     }
 
+    await assertGrantLiveBeforeWrite(deps, reservation, DELEGATE_RECONCILE);
     let created;
     try {
       created = await adapter.createSession({
@@ -563,6 +565,7 @@ async function replyInner(
     if (isExpired(deps.clock, deadline)) {
       return settleExpiredBeforeWrite(deps, reservation, SESSION_RECONCILE);
     }
+    await assertGrantLiveBeforeWrite(deps, reservation, SESSION_RECONCILE);
     try {
       await adapter.sendMessage(target.sessionResource, message);
     } catch (err) {
@@ -786,6 +789,7 @@ async function approveInner(
       return settleExpiredBeforeWrite(deps, reservation, SESSION_RECONCILE);
     }
 
+    await assertGrantLiveBeforeWrite(deps, reservation, SESSION_RECONCILE);
     try {
       await adapter.approvePlan(target.sessionResource);
     } catch (err) {

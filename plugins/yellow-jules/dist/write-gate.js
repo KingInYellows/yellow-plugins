@@ -17,6 +17,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.plainLaunchGrantIds = plainLaunchGrantIds;
 exports.hasPlainLaunch = hasPlainLaunch;
 exports.reserveUnderGrant = reserveUnderGrant;
+exports.assertGrantLiveBeforeWrite = assertGrantLiveBeforeWrite;
 exports.confirmationRequired = confirmationRequired;
 exports.settleAccepted = settleAccepted;
 exports.settleFailure = settleFailure;
@@ -126,6 +127,15 @@ async function reserveUnderGrant(deps, gate) {
         if (gate.authority.operation !== 'create' && owner === undefined) {
             throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_AUTHORITY_DENIED', 'the session this write targets has no owning launch record'), ids);
         }
+        // A concurrent `status` may have recorded a terminal condition (and freed
+        // the slot) after the caller's live read; a reply or approve would reopen it.
+        if (gate.authority.operation !== 'create' &&
+            owner !== undefined &&
+            (0, runtime_support_js_1.isTerminalCondition)(owner.condition)) {
+            throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_INVALID_STATE', `the session is ${owner.condition}; a ${gate.authority.operation} does not reopen a finished session`, {
+                recoveryAction: 'For a repair, run delegate with --correction and the same --task-ref.',
+            }), ids);
+        }
         if (owner?.supervision?.outsideSeen !== undefined) {
             throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_SUPERVISION_PAUSED', `outside activity was recorded on ${owner.sessionResource ?? 'this session'}; no grant-backed write is allowed until supervise --clear-pause`), ids);
         }
@@ -202,6 +212,32 @@ async function reserveUnderGrant(deps, gate) {
         }
         return record;
     });
+}
+/**
+ * The last check before a vendor POST: the grant may have been revoked or may
+ * have expired since the reservation (a delegate does an SDK source read in
+ * between). On failure nothing was sent, so the reservation settles as a clean
+ * failure and, for a create, frees its slot.
+ */
+async function assertGrantLiveBeforeWrite(deps, record, reconcileHint) {
+    let failure;
+    try {
+        const { grant } = loadAuthorizedGrant(deps, record.grantId ?? '');
+        if (grant.revokedAt !== undefined) {
+            failure = new errors_js_1.AppErrorException((0, errors_js_1.makeAppError)('JULES_AUTHORITY_DENIED', `grant ${grant.grantId} was revoked before the write; nothing was sent`));
+        }
+        else if ((0, authority_js_1.grantIsExpired)(grant, (0, runtime_support_js_1.nowFn)(deps)())) {
+            failure = new errors_js_1.AppErrorException((0, errors_js_1.makeAppError)('JULES_GRANT_EXPIRED', `grant ${grant.grantId} expired at ${grant.expiresAt} before the write; nothing was sent`));
+        }
+    }
+    catch (err) {
+        if (!(err instanceof errors_js_1.AppErrorException))
+            throw err;
+        failure = err;
+    }
+    if (failure !== undefined) {
+        await settleFailure(deps, record, failure, { reconcileHint });
+    }
 }
 function shellQuote(value) {
     return `'${value.replace(/'/g, `'\\''`)}'`;
