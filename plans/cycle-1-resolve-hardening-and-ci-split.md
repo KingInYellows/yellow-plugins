@@ -1,20 +1,17 @@
 # Feature: Cycle 1 — resolve-flow hardening, CI split, restack abort guard
 
-> **Status (2026-10-06):** reviewed and refreshed; still valid in direction.
-> 4 of 40 boxes are now `[x]` (2 already on `main`, 7.4 and 7.5 in this
-> stack), 1 is `[-]`, 35 are open. Five of the six PRs are still needed:
-> PR 1 (CI split), PR 3, PR 4, PR 5 and PR 6 are unchanged in substance. PR 2 is partly done by
-> #1025 (`refuse in-worktree git, gh, and jq`): git, gh and jq are bound,
-> but 2.2 and 2.3 stay open, and 2.1, 2.4, 2.5 and 2.6 stay rescoped to
-> what remains. Task 4.4 is not applicable. Task 7.2 stays open: Linear
-> already shows the five issues Done, and the mapping and confirm step
-> were not recorded. `main` has moved about 20 commits past the `38d5d5d25` baseline,
-> including #1014 (stage-unattended-learnings) and #1032 (restack pause state);
-> the PR 6 targets (`cmd_abort`, `chain_rebase_worktree`) are unchanged.
-> Linear: CLAUDE-70 to 75 are still In Progress with no open PR;
-> CLAUDE-44, 45, 46, 48 and 49 are Done. Open risk: `agent/fix/astra-bridge`
-> edits the same `ci-status` block as task 1.3. Line numbers in the tasks have
-> drifted; re-find them by name.
+> **Status (2026-10-09):** reconciled against the stack tree. 30 of 40 boxes
+> are `[x]`, 1 is `[-]` (4.4, not applicable) and 9 are open. Phases 3 and 6
+> are implemented, and Phase 1 except 1.7. Phase 2 lacks 2.5 and 2.6 (the
+> special-file deletion is still not deferred until `save_patch`, so its
+> snapshot-failure test does not exist). Phase 4 lacks 4.3 (`resolve-stack.md`
+> is 502 lines, over the 500-line target). Phase 5 lacks only the
+> `plugins/yellow-review/CLAUDE.md` update in 5.4. Open and not code: 0.1
+> (`/stack:status` gate), 1.7 (CI counts and green jobs), 7.1 to 7.3 (ledger
+> reconcile; Linear shows the five issues Done, but the mapping and confirm
+> step were not recorded). Open risk: `agent/fix/astra-bridge` edits the same
+> `ci-status` block as task 1.3. Line numbers in the tasks have drifted;
+> re-find them by name.
 
 ## Overview
 
@@ -149,27 +146,27 @@ only yellow-core and may be unstacked to reduce restack risk.
 
 ### Phase 1: PR 1 — `chore(ci)`: split yellow-review bats into its own required job (CLAUDE-75)
 
-- [ ] 1.1: Add a `yellow-review` shell-test job modelled on `ruvector-shell-tests`
+- [x] 1.1: Add a `yellow-review` shell-test job modelled on `ruvector-shell-tests`
   (`validate-schemas.yml` ~L1548). Copy the fork-PR `if:` guard from
   `plugin-shell-tests`, `needs: [validate-schemas]`, `timeout-minutes: 15`,
   and install `bats@1.11.0`, gawk, zsh and `universal-ctags`. Run
   `bats plugins/yellow-review/tests/`. No `continue-on-error`.
-- [ ] 1.2: Remove the yellow-review step (~L1498) from `plugin-shell-tests`.
+- [x] 1.2: Remove the yellow-review step (~L1498) from `plugin-shell-tests`.
   Keep `plugins/yellow-review/tests` in the advisory loop `case` skip
   (~L1521–1531) so it does not run twice; update the comment at ~L1514–1518.
-- [ ] 1.3: (coordinate: the unpushed `agent/fix/astra-bridge` branch also edits
+- [x] 1.3: (coordinate: the unpushed `agent/fix/astra-bridge` branch also edits
   the `ci-status` needs list and gate (it adds `goal-engine-compat`); whichever
   lands second restacks.) Wire `ci-status`: `needs:` list (~L1741–1755), result env var
   (~L1760–1771), the AND gate (~L1773–1784), and the failure echo (~L1796).
   Check what `report-metrics` consumes before deciding whether it lists the
   new job.
-- [ ] 1.4: In `plugins/yellow-review/tests/review-ledger.bats` (~L767–786) make
+- [x] 1.4: In `plugins/yellow-review/tests/review-ledger.bats` (~L767–786) make
   the two ctags tests fail instead of skip when `CI` is set (same pattern as
   the kislyuk `yq` check in `shell-compat-tests`).
-- [ ] 1.5: Update together: `CLAUDE.md` (~L63–66 required-job list),
+- [x] 1.5: Update together: `CLAUDE.md` (~L63–66 required-job list),
   `docs/operations/ci.md` (~L71–73, L118–124), `docs/architecture-overview.md`
   (~L349–355).
-- [ ] 1.6: Add a changeset (`yellow-review: patch`); task 1.4 edits a file under
+- [x] 1.6: Add a changeset (`yellow-review: patch`); task 1.4 edits a file under
   `plugins/`, and `changeset-check` greps `^plugins/[^/]+/`.
 - [ ] 1.7: Verify: summed test counts of both jobs equal the old total; both
   jobs green; the gate turns `ci-status` red when the new job fails (read the
@@ -207,7 +204,7 @@ only yellow-core and may be unstacked to reduce restack risk.
 
 ### Phase 2: PR 2 — `fix(yellow-review)`: close git/PATH/fsmonitor trust gaps (CLAUDE-71)
 
-- [ ] 2.1: (rescoped 2026-10-06: #1025 already resolves git, gh and jq inline
+- [x] 2.1: (rescoped 2026-10-06: #1025 already resolves git, gh and jq inline
   before the lib integrity check, so only the shared hardening function is left.
   `harden_git_config` still lives only in `commit-resolve-fixes`; move it to
   `resolve-paths.sh` and call it from `run-verify-command` too.) In `lib/resolve-paths.sh` (next to `lgit` L21 and `lgit_nohooks` L28)
@@ -215,7 +212,7 @@ only yellow-core and may be unstacked to reduce restack risk.
   `die`, since the two scripts use different exit codes. Move the transport
   and filter refusals, signing-off and fsmonitor/untrackedCache overrides out
   of `commit-resolve-fixes` (L451–504) into it. Both scripts call it.
-- [ ] 2.2: (rescoped 2026-10-06: #1025 (`e7992d9c0`) binds git, gh and jq
+- [x] 2.2: (rescoped 2026-10-06: #1025 (`e7992d9c0`) binds git, gh and jq
   through `yr_resolve_tool` before `check_lib_integrity`. `gt` and `node`
   still use `check_tools_outside_repo`, which canonicalises only the
   containing directory, and the script invokes them by bare name, so an
@@ -229,14 +226,14 @@ only yellow-core and may be unstacked to reduce restack risk.
   trusted location. `$PWD` alone is not enough — a launch from `/repo/subdir`
   lets `/repo/bin/git` through. Test against the git toplevel once known.
   Drop empty and relative PATH entries. Call the resolved absolute paths.
-- [ ] 2.3: (still open 2026-10-06: per-file status uses `lgit_nohooks`. The
+- [x] 2.3: (still open 2026-10-06: per-file status uses `lgit_nohooks`. The
   final rollback status is still `git -c core.hooksPath=/dev/null status`
   and does not set `core.fsmonitor=false` or `core.untrackedCache=false`.
   The `git()` shadow from #1025 makes that binary absolute; it does not
   add those overrides.) `run-verify-command` L833: use `lgit_nohooks status`. Audit the other
   plain-`git` calls (`diff --no-index` L595/L606, `check-ignore` L347,
   `cat-file` L430/L588/L808).
-- [ ] 2.4: (verified still open 2026-10-06: `run-verify-command` requires
+- [x] 2.4: (verified still open 2026-10-06: `run-verify-command` requires
   `--ignored-since` only when `--unattended`.) Make `--ignored-since` required in attended runs (L254–263).
 - [ ] 2.5: (verified still open 2026-10-06: `TO_REMOVE` entries are deleted
   before `save_patch`, while `DIR_REMOVE` is deferred. Decide first whether to
@@ -255,7 +252,7 @@ only yellow-core and may be unstacked to reduce restack risk.
   list (wrap in `timeout`, never open it); attended run without
   `--ignored-since` is refused; snapshot-failure keeps the special file.
   Use `run grep` plus a status assertion, never mid-test `! grep`.
-- [ ] 2.7: `lib/*.sh` is hash-checked against HEAD, so commit lib edits before
+- [x] 2.7: `lib/*.sh` is hash-checked against HEAD, so commit lib edits before
   running the scripts in-tree. Update `plugins/yellow-review/CLAUDE.md` and
   `README.md` blurbs. Changeset `yellow-review: patch`.
 
@@ -287,21 +284,21 @@ only yellow-core and may be unstacked to reduce restack risk.
 
 ### Phase 3: PR 3 — `fix(yellow-review)`: unreported-edit policy and self-verify budgets (CLAUDE-72)
 
-- [ ] 3.1: `commands/review/resolve-pr.md` Step 6 (L432–446) and
+- [x] 3.1: `commands/review/resolve-pr.md` Step 6 (L432–446) and
   `references/resolve/dispositions.md` (L560–577): revert an unreported edit
   only when its path is on the contract deny list in `lib/resolve-paths.sh`;
   other paths keep today's behaviour (ask when interactive; leave and report
   when unattended). Do not touch the `Resolve:` line or any `resolve-contract.md`.
-- [ ] 3.2: `commands/review/resolve-stack.md` self-verify (L286–297): add a
+- [x] 3.2: `commands/review/resolve-stack.md` self-verify (L286–297): add a
   300000 ms Bash timeout. Sub-claim 2 (`--include-outdated`) is already fixed
   at L288; do not claim it.
-- [ ] 3.3: `resolve-pr.md` Step 3 (L174–178): give `get-pr-blockers` its own
+- [x] 3.3: `resolve-pr.md` Step 3 (L174–178): give `get-pr-blockers` its own
   360000 ms timeout. Add a `get-pr-blockers` worst-case row (5 sequential
   `gh` calls × 60 s) to the Bash-timeouts table in `dispositions.md` (L582–636).
-- [ ] 3.4: Update the pins in `tests/skill-content.bats` (~L496, L555,
+- [x] 3.4: Update the pins in `tests/skill-content.bats` (~L496, L555,
   L1140–1144, L1160–1166) and add assertions for the new timeouts and the
   deny-list-only revert.
-- [ ] 3.5: Keep added lines in `resolve-stack.md` to a few; PR 4 offloads.
+- [x] 3.5: Keep added lines in `resolve-stack.md` to a few; PR 4 offloads.
   Changeset `yellow-review: patch`.
 
 <!-- deepen-plan: codebase -->
@@ -320,11 +317,11 @@ only yellow-core and may be unstacked to reduce restack risk.
 
 Start from a base that includes `stage-unattended-learnings` and PR 3.
 
-- [ ] 4.1: `sweep.md` Step 1b (L101–142): close the window where the starting
+- [x] 4.1: `sweep.md` Step 1b (L101–142): close the window where the starting
   branch does not ignore `yellow-plugins.local.md` but the target PR does.
   Resolve the PR head first, or snapshot after checkout. Pin in
   `skill-content.bats` (~L356).
-- [ ] 4.2: `sweep-all.md` item 1b (L224–248): a non-rate-limit `gh pr view`
+- [x] 4.2: `sweep-all.md` item 1b (L224–248): a non-rate-limit `gh pr view`
   failure stops the batch with its own reason, not a benign skip. Update the
   stop lists (L216–217, L322), the Error Handling bullets (L436–451), and the
   tests (~L644, L915, L929).
@@ -339,7 +336,7 @@ Start from a base that includes `stage-unattended-learnings` and PR 3.
   stop that left tree state unknown, including the no-contract stop. If the
   merged staging branch already removed that pass, mark this task not
   applicable and note it on CLAUDE-73.
-- [ ] 4.5: Run the whole `skill-content.bats`. Changeset `yellow-review: patch`.
+- [x] 4.5: Run the whole `skill-content.bats`. Changeset `yellow-review: patch`.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Corrections to tasks 4.3 and 4.4. `Read` is already in
@@ -358,24 +355,24 @@ Start from a base that includes `stage-unattended-learnings` and PR 3.
 
 ### Phase 5: PR 5 — `fix(yellow-review)`: credential-scan edge cases and oos→fixed reply (CLAUDE-70)
 
-- [ ] 5.1: `lib/resolve-text.sh` L396/L403: stop refusing capitalised non-English
+- [x] 5.1: `lib/resolve-text.sh` L396/L403: stop refusing capitalised non-English
   prose. Treat a non-ASCII lead byte as possibly capitalised, keep the
   remaining shape checks, and avoid `{n,}` intervals (mawk). Contract: a
   planted ASCII credential after a bare keyword is still flagged under both
   awks.
-- [ ] 5.2: L450–461: keep the Bearer floor at 20; give `Authorization: Basic`
+- [x] 5.2: L450–461: keep the Bearer floor at 20; give `Authorization: Basic`
   the minimum valid encoded length (4, `YTpi` = `a:b`) plus a decodable
   `user:pass` shape. Boundary tests at 4 and 8; do not assert that length 11
   stays clean. Keep the realistic-text test ("Authentication") that must
   not flag.
-- [ ] 5.3: L478–490: add `tvly-`, `pplx-`, and repo-documented `sgp_`
+- [x] 5.3: L478–490: add `tvly-`, `pplx-`, and repo-documented `sgp_`
   (`^sgp_[a-zA-Z0-9]{20,}$` in `plugins/yellow-semgrep/CLAUDE.md:80`) with
   floors from those in-repo formats. Add the same prefixes to yellow-core
   `cs_redact_secrets` (`compound-staging.sh` L118–150).
 - [ ] 5.4: `scripts/reply-pr-thread` L215–217: allow `oos → fixed` and
   `oos → addressed`; keep `oos → oos` idempotent. Update the header
   (L14–16), `dispositions.md` (L650–653), and `plugins/yellow-review/CLAUDE.md`.
-- [ ] 5.5: Tests in `check-resolve-text.bats` and `reply-pr-thread.bats`, run
+- [x] 5.5: Tests in `check-resolve-text.bats` and `reply-pr-thread.bats`, run
   under gawk and mawk by explicit-binary PATH shims (the existing
   `failbin/awk` stub shows the pattern). Split vendor-prefix literals in the
   test file so it does not trip the scan. Changesets: `yellow-review: patch`,
@@ -426,7 +423,7 @@ Start from a base that includes `stage-unattended-learnings` and PR 3.
 
 ### Phase 6: PR 6 — `fix(yellow-core)`: `/worktree:restack --abort` checks every stack worktree (CLAUDE-74)
 
-- [ ] 6.1: `skills/git-worktree/scripts/worktree-restack.sh` `cmd_abort` (L1433–1461):
+- [x] 6.1: `skills/git-worktree/scripts/worktree-restack.sh` `cmd_abort` (L1433–1461):
   before `restore_and_clear`, run a bounded detect-and-abort loop.
   `chain_rebase_worktree` (L1376–1391) returns only the first match, so keep
   calling it and running `git rebase --abort` in that worktree through the
@@ -435,10 +432,10 @@ Start from a base that includes `stage-unattended-learnings` and PR 3.
   --git-path rebase-merge` and `rebase-apply` (or `wt_busy` across
   `WT_PATH`). Stop with `X_KEPT` (exit 31) if any marker remains. A second
   `--abort` must work.
-- [ ] 6.2: Tests in `skills/git-worktree/tests/worktree-restack.bats`, modelled on
+- [x] 6.2: Tests in `skills/git-worktree/tests/worktree-restack.bats`, modelled on
   the `--continue` test at L809–820: rebase paused in a non-run worktree;
   rebases in two worktrees; repeated `--abort`.
-- [ ] 6.3: `commands/worktree/restack.md` Phase 4 text and exit table (L171–183,
+- [x] 6.3: `commands/worktree/restack.md` Phase 4 text and exit table (L171–183,
   L213–224). Record the `$ARGUMENTS` heredoc limitation as won't-fix in
   `plugins/yellow-core/CLAUDE.md`. Changeset `yellow-core: patch`.
 
