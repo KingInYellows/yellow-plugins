@@ -946,12 +946,13 @@ JSEOF
   [[ $output == *"could not be written"* ]]
   [[ $output == *"git -C $(wtp c) rebase --abort"* ]]
   [ -e "$SD/state" ]
-  # The provider no longer reports a pause: fixing only the marker path would
-  # hit the lost-provider refusal, so the user clears the rebase by hand.
+  # The durable phase records the rollback, so the retry no longer hits the
+  # lost-provider refusal; the stuck rebase is still reported for manual clearing.
   rmdir "$SD/provider-aborted"
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 31 ]
-  [[ $output == *"no record of it"* ]]
+  [[ $output == *"still in progress"* ]]
+  [[ $output != *"no record of it"* ]]
   rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 0 ]
@@ -1158,6 +1159,35 @@ SH
   [ "$status" -eq 0 ]
   assert_all_restored
   [ ! -e "$SD/state" ]
+}
+
+@test "a retried --abort from phase aborting with no marker runs the rebase cleanup" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  plant_stuck_rebase "$(wtp c)" c
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  # Interrupted after the provider rollback, before the marker: only the
+  # durable phase remains, and the leftover rebase is one git can clear.
+  rm -f "$SD/provider-aborted"
+  sed -i 's/^phase\taborted$/phase\taborting/' "$SD/state"
+  grep -q '^phase.aborting$' "$SD/state"
+  rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
+  plant_rebase "$(wtp c)" c b
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  [[ $output != *"no record of it"* ]]
+  assert_all_restored
+}
+
+@test "phase aborting does not hide branches the provider never rolled back" {
+  moved_by_hand
+  sed -i 's/^runid\t/phase\taborting\nrunid\t/' "$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"moved"* ]]
+  [ -e "$SD/state" ]
 }
 
 @test "--continue refuses after a successful provider abort left the cleanup unfinished" {

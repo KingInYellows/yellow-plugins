@@ -425,9 +425,10 @@ aborted_marker_valid() {
 # abort_recorded: the provider abort of this run is on record, in the marker
 # or in the state file's own phase field (which needs no marker path); phase
 # aborting is the intent recorded before the provider abort runs, so it counts
-# too: the rollback may have run. Only
-# ever makes the script stricter: it blocks --continue and picks restore advice;
-# skipping checks still requires a valid marker (aborted_marker_valid).
+# too: the rollback may have run. It blocks --continue, picks restore advice,
+# and lets a retried --abort skip the provider and the lost-provider refusal;
+# moved_tips still refuses to clear state over branches that were not rolled
+# back. The no-start-tips guard keeps requiring a valid marker.
 abort_recorded() { [ "$S_PHASE" = aborted ] || [ "$S_PHASE" = aborting ] || aborted_marker_valid; }
 
 # new_run_id: 32 random hex digits (od and /dev/urandom exist on Linux and macOS).
@@ -1746,7 +1747,7 @@ cmd_abort() {
   need_lock
   report_all_floating
   local provider_aborted=0 left moved start=${S_CHAIN[1]:-}
-  if [ "$S_PROVIDER" = graphite ] && aborted_marker_valid && ! gt_paused "$S_RUN"; then
+  if [ "$S_PROVIDER" = graphite ] && abort_recorded && ! gt_paused "$S_RUN"; then
     : # a recorded provider abort leaves nothing for gt to do, so a retry needs no gt.
     # A marker beside a still-paused Graphite conflict is stale or forged: gt abort runs.
   elif [ "$S_PROVIDER" = graphite ]; then
@@ -1780,7 +1781,7 @@ cmd_abort() {
     S_PHASE=aborted
     write_state 2>/dev/null || err "could not record the abort in the state file"
     write_aborted_marker 2>/dev/null || MARKER_PENDING=1
-  elif ! aborted_marker_valid && left=$(chain_rebase_worktree); then
+  elif ! abort_recorded && left=$(chain_rebase_worktree); then
     # The provider lost its record (Graphite's .gtcontinue or gh-stack's
     # rebase state) mid-restack, so its whole-stack rollback cannot run.
     # Aborting only this rebase would leave branches that already restacked
