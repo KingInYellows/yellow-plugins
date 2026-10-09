@@ -213,6 +213,12 @@ Safety rules the script holds:
   discarding that rebase's in-progress state). A worktree that cannot be
   restored stays detached and the script prints the
   `git -C <path> checkout <branch>` line.
+- `--abort` keeps the state (exit `31`) and restores nothing when no rebase is
+  left but a stack branch is no longer at the commit recorded at start (for
+  example the paused rebase was finished with `git rebase --continue`): the
+  provider has nothing to roll back. The script lists each moved branch with
+  its starting commit; point those branches back by hand and run `--abort`
+  again, or run `--continue` to keep the restacked branches.
 - A conflict pauses the run (exit 10). Graphite: the stack worktrees stay
   detached and are `git worktree lock`ed with a reason. Do not commit in them;
   a commit there lands on no branch, and the script reports it and refuses to
