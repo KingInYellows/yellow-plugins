@@ -99,6 +99,18 @@ describe('the host-neutral skills carry the guarded CLI flags', () => {
       /approve --session <ref> --plan-id <id> --grant-id/
     );
   });
+
+  it('jules-supervision names every guarded invocation', () => {
+    const text = skill('jules-supervision');
+    for (const flag of [
+      '--reply-kind question --expect-activity-id <observedActivityId> --expect-question-digest <observedQuestionDigest>',
+      '--reply-kind plan --expect-plan-id <observedPlanId> --expect-plan-digest <digest>',
+      '--reply-kind other',
+      'approve --session <ref> --plan-id <observedPlanId> --expect-plan-digest <digest>',
+    ]) {
+      expect(text).toContain(flag);
+    }
+  });
 });
 
 describe('approve always carries the reviewed plan digest', () => {
