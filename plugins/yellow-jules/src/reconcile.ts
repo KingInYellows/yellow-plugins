@@ -23,6 +23,7 @@ import {
 } from './activity-walk.js';
 import { type Deadline, isExpired } from './deadline.js';
 import { AppErrorException } from './errors.js';
+import { redactDeep } from './redact.js';
 import {
   type RuntimeDeps,
   nowFn,
@@ -35,6 +36,7 @@ import {
   absorbObservedOwners,
   conflictingSessionOwner,
   followsDispatch,
+  planDigest,
   messageDigest,
   ownsSession,
   UNRESOLVED_STATUSES,
@@ -88,6 +90,8 @@ interface Resolution {
   readonly deviation?: string;
   /** The userMessaged activity a reply was bound through; persisted so later passes cannot reuse it. */
   readonly echoActivityId?: string;
+  /** That activity's vendor `createTime`; supervise orders a reply against a plan swap by it. */
+  readonly echoCreateTime?: string;
 }
 
 function entryOf(r: Resolution): ReconciledEntry {
@@ -100,6 +104,50 @@ function entryOf(r: Resolution): ReconciledEntry {
     ...(r.reason !== undefined ? { reason: r.reason } : {}),
     ...(sessionResource !== undefined ? { sessionResource } : {}),
   };
+}
+
+const APPROVED_PLAN_DEVIATION =
+  'the plan approved by the vendor differs from the plan evaluated before approval';
+
+/**
+ * What the vendor approved, judged like the post-POST verifier: the newest plan
+ * generated strictly before the approval must match the reviewed digest; plans
+ * tied at that time, or stamped at the approval's own time, cannot be ordered,
+ * so any that differ count as a change. No readable preceding plan, or an
+ * incomplete walk, is `unreadable`: never silently bound.
+ */
+export function approvedPlanVerdict(
+  plans: ReadonlyArray<{
+    createTime: string;
+    activityId: string;
+    digest: string;
+  }>,
+  approvalTime: string | undefined,
+  reviewedDigest: string,
+  walkComplete: boolean
+): 'same' | 'changed' | 'unreadable' {
+  if (!walkComplete || approvalTime === undefined) return 'unreadable';
+  const cmp = (a: string, b: string): number =>
+    compareStamp(
+      { createTime: a, activityId: '' },
+      { createTime: b, activityId: '' }
+    );
+  const before = plans.filter((p) => cmp(p.createTime, approvalTime) < 0);
+  const atApproval = plans.filter((p) => cmp(p.createTime, approvalTime) === 0);
+  if (before.length === 0) return 'unreadable';
+  const newest = before.reduce((a, b) =>
+    cmp(b.createTime, a.createTime) > 0 ? b : a
+  );
+  const tied = before.filter((p) => cmp(p.createTime, newest.createTime) === 0);
+  const digests = new Set(tied.map((p) => p.digest));
+  if (
+    digests.size > 1 ||
+    !digests.has(reviewedDigest) ||
+    atApproval.some((p) => p.digest !== reviewedDigest)
+  ) {
+    return 'changed';
+  }
+  return 'same';
 }
 
 function notReached(record: OperationRecord, reason: string): Resolution {
@@ -321,15 +369,28 @@ async function resolveOnOwnSession(
   const earliest = Math.min(
     ...records.map((r) => Date.parse(r.vendorFloorCreateTime ?? r.createdAt))
   );
+  // An approve reserved with a reviewed digest checks the plan that preceded
+  // its approval, which can predate the floor: read the whole session.
+  const needsPlans = records.some(
+    (r) => r.kind === 'approve' && r.observedPlanDigest !== undefined
+  );
+  const plans: Array<{
+    createTime: string;
+    activityId: string;
+    digest: string;
+  }> = [];
+  const createTimes = new Map<string, string>();
   const walk = await walkActivities({
     adapter,
     sessionResource,
     pageSize: STATUS_PAGE_SIZE,
-    start: {
-      kind: 'watermark',
-      createTime: new Date(earliest).toISOString(),
-      activityId: '',
-    },
+    start: needsPlans
+      ? { kind: 'session-start' }
+      : {
+          kind: 'watermark',
+          createTime: new Date(earliest).toISOString(),
+          activityId: '',
+        },
     clock: deps.clock,
     deadline,
     onActivity: (activity) => {
@@ -338,6 +399,17 @@ async function resolveOnOwnSession(
       // An echo another operation already claimed explains that operation, not
       // a later one with the same message. A record's own claimed echo is
       // positive landing evidence for it and still matches.
+      createTimes.set(activity.activityId, activity.createTime);
+      if (activity.type === 'planGenerated' && activity.plan !== undefined) {
+        plans.push({
+          createTime: activity.createTime,
+          activityId: activity.activityId,
+          digest: planDigest(
+            activity.plan.planId,
+            redactDeep({ steps: activity.plan.steps }).steps
+          ),
+        });
+      }
       const claimedBy = claimedEchoes.get(activity.activityId);
       for (const record of candidates) {
         const claimed =
@@ -413,12 +485,39 @@ async function resolveOnOwnSession(
     }
     if (found.size === 1) {
       const [echoId] = found;
+      const echoTime =
+        echoId !== undefined ? createTimes.get(echoId) : undefined;
+      let deviation: string | undefined;
+      if (
+        record.kind === 'approve' &&
+        record.observedPlanDigest !== undefined &&
+        echoId !== undefined
+      ) {
+        const verdict = approvedPlanVerdict(
+          plans,
+          echoTime,
+          record.observedPlanDigest,
+          walk.complete
+        );
+        if (verdict === 'unreadable') {
+          return {
+            record,
+            outcome: 'ambiguous-reconcile',
+            reason: 'approved-plan-unreadable',
+          };
+        }
+        if (verdict === 'changed') deviation = APPROVED_PLAN_DEVIATION;
+      }
       return {
         record,
         outcome: 'bound',
         ...(record.kind === 'reply' && echoId !== undefined
-          ? { echoActivityId: echoId }
+          ? {
+              echoActivityId: echoId,
+              ...(echoTime !== undefined ? { echoCreateTime: echoTime } : {}),
+            }
           : {}),
+        ...(deviation !== undefined ? { deviation } : {}),
       };
     }
     if (!walk.complete) {
@@ -497,6 +596,9 @@ async function persist(
           ...(r.echoActivityId !== undefined
             ? { echoActivityId: r.echoActivityId }
             : {}),
+          ...(r.echoCreateTime !== undefined
+            ? { echoCreateTime: r.echoCreateTime }
+            : {}),
           ...(r.session !== undefined
             ? {
                 sessionResource: r.session.sessionResource,
@@ -512,6 +614,31 @@ async function persist(
           TERMINAL_VENDOR_STATES.has(r.session.vendorState)
         ) {
           released.add(current.localRequestId);
+        }
+        // An approve that landed on other steps than the reviewed ones is a
+        // deviation on the session's owner, as the post-POST verifier records.
+        if (r.deviation !== undefined && next.sessionResource !== undefined) {
+          const owner = Object.values(operations).find(
+            (o) => ownsSession(o) && o.sessionResource === next.sessionResource
+          );
+          if (
+            owner !== undefined &&
+            !owner.deviations.some((d) => d.reason === r.deviation)
+          ) {
+            operations[owner.localRequestId] = {
+              ...owner,
+              deviations: [
+                ...owner.deviations,
+                {
+                  kind: 'policy-deviation',
+                  reason: r.deviation,
+                  observedAt: now,
+                  reconciled: false,
+                },
+              ],
+              updatedAt: now,
+            };
+          }
         }
       } else if (r.outcome === 'released') {
         next = { ...next, status: 'failed' };

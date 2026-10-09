@@ -166,7 +166,25 @@ async function authorizeList(deps) {
 async function authorizeRevoke(deps, grantId) {
     (0, runtime_support_js_1.prepare)(deps);
     (0, validate_js_1.validateGrantId)(grantId);
-    const result = await (0, authority_js_1.revokeGrant)(deps.dataDir, grantId, (0, runtime_support_js_1.nowFn)(deps)());
+    const ctx = (0, runtime_support_js_1.resolveControllerContext)(deps);
+    // Revocation needs no terminal (it only narrows authority), but a host that
+    // is not the grant's controller must not rewrite shared state. A legitimate
+    // owner who lost the controller file recovers with `authorize --take-over`.
+    const result = await (0, authority_js_1.revokeGrant)(deps.dataDir, grantId, (0, runtime_support_js_1.nowFn)(deps)(), (grant) => {
+        try {
+            (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef, ctx.controllerId);
+        }
+        catch (err) {
+            if (err instanceof errors_js_1.AppErrorException &&
+                err.appError.code === 'JULES_CONTROLLER_MISMATCH') {
+                throw new errors_js_1.AppErrorException({
+                    ...err.appError,
+                    recoveryAction: 'Revoke from the host that controls this data directory. If that host lost its controller authority file, run `authorize --take-over` there (terminal-confirmed), then revoke.',
+                });
+            }
+            throw err;
+        }
+    });
     return { operation: 'authorize', ...result };
 }
 /** R38 handoff: TTY-confirmed; writes epoch+1 for this host and path and rebinds every grant. */

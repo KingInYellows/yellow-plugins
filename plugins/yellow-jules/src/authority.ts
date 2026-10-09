@@ -535,7 +535,8 @@ export function listGrants(
 export async function revokeGrant(
   dataDir: string,
   grantId: string,
-  now: Date
+  now: Date,
+  beforeWrite?: (grant: GrantRecord) => void
 ): Promise<{ grantId: string; revokedAt: string }> {
   validateGrantId(grantId);
   return withJournalLock(dataDir, async () => {
@@ -549,6 +550,8 @@ export async function revokeGrant(
     if (grant.revokedAt !== undefined) {
       return { grantId, revokedAt: grant.revokedAt };
     }
+    // Runs under the lock, before any write: a refusal leaves grants.json as it was.
+    beforeWrite?.(grant);
     const revokedAt = now.toISOString();
     writeGrants(
       dataDir,

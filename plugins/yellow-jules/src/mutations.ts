@@ -1409,6 +1409,9 @@ async function approveInner(
         localId: ids.localId,
         sessionResource: target.sessionResource,
         observedPlanId: planId,
+        ...(args.expectPlanDigest !== undefined
+          ? { observedPlanDigest: args.expectPlanDigest }
+          : {}),
       },
     });
 

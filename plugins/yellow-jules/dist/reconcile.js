@@ -15,10 +15,12 @@
  * candidate, and the journal's `archiveVisibilityConfirmed` flag.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.approvedPlanVerdict = approvedPlanVerdict;
 exports.reconcile = reconcile;
 const activity_walk_js_1 = require("./activity-walk.js");
 const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
+const redact_js_1 = require("./redact.js");
 const runtime_support_js_1 = require("./runtime-support.js");
 const slot_release_js_1 = require("./slot-release.js");
 const state_js_1 = require("./state.js");
@@ -48,6 +50,32 @@ function entryOf(r) {
         ...(r.reason !== undefined ? { reason: r.reason } : {}),
         ...(sessionResource !== undefined ? { sessionResource } : {}),
     };
+}
+const APPROVED_PLAN_DEVIATION = 'the plan approved by the vendor differs from the plan evaluated before approval';
+/**
+ * What the vendor approved, judged like the post-POST verifier: the newest plan
+ * generated strictly before the approval must match the reviewed digest; plans
+ * tied at that time, or stamped at the approval's own time, cannot be ordered,
+ * so any that differ count as a change. No readable preceding plan, or an
+ * incomplete walk, is `unreadable`: never silently bound.
+ */
+function approvedPlanVerdict(plans, approvalTime, reviewedDigest, walkComplete) {
+    if (!walkComplete || approvalTime === undefined)
+        return 'unreadable';
+    const cmp = (a, b) => (0, activity_walk_js_1.compareStamp)({ createTime: a, activityId: '' }, { createTime: b, activityId: '' });
+    const before = plans.filter((p) => cmp(p.createTime, approvalTime) < 0);
+    const atApproval = plans.filter((p) => cmp(p.createTime, approvalTime) === 0);
+    if (before.length === 0)
+        return 'unreadable';
+    const newest = before.reduce((a, b) => cmp(b.createTime, a.createTime) > 0 ? b : a);
+    const tied = before.filter((p) => cmp(p.createTime, newest.createTime) === 0);
+    const digests = new Set(tied.map((p) => p.digest));
+    if (digests.size > 1 ||
+        !digests.has(reviewedDigest) ||
+        atApproval.some((p) => p.digest !== reviewedDigest)) {
+        return 'changed';
+    }
+    return 'same';
 }
 function notReached(record, reason) {
     return { record, outcome: 'not-reached', reason };
@@ -207,15 +235,22 @@ async function resolveOnOwnSession(deps, adapter, sessionResource, records, dead
     // The walk starts at the vendor floor when a record has one (an echo is
     // newer than it), else at the reservation time.
     const earliest = Math.min(...records.map((r) => Date.parse(r.vendorFloorCreateTime ?? r.createdAt)));
+    // An approve reserved with a reviewed digest checks the plan that preceded
+    // its approval, which can predate the floor: read the whole session.
+    const needsPlans = records.some((r) => r.kind === 'approve' && r.observedPlanDigest !== undefined);
+    const plans = [];
+    const createTimes = new Map();
     const walk = await (0, activity_walk_js_1.walkActivities)({
         adapter,
         sessionResource,
         pageSize: activity_walk_js_1.STATUS_PAGE_SIZE,
-        start: {
-            kind: 'watermark',
-            createTime: new Date(earliest).toISOString(),
-            activityId: '',
-        },
+        start: needsPlans
+            ? { kind: 'session-start' }
+            : {
+                kind: 'watermark',
+                createTime: new Date(earliest).toISOString(),
+                activityId: '',
+            },
         clock: deps.clock,
         deadline,
         onActivity: (activity) => {
@@ -225,6 +260,14 @@ async function resolveOnOwnSession(deps, adapter, sessionResource, records, dead
             // An echo another operation already claimed explains that operation, not
             // a later one with the same message. A record's own claimed echo is
             // positive landing evidence for it and still matches.
+            createTimes.set(activity.activityId, activity.createTime);
+            if (activity.type === 'planGenerated' && activity.plan !== undefined) {
+                plans.push({
+                    createTime: activity.createTime,
+                    activityId: activity.activityId,
+                    digest: (0, state_js_1.planDigest)(activity.plan.planId, (0, redact_js_1.redactDeep)({ steps: activity.plan.steps }).steps),
+                });
+            }
             const claimedBy = claimedEchoes.get(activity.activityId);
             for (const record of candidates) {
                 const claimed = claimedBy !== undefined && claimedBy !== record.localRequestId;
@@ -288,12 +331,32 @@ async function resolveOnOwnSession(deps, adapter, sessionResource, records, dead
         }
         if (found.size === 1) {
             const [echoId] = found;
+            const echoTime = echoId !== undefined ? createTimes.get(echoId) : undefined;
+            let deviation;
+            if (record.kind === 'approve' &&
+                record.observedPlanDigest !== undefined &&
+                echoId !== undefined) {
+                const verdict = approvedPlanVerdict(plans, echoTime, record.observedPlanDigest, walk.complete);
+                if (verdict === 'unreadable') {
+                    return {
+                        record,
+                        outcome: 'ambiguous-reconcile',
+                        reason: 'approved-plan-unreadable',
+                    };
+                }
+                if (verdict === 'changed')
+                    deviation = APPROVED_PLAN_DEVIATION;
+            }
             return {
                 record,
                 outcome: 'bound',
                 ...(record.kind === 'reply' && echoId !== undefined
-                    ? { echoActivityId: echoId }
+                    ? {
+                        echoActivityId: echoId,
+                        ...(echoTime !== undefined ? { echoCreateTime: echoTime } : {}),
+                    }
                     : {}),
+                ...(deviation !== undefined ? { deviation } : {}),
             };
         }
         if (!walk.complete) {
@@ -354,6 +417,9 @@ async function persist(deps, resolutions) {
                     ...(r.echoActivityId !== undefined
                         ? { echoActivityId: r.echoActivityId }
                         : {}),
+                    ...(r.echoCreateTime !== undefined
+                        ? { echoCreateTime: r.echoCreateTime }
+                        : {}),
                     ...(r.session !== undefined
                         ? {
                             sessionResource: r.session.sessionResource,
@@ -367,6 +433,27 @@ async function persist(deps, resolutions) {
                 if (r.session !== undefined &&
                     slot_release_js_1.TERMINAL_VENDOR_STATES.has(r.session.vendorState)) {
                     released.add(current.localRequestId);
+                }
+                // An approve that landed on other steps than the reviewed ones is a
+                // deviation on the session's owner, as the post-POST verifier records.
+                if (r.deviation !== undefined && next.sessionResource !== undefined) {
+                    const owner = Object.values(operations).find((o) => (0, state_js_1.ownsSession)(o) && o.sessionResource === next.sessionResource);
+                    if (owner !== undefined &&
+                        !owner.deviations.some((d) => d.reason === r.deviation)) {
+                        operations[owner.localRequestId] = {
+                            ...owner,
+                            deviations: [
+                                ...owner.deviations,
+                                {
+                                    kind: 'policy-deviation',
+                                    reason: r.deviation,
+                                    observedAt: now,
+                                    reconciled: false,
+                                },
+                            ],
+                            updatedAt: now,
+                        };
+                    }
                 }
             }
             else if (r.outcome === 'released') {

@@ -277,6 +277,8 @@ export interface OperationRecord {
    * settles it.
    */
   readonly echoAmbiguous?: boolean;
+  /** The reviewed plan digest an `approve` was reserved against; reconcile checks the approved plan against it. */
+  readonly observedPlanDigest?: string;
   readonly observedPlanId?: string;
   readonly vendorState?: string;
   readonly condition?: string;

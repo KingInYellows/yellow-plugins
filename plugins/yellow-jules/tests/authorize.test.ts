@@ -17,6 +17,7 @@ import {
   assertControllerAuthority,
   controllerFilePath,
 } from '../src/controller.js';
+import { AppErrorException } from '../src/errors.js';
 
 import { codeOfAsync } from './support/app-error.js';
 import {
@@ -214,7 +215,26 @@ describe('authorize --list / --revoke', () => {
     });
     const revoked = await authorizeRevoke(noTty, id);
     expect(revoked.grantId).toBe(id);
-    expect((await authorizeList(noTty)).grants[0]).toMatchObject({ revoked: true });
+    expect((await authorizeList(noTty)).grants[0]).toMatchObject({
+      revoked: true,
+    });
+  });
+
+  it('revoke from a host without the matching controller file refuses and leaves the grant live', async () => {
+    const id = await createGrant(h);
+    fs.rmSync(controllerFilePath(h.controllerDir, 'testhost'));
+    const noTty = { ...h.deps, openTty: makeHarness('no-tty').tty.openTty };
+    let caught: unknown;
+    try {
+      await authorizeRevoke(noTty, id);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(AppErrorException);
+    const appError = (caught as AppErrorException).appError;
+    expect(appError.code).toBe('JULES_CONTROLLER_MISMATCH');
+    expect(appError.recoveryAction).toContain('--take-over');
+    expect(loadGrants(h.dataDir).grants[id]?.revokedAt).toBeUndefined();
   });
 
   it('revoke rejects a malformed id', async () => {

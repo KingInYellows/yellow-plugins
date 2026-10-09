@@ -257,6 +257,20 @@ record with no floor (legacy), or a missing `createTime` cannot be ordered, so r
 as outside activity. No local time is compared with a vendor time for this. A
 create is exempt: its session did not exist before the POST.
 
+`status --reconcile` carries a bound reply's echo `createTime` with its id
+(`echoCreateTime`), because a later walk sees the id as already claimed and
+never fills it, and `supervise` needs it to order the reply against a plan swap.
+An `approve` reservation stores the reviewed digest (`observedPlanDigest`).
+Before binding a `planApproved`, reconcile reads the whole session and applies
+the post-POST verifier's rule to the newest plan generated before the approval:
+a different digest (or an unorderable tie) binds the approve but records the
+policy deviation on the session's owner; an incomplete walk or no readable
+preceding plan leaves it `ambiguous-reconcile` (`approved-plan-unreadable`).
+`authorize --revoke` needs no terminal but asserts the grant's controller
+authority under the journal lock; a host without it is refused
+(`JULES_CONTROLLER_MISMATCH`, recovery: revoke from the controlling host, or
+`authorize --take-over` there if it lost its authority file).
+
 A dispatched reservation proves only that the POST began, not that it landed. A
 message that only such a still-`reserved` reply (inside its settle window) could
 explain is held: `status` neither claims it nor classifies it, and the watermark

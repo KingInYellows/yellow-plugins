@@ -193,6 +193,7 @@ const OPTIONAL_STRING_FIELDS = [
     'echoActivityId',
     'echoCreateTime',
     'observedPlanId',
+    'observedPlanDigest',
     'vendorState',
     'condition',
     'lastActivityCreateTime',

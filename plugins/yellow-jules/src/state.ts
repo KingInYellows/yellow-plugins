@@ -181,6 +181,7 @@ const OPTIONAL_STRING_FIELDS = [
   'echoActivityId',
   'echoCreateTime',
   'observedPlanId',
+  'observedPlanDigest',
   'vendorState',
   'condition',
   'lastActivityCreateTime',
@@ -907,6 +908,7 @@ export interface ReservationInput {
   readonly correction?: boolean;
   readonly promptDigest?: string;
   readonly observedPlanId?: string;
+  readonly observedPlanDigest?: string;
 }
 
 /**

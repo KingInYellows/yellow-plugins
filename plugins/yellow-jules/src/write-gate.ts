@@ -88,6 +88,7 @@ export interface GateRequest {
     | 'autoPrRequested'
     | 'promptDigest'
     | 'observedPlanId'
+    | 'observedPlanDigest'
   >;
 }
 

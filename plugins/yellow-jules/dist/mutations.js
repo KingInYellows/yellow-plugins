@@ -844,6 +844,9 @@ async function approveInner(deps, args, ids) {
                 localId: ids.localId,
                 sessionResource: target.sessionResource,
                 observedPlanId: planId,
+                ...(args.expectPlanDigest !== undefined
+                    ? { observedPlanDigest: args.expectPlanDigest }
+                    : {}),
             },
         });
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {

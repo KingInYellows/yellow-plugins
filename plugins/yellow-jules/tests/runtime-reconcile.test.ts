@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadGrants } from '../src/authority.js';
 import { AdapterError, AppErrorException } from '../src/errors.js';
 import { approve, delegate, reply } from '../src/mutations.js';
+import { approvedPlanVerdict } from '../src/reconcile.js';
 import { status } from '../src/runtime.js';
 import {
   ensureObservedRecord,
@@ -821,6 +822,124 @@ describe('reply and approve reservations resolve on their own session', () => {
       reconcile: true,
     });
     expect(result.reconciled?.[0]?.outcome).toBe('not-reached');
+  });
+
+  it('a reply bound by reconcile persists its echo createTime beside the id', async () => {
+    const session = await strandedReply('carry my time', 'reply-1');
+    const echo = addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'carry my time',
+      createTime: new Date(h.deps.clock.now() + 5_000).toISOString(),
+    });
+    await status(h.deps, { session: session.localId, reconcile: true });
+    const record = (await readJournal(h.dataDir)).operations['reply-1'];
+    expect(record?.echoActivityId).toBe(echo.activityId);
+    expect(record?.echoCreateTime).toBe(echo.createTime);
+  });
+
+  async function strandedApprove() {
+    const session = await delegateOk(h, grantId);
+    addPlan(h, session.sessionResource, 'plan-1');
+    await status(h.deps, { session: session.localId, reconcile: false });
+    h.adapter.approvePlanImpl = async () => {
+      throw new AdapterError('network', 'reset', { dispatched: true });
+    };
+    await expect(
+      approve(h.deps, {
+        session: session.localId,
+        planId: 'plan-1',
+        expectPlanDigest: await reviewedDigestOf(h, session.localRequestId),
+        dryRun: false,
+        grantId,
+        requestId: 'approve-1',
+      })
+    ).rejects.toBeInstanceOf(AppErrorException);
+    return session;
+  }
+
+  it('an approve whose lost response landed on a same-id replacement plan binds but records a deviation', async () => {
+    const session = await strandedApprove();
+    const now = h.deps.clock.now();
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      createTime: new Date(now + 1_000).toISOString(),
+      plan: {
+        planId: 'plan-1',
+        steps: [{ id: 'st-x', title: 'Entirely different work', index: 0 }],
+      },
+    });
+    addActivity(h, session.sessionResource, {
+      type: 'planApproved',
+      approvedPlanId: 'plan-1',
+      createTime: new Date(now + 2_000).toISOString(),
+    });
+    await status(h.deps, { session: session.localId, reconcile: true });
+    const ops = (await readJournal(h.dataDir)).operations;
+    expect(ops['approve-1']?.status).toBe('accepted');
+    expect(ops[session.localRequestId]?.deviations).toEqual([
+      expect.objectContaining({
+        kind: 'policy-deviation',
+        reconciled: false,
+      }),
+    ]);
+  });
+
+  it('an approve that landed on the reviewed plan binds without a deviation', async () => {
+    const session = await strandedApprove();
+    addActivity(h, session.sessionResource, {
+      type: 'planApproved',
+      approvedPlanId: 'plan-1',
+      createTime: new Date(h.deps.clock.now() + 2_000).toISOString(),
+    });
+    await status(h.deps, { session: session.localId, reconcile: true });
+    const ops = (await readJournal(h.dataDir)).operations;
+    expect(ops['approve-1']?.status).toBe('accepted');
+    expect(ops[session.localRequestId]?.deviations).toEqual([]);
+  });
+
+  it('approvedPlanVerdict leaves an unreadable preceding plan ambiguous', () => {
+    const t = '2026-01-01T00:00:10.000Z';
+    const plan = (time: string, digest: string) => ({
+      createTime: time,
+      activityId: `p-${digest}`,
+      digest,
+    });
+    expect(approvedPlanVerdict([], t, 'd1', true)).toBe('unreadable');
+    expect(
+      approvedPlanVerdict(
+        [plan('2026-01-01T00:00:01.000Z', 'd1')],
+        t,
+        'd1',
+        false
+      )
+    ).toBe('unreadable');
+    expect(
+      approvedPlanVerdict(
+        [plan('2026-01-01T00:00:01.000Z', 'd1')],
+        undefined,
+        'd1',
+        true
+      )
+    ).toBe('unreadable');
+    expect(approvedPlanVerdict([plan(t, 'd1')], t, 'd1', true)).toBe(
+      'unreadable'
+    );
+    expect(
+      approvedPlanVerdict(
+        [plan('2026-01-01T00:00:01.000Z', 'd1')],
+        t,
+        'd1',
+        true
+      )
+    ).toBe('same');
+    expect(
+      approvedPlanVerdict(
+        [plan('2026-01-01T00:00:01.000Z', 'd2')],
+        t,
+        'd1',
+        true
+      )
+    ).toBe('changed');
   });
 
   it('an approve is bound by a planApproved for the reserved plan id', async () => {

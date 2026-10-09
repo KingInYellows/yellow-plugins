@@ -385,7 +385,7 @@ function listGrants(dataDir, now, journal) {
         unreconciledDeviation: grantHasUnreconciledDeviation(journal, grant.grantId),
     }));
 }
-async function revokeGrant(dataDir, grantId, now) {
+async function revokeGrant(dataDir, grantId, now, beforeWrite) {
     (0, validate_js_1.validateGrantId)(grantId);
     return (0, state_js_1.withJournalLock)(dataDir, async () => {
         const file = loadGrants(dataDir);
@@ -398,6 +398,8 @@ async function revokeGrant(dataDir, grantId, now) {
         if (grant.revokedAt !== undefined) {
             return { grantId, revokedAt: grant.revokedAt };
         }
+        // Runs under the lock, before any write: a refusal leaves grants.json as it was.
+        beforeWrite?.(grant);
         const revokedAt = now.toISOString();
         writeGrants(dataDir, updateGrant(file, grantId, (g) => ({ ...g, revokedAt })));
         return { grantId, revokedAt };

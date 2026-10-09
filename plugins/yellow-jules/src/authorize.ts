@@ -22,12 +22,13 @@ import {
 } from './authority.js';
 import { canonicalPath } from './config.js';
 import {
+  assertControllerAuthority,
   initControllerAuthority,
   readControllerAuthority,
   takeOverController,
 } from './controller.js';
 import { DEFAULT_READ_DEADLINE_MS, deadlineIn } from './deadline.js';
-import { throwAppError } from './errors.js';
+import { AppErrorException, throwAppError } from './errors.js';
 import {
   confirmOwner,
   nowFn,
@@ -330,7 +331,37 @@ export async function authorizeRevoke(
 ): Promise<AuthorizeRevokeResult> {
   prepare(deps);
   validateGrantId(grantId);
-  const result = await revokeGrant(deps.dataDir, grantId, nowFn(deps)());
+  const ctx = resolveControllerContext(deps);
+  // Revocation needs no terminal (it only narrows authority), but a host that
+  // is not the grant's controller must not rewrite shared state. A legitimate
+  // owner who lost the controller file recovers with `authorize --take-over`.
+  const result = await revokeGrant(
+    deps.dataDir,
+    grantId,
+    nowFn(deps)(),
+    (grant) => {
+      try {
+        assertControllerAuthority(
+          ctx.controllerDir,
+          deps.dataDir,
+          grant.epochRef,
+          ctx.controllerId
+        );
+      } catch (err) {
+        if (
+          err instanceof AppErrorException &&
+          err.appError.code === 'JULES_CONTROLLER_MISMATCH'
+        ) {
+          throw new AppErrorException({
+            ...err.appError,
+            recoveryAction:
+              'Revoke from the host that controls this data directory. If that host lost its controller authority file, run `authorize --take-over` there (terminal-confirmed), then revoke.',
+          });
+        }
+        throw err;
+      }
+    }
+  );
   return { operation: 'authorize', ...result };
 }
 
