@@ -516,6 +516,10 @@ specific to this PR, or are not a benign skip, so the batch must still stop.
   ignored on the PR head; rerun /review:sweep from the PR's branch` and stop
   before Step 2, with no `Sweep:` or `Resolve:` line, so `/review:sweep-all`
   records `no contract`.
+- **Untracked config here, ignored on the PR head** (Step 1b): `[review:sweep]
+  aborted at PR #<PR#>: yellow-plugins.local.md exists untracked and unignored
+  on this branch but is ignored on the PR head; remove it or rerun
+  /review:sweep from the PR branch` and stop with exit 1, before Step 2.
 - **Dirty working directory** at Step 1: `[review:sweep] Error:
   uncommitted changes detected. Commit or stash first.` and stop.
   Both downstream skills enforce this independently; the wrapper-level
