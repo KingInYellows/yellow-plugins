@@ -78,8 +78,9 @@ gh pr view --json url,title,state,mergedAt,number 2>/dev/null
 
 Note: This works for Graphite-created PRs since they are GitHub PRs underneath.
 Graphite's merge queue closes PRs that landed, so a `CLOSED` PR with `mergedAt`
-null may be merged. Before calling it closed, run the `linear-workflows` skill's
-"Merged-PR detection": `scripts/pr-landed.sh` with the repository
+null may be merged. Before calling it closed, load the `linear-workflows` skill
+with the Skill tool and apply its "Merged-PR detection": run
+`"${CLAUDE_PLUGIN_ROOT}/scripts/pr-landed.sh"` with the repository
 (`gh repo view --json nameWithOwner --jq .nameWithOwner`) and the `number` from
 the output above, both written as literals in the call, and bind `landed` from
 the `landed=` line it prints.
