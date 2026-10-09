@@ -20,13 +20,13 @@ import {
   updateJournal,
   upsertReadState,
 } from '../src/state.js';
-import { reserveUnderGrant } from '../src/write-gate.js';
 import {
   BACKOFF_CAP_SECONDS,
   clearPause,
   superviseOnce,
   type SuperviseResult,
 } from '../src/supervise.js';
+import { reserveUnderGrant } from '../src/write-gate.js';
 
 import {
   addActivity,
