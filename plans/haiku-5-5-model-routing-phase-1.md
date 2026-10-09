@@ -84,7 +84,9 @@ usage-limit headroom, not dollars. The quality-relevant fix is explicit
 > explicit `effort:` makes the level deterministic. Two gotchas: a top-level
 > `effortLevel` setting "doesn't count for Opus 5.5" (use
 > `modelSettings.claude-opus-5-5.effortLevel`), and `maxEffortLevel` caps
-> frontmatter effort. Sources: https://code.claude.com/docs/en/sub-agents and
+> frontmatter effort. The `CLAUDE_CODE_EFFORT_LEVEL` environment variable
+> also takes precedence over frontmatter `effort:`, so a user who exports it
+> gets that effort on every pinned agent. Sources: https://code.claude.com/docs/en/sub-agents and
 > https://code.claude.com/docs/en/model-config
 <!-- /deepen-plan -->
 
@@ -118,7 +120,10 @@ usage-limit headroom, not dollars. The quality-relevant fix is explicit
       `effort:` in 1.1, so they prove only the override. For the inherit
       case, also run a scratch project agent (`.claude/agents/`, not shipped,
       deleted afterwards) with `model: haiku` and no `effort:`, under two
-      different session efforts. If the transcript contradicts the docs,
+      different session efforts. Run every case with
+      `CLAUDE_CODE_EFFORT_LEVEL` unset (`env -u CLAUDE_CODE_EFFORT_LEVEL
+      claude ...`), then repeat one pinned case with it exported to confirm
+      it overrides frontmatter. If the transcript contradicts the docs,
       record that and word 1.4.4 to match what was observed.
 - [ ] 1.0.3: Confirm the action's bundled CLI is ≥ v2.1.284, so that `sonnet`
       resolves to 5.5. Read the run log of the first CI run after 1.3.
@@ -416,7 +421,8 @@ Kept `inherit`, with the reason recorded:
 
   The wording: "A subagent without `effort:` inherits the session's effort.
   The session default is the model's (`medium` on the 5.5 models). Set
-  `effort:` explicitly on every pinned agent." Adjust it only if 1.0.2
+  `effort:` explicitly on every pinned agent. An exported
+  `CLAUDE_CODE_EFFORT_LEVEL` overrides both." Adjust it only if 1.0.2
   observes otherwise. Bump the catalog's "last verified" note (line 28).
 - [ ] 1.4.5: Add the v2.1.293 floor note to `AGENTS.md`'s model/effort
       section, linking to the policy doc.
