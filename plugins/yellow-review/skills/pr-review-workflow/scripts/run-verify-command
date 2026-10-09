@@ -536,15 +536,33 @@ safe_path_label() {
         printf '%s' '<a path withheld: credential-shaped or control characters>'
     fi
 }
-# safe_path_list <newline-separated paths>: safe_path_label on each line,
-# joined with ", ".
-safe_path_list() {
-    local line out=""
+# safe_path_list_z: reads NUL-delimited whole paths on stdin, prints
+# safe_path_label of each joined with ", ". A newline inside a name reaches
+# path_is_safe intact, so the name is withheld whole.
+safe_path_list_z() {
+    local p out=""
+    while IFS= read -r -d '' p; do
+        out="${out:+$out, }$(safe_path_label "$p")"
+    done
+    printf '%s' "$out"
+}
+# safe_hits_list <newline-joined find output>: rp_ignored_changed_since joins
+# its hits with newlines at the source, so a name containing a newline splits
+# into fragments. Print the list only when every line is a real path in the
+# tree (a fragment of a split name is not one); otherwise print a count.
+safe_hits_list() {
+    local line n=0
     while IFS= read -r line; do
         [ -n "$line" ] || continue
-        out="${out:+$out, }$(safe_path_label "$line")"
+        n=$((n + 1))
+        if [ ! -e "$line" ] && [ ! -L "$line" ]; then
+            printf '%s' "<$(grep -c . <<<"$1") changed path(s) withheld: a name contains a newline>"
+            return 0
+        fi
     done <<<"$1"
-    printf '%s' "$out"
+    while IFS= read -r line; do
+        [ -n "$line" ] && printf '%s\0' "$line"
+    done <<<"$1" | safe_path_list_z
 }
 add_path_reason() {
     if path_is_safe "$2"; then
@@ -563,6 +581,7 @@ MARKER=""
 STREAM_FILE=""
 IGNORED_SCRATCH=""
 DIR_LIST=""
+HIDDEN_HITS=""
 # The snapshot is provisional until it is complete and credential-screened: any
 # exit before then (a signal, a die, a failed screen) removes it, so no
 # unscreened patch stays under .git.
@@ -570,7 +589,7 @@ PATCH=""
 PATCH_PROVISIONAL=0
 cleanup() {
     local f
-    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST"; do
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST" "$HIDDEN_HITS"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
     if [ "$PATCH_PROVISIONAL" = 1 ] && [ -n "$PATCH" ]; then
@@ -596,7 +615,7 @@ if [ "$MODE" = check-ignored ]; then
         # changes (the resolver edits are in the tree by design), so claiming
         # a clean tree would let the caller skip its own dirty-tree stop.
         0) jq -nc '{result: "clean", patch: null, log: null}'; exit 0 ;;
-        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored file): $(safe_path_list "$IGN_HITS")" ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored file): $(safe_hits_list "$IGN_HITS")" ;;
         *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
 fi
@@ -607,19 +626,21 @@ fi
 # change". `ls-files -v` tags assume-unchanged paths in lowercase (skip-worktree
 # is `S`, or `s` with both flags).
 refuse_hidden_flags() {
-    local out tag f hits=""
+    local out tag f hits
     out=$(mktemp) || die 2 "mktemp failed"
+    hits=$(mktemp) || { rm -f -- "$out"; die 2 "mktemp failed"; }
+    HIDDEN_HITS="$hits"
     yr_git ls-files -v -z >|"$out" 2>/dev/null || { rm -f -- "$out"; die 2 "cannot check tracked files for skip-worktree or assume-unchanged flags"; }
     while IFS= read -r -d '' f; do
         tag="${f:0:1}"
         f="${f:2}"
         case "$tag" in [a-z]|S) ;; *) continue ;; esac
         if rp_trusted_config "$f" || rp_denied "$f"; then
-            hits="${hits:+$hits$'\n'}$f"
+            printf '%s\0' "$f" >>"$hits"
         fi
     done <"$out"
     rm -f -- "$out"
-    [ -z "$hits" ] || die 2 "tracked trusted-config or deny-listed files carry a skip-worktree or assume-unchanged flag, so edits to them are invisible to the tree check; clear the flag (git update-index --no-skip-worktree --no-assume-unchanged) and retry: $(safe_path_list "$hits")"
+    [ ! -s "$hits" ] || die 2 "tracked trusted-config or deny-listed files carry a skip-worktree or assume-unchanged flag, so edits to them are invisible to the tree check; clear the flag (git update-index --no-skip-worktree --no-assume-unchanged) and retry: $(safe_path_list_z <"$hits")"
 }
 
 if [ "$MODE" != revert-only ]; then
@@ -688,7 +709,7 @@ if [ "$MODE" = run ]; then
     rm -f -- "$IGNORED_SCRATCH"
     case "$IGN_RC" in
         0) ;;
-        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: $(safe_path_list "$IGN_HITS")" ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: $(safe_hits_list "$IGN_HITS")" ;;
         *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
 
