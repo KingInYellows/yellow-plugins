@@ -55,3 +55,6 @@ credits such an echo to the settled reply first. `supervise` withholds `reply`
 for a question the command wrapper would display differently (for example
 `git push --force`, tabs, or text over 6000 characters), the same rule plan
 review follows.
+
+The same holds for an unknown-outcome approval when a settled approval of the
+same plan could own the single `planApproved` activity.

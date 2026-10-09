@@ -278,10 +278,11 @@ pauses. `status --reconcile` binds an unknown-outcome reply to the echo a plain
 operations are excluded.
 
 `status --reconcile` also counts settled (`accepted` or `reconciled`) replies
-with the same digest and no recorded echo as competing candidates: an activity
-that could be theirs is ambiguous and leaves an unknown-outcome reply unbound.
-When `status` classifies an ambiguous echo, a settled write is credited before
-an unresolved one, so an unproven reply is never marked landed on a guess.
+with the same digest, and approvals of the same plan, that have no recorded echo
+as competing candidates: an activity that could be theirs is ambiguous and
+leaves an unknown-outcome reply unbound. When `status` classifies an ambiguous
+echo, a settled write is credited before an unresolved one, so an unproven reply
+is never marked landed on a guess.
 
 A bindable `needs-answer` question must also display unchanged through the
 `supervise` wrapper's `safe` filter (tabs and carriage returns become spaces,

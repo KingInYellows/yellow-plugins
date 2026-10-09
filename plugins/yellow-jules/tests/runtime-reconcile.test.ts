@@ -761,6 +761,47 @@ describe('reply and approve reservations resolve on their own session', () => {
     ]);
   });
 
+  it('a planApproved that may belong to a settled approval of the same plan is not bound to an unknown-outcome one', async () => {
+    const session = await delegateOk(h, grantId);
+    addPlan(h, session.sessionResource, 'plan-1');
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const digest = await reviewedDigestOf(h, session.localRequestId);
+    const call = (requestId: string) =>
+      approve(h.deps, {
+        session: session.localId,
+        planId: 'plan-1',
+        expectPlanDigest: digest,
+        dryRun: false,
+        grantId,
+        requestId,
+      });
+    await call('approve-a');
+    expect((await readJournal(h.dataDir)).operations['approve-a']?.status).toBe(
+      'accepted'
+    );
+    h.deps.clock.time += 1_000;
+    h.adapter.approvePlanImpl = async () => {
+      throw new AdapterError('network', 'reset', { dispatched: true });
+    };
+    await expect(call('approve-b')).rejects.toBeInstanceOf(AppErrorException);
+    h.deps.clock.time += 1_000;
+    // One planApproved: it may belong entirely to the first approval.
+    addActivity(h, session.sessionResource, {
+      type: 'planApproved',
+      approvedPlanId: 'plan-1',
+    });
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(
+      result.reconciled?.find((r) => r.localRequestId === 'approve-b')
+    ).toMatchObject({ outcome: 'ambiguous-reconcile' });
+    expect((await readJournal(h.dataDir)).operations['approve-b']?.status).toBe(
+      'unknown-outcome'
+    );
+  });
+
   it('--session narrows the reconcile to that session', async () => {
     const a = await strandedReply('for a', 'reply-a');
     addActivity(h, a.sessionResource, {

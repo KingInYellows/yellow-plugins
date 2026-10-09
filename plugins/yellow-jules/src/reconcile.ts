@@ -296,15 +296,15 @@ async function resolveOnOwnSession(
   // before the dispatch is somebody else's. A record with no stamp has no
   // causal lower bound; any match for it falls back to the reservation floor
   // and is left ambiguous rather than bound.
-  // A settled reply that never had its echo recorded competes for a matching
+  // A settled reply or approval that never had its echo recorded competes for a matching
   // activity: its sole echo may first appear in this very walk, and binding an
   // unresolved reply to it would credit a write that may never have landed. A
   // shared activity makes both ambiguous; the settled record is not changed.
   const competing = settledCandidates.filter(
     (c) =>
-      c.kind === 'reply' &&
       c.echoActivityId === undefined &&
-      c.promptDigest !== undefined &&
+      ((c.kind === 'reply' && c.promptDigest !== undefined) ||
+        (c.kind === 'approve' && c.observedPlanId !== undefined)) &&
       !records.some((r) => r.localRequestId === c.localRequestId)
   );
   const candidates = [...records, ...competing];
@@ -606,7 +606,7 @@ export async function reconcile(
           );
           const settledReplies = Object.values(journal.operations).filter(
             (r) =>
-              r.kind === 'reply' &&
+              (r.kind === 'reply' || r.kind === 'approve') &&
               (r.status === 'accepted' || r.status === 'reconciled')
           );
           const bySession = new Map<string, OperationRecord[]>();
