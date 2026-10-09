@@ -332,15 +332,20 @@ _rt_scan() {
             # whitespace. With a multibyte locale (gawk in UTF-8) a token is
             # symbolic when it holds no [:alpha:] character. Byte-wise awk
             # (mawk, BWK awk, gawk in C) cannot classify letters, so the token
-            # is matched by UTF-8 symbol blocks instead: E2 (punctuation,
-            # arrows, dingbats), E3 80 (CJK punctuation), EF B8 (variation
-            # selectors), F0 9F (emoji), C2 (Latin-1 punctuation). Every other
-            # lead byte (Latin, Greek, Cyrillic, CJK, Hangul ...) is a word.
+            # is matched by UTF-8 symbol blocks instead: E2 80-AF (U+2000-2BFF
+            # punctuation, arrows, dingbats, shapes), E2 B8-B9 (U+2E00-2E7F
+            # supplemental punctuation), E3 80 (CJK punctuation), EF B8
+            # (variation selectors), F0 9F (emoji), C2 (Latin-1 punctuation)
+            # and the two C3 symbols x (97) and division (B7). Every other
+            # lead byte (accented Latin, Greek, Cyrillic, CJK, Hangul, and E2
+            # B0-B7 Glagolitic/Coptic/Tifinagh) is a word. E2 BA-BF (CJK
+            # radicals, Kangxi, ideographic description) are arguably symbols
+            # but count as words: the safe side for prose.
             if (length("\303\251") == 1) {
                 symtok = "^([^\001-\177[:alpha:]]+[ \t]+)+"
             } else {
                 symb = "[\200-\277]"
-                symc = "(\342" symb symb "|\343\200" symb "|\357\270" symb "|\360\237" symb symb "|\302" symb ")"
+                symc = "(\342[\200-\257]" symb "|\342[\270\271]" symb "|\303[\227\267]|\343\200" symb "|\357\270" symb "|\360\237" symb symb "|\302" symb ")"
                 symtok = "^(" symc "+[ \t]+)+"
             }
             kw = "(pass([_-]?(phrase|code)|word|wd)?|pwd|secret([_ \t-]?key)?|(private|access)[_ \t-]?key|token|api[_ \t-]?key|credentials?)"

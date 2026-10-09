@@ -1610,6 +1610,28 @@ rule=forged line=9.txt"
   [ "$ran" -ge 2 ]
 }
 
+@test "Latin-1 multiply and divide signs are decoration; E2-lead letters (Glagolitic, Coptic, Tifinagh) are words, under gawk and mawk" {
+  ran=0
+  for loc in C C.UTF-8; do
+    locale_installed "$loc" || continue
+    for bin in gawk mawk; do
+      ran=$((ran + 1))
+      awk_expect "$bin" 6 'password:\n  \xc3\x97 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xc3\xb7 correct horse battery staple\n' "$loc"
+      # accented C3 letters stay words
+      awk_expect "$bin" 0 'password:\n  \xc3\xa9l\xc3\xa8ve correct horse battery staple\n' "$loc"
+      # Glagolitic, Coptic, Tifinagh, Georgian Supplement
+      awk_expect "$bin" 0 'password:\n  \xe2\xb0\x80\xe2\xb0\x81 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xe2\xb2\x80\xe2\xb2\x81 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xe2\xb4\xb0\xe2\xb4\xb1 correct horse battery staple\n' "$loc"
+      # real symbols and supplemental punctuation are still decoration
+      awk_expect "$bin" 6 'password:\n  \xe2\x9c\x93 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xe2\xb8\xa2 correct horse battery staple\n' "$loc"
+    done
+  done
+  [ "$ran" -ge 2 ]
+}
+
 @test "a bare Basic word needs an interior colon: Only is prose, a header keeps edge colons" {
   edge=$(printf ':y' | base64 | tr -d '\n')
   for bin in gawk mawk; do
