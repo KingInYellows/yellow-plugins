@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -5,6 +7,7 @@ import {
   releaseSlotInStore,
   writeGrants,
 } from '../src/authority.js';
+import { controllerFilePath } from '../src/controller.js';
 import { AdapterError, MutationErrorException } from '../src/errors.js';
 import {
   abandon,
@@ -175,6 +178,23 @@ describe('settling a clean rejection', () => {
       'failed'
     );
     expect(usage()?.activeSessionRefs).toEqual(['rej-2']);
+  });
+
+  it('keeps the slot held when the controller was taken over during the POST', async () => {
+    h.adapter.createSessionImpl = async () => {
+      // A take-over while the request is in flight: this host is no longer
+      // the grant's controller when the rejection settles.
+      fs.rmSync(controllerFilePath(h.controllerDir, 'testhost'));
+      throw new AdapterError('invalid-request', 'rejected', {
+        dispatched: true,
+      });
+    };
+    const err = (await failure(() =>
+      delegate(h.deps, args({ requestId: 'rej-3' }))
+    )) as MutationErrorException;
+    expect(err.appError.code).toBe('JULES_INVALID_INPUT');
+    expect(err.details).toMatchObject({ slotReleased: false });
+    expect(usage()?.activeSessionRefs).toEqual(['rej-3']);
   });
 });
 

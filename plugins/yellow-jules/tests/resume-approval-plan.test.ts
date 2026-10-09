@@ -80,6 +80,46 @@ describe('approvals at one createTime that name different plans', () => {
   });
 });
 
+describe('an equal-time approval and several plans at that time', () => {
+  it('keeps the plan pending and ambiguous even when the approval names one of them', async () => {
+    const adapter = new FakeSdkAdapter();
+    adapter.activities.set(SESSION, [
+      {
+        activityId: 'aaa-plan',
+        createTime: STAMP,
+        type: 'planGenerated',
+        plan: { planId: 'plan-1', steps: [{ id: 's', title: 'A', index: 0 }] },
+        artifacts: [],
+      },
+      {
+        activityId: 'bbb-plan',
+        createTime: STAMP,
+        type: 'planGenerated',
+        plan: { planId: 'plan-2', steps: [{ id: 's', title: 'B', index: 0 }] },
+        artifacts: [],
+      },
+      {
+        activityId: 'ccc-approval',
+        createTime: STAMP,
+        type: 'planApproved',
+        approvedPlanId: 'plan-2',
+        artifacts: [],
+      },
+    ]);
+    const clock = new FakeClock();
+    const walk = await walkActivities({
+      adapter,
+      sessionResource: SESSION,
+      pageSize: STATUS_PAGE_SIZE,
+      start: { kind: 'session-start' },
+      clock,
+      deadline: deadlineIn(clock, 60_000),
+    });
+    expect(walk.pendingPlan).not.toBeNull();
+    expect(walk.pendingPlan).toMatchObject({ ambiguous: true });
+  });
+});
+
 describe('a resumed walk keeps the approved plan id of its stored approval', () => {
   it('an equal-time approval that names the plan clears it', async () => {
     const walk = await walkWith({

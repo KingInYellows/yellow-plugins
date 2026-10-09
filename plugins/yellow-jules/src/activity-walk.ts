@@ -394,6 +394,7 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
     approvalVsPlan !== undefined &&
     (approvalVsPlan > 0 ||
       (approvalTies &&
+        newestPlanKeys.size <= 1 &&
         approvalPlanIds.size === 1 &&
         approvalPlanIds.has(latestPlan?.planId)));
   const pendingPlan: PendingPlan | null | undefined = approvalClears

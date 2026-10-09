@@ -390,6 +390,7 @@ run_preview_block() {
   mkdir -p "$repo/.git/tmp"
   local dir
   dir="$(mktemp -d "$repo/.git/tmp/yellow-linear-packet.XXXXXX")"
+  PREVIEW_PACKET_DIR="$dir"
   { printf 'HEAD-'; head -c "$chars" /dev/zero | tr '\0' 'x'; printf 'TAIL-MARKER'; } > "$dir/packet.txt"
   block="$(awk '
     /PACKET_FILE=.YELLOW_TODO_packet_file./ { found=1 }
@@ -420,6 +421,7 @@ run_preview_block_text() {
   git -C "$repo" init -q
   mkdir -p "$repo/.git/tmp"
   dir="$(mktemp -d "$repo/.git/tmp/yellow-linear-packet.XXXXXX")"
+  PREVIEW_PACKET_DIR="$dir"
   printf "$text" > "$dir/packet.txt"
   block="$(awk '
     /PACKET_FILE=.YELLOW_TODO_packet_file./ { found=1 }
@@ -437,6 +439,23 @@ run_preview_block_text() {
     [[ "$output" == *"hidden characters"* ]]
     [[ "$output" != *"packet_sha="* ]]
   done
+}
+
+@test "Jules launch preview removes the packet directory when it refuses a packet" {
+  for text in 'Fix\xe2\x80\x8b it' 'Fix\x07 it'; do
+    run_preview_block_text "$text"
+    [ "$status" -eq 1 ]
+    [ ! -e "$PREVIEW_PACKET_DIR" ]
+  done
+  run_preview_block 20001
+  [ "$status" -eq 1 ]
+  [ ! -e "$PREVIEW_PACKET_DIR" ]
+}
+
+@test "Jules launch preview keeps the packet directory after a successful preview" {
+  run_preview_block 300
+  [ "$status" -eq 0 ]
+  [ -f "$PREVIEW_PACKET_DIR/packet.txt" ]
 }
 
 @test "Jules launch preview still binds a packet with newlines, tabs and dash runs" {

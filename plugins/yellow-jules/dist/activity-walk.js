@@ -243,6 +243,7 @@ async function walkActivities(params) {
     const approvalClears = approvalVsPlan !== undefined &&
         (approvalVsPlan > 0 ||
             (approvalTies &&
+                newestPlanKeys.size <= 1 &&
                 approvalPlanIds.size === 1 &&
                 approvalPlanIds.has(latestPlan?.planId)));
     const pendingPlan = approvalClears

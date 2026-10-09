@@ -293,6 +293,13 @@ floors do not make the batch order-dependent. Equal or
 missing vendor times, unorderable dispatches, or a different number of echoes
 and writes make the batch ambiguous: the messages are recorded as outside
 activity (pause) and its unresolved writes are marked `echoAmbiguous`.
+An equal-time approval clears the pending plan only when exactly one plan
+content exists at that timestamp; with several, the plan stays pending and
+`ambiguous`. The slot release after a clean rejection of a create POST asserts
+controller authority under the journal lock like the terminal and reconcile
+releases: after a take-over during the POST the slot stays held
+(`slotReleased: false`).
+
 Every `ambiguous-reconcile` on an `approve` also records a blocking deviation
 on the session's owner (fail closed), whatever the reason. One vendor activity
 is credited to at most one record: same-plan and foreign approvals count as
