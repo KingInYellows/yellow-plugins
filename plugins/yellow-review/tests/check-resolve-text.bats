@@ -344,6 +344,26 @@ locale_installed() {
   [ "$status" -eq 0 ]
 }
 
+@test "an unpadded Basic credential of 18 or 19 characters exits 6" {
+  for cred in 'user:pass1234' 'user:pass12345'; do
+    tok=$(printf '%s' "$cred" | base64 | tr -d '\n=')
+    echo "len ${#tok}"
+    [ "${#tok}" -ge 18 ] && [ "${#tok}" -le 19 ]
+    printf 'Authorization: Basic %s\n' "$tok" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 6 ]
+    printf 'sent basic %s.\n' "$tok" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 6 ]
+  done
+  # 18/19 characters of non-credential text stay clean
+  for tok in 'AuthenticationHelp' 'AuthenticationHelpe'; do
+    printf 'Authorization: Basic %s\n' "$tok" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 0 ]
+  done
+}
+
 @test "a token prefix after an = is flagged at its length floor and clean one below" {
   for spec in 'gh''p_:24' 'github''_pat_:30' 'AK''IA:20' 'xo''xb-:14' 'sk''-:23' 'sk''_live_:24' 'tv''ly-:25' 'pp''lx-:45' 'sg''p_:24'; do
     prefix=${spec%:*}
