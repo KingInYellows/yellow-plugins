@@ -202,7 +202,7 @@ MAX_CHANGED_LINES=50
 # check_lib_integrity runs before that file is sourced: a function that
 # exists only there cannot resolve the first git. A caller-supplied path is
 # ignored. The result stays in the shell; it is not written to a file.
-unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ
+unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ YR_GIT_PATH
 # yr_helper <name>: a helper the trust check itself must run (readlink). Looked
 # up in fixed system directories, never on PATH: a PATH directory inside the
 # worktree could hold a planted one that runs before any check. Fails closed
@@ -653,14 +653,15 @@ check_tools_outside_repo() {
     export PATH
     hash -r 2>/dev/null || true
 }
-# gh and jq were bound above to a canonical file outside the worktree. gt and
+# gh and jq were bound above to a canonical file outside the worktree. awk is
+# checked here too: the hunk and range parsers below run it by name. gt and
 # node are bound by check_tools_outside_repo to the absolute PATH hit (argv is
 # not rewritten to the canonical file), and every call below uses that path.
 TOOL_BIN_gt="" TOOL_BIN_node=""
 if [ "$PROVIDER" = github ]; then
-    check_tools_outside_repo node timeout gtimeout
+    check_tools_outside_repo node timeout gtimeout awk
 else
-    check_tools_outside_repo gt timeout gtimeout
+    check_tools_outside_repo gt timeout gtimeout awk
     [ -n "$TOOL_BIN_gt" ] || die 2 "gt not found"
 fi
 gt() { "${TOOL_BIN_gt:-gt}" "$@"; }
