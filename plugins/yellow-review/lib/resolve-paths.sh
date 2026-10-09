@@ -151,10 +151,23 @@ yr_git() {
     # Git runs the stock git-lfs filters (and other helpers) by name through
     # PATH: run it with a PATH from which relative entries and entries inside
     # the worktree are dropped, so a resolver-written git-lfs cannot run.
-    if [ -z "${YR_GIT_PATH:-}" ]; then
-        YR_GIT_PATH=$(yr_safe_path) || return $?
-    fi
+    yr_prime_path || return $?
     PATH=$YR_GIT_PATH "$YELLOW_REVIEW_GIT" "$@"
+}
+
+# yr_prime_path: set YR_GIT_PATH to yr_safe_path's result, once per PATH and
+# working directory. yr_safe_path canonicalizes every PATH entry, so computing
+# it in each $(...) that calls yr_git or yr_awk dominated the suites' run time;
+# a caller that runs yr_git once in the main shell (the scripts do, right after
+# sourcing this file) hands the value to every later subshell. A changed PATH
+# or directory recomputes it.
+yr_prime_path() {
+    local key="$PATH|$PWD"
+    if [ -n "${YR_GIT_PATH:-}" ] && [ "${YR_PATH_KEY-}" = "$key" ]; then
+        return 0
+    fi
+    YR_GIT_PATH=$(yr_safe_path) || { YR_GIT_PATH=""; return 1; }
+    YR_PATH_KEY=$key
 }
 
 # yr_safe_path: print PATH without empty or relative entries and without any
@@ -224,9 +237,8 @@ yr_walk_path() {
 # Recomputes the path when YR_GIT_PATH is unset (yr_git sets it in a subshell
 # when called inside $(...), so the parent may not have it).
 yr_awk() {
-    local safe=${YR_GIT_PATH:-}
-    [ -n "$safe" ] || safe=$(yr_safe_path) || return $?
-    PATH=$safe awk "$@"
+    yr_prime_path || return $?
+    PATH=$YR_GIT_PATH awk "$@"
 }
 
 # Git with listed paths taken literally (no globs or pathspec magic). A

@@ -348,6 +348,8 @@ check_lib_integrity || exit 2
 
 # shellcheck source=../../../lib/resolve-paths.sh
 . "$PLUGIN_ROOT/lib/resolve-paths.sh" || { printf '[run-verify-command] Error: cannot load lib/resolve-paths.sh\n' >&2; exit 2; }
+# Resolve git and the worktree-free PATH once, here, so later subshells reuse them.
+yr_git --version >/dev/null 2>&1 || true
 # shellcheck source=../../../lib/resolve-text.sh
 . "$PLUGIN_ROOT/lib/resolve-text.sh" || { printf '[run-verify-command] Error: cannot load lib/resolve-text.sh\n' >&2; exit 2; }
 # shellcheck source=../../../lib/verify-run.sh
