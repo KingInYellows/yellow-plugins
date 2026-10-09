@@ -191,12 +191,19 @@ Show the user:
   auto-PR is off. It may run for a long time and is billed to your Jules
   account."
 
-Print the prompt preview fenced. Same substitution rule:
+Print the prompt preview fenced and the confirmation binding. Substitute the
+grant id from Step 4 and the request id from Step 3 as well. Same substitution rule:
 
 ```bash
 set -uo pipefail
 WORK_DIR='YELLOW_TODO_work_dir'
-case "$WORK_DIR" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+REPO='YELLOW_TODO_repo'
+BRANCH='YELLOW_TODO_branch'
+TASK_REF='YELLOW_TODO_task_ref'
+GRANT_ID='YELLOW_TODO_grant_id'
+REQUEST_ID='YELLOW_TODO_request_id'
+CORRECTION='YELLOW_TODO_1_or_0'
+case "$WORK_DIR$REPO$BRANCH$TASK_REF$GRANT_ID$REQUEST_ID$CORRECTION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 case "$WORK_DIR" in
   *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
   /*/yellow-jules-delegate.??????) ;;
@@ -217,21 +224,35 @@ for f in prompt.txt title.txt; do
   fi
 done
 command -v jq >/dev/null 2>&1 || { printf 'ERROR: jq required.\n' >&2; exit 1; }
+# Confirmation binding: sha256 over the scope and the exact staged bytes. The
+# launch recomputes it from the files it is about to send.
+PROMPT=$(cat -- "$WORK_DIR/prompt.txt")
+TITLE=''
+[ -s "$WORK_DIR/title.txt" ] && TITLE=$(cat -- "$WORK_DIR/title.txt")
+bind_hash() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
+}
+PROMPT_SHA=$(printf '%s' "$PROMPT" | bind_hash)
+TITLE_SHA=$(printf '%s' "$TITLE" | bind_hash)
+BINDING=$(printf '%s' "${REPO}|${BRANCH}|${TASK_REF}|${GRANT_ID}|${REQUEST_ID}|${CORRECTION}|${PROMPT_SHA}|${TITLE_SHA}" | bind_hash)
+printf 'binding=%s\n' "$BINDING"
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
 printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
-jq -Rrs 'gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | .[0:500]' "$WORK_DIR/prompt.txt"
+printf '%s' "$PROMPT" | jq -Rrs 'gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | .[0:500]'
 printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
 ```
 
 Then AskUserQuestion: "Launch this Jules session now?" with "Yes, launch" and
 "No, cancel". If the user declines, stop and say the request id is safe to
-reuse.
+reuse. Keep the printed `binding=` value for Step 6.
 
 ### Step 6: Launch
 
 Immediately after confirmation, run the real launch with the same arguments plus
-the grant id from Step 4 and the request id from Step 3. Set the Bash timeout to
+the grant id from Step 4, the request id from Step 3 and the `binding=` value from
+Step 5. The block recomputes the binding from the staged files and the substituted
+values and refuses to call the CLI when it differs from the confirmed one. Set the Bash timeout to
 300000 ms — the CLI's own deadline defaults to 180 s. Same substitution rule:
 
 ```bash
@@ -244,7 +265,8 @@ GRANT_ID='YELLOW_TODO_grant_id'
 REQUEST_ID='YELLOW_TODO_request_id'
 DEADLINE='YELLOW_TODO_deadline_or_empty'
 CORRECTION='YELLOW_TODO_1_or_0'
-case "$WORK_DIR$REPO$BRANCH$TASK_REF$GRANT_ID$REQUEST_ID$DEADLINE$CORRECTION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+CONFIRMED_BINDING='YELLOW_TODO_binding_from_preview'
+case "$WORK_DIR$REPO$BRANCH$TASK_REF$GRANT_ID$REQUEST_ID$DEADLINE$CORRECTION$CONFIRMED_BINDING" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 case "$WORK_DIR" in
   *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
   /*/yellow-jules-delegate.??????) ;;
@@ -266,8 +288,24 @@ for f in prompt.txt title.txt; do
 done
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 [ -f "$CLI" ] || { printf 'ERROR: yellow-jules CLI not found at %s. Reinstall the plugin.\n' "$CLI" >&2; exit 1; }
-args=(delegate --repo "$REPO" --branch "$BRANCH" --task-ref "$TASK_REF" "--prompt=$(cat -- "$WORK_DIR/prompt.txt")" --grant-id "$GRANT_ID" --request-id "$REQUEST_ID")
-[ -s "$WORK_DIR/title.txt" ] && args+=("--title=$(cat -- "$WORK_DIR/title.txt")")
+# Read each staged file once; the digest and the dispatched value are the same bytes.
+PROMPT=$(cat -- "$WORK_DIR/prompt.txt")
+TITLE=''
+[ -s "$WORK_DIR/title.txt" ] && TITLE=$(cat -- "$WORK_DIR/title.txt")
+bind_hash() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
+}
+PROMPT_SHA=$(printf '%s' "$PROMPT" | bind_hash)
+TITLE_SHA=$(printf '%s' "$TITLE" | bind_hash)
+BINDING=$(printf '%s' "${REPO}|${BRANCH}|${TASK_REF}|${GRANT_ID}|${REQUEST_ID}|${CORRECTION}|${PROMPT_SHA}|${TITLE_SHA}" | bind_hash)
+if ! printf '%s' "$CONFIRMED_BINDING" | grep -qE '^[0-9a-f]{64}$'; then
+  printf 'ERROR: CONFIRMED_BINDING must be the 64-hex binding= value printed by the Step 5 preview.\n' >&2; exit 1
+fi
+if [ "$CONFIRMED_BINDING" != "$BINDING" ]; then
+  printf 'ERROR: the prompt, title, scope, grant or request id changed since the confirmed preview. Nothing was sent; run Step 5 again and ask for confirmation again.\n' >&2; exit 1
+fi
+args=(delegate --repo "$REPO" --branch "$BRANCH" --task-ref "$TASK_REF" "--prompt=$PROMPT" --grant-id "$GRANT_ID" --request-id "$REQUEST_ID")
+[ -n "$TITLE" ] && args+=("--title=$TITLE")
 [ -n "$DEADLINE" ] && args+=(--deadline-ms "$DEADLINE")
 [ "$CORRECTION" = 1 ] && args+=(--correction)
 OUTPUT=$(node "$CLI" "${args[@]}")
