@@ -219,6 +219,9 @@ Safety rules the script holds:
   provider has nothing to roll back. The script lists each moved branch with
   its starting commit; point those branches back by hand and run `--abort`
   again, or run `--continue` to keep the restacked branches.
+  A state file written before tips were recorded gets the same refusal (exit
+  `31`) in this case; after inspecting the branches, run `--continue` or the
+  `restore` subcommand.
 - A conflict pauses the run (exit 10). Graphite: the stack worktrees stay
   detached and are `git worktree lock`ed with a reason. Do not commit in them;
   a commit there lands on no branch, and the script reports it and refuses to

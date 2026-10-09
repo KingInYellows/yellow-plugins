@@ -1644,6 +1644,10 @@ cmd_abort() {
       note "  $(v "$mb"): started at $(v "$mold"), now $(v "$mnew")"
     done <<<"$moved"
     die "$X_KEPT" "state kept, nothing aborted or restored. Point each branch above back at its starting commit by hand (git branch -f <branch> <commit>, from a worktree that does not have that branch checked out), then run --abort again. To keep the restacked branches instead, run --continue"
+  elif ! { [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ]; } && [ "${#T_BRANCH[@]}" -eq 0 ]; then
+    # A state file from before tips were recorded: with no provider rollback
+    # and no rebase to abort, nothing shows whether branches were restacked.
+    die "$X_KEPT" "the provider has no paused restack to roll back and this state file has no recorded start tips, so it cannot tell whether stack branches were already restacked; state kept, nothing aborted or restored. Inspect the stack branches and, if needed, point them back by hand (git branch -f <branch> <commit>, from a worktree that does not have that branch checked out). Then run --continue to keep them, or run restore (no provider) to put the worktrees back and clear the state"
   fi
   # The provider abort only clears the rebase it recorded. Abort any other
   # in-chain git rebase (a stack branch, in whichever worktree holds it),

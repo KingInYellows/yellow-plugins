@@ -1055,6 +1055,24 @@ JSEOF
   assert_all_restored
 }
 
+@test "--abort keeps a tipless legacy state when no provider rollback or rebase exists" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
+  git -C "$(wtp a)" rebase --abort
+  sed -i '/^tip\t/d' "$SD/state"
+  ! grep -q '^tip' "$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"no recorded start tips"* ]]
+  [ -e "$SD/state" ]
+  git -C "$(wtp a)" checkout -q a
+  run bash "$SCRIPT" restore
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
 @test "--abort keeps state when gh-stack no longer records a rebase in a non-run worktree" {
   command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
   mk_stack b
