@@ -192,7 +192,8 @@ yr_args_enter() {
 # -S / --split-string, whose string is split into words that continue the
 # operand list (attached or separate, and inside a short cluster such as
 # -vS; a `$`, backslash or quote in that string, which env expands or decodes,
-# counts as entering, and so does a NAME=value operand). A bare
+# counts as entering, and so do a NAME=value operand and -P, which makes env
+# search a path other than PATH). A bare
 # operand is looked up on the caller's PATH (YR_ORIG_PATH), the
 # way the tool itself would be. Copies of this block (through
 # yr_file_shebang_enters) sit in the two scripts' bootstrap resolvers, which
@@ -228,12 +229,16 @@ yr_file_shebang_enters() {
                         while [ "$k" -lt "${#cl}" ]; do
                             c=${cl:k:1}
                             case "$c" in
+                                P)
+                                    # env searches another path than PATH: fail closed.
+                                    return 0
+                                    ;;
                                 S)
                                     val=${cl:k+1}; last=$idx
                                     if [ -z "$val" ]; then val=${w[idx + 1]-}; last=$((idx + 1)); fi
                                     break
                                     ;;
-                                u|C|P|a)
+                                u|C|a)
                                     [ -n "${cl:k+1}" ] || idx=$((idx + 1))
                                     break
                                     ;;
@@ -457,7 +462,8 @@ yr_shebang_inside() {
                             if (val == "") { val = w[idx + 1]; last = idx + 1 }
                             break
                         }
-                        if (c ~ /[uCPa]/) { if (substr(cl, k + 1) == "") idx++; break }
+                        if (c == "P") { pr(root); return "" }
+                        if (c ~ /[uCa]/) { if (substr(cl, k + 1) == "") idx++; break }
                     }
                 } else if (x ~ /=/) { pr(root); return "" }
                 else { gsub(/^["\047]|["\047]$/, "", x); return x }
@@ -608,6 +614,11 @@ yr_safe_path() {
                     break
                 fi
             done
+        fi
+        # A directory that exists but cannot be listed (execute-only) cannot be
+        # screened, and its entries still run: drop it.
+        if [ "${verdict[i]}" = k ] && [ -d "$entry" ] && { [ ! -r "$entry" ] || [ ! -x "$entry" ]; }; then
+            verdict[i]=x
         fi
         [ "${verdict[i]}" != k ] || cand+=("$i")
     done
@@ -794,7 +805,8 @@ yr_env_cmd_verdict() {
 # command variables (GIT_SSH_COMMAND, GIT_SSH, GIT_ASKPASS, SSH_ASKPASS,
 # GIT_PROXY_COMMAND, GIT_EXTERNAL_DIFF, GIT_PAGER, PAGER, GIT_EDITOR, EDITOR,
 # VISUAL), the path variables (GIT_EXEC_PATH, GIT_TEMPLATE_DIR,
-# GIT_CONFIG_GLOBAL, GIT_CONFIG_SYSTEM) and config injected through
+# GIT_CONFIG_GLOBAL, GIT_CONFIG_SYSTEM; any GIT_CONFIG is refused) and config
+# injected through
 # GIT_CONFIG_KEY_<i>/GIT_CONFIG_VALUE_<i> (below GIT_CONFIG_COUNT) and
 # GIT_CONFIG_PARAMETERS, judged by the same rules as the repository's own
 # config. A GIT_CONFIG_COUNT that is not a number is refused by
@@ -819,6 +831,13 @@ yr_check_git_env() {
             return 1
         fi
     done
+    # GIT_CONFIG makes `git config` read that one file and nothing else, so
+    # every config scan would miss the repository's own entries: refuse it,
+    # whatever it points at.
+    if [ -n "${GIT_CONFIG+x}" ]; then
+        YR_HARDEN_MSG="GIT_CONFIG is set, which hides the repository config from the checks; unset it"
+        return 1
+    fi
     # Without GIT_CONFIG_GLOBAL, git reads $XDG_CONFIG_HOME/git/config (else
     # $HOME/.config/git/config) and $HOME/.gitconfig.
     if [ -z "${GIT_CONFIG_GLOBAL+x}" ]; then
