@@ -132,7 +132,7 @@ without `origin` is a failure. On failure, before any snapshot, print
 with no skip line. The raw blob is only what checkout writes when `.gitignore`
 has no content-transforming attribute, so the probe also reads the commit's
 `filter`, `eol`, `working-tree-encoding` and `ident` attributes
-(`check-attr --source`, git 2.40+) and stops with its own `Error:` line, no
+(`check-attr --cached` on a throwaway index of that commit) and stops with its own `Error:` line, no
 skip line, on any value other than unspecified (`eol` may also be `lf`).
 
 ```bash
@@ -161,7 +161,8 @@ else
   GI_LS=$(git -C "$TOP" ls-tree "$GOT" -- .gitignore 2>/dev/null) || { rm -rf -- "$WT"; head_fail; }
   GI_MODE=${GI_LS%% *}
   if [ -n "$GI_MODE" ]; then
-    ATTRS=$(git -C "$TOP" check-attr --source="$GOT" filter eol working-tree-encoding ident -- .gitignore 2>/dev/null) || { rm -rf -- "$WT"; head_fail; }
+    GIT_INDEX_FILE="$WT/idx" git -C "$TOP" read-tree "$GOT" 2>/dev/null || { rm -rf -- "$WT"; head_fail; }
+    ATTRS=$(GIT_INDEX_FILE="$WT/idx" git -C "$TOP" check-attr --cached filter eol working-tree-encoding ident -- .gitignore 2>/dev/null) || { rm -rf -- "$WT"; head_fail; }
     [ -n "$ATTRS" ] || { rm -rf -- "$WT"; head_fail; }
     if printf '%s\n' "$ATTRS" | grep -vE ': (unspecified|lf)$' >/dev/null; then
       rm -rf -- "$WT"

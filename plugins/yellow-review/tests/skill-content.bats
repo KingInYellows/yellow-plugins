@@ -670,7 +670,9 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
 
 @test "sweep: the PR head ignore probe refuses content-transforming attributes on .gitignore" {
   text=$(flat "$SWEEP")
-  [[ "$text" == *'check-attr --source="$GOT" filter eol working-tree-encoding ident -- .gitignore'* ]]
+  [[ "$text" == *'read-tree "$GOT"'* ]]
+  [[ "$text" == *'check-attr --cached filter eol working-tree-encoding ident -- .gitignore'* ]]
+  [[ "$text" != *'check-attr --source'* ]]
   [[ "$text" == *'sets content-transforming attributes on .gitignore'* ]]
 }
 
