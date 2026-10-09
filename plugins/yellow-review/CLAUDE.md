@@ -133,7 +133,9 @@ resolution, and sequential stack review. Graphite-native workflow.
   changes, hook contract changes); selected when diff touches
   `plugins/*/.claude-plugin/plugin.json`, `plugins/*/agents/**/*.md`,
   `plugins/*/commands/**/*.md`, `plugins/*/skills/**/SKILL.md`, or
-  `plugins/*/hooks/`. Sister to `pattern-recognition-specialist`
+  `plugins/*/hooks/` (a `plugin.json` whose only changed line is
+  `"version"` does not count, for this persona or the other plugin-surface
+  ones). Sister to `pattern-recognition-specialist`
   (yellow-core) — pattern-rec catches new convention drift,
   plugin-contract catches breaks to existing surface.
 - `cli-readiness-reviewer` — Conditional persona that reviews CLI command
