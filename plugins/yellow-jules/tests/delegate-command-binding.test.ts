@@ -280,7 +280,7 @@ describe('/jules:approve binds the approval to the reviewed plan', () => {
 
   it('uses the same plan digest expression in Step 3 and Step 6', () => {
     const expr =
-      "jq -c '[.pendingPlan.planId, ((.pendingPlan.steps // []) | map([.title, .description]))]'";
+      "jq -c '[.pendingPlan.planId, ((.pendingPlan.steps // []) | map([.id, .index, .title, .description]))]'";
     expect(s3).toContain(expr);
     expect(s6).toContain(expr);
   });
@@ -618,21 +618,40 @@ describe('/jules:supervise binds the reply to the pass decision', () => {
 
   it('computes the same plan digest as the jq expression the commands use', () => {
     const steps = [
-      { title: 'Say "hi"\nthere', description: 'caf\u00e9 \u007f end' },
-      { title: 'No description' },
+      {
+        id: 's-1',
+        index: 0,
+        title: 'Say "hi"\nthere',
+        description: 'caf\u00e9 \u007f end',
+      },
+      { id: 's-2', index: 1, title: 'No description' },
     ];
     const json = JSON.stringify({ planId: 'p-1', steps });
     const jq = spawnSync(
       'bash',
       [
         '-c',
-        `printf '%s' "$1" | jq -c '[.planId, ((.steps // []) | map([.title, .description]))]' | sha256sum | cut -c1-64`,
+        `printf '%s' "$1" | jq -c '[.planId, ((.steps // []) | map([.id, .index, .title, .description]))]' | sha256sum | cut -c1-64`,
         'bash',
         json,
       ],
       { encoding: 'utf8' }
     );
     expect(planDigest('p-1', steps)).toBe(jq.stdout.trim());
+  });
+
+  it('changes the plan digest when a step id or index changes', () => {
+    const base = [
+      { id: 's-1', index: 0, title: 'A', description: 'a' },
+      { id: 's-2', index: 1, title: 'B' },
+    ];
+    const digest = planDigest('p-1', base);
+    expect(
+      planDigest('p-1', [{ ...base[0]!, id: 's-9' }, base[1]!])
+    ).not.toBe(digest);
+    expect(
+      planDigest('p-1', [base[0]!, { ...base[1]!, index: 5 }])
+    ).not.toBe(digest);
   });
 });
 

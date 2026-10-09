@@ -140,7 +140,7 @@ printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
 bind_hash() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
 }
-printf 'plan_digest=%s\n' "$(printf '%s\n' "$OUTPUT" | jq -c '[.pendingPlan.planId, ((.pendingPlan.steps // []) | map([.title, .description]))]' | bind_hash)"
+printf 'plan_digest=%s\n' "$(printf '%s\n' "$OUTPUT" | jq -c '[.pendingPlan.planId, ((.pendingPlan.steps // []) | map([.id, .index, .title, .description]))]' | bind_hash)"
 ```
 
 Then run the command below with the same values and that `plan_digest=`. It
@@ -164,7 +164,7 @@ fi
 bind_hash() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
 }
-FRESH_DIGEST=$(printf '%s\n' "$FRESH" | jq -c '[.pendingPlan.planId, ((.pendingPlan.steps // []) | map([.title, .description]))]' | bind_hash)
+FRESH_DIGEST=$(printf '%s\n' "$FRESH" | jq -c '[.pendingPlan.planId, ((.pendingPlan.steps // []) | map([.id, .index, .title, .description]))]' | bind_hash)
 if [ "$FRESH_DIGEST" != "$PLAN_DIGEST" ]; then
   printf 'ERROR: the plan changed since you reviewed it. Nothing was approved; run the pass again.\n' >&2; exit 1
 fi

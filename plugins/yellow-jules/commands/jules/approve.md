@@ -116,7 +116,7 @@ printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
 bind_hash() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
 }
-printf 'plan_digest=%s\n' "$(printf '%s\n' "$OUTPUT" | jq -c '[.pendingPlan.planId, ((.pendingPlan.steps // []) | map([.title, .description]))]' | bind_hash)"
+printf 'plan_digest=%s\n' "$(printf '%s\n' "$OUTPUT" | jq -c '[.pendingPlan.planId, ((.pendingPlan.steps // []) | map([.id, .index, .title, .description]))]' | bind_hash)"
 ```
 
 Keep the printed `plan_digest=` value: it identifies the plan the user is shown.
@@ -221,7 +221,7 @@ fi
 bind_hash() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
 }
-PLAN_DIGEST=$(printf '%s\n' "$FRESH" | jq -c '[.pendingPlan.planId, ((.pendingPlan.steps // []) | map([.title, .description]))]' | bind_hash)
+PLAN_DIGEST=$(printf '%s\n' "$FRESH" | jq -c '[.pendingPlan.planId, ((.pendingPlan.steps // []) | map([.id, .index, .title, .description]))]' | bind_hash)
 BINDING=$(printf '%s' "${SESSION}|${PLAN_ID}|${GRANT_ID}|${REQUEST_ID}|${PLAN_DIGEST}" | bind_hash)
 if ! printf '%s' "$CONFIRMED_BINDING" | grep -qE '^[0-9a-f]{64}$'; then
   printf 'ERROR: CONFIRMED_BINDING must be the 64-hex binding= value printed by the Step 5 preview.\n' >&2; exit 1

@@ -56,19 +56,26 @@ export function digestText(text: string): string {
 
 /**
  * Digest of a plan under review: sha256 of the compact JSON
- * `[planId, [[title, description], ...]]` plus the newline `jq -c` prints. The commands compute the same value
+ * `[planId, [[id, index, title, description], ...]]` (every reviewed `PlanStepRecord` field) plus the newline `jq -c` prints. The commands compute the same value
  * with `jq -c` over `status` output, so DEL is escaped the way jq escapes it.
  */
 export function planDigest(
   planId: string,
   steps: ReadonlyArray<{
+    readonly id: string;
+    readonly index: number;
     readonly title: string;
     readonly description?: string;
   }>
 ): string {
   const json = JSON.stringify([
     planId,
-    steps.map((step) => [step.title, step.description ?? null]),
+    steps.map((step) => [
+      step.id,
+      step.index,
+      step.title,
+      step.description ?? null,
+    ]),
   ]).replace(/\u007f/g, '\\u007f');
   return digestText(`${json}\n`);
 }

@@ -120,7 +120,7 @@ printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
 bind_hash() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
 }
-printf 'plan_digest=%s\n' "$(printf '%s\n' "$OUTPUT" | jq -c '[.pendingPlan.planId, ((.pendingPlan.steps // []) | map([.title, .description]))]' | bind_hash)"
+printf 'plan_digest=%s\n' "$(printf '%s\n' "$OUTPUT" | jq -c '[.pendingPlan.planId, ((.pendingPlan.steps // []) | map([.id, .index, .title, .description]))]' | bind_hash)"
 ```
 
 Use the printed `plan_digest=` value; it covers exactly the plan shown in the
