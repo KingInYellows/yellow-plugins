@@ -201,3 +201,95 @@ describe('/jules:approve binds the approval to the reviewed plan', () => {
     expect(s6).toContain(expr);
   });
 });
+
+describe('/jules:supervise binds the approval to the reviewed plan', () => {
+  const supervise = cmd('supervise');
+  const blocks = [...supervise.matchAll(/```bash\n([\s\S]*?)```/g)].map(
+    (m) => m[1] ?? ''
+  );
+  const review = blocks.find((b) => b.includes("printf 'plan_digest=%s")) ?? '';
+  const approve =
+    blocks.find((b) => b.includes('"$CLI" approve --session')) ?? '';
+
+  const plan = (title: string, description = 'd', planId = 'p1') => ({
+    ok: true,
+    pendingPlan: { planId, steps: [{ index: 0, title, description }] },
+  });
+
+  // Runs a block against a stub CLI: `status` prints `status`, `approve` is
+  // recorded in calls.log.
+  const run = (
+    script: string,
+    status: unknown,
+    subst: Record<string, string>
+  ) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'jules-supervise-'));
+    fs.mkdirSync(path.join(root, 'dist'));
+    fs.writeFileSync(
+      path.join(root, 'dist/cli.js'),
+      `const fs=require('fs');const c=process.argv[2];` +
+        `if(c==='approve'){fs.appendFileSync(${JSON.stringify(path.join(root, 'calls.log'))},'approve\\n');console.log('{"ok":true}');}` +
+        `else console.log(${JSON.stringify(JSON.stringify(status))});`
+    );
+    let body = script;
+    for (const [k, v] of Object.entries(subst)) body = body.replace(k, v);
+    const res = spawnSync('bash', ['-c', body], {
+      env: { ...process.env, CLAUDE_PLUGIN_ROOT: root },
+      encoding: 'utf8',
+    });
+    const called = fs.existsSync(path.join(root, 'calls.log'));
+    fs.rmSync(root, { recursive: true, force: true });
+    return { ...res, called };
+  };
+  const reviewRun = (status: unknown) =>
+    run(review, status, {
+      YELLOW_TODO_session: 'sessions/1',
+      YELLOW_TODO_observed_plan_id: 'p1',
+    });
+  const approveRun = (status: unknown, digest: string) =>
+    run(approve, status, {
+      YELLOW_TODO_session: 'sessions/1',
+      YELLOW_TODO_observed_plan_id: 'p1',
+      YELLOW_TODO_grant_id: 'g1',
+      YELLOW_TODO_plan_digest: digest,
+    });
+  const digestOf = (status: unknown): string =>
+    /plan_digest=([0-9a-f]{64})/.exec(reviewRun(status).stdout)?.[1] ?? '';
+
+  it('finds both blocks', () => {
+    expect(review).not.toBe('');
+    expect(approve).not.toBe('');
+  });
+
+  it('approves the plan it reviewed', () => {
+    const digest = digestOf(plan('Add tests'));
+    expect(digest).toHaveLength(64);
+    const res = approveRun(plan('Add tests'), digest);
+    expect(res.called).toBe(true);
+  });
+
+  it('refuses when the plan text changed under the same plan id', () => {
+    const digest = digestOf(plan('Add tests'));
+    const res = approveRun(plan('Delete everything'), digest);
+    expect(res.status).toBe(1);
+    expect(res.called).toBe(false);
+    expect(res.stderr).toContain('plan changed');
+  });
+
+  it.each([
+    ['status failed', { ok: false }],
+    ['no pending plan', { ok: true, pendingPlan: null }],
+    ['a different plan id', plan('Add tests', 'd', 'p2')],
+  ])('refuses to review or approve when %s', (_n, status) => {
+    expect(reviewRun(status).stdout).not.toContain('plan_digest=');
+    const res = approveRun(status, 'a'.repeat(64));
+    expect(res.status).toBe(1);
+    expect(res.called).toBe(false);
+  });
+
+  it('refuses a review whose fields would be capped', () => {
+    const res = reviewRun(plan('T'.repeat(301)));
+    expect(res.status).toBe(1);
+    expect(res.stdout).not.toContain('plan_digest=');
+  });
+});
