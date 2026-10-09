@@ -125,6 +125,15 @@ has_kill_after() {
   [ ! -e "$BATS_TEST_TMPDIR/lfs-ran" ]
 }
 
+@test "a fake awk in a PATH directory inside the worktree never runs" {
+  mkdir -p fakebin
+  printf '#!/bin/sh\ntouch "%s/awk-ran"\nexit 1\n' "$BATS_TEST_TMPDIR" >| fakebin/awk
+  chmod +x fakebin/awk
+  git config --local filter.x.clean 'cat'
+  PATH="$REPO/fakebin:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/awk-ran" ]
+}
+
 @test "an unlisted dirty file left after --revert-only makes treeClean false" {
   printf 'two\nstray\n' >| src/b.txt
   run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
