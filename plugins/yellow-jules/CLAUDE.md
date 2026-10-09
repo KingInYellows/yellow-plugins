@@ -217,11 +217,11 @@ plugin did not send (for example someone typed in the Jules web page), it
 records that as outside activity. While it is recorded, `reply` and `approve`
 under a grant are refused with `JULES_SUPERVISION_PAUSED`, and so is a repair
 `delegate` for that task. Only `supervise --clear-pause` removes it: it needs a
-complete `status` walk that began after the newest pause evidence (the pause
-or the latest outside message, whichever is later) and a typed code in a terminal, and its prompt
-lists the outside activity so you read it before you confirm. If writes start
-failing with a paused error, look at the session first; a teammate may have
-commented on it.
+complete `status` walk that began after the newest pause evidence (the pause or
+the latest outside message, whichever is later) and a typed code in a terminal,
+and its prompt lists the outside activity so you read it before you confirm. If
+writes start failing with a paused error, look at the session first; a teammate
+may have commented on it.
 
 ### Where the guarantee ends
 
@@ -247,13 +247,13 @@ A dispatched reservation proves only that the POST began, not that it landed. A
 message that only such a still-`reserved` reply (inside its settle window) could
 explain is held: `status` neither claims it nor classifies it, and the watermark
 and dedup ring do not pass it. After the write settles, the next walk claims it
-as the echo (accepted) or records it as outside activity (cleanly rejected).
-A message is also held when the only matching write was created or dispatched
+as the echo (accepted) or records it as outside activity (cleanly rejected). A
+message is also held when the only matching write was created or dispatched
 after the walk began: that write cannot be its echo, and the next walk (which
 starts after the write) decides. Newer outside messages replace `outsideSeen`
-and older ones never do (the marker keeps the message's `createTime`, ordered
-by `compareStamp`), so a `--clear-pause` confirmed against an older id is
-refused and a delayed overlapping walk cannot swap in an older message.
+and older ones never do (the marker keeps the message's `createTime`, ordered by
+`compareStamp`), so a `--clear-pause` confirmed against an older id is refused
+and a delayed overlapping walk cannot swap in an older message.
 `lastCompleteWalkAt`, a stored pause and `lastDecision` likewise only move
 forward.
 
@@ -264,26 +264,37 @@ held message's first read each store the value they were given. Every "before"
 or "after" that decides an authority or pause outcome compares those values,
 which cannot tie, so two events in one millisecond are still ordered. Timestamps
 stay for display, TTLs and the vendor-clock windows in `reconcile.ts`. State
-written before sequences has an unknown order and never authorizes: such a
-reply cannot suppress a plan-swap pause, and a pause with a sequence is cleared
-only by a walk that has one. Where the old timestamp rule already failed closed
-on a tie it still applies to those older records, so they do not stall.
+written before sequences has an unknown order and never authorizes: such a reply
+cannot suppress a plan-swap pause, and a pause with a sequence is cleared only
+by a walk that has one. Where the old timestamp rule already failed closed on a
+tie it still applies to those older records, so they do not stall.
 
-Only positive landing evidence explains a plan replacement and so suppresses
-the `plan-changed-after-evaluation` pause: an `accepted` or `reconciled` reply
+Only positive landing evidence explains a plan replacement and so suppresses the
+`plan-changed-after-evaluation` pause: an `accepted` or `reconciled` reply
 sequenced after the evaluation, or one whose echo was claimed. A `reserved` or
 `unknown-outcome` reply may never have landed and does not hide a swap; the pass
 pauses. `status --reconcile` binds an unknown-outcome reply to the echo a plain
 `status` already recorded for that same reply; only echoes claimed by other
 operations are excluded.
 
+`status --reconcile` also counts settled (`accepted` or `reconciled`) replies
+with the same digest and no recorded echo as competing candidates: an activity
+that could be theirs is ambiguous and leaves an unknown-outcome reply unbound.
+When `status` classifies an ambiguous echo, a settled write is credited before
+an unresolved one, so an unproven reply is never marked landed on a guess.
+
+A bindable `needs-answer` question must also display unchanged through the
+`supervise` wrapper's `safe` filter (tabs and carriage returns become spaces,
+dash runs fold, text over 6000 characters is cut). Otherwise `reply` is withheld
+and `questionUnavailable` is set, because the digest binds the raw question.
+
 Binding a create to a session that an `observe` row already owns (reconcile, or
 a create whose response arrived after a raw-resource `status`) folds that row
-into the create and retires its local id: deviations stay unreconciled if
-either copy was, pause and outside markers keep the later evidence, and read
-cursors reset so the next `status` rewalks the session under the create. A
-session already owned by another create is not bound: the create stays
-unresolved as `ambiguous-reconcile` (`session-already-owned`).
+into the create and retires its local id: deviations stay unreconciled if either
+copy was, pause and outside markers keep the later evidence, and read cursors
+reset so the next `status` rewalks the session under the create. A session
+already owned by another create is not bound: the create stays unresolved as
+`ambiguous-reconcile` (`session-already-owned`).
 
 The residual window is between that re-check and the vendor POST: local state
 and the remote call cannot be made atomic, so a revoke or an outside message
@@ -357,7 +368,8 @@ plugins; `pnpm validate:jules` fails on drift. Change both sides together.
   write one or to take over the controller
 - `/jules:abandon` — prints the terminal command to give up an unresolved
   operation
-- `/jules:supervise` — one bounded pass; at most one reply, approval, or repair delegate
+- `/jules:supervise` — one bounded pass; at most one reply, approval, or repair
+  delegate
 
 ### Skills (2)
 

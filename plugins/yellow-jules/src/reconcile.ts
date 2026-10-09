@@ -276,7 +276,8 @@ async function resolveOnOwnSession(
   sessionResource: string,
   records: readonly OperationRecord[],
   deadline: Deadline,
-  claimedEchoes: ReadonlyMap<string, string>
+  claimedEchoes: ReadonlyMap<string, string>,
+  settledCandidates: readonly OperationRecord[] = []
 ): Promise<Resolution[]> {
   try {
     await read(deps, deadline, () => adapter.getSession(sessionResource));
@@ -295,8 +296,20 @@ async function resolveOnOwnSession(
   // before the dispatch is somebody else's. A record with no stamp has no
   // causal lower bound; any match for it falls back to the reservation floor
   // and is left ambiguous rather than bound.
+  // A settled reply that never had its echo recorded competes for a matching
+  // activity: its sole echo may first appear in this very walk, and binding an
+  // unresolved reply to it would credit a write that may never have landed. A
+  // shared activity makes both ambiguous; the settled record is not changed.
+  const competing = settledCandidates.filter(
+    (c) =>
+      c.kind === 'reply' &&
+      c.echoActivityId === undefined &&
+      c.promptDigest !== undefined &&
+      !records.some((r) => r.localRequestId === c.localRequestId)
+  );
+  const candidates = [...records, ...competing];
   const floors = new Map(
-    records.map((r) => {
+    candidates.map((r) => {
       const dispatched =
         r.dispatchedAt !== undefined ? Date.parse(r.dispatchedAt) : NaN;
       return [
@@ -308,7 +321,7 @@ async function resolveOnOwnSession(
     })
   );
   const matches = new Map<string, Set<string>>(
-    records.map((r) => [r.localRequestId, new Set<string>()])
+    candidates.map((r) => [r.localRequestId, new Set<string>()])
   );
   const earliest = Math.min(...records.map((r) => Date.parse(r.createdAt)));
   const walk = await walkActivities({
@@ -329,7 +342,7 @@ async function resolveOnOwnSession(
       // a later one with the same message. A record's own claimed echo is
       // positive landing evidence for it and still matches.
       const claimedBy = claimedEchoes.get(activity.activityId);
-      for (const record of records) {
+      for (const record of candidates) {
         const claimed =
           claimedBy !== undefined && claimedBy !== record.localRequestId;
         // Only activities at or after this reservation (minus the overlap window).
@@ -591,6 +604,11 @@ export async function reconcile(
                   : []
             )
           );
+          const settledReplies = Object.values(journal.operations).filter(
+            (r) =>
+              r.kind === 'reply' &&
+              (r.status === 'accepted' || r.status === 'reconciled')
+          );
           const bySession = new Map<string, OperationRecord[]>();
           for (const record of others) {
             if (record.sessionResource === undefined) {
@@ -622,7 +640,8 @@ export async function reconcile(
                 session,
                 records,
                 deadline,
-                claimedEchoes
+                claimedEchoes,
+                settledReplies.filter((c) => c.sessionResource === session)
               ))
             );
           }

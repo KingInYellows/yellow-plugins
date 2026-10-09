@@ -175,7 +175,7 @@ function resolveCreates(journal, creates, walk) {
  * and one activity walk from the earliest reservation, so ten stuck operations
  * on a session cost one walk, not ten.
  */
-async function resolveOnOwnSession(deps, adapter, sessionResource, records, deadline, claimedEchoes) {
+async function resolveOnOwnSession(deps, adapter, sessionResource, records, deadline, claimedEchoes, settledCandidates = []) {
     try {
         await (0, runtime_support_js_1.read)(deps, deadline, () => adapter.getSession(sessionResource));
     }
@@ -192,7 +192,16 @@ async function resolveOnOwnSession(deps, adapter, sessionResource, records, dead
     // before the dispatch is somebody else's. A record with no stamp has no
     // causal lower bound; any match for it falls back to the reservation floor
     // and is left ambiguous rather than bound.
-    const floors = new Map(records.map((r) => {
+    // A settled reply that never had its echo recorded competes for a matching
+    // activity: its sole echo may first appear in this very walk, and binding an
+    // unresolved reply to it would credit a write that may never have landed. A
+    // shared activity makes both ambiguous; the settled record is not changed.
+    const competing = settledCandidates.filter((c) => c.kind === 'reply' &&
+        c.echoActivityId === undefined &&
+        c.promptDigest !== undefined &&
+        !records.some((r) => r.localRequestId === c.localRequestId));
+    const candidates = [...records, ...competing];
+    const floors = new Map(candidates.map((r) => {
         const dispatched = r.dispatchedAt !== undefined ? Date.parse(r.dispatchedAt) : NaN;
         return [
             r.localRequestId,
@@ -201,7 +210,7 @@ async function resolveOnOwnSession(deps, adapter, sessionResource, records, dead
                 : dispatched - activity_walk_js_1.DISPATCH_SKEW_MS,
         ];
     }));
-    const matches = new Map(records.map((r) => [r.localRequestId, new Set()]));
+    const matches = new Map(candidates.map((r) => [r.localRequestId, new Set()]));
     const earliest = Math.min(...records.map((r) => Date.parse(r.createdAt)));
     const walk = await (0, activity_walk_js_1.walkActivities)({
         adapter,
@@ -222,7 +231,7 @@ async function resolveOnOwnSession(deps, adapter, sessionResource, records, dead
             // a later one with the same message. A record's own claimed echo is
             // positive landing evidence for it and still matches.
             const claimedBy = claimedEchoes.get(activity.activityId);
-            for (const record of records) {
+            for (const record of candidates) {
                 const claimed = claimedBy !== undefined && claimedBy !== record.localRequestId;
                 // Only activities at or after this reservation (minus the overlap window).
                 if (created < (floors.get(record.localRequestId) ?? Infinity))
@@ -431,6 +440,8 @@ async function reconcile(deps, journal, sessionResource, deadline) {
                 const claimedEchoes = new Map(Object.values(journal.operations).flatMap((r) => r.echoActivityId !== undefined
                     ? [[r.echoActivityId, r.localRequestId]]
                     : []));
+                const settledReplies = Object.values(journal.operations).filter((r) => r.kind === 'reply' &&
+                    (r.status === 'accepted' || r.status === 'reconciled'));
                 const bySession = new Map();
                 for (const record of others) {
                     if (record.sessionResource === undefined) {
@@ -446,7 +457,7 @@ async function reconcile(deps, journal, sessionResource, deadline) {
                         out.push(...records.map((record) => notReached(record, 'the deadline expired before this operation was checked')));
                         continue;
                     }
-                    out.push(...(await resolveOnOwnSession(deps, adapter, session, records, deadline, claimedEchoes)));
+                    out.push(...(await resolveOnOwnSession(deps, adapter, session, records, deadline, claimedEchoes, settledReplies.filter((c) => c.sessionResource === session))));
                 }
                 return out;
             })),

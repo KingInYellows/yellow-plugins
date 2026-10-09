@@ -79,7 +79,9 @@ that the text was cut and ask the user to read the session.
 
 Take **at most one** write in this pass, and only the actions listed in
 `allowedActions`. The CLI enforces the grant either way. A `needs-answer` whose
-question is missing, too long, redacted or rewritten by the fence lists no `reply`.
+question is missing, too long (over 6000 characters), redacted or rewritten by
+the fence, or holds text this wrapper would display differently (dash runs such
+as `--force`, tabs, carriage returns), lists no `reply`.
 
 | `decision`           | What to do                                                                                                                                                                                                                                                     |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -347,20 +349,20 @@ printf '  node %s supervise --clear-pause --session %s\n\n' "$(shq "$CLI")" "$(s
 
 ## Error Handling
 
-| Code                          | Retryable | Recovery Action                                                                             |
-| ----------------------------- | --------- | ------------------------------------------------------------------------------------------- |
-| `JULES_AUTHORITY_DENIED`      | false     | the grant does not cover this session; list grants or ask the owner for a new one           |
-| `JULES_GRANT_EXPIRED`         | false     | the grant expired; remote work may still run — see Step 5                                   |
-| `JULES_GRANT_EXHAUSTED`       | false     | a limit is spent; the owner writes a new grant in a terminal                                |
-| `JULES_SUPERVISION_PAUSED`    | false     | the session is paused; see Step 6                                                           |
+| Code                          | Retryable | Recovery Action                                                                                         |
+| ----------------------------- | --------- | ------------------------------------------------------------------------------------------------------- |
+| `JULES_AUTHORITY_DENIED`      | false     | the grant does not cover this session; list grants or ask the owner for a new one                       |
+| `JULES_GRANT_EXPIRED`         | false     | the grant expired; remote work may still run — see Step 5                                               |
+| `JULES_GRANT_EXHAUSTED`       | false     | a limit is spent; the owner writes a new grant in a terminal                                            |
+| `JULES_SUPERVISION_PAUSED`    | false     | the session is paused; see Step 6                                                                       |
 | `JULES_QUESTION_CHANGED`      | false     | the session no longer awaits the question or plan the pass showed; nothing was sent; run the pass again |
-| `JULES_POLICY_DEVIATION`      | false     | the newest plan differs from the evaluated one, or a deviation is open; run `/jules:status` |
-| `JULES_UNKNOWN_OUTCOME`       | false     | **do not repeat the write.** Run `/jules:status --session <ref> --reconcile`                |
-| `JULES_INVALID_STATE`         | false     | follow the error's recovery text; for a pause, run `/jules:status` first                    |
-| `JULES_CONTROLLER_MISMATCH`   | false     | this data directory is not the authorized controller copy; follow the handoff procedure     |
-| `JULES_NOT_FOUND`             | false     | verify the reference with `/jules:list`                                                     |
-| `JULES_CONFIRMATION_REQUIRED` | false     | a write without `--grant-id`; pass the chosen grant                                         |
-| `JULES_AUTH_FAILED`           | false     | set `JULES_API_KEY`, then run `/jules:setup`                                                |
+| `JULES_POLICY_DEVIATION`      | false     | the newest plan differs from the evaluated one, or a deviation is open; run `/jules:status`             |
+| `JULES_UNKNOWN_OUTCOME`       | false     | **do not repeat the write.** Run `/jules:status --session <ref> --reconcile`                            |
+| `JULES_INVALID_STATE`         | false     | follow the error's recovery text; for a pause, run `/jules:status` first                                |
+| `JULES_CONTROLLER_MISMATCH`   | false     | this data directory is not the authorized controller copy; follow the handoff procedure                 |
+| `JULES_NOT_FOUND`             | false     | verify the reference with `/jules:list`                                                                 |
+| `JULES_CONFIRMATION_REQUIRED` | false     | a write without `--grant-id`; pass the chosen grant                                                     |
+| `JULES_AUTH_FAILED`           | false     | set `JULES_API_KEY`, then run `/jules:setup`                                                            |
 
 Any other `error.code`: report it with its recovery action. `error.message` and
 `error.recoveryAction` can carry vendor text; quote them inside a reference-only

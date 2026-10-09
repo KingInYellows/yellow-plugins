@@ -253,15 +253,39 @@ describe('needs-answer', () => {
     expect(r.allowedActions).toEqual([]);
   });
 
-  it('still binds a question with carriage returns and ordinary dashes', async () => {
+  it('still binds a question with newlines and single dashes', async () => {
     setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
     addActivity(h, session.sessionResource, {
       type: 'agentMessaged',
-      message: 'Use --force?\r\nOr -- safe mode?',
+      message: 'Use the flag -f?\nOr a long-lived branch?',
     });
     const r = await sup();
     expect(r.observedQuestionDigest).toBeDefined();
+    expect(r.allowedActions).toEqual(['reply']);
   });
+
+  it.each([
+    ['a double-dash flag', 'Run git push --force?'],
+    ['a tab', 'Which\tdatabase?'],
+    ['a carriage return', 'Which\r\ndatabase?'],
+    ['an en dash', 'Pick a \u2013 b?'],
+    ['text over the wrapper display limit', 'q'.repeat(6001)],
+  ])(
+    'offers no reply for a question the wrapper would display differently (%s)',
+    async (_l, message) => {
+      setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
+      addActivity(h, session.sessionResource, {
+        type: 'agentMessaged',
+        message,
+      });
+      const r = await sup();
+      expect(r.decision).toBe('needs-answer');
+      expect(r.observedActivityId).toBeUndefined();
+      expect(r.observedQuestionDigest).toBeUndefined();
+      expect(r.attention).toContain('questionUnavailable');
+      expect(r.allowedActions).toEqual([]);
+    }
+  );
 
   it('offers no reply for an empty question body', async () => {
     setVendorState(h, session.sessionResource, 'awaitingUserFeedback');

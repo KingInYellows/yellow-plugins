@@ -87,6 +87,24 @@ function planText(plan) {
 function backoffSeconds(failures) {
     return Math.min(BACKOFF_BASE_SECONDS * 2 ** Math.max(0, failures - 1), exports.BACKOFF_CAP_SECONDS);
 }
+/**
+ * Mirrors the `safe` filter in commands/jules/supervise.md, which flattens the
+ * fenced question for display: control characters (tab and CR included) become
+ * spaces, dash-like characters fold into runs of `-`, and text over 6000
+ * characters is cut. The question digest binds the raw text, so a question this
+ * filter would change is not shown as bound and is not offered for a reply.
+ * Keep it identical to that filter.
+ */
+const WRAPPER_DISPLAY_MAX_CHARS = 6000;
+/* eslint-disable no-control-regex, no-misleading-character-class */
+function wrapperAltersText(text) {
+    const shown = text
+        .replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\u{e0000}-\u{e007f}]/gu, ' ')
+        .replace(/[\p{Pd}\u2500-\u257f\u2e3a\u2e3b\u30fc\u2043\u207b\u208b\u02d7\u2796\ufe31\ufe32\u2212\ufe58\ufe63\uff0d-]+/gu, '-')
+        .replace(/-(\s*-)+/g, '-');
+    return shown !== text || [...text].length > WRAPPER_DISPLAY_MAX_CHARS;
+}
+/* eslint-enable no-control-regex, no-misleading-character-class */
 /** Failures a pass maps to `check-failed`: transient vendor, network, or credential trouble. */
 const CHECK_FAILED_CODES = new Set([
     'JULES_SERVICE_UNAVAILABLE',
@@ -482,13 +500,16 @@ async function superviseOnce(deps, args) {
                 ? latest.message
                 : truncate(latest.message));
         }
-        // A question that redaction altered, or that is too long to show in full, was not
-        // shown in full: no binding and no reply action are offered for it, so the
+        // A question that redaction altered, that the command wrapper's display
+        // flattening would change (dash folding turns `--force` into `-force`, tabs
+        // and carriage returns become spaces), or that is too long to show in full,
+        // was not shown as it is: no binding and no reply action are offered for it, so the
         // operator answers.
         const bindable = latest?.message !== undefined &&
             latest.message.trim() !== '' &&
             !redact_js_1.HIDDEN_CHARS_RE.test(latest.message) &&
             !(0, redact_js_1.fenceAltersText)(latest.message) &&
+            !wrapperAltersText(latest.message) &&
             latest.message.length <= BOUND_QUESTION_MAX_CHARS;
         return finish('needs-answer', {
             ...(bindable

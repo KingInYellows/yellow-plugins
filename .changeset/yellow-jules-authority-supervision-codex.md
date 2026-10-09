@@ -48,3 +48,10 @@ A `reserved` or `unknown-outcome` reply no longer hides a plan replacement from
 so an unproven reply fails safe and the pass pauses. `status --reconcile` now
 resolves an unknown-outcome reply as landed when a plain `status` had already
 recorded its echo, instead of leaving it unknown.
+
+`status --reconcile` no longer binds an unknown-outcome reply to an echo that a
+settled reply with the same text may own; it stays unresolved and `status`
+credits such an echo to the settled reply first. `supervise` withholds `reply`
+for a question the command wrapper would display differently (for example
+`git push --force`, tabs, or text over 6000 characters), the same rule plan
+review follows.

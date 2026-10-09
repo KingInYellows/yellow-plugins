@@ -500,6 +500,51 @@ describe('reply and approve reservations resolve on their own session', () => {
     expect(record?.echoActivityId).toBe(echo.activityId);
   });
 
+  it('an echo that may belong to a settled same-text reply is not bound to an unknown-outcome one', async () => {
+    const session = await delegateOk(h, grantId);
+    await reply(h.deps, {
+      session: session.localId,
+      message: 'same words',
+      dryRun: false,
+      correction: false,
+      grantId,
+      requestId: 'reply-a',
+    });
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-a']?.echoActivityId
+    ).toBeUndefined();
+    h.deps.clock.time += 5_000;
+    h.adapter.sendMessageImpl = async () => {
+      throw new AdapterError('network', 'reset', { dispatched: true });
+    };
+    await expect(
+      reply(h.deps, {
+        session: session.localId,
+        message: 'same words',
+        dryRun: false,
+        correction: false,
+        grantId,
+        requestId: 'reply-b',
+      })
+    ).rejects.toBeInstanceOf(AppErrorException);
+    h.deps.clock.time += 1_000;
+    // The only echo first appears now, during the reconcile run: it may be A's.
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'same words',
+    });
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(
+      result.reconciled?.find((r) => r.localRequestId === 'reply-b')
+    ).toMatchObject({ outcome: 'ambiguous-reconcile' });
+    const ops = (await readJournal(h.dataDir)).operations;
+    expect(ops['reply-b']?.status).toBe('unknown-outcome');
+    expect(ops['reply-b']?.echoActivityId).toBeUndefined();
+  });
+
   it('a sessionless reconcile that binds a reply persists the echo it matched', async () => {
     const session = await strandedReply('exact words', 'reply-1');
     const echo = addActivity(h, session.sessionResource, {

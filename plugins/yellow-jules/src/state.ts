@@ -1875,7 +1875,14 @@ export async function claimOwnEchoes(
         const possible = landed.filter(
           (r) => matches(r) && !afterFirstRead(r, message.activityId)
         );
-        const eligible = possible.filter((r) => !inFlight(r) && !postWalk(r));
+        const open = possible.filter((r) => !inFlight(r) && !postWalk(r));
+        // A settled write needs no resolution, so an ambiguous message goes to
+        // it before an unresolved one: crediting an unknown-outcome write with
+        // an echo that may be a settled write's would mark it landed.
+        const settledOpen = open.filter(
+          (r) => r.status === 'accepted' || r.status === 'reconciled'
+        );
+        const eligible = settledOpen.length > 0 ? settledOpen : open;
         // Vendor list order is unverified, so with a usable timestamp prefer
         // the latest-dispatched write that precedes the message: an older
         // identical write then keeps the older echo.
