@@ -378,6 +378,14 @@ in order from bottom (item 1) to top:
    same branch, because amending with `-m` rewrites the message. The Phase 4
    fallback commits below use this rule too.
 
+   In single-branch mode there is no stack to place the line by, so the
+   Phase 2 and Phase 3 commits use `Part of <ISSUE-ID>`. Before the first of
+   them, ask once with `AskUserQuestion` whether this branch completes the
+   issue; write `Closes <ISSUE-ID>` instead only on a yes. Every later
+   message for the branch keeps the chosen line, because each amend
+   rewrites the whole message and Phase 4's `smart-submit` exits on a branch
+   with no uncommitted changes.
+
    Then, in a fresh Bash call, re-declare `msgfile=<the literal path
    printed above>` (Bash variables don't survive across separate tool
    calls) and use the provider resolved in Phase 1 step 4:
@@ -595,7 +603,9 @@ Phase 3 (Quality Check) in stack summary mode.
    pattern as Phase 1b step 5 (never embed generated text directly in
    `-m "..."`; a message summarizing the diff can contain `$(...)`,
    backticks, or quotes a literal `-m` argument would let the shell
-   execute) — with content shaped like:
+   execute) — with content shaped like the block below, ending with the
+   single-branch Linear closing line from Phase 1b step 5 when an ID
+   qualifies:
 
    ```
    feat(scope): implement X component
@@ -840,7 +850,8 @@ it at a Phase 1b checkpoint.
 6. Make final quality commit if changes needed, using the provider resolved
    in Phase 1 step 4. Write the message to a file first — same `mktemp -u`
    plus Write-tool pattern as Phase 1b step 5 (never embed generated text
-   directly in `-m "..."`) — with content shaped like:
+   directly in `-m "..."`) — with content shaped like the block below, keeping
+   the Linear closing line the earlier commits carry:
 
    ```
    refactor: address code review feedback

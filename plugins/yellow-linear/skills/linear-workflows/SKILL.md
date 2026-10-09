@@ -367,7 +367,7 @@ Take the Linear ID only from the last path segment of the branch name, which mus
 End the commit body with `Part of <ISSUE-ID>`, or with `Closes <ISSUE-ID>` only
 on the one commit that completes the issue: the topmost stack item that carries
 the ID (`/flow:work` knows the whole stack) or a single branch the user confirms
-(`smart-submit`). `Part of` never moves the issue, so a lower branch built first
+(`smart-submit`, or `/flow:work` in single-branch mode). `Part of` never moves the issue, so a lower branch built first
 can never close it early. `gt-amend` keeps whatever line the commit already has.
 The Linear commands that act on an ID (`/linear:sync`, `linear-pr-linker`)
 validate it with `get_issue`; the writers do not.
