@@ -94,6 +94,11 @@ teardown() {
   echo "$result" | grep -q 'api_key=\[REDACTED\]'
 }
 
+@test "redact_secrets strips a short Basic credential with an empty side" {
+  result=$(printf 'Authorization: Basic YTo= and authorization: basic OmI= and Authorization: Basic Og==\n' | cs_redact_secrets)
+  [ "$result" = 'Authorization: Basic [REDACTED] and authorization: basic [REDACTED] and Authorization: Basic [REDACTED]' ]
+}
+
 @test "redact_secrets strips an Authorization Basic token and leaves prose that says basic alone" {
   result=$(printf 'curl -H "Authorization: Basic YWI6Y2Q=" and AUTHORIZATION: BASIC YTpi done\n' | cs_redact_secrets)
   echo "$result" | grep -q 'Authorization: Basic \[REDACTED\]'

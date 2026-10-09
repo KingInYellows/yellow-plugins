@@ -1563,6 +1563,17 @@ rule=forged line=9.txt"
   done
 }
 
+@test "a bare Basic word needs an interior colon: Only is prose, a header keeps edge colons" {
+  edge=$(printf ':y' | base64 | tr -d '\n')
+  for bin in gawk mawk; do
+    awk_expect "$bin" 0 'This endpoint supports Basic Only mode\n'
+    awk_expect "$bin" 0 "bare basic ${edge}\n"
+    awk_expect "$bin" 6 'Authorization: Basic Only\n'
+    awk_expect "$bin" 6 "Authorization: Basic ${edge}\n"
+    awk_expect "$bin" 6 'This endpoint supports Basic YTpi mode\n'
+  done
+}
+
 @test "a leading non-ASCII quote, bullet, dash or no-break space cannot exempt a multi-word credential; accented letters stay prose" {
   ran=0
   for loc in C C.UTF-8; do
