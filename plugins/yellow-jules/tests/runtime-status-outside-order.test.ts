@@ -60,6 +60,7 @@ describe('status records outside activity before advancing the watermark', () =>
     ];
     expect(record?.supervision?.outsideSeen).toBeDefined();
     // The watermark did not advance, so the message is still re-detectable.
-    expect(record?.watermark).toBeUndefined();
+    expect(record?.lastActivityId).toBeUndefined();
+    expect(record?.lastActivityCreateTime).toBeUndefined();
   });
 });
