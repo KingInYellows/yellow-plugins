@@ -1156,6 +1156,31 @@ commit_repo() {
   ( rc=0; harden_git_config revert || rc=$?; [ "$rc" -eq 1 ] )
 }
 
+@test "harden_git_config refuses repository-local Git LFS settings that name a program, in full and revert" {
+  git config --local filter.lfs.clean 'git-lfs clean -- %f'
+  git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
+  git config --local filter.lfs.process 'git-lfs filter-process'
+  mkdir -p tools
+  : >| tools/evil
+  # git lowercases the section and variable, so mixed-case spellings are the same keys
+  for setting in "LFS.StandaloneTransferAgent evil" "lfs.customtransfer.evil.path $PWD/tools/evil" \
+                 "lfs.extension.ext.clean $PWD/tools/evil"; do
+    git config --local "${setting%% *}" "${setting#* }"
+    for scope in full revert; do
+      rc=0; ( harden_git_config "$scope" || { [[ "$YR_HARDEN_MSG" == *lfs* && "$YR_HARDEN_MSG" != *"$PWD/tools"* ]] || exit 2; exit 1; } ) || rc=$?
+      [ "$rc" -eq 1 ] || { echo "$scope accepted or leaked: ${setting%% *}" >&2; return 1; }
+    done
+    git config --local --unset-all "${setting%% *}"
+  done
+  # Without them the stock filter is still allowed, and lfs.url is not a program.
+  git config --local lfs.url https://example.com/lfs
+  ( rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 0 ] )
+  # A global LFS transfer agent is the user's own.
+  git config --local --unset lfs.url
+  printf '[lfs]\n\tstandalonetransferagent = mine\n' >| "$BATS_TEST_TMPDIR/gcfg"
+  ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/gcfg"; rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 0 ] )
+}
+
 @test "harden_git_config refuses a stock LFS filter command followed by a second line" {
   git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
   git config --local filter.lfs.process 'git-lfs filter-process'

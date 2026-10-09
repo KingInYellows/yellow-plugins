@@ -382,7 +382,10 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   `safe.bareRepository=explicit` for the process tree; scope `full` also
   refuses a repository-local transport, credential or non-LFS filter config
   and forces signing off, scope `revert` (the rollback and check-ignored
-  modes) refuses only a non-LFS filter; reads config through `yr_git`;
+  modes) refuses only a non-LFS filter; both scopes also refuse a
+  repository-local `lfs.customtransfer.*`, `lfs.standalonetransferagent` or
+  `lfs.extension.*` (Git LFS runs the program they name when it downloads an
+  object; `.lfsconfig` ignores these keys, so only git config is read); reads config through `yr_git`;
   does not set `core.hooksPath`; returns a code instead of exiting, with the
   unsigned-commit note in `YR_HARDEN_NOTE` for the caller to print;
   `harden_git_config_for_verify` drops `safe.bareRepository` for the user's

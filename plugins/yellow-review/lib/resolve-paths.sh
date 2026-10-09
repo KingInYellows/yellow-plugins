@@ -1082,8 +1082,14 @@ harden_git_config() {
     # A clean, smudge or process filter runs on `git add` and on checkout, so a
     # repository-local one is judged the same way; the three stock Git LFS
     # commands (`git lfs install --local`) are allowed by exact value.
-    tre='^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process))$'
-    [ "$scope" = revert ] && tre='^filter\..*\.(clean|smudge|process)$'
+    # The stock filter downloads missing objects through Git LFS, which runs
+    # the program a repository-local lfs.customtransfer.<name>.path,
+    # lfs.standalonetransferagent or lfs.extension.<name>.* names, so those are
+    # judged too (git lowercases the section and variable, not the subsection;
+    # .lfsconfig ignores these keys, so only git config is read).
+    local lre='lfs\.(customtransfer\..*|standalonetransferagent|extension\..*)'
+    tre='^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process)|'"$lre"')$'
+    [ "$scope" = revert ] && tre='^(filter\..*\.(clean|smudge|process)|'"$lre"')$'
     # --null --show-scope emits `scope NUL key NL value NUL` per entry, so a
     # value holding newlines is read whole. The records go straight into awk
     # (a command substitution would drop the NULs); git's status 0 or 1 (no
@@ -1109,6 +1115,7 @@ harden_git_config() {
         credential.helper) ;;
         credential.*) tkey="credential.<url>.helper" ;;
         filter.*) tkey="filter.<driver>.clean|smudge|process" ;;
+        lfs.*) tkey="lfs.<customtransfer|standalonetransferagent|extension> (a Git LFS program)" ;;
     esac
     if [ -n "$tkey" ]; then
         if [ "$scope" = revert ]; then
