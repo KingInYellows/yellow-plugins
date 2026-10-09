@@ -500,6 +500,47 @@ describe('outside markers only move forward', () => {
     expect(state?.outsideSeen?.activityId).toBe('activities/b-newer');
   });
 
+  it('an older pass finishing last neither clears nor replaces a newer evaluated plan', async () => {
+    const plan = (planId: string) => ({
+      planId,
+      evaluatedAt: '2026-09-29T12:00:00.000Z',
+    });
+    // Newer pass (started 12:00) evaluated plan P.
+    await updateSupervision(h.dataDir, session.localRequestId, {
+      evaluatedPlan: plan('plan-P'),
+      passStartedAt: '2026-09-29T12:00:00.000Z',
+    });
+    // Stale pass (started 11:00) saw `working` and finishes last: must not clear.
+    await updateSupervision(h.dataDir, session.localRequestId, {
+      evaluatedPlan: null,
+      passStartedAt: '2026-09-29T11:00:00.000Z',
+    });
+    expect((await owner())?.supervision?.evaluatedPlan?.planId).toBe('plan-P');
+    // Stale pass that saw an older plan must not replace it.
+    await updateSupervision(h.dataDir, session.localRequestId, {
+      evaluatedPlan: plan('plan-OLD'),
+      passStartedAt: '2026-09-29T11:30:00.000Z',
+    });
+    expect((await owner())?.supervision?.evaluatedPlan?.planId).toBe('plan-P');
+    // Same start (order unknown) fails closed: the stored value stays.
+    await updateSupervision(h.dataDir, session.localRequestId, {
+      evaluatedPlan: null,
+      passStartedAt: '2026-09-29T12:00:00.000Z',
+    });
+    expect((await owner())?.supervision?.evaluatedPlan?.planId).toBe('plan-P');
+    // A genuinely later pass still replaces and clears.
+    await updateSupervision(h.dataDir, session.localRequestId, {
+      evaluatedPlan: plan('plan-Q'),
+      passStartedAt: '2026-09-29T12:05:00.000Z',
+    });
+    expect((await owner())?.supervision?.evaluatedPlan?.planId).toBe('plan-Q');
+    await updateSupervision(h.dataDir, session.localRequestId, {
+      evaluatedPlan: null,
+      passStartedAt: '2026-09-29T12:06:00.000Z',
+    });
+    expect((await owner())?.supervision?.evaluatedPlan).toBeUndefined();
+  });
+
   it('a delayed older complete-walk stamp does not pull lastCompleteWalkAt back', async () => {
     await upsertReadState(h.dataDir, session.localRequestId, {
       completeWalkAt: '2026-09-29T12:00:00.000Z',

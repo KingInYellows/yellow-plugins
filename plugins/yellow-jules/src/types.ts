@@ -379,6 +379,12 @@ export interface SupervisionState {
     readonly planId: string;
     readonly evaluatedAt: string;
   };
+  /**
+   * Start of the pass that last set or cleared `evaluatedPlan`. Passes run
+   * unlocked, so a pass that began earlier never overwrites or clears the
+   * evaluation of one that began later.
+   */
+  readonly evaluatedPassAt?: string;
 }
 
 export interface Journal {

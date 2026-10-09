@@ -227,6 +227,8 @@ export async function superviseOnce(
     args.deadlineMs ?? DEFAULT_MUTATION_DEADLINE_MS
   );
   const now = nowFn(deps);
+  // Orders this pass's evaluated-plan write against overlapping passes.
+  const passStartedAt = now().toISOString();
 
   let journal = await readJournal(deps.dataDir);
   const sessionResource = resolveSessionResource(journal, args.session);
@@ -545,6 +547,7 @@ export async function superviseOnce(
       backoff: null,
       ...(decision === 'needs-plan-review' ? {} : { evaluatedPlan: null }),
       ...patch,
+      passStartedAt,
       ...decided(decision),
     });
     return {

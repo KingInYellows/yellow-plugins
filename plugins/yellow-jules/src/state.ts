@@ -288,6 +288,9 @@ function isValidSupervision(value: unknown): boolean {
     )
   )
     return false;
+  const evaluatedPassAt = value['evaluatedPassAt'];
+  if (evaluatedPassAt !== undefined && typeof evaluatedPassAt !== 'string')
+    return false;
   return (
     lastDecision === undefined ||
     (isPlainObject(lastDecision) &&
@@ -1260,6 +1263,8 @@ export interface SupervisionPatch {
   readonly evaluatedPlan?: NonNullable<
     SupervisionState['evaluatedPlan']
   > | null;
+  /** Start of the producing pass; orders `evaluatedPlan` writes. Required with it. */
+  readonly passStartedAt?: string;
 }
 
 /** `undefined` keeps the stored value, `null` clears it, anything else sets it. */
@@ -1315,12 +1320,27 @@ export async function updateSupervision(
         ) <= 0
           ? undefined
           : patch.outsideSeen;
+      // The evaluated plan is ordered by the start of the pass that produced
+      // it. An older pass, or one starting in the same millisecond (order
+      // unknown), neither replaces nor clears what a newer one stored. A write
+      // with no token (or none stored) keeps the old behaviour.
+      const planStale =
+        patch.evaluatedPlan !== undefined &&
+        patch.passStartedAt !== undefined &&
+        previous.evaluatedPassAt !== undefined &&
+        patch.passStartedAt <= previous.evaluatedPassAt;
+      const planPatch = planStale ? undefined : patch.evaluatedPlan;
+      const passAt =
+        planPatch !== undefined && patch.passStartedAt !== undefined
+          ? patch.passStartedAt
+          : previous.evaluatedPassAt;
       const next: SupervisionState = {
         ...keep('paused', previous.paused, pausedPatch),
         ...keep('backoff', previous.backoff, patch.backoff),
         ...keep('lastDecision', previous.lastDecision, decisionPatch),
         ...keep('outsideSeen', previous.outsideSeen, outsidePatch),
-        ...keep('evaluatedPlan', previous.evaluatedPlan, patch.evaluatedPlan),
+        ...keep('evaluatedPlan', previous.evaluatedPlan, planPatch),
+        ...(passAt !== undefined ? { evaluatedPassAt: passAt } : {}),
         // Owned by claimOwnEchoes; a supervise patch must not drop it.
         ...(previous.heldActivities !== undefined
           ? { heldActivities: previous.heldActivities }

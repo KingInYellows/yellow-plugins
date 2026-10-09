@@ -24,3 +24,7 @@ A write stamped in the same millisecond as a status walk's start can no longer
 claim a same-text teammate message as its echo (it is held, then classified as
 outside), and `status --reconcile` frees the grant slot of a create it binds to
 an already completed or failed session in the same run.
+
+Overlapping `supervise` passes for one session no longer let an older pass
+clear or replace the plan a newer pass evaluated, so a plan swap is neither
+missed nor falsely paused.

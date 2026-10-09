@@ -100,6 +100,8 @@ async function superviseOnce(deps, args) {
     (0, runtime_support_js_1.prepare)(deps);
     const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, args.deadlineMs ?? deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS);
     const now = (0, runtime_support_js_1.nowFn)(deps);
+    // Orders this pass's evaluated-plan write against overlapping passes.
+    const passStartedAt = now().toISOString();
     let journal = await (0, state_js_1.readJournal)(deps.dataDir);
     const sessionResource = (0, runtime_support_js_1.resolveSessionResource)(journal, args.session);
     const owner = owns(journal, sessionResource);
@@ -360,6 +362,7 @@ async function superviseOnce(deps, args) {
             backoff: null,
             ...(decision === 'needs-plan-review' ? {} : { evaluatedPlan: null }),
             ...patch,
+            passStartedAt,
             ...decided(decision),
         });
         return {
