@@ -359,6 +359,14 @@ function isValidRecord(key, value) {
     if (value['pendingPlan'] !== undefined &&
         !isValidPendingPlan(value['pendingPlan']))
         return false;
+    if (value['lastGeneratedPlan'] !== undefined &&
+        !((0, shape_js_1.isPlainObject)(value['lastGeneratedPlan']) &&
+            typeof value['lastGeneratedPlan']['planId'] === 'string' &&
+            typeof value['lastGeneratedPlan']['activityId'] === 'string' &&
+            typeof value['lastGeneratedPlan']['activityCreateTime'] === 'string' &&
+            (value['lastGeneratedPlan']['seq'] === undefined ||
+                (0, shape_js_1.isNonNegativeInt)(value['lastGeneratedPlan']['seq']))))
+        return false;
     if (value['resumeApproval'] !== undefined &&
         !((0, shape_js_1.isPlainObject)(value['resumeApproval']) &&
             typeof value['resumeApproval']['createTime'] === 'string' &&
@@ -950,7 +958,7 @@ function completeWalkAdvances(current, update) {
  * and dedup ring; approve and collect walks only read them).
  */
 async function upsertReadState(dataDir, localRequestId, update, now = () => new Date(), config = exports.DEFAULT_LOCK_CONFIG) {
-    return updateJournal(dataDir, (operations) => {
+    return updateJournal(dataDir, (operations, journal) => {
         const current = requireRecord(operations, localRequestId);
         const { resumePageToken: _drop, pendingPlan: _dropPlan, resumeApproval: _dropApproval, ...base } = current;
         const resumePageToken = update.resumePageToken === undefined
@@ -1053,8 +1061,29 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
             (current.condition === 'remote-completed' ||
                 current.condition === 'failed') &&
             update.condition !== current.condition;
+        // Forward only by activity stamp; the sequence is taken when a plan id is
+        // first recorded, so it orders the swap against an evaluation.
+        const gen = update.generatedPlan;
+        const prevGen = current.lastGeneratedPlan;
+        const genAdvances = gen !== undefined &&
+            (prevGen === undefined ||
+                (0, activity_walk_js_1.compareStamp)({ createTime: gen.activityCreateTime, activityId: gen.activityId }, {
+                    createTime: prevGen.activityCreateTime,
+                    activityId: prevGen.activityId,
+                }) > 0);
+        const lastGeneratedPlan = gen !== undefined && genAdvances
+            ? {
+                planId: gen.planId,
+                activityId: gen.activityId,
+                activityCreateTime: gen.activityCreateTime,
+                seq: prevGen?.planId === gen.planId && prevGen.seq !== undefined
+                    ? prevGen.seq
+                    : nextSeq(journal),
+            }
+            : prevGen;
         const next = applyRetention({
             ...base,
+            ...(lastGeneratedPlan !== undefined ? { lastGeneratedPlan } : {}),
             ...(update.vendorState !== undefined && !keepTerminal
                 ? { vendorState: update.vendorState }
                 : {}),

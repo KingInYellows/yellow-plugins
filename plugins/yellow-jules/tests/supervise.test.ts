@@ -667,6 +667,25 @@ describe('outside activity pauses (R32)', () => {
     });
   });
 
+  it('a plan swap whose replacement was approved before the next pass still pauses', async () => {
+    addPlan(h, session.sessionResource, 'plan-1');
+    expect((await sup()).decision).toBe('needs-plan-review');
+    h.deps.clock.time += 30_000;
+    addPlanNow(h, session.sessionResource, 'plan-2');
+    h.deps.clock.time += 1_000;
+    addActivity(h, session.sessionResource, {
+      type: 'planApproved',
+      planId: 'plan-2',
+    });
+    setVendorState(h, session.sessionResource, 'inProgress');
+    // A plain status consumes both activities and clears the pending plan.
+    await status(h.deps, { session: session.localId, reconcile: false });
+    expect(await sup()).toMatchObject({
+      decision: 'paused',
+      reason: 'plan-changed-after-evaluation',
+    });
+  });
+
   it('a reply that was cleanly rejected does not hide a plan swap', async () => {
     addPlan(h, session.sessionResource, 'plan-1');
     expect((await sup()).decision).toBe('needs-plan-review');

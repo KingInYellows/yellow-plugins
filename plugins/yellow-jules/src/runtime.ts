@@ -699,6 +699,9 @@ export async function status(
             ? { approval: record.resumeApproval }
             : {}),
         },
+        ...(walk.generatedPlan !== undefined
+          ? { generatedPlan: walk.generatedPlan }
+          : {}),
         ...(walk.pendingPlan !== record.pendingPlan
           ? {
               // Plan text is vendor-writable: redacted before it is persisted.

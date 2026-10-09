@@ -276,6 +276,18 @@ export interface OperationRecord {
   readonly recentActivityIds: readonly string[];
   readonly activityCount: number;
   readonly pendingPlan?: PendingPlan;
+  /**
+   * The newest `planGenerated` any `status` walk has read, kept after the plan
+   * is approved or cleared. `seq` is the journal sequence at which `status`
+   * first recorded this plan id; supervise compares it with the evaluation's
+   * sequence to catch a swap that an intervening status consumed (R32).
+   */
+  readonly lastGeneratedPlan?: {
+    readonly planId: string;
+    readonly activityId: string;
+    readonly activityCreateTime: string;
+    readonly seq?: number;
+  };
   /** Newest `planApproved` read by a partial walk, kept while `resumePageToken` is stored. */
   readonly resumeApproval?: {
     readonly createTime: string;

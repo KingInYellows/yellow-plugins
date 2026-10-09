@@ -229,6 +229,7 @@ async function walkActivities(params) {
         ...(newest !== undefined ? { newest } : {}),
         seen,
         pendingPlan,
+        ...(latestPlan !== undefined ? { generatedPlan: latestPlan } : {}),
         ...(latestApproval !== undefined ? { latestApproval } : {}),
         startedFromResume: params.start.kind === 'resume',
         resumeRejected,

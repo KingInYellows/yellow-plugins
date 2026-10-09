@@ -118,6 +118,8 @@ export interface WalkResult {
   }>;
   /** The pending plan after this walk; `null` when a later planApproved cleared it. */
   readonly pendingPlan: PendingPlan | null | undefined;
+  /** The newest plan generated (including the carried one), whether or not a later approval cleared it. */
+  readonly generatedPlan?: PendingPlan;
   /** Newest `planApproved` seen (including the carried `approval`); persist it across a partial walk. */
   readonly latestApproval?: {
     readonly createTime: string;
@@ -361,6 +363,7 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
     ...(newest !== undefined ? { newest } : {}),
     seen,
     pendingPlan,
+    ...(latestPlan !== undefined ? { generatedPlan: latestPlan } : {}),
     ...(latestApproval !== undefined ? { latestApproval } : {}),
     startedFromResume: params.start.kind === 'resume',
     resumeRejected,

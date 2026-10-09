@@ -510,6 +510,14 @@ export async function superviseOnce(
         (seen.pendingPlan !== undefined &&
         seen.pendingPlan.planId !== evaluated.planId
           ? seen.pendingPlan.activityId
+          : undefined) ??
+        // A plain status may have consumed the replacement AND its approval,
+        // leaving no pending plan: the retained latest-generated plan still
+        // shows the swap when it was first recorded after the evaluation.
+        (fresh.lastGeneratedPlan !== undefined &&
+        fresh.lastGeneratedPlan.planId !== evaluated.planId &&
+        seqBefore(evaluated.evaluatedSeq, fresh.lastGeneratedPlan.seq)
+          ? fresh.lastGeneratedPlan.activityId
           : undefined))
       : undefined;
   let pauseReason: string | undefined;
