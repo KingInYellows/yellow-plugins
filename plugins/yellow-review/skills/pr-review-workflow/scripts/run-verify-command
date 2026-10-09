@@ -536,6 +536,16 @@ safe_path_label() {
         printf '%s' '<a path withheld: credential-shaped or control characters>'
     fi
 }
+# safe_path_list <newline-separated paths>: safe_path_label on each line,
+# joined with ", ".
+safe_path_list() {
+    local line out=""
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        out="${out:+$out, }$(safe_path_label "$line")"
+    done <<<"$1"
+    printf '%s' "$out"
+}
 add_path_reason() {
     if path_is_safe "$2"; then
         add_reason "$1: $2"
@@ -586,7 +596,7 @@ if [ "$MODE" = check-ignored ]; then
         # changes (the resolver edits are in the tree by design), so claiming
         # a clean tree would let the caller skip its own dirty-tree stop.
         0) jq -nc '{result: "clean", patch: null, log: null}'; exit 0 ;;
-        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored file): ${IGN_HITS//$'\n'/, }" ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored file): $(safe_path_list "$IGN_HITS")" ;;
         *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
 fi
@@ -656,7 +666,7 @@ if [ "$MODE" = run ]; then
     rm -f -- "$IGNORED_SCRATCH"
     case "$IGN_RC" in
         0) ;;
-        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: ${IGN_HITS//$'\n'/, }" ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: $(safe_path_list "$IGN_HITS")" ;;
         *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
 

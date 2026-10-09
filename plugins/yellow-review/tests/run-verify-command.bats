@@ -2550,3 +2550,29 @@ trust_assert_absolute() {
   [[ "$stderr" != *"$tok"* ]]
   [[ "$output" != *"$tok"* ]]
 }
+
+@test "--check-ignored withholds a credential-shaped ignored path from the refusal" {
+  tok=ghp_abcdefghijklmnopqrstuvwxyz0123456789
+  printf '.cache/\n' >> .git/info/exclude
+  touch -t 202001010000 "$IGN_MARKER"
+  mkdir -p .cache
+  printf 'planted\n' >| ".cache/$tok"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'gitignored files changed since'* ]]
+  [[ "$stderr" == *'<a path withheld'* ]]
+  [[ "$stderr" != *"$tok"* ]]
+}
+
+@test "--ignored-since withholds a credential-shaped ignored path from the run refusal" {
+  tok=ghp_abcdefghijklmnopqrstuvwxyz0123456789
+  printf '.cache/\n' >> .git/info/exclude
+  touch -t 202001010000 "$IGN_MARKER"
+  mkdir -p .cache
+  printf 'planted\n' >| ".cache/$tok"
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'gitignored files changed since'* ]]
+  [[ "$stderr" != *"$tok"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
