@@ -359,6 +359,10 @@ export interface ReconciledEntry {
   readonly sessionResource?: string;
   /** The create was released but its grant slot could not be freed. */
   readonly slotStuck?: true;
+  /** The slot was left held: this host is not the grant's controller, so status stays read-only. */
+  readonly slotReleaseSkipped?: true;
+  /** The bound approve landed on a different plan than the reviewed one; the deviation is recorded on the session owner. */
+  readonly policyDeviation?: true;
 }
 
 export type ReconcileOutcome =

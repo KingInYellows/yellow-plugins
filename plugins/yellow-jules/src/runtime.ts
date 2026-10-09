@@ -539,17 +539,27 @@ export async function status(
     .filter(
       (r) =>
         (r.outcome !== 'bound' && r.outcome !== 'released') ||
-        r.slotStuck === true
+        r.slotStuck === true ||
+        r.slotReleaseSkipped === true ||
+        r.policyDeviation === true
     )
     .map((r) =>
-      r.slotStuck === true ? 'reconciled:slotStuck' : `reconciled:${r.outcome}`
+      r.slotStuck === true
+        ? 'reconciled:slotStuck'
+        : r.slotReleaseSkipped === true
+          ? 'reconciled:slotReleaseSkipped'
+          : r.policyDeviation === true
+            ? 'reconciled:policyDeviation'
+            : `reconciled:${r.outcome}`
     );
 
   if (sessionResource === undefined) {
     return {
       operation: 'status',
       reconciled: reconciled ?? [],
-      ...((reconciled ?? []).some((r) => r.outcome === 'policy-deviation')
+      ...((reconciled ?? []).some(
+        (r) => r.outcome === 'policy-deviation' || r.policyDeviation === true
+      )
         ? { policyDeviation: true as const }
         : {}),
       ...attentionOf(reconcileFlags),
@@ -732,14 +742,12 @@ export async function status(
     // grant's active-session slot (tasks and corrective rounds stay spent).
     // status is a read command: a failed release keeps the slot held, which
     // only makes the grant stricter, and is reported instead of thrown.
-    const slotStuck = await releaseTerminalSlot(
-      deps.dataDir,
-      record,
-      vendorState
-    );
+    const slotRelease = await releaseTerminalSlot(deps, record, vendorState);
+    const slotStuck = slotRelease === 'stuck';
 
     const flags: string[] = [];
     if (slotStuck) flags.push('slotStuck');
+    if (slotRelease === 'skipped') flags.push('slotReleaseSkipped');
     if (walk.partialPagination) flags.push('partialPagination');
     if (walk.unmappedActivity) flags.push('unmappedActivity');
     if (dedupWindowExceeded) flags.push('dedupWindowExceeded');

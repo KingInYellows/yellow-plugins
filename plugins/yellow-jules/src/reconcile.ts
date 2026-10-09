@@ -805,6 +805,7 @@ export async function reconcile(
   // One failed release must not hide the others or the report; the slot stays
   // held, which only makes the grant stricter, and the entry says so.
   const slotStuck = new Set<string>();
+  const slotSkipped = new Set<string>();
   for (const r of resolutions) {
     if (
       (r.outcome === 'released' || r.outcome === 'bound') &&
@@ -813,12 +814,13 @@ export async function reconcile(
     ) {
       // `released` creates never reached a session; `bound` ones count only
       // when the listed vendor state is terminal (checked by the helper).
-      const stuck = await releaseTerminalSlot(
-        deps.dataDir,
+      const release = await releaseTerminalSlot(
+        deps,
         r.record,
         r.outcome === 'released' ? 'failed' : r.session?.vendorState
       );
-      if (stuck) slotStuck.add(r.record.localRequestId);
+      if (release === 'stuck') slotStuck.add(r.record.localRequestId);
+      if (release === 'skipped') slotSkipped.add(r.record.localRequestId);
     }
   }
   return resolutions.map((r) =>
@@ -830,6 +832,14 @@ export async function reconcile(
           }),
           slotStuck: true as const,
         }
-      : entryOf(r)
+      : {
+          ...entryOf(r),
+          ...(slotSkipped.has(r.record.localRequestId)
+            ? { slotReleaseSkipped: true as const }
+            : {}),
+          ...(r.deviation !== undefined && r.outcome === 'bound'
+            ? { policyDeviation: true as const }
+            : {}),
+        }
   );
 }

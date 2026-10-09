@@ -266,6 +266,12 @@ the post-POST verifier's rule to the newest plan generated before the approval:
 a different digest (or an unorderable tie) binds the approve but records the
 policy deviation on the session's owner; an incomplete walk or no readable
 preceding plan leaves it `ambiguous-reconcile` (`approved-plan-unreadable`).
+A bound approve that landed on a changed plan carries `policyDeviation: true` on
+its reconciled entry, so a sessionless `status --reconcile` sets
+`policyDeviation` and `requiresAttention`. Terminal-session slot release (in
+`status` and the reconcile path) asserts the grant's controller authority under
+the journal lock; on a host without it the slot stays held, `grants.json` is
+untouched, status still succeeds, and the output flags `slotReleaseSkipped`.
 `authorize --revoke` needs no terminal but asserts the grant's controller
 authority under the journal lock; a host without it is refused
 (`JULES_CONTROLLER_MISMATCH`, recovery: revoke from the controlling host, or

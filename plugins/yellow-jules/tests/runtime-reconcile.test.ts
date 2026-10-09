@@ -1,6 +1,10 @@
+import * as fs from 'node:fs';
+
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadGrants } from '../src/authority.js';
+import { resolveGrantsPath } from '../src/config.js';
+import { controllerFilePath } from '../src/controller.js';
 import { AdapterError, AppErrorException } from '../src/errors.js';
 import { approve, delegate, reply } from '../src/mutations.js';
 import { approvedPlanVerdict } from '../src/reconcile.js';
@@ -884,6 +888,33 @@ describe('reply and approve reservations resolve on their own session', () => {
     ]);
   });
 
+  it('a sessionless reconcile reports the changed-plan approve as a policy deviation needing attention', async () => {
+    const session = await strandedApprove();
+    const now = h.deps.clock.now();
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      createTime: new Date(now + 1_000).toISOString(),
+      plan: {
+        planId: 'plan-1',
+        steps: [{ id: 'st-x', title: 'Entirely different work', index: 0 }],
+      },
+    });
+    addActivity(h, session.sessionResource, {
+      type: 'planApproved',
+      approvedPlanId: 'plan-1',
+      createTime: new Date(now + 2_000).toISOString(),
+    });
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled?.[0]).toMatchObject({
+      localRequestId: 'approve-1',
+      outcome: 'bound',
+      policyDeviation: true,
+    });
+    expect(result.policyDeviation).toBe(true);
+    expect(result.requiresAttention).toBe(true);
+    expect(result.attention).toContain('reconciled:policyDeviation');
+  });
+
   it('an approve that landed on the reviewed plan binds without a deviation', async () => {
     const session = await strandedApprove();
     addActivity(h, session.sessionResource, {
@@ -1055,6 +1086,38 @@ describe('active-session slots follow the vendor state', () => {
     const usage = loadGrants(h.dataDir).grants[grantId]?.usage;
     expect(usage?.activeSessionRefs).toEqual([]);
     expect(usage?.totalTasks).toBe(1);
+  });
+
+  it('a host without the controller authority leaves the slot held and status still succeeds', async () => {
+    const session = await delegateOk(h, grantId);
+    setVendorState(h, session.sessionResource, 'completed');
+    fs.rmSync(controllerFilePath(h.controllerDir, 'testhost'));
+    const before = fs.readFileSync(resolveGrantsPath(h.dataDir), 'utf8');
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: false,
+    });
+    expect(result.attention).toContain('slotReleaseSkipped');
+    expect(fs.readFileSync(resolveGrantsPath(h.dataDir), 'utf8')).toBe(before);
+    expect(
+      loadGrants(h.dataDir).grants[grantId]?.usage.activeSessionRefs
+    ).toHaveLength(1);
+  });
+
+  it('the reconcile release path skips the slot on a host without controller authority', async () => {
+    await lostResponse('scratch/done', 'lost-done');
+    const [listed] = [...h.adapter.sessions.values()];
+    setVendorState(h, listed!.sessionResource, 'completed');
+    fs.rmSync(controllerFilePath(h.controllerDir, 'testhost'));
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled?.[0]).toMatchObject({
+      localRequestId: 'lost-done',
+      outcome: 'bound',
+      slotReleaseSkipped: true,
+    });
+    expect(
+      loadGrants(h.dataDir).grants[grantId]?.usage.activeSessionRefs
+    ).toHaveLength(1);
   });
 
   it('a failed session frees its slot too, and repeating the observation is harmless', async () => {

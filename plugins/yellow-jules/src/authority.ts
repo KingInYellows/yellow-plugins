@@ -571,7 +571,8 @@ export async function revokeGrant(
 export async function releaseSlotInStore(
   dataDir: string,
   grantId: string,
-  localRequestId: string
+  localRequestId: string,
+  beforeWrite?: (grant: GrantRecord) => void
 ): Promise<boolean> {
   return withJournalLock(dataDir, async () => {
     const file = loadGrants(dataDir);
@@ -582,6 +583,8 @@ export async function releaseSlotInStore(
     ) {
       return false;
     }
+    // Under the lock, before the write: a refusal leaves grants.json as it was.
+    beforeWrite?.(grant);
     writeGrants(
       dataDir,
       updateGrant(file, grantId, (g) => releaseGrant(g, localRequestId))

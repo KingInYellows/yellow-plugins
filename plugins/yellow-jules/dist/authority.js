@@ -412,7 +412,7 @@ async function revokeGrant(dataDir, grantId, now, beforeWrite) {
  * that no longer exists (hand-removed file) is a no-op; a corrupt grants file
  * still fails loud.
  */
-async function releaseSlotInStore(dataDir, grantId, localRequestId) {
+async function releaseSlotInStore(dataDir, grantId, localRequestId, beforeWrite) {
     return (0, state_js_1.withJournalLock)(dataDir, async () => {
         const file = loadGrants(dataDir);
         const grant = file.grants[grantId];
@@ -420,6 +420,8 @@ async function releaseSlotInStore(dataDir, grantId, localRequestId) {
             !grant.usage.activeSessionRefs.includes(localRequestId)) {
             return false;
         }
+        // Under the lock, before the write: a refusal leaves grants.json as it was.
+        beforeWrite?.(grant);
         writeGrants(dataDir, updateGrant(file, grantId, (g) => releaseGrant(g, localRequestId)));
         return true;
     });
