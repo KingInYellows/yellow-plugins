@@ -217,6 +217,11 @@ in the worktree that has it checked out, else `git branch -f` (git refuses to
 force-update a checked-out branch). Run them, then `--abort` again, or run
 `--continue` to keep the branches.
 
+After aborting in-chain rebases, `--abort` checks the recorded start tips once
+more: a rebase abort restores that rebase's own starting tip, which can put a
+stack branch back on its restacked commit. If any branch moved, it exits `31`
+with the same fix lines and keeps the state; it never resets branches itself.
+
 `--continue` refuses with exit `31` once the provider's abort has succeeded
 (a valid marker) but the abort cleanup is unfinished; run `--abort` to finish.
 

@@ -1647,6 +1647,24 @@ cmd_continue() {
   drive_result
 }
 
+# refuse_moved LEAD MOVED: print the moved branches, each with a fix line, and
+# exit 31 keeping the state. Never resets a branch itself.
+refuse_moved() {
+  local mb mold mnew mholder
+  load_worktrees 2>/dev/null || true
+  note "$1"
+  while IFS=$'\t' read -r mb mold mnew; do
+    note "  $(v "$mb"): started at $(v "$mold"), now $(v "$mnew")"
+    # git refuses to force-update a branch checked out in any worktree.
+    if mholder=$(branch_holder "refs/heads/$mb"); then
+      note "    fix: git -C $(q "$mholder") reset --hard $(v "$mold")"
+    else
+      note "    fix: git branch -f $(q "$mb") $(v "$mold")"
+    fi
+  done <<<"$2"
+  die "$X_KEPT" "state kept, nothing aborted or restored. Run each fix line above to point the branch back at its starting commit, then run --abort again. To keep the restacked branches instead, run --continue"
+}
+
 cmd_abort() {
   parse_flags "$@"
   reject_remote
@@ -1687,18 +1705,7 @@ cmd_abort() {
     # No rebase directory is left, yet stack branches are not where they
     # started: the user finished the paused rebase with git, or the provider
     # lost its record. Nothing can roll those branches back from here.
-    local mb mold mnew mholder
-    note "stack branches have moved since the restack started and the provider has no paused restack to roll back:"
-    while IFS=$'\t' read -r mb mold mnew; do
-      note "  $(v "$mb"): started at $(v "$mold"), now $(v "$mnew")"
-      # git refuses to force-update a branch checked out in any worktree.
-      if mholder=$(branch_holder "refs/heads/$mb"); then
-        note "    fix: git -C $(q "$mholder") reset --hard $(v "$mold")"
-      else
-        note "    fix: git branch -f $(q "$mb") $(v "$mold")"
-      fi
-    done <<<"$moved"
-    die "$X_KEPT" "state kept, nothing aborted or restored. Run each fix line above to point the branch back at its starting commit, then run --abort again. To keep the restacked branches instead, run --continue"
+    refuse_moved "stack branches have moved since the restack started and the provider has no paused restack to roll back:" "$moved"
   elif [ "${#T_BRANCH[@]}" -eq 0 ] && ! aborted_marker_valid; then
     # A state file from before tips were recorded: with no provider rollback
     # and no rebase to abort, nothing shows whether branches were restacked.
@@ -1714,6 +1721,12 @@ cmd_abort() {
       die "$X_KEPT" "the provider's abort succeeded, but the marker $(v "$ABORTED_FILE") could not be written and a rebase operation is still in progress in $(v "$ABORT_STUCK"); state kept, nothing restored. Abort that rebase by hand (git -C $(q "$ABORT_STUCK") rebase --abort) before running --abort again; fixing only the marker path is not enough, because a rerun with that rebase in place would wrongly ask for a manual whole-stack reset"
     fi
     die "$X_KEPT" "a rebase operation is still in progress in $(v "$ABORT_STUCK"); state kept, nothing restored. Finish or abort it (git -C $(q "$ABORT_STUCK") rebase --abort), then run --abort again"
+  fi
+  # An auxiliary rebase abort restores that rebase's own orig-head, which can
+  # be a restacked tip the provider rollback had just undone. Recheck before
+  # restoring and clearing.
+  if moved=$(moved_tips); then
+    refuse_moved "stack branches are not at their starting commits after the abort:" "$moved"
   fi
   if ! release_run_worktree "$start"; then
     die "$X_KEPT" "could not return the run worktree to $(v "$start"); state kept, nothing restored"

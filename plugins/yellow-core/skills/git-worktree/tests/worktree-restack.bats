@@ -1120,6 +1120,30 @@ moved_by_hand() {
   [[ $output == *"fix: git branch -f a "* ]]
 }
 
+@test "--abort refuses when an auxiliary rebase abort puts a stack branch back on its restacked tip" {
+  mk_stack c
+  orig_b=$(git rev-parse b)
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  [ "$(git rev-parse b)" != "$orig_b" ]
+  # The provider is paused on c; b's old worktree is detached, so the user
+  # checks the restacked b out there and starts a conflicting rebase of it.
+  git -C "$(wtp b)" checkout -q b
+  printf 'b-side\n' >"$(wtp b)/z.txt"
+  git -C "$(wtp b)" add z.txt
+  git -C "$(wtp b)" commit -q -m "feat: b z"
+  printf 'main-side\n' >"$REPO/z.txt"
+  git -C "$REPO" add z.txt
+  git -C "$REPO" commit -q -m "main z"
+  git -C "$(wtp b)" rebase main >/dev/null 2>&1 || true
+  rebase_marker "$(wtp b)"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"not at their starting commits"* ]]
+  [[ $output == *"fix: "* ]]
+  [ -e "$SD/state" ]
+}
+
 @test "--continue after the user finished the provider's continue by hand verifies and restores" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
