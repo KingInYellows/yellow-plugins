@@ -66,8 +66,8 @@ describe('a plan with hidden characters', () => {
   });
 });
 
-/** Adds a teammate's message at the first activity read after the write was reserved. */
-function teammateAfterReserve(kind: 'reply' | 'approve', text: string): void {
+/** Runs `inject` at the first activity read after the write was reserved. */
+function afterReserve(kind: 'reply' | 'approve', inject: () => void): void {
   const base = h.adapter.listActivitiesImpl;
   let injected = false;
   h.adapter.listActivitiesImpl = async (resource, options) => {
@@ -77,14 +77,21 @@ function teammateAfterReserve(kind: 'reply' | 'approve', text: string): void {
       ).some((r) => r.kind === kind && r.status === 'reserved');
       if (reserved) {
         injected = true;
-        addActivity(h, session.sessionResource, {
-          type: 'userMessaged',
-          message: text,
-        });
+        inject();
       }
     }
     return base(resource, options);
   };
+}
+
+/** Adds a teammate's message at the first activity read after the write was reserved. */
+function teammateAfterReserve(kind: 'reply' | 'approve', text: string): void {
+  afterReserve(kind, () => {
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: text,
+    });
+  });
 }
 
 function args(overrides: Partial<ApproveArgs> = {}): ApproveArgs {
@@ -133,6 +140,43 @@ describe('a teammate message between the reserve and the floor read', () => {
     const ops = (await readJournal(h.dataDir)).operations;
     expect(ops[session.localRequestId]?.supervision?.outsideSeen).toBeDefined();
     expect(ops[err.localRequestId as string]?.dispatchedAt).toBeUndefined();
+  });
+});
+
+describe('the reviewed plan is re-checked on the final floor walk', () => {
+  it('a different plan between the reserve and the floor read is a policy deviation and nothing is sent', async () => {
+    afterReserve('approve', () => {
+      h.deps.clock.time += 1_000;
+      addPlanNow(h, session.sessionResource, 'plan-2');
+    });
+    const err = await fails(() => approve(h.deps, args()));
+    expect(err.appError.code).toBe('JULES_POLICY_DEVIATION');
+    expect(h.adapter.callsTo('approvePlan')).toHaveLength(0);
+    const record = (await readJournal(h.dataDir)).operations[
+      err.localRequestId as string
+    ];
+    expect(record?.status).toBe('failed');
+    expect(record?.dispatchedAt).toBeUndefined();
+  });
+
+  it('two different plans tied at the newest time are refused too', async () => {
+    afterReserve('approve', () => {
+      h.deps.clock.time += 1_000;
+      const at = new Date(h.deps.clock.now()).toISOString();
+      for (const [id, title] of [
+        ['plan-1', 'Do the work'],
+        ['plan-3', 'Other work'],
+      ] as const) {
+        addActivity(h, session.sessionResource, {
+          type: 'planGenerated',
+          createTime: at,
+          plan: { planId: id, steps: [{ id: `s-${id}`, title, index: 0 }] },
+        });
+      }
+    });
+    const err = await fails(() => approve(h.deps, args()));
+    expect(err.appError.code).toBe('JULES_POLICY_DEVIATION');
+    expect(h.adapter.callsTo('approvePlan')).toHaveLength(0);
   });
 });
 

@@ -85,8 +85,8 @@ async function codeOf(run: () => Promise<unknown>): Promise<AppErrorCode> {
   return (await fails(run)).appError.code;
 }
 
-/** Adds a teammate's message at the first activity read after the write was reserved. */
-function teammateAfterReserve(kind: 'reply' | 'approve', text: string): void {
+/** Runs `inject` at the first activity read after the write was reserved. */
+function afterReserve(kind: 'reply' | 'approve', inject: () => void): void {
   const base = h.adapter.listActivitiesImpl;
   let injected = false;
   h.adapter.listActivitiesImpl = async (resource, options) => {
@@ -96,14 +96,21 @@ function teammateAfterReserve(kind: 'reply' | 'approve', text: string): void {
       ).some((r) => r.kind === kind && r.status === 'reserved');
       if (reserved) {
         injected = true;
-        addActivity(h, session.sessionResource, {
-          type: 'userMessaged',
-          message: text,
-        });
+        inject();
       }
     }
     return base(resource, options);
   };
+}
+
+/** Adds a teammate's message at the first activity read after the write was reserved. */
+function teammateAfterReserve(kind: 'reply' | 'approve', text: string): void {
+  afterReserve(kind, () => {
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: text,
+    });
+  });
 }
 
 describe('reply --dry-run', () => {
@@ -935,6 +942,29 @@ describe('races inside the write gate', () => {
       expect(h.adapter.callsTo('sendMessage')).toHaveLength(1);
     });
 
+    it('refuses when a newer question appears between the reserve and the floor read', async () => {
+      const q = ask();
+      afterReserve('reply', () => {
+        h.deps.clock.time += 1_000;
+        ask('Actually, which cache should I use?');
+      });
+      const err = await fails(() =>
+        reply(
+          h.deps,
+          args({
+            expectActivityId: q.activityId,
+            expectQuestionDigest: messageDigest(QUESTION),
+          })
+        )
+      );
+      expect(err.appError.code).toBe('JULES_QUESTION_CHANGED');
+      expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+      expect(
+        (await readJournal(h.dataDir)).operations[err.localRequestId as string]
+          ?.dispatchedAt
+      ).toBeUndefined();
+    });
+
     it('refuses when a user message sits at the same createTime as the question', async () => {
       const q = ask();
       addActivity(h, session.sessionResource, {
@@ -1226,6 +1256,24 @@ describe('races inside the write gate', () => {
         'JULES_QUESTION_CHANGED'
       );
       expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    });
+
+    it('refuses when a different plan appears between the reserve and the floor read', async () => {
+      const expected = await reviewed();
+      afterReserve('reply', () => {
+        h.deps.clock.time += 1_000;
+        addPlanNow(h, session.sessionResource, 'plan-2');
+      });
+      const err = await fails(() =>
+        reply(h.deps, args({ ...expected, replyKind: 'plan' }))
+      );
+      expect(err.appError.code).toBe('JULES_QUESTION_CHANGED');
+      expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+      const record = (await readJournal(h.dataDir)).operations[
+        err.localRequestId as string
+      ];
+      expect(record?.status).toBe('failed');
+      expect(record?.dispatchedAt).toBeUndefined();
     });
 
     it('refuses when a teammate message follows the reviewed plan', async () => {

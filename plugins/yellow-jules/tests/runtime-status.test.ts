@@ -777,6 +777,9 @@ describe('--reconcile', () => {
       requestedBranch: 'main',
       sourceResource: 'sources/github/acme/widgets',
     });
+    // No candidate at all: the fixture session would otherwise count as an
+    // unowned same-repo/branch candidate (there is no create-time floor).
+    fake.sessions.clear();
     // Old enough that its write cannot still be in flight.
     const deps = makeDeps(dataDir, fake);
     deps.clock.time = Date.now() + 10 * 60_000;

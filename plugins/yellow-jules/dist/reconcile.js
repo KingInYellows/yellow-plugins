@@ -157,20 +157,13 @@ function resolveCreates(journal, creates, walk) {
         if (!walk.complete) {
             return notReached(record, `sessions walk incomplete (${walk.stopReason ?? 'unknown'})`);
         }
-        const floor = Date.parse(record.createdAt) - activity_walk_js_1.OVERLAP_WINDOW_MS;
-        const untagged = walk.sessions.filter((s) => {
-            if ((0, validate_js_1.extractTitleTag)(s.title).localId !== undefined)
-                return false;
-            if (boundElsewhere.has(s.sessionResource))
-                return false;
-            if (s.sourceResource !== record.sourceResource ||
-                s.startingBranch !== record.requestedBranch) {
-                return false;
-            }
-            const created = s.createTime !== undefined ? Date.parse(s.createTime) : NaN;
-            // A session with no usable create time cannot be ruled out.
-            return Number.isNaN(created) || created >= floor;
-        });
+        // No create-time floor: it would compare the vendor's stamps with the
+        // controller's clock. A same-repo/branch session nothing owns, from a
+        // complete walk, keeps the create ambiguous instead of released.
+        const untagged = walk.sessions.filter((s) => (0, validate_js_1.extractTitleTag)(s.title).localId === undefined &&
+            !boundElsewhere.has(s.sessionResource) &&
+            s.sourceResource === record.sourceResource &&
+            s.startingBranch === record.requestedBranch);
         if (untagged.length > 0) {
             return {
                 record,

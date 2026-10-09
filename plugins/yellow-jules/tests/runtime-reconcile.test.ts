@@ -279,21 +279,28 @@ describe('delegate reservations: one shared sessions walk', () => {
     );
   });
 
-  it('an untagged session created long before the reservation is not a candidate', async () => {
-    await lostResponse('scratch/a', 'lost-a', false);
+  it('an unowned same-repo/branch session stamped before the reservation keeps the create ambiguous, never released (no cross-clock floor)', async () => {
+    await lostResponse('scratch/a', 'lost-a');
     await confirmArchiveVisibility();
-    h.adapter.sessions.set(
-      'sessions/old1',
-      makeSession({
-        sessionResource: 'sessions/old1',
-        title: 'old',
-        sourceResource: 'sources/github/acme/widgets',
-        startingBranch: 'scratch/a',
-        createTime: '2026-01-01T00:00:00Z',
-      })
-    );
+    const record = (await readJournal(h.dataDir)).operations['lost-a'];
+    const [resource, vendor] = [...h.adapter.sessions.entries()][0] ?? [];
+    // The controller clock runs more than 5 minutes ahead of the service's, and
+    // the vendor dropped the title tag: the stamp lies before any local floor.
+    h.adapter.sessions.set(resource as string, {
+      ...(vendor as AdapterSession),
+      title: 'trimmed title',
+      createTime: new Date(
+        Date.parse(record?.createdAt as string) - 10 * 60_000
+      ).toISOString(),
+    });
     const result = await status(h.deps, { reconcile: true });
-    expect(result.reconciled?.[0]?.outcome).toBe('released');
+    expect(result.reconciled?.[0]).toMatchObject({
+      outcome: 'ambiguous-reconcile',
+      reason: 'untagged-candidate',
+    });
+    expect((await readJournal(h.dataDir)).operations['lost-a']?.status).toBe(
+      'unknown-outcome'
+    );
   });
 
   it('more than one tagged candidate is ambiguous', async () => {

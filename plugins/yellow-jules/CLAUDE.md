@@ -307,7 +307,14 @@ clears `pendingPlan` cannot hide it: the next `supervise` pass treats it as an
 unexplained replacement and pauses. Create reconciliation walks sessions
 without a `create_time` filter, since a floor derived from the controller's
 clock would hide the tagged session when that clock runs ahead of the service's;
-a walk cut short by the page cap is `not-reached`, never a release.
+a walk cut short by the page cap is `not-reached`, never a release. Untagged
+candidates have no create-time floor either: an unowned same-repo/branch session
+in a complete walk leaves the create `ambiguous-reconcile`
+(`untagged-candidate`). The final floor walk of `reply` and `approve` also
+re-validates the target on that same complete read: the pending plan must still
+be the reviewed one and not ambiguous (approve: `JULES_POLICY_DEVIATION`;
+guarded reply: `JULES_QUESTION_CHANGED`), and a guarded question must have no
+newer or tied agent message; a mismatch settles as a clean failure before the POST.
 
 `authorize` (create) refuses under the lock when any existing grant is bound to
 another controller id or epoch (for example after another host's take-over): a

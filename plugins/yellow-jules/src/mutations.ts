@@ -722,6 +722,32 @@ function stampBefore(
   );
 }
 
+/**
+ * What the write was approved against, re-checked on the final floor walk (a
+ * complete read right before the POST). A mismatch refuses before dispatch.
+ */
+interface FloorExpectation {
+  /** approve and plan-guarded reply: the pending plan must still be this one. */
+  readonly plan?: {
+    readonly planId: string;
+    readonly digest?: string;
+    readonly code: 'JULES_POLICY_DEVIATION' | 'JULES_QUESTION_CHANGED';
+  };
+  /** question-guarded reply: no newer or tied agent message may exist. */
+  readonly question?: { readonly activityId: string; readonly digest: string };
+}
+
+function targetChanged(
+  code: 'JULES_POLICY_DEVIATION' | 'JULES_QUESTION_CHANGED',
+  why: string
+): AppErrorException {
+  return new AppErrorException(
+    makeAppError(code, `${why}; nothing was sent`, {
+      recoveryAction: 'Run status, evaluate the session again, then retry.',
+    })
+  );
+}
+
 /** Refusal when the floor walk met a user message this plugin did not send. */
 function outsideBeforeWrite(): AppErrorException {
   return new AppErrorException(
@@ -759,8 +785,9 @@ async function readVendorFloor(
   adapter: SdkAdapter,
   sessionResource: string,
   owner: OperationRecord,
-  deadline: Deadline
-): Promise<VendorFloor | 'outside' | undefined> {
+  deadline: Deadline,
+  expect: FloorExpectation = {}
+): Promise<VendorFloor | AppErrorException | undefined> {
   const stored =
     owner.lastActivityCreateTime !== undefined &&
     owner.lastActivityId !== undefined
@@ -780,6 +807,11 @@ async function readVendorFloor(
       createTime: string;
       observedAt: string;
     }> = [];
+    const agentMessages: Array<{
+      activityId: string;
+      createTime: string;
+      digest: string;
+    }> = [];
     const walkStartedAt = nowFn(deps)().toISOString();
     const walkSeq = await takeSeq(deps.dataDir);
     const walk = await walkActivities({
@@ -795,6 +827,9 @@ async function readVendorFloor(
       pageCap: APPROVE_PAGE_CAP,
       ring: owner.recentActivityIds,
       ...(stored !== undefined ? { watermark: stored } : {}),
+      ...(owner.pendingPlan !== undefined
+        ? { pendingPlan: owner.pendingPlan }
+        : {}),
       onActivity: (activity, info) => {
         if (
           info.unseen &&
@@ -806,6 +841,13 @@ async function readVendorFloor(
             digest: messageDigest(activity.message),
             createTime: activity.createTime,
             observedAt: nowFn(deps)().toISOString(),
+          });
+        }
+        if (activity.type === 'agentMessaged') {
+          agentMessages.push({
+            activityId: activity.activityId,
+            createTime: activity.createTime,
+            digest: messageDigest(activity.message ?? ''),
           });
         }
       },
@@ -828,7 +870,57 @@ async function readVendorFloor(
       );
       // Unclaimed (outside) or held (an in-flight write might explain it):
       // either way the session is not provably ours alone.
-      if (outside !== undefined || held.length > 0) return 'outside';
+      if (outside !== undefined || held.length > 0) {
+        return outsideBeforeWrite();
+      }
+    }
+    // The target the write was approved against must still be current on this
+    // same complete walk.
+    if (expect.plan !== undefined) {
+      const { planId, digest, code } = expect.plan;
+      const current = walk.pendingPlan;
+      if (current?.ambiguous === true) {
+        return targetChanged(
+          code,
+          'two different plans share the newest timestamp, so the current plan cannot be told'
+        );
+      }
+      if (
+        current === null ||
+        current === undefined ||
+        current.planId !== planId ||
+        (digest !== undefined &&
+          planDigest(current.planId, redactDeep(current).steps) !== digest)
+      ) {
+        return targetChanged(
+          code,
+          'the pending plan is no longer the reviewed plan (id or digest)'
+        );
+      }
+    }
+    if (expect.question !== undefined) {
+      if (newestPlanAmbiguous(agentMessages)) {
+        return targetChanged(
+          'JULES_QUESTION_CHANGED',
+          'two different questions share the newest timestamp, so the current one cannot be told'
+        );
+      }
+      let newestMsg: (typeof agentMessages)[number] | undefined;
+      for (const m of agentMessages) {
+        if (newestMsg === undefined || compareStamp(m, newestMsg) > 0) {
+          newestMsg = m;
+        }
+      }
+      if (
+        newestMsg !== undefined &&
+        (newestMsg.activityId !== expect.question.activityId ||
+          newestMsg.digest !== expect.question.digest)
+      ) {
+        return targetChanged(
+          'JULES_QUESTION_CHANGED',
+          'the session no longer awaits the question the pass showed'
+        );
+      }
     }
     const newest =
       walk.newest !== undefined &&
@@ -1148,7 +1240,19 @@ async function replyInner(
       adapter,
       target.sessionResource,
       owner,
-      deadline
+      deadline,
+      {
+        ...(expectPlan !== undefined
+          ? {
+              plan: {
+                planId: expectPlan.planId,
+                digest: expectPlan.digest,
+                code: 'JULES_QUESTION_CHANGED' as const,
+              },
+            }
+          : {}),
+        ...(expectQuestion !== undefined ? { question: expectQuestion } : {}),
+      }
     );
     if (isExpired(deps.clock, deadline)) {
       return settleExpiredBeforeWrite(deps, reservation, SESSION_RECONCILE);
@@ -1158,8 +1262,8 @@ async function replyInner(
         reconcileHint: SESSION_RECONCILE,
       });
     }
-    if (replyFloor === 'outside') {
-      return settleFailure(deps, reservation, outsideBeforeWrite(), {
+    if (replyFloor instanceof AppErrorException) {
+      return settleFailure(deps, reservation, replyFloor, {
         reconcileHint: SESSION_RECONCILE,
       });
     }
@@ -1493,7 +1597,16 @@ async function approveInner(
       adapter,
       target.sessionResource,
       owner,
-      deadline
+      deadline,
+      {
+        plan: {
+          planId,
+          ...(args.expectPlanDigest !== undefined
+            ? { digest: args.expectPlanDigest }
+            : {}),
+          code: 'JULES_POLICY_DEVIATION',
+        },
+      }
     );
     if (isExpired(deps.clock, deadline)) {
       return settleExpiredBeforeWrite(deps, reservation, SESSION_RECONCILE);
@@ -1503,8 +1616,8 @@ async function approveInner(
         reconcileHint: SESSION_RECONCILE,
       });
     }
-    if (approveFloor === 'outside') {
-      return settleFailure(deps, reservation, outsideBeforeWrite(), {
+    if (approveFloor instanceof AppErrorException) {
+      return settleFailure(deps, reservation, approveFloor, {
         reconcileHint: SESSION_RECONCILE,
       });
     }

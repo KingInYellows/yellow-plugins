@@ -17,7 +17,6 @@
 import {
   compareStamp,
   RESERVATION_SETTLE_MS,
-  OVERLAP_WINDOW_MS,
   STATUS_PAGE_SIZE,
   walkActivities,
 } from './activity-walk.js';
@@ -267,21 +266,16 @@ function resolveCreates(
         `sessions walk incomplete (${walk.stopReason ?? 'unknown'})`
       );
     }
-    const floor = Date.parse(record.createdAt) - OVERLAP_WINDOW_MS;
-    const untagged = walk.sessions.filter((s) => {
-      if (extractTitleTag(s.title).localId !== undefined) return false;
-      if (boundElsewhere.has(s.sessionResource)) return false;
-      if (
-        s.sourceResource !== record.sourceResource ||
-        s.startingBranch !== record.requestedBranch
-      ) {
-        return false;
-      }
-      const created =
-        s.createTime !== undefined ? Date.parse(s.createTime) : NaN;
-      // A session with no usable create time cannot be ruled out.
-      return Number.isNaN(created) || created >= floor;
-    });
+    // No create-time floor: it would compare the vendor's stamps with the
+    // controller's clock. A same-repo/branch session nothing owns, from a
+    // complete walk, keeps the create ambiguous instead of released.
+    const untagged = walk.sessions.filter(
+      (s) =>
+        extractTitleTag(s.title).localId === undefined &&
+        !boundElsewhere.has(s.sessionResource) &&
+        s.sourceResource === record.sourceResource &&
+        s.startingBranch === record.requestedBranch
+    );
     if (untagged.length > 0) {
       return {
         record,

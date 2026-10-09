@@ -408,6 +408,11 @@ async function hasUnclaimedUserMessage(deps, sessionResource, userMessages, afte
 function stampBefore(a, b) {
     return ((0, activity_walk_js_1.compareStamp)({ createTime: a.createTime, activityId: '' }, { createTime: b.createTime, activityId: '' }) < 0);
 }
+function targetChanged(code, why) {
+    return new errors_js_1.AppErrorException((0, errors_js_1.makeAppError)(code, `${why}; nothing was sent`, {
+        recoveryAction: 'Run status, evaluate the session again, then retry.',
+    }));
+}
 /** Refusal when the floor walk met a user message this plugin did not send. */
 function outsideBeforeWrite() {
     return new errors_js_1.AppErrorException((0, errors_js_1.makeAppError)('JULES_SUPERVISION_PAUSED', 'a user message not sent by this plugin arrived before the write; outside activity was recorded and nothing was sent', {
@@ -425,7 +430,7 @@ function floorUnreadable() {
  * failed or partial read yields no floor, and the caller refuses the write
  * before the POST rather than send one whose echo could never bind.
  */
-async function readVendorFloor(deps, adapter, sessionResource, owner, deadline) {
+async function readVendorFloor(deps, adapter, sessionResource, owner, deadline, expect = {}) {
     const stored = owner.lastActivityCreateTime !== undefined &&
         owner.lastActivityId !== undefined
         ? {
@@ -439,6 +444,7 @@ async function readVendorFloor(deps, adapter, sessionResource, owner, deadline) 
         // dispatched over. They get the same own-echo / outside-activity
         // classification as a status walk.
         const userMessages = [];
+        const agentMessages = [];
         const walkStartedAt = (0, runtime_support_js_1.nowFn)(deps)().toISOString();
         const walkSeq = await (0, state_js_1.takeSeq)(deps.dataDir);
         const walk = await (0, activity_walk_js_1.walkActivities)({
@@ -453,6 +459,9 @@ async function readVendorFloor(deps, adapter, sessionResource, owner, deadline) 
             pageCap: APPROVE_PAGE_CAP,
             ring: owner.recentActivityIds,
             ...(stored !== undefined ? { watermark: stored } : {}),
+            ...(owner.pendingPlan !== undefined
+                ? { pendingPlan: owner.pendingPlan }
+                : {}),
             onActivity: (activity, info) => {
                 if (info.unseen &&
                     activity.type === 'userMessaged' &&
@@ -462,6 +471,13 @@ async function readVendorFloor(deps, adapter, sessionResource, owner, deadline) 
                         digest: (0, state_js_1.messageDigest)(activity.message),
                         createTime: activity.createTime,
                         observedAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString(),
+                    });
+                }
+                if (activity.type === 'agentMessaged') {
+                    agentMessages.push({
+                        activityId: activity.activityId,
+                        createTime: activity.createTime,
+                        digest: (0, state_js_1.messageDigest)(activity.message ?? ''),
                     });
                 }
             },
@@ -478,8 +494,41 @@ async function readVendorFloor(deps, adapter, sessionResource, owner, deadline) 
             }, held, true);
             // Unclaimed (outside) or held (an in-flight write might explain it):
             // either way the session is not provably ours alone.
-            if (outside !== undefined || held.length > 0)
-                return 'outside';
+            if (outside !== undefined || held.length > 0) {
+                return outsideBeforeWrite();
+            }
+        }
+        // The target the write was approved against must still be current on this
+        // same complete walk.
+        if (expect.plan !== undefined) {
+            const { planId, digest, code } = expect.plan;
+            const current = walk.pendingPlan;
+            if (current?.ambiguous === true) {
+                return targetChanged(code, 'two different plans share the newest timestamp, so the current plan cannot be told');
+            }
+            if (current === null ||
+                current === undefined ||
+                current.planId !== planId ||
+                (digest !== undefined &&
+                    (0, state_js_1.planDigest)(current.planId, (0, redact_js_1.redactDeep)(current).steps) !== digest)) {
+                return targetChanged(code, 'the pending plan is no longer the reviewed plan (id or digest)');
+            }
+        }
+        if (expect.question !== undefined) {
+            if (newestPlanAmbiguous(agentMessages)) {
+                return targetChanged('JULES_QUESTION_CHANGED', 'two different questions share the newest timestamp, so the current one cannot be told');
+            }
+            let newestMsg;
+            for (const m of agentMessages) {
+                if (newestMsg === undefined || (0, activity_walk_js_1.compareStamp)(m, newestMsg) > 0) {
+                    newestMsg = m;
+                }
+            }
+            if (newestMsg !== undefined &&
+                (newestMsg.activityId !== expect.question.activityId ||
+                    newestMsg.digest !== expect.question.digest)) {
+                return targetChanged('JULES_QUESTION_CHANGED', 'the session no longer awaits the question the pass showed');
+            }
         }
         const newest = walk.newest !== undefined &&
             (stored === undefined || (0, activity_walk_js_1.compareStamp)(walk.newest, stored) > 0)
@@ -694,7 +743,18 @@ async function replyInner(deps, args, ids) {
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
             return (0, write_gate_js_1.settleExpiredBeforeWrite)(deps, reservation, SESSION_RECONCILE);
         }
-        const replyFloor = await readVendorFloor(deps, adapter, target.sessionResource, owner, deadline);
+        const replyFloor = await readVendorFloor(deps, adapter, target.sessionResource, owner, deadline, {
+            ...(expectPlan !== undefined
+                ? {
+                    plan: {
+                        planId: expectPlan.planId,
+                        digest: expectPlan.digest,
+                        code: 'JULES_QUESTION_CHANGED',
+                    },
+                }
+                : {}),
+            ...(expectQuestion !== undefined ? { question: expectQuestion } : {}),
+        });
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
             return (0, write_gate_js_1.settleExpiredBeforeWrite)(deps, reservation, SESSION_RECONCILE);
         }
@@ -703,8 +763,8 @@ async function replyInner(deps, args, ids) {
                 reconcileHint: SESSION_RECONCILE,
             });
         }
-        if (replyFloor === 'outside') {
-            return (0, write_gate_js_1.settleFailure)(deps, reservation, outsideBeforeWrite(), {
+        if (replyFloor instanceof errors_js_1.AppErrorException) {
+            return (0, write_gate_js_1.settleFailure)(deps, reservation, replyFloor, {
                 reconcileHint: SESSION_RECONCILE,
             });
         }
@@ -897,7 +957,15 @@ async function approveInner(deps, args, ids) {
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
             return (0, write_gate_js_1.settleExpiredBeforeWrite)(deps, reservation, SESSION_RECONCILE);
         }
-        const approveFloor = await readVendorFloor(deps, adapter, target.sessionResource, owner, deadline);
+        const approveFloor = await readVendorFloor(deps, adapter, target.sessionResource, owner, deadline, {
+            plan: {
+                planId,
+                ...(args.expectPlanDigest !== undefined
+                    ? { digest: args.expectPlanDigest }
+                    : {}),
+                code: 'JULES_POLICY_DEVIATION',
+            },
+        });
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
             return (0, write_gate_js_1.settleExpiredBeforeWrite)(deps, reservation, SESSION_RECONCILE);
         }
@@ -906,8 +974,8 @@ async function approveInner(deps, args, ids) {
                 reconcileHint: SESSION_RECONCILE,
             });
         }
-        if (approveFloor === 'outside') {
-            return (0, write_gate_js_1.settleFailure)(deps, reservation, outsideBeforeWrite(), {
+        if (approveFloor instanceof errors_js_1.AppErrorException) {
+            return (0, write_gate_js_1.settleFailure)(deps, reservation, approveFloor, {
                 reconcileHint: SESSION_RECONCILE,
             });
         }
