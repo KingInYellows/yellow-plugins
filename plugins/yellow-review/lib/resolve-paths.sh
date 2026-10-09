@@ -116,6 +116,89 @@ yr_inside_root() {
     return 1
 }
 
+# yr_file_shebang_enters <file> <root>: succeed when <file> starts with a #!
+# line whose interpreter, or the program `env` is asked to run, is inside
+# <root> by canonical path or identity, or cannot be canonicalized (fail
+# closed). The interpreter comes from the first line only and is never run.
+# `env` operands follow env(1): options with an argument (-u, -C, -P, -a and
+# their long forms), NAME=value words, and -S / --split-string, whose string is
+# split into words that continue the operand list (attached or separate, and
+# inside a short cluster such as -vS). A bare operand is looked up on the
+# caller's PATH (YR_ORIG_PATH), the way the tool itself would be. Copies of
+# this function sit in the two scripts' bootstrap resolvers, which run before
+# this library is sourced; keep them identical.
+yr_file_shebang_enters() {
+    local f="$1" root="$2" line rest i x idx last k c cl val p
+    local -a w=() v=() nw=()
+    [ -f "$f" ] || return 1
+    IFS= read -r -n 512 line <"$f" 2>/dev/null || true
+    case "$line" in '#!'*) ;; *) return 1 ;; esac
+    rest=${line#\#!}
+    read -r -a w <<<"$rest" || true
+    i=${w[0]-}
+    [ -n "$i" ] || return 1
+    case "$i" in
+        env|*/env)
+            i=""
+            idx=1
+            while [ "$idx" -lt "${#w[@]}" ]; do
+                x=${w[idx]}
+                val=""; last=-1
+                case "$x" in
+                    "") idx=$((idx + 1)); continue ;;
+                    --) idx=$((idx + 1)); continue ;;
+                    --split-string) val=${w[idx + 1]-}; last=$((idx + 1)) ;;
+                    --split-string=*) val=${x#*=}; last=$idx ;;
+                    --chdir|--unset|--argv0) idx=$((idx + 2)); continue ;;
+                    --*) idx=$((idx + 1)); continue ;;
+                    -?*)
+                        cl=${x#-}
+                        k=0
+                        while [ "$k" -lt "${#cl}" ]; do
+                            c=${cl:k:1}
+                            case "$c" in
+                                S)
+                                    val=${cl:k+1}; last=$idx
+                                    if [ -z "$val" ]; then val=${w[idx + 1]-}; last=$((idx + 1)); fi
+                                    break
+                                    ;;
+                                u|C|P|a)
+                                    [ -n "${cl:k+1}" ] || idx=$((idx + 1))
+                                    break
+                                    ;;
+                            esac
+                            k=$((k + 1))
+                        done
+                        ;;
+                    *=*) idx=$((idx + 1)); continue ;;
+                    *) i="$x"; break ;;
+                esac
+                if [ "$last" -ge 0 ]; then
+                    # Splice the -S string's words in place of the option.
+                    v=()
+                    read -r -a v <<<"$val" || true
+                    nw=()
+                    [ "$idx" -eq 0 ] || nw=("${w[@]:0:idx}")
+                    nw=(${nw[@]+"${nw[@]}"} ${v[@]+"${v[@]}"} ${w[@]+"${w[@]:last+1}"})
+                    w=(${nw[@]+"${nw[@]}"})
+                else
+                    idx=$((idx + 1))
+                fi
+            done
+            i=${i#[\"\']}
+            i=${i%[\"\']}
+            [ -n "$i" ] || return 1
+            case "$i" in
+                */*) ;;
+                *) i=$(PATH=${YR_ORIG_PATH-$PATH}; type -P "$i" 2>/dev/null) || return 1 ;;
+            esac
+            ;;
+    esac
+    case "$i" in /*) p="$i" ;; *) p="$(pwd -P)/$i" ;; esac
+    c=$(yr_canon_path "$p" 2>/dev/null) || return 0
+    yr_inside_root "$c" "$root" || yr_inside_root "$p" "$root"
+}
+
 # yr_resolve_tool <name>: print one absolute path whose canonical file is
 # outside the worktree. Return 1 when <name> is not on PATH, 2 when that
 # canonical file is inside the worktree, 3 when the path cannot be
@@ -140,6 +223,8 @@ yr_resolve_tool() {
     if [ -n "$root" ]; then
         yr_inside_root "$canon" "$root" && return 2
         yr_inside_root "$invoke" "$root" && return 2
+        # A script whose #! interpreter is inside the worktree runs it.
+        yr_file_shebang_enters "$canon" "$root" && return 2
     fi
     printf '%s\n' "$invoke"
 }
@@ -201,7 +286,7 @@ yr_any_inside() {
     return 1
 }
 
-# yr_batch_inside <root> <find> <realpath> <dir>...: succeed when any symlink
+# yr_batch_inside <root> <find> <realpath> <awk> <dir>...: succeed when any symlink
 # directly in any <dir>, dangling or not (a link to a directory counts), has a
 # canonical target inside <root>. Cost is counted in shell commands, not
 # forks: the bats suites run under a DEBUG trap that makes every command
@@ -215,33 +300,118 @@ yr_any_inside() {
 # them the identity walk runs per link. A realpath error concerns a path this
 # process cannot traverse either, so it cannot reach a program it could run.
 yr_batch_inside() {
-    local root="$1" find="$2" rp="$3" out out_same par sed sort
-    shift 3
+    local root="$1" find="$2" rp="$3" awk="$4" out out_same
+    shift 4
     out=$("$find" "$@" -maxdepth 1 -type l -exec "$rp" -m -- {} + 2>/dev/null) || true
     [ -n "$out" ] || return 1
+    yr_batch_canon_inside "$root" "$out" "$find" "$awk" && return 0
+    out_same=$("$find" -L "$@" -maxdepth 1 -samefile "$root" -print -quit 2>/dev/null) || true
+    [ -z "$out_same" ] || return 0
+    return 1
+}
+
+# yr_batch_canon_inside <root> <list> <find> <awk>: yr_any_inside for a long
+# list of canonical paths without a per-path shell loop: a pattern match on the
+# whole list (spelling), then awk prints each path and every ancestor once and
+# one `find -L ... -maxdepth 0 -samefile <root>` compares them all with the
+# root by inode (bind mounts, case-insensitive volumes).
+yr_batch_canon_inside() {
+    local root="$1" out="$2" find="$3" awk="$4" same
     case $'\n'"$out" in
         *$'\n'"$root"|*$'\n'"$root"/*) return 0 ;;
     esac
-    out_same=$("$find" -L "$@" -maxdepth 1 -samefile "$root" -print -quit 2>/dev/null) || true
-    [ -z "$out_same" ] || return 0
-    if sed=$(yr_helper sed) && sort=$(yr_helper sort); then
-        for par in $(printf '%s\n' "$out" | "$sed" 's,/[^/]*$,,' | "$sort" -u); do
-            yr_inside_root "$par" "$root" && return 0
-        done
-        return 1
-    fi
-    yr_any_inside "$root" "$out"
+    yr_split_lines "$(printf '%s\n' "$out" | "$awk" '{ n = split($0, a, "/"); p = ""; for (i = 2; i <= n; i++) { p = p "/" a[i]; if (!(p in s)) { s[p] = 1; print p } } }')"
+    [ "${#YR_LINES[@]}" -gt 0 ] || return 1
+    same=$("$find" -L "${YR_LINES[@]}" -maxdepth 0 -samefile "$root" -print -quit 2>/dev/null) || true
+    [ -n "$same" ]
 }
 
-# yr_links_inside <dir> <root>: the fallback of yr_batch_inside for a system
-# without GNU realpath or find: succeed when any symlink directly in <dir> has
-# a canonical target (yr_canon_path) inside <root>, or cannot be canonicalized.
+# yr_shebang_inside <root> <find> <rp> <awk> <dir>...: succeed when any
+# executable regular file in any <dir> (links followed) starts with a #! line
+# whose interpreter, or the program `env` is asked to run, canonicalizes inside
+# <root>. One find runs one awk over the files (first line only, then
+# nextfile), which prints each distinct interpreter; those, plus the `env`
+# operand looked up in every <dir>, go through one realpath. A script whose
+# interpreter is outside the worktree is fine. An awk without nextfile would
+# print nothing, so yr_safe_path probes for it and otherwise falls back
+# to yr_links_inside.
+yr_shebang_inside() {
+    local root="$1" find="$2" rp="$3" awk="$4" out dirs
+    shift 4
+    dirs=$(IFS=:; printf '%s' "$*")
+    out=$(YR_SB_DIRS="$dirs" YR_SB_CWD="$(pwd -P)" "$find" -L "$@" -maxdepth 1 -type f \( -perm -100 -o -perm -010 -o -perm -001 \) \
+        -exec "$awk" 'function splice(val, last,    m, v, j, nn, t) {
+            m = split(val, v, /[ \t]+/)
+            nn = 0
+            for (j = 1; j < idx; j++) t[++nn] = w[j]
+            for (j = 1; j <= m; j++) if (v[j] != "") t[++nn] = v[j]
+            for (j = last + 1; j <= n; j++) t[++nn] = w[j]
+            for (j = 1; j <= n; j++) delete w[j]
+            for (j = 1; j <= nn; j++) w[j] = t[j]
+            n = nn
+        }
+        function envcmd(    x, cl, k, c, val, last, name) {
+            idx = 2
+            while (idx <= n) {
+                x = w[idx]; val = ""; last = -1
+                if (x == "" || x == "--") { idx++; continue }
+                if (x ~ /^--/) {
+                    name = x; sub(/=.*/, "", name)
+                    if (name == "--split-string") {
+                        if (x ~ /=/) { val = x; sub(/^[^=]*=/, "", val); last = idx }
+                        else { val = w[idx + 1]; last = idx + 1 }
+                    } else {
+                        if ((name == "--chdir" || name == "--unset" || name == "--argv0") && x !~ /=/) idx++
+                        idx++; continue
+                    }
+                } else if (x ~ /^-./) {
+                    cl = substr(x, 2)
+                    for (k = 1; k <= length(cl); k++) {
+                        c = substr(cl, k, 1)
+                        if (c == "S") {
+                            val = substr(cl, k + 1); last = idx
+                            if (val == "") { val = w[idx + 1]; last = idx + 1 }
+                            break
+                        }
+                        if (c ~ /[uCPa]/) { if (substr(cl, k + 1) == "") idx++; break }
+                    }
+                } else if (x ~ /=/) { idx++; continue }
+                else { gsub(/^["\047]|["\047]$/, "", x); return x }
+                if (last >= 0) splice(val, last); else idx++
+            }
+            return ""
+        }
+        BEGIN { nd = split(ENVIRON["YR_SB_DIRS"], D, ":"); cwd = ENVIRON["YR_SB_CWD"] }
+        FNR == 1 && substr($0, 1, 2) == "#!" {
+            s = substr($0, 3); sub(/^[ \t]+/, "", s); n = split(s, w, /[ \t]+/); i = w[1]; e = ""
+            if (i ~ /(^|\/)env$/) { i = envcmd(); e = 1 }
+            if (i == "" || (i in seen)) next
+            seen[i] = 1
+            if (i ~ /\//) print (i ~ /^\// ? i : cwd "/" i)
+            else if (e) { for (j = 1; j <= nd; j++) print D[j] "/" i }
+            else print cwd "/" i
+        } { nextfile }' {} + 2>/dev/null) || true
+    [ -n "$out" ] || return 1
+    yr_split_lines "$out"
+    out=$("$rp" -m -- "${YR_LINES[@]}" 2>/dev/null) || true
+    yr_batch_canon_inside "$root" "$out" "$find" "$awk"
+}
+
+# yr_links_inside <dir> <root>: the fallback of yr_batch_inside and
+# yr_shebang_inside for a system without GNU realpath, find or awk: succeed
+# when any symlink directly in <dir> has a canonical target (yr_canon_path)
+# inside <root> or cannot be canonicalized, or an executable file's #!
+# interpreter is inside it.
 yr_links_inside() {
     local f out
     for f in "$1"/* "$1"/.[!.]* "$1"/..?*; do
-        [ -L "$f" ] || continue
-        out=$(yr_canon_path "$f" 2>/dev/null || true)
-        if [ -z "$out" ] || yr_inside_root "$out" "$2"; then
+        if [ -L "$f" ]; then
+            out=$(yr_canon_path "$f" 2>/dev/null || true)
+            if [ -z "$out" ] || yr_inside_root "$out" "$2"; then
+                return 0
+            fi
+        fi
+        if [ -f "$f" ] && [ -x "$f" ] && yr_file_shebang_enters "$f" "$2"; then
             return 0
         fi
     done
@@ -256,26 +426,30 @@ yr_links_inside() {
 # true under timeout, ssh, git-credential-*, gpg, pagers, git-remote-*), so
 # no list of names can be complete: any such link makes the whole directory
 # untrustworthy. Symlinks are the only way an outside directory reaches the
-# worktree. One realpath call canonicalizes every entry and one find lists
-# and canonicalizes every link of every remaining directory (see
-# yr_batch_inside); only when that finds a link into the worktree is each
+# worktree, and so is a script whose #! interpreter is inside it (a venv
+# console script). One realpath call canonicalizes every entry, one find lists
+# and canonicalizes every link of every remaining directory (yr_batch_inside)
+# and one find+awk reads the first line of every executable file
+# (yr_shebang_inside); only when either finds a problem is each
 # directory judged on its own, and a directory reached twice (/bin -> usr/bin)
 # takes the verdict of its first spelling. Returns 1 when nothing is left. The
 # caller's PATH is not changed here; yr_prime_path caches the result, and each
 # script runs on it (the verify command keeps its own PATH, it may need
 # node_modules/.bin).
-# This screen forks only find, realpath, sed, sort and readlink from fixed
+# This screen forks only find, awk, realpath, sed, sort and readlink from fixed
 # system locations (yr_helper), never a PATH tool: it must not run a program
 # from a directory it has not judged yet. When find or a GNU realpath is
 # missing it canonicalizes each link in the shell (readlink from a fixed
 # location), and a link it cannot resolve drops the directory.
 yr_safe_path() {
-    local root rest entry canon rp="" find="" kept="" i j k out
+    local root rest entry canon rp="" find="" awk="" kept="" i j k out
     local -a pent=() pcan=() ents=() canons=() verdict=() cand=() dirs=()
     root=$(yr_worktree_root || true)
     if [ -n "$root" ]; then
         if rp=$(yr_helper realpath) && canon=$("$rp" -m -- / 2>/dev/null) && [ "$canon" = / ]; then
             find=$(yr_helper find) || find=""
+            # The #! screen needs an awk that knows nextfile; probe by parsing.
+            awk=$(yr_helper awk) && "$awk" 'FNR == 1 { nextfile }' /dev/null 2>/dev/null || awk=""
         else
             rp=""
         fi
@@ -325,12 +499,16 @@ yr_safe_path() {
         [ "${verdict[i]}" != k ] || cand+=("$i")
     done
     if [ "${#cand[@]}" -gt 0 ] && [ -n "$root" ]; then
-        if [ -n "$rp" ] && [ -n "$find" ]; then
+        if [ -n "$rp" ] && [ -n "$find" ] && [ -n "$awk" ]; then
             dirs=()
             for i in "${cand[@]}"; do dirs+=("${ents[i]}"); done
-            if yr_batch_inside "$root" "$find" "$rp" "${dirs[@]}"; then
+            if yr_batch_inside "$root" "$find" "$rp" "$awk" "${dirs[@]}" \
+                || yr_shebang_inside "$root" "$find" "$rp" "$awk" "${dirs[@]}"; then
                 for i in "${cand[@]}"; do
-                    if yr_batch_inside "$root" "$find" "$rp" "${ents[i]}"; then verdict[i]=x; fi
+                    if yr_batch_inside "$root" "$find" "$rp" "$awk" "${ents[i]}" \
+                        || yr_shebang_inside "$root" "$find" "$rp" "$awk" "${ents[i]}"; then
+                        verdict[i]=x
+                    fi
                 done
             fi
         else
@@ -397,6 +575,164 @@ lgit() { yr_git -c core.fsmonitor=false -c core.untrackedCache=false --literal-p
 # (post-checkout, post-index-change).
 lgit_nohooks() { yr_git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs "$@"; }
 
+# yr_cmd_enters <value> <root>: succeed when a command string would run
+# anything inside <root>, or a path cannot be canonicalized (fail closed). The
+# value is a shell command line (GIT_SSH_COMMAND, a pager or editor, a
+# credential helper, a program-running config value), so `sh <root>/script`
+# and `ssh -F <root>/cfg` count, not only a first word that is a path. It
+# fails when
+#   - the raw value contains the worktree path, spelled physically or through
+#     the logical $PWD;
+#   - any whitespace-separated token (leading ! and quotes stripped, and for
+#     --opt=VALUE both the token and VALUE) is an absolute path, or an
+#     existing path relative to the current directory, that canonicalizes
+#     inside <root> or is identical to it (tokens starting with ~ or $ are
+#     not expanded here and are skipped);
+#   - the first word is a bare name that the screened PATH (YR_GIT_PATH, else
+#     the current PATH) resolves to a script whose #! interpreter enters
+#     <root>, or to a file inside it.
+# Values that point only outside the worktree keep working.
+yr_cmd_enters() {
+    local v="$1" root="$2" lroot="" phys tok t u bin c first=1 noglob=1
+    local -a toks=()
+    phys=$(pwd -P) || return 0
+    case "$PWD" in
+        "$phys") ;;
+        *)
+            # Logical spelling of the root: $PWD minus the part below it.
+            t=${phys#"$root"}
+            [ "$t" != "$phys" ] && case "$PWD" in *"$t") lroot=${PWD%"$t"} ;; esac
+            ;;
+    esac
+    case "$v" in *"$root"*) return 0 ;; esac
+    if [ -n "$lroot" ]; then
+        case "$v" in *"$lroot"*) return 0 ;; esac
+    fi
+    case $- in *f*) noglob=0 ;; esac
+    {
+        local IFS=$' \t\n'
+        set -f
+        toks=($v)
+        [ "$noglob" -eq 0 ] || set +f
+    }
+    for tok in ${toks[@]+"${toks[@]}"}; do
+        t=${tok#!}
+        t=${t#[\"\']}
+        t=${t%[\"\']}
+        for u in "$t" "${t#*=}"; do
+            case "$u" in
+                ''|'~'*|'$'*) continue ;;
+                /*)
+                    c=$(yr_canon_path "$u" 2>/dev/null) || return 0
+                    yr_inside_root "$c" "$root" && return 0
+                    yr_inside_root "$u" "$root" && return 0
+                    ;;
+                *)
+                    [ -e "$u" ] || continue
+                    c=$(yr_canon_path "$phys/$u" 2>/dev/null) || return 0
+                    yr_inside_root "$c" "$root" && return 0
+                    ;;
+            esac
+            case "$t" in -*=*) ;; *) break ;; esac
+        done
+        if [ "$first" -eq 1 ]; then
+            first=0
+            case "$t" in
+                */*|-*) ;;
+                *)
+                    bin=$(PATH=${YR_GIT_PATH:-$PATH}; type -P "$t" 2>/dev/null) || bin=""
+                    if [ -n "$bin" ]; then
+                        c=$(yr_canon_path "$bin" 2>/dev/null) || return 0
+                        yr_inside_root "$c" "$root" && return 0
+                        yr_file_shebang_enters "$c" "$root" && return 0
+                    fi
+                    ;;
+            esac
+            case "$t" in
+                */*)
+                    case "$t" in /*) bin="$t" ;; *) bin="$phys/$t" ;; esac
+                    if [ -e "$bin" ]; then
+                        c=$(yr_canon_path "$bin" 2>/dev/null) || return 0
+                        yr_file_shebang_enters "$c" "$root" && return 0
+                    fi
+                    ;;
+            esac
+        fi
+    done
+    return 1
+}
+
+# yr_cmd_key <config key>: succeed for a config key whose value is a program
+# git (or ssh, gpg, a pager) runs. Case-insensitive.
+yr_cmd_key() {
+    local r=1 had=0
+    shopt -q nocasematch && had=1
+    shopt -s nocasematch
+    [[ "$1" =~ ^(core\.(sshcommand|askpass|gitproxy|pager|editor)|credential\.(.*\.)?helper|diff\.(external|.*\.(command|textconv))|merge\..*\.driver|gpg\.(.*\.)?program|sequence\.editor|filter\..*\.(clean|smudge|process)|pager\..*)$ ]] && r=0
+    [ "$had" -eq 1 ] || shopt -u nocasematch
+    return $r
+}
+
+# yr_check_git_env: refuse an inherited git environment that runs a program, or
+# loads config or helpers, from inside the worktree. A resolver can write any
+# file there, and the submit step's git, ssh, gpg and pager run with
+# submission authority. Sets YR_HARDEN_MSG (variable names only, never
+# values) and returns 1 on a hit. Trusted values outside the worktree are kept,
+# so ordinary ssh pushes and credential helpers still work. Covers: the
+# command variables (GIT_SSH_COMMAND, GIT_SSH, GIT_ASKPASS, SSH_ASKPASS,
+# GIT_PROXY_COMMAND, GIT_EXTERNAL_DIFF, GIT_PAGER, PAGER, GIT_EDITOR, EDITOR,
+# VISUAL), the path variables (GIT_EXEC_PATH, GIT_TEMPLATE_DIR,
+# GIT_CONFIG_GLOBAL, GIT_CONFIG_SYSTEM) and config injected through
+# GIT_CONFIG_KEY_<i>/GIT_CONFIG_VALUE_<i> (below GIT_CONFIG_COUNT) and
+# GIT_CONFIG_PARAMETERS, judged by the same rules as the repository's own
+# config. A GIT_CONFIG_COUNT that is not a number is refused by
+# harden_git_config itself.
+yr_check_git_env() {
+    local root name val i n k v rest
+    root=$(yr_worktree_root || true)
+    [ -n "$root" ] || return 0
+    for name in GIT_SSH_COMMAND GIT_SSH GIT_ASKPASS SSH_ASKPASS GIT_PROXY_COMMAND \
+        GIT_EXTERNAL_DIFF GIT_PAGER PAGER GIT_EDITOR EDITOR VISUAL; do
+        val="${!name-}"
+        [ -n "$val" ] || continue
+        if yr_cmd_enters "$val" "$root"; then
+            YR_HARDEN_MSG="$name runs a program inside the repository; unset it or point it outside the repository"
+            return 1
+        fi
+    done
+    for name in GIT_EXEC_PATH GIT_TEMPLATE_DIR GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM; do
+        val="${!name-}"
+        [ -n "$val" ] || continue
+        case "$val" in /*) ;; *) val="$(pwd -P)/$val" ;; esac
+        k=$(yr_canon_path "$val" 2>/dev/null) || k=""
+        if [ -z "$k" ] || yr_inside_root "$k" "$root" || yr_inside_root "$val" "$root"; then
+            YR_HARDEN_MSG="$name points inside the repository; unset it or point it outside the repository"
+            return 1
+        fi
+    done
+    n="${GIT_CONFIG_COUNT:-0}"
+    case "$n" in ''|*[!0-9]*) n=0 ;; esac
+    for ((i = 0; i < 10#$n; i++)); do
+        name="GIT_CONFIG_KEY_$i"; k="${!name-}"
+        name="GIT_CONFIG_VALUE_$i"; v="${!name-}"
+        if yr_cmd_key "$k" && yr_cmd_enters "$v" "$root"; then
+            YR_HARDEN_MSG="GIT_CONFIG_VALUE_$i (injected config) runs a program inside the repository; unset it or point it outside the repository"
+            return 1
+        fi
+    done
+    # GIT_CONFIG_PARAMETERS holds 'key'='value' (or 'key=value') entries that
+    # git itself exports to child processes; judge each one the same way.
+    rest="${GIT_CONFIG_PARAMETERS-}"
+    while [[ "$rest" =~ \'([^\'=]+)\'=\'([^\']*)\'(.*)$ || "$rest" =~ \'([^\'=]+)=([^\']*)\'(.*)$ ]]; do
+        k="${BASH_REMATCH[1]}"; v="${BASH_REMATCH[2]}"; rest="${BASH_REMATCH[3]}"
+        if yr_cmd_key "$k" && yr_cmd_enters "$v" "$root"; then
+            YR_HARDEN_MSG="GIT_CONFIG_PARAMETERS (injected config) runs a program inside the repository; unset it or point it outside the repository"
+            return 1
+        fi
+    done
+    return 0
+}
+
 # harden_git_config [full|revert]: force core.fsmonitor and
 # core.untrackedCache off, and safe.bareRepository=explicit, for this process
 # and its children (GIT_CONFIG_COUNT, appended to the caller's). It reads
@@ -425,6 +761,9 @@ harden_git_config() {
             return 1
             ;;
     esac
+    # Before any git call: an inherited environment can name a program inside
+    # the worktree for git to run.
+    yr_check_git_env || return 1
     n=$((10#$n))
     YR_HARDEN_FROM_N=$n
     export "GIT_CONFIG_KEY_$n=core.fsmonitor" "GIT_CONFIG_VALUE_$n=false" \
