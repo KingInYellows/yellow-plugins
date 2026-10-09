@@ -1372,6 +1372,37 @@ moved_by_hand() {
   assert_all_restored
 }
 
+@test "an unwritable marker plus a busy non-rebase operation reports the unrecorded rollback" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  gd=$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)
+  git -C "$(wtp c)" rev-parse HEAD >"$gd/MERGE_HEAD"
+  mkdir "$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"MERGE_HEAD operation is still in progress"* ]]
+  [[ $output == *"could not be written"* ]]
+  [[ $output == *"--abort again"* ]]
+  [[ $output != *"run --continue"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "a busy non-rebase operation after a provider abort leaves a marker that makes --continue refuse" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  gd=$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)
+  git -C "$(wtp c)" rev-parse HEAD >"$gd/MERGE_HEAD"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [ "$(cat "$SD/provider-aborted")" = "$(runid_of)" ]
+  rm -f "$gd/MERGE_HEAD"
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"already aborted"* ]]
+}
+
 @test "--abort ignores a non-rebase operation in a worktree outside the recorded stack" {
   mk_stack b
   git -C "$REPO" branch side main

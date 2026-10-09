@@ -1667,6 +1667,17 @@ die_marker_unwritable() {
   die "$X_KEPT" "the provider's abort succeeded, but the record of it, $(v "$ABORTED_FILE"), could not be written; state kept, nothing restored. Remove or fix that path, then run --abort again. --continue would treat the rolled-back stack as restacked"
 }
 
+# abort_die MESSAGE: every refusal after the provider abort ran. The rollback
+# is recorded first; when that is impossible the unrecorded rollback is added to
+# the refusal, so no exit leaves a state --continue would accept.
+abort_die() {
+  if ! rollback_recorded; then
+    err "$1"
+    die_marker_unwritable
+  fi
+  die "$X_KEPT" "$1"
+}
+
 # refuse_moved LEAD MOVED: print the moved branches, each with a fix line, and
 # exit 31 keeping the state. Never resets a branch itself.
 refuse_moved() {
@@ -1746,7 +1757,7 @@ cmd_abort() {
     if ! rollback_recorded; then
       die "$X_KEPT" "the provider's abort succeeded, but the marker $(v "$ABORTED_FILE") could not be written and a rebase operation is still in progress in $(v "$ABORT_STUCK"); state kept, nothing restored. Abort that rebase by hand (git -C $(q "$ABORT_STUCK") rebase --abort) before running --abort again; fixing only the marker path is not enough, because a rerun with that rebase in place would wrongly ask for a manual whole-stack reset"
     fi
-    die "$X_KEPT" "a rebase operation is still in progress in $(v "$ABORT_STUCK"); state kept, nothing restored. Finish or abort it (git -C $(q "$ABORT_STUCK") rebase --abort), then run --abort again"
+    abort_die "a rebase operation is still in progress in $(v "$ABORT_STUCK"); state kept, nothing restored. Finish or abort it (git -C $(q "$ABORT_STUCK") rebase --abort), then run --abort again"
   fi
   # An auxiliary rebase abort restores that rebase's own orig-head, which can
   # be a restacked tip the provider rollback had just undone. Recheck before
@@ -1755,7 +1766,7 @@ cmd_abort() {
     refuse_moved "stack branches are not at their starting commits after the abort:" "$moved"
   fi
   if ! release_run_worktree "$start"; then
-    die "$X_KEPT" "could not return the run worktree to $(v "$start"); state kept, nothing restored"
+    abort_die "could not return the run worktree to $(v "$start"); state kept, nothing restored"
   fi
   local busy_line rc busy_name busy_path
   busy_line=$(in_chain_busy) || rc=$?
@@ -1763,14 +1774,16 @@ cmd_abort() {
   if [ "$rc" -eq 0 ]; then
     busy_name=${busy_line%%$'\t'*}
     busy_path=${busy_line#*$'\t'}
-    die "$X_KEPT" "a $(v "$busy_name") operation is still in progress in $(v "$busy_path"); state kept, nothing restored. Finish or abort it, then run --abort again"
+    abort_die "a $(v "$busy_name") operation is still in progress in $(v "$busy_path"); state kept, nothing restored. Finish or abort it, then run --abort again"
   elif [ "$rc" -eq 2 ]; then
-    die "$X_KEPT" "could not list worktrees; state kept, nothing restored"
+    abort_die "could not list worktrees; state kept, nothing restored"
   fi
   if restore_and_clear; then
     note "aborted"
     exit "$X_OK"
   fi
+  # Entries remain detached and the state was rewritten: keep the rollback on record.
+  rollback_recorded || err "the rollback record $(v "$ABORTED_FILE") could not be written; rerun --abort after fixing that path, not --continue"
   exit "$X_PARTIAL"
 }
 
