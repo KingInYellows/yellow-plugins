@@ -39,6 +39,18 @@ require_timeout() {
   [[ "$stderr" == *"$B"* ]]
 }
 
+@test "an executable named yr_awk on PATH is never run as the scanner" {
+  bin="$BATS_TEST_TMPDIR/fakebin"
+  mkdir -p "$bin"
+  marker="$BATS_TEST_TMPDIR/yr_awk-ran"
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$bin/yr_awk"
+  chmod +x "$bin/yr_awk"
+  printf 'use AKIA''ABCDEFGHIJKLMNOP\n' >| "$B"
+  PATH="$bin:$PATH" run --separate-stderr "$SCRIPT" "$A" "$B"
+  [ "$status" -eq 6 ]
+  [ ! -e "$marker" ]
+}
+
 @test "a private key block exits 6" {
   printf -- '-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n' >| "$A"
   run "$SCRIPT" "$A"
@@ -1459,9 +1471,9 @@ rule=forged line=9.txt"
     awk_expect "$bin" 6 "Authorization: Basic ${one},\n"
     # no padding at all
     awk_expect "$bin" 6 "Authorization: Basic ${two%%=*}\n"
-    # a colon first or last is no user:pass
-    awk_expect "$bin" 0 "Authorization: Basic ${colonfirst}\n"
-    awk_expect "$bin" 0 "Authorization: Basic ${colonlast}\n"
+    # a colon first or last is an empty user or password, still a credential
+    awk_expect "$bin" 6 "Authorization: Basic ${colonfirst}\n"
+    awk_expect "$bin" 6 "Authorization: Basic ${colonlast}\n"
     # = in the middle, and a length that cannot be base64
     awk_expect "$bin" 0 'Authorization: Basic YW=I6Yw==\n'
     awk_expect "$bin" 0 'Authorization: Basic YWI6Y\n'
@@ -1486,6 +1498,35 @@ rule=forged line=9.txt"
     awk_expect "$bin" 0 "x ${tv}abcdefghij+abcdefghij y\n"
     awk_expect "$bin" 0 "x ${sg}abcdefghij/abcdefghij y\n"
     awk_expect "$bin" 6 "x ${tv}abcdefghijabcdefghijabcde+abc y\n"
+  done
+}
+
+@test "short Basic credentials with an empty side or UTF-8 text are refused; a lone colon and binary prose are not" {
+  for bin in gawk mawk; do
+    for cred in 'key:' ':pw' 'jörg:pw' 'ab:wörd'; do
+      tok=$(printf '%s' "$cred" | base64 | tr -d '\n')
+      [ "${#tok}" -lt 20 ]
+      awk_expect "$bin" 6 "Authorization: Basic ${tok}\n"
+    done
+    # a bare colon has no secret side; httpOnly decodes to malformed UTF-8
+    awk_expect "$bin" 0 'Authorization: Basic Og==\n'
+    awk_expect "$bin" 0 'This handler uses Basic httpOnly mode.\n'
+    # a control byte (here a tab) is not text
+    tok=$(printf 'a\tb:c' | base64 | tr -d '\n')
+    awk_expect "$bin" 0 "Authorization: Basic ${tok}\n"
+    # a UTF-8 lead byte without its continuation byte is malformed
+    tok=$(printf 'ab:c\303' | base64 | tr -d '\n')
+    awk_expect "$bin" 0 "Authorization: Basic ${tok}\n"
+  done
+}
+
+@test "sgp_ prefix counts the alphanumeric leading run only, under gawk and mawk" {
+  sg=$(printf 'sg%s_' 'p')
+  for bin in gawk mawk; do
+    awk_expect "$bin" 0 "x ${sg}abcdefghij-abcdefghij_ y\n"
+    awk_expect "$bin" 0 "x ${sg}abcdefghij_abcdefghij_abcdefghij y\n"
+    awk_expect "$bin" 6 "x ${sg}abcdefghijabcdefghij y\n"
+    awk_expect "$bin" 6 "x ${sg}abcdefghijabcdefghij-abc y\n"
   done
 }
 
@@ -1528,12 +1569,14 @@ rule=forged line=9.txt"
   [ "$ran" -ge 2 ]
 }
 
-@test "the tvly-, pplx- and sgp_ prefixes count - and _ in the body and end at an invalid character" {
+@test "the tvly-, pplx- and sgp_ prefixes end at an invalid character; sgp_ takes an alphanumeric body only" {
   body=$(printf 'A-B_%.0s' $(seq 1 12))
-  for prefix in 'tv''ly-' 'pp''lx-' 'sg''p_'; do
+  for prefix in 'tv''ly-' 'pp''lx-'; do
     printf 'x %s%s y\n' "$prefix" "$body" >| "$A"
     run "$SCRIPT" "$A"
     [ "$status" -eq 6 ] || { echo "not flagged with - and _ in the body: $prefix"; false; }
+  done
+  for prefix in 'tv''ly-' 'pp''lx-' 'sg''p_'; do
     printf 'x %s%s!%s y\n' "$prefix" "$(pad 10)" "$(pad 10)" >| "$A"
     run "$SCRIPT" "$A"
     [ "$status" -eq 0 ] || { echo "flagged across an invalid character: $prefix"; false; }

@@ -89,8 +89,9 @@ resolution, and sequential stack review. Graphite-native workflow.
   between — fully unattended — then `/review:triage --non-interactive`
   (reconcile only) and a Ledger line in its summary. Before `/review:pr` it
   snapshots `yellow-plugins.local.md` when this work tree ignores it, or when
-  the file is untracked here and the fetched PR head ignores it; a config
-  tracked here but ignored on the PR head aborts before the checkout, and an
+  the file is absent here and the fetched PR head ignores it; a config
+  tracked here but ignored on the PR head, or an existing untracked unignored
+  file there, aborts before the checkout, and an
   unreadable PR head ignore rule set stops with exit 2 (neither prints a skip
   line)
 - `/review:sweep-all` — Run `/review:sweep` on every open non-draft PR you
@@ -251,8 +252,8 @@ resolution, and sequential stack review. Graphite-native workflow.
 
 `commit-resolve-fixes` and `run-verify-command` refuse a `git`, `gh`, or
 `jq` whose canonical file is inside the worktree, and they exec only the
-absolute path outside it. `commit-resolve-fixes` also refuses a `gt` or
-`node` whose canonical file is inside the worktree, including a symlink
+absolute path outside it. `commit-resolve-fixes` also refuses a `gt`, `node` or
+`awk` whose canonical file is inside the worktree, including a symlink
 outside the worktree that points at one, and drops empty or relative `PATH`
 entries before that check.
 
