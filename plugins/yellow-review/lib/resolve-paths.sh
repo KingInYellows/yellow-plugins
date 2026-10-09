@@ -830,8 +830,8 @@ lgit_nohooks() { yr_git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c c
 #   1  it is fine.
 # The checks are those of yr_args_enter (whole-path match of the worktree in
 # the raw text, absolute and existing relative words), plus: the first word,
-# when bare, is looked up on the screened PATH only (YR_GIT_PATH, else the
-# current PATH), never in the current directory, and must not be a file inside
+# when bare, is looked up on the screened PATH only (YR_CMD_LOOKUP_PATH when
+# set, else YR_GIT_PATH, else the current PATH), never in the current directory, and must not be a file inside
 # <root> or a script whose #! enters it. Values that point only outside the
 # worktree keep working.
 yr_cmd_enters() {
@@ -886,7 +886,7 @@ yr_cmd_enters() {
             fi
             ;;
         *)
-            bin=$(PATH=${YR_GIT_PATH:-$PATH}; type -P "$t" 2>/dev/null) || bin=""
+            bin=$(PATH=${YR_CMD_LOOKUP_PATH:-${YR_GIT_PATH:-$PATH}}; type -P "$t" 2>/dev/null) || bin=""
             if [ -n "$bin" ]; then
                 c=$(yr_canon_path "$bin" 2>/dev/null) || return 0
                 yr_inside_root "$c" "$root" && return 0
@@ -1090,6 +1090,19 @@ yr_check_git_env() {
         fi
     done
     return 0
+}
+
+# yr_check_git_env_on_path <path>: yr_check_git_env with a bare first word of
+# each command variable looked up on <path>. The verify command runs on the
+# caller's PATH (YR_ORIG_PATH), not the screened one, so GIT_SSH_COMMAND=ssh and
+# its kin must be judged where they will actually be resolved. Sets
+# YR_HARDEN_MSG; returns 1 on a hit.
+yr_check_git_env_on_path() {
+    local rc=0
+    YR_CMD_LOOKUP_PATH=$1
+    yr_check_git_env || rc=$?
+    unset YR_CMD_LOOKUP_PATH
+    return $rc
 }
 
 # harden_git_config [full|revert]: force core.fsmonitor and
