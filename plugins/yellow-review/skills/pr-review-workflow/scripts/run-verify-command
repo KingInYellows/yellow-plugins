@@ -856,6 +856,15 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         continue
     fi
     [ "$MODE" != run ] || die 2 "refusing a path that is not a regular file or symlink: $f"
+    if [ ! -d "$f" ] && [ "$MODE" != revert-only ]; then
+        # A FIFO, socket or device the recovery patch cannot encode: removing
+        # it would lose it for good, so keep it (--revert-denied) or refuse.
+        [ "$MODE" = revert-denied ] \
+            || die 2 "refusing to remove a special file the recovery patch cannot encode: $(safe_path_label "$f")"
+        add_path_reason "left a special file (not a regular file or symlink) in place" "$f"
+        NESTED_KEPT+=("$f")
+        continue
+    fi
     if [ -d "$f" ] && [ ! -L "$f" ]; then
         # A real directory (a resolver replaced a file with one): `rm -f` cannot
         # remove it. Delete it recursively only after its physical path is

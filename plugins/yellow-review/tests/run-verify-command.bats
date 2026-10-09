@@ -1419,16 +1419,25 @@ redact_log() {
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
 }
 
-@test "--revert-dirty deletes a tracked file's FIFO replacement unopened and restores the file" {
+@test "--revert-dirty refuses to delete a tracked file's FIFO replacement" {
   command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
   rm -f src/a.txt && mkfifo src/a.txt
   run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"special file the recovery patch cannot encode: src/a.txt"* ]]
+  [ -p src/a.txt ]
+}
+
+@test "--revert-denied keeps a FIFO that replaced a tracked trusted-config file" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  printf 'tracked\n' >| .cursor
+  git add .cursor && git commit -q -m "add .cursor file"
+  rm -f .cursor && mkfifo .cursor
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
   [ "$status" -eq 0 ]
-  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
-  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"not a regular file or symlink: src/a.txt"* ]]
-  [ -f src/a.txt ]
-  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
-  [ -z "$(git status --porcelain)" ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ -p .cursor ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'special file'*'.cursor'* ]]
 }
 
 @test "--revert-only restores a tracked file that was replaced by a FIFO" {
