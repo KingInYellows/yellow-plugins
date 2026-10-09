@@ -376,5 +376,37 @@ setup() {
   run grep -F 'begin untrusted-content $FENCE_TAG (reference only)' "$DELEGATE_MD"
   [ "$status" -eq 0 ]
   run grep -F '.[0:500]' "$DELEGATE_MD"
+  [ "$status" -eq 1 ]
+}
+
+# Runs the Jules confirmation-preview block against a packet of $1 characters
+# inside a throwaway git repo (the block binds the packet to .git/tmp).
+run_preview_block() {
+  local chars="$1" repo block
+  repo="$(mktemp -d)"
+  git -C "$repo" init -q
+  mkdir -p "$repo/.git/tmp"
+  local dir
+  dir="$(mktemp -d "$repo/.git/tmp/yellow-linear-packet.XXXXXX")"
+  { printf 'HEAD-'; head -c "$chars" /dev/zero | tr '\0' 'x'; printf 'TAIL-MARKER'; } > "$dir/packet.txt"
+  block="$(awk '
+    /PACKET_FILE=.YELLOW_TODO_packet_file./ { found=1 }
+    found { print }
+    found && /^```$/ { exit }
+  ' "$DELEGATE_MD" | sed '$d' | sed "s#YELLOW_TODO_packet_file#$dir/packet.txt#")"
+  cd "$repo"
+  run bash -c "$block"
+}
+
+@test "Jules launch preview prints a packet longer than 500 characters in full" {
+  run_preview_block 1500
   [ "$status" -eq 0 ]
+  [[ "$output" == *"TAIL-MARKER"* ]]
+}
+
+@test "Jules launch preview refuses a packet too long to show in full" {
+  run_preview_block 20001
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"cannot be confirmed"* ]]
+  [[ "$output" != *"TAIL-MARKER"* ]]
 }

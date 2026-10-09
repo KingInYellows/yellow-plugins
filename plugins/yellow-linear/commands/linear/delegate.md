@@ -851,7 +851,8 @@ directory only), and stop: nothing was sent, no Linear comment is posted, and th
 issue is unchanged. Do not try to run `authorize` yourself.
 
 **Confirm.** Show the repository, branch, issue id (not the title), and the grant
-(id, limits, what it has used). Then print the first 500 characters of the packet
+(id, limits, what it has used). Then print the whole packet (one over 20000
+characters is refused)
 fenced, with this Bash call (substitute the packet path printed by the allocation
 step). The packet carries the issue title outside its inner fence, so the whole
 preview goes inside this fence:
@@ -879,10 +880,15 @@ if [ -z "$GIT_TMP_REAL" ] || [ "$PACKET_PARENT_REAL" != "$GIT_TMP_REAL" ] \
   exit 1
 fi
 command -v jq >/dev/null 2>&1 || { printf 'ERROR: jq required.\n' >&2; exit 1; }
+# The preview prints the whole packet: one too long to show in full cannot be confirmed.
+PACKET_CHARS=$(jq -Rrs 'length' "$PACKET_FILE")
+if [ "$PACKET_CHARS" -gt 20000 ]; then
+  printf 'ERROR: the packet is %s characters; the preview shows at most 20000 in full, so it cannot be confirmed. Nothing was sent.\n' "$PACKET_CHARS" >&2; exit 1
+fi
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
 printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
-jq -Rrs 'gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | .[0:500]' "$PACKET_FILE"
+jq -Rrs 'gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ")' "$PACKET_FILE"
 printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
 ```
 
