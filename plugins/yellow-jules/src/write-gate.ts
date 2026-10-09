@@ -47,10 +47,12 @@ import {
 } from './runtime-support.js';
 import {
   applyReservation,
+  blocksRepairLaunch,
   hasUnreconciledDeviation,
   markOperation,
   readJournal,
   type ReservationInput,
+  updateJournal,
   withJournalLock,
   writeJournal,
 } from './state.js';
@@ -297,13 +299,8 @@ export async function reserveUnderGrant(
     if (
       gate.authority.operation === 'create' &&
       gate.authority.correction === true &&
-      Object.values(journal.operations).some(
-        (r) =>
-          r.kind === 'create' &&
-          r.grantId === grant.grantId &&
-          r.taskRef === gate.authority.taskRef &&
-          (r.supervision?.paused !== undefined ||
-            r.supervision?.outsideSeen !== undefined)
+      Object.values(journal.operations).some((r) =>
+        blocksRepairLaunch(r, grant.grantId, gate.authority.taskRef)
       )
     ) {
       throw new MutationErrorException(
@@ -421,18 +418,7 @@ export async function assertGrantLiveBeforeWrite(
         )
       );
     } else {
-      // Outside activity recorded after the reserve invalidates this record.
-      const fresh = (await readJournal(deps.dataDir)).operations[
-        record.localRequestId
-      ];
-      if (fresh?.invalidatedBy !== undefined) {
-        failure = new AppErrorException(
-          makeAppError(
-            'JULES_SUPERVISION_PAUSED',
-            `outside activity was recorded on ${record.sessionResource ?? 'this session'} after the write was reserved; nothing was sent`
-          )
-        );
-      }
+      failure = await finalDispatchCheck(deps, record);
     }
   } catch (err) {
     if (!(err instanceof AppErrorException)) throw err;
@@ -441,6 +427,66 @@ export async function assertGrantLiveBeforeWrite(
   if (failure !== undefined) {
     await settleFailure(deps, record, failure, { reconcileHint });
   }
+}
+
+/**
+ * The last journal-side check, in one critical section with the dispatch mark:
+ * the record is re-read, refused when outside activity invalidated it, when its
+ * owner finished meanwhile (the slot is already released), or when an earlier
+ * launch of a repair's task is now paused or has outside activity; otherwise it
+ * is stamped `dispatchedAt`, which is what lets a later echo claim treat it as
+ * possibly landed. Because check and stamp share the lock, an outside mark
+ * either lands first (refused here) or sees the stamp.
+ */
+async function finalDispatchCheck(
+  deps: WriteDeps,
+  record: OperationRecord
+): Promise<AppErrorException | undefined> {
+  const now = nowFn(deps);
+  const paused = (why: string): AppErrorException =>
+    new AppErrorException(
+      makeAppError(
+        'JULES_SUPERVISION_PAUSED',
+        `${why} after the write was reserved; nothing was sent`
+      )
+    );
+  return updateJournal(deps.dataDir, (operations) => {
+    const fresh = operations[record.localRequestId];
+    if (fresh === undefined) return undefined;
+    const session = record.sessionResource ?? 'this session';
+    if (fresh.invalidatedBy !== undefined) {
+      return paused(`outside activity was recorded on ${session}`);
+    }
+    if (record.kind === 'create' && record.correction === true) {
+      const blocked = Object.values(operations).some((r) =>
+        blocksRepairLaunch(r, record.grantId, record.taskRef)
+      );
+      if (blocked) {
+        return paused(
+          `a session for task ${record.taskRef ?? '(none)'} was paused or saw outside activity`
+        );
+      }
+    }
+    if (record.kind !== 'create') {
+      const owner = Object.values(operations).find(
+        (r) =>
+          r.kind === 'create' && r.sessionResource === record.sessionResource
+      );
+      if (owner !== undefined && isTerminalCondition(owner.condition)) {
+        return new AppErrorException(
+          makeAppError(
+            'JULES_INVALID_STATE',
+            `the session became ${owner.condition} after the write was reserved; a ${record.kind} does not reopen a finished session; nothing was sent`
+          )
+        );
+      }
+    }
+    operations[record.localRequestId] = {
+      ...fresh,
+      dispatchedAt: new Date(now()).toISOString(),
+    };
+    return undefined;
+  });
 }
 
 function shellQuote(value: string): string {

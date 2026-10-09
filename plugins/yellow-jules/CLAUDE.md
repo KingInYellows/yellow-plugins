@@ -231,6 +231,13 @@ write gate" (revoke after reserve; outside activity after reserve) and
 `runtime-delegate.test.ts` and `runtime-approve.test.ts` (revoke between
 reservation and POST).
 
+The same re-check, in one journal lock, also refuses a reply or approve whose
+owner finished after the reserve, and a corrective `delegate` whose task gained
+a pause or outside activity on an earlier launch (`blocksRepairLaunch`, the
+predicate the reserve uses), then stamps `dispatchedAt`. Only a reservation
+carrying that stamp can claim a vendor activity as its own echo, so a teammate
+repeating a still-undispatched message is classified as outside activity.
+
 The residual window is between that re-check and the vendor POST: local state
 and the remote call cannot be made atomic, so a revoke or an outside message
 landing in that interval does not stop the write. `delegate` is wider: the SDK

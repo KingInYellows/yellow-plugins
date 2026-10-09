@@ -71,6 +71,7 @@ exports.recordDeviation = recordDeviation;
 exports.hasUnreconciledDeviation = hasUnreconciledDeviation;
 exports.updateSupervision = updateSupervision;
 exports.claimOwnEchoes = claimOwnEchoes;
+exports.blocksRepairLaunch = blocksRepairLaunch;
 exports.isOwningCreate = isOwningCreate;
 const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
@@ -145,6 +146,7 @@ const OPTIONAL_STRING_FIELDS = [
     'abandonedAt',
     'abandonReason',
     'invalidatedBy',
+    'dispatchedAt',
 ];
 const ARTIFACT_KINDS = new Set(['patch', 'pr-ref', 'generated-file']);
 const ARTIFACT_VERIFICATIONS = new Set([
@@ -943,7 +945,9 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, config =
             return (record.sessionResource === sessionResource &&
                 (record.kind === 'reply' || record.kind === 'create') &&
                 record.promptDigest !== undefined &&
-                !neverLanded);
+                !neverLanded &&
+                // A reservation whose POST has not begun cannot have produced an echo.
+                !(record.status === 'reserved' && record.dispatchedAt === undefined));
         });
         const claimed = new Set(landed.flatMap((r) => r.echoActivityId !== undefined ? [r.echoActivityId] : []));
         let outside;
@@ -999,6 +1003,18 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, config =
         }
         return outside;
     }, config);
+}
+/**
+ * An earlier launch of this task under this grant that blocks a repair launch:
+ * it is paused or carries unreviewed outside activity. One predicate for the
+ * pre-reservation gate and the pre-POST re-check.
+ */
+function blocksRepairLaunch(record, grantId, taskRef) {
+    return (record.kind === 'create' &&
+        record.grantId === grantId &&
+        record.taskRef === taskRef &&
+        (record.supervision?.paused !== undefined ||
+            record.supervision?.outsideSeen !== undefined));
 }
 function isOwningCreate(record) {
     return (record !== undefined &&

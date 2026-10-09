@@ -295,6 +295,8 @@ export interface OperationRecord {
   readonly supervision?: SupervisionState;
   /** Set under the journal lock when outside activity is recorded on the session while this reply/approve is reserved but not dispatched; the pre-POST re-check refuses it. */
   readonly invalidatedBy?: 'outside-activity';
+  /** Set under the journal lock by the final pre-POST check; only a record carrying it may have landed, so only it can claim an echo. */
+  readonly dispatchedAt?: string;
   /** Set only by `abandon`, which maps onto terminal `failed` (no new status). */
   readonly abandonedAt?: string;
   readonly abandonReason?: string;

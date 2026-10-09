@@ -393,6 +393,133 @@ describe('races inside the write gate', () => {
     ).toBe('failed');
   });
 
+  const replyGate = (id: string, correction?: boolean) => ({
+    grantId,
+    ownerRequestId: session.localRequestId,
+    authority: {
+      repository: 'acme/widgets',
+      sourceResource: 'sources/github/acme/widgets',
+      branch: 'scratch/one',
+      taskRef: 't1',
+      operation: 'reply' as const,
+      ...(correction !== undefined ? { correction } : {}),
+    },
+    reservation: {
+      localRequestId: id,
+      localId: `jl-${'b'.repeat(32)}`,
+      sessionResource: session.sessionResource,
+      promptDigest: messageDigest(MESSAGE),
+    },
+  });
+
+  it("a teammate repeating the reserved text is outside activity, not the undispatched reply's echo", async () => {
+    const reservation = await reserveUnderGrant(
+      h.deps,
+      replyGate('reply-echo-1')
+    );
+    // The reservation has not reached its POST, so it cannot have produced this activity.
+    const outside = await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [{ activityId: 'act-teammate', digest: messageDigest(MESSAGE) }],
+      {
+        ownerRequestId: session.localRequestId,
+        observedAt: new Date(h.deps.clock.now()).toISOString(),
+      }
+    );
+    expect(outside?.activityId).toBe('act-teammate');
+    const journal = await readJournal(h.dataDir);
+    expect(journal.operations['reply-echo-1']?.echoActivityId).toBeUndefined();
+    expect(journal.operations['reply-echo-1']?.invalidatedBy).toBe(
+      'outside-activity'
+    );
+    await expect(
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+    ).rejects.toMatchObject({ appError: { code: 'JULES_SUPERVISION_PAUSED' } });
+    expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+  });
+
+  it('a dispatched reply still claims its own echo', async () => {
+    const reservation = await reserveUnderGrant(
+      h.deps,
+      replyGate('reply-echo-2')
+    );
+    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+    const outside = await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [{ activityId: 'act-own', digest: messageDigest(MESSAGE) }],
+      {
+        ownerRequestId: session.localRequestId,
+        observedAt: new Date(h.deps.clock.now()).toISOString(),
+      }
+    );
+    expect(outside).toBeUndefined();
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-echo-2']?.echoActivityId
+    ).toBe('act-own');
+  });
+
+  it('an owner that finished after the reserve refuses the reply at the final check', async () => {
+    const reservation = await reserveUnderGrant(
+      h.deps,
+      replyGate('reply-term-1')
+    );
+    await markOperation(
+      h.dataDir,
+      session.localRequestId,
+      'accepted',
+      { condition: 'remote-completed' },
+      () => new Date(h.deps.clock.now())
+    );
+    await expect(
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+    ).rejects.toMatchObject({ appError: { code: 'JULES_INVALID_STATE' } });
+    expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-term-1']?.status
+    ).toBe('failed');
+  });
+
+  it('a reserved repair launch is refused when outside activity lands on an earlier launch of its task', async () => {
+    const repairGrant = await createGrant(h, {
+      maxActiveSessions: 3,
+      maxCorrectiveRounds: 2,
+    });
+    const earlier = await delegateOk(h, repairGrant, { branch: 'scratch/one' });
+    h.adapter.calls.length = 0;
+    const reservation = await reserveUnderGrant(h.deps, {
+      grantId: repairGrant,
+      authority: {
+        repository: 'acme/widgets',
+        sourceResource: 'sources/github/acme/widgets',
+        branch: 'scratch/one',
+        taskRef: 't1',
+        operation: 'create',
+        correction: true,
+      },
+      reservation: {
+        localRequestId: 'repair-race-1',
+        localId: `jl-${'c'.repeat(32)}`,
+        autoPrRequested: false,
+        promptDigest: messageDigest('repair'),
+      },
+    });
+    await claimOwnEchoes(
+      h.dataDir,
+      earlier.sessionResource,
+      [{ activityId: 'act-out', digest: messageDigest('someone else') }],
+      {
+        ownerRequestId: earlier.localRequestId,
+        observedAt: new Date(h.deps.clock.now()).toISOString(),
+      }
+    );
+    await expect(
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+    ).rejects.toMatchObject({ appError: { code: 'JULES_SUPERVISION_PAUSED' } });
+    expect(h.adapter.callsTo('createSession')).toHaveLength(0);
+  });
+
   it('a terminal condition recorded after the live read is refused inside the gate', async () => {
     const real = h.adapter.getSessionImpl;
     h.adapter.getSessionImpl = async (resource) => {
