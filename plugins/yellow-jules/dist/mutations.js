@@ -55,6 +55,7 @@ const authority_js_1 = require("./authority.js");
 const controller_js_1 = require("./controller.js");
 const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
+const redact_js_1 = require("./redact.js");
 const runtime_support_js_1 = require("./runtime-support.js");
 const state_js_1 = require("./state.js");
 const validate_js_1 = require("./validate.js");
@@ -336,9 +337,63 @@ async function assertQuestionStillOpen(deps, adapter, sessionResource, liveCondi
         return changed('the session no longer awaits the question the pass showed');
     }
 }
+function validateExpectedPlan(args, haveQuestion) {
+    const { expectPlanId: id, expectPlanDigest: digest } = args;
+    if (id === undefined && digest === undefined)
+        return undefined;
+    if (id === undefined || digest === undefined) {
+        return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', '--expect-plan-id and --expect-plan-digest must be given together');
+    }
+    if (haveQuestion) {
+        return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', 'a reply expects either a question or a plan, not both');
+    }
+    const planId = (0, validate_js_1.validatePlanId)(id, 'input');
+    if (!/^[0-9a-f]{64}$/.test(digest)) {
+        return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', '--expect-plan-digest must be 64 lowercase hex characters');
+    }
+    return { planId, digest };
+}
+/**
+ * Refuses a reply unless the session still awaits plan approval and its newest
+ * pending plan is the one the caller reviewed (id and digest). Same shape and
+ * the same race limit as `assertQuestionStillOpen`.
+ */
+async function assertPlanStillPending(deps, adapter, target, liveCondition, expected, deadline) {
+    const changed = (why) => (0, errors_js_1.throwAppError)('JULES_QUESTION_CHANGED', `${why}; nothing was sent`);
+    if (liveCondition !== 'awaiting-approval') {
+        return changed(`the session is ${liveCondition}, not awaiting plan approval`);
+    }
+    const pending = target.owner?.pendingPlan;
+    if (pending === undefined) {
+        return changed('no pending plan is recorded for this session');
+    }
+    const walk = await (0, activity_walk_js_1.walkActivities)({
+        adapter,
+        sessionResource: target.sessionResource,
+        pageSize: activity_walk_js_1.STATUS_PAGE_SIZE,
+        start: {
+            kind: 'watermark',
+            createTime: pending.activityCreateTime,
+            activityId: pending.activityId,
+        },
+        clock: deps.clock,
+        deadline,
+        pageCap: APPROVE_PAGE_CAP,
+    });
+    if (!walk.complete)
+        return incompleteRefetch(walk);
+    const current = walk.pendingPlan;
+    if (current === null ||
+        current === undefined ||
+        current.planId !== expected.planId ||
+        (0, state_js_1.planDigest)(current.planId, (0, redact_js_1.redactDeep)(current).steps) !== expected.digest) {
+        return changed('the session no longer has the plan the pass showed');
+    }
+}
 async function replyInner(deps, args, ids) {
     const message = validateText(args.message, '--message', MESSAGE_MAX_CHARS);
     const expectQuestion = validateExpectedQuestion(args);
+    const expectPlan = validateExpectedPlan(args, expectQuestion !== undefined);
     (0, runtime_support_js_1.prepare)(deps);
     const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, args.deadlineMs ?? deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS);
     const target = await resolveTarget(deps, args.session);
@@ -373,6 +428,9 @@ async function replyInner(deps, args, ids) {
         }
         if (expectQuestion !== undefined) {
             await assertQuestionStillOpen(deps, adapter, target.sessionResource, liveCondition, expectQuestion, deadline);
+        }
+        if (expectPlan !== undefined) {
+            await assertPlanStillPending(deps, adapter, target, liveCondition, expectPlan, deadline);
         }
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline))
             return expiredBeforeWrite();

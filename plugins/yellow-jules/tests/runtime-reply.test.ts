@@ -17,6 +17,7 @@ import {
   claimOwnEchoes,
   markOperation,
   messageDigest,
+  planDigest,
   readJournal,
   recordDeviation,
   updateJournal,
@@ -30,6 +31,8 @@ import {
 
 import {
   addActivity,
+  addPlan,
+  addPlanNow,
   createGrant,
   delegateOk,
   type DelegatedSession,
@@ -799,6 +802,77 @@ describe('races inside the write gate', () => {
     it('a plain reply needs neither', async () => {
       ask();
       expect((await reply(h.deps, args())).sent).toBe(true);
+    });
+  });
+
+  describe('--expect-plan-id and --expect-plan-digest', () => {
+    const code = async (run: () => Promise<unknown>) =>
+      (await fails(run)).appError.code;
+
+    async function reviewed(planId = 'plan-1') {
+      addPlan(h, session.sessionResource, planId);
+      await status(h.deps, { session: session.localId, reconcile: false });
+      const plan = (await readJournal(h.dataDir)).operations[
+        session.localRequestId
+      ]?.pendingPlan;
+      return {
+        expectPlanId: plan!.planId,
+        expectPlanDigest: planDigest(plan!.planId, plan!.steps),
+      };
+    }
+
+    it('sends while the reviewed plan is still pending', async () => {
+      const expected = await reviewed();
+      expect((await reply(h.deps, args(expected))).sent).toBe(true);
+    });
+
+    it('refuses when a replacement plan arrived', async () => {
+      const expected = await reviewed();
+      h.deps.clock.time += 1_000;
+      addPlanNow(h, session.sessionResource, 'plan-2');
+      expect(await code(() => reply(h.deps, args(expected)))).toBe(
+        'JULES_QUESTION_CHANGED'
+      );
+      expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    });
+
+    it('refuses when the digest does not match the pending plan', async () => {
+      const expected = await reviewed();
+      expect(
+        await code(() =>
+          reply(h.deps, args({ ...expected, expectPlanDigest: 'f'.repeat(64) }))
+        )
+      ).toBe('JULES_QUESTION_CHANGED');
+      expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    });
+
+    it('refuses when the session no longer awaits plan approval', async () => {
+      const expected = await reviewed();
+      setVendorState(h, session.sessionResource, 'inProgress');
+      expect(await code(() => reply(h.deps, args(expected)))).toBe(
+        'JULES_QUESTION_CHANGED'
+      );
+    });
+
+    it('needs both values and cannot be combined with a question', async () => {
+      const expected = await reviewed();
+      expect(
+        await code(() =>
+          reply(h.deps, args({ expectPlanId: expected.expectPlanId }))
+        )
+      ).toBe('JULES_INVALID_INPUT');
+      expect(
+        await code(() =>
+          reply(
+            h.deps,
+            args({
+              ...expected,
+              expectActivityId: 'a',
+              expectQuestionDigest: 'a'.repeat(64),
+            })
+          )
+        )
+      ).toBe('JULES_INVALID_INPUT');
     });
   });
 

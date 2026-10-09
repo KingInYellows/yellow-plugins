@@ -54,6 +54,25 @@ export function digestText(text: string): string {
   return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
+/**
+ * Digest of a plan under review: sha256 of the compact JSON
+ * `[planId, [[title, description], ...]]` plus the newline `jq -c` prints. The commands compute the same value
+ * with `jq -c` over `status` output, so DEL is escaped the way jq escapes it.
+ */
+export function planDigest(
+  planId: string,
+  steps: ReadonlyArray<{
+    readonly title: string;
+    readonly description?: string;
+  }>
+): string {
+  const json = JSON.stringify([
+    planId,
+    steps.map((step) => [step.title, step.description ?? null]),
+  ]).replace(/\u007f/g, '\\u007f');
+  return digestText(`${json}\n`);
+}
+
 /** Digest of a message for reply matching: the vendor may trim edge whitespace, so both sides are trimmed. */
 export function messageDigest(text: string): string {
   return digestText(text.trim());

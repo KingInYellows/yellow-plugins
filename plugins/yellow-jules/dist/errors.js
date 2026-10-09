@@ -141,7 +141,7 @@ const CODE_TABLE = {
     },
     JULES_QUESTION_CHANGED: {
         retryable: false,
-        recoveryAction: 'The session no longer awaits the question the pass showed; nothing was sent. Run supervise again.',
+        recoveryAction: 'The session no longer awaits the question or has the plan the pass showed; nothing was sent. Run supervise again.',
     },
 };
 // replica:makeAppError:start

@@ -522,7 +522,7 @@ transient failure from an undetermined one.
   complete walk leaves `unknown-outcome`, and a partial walk leaves
   `not-reached`. Operations the deadline prevented from being checked are
   reported as `not-reached`, never as resolved.
-- `reply --session <ref> --message <text> [--correction] [--expect-activity-id <id> --expect-question-digest <hex>] [--request-id <id>] [--dry-run] [--grant-id <id>]`
+- `reply --session <ref> --message <text> [--correction] [--expect-activity-id <id> --expect-question-digest <hex> | --expect-plan-id <id> --expect-plan-digest <hex>] [--request-id <id>] [--dry-run] [--grant-id <id>]`
   → `{ localRequestId, localId, sessionResource, sent: true }`. `--dry-run`
   validates, performs one `info()`, and returns the same fields with
   `sent: false, dryRun: true`, plus `repository`, `requestedBranch`, and
@@ -533,8 +533,11 @@ transient failure from an undetermined one.
   `observedQuestionDigest`; one alone is `JULES_INVALID_INPUT`), a real call
   re-reads the session's activities before reserving and fails with
   `JULES_QUESTION_CHANGED` unless the session still awaits a reply and its
-  newest agent message has that id and digest. Like approve's plan check, the
-  read narrows the race without closing it.
+  newest agent message has that id and digest. `--expect-plan-id` and
+  `--expect-plan-digest` (the `needs-plan-review` plan id and the sha256 of the
+  compact JSON `[planId, [[title, description], ...]]` plus a newline, as `approve.md` prints
+  it) do the same for a pending plan and cannot be combined with the question
+  pair. Like approve's plan check, the read narrows the race without closing it.
 - `approve --session <ref> --plan-id <evaluated plan id> [--request-id <id>] [--dry-run] [--grant-id <id>]`
   →
   `{ localRequestId, localId, sessionResource, approvedPlanId, observedPlanIdAfter: string | null, verificationDeferred: bool, verification: { pages: n, partialPagination: bool }, policyDeviation? }`.
@@ -800,7 +803,7 @@ not the only permitted text. `sdk-adapter.ts` classifies SDK errors by
 | `JULES_CONTROLLER_MISMATCH`    | false     | this data directory is not the authorized controller copy; follow the handoff procedure in the plugin CLAUDE.md (R38)                        |
 | `JULES_GRANT_EXHAUSTED`        | false     | create a new grant with `authorize`                                                                                                          |
 | `JULES_SUPERVISION_PAUSED`     | false     | inspect the session, then run `supervise --clear-pause` in a terminal (R32)                                                                  |
-| `JULES_QUESTION_CHANGED`       | false     | `reply --expect-activity-id/--expect-question-digest`: the session no longer awaits the question the pass showed; nothing was sent             |
+| `JULES_QUESTION_CHANGED`       | false     | `reply --expect-*`: the session no longer awaits the question or has the plan the pass showed; nothing was sent                              |
 
 SDK class to code (all eleven classes in `dist/errors.d.ts`). "After dispatch"
 means a mutating POST has been sent and no clear rejection was received. A

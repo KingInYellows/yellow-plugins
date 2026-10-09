@@ -165,8 +165,11 @@ only when the message asks for a fix to the session's work; it spends one
 corrective round, and `correctiveRoundsLeft` in the result says how many remain.
 For `needs-answer`, take `ACTIVITY_ID` and `QUESTION_DIGEST` from the pass's
 `observedActivityId` and `observedQuestionDigest` (both are required; if the
-pass reported `questionUnavailable`, ask the user instead). For any other
-decision use `none` for both.
+pass reported `questionUnavailable`, ask the user instead) and set `PLAN_ID` and
+`PLAN_DIGEST` to `none`. For `needs-plan-review`, run the plan-review block from
+the Approve step first and take `PLAN_ID` and `PLAN_DIGEST` from it (the
+`observedPlanId` and the printed `plan_digest=`); set the question values to
+`none`. For any other decision use `none` for all four.
 
 ```bash
 set -euo pipefail
@@ -182,7 +185,9 @@ GRANT_ID='YELLOW_TODO_grant_id'
 CORRECTION='YELLOW_TODO_1_or_0'
 ACTIVITY_ID='YELLOW_TODO_observed_activity_id_or_none'
 QUESTION_DIGEST='YELLOW_TODO_observed_question_digest_or_none'
-case "$WORK_DIR$SESSION$GRANT_ID$CORRECTION$ACTIVITY_ID$QUESTION_DIGEST" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+PLAN_ID='YELLOW_TODO_reviewed_plan_id_or_none'
+PLAN_DIGEST='YELLOW_TODO_reviewed_plan_digest_or_none'
+case "$WORK_DIR$SESSION$GRANT_ID$CORRECTION$ACTIVITY_ID$QUESTION_DIGEST$PLAN_ID$PLAN_DIGEST" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 case "$CORRECTION" in 0|1) ;; *) printf 'ERROR: CORRECTION must be exactly 0 or 1.\n' >&2; exit 1 ;; esac
 [ -f "$WORK_DIR/message.txt" ] && [ ! -L "$WORK_DIR/message.txt" ] && [ -s "$WORK_DIR/message.txt" ] || { printf 'ERROR: write the message to %s/message.txt first.\n' "$WORK_DIR" >&2; exit 1; }
 bind_hash() {
@@ -190,13 +195,14 @@ bind_hash() {
 }
 MESSAGE=$(cat -- "$WORK_DIR/message.txt")
 MESSAGE_SHA=$(printf '%s' "$MESSAGE" | bind_hash)
-printf 'binding=%s\n' "$(printf '%s' "${SESSION}|${GRANT_ID}|${CORRECTION}|${ACTIVITY_ID}|${QUESTION_DIGEST}|${MESSAGE_SHA}" | bind_hash)"
+printf 'binding=%s\n' "$(printf '%s' "${SESSION}|${GRANT_ID}|${CORRECTION}|${ACTIVITY_ID}|${QUESTION_DIGEST}|${PLAN_ID}|${PLAN_DIGEST}|${MESSAGE_SHA}" | bind_hash)"
 ```
 
 Keep the printed `binding=` value. The send block recomputes it from the same
 file and refuses when anything differs, then sends the bytes it hashed. For
-`needs-answer` it also passes the question to the CLI, which refuses with
-`JULES_QUESTION_CHANGED` unless the session still awaits that question.
+`needs-answer` or `needs-plan-review` it also passes the question or plan to the
+CLI, which refuses with `JULES_QUESTION_CHANGED` unless the session still awaits
+that question or has that plan pending.
 
 ```bash
 set -uo pipefail
@@ -206,8 +212,10 @@ GRANT_ID='YELLOW_TODO_grant_id'
 CORRECTION='YELLOW_TODO_1_or_0'
 ACTIVITY_ID='YELLOW_TODO_observed_activity_id_or_none'
 QUESTION_DIGEST='YELLOW_TODO_observed_question_digest_or_none'
+PLAN_ID='YELLOW_TODO_reviewed_plan_id_or_none'
+PLAN_DIGEST='YELLOW_TODO_reviewed_plan_digest_or_none'
 CONFIRMED_BINDING='YELLOW_TODO_binding_from_preview'
-case "$WORK_DIR$SESSION$GRANT_ID$CORRECTION$ACTIVITY_ID$QUESTION_DIGEST$CONFIRMED_BINDING" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+case "$WORK_DIR$SESSION$GRANT_ID$CORRECTION$ACTIVITY_ID$QUESTION_DIGEST$PLAN_ID$PLAN_DIGEST$CONFIRMED_BINDING" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 case "$CORRECTION" in 0|1) ;; *) printf 'ERROR: CORRECTION must be exactly 0 or 1.\n' >&2; exit 1 ;; esac
 case "$WORK_DIR" in
   *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
@@ -237,7 +245,7 @@ bind_hash() {
 # Hash and send the same bytes: one read of the staged file.
 MESSAGE=$(cat -- "$WORK_DIR/message.txt")
 MESSAGE_SHA=$(printf '%s' "$MESSAGE" | bind_hash)
-BINDING=$(printf '%s' "${SESSION}|${GRANT_ID}|${CORRECTION}|${ACTIVITY_ID}|${QUESTION_DIGEST}|${MESSAGE_SHA}" | bind_hash)
+BINDING=$(printf '%s' "${SESSION}|${GRANT_ID}|${CORRECTION}|${ACTIVITY_ID}|${QUESTION_DIGEST}|${PLAN_ID}|${PLAN_DIGEST}|${MESSAGE_SHA}" | bind_hash)
 if [ "$CONFIRMED_BINDING" != "$BINDING" ]; then
   printf 'ERROR: the session, grant, correction flag, question or message differs from the printed binding. Nothing was sent; start again from the preview.\n' >&2; exit 1
 fi
@@ -246,6 +254,10 @@ args=(reply --session "$SESSION" "--message=$MESSAGE" --grant-id "$GRANT_ID")
 if [ "$ACTIVITY_ID" != none ]; then
   [ "$QUESTION_DIGEST" != none ] || { printf 'ERROR: ACTIVITY_ID and QUESTION_DIGEST go together.\n' >&2; exit 1; }
   args+=(--expect-activity-id "$ACTIVITY_ID" --expect-question-digest "$QUESTION_DIGEST")
+fi
+if [ "$PLAN_ID" != none ]; then
+  [ "$PLAN_DIGEST" != none ] || { printf 'ERROR: PLAN_ID and PLAN_DIGEST go together.\n' >&2; exit 1; }
+  args+=(--expect-plan-id "$PLAN_ID" --expect-plan-digest "$PLAN_DIGEST")
 fi
 OUTPUT=$(node "$CLI" "${args[@]}")
 printf 'exit=%s\n' "$?"
@@ -314,7 +326,7 @@ printf '  node %s supervise --clear-pause --session %s\n\n' "'$CLI'" "'$SESSION'
 | `JULES_GRANT_EXPIRED`         | false     | the grant expired; remote work may still run — see Step 5                                   |
 | `JULES_GRANT_EXHAUSTED`       | false     | a limit is spent; the owner writes a new grant in a terminal                                |
 | `JULES_SUPERVISION_PAUSED`    | false     | the session is paused; see Step 6                                                           |
-| `JULES_QUESTION_CHANGED`      | false     | the session no longer awaits the question the pass showed; nothing was sent; run the pass again |
+| `JULES_QUESTION_CHANGED`      | false     | the session no longer awaits the question or plan the pass showed; nothing was sent; run the pass again |
 | `JULES_POLICY_DEVIATION`      | false     | the newest plan differs from the evaluated one, or a deviation is open; run `/jules:status` |
 | `JULES_UNKNOWN_OUTCOME`       | false     | **do not repeat the write.** Run `/jules:status --session <ref> --reconcile`                |
 | `JULES_INVALID_STATE`         | false     | follow the error's recovery text; for a pause, run `/jules:status` first                    |

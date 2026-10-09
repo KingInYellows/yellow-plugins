@@ -49,6 +49,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEFAULT_LOCK_CONFIG = exports.UNRESOLVED_STATUSES = exports.TERMINAL_STATUSES = void 0;
 exports.digestText = digestText;
+exports.planDigest = planDigest;
 exports.messageDigest = messageDigest;
 exports.emptyJournal = emptyJournal;
 exports.readJournal = readJournal;
@@ -85,6 +86,18 @@ const shape_js_1 = require("./shape.js");
 const validate_js_1 = require("./validate.js");
 function digestText(text) {
     return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
+}
+/**
+ * Digest of a plan under review: sha256 of the compact JSON
+ * `[planId, [[title, description], ...]]` plus the newline `jq -c` prints. The commands compute the same value
+ * with `jq -c` over `status` output, so DEL is escaped the way jq escapes it.
+ */
+function planDigest(planId, steps) {
+    const json = JSON.stringify([
+        planId,
+        steps.map((step) => [step.title, step.description ?? null]),
+    ]).replace(/\u007f/g, '\\u007f');
+    return digestText(`${json}\n`);
 }
 /** Digest of a message for reply matching: the vendor may trim edge whitespace, so both sides are trimmed. */
 function messageDigest(text) {

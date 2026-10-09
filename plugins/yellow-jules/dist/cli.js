@@ -257,6 +257,8 @@ async function dispatch(operation, rest, deps) {
                     correction: { type: 'boolean', default: false },
                     'expect-activity-id': { type: 'string' },
                     'expect-question-digest': { type: 'string' },
+                    'expect-plan-id': { type: 'string' },
+                    'expect-plan-digest': { type: 'string' },
                     ...deadline,
                 },
                 strict: true,
@@ -278,6 +280,12 @@ async function dispatch(operation, rest, deps) {
                     : {}),
                 ...(typeof values['expect-question-digest'] === 'string'
                     ? { expectQuestionDigest: values['expect-question-digest'] }
+                    : {}),
+                ...(typeof values['expect-plan-id'] === 'string'
+                    ? { expectPlanId: values['expect-plan-id'] }
+                    : {}),
+                ...(typeof values['expect-plan-digest'] === 'string'
+                    ? { expectPlanDigest: values['expect-plan-digest'] }
                     : {}),
                 deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS),
             });

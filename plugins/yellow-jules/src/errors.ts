@@ -236,7 +236,7 @@ const CODE_TABLE: Record<AppErrorCode, CodeDefaults> = {
   JULES_QUESTION_CHANGED: {
     retryable: false,
     recoveryAction:
-      'The session no longer awaits the question the pass showed; nothing was sent. Run supervise again.',
+      'The session no longer awaits the question or has the plan the pass showed; nothing was sent. Run supervise again.',
   },
 };
 

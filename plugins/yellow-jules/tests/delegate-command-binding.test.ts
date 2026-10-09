@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { planDigest } from '../src/state.js';
+
 const md = fs.readFileSync(
   path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
@@ -332,6 +334,8 @@ describe('/jules:supervise binds the reply to the pass decision', () => {
       YELLOW_TODO_1_or_0: '1',
       YELLOW_TODO_observed_activity_id_or_none: 'act-1',
       YELLOW_TODO_observed_question_digest_or_none: DIGEST,
+      YELLOW_TODO_reviewed_plan_id_or_none: 'none',
+      YELLOW_TODO_reviewed_plan_digest_or_none: 'none',
       ...over,
     };
     let body = script;
@@ -397,6 +401,70 @@ describe('/jules:supervise binds the reply to the pass decision', () => {
     expect(res.stderr).toContain('differs from the printed binding');
     fs.rmSync(ctx.dir, { recursive: true, force: true });
     fs.rmSync(ctx.root, { recursive: true, force: true });
+  });
+
+  it('passes the reviewed plan to the CLI for a plan-review reply', () => {
+    const ctx = prepare('Please restructure.');
+    const plan = {
+      YELLOW_TODO_observed_activity_id_or_none: 'none',
+      YELLOW_TODO_observed_question_digest_or_none: 'none',
+      YELLOW_TODO_reviewed_plan_id_or_none: 'plan-1',
+      YELLOW_TODO_reviewed_plan_digest_or_none: DIGEST,
+    };
+    const binding = bindingOf(ctx, plan);
+    exec(send, ctx, { YELLOW_TODO_binding_from_preview: binding, ...plan });
+    const argv = JSON.parse(fs.readFileSync(ctx.calls, 'utf8')) as string[];
+    expect(argv).toEqual(
+      expect.arrayContaining([
+        '--expect-plan-id',
+        'plan-1',
+        '--expect-plan-digest',
+        DIGEST,
+      ])
+    );
+    expect(argv).not.toContain('--expect-activity-id');
+    fs.rmSync(ctx.root, { recursive: true, force: true });
+  });
+
+  it('refuses when the reviewed plan digest differs from the printed binding', () => {
+    const ctx = prepare('Please restructure.');
+    const plan = {
+      YELLOW_TODO_observed_activity_id_or_none: 'none',
+      YELLOW_TODO_observed_question_digest_or_none: 'none',
+      YELLOW_TODO_reviewed_plan_id_or_none: 'plan-1',
+    };
+    const binding = bindingOf(ctx, {
+      ...plan,
+      YELLOW_TODO_reviewed_plan_digest_or_none: DIGEST,
+    });
+    const res = exec(send, ctx, {
+      YELLOW_TODO_binding_from_preview: binding,
+      ...plan,
+      YELLOW_TODO_reviewed_plan_digest_or_none: 'c'.repeat(64),
+    });
+    expect(res.status).toBe(1);
+    expect(fs.existsSync(ctx.calls)).toBe(false);
+    fs.rmSync(ctx.dir, { recursive: true, force: true });
+    fs.rmSync(ctx.root, { recursive: true, force: true });
+  });
+
+  it('computes the same plan digest as the jq expression the commands use', () => {
+    const steps = [
+      { title: 'Say "hi"\nthere', description: 'caf\u00e9 \u007f end' },
+      { title: 'No description' },
+    ];
+    const json = JSON.stringify({ planId: 'p-1', steps });
+    const jq = spawnSync(
+      'bash',
+      [
+        '-c',
+        `printf '%s' "$1" | jq -c '[.planId, ((.steps // []) | map([.title, .description]))]' | sha256sum | cut -c1-64`,
+        'bash',
+        json,
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(planDigest('p-1', steps)).toBe(jq.stdout.trim());
   });
 
   it('omits the expectation flags for a non-question decision', () => {

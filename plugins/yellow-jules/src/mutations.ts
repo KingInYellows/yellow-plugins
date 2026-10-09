@@ -41,6 +41,7 @@ import {
   rethrowWithContext,
   throwAppError,
 } from './errors.js';
+import { redactDeep } from './redact.js';
 import {
   type Attention,
   attentionOf,
@@ -62,6 +63,7 @@ import {
   isOwningCreate,
   type OwningCreate,
   messageDigest,
+  planDigest,
   readJournal,
   recordDeviation,
   UNRESOLVED_STATUSES,
@@ -439,6 +441,12 @@ export interface ReplyArgs {
    */
   readonly expectActivityId?: string;
   readonly expectQuestionDigest?: string;
+  /**
+   * Both or neither, and not with the question pair. Same refusal, for a reply
+   * written while a plan is under review (the `needs-plan-review` values).
+   */
+  readonly expectPlanId?: string;
+  readonly expectPlanDigest?: string;
   readonly deadlineMs?: number;
 }
 
@@ -584,6 +592,86 @@ async function assertQuestionStillOpen(
   }
 }
 
+function validateExpectedPlan(
+  args: Pick<ReplyArgs, 'expectPlanId' | 'expectPlanDigest'>,
+  haveQuestion: boolean
+): { readonly planId: string; readonly digest: string } | undefined {
+  const { expectPlanId: id, expectPlanDigest: digest } = args;
+  if (id === undefined && digest === undefined) return undefined;
+  if (id === undefined || digest === undefined) {
+    return throwAppError(
+      'JULES_INVALID_INPUT',
+      '--expect-plan-id and --expect-plan-digest must be given together'
+    );
+  }
+  if (haveQuestion) {
+    return throwAppError(
+      'JULES_INVALID_INPUT',
+      'a reply expects either a question or a plan, not both'
+    );
+  }
+  const planId = validatePlanId(id, 'input');
+  if (!/^[0-9a-f]{64}$/.test(digest)) {
+    return throwAppError(
+      'JULES_INVALID_INPUT',
+      '--expect-plan-digest must be 64 lowercase hex characters'
+    );
+  }
+  return { planId, digest };
+}
+
+/**
+ * Refuses a reply unless the session still awaits plan approval and its newest
+ * pending plan is the one the caller reviewed (id and digest). Same shape and
+ * the same race limit as `assertQuestionStillOpen`.
+ */
+async function assertPlanStillPending(
+  deps: WriteDeps,
+  adapter: SdkAdapter,
+  target: {
+    readonly sessionResource: string;
+    readonly owner?: OperationRecord;
+  },
+  liveCondition: string,
+  expected: { readonly planId: string; readonly digest: string },
+  deadline: Deadline
+): Promise<void> {
+  const changed = (why: string): never =>
+    throwAppError('JULES_QUESTION_CHANGED', `${why}; nothing was sent`);
+  if (liveCondition !== 'awaiting-approval') {
+    return changed(
+      `the session is ${liveCondition}, not awaiting plan approval`
+    );
+  }
+  const pending = target.owner?.pendingPlan;
+  if (pending === undefined) {
+    return changed('no pending plan is recorded for this session');
+  }
+  const walk = await walkActivities({
+    adapter,
+    sessionResource: target.sessionResource,
+    pageSize: STATUS_PAGE_SIZE,
+    start: {
+      kind: 'watermark' as const,
+      createTime: pending.activityCreateTime,
+      activityId: pending.activityId,
+    },
+    clock: deps.clock,
+    deadline,
+    pageCap: APPROVE_PAGE_CAP,
+  });
+  if (!walk.complete) return incompleteRefetch(walk);
+  const current = walk.pendingPlan;
+  if (
+    current === null ||
+    current === undefined ||
+    current.planId !== expected.planId ||
+    planDigest(current.planId, redactDeep(current).steps) !== expected.digest
+  ) {
+    return changed('the session no longer has the plan the pass showed');
+  }
+}
+
 async function replyInner(
   deps: WriteDeps,
   args: ReplyArgs,
@@ -591,6 +679,7 @@ async function replyInner(
 ): Promise<ReplyResult> {
   const message = validateText(args.message, '--message', MESSAGE_MAX_CHARS);
   const expectQuestion = validateExpectedQuestion(args);
+  const expectPlan = validateExpectedPlan(args, expectQuestion !== undefined);
   prepare(deps);
   const deadline = deadlineIn(
     deps.clock,
@@ -651,6 +740,16 @@ async function replyInner(
         target.sessionResource,
         liveCondition,
         expectQuestion,
+        deadline
+      );
+    }
+    if (expectPlan !== undefined) {
+      await assertPlanStillPending(
+        deps,
+        adapter,
+        target,
+        liveCondition,
+        expectPlan,
         deadline
       );
     }
