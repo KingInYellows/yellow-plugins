@@ -109,6 +109,12 @@ If `PR_JSON` is empty after error handling, classify the issue as `gh-error`
 and skip it from transition candidates (report in summary as "skipped — gh
 error").
 
+The search matches titles, so keep only the PRs whose `headRefName` contains
+the lowercased identifier as a whole segment (bounded by the start or end of
+the name, `/`, `-` or `_`, compared case-insensitively) and drop the rest
+before anything below. A PR that only mentions the identifier in its title
+never moves the issue.
+
 `--state all` is required: `gh pr list` returns only open PRs by default, so a
 closed or landed PR would never reach the classification below.
 
