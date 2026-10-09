@@ -134,6 +134,20 @@ has_kill_after() {
   [ ! -e "$BATS_TEST_TMPDIR/awk-ran" ]
 }
 
+@test "a symlink to an executable inside the worktree in an outside PATH directory never runs" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/outbin"
+  printf '#!/bin/sh\ntouch "%s/helper-ran"\nexit 1\n' "$BATS_TEST_TMPDIR" >| ignored/helper
+  chmod +x ignored/helper
+  ln -s "$REPO/ignored/helper" "$BATS_TEST_TMPDIR/outbin/awk"
+  ln -s "$REPO/ignored/helper" "$BATS_TEST_TMPDIR/outbin/git-lfs"
+  git config --local filter.lfs.clean 'git-lfs clean -- %f'
+  git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
+  git config --local filter.lfs.process 'git-lfs filter-process'
+  printf '*.txt filter=lfs\n' >| .git/info/attributes
+  PATH="$BATS_TEST_TMPDIR/outbin:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/helper-ran" ]
+}
+
 @test "an unlisted dirty file left after --revert-only makes treeClean false" {
   printf 'two\nstray\n' >| src/b.txt
   run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt

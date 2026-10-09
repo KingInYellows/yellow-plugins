@@ -832,7 +832,7 @@ PATCH_SCREENED=0
 # embedded in a name that anchor. The rules themselves are unchanged.
 # A hunk header keeps its trailing section text, which is file content.
 patch_hunk_lines() {
-    awk '
+    yr_awk '
         /^diff --git / {
             h = 0
             s = substr($0, 12)
