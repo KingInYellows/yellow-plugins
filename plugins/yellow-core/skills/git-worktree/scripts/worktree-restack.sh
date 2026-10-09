@@ -390,7 +390,21 @@ write_state() {
   }
 }
 
-clear_state() { rm -f -- "$STATE_FILE" "$STATE_FILE".tmp.* "$ABORTED_FILE" 2>/dev/null; }
+# write_aborted_marker creates the marker through a temp file and a rename, so a
+# symlink planted at the marker path is replaced, never followed and truncated.
+# A directory there (also via a link) is refused: mv would move the file into it.
+write_aborted_marker() {
+  local tmp
+  [ ! -d "$ABORTED_FILE" ] || return 1
+  tmp=$(umask 077 && mktemp "$STATE_DIR/provider-aborted.tmp.XXXXXX") || return 1
+  if mv -f -- "$tmp" "$ABORTED_FILE"; then
+    return 0
+  fi
+  rm -f -- "$tmp"
+  return 1
+}
+
+clear_state() { rm -f -- "$STATE_FILE" "$STATE_FILE".tmp.* "$ABORTED_FILE" "$ABORTED_FILE".tmp.* 2>/dev/null; }
 
 # read_state parses the fixed-field TSV; validate_state decides whether to trust it.
 read_state() {
@@ -1564,7 +1578,7 @@ cmd_abort() {
     # The marker tells a later --abort the provider already rolled back. A
     # write that fails is no success: without it that retry would take the
     # lost-provider branch and demand a manual whole-stack reset.
-    (umask 077 && : >|"$ABORTED_FILE") 2>/dev/null \
+    write_aborted_marker 2>/dev/null \
       || die "$X_KEPT" "the provider's abort succeeded, but the marker $(v "$ABORTED_FILE") could not be written; state kept, nothing restored. Fix the cause (permissions, or a directory or link at that path), then run --abort again"
   elif ! { [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ]; } && left=$(chain_rebase_worktree); then
     # The provider lost its record (Graphite's .gtcontinue or gh-stack's
