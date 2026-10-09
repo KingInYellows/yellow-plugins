@@ -546,15 +546,19 @@ _rt_scan() {
                 # decoding, so a hostile long token never reaches the
                 # per-byte decoder (mawk concatenation is quadratic).
                 btok = ""
+                blen = 0
                 # A run followed by more base64 characters or `=` is not a
                 # token (`YWI6Yw=Z`): leave btok empty.
                 if (scheme == "basic" && match(segorig, /^[A-Za-z0-9+\/]+=*/)) {
                     btok = substr(segorig, 1, RLENGTH)
                     if (substr(segorig, RLENGTH + 1, 1) ~ /[A-Za-z0-9+\/=]/) btok = ""
                     sub(/=+$/, "", btok)
+                    # The threshold below uses this unpadded length: padding
+                    # an 18 or 19 character run to 20 must not skip basiccred.
+                    blen = length(btok)
                     while (btok != "" && length(btok) % 4) btok = btok "="
                 }
-                if (scheme == "basic" && length(btok) >= 4 && length(btok) < 20 && basiccred(btok)) flag("authorization-header")
+                if (scheme == "basic" && blen >= 4 && blen < 20 && basiccred(btok)) flag("authorization-header")
                 else if (length(seg) >= 20) flag("authorization-header")
             }
             # split() keeps this linear on very long (minified) lines.

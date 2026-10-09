@@ -1561,7 +1561,11 @@ cmd_abort() {
     provider_aborted=1
   fi
   if [ "$provider_aborted" = 1 ]; then
-    (umask 077 && : >|"$ABORTED_FILE") 2>/dev/null || true
+    # The marker tells a later --abort the provider already rolled back. A
+    # write that fails is no success: without it that retry would take the
+    # lost-provider branch and demand a manual whole-stack reset.
+    (umask 077 && : >|"$ABORTED_FILE") 2>/dev/null \
+      || die "$X_KEPT" "the provider's abort succeeded, but the marker $(v "$ABORTED_FILE") could not be written; state kept, nothing restored. Fix the cause (permissions, or a directory or link at that path), then run --abort again"
   elif ! { [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ]; } && left=$(chain_rebase_worktree); then
     # The provider lost its record (Graphite's .gtcontinue or gh-stack's
     # rebase state) mid-restack, so its whole-stack rollback cannot run.

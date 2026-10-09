@@ -923,6 +923,22 @@ JSEOF
   [ "$(cat "$SD/lock.d/pid")" = paused ]
 }
 
+@test "a provider abort whose marker cannot be written exits 31 with state kept, and a retry finishes" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  mkdir "$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"marker"* ]]
+  [[ $output == *"could not be written"* ]]
+  [ -e "$SD/state" ]
+  rmdir "$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
 @test "--continue after the user finished the provider's continue by hand verifies and restores" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite

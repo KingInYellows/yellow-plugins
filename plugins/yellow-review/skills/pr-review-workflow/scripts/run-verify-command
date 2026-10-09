@@ -509,6 +509,18 @@ fi
 
 REASON=""
 add_reason() { REASON="${REASON:+$REASON; }$1"; }
+# A reason that names a git-derived path: screen the path as the reverted list
+# is, so a credential-shaped directory name never reaches the JSON or the
+# resolve summary. A screen that cannot answer withholds the path too.
+add_path_reason() {
+    local t
+    if t=$(mktemp) && printf '%s\n' "$2" >|"$t" && rt_code_clean "$t"; then
+        add_reason "$1: $2"
+    else
+        add_reason "$1: <path withheld: it looks like a credential or could not be screened>"
+    fi
+    [ -z "${t:-}" ] || rm -f -- "$t"
+}
 
 # Temp files and the output pipe; removed on every exit.
 CHANGES_FILE=""
@@ -599,7 +611,7 @@ else
         if [ -z "$(lgit_nohooks status --porcelain --untracked-files=all -- "$f")" ]; then
             [ "$MODE" = run ] && die 2 "listed file has no changes: $f"
             # Nothing to revert: do not abort the other files' revert.
-            add_reason "skipped, no changes: $f"
+            add_path_reason "skipped, no changes" "$f"
             continue
         fi
         KEEP_FILES+=("$f")
@@ -676,7 +688,7 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
             # repository it must not delete does not stop the other reverts.
             [ "$MODE" = revert-denied ] \
                 || die 2 "refusing to remove a directory that contains a nested git repository: $f"
-            add_reason "left a nested git repository in place: $f"
+            add_path_reason "left a nested git repository in place" "$f"
             NESTED_KEPT+=("$f")
             continue
         fi
@@ -733,7 +745,7 @@ for f in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
     if [ -e "$f" ] || [ -L "$f" ]; then
         die 2 "cannot remove a path that is not a regular file or symlink: $f"
     fi
-    add_reason "removed without reading, not a regular file or symlink: $f"
+    add_path_reason "removed without reading, not a regular file or symlink" "$f"
 done
 
 RC=0
