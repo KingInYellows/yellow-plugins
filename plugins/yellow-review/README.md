@@ -130,6 +130,13 @@ drain thresholds; interactive review behavior is unchanged.
 | `silent-failure-hunter`        | Silent failure and error handling analysis                                                                   |
 | `thermonuclear-reviewer`       | Strict structural-quality lane: code-judo restructurings, spaghetti-condition growth, weak type/module boundaries, misplaced ownership, evidence-gated file-size threshold crossings. **Opt-in only** — never auto-selected; enable via `reviewer_set.include` |
 
+A `plugin.json` whose only changed line is `"version"` (Changesets' "chore:
+version packages" PRs) does not select the plugin-surface personas
+(`plugin-contract-reviewer`, `cli-readiness-reviewer`,
+`agent-cli-readiness-reviewer`, `agent-native-reviewer`, and yellow-core's
+`pattern-recognition-specialist`) in `/review:pr` or `/review:all`; any other
+manifest change or plugin-authoring path still does.
+
 ### Workflow (1)
 
 | Agent                 | Description                                |
