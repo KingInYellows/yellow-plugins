@@ -1478,6 +1478,10 @@ rule=forged line=9.txt"
     awk_expect "$bin" 0 'This handler uses Basic httpOnly mode.\n'
     # padding followed by another base64 character is no token
     awk_expect "$bin" 0 'Authorization: Basic YWI6Yw=Z\n'
+    # excess or miscounted padding is malformed base64, not a credential
+    awk_expect "$bin" 0 'Authorization: Basic YWI6Yw===\n'
+    awk_expect "$bin" 0 'Authorization: Basic YWI6Yw=\n'
+    awk_expect "$bin" 6 'Authorization: Basic YWI6Yw==\n'
     # the floor counts the leading run, not the whole word
     awk_expect "$bin" 0 "x ${tv}abcdefghij+abcdefghij y\n"
     awk_expect "$bin" 0 "x ${sg}abcdefghij/abcdefghij y\n"
