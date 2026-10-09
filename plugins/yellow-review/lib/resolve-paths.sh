@@ -159,8 +159,9 @@ yr_git() {
 
 # yr_safe_path: print PATH without empty or relative entries and without any
 # entry inside the worktree (by spelling, canonical path or identity) and
-# without an entry whose awk, git, git-lfs or ignored-walk helper resolves
-# into it. Returns 1 when nothing is left. The caller's PATH is not changed;
+# without an entry whose awk, git or git-lfs resolves into it. Every yr_git
+# and yr_awk call pays for this, so the ignored-walk helpers are checked
+# separately, once per walk, by yr_walk_path. Returns 1 when nothing is left. The caller's PATH is not changed;
 # the verify command keeps its own PATH (it may need node_modules/.bin).
 yr_safe_path() {
     local root rest entry canon helper hcanon kept=""
@@ -176,9 +177,35 @@ yr_safe_path() {
                 continue
             fi
             # An outside directory can still hold a symlink to a file inside
-            # the worktree: drop it when any helper git, yr_awk or the
-            # ignored-file walk would find there canonicalizes into the worktree.
-            for helper in awk git git-lfs find head mktemp rm dirname basename readlink; do
+            # the worktree (awk, git-lfs, git): drop it when any helper
+            # git or yr_awk would find there canonicalizes into the worktree.
+            for helper in awk git git-lfs; do
+                [ -e "$entry/$helper" ] || continue
+                hcanon=$(yr_canon_path "$entry/$helper" 2>/dev/null || true)
+                if [ -z "$hcanon" ] || yr_inside_root "$hcanon" "$root"; then
+                    continue 2
+                fi
+            done
+        fi
+        kept="${kept:+$kept:}$entry"
+    done
+    [ -n "$kept" ] || return 1
+    printf '%s\n' "$kept"
+}
+
+# yr_walk_path: yr_safe_path, minus any entry whose find, head, mktemp, rm,
+# dirname, basename or readlink resolves into the worktree. Only the ignored-
+# file walk runs those by name, so it pays for this check once per walk.
+yr_walk_path() {
+    local root rest entry helper hcanon kept="" safe
+    safe=$(yr_safe_path) || return $?
+    root=$(yr_worktree_root || true)
+    rest="${safe}:"
+    while [ -n "$rest" ]; do
+        entry="${rest%%:*}"
+        rest="${rest#*:}"
+        if [ -n "$root" ]; then
+            for helper in find head mktemp rm dirname basename readlink; do
                 [ -e "$entry/$helper" ] || continue
                 hcanon=$(yr_canon_path "$entry/$helper" 2>/dev/null || true)
                 if [ -z "$hcanon" ] || yr_inside_root "$hcanon" "$root"; then
@@ -696,7 +723,7 @@ rp_ignored_changed_since() {
     [ -f "$marker" ] && [ ! -L "$marker" ] && [ -r "$marker" ] || return 2
     # find, head, mktemp and the rest run by name after the resolvers wrote
     # the tree, so the walk uses the worktree-free PATH, as yr_git does.
-    safe=$(yr_safe_path) || return 2
+    safe=$(yr_walk_path) || return 2
     (
         PATH=$safe
         hash -r 2>/dev/null || true
