@@ -2689,3 +2689,32 @@ SHIM
   [ "$status" -eq 2 ]
   [[ "$stderr" == *'skip-worktree or assume-unchanged'* ]]
 }
+
+@test "hidden flags: --revert-dirty refuses a hidden ordinary tracked file instead of reporting clean" {
+  git update-index --assume-unchanged src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'skip-worktree or assume-unchanged'* ]]
+  [[ "$stderr" == *'src/a.txt'* ]]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "hidden flags: --revert-denied still reverts a visible trusted-config edit beside an unrelated hidden deny-listed path" {
+  printf 'rules\n' >| CLAUDE.md
+  printf 'SECRET=1\n' >| .env
+  git add CLAUDE.md .env && git commit -q -m "chore: rules and env"
+  git update-index --assume-unchanged .env
+  printf 'planted\n' >| CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 0 ]
+  [ "$(cat CLAUDE.md)" = rules ]
+}
+
+@test "hidden flags: --revert-denied still refuses a hidden trusted-config path" {
+  printf 'rules\n' >| CLAUDE.md
+  git add CLAUDE.md && git commit -q -m "chore: rules"
+  git update-index --assume-unchanged CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'skip-worktree or assume-unchanged'* ]]
+}
