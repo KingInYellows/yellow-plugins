@@ -84,7 +84,7 @@ def inspect(parent_fd, name, relative):
     lines_left -= len(selected)
     numbered = []
     for number, line in enumerate(selected, 1):
-        if re.search(r"(?i)(?:api[_-]?key|token|password|secret|private[_-]?key)\s*[=:]", line):
+        if re.search(r"(?i)(?:(?:api[_-]?key|token|password|secret|private[_-]?key)[\"']?\s*[=:]|authorization[\"']?\s*[=:,]|\bbearer\s+\S)", line):
             line = "--- redacted possible credential at line " + str(number) + " ---"
         numbered.append({"line": number, "text": line})
     files.append({"path": relative, "lines": numbered})
