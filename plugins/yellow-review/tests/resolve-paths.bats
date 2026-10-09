@@ -1121,6 +1121,16 @@ commit_repo() {
   [[ "$YR_HARDEN_MSG" != *secretpw* ]]
 }
 
+@test "harden_git_config redacts a filter key whose subsection contains whitespace" {
+  git config --local 'filter.sk-secretword x.clean' 'touch /never'
+  for scope in full revert; do
+    rc=0; harden_git_config "$scope" || rc=$?
+    [ "$rc" -eq 1 ]
+    [[ "$YR_HARDEN_MSG" == *"filter.<driver>.clean|smudge|process"* ]]
+    [[ "$YR_HARDEN_MSG" != *secretword* ]]
+  done
+}
+
 @test "harden_git_config allows the stock Git LFS filter commands and refuses a changed one" {
   git config --local filter.lfs.clean 'git-lfs clean -- %f'
   git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
@@ -1130,6 +1140,23 @@ commit_repo() {
   git config --local filter.lfs.clean 'sh -c evil'
   ( rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 1 ] )
   ( rc=0; harden_git_config revert || rc=$?; [ "$rc" -eq 1 ] )
+}
+
+@test "harden_git_config refuses a stock LFS filter command followed by a second line" {
+  git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
+  git config --local filter.lfs.process 'git-lfs filter-process'
+  for first in 'git-lfs clean -- %f'; do
+    git config --local filter.lfs.clean "$first"$'\n'"touch $BATS_TEST_TMPDIR/lfs-ran"
+    for scope in full revert; do
+      rc=0; harden_git_config "$scope" || rc=$?
+      [ "$rc" -eq 1 ] || { echo "$scope accepted a multiline LFS value"; false; }
+      [[ "$YR_HARDEN_MSG" == *"filter.<driver>."* ]]
+      [[ "$YR_HARDEN_MSG" != *lfs-ran* ]]
+    done
+  done
+  git config --local filter.lfs.clean $'git-lfs clean -- %f\nlocal\tfilter.lfs.clean git-lfs clean -- %f'
+  rc=0; harden_git_config full || rc=$?
+  [ "$rc" -eq 1 ]
 }
 
 @test "harden_git_config forces signing off with a note only when local gpg config exists, in full scope" {

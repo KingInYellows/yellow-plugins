@@ -381,6 +381,8 @@ check_lib_integrity || exit 2
 
 # shellcheck source=../../../lib/resolve-paths.sh
 . "$PLUGIN_ROOT/lib/resolve-paths.sh" || { printf '[run-verify-command] Error: cannot load lib/resolve-paths.sh\n' >&2; exit 2; }
+# Resolve git and the worktree-free PATH once, here, so later subshells reuse them.
+yr_git --version >/dev/null 2>&1 || true
 # shellcheck source=../../../lib/resolve-text.sh
 . "$PLUGIN_ROOT/lib/resolve-text.sh" || { printf '[run-verify-command] Error: cannot load lib/resolve-text.sh\n' >&2; exit 2; }
 # shellcheck source=../../../lib/verify-run.sh
@@ -546,24 +548,6 @@ safe_path_list_z() {
     done
     printf '%s' "$out"
 }
-# safe_hits_list <newline-joined find output>: rp_ignored_changed_since joins
-# its hits with newlines at the source, so a name containing a newline splits
-# into fragments. Print the list only when every line is a real path in the
-# tree (a fragment of a split name is not one); otherwise print a count.
-safe_hits_list() {
-    local line n=0
-    while IFS= read -r line; do
-        [ -n "$line" ] || continue
-        n=$((n + 1))
-        if [ ! -e "$line" ] && [ ! -L "$line" ]; then
-            printf '%s' "<$(grep -c . <<<"$1") changed path(s) withheld: a name contains a newline>"
-            return 0
-        fi
-    done <<<"$1"
-    while IFS= read -r line; do
-        [ -n "$line" ] && printf '%s\0' "$line"
-    done <<<"$1" | safe_path_list_z
-}
 add_path_reason() {
     if path_is_safe "$2"; then
         add_reason "$1: $2"
@@ -580,6 +564,7 @@ FIFO=""
 MARKER=""
 STREAM_FILE=""
 IGNORED_SCRATCH=""
+IGNORED_HITS=""
 DIR_LIST=""
 HIDDEN_HITS=""
 # The snapshot is provisional until it is complete and credential-screened: any
@@ -589,7 +574,7 @@ PATCH=""
 PATCH_PROVISIONAL=0
 cleanup() {
     local f
-    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST" "$HIDDEN_HITS"; do
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$IGNORED_HITS" "$DIR_LIST" "$HIDDEN_HITS"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
     if [ "$PATCH_PROVISIONAL" = 1 ] && [ -n "$PATCH" ]; then
@@ -608,14 +593,15 @@ list_tree_changes() {
 
 if [ "$MODE" = check-ignored ]; then
     IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"
+    IGNORED_HITS=$(mktemp) || die 2 "mktemp failed"
     IGN_RC=0
-    IGN_HITS=$(rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH") || IGN_RC=$?
+    rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH" "$IGNORED_HITS" || IGN_RC=$?
     case "$IGN_RC" in
         # No treeClean: this guard never looks at tracked or untracked-unignored
         # changes (the resolver edits are in the tree by design), so claiming
         # a clean tree would let the caller skip its own dirty-tree stop.
         0) jq -nc '{result: "clean", patch: null, log: null}'; exit 0 ;;
-        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored file): $(safe_hits_list "$IGN_HITS")" ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored file): $(safe_path_list_z <"$IGNORED_HITS")" ;;
         *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
 fi
@@ -726,12 +712,13 @@ if [ "$MODE" = run ]; then
     # the command runs (node_modules/.bin/<runner>). Exit 1 means files changed,
     # exit 2 means the check could not tell; both refuse.
     IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"
+    IGNORED_HITS=$(mktemp) || die 2 "mktemp failed"
     IGN_RC=0
-    IGN_HITS=$(rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH") || IGN_RC=$?
+    rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH" "$IGNORED_HITS" || IGN_RC=$?
     rm -f -- "$IGNORED_SCRATCH"
     case "$IGN_RC" in
         0) ;;
-        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: $(safe_hits_list "$IGN_HITS")" ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: $(safe_path_list_z <"$IGNORED_HITS")" ;;
         *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
 
