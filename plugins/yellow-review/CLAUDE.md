@@ -383,9 +383,22 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   refuses a repository-local transport, credential or non-LFS filter config
   and forces signing off, scope `revert` (the rollback and check-ignored
   modes) refuses only a non-LFS filter; both scopes also refuse a
-  repository-local `lfs.customtransfer.*`, `lfs.standalonetransferagent` or
-  `lfs.extension.*` (Git LFS runs the program they name when it downloads an
-  object; `.lfsconfig` ignores these keys, so only git config is read); reads config through `yr_git`;
+  config entry that `yr_cfg_key_runs_command` matches (the one list of keys
+  that name a program: `filter.*`, `merge.*.driver`, `diff.*`, `core.sshCommand`
+  and the other `core.*` programs, `credential.*.helper`, `gpg.*`, `sequence.editor`,
+  `pager.*`, `remote.*.uploadpack|receivepack|vcs`, `lfs.customtransfer.*`,
+  `lfs.standalonetransferagent`, `lfs.extension.*`, `alias.*` and
+  `submodule.*.update` with a `!` value, `url.ext::*.insteadOf`, and more; case
+  insensitive), judged by origin and not by scope: refused in the repository's
+  local or worktree config, and in any global or system file that is inside the
+  worktree or hard-linked to a file in it (a global config can include one and
+  keeps its scope); `gpg.*` in the local scopes is tolerated because signing is
+  forced off, and `.lfsconfig` ignores the lfs keys, so only git config is read.
+  `core.hooksPath` and `core.fsmonitor` are not in the list because they are
+  neutralized instead: `core.fsmonitor=false` is forced for the whole process by
+  `harden_git_config` and per call by `lgit` (`lib/resolve-paths.sh` `lgit`), and hooks
+  are disabled by `disable_git_hooks` in `commit-resolve-fixes` (unless the
+  verified-tracked-hooks opt-in applies) and by `lgit_nohooks` in the rollbacks; reads config through `yr_git`;
   does not set `core.hooksPath`; returns a code instead of exiting, with the
   unsigned-commit note in `YR_HARDEN_NOTE` for the caller to print;
   `harden_git_config_for_verify` drops `safe.bareRepository` for the user's

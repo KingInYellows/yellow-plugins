@@ -1181,6 +1181,77 @@ commit_repo() {
   ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/gcfg"; rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 0 ] )
 }
 
+# One classifier (yr_cfg_key_runs_command) for every scope: each key is
+# refused in the repository's own config and in a global config that includes
+# a file inside the worktree. The table is the keys that name a program.
+CFG_CMD_KEYS=(
+  "filter.evil.clean|sh evil" "filter.evil.smudge|sh evil" "filter.evil.process|sh evil"
+  "merge.m.driver|sh evil %O %A %B" "diff.d.command|sh evil" "diff.d.textconv|sh evil" "diff.external|sh evil"
+  "core.sshCommand|sh evil" "core.askPass|evil" "core.gitProxy|evil" "core.editor|evil" "core.pager|evil"
+  "core.alternateRefsCommand|evil" "credential.helper|evil" "credential.https://h.example/.helper|evil"
+  "sequence.editor|evil" "uploadpack.packObjectsHook|evil" "remote.o.uploadpack|evil" "remote.o.receivepack|evil"
+  "remote.o.vcs|evil" "difftool.t.cmd|evil" "mergetool.t.path|evil" "trailer.t.cmd|evil"
+  "lfs.customtransfer.e.path|evil" "lfs.standalonetransferagent|e" "lfs.extension.e.clean|evil"
+  "alias.a|!sh evil" "submodule.s.update|!sh evil" "pager.log|sh evil" "url.ext::sh evil.insteadOf|https://h.example/"
+)
+
+@test "yr_cfg_key_runs_command matches every key in the table, in any case, and not the ordinary ones" {
+  for entry in "${CFG_CMD_KEYS[@]}"; do
+    key=${entry%%|*}; val=${entry#*|}
+    yr_cfg_key_runs_command "$key" "$val" || { echo "not matched: $key" >&2; return 1; }
+    up=$(printf '%s' "$key" | tr 'a-z' 'A-Z')
+    yr_cfg_key_runs_command "$up" "$val" || { echo "not matched (upper): $up" >&2; return 1; }
+  done
+  for entry in "user.name|x" "core.hooksPath|.hooks" "core.fsmonitor|false" "lfs.url|https://x" "alias.s|status" \
+               "submodule.s.update|checkout" "pager.log|true" "pager.log|false" "branch.main.remote|origin" "url.https://h/.insteadOf|x"; do
+    yr_cfg_key_runs_command "${entry%%|*}" "${entry#*|}" && { echo "matched: $entry" >&2; return 1; }
+  done
+  # the rollback modes judge the checkout subset of the same list
+  yr_cfg_key_runs_command filter.x.clean evil checkout
+  yr_cfg_key_runs_command lfs.standalonetransferagent e checkout
+  ! yr_cfg_key_runs_command merge.m.driver evil checkout
+  ! yr_cfg_key_runs_command core.sshCommand evil checkout
+}
+
+@test "harden_git_config refuses every table key set in the repository config, naming the key and not the value" {
+  for entry in "${CFG_CMD_KEYS[@]}"; do
+    key=${entry%%|*}; val=${entry#*|}
+    git config --local "$key" "$val"
+    rc=0; ( harden_git_config full || { [[ "$YR_HARDEN_MSG" != *evil* && "$YR_HARDEN_MSG" != *h.example* ]] || exit 1; exit 2; } ) || rc=$?
+    [ "$rc" -eq 2 ] || { echo "full not refused or leaked: $key (rc=$rc)" >&2; return 1; }
+    git config --local --unset-all "$key"
+  done
+}
+
+@test "harden_git_config refuses every table key reached through a global include that points inside the worktree" {
+  mkdir -p ignored
+  printf '[include]\n\tpath = %s/ignored/inc\n' "$PWD" >| "$BATS_TEST_TMPDIR/global"
+  for entry in "${CFG_CMD_KEYS[@]}"; do
+    key=${entry%%|*}; val=${entry#*|}
+    : >| ignored/inc
+    git config -f ignored/inc "$key" "$val"
+    rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "include not refused: $key" >&2; return 1; }
+  done
+}
+
+@test "harden_git_config accepts ordinary keys, a merge driver in a global file outside the worktree, and tolerates gpg.program locally" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/out"
+  git config --local core.hooksPath .hooks
+  git config --local pager.log true
+  git config --local alias.s status
+  git config --local lfs.url https://example.com/lfs
+  git config --local gpg.program gpg
+  ( rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 0 ] )
+  git config -f "$BATS_TEST_TMPDIR/out/inc" merge.m.driver 'mymerge %O %A %B'
+  printf '[include]\n\tpath = %s/out/inc\n' "$BATS_TEST_TMPDIR" >| "$BATS_TEST_TMPDIR/global"
+  ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global"; rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 0 ] )
+  # a gpg program in a global file inside the worktree is not the user's own
+  git config -f ignored/inc gpg.program evil
+  printf '[include]\n\tpath = %s/ignored/inc\n' "$PWD" >| "$BATS_TEST_TMPDIR/global"
+  ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global"; rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 1 ] )
+}
+
 @test "harden_git_config refuses a stock LFS filter command followed by a second line" {
   git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
   git config --local filter.lfs.process 'git-lfs filter-process'
@@ -1621,7 +1692,7 @@ commit_repo() {
   rc=0; ( export GIT_CONFIG_PARAMETERS="'credential.helper'='!f() { x; }; f'"; harden_git_config full ) || rc=$?
   [ "$rc" -eq 1 ]
   # Other config keys are not command-bearing: shell syntax there is fine.
-  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.x GIT_CONFIG_VALUE_0='!f() { x; }; f'; harden_git_config full ) || rc=$?
+  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0='!f() { x; }; f'; harden_git_config full ) || rc=$?
   [ "$rc" -eq 0 ]
 }
 

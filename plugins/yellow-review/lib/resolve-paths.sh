@@ -892,15 +892,61 @@ yr_cmd_enters() {
     return 1
 }
 
-# yr_cmd_key <config key>: succeed for a config key whose value is a program
-# git (or ssh, gpg, a pager) runs. Case-insensitive.
-yr_cmd_key() {
-    local r=1 had=0
+# The one list of config keys whose value git, gt or a program they start runs
+# as a command (lowercase; matched case-insensitively, so a subsection spelled
+# in any case matches). yr_cfg_key_runs_command applies it with the value
+# refinements below; harden_git_config and yr_check_git_env both use it. Not
+# listed on purpose: core.hooksPath (the commit script handles hooks and
+# supported repositories set it) and core.fsmonitor (forced off for the whole
+# process). Also see `git help config` before adding a key.
+YR_CFG_CMD_KEY_RE='^(core\.(sshcommand|askpass|gitproxy|editor|pager|alternaterefscommand)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process)|merge\..*\.driver|diff\.(external|.*\.(command|textconv))|gpg\.(.*\.)?(program|defaultkeycommand)|sequence\.editor|pager\..*|uploadpack\.packobjectshook|remote\..*\.(uploadpack|receivepack|vcs)|(difftool|mergetool)\..*\.(cmd|path)|trailer\..*\.(cmd|command)|lfs\.(customtransfer\..*|standalonetransferagent|extension\..*)|alias\..*|submodule\..*\.update|url\.ext::.*\.(push)?insteadof)$'
+
+# yr_cfg_key_runs_command <key> [value] [checkout]: succeed when <key> names a
+# program (YR_CFG_CMD_KEY_RE) that would run. Value refinements, applied only
+# when a value is given: alias.* and submodule.*.update run only when the value
+# starts with !, and pager.<cmd> only when it is not a boolean. With
+# "checkout", only the keys a checkout or a filter run reaches (filter.* and
+# lfs.*) count: the rollback modes use that subset of the same list.
+yr_cfg_key_runs_command() {
+    local k="$1" v="${2-}" mode="${3-}" r=1 had=0
     shopt -q nocasematch && had=1
     shopt -s nocasematch
-    [[ "$1" =~ ^(core\.(sshcommand|askpass|gitproxy|pager|editor)|credential\.(.*\.)?helper|diff\.(external|.*\.(command|textconv))|merge\..*\.driver|gpg\.(.*\.)?program|sequence\.editor|filter\..*\.(clean|smudge|process)|pager\..*)$ ]] && r=0
+    if [[ "$k" =~ $YR_CFG_CMD_KEY_RE ]]; then
+        r=0
+        if [ "$#" -ge 2 ]; then
+            case "$k" in
+                alias.*|submodule.*.update) case "$v" in '!'*) ;; *) r=1 ;; esac ;;
+                pager.*) case "$v" in ''|true|false|yes|no|on|off|0|1) r=1 ;; esac ;;
+            esac
+        fi
+        if [ "$mode" = checkout ]; then
+            case "$k" in filter.*|lfs.*) ;; *) r=1 ;; esac
+        fi
+    fi
     [ "$had" -eq 1 ] || shopt -u nocasematch
     return $r
+}
+
+# yr_cfg_key_label <key>: a name for <key> that never carries its subsection
+# (a URL can hold userinfo) or the value.
+yr_cfg_key_label() {
+    case "$1" in
+        [Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll].*.*.*) printf 'credential.<url>.helper' ;;
+        [Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll].*) printf 'credential.helper' ;;
+        [Ff][Ii][Ll][Tt][Ee][Rr].*) printf 'filter.<driver>.clean|smudge|process' ;;
+        [Mm][Ee][Rr][Gg][Ee].*) printf 'merge.<driver>.driver' ;;
+        [Dd][Ii][Ff][Ff].*) printf 'diff.<driver>.command|textconv|external' ;;
+        [Gg][Pp][Gg].*) printf 'gpg.program' ;;
+        [Ll][Ff][Ss].*) printf 'lfs.<customtransfer|standalonetransferagent|extension> (a Git LFS program)' ;;
+        [Rr][Ee][Mm][Oo][Tt][Ee].*) printf 'remote.<name>.uploadpack|receivepack|vcs' ;;
+        [Uu][Rr][Ll].*) printf 'url.<ext::...>.insteadOf' ;;
+        [Aa][Ll][Ii][Aa][Ss].*) printf 'alias.<name> (a ! command)' ;;
+        [Pp][Aa][Gg][Ee][Rr].*) printf 'pager.<command>' ;;
+        [Ss][Uu][Bb][Mm][Oo][Dd][Uu][Ll][Ee].*) printf 'submodule.<name>.update (a ! command)' ;;
+        [Dd][Ii][Ff][Ff][Tt][Oo][Oo][Ll].*|[Mm][Ee][Rr][Gg][Ee][Tt][Oo][Oo][Ll].*) printf '(diff|merge)tool.<name>.cmd|path' ;;
+        [Tt][Rr][Aa][Ii][Ll][Ee][Rr].*) printf 'trailer.<token>.cmd|command' ;;
+        *) printf '%s' "$1" ;;
+    esac
 }
 
 # yr_include_key <config key>: succeed for include.path or includeIf.*.path,
@@ -997,7 +1043,7 @@ yr_check_git_env() {
             YR_HARDEN_MSG="GIT_CONFIG_KEY_$i injects an include; git loads the file as command-line config, which the checks do not scan, so unset it"
             return 1
         fi
-        if yr_cmd_key "$k"; then
+        if yr_cfg_key_runs_command "$k" "$v"; then
             yr_env_cmd_verdict "GIT_CONFIG_VALUE_$i" "$v" "$root" "(injected config)" || return 1
         fi
     done
@@ -1025,7 +1071,7 @@ yr_check_git_env() {
             YR_HARDEN_MSG="GIT_CONFIG_PARAMETERS injects an include; git loads the file as command-line config, which the checks do not scan, so unset it"
             return 1
         fi
-        if yr_cmd_key "$k"; then
+        if yr_cfg_key_runs_command "$k" "$v"; then
             yr_env_cmd_verdict GIT_CONFIG_PARAMETERS "$v" "$root" "(injected config)" || return 1
         fi
     done
@@ -1077,87 +1123,85 @@ harden_git_config() {
         && [ "$(yr_git config --get core.untrackedCache 2>/dev/null)" = false ] \
         && [ "$(yr_git config --get safe.bareRepository 2>/dev/null)" = explicit ] \
         || { YR_HARDEN_MSG="could not disable core.fsmonitor"; return 1; }
-    # A repository-local or worktree-scope transport command is run by the
-    # submit step's git (and gt, gh) with submission authority: refuse it,
-    # naming the key only. Global and system scopes are not judged, and the
-    # values are never overridden, which would also disable the user's own
-    # credential helper.
-    local trc=0 tkey tre
-    # A clean, smudge or process filter runs on `git add` and on checkout, so a
-    # repository-local one is judged the same way; the three stock Git LFS
-    # commands (`git lfs install --local`) are allowed by exact value.
-    # The stock filter downloads missing objects through Git LFS, which runs
-    # the program a repository-local lfs.customtransfer.<name>.path,
-    # lfs.standalonetransferagent or lfs.extension.<name>.* names, so those are
-    # judged too (git lowercases the section and variable, not the subsection;
-    # .lfsconfig ignores these keys, so only git config is read).
-    local lre='lfs\.(customtransfer\..*|standalonetransferagent|extension\..*)'
-    tre='^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process)|'"$lre"')$'
-    [ "$scope" = revert ] && tre='^(filter\..*\.(clean|smudge|process)|'"$lre"')$'
-    # --null --show-scope emits `scope NUL key NL value NUL` per entry, so a
-    # value holding newlines is read whole. The records go straight into awk
-    # (a command substitution would drop the NULs); git's status 0 or 1 (no
-    # match) is fine, anything else fails closed. The LFS exemption needs a
-    # single-line value that matches exactly, and an awk that cannot split on
-    # NUL sees mangled records that match nothing and are refused.
-    tkey=$(set -o pipefail; yr_git config --null --show-scope --get-regexp "$tre" 2>/dev/null | yr_awk 'BEGIN { RS = "\0" }
-        NR % 2 == 1 { sc = $0; next }
+    # Every config entry that names a program (yr_cfg_key_runs_command, the one
+    # list) is judged by where it came from, not by its scope: refused when it is
+    # in the repository's local or worktree config, or in a file inside the
+    # worktree, hard-linked to a file inside it, or that cannot be checked (a
+    # global or system config can include such a file and keeps its scope).
+    # The user's own global and system files outside the worktree keep working,
+    # and values are never overridden (which would also disable the user's own
+    # credential helper). Names only, never values. A clean, smudge or process
+    # filter runs on `git add` and on checkout; the three stock Git LFS
+    # commands (`git lfs install --local`) are allowed by exact value, and
+    # .lfsconfig ignores the lfs keys that name a program. The scope `revert`
+    # (rollback) judges the checkout subset of the list. gpg.* in the local
+    # scopes is not refused here: signing is forced off below.
+    # --null --show-scope --show-origin emits `scope NUL origin NUL key NL
+    # value NUL` per entry, so a value holding newlines is read whole. awk
+    # pre-filters with the same list and prints one tab-separated line per
+    # candidate (M marks a multi-line value); git's status 0 is required, an
+    # awk that cannot split on NUL leaves a record count that is not a
+    # multiple of 3 and is refused.
+    local tkey="" tscope trigin tkeyname tml tval ofile c oroot cache=$'\n'
+    local recs
+    recs=$(set -o pipefail; yr_git config --null --show-scope --show-origin --list 2>/dev/null | YR_RE="$YR_CFG_CMD_KEY_RE" yr_awk 'BEGIN { RS = "\0" }
+        NR % 3 == 1 { sc = $0; next }
+        NR % 3 == 2 { og = $0; next }
         {
             i = index($0, "\n")
-            if (i == 0) { print "filter.<unparsed>.clean"; exit }
-            k = substr($0, 1, i - 1); v = substr($0, i + 1)
-            if (sc != "local" && sc != "worktree") next
-            if (k ~ /^filter\.lfs\.(clean|smudge|process)$/ && (v == "git-lfs clean -- %f" || v == "git-lfs smudge -- %f" || v == "git-lfs filter-process" || v == "git-lfs smudge --skip -- %f" || v == "git-lfs filter-process --skip")) next
-            print k; exit
-        }') || trc=$?
-    case "$trc" in
-        0|1) ;;
-        *) YR_HARDEN_MSG="could not parse the git transport config"; return 1 ;;
-    esac
-    # A credential URL can carry userinfo: name the key without it.
-    case "$tkey" in
-        credential.helper) ;;
-        credential.*) tkey="credential.<url>.helper" ;;
-        filter.*) tkey="filter.<driver>.clean|smudge|process" ;;
-        lfs.*) tkey="lfs.<customtransfer|standalonetransferagent|extension> (a Git LFS program)" ;;
-    esac
-    if [ -n "$tkey" ]; then
-        if [ "$scope" = revert ]; then
-            YR_HARDEN_MSG="the repository config sets $tkey, which a checkout would run; remove it from the repository config (a global or system config is fine)"
-        else
-            YR_HARDEN_MSG="the repository config sets $tkey, which would run a command with submission authority; remove it from the repository config (a global or system config is fine)"
-        fi
-        return 1
-    fi
-    # The scan above skips the global and system scopes, which are the user's
-    # own. A file of those scopes that lies inside the worktree is not: HOME,
-    # XDG_CONFIG_HOME or an include can point there, and a resolver can write
-    # it. Judge each command-bearing entry by the file it came from.
-    local ore org o ofile c
-    ore='^(core\.(sshcommand|askpass|gitproxy|pager|editor)|credential\.(.*\.)?helper|diff\.external|gpg\.(.*\.)?program|filter\..*\.(clean|smudge|process))$'
-    [ "$scope" = revert ] && ore='^filter\..*\.(clean|smudge|process)$'
-    org=$(set -o pipefail; yr_git config --show-scope --show-origin --name-only --list 2>/dev/null \
-        | YR_ORE="$ore" yr_awk -F'\t' '$1 != "local" && $1 != "worktree" && $1 != "command" && tolower($3) ~ ENVIRON["YR_ORE"] { if (!($2 in s)) { s[$2] = 1; print $2 } }') \
-        || { YR_HARDEN_MSG="could not read the git config origins"; return 1; }
-    yr_split_lines "$org"
-    local oroot
+            if (i == 0) { k = $0; v = "" } else { k = substr($0, 1, i - 1); v = substr($0, i + 1) }
+            if (sc == "command") next
+            if (tolower(k) !~ ENVIRON["YR_RE"]) next
+            ml = (index(v, "\n") > 0) ? "M" : "S"
+            gsub(/[\t\n]/, " ", v)
+            printf "%s\t%s\t%s\t%s\t%s\n", sc, og, k, ml, v
+        }
+        END { if (NR % 3 != 0) printf "local\t-\t<unparsed>\tM\t\n" }') \
+        || { YR_HARDEN_MSG="could not parse the git transport config"; return 1; }
     oroot=$(yr_worktree_root || true)
-    if [ -n "$oroot" ]; then
-        for o in ${YR_LINES[@]+"${YR_LINES[@]}"}; do
-            case "$o" in file:*) ofile=${o#file:} ;; *) continue ;; esac
-            case "$ofile" in /*) ;; *) ofile="$(pwd -P)/$ofile" ;; esac
-            c=$(yr_canon_path "$ofile" 2>/dev/null) || c=""
-            if [ -z "$c" ] || yr_inside_root "$c" "$oroot" || yr_inside_root "$ofile" "$oroot"; then
-                YR_HARDEN_MSG="a global or system git config file inside the repository sets a command that git would run; point HOME, XDG_CONFIG_HOME or the include outside the repository"
+    local ckmode=""
+    [ "$scope" = revert ] && ckmode=checkout
+    while IFS=$'\t' read -r tscope trigin tkeyname tml tval; do
+        [ -n "$tkeyname" ] || continue
+        if [ "$tkeyname" = "<unparsed>" ]; then
+            YR_HARDEN_MSG="could not parse the git transport config"
+            return 1
+        fi
+        yr_cfg_key_runs_command "$tkeyname" "$tval" $ckmode || continue
+        if [ "$tml" = S ] && [[ "$tkeyname" =~ ^filter\.lfs\.(clean|smudge|process)$ ]]; then
+            case "$tval" in
+                "git-lfs clean -- %f"|"git-lfs smudge -- %f"|"git-lfs filter-process"|"git-lfs smudge --skip -- %f"|"git-lfs filter-process --skip") continue ;;
+            esac
+        fi
+        case "$tscope" in
+            local|worktree)
+                case "$tkeyname" in [Gg][Pp][Gg].*) continue ;; esac
+                tkey=$(yr_cfg_key_label "$tkeyname")
+                if [ "$scope" = revert ]; then
+                    YR_HARDEN_MSG="the repository config sets $tkey, which a checkout would run; remove it from the repository config (a global or system config is fine)"
+                else
+                    YR_HARDEN_MSG="the repository config sets $tkey, which would run a command with submission authority; remove it from the repository config (a global or system config is fine)"
+                fi
                 return 1
-            fi
-            # A hard link to a file inside the worktree canonicalizes outside it.
-            if yr_hardlink_enters "${c:-$ofile}" "$oroot"; then
-                YR_HARDEN_MSG="a global or system git config file that sets a command is hard-linked to a file inside the repository (or its links cannot be checked); point HOME, XDG_CONFIG_HOME or the include at a separate copy outside the repository"
-                return 1
-            fi
-        done
-    fi
+                ;;
+        esac
+        # Global, system and other scopes: judge the file the entry came from.
+        case "$trigin" in file:*) ofile=${trigin#file:} ;; *) continue ;; esac
+        case "$cache" in *$'\n'"$ofile"$'\n'*) continue ;; esac
+        [ -n "$oroot" ] || { cache="$cache$ofile"$'\n'; continue; }
+        case "$ofile" in /*) ;; *) ofile="$(pwd -P)/$ofile" ;; esac
+        c=$(yr_canon_path "$ofile" 2>/dev/null) || c=""
+        if [ -z "$c" ] || yr_inside_root "$c" "$oroot" || yr_inside_root "$ofile" "$oroot"; then
+            YR_HARDEN_MSG="a global or system git config file inside the repository sets $(yr_cfg_key_label "$tkeyname"), a command that git would run; point HOME, XDG_CONFIG_HOME or the include outside the repository"
+            return 1
+        fi
+        # A hard link to a file inside the worktree canonicalizes outside it.
+        if yr_hardlink_enters "$c" "$oroot"; then
+            YR_HARDEN_MSG="a global or system git config file that sets $(yr_cfg_key_label "$tkeyname") is hard-linked to a file inside the repository (or its links cannot be checked); point HOME, XDG_CONFIG_HOME or the include at a separate copy outside the repository"
+            return 1
+        fi
+        cache="$cache$ofile"$'\n'
+    done <<<"$recs"
     [ "$scope" = revert ] && return 0
     # A resolver can also write commit.gpgSign and gpg.program (or
     # gpg.<format>.program) into the repository's own config: signing the commit
