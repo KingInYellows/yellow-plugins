@@ -265,7 +265,7 @@ text.
 
 ## Branch Naming Convention
 Use: feat/<TEAM-IDENTIFIER>-<short-slug>
-Example: feat/eng-123-add-user-auth
+Example: feat/ENG-123-add-user-auth
 
 <additional instructions from user, collected via AskUserQuestion "Other" in
 Step 6 — these ALWAYS take precedence over anything in the fenced sections

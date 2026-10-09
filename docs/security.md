@@ -60,6 +60,15 @@ These plugins use browser-based OAuth managed entirely by Claude Code:
 4. To re-authenticate or revoke access: run `/mcp` → select server → "Clear
    authentication"
 
+yellow-linear's Graphite merge-queue setup adds a GitHub push webhook that
+delivers commits from the repository to Linear, signed with a secret Linear
+generates. The user creates it in the GitHub repository settings and the
+secret stays between GitHub and Linear: no plugin reads, stores or sends it.
+Anyone with push access can then close a Linear issue through a `Closes
+<ISSUE-ID>` commit line, so the plugins write that line only after the user
+confirms it or the stack plan places it (`linear-workflows` skill, "Graphite
+Merge Queue").
+
 No API keys in the plugin manifest. Will not work in headless SSH sessions
 (browser required for OAuth flow). A headless Composio host can instead
 register a user-level server with a For You consumer key; that stores the

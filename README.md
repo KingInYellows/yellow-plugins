@@ -131,6 +131,11 @@ automatically.
 To re-authenticate or revoke access: run `/mcp` in Claude Code, select the
 server, and choose "Clear authentication".
 
+With Graphite's merge queue, Linear moves an issue to Done only through
+commit magic words, which needs a one-time GitHub push webhook from Linear's
+GitHub integration. The plugin never sees that webhook's secret; the setup
+steps are in `plugins/yellow-linear/README.md` "Graphite Merge Queue".
+
 These plugins require browser access and **will not work in headless SSH
 sessions**.
 
