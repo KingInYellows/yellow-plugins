@@ -128,7 +128,8 @@ decision_lines() { printf '%s\n' "$output" | grep -E '^\[plan:complete\] GATE_C_
     [ ! -e "$PROV" ]
   done
   # Neither the commits lookup nor the PR was even asked for.
-  ! grep -q 'commits/' "$CALLS"
+  run grep -q 'commits/' "$CALLS"
+  [ "$status" -ne 0 ]
   ! grep -q '/pulls/42' "$CALLS"
 }
 
