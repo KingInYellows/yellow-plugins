@@ -25,6 +25,7 @@ import {
 
 import { authorizeCreate } from '../src/authorize.js';
 import { REAL_CLOCK } from '../src/runtime.js';
+import { planDigest } from '../src/state.js';
 
 import {
   FakeJulesServer,
@@ -430,6 +431,13 @@ describe('reply, approve and supervise through the compiled CLI', () => {
     );
 
     // approve: dry-run re-fetch, then the single approve POST.
+    const reviewed = (await cli(['status', '--session', localId])).json[
+      'pendingPlan'
+    ] as {
+      planId: string;
+      steps: readonly { title: string; description?: string }[];
+    };
+    const reviewedDigest = planDigest(reviewed.planId, reviewed.steps);
     const dry = await cli([
       'approve',
       '--session',
@@ -451,6 +459,8 @@ describe('reply, approve and supervise through the compiled CLI', () => {
       localId,
       '--plan-id',
       'plan-1',
+      '--expect-plan-digest',
+      reviewedDigest,
       '--grant-id',
       grantId,
     ]);
@@ -492,6 +502,8 @@ describe('reply, approve and supervise through the compiled CLI', () => {
       localId,
       '--plan-id',
       'plan-1',
+      '--expect-plan-digest',
+      'a'.repeat(64),
       '--grant-id',
       grantId,
     ]);

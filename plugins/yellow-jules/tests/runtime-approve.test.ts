@@ -8,7 +8,7 @@ import {
 } from '../src/errors.js';
 import { approve, delegate, type ApproveArgs } from '../src/mutations.js';
 import { status } from '../src/runtime.js';
-import { readJournal, updateSupervision } from '../src/state.js';
+import { planDigest, readJournal, updateSupervision } from '../src/state.js';
 
 import {
   addActivity,
@@ -26,6 +26,7 @@ import {
 let h: GrantHarness;
 let grantId: string;
 let session: DelegatedSession;
+let reviewedDigest: string;
 
 beforeEach(async () => {
   h = makeHarness('correct');
@@ -34,6 +35,9 @@ beforeEach(async () => {
   addPlan(h, session.sessionResource, 'plan-1');
   // `status` is the only writer of the pending plan the approval compares against.
   await status(h.deps, { session: session.localId, reconcile: false });
+  const plan = (await readJournal(h.dataDir)).operations[session.localRequestId]
+    ?.pendingPlan;
+  reviewedDigest = planDigest(plan!.planId, plan!.steps);
   h.adapter.calls.length = 0;
 });
 afterEach(() => {
@@ -44,6 +48,7 @@ function args(overrides: Partial<ApproveArgs> = {}): ApproveArgs {
   return {
     session: session.localId,
     planId: 'plan-1',
+    expectPlanDigest: reviewedDigest,
     dryRun: false,
     grantId,
     ...overrides,
@@ -319,6 +324,48 @@ describe('checks that must hold at the moment of the write (inside the critical 
       approve(h.deps, args({ grantId: other, planId: 'plan-3' }))
     );
     expect(err.appError.code).toBe('JULES_POLICY_DEVIATION');
+  });
+});
+
+describe('the reviewed plan digest', () => {
+  function rewritePlanText(): void {
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      plan: {
+        planId: 'plan-1',
+        steps: [{ id: 'st-x', title: 'Something else entirely', index: 0 }],
+      },
+    });
+    setVendorState(h, session.sessionResource, 'awaitingPlanApproval');
+  }
+
+  it('refuses a plan whose text changed under the same id, and sends nothing', async () => {
+    rewritePlanText();
+    const err = await fails(() => approve(h.deps, args()));
+    expect(err.appError.code).toBe('JULES_POLICY_DEVIATION');
+    expect(h.adapter.writeCount()).toBe(0);
+  });
+
+  it('a real approve without the digest is refused before any vendor call', async () => {
+    const err = await fails(() =>
+      approve(h.deps, args({ expectPlanDigest: undefined }))
+    );
+    expect(err.appError.code).toBe('JULES_INVALID_INPUT');
+    expect(h.adapter.calls).toEqual([]);
+  });
+
+  it('a malformed digest is refused', async () => {
+    expect(
+      await codeOf(() => approve(h.deps, args({ expectPlanDigest: 'none' })))
+    ).toBe('JULES_INVALID_INPUT');
+    expect(h.adapter.writeCount()).toBe(0);
+  });
+
+  it('a dry run flags a changed text as planChanged', async () => {
+    rewritePlanText();
+    expect(await approve(h.deps, args({ dryRun: true }))).toMatchObject({
+      attention: ['planChanged'],
+    });
   });
 });
 

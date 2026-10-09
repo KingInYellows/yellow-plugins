@@ -348,6 +348,7 @@ async function dispatch(
         options: {
           session: { type: 'string' },
           'plan-id': { type: 'string' },
+          'expect-plan-digest': { type: 'string' },
           'request-id': { type: 'string' },
           'grant-id': { type: 'string' },
           'dry-run': { type: 'boolean', default: false },
@@ -359,6 +360,9 @@ async function dispatch(
       return approve(deps, {
         session: requireString(values.session, '--session'),
         planId: requireString(values['plan-id'], '--plan-id'),
+        ...(typeof values['expect-plan-digest'] === 'string'
+          ? { expectPlanDigest: values['expect-plan-digest'] }
+          : {}),
         ...(typeof values['request-id'] === 'string'
           ? { requestId: values['request-id'] }
           : {}),

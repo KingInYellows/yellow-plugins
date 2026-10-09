@@ -151,7 +151,7 @@ FRESH_DIGEST=$(printf '%s\n' "$FRESH" | jq -c '[.pendingPlan.planId, ((.pendingP
 if [ "$FRESH_DIGEST" != "$PLAN_DIGEST" ]; then
   printf 'ERROR: the plan changed since you reviewed it. Nothing was approved; run the pass again.\n' >&2; exit 1
 fi
-OUTPUT=$(node "$CLI" approve --session "$SESSION" --plan-id "$PLAN_ID" --grant-id "$GRANT_ID")
+OUTPUT=$(node "$CLI" approve --session "$SESSION" --plan-id "$PLAN_ID" --expect-plan-digest "$PLAN_DIGEST" --grant-id "$GRANT_ID")
 printf 'exit=%s\n' "$?"
 printf '%s\n' "$OUTPUT" | jq '{ok, operation, localRequestId, approvedPlanId, observedPlanIdAfter, verificationDeferred, policyDeviation, requiresAttention, attention, details, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
 ```

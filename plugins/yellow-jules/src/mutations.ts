@@ -842,6 +842,14 @@ async function replyInner(
 export interface ApproveArgs {
   readonly session: string;
   readonly planId: string;
+  /**
+   * Digest of the plan the caller reviewed (`planDigest` of its id and steps).
+   * Required for a real approve: the final pre-POST re-read refuses with
+   * `JULES_POLICY_DEVIATION` unless the newest plan has this digest, so a plan
+   * whose text changed under the same id is never approved. Optional on a dry
+   * run, where a mismatch is reported as `planChanged`.
+   */
+  readonly expectPlanDigest?: string;
   readonly requestId?: string;
   readonly dryRun: boolean;
   readonly grantId?: string;
@@ -926,6 +934,15 @@ async function approveInner(
   ids: Ids
 ): Promise<ApproveResult | ApproveDryRunResult> {
   const planId = validatePlanId(args.planId, 'input');
+  if (
+    args.expectPlanDigest !== undefined &&
+    !/^[0-9a-f]{64}$/.test(args.expectPlanDigest)
+  ) {
+    throwAppError(
+      'JULES_INVALID_INPUT',
+      '--expect-plan-digest must be 64 lowercase hex characters'
+    );
+  }
   prepare(deps);
   const totalMs = args.deadlineMs ?? DEFAULT_MUTATION_DEADLINE_MS;
   const deadline = deadlineIn(deps.clock, totalMs);
@@ -936,6 +953,12 @@ async function approveInner(
       deps,
       { operation: 'approve', ...scopeOf(target) },
       ids
+    );
+  }
+  if (!args.dryRun && args.expectPlanDigest === undefined) {
+    throwAppError(
+      'JULES_INVALID_INPUT',
+      'approve requires --expect-plan-digest: the sha256 of the plan you reviewed'
     );
   }
   const pending = target.owner?.pendingPlan;
@@ -986,7 +1009,11 @@ async function approveInner(
     }
 
     if (args.dryRun) {
-      const changed = newest.planId !== planId;
+      const changed =
+        newest.planId !== planId ||
+        (args.expectPlanDigest !== undefined &&
+          planDigest(newest.planId, redactDeep(newest).steps) !==
+            args.expectPlanDigest);
       return {
         operation: 'approve' as const,
         localRequestId: ids.localRequestId,
@@ -998,10 +1025,14 @@ async function approveInner(
         ...attentionOf(changed ? ['planChanged'] : []),
       };
     }
-    if (newest.planId !== planId) {
+    if (
+      newest.planId !== planId ||
+      planDigest(newest.planId, redactDeep(newest).steps) !==
+        args.expectPlanDigest
+    ) {
       return throwAppError(
         'JULES_POLICY_DEVIATION',
-        'the newest pending plan differs from the evaluated --plan-id; nothing was approved',
+        'the newest pending plan differs from the reviewed plan (id or digest); nothing was approved',
         {
           recoveryAction:
             'Run status, evaluate the new plan, and approve that plan id.',

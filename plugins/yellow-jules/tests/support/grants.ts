@@ -17,6 +17,7 @@ import {
 import { type AuthorizeDeps, authorizeCreate } from '../../src/authorize.js';
 import { resolveJournalPath } from '../../src/config.js';
 import { delegate, type DelegateArgs } from '../../src/mutations.js';
+import { planDigest, readJournal } from '../../src/state.js';
 import type { OpenTty, TtyHandle } from '../../src/tty-confirm.js';
 import type { AdapterActivity, GrantRecord } from '../../src/types.js';
 import { FakeSdkAdapter, makeDeps } from '../fake-sdk.js';
@@ -181,6 +182,17 @@ let planSeq = 0;
  * Adds a `planGenerated` activity to the fake and puts the session in the
  * given state, newer than anything already there.
  */
+/** The digest of the plan `status` last recorded as pending for the session. */
+export async function reviewedDigestOf(
+  harness: GrantHarness,
+  localRequestId: string
+): Promise<string> {
+  const plan = (await readJournal(harness.dataDir)).operations[localRequestId]
+    ?.pendingPlan;
+  if (plan === undefined) throw new Error('no pending plan recorded');
+  return planDigest(plan.planId, plan.steps);
+}
+
 export function addPlan(
   harness: GrantHarness,
   sessionResource: string,

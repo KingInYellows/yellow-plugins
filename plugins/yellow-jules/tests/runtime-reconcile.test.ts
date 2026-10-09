@@ -18,6 +18,7 @@ import {
   addPlan,
   createGrant,
   delegateOk,
+  reviewedDigestOf,
   type GrantHarness,
   makeHarness,
   setVendorState,
@@ -544,6 +545,7 @@ describe('reply and approve reservations resolve on their own session', () => {
       approve(h.deps, {
         session: session.localId,
         planId: 'plan-1',
+        expectPlanDigest: await reviewedDigestOf(h, session.localRequestId),
         dryRun: false,
         grantId,
         requestId: 'approve-1',

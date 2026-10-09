@@ -211,7 +211,7 @@ fi
 if [ "$CONFIRMED_BINDING" != "$BINDING" ]; then
   printf 'ERROR: the session, plan, grant or request id changed since the confirmed preview. Nothing was approved; start again from Step 3.\n' >&2; exit 1
 fi
-args=(approve --session "$SESSION" --plan-id "$PLAN_ID" --grant-id "$GRANT_ID" --request-id "$REQUEST_ID")
+args=(approve --session "$SESSION" --plan-id "$PLAN_ID" --expect-plan-digest "$PLAN_DIGEST" --grant-id "$GRANT_ID" --request-id "$REQUEST_ID")
 [ -n "$DEADLINE" ] && args+=(--deadline-ms "$DEADLINE")
 OUTPUT=$(node "$CLI" "${args[@]}")
 printf 'exit=%s\n' "$?"

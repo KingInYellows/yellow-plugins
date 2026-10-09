@@ -542,7 +542,7 @@ transient failure from an undetermined one.
   needs the question pair, `plan` the plan pair, and `other` refuses both, each
   failing with `JULES_INVALID_INPUT` before any read. Omitted, the pairs stay
   optional.
-- `approve --session <ref> --plan-id <evaluated plan id> [--request-id <id>] [--dry-run] [--grant-id <id>]`
+- `approve --session <ref> --plan-id <evaluated plan id> --expect-plan-digest <hex> [--request-id <id>] [--dry-run] [--grant-id <id>]`
   →
   `{ localRequestId, localId, sessionResource, approvedPlanId, observedPlanIdAfter: string | null, verificationDeferred: bool, verification: { pages: n, partialPagination: bool }, policyDeviation? }`.
   `--dry-run` performs the R34 re-fetch: one `info()` (state must be
@@ -566,7 +566,13 @@ transient failure from an undetermined one.
   "retry; if it repeats, run `status`"; an activity the SDK mapper cannot parse
   (`unmappedActivity`) — "re-verify the SDK pin with `/jules:setup`; a larger
   deadline will not help"; a complete re-fetch whose newest `planGenerated`
-  differs from `--plan-id` fails closed with `JULES_POLICY_DEVIATION`. Only then
+  differs from `--plan-id`, or whose `planDigest` (the same sha256 `reply`
+  takes) differs from `--expect-plan-digest`, fails closed with
+  `JULES_POLICY_DEVIATION`, so text changed under the same plan id is never
+  approved. The digest is required for a real call (missing or not 64
+  lowercase hex is `JULES_INVALID_INPUT`, before any vendor call, but after the
+  grant check); on `--dry-run` it is optional and a mismatch reports
+  `planChanged`. Only then
   does it issue the POST (the endpoint takes no plan id), then re-read from the
   same start point within the remaining budget and record a deviation on
   mismatch (R34). If the post-POST re-read is partial for any reason (page cap,

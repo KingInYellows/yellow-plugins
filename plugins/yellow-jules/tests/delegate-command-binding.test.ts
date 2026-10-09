@@ -82,6 +82,22 @@ describe('/jules:reply binds the send to the confirmed preview', () => {
   });
 });
 
+describe('approve always carries the reviewed plan digest', () => {
+  it.each(['approve', 'supervise'])(
+    '/jules:%s passes it to the CLI',
+    (name) => {
+      const line = cmd(name)
+        .split('\n')
+        .find(
+          (l) =>
+            /(args=\(|OUTPUT=\$\()(node "\$CLI" )?approve --session/.test(l) &&
+            !l.includes('--dry-run')
+        );
+      expect(line).toContain('--expect-plan-digest "$PLAN_DIGEST"');
+    }
+  );
+});
+
 describe('/jules:approve binds the approval to the reviewed plan', () => {
   const approve = cmd('approve');
   const s3 = approve.slice(

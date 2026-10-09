@@ -529,12 +529,19 @@ async function approve(deps, args) {
 }
 async function approveInner(deps, args, ids) {
     const planId = (0, validate_js_1.validatePlanId)(args.planId, 'input');
+    if (args.expectPlanDigest !== undefined &&
+        !/^[0-9a-f]{64}$/.test(args.expectPlanDigest)) {
+        (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', '--expect-plan-digest must be 64 lowercase hex characters');
+    }
     (0, runtime_support_js_1.prepare)(deps);
     const totalMs = args.deadlineMs ?? deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS;
     const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, totalMs);
     const target = await resolveTarget(deps, args.session);
     if (!args.dryRun && args.grantId === undefined) {
         throw (0, write_gate_js_1.confirmationRequired)(deps, { operation: 'approve', ...scopeOf(target) }, ids);
+    }
+    if (!args.dryRun && args.expectPlanDigest === undefined) {
+        (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', 'approve requires --expect-plan-digest: the sha256 of the plan you reviewed');
     }
     const pending = target.owner?.pendingPlan;
     if (pending === undefined) {
@@ -570,7 +577,10 @@ async function approveInner(deps, args, ids) {
             return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'the vendor shows no pending plan for this session', { recoveryAction: 'Run status for this session, then retry.' });
         }
         if (args.dryRun) {
-            const changed = newest.planId !== planId;
+            const changed = newest.planId !== planId ||
+                (args.expectPlanDigest !== undefined &&
+                    (0, state_js_1.planDigest)(newest.planId, (0, redact_js_1.redactDeep)(newest).steps) !==
+                        args.expectPlanDigest);
             return {
                 operation: 'approve',
                 localRequestId: ids.localRequestId,
@@ -582,8 +592,10 @@ async function approveInner(deps, args, ids) {
                 ...(0, runtime_support_js_1.attentionOf)(changed ? ['planChanged'] : []),
             };
         }
-        if (newest.planId !== planId) {
-            return (0, errors_js_1.throwAppError)('JULES_POLICY_DEVIATION', 'the newest pending plan differs from the evaluated --plan-id; nothing was approved', {
+        if (newest.planId !== planId ||
+            (0, state_js_1.planDigest)(newest.planId, (0, redact_js_1.redactDeep)(newest).steps) !==
+                args.expectPlanDigest) {
+            return (0, errors_js_1.throwAppError)('JULES_POLICY_DEVIATION', 'the newest pending plan differs from the reviewed plan (id or digest); nothing was approved', {
                 recoveryAction: 'Run status, evaluate the new plan, and approve that plan id.',
             });
         }

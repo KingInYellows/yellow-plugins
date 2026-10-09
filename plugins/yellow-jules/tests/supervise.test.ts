@@ -34,6 +34,7 @@ import {
   addPlanNow,
   createGrant,
   delegateOk,
+  reviewedDigestOf,
   type DelegatedSession,
   type GrantHarness,
   makeHarness,
@@ -508,6 +509,7 @@ describe('outside activity pauses (R32)', () => {
     const approveErr = await approve(h.deps, {
       session: session.localId,
       planId: 'plan-1',
+      expectPlanDigest: await reviewedDigestOf(h, session.localRequestId),
       dryRun: false,
       grantId,
     }).catch((e: unknown) => e);
