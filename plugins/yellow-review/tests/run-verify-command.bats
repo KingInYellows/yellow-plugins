@@ -113,6 +113,18 @@ has_kill_after() {
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
 }
 
+@test "a fake git-lfs in a PATH directory inside the worktree never runs" {
+  mkdir -p fakebin
+  printf '#!/bin/sh\ntouch "%s/lfs-ran"\nexit 1\n' "$BATS_TEST_TMPDIR" >| fakebin/git-lfs
+  chmod +x fakebin/git-lfs
+  git config --local filter.lfs.clean 'git-lfs clean -- %f'
+  git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
+  git config --local filter.lfs.process 'git-lfs filter-process'
+  printf '*.txt filter=lfs\n' >| .git/info/attributes
+  PATH="$REPO/fakebin:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/lfs-ran" ]
+}
+
 @test "an unlisted dirty file left after --revert-only makes treeClean false" {
   printf 'two\nstray\n' >| src/b.txt
   run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt

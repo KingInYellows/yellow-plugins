@@ -148,7 +148,37 @@ yr_git() {
     if [ -z "${YELLOW_REVIEW_GIT:-}" ]; then
         YELLOW_REVIEW_GIT=$(yr_resolve_tool git) || return $?
     fi
-    "$YELLOW_REVIEW_GIT" "$@"
+    # Git runs the stock git-lfs filters (and other helpers) by name through
+    # PATH: run it with a PATH from which relative entries and entries inside
+    # the worktree are dropped, so a resolver-written git-lfs cannot run.
+    if [ -z "${YR_GIT_PATH:-}" ]; then
+        YR_GIT_PATH=$(yr_safe_path) || return $?
+    fi
+    PATH=$YR_GIT_PATH "$YELLOW_REVIEW_GIT" "$@"
+}
+
+# yr_safe_path: print PATH without empty or relative entries and without any
+# entry inside the worktree (by spelling, canonical path or identity). Returns
+# 1 when nothing is left. The caller's PATH is not changed; the verify command
+# keeps its own PATH (it may need node_modules/.bin).
+yr_safe_path() {
+    local root rest entry canon kept=""
+    root=$(yr_worktree_root || true)
+    rest="${PATH}:"
+    while [ -n "$rest" ]; do
+        entry="${rest%%:*}"
+        rest="${rest#*:}"
+        case "$entry" in /*) ;; *) continue ;; esac
+        if [ -n "$root" ]; then
+            canon=$(yr_canon_path "$entry" 2>/dev/null || true)
+            if yr_inside_root "$entry" "$root" || { [ -n "$canon" ] && yr_inside_root "$canon" "$root"; }; then
+                continue
+            fi
+        fi
+        kept="${kept:+$kept:}$entry"
+    done
+    [ -n "$kept" ] || return 1
+    printf '%s\n' "$kept"
 }
 
 # Git with listed paths taken literally (no globs or pathspec magic). A
