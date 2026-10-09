@@ -297,14 +297,16 @@ yr_file_shebang_enters() {
 
 # yr_hardlink_enters <file> <root>: succeed when <file> has other hard links
 # and one of them is inside <root> (a link to an ignored script there keeps
-# the script's content under an outside name), or when that cannot be told.
+# the script's content under an outside name), or when that cannot be told
+# (the link count unreadable, or the walk of <root> failed before a match).
 # find comes from yr_helper, never PATH. The tree is walked only for a file
 # with a link count above 1 that is on the worktree's device.
 yr_hardlink_enters() {
     local f="$1" root="$2" find fd rd hit
     [ -f "$f" ] || return 1
     find=$(yr_helper find) || return 0
-    [ -n "$("$find" "$f" -maxdepth 0 -links +1 -print 2>/dev/null)" ] || return 1
+    hit=$("$find" "$f" -maxdepth 0 -links +1 -print 2>/dev/null) || return 0
+    [ -n "$hit" ] || return 1
     fd=$("$find" "$f" -maxdepth 0 -printf '%D' 2>/dev/null) || fd=""
     rd=$("$find" "$root" -maxdepth 0 -printf '%D' 2>/dev/null) || rd=""
     if [ -n "$fd" ] && [ -n "$rd" ] && [ "$fd" != "$rd" ]; then return 1; fi
@@ -568,12 +570,17 @@ yr_hardlink_inside() {
     local root="$1" find="$2" awk="$3" dev cands
     shift 3
     dev=$("$find" "$root" -maxdepth 0 -printf '%D' 2>/dev/null) || dev=""
+    # Not checked for errors: -L reports a symlink loop such as /usr/bin/X11
+    # as one, and the entries it did list are all that matters here.
     cands=$("$find" -L "$@" -maxdepth 1 -type f -links +1 -printf '%D:%i\n' 2>/dev/null) || true
     [ -n "$cands" ] || return 1
     [ -z "$dev" ] || cands=$(printf '%s\n' "$cands" | "$awk" -v d="$dev:" 'index($0, d) == 1')
     [ -n "$cands" ] || return 1
+    # A walk that fails part way (an unreadable directory hides links) is not
+    # cached and not trusted: every directory holding a same-device multi-link
+    # file is dropped, as in yr_hardlink_stat.
     if [ -z "${YR_HL_TREE+x}" ]; then
-        YR_HL_TREE=$("$find" "$root" -xdev -type f -links +1 -printf '%D:%i\n' 2>/dev/null) || true
+        YR_HL_TREE=$("$find" "$root" -xdev -type f -links +1 -printf '%D:%i\n' 2>/dev/null) || { unset YR_HL_TREE; return 0; }
     fi
     [ -n "$YR_HL_TREE" ] || return 1
     printf '%s\n' "$YR_HL_TREE" | YR_HL_C="$cands" "$awk" 'BEGIN { n = split(ENVIRON["YR_HL_C"], a, "\n"); for (i = 1; i <= n; i++) s[a[i]] = 1 } ($0 in s) { f = 1; exit } END { exit !f }'
@@ -1131,6 +1138,11 @@ harden_git_config() {
             c=$(yr_canon_path "$ofile" 2>/dev/null) || c=""
             if [ -z "$c" ] || yr_inside_root "$c" "$oroot" || yr_inside_root "$ofile" "$oroot"; then
                 YR_HARDEN_MSG="a global or system git config file inside the repository sets a command that git would run; point HOME, XDG_CONFIG_HOME or the include outside the repository"
+                return 1
+            fi
+            # A hard link to a file inside the worktree canonicalizes outside it.
+            if yr_hardlink_enters "${c:-$ofile}" "$oroot"; then
+                YR_HARDEN_MSG="a global or system git config file that sets a command is hard-linked to a file inside the repository (or its links cannot be checked); point HOME, XDG_CONFIG_HOME or the include at a separate copy outside the repository"
                 return 1
             fi
         done

@@ -493,14 +493,16 @@ yr_file_shebang_enters() {
 
 # yr_hardlink_enters <file> <root>: succeed when <file> has other hard links
 # and one of them is inside <root> (a link to an ignored script there keeps
-# the script's content under an outside name), or when that cannot be told.
+# the script's content under an outside name), or when that cannot be told
+# (the link count unreadable, or the walk of <root> failed before a match).
 # find comes from yr_helper, never PATH. The tree is walked only for a file
 # with a link count above 1 that is on the worktree's device.
 yr_hardlink_enters() {
     local f="$1" root="$2" find fd rd hit
     [ -f "$f" ] || return 1
     find=$(yr_helper find) || return 0
-    [ -n "$("$find" "$f" -maxdepth 0 -links +1 -print 2>/dev/null)" ] || return 1
+    hit=$("$find" "$f" -maxdepth 0 -links +1 -print 2>/dev/null) || return 0
+    [ -n "$hit" ] || return 1
     fd=$("$find" "$f" -maxdepth 0 -printf '%D' 2>/dev/null) || fd=""
     rd=$("$find" "$root" -maxdepth 0 -printf '%D' 2>/dev/null) || rd=""
     if [ -n "$fd" ] && [ -n "$rd" ] && [ "$fd" != "$rd" ]; then return 1; fi

@@ -288,7 +288,10 @@ device and inode) to a regular file inside the worktree, and `yr_resolve_tool` r
 tool that is such a link (one `find -xdev` pass over the worktree, only when a PATH
 directory on its device holds a multi-link file). Without a `-printf` find or GNU
 `realpath`, a directory on the worktree's device holding any multi-link file is dropped,
-and one whose link counts `stat` cannot report is dropped too. Any inherited `GIT_CONFIG` (it makes `git config` read only that file,
+and one whose link counts `stat` cannot report is dropped too. A worktree walk that fails part way (an unreadable directory) is not
+cached or trusted: every same-device directory holding a multi-link file is dropped. A
+global or system config file that sets a command and is a hard link to a worktree file
+(or whose link count cannot be read) is refused by `harden_git_config`. Any inherited `GIT_CONFIG` (it makes `git config` read only that file,
 hiding the repository config from the scans) is refused. Command lines are judged whole: the raw value must not contain the
 worktree path as a whole path (`<root>2` and `<root>-keys` are siblings and
 pass), no word (quotes, a leading `!` and `--opt=VALUE` handled) may be an

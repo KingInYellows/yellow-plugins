@@ -1406,6 +1406,36 @@ commit_repo() {
   [[ "$out" == "$BATS_TEST_TMPDIR/hok:"* ]]
 }
 
+@test "yr_safe_path drops a directory holding a multi-link file when the worktree walk fails part way" {
+  mkdir -p "$BATS_TEST_TMPDIR/hok" "$BATS_TEST_TMPDIR/plain"
+  : >| "$BATS_TEST_TMPDIR/hok/a"
+  ln "$BATS_TEST_TMPDIR/hok/a" "$BATS_TEST_TMPDIR/hok/b"
+  : >| "$BATS_TEST_TMPDIR/plain/a"
+  # A find that lists the worktree but then exits non-zero, as one does when a
+  # directory under it cannot be read.
+  printf '#!/bin/sh\n/usr/bin/find "$@"\nrc=$?\ncase " $* " in *" -xdev "*) exit 1 ;; esac\nexit $rc\n' >| "$BATS_TEST_TMPDIR/failfind"
+  chmod +x "$BATS_TEST_TMPDIR/failfind"
+  yr_helper() { case "$1" in find) printf '%s\n' "$BATS_TEST_TMPDIR/failfind" ;; *) command -p which "$1" 2>/dev/null || return 1 ;; esac; }
+  out=$(PATH="$BATS_TEST_TMPDIR/hok:$BATS_TEST_TMPDIR/plain:/usr/bin:/bin" yr_safe_path)
+  [[ ":$out:" != *":$BATS_TEST_TMPDIR/hok:"* ]]
+  # a directory without a multi-link file does not need the walk
+  [[ ":$out:" == *":$BATS_TEST_TMPDIR/plain:"* ]]
+}
+
+@test "harden_git_config refuses a global config hard-linked to a file inside the worktree" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/home"
+  printf '[core]\n\tsshCommand = true\n' >| ignored/gitcfg
+  ln ignored/gitcfg "$BATS_TEST_TMPDIR/home/.gitconfig"
+  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/home/.gitconfig"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/home/.gitconfig"; harden_git_config full; [[ "$YR_HARDEN_MSG" == *"hard-linked"* ]] ) || rc=$?
+  # a multi-link global config that is not linked into the worktree is the user's own
+  printf '[core]\n\tsshCommand = ssh -x\n' >| "$BATS_TEST_TMPDIR/home/own"
+  ln "$BATS_TEST_TMPDIR/home/own" "$BATS_TEST_TMPDIR/home/own2"
+  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/home/own"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
 @test "yr_resolve_tool refuses a tool that is a hard link to a file inside the worktree (exit 2)" {
   mkdir -p ignored "$BATS_TEST_TMPDIR/hbin"
   printf '#!/bin/sh\nexit 0\n' >| ignored/helper
