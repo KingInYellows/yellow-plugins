@@ -84,6 +84,7 @@ import {
 import {
   confirmationRequired,
   assertGrantLiveBeforeWrite,
+  type VendorFloor,
   plainLaunchGrantIds,
   reserveUnderGrant,
   settleAcceptedOrUnknown,
@@ -719,6 +720,64 @@ function stampBefore(
   );
 }
 
+/** Refusal when the pre-dispatch floor could not be read: nothing was sent. */
+function floorUnreadable(): AppErrorException {
+  return new AppErrorException(
+    makeAppError(
+      'JULES_SERVICE_UNAVAILABLE',
+      "the session's activity could not be completely read before the write, so its echo could never be ordered; nothing was sent",
+      { recoveryAction: 'Retry the write; no request was dispatched.' }
+    )
+  );
+}
+
+/**
+ * Reads the session's newest activity right before a reply or approve is sent,
+ * so a later echo can be ordered against the dispatch on the vendor's clock
+ * alone. Starts from the owner's stored status watermark when there is one. A
+ * failed or partial read yields no floor, and the caller refuses the write
+ * before the POST rather than send one whose echo could never bind.
+ */
+async function readVendorFloor(
+  deps: WriteDeps,
+  adapter: SdkAdapter,
+  sessionResource: string,
+  owner: OperationRecord,
+  deadline: Deadline
+): Promise<VendorFloor | undefined> {
+  const stored =
+    owner.lastActivityCreateTime !== undefined &&
+    owner.lastActivityId !== undefined
+      ? {
+          createTime: owner.lastActivityCreateTime,
+          activityId: owner.lastActivityId,
+        }
+      : undefined;
+  try {
+    const walk = await walkActivities({
+      adapter,
+      sessionResource,
+      pageSize: STATUS_PAGE_SIZE,
+      start:
+        stored !== undefined
+          ? { kind: 'watermark' as const, ...stored }
+          : { kind: 'session-start' as const },
+      clock: deps.clock,
+      deadline,
+      pageCap: APPROVE_PAGE_CAP,
+    });
+    if (!walk.complete) return undefined;
+    const newest =
+      walk.newest !== undefined &&
+      (stored === undefined || compareStamp(walk.newest, stored) > 0)
+        ? walk.newest
+        : stored;
+    return newest ?? 'empty';
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * True when more than one plan with differing digests shares the newest
  * createTime: which one is current is unknowable from opaque ids, so the
@@ -1021,7 +1080,27 @@ async function replyInner(
     if (isExpired(deps.clock, deadline)) {
       return settleExpiredBeforeWrite(deps, reservation, SESSION_RECONCILE);
     }
-    await assertGrantLiveBeforeWrite(deps, reservation, SESSION_RECONCILE);
+    const replyFloor = await readVendorFloor(
+      deps,
+      adapter,
+      target.sessionResource,
+      owner,
+      deadline
+    );
+    if (isExpired(deps.clock, deadline)) {
+      return settleExpiredBeforeWrite(deps, reservation, SESSION_RECONCILE);
+    }
+    if (replyFloor === undefined) {
+      return settleFailure(deps, reservation, floorUnreadable(), {
+        reconcileHint: SESSION_RECONCILE,
+      });
+    }
+    await assertGrantLiveBeforeWrite(
+      deps,
+      reservation,
+      SESSION_RECONCILE,
+      replyFloor
+    );
     try {
       await adapter.sendMessage(target.sessionResource, message);
     } catch (err) {
@@ -1337,7 +1416,27 @@ async function approveInner(
       return settleExpiredBeforeWrite(deps, reservation, SESSION_RECONCILE);
     }
 
-    await assertGrantLiveBeforeWrite(deps, reservation, SESSION_RECONCILE);
+    const approveFloor = await readVendorFloor(
+      deps,
+      adapter,
+      target.sessionResource,
+      owner,
+      deadline
+    );
+    if (isExpired(deps.clock, deadline)) {
+      return settleExpiredBeforeWrite(deps, reservation, SESSION_RECONCILE);
+    }
+    if (approveFloor === undefined) {
+      return settleFailure(deps, reservation, floorUnreadable(), {
+        reconcileHint: SESSION_RECONCILE,
+      });
+    }
+    await assertGrantLiveBeforeWrite(
+      deps,
+      reservation,
+      SESSION_RECONCILE,
+      approveFloor
+    );
     try {
       await adapter.approvePlan(target.sessionResource);
     } catch (err) {

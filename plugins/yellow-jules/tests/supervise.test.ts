@@ -622,6 +622,8 @@ describe('outside activity pauses (R32)', () => {
       correction: false,
       grantId,
     });
+    // The vendor stamps the echo strictly after what was there at dispatch.
+    h.deps.clock.time += 1_000;
     addActivity(h, session.sessionResource, {
       type: 'userMessaged',
       message: ' use sqlite ',

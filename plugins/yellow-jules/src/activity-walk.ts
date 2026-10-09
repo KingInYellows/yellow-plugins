@@ -24,12 +24,6 @@ export const STATUS_PAGE_SIZE = 50;
 export const COLLECT_PAGE_SIZE = 10;
 export const PAGE_CAP = 20;
 export const OVERLAP_WINDOW_MS = 5 * 60_000;
-/**
- * Clock-skew tolerance between the local `dispatchedAt` stamp and a vendor
- * activity `createTime`. Deliberately tight: a message older than the dispatch
- * minus this cannot be the echo of that POST.
- */
-export const DISPATCH_SKEW_MS = 30_000;
 /** Longer than any write deadline (cli MAX_DEADLINE_MS 200 s) plus a minute of slack. */
 export const RESERVATION_SETTLE_MS = 260_000;
 export const DEDUP_RING_CAP = 1000;

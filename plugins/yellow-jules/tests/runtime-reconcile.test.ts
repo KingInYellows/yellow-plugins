@@ -371,6 +371,15 @@ describe('delegate reservations: one shared sessions walk', () => {
 describe('reply and approve reservations resolve on their own session', () => {
   async function strandedReply(message: string, requestId: string) {
     const session = await delegateOk(h, grantId);
+    await strand(session, message, requestId);
+    return session;
+  }
+
+  async function strand(
+    session: { localId: string },
+    message: string,
+    requestId: string
+  ) {
     h.adapter.sendMessageImpl = async () => {
       throw new AdapterError('network', 'reset', { dispatched: true });
     };
@@ -385,7 +394,6 @@ describe('reply and approve reservations resolve on their own session', () => {
       })
     ).rejects.toBeInstanceOf(AppErrorException);
     h.adapter.calls.length = 0;
-    return session;
   }
 
   it('a userMessaged activity whose digest matches binds it — and sessions are never walked', async () => {
@@ -675,12 +683,18 @@ describe('reply and approve reservations resolve on their own session', () => {
   });
 
   it('an older matching send is a prior send, never this one', async () => {
-    const session = await strandedReply('repeat me', 'reply-1');
+    const session = await delegateOk(h, grantId);
     addActivity(h, session.sessionResource, {
       type: 'userMessaged',
       message: 'repeat me',
       createTime: new Date(h.deps.clock.now() - 60 * 60_000).toISOString(),
     });
+    await strand(session, 'repeat me', 'reply-1');
+    // The prior message is older than the pre-dispatch floor: not an echo.
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-1']
+        ?.vendorFloorCreateTime
+    ).toBeDefined();
     const result = await status(h.deps, {
       session: session.localId,
       reconcile: true,
@@ -688,13 +702,17 @@ describe('reply and approve reservations resolve on their own session', () => {
     expect(result.reconciled?.[0]?.outcome).toBe('unknown-outcome');
   });
 
-  it('an identical message from minutes before the dispatch is not bound', async () => {
-    const session = await strandedReply('same words', 'reply-1');
-    addActivity(h, session.sessionResource, {
+  it('a teammate message the controller clock calls later is not bound when the vendor clock runs ahead', async () => {
+    const session = await delegateOk(h, grantId);
+    // Two minutes ahead of the controller: after dispatchedAt, before the POST.
+    const teammate = addActivity(h, session.sessionResource, {
       type: 'userMessaged',
       message: 'same words',
-      createTime: new Date(h.deps.clock.now() - 4 * 60_000).toISOString(),
+      createTime: new Date(h.deps.clock.now() + 120_000).toISOString(),
     });
+    await strand(session, 'same words', 'reply-1');
+    const floor = (await readJournal(h.dataDir)).operations['reply-1'];
+    expect(floor?.vendorFloorActivityId).toBe(teammate.activityId);
     const result = await status(h.deps, {
       session: session.localId,
       reconcile: true,
@@ -703,6 +721,52 @@ describe('reply and approve reservations resolve on their own session', () => {
     expect((await readJournal(h.dataDir)).operations['reply-1']?.status).toBe(
       'unknown-outcome'
     );
+  });
+
+  it('an echo strictly newer than the pre-dispatch activity binds (the common path)', async () => {
+    const session = await delegateOk(h, grantId);
+    const prior = addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'unrelated',
+      createTime: new Date(h.deps.clock.now() + 1_000).toISOString(),
+    });
+    await strand(session, 'same words', 'reply-1');
+    const echo = addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'same words',
+      createTime: new Date(Date.parse(prior.createTime) + 1_000).toISOString(),
+    });
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(result.reconciled?.[0]?.outcome).toBe('bound');
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-1']?.echoActivityId
+    ).toBe(echo.activityId);
+  });
+
+  it('a match at the same createTime as the pre-dispatch activity cannot be ordered and stays ambiguous', async () => {
+    const session = await delegateOk(h, grantId);
+    const prior = addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'unrelated',
+      createTime: new Date(h.deps.clock.now() + 1_000).toISOString(),
+    });
+    await strand(session, 'same words', 'reply-1');
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'same words',
+      createTime: prior.createTime,
+    });
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(result.reconciled?.[0]).toMatchObject({
+      outcome: 'ambiguous-reconcile',
+      reason: 'dispatch-time-unknown',
+    });
   });
 
   it('a matching message just after the dispatch binds', async () => {
@@ -719,10 +783,15 @@ describe('reply and approve reservations resolve on their own session', () => {
     expect(result.reconciled?.[0]?.outcome).toBe('bound');
   });
 
-  it('a reply with no dispatch stamp is never bound — a match is ambiguous', async () => {
+  it('a reply with no vendor floor is never bound — a match is ambiguous', async () => {
     const session = await strandedReply('legacy words', 'reply-1');
     await updateJournal(h.dataDir, (operations) => {
-      const { dispatchedAt: _drop, ...rest } = operations['reply-1']!;
+      const {
+        vendorFloorEmpty: _e,
+        vendorFloorCreateTime: _c,
+        vendorFloorActivityId: _a,
+        ...rest
+      } = operations['reply-1']!;
       operations['reply-1'] = rest;
     });
     addActivity(h, session.sessionResource, {

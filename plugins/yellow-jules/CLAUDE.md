@@ -243,6 +243,20 @@ predicate the reserve uses), then stamps `dispatchedAt`. Only a reservation
 carrying that stamp can claim a vendor activity as its own echo, so a teammate
 repeating a still-undispatched message is classified as outside activity.
 
+A reply or approve also records a vendor floor at that stamp: just before the
+POST the controller reads the session's newest activity (`createTime`, id;
+the stored status watermark plus a walk from it) and stores it as
+`vendorFloorCreateTime` / `vendorFloorActivityId`, or `vendorFloorEmpty` when
+the session had no activities. A failed or partial read refuses the write before
+the POST (`JULES_SERVICE_UNAVAILABLE`, retryable; the reservation settles
+`failed` and nothing is dispatched). An echo, in `status --reconcile` and in
+`claimOwnEchoes`, must be strictly newer than the floor by vendor `createTime`.
+Older (or the floor activity itself) is not an echo; an equal `createTime`, a
+record with no floor (legacy), or a missing `createTime` cannot be ordered, so reconcile reports
+`ambiguous-reconcile` (`dispatch-time-unknown`) and `status` treats the message
+as outside activity. No local time is compared with a vendor time for this. A
+create is exempt: its session did not exist before the POST.
+
 A dispatched reservation proves only that the POST began, not that it landed. A
 message that only such a still-`reserved` reply (inside its settle window) could
 explain is held: `status` neither claims it nor classifies it, and the watermark
@@ -333,8 +347,8 @@ also marked `echoAmbiguous` on its journal record: no later walk, even one that
 re-reads the surplus message, may give it an `echoActivityId`; only reconcile or
 abandon settles it. Older records without the field parse unchanged.
 Only writes that could own a message of the batch count: those dispatched before
-the walk began, not after the message was first read, and within the dispatch
-skew of it.
+the walk began, not after the message was first read, and whose echo is proven
+newer than the write's vendor floor (below).
 
 A swap pause in `supervise` is suppressed by our own reply only when that reply
 has positive landing evidence and its echo's vendor `createTime` (recorded as

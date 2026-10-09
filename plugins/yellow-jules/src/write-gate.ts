@@ -400,6 +400,15 @@ export async function reserveUnderGrant(
 }
 
 /**
+ * The newest vendor activity read just before a reply or approve was sent, or
+ * `'empty'` when the session had none. It orders the write's echo on the
+ * vendor's clock; absent, the echo can never be bound.
+ */
+export type VendorFloor =
+  | { readonly createTime: string; readonly activityId: string }
+  | 'empty';
+
+/**
  * The last check before a vendor POST: the grant may have been revoked or may
  * have expired since the reservation (a delegate does an SDK source read in
  * between). On failure nothing was sent, so the reservation settles as a clean
@@ -412,11 +421,12 @@ export async function reserveUnderGrant(
 export async function assertGrantLiveBeforeWrite(
   deps: WriteDeps,
   record: OperationRecord,
-  reconcileHint: string
+  reconcileHint: string,
+  vendorFloor?: VendorFloor
 ): Promise<void> {
   let failure: AppErrorException | undefined;
   try {
-    failure = await finalDispatchCheck(deps, record);
+    failure = await finalDispatchCheck(deps, record, vendorFloor);
   } catch (err) {
     if (!(err instanceof AppErrorException)) throw err;
     failure = err;
@@ -437,7 +447,8 @@ export async function assertGrantLiveBeforeWrite(
  */
 async function finalDispatchCheck(
   deps: WriteDeps,
-  record: OperationRecord
+  record: OperationRecord,
+  vendorFloor?: VendorFloor
 ): Promise<AppErrorException | undefined> {
   const now = nowFn(deps);
   const paused = (why: string): AppErrorException =>
@@ -550,6 +561,14 @@ async function finalDispatchCheck(
     operations[record.localRequestId] = {
       ...fresh,
       dispatchedAt: new Date(now()).toISOString(),
+      ...(vendorFloor === 'empty'
+        ? { vendorFloorEmpty: true as const }
+        : vendorFloor !== undefined
+          ? {
+              vendorFloorCreateTime: vendorFloor.createTime,
+              vendorFloorActivityId: vendorFloor.activityId,
+            }
+          : {}),
       // Orders the dispatch against evaluations and walks without a clock.
       dispatchSeq: nextSeq(journal),
     };

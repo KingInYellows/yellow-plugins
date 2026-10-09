@@ -228,10 +228,10 @@ async function reserveUnderGrant(deps, gate) {
  * POST that follows cannot be made atomic with local state, so a revoke or an
  * outside message landing in that last window is not stopped.
  */
-async function assertGrantLiveBeforeWrite(deps, record, reconcileHint) {
+async function assertGrantLiveBeforeWrite(deps, record, reconcileHint, vendorFloor) {
     let failure;
     try {
-        failure = await finalDispatchCheck(deps, record);
+        failure = await finalDispatchCheck(deps, record, vendorFloor);
     }
     catch (err) {
         if (!(err instanceof errors_js_1.AppErrorException))
@@ -251,7 +251,7 @@ async function assertGrantLiveBeforeWrite(deps, record, reconcileHint) {
  * possibly landed. Because check and stamp share the lock, an outside mark
  * either lands first (refused here) or sees the stamp.
  */
-async function finalDispatchCheck(deps, record) {
+async function finalDispatchCheck(deps, record, vendorFloor) {
     const now = (0, runtime_support_js_1.nowFn)(deps);
     const paused = (why) => new errors_js_1.AppErrorException((0, errors_js_1.makeAppError)('JULES_SUPERVISION_PAUSED', `${why} after the write was reserved; nothing was sent`));
     return (0, state_js_1.updateJournal)(deps.dataDir, (operations, journal) => {
@@ -311,6 +311,14 @@ async function finalDispatchCheck(deps, record) {
         operations[record.localRequestId] = {
             ...fresh,
             dispatchedAt: new Date(now()).toISOString(),
+            ...(vendorFloor === 'empty'
+                ? { vendorFloorEmpty: true }
+                : vendorFloor !== undefined
+                    ? {
+                        vendorFloorCreateTime: vendorFloor.createTime,
+                        vendorFloorActivityId: vendorFloor.activityId,
+                    }
+                    : {}),
             // Orders the dispatch against evaluations and walks without a clock.
             dispatchSeq: (0, state_js_1.nextSeq)(journal),
         };

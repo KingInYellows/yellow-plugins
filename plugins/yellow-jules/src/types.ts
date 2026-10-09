@@ -328,6 +328,16 @@ export interface OperationRecord {
   readonly invalidatedBy?: 'outside-activity';
   /** Set under the journal lock by the final pre-POST check; only a record carrying it may have landed, so only it can claim an echo. */
   readonly dispatchedAt?: string;
+  /**
+   * The newest vendor activity (`createTime`, id) the controller read just
+   * before this write was sent. An echo must be strictly newer by vendor
+   * `createTime`; an equal or older stamp, or no floor at all, leaves the match
+   * unordered (never bound). Same clock on both sides: no local time is compared.
+   */
+  readonly vendorFloorCreateTime?: string;
+  readonly vendorFloorActivityId?: string;
+  /** The session had no activities at all before dispatch: any matching activity is newer by construction. */
+  readonly vendorFloorEmpty?: true;
   /** Journal sequence at reservation; absent on records written before sequences (order unknown). */
   readonly createSeq?: number;
   /** Journal sequence stamped with `dispatchedAt`, in the same critical section. */

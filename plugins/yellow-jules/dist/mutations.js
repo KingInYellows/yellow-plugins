@@ -408,6 +408,49 @@ async function hasUnclaimedUserMessage(deps, sessionResource, userMessages, afte
 function stampBefore(a, b) {
     return ((0, activity_walk_js_1.compareStamp)({ createTime: a.createTime, activityId: '' }, { createTime: b.createTime, activityId: '' }) < 0);
 }
+/** Refusal when the pre-dispatch floor could not be read: nothing was sent. */
+function floorUnreadable() {
+    return new errors_js_1.AppErrorException((0, errors_js_1.makeAppError)('JULES_SERVICE_UNAVAILABLE', "the session's activity could not be completely read before the write, so its echo could never be ordered; nothing was sent", { recoveryAction: 'Retry the write; no request was dispatched.' }));
+}
+/**
+ * Reads the session's newest activity right before a reply or approve is sent,
+ * so a later echo can be ordered against the dispatch on the vendor's clock
+ * alone. Starts from the owner's stored status watermark when there is one. A
+ * failed or partial read yields no floor, and the caller refuses the write
+ * before the POST rather than send one whose echo could never bind.
+ */
+async function readVendorFloor(deps, adapter, sessionResource, owner, deadline) {
+    const stored = owner.lastActivityCreateTime !== undefined &&
+        owner.lastActivityId !== undefined
+        ? {
+            createTime: owner.lastActivityCreateTime,
+            activityId: owner.lastActivityId,
+        }
+        : undefined;
+    try {
+        const walk = await (0, activity_walk_js_1.walkActivities)({
+            adapter,
+            sessionResource,
+            pageSize: activity_walk_js_1.STATUS_PAGE_SIZE,
+            start: stored !== undefined
+                ? { kind: 'watermark', ...stored }
+                : { kind: 'session-start' },
+            clock: deps.clock,
+            deadline,
+            pageCap: APPROVE_PAGE_CAP,
+        });
+        if (!walk.complete)
+            return undefined;
+        const newest = walk.newest !== undefined &&
+            (stored === undefined || (0, activity_walk_js_1.compareStamp)(walk.newest, stored) > 0)
+            ? walk.newest
+            : stored;
+        return newest ?? 'empty';
+    }
+    catch {
+        return undefined;
+    }
+}
 /**
  * True when more than one plan with differing digests shares the newest
  * createTime: which one is current is unknowable from opaque ids, so the
@@ -611,7 +654,16 @@ async function replyInner(deps, args, ids) {
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
             return (0, write_gate_js_1.settleExpiredBeforeWrite)(deps, reservation, SESSION_RECONCILE);
         }
-        await (0, write_gate_js_1.assertGrantLiveBeforeWrite)(deps, reservation, SESSION_RECONCILE);
+        const replyFloor = await readVendorFloor(deps, adapter, target.sessionResource, owner, deadline);
+        if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
+            return (0, write_gate_js_1.settleExpiredBeforeWrite)(deps, reservation, SESSION_RECONCILE);
+        }
+        if (replyFloor === undefined) {
+            return (0, write_gate_js_1.settleFailure)(deps, reservation, floorUnreadable(), {
+                reconcileHint: SESSION_RECONCILE,
+            });
+        }
+        await (0, write_gate_js_1.assertGrantLiveBeforeWrite)(deps, reservation, SESSION_RECONCILE, replyFloor);
         try {
             await adapter.sendMessage(target.sessionResource, message);
         }
@@ -797,7 +849,16 @@ async function approveInner(deps, args, ids) {
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
             return (0, write_gate_js_1.settleExpiredBeforeWrite)(deps, reservation, SESSION_RECONCILE);
         }
-        await (0, write_gate_js_1.assertGrantLiveBeforeWrite)(deps, reservation, SESSION_RECONCILE);
+        const approveFloor = await readVendorFloor(deps, adapter, target.sessionResource, owner, deadline);
+        if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
+            return (0, write_gate_js_1.settleExpiredBeforeWrite)(deps, reservation, SESSION_RECONCILE);
+        }
+        if (approveFloor === undefined) {
+            return (0, write_gate_js_1.settleFailure)(deps, reservation, floorUnreadable(), {
+                reconcileHint: SESSION_RECONCILE,
+            });
+        }
+        await (0, write_gate_js_1.assertGrantLiveBeforeWrite)(deps, reservation, SESSION_RECONCILE, approveFloor);
         try {
             await adapter.approvePlan(target.sessionResource);
         }

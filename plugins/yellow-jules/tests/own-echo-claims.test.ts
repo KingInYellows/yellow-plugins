@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { reply } from '../src/mutations.js';
 import { status } from '../src/runtime.js';
 import { claimOwnEchoes, messageDigest, readJournal } from '../src/state.js';
 import {
@@ -87,22 +88,46 @@ describe('each dispatched message explains at most one vendor activity', () => {
     expect(await outsideSeen(session.localRequestId)).toBe(false);
   });
 
-  it('an identical message older than the dispatch is outside, not the echo', async () => {
+  it('a teammate message that predates the dispatch on the vendor clock is outside, even when the controller clock trails', async () => {
     const grantId = await createGrant(h, { maxActiveSessions: 3 });
     const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
-    setVendorState(h, session.sessionResource, 'inProgress');
-    addActivity(h, session.sessionResource, {
+    setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
+    // The vendor clock runs two minutes ahead of the controller's: the
+    // teammate's message was sent before the dispatch but is stamped after the
+    // controller's dispatchedAt.
+    const ahead = h.deps.clock.now() + 120_000;
+    const teammate = addActivity(h, session.sessionResource, {
       type: 'userMessaged',
-      message: 'Do the task.',
+      message: 'use sqlite',
       originator: 'user',
-      createTime: new Date(h.deps.clock.now() - 10 * 60_000).toISOString(),
+      createTime: new Date(ahead).toISOString(),
+    });
+    await reply(h.deps, {
+      session: session.localId,
+      message: 'use sqlite',
+      dryRun: false,
+      correction: false,
+      grantId,
     });
     await status(h.deps, { session: session.localId, reconcile: false });
+    const ops = (await readJournal(h.dataDir)).operations;
+    const replyRecord = Object.values(ops).find((r) => r.kind === 'reply');
+    expect(replyRecord?.echoActivityId).toBeUndefined();
     expect(await outsideSeen(session.localRequestId)).toBe(true);
-    expect(
-      (await readJournal(h.dataDir)).operations[session.localRequestId]
-        ?.echoActivityId
-    ).toBeUndefined();
+
+    // The real echo, strictly newer on the vendor clock, is still claimed.
+    const echo = addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'use sqlite',
+      originator: 'user',
+      createTime: new Date(ahead + 1_000).toISOString(),
+    });
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const after = Object.values((await readJournal(h.dataDir)).operations).find(
+      (r) => r.kind === 'reply'
+    );
+    expect(after?.echoActivityId).toBe(echo.activityId);
+    expect(after?.echoActivityId).not.toBe(teammate.activityId);
   });
 
   it('two identical messages in one batch explain only one', async () => {
@@ -169,7 +194,7 @@ describe('identical text from a create and a later reply, newest first', () => {
         promptDigest: messageDigest('Do the task.'),
       },
     });
-    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty');
     await settleAccepted(h.deps, reservation);
     const digest = messageDigest('Do the task.');
     const outside = await claimOwnEchoes(

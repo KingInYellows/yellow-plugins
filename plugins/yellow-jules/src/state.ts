@@ -21,7 +21,6 @@ import * as path from 'node:path';
 import {
   compareStamp,
   DEDUP_RING_CAP,
-  DISPATCH_SKEW_MS,
   RESERVATION_SETTLE_MS,
 } from './activity-walk.js';
 import {
@@ -65,6 +64,35 @@ export function digestText(text: string): string {
  * unordered (opaque ids carry no order), so they refresh the marker rather than
  * lose to an id comparison.
  */
+/**
+ * Whether a message/activity is proven to follow the record's dispatch, by the
+ * vendor's clock alone. A create's session did not exist before its POST, so
+ * everything in it follows. Otherwise the echo must be strictly newer by
+ * `createTime` than the newest activity read before dispatch (equal time is
+ * unordered), or the session must have been empty. No floor: unproven.
+ */
+export function followsDispatch(
+  r: OperationRecord,
+  createTime: string | undefined,
+  activityId?: string
+): boolean {
+  if (r.kind === 'create') return true;
+  // The floor activity itself was read before dispatch.
+  if (activityId !== undefined && activityId === r.vendorFloorActivityId) {
+    return false;
+  }
+  if (r.vendorFloorEmpty === true) return true;
+  if (r.vendorFloorCreateTime === undefined || createTime === undefined) {
+    return false;
+  }
+  return (
+    compareStamp(
+      { createTime, activityId: '' },
+      { createTime: r.vendorFloorCreateTime, activityId: '' }
+    ) > 0
+  );
+}
+
 function outsideSupersedes(
   next: { createTime?: string; activityId: string },
   prev: { createTime?: string; activityId: string }
@@ -164,6 +192,8 @@ const OPTIONAL_STRING_FIELDS = [
   'abandonReason',
   'invalidatedBy',
   'dispatchedAt',
+  'vendorFloorCreateTime',
+  'vendorFloorActivityId',
 ] as const;
 
 const ARTIFACT_KINDS = new Set(['patch', 'pr-ref', 'generated-file']);
@@ -371,6 +401,7 @@ function isValidRecord(key: string, value: unknown): value is OperationRecord {
     'autoPrRequested',
     'correction',
     'echoAmbiguous',
+    'vendorFloorEmpty',
   ] as const) {
     if (value[field] !== undefined && typeof value[field] !== 'boolean') {
       return false;
@@ -1944,16 +1975,11 @@ export async function claimOwnEchoes(
         r: OperationRecord,
         message: { activityId: string; createTime?: string }
       ): boolean => {
-        const sentMs = message.createTime
-          ? Date.parse(message.createTime)
-          : Number.NaN;
         return (
-          // A message older than the record's dispatch cannot be its echo.
-          !(
-            !Number.isNaN(sentMs) &&
-            r.dispatchedAt !== undefined &&
-            sentMs < Date.parse(r.dispatchedAt) - DISPATCH_SKEW_MS
-          ) && !afterFirstRead(r, message.activityId)
+          // Only a message proven newer than the activity the controller saw
+          // before dispatch (vendor clock) can be its echo.
+          followsDispatch(r, message.createTime, message.activityId) &&
+          !afterFirstRead(r, message.activityId)
         );
       };
       const blockedDigests = new Set<string>();
@@ -2027,13 +2053,9 @@ export async function claimOwnEchoes(
           r.echoActivityId === undefined &&
           r.echoAmbiguous !== true &&
           r.promptDigest === message.digest &&
-          // A message older than the record's dispatch cannot be its echo.
-          !(
-            typeof sent === 'number' &&
-            !Number.isNaN(sent) &&
-            r.dispatchedAt !== undefined &&
-            sent < Date.parse(r.dispatchedAt) - DISPATCH_SKEW_MS
-          );
+          // Only a message proven newer than the activity the controller saw
+          // before dispatch (vendor clock) can be its echo; unordered is outside.
+          followsDispatch(r, message.createTime, message.activityId);
         // A write made after the message was first read cannot be its echo.
         const possible = landed.filter(
           (r) => matches(r) && !afterFirstRead(r, message.activityId)

@@ -49,6 +49,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEFAULT_LOCK_CONFIG = exports.UNRESOLVED_STATUSES = exports.TERMINAL_STATUSES = void 0;
 exports.digestText = digestText;
+exports.followsDispatch = followsDispatch;
 exports.planDigest = planDigest;
 exports.messageDigest = messageDigest;
 exports.emptyJournal = emptyJournal;
@@ -103,6 +104,27 @@ function digestText(text) {
  * unordered (opaque ids carry no order), so they refresh the marker rather than
  * lose to an id comparison.
  */
+/**
+ * Whether a message/activity is proven to follow the record's dispatch, by the
+ * vendor's clock alone. A create's session did not exist before its POST, so
+ * everything in it follows. Otherwise the echo must be strictly newer by
+ * `createTime` than the newest activity read before dispatch (equal time is
+ * unordered), or the session must have been empty. No floor: unproven.
+ */
+function followsDispatch(r, createTime, activityId) {
+    if (r.kind === 'create')
+        return true;
+    // The floor activity itself was read before dispatch.
+    if (activityId !== undefined && activityId === r.vendorFloorActivityId) {
+        return false;
+    }
+    if (r.vendorFloorEmpty === true)
+        return true;
+    if (r.vendorFloorCreateTime === undefined || createTime === undefined) {
+        return false;
+    }
+    return ((0, activity_walk_js_1.compareStamp)({ createTime, activityId: '' }, { createTime: r.vendorFloorCreateTime, activityId: '' }) > 0);
+}
 function outsideSupersedes(next, prev) {
     if (next.activityId === prev.activityId)
         return false;
@@ -182,6 +204,8 @@ const OPTIONAL_STRING_FIELDS = [
     'abandonReason',
     'invalidatedBy',
     'dispatchedAt',
+    'vendorFloorCreateTime',
+    'vendorFloorActivityId',
 ];
 const ARTIFACT_KINDS = new Set(['patch', 'pr-ref', 'generated-file']);
 const ARTIFACT_VERIFICATIONS = new Set([
@@ -347,6 +371,7 @@ function isValidRecord(key, value) {
         'autoPrRequested',
         'correction',
         'echoAmbiguous',
+        'vendorFloorEmpty',
     ]) {
         if (value[field] !== undefined && typeof value[field] !== 'boolean') {
             return false;
@@ -1435,14 +1460,11 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
         // Without this the first message goes to the settled write and the second
         // to the unresolved one, as false landing evidence.
         const couldOwn = (r, message) => {
-            const sentMs = message.createTime
-                ? Date.parse(message.createTime)
-                : Number.NaN;
             return (
-            // A message older than the record's dispatch cannot be its echo.
-            !(!Number.isNaN(sentMs) &&
-                r.dispatchedAt !== undefined &&
-                sentMs < Date.parse(r.dispatchedAt) - activity_walk_js_1.DISPATCH_SKEW_MS) && !afterFirstRead(r, message.activityId));
+            // Only a message proven newer than the activity the controller saw
+            // before dispatch (vendor clock) can be its echo.
+            followsDispatch(r, message.createTime, message.activityId) &&
+                !afterFirstRead(r, message.activityId));
         };
         const blockedDigests = new Set();
         const surplusIds = new Set();
@@ -1504,11 +1526,9 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
             const matches = (r) => r.echoActivityId === undefined &&
                 r.echoAmbiguous !== true &&
                 r.promptDigest === message.digest &&
-                // A message older than the record's dispatch cannot be its echo.
-                !(typeof sent === 'number' &&
-                    !Number.isNaN(sent) &&
-                    r.dispatchedAt !== undefined &&
-                    sent < Date.parse(r.dispatchedAt) - activity_walk_js_1.DISPATCH_SKEW_MS);
+                // Only a message proven newer than the activity the controller saw
+                // before dispatch (vendor clock) can be its echo; unordered is outside.
+                followsDispatch(r, message.createTime, message.activityId);
             // A write made after the message was first read cannot be its echo.
             const possible = landed.filter((r) => matches(r) && !afterFirstRead(r, message.activityId));
             const open = possible.filter((r) => !inFlight(r) && !postWalk(r));

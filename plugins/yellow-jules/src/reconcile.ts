@@ -15,7 +15,7 @@
  */
 
 import {
-  DISPATCH_SKEW_MS,
+  compareStamp,
   RESERVATION_SETTLE_MS,
   OVERLAP_WINDOW_MS,
   STATUS_PAGE_SIZE,
@@ -34,6 +34,7 @@ import { releaseTerminalSlot, TERMINAL_VENDOR_STATES } from './slot-release.js';
 import {
   absorbObservedOwners,
   conflictingSessionOwner,
+  followsDispatch,
   messageDigest,
   ownsSession,
   UNRESOLVED_STATUSES,
@@ -290,12 +291,12 @@ async function resolveOnOwnSession(
     }
     throw err;
   }
-  // A POST cannot have produced an activity before it was dispatched, so a
-  // stamped record's floor is its `dispatchedAt` (minus a small clock-skew
-  // tolerance), not the reservation time: an identical message sent minutes
-  // before the dispatch is somebody else's. A record with no stamp has no
-  // causal lower bound; any match for it falls back to the reservation floor
-  // and is left ambiguous rather than bound.
+  // A POST cannot have produced an activity before it was dispatched. That is
+  // decided on the vendor's clock only: a record carries the newest activity
+  // the controller read just before dispatch, and a candidate echo must be
+  // strictly newer. An older identical message is somebody else's; an equal
+  // time, or a record with no such floor (legacy, or the pre-dispatch read
+  // failed), cannot be ordered, so its match is left ambiguous, never bound.
   // A settled reply or approval that never had its echo recorded competes for a matching
   // activity: its sole echo may first appear in this very walk, and binding an
   // unresolved reply to it would credit a write that may never have landed. A
@@ -308,22 +309,18 @@ async function resolveOnOwnSession(
       !records.some((r) => r.localRequestId === c.localRequestId)
   );
   const candidates = [...records, ...competing];
-  const floors = new Map(
-    candidates.map((r) => {
-      const dispatched =
-        r.dispatchedAt !== undefined ? Date.parse(r.dispatchedAt) : NaN;
-      return [
-        r.localRequestId,
-        Number.isNaN(dispatched)
-          ? Date.parse(r.createdAt) - OVERLAP_WINDOW_MS
-          : dispatched - DISPATCH_SKEW_MS,
-      ];
-    })
-  );
   const matches = new Map<string, Set<string>>(
     candidates.map((r) => [r.localRequestId, new Set<string>()])
   );
-  const earliest = Math.min(...records.map((r) => Date.parse(r.createdAt)));
+  // Matches whose order against the dispatch is unproven.
+  const unordered = new Map<string, Set<string>>(
+    candidates.map((r) => [r.localRequestId, new Set<string>()])
+  );
+  // The walk starts at the vendor floor when a record has one (an echo is
+  // newer than it), else at the reservation time.
+  const earliest = Math.min(
+    ...records.map((r) => Date.parse(r.vendorFloorCreateTime ?? r.createdAt))
+  );
   const walk = await walkActivities({
     adapter,
     sessionResource,
@@ -345,10 +342,28 @@ async function resolveOnOwnSession(
       for (const record of candidates) {
         const claimed =
           claimedBy !== undefined && claimedBy !== record.localRequestId;
-        // Only activities at or after this reservation (minus the overlap window).
-        if (created < (floors.get(record.localRequestId) ?? Infinity)) continue;
-        const found = matches.get(record.localRequestId);
-        if (found === undefined) continue;
+        const ordered = matches.get(record.localRequestId);
+        const unproven = unordered.get(record.localRequestId);
+        if (ordered === undefined || unproven === undefined) continue;
+        // Strictly older than what the controller saw before dispatch: not an echo.
+        if (
+          record.vendorFloorActivityId === activity.activityId ||
+          (record.vendorFloorCreateTime !== undefined &&
+            compareStamp(
+              { createTime: activity.createTime, activityId: '' },
+              { createTime: record.vendorFloorCreateTime, activityId: '' }
+            ) < 0)
+        ) {
+          continue;
+        }
+        // Proven newer: may bind. Equal, or no floor: ambiguous at best.
+        const found = followsDispatch(
+          record,
+          activity.createTime,
+          activity.activityId
+        )
+          ? ordered
+          : unproven;
         if (
           record.kind === 'reply' &&
           !claimed &&
@@ -374,11 +389,14 @@ async function resolveOnOwnSession(
   // the same digest (or two approvals of the same plan) that share an activity
   // cannot both be bound to it, and nothing says which one landed.
   const owners = new Map<string, number>();
-  for (const found of matches.values()) {
-    for (const id of found) owners.set(id, (owners.get(id) ?? 0) + 1);
+  for (const group of [matches, unordered]) {
+    for (const found of group.values()) {
+      for (const id of found) owners.set(id, (owners.get(id) ?? 0) + 1);
+    }
   }
   return records.map((record): Resolution => {
     const found = matches.get(record.localRequestId) ?? new Set<string>();
+    const unproven = unordered.get(record.localRequestId) ?? new Set<string>();
     if (found.size > 1 || [...found].some((id) => (owners.get(id) ?? 0) > 1)) {
       return {
         record,
@@ -386,7 +404,7 @@ async function resolveOnOwnSession(
         reason: 'multiple-candidates',
       };
     }
-    if (found.size > 0 && !hasDispatchStamp(record)) {
+    if (unproven.size > 0) {
       return {
         record,
         outcome: 'ambiguous-reconcile',
@@ -411,13 +429,6 @@ async function resolveOnOwnSession(
     }
     return { record, outcome: 'unknown-outcome' };
   });
-}
-
-function hasDispatchStamp(record: OperationRecord): boolean {
-  return (
-    record.dispatchedAt !== undefined &&
-    !Number.isNaN(Date.parse(record.dispatchedAt))
-  );
 }
 
 // ---------------------------------------------------------------------------

@@ -393,6 +393,21 @@ describe('races inside the write gate', () => {
     expect(record?.status).toBe('failed');
   });
 
+  it('a failed pre-dispatch activity read refuses the write: nothing is sent and the record never dispatches', async () => {
+    h.adapter.listActivitiesImpl = async () => {
+      throw new AdapterError('server-error', 'boom', { status: 503 });
+    };
+    const err = await fails(() => reply(h.deps, args()));
+    expect(err.appError.code).toBe('JULES_SERVICE_UNAVAILABLE');
+    expect(err.appError.retryable).toBe(true);
+    expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    const record = (await readJournal(h.dataDir)).operations[
+      err.localRequestId as string
+    ];
+    expect(record?.status).toBe('failed');
+    expect(record?.dispatchedAt).toBeUndefined();
+  });
+
   it('outside activity marked after the reserve invalidates the record; dispatch is refused with no adapter call', async () => {
     const reservation = await reserveUnderGrant(h.deps, {
       grantId,
@@ -424,7 +439,7 @@ describe('races inside the write gate', () => {
     const marked = (await readJournal(h.dataDir)).operations['reply-race-1'];
     expect(marked?.invalidatedBy).toBe('outside-activity');
     await expect(
-      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty')
     ).rejects.toMatchObject({
       appError: { code: 'JULES_SUPERVISION_PAUSED' },
     });
@@ -475,7 +490,7 @@ describe('races inside the write gate', () => {
       'outside-activity'
     );
     await expect(
-      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty')
     ).rejects.toMatchObject({ appError: { code: 'JULES_SUPERVISION_PAUSED' } });
     expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
   });
@@ -498,7 +513,7 @@ describe('races inside the write gate', () => {
       };
     });
     await expect(
-      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty')
     ).rejects.toMatchObject({ appError: { code: 'JULES_SUPERVISION_PAUSED' } });
     const record = (await readJournal(h.dataDir)).operations['reply-pause-1'];
     expect(record?.dispatchedAt).toBeUndefined();
@@ -516,7 +531,7 @@ describe('races inside the write gate', () => {
       reason: 'vendor opened a pull request',
     });
     await expect(
-      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty')
     ).rejects.toMatchObject({ appError: { code: 'JULES_POLICY_DEVIATION' } });
     const record = (await readJournal(h.dataDir)).operations['reply-dev-1'];
     expect(record?.dispatchedAt).toBeUndefined();
@@ -538,7 +553,7 @@ describe('races inside the write gate', () => {
       };
     });
     await expect(
-      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty')
     ).rejects.toMatchObject({ appError: { code: 'JULES_INVALID_STATE' } });
     const record = (await readJournal(h.dataDir)).operations[
       'reply-abandoned-1'
@@ -555,7 +570,7 @@ describe('races inside the write gate', () => {
     );
     await revokeGrant(h.dataDir, grantId, new Date(h.deps.clock.now()));
     await expect(
-      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty')
     ).rejects.toMatchObject({ appError: { code: 'JULES_AUTHORITY_DENIED' } });
     const record = (await readJournal(h.dataDir)).operations['reply-revoke-1'];
     expect(record?.dispatchedAt).toBeUndefined();
@@ -591,7 +606,7 @@ describe('races inside the write gate', () => {
       h.deps,
       replyGate('reply-echo-2')
     );
-    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty');
     await settleAccepted(h.deps, reservation);
     const outside = await claimOwnEchoes(
       h.dataDir,
@@ -613,7 +628,7 @@ describe('races inside the write gate', () => {
       h.deps,
       replyGate('reply-partial-1')
     );
-    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty');
     await settleAccepted(h.deps, reservation);
     // The message is read after the dispatch, never in the same millisecond.
     h.deps.clock.time += 1_000;
@@ -662,7 +677,12 @@ describe('races inside the write gate', () => {
 
     async function dispatchedReplyWithMatchingMessage(id: string) {
       const reservation = await reserveUnderGrant(h.deps, replyGate(id));
-      await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+      await assertGrantLiveBeforeWrite(
+        h.deps,
+        reservation,
+        'reconcile',
+        'empty'
+      );
       // The echo is read after the dispatch, never in the same millisecond.
       h.deps.clock.time += 1_000;
       setVendorState(h, session.sessionResource, 'inProgress');
@@ -745,11 +765,11 @@ describe('races inside the write gate', () => {
       // such messages. Which is whose is unknowable, so the unresolved write
       // gets no landing evidence and the surplus is possible outside activity.
       const a = await reserveUnderGrant(h.deps, replyGate('pend-a'));
-      await assertGrantLiveBeforeWrite(h.deps, a, 'reconcile');
+      await assertGrantLiveBeforeWrite(h.deps, a, 'reconcile', 'empty');
       await settleAccepted(h.deps, a);
       h.deps.clock.time += 1_000;
       const b = await reserveUnderGrant(h.deps, replyGate('pend-b'));
-      await assertGrantLiveBeforeWrite(h.deps, b, 'reconcile');
+      await assertGrantLiveBeforeWrite(h.deps, b, 'reconcile', 'empty');
       h.deps.clock.time += 1_000;
       setVendorState(h, session.sessionResource, 'inProgress');
       for (const activityId of ['act-m1', 'act-m2']) {
@@ -786,7 +806,7 @@ describe('races inside the write gate', () => {
 
     it('a write dispatched after the walk began is not marked echo-ambiguous by the batch', async () => {
       const a = await reserveUnderGrant(h.deps, replyGate('pend-a2'));
-      await assertGrantLiveBeforeWrite(h.deps, a, 'reconcile');
+      await assertGrantLiveBeforeWrite(h.deps, a, 'reconcile', 'empty');
       await settleAccepted(h.deps, a);
       h.deps.clock.time += 1_000;
       setVendorState(h, session.sessionResource, 'inProgress');
@@ -807,7 +827,7 @@ describe('races inside the write gate', () => {
         if (!raced) {
           raced = true;
           const b = await reserveUnderGrant(h.deps, replyGate('pend-b2'));
-          await assertGrantLiveBeforeWrite(h.deps, b, 'reconcile');
+          await assertGrantLiveBeforeWrite(h.deps, b, 'reconcile', 'empty');
         }
         return original(resource, options);
       };
@@ -1268,7 +1288,7 @@ describe('races inside the write gate', () => {
       () => new Date(h.deps.clock.now())
     );
     await expect(
-      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty')
     ).rejects.toMatchObject({ appError: { code: 'JULES_INVALID_STATE' } });
     expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
     expect(
@@ -1310,7 +1330,7 @@ describe('races inside the write gate', () => {
       }
     );
     await expect(
-      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty')
     ).rejects.toMatchObject({ appError: { code: 'JULES_SUPERVISION_PAUSED' } });
     expect(h.adapter.callsTo('createSession')).toHaveLength(0);
   });
@@ -1376,7 +1396,7 @@ describe('races inside the write gate', () => {
         () => new Date(h.deps.clock.now())
       );
       await expect(
-        assertGrantLiveBeforeWrite(h.deps, repair, 'reconcile')
+        assertGrantLiveBeforeWrite(h.deps, repair, 'reconcile', 'empty')
       ).rejects.toMatchObject({ appError: { code: 'JULES_AUTHORITY_DENIED' } });
     });
   });

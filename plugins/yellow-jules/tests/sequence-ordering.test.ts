@@ -84,7 +84,7 @@ async function landReply(localRequestId: string, text: string): Promise<void> {
       promptDigest: messageDigest(text),
     },
   });
-  await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+  await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty');
   await settleAccepted(h.deps, reservation);
 }
 
@@ -112,7 +112,7 @@ async function dispatchReply(
       promptDigest: messageDigest(text),
     },
   });
-  await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+  await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty');
   if (finalStatus === 'unknown-outcome') {
     await markOperation(h.dataDir, localRequestId, 'unknown-outcome');
   }

@@ -115,7 +115,7 @@ describe('a message that a later write could explain is not its echo', () => {
         promptDigest: digest,
       },
     });
-    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty');
     await settleAccepted(h.deps, reservation);
   }
 
@@ -193,7 +193,7 @@ describe('a held message keeps the time it was first read', () => {
   });
   async function reply(id: string): Promise<void> {
     const reservation = await reserveUnderGrant(h.deps, reservationFor(id));
-    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty');
     await settleAccepted(h.deps, reservation);
   }
   const seenOnce = (readAt: string, createTime: string) => ({
