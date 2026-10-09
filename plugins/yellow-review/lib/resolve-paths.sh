@@ -159,9 +159,9 @@ yr_git() {
 
 # yr_safe_path: print PATH without empty or relative entries and without any
 # entry inside the worktree (by spelling, canonical path or identity) and
-# without an entry whose awk, git or git-lfs resolves into it. Returns
-# 1 when nothing is left. The caller's PATH is not changed; the verify command
-# keeps its own PATH (it may need node_modules/.bin).
+# without an entry whose awk, git, git-lfs or ignored-walk helper resolves
+# into it. Returns 1 when nothing is left. The caller's PATH is not changed;
+# the verify command keeps its own PATH (it may need node_modules/.bin).
 yr_safe_path() {
     local root rest entry canon helper hcanon kept=""
     root=$(yr_worktree_root || true)
@@ -176,9 +176,9 @@ yr_safe_path() {
                 continue
             fi
             # An outside directory can still hold a symlink to a file inside
-            # the worktree (awk, git-lfs, git): drop it when any helper
-            # git or yr_awk would find there canonicalizes into the worktree.
-            for helper in awk git git-lfs; do
+            # the worktree: drop it when any helper git, yr_awk or the
+            # ignored-file walk would find there canonicalizes into the worktree.
+            for helper in awk git git-lfs find head mktemp rm dirname basename readlink; do
                 [ -e "$entry/$helper" ] || continue
                 hcanon=$(yr_canon_path "$entry/$helper" 2>/dev/null || true)
                 if [ -z "$hcanon" ] || yr_inside_root "$hcanon" "$root"; then
@@ -692,12 +692,17 @@ rp_link_target_changed() {
 # refusal. Whole ignored directories are walked with find; the caller owns
 # <scratch>, a scratch file for git's NUL-delimited listing.
 rp_ignored_changed_since() {
-    local marker="$1" scratch="$2" mdir
+    local marker="$1" scratch="$2" safe
     [ -f "$marker" ] && [ ! -L "$marker" ] && [ -r "$marker" ] || return 2
-    mdir=$(cd -- "$(dirname -- "$marker")" 2>/dev/null && pwd) || return 2
-    marker="$mdir/$(basename -- "$marker")"
+    # find, head, mktemp and the rest run by name after the resolvers wrote
+    # the tree, so the walk uses the worktree-free PATH, as yr_git does.
+    safe=$(yr_safe_path) || return 2
     (
-        local top f out p l rc lrc symlist n=0 hits=""
+        PATH=$safe
+        hash -r 2>/dev/null || true
+        local mdir top f out p l rc lrc symlist n=0 hits=""
+        mdir=$(cd -- "$(dirname -- "$marker")" 2>/dev/null && pwd) || exit 2
+        marker="$mdir/$(basename -- "$marker")"
         top=$(yr_git rev-parse --show-toplevel 2>/dev/null) || exit 2
         cd -- "$top" 2>/dev/null || exit 2
         symlist=$(mktemp) || exit 2

@@ -1380,6 +1380,19 @@ ignored_fixture() {
   grep -q 'resolver edit' src/a.txt
 }
 
+@test "--check-ignored never runs a find or head from a PATH directory inside the worktree" {
+  ignored_fixture
+  for tool in find head; do
+    printf '#!/bin/sh\ntouch "%s/walk-tool-ran"\nexit 0\n' "$BATS_TEST_TMPDIR" >| "node_modules/.bin/$tool"
+    chmod +x "node_modules/.bin/$tool"
+  done
+  printf '#!/bin/sh\necho pwned\n' >| node_modules/.bin/runner
+  PATH="$REPO/node_modules/.bin:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ ! -e "$BATS_TEST_TMPDIR/walk-tool-ran" ]
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/.bin"* ]]
+}
+
 @test "--check-ignored needs a readable marker and takes no file list" {
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored
   [ "$status" -eq 2 ]
