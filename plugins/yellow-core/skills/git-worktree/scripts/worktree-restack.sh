@@ -597,12 +597,10 @@ validate_state() {
       STATE_ERR="recorded tip is not for a branch in the chain"
       return 1
     }
-    case ${T_SHA[i]} in
-      '' | *[!0-9a-f]*)
-        STATE_ERR="recorded tip is not a commit hash"
-        return 1
-        ;;
-    esac
+    valid_sha "${T_SHA[i]}" || {
+      STATE_ERR="recorded tip is not a full commit hash"
+      return 1
+    }
   done
   # Tips are recorded once per restacked branch, in chain order. A partial or
   # duplicated list would leave a branch out of moved_tips while still passing

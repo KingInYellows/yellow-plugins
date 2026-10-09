@@ -479,6 +479,23 @@ forge() {
   assert_all_restored
 }
 
+@test "a state with an abbreviated tip hash is rejected before any reset advice" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  cp "$SD/state" "$BATS_TEST_TMPDIR/state.orig"
+  sed -i 's/^\(tip\t[^\t]*\t\)\([0-9a-f]\{8\}\)[0-9a-f]*$/\1\2/' "$SD/state"
+  awk -F'\t' '$1 == "tip" && length($3) == 8' "$SD/state" | grep -q .
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 4 ]
+  [[ $output == *"full commit hash"* ]]
+  [[ $output != *"reset --hard"* ]]
+  cp "$BATS_TEST_TMPDIR/state.orig" "$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
 @test "a state file that is a symlink is rejected" {
   mk_stack
   mkdir -p "$SD"
