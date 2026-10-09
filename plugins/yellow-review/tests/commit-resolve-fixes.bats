@@ -2646,6 +2646,22 @@ crf_ssh_remote() {
   [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
 }
 
+@test "a git script whose #! uses env -S with a variable is refused before the bootstrap runs it (commit-resolve-fixes)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/boot-envs-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/interp"
+  chmod +x "$REPO/tools/interp"
+  printf '%s\n' '#!/usr/bin/env -S ${INTERP}' >| "$BATS_TEST_TMPDIR/gitbin/git"
+  chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+  printf 'one\nfeature\nfix-boot\n' >| src/a.txt
+  run --separate-stderr env "INTERP=$REPO/tools/interp" "PATH=$BATS_TEST_TMPDIR/gitbin:$old_path" "$SCRIPT" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the bootstrap ran the planted git" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
+}
+
 @test "a GIT_SSH_COMMAND using a shell variable is refused as unjudgeable and never runs (exit 3)" {
   old_path="$PATH"
   marker="$BATS_TEST_TMPDIR/dollar-canary"

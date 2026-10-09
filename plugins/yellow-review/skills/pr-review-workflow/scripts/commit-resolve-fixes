@@ -387,7 +387,8 @@ yr_args_enter() {
 # with an argument (-u, -C, -P, -a and their long forms), NAME=value words, and
 # -S / --split-string, whose string is split into words that continue the
 # operand list (attached or separate, and inside a short cluster such as
-# -vS). A bare operand is looked up on the caller's PATH (YR_ORIG_PATH), the
+# -vS; a `$` in that string, which env expands, counts as entering). A bare
+# operand is looked up on the caller's PATH (YR_ORIG_PATH), the
 # way the tool itself would be. Copies of this block (through
 # yr_file_shebang_enters) sit in the two scripts' bootstrap resolvers, which
 # run before this library is sourced; keep them identical.
@@ -439,6 +440,9 @@ yr_file_shebang_enters() {
                     *) i="$x"; break ;;
                 esac
                 if [ "$last" -ge 0 ]; then
+                    # env expands ${VAR} in a -S string, and Linux hands it the
+                    # whole rest of the line: fail closed on any $ from here on.
+                    case "${w[*]:idx}" in *\$*) return 0 ;; esac
                     # Splice the -S string's words in place of the option.
                     v=()
                     read -r -a v <<<"$val" || true

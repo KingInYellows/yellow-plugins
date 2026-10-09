@@ -1799,3 +1799,86 @@ EOF
     *) echo "resolved $YELLOW_REVIEW_GIT"; return 1 ;;
   esac
 }
+
+@test "yr_safe_path drops a symlinked outside directory whose child links into the worktree, in find and in the shell" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/realbin" "$BATS_TEST_TMPDIR/realscript"
+  printf '#!/bin/sh\nexit 0\n' >| ignored/awk
+  chmod +x ignored/awk
+  ln -s "$PWD/ignored/awk" "$BATS_TEST_TMPDIR/realbin/awk"
+  ln -s "$BATS_TEST_TMPDIR/realbin" "$BATS_TEST_TMPDIR/linkbin"
+  out=$(PATH="$BATS_TEST_TMPDIR/linkbin:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *linkbin* ]] || { echo "kept: $out" >&2; return 1; }
+  # A symlinked directory with an in-worktree interpreter script is dropped too.
+  printf '#!%s/ignored/awk\n' "$PWD" >| "$BATS_TEST_TMPDIR/realscript/tool"
+  chmod +x "$BATS_TEST_TMPDIR/realscript/tool"
+  ln -s "$BATS_TEST_TMPDIR/realscript" "$BATS_TEST_TMPDIR/linkscript"
+  out=$(PATH="$BATS_TEST_TMPDIR/linkscript:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *linkscript* ]]
+  # The shell fallback (no GNU realpath, find or awk) walks the same children.
+  mkdir -p "$BATS_TEST_TMPDIR/okreal"
+  ln -s "$(command -v grep)" "$BATS_TEST_TMPDIR/okreal/grep"
+  ln -s "$BATS_TEST_TMPDIR/okreal" "$BATS_TEST_TMPDIR/oklink"
+  yr_links_inside "$BATS_TEST_TMPDIR/linkbin" "$PWD"
+  yr_links_inside "$BATS_TEST_TMPDIR/linkscript" "$PWD"
+  ! yr_links_inside "$BATS_TEST_TMPDIR/oklink" "$PWD"
+  # A symlinked directory with only outside children stays in the batched screen.
+  out=$(PATH="$BATS_TEST_TMPDIR/oklink:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" == "$BATS_TEST_TMPDIR/oklink:"* ]]
+}
+
+@test "#! lines whose env -S string expands a variable drop the directory, in awk and in the shell" {
+  mkdir -p venv
+  printf '#!/bin/sh\nexit 0\n' >| venv/python
+  chmod +x venv/python
+  n=0
+  for shebang in '#!/usr/bin/env -S ${INTERP}' '#!/usr/bin/env -S $INTERP -u' '#!/usr/bin/env -vS ${INTERP} x' \
+                 '#!/usr/bin/env --split-string=${INTERP}' '#!/usr/bin/env --split-string $INTERP' \
+                 '#!/usr/bin/env -S sh -c ${INTERP}' '#!/usr/bin/env -S/usr/bin/${X}/python'; do
+    n=$((n + 1))
+    d="$BATS_TEST_TMPDIR/sv$n"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell missed: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
+  done
+  # A dollar sign outside an env -S string is a literal path character.
+  d="$BATS_TEST_TMPDIR/svok"
+  mkdir -p "$d"
+  printf '#!/usr/bin/env sh\n' >| "$d/tool"
+  chmod +x "$d/tool"
+  ! yr_file_shebang_enters "$d/tool" "$PWD"
+  out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" == "$d:"* ]]
+}
+
+@test "harden_git_config refuses a backslash or a quote inside a word, naming the variable and not the value" {
+  mkdir -p ignored
+  : >| ignored/ssh
+  root="$PWD"
+  for val in "${root//\//\\/}/ignored/ssh" "$root/ign\\ored/ssh" 'ssh\ -F\ x' 'ssh -o a\"b' \
+             "${root%?}\"${root: -1}\"/ignored/ssh" "ssh -F ${root:0:5}'${root:5}'/ignored/x" 'ssh -F a"b"c'; do
+    for name in GIT_SSH_COMMAND GIT_PAGER EDITOR GIT_ASKPASS; do
+      rc=0; ( export "$name=$val"; harden_git_config full; ) || rc=$?
+      [ "$rc" -eq 1 ] || { echo "$name accepted: $val" >&2; return 1; }
+    done
+  done
+  ( export GIT_SSH_COMMAND='ssh\ x'; harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_SSH_COMMAND uses shell syntax"* && "$YR_HARDEN_MSG" != *'ssh\ x'* ]] )
+  # Quotes that wrap whole words are still judged by the existing rules and pass.
+  for val in 'ssh -i "/nonexistent/key"' "ssh -o 'StrictHostKeyChecking no'"; do
+    rc=0; ( export GIT_SSH_COMMAND="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
+  done
+}
+
+@test "harden_git_config refuses an escaped worktree path that contains a space" {
+  cd "$BATS_TEST_TMPDIR" && mkdir -p "my repo" && cd "my repo" && git init -q
+  mkdir -p ignored
+  printf '#!/bin/sh\nexit 0\n' >| ignored/ssh
+  chmod +x ignored/ssh
+  val="$PWD/ignored/ssh"
+  val=${val// /\\ }
+  rc=0; ( export GIT_SSH_COMMAND="$val"; harden_git_config full; ) || rc=$?
+  [ "$rc" -eq 1 ]
+}

@@ -191,7 +191,8 @@ yr_args_enter() {
 # with an argument (-u, -C, -P, -a and their long forms), NAME=value words, and
 # -S / --split-string, whose string is split into words that continue the
 # operand list (attached or separate, and inside a short cluster such as
-# -vS). A bare operand is looked up on the caller's PATH (YR_ORIG_PATH), the
+# -vS; a `$` in that string, which env expands, counts as entering). A bare
+# operand is looked up on the caller's PATH (YR_ORIG_PATH), the
 # way the tool itself would be. Copies of this block (through
 # yr_file_shebang_enters) sit in the two scripts' bootstrap resolvers, which
 # run before this library is sourced; keep them identical.
@@ -243,6 +244,9 @@ yr_file_shebang_enters() {
                     *) i="$x"; break ;;
                 esac
                 if [ "$last" -ge 0 ]; then
+                    # env expands ${VAR} in a -S string, and Linux hands it the
+                    # whole rest of the line: fail closed on any $ from here on.
+                    case "${w[*]:idx}" in *\$*) return 0 ;; esac
                     # Splice the -S string's words in place of the option.
                     v=()
                     read -r -a v <<<"$val" || true
@@ -362,7 +366,8 @@ yr_any_inside() {
 }
 
 # yr_batch_inside <root> <find> <realpath> <awk> <dir>...: succeed when any symlink
-# directly in any <dir>, dangling or not (a link to a directory counts), has a
+# directly in any <dir> (a <dir> that is itself a symlink is followed: -H),
+# dangling or not (a link to a directory counts), has a
 # canonical target inside <root>. Cost is counted in shell commands, not
 # forks: the bats suites run under a DEBUG trap that makes every command
 # slow, and a per-link or per-directory shell loop (hundreds of links in
@@ -377,7 +382,7 @@ yr_any_inside() {
 yr_batch_inside() {
     local root="$1" find="$2" rp="$3" awk="$4" out out_same
     shift 4
-    out=$("$find" "$@" -maxdepth 1 -type l -exec "$rp" -m -- {} + 2>/dev/null) || true
+    out=$("$find" -H "$@" -maxdepth 1 -type l -exec "$rp" -m -- {} + 2>/dev/null) || true
     [ -n "$out" ] || return 1
     yr_batch_canon_inside "$root" "$out" "$find" "$awk" && return 0
     out_same=$("$find" -L "$@" -maxdepth 1 -samefile "$root" -print -quit 2>/dev/null) || true
@@ -452,7 +457,7 @@ yr_shebang_inside() {
                     }
                 } else if (x ~ /=/) { idx++; continue }
                 else { gsub(/^["\047]|["\047]$/, "", x); return x }
-                if (last >= 0) splice(val, last); else idx++
+                if (last >= 0) { for (k = idx; k <= n; k++) if (w[k] ~ /\$/) { pr(root); return "" } splice(val, last) } else idx++
             }
             return ""
         }
@@ -686,7 +691,8 @@ lgit_nohooks() { yr_git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c c
 #   0  it would run or read something inside <root> (or a path cannot be
 #      canonicalized: fail closed);
 #   2  it uses shell syntax this check cannot judge: $ (expansion), backtick,
-#      ; & | < > ( ) * ? [ or a newline, or a ~ other than a word starting
+#      ; & | < > ( ) * ? [ a backslash, a quote inside a word or a newline,
+#      or a ~ other than a word starting
 #      with ~ or ~/ (which is expanded to $HOME and judged);
 #   1  it is fine.
 # The checks are those of yr_args_enter (whole-path match of the worktree in
@@ -699,7 +705,7 @@ yr_cmd_enters() {
     local v="$1" root="$2" tok t bin c first="" noglob=1 phys
     local -a toks=()
     case "$v" in
-        *[\$\`\;\&\|\<\>\(\)\*\?\[]*|*$'\n'*) return 2 ;;
+        *[\$\`\;\&\|\<\>\(\)\*\?\[\\]*|*$'\n'*) return 2 ;;
     esac
     phys=$(pwd -P) || return 0
     case $- in *f*) noglob=0 ;; esac
@@ -710,6 +716,13 @@ yr_cmd_enters() {
         [ "$noglob" -eq 0 ] || set +f
     }
     for tok in ${toks[@]+"${toks[@]}"}; do
+        # Quotes are only judged at the edges of a word (yr_args_enter strips
+        # one on each side); one inside a word, or after --opt=, is removed by
+        # the shell and joins the pieces into a path this check never sees.
+        t=${tok#!}
+        t=${t#[\"\']}
+        t=${t%[\"\']}
+        case "$t" in *[\"\']*) return 2 ;; esac
         case "$tok" in
             '~'|'~/'*)
                 [ -n "${HOME:-}" ] || return 2
@@ -762,7 +775,7 @@ yr_env_cmd_verdict() {
     yr_cmd_enters "$2" "$3" || rc=$?
     case "$rc" in
         0) YR_HARDEN_MSG="$1${4:+ $4} runs a program inside the repository; unset it or point it outside the repository" ;;
-        2) YR_HARDEN_MSG="$1${4:+ $4} uses shell syntax (\$, backticks, ; & | < > ( ) * ? [ or ~user) that cannot be checked against the repository; use a plain command line or a script outside the repository" ;;
+        2) YR_HARDEN_MSG="$1${4:+ $4} uses shell syntax (\$, backticks, ; & | < > ( ) * ? [ backslashes, quotes inside a word or ~user) that cannot be checked against the repository; use a plain command line or a script outside the repository" ;;
         *) return 0 ;;
     esac
     return 1
