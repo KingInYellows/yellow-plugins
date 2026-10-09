@@ -402,24 +402,7 @@ export async function assertGrantLiveBeforeWrite(
 ): Promise<void> {
   let failure: AppErrorException | undefined;
   try {
-    const { grant } = loadAuthorizedGrant(deps, record.grantId ?? '');
-    if (grant.revokedAt !== undefined) {
-      failure = new AppErrorException(
-        makeAppError(
-          'JULES_AUTHORITY_DENIED',
-          `grant ${grant.grantId} was revoked before the write; nothing was sent`
-        )
-      );
-    } else if (grantIsExpired(grant, nowFn(deps)())) {
-      failure = new AppErrorException(
-        makeAppError(
-          'JULES_GRANT_EXPIRED',
-          `grant ${grant.grantId} expired at ${grant.expiresAt} before the write; nothing was sent`
-        )
-      );
-    } else {
-      failure = await finalDispatchCheck(deps, record);
-    }
+    failure = await finalDispatchCheck(deps, record);
   } catch (err) {
     if (!(err instanceof AppErrorException)) throw err;
     failure = err;
@@ -430,8 +413,8 @@ export async function assertGrantLiveBeforeWrite(
 }
 
 /**
- * The last journal-side check, in one critical section with the dispatch mark:
- * the record is re-read, refused when outside activity invalidated it, when its
+ * The last check, in one critical section with the dispatch mark: the grant is
+ * re-read (revoked or expired refuses), the record is re-read, refused when outside activity invalidated it, when its
  * owner finished meanwhile (the slot is already released), or when an earlier
  * launch of a repair's task is now paused or has outside activity; otherwise it
  * is stamped `dispatchedAt`, which is what lets a later echo claim treat it as
@@ -451,6 +434,25 @@ async function finalDispatchCheck(
       )
     );
   return updateJournal(deps.dataDir, (operations) => {
+    // `authorize --revoke` writes grants.json under this same journal lock, so
+    // reading the grant here serializes a revoke with the dispatch stamp.
+    const { grant } = loadAuthorizedGrant(deps, record.grantId ?? '');
+    if (grant.revokedAt !== undefined) {
+      return new AppErrorException(
+        makeAppError(
+          'JULES_AUTHORITY_DENIED',
+          `grant ${grant.grantId} was revoked before the write; nothing was sent`
+        )
+      );
+    }
+    if (grantIsExpired(grant, now())) {
+      return new AppErrorException(
+        makeAppError(
+          'JULES_GRANT_EXPIRED',
+          `grant ${grant.grantId} expired at ${grant.expiresAt} before the write; nothing was sent`
+        )
+      );
+    }
     const fresh = operations[record.localRequestId];
     if (fresh === undefined) return undefined;
     const session = record.sessionResource ?? 'this session';

@@ -439,6 +439,21 @@ describe('races inside the write gate', () => {
     expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
   });
 
+  it('a revoke that lands before the locked final check refuses and leaves no dispatch stamp', async () => {
+    const reservation = await reserveUnderGrant(
+      h.deps,
+      replyGate('reply-revoke-1')
+    );
+    await revokeGrant(h.dataDir, grantId, new Date(h.deps.clock.now()));
+    await expect(
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+    ).rejects.toMatchObject({ appError: { code: 'JULES_AUTHORITY_DENIED' } });
+    const record = (await readJournal(h.dataDir)).operations['reply-revoke-1'];
+    expect(record?.dispatchedAt).toBeUndefined();
+    expect(record?.status).toBe('failed');
+    expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+  });
+
   it('a dispatched reply still claims its own echo', async () => {
     const reservation = await reserveUnderGrant(
       h.deps,
