@@ -1094,6 +1094,72 @@ moved_by_hand() {
   [ -e "$SD/state" ]
 }
 
+# mv_fail_nth N: a PATH shim whose Nth mv onto the state file fails, so a state
+# rewrite can be made to fail (chmod does not stop root).
+mv_fail_nth() {
+  mkdir -p "$T/mvshim"
+  cat >"$T/mvshim/mv" <<'SH'
+#!/bin/sh
+for a; do last=$a; done
+case $last in
+  */state)
+    n=$(cat "$MV_COUNT" 2>/dev/null || echo 0)
+    n=$((n + 1))
+    echo "$n" >"$MV_COUNT"
+    if [ "$n" = "$MV_FAIL_NTH" ]; then exit 1; fi
+    ;;
+esac
+exec /bin/mv "$@"
+SH
+  chmod +x "$T/mvshim/mv"
+  export MV_COUNT="$T/mvcount" MV_FAIL_NTH="$1"
+  rm -f "$MV_COUNT"
+  PATH="$T/mvshim:$PATH"
+}
+
+@test "--abort refuses before the provider abort when the abort cannot be recorded" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  mv_fail_nth 1
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"nothing was aborted"* ]]
+  [[ $output == *"must be writable"* ]]
+  [ -e "$SD/state" ]
+  ! grep -q '^phase' "$SD/state"
+  [ "$(cat "$SD/lock.d/pid")" = paused ]
+  # The provider abort never ran: the conflict is still paused.
+  PATH="${PATH#"$T/mvshim:"}"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "a state left at phase aborting makes --continue refuse and --abort finish" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite --submit
+  [ "$status" -eq 10 ]
+  plant_stuck_rebase "$(wtp c)" c
+  mkdir "$SD/provider-aborted"
+  mv_fail_nth 2 # the post-abort phase aborted write fails; phase aborting stays
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  grep -q '^phase.aborting$' "$SD/state"
+  [ ! -f "$SD/provider-aborted" ]
+  PATH="${PATH#"$T/mvshim:"}"
+  rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"already aborted"* ]]
+  [ -e "$SD/state" ]
+  rmdir "$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+  [ ! -e "$SD/state" ]
+}
+
 @test "--continue refuses after a successful provider abort left the cleanup unfinished" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite --submit

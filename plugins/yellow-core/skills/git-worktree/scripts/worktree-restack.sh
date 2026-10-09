@@ -423,10 +423,12 @@ aborted_marker_valid() {
 }
 
 # abort_recorded: the provider abort of this run is on record, in the marker
-# or in the state file's own phase field (which needs no marker path). Only
+# or in the state file's own phase field (which needs no marker path); phase
+# aborting is the intent recorded before the provider abort runs, so it counts
+# too: the rollback may have run. Only
 # ever makes the script stricter: it blocks --continue and picks restore advice;
 # skipping checks still requires a valid marker (aborted_marker_valid).
-abort_recorded() { [ "$S_PHASE" = aborted ] || aborted_marker_valid; }
+abort_recorded() { [ "$S_PHASE" = aborted ] || [ "$S_PHASE" = aborting ] || aborted_marker_valid; }
 
 # new_run_id: 32 random hex digits (od and /dev/urandom exist on Linux and macOS).
 new_run_id() {
@@ -542,7 +544,7 @@ validate_state() {
       return 1
     }
   fi
-  case $S_PHASE in '' | aborted) ;; *)
+  case $S_PHASE in '' | aborting | aborted) ;; *)
     STATE_ERR="bad phase"
     return 1
     ;;
@@ -1715,6 +1717,27 @@ refuse_moved() {
   die "$X_KEPT" "state kept, nothing aborted or restored. Run each fix line above to point the branch back at its starting commit, then run --abort again. To keep the restacked branches instead, run --continue"
 }
 
+# begin_abort: durably record the intent to abort before the provider rolls
+# anything back, so a state that cannot be rewritten afterwards still refuses
+# --continue. Refuses (nothing aborted) when the record cannot be written.
+ABORT_PHASE_PRIOR=""
+begin_abort() {
+  ABORT_PHASE_PRIOR=$S_PHASE
+  S_PHASE=aborting
+  write_state 2>/dev/null || {
+    S_PHASE=$ABORT_PHASE_PRIOR
+    die "$X_KEPT" "nothing was aborted: the abort could not be recorded in the state file $(v "$STATE_FILE"); the state directory must be writable. Fix that, then run --abort again"
+  }
+}
+
+# abort_failed_unrecord: the provider abort failed, so no rollback is pending;
+# restore the prior phase (best effort: a failed write leaves phase aborting,
+# which only makes --continue stricter).
+abort_failed_unrecord() {
+  S_PHASE=$ABORT_PHASE_PRIOR
+  write_state 2>/dev/null || true
+}
+
 cmd_abort() {
   parse_flags "$@"
   reject_remote
@@ -1730,13 +1753,21 @@ cmd_abort() {
     command -v gt >/dev/null 2>&1 || die "$X_KEPT" "gt (Graphite CLI) is not installed; state kept"
     if gt_paused "$S_RUN"; then
       note "warning: aborting rolls the whole restack back, including branches that had already restacked cleanly"
+      begin_abort
       step_graphite abort
-      [ "$RESULT" = ok ] || die "$X_KEPT" "the provider's abort failed; state kept, nothing restored"
+      [ "$RESULT" = ok ] || {
+        abort_failed_unrecord
+        die "$X_KEPT" "the provider's abort failed; state kept, nothing restored"
+      }
       provider_aborted=1
     fi
   elif [ -e "$COMMON/gh-stack-rebase-state" ]; then
+    begin_abort
     step_github abort
-    [ "$RESULT" = ok ] || die "$X_KEPT" "the provider's abort failed; state kept"
+    [ "$RESULT" = ok ] || {
+      abort_failed_unrecord
+      die "$X_KEPT" "the provider's abort failed; state kept"
+    }
     provider_aborted=1
   fi
   if [ "$provider_aborted" = 1 ]; then
