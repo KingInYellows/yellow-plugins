@@ -939,6 +939,19 @@ JSEOF
   assert_all_restored
 }
 
+@test "a symlinked provider-aborted marker is replaced, never followed" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  printf 'sentinel\n' >"$BATS_TEST_TMPDIR/sentinel"
+  ln -s "$BATS_TEST_TMPDIR/sentinel" "$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  [ "$(cat "$BATS_TEST_TMPDIR/sentinel")" = sentinel ]
+  [ ! -L "$SD/provider-aborted" ] # a successful abort then clears the marker
+  assert_all_restored
+}
+
 @test "--continue after the user finished the provider's continue by hand verifies and restores" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
