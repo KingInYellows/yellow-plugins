@@ -191,6 +191,32 @@ describe('authorize (create)', () => {
     );
   });
 
+  it('refuses to create a grant on a stale epoch after another host took over', async () => {
+    const id = await createGrant(h);
+    // Host B takes over the shared data dir with its own controller directory.
+    const hostB = {
+      ...h.deps,
+      controllerId: 'hostb',
+      controllerDir: path.join(path.dirname(h.dataDir), 'controller-b'),
+    };
+    await authorizeTakeOver(hostB);
+    expect(loadGrants(h.dataDir).grants[id]?.epochRef.controllerId).toBe(
+      'hostb'
+    );
+    // Host A still holds its old controller file (epoch 1).
+    let caught: unknown;
+    try {
+      await authorizeCreate(h.deps, BASE);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(AppErrorException);
+    const appError = (caught as AppErrorException).appError;
+    expect(appError.code).toBe('JULES_CONTROLLER_MISMATCH');
+    expect(appError.message).toContain('--take-over');
+    expect(Object.keys(loadGrants(h.dataDir).grants)).toEqual([id]);
+  });
+
   it('a controller authority for a different data dir blocks creation', async () => {
     await authorizeCreate(h.deps, BASE);
     const copy = path.join(path.dirname(h.dataDir), 'copy');

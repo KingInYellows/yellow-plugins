@@ -293,6 +293,10 @@ floors do not make the batch order-dependent. Equal or
 missing vendor times, unorderable dispatches, or a different number of echoes
 and writes make the batch ambiguous: the messages are recorded as outside
 activity (pause) and its unresolved writes are marked `echoAmbiguous`.
+`authorize` (create) refuses under the lock when any existing grant is bound to
+another controller id or epoch (for example after another host's take-over): a
+stale local epoch never mints a grant beside them; run `--take-over` explicitly.
+
 An equal-time approval clears the pending plan only when exactly one plan
 content exists at that timestamp; with several, the plan stays pending and
 `ambiguous`. The slot release after a clean rejection of a create POST asserts

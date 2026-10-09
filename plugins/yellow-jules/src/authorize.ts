@@ -276,6 +276,20 @@ export async function authorizeCreate(
       }
       epoch = existing.epoch;
     }
+    // Single-controller boundary: a stale local epoch must not mint a grant
+    // beside grants another host took over. Every existing grant (revoked or
+    // expired included) has to be bound to this controller id and epoch.
+    for (const g of Object.values(grants.grants)) {
+      if (
+        g.epochRef.controllerId !== ctx.controllerId ||
+        g.epochRef.epoch !== epoch
+      ) {
+        return throwAppError(
+          'JULES_CONTROLLER_MISMATCH',
+          `existing grants are bound to controller ${g.epochRef.controllerId} epoch ${g.epochRef.epoch}, not this host (${ctx.controllerId} epoch ${epoch}); run authorize --take-over explicitly to move control here before creating grants`
+        );
+      }
+    }
     const grantId = mintGrantId();
     const grant: GrantRecord = {
       grantId,
