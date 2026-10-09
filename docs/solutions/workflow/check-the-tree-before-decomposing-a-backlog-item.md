@@ -42,9 +42,9 @@ before relying on it:
   the PATH hit so a git-ai wrapper keeps `argv[0]` equal to `git`.
 - `harden_git_config` must not set `core.hooksPath`. Hooks stay in
   `disable_git_hooks` unless `YELLOW_REVIEW_COMMIT_HOOKS=1`.
-- `run-verify-command` in run mode refuses a FIFO, socket, or device path
-  (exit 2). The revert modes delete it with `rm -f` of `TO_REMOVE` without
-  opening it. `run-verify-command.bats` is the spec.
+- `run-verify-command` in run mode refuses a FIFO, socket, or device path (exit
+  2). The revert modes delete it with `rm -f` of `TO_REMOVE` without opening it.
+  `run-verify-command.bats` is the spec.
 - `--revert-dirty` still reverts every dirty path and takes no path list. The
   deny-list mode is a separate flag, `--revert-denied`.
 - Sweep-all Step 6 was already removed. Do not put it back.

@@ -1,9 +1,9 @@
 # Feature: Cycle 1 — resolve-flow hardening, CI split, restack abort guard
 
 > **Status (2026-10-06):** reviewed and refreshed; still valid in direction.
-> 2 of 40 boxes are now `[x]` (work already on `main`), 1 is `[-]`, 37 are
-> open. Five of the six PRs are still needed: PR 1 (CI split), PR 3, PR 4,
-> PR 5 and PR 6 are unchanged in substance. PR 2 is partly done by
+> 4 of 40 boxes are now `[x]` (2 already on `main`, 7.4 and 7.5 in this
+> stack), 1 is `[-]`, 35 are open. Five of the six PRs are still needed:
+> PR 1 (CI split), PR 3, PR 4, PR 5 and PR 6 are unchanged in substance. PR 2 is partly done by
 > #1025 (`refuse in-worktree git, gh, and jq`): git, gh and jq are bound,
 > but 2.2 and 2.3 stay open, and 2.1, 2.4, 2.5 and 2.6 stay rescoped to
 > what remains. Task 4.4 is not applicable. Task 7.2 stays open: Linear
