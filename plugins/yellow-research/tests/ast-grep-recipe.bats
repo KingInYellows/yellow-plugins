@@ -440,3 +440,11 @@ run_with_pointer() {
     [ ! -e "$RECIPE_DIR" ]
   done
 }
+
+@test "write-permission trust boundary is documented" {
+  local root="$PLUGIN_ROOT/../.."
+  grep -q 'Write permission and temp files' "$PLUGIN_ROOT/CLAUDE.md"
+  grep -q 'Write' "$PLUGIN_ROOT/README.md"
+  grep -q '^## ast-grep value files' "$root/docs/security.md"
+  grep -q 'ast-grep value files' "$root/plugins/yellow-debt/CLAUDE.md"
+}

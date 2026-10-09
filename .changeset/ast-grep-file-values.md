@@ -22,3 +22,7 @@ leaves any other directory untouched. It creates its trusted `-c` config with
 finishes it deletes only its own files and then the empty directory, never
 `rm -rf`, and releases the lock. `code-researcher` gains the Write tool for
 these value files only.
+
+Document the new `Write` permission and temp-file workflow in the
+yellow-research README and CLAUDE.md, yellow-debt's CLAUDE.md and
+`docs/security.md`.
