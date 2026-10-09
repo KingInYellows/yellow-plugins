@@ -471,6 +471,23 @@ run_check() { run --separate-stderr "$SCRIPT" --check-ranges "$@"; }
   [ "$output" = '{"out_of_range":[]}' ]
 }
 
+@test "--check-ranges never runs an awk from a PATH directory inside the worktree" {
+  marker="$BATS_TEST_TMPDIR/check-awk-ran"
+  rm -f "$marker"
+  printf 'canary-chk/\n' >> .git/info/exclude
+  mkdir -p canary-chk
+  printf '#!/bin/sh\ntouch "%s"\necho 0\n' "$marker" >| canary-chk/awk
+  chmod +x canary-chk/awk
+  seq 1 30 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file"
+  sed -i.bak 's/^25$/changed/' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt 1-5\n' >| "$BATS_TEST_TMPDIR/ranges"
+  PATH="$REPO/canary-chk:$PATH" run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ ! -e "$marker" ]
+  [ "$status" -eq 0 ]
+  [ "$(jq -c . <<<"$output")" = '{"out_of_range":[{"path":"src/a.txt","old_lines":["25-25"]}]}' ]
+}
+
 @test "--check-ranges lists an out-of-range file with its old-line span" {
   seq 1 30 >| src/a.txt
   git add src/a.txt && git commit -q -m "chore: long file"
