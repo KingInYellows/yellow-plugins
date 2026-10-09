@@ -931,6 +931,40 @@ describe('races inside the write gate', () => {
       );
     });
 
+    it('refuses a plan whose review text was redacted, even with the digest of what was shown', async () => {
+      addActivity(h, session.sessionResource, {
+        type: 'planGenerated',
+        plan: {
+          planId: 'plan-k',
+          steps: [
+            {
+              id: 'st-k',
+              title: 'Call the API with AIzaSyA1234567890abcdefghijk',
+              index: 0,
+            },
+          ],
+        },
+      });
+      setVendorState(h, session.sessionResource, 'awaitingPlanApproval');
+      await status(h.deps, { session: session.localId, reconcile: false });
+      const plan = (await readJournal(h.dataDir)).operations[
+        session.localRequestId
+      ]?.pendingPlan;
+      const writes = h.adapter.writeCount();
+      expect(
+        await code(() =>
+          reply(
+            h.deps,
+            args({
+              expectPlanId: plan!.planId,
+              expectPlanDigest: planDigest(plan!.planId, plan!.steps),
+            })
+          )
+        )
+      ).toBe('JULES_INVALID_STATE');
+      expect(h.adapter.writeCount()).toBe(writes);
+    });
+
     it('needs both values and cannot be combined with a question', async () => {
       const expected = await reviewed();
       expect(

@@ -383,11 +383,25 @@ async function assertPlanStillPending(deps, adapter, target, liveCondition, expe
     if (!walk.complete)
         return incompleteRefetch(walk);
     const current = walk.pendingPlan;
+    if (current !== null && current !== undefined)
+        assertPlanReviewable(current);
     if (current === null ||
         current === undefined ||
         current.planId !== expected.planId ||
         (0, state_js_1.planDigest)(current.planId, (0, redact_js_1.redactDeep)(current).steps) !== expected.digest) {
         return changed('the session no longer has the plan the pass showed');
+    }
+}
+/**
+ * Redaction hides part of a plan from the review, and the plan digest hashes the
+ * redacted text, so plans differing only in the hidden value would share a
+ * digest. A plan redaction changed cannot be approved or replied to unseen.
+ */
+function assertPlanReviewable(plan) {
+    if (JSON.stringify((0, redact_js_1.redactDeep)(plan)) !== JSON.stringify(plan)) {
+        (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'the pending plan contains credential-shaped text that is redacted from the review; it cannot be acted on unseen. Nothing was sent', {
+            recoveryAction: 'Review this plan in the Jules console, or ask for a plan without credentials.',
+        });
     }
 }
 function validateReplyKind(kind, question, plan) {
@@ -592,14 +606,7 @@ async function approveInner(deps, args, ids) {
                 ...(0, runtime_support_js_1.attentionOf)(changed ? ['planChanged'] : []),
             };
         }
-        // Redaction hides part of the plan from the review (and from the digest,
-        // which hashes the redacted text), so plans differing only in the hidden
-        // value would share a digest. Such a plan cannot be approved unseen.
-        if (JSON.stringify((0, redact_js_1.redactDeep)(newest)) !== JSON.stringify(newest)) {
-            return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'the pending plan contains credential-shaped text that is redacted from the review; it cannot be approved unseen. Nothing was approved', {
-                recoveryAction: 'Review and approve this plan in the Jules console, or ask for a plan without credentials.',
-            });
-        }
+        assertPlanReviewable(newest);
         if (newest.planId !== planId ||
             (0, state_js_1.planDigest)(newest.planId, (0, redact_js_1.redactDeep)(newest).steps) !==
                 args.expectPlanDigest) {
