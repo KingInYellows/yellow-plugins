@@ -1483,3 +1483,18 @@ EOF
     *) echo "resolved $YELLOW_REVIEW_GIT"; return 1 ;;
   esac
 }
+
+@test "rp_ignored_changed_since never inspects the target of a symlink the predicate rejects" {
+  link_repo
+  old_link ../real/tool src/skip.cache
+  mkdir -p .cache/d
+  ln -s ../../real/tool .cache/d/link
+  # A target that cannot be examined (an unsearchable directory) reports 2.
+  rp_link_target_changed() { return 2; }
+  only_claude() { [ "$1" = CLAUDE.md ]; }
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" "" only_claude
+  [ "$status" -eq 0 ]
+  # Without a predicate the unexaminable target still fails closed.
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 2 ]
+}

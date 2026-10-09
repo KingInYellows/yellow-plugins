@@ -828,6 +828,9 @@ rp_ignored_changed_since() {
                     # Nothing newer: judge the target of each symlink inside.
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o -type l -print0 >|"$symlist" 2>/dev/null || exit 2
                     while IFS= read -r -d '' l; do
+                        # A path the predicate rejects never counts, so its
+                        # target is not examined (it could abort the guard).
+                        kept "$l" || continue
                         lrc=0
                         rp_link_target_changed "$l" "$marker" || lrc=$?
                         case "$lrc" in
@@ -840,7 +843,7 @@ rp_ignored_changed_since() {
             elif [ -L "./$f" ]; then
                 find "./$f" -type l -newer "$marker" -print0 >|"$outfile" 2>/dev/null || rc=$?
                 kept "$f" || : >|"$outfile"
-                if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ]; then
+                if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ] && kept "$f"; then
                     lrc=0
                     rp_link_target_changed "./$f" "$marker" || lrc=$?
                     case "$lrc" in
