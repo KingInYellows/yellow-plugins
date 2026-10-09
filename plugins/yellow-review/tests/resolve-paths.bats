@@ -489,7 +489,90 @@ ignored_repo() {
   [ "$output" = .ruvector/hook.sh ]
 }
 
-@test "rp_ignored_changed_since ignores coedit-sessions through a .ruvector symlink but not its siblings" {
+@test "rp_ignored_changed_since ignores the ruvector coedit.json pair store but not its siblings" {
+  ignored_repo
+  printf '.ruvector/\n' >> .gitignore
+  mkdir -p .ruvector
+  printf '{}\n' >| .ruvector/coedit.json
+  printf 'old\n' >| .ruvector/intelligence.json
+  touch -t 201901010000 .ruvector/coedit.json .ruvector/intelligence.json
+  printf '{"version":1}\n' >| .ruvector/coedit.json
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  # A same-named file elsewhere is not the hook's store.
+  mkdir -p node_modules/.ruvector
+  printf 'new\n' >| node_modules/.ruvector/coedit.json
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$output" = node_modules/.ruvector/coedit.json ]
+  rm -rf node_modules/.ruvector
+  printf 'new\n' >| .ruvector/intelligence.json
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$output" = .ruvector/intelligence.json ]
+}
+
+@test "rp_ignored_changed_since still judges a symlink at .ruvector/coedit.json" {
+  ignored_repo
+  printf '.ruvector/\n' >> .gitignore
+  mkdir -p .ruvector
+  ln -s ../node_modules/.bin/runner .ruvector/coedit.json
+  touch -h -t 201901010000 .ruvector/coedit.json
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  # A write through the link lands on an executable: it must still count.
+  printf 'new\n' >| node_modules/.bin/runner
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *node_modules/.bin/runner* ]]
+}
+
+@test "rp_ignored_changed_since ignores coedit.json listed on its own, not as part of .ruvector/" {
+  ignored_repo
+  # Only the file is ignored, so git lists it rather than the directory.
+  printf '.ruvector/coedit.json\n' >> .gitignore
+  mkdir -p .ruvector
+  printf 'new\n' >| .ruvector/coedit.json
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "rp_ignored_changed_since ignores vitest's results cache but not the rest of node_modules" {
+  ignored_repo
+  mkdir -p node_modules/.vite/vitest node_modules/.vite/deps pkg/node_modules/.vite/vitest
+  printf '{}\n' >| node_modules/.vite/vitest/results.json
+  printf '{}\n' >| pkg/node_modules/.vite/vitest/results.json
+  printf 'old\n' >| node_modules/.vite/deps/chunk.js
+  touch -t 201901010000 node_modules/.vite/vitest/results.json pkg/node_modules/.vite/vitest/results.json node_modules/.vite/deps/chunk.js
+  # What a vitest run leaves behind (root and workspace package).
+  printf '{"version":"1.6.0","results":{}}\n' >| node_modules/.vite/vitest/results.json
+  printf '{"version":"1.6.0","results":{}}\n' >| pkg/node_modules/.vite/vitest/results.json
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  # vitest's pre-bundled deps are code: still the ignored-file stop.
+  printf 'new\n' >| node_modules/.vite/deps/chunk.js
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$output" = node_modules/.vite/deps/chunk.js ]
+}
+
+@test "rp_ignored_changed_since still judges a symlink at vitest's results cache" {
+  ignored_repo
+  mkdir -p node_modules/.vite/vitest
+  ln -s ../../.bin/runner node_modules/.vite/vitest/results.json
+  touch -h -t 201901010000 node_modules/.vite/vitest/results.json
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  printf 'new\n' >| node_modules/.bin/runner
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *node_modules/.bin/runner* ]]
+}
+
+@test "rp_ignored_changed_since ignores co-edit state through a .ruvector symlink but not its siblings" {
   ignored_repo
   printf '.ruvector\n' >> .gitignore
   store="$BATS_TEST_TMPDIR/store"
@@ -498,8 +581,11 @@ ignored_repo() {
   printf 'old\n' >| "$store/hook.sh"
   touch -t 201901010000 "$store/coedit-sessions/s1.json" "$store/hook.sh"
   ln -s "$store" .ruvector
+  printf '{}\n' >| "$store/coedit.json"
+  touch -t 201901010000 "$store/coedit.json"
   touch -h -t 201901010000 .ruvector
   printf 'new\n' >| "$store/coedit-sessions/s1.json"
+  printf '{"version":1}\n' >| "$store/coedit.json"
   run rp_ignored_changed_since "$MARKER" "$SCRATCH"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
@@ -1190,4 +1276,23 @@ EOF
     "$dest/git") ;;
     *) echo "resolved $YELLOW_REVIEW_GIT"; return 1 ;;
   esac
+}
+
+@test "rp_ignored_changed_since ignores vitest's results cache behind a symlinked .vite directory but not its siblings" {
+  ignored_repo
+  mkdir -p ext-cache/vitest node_modules
+  printf '{}\n' >| ext-cache/vitest/results.json
+  printf 'old\n' >| ext-cache/chunk.js
+  touch -t 201901010000 ext-cache/vitest/results.json ext-cache/chunk.js
+  ln -s ../ext-cache node_modules/.vite
+  touch -h -t 201901010000 node_modules/.vite
+  printf '{"version":"1.6.0","results":{}}\n' >| ext-cache/vitest/results.json
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  # A sibling file behind the same link is still code: refuse.
+  printf 'new\n' >| ext-cache/chunk.js
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [ "$output" = node_modules/.vite ]
 }
