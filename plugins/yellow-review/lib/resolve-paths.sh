@@ -159,9 +159,9 @@ yr_git() {
 
 # yr_safe_path: print PATH without empty or relative entries and without any
 # entry inside the worktree (by spelling, canonical path or identity) and
-# without an entry whose awk, git or git-lfs resolves into it. Returns
-# 1 when nothing is left. The caller's PATH is not changed; the verify command
-# keeps its own PATH (it may need node_modules/.bin).
+# without an entry whose awk, git, git-lfs or ignored-walk helper resolves
+# into it. Returns 1 when nothing is left. The caller's PATH is not changed;
+# the verify command keeps its own PATH (it may need node_modules/.bin).
 yr_safe_path() {
     local root rest entry canon helper hcanon kept=""
     root=$(yr_worktree_root || true)
@@ -176,9 +176,9 @@ yr_safe_path() {
                 continue
             fi
             # An outside directory can still hold a symlink to a file inside
-            # the worktree (awk, git-lfs, git): drop it when any helper
-            # git or yr_awk would find there canonicalizes into the worktree.
-            for helper in awk git git-lfs; do
+            # the worktree: drop it when any helper git, yr_awk or the
+            # ignored-file walk would find there canonicalizes into the worktree.
+            for helper in awk git git-lfs find head mktemp rm dirname basename readlink; do
                 [ -e "$entry/$helper" ] || continue
                 hcanon=$(yr_canon_path "$entry/$helper" 2>/dev/null || true)
                 if [ -z "$hcanon" ] || yr_inside_root "$hcanon" "$root"; then
@@ -720,14 +720,24 @@ rp_link_target_changed() {
 # marker is missing, unreadable, not a regular file or a symlink, git or find
 # fails, or a symlink's target cannot be examined. A caller must treat 2 as a
 # refusal. Whole ignored directories are walked with find; the caller owns
-# <scratch>, a scratch file for git's NUL-delimited listing.
+# <scratch>, a scratch file for git's NUL-delimited listing. An optional third
+# argument names a path predicate (rp_trusted_config): only paths it accepts
+# count, and a directory walk filters before its 20-path cut.
 rp_ignored_changed_since() {
-    local marker="$1" scratch="$2" mdir
+    local marker="$1" scratch="$2" keep="${3:-}" safe
+    [ -z "$keep" ] || declare -F -- "$keep" >/dev/null || return 2
     [ -f "$marker" ] && [ ! -L "$marker" ] && [ -r "$marker" ] || return 2
-    mdir=$(cd -- "$(dirname -- "$marker")" 2>/dev/null && pwd) || return 2
-    marker="$mdir/$(basename -- "$marker")"
+    # find, head, mktemp and the rest run by name after the resolvers wrote
+    # the tree, so the walk uses the worktree-free PATH, as yr_git does.
+    safe=$(yr_safe_path) || return 2
     (
-        local top f out p l rc lrc symlist n=0 hits=""
+        PATH=$safe
+        hash -r 2>/dev/null || true
+        local mdir top f out p l rc lrc symlist n=0 hits=""
+        mdir=$(cd -- "$(dirname -- "$marker")" 2>/dev/null && pwd) || exit 2
+        marker="$mdir/$(basename -- "$marker")"
+        # kept <path>: no predicate, or the predicate accepts the path.
+        kept() { [ -z "$keep" ] || "$keep" "${1#./}"; }
         top=$(yr_git rev-parse --show-toplevel 2>/dev/null) || exit 2
         cd -- "$top" 2>/dev/null || exit 2
         symlist=$(mktemp) || exit 2
@@ -744,6 +754,7 @@ rp_ignored_changed_since() {
                 # fails with nothing found is "cannot tell".
                 out=$(set -o pipefail
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o \( -type f -o -type l \) -newer "$marker" -print 2>/dev/null \
+                        | while IFS= read -r p; do if kept "$p"; then printf '%s\n' "$p"; fi; done \
                         | head -n 20) || rc=$?
                 if [ -z "$out" ] && [ "$rc" -eq 0 ]; then
                     # Nothing newer: judge the target of each symlink inside.
@@ -752,7 +763,7 @@ rp_ignored_changed_since() {
                         lrc=0
                         rp_link_target_changed "$l" "$marker" || lrc=$?
                         case "$lrc" in
-                            0) out="$l"; break ;;
+                            0) if kept "$l"; then out="$l"; break; fi ;;
                             1) ;;
                             *) exit 2 ;;
                         esac
@@ -760,17 +771,18 @@ rp_ignored_changed_since() {
                 fi
             elif [ -L "./$f" ]; then
                 out=$(find "./$f" -type l -newer "$marker" -print 2>/dev/null) || rc=$?
+                kept "$f" || out=""
                 if [ -z "$out" ] && [ "$rc" -eq 0 ]; then
                     lrc=0
                     rp_link_target_changed "./$f" "$marker" || lrc=$?
                     case "$lrc" in
-                        0) out="./$f" ;;
+                        0) kept "$f" && out="./$f" ;;
                         1) ;;
                         *) exit 2 ;;
                     esac
                 fi
             elif [ -f "./$f" ]; then
-                [ "./$f" -nt "$marker" ] && out="./$f"
+                [ "./$f" -nt "$marker" ] && kept "$f" && out="./$f"
             fi
             if [ -z "$out" ]; then
                 [ "$rc" -eq 0 ] || exit 2
