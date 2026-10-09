@@ -224,6 +224,115 @@ describe('identical text from a create and a later reply, newest first', () => {
   });
 });
 
+describe('same-text echoes are paired as a vendor-time-ordered batch', () => {
+  async function setup() {
+    const grantId = await createGrant(h, { maxActiveSessions: 3 });
+    const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
+    h.deps.clock.time += 5 * 60_000;
+    const reservation = await reserveUnderGrant(h.deps, {
+      grantId,
+      ownerRequestId: session.localRequestId,
+      authority: {
+        repository: 'acme/widgets',
+        sourceResource: 'sources/github/acme/widgets',
+        branch: 'scratch/one',
+        taskRef: 't1',
+        operation: 'reply',
+      },
+      reservation: {
+        localRequestId: 'reply-same-text',
+        localId: `jl-${'e'.repeat(32)}`,
+        sessionResource: session.sessionResource,
+        promptDigest: messageDigest('Do the task.'),
+      },
+    });
+    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty');
+    await settleAccepted(h.deps, reservation);
+    return { session, digest: messageDigest('Do the task.') };
+  }
+  const at = (offsetMs: number) =>
+    new Date(h.deps.clock.now() + offsetMs).toISOString();
+
+  for (const order of ['oldest first', 'newest first'] as const) {
+    it(`gives the older echo to the create and the newer to the reply (${order}), with a plan swap between them left unexplained`, async () => {
+      const { session, digest } = await setup();
+      const createEcho = {
+        activityId: 'act-create',
+        digest,
+        createTime: at(1_000),
+      };
+      const replyEcho = {
+        activityId: 'act-reply',
+        digest,
+        createTime: at(9_000),
+      };
+      const planSwapMs = Date.parse(at(5_000));
+      await claimOwnEchoes(
+        h.dataDir,
+        session.sessionResource,
+        order === 'oldest first'
+          ? [createEcho, replyEcho]
+          : [replyEcho, createEcho],
+        {
+          ownerRequestId: session.localRequestId,
+          observedAt: new Date(h.deps.clock.now()).toISOString(),
+        }
+      );
+      const ops = (await readJournal(h.dataDir)).operations;
+      expect(ops[session.localRequestId]?.echoActivityId).toBe('act-create');
+      expect(ops['reply-same-text']?.echoActivityId).toBe('act-reply');
+      // The reply's echo is after the plan swap, so it cannot explain it.
+      expect(
+        Date.parse(ops['reply-same-text']?.echoCreateTime ?? '')
+      ).toBeGreaterThan(planSwapMs);
+      expect(
+        Date.parse(ops[session.localRequestId]?.echoCreateTime ?? '')
+      ).toBeLessThan(planSwapMs);
+    });
+  }
+
+  it('an equal vendor time makes the pairing unprovable: no echo is credited and the messages are outside', async () => {
+    const { session, digest } = await setup();
+    const t = at(1_000);
+    const outside = await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [
+        { activityId: 'act-a', digest, createTime: t },
+        { activityId: 'act-b', digest, createTime: t },
+      ],
+      {
+        ownerRequestId: session.localRequestId,
+        observedAt: new Date(h.deps.clock.now()).toISOString(),
+      }
+    );
+    expect(outside).toBeDefined();
+    const ops = (await readJournal(h.dataDir)).operations;
+    expect(ops[session.localRequestId]?.echoActivityId).toBeUndefined();
+    expect(ops['reply-same-text']?.echoActivityId).toBeUndefined();
+    expect(await outsideSeen(session.localRequestId)).toBe(true);
+  });
+
+  it('a missing vendor time is unprovable too', async () => {
+    const { session, digest } = await setup();
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [
+        { activityId: 'act-a', digest },
+        { activityId: 'act-b', digest, createTime: at(1_000) },
+      ],
+      {
+        ownerRequestId: session.localRequestId,
+        observedAt: new Date(h.deps.clock.now()).toISOString(),
+      }
+    );
+    const ops = (await readJournal(h.dataDir)).operations;
+    expect(ops['reply-same-text']?.echoActivityId).toBeUndefined();
+    expect(ops[session.localRequestId]?.echoActivityId).toBeUndefined();
+  });
+});
+
 describe('the newest outside message is chosen by stamp, not traversal order', () => {
   const older = {
     activityId: 'activities/a-older',

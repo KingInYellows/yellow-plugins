@@ -2036,6 +2036,82 @@ export async function claimOwnEchoes(
             .forEach((m) => surplusIds.add(m.activityId));
         }
       }
+      // Same-text echoes are matched as a vendor-time-ordered batch, never in
+      // arrival order: with several writes sharing a digest, the oldest echo
+      // belongs to the oldest-dispatched write. When the pairing cannot be
+      // proven (equal or missing vendor time, unorderable dispatches, or a
+      // different number of echoes and writes) the batch is ambiguous: its
+      // messages are outside activity and its unresolved writes can never be
+      // credited.
+      const pairedSlots = new Map<string, OperationRecord>();
+      const eligibleOf = (
+        message: (typeof messages)[number]
+      ): OperationRecord[] => {
+        const possible = landed.filter(
+          (r) =>
+            r.echoActivityId === undefined &&
+            r.echoAmbiguous !== true &&
+            r.promptDigest === message.digest &&
+            followsDispatch(r, message.createTime, message.activityId) &&
+            !afterFirstRead(r, message.activityId)
+        );
+        const open = possible.filter((r) => !inFlight(r) && !postWalk(r));
+        const settledOpen = open.filter(
+          (r) => r.status === 'accepted' || r.status === 'reconciled'
+        );
+        return settledOpen.length > 0 ? settledOpen : open;
+      };
+      const timeOf = (m: { createTime?: string }): number =>
+        m.createTime !== undefined ? Date.parse(m.createTime) : Number.NaN;
+      for (const [digest, group] of byDigest) {
+        const live = group.filter((m) => !surplusIds.has(m.activityId));
+        if (live.length < 2 || blockedDigests.has(digest)) continue;
+        const sets = live.map((m) => eligibleOf(m));
+        const first = sets[0] ?? [];
+        if (first.length < 2) continue;
+        const sameSet = sets.every(
+          (e) =>
+            e.length === first.length &&
+            e.every((r) =>
+              first.some((f) => f.localRequestId === r.localRequestId)
+            )
+        );
+        const times = live.map(timeOf);
+        const distinctTimes =
+          times.every((t) => !Number.isNaN(t)) &&
+          new Set(times).size === times.length;
+        const bySeq = first.every((r) => r.dispatchSeq !== undefined);
+        const dispatchKey = (r: OperationRecord): number =>
+          bySeq ? (r.dispatchSeq as number) : Date.parse(r.dispatchedAt ?? '');
+        const keys = first.map(dispatchKey);
+        const distinctDispatch =
+          keys.every((k) => !Number.isNaN(k)) &&
+          new Set(keys).size === keys.length;
+        if (
+          sameSet &&
+          distinctTimes &&
+          distinctDispatch &&
+          live.length === first.length
+        ) {
+          const msgs = [...live].sort((x, y) => timeOf(x) - timeOf(y));
+          const recs = [...first].sort(
+            (x, y) => dispatchKey(x) - dispatchKey(y)
+          );
+          msgs.forEach((m, i) => pairedSlots.set(m.activityId, recs[i]!));
+          continue;
+        }
+        for (const r of first) {
+          if (r.status === 'accepted' || r.status === 'reconciled') continue;
+          const marked = {
+            ...r,
+            echoAmbiguous: true,
+            updatedAt: mark?.observedAt ?? r.updatedAt,
+          };
+          operations[r.localRequestId] = marked;
+          landed[landed.indexOf(r)] = marked;
+        }
+        for (const m of live) surplusIds.add(m.activityId);
+      }
       for (const message of messages) {
         if (claimed.has(message.activityId)) {
           release(message.activityId);
@@ -2080,19 +2156,21 @@ export async function claimOwnEchoes(
         // Vendor list order is unverified, so with a usable timestamp prefer
         // the latest-dispatched write that precedes the message: an older
         // identical write then keeps the older echo.
-        const slot = ambiguousUnresolved
-          ? undefined
-          : typeof sent === 'number' && !Number.isNaN(sent)
-            ? eligible.reduce<OperationRecord | undefined>(
-                (best, r) =>
-                  best === undefined ||
-                  Date.parse(r.dispatchedAt ?? r.createdAt) >
-                    Date.parse(best.dispatchedAt ?? best.createdAt)
-                    ? r
-                    : best,
-                undefined
-              )
-            : eligible[0];
+        const slot = pairedSlots.has(message.activityId)
+          ? pairedSlots.get(message.activityId)
+          : ambiguousUnresolved
+            ? undefined
+            : typeof sent === 'number' && !Number.isNaN(sent)
+              ? eligible.reduce<OperationRecord | undefined>(
+                  (best, r) =>
+                    best === undefined ||
+                    Date.parse(r.dispatchedAt ?? r.createdAt) >
+                      Date.parse(best.dispatchedAt ?? best.createdAt)
+                      ? r
+                      : best,
+                  undefined
+                )
+              : eligible[0];
         if (slot === undefined && possible.length > 0) {
           // Only a dispatched write whose outcome is unknown could explain it:
           // `dispatchedAt` proves the POST began, not that it landed. Leave the

@@ -266,6 +266,12 @@ the post-POST verifier's rule to the newest plan generated before the approval:
 a different digest (or an unorderable tie) binds the approve but records the
 policy deviation on the session's owner; an incomplete walk or no readable
 preceding plan leaves it `ambiguous-reconcile` (`approved-plan-unreadable`).
+Same-text echoes are matched as a vendor-time-ordered batch, not in arrival
+order: with several writes sharing a digest, the oldest echo goes to the
+oldest-dispatched write (by dispatch sequence, else `dispatchedAt`). Equal or
+missing vendor times, unorderable dispatches, or a different number of echoes
+and writes make the batch ambiguous: the messages are recorded as outside
+activity (pause) and its unresolved writes are marked `echoAmbiguous`.
 A bound approve that landed on a changed plan carries `policyDeviation: true` on
 its reconciled entry, so a sessionless `status --reconcile` sets
 `policyDeviation` and `requiresAttention`. Terminal-session slot release (in
