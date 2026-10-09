@@ -1641,6 +1641,22 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
             // Vendor list order is unverified, so with a usable timestamp prefer
             // the latest-dispatched write that precedes the message: an older
             // identical write then keeps the older echo.
+            // More than one eligible writer and no proven pairing: the message is
+            // never assigned greedily (it may be another write's echo or a
+            // teammate's identical comment), so it is outside activity.
+            if (!pairedSlots.has(message.activityId) &&
+                !ambiguousUnresolved &&
+                eligible.length > 1) {
+                if (!walkComplete) {
+                    pendingOut?.push(message.activityId);
+                    hold(message);
+                }
+                else {
+                    release(message.activityId);
+                    noteOutside(message);
+                }
+                continue;
+            }
             const slot = pairedSlots.has(message.activityId)
                 ? pairedSlots.get(message.activityId)
                 : ambiguousUnresolved

@@ -968,6 +968,83 @@ describe('reply and approve reservations resolve on their own session', () => {
     expect(ops[session.localRequestId]?.deviations).toHaveLength(1);
   });
 
+  it('an unordered same-plan match plus a later approval of another plan is ambiguous and still records a blocking deviation', async () => {
+    const session = await strandedApprove();
+    const floor = (await readJournal(h.dataDir)).operations['approve-1']
+      ?.vendorFloorCreateTime;
+    expect(floor).toBeDefined();
+    // Tied with the vendor floor: cannot be ordered against the dispatch.
+    addActivity(h, session.sessionResource, {
+      type: 'planApproved',
+      approvedPlanId: 'plan-1',
+      createTime: floor,
+    });
+    addActivity(h, session.sessionResource, {
+      type: 'planApproved',
+      approvedPlanId: 'plan-2',
+      createTime: new Date(Date.parse(floor!) + 5_000).toISOString(),
+    });
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(result.reconciled?.[0]).toMatchObject({
+      outcome: 'ambiguous-reconcile',
+    });
+    const ops = (await readJournal(h.dataDir)).operations;
+    expect(ops[session.localRequestId]?.deviations).toHaveLength(1);
+  });
+
+  it('one foreign approval cannot resolve two unresolved approves, and a bound one persists the consumed activity', async () => {
+    const session = await strandedApprove();
+    h.adapter.approvePlanImpl = async () => {
+      throw new AdapterError('network', 'reset', { dispatched: true });
+    };
+    await expect(
+      approve(h.deps, {
+        session: session.localId,
+        planId: 'plan-1',
+        expectPlanDigest: await reviewedDigestOf(h, session.localRequestId),
+        dryRun: false,
+        grantId,
+        requestId: 'approve-2',
+      })
+    ).rejects.toBeInstanceOf(AppErrorException);
+    const floor = (await readJournal(h.dataDir)).operations['approve-2']
+      ?.vendorFloorCreateTime;
+    addActivity(h, session.sessionResource, {
+      type: 'planApproved',
+      approvedPlanId: 'plan-2',
+      createTime: new Date(Date.parse(floor!) + 5_000).toISOString(),
+    });
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    const outcomes = Object.fromEntries(
+      (result.reconciled ?? []).map((r) => [r.localRequestId, r.outcome])
+    );
+    expect(outcomes).toEqual({
+      'approve-1': 'ambiguous-reconcile',
+      'approve-2': 'ambiguous-reconcile',
+    });
+  });
+
+  it('a foreign approval that binds a single approve is persisted as its consumed activity', async () => {
+    const session = await strandedApprove();
+    const floor = (await readJournal(h.dataDir)).operations['approve-1']
+      ?.vendorFloorCreateTime;
+    const consumed = addActivity(h, session.sessionResource, {
+      type: 'planApproved',
+      approvedPlanId: 'plan-2',
+      createTime: new Date(Date.parse(floor!) + 5_000).toISOString(),
+    });
+    await status(h.deps, { session: session.localId, reconcile: true });
+    expect(
+      (await readJournal(h.dataDir)).operations['approve-1']?.echoActivityId
+    ).toBe(consumed.activityId);
+  });
+
   it('an approve that landed on the reviewed plan binds without a deviation', async () => {
     const session = await strandedApprove();
     addActivity(h, session.sessionResource, {

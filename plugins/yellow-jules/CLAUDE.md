@@ -293,6 +293,14 @@ floors do not make the batch order-dependent. Equal or
 missing vendor times, unorderable dispatches, or a different number of echoes
 and writes make the batch ambiguous: the messages are recorded as outside
 activity (pause) and its unresolved writes are marked `echoAmbiguous`.
+Every `ambiguous-reconcile` on an `approve` also records a blocking deviation
+on the session's owner (fail closed), whatever the reason. One vendor activity
+is credited to at most one record: same-plan and foreign approvals count as
+owners alongside reply echoes, so two unresolved approves never both claim one
+approval. A bound approve persists the consumed activity id (`echoActivityId`),
+so a later pass cannot reuse it. A same-digest message with more than one
+eligible writer and no proven pairing is never assigned to the latest
+dispatch: it is outside activity, whatever the batch size.
 A bound approve that landed on a changed plan carries `policyDeviation: true` on
 its reconciled entry, so a sessionless `status --reconcile` sets
 `policyDeviation` and `requiresAttention`. Terminal-session slot release (in

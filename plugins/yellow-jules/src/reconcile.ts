@@ -460,6 +460,7 @@ async function resolveOnOwnSession(
         }
         if (
           record.kind === 'approve' &&
+          !claimed &&
           activity.type === 'planApproved' &&
           record.observedPlanId !== undefined &&
           activity.approvedPlanId === record.observedPlanId
@@ -468,6 +469,7 @@ async function resolveOnOwnSession(
         }
         if (
           record.kind === 'approve' &&
+          !claimed &&
           activity.type === 'planApproved' &&
           record.observedPlanId !== undefined &&
           activity.approvedPlanId !== undefined &&
@@ -480,11 +482,11 @@ async function resolveOnOwnSession(
       }
     },
   });
-  // One vendor activity can explain only one record: two unresolved records with
-  // the same digest (or two approvals of the same plan) that share an activity
-  // cannot both be bound to it, and nothing says which one landed.
+  // One vendor activity can explain only one record, same-plan or foreign: two
+  // unresolved records that share an activity cannot both be bound to it, and
+  // nothing says which one landed.
   const owners = new Map<string, number>();
-  for (const group of [matches, unordered]) {
+  for (const group of [matches, unordered, foreignOrdered, foreignUnordered]) {
     for (const found of group.values()) {
       for (const id of found) owners.set(id, (owners.get(id) ?? 0) + 1);
     }
@@ -492,44 +494,49 @@ async function resolveOnOwnSession(
   return records.map((record): Resolution => {
     const found = matches.get(record.localRequestId) ?? new Set<string>();
     const unproven = unordered.get(record.localRequestId) ?? new Set<string>();
-    if (found.size > 1 || [...found].some((id) => (owners.get(id) ?? 0) > 1)) {
-      return {
-        record,
-        outcome: 'ambiguous-reconcile',
-        reason: 'multiple-candidates',
-      };
+    const orderedForeign =
+      foreignOrdered.get(record.localRequestId) ?? new Set<string>();
+    const unorderedForeign =
+      foreignUnordered.get(record.localRequestId) ?? new Set<string>();
+    // Every ambiguity on an approve also records a blocking deviation: an
+    // approval whose fate is unknown must keep later grant-backed writes shut.
+    const ambiguous = (reason: string): Resolution => ({
+      record,
+      outcome: 'ambiguous-reconcile',
+      reason,
+      ...(record.kind === 'approve'
+        ? { deviation: UNATTRIBUTED_APPROVAL_DEVIATION }
+        : {}),
+    });
+    const all = [...found, ...unproven, ...orderedForeign, ...unorderedForeign];
+    if (found.size > 1 || all.some((id) => (owners.get(id) ?? 0) > 1)) {
+      return ambiguous('multiple-candidates');
     }
-    if (unproven.size > 0) {
-      return {
-        record,
-        outcome: 'ambiguous-reconcile',
-        reason: 'dispatch-time-unknown',
-      };
-    }
-    if (record.kind === 'approve' && found.size === 0) {
-      const ordered = foreignOrdered.get(record.localRequestId) ?? new Set();
-      const unorderedForeign =
-        foreignUnordered.get(record.localRequestId) ?? new Set();
-      if (ordered.size + unorderedForeign.size > 0) {
-        const [only] = ordered;
-        const shared = only !== undefined && (owners.get(only) ?? 0) > 1;
-        // One approval, proven after the dispatch: the POST landed on the
-        // replacement plan. Anything less certain still blocks later writes.
-        if (ordered.size === 1 && unorderedForeign.size === 0 && !shared) {
-          return {
-            record,
-            outcome: 'bound',
-            deviation: APPROVED_PLAN_DEVIATION,
-          };
-        }
+    if (
+      record.kind === 'approve' &&
+      orderedForeign.size + unorderedForeign.size > 0
+    ) {
+      const [only] = orderedForeign;
+      // One approval of another plan, proven after the dispatch and nothing
+      // else: the POST landed on the replacement plan. Anything less certain
+      // (a same-plan match too, an unordered one) is ambiguous.
+      if (
+        found.size === 0 &&
+        unproven.size === 0 &&
+        orderedForeign.size === 1 &&
+        unorderedForeign.size === 0 &&
+        only !== undefined
+      ) {
         return {
           record,
-          outcome: 'ambiguous-reconcile',
-          reason: 'approval-of-another-plan',
-          deviation: UNATTRIBUTED_APPROVAL_DEVIATION,
+          outcome: 'bound',
+          deviation: APPROVED_PLAN_DEVIATION,
+          echoActivityId: only,
         };
       }
+      return ambiguous('approval-of-another-plan');
     }
+    if (unproven.size > 0) return ambiguous('dispatch-time-unknown');
     if (found.size === 1) {
       const [echoId] = found;
       const echoTime =
@@ -546,23 +553,18 @@ async function resolveOnOwnSession(
           record.observedPlanDigest,
           walk.complete
         );
-        if (verdict === 'unreadable') {
-          return {
-            record,
-            outcome: 'ambiguous-reconcile',
-            reason: 'approved-plan-unreadable',
-          };
-        }
+        if (verdict === 'unreadable')
+          return ambiguous('approved-plan-unreadable');
         if (verdict === 'changed') deviation = APPROVED_PLAN_DEVIATION;
       }
       return {
         record,
         outcome: 'bound',
-        ...(record.kind === 'reply' && echoId !== undefined
-          ? {
-              echoActivityId: echoId,
-              ...(echoTime !== undefined ? { echoCreateTime: echoTime } : {}),
-            }
+        // The consumed activity is persisted for approves too, so a later pass
+        // cannot credit the same vendor approval to another record.
+        ...(echoId !== undefined ? { echoActivityId: echoId } : {}),
+        ...(record.kind === 'reply' && echoTime !== undefined
+          ? { echoCreateTime: echoTime }
           : {}),
         ...(deviation !== undefined ? { deviation } : {}),
       };

@@ -336,6 +336,24 @@ describe('same-text echoes are paired as a vendor-time-ordered batch', () => {
     });
   }
 
+  it('a single message with two eligible settled writers is never assigned greedily', async () => {
+    const { session, digest } = await setup();
+    const outside = await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [{ activityId: 'act-only', digest, createTime: at(1_000) }],
+      {
+        ownerRequestId: session.localRequestId,
+        observedAt: new Date(h.deps.clock.now()).toISOString(),
+      }
+    );
+    expect(outside).toBeDefined();
+    const ops = (await readJournal(h.dataDir)).operations;
+    expect(ops[session.localRequestId]?.echoActivityId).toBeUndefined();
+    expect(ops['reply-same-text']?.echoActivityId).toBeUndefined();
+    expect(await outsideSeen(session.localRequestId)).toBe(true);
+  });
+
   it('an equal vendor time makes the pairing unprovable: no echo is credited and the messages are outside', async () => {
     const { session, digest } = await setup();
     const t = at(1_000);
