@@ -391,6 +391,8 @@ check_lib_integrity || exit 3
 
 # shellcheck source=../../../lib/resolve-paths.sh
 . "$(dirname -- "$0")/../../../lib/resolve-paths.sh"
+# Resolve git and the worktree-free PATH once, here, so later subshells reuse them.
+yr_git --version >/dev/null 2>&1 || true
 # shellcheck source=../../../lib/resolve-text.sh
 . "$(dirname -- "$0")/../../../lib/resolve-text.sh"
 # shellcheck source=../../../lib/verify-run.sh
