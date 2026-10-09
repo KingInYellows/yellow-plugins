@@ -712,11 +712,25 @@ forge() {
   [ "$status" -eq 10 ]
   STUB_FAIL=abort-after run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 31 ]
-  [[ $output == *"may have rolled the restack back"* ]]
+  [[ $output == *"may have rolled part of the restack back"* ]]
   grep -q '^phase.aborting$' "$SD/state"
   run bash "$SCRIPT" continue --provider graphite
   [ "$status" -eq 31 ]
   [ -e "$SD/state" ]
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "a failed provider abort with the pause still in place keeps phase aborting and a retry finishes" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  STUB_FAIL=abort run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  grep -q '^phase.aborting$' "$SD/state"
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 31 ]
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 0 ]
   assert_all_restored
@@ -729,7 +743,7 @@ forge() {
   [ "$status" -eq 10 ]
   STUB_GH_VERSION=v0.2.1 STUB_FAIL=abort-after run bash "$SCRIPT" abort --provider github
   [ "$status" -eq 31 ]
-  [[ $output == *"may have rolled the restack back"* ]]
+  [[ $output == *"may have rolled part of the restack back"* ]]
   grep -q '^phase.aborting$' "$SD/state"
   STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" continue --provider github
   [ "$status" -eq 31 ]
