@@ -22,6 +22,7 @@ import {
   compareStamp,
   DEDUP_RING_CAP,
   DISPATCH_SKEW_MS,
+  RESERVATION_SETTLE_MS,
 } from './activity-walk.js';
 import {
   assertOwnerOnlyFile,
@@ -1270,7 +1271,9 @@ export async function updateSupervision(
  * and further matches have no operation left to explain them. A rewalk of an
  * already-claimed activity stays own. With `mark`, the first outside message is
  * also recorded as the owner's `outsideSeen` under the same journal lock; later outside
- * messages replace the marker, so a pending `--clear-pause` confirmation for the older one fails. A cleanly rejected or released write never
+ * messages replace the marker, so a pending `--clear-pause` confirmation for the older one fails. A message that only a dispatched write
+ * still in flight could explain is reported in `pendingOut` and neither claimed nor
+ * classified, so the caller leaves it for a later walk. A cleanly rejected or released write never
  * landed and claims nothing; an abandoned one might have, so it can.
  */
 export async function claimOwnEchoes(
@@ -1282,6 +1285,7 @@ export async function claimOwnEchoes(
     createTime?: string;
   }>,
   mark?: { readonly ownerRequestId: string; readonly observedAt: string },
+  pendingOut?: string[],
   config: LockConfig = DEFAULT_LOCK_CONFIG
 ): Promise<{ activityId: string; digest: string } | undefined> {
   return updateJournal(
@@ -1300,6 +1304,13 @@ export async function claimOwnEchoes(
           !(record.status === 'reserved' && record.dispatchedAt === undefined)
         );
       });
+      const nowMs = Date.parse(mark?.observedAt ?? new Date().toISOString());
+      // A dispatched write that has not settled and is still inside its settle
+      // window; past it the existing unknown-outcome rules apply.
+      const inFlight = (r: OperationRecord): boolean =>
+        r.status === 'reserved' &&
+        r.dispatchedAt !== undefined &&
+        nowMs - Date.parse(r.dispatchedAt) < RESERVATION_SETTLE_MS;
       const claimed = new Set(
         landed.flatMap((r) =>
           r.echoActivityId !== undefined ? [r.echoActivityId] : []
@@ -1310,18 +1321,24 @@ export async function claimOwnEchoes(
       for (const message of messages) {
         if (claimed.has(message.activityId)) continue;
         const sent = message.createTime && Date.parse(message.createTime);
-        const slot = landed.find(
-          (r) =>
-            r.echoActivityId === undefined &&
-            r.promptDigest === message.digest &&
-            // A message older than the record's dispatch cannot be its echo.
-            !(
-              typeof sent === 'number' &&
-              !Number.isNaN(sent) &&
-              r.dispatchedAt !== undefined &&
-              sent < Date.parse(r.dispatchedAt) - DISPATCH_SKEW_MS
-            )
-        );
+        const matches = (r: OperationRecord): boolean =>
+          r.echoActivityId === undefined &&
+          r.promptDigest === message.digest &&
+          // A message older than the record's dispatch cannot be its echo.
+          !(
+            typeof sent === 'number' &&
+            !Number.isNaN(sent) &&
+            r.dispatchedAt !== undefined &&
+            sent < Date.parse(r.dispatchedAt) - DISPATCH_SKEW_MS
+          );
+        const slot = landed.find((r) => matches(r) && !inFlight(r));
+        if (slot === undefined && landed.some((r) => matches(r))) {
+          // Only a dispatched write whose outcome is unknown could explain it:
+          // `dispatchedAt` proves the POST began, not that it landed. Leave the
+          // message unclassified; the caller must not consume it yet.
+          pendingOut?.push(message.activityId);
+          continue;
+        }
         if (slot === undefined) {
           outside ??= message;
           newestOutside = message;

@@ -935,10 +935,12 @@ async function updateSupervision(dataDir, localRequestId, patch, now = () => new
  * and further matches have no operation left to explain them. A rewalk of an
  * already-claimed activity stays own. With `mark`, the first outside message is
  * also recorded as the owner's `outsideSeen` under the same journal lock; later outside
- * messages replace the marker, so a pending `--clear-pause` confirmation for the older one fails. A cleanly rejected or released write never
+ * messages replace the marker, so a pending `--clear-pause` confirmation for the older one fails. A message that only a dispatched write
+ * still in flight could explain is reported in `pendingOut` and neither claimed nor
+ * classified, so the caller leaves it for a later walk. A cleanly rejected or released write never
  * landed and claims nothing; an abandoned one might have, so it can.
  */
-async function claimOwnEchoes(dataDir, sessionResource, messages, mark, config = exports.DEFAULT_LOCK_CONFIG) {
+async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingOut, config = exports.DEFAULT_LOCK_CONFIG) {
     return updateJournal(dataDir, (operations) => {
         const landed = Object.values(operations).filter((record) => {
             const neverLanded = (record.status === 'failed' && record.abandonedAt === undefined) ||
@@ -950,6 +952,12 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, config =
                 // A reservation whose POST has not begun cannot have produced an echo.
                 !(record.status === 'reserved' && record.dispatchedAt === undefined));
         });
+        const nowMs = Date.parse(mark?.observedAt ?? new Date().toISOString());
+        // A dispatched write that has not settled and is still inside its settle
+        // window; past it the existing unknown-outcome rules apply.
+        const inFlight = (r) => r.status === 'reserved' &&
+            r.dispatchedAt !== undefined &&
+            nowMs - Date.parse(r.dispatchedAt) < activity_walk_js_1.RESERVATION_SETTLE_MS;
         const claimed = new Set(landed.flatMap((r) => r.echoActivityId !== undefined ? [r.echoActivityId] : []));
         let outside;
         let newestOutside;
@@ -957,13 +965,21 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, config =
             if (claimed.has(message.activityId))
                 continue;
             const sent = message.createTime && Date.parse(message.createTime);
-            const slot = landed.find((r) => r.echoActivityId === undefined &&
+            const matches = (r) => r.echoActivityId === undefined &&
                 r.promptDigest === message.digest &&
                 // A message older than the record's dispatch cannot be its echo.
                 !(typeof sent === 'number' &&
                     !Number.isNaN(sent) &&
                     r.dispatchedAt !== undefined &&
-                    sent < Date.parse(r.dispatchedAt) - activity_walk_js_1.DISPATCH_SKEW_MS));
+                    sent < Date.parse(r.dispatchedAt) - activity_walk_js_1.DISPATCH_SKEW_MS);
+            const slot = landed.find((r) => matches(r) && !inFlight(r));
+            if (slot === undefined && landed.some((r) => matches(r))) {
+                // Only a dispatched write whose outcome is unknown could explain it:
+                // `dispatchedAt` proves the POST began, not that it landed. Leave the
+                // message unclassified; the caller must not consume it yet.
+                pendingOut?.push(message.activityId);
+                continue;
+            }
             if (slot === undefined) {
                 outside ??= message;
                 newestOutside = message;

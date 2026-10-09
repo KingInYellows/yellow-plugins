@@ -30,6 +30,8 @@ export const OVERLAP_WINDOW_MS = 5 * 60_000;
  * minus this cannot be the echo of that POST.
  */
 export const DISPATCH_SKEW_MS = 30_000;
+/** Longer than any write deadline (cli MAX_DEADLINE_MS 200 s) plus a minute of slack. */
+export const RESERVATION_SETTLE_MS = 260_000;
 export const DEDUP_RING_CAP = 1000;
 
 export type WalkStart =

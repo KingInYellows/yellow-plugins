@@ -23,8 +23,6 @@ const errors_js_1 = require("./errors.js");
 const runtime_support_js_1 = require("./runtime-support.js");
 const state_js_1 = require("./state.js");
 const validate_js_1 = require("./validate.js");
-/** Longer than any write deadline (cli MAX_DEADLINE_MS 200 s) plus a minute of slack. */
-const RESERVATION_SETTLE_MS = 260_000;
 const RECONCILE_SESSIONS_PAGE_SIZE = 100;
 const RECONCILE_SESSIONS_PAGE_CAP = 5;
 function project(s) {
@@ -356,7 +354,7 @@ async function reconcile(deps, journal, sessionResource, deadline) {
     // reconcile can never free (and then be overwritten by) a live write.
     const nowMs = deps.clock.now();
     const inFlight = targets.filter((r) => r.status === 'reserved' &&
-        nowMs - Date.parse(r.createdAt) < RESERVATION_SETTLE_MS);
+        nowMs - Date.parse(r.createdAt) < activity_walk_js_1.RESERVATION_SETTLE_MS);
     const settled = targets.filter((r) => !inFlight.includes(r));
     const early = inFlight.map((record) => notReached(record, 'the reservation may still be in flight; try again shortly'));
     const creates = settled.filter((r) => r.kind === 'create');

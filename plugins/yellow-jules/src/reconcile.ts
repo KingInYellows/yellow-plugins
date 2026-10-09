@@ -16,6 +16,7 @@
 
 import {
   DISPATCH_SKEW_MS,
+  RESERVATION_SETTLE_MS,
   OVERLAP_WINDOW_MS,
   STATUS_PAGE_SIZE,
   walkActivities,
@@ -47,8 +48,6 @@ import type {
 } from './types.js';
 import { extractTitleTag } from './validate.js';
 
-/** Longer than any write deadline (cli MAX_DEADLINE_MS 200 s) plus a minute of slack. */
-const RESERVATION_SETTLE_MS = 260_000;
 const RECONCILE_SESSIONS_PAGE_SIZE = 100;
 const RECONCILE_SESSIONS_PAGE_CAP = 5;
 

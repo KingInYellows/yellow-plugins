@@ -22,9 +22,12 @@ import {
 import {
   assertGrantLiveBeforeWrite,
   reserveUnderGrant,
+  settleAccepted,
+  settleFailure,
 } from '../src/write-gate.js';
 
 import {
+  addActivity,
   createGrant,
   delegateOk,
   type DelegatedSession,
@@ -454,12 +457,13 @@ describe('races inside the write gate', () => {
     expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
   });
 
-  it('a dispatched reply still claims its own echo', async () => {
+  it('a settled dispatched reply claims its own echo', async () => {
     const reservation = await reserveUnderGrant(
       h.deps,
       replyGate('reply-echo-2')
     );
     await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+    await settleAccepted(h.deps, reservation);
     const outside = await claimOwnEchoes(
       h.dataDir,
       session.sessionResource,
@@ -473,6 +477,80 @@ describe('races inside the write gate', () => {
     expect(
       (await readJournal(h.dataDir)).operations['reply-echo-2']?.echoActivityId
     ).toBe('act-own');
+  });
+
+  describe('a message matching a dispatched reply whose outcome is unknown', () => {
+    const readStatus = () =>
+      status(h.deps, { session: session.localId, reconcile: false });
+    const owner = async () =>
+      (await readJournal(h.dataDir)).operations[session.localRequestId];
+
+    async function dispatchedReplyWithMatchingMessage(id: string) {
+      const reservation = await reserveUnderGrant(h.deps, replyGate(id));
+      await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+      setVendorState(h, session.sessionResource, 'inProgress');
+      const activity = addActivity(h, session.sessionResource, {
+        type: 'userMessaged',
+        message: MESSAGE,
+        originator: 'user',
+      });
+      return { reservation, activity };
+    }
+
+    it('is held, not claimed, and the walk does not move past it', async () => {
+      const { activity } = await dispatchedReplyWithMatchingMessage('pend-1');
+      const before = await owner();
+      await readStatus();
+      const after = await owner();
+      const journal = await readJournal(h.dataDir);
+      expect(journal.operations['pend-1']?.echoActivityId).toBeUndefined();
+      expect(after?.supervision?.outsideSeen).toBeUndefined();
+      expect(after?.lastActivityId).toBe(before?.lastActivityId);
+      expect(after?.recentActivityIds).not.toContain(activity.activityId);
+    });
+
+    it('a clean rejection then makes the next walk record it as outside activity', async () => {
+      const { reservation } =
+        await dispatchedReplyWithMatchingMessage('pend-2');
+      await readStatus();
+      await expect(
+        settleFailure(
+          h.deps,
+          reservation,
+          new AdapterError('not-found', 'gone', {
+            status: 404,
+            dispatched: true,
+          }),
+          { reconcileHint: 'reconcile' }
+        )
+      ).rejects.toBeInstanceOf(MutationErrorException);
+      await readStatus();
+      expect((await owner())?.supervision?.outsideSeen).toBeDefined();
+      expect(
+        (await readJournal(h.dataDir)).operations['pend-2']?.echoActivityId
+      ).toBeUndefined();
+    });
+
+    it('an accepted reply then claims it as its own echo on the next walk', async () => {
+      const { reservation, activity } =
+        await dispatchedReplyWithMatchingMessage('pend-3');
+      await readStatus();
+      await settleAccepted(h.deps, reservation);
+      await readStatus();
+      expect((await owner())?.supervision?.outsideSeen).toBeUndefined();
+      expect(
+        (await readJournal(h.dataDir)).operations['pend-3']?.echoActivityId
+      ).toBe(activity.activityId);
+    });
+
+    it('a reservation stuck past its settle window no longer holds the walk', async () => {
+      await dispatchedReplyWithMatchingMessage('pend-4');
+      h.deps.clock.time += 10 * 60_000;
+      await readStatus();
+      expect(
+        (await readJournal(h.dataDir)).operations['pend-4']?.echoActivityId
+      ).toBeDefined();
+    });
   });
 
   it('an owner that finished after the reserve refuses the reply at the final check', async () => {

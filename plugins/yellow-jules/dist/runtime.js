@@ -274,14 +274,16 @@ function walkStartFor(record, token) {
  * against.
  */
 async function recordOutsideActivity(deps, record, messages) {
+    const pending = [];
     if (messages.length === 0 || record.kind !== 'create')
-        return;
+        return new Set();
     if (record.sessionResource === undefined)
-        return;
+        return new Set();
     await (0, state_js_1.claimOwnEchoes)(deps.dataDir, record.sessionResource, messages, {
         ownerRequestId: record.localRequestId,
         observedAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString(),
-    });
+    }, pending);
+    return new Set(pending);
 }
 async function status(deps, args) {
     if (args.session === undefined && !args.reconcile) {
@@ -380,27 +382,33 @@ async function status(deps, args) {
         // Record outside evidence BEFORE the watermark/dedup ring advances: a
         // failure between the two then leaves the message re-detectable on the
         // next walk instead of lost (the write gate also sees outsideSeen first).
-        await recordOutsideActivity(deps, record, newUserMessages);
+        // Messages only an in-flight (dispatched, unsettled) reply could explain are
+        // held back: neither the watermark nor the ring may pass them, so the next
+        // walk classifies them once the write has settled.
+        const held = await recordOutsideActivity(deps, record, newUserMessages);
+        const heldBack = held.size > 0;
         record = await (0, state_js_1.upsertReadState)(deps.dataDir, record.localRequestId, {
             vendorState,
             condition,
-            ...(advance && walk.newest !== undefined
+            ...(advance && !heldBack && walk.newest !== undefined
                 ? { watermark: walk.newest }
                 : {}),
-            resumePageToken,
+            resumePageToken: heldBack ? null : resumePageToken,
             // A partial walk keeps the newest approval it read so the resumed walk
             // can pair it with the older plan; otherwise it is dropped.
-            resumeApproval: resumePageToken !== null && walk.latestApproval !== undefined
+            resumeApproval: !heldBack &&
+                resumePageToken !== null &&
+                walk.latestApproval !== undefined
                 ? walk.latestApproval
                 : null,
             ...(walk.complete
                 ? { completeWalkAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString() }
                 : {}),
-            recentActivityIds: ring,
-            activityCountDelta: walk.newIds.length,
+            recentActivityIds: ring.filter((id) => !held.has(id)),
+            activityCountDelta: walk.newIds.filter((id) => !held.has(id)).length,
             // The walk ran unlocked: rebase against the journal record as it is
             // when the update lands, so an overlapping status is not double-counted.
-            newActivityIds: walk.newIds,
+            newActivityIds: walk.newIds.filter((id) => !held.has(id)),
             rebase: {
                 ring: record.recentActivityIds,
                 ...(record.pendingPlan !== undefined

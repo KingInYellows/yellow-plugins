@@ -238,6 +238,14 @@ predicate the reserve uses), then stamps `dispatchedAt`. Only a reservation
 carrying that stamp can claim a vendor activity as its own echo, so a teammate
 repeating a still-undispatched message is classified as outside activity.
 
+A dispatched reservation proves only that the POST began, not that it landed. A
+message that only such a still-`reserved` reply (inside its settle window) could
+explain is held: `status` neither claims it nor classifies it, and the watermark
+and dedup ring do not pass it. After the write settles, the next walk claims it
+as the echo (accepted) or records it as outside activity (cleanly rejected).
+Newer outside messages also replace `outsideSeen`, so a `--clear-pause`
+confirmed against an older id is refused.
+
 The residual window is between that re-check and the vendor POST: local state
 and the remote call cannot be made atomic, so a revoke or an outside message
 landing in that interval does not stop the write. `delegate` is wider: the SDK
