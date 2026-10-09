@@ -1607,8 +1607,9 @@ cmd_abort() {
   need_lock
   report_all_floating
   local provider_aborted=0 marker_failed=0 left moved start=${S_CHAIN[1]:-}
-  if [ "$S_PROVIDER" = graphite ] && { [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ]; }; then
-    : # a recorded provider abort leaves nothing for gt to do, so a retry needs no gt
+  if [ "$S_PROVIDER" = graphite ] && { [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ]; } && ! gt_paused "$S_RUN"; then
+    : # a recorded provider abort leaves nothing for gt to do, so a retry needs no gt.
+    # A marker beside a still-paused Graphite conflict is stale or forged: gt abort runs.
   elif [ "$S_PROVIDER" = graphite ]; then
     command -v gt >/dev/null 2>&1 || die "$X_KEPT" "gt (Graphite CLI) is not installed; state kept"
     if gt_paused "$S_RUN"; then

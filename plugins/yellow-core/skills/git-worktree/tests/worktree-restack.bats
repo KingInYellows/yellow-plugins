@@ -974,6 +974,20 @@ JSEOF
   assert_all_restored
 }
 
+@test "a provider-aborted marker beside a still-paused Graphite conflict does not skip gt abort" {
+  mk_stack b
+  orig_a=$(git rev-parse a)
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  [ "$(git rev-parse a)" != "$orig_a" ]
+  : >"$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  [[ $output == *"rolls the whole restack back"* ]]
+  assert_all_restored
+  [ "$(git rev-parse a)" = "$orig_a" ]
+}
+
 @test "a symlinked provider-aborted marker is replaced, never followed" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
