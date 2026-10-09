@@ -195,15 +195,18 @@ yr_args_enter() {
 # counts as entering, and so do a NAME=value operand, -P (env searches a path
 # other than PATH) and -C/--chdir (env resolves the utility elsewhere)). A bare
 # operand is looked up on the caller's PATH (YR_ORIG_PATH), the
-# way the tool itself would be. Copies of this block (through
+# way the tool itself would be. An interpreter that is itself a #! script is
+# judged the same way, to a depth of 4; a script at depth 5 counts as entering
+# (the kernel follows such chains). Copies of this block (through
 # yr_file_shebang_enters) sit in the two scripts' bootstrap resolvers, which
 # run before this library is sourced; keep them identical.
 yr_file_shebang_enters() {
-    local f="$1" root="$2" line rest i x idx last k c cl val p args=""
+    local f="$1" root="$2" depth="${3:-0}" line rest i x idx last k c cl val p args=""
     local -a w=() v=() nw=()
     [ -f "$f" ] || return 1
     IFS= read -r -n 512 line <"$f" 2>/dev/null || true
     case "$line" in '#!'*) ;; *) return 1 ;; esac
+    [ "$depth" -le 4 ] || return 0
     rest=${line#\#!}
     rest=${rest#"${rest%%[![:space:]]*}"}
     read -r -a w <<<"$rest" || true
@@ -287,7 +290,26 @@ yr_file_shebang_enters() {
     fi
     case "$i" in /*) p="$i" ;; *) p="$(pwd -P)/$i" ;; esac
     c=$(yr_canon_path "$p" 2>/dev/null) || return 0
-    yr_inside_root "$c" "$root" || yr_inside_root "$p" "$root"
+    yr_inside_root "$c" "$root" && return 0
+    yr_inside_root "$p" "$root" && return 0
+    yr_file_shebang_enters "$c" "$root" $((depth + 1))
+}
+
+# yr_hardlink_enters <file> <root>: succeed when <file> has other hard links
+# and one of them is inside <root> (a link to an ignored script there keeps
+# the script's content under an outside name), or when that cannot be told.
+# find comes from yr_helper, never PATH. The tree is walked only for a file
+# with a link count above 1 that is on the worktree's device.
+yr_hardlink_enters() {
+    local f="$1" root="$2" find fd rd hit
+    [ -f "$f" ] || return 1
+    find=$(yr_helper find) || return 0
+    [ -n "$("$find" "$f" -maxdepth 0 -links +1 -print 2>/dev/null)" ] || return 1
+    fd=$("$find" "$f" -maxdepth 0 -printf '%D' 2>/dev/null) || fd=""
+    rd=$("$find" "$root" -maxdepth 0 -printf '%D' 2>/dev/null) || rd=""
+    if [ -n "$fd" ] && [ -n "$rd" ] && [ "$fd" != "$rd" ]; then return 1; fi
+    hit=$("$find" "$root" -xdev -type f -samefile "$f" -print -quit 2>/dev/null) || return 0
+    [ -n "$hit" ]
 }
 
 # yr_resolve_tool <name>: print one absolute path whose canonical file is
@@ -316,6 +338,8 @@ yr_resolve_tool() {
         yr_inside_root "$invoke" "$root" && return 2
         # A script whose #! interpreter is inside the worktree runs it.
         yr_file_shebang_enters "$canon" "$root" && return 2
+        # A hard link to a file inside the worktree is that file.
+        yr_hardlink_enters "$canon" "$root" && return 2
     fi
     printf '%s\n' "$invoke"
 }
@@ -428,11 +452,10 @@ yr_batch_canon_inside() {
 # print nothing, so yr_safe_path probes for it and otherwise falls back
 # to yr_links_inside.
 yr_shebang_inside() {
-    local root="$1" find="$2" rp="$3" awk="$4" out dirs
+    local root="$1" find="$2" rp="$3" awk="$4" out dirs prog depth=1
     shift 4
     dirs=$(IFS=:; printf '%s' "$*")
-    out=$(YR_SB_DIRS="$dirs" YR_SB_CWD="$(pwd -P)" YR_SB_ROOT="$root" "$find" -L "$@" -maxdepth 1 -type f \( -perm -100 -o -perm -010 -o -perm -001 \) \
-        -exec "$awk" 'function splice(val, last,    m, v, j, nn, t) {
+    prog='function splice(val, last,    m, v, j, nn, t) {
             m = split(val, v, /[ \t]+/)
             nn = 0
             for (j = 1; j < idx; j++) t[++nn] = w[j]
@@ -513,11 +536,84 @@ yr_shebang_inside() {
             if (i ~ /\//) pr(i ~ /^\// ? i : cwd "/" i)
             else if (e) { for (j = 1; j <= nd; j++) pr(D[j] "/" i) }
             else pr(cwd "/" i)
-        } { nextfile }' {} + 2>/dev/null) || true
-    [ -n "$out" ] || return 1
-    yr_split_lines "$out"
-    out=$("$rp" -m -- "${YR_LINES[@]}" 2>/dev/null) || true
-    yr_batch_canon_inside "$root" "$out" "$find" "$awk"
+        } { nextfile }'
+    out=$(YR_SB_DIRS="$dirs" YR_SB_CWD="$(pwd -P)" YR_SB_ROOT="$root" "$find" -L "$@" -maxdepth 1 -type f \( -perm -100 -o -perm -010 -o -perm -001 \) \
+        -exec "$awk" "$prog" {} + 2>/dev/null) || true
+    # The interpreters found are themselves judged: one that is a #! script
+    # has its own line read, to a depth of 4 (an interpreter script at depth 5
+    # counts as entering, as in yr_file_shebang_enters).
+    while [ -n "$out" ]; do
+        yr_split_lines "$out"
+        out=$("$rp" -m -- "${YR_LINES[@]}" 2>/dev/null) || true
+        yr_batch_canon_inside "$root" "$out" "$find" "$awk" && return 0
+        [ -n "$out" ] || return 1
+        yr_split_lines "$out"
+        out=$(YR_SB_DIRS="$dirs" YR_SB_CWD="$(pwd -P)" YR_SB_ROOT="$root" "$awk" "$prog" "${YR_LINES[@]}" 2>/dev/null) || true
+        [ -n "$out" ] || return 1
+        [ "$depth" -lt 5 ] || return 0
+        depth=$((depth + 1))
+    done
+    return 1
+}
+
+# yr_hardlink_inside <root> <find> <awk> <dir>...: succeed when any regular
+# file directly in any <dir> (links followed) has a link count above 1 and
+# shares its device and inode with a regular file inside <root>: a hard link
+# is no symlink and has no #! to read, but it is the worktree's file under an
+# outside name. Only files on the worktree's device can match, so the tree is
+# walked (-xdev, once per yr_safe_path call: YR_HL_TREE) only when a <dir>
+# holds such a file. A find without -printf cannot tell; yr_safe_path then
+# uses yr_hardlink_stat per directory.
+yr_hardlink_inside() {
+    local root="$1" find="$2" awk="$3" dev cands
+    shift 3
+    dev=$("$find" "$root" -maxdepth 0 -printf '%D' 2>/dev/null) || dev=""
+    cands=$("$find" -L "$@" -maxdepth 1 -type f -links +1 -printf '%D:%i\n' 2>/dev/null) || true
+    [ -n "$cands" ] || return 1
+    [ -z "$dev" ] || cands=$(printf '%s\n' "$cands" | "$awk" -v d="$dev:" 'index($0, d) == 1')
+    [ -n "$cands" ] || return 1
+    if [ -z "${YR_HL_TREE+x}" ]; then
+        YR_HL_TREE=$("$find" "$root" -xdev -type f -links +1 -printf '%D:%i\n' 2>/dev/null) || true
+    fi
+    [ -n "$YR_HL_TREE" ] || return 1
+    printf '%s\n' "$YR_HL_TREE" | YR_HL_C="$cands" "$awk" 'BEGIN { n = split(ENVIRON["YR_HL_C"], a, "\n"); for (i = 1; i <= n; i++) s[a[i]] = 1 } ($0 in s) { f = 1; exit } END { exit !f }'
+}
+
+# yr_hardlink_stat <dir> <root>: the fallback of yr_hardlink_inside for a
+# system without a find that has -printf: succeed when any non-directory
+# directly in <dir> has a link count above 1 and is on the worktree's device,
+# or when stat (GNU or BSD, from yr_helper) cannot tell. Without find the
+# inode cannot be matched, so a same-device multi-link file drops the
+# directory. A directory on another device cannot hold a link into the tree.
+yr_hardlink_stat() {
+    local dir="$1" root="$2" stat out rd line links dev
+    stat=$(yr_helper stat) || return 0
+    rd=$("$stat" -L -c '%d' -- "$root" 2>/dev/null) || rd=$("$stat" -L -f '%d' "$root" 2>/dev/null) || return 0
+    # Unmatched globs stay literal and make stat exit non-zero after printing
+    # the rest, so the output is used whatever the status.
+    out=$("$stat" -L -c '%h %d %F' -- "$dir"/* "$dir"/.[!.]* "$dir"/..?* 2>/dev/null) || true
+    [ -n "$out" ] || out=$("$stat" -L -f '%l %d %HT' "$dir"/* "$dir"/.[!.]* "$dir"/..?* 2>/dev/null) || true
+    while read -r links dev line; do
+        [ -n "$links" ] || continue
+        case "$line" in [Dd]irectory*) continue ;; esac
+        [ "$dev" = "$rd" ] && [ "$links" -gt 1 ] 2>/dev/null && return 0
+    done <<<"$out"
+    return 1
+}
+
+# yr_hardlink_any <root> <find> <awk> <dir>...: yr_hardlink_inside, or
+# yr_hardlink_stat per directory when this find has no -printf.
+yr_hardlink_any() {
+    local root="$1" find="$2" awk="$3" d
+    shift 3
+    if "$find" "$root" -maxdepth 0 -printf '' 2>/dev/null; then
+        yr_hardlink_inside "$root" "$find" "$awk" "$@"
+        return
+    fi
+    for d in "$@"; do
+        yr_hardlink_stat "$d" "$root" && return 0
+    done
+    return 1
 }
 
 # yr_links_inside <dir> <root>: the fallback of yr_batch_inside and
@@ -538,7 +634,7 @@ yr_links_inside() {
             return 0
         fi
     done
-    return 1
+    yr_hardlink_stat "$1" "$2"
 }
 
 # yr_safe_path: print PATH without empty or relative entries and without any
@@ -553,7 +649,9 @@ yr_links_inside() {
 # console script). One realpath call canonicalizes every entry, one find lists
 # and canonicalizes every link of every remaining directory (yr_batch_inside)
 # and one find+awk reads the first line of every executable file
-# (yr_shebang_inside); only when either finds a problem is each
+# (yr_shebang_inside, interpreter scripts followed to depth 4) and one more
+# find lists the files with several hard links (yr_hardlink_inside: a hard
+# link to a file in the worktree has no #! and is no symlink); only when either finds a problem is each
 # directory judged on its own, and a directory reached twice (/bin -> usr/bin)
 # takes the verdict of its first spelling. Returns 1 when nothing is left. The
 # caller's PATH is not changed here; yr_prime_path caches the result, and each
@@ -630,11 +728,14 @@ yr_safe_path() {
         if [ -n "$rp" ] && [ -n "$find" ] && [ -n "$awk" ]; then
             dirs=()
             for i in "${cand[@]}"; do dirs+=("${ents[i]}"); done
+            unset YR_HL_TREE
             if yr_batch_inside "$root" "$find" "$rp" "$awk" "${dirs[@]}" \
-                || yr_shebang_inside "$root" "$find" "$rp" "$awk" "${dirs[@]}"; then
+                || yr_shebang_inside "$root" "$find" "$rp" "$awk" "${dirs[@]}" \
+                || yr_hardlink_any "$root" "$find" "$awk" "${dirs[@]}"; then
                 for i in "${cand[@]}"; do
                     if yr_batch_inside "$root" "$find" "$rp" "$awk" "${ents[i]}" \
-                        || yr_shebang_inside "$root" "$find" "$rp" "$awk" "${ents[i]}"; then
+                        || yr_shebang_inside "$root" "$find" "$rp" "$awk" "${ents[i]}" \
+                        || yr_hardlink_any "$root" "$find" "$awk" "${ents[i]}"; then
                         verdict[i]=x
                     fi
                 done
@@ -827,8 +928,8 @@ yr_env_cmd_verdict() {
 # so ordinary ssh pushes and credential helpers still work. Covers: the
 # command variables (GIT_SSH_COMMAND, GIT_SSH, GIT_ASKPASS, SSH_ASKPASS,
 # GIT_PROXY_COMMAND, GIT_EXTERNAL_DIFF, GIT_PAGER, PAGER, GIT_EDITOR, EDITOR,
-# VISUAL), the path variables (GIT_EXEC_PATH, GIT_TEMPLATE_DIR,
-# GIT_CONFIG_GLOBAL, GIT_CONFIG_SYSTEM; any GIT_CONFIG is refused) and config
+# VISUAL), the path variables (GIT_TEMPLATE_DIR,
+# GIT_CONFIG_GLOBAL, GIT_CONFIG_SYSTEM; any GIT_EXEC_PATH or GIT_CONFIG is refused) and config
 # injected through
 # GIT_CONFIG_KEY_<i>/GIT_CONFIG_VALUE_<i> (below GIT_CONFIG_COUNT) and
 # GIT_CONFIG_PARAMETERS, judged by the same rules as the repository's own
@@ -844,7 +945,14 @@ yr_check_git_env() {
         [ -n "$val" ] || continue
         yr_env_cmd_verdict "$name" "$val" "$root" || return 1
     done
-    for name in GIT_EXEC_PATH GIT_TEMPLATE_DIR GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM; do
+    # Git runs git-remote-* and the other dashed helpers from this directory,
+    # and a symlink or hard link there can reach the worktree; the default exec
+    # path is right for these scripts, so refuse any value.
+    if [ -n "${GIT_EXEC_PATH-}" ]; then
+        YR_HARDEN_MSG="GIT_EXEC_PATH is set, which lets git run helper programs from that directory; unset it"
+        return 1
+    fi
+    for name in GIT_TEMPLATE_DIR GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM; do
         val="${!name-}"
         [ -n "$val" ] || continue
         case "$val" in /*) ;; *) val="$(pwd -P)/$val" ;; esac

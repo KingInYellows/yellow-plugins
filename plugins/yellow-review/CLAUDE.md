@@ -278,7 +278,17 @@ entry) is refused. An injected `include.path` or `includeIf.*.path` (either vari
 any case) is refused outright: git loads the file as command-line config, which the
 scans skip. A quote that opens in one word and closes in another (a quoted span
 containing whitespace, `sh 'dir with space/evil'`) is refused as unjudgeable;
-single-word wrappers such as `'/usr/bin/ssh'` still pass. Any inherited `GIT_CONFIG` (it makes `git config` read only that file,
+single-word wrappers such as `'/usr/bin/ssh'` still pass. Any inherited `GIT_EXEC_PATH` is refused (git runs `git-remote-*` and
+other dashed helpers from it, and a link there can reach the worktree; the default exec
+path is right for these scripts). The `#!` check follows an interpreter that is itself a
+`#!` script, to a depth of 4 (an interpreter script at depth 5 counts as entering the
+worktree), in `yr_file_shebang_enters`, the batched awk screen and the bootstrap copies.
+The PATH screen also drops a directory holding a hard link (link count above 1, same
+device and inode) to a regular file inside the worktree, and `yr_resolve_tool` refuses a
+tool that is such a link (one `find -xdev` pass over the worktree, only when a PATH
+directory on its device holds a multi-link file). Without a `-printf` find or GNU
+`realpath`, a directory on the worktree's device holding any multi-link file is dropped,
+and one whose link counts `stat` cannot report is dropped too. Any inherited `GIT_CONFIG` (it makes `git config` read only that file,
 hiding the repository config from the scans) is refused. Command lines are judged whole: the raw value must not contain the
 worktree path as a whole path (`<root>2` and `<root>-keys` are siblings and
 pass), no word (quotes, a leading `!` and `--opt=VALUE` handled) may be an

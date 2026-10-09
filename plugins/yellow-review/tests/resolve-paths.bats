@@ -1311,6 +1311,17 @@ commit_repo() {
   [ "$out" = "$BATS_TEST_TMPDIR/biggood:$BATS_TEST_TMPDIR/biggood-again" ]
 }
 
+@test "yr_safe_path without GNU realpath drops a same-device directory holding a multi-link file, and keeps one without" {
+  mkdir -p "$BATS_TEST_TMPDIR/hbin" "$BATS_TEST_TMPDIR/hok"
+  : >| "$BATS_TEST_TMPDIR/hbin/a"
+  ln "$BATS_TEST_TMPDIR/hbin/a" "$BATS_TEST_TMPDIR/hbin/b"
+  : >| "$BATS_TEST_TMPDIR/hok/a"
+  yr_helper() { case "$1" in realpath) return 1 ;; *) command -p which "$1" 2>/dev/null || return 1 ;; esac; }
+  out=$(PATH="$BATS_TEST_TMPDIR/hbin:$BATS_TEST_TMPDIR/hok:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *hbin* ]]
+  [[ ":$out:" == *":$BATS_TEST_TMPDIR/hok:"* ]]
+}
+
 @test "yr_safe_path falls back to yr_canon_path per link when no GNU realpath is available" {
   mkdir -p tools "$BATS_TEST_TMPDIR/badbin" "$BATS_TEST_TMPDIR/okbin"
   ln -s "$PWD/tools/none" "$BATS_TEST_TMPDIR/badbin/ssh"
@@ -1319,7 +1330,7 @@ commit_repo() {
   yr_helper() { case "$1" in realpath) return 1 ;; *) command -p which "$1" 2>/dev/null || return 1 ;; esac; }
   out=$(PATH="$BATS_TEST_TMPDIR/badbin:$BATS_TEST_TMPDIR/okbin:/usr/bin:/bin" yr_safe_path)
   [[ "$out" != *badbin* ]]
-  [[ "$out" == "$BATS_TEST_TMPDIR/okbin:"* ]]
+  [[ ":$out:" == *":$BATS_TEST_TMPDIR/okbin:"* ]]
 }
 
 @test "yr_safe_path drops an outside directory holding a script whose #! interpreter is inside the worktree" {
@@ -1346,6 +1357,62 @@ commit_repo() {
   printf '#!%s/venv/python\n' "$PWD" >| "$BATS_TEST_TMPDIR/okbin/notes"
   out=$(PATH="$BATS_TEST_TMPDIR/okbin:/usr/bin:/bin" yr_safe_path)
   [[ "$out" == "$BATS_TEST_TMPDIR/okbin:"* ]]
+}
+
+@test "yr_safe_path follows an interpreter script's own #! line, to a depth of 4" {
+  mkdir -p venv "$BATS_TEST_TMPDIR/nbin" "$BATS_TEST_TMPDIR/interp" "$BATS_TEST_TMPDIR/deep"
+  printf '#!/bin/sh\nexit 0\n' >| venv/python
+  chmod +x venv/python
+  # tool -> outside interpreter script -> in-worktree executable
+  printf '#!%s/interp/i1\n' "$BATS_TEST_TMPDIR" >| "$BATS_TEST_TMPDIR/nbin/tool"
+  printf '#!%s/venv/python\n' "$PWD" >| "$BATS_TEST_TMPDIR/interp/i1"
+  chmod +x "$BATS_TEST_TMPDIR"/nbin/tool "$BATS_TEST_TMPDIR"/interp/i1
+  out=$(PATH="$BATS_TEST_TMPDIR/nbin:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *nbin* ]]
+  rc=0; PATH="$BATS_TEST_TMPDIR/nbin:$PATH" yr_resolve_tool tool >/dev/null || rc=$?
+  [ "$rc" -eq 2 ]
+  # a chain of outside scripts that stays outside is kept; one deeper than 4 is not
+  printf 'plain\n' >| "$BATS_TEST_TMPDIR/interp/ok"
+  chmod +x "$BATS_TEST_TMPDIR/interp/ok"
+  prev="$BATS_TEST_TMPDIR/interp/ok"
+  for n in 1 2 3 4; do
+    printf '#!%s\n' "$prev" >| "$BATS_TEST_TMPDIR/interp/c$n"
+    chmod +x "$BATS_TEST_TMPDIR/interp/c$n"
+    prev="$BATS_TEST_TMPDIR/interp/c$n"
+  done
+  printf '#!%s\n' "$prev" >| "$BATS_TEST_TMPDIR/deep/short"
+  chmod +x "$BATS_TEST_TMPDIR/deep/short"
+  out=$(PATH="$BATS_TEST_TMPDIR/deep:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" == "$BATS_TEST_TMPDIR/deep:"* ]]
+  printf '#!%s\n' "$BATS_TEST_TMPDIR/interp/c4" >| "$BATS_TEST_TMPDIR/interp/c5"
+  printf '#!%s\n' "$BATS_TEST_TMPDIR/interp/c5" >| "$BATS_TEST_TMPDIR/interp/c6"
+  chmod +x "$BATS_TEST_TMPDIR"/interp/c5 "$BATS_TEST_TMPDIR"/interp/c6
+  printf '#!%s\n' "$BATS_TEST_TMPDIR/interp/c6" >| "$BATS_TEST_TMPDIR/deep/short"
+  out=$(PATH="$BATS_TEST_TMPDIR/deep:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *deep* ]]
+}
+
+@test "yr_safe_path drops an outside directory holding a hard link to a file inside the worktree" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/hbin" "$BATS_TEST_TMPDIR/hok"
+  printf '#!/bin/sh\nexit 0\n' >| ignored/helper
+  chmod +x ignored/helper
+  ln ignored/helper "$BATS_TEST_TMPDIR/hbin/git-remote-https"
+  printf '#!/bin/sh\nexit 0\n' >| "$BATS_TEST_TMPDIR/hok/a"
+  chmod +x "$BATS_TEST_TMPDIR/hok/a"
+  ln "$BATS_TEST_TMPDIR/hok/a" "$BATS_TEST_TMPDIR/hok/b"
+  out=$(PATH="$BATS_TEST_TMPDIR/hbin:$BATS_TEST_TMPDIR/hok:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *hbin* ]]
+  # a multi-link file that is not linked into the worktree is fine
+  [[ "$out" == "$BATS_TEST_TMPDIR/hok:"* ]]
+}
+
+@test "yr_resolve_tool refuses a tool that is a hard link to a file inside the worktree (exit 2)" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/hbin"
+  printf '#!/bin/sh\nexit 0\n' >| ignored/helper
+  chmod +x ignored/helper
+  ln ignored/helper "$BATS_TEST_TMPDIR/hbin/mytool"
+  rc=0; PATH="$BATS_TEST_TMPDIR/hbin:$PATH" yr_resolve_tool mytool >/dev/null || rc=$?
+  [ "$rc" -eq 2 ]
 }
 
 @test "yr_safe_path judges a script reached through an outside symlink by its interpreter" {
@@ -1581,16 +1648,30 @@ commit_repo() {
   [ "$rc" -eq 1 ]
 }
 
-@test "harden_git_config refuses GIT_EXEC_PATH, GIT_TEMPLATE_DIR and GIT_CONFIG_GLOBAL inside the worktree" {
+@test "harden_git_config refuses GIT_TEMPLATE_DIR and GIT_CONFIG_GLOBAL inside the worktree" {
   mkdir -p tools/dir
   : >| tools/cfg
-  for name in GIT_EXEC_PATH GIT_TEMPLATE_DIR GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM; do
+  for name in GIT_TEMPLATE_DIR GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM; do
     rc=0; ( export "$name=$PWD/tools/dir"; harden_git_config full ) || rc=$?
     [ "$rc" -eq 1 ] || { echo "$name accepted" >&2; return 1; }
     rc=0; ( export "$name=tools/cfg"; harden_git_config full ) || rc=$?
     [ "$rc" -eq 1 ] || { echo "$name relative accepted" >&2; return 1; }
   done
-  rc=0; ( export GIT_EXEC_PATH=/usr/lib/git-core GIT_TEMPLATE_DIR=/usr/share/git-core/templates; harden_git_config full ) || rc=$?
+  rc=0; ( export GIT_TEMPLATE_DIR=/usr/share/git-core/templates; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
+@test "harden_git_config refuses any inherited GIT_EXEC_PATH, naming the variable and not the value" {
+  mkdir -p "$BATS_TEST_TMPDIR/xp" ignored
+  : >| ignored/helper
+  chmod +x ignored/helper
+  ln -s "$PWD/ignored/helper" "$BATS_TEST_TMPDIR/xp/git-remote-https"
+  for val in "$BATS_TEST_TMPDIR/xp" /usr/lib/git-core; do
+    rc=0; ( export GIT_EXEC_PATH="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "accepted: $val" >&2; return 1; }
+  done
+  ( export GIT_EXEC_PATH="$BATS_TEST_TMPDIR/xp"; harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_EXEC_PATH"* && "$YR_HARDEN_MSG" != *"$BATS_TEST_TMPDIR"* ]] )
+  rc=0; ( unset GIT_EXEC_PATH; harden_git_config full ) || rc=$?
   [ "$rc" -eq 0 ]
 }
 
