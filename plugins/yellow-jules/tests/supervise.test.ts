@@ -219,6 +219,7 @@ describe('needs-answer', () => {
     expect(r.observedActivityId).toBeUndefined();
     expect(r.observedQuestionDigest).toBeUndefined();
     expect(r.attention).toContain('questionUnavailable');
+    expect(r.allowedActions).toEqual([]);
   });
 
   it('shows a 600-character question in full and binds it', async () => {
@@ -246,6 +247,7 @@ describe('needs-answer', () => {
     expect(r.observedActivityId).toBeUndefined();
     expect(r.observedQuestionDigest).toBeUndefined();
     expect(r.attention).toContain('questionUnavailable');
+    expect(r.allowedActions).toEqual([]);
   });
 
   it('still binds a question with carriage returns and ordinary dashes', async () => {
@@ -269,6 +271,7 @@ describe('needs-answer', () => {
     expect(r.observedActivityId).toBeUndefined();
     expect(r.observedQuestionDigest).toBeUndefined();
     expect(r.attention).toContain('questionUnavailable');
+    expect(r.allowedActions).toEqual([]);
   });
 
   it('flags a question that is no longer in the read window', async () => {
@@ -277,6 +280,7 @@ describe('needs-answer', () => {
     expect(r.decision).toBe('needs-answer');
     expect(r.fenced.question).toBeUndefined();
     expect(r.attention).toContain('questionUnavailable');
+    expect(r.allowedActions).toEqual([]);
   });
 });
 

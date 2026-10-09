@@ -188,8 +188,8 @@ Show the user:
 
 - **Repository / branch / task:** from the dry-run
 - **Grant:** the id, its limits, and what it has already used
-- **Prompt:** the title and the whole prompt (a prompt over 20000 characters is
-  refused), printed by the command below inside the
+- **Prompt:** the title and the whole prompt (a prompt over 20000 characters, or
+  a prompt or title holding a control, bidi or zero-width character, is refused), printed by the command below inside the
   fence (never typed into your own message)
 - **Effect:** "Creates a Jules session. Plan approval is required and vendor
   auto-PR is off. It may run for a long time and is billed to your Jules
@@ -241,6 +241,13 @@ bind_hash() {
 PROMPT_CHARS=$(printf '%s' "$PROMPT" | jq -Rrs 'length')
 if [ "$PROMPT_CHARS" -gt 20000 ]; then
   printf 'ERROR: the prompt is %s characters; the preview shows at most 20000 in full, so it cannot be confirmed. Nothing was launched. Shorten the prompt and start again from Step 2.\n' "$PROMPT_CHARS" >&2; exit 1
+fi
+# The preview replaces control, bidi and zero-width characters, so a prompt or title holding
+# any would be bound to text the user did not see. Newlines and tabs stay visible
+# as line breaks and spaces.
+HIDDEN=$(printf '%s\n%s' "$TITLE" "$PROMPT" | jq -Rrs 'test("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]") | if . then 1 else 0 end')
+if [ "$HIDDEN" != 0 ]; then
+  printf 'ERROR: the prompt or title holds hidden characters (control, bidi or zero-width) that the preview would replace, so it cannot be confirmed. Nothing was launched. Remove them and start again from Step 2.\n' >&2; exit 1
 fi
 PROMPT_SHA=$(printf '%s' "$PROMPT" | bind_hash)
 TITLE_SHA=$(printf '%s' "$TITLE" | bind_hash)

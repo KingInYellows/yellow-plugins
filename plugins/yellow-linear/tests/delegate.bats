@@ -411,6 +411,38 @@ run_preview_block() {
   [[ "$output" != *"TAIL-MARKER"* ]]
 }
 
+# Like run_preview_block, with $1 written to the packet verbatim (printf escapes).
+run_preview_block_text() {
+  local text="$1" repo block dir
+  repo="$(mktemp -d)"
+  git -C "$repo" init -q
+  mkdir -p "$repo/.git/tmp"
+  dir="$(mktemp -d "$repo/.git/tmp/yellow-linear-packet.XXXXXX")"
+  printf "$text" > "$dir/packet.txt"
+  block="$(awk '
+    /PACKET_FILE=.YELLOW_TODO_packet_file./ { found=1 }
+    found { print }
+    found && /^```$/ { exit }
+  ' "$DELEGATE_MD" | sed '$d' | sed "s#YELLOW_TODO_packet_file#$dir/packet.txt#")"
+  cd "$repo"
+  run bash -c "$block"
+}
+
+@test "Jules launch preview refuses a packet holding a bidi or zero-width character" {
+  for text in 'Fix it\xe2\x80\xae end' 'Fix\xe2\x80\x8b it' 'Fix\x07 it'; do
+    run_preview_block_text "$text"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"hidden characters"* ]]
+    [[ "$output" != *"packet_sha="* ]]
+  done
+}
+
+@test "Jules launch preview still binds a packet with newlines, tabs and dash runs" {
+  run_preview_block_text 'Run --force \xe2\x80\x94 now\n\tindented\n'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"packet_sha="* ]]
+}
+
 @test "Jules launch preview prints the digest of the exact bytes it showed, from one read" {
   run_preview_block 300
   [ "$status" -eq 0 ]

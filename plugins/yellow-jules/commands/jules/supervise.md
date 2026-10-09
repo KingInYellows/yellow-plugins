@@ -78,7 +78,8 @@ that the text was cut and ask the user to read the session.
 ### Step 3: Act on the Decision
 
 Take **at most one** write in this pass, and only the actions listed in
-`allowedActions`. The CLI enforces the grant either way.
+`allowedActions`. The CLI enforces the grant either way. A `needs-answer` whose
+question is missing, too long, redacted or rewritten by the fence lists no `reply`.
 
 | `decision`           | What to do                                                                                                                                                                                                                                                     |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

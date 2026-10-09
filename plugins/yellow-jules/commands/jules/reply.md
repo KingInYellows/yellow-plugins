@@ -153,7 +153,8 @@ types a confirmation code there.
 
 Show the session, the grant id, and whether this is a corrective message (and how
 many rounds the grant has left). Then print the whole message fenced (one over 20000
-characters is refused: the preview must show everything that is sent), with this Bash call (same substitution rule; also substitute the
+characters, or one holding a control, bidi or zero-width character, is refused:
+the preview must show everything that is sent), with this Bash call (same substitution rule; also substitute the
 grant id from Step 4 and the request id from Step 3). It prints the confirmation
 `binding=` value:
 
@@ -195,6 +196,13 @@ bind_hash() {
 MESSAGE_CHARS=$(printf '%s' "$MESSAGE" | jq -Rrs 'length')
 if [ "$MESSAGE_CHARS" -gt 20000 ]; then
   printf 'ERROR: the message is %s characters; the preview shows at most 20000 in full, so it cannot be confirmed. Nothing was sent. Shorten the message and start again from Step 2.\n' "$MESSAGE_CHARS" >&2; exit 1
+fi
+# The preview replaces control, bidi and zero-width characters, so a message holding
+# any would be bound to text the user did not see. Newlines and tabs stay visible
+# as line breaks and spaces.
+HIDDEN=$(printf '%s' "$MESSAGE" | jq -Rrs 'test("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]") | if . then 1 else 0 end')
+if [ "$HIDDEN" != 0 ]; then
+  printf 'ERROR: the message holds hidden characters (control, bidi or zero-width) that the preview would replace, so it cannot be confirmed. Nothing was sent. Remove them and start again from Step 2.\n' >&2; exit 1
 fi
 MESSAGE_SHA=$(printf '%s' "$MESSAGE" | bind_hash)
 BINDING=$(printf '%s' "${SESSION}|${GRANT_ID}|${REQUEST_ID}|${CORRECTION}|${MESSAGE_SHA}" | bind_hash)

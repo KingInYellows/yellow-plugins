@@ -459,8 +459,8 @@ async function superviseOnce(deps, args) {
                 : truncate(latest.message));
         }
         // A question that redaction altered, or that is too long to show in full, was not
-        // shown in full: no binding is offered for it, so the reply cannot be
-        // guarded and the operator answers.
+        // shown in full: no binding and no reply action are offered for it, so the
+        // operator answers.
         const bindable = latest?.message !== undefined &&
             !(0, redact_js_1.fenceAltersText)(latest.message) &&
             latest.message.length <= BOUND_QUESTION_MAX_CHARS;
@@ -472,7 +472,7 @@ async function superviseOnce(deps, args) {
                 }
                 : {}),
             nextCheck: acting,
-            allowedActions: permits(grant, 'reply') ? ['reply'] : [],
+            allowedActions: bindable && permits(grant, 'reply') ? ['reply'] : [],
         }, {}, bindable ? [] : ['questionUnavailable']);
     }
     if (condition === 'remote-completed') {

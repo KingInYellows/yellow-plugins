@@ -634,6 +634,23 @@ describe('/jules:reply previews the whole message it binds', () => {
     expect(res.stdout).toContain('TAIL');
   });
 
+  it.each([
+    ['a bell', 'ab\u0007c'],
+    ['a bidi override', 'ab\u202ec'],
+    ['a zero-width space', 'ab\u200bc'],
+  ])('refuses to bind a message whose preview would hide %s', (_n, message) => {
+    const res = run(message);
+    expect(res.status).toBe(1);
+    expect(res.stdout).not.toContain('binding=');
+    expect(res.stderr).toContain('hidden characters');
+  });
+
+  it('still binds a message with newlines, tabs and dash runs', () => {
+    const res = run('Run --force \u2014 now\n\tindented');
+    expect(res.status).toBe(0);
+    expect(res.stdout).toMatch(/binding=[0-9a-f]{64}/);
+  });
+
   it('exits without a binding when the message is too long to show in full', () => {
     const res = run('x'.repeat(20001));
     expect(res.status).toBe(1);
@@ -673,9 +690,21 @@ describe('/jules:delegate previews the whole prompt it binds', () => {
     expect(res.stdout).toContain('title: My title');
   });
 
-  it('still flattens control characters', () => {
-    const res = run('a\u0007b‮c');
-    expect(res.stdout).toContain('a b c');
+  it.each([
+    ['a bell in the prompt', 'a\u0007b', ''],
+    ['a bidi override in the prompt', 'ab\u202ec', ''],
+    ['a zero-width space in the title', 'ab', 'My\u200b title'],
+  ])('refuses to bind when the preview would hide %s', (_n, prompt, title) => {
+    const res = run(prompt, title);
+    expect(res.status).toBe(1);
+    expect(res.stdout).not.toContain('binding=');
+    expect(res.stderr).toContain('hidden characters');
+  });
+
+  it('still binds a prompt and title with newlines, tabs and dash runs', () => {
+    const res = run('Run --force \u2014 now\n\tindented', 'A -- title');
+    expect(res.status).toBe(0);
+    expect(res.stdout).toMatch(/binding=[0-9a-f]{64}/);
   });
 
   it('refuses a prompt too long to show in full, with no binding', () => {

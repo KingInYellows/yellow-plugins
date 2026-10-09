@@ -861,7 +861,7 @@ issue is unchanged. Do not try to run `authorize` yourself.
 
 **Confirm.** Show the repository, branch, issue id (not the title), and the grant
 (id, limits, what it has used). Then print the whole packet (one over 20000
-characters is refused)
+characters, or one holding a control, bidi or zero-width character, is refused)
 fenced, with this Bash call (substitute the packet path printed by the allocation
 step). The packet carries the issue title outside its inner fence, so the whole
 preview goes inside this fence:
@@ -897,6 +897,13 @@ PACKET=$(cat -- "$PACKET_FILE")
 PACKET_CHARS=$(printf '%s' "$PACKET" | jq -Rrs 'length')
 if [ "$PACKET_CHARS" -gt 20000 ]; then
   printf 'ERROR: the packet is %s characters; the preview shows at most 20000 in full, so it cannot be confirmed. Nothing was sent.\n' "$PACKET_CHARS" >&2; exit 1
+fi
+# The preview replaces control, bidi and zero-width characters, so a packet holding
+# any would be bound to text the user did not see. Newlines and tabs stay visible
+# as line breaks and spaces.
+HIDDEN=$(printf '%s' "$PACKET" | jq -Rrs 'test("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]") | if . then 1 else 0 end')
+if [ "$HIDDEN" != 0 ]; then
+  printf 'ERROR: the packet holds hidden characters (control, bidi or zero-width) that the preview would replace, so it cannot be confirmed. Nothing was sent. Review the issue text in Linear and try again.\n' >&2; exit 1
 fi
 if command -v sha256sum >/dev/null 2>&1; then
   PACKET_SHA=$(printf '%s' "$PACKET" | sha256sum | cut -c1-64)
