@@ -187,8 +187,9 @@ _rt_scan() {
         # bytes. The line scan lowercases, and base64 is case-sensitive.
         # `YTpi` is `a:b`, the shortest `user:pass`. Padding is only `=` at
         # the end, and only in the last quad; the per-quad checks below are the
-        # one place that is judged. A decoded value with a colon that is not
-        # first or last is a credential; prose such as `Authentication` is not.
+        # one place that is judged. A decoded value of printable or well-formed
+        # UTF-8 text with a colon and at least one other byte is a credential;
+        # prose such as `Authentication` or `httpOnly` is not.
         function b64digit(c) {
             if (c >= "A" && c <= "Z") return index("ABCDEFGHIJKLMNOPQRSTUVWXYZ", c) - 1
             if (c >= "a" && c <= "z") return index("abcdefghijklmnopqrstuvwxyz", c) - 1 + 26
@@ -197,10 +198,10 @@ _rt_scan() {
             if (c == "/") return 63
             return -1
         }
-        function basiccred(tok,    n, i, a, b, c, d, va, vb, vc, vd, out, byte, p) {
+        function basiccred(tok,    n, i, a, b, c, d, va, vb, vc, vd, nb, bv, k, x, need, colon) {
             n = length(tok)
             if (n < 4 || n % 4 != 0) return 0
-            out = ""
+            nb = 0
             for (i = 1; i <= n; i += 4) {
                 a = substr(tok, i, 1); b = substr(tok, i + 1, 1)
                 c = substr(tok, i + 2, 1); d = substr(tok, i + 3, 1)
@@ -210,22 +211,33 @@ _rt_scan() {
                 vc = (c == "=") ? 0 : b64digit(c)
                 vd = (d == "=") ? 0 : b64digit(d)
                 if (va < 0 || vb < 0 || vc < 0 || vd < 0) return 0
-                byte = int(va * 4 + int(vb / 16))
-                if (byte < 32 || byte > 126) return 0
-                out = out sprintf("%c", byte)
-                if (c != "=") {
-                    byte = int((vb % 16) * 16 + int(vc / 4))
-                    if (byte < 32 || byte > 126) return 0
-                    out = out sprintf("%c", byte)
-                }
-                if (d != "=") {
-                    byte = int((vc % 4) * 64 + vd)
-                    if (byte < 32 || byte > 126) return 0
-                    out = out sprintf("%c", byte)
+                bv[++nb] = int(va * 4 + int(vb / 16))
+                if (c != "=") bv[++nb] = int((vb % 16) * 16 + int(vc / 4))
+                if (d != "=") bv[++nb] = int((vc % 4) * 64 + vd)
+            }
+            # Decoded bytes are numeric, so no locale or %c handling is
+            # involved. Reject controls and anything that is not well-formed
+            # UTF-8 (stray continuation, C0/C1 and F5+ leads, a lead without
+            # its continuation bytes); `httpOnly` decodes to such bytes.
+            # Overlong E0/F0 and surrogate or beyond-U+10FFFF second bytes
+            # are not checked: they cost nothing to accept here.
+            colon = 0
+            for (k = 1; k <= nb; k++) {
+                x = bv[k]
+                if (x < 32 || x == 127) return 0
+                if (x == 58 && !colon) colon = k
+                if (x < 128) continue
+                if (x < 194 || x > 244) return 0
+                need = (x < 224) ? 1 : (x < 240) ? 2 : 3
+                if (k + need > nb) return 0
+                while (need-- > 0) {
+                    x = bv[++k]
+                    if (x < 128 || x > 191) return 0
                 }
             }
-            p = index(out, ":")
-            return (p > 1 && p < length(out)) ? 1 : 0
+            # A colon is required. At either edge it still counts (an API key
+            # with a blank password), but a lone `:` has no secret side.
+            return (colon && nb > 1) ? 1 : 0
         }
         # Multi-line quoted value. A credential keyword whose value opens a
         # quote that does not close on its line starts a carry (mqo): the
@@ -596,7 +608,7 @@ _rt_scan() {
                     # `+ / =` segment of the same word.
                     if (match(v, /^tvly-[A-Za-z0-9_-]+/) && RLENGTH >= 25) flag("token-prefix")
                     if (match(v, /^pplx-[A-Za-z0-9_-]+/) && RLENGTH >= 45) flag("token-prefix")
-                    if (match(v, /^sgp_[A-Za-z0-9_-]+/) && RLENGTH >= 24) flag("token-prefix")
+                    if (match(v, /^sgp_[A-Za-z0-9]+/) && RLENGTH >= 24) flag("token-prefix")
                     # hooks.slack.com/services/T<id>/B<id>/<secret>: the dot
                     # splits the host off, and the slashes would otherwise earn
                     # the path exemption below.
