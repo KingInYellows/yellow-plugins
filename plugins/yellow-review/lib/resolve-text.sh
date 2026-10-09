@@ -223,6 +223,10 @@ _rt_scan() {
                 vc = (c == "=") ? 0 : b64digit(c)
                 vd = (d == "=") ? 0 : b64digit(d)
                 if (va < 0 || vb < 0 || vc < 0 || vd < 0) return 0
+                # Unused bits must be zero (canonical padding): `YWI6Yx==`
+                # is malformed, so it is left clean like other bad shapes.
+                if (c == "=" && vb % 16 != 0) return 0
+                if (c != "=" && d == "=" && vc % 4 != 0) return 0
                 bv[++nb] = int(va * 4 + int(vb / 16))
                 if (c != "=") bv[++nb] = int((vb % 16) * 16 + int(vc / 4))
                 if (d != "=") bv[++nb] = int((vc % 4) * 64 + vd)

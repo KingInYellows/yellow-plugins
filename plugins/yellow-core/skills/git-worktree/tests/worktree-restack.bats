@@ -1001,6 +1001,188 @@ JSEOF
   assert_all_restored
 }
 
+# runid_of: the run id recorded in the state file.
+runid_of() { sed -n 's/^runid\t//p' "$SD/state"; }
+
+# moved_by_hand: restack b c, finish the paused rebase with git so a is
+# restacked, no rebase directory is left and Graphite is no longer paused.
+moved_by_hand() {
+  mk_stack b c
+  orig_a=$(git rev-parse a)
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  resolve_in "$(wtp a)" b.txt
+  GIT_EDITOR=true git -C "$(wtp a)" rebase --continue >/dev/null 2>&1 || true
+  [ "$(git rev-parse a)" != "$orig_a" ]
+}
+
+@test "state records a 32-hex run id and a genuine abort binds the marker to it" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  id=$(runid_of)
+  [[ $id =~ ^[0-9a-f]{32}$ ]]
+  plant_stuck_rebase "$(wtp c)" c
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [ -f "$SD/provider-aborted" ] && [ ! -L "$SD/provider-aborted" ]
+  [ "$(cat "$SD/provider-aborted")" = "$id" ]
+  rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+  [ ! -e "$SD/provider-aborted" ] && [ ! -e "$SD/state" ]
+}
+
+@test "a forged provider-aborted marker without the run id does not skip the moved-tip check" {
+  moved_by_hand
+  : >"$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"have moved"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "a forged provider-aborted marker with the wrong run id does not skip the moved-tip check" {
+  moved_by_hand
+  printf '%032d\n' 0 >"$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"have moved"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "a marker carrying the right id still cannot hide moved tips" {
+  moved_by_hand
+  runid_of >"$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"have moved"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "a symlinked marker holding the right run id is rejected" {
+  moved_by_hand
+  runid_of >"$BATS_TEST_TMPDIR/idfile"
+  ln -s "$BATS_TEST_TMPDIR/idfile" "$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"have moved"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "a forged marker (no id, wrong id, or legacy state) does not skip the remaining-rebase check" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  id=$(runid_of)
+  rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
+  : >"$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"no record of it"* ]]
+  printf '%032d\n' 0 >"$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"no record of it"* ]]
+  # A state written before run ids existed can never be matched by a marker.
+  sed -i '/^runid\t/d' "$SD/state"
+  printf '%s\n' "$id" >"$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"no record of it"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "--continue refuses after a successful provider abort left the cleanup unfinished" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite --submit
+  [ "$status" -eq 10 ]
+  plant_stuck_rebase "$(wtp c)" c
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [ -f "$SD/provider-aborted" ]
+  rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"Run --abort"* ]]
+  [ -e "$SD/state" ]
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "the moved-branch message names git reset --hard in the worktree that holds the branch" {
+  moved_by_hand
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"fix: git -C $(wtp a) reset --hard $(git rev-parse b)"* || $output == *"fix: git -C $(wtp a) reset --hard"* ]]
+  [[ $output == *"fix: git branch -f a "* ]]
+}
+
+@test "--abort refuses when an auxiliary rebase abort puts a stack branch back on its restacked tip" {
+  mk_stack c
+  orig_b=$(git rev-parse b)
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  [ "$(git rev-parse b)" != "$orig_b" ]
+  # The provider is paused on c; b's old worktree is detached, so the user
+  # checks the restacked b out there and starts a conflicting rebase of it.
+  git -C "$(wtp b)" checkout -q b
+  printf 'b-side\n' >"$(wtp b)/z.txt"
+  git -C "$(wtp b)" add z.txt
+  git -C "$(wtp b)" commit -q -m "feat: b z"
+  printf 'main-side\n' >"$REPO/z.txt"
+  git -C "$REPO" add z.txt
+  git -C "$REPO" commit -q -m "main z"
+  git -C "$(wtp b)" rebase main >/dev/null 2>&1 || true
+  rebase_marker "$(wtp b)"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"not at their starting commits"* ]]
+  [[ $output == *"fix: "* ]]
+  [[ $output == *"run restore"* ]]
+  [[ $output != *"run --continue"* ]]
+  [ -e "$SD/state" ]
+  # restore keeps the branches where they are, puts the worktrees back and clears the state.
+  run bash "$SCRIPT" restore --provider graphite
+  [ "$status" -eq 0 ]
+  [ ! -e "$SD/state" ]
+  [ ! -e "$SD/provider-aborted" ]
+}
+
+@test "an unwritable marker plus a moved tip never recommends --continue and asks to rerun --abort" {
+  mk_stack c
+  orig_b=$(git rev-parse b)
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  [ "$(git rev-parse b)" != "$orig_b" ]
+  # The provider is paused on c; b's old worktree is detached, so the user
+  # checks the restacked b out there and starts a conflicting rebase of it.
+  git -C "$(wtp b)" checkout -q b
+  printf 'b-side\n' >"$(wtp b)/z.txt"
+  git -C "$(wtp b)" add z.txt
+  git -C "$(wtp b)" commit -q -m "feat: b z"
+  printf 'main-side\n' >"$REPO/z.txt"
+  git -C "$REPO" add z.txt
+  git -C "$REPO" commit -q -m "main z"
+  git -C "$(wtp b)" rebase main >/dev/null 2>&1 || true
+  rebase_marker "$(wtp b)"
+  mkdir "$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"could not be written"* ]]
+  [[ $output == *"$SD/provider-aborted"* ]]
+  [[ $output == *"--abort again"* ]]
+  [[ $output != *"run --continue"* ]]
+  [ -e "$SD/state" ]
+  # With the path cleared, the rerun still refuses on the moved tip.
+  rmdir "$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [ -e "$SD/state" ]
+}
+
 @test "--continue after the user finished the provider's continue by hand verifies and restores" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
@@ -1190,6 +1372,37 @@ JSEOF
   assert_all_restored
 }
 
+@test "an unwritable marker plus a busy non-rebase operation reports the unrecorded rollback" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  gd=$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)
+  git -C "$(wtp c)" rev-parse HEAD >"$gd/MERGE_HEAD"
+  mkdir "$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"MERGE_HEAD operation is still in progress"* ]]
+  [[ $output == *"could not be written"* ]]
+  [[ $output == *"--abort again"* ]]
+  [[ $output != *"run --continue"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "a busy non-rebase operation after a provider abort leaves a marker that makes --continue refuse" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  gd=$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)
+  git -C "$(wtp c)" rev-parse HEAD >"$gd/MERGE_HEAD"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [ "$(cat "$SD/provider-aborted")" = "$(runid_of)" ]
+  rm -f "$gd/MERGE_HEAD"
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"already aborted"* ]]
+}
+
 @test "--abort ignores a non-rebase operation in a worktree outside the recorded stack" {
   mk_stack b
   git -C "$REPO" branch side main
@@ -1278,8 +1491,9 @@ JSEOF
 }
 
 @test "the script has no force, merge, stash, hard-reset or ignore-other-worktrees path" {
-  # Comments may mention the words; only code lines count.
-  code=$(grep -v '^[[:space:]]*#' "$SCRIPT")
+  # Comments may mention the words, and the printed "fix: git ..." recovery
+  # lines are advice for the user, never run; only other code lines count.
+  code=$(grep -v '^[[:space:]]*#' "$SCRIPT" | grep -v 'note "    fix: git ')
   run grep -nE '(checkout|switch)[^|;&]*[[:space:]](-f|--force|-m|--merge)([[:space:]]|$)|reset --hard|--ignore-other-worktrees|stash' <<<"$code"
   [ "$status" -eq 1 ]
 }

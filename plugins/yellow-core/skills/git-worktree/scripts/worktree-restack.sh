@@ -275,8 +275,10 @@ init_paths() {
   COMMON=$(common_dir) || die "$X_USAGE" "not inside a git repository"
   STATE_DIR="$COMMON/yellow-core/worktree-restack"
   STATE_FILE="$STATE_DIR/state"
-  # Present once this run's provider abort has succeeded, so a later --abort
-  # may clear leftover in-chain rebases the provider no longer records.
+  # Written once this run's provider abort has succeeded, holding the run id
+  # of the state it belongs to, so a later --abort may clear leftover in-chain
+  # rebases the provider no longer records. Only a regular, non-symlink file
+  # whose content equals the current state's run id counts (aborted_marker_valid).
   ABORTED_FILE="$STATE_DIR/provider-aborted"
   LOCK_DIR="$STATE_DIR/lock.d"
   LOCK_GUARD="$STATE_DIR/lock.guard"
@@ -369,6 +371,7 @@ write_state() {
     umask 077
 
     printf 'v1\n'
+    printf 'runid\t%s\n' "$S_RUNID"
     printf 'provider\t%s\n' "$S_PROVIDER"
     printf 'common\t%s\n' "$S_COMMON"
     printf 'run\t%s\n' "$S_RUN"
@@ -399,19 +402,41 @@ write_state() {
 write_aborted_marker() {
   local tmp
   [ ! -d "$ABORTED_FILE" ] || return 1
+  # A state without a run id (written before ids existed) cannot be bound.
+  [ -n "$S_RUNID" ] || return 1
   tmp=$(umask 077 && mktemp "$STATE_DIR/provider-aborted.tmp.XXXXXX") || return 1
-  if mv -f -- "$tmp" "$ABORTED_FILE"; then
+  if printf '%s\n' "$S_RUNID" >|"$tmp" && mv -f -- "$tmp" "$ABORTED_FILE"; then
     return 0
   fi
   rm -f -- "$tmp"
   return 1
 }
 
+# aborted_marker_valid: the marker proves this run's provider rollback only when
+# it is a regular, non-symlink file holding the current state's run id. A missing
+# id (legacy state), a different id, a symlink or any other file type is not proof.
+aborted_marker_valid() {
+  [ -n "$S_RUNID" ] || return 1
+  [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ] || return 1
+  [ "$(head -c 64 -- "$ABORTED_FILE" 2>/dev/null)" = "$S_RUNID" ]
+}
+
+# new_run_id: 32 random hex digits (od and /dev/urandom exist on Linux and macOS).
+new_run_id() {
+  local id
+  id=$(od -An -N16 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n') || return 1
+  case $id in
+    *[!0-9a-f]* | '') return 1 ;;
+  esac
+  [ "${#id}" -eq 32 ] || return 1
+  printf '%s' "$id"
+}
+
 clear_state() { rm -f -- "$STATE_FILE" "$STATE_FILE".tmp.* "$ABORTED_FILE" "$ABORTED_FILE".tmp.* 2>/dev/null; }
 
 # read_state parses the fixed-field TSV; validate_state decides whether to trust it.
 read_state() {
-  S_PROVIDER="" S_COMMON="" S_RUN="" S_SUBMIT="" S_REMOTE=""
+  S_PROVIDER="" S_COMMON="" S_RUN="" S_SUBMIT="" S_REMOTE="" S_RUNID=""
   S_CHAIN=() E_PATH=() E_REF=() E_SHA=() T_BRANCH=() T_SHA=()
   STATE_ERR=""
   if [ ! -f "$STATE_FILE" ] || [ -L "$STATE_FILE" ]; then
@@ -431,6 +456,7 @@ read_state() {
     fi
     IFS=$'\t' read -r -a f <<<"$line"
     case ${f[0]:-} in
+      runid) S_RUNID=${f[1]:-} ;;
       provider) S_PROVIDER=${f[1]:-} ;;
       common) S_COMMON=${f[1]:-} ;;
       run) S_RUN=${f[1]:-} ;;
@@ -495,6 +521,19 @@ validate_state() {
     STATE_ERR="state belongs to another repository"
     return 1
   }
+  # The run id is absent in state from before ids existed; present, it is 32 hex.
+  if [ -n "$S_RUNID" ]; then
+    case $S_RUNID in
+      *[!0-9a-f]*)
+        STATE_ERR="bad run id"
+        return 1
+        ;;
+    esac
+    [ "${#S_RUNID}" -eq 32 ] || {
+      STATE_ERR="bad run id"
+      return 1
+    }
+  fi
   case $S_SUBMIT in 0 | 1) ;; *)
     STATE_ERR="bad submit flag"
     return 1
@@ -1335,6 +1374,10 @@ cmd_start() {
     die "$X_BUSY" "could not take the restack lock; a restack is in progress"
   }
   S_PROVIDER=$PROVIDER S_COMMON=$COMMON S_RUN=$RUN_WT S_SUBMIT=$SUBMIT S_REMOTE=$REMOTE
+  S_RUNID=$(new_run_id) || {
+    release_lock
+    die "$X_FAILED" "cannot generate a run id; nothing was changed"
+  }
   E_PATH=() E_REF=() E_SHA=() T_BRANCH=() T_SHA=()
   # Pre-restack tips of the restack set: --abort compares them with the current
   # tips to tell whether a rollback is still owed after the provider lost track.
@@ -1566,6 +1609,11 @@ cmd_continue() {
   load_state_or_exit
   need_lock
   report_all_floating
+  # A valid marker means this run was aborted at the provider and only the
+  # abort cleanup is pending; continuing would treat the rollback as success.
+  if aborted_marker_valid; then
+    die "$X_KEPT" "this restack was already aborted at the provider and only the abort cleanup is unfinished; state kept. Run --abort to finish it. --continue would treat the rolled-back stack as restacked"
+  fi
   # A git rebase still in progress that the provider has no record of (an
   # adapter timeout, a lost marker) is not "nothing paused": finishing now
   # would clear the state and the lock over a half-applied restack.
@@ -1599,6 +1647,61 @@ cmd_continue() {
   drive_result
 }
 
+# rollback_recorded: 0 when this invocation's provider abort is on record (the
+# marker is written, retrying a failed write now), or when no abort ran here.
+# Every refusal after a successful provider abort goes through it, so none can
+# leave the abort unrecorded and then advise --continue.
+MARKER_PENDING=0
+rollback_recorded() {
+  [ "$MARKER_PENDING" = 1 ] || return 0
+  if write_aborted_marker 2>/dev/null; then
+    MARKER_PENDING=0
+    return 0
+  fi
+  return 1
+}
+
+# die_marker_unwritable: refuse, keeping the state, when the rollback record
+# cannot be written. Never suggests --continue.
+die_marker_unwritable() {
+  die "$X_KEPT" "the provider's abort succeeded, but the record of it, $(v "$ABORTED_FILE"), could not be written; state kept, nothing restored. Remove or fix that path, then run --abort again. --continue would treat the rolled-back stack as restacked"
+}
+
+# abort_die MESSAGE: every refusal after the provider abort ran. The rollback
+# is recorded first; when that is impossible the unrecorded rollback is added to
+# the refusal, so no exit leaves a state --continue would accept.
+abort_die() {
+  if ! rollback_recorded; then
+    err "$1"
+    die_marker_unwritable
+  fi
+  die "$X_KEPT" "$1"
+}
+
+# refuse_moved LEAD MOVED: print the moved branches, each with a fix line, and
+# exit 31 keeping the state. Never resets a branch itself.
+refuse_moved() {
+  local mb mold mnew mholder
+  load_worktrees 2>/dev/null || true
+  note "$1"
+  while IFS=$'\t' read -r mb mold mnew; do
+    note "  $(v "$mb"): started at $(v "$mold"), now $(v "$mnew")"
+    # git refuses to force-update a branch checked out in any worktree.
+    if mholder=$(branch_holder "refs/heads/$mb"); then
+      note "    fix: git -C $(q "$mholder") reset --hard $(v "$mold")"
+    else
+      note "    fix: git branch -f $(q "$mb") $(v "$mold")"
+    fi
+  done <<<"$2"
+  rollback_recorded || die_marker_unwritable
+  if aborted_marker_valid; then
+    # --continue refuses once the provider abort has succeeded; restore is the
+    # path that accepts an already-aborted provider.
+    die "$X_KEPT" "state kept, nothing restored. Run each fix line above to point the branch back at its starting commit, then run --abort again. To keep the branches where they are instead, run restore, which puts the worktrees back and clears the state"
+  fi
+  die "$X_KEPT" "state kept, nothing aborted or restored. Run each fix line above to point the branch back at its starting commit, then run --abort again. To keep the restacked branches instead, run --continue"
+}
+
 cmd_abort() {
   parse_flags "$@"
   reject_remote
@@ -1606,8 +1709,8 @@ cmd_abort() {
   load_state_or_exit
   need_lock
   report_all_floating
-  local provider_aborted=0 marker_failed=0 left moved start=${S_CHAIN[1]:-}
-  if [ "$S_PROVIDER" = graphite ] && { [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ]; } && ! gt_paused "$S_RUN"; then
+  local provider_aborted=0 left moved start=${S_CHAIN[1]:-}
+  if [ "$S_PROVIDER" = graphite ] && aborted_marker_valid && ! gt_paused "$S_RUN"; then
     : # a recorded provider abort leaves nothing for gt to do, so a retry needs no gt.
     # A marker beside a still-paused Graphite conflict is stale or forged: gt abort runs.
   elif [ "$S_PROVIDER" = graphite ]; then
@@ -1628,27 +1731,22 @@ cmd_abort() {
     # failed write does not stop the abort: cleanup below can still finish and
     # clear the state, which makes the marker moot. Only a cleanup that must
     # be retried needs it; that case is handled where it can fail.
-    write_aborted_marker 2>/dev/null || marker_failed=1
-  elif ! { [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ]; } && left=$(chain_rebase_worktree); then
+    write_aborted_marker 2>/dev/null || MARKER_PENDING=1
+  elif ! aborted_marker_valid && left=$(chain_rebase_worktree); then
     # The provider lost its record (Graphite's .gtcontinue or gh-stack's
     # rebase state) mid-restack, so its whole-stack rollback cannot run.
     # Aborting only this rebase would leave branches that already restacked
     # rebased and report success; keep everything for a manual recovery.
     die "$X_KEPT" "a rebase of a stack branch is in progress in $(v "$left") but the provider has no record of it, so its whole-stack rollback cannot run; state kept, nothing aborted or restored. Abort that rebase by hand, reset any stack branch that already restacked, then run --abort again"
-  elif ! { [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ]; } && moved=$(moved_tips); then
+  elif moved=$(moved_tips); then
     # No rebase directory is left, yet stack branches are not where they
     # started: the user finished the paused rebase with git, or the provider
     # lost its record. Nothing can roll those branches back from here.
-    local mline mb mold mnew
-    note "stack branches have moved since the restack started and the provider has no paused restack to roll back:"
-    while IFS=$'\t' read -r mb mold mnew; do
-      note "  $(v "$mb"): started at $(v "$mold"), now $(v "$mnew")"
-    done <<<"$moved"
-    die "$X_KEPT" "state kept, nothing aborted or restored. Point each branch above back at its starting commit by hand (git branch -f <branch> <commit>, from a worktree that does not have that branch checked out), then run --abort again. To keep the restacked branches instead, run --continue"
-  elif ! { [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ]; } && [ "${#T_BRANCH[@]}" -eq 0 ]; then
+    refuse_moved "stack branches have moved since the restack started and the provider has no paused restack to roll back:" "$moved"
+  elif [ "${#T_BRANCH[@]}" -eq 0 ] && ! aborted_marker_valid; then
     # A state file from before tips were recorded: with no provider rollback
     # and no rebase to abort, nothing shows whether branches were restacked.
-    die "$X_KEPT" "the provider has no paused restack to roll back and this state file has no recorded start tips, so it cannot tell whether stack branches were already restacked; state kept, nothing aborted or restored. Inspect the stack branches and, if needed, point them back by hand (git branch -f <branch> <commit>, from a worktree that does not have that branch checked out). Then run --continue to keep them, or run restore (no provider) to put the worktrees back and clear the state"
+    die "$X_KEPT" "the provider has no paused restack to roll back and this state file has no recorded start tips, so it cannot tell whether stack branches were already restacked; state kept, nothing aborted or restored. Inspect the stack branches and, if needed, point them back by hand (reset it in the worktree that has the branch checked out, else git branch -f <branch> <commit>). Then run --continue to keep them, or run restore (no provider) to put the worktrees back and clear the state"
   fi
   # The provider abort only clears the rebase it recorded. Abort any other
   # in-chain git rebase (a stack branch, in whichever worktree holds it),
@@ -1656,13 +1754,19 @@ cmd_abort() {
   if ! abort_in_chain_rebases; then
     # The provider rollback already ran, so a retry must not reach the
     # lost-provider branch: it needs the marker, or no rebase left to find.
-    if [ "$marker_failed" = 1 ] && ! write_aborted_marker 2>/dev/null; then
+    if ! rollback_recorded; then
       die "$X_KEPT" "the provider's abort succeeded, but the marker $(v "$ABORTED_FILE") could not be written and a rebase operation is still in progress in $(v "$ABORT_STUCK"); state kept, nothing restored. Abort that rebase by hand (git -C $(q "$ABORT_STUCK") rebase --abort) before running --abort again; fixing only the marker path is not enough, because a rerun with that rebase in place would wrongly ask for a manual whole-stack reset"
     fi
-    die "$X_KEPT" "a rebase operation is still in progress in $(v "$ABORT_STUCK"); state kept, nothing restored. Finish or abort it (git -C $(q "$ABORT_STUCK") rebase --abort), then run --abort again"
+    abort_die "a rebase operation is still in progress in $(v "$ABORT_STUCK"); state kept, nothing restored. Finish or abort it (git -C $(q "$ABORT_STUCK") rebase --abort), then run --abort again"
+  fi
+  # An auxiliary rebase abort restores that rebase's own orig-head, which can
+  # be a restacked tip the provider rollback had just undone. Recheck before
+  # restoring and clearing.
+  if moved=$(moved_tips); then
+    refuse_moved "stack branches are not at their starting commits after the abort:" "$moved"
   fi
   if ! release_run_worktree "$start"; then
-    die "$X_KEPT" "could not return the run worktree to $(v "$start"); state kept, nothing restored"
+    abort_die "could not return the run worktree to $(v "$start"); state kept, nothing restored"
   fi
   local busy_line rc busy_name busy_path
   busy_line=$(in_chain_busy) || rc=$?
@@ -1670,14 +1774,16 @@ cmd_abort() {
   if [ "$rc" -eq 0 ]; then
     busy_name=${busy_line%%$'\t'*}
     busy_path=${busy_line#*$'\t'}
-    die "$X_KEPT" "a $(v "$busy_name") operation is still in progress in $(v "$busy_path"); state kept, nothing restored. Finish or abort it, then run --abort again"
+    abort_die "a $(v "$busy_name") operation is still in progress in $(v "$busy_path"); state kept, nothing restored. Finish or abort it, then run --abort again"
   elif [ "$rc" -eq 2 ]; then
-    die "$X_KEPT" "could not list worktrees; state kept, nothing restored"
+    abort_die "could not list worktrees; state kept, nothing restored"
   fi
   if restore_and_clear; then
     note "aborted"
     exit "$X_OK"
   fi
+  # Entries remain detached and the state was rewritten: keep the rollback on record.
+  rollback_recorded || err "the rollback record $(v "$ABORTED_FILE") could not be written; rerun --abort after fixing that path, not --continue"
   exit "$X_PARTIAL"
 }
 
