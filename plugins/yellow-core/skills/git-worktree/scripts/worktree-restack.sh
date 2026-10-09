@@ -372,6 +372,7 @@ write_state() {
 
     printf 'v1\n'
     printf 'runid\t%s\n' "$S_RUNID"
+    [ -z "$S_PHASE" ] || printf 'phase\t%s\n' "$S_PHASE"
     printf 'provider\t%s\n' "$S_PROVIDER"
     printf 'common\t%s\n' "$S_COMMON"
     printf 'run\t%s\n' "$S_RUN"
@@ -421,6 +422,12 @@ aborted_marker_valid() {
   [ "$(head -c 64 -- "$ABORTED_FILE" 2>/dev/null)" = "$S_RUNID" ]
 }
 
+# abort_recorded: the provider abort of this run is on record, in the marker
+# or in the state file's own phase field (which needs no marker path). Only
+# ever makes the script stricter: it blocks --continue and picks restore advice;
+# skipping checks still requires a valid marker (aborted_marker_valid).
+abort_recorded() { [ "$S_PHASE" = aborted ] || aborted_marker_valid; }
+
 # new_run_id: 32 random hex digits (od and /dev/urandom exist on Linux and macOS).
 new_run_id() {
   local id
@@ -436,7 +443,7 @@ clear_state() { rm -f -- "$STATE_FILE" "$STATE_FILE".tmp.* "$ABORTED_FILE" "$ABO
 
 # read_state parses the fixed-field TSV; validate_state decides whether to trust it.
 read_state() {
-  S_PROVIDER="" S_COMMON="" S_RUN="" S_SUBMIT="" S_REMOTE="" S_RUNID=""
+  S_PROVIDER="" S_COMMON="" S_RUN="" S_SUBMIT="" S_REMOTE="" S_RUNID="" S_PHASE=""
   S_CHAIN=() E_PATH=() E_REF=() E_SHA=() T_BRANCH=() T_SHA=()
   STATE_ERR=""
   if [ ! -f "$STATE_FILE" ] || [ -L "$STATE_FILE" ]; then
@@ -457,6 +464,7 @@ read_state() {
     IFS=$'\t' read -r -a f <<<"$line"
     case ${f[0]:-} in
       runid) S_RUNID=${f[1]:-} ;;
+      phase) S_PHASE=${f[1]:-} ;;
       provider) S_PROVIDER=${f[1]:-} ;;
       common) S_COMMON=${f[1]:-} ;;
       run) S_RUN=${f[1]:-} ;;
@@ -534,6 +542,11 @@ validate_state() {
       return 1
     }
   fi
+  case $S_PHASE in '' | aborted) ;; *)
+    STATE_ERR="bad phase"
+    return 1
+    ;;
+  esac
   case $S_SUBMIT in 0 | 1) ;; *)
     STATE_ERR="bad submit flag"
     return 1
@@ -963,7 +976,7 @@ plan_github_stack() {
 # --- restore ----------------------------------------------------------------
 
 FLOAT_SEEN=()
-S_PROVIDER=""
+S_PROVIDER="" S_PHASE=""
 
 # report_floating I: when entry I's worktree is detached at a commit other than
 # the recorded one (someone committed or moved HEAD during the pause), print the
@@ -1063,7 +1076,7 @@ restore_and_clear() {
   fi
   write_state || err "could not rewrite the state file"
   lock_mark_paused
-  err "some worktrees are still detached; resolve them, then run /worktree:restack --continue, --abort or the restore subcommand again"
+  err "some worktrees are still detached; resolve them, then run /worktree:restack $(abort_recorded && printf '%s' '--abort' || printf '%s' '--continue, --abort') or the restore subcommand again"
   return 1
 }
 
@@ -1611,7 +1624,7 @@ cmd_continue() {
   report_all_floating
   # A valid marker means this run was aborted at the provider and only the
   # abort cleanup is pending; continuing would treat the rollback as success.
-  if aborted_marker_valid; then
+  if abort_recorded; then
     die "$X_KEPT" "this restack was already aborted at the provider and only the abort cleanup is unfinished; state kept. Run --abort to finish it. --continue would treat the rolled-back stack as restacked"
   fi
   # A git rebase still in progress that the provider has no record of (an
@@ -1694,7 +1707,7 @@ refuse_moved() {
     fi
   done <<<"$2"
   rollback_recorded || die_marker_unwritable
-  if aborted_marker_valid; then
+  if abort_recorded; then
     # --continue refuses once the provider abort has succeeded; restore is the
     # path that accepts an already-aborted provider.
     die "$X_KEPT" "state kept, nothing restored. Run each fix line above to point the branch back at its starting commit, then run --abort again. To keep the branches where they are instead, run restore, which puts the worktrees back and clears the state"
@@ -1731,6 +1744,10 @@ cmd_abort() {
     # failed write does not stop the abort: cleanup below can still finish and
     # clear the state, which makes the marker moot. Only a cleanup that must
     # be retried needs it; that case is handled where it can fail.
+    # Record the abort in the state file first, so --continue refuses even when
+    # the marker path is unusable; the marker stays the retry shortcut.
+    S_PHASE=aborted
+    write_state 2>/dev/null || err "could not record the abort in the state file"
     write_aborted_marker 2>/dev/null || MARKER_PENDING=1
   elif ! aborted_marker_valid && left=$(chain_rebase_worktree); then
     # The provider lost its record (Graphite's .gtcontinue or gh-stack's
@@ -1783,7 +1800,7 @@ cmd_abort() {
     exit "$X_OK"
   fi
   # Entries remain detached and the state was rewritten: keep the rollback on record.
-  rollback_recorded || err "the rollback record $(v "$ABORTED_FILE") could not be written; rerun --abort after fixing that path, not --continue"
+  rollback_recorded || err "the rollback record $(v "$ABORTED_FILE") could not be written; fix that path, then rerun --abort. --continue is refused for this run"
   exit "$X_PARTIAL"
 }
 
