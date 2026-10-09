@@ -1298,9 +1298,9 @@ export async function updateSupervision(
  * teammate later repeating an earlier prompt verbatim is not mistaken for the
  * plugin: the first matching activity claims the operation's `echoActivityId`,
  * and further matches have no operation left to explain them. A rewalk of an
- * already-claimed activity stays own. With `mark`, the first outside message is
- * also recorded as the owner's `outsideSeen` under the same journal lock; later outside
- * messages replace the marker, so a pending `--clear-pause` confirmation for the older one fails. A message that only a dispatched write
+ * already-claimed activity stays own. With `mark`, the newest outside message (by
+ * `(createTime, activityId)`, independent of list order) is also recorded as the
+ * owner's `outsideSeen` under the same journal lock; a newer one replaces the marker, so a pending `--clear-pause` confirmation for the older one fails. A message that only a dispatched write
  * still in flight could explain is reported in `pendingOut` and neither claimed nor
  * classified, so the caller leaves it for a later walk. On a partial walk (`walkComplete` false) a message that would claim an echo is held the same way. A cleanly rejected or released write never
  * landed and claims nothing; an abandoned one might have, so it can.
@@ -1346,8 +1346,12 @@ export async function claimOwnEchoes(
           r.echoActivityId !== undefined ? [r.echoActivityId] : []
         )
       );
-      let outside: { activityId: string; digest: string } | undefined;
-      let newestOutside: { activityId: string; digest: string } | undefined;
+      // The newest outside message by `(createTime, activityId)`, the order
+      // `compareStamp` uses: vendor list order is unverified, so neither the
+      // first nor the last message visited can stand for it.
+      let newestOutside:
+        | { activityId: string; digest: string; createTime?: string }
+        | undefined;
       for (const message of messages) {
         if (claimed.has(message.activityId)) continue;
         const sent = message.createTime && Date.parse(message.createTime);
@@ -1392,8 +1396,21 @@ export async function claimOwnEchoes(
           continue;
         }
         if (slot === undefined) {
-          outside ??= message;
-          newestOutside = message;
+          if (
+            newestOutside === undefined ||
+            compareStamp(
+              {
+                createTime: message.createTime ?? '',
+                activityId: message.activityId,
+              },
+              {
+                createTime: newestOutside.createTime ?? '',
+                activityId: newestOutside.activityId,
+              }
+            ) > 0
+          ) {
+            newestOutside = message;
+          }
           continue;
         }
         claimed.add(message.activityId);
@@ -1413,7 +1430,7 @@ export async function claimOwnEchoes(
       const stored = owner?.supervision?.outsideSeen;
       const evidence =
         stored === undefined
-          ? outside
+          ? newestOutside
           : newestOutside !== undefined &&
               newestOutside.activityId !== stored.activityId
             ? newestOutside
@@ -1448,7 +1465,7 @@ export async function claimOwnEchoes(
           }
         }
       }
-      return outside;
+      return newestOutside;
     },
     config
   );

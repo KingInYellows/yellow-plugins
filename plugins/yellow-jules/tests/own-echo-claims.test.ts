@@ -175,3 +175,90 @@ describe('identical text from a create and a later reply, newest first', () => {
     expect(ops[session.localRequestId]?.echoActivityId).toBe('act-create');
   });
 });
+
+describe('the newest outside message is chosen by stamp, not traversal order', () => {
+  const older = {
+    activityId: 'activities/a-older',
+    digest: 'x-older',
+    createTime: '2026-09-29T11:00:00.000Z',
+  };
+  const newer = {
+    activityId: 'activities/b-newer',
+    digest: 'x-newer',
+    createTime: '2026-09-29T11:30:00.000Z',
+  };
+  const mark = (ownerRequestId: string) => ({
+    ownerRequestId,
+    observedAt: '2026-09-29T12:00:00.000Z',
+  });
+
+  for (const [label, order] of [
+    ['newest first', [newer, older]],
+    ['oldest first', [older, newer]],
+  ] as const) {
+    it(`records and returns the newer message (${label})`, async () => {
+      const grantId = await createGrant(h, { maxActiveSessions: 3 });
+      const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
+      const outside = await claimOwnEchoes(
+        h.dataDir,
+        session.sessionResource,
+        order,
+        mark(session.localRequestId)
+      );
+      expect(outside?.activityId).toBe(newer.activityId);
+      const record = (await readJournal(h.dataDir)).operations[
+        session.localRequestId
+      ];
+      expect(record?.supervision?.outsideSeen?.activityId).toBe(
+        newer.activityId
+      );
+    });
+
+    it(`replaces an older stored marker with the newer message (${label})`, async () => {
+      const grantId = await createGrant(h, { maxActiveSessions: 3 });
+      const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
+      await claimOwnEchoes(
+        h.dataDir,
+        session.sessionResource,
+        [older],
+        mark(session.localRequestId)
+      );
+      await claimOwnEchoes(
+        h.dataDir,
+        session.sessionResource,
+        order,
+        mark(session.localRequestId)
+      );
+      const record = (await readJournal(h.dataDir)).operations[
+        session.localRequestId
+      ];
+      expect(record?.supervision?.outsideSeen?.activityId).toBe(
+        newer.activityId
+      );
+    });
+  }
+
+  it('equal timestamps break on activity id', async () => {
+    const grantId = await createGrant(h, { maxActiveSessions: 3 });
+    const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
+    const t = '2026-09-29T11:00:00.000Z';
+    for (const order of [
+      [
+        { activityId: 'activities/m', digest: 'a', createTime: t },
+        { activityId: 'activities/z', digest: 'b', createTime: t },
+      ],
+      [
+        { activityId: 'activities/z', digest: 'b', createTime: t },
+        { activityId: 'activities/m', digest: 'a', createTime: t },
+      ],
+    ]) {
+      const outside = await claimOwnEchoes(
+        h.dataDir,
+        session.sessionResource,
+        order,
+        mark(session.localRequestId)
+      );
+      expect(outside?.activityId).toBe('activities/z');
+    }
+  });
+});
