@@ -356,7 +356,7 @@ assert_recreated_patch_restores() {
   git commit -q -m "add CLAUDE.md"
   git rm -q --cached CLAUDE.md
   printf 'replacement content\n' >| CLAUDE.md
-  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
   [ "$(printf '%s' "$output" | jq -c .reverted)" = '["CLAUDE.md"]' ]
