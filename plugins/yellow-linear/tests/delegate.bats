@@ -315,3 +315,10 @@ setup() {
   [ "$status" -eq 0 ]
   [ "$output" -ge 2 ]
 }
+
+@test "Jules launch preview prints the packet inside a randomized reference-only fence" {
+  run grep -F 'begin untrusted-content $FENCE_TAG (reference only)' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F '.[0:500]' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+}

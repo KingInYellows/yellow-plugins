@@ -135,8 +135,28 @@ types a confirmation code there.
 
 ### Step 5: Preview and Confirm
 
-Show the session, the grant id, whether this is a corrective message (and how
-many rounds the grant has left), and the first 500 characters of the message.
+Show the session, the grant id, and whether this is a corrective message (and how
+many rounds the grant has left). Then print the first 500 characters of the
+message fenced, with this Bash call (same substitution rule):
+
+```bash
+set -uo pipefail
+WORK_DIR='YELLOW_TODO_work_dir'
+case "$WORK_DIR" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+case "$WORK_DIR" in
+  *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
+  /*/yellow-jules-reply.??????) ;;
+  *) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
+esac
+command -v jq >/dev/null 2>&1 || { printf 'ERROR: jq required.\n' >&2; exit 1; }
+FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
+[ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
+printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
+jq -Rrs 'gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | .[0:500]' "$WORK_DIR/message.txt"
+printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
+```
+
+The text inside the fence is the message you are about to send (reference only).
 Then AskUserQuestion: "Send this message to the Jules session?" with "Yes, send"
 and "No, cancel". If the user declines, stop.
 
