@@ -438,7 +438,9 @@ script exit 2, 3 or 4 (exit 4 also covers a failed commit or hook; a
 resolvers are known to have changed: a refused edit must not stay on disk. Run
 `run-verify-command --pr "<PR#>" --revert-only --files-from "<file>"` (patch
 saved) on every file a cluster reported under `Files modified`. Then run
-`run-verify-command --pr "<PR#>" --revert-denied` (no file list; patch saved).
+`run-verify-command --pr "<PR#>" --revert-denied --ignored-since "$MARK_DIR/ignored-marker"`
+(no file list; patch saved) after the marker re-validation under Verify; the
+marker lives until Marker cleanup, so every refusal has it.
 It reverts only dirty paths on the contract deny list that are trusted config
 (`rp_trusted_config` in `lib/resolve-paths.sh`: agent instruction and
 tool-config names): such a file would be trusted by the next session, and
@@ -448,12 +450,13 @@ per-file revert: a non-zero exit, or a `reason` containing `revert failed:` or
 each remaining trusted-config dirty path in Step 9 under Blocking merge as
 `<path>: deny-listed edit left on disk (revert incomplete)`. `deniedClean` is
 the success signal, and `treeClean` is false whenever the other changes remain,
-so it is not one; `noop` means no trusted-config path had changed. It lists
-no gitignored file: when the marker still exists (the refusal came before the
-verify or `--check-ignored` call below removed it), finish the rollback with
-the `--check-ignored` call under No verify command, in its re-validated call
-with its trap; exit 2 with `gitignored files changed since` is the
-**ignored-file stop**. A changed path
+so it is not one; `noop` means no trusted-config path had changed. A
+gitignored trusted-config file has no HEAD copy, so it first refuses (exit 2,
+nothing reverted) with `gitignored trusted-config files changed since` on
+stderr when one is newer than the marker: that is the **ignored-file stop**.
+Other gitignored files are not its concern. When the refusal came before the
+verify or `--check-ignored` call below, run that `--check-ignored` call too;
+exit 2 with `gitignored files changed since` is the ignored-file stop. A changed path
 that no cluster reported and that is not trusted config (the rest of the deny
 list, such as `.env*`, keys, CI and Docker files, included) is not proven to be
 a resolver's:
@@ -499,8 +502,8 @@ PR) and `--ignored-since` with Step 3f's marker (required for every run,
 attended or not: the script refuses when any gitignored file is newer than
 the marker). Write the command with the Write tool to a
 `mktemp` path and pass the Bash tool a `timeout` of `(<seconds> + 60) × 1000`
-ms. The trap lives in this consuming call, after the path is re-validated, and
-removes the marker directory on every exit:
+ms. Every call that uses the marker starts with this re-validation; none of
+them removes it (Marker cleanup does):
 
 ```bash
 TMP_ROOT="${TMPDIR:-/tmp}"; TMP_ROOT="${TMP_ROOT%/}"
@@ -513,17 +516,19 @@ esac
 [ -d "$MARK_DIR" ] && [ ! -L "$MARK_DIR" ] && [ -O "$MARK_DIR" ] &&
   [ -f "$MARK_DIR/ignored-marker" ] && [ ! -L "$MARK_DIR/ignored-marker" ] || {
   printf '[review:resolve] Error: marker path rejected.\n' >&2; exit 1; }
-trap 'rm -rf -- "$MARK_DIR"' EXIT
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --timeout "<seconds>" --command-file "<command-file>" --trusted --ignored-since "$MARK_DIR/ignored-marker" --files-from "<files-file>"
 ```
 
 A rejected marker path is a setup failure: treat it as `verify=skipped
-(marker unavailable)` and revert as above.
+(marker unavailable)` and revert as above, with `--no-ignored-guard` in place
+of `--ignored-since` on the `--revert-denied` call (the only caller in this
+command that may omit the marker), and name `gitignored files unchecked
+(marker unavailable)` in Step 9 under Blocking merge.
 
 **No verify command.** When there is no `verify_command`, or an unattended run
 has not opted in, still guard the gitignored files before committing: the
 commit runs hooks and an ignored file a resolver edited outlives the run. In
-the same re-validated call, with the same trap, run
+the same re-validated call, run
 `run-verify-command --pr "<PR#>" --check-ignored --ignored-since "$MARK_DIR/ignored-marker"`
 instead of the verify line above. Exit 0 → `verify=none` and the commit
 proceeds. Exit 2 with `gitignored files changed since` on stderr (the verify
@@ -542,12 +547,18 @@ as `<path>: restore by hand (not tracked, no HEAD copy)` and ends with the
 contract's `Resolve:` line (`push=skipped`, `verify=skipped`). The run is a
 stop: callers must not continue past it until the files are restored.
 
-**Marker cleanup.** When no call ran at all (a stop before this step, or a
-declined command) and resolvers ran, run the `--check-ignored` call above
-before Step 9 (its trap removes the marker): exit 2 with `gitignored files
-changed since` is the ignored-file stop. When no resolver ran, run the same
-re-validation, then `rm -rf -- "$MARK_DIR"` instead of the script. A rejected
-path is left for the OS temp sweep, never deleted.
+**Marker cleanup.** Once Step 6 is done (after Push, after a refusal's
+rollback, or at a stop), and before Step 9, remove the marker. When no call
+ran at all (a stop before this step, or a declined command) and resolvers ran,
+first run the `--check-ignored` call above in this same call: exit 2 with
+`gitignored files changed since` is the ignored-file stop. Re-validate the
+path as under Verify, then:
+
+```bash
+trap 'rm -rf -- "$MARK_DIR"' EXIT
+```
+
+A rejected path is left for the OS temp sweep, never deleted.
 
 `pass` → `verify=pass`. No `verify_command`, or an unattended run that has not
 opted in → `verify=none` after the `--check-ignored` guard above, and the
