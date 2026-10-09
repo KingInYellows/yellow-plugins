@@ -455,6 +455,16 @@ async function finalDispatchCheck(
     }
     const fresh = operations[record.localRequestId];
     if (fresh === undefined) return undefined;
+    // A delayed writer must not dispatch a reservation that was resolved or
+    // abandoned (TTY-confirmed) while it waited.
+    if (fresh.status !== 'reserved' || fresh.abandonedAt !== undefined) {
+      return new AppErrorException(
+        makeAppError(
+          'JULES_INVALID_STATE',
+          `the reservation is ${fresh.abandonedAt !== undefined ? 'abandoned' : fresh.status}, no longer reserved; nothing was sent`
+        )
+      );
+    }
     const session = record.sessionResource ?? 'this session';
     if (fresh.invalidatedBy !== undefined) {
       return paused(`outside activity was recorded on ${session}`);

@@ -491,6 +491,30 @@ describe('races inside the write gate', () => {
     expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
   });
 
+  it('a reservation abandoned before the final check is not dispatched', async () => {
+    const reservation = await reserveUnderGrant(
+      h.deps,
+      replyGate('reply-abandoned-1')
+    );
+    await updateJournal(h.dataDir, (operations) => {
+      const record = operations['reply-abandoned-1']!;
+      operations['reply-abandoned-1'] = {
+        ...record,
+        status: 'failed',
+        abandonedAt: new Date(h.deps.clock.now()).toISOString(),
+      };
+    });
+    await expect(
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+    ).rejects.toMatchObject({ appError: { code: 'JULES_INVALID_STATE' } });
+    const record = (await readJournal(h.dataDir)).operations[
+      'reply-abandoned-1'
+    ];
+    expect(record?.dispatchedAt).toBeUndefined();
+    expect(record?.abandonedAt).toBeDefined();
+    expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+  });
+
   it('a revoke that lands before the locked final check refuses and leaves no dispatch stamp', async () => {
     const reservation = await reserveUnderGrant(
       h.deps,
