@@ -14,9 +14,11 @@
 # shellcheck shell=sh
 # _rt_awk: awk through yr_awk (lib/resolve-paths.sh) when the caller loaded it,
 # so a PATH directory holding a symlink into the worktree cannot supply awk;
-# plain awk for the scripts that do not source resolve-paths.sh.
+# plain awk for the scripts that do not source resolve-paths.sh. Only the shell
+# function counts: `command -v` prints a function's bare name but a path for an
+# executable, so a `yr_awk` program on PATH is never run.
 _rt_awk() {
-    if command -v yr_awk >/dev/null 2>&1; then
+    if [ "$(command -v yr_awk 2>/dev/null)" = yr_awk ]; then
         yr_awk "$@"
     else
         awk "$@"
