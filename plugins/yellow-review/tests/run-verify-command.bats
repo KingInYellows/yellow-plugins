@@ -3249,6 +3249,17 @@ ancestor_link_setup() {
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
 }
 
+@test "--revert-denied counts an ordinary-named dir link whose walk passes the entry cap, without a trusted-config descendant" {
+  ancestor_link_setup
+  rm -rf "$OUTDIR/.claude"
+  mkdir "$OUTDIR/many"
+  (cd "$OUTDIR/many" && seq 1 50100 | xargs touch)
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'cfg'* ]]
+}
+
 @test "a verify run refuses when a write went through an ordinary-named dir link to cfg/.claude/settings.json" {
   ancestor_link_setup
   printf '{"hooks":"evil"}\n' >| cfg/.claude/settings.json

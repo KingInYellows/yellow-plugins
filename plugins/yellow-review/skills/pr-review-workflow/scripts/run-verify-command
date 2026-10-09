@@ -909,7 +909,7 @@ add_unique_file() {
 # a file under the target, at a path P with `<link>/P` trusted-config, is newer
 # than the marker (nested symlinks followed, a loop or find error counts) or,
 # without a marker, when any such P exists. The walk stops at the first match
-# and counts after 50000 entries examined; a target inside the worktree is
+# and counts after 50000 entries examined (find is streamed and stopped at the cap, never stored); a target inside the worktree is
 # covered by the tree listing and the ignored-file guard.
 LINK_HITS=()
 check_trusted_links() {
@@ -933,21 +933,24 @@ check_trusted_links() {
         # holds a descendant P with <link>/P trusted-config (newer than the
         # marker when there is one), or the walk fails or is too large.
         dir_link_hit() {
-            local x rel n=0 wrc=0
+            local x rel n=0 fl
+            # find streams into the reader, which stops at the cap (find then
+            # dies of SIGPIPE) or at the first match; nothing is stored. A find
+            # that fails before the cap emits the sentinel, which counts.
             if [ -n "$IGNORED_SINCE" ]; then
-                find -L "$1" -name .git -prune -o -type f -newer "$IGNORED_SINCE" -print0 >|"$tdir/walk" 2>/dev/null || wrc=$?
+                fl=(-type f -newer "$IGNORED_SINCE")
             else
-                find -L "$1" -name .git -prune -o -print0 >|"$tdir/walk" 2>/dev/null || wrc=$?
+                fl=()
             fi
             while IFS= read -r -d '' x; do
+                [ "$x" != $'\001ERR' ] || return 0
                 n=$((n + 1))
                 [ "$n" -le 50000 ] || return 0
                 rel="${x#"$1"}"
                 rel="${rel#/}"
                 [ -n "$rel" ] || continue
                 ! rp_trusted_config "$2/$rel" || return 0
-            done <"$tdir/walk"
-            [ "$wrc" -eq 0 ] || return 0
+            done < <(find -L "$1" -name .git -prune -o ${fl[@]+"${fl[@]}"} -print0 2>/dev/null || printf '\001ERR\0')
             return 1
         }
         while IFS= read -r -d '' rec; do
