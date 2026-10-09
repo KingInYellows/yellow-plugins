@@ -411,7 +411,7 @@ die() { printf '[run-verify-command] Error: %s\n' "$2" >&2; exit "$1"; }
 # From here PATH is yr_safe_path's result: a bare mktemp, rm, tail, tr, cat and
 # the rest resolve only to a file outside the worktree, however the verify
 # command or the resolvers changed the tree. A directory that is inside it, or
-# holds one of those tools as a symlink into it, is dropped. The verify command
+# holds any symlink into it, is dropped. The verify command
 # itself keeps the caller's PATH (YR_ORIG_PATH; it may need node_modules/.bin).
 yr_adopt_path || die 2 "no PATH directory is left once those that reach into the repository are dropped; the tree is untouched"
 
@@ -649,8 +649,9 @@ fi
 # a path the mode relies on seeing: a clean listing would be a false "no
 # change". Scope by mode: --revert-dirty reverts every listed change, so any
 # tracked path counts; --revert-denied acts only on trusted-config paths, so an
-# unrelated hidden deny-listed path must not block it; a verify run keeps the
-# trusted-config or deny-listed scope. --revert-only and --check-ignored never
+# unrelated hidden deny-listed path must not block it; a verify run also counts
+# any tracked path, because the approved command can source or import a hidden
+# ordinary file whose resolver edit would never reach the allowed set. --revert-only and --check-ignored never
 # call this (the former reverts a named list, the latter reads no tracked tree). `ls-files -v` tags assume-unchanged paths in lowercase (skip-worktree
 # is `S`, or `s` with both flags).
 # One exemption: git sets skip-worktree on every tracked file outside a sparse
@@ -679,7 +680,7 @@ refuse_hidden_flags() {
             continue
         fi
         case "$MODE" in
-            revert-dirty) ;;
+            revert-dirty|run) ;;
             revert-denied) rp_trusted_config "$f" || continue ;;
             *) rp_trusted_config "$f" || rp_denied "$f" || continue ;;
         esac
@@ -855,6 +856,15 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         continue
     fi
     [ "$MODE" != run ] || die 2 "refusing a path that is not a regular file or symlink: $f"
+    if [ ! -d "$f" ] && [ "$MODE" != revert-only ]; then
+        # A FIFO, socket or device the recovery patch cannot encode: removing
+        # it would lose it for good, so keep it (--revert-denied) or refuse.
+        [ "$MODE" = revert-denied ] \
+            || die 2 "refusing to remove a special file the recovery patch cannot encode: $(safe_path_label "$f")"
+        add_path_reason "left a special file (not a regular file or symlink) in place" "$f"
+        NESTED_KEPT+=("$f")
+        continue
+    fi
     if [ -d "$f" ] && [ ! -L "$f" ]; then
         # A real directory (a resolver replaced a file with one): `rm -f` cannot
         # remove it. Delete it recursively only after its physical path is
@@ -890,6 +900,21 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
                 | while IFS= read -r -d '' c; do
                     rp_trusted_config "$c" || { printf 1; break; }
                 done)
+        fi
+        # The recovery patch encodes regular files and symlinks only. A FIFO,
+        # socket, device or empty directory in the subtree would vanish with
+        # the recursive removal and be absent from the patch, so keep the tree.
+        UNENCODABLE=""
+        if [ -z "$NESTED" ] && [ -z "$EXCLUDED" ]; then
+            UNENCODABLE=$(find -- "$f" ! -type f ! -type l \( ! -type d -o -empty \) -print -quit 2>/dev/null) \
+                || die 2 "cannot scan the directory for entries the recovery patch cannot hold: $(safe_path_label "$f")"
+        fi
+        if [ -n "$UNENCODABLE" ]; then
+            [ "$MODE" = revert-denied ] \
+                || die 2 "refusing to remove a directory holding an entry the recovery patch cannot encode (special file or empty directory): $(safe_path_label "$f")"
+            add_path_reason "left a directory holding a special file or empty directory in place" "$f"
+            NESTED_KEPT+=("$f")
+            continue
         fi
         if [ -n "$NESTED" ] || [ -n "$EXCLUDED" ]; then
             # --revert-denied judges each trusted-config path on its own, so a
