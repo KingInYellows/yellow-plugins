@@ -2434,7 +2434,7 @@ crf_refuses_untouched() {
   [[ "$stderr" == *"gt not found"* ]]
 }
 
-@test "a symlink outside the worktree to an in-tree gt or node is refused before it runs" {
+@test "a symlink outside the worktree to an in-tree gt, node or awk is refused before it runs" {
   old_path="$PATH"
   marker="$BATS_TEST_TMPDIR/tool-canary"
   rm -f "$marker"
@@ -2443,19 +2443,19 @@ crf_refuses_untouched() {
   chmod +x "$REPO/tools/canary"
   ln -s canary "$REPO/tools/gt"
   ln -s canary "$REPO/tools/node"
+  ln -s canary "$REPO/tools/awk"
   link="$BATS_TEST_TMPDIR/linkbin"
   mkdir -p "$link"
-  ln -s "$REPO/tools/gt" "$link/gt"
-  ln -s "$REPO/tools/node" "$link/node"
   link_dir=$(cd "$link" && pwd -P)
   repo_dir=$(pwd -P)
   case "$link_dir" in
     "$repo_dir"|"$repo_dir"/*) echo "symlink directory is inside the worktree"; return 1 ;;
   esac
-  for spec in "graphite gt" "github node"; do
+  for spec in "graphite gt" "github node" "graphite awk" "github awk"; do
     provider=${spec%% *}
     tool=${spec#* }
-    rm -f "$marker"
+    rm -f "$marker" "$link"/*
+    ln -s "$REPO/tools/$tool" "$link/$tool"
     PATH="$link:$old_path"
     crf_refuses_untouched "$provider" || { PATH="$old_path"; echo "not refused: $spec" >&2; return 1; }
     PATH="$old_path"
@@ -2464,6 +2464,18 @@ crf_refuses_untouched() {
     [[ "$stderr" == *"inside the repository"* ]]
     [[ "$stderr" == *"nothing committed"* ]]
   done
+}
+
+@test "an inherited YR_GIT_PATH naming a worktree directory is ignored, so a planted awk never runs" {
+  marker="$BATS_TEST_TMPDIR/inherited-ran"
+  rm -f "$marker"
+  printf 'canary-inh/\n' >> .git/info/exclude
+  mkdir -p canary-inh
+  printf '#!/bin/sh\ntouch "%s"\nexit 99\n' "$marker" >| canary-inh/awk
+  chmod +x canary-inh/awk
+  printf 'one\nfeature\nfix-inherited\n' >| src/a.txt
+  YR_GIT_PATH="$REPO/canary-inh:$PATH" run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ]
 }
 
 @test "tools outside the repository still work" {

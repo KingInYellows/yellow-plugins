@@ -39,6 +39,18 @@ require_timeout() {
   [[ "$stderr" == *"$B"* ]]
 }
 
+@test "an executable named yr_awk on PATH is never run as the scanner" {
+  bin="$BATS_TEST_TMPDIR/fakebin"
+  mkdir -p "$bin"
+  marker="$BATS_TEST_TMPDIR/yr_awk-ran"
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$bin/yr_awk"
+  chmod +x "$bin/yr_awk"
+  printf 'use AKIA''ABCDEFGHIJKLMNOP\n' >| "$B"
+  PATH="$bin:$PATH" run --separate-stderr "$SCRIPT" "$A" "$B"
+  [ "$status" -eq 6 ]
+  [ ! -e "$marker" ]
+}
+
 @test "a private key block exits 6" {
   printf -- '-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n' >| "$A"
   run "$SCRIPT" "$A"

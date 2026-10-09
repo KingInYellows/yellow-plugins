@@ -179,9 +179,28 @@ them as an ignored, untracked config that `/review:resolve` trusts. Print
 and stop before Step 2, with no `Sweep:` or `Resolve:` line, so
 `/review:sweep-all` records `no contract` and stops the batch.
 
+When the work-tree probe printed `unignored` and this probe printed
+`head=ignored`, the snapshot is only safe for an absent path: `git status`
+can hide an existing untracked file (`status.showUntrackedFiles=no`), and the
+checkout would leave those bytes in place as an ignored config that
+`/review:resolve` trusts. Stop when the path exists as a file or symlink
+(`-L` also catches a dangling link):
+
+```bash
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
+p="$TOP/yellow-plugins.local.md"
+if [ -z "$TOP" ] || [ -e "$p" ] || [ -L "$p" ]; then
+  printf '[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md exists untracked and unignored on this branch but is ignored on the PR head; remove it or rerun /review:sweep from the PR branch\n' >&2
+  exit 1
+fi
+```
+
+Print no `Sweep:` or `Resolve:` line on that stop, as for the tracked case
+above.
+
 Otherwise snapshot when the work-tree probe printed `ignored`, or when it
-printed `unignored` and this probe printed `head=ignored` (the file is absent
-or untracked on this branch). If neither holds, log
+printed `unignored` and this probe printed `head=ignored` (the path is absent
+on this branch). If neither holds, log
 `[review:sweep] PR #<PR#>: yellow-plugins.local.md is not an ignored untracked file; not guarded`,
 set `<guard-dir>` to `none`, and skip every `guard-local-config` call below
 (`/review:resolve` treats a tracked config as untrusted). When the snapshot
