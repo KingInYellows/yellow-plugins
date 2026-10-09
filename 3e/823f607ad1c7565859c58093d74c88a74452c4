@@ -1,0 +1,44 @@
+plugins/yellow-review/tests/resolve-paths.bats
+  s_7acef71c5d81d1::t_149c8bc28e1041 498-520,522
+  s_7acef71c5d81d1::t_5fc91d8770d106 521,523-526
+.changeset/yellow-review-revert-denied.md
+  s_7acef71c5d81d1::t_5228b8ed8921d9 5
+plugins/yellow-review/CLAUDE.md
+  s_7acef71c5d81d1::t_b01fa4f6a29f2d 234-236,240
+plugins/yellow-review/README.md
+  s_7acef71c5d81d1::t_2a1a4f8fac372f 169
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_7acef71c5d81d1::t_cdb51903f85ed8 441-443,453-459,505-506,523-526,531,550-561
+plugins/yellow-review/lib/resolve-paths.sh
+  s_7acef71c5d81d1::t_b15a1c05250e01 723-725,728,739-740,757,766,774,779,785
+plugins/yellow-review/references/resolve/dispositions.md
+  s_7acef71c5d81d1::t_1e8b41d526612d 524-528,597-600
+plugins/yellow-review/references/review-resolve-stack/dirty-tree-cleanup.md
+  s_7acef71c5d81d1::t_ebee3360dc97ef 97,100-103
+plugins/yellow-review/references/review-sweep-all/dirty-tree-cleanup.md
+  s_7acef71c5d81d1::t_85449680cde47c 97,100-103
+plugins/yellow-review/skills/pr-review-workflow/references/local-scripts.md
+  s_7acef71c5d81d1::t_8d334cae905a07 28-30
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_7acef71c5d81d1::t_846676ec679b62 10,34-35,76-85,131-132,141-142,426-427,430,454,463,483-492,511,513,706-716,718-720
+plugins/yellow-review/tests/run-verify-command.bats
+  s_7acef71c5d81d1::t_92b4aae18575db 311,335,343,369,393,410,477,487,492-508,510-523,525-529,531-542,548,561,586,1078,1080
+plugins/yellow-review/tests/skill-content.bats
+  s_7acef71c5d81d1::t_870af7d09c2756 731,1171-1175,1183-1184
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3e823f607ad1c7565859c58093d74c88a74452c4",
+  "prompts": {},
+  "sessions": {
+    "s_7acef71c5d81d1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "93619395-9e75-47ca-a284-258645abbf2a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
