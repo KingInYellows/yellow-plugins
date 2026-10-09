@@ -582,6 +582,8 @@ describe('races inside the write gate', () => {
     );
     await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
     await settleAccepted(h.deps, reservation);
+    // The message is read after the dispatch, never in the same millisecond.
+    h.deps.clock.time += 1_000;
     const mark = {
       ownerRequestId: session.localRequestId,
       observedAt: new Date(h.deps.clock.now()).toISOString(),
@@ -628,6 +630,8 @@ describe('races inside the write gate', () => {
     async function dispatchedReplyWithMatchingMessage(id: string) {
       const reservation = await reserveUnderGrant(h.deps, replyGate(id));
       await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+      // The echo is read after the dispatch, never in the same millisecond.
+      h.deps.clock.time += 1_000;
       setVendorState(h, session.sessionResource, 'inProgress');
       const activity = addActivity(h, session.sessionResource, {
         type: 'userMessaged',

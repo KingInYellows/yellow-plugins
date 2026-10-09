@@ -253,6 +253,43 @@ describe('a held message keeps the time it was first read', () => {
     ).toBeUndefined();
   });
 
+  it('a write stamped in the same millisecond as the first read cannot claim it', async () => {
+    const t0 = iso(0);
+    await reply('reply-after-read');
+    const message = seenOnce(t0, iso(-5_000));
+    // Seed the hold at exactly the reply's dispatch stamp.
+    const dispatched = (await readJournal(h.dataDir)).operations[
+      'reply-after-read'
+    ]!.dispatchedAt!;
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [{ ...message, observedAt: dispatched }],
+      {
+        ownerRequestId: session.localRequestId,
+        observedAt: dispatched,
+        walkStartedAt: new Date(Date.parse(dispatched) - 1).toISOString(),
+      },
+      []
+    );
+    expect((await owner())?.supervision?.heldActivities).toEqual({
+      'activities/teammate': dispatched,
+    });
+    h.deps.clock.time += 20_000;
+    const outside = await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [{ ...message, observedAt: iso(0) }],
+      { ownerRequestId: session.localRequestId, observedAt: iso(0) },
+      []
+    );
+    expect(outside?.activityId).toBe('activities/teammate');
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-after-read']
+        ?.echoActivityId
+    ).toBeUndefined();
+  });
+
   it('a write dispatched before the first read can still claim it once settled', async () => {
     await reply('reply-before-read');
     h.deps.clock.time += 5_000;

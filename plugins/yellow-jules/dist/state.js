@@ -1037,9 +1037,9 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
                 return false;
             const sinceMs = Date.parse(since);
             return (!Number.isNaN(sinceMs) &&
-                (Date.parse(r.createdAt) > sinceMs ||
+                (Date.parse(r.createdAt) >= sinceMs ||
                     (r.dispatchedAt !== undefined &&
-                        Date.parse(r.dispatchedAt) > sinceMs)));
+                        Date.parse(r.dispatchedAt) >= sinceMs)));
         };
         const hold = (message) => {
             held[message.activityId] ??=
