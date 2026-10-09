@@ -3203,6 +3203,60 @@ link_setup() {
   [[ "$stderr" == *'.claude/settings.json'* ]]
 }
 
+# An ordinary-named tracked link to an outside directory is an ancestor of
+# trusted-config paths below it (cfg -> /elsewhere, then cfg/.claude/settings.json).
+ancestor_link_setup() {
+  OUTDIR="$BATS_TEST_TMPDIR/outside-dir"
+  mkdir -p "$OUTDIR/.claude" "$OUTDIR/docs"
+  printf '{}\n' >| "$OUTDIR/.claude/settings.json"
+  printf 'x\n' >| "$OUTDIR/docs/a.md"
+  ln -s "$OUTDIR" cfg
+  git add cfg && git commit -q -m "track dir link"
+  touch -t 202001010000 "$IGN_MARKER"
+  touch -t 201901010000 "$OUTDIR/.claude/settings.json" "$OUTDIR/docs/a.md"
+}
+
+@test "--revert-denied reports deniedClean false when a write went through an ordinary-named dir link to cfg/.claude/settings.json" {
+  ancestor_link_setup
+  printf '{"hooks":"evil"}\n' >| cfg/.claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'cfg'* ]]
+  grep -q evil "$OUTDIR/.claude/settings.json"
+}
+
+@test "--revert-denied stays clean for an untouched ordinary-named dir link, and for a write outside trusted-config" {
+  ancestor_link_setup
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = noop ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  printf 'y\n' >| cfg/docs/a.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+}
+
+@test "--revert-denied --no-ignored-guard counts a dir link with a trusted-config descendant, not one without" {
+  ancestor_link_setup
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  rm -rf "$OUTDIR/.claude"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+}
+
+@test "a verify run refuses when a write went through an ordinary-named dir link to cfg/.claude/settings.json" {
+  ancestor_link_setup
+  printf '{"hooks":"evil"}\n' >| cfg/.claude/settings.json
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'cfg'* ]]
+}
+
 # --- dir_has_mount without GNU find -printf or /proc (macOS, BSD) ---
 # Shims on PATH stand in for BSD find (no -printf), BSD stat (-f %d, no -c) and
 # mount(8) ("dev on /path (type, opts)").

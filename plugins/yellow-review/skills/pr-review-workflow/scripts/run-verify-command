@@ -902,6 +902,15 @@ add_unique_file() {
 # judged by its HEAD target, which the revert restores (an edited original
 # target must not be laundered by redirecting the link). Nothing is written,
 # outside the worktree included (a scratch link lives in a mktemp directory).
+# A tracked symlink that is not itself trusted-config but resolves to a
+# directory outside the worktree is an ancestor of every path below it: a write
+# to cfg/.claude/settings.json through `cfg -> /elsewhere` edits trusted config
+# that neither the tree listing nor the ignored-file guard sees. It counts when
+# a file under the target, at a path P with `<link>/P` trusted-config, is newer
+# than the marker (nested symlinks followed, a loop or find error counts) or,
+# without a marker, when any such P exists. The walk stops at the first match
+# and counts after 50000 entries examined; a target inside the worktree is
+# covered by the tree listing and the ignored-file guard.
 LINK_HITS=()
 check_trusted_links() {
     local ls out safe top f c changed tdir
@@ -920,11 +929,33 @@ check_trusted_links() {
     (
         PATH=$safe
         hash -r 2>/dev/null || true
+        # dir_link_hit <probe> <link>: 0 when the directory <probe> resolves to
+        # holds a descendant P with <link>/P trusted-config (newer than the
+        # marker when there is one), or the walk fails or is too large.
+        dir_link_hit() {
+            local x rel n=0 wrc=0
+            if [ -n "$IGNORED_SINCE" ]; then
+                find -L "$1" -name .git -prune -o -type f -newer "$IGNORED_SINCE" -print0 >|"$tdir/walk" 2>/dev/null || wrc=$?
+            else
+                find -L "$1" -name .git -prune -o -print0 >|"$tdir/walk" 2>/dev/null || wrc=$?
+            fi
+            while IFS= read -r -d '' x; do
+                n=$((n + 1))
+                [ "$n" -le 50000 ] || return 0
+                rel="${x#"$1"}"
+                rel="${rel#/}"
+                [ -n "$rel" ] || continue
+                ! rp_trusted_config "$2/$rel" || return 0
+            done <"$tdir/walk"
+            [ "$wrc" -eq 0 ] || return 0
+            return 1
+        }
         while IFS= read -r -d '' rec; do
             mode="${rec%% *}"
             [ "$mode" = 120000 ] || continue
             f="${rec#*$'\t'}"
-            rp_trusted_config "$f" || continue
+            direct=0
+            ! rp_trusted_config "$f" || direct=1
             probe="$f"
             dirty=0
             for c in ${changed[@]+"${changed[@]}"}; do
@@ -953,6 +984,14 @@ check_trusted_links() {
             fi
             hit=0
             canon=$(yr_canon_path "$probe" 2>/dev/null) || canon=""
+            if [ "$direct" = 0 ]; then
+                # An ordinary-named link: only a directory outside the
+                # worktree can hide trusted-config descendants.
+                [ -d "$probe" ] || continue
+                if [ -n "$canon" ] && yr_inside_root "$canon" "$top"; then continue; fi
+                if dir_link_hit "$probe" "$f"; then printf '%s\0' "$f" >>"$out"; fi
+                continue
+            fi
             if [ -n "$IGNORED_SINCE" ]; then
                 rc=0
                 rp_link_target_changed "$probe" "$IGNORED_SINCE" follow || rc=$?
