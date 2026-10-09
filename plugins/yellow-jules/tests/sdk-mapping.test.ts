@@ -62,6 +62,20 @@ describe('vendor fields that render bare are allowlisted', () => {
     expect(() => plan('not a time')).toThrow(/no usable createTime/);
   });
 
+  it('a user message without a usable time fails closed, so supervision pauses on it', () => {
+    const user = (createTime: unknown) =>
+      mapActivity({
+        id: 'u1',
+        type: 'userMessaged',
+        createTime,
+        message: 'stop',
+        artifacts: [],
+      } as unknown as Parameters<typeof mapActivity>[0]);
+    expect(user('2026-09-10T00:00:01Z').message).toBe('stop');
+    expect(() => user(undefined)).toThrow(/no usable createTime/);
+    expect(() => user('soon')).toThrow(/no usable createTime/);
+  });
+
   it('plan step indexes that are not non-negative integers fall back to position', () => {
     const rec = mapActivity({
       id: 'a1',

@@ -362,6 +362,16 @@ export function mapActivity(activity: Sdk.Activity): AdapterActivity {
       `plan activity ${activityId} has no usable createTime`
     );
   }
+  // A user message is outside-activity evidence, which is ordered by time: one
+  // with no usable time would sort before every watermark and never be
+  // recorded, so it is malformed too and the walk stops on it (supervise
+  // pauses on a partial walk).
+  if (activity.type === 'userMessaged' && createTime === '') {
+    throwAppError(
+      'JULES_MALFORMED_RESPONSE',
+      `user message ${activityId} has no usable createTime`
+    );
+  }
   const base = {
     activityId,
     createTime,
