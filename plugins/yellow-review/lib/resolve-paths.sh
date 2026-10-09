@@ -821,7 +821,7 @@ rp_ignored_changed_since() {
                 # past 20 rejected ones still counts.
                 (set -o pipefail
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o \( -type f -o -type l \) -newer "$marker" -print0 2>/dev/null \
-                        | { k=0; while IFS= read -r -d '' x; do kept "$x" || continue; [ "$k" -ge 20 ] || printf '%s\0' "$x"; k=$((k + 1)); done; }) >|"$outfile" || rc=$?
+                        | { k=0; while IFS= read -r -d '' x; do kept "$x" || continue; [ "$k" -ge 20 ] || printf '%s\0' "$x" || exit 2; k=$((k + 1)); done; }) >|"$outfile" || rc=$?
                 if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ]; then
                     # Nothing newer: judge the target of each symlink inside.
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o -type l -print0 >|"$symlist" 2>/dev/null || exit 2
@@ -829,7 +829,7 @@ rp_ignored_changed_since() {
                         lrc=0
                         rp_link_target_changed "$l" "$marker" || lrc=$?
                         case "$lrc" in
-                            0) if kept "$l"; then printf '%s\0' "$l" >|"$outfile"; break; fi ;;
+                            0) if kept "$l"; then printf '%s\0' "$l" >|"$outfile" || exit 2; break; fi ;;
                             1) ;;
                             *) exit 2 ;;
                         esac
@@ -842,13 +842,13 @@ rp_ignored_changed_since() {
                     lrc=0
                     rp_link_target_changed "./$f" "$marker" || lrc=$?
                     case "$lrc" in
-                        0) if kept "$f"; then printf '%s\0' "./$f" >|"$outfile"; fi ;;
+                        0) if kept "$f"; then printf '%s\0' "./$f" >|"$outfile" || exit 2; fi ;;
                         1) ;;
                         *) exit 2 ;;
                     esac
                 fi
             elif [ -f "./$f" ]; then
-                [ "./$f" -nt "$marker" ] && kept "$f" && printf '%s\0' "./$f" >|"$outfile"
+                if [ "./$f" -nt "$marker" ] && kept "$f"; then printf '%s\0' "./$f" >|"$outfile" || exit 2; fi
             fi
             if [ ! -s "$outfile" ]; then
                 [ "$rc" -eq 0 ] || exit 2
@@ -865,7 +865,7 @@ rp_ignored_changed_since() {
                 done
                 [ -z "$dup" ] || continue
                 seen+=("$p")
-                printf '%s\0' "$p" >>"$hitsfile"
+                printf '%s\0' "$p" >>"$hitsfile" || exit 2
                 n=$((n + 1))
                 [ "$n" -lt 20 ] || break
             done <"$outfile"

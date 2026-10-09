@@ -524,6 +524,43 @@ ignored_repo() {
   [ "$status" -eq 2 ]
 }
 
+# A full temporary filesystem: the collector's output file (the third mktemp
+# call, after the hits file and the symlink list) is a symlink to
+# /dev/full, so every write to it fails. A lost write must not read as "no
+# change".
+full_outfile_shim() {
+  [ -c /dev/full ] || skip "needs /dev/full"
+  mkdir -p "$BATS_TEST_TMPDIR/shim"
+  REAL_MKTEMP=$(type -P mktemp)
+  cat >| "$BATS_TEST_TMPDIR/shim/mktemp" <<SH
+#!/bin/sh
+n=\$(cat "$BATS_TEST_TMPDIR/shim/count" 2>/dev/null || echo 0)
+n=\$((n + 1)); echo "\$n" >| "$BATS_TEST_TMPDIR/shim/count"
+if [ "\$n" -eq 3 ]; then
+  ln -s /dev/full "$BATS_TEST_TMPDIR/full.\$n" && echo "$BATS_TEST_TMPDIR/full.\$n"
+else
+  exec "$REAL_MKTEMP" "\$@"
+fi
+SH
+  chmod +x "$BATS_TEST_TMPDIR/shim/mktemp"
+}
+
+@test "rp_ignored_changed_since fails closed when a changed name in an ignored directory cannot be recorded" {
+  ignored_repo
+  printf 'new\n' >| node_modules/.bin/runner
+  full_outfile_shim
+  PATH="$BATS_TEST_TMPDIR/shim:$PATH" run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 2 ]
+}
+
+@test "rp_ignored_changed_since fails closed when a changed ignored file cannot be recorded" {
+  ignored_repo
+  printf 'new\n' >| src/gen.cache
+  full_outfile_shim
+  PATH="$BATS_TEST_TMPDIR/shim:$PATH" run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 2 ]
+}
+
 @test "rp_ignored_changed_since ignores the ruvector coedit-sessions log but not its siblings" {
   ignored_repo
   printf '.ruvector/\n' >> .gitignore
