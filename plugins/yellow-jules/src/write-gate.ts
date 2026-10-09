@@ -474,6 +474,13 @@ async function finalDispatchCheck(
         (r) =>
           r.kind === 'create' && r.sessionResource === record.sessionResource
       );
+      // A pause recorded after the reserve (supervise sets no invalidatedBy for
+      // plan or partial-walk pauses) must stop the write too.
+      if (owner?.supervision?.paused !== undefined) {
+        return paused(
+          `supervision of ${session} was paused (${owner.supervision.paused.reason})`
+        );
+      }
       if (owner !== undefined && isTerminalCondition(owner.condition)) {
         return new AppErrorException(
           makeAppError(

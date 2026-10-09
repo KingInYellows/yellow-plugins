@@ -271,6 +271,11 @@ async function finalDispatchCheck(deps, record) {
         }
         if (record.kind !== 'create') {
             const owner = Object.values(operations).find((r) => r.kind === 'create' && r.sessionResource === record.sessionResource);
+            // A pause recorded after the reserve (supervise sets no invalidatedBy for
+            // plan or partial-walk pauses) must stop the write too.
+            if (owner?.supervision?.paused !== undefined) {
+                return paused(`supervision of ${session} was paused (${owner.supervision.paused.reason})`);
+            }
             if (owner !== undefined && (0, runtime_support_js_1.isTerminalCondition)(owner.condition)) {
                 return new errors_js_1.AppErrorException((0, errors_js_1.makeAppError)('JULES_INVALID_STATE', `the session became ${owner.condition} after the write was reserved; a ${record.kind} does not reopen a finished session; nothing was sent`));
             }

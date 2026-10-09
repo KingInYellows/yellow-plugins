@@ -18,6 +18,7 @@ import {
   markOperation,
   messageDigest,
   readJournal,
+  updateJournal,
 } from '../src/state.js';
 import {
   assertGrantLiveBeforeWrite,
@@ -439,6 +440,32 @@ describe('races inside the write gate', () => {
     await expect(
       assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
     ).rejects.toMatchObject({ appError: { code: 'JULES_SUPERVISION_PAUSED' } });
+    expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+  });
+
+  it('a supervision pause recorded after the reserve refuses at the final check', async () => {
+    const reservation = await reserveUnderGrant(
+      h.deps,
+      replyGate('reply-pause-1')
+    );
+    await updateJournal(h.dataDir, (operations) => {
+      const owner = operations[session.localRequestId]!;
+      operations[session.localRequestId] = {
+        ...owner,
+        supervision: {
+          paused: {
+            reason: 'plan-changed-after-evaluation',
+            observedAt: new Date(h.deps.clock.now()).toISOString(),
+          },
+        },
+      };
+    });
+    await expect(
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+    ).rejects.toMatchObject({ appError: { code: 'JULES_SUPERVISION_PAUSED' } });
+    const record = (await readJournal(h.dataDir)).operations['reply-pause-1'];
+    expect(record?.dispatchedAt).toBeUndefined();
+    expect(record?.status).toBe('failed');
     expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
   });
 
