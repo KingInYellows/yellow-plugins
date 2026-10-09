@@ -1,0 +1,311 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { AppErrorException } from '../src/errors.js';
+import {
+  claimOwnEchoes,
+  messageDigest,
+  readJournal,
+  updateJournal,
+  updateSupervision,
+  upsertReadState,
+} from '../src/state.js';
+import { clearPause } from '../src/supervise.js';
+import {
+  assertGrantLiveBeforeWrite,
+  reserveUnderGrant,
+  settleAccepted,
+} from '../src/write-gate.js';
+
+import {
+  createGrant,
+  delegateOk,
+  type DelegatedSession,
+  type GrantHarness,
+  makeHarness,
+} from './support/grants.js';
+
+let h: GrantHarness;
+let grantId: string;
+let session: DelegatedSession;
+
+beforeEach(async () => {
+  h = makeHarness('correct');
+  grantId = await createGrant(h, { maxActiveSessions: 3 });
+  session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
+});
+afterEach(() => {
+  h.cleanup();
+});
+
+const iso = (offsetMs: number): string =>
+  new Date(h.deps.clock.now() + offsetMs).toISOString();
+
+async function owner() {
+  return (await readJournal(h.dataDir)).operations[session.localRequestId];
+}
+
+describe('clear-pause requires a walk after every piece of pause evidence', () => {
+  async function seed(walkAt: string): Promise<void> {
+    await updateJournal(h.dataDir, (operations) => {
+      const record = operations[session.localRequestId]!;
+      operations[session.localRequestId] = {
+        ...record,
+        lastCompleteWalkAt: walkAt,
+        supervision: {
+          paused: { reason: 'partial-walk', observedAt: iso(-3_000) },
+          // A status walk recorded an outside message AFTER the pause.
+          outsideSeen: {
+            activityId: 'activities/late',
+            observedAt: iso(-1_000),
+          },
+        },
+      };
+    });
+  }
+
+  it('refuses a complete walk that postdates the pause but not the outside message', async () => {
+    await seed(iso(-2_000));
+    const err = await clearPause(h.deps, { session: session.localId }).catch(
+      (e: unknown) => e
+    );
+    expect((err as AppErrorException).appError.code).toBe(
+      'JULES_INVALID_STATE'
+    );
+    const record = await owner();
+    expect(record?.supervision?.paused).toBeDefined();
+    expect(record?.supervision?.outsideSeen).toBeDefined();
+  });
+
+  it('accepts a complete walk that postdates both', async () => {
+    await seed(iso(500));
+    const result = await clearPause(h.deps, { session: session.localId });
+    expect(result).toMatchObject({ cleared: true });
+    const record = await owner();
+    expect(record?.supervision?.paused).toBeUndefined();
+    expect(record?.supervision?.outsideSeen).toBeUndefined();
+  });
+
+  it('keeps the pause reason while using the newest evidence time', async () => {
+    await seed(iso(-2_000));
+    const err = (await clearPause(h.deps, { session: session.localId }).catch(
+      (e: unknown) => e
+    )) as AppErrorException;
+    expect(err.appError.message).toContain('since the pause');
+  });
+});
+
+describe('a message that a later write could explain is not its echo', () => {
+  const digest = messageDigest('A different follow-up.');
+
+  async function laterReply(): Promise<void> {
+    const reservation = await reserveUnderGrant(h.deps, {
+      grantId,
+      ownerRequestId: session.localRequestId,
+      authority: {
+        repository: 'acme/widgets',
+        sourceResource: 'sources/github/acme/widgets',
+        branch: 'scratch/one',
+        taskRef: 't1',
+        operation: 'reply',
+      },
+      reservation: {
+        localRequestId: 'reply-late',
+        localId: `jl-${'e'.repeat(32)}`,
+        sessionResource: session.sessionResource,
+        promptDigest: digest,
+      },
+    });
+    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+    await settleAccepted(h.deps, reservation);
+  }
+
+  it('a reply created after the walk began cannot claim a message the walk held', async () => {
+    const walkStartedAt = iso(0);
+    h.deps.clock.time += 60_000;
+    await laterReply();
+    // The teammate's message is a few seconds older than the reply's dispatch.
+    const message = {
+      activityId: 'activities/teammate',
+      digest,
+      createTime: iso(-5_000),
+    };
+    const pending: string[] = [];
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [message],
+      {
+        ownerRequestId: session.localRequestId,
+        observedAt: iso(0),
+        walkStartedAt,
+      },
+      pending
+    );
+    // Held for a later walk: neither consumed as an echo nor lost.
+    expect(pending).toEqual(['activities/teammate']);
+    const ops = (await readJournal(h.dataDir)).operations;
+    expect(ops['reply-late']?.echoActivityId).toBeUndefined();
+  });
+
+  it('a later walk settles it against the now-existing write', async () => {
+    h.deps.clock.time += 60_000;
+    await laterReply();
+    const pending: string[] = [];
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [{ activityId: 'activities/echo', digest, createTime: iso(1_000) }],
+      {
+        ownerRequestId: session.localRequestId,
+        observedAt: iso(2_000),
+        walkStartedAt: iso(1_500),
+      },
+      pending
+    );
+    expect(pending).toEqual([]);
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-late']?.echoActivityId
+    ).toBe('activities/echo');
+  });
+});
+
+describe('outside markers only move forward', () => {
+  const older = {
+    activityId: 'activities/a-older',
+    digest: 'x-older',
+    createTime: '2026-09-29T11:00:00.000Z',
+  };
+  const newer = {
+    activityId: 'activities/b-newer',
+    digest: 'x-newer',
+    createTime: '2026-09-29T11:30:00.000Z',
+  };
+  const mark = (observedAt: string) => ({
+    ownerRequestId: session.localRequestId,
+    observedAt,
+  });
+
+  it('a delayed walk that saw only the older message leaves the newer marker', async () => {
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [newer],
+      mark('2026-09-29T12:00:00.000Z')
+    );
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [older],
+      mark('2026-09-29T12:00:05.000Z')
+    );
+    expect((await owner())?.supervision?.outsideSeen).toEqual({
+      activityId: newer.activityId,
+      observedAt: '2026-09-29T12:00:00.000Z',
+      createTime: newer.createTime,
+    });
+  });
+
+  it('a newer message replaces an older marker and keeps its stamp', async () => {
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [older],
+      mark('2026-09-29T12:00:00.000Z')
+    );
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [newer],
+      mark('2026-09-29T12:00:05.000Z')
+    );
+    expect((await owner())?.supervision?.outsideSeen).toMatchObject({
+      activityId: newer.activityId,
+      createTime: newer.createTime,
+    });
+  });
+
+  it('rewalking the stored message does not refresh the marker', async () => {
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [newer],
+      mark('2026-09-29T12:00:00.000Z')
+    );
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [newer],
+      mark('2026-09-29T12:05:00.000Z')
+    );
+    expect((await owner())?.supervision?.outsideSeen?.observedAt).toBe(
+      '2026-09-29T12:00:00.000Z'
+    );
+  });
+
+  it('a marker written before stamps were kept yields to any stamped message', async () => {
+    await updateJournal(h.dataDir, (operations) => {
+      const record = operations[session.localRequestId]!;
+      operations[session.localRequestId] = {
+        ...record,
+        supervision: {
+          outsideSeen: {
+            activityId: 'activities/legacy',
+            observedAt: '2026-09-29T10:00:00.000Z',
+          },
+        },
+      };
+    });
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [older],
+      mark('2026-09-29T12:00:00.000Z')
+    );
+    expect((await owner())?.supervision?.outsideSeen?.activityId).toBe(
+      older.activityId
+    );
+  });
+
+  it('updateSupervision never replaces a later pause, decision or marker with an earlier one', async () => {
+    await updateSupervision(h.dataDir, session.localRequestId, {
+      paused: { reason: 'new', observedAt: '2026-09-29T12:00:00.000Z' },
+      lastDecision: {
+        decision: 'paused',
+        decidedAt: '2026-09-29T12:00:00.000Z',
+      },
+      outsideSeen: {
+        activityId: 'activities/b-newer',
+        observedAt: '2026-09-29T12:00:00.000Z',
+        createTime: newer.createTime,
+      },
+    });
+    await updateSupervision(h.dataDir, session.localRequestId, {
+      paused: { reason: 'old', observedAt: '2026-09-29T11:00:00.000Z' },
+      lastDecision: {
+        decision: 'no-change',
+        decidedAt: '2026-09-29T11:00:00.000Z',
+      },
+      outsideSeen: {
+        activityId: 'activities/a-older',
+        observedAt: '2026-09-29T12:01:00.000Z',
+        createTime: older.createTime,
+      },
+    });
+    const state = (await owner())?.supervision;
+    expect(state?.paused?.reason).toBe('new');
+    expect(state?.lastDecision?.decision).toBe('paused');
+    expect(state?.outsideSeen?.activityId).toBe('activities/b-newer');
+  });
+
+  it('a delayed older complete-walk stamp does not pull lastCompleteWalkAt back', async () => {
+    await upsertReadState(h.dataDir, session.localRequestId, {
+      completeWalkAt: '2026-09-29T12:00:00.000Z',
+    });
+    await upsertReadState(h.dataDir, session.localRequestId, {
+      completeWalkAt: '2026-09-29T11:00:00.000Z',
+    });
+    expect((await owner())?.lastCompleteWalkAt).toBe(
+      '2026-09-29T12:00:00.000Z'
+    );
+  });
+});

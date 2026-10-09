@@ -259,7 +259,8 @@ function isValidSupervision(value) {
     if (outsideSeen !== undefined &&
         !((0, shape_js_1.isPlainObject)(outsideSeen) &&
             typeof outsideSeen['activityId'] === 'string' &&
-            typeof outsideSeen['observedAt'] === 'string'))
+            typeof outsideSeen['observedAt'] === 'string' &&
+            hasOptionalStrings(outsideSeen, ['createTime'])))
         return false;
     const evaluatedPlan = value['evaluatedPlan'];
     if (evaluatedPlan !== undefined &&
@@ -833,7 +834,10 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
                     lastActivityId: watermark.activityId,
                 }
                 : {}),
-            ...(update.completeWalkAt !== undefined
+            // Forward only: a delayed older walk must not pull the stamp back.
+            ...(update.completeWalkAt !== undefined &&
+                (current.lastCompleteWalkAt === undefined ||
+                    update.completeWalkAt > current.lastCompleteWalkAt)
                 ? { lastCompleteWalkAt: update.completeWalkAt }
                 : {}),
             ...(resumePageToken !== undefined ? { resumePageToken } : {}),
@@ -933,11 +937,34 @@ async function updateSupervision(dataDir, localRequestId, patch, now = () => new
         const current = requireRecord(operations, localRequestId);
         const previous = current.supervision ?? {};
         // `undefined` keeps the stored value, `null` clears it, anything else sets it.
+        // A pass runs unlocked, so a delayed one can land after a newer one:
+        // markers replace the stored value only with a strictly later one.
+        const pausedPatch = patch.paused != null &&
+            previous.paused !== undefined &&
+            patch.paused.observedAt < previous.paused.observedAt
+            ? undefined
+            : patch.paused;
+        const decisionPatch = patch.lastDecision !== undefined &&
+            previous.lastDecision !== undefined &&
+            patch.lastDecision.decidedAt < previous.lastDecision.decidedAt
+            ? undefined
+            : patch.lastDecision;
+        const outsidePatch = patch.outsideSeen != null &&
+            previous.outsideSeen !== undefined &&
+            (0, activity_walk_js_1.compareStamp)({
+                createTime: patch.outsideSeen.createTime ?? '',
+                activityId: patch.outsideSeen.activityId,
+            }, {
+                createTime: previous.outsideSeen.createTime ?? '',
+                activityId: previous.outsideSeen.activityId,
+            }) <= 0
+            ? undefined
+            : patch.outsideSeen;
         const next = {
-            ...keep('paused', previous.paused, patch.paused),
+            ...keep('paused', previous.paused, pausedPatch),
             ...keep('backoff', previous.backoff, patch.backoff),
-            ...keep('lastDecision', previous.lastDecision, patch.lastDecision),
-            ...keep('outsideSeen', previous.outsideSeen, patch.outsideSeen),
+            ...keep('lastDecision', previous.lastDecision, decisionPatch),
+            ...keep('outsideSeen', previous.outsideSeen, outsidePatch),
             ...keep('evaluatedPlan', previous.evaluatedPlan, patch.evaluatedPlan),
         };
         const updated = {
@@ -980,6 +1007,15 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
         const inFlight = (r) => r.status === 'reserved' &&
             r.dispatchedAt !== undefined &&
             nowMs - Date.parse(r.dispatchedAt) < activity_walk_js_1.RESERVATION_SETTLE_MS;
+        const walkStartMs = mark?.walkStartedAt !== undefined
+            ? Date.parse(mark.walkStartedAt)
+            : Number.NaN;
+        // Rebased under this lock, but only writes the walk could have raced:
+        // one created or dispatched after the walk began is not a candidate.
+        const postWalk = (r) => !Number.isNaN(walkStartMs) &&
+            (Date.parse(r.createdAt) > walkStartMs ||
+                (r.dispatchedAt !== undefined &&
+                    Date.parse(r.dispatchedAt) > walkStartMs));
         const claimed = new Set(landed.flatMap((r) => r.echoActivityId !== undefined ? [r.echoActivityId] : []));
         // The newest outside message by `(createTime, activityId)`, the order
         // `compareStamp` uses: vendor list order is unverified, so neither the
@@ -996,7 +1032,7 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
                     !Number.isNaN(sent) &&
                     r.dispatchedAt !== undefined &&
                     sent < Date.parse(r.dispatchedAt) - activity_walk_js_1.DISPATCH_SKEW_MS);
-            const eligible = landed.filter((r) => matches(r) && !inFlight(r));
+            const eligible = landed.filter((r) => matches(r) && !inFlight(r) && !postWalk(r));
             // Vendor list order is unverified, so with a usable timestamp prefer
             // the latest-dispatched write that precedes the message: an older
             // identical write then keeps the older echo.
@@ -1045,13 +1081,21 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
         // The marker is written in this same critical section: a reserve cannot
         // slip between classifying the message and recording that it was seen.
         const owner = mark !== undefined ? operations[mark.ownerRequestId] : undefined;
-        // Outside evidence that is newer than the stored marker replaces it: a
-        // `--clear-pause` confirmed against the older id must then be refused.
+        // Outside evidence strictly newer (by stamp) than the stored marker
+        // replaces it: a `--clear-pause` confirmed against the older id must then
+        // be refused. An older message, from a delayed overlapping walk, never
+        // displaces a newer marker, or clearing it would forget the newer one.
         const stored = owner?.supervision?.outsideSeen;
         const evidence = stored === undefined
             ? newestOutside
             : newestOutside !== undefined &&
-                newestOutside.activityId !== stored.activityId
+                (0, activity_walk_js_1.compareStamp)({
+                    createTime: newestOutside.createTime ?? '',
+                    activityId: newestOutside.activityId,
+                }, {
+                    createTime: stored.createTime ?? '',
+                    activityId: stored.activityId,
+                }) > 0
                 ? newestOutside
                 : undefined;
         if (evidence !== undefined && mark !== undefined && owner !== undefined) {
@@ -1062,6 +1106,9 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
                     outsideSeen: {
                         activityId: evidence.activityId,
                         observedAt: mark.observedAt,
+                        ...(evidence.createTime !== undefined
+                            ? { createTime: evidence.createTime }
+                            : {}),
                     },
                 },
                 updatedAt: mark.observedAt,

@@ -356,6 +356,12 @@ export interface SupervisionState {
   readonly outsideSeen?: {
     readonly activityId: string;
     readonly observedAt: string;
+    /**
+     * The message's vendor `createTime`; with `activityId` it is the stamp the
+     * marker is ordered by, so it only ever moves to a strictly newer message.
+     * Absent on markers written before the stamp was kept.
+     */
+    readonly createTime?: string;
   };
   /**
    * The plan a `needs-plan-review` pass presented, and when. A different plan

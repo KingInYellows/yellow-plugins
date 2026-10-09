@@ -554,16 +554,20 @@ async function superviseOnce(deps, args) {
 /**
  * The pause the write gate enforces: a recorded pause, or else outside
  * activity that `status` saw before any supervise pass turned it into a pause.
+ * `observedAt` is the newest piece of evidence: a status walk can record an
+ * outside message after a pause was written, and the owner must inspect after
+ * that message too, so a walk that predates it never vouches.
  */
 function effectivePause(state) {
-    if (state?.paused !== undefined)
-        return state.paused;
-    if (state?.outsideSeen === undefined)
+    const outside = state?.outsideSeen;
+    if (state?.paused !== undefined) {
+        return outside !== undefined && outside.observedAt > state.paused.observedAt
+            ? { reason: state.paused.reason, observedAt: outside.observedAt }
+            : state.paused;
+    }
+    if (outside === undefined)
         return undefined;
-    return {
-        reason: 'outside-user-message',
-        observedAt: state.outsideSeen.observedAt,
-    };
+    return { reason: 'outside-user-message', observedAt: outside.observedAt };
 }
 /**
  * Clears a pause. TTY-confirmed (it widens effective authority) and only after
@@ -593,7 +597,7 @@ async function clearPause(deps, args) {
         'yellow-jules: CLEAR SUPERVISION PAUSE',
         `  session:     ${sessionResource}`,
         `  paused for:  ${paused.reason}`,
-        `  paused at:   ${paused.observedAt}`,
+        `  evidence at: ${paused.observedAt}`,
         ...(owner.supervision?.outsideSeen !== undefined
             ? [
                 `  outside activity: ${owner.supervision.outsideSeen.activityId} (seen ${owner.supervision.outsideSeen.observedAt}) - inspect it first; clearing forgets it`,

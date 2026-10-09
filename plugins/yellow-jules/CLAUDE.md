@@ -213,7 +213,8 @@ plugin did not send (for example someone typed in the Jules web page), it
 records that as outside activity. While it is recorded, `reply` and `approve`
 under a grant are refused with `JULES_SUPERVISION_PAUSED`, and so is a repair
 `delegate` for that task. Only `supervise --clear-pause` removes it: it needs a
-complete `status` walk first and a typed code in a terminal, and its prompt
+complete `status` walk that began after the newest pause evidence (the pause
+or the latest outside message, whichever is later) and a typed code in a terminal, and its prompt
 lists the outside activity so you read it before you confirm. If writes start
 failing with a paused error, look at the session first; a teammate may have
 commented on it.
@@ -243,8 +244,14 @@ message that only such a still-`reserved` reply (inside its settle window) could
 explain is held: `status` neither claims it nor classifies it, and the watermark
 and dedup ring do not pass it. After the write settles, the next walk claims it
 as the echo (accepted) or records it as outside activity (cleanly rejected).
-Newer outside messages also replace `outsideSeen`, so a `--clear-pause`
-confirmed against an older id is refused.
+A message is also held when the only matching write was created or dispatched
+after the walk began: that write cannot be its echo, and the next walk (which
+starts after the write) decides. Newer outside messages replace `outsideSeen`
+and older ones never do (the marker keeps the message's `createTime`, ordered
+by `compareStamp`), so a `--clear-pause` confirmed against an older id is
+refused and a delayed overlapping walk cannot swap in an older message.
+`lastCompleteWalkAt`, a stored pause and `lastDecision` likewise only move
+forward.
 
 The residual window is between that re-check and the vendor POST: local state
 and the remote call cannot be made atomic, so a revoke or an outside message

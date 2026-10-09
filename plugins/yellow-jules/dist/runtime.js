@@ -273,7 +273,7 @@ function walkStartFor(record, token) {
  * on the record. Only sessions this plugin created have a digest set to compare
  * against.
  */
-async function recordOutsideActivity(deps, record, messages, walkComplete) {
+async function recordOutsideActivity(deps, record, messages, walkComplete, walkStartedAt) {
     const pending = [];
     if (messages.length === 0 || record.kind !== 'create')
         return new Set();
@@ -282,6 +282,7 @@ async function recordOutsideActivity(deps, record, messages, walkComplete) {
     await (0, state_js_1.claimOwnEchoes)(deps.dataDir, record.sessionResource, messages, {
         ownerRequestId: record.localRequestId,
         observedAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString(),
+        walkStartedAt,
     }, pending, walkComplete);
     return new Set(pending);
 }
@@ -388,7 +389,7 @@ async function status(deps, args) {
         // Messages only an in-flight (dispatched, unsettled) reply could explain are
         // held back: neither the watermark nor the ring may pass them, so the next
         // walk classifies them once the write has settled.
-        const held = await recordOutsideActivity(deps, record, newUserMessages, walk.complete);
+        const held = await recordOutsideActivity(deps, record, newUserMessages, walk.complete, walkStartedAt);
         const heldBack = held.size > 0;
         record = await (0, state_js_1.upsertReadState)(deps.dataDir, record.localRequestId, {
             vendorState,

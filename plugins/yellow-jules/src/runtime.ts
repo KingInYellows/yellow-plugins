@@ -477,7 +477,8 @@ async function recordOutsideActivity(
     digest: string;
     createTime?: string;
   }>,
-  walkComplete: boolean
+  walkComplete: boolean,
+  walkStartedAt: string
 ): Promise<ReadonlySet<string>> {
   const pending: string[] = [];
   if (messages.length === 0 || record.kind !== 'create') return new Set();
@@ -489,6 +490,7 @@ async function recordOutsideActivity(
     {
       ownerRequestId: record.localRequestId,
       observedAt: nowFn(deps)().toISOString(),
+      walkStartedAt,
     },
     pending,
     walkComplete
@@ -648,7 +650,8 @@ export async function status(
       deps,
       record,
       newUserMessages,
-      walk.complete
+      walk.complete,
+      walkStartedAt
     );
     const heldBack = held.size > 0;
     record = await upsertReadState(
