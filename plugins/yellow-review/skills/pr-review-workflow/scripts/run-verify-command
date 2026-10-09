@@ -511,10 +511,12 @@ REASON=""
 add_reason() { REASON="${REASON:+$REASON; }$1"; }
 # A reason that names a git-derived path: screen the path as the reverted list
 # is, so a credential-shaped directory name never reaches the JSON or the
-# resolve summary. A screen that cannot answer withholds the path too.
+# resolve summary. A screen that cannot answer withholds the path too. The
+# screen treats `/` as part of a word, so each segment is screened on its own
+# line as well (a `ghp_` directory name is a credential prefix only there).
 add_path_reason() {
     local t
-    if t=$(mktemp) && printf '%s\n' "$2" >|"$t" && rt_code_clean "$t"; then
+    if t=$(mktemp) && printf '%s\n' "$2" "${2//\//$'\n'}" >|"$t" && rt_code_clean "$t"; then
         add_reason "$1: $2"
     else
         add_reason "$1: <path withheld: it looks like a credential or could not be screened>"
