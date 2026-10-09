@@ -169,6 +169,7 @@ const OPTIONAL_STRING_FIELDS = [
     'grantId',
     'promptDigest',
     'echoActivityId',
+    'echoCreateTime',
     'observedPlanId',
     'vendorState',
     'condition',
@@ -1530,6 +1531,9 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
             operations[slot.localRequestId] = {
                 ...slot,
                 echoActivityId: message.activityId,
+                ...(message.createTime !== undefined
+                    ? { echoCreateTime: message.createTime }
+                    : {}),
             };
             // `landed` holds the replaced record; keep it current for later matches.
             landed[landed.indexOf(slot)] = operations[slot.localRequestId];

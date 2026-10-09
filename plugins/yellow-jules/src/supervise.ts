@@ -20,7 +20,7 @@
  * delegate or escalation — never acceptance.
  */
 
-import { compareStamp } from './activity-walk.js';
+import { compareStamp, DISPATCH_SKEW_MS } from './activity-walk.js';
 import {
   evaluateScope,
   grantHasUnreconciledDeviation,
@@ -565,17 +565,22 @@ export async function superviseOnce(
               r.dispatchedAt !== undefined ? r.dispatchSeq : r.createSeq
             )
         );
-  // The reply must also precede the differing plan it would explain: a plan
-  // generated before the reply was dispatched (or at the same instant) is not
-  // the reply's doing. No dispatch time, or an unparsable one, fails closed.
+  // The reply must also precede the differing plan it would explain. The plan
+  // stamp is the vendor's clock, so the reply is ordered by its echo's vendor
+  // stamp, strictly before. The local dispatch clock counts only when there is
+  // no echo and the gap clears the dispatch-skew window. Anything else fails
+  // closed to the pause.
   const explainedByReply = (planCreateTime: string | undefined): boolean => {
     const planMs = Date.parse(planCreateTime ?? '');
+    if (Number.isNaN(planMs)) return false;
     return landedReplies.some((r) => {
+      if (r.echoActivityId !== undefined) {
+        const echoMs = Date.parse(r.echoCreateTime ?? '');
+        return !Number.isNaN(echoMs) && echoMs < planMs;
+      }
       const dispatchMs = Date.parse(r.dispatchedAt ?? '');
       return (
-        !Number.isNaN(planMs) &&
-        !Number.isNaN(dispatchMs) &&
-        dispatchMs < planMs
+        !Number.isNaN(dispatchMs) && dispatchMs + DISPATCH_SKEW_MS < planMs
       );
     });
   };

@@ -337,9 +337,11 @@ the walk began, not after the message was first read, and within the dispatch
 skew of it.
 
 A swap pause in `supervise` is suppressed by our own reply only when that reply
-has positive landing evidence and its dispatch time is strictly before the
-differing `planGenerated` activity; a plan generated before the reply was
-dispatched, or at the same instant, still pauses.
+has positive landing evidence and its echo's vendor `createTime` (recorded as
+`echoCreateTime`) is strictly before the differing `planGenerated` activity's.
+The local dispatch clock is a different clock, so without an echo it counts only
+when it precedes the plan by more than the dispatch-skew window; an equal or
+earlier plan still pauses.
 
 Outside-activity markers treat an equal `createTime` as unordered: a second
 outside message at the marker's time, whatever its id, replaces the marker so a

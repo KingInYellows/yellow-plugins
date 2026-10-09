@@ -266,6 +266,8 @@ export interface OperationRecord {
   readonly promptDigest?: string;
   /** The vendor activity that echoed this operation's message; each landed message explains at most one activity. */
   readonly echoActivityId?: string;
+  /** The vendor `createTime` of that echo: same-clock evidence for ordering against vendor plan stamps. */
+  readonly echoCreateTime?: string;
   /**
    * Set when a walk judged same-text messages to outnumber the settled writes
    * sharing this unresolved write's text: which message is whose is unknowable,

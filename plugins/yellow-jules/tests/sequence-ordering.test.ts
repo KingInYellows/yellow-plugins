@@ -186,6 +186,13 @@ describe('supervise: a reply "since the evaluation" must be proven to follow it'
     expect((await sup()).decision).toBe('needs-plan-review');
     await landReply('rep-after', 'please restructure the plan');
     h.deps.clock.time += 1_000;
+    // The reply's echo (vendor clock) precedes the replacement plan.
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'please restructure the plan',
+      originator: 'user',
+    });
+    h.deps.clock.time += 1_000;
     addPlanNow(h, session.sessionResource, 'plan-2');
     const result = await sup();
     expect(result.decision).toBe('needs-plan-review');
@@ -223,6 +230,7 @@ describe('supervise: a reply "since the evaluation" must be proven to follow it'
       operations['rep-echoed'] = {
         ...operations['rep-echoed']!,
         echoActivityId: 'act-echo',
+        echoCreateTime: new Date(h.deps.clock.now()).toISOString(),
       };
     });
     h.deps.clock.time += 1_000;

@@ -108,3 +108,4 @@ A plan replacement is explained by our own reply, and so does not pause
 `supervise`, only when the reply was dispatched strictly before that plan was
 generated. The batch echo-ambiguity rule counts only writes that could own the
 messages (dispatched before the walk began).
+That ordering uses the reply echo's vendor timestamp (new `echoCreateTime` on the journal record), not the local dispatch clock.

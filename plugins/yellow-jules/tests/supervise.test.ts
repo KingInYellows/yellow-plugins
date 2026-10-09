@@ -918,6 +918,41 @@ describe('outside activity pauses (R32)', () => {
     });
   });
 
+  it('a replacement plan earlier than our reply echo pauses even when the local dispatch clock is behind', async () => {
+    addPlan(h, session.sessionResource, 'plan-1');
+    await sup();
+    h.deps.clock.time += 30_000;
+    await reply(h.deps, {
+      session: session.localId,
+      message: 'please restructure the plan',
+      dryRun: false,
+      correction: true,
+      grantId,
+    });
+    const dispatched = h.deps.clock.now();
+    // Vendor clock: the replacement plan is stamped before the reply's echo,
+    // though after the local dispatch time.
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      createTime: new Date(dispatched + 5_000).toISOString(),
+      plan: {
+        planId: 'plan-2',
+        steps: [{ id: 'st-2', title: 'Different work', index: 0 }],
+      },
+    });
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'please restructure the plan',
+      createTime: new Date(dispatched + 10_000).toISOString(),
+    });
+    setVendorState(h, session.sessionResource, 'awaitingPlanApproval');
+    h.deps.clock.time += 20_000;
+    expect(await sup()).toMatchObject({
+      decision: 'paused',
+      reason: 'plan-changed-after-evaluation',
+    });
+  });
+
   it('a new plan after OUR corrective reply is reviewed, not paused', async () => {
     addPlan(h, session.sessionResource, 'plan-1');
     await sup();
