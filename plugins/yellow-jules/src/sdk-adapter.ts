@@ -386,23 +386,29 @@ export function mapActivity(activity: Sdk.Activity): AdapterActivity {
     artifacts: (activity.artifacts ?? []).map(mapArtifact),
   };
   if (activity.type === 'planGenerated') {
-    const steps: PlanStepRecord[] = (activity.plan?.steps ?? []).map(
-      (step, i) => ({
+    const steps: PlanStepRecord[] = (activity.plan?.steps ?? []).map((step) => {
+      // The index is part of the executable plan the reviewer approves, so a
+      // value the journal cannot hold is a malformed activity (the walk stops
+      // on it), never replaced by the array position.
+      if (
+        typeof step.index !== 'number' ||
+        !Number.isInteger(step.index) ||
+        step.index < 0
+      ) {
+        throwAppError(
+          'JULES_MALFORMED_RESPONSE',
+          `plan activity ${activityId} has a step with a malformed index`
+        );
+      }
+      return {
         id: validatePlanId(step.id, 'response'),
         title: str(step.title),
         ...(typeof step.description === 'string'
           ? { description: step.description }
           : {}),
-        // Journal validation requires a non-negative integer; fall back to
-        // the array position for negative, fractional, or non-finite values.
-        index:
-          typeof step.index === 'number' &&
-          Number.isInteger(step.index) &&
-          step.index >= 0
-            ? step.index
-            : i,
-      })
-    );
+        index: step.index,
+      };
+    });
     return {
       ...base,
       plan: { planId: validatePlanId(activity.plan?.id, 'response'), steps },

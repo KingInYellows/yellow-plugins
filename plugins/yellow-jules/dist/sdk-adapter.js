@@ -316,20 +316,24 @@ function mapActivity(activity) {
         artifacts: (activity.artifacts ?? []).map(mapArtifact),
     };
     if (activity.type === 'planGenerated') {
-        const steps = (activity.plan?.steps ?? []).map((step, i) => ({
-            id: (0, validate_js_1.validatePlanId)(step.id, 'response'),
-            title: str(step.title),
-            ...(typeof step.description === 'string'
-                ? { description: step.description }
-                : {}),
-            // Journal validation requires a non-negative integer; fall back to
-            // the array position for negative, fractional, or non-finite values.
-            index: typeof step.index === 'number' &&
-                Number.isInteger(step.index) &&
-                step.index >= 0
-                ? step.index
-                : i,
-        }));
+        const steps = (activity.plan?.steps ?? []).map((step) => {
+            // The index is part of the executable plan the reviewer approves, so a
+            // value the journal cannot hold is a malformed activity (the walk stops
+            // on it), never replaced by the array position.
+            if (typeof step.index !== 'number' ||
+                !Number.isInteger(step.index) ||
+                step.index < 0) {
+                (0, errors_js_1.throwAppError)('JULES_MALFORMED_RESPONSE', `plan activity ${activityId} has a step with a malformed index`);
+            }
+            return {
+                id: (0, validate_js_1.validatePlanId)(step.id, 'response'),
+                title: str(step.title),
+                ...(typeof step.description === 'string'
+                    ? { description: step.description }
+                    : {}),
+                index: step.index,
+            };
+        });
         return {
             ...base,
             plan: { planId: (0, validate_js_1.validatePlanId)(activity.plan?.id, 'response'), steps },

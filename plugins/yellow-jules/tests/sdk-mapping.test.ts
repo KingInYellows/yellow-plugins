@@ -99,22 +99,41 @@ describe('vendor fields that render bare are allowlisted', () => {
     else expect(map().createTime).toBe('');
   });
 
-  it('plan step indexes that are not non-negative integers fall back to position', () => {
+  it.each([
+    ['negative', -1],
+    ['fractional', 1.5],
+    ['NaN', Number.NaN],
+    ['missing', undefined],
+    ['a string', '2'],
+  ])(
+    'a plan step index that is %s is malformed, never synthesized',
+    (_l, index) => {
+      const map = () =>
+        mapActivity({
+          id: 'a1',
+          type: 'planGenerated',
+          createTime: '2026-09-10T00:00:01Z',
+          plan: {
+            id: 'p1',
+            steps: [
+              { id: 's0', title: 'a', index: 0 },
+              { id: 's1', title: 'b', index },
+            ],
+          },
+          artifacts: [],
+        } as unknown as Parameters<typeof mapActivity>[0]);
+      expect(map).toThrow(/malformed|index/i);
+    }
+  );
+
+  it('keeps the vendor index of a well-formed plan step', () => {
     const rec = mapActivity({
       id: 'a1',
       type: 'planGenerated',
       createTime: '2026-09-10T00:00:01Z',
-      plan: {
-        id: 'p1',
-        steps: [
-          { id: 's0', title: 'a', index: -1 },
-          { id: 's1', title: 'b', index: 1.5 },
-          { id: 's2', title: 'c', index: 7 },
-          { id: 's3', title: 'd', index: Number.NaN },
-        ],
-      },
+      plan: { id: 'p1', steps: [{ id: 's2', title: 'c', index: 7 }] },
       artifacts: [],
     } as unknown as Parameters<typeof mapActivity>[0]);
-    expect(rec.plan?.steps.map((s) => s.index)).toEqual([0, 1, 7, 3]);
+    expect(rec.plan?.steps.map((s) => s.index)).toEqual([7]);
   });
 });
