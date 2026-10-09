@@ -771,9 +771,13 @@ rp_link_target_changed() {
 # marker is missing, unreadable, not a regular file or a symlink, git or find
 # fails, or a symlink's target cannot be examined. A caller must treat 2 as a
 # refusal. Whole ignored directories are walked with find; the caller owns
-# <scratch>, a scratch file for git's NUL-delimited listing.
+# <scratch>, a scratch file for git's NUL-delimited listing. An optional fourth
+# argument names a path predicate (rp_trusted_config; pass an empty <hitsfile>
+# to keep the printed form): only paths it accepts count, and a directory walk
+# filters before its 20-path cut.
 rp_ignored_changed_since() {
-    local marker="$1" scratch="$2" hitsfile="${3:-}" safe own=""
+    local marker="$1" scratch="$2" hitsfile="${3:-}" keep="${4:-}" safe own=""
+    [ -z "$keep" ] || declare -F -- "$keep" >/dev/null || return 2
     [ -f "$marker" ] && [ ! -L "$marker" ] && [ -r "$marker" ] || return 2
     # find, head, mktemp and the rest run by name after the resolvers wrote
     # the tree, so the walk uses the worktree-free PATH, as yr_git does.
@@ -789,6 +793,8 @@ rp_ignored_changed_since() {
         local mdir top f p l rc lrc symlist outfile x k dup n=0 seen=()
         mdir=$(cd -- "$(dirname -- "$marker")" 2>/dev/null && pwd) || exit 2
         marker="$mdir/$(basename -- "$marker")"
+        # kept <path>: no predicate, or the predicate accepts the path.
+        kept() { [ -z "$keep" ] || "$keep" "${1#./}"; }
         top=$(yr_git rev-parse --show-toplevel 2>/dev/null) || exit 2
         cd -- "$top" 2>/dev/null || exit 2
         symlist=$(mktemp) || exit 2
@@ -806,9 +812,11 @@ rp_ignored_changed_since() {
                 # name can hold a newline) and only the first 20 are kept, so
                 # a tree rewritten end to end cannot fill memory; a find that
                 # fails with nothing found is "cannot tell".
+                # A predicate filters before the cut, so an accepted name
+                # past 20 rejected ones still counts.
                 (set -o pipefail
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o \( -type f -o -type l \) -newer "$marker" -print0 2>/dev/null \
-                        | { k=0; while IFS= read -r -d '' x; do [ "$k" -ge 20 ] || printf '%s\0' "$x"; k=$((k + 1)); done; }) >|"$outfile" || rc=$?
+                        | { k=0; while IFS= read -r -d '' x; do kept "$x" || continue; [ "$k" -ge 20 ] || printf '%s\0' "$x"; k=$((k + 1)); done; }) >|"$outfile" || rc=$?
                 if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ]; then
                     # Nothing newer: judge the target of each symlink inside.
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o -type l -print0 >|"$symlist" 2>/dev/null || exit 2
@@ -816,7 +824,7 @@ rp_ignored_changed_since() {
                         lrc=0
                         rp_link_target_changed "$l" "$marker" || lrc=$?
                         case "$lrc" in
-                            0) printf '%s\0' "$l" >|"$outfile"; break ;;
+                            0) if kept "$l"; then printf '%s\0' "$l" >|"$outfile"; break; fi ;;
                             1) ;;
                             *) exit 2 ;;
                         esac
@@ -824,17 +832,18 @@ rp_ignored_changed_since() {
                 fi
             elif [ -L "./$f" ]; then
                 find "./$f" -type l -newer "$marker" -print0 >|"$outfile" 2>/dev/null || rc=$?
+                kept "$f" || : >|"$outfile"
                 if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ]; then
                     lrc=0
                     rp_link_target_changed "./$f" "$marker" || lrc=$?
                     case "$lrc" in
-                        0) printf '%s\0' "./$f" >|"$outfile" ;;
+                        0) if kept "$f"; then printf '%s\0' "./$f" >|"$outfile"; fi ;;
                         1) ;;
                         *) exit 2 ;;
                     esac
                 fi
             elif [ -f "./$f" ]; then
-                [ "./$f" -nt "$marker" ] && printf '%s\0' "./$f" >|"$outfile"
+                [ "./$f" -nt "$marker" ] && kept "$f" && printf '%s\0' "./$f" >|"$outfile"
             fi
             if [ ! -s "$outfile" ]; then
                 [ "$rc" -eq 0 ] || exit 2
