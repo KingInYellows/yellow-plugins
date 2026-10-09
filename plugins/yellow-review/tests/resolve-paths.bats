@@ -1950,10 +1950,47 @@ EOF
   done
   ( export GIT_SSH_COMMAND='ssh\ x'; harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_SSH_COMMAND uses shell syntax"* && "$YR_HARDEN_MSG" != *'ssh\ x'* ]] )
   # Quotes that wrap whole words are still judged by the existing rules and pass.
-  for val in 'ssh -i "/nonexistent/key"' "ssh -o 'StrictHostKeyChecking no'"; do
+  for val in 'ssh -i "/nonexistent/key"' "'/usr/bin/ssh' -x" 'ssh -i /home/u/.ssh/key' 'less -R'; do
     rc=0; ( export GIT_SSH_COMMAND="$val"; harden_git_config full ) || rc=$?
     [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
   done
+}
+
+@test "harden_git_config refuses a quoted span that contains whitespace" {
+  mkdir -p "dir with space"
+  : >| "dir with space/evil"
+  for val in "sh 'dir with space/evil'" 'sh "dir with space/evil"' "ssh -o 'StrictHostKeyChecking no'" "sh 'a b"; do
+    for name in GIT_SSH_COMMAND GIT_PAGER EDITOR GIT_ASKPASS; do
+      rc=0; ( export "$name=$val"; harden_git_config full ) || rc=$?
+      [ "$rc" -eq 1 ] || { echo "$name accepted: $val" >&2; return 1; }
+    done
+  done
+  rc=0; ( export GIT_CONFIG_PARAMETERS="'core.sshcommand'='sh \"dir with space/evil\"'"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.sshCommand GIT_CONFIG_VALUE_0="sh 'dir with space/evil'"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  for val in 'ssh -i /home/u/.ssh/key' 'less -R' "'/usr/bin/ssh' -x"; do
+    rc=0; ( export GIT_SSH_COMMAND="$val" GIT_PAGER="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
+  done
+}
+
+@test "harden_git_config refuses an injected include.path or includeIf path, naming the variable and not the value" {
+  mkdir -p tools
+  : >| tools/inc
+  for key in include.path includeIf.gitdir:/x/.path INCLUDE.PATH includeif.onbranch:main.path; do
+    for val in "$PWD/tools/inc" tools/inc "$BATS_TEST_TMPDIR/outside"; do
+      rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="$key" GIT_CONFIG_VALUE_0="$val"; harden_git_config full ) || rc=$?
+      [ "$rc" -eq 1 ] || { echo "KEY accepted: $key $val" >&2; return 1; }
+      rc=0; ( export GIT_CONFIG_PARAMETERS="'user.name'='x' '$key'='$val'"; harden_git_config full ) || rc=$?
+      [ "$rc" -eq 1 ] || { echo "PARAMETERS accepted: $key $val" >&2; return 1; }
+    done
+  done
+  ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=include.path GIT_CONFIG_VALUE_0="$PWD/tools/inc"
+    harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_CONFIG_KEY_0"* && "$YR_HARDEN_MSG" != *tools/inc* ]] )
+  # A non-include key whose value merely looks like one stays accepted.
+  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=include.path; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
 }
 
 @test "harden_git_config refuses an escaped worktree path that contains a space" {

@@ -710,7 +710,8 @@ lgit_nohooks() { yr_git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c c
 #   0  it would run or read something inside <root> (or a path cannot be
 #      canonicalized: fail closed);
 #   2  it uses shell syntax this check cannot judge: $ (expansion), backtick,
-#      ; & | < > ( ) * ? [ a backslash, a quote inside a word or a newline,
+#      ; & | < > ( ) * ? [ a backslash, a quote inside a word, a quote that
+#      does not wrap exactly one word (a quoted span containing whitespace) or a newline,
 #      or a ~ other than a word starting
 #      with ~ or ~/ (which is expanded to $HOME and judged);
 #   1  it is fine.
@@ -739,6 +740,13 @@ yr_cmd_enters() {
         # one on each side); one inside a word, or after --opt=, is removed by
         # the shell and joins the pieces into a path this check never sees.
         t=${tok#!}
+        # A quote that opens in one word and closes in another quotes a span
+        # with whitespace (`sh 'dir with space/evil'`), which the split cannot
+        # see whole: a word may carry a quote only as a matching wrapper.
+        case "$t" in
+            \"?*\"|\'?*\') ;;
+            [\"\']*|*[\"\']) return 2 ;;
+        esac
         t=${t#[\"\']}
         t=${t%[\"\']}
         case "$t" in *[\"\']*) return 2 ;; esac
@@ -787,6 +795,17 @@ yr_cmd_key() {
     return $r
 }
 
+# yr_include_key <config key>: succeed for include.path or includeIf.*.path,
+# which pull a file into command scope that the config scans then skip.
+yr_include_key() {
+    local r=1 had=0
+    shopt -q nocasematch && had=1
+    shopt -s nocasematch
+    [[ "$1" =~ ^(include\.path|includeif\..*\.path)$ ]] && r=0
+    [ "$had" -eq 1 ] || shopt -u nocasematch
+    return $r
+}
+
 # yr_env_cmd_verdict <name> <value> <root> [note]: run yr_cmd_enters and set
 # YR_HARDEN_MSG (variable name only, never the value) when it refuses.
 yr_env_cmd_verdict() {
@@ -813,7 +832,7 @@ yr_env_cmd_verdict() {
 # injected through
 # GIT_CONFIG_KEY_<i>/GIT_CONFIG_VALUE_<i> (below GIT_CONFIG_COUNT) and
 # GIT_CONFIG_PARAMETERS, judged by the same rules as the repository's own
-# config. A GIT_CONFIG_COUNT that is not a number is refused by
+# config; an injected include.path or includeIf.*.path is refused outright. A GIT_CONFIG_COUNT that is not a number is refused by
 # harden_git_config itself.
 yr_check_git_env() {
     local root name val i n k v rest
@@ -859,6 +878,10 @@ yr_check_git_env() {
     for ((i = 0; i < 10#$n; i++)); do
         name="GIT_CONFIG_KEY_$i"; k="${!name-}"
         name="GIT_CONFIG_VALUE_$i"; v="${!name-}"
+        if yr_include_key "$k"; then
+            YR_HARDEN_MSG="GIT_CONFIG_KEY_$i injects an include; git loads the file as command-line config, which the checks do not scan, so unset it"
+            return 1
+        fi
         if yr_cmd_key "$k"; then
             yr_env_cmd_verdict "GIT_CONFIG_VALUE_$i" "$v" "$root" "(injected config)" || return 1
         fi
@@ -881,6 +904,10 @@ yr_check_git_env() {
         fi
         if [ -n "$rest" ] && [[ "$rest" != [[:space:]]* ]]; then
             YR_HARDEN_MSG="GIT_CONFIG_PARAMETERS has an entry that cannot be decoded exactly; unset it"
+            return 1
+        fi
+        if yr_include_key "$k"; then
+            YR_HARDEN_MSG="GIT_CONFIG_PARAMETERS injects an include; git loads the file as command-line config, which the checks do not scan, so unset it"
             return 1
         fi
         if yr_cmd_key "$k"; then
