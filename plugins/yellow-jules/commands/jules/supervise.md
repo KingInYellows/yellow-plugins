@@ -127,6 +127,7 @@ SESSION='YELLOW_TODO_session'
 GRANT_ID='YELLOW_TODO_grant_id'
 CORRECTION='YELLOW_TODO_1_or_0'
 case "$WORK_DIR$SESSION$GRANT_ID$CORRECTION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+case "$CORRECTION" in 0|1) ;; *) printf 'ERROR: CORRECTION must be exactly 0 or 1.\n' >&2; exit 1 ;; esac
 case "$WORK_DIR" in
   *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
   /*/yellow-jules-supervise.??????) ;;

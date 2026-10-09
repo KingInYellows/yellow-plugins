@@ -114,6 +114,7 @@ BRANCH='YELLOW_TODO_requested_branch'
 TASK_REF='YELLOW_TODO_task_ref'
 CORRECTION='YELLOW_TODO_1_or_0'
 case "$REPO$BRANCH$TASK_REF$CORRECTION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+case "$CORRECTION" in 0|1) ;; *) printf 'ERROR: CORRECTION must be exactly 0 or 1.\n' >&2; exit 1 ;; esac
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 LIST=$(node "$CLI" authorize --list)
 if [ "$(printf '%s' "$LIST" | jq -r '.ok // false')" != true ]; then
@@ -163,6 +164,7 @@ GRANT_ID='YELLOW_TODO_grant_id'
 REQUEST_ID='YELLOW_TODO_request_id'
 CORRECTION='YELLOW_TODO_1_or_0'
 case "$WORK_DIR$SESSION$GRANT_ID$REQUEST_ID$CORRECTION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+case "$CORRECTION" in 0|1) ;; *) printf 'ERROR: CORRECTION must be exactly 0 or 1.\n' >&2; exit 1 ;; esac
 case "$WORK_DIR" in
   *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
   /*/yellow-jules-reply.??????) ;;
@@ -218,6 +220,7 @@ DEADLINE='YELLOW_TODO_deadline_or_empty'
 CORRECTION='YELLOW_TODO_1_or_0'
 CONFIRMED_BINDING='YELLOW_TODO_binding_from_preview'
 case "$WORK_DIR$SESSION$GRANT_ID$REQUEST_ID$DEADLINE$CORRECTION$CONFIRMED_BINDING" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+case "$CORRECTION" in 0|1) ;; *) printf 'ERROR: CORRECTION must be exactly 0 or 1.\n' >&2; exit 1 ;; esac
 case "$WORK_DIR" in
   *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
   /*/yellow-jules-reply.??????) ;;
