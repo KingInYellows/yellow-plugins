@@ -667,6 +667,22 @@ describe('outside activity pauses (R32)', () => {
     });
   });
 
+  it('withholds approve and reply for a plan holding hidden characters', async () => {
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      plan: {
+        planId: 'plan-h',
+        steps: [{ id: 'st-h', title: 'Do\u200b the work\u202e', index: 0 }],
+      },
+    });
+    setVendorState(h, session.sessionResource, 'awaitingPlanApproval');
+    const r = await sup();
+    expect(r.decision).toBe('needs-plan-review');
+    expect(r.allowedActions).toEqual([]);
+    expect(r.observedPlanId).toBeUndefined();
+    expect(r.attention).toContain('planUnavailable');
+  });
+
   it('a plan swap whose replacement was approved before the next pass still pauses', async () => {
     addPlan(h, session.sessionResource, 'plan-1');
     expect((await sup()).decision).toBe('needs-plan-review');

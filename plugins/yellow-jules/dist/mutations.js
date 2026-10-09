@@ -428,6 +428,14 @@ async function assertPlanStillPending(deps, adapter, target, liveCondition, expe
  * digest. A plan redaction changed cannot be approved or replied to unseen.
  */
 function assertPlanReviewable(plan) {
+    const steps = plan
+        .steps;
+    const hidden = (steps ?? []).some((step) => [step['title'], step['description']].some((text) => typeof text === 'string' && redact_js_1.HIDDEN_CHARS_RE.test(text)));
+    if (hidden) {
+        (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'the pending plan contains hidden characters (control, bidi or zero-width) that the review would replace; it cannot be acted on unseen. Nothing was sent', {
+            recoveryAction: 'Review this plan in the Jules console, or ask for a plan without hidden characters.',
+        });
+    }
     if (JSON.stringify((0, redact_js_1.redactDeep)(plan)) !== JSON.stringify(plan)) {
         (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'the pending plan contains credential-shaped text that is redacted from the review; it cannot be acted on unseen. Nothing was sent', {
             recoveryAction: 'Review this plan in the Jules console, or ask for a plan without credentials.',

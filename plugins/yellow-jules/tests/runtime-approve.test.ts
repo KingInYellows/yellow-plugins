@@ -45,6 +45,27 @@ afterEach(() => {
   h.cleanup();
 });
 
+describe('a plan with hidden characters', () => {
+  it('is refused by approve even with a matching digest', async () => {
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      plan: {
+        planId: 'plan-h',
+        steps: [{ id: 'st-h', title: 'Do\u200b it', index: 0 }],
+      },
+    });
+    setVendorState(h, session.sessionResource, 'awaitingPlanApproval');
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const digest = await reviewedDigestOf(h, session.localRequestId);
+    expect(
+      await codeOf(() =>
+        approve(h.deps, args({ planId: 'plan-h', expectPlanDigest: digest }))
+      )
+    ).toBe('JULES_INVALID_STATE');
+    expect(h.adapter.writeCount()).toBe(0);
+  });
+});
+
 function args(overrides: Partial<ApproveArgs> = {}): ApproveArgs {
   return {
     session: session.localId,

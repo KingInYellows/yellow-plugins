@@ -666,7 +666,8 @@ export async function superviseOnce(
     fenced.plan = fenceUntrusted(shownPlan);
     // A plan the fence rewrote (redaction, a forged delimiter) was not shown as
     // it is: it is not offered for approval or a plan-bound reply.
-    const unactionable = fenceAltersText(shownPlan);
+    const unactionable =
+      fenceAltersText(shownPlan) || HIDDEN_CHARS_RE.test(shownPlan);
     const actions: AllowedAction[] = unactionable
       ? []
       : [

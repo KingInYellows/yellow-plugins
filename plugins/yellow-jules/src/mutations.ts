@@ -41,7 +41,7 @@ import {
   rethrowWithContext,
   throwAppError,
 } from './errors.js';
-import { redact, redactDeep } from './redact.js';
+import { HIDDEN_CHARS_RE, redact, redactDeep } from './redact.js';
 import {
   type Attention,
   attentionOf,
@@ -739,6 +739,23 @@ async function assertPlanStillPending(
  * digest. A plan redaction changed cannot be approved or replied to unseen.
  */
 function assertPlanReviewable(plan: unknown): void {
+  const steps = (plan as { steps?: ReadonlyArray<Record<string, unknown>> })
+    .steps;
+  const hidden = (steps ?? []).some((step) =>
+    [step['title'], step['description']].some(
+      (text) => typeof text === 'string' && HIDDEN_CHARS_RE.test(text)
+    )
+  );
+  if (hidden) {
+    throwAppError(
+      'JULES_INVALID_STATE',
+      'the pending plan contains hidden characters (control, bidi or zero-width) that the review would replace; it cannot be acted on unseen. Nothing was sent',
+      {
+        recoveryAction:
+          'Review this plan in the Jules console, or ask for a plan without hidden characters.',
+      }
+    );
+  }
   if (JSON.stringify(redactDeep(plan)) !== JSON.stringify(plan)) {
     throwAppError(
       'JULES_INVALID_STATE',
