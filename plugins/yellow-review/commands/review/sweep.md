@@ -129,7 +129,11 @@ only that commit's root `.gitignore`. Use `--no-index` and the `-q` exit
 remote, taken as git printed it (one line, no leading `-`); several remotes
 without `origin` is a failure. On failure, before any snapshot, print
 `[review:sweep] Error: could not read the PR head ignore rules.` and stop
-with no skip line.
+with no skip line. The raw blob is only what checkout writes when `.gitignore`
+has no content-transforming attribute, so the probe also reads the commit's
+`filter`, `eol`, `working-tree-encoding` and `ident` attributes
+(`check-attr --source`, git 2.40+) and stops with its own `Error:` line, no
+skip line, on any value other than unspecified (`eol` may also be `lf`).
 
 ```bash
 set -u
@@ -156,6 +160,15 @@ else
   WT=$(mktemp -d) || head_fail
   GI_LS=$(git -C "$TOP" ls-tree "$GOT" -- .gitignore 2>/dev/null) || { rm -rf -- "$WT"; head_fail; }
   GI_MODE=${GI_LS%% *}
+  if [ -n "$GI_MODE" ]; then
+    ATTRS=$(git -C "$TOP" check-attr --source="$GOT" filter eol working-tree-encoding ident -- .gitignore 2>/dev/null) || { rm -rf -- "$WT"; head_fail; }
+    [ -n "$ATTRS" ] || { rm -rf -- "$WT"; head_fail; }
+    if printf '%s\n' "$ATTRS" | grep -vE ': (unspecified|lf)$' >/dev/null; then
+      rm -rf -- "$WT"
+      printf '[review:sweep] Error: the PR head sets content-transforming attributes on .gitignore, so its ignore rules cannot be read from the blob.\n' >&2
+      exit 2
+    fi
+  fi
   case "$GI_MODE" in
     '') ;;
     100644|100755) git -C "$TOP" show "${GOT}:.gitignore" > "$WT/.gitignore" || { rm -rf -- "$WT"; head_fail; } ;;

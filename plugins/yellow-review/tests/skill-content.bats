@@ -668,6 +668,12 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   [[ "$text" == *"--- begin gh-error (reference only) ---"*"cause=%s"*"--- end gh-error ---"* ]]
 }
 
+@test "sweep: the PR head ignore probe refuses content-transforming attributes on .gitignore" {
+  text=$(flat "$SWEEP")
+  [[ "$text" == *'check-attr --source="$GOT" filter eol working-tree-encoding ident -- .gitignore'* ]]
+  [[ "$text" == *'sets content-transforming attributes on .gitignore'* ]]
+}
+
 # Collapse line wraps so a phrase can be matched across them.
 flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
 
