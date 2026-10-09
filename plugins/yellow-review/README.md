@@ -184,7 +184,11 @@ directory with an executable script whose `#!` interpreter is inside it. Both
 scripts also refuse an inherited `GIT_SSH_COMMAND`, `GIT_ASKPASS`, `GIT_PAGER`,
 `EDITOR`, `GIT_EXEC_PATH` or injected git config (`core.sshCommand`,
 `credential.helper`, ...) whose command line names a path inside the worktree
-(`sh <worktree>/script` included); values outside it keep working.
+(`sh <worktree>/script` included), or uses shell syntax that cannot be judged
+(`$VAR`, backticks, `;`, `|`, ...), or a `HOME`/`XDG_CONFIG_HOME` that puts git's
+global config inside the worktree; values outside it keep working. A script
+whose `#!` line passes a path inside the worktree as an argument is treated like
+one whose interpreter is inside it.
 
 Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-gh.sh`,
 `resolve-paths.sh`, `gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.

@@ -318,24 +318,96 @@ yr_inside_root() {
     return 1
 }
 
+# yr_has_root <string> <root>: succeed when <string> contains <root> as a whole
+# path: not preceded by a path character and followed by / or a character that
+# cannot continue a name. A sibling such as <root>2 or <root>-keys is not it.
+yr_has_root() {
+    local rest="$1" root="$2" pre post prev next
+    while :; do
+        case "$rest" in *"$root"*) ;; *) return 1 ;; esac
+        pre=${rest%%"$root"*}
+        post=${rest#*"$root"}
+        prev=${pre: -1}
+        next=${post:0:1}
+        case "$prev" in [A-Za-z0-9._/-]) ;; *)
+            case "$next" in [A-Za-z0-9._-]) ;; *) return 0 ;; esac
+        esac
+        rest=$post
+    done
+}
+
+# yr_args_enter <string> <root> <skip-bare-first>: succeed when <string>, read
+# as a word list, names anything inside <root>: the raw text holds the root as
+# a whole path (yr_has_root), or a word (leading ! and quotes stripped; for
+# --opt=VALUE both the word and VALUE) is an absolute path, or an existing path
+# relative to the current directory, that canonicalizes inside <root>, or a
+# path that cannot be canonicalized. With <skip-bare-first> 1 the first word is
+# left alone when it has no slash (a program name is looked up on PATH, never
+# in the current directory). Words starting with ~ or $ are not judged here.
+yr_args_enter() {
+    local v="$1" root="$2" skipfirst="${3:-0}" phys tok t u c first=1 noglob=1
+    local -a toks=()
+    phys=$(pwd -P) || return 0
+    yr_has_root "$v" "$root" && return 0
+    case $- in *f*) noglob=0 ;; esac
+    {
+        local IFS=$' \t\n'
+        set -f
+        toks=($v)
+        [ "$noglob" -eq 0 ] || set +f
+    }
+    for tok in ${toks[@]+"${toks[@]}"}; do
+        t=${tok#!}
+        t=${t#[\"\']}
+        t=${t%[\"\']}
+        for u in "$t" "${t#*=}"; do
+            case "$u" in
+                ''|'~'*|'$'*) continue ;;
+                /*)
+                    c=$(yr_canon_path "$u" 2>/dev/null) || return 0
+                    yr_inside_root "$c" "$root" && return 0
+                    yr_inside_root "$u" "$root" && return 0
+                    ;;
+                *)
+                    if [ "$first" -eq 1 ] && [ "$skipfirst" -eq 1 ]; then
+                        case "$u" in */*) ;; *) continue ;; esac
+                    fi
+                    [ -e "$u" ] || continue
+                    c=$(yr_canon_path "$phys/$u" 2>/dev/null) || return 0
+                    yr_inside_root "$c" "$root" && return 0
+                    ;;
+            esac
+            case "$t" in -*=*) ;; *) break ;; esac
+        done
+        first=0
+    done
+    return 1
+}
+
 # yr_file_shebang_enters <file> <root>: succeed when <file> starts with a #!
-# line whose interpreter, or the program `env` is asked to run, is inside
-# <root> by canonical path or identity, or cannot be canonicalized (fail
-# closed). The interpreter comes from the first line only and is never run.
-# `env` operands follow env(1): options with an argument (-u, -C, -P, -a and
-# their long forms), NAME=value words, and -S / --split-string, whose string is
-# split into words that continue the operand list (attached or separate, and
-# inside a short cluster such as -vS). A bare operand is looked up on the
-# caller's PATH (YR_ORIG_PATH), the way the tool itself would be. Copies of
-# this function sit in the two scripts' bootstrap resolvers, which run before
-# this library is sourced; keep them identical.
+# line that would run anything inside <root> by canonical path or identity, or
+# cannot be canonicalized (fail closed): the interpreter, the program `env` is
+# asked to run, or a path in the optional argument (Linux passes the rest of
+# the line as one argument, BSD splits it; both are judged, see yr_args_enter).
+# The first line is read and never run. `env` operands follow env(1): options
+# with an argument (-u, -C, -P, -a and their long forms), NAME=value words, and
+# -S / --split-string, whose string is split into words that continue the
+# operand list (attached or separate, and inside a short cluster such as
+# -vS; a `$`, backslash or quote in that string, which env expands or decodes,
+# counts as entering, and so do a NAME=value operand, -P (env searches a path
+# other than PATH) and -C/--chdir (env resolves the utility elsewhere)). A bare
+# operand is looked up on the caller's PATH (YR_ORIG_PATH), the
+# way the tool itself would be. Copies of this block (through
+# yr_file_shebang_enters) sit in the two scripts' bootstrap resolvers, which
+# run before this library is sourced; keep them identical.
 yr_file_shebang_enters() {
-    local f="$1" root="$2" line rest i x idx last k c cl val p
+    local f="$1" root="$2" line rest i x idx last k c cl val p args=""
     local -a w=() v=() nw=()
     [ -f "$f" ] || return 1
     IFS= read -r -n 512 line <"$f" 2>/dev/null || true
     case "$line" in '#!'*) ;; *) return 1 ;; esac
     rest=${line#\#!}
+    rest=${rest#"${rest%%[![:space:]]*}"}
     read -r -a w <<<"$rest" || true
     i=${w[0]-}
     [ -n "$i" ] || return 1
@@ -351,7 +423,9 @@ yr_file_shebang_enters() {
                     --) idx=$((idx + 1)); continue ;;
                     --split-string) val=${w[idx + 1]-}; last=$((idx + 1)) ;;
                     --split-string=*) val=${x#*=}; last=$idx ;;
-                    --chdir|--unset|--argv0) idx=$((idx + 2)); continue ;;
+                    # env resolves the utility after a chdir: fail closed.
+                    --chdir|--chdir=*) return 0 ;;
+                    --unset|--argv0) idx=$((idx + 2)); continue ;;
                     --*) idx=$((idx + 1)); continue ;;
                     -?*)
                         cl=${x#-}
@@ -359,12 +433,17 @@ yr_file_shebang_enters() {
                         while [ "$k" -lt "${#cl}" ]; do
                             c=${cl:k:1}
                             case "$c" in
+                                P|C)
+                                    # env searches another path than PATH, or
+                                    # chdirs first: fail closed.
+                                    return 0
+                                    ;;
                                 S)
                                     val=${cl:k+1}; last=$idx
                                     if [ -z "$val" ]; then val=${w[idx + 1]-}; last=$((idx + 1)); fi
                                     break
                                     ;;
-                                u|C|P|a)
+                                u|a)
                                     [ -n "${cl:k+1}" ] || idx=$((idx + 1))
                                     break
                                     ;;
@@ -372,10 +451,16 @@ yr_file_shebang_enters() {
                             k=$((k + 1))
                         done
                         ;;
-                    *=*) idx=$((idx + 1)); continue ;;
+                    # NAME=value before the utility (PATH=tools changes where it
+                    # is looked up): fail closed.
+                    *=*) return 0 ;;
                     *) i="$x"; break ;;
                 esac
                 if [ "$last" -ge 0 ]; then
+                    # env expands ${VAR} and decodes \_ and quotes in a -S string,
+                    # and Linux hands it the whole rest of the line: fail closed
+                    # on any $, backslash or quote from here on.
+                    case "${w[*]:idx}" in *[\$\\\"\']*) return 0 ;; esac
                     # Splice the -S string's words in place of the option.
                     v=()
                     read -r -a v <<<"$val" || true
@@ -387,6 +472,8 @@ yr_file_shebang_enters() {
                     idx=$((idx + 1))
                 fi
             done
+            # What follows the operand is its argument list.
+            [ "$idx" -lt "${#w[@]}" ] && args="${w[*]:idx+1}"
             i=${i#[\"\']}
             i=${i%[\"\']}
             [ -n "$i" ] || return 1
@@ -395,7 +482,11 @@ yr_file_shebang_enters() {
                 *) i=$(PATH=${YR_ORIG_PATH-$PATH}; type -P "$i" 2>/dev/null) || return 1 ;;
             esac
             ;;
+        *) args=${rest#"$i"} ;;
     esac
+    if [ -n "$args" ] && yr_args_enter "$args" "$root" 0; then
+        return 0
+    fi
     case "$i" in /*) p="$i" ;; *) p="$(pwd -P)/$i" ;; esac
     c=$(yr_canon_path "$p" 2>/dev/null) || return 0
     yr_inside_root "$c" "$root" || yr_inside_root "$p" "$root"
@@ -792,7 +883,9 @@ add_unique_file() {
     FILES+=("$1")
 }
 
-# A write through a tracked symlink edits its target and leaves the link, which
+# The tracked links come from HEAD (ls-tree), the tree the revert restores from
+# (`checkout HEAD`), never the index: a staged retarget must not hide the
+# committed target. A write through a tracked symlink edits its target and leaves the link, which
 # is all rp_tree_changes sees. check_trusted_links fills LINK_HITS with every
 # tracked trusted-config symlink (.claude/settings.json -> a file elsewhere)
 # whose target may have been edited, so a clean listing is not read as a clean
@@ -801,7 +894,11 @@ add_unique_file() {
 # A target inside the worktree that is itself trusted-config is skipped: the
 # tree listing already covers it. Without a marker (--revert-denied
 # --no-ignored-guard) nothing can be compared, so a link that resolves outside
-# the worktree or cannot be resolved counts. A link that git lists as changed is
+# the worktree, cannot be resolved, or lands on an untracked, ignored or .git
+# path inside it, on a tracked target that git lists as changed (unless it is
+# trusted-config, which the revert restores), on a directory (a tracked descendant does not cover its
+# ignored siblings), or on a tracked path flagged skip-worktree or
+# assume-unchanged (the tree check cannot see those), counts. A link that git lists as changed is
 # judged by its HEAD target, which the revert restores (an edited original
 # target must not be laundered by redirecting the link). Nothing is written,
 # outside the worktree included (a scratch link lives in a mktemp directory).
@@ -812,7 +909,7 @@ check_trusted_links() {
     ls=$(mktemp) || die 2 "mktemp failed"
     out=$(mktemp) || { rm -f -- "$ls"; die 2 "mktemp failed"; }
     tdir=$(mktemp -d) || { rm -f -- "$ls" "$out"; die 2 "mktemp failed"; }
-    yr_git ls-files -s -z >|"$ls" 2>/dev/null \
+    yr_git ls-tree -r -z HEAD >|"$ls" 2>/dev/null \
         || { rm -rf -- "$ls" "$out" "$tdir"; die 2 "cannot list tracked symlinks to check trusted-config targets"; }
     safe=$(yr_walk_path) || { rm -rf -- "$ls" "$out" "$tdir"; die 2 "cannot build a safe PATH to check trusted-config symlinks"; }
     top=$(pwd -P)
@@ -837,14 +934,16 @@ check_trusted_links() {
                 # Git lists the link as changed and the revert restores the HEAD
                 # link, so judge the HEAD link's target through a scratch link.
                 sha="${rec#* }"
-                sha="${sha%% *}"
+                sha="${sha#* }"
+                sha="${sha%%$'\t'*}"
                 t=$(yr_git cat-file blob "$sha" 2>/dev/null; printf x) || t=""
                 t="${t%x}"
                 if [ -z "$t" ]; then printf '%s\0' "$f" >>"$out"; continue; fi
+                parent=.
+                case "$f" in */*) parent="${f%/*}" ;; esac
                 case "$t" in
                     /*) ;;
-                    */*) t="$top/${f%/*}/$t" ;;
-                    *) t="$top/$t" ;;
+                    *) t="$top/$parent/$t" ;;
                 esac
                 rm -f -- "$tdir/l"
                 ln -s -- "$t" "$tdir/l" 2>/dev/null || { printf '%s\0' "$f" >>"$out"; continue; }
@@ -856,14 +955,48 @@ check_trusted_links() {
             canon=$(yr_canon_path "$probe" 2>/dev/null) || canon=""
             if [ -n "$IGNORED_SINCE" ]; then
                 rc=0
-                rp_link_target_changed "$probe" "$IGNORED_SINCE" || rc=$?
+                rp_link_target_changed "$probe" "$IGNORED_SINCE" follow || rc=$?
                 [ "$rc" -eq 1 ] || hit=1
                 if [ "$hit" = 1 ] && [ "$rc" -eq 0 ] && [ -n "$canon" ] && yr_inside_root "$canon" "$top"; then
                     rel="${canon#"$top"/}"
                     ! rp_trusted_config "$rel" || hit=0
                 fi
             else
-                if [ -z "$canon" ] || ! yr_inside_root "$canon" "$top"; then hit=1; fi
+                # Inside the worktree counts as covered only for a tracked path
+                # outside .git: the tree check never sees an ignored file or
+                # anything under .git.
+                if [ -z "$canon" ] || ! yr_inside_root "$canon" "$top"; then
+                    hit=1
+                else
+                    rel="${canon#"$top"/}"
+                    case "$canon:$rel" in
+                        "$top:"*|*:.git|*:.git/*) hit=1 ;;
+                        *)
+                            # A skip-worktree or assume-unchanged flag hides
+                            # edits from the tree check too (ls-files -v tags
+                            # them S or lowercase).
+                            # Only a tracked regular file with a plain H tag
+                            # counts: ls-files lists a directory's tracked
+                            # descendants, which would cover an ignored one.
+                            tagged=$(yr_git ls-files -v -- "$rel" 2>/dev/null | head -n 1) || tagged=""
+                            if [ ! -f "$canon" ]; then
+                                hit=1
+                            else
+                                case "$tagged" in
+                                    "H "*) ;;
+                                    *) hit=1 ;;
+                                esac
+                                # A target git lists as changed is live edited
+                                # content; only a trusted-config one is reverted.
+                                if [ "$hit" = 0 ] && ! rp_trusted_config "$rel"; then
+                                    for c in ${changed[@]+"${changed[@]}"}; do
+                                        [ "$c" != "$rel" ] || { hit=1; break; }
+                                    done
+                                fi
+                            fi
+                            ;;
+                    esac
+                fi
             fi
             [ "$hit" = 0 ] || printf '%s\0' "$f" >>"$out"
         done <"$ls"
