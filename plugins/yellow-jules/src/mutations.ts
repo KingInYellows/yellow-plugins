@@ -215,6 +215,8 @@ async function nextAttemptRequestId(
   deps: WriteDeps,
   base: string
 ): Promise<string> {
+  // Location rules first: reading the journal creates the state directory.
+  prepare(deps);
   const { operations } = await readJournal(deps.dataDir);
   let candidate = base;
   for (let attempt = 2; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {

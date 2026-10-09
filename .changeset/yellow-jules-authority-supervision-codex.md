@@ -58,3 +58,11 @@ review follows.
 
 The same holds for an unknown-outcome approval when a settled approval of the
 same plan could own the single `planApproved` activity.
+
+A plan step with a missing or non-string title, or a present non-string
+description, is now an unmapped activity instead of being read as empty text,
+so such a plan is neither shown as reviewed nor approved. `delegate
+--retry-failed` checks the data directory location before it reads the journal,
+so a data directory inside the checkout or plugin cache is refused without
+creating anything. `supervise --clear-pause` requires this host's controller
+authority for the pause's grant.

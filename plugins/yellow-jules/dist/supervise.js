@@ -26,6 +26,7 @@ exports.superviseOnce = superviseOnce;
 exports.clearPause = clearPause;
 const activity_walk_js_1 = require("./activity-walk.js");
 const authority_js_1 = require("./authority.js");
+const controller_js_1 = require("./controller.js");
 const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
 const redact_js_1 = require("./redact.js");
@@ -649,6 +650,21 @@ function walkFollowsPause(record, paused) {
  * at what happened first, and the activity that caused the pause is no longer
  * "new" to the next pass.
  */
+/**
+ * R38: clearing a pause widens what the owning grant may write, so it needs the
+ * same controller authority a write does. A second host that shares the data
+ * directory but holds no matching authority file (or a stale epoch) is refused
+ * with `JULES_CONTROLLER_MISMATCH`, even with the terminal code in hand.
+ */
+function assertPauseControllerAuthority(deps, grantId) {
+    if (grantId === undefined)
+        return;
+    const grant = (0, authority_js_1.loadGrants)(deps.dataDir).grants[grantId];
+    if (grant === undefined)
+        return;
+    const ctx = (0, runtime_support_js_1.resolveControllerContext)(deps);
+    (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef, ctx.controllerId);
+}
 async function clearPause(deps, args) {
     (0, runtime_support_js_1.refuseInsideSupervisedSession)(deps.env, 'supervise --clear-pause');
     (0, runtime_support_js_1.prepare)(deps);
@@ -666,6 +682,7 @@ async function clearPause(deps, args) {
             recoveryAction: 'Run status for this session first, inspect it, then retry.',
         });
     }
+    assertPauseControllerAuthority(deps, owner.grantId);
     await (0, runtime_support_js_1.confirmOwner)(deps, [
         'yellow-jules: CLEAR SUPERVISION PAUSE',
         `  session:     ${sessionResource}`,
@@ -682,6 +699,9 @@ async function clearPause(deps, args) {
     // The owner typed the code for THIS pause. A pass that recorded a different
     // pause or newer outside activity during the wait must not be cleared by it.
     await (0, state_js_1.updateJournal)(deps.dataDir, (operations) => {
+        // Rechecked under the journal lock: the controller may have changed while
+        // the confirmation was open.
+        assertPauseControllerAuthority(deps, owner.grantId);
         const current = operations[owner.localRequestId];
         const state = current?.supervision;
         if (current === undefined ||

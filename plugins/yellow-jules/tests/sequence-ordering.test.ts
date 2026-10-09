@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { resolveJournalPath } from '../src/config.js';
+import { controllerFilePath } from '../src/controller.js';
 import {
   AdapterError,
   AppErrorException,
@@ -481,6 +482,30 @@ describe('clear-pause orders the walk against the pause by sequence', () => {
       clearPause(h.deps, { session: session.localId })
     ).resolves.toMatchObject({ cleared: true });
   });
+
+  it.each(['missing', 'stale-epoch'] as const)(
+    "refuses to clear a pause without this host's controller authority (%s)",
+    async (mode) => {
+      await seed(5, 6);
+      const file = controllerFilePath(h.controllerDir, 'testhost');
+      if (mode === 'missing') {
+        fs.rmSync(file);
+      } else {
+        const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as {
+          epoch: number;
+        };
+        fs.writeFileSync(
+          file,
+          JSON.stringify({ ...raw, epoch: raw.epoch + 1 })
+        );
+      }
+      const err = (await clearPause(h.deps, {
+        session: session.localId,
+      }).catch((e: unknown) => e)) as AppErrorException;
+      expect(err.appError.code).toBe('JULES_CONTROLLER_MISMATCH');
+      expect((await owner())?.supervision?.paused).toBeDefined();
+    }
+  );
 
   it('refuses a walk that began before the pause when both share a millisecond', async () => {
     await seed(6, 5);

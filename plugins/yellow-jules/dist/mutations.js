@@ -119,6 +119,8 @@ function expiredBeforeWrite() {
 /** Cap on chained retries so a runaway journal cannot grow the id without bound. */
 const MAX_RETRY_ATTEMPTS = 50;
 async function nextAttemptRequestId(deps, base) {
+    // Location rules first: reading the journal creates the state directory.
+    (0, runtime_support_js_1.prepare)(deps);
     const { operations } = await (0, state_js_1.readJournal)(deps.dataDir);
     let candidate = base;
     for (let attempt = 2; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {

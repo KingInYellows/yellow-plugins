@@ -49,6 +49,27 @@ function args(overrides: Partial<DelegateArgs> = {}): DelegateArgs {
   };
 }
 
+describe('--retry-failed validates the data directory location first', () => {
+  it.each([true, false])(
+    'an invalid data dir inside the plugin directory is refused and nothing is created (dryRun %s)',
+    async (dryRun) => {
+      const pluginRoot = fs.mkdtempSync(
+        path.join(path.dirname(h.dataDir), 'plugin-root-')
+      );
+      const inside = path.join(pluginRoot, 'state-home');
+      const deps = { ...h.deps, dataDir: inside, pluginRoot };
+      await expect(
+        delegate(
+          deps,
+          args({ dryRun, requestId: 'base-req', retryFailed: true })
+        )
+      ).rejects.toMatchObject({ appError: { code: 'JULES_DATA_DIR' } });
+      expect(fs.existsSync(inside)).toBe(false);
+      expect(fs.readdirSync(pluginRoot)).toEqual([]);
+    }
+  );
+});
+
 async function fails(
   run: () => Promise<unknown>
 ): Promise<MutationErrorException> {

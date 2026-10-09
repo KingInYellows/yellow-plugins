@@ -157,6 +157,50 @@ describe('vendor fields that render bare are allowlisted', () => {
     expect(rec.message).toBe('');
   });
 
+  it.each([
+    ['a missing title', { id: 's1', index: 0 }],
+    ['a numeric title', { id: 's1', title: 7, index: 0 }],
+    ['a null title', { id: 's1', title: null, index: 0 }],
+    [
+      'an object description',
+      { id: 's1', title: 'a', description: {}, index: 0 },
+    ],
+    [
+      'a numeric description',
+      { id: 's1', title: 'a', description: 3, index: 0 },
+    ],
+  ])('a plan step with %s is malformed, never normalized', (_l, step) => {
+    expect(() =>
+      mapActivity({
+        id: 'a1',
+        type: 'planGenerated',
+        createTime: '2026-09-10T00:00:01Z',
+        plan: { id: 'p1', steps: [step] },
+        artifacts: [],
+      } as unknown as Parameters<typeof mapActivity>[0])
+    ).toThrow(/malformed (title|description)/);
+  });
+
+  it('keeps an empty title and an absent or null description of a plan step', () => {
+    const rec = mapActivity({
+      id: 'a1',
+      type: 'planGenerated',
+      createTime: '2026-09-10T00:00:01Z',
+      plan: {
+        id: 'p1',
+        steps: [
+          { id: 's1', title: '', index: 0 },
+          { id: 's2', title: 'b', description: null, index: 1 },
+        ],
+      },
+      artifacts: [],
+    } as unknown as Parameters<typeof mapActivity>[0]);
+    expect(rec.plan?.steps.map((s) => s.title)).toEqual(['', 'b']);
+    expect(rec.plan?.steps.every((s) => s.description === undefined)).toBe(
+      true
+    );
+  });
+
   it('keeps the vendor index of a well-formed plan step', () => {
     const rec = mapActivity({
       id: 'a1',

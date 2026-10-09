@@ -325,9 +325,20 @@ function mapActivity(activity) {
                 step.index < 0) {
                 (0, errors_js_1.throwAppError)('JULES_MALFORMED_RESPONSE', `plan activity ${activityId} has a step with a malformed index`);
             }
+            // The title and description are part of what the reviewer approves: a
+            // missing or non-string title, or a present non-string description, is a
+            // malformed activity (the walk stops on it), never normalized to ''.
+            if (typeof step.title !== 'string') {
+                (0, errors_js_1.throwAppError)('JULES_MALFORMED_RESPONSE', `plan activity ${activityId} has a step with a malformed title`);
+            }
+            if (step.description !== undefined &&
+                step.description !== null &&
+                typeof step.description !== 'string') {
+                (0, errors_js_1.throwAppError)('JULES_MALFORMED_RESPONSE', `plan activity ${activityId} has a step with a malformed description`);
+            }
             return {
                 id: (0, validate_js_1.validatePlanId)(step.id, 'response'),
-                title: str(step.title),
+                title: step.title,
                 ...(typeof step.description === 'string'
                     ? { description: step.description }
                     : {}),

@@ -289,6 +289,13 @@ A bindable `needs-answer` question must also display unchanged through the
 dash runs fold, text over 6000 characters is cut). Otherwise `reply` is withheld
 and `questionUnavailable` is set, because the digest binds the raw question.
 
+`supervise --clear-pause` also checks the owning grant's controller authority,
+before the terminal prompt and again under the journal lock; a host without a
+matching authority file is refused with `JULES_CONTROLLER_MISMATCH`. A plan step
+whose title is not a string, or whose description is present and not a string,
+is an unmapped activity (the walk stops, supervision pauses, approval refetch
+refuses) rather than being normalized to an empty string.
+
 Binding a create to a session that an `observe` row already owns (reconcile, or
 a create whose response arrived after a raw-resource `status`) folds that row
 into the create and retires its local id: deviations stay unreconciled if either
