@@ -152,7 +152,7 @@ types a confirmation code there.
 ### Step 5: Preview and Confirm
 
 Show the session, the grant id, and whether this is a corrective message (and how
-many rounds the grant has left). Then print the message fenced (a message over 500
+many rounds the grant has left). Then print the whole message fenced (one over 20000
 characters is refused: the preview must show everything that is sent), with this Bash call (same substitution rule; also substitute the
 grant id from Step 4 and the request id from Step 3). It prints the confirmation
 `binding=` value:
@@ -191,10 +191,10 @@ MESSAGE=$(cat -- "$WORK_DIR/message.txt")
 bind_hash() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
 }
-# The preview shows 500 characters but the binding covers, and Step 6 sends, the whole message.
+# The preview prints the whole message: one too long to show in full cannot be confirmed.
 MESSAGE_CHARS=$(printf '%s' "$MESSAGE" | jq -Rrs 'length')
-if [ "$MESSAGE_CHARS" -gt 500 ]; then
-  printf 'ERROR: the message is %s characters; the preview shows at most 500, so it cannot be confirmed. Nothing was sent. Shorten the message to 500 characters or fewer and start again from Step 2.\n' "$MESSAGE_CHARS" >&2; exit 1
+if [ "$MESSAGE_CHARS" -gt 20000 ]; then
+  printf 'ERROR: the message is %s characters; the preview shows at most 20000 in full, so it cannot be confirmed. Nothing was sent. Shorten the message and start again from Step 2.\n' "$MESSAGE_CHARS" >&2; exit 1
 fi
 MESSAGE_SHA=$(printf '%s' "$MESSAGE" | bind_hash)
 BINDING=$(printf '%s' "${SESSION}|${GRANT_ID}|${REQUEST_ID}|${CORRECTION}|${MESSAGE_SHA}" | bind_hash)
@@ -202,7 +202,7 @@ printf 'binding=%s\n' "$BINDING"
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
 printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
-printf '%s' "$MESSAGE" | jq -Rrs 'gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | .[0:500]'
+printf '%s' "$MESSAGE" | jq -Rrs 'gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ")'
 printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
 ```
 

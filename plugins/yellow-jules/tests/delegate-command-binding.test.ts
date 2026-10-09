@@ -481,7 +481,7 @@ describe('/jules:supervise binds the reply to the pass decision', () => {
   });
 });
 
-describe('/jules:reply refuses a preview that would hide part of the message', () => {
+describe('/jules:reply previews the whole message it binds', () => {
   const reply = cmd('reply');
   const s5 = reply.slice(
     reply.indexOf('### Step 5'),
@@ -503,18 +503,18 @@ describe('/jules:reply refuses a preview that would hide part of the message', (
     return res;
   };
 
-  it('prints the binding and the whole message when it fits', () => {
-    const res = run('x'.repeat(500));
+  it('prints a message longer than 500 characters in full, with its binding', () => {
+    const res = run(`${'x'.repeat(1500)}TAIL`);
     expect(res.status).toBe(0);
     expect(res.stdout).toMatch(/binding=[0-9a-f]{64}/);
-    expect(res.stdout).toContain('x'.repeat(500));
+    expect(res.stdout).toContain('TAIL');
   });
 
-  it('exits without a binding when the message is over 500 characters', () => {
-    const res = run('x'.repeat(501));
+  it('exits without a binding when the message is too long to show in full', () => {
+    const res = run('x'.repeat(20001));
     expect(res.status).toBe(1);
     expect(res.stdout).not.toContain('binding=');
-    expect(res.stderr).toContain('501 characters');
+    expect(res.stderr).toContain('20001 characters');
   });
 });
 
