@@ -196,10 +196,15 @@ equals the current run id lets a retry skip the provider and the
 remaining-rebase check. A missing, mismatched, symlinked or legacy (id-less)
 marker is ignored, and the moved-tip check always runs, so a forged marker
 cannot hide restacked branches. If the provider's abort succeeded but its
-marker could not be written, the abort still runs to the end; only when an in-chain rebase
-then cannot be cleared does it keep the state (exit `31`), and abort that
-rebase by hand first, because fixing only the marker path leaves `--abort`
-refusing as above.
+marker cannot be written (for example `provider-aborted` is a directory), the
+abort retries the write before any refusal and otherwise runs to the end. Every
+later refusal then reports the unwritten marker, names its path and exits `31`
+with the state kept: a stuck in-chain rebase, moved tips, a busy operation, a
+run worktree that cannot be returned, or a worktree listing failure. A
+partial restore (exit `40`) prints the same warning. Fix the marker path and run
+`--abort` again; never run `--continue`, which would treat the rolled-back stack
+as restacked. With a stuck rebase, clear that rebase by hand first, because
+fixing only the marker path leaves `--abort` refusing as above.
 
 If the provider has lost its record of the paused restack (Graphite's
 `.gtcontinue` or gh-stack's rebase state) while a stack branch is still
@@ -225,9 +230,6 @@ The provider abort has already succeeded there (a valid marker), so
 `--continue` is refused: reset the branches and run `--abort` again, or run
 `restore` to keep them where they are, put the worktrees back and clear the
 state.
-If the marker itself cannot be written (for example `provider-aborted` is a
-directory), every such refusal says so, names the path and asks to rerun
-`--abort`; it never suggests `--continue`.
 
 `--continue` refuses with exit `31` once the provider's abort has succeeded
 (a valid marker) but the abort cleanup is unfinished; run `--abort` to finish.
