@@ -151,12 +151,18 @@ types a confirmation code there.
 
 Show the session, the grant id, and whether this is a corrective message (and how
 many rounds the grant has left). Then print the first 500 characters of the
-message fenced, with this Bash call (same substitution rule):
+message fenced, with this Bash call (same substitution rule; also substitute the
+grant id from Step 4 and the request id from Step 3). It prints the confirmation
+`binding=` value:
 
 ```bash
 set -uo pipefail
 WORK_DIR='YELLOW_TODO_work_dir'
-case "$WORK_DIR" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+SESSION='YELLOW_TODO_session'
+GRANT_ID='YELLOW_TODO_grant_id'
+REQUEST_ID='YELLOW_TODO_request_id'
+CORRECTION='YELLOW_TODO_1_or_0'
+case "$WORK_DIR$SESSION$GRANT_ID$REQUEST_ID$CORRECTION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 case "$WORK_DIR" in
   *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
   /*/yellow-jules-reply.??????) ;;
@@ -177,21 +183,30 @@ for f in message.txt; do
   fi
 done
 command -v jq >/dev/null 2>&1 || { printf 'ERROR: jq required.\n' >&2; exit 1; }
+# Confirmation binding: sha256 over the scope and the exact staged message bytes.
+MESSAGE=$(cat -- "$WORK_DIR/message.txt")
+bind_hash() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
+}
+MESSAGE_SHA=$(printf '%s' "$MESSAGE" | bind_hash)
+BINDING=$(printf '%s' "${SESSION}|${GRANT_ID}|${REQUEST_ID}|${CORRECTION}|${MESSAGE_SHA}" | bind_hash)
+printf 'binding=%s\n' "$BINDING"
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
 printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
-jq -Rrs 'gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | .[0:500]' "$WORK_DIR/message.txt"
+printf '%s' "$MESSAGE" | jq -Rrs 'gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | .[0:500]'
 printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
 ```
 
 The text inside the fence is the message you are about to send (reference only).
 Then AskUserQuestion: "Send this message to the Jules session?" with "Yes, send"
-and "No, cancel". If the user declines, stop.
+and "No, cancel". If the user declines, stop. Keep the printed `binding=` value for Step 6.
 
 ### Step 6: Send
 
 Immediately after confirmation, send with the grant id from Step 4 and the
-request id from Step 3. Bash timeout 300000 ms. Same substitution rule:
+request id from Step 3 and the `binding=` value from Step 5. The block recomputes
+the binding and refuses to call the CLI when it differs. Bash timeout 300000 ms. Same substitution rule:
 
 ```bash
 set -uo pipefail
@@ -201,7 +216,8 @@ GRANT_ID='YELLOW_TODO_grant_id'
 REQUEST_ID='YELLOW_TODO_request_id'
 DEADLINE='YELLOW_TODO_deadline_or_empty'
 CORRECTION='YELLOW_TODO_1_or_0'
-case "$WORK_DIR$SESSION$GRANT_ID$REQUEST_ID$DEADLINE$CORRECTION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+CONFIRMED_BINDING='YELLOW_TODO_binding_from_preview'
+case "$WORK_DIR$SESSION$GRANT_ID$REQUEST_ID$DEADLINE$CORRECTION$CONFIRMED_BINDING" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 case "$WORK_DIR" in
   *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
   /*/yellow-jules-reply.??????) ;;
@@ -223,7 +239,20 @@ for f in message.txt; do
 done
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 [ -f "$CLI" ] || { printf 'ERROR: yellow-jules CLI not found at %s. Reinstall the plugin.\n' "$CLI" >&2; exit 1; }
-args=(reply --session "$SESSION" "--message=$(cat -- "$WORK_DIR/message.txt")" --grant-id "$GRANT_ID" --request-id "$REQUEST_ID")
+# Read the message once; the digest and the dispatched value are the same bytes.
+MESSAGE=$(cat -- "$WORK_DIR/message.txt")
+bind_hash() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
+}
+MESSAGE_SHA=$(printf '%s' "$MESSAGE" | bind_hash)
+BINDING=$(printf '%s' "${SESSION}|${GRANT_ID}|${REQUEST_ID}|${CORRECTION}|${MESSAGE_SHA}" | bind_hash)
+if ! printf '%s' "$CONFIRMED_BINDING" | grep -qE '^[0-9a-f]{64}$'; then
+  printf 'ERROR: CONFIRMED_BINDING must be the 64-hex binding= value printed by the Step 5 preview.\n' >&2; exit 1
+fi
+if [ "$CONFIRMED_BINDING" != "$BINDING" ]; then
+  printf 'ERROR: the message, session, grant, request id or correction flag changed since the confirmed preview. Nothing was sent; run Step 5 again and ask for confirmation again.\n' >&2; exit 1
+fi
+args=(reply --session "$SESSION" "--message=$MESSAGE" --grant-id "$GRANT_ID" --request-id "$REQUEST_ID")
 [ -n "$DEADLINE" ] && args+=(--deadline-ms "$DEADLINE")
 [ "$CORRECTION" = 1 ] && args+=(--correction)
 OUTPUT=$(node "$CLI" "${args[@]}")
