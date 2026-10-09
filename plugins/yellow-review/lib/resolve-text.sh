@@ -211,13 +211,16 @@ _rt_scan() {
                 vd = (d == "=") ? 0 : b64digit(d)
                 if (va < 0 || vb < 0 || vc < 0 || vd < 0) return 0
                 byte = int(va * 4 + int(vb / 16))
+                if (byte < 32 || byte > 126) return 0
                 out = out sprintf("%c", byte)
                 if (c != "=") {
                     byte = int((vb % 16) * 16 + int(vc / 4))
+                    if (byte < 32 || byte > 126) return 0
                     out = out sprintf("%c", byte)
                 }
                 if (d != "=") {
                     byte = int((vc % 4) * 64 + vd)
+                    if (byte < 32 || byte > 126) return 0
                     out = out sprintf("%c", byte)
                 }
             }
@@ -543,10 +546,13 @@ _rt_scan() {
                 # decoding, so a hostile long token never reaches the
                 # per-byte decoder (mawk concatenation is quadratic).
                 btok = ""
+                # A run followed by more base64 characters or `=` is not a
+                # token (`YWI6Yw=Z`): leave btok empty.
                 if (scheme == "basic" && match(segorig, /^[A-Za-z0-9+\/]+=*/)) {
                     btok = substr(segorig, 1, RLENGTH)
+                    if (substr(segorig, RLENGTH + 1, 1) ~ /[A-Za-z0-9+\/=]/) btok = ""
                     sub(/=+$/, "", btok)
-                    while (length(btok) % 4) btok = btok "="
+                    while (btok != "" && length(btok) % 4) btok = btok "="
                 }
                 if (scheme == "basic" && length(btok) >= 4 && length(btok) < 20 && basiccred(btok)) flag("authorization-header")
                 else if (length(seg) >= 20) flag("authorization-header")
@@ -576,9 +582,11 @@ _rt_scan() {
                     if (v ~ /^(sk|rk|pk)_live_/ && mv >= 24) flag("token-prefix")
                     if (v ~ /^glpat-/ && mv >= 26) flag("token-prefix")
                     # In-repo floors: tvly- plus 20, pplx- plus 40, sgp_ plus 20.
-                    if (v ~ /^tvly-[A-Za-z0-9_-]/ && mv >= 25) flag("token-prefix")
-                    if (v ~ /^pplx-[A-Za-z0-9_-]/ && mv >= 45) flag("token-prefix")
-                    if (v ~ /^sgp_[A-Za-z0-9]/ && mv >= 24) flag("token-prefix")
+                    # The floor counts the leading token run only, not a later
+                    # `+ / =` segment of the same word.
+                    if (match(v, /^tvly-[A-Za-z0-9_-]+/) && RLENGTH >= 25) flag("token-prefix")
+                    if (match(v, /^pplx-[A-Za-z0-9_-]+/) && RLENGTH >= 45) flag("token-prefix")
+                    if (match(v, /^sgp_[A-Za-z0-9_-]+/) && RLENGTH >= 24) flag("token-prefix")
                     # hooks.slack.com/services/T<id>/B<id>/<secret>: the dot
                     # splits the host off, and the slashes would otherwise earn
                     # the path exemption below.
