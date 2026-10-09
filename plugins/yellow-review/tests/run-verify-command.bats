@@ -1935,7 +1935,7 @@ ignored_fixture() {
   [[ "$stderr" == *"node_modules/l1"* ]]
 }
 
-@test "--check-ignored fails closed on a symlink loop below an ignored directory link" {
+@test "--check-ignored skips a symlink loop below an external ignored directory link when nothing changed" {
   ignored_fixture
   MID="$BATS_TEST_TMPDIR/mid"
   mkdir -p "$MID"
@@ -1945,7 +1945,42 @@ ignored_fixture() {
   touch -h -t 201901010000 "$MID/loop" node_modules/l1
   touch -t 202001010000 "$IGN_MARKER"
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 0 ]
+}
+
+@test "--check-ignored stays clean on a pnpm-like ignored tree with internal links and a cycle" {
+  ignored_fixture
+  for pkg in a b c; do
+    mkdir -p "node_modules/.pnpm/$pkg@1/node_modules/$pkg/lib"
+    for i in $(seq 1 40); do printf 'x\n' >| "node_modules/.pnpm/$pkg@1/node_modules/$pkg/lib/f$i.js"; done
+  done
+  ln -s ../../../b@1/node_modules/b node_modules/.pnpm/a@1/node_modules/a/dep-b
+  ln -s ../../../a@1/node_modules/a node_modules/.pnpm/b@1/node_modules/b/dep-a
+  ln -s ../../../c@1/node_modules/c node_modules/.pnpm/b@1/node_modules/b/dep-c
+  ln -s ../../../b@1/node_modules/b node_modules/.pnpm/c@1/node_modules/c/dep-b
+  ln -s .pnpm/a@1/node_modules/a node_modules/a
+  ln -s .pnpm/b@1/node_modules/b node_modules/b
+  find node_modules -depth -exec touch -h -t 201901010000 {} +
+  touch -t 202001010000 "$IGN_MARKER"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = clean ]
+}
+
+@test "--revert-denied counts an alias into an excluded path whose descendant is trusted under the link's name" {
+  mkdir -p .claude/agent-memory/x
+  printf 'm\n' >| .claude/agent-memory/x/CLAUDE.md
+  ln -s .claude/agent-memory/x cfg
+  git add -f .claude/agent-memory/x/CLAUDE.md cfg && git commit -q -m "track alias into agent-memory"
+  touch -t 201901010000 .claude/agent-memory/x/CLAUDE.md
+  touch -t 202001010000 "$IGN_MARKER"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  printf 'evil\n' >| cfg/CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'cfg'* ]]
 }
 
 @test "--check-ignored never runs a find or head from a PATH directory inside the worktree" {
@@ -3482,11 +3517,15 @@ dirlink_setup() {
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
 }
 
-@test "--revert-denied fails closed on a tracked trusted-config directory symlink holding a symlink loop" {
+@test "--revert-denied skips a symlink loop inside a tracked trusted-config directory symlink when nothing changed, and still sees a newer file" {
   dirlink_setup
   ln -s . "$EXTDIR/loop"
+  touch -h -t 201901010000 "$EXTDIR/loop"
   run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
   [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  printf 'x\n' >| "$EXTDIR/new"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
 }
 

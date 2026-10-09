@@ -1406,31 +1406,65 @@ rp_walk_cap() {
 # directory, or dangling (nothing to write to). Returns 2 when it cannot tell:
 # the link cannot be read, the target directory cannot be walked, or the target
 # is hidden behind a directory that cannot be searched. An optional third
-# argument `follow` walks a target directory with find -L, so symlinks nested
-# below it are judged by their targets too; a loop or any other find error then
-# returns 2 (cannot tell). The trusted-config symlink check uses it, and so
+# argument `follow` also judges the symlinks nested below the target by their
+# targets: those inside the worktree are skipped (covered by the tree listing
+# and the ignored scan), those outside are walked once each (a repeat, a loop
+# or a dangling link is skipped); a find error returns 2 (cannot tell). The trusted-config symlink check uses it, and so
 # does rp_ignored_changed_since, filtered or not. The walk is bounded: see rp_walk_cap (at the cap the target counts as changed). Run it from the working
 # tree root with a path that does not begin with `-`.
 rp_link_target_changed() {
-    local l="$1" marker="$2" follow="${3:-}" t p d x n=0 cap skip="" fl=-H
+    local l="$1" marker="$2" follow="${3:-}" t p d x n=0 cap skip="" top c v dup qi queue seen
     if [ -e "$l" ]; then
         if [ -d "$l" ]; then
-            [ "$follow" != follow ] || fl=-L
             # The root `.ruvector` link: skip its session log as the literal
             # directory scan does (see rp_ignored_changed_since).
             case "$l" in .ruvector|./.ruvector) skip="$l/coedit-sessions" ;; esac
             # Every visited entry counts against rp_walk_cap; the walk is
             # streamed and stops at the first newer file (changed), at the cap
             # (changed: too large to judge) or at a find error (cannot tell).
+            # With `follow` the walk is breadth-first over link targets, each
+            # directory listed with find -H so a nested symlink is an entry,
+            # not a descent: a nested link whose target lies inside the
+            # worktree is skipped (the tree listing and the ignored scan cover
+            # that content, and pnpm-style stores are full of such links), a
+            # target outside it is queued once (a visited set of canonical
+            # paths skips a repeat, a loop or a dangling link silently), and a
+            # link to a file is judged by its target.
             cap=$(rp_walk_cap)
-            while IFS= read -r -d '' x; do
-                [ "$x" != $'\001ERR' ] || return 2
-                n=$((n + 1))
-                [ "$n" -le "$cap" ] || return 0
-                [ -f "$x" ] || continue
-                [ "$fl" = -L ] || [ ! -L "$x" ] || continue
-                [ "$x" -nt "$marker" ] && return 0
-            done < <(find "$fl" "$l" -name .git -prune -o -path "$skip" -prune -o -print0 2>/dev/null || printf '\001ERR\0')
+            queue=("$l")
+            if [ "$follow" = follow ]; then
+                top=$(pwd -P) || return 2
+                seen=$(yr_canon_path "$l") || return 2
+                seen=("$seen")
+            fi
+            qi=0
+            while [ "$qi" -lt "${#queue[@]}" ]; do
+                d="${queue[qi]}"
+                qi=$((qi + 1))
+                while IFS= read -r -d '' x; do
+                    [ "$x" != $'\001ERR' ] || return 2
+                    n=$((n + 1))
+                    [ "$n" -le "$cap" ] || return 0
+                    if [ -L "$x" ]; then
+                        [ "$follow" = follow ] && [ "$x" != "$d" ] || continue
+                        [ -e "$x" ] || continue
+                        c=$(yr_canon_path "$x") || continue
+                        ! yr_inside_root "$c" "$top" || continue
+                        if [ -d "$c" ]; then
+                            dup=""
+                            for v in "${seen[@]}"; do
+                                [ "$v" != "$c" ] || { dup=1; break; }
+                            done
+                            [ -n "$dup" ] || { seen+=("$c"); queue+=("$x"); }
+                        elif [ -f "$c" ] && [ "$c" -nt "$marker" ]; then
+                            return 0
+                        fi
+                        continue
+                    fi
+                    [ -f "$x" ] || continue
+                    [ "$x" -nt "$marker" ] && return 0
+                done < <(find -H "$d" -name .git -prune -o -path "$skip" -prune -o -print0 2>/dev/null || printf '\001ERR\0')
+            done
             return 1
         fi
         [ -f "$l" ] || return 1
@@ -1487,7 +1521,8 @@ rp_link_target_changed() {
 # to keep the printed form): only paths it accepts count, and a directory walk
 # filters before its 20-path cut. A symlink's target is always walked with
 # `follow`, so a link nested below a linked directory is judged by its own
-# target (a loop returns 2; the walk is capped, see rp_walk_cap).
+# target when that lies outside the worktree (a loop is skipped; the walk is
+# capped, see rp_walk_cap).
 rp_ignored_changed_since() {
     local marker="$1" scratch="$2" hitsfile="${3:-}" keep="${4:-}" safe own=""
     [ -z "$keep" ] || declare -F -- "$keep" >/dev/null || return 2

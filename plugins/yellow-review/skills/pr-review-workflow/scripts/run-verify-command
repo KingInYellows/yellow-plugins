@@ -929,12 +929,18 @@ check_trusted_links() {
     (
         PATH=$safe
         hash -r 2>/dev/null || true
-        # dir_link_hit <probe> <link>: 0 when the directory <probe> resolves to
-        # holds a descendant P with <link>/P trusted-config (newer than the
-        # marker when there is one), or the walk fails or is too large.
+        # dir_link_hit <probe> <link> [<physical>]: 0 when the directory <probe>
+        # resolves to holds a descendant P with <link>/P trusted-config (newer
+        # than the marker when there is one), or the walk fails or is too
+        # large. With <physical>, the worktree-relative path of an in-worktree
+        # target, P only counts when <physical>/P is not itself trusted-config
+        # (the tree listing already covers that spelling).
         dir_link_hit() {
-            local x rel n=0 cap
+            local x rel n=0 cap fl=-L
             cap=$(rp_walk_cap)
+            # Nested links inside the worktree are covered by the tree listing:
+            # an in-worktree target is walked without following them.
+            [ -z "${3:-}" ] || fl=-H
             while IFS= read -r -d '' x; do
                 [ "$x" != $'\001ERR' ] || return 0
                 n=$((n + 1))
@@ -945,8 +951,10 @@ check_trusted_links() {
                 # Every visited entry counts against the cap; the marker test
                 # (a regular file newer than it) is judged here, per entry.
                 [ -z "$IGNORED_SINCE" ] || { [ -f "$x" ] && [ "$x" -nt "$IGNORED_SINCE" ]; } || continue
-                ! rp_trusted_config "$2/$rel" || return 0
-            done < <(find -L "$1" -name .git -prune -o -print0 2>/dev/null || printf '\001ERR\0')
+                rp_trusted_config "$2/$rel" || continue
+                [ -n "${3:-}" ] && rp_trusted_config "$3/$rel" && continue
+                return 0
+            done < <(find "$fl" "$1" -name .git -prune -o -print0 2>/dev/null || printf '\001ERR\0')
             return 1
         }
         while IFS= read -r -d '' rec; do
@@ -987,8 +995,16 @@ check_trusted_links() {
                 # An ordinary-named link: only a directory outside the
                 # worktree can hide trusted-config descendants.
                 [ -d "$probe" ] || continue
-                if [ -n "$canon" ] && yr_inside_root "$canon" "$top"; then continue; fi
-                if dir_link_hit "$probe" "$f"; then printf '%s\0' "$f" >>"$out"; fi
+                phys=""
+                if [ -n "$canon" ] && yr_inside_root "$canon" "$top"; then
+                    # The tree listing covers the physical spelling only. An
+                    # alias into an excluded path (.claude/agent-memory/x)
+                    # can make a descendant trusted under the link's name.
+                    phys="${canon#"$top"}"
+                    phys="${phys#/}"
+                    [ -n "$phys" ] || phys="."
+                fi
+                if dir_link_hit "$probe" "$f" ${phys:+"$phys"}; then printf '%s\0' "$f" >>"$out"; fi
                 continue
             fi
             if [ -n "$IGNORED_SINCE" ]; then
