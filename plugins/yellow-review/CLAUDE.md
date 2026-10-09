@@ -256,13 +256,18 @@ resolution, and sequential stack review. Graphite-native workflow.
 absolute path outside it. `commit-resolve-fixes` also refuses a `gt`, `node` or
 `awk` whose canonical file is inside the worktree, including a symlink
 outside the worktree that points at one, and drops empty or relative `PATH`
-entries before that check. Every other tool either script runs by bare name
-(`grep`, `sed`, `sort`, `cut`, `tr`, `wc`, `head`, `tail`, `cat`, `mktemp`,
-`rm`, `mv`, `find`, `dirname` and the rest listed in `yr_safe_path`) is not
-refused: both scripts call `yr_adopt_path` before parsing arguments and run on
-`yr_safe_path`'s result, which drops a `PATH` directory inside the worktree and
-a directory in which any of those tools is a symlink (dangling or not) into it,
-so the name resolves to a file outside the worktree or not at all.
+entries before that check. Every other program either script, git or a git child
+(`ssh`, `git-credential-*`, `gpg`, pagers, `git-remote-*`) looks up by bare
+name is not refused: both scripts call `yr_adopt_path` before parsing
+arguments and run on `yr_safe_path`'s result. It drops a `PATH` directory
+inside the worktree and any directory that holds a symlink, whatever its name,
+dangling or not, whose canonical target (a file or a directory) is inside the
+worktree, so the name resolves to a file outside the worktree or not at all.
+There is no name list to extend. The screen runs no `PATH` tool: it uses
+shell globs and tests, plus `find` and GNU `realpath -m` from fixed system
+directories (one `realpath` call for all ordinary directories, one `find` for
+a directory over 300 entries). Without them it canonicalizes each link in the
+shell, and a link it cannot resolve drops the directory.
 `run-verify-command` still gives the verify command the caller's `PATH`
 (`YR_ORIG_PATH`). Both scripts take their own directory by parameter expansion,
 not `dirname`.
