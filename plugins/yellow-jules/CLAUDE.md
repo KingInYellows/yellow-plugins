@@ -323,6 +323,12 @@ other steps is reported as a policy deviation. Two different agent questions at
 the newest `createTime` withhold the `reply` action in `supervise` and make a
 question-bound `reply` refuse with `JULES_QUESTION_CHANGED`.
 
+Same-text messages are classified as a batch: when a settled write and an
+unresolved one share a digest and a walk holds more such messages than settled
+writes, the settled writes take the earliest messages, the unresolved write gets
+no landing evidence, and the surplus is held and recorded as possible outside
+activity.
+
 Outside-activity markers treat an equal `createTime` as unordered: a second
 outside message at the marker's time, whatever its id, replaces the marker so a
 `--clear-pause` confirmed against the old id is refused. `approve` rejects any

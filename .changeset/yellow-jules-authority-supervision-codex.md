@@ -96,3 +96,8 @@ A second outside message at the same timestamp as the recorded marker now
 replaces it, so `supervise --clear-pause` cannot forget it, and `approve`
 rejects observed steering even when the pause it read earlier was cleared
 before the reservation.
+
+When an accepted reply and an unresolved one share their text and a walk sees
+more matching messages than accepted replies, the unresolved reply is no longer
+credited with the surplus message; it stays unresolved and the surplus is
+recorded as possible outside activity.

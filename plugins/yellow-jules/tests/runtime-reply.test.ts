@@ -740,6 +740,34 @@ describe('races inside the write gate', () => {
       ).toBe(activity.activityId);
     });
 
+    it('one echo plus an identical teammate message does not credit the unresolved write', async () => {
+      // A settled reply and an unresolved one share the text; the walk holds two
+      // such messages. Which is whose is unknowable, so the unresolved write
+      // gets no landing evidence and the surplus is possible outside activity.
+      const a = await reserveUnderGrant(h.deps, replyGate('pend-a'));
+      await assertGrantLiveBeforeWrite(h.deps, a, 'reconcile');
+      await settleAccepted(h.deps, a);
+      h.deps.clock.time += 1_000;
+      const b = await reserveUnderGrant(h.deps, replyGate('pend-b'));
+      await assertGrantLiveBeforeWrite(h.deps, b, 'reconcile');
+      h.deps.clock.time += 1_000;
+      setVendorState(h, session.sessionResource, 'inProgress');
+      for (const activityId of ['act-m1', 'act-m2']) {
+        addActivity(h, session.sessionResource, {
+          type: 'userMessaged',
+          message: MESSAGE,
+          originator: 'user',
+          activityId,
+        });
+      }
+      h.deps.clock.time += 10 * 60_000;
+      await readStatus();
+      const journal = await readJournal(h.dataDir);
+      expect(journal.operations['pend-a']?.echoActivityId).toBe('act-m1');
+      expect(journal.operations['pend-b']?.echoActivityId).toBeUndefined();
+      expect((await owner())?.supervision?.outsideSeen).toBeDefined();
+    });
+
     it('a reservation stuck past its settle window no longer holds the walk', async () => {
       await dispatchedReplyWithMatchingMessage('pend-4');
       h.deps.clock.time += 10 * 60_000;

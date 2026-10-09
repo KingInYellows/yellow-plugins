@@ -1871,9 +1871,75 @@ export async function claimOwnEchoes(
       let newestOutside:
         | { activityId: string; digest: string; createTime?: string }
         | undefined;
+      const noteOutside = (message: {
+        activityId: string;
+        digest: string;
+        createTime?: string;
+      }): void => {
+        if (
+          newestOutside === undefined ||
+          compareStamp(
+            {
+              createTime: message.createTime ?? '',
+              activityId: message.activityId,
+            },
+            {
+              createTime: newestOutside.createTime ?? '',
+              activityId: newestOutside.activityId,
+            }
+          ) > 0
+        ) {
+          newestOutside = message;
+        }
+      };
+      // Classify each same-digest batch as a whole. When a settled write and an
+      // unresolved one share a digest and the walk holds more such messages than
+      // settled writes to claim them, which message is whose is unknowable: the
+      // settled writes take the earliest messages, the unresolved writes get no
+      // credit from this batch, and the surplus is possible outside activity.
+      // Without this the first message goes to the settled write and the second
+      // to the unresolved one, as false landing evidence.
+      const blockedDigests = new Set<string>();
+      const surplusIds = new Set<string>();
+      const byDigest = new Map<string, typeof messages>();
+      for (const m of messages) {
+        if (claimed.has(m.activityId)) continue;
+        byDigest.set(m.digest, [...(byDigest.get(m.digest) ?? []), m]);
+      }
+      for (const [digest, group] of byDigest) {
+        const candidates = landed.filter(
+          (r) => r.echoActivityId === undefined && r.promptDigest === digest
+        );
+        const settledCount = candidates.filter(
+          (r) => r.status === 'accepted' || r.status === 'reconciled'
+        ).length;
+        const unresolvedCount = candidates.length - settledCount;
+        if (
+          settledCount > 0 &&
+          unresolvedCount > 0 &&
+          group.length > settledCount
+        ) {
+          blockedDigests.add(digest);
+          [...group]
+            .sort((a, b) =>
+              compareStamp(
+                { createTime: a.createTime ?? '', activityId: a.activityId },
+                { createTime: b.createTime ?? '', activityId: b.activityId }
+              )
+            )
+            .slice(settledCount)
+            .forEach((m) => surplusIds.add(m.activityId));
+        }
+      }
       for (const message of messages) {
         if (claimed.has(message.activityId)) {
           release(message.activityId);
+          continue;
+        }
+        if (surplusIds.has(message.activityId)) {
+          pendingOut?.push(message.activityId);
+          hold(message);
+          noteOutside(message);
           continue;
         }
         const sent = message.createTime && Date.parse(message.createTime);
@@ -1898,11 +1964,14 @@ export async function claimOwnEchoes(
         const settledOpen = open.filter(
           (r) => r.status === 'accepted' || r.status === 'reconciled'
         );
-        const eligible = settledOpen.length > 0 ? settledOpen : open;
+        const blocked = blockedDigests.has(message.digest);
+        const eligible =
+          settledOpen.length > 0 ? settledOpen : blocked ? [] : open;
         // Several unresolved writes can own one message and nothing proves
         // which landed: crediting the latest would mark a write landed on a
         // guess. The message stays held until reconcile or abandon settles them.
-        const ambiguousUnresolved = settledOpen.length === 0 && open.length > 1;
+        const ambiguousUnresolved =
+          settledOpen.length === 0 && !blocked && open.length > 1;
         // Vendor list order is unverified, so with a usable timestamp prefer
         // the latest-dispatched write that precedes the message: an older
         // identical write then keeps the older echo.
@@ -1937,21 +2006,7 @@ export async function claimOwnEchoes(
         }
         if (slot === undefined) {
           release(message.activityId);
-          if (
-            newestOutside === undefined ||
-            compareStamp(
-              {
-                createTime: message.createTime ?? '',
-                activityId: message.activityId,
-              },
-              {
-                createTime: newestOutside.createTime ?? '',
-                activityId: newestOutside.activityId,
-              }
-            ) > 0
-          ) {
-            newestOutside = message;
-          }
+          noteOutside(message);
           continue;
         }
         claimed.add(message.activityId);
