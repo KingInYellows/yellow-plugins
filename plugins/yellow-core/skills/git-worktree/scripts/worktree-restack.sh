@@ -1702,7 +1702,7 @@ cmd_abort() {
   elif [ "${#T_BRANCH[@]}" -eq 0 ] && ! aborted_marker_valid; then
     # A state file from before tips were recorded: with no provider rollback
     # and no rebase to abort, nothing shows whether branches were restacked.
-    die "$X_KEPT" "the provider has no paused restack to roll back and this state file has no recorded start tips, so it cannot tell whether stack branches were already restacked; state kept, nothing aborted or restored. Inspect the stack branches and, if needed, point them back by hand (git reset --hard <commit> in the worktree that has the branch checked out, else git branch -f <branch> <commit>). Then run --continue to keep them, or run restore (no provider) to put the worktrees back and clear the state"
+    die "$X_KEPT" "the provider has no paused restack to roll back and this state file has no recorded start tips, so it cannot tell whether stack branches were already restacked; state kept, nothing aborted or restored. Inspect the stack branches and, if needed, point them back by hand (reset it in the worktree that has the branch checked out, else git branch -f <branch> <commit>). Then run --continue to keep them, or run restore (no provider) to put the worktrees back and clear the state"
   fi
   # The provider abort only clears the rebase it recorded. Abort any other
   # in-chain git rebase (a stack branch, in whichever worktree holds it),
