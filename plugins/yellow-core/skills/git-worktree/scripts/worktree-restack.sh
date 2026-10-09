@@ -1647,6 +1647,26 @@ cmd_continue() {
   drive_result
 }
 
+# rollback_recorded: 0 when this invocation's provider abort is on record (the
+# marker is written, retrying a failed write now), or when no abort ran here.
+# Every refusal after a successful provider abort goes through it, so none can
+# leave the abort unrecorded and then advise --continue.
+MARKER_PENDING=0
+rollback_recorded() {
+  [ "$MARKER_PENDING" = 1 ] || return 0
+  if write_aborted_marker 2>/dev/null; then
+    MARKER_PENDING=0
+    return 0
+  fi
+  return 1
+}
+
+# die_marker_unwritable: refuse, keeping the state, when the rollback record
+# cannot be written. Never suggests --continue.
+die_marker_unwritable() {
+  die "$X_KEPT" "the provider's abort succeeded, but the record of it, $(v "$ABORTED_FILE"), could not be written; state kept, nothing restored. Remove or fix that path, then run --abort again. --continue would treat the rolled-back stack as restacked"
+}
+
 # refuse_moved LEAD MOVED: print the moved branches, each with a fix line, and
 # exit 31 keeping the state. Never resets a branch itself.
 refuse_moved() {
@@ -1662,6 +1682,7 @@ refuse_moved() {
       note "    fix: git branch -f $(q "$mb") $(v "$mold")"
     fi
   done <<<"$2"
+  rollback_recorded || die_marker_unwritable
   if aborted_marker_valid; then
     # --continue refuses once the provider abort has succeeded; restore is the
     # path that accepts an already-aborted provider.
@@ -1677,7 +1698,7 @@ cmd_abort() {
   load_state_or_exit
   need_lock
   report_all_floating
-  local provider_aborted=0 marker_failed=0 left moved start=${S_CHAIN[1]:-}
+  local provider_aborted=0 left moved start=${S_CHAIN[1]:-}
   if [ "$S_PROVIDER" = graphite ] && aborted_marker_valid && ! gt_paused "$S_RUN"; then
     : # a recorded provider abort leaves nothing for gt to do, so a retry needs no gt.
     # A marker beside a still-paused Graphite conflict is stale or forged: gt abort runs.
@@ -1699,7 +1720,7 @@ cmd_abort() {
     # failed write does not stop the abort: cleanup below can still finish and
     # clear the state, which makes the marker moot. Only a cleanup that must
     # be retried needs it; that case is handled where it can fail.
-    write_aborted_marker 2>/dev/null || marker_failed=1
+    write_aborted_marker 2>/dev/null || MARKER_PENDING=1
   elif ! aborted_marker_valid && left=$(chain_rebase_worktree); then
     # The provider lost its record (Graphite's .gtcontinue or gh-stack's
     # rebase state) mid-restack, so its whole-stack rollback cannot run.
@@ -1722,7 +1743,7 @@ cmd_abort() {
   if ! abort_in_chain_rebases; then
     # The provider rollback already ran, so a retry must not reach the
     # lost-provider branch: it needs the marker, or no rebase left to find.
-    if [ "$marker_failed" = 1 ] && ! write_aborted_marker 2>/dev/null; then
+    if ! rollback_recorded; then
       die "$X_KEPT" "the provider's abort succeeded, but the marker $(v "$ABORTED_FILE") could not be written and a rebase operation is still in progress in $(v "$ABORT_STUCK"); state kept, nothing restored. Abort that rebase by hand (git -C $(q "$ABORT_STUCK") rebase --abort) before running --abort again; fixing only the marker path is not enough, because a rerun with that rebase in place would wrongly ask for a manual whole-stack reset"
     fi
     die "$X_KEPT" "a rebase operation is still in progress in $(v "$ABORT_STUCK"); state kept, nothing restored. Finish or abort it (git -C $(q "$ABORT_STUCK") rebase --abort), then run --abort again"

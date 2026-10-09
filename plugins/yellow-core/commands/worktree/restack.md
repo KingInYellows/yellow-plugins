@@ -225,6 +225,9 @@ The provider abort has already succeeded there (a valid marker), so
 `--continue` is refused: reset the branches and run `--abort` again, or run
 `restore` to keep them where they are, put the worktrees back and clear the
 state.
+If the marker itself cannot be written (for example `provider-aborted` is a
+directory), every such refusal says so, names the path and asks to rerun
+`--abort`; it never suggests `--continue`.
 
 `--continue` refuses with exit `31` once the provider's abort has succeeded
 (a valid marker) but the abort cleanup is unfinished; run `--abort` to finish.

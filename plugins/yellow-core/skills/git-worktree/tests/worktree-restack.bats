@@ -1151,6 +1151,38 @@ moved_by_hand() {
   [ ! -e "$SD/provider-aborted" ]
 }
 
+@test "an unwritable marker plus a moved tip never recommends --continue and asks to rerun --abort" {
+  mk_stack c
+  orig_b=$(git rev-parse b)
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  [ "$(git rev-parse b)" != "$orig_b" ]
+  # The provider is paused on c; b's old worktree is detached, so the user
+  # checks the restacked b out there and starts a conflicting rebase of it.
+  git -C "$(wtp b)" checkout -q b
+  printf 'b-side\n' >"$(wtp b)/z.txt"
+  git -C "$(wtp b)" add z.txt
+  git -C "$(wtp b)" commit -q -m "feat: b z"
+  printf 'main-side\n' >"$REPO/z.txt"
+  git -C "$REPO" add z.txt
+  git -C "$REPO" commit -q -m "main z"
+  git -C "$(wtp b)" rebase main >/dev/null 2>&1 || true
+  rebase_marker "$(wtp b)"
+  mkdir "$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"could not be written"* ]]
+  [[ $output == *"$SD/provider-aborted"* ]]
+  [[ $output == *"--abort again"* ]]
+  [[ $output != *"run --continue"* ]]
+  [ -e "$SD/state" ]
+  # With the path cleared, the rerun still refuses on the moved tip.
+  rmdir "$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [ -e "$SD/state" ]
+}
+
 @test "--continue after the user finished the provider's continue by hand verifies and restores" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
