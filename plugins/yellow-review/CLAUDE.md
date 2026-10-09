@@ -274,7 +274,11 @@ inside it, and injected `GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` or
 `gpg.program` and the like) that does; trusted values outside the worktree are
 kept. `GIT_CONFIG_PARAMETERS` is decoded in git's own quoting; an entry that
 cannot be decoded exactly (an escaped quote `'\''`, junk, an unterminated
-entry) is refused. Any inherited `GIT_CONFIG` (it makes `git config` read only that file,
+entry) is refused. An injected `include.path` or `includeIf.*.path` (either variable form,
+any case) is refused outright: git loads the file as command-line config, which the
+scans skip. A quote that opens in one word and closes in another (a quoted span
+containing whitespace, `sh 'dir with space/evil'`) is refused as unjudgeable;
+single-word wrappers such as `'/usr/bin/ssh'` still pass. Any inherited `GIT_CONFIG` (it makes `git config` read only that file,
 hiding the repository config from the scans) is refused. Command lines are judged whole: the raw value must not contain the
 worktree path as a whole path (`<root>2` and `<root>-keys` are siblings and
 pass), no word (quotes, a leading `!` and `--opt=VALUE` handled) may be an
