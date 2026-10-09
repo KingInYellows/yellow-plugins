@@ -233,7 +233,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   file list; `--revert-denied` reverts only trusted-config dirty paths
   (`rp_trusted_config`, a subset of the deny list), takes no file list, and
   needs `--ignored-since <marker-file>` (refusing on a changed gitignored
-  trusted-config file) or `--no-ignored-guard`; `--check-ignored --ignored-since <marker-file>` runs only the
+  trusted-config file) or `--no-ignored-guard`; a tracked trusted-config symlink whose target was written since the marker (or, with `--no-ignored-guard`, resolves outside the worktree) is left in place with `deniedClean: false`, and a verify run refuses on one; `--check-ignored --ignored-since <marker-file>` runs only the
   gitignored-file guard, for a resolve with no verify command.
   `/review:resolve-stack` and `/review:sweep-all` run it after a
   dirty resolve only when every dirty path is owned by the run (a PR file

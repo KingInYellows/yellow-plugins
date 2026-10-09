@@ -120,7 +120,12 @@
 #   Reasons seen only with --revert-denied: "no deny-listed changes to
 #   revert", "deny-listed changes remain after the revert", "reverted list
 #   withheld: ...", "reverted list shows the first 20 of N" and "left a
-#   nested git repository in place: <path>". The usual
+#   nested git repository in place: <path>" and "left a trusted-config
+#   symlink whose target may have been edited (or sits outside the worktree)
+#   in place: <path>" (deniedClean false; a tracked trusted-config symlink's
+#   target is judged against the --ignored-since marker, or counts when it
+#   resolves outside the worktree under --no-ignored-guard; a verify run
+#   refuses on one). The usual
 #   "changes remain after the revert" is not used there: the kept changes
 #   are expected.
 #   The revert modes run nothing and report "log": null. A passing command
@@ -702,6 +707,64 @@ add_unique_file() {
     FILES+=("$1")
 }
 
+# A write through a tracked symlink edits its target and leaves the link, which
+# is all rp_tree_changes sees. check_trusted_links fills LINK_HITS with every
+# tracked trusted-config symlink (.claude/settings.json -> a file elsewhere)
+# whose target may have been edited, so a clean listing is not read as a clean
+# denied set. With a marker (--ignored-since) the target is judged as an ignored
+# symlink's is (rp_link_target_changed: newer than the marker, or unjudgeable).
+# A target inside the worktree that is itself trusted-config is skipped: the
+# tree listing already covers it. Without a marker (--revert-denied
+# --no-ignored-guard) nothing can be compared, so a link that resolves outside
+# the worktree or cannot be resolved counts. A link that git lists as changed is
+# skipped (the revert restores it). Nothing is written, outside the worktree
+# included.
+LINK_HITS=()
+check_trusted_links() {
+    local ls out safe top f c changed
+    LINK_HITS=()
+    ls=$(mktemp) || die 2 "mktemp failed"
+    out=$(mktemp) || { rm -f -- "$ls"; die 2 "mktemp failed"; }
+    yr_git ls-files -s -z >|"$ls" 2>/dev/null \
+        || { rm -f -- "$ls" "$out"; die 2 "cannot list tracked symlinks to check trusted-config targets"; }
+    safe=$(yr_walk_path) || { rm -f -- "$ls" "$out"; die 2 "cannot build a safe PATH to check trusted-config symlinks"; }
+    top=$(pwd -P)
+    changed=()
+    if [ -s "$CHANGES_FILE" ]; then
+        while IFS= read -r -d '' c; do changed+=("$c"); done <"$CHANGES_FILE"
+    fi
+    (
+        PATH=$safe
+        hash -r 2>/dev/null || true
+        while IFS= read -r -d '' rec; do
+            mode="${rec%% *}"
+            [ "$mode" = 120000 ] || continue
+            f="${rec#*$'\t'}"
+            rp_trusted_config "$f" || continue
+            [ -L "$f" ] || continue
+            for c in ${changed[@]+"${changed[@]}"}; do
+                [ "$c" != "$f" ] || continue 2
+            done
+            hit=0
+            canon=$(yr_canon_path "$f" 2>/dev/null) || canon=""
+            if [ -n "$IGNORED_SINCE" ]; then
+                rc=0
+                rp_link_target_changed "$f" "$IGNORED_SINCE" || rc=$?
+                [ "$rc" -eq 1 ] || hit=1
+                if [ "$hit" = 1 ] && [ "$rc" -eq 0 ] && [ -n "$canon" ] && yr_inside_root "$canon" "$top"; then
+                    rel="${canon#"$top"/}"
+                    ! rp_trusted_config "$rel" || hit=0
+                fi
+            else
+                if [ -z "$canon" ] || ! yr_inside_root "$canon" "$top"; then hit=1; fi
+            fi
+            [ "$hit" = 0 ] || printf '%s\0' "$f" >>"$out"
+        done <"$ls"
+    ) || { rm -f -- "$ls" "$out"; die 2 "cannot check tracked trusted-config symlinks"; }
+    while IFS= read -r -d '' f; do LINK_HITS+=("$f"); done <"$out"
+    rm -f -- "$ls" "$out"
+}
+
 if [ "$MODE" != revert-only ]; then
     list_tree_changes || die 2 "cannot list tree changes"
     refuse_hidden_flags
@@ -735,6 +798,12 @@ elif [ "$MODE" = revert-denied ]; then
     while IFS= read -r -d '' f; do
         [ -n "$f" ] && rp_trusted_config "$f" && add_unique_file "$f"
     done <"$CHANGES_FILE"
+    # A symlink target that may have been edited cannot be reverted from here
+    # (it can sit outside the worktree): leave it, report it, deniedClean false.
+    check_trusted_links
+    for f in ${LINK_HITS[@]+"${LINK_HITS[@]}"}; do
+        add_path_reason "left a trusted-config symlink whose target may have been edited (or sits outside the worktree) in place" "$f"
+    done
 else
     # KEEP_FILES is the deduplicated list (first-seen order). A path listed
     # twice, in --files-from and/or after --, would otherwise put its diff into
@@ -826,6 +895,11 @@ if [ "$MODE" = run ]; then
         *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
 
+    # The same for a tracked trusted-config symlink whose target was written.
+    check_trusted_links
+    [ "${#LINK_HITS[@]}" -eq 0 ] \
+        || die 2 "a tracked trusted-config symlink's target may have been edited since the --ignored-since marker; refusing to run: $(printf '%s\0' "${LINK_HITS[@]}" | safe_path_list_z)"
+
     # Never execute files outside the PR (the resolver's list is untrusted),
     # attended or not. Unattended also never runs runner files.
     skip() {
@@ -848,26 +922,75 @@ TOP_REAL=$(pwd -P)
 # directory, 1 when none does, 2 when that cannot be told (the caller fails
 # closed). Two checks, because a same-filesystem bind mount shares st_dev: a
 # device change inside the tree, and any mount point at or under the path in
-# the mount table (YR_MOUNTINFO, default /proc/self/mountinfo; octal escapes in
-# the mount point are decoded).
+# the mount table.
+# Device check: GNU `find -printf %D`; where find lacks -printf (macOS, BSD),
+# `stat` over the tree in batches (`stat -c %d` on GNU, `stat -f %d` on BSD,
+# probed in that order because GNU `stat -f` means something else).
+# Mount table: YR_MOUNTINFO, default /proc/self/mountinfo (octal escapes in the
+# mount point are decoded). Where the default is absent (no procfs), the output
+# of mount(8) is parsed instead: "dev on /path (opts)" (BSD, macOS) or
+# "dev on /path type fs (opts)" (Linux). A YR_MOUNTINFO that is set but
+# unreadable stays a failure; set to the empty string it forces the mount(8)
+# fallback (for tests).
 dir_has_mount() {
-    local d="$1" mi="${YR_MOUNTINFO:-/proc/self/mountinfo}" mp devs
-    [ -r "$mi" ] || return 2
-    devs=$(find -- "$d" -printf '%D\n' 2>/dev/null | LC_ALL=C sort -u | wc -l) || return 2
+    local d="$1" mi="${YR_MOUNTINFO-/proc/self/mountinfo}" mp devs line rest mnt="" m
+    devs=$(find -- "$d" -printf '%D\n' 2>/dev/null | LC_ALL=C sort -u | wc -l) || devs=""
     case "$devs" in
-        *[!0-9\ ]*|"") return 2 ;;
+        *[!0-9\ ]*|"") devs="" ;;
     esac
+    if [ -z "$devs" ] || [ "$((devs + 0))" -lt 1 ]; then
+        devs=$(dir_device_count "$d") || return 2
+    fi
     [ "$((devs + 0))" -ge 1 ] || return 2
     [ "$((devs + 0))" -le 1 ] || return 0
-    while read -r _ _ _ _ mp _; do
-        [ -n "$mp" ] || continue
-        mp=$(printf '%b' "$(printf '%s' "$mp" | sed 's/\\\([0-7][0-7][0-7]\)/\\0\1/g')x") || return 2
-        mp="${mp%x}"
-        case "$mp" in
+    if [ -n "$mi" ] && [ -r "$mi" ]; then
+        while read -r _ _ _ _ mp _; do
+            [ -n "$mp" ] || continue
+            mp=$(printf '%b' "$(printf '%s' "$mp" | sed 's/\\\([0-7][0-7][0-7]\)/\\0\1/g')x") || return 2
+            mp="${mp%x}"
+            case "$mp" in
+                "$d"|"$d/"*) return 0 ;;
+            esac
+        done <"$mi"
+        return 1
+    fi
+    # No readable mount table: only the unset default may fall back to mount(8).
+    if [ -n "$mi" ] && [ "${YR_MOUNTINFO+set}" = set ]; then return 2; fi
+    for m in mount /sbin/mount /usr/sbin/mount; do
+        if mnt=$(command -v -- "$m" 2>/dev/null) && [ -n "$mnt" ]; then break; fi
+        mnt=""
+    done
+    [ -n "$mnt" ] || return 2
+    mnt=$("$mnt" 2>/dev/null) || return 2
+    [ -n "$mnt" ] || return 2
+    while IFS= read -r line; do
+        case "$line" in *" on "*) ;; *) continue ;; esac
+        rest="${line#* on }"
+        case "$rest" in *" ("*) rest="${rest% (*}" ;; esac
+        case "$rest" in *" type "*) rest="${rest% type *}" ;; esac
+        case "$rest" in
             "$d"|"$d/"*) return 0 ;;
         esac
-    done <"$mi"
+    done <<<"$mnt"
     return 1
+}
+
+# dir_device_count <dir>: the number of distinct device numbers in the tree, by
+# `stat` over `find -exec ... {} +`; non-zero exit when no stat flavor works.
+dir_device_count() {
+    local d="$1" fmt n
+    if stat -c %d -- "$d" >/dev/null 2>&1; then
+        fmt=-c
+    elif stat -f %d -- "$d" >/dev/null 2>&1; then
+        fmt=-f
+    else
+        return 1
+    fi
+    n=$(find -- "$d" -exec stat "$fmt" %d {} + 2>/dev/null | LC_ALL=C sort -u | wc -l) || return 1
+    case "$n" in
+        *[!0-9\ ]*|"") return 1 ;;
+    esac
+    printf '%s\n' "$((n + 0))"
 }
 
 TO_REMOVE=()
@@ -1375,7 +1498,7 @@ if [ "$MODE" = revert-denied ] && [ "${#FILES[@]}" -eq 0 ]; then
     [ ! -s "$CHANGES_FILE" ] || NOOP_CLEAN=false
     # A kept nested repository is a trusted-config change that remains.
     NOOP_DENIED=true
-    if [ "${#NESTED_KEPT[@]}" -gt 0 ]; then
+    if [ "${#NESTED_KEPT[@]}" -gt 0 ] || [ "${#LINK_HITS[@]}" -gt 0 ]; then
         NOOP_DENIED=false
     else
         add_reason "no deny-listed changes to revert"
@@ -1455,6 +1578,7 @@ if [ "$MODE" = revert-denied ]; then
         DENIED_CLEAN=false
         add_reason "could not re-list the tree to check the deny-listed paths"
     fi
+    [ "${#LINK_HITS[@]}" -eq 0 ] || DENIED_CLEAN=false
     if [ "${#REMAINING[@]}" -gt 0 ]; then
         DENIED_CLEAN=false
         [ "${#REVERT_FAILS[@]}" -gt 0 ] || add_reason "deny-listed changes remain after the revert"
