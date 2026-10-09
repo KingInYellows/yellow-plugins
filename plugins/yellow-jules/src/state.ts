@@ -366,7 +366,11 @@ function isValidRecord(key: string, value: unknown): value is OperationRecord {
     if (value[field] !== undefined && !isValidPageToken(value[field]))
       return false;
   }
-  for (const field of ['autoPrRequested', 'correction'] as const) {
+  for (const field of [
+    'autoPrRequested',
+    'correction',
+    'echoAmbiguous',
+  ] as const) {
     if (value[field] !== undefined && typeof value[field] !== 'boolean') {
       return false;
     }
@@ -1908,7 +1912,10 @@ export async function claimOwnEchoes(
       }
       for (const [digest, group] of byDigest) {
         const candidates = landed.filter(
-          (r) => r.echoActivityId === undefined && r.promptDigest === digest
+          (r) =>
+            r.echoActivityId === undefined &&
+            r.echoAmbiguous !== true &&
+            r.promptDigest === digest
         );
         const settledCount = candidates.filter(
           (r) => r.status === 'accepted' || r.status === 'reconciled'
@@ -1920,6 +1927,18 @@ export async function claimOwnEchoes(
           group.length > settledCount
         ) {
           blockedDigests.add(digest);
+          // Permanent: no later walk, whatever it re-reads, may credit these
+          // writes with an echo; only reconcile or abandon settles them.
+          for (const r of candidates) {
+            if (r.status === 'accepted' || r.status === 'reconciled') continue;
+            const marked = {
+              ...r,
+              echoAmbiguous: true,
+              updatedAt: mark?.observedAt ?? r.updatedAt,
+            };
+            operations[r.localRequestId] = marked;
+            landed[landed.indexOf(r)] = marked;
+          }
           [...group]
             .sort((a, b) =>
               compareStamp(
@@ -1948,6 +1967,7 @@ export async function claimOwnEchoes(
         const sent = message.createTime && Date.parse(message.createTime);
         const matches = (r: OperationRecord): boolean =>
           r.echoActivityId === undefined &&
+          r.echoAmbiguous !== true &&
           r.promptDigest === message.digest &&
           // A message older than the record's dispatch cannot be its echo.
           !(

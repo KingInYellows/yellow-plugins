@@ -266,6 +266,13 @@ export interface OperationRecord {
   readonly promptDigest?: string;
   /** The vendor activity that echoed this operation's message; each landed message explains at most one activity. */
   readonly echoActivityId?: string;
+  /**
+   * Set when a walk judged same-text messages to outnumber the settled writes
+   * sharing this unresolved write's text: which message is whose is unknowable,
+   * so no later walk may give it an `echoActivityId`; only reconcile or abandon
+   * settles it.
+   */
+  readonly echoAmbiguous?: boolean;
   readonly observedPlanId?: string;
   readonly vendorState?: string;
   readonly condition?: string;

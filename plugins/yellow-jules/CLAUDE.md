@@ -328,7 +328,10 @@ unresolved one share a digest and a walk holds more such messages than settled
 writes, the settled writes take the earliest messages, the unresolved write gets
 no landing evidence, and the surplus is consumed (not held, so no later walk can
 reclassify it as the unresolved write's echo) and recorded as possible outside
-activity.
+activity. The unresolved write is
+also marked `echoAmbiguous` on its journal record: no later walk, even one that
+re-reads the surplus message, may give it an `echoActivityId`; only reconcile or
+abandon settles it. Older records without the field parse unchanged.
 
 Outside-activity markers treat an equal `createTime` as unordered: a second
 outside message at the marker's time, whatever its id, replaces the marker so a

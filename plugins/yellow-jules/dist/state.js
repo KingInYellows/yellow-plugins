@@ -342,7 +342,11 @@ function isValidRecord(key, value) {
         if (value[field] !== undefined && !(0, validate_js_1.isValidPageToken)(value[field]))
             return false;
     }
-    for (const field of ['autoPrRequested', 'correction']) {
+    for (const field of [
+        'autoPrRequested',
+        'correction',
+        'echoAmbiguous',
+    ]) {
         if (value[field] !== undefined && typeof value[field] !== 'boolean') {
             return false;
         }
@@ -1409,13 +1413,28 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
             byDigest.set(m.digest, [...(byDigest.get(m.digest) ?? []), m]);
         }
         for (const [digest, group] of byDigest) {
-            const candidates = landed.filter((r) => r.echoActivityId === undefined && r.promptDigest === digest);
+            const candidates = landed.filter((r) => r.echoActivityId === undefined &&
+                r.echoAmbiguous !== true &&
+                r.promptDigest === digest);
             const settledCount = candidates.filter((r) => r.status === 'accepted' || r.status === 'reconciled').length;
             const unresolvedCount = candidates.length - settledCount;
             if (settledCount > 0 &&
                 unresolvedCount > 0 &&
                 group.length > settledCount) {
                 blockedDigests.add(digest);
+                // Permanent: no later walk, whatever it re-reads, may credit these
+                // writes with an echo; only reconcile or abandon settles them.
+                for (const r of candidates) {
+                    if (r.status === 'accepted' || r.status === 'reconciled')
+                        continue;
+                    const marked = {
+                        ...r,
+                        echoAmbiguous: true,
+                        updatedAt: mark?.observedAt ?? r.updatedAt,
+                    };
+                    operations[r.localRequestId] = marked;
+                    landed[landed.indexOf(r)] = marked;
+                }
                 [...group]
                     .sort((a, b) => (0, activity_walk_js_1.compareStamp)({ createTime: a.createTime ?? '', activityId: a.activityId }, { createTime: b.createTime ?? '', activityId: b.activityId }))
                     .slice(settledCount)
@@ -1438,6 +1457,7 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
             }
             const sent = message.createTime && Date.parse(message.createTime);
             const matches = (r) => r.echoActivityId === undefined &&
+                r.echoAmbiguous !== true &&
                 r.promptDigest === message.digest &&
                 // A message older than the record's dispatch cannot be its echo.
                 !(typeof sent === 'number' &&

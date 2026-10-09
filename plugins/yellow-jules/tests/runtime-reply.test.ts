@@ -767,7 +767,16 @@ describe('races inside the write gate', () => {
       expect(journal.operations['pend-b']?.echoActivityId).toBeUndefined();
       expect((await owner())?.supervision?.outsideSeen).toBeDefined();
 
-      // A second walk must not hand the consumed surplus to the unresolved write.
+      expect(journal.operations['pend-b']?.echoAmbiguous).toBe(true);
+
+      // A walk that does not advance past the surplus (the read state is lost)
+      // re-reads both messages; the settled write already has its echo, so the
+      // unresolved write is the only match left. It must still get nothing.
+      await updateJournal(h.dataDir, (operations) => {
+        const o = operations[session.localRequestId]!;
+        const { lastActivityId: _a, lastActivityCreateTime: _b, ...rest } = o;
+        operations[session.localRequestId] = { ...rest, recentActivityIds: [] };
+      });
       await readStatus();
       const again = await readJournal(h.dataDir);
       expect(again.operations['pend-a']?.echoActivityId).toBe('act-m1');
