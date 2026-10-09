@@ -1365,6 +1365,40 @@ SH
   assert_all_restored
 }
 
+# legacy_tipless: a paused restack whose state has no run id and no tips, no
+# provider pause left, and phase $1 recorded (empty for none).
+legacy_tipless() {
+  rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
+  git -C "$(wtp a)" rebase --abort
+  sed -i '/^tip\t/d;/^runid\t/d;/^phase\t/d' "$SD/state"
+  [ -z "$1" ] || sed -i "2i phase\t$1" "$SD/state"
+  ! grep -q '^tip\|^runid' "$SD/state"
+}
+
+@test "a legacy tipless state at phase aborted lets a retried --abort proceed" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  legacy_tipless aborted
+  grep -q '^phase.aborted$' "$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+  [ ! -e "$SD/state" ]
+}
+
+@test "a legacy tipless state at phase aborting is still refused" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  legacy_tipless aborting
+  grep -q '^phase.aborting$' "$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"no recorded start tips"* ]]
+  [ -e "$SD/state" ]
+}
+
 @test "--abort keeps state when gh-stack no longer records a rebase in a non-run worktree" {
   command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
   mk_stack b
