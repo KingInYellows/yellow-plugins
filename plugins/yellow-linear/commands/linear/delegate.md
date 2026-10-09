@@ -630,7 +630,6 @@ MODE='YELLOW_TODO_dry-run_or_launch'
 ISSUE_ID='YELLOW_TODO_issue_id'
 DELEGATION_REV='YELLOW_TODO_delegation_rev'
 PACKET_FILE='YELLOW_TODO_packet_path_from_path_step'
-YELLOW_JULES_ROOT='YELLOW_TODO_yellow_jules_root_from_step_3'
 GRANT_ID='YELLOW_TODO_grant_id_for_launch_or_empty'
 
 case "$MODE" in dry-run|launch) ;; *) printf 'ERROR: MODE must be dry-run or launch.\n' >&2; exit 1 ;; esac
@@ -651,11 +650,81 @@ case "$PACKET_FILE" in
     ;;
 esac
 case "$PACKET_FILE" in */../*|*/..) printf 'ERROR: PACKET_FILE contains a parent-directory segment.\n' >&2; exit 1 ;; esac
-CLI="${YELLOW_JULES_ROOT}/dist/cli.js"
-if [ ! -f "$CLI" ]; then
-  printf 'ERROR: yellow-jules CLI not found at %s.\n' "$CLI" >&2
+# Bind the packet to a directory the allocation step made: same scratch root,
+# no symlinked components, owned by this user. The block reads it into the
+# vendor prompt and later deletes its parent recursively.
+GIT_DIR_ABS=$(git rev-parse --absolute-git-dir 2>/dev/null || true)
+if [ -n "$GIT_DIR_ABS" ]; then GIT_TMP="${GIT_DIR_ABS}/tmp"; else GIT_TMP="${TMPDIR:-/tmp}"; fi
+PACKET_DIR=$(dirname -- "$PACKET_FILE")
+GIT_TMP_REAL=$(cd -P -- "$GIT_TMP" 2>/dev/null && pwd -P || true)
+PACKET_PARENT_REAL=$(cd -P -- "$(dirname -- "$PACKET_DIR")" 2>/dev/null && pwd -P || true)
+if [ -z "$GIT_TMP_REAL" ] || [ "$PACKET_PARENT_REAL" != "$GIT_TMP_REAL" ] \
+  || [ -L "$PACKET_DIR" ] || [ ! -d "$PACKET_DIR" ] || [ ! -O "$PACKET_DIR" ] \
+  || [ -L "$PACKET_FILE" ]; then
+  printf 'ERROR: PACKET_FILE "%s" is not inside a packet directory allocated under %s.\n' "$PACKET_FILE" "$GIT_TMP" >&2
   exit 1
 fi
+
+# Re-resolve the yellow-jules CLI from the enabled plugin's installPath here;
+# never execute a root carried over from an earlier call.
+resolve_plugin_root() {
+  local name="$1" required="$2" root=""
+  if [ -n "${_plugin_list_json:-}" ]; then
+    root=$(printf '%s' "$_plugin_list_json" | node -e '
+      const fs = require("fs");
+      let rows;
+      try { rows = JSON.parse(fs.readFileSync(0, "utf8")); } catch { rows = []; }
+      if (!Array.isArray(rows)) rows = [];
+      const name = process.argv[1];
+      const projectPath = process.argv[2] || "";
+      const scopeRank = { local: 0, project: 1, user: 2, managed: 3 };
+      const candidates = rows
+        .filter((row) => {
+          if (
+            row === null ||
+            typeof row !== "object" ||
+            row.id !== `${name}@yellow-plugins` ||
+            row.enabled !== true ||
+            typeof row.installPath !== "string" ||
+            row.installPath.length === 0
+          ) {
+            return false;
+          }
+          if (
+            (row.scope === "project" || row.scope === "local") &&
+            projectPath.length > 0
+          ) {
+            return row.projectPath === projectPath;
+          }
+          return true;
+        })
+        .sort((a, b) => (scopeRank[a.scope] ?? 9) - (scopeRank[b.scope] ?? 9));
+      process.stdout.write(candidates.length > 0 ? candidates[0].installPath : "");
+    ' "$name" "${repo_root:-}" 2>/dev/null)
+  fi
+  if [ -z "$root" ] || [ ! -f "$root/$required" ]; then
+    local repo_root_local
+    repo_root_local=$(git rev-parse --show-toplevel 2>/dev/null || true)
+    if [ -n "$repo_root_local" ] && [ -f "$repo_root_local/plugins/$name/$required" ]; then
+      root="$repo_root_local/plugins/$name"
+    else
+      root=""
+    fi
+  fi
+  printf '%s' "$root"
+}
+
+if ! _plugin_list_json=$(claude plugin list --json 2>/dev/null); then
+  printf 'ERROR: claude plugin list --json failed — cannot resolve the yellow-jules install path.\n' >&2
+  exit 1
+fi
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || printf '')
+YELLOW_JULES_ROOT=$(resolve_plugin_root yellow-jules dist/cli.js)
+if [ -z "$YELLOW_JULES_ROOT" ]; then
+  printf 'ERROR: yellow-jules CLI not resolved — install or enable yellow-jules before delegating.\n' >&2
+  exit 1
+fi
+CLI="${YELLOW_JULES_ROOT}/dist/cli.js"
 command -v jq >/dev/null 2>&1 || { printf 'ERROR: jq required.\n' >&2; exit 1; }
 [ -s "$PACKET_FILE" ] || { printf 'ERROR: %s is missing or empty — write the packet with the Write tool first.\n' "$PACKET_FILE" >&2; exit 1; }
 

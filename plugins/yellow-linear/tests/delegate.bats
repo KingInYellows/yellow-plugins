@@ -303,11 +303,20 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
-@test "step 3 prints the jules plugin root that the jules launch block asks for" {
-  run grep -F "printf 'yellow_jules_root: %s\\n' \"\${YELLOW_JULES_ROOT:-NONE}\"" "$DELEGATE_MD"
-  [ "$status" -eq 0 ]
-  run grep -F "YELLOW_JULES_ROOT='YELLOW_TODO_yellow_jules_root_from_step_3'" "$DELEGATE_MD"
-  [ "$status" -eq 0 ]
+@test "the jules block re-resolves the CLI from installPath instead of a substituted root" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  run bash -c 'printf "%s\n" "$1" | grep -F "YELLOW_TODO_yellow_jules_root"' _ "$jules_block"
+  [ "$status" -eq 1 ]
+  printf '%s\n' "$jules_block" | grep -qF 'YELLOW_JULES_ROOT=$(resolve_plugin_root yellow-jules dist/cli.js)'
+  printf '%s\n' "$jules_block" | grep -qF '_plugin_list_json=$(claude plugin list --json 2>/dev/null)'
+}
+
+@test "the jules block binds the packet to an allocated, unlinked directory under the git scratch root" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  printf '%s\n' "$jules_block" | grep -qF '[ "$PACKET_PARENT_REAL" != "$GIT_TMP_REAL" ]'
+  printf '%s\n' "$jules_block" | grep -qF '[ -L "$PACKET_DIR" ]'
+  printf '%s\n' "$jules_block" | grep -qF '[ ! -O "$PACKET_DIR" ]'
+  printf '%s\n' "$jules_block" | grep -qF '[ -L "$PACKET_FILE" ]'
 }
 
 @test "the jules launch passes the packet as an inline --prompt= so a leading dash is not a flag" {
