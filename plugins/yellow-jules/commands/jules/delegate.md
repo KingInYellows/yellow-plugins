@@ -91,7 +91,7 @@ args=(delegate --repo "$REPO" --branch "$BRANCH" --task-ref "$TASK_REF" "--promp
 [ "$CORRECTION" = 1 ] && args+=(--correction)
 OUTPUT=$(node "$CLI" "${args[@]}")
 printf 'exit=%s\n' "$?"
-printf '%s\n' "$OUTPUT" | jq '{ok, operation, localRequestId, localId, repository, requestedBranch, sourceResource, taskRef, dryRun, requiresAttention, attention, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
+printf '%s\n' "$OUTPUT" | jq '{ok, operation, localRequestId, localId, repository, requestedBranch, sourceResource, taskRef, launchGrantIds, dryRun, requiresAttention, attention, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
 printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
@@ -111,7 +111,9 @@ and matches the repository, task ref, and branch (an exact ref, or a prefix when
 the pattern ends in `*`). A grant that is full (all session slots held or all
 tasks spent) never covers; of several that do, the latest expiry wins. Use the
 same single-quoted substitution rule; `CORRECTION` is `1` for a repair launch
-and `0` otherwise:
+and `0` otherwise. For a repair, only a grant that owns a plain launch of the
+task qualifies: set `LAUNCH_GRANTS` to the dry-run's `launchGrantIds` as a
+comma-separated list (empty for a plain launch):
 
 ```bash
 set -uo pipefail
@@ -119,7 +121,8 @@ REPO='YELLOW_TODO_repo'
 BRANCH='YELLOW_TODO_branch'
 TASK_REF='YELLOW_TODO_task_ref'
 CORRECTION='YELLOW_TODO_1_or_0'
-case "$REPO$BRANCH$TASK_REF$CORRECTION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+LAUNCH_GRANTS='YELLOW_TODO_launch_grant_ids_csv_or_empty'
+case "$REPO$BRANCH$TASK_REF$CORRECTION$LAUNCH_GRANTS" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 LIST=$(node "$CLI" authorize --list)
 if [ "$(printf '%s' "$LIST" | jq -r '.ok // false')" != true ]; then
@@ -127,7 +130,7 @@ if [ "$(printf '%s' "$LIST" | jq -r '.ok // false')" != true ]; then
   printf '%s\n' "$LIST" | jq '{ok, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))' >&2
   exit 1
 fi
-GRANT_ID=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO" --arg branch "$BRANCH" --arg task "$TASK_REF" --argjson corr "$CORRECTION" '
+GRANT_ID=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO" --arg branch "$BRANCH" --arg task "$TASK_REF" --argjson corr "$CORRECTION" --arg launch "$LAUNCH_GRANTS" '
   [ .grants[]?
     | select((.revoked | not) and (.expired | not)
         and .repository == $repo
@@ -135,7 +138,8 @@ GRANT_ID=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO" --arg branch "$BRANCH"
         and ((.taskRefs | index($task)) != null)
         and ((.usage.activeSessionRefs | length) < .maxActiveSessions)
         and (if $corr == 1
-             then ((.usage.correctiveRounds[$task] // 0) < .maxCorrectiveRounds)
+             then (((.usage.correctiveRounds[$task] // 0) < .maxCorrectiveRounds)
+                   and (.grantId as $gid | ($launch | split(",") | index($gid)) != null))
              else (.usage.totalTasks < .maxTotalTasks) end)
         and (. as $g
              | if ($g.branchPattern | endswith("*"))
@@ -167,10 +171,30 @@ Show the user:
 
 - **Repository / branch / task:** from the dry-run
 - **Grant:** the id, its limits, and what it has already used
-- **Prompt:** the first 500 characters
+- **Prompt:** the first 500 characters, printed by the command below inside the
+  fence (never typed into your own message)
 - **Effect:** "Creates a Jules session. Plan approval is required and vendor
   auto-PR is off. It may run for a long time and is billed to your Jules
   account."
+
+Print the prompt preview fenced. Same substitution rule:
+
+```bash
+set -uo pipefail
+WORK_DIR='YELLOW_TODO_work_dir'
+case "$WORK_DIR" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+case "$WORK_DIR" in
+  *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
+  /*/yellow-jules-delegate.??????) ;;
+  *) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
+esac
+command -v jq >/dev/null 2>&1 || { printf 'ERROR: jq required.\n' >&2; exit 1; }
+FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
+[ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
+printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
+jq -Rrs 'gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | .[0:500]' "$WORK_DIR/prompt.txt"
+printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
+```
 
 Then AskUserQuestion: "Launch this Jules session now?" with "Yes, launch" and
 "No, cancel". If the user declines, stop and say the request id is safe to

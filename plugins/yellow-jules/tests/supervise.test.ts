@@ -707,6 +707,34 @@ describe('--clear-pause', () => {
     );
   });
 
+  it('outside activity recorded by status alone (no supervise pass) is clearable', async () => {
+    const fresh = makeHarness('correct');
+    try {
+      const gid = await createGrant(fresh, { maxActiveSessions: 3 });
+      const s2 = await delegateOk(fresh, gid);
+      addActivity(fresh, s2.sessionResource, {
+        type: 'userMessaged',
+        message: 'outside',
+      });
+      await status(fresh.deps, { session: s2.localId, reconcile: false });
+      fresh.deps.clock.time += 60_000;
+      await status(fresh.deps, { session: s2.localId, reconcile: false });
+      const before = Object.values(
+        (await readJournal(fresh.dataDir)).operations
+      ).find((r) => r.sessionResource === s2.sessionResource && r.kind === 'create');
+      expect(before?.supervision?.paused).toBeUndefined();
+      expect(before?.supervision?.outsideSeen).toBeDefined();
+      const result = await clearPause(fresh.deps, { session: s2.localId });
+      expect(result).toMatchObject({ cleared: true });
+      const after = Object.values(
+        (await readJournal(fresh.dataDir)).operations
+      ).find((r) => r.sessionResource === s2.sessionResource && r.kind === 'create');
+      expect(after?.supervision?.outsideSeen).toBeUndefined();
+    } finally {
+      fresh.cleanup();
+    }
+  });
+
   it('an unpaused session is JULES_INVALID_STATE', async () => {
     await status(h.deps, { session: session.localId, reconcile: false });
     await clearPause(h.deps, { session: session.localId });

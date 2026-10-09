@@ -515,6 +515,20 @@ async function superviseOnce(deps, args) {
     return finish('no-change', { nextCheck, allowedActions: [] });
 }
 /**
+ * The pause the write gate enforces: a recorded pause, or else outside
+ * activity that `status` saw before any supervise pass turned it into a pause.
+ */
+function effectivePause(state) {
+    if (state?.paused !== undefined)
+        return state.paused;
+    if (state?.outsideSeen === undefined)
+        return undefined;
+    return {
+        reason: 'outside-user-message',
+        observedAt: state.outsideSeen.observedAt,
+    };
+}
+/**
  * Clears a pause. TTY-confirmed (it widens effective authority) and only after
  * a COMPLETE `status` walk newer than the pause: the owner must have looked
  * at what happened first, and the activity that caused the pause is no longer
@@ -526,7 +540,7 @@ async function clearPause(deps, args) {
     const journal = await (0, state_js_1.readJournal)(deps.dataDir);
     const sessionResource = (0, runtime_support_js_1.resolveSessionResource)(journal, args.session);
     const owner = owns(journal, sessionResource);
-    const paused = owner.supervision?.paused;
+    const paused = effectivePause(owner.supervision);
     if (paused === undefined) {
         return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'this session is not paused', {
             recoveryAction: 'Nothing to clear.',
@@ -557,8 +571,9 @@ async function clearPause(deps, args) {
         const current = operations[owner.localRequestId];
         const state = current?.supervision;
         if (current === undefined ||
-            state?.paused?.observedAt !== paused.observedAt ||
-            state.paused.reason !== paused.reason ||
+            state === undefined ||
+            effectivePause(state)?.observedAt !== paused.observedAt ||
+            effectivePause(state)?.reason !== paused.reason ||
             state.outsideSeen?.activityId !==
                 owner.supervision?.outsideSeen?.activityId ||
             current.lastCompleteWalkAt === undefined ||

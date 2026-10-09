@@ -235,6 +235,15 @@ describe('replies and finished sessions', () => {
     expect(err.appError.recoveryAction).toContain('--correction');
     expect(h.adapter.writeCount()).toBe(0);
   });
+
+  it('a session that finished since the last status is refused on the live state, not the stale journal', async () => {
+    // No status call: the journal still says the session is working.
+    setVendorState(h, session.sessionResource, 'completed');
+    const err = await fails(() => reply(h.deps, args()));
+    expect(err.appError.code).toBe('JULES_INVALID_STATE');
+    expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    expect(h.adapter.writeCount()).toBe(0);
+  });
 });
 
 describe('our own integrity verdicts on the write path are not flattened', () => {

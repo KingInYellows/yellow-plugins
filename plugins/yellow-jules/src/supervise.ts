@@ -765,6 +765,21 @@ export interface ClearPauseResult {
 }
 
 /**
+ * The pause the write gate enforces: a recorded pause, or else outside
+ * activity that `status` saw before any supervise pass turned it into a pause.
+ */
+function effectivePause(
+  state: OperationRecord['supervision']
+): { readonly reason: string; readonly observedAt: string } | undefined {
+  if (state?.paused !== undefined) return state.paused;
+  if (state?.outsideSeen === undefined) return undefined;
+  return {
+    reason: 'outside-user-message',
+    observedAt: state.outsideSeen.observedAt,
+  };
+}
+
+/**
  * Clears a pause. TTY-confirmed (it widens effective authority) and only after
  * a COMPLETE `status` walk newer than the pause: the owner must have looked
  * at what happened first, and the activity that caused the pause is no longer
@@ -779,7 +794,7 @@ export async function clearPause(
   const journal = await readJournal(deps.dataDir);
   const sessionResource = resolveSessionResource(journal, args.session);
   const owner = owns(journal, sessionResource);
-  const paused = owner.supervision?.paused;
+  const paused = effectivePause(owner.supervision);
   if (paused === undefined) {
     return throwAppError('JULES_INVALID_STATE', 'this session is not paused', {
       recoveryAction: 'Nothing to clear.',
@@ -821,8 +836,9 @@ export async function clearPause(
     const state = current?.supervision;
     if (
       current === undefined ||
-      state?.paused?.observedAt !== paused.observedAt ||
-      state.paused.reason !== paused.reason ||
+      state === undefined ||
+      effectivePause(state)?.observedAt !== paused.observedAt ||
+      effectivePause(state)?.reason !== paused.reason ||
       state.outsideSeen?.activityId !==
         owner.supervision?.outsideSeen?.activityId ||
       current.lastCompleteWalkAt === undefined ||

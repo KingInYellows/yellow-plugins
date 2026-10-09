@@ -16,6 +16,7 @@ import { readJournal } from '../src/state.js';
 
 import {
   createGrant,
+  delegateOk,
   type GrantHarness,
   makeHarness,
 } from './support/grants.js';
@@ -77,6 +78,22 @@ describe('delegate --dry-run', () => {
     expect(h.adapter.callsTo('getSource')).toHaveLength(1);
     expect(h.adapter.writeCount()).toBe(0);
     expect(Object.keys((await readJournal(h.dataDir)).operations)).toEqual([]);
+  });
+});
+
+describe('delegate --dry-run --correction', () => {
+  it('names the grants that own a plain launch of the task', async () => {
+    const grantId = await createGrant(h, { maxActiveSessions: 3 });
+    expect(
+      await delegate(h.deps, args({ dryRun: true, correction: true }))
+    ).toMatchObject({ launchGrantIds: [] });
+    await delegateOk(h, grantId);
+    expect(
+      await delegate(h.deps, args({ dryRun: true, correction: true }))
+    ).toMatchObject({ launchGrantIds: [grantId] });
+    expect(await delegate(h.deps, args({ dryRun: true }))).not.toHaveProperty(
+      'launchGrantIds'
+    );
   });
 });
 

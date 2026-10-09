@@ -166,6 +166,11 @@ async function delegateInner(deps, args, ids) {
                 requestedBranch: branch,
                 sourceResource,
                 ...(taskRef !== undefined ? { taskRef } : {}),
+                ...(args.correction
+                    ? {
+                        launchGrantIds: (0, write_gate_js_1.plainLaunchGrantIds)(await (0, state_js_1.readJournal)(deps.dataDir), taskRef),
+                    }
+                    : {}),
                 dryRun: true,
             };
         }
@@ -291,9 +296,13 @@ async function replyInner(deps, args, ids) {
         const grantId = (0, validate_js_1.validateGrantId)(args.grantId);
         const owner = requireOwner(target, ids);
         // A reply to a finished session would reopen it, past the active-session
-        // limit that freed its slot. A repair is a new delegate instead.
-        if ((0, runtime_support_js_1.isTerminalCondition)(owner.condition)) {
-            throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_INVALID_STATE', `the session is ${owner.condition}; a reply does not reopen a finished session`, {
+        // limit that freed its slot. The journal's condition is the last status
+        // call's, so read the live session right before reserving. A repair is a
+        // new delegate instead.
+        const live = await (0, runtime_support_js_1.read)(deps, deadline, () => adapter.getSession(target.sessionResource));
+        const liveCondition = (0, runtime_support_js_1.conditionOf)(live.vendorState);
+        if ((0, runtime_support_js_1.isTerminalCondition)(liveCondition)) {
+            throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_INVALID_STATE', `the session is ${liveCondition}; a reply does not reopen a finished session`, {
                 recoveryAction: 'For a repair, run delegate with --correction and the same --task-ref.',
             }), ids);
         }

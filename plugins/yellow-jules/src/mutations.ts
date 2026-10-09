@@ -81,6 +81,7 @@ import {
 } from './validate.js';
 import {
   confirmationRequired,
+  plainLaunchGrantIds,
   reserveUnderGrant,
   settleAcceptedOrUnknown,
   settleExpiredBeforeWrite,
@@ -218,6 +219,8 @@ export interface DelegateDryRunResult {
   readonly requestedBranch: string;
   readonly sourceResource: string;
   readonly taskRef?: string;
+  /** For a `--correction` dry run: the grants that own a plain launch of this task; a repair runs under one of them. */
+  readonly launchGrantIds?: readonly string[];
   readonly dryRun: true;
 }
 
@@ -300,6 +303,14 @@ async function delegateInner(
         requestedBranch: branch,
         sourceResource,
         ...(taskRef !== undefined ? { taskRef } : {}),
+        ...(args.correction
+          ? {
+              launchGrantIds: plainLaunchGrantIds(
+                await readJournal(deps.dataDir),
+                taskRef
+              ),
+            }
+          : {}),
         dryRun: true as const,
       };
     }
@@ -508,12 +519,18 @@ async function replyInner(
     const grantId = validateGrantId(args.grantId);
     const owner = requireOwner(target, ids);
     // A reply to a finished session would reopen it, past the active-session
-    // limit that freed its slot. A repair is a new delegate instead.
-    if (isTerminalCondition(owner.condition)) {
+    // limit that freed its slot. The journal's condition is the last status
+    // call's, so read the live session right before reserving. A repair is a
+    // new delegate instead.
+    const live = await read(deps, deadline, () =>
+      adapter.getSession(target.sessionResource)
+    );
+    const liveCondition = conditionOf(live.vendorState);
+    if (isTerminalCondition(liveCondition)) {
       throw new MutationErrorException(
         makeAppError(
           'JULES_INVALID_STATE',
-          `the session is ${owner.condition}; a reply does not reopen a finished session`,
+          `the session is ${liveCondition}; a reply does not reopen a finished session`,
           {
             recoveryAction:
               'For a repair, run delegate with --correction and the same --task-ref.',

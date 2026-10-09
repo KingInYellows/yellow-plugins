@@ -41,8 +41,8 @@ placeholder.
 ### Calling the CLI
 
 Run `node <plugin-root>/dist/cli.js <subcommand> [flags]`, where `<plugin-root>`
-is the yellow-jules plugin directory, the one that contains `dist/cli.js`; for
-this skill it is three levels above this file. Pass flags as separate arguments,
+is the yellow-jules plugin directory, the one that contains `dist/cli.js`: the
+nearest ancestor directory of this file that holds `dist/cli.js`. Pass flags as separate arguments,
 never as one interpolated shell string. Put free text (a prompt or message) in a
 file and pass it inline as `"--prompt=$(cat -- <file>)"` (likewise `--message=`
 and `--title=`): the inline form keeps quotes and `$(...)` inert and lets text
@@ -88,8 +88,12 @@ Subcommands: `setup`, `list`, `status`, `collect` (read-only), `delegate`,
 that covers the call: unexpired, unrevoked, permitting that operation, and
 matching the repository, a branch (exact, or a prefix when the grant's pattern
 ends in `*`), and the task ref. Dry runs need no grant. Before a write, run
-`authorize --list` and pick a grant that covers it and still has session and
-task capacity; only when none does, relay the command below.
+`authorize --list` and pick a grant that covers it; only when none does, relay
+the command below. Capacity applies per call: a new `delegate` needs a free
+active-session slot and, unless it is a `--correction` repair, a task left in
+`maxTotalTasks`. A `--correction` reply or repair needs a corrective round left
+for its task. A plain `reply` or `approve` needs neither, so a grant whose slots
+or tasks are used up still covers them.
 
 The CLI will not create a grant for you. `authorize` opens the controlling
 terminal itself and requires the operator to type back a random code, so a

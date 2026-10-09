@@ -102,6 +102,20 @@ function runningSessionsUnder(journal: Journal, grantId: string): string[] {
     .map((r) => r.sessionResource as string);
 }
 
+/** The grants under which a plain (non-repair) launch of this task exists; a repair must run under one of them. */
+export function plainLaunchGrantIds(
+  journal: Journal,
+  taskRef: string | undefined
+): string[] {
+  const ids = new Set<string>();
+  for (const r of Object.values(journal.operations)) {
+    if (r.grantId !== undefined && hasPlainLaunch(journal, r.grantId, taskRef)) {
+      ids.add(r.grantId);
+    }
+  }
+  return [...ids].sort();
+}
+
 export function hasPlainLaunch(
   journal: Journal,
   grantId: string,

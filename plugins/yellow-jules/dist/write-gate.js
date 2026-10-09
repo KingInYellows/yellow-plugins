@@ -14,6 +14,7 @@
  * make the grant stricter — never a reservation the grant did not pay for.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.plainLaunchGrantIds = plainLaunchGrantIds;
 exports.hasPlainLaunch = hasPlainLaunch;
 exports.reserveUnderGrant = reserveUnderGrant;
 exports.confirmationRequired = confirmationRequired;
@@ -39,6 +40,16 @@ function runningSessionsUnder(journal, grantId) {
         r.status !== 'rejected' &&
         !(0, runtime_support_js_1.isTerminalCondition)(r.condition))
         .map((r) => r.sessionResource);
+}
+/** The grants under which a plain (non-repair) launch of this task exists; a repair must run under one of them. */
+function plainLaunchGrantIds(journal, taskRef) {
+    const ids = new Set();
+    for (const r of Object.values(journal.operations)) {
+        if (r.grantId !== undefined && hasPlainLaunch(journal, r.grantId, taskRef)) {
+            ids.add(r.grantId);
+        }
+    }
+    return [...ids].sort();
 }
 function hasPlainLaunch(journal, grantId, taskRef) {
     return Object.values(journal.operations).some((r) => r.kind === 'create' &&
