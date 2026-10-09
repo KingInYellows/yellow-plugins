@@ -3263,6 +3263,18 @@ ancestor_link_setup() {
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
 }
 
+@test "--revert-denied counts an ordinary-named dir link whose tree holds more old files than the cap and no new file" {
+  ancestor_link_setup
+  rm -rf "$OUTDIR/.claude"
+  mkdir "$OUTDIR/many"
+  (cd "$OUTDIR/many" && seq 1 100 | xargs touch -t 201901010000)
+  run --separate-stderr env YR_DIR_LINK_WALK_CAP=50 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  run --separate-stderr env YR_DIR_LINK_WALK_CAP=999999 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+}
+
 @test "a verify run refuses when a write went through an ordinary-named dir link to cfg/.claude/settings.json" {
   ancestor_link_setup
   printf '{"hooks":"evil"}\n' >| cfg/.claude/settings.json
