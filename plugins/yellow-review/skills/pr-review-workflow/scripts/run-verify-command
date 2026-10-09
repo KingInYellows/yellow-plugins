@@ -1104,7 +1104,7 @@ for f in ${DIR_REMOVE[@]+"${DIR_REMOVE[@]}"}; do
     if [ -e "$f" ] || [ -L "$f" ]; then
         REVERT_FAILS+=("rm -r $f")
     else
-        add_reason "removed a directory standing where a file was (its files are in the recovery patch): $f"
+        add_path_reason "removed a directory standing where a file was (its files are in the recovery patch)" "$f"
     fi
 done
 for f in ${FILES[@]+"${FILES[@]}"}; do
@@ -1126,7 +1126,7 @@ if [ "${#REVERT_FAILS[@]}" -gt 0 ]; then
         [ "$n" -le 5 ] && FAIL_LIST="${FAIL_LIST:+$FAIL_LIST, }$f"
     done
     [ "$n" -le 5 ] || FAIL_LIST="$FAIL_LIST (+$((n - 5)) more)"
-    add_reason "revert failed: $FAIL_LIST"
+    add_path_reason "revert failed" "$FAIL_LIST"
 fi
 
 # The caller starts from a clean tree, so any remaining change (tracked or

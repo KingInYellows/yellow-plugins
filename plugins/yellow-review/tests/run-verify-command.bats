@@ -416,6 +416,20 @@ has_kill_after() {
   [[ "$output" != *"$tok"* ]]
 }
 
+@test "--revert-denied withholds a credential-shaped replacement-directory path from the reason" {
+  tok=ghp_abcdefghijklmnopqrstuvwxyz0123456789
+  mkdir -p .cursor
+  printf 'rule\n' >| ".cursor/$tok"
+  git add ".cursor/$tok" && git commit -q -m "chore: cursor rule"
+  rm -f ".cursor/$tok" && mkdir ".cursor/$tok" && printf 'child\n' >| ".cursor/$tok/child"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ -f ".cursor/$tok" ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'removed a directory standing where a file was (its files are in the recovery patch): <path withheld'* ]]
+  [[ "$output" != *"$tok"* ]]
+}
+
 @test "--revert-denied with only a nested repository is a noop that is not deniedClean" {
   mkdir -p .cursor/vendored
   git -C .cursor/vendored init -q
