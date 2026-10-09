@@ -649,8 +649,9 @@ fi
 # a path the mode relies on seeing: a clean listing would be a false "no
 # change". Scope by mode: --revert-dirty reverts every listed change, so any
 # tracked path counts; --revert-denied acts only on trusted-config paths, so an
-# unrelated hidden deny-listed path must not block it; a verify run keeps the
-# trusted-config or deny-listed scope. --revert-only and --check-ignored never
+# unrelated hidden deny-listed path must not block it; a verify run also counts
+# any tracked path, because the approved command can source or import a hidden
+# ordinary file whose resolver edit would never reach the allowed set. --revert-only and --check-ignored never
 # call this (the former reverts a named list, the latter reads no tracked tree). `ls-files -v` tags assume-unchanged paths in lowercase (skip-worktree
 # is `S`, or `s` with both flags).
 # One exemption: git sets skip-worktree on every tracked file outside a sparse
@@ -679,7 +680,7 @@ refuse_hidden_flags() {
             continue
         fi
         case "$MODE" in
-            revert-dirty) ;;
+            revert-dirty|run) ;;
             revert-denied) rp_trusted_config "$f" || continue ;;
             *) rp_trusted_config "$f" || rp_denied "$f" || continue ;;
         esac

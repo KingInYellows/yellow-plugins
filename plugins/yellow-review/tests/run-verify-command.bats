@@ -3017,3 +3017,18 @@ SHIM
   [ "$status" -eq 2 ]
   [[ "$stderr" == *'skip-worktree or assume-unchanged'* ]]
 }
+
+@test "hidden flags: a run refuses a hidden ordinary tracked file the command could source (skip-worktree and assume-unchanged)" {
+  printf 'echo helper-ok\n' >| src/helper.sh
+  git add src/helper.sh && git commit -q -m "chore: helper"
+  printf 'echo PAYLOAD\n' >| src/helper.sh
+  for flag in --skip-worktree --assume-unchanged; do
+    git update-index "$flag" src/helper.sh
+    verify '. src/helper.sh' --timeout 5 --trusted -- src/a.txt src/new.txt
+    [ "$status" -eq 2 ]
+    [[ "$stderr" == *'skip-worktree or assume-unchanged'* ]]
+    [[ "$stderr" == *'src/helper.sh'* ]]
+    [[ "$output" != *PAYLOAD* ]]
+    git update-index --no-skip-worktree --no-assume-unchanged src/helper.sh
+  done
+}
