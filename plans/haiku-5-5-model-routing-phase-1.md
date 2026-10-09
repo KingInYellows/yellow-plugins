@@ -102,9 +102,12 @@ usage-limit headroom, not dollars. The quality-relevant fix is explicit
 ### Phase 1.0: Verification tooling (do first; gates the doc wording)
 
 - [ ] 1.0.1: Write a transcript check that prints, for each subagent in a
-      session, the `message.model` and effort actually used. Use `jq` over
-      `~/.claude/projects/<slug>/<session>.jsonl` plus the `/tasks` panel.
-      Put the command in the new policy doc's "Verify" section.
+      session, the `message.model` and effort actually used. Run the `jq`
+      one-liner from the research note below over the per-agent transcripts
+      at `~/.claude/projects/<slug>/<session-id>/subagents/agent-*.jsonl`,
+      not the session JSONL. `/tasks` shows effort only when the definition
+      sets `effort:`, so it cannot confirm inherited effort. Put the command
+      in the new policy doc's "Verify" section.
 - [ ] 1.0.2: Run the check once on a current client (≥ v2.1.293). Spawn one
       agent per tier (T1 `linear-issue-loader`, T2 `coherence-reviewer`, T3
       `failure-analyst`, T4 `security-sentinel`) after their edits land.
@@ -273,6 +276,7 @@ Kept `inherit`, with the reason recorded:
       DRAIN_MODEL="${COMPOUND_DRAIN_MODEL-sonnet}"
       case "$DRAIN_MODEL" in
         ''|*[!a-z0-9-]*) DRAIN_MODEL_REJECTED=1 ;;
+        claude-|*--*|*-) DRAIN_MODEL_REJECTED=1 ;;
         haiku|sonnet|opus|claude-*) DRAIN_MODEL_REJECTED=0 ;;
         *) DRAIN_MODEL_REJECTED=1 ;;
       esac
@@ -280,7 +284,11 @@ Kept `inherit`, with the reason recorded:
 
       The default uses `-` (no colon). Unset silently defaults to sonnet with
       no warning; set-but-empty (`COMPOUND_DRAIN_MODEL=`) reaches the `''` arm
-      and is rejected and logged.
+      and is rejected and logged. The second arm mirrors the full-ID shape
+      of `MODEL_VALUE_PATTERN` in `scripts/validate-agent-authoring.js`
+      (non-empty segments joined by single hyphens), so `claude-`,
+      `claude-opus--5` and `claude-opus-5-` are rejected rather than reaching
+      `claude -p`.
 
       Put the block after `DRAIN_LOG` is created (`:314-316`). When
       `DRAIN_MODEL_REJECTED=1`, append a warning to `DRAIN_LOG` before
@@ -300,14 +308,12 @@ Kept `inherit`, with the reason recorded:
       a model the client rejects, leaves only the CLI's stderr behind, and the
       1.3.3 pass criterion and the rollback watch both depend on seeing it.
 <!-- deepen-plan: codebase -->
-> **Codebase:** The proposed `case` doesn't enforce the allowlist.
-> `claude-[a-z0-9-]*` is a glob whose trailing `*` matches anything, so
-> `claude-x; rm` passes. It's quoted, so this isn't an injection, but the
-> validation is false. Mirror the negated-class precedent at
-> `session-start.sh:323-325` (`''|*[!0-9]*|0)`) and reject first:
-> `''|*[!a-z0-9-]*) DRAIN_MODEL=sonnet ;;`, then
-> `haiku|sonnet|opus|claude-*) ;;` and `*) DRAIN_MODEL=sonnet ;;`. Add a
-> `claude-x; rm` test case. Don't gate `COMPOUND_DRAIN_MODEL` on
+> **Codebase:** An earlier draft matched `claude-[a-z0-9-]*` with no
+> negated-class arm in front, so `claude-x; rm` passed. The block above now
+> follows the negated-class precedent at `session-start.sh:323-325`
+> (`''|*[!0-9]*|0)`): the `*[!a-z0-9-]*` arm rejects that value before the
+> `claude-*` arm, and every rejection sets `DRAIN_MODEL_REJECTED=1` so the
+> warning is logged. Keep the `claude-x; rm` test case as a regression. Don't gate `COMPOUND_DRAIN_MODEL` on
 > `BATS_VERSION` the way `COMPOUND_DRAIN_CMD` (`:254`) and
 > `COMPOUND_STAGING_REVIEWER_AGENT` (`:273`) are gated. It's a user-facing
 > rollback knob, not a binary-hijack vector. Insertion points are confirmed:
@@ -319,7 +325,8 @@ Kept `inherit`, with the reason recorded:
   - `--model sonnet` by default (unset, no rejection warning).
   - `COMPOUND_DRAIN_MODEL=haiku` gives `--model haiku`.
   - An invalid value (`'x; rm'`, `claude-x; rm`, set-but-empty
-    `COMPOUND_DRAIN_MODEL=`) falls back to
+    `COMPOUND_DRAIN_MODEL=`, and the malformed IDs `claude-`,
+    `claude-opus--5`, `claude-opus-5-`) falls back to
     `--model sonnet`, and the rejection warning is in `DRAIN_LOG`.
   - `--bare` is absent and `--max-turns 50` is still present.
 
@@ -527,7 +534,8 @@ Kept `inherit`, with the reason recorded:
    codex-executor, claude-reviewer and devin-orchestrator, each with a body
    note.
 2. All 20 agents edited in 1.1 have both `model:` and `effort:` set, matching
-   the table. Verify by grepping frontmatter.
+   the table, except that `codex-reviewer` and `codex-analyst` may instead be
+   `sonnet/medium` when 1.5.1 fails. Verify by grepping frontmatter.
 3. `pnpm validate:agents` emits no V3 advisories. V5 lists exactly 37 agents,
    all outside this plan's scope, and that list is recorded in the PR.
 4. The validator tests pass, including an inverted `workflow/` V3 case and the
@@ -541,8 +549,10 @@ Kept `inherit`, with the reason recorded:
    Sonnet 5.5.
 7. The 1.4.6 `rg` check returns only qualified mentions. The policy doc exists,
    and the old research doc carries a supersede banner with no dangling links.
-8. The 1.5 gates are recorded in the PR body. The codex moves land only if
-   the manual 1.5.1 checklist passes 5/5 and the Step 6 vitest passes.
+8. The 1.5 gates are recorded in the PR body. The codex haiku moves land
+   only if the manual 1.5.1 checklist passes 5/5 and the Step 6 vitest
+   passes; otherwise both agents land as `sonnet/medium` with the failure
+   noted in the PR body.
 9. Every touched plugin has a changeset, and `pnpm release:check` passes.
 
 ## Edge Cases & Error Handling
