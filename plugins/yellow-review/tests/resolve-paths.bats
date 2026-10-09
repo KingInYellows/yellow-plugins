@@ -2446,6 +2446,7 @@ walk_fixture() {
   touch "$EXT/sub/new"
   run rp_link_target_changed lnk "$MARKER"
   [ "$status" -eq 0 ]
+}
 
 @test "harden_git_config refuses a global config whose program value names a file inside the worktree" {
   mkdir -p tools "$BATS_TEST_TMPDIR/own"
