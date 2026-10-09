@@ -118,10 +118,18 @@ if [ "$PLAN_CHARS" -gt 20000 ]; then
 fi
 # The preview replaces control, bidi and zero-width characters, so a plan holding
 # any would be bound to text the user did not see. Newlines and tabs stay visible
-# as line breaks and spaces; dash folding changes no wording.
+# as line breaks and spaces.
 HIDDEN=$(printf '%s\n' "$OUTPUT" | jq -r '[(.pendingPlan.steps // [])[] | (.title, (.description // "")) | tostring | select(test("[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"))] | length')
 if [ "$HIDDEN" != 0 ]; then
   printf 'ERROR: the plan holds hidden characters (control, bidi or zero-width) that the preview would replace, so it cannot be bound. Nothing was approved; review the plan in the Jules UI.\n' >&2
+  exit 1
+fi
+# The digest covers the raw text, so the preview must print exactly that text:
+# a field that flattening would alter (dash folding turns --force into -force)
+# cannot be bound. Line breaks and tabs are the only exempt change.
+CHANGED=$(printf '%s\n' "$OUTPUT" | jq -r "$FLAT_DEF"'[(.pendingPlan.steps // [])[] | (.title, (.description // "")) | select((tostring | gsub("[\t\n\r]"; " ")) != flat)] | length')
+if [ "$CHANGED" != 0 ]; then
+  printf 'ERROR: the plan holds text the preview would change (for example dashes or symbols it folds), so the user would approve different text than the digest covers. Nothing was approved; review the plan in the Jules UI.\n' >&2
   exit 1
 fi
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')

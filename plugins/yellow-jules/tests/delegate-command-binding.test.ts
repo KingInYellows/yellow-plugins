@@ -240,10 +240,34 @@ describe('/jules:approve binds the approval to the reviewed plan', () => {
       expect(res.stderr).toContain('hidden characters');
     });
 
-    it('still binds a plan with newlines, tabs, dash runs and long dashes', () => {
-      const res = run('Run --force \u2014 carefully', 'line one\n\tline two');
+    it('still binds a plan with newlines and tabs', () => {
+      const res = run('Run tests carefully', 'line one\n\tline two');
       expect(res.status).toBe(0);
       expect(res.stdout).toMatch(/plan_digest=[0-9a-f]{64}/);
+    });
+
+    it.each([
+      ['a double-dash flag', 'git push --force'],
+      ['a spaced dash run', 'a - - b'],
+      ['a long dash', 'Run \u2014 carefully'],
+      ['a box-drawing character', 'a \u2500 b'],
+    ])('refuses to bind a plan whose preview would change %s', (_n, text) => {
+      for (const [title, description] of [
+        [text, 'd'],
+        ['t', text],
+      ] as const) {
+        const res = run(title, description);
+        expect(res.status).toBe(1);
+        expect(res.stdout).not.toContain('plan_digest=');
+        expect(res.stderr).toContain('would change');
+      }
+    });
+
+    it('prints a preview that equals the digested text for a plain plan', () => {
+      const res = run('Run tests', 'then git push origin feature');
+      expect(res.status).toBe(0);
+      expect(res.stdout).toContain('1. Run tests');
+      expect(res.stdout).toContain('then git push origin feature');
     });
 
     it('exits without a digest when the plan is too long to show in full', () => {
@@ -357,10 +381,17 @@ describe('/jules:supervise binds the approval to the reviewed plan', () => {
     expect(res.stderr).toContain('hidden characters');
   });
 
-  it('still binds a plan with newlines, tabs and dash runs', () => {
-    const res = reviewRun(plan('Run --force \u2014 carefully', 'a\n\tb'));
+  it('still binds a plan with newlines and tabs', () => {
+    const res = reviewRun(plan('Run tests carefully', 'a\n\tb'));
     expect(res.status).toBe(0);
     expect(res.stdout).toMatch(/plan_digest=[0-9a-f]{64}/);
+  });
+
+  it('refuses a plan whose dashes the preview would fold', () => {
+    const res = reviewRun(plan('git push --force', 'a \u2014 b'));
+    expect(res.status).toBe(1);
+    expect(res.stdout).not.toContain('plan_digest=');
+    expect(res.stderr).toContain('would change');
   });
 
   it('shows a long plan in full and refuses one too long to show', () => {
@@ -712,5 +743,21 @@ describe('/jules:delegate previews the whole prompt it binds', () => {
     expect(res.status).toBe(1);
     expect(res.stdout).not.toContain('binding=');
     expect(res.stderr).toContain('20001 characters');
+  });
+});
+
+describe('every plan preview that binds a digest refuses text it would change', () => {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const files = [
+    'commands/jules/approve.md',
+    'commands/jules/supervise.md',
+    'skills/jules-delegation/SKILL.md',
+    'skills/jules-supervision/SKILL.md',
+  ];
+  it.each(files)('%s computes CHANGED and exits on it', (rel) => {
+    const text = fs.readFileSync(path.resolve(here, '..', rel), 'utf8');
+    expect(text).toContain('CHANGED=$(');
+    expect(text).toContain('!= flat)] | length');
+    expect(text).toMatch(/\[ "\$CHANGED" != 0 \]/);
   });
 });
