@@ -12,6 +12,16 @@
 # Authorization/Bearer, NAME_KEY=value, DEVIN_ORG_ID=value) and fails closed. When a vendor
 # prefix is added to one scanner, check the other.
 # shellcheck shell=sh
+# _rt_awk: awk through yr_awk (lib/resolve-paths.sh) when the caller loaded it,
+# so a PATH directory holding a symlink into the worktree cannot supply awk;
+# plain awk for the scripts that do not source resolve-paths.sh.
+_rt_awk() {
+    if command -v yr_awk >/dev/null 2>&1; then
+        yr_awk "$@"
+    else
+        awk "$@"
+    fi
+}
 
 # _rt_scan <strict> <file>: exit 0 when the file contains a credential shape.
 # strict=0 applies every rule; strict=1 only the high-precision ones (private
@@ -26,7 +36,7 @@ _rt_scan() {
     RT_HIT_LINE=""
     [ -f "$2" ] && [ -r "$2" ] || return 2
     _rt_awk_rc=0
-    _rt_out=$(awk -v strict="$1" '
+    _rt_out=$(_rt_awk -v strict="$1" '
         # flag(rule): the first hit wins; END reports its rule and line,
         # never the matched text.
         # An optional line names the line a multi-line value started on.
@@ -586,7 +596,7 @@ rt_text_clean() {
     # No credential shape. The text is also posted publicly under the user's
     # account, so refuse the shapes that notify people or load remote content.
     _rt_awk_rc=0
-    _rt_out=$(awk -v host="${RT_ALLOWED_HOST:-${GH_HOST:-github.com}}" '
+    _rt_out=$(_rt_awk -v host="${RT_ALLOWED_HOST:-${GH_HOST:-github.com}}" '
         function flag(rule) { if (!hit) { hit = 1; hitrule = rule; hitline = NR } }
         # relfix(s, re): re matches text ending in `//X`; rewrite each match
         # to end in `https://X` (X is kept).
@@ -656,5 +666,5 @@ rt_text_clean() {
 # position, so an added "++ x" line is still printed). Feed the output to
 # rt_code_clean.
 rt_added_lines() {
-    awk '/^diff --git / { h = 0; next } /^@@/ { h = 1; next } h && /^\+/ { print substr($0, 2) }'
+    _rt_awk '/^diff --git / { h = 0; next } /^@@/ { h = 1; next } h && /^\+/ { print substr($0, 2) }'
 }
