@@ -754,6 +754,9 @@ cd -- "$TOP" || die 2 "cannot enter $TOP"
 # This script never commits, so the unsigned-commit note is not printed.
 if [ "$MODE" = run ]; then
     harden_git_config full || die 2 "$YR_HARDEN_MSG; the tree is untouched"
+    # The verify command runs on the caller's PATH, so a bare helper name in a
+    # command variable (GIT_SSH_COMMAND=ssh) is judged there too.
+    yr_check_git_env_on_path "$YR_ORIG_PATH" || die 2 "$YR_HARDEN_MSG; the verify command was not run; the tree is untouched"
 else
     harden_git_config revert || die 2 "$YR_HARDEN_MSG; the tree is untouched"
 fi
