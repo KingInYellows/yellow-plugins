@@ -114,8 +114,12 @@ usage-limit headroom, not dollars. The quality-relevant fix is explicit
       Confirm the documented behavior (brainstorm Open Question 1, answered
       by the sub-agents docs): an agent with a pinned `model:` and no
       `effort:` inherits the session's effort. Also confirm that each pinned
-      `effort:` overrides it. If the transcript contradicts the docs, record
-      that and word 1.4.4 to match what was observed.
+      `effort:` overrides it. The four tier agents all get an explicit
+      `effort:` in 1.1, so they prove only the override. For the inherit
+      case, also run a scratch project agent (`.claude/agents/`, not shipped,
+      deleted afterwards) with `model: haiku` and no `effort:`, under two
+      different session efforts. If the transcript contradicts the docs,
+      record that and word 1.4.4 to match what was observed.
 - [ ] 1.0.3: Confirm the action's bundled CLI is ≥ v2.1.284, so that `sonnet`
       resolves to 5.5. Read the run log of the first CI run after 1.3.
 
@@ -379,7 +383,7 @@ Kept `inherit`, with the reason recorded:
 > https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
 <!-- /deepen-plan -->
 
-### Phase 1.4: Docs (no changeset; root and `docs/`)
+### Phase 1.4: Docs (root, `docs/` and the touched plugins)
 
 - [ ] 1.4.1: Write the policy doc at `docs/research/model-routing-policy.md`.
       It covers:
@@ -419,6 +423,11 @@ Kept `inherit`, with the reason recorded:
 - [ ] 1.4.6: Run `rg -n "Haiku 4\.5|ignores .?effort" AGENTS.md docs/ --glob '!docs/brainstorms/**' --glob '!docs/research/model-selection-token-context-optimization.md'`.
       Only qualified mentions may remain. The superseded doc is excluded
       because its banner covers it.
+- [ ] 1.4.7: In every plugin that 1.1 edits, update `README.md` and `CLAUDE.md`
+      wherever they state an agent's model, effort or cost tier, so they
+      match the new frontmatter. Run
+      `rg -n -i "haiku|sonnet|opus|inherit|effort" plugins/<name>/README.md plugins/<name>/CLAUDE.md`
+      per plugin to find them. The 1.6.1 changesets cover these edits.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:**
