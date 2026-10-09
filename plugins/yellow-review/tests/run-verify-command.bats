@@ -125,6 +125,15 @@ has_kill_after() {
   [ ! -e "$BATS_TEST_TMPDIR/lfs-ran" ]
 }
 
+@test "a fake awk in a PATH directory inside the worktree never runs" {
+  mkdir -p fakebin
+  printf '#!/bin/sh\ntouch "%s/awk-ran"\nexit 1\n' "$BATS_TEST_TMPDIR" >| fakebin/awk
+  chmod +x fakebin/awk
+  git config --local filter.x.clean 'cat'
+  PATH="$REPO/fakebin:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/awk-ran" ]
+}
+
 @test "an unlisted dirty file left after --revert-only makes treeClean false" {
   printf 'two\nstray\n' >| src/b.txt
   run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
@@ -392,6 +401,33 @@ has_kill_after() {
   [[ "$(printf '%s' "$output" | jq -r .reason)" == *'left a nested git repository in place: <path withheld'* ]]
   [[ "$output" != *"$tok"* ]]
   [ -d ".cursor/$tok/.git" ]
+}
+
+@test "--revert-denied withholds a reverted path with a credential-shaped directory segment" {
+  tok=ghp_abcdefghijklmnopqrstuvwxyz0123456789
+  mkdir -p ".cursor/$tok"
+  printf 'rule\n' >| ".cursor/$tok/file"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ "$(printf '%s' "$output" | jq -c .reverted)" = '[]' ]
+  [ "$(printf '%s' "$output" | jq -r .revertedCount)" = 1 ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'reverted list withheld'* ]]
+  [[ "$output" != *"$tok"* ]]
+}
+
+@test "--revert-denied withholds a credential-shaped replacement-directory path from the reason" {
+  tok=ghp_abcdefghijklmnopqrstuvwxyz0123456789
+  mkdir -p .cursor
+  printf 'rule\n' >| ".cursor/$tok"
+  git add ".cursor/$tok" && git commit -q -m "chore: cursor rule"
+  rm -f ".cursor/$tok" && mkdir ".cursor/$tok" && printf 'child\n' >| ".cursor/$tok/child"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ -f ".cursor/$tok" ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'removed a directory standing where a file was (its files are in the recovery patch): <path withheld'* ]]
+  [[ "$output" != *"$tok"* ]]
 }
 
 @test "--revert-denied with only a nested repository is a noop that is not deniedClean" {

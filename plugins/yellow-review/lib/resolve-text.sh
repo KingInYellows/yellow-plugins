@@ -552,7 +552,13 @@ _rt_scan() {
                 if (scheme == "basic" && match(segorig, /^[A-Za-z0-9+\/]+=*/)) {
                     btok = substr(segorig, 1, RLENGTH)
                     if (substr(segorig, RLENGTH + 1, 1) ~ /[A-Za-z0-9+\/=]/) btok = ""
+                    # Valid padding is 0-2 `=` that bring the length to a
+                    # multiple of 4. `YWI6Yw===` and `YWI6Yw=` are malformed,
+                    # not credentials: do not normalize them into valid ones.
+                    plen = length(btok)
                     sub(/=+$/, "", btok)
+                    plen -= length(btok)
+                    if (plen > 2 || (plen > 0 && (length(btok) + plen) % 4)) btok = ""
                     # The threshold below uses this unpadded length: padding
                     # an 18 or 19 character run to 20 must not skip basiccred.
                     blen = length(btok)
