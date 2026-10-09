@@ -1063,6 +1063,10 @@ harden_git_config() {
     # Before any git call: an inherited environment can name a program inside
     # the worktree for git to run.
     yr_check_git_env || return 1
+    # Screen PATH once in this shell. Every yr_git below runs in a $(...)
+    # subshell, where an unprimed call recomputes the screen (about 0.2 s) and
+    # loses the result, so a harden_git_config call cost a dozen screens.
+    yr_prime_path || { YR_HARDEN_MSG="no usable directory is left on PATH after the worktree screen"; return 1; }
     n=$((10#$n))
     YR_HARDEN_FROM_N=$n
     export "GIT_CONFIG_KEY_$n=core.fsmonitor" "GIT_CONFIG_VALUE_$n=false" \
