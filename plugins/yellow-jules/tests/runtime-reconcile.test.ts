@@ -4,7 +4,12 @@ import { loadGrants } from '../src/authority.js';
 import { AdapterError, AppErrorException } from '../src/errors.js';
 import { approve, delegate, reply } from '../src/mutations.js';
 import { status } from '../src/runtime.js';
-import { readJournal, withJournalLock, writeJournal } from '../src/state.js';
+import {
+  readJournal,
+  updateJournal,
+  withJournalLock,
+  writeJournal,
+} from '../src/state.js';
 import type { AdapterSession } from '../src/types.js';
 
 import { makeSession } from './fake-sdk.js';
@@ -460,6 +465,60 @@ describe('reply and approve reservations resolve on their own session', () => {
       reconcile: true,
     });
     expect(result.reconciled?.[0]?.outcome).toBe('unknown-outcome');
+  });
+
+  it('an identical message from minutes before the dispatch is not bound', async () => {
+    const session = await strandedReply('same words', 'reply-1');
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'same words',
+      createTime: new Date(h.deps.clock.now() - 4 * 60_000).toISOString(),
+    });
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(result.reconciled?.[0]?.outcome).toBe('unknown-outcome');
+    expect((await readJournal(h.dataDir)).operations['reply-1']?.status).toBe(
+      'unknown-outcome'
+    );
+  });
+
+  it('a matching message just after the dispatch binds', async () => {
+    const session = await strandedReply('same words', 'reply-1');
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'same words',
+      createTime: new Date(h.deps.clock.now() + 1_000).toISOString(),
+    });
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(result.reconciled?.[0]?.outcome).toBe('bound');
+  });
+
+  it('a reply with no dispatch stamp is never bound — a match is ambiguous', async () => {
+    const session = await strandedReply('legacy words', 'reply-1');
+    await updateJournal(h.dataDir, (operations) => {
+      const { dispatchedAt: _drop, ...rest } = operations['reply-1']!;
+      operations['reply-1'] = rest;
+    });
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'legacy words',
+    });
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(result.reconciled?.[0]).toMatchObject({
+      outcome: 'ambiguous-reconcile',
+      reason: 'dispatch-time-unknown',
+    });
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-1']?.status
+    ).not.toBe('accepted');
   });
 
   it('a partial walk is not-reached', async () => {

@@ -12,7 +12,7 @@
  * `400` on a filtered first page is retried once unfiltered.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEDUP_RING_CAP = exports.OVERLAP_WINDOW_MS = exports.PAGE_CAP = exports.COLLECT_PAGE_SIZE = exports.STATUS_PAGE_SIZE = void 0;
+exports.DEDUP_RING_CAP = exports.DISPATCH_SKEW_MS = exports.OVERLAP_WINDOW_MS = exports.PAGE_CAP = exports.COLLECT_PAGE_SIZE = exports.STATUS_PAGE_SIZE = void 0;
 exports.compareStamp = compareStamp;
 exports.watermarkFilter = watermarkFilter;
 exports.walkActivities = walkActivities;
@@ -23,6 +23,12 @@ exports.STATUS_PAGE_SIZE = 50;
 exports.COLLECT_PAGE_SIZE = 10;
 exports.PAGE_CAP = 20;
 exports.OVERLAP_WINDOW_MS = 5 * 60_000;
+/**
+ * Clock-skew tolerance between the local `dispatchedAt` stamp and a vendor
+ * activity `createTime`. Deliberately tight: a message older than the dispatch
+ * minus this cannot be the echo of that POST.
+ */
+exports.DISPATCH_SKEW_MS = 30_000;
 exports.DEDUP_RING_CAP = 1000;
 function timeOf(createTime) {
     const t = Date.parse(createTime);

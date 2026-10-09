@@ -18,7 +18,11 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { compareStamp, DEDUP_RING_CAP } from './activity-walk.js';
+import {
+  compareStamp,
+  DEDUP_RING_CAP,
+  DISPATCH_SKEW_MS,
+} from './activity-walk.js';
 import {
   assertOwnerOnlyFile,
   ensureOwnerOnlyDir,
@@ -1271,7 +1275,11 @@ export async function updateSupervision(
 export async function claimOwnEchoes(
   dataDir: string,
   sessionResource: string,
-  messages: ReadonlyArray<{ activityId: string; digest: string }>,
+  messages: ReadonlyArray<{
+    activityId: string;
+    digest: string;
+    createTime?: string;
+  }>,
   mark?: { readonly ownerRequestId: string; readonly observedAt: string },
   config: LockConfig = DEFAULT_LOCK_CONFIG
 ): Promise<{ activityId: string; digest: string } | undefined> {
@@ -1299,9 +1307,18 @@ export async function claimOwnEchoes(
       let outside: { activityId: string; digest: string } | undefined;
       for (const message of messages) {
         if (claimed.has(message.activityId)) continue;
+        const sent = message.createTime && Date.parse(message.createTime);
         const slot = landed.find(
           (r) =>
-            r.echoActivityId === undefined && r.promptDigest === message.digest
+            r.echoActivityId === undefined &&
+            r.promptDigest === message.digest &&
+            // A message older than the record's dispatch cannot be its echo.
+            !(
+              typeof sent === 'number' &&
+              !Number.isNaN(sent) &&
+              r.dispatchedAt !== undefined &&
+              sent < Date.parse(r.dispatchedAt) - DISPATCH_SKEW_MS
+            )
         );
         if (slot === undefined) {
           outside ??= message;

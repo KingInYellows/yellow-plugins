@@ -24,6 +24,12 @@ export const STATUS_PAGE_SIZE = 50;
 export const COLLECT_PAGE_SIZE = 10;
 export const PAGE_CAP = 20;
 export const OVERLAP_WINDOW_MS = 5 * 60_000;
+/**
+ * Clock-skew tolerance between the local `dispatchedAt` stamp and a vendor
+ * activity `createTime`. Deliberately tight: a message older than the dispatch
+ * minus this cannot be the echo of that POST.
+ */
+export const DISPATCH_SKEW_MS = 30_000;
 export const DEDUP_RING_CAP = 1000;
 
 export type WalkStart =

@@ -472,7 +472,11 @@ function walkStartFor(
 async function recordOutsideActivity(
   deps: RuntimeDeps,
   record: OperationRecord,
-  messages: ReadonlyArray<{ activityId: string; digest: string }>
+  messages: ReadonlyArray<{
+    activityId: string;
+    digest: string;
+    createTime?: string;
+  }>
 ): Promise<void> {
   if (messages.length === 0 || record.kind !== 'create') return;
   if (record.sessionResource === undefined) return;
@@ -541,7 +545,11 @@ export async function status(
             activityId: record.lastActivityId,
           }
         : undefined;
-    const newUserMessages: Array<{ activityId: string; digest: string }> = [];
+    const newUserMessages: Array<{
+      activityId: string;
+      digest: string;
+      createTime?: string;
+    }> = [];
     const walk = await walkActivities({
       adapter,
       sessionResource,
@@ -566,6 +574,7 @@ export async function status(
           newUserMessages.push({
             activityId: activity.activityId,
             digest: messageDigest(activity.message),
+            createTime: activity.createTime,
           });
         }
         args.observer?.(activity, info);

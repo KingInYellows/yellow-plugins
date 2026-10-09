@@ -344,6 +344,7 @@ async function status(deps, args) {
                     newUserMessages.push({
                         activityId: activity.activityId,
                         digest: (0, state_js_1.messageDigest)(activity.message),
+                        createTime: activity.createTime,
                     });
                 }
                 args.observer?.(activity, info);

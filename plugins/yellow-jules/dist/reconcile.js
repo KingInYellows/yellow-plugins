@@ -183,10 +183,21 @@ async function resolveOnOwnSession(deps, adapter, sessionResource, records, dead
         }
         throw err;
     }
-    const floors = new Map(records.map((r) => [
-        r.localRequestId,
-        Date.parse(r.createdAt) - activity_walk_js_1.OVERLAP_WINDOW_MS,
-    ]));
+    // A POST cannot have produced an activity before it was dispatched, so a
+    // stamped record's floor is its `dispatchedAt` (minus a small clock-skew
+    // tolerance), not the reservation time: an identical message sent minutes
+    // before the dispatch is somebody else's. A record with no stamp has no
+    // causal lower bound; any match for it falls back to the reservation floor
+    // and is left ambiguous rather than bound.
+    const floors = new Map(records.map((r) => {
+        const dispatched = r.dispatchedAt !== undefined ? Date.parse(r.dispatchedAt) : NaN;
+        return [
+            r.localRequestId,
+            Number.isNaN(dispatched)
+                ? Date.parse(r.createdAt) - activity_walk_js_1.OVERLAP_WINDOW_MS
+                : dispatched - activity_walk_js_1.DISPATCH_SKEW_MS,
+        ];
+    }));
     const matches = new Map(records.map((r) => [r.localRequestId, new Set()]));
     const earliest = Math.min(...records.map((r) => Date.parse(r.createdAt)));
     const walk = await (0, activity_walk_js_1.walkActivities)({
@@ -244,6 +255,13 @@ async function resolveOnOwnSession(deps, adapter, sessionResource, records, dead
                 reason: 'multiple-candidates',
             };
         }
+        if (found.size > 0 && !hasDispatchStamp(record)) {
+            return {
+                record,
+                outcome: 'ambiguous-reconcile',
+                reason: 'dispatch-time-unknown',
+            };
+        }
         if (found.size === 1)
             return { record, outcome: 'bound' };
         if (!walk.complete) {
@@ -251,6 +269,10 @@ async function resolveOnOwnSession(deps, adapter, sessionResource, records, dead
         }
         return { record, outcome: 'unknown-outcome' };
     });
+}
+function hasDispatchStamp(record) {
+    return (record.dispatchedAt !== undefined &&
+        !Number.isNaN(Date.parse(record.dispatchedAt)));
 }
 // ---------------------------------------------------------------------------
 // persistence

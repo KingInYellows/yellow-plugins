@@ -511,9 +511,13 @@ transient failure from an undetermined one.
   sessions walk: one `info()` plus the activity walk, looking for a
   `userMessaged` activity whose message digest equals the reservation's payload
   digest, or a `planApproved` whose `planId` equals the reservation's observed
-  plan id, in either case with a `createTime` at or after the reservation time
-  minus the 5-minute overlap window — an older match is a prior send, never this
-  one. Exactly one qualifying match binds; more than one is
+  plan id, in either case with a `createTime` at or after the record's `dispatchedAt`
+  stamp minus a 30-second clock-skew tolerance — an older match predates the
+  POST and is a prior send, never this one. A record with no `dispatchedAt`
+  (reserved before the stamp existed) is never bound: a match at or after the
+  reservation time minus the 5-minute overlap window is `ambiguous-reconcile`
+  with `reason: "dispatch-time-unknown"`. The status walk's own-echo claim
+  applies the same lower bound. Exactly one qualifying match binds; more than one is
   `ambiguous-reconcile` with `reason: "multiple-candidates"`; none after a
   complete walk leaves `unknown-outcome`, and a partial walk leaves
   `not-reached`. Operations the deadline prevented from being checked are

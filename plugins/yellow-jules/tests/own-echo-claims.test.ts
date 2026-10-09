@@ -61,6 +61,24 @@ describe('each dispatched message explains at most one vendor activity', () => {
     ).toBe(claimed);
   });
 
+  it('an identical message older than the dispatch is outside, not the echo', async () => {
+    const grantId = await createGrant(h, { maxActiveSessions: 3 });
+    const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
+    setVendorState(h, session.sessionResource, 'inProgress');
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'Do the task.',
+      originator: 'user',
+      createTime: new Date(h.deps.clock.now() - 10 * 60_000).toISOString(),
+    });
+    await status(h.deps, { session: session.localId, reconcile: false });
+    expect(await outsideSeen(session.localRequestId)).toBe(true);
+    expect(
+      (await readJournal(h.dataDir)).operations[session.localRequestId]
+        ?.echoActivityId
+    ).toBeUndefined();
+  });
+
   it('two identical messages in one batch explain only one', async () => {
     const grantId = await createGrant(h, { maxActiveSessions: 3 });
     const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });

@@ -954,7 +954,14 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, config =
         for (const message of messages) {
             if (claimed.has(message.activityId))
                 continue;
-            const slot = landed.find((r) => r.echoActivityId === undefined && r.promptDigest === message.digest);
+            const sent = message.createTime && Date.parse(message.createTime);
+            const slot = landed.find((r) => r.echoActivityId === undefined &&
+                r.promptDigest === message.digest &&
+                // A message older than the record's dispatch cannot be its echo.
+                !(typeof sent === 'number' &&
+                    !Number.isNaN(sent) &&
+                    r.dispatchedAt !== undefined &&
+                    sent < Date.parse(r.dispatchedAt) - activity_walk_js_1.DISPATCH_SKEW_MS));
             if (slot === undefined) {
                 outside ??= message;
                 continue;
