@@ -100,6 +100,7 @@ const OPTIONAL_STRING_FIELDS = [
   'taskRef',
   'grantId',
   'promptDigest',
+  'echoActivityId',
   'observedPlanId',
   'vendorState',
   'condition',
@@ -1256,29 +1257,63 @@ export async function updateSupervision(
 }
 
 /**
- * Digests of the messages this plugin itself sent to the session: its prompt and its replies.
- * A cleanly rejected or released write never landed, so its digest does not count; an abandoned
- * one might have, so it does.
+ * Splits new user messages into this plugin's own echoes and outside ones. Each
+ * landed reply or create explains at most ONE vendor activity (its echo), so a
+ * teammate later repeating an earlier prompt verbatim is not mistaken for the
+ * plugin: the first matching activity claims the operation's `echoActivityId`,
+ * and further matches have no operation left to explain them. A rewalk of an
+ * already-claimed activity stays own. A cleanly rejected or released write never
+ * landed and claims nothing; an abandoned one might have, so it can.
  */
-export function ownMessageDigests(
-  journal: Journal,
-  sessionResource: string
-): Set<string> {
-  const digests = new Set<string>();
-  for (const record of Object.values(journal.operations)) {
-    const neverLanded =
-      (record.status === 'failed' && record.abandonedAt === undefined) ||
-      record.status === 'rejected';
-    if (
-      record.sessionResource === sessionResource &&
-      (record.kind === 'reply' || record.kind === 'create') &&
-      record.promptDigest !== undefined &&
-      !neverLanded
-    ) {
-      digests.add(record.promptDigest);
-    }
-  }
-  return digests;
+export async function claimOwnEchoes(
+  dataDir: string,
+  sessionResource: string,
+  messages: ReadonlyArray<{ activityId: string; digest: string }>,
+  config: LockConfig = DEFAULT_LOCK_CONFIG
+): Promise<{ activityId: string; digest: string } | undefined> {
+  return updateJournal(
+    dataDir,
+    (operations) => {
+      const landed = Object.values(operations).filter((record) => {
+        const neverLanded =
+          (record.status === 'failed' && record.abandonedAt === undefined) ||
+          record.status === 'rejected';
+        return (
+          record.sessionResource === sessionResource &&
+          (record.kind === 'reply' || record.kind === 'create') &&
+          record.promptDigest !== undefined &&
+          !neverLanded
+        );
+      });
+      const claimed = new Set(
+        landed.flatMap((r) =>
+          r.echoActivityId !== undefined ? [r.echoActivityId] : []
+        )
+      );
+      let outside: { activityId: string; digest: string } | undefined;
+      for (const message of messages) {
+        if (claimed.has(message.activityId)) continue;
+        const slot = landed.find(
+          (r) =>
+            r.echoActivityId === undefined &&
+            r.promptDigest === message.digest
+        );
+        if (slot === undefined) {
+          outside ??= message;
+          continue;
+        }
+        claimed.add(message.activityId);
+        operations[slot.localRequestId] = {
+          ...slot,
+          echoActivityId: message.activityId,
+        };
+        // `landed` holds the replaced record; keep it current for later matches.
+        landed[landed.indexOf(slot)] = operations[slot.localRequestId]!;
+      }
+      return outside;
+    },
+    config
+  );
 }
 
 /** A create this plugin made: the only record a grant can cover (it carries the repository, branch and source). */

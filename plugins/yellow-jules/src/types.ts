@@ -260,6 +260,8 @@ export interface OperationRecord {
   /** A `delegate --correction` repair launch; it needs an earlier plain launch of the same task under the grant. */
   readonly correction?: boolean;
   readonly promptDigest?: string;
+  /** The vendor activity that echoed this operation's message; each landed message explains at most one activity. */
+  readonly echoActivityId?: string;
   readonly observedPlanId?: string;
   readonly vendorState?: string;
   readonly condition?: string;

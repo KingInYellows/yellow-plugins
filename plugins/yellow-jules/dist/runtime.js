@@ -278,11 +278,10 @@ async function recordOutsideActivity(deps, record, messages) {
         return;
     if (record.sessionResource === undefined)
         return;
-    const journal = await (0, state_js_1.readJournal)(deps.dataDir);
-    const own = (0, state_js_1.ownMessageDigests)(journal, record.sessionResource);
-    const outside = messages.find((m) => !own.has(m.digest));
+    const outside = await (0, state_js_1.claimOwnEchoes)(deps.dataDir, record.sessionResource, messages);
     if (outside === undefined)
         return;
+    const journal = await (0, state_js_1.readJournal)(deps.dataDir);
     const current = journal.operations[record.localRequestId]?.supervision;
     if (current?.outsideSeen !== undefined)
         return;

@@ -70,7 +70,7 @@ exports.recordArtifacts = recordArtifacts;
 exports.recordDeviation = recordDeviation;
 exports.hasUnreconciledDeviation = hasUnreconciledDeviation;
 exports.updateSupervision = updateSupervision;
-exports.ownMessageDigests = ownMessageDigests;
+exports.claimOwnEchoes = claimOwnEchoes;
 exports.isOwningCreate = isOwningCreate;
 const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
@@ -133,6 +133,7 @@ const OPTIONAL_STRING_FIELDS = [
     'taskRef',
     'grantId',
     'promptDigest',
+    'echoActivityId',
     'observedPlanId',
     'vendorState',
     'condition',
@@ -924,23 +925,45 @@ async function updateSupervision(dataDir, localRequestId, patch, now = () => new
     }, config);
 }
 /**
- * Digests of the messages this plugin itself sent to the session: its prompt and its replies.
- * A cleanly rejected or released write never landed, so its digest does not count; an abandoned
- * one might have, so it does.
+ * Splits new user messages into this plugin's own echoes and outside ones. Each
+ * landed reply or create explains at most ONE vendor activity (its echo), so a
+ * teammate later repeating an earlier prompt verbatim is not mistaken for the
+ * plugin: the first matching activity claims the operation's `echoActivityId`,
+ * and further matches have no operation left to explain them. A rewalk of an
+ * already-claimed activity stays own. A cleanly rejected or released write never
+ * landed and claims nothing; an abandoned one might have, so it can.
  */
-function ownMessageDigests(journal, sessionResource) {
-    const digests = new Set();
-    for (const record of Object.values(journal.operations)) {
-        const neverLanded = (record.status === 'failed' && record.abandonedAt === undefined) ||
-            record.status === 'rejected';
-        if (record.sessionResource === sessionResource &&
-            (record.kind === 'reply' || record.kind === 'create') &&
-            record.promptDigest !== undefined &&
-            !neverLanded) {
-            digests.add(record.promptDigest);
+async function claimOwnEchoes(dataDir, sessionResource, messages, config = exports.DEFAULT_LOCK_CONFIG) {
+    return updateJournal(dataDir, (operations) => {
+        const landed = Object.values(operations).filter((record) => {
+            const neverLanded = (record.status === 'failed' && record.abandonedAt === undefined) ||
+                record.status === 'rejected';
+            return (record.sessionResource === sessionResource &&
+                (record.kind === 'reply' || record.kind === 'create') &&
+                record.promptDigest !== undefined &&
+                !neverLanded);
+        });
+        const claimed = new Set(landed.flatMap((r) => r.echoActivityId !== undefined ? [r.echoActivityId] : []));
+        let outside;
+        for (const message of messages) {
+            if (claimed.has(message.activityId))
+                continue;
+            const slot = landed.find((r) => r.echoActivityId === undefined &&
+                r.promptDigest === message.digest);
+            if (slot === undefined) {
+                outside ??= message;
+                continue;
+            }
+            claimed.add(message.activityId);
+            operations[slot.localRequestId] = {
+                ...slot,
+                echoActivityId: message.activityId,
+            };
+            // `landed` holds the replaced record; keep it current for later matches.
+            landed[landed.indexOf(slot)] = operations[slot.localRequestId];
         }
-    }
-    return digests;
+        return outside;
+    }, config);
 }
 function isOwningCreate(record) {
     return (record !== undefined &&
