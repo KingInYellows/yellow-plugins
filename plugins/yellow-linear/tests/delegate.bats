@@ -278,7 +278,7 @@ setup() {
   jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
   printf '%s\n' "$jules_block" | grep -qF 'and (.unreconciledDeviation | not)'
   # Run the real selection program: the blocked grant expires last but must lose.
-  program=$(printf '%s\n' "$jules_block" | awk '/^FOUND=\$\(/{found=1; sub(/^[^\x27]*\x27/, "")} found{if ($0 ~ /\x27\)$/) {sub(/\x27\)$/, ""); print; exit} print}')
+  program=$(printf '%s\n' "$jules_block" | awk -v q="'" '/^FOUND=\$\(/{f=1; sub(/.*\x27/, "")} f{ if (substr($0, length($0) - 1) == q ")") {print substr($0, 1, length($0) - 2); exit} print }')
   grant='{"repository":"o/r","operations":["create"],"taskRefs":["T-1"],"branchPattern":"b","revoked":false,"expired":false,"maxActiveSessions":2,"maxTotalTasks":5,"usage":{"activeSessionRefs":[],"totalTasks":0}}'
   list=$(jq -n --argjson g "$grant" '{grants: [($g + {grantId:"blocked", expiresAt:"2030-01-02T00:00:00Z", unreconciledDeviation:true}), ($g + {grantId:"usable", expiresAt:"2030-01-01T00:00:00Z", unreconciledDeviation:false})]}')
   run bash -c 'printf "%s" "$1" | jq -r --arg repo o/r --arg branch b --arg task T-1 "$2"' _ "$list" "$program"
