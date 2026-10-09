@@ -1013,6 +1013,72 @@ describe('races inside the write gate', () => {
     expect(h.adapter.callsTo('createSession')).toHaveLength(0);
   });
 
+  describe('a repair launch needs a landed plain launch of its task', () => {
+    const scope = (correction: boolean) => ({
+      repository: 'acme/widgets',
+      sourceResource: 'sources/github/acme/widgets',
+      branch: correction ? 'scratch/one-fix' : 'scratch/one',
+      taskRef: 't-repair',
+      operation: 'create' as const,
+      correction,
+    });
+    const reserve = (
+      grantId: string,
+      correction: boolean,
+      id: string,
+      char: string
+    ) =>
+      reserveUnderGrant(h.deps, {
+        grantId,
+        authority: scope(correction),
+        reservation: {
+          localRequestId: id,
+          localId: `jl-${char.repeat(32)}`,
+          autoPrRequested: false,
+          promptDigest: messageDigest(id),
+        },
+      });
+
+    it('an undispatched plain reservation does not qualify', async () => {
+      const g = await createGrant(h, {
+        maxActiveSessions: 3,
+        maxCorrectiveRounds: 2,
+        taskRefs: ['t-repair'],
+      });
+      await reserve(g, false, 'plain-pending', 'd');
+      await expect(reserve(g, true, 'repair-early', 'e')).rejects.toMatchObject(
+        { appError: { code: 'JULES_AUTHORITY_DENIED' } }
+      );
+    });
+
+    it('the plain launch is rechecked before the repair POST', async () => {
+      const g = await createGrant(h, {
+        maxActiveSessions: 3,
+        maxCorrectiveRounds: 2,
+        taskRefs: ['t-repair'],
+      });
+      await reserve(g, false, 'plain-landed', 'd');
+      await markOperation(
+        h.dataDir,
+        'plain-landed',
+        'accepted',
+        { sessionResource: 'sessions/plain' },
+        () => new Date(h.deps.clock.now())
+      );
+      const repair = await reserve(g, true, 'repair-ok', 'e');
+      await markOperation(
+        h.dataDir,
+        'plain-landed',
+        'failed',
+        {},
+        () => new Date(h.deps.clock.now())
+      );
+      await expect(
+        assertGrantLiveBeforeWrite(h.deps, repair, 'reconcile')
+      ).rejects.toMatchObject({ appError: { code: 'JULES_AUTHORITY_DENIED' } });
+    });
+  });
+
   it('a terminal condition recorded after the live read is refused inside the gate', async () => {
     const real = h.adapter.getSessionImpl;
     h.adapter.getSessionImpl = async (resource) => {

@@ -54,12 +54,20 @@ function plainLaunchGrantIds(journal, taskRef) {
     return [...ids].sort();
 }
 function hasPlainLaunch(journal, grantId, taskRef) {
-    return Object.values(journal.operations).some((r) => r.kind === 'create' &&
+    return hasLandedPlainLaunch(journal.operations, grantId, taskRef);
+}
+/**
+ * Only a plain create the vendor accepted (or reconciliation bound to a
+ * session) counts: a reservation that has not dispatched, an unknown outcome,
+ * or a failure leaves no original session for a repair to correct.
+ */
+function hasLandedPlainLaunch(operations, grantId, taskRef) {
+    return Object.values(operations).some((r) => r.kind === 'create' &&
         r.grantId === grantId &&
         r.taskRef === taskRef &&
         r.correction !== true &&
-        r.status !== 'failed' &&
-        r.status !== 'rejected');
+        (r.status === 'accepted' || r.status === 'reconciled') &&
+        r.sessionResource !== undefined);
 }
 function denialError(denial, grant, journal, ids) {
     const context = {
@@ -277,6 +285,11 @@ async function finalDispatchCheck(deps, record) {
                     (0, state_js_1.hasUnreconciledDeviation)(r)));
         if (deviated) {
             return new errors_js_1.AppErrorException((0, errors_js_1.makeAppError)('JULES_POLICY_DEVIATION', `a policy deviation was recorded under grant ${grant.grantId} after the write was reserved; nothing was sent`));
+        }
+        if (record.kind === 'create' &&
+            record.correction === true &&
+            !hasLandedPlainLaunch(operations, grant.grantId, record.taskRef)) {
+            return new errors_js_1.AppErrorException((0, errors_js_1.makeAppError)('JULES_AUTHORITY_DENIED', `no landed launch of task ${record.taskRef ?? '(none)'} under grant ${grant.grantId} remains; nothing was sent`));
         }
         if (record.kind === 'create' && record.correction === true) {
             const blocked = Object.values(operations).some((r) => (0, state_js_1.blocksRepairLaunch)(r, record.grantId, record.taskRef));

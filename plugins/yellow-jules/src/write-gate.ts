@@ -127,14 +127,27 @@ export function hasPlainLaunch(
   grantId: string,
   taskRef: string | undefined
 ): boolean {
-  return Object.values(journal.operations).some(
+  return hasLandedPlainLaunch(journal.operations, grantId, taskRef);
+}
+
+/**
+ * Only a plain create the vendor accepted (or reconciliation bound to a
+ * session) counts: a reservation that has not dispatched, an unknown outcome,
+ * or a failure leaves no original session for a repair to correct.
+ */
+function hasLandedPlainLaunch(
+  operations: Journal['operations'],
+  grantId: string,
+  taskRef: string | undefined
+): boolean {
+  return Object.values(operations).some(
     (r) =>
       r.kind === 'create' &&
       r.grantId === grantId &&
       r.taskRef === taskRef &&
       r.correction !== true &&
-      r.status !== 'failed' &&
-      r.status !== 'rejected'
+      (r.status === 'accepted' || r.status === 'reconciled') &&
+      r.sessionResource !== undefined
   );
 }
 
@@ -487,6 +500,18 @@ async function finalDispatchCheck(
         makeAppError(
           'JULES_POLICY_DEVIATION',
           `a policy deviation was recorded under grant ${grant.grantId} after the write was reserved; nothing was sent`
+        )
+      );
+    }
+    if (
+      record.kind === 'create' &&
+      record.correction === true &&
+      !hasLandedPlainLaunch(operations, grant.grantId, record.taskRef)
+    ) {
+      return new AppErrorException(
+        makeAppError(
+          'JULES_AUTHORITY_DENIED',
+          `no landed launch of task ${record.taskRef ?? '(none)'} under grant ${grant.grantId} remains; nothing was sent`
         )
       );
     }
