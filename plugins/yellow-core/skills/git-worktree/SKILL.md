@@ -207,43 +207,32 @@ Safety rules the script holds:
   prunable or mid-operation, when the stack forks, or when a restack is already
   in progress. An untracked `.ruvector` symlink does not count as dirty.
 - Its own git calls never force a checkout, stash, hard-reset or pass
-  `--ignore-other-worktrees` (Graphite's abort, which the script runs on
-  `--abort`, still rolls the whole restack back, and `--abort` also runs
-  `git rebase --abort` in any stack worktree holding an in-chain rebase,
-  discarding that rebase's in-progress state). A worktree that cannot be
-  restored stays detached and the script prints the
+  `--ignore-other-worktrees`. Graphite's abort (run by `--abort`) rolls the
+  whole restack back, and `--abort` runs `git rebase --abort` in any stack
+  worktree holding an in-chain rebase, discarding its in-progress state. A
+  worktree that cannot be restored stays detached and the script prints the
   `git -C <path> checkout <branch>` line.
-- `--abort` keeps the state (exit `31`) and restores nothing when no rebase is
-  left but a stack branch is no longer at the commit recorded at start (for
-  example the paused rebase was finished with `git rebase --continue`): the
-  provider has nothing to roll back. The script lists each moved branch with
-  its starting commit; point those branches back by hand and run `--abort`
-  again, or run `--continue` to keep the restacked branches.
-  A state file written before tips were recorded gets the same refusal (exit
-  `31`) in this case; after inspecting the branches, run `--continue` or the
-  `restore` subcommand.
+- `--abort` keeps the state (exit `31`) when a stack branch is off its recorded
+  start commit, before or after its cleanup. Each gets a fix line; see
+  `/worktree:restack`.
 - A conflict pauses the run (exit 10). Graphite: the stack worktrees stay
-  detached and are `git worktree lock`ed with a reason. Do not commit in them;
-  a commit there lands on no branch, and the script reports it and refuses to
-  restore over it. GitHub: nothing was detached or locked, because gh-stack
-  holds the paused rebase itself.
+  detached and `git worktree lock`ed. Do not commit in them: a commit there
+  lands on no branch, and the script refuses to restore over it. GitHub:
+  nothing is detached or locked; gh-stack holds the paused rebase.
 - State lives in `<git-common-dir>/yellow-core/worktree-restack/` and is
   re-validated on every read; a rejected state file runs nothing.
 - Residual: the dirty check ignores gitignored files, and a restore checkout
   overwrites an ignored file when the restacked branch now tracks that path.
-  A model that writes a self-consistent state file is also not stopped, only
-  constrained to this repository's worktrees and the recorded stack branches.
+  A self-consistent forged state file is constrained to this repository's
+  worktrees and the recorded stack branches, not stopped.
 
-Exit codes are documented in the script header and in the `/worktree:restack`
-command's exit table. Exit `31` means a step failed with the state kept (a
-provider step failed, a worktree may still be detached, or an in-chain rebase
-or other operation is still in progress): run `status`, then `continue`,
-`abort` or `restore`. Exit `40` means
-restore kept the state: remaining detached worktrees, or a GitHub restack
-still paused (nothing detached; `--continue` or `--abort`).
+Exit codes are in the script header and the `/worktree:restack` exit table.
+Exit `31`: a step failed with the state kept; run `status`, then `continue`,
+`abort` or `restore`. Exit `40`: restore kept the state (detached worktrees
+remain, or a GitHub restack is still paused).
 
-The restack engine depends on the stacked-PR providers (and, for GitHub, Node,
-`jq` and the github-workflow adapter); `worktree-manager.sh` does not.
+The restack engine needs the stacked-PR providers (GitHub also needs Node, `jq`
+and the github-workflow adapter); `worktree-manager.sh` does not.
 
 ## When to Use
 
