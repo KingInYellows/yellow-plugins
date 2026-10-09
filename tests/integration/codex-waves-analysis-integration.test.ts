@@ -157,6 +157,25 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     );
   });
 
+  it('redacts quoted-key credentials and authorization headers', () => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'const a = { "api_key": "synthetic-one" };\n' +
+          "const b = { 'password': 'synthetic-two' };\n" +
+          'const c = { Authorization: "Bearer synthetic-three" };\n' +
+          'h.set("Authorization", "synthetic-four");\n' +
+          'const amount = 1;\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    const text = JSON.stringify(result.output);
+    for (const secret of ['one', 'two', 'three', 'four']) {
+      expect(text).not.toContain('synthetic-' + secret);
+    }
+    expect(result.output.files[0].lines[4].text).toBe('const amount = 1;');
+  });
+
   it('bounds directory scans to twenty supported source files', () => {
     const result = inspect('src', (workspace) => {
       for (let index = 0; index < 21; index += 1) {
