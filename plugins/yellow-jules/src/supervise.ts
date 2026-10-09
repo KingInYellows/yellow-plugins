@@ -29,7 +29,7 @@ import {
   remainingMs,
 } from './deadline.js';
 import { AppErrorException, makeAppError, throwAppError } from './errors.js';
-import { fenceAltersText, fenceUntrusted } from './redact.js';
+import { fenceAltersText, fenceUntrusted, HIDDEN_CHARS_RE } from './redact.js';
 import {
   type Attention,
   attentionOf,
@@ -711,6 +711,7 @@ export async function superviseOnce(
     const bindable =
       latest?.message !== undefined &&
       latest.message.trim() !== '' &&
+      !HIDDEN_CHARS_RE.test(latest.message) &&
       !fenceAltersText(latest.message) &&
       latest.message.length <= BOUND_QUESTION_MAX_CHARS;
     return finish(

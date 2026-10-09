@@ -277,6 +277,23 @@ describe('needs-answer', () => {
     expect(r.allowedActions).toEqual([]);
   });
 
+  it.each([
+    ['a bidi override', 'Which database?\u202e'],
+    ['a zero-width space', 'Which\u200b database?'],
+    ['a BOM', '\ufeffWhich database?'],
+    ['a tag character', 'Which database?\u{e0041}'],
+    ['a NUL', 'Which\u0000 database?'],
+  ])('offers no reply for a question with %s', async (_l, message) => {
+    setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
+    addActivity(h, session.sessionResource, { type: 'agentMessaged', message });
+    const r = await sup();
+    expect(r.decision).toBe('needs-answer');
+    expect(r.observedActivityId).toBeUndefined();
+    expect(r.observedQuestionDigest).toBeUndefined();
+    expect(r.attention).toContain('questionUnavailable');
+    expect(r.allowedActions).toEqual([]);
+  });
+
   it('withholds the question bindings above 20000 characters', async () => {
     setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
     addActivity(h, session.sessionResource, {

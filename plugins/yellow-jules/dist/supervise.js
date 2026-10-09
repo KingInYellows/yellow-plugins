@@ -476,6 +476,7 @@ async function superviseOnce(deps, args) {
         // operator answers.
         const bindable = latest?.message !== undefined &&
             latest.message.trim() !== '' &&
+            !redact_js_1.HIDDEN_CHARS_RE.test(latest.message) &&
             !(0, redact_js_1.fenceAltersText)(latest.message) &&
             latest.message.length <= BOUND_QUESTION_MAX_CHARS;
         return finish('needs-answer', {
