@@ -395,7 +395,18 @@ pgp_tier_run() {
   # This function owns the clear: a stale file from an aborted run must never
   # reach the Phase 7 trailer.
   rm -f -- "$_pgt_prov"
-  _pgt_owner=$(pgp_gh_t 20 repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || :)
+  # A timed-out or rate-limited repo lookup is a retryable stop, not no-repo.
+  _pgt_oerr=$(mktemp 2>/dev/null) || _pgt_oerr=/dev/null
+  _pgt_orc=0
+  _pgt_owner=$(pgp_gh_t 20 repo view --json nameWithOwner -q .nameWithOwner 2>|"$_pgt_oerr") || _pgt_orc=$?
+  _pgt_noowner=no-repo
+  if [ "$_pgt_orc" = 124 ]; then
+    _pgt_noowner=gh-timeout
+  elif [ "$_pgt_orc" != 0 ] && [ "$(pgp_gh_error_class "$_pgt_oerr")" = rate-limited ]; then
+    _pgt_noowner=rate-limited
+  fi
+  [ "$_pgt_oerr" = /dev/null ] || rm -f -- "$_pgt_oerr"
+  [ "$_pgt_orc" = 0 ] || _pgt_owner=''
   _pgt_ownersafe=$(printf '%s' "$_pgt_owner" | tr -d '[:cntrl:]')
   _pgt_reason=no-commit
   _pgt_fsha=''
@@ -432,7 +443,7 @@ pgp_tier_run() {
   _pgt_lookup=skipped
   _pgt_pulls='[]'
   if [ -n "$_pgt_fsha" ] && [ -z "$_pgt_owner" ]; then
-    _pgt_reason=no-repo
+    _pgt_reason=$_pgt_noowner
   fi
   if [ -n "$_pgt_fsha" ] && [ -n "$_pgt_owner" ]; then
     _pgt_err=$(mktemp 2>/dev/null) || _pgt_err=/dev/null

@@ -33,7 +33,13 @@ setup() {
 #!/bin/sh
 printf '%s\n' "$*" >>"$TIER_CALLS"
 case "$*" in
-  "repo view"*) echo 'o/r' ;;
+  "repo view"*)
+    case "${TIER_REPO:-ok}" in
+      rate) echo 'gh: API rate limit exceeded (HTTP 403)' >&2; exit 1 ;;
+      timeout) exit 124 ;;
+      fail) echo 'gh: some other error' >&2; exit 1 ;;
+      *) echo 'o/r' ;;
+    esac ;;
   *"/commits/"*"/pulls"*)
     case "${TIER_PULLS:-empty}" in
       rate) echo 'gh: API rate limit exceeded (HTTP 403)' >&2; exit 1 ;;
@@ -177,4 +183,16 @@ pr=#8 sha=$h" ""; do
     run pgp_evidence_line_is_valid "$bad"
     [ "$status" -ne 0 ] || { echo "accepted: $bad"; false; }
   done
+}
+
+@test "a rate-limited or timed-out repo lookup is a retryable stop; any other failure is no-repo" {
+  TIER_REPO=rate tier
+  [ "$status" -eq 0 ]
+  [ "$(decision_lines)" = "[plan:complete] GATE_C_PROVENANCE=FALLTHROUGH [plan:complete] GATE_C_REASON=rate-limited GATE_C_RETRYABLE=1 " ]
+  TIER_REPO=timeout tier
+  [ "$(decision_lines)" = "[plan:complete] GATE_C_PROVENANCE=FALLTHROUGH [plan:complete] GATE_C_REASON=gh-timeout GATE_C_RETRYABLE=1 " ]
+  TIER_REPO=fail tier
+  [ "$(decision_lines)" = "[plan:complete] GATE_C_PROVENANCE=FALLTHROUGH [plan:complete] GATE_C_REASON=no-repo GATE_C_RETRYABLE=0 " ]
+  [ ! -e "$PROV" ]
+  ! grep -q '/commits/' "$CALLS"
 }
