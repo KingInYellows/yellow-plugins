@@ -706,6 +706,36 @@ forge() {
   [ -e "$(git rev-parse --path-format=absolute --git-common-dir)/gh-stack-rebase-state" ]
 }
 
+@test "a provider abort that fails after rolling back keeps phase aborting, so --continue refuses" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  STUB_FAIL=abort-after run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"may have rolled the restack back"* ]]
+  grep -q '^phase.aborting$' "$SD/state"
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 31 ]
+  [ -e "$SD/state" ]
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "github: a provider abort that fails after removing its rebase record keeps phase aborting" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack b
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  STUB_GH_VERSION=v0.2.1 STUB_FAIL=abort-after run bash "$SCRIPT" abort --provider github
+  [ "$status" -eq 31 ]
+  [[ $output == *"may have rolled the restack back"* ]]
+  grep -q '^phase.aborting$' "$SD/state"
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" continue --provider github
+  [ "$status" -eq 31 ]
+  [ -e "$SD/state" ]
+}
+
 @test "github: gh-stack 0.1.0, an unparseable version, or none exits 20 with an upgrade message" {
   mk_stack
   local v

@@ -1755,6 +1755,7 @@ refuse_moved() {
 # anything back, so a state that cannot be rewritten afterwards still refuses
 # --continue. Refuses (nothing aborted) when the record cannot be written.
 ABORT_PHASE_PRIOR=""
+ABORT_UNCLEAR="the provider's abort failed, but it may have rolled the restack back (its paused restack is gone, or the adapter timed out); state kept with the abort recorded, so --continue is refused. Run --abort again to finish the cleanup"
 begin_abort() {
   ABORT_PHASE_PRIOR=$S_PHASE
   S_PHASE=aborting
@@ -1764,12 +1765,25 @@ begin_abort() {
   }
 }
 
-# abort_failed_unrecord: the provider abort failed, so no rollback is pending;
-# restore the prior phase (best effort: a failed write leaves phase aborting,
-# which only makes --continue stricter).
+# abort_failed_unrecord: the provider abort failed. Only when the provider
+# still holds its paused restack (and, for GitHub, the adapter did not time
+# out) is it known that nothing was rolled back; then restore the prior phase
+# (best effort: a failed write leaves phase aborting, which only makes
+# --continue stricter). Otherwise the abort may have partly or fully run, so
+# phase aborting stays and --continue keeps refusing.
 abort_failed_unrecord() {
-  S_PHASE=$ABORT_PHASE_PRIOR
-  write_state 2>/dev/null || true
+  local untouched=0
+  if [ "$S_PROVIDER" = graphite ]; then
+    gt_paused "$S_RUN" && untouched=1
+  elif [ -e "$COMMON/gh-stack-rebase-state" ] && [ "$AD_STATUS" != SPAWN_FAILURE ]; then
+    untouched=1
+  fi
+  if [ "$untouched" = 1 ]; then
+    S_PHASE=$ABORT_PHASE_PRIOR
+    write_state 2>/dev/null || true
+    return 0
+  fi
+  return 1
 }
 
 cmd_abort() {
@@ -1790,7 +1804,7 @@ cmd_abort() {
       begin_abort
       step_graphite abort
       [ "$RESULT" = ok ] || {
-        abort_failed_unrecord
+        abort_failed_unrecord || die "$X_KEPT" "$ABORT_UNCLEAR"
         die "$X_KEPT" "the provider's abort failed; state kept, nothing restored"
       }
       provider_aborted=1
@@ -1799,7 +1813,7 @@ cmd_abort() {
     begin_abort
     step_github abort
     [ "$RESULT" = ok ] || {
-      abort_failed_unrecord
+      abort_failed_unrecord || die "$X_KEPT" "$ABORT_UNCLEAR"
       die "$X_KEPT" "the provider's abort failed; state kept"
     }
     provider_aborted=1
