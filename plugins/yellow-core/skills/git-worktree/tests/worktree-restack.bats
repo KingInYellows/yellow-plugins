@@ -1403,6 +1403,24 @@ moved_by_hand() {
   [[ $output == *"already aborted"* ]]
 }
 
+@test "a partial restore with an unwritable marker still makes --continue refuse" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  mkdir "$SD/provider-aborted"
+  # A floating commit in a detached stack worktree makes the restore partial.
+  git -C "$(wtp c)" commit -q --allow-empty -m "floating"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 40 ]
+  [[ $output == *"could not be written"* ]]
+  [[ $output != *"--continue, --abort"* ]]
+  [ -e "$SD/state" ]
+  grep -q '^phase.aborted$' "$SD/state"
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"already aborted"* ]]
+}
+
 @test "--abort ignores a non-rebase operation in a worktree outside the recorded stack" {
   mk_stack b
   git -C "$REPO" branch side main
