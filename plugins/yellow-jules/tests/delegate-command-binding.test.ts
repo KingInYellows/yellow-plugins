@@ -229,6 +229,23 @@ describe('/jules:approve binds the approval to the reviewed plan', () => {
       expect(res.stdout).toContain('END-OF-PLAN');
     });
 
+    it.each([
+      ['a bidi override', 'Add tests\u202e'],
+      ['a zero-width space', 'Add\u200b tests'],
+      ['a bell', 'Add tests\u0007'],
+    ])('refuses to bind a plan whose preview would hide %s', (_n, title) => {
+      const res = run(title, 'd');
+      expect(res.status).toBe(1);
+      expect(res.stdout).not.toContain('plan_digest=');
+      expect(res.stderr).toContain('hidden characters');
+    });
+
+    it('still binds a plan with newlines, tabs, dash runs and long dashes', () => {
+      const res = run('Run --force \u2014 carefully', 'line one\n\tline two');
+      expect(res.status).toBe(0);
+      expect(res.stdout).toMatch(/plan_digest=[0-9a-f]{64}/);
+    });
+
     it('exits without a digest when the plan is too long to show in full', () => {
       const res = run('Add tests', 'D'.repeat(20001));
       expect(res.status).toBe(1);
@@ -328,6 +345,22 @@ describe('/jules:supervise binds the approval to the reviewed plan', () => {
     const res = approveRun(status, 'a'.repeat(64));
     expect(res.status).toBe(1);
     expect(res.called).toBe(false);
+  });
+
+  it.each([
+    ['a bidi override', 'Add tests\u202e'],
+    ['a zero-width space', 'Add\u200b tests'],
+  ])('refuses to bind a plan whose preview would hide %s', (_n, title) => {
+    const res = reviewRun(plan(title));
+    expect(res.status).toBe(1);
+    expect(res.stdout).not.toContain('plan_digest=');
+    expect(res.stderr).toContain('hidden characters');
+  });
+
+  it('still binds a plan with newlines, tabs and dash runs', () => {
+    const res = reviewRun(plan('Run --force \u2014 carefully', 'a\n\tb'));
+    expect(res.status).toBe(0);
+    expect(res.stdout).toMatch(/plan_digest=[0-9a-f]{64}/);
   });
 
   it('shows a long plan in full and refuses one too long to show', () => {
