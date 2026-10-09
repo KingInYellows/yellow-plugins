@@ -489,6 +489,33 @@ describe('checks that must hold at the moment of the write (inside the critical 
     expect(h.adapter.writeCount()).toBe(0);
   });
 
+  it('observed steering is rejected even when the cached pause is cleared before the reservation', async () => {
+    await updateSupervision(h.dataDir, session.localRequestId, {
+      paused: {
+        reason: 'outside-user-message',
+        observedAt: new Date().toISOString(),
+      },
+    });
+    const original = h.adapter.listActivitiesImpl;
+    h.adapter.listActivitiesImpl = async (resource, options) => {
+      // The owner clears the pause after the target was resolved; steering is visible.
+      await updateSupervision(h.dataDir, session.localRequestId, {
+        paused: null,
+      });
+      h.deps.clock.time += 1_000;
+      addActivity(h, session.sessionResource, {
+        type: 'userMessaged',
+        message: 'Actually, drop the migration step.',
+      });
+      return original(resource, options);
+    };
+    const err = await fails(() => approve(h.deps, args()));
+    expect(['JULES_SUPERVISION_PAUSED', 'JULES_INVALID_STATE']).toContain(
+      err.appError.code
+    );
+    expect(h.adapter.writeCount()).toBe(0);
+  });
+
   it('a deviation recorded on the session blocks it under a DIFFERENT grant too', async () => {
     approvalLands('plan-9');
     await approve(h.deps, args()); // approves a different plan than evaluated -> deviation

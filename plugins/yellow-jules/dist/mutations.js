@@ -748,14 +748,17 @@ async function approveInner(deps, args, ids) {
         }
         // A user message after the reviewed plan that this plugin did not send may
         // have changed what the plan means; the re-read does not classify it.
-        // Already-recorded outside activity is refused by the reservation below
-        // with the more specific JULES_SUPERVISION_PAUSED.
-        const alreadyPaused = target.owner?.supervision?.paused !== undefined ||
-            target.owner?.supervision?.outsideSeen !== undefined;
-        if (steered && !alreadyPaused) {
-            return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'a user message arrived after the reviewed plan and was not sent by this plugin; nothing was approved', {
-                recoveryAction: 'Run status to record it, read the session, then evaluate the plan again.',
-            });
+        // Rejected whatever the cached pause state says: the owner may clear that
+        // pause between resolving the target and the reservation. A session that
+        // already records outside activity gets the more specific code.
+        if (steered) {
+            const alreadyPaused = target.owner?.supervision?.paused !== undefined ||
+                target.owner?.supervision?.outsideSeen !== undefined;
+            return alreadyPaused
+                ? (0, errors_js_1.throwAppError)('JULES_SUPERVISION_PAUSED', 'outside activity was recorded on this session; no grant-backed write is allowed until supervise --clear-pause')
+                : (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'a user message arrived after the reviewed plan and was not sent by this plugin; nothing was approved', {
+                    recoveryAction: 'Run status to record it, read the session, then evaluate the plan again.',
+                });
         }
         assertPlanReviewable(newest);
         if (ambiguous) {

@@ -91,3 +91,8 @@ changed plan, two different questions at the newest timestamp withhold the
 `reply` action and refuse a question-bound `reply`, and a scratch-tripwire
 failure when the adapter closes after a dispatched write no longer replaces the
 write's result or an unknown outcome (it is reported as `cleanupViolation`).
+
+A second outside message at the same timestamp as the recorded marker now
+replaces it, so `supervise --clear-pause` cannot forget it, and `approve`
+rejects observed steering even when the pause it read earlier was cleared
+before the reservation.

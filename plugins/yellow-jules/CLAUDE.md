@@ -323,6 +323,13 @@ other steps is reported as a policy deviation. Two different agent questions at
 the newest `createTime` withhold the `reply` action in `supervise` and make a
 question-bound `reply` refuse with `JULES_QUESTION_CHANGED`.
 
+Outside-activity markers treat an equal `createTime` as unordered: a second
+outside message at the marker's time, whatever its id, replaces the marker so a
+`--clear-pause` confirmed against the old id is refused. `approve` rejects any
+observed unclaimed steering message regardless of the pause state it cached when
+it resolved the session (`JULES_SUPERVISION_PAUSED` if that state already
+recorded outside activity, else `JULES_INVALID_STATE`).
+
 A scratch-tripwire failure when the adapter closes after `delegate`, `reply` or
 `approve` dispatched never replaces the write's result: a success keeps its
 body and gains `cleanupViolation` plus the `adapterCleanupViolation` attention

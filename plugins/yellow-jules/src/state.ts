@@ -59,6 +59,25 @@ export function digestText(text: string): string {
  * `[planId, [[id, index, title, description], ...]]` (every reviewed `PlanStepRecord` field) plus the newline `jq -c` prints. The commands compute the same value
  * with `jq -c` over `status` output, so DEL is escaped the way jq escapes it.
  */
+/**
+ * True when `next` is outside evidence the stored marker has not recorded: a
+ * different activity that is not strictly older by createTime. Equal times are
+ * unordered (opaque ids carry no order), so they refresh the marker rather than
+ * lose to an id comparison.
+ */
+function outsideSupersedes(
+  next: { createTime?: string; activityId: string },
+  prev: { createTime?: string; activityId: string }
+): boolean {
+  if (next.activityId === prev.activityId) return false;
+  return (
+    compareStamp(
+      { createTime: next.createTime ?? '', activityId: '' },
+      { createTime: prev.createTime ?? '', activityId: '' }
+    ) >= 0
+  );
+}
+
 export function planDigest(
   planId: string,
   steps: ReadonlyArray<{
@@ -1033,16 +1052,7 @@ function mergeSupervision(
   if (observed.outsideSeen !== undefined) {
     merged['outsideSeen'] =
       own.outsideSeen === undefined ||
-      compareStamp(
-        {
-          createTime: observed.outsideSeen.createTime ?? '',
-          activityId: observed.outsideSeen.activityId,
-        },
-        {
-          createTime: own.outsideSeen.createTime ?? '',
-          activityId: own.outsideSeen.activityId,
-        }
-      ) > 0
+      outsideSupersedes(observed.outsideSeen, own.outsideSeen)
         ? observed.outsideSeen
         : own.outsideSeen;
   }
@@ -1655,16 +1665,7 @@ export async function updateSupervision(
       const outsidePatch =
         patch.outsideSeen != null &&
         previous.outsideSeen !== undefined &&
-        compareStamp(
-          {
-            createTime: patch.outsideSeen.createTime ?? '',
-            activityId: patch.outsideSeen.activityId,
-          },
-          {
-            createTime: previous.outsideSeen.createTime ?? '',
-            activityId: previous.outsideSeen.activityId,
-          }
-        ) <= 0
+        !outsideSupersedes(patch.outsideSeen, previous.outsideSeen)
           ? undefined
           : patch.outsideSeen;
       // The evaluated plan is ordered by the start of the pass that produced
@@ -1975,7 +1976,7 @@ export async function claimOwnEchoes(
         stored === undefined
           ? newestOutside
           : newestOutside !== undefined &&
-              compareStamp(
+              outsideSupersedes(
                 {
                   createTime: newestOutside.createTime ?? '',
                   activityId: newestOutside.activityId,
@@ -1984,7 +1985,7 @@ export async function claimOwnEchoes(
                   createTime: stored.createTime ?? '',
                   activityId: stored.activityId,
                 }
-              ) > 0
+              )
             ? newestOutside
             : undefined;
       if (evidence !== undefined && mark !== undefined && owner !== undefined) {

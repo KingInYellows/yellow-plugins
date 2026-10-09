@@ -98,6 +98,36 @@ describe('status classifies unseen messages that sort at or before the watermark
     expect(record?.supervision?.outsideSeen?.activityId).toBe('aaa-user');
   });
 
+  it('a second outside message at the marker time with a lower id refreshes the marker', async () => {
+    const grantId = await createGrant(h, { maxActiveSessions: 3 });
+    const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
+    setVendorState(h, session.sessionResource, 'inProgress');
+    const stamp = '2030-01-01T00:00:00.000Z';
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'use postgres',
+      originator: 'user',
+      activityId: 'zzz-user',
+      createTime: stamp,
+    });
+    await status(h.deps, { session: session.localId, reconcile: false });
+    let record = (await readJournal(h.dataDir)).operations[
+      session.localRequestId
+    ];
+    expect(record?.supervision?.outsideSeen?.activityId).toBe('zzz-user');
+
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'and drop the migration',
+      originator: 'user',
+      activityId: 'aaa-user',
+      createTime: stamp,
+    });
+    await status(h.deps, { session: session.localId, reconcile: false });
+    record = (await readJournal(h.dataDir)).operations[session.localRequestId];
+    expect(record?.supervision?.outsideSeen?.activityId).toBe('aaa-user');
+  });
+
   it('an already-seen message is not reclassified after the watermark passes it', async () => {
     const grantId = await createGrant(h, { maxActiveSessions: 3 });
     const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
