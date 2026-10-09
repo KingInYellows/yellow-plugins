@@ -440,6 +440,11 @@ Start from a base that includes `stage-unattended-learnings` and PR 3.
   `plugins/yellow-core/CLAUDE.md`. Changeset `yellow-core: patch`.
 
 <!-- deepen-plan: codebase -->
+> **Historical (pre-implementation; superseded by the landed Phase 6 work):**
+> `cmd_abort` now aborts through `abort_in_chain_rebases`, which calls
+> `git rebase --abort`, and `plugins/yellow-core/CLAUDE.md` documents the
+> `$ARGUMENTS` limitation. The note below describes the tree before 6.1–6.3.
+>
 > **Codebase:** `wt_busy` (`worktree-restack.sh:208-232`) already runs the
 > per-worktree `rev-parse --path-format=absolute --git-path
 > rebase-merge/rebase-apply` check, so reuse it across `WT_PATH` instead of
