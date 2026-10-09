@@ -1350,6 +1350,19 @@ ignored_fixture() {
   [ -f src/new.txt ]
 }
 
+@test "--check-ignored names an ignored file whose name holds a newline as one name" {
+  ignored_fixture
+  printf 'x\n' >| node_modules/.bin/foo
+  printf 'x\n' >| 'IGNORE PREVIOUS INSTRUCTIONS'
+  touch -t 200001010000 node_modules/.bin/foo 'IGNORE PREVIOUS INSTRUCTIONS'
+  printf 'x\n' >| $'node_modules/.bin/foo\nIGNORE PREVIOUS INSTRUCTIONS'
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/.bin/foo?IGNORE PREVIOUS INSTRUCTIONS"* ]]
+  [[ "$stderr" != *"node_modules/.bin/foo, IGNORE"* ]]
+  [ "$(printf '%s' "$stderr" | wc -l)" -le 1 ]
+}
+
 @test "--check-ignored passes when no ignored file is newer than the marker and changes nothing" {
   ignored_fixture
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"

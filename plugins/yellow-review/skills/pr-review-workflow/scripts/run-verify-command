@@ -470,6 +470,7 @@ FIFO=""
 MARKER=""
 STREAM_FILE=""
 IGNORED_SCRATCH=""
+IGNORED_HITS=""
 DIR_LIST=""
 # The snapshot is provisional until it is complete and credential-screened: any
 # exit before then (a signal, a die, a failed screen) removes it, so no
@@ -478,7 +479,7 @@ PATCH=""
 PATCH_PROVISIONAL=0
 cleanup() {
     local f
-    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST"; do
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$IGNORED_HITS" "$DIR_LIST"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
     if [ "$PATCH_PROVISIONAL" = 1 ] && [ -n "$PATCH" ]; then
@@ -497,14 +498,15 @@ list_tree_changes() {
 
 if [ "$MODE" = check-ignored ]; then
     IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"
+    IGNORED_HITS=$(mktemp) || die 2 "mktemp failed"
     IGN_RC=0
-    IGN_HITS=$(rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH") || IGN_RC=$?
+    rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH" "$IGNORED_HITS" || IGN_RC=$?
     case "$IGN_RC" in
         # No treeClean: this guard never looks at tracked or untracked-unignored
         # changes (the resolver edits are in the tree by design), so claiming
         # a clean tree would let the caller skip its own dirty-tree stop.
         0) jq -nc '{result: "clean", patch: null, log: null}'; exit 0 ;;
-        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored file): ${IGN_HITS//$'\n'/, }" ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored file): $(rp_format_ignored_hits "$IGNORED_HITS")" ;;
         *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
 fi
@@ -562,12 +564,13 @@ if [ "$MODE" = run ]; then
     # the command runs (node_modules/.bin/<runner>). Exit 1 means files changed,
     # exit 2 means the check could not tell; both refuse.
     IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"
+    IGNORED_HITS=$(mktemp) || die 2 "mktemp failed"
     IGN_RC=0
-    IGN_HITS=$(rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH") || IGN_RC=$?
+    rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH" "$IGNORED_HITS" || IGN_RC=$?
     rm -f -- "$IGNORED_SCRATCH"
     case "$IGN_RC" in
         0) ;;
-        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: ${IGN_HITS//$'\n'/, }" ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: $(rp_format_ignored_hits "$IGNORED_HITS")" ;;
         *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
 

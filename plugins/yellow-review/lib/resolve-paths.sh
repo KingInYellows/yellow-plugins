@@ -719,93 +719,126 @@ rp_link_target_changed() {
 # ignored directories included. `.git` is skipped as a walked directory, not
 # as a link target. `.ruvector/coedit-sessions` (the session log yellow-ruvector's
 # PostToolUse hook rewrites on every resolver Edit) is skipped entirely: it is
-# data nothing executes, and counting it would refuse every verify run. Prints up to 20
-# repository-relative paths, one per line (control characters shown as `?`,
-# never file contents), and returns 1 when any file changed; a symlink is named
-# by its own path. Returns 0 when none did and 2 when it cannot tell: the
+# data nothing executes, and counting it would refuse every verify run. Collects
+# up to 20 repository-relative paths and returns 1 when any file changed; a
+# symlink is named by its own path. With a third argument <hitsfile> the raw
+# names are written there NUL-terminated (a name may hold a newline) and
+# nothing is printed; print them with rp_format_ignored_hits. Without it the
+# names are printed one per line, control characters shown as `?`, never file
+# contents. Returns 0 when none did and 2 when it cannot tell: the
 # marker is missing, unreadable, not a regular file or a symlink, git or find
 # fails, or a symlink's target cannot be examined. A caller must treat 2 as a
 # refusal. Whole ignored directories are walked with find; the caller owns
 # <scratch>, a scratch file for git's NUL-delimited listing.
 rp_ignored_changed_since() {
-    local marker="$1" scratch="$2" safe
+    local marker="$1" scratch="$2" hitsfile="${3:-}" safe own=""
     [ -f "$marker" ] && [ ! -L "$marker" ] && [ -r "$marker" ] || return 2
     # find, head, mktemp and the rest run by name after the resolvers wrote
     # the tree, so the walk uses the worktree-free PATH, as yr_git does.
     safe=$(yr_walk_path) || return 2
+    if [ -z "$hitsfile" ]; then
+        hitsfile=$(mktemp) || return 2
+        own=1
+    fi
+    local wrc=0
     (
         PATH=$safe
         hash -r 2>/dev/null || true
-        local mdir top f out p l rc lrc symlist n=0 hits=""
+        local mdir top f p l rc lrc symlist outfile x k dup n=0 seen=()
         mdir=$(cd -- "$(dirname -- "$marker")" 2>/dev/null && pwd) || exit 2
         marker="$mdir/$(basename -- "$marker")"
         top=$(yr_git rev-parse --show-toplevel 2>/dev/null) || exit 2
         cd -- "$top" 2>/dev/null || exit 2
         symlist=$(mktemp) || exit 2
-        trap 'rm -f -- "$symlist"' EXIT
+        outfile=$(mktemp) || exit 2
+        trap 'rm -f -- "$symlist" "$outfile"' EXIT
+        : >|"$hitsfile" || exit 2
         lgit ls-files --others --ignored --exclude-standard --directory -z >|"$scratch" 2>/dev/null || exit 2
         while IFS= read -r -d '' f; do
             case "$f" in .git|.git/*|*/.git|*/.git/*) continue ;; esac
             case "$f" in .ruvector/coedit-sessions|.ruvector/coedit-sessions/) continue ;; esac
-            out=""
+            : >|"$outfile"
             rc=0
             if [ "${f%/}" != "$f" ]; then
-                # A wholly ignored directory. head bounds the output, so a
-                # tree rewritten end to end cannot fill memory; a find that
+                # A wholly ignored directory. Names stay NUL-delimited (a
+                # name can hold a newline) and only the first 20 are kept, so
+                # a tree rewritten end to end cannot fill memory; a find that
                 # fails with nothing found is "cannot tell".
-                out=$(set -o pipefail
-                    find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o \( -type f -o -type l \) -newer "$marker" -print 2>/dev/null \
-                        | head -n 20) || rc=$?
-                if [ -z "$out" ] && [ "$rc" -eq 0 ]; then
+                (set -o pipefail
+                    find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o \( -type f -o -type l \) -newer "$marker" -print0 2>/dev/null \
+                        | { k=0; while IFS= read -r -d '' x; do [ "$k" -ge 20 ] || printf '%s\0' "$x"; k=$((k + 1)); done; }) >|"$outfile" || rc=$?
+                if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ]; then
                     # Nothing newer: judge the target of each symlink inside.
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o -type l -print0 >|"$symlist" 2>/dev/null || exit 2
                     while IFS= read -r -d '' l; do
                         lrc=0
                         rp_link_target_changed "$l" "$marker" || lrc=$?
                         case "$lrc" in
-                            0) out="$l"; break ;;
+                            0) printf '%s\0' "$l" >|"$outfile"; break ;;
                             1) ;;
                             *) exit 2 ;;
                         esac
                     done <"$symlist"
                 fi
             elif [ -L "./$f" ]; then
-                out=$(find "./$f" -type l -newer "$marker" -print 2>/dev/null) || rc=$?
-                if [ -z "$out" ] && [ "$rc" -eq 0 ]; then
+                find "./$f" -type l -newer "$marker" -print0 >|"$outfile" 2>/dev/null || rc=$?
+                if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ]; then
                     lrc=0
                     rp_link_target_changed "./$f" "$marker" || lrc=$?
                     case "$lrc" in
-                        0) out="./$f" ;;
+                        0) printf '%s\0' "./$f" >|"$outfile" ;;
                         1) ;;
                         *) exit 2 ;;
                     esac
                 fi
             elif [ -f "./$f" ]; then
-                [ "./$f" -nt "$marker" ] && out="./$f"
+                [ "./$f" -nt "$marker" ] && printf '%s\0' "./$f" >|"$outfile"
             fi
-            if [ -z "$out" ]; then
+            if [ ! -s "$outfile" ]; then
                 [ "$rc" -eq 0 ] || exit 2
                 continue
             fi
-            while IFS= read -r p; do
+            while IFS= read -r -d '' p; do
                 [ -n "$p" ] || continue
                 p="${p#./}"
-                p="${p//[[:cntrl:]]/?}"
                 # git lists an ignored symlink on its own and, when its whole
                 # directory is ignored, again as part of that directory.
-                case $'\n'"$hits" in *$'\n'"$p"$'\n'*) continue ;; esac
+                dup=""
+                for x in ${seen[@]+"${seen[@]}"}; do
+                    [ "$x" != "$p" ] || { dup=1; break; }
+                done
+                [ -z "$dup" ] || continue
+                seen+=("$p")
+                printf '%s\0' "$p" >>"$hitsfile"
                 n=$((n + 1))
-                hits="${hits}${p}"$'\n'
                 [ "$n" -lt 20 ] || break
-            done <<<"$out"
+            done <"$outfile"
             [ "$n" -lt 20 ] || break
         done <"$scratch"
-        if [ "$n" -gt 0 ]; then
-            printf '%s' "$hits"
-            exit 1
-        fi
+        [ "$n" -eq 0 ] || exit 1
         exit 0
-    )
+    ) || wrc=$?
+    if [ -n "$own" ]; then
+        # Legacy form: one sanitized name per line on stdout.
+        [ "$wrc" -ne 1 ] || rp_format_ignored_hits "$hitsfile" $'\n'
+        rm -f -- "$hitsfile"
+    fi
+    return "$wrc"
+}
+
+# rp_format_ignored_hits <hitsfile> [separator]: print the NUL-delimited names
+# rp_ignored_changed_since collected, each as one whole name with control
+# characters (newline included) shown as `?`, joined by the separator (default
+# ", ") and, for a newline separator, ended by one. A name holding a newline
+# stays one name; it is never split into fragments.
+rp_format_ignored_hits() {
+    local f="$1" sep="${2:-, }" p first=1
+    while IFS= read -r -d '' p; do
+        p="${p//[[:cntrl:]]/?}"
+        if [ "$first" = 1 ]; then first=""; else printf '%s' "$sep"; fi
+        printf '%s' "$p"
+    done <"$f"
+    [ "$sep" != $'\n' ] || [ -n "$first" ] || printf '\n'
 }
 
 # rp_hooks_untracked <outfile>: the dirty-set guard cannot see a resolver edit
