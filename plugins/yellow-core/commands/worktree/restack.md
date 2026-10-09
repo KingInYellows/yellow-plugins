@@ -190,8 +190,13 @@ recorded stack branch in any of this stack's worktrees, not only the run
 worktree, and then restores. If one of those rebases is still in progress, it
 keeps the state (exit `31`) and restores nothing; run `--abort` again after
 that rebase can be cleared. A rebase in a worktree outside this stack is left
-alone. If the provider's abort succeeded but its "already aborted" marker could
-not be written, the abort still runs to the end; only when an in-chain rebase
+alone. The state file records a random run id, and the provider's "already
+aborted" marker holds that id: only a regular, non-symlink marker whose content
+equals the current run id lets a retry skip the provider and the
+remaining-rebase check. A missing, mismatched, symlinked or legacy (id-less)
+marker is ignored, and the moved-tip check always runs, so a forged marker
+cannot hide restacked branches. If the provider's abort succeeded but its
+marker could not be written, the abort still runs to the end; only when an in-chain rebase
 then cannot be cleared does it keep the state (exit `31`), and abort that
 rebase by hand first, because fixing only the marker path leaves `--abort`
 refusing as above.

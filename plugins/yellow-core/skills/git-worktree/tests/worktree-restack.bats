@@ -1001,6 +1001,99 @@ JSEOF
   assert_all_restored
 }
 
+# runid_of: the run id recorded in the state file.
+runid_of() { sed -n 's/^runid\t//p' "$SD/state"; }
+
+# moved_by_hand: restack b c, finish the paused rebase with git so a is
+# restacked, no rebase directory is left and Graphite is no longer paused.
+moved_by_hand() {
+  mk_stack b c
+  orig_a=$(git rev-parse a)
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  resolve_in "$(wtp a)" b.txt
+  GIT_EDITOR=true git -C "$(wtp a)" rebase --continue >/dev/null 2>&1 || true
+  [ "$(git rev-parse a)" != "$orig_a" ]
+}
+
+@test "state records a 32-hex run id and a genuine abort binds the marker to it" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  id=$(runid_of)
+  [[ $id =~ ^[0-9a-f]{32}$ ]]
+  plant_stuck_rebase "$(wtp c)" c
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [ -f "$SD/provider-aborted" ] && [ ! -L "$SD/provider-aborted" ]
+  [ "$(cat "$SD/provider-aborted")" = "$id" ]
+  rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+  [ ! -e "$SD/provider-aborted" ] && [ ! -e "$SD/state" ]
+}
+
+@test "a forged provider-aborted marker without the run id does not skip the moved-tip check" {
+  moved_by_hand
+  : >"$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"have moved"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "a forged provider-aborted marker with the wrong run id does not skip the moved-tip check" {
+  moved_by_hand
+  printf '%032d\n' 0 >"$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"have moved"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "a marker carrying the right id still cannot hide moved tips" {
+  moved_by_hand
+  runid_of >"$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"have moved"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "a symlinked marker holding the right run id is rejected" {
+  moved_by_hand
+  runid_of >"$BATS_TEST_TMPDIR/idfile"
+  ln -s "$BATS_TEST_TMPDIR/idfile" "$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"have moved"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "a forged marker (no id, wrong id, or legacy state) does not skip the remaining-rebase check" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  id=$(runid_of)
+  rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
+  : >"$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"no record of it"* ]]
+  printf '%032d\n' 0 >"$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"no record of it"* ]]
+  # A state written before run ids existed can never be matched by a marker.
+  sed -i '/^runid\t/d' "$SD/state"
+  printf '%s\n' "$id" >"$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"no record of it"* ]]
+  [ -e "$SD/state" ]
+}
+
 @test "--continue after the user finished the provider's continue by hand verifies and restores" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
