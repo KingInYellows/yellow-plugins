@@ -393,6 +393,14 @@ Spawn unconditionally:
 | `type-design-analyzer` | `yellow-review:review:type-design-analyzer` | types | Files have extensions `.ts`, `.py`, `.rb`, `.go`, `.rs` AND diff contains type-shape keywords (`interface`, `type`, `class`, `struct`, `enum`, `model`, `dataclass`) |
 | `silent-failure-hunter` | `yellow-review:review:silent-failure-hunter` | reliability | Diff contains `try`/`catch`/`except`/`rescue`/`recover` OR fallback patterns (`\|\| null`, `?? undefined`, `or None`) |
 
+**Version-only manifest edits do not trigger.** A `plugin.json` (under
+`.claude-plugin/`, `.codex-plugin/` or `.cursor-plugin/`) whose only changed
+line is `"version"` does not count as touching `plugin.json` for the triggers
+above. Changesets' "chore: version packages" PRs change exactly that, plus
+`package.json`, `marketplace.json` and `CHANGELOG.md`, and none of it is an
+authoring, contract or CLI surface. Any other changed line in the manifest, or
+any other trigger path in the diff, selects those reviewers as usual.
+
 #### Optional supplementary
 
 | Agent | subagent_type | Trigger |

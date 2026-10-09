@@ -238,7 +238,8 @@ aggregation rules change there, propagate the same change here.
    review-pr.md, which points at it too.
 
 6. **Tiered persona dispatch** (mirrors review-pr.md Step 4): always-on
-   personas + conditional personas + the "Opt-in only" registry (the
+   personas + conditional personas (version-only `plugin.json` edits do not
+   trigger them) + the "Opt-in only" registry (the
    `thermonuclear-reviewer` row, reachable solely via `reviewer_set.include`)
    + graceful-degradation guard. Read
    `yellow-plugins.local.md` for `review_pipeline`, `review_depth`,

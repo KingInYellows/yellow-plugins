@@ -1262,3 +1262,8 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -q '^Merge readiness unknown (no readable ledger): ' "$SWEEP_ALL"
   grep -q 'a PR is never treated as merge-ready without a ledger' "$SWEEP_ALL"
 }
+
+@test "review-pr: version-only plugin.json edits do not trigger plugin reviewers" {
+  grep -q '^\*\*Version-only manifest edits do not trigger\.\*\*' "$REVIEW_PR"
+  grep -q 'line is `"version"` does not count as touching `plugin.json` for the triggers' "$REVIEW_PR"
+}
