@@ -543,6 +543,54 @@ assert_recreated_patch_restores() {
   [[ "$output" != *IGNORE* ]]
 }
 
+@test "--revert-denied leaves an untracked bare repository in place, reverts the rest, and is not deniedClean" {
+  mkdir -p .cursor
+  git init -q --bare .cursor/bare.git
+  printf 'secret\n' >| CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ "$(printf '%s' "$output" | jq -c .reverted)" = '["CLAUDE.md"]' ]
+  [ ! -e CLAUDE.md ]
+  [ -f .cursor/bare.git/HEAD ]
+  [ -f .cursor/bare.git/config ]
+  [ -d .cursor/bare.git/hooks ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'left a nested git repository in place: .cursor/bare.git/'* ]]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  ! grep -q 'bare.git' "$patch"
+}
+
+@test "--revert-denied with only an untracked bare repository is a noop that is not deniedClean" {
+  mkdir -p .cursor
+  git init -q --bare .cursor/bare.git
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = noop ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ "$(printf '%s' "$output" | jq -r .patch)" = null ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'left a nested git repository in place'* ]]
+  [ -f .cursor/bare.git/HEAD ]
+}
+
+@test "--revert-dirty, --revert-only and a failing run refuse to remove an untracked bare repository" {
+  mkdir -p src
+  git init -q --bare src/bare.git
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"nested git repository"* ]]
+  [ -f src/bare.git/HEAD ]
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/bare.git/HEAD
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"nested git repository"* ]]
+  [ -f src/bare.git/HEAD ]
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt src/bare.git/HEAD
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"nested git repository"* ]]
+  [ -f src/bare.git/HEAD ]
+  [ -f src/bare.git/config ]
+}
+
 @test "--revert-denied with only a nested repository is a noop that is not deniedClean" {
   mkdir -p .cursor/vendored
   git -C .cursor/vendored init -q

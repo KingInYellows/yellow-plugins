@@ -754,6 +754,43 @@ else
     FILES=(${KEEP_FILES[@]+"${KEEP_FILES[@]}"})
 fi
 
+# An untracked bare repository (HEAD, objects/, refs/ and no .git entry) is not
+# a nested-repository boundary to git: it lists the files inside one by one, so
+# the `find -name .git` check below never sees it and the revert would delete
+# its HEAD, config and hooks. Find the boundary from each untracked listed file's
+# ancestors and treat the directory like a nested repository: --revert-denied
+# leaves it in place and says so, every other mode refuses.
+BARE_KEPT=()
+if [ "${#FILES[@]}" -gt 0 ]; then
+    KEEP_FILES=()
+    for f in "${FILES[@]}"; do
+        BARE=""
+        if ! lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
+            && ! lgit cat-file -e "HEAD:$f" 2>/dev/null; then
+            d="$f"
+            while :; do
+                case "$d" in */*) d="${d%/*}" ;; *) break ;; esac
+                if [ -d "$d" ] && [ ! -L "$d" ] && [ -f "$d/HEAD" ] && [ ! -L "$d/HEAD" ] \
+                    && [ -d "$d/objects" ] && [ -d "$d/refs" ]; then
+                    BARE="$d/"
+                fi
+            done
+        fi
+        if [ -z "$BARE" ]; then
+            KEEP_FILES+=("$f")
+            continue
+        fi
+        [ "$MODE" = revert-denied ] \
+            || die 2 "refusing to remove a directory that contains a nested git repository: $(safe_path_label "$BARE")"
+        SEEN=0
+        for p in ${BARE_KEPT[@]+"${BARE_KEPT[@]}"}; do
+            [ "$p" = "$BARE" ] && { SEEN=1; break; }
+        done
+        [ "$SEEN" = 1 ] || BARE_KEPT+=("$BARE")
+    done
+    FILES=(${KEEP_FILES[@]+"${KEEP_FILES[@]}"})
+fi
+
 if [ "$MODE" = run ]; then
     # Never run a command while the tree has changes the list does not name.
     d=$(rp_assert_only_listed "$CHANGES_FILE" ${FILES[@]+"${FILES[@]}"}) \
@@ -795,6 +832,10 @@ TOP_REAL=$(pwd -P)
 TO_REMOVE=()
 DIR_REMOVE=()
 NESTED_KEPT=()
+for f in ${BARE_KEPT[@]+"${BARE_KEPT[@]}"}; do
+    add_path_reason "left a nested git repository in place" "$f"
+    NESTED_KEPT+=("$f")
+done
 for f in ${FILES[@]+"${FILES[@]}"}; do
     if [ -L "$f" ] || [ -f "$f" ] || [ ! -e "$f" ]; then
         continue
