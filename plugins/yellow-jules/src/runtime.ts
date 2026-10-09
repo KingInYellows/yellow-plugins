@@ -541,6 +541,9 @@ export async function status(
     return {
       operation: 'status',
       reconciled: reconciled ?? [],
+      ...((reconciled ?? []).some((r) => r.outcome === 'policy-deviation')
+        ? { policyDeviation: true as const }
+        : {}),
       ...attentionOf(reconcileFlags),
     };
   }

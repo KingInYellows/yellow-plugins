@@ -308,6 +308,9 @@ async function status(deps, args) {
         return {
             operation: 'status',
             reconciled: reconciled ?? [],
+            ...((reconciled ?? []).some((r) => r.outcome === 'policy-deviation')
+                ? { policyDeviation: true }
+                : {}),
             ...(0, runtime_support_js_1.attentionOf)(reconcileFlags),
         };
     }

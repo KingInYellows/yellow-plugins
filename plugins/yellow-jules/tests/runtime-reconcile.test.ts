@@ -79,7 +79,10 @@ describe('delegate reservations: one shared sessions walk', () => {
     const result = await status(h.deps, { reconcile: true });
 
     expect(result.reconciled).toEqual([
-      expect.objectContaining({ localRequestId: 'lost-done', outcome: 'bound' }),
+      expect.objectContaining({
+        localRequestId: 'lost-done',
+        outcome: 'bound',
+      }),
     ]);
     expect(
       loadGrants(h.dataDir).grants[grantId]?.usage.activeSessionRefs
@@ -258,6 +261,7 @@ describe('delegate reservations: one shared sessions walk', () => {
       reason: 'repository-or-branch-mismatch',
     });
     expect(result.attention).toEqual(['reconciled:policy-deviation']);
+    expect(result.policyDeviation).toBe(true);
     const record = (await readJournal(h.dataDir)).operations['lost-a'];
     expect(record?.deviations).toHaveLength(1);
     expect(record?.status).toBe('unknown-outcome');
