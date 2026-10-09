@@ -196,4 +196,7 @@ function fenceAltersText(text) {
  * LF and CR, C1 controls, soft hyphen, bidi and zero-width characters, and tag
  * characters. Keep it identical to those commands.
  */
-exports.HIDDEN_CHARS_RE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\u{e0000}-\u{e007f}]/u;
+// The class is the point: it must name control and combining characters.
+exports.HIDDEN_CHARS_RE = 
+// eslint-disable-next-line no-control-regex, no-misleading-character-class
+/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\u{e0000}-\u{e007f}]/u;
