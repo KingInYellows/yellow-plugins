@@ -18,6 +18,7 @@ import {
   markOperation,
   messageDigest,
   readJournal,
+  recordDeviation,
   updateJournal,
 } from '../src/state.js';
 import {
@@ -464,6 +465,24 @@ describe('races inside the write gate', () => {
       assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
     ).rejects.toMatchObject({ appError: { code: 'JULES_SUPERVISION_PAUSED' } });
     const record = (await readJournal(h.dataDir)).operations['reply-pause-1'];
+    expect(record?.dispatchedAt).toBeUndefined();
+    expect(record?.status).toBe('failed');
+    expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+  });
+
+  it('a policy deviation recorded after the reserve refuses at the final check', async () => {
+    const reservation = await reserveUnderGrant(
+      h.deps,
+      replyGate('reply-dev-1')
+    );
+    await recordDeviation(h.dataDir, session.localRequestId, {
+      kind: 'policy-deviation',
+      reason: 'vendor opened a pull request',
+    });
+    await expect(
+      assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile')
+    ).rejects.toMatchObject({ appError: { code: 'JULES_POLICY_DEVIATION' } });
+    const record = (await readJournal(h.dataDir)).operations['reply-dev-1'];
     expect(record?.dispatchedAt).toBeUndefined();
     expect(record?.status).toBe('failed');
     expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);

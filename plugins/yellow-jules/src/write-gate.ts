@@ -459,6 +459,27 @@ async function finalDispatchCheck(
     if (fresh.invalidatedBy !== undefined) {
       return paused(`outside activity was recorded on ${session}`);
     }
+    // R13: a deviation recorded after the reserve blocks every write under the
+    // grant, and any write on a session that carries one.
+    const deviated =
+      Object.values(operations).some(
+        (r) => r.grantId === grant.grantId && hasUnreconciledDeviation(r)
+      ) ||
+      (record.kind !== 'create' &&
+        Object.values(operations).some(
+          (r) =>
+            r.kind === 'create' &&
+            r.sessionResource === record.sessionResource &&
+            hasUnreconciledDeviation(r)
+        ));
+    if (deviated) {
+      return new AppErrorException(
+        makeAppError(
+          'JULES_POLICY_DEVIATION',
+          `a policy deviation was recorded under grant ${grant.grantId} after the write was reserved; nothing was sent`
+        )
+      );
+    }
     if (record.kind === 'create' && record.correction === true) {
       const blocked = Object.values(operations).some((r) =>
         blocksRepairLaunch(r, record.grantId, record.taskRef)
