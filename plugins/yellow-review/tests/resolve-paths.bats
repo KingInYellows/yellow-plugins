@@ -1374,6 +1374,183 @@ commit_repo() {
   [[ "$out" == "$BATS_TEST_TMPDIR/okbin:"* ]]
 }
 
+@test "yr_safe_path drops an outside directory holding a script whose #! interpreter is inside the worktree" {
+  mkdir -p venv "$BATS_TEST_TMPDIR/shbin" "$BATS_TEST_TMPDIR/envbin" "$BATS_TEST_TMPDIR/rel"
+  printf '#!/bin/sh\nexit 0\n' >| venv/python
+  chmod +x venv/python
+  printf '#!%s/venv/python\nprint(1)\n' "$PWD" >| "$BATS_TEST_TMPDIR/shbin/console-script"
+  printf '#! /usr/bin/env -S %s/venv/python -u\n' "$PWD" >| "$BATS_TEST_TMPDIR/envbin/other"
+  printf '#!venv/python\n' >| "$BATS_TEST_TMPDIR/rel/relative"
+  chmod +x "$BATS_TEST_TMPDIR"/shbin/* "$BATS_TEST_TMPDIR"/envbin/* "$BATS_TEST_TMPDIR"/rel/*
+  out=$(PATH="$BATS_TEST_TMPDIR/shbin:$BATS_TEST_TMPDIR/envbin:$BATS_TEST_TMPDIR/rel:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *shbin* ]]
+  [[ "$out" != *envbin* ]]
+  [[ "$out" != *rel* ]]
+}
+
+@test "yr_safe_path keeps a directory whose scripts name interpreters outside the worktree, and a non-executable one" {
+  mkdir -p venv "$BATS_TEST_TMPDIR/okbin"
+  printf '#!/bin/sh\nexit 0\n' >| "$BATS_TEST_TMPDIR/okbin/a"
+  printf '#!/usr/bin/env python3\n' >| "$BATS_TEST_TMPDIR/okbin/b"
+  printf '#!/usr/bin/env -S sh -c true\n' >| "$BATS_TEST_TMPDIR/okbin/c"
+  chmod +x "$BATS_TEST_TMPDIR"/okbin/*
+  # Not executable, so never run: its interpreter does not matter.
+  printf '#!%s/venv/python\n' "$PWD" >| "$BATS_TEST_TMPDIR/okbin/notes"
+  out=$(PATH="$BATS_TEST_TMPDIR/okbin:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" == "$BATS_TEST_TMPDIR/okbin:"* ]]
+}
+
+@test "yr_safe_path judges a script reached through an outside symlink by its interpreter" {
+  mkdir -p venv "$BATS_TEST_TMPDIR/lnbin" "$BATS_TEST_TMPDIR/real"
+  printf '#!%s/venv/python\n' "$PWD" >| "$BATS_TEST_TMPDIR/real/tool"
+  chmod +x "$BATS_TEST_TMPDIR/real/tool"
+  ln -s "$BATS_TEST_TMPDIR/real/tool" "$BATS_TEST_TMPDIR/lnbin/tool"
+  out=$(PATH="$BATS_TEST_TMPDIR/lnbin:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *lnbin* ]]
+}
+
+@test "yr_resolve_tool refuses an outside script whose #! interpreter is inside the worktree (exit 2)" {
+  mkdir -p venv "$BATS_TEST_TMPDIR/shbin"
+  printf '#!/bin/sh\nexit 0\n' >| venv/python
+  chmod +x venv/python
+  for line in "#!$PWD/venv/python" "#!/usr/bin/env $PWD/venv/python"; do
+    printf '%s\n' "$line" >| "$BATS_TEST_TMPDIR/shbin/mytool"
+    chmod +x "$BATS_TEST_TMPDIR/shbin/mytool"
+    rc=0; PATH="$BATS_TEST_TMPDIR/shbin:$PATH" yr_resolve_tool mytool >/dev/null || rc=$?
+    [ "$rc" -eq 2 ] || { echo "rc=$rc for $line" >&2; return 1; }
+  done
+  printf '#!/bin/sh\n' >| "$BATS_TEST_TMPDIR/shbin/mytool"
+  rc=0; PATH="$BATS_TEST_TMPDIR/shbin:$PATH" yr_resolve_tool mytool >/dev/null || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
+@test "harden_git_config refuses a command variable that runs a program inside the worktree, naming the variable only" {
+  mkdir -p tools
+  printf '#!/bin/sh\nexit 0\n' >| tools/cmd
+  chmod +x tools/cmd
+  for name in GIT_SSH_COMMAND GIT_SSH GIT_ASKPASS SSH_ASKPASS GIT_PROXY_COMMAND GIT_EXTERNAL_DIFF \
+              GIT_PAGER PAGER GIT_EDITOR EDITOR VISUAL; do
+    for val in "$PWD/tools/cmd" "$PWD/tools/cmd -o x" "\"$PWD/tools/cmd\" arg" "tools/cmd" \
+               "sh $PWD/tools/cmd" "sh tools/cmd" "sh -c 'exec $PWD/tools/cmd'" "ssh -F $PWD/tools/cmd host" \
+               "ssh --config=tools/cmd host" "env X=1 sh '$PWD/tools/cmd'" "less -R !$PWD/tools/cmd"; do
+      for scope in full revert; do
+        rc=0; ( export "$name=$val"; harden_git_config "$scope" ) || rc=$?
+        [ "$rc" -eq 1 ] || { echo "$name=$val ($scope) rc=$rc" >&2; return 1; }
+      done
+    done
+    ( export "$name=$PWD/tools/cmd"; harden_git_config full || [[ "$YR_HARDEN_MSG" == "$name runs"* && "$YR_HARDEN_MSG" != *tools/cmd* ]] )
+  done
+}
+
+@test "harden_git_config judges every token: logical spelling, a bare first word that is a script entering the worktree" {
+  mkdir -p tools venv "$BATS_TEST_TMPDIR/hbin"
+  printf '#!/bin/sh\nexit 0\n' >| venv/python
+  chmod +x venv/python
+  : >| tools/cmd
+  printf '#!%s/venv/python\n' "$PWD" >| "$BATS_TEST_TMPDIR/hbin/myhelper"
+  chmod +x "$BATS_TEST_TMPDIR/hbin/myhelper"
+  # A bare first word resolves through the PATH: a script with an interpreter
+  # inside the worktree is refused, a plain one is kept.
+  rc=0; ( PATH="$BATS_TEST_TMPDIR/hbin:$PATH"; export GIT_SSH_COMMAND="myhelper -o x"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  rc=0; ( PATH="$BATS_TEST_TMPDIR/hbin:$PATH"; export GIT_PAGER="myhelper"; harden_git_config revert ) || rc=$?
+  [ "$rc" -eq 1 ]
+  # The logical spelling of the worktree (cwd reached through a symlink).
+  ln -s "$PWD" "$BATS_TEST_TMPDIR/lnk"
+  rc=0; ( cd "$BATS_TEST_TMPDIR/lnk"; export EDITOR="sh $BATS_TEST_TMPDIR/lnk/tools/cmd"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.sshCommand GIT_CONFIG_VALUE_0="sh $PWD/tools/cmd"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  rc=0; ( export GIT_CONFIG_PARAMETERS="'core.sshcommand'='sh tools/cmd'"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  # Trusted shell command lines keep working.
+  for val in "sh -c true" "less -R" "ssh -F /etc/ssh/ssh_config -o BatchMode=yes" "ssh -i ~/.ssh/id_ed25519" "ssh -o ProxyCommand=nc"; do
+    rc=0; ( export GIT_SSH_COMMAND="$val" GIT_PAGER="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
+  done
+}
+
+@test "#! lines with env -S, --split-string, clusters and option arguments are parsed, in awk and in the shell" {
+  mkdir -p venv
+  printf '#!/bin/sh\nexit 0\n' >| venv/python
+  chmod +x venv/python
+  n=0
+  for shebang in "#!/usr/bin/env -S $PWD/venv/python -u" "#!/usr/bin/env -S$PWD/venv/python x" \
+                 "#!/usr/bin/env --split-string=$PWD/venv/python x" "#!/usr/bin/env --split-string $PWD/venv/python x" \
+                 "#!/usr/bin/env -vS $PWD/venv/python x" "#!/usr/bin/env -vS$PWD/venv/python x" \
+                 "#!/usr/bin/env -u FOO $PWD/venv/python" "#!/usr/bin/env -C /tmp $PWD/venv/python" \
+                 "#!/usr/bin/env --chdir /tmp --unset=A A=1 $PWD/venv/python" "#!/usr/bin/env -P /usr/bin $PWD/venv/python" \
+                 "#!/usr/bin/env -S -u X $PWD/venv/python" "#!/usr/bin/env -S \"$PWD/venv/python\" x" "#!/usr/bin/env -- $PWD/venv/python"; do
+    n=$((n + 1))
+    d="$BATS_TEST_TMPDIR/sb$n"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell missed: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
+  done
+  # Option operands are not the command; outside commands stay fine.
+  for shebang in "#!/usr/bin/env -C $PWD/venv sh" "#!/usr/bin/env -u $PWD/venv/python sh" "#!/usr/bin/env -S sh -c true" \
+                 "#!/usr/bin/env --chdir=$PWD/venv /usr/bin/sh"; do
+    d="$BATS_TEST_TMPDIR/sbok"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    ! yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell false hit: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" == "$d:"* ]] || { echo "awk false hit: $shebang" >&2; return 1; }
+  done
+}
+
+@test "harden_git_config keeps a trusted command variable, a bare name and a link to an outside file" {
+  ln -s /usr/bin/true "$BATS_TEST_TMPDIR/trusted"
+  for val in "/usr/bin/ssh -o BatchMode=yes" ssh "ssh -i /nonexistent/key" "$BATS_TEST_TMPDIR/trusted" "'/usr/bin/true' x" "!/usr/bin/true"; do
+    rc=0; ( export GIT_SSH_COMMAND="$val" GIT_ASKPASS="$val" EDITOR="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
+  done
+}
+
+@test "harden_git_config refuses a command variable that reaches the worktree through a symlink" {
+  mkdir -p tools
+  : >| tools/cmd
+  ln -s "$PWD/tools/cmd" "$BATS_TEST_TMPDIR/viaLink"
+  rc=0; ( export GIT_SSH_COMMAND="$BATS_TEST_TMPDIR/viaLink -x"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+}
+
+@test "harden_git_config refuses GIT_EXEC_PATH, GIT_TEMPLATE_DIR and GIT_CONFIG_GLOBAL inside the worktree" {
+  mkdir -p tools/dir
+  : >| tools/cfg
+  for name in GIT_EXEC_PATH GIT_TEMPLATE_DIR GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM; do
+    rc=0; ( export "$name=$PWD/tools/dir"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "$name accepted" >&2; return 1; }
+    rc=0; ( export "$name=tools/cfg"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "$name relative accepted" >&2; return 1; }
+  done
+  rc=0; ( export GIT_EXEC_PATH=/usr/lib/git-core GIT_TEMPLATE_DIR=/usr/share/git-core/templates; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
+@test "harden_git_config refuses injected config (GIT_CONFIG_KEY_n and GIT_CONFIG_PARAMETERS) that runs a program inside the worktree" {
+  mkdir -p tools
+  : >| tools/cmd
+  for key in core.sshCommand core.askpass credential.helper credential.https://x.example.helper core.pager \
+             diff.external gpg.program core.editor; do
+    rc=0; ( export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=x \
+                   GIT_CONFIG_KEY_1="$key" GIT_CONFIG_VALUE_1="$PWD/tools/cmd -x"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "KEY accepted: $key" >&2; return 1; }
+    rc=0; ( export GIT_CONFIG_PARAMETERS="'user.name'='x' '$key'='$PWD/tools/cmd -x'"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "PARAMETERS accepted: $key" >&2; return 1; }
+    rc=0; ( export GIT_CONFIG_PARAMETERS="'$key=$PWD/tools/cmd'"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "PARAMETERS (old form) accepted: $key" >&2; return 1; }
+  done
+  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.sshCommand GIT_CONFIG_VALUE_0="/usr/bin/ssh -o x"
+          export GIT_CONFIG_PARAMETERS="'credential.helper'='store' 'core.sshcommand'='ssh -x'"
+          harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
 @test "yr_adopt_path runs bare names on the screened PATH and keeps the caller's PATH in YR_ORIG_PATH" {
   mkdir -p tools "$BATS_TEST_TMPDIR/badbin"
   printf '#!/bin/sh\ntouch "%s/grep-ran"\nexit 0\n' "$BATS_TEST_TMPDIR" >| tools/canary
