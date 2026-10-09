@@ -64,3 +64,57 @@ describe('status records outside activity before advancing the watermark', () =>
     expect(record?.lastActivityCreateTime).toBeUndefined();
   });
 });
+
+describe('status classifies unseen messages that sort at or before the watermark', () => {
+  it('an equal-timestamp message with a lower opaque id still sets outsideSeen', async () => {
+    const grantId = await createGrant(h, { maxActiveSessions: 3 });
+    const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
+    setVendorState(h, session.sessionResource, 'inProgress');
+    const stamp = '2030-01-01T00:00:00.000Z';
+    addActivity(h, session.sessionResource, {
+      type: 'agentMessaged',
+      message: 'working',
+      originator: 'agent',
+      activityId: 'zzz-agent',
+      createTime: stamp,
+    });
+    await status(h.deps, { session: session.localId, reconcile: false });
+    let record = (await readJournal(h.dataDir)).operations[
+      session.localRequestId
+    ];
+    expect(record?.lastActivityId).toBe('zzz-agent');
+    expect(record?.supervision?.outsideSeen).toBeUndefined();
+
+    // Becomes visible late: same timestamp, lexicographically lower id.
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'actually use postgres instead',
+      originator: 'user',
+      activityId: 'aaa-user',
+      createTime: stamp,
+    });
+    await status(h.deps, { session: session.localId, reconcile: false });
+    record = (await readJournal(h.dataDir)).operations[session.localRequestId];
+    expect(record?.supervision?.outsideSeen?.activityId).toBe('aaa-user');
+  });
+
+  it('an already-seen message is not reclassified after the watermark passes it', async () => {
+    const grantId = await createGrant(h, { maxActiveSessions: 3 });
+    const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
+    setVendorState(h, session.sessionResource, 'inProgress');
+    const stamp = '2030-01-01T00:00:00.000Z';
+    addActivity(h, session.sessionResource, {
+      type: 'agentMessaged',
+      message: 'working',
+      originator: 'agent',
+      activityId: 'zzz-agent',
+      createTime: stamp,
+    });
+    await status(h.deps, { session: session.localId, reconcile: false });
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const record = (await readJournal(h.dataDir)).operations[
+      session.localRequestId
+    ];
+    expect(record?.supervision?.outsideSeen).toBeUndefined();
+  });
+});

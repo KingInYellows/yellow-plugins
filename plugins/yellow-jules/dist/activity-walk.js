@@ -128,6 +128,7 @@ async function walkActivities(params) {
         for (const activity of page.activities) {
             processed += 1;
             let isNew = false;
+            let unseen = false;
             if (!seenIds.has(activity.activityId)) {
                 seenIds.add(activity.activityId);
                 seen.push({
@@ -136,6 +137,15 @@ async function walkActivities(params) {
                 });
                 const afterWatermark = params.watermark === undefined ||
                     compareStamp(activity, params.watermark) > 0;
+                // The ring covers every id within the overlap window below the
+                // watermark, so an id absent from it there was never seen, even when
+                // it sorts at or before the watermark (equal time, lower opaque id).
+                if (!ring.has(activity.activityId) &&
+                    (afterWatermark ||
+                        timeOf(activity.createTime) >=
+                            timeOf(params.watermark?.createTime ?? '') - exports.OVERLAP_WINDOW_MS)) {
+                    unseen = true;
+                }
                 if (!ring.has(activity.activityId) && afterWatermark) {
                     newIds.push(activity.activityId);
                     isNew = true;
@@ -177,7 +187,7 @@ async function walkActivities(params) {
                     };
                 }
             }
-            await params.onActivity?.(activity, { isNew });
+            await params.onActivity?.(activity, { isNew, unseen });
         }
         if (page.unmappedActivity === true) {
             unmappedActivity = true;

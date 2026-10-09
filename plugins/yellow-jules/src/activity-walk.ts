@@ -84,11 +84,14 @@ export interface WalkParams {
   /**
    * Called for every activity read, in page order (collect stages artifacts
    * here). `isNew` is true when the activity was counted toward `newIds`:
-   * outside the dedup ring and after the watermark.
+   * outside the dedup ring and after the watermark. `unseen` is wider: the id
+   * is absent from the ring and not older than the ring's coverage (the
+   * overlap window below the watermark), whatever its sort position.
+   * Classification that must not miss an activity uses `unseen`.
    */
   readonly onActivity?: (
     activity: AdapterActivity,
-    info: { readonly isNew: boolean }
+    info: { readonly isNew: boolean; readonly unseen: boolean }
   ) => void | Promise<void>;
 }
 
@@ -246,6 +249,7 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
     for (const activity of page.activities) {
       processed += 1;
       let isNew = false;
+      let unseen = false;
       if (!seenIds.has(activity.activityId)) {
         seenIds.add(activity.activityId);
         seen.push({
@@ -255,6 +259,17 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
         const afterWatermark =
           params.watermark === undefined ||
           compareStamp(activity, params.watermark) > 0;
+        // The ring covers every id within the overlap window below the
+        // watermark, so an id absent from it there was never seen, even when
+        // it sorts at or before the watermark (equal time, lower opaque id).
+        if (
+          !ring.has(activity.activityId) &&
+          (afterWatermark ||
+            timeOf(activity.createTime) >=
+              timeOf(params.watermark?.createTime ?? '') - OVERLAP_WINDOW_MS)
+        ) {
+          unseen = true;
+        }
         if (!ring.has(activity.activityId) && afterWatermark) {
           newIds.push(activity.activityId);
           isNew = true;
@@ -299,7 +314,7 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
           };
         }
       }
-      await params.onActivity?.(activity, { isNew });
+      await params.onActivity?.(activity, { isNew, unseen });
     }
 
     if (page.unmappedActivity === true) {

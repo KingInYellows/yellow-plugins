@@ -406,7 +406,7 @@ export interface StatusArgs {
    */
   readonly observer?: (
     activity: AdapterActivity,
-    info: { readonly isNew: boolean }
+    info: { readonly isNew: boolean; readonly unseen: boolean }
   ) => void;
 }
 
@@ -580,7 +580,7 @@ export async function status(
         : {}),
       onActivity: (activity, info) => {
         if (
-          info.isNew &&
+          info.unseen &&
           activity.type === 'userMessaged' &&
           activity.message !== undefined
         ) {

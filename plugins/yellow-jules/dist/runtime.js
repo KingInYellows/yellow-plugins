@@ -343,7 +343,7 @@ async function status(deps, args) {
                 ? { approval: record.resumeApproval }
                 : {}),
             onActivity: (activity, info) => {
-                if (info.isNew &&
+                if (info.unseen &&
                     activity.type === 'userMessaged' &&
                     activity.message !== undefined) {
                     newUserMessages.push({

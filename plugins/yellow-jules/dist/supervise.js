@@ -236,7 +236,7 @@ async function superviseOnce(deps, args) {
             reconcile: false,
             deadlineMs: Math.max(1, (0, deadline_js_1.remainingMs)(deps.clock, deadline)),
             observer: (activity, info) => {
-                if (info.isNew)
+                if (info.unseen)
                     newActivities.push(viewOf(activity));
                 if (activity.type === 'agentMessaged' &&
                     (newest.agent === undefined ||
