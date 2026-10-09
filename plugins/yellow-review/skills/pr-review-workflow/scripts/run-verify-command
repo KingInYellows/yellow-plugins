@@ -887,7 +887,8 @@ add_unique_file() {
 # tree listing already covers it. Without a marker (--revert-denied
 # --no-ignored-guard) nothing can be compared, so a link that resolves outside
 # the worktree, cannot be resolved, or lands on an untracked, ignored or .git
-# path inside it, on a directory (a tracked descendant does not cover its
+# path inside it, on a tracked target that git lists as changed (unless it is
+# trusted-config, which the revert restores), on a directory (a tracked descendant does not cover its
 # ignored siblings), or on a tracked path flagged skip-worktree or
 # assume-unchanged (the tree check cannot see those), counts. A link that git lists as changed is
 # judged by its HEAD target, which the revert restores (an edited original
@@ -977,6 +978,13 @@ check_trusted_links() {
                                     "H "*) ;;
                                     *) hit=1 ;;
                                 esac
+                                # A target git lists as changed is live edited
+                                # content; only a trusted-config one is reverted.
+                                if [ "$hit" = 0 ] && ! rp_trusted_config "$rel"; then
+                                    for c in ${changed[@]+"${changed[@]}"}; do
+                                        [ "$c" != "$rel" ] || { hit=1; break; }
+                                    done
+                                fi
                             fi
                             ;;
                     esac
