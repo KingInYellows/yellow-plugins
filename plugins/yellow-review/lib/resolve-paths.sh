@@ -191,7 +191,8 @@ yr_args_enter() {
 # with an argument (-u, -C, -P, -a and their long forms), NAME=value words, and
 # -S / --split-string, whose string is split into words that continue the
 # operand list (attached or separate, and inside a short cluster such as
-# -vS; a `$` in that string, which env expands, counts as entering). A bare
+# -vS; a `$`, backslash or quote in that string, which env expands or decodes,
+# counts as entering, and so does a NAME=value operand). A bare
 # operand is looked up on the caller's PATH (YR_ORIG_PATH), the
 # way the tool itself would be. Copies of this block (through
 # yr_file_shebang_enters) sit in the two scripts' bootstrap resolvers, which
@@ -240,13 +241,16 @@ yr_file_shebang_enters() {
                             k=$((k + 1))
                         done
                         ;;
-                    *=*) idx=$((idx + 1)); continue ;;
+                    # NAME=value before the utility (PATH=tools changes where it
+                    # is looked up): fail closed.
+                    *=*) return 0 ;;
                     *) i="$x"; break ;;
                 esac
                 if [ "$last" -ge 0 ]; then
-                    # env expands ${VAR} in a -S string, and Linux hands it the
-                    # whole rest of the line: fail closed on any $ from here on.
-                    case "${w[*]:idx}" in *\$*) return 0 ;; esac
+                    # env expands ${VAR} and decodes \_ and quotes in a -S string,
+                    # and Linux hands it the whole rest of the line: fail closed
+                    # on any $, backslash or quote from here on.
+                    case "${w[*]:idx}" in *[\$\\\"\']*) return 0 ;; esac
                     # Splice the -S string's words in place of the option.
                     v=()
                     read -r -a v <<<"$val" || true
@@ -455,9 +459,9 @@ yr_shebang_inside() {
                         }
                         if (c ~ /[uCPa]/) { if (substr(cl, k + 1) == "") idx++; break }
                     }
-                } else if (x ~ /=/) { idx++; continue }
+                } else if (x ~ /=/) { pr(root); return "" }
                 else { gsub(/^["\047]|["\047]$/, "", x); return x }
-                if (last >= 0) { for (k = idx; k <= n; k++) if (w[k] ~ /\$/) { pr(root); return "" } splice(val, last) } else idx++
+                if (last >= 0) { for (k = idx; k <= n; k++) if (w[k] ~ /[$\\"\047]/) { pr(root); return "" } splice(val, last) } else idx++
             }
             return ""
         }

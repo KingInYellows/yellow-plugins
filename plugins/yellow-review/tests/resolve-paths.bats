@@ -1882,3 +1882,31 @@ EOF
   rc=0; ( export GIT_SSH_COMMAND="$val"; harden_git_config full; ) || rc=$?
   [ "$rc" -eq 1 ]
 }
+
+@test "#! lines with an env NAME=value operand or an escape or quote in an env -S string drop the directory, in awk and in the shell" {
+  mkdir -p tools
+  printf '#!/bin/sh\nexit 0\n' >| tools/evil
+  chmod +x tools/evil
+  n=0
+  for shebang in '#!/usr/bin/env -S PATH=tools evil' '#!/usr/bin/env PATH=tools evil' '#!/usr/bin/env A=1 sh' \
+                 '#!/usr/bin/env -S "/tmp/my\_repo/evil"' "#!/usr/bin/env -S '/tmp/x/evil'" \
+                 '#!/usr/bin/env -S sh\_x' '#!/usr/bin/env --split-string=/tmp/a\_b' '#!/usr/bin/env -vS "sh" x'; do
+    n=$((n + 1))
+    d="$BATS_TEST_TMPDIR/ea$n"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell missed: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
+  done
+  for shebang in '#!/usr/bin/env python3' '#!/usr/bin/env -S node --flag' '#!/usr/bin/env -S sh -c true'; do
+    d="$BATS_TEST_TMPDIR/eaok"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    ! yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell false hit: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" == "$d:"* ]] || { echo "awk false hit: $shebang" >&2; return 1; }
+  done
+}

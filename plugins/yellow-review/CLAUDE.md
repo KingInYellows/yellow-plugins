@@ -294,7 +294,9 @@ every tool). In `#!` lines the optional argument of a non-`env` interpreter and
 an `env` command's arguments are judged like command-line words.
 `env -S`/`--split-string` (attached or separate, also in a cluster such as
 `-vS`) and options with arguments (`-u`, `-C`, `-P`, `-a` and long forms) are
-parsed; an `env -S` line containing `$` (env expands it) counts as entering the
+parsed. Fail closed: an `env` line with a `NAME=value` operand before the
+utility (`PATH=tools` changes where it is looked up), or with a `$`, backslash
+or quote after `-S` (env expands and decodes them), counts as entering the
 worktree.
 `run-verify-command` still gives the verify command the caller's `PATH`
 (`YR_ORIG_PATH`). Both scripts take their own directory by parameter expansion,

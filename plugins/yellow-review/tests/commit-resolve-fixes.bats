@@ -2662,6 +2662,18 @@ crf_ssh_remote() {
   [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
 }
 
+@test "a git script whose #! has an env assignment or an -S escape is refused before the bootstrap runs it (commit-resolve-fixes)" {
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf 'one\nfeature\nfix-boot\n' >| src/a.txt
+  for shebang in '#!/usr/bin/env -S PATH=tools git' '#!/usr/bin/env -S "/tmp/my\_repo/git"'; do
+    printf '%s\n' "$shebang" >| "$BATS_TEST_TMPDIR/gitbin/git"
+    chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "status $status: $shebang: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git resolves to a path inside the repository"* ]] || { echo "accepted: $shebang" >&2; return 1; }
+  done
+}
+
 @test "a GIT_SSH_COMMAND using a shell variable is refused as unjudgeable and never runs (exit 3)" {
   old_path="$PATH"
   marker="$BATS_TEST_TMPDIR/dollar-canary"
