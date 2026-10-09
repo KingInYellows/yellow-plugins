@@ -455,6 +455,47 @@ forge() {
   [ -z "$(branch_of "$wtb")" ]
 }
 
+@test "a state whose tips omit or repeat a restacked branch is rejected" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  cp "$SD/state" "$BATS_TEST_TMPDIR/state.orig"
+  [ "$(grep -c '^tip' "$SD/state")" -ge 2 ]
+  last=$(grep '^tip' "$SD/state" | tail -1)
+  # One tip missing.
+  grep -vxF "$last" "$BATS_TEST_TMPDIR/state.orig" >|"$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 4 ]
+  [[ $output == *"exactly once"* ]]
+  # One tip recorded twice in place of another.
+  first=$(grep '^tip' "$BATS_TEST_TMPDIR/state.orig" | head -1)
+  { grep -vxF "$last" "$BATS_TEST_TMPDIR/state.orig"; printf '%s\n' "$first"; } >|"$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 4 ]
+  [[ $output == *"exactly once"* ]]
+  cp "$BATS_TEST_TMPDIR/state.orig" "$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "a state with an abbreviated tip hash is rejected before any reset advice" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  cp "$SD/state" "$BATS_TEST_TMPDIR/state.orig"
+  sed -i 's/^\(tip\t[^\t]*\t\)\([0-9a-f]\{8\}\)[0-9a-f]*$/\1\2/' "$SD/state"
+  awk -F'\t' '$1 == "tip" && length($3) == 8' "$SD/state" | grep -q .
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 4 ]
+  [[ $output == *"full commit hash"* ]]
+  [[ $output != *"reset --hard"* ]]
+  cp "$BATS_TEST_TMPDIR/state.orig" "$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
 @test "a state file that is a symlink is rejected" {
   mk_stack
   mkdir -p "$SD"
@@ -663,6 +704,50 @@ forge() {
   [[ $output == *"state kept"* ]]
   [ -e "$SD/state" ]
   [ -e "$(git rev-parse --path-format=absolute --git-common-dir)/gh-stack-rebase-state" ]
+}
+
+@test "a provider abort that fails after rolling back keeps phase aborting, so --continue refuses" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  STUB_FAIL=abort-after run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"may have rolled part of the restack back"* ]]
+  grep -q '^phase.aborting$' "$SD/state"
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 31 ]
+  [ -e "$SD/state" ]
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "a failed provider abort with the pause still in place keeps phase aborting and a retry finishes" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  STUB_FAIL=abort run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  grep -q '^phase.aborting$' "$SD/state"
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 31 ]
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "github: a provider abort that fails after removing its rebase record keeps phase aborting" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack b
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  STUB_GH_VERSION=v0.2.1 STUB_FAIL=abort-after run bash "$SCRIPT" abort --provider github
+  [ "$status" -eq 31 ]
+  [[ $output == *"may have rolled part of the restack back"* ]]
+  grep -q '^phase.aborting$' "$SD/state"
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" continue --provider github
+  [ "$status" -eq 31 ]
+  [ -e "$SD/state" ]
 }
 
 @test "github: gh-stack 0.1.0, an unparseable version, or none exits 20 with an upgrade message" {
@@ -946,12 +1031,31 @@ JSEOF
   [[ $output == *"could not be written"* ]]
   [[ $output == *"git -C $(wtp c) rebase --abort"* ]]
   [ -e "$SD/state" ]
-  # The provider no longer reports a pause: fixing only the marker path would
-  # hit the lost-provider refusal, so the user clears the rebase by hand.
+  # The durable phase records the rollback, so the retry no longer hits the
+  # lost-provider refusal; the stuck rebase is still reported for manual clearing.
   rmdir "$SD/provider-aborted"
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 31 ]
-  [[ $output == *"no record of it"* ]]
+  [[ $output == *"still in progress"* ]]
+  [[ $output != *"no record of it"* ]]
+  rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "a legacy state without a run id records the abort in its phase, not as an unwritable marker" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  sed -i '/^runid\t/d' "$SD/state"
+  plant_stuck_rebase "$(wtp c)" c
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"still in progress"* ]]
+  [[ $output != *"could not be written"* ]]
+  [ ! -e "$SD/provider-aborted" ]
+  grep -q '^phase.aborted$' "$SD/state"
   rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 0 ]
@@ -1091,6 +1195,131 @@ moved_by_hand() {
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 31 ]
   [[ $output == *"no record of it"* ]]
+  [ -e "$SD/state" ]
+}
+
+# mv_fail_nth N: a PATH shim whose Nth mv onto the state file fails, so a state
+# rewrite can be made to fail (chmod does not stop root).
+mv_fail_nth() {
+  mkdir -p "$T/mvshim"
+  cat >"$T/mvshim/mv" <<'SH'
+#!/bin/sh
+for a; do last=$a; done
+case $last in
+  */state)
+    n=$(cat "$MV_COUNT" 2>/dev/null || echo 0)
+    n=$((n + 1))
+    echo "$n" >"$MV_COUNT"
+    if [ "$n" = "$MV_FAIL_NTH" ]; then exit 1; fi
+    ;;
+esac
+exec /bin/mv "$@"
+SH
+  chmod +x "$T/mvshim/mv"
+  export MV_COUNT="$T/mvcount" MV_FAIL_NTH="$1"
+  rm -f "$MV_COUNT"
+  PATH="$T/mvshim:$PATH"
+}
+
+@test "--abort refuses before the provider abort when the abort cannot be recorded" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  mv_fail_nth 1
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"nothing was aborted"* ]]
+  [[ $output == *"must be writable"* ]]
+  [ -e "$SD/state" ]
+  ! grep -q '^phase' "$SD/state"
+  [ "$(cat "$SD/lock.d/pid")" = paused ]
+  # The provider abort never ran: the conflict is still paused.
+  PATH="${PATH#"$T/mvshim:"}"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "a state left at phase aborting makes --continue refuse and --abort finish" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite --submit
+  [ "$status" -eq 10 ]
+  plant_stuck_rebase "$(wtp c)" c
+  mkdir "$SD/provider-aborted"
+  mv_fail_nth 2 # the post-abort phase aborted write fails; phase aborting stays
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  grep -q '^phase.aborting$' "$SD/state"
+  [ ! -f "$SD/provider-aborted" ]
+  PATH="${PATH#"$T/mvshim:"}"
+  rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"already aborted"* ]]
+  [ -e "$SD/state" ]
+  rmdir "$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+  [ ! -e "$SD/state" ]
+}
+
+@test "a retried --abort from phase aborting with no marker runs the rebase cleanup" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  plant_stuck_rebase "$(wtp c)" c
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  # Interrupted after the provider rollback, before the marker: only the
+  # durable phase remains, and the leftover rebase is one git can clear.
+  rm -f "$SD/provider-aborted"
+  sed -i 's/^phase\taborted$/phase\taborting/' "$SD/state"
+  grep -q '^phase.aborting$' "$SD/state"
+  rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
+  plant_rebase "$(wtp c)" c b
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  [[ $output != *"no record of it"* ]]
+  assert_all_restored
+}
+
+@test "phase aborting does not hide branches the provider never rolled back" {
+  moved_by_hand
+  sed -i 's/^runid\t/phase\taborting\nrunid\t/' "$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"moved"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "--continue after the last paused rebase was finished by hand returns the run worktree and restores" {
+  mk_stack c
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  resolve_in "$(wtp a)" c.txt
+  GIT_EDITOR=true git -C "$(wtp a)" rebase --continue >/dev/null 2>&1 || true
+  # The run worktree still holds the branch it was rebasing, which c's own
+  # worktree needs back.
+  [ "$(git -C "$(wtp a)" branch --show-current)" = c ]
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 0 ]
+  [ "$(git -C "$(wtp a)" branch --show-current)" = a ]
+  [ "$(git -C "$(wtp c)" branch --show-current)" = c ]
+  [ ! -e "$SD/state" ]
+}
+
+@test "--continue after a by-hand finish keeps state when the run worktree cannot return to the start branch" {
+  mk_stack c
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  resolve_in "$(wtp a)" c.txt
+  GIT_EDITOR=true git -C "$(wtp a)" rebase --continue >/dev/null 2>&1 || true
+  git -C "$(wtp a)" checkout -q --detach
+  git -C "$(wtp a)" commit -q --allow-empty -m floating
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"could not return the run worktree"* ]]
   [ -e "$SD/state" ]
 }
 
@@ -1267,6 +1496,40 @@ moved_by_hand() {
   run bash "$SCRIPT" restore
   [ "$status" -eq 0 ]
   assert_all_restored
+}
+
+# legacy_tipless: a paused restack whose state has no run id and no tips, no
+# provider pause left, and phase $1 recorded (empty for none).
+legacy_tipless() {
+  rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
+  git -C "$(wtp a)" rebase --abort
+  sed -i '/^tip\t/d;/^runid\t/d;/^phase\t/d' "$SD/state"
+  [ -z "$1" ] || sed -i "2i phase\t$1" "$SD/state"
+  ! grep -q '^tip\|^runid' "$SD/state"
+}
+
+@test "a legacy tipless state at phase aborted lets a retried --abort proceed" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  legacy_tipless aborted
+  grep -q '^phase.aborted$' "$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+  [ ! -e "$SD/state" ]
+}
+
+@test "a legacy tipless state at phase aborting is still refused" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  legacy_tipless aborting
+  grep -q '^phase.aborting$' "$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"no recorded start tips"* ]]
+  [ -e "$SD/state" ]
 }
 
 @test "--abort keeps state when gh-stack no longer records a rebase in a non-run worktree" {

@@ -423,10 +423,13 @@ aborted_marker_valid() {
 }
 
 # abort_recorded: the provider abort of this run is on record, in the marker
-# or in the state file's own phase field (which needs no marker path). Only
-# ever makes the script stricter: it blocks --continue and picks restore advice;
-# skipping checks still requires a valid marker (aborted_marker_valid).
-abort_recorded() { [ "$S_PHASE" = aborted ] || aborted_marker_valid; }
+# or in the state file's own phase field (which needs no marker path); phase
+# aborting is the intent recorded before the provider abort runs, so it counts
+# too: the rollback may have run. It blocks --continue, picks restore advice,
+# and lets a retried --abort skip the provider and the lost-provider refusal;
+# moved_tips still refuses to clear state over branches that were not rolled
+# back. The no-start-tips guard keeps requiring a valid marker.
+abort_recorded() { [ "$S_PHASE" = aborted ] || [ "$S_PHASE" = aborting ] || aborted_marker_valid; }
 
 # new_run_id: 32 random hex digits (od and /dev/urandom exist on Linux and macOS).
 new_run_id() {
@@ -542,7 +545,7 @@ validate_state() {
       return 1
     }
   fi
-  case $S_PHASE in '' | aborted) ;; *)
+  case $S_PHASE in '' | aborting | aborted) ;; *)
     STATE_ERR="bad phase"
     return 1
     ;;
@@ -594,13 +597,27 @@ validate_state() {
       STATE_ERR="recorded tip is not for a branch in the chain"
       return 1
     }
-    case ${T_SHA[i]} in
-      '' | *[!0-9a-f]*)
-        STATE_ERR="recorded tip is not a commit hash"
-        return 1
-        ;;
-    esac
+    valid_sha "${T_SHA[i]}" || {
+      STATE_ERR="recorded tip is not a full commit hash"
+      return 1
+    }
   done
+  # Tips are recorded once per restacked branch, in chain order. A partial or
+  # duplicated list would leave a branch out of moved_tips while still passing
+  # the no-tips guard, so anything but that exact list is invalid. No tips at
+  # all is a legacy state, handled by its own guard.
+  if [ "${#T_BRANCH[@]}" -gt 0 ]; then
+    [ "${#T_BRANCH[@]}" -eq $((${#S_CHAIN[@]} - 1)) ] || {
+      STATE_ERR="recorded tips do not cover each restacked branch exactly once"
+      return 1
+    }
+    for ((i = 0; i < ${#T_BRANCH[@]}; i++)); do
+      [ "${T_BRANCH[i]}" = "${S_CHAIN[i + 1]}" ] || {
+        STATE_ERR="recorded tips do not cover each restacked branch exactly once"
+        return 1
+      }
+    done
+  fi
   for ((i = 0; i < ${#E_PATH[@]}; i++)); do
     p=${E_PATH[i]}
     case $p in /*) ;; *)
@@ -1615,6 +1632,15 @@ in_chain_busy() {
   return 1
 }
 
+# continue_release_run: when the paused rebase was finished by hand, the run
+# worktree still holds the stack branch it was rebasing, so that branch's own
+# worktree cannot be restored. Check the start branch back out first; refuse,
+# keeping the state, when that would lose commits or git refuses the checkout.
+continue_release_run() {
+  release_run_worktree "${S_CHAIN[1]:-}" ||
+    die "$X_KEPT" "could not return the run worktree $(v "$S_RUN") to $(v "${S_CHAIN[1]:-}") before restoring; state kept. Check out $(v "${S_CHAIN[1]:-}") there (resolving any local changes first), then run --continue again"
+}
+
 cmd_continue() {
   parse_flags "$@"
   reject_remote
@@ -1649,12 +1675,14 @@ cmd_continue() {
       step_graphite continue
     else
       note "no conflict is paused in $(v "$S_RUN"); verifying and restoring"
+      continue_release_run
       RESULT=ok
     fi
   elif [ -e "$COMMON/gh-stack-rebase-state" ]; then
     step_github continue
   else
     note "no provider rebase is paused; verifying and restoring"
+    continue_release_run
     RESULT=ok
   fi
   drive_result
@@ -1667,6 +1695,14 @@ cmd_continue() {
 MARKER_PENDING=0
 rollback_recorded() {
   [ "$MARKER_PENDING" = 1 ] || return 0
+  # A state without a run id (written before ids existed) can never hold a
+  # marker; its record is `phase aborted` in the state file, retried here.
+  if [ -z "$S_RUNID" ]; then
+    S_PHASE=aborted
+    write_state 2>/dev/null || return 1
+    MARKER_PENDING=0
+    return 0
+  fi
   if write_aborted_marker 2>/dev/null; then
     MARKER_PENDING=0
     return 0
@@ -1715,6 +1751,22 @@ refuse_moved() {
   die "$X_KEPT" "state kept, nothing aborted or restored. Run each fix line above to point the branch back at its starting commit, then run --abort again. To keep the restacked branches instead, run --continue"
 }
 
+# begin_abort: durably record the intent to abort before the provider rolls
+# anything back, so a state that cannot be rewritten afterwards still refuses
+# --continue. Refuses (nothing aborted) when the record cannot be written.
+ABORT_PHASE_PRIOR=""
+# A failed provider abort may still have rolled back some branches, so the
+# recorded `phase aborting` stays and --continue keeps refusing.
+ABORT_UNCLEAR="the provider's abort failed and may have rolled part of the restack back; state kept, nothing restored, and the abort stays recorded, so --continue is refused. Fix the provider error, then run --abort again"
+begin_abort() {
+  ABORT_PHASE_PRIOR=$S_PHASE
+  S_PHASE=aborting
+  write_state 2>/dev/null || {
+    S_PHASE=$ABORT_PHASE_PRIOR
+    die "$X_KEPT" "nothing was aborted: the abort could not be recorded in the state file $(v "$STATE_FILE"); the state directory must be writable. Fix that, then run --abort again"
+  }
+}
+
 cmd_abort() {
   parse_flags "$@"
   reject_remote
@@ -1723,20 +1775,26 @@ cmd_abort() {
   need_lock
   report_all_floating
   local provider_aborted=0 left moved start=${S_CHAIN[1]:-}
-  if [ "$S_PROVIDER" = graphite ] && aborted_marker_valid && ! gt_paused "$S_RUN"; then
+  if [ "$S_PROVIDER" = graphite ] && abort_recorded && ! gt_paused "$S_RUN"; then
     : # a recorded provider abort leaves nothing for gt to do, so a retry needs no gt.
     # A marker beside a still-paused Graphite conflict is stale or forged: gt abort runs.
   elif [ "$S_PROVIDER" = graphite ]; then
     command -v gt >/dev/null 2>&1 || die "$X_KEPT" "gt (Graphite CLI) is not installed; state kept"
     if gt_paused "$S_RUN"; then
       note "warning: aborting rolls the whole restack back, including branches that had already restacked cleanly"
+      begin_abort
       step_graphite abort
-      [ "$RESULT" = ok ] || die "$X_KEPT" "the provider's abort failed; state kept, nothing restored"
+      [ "$RESULT" = ok ] || {
+        die "$X_KEPT" "$ABORT_UNCLEAR"
+      }
       provider_aborted=1
     fi
   elif [ -e "$COMMON/gh-stack-rebase-state" ]; then
+    begin_abort
     step_github abort
-    [ "$RESULT" = ok ] || die "$X_KEPT" "the provider's abort failed; state kept"
+    [ "$RESULT" = ok ] || {
+      die "$X_KEPT" "$ABORT_UNCLEAR"
+    }
     provider_aborted=1
   fi
   if [ "$provider_aborted" = 1 ]; then
@@ -1747,9 +1805,15 @@ cmd_abort() {
     # Record the abort in the state file first, so --continue refuses even when
     # the marker path is unusable; the marker stays the retry shortcut.
     S_PHASE=aborted
-    write_state 2>/dev/null || err "could not record the abort in the state file"
-    write_aborted_marker 2>/dev/null || MARKER_PENDING=1
-  elif ! aborted_marker_valid && left=$(chain_rebase_worktree); then
+    # A legacy state (no run id) has no marker: the phase is its only record.
+    if ! write_state 2>/dev/null; then
+      err "could not record the abort in the state file"
+      [ -n "$S_RUNID" ] || MARKER_PENDING=1
+    fi
+    if [ -n "$S_RUNID" ]; then
+      write_aborted_marker 2>/dev/null || MARKER_PENDING=1
+    fi
+  elif ! abort_recorded && left=$(chain_rebase_worktree); then
     # The provider lost its record (Graphite's .gtcontinue or gh-stack's
     # rebase state) mid-restack, so its whole-stack rollback cannot run.
     # Aborting only this rebase would leave branches that already restacked
@@ -1760,9 +1824,11 @@ cmd_abort() {
     # started: the user finished the paused rebase with git, or the provider
     # lost its record. Nothing can roll those branches back from here.
     refuse_moved "stack branches have moved since the restack started and the provider has no paused restack to roll back:" "$moved"
-  elif [ "${#T_BRANCH[@]}" -eq 0 ] && ! aborted_marker_valid; then
+  elif [ "${#T_BRANCH[@]}" -eq 0 ] && [ "$S_PHASE" != aborted ] && ! aborted_marker_valid; then
     # A state file from before tips were recorded: with no provider rollback
     # and no rebase to abort, nothing shows whether branches were restacked.
+    # phase aborted counts as the rollback record here, since a legacy state
+    # has no run id and so can never hold a valid marker.
     die "$X_KEPT" "the provider has no paused restack to roll back and this state file has no recorded start tips, so it cannot tell whether stack branches were already restacked; state kept, nothing aborted or restored. Inspect the stack branches and, if needed, point them back by hand (reset it in the worktree that has the branch checked out, else git branch -f <branch> <commit>). Then run --continue to keep them, or run restore (no provider) to put the worktrees back and clear the state"
   fi
   # The provider abort only clears the rebase it recorded. Abort any other

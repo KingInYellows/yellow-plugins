@@ -203,7 +203,10 @@ with the state kept: a stuck in-chain rebase, moved tips, a busy operation, a
 run worktree that cannot be returned, or a worktree listing failure. A
 partial restore (exit `40`) prints the same warning. The abort is also recorded
 as `phase aborted` in the state file, so `--continue` refuses (exit `31`) even
-when the marker cannot be written. Fix the marker path and run `--abort` again;
+when the marker cannot be written. Before the provider's abort runs, `--abort`
+first records `phase aborting` in the state file; if that write fails it exits
+`31` with nothing aborted, and a state left at `aborting` is treated like
+`aborted` (`--continue` refuses, a retried `--abort` finishes). Fix the marker path and run `--abort` again;
 never run `--continue`, which would treat the rolled-back stack as restacked. With a stuck rebase, clear that rebase by hand first, because
 fixing only the marker path leaves `--abort` refusing as above.
 

@@ -2646,6 +2646,90 @@ crf_ssh_remote() {
   [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
 }
 
+@test "a git script whose #! uses env -S with a variable is refused before the bootstrap runs it (commit-resolve-fixes)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/boot-envs-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/interp"
+  chmod +x "$REPO/tools/interp"
+  printf '%s\n' '#!/usr/bin/env -S ${INTERP}' >| "$BATS_TEST_TMPDIR/gitbin/git"
+  chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+  printf 'one\nfeature\nfix-boot\n' >| src/a.txt
+  run --separate-stderr env "INTERP=$REPO/tools/interp" "PATH=$BATS_TEST_TMPDIR/gitbin:$old_path" "$SCRIPT" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the bootstrap ran the planted git" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
+}
+
+@test "a git script whose #! has an env assignment or an -S escape is refused before the bootstrap runs it (commit-resolve-fixes)" {
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf 'one\nfeature\nfix-boot\n' >| src/a.txt
+  for shebang in '#!/usr/bin/env -S PATH=tools git' '#!/usr/bin/env -S "/tmp/my\_repo/git"'; do
+    printf '%s\n' "$shebang" >| "$BATS_TEST_TMPDIR/gitbin/git"
+    chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "status $status: $shebang: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git resolves to a path inside the repository"* ]] || { echo "accepted: $shebang" >&2; return 1; }
+  done
+}
+
+@test "a git script whose #! has an env -P is refused before the bootstrap runs it (commit-resolve-fixes)" {
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf 'one\nfeature\nfix-boot\n' >| src/a.txt
+  for shebang in '#!/usr/bin/env -P tools git' '#!/usr/bin/env -S -P/usr/bin git'; do
+    printf '%s\n' "$shebang" >| "$BATS_TEST_TMPDIR/gitbin/git"
+    chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "status $status: $shebang: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git resolves to a path inside the repository"* ]] || { echo "accepted: $shebang" >&2; return 1; }
+  done
+}
+
+@test "a git script whose #! has an env -C is refused before the bootstrap runs it (commit-resolve-fixes)" {
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf 'one\nfeature\nfix-boot\n' >| src/a.txt
+  for shebang in '#!/usr/bin/env -C tools git' '#!/usr/bin/env -S --chdir=tools git'; do
+    printf '%s\n' "$shebang" >| "$BATS_TEST_TMPDIR/gitbin/git"
+    chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "status $status: $shebang: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git resolves to a path inside the repository"* ]] || { echo "accepted: $shebang" >&2; return 1; }
+  done
+}
+
+@test "a GIT_SSH_COMMAND using a shell variable is refused as unjudgeable and never runs (exit 3)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/dollar-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/sshcmd"
+  chmod +x "$REPO/tools/sshcmd"
+  crf_ssh_remote
+  GH_HOST=example.invalid GIT_SSH_COMMAND='$PWD/tools/sshcmd' \
+    run --separate-stderr env "PATH=$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the expanded command ran" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"GIT_SSH_COMMAND uses shell syntax"* ]]
+}
+
+@test "a HOME inside the worktree whose .gitconfig sets core.sshCommand is refused and never runs (exit 3)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/home-canary"
+  printf 'tools/\n.gitconfig\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/sshcmd"
+  chmod +x "$REPO/tools/sshcmd"
+  printf '[core]\n\tsshCommand = %s/tools/sshcmd\n' "$REPO" >| "$REPO/.gitconfig"
+  crf_ssh_remote
+  GH_HOST=example.invalid run --separate-stderr env -u GIT_CONFIG_GLOBAL -u XDG_CONFIG_HOME "HOME=$REPO" "PATH=$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the HOME config command ran" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"global config inside the repository"* ]]
+}
+
 @test "a trusted GIT_SSH_COMMAND outside the worktree is kept and used by the ls-remote check" {
   old_path="$PATH"
   good="$BATS_TEST_TMPDIR/goodssh"

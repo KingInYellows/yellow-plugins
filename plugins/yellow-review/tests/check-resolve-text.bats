@@ -173,6 +173,18 @@ awk_expect() {
   [ "$status" -eq "$2" ] || { echo "$1 ${4:-default locale}: want $2 got $status for [$3]"; false; }
 }
 
+# accented_status <awk binary> [locale]: the expected status for an accented
+# first word followed by ASCII words. Only a multibyte gawk can tell the letter
+# from punctuation (prose, 0); byte-wise awk (mawk, gawk in C) fails closed (6).
+accented_status() {
+  local loc="${2-}"
+  [ -n "$loc" ] || loc="${LC_ALL:-${LC_CTYPE:-${LANG-}}}"
+  case "$1:$loc" in
+    gawk:*[Uu][Tt][Ff]-8 | gawk:*[Uu][Tt][Ff]8) echo 0 ;;
+    *) echo 6 ;;
+  esac
+}
+
 # locale_installed <name>: C.UTF-8 is listed as C.utf8 by `locale -a`.
 locale_installed() {
   locale -a 2>/dev/null | tr 'A-Z' 'a-z' | grep -qx "$(printf '%s' "$1" | tr -d '-' | tr 'A-Z' 'a-z')"
@@ -1438,8 +1450,8 @@ rule=forged line=9.txt"
     command -v "$bin" >/dev/null 2>&1 || { echo "missing $bin"; false; }
     with_awk "$bin" 6 'password:\n  my correct horse battery staple\n'
     with_awk "$bin" 0 'password:\n  Rotation is scheduled for Friday\n'
-    with_awk "$bin" 0 'password:\n  Élève a trois mots ici\n'
-    with_awk "$bin" 0 'password:\n  élève a trois mots ici\n'
+    with_awk "$bin" "$(accented_status "$bin")" 'password:\n  Élève a trois mots ici\n'
+    with_awk "$bin" "$(accented_status "$bin")" 'password:\n  élève a trois mots ici\n'
     with_awk "$bin" 6 "Authorization: Basic ${tok4}\n"
     with_awk "$bin" 6 "Authorization: Basic ${tok8}\n"
     with_awk "$bin" 0 'Authorization: Basic AAAA\n'
@@ -1464,7 +1476,7 @@ rule=forged line=9.txt"
     # three stacked decorations with mixed whitespace
     awk_expect "$bin" 6 'password:\n  \xe2\x80\xa2 \xc2\xab\t\xe2\x80\x9cmy correct horse battery staple\n'
     # non-ASCII prose after stacked decorations stays clean
-    awk_expect "$bin" 0 'password:\n  \xe2\x80\xa2 \xe2\x80\x9c\xc3\xa9l\xc3\xa8ve a trois mots ici\n'
+    awk_expect "$bin" "$(accented_status "$bin")" 'password:\n  \xe2\x80\xa2 \xe2\x80\x9c\xc3\xa9l\xc3\xa8ve a trois mots ici\n'
   done
 }
 
@@ -1619,7 +1631,7 @@ rule=forged line=9.txt"
       awk_expect "$bin" 6 'password:\n  \xc3\x97 correct horse battery staple\n' "$loc"
       awk_expect "$bin" 6 'password:\n  \xc3\xb7 correct horse battery staple\n' "$loc"
       # accented C3 letters stay words
-      awk_expect "$bin" 0 'password:\n  \xc3\xa9l\xc3\xa8ve correct horse battery staple\n' "$loc"
+      awk_expect "$bin" "$(accented_status "$bin" "$loc")" 'password:\n  \xc3\xa9l\xc3\xa8ve correct horse battery staple\n' "$loc"
       # Glagolitic, Coptic, Tifinagh, Georgian Supplement
       awk_expect "$bin" 0 'password:\n  \xe2\xb0\x80\xe2\xb0\x81 correct horse battery staple\n' "$loc"
       awk_expect "$bin" 0 'password:\n  \xe2\xb2\x80\xe2\xb2\x81 correct horse battery staple\n' "$loc"
@@ -1661,9 +1673,42 @@ rule=forged line=9.txt"
       awk_expect "$bin" 6 'password:\n  • correct horse battery staple\n' "$loc"
       awk_expect "$bin" 6 'password:\n  — correct horse battery staple\n' "$loc"
       awk_expect "$bin" 6 'password:\n  \xc2\xa0correct horse battery staple\n' "$loc"
-      awk_expect "$bin" 0 'password:\n  élève a trois mots ici\n' "$loc"
-      awk_expect "$bin" 0 'password:\n  Élève a trois mots ici\n' "$loc"
+      awk_expect "$bin" "$(accented_status "$bin" "$loc")" 'password:\n  élève a trois mots ici\n' "$loc"
+      awk_expect "$bin" "$(accented_status "$bin" "$loc")" 'password:\n  Élève a trois mots ici\n' "$loc"
       awk_expect "$bin" 0 'password:\n  “Correct horse battery staple”\n' "$loc"
+    done
+  done
+  [ "$ran" -ge 2 ]
+}
+
+@test "a non-ASCII prefix attached to the first word cannot exempt a multi-word credential; byte-wise awk fails closed" {
+  ran=0
+  for loc in C C.UTF-8; do
+    locale_installed "$loc" || continue
+    for bin in gawk mawk; do
+      ran=$((ran + 1))
+      # fullwidth quotation mark, curly quote, guillemet, emoji, fullwidth
+      # punctuation (EF BC 80-8F and EF BD 9B-A5), all glued to the word
+      awk_expect "$bin" 6 'password:\n  \xef\xbc\x82correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xe2\x80\x9ccorrect horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xc2\xabcorrect horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xf0\x9f\x94\x91correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xef\xbc\x81correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xef\xbd\x9bcorrect horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xef\xbd\xa5correct horse battery staple\n' "$loc"
+      # punctuation outside the symbol blocks: Arabic comma, ideographic comma
+      awk_expect "$bin" 6 'password:\n  \xd8\x8ccorrect horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xe3\x80\x81correct horse battery staple\n' "$loc"
+      # Byte-wise awk (mawk, gawk in C) cannot tell a letter from punctuation,
+      # so it fails closed on any non-ASCII prefix glued to the first word.
+      # Only a multibyte gawk keeps letter-leading words as prose.
+      if [ "$bin" = gawk ] && [ "$loc" = C.UTF-8 ]; then
+        awk_expect "$bin" 0 'password:\n  éclair recipe is great\n' "$loc"
+        awk_expect "$bin" 0 'password:\n  \xef\xbc\x90correct horse battery staple\n' "$loc"
+        awk_expect "$bin" 0 'password:\n  \xef\xbc\xa1correct horse battery staple\n' "$loc"
+      else
+        awk_expect "$bin" 6 'password:\n  éclair recipe is great\n' "$loc"
+      fi
     done
   done
   [ "$ran" -ge 2 ]
