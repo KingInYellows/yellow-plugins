@@ -112,7 +112,7 @@ describe('/jules:approve binds the approval to the reviewed plan', () => {
     expect(compare).toBeLessThan(s6.indexOf('node "$CLI" "${args[@]}"'));
   });
 
-  describe('Step 3 refuses a plan whose preview would be capped', () => {
+  describe('Step 3 shows the whole plan it digests', () => {
     const s6Block = /```bash\n([\s\S]*?)```/.exec(s6)?.[1] ?? '';
     const block = /```bash\n([\s\S]*?)```/.exec(s3)?.[1] ?? '';
     const runStatus = (status: unknown, script = block) => {
@@ -175,25 +175,19 @@ describe('/jules:approve binds the approval to the reviewed plan', () => {
       }
     );
 
-    it('binds a plan that fits the preview', () => {
-      const res = run('Add tests', 'x'.repeat(300));
+    it('shows and binds a plan with fields over 300 characters', () => {
+      const res = run('T'.repeat(400), `${'x'.repeat(700)}END-OF-PLAN`);
       expect(res.status).toBe(0);
       expect(res.stdout).toMatch(/plan_digest=[0-9a-f]{64}/);
+      expect(res.stdout).toContain('END-OF-PLAN');
     });
 
-    it.each([
-      ['title', 'T'.repeat(301), 'short'],
-      ['description', 'short', 'D'.repeat(301)],
-    ])(
-      'exits without a digest when the %s is over 300 characters',
-      (field, title, description) => {
-        const res = run(title, description);
-        expect(res.status).toBe(1);
-        expect(res.stdout).not.toContain('plan_digest=');
-        expect(res.stderr).toContain(`step 1 ${field}`);
-        expect(res.stderr).toContain('Jules UI');
-      }
-    );
+    it('exits without a digest when the plan is too long to show in full', () => {
+      const res = run('Add tests', 'D'.repeat(20001));
+      expect(res.status).toBe(1);
+      expect(res.stdout).not.toContain('plan_digest=');
+      expect(res.stderr).toContain('Jules UI');
+    });
   });
 
   it('uses the same plan digest expression in Step 3 and Step 6', () => {
@@ -289,10 +283,14 @@ describe('/jules:supervise binds the approval to the reviewed plan', () => {
     expect(res.called).toBe(false);
   });
 
-  it('refuses a review whose fields would be capped', () => {
-    const res = reviewRun(plan('T'.repeat(301)));
-    expect(res.status).toBe(1);
-    expect(res.stdout).not.toContain('plan_digest=');
+  it('shows a long plan in full and refuses one too long to show', () => {
+    const long = reviewRun(plan('Add tests', `${'x'.repeat(900)}END-OF-PLAN`));
+    expect(long.status).toBe(0);
+    expect(long.stdout).toContain('END-OF-PLAN');
+    expect(long.stdout).toMatch(/plan_digest=[0-9a-f]{64}/);
+    const huge = reviewRun(plan('T'.repeat(20001)));
+    expect(huge.status).toBe(1);
+    expect(huge.stdout).not.toContain('plan_digest=');
   });
 });
 

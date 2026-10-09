@@ -107,21 +107,19 @@ OUTPUT=$(node "$CLI" status --session "$SESSION")
 if ! printf '%s\n' "$OUTPUT" | jq -e --arg id "$PLAN_ID" '.ok == true and .pendingPlan != null and .pendingPlan.planId == $id' >/dev/null 2>&1; then
   printf 'ERROR: the plan %s could not be read as pending (status failed, no pending plan, or a different plan). Nothing was approved; run /jules:status --session %s.\n' "$PLAN_ID" "$SESSION" >&2; exit 1
 fi
-# Plan text is vendor-writable: fenced, flattened, capped.
+# Plan text is vendor-writable: fenced and flattened.
+FLAT_DEF='def flat: tostring | gsub("[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | gsub("[\\p{Pd}\u2500-\u257f\u2e3a\u2e3b\u30fc\u2043\u207b\u208b\u02d7\u2796\ufe31\ufe32\u2212\ufe58\ufe63\uff0d-]+"; "-") | gsub("-(\\s*-)+"; "-");'
+# The preview prints every plan field in full; a plan too long to show cannot be bound.
+PLAN_CHARS=$(printf '%s\n' "$OUTPUT" | jq -r "$FLAT_DEF"'[(.pendingPlan.steps // [])[] | (.title | flat | length) + ((.description // "") | flat | length)] | add // 0')
+if [ "$PLAN_CHARS" -gt 20000 ]; then
+  printf 'ERROR: the plan text is %s characters; the preview shows at most 20000 in full, so it cannot be bound. Nothing was approved; review the full plan in the Jules UI.\n' "$PLAN_CHARS" >&2
+  exit 1
+fi
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
 printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
-FLAT_DEF='def flat: tostring | gsub("[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | gsub("[\\p{Pd}\u2500-\u257f\u2e3a\u2e3b\u30fc\u2043\u207b\u208b\u02d7\u2796\ufe31\ufe32\u2212\ufe58\ufe63\uff0d-]+"; "-") | gsub("-(\\s*-)+"; "-");'
-printf '%s\n' "$OUTPUT" | jq -r "$FLAT_DEF"'def safe: flat | .[0:300]; (.pendingPlan.steps // [])[] | "\(.index + 1). \(.title | safe)" + (if .description then "\n   \(.description | safe)" else "" end)'
+printf '%s\n' "$OUTPUT" | jq -r "$FLAT_DEF"'def safe: flat; (.pendingPlan.steps // [])[] | "\(.index + 1). \(.title | safe)" + (if .description then "\n   \(.description | safe)" else "" end)'
 printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
-# The preview caps each field at 300 characters but plan_digest covers the full text:
-# approving a plan with a capped field would approve text the user never saw. Refuse.
-CAPPED=$(printf '%s\n' "$OUTPUT" | jq -r "$FLAT_DEF"'(.pendingPlan.steps // [])[] | . as $s | ("title", "description") as $f | select(($s[$f] // "") | flat | length > 300) | "step \($s.index + 1) \($f)"')
-if [ -n "$CAPPED" ]; then
-  printf 'ERROR: the preview cannot show these plan fields in full (over 300 characters): %s\n' "$(printf '%s' "$CAPPED" | paste -sd, -)" >&2
-  printf 'Refusing to bind an approval to text the user has not seen. Nothing was approved; review the full plan in the Jules UI.\n' >&2
-  exit 1
-fi
 bind_hash() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
 }
