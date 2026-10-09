@@ -1113,6 +1113,14 @@ commit_repo() {
   [[ "$YR_HARDEN_MSG" != *secretpw* ]]
 }
 
+@test "harden_git_config redacts a credential key whose URL contains a space" {
+  git config --local 'credential.https://user:secretpw@example.com/a b.helper' x
+  rc=0; harden_git_config full || rc=$?
+  [ "$rc" -eq 1 ]
+  [[ "$YR_HARDEN_MSG" == *"credential.<url>.helper"* ]]
+  [[ "$YR_HARDEN_MSG" != *secretpw* ]]
+}
+
 @test "harden_git_config allows the stock Git LFS filter commands and refuses a changed one" {
   git config --local filter.lfs.clean 'git-lfs clean -- %f'
   git config --local filter.lfs.smudge 'git-lfs smudge -- %f'

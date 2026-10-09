@@ -1449,6 +1449,22 @@ rule=forged line=9.txt"
   done
 }
 
+@test "Basic prose, a malformed padded token and short vendor prefixes followed by + or / are clean under gawk and mawk" {
+  tv=$(printf 'tv%s-' 'ly')
+  sg=$(printf 'sg%s_' 'p')
+  for bin in gawk mawk; do
+    command -v "$bin" >/dev/null 2>&1 || { echo "missing $bin"; false; }
+    # decodes with an interior colon, but not to printable ASCII
+    awk_expect "$bin" 0 'This handler uses Basic httpOnly mode.\n'
+    # padding followed by another base64 character is no token
+    awk_expect "$bin" 0 'Authorization: Basic YWI6Yw=Z\n'
+    # the floor counts the leading run, not the whole word
+    awk_expect "$bin" 0 "x ${tv}abcdefghij+abcdefghij y\n"
+    awk_expect "$bin" 0 "x ${sg}abcdefghij/abcdefghij y\n"
+    awk_expect "$bin" 6 "x ${tv}abcdefghijabcdefghijabcde+abc y\n"
+  done
+}
+
 @test "Basic tokens: two on one line, an upper-case header and a bare scheme are all found" {
   tok4=$(printf 'a:b' | base64 | tr -d '\n')
   for bin in gawk mawk; do
