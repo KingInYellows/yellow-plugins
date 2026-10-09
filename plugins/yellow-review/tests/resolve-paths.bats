@@ -2139,3 +2139,40 @@ unprivileged() {
     [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
   done
 }
+
+# --- rp_link_target_changed: the directory walk is bounded (rp_walk_cap) ---
+
+walk_fixture() {
+  EXT="$BATS_TEST_TMPDIR/ext"
+  mkdir -p "$EXT/sub"
+  (cd "$EXT/sub" && seq 1 100 | xargs touch -t 201901010000)
+  ln -s "$EXT" lnk
+  MARKER="$BATS_TEST_TMPDIR/marker"
+  touch -t 202001010000 "$MARKER"
+}
+
+@test "rp_walk_cap only lowers the default and ignores other values" {
+  [ "$(rp_walk_cap)" = 50000 ]
+  [ "$(YR_DIR_LINK_WALK_CAP=50 rp_walk_cap)" = 50 ]
+  for v in 0 007 -5 abc 5.5 50000 99999 100000 999999999 ''; do
+    [ "$(YR_DIR_LINK_WALK_CAP=$v rp_walk_cap)" = 50000 ] || { echo "accepted: $v"; false; }
+  done
+}
+
+@test "rp_link_target_changed counts a linked tree with more old files than the cap as changed" {
+  walk_fixture
+  YR_DIR_LINK_WALK_CAP=50 run rp_link_target_changed lnk "$MARKER"
+  [ "$status" -eq 0 ]
+  YR_DIR_LINK_WALK_CAP=50 run rp_link_target_changed lnk "$MARKER" follow
+  [ "$status" -eq 0 ]
+  # Under the cap the same tree is unchanged.
+  run rp_link_target_changed lnk "$MARKER"
+  [ "$status" -eq 1 ]
+}
+
+@test "rp_link_target_changed still finds a newer file under the cap" {
+  walk_fixture
+  touch "$EXT/sub/new"
+  run rp_link_target_changed lnk "$MARKER"
+  [ "$status" -eq 0 ]
+}

@@ -933,15 +933,8 @@ check_trusted_links() {
         # holds a descendant P with <link>/P trusted-config (newer than the
         # marker when there is one), or the walk fails or is too large.
         dir_link_hit() {
-            local x rel n=0 cap=50000
-            # YR_DIR_LINK_WALK_CAP can only lower the cap (a positive integer).
-            case "${YR_DIR_LINK_WALK_CAP:-}" in
-                ''|*[!0-9]*|0|0[0-9]*) ;;
-                *) [ "${#YR_DIR_LINK_WALK_CAP}" -gt 5 ] || [ "$YR_DIR_LINK_WALK_CAP" -ge "$cap" ] || cap=$YR_DIR_LINK_WALK_CAP ;;
-            esac
-            # find streams into the reader, which stops at the cap (find then
-            # dies of SIGPIPE) or at the first match; nothing is stored. A find
-            # that fails before the cap emits the sentinel, which counts.
+            local x rel n=0 cap
+            cap=$(rp_walk_cap)
             while IFS= read -r -d '' x; do
                 [ "$x" != $'\001ERR' ] || return 0
                 n=$((n + 1))

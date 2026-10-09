@@ -1383,6 +1383,19 @@ rp_tree_changes() {
     fi
 }
 
+# rp_walk_cap: the most entries a symlinked-directory walk visits before it
+# stops and counts the link as changed (fail closed). YR_DIR_LINK_WALK_CAP can
+# only lower the 50000 default: a positive integer without a leading zero;
+# anything else is ignored.
+rp_walk_cap() {
+    local cap=50000
+    case "${YR_DIR_LINK_WALK_CAP:-}" in
+        ''|*[!0-9]*|0|0[0-9]*) ;;
+        *) [ "${#YR_DIR_LINK_WALK_CAP}" -gt 5 ] || [ "$YR_DIR_LINK_WALK_CAP" -ge "$cap" ] || cap=$YR_DIR_LINK_WALK_CAP ;;
+    esac
+    printf '%s' "$cap"
+}
+
 # rp_link_target_changed <symlink> <marker>: judge what a symlink points to,
 # not the link: a write through it changes the target's mtime and leaves the
 # link's alone. The operating system resolves the chain, so a relative target
@@ -1397,21 +1410,28 @@ rp_tree_changes() {
 # below it are judged by their targets too; a loop or any other find error then
 # returns 2 (cannot tell). The trusted-config symlink check uses it, and so
 # does rp_ignored_changed_since when given a path predicate; its unfiltered
-# form does not. Run it from the working
+# form does not. The walk is bounded: see rp_walk_cap (at the cap the target counts as changed). Run it from the working
 # tree root with a path that does not begin with `-`.
 rp_link_target_changed() {
-    local l="$1" marker="$2" follow="${3:-}" t p d out skip="" rc=0 fl=-H
+    local l="$1" marker="$2" follow="${3:-}" t p d x n=0 cap skip="" fl=-H
     if [ -e "$l" ]; then
         if [ -d "$l" ]; then
             [ "$follow" != follow ] || fl=-L
             # The root `.ruvector` link: skip its session log as the literal
             # directory scan does (see rp_ignored_changed_since).
             case "$l" in .ruvector|./.ruvector) skip="$l/coedit-sessions" ;; esac
-            out=$(set -o pipefail
-                find "$fl" "$l" -name .git -prune -o -path "$skip" -prune -o -type f -newer "$marker" -print 2>/dev/null \
-                    | head -n 1) || rc=$?
-            [ -z "$out" ] || return 0
-            [ "$rc" -eq 0 ] || return 2
+            # Every visited entry counts against rp_walk_cap; the walk is
+            # streamed and stops at the first newer file (changed), at the cap
+            # (changed: too large to judge) or at a find error (cannot tell).
+            cap=$(rp_walk_cap)
+            while IFS= read -r -d '' x; do
+                [ "$x" != $'\001ERR' ] || return 2
+                n=$((n + 1))
+                [ "$n" -le "$cap" ] || return 0
+                [ -f "$x" ] || continue
+                [ "$fl" = -L ] || [ ! -L "$x" ] || continue
+                [ "$x" -nt "$marker" ] && return 0
+            done < <(find "$fl" "$l" -name .git -prune -o -path "$skip" -prune -o -print0 2>/dev/null || printf '\001ERR\0')
             return 1
         fi
         [ -f "$l" ] || return 1
