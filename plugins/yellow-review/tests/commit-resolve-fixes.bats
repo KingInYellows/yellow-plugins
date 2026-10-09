@@ -2466,6 +2466,18 @@ crf_refuses_untouched() {
   done
 }
 
+@test "an inherited YR_GIT_PATH naming a worktree directory is ignored, so a planted awk never runs" {
+  marker="$BATS_TEST_TMPDIR/inherited-ran"
+  rm -f "$marker"
+  printf 'canary-inh/\n' >> .git/info/exclude
+  mkdir -p canary-inh
+  printf '#!/bin/sh\ntouch "%s"\nexit 99\n' "$marker" >| canary-inh/awk
+  chmod +x canary-inh/awk
+  printf 'one\nfeature\nfix-inherited\n' >| src/a.txt
+  YR_GIT_PATH="$REPO/canary-inh:$PATH" run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ]
+}
+
 @test "tools outside the repository still work" {
   for provider in graphite github; do
     printf 'one\nfeature\nfix-%s\n' "$provider" >| src/a.txt

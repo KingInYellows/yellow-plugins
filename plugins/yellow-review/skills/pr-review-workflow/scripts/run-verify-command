@@ -159,7 +159,7 @@ PLUGIN_ROOT=$(cd -- "$SCRIPT_DIR/../../.." && pwd) || exit 2
 # check_lib_integrity runs before that file is sourced: a function that
 # exists only there cannot resolve the first git. A caller-supplied path is
 # ignored. The result stays in the shell; it is not written to a file.
-unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ
+unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ YR_GIT_PATH
 # yr_helper <name>: a helper the trust check itself must run (readlink). Looked
 # up in fixed system directories, never on PATH: a PATH directory inside the
 # worktree could hold a planted one that runs before any check. Fails closed
