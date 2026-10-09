@@ -397,15 +397,18 @@ yr_args_enter() {
 # counts as entering, and so do a NAME=value operand, -P (env searches a path
 # other than PATH) and -C/--chdir (env resolves the utility elsewhere)). A bare
 # operand is looked up on the caller's PATH (YR_ORIG_PATH), the
-# way the tool itself would be. Copies of this block (through
+# way the tool itself would be. An interpreter that is itself a #! script is
+# judged the same way, to a depth of 4; a script at depth 5 counts as entering
+# (the kernel follows such chains). Copies of this block (through
 # yr_file_shebang_enters) sit in the two scripts' bootstrap resolvers, which
 # run before this library is sourced; keep them identical.
 yr_file_shebang_enters() {
-    local f="$1" root="$2" line rest i x idx last k c cl val p args=""
+    local f="$1" root="$2" depth="${3:-0}" line rest i x idx last k c cl val p args=""
     local -a w=() v=() nw=()
     [ -f "$f" ] || return 1
     IFS= read -r -n 512 line <"$f" 2>/dev/null || true
     case "$line" in '#!'*) ;; *) return 1 ;; esac
+    [ "$depth" -le 4 ] || return 0
     rest=${line#\#!}
     rest=${rest#"${rest%%[![:space:]]*}"}
     read -r -a w <<<"$rest" || true
@@ -489,7 +492,28 @@ yr_file_shebang_enters() {
     fi
     case "$i" in /*) p="$i" ;; *) p="$(pwd -P)/$i" ;; esac
     c=$(yr_canon_path "$p" 2>/dev/null) || return 0
-    yr_inside_root "$c" "$root" || yr_inside_root "$p" "$root"
+    yr_inside_root "$c" "$root" && return 0
+    yr_inside_root "$p" "$root" && return 0
+    yr_file_shebang_enters "$c" "$root" $((depth + 1))
+}
+
+# yr_hardlink_enters <file> <root>: succeed when <file> has other hard links
+# and one of them is inside <root> (a link to an ignored script there keeps
+# the script's content under an outside name), or when that cannot be told
+# (the link count unreadable, or the walk of <root> failed before a match).
+# find comes from yr_helper, never PATH. The tree is walked only for a file
+# with a link count above 1 that is on the worktree's device.
+yr_hardlink_enters() {
+    local f="$1" root="$2" find fd rd hit
+    [ -f "$f" ] || return 1
+    find=$(yr_helper find) || return 0
+    hit=$("$find" "$f" -maxdepth 0 -links +1 -print 2>/dev/null) || return 0
+    [ -n "$hit" ] || return 1
+    fd=$("$find" "$f" -maxdepth 0 -printf '%D' 2>/dev/null) || fd=""
+    rd=$("$find" "$root" -maxdepth 0 -printf '%D' 2>/dev/null) || rd=""
+    if [ -n "$fd" ] && [ -n "$rd" ] && [ "$fd" != "$rd" ]; then return 1; fi
+    hit=$("$find" "$root" -xdev -type f -samefile "$f" -print -quit 2>/dev/null) || return 0
+    [ -n "$hit" ]
 }
 
 # yr_resolve_tool <name>: print one absolute path whose canonical file is
@@ -516,6 +540,8 @@ yr_resolve_tool() {
         yr_inside_root "$invoke" "$root" && return 2
         # A script whose #! interpreter is inside the worktree runs it.
         yr_file_shebang_enters "$canon" "$root" && return 2
+        # A hard link to a file inside the worktree is that file.
+        yr_hardlink_enters "$canon" "$root" && return 2
     fi
     printf '%s\n' "$invoke"
 }
@@ -902,6 +928,15 @@ add_unique_file() {
 # judged by its HEAD target, which the revert restores (an edited original
 # target must not be laundered by redirecting the link). Nothing is written,
 # outside the worktree included (a scratch link lives in a mktemp directory).
+# A tracked symlink that is not itself trusted-config but resolves to a
+# directory outside the worktree is an ancestor of every path below it: a write
+# to cfg/.claude/settings.json through `cfg -> /elsewhere` edits trusted config
+# that neither the tree listing nor the ignored-file guard sees. It counts when
+# a file under the target, at a path P with `<link>/P` trusted-config, is newer
+# than the marker (nested symlinks followed, a loop or find error counts) or,
+# without a marker, when any such P exists. The walk stops at the first match
+# and counts after 50000 entries visited, old ones included (find is streamed and stopped at the cap, never stored); a target inside the worktree is
+# covered by the tree listing and the ignored-file guard.
 LINK_HITS=()
 check_trusted_links() {
     local ls out safe top f c changed tdir
@@ -920,11 +955,40 @@ check_trusted_links() {
     (
         PATH=$safe
         hash -r 2>/dev/null || true
+        # dir_link_hit <probe> <link> [<physical>]: 0 when the directory <probe>
+        # resolves to holds a descendant P with <link>/P trusted-config (newer
+        # than the marker when there is one), or the walk fails or is too
+        # large. With <physical>, the worktree-relative path of an in-worktree
+        # target, P only counts when <physical>/P is not itself trusted-config
+        # (the tree listing already covers that spelling).
+        dir_link_hit() {
+            local x rel n=0 cap fl=-L
+            cap=$(rp_walk_cap)
+            # Nested links inside the worktree are covered by the tree listing:
+            # an in-worktree target is walked without following them.
+            [ -z "${3:-}" ] || fl=-H
+            while IFS= read -r -d '' x; do
+                [ "$x" != $'\001ERR' ] || return 0
+                n=$((n + 1))
+                [ "$n" -le "$cap" ] || return 0
+                rel="${x#"$1"}"
+                rel="${rel#/}"
+                [ -n "$rel" ] || continue
+                # Every visited entry counts against the cap; the marker test
+                # (a regular file newer than it) is judged here, per entry.
+                [ -z "$IGNORED_SINCE" ] || { [ -f "$x" ] && [ "$x" -nt "$IGNORED_SINCE" ]; } || continue
+                rp_trusted_config "$2/$rel" || continue
+                [ -n "${3:-}" ] && rp_trusted_config "$3/$rel" && continue
+                return 0
+            done < <(find "$fl" "$1" -name .git -prune -o -print0 2>/dev/null || printf '\001ERR\0')
+            return 1
+        }
         while IFS= read -r -d '' rec; do
             mode="${rec%% *}"
             [ "$mode" = 120000 ] || continue
             f="${rec#*$'\t'}"
-            rp_trusted_config "$f" || continue
+            direct=0
+            ! rp_trusted_config "$f" || direct=1
             probe="$f"
             dirty=0
             for c in ${changed[@]+"${changed[@]}"}; do
@@ -953,6 +1017,22 @@ check_trusted_links() {
             fi
             hit=0
             canon=$(yr_canon_path "$probe" 2>/dev/null) || canon=""
+            if [ "$direct" = 0 ]; then
+                # An ordinary-named link: only a directory outside the
+                # worktree can hide trusted-config descendants.
+                [ -d "$probe" ] || continue
+                phys=""
+                if [ -n "$canon" ] && yr_inside_root "$canon" "$top"; then
+                    # The tree listing covers the physical spelling only. An
+                    # alias into an excluded path (.claude/agent-memory/x)
+                    # can make a descendant trusted under the link's name.
+                    phys="${canon#"$top"}"
+                    phys="${phys#/}"
+                    [ -n "$phys" ] || phys="."
+                fi
+                if dir_link_hit "$probe" "$f" ${phys:+"$phys"}; then printf '%s\0' "$f" >>"$out"; fi
+                continue
+            fi
             if [ -n "$IGNORED_SINCE" ]; then
                 rc=0
                 rp_link_target_changed "$probe" "$IGNORED_SINCE" follow || rc=$?
