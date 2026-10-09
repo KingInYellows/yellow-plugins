@@ -1403,12 +1403,14 @@ export async function claimOwnEchoes(
           ? Date.parse(mark.walkStartedAt)
           : Number.NaN;
       // Rebased under this lock, but only writes the walk could have raced:
-      // one created or dispatched after the walk began is not a candidate.
+      // one created or dispatched after the walk began is not a candidate. A
+      // write stamped the same millisecond as the walk start cannot be ordered
+      // against it, so it counts as post-walk (fail closed: it cannot claim).
       const postWalk = (r: OperationRecord): boolean =>
         !Number.isNaN(walkStartMs) &&
-        (Date.parse(r.createdAt) > walkStartMs ||
+        (Date.parse(r.createdAt) >= walkStartMs ||
           (r.dispatchedAt !== undefined &&
-            Date.parse(r.dispatchedAt) > walkStartMs));
+            Date.parse(r.dispatchedAt) >= walkStartMs));
       const claimed = new Set(
         landed.flatMap((r) =>
           r.echoActivityId !== undefined ? [r.echoActivityId] : []

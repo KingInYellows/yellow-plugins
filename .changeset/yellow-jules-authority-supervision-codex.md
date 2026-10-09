@@ -19,3 +19,8 @@ another path cannot write. Adds six command wrappers, the host-neutral
 `jules-delegation` and `jules-supervision` skills, and enables both for Codex.
 Live Jules behavior is still unexercised: the owner smoke in
 `docs/yellow-jules/smoke-procedure.md` comes next.
+
+A write stamped in the same millisecond as a status walk's start can no longer
+claim a same-text teammate message as its echo (it is held, then classified as
+outside), and `status --reconcile` frees the grant slot of a create it binds to
+an already completed or failed session in the same run.

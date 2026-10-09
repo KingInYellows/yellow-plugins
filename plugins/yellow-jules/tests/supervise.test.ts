@@ -61,6 +61,9 @@ beforeEach(async () => {
   grantId = await createGrant(h, { maxActiveSessions: 3, maxTotalTasks: 10 });
   session = await delegateOk(h, grantId, { prompt: PROMPT });
   setVendorState(h, session.sessionResource, 'inProgress');
+  // The create landed strictly before any walk: a write sharing a walk's
+  // millisecond cannot be ordered against it and never claims an echo.
+  h.deps.clock.time += 1;
   echoPrompt();
   h.adapter.calls.length = 0;
 });

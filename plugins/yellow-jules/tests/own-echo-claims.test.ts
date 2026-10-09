@@ -39,6 +39,8 @@ describe('each dispatched message explains at most one vendor activity', () => {
     const read = () =>
       status(h.deps, { session: session.localId, reconcile: false });
 
+    // The create landed strictly before this walk starts.
+    h.deps.clock.time += 1;
     addActivity(h, session.sessionResource, {
       type: 'userMessaged',
       message: 'Do the task.',
@@ -66,6 +68,33 @@ describe('each dispatched message explains at most one vendor activity', () => {
     ).toBe(claimed);
   });
 
+  it('a write sharing the walk start millisecond cannot claim a same-text message', async () => {
+    const grantId = await createGrant(h, { maxActiveSessions: 3 });
+    const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
+    setVendorState(h, session.sessionResource, 'inProgress');
+    // No clock advance: the create and the walk start share a millisecond, so
+    // the walk cannot tell whether a teammate's identical text is the echo.
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'Do the task.',
+      originator: 'user',
+    });
+    await status(h.deps, { session: session.localId, reconcile: false });
+    expect(
+      (await readJournal(h.dataDir)).operations[session.localRequestId]
+        ?.echoActivityId
+    ).toBeUndefined();
+    // Held, not claimed; a later walk (strictly after the write) classifies it
+    // as the outside message it is.
+    h.deps.clock.time += 1;
+    await status(h.deps, { session: session.localId, reconcile: false });
+    expect(await outsideSeen(session.localRequestId)).toBe(true);
+    expect(
+      (await readJournal(h.dataDir)).operations[session.localRequestId]
+        ?.echoActivityId
+    ).toBeUndefined();
+  });
+
   it('an identical message older than the dispatch is outside, not the echo', async () => {
     const grantId = await createGrant(h, { maxActiveSessions: 3 });
     const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
@@ -88,6 +117,7 @@ describe('each dispatched message explains at most one vendor activity', () => {
     const grantId = await createGrant(h, { maxActiveSessions: 3 });
     const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
     setVendorState(h, session.sessionResource, 'inProgress');
+    h.deps.clock.time += 1;
     for (let i = 0; i < 2; i += 1) {
       addActivity(h, session.sessionResource, {
         type: 'userMessaged',
