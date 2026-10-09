@@ -138,7 +138,8 @@ GRANT_ID=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO" --arg branch "$BRANCH"
 if [ -z "$GRANT_ID" ]; then
   printf 'grant_id=NONE\n'
   printf 'Run this yourself in a separate terminal window on this machine (not through Claude Code), then retry:\n'
-  printf '  node %s authorize --repo %s --branch %s --task-ref %s --operations reply --owner YOUR_NAME\n' "'$CLI'" "'$REPO'" "'$BRANCH'" "'$TASK_REF'"
+  shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+  printf '  node %s authorize --repo %s --branch %s --task-ref %s --operations reply --owner YOUR_NAME\n' "$(shq "$CLI")" "$(shq "$REPO")" "$(shq "$BRANCH")" "$(shq "$TASK_REF")"
   exit 0
 fi
 printf 'grant_id=%s\n' "$GRANT_ID"

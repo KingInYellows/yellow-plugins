@@ -102,20 +102,21 @@ if [ -n "$SOURCE" ]; then
   case "$SOURCE" in *[!A-Za-z0-9_./-]*) printf 'ERROR: --source is not sources/github/<owner>/<repo>.\n' >&2; exit 1 ;; esac
   printf '%s\n' "$SOURCE" | grep -Eq '^sources/github/[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100}$' || { printf 'ERROR: --source is not sources/github/<owner>/<repo>.\n' >&2; exit 1; }
 fi
-REFS=$(printf '%s\n' "$TASK_REFS" | sed "s/.*/--task-ref '&' /" | tr -d '\n')
-CMD="node '$CLI' authorize --repo '$REPO' --branch '$BRANCH' ${REFS}--operations '$OPERATIONS' --owner '$OWNER'"
+shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+REFS=$(printf '%s\n' "$TASK_REFS" | while IFS= read -r ref; do printf '%s ' "--task-ref $(shq "$ref")"; done)
+CMD="node $(shq "$CLI") authorize --repo $(shq "$REPO") --branch $(shq "$BRANCH") ${REFS}--operations $(shq "$OPERATIONS") --owner $(shq "$OWNER")"
 [ -n "$MAX_SESSIONS" ] && CMD="$CMD --max-active-sessions $MAX_SESSIONS"
 [ -n "$MAX_TASKS" ] && CMD="$CMD --max-total-tasks $MAX_TASKS"
 [ -n "$MAX_ROUNDS" ] && CMD="$CMD --max-corrective-rounds $MAX_ROUNDS"
 [ -n "$TTL" ] && CMD="$CMD --ttl-minutes $TTL"
-[ -n "$SOURCE" ] && CMD="$CMD --source '$SOURCE'"
+[ -n "$SOURCE" ] && CMD="$CMD --source $(shq "$SOURCE")"
 printf 'Run this yourself in a separate terminal on the controller host:\n\n'
 printf '  %s\n\n' "$CMD"
 printf 'It prints the grant and a six-character code. Type the code to write the grant.\n'
 printf 'Then give me the grant id from its output, or run /jules:authorize --list.\n'
 ```
 
-For `--take-over` print `node '<CLI>' authorize --take-over`. It advances the
+For `--take-over` print `node <CLI> authorize --take-over` with `<CLI>` shell-quoted (`shq`, defined above). It advances the
 controller epoch for this host and data directory and rebinds every grant; run
 it only as step 5 of the handoff procedure in this plugin's `CLAUDE.md`.
 

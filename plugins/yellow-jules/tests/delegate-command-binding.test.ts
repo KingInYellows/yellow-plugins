@@ -761,3 +761,43 @@ describe('every plan preview that binds a digest refuses text it would change', 
     expect(text).toMatch(/\[ "\$CHANGED" != 0 \]/);
   });
 });
+
+describe('printed copyable commands shell-quote every value', () => {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const hostile = "/tmp/it's;$(touch pwned)/dist/cli.js";
+  const shq = (): string => {
+    const text = fs.readFileSync(
+      path.resolve(here, '../commands/jules/abandon.md'),
+      'utf8'
+    );
+    return /^shq\(\) .*$/m.exec(text)![0];
+  };
+  it.each([
+    'abandon',
+    'approve',
+    'delegate',
+    'reply',
+    'supervise',
+    'authorize',
+  ])('%s prints no hand-quoted value', (name) => {
+    const text = fs.readFileSync(
+      path.resolve(here, `../commands/jules/${name}.md`),
+      'utf8'
+    );
+    expect(text).toContain('shq() {');
+    expect(text).not.toMatch(/"'\$\w+'"/);
+    expect(text).not.toContain("node '$CLI'");
+  });
+  it.each(['bash', 'zsh'])('shq round-trips a hostile path under %s', (sh) => {
+    const res = spawnSync(
+      sh,
+      [
+        '-c',
+        `${shq()}\nc="node $(shq "$P") x"; eval "set -- $c"; printf '%s|' "$@"`,
+      ],
+      { env: { ...process.env, P: hostile }, encoding: 'utf8' }
+    );
+    if (res.error) return; // shell not installed
+    expect(res.stdout).toBe(`node|${hostile}|x|`);
+  });
+});

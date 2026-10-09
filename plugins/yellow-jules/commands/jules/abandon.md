@@ -39,7 +39,8 @@ CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 REQUEST_ID='YELLOW_TODO_request_id'
 printf 'First make sure /jules:status --reconcile reports this operation as ambiguous-reconcile or not-reached.\n'
 printf 'Then run this yourself in a separate terminal on the controller host:\n\n'
-printf '  node %s abandon --request-id %s\n\n' "'$CLI'" "'$REQUEST_ID'"
+shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+printf '  node %s abandon --request-id %s\n\n' "$(shq "$CLI")" "$(shq "$REQUEST_ID")"
 printf 'It prints the operation and a six-character code. Type the code to confirm.\n'
 ```
 

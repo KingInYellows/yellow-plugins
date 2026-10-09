@@ -341,7 +341,8 @@ CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 SESSION='YELLOW_TODO_session'
 case "$SESSION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 printf 'Inspect the session first, then run this yourself in a separate terminal:\n\n'
-printf '  node %s supervise --clear-pause --session %s\n\n' "'$CLI'" "'$SESSION'"
+shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+printf '  node %s supervise --clear-pause --session %s\n\n' "$(shq "$CLI")" "$(shq "$SESSION")"
 ```
 
 ## Error Handling

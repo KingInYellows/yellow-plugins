@@ -846,7 +846,8 @@ FOUND=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO_PATH" --arg branch "$BRANC
 if [ -z "$FOUND" ]; then
   printf 'grant_id=NONE\n'
   printf 'No active grant with free session and task capacity covers %s on %s for %s. A slot frees when a session under a grant finishes; otherwise run this yourself in a separate terminal window on this machine (not through Claude Code), then retry:\n' "$REPO_PATH" "$BRANCH" "$ISSUE_ID"
-  printf '  node %s authorize --repo %s --branch %s --task-ref %s --operations create,approve,reply --owner YOUR_NAME\n' "'$CLI'" "'$REPO_PATH'" "'$BRANCH'" "'$ISSUE_ID'"
+  shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+  printf '  node %s authorize --repo %s --branch %s --task-ref %s --operations create,approve,reply --owner YOUR_NAME\n' "$(shq "$CLI")" "$(shq "$REPO_PATH")" "$(shq "$BRANCH")" "$(shq "$ISSUE_ID")"
   exit 0
 fi
 printf 'grant_id=%s\n' "$FOUND"
