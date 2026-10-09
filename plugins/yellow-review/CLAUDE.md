@@ -272,7 +272,8 @@ inherited `GIT_SSH_COMMAND`, `GIT_SSH`, `GIT_ASKPASS`, `SSH_ASKPASS`,
 inside it, and injected `GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` or
 `GIT_CONFIG_PARAMETERS` config (`core.sshCommand`, `credential.helper`,
 `gpg.program` and the like) that does; trusted values outside the worktree are
-kept. Command lines are judged whole: the raw value must not contain the
+kept. Any inherited `GIT_CONFIG` (it makes `git config` read only that file,
+hiding the repository config from the scans) is refused. Command lines are judged whole: the raw value must not contain the
 worktree path as a whole path (`<root>2` and `<root>-keys` are siblings and
 pass), no word (quotes, a leading `!` and `--opt=VALUE` handled) may be an
 absolute path, or an existing path relative to the current directory, that

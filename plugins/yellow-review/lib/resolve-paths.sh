@@ -805,7 +805,8 @@ yr_env_cmd_verdict() {
 # command variables (GIT_SSH_COMMAND, GIT_SSH, GIT_ASKPASS, SSH_ASKPASS,
 # GIT_PROXY_COMMAND, GIT_EXTERNAL_DIFF, GIT_PAGER, PAGER, GIT_EDITOR, EDITOR,
 # VISUAL), the path variables (GIT_EXEC_PATH, GIT_TEMPLATE_DIR,
-# GIT_CONFIG_GLOBAL, GIT_CONFIG_SYSTEM) and config injected through
+# GIT_CONFIG_GLOBAL, GIT_CONFIG_SYSTEM; any GIT_CONFIG is refused) and config
+# injected through
 # GIT_CONFIG_KEY_<i>/GIT_CONFIG_VALUE_<i> (below GIT_CONFIG_COUNT) and
 # GIT_CONFIG_PARAMETERS, judged by the same rules as the repository's own
 # config. A GIT_CONFIG_COUNT that is not a number is refused by
@@ -830,6 +831,13 @@ yr_check_git_env() {
             return 1
         fi
     done
+    # GIT_CONFIG makes `git config` read that one file and nothing else, so
+    # every config scan would miss the repository's own entries: refuse it,
+    # whatever it points at.
+    if [ -n "${GIT_CONFIG+x}" ]; then
+        YR_HARDEN_MSG="GIT_CONFIG is set, which hides the repository config from the checks; unset it"
+        return 1
+    fi
     # Without GIT_CONFIG_GLOBAL, git reads $XDG_CONFIG_HOME/git/config (else
     # $HOME/.config/git/config) and $HOME/.gitconfig.
     if [ -z "${GIT_CONFIG_GLOBAL+x}" ]; then

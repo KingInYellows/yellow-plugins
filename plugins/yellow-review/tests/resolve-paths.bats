@@ -1970,3 +1970,16 @@ unprivileged() {
     [[ "$out" == "$d:"* ]] || { echo "awk false hit: $shebang" >&2; return 1; }
   done
 }
+
+@test "harden_git_config refuses an inherited GIT_CONFIG, which would hide the repository config from its scans" {
+  git config filter.evil.clean 'sh -c evil'
+  printf '[core]\n\tfsmonitor = false\n\tuntrackedCache = false\n[safe]\n\tbareRepository = explicit\n' >| "$BATS_TEST_TMPDIR/alt.conf"
+  for scope in full revert; do
+    rc=0; ( export GIT_CONFIG="$BATS_TEST_TMPDIR/alt.conf"; harden_git_config "$scope" ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "$scope accepted GIT_CONFIG" >&2; return 1; }
+  done
+  ( export GIT_CONFIG="$BATS_TEST_TMPDIR/alt.conf"; harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_CONFIG "* && "$YR_HARDEN_MSG" != *alt.conf* ]] )
+  # An empty value is still a set variable.
+  rc=0; ( export GIT_CONFIG=; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+}
