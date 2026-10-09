@@ -561,6 +561,57 @@ assert_recreated_patch_restores() {
   ! grep -q 'bare.git' "$patch"
 }
 
+@test "--revert-denied keeps a bare repository that replaced a tracked trusted-config file" {
+  mkdir -p .cursor
+  printf 'tracked\n' >| .cursor/cache.git
+  git add .cursor/cache.git
+  git commit -q -m "add cache.git file"
+  rm -f .cursor/cache.git
+  git init -q --bare .cursor/cache.git
+  printf 'secret\n' >| CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ ! -e CLAUDE.md ]
+  [ -f .cursor/cache.git/HEAD ]
+  [ -f .cursor/cache.git/config ]
+  [ -d .cursor/cache.git/hooks ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'left a nested git repository in place'* ]]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" != *'removed a directory'* ]]
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ -f "$patch" ]
+  ! grep -q 'cache.git/' "$patch"
+}
+
+@test "--revert-denied keeps agent memory under a directory that replaced a tracked .claude file" {
+  printf 'tracked\n' >| .claude
+  git add .claude
+  git commit -q -m "add .claude file"
+  rm -f .claude
+  mkdir -p .claude/agent-memory/worker
+  printf 'remember this\n' >| .claude/agent-memory/worker/notes.md
+  printf '{}\n' >| .claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ "$(cat .claude/agent-memory/worker/notes.md)" = 'remember this' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'excluded'*'.claude'* ]]
+}
+
+@test "--revert-dirty refuses a bare repository that replaced a tracked file" {
+  printf 'tracked\n' >| src/cache.git
+  git add src/cache.git
+  git commit -q -m "add cache.git file"
+  rm -f src/cache.git
+  git init -q --bare src/cache.git
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"nested git repository"* ]]
+  [ -f src/cache.git/HEAD ]
+  [ -f src/cache.git/config ]
+}
+
 @test "--revert-denied with only an untracked bare repository is a noop that is not deniedClean" {
   mkdir -p .cursor
   git init -q --bare .cursor/bare.git

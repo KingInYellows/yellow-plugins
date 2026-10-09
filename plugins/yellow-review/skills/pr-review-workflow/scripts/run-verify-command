@@ -860,12 +860,38 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         # remove it.
         NESTED=$(find -- "$f" -name .git -print -quit 2>/dev/null) \
             || die 2 "cannot scan the directory for a nested repository: $(safe_path_label "$f")"
-        if [ -n "$NESTED" ]; then
+        # The scan covers the whole subtree, not only the selected path: a
+        # bare repository (HEAD, objects/, refs/) has no .git entry, and under
+        # --revert-denied a descendant outside the trusted-config set (such as
+        # .claude/agent-memory/) was filtered out of the list on purpose. The
+        # recursive removal would delete either one.
+        if [ -z "$NESTED" ]; then
+            NESTED=$(find -- "$f" -type f -name HEAD \
+                -exec sh -c 'd=${1%/HEAD}; [ -d "$d/objects" ] && [ -d "$d/refs" ]' _ {} \; -print -quit 2>/dev/null) \
+                || die 2 "cannot scan the directory for a nested repository: $(safe_path_label "$f")"
+        fi
+        EXCLUDED=""
+        if [ "$MODE" = revert-denied ] && [ -z "$NESTED" ]; then
+            EXCLUDED=$(find -- "$f" \( -type f -o -type l \) -print0 2>/dev/null \
+                | while IFS= read -r -d '' c; do
+                    rp_trusted_config "$c" || { printf 1; break; }
+                done)
+        fi
+        if [ -n "$NESTED" ] || [ -n "$EXCLUDED" ]; then
             # --revert-denied judges each trusted-config path on its own, so a
             # repository it must not delete does not stop the other reverts.
             [ "$MODE" = revert-denied ] \
                 || die 2 "refusing to remove a directory that contains a nested git repository: $(safe_path_label "$f")"
-            add_path_reason "left a nested git repository in place" "$f"
+            # A bare repository the pre-pass already reported is not repeated.
+            REPORTED=0
+            for p in ${BARE_KEPT[@]+"${BARE_KEPT[@]}"}; do
+                [ "$p" = "$f/" ] && REPORTED=1
+            done
+            if [ -n "$NESTED" ]; then
+                [ "$REPORTED" = 1 ] || add_path_reason "left a nested git repository in place" "$f"
+            else
+                add_path_reason "left a directory holding excluded (non-trusted-config) files in place" "$f"
+            fi
             NESTED_KEPT+=("$f")
             continue
         fi
