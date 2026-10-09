@@ -87,6 +87,36 @@ async function landReply(localRequestId: string, text: string): Promise<void> {
   await settleAccepted(h.deps, reservation);
 }
 
+/** A grant-backed reply whose POST began but whose outcome is not proven. */
+async function dispatchReply(
+  localRequestId: string,
+  text: string,
+  finalStatus: 'reserved' | 'unknown-outcome'
+): Promise<void> {
+  const reservation = await reserveUnderGrant(h.deps, {
+    grantId,
+    ownerRequestId: session.localRequestId,
+    authority: {
+      repository: 'acme/widgets',
+      sourceResource: 'sources/github/acme/widgets',
+      branch: 'scratch/one',
+      taskRef: 't1',
+      operation: 'reply',
+      correction: true,
+    },
+    reservation: {
+      localRequestId,
+      localId: `jl-${Buffer.from(localRequestId).toString('hex').padEnd(32, '0').slice(0, 32)}`,
+      sessionResource: session.sessionResource,
+      promptDigest: messageDigest(text),
+    },
+  });
+  await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+  if (finalStatus === 'unknown-outcome') {
+    await markOperation(h.dataDir, localRequestId, 'unknown-outcome');
+  }
+}
+
 describe('journal sequence', () => {
   it('stamps create and dispatch strictly in order, even on a frozen clock', async () => {
     await landReply('rep1', 'first');
@@ -154,6 +184,46 @@ describe('supervise: a reply "since the evaluation" must be proven to follow it'
     addPlan(h, session.sessionResource, 'plan-1');
     expect((await sup()).decision).toBe('needs-plan-review');
     await landReply('rep-after', 'please restructure the plan');
+    h.deps.clock.time += 1_000;
+    addPlanNow(h, session.sessionResource, 'plan-2');
+    const result = await sup();
+    expect(result.decision).toBe('needs-plan-review');
+    expect(result.reason).not.toBe('plan-changed-after-evaluation');
+  });
+
+  it.each(['reserved', 'unknown-outcome'] as const)(
+    'a dispatched reply left %s (landing unproven) does not hide a plan swap',
+    async (finalStatus) => {
+      addPlan(h, session.sessionResource, 'plan-1');
+      expect((await sup()).decision).toBe('needs-plan-review');
+      await dispatchReply(
+        'rep-unproven',
+        'please restructure the plan',
+        finalStatus
+      );
+      h.deps.clock.time += 1_000;
+      addPlanNow(h, session.sessionResource, 'plan-2');
+      expect(await sup()).toMatchObject({
+        decision: 'paused',
+        reason: 'plan-changed-after-evaluation',
+      });
+    }
+  );
+
+  it('an unknown-outcome reply whose echo was claimed is landing evidence and explains a plan change', async () => {
+    addPlan(h, session.sessionResource, 'plan-1');
+    expect((await sup()).decision).toBe('needs-plan-review');
+    await dispatchReply(
+      'rep-echoed',
+      'please restructure the plan',
+      'unknown-outcome'
+    );
+    await updateJournal(h.dataDir, (operations) => {
+      operations['rep-echoed'] = {
+        ...operations['rep-echoed']!,
+        echoActivityId: 'act-echo',
+      };
+    });
     h.deps.clock.time += 1_000;
     addPlanNow(h, session.sessionResource, 'plan-2');
     const result = await sup();

@@ -308,12 +308,15 @@ async function superviseOnce(deps, args) {
     const repliedSinceEvaluation = evaluated !== undefined &&
         Object.values(journal.operations).some((r) => r.sessionResource === sessionResource &&
             r.kind === 'reply' &&
-            // A clean rejection or a failure before dispatch never reached Jules;
-            // reserved, accepted, unknown-outcome and reconciled replies might have.
-            r.status !== 'failed' &&
-            r.status !== 'rejected' &&
-            // A reservation whose POST has not begun cannot have changed the plan.
-            !(r.status === 'reserved' && r.dispatchedAt === undefined) &&
+            // Only positive landing evidence explains a plan replacement: an
+            // accepted or reconciled reply, or one whose echo was claimed. A
+            // reserved or unknown-outcome reply may never have landed, a clean
+            // rejection or failure never reached Jules, and none of those may hide
+            // a swap: the pass fails safe and pauses.
+            (r.status === 'accepted' ||
+                r.status === 'reconciled' ||
+                ((r.status === 'reserved' || r.status === 'unknown-outcome') &&
+                    r.echoActivityId !== undefined)) &&
             // Suppresses the swap pause, so it must be PROVEN: the reply's dispatch
             // (else its reservation) carries a sequence above the evaluation's.
             // Equal or unknown order (a record from before sequences) is not

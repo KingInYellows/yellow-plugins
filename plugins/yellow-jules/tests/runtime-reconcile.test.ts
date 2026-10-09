@@ -459,6 +459,47 @@ describe('reply and approve reservations resolve on their own session', () => {
     );
   });
 
+  it('an unknown-outcome reply whose echo a plain status already claimed is resolved as landed by reconcile', async () => {
+    const session = await delegateOk(h, grantId);
+    h.adapter.sendMessageImpl = async () => {
+      throw new AdapterError('network', 'reset', { dispatched: true });
+    };
+    await expect(
+      reply(h.deps, {
+        session: session.localId,
+        message: 'lost words',
+        dryRun: false,
+        correction: false,
+        grantId,
+        requestId: 'reply-1',
+      })
+    ).rejects.toBeInstanceOf(AppErrorException);
+    expect((await readJournal(h.dataDir)).operations['reply-1']?.status).toBe(
+      'unknown-outcome'
+    );
+    h.deps.clock.time += 1_000;
+    const echo = addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'lost words',
+    });
+    // A plain status records the echo against the unresolved reply.
+    await status(h.deps, { session: session.localId, reconcile: false });
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-1']?.echoActivityId
+    ).toBe(echo.activityId);
+
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(
+      result.reconciled?.find((r) => r.localRequestId === 'reply-1')
+    ).toMatchObject({ outcome: 'bound' });
+    const record = (await readJournal(h.dataDir)).operations['reply-1'];
+    expect(record?.status).toBe('accepted');
+    expect(record?.echoActivityId).toBe(echo.activityId);
+  });
+
   it('a sessionless reconcile that binds a reply persists the echo it matched', async () => {
     const session = await strandedReply('exact words', 'reply-1');
     const echo = addActivity(h, session.sessionResource, {

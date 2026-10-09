@@ -218,10 +218,12 @@ async function resolveOnOwnSession(deps, adapter, sessionResource, records, dead
             const created = Date.parse(activity.createTime);
             if (Number.isNaN(created))
                 return;
-            // An echo a settled operation already claimed explains that operation,
-            // not a later one with the same message.
-            const claimed = claimedEchoes.has(activity.activityId);
+            // An echo another operation already claimed explains that operation, not
+            // a later one with the same message. A record's own claimed echo is
+            // positive landing evidence for it and still matches.
+            const claimedBy = claimedEchoes.get(activity.activityId);
             for (const record of records) {
+                const claimed = claimedBy !== undefined && claimedBy !== record.localRequestId;
                 // Only activities at or after this reservation (minus the overlap window).
                 if (created < (floors.get(record.localRequestId) ?? Infinity))
                     continue;
@@ -426,7 +428,9 @@ async function reconcile(deps, journal, sessionResource, deadline) {
                     const walk = await walkSessions(deps, adapter, oldest, deadline);
                     out.push(...resolveCreates(journal, creates, walk));
                 }
-                const claimedEchoes = new Set(Object.values(journal.operations).flatMap((r) => r.echoActivityId !== undefined ? [r.echoActivityId] : []));
+                const claimedEchoes = new Map(Object.values(journal.operations).flatMap((r) => r.echoActivityId !== undefined
+                    ? [[r.echoActivityId, r.localRequestId]]
+                    : []));
                 const bySession = new Map();
                 for (const record of others) {
                     if (record.sessionResource === undefined) {

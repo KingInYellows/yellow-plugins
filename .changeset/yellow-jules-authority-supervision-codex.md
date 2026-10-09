@@ -42,3 +42,9 @@ same session into the create (deviations, pause and outside markers; read
 cursors reset) and retire that row, and refuse to bind a session another create
 already owns (`session-already-owned`), so a recorded policy deviation can no
 longer be hidden from the write gate.
+
+A `reserved` or `unknown-outcome` reply no longer hides a plan replacement from
+`supervise`: only an accepted, reconciled, or echo-confirmed reply explains it,
+so an unproven reply fails safe and the pass pauses. `status --reconcile` now
+resolves an unknown-outcome reply as landed when a plain `status` had already
+recorded its echo, instead of leaving it unknown.

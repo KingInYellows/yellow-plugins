@@ -269,6 +269,14 @@ reply cannot suppress a plan-swap pause, and a pause with a sequence is cleared
 only by a walk that has one. Where the old timestamp rule already failed closed
 on a tie it still applies to those older records, so they do not stall.
 
+Only positive landing evidence explains a plan replacement and so suppresses
+the `plan-changed-after-evaluation` pause: an `accepted` or `reconciled` reply
+sequenced after the evaluation, or one whose echo was claimed. A `reserved` or
+`unknown-outcome` reply may never have landed and does not hide a swap; the pass
+pauses. `status --reconcile` binds an unknown-outcome reply to the echo a plain
+`status` already recorded for that same reply; only echoes claimed by other
+operations are excluded.
+
 Binding a create to a session that an `observe` row already owns (reconcile, or
 a create whose response arrived after a raw-resource `status`) folds that row
 into the create and retires its local id: deviations stay unreconciled if
