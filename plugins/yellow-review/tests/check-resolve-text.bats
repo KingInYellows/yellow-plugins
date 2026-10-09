@@ -1563,6 +1563,34 @@ rule=forged line=9.txt"
   done
 }
 
+@test "an unlisted leading symbol (checkmark, arrow, emoji) cannot exempt a multi-word credential" {
+  for bin in gawk mawk; do
+    awk_expect "$bin" 6 'password:\n  \xe2\x9c\x93 correct horse battery staple\n'
+    awk_expect "$bin" 6 'password:\n  \xe2\x86\x92 correct horse battery staple\n'
+    awk_expect "$bin" 6 'password:\n  \xf0\x9f\x94\x91 correct horse battery staple\n'
+    awk_expect "$bin" 0 'password:\n  \xe2\x9c\x93 Rotation is scheduled for Friday\n'
+  done
+}
+
+@test "a bare Basic word needs an interior colon: Only is prose, a header keeps edge colons" {
+  edge=$(printf ':y' | base64 | tr -d '\n')
+  for bin in gawk mawk; do
+    awk_expect "$bin" 0 'This endpoint supports Basic Only mode\n'
+    awk_expect "$bin" 0 "bare basic ${edge}\n"
+    awk_expect "$bin" 6 'Authorization: Basic Only\n'
+    # a later interior colon counts: empty user, password containing a colon
+    colons=$(printf ':pa:ss' | base64 | tr -d '\n')
+    awk_expect "$bin" 6 "bare basic ${colons}\n"
+    awk_expect "$bin" 6 "Authorization: Basic ${edge}\n"
+    awk_expect "$bin" 6 'This endpoint supports Basic YTpi mode\n'
+    # unpadded 3-character token (`a:`): a header flags it, bare prose does not
+    awk_expect "$bin" 6 'Authorization: Basic YTo\n'
+    awk_expect "$bin" 0 'Authorization: Basic Hey\n'
+    awk_expect "$bin" 0 'This endpoint supports Basic Hey mode\n'
+    awk_expect "$bin" 0 'bare basic YTo mode\n'
+  done
+}
+
 @test "a leading non-ASCII quote, bullet, dash or no-break space cannot exempt a multi-word credential; accented letters stay prose" {
   ran=0
   for loc in C C.UTF-8; do
