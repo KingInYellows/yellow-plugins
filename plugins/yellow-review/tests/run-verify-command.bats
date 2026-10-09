@@ -3453,3 +3453,25 @@ dirlink_setup() {
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
 }
+
+@test "--revert-denied --no-ignored-guard flags a link to a tracked in-worktree target marked skip-worktree" {
+  mkdir -p .claude
+  ln -s ../src/a.txt .claude/settings.json
+  git add -f .claude/settings.json && git commit -q -m "link to tracked"
+  git checkout -q HEAD -- src/a.txt
+  git update-index --skip-worktree src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "--revert-denied --no-ignored-guard flags a link to a tracked in-worktree target marked assume-unchanged" {
+  mkdir -p .claude
+  ln -s ../src/a.txt .claude/settings.json
+  git add -f .claude/settings.json && git commit -q -m "link to tracked"
+  git checkout -q HEAD -- src/a.txt
+  git update-index --assume-unchanged src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}

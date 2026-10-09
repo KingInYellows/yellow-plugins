@@ -804,7 +804,8 @@ add_unique_file() {
 # tree listing already covers it. Without a marker (--revert-denied
 # --no-ignored-guard) nothing can be compared, so a link that resolves outside
 # the worktree, cannot be resolved, or lands on an untracked, ignored or .git
-# path inside it (the tree check cannot see those) counts. A link that git lists as changed is
+# path inside it, or on a tracked path flagged skip-worktree or
+# assume-unchanged (the tree check cannot see those), counts. A link that git lists as changed is
 # judged by its HEAD target, which the revert restores (an edited original
 # target must not be laundered by redirecting the link). Nothing is written,
 # outside the worktree included (a scratch link lives in a mktemp directory).
@@ -877,7 +878,16 @@ check_trusted_links() {
                     rel="${canon#"$top"/}"
                     case "$canon:$rel" in
                         "$top:"*|*:.git|*:.git/*) hit=1 ;;
-                        *) yr_git ls-files --error-unmatch -- "$rel" >/dev/null 2>&1 || hit=1 ;;
+                        *)
+                            # A skip-worktree or assume-unchanged flag hides
+                            # edits from the tree check too (ls-files -v tags
+                            # them S or lowercase).
+                            tagged=$(yr_git ls-files -v -- "$rel" 2>/dev/null | head -n 1) || tagged=""
+                            case "$tagged" in
+                                "") hit=1 ;;
+                                [a-zS]" "*) hit=1 ;;
+                            esac
+                            ;;
                     esac
                 fi
             fi
