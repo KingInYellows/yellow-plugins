@@ -522,7 +522,7 @@ transient failure from an undetermined one.
   complete walk leaves `unknown-outcome`, and a partial walk leaves
   `not-reached`. Operations the deadline prevented from being checked are
   reported as `not-reached`, never as resolved.
-- `reply --session <ref> --message <text> [--correction] [--expect-activity-id <id> --expect-question-digest <hex> | --expect-plan-id <id> --expect-plan-digest <hex>] [--request-id <id>] [--dry-run] [--grant-id <id>]`
+- `reply --session <ref> --message <text> [--correction] [--reply-kind question|plan|other] [--expect-activity-id <id> --expect-question-digest <hex> | --expect-plan-id <id> --expect-plan-digest <hex>] [--request-id <id>] [--dry-run] [--grant-id <id>]`
   → `{ localRequestId, localId, sessionResource, sent: true }`. `--dry-run`
   validates, performs one `info()`, and returns the same fields with
   `sent: false, dryRun: true`, plus `repository`, `requestedBranch`, and
@@ -538,6 +538,10 @@ transient failure from an undetermined one.
   compact JSON `[planId, [[title, description], ...]]` plus a newline, as `approve.md` prints
   it) do the same for a pending plan and cannot be combined with the question
   pair. Like approve's plan check, the read narrows the race without closing it.
+  `--reply-kind` (what `supervise` sends) makes the pair mandatory: `question`
+  needs the question pair, `plan` the plan pair, and `other` refuses both, each
+  failing with `JULES_INVALID_INPUT` before any read. Omitted, the pairs stay
+  optional.
 - `approve --session <ref> --plan-id <evaluated plan id> [--request-id <id>] [--dry-run] [--grant-id <id>]`
   →
   `{ localRequestId, localId, sessionResource, approvedPlanId, observedPlanIdAfter: string | null, verificationDeferred: bool, verification: { pages: n, partialPagination: bool }, policyDeviation? }`.

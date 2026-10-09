@@ -81,6 +81,16 @@ function requireString(value: unknown, flag: string): string {
   return value;
 }
 
+function replyKindOf(
+  value: unknown
+): { replyKind: 'question' | 'plan' | 'other' } | Record<string, never> {
+  if (value === undefined) return {};
+  if (value === 'question' || value === 'plan' || value === 'other') {
+    return { replyKind: value };
+  }
+  throw new UsageError('--reply-kind must be question, plan, or other');
+}
+
 function deadlineFlag(value: unknown, fallback: number): number {
   return typeof value === 'string'
     ? validatePositiveInt(value, '--deadline-ms', 1, MAX_DEADLINE_MS)
@@ -295,6 +305,7 @@ async function dispatch(
           'expect-question-digest': { type: 'string' },
           'expect-plan-id': { type: 'string' },
           'expect-plan-digest': { type: 'string' },
+          'reply-kind': { type: 'string' },
           ...deadline,
         },
         strict: true,
@@ -323,6 +334,7 @@ async function dispatch(
         ...(typeof values['expect-plan-digest'] === 'string'
           ? { expectPlanDigest: values['expect-plan-digest'] }
           : {}),
+        ...replyKindOf(values['reply-kind']),
         deadlineMs: deadlineFlag(
           values['deadline-ms'],
           DEFAULT_MUTATION_DEADLINE_MS

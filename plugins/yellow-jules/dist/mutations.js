@@ -390,10 +390,31 @@ async function assertPlanStillPending(deps, adapter, target, liveCondition, expe
         return changed('the session no longer has the plan the pass showed');
     }
 }
+function validateReplyKind(kind, question, plan) {
+    if (kind === undefined)
+        return;
+    const bad = (m) => (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', m);
+    if (kind === 'question' && question === undefined) {
+        bad('--reply-kind question requires --expect-activity-id and --expect-question-digest');
+    }
+    if (kind === 'plan' && plan === undefined) {
+        bad('--reply-kind plan requires --expect-plan-id and --expect-plan-digest');
+    }
+    if (kind === 'question' && plan !== undefined) {
+        bad('--reply-kind question cannot carry a plan expectation');
+    }
+    if (kind === 'plan' && question !== undefined) {
+        bad('--reply-kind plan cannot carry a question expectation');
+    }
+    if (kind === 'other' && (question !== undefined || plan !== undefined)) {
+        bad('--reply-kind other cannot carry an expectation');
+    }
+}
 async function replyInner(deps, args, ids) {
     const message = validateText(args.message, '--message', MESSAGE_MAX_CHARS);
     const expectQuestion = validateExpectedQuestion(args);
     const expectPlan = validateExpectedPlan(args, expectQuestion !== undefined);
+    validateReplyKind(args.replyKind, expectQuestion, expectPlan);
     (0, runtime_support_js_1.prepare)(deps);
     const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, args.deadlineMs ?? deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS);
     const target = await resolveTarget(deps, args.session);

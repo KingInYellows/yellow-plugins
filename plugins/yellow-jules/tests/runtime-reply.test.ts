@@ -827,6 +827,59 @@ describe('races inside the write gate', () => {
       ask();
       expect((await reply(h.deps, args())).sent).toBe(true);
     });
+
+    describe('--reply-kind', () => {
+      it('question without the question pair is refused, even for a vendor id spelled none', async () => {
+        ask();
+        const calls = h.adapter.writeCount();
+        for (const extra of [
+          {},
+          { expectPlanId: 'plan-1', expectPlanDigest: 'a'.repeat(64) },
+        ]) {
+          expect(
+            await code(() =>
+              reply(h.deps, args({ replyKind: 'question', ...extra }))
+            )
+          ).toBe('JULES_INVALID_INPUT');
+        }
+        expect(h.adapter.writeCount()).toBe(calls);
+      });
+
+      it('question with the pair sends, including an activity id spelled none', async () => {
+        const q = ask();
+        const result = await reply(
+          h.deps,
+          args({
+            replyKind: 'question',
+            expectActivityId: q.activityId,
+            expectQuestionDigest: messageDigest(QUESTION),
+          })
+        );
+        expect(result.sent).toBe(true);
+      });
+
+      it('other refuses any expectation and plan refuses a missing one', async () => {
+        const q = ask();
+        expect(
+          await code(() =>
+            reply(
+              h.deps,
+              args({
+                replyKind: 'other',
+                expectActivityId: q.activityId,
+                expectQuestionDigest: messageDigest(QUESTION),
+              })
+            )
+          )
+        ).toBe('JULES_INVALID_INPUT');
+        expect(
+          await code(() => reply(h.deps, args({ replyKind: 'plan' })))
+        ).toBe('JULES_INVALID_INPUT');
+        expect((await reply(h.deps, args({ replyKind: 'other' }))).sent).toBe(
+          true
+        );
+      });
+    });
   });
 
   describe('--expect-plan-id and --expect-plan-digest', () => {

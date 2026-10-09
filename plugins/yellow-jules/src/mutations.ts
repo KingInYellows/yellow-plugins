@@ -447,6 +447,13 @@ export interface ReplyArgs {
    */
   readonly expectPlanId?: string;
   readonly expectPlanDigest?: string;
+  /**
+   * What the caller says this reply answers. `question` and `plan` require the
+   * matching expectation pair (a supervised reply must not drop it); `other`
+   * refuses any expectation. Absent: the pairs are optional, as for a direct
+   * reply.
+   */
+  readonly replyKind?: 'question' | 'plan' | 'other';
   readonly deadlineMs?: number;
 }
 
@@ -672,6 +679,32 @@ async function assertPlanStillPending(
   }
 }
 
+function validateReplyKind(
+  kind: ReplyArgs['replyKind'],
+  question: unknown,
+  plan: unknown
+): void {
+  if (kind === undefined) return;
+  const bad = (m: string): never => throwAppError('JULES_INVALID_INPUT', m);
+  if (kind === 'question' && question === undefined) {
+    bad(
+      '--reply-kind question requires --expect-activity-id and --expect-question-digest'
+    );
+  }
+  if (kind === 'plan' && plan === undefined) {
+    bad('--reply-kind plan requires --expect-plan-id and --expect-plan-digest');
+  }
+  if (kind === 'question' && plan !== undefined) {
+    bad('--reply-kind question cannot carry a plan expectation');
+  }
+  if (kind === 'plan' && question !== undefined) {
+    bad('--reply-kind plan cannot carry a question expectation');
+  }
+  if (kind === 'other' && (question !== undefined || plan !== undefined)) {
+    bad('--reply-kind other cannot carry an expectation');
+  }
+}
+
 async function replyInner(
   deps: WriteDeps,
   args: ReplyArgs,
@@ -680,6 +713,7 @@ async function replyInner(
   const message = validateText(args.message, '--message', MESSAGE_MAX_CHARS);
   const expectQuestion = validateExpectedQuestion(args);
   const expectPlan = validateExpectedPlan(args, expectQuestion !== undefined);
+  validateReplyKind(args.replyKind, expectQuestion, expectPlan);
   prepare(deps);
   const deadline = deadlineIn(
     deps.clock,

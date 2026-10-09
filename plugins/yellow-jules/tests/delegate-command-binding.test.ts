@@ -330,6 +330,7 @@ describe('/jules:supervise binds the reply to the pass decision', () => {
       YELLOW_TODO_session: 'sessions/1',
       YELLOW_TODO_grant_id: 'g1',
       YELLOW_TODO_1_or_0: '1',
+      YELLOW_TODO_question_plan_or_other: 'question',
       YELLOW_TODO_observed_activity_id_or_none: 'act-1',
       YELLOW_TODO_observed_question_digest_or_none: DIGEST,
       YELLOW_TODO_reviewed_plan_id_or_none: 'none',
@@ -366,8 +367,64 @@ describe('/jules:supervise binds the reply to the pass decision', () => {
         'act-1',
         '--expect-question-digest',
         DIGEST,
+        '--reply-kind',
+        'question',
       ])
     );
+    fs.rmSync(ctx.root, { recursive: true, force: true });
+  });
+
+  it('passes the expectation flags even when the vendor ids are spelled none', () => {
+    const ctx = prepare('Use Postgres.');
+    const over = { YELLOW_TODO_observed_activity_id_or_none: 'none' };
+    const binding = bindingOf(ctx, over);
+    exec(send, ctx, { YELLOW_TODO_binding_from_preview: binding, ...over });
+    const argv = JSON.parse(fs.readFileSync(ctx.calls, 'utf8')) as string[];
+    expect(argv).toEqual(
+      expect.arrayContaining(['--expect-activity-id', 'none'])
+    );
+    fs.rmSync(ctx.root, { recursive: true, force: true });
+  });
+
+  it('sends reply-kind other with no expectation flags only when all four values are none', () => {
+    const ctx = prepare('Thanks.');
+    const none = {
+      YELLOW_TODO_question_plan_or_other: 'other',
+      YELLOW_TODO_observed_activity_id_or_none: 'none',
+      YELLOW_TODO_observed_question_digest_or_none: 'none',
+    };
+    const binding = bindingOf(ctx, none);
+    const res = exec(send, ctx, {
+      YELLOW_TODO_binding_from_preview: binding,
+      ...none,
+    });
+    expect(res.status).toBe(0);
+    const argv = JSON.parse(fs.readFileSync(ctx.calls, 'utf8')) as string[];
+    expect(argv).toEqual(expect.arrayContaining(['--reply-kind', 'other']));
+    expect(argv).not.toContain('--expect-activity-id');
+    fs.rmSync(ctx.root, { recursive: true, force: true });
+  });
+
+  it.each([
+    ['an unknown reply kind', { YELLOW_TODO_question_plan_or_other: 'none' }],
+    [
+      'reply-kind other still carrying question values',
+      { YELLOW_TODO_question_plan_or_other: 'other' },
+    ],
+    [
+      'reply-kind plan still carrying question values',
+      { YELLOW_TODO_question_plan_or_other: 'plan' },
+    ],
+  ])('refuses before the CLI for %s', (_n, over) => {
+    const ctx = prepare('Use Postgres.');
+    const binding = bindingOf(ctx, over);
+    const res = exec(send, ctx, {
+      YELLOW_TODO_binding_from_preview: binding,
+      ...over,
+    });
+    expect(res.status).toBe(1);
+    expect(fs.existsSync(ctx.calls)).toBe(false);
+    fs.rmSync(ctx.dir, { recursive: true, force: true });
     fs.rmSync(ctx.root, { recursive: true, force: true });
   });
 
@@ -404,6 +461,7 @@ describe('/jules:supervise binds the reply to the pass decision', () => {
   it('passes the reviewed plan to the CLI for a plan-review reply', () => {
     const ctx = prepare('Please restructure.');
     const plan = {
+      YELLOW_TODO_question_plan_or_other: 'plan',
       YELLOW_TODO_observed_activity_id_or_none: 'none',
       YELLOW_TODO_observed_question_digest_or_none: 'none',
       YELLOW_TODO_reviewed_plan_id_or_none: 'plan-1',
@@ -427,6 +485,7 @@ describe('/jules:supervise binds the reply to the pass decision', () => {
   it('refuses when the reviewed plan digest differs from the printed binding', () => {
     const ctx = prepare('Please restructure.');
     const plan = {
+      YELLOW_TODO_question_plan_or_other: 'plan',
       YELLOW_TODO_observed_activity_id_or_none: 'none',
       YELLOW_TODO_observed_question_digest_or_none: 'none',
       YELLOW_TODO_reviewed_plan_id_or_none: 'plan-1',
@@ -463,19 +522,6 @@ describe('/jules:supervise binds the reply to the pass decision', () => {
       { encoding: 'utf8' }
     );
     expect(planDigest('p-1', steps)).toBe(jq.stdout.trim());
-  });
-
-  it('omits the expectation flags for a non-question decision', () => {
-    const ctx = prepare('Please restructure.');
-    const none = {
-      YELLOW_TODO_observed_activity_id_or_none: 'none',
-      YELLOW_TODO_observed_question_digest_or_none: 'none',
-    };
-    const binding = bindingOf(ctx, none);
-    exec(send, ctx, { YELLOW_TODO_binding_from_preview: binding, ...none });
-    const argv = JSON.parse(fs.readFileSync(ctx.calls, 'utf8')) as string[];
-    expect(argv).not.toContain('--expect-activity-id');
-    fs.rmSync(ctx.root, { recursive: true, force: true });
   });
 });
 

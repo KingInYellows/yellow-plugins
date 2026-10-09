@@ -161,13 +161,17 @@ the Write tool — never into Bash source. Allocate a directory, write
 `<printed path>/message.txt`, print the binding, then send. Add `--correction`
 only when the message asks for a fix to the session's work; it spends one
 corrective round, and `correctiveRoundsLeft` in the result says how many remain.
-For `needs-answer`, take `ACTIVITY_ID` and `QUESTION_DIGEST` from the pass's
-`observedActivityId` and `observedQuestionDigest` (both are required; if the
-pass reported `questionUnavailable`, ask the user instead) and set `PLAN_ID` and
-`PLAN_DIGEST` to `none`. For `needs-plan-review`, run the plan-review block from
-the Approve step first and take `PLAN_ID` and `PLAN_DIGEST` from it (the
-`observedPlanId` and the printed `plan_digest=`); set the question values to
-`none`. For any other decision use `none` for all four.
+Set `REPLY_KIND` from the pass decision: `question` for `needs-answer`, `plan`
+for `needs-plan-review`, `other` for anything else. For `question`, take
+`ACTIVITY_ID` and `QUESTION_DIGEST` from the pass's `observedActivityId` and
+`observedQuestionDigest` (both are required; if the pass reported
+`questionUnavailable`, ask the user instead) and set `PLAN_ID` and `PLAN_DIGEST`
+to `none`. For `plan`, run the plan-review block from the Approve step first and
+take `PLAN_ID` and `PLAN_DIGEST` from it (the `observedPlanId` and the printed
+`plan_digest=`); set the question values to `none`. For `other` use `none` for
+all four. The block always passes the pair its `REPLY_KIND` names (a vendor id
+may itself be spelled `none`), and the CLI refuses a `question` or `plan` reply
+without it.
 
 ```bash
 set -euo pipefail
@@ -181,19 +185,21 @@ WORK_DIR='YELLOW_TODO_work_dir'
 SESSION='YELLOW_TODO_session'
 GRANT_ID='YELLOW_TODO_grant_id'
 CORRECTION='YELLOW_TODO_1_or_0'
+REPLY_KIND='YELLOW_TODO_question_plan_or_other'
 ACTIVITY_ID='YELLOW_TODO_observed_activity_id_or_none'
 QUESTION_DIGEST='YELLOW_TODO_observed_question_digest_or_none'
 PLAN_ID='YELLOW_TODO_reviewed_plan_id_or_none'
 PLAN_DIGEST='YELLOW_TODO_reviewed_plan_digest_or_none'
-case "$WORK_DIR$SESSION$GRANT_ID$CORRECTION$ACTIVITY_ID$QUESTION_DIGEST$PLAN_ID$PLAN_DIGEST" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+case "$WORK_DIR$SESSION$GRANT_ID$CORRECTION$REPLY_KIND$ACTIVITY_ID$QUESTION_DIGEST$PLAN_ID$PLAN_DIGEST" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 case "$CORRECTION" in 0|1) ;; *) printf 'ERROR: CORRECTION must be exactly 0 or 1.\n' >&2; exit 1 ;; esac
+case "$REPLY_KIND" in question|plan|other) ;; *) printf 'ERROR: REPLY_KIND must be question, plan or other.\n' >&2; exit 1 ;; esac
 [ -f "$WORK_DIR/message.txt" ] && [ ! -L "$WORK_DIR/message.txt" ] && [ -s "$WORK_DIR/message.txt" ] || { printf 'ERROR: write the message to %s/message.txt first.\n' "$WORK_DIR" >&2; exit 1; }
 bind_hash() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
 }
 MESSAGE=$(cat -- "$WORK_DIR/message.txt")
 MESSAGE_SHA=$(printf '%s' "$MESSAGE" | bind_hash)
-printf 'binding=%s\n' "$(printf '%s' "${SESSION}|${GRANT_ID}|${CORRECTION}|${ACTIVITY_ID}|${QUESTION_DIGEST}|${PLAN_ID}|${PLAN_DIGEST}|${MESSAGE_SHA}" | bind_hash)"
+printf 'binding=%s\n' "$(printf '%s' "${SESSION}|${GRANT_ID}|${CORRECTION}|${REPLY_KIND}|${ACTIVITY_ID}|${QUESTION_DIGEST}|${PLAN_ID}|${PLAN_DIGEST}|${MESSAGE_SHA}" | bind_hash)"
 ```
 
 Keep the printed `binding=` value. The send block recomputes it from the same
@@ -208,13 +214,15 @@ WORK_DIR='YELLOW_TODO_work_dir'
 SESSION='YELLOW_TODO_session'
 GRANT_ID='YELLOW_TODO_grant_id'
 CORRECTION='YELLOW_TODO_1_or_0'
+REPLY_KIND='YELLOW_TODO_question_plan_or_other'
 ACTIVITY_ID='YELLOW_TODO_observed_activity_id_or_none'
 QUESTION_DIGEST='YELLOW_TODO_observed_question_digest_or_none'
 PLAN_ID='YELLOW_TODO_reviewed_plan_id_or_none'
 PLAN_DIGEST='YELLOW_TODO_reviewed_plan_digest_or_none'
 CONFIRMED_BINDING='YELLOW_TODO_binding_from_preview'
-case "$WORK_DIR$SESSION$GRANT_ID$CORRECTION$ACTIVITY_ID$QUESTION_DIGEST$PLAN_ID$PLAN_DIGEST$CONFIRMED_BINDING" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+case "$WORK_DIR$SESSION$GRANT_ID$CORRECTION$REPLY_KIND$ACTIVITY_ID$QUESTION_DIGEST$PLAN_ID$PLAN_DIGEST$CONFIRMED_BINDING" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 case "$CORRECTION" in 0|1) ;; *) printf 'ERROR: CORRECTION must be exactly 0 or 1.\n' >&2; exit 1 ;; esac
+case "$REPLY_KIND" in question|plan|other) ;; *) printf 'ERROR: REPLY_KIND must be question, plan or other.\n' >&2; exit 1 ;; esac
 case "$WORK_DIR" in
   *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
   /*/yellow-jules-supervise.??????) ;;
@@ -243,20 +251,23 @@ bind_hash() {
 # Hash and send the same bytes: one read of the staged file.
 MESSAGE=$(cat -- "$WORK_DIR/message.txt")
 MESSAGE_SHA=$(printf '%s' "$MESSAGE" | bind_hash)
-BINDING=$(printf '%s' "${SESSION}|${GRANT_ID}|${CORRECTION}|${ACTIVITY_ID}|${QUESTION_DIGEST}|${PLAN_ID}|${PLAN_DIGEST}|${MESSAGE_SHA}" | bind_hash)
+BINDING=$(printf '%s' "${SESSION}|${GRANT_ID}|${CORRECTION}|${REPLY_KIND}|${ACTIVITY_ID}|${QUESTION_DIGEST}|${PLAN_ID}|${PLAN_DIGEST}|${MESSAGE_SHA}" | bind_hash)
 if [ "$CONFIRMED_BINDING" != "$BINDING" ]; then
   printf 'ERROR: the session, grant, correction flag, question or message differs from the printed binding. Nothing was sent; start again from the preview.\n' >&2; exit 1
 fi
 args=(reply --session "$SESSION" "--message=$MESSAGE" --grant-id "$GRANT_ID")
 [ "$CORRECTION" = 1 ] && args+=(--correction)
-if [ "$ACTIVITY_ID" != none ]; then
-  [ "$QUESTION_DIGEST" != none ] || { printf 'ERROR: ACTIVITY_ID and QUESTION_DIGEST go together.\n' >&2; exit 1; }
-  args+=(--expect-activity-id "$ACTIVITY_ID" --expect-question-digest "$QUESTION_DIGEST")
-fi
-if [ "$PLAN_ID" != none ]; then
-  [ "$PLAN_DIGEST" != none ] || { printf 'ERROR: PLAN_ID and PLAN_DIGEST go together.\n' >&2; exit 1; }
-  args+=(--expect-plan-id "$PLAN_ID" --expect-plan-digest "$PLAN_DIGEST")
-fi
+case "$REPLY_KIND" in
+  question)
+    [ "$PLAN_ID" = none ] && [ "$PLAN_DIGEST" = none ] || { printf 'ERROR: a question reply carries no plan values.\n' >&2; exit 1; }
+    args+=(--reply-kind question --expect-activity-id "$ACTIVITY_ID" --expect-question-digest "$QUESTION_DIGEST") ;;
+  plan)
+    [ "$ACTIVITY_ID" = none ] && [ "$QUESTION_DIGEST" = none ] || { printf 'ERROR: a plan reply carries no question values.\n' >&2; exit 1; }
+    args+=(--reply-kind plan --expect-plan-id "$PLAN_ID" --expect-plan-digest "$PLAN_DIGEST") ;;
+  other)
+    [ "$ACTIVITY_ID$QUESTION_DIGEST$PLAN_ID$PLAN_DIGEST" = nonenonenonenone ] || { printf 'ERROR: only a question or plan reply carries expectation values.\n' >&2; exit 1; }
+    args+=(--reply-kind other) ;;
+esac
 OUTPUT=$(node "$CLI" "${args[@]}")
 printf 'exit=%s\n' "$?"
 printf '%s\n' "$OUTPUT" | jq '{ok, operation, localRequestId, sent, requiresAttention, attention, details, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
