@@ -184,6 +184,42 @@ describe('delegate reservations: one shared sessions walk', () => {
     ).resolves.toHaveProperty('sessionResource');
   });
 
+  it('a controller clock more than 5 minutes ahead of the service clock still finds the tagged session', async () => {
+    await lostResponse('scratch/a', 'lost-a');
+    await confirmArchiveVisibility();
+    const record = (await readJournal(h.dataDir)).operations['lost-a'];
+    const [resource, vendor] = [...h.adapter.sessions.entries()][0] ?? [];
+    // The service stamped the session 10 minutes before the controller's
+    // reservation time: the controller clock runs ahead.
+    h.adapter.sessions.set(resource as string, {
+      ...(vendor as AdapterSession),
+      createTime: new Date(
+        Date.parse(record?.createdAt as string) - 10 * 60_000
+      ).toISOString(),
+    });
+    // A vendor that honours a create_time filter hides the session from a
+    // filter derived from the controller clock.
+    const all = h.adapter.listSessionsImpl;
+    h.adapter.listSessionsImpl = async (options) => {
+      const page = await all({ ...options, pageSize: 1000 });
+      const m = /create_time > "([^"]+)"/.exec(options.filter ?? '');
+      return {
+        sessions: page.sessions.filter(
+          (x) =>
+            m === null ||
+            Date.parse(x.createTime ?? '') > Date.parse(m[1] as string)
+        ),
+      };
+    };
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled).toEqual([
+      expect.objectContaining({ localRequestId: 'lost-a', outcome: 'bound' }),
+    ]);
+    expect(h.adapter.callsTo('listSessions')[0]?.args[0]).not.toHaveProperty(
+      'filter'
+    );
+  });
+
   it('absence of evidence never releases while archive visibility is unverified', async () => {
     await lostResponse('scratch/a', 'lost-a', false);
     const result = await status(h.deps, { reconcile: true });

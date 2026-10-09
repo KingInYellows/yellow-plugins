@@ -180,13 +180,11 @@ interface SessionsWalk {
 async function walkSessions(
   deps: RuntimeDeps,
   adapter: SdkAdapter,
-  oldestReservation: Date,
   deadline: Deadline
 ): Promise<SessionsWalk> {
-  const since = new Date(
-    oldestReservation.getTime() - OVERLAP_WINDOW_MS
-  ).toISOString();
-  let filter: string | undefined = `create_time > "${since}"`;
+  // No create_time filter: its floor would come from the controller's clock,
+  // and a controller ahead of the service clock would hide the tagged session
+  // and release the create. A walk the page cap cuts short is `not-reached`.
   let pageToken: string | undefined;
   const sessions: SessionProjection[] = [];
   for (let pages = 0; ; ) {
@@ -202,21 +200,10 @@ async function walkSessions(
         adapter.listSessions({
           pageSize: RECONCILE_SESSIONS_PAGE_SIZE,
           ...(pageToken !== undefined ? { pageToken } : {}),
-          ...(filter !== undefined ? { filter } : {}),
         })
       );
     } catch (err) {
       rethrowIfAuth(err);
-      // The filter is an optimization: a first page the vendor rejects is retried unfiltered once.
-      if (
-        err instanceof AppErrorException &&
-        err.appError.code === 'JULES_INVALID_INPUT' &&
-        filter !== undefined &&
-        pages === 0
-      ) {
-        filter = undefined;
-        continue;
-      }
       if (err instanceof AppErrorException) {
         return { sessions, complete: false, stopReason: 'page-failure' };
       }
@@ -782,10 +769,7 @@ export async function reconcile(
       : await withAdapter(deps, async (adapter) => {
           const out: Resolution[] = [];
           if (creates.length > 0) {
-            const oldest = new Date(
-              Math.min(...creates.map((r) => Date.parse(r.createdAt)))
-            );
-            const walk = await walkSessions(deps, adapter, oldest, deadline);
+            const walk = await walkSessions(deps, adapter, deadline);
             out.push(...resolveCreates(journal, creates, walk));
           }
           // Activity ids are stored without their session, so two sessions can

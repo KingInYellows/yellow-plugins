@@ -88,9 +88,10 @@ function rethrowIfAuth(err) {
         throw err;
     }
 }
-async function walkSessions(deps, adapter, oldestReservation, deadline) {
-    const since = new Date(oldestReservation.getTime() - activity_walk_js_1.OVERLAP_WINDOW_MS).toISOString();
-    let filter = `create_time > "${since}"`;
+async function walkSessions(deps, adapter, deadline) {
+    // No create_time filter: its floor would come from the controller's clock,
+    // and a controller ahead of the service clock would hide the tagged session
+    // and release the create. A walk the page cap cuts short is `not-reached`.
     let pageToken;
     const sessions = [];
     for (let pages = 0;;) {
@@ -105,19 +106,10 @@ async function walkSessions(deps, adapter, oldestReservation, deadline) {
             page = await (0, runtime_support_js_1.read)(deps, deadline, () => adapter.listSessions({
                 pageSize: RECONCILE_SESSIONS_PAGE_SIZE,
                 ...(pageToken !== undefined ? { pageToken } : {}),
-                ...(filter !== undefined ? { filter } : {}),
             }));
         }
         catch (err) {
             rethrowIfAuth(err);
-            // The filter is an optimization: a first page the vendor rejects is retried unfiltered once.
-            if (err instanceof errors_js_1.AppErrorException &&
-                err.appError.code === 'JULES_INVALID_INPUT' &&
-                filter !== undefined &&
-                pages === 0) {
-                filter = undefined;
-                continue;
-            }
             if (err instanceof errors_js_1.AppErrorException) {
                 return { sessions, complete: false, stopReason: 'page-failure' };
             }
@@ -561,8 +553,7 @@ async function reconcile(deps, journal, sessionResource, deadline) {
             : await (0, runtime_support_js_1.withAdapter)(deps, async (adapter) => {
                 const out = [];
                 if (creates.length > 0) {
-                    const oldest = new Date(Math.min(...creates.map((r) => Date.parse(r.createdAt))));
-                    const walk = await walkSessions(deps, adapter, oldest, deadline);
+                    const walk = await walkSessions(deps, adapter, deadline);
                     out.push(...resolveCreates(journal, creates, walk));
                 }
                 // Activity ids are stored without their session, so two sessions can

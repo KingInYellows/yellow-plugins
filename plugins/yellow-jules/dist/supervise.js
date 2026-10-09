@@ -405,7 +405,8 @@ async function superviseOnce(deps, args) {
         // leaving no pending plan: the retained latest-generated plan still
         // shows the swap when it was first recorded after the evaluation.
         if (fresh.lastGeneratedPlan !== undefined &&
-            planDiffers(evaluated, fresh.lastGeneratedPlan.planId, fresh.lastGeneratedPlan.planDigest) &&
+            (fresh.lastGeneratedPlan.ambiguous === true ||
+                planDiffers(evaluated, fresh.lastGeneratedPlan.planId, fresh.lastGeneratedPlan.planDigest)) &&
             (0, state_js_1.seqBefore)(evaluated.evaluatedSeq, fresh.lastGeneratedPlan.seq)) {
             swapCandidates.push({
                 activityId: fresh.lastGeneratedPlan.activityId,

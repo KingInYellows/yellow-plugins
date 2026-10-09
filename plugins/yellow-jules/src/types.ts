@@ -306,6 +306,8 @@ export interface OperationRecord {
     readonly seq?: number;
     /** Digest of the plan's id and (redacted) steps; a same-id plan with other steps differs. */
     readonly planDigest?: string;
+    /** Another plan with different content shares this plan's createTime: which is current is unknowable. */
+    readonly ambiguous?: true;
   };
   /** Newest `planApproved` read by a partial walk, kept while `resumePageToken` is stored. */
   readonly resumeApproval?: {

@@ -845,6 +845,46 @@ describe('outside activity pauses (R32)', () => {
     });
   });
 
+  it('a tie of two plans at one vendor time, cleared by an approval, still pauses the next pass', async () => {
+    const steps = [{ id: 's1', title: 'Do the work', index: 0 }];
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      plan: { planId: 'plan-1', steps },
+    });
+    setVendorState(h, session.sessionResource, 'awaitingPlanApproval');
+    expect((await sup()).decision).toBe('needs-plan-review');
+    h.deps.clock.time += 30_000;
+    const tie = new Date(h.deps.clock.now()).toISOString();
+    // The opaque-id winner is the plan already evaluated; its tied twin is a
+    // different plan that no id order can rank.
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      activityId: 'zzz-same',
+      createTime: tie,
+      plan: { planId: 'plan-1', steps },
+    });
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      activityId: 'aaa-other',
+      createTime: tie,
+      plan: {
+        planId: 'plan-2',
+        steps: [{ id: 's2', title: 'Something else', index: 0 }],
+      },
+    });
+    h.deps.clock.time += 1_000;
+    addActivity(h, session.sessionResource, {
+      type: 'planApproved',
+      approvedPlanId: 'plan-1',
+    });
+    setVendorState(h, session.sessionResource, 'inProgress');
+    await status(h.deps, { session: session.localId, reconcile: false });
+    expect(await sup()).toMatchObject({
+      decision: 'paused',
+      reason: 'plan-changed-after-evaluation',
+    });
+  });
+
   it('withholds approve and reply for a plan holding hidden characters', async () => {
     addActivity(h, session.sessionResource, {
       type: 'planGenerated',

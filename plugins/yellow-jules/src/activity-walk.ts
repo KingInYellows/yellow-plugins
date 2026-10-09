@@ -415,7 +415,14 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
     ...(newest !== undefined ? { newest } : {}),
     seen,
     pendingPlan,
-    ...(latestPlan !== undefined ? { generatedPlan: latestPlan } : {}),
+    ...(latestPlan !== undefined
+      ? {
+          generatedPlan:
+            newestPlanKeys.size > 1
+              ? { ...latestPlan, ambiguous: true as const }
+              : latestPlan,
+        }
+      : {}),
     ...(latestApproval !== undefined
       ? {
           latestApproval: {

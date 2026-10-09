@@ -301,6 +301,14 @@ write is refused (`JULES_SUPERVISION_PAUSED`) before the POST; a message only an
 in-flight write could explain refuses too. An approval rebase never clears a
 fresh pending plan stored as `ambiguous`.
 
+A tie of different plans at the newest vendor time is kept in the retained
+generated-plan state (`lastGeneratedPlan.ambiguous`), so a later approval that
+clears `pendingPlan` cannot hide it: the next `supervise` pass treats it as an
+unexplained replacement and pauses. Create reconciliation walks sessions
+without a `create_time` filter, since a floor derived from the controller's
+clock would hide the tagged session when that clock runs ahead of the service's;
+a walk cut short by the page cap is `not-reached`, never a release.
+
 `authorize` (create) refuses under the lock when any existing grant is bound to
 another controller id or epoch (for example after another host's take-over): a
 stale local epoch never mints a grant beside them; run `--take-over` explicitly.

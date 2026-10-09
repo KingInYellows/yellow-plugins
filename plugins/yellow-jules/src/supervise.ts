@@ -622,11 +622,12 @@ export async function superviseOnce(
     // shows the swap when it was first recorded after the evaluation.
     if (
       fresh.lastGeneratedPlan !== undefined &&
-      planDiffers(
-        evaluated,
-        fresh.lastGeneratedPlan.planId,
-        fresh.lastGeneratedPlan.planDigest
-      ) &&
+      (fresh.lastGeneratedPlan.ambiguous === true ||
+        planDiffers(
+          evaluated,
+          fresh.lastGeneratedPlan.planId,
+          fresh.lastGeneratedPlan.planDigest
+        )) &&
       seqBefore(evaluated.evaluatedSeq, fresh.lastGeneratedPlan.seq)
     ) {
       swapCandidates.push({

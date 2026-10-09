@@ -412,7 +412,9 @@ function isValidRecord(key, value) {
             (value['lastGeneratedPlan']['planDigest'] === undefined ||
                 typeof value['lastGeneratedPlan']['planDigest'] === 'string') &&
             (value['lastGeneratedPlan']['seq'] === undefined ||
-                (0, shape_js_1.isNonNegativeInt)(value['lastGeneratedPlan']['seq']))))
+                (0, shape_js_1.isNonNegativeInt)(value['lastGeneratedPlan']['seq'])) &&
+            (value['lastGeneratedPlan']['ambiguous'] === undefined ||
+                value['lastGeneratedPlan']['ambiguous'] === true)))
         return false;
     if (value['resumeApproval'] !== undefined &&
         !((0, shape_js_1.isPlainObject)(value['resumeApproval']) &&
@@ -1154,17 +1156,31 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
             prevGen?.planId === gen.planId &&
             prevGen.seq !== undefined &&
             (prevGen.planDigest === undefined || prevGen.planDigest === genDigest);
+        // A tie at the newest createTime (different content, opaque ids) leaves
+        // the current plan unknown. The flag is sticky for that stamp, and
+        // recording it afresh takes a new sequence so supervision sees it as a
+        // replacement that appeared after its evaluation.
+        const sameStamp = gen !== undefined &&
+            prevGen !== undefined &&
+            (0, activity_walk_js_1.compareStamp)({ createTime: gen.activityCreateTime, activityId: '' }, { createTime: prevGen.activityCreateTime, activityId: '' }) === 0;
+        const newlyAmbiguous = gen?.ambiguous === true &&
+            sameStamp &&
+            prevGen?.ambiguous !== true &&
+            !genAdvances;
         const lastGeneratedPlan = gen !== undefined && genAdvances
             ? {
                 planId: gen.planId,
                 activityId: gen.activityId,
                 activityCreateTime: gen.activityCreateTime,
                 ...(genDigest !== undefined ? { planDigest: genDigest } : {}),
-                seq: sameGen
+                ...(gen.ambiguous === true ? { ambiguous: true } : {}),
+                seq: sameGen && !(gen.ambiguous === true && !prevGen?.ambiguous)
                     ? (prevGen?.seq ?? nextSeq(journal))
                     : nextSeq(journal),
             }
-            : prevGen;
+            : newlyAmbiguous && prevGen !== undefined
+                ? { ...prevGen, ambiguous: true, seq: nextSeq(journal) }
+                : prevGen;
         const next = applyRetention({
             ...base,
             ...(lastGeneratedPlan !== undefined ? { lastGeneratedPlan } : {}),
