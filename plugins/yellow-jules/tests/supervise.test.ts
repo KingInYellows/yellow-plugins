@@ -207,6 +207,20 @@ describe('needs-answer', () => {
     expect(r.attention).toContain('questionUnavailable');
   });
 
+  it('withholds the question bindings when the fenced question is truncated', async () => {
+    setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
+    addActivity(h, session.sessionResource, {
+      type: 'agentMessaged',
+      message: `${'Which database? '.repeat(60)}END`,
+    });
+    const r = await sup();
+    expect(r.decision).toBe('needs-answer');
+    expect(r.fenced.question).toContain('[truncated]');
+    expect(r.observedActivityId).toBeUndefined();
+    expect(r.observedQuestionDigest).toBeUndefined();
+    expect(r.attention).toContain('questionUnavailable');
+  });
+
   it('flags a question that is no longer in the read window', async () => {
     setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
     const r = await sup();

@@ -448,10 +448,12 @@ async function superviseOnce(deps, args) {
         if (latest?.message !== undefined) {
             fenced.question = (0, redact_js_1.fenceUntrusted)(truncate(latest.message));
         }
-        // A question redaction altered was not shown in full: no binding is
-        // offered for it, so the reply cannot be guarded and the operator answers.
+        // A question that redaction altered, or that the fence truncated, was not
+        // shown in full: no binding is offered for it, so the reply cannot be
+        // guarded and the operator answers.
         const bindable = latest?.message !== undefined &&
-            (0, redact_js_1.redact)(latest.message) === latest.message;
+            (0, redact_js_1.redact)(latest.message) === latest.message &&
+            latest.message.length <= FENCED_MESSAGE_CHARS;
         return finish('needs-answer', {
             ...(bindable
                 ? {
