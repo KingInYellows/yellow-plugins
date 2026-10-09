@@ -625,8 +625,20 @@ fi
 # a trusted-config or deny-listed path: a clean listing would be a false "no
 # change". `ls-files -v` tags assume-unchanged paths in lowercase (skip-worktree
 # is `S`, or `s` with both flags).
+# One exemption: git sets skip-worktree on every tracked file outside a sparse
+# checkout's patterns, and such a file is not on disk, so no resolver edited it.
+# An `S` entry is skipped only when core.sparseCheckout reads true, the path is
+# absent from the worktree and is not a symlink. Lowercase tags (including `s`),
+# a present file, an absent file outside a sparse checkout (a hidden deletion)
+# and any config read failure other than "unset" still refuse.
 refuse_hidden_flags() {
-    local out tag f hits
+    local out tag f hits sparse=false rc=0 val
+    val=$(yr_git config --bool --get core.sparseCheckout 2>/dev/null) || rc=$?
+    case "$rc:$val" in
+        0:true) sparse=true ;;
+        0:false|1:) ;;
+        *) sparse=false ;;
+    esac
     out=$(mktemp) || die 2 "mktemp failed"
     hits=$(mktemp) || { rm -f -- "$out"; die 2 "mktemp failed"; }
     HIDDEN_HITS="$hits"
@@ -635,6 +647,9 @@ refuse_hidden_flags() {
         tag="${f:0:1}"
         f="${f:2}"
         case "$tag" in [a-z]|S) ;; *) continue ;; esac
+        if [ "$tag" = S ] && [ "$sparse" = true ] && [ ! -e "$f" ] && [ ! -L "$f" ]; then
+            continue
+        fi
         if rp_trusted_config "$f" || rp_denied "$f"; then
             printf '%s\0' "$f" >>"$hits"
         fi

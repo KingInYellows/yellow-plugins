@@ -2630,3 +2630,62 @@ trust_assert_absolute() {
   [[ "$stderr" == *'gitignored files changed since'* ]]
   [[ "$stderr" != *'IGNORE PREVIOUS'* ]]
 }
+
+# A sparse checkout leaves tracked files outside it skip-worktree and absent
+# from disk. "sparse" excludes CLAUDE.md that way (git removes it); "nosparse"
+# flags it by hand and leaves sparse checkout off.
+sparse_hide_claude_md() {
+  printf 'rules\n' >| CLAUDE.md
+  git add CLAUDE.md && git commit -q -m "chore: claude md"
+  if [ "$1" = sparse ]; then
+    git sparse-checkout set --no-cone '/src/' '/.github/'
+    [ "$(git ls-files -v -- CLAUDE.md)" = 'S CLAUDE.md' ]
+    [ ! -e CLAUDE.md ]
+  else
+    git update-index --skip-worktree CLAUDE.md
+    rm -f CLAUDE.md
+  fi
+}
+
+@test "hidden flags: an absent skip-worktree trusted file in a sparse checkout does not refuse" {
+  sparse_hide_claude_md sparse
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [[ "$stderr" != *'skip-worktree or assume-unchanged'* ]]
+  [ "$status" -eq 0 ]
+}
+
+@test "hidden flags: a present skip-worktree trusted file in a sparse checkout still refuses" {
+  sparse_hide_claude_md sparse
+  printf 'rules\n' >| CLAUDE.md
+  # Git clears skip-worktree on a materialised file in a sparse checkout, so a
+  # real index cannot hold this state. A shim reports the flag for ls-files and
+  # leaves every other git call real, to exercise the on-disk check.
+  real_git=$(command -v git)
+  mkdir -p "$BATS_TEST_TMPDIR/shim-bin"
+  cat >| "$BATS_TEST_TMPDIR/shim-bin/git" <<SHIM
+#!/bin/sh
+if [ "\$1" = ls-files ]; then printf 'S CLAUDE.md\\0'; exit 0; fi
+exec "$real_git" "\$@"
+SHIM
+  chmod +x "$BATS_TEST_TMPDIR/shim-bin/git"
+  PATH="$BATS_TEST_TMPDIR/shim-bin:$PATH"
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'skip-worktree or assume-unchanged'* ]]
+  [[ "$stderr" == *'CLAUDE.md'* ]]
+}
+
+@test "hidden flags: an absent skip-worktree trusted file without sparse checkout still refuses" {
+  sparse_hide_claude_md nosparse
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'skip-worktree or assume-unchanged'* ]]
+}
+
+@test "hidden flags: an absent assume-unchanged trusted file in a sparse checkout still refuses" {
+  sparse_hide_claude_md sparse
+  git update-index --no-skip-worktree --assume-unchanged CLAUDE.md
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'skip-worktree or assume-unchanged'* ]]
+}
