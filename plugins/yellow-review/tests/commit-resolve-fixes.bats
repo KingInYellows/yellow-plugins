@@ -2559,6 +2559,37 @@ crf_refuses_untouched() {
   [ ! -e "$marker" ]
 }
 
+@test "an ssh symlinked into the worktree never runs when git spawns it for the post-submit ls-remote" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/ssh-canary"
+  rm -f "$marker"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/ssh"
+  chmod +x "$REPO/tools/ssh"
+  # A directory holding only ssh: git looks it up through PATH, not the script.
+  link="$BATS_TEST_TMPDIR/sshbin"
+  mkdir -p "$link"
+  ln -s "$REPO/tools/ssh" "$link/ssh"
+  remote_with_push_url fork ssh://git@example.invalid/acme/widgets.git
+  git config branch.feature.pushRemote fork
+  printf 'one\nfeature\nfix-ssh\n' >| src/a.txt
+  # No ls-remote shim here: git must resolve ssh itself.
+  GH_HOST=example.invalid run --separate-stderr env "PATH=$link:$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the planted ssh ran: $stderr" >&2; return 1; }
+  # Prove the fixture reaches git's ssh spawn: a trusted ssh on PATH runs.
+  good="$BATS_TEST_TMPDIR/goodssh"
+  mkdir -p "$good"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$BATS_TEST_TMPDIR/good-ssh-ran" >| "$good/ssh"
+  chmod +x "$good/ssh"
+  git reset -q --hard "$FIRST_SHA"
+  printf 'one\nfeature\nfix-ssh2\n' >| src/a.txt
+  GH_HOST=example.invalid run --separate-stderr env "PATH=$good:$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ -e "$BATS_TEST_TMPDIR/good-ssh-ran" ] || { echo "ssh was never spawned: $status $stderr" >&2; return 1; }
+}
+
 @test "an inherited YR_GIT_PATH naming a worktree directory is ignored, so a planted awk never runs" {
   marker="$BATS_TEST_TMPDIR/inherited-ran"
   rm -f "$marker"

@@ -1298,6 +1298,82 @@ commit_repo() {
   [[ "$out" == "$BATS_TEST_TMPDIR/okbin:"* ]]
 }
 
+@test "yr_safe_path drops an outside directory holding only ssh, or any other name, symlinked into the worktree" {
+  mkdir -p tools "$BATS_TEST_TMPDIR/goodbin" "$BATS_TEST_TMPDIR/badbin"
+  printf '#!/bin/sh\nexit 0\n' >| tools/canary
+  chmod +x tools/canary
+  # Git spawns ssh, git-credential-*, gpg and pagers by name; no list is complete.
+  for tool in ssh git-credential-foo gpg ssh-keygen less zz-any-name; do
+    ln -s "$PWD/tools/canary" "$BATS_TEST_TMPDIR/badbin/$tool"
+    out=$(PATH="$BATS_TEST_TMPDIR/badbin:$BATS_TEST_TMPDIR/goodbin:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *badbin* ]] || { echo "kept: $tool: $out" >&2; return 1; }
+    [[ "$out" == *goodbin* ]]
+    rm -f "$BATS_TEST_TMPDIR/badbin/$tool"
+  done
+}
+
+@test "yr_safe_path drops a directory with a dangling link into the worktree, or a link to a directory there" {
+  mkdir -p tools/sub "$BATS_TEST_TMPDIR/danglebin" "$BATS_TEST_TMPDIR/dirbin"
+  ln -s "$PWD/tools/not-yet" "$BATS_TEST_TMPDIR/danglebin/git-credential-foo"
+  ln -s "$PWD/tools/sub" "$BATS_TEST_TMPDIR/dirbin/subdir"
+  out=$(PATH="$BATS_TEST_TMPDIR/danglebin:$BATS_TEST_TMPDIR/dirbin:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *danglebin* ]]
+  [[ "$out" != *dirbin* ]]
+  [[ "$out" == "/usr/bin:/bin" || "$out" == "/usr/bin" || "$out" == "/bin" ]]
+}
+
+@test "yr_safe_path drops a directory whose link reaches the worktree through a chain or a hidden name" {
+  mkdir -p tools "$BATS_TEST_TMPDIR/chainbin" "$BATS_TEST_TMPDIR/hidbin"
+  : >| tools/real
+  ln -s "$PWD/tools/real" "$BATS_TEST_TMPDIR/hop"
+  ln -s "$BATS_TEST_TMPDIR/hop" "$BATS_TEST_TMPDIR/chainbin/ssh"
+  ln -s "$PWD/tools/real" "$BATS_TEST_TMPDIR/hidbin/.ssh"
+  mkdir -p "$BATS_TEST_TMPDIR/rootbin"
+  ln -s "$PWD" "$BATS_TEST_TMPDIR/rootbin/repo"
+  out=$(PATH="$BATS_TEST_TMPDIR/chainbin:$BATS_TEST_TMPDIR/hidbin:$BATS_TEST_TMPDIR/rootbin:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *chainbin* ]]
+  [[ "$out" != *hidbin* ]]
+  [[ "$out" != *rootbin* ]]
+}
+
+@test "yr_safe_path keeps an outside directory whose links, whatever their names, point outside the worktree" {
+  mkdir -p "$BATS_TEST_TMPDIR/okbin"
+  ln -s "$(command -v ls)" "$BATS_TEST_TMPDIR/okbin/ssh"
+  ln -s "$(command -v ls)" "$BATS_TEST_TMPDIR/okbin/git-credential-foo"
+  ln -s /nonexistent-outside/x "$BATS_TEST_TMPDIR/okbin/dangling-outside"
+  ln -s "$BATS_TEST_TMPDIR" "$BATS_TEST_TMPDIR/okbin/a-dir"
+  out=$(PATH="$BATS_TEST_TMPDIR/okbin:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" == "$BATS_TEST_TMPDIR/okbin:"* ]]
+}
+
+@test "yr_safe_path screens a big directory (find path) and both spellings of one bad directory" {
+  mkdir -p tools "$BATS_TEST_TMPDIR/bigbad" "$BATS_TEST_TMPDIR/biggood"
+  for i in $(seq 1 320); do
+    ln -s /usr/bin/true "$BATS_TEST_TMPDIR/bigbad/t$i"
+    ln -s /usr/bin/true "$BATS_TEST_TMPDIR/biggood/t$i"
+  done
+  ln -s "$PWD/tools/none" "$BATS_TEST_TMPDIR/bigbad/ssh"
+  ln -s "$BATS_TEST_TMPDIR/bigbad" "$BATS_TEST_TMPDIR/bigbad-again"
+  out=$(PATH="$BATS_TEST_TMPDIR/bigbad:$BATS_TEST_TMPDIR/bigbad-again:$BATS_TEST_TMPDIR/biggood:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *bigbad* ]]
+  [[ "$out" == "$BATS_TEST_TMPDIR/biggood:"* ]]
+  # A good directory reached by two spellings is kept under both.
+  ln -s "$BATS_TEST_TMPDIR/biggood" "$BATS_TEST_TMPDIR/biggood-again"
+  out=$(PATH="$BATS_TEST_TMPDIR/biggood:$BATS_TEST_TMPDIR/biggood-again" yr_safe_path)
+  [ "$out" = "$BATS_TEST_TMPDIR/biggood:$BATS_TEST_TMPDIR/biggood-again" ]
+}
+
+@test "yr_safe_path falls back to yr_canon_path per link when no GNU realpath is available" {
+  mkdir -p tools "$BATS_TEST_TMPDIR/badbin" "$BATS_TEST_TMPDIR/okbin"
+  ln -s "$PWD/tools/none" "$BATS_TEST_TMPDIR/badbin/ssh"
+  ln -s "$(command -v ls)" "$BATS_TEST_TMPDIR/okbin/ssh"
+  # A fixed-location lookup that finds readlink but not realpath.
+  yr_helper() { case "$1" in realpath) return 1 ;; *) command -p which "$1" 2>/dev/null || return 1 ;; esac; }
+  out=$(PATH="$BATS_TEST_TMPDIR/badbin:$BATS_TEST_TMPDIR/okbin:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *badbin* ]]
+  [[ "$out" == "$BATS_TEST_TMPDIR/okbin:"* ]]
+}
+
 @test "yr_adopt_path runs bare names on the screened PATH and keeps the caller's PATH in YR_ORIG_PATH" {
   mkdir -p tools "$BATS_TEST_TMPDIR/badbin"
   printf '#!/bin/sh\ntouch "%s/grep-ran"\nexit 0\n' "$BATS_TEST_TMPDIR" >| tools/canary
@@ -1482,4 +1558,19 @@ EOF
     "$dest/git") ;;
     *) echo "resolved $YELLOW_REVIEW_GIT"; return 1 ;;
   esac
+}
+
+@test "rp_ignored_changed_since never inspects the target of a symlink the predicate rejects" {
+  link_repo
+  old_link ../real/tool src/skip.cache
+  mkdir -p .cache/d
+  ln -s ../../real/tool .cache/d/link
+  # A target that cannot be examined (an unsearchable directory) reports 2.
+  rp_link_target_changed() { return 2; }
+  only_claude() { [ "$1" = CLAUDE.md ]; }
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" "" only_claude
+  [ "$status" -eq 0 ]
+  # Without a predicate the unexaminable target still fails closed.
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 2 ]
 }
