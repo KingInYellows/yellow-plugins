@@ -254,7 +254,7 @@ arguments and run on `yr_safe_path`'s result. It drops a `PATH` directory
 inside the worktree and any directory (a symlinked `PATH` entry is followed
 into its real children) that holds a symlink, whatever its name,
 dangling or not, whose canonical target (a file or a directory) is inside the
-worktree, so the name resolves to a file outside the worktree or not at all.
+worktree, and any existing directory it cannot list (execute-only), so the name resolves to a file outside the worktree or not at all.
 It also drops a directory with an executable script whose `#!` interpreter
 (or `env` operand) canonicalizes inside the worktree, such as a console
 script of a venv kept in the repository, and `commit-resolve-fixes` and
@@ -296,8 +296,8 @@ an `env` command's arguments are judged like command-line words.
 `-vS`) and options with arguments (`-u`, `-C`, `-P`, `-a` and long forms) are
 parsed. Fail closed: an `env` line with a `NAME=value` operand before the
 utility (`PATH=tools` changes where it is looked up), or with a `$`, backslash
-or quote after `-S` (env expands and decodes them), counts as entering the
-worktree.
+or quote after `-S` (env expands and decodes them), or with `-P` (env then
+searches another path than `PATH`), counts as entering the worktree.
 `run-verify-command` still gives the verify command the caller's `PATH`
 (`YR_ORIG_PATH`). Both scripts take their own directory by parameter expansion,
 not `dirname`.

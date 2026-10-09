@@ -1910,3 +1910,63 @@ EOF
     [[ "$out" == "$d:"* ]] || { echo "awk false hit: $shebang" >&2; return 1; }
   done
 }
+
+# unprivileged <script>: run a bash script as a user that directory modes bind
+# (root reads an execute-only directory anyway). Sets nothing; prints its output.
+# Returns 77 when no unprivileged user is available.
+unprivileged() {
+  if [ "$(id -u)" -ne 0 ]; then
+    bash -c "$1"
+  elif command -v setpriv >/dev/null 2>&1 && id nobody >/dev/null 2>&1; then
+    setpriv --reuid="$(id -u nobody)" --regid="$(id -g nobody)" --clear-groups bash -c "$1"
+  else
+    return 77
+  fi
+}
+
+@test "yr_safe_path drops an execute-only PATH directory it cannot list, even when it holds a link into the worktree" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/xbin" "$BATS_TEST_TMPDIR/okbin"
+  printf '#!/bin/sh\nexit 0\n' >| ignored/awk
+  chmod +x ignored/awk
+  ln -s "$PWD/ignored/awk" "$BATS_TEST_TMPDIR/xbin/awk"
+  ln -s "$(command -v grep)" "$BATS_TEST_TMPDIR/okbin/grep"
+  chmod 711 "$BATS_TEST_TMPDIR/xbin"
+  # Let the unprivileged user reach the repository and the directories.
+  p="$BATS_TEST_TMPDIR"
+  while [ "$p" != /tmp ] && [ "$p" != / ]; do chmod 755 "$p"; p=$(dirname "$p"); done
+  chmod -R a+rX "$PWD" "$BATS_TEST_TMPDIR/okbin"
+  script='export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0="*"
+    . "'"$LIB"'"; cd "'"$PWD"'"; PATH="'"$BATS_TEST_TMPDIR"'/xbin:'"$BATS_TEST_TMPDIR"'/okbin:/usr/bin:/bin" yr_safe_path'
+  rc=0; out=$(unprivileged "$script") || rc=$?
+  if [ "$rc" -eq 77 ]; then skip "no unprivileged user to run as (running as root without setpriv/nobody): chmod cannot restrict root"; fi
+  [ "$rc" -eq 0 ] || { echo "rc=$rc out=$out" >&2; return 1; }
+  [[ "$out" != *xbin* ]] || { echo "kept: $out" >&2; return 1; }
+  [[ "$out" == "$BATS_TEST_TMPDIR/okbin:"* ]]
+}
+
+@test "#! lines whose env has -P (a search path that is not PATH) drop the directory, in awk and in the shell" {
+  mkdir -p tools
+  printf '#!/bin/sh\nexit 0\n' >| tools/evil
+  chmod +x tools/evil
+  n=0
+  for shebang in '#!/usr/bin/env -P tools evil' '#!/usr/bin/env -Ptools evil' '#!/usr/bin/env -vP tools evil' \
+                 '#!/usr/bin/env -S -P tools evil' '#!/usr/bin/env -S -Ptools evil' '#!/usr/bin/env -P/usr/bin sh'; do
+    n=$((n + 1))
+    d="$BATS_TEST_TMPDIR/ep$n"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell missed: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
+  done
+  for shebang in '#!/usr/bin/env python3' '#!/usr/bin/env -S node --flag' '#!/usr/bin/env -u P sh' '#!/usr/bin/env sh -P'; do
+    d="$BATS_TEST_TMPDIR/epok"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    ! yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell false hit: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" == "$d:"* ]] || { echo "awk false hit: $shebang" >&2; return 1; }
+  done
+}
