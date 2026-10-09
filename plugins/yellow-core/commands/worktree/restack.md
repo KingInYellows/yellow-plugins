@@ -190,7 +190,11 @@ recorded stack branch in any of this stack's worktrees, not only the run
 worktree, and then restores. If one of those rebases is still in progress, it
 keeps the state (exit `31`) and restores nothing; run `--abort` again after
 that rebase can be cleared. A rebase in a worktree outside this stack is left
-alone.
+alone. If the provider's abort succeeded but its "already aborted" marker could
+not be written, the abort still runs to the end; only when an in-chain rebase
+then cannot be cleared does it keep the state (exit `31`), and abort that
+rebase by hand first, because fixing only the marker path leaves `--abort`
+refusing as above.
 
 If the provider has lost its record of the paused restack (Graphite's
 `.gtcontinue` or gh-stack's rebase state) while a stack branch is still
