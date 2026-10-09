@@ -380,6 +380,9 @@ write_state() {
     for ((i = 0; i < ${#E_PATH[@]}; i++)); do
       printf 'entry\t%s\t%s\t%s\n' "${E_PATH[i]}" "${E_REF[i]}" "${E_SHA[i]}"
     done
+    for ((i = 0; i < ${#T_BRANCH[@]}; i++)); do
+      printf 'tip\t%s\t%s\n' "${T_BRANCH[i]}" "${T_SHA[i]}"
+    done
   ) >|"$tmp" || {
     rm -f -- "$tmp"
     return 1
@@ -409,7 +412,7 @@ clear_state() { rm -f -- "$STATE_FILE" "$STATE_FILE".tmp.* "$ABORTED_FILE" "$ABO
 # read_state parses the fixed-field TSV; validate_state decides whether to trust it.
 read_state() {
   S_PROVIDER="" S_COMMON="" S_RUN="" S_SUBMIT="" S_REMOTE=""
-  S_CHAIN=() E_PATH=() E_REF=() E_SHA=()
+  S_CHAIN=() E_PATH=() E_REF=() E_SHA=() T_BRANCH=() T_SHA=()
   STATE_ERR=""
   if [ ! -f "$STATE_FILE" ] || [ -L "$STATE_FILE" ]; then
     STATE_ERR="state file is missing or not a regular file"
@@ -440,6 +443,10 @@ read_state() {
         E_SHA[n]=${f[3]:-}
         n=$((n + 1))
         ;;
+      tip)
+        T_BRANCH+=("${f[1]:-}")
+        T_SHA+=("${f[2]:-}")
+        ;;
       '') ;;
       *)
         STATE_ERR="unknown field in state file"
@@ -448,6 +455,22 @@ read_state() {
     esac
   done <"$STATE_FILE"
   return 0
+}
+
+# moved_tips: print one 'branch<TAB>recorded<TAB>current' line per stack branch
+# whose tip is no longer the one recorded at start (current 'missing' when the
+# ref is gone). Return 0 when at least one moved. A state file written before
+# tips were recorded has none, so nothing is reported.
+moved_tips() {
+  local i cur rc=1
+  for ((i = 0; i < ${#T_BRANCH[@]}; i++)); do
+    cur=$(git rev-parse --verify --quiet "refs/heads/${T_BRANCH[i]}^{commit}" 2>/dev/null) || cur=missing
+    if [ "$cur" != "${T_SHA[i]}" ]; then
+      printf '%s\t%s\t%s\n' "${T_BRANCH[i]}" "${T_SHA[i]}" "$cur"
+      rc=0
+    fi
+  done
+  return "$rc"
 }
 
 # in_chain BRANCH: true when BRANCH is one of the recorded restack set (not the base).
@@ -514,6 +537,18 @@ validate_state() {
     STATE_ERR="github state must have no detached entries"
     return 1
   fi
+  for ((i = 0; i < ${#T_BRANCH[@]}; i++)); do
+    in_chain "${T_BRANCH[i]}" || {
+      STATE_ERR="recorded tip is not for a branch in the chain"
+      return 1
+    }
+    case ${T_SHA[i]} in
+      '' | *[!0-9a-f]*)
+        STATE_ERR="recorded tip is not a commit hash"
+        return 1
+        ;;
+    esac
+  done
   for ((i = 0; i < ${#E_PATH[@]}; i++)); do
     p=${E_PATH[i]}
     case $p in /*) ;; *)
@@ -1300,7 +1335,18 @@ cmd_start() {
     die "$X_BUSY" "could not take the restack lock; a restack is in progress"
   }
   S_PROVIDER=$PROVIDER S_COMMON=$COMMON S_RUN=$RUN_WT S_SUBMIT=$SUBMIT S_REMOTE=$REMOTE
-  E_PATH=() E_REF=() E_SHA=()
+  E_PATH=() E_REF=() E_SHA=() T_BRANCH=() T_SHA=()
+  # Pre-restack tips of the restack set: --abort compares them with the current
+  # tips to tell whether a rollback is still owed after the provider lost track.
+  local tipsha k
+  for ((k = 1; k < ${#S_CHAIN[@]}; k++)); do
+    tipsha=$(git rev-parse --verify --quiet "refs/heads/${S_CHAIN[k]}^{commit}" 2>/dev/null) || {
+      release_lock
+      die "$X_FAILED" "cannot read the tip of $(v "${S_CHAIN[k]}"); nothing was changed"
+    }
+    T_BRANCH+=("${S_CHAIN[k]}")
+    T_SHA+=("$tipsha")
+  done
   if [ "$PROVIDER" = graphite ]; then
     local sha
     for ((i = 0; i < ${#SEL_PATH[@]}; i++)); do
@@ -1560,9 +1606,10 @@ cmd_abort() {
   load_state_or_exit
   need_lock
   report_all_floating
-  local provider_aborted=0 marker_failed=0 left start=${S_CHAIN[1]:-}
-  if [ "$S_PROVIDER" = graphite ] && { [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ]; }; then
-    : # a recorded provider abort leaves nothing for gt to do, so a retry needs no gt
+  local provider_aborted=0 marker_failed=0 left moved start=${S_CHAIN[1]:-}
+  if [ "$S_PROVIDER" = graphite ] && { [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ]; } && ! gt_paused "$S_RUN"; then
+    : # a recorded provider abort leaves nothing for gt to do, so a retry needs no gt.
+    # A marker beside a still-paused Graphite conflict is stale or forged: gt abort runs.
   elif [ "$S_PROVIDER" = graphite ]; then
     command -v gt >/dev/null 2>&1 || die "$X_KEPT" "gt (Graphite CLI) is not installed; state kept"
     if gt_paused "$S_RUN"; then
@@ -1588,6 +1635,20 @@ cmd_abort() {
     # Aborting only this rebase would leave branches that already restacked
     # rebased and report success; keep everything for a manual recovery.
     die "$X_KEPT" "a rebase of a stack branch is in progress in $(v "$left") but the provider has no record of it, so its whole-stack rollback cannot run; state kept, nothing aborted or restored. Abort that rebase by hand, reset any stack branch that already restacked, then run --abort again"
+  elif ! { [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ]; } && moved=$(moved_tips); then
+    # No rebase directory is left, yet stack branches are not where they
+    # started: the user finished the paused rebase with git, or the provider
+    # lost its record. Nothing can roll those branches back from here.
+    local mline mb mold mnew
+    note "stack branches have moved since the restack started and the provider has no paused restack to roll back:"
+    while IFS=$'\t' read -r mb mold mnew; do
+      note "  $(v "$mb"): started at $(v "$mold"), now $(v "$mnew")"
+    done <<<"$moved"
+    die "$X_KEPT" "state kept, nothing aborted or restored. Point each branch above back at its starting commit by hand (git branch -f <branch> <commit>, from a worktree that does not have that branch checked out), then run --abort again. To keep the restacked branches instead, run --continue"
+  elif ! { [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ]; } && [ "${#T_BRANCH[@]}" -eq 0 ]; then
+    # A state file from before tips were recorded: with no provider rollback
+    # and no rebase to abort, nothing shows whether branches were restacked.
+    die "$X_KEPT" "the provider has no paused restack to roll back and this state file has no recorded start tips, so it cannot tell whether stack branches were already restacked; state kept, nothing aborted or restored. Inspect the stack branches and, if needed, point them back by hand (git branch -f <branch> <commit>, from a worktree that does not have that branch checked out). Then run --continue to keep them, or run restore (no provider) to put the worktrees back and clear the state"
   fi
   # The provider abort only clears the rebase it recorded. Abort any other
   # in-chain git rebase (a stack branch, in whichever worktree holds it),

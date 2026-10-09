@@ -257,7 +257,16 @@ resolution, and sequential stack review. Graphite-native workflow.
 absolute path outside it. `commit-resolve-fixes` also refuses a `gt`, `node` or
 `awk` whose canonical file is inside the worktree, including a symlink
 outside the worktree that points at one, and drops empty or relative `PATH`
-entries before that check.
+entries before that check. Every other tool either script runs by bare name
+(`grep`, `sed`, `sort`, `cut`, `tr`, `wc`, `head`, `tail`, `cat`, `mktemp`,
+`rm`, `mv`, `find`, `dirname` and the rest listed in `yr_safe_path`) is not
+refused: both scripts call `yr_adopt_path` before parsing arguments and run on
+`yr_safe_path`'s result, which drops a `PATH` directory inside the worktree and
+a directory in which any of those tools is a symlink (dangling or not) into it,
+so the name resolves to a file outside the worktree or not at all.
+`run-verify-command` still gives the verify command the caller's `PATH`
+(`YR_ORIG_PATH`). Both scripts take their own directory by parameter expansion,
+not `dirname`.
 
 - `guard-local-config snapshot | check <dir> <digest> | clear <dir>` — Snapshot the
   ignored `yellow-plugins.local.md` (printing the path and a `digest=<hex>`

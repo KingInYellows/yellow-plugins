@@ -188,7 +188,14 @@ LOG_CAP_BYTES=1048576
 LOG_CONTEXT_BYTES=65536
 KEEP=10
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd) || exit 2
+# By parameter expansion, not dirname: a PATH lookup could land in the
+# worktree, where a resolver may have planted a dirname.
+case "$0" in
+    */*) _rv_dir=${0%/*}; [ -n "$_rv_dir" ] || _rv_dir=/ ;;
+    *) _rv_dir=. ;;
+esac
+SCRIPT_DIR=$(cd -- "$_rv_dir" && pwd) || exit 2
+unset _rv_dir
 PLUGIN_ROOT=$(cd -- "$SCRIPT_DIR/../../.." && pwd) || exit 2
 
 # The libraries below run before any tree check. In a source checkout they sit
@@ -203,7 +210,7 @@ PLUGIN_ROOT=$(cd -- "$SCRIPT_DIR/../../.." && pwd) || exit 2
 # check_lib_integrity runs before that file is sourced: a function that
 # exists only there cannot resolve the first git. A caller-supplied path is
 # ignored. The result stays in the shell; it is not written to a file.
-unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ YR_GIT_PATH
+unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ YR_GIT_PATH YR_ORIG_PATH
 # yr_helper <name>: a helper the trust check itself must run (readlink). Looked
 # up in fixed system directories, never on PATH: a PATH directory inside the
 # worktree could hold a planted one that runs before any check. Fails closed
@@ -400,6 +407,13 @@ yr_git --version >/dev/null 2>&1 || true
 . "$PLUGIN_ROOT/lib/verify-run.sh" || { printf '[run-verify-command] Error: cannot load lib/verify-run.sh\n' >&2; exit 2; }
 
 die() { printf '[run-verify-command] Error: %s\n' "$2" >&2; exit "$1"; }
+
+# From here PATH is yr_safe_path's result: a bare mktemp, rm, tail, tr, cat and
+# the rest resolve only to a file outside the worktree, however the verify
+# command or the resolvers changed the tree. A directory that is inside it, or
+# holds one of those tools as a symlink into it, is dropped. The verify command
+# itself keeps the caller's PATH (YR_ORIG_PATH; it may need node_modules/.bin).
+yr_adopt_path || die 2 "no PATH directory is left once those that reach into the repository are dropped; the tree is untouched"
 
 # Bound the gh call that lists the PR's files (shadows gh for the sourced
 # rp_pr_files). Without a timeout binary it runs unbounded, as in
@@ -675,6 +689,18 @@ refuse_hidden_flags() {
     [ ! -s "$hits" ] || die 2 "tracked files this mode checks carry a skip-worktree or assume-unchanged flag, so edits to them are invisible to the tree check; clear the flag (git update-index --no-skip-worktree --no-assume-unchanged) and retry: $(safe_path_list_z <"$hits")"
 }
 
+# FILES += <path> unless already present. The tree listing (rp_tree_changes)
+# is `diff --name-only HEAD` followed by `ls-files --others`, so a path staged
+# for deletion and recreated in the worktree appears in both halves; listed
+# twice it would put two identical deletion diffs into the recovery patch.
+add_unique_file() {
+    local p
+    for p in ${FILES[@]+"${FILES[@]}"}; do
+        [ "$p" = "$1" ] && return 0
+    done
+    FILES+=("$1")
+}
+
 if [ "$MODE" != revert-only ]; then
     list_tree_changes || die 2 "cannot list tree changes"
     refuse_hidden_flags
@@ -683,7 +709,7 @@ fi
 if [ "$MODE" = revert-dirty ]; then
     [ "${#FILES[@]}" -eq 0 ] || die 2 "--revert-dirty takes no file list"
     while IFS= read -r -d '' f; do
-        [ -n "$f" ] && FILES+=("$f")
+        [ -n "$f" ] && add_unique_file "$f"
     done <"$CHANGES_FILE"
 elif [ "$MODE" = revert-denied ]; then
     # Git lists the paths. Only trusted-config paths are reverted; the caller
@@ -706,7 +732,7 @@ elif [ "$MODE" = revert-denied ]; then
         esac
     fi
     while IFS= read -r -d '' f; do
-        [ -n "$f" ] && rp_trusted_config "$f" && FILES+=("$f")
+        [ -n "$f" ] && rp_trusted_config "$f" && add_unique_file "$f"
     done <"$CHANGES_FILE"
 else
     # KEEP_FILES is the deduplicated list (first-seen order). A path listed
@@ -738,6 +764,43 @@ else
             continue
         fi
         KEEP_FILES+=("$f")
+    done
+    FILES=(${KEEP_FILES[@]+"${KEEP_FILES[@]}"})
+fi
+
+# An untracked bare repository (HEAD, objects/, refs/ and no .git entry) is not
+# a nested-repository boundary to git: it lists the files inside one by one, so
+# the `find -name .git` check below never sees it and the revert would delete
+# its HEAD, config and hooks. Find the boundary from each untracked listed file's
+# ancestors and treat the directory like a nested repository: --revert-denied
+# leaves it in place and says so, every other mode refuses.
+BARE_KEPT=()
+if [ "${#FILES[@]}" -gt 0 ]; then
+    KEEP_FILES=()
+    for f in "${FILES[@]}"; do
+        BARE=""
+        if ! lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
+            && ! lgit cat-file -e "HEAD:$f" 2>/dev/null; then
+            d="$f"
+            while :; do
+                case "$d" in */*) d="${d%/*}" ;; *) break ;; esac
+                if [ -d "$d" ] && [ ! -L "$d" ] && [ -f "$d/HEAD" ] && [ ! -L "$d/HEAD" ] \
+                    && [ -d "$d/objects" ] && [ -d "$d/refs" ]; then
+                    BARE="$d/"
+                fi
+            done
+        fi
+        if [ -z "$BARE" ]; then
+            KEEP_FILES+=("$f")
+            continue
+        fi
+        [ "$MODE" = revert-denied ] \
+            || die 2 "refusing to remove a directory that contains a nested git repository: $(safe_path_label "$BARE")"
+        SEEN=0
+        for p in ${BARE_KEPT[@]+"${BARE_KEPT[@]}"}; do
+            [ "$p" = "$BARE" ] && { SEEN=1; break; }
+        done
+        [ "$SEEN" = 1 ] || BARE_KEPT+=("$BARE")
     done
     FILES=(${KEEP_FILES[@]+"${KEEP_FILES[@]}"})
 fi
@@ -783,6 +846,10 @@ TOP_REAL=$(pwd -P)
 TO_REMOVE=()
 DIR_REMOVE=()
 NESTED_KEPT=()
+for f in ${BARE_KEPT[@]+"${BARE_KEPT[@]}"}; do
+    add_path_reason "left a nested git repository in place" "$f"
+    NESTED_KEPT+=("$f")
+done
 for f in ${FILES[@]+"${FILES[@]}"}; do
     if [ -L "$f" ] || [ -f "$f" ] || [ ! -e "$f" ]; then
         continue
@@ -807,12 +874,38 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         # remove it.
         NESTED=$(find -- "$f" -name .git -print -quit 2>/dev/null) \
             || die 2 "cannot scan the directory for a nested repository: $(safe_path_label "$f")"
-        if [ -n "$NESTED" ]; then
+        # The scan covers the whole subtree, not only the selected path: a
+        # bare repository (HEAD, objects/, refs/) has no .git entry, and under
+        # --revert-denied a descendant outside the trusted-config set (such as
+        # .claude/agent-memory/) was filtered out of the list on purpose. The
+        # recursive removal would delete either one.
+        if [ -z "$NESTED" ]; then
+            NESTED=$(find -- "$f" -type f -name HEAD \
+                -exec sh -c 'd=${1%/HEAD}; [ -d "$d/objects" ] && [ -d "$d/refs" ]' _ {} \; -print -quit 2>/dev/null) \
+                || die 2 "cannot scan the directory for a nested repository: $(safe_path_label "$f")"
+        fi
+        EXCLUDED=""
+        if [ "$MODE" = revert-denied ] && [ -z "$NESTED" ]; then
+            EXCLUDED=$(find -- "$f" \( -type f -o -type l \) -print0 2>/dev/null \
+                | while IFS= read -r -d '' c; do
+                    rp_trusted_config "$c" || { printf 1; break; }
+                done)
+        fi
+        if [ -n "$NESTED" ] || [ -n "$EXCLUDED" ]; then
             # --revert-denied judges each trusted-config path on its own, so a
             # repository it must not delete does not stop the other reverts.
             [ "$MODE" = revert-denied ] \
                 || die 2 "refusing to remove a directory that contains a nested git repository: $(safe_path_label "$f")"
-            add_path_reason "left a nested git repository in place" "$f"
+            # A bare repository the pre-pass already reported is not repeated.
+            REPORTED=0
+            for p in ${BARE_KEPT[@]+"${BARE_KEPT[@]}"}; do
+                [ "$p" = "$f/" ] && REPORTED=1
+            done
+            if [ -n "$NESTED" ]; then
+                [ "$REPORTED" = 1 ] || add_path_reason "left a nested git repository in place" "$f"
+            else
+                add_path_reason "left a directory holding excluded (non-trusted-config) files in place" "$f"
+            fi
             NESTED_KEPT+=("$f")
             continue
         fi
@@ -923,11 +1016,14 @@ run_verify() {
     ( vr_redact_stream <"$FIFO" | tail -c $((LOG_CAP_BYTES + LOG_CONTEXT_BYTES)) >|"$STREAM_FILE" ) &
     TAIL_PID=$!
     start=$SECONDS
+    # bash and timeout are resolved on the screened PATH, then the command gets
+    # the caller's.
+    B=$(type -P bash) || die 2 "bash not found"
     if T=$(vr_timeout_bin); then
-        ( harden_git_config_for_verify; exec "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" bash -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
+        ( harden_git_config_for_verify; PATH=$YR_ORIG_PATH; exec "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
         CMD_PID=$!
     else
-        ( harden_git_config_for_verify; exec bash -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
+        ( harden_git_config_for_verify; PATH=$YR_ORIG_PATH; exec "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
         CMD_PID=$!
         ( vr_watchdog "$CMD_PID" "$TIMEOUT" "$MARKER" "$KILL_AFTER" ) &
         WD_PID=$!
@@ -993,6 +1089,17 @@ save_patch() {
             || lgit cat-file -e "HEAD:$f" 2>/dev/null; then
             lgit_nohooks diff --no-color --no-ext-diff --no-textconv "$fmt" \
                 --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$out" || return 1
+            # In HEAD but not in the index (staged deletion) and present in the
+            # worktree again: the diff above holds only the deletion. Append
+            # the worktree content as a creation so the patch, applied to the
+            # reverted tree (HEAD's file), recreates the replacement.
+            if ! lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
+                && { [ -L "$f" ] || [ -f "$f" ]; }; then
+                rc=0
+                lgit diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
+                    --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$f" >>"$out" || rc=$?
+                [ "$rc" -le 1 ] || return 1
+            fi
         elif [ -L "$f" ] || [ -f "$f" ]; then
             # -L: a dangling symlink has no -e but is still an edit to keep.
             # Never a FIFO or other special file: git diff would open it.

@@ -210,7 +210,7 @@ _rt_scan() {
             if (c == "/") return 63
             return -1
         }
-        function basiccred(tok,    n, i, a, b, c, d, va, vb, vc, vd, nb, bv, k, x, need, colon) {
+        function basiccred(tok, bare,    n, i, a, b, c, d, va, vb, vc, vd, nb, bv, k, x, need, colon, icolon) {
             n = length(tok)
             if (n < 4 || n % 4 != 0) return 0
             nb = 0
@@ -233,11 +233,11 @@ _rt_scan() {
             # its continuation bytes); `httpOnly` decodes to such bytes.
             # Overlong E0/F0 and surrogate or beyond-U+10FFFF second bytes
             # are not checked: they cost nothing to accept here.
-            colon = 0
+            colon = 0; icolon = 0
             for (k = 1; k <= nb; k++) {
                 x = bv[k]
                 if (x < 32 || x == 127) return 0
-                if (x == 58 && !colon) colon = k
+                if (x == 58) { if (!colon) colon = k; if (k > 1 && k < nb) icolon = 1 }
                 if (x < 128) continue
                 if (x < 194 || x > 244) return 0
                 need = (x < 224) ? 1 : (x < 240) ? 2 : 3
@@ -249,6 +249,12 @@ _rt_scan() {
             }
             # A colon is required. At either edge it still counts (an API key
             # with a blank password), but a lone `:` has no secret side.
+            # A bare `Basic` word (no Authorization header) is also ordinary
+            # prose, and a short letters-only word such as `Only` decodes to
+            # `:yr`. There some colon must sit between two other bytes, so a
+            # word whose decoded text only begins or ends with a colon is
+            # not a credential.
+            if (bare && !icolon) return 0
             return (colon && nb > 1) ? 1 : 0
         }
         # Multi-line quoted value. A credential keyword whose value opens a
@@ -483,6 +489,12 @@ _rt_scan() {
                             sub(lead, "", r2)
                             sub(/^[ \t]+/, "", o)
                             sub(/^[ \t]+/, "", r2)
+                            # Any other standalone non-ASCII token (checkmark,
+                            # arrow, emoji) is decoration too. A non-ASCII
+                            # letter inside a word is not followed by a space,
+                            # so accented prose is untouched.
+                            sub(/^([^\001-\177]+[ \t]+)+/, "", o)
+                            sub(/^([^\001-\177]+[ \t]+)+/, "", r2)
                         }
                         c = substr(o, 1, 1)
                         if (c !~ /["\047A-Z]/ && c ~ /^[\001-\177]/ && split(r2, wparts, /[ \t]+/) >= 3 && wordcred(r2)) flag("unquoted-keyword-value")
@@ -549,7 +561,9 @@ _rt_scan() {
                 if (++nauth > 200) { flag("too-many-matches"); break }
                 r = substr(r, RSTART + RLENGTH)
                 oline = substr(oline, RSTART + RLENGTH)
+                hdr = 0
                 if (match(seg, /^authorization[ \t]*[=:][ \t]*/)) {
+                    hdr = 1
                     seg = substr(seg, RLENGTH + 1)
                     segorig = substr(segorig, RLENGTH + 1)
                 }
@@ -571,6 +585,7 @@ _rt_scan() {
                 # per-byte decoder (mawk concatenation is quadratic).
                 btok = ""
                 blen = 0
+                plen = 0
                 # A run followed by more base64 characters or `=` is not a
                 # token (`YWI6Yw=Z`): leave btok empty.
                 if (scheme == "basic" && match(segorig, /^[A-Za-z0-9+\/]+=*/)) {
@@ -588,7 +603,7 @@ _rt_scan() {
                     blen = length(btok)
                     while (btok != "" && length(btok) % 4) btok = btok "="
                 }
-                if (scheme == "basic" && blen >= 4 && blen < 20 && basiccred(btok)) flag("authorization-header")
+                if (scheme == "basic" && (blen >= 3 || (plen > 0 && blen >= 2)) && blen < 20 && basiccred(btok, !hdr)) flag("authorization-header")
                 else if (length(seg) >= 20) flag("authorization-header")
             }
             # split() keeps this linear on very long (minified) lines.

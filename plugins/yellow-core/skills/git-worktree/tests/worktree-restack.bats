@@ -974,6 +974,20 @@ JSEOF
   assert_all_restored
 }
 
+@test "a provider-aborted marker beside a still-paused Graphite conflict does not skip gt abort" {
+  mk_stack b
+  orig_a=$(git rev-parse a)
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  [ "$(git rev-parse a)" != "$orig_a" ]
+  : >"$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  [[ $output == *"rolls the whole restack back"* ]]
+  assert_all_restored
+  [ "$(git rev-parse a)" = "$orig_a" ]
+}
+
 @test "a symlinked provider-aborted marker is replaced, never followed" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
@@ -1002,6 +1016,7 @@ JSEOF
 
 @test "--abort keeps state when the provider no longer records an in-chain rebase" {
   mk_stack b
+  orig_a=$(git rev-parse a)
   run bash "$SCRIPT" start --provider graphite
   [ "$status" -eq 10 ]
   rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
@@ -1011,15 +1026,71 @@ JSEOF
   [ -e "$SD/state" ]
   rebase_marker "$(wtp a)"
   git -C "$(wtp a)" rebase --abort
+  # Branch a already restacked and nothing rolls it back: still refused.
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"have moved"* ]]
+  [ -e "$SD/state" ]
+  git update-ref refs/heads/a "$orig_a"
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 0 ]
   [[ $output == *"aborted"* ]]
   assert_all_restored
 }
 
+@test "--abort keeps state when the paused rebase was finished by hand and stack branches moved" {
+  mk_stack b c
+  orig_a=$(git rev-parse a)
+  orig_b=$(git rev-parse b)
+  orig_c=$(git rev-parse c)
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  [ "$(git rev-parse a)" != "$orig_a" ]
+  # git rebase --continue drops rebase-merge/ and leaves Graphite's .gtcontinue.
+  resolve_in "$(wtp a)" b.txt
+  GIT_EDITOR=true git -C "$(wtp a)" rebase --continue >/dev/null 2>&1 || true
+  [ -e "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue" ]
+  run rebase_marker "$(wtp a)"
+  [ "$status" -eq 1 ]
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"have moved"* ]]
+  [[ $output != *"aborted"$'\n'* ]]
+  [ -e "$SD/state" ]
+  [ "$(git rev-parse b)" != "$orig_b" ]
+  # Resetting the moved branches by hand lets --abort finish. The run worktree
+  # sits on b, so reset it there to drop the staged resolution too.
+  [ "$(branch_of "$(wtp a)")" = b ]
+  git -C "$(wtp a)" reset -q --hard "$orig_b"
+  git update-ref refs/heads/a "$orig_a"
+  git update-ref refs/heads/c "$orig_c"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "--abort keeps a tipless legacy state when no provider rollback or rebase exists" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
+  git -C "$(wtp a)" rebase --abort
+  sed -i '/^tip\t/d' "$SD/state"
+  ! grep -q '^tip' "$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"no recorded start tips"* ]]
+  [ -e "$SD/state" ]
+  git -C "$(wtp a)" checkout -q a
+  run bash "$SCRIPT" restore
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
 @test "--abort keeps state when gh-stack no longer records a rebase in a non-run worktree" {
   command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
   mk_stack b
+  orig_a=$(git rev-parse a)
   STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
   [ "$status" -eq 10 ]
   rebase_marker "$(wtp b)"
@@ -1032,6 +1103,11 @@ JSEOF
   [ -e "$SD/state" ]
   rebase_marker "$(wtp b)"
   git -C "$(wtp b)" rebase --abort
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" abort --provider github
+  [ "$status" -eq 31 ]
+  [[ $output == *"have moved"* ]]
+  [ "$(git rev-parse a)" != "$orig_a" ]
+  git -C "$(wtp a)" reset -q --hard "$orig_a"
   STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" abort --provider github
   [ "$status" -eq 0 ]
   [[ $output == *"aborted"* ]]

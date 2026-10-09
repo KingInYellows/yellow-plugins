@@ -419,9 +419,12 @@ prompt; an interactive run asks before filing an issue. The controls
   config that `guard-local-config` protects. `/review:sweep` snapshots it
   before `/review:pr` and classifies the PR head's root `.gitignore` through a
   temporary work tree (`check-ignore -q --no-index`); it aborts when the file
-  is tracked here but ignored on the head, and fails closed (exit 2) when the
-  head's rules cannot be read, including a `.gitignore` that is not a regular
-  file. Step 2b re-checks after checkout.
+  is tracked here but ignored on the head, and also when an untracked,
+  unignored `yellow-plugins.local.md` exists here (as a file or symlink,
+  including a dangling link) but the head ignores it, so those existing bytes
+  never become trusted unattended config (exit 1, before the checkout). It
+  fails closed (exit 2) when the head's rules cannot be read, including a
+  `.gitignore` that is not a regular file. Step 2b re-checks after checkout.
 
 ### Unattended Review Learning Staging (yellow-review / yellow-core)
 

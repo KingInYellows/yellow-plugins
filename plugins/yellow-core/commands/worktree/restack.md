@@ -204,6 +204,12 @@ rebased. It keeps the state (exit `31`) and aborts and restores nothing. Abort
 that rebase by hand, reset any stack branch that already restacked, then run
 `--abort` again.
 
+`--abort` also refuses, with exit `31`, when no rebase is left but a stack
+branch is no longer at the commit recorded at start (a paused rebase finished
+with `git rebase --continue`). It lists each moved branch and its starting
+commit and restores nothing. Point those branches back by hand and run
+`--abort` again, or run `--continue` to keep them.
+
 ## Recovery
 
 Restore only. When the exit table points here, run the script's `restore`
