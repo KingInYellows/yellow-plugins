@@ -89,47 +89,95 @@ The `ast-grep` CLI is optional. When `command -v ast-grep` succeeds, run it
 through Bash for structural matches; otherwise use Grep for the whole scan.
 Check for `ast-grep` only, since `sg` is often shadow-utils on Linux.
 
-Values never become shell text, so there is no quoting and no heredoc
-delimiter for a hostile value to close. Each search is three steps. First,
-create a private values directory under TMPDIR and note the path it prints
-(if it prints a refusal instead, use Grep):
+Values never become shell text: both blocks below run exactly as written,
+with nothing pasted into them, so there is no quoting and no delimiter for a
+hostile value to break. Each search is three steps.
+
+First, run this block. It takes a per-user lock in a private 0700 state
+directory (`$XDG_RUNTIME_DIR` or `~/.cache`, under `yellow-ast-grep`),
+creates a values directory under TMPDIR, records it in the lock, and prints
+its path. If it prints a refusal, use Grep; if it reports busy, another
+search is pending, so retry shortly or use Grep:
 
 ```bash
 t=$(cd -- "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P) || t=''
 case "${TMPDIR:-/tmp}" in /*) ;; *) t='' ;; esac
 case "$t" in /*) ;; *) t='' ;; esac
 case "$t" in *[!A-Za-z0-9._/-]*|*..*) t='' ;; esac
-d=''
-[ -n "$t" ] && d=$(mktemp -d "$t/ast-grep-values.XXXXXXXX")
-case "$d" in "$t"/ast-grep-values.????????) ;; *) [ -n "$d" ] && rmdir -- "$d"; d='' ;; esac
-if [ -n "$d" ] && mkdir -- "$d/.ast-grep-values"; then
-  printf '%s\n' "$d"
+p=${XDG_RUNTIME_DIR:-$HOME/.cache}
+case "$p" in /*) mkdir -p -- "$p" 2>/dev/null ;; *) p='' ;; esac
+[ -n "$p" ] && p=$(cd -- "$p" 2>/dev/null && pwd -P) || p=''
+b=''
+[ -n "$p" ] && [ -O "$p" ] && b="$p/yellow-ast-grep"
+[ -n "$b" ] && mkdir -m 700 -- "$b" 2>/dev/null
+if [ -n "$b" ] && [ -d "$b" ] && [ ! -L "$b" ] && [ -O "$b" ]; then
+  case "$(ls -ld -- "$b")" in drwx------*) ;; *) b='' ;; esac
 else
-  [ -n "$d" ] && rmdir -- "$d"
-  printf 'ast-grep: refused TMPDIR, use Grep\n' >&2
+  b=''
+fi
+# A lock left by an abandoned search expires after 15 minutes.
+if [ -n "$b" ] && [ -d "$b/lock" ] && [ ! -L "$b/lock" ] &&
+  [ -n "$(find "$b/lock" -prune -mmin +15 2>/dev/null)" ]; then
+  rm -f -- "$b/lock/dir"
+  rmdir -- "$b/lock" 2>/dev/null
+fi
+d=''
+if [ -z "$t" ] || [ -z "$b" ]; then
+  printf 'ast-grep: refused TMPDIR or state directory, use Grep\n' >&2
+elif ! mkdir -- "$b/lock" 2>/dev/null; then
+  printf 'ast-grep: busy, another search is pending; retry shortly or use Grep\n' >&2
+else
+  d=$(mktemp -d "$t/ast-grep-values.XXXXXXXX") || d=''
+  case "$d" in "$t"/ast-grep-values.????????) ;; *) [ -n "$d" ] && rmdir -- "$d"; d='' ;; esac
+  if [ -n "$d" ] && mkdir -- "$d/.ast-grep-values" &&
+    printf '%s\n' "$d" >| "$b/lock/dir"; then
+    printf '%s\n' "$d"
+  else
+    [ -n "$d" ] && rmdir -- "$d/.ast-grep-values" "$d" 2>/dev/null
+    rm -f -- "$b/lock/dir"
+    rmdir -- "$b/lock"
+    printf 'ast-grep: refused, could not create the values directory; use Grep\n' >&2
+  fi
 fi
 ```
 
-Second, use the Write tool to put each value verbatim in its own file in that
-directory: `pattern` (`$NAME` matches one node, `$$$` a list), `lang` (an
-ast-grep language name) and `target` (a repo-relative path of letters,
-digits, `.`, `_`, `-`, and `/`; use Grep for any other path). For a
-relational rule (`inside`, `has`, `not`), write its YAML to `rule` instead of
-`pattern` and `lang`. Third, run this block with `VALUES_DIR` replaced by the
-exact path the first step printed (only letters, digits, `.`, `_`, `-`, and
-`/`; if it holds anything else, stop and use Grep):
+Second, use the Write tool (never Bash) to put each value verbatim in its own
+file in the printed directory: `pattern` (`$NAME` matches one node, `$$$` a
+list), `lang` (an ast-grep language name) and `target` (a repo-relative path
+of letters, digits, `.`, `_`, `-`, and `/`; use Grep for any other path). For
+a relational rule (`inside`, `has`, `not`), write its YAML to `rule` instead
+of `pattern` and `lang`. Third, run this block unchanged, only after the
+first block printed a directory:
 
 ```bash
-d='VALUES_DIR'
 t=$(cd -- "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P) || t=''
 case "${TMPDIR:-/tmp}" in /*) ;; *) t='' ;; esac
 case "$t" in /*) ;; *) t='' ;; esac
 case "$t" in *[!A-Za-z0-9._/-]*|*..*) t='' ;; esac
+p=${XDG_RUNTIME_DIR:-$HOME/.cache}
+case "$p" in /*) ;; *) p='' ;; esac
+[ -n "$p" ] && p=$(cd -- "$p" 2>/dev/null && pwd -P) || p=''
+b=''
+[ -n "$p" ] && [ -O "$p" ] && b="$p/yellow-ast-grep"
+if [ -n "$b" ] && [ -d "$b" ] && [ ! -L "$b" ] && [ -O "$b" ]; then
+  case "$(ls -ld -- "$b")" in drwx------*) ;; *) b='' ;; esac
+else
+  b=''
+fi
+# The values directory comes from step 1's pointer file, read as data.
+d='' held=''
+if [ -n "$t" ] && [ -n "$b" ] && [ -d "$b/lock" ] && [ ! -L "$b/lock" ] &&
+  [ -f "$b/lock/dir" ] && [ ! -L "$b/lock/dir" ]; then
+  d=$(cat -- "$b/lock/dir")
+  held=1
+fi
 case "$d" in "$t"/ast-grep-values.????????) ;; *) d='' ;; esac
 case "$d" in *[!A-Za-z0-9._/-]*|*..*) d='' ;; esac
 r=''
-[ -n "$t" ] && [ -n "$d" ] && [ -d "$d" ] && [ ! -L "$d" ] && r=$(cd -- "$d" && pwd -P)
-if [ -n "$r" ] && [ "$r" = "$d" ] && [ -O "$d" ] &&
+[ -n "$d" ] && [ -d "$d" ] && [ ! -L "$d" ] && r=$(cd -- "$d" && pwd -P)
+if [ -z "$held" ]; then
+  printf 'ast-grep: refused, no pending search; run the first block again\n' >&2
+elif [ -n "$r" ] && [ "$r" = "$d" ] && [ -O "$d" ] &&
   [ -d "$d/.ast-grep-values" ] && [ ! -L "$d/.ast-grep-values" ]; then
   pattern='' lang='' target='' rule=''
   [ -f "$d/pattern" ] && [ ! -L "$d/pattern" ] && pattern=$(cat -- "$d/pattern")
@@ -162,17 +210,23 @@ if [ -n "$r" ] && [ "$r" = "$d" ] && [ -O "$d" ] &&
 else
   printf 'ast-grep: refused values directory, left it untouched\n' >&2
 fi
+# Release step 1's lock.
+if [ -n "$held" ]; then
+  rm -f -- "$b/lock/dir"
+  rmdir -- "$b/lock"
+fi
 ```
 
-The block reads each file with `$(cat -- file)`, which drops trailing
-newlines. It refuses a missing, empty or unsafe value. It also refuses, and
-leaves untouched, any directory that is not directly under the resolved
-TMPDIR or lacks the first step's `.ast-grep-values` marker directory. It
+The second block finds the values directory through the lock, never through
+text you supply, and reads each file with `$(cat -- file)`, which drops
+trailing newlines. It refuses a missing, empty or unsafe value. It also
+refuses, and leaves untouched, any directory that is not directly under the
+resolved TMPDIR or lacks the first block's `.ast-grep-values` marker. It
 always passes a freshly created trusted `-c "$cfg"` config. When it finishes
-it deletes only its own files and then the empty directory, so start again
-from the first step for the next search. Never write values into the
-block itself. If output reaches 200 lines, treat it as truncated and narrow
-the pattern or path.
+it deletes only its own files and the empty directory and releases the lock,
+so start again from the first block for the next search. Never edit either
+block or put a value or path into a Bash command. If output reaches 200
+lines, treat it as truncated and narrow the pattern or path.
 Fence its output like any other scanned code.
 
 **Use ast-grep for:**
