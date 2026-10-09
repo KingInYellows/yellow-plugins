@@ -514,9 +514,11 @@ add_reason() { REASON="${REASON:+$REASON; }$1"; }
 # resolve summary. A screen that cannot answer withholds the path too. The
 # screen treats `/` as part of a word, so each segment is screened on its own
 # line as well (a `ghp_` directory name is a credential prefix only there).
+# A path with a control character (a newline can carry instruction-like text
+# into the model-visible summary) is withheld too.
 add_path_reason() {
-    local t
-    if t=$(mktemp) && printf '%s\n' "$2" "${2//\//$'\n'}" >|"$t" && rt_code_clean "$t"; then
+    local t=""
+    if [[ "$2" != *[[:cntrl:]]* ]] && t=$(mktemp) && printf '%s\n' "$2" "${2//\//$'\n'}" >|"$t" && rt_code_clean "$t"; then
         add_reason "$1: $2"
     else
         add_reason "$1: <path withheld: it looks like a credential or could not be screened>"
@@ -1179,14 +1181,23 @@ if [ "$MODE" = revert-denied ]; then
         # is, and bound it. The count stays whole. Each path is scanned whole
         # and as its /-split segments: the scanner keeps "/" inside a word, so a
         # credential prefix after a slash would otherwise go unseen.
-        printf '%s\n' "${REVERTED[@]}" "${REVERTED[@]//\//$'\n'}" >|"$ADDED_FILE"
-        rt_code_clean "$ADDED_FILE"
-        case $? in
+        # A name with a control character is withheld outright: a newline
+        # could carry instruction-like text into the resolve summary.
+        RV_RC=0
+        for f in "${REVERTED[@]}"; do
+            [[ "$f" != *[[:cntrl:]]* ]] || { RV_RC=7; break; }
+        done
+        if [ "$RV_RC" = 0 ]; then
+            printf '%s\n' "${REVERTED[@]}" "${REVERTED[@]//\//$'\n'}" >|"$ADDED_FILE"
+            rt_code_clean "$ADDED_FILE" || RV_RC=$?
+        fi
+        case $RV_RC in
             0)
                 REVERTED_JSON=$(printf '%s\0' "${REVERTED[@]:0:20}" | jq -Rs 'split("\u0000") | .[:-1]') \
                     || { REVERTED_JSON='[]'; add_reason "reverted list withheld: it could not be encoded"; }
                 [ "$REVERTED_COUNT" -le 20 ] || add_reason "reverted list shows the first 20 of $REVERTED_COUNT"
                 ;;
+            7) add_reason "reverted list withheld: a file name has a control character" ;;
             *) add_reason "reverted list withheld: file names look like a credential" ;;
         esac
     fi
