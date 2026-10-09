@@ -188,7 +188,14 @@ LOG_CAP_BYTES=1048576
 LOG_CONTEXT_BYTES=65536
 KEEP=10
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd) || exit 2
+# By parameter expansion, not dirname: a PATH lookup could land in the
+# worktree, where a resolver may have planted a dirname.
+case "$0" in
+    */*) _rv_dir=${0%/*}; [ -n "$_rv_dir" ] || _rv_dir=/ ;;
+    *) _rv_dir=. ;;
+esac
+SCRIPT_DIR=$(cd -- "$_rv_dir" && pwd) || exit 2
+unset _rv_dir
 PLUGIN_ROOT=$(cd -- "$SCRIPT_DIR/../../.." && pwd) || exit 2
 
 # The libraries below run before any tree check. In a source checkout they sit
@@ -203,7 +210,7 @@ PLUGIN_ROOT=$(cd -- "$SCRIPT_DIR/../../.." && pwd) || exit 2
 # check_lib_integrity runs before that file is sourced: a function that
 # exists only there cannot resolve the first git. A caller-supplied path is
 # ignored. The result stays in the shell; it is not written to a file.
-unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ YR_GIT_PATH
+unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ YR_GIT_PATH YR_ORIG_PATH
 # yr_helper <name>: a helper the trust check itself must run (readlink). Looked
 # up in fixed system directories, never on PATH: a PATH directory inside the
 # worktree could hold a planted one that runs before any check. Fails closed
@@ -400,6 +407,13 @@ yr_git --version >/dev/null 2>&1 || true
 . "$PLUGIN_ROOT/lib/verify-run.sh" || { printf '[run-verify-command] Error: cannot load lib/verify-run.sh\n' >&2; exit 2; }
 
 die() { printf '[run-verify-command] Error: %s\n' "$2" >&2; exit "$1"; }
+
+# From here PATH is yr_safe_path's result: a bare mktemp, rm, tail, tr, cat and
+# the rest resolve only to a file outside the worktree, however the verify
+# command or the resolvers changed the tree. A directory that is inside it, or
+# holds one of those tools as a symlink into it, is dropped. The verify command
+# itself keeps the caller's PATH (YR_ORIG_PATH; it may need node_modules/.bin).
+yr_adopt_path || die 2 "no PATH directory is left once those that reach into the repository are dropped; the tree is untouched"
 
 # Bound the gh call that lists the PR's files (shadows gh for the sourced
 # rp_pr_files). Without a timeout binary it runs unbounded, as in
@@ -1002,11 +1016,14 @@ run_verify() {
     ( vr_redact_stream <"$FIFO" | tail -c $((LOG_CAP_BYTES + LOG_CONTEXT_BYTES)) >|"$STREAM_FILE" ) &
     TAIL_PID=$!
     start=$SECONDS
+    # bash and timeout are resolved on the screened PATH, then the command gets
+    # the caller's.
+    B=$(type -P bash) || die 2 "bash not found"
     if T=$(vr_timeout_bin); then
-        ( harden_git_config_for_verify; exec "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" bash -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
+        ( harden_git_config_for_verify; PATH=$YR_ORIG_PATH; exec "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
         CMD_PID=$!
     else
-        ( harden_git_config_for_verify; exec bash -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
+        ( harden_git_config_for_verify; PATH=$YR_ORIG_PATH; exec "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
         CMD_PID=$!
         ( vr_watchdog "$CMD_PID" "$TIMEOUT" "$MARKER" "$KILL_AFTER" ) &
         WD_PID=$!

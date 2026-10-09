@@ -56,6 +56,19 @@ run_crf() {
     run --separate-stderr "$SCRIPT" "$@"
 }
 
+# run_crf with PATH set for the script only (the first argument), so a planted
+# tool on it cannot run in the test harness itself.
+run_crf_path() {
+  local p="$1"
+  shift
+  GIT_CONFIG_COUNT=2 \
+    GIT_CONFIG_KEY_0="url.https://github.com/acme/widgets.git.pushInsteadOf" \
+    GIT_CONFIG_VALUE_0="$BATS_TEST_TMPDIR/origin.git" \
+    GIT_CONFIG_KEY_1="url.https://github.com/acme/widgets.git.pushInsteadOf" \
+    GIT_CONFIG_VALUE_1="$BATS_TEST_TMPDIR/other.git" \
+    run --separate-stderr env "PATH=$(ls_remote_shim_dir):$p" "$SCRIPT" "$@"
+}
+
 # --- Usage ---
 
 @test "rejects a missing provider with exit 2" {
@@ -2481,6 +2494,52 @@ crf_refuses_untouched() {
     [[ "$stderr" == *"inside the repository"* ]]
     [[ "$stderr" == *"nothing committed"* ]]
   done
+}
+
+@test "a grep symlinked into the worktree from an outside PATH directory never runs, so the PR-file gate still refuses" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/grep-canary"
+  rm -f "$marker"
+  mkdir -p "$REPO/tools"
+  # A planted grep that reports a match for everything.
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$REPO/tools/grep"
+  chmod +x "$REPO/tools/grep"
+  link="$BATS_TEST_TMPDIR/linkbin"
+  mkdir -p "$link"
+  ln -s "$REPO/tools/grep" "$link/grep"
+  link_dir=$(cd "$link" && pwd -P)
+  repo_dir=$(pwd -P)
+  case "$link_dir" in
+    "$repo_dir"|"$repo_dir"/*) echo "symlink directory is inside the worktree"; return 1 ;;
+  esac
+  for provider in graphite github; do
+    printf 'edited\n' >| src/c.txt
+    run_crf_path "$link:$old_path" --provider "$provider" --pr 7 --message "$MSG" -- src/c.txt
+    [ ! -e "$marker" ] || { echo "the planted grep ran ($provider)" >&2; return 1; }
+    [ "$status" -eq 3 ]
+    [[ "$stderr" == *"not one of PR #7's changed files: src/c.txt"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+    git checkout -q -- src/c.txt
+  done
+}
+
+@test "a utility symlinked into the worktree from an outside PATH directory never runs, and the run still commits" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/util-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 99\n' "$marker" >| "$REPO/tools/canary"
+  chmod +x "$REPO/tools/canary"
+  link="$BATS_TEST_TMPDIR/linkbin"
+  mkdir -p "$link"
+  # Not dirname: the fixture's git shim runs it before the script's PATH exists.
+  for tool in grep sed tr cut sort wc head tail cat mktemp rm mv find basename date; do
+    ln -s "$REPO/tools/canary" "$link/$tool"
+  done
+  printf 'one\nfeature\nfix-links\n' >| src/a.txt
+  run_crf_path "$link:$old_path" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ] || { echo "refused: $stderr" >&2; return 1; }
+  [ ! -e "$marker" ]
 }
 
 @test "an inherited YR_GIT_PATH naming a worktree directory is ignored, so a planted awk never runs" {

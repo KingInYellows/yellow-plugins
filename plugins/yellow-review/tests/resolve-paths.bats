@@ -1240,6 +1240,46 @@ commit_repo() {
   git rev-parse --git-dir >/dev/null
 }
 
+@test "yr_safe_path drops an outside directory whose grep, sed or mktemp is a symlink into the worktree" {
+  mkdir -p tools "$BATS_TEST_TMPDIR/goodbin" "$BATS_TEST_TMPDIR/badbin"
+  printf '#!/bin/sh\nexit 0\n' >| tools/canary
+  chmod +x tools/canary
+  for tool in grep sed mktemp; do
+    # Dangling, so a target created later counts too.
+    ln -s "$PWD/tools/not-yet-$tool" "$BATS_TEST_TMPDIR/badbin/$tool"
+    out=$(PATH="$BATS_TEST_TMPDIR/badbin:$BATS_TEST_TMPDIR/goodbin:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *badbin* ]] || { echo "kept: $tool: $out" >&2; return 1; }
+    [[ "$out" == *goodbin* ]]
+    rm -f "$BATS_TEST_TMPDIR/badbin/$tool"
+  done
+}
+
+@test "yr_safe_path keeps an outside directory whose tools are symlinks to files outside the worktree" {
+  mkdir -p "$BATS_TEST_TMPDIR/okbin"
+  ln -s "$(command -v grep)" "$BATS_TEST_TMPDIR/okbin/grep"
+  out=$(PATH="$BATS_TEST_TMPDIR/okbin:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" == "$BATS_TEST_TMPDIR/okbin:"* ]]
+}
+
+@test "yr_adopt_path runs bare names on the screened PATH and keeps the caller's PATH in YR_ORIG_PATH" {
+  mkdir -p tools "$BATS_TEST_TMPDIR/badbin"
+  printf '#!/bin/sh\ntouch "%s/grep-ran"\nexit 0\n' "$BATS_TEST_TMPDIR" >| tools/canary
+  chmod +x tools/canary
+  ln -s "$PWD/tools/canary" "$BATS_TEST_TMPDIR/badbin/grep"
+  orig="$BATS_TEST_TMPDIR/badbin:$PATH"
+  PATH="$orig"
+  yr_adopt_path
+  [ "$YR_ORIG_PATH" = "$orig" ]
+  [[ "$PATH" != *badbin* ]]
+  printf 'x\n' | grep -q y && return 1
+  [ ! -e "$BATS_TEST_TMPDIR/grep-ran" ]
+  # yr_resolve_tool still judges the caller's PATH, so a tool that reaches into
+  # the worktree is refused rather than skipped.
+  ln -s "$PWD/tools/canary" "$BATS_TEST_TMPDIR/badbin/zzcanary"
+  rc=0; yr_resolve_tool zzcanary >/dev/null || rc=$?
+  [ "$rc" -eq 2 ]
+}
+
 @test "harden_git_config fails closed when awk fails while reading the transport config" {
   git config --local core.sshCommand x
   mkdir -p "$BATS_TEST_TMPDIR/badawk"

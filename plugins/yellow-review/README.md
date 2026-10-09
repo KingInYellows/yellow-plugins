@@ -175,7 +175,9 @@ fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
 absolute path outside it. `commit-resolve-fixes` also refuses a `gt` or
 `node` whose canonical file is inside the worktree, including a symlink
 outside the worktree that points at one, and drops empty or relative `PATH`
-entries before that check.
+entries before that check. Every other tool they run by bare name (`grep`,
+`sed`, `mktemp`, `rm` and so on) runs from a `PATH` that drops directories inside
+the worktree and directories holding such a tool as a symlink into it.
 
 Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-gh.sh`,
 `resolve-paths.sh`, `gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.

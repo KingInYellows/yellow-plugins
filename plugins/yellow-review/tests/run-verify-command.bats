@@ -148,6 +148,63 @@ has_kill_after() {
   [ ! -e "$BATS_TEST_TMPDIR/helper-ran" ]
 }
 
+@test "a utility symlinked into the worktree from an outside PATH directory never runs, and the verify command keeps the caller's PATH" {
+  mkdir -p ignored node_modules/.bin "$BATS_TEST_TMPDIR/outbin"
+  printf 'ignored/\nnode_modules/\n' >> .git/info/exclude
+  printf '#!/bin/sh\ntouch "%s/util-ran"\nexit 1\n' "$BATS_TEST_TMPDIR" >| ignored/helper
+  chmod +x ignored/helper
+  touch -t 201901010000 ignored/helper
+  for tool in grep sed tr cut sort wc head tail cat mktemp rm mv find basename date mkdir chmod touch; do
+    ln -s "$REPO/ignored/helper" "$BATS_TEST_TMPDIR/outbin/$tool"
+  done
+  seen="$BATS_TEST_TMPDIR/seen-path"
+  caller="$BATS_TEST_TMPDIR/outbin:$REPO/node_modules/.bin:$PATH"
+  printf '%s\n' 'printf "%s" "$PATH" >| "$BATS_TEST_TMPDIR/seen-path"' >| "$CMD"
+  run --separate-stderr env "PATH=$caller" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/util-ran" ]
+  [ "$status" -eq 0 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [ "$(cat "$seen")" = "$caller" ]
+}
+
+@test "a tr symlinked into the worktree never runs in the revert modes (rp_lower runs tr by name)" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/outbin"
+  printf '#!/bin/sh\ntouch "%s/tr-ran"\ncat\n' "$BATS_TEST_TMPDIR" >| ignored/helper
+  chmod +x ignored/helper
+  ln -s "$REPO/ignored/helper" "$BATS_TEST_TMPDIR/outbin/tr"
+  for mode in --revert-only --revert-dirty; do
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/outbin:$PATH" "$SCRIPT" --pr 7 $mode -- src/a.txt src/new.txt
+    [ ! -e "$BATS_TEST_TMPDIR/tr-ran" ] || { echo "tr ran: $mode" >&2; return 1; }
+    printf 'one\nfeature\nresolver edit\n' >| src/a.txt
+    printf 'new\n' >| src/new.txt
+  done
+}
+
+@test "a tr or find symlinked into the worktree never runs under --revert-denied, and agent memory survives" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/outbin"
+  # tr records itself and passes stdin through; find records itself, prints
+  # nothing and exits 0, which would blind the replacement-directory scan.
+  printf '#!/bin/sh\ntouch "%s/tr-ran"\ncat\n' "$BATS_TEST_TMPDIR" >| ignored/tr-helper
+  printf '#!/bin/sh\ntouch "%s/find-ran"\nexit 0\n' "$BATS_TEST_TMPDIR" >| ignored/find-helper
+  chmod +x ignored/tr-helper ignored/find-helper
+  ln -s "$REPO/ignored/tr-helper" "$BATS_TEST_TMPDIR/outbin/tr"
+  ln -s "$REPO/ignored/find-helper" "$BATS_TEST_TMPDIR/outbin/find"
+  printf 'tracked\n' >| .claude
+  git add .claude
+  git commit -q -m "add .claude file"
+  rm -f .claude
+  mkdir -p .claude/agent-memory/worker
+  printf 'remember this\n' >| .claude/agent-memory/worker/notes.md
+  printf '{}\n' >| .claude/settings.json
+  printf 'denied-content\n' >| CLAUDE.md
+  run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/outbin:$PATH" "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ ! -e "$BATS_TEST_TMPDIR/tr-ran" ] || { echo "tr ran under --revert-denied" >&2; return 1; }
+  [ ! -e "$BATS_TEST_TMPDIR/find-ran" ] || { echo "find ran under --revert-denied" >&2; return 1; }
+  [ "$(cat .claude/agent-memory/worker/notes.md)" = 'remember this' ]
+  [ "$status" -eq 0 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [ ! -e CLAUDE.md ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
 @test "an inherited YR_GIT_PATH naming a worktree directory is ignored, so a planted awk or git-lfs never runs" {
   mkdir -p fakebin
   printf '#!/bin/sh\ntouch "%s/inherited-ran"\nexit 1\n' "$BATS_TEST_TMPDIR" >| fakebin/awk
