@@ -126,6 +126,37 @@ describe('vendor fields that render bare are allowlisted', () => {
     }
   );
 
+  it.each([
+    ['agentMessaged', undefined],
+    ['agentMessaged', 42],
+    ['agentMessaged', { text: 'q' }],
+    ['userMessaged', undefined],
+  ])(
+    '%s with a non-string body (%j) is malformed, never ""',
+    (type, message) => {
+      expect(() =>
+        mapActivity({
+          id: 'm1',
+          type,
+          createTime: '2026-09-10T00:00:01Z',
+          message,
+          artifacts: [],
+        } as unknown as Parameters<typeof mapActivity>[0])
+      ).toThrow(/no string body/);
+    }
+  );
+
+  it('keeps an empty string body as a string', () => {
+    const rec = mapActivity({
+      id: 'm1',
+      type: 'agentMessaged',
+      createTime: '2026-09-10T00:00:01Z',
+      message: '',
+      artifacts: [],
+    } as unknown as Parameters<typeof mapActivity>[0]);
+    expect(rec.message).toBe('');
+  });
+
   it('keeps the vendor index of a well-formed plan step', () => {
     const rec = mapActivity({
       id: 'a1',

@@ -475,6 +475,7 @@ async function superviseOnce(deps, args) {
         // shown in full: no binding and no reply action are offered for it, so the
         // operator answers.
         const bindable = latest?.message !== undefined &&
+            latest.message.trim() !== '' &&
             !(0, redact_js_1.fenceAltersText)(latest.message) &&
             latest.message.length <= BOUND_QUESTION_MAX_CHARS;
         return finish('needs-answer', {

@@ -710,6 +710,7 @@ export async function superviseOnce(
     // operator answers.
     const bindable =
       latest?.message !== undefined &&
+      latest.message.trim() !== '' &&
       !fenceAltersText(latest.message) &&
       latest.message.length <= BOUND_QUESTION_MAX_CHARS;
     return finish(

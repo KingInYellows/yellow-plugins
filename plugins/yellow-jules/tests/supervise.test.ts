@@ -263,6 +263,20 @@ describe('needs-answer', () => {
     expect(r.observedQuestionDigest).toBeDefined();
   });
 
+  it('offers no reply for an empty question body', async () => {
+    setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
+    addActivity(h, session.sessionResource, {
+      type: 'agentMessaged',
+      message: '',
+    });
+    const r = await sup();
+    expect(r.decision).toBe('needs-answer');
+    expect(r.observedActivityId).toBeUndefined();
+    expect(r.observedQuestionDigest).toBeUndefined();
+    expect(r.attention).toContain('questionUnavailable');
+    expect(r.allowedActions).toEqual([]);
+  });
+
   it('withholds the question bindings above 20000 characters', async () => {
     setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
     addActivity(h, session.sessionResource, {

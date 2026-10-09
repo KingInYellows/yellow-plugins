@@ -421,7 +421,15 @@ export function mapActivity(activity: Sdk.Activity): AdapterActivity {
     };
   }
   if (activity.type === 'userMessaged' || activity.type === 'agentMessaged') {
-    return { ...base, message: str(activity.message) };
+    // A body that is not a string must not become '' (a bindable empty
+    // message): the activity is malformed and the walk stops on it.
+    if (typeof activity.message !== 'string') {
+      throwAppError(
+        'JULES_MALFORMED_RESPONSE',
+        `message ${activityId} has no string body`
+      );
+    }
+    return { ...base, message: activity.message };
   }
   return base;
 }
