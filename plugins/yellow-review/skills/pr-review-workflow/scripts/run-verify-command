@@ -120,9 +120,9 @@
 #   Reasons seen only with --revert-denied: "no deny-listed changes to
 #   revert", "deny-listed changes remain after the revert", "reverted list
 #   withheld: ...", "reverted list shows the first 20 of N" and "left a
-#   nested git repository in place: <path>" and "left a trusted-config
-#   symlink whose target may have been edited (or sits outside the worktree)
-#   in place: <path>" (deniedClean false; a tracked trusted-config symlink's
+#   nested git repository in place: <path>" and "found a trusted-config
+#   symlink whose target may have been edited (or sits outside the worktree):
+#   <path>" (deniedClean false; a redirected link is judged by its HEAD target; a tracked trusted-config symlink's
 #   target is judged against the --ignored-since marker, or counts when it
 #   resolves outside the worktree under --no-ignored-guard; a verify run
 #   refuses on one). The usual
@@ -717,17 +717,19 @@ add_unique_file() {
 # tree listing already covers it. Without a marker (--revert-denied
 # --no-ignored-guard) nothing can be compared, so a link that resolves outside
 # the worktree or cannot be resolved counts. A link that git lists as changed is
-# skipped (the revert restores it). Nothing is written, outside the worktree
-# included.
+# judged by its HEAD target, which the revert restores (an edited original
+# target must not be laundered by redirecting the link). Nothing is written,
+# outside the worktree included (a scratch link lives in a mktemp directory).
 LINK_HITS=()
 check_trusted_links() {
-    local ls out safe top f c changed
+    local ls out safe top f c changed tdir
     LINK_HITS=()
     ls=$(mktemp) || die 2 "mktemp failed"
     out=$(mktemp) || { rm -f -- "$ls"; die 2 "mktemp failed"; }
+    tdir=$(mktemp -d) || { rm -f -- "$ls" "$out"; die 2 "mktemp failed"; }
     yr_git ls-files -s -z >|"$ls" 2>/dev/null \
-        || { rm -f -- "$ls" "$out"; die 2 "cannot list tracked symlinks to check trusted-config targets"; }
-    safe=$(yr_walk_path) || { rm -f -- "$ls" "$out"; die 2 "cannot build a safe PATH to check trusted-config symlinks"; }
+        || { rm -rf -- "$ls" "$out" "$tdir"; die 2 "cannot list tracked symlinks to check trusted-config targets"; }
+    safe=$(yr_walk_path) || { rm -rf -- "$ls" "$out" "$tdir"; die 2 "cannot build a safe PATH to check trusted-config symlinks"; }
     top=$(pwd -P)
     changed=()
     if [ -s "$CHANGES_FILE" ]; then
@@ -741,15 +743,35 @@ check_trusted_links() {
             [ "$mode" = 120000 ] || continue
             f="${rec#*$'\t'}"
             rp_trusted_config "$f" || continue
-            [ -L "$f" ] || continue
+            probe="$f"
+            dirty=0
             for c in ${changed[@]+"${changed[@]}"}; do
-                [ "$c" != "$f" ] || continue 2
+                [ "$c" != "$f" ] || { dirty=1; break; }
             done
+            if [ "$dirty" = 1 ]; then
+                # Git lists the link as changed and the revert restores the HEAD
+                # link, so judge the HEAD link's target through a scratch link.
+                sha="${rec#* }"
+                sha="${sha%% *}"
+                t=$(yr_git cat-file blob "$sha" 2>/dev/null; printf x) || t=""
+                t="${t%x}"
+                if [ -z "$t" ]; then printf '%s\0' "$f" >>"$out"; continue; fi
+                case "$t" in
+                    /*) ;;
+                    */*) t="$top/${f%/*}/$t" ;;
+                    *) t="$top/$t" ;;
+                esac
+                rm -f -- "$tdir/l"
+                ln -s -- "$t" "$tdir/l" 2>/dev/null || { printf '%s\0' "$f" >>"$out"; continue; }
+                probe="$tdir/l"
+            else
+                [ -L "$f" ] || continue
+            fi
             hit=0
-            canon=$(yr_canon_path "$f" 2>/dev/null) || canon=""
+            canon=$(yr_canon_path "$probe" 2>/dev/null) || canon=""
             if [ -n "$IGNORED_SINCE" ]; then
                 rc=0
-                rp_link_target_changed "$f" "$IGNORED_SINCE" || rc=$?
+                rp_link_target_changed "$probe" "$IGNORED_SINCE" || rc=$?
                 [ "$rc" -eq 1 ] || hit=1
                 if [ "$hit" = 1 ] && [ "$rc" -eq 0 ] && [ -n "$canon" ] && yr_inside_root "$canon" "$top"; then
                     rel="${canon#"$top"/}"
@@ -760,9 +782,9 @@ check_trusted_links() {
             fi
             [ "$hit" = 0 ] || printf '%s\0' "$f" >>"$out"
         done <"$ls"
-    ) || { rm -f -- "$ls" "$out"; die 2 "cannot check tracked trusted-config symlinks"; }
+    ) || { rm -rf -- "$ls" "$out" "$tdir"; die 2 "cannot check tracked trusted-config symlinks"; }
     while IFS= read -r -d '' f; do LINK_HITS+=("$f"); done <"$out"
-    rm -f -- "$ls" "$out"
+    rm -rf -- "$ls" "$out" "$tdir"
 }
 
 if [ "$MODE" != revert-only ]; then
@@ -802,7 +824,7 @@ elif [ "$MODE" = revert-denied ]; then
     # (it can sit outside the worktree): leave it, report it, deniedClean false.
     check_trusted_links
     for f in ${LINK_HITS[@]+"${LINK_HITS[@]}"}; do
-        add_path_reason "left a trusted-config symlink whose target may have been edited (or sits outside the worktree) in place" "$f"
+        add_path_reason "found a trusted-config symlink whose target may have been edited (or sits outside the worktree)" "$f"
     done
 else
     # KEEP_FILES is the deduplicated list (first-seen order). A path listed

@@ -3286,3 +3286,43 @@ SH
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
   [ -d .cursor ]
 }
+
+@test "--revert-denied flags a dirty tracked trusted-config symlink whose HEAD target was written, even after the link is redirected" {
+  link_setup
+  printf '{"hooks":"evil"}\n' >| "$OUTSIDE/settings.json"
+  rm .claude/settings.json
+  ln -s "$BATS_TEST_TMPDIR/elsewhere" .claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ "$(readlink .claude/settings.json)" = "$OUTSIDE/settings.json" ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'.claude/settings.json'* ]]
+}
+
+@test "--revert-denied restores a dirty tracked trusted-config symlink whose HEAD target is unchanged and stays deniedClean" {
+  link_setup
+  rm .claude/settings.json
+  ln -s "$BATS_TEST_TMPDIR/elsewhere" .claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  [ "$(readlink .claude/settings.json)" = "$OUTSIDE/settings.json" ]
+}
+
+@test "--revert-denied --no-ignored-guard flags a dirty tracked trusted-config symlink whose HEAD target is outside the worktree" {
+  link_setup
+  rm .claude/settings.json
+  ln -s "$BATS_TEST_TMPDIR/elsewhere" .claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "a verify run refuses when a dirty tracked trusted-config symlink's HEAD target was written" {
+  link_setup
+  printf '{"hooks":"evil"}\n' >| "$OUTSIDE/settings.json"
+  rm .claude/settings.json
+  ln -s "$BATS_TEST_TMPDIR/elsewhere" .claude/settings.json
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+}
