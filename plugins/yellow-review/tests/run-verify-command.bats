@@ -394,6 +394,19 @@ has_kill_after() {
   [ -d ".cursor/$tok/.git" ]
 }
 
+@test "--revert-denied withholds a reverted path with a credential-shaped directory segment" {
+  tok=ghp_abcdefghijklmnopqrstuvwxyz0123456789
+  mkdir -p ".cursor/$tok"
+  printf 'rule\n' >| ".cursor/$tok/file"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ "$(printf '%s' "$output" | jq -c .reverted)" = '[]' ]
+  [ "$(printf '%s' "$output" | jq -r .revertedCount)" = 1 ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'reverted list withheld'* ]]
+  [[ "$output" != *"$tok"* ]]
+}
+
 @test "--revert-denied with only a nested repository is a noop that is not deniedClean" {
   mkdir -p .cursor/vendored
   git -C .cursor/vendored init -q
