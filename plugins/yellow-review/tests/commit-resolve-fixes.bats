@@ -2646,6 +2646,38 @@ crf_ssh_remote() {
   [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
 }
 
+@test "a GIT_SSH_COMMAND using a shell variable is refused as unjudgeable and never runs (exit 3)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/dollar-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/sshcmd"
+  chmod +x "$REPO/tools/sshcmd"
+  crf_ssh_remote
+  GH_HOST=example.invalid GIT_SSH_COMMAND='$PWD/tools/sshcmd' \
+    run --separate-stderr env "PATH=$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the expanded command ran" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"GIT_SSH_COMMAND uses shell syntax"* ]]
+}
+
+@test "a HOME inside the worktree whose .gitconfig sets core.sshCommand is refused and never runs (exit 3)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/home-canary"
+  printf 'tools/\n.gitconfig\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/sshcmd"
+  chmod +x "$REPO/tools/sshcmd"
+  printf '[core]\n\tsshCommand = %s/tools/sshcmd\n' "$REPO" >| "$REPO/.gitconfig"
+  crf_ssh_remote
+  GH_HOST=example.invalid run --separate-stderr env -u GIT_CONFIG_GLOBAL -u XDG_CONFIG_HOME "HOME=$REPO" "PATH=$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the HOME config command ran" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"global config inside the repository"* ]]
+}
+
 @test "a trusted GIT_SSH_COMMAND outside the worktree is kept and used by the ls-remote check" {
   old_path="$PATH"
   good="$BATS_TEST_TMPDIR/goodssh"

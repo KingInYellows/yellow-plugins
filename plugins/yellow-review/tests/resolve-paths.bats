@@ -1451,6 +1451,121 @@ commit_repo() {
   done
 }
 
+@test "yr_has_root matches the worktree only as a whole path" {
+  root="$PWD"
+  yr_has_root "ssh -i $root/key" "$root"
+  yr_has_root "x '$root'" "$root"
+  yr_has_root "a=$root:b" "$root"
+  yr_has_root "$root" "$root"
+  ! yr_has_root "ssh -i ${root}-keys/id" "$root"
+  ! yr_has_root "${root}2/bin/ssh" "$root"
+  ! yr_has_root "${root}.bak/x" "$root"
+  ! yr_has_root "pre${root}/x" "$root"
+  yr_has_root "${root}2/x $root/y" "$root"
+}
+
+@test "harden_git_config does not over-refuse siblings of the worktree or a bare first word that is also a repo directory" {
+  mkdir -p "${PWD}-keys" "${PWD}2/bin" less evil
+  : >| evil/file
+  for val in "ssh -i ${PWD}-keys/id" "${PWD}2/bin/ssh -o x" "less -FRX" "less" "sh -c true"; do
+    rc=0; ( export GIT_SSH_COMMAND="$val" PAGER="$val" GIT_PAGER="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
+  done
+  rm -rf "${PWD}-keys" "${PWD}2"
+}
+
+@test "harden_git_config still checks later bare words and slash words against the current directory" {
+  : >| evil
+  mkdir -p tools
+  : >| tools/evil
+  for val in "sh evil" "sh tools/evil" "sh -e evil" "ssh -F evil host"; do
+    rc=0; ( export GIT_SSH_COMMAND="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "accepted: $val" >&2; return 1; }
+  done
+}
+
+@test "harden_git_config refuses shell syntax it cannot judge, naming the variable and not the value" {
+  mkdir -p tools
+  : >| tools/evil
+  for val in '$PWD/tools/evil' '${PWD}/tools/evil' '`touch x`' '$(touch x)' 'ssh; touch x' 'ssh && true' 'ssh | cat' \
+             'ssh > out' 'ssh < in' 'f() { x; }' 'ssh *' 'ssh ?' 'ssh [a]' '~root/x' 'ssh ~root/key' $'ssh\ntouch x'; do
+    for name in GIT_SSH_COMMAND GIT_PAGER EDITOR GIT_ASKPASS; do
+      rc=0; ( export "$name=$val"; harden_git_config full; ) || rc=$?
+      [ "$rc" -eq 1 ] || { echo "$name accepted: $val" >&2; return 1; }
+    done
+  done
+  ( export GIT_SSH_COMMAND='$PWD/tools/evil'; harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_SSH_COMMAND uses shell syntax"* && "$YR_HARDEN_MSG" != *evil* ]] )
+  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.sshCommand GIT_CONFIG_VALUE_0='$PWD/tools/evil'; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  rc=0; ( export GIT_CONFIG_PARAMETERS="'credential.helper'='!f() { x; }; f'"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  # Other config keys are not command-bearing: shell syntax there is fine.
+  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.x GIT_CONFIG_VALUE_0='!f() { x; }; f'; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
+@test "harden_git_config expands a leading ~/ to HOME and judges the result" {
+  mkdir -p "$BATS_TEST_TMPDIR/home" tools
+  : >| tools/key
+  rc=0; ( export HOME="$BATS_TEST_TMPDIR/home" GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519'; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+  rc=0; ( export HOME="$PWD" GIT_CONFIG_GLOBAL=/dev/null GIT_SSH_COMMAND='ssh -i ~/tools/key'; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+}
+
+@test "harden_git_config refuses a global git config that HOME or XDG_CONFIG_HOME puts inside the worktree" {
+  mkdir -p "$BATS_TEST_TMPDIR/home" cfg/git
+  rc=0; ( unset GIT_CONFIG_GLOBAL; export HOME="$BATS_TEST_TMPDIR/home"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+  rc=0; ( unset GIT_CONFIG_GLOBAL XDG_CONFIG_HOME; export HOME="$PWD"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  rc=0; ( unset GIT_CONFIG_GLOBAL; export HOME="$BATS_TEST_TMPDIR/home" XDG_CONFIG_HOME="$PWD/cfg"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  # An explicit GIT_CONFIG_GLOBAL replaces both derived files.
+  rc=0; ( export GIT_CONFIG_GLOBAL=/dev/null HOME="$PWD"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
+@test "harden_git_config judges the file a global-scope command came from, such as an include inside the worktree" {
+  mkdir -p tools
+  printf '[core]\n\tsshCommand = ssh -x\n' >| tools/inc.cfg
+  printf '[include]\n\tpath = %s/tools/inc.cfg\n' "$PWD" >| "$BATS_TEST_TMPDIR/global.cfg"
+  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global.cfg"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global.cfg"; harden_git_config full || [[ "$YR_HARDEN_MSG" == *"global or system git config file inside the repository"* ]] )
+  # The same command in a global file outside the worktree is the user's own.
+  printf '[core]\n\tsshCommand = ssh -x\n' >| "$BATS_TEST_TMPDIR/own.cfg"
+  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/own.cfg"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
+@test "a non-env #! optional argument or an env command's arguments that enter the worktree are caught, in awk and in the shell" {
+  mkdir -p venv
+  : >| evil
+  n=0
+  for shebang in "#!/bin/sh $PWD/venv/python" "#!/bin/sh -e $PWD/evil" "#!/bin/sh evil" "#!/bin/sh --file=$PWD/evil" \
+                 "#!/bin/sh \"$PWD/evil\"" "#!/usr/bin/env sh $PWD/evil" "#!/usr/bin/env -S sh -e $PWD/evil" "#!/bin/sh -x $PWD" \
+                 "#!/usr/bin/awk -f $PWD/evil"; do
+    n=$((n + 1))
+    d="$BATS_TEST_TMPDIR/oa$n"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell missed: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
+  done
+  for shebang in "#!/bin/sh -e" "#!/bin/sh -x ${PWD}2/evil" "#!/bin/sh -x ${PWD}-keys/id" "#!/usr/bin/env sh -e" "#!/usr/bin/awk -f" "#!/bin/sh nosuchfile"; do
+    d="$BATS_TEST_TMPDIR/oaok"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/tool"
+    chmod +x "$d/tool"
+    ! yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell false hit: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" == "$d:"* ]] || { echo "awk false hit: $shebang" >&2; return 1; }
+  done
+}
+
 @test "harden_git_config keeps a trusted command variable, a bare name and a link to an outside file" {
   ln -s /usr/bin/true "$BATS_TEST_TMPDIR/trusted"
   for val in "/usr/bin/ssh -o BatchMode=yes" ssh "ssh -i /nonexistent/key" "$BATS_TEST_TMPDIR/trusted" "'/usr/bin/true' x" "!/usr/bin/true"; do

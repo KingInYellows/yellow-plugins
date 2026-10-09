@@ -312,24 +312,93 @@ yr_inside_root() {
     return 1
 }
 
+# yr_has_root <string> <root>: succeed when <string> contains <root> as a whole
+# path: not preceded by a path character and followed by / or a character that
+# cannot continue a name. A sibling such as <root>2 or <root>-keys is not it.
+yr_has_root() {
+    local rest="$1" root="$2" pre post prev next
+    while :; do
+        case "$rest" in *"$root"*) ;; *) return 1 ;; esac
+        pre=${rest%%"$root"*}
+        post=${rest#*"$root"}
+        prev=${pre: -1}
+        next=${post:0:1}
+        case "$prev" in [A-Za-z0-9._/-]) ;; *)
+            case "$next" in [A-Za-z0-9._-]) ;; *) return 0 ;; esac
+        esac
+        rest=$post
+    done
+}
+
+# yr_args_enter <string> <root> <skip-bare-first>: succeed when <string>, read
+# as a word list, names anything inside <root>: the raw text holds the root as
+# a whole path (yr_has_root), or a word (leading ! and quotes stripped; for
+# --opt=VALUE both the word and VALUE) is an absolute path, or an existing path
+# relative to the current directory, that canonicalizes inside <root>, or a
+# path that cannot be canonicalized. With <skip-bare-first> 1 the first word is
+# left alone when it has no slash (a program name is looked up on PATH, never
+# in the current directory). Words starting with ~ or $ are not judged here.
+yr_args_enter() {
+    local v="$1" root="$2" skipfirst="${3:-0}" phys tok t u c first=1 noglob=1
+    local -a toks=()
+    phys=$(pwd -P) || return 0
+    yr_has_root "$v" "$root" && return 0
+    case $- in *f*) noglob=0 ;; esac
+    {
+        local IFS=$' \t\n'
+        set -f
+        toks=($v)
+        [ "$noglob" -eq 0 ] || set +f
+    }
+    for tok in ${toks[@]+"${toks[@]}"}; do
+        t=${tok#!}
+        t=${t#[\"\']}
+        t=${t%[\"\']}
+        for u in "$t" "${t#*=}"; do
+            case "$u" in
+                ''|'~'*|'$'*) continue ;;
+                /*)
+                    c=$(yr_canon_path "$u" 2>/dev/null) || return 0
+                    yr_inside_root "$c" "$root" && return 0
+                    yr_inside_root "$u" "$root" && return 0
+                    ;;
+                *)
+                    if [ "$first" -eq 1 ] && [ "$skipfirst" -eq 1 ]; then
+                        case "$u" in */*) ;; *) continue ;; esac
+                    fi
+                    [ -e "$u" ] || continue
+                    c=$(yr_canon_path "$phys/$u" 2>/dev/null) || return 0
+                    yr_inside_root "$c" "$root" && return 0
+                    ;;
+            esac
+            case "$t" in -*=*) ;; *) break ;; esac
+        done
+        first=0
+    done
+    return 1
+}
+
 # yr_file_shebang_enters <file> <root>: succeed when <file> starts with a #!
-# line whose interpreter, or the program `env` is asked to run, is inside
-# <root> by canonical path or identity, or cannot be canonicalized (fail
-# closed). The interpreter comes from the first line only and is never run.
-# `env` operands follow env(1): options with an argument (-u, -C, -P, -a and
-# their long forms), NAME=value words, and -S / --split-string, whose string is
-# split into words that continue the operand list (attached or separate, and
-# inside a short cluster such as -vS). A bare operand is looked up on the
-# caller's PATH (YR_ORIG_PATH), the way the tool itself would be. Copies of
-# this function sit in the two scripts' bootstrap resolvers, which run before
-# this library is sourced; keep them identical.
+# line that would run anything inside <root> by canonical path or identity, or
+# cannot be canonicalized (fail closed): the interpreter, the program `env` is
+# asked to run, or a path in the optional argument (Linux passes the rest of
+# the line as one argument, BSD splits it; both are judged, see yr_args_enter).
+# The first line is read and never run. `env` operands follow env(1): options
+# with an argument (-u, -C, -P, -a and their long forms), NAME=value words, and
+# -S / --split-string, whose string is split into words that continue the
+# operand list (attached or separate, and inside a short cluster such as
+# -vS). A bare operand is looked up on the caller's PATH (YR_ORIG_PATH), the
+# way the tool itself would be. Copies of this block (through
+# yr_file_shebang_enters) sit in the two scripts' bootstrap resolvers, which
+# run before this library is sourced; keep them identical.
 yr_file_shebang_enters() {
-    local f="$1" root="$2" line rest i x idx last k c cl val p
+    local f="$1" root="$2" line rest i x idx last k c cl val p args=""
     local -a w=() v=() nw=()
     [ -f "$f" ] || return 1
     IFS= read -r -n 512 line <"$f" 2>/dev/null || true
     case "$line" in '#!'*) ;; *) return 1 ;; esac
     rest=${line#\#!}
+    rest=${rest#"${rest%%[![:space:]]*}"}
     read -r -a w <<<"$rest" || true
     i=${w[0]-}
     [ -n "$i" ] || return 1
@@ -381,6 +450,8 @@ yr_file_shebang_enters() {
                     idx=$((idx + 1))
                 fi
             done
+            # What follows the operand is its argument list.
+            [ "$idx" -lt "${#w[@]}" ] && args="${w[*]:idx+1}"
             i=${i#[\"\']}
             i=${i%[\"\']}
             [ -n "$i" ] || return 1
@@ -389,7 +460,11 @@ yr_file_shebang_enters() {
                 *) i=$(PATH=${YR_ORIG_PATH-$PATH}; type -P "$i" 2>/dev/null) || return 1 ;;
             esac
             ;;
+        *) args=${rest#"$i"} ;;
     esac
+    if [ -n "$args" ] && yr_args_enter "$args" "$root" 0; then
+        return 0
+    fi
     case "$i" in /*) p="$i" ;; *) p="$(pwd -P)/$i" ;; esac
     c=$(yr_canon_path "$p" 2>/dev/null) || return 0
     yr_inside_root "$c" "$root" || yr_inside_root "$p" "$root"
