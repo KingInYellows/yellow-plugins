@@ -139,6 +139,10 @@ const CODE_TABLE = {
         retryable: false,
         recoveryAction: 'Inspect the session, then run supervise --clear-pause in a terminal.',
     },
+    JULES_QUESTION_CHANGED: {
+        retryable: false,
+        recoveryAction: 'The session no longer awaits the question the pass showed; nothing was sent. Run supervise again.',
+    },
 };
 // replica:makeAppError:start
 function makeAppError(code, message, overrides = {}) {

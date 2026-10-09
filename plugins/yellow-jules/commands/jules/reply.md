@@ -300,6 +300,7 @@ action. **Never resend automatically.**
 | `JULES_GRANT_EXPIRED`         | false     | the grant expired; remote work may still run — see the error's containment steps                                                |
 | `JULES_GRANT_EXHAUSTED`       | false     | the corrective-round limit is spent; write a new grant in a terminal                                                            |
 | `JULES_SUPERVISION_PAUSED`    | false     | inspect the session, then run `supervise --clear-pause` in a terminal                                                           |
+| `JULES_QUESTION_CHANGED`      | false     | `--expect-activity-id`/`--expect-question-digest` were given and the session no longer awaits that question; nothing was sent |
 | `JULES_POLICY_DEVIATION`      | false     | a deviation was recorded under this grant; `status --reconcile` does not clear it: inspect with `/jules:status`, then ask the owner to `/jules:authorize --revoke` the grant and write a new one (the deviating session stays blocked) |
 | `JULES_INVALID_STATE`         | false     | the session is finished; a reply does not reopen it. For a repair run `/jules:delegate --correction` with the same `--task-ref` |
 | `JULES_UNKNOWN_OUTCOME`       | false     | **do not resend.** Run `/jules:status --session <ref> --reconcile` to learn if it arrived                                       |

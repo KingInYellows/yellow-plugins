@@ -45,6 +45,7 @@ import { collect, status, type StatusResult } from './runtime.js';
 import {
   findBySessionResource,
   isOwningCreate,
+  messageDigest,
   type OwningCreate,
   readJournal,
   updateJournal,
@@ -130,6 +131,9 @@ export interface SuperviseResult extends Attention {
   readonly requestedBranch: string;
   readonly taskRef?: string;
   readonly observedPlanId?: string;
+  /** `needs-answer`: the question's activity id and message digest; `reply --expect-activity-id/--expect-question-digest` verify them. */
+  readonly observedActivityId?: string;
+  readonly observedQuestionDigest?: string;
   /** `needs-verification`, and `escalate` with `corrective-rounds-exhausted`; R43 tooling ships in PR4. */
   readonly verification?: 'unavailable';
   readonly artifacts?: {
@@ -673,6 +677,12 @@ export async function superviseOnce(
     return finish(
       'needs-answer',
       {
+        ...(latest?.message !== undefined
+          ? {
+              observedActivityId: latest.activityId,
+              observedQuestionDigest: messageDigest(latest.message),
+            }
+          : {}),
         nextCheck: acting,
         allowedActions: permits(grant, 'reply') ? ['reply'] : [],
       },

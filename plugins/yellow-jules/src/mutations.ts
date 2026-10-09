@@ -432,6 +432,13 @@ export interface ReplyArgs {
   readonly grantId?: string;
   /** A corrective message (R44): spends one corrective round on the session's task. */
   readonly correction: boolean;
+  /**
+   * Both or neither. The reply is refused with `JULES_QUESTION_CHANGED` unless
+   * the session still awaits a reply and its newest agent message has this
+   * activity id and message digest (the `supervise` `needs-answer` values).
+   */
+  readonly expectActivityId?: string;
+  readonly expectQuestionDigest?: string;
   readonly deadlineMs?: number;
 }
 
@@ -482,12 +489,108 @@ export async function reply(
   }
 }
 
+function validateExpectedQuestion(
+  args: Pick<ReplyArgs, 'expectActivityId' | 'expectQuestionDigest'>
+): { readonly activityId: string; readonly digest: string } | undefined {
+  const { expectActivityId: id, expectQuestionDigest: digest } = args;
+  if (id === undefined && digest === undefined) return undefined;
+  if (id === undefined || digest === undefined) {
+    return throwAppError(
+      'JULES_INVALID_INPUT',
+      '--expect-activity-id and --expect-question-digest must be given together'
+    );
+  }
+  const hasControl = [...id].some((c) => {
+    const code = c.charCodeAt(0);
+    return code < 32 || code === 127;
+  });
+  if (id.length === 0 || id.length > 512 || hasControl) {
+    return throwAppError(
+      'JULES_INVALID_INPUT',
+      '--expect-activity-id must be a non-empty activity id'
+    );
+  }
+  if (!/^[0-9a-f]{64}$/.test(digest)) {
+    return throwAppError(
+      'JULES_INVALID_INPUT',
+      '--expect-question-digest must be 64 lowercase hex characters'
+    );
+  }
+  return { activityId: id, digest };
+}
+
+/**
+ * Refuses a reply unless the session still awaits one and its newest agent
+ * message is the question the caller evaluated. A fresh, complete read right
+ * before the reservation: like approve's plan check it narrows the race but the
+ * POST cannot be made atomic with it.
+ */
+async function assertQuestionStillOpen(
+  deps: WriteDeps,
+  adapter: SdkAdapter,
+  sessionResource: string,
+  liveCondition: string,
+  expected: { readonly activityId: string; readonly digest: string },
+  deadline: Deadline
+): Promise<void> {
+  const changed = (why: string): never =>
+    throwAppError('JULES_QUESTION_CHANGED', `${why}; nothing was sent`);
+  if (liveCondition !== 'awaiting-reply') {
+    return changed(`the session is ${liveCondition}, not awaiting a reply`);
+  }
+  let newest:
+    | { activityId: string; createTime: string; message?: string }
+    | undefined;
+  const walk = await walkActivities({
+    adapter,
+    sessionResource,
+    pageSize: STATUS_PAGE_SIZE,
+    start: { kind: 'session-start' },
+    clock: deps.clock,
+    deadline,
+    pageCap: APPROVE_PAGE_CAP,
+    onActivity: (activity) => {
+      if (
+        activity.type === 'agentMessaged' &&
+        (newest === undefined || compareStamp(activity, newest) > 0)
+      ) {
+        newest = {
+          activityId: activity.activityId,
+          createTime: activity.createTime,
+          ...(activity.message !== undefined
+            ? { message: activity.message }
+            : {}),
+        };
+      }
+    },
+  });
+  if (!walk.complete) {
+    return throwAppError(
+      'JULES_INVALID_STATE',
+      'the session activity could not be completely re-read; nothing was sent',
+      { recoveryAction: 'Retry with a larger --deadline-ms.' }
+    );
+  }
+  const current = newest as
+    | { activityId: string; message?: string }
+    | undefined;
+  if (
+    current === undefined ||
+    current.message === undefined ||
+    current.activityId !== expected.activityId ||
+    messageDigest(current.message) !== expected.digest
+  ) {
+    return changed('the session no longer awaits the question the pass showed');
+  }
+}
+
 async function replyInner(
   deps: WriteDeps,
   args: ReplyArgs,
   ids: Ids
 ): Promise<ReplyResult> {
   const message = validateText(args.message, '--message', MESSAGE_MAX_CHARS);
+  const expectQuestion = validateExpectedQuestion(args);
   prepare(deps);
   const deadline = deadlineIn(
     deps.clock,
@@ -539,6 +642,16 @@ async function replyInner(
           }
         ),
         ids
+      );
+    }
+    if (expectQuestion !== undefined) {
+      await assertQuestionStillOpen(
+        deps,
+        adapter,
+        target.sessionResource,
+        liveCondition,
+        expectQuestion,
+        deadline
       );
     }
     if (isExpired(deps.clock, deadline)) return expiredBeforeWrite();

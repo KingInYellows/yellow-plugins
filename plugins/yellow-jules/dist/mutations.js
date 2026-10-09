@@ -273,8 +273,72 @@ async function reply(deps, args) {
         return (0, errors_js_1.rethrowWithContext)(err, { localRequestId, localId });
     }
 }
+function validateExpectedQuestion(args) {
+    const { expectActivityId: id, expectQuestionDigest: digest } = args;
+    if (id === undefined && digest === undefined)
+        return undefined;
+    if (id === undefined || digest === undefined) {
+        return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', '--expect-activity-id and --expect-question-digest must be given together');
+    }
+    const hasControl = [...id].some((c) => {
+        const code = c.charCodeAt(0);
+        return code < 32 || code === 127;
+    });
+    if (id.length === 0 || id.length > 512 || hasControl) {
+        return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', '--expect-activity-id must be a non-empty activity id');
+    }
+    if (!/^[0-9a-f]{64}$/.test(digest)) {
+        return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', '--expect-question-digest must be 64 lowercase hex characters');
+    }
+    return { activityId: id, digest };
+}
+/**
+ * Refuses a reply unless the session still awaits one and its newest agent
+ * message is the question the caller evaluated. A fresh, complete read right
+ * before the reservation: like approve's plan check it narrows the race but the
+ * POST cannot be made atomic with it.
+ */
+async function assertQuestionStillOpen(deps, adapter, sessionResource, liveCondition, expected, deadline) {
+    const changed = (why) => (0, errors_js_1.throwAppError)('JULES_QUESTION_CHANGED', `${why}; nothing was sent`);
+    if (liveCondition !== 'awaiting-reply') {
+        return changed(`the session is ${liveCondition}, not awaiting a reply`);
+    }
+    let newest;
+    const walk = await (0, activity_walk_js_1.walkActivities)({
+        adapter,
+        sessionResource,
+        pageSize: activity_walk_js_1.STATUS_PAGE_SIZE,
+        start: { kind: 'session-start' },
+        clock: deps.clock,
+        deadline,
+        pageCap: APPROVE_PAGE_CAP,
+        onActivity: (activity) => {
+            if (activity.type === 'agentMessaged' &&
+                (newest === undefined || (0, activity_walk_js_1.compareStamp)(activity, newest) > 0)) {
+                newest = {
+                    activityId: activity.activityId,
+                    createTime: activity.createTime,
+                    ...(activity.message !== undefined
+                        ? { message: activity.message }
+                        : {}),
+                };
+            }
+        },
+    });
+    if (!walk.complete) {
+        return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'the session activity could not be completely re-read; nothing was sent', { recoveryAction: 'Retry with a larger --deadline-ms.' });
+    }
+    const current = newest;
+    if (current === undefined ||
+        current.message === undefined ||
+        current.activityId !== expected.activityId ||
+        (0, state_js_1.messageDigest)(current.message) !== expected.digest) {
+        return changed('the session no longer awaits the question the pass showed');
+    }
+}
 async function replyInner(deps, args, ids) {
     const message = validateText(args.message, '--message', MESSAGE_MAX_CHARS);
+    const expectQuestion = validateExpectedQuestion(args);
     (0, runtime_support_js_1.prepare)(deps);
     const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, args.deadlineMs ?? deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS);
     const target = await resolveTarget(deps, args.session);
@@ -306,6 +370,9 @@ async function replyInner(deps, args, ids) {
             throw new errors_js_1.MutationErrorException((0, errors_js_1.makeAppError)('JULES_INVALID_STATE', `the session is ${liveCondition}; a reply does not reopen a finished session`, {
                 recoveryAction: 'For a repair, run delegate with --correction and the same --task-ref.',
             }), ids);
+        }
+        if (expectQuestion !== undefined) {
+            await assertQuestionStillOpen(deps, adapter, target.sessionResource, liveCondition, expectQuestion, deadline);
         }
         if ((0, deadline_js_1.isExpired)(deps.clock, deadline))
             return expiredBeforeWrite();

@@ -449,6 +449,12 @@ async function superviseOnce(deps, args) {
             fenced.question = (0, redact_js_1.fenceUntrusted)(truncate(latest.message));
         }
         return finish('needs-answer', {
+            ...(latest?.message !== undefined
+                ? {
+                    observedActivityId: latest.activityId,
+                    observedQuestionDigest: (0, state_js_1.messageDigest)(latest.message),
+                }
+                : {}),
             nextCheck: acting,
             allowedActions: permits(grant, 'reply') ? ['reply'] : [],
         }, {}, latest?.message === undefined ? ['questionUnavailable'] : []);

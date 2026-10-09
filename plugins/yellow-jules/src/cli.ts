@@ -291,6 +291,8 @@ async function dispatch(
           'grant-id': { type: 'string' },
           'dry-run': { type: 'boolean', default: false },
           correction: { type: 'boolean', default: false },
+          'expect-activity-id': { type: 'string' },
+          'expect-question-digest': { type: 'string' },
           ...deadline,
         },
         strict: true,
@@ -307,6 +309,12 @@ async function dispatch(
           : {}),
         dryRun: values['dry-run'] === true,
         correction: values.correction === true,
+        ...(typeof values['expect-activity-id'] === 'string'
+          ? { expectActivityId: values['expect-activity-id'] }
+          : {}),
+        ...(typeof values['expect-question-digest'] === 'string'
+          ? { expectQuestionDigest: values['expect-question-digest'] }
+          : {}),
         deadlineMs: deadlineFlag(
           values['deadline-ms'],
           DEFAULT_MUTATION_DEADLINE_MS

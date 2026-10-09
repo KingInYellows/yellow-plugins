@@ -293,3 +293,122 @@ describe('/jules:supervise binds the approval to the reviewed plan', () => {
     expect(res.stdout).not.toContain('plan_digest=');
   });
 });
+
+describe('/jules:supervise binds the reply to the pass decision', () => {
+  const supervise = cmd('supervise');
+  const blocks = [...supervise.matchAll(/```bash\n([\s\S]*?)```/g)].map(
+    (m) => m[1] ?? ''
+  );
+  const preview =
+    blocks.find(
+      (b) => b.includes("printf 'binding=%s") && b.includes('message.txt')
+    ) ?? '';
+  const send = blocks.find((b) => b.includes('args=(reply --session')) ?? '';
+  const DIGEST = 'b'.repeat(64);
+
+  const prepare = (message: string) => {
+    const dir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'yellow-jules-supervise.')
+    );
+    fs.writeFileSync(path.join(dir, 'message.txt'), message);
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'jules-sup-reply-'));
+    fs.mkdirSync(path.join(root, 'dist'));
+    const calls = path.join(root, 'calls.json');
+    fs.writeFileSync(
+      path.join(root, 'dist/cli.js'),
+      `require('fs').writeFileSync(${JSON.stringify(calls)},JSON.stringify(process.argv.slice(2)));console.log('{"ok":true,"sent":true}');`
+    );
+    return { dir, root, calls };
+  };
+  const exec = (
+    script: string,
+    ctx: { dir: string; root: string },
+    over: Record<string, string> = {}
+  ) => {
+    const values: Record<string, string> = {
+      YELLOW_TODO_work_dir: ctx.dir,
+      YELLOW_TODO_session: 'sessions/1',
+      YELLOW_TODO_grant_id: 'g1',
+      YELLOW_TODO_1_or_0: '1',
+      YELLOW_TODO_observed_activity_id_or_none: 'act-1',
+      YELLOW_TODO_observed_question_digest_or_none: DIGEST,
+      ...over,
+    };
+    let body = script;
+    for (const [k, v] of Object.entries(values)) body = body.replace(k, v);
+    return spawnSync('bash', ['-c', body], {
+      env: { ...process.env, CLAUDE_PLUGIN_ROOT: ctx.root },
+      encoding: 'utf8',
+    });
+  };
+  const bindingOf = (ctx: { dir: string; root: string }, over = {}) =>
+    /binding=([0-9a-f]{64})/.exec(exec(preview, ctx, over).stdout)?.[1] ?? '';
+
+  it('finds both blocks', () => {
+    expect(preview).not.toBe('');
+    expect(send).not.toBe('');
+  });
+
+  it('sends the confirmed message with the question expectation', () => {
+    const ctx = prepare('Use Postgres.');
+    const binding = bindingOf(ctx);
+    expect(binding).toHaveLength(64);
+    const res = exec(send, ctx, { YELLOW_TODO_binding_from_preview: binding });
+    const argv = JSON.parse(fs.readFileSync(ctx.calls, 'utf8')) as string[];
+    expect(res.status).toBe(0);
+    expect(argv).toContain('--message=Use Postgres.');
+    expect(argv).toContain('--correction');
+    expect(argv).toEqual(
+      expect.arrayContaining([
+        '--expect-activity-id',
+        'act-1',
+        '--expect-question-digest',
+        DIGEST,
+      ])
+    );
+    fs.rmSync(ctx.root, { recursive: true, force: true });
+  });
+
+  it.each([
+    ['the message bytes change', {}, 'Use MySQL.'],
+    [
+      'the observed question differs',
+      { YELLOW_TODO_observed_activity_id_or_none: 'act-2' },
+      undefined,
+    ],
+    [
+      'the session is substituted',
+      { YELLOW_TODO_session: 'sessions/2' },
+      undefined,
+    ],
+    ['the correction flag flips', { YELLOW_TODO_1_or_0: '0' }, undefined],
+  ])('refuses before the CLI when %s', (_n, over, newMessage) => {
+    const ctx = prepare('Use Postgres.');
+    const binding = bindingOf(ctx);
+    if (newMessage !== undefined) {
+      fs.writeFileSync(path.join(ctx.dir, 'message.txt'), newMessage);
+    }
+    const res = exec(send, ctx, {
+      YELLOW_TODO_binding_from_preview: binding,
+      ...over,
+    });
+    expect(res.status).toBe(1);
+    expect(fs.existsSync(ctx.calls)).toBe(false);
+    expect(res.stderr).toContain('differs from the printed binding');
+    fs.rmSync(ctx.dir, { recursive: true, force: true });
+    fs.rmSync(ctx.root, { recursive: true, force: true });
+  });
+
+  it('omits the expectation flags for a non-question decision', () => {
+    const ctx = prepare('Please restructure.');
+    const none = {
+      YELLOW_TODO_observed_activity_id_or_none: 'none',
+      YELLOW_TODO_observed_question_digest_or_none: 'none',
+    };
+    const binding = bindingOf(ctx, none);
+    exec(send, ctx, { YELLOW_TODO_binding_from_preview: binding, ...none });
+    const argv = JSON.parse(fs.readFileSync(ctx.calls, 'utf8')) as string[];
+    expect(argv).not.toContain('--expect-activity-id');
+    fs.rmSync(ctx.root, { recursive: true, force: true });
+  });
+});

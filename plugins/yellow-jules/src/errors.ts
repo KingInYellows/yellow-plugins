@@ -95,7 +95,8 @@ export type AppErrorCode =
   | 'JULES_DATA_DIR'
   | 'JULES_CONTROLLER_MISMATCH'
   | 'JULES_GRANT_EXHAUSTED'
-  | 'JULES_SUPERVISION_PAUSED';
+  | 'JULES_SUPERVISION_PAUSED'
+  | 'JULES_QUESTION_CHANGED';
 
 // replica:AppError:start
 export interface AppError {
@@ -231,6 +232,11 @@ const CODE_TABLE: Record<AppErrorCode, CodeDefaults> = {
     retryable: false,
     recoveryAction:
       'Inspect the session, then run supervise --clear-pause in a terminal.',
+  },
+  JULES_QUESTION_CHANGED: {
+    retryable: false,
+    recoveryAction:
+      'The session no longer awaits the question the pass showed; nothing was sent. Run supervise again.',
   },
 };
 

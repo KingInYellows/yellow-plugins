@@ -186,6 +186,10 @@ describe('needs-answer', () => {
       allowedActions: ['reply'],
     });
     expect(r.fenced.question).toContain('Which database should I use?');
+    expect(r.observedActivityId).toBeDefined();
+    expect(r.observedQuestionDigest).toBe(
+      messageDigest('Which database should I use?')
+    );
     expect(r.fenced.question?.startsWith(FENCE_BEGIN)).toBe(true);
   });
 

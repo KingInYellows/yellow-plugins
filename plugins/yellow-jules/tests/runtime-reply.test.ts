@@ -663,6 +663,122 @@ describe('races inside the write gate', () => {
     });
   });
 
+  describe('--expect-activity-id and --expect-question-digest', () => {
+    const QUESTION = 'Which database should I use?';
+    const code = async (run: () => Promise<unknown>) =>
+      (await fails(run)).appError.code;
+
+    function ask(text = QUESTION) {
+      setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
+      return addActivity(h, session.sessionResource, {
+        type: 'agentMessaged',
+        message: text,
+      });
+    }
+
+    it('sends when the session still awaits the question the pass showed', async () => {
+      const q = ask();
+      const result = await reply(
+        h.deps,
+        args({
+          expectActivityId: q.activityId,
+          expectQuestionDigest: messageDigest(QUESTION),
+        })
+      );
+      expect(result.sent).toBe(true);
+      expect(h.adapter.callsTo('sendMessage')).toHaveLength(1);
+    });
+
+    it('refuses when a newer agent message replaced the question', async () => {
+      const q = ask();
+      h.deps.clock.time += 1_000;
+      addActivity(h, session.sessionResource, {
+        type: 'agentMessaged',
+        message: 'Never mind, which cloud?',
+        createTime: new Date(h.deps.clock.now()).toISOString(),
+      });
+      expect(
+        await code(() =>
+          reply(
+            h.deps,
+            args({
+              expectActivityId: q.activityId,
+              expectQuestionDigest: messageDigest(QUESTION),
+            })
+          )
+        )
+      ).toBe('JULES_QUESTION_CHANGED');
+      expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    });
+
+    it('refuses when the session no longer awaits a reply', async () => {
+      const q = ask();
+      setVendorState(h, session.sessionResource, 'inProgress');
+      expect(
+        await code(() =>
+          reply(
+            h.deps,
+            args({
+              expectActivityId: q.activityId,
+              expectQuestionDigest: messageDigest(QUESTION),
+            })
+          )
+        )
+      ).toBe('JULES_QUESTION_CHANGED');
+      expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    });
+
+    it('refuses when the question text differs from the digest', async () => {
+      const q = ask();
+      expect(
+        await code(() =>
+          reply(
+            h.deps,
+            args({
+              expectActivityId: q.activityId,
+              expectQuestionDigest: messageDigest('something else'),
+            })
+          )
+        )
+      ).toBe('JULES_QUESTION_CHANGED');
+      expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    });
+
+    it('refuses an expected id that is not the newest question', async () => {
+      ask();
+      expect(
+        await code(() =>
+          reply(
+            h.deps,
+            args({
+              expectActivityId: 'activities/not-it',
+              expectQuestionDigest: messageDigest(QUESTION),
+            })
+          )
+        )
+      ).toBe('JULES_QUESTION_CHANGED');
+    });
+
+    it('needs both values', async () => {
+      const q = ask();
+      expect(
+        await code(() =>
+          reply(h.deps, args({ expectActivityId: q.activityId }))
+        )
+      ).toBe('JULES_INVALID_INPUT');
+      expect(
+        await code(() =>
+          reply(h.deps, args({ expectQuestionDigest: messageDigest(QUESTION) }))
+        )
+      ).toBe('JULES_INVALID_INPUT');
+    });
+
+    it('a plain reply needs neither', async () => {
+      ask();
+      expect((await reply(h.deps, args())).sent).toBe(true);
+    });
+  });
+
   it('an owner that finished after the reserve refuses the reply at the final check', async () => {
     const reservation = await reserveUnderGrant(
       h.deps,

@@ -60,7 +60,7 @@ args=(supervise --session "$SESSION" --grant-id "$GRANT_ID")
 [ -n "$DEADLINE" ] && args+=(--deadline-ms "$DEADLINE")
 OUTPUT=$(node "$CLI" "${args[@]}")
 printf 'exit=%s\n' "$?"
-printf '%s\n' "$OUTPUT" | jq '{ok, operation, localId, sessionResource, decision, reason, condition, vendorState, nextCheck, allowedActions, correctiveRoundsLeft, repository, requestedBranch, taskRef, observedPlanId, verification, artifacts, pause, requiresAttention, attention, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
+printf '%s\n' "$OUTPUT" | jq '{ok, operation, localId, sessionResource, decision, reason, condition, vendorState, nextCheck, allowedActions, correctiveRoundsLeft, repository, requestedBranch, taskRef, observedPlanId, observedActivityId, observedQuestionDigest, verification, artifacts, pause, requiresAttention, attention, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
 # Vendor-writable text (plan steps, the agent question, outside messages) only inside a random-tag fence.
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
@@ -160,9 +160,13 @@ printf '%s\n' "$OUTPUT" | jq '{ok, operation, localRequestId, approvedPlanId, ob
 
 **Reply** (only when `reply` is allowed): route the message through a file with
 the Write tool — never into Bash source. Allocate a directory, write
-`<printed path>/message.txt`, then send. Add `--correction` only when the
-message asks for a fix to the session's work; it spends one corrective round,
-and `correctiveRoundsLeft` in the result says how many remain.
+`<printed path>/message.txt`, print the binding, then send. Add `--correction`
+only when the message asks for a fix to the session's work; it spends one
+corrective round, and `correctiveRoundsLeft` in the result says how many remain.
+For `needs-answer`, take `ACTIVITY_ID` and `QUESTION_DIGEST` from the pass's
+`observedActivityId` and `observedQuestionDigest` (both are required; if the
+pass reported `questionUnavailable`, ask the user instead). For any other
+decision use `none` for both.
 
 ```bash
 set -euo pipefail
@@ -176,7 +180,34 @@ WORK_DIR='YELLOW_TODO_work_dir'
 SESSION='YELLOW_TODO_session'
 GRANT_ID='YELLOW_TODO_grant_id'
 CORRECTION='YELLOW_TODO_1_or_0'
-case "$WORK_DIR$SESSION$GRANT_ID$CORRECTION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+ACTIVITY_ID='YELLOW_TODO_observed_activity_id_or_none'
+QUESTION_DIGEST='YELLOW_TODO_observed_question_digest_or_none'
+case "$WORK_DIR$SESSION$GRANT_ID$CORRECTION$ACTIVITY_ID$QUESTION_DIGEST" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+case "$CORRECTION" in 0|1) ;; *) printf 'ERROR: CORRECTION must be exactly 0 or 1.\n' >&2; exit 1 ;; esac
+[ -f "$WORK_DIR/message.txt" ] && [ ! -L "$WORK_DIR/message.txt" ] && [ -s "$WORK_DIR/message.txt" ] || { printf 'ERROR: write the message to %s/message.txt first.\n' "$WORK_DIR" >&2; exit 1; }
+bind_hash() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
+}
+MESSAGE=$(cat -- "$WORK_DIR/message.txt")
+MESSAGE_SHA=$(printf '%s' "$MESSAGE" | bind_hash)
+printf 'binding=%s\n' "$(printf '%s' "${SESSION}|${GRANT_ID}|${CORRECTION}|${ACTIVITY_ID}|${QUESTION_DIGEST}|${MESSAGE_SHA}" | bind_hash)"
+```
+
+Keep the printed `binding=` value. The send block recomputes it from the same
+file and refuses when anything differs, then sends the bytes it hashed. For
+`needs-answer` it also passes the question to the CLI, which refuses with
+`JULES_QUESTION_CHANGED` unless the session still awaits that question.
+
+```bash
+set -uo pipefail
+WORK_DIR='YELLOW_TODO_work_dir'
+SESSION='YELLOW_TODO_session'
+GRANT_ID='YELLOW_TODO_grant_id'
+CORRECTION='YELLOW_TODO_1_or_0'
+ACTIVITY_ID='YELLOW_TODO_observed_activity_id_or_none'
+QUESTION_DIGEST='YELLOW_TODO_observed_question_digest_or_none'
+CONFIRMED_BINDING='YELLOW_TODO_binding_from_preview'
+case "$WORK_DIR$SESSION$GRANT_ID$CORRECTION$ACTIVITY_ID$QUESTION_DIGEST$CONFIRMED_BINDING" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 case "$CORRECTION" in 0|1) ;; *) printf 'ERROR: CORRECTION must be exactly 0 or 1.\n' >&2; exit 1 ;; esac
 case "$WORK_DIR" in
   *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
@@ -200,8 +231,22 @@ done
 export YELLOW_JULES_ACTIVE_GRANT="$GRANT_ID"
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 [ -s "$WORK_DIR/message.txt" ] || { printf 'ERROR: write the message to %s/message.txt first.\n' "$WORK_DIR" >&2; exit 1; }
-args=(reply --session "$SESSION" "--message=$(cat -- "$WORK_DIR/message.txt")" --grant-id "$GRANT_ID")
+bind_hash() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
+}
+# Hash and send the same bytes: one read of the staged file.
+MESSAGE=$(cat -- "$WORK_DIR/message.txt")
+MESSAGE_SHA=$(printf '%s' "$MESSAGE" | bind_hash)
+BINDING=$(printf '%s' "${SESSION}|${GRANT_ID}|${CORRECTION}|${ACTIVITY_ID}|${QUESTION_DIGEST}|${MESSAGE_SHA}" | bind_hash)
+if [ "$CONFIRMED_BINDING" != "$BINDING" ]; then
+  printf 'ERROR: the session, grant, correction flag, question or message differs from the printed binding. Nothing was sent; start again from the preview.\n' >&2; exit 1
+fi
+args=(reply --session "$SESSION" "--message=$MESSAGE" --grant-id "$GRANT_ID")
 [ "$CORRECTION" = 1 ] && args+=(--correction)
+if [ "$ACTIVITY_ID" != none ]; then
+  [ "$QUESTION_DIGEST" != none ] || { printf 'ERROR: ACTIVITY_ID and QUESTION_DIGEST go together.\n' >&2; exit 1; }
+  args+=(--expect-activity-id "$ACTIVITY_ID" --expect-question-digest "$QUESTION_DIGEST")
+fi
 OUTPUT=$(node "$CLI" "${args[@]}")
 printf 'exit=%s\n' "$?"
 printf '%s\n' "$OUTPUT" | jq '{ok, operation, localRequestId, sent, requiresAttention, attention, details, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
@@ -269,6 +314,7 @@ printf '  node %s supervise --clear-pause --session %s\n\n' "'$CLI'" "'$SESSION'
 | `JULES_GRANT_EXPIRED`         | false     | the grant expired; remote work may still run — see Step 5                                   |
 | `JULES_GRANT_EXHAUSTED`       | false     | a limit is spent; the owner writes a new grant in a terminal                                |
 | `JULES_SUPERVISION_PAUSED`    | false     | the session is paused; see Step 6                                                           |
+| `JULES_QUESTION_CHANGED`      | false     | the session no longer awaits the question the pass showed; nothing was sent; run the pass again |
 | `JULES_POLICY_DEVIATION`      | false     | the newest plan differs from the evaluated one, or a deviation is open; run `/jules:status` |
 | `JULES_UNKNOWN_OUTCOME`       | false     | **do not repeat the write.** Run `/jules:status --session <ref> --reconcile`                |
 | `JULES_INVALID_STATE`         | false     | follow the error's recovery text; for a pause, run `/jules:status` first                    |

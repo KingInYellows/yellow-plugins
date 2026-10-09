@@ -522,13 +522,19 @@ transient failure from an undetermined one.
   complete walk leaves `unknown-outcome`, and a partial walk leaves
   `not-reached`. Operations the deadline prevented from being checked are
   reported as `not-reached`, never as resolved.
-- `reply --session <ref> --message <text> [--correction] [--request-id <id>] [--dry-run] [--grant-id <id>]`
+- `reply --session <ref> --message <text> [--correction] [--expect-activity-id <id> --expect-question-digest <hex>] [--request-id <id>] [--dry-run] [--grant-id <id>]`
   → `{ localRequestId, localId, sessionResource, sent: true }`. `--dry-run`
   validates, performs one `info()`, and returns the same fields with
   `sent: false, dryRun: true`, plus `repository`, `requestedBranch`, and
   `taskRef` of the session when this plugin created it (the scope a covering
   grant must match). A dry-run never reports `sent: true`, because it issues no
-  POST. The real call is one POST, non-blocking (R9).
+  POST. The real call is one POST, non-blocking (R9). With both `--expect-*`
+  values (the `supervise` `needs-answer` `observedActivityId` and
+  `observedQuestionDigest`; one alone is `JULES_INVALID_INPUT`), a real call
+  re-reads the session's activities before reserving and fails with
+  `JULES_QUESTION_CHANGED` unless the session still awaits a reply and its
+  newest agent message has that id and digest. Like approve's plan check, the
+  read narrows the race without closing it.
 - `approve --session <ref> --plan-id <evaluated plan id> [--request-id <id>] [--dry-run] [--grant-id <id>]`
   →
   `{ localRequestId, localId, sessionResource, approvedPlanId, observedPlanIdAfter: string | null, verificationDeferred: bool, verification: { pages: n, partialPagination: bool }, policyDeviation? }`.
@@ -794,6 +800,7 @@ not the only permitted text. `sdk-adapter.ts` classifies SDK errors by
 | `JULES_CONTROLLER_MISMATCH`    | false     | this data directory is not the authorized controller copy; follow the handoff procedure in the plugin CLAUDE.md (R38)                        |
 | `JULES_GRANT_EXHAUSTED`        | false     | create a new grant with `authorize`                                                                                                          |
 | `JULES_SUPERVISION_PAUSED`     | false     | inspect the session, then run `supervise --clear-pause` in a terminal (R32)                                                                  |
+| `JULES_QUESTION_CHANGED`       | false     | `reply --expect-activity-id/--expect-question-digest`: the session no longer awaits the question the pass showed; nothing was sent             |
 
 SDK class to code (all eleven classes in `dist/errors.d.ts`). "After dispatch"
 means a mutating POST has been sent and no clear rejection was received. A
