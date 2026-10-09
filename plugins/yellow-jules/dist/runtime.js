@@ -351,6 +351,7 @@ async function status(deps, args) {
                         activityId: activity.activityId,
                         digest: (0, state_js_1.messageDigest)(activity.message),
                         createTime: activity.createTime,
+                        observedAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString(),
                     });
                 }
                 args.observer?.(activity, info);

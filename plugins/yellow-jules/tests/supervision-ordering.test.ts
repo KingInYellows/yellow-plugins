@@ -169,6 +169,172 @@ describe('a message that a later write could explain is not its echo', () => {
   });
 });
 
+describe('a held message keeps the time it was first read', () => {
+  const digest = messageDigest('A different follow-up.');
+  const reservationFor = (id: string) => ({
+    grantId,
+    ownerRequestId: session.localRequestId,
+    authority: {
+      repository: 'acme/widgets',
+      sourceResource: 'sources/github/acme/widgets',
+      branch: 'scratch/one',
+      taskRef: 't1',
+      operation: 'reply' as const,
+    },
+    reservation: {
+      localRequestId: id,
+      localId: `jl-${id === 'reply-before-read' ? 'd' : 'e'.repeat(1)}`.padEnd(
+        35,
+        id === 'reply-before-read' ? 'd' : 'e'
+      ),
+      sessionResource: session.sessionResource,
+      promptDigest: digest,
+    },
+  });
+  async function reply(id: string): Promise<void> {
+    const reservation = await reserveUnderGrant(h.deps, reservationFor(id));
+    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+    await settleAccepted(h.deps, reservation);
+  }
+  const seenOnce = (readAt: string, createTime: string) => ({
+    activityId: 'activities/teammate',
+    digest,
+    createTime,
+    observedAt: readAt,
+  });
+
+  it('a write dispatched after the first read cannot claim the message on a later walk', async () => {
+    const t0 = iso(0);
+    const message = seenOnce(t0, iso(-5_000));
+    // Walk 1 reads the teammate message; the reply is dispatched during/after it.
+    h.deps.clock.time += 10_000;
+    await reply('reply-after-read');
+    const pending1: string[] = [];
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [message],
+      {
+        ownerRequestId: session.localRequestId,
+        observedAt: iso(0),
+        walkStartedAt: t0,
+      },
+      pending1
+    );
+    expect(pending1).toEqual(['activities/teammate']);
+    expect((await owner())?.supervision?.heldActivities).toEqual({
+      'activities/teammate': t0,
+    });
+    // Walk 2 starts after the reply, which is therefore no longer post-walk.
+    // The vendor's real echo is not visible yet, only the teammate's message.
+    h.deps.clock.time += 20_000;
+    const pending2: string[] = [];
+    const outside = await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [{ ...message, observedAt: iso(0) }],
+      {
+        ownerRequestId: session.localRequestId,
+        observedAt: iso(0),
+        walkStartedAt: iso(-100),
+      },
+      pending2
+    );
+    expect(pending2).toEqual([]);
+    expect(outside?.activityId).toBe('activities/teammate');
+    const record = await owner();
+    expect(record?.supervision?.outsideSeen?.activityId).toBe(
+      'activities/teammate'
+    );
+    expect(record?.supervision?.heldActivities).toBeUndefined();
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-after-read']
+        ?.echoActivityId
+    ).toBeUndefined();
+  });
+
+  it('a write dispatched before the first read can still claim it once settled', async () => {
+    await reply('reply-before-read');
+    h.deps.clock.time += 5_000;
+    const readAt = iso(0);
+    const message = seenOnce(readAt, iso(-1_000));
+    const pending: string[] = [];
+    // Held only because the walk began before the write finished settling.
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [message],
+      {
+        ownerRequestId: session.localRequestId,
+        observedAt: readAt,
+        walkStartedAt: iso(-10_000),
+      },
+      pending
+    );
+    h.deps.clock.time += 20_000;
+    const later: string[] = [];
+    const outside = await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [{ ...message, observedAt: iso(0) }],
+      { ownerRequestId: session.localRequestId, observedAt: iso(0) },
+      later
+    );
+    expect(later).toEqual([]);
+    expect(outside).toBeUndefined();
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-before-read']
+        ?.echoActivityId
+    ).toBe('activities/teammate');
+    expect((await owner())?.supervision?.heldActivities).toBeUndefined();
+  });
+
+  it('keeps the first read time across further holds and a supervise patch', async () => {
+    await reply('reply-before-read');
+    h.deps.clock.time += 5_000;
+    const t0 = iso(0);
+    const message = seenOnce(t0, iso(-1_000));
+    const mark = (walkStartedAt: string) => ({
+      ownerRequestId: session.localRequestId,
+      observedAt: iso(0),
+      walkStartedAt,
+    });
+    // A partial walk holds a message that an earlier write could explain.
+    const pending: string[] = [];
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [message],
+      mark(iso(-100)),
+      pending,
+      false
+    );
+    expect(pending).toEqual(['activities/teammate']);
+    await updateSupervision(
+      h.dataDir,
+      session.localRequestId,
+      { backoff: null },
+      () => new Date(h.deps.clock.now())
+    );
+    expect((await owner())?.supervision?.heldActivities).toEqual({
+      'activities/teammate': t0,
+    });
+    // Held again by another partial walk: the stored time does not move.
+    h.deps.clock.time += 20_000;
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [{ ...message, observedAt: iso(0) }],
+      mark(iso(-100)),
+      [],
+      false
+    );
+    expect((await owner())?.supervision?.heldActivities).toEqual({
+      'activities/teammate': t0,
+    });
+  });
+});
+
 describe('outside markers only move forward', () => {
   const older = {
     activityId: 'activities/a-older',

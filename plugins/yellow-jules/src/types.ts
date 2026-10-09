@@ -364,6 +364,14 @@ export interface SupervisionState {
     readonly createTime?: string;
   };
   /**
+   * User messages a walk saw but could not yet classify (a still-unsettled or
+   * post-walk write might have explained them), keyed by activity id, with when
+   * a walk first read each. A write dispatched after that time can never be the
+   * echo of the message, however many walks later it is compared. Removed when
+   * the message is claimed or recorded as outside activity.
+   */
+  readonly heldActivities?: Readonly<Record<string, string>>;
+  /**
    * The plan a `needs-plan-review` pass presented, and when. A different plan
    * appearing before it is approved, with no reply of ours since, pauses (R32).
    */

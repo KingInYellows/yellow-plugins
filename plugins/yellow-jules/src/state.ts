@@ -269,6 +269,15 @@ function isValidSupervision(value: unknown): boolean {
     )
   )
     return false;
+  const heldActivities = value['heldActivities'];
+  if (
+    heldActivities !== undefined &&
+    !(
+      isPlainObject(heldActivities) &&
+      Object.values(heldActivities).every((v) => typeof v === 'string')
+    )
+  )
+    return false;
   const evaluatedPlan = value['evaluatedPlan'];
   if (
     evaluatedPlan !== undefined &&
@@ -1312,6 +1321,10 @@ export async function updateSupervision(
         ...keep('lastDecision', previous.lastDecision, decisionPatch),
         ...keep('outsideSeen', previous.outsideSeen, outsidePatch),
         ...keep('evaluatedPlan', previous.evaluatedPlan, patch.evaluatedPlan),
+        // Owned by claimOwnEchoes; a supervise patch must not drop it.
+        ...(previous.heldActivities !== undefined
+          ? { heldActivities: previous.heldActivities }
+          : {}),
       };
       const updated: OperationRecord = {
         ...current,
@@ -1345,6 +1358,8 @@ export async function claimOwnEchoes(
     activityId: string;
     digest: string;
     createTime?: string;
+    /** When the walk read this message; the persisted hold starts here. */
+    observedAt?: string;
   }>,
   mark?: {
     readonly ownerRequestId: string;
@@ -1399,6 +1414,29 @@ export async function claimOwnEchoes(
           r.echoActivityId !== undefined ? [r.echoActivityId] : []
         )
       );
+      // Held messages persist when they were first read: a write dispatched
+      // after that can never explain them, however many walks later it is
+      // compared (the 30 s dispatch allowance must not let it reach back).
+      const heldBefore = (
+        mark !== undefined ? operations[mark.ownerRequestId] : undefined
+      )?.supervision?.heldActivities;
+      const held: Record<string, string> = { ...(heldBefore ?? {}) };
+      const afterFirstRead = (r: OperationRecord, id: string): boolean => {
+        const since = held[id];
+        if (since === undefined) return false;
+        const sinceMs = Date.parse(since);
+        return (
+          !Number.isNaN(sinceMs) &&
+          (Date.parse(r.createdAt) > sinceMs ||
+            (r.dispatchedAt !== undefined &&
+              Date.parse(r.dispatchedAt) > sinceMs))
+        );
+      };
+      const hold = (message: { activityId: string; observedAt?: string }) => {
+        held[message.activityId] ??=
+          message.observedAt ?? mark?.walkStartedAt ?? mark?.observedAt ?? '';
+        if (held[message.activityId] === '') delete held[message.activityId];
+      };
       // The newest outside message by `(createTime, activityId)`, the order
       // `compareStamp` uses: vendor list order is unverified, so neither the
       // first nor the last message visited can stand for it.
@@ -1406,7 +1444,10 @@ export async function claimOwnEchoes(
         | { activityId: string; digest: string; createTime?: string }
         | undefined;
       for (const message of messages) {
-        if (claimed.has(message.activityId)) continue;
+        if (claimed.has(message.activityId)) {
+          delete held[message.activityId];
+          continue;
+        }
         const sent = message.createTime && Date.parse(message.createTime);
         const matches = (r: OperationRecord): boolean =>
           r.echoActivityId === undefined &&
@@ -1418,9 +1459,11 @@ export async function claimOwnEchoes(
             r.dispatchedAt !== undefined &&
             sent < Date.parse(r.dispatchedAt) - DISPATCH_SKEW_MS
           );
-        const eligible = landed.filter(
-          (r) => matches(r) && !inFlight(r) && !postWalk(r)
+        // A write made after the message was first read cannot be its echo.
+        const possible = landed.filter(
+          (r) => matches(r) && !afterFirstRead(r, message.activityId)
         );
+        const eligible = possible.filter((r) => !inFlight(r) && !postWalk(r));
         // Vendor list order is unverified, so with a usable timestamp prefer
         // the latest-dispatched write that precedes the message: an older
         // identical write then keeps the older echo.
@@ -1436,11 +1479,12 @@ export async function claimOwnEchoes(
                 undefined
               )
             : eligible[0];
-        if (slot === undefined && landed.some((r) => matches(r))) {
+        if (slot === undefined && possible.length > 0) {
           // Only a dispatched write whose outcome is unknown could explain it:
           // `dispatchedAt` proves the POST began, not that it landed. Leave the
           // message unclassified; the caller must not consume it yet.
           pendingOut?.push(message.activityId);
+          hold(message);
           continue;
         }
         if (slot !== undefined && !walkComplete) {
@@ -1448,9 +1492,11 @@ export async function claimOwnEchoes(
           // claiming this same-digest message now could be a teammate's. Hold
           // it until a complete walk can tell which match is earliest.
           pendingOut?.push(message.activityId);
+          hold(message);
           continue;
         }
         if (slot === undefined) {
+          delete held[message.activityId];
           if (
             newestOutside === undefined ||
             compareStamp(
@@ -1469,6 +1515,7 @@ export async function claimOwnEchoes(
           continue;
         }
         claimed.add(message.activityId);
+        delete held[message.activityId];
         operations[slot.localRequestId] = {
           ...slot,
           echoActivityId: message.activityId,
@@ -1532,6 +1579,28 @@ export async function claimOwnEchoes(
               updatedAt: mark.observedAt,
             };
           }
+        }
+      }
+      // Persist what is still held (and forget what was classified) in the
+      // same critical section, so the next walk compares writes against when
+      // each held message was first read.
+      const current =
+        mark !== undefined ? operations[mark.ownerRequestId] : undefined;
+      if (current !== undefined && mark !== undefined) {
+        const before = current.supervision?.heldActivities ?? {};
+        const same =
+          Object.keys(held).length === Object.keys(before).length &&
+          Object.entries(held).every(([id, at]) => before[id] === at);
+        if (!same) {
+          const { heldActivities: _drop, ...rest } = current.supervision ?? {};
+          operations[mark.ownerRequestId] = {
+            ...current,
+            supervision: {
+              ...rest,
+              ...(Object.keys(held).length > 0 ? { heldActivities: held } : {}),
+            },
+            updatedAt: mark.observedAt,
+          };
         }
       }
       return newestOutside;

@@ -476,6 +476,7 @@ async function recordOutsideActivity(
     activityId: string;
     digest: string;
     createTime?: string;
+    observedAt?: string;
   }>,
   walkComplete: boolean,
   walkStartedAt: string
@@ -561,6 +562,7 @@ export async function status(
       activityId: string;
       digest: string;
       createTime?: string;
+      observedAt: string;
     }> = [];
     // A complete walk vouches only for what it could see when it began: a
     // pause or outside marker recorded while it ran must postdate the stamp.
@@ -590,6 +592,7 @@ export async function status(
             activityId: activity.activityId,
             digest: messageDigest(activity.message),
             createTime: activity.createTime,
+            observedAt: nowFn(deps)().toISOString(),
           });
         }
         args.observer?.(activity, info);
