@@ -809,6 +809,24 @@ describe('races inside the write gate', () => {
       ).toBe('JULES_QUESTION_CHANGED');
     });
 
+    it('refuses a question whose text redaction altered, even with the digest of the raw text', async () => {
+      const raw = 'Use key AIzaSyA1234567890abcdefghijk for the call?';
+      const q = ask(raw);
+      const writes = h.adapter.writeCount();
+      expect(
+        await code(() =>
+          reply(
+            h.deps,
+            args({
+              expectActivityId: q.activityId,
+              expectQuestionDigest: messageDigest(raw),
+            })
+          )
+        )
+      ).toBe('JULES_INVALID_STATE');
+      expect(h.adapter.writeCount()).toBe(writes);
+    });
+
     it('needs both values', async () => {
       const q = ask();
       expect(

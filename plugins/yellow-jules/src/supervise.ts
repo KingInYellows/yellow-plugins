@@ -29,7 +29,7 @@ import {
   remainingMs,
 } from './deadline.js';
 import { AppErrorException, makeAppError, throwAppError } from './errors.js';
-import { fenceUntrusted } from './redact.js';
+import { fenceUntrusted, redact } from './redact.js';
 import {
   type Attention,
   attentionOf,
@@ -674,10 +674,15 @@ export async function superviseOnce(
     if (latest?.message !== undefined) {
       fenced.question = fenceUntrusted(truncate(latest.message));
     }
+    // A question redaction altered was not shown in full: no binding is
+    // offered for it, so the reply cannot be guarded and the operator answers.
+    const bindable =
+      latest?.message !== undefined &&
+      redact(latest.message) === latest.message;
     return finish(
       'needs-answer',
       {
-        ...(latest?.message !== undefined
+        ...(bindable
           ? {
               observedActivityId: latest.activityId,
               observedQuestionDigest: messageDigest(latest.message),
@@ -687,7 +692,7 @@ export async function superviseOnce(
         allowedActions: permits(grant, 'reply') ? ['reply'] : [],
       },
       {},
-      latest?.message === undefined ? ['questionUnavailable'] : []
+      bindable ? [] : ['questionUnavailable']
     );
   }
 

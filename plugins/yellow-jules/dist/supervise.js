@@ -448,8 +448,12 @@ async function superviseOnce(deps, args) {
         if (latest?.message !== undefined) {
             fenced.question = (0, redact_js_1.fenceUntrusted)(truncate(latest.message));
         }
+        // A question redaction altered was not shown in full: no binding is
+        // offered for it, so the reply cannot be guarded and the operator answers.
+        const bindable = latest?.message !== undefined &&
+            (0, redact_js_1.redact)(latest.message) === latest.message;
         return finish('needs-answer', {
-            ...(latest?.message !== undefined
+            ...(bindable
                 ? {
                     observedActivityId: latest.activityId,
                     observedQuestionDigest: (0, state_js_1.messageDigest)(latest.message),
@@ -457,7 +461,7 @@ async function superviseOnce(deps, args) {
                 : {}),
             nextCheck: acting,
             allowedActions: permits(grant, 'reply') ? ['reply'] : [],
-        }, {}, latest?.message === undefined ? ['questionUnavailable'] : []);
+        }, {}, bindable ? [] : ['questionUnavailable']);
     }
     if (condition === 'remote-completed') {
         if (base.correctiveRoundsLeft === 0) {

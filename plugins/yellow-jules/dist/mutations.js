@@ -330,6 +330,14 @@ async function assertQuestionStillOpen(deps, adapter, sessionResource, liveCondi
         return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'the session activity could not be completely re-read; nothing was sent', { recoveryAction: 'Retry with a larger --deadline-ms.' });
     }
     const current = newest;
+    // The review saw the redacted question; an answer to text redaction hid
+    // cannot be bound to what was shown.
+    if (current?.message !== undefined &&
+        (0, redact_js_1.redact)(current.message) !== current.message) {
+        (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'the pending question contains credential-shaped text that is redacted from the review; it cannot be answered unseen. Nothing was sent', {
+            recoveryAction: 'Read the question in the Jules console and answer it there.',
+        });
+    }
     if (current === undefined ||
         current.message === undefined ||
         current.activityId !== expected.activityId ||

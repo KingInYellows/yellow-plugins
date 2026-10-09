@@ -41,7 +41,7 @@ import {
   rethrowWithContext,
   throwAppError,
 } from './errors.js';
-import { redactDeep } from './redact.js';
+import { redact, redactDeep } from './redact.js';
 import {
   type Attention,
   attentionOf,
@@ -589,6 +589,21 @@ async function assertQuestionStillOpen(
   const current = newest as
     | { activityId: string; message?: string }
     | undefined;
+  // The review saw the redacted question; an answer to text redaction hid
+  // cannot be bound to what was shown.
+  if (
+    current?.message !== undefined &&
+    redact(current.message) !== current.message
+  ) {
+    throwAppError(
+      'JULES_INVALID_STATE',
+      'the pending question contains credential-shaped text that is redacted from the review; it cannot be answered unseen. Nothing was sent',
+      {
+        recoveryAction:
+          'Read the question in the Jules console and answer it there.',
+      }
+    );
+  }
   if (
     current === undefined ||
     current.message === undefined ||

@@ -194,6 +194,19 @@ describe('needs-answer', () => {
     expect(r.fenced.question?.startsWith(FENCE_BEGIN)).toBe(true);
   });
 
+  it('withholds the question bindings when redaction altered the question', async () => {
+    setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
+    addActivity(h, session.sessionResource, {
+      type: 'agentMessaged',
+      message: 'Use key AIzaSyA1234567890abcdefghijk for the call?',
+    });
+    const r = await sup();
+    expect(r.decision).toBe('needs-answer');
+    expect(r.observedActivityId).toBeUndefined();
+    expect(r.observedQuestionDigest).toBeUndefined();
+    expect(r.attention).toContain('questionUnavailable');
+  });
+
   it('flags a question that is no longer in the read window', async () => {
     setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
     const r = await sup();
