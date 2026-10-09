@@ -521,7 +521,11 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   trusted-config file whoever created it (the saved patch holds the content
   unless the credential screen withheld it), and leaves an untracked nested
   git repository in place, named in `reason`, while still reverting the other
-  paths. It lists no gitignored file. It reports
+  paths. It lists no gitignored file, so it requires `--ignored-since
+  <marker-file>` (or an explicit `--no-ignored-guard` from a caller that holds
+  no marker, such as the stack and sweep dirty-tree cleanup) and, with the
+  marker, refuses (exit 2, nothing reverted) when a gitignored trusted-config
+  file is newer than it. It reports
   `deniedClean` (no deny-listed change remains), `reverted` (at most 20 paths,
   screened like the patch) and `revertedCount`; an empty match is
   `result: "noop"` with no patch. `treeClean` still covers the whole tree and is
@@ -590,9 +594,10 @@ a change outside the set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify
 `skipped` — the orchestrator runs `run-verify-command --pr <N> --revert-only`
 on the files the clusters reported under `Files modified`, which saves a patch
 first. Then `--revert-denied` (no file list) reverts dirty trusted-config
-paths on the contract deny list without asking, and while the `--ignored-since`
-marker still exists a `--check-ignored` call guards the gitignored files (a hit
-is the ignored-file stop). Step 2
+paths on the contract deny list without asking, with the `--ignored-since`
+marker (it refuses on a changed gitignored trusted-config file: the ignored-file
+stop), and a refusal before the verify call also runs `--check-ignored` for the
+other gitignored files. The marker lives until the end of Step 6. Step 2
 guarantees a clean start, but not a quiet tree: a changed path no cluster
 reported and that is not trusted config (`.env*`, keys, CI and Docker files
 included) is not proven to be a resolver's edit, so it is never reverted

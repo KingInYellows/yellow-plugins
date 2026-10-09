@@ -958,6 +958,22 @@ JSEOF
   assert_all_restored
 }
 
+@test "a retry after a recorded provider abort does not need gt on PATH" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  plant_stuck_rebase "$(wtp c)" c
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [ -f "$SD/provider-aborted" ]
+  rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
+  rm -f "$STUB_DIR/bin/gt"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  [[ $output != *"not installed"* ]]
+  assert_all_restored
+}
+
 @test "a symlinked provider-aborted marker is replaced, never followed" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite

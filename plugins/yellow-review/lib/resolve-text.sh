@@ -323,7 +323,7 @@ _rt_scan() {
             # Leading non-ASCII punctuation or space (curly quotes, bullet,
             # middle dot, guillemets, en and em dash, ellipsis, no-break space
             # as its UTF-8 bytes). One regex for gawk (either locale) and mawk.
-            lead = "^(“|”|‘|’|•|·|«|»|–|—|…|\302\240)+"
+            lead = "^((“|”|‘|’|•|·|«|»|–|—|…|\302\240)[ \t]*)+"
             kw = "(pass([_-]?(phrase|code)|word|wd)?|pwd|secret([_ \t-]?key)?|(private|access)[_ \t-]?key|token|api[_ \t-]?key|credentials?)"
             ph =" string number integer boolean object array unknown undefined"
             ph = ph " nullable optional required redacted placeholder example"

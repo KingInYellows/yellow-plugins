@@ -7,7 +7,7 @@
 #                           [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-dirty
-#        run-verify-command --pr <N> --revert-denied
+#        run-verify-command --pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard)
 #        run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>
 #   --trusted:     required to run a command. The caller sets it only after
 #                  confirming the command came from an untracked config file
@@ -31,7 +31,8 @@
 #                  marker that is missing, unreadable, a symlink or not a
 #                  regular file also refuses (fail closed), as does a listing
 #                  failure. Every run requires it (usage error, exit 2, without
-#                  it). The revert modes ignore it. Ignored changes are refused,
+#                  it). --revert-only and --revert-dirty ignore it;
+#                  --revert-denied uses it (below). Ignored changes are refused,
 #                  never reported as a clean tree: treeClean covers tracked and
 #                  untracked-unignored files.
 #   --check-ignored: run nothing and revert nothing; only the --ignored-since
@@ -72,8 +73,16 @@
 #                  the deny list (.env*, keys, CI and Docker files), stay for
 #                  the caller to ask about or leave. Takes no file
 #                  list: git lists the changes, so a resolver path never
-#                  reaches the command line. Gitignored files are not listed;
-#                  the caller guards them with --check-ignored. It deletes an
+#                  reaches the command line. Gitignored files are not listed,
+#                  so it needs --ignored-since <marker-file> or an explicit
+#                  --no-ignored-guard (exit 2 with neither, or both). With the
+#                  marker it first refuses (exit 2, nothing reverted, paths
+#                  named) when a gitignored trusted-config file is newer than
+#                  the marker: it has no HEAD copy to restore, so the caller
+#                  stops. Other gitignored files (a verify run's build output)
+#                  do not count. --no-ignored-guard is for callers that hold
+#                  no marker (the stack and sweep dirty-tree cleanup, after
+#                  /review:resolve ran its own guard). It deletes an
 #                  untracked trusted-config file whoever created it; the
 #                  recovery patch holds the content unless the credential
 #                  screen withholds it. An untracked nested git repository is
@@ -119,7 +128,8 @@
 #   treeClean false and a reason; nothing is reverted.
 # Exit codes: 0 ran (read "result"), 2 refused or could not start: usage
 #   error (including run-only flags next to a revert flag, and a run
-#   without --ignored-since), no --trusted,
+#   without --ignored-since, a --revert-denied with neither or both of
+#   --ignored-since and --no-ignored-guard), no --trusted,
 #   unreadable --command-file or --files-from, not in a git repository, a
 #   git config harden_git_config refuses in any mode (a non-numeric
 #   GIT_CONFIG_COUNT, an override that did not take, or a repository-local
@@ -128,7 +138,8 @@
 #   the revert and check-ignored modes leave alone; the tree is untouched), a
 #   refused path (not canonical, deny-listed when running, gitignored or
 #   unverifiable, or without changes when running), a change outside the
-#   listed files, an ignored file changed since the --ignored-since marker (or
+#   listed files, an ignored file (for --revert-denied, an ignored
+#   trusted-config file) changed since the --ignored-since marker (or
 #   a marker or ignored-file listing that cannot be read), a tree listing or
 #   setup failure (library, output directory,
 #   log, temp file or pipe), or a recovery patch that could not be screened
@@ -412,10 +423,11 @@ gh() {
 usage() {
     printf 'Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted [--unattended] --ignored-since <marker-file> [--files-from <file>] [-- <files...>]\n' >&2
     printf '       run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]\n' >&2
-    printf '       run-verify-command --pr <N> (--revert-dirty | --revert-denied)\n' >&2
+    printf '       run-verify-command --pr <N> --revert-dirty\n' >&2
+    printf '       run-verify-command --pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard)\n' >&2
     printf '       run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>\n' >&2
     printf '  exactly one of --revert-only, --revert-dirty, --revert-denied and --check-ignored may be given; --revert-dirty and --revert-denied take no file list\n' >&2
-    printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required for every run; revert modes ignore it\n' >&2
+    printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required for every run and for --revert-denied (or --no-ignored-guard); --revert-only and --revert-dirty ignore it\n' >&2
     exit 2
 }
 
@@ -439,6 +451,7 @@ COMMAND_FILE=""
 TRUSTED=0
 UNATTENDED=0
 IGNORED_SINCE=""
+NO_IGNORED_GUARD=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --pr) [ $# -ge 2 ] || usage; PR="$2"; shift 2 ;;
@@ -447,6 +460,7 @@ while [ $# -gt 0 ]; do
         --command-file) [ $# -ge 2 ] || usage; COMMAND_FILE="$2"; shift 2 ;;
         --trusted) TRUSTED=1; shift ;;
         --unattended) UNATTENDED=1; shift ;;
+        --no-ignored-guard) NO_IGNORED_GUARD=1; shift ;;
         --revert-only) set_mode --revert-only revert-only; shift ;;
         --revert-dirty) set_mode --revert-dirty revert-dirty; shift ;;
         --revert-denied) set_mode --revert-denied revert-denied; shift ;;
@@ -466,6 +480,16 @@ if [ "$MODE" != run ] && { [ -n "$TIMEOUT$COMMAND_FILE" ] || [ "$TRUSTED$UNATTEN
 fi
 
 [[ "$PR" =~ ^[1-9][0-9]*$ ]] || die 2 "--pr must be a positive integer"
+if [ "$MODE" = revert-denied ]; then
+    # Gitignored trusted-config edits are invisible to the listing below, so
+    # the caller must either hand over the marker or say it holds none.
+    [ -n "$IGNORED_SINCE" ] || [ "$NO_IGNORED_GUARD" = 1 ] \
+        || die 2 "--revert-denied requires --ignored-since <marker-file>, or --no-ignored-guard when no marker exists"
+    [ -z "$IGNORED_SINCE" ] || [ "$NO_IGNORED_GUARD" = 0 ] \
+        || die 2 "--ignored-since and --no-ignored-guard cannot be combined"
+elif [ "$NO_IGNORED_GUARD" = 1 ]; then
+    die 2 "--no-ignored-guard applies only to --revert-denied"
+fi
 if [ "$MODE" = check-ignored ]; then
     [ -n "$IGNORED_SINCE" ] || die 2 "--check-ignored requires --ignored-since <marker-file>"
     [ "${#FILES[@]}" -eq 0 ] || die 2 "--check-ignored takes no file list"
@@ -484,9 +508,9 @@ if [ "$MODE" = run ]; then
         exit 2
     fi
 fi
-# The marker is validated and resolved once for both modes that take it; the
+# The marker is validated and resolved once for every mode that uses it; the
 # script changes directory below.
-if [ "$MODE" = check-ignored ] || [ "$MODE" = run ]; then
+if [ "$MODE" = check-ignored ] || [ "$MODE" = run ] || { [ "$MODE" = revert-denied ] && [ -n "$IGNORED_SINCE" ]; }; then
     [ -f "$IGNORED_SINCE" ] && [ ! -L "$IGNORED_SINCE" ] && [ -r "$IGNORED_SINCE" ] \
         || die 2 "--ignored-since marker is not a readable regular file: $IGNORED_SINCE"
     IGNORED_SINCE=$(cd -- "$(dirname -- "$IGNORED_SINCE")" && pwd)/$(basename -- "$IGNORED_SINCE") \
@@ -516,14 +540,60 @@ add_reason() { REASON="${REASON:+$REASON; }$1"; }
 # line as well (a `ghp_` directory name is a credential prefix only there).
 # A path with a control character (a newline can carry instruction-like text
 # into the model-visible summary) is withheld too.
+# path_is_safe <path>: success when the path has no control character and the
+# credential screen answers clean.
+path_is_safe() {
+    local t="" rc=1
+    if [[ "$1" != *[[:cntrl:]]* ]] && t=$(mktemp) && printf '%s\n' "$1" "${1//\//$'\n'}" >|"$t" && rt_code_clean "$t"; then
+        rc=0
+    fi
+    [ -z "${t:-}" ] || rm -f -- "$t"
+    return "$rc"
+}
+# safe_path_label <path>: the path for a stderr message, or a placeholder when
+# path_is_safe says no. An auto-discovered path reaches the refusal dies below
+# before any JSON reason is screened.
+safe_path_label() {
+    if path_is_safe "$1"; then
+        printf '%s' "$1"
+    else
+        printf '%s' '<a path withheld: credential-shaped or control characters>'
+    fi
+}
+# safe_path_list_z: reads NUL-delimited whole paths on stdin, prints
+# safe_path_label of each joined with ", ". A newline inside a name reaches
+# path_is_safe intact, so the name is withheld whole.
+safe_path_list_z() {
+    local p out=""
+    while IFS= read -r -d '' p; do
+        out="${out:+$out, }$(safe_path_label "$p")"
+    done
+    printf '%s' "$out"
+}
+# safe_hits_list <newline-joined find output>: rp_ignored_changed_since joins
+# its hits with newlines at the source, so a name containing a newline splits
+# into fragments. Print the list only when every line is a real path in the
+# tree (a fragment of a split name is not one); otherwise print a count.
+safe_hits_list() {
+    local line n=0
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        n=$((n + 1))
+        if [ ! -e "$line" ] && [ ! -L "$line" ]; then
+            printf '%s' "<$(grep -c . <<<"$1") changed path(s) withheld: a name contains a newline>"
+            return 0
+        fi
+    done <<<"$1"
+    while IFS= read -r line; do
+        [ -n "$line" ] && printf '%s\0' "$line"
+    done <<<"$1" | safe_path_list_z
+}
 add_path_reason() {
-    local t=""
-    if [[ "$2" != *[[:cntrl:]]* ]] && t=$(mktemp) && printf '%s\n' "$2" "${2//\//$'\n'}" >|"$t" && rt_code_clean "$t"; then
+    if path_is_safe "$2"; then
         add_reason "$1: $2"
     else
         add_reason "$1: <path withheld: it looks like a credential or could not be screened>"
     fi
-    [ -z "${t:-}" ] || rm -f -- "$t"
 }
 
 # Temp files and the output pipe; removed on every exit.
@@ -535,6 +605,7 @@ MARKER=""
 STREAM_FILE=""
 IGNORED_SCRATCH=""
 DIR_LIST=""
+HIDDEN_HITS=""
 # The snapshot is provisional until it is complete and credential-screened: any
 # exit before then (a signal, a die, a failed screen) removes it, so no
 # unscreened patch stays under .git.
@@ -542,7 +613,7 @@ PATCH=""
 PATCH_PROVISIONAL=0
 cleanup() {
     local f
-    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST"; do
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST" "$HIDDEN_HITS"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
     if [ "$PATCH_PROVISIONAL" = 1 ] && [ -n "$PATCH" ]; then
@@ -568,13 +639,59 @@ if [ "$MODE" = check-ignored ]; then
         # changes (the resolver edits are in the tree by design), so claiming
         # a clean tree would let the caller skip its own dirty-tree stop.
         0) jq -nc '{result: "clean", patch: null, log: null}'; exit 0 ;;
-        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored file): ${IGN_HITS//$'\n'/, }" ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored file): $(safe_hits_list "$IGN_HITS")" ;;
         *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
 fi
 
+# rp_tree_changes diffs against HEAD and cannot see an edit to a tracked file
+# marked skip-worktree or assume-unchanged. Fail closed when such a flag sits on
+# a path the mode relies on seeing: a clean listing would be a false "no
+# change". Scope by mode: --revert-dirty reverts every listed change, so any
+# tracked path counts; --revert-denied acts only on trusted-config paths, so an
+# unrelated hidden deny-listed path must not block it; a verify run keeps the
+# trusted-config or deny-listed scope. --revert-only and --check-ignored never
+# call this (the former reverts a named list, the latter reads no tracked tree). `ls-files -v` tags assume-unchanged paths in lowercase (skip-worktree
+# is `S`, or `s` with both flags).
+# One exemption: git sets skip-worktree on every tracked file outside a sparse
+# checkout's patterns, and such a file is not on disk, so no resolver edited it.
+# An `S` entry is skipped only when core.sparseCheckout reads true, the path is
+# absent from the worktree and is not a symlink. Lowercase tags (including `s`),
+# a present file, an absent file outside a sparse checkout (a hidden deletion)
+# and any config read failure other than "unset" still refuse.
+refuse_hidden_flags() {
+    local out tag f hits sparse=false rc=0 val
+    val=$(yr_git config --bool --get core.sparseCheckout 2>/dev/null) || rc=$?
+    case "$rc:$val" in
+        0:true) sparse=true ;;
+        0:false|1:) ;;
+        *) sparse=false ;;
+    esac
+    out=$(mktemp) || die 2 "mktemp failed"
+    hits=$(mktemp) || { rm -f -- "$out"; die 2 "mktemp failed"; }
+    HIDDEN_HITS="$hits"
+    yr_git ls-files -v -z >|"$out" 2>/dev/null || { rm -f -- "$out"; die 2 "cannot check tracked files for skip-worktree or assume-unchanged flags"; }
+    while IFS= read -r -d '' f; do
+        tag="${f:0:1}"
+        f="${f:2}"
+        case "$tag" in [a-z]|S) ;; *) continue ;; esac
+        if [ "$tag" = S ] && [ "$sparse" = true ] && [ ! -e "$f" ] && [ ! -L "$f" ]; then
+            continue
+        fi
+        case "$MODE" in
+            revert-dirty) ;;
+            revert-denied) rp_trusted_config "$f" || continue ;;
+            *) rp_trusted_config "$f" || rp_denied "$f" || continue ;;
+        esac
+        printf '%s\0' "$f" >>"$hits"
+    done <"$out"
+    rm -f -- "$out"
+    [ ! -s "$hits" ] || die 2 "tracked files this mode checks carry a skip-worktree or assume-unchanged flag, so edits to them are invisible to the tree check; clear the flag (git update-index --no-skip-worktree --no-assume-unchanged) and retry: $(safe_path_list_z <"$hits")"
+}
+
 if [ "$MODE" != revert-only ]; then
     list_tree_changes || die 2 "cannot list tree changes"
+    refuse_hidden_flags
 fi
 
 if [ "$MODE" = revert-dirty ]; then
@@ -586,6 +703,21 @@ elif [ "$MODE" = revert-denied ]; then
     # Git lists the paths. Only trusted-config paths are reverted; the caller
     # never passes resolver-derived paths on the command line.
     [ "${#FILES[@]}" -eq 0 ] || die 2 "--revert-denied takes no file list"
+    # A gitignored trusted-config file has no HEAD copy and is not listed, so
+    # it cannot be reverted here: refuse before anything changes, and let the
+    # caller stop. Only trusted-config paths count, so a verify run's ignored
+    # build output does not block the rollback.
+    if [ -n "$IGNORED_SINCE" ]; then
+        IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"
+        IGN_RC=0
+        IGN_HITS=$(rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH" rp_trusted_config) || IGN_RC=$?
+        rm -f -- "$IGNORED_SCRATCH"
+        case "$IGN_RC" in
+            0) ;;
+            1) die 2 "gitignored trusted-config files changed since the --ignored-since marker; nothing was reverted: $(safe_hits_list "$IGN_HITS")" ;;
+            *) die 2 "cannot check gitignored trusted-config files against the --ignored-since marker; nothing was reverted: $IGNORED_SINCE" ;;
+        esac
+    fi
     while IFS= read -r -d '' f; do
         [ -n "$f" ] && rp_trusted_config "$f" && FILES+=("$f")
     done <"$CHANGES_FILE"
@@ -638,7 +770,7 @@ if [ "$MODE" = run ]; then
     rm -f -- "$IGNORED_SCRATCH"
     case "$IGN_RC" in
         0) ;;
-        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: ${IGN_HITS//$'\n'/, }" ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: $(safe_hits_list "$IGN_HITS")" ;;
         *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
 
@@ -675,23 +807,23 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         # never follows a symlink, and a symlinked parent that escapes the repo
         # fails the containment check.
         REAL=$(cd -P -- "$f" 2>/dev/null && pwd -P) \
-            || die 2 "cannot resolve the directory at: $f"
+            || die 2 "cannot resolve the directory at: $(safe_path_label "$f")"
         case "$REAL" in
-            "$TOP_REAL"|"$TOP_REAL/.git"|"$TOP_REAL/.git/"*) die 2 "refusing to remove a directory that is the repo root or .git: $f" ;;
+            "$TOP_REAL"|"$TOP_REAL/.git"|"$TOP_REAL/.git/"*) die 2 "refusing to remove a directory that is the repo root or .git: $(safe_path_label "$f")" ;;
             "$TOP_REAL/"*) ;;
-            *) die 2 "refusing to remove a directory outside the repository: $f" ;;
+            *) die 2 "refusing to remove a directory outside the repository: $(safe_path_label "$f")" ;;
         esac
         # An untracked nested repository, or a submodule's worktree (it holds a
         # .git file), is listed as a single directory; its history and any
         # untracked files in it are not ours to delete, so refuse rather than
         # remove it.
         NESTED=$(find -- "$f" -name .git -print -quit 2>/dev/null) \
-            || die 2 "cannot scan the directory for a nested repository: $f"
+            || die 2 "cannot scan the directory for a nested repository: $(safe_path_label "$f")"
         if [ -n "$NESTED" ]; then
             # --revert-denied judges each trusted-config path on its own, so a
             # repository it must not delete does not stop the other reverts.
             [ "$MODE" = revert-denied ] \
-                || die 2 "refusing to remove a directory that contains a nested git repository: $f"
+                || die 2 "refusing to remove a directory that contains a nested git repository: $(safe_path_label "$f")"
             add_path_reason "left a nested git repository in place" "$f"
             NESTED_KEPT+=("$f")
             continue
@@ -702,7 +834,7 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         # siblings), so refuse rather than remove it.
         HEAD_TYPE=$(lgit cat-file -t "HEAD:$f" 2>/dev/null) || HEAD_TYPE=""
         [ "$HEAD_TYPE" = blob ] \
-            || die 2 "refusing to remove a directory that is not a replaced file (HEAD has ${HEAD_TYPE:-nothing} there): $f"
+            || die 2 "refusing to remove a directory that is not a replaced file (HEAD has ${HEAD_TYPE:-nothing} there): $(safe_path_label "$f")"
     fi
     # Validated; the removal waits until the output setup below has succeeded,
     # so a setup failure exits before anything is deleted that the checkout
@@ -747,7 +879,7 @@ fi
 for f in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
     rm -f -- "$f" 2>/dev/null
     if [ -e "$f" ] || [ -L "$f" ]; then
-        die 2 "cannot remove a path that is not a regular file or symlink: $f"
+        die 2 "cannot remove a path that is not a regular file or symlink: $(safe_path_label "$f")"
     fi
     add_path_reason "removed without reading, not a regular file or symlink" "$f"
 done
