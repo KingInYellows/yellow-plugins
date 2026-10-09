@@ -3475,3 +3475,30 @@ dirlink_setup() {
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
 }
+
+@test "a git script whose #! uses env -S with a variable is refused before the bootstrap runs it (run-verify-command)" {
+  marker="$BATS_TEST_TMPDIR/boot-envs-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/interp"
+  chmod +x "$REPO/tools/interp"
+  printf '%s\n' '#!/usr/bin/env -S ${INTERP}' >| "$BATS_TEST_TMPDIR/gitbin/git"
+  chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+  printf '%s\n' 'true' >| "$CMD"
+  run --separate-stderr env "INTERP=$REPO/tools/interp" "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the bootstrap ran the planted git" >&2; return 1; }
+  [ "$status" -eq 2 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
+}
+
+@test "a git script whose #! has an env assignment or an -S escape is refused before the bootstrap runs it (run-verify-command)" {
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '%s\n' 'true' >| "$CMD"
+  for shebang in '#!/usr/bin/env -S PATH=tools git' '#!/usr/bin/env -S "/tmp/my\_repo/git"'; do
+    printf '%s\n' "$shebang" >| "$BATS_TEST_TMPDIR/gitbin/git"
+    chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt
+    [ "$status" -eq 2 ] || { echo "status $status: $shebang: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git resolves to a path inside the repository"* ]] || { echo "accepted: $shebang" >&2; return 1; }
+  done
+}

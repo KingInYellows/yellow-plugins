@@ -254,7 +254,8 @@ entries before that check. Every other program either script, git or a git child
 (`ssh`, `git-credential-*`, `gpg`, pagers, `git-remote-*`) looks up by bare
 name is not refused: both scripts call `yr_adopt_path` before parsing
 arguments and run on `yr_safe_path`'s result. It drops a `PATH` directory
-inside the worktree and any directory that holds a symlink, whatever its name,
+inside the worktree and any directory (a symlinked `PATH` entry is followed
+into its real children) that holds a symlink, whatever its name,
 dangling or not, whose canonical target (a file or a directory) is inside the
 worktree, so the name resolves to a file outside the worktree or not at all.
 It also drops a directory with an executable script whose `#!` interpreter
@@ -275,15 +276,31 @@ inside it, and injected `GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` or
 `GIT_CONFIG_PARAMETERS` config (`core.sshCommand`, `credential.helper`,
 `gpg.program` and the like) that does; trusted values outside the worktree are
 kept. Command lines are judged whole: the raw value must not contain the
-worktree path (physical or logical spelling), no token (quotes, a leading `!`
-and `--opt=VALUE` handled) may be an absolute path, or an existing path
-relative to the current directory, that resolves inside it, and a bare first
-word must not resolve through the screened `PATH` to a script whose `#!`
-interpreter enters it, so `sh <worktree>/script` is refused. The pre-source
-bootstrap resolvers of both scripts apply the same `#!` check to the first
-`git` (and every tool). `env -S`/`--split-string` (attached or separate, also
-in a cluster such as `-vS`) and options with arguments (`-u`, `-C`, `-P`,
-`-a` and long forms) are parsed in `#!` lines.
+worktree path as a whole path (`<root>2` and `<root>-keys` are siblings and
+pass), no word (quotes, a leading `!` and `--opt=VALUE` handled) may be an
+absolute path, or an existing path relative to the current directory, that
+resolves inside it, and a bare first word is looked up on the screened `PATH`
+only (never the current directory, so `PAGER=less` is fine next to a `less/`
+directory) and must not be a script whose `#!` interpreter enters the worktree.
+`sh <worktree>/script` and `sh evil` (with `evil` in the current directory) are
+refused. A value that uses shell syntax the check cannot judge (`$`, backtick,
+`;`, `&`, `|`, `<`, `>`, parentheses, `*`, `?`, `[`, a backslash, a newline,
+`~user`, or a quote inside a word rather than at its edge) is refused with a
+message naming the variable; a leading `~/` is expanded to
+`HOME` and judged. When `GIT_CONFIG_GLOBAL` is unset, a `HOME` or
+`XDG_CONFIG_HOME` that puts git's global config inside the worktree is refused
+(a dotfiles repository rooted at `HOME` therefore needs `GIT_CONFIG_GLOBAL`
+set), and a command-bearing entry whose global or system config file (also an
+include) lies inside the worktree is refused. The pre-source bootstrap
+resolvers of both scripts apply the same `#!` check to the first `git` (and
+every tool). In `#!` lines the optional argument of a non-`env` interpreter and
+an `env` command's arguments are judged like command-line words.
+`env -S`/`--split-string` (attached or separate, also in a cluster such as
+`-vS`) and options with arguments (`-u`, `-C`, `-P`, `-a` and long forms) are
+parsed. Fail closed: an `env` line with a `NAME=value` operand before the
+utility (`PATH=tools` changes where it is looked up), or with a `$`, backslash
+or quote after `-S` (env expands and decodes them), counts as entering the
+worktree.
 `run-verify-command` still gives the verify command the caller's `PATH`
 (`YR_ORIG_PATH`). Both scripts take their own directory by parameter expansion,
 not `dirname`.
