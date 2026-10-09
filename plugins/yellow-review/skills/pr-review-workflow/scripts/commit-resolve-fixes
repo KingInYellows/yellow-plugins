@@ -202,7 +202,14 @@ MAX_CHANGED_LINES=50
 # check_lib_integrity runs before that file is sourced: a function that
 # exists only there cannot resolve the first git. A caller-supplied path is
 # ignored. The result stays in the shell; it is not written to a file.
-unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ YR_GIT_PATH
+unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ YR_GIT_PATH YR_ORIG_PATH
+# This script's own directory by parameter expansion: dirname is a PATH lookup,
+# and a PATH directory inside the worktree could hold a planted one that runs
+# before any check.
+case "$0" in
+    */*) CRF_DIR=${0%/*}; [ -n "$CRF_DIR" ] || CRF_DIR=/ ;;
+    *) CRF_DIR=. ;;
+esac
 # yr_helper <name>: a helper the trust check itself must run (readlink). Looked
 # up in fixed system directories, never on PATH: a PATH directory inside the
 # worktree could hold a planted one that runs before any check. Fails closed
@@ -371,7 +378,7 @@ unset _yr_rc
 
 check_lib_integrity() {
     local libdir top rel name st blob
-    libdir=$(cd -- "$(dirname -- "$0")/../../../lib" 2>/dev/null && pwd -P) || return 0
+    libdir=$(cd -- "$CRF_DIR/../../../lib" 2>/dev/null && pwd -P) || return 0
     [ -n "${YELLOW_REVIEW_GIT:-}" ] || return 0
     top=$("$YELLOW_REVIEW_GIT" rev-parse --show-toplevel 2>/dev/null) || return 0
     top=$(cd -- "$top" 2>/dev/null && pwd -P) || { printf '[commit-resolve-fixes] Error: cannot resolve the repository root to verify the plugin libraries; nothing committed\n' >&2; return 1; }
@@ -390,18 +397,28 @@ check_lib_integrity() {
 check_lib_integrity || exit 3
 
 # shellcheck source=../../../lib/resolve-paths.sh
-. "$(dirname -- "$0")/../../../lib/resolve-paths.sh"
+. "$CRF_DIR/../../../lib/resolve-paths.sh"
 # Resolve git and the worktree-free PATH once, here, so later subshells reuse them.
 yr_git --version >/dev/null 2>&1 || true
 # shellcheck source=../../../lib/resolve-text.sh
-. "$(dirname -- "$0")/../../../lib/resolve-text.sh"
+. "$CRF_DIR/../../../lib/resolve-text.sh"
 # shellcheck source=../../../lib/verify-run.sh
-. "$(dirname -- "$0")/../../../lib/verify-run.sh" || { printf '[commit-resolve-fixes] Error: cannot load lib/verify-run.sh\n' >&2; exit 2; }
+. "$CRF_DIR/../../../lib/verify-run.sh" || { printf '[commit-resolve-fixes] Error: cannot load lib/verify-run.sh\n' >&2; exit 2; }
 
 die() { printf '[commit-resolve-fixes] Error: %s\n' "$2" >&2; exit "$1"; }
 
+# From here PATH is yr_safe_path's result. Everything this script runs by bare
+# name after the resolvers wrote the tree (grep decides which paths belong to
+# the PR; sed, tr, cat, mktemp, rm and the rest handle what is committed)
+# resolves only to a file outside the worktree: a directory that is inside it,
+# or that holds one of those tools as a symlink into it, is dropped. Tools
+# bound by absolute path below (git, gh, jq, gt, node, awk, timeout) are still
+# resolved against the caller's PATH and refused, not skipped; see
+# yr_resolve_tool. Before any argument is parsed.
+yr_adopt_path || die 3 "no PATH directory is left once those that reach into the repository are dropped; nothing committed"
+
 # Resolved before the script changes directory: $0 may be relative.
-PLUGIN_ROOT=$(cd -- "$(dirname -- "$0")/../../.." && pwd) || { printf '[commit-resolve-fixes] Error: cannot resolve the plugin root\n' >&2; exit 2; }
+PLUGIN_ROOT=$(cd -- "$CRF_DIR/../../.." && pwd) || { printf '[commit-resolve-fixes] Error: cannot resolve the plugin root\n' >&2; exit 2; }
 
 usage() {
     printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--unattended] [--allow-credential-shaped] [--files-from <file>] [--ranges-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-ranges --ranges-from <file> [--files-from <file>] [-- <files...>]\n' >&2
@@ -606,16 +623,17 @@ cd -- "$TOP"
 #   2. Each tool is resolved through yr_resolve_tool and refused when its
 #      canonical file, or the PATH hit itself, is inside the worktree. The
 #      absolute PATH hit is kept in TOOL_BIN_<tool> and run by that path.
-#   3. Entries inside the worktree are dropped from the exported PATH, so a
-#      child lookup of any other name (git, env, gh) cannot land in a
-#      resolver-writable directory either.
+#   3. PATH is already yr_safe_path's result (yr_adopt_path, before any
+#      argument is parsed): entries inside the worktree, and entries that hold a
+#      tool as a symlink into it, are dropped, so a child lookup of any other
+#      name (git, env, gh, grep) cannot land in a resolver-writable file either.
 # A tool outside the worktree is not judged, and one that cannot be found is
 # left to the "not found" handling. gh and jq were bound above. No tool has run.
 check_tools_outside_repo() {
-    local tool root canon hit rc dir entry rest cleaned kept
+    local tool root canon hit rc entry rest cleaned
     root=$(yr_worktree_root) || die 3 "cannot resolve the repository root to verify the tools on PATH; nothing committed"
     cleaned=""
-    rest="${PATH}:"
+    rest="${YR_ORIG_PATH}:"
     while [ -n "$rest" ]; do
         entry="${rest%%:*}"
         rest="${rest#*:}"
@@ -624,9 +642,9 @@ check_tools_outside_repo() {
         esac
     done
     [ -n "$cleaned" ] || die 3 "PATH has no absolute entry, so the tools on it cannot be verified; nothing committed"
-    PATH=$cleaned
-    export PATH
-    hash -r 2>/dev/null || true
+    # The lookups below judge the caller's PATH minus its relative entries.
+    # PATH itself is already the screened one (yr_adopt_path).
+    YR_ORIG_PATH=$cleaned
     for tool in "$@"; do
         rc=0
         hit=$(yr_resolve_tool "$tool") || rc=$?
@@ -634,27 +652,12 @@ check_tools_outside_repo() {
             0) printf -v "TOOL_BIN_$tool" '%s' "$hit" ;;
             1) ;;
             2)
-                canon=$(yr_canon_path "$(type -P "$tool")" 2>/dev/null || true)
+                canon=$(yr_canon_path "$(PATH=$YR_ORIG_PATH; type -P "$tool")" 2>/dev/null || true)
                 die 3 "$tool resolves to ${canon:-a file} inside the repository, where a resolver can replace it; remove that directory from PATH; nothing committed"
                 ;;
             *) die 3 "cannot resolve $tool; nothing committed" ;;
         esac
     done
-    kept=""
-    rest="${PATH}:"
-    while [ -n "$rest" ]; do
-        dir="${rest%%:*}"
-        rest="${rest#*:}"
-        canon=$(yr_canon_path "$dir" 2>/dev/null || true)
-        if yr_inside_root "$dir" "$root" || { [ -n "$canon" ] && yr_inside_root "$canon" "$root"; }; then
-            continue
-        fi
-        kept="${kept:+$kept:}$dir"
-    done
-    [ -n "$kept" ] || die 3 "every PATH entry is inside the repository, where a resolver can replace a tool; nothing committed"
-    PATH=$kept
-    export PATH
-    hash -r 2>/dev/null || true
 }
 # gh and jq were bound above to a canonical file outside the worktree. awk is
 # checked here too: the hunk and range parsers below run it by name. gt and
@@ -680,7 +683,7 @@ harden_git_config || die 3 "$YR_HARDEN_MSG; nothing committed"
 # source tree, <marketplace>/<name>/<version>/ in the installed cache.
 find_runtime() {
     local root
-    root=$(cd -- "$(dirname -- "$0")/../../.." && pwd) || return 1
+    root=$(cd -- "$CRF_DIR/../../.." && pwd) || return 1
     sp_sibling_file "$root" github-workflow lib/github-stack-runtime.js
 }
 
