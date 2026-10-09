@@ -151,16 +151,30 @@ yr_git() {
     # Git runs the stock git-lfs filters (and other helpers) by name through
     # PATH: run it with a PATH from which relative entries and entries inside
     # the worktree are dropped, so a resolver-written git-lfs cannot run.
-    if [ -z "${YR_GIT_PATH:-}" ]; then
-        YR_GIT_PATH=$(yr_safe_path) || return $?
-    fi
+    yr_prime_path || return $?
     PATH=$YR_GIT_PATH "$YELLOW_REVIEW_GIT" "$@"
+}
+
+# yr_prime_path: set YR_GIT_PATH to yr_safe_path's result, once per PATH and
+# working directory. yr_safe_path canonicalizes every PATH entry, so computing
+# it in each $(...) that calls yr_git or yr_awk dominated the suites' run time;
+# a caller that runs yr_git once in the main shell (the scripts do, right after
+# sourcing this file) hands the value to every later subshell. A changed PATH
+# or directory recomputes it.
+yr_prime_path() {
+    local key="$PATH|$PWD"
+    if [ -n "${YR_GIT_PATH:-}" ] && [ "${YR_PATH_KEY-}" = "$key" ]; then
+        return 0
+    fi
+    YR_GIT_PATH=$(yr_safe_path) || { YR_GIT_PATH=""; return 1; }
+    YR_PATH_KEY=$key
 }
 
 # yr_safe_path: print PATH without empty or relative entries and without any
 # entry inside the worktree (by spelling, canonical path or identity) and
-# without an entry whose awk, git, git-lfs or ignored-walk helper resolves
-# into it. Returns 1 when nothing is left. The caller's PATH is not changed;
+# without an entry whose awk, git or git-lfs resolves into it. Every yr_git
+# and yr_awk call pays for this, so the ignored-walk helpers are checked
+# separately, once per walk, by yr_walk_path. Returns 1 when nothing is left. The caller's PATH is not changed;
 # the verify command keeps its own PATH (it may need node_modules/.bin).
 yr_safe_path() {
     local root rest entry canon helper hcanon kept=""
@@ -176,9 +190,35 @@ yr_safe_path() {
                 continue
             fi
             # An outside directory can still hold a symlink to a file inside
-            # the worktree: drop it when any helper git, yr_awk or the
-            # ignored-file walk would find there canonicalizes into the worktree.
-            for helper in awk git git-lfs find head mktemp rm dirname basename readlink; do
+            # the worktree (awk, git-lfs, git): drop it when any helper
+            # git or yr_awk would find there canonicalizes into the worktree.
+            for helper in awk git git-lfs; do
+                [ -e "$entry/$helper" ] || continue
+                hcanon=$(yr_canon_path "$entry/$helper" 2>/dev/null || true)
+                if [ -z "$hcanon" ] || yr_inside_root "$hcanon" "$root"; then
+                    continue 2
+                fi
+            done
+        fi
+        kept="${kept:+$kept:}$entry"
+    done
+    [ -n "$kept" ] || return 1
+    printf '%s\n' "$kept"
+}
+
+# yr_walk_path: yr_safe_path, minus any entry whose find, head, mktemp, rm,
+# dirname, basename or readlink resolves into the worktree. Only the ignored-
+# file walk runs those by name, so it pays for this check once per walk.
+yr_walk_path() {
+    local root rest entry helper hcanon kept="" safe
+    safe=$(yr_safe_path) || return $?
+    root=$(yr_worktree_root || true)
+    rest="${safe}:"
+    while [ -n "$rest" ]; do
+        entry="${rest%%:*}"
+        rest="${rest#*:}"
+        if [ -n "$root" ]; then
+            for helper in find head mktemp rm dirname basename readlink; do
                 [ -e "$entry/$helper" ] || continue
                 hcanon=$(yr_canon_path "$entry/$helper" 2>/dev/null || true)
                 if [ -z "$hcanon" ] || yr_inside_root "$hcanon" "$root"; then
@@ -197,9 +237,8 @@ yr_safe_path() {
 # Recomputes the path when YR_GIT_PATH is unset (yr_git sets it in a subshell
 # when called inside $(...), so the parent may not have it).
 yr_awk() {
-    local safe=${YR_GIT_PATH:-}
-    [ -n "$safe" ] || safe=$(yr_safe_path) || return $?
-    PATH=$safe awk "$@"
+    yr_prime_path || return $?
+    PATH=$YR_GIT_PATH awk "$@"
 }
 
 # Git with listed paths taken literally (no globs or pathspec magic). A
@@ -262,28 +301,37 @@ harden_git_config() {
     # naming the key only. Global and system scopes are not judged, and the
     # values are never overridden, which would also disable the user's own
     # credential helper.
-    local tcfg trc=0 tkey tre
+    local trc=0 tkey tre
     # A clean, smudge or process filter runs on `git add` and on checkout, so a
     # repository-local one is judged the same way; the three stock Git LFS
     # commands (`git lfs install --local`) are allowed by exact value.
     tre='^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process))$'
     [ "$scope" = revert ] && tre='^filter\..*\.(clean|smudge|process)$'
-    tcfg=$(yr_git config --show-scope --get-regexp "$tre" 2>/dev/null) || trc=$?
-    case "$trc" in
-        0|1) ;;
-        *) YR_HARDEN_MSG="could not read the git transport config"; return 1 ;;
-    esac
-    tkey=$(printf '%s\n' "$tcfg" | yr_awk -F'\t' '
-        ($1 == "local" || $1 == "worktree") {
-            k = $2; v = $2; sub(/ .*/, "", k); sub(/^[^ ]* /, "", v)
+    # --null --show-scope emits `scope NUL key NL value NUL` per entry, so a
+    # value holding newlines is read whole. The records go straight into awk
+    # (a command substitution would drop the NULs); git's status 0 or 1 (no
+    # match) is fine, anything else fails closed. The LFS exemption needs a
+    # single-line value that matches exactly, and an awk that cannot split on
+    # NUL sees mangled records that match nothing and are refused.
+    tkey=$(set -o pipefail; yr_git config --null --show-scope --get-regexp "$tre" 2>/dev/null | yr_awk 'BEGIN { RS = "\0" }
+        NR % 2 == 1 { sc = $0; next }
+        {
+            i = index($0, "\n")
+            if (i == 0) { print "filter.<unparsed>.clean"; exit }
+            k = substr($0, 1, i - 1); v = substr($0, i + 1)
+            if (sc != "local" && sc != "worktree") next
             if (k ~ /^filter\.lfs\.(clean|smudge|process)$/ && (v == "git-lfs clean -- %f" || v == "git-lfs smudge -- %f" || v == "git-lfs filter-process" || v == "git-lfs smudge --skip -- %f" || v == "git-lfs filter-process --skip")) next
             print k; exit
-        }') || { YR_HARDEN_MSG="could not parse the git transport config"; return 1; }
+        }') || trc=$?
+    case "$trc" in
+        0|1) ;;
+        *) YR_HARDEN_MSG="could not parse the git transport config"; return 1 ;;
+    esac
     # A credential URL can carry userinfo: name the key without it.
     case "$tkey" in
         credential.helper) ;;
         credential.*) tkey="credential.<url>.helper" ;;
-        filter.*) tkey="filter.<driver>.${tkey##*.}" ;;
+        filter.*) tkey="filter.<driver>.clean|smudge|process" ;;
     esac
     if [ -n "$tkey" ]; then
         if [ "$scope" = revert ]; then
@@ -713,27 +761,36 @@ rp_link_target_changed() {
 # ignored directories included. `.git` is skipped as a walked directory, not
 # as a link target. `.ruvector/coedit-sessions` (the session log yellow-ruvector's
 # PostToolUse hook rewrites on every resolver Edit) is skipped entirely: it is
-# data nothing executes, and counting it would refuse every verify run. Prints up to 20
-# repository-relative paths, one per line (control characters shown as `?`,
-# never file contents), and returns 1 when any file changed; a symlink is named
-# by its own path. Returns 0 when none did and 2 when it cannot tell: the
+# data nothing executes, and counting it would refuse every verify run. Collects
+# up to 20 repository-relative paths and returns 1 when any file changed; a
+# symlink is named by its own path. With a third argument <hitsfile> the raw
+# names are written there NUL-terminated (a name may hold a newline) and
+# nothing is printed; print them with rp_format_ignored_hits. Without it the
+# names are printed one per line, control characters shown as `?`, never file
+# contents. Returns 0 when none did and 2 when it cannot tell: the
 # marker is missing, unreadable, not a regular file or a symlink, git or find
 # fails, or a symlink's target cannot be examined. A caller must treat 2 as a
 # refusal. Whole ignored directories are walked with find; the caller owns
-# <scratch>, a scratch file for git's NUL-delimited listing. An optional third
-# argument names a path predicate (rp_trusted_config): only paths it accepts
-# count, and a directory walk filters before its 20-path cut.
+# <scratch>, a scratch file for git's NUL-delimited listing. An optional fourth
+# argument names a path predicate (rp_trusted_config; pass an empty <hitsfile>
+# to keep the printed form): only paths it accepts count, and a directory walk
+# filters before its 20-path cut.
 rp_ignored_changed_since() {
-    local marker="$1" scratch="$2" keep="${3:-}" safe
+    local marker="$1" scratch="$2" hitsfile="${3:-}" keep="${4:-}" safe own=""
     [ -z "$keep" ] || declare -F -- "$keep" >/dev/null || return 2
     [ -f "$marker" ] && [ ! -L "$marker" ] && [ -r "$marker" ] || return 2
     # find, head, mktemp and the rest run by name after the resolvers wrote
     # the tree, so the walk uses the worktree-free PATH, as yr_git does.
-    safe=$(yr_safe_path) || return 2
+    safe=$(yr_walk_path) || return 2
+    if [ -z "$hitsfile" ]; then
+        hitsfile=$(mktemp) || return 2
+        own=1
+    fi
+    local wrc=0
     (
         PATH=$safe
         hash -r 2>/dev/null || true
-        local mdir top f out p l rc lrc symlist n=0 hits=""
+        local mdir top f p l rc lrc symlist outfile x k dup n=0 seen=()
         mdir=$(cd -- "$(dirname -- "$marker")" 2>/dev/null && pwd) || exit 2
         marker="$mdir/$(basename -- "$marker")"
         # kept <path>: no predicate, or the predicate accepts the path.
@@ -741,72 +798,98 @@ rp_ignored_changed_since() {
         top=$(yr_git rev-parse --show-toplevel 2>/dev/null) || exit 2
         cd -- "$top" 2>/dev/null || exit 2
         symlist=$(mktemp) || exit 2
-        trap 'rm -f -- "$symlist"' EXIT
+        outfile=$(mktemp) || exit 2
+        trap 'rm -f -- "$symlist" "$outfile"' EXIT
+        : >|"$hitsfile" || exit 2
         lgit ls-files --others --ignored --exclude-standard --directory -z >|"$scratch" 2>/dev/null || exit 2
         while IFS= read -r -d '' f; do
             case "$f" in .git|.git/*|*/.git|*/.git/*) continue ;; esac
             case "$f" in .ruvector/coedit-sessions|.ruvector/coedit-sessions/) continue ;; esac
-            out=""
+            : >|"$outfile"
             rc=0
             if [ "${f%/}" != "$f" ]; then
-                # A wholly ignored directory. head bounds the output, so a
-                # tree rewritten end to end cannot fill memory; a find that
+                # A wholly ignored directory. Names stay NUL-delimited (a
+                # name can hold a newline) and only the first 20 are kept, so
+                # a tree rewritten end to end cannot fill memory; a find that
                 # fails with nothing found is "cannot tell".
-                out=$(set -o pipefail
-                    find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o \( -type f -o -type l \) -newer "$marker" -print 2>/dev/null \
-                        | while IFS= read -r p; do if kept "$p"; then printf '%s\n' "$p"; fi; done \
-                        | head -n 20) || rc=$?
-                if [ -z "$out" ] && [ "$rc" -eq 0 ]; then
+                # A predicate filters before the cut, so an accepted name
+                # past 20 rejected ones still counts.
+                (set -o pipefail
+                    find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o \( -type f -o -type l \) -newer "$marker" -print0 2>/dev/null \
+                        | { k=0; while IFS= read -r -d '' x; do kept "$x" || continue; [ "$k" -ge 20 ] || printf '%s\0' "$x"; k=$((k + 1)); done; }) >|"$outfile" || rc=$?
+                if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ]; then
                     # Nothing newer: judge the target of each symlink inside.
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o -type l -print0 >|"$symlist" 2>/dev/null || exit 2
                     while IFS= read -r -d '' l; do
                         lrc=0
                         rp_link_target_changed "$l" "$marker" || lrc=$?
                         case "$lrc" in
-                            0) if kept "$l"; then out="$l"; break; fi ;;
+                            0) if kept "$l"; then printf '%s\0' "$l" >|"$outfile"; break; fi ;;
                             1) ;;
                             *) exit 2 ;;
                         esac
                     done <"$symlist"
                 fi
             elif [ -L "./$f" ]; then
-                out=$(find "./$f" -type l -newer "$marker" -print 2>/dev/null) || rc=$?
-                kept "$f" || out=""
-                if [ -z "$out" ] && [ "$rc" -eq 0 ]; then
+                find "./$f" -type l -newer "$marker" -print0 >|"$outfile" 2>/dev/null || rc=$?
+                kept "$f" || : >|"$outfile"
+                if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ]; then
                     lrc=0
                     rp_link_target_changed "./$f" "$marker" || lrc=$?
                     case "$lrc" in
-                        0) kept "$f" && out="./$f" ;;
+                        0) if kept "$f"; then printf '%s\0' "./$f" >|"$outfile"; fi ;;
                         1) ;;
                         *) exit 2 ;;
                     esac
                 fi
             elif [ -f "./$f" ]; then
-                [ "./$f" -nt "$marker" ] && kept "$f" && out="./$f"
+                [ "./$f" -nt "$marker" ] && kept "$f" && printf '%s\0' "./$f" >|"$outfile"
             fi
-            if [ -z "$out" ]; then
+            if [ ! -s "$outfile" ]; then
                 [ "$rc" -eq 0 ] || exit 2
                 continue
             fi
-            while IFS= read -r p; do
+            while IFS= read -r -d '' p; do
                 [ -n "$p" ] || continue
                 p="${p#./}"
-                p="${p//[[:cntrl:]]/?}"
                 # git lists an ignored symlink on its own and, when its whole
                 # directory is ignored, again as part of that directory.
-                case $'\n'"$hits" in *$'\n'"$p"$'\n'*) continue ;; esac
+                dup=""
+                for x in ${seen[@]+"${seen[@]}"}; do
+                    [ "$x" != "$p" ] || { dup=1; break; }
+                done
+                [ -z "$dup" ] || continue
+                seen+=("$p")
+                printf '%s\0' "$p" >>"$hitsfile"
                 n=$((n + 1))
-                hits="${hits}${p}"$'\n'
                 [ "$n" -lt 20 ] || break
-            done <<<"$out"
+            done <"$outfile"
             [ "$n" -lt 20 ] || break
         done <"$scratch"
-        if [ "$n" -gt 0 ]; then
-            printf '%s' "$hits"
-            exit 1
-        fi
+        [ "$n" -eq 0 ] || exit 1
         exit 0
-    )
+    ) || wrc=$?
+    if [ -n "$own" ]; then
+        # Legacy form: one sanitized name per line on stdout.
+        [ "$wrc" -ne 1 ] || rp_format_ignored_hits "$hitsfile" $'\n'
+        rm -f -- "$hitsfile"
+    fi
+    return "$wrc"
+}
+
+# rp_format_ignored_hits <hitsfile> [separator]: print the NUL-delimited names
+# rp_ignored_changed_since collected, each as one whole name with control
+# characters (newline included) shown as `?`, joined by the separator (default
+# ", ") and, for a newline separator, ended by one. A name holding a newline
+# stays one name; it is never split into fragments.
+rp_format_ignored_hits() {
+    local f="$1" sep="${2:-, }" p first=1
+    while IFS= read -r -d '' p; do
+        p="${p//[[:cntrl:]]/?}"
+        if [ "$first" = 1 ]; then first=""; else printf '%s' "$sep"; fi
+        printf '%s' "$p"
+    done <"$f"
+    [ "$sep" != $'\n' ] || [ -n "$first" ] || printf '\n'
 }
 
 # rp_hooks_untracked <outfile>: the dirty-set guard cannot see a resolver edit
