@@ -1401,7 +1401,8 @@ export async function upsertReadState(
           // different (newer) plan a concurrent update stored since.
           pendingPlan =
             fresh === undefined ||
-            fresh.activityId === rebase.pendingPlan?.activityId
+            (fresh.ambiguous !== true &&
+              fresh.activityId === rebase.pendingPlan?.activityId)
               ? undefined
               : fresh;
         } else if (fresh !== undefined) {

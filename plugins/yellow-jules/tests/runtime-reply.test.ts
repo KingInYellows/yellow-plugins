@@ -85,6 +85,27 @@ async function codeOf(run: () => Promise<unknown>): Promise<AppErrorCode> {
   return (await fails(run)).appError.code;
 }
 
+/** Adds a teammate's message at the first activity read after the write was reserved. */
+function teammateAfterReserve(kind: 'reply' | 'approve', text: string): void {
+  const base = h.adapter.listActivitiesImpl;
+  let injected = false;
+  h.adapter.listActivitiesImpl = async (resource, options) => {
+    if (!injected) {
+      const reserved = Object.values(
+        (await readJournal(h.dataDir)).operations
+      ).some((r) => r.kind === kind && r.status === 'reserved');
+      if (reserved) {
+        injected = true;
+        addActivity(h, session.sessionResource, {
+          type: 'userMessaged',
+          message: text,
+        });
+      }
+    }
+    return base(resource, options);
+  };
+}
+
 describe('reply --dry-run', () => {
   it('does one info() read, sends nothing, and needs no grant', async () => {
     const result = await reply(
@@ -406,6 +427,17 @@ describe('races inside the write gate', () => {
     ];
     expect(record?.status).toBe('failed');
     expect(record?.dispatchedAt).toBeUndefined();
+  });
+
+  it("a teammate's message arriving between the reserve and the floor read refuses the reply and records outside activity", async () => {
+    teammateAfterReserve('reply', 'please stop and do something else');
+    const err = await fails(() => reply(h.deps, args()));
+    expect(err.appError.code).toBe('JULES_SUPERVISION_PAUSED');
+    expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    const ops = (await readJournal(h.dataDir)).operations;
+    expect(ops[session.localRequestId]?.supervision?.outsideSeen).toBeDefined();
+    expect(ops[err.localRequestId as string]?.status).toBe('failed');
+    expect(ops[err.localRequestId as string]?.dispatchedAt).toBeUndefined();
   });
 
   it('outside activity marked after the reserve invalidates the record; dispatch is refused with no adapter call', async () => {

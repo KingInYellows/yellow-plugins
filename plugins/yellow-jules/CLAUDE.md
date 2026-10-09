@@ -293,6 +293,14 @@ floors do not make the batch order-dependent. Equal or
 missing vendor times, unorderable dispatches, or a different number of echoes
 and writes make the batch ambiguous: the messages are recorded as outside
 activity (pause) and its unresolved writes are marked `echoAmbiguous`.
+The pre-dispatch vendor-floor walk of a `reply` or `approve` classifies the user
+messages it sees with the same own-echo / outside-activity logic as `status`
+(`claimOwnEchoes`). A teammate's message that arrived since the last status, or
+between preflight and the floor read, is recorded as outside activity and the
+write is refused (`JULES_SUPERVISION_PAUSED`) before the POST; a message only an
+in-flight write could explain refuses too. An approval rebase never clears a
+fresh pending plan stored as `ambiguous`.
+
 `authorize` (create) refuses under the lock when any existing grant is bound to
 another controller id or epoch (for example after another host's take-over): a
 stale local epoch never mints a grant beside them; run `--take-over` explicitly.

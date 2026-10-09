@@ -66,6 +66,27 @@ describe('a plan with hidden characters', () => {
   });
 });
 
+/** Adds a teammate's message at the first activity read after the write was reserved. */
+function teammateAfterReserve(kind: 'reply' | 'approve', text: string): void {
+  const base = h.adapter.listActivitiesImpl;
+  let injected = false;
+  h.adapter.listActivitiesImpl = async (resource, options) => {
+    if (!injected) {
+      const reserved = Object.values(
+        (await readJournal(h.dataDir)).operations
+      ).some((r) => r.kind === kind && r.status === 'reserved');
+      if (reserved) {
+        injected = true;
+        addActivity(h, session.sessionResource, {
+          type: 'userMessaged',
+          message: text,
+        });
+      }
+    }
+    return base(resource, options);
+  };
+}
+
 function args(overrides: Partial<ApproveArgs> = {}): ApproveArgs {
   return {
     session: session.localId,
@@ -102,6 +123,18 @@ function approvalLands(planId: string): void {
     });
   };
 }
+
+describe('a teammate message between the reserve and the floor read', () => {
+  it('refuses the approve, records outside activity, and sends nothing', async () => {
+    teammateAfterReserve('approve', 'hold on, do not approve this');
+    const err = await fails(() => approve(h.deps, args()));
+    expect(err.appError.code).toBe('JULES_SUPERVISION_PAUSED');
+    expect(h.adapter.callsTo('approvePlan')).toHaveLength(0);
+    const ops = (await readJournal(h.dataDir)).operations;
+    expect(ops[session.localRequestId]?.supervision?.outsideSeen).toBeDefined();
+    expect(ops[err.localRequestId as string]?.dispatchedAt).toBeUndefined();
+  });
+});
 
 describe('approve --dry-run (the R34 re-fetch)', () => {
   it('returns the plan id a confirmation binds to and sends nothing', async () => {

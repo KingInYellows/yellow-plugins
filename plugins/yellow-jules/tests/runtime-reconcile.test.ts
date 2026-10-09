@@ -13,6 +13,7 @@ import {
   ensureObservedRecord,
   readJournal,
   updateJournal,
+  updateSupervision,
   withJournalLock,
   writeJournal,
 } from '../src/state.js';
@@ -374,6 +375,17 @@ describe('delegate reservations: one shared sessions walk', () => {
 });
 
 describe('reply and approve reservations resolve on their own session', () => {
+  /** Classifies the session's existing user messages and clears the pause: a write never dispatches over an unclassified one. */
+  async function observePrior(session: {
+    localId: string;
+    localRequestId: string;
+  }) {
+    await status(h.deps, { session: session.localId, reconcile: false });
+    await updateSupervision(h.dataDir, session.localRequestId, {
+      outsideSeen: null,
+    });
+  }
+
   async function strandedReply(message: string, requestId: string) {
     const session = await delegateOk(h, grantId);
     await strand(session, message, requestId);
@@ -694,6 +706,7 @@ describe('reply and approve reservations resolve on their own session', () => {
       message: 'repeat me',
       createTime: new Date(h.deps.clock.now() - 60 * 60_000).toISOString(),
     });
+    await observePrior(session);
     await strand(session, 'repeat me', 'reply-1');
     // The prior message is older than the pre-dispatch floor: not an echo.
     expect(
@@ -715,6 +728,7 @@ describe('reply and approve reservations resolve on their own session', () => {
       message: 'same words',
       createTime: new Date(h.deps.clock.now() + 120_000).toISOString(),
     });
+    await observePrior(session);
     await strand(session, 'same words', 'reply-1');
     const floor = (await readJournal(h.dataDir)).operations['reply-1'];
     expect(floor?.vendorFloorActivityId).toBe(teammate.activityId);
@@ -735,6 +749,7 @@ describe('reply and approve reservations resolve on their own session', () => {
       message: 'unrelated',
       createTime: new Date(h.deps.clock.now() + 1_000).toISOString(),
     });
+    await observePrior(session);
     await strand(session, 'same words', 'reply-1');
     const echo = addActivity(h, session.sessionResource, {
       type: 'userMessaged',
@@ -758,6 +773,7 @@ describe('reply and approve reservations resolve on their own session', () => {
       message: 'unrelated',
       createTime: new Date(h.deps.clock.now() + 1_000).toISOString(),
     });
+    await observePrior(session);
     await strand(session, 'same words', 'reply-1');
     addActivity(h, session.sessionResource, {
       type: 'userMessaged',

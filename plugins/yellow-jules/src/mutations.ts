@@ -59,6 +59,7 @@ import {
 } from './runtime-support.js';
 import {
   applyRetention,
+  claimOwnEchoes,
   findBySessionResource,
   isOwningCreate,
   type OwningCreate,
@@ -66,6 +67,7 @@ import {
   planDigest,
   readJournal,
   recordDeviation,
+  takeSeq,
   UNRESOLVED_STATUSES,
   withJournalLock,
   writeJournal,
@@ -720,6 +722,20 @@ function stampBefore(
   );
 }
 
+/** Refusal when the floor walk met a user message this plugin did not send. */
+function outsideBeforeWrite(): AppErrorException {
+  return new AppErrorException(
+    makeAppError(
+      'JULES_SUPERVISION_PAUSED',
+      'a user message not sent by this plugin arrived before the write; outside activity was recorded and nothing was sent',
+      {
+        recoveryAction:
+          'Review the session, then run supervise --clear-pause before writing again.',
+      }
+    )
+  );
+}
+
 /** Refusal when the pre-dispatch floor could not be read: nothing was sent. */
 function floorUnreadable(): AppErrorException {
   return new AppErrorException(
@@ -744,7 +760,7 @@ async function readVendorFloor(
   sessionResource: string,
   owner: OperationRecord,
   deadline: Deadline
-): Promise<VendorFloor | undefined> {
+): Promise<VendorFloor | 'outside' | undefined> {
   const stored =
     owner.lastActivityCreateTime !== undefined &&
     owner.lastActivityId !== undefined
@@ -754,6 +770,18 @@ async function readVendorFloor(
         }
       : undefined;
   try {
+    // User messages this walk sees were never classified: a teammate's message
+    // that arrived since the last status (or since preflight) must not be
+    // dispatched over. They get the same own-echo / outside-activity
+    // classification as a status walk.
+    const userMessages: Array<{
+      activityId: string;
+      digest: string;
+      createTime: string;
+      observedAt: string;
+    }> = [];
+    const walkStartedAt = nowFn(deps)().toISOString();
+    const walkSeq = await takeSeq(deps.dataDir);
     const walk = await walkActivities({
       adapter,
       sessionResource,
@@ -765,8 +793,43 @@ async function readVendorFloor(
       clock: deps.clock,
       deadline,
       pageCap: APPROVE_PAGE_CAP,
+      ring: owner.recentActivityIds,
+      ...(stored !== undefined ? { watermark: stored } : {}),
+      onActivity: (activity, info) => {
+        if (
+          info.unseen &&
+          activity.type === 'userMessaged' &&
+          activity.message !== undefined
+        ) {
+          userMessages.push({
+            activityId: activity.activityId,
+            digest: messageDigest(activity.message),
+            createTime: activity.createTime,
+            observedAt: nowFn(deps)().toISOString(),
+          });
+        }
+      },
     });
     if (!walk.complete) return undefined;
+    if (userMessages.length > 0) {
+      const held: string[] = [];
+      const outside = await claimOwnEchoes(
+        deps.dataDir,
+        sessionResource,
+        userMessages,
+        {
+          ownerRequestId: owner.localRequestId,
+          observedAt: nowFn(deps)().toISOString(),
+          walkStartedAt,
+          walkSeq,
+        },
+        held,
+        true
+      );
+      // Unclaimed (outside) or held (an in-flight write might explain it):
+      // either way the session is not provably ours alone.
+      if (outside !== undefined || held.length > 0) return 'outside';
+    }
     const newest =
       walk.newest !== undefined &&
       (stored === undefined || compareStamp(walk.newest, stored) > 0)
@@ -1092,6 +1155,11 @@ async function replyInner(
     }
     if (replyFloor === undefined) {
       return settleFailure(deps, reservation, floorUnreadable(), {
+        reconcileHint: SESSION_RECONCILE,
+      });
+    }
+    if (replyFloor === 'outside') {
+      return settleFailure(deps, reservation, outsideBeforeWrite(), {
         reconcileHint: SESSION_RECONCILE,
       });
     }
@@ -1432,6 +1500,11 @@ async function approveInner(
     }
     if (approveFloor === undefined) {
       return settleFailure(deps, reservation, floorUnreadable(), {
+        reconcileHint: SESSION_RECONCILE,
+      });
+    }
+    if (approveFloor === 'outside') {
+      return settleFailure(deps, reservation, outsideBeforeWrite(), {
         reconcileHint: SESSION_RECONCILE,
       });
     }

@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { reply } from '../src/mutations.js';
 import { status } from '../src/runtime.js';
-import { claimOwnEchoes, messageDigest, readJournal } from '../src/state.js';
+import {
+  claimOwnEchoes,
+  messageDigest,
+  readJournal,
+  updateSupervision,
+} from '../src/state.js';
 import {
   assertGrantLiveBeforeWrite,
   reserveUnderGrant,
@@ -102,6 +107,13 @@ describe('each dispatched message explains at most one vendor activity', () => {
       originator: 'user',
       createTime: new Date(ahead).toISOString(),
     });
+    // The teammate's message is classified (outside) before the reply, then the
+    // owner clears it: a write never dispatches over an unclassified message.
+    await status(h.deps, { session: session.localId, reconcile: false });
+    expect(await outsideSeen(session.localRequestId)).toBe(true);
+    await updateSupervision(h.dataDir, session.localRequestId, {
+      outsideSeen: null,
+    });
     await reply(h.deps, {
       session: session.localId,
       message: 'use sqlite',
@@ -113,7 +125,6 @@ describe('each dispatched message explains at most one vendor activity', () => {
     const ops = (await readJournal(h.dataDir)).operations;
     const replyRecord = Object.values(ops).find((r) => r.kind === 'reply');
     expect(replyRecord?.echoActivityId).toBeUndefined();
-    expect(await outsideSeen(session.localRequestId)).toBe(true);
 
     // The real echo, strictly newer on the vendor clock, is still claimed.
     const echo = addActivity(h, session.sessionResource, {

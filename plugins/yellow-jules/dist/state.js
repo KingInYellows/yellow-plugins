@@ -1059,7 +1059,8 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
                 // different (newer) plan a concurrent update stored since.
                 pendingPlan =
                     fresh === undefined ||
-                        fresh.activityId === rebase.pendingPlan?.activityId
+                        (fresh.ambiguous !== true &&
+                            fresh.activityId === rebase.pendingPlan?.activityId)
                         ? undefined
                         : fresh;
             }

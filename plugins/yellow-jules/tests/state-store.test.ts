@@ -477,6 +477,30 @@ describe('read-state, external records, deviations, retention', () => {
     expect(cleared.pendingPlan?.activityId).toBe('a3');
   });
 
+  it('an approval rebase keeps a fresh plan that a concurrent walk stored as ambiguous', async () => {
+    const t = '2026-01-01T00:01:00Z';
+    const plan = {
+      planId: 'p-a',
+      steps: [],
+      activityCreateTime: t,
+      activityId: 'a1',
+    };
+    const rec = await ensureObservedRecord(dataDir, 'sessions/amb-approval');
+    await upsertReadState(dataDir, rec.localRequestId, {
+      pendingPlan: { ...plan, ambiguous: true as const },
+      rebase: { ring: [] },
+    });
+    // A stale approval computed against the (unflagged) snapshot of the same plan id.
+    const next = await upsertReadState(dataDir, rec.localRequestId, {
+      pendingPlan: null,
+      rebase: { ring: [], pendingPlan: plan },
+    });
+    expect(next.pendingPlan).toMatchObject({
+      activityId: 'a1',
+      ambiguous: true,
+    });
+  });
+
   it('marks the pending plan ambiguous when a rebase meets a different plan at the same createTime', async () => {
     const t = '2026-01-01T00:01:00Z';
     const plan = (id: string) => ({

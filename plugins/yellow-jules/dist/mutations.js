@@ -408,6 +408,12 @@ async function hasUnclaimedUserMessage(deps, sessionResource, userMessages, afte
 function stampBefore(a, b) {
     return ((0, activity_walk_js_1.compareStamp)({ createTime: a.createTime, activityId: '' }, { createTime: b.createTime, activityId: '' }) < 0);
 }
+/** Refusal when the floor walk met a user message this plugin did not send. */
+function outsideBeforeWrite() {
+    return new errors_js_1.AppErrorException((0, errors_js_1.makeAppError)('JULES_SUPERVISION_PAUSED', 'a user message not sent by this plugin arrived before the write; outside activity was recorded and nothing was sent', {
+        recoveryAction: 'Review the session, then run supervise --clear-pause before writing again.',
+    }));
+}
 /** Refusal when the pre-dispatch floor could not be read: nothing was sent. */
 function floorUnreadable() {
     return new errors_js_1.AppErrorException((0, errors_js_1.makeAppError)('JULES_SERVICE_UNAVAILABLE', "the session's activity could not be completely read before the write, so its echo could never be ordered; nothing was sent", { recoveryAction: 'Retry the write; no request was dispatched.' }));
@@ -428,6 +434,13 @@ async function readVendorFloor(deps, adapter, sessionResource, owner, deadline) 
         }
         : undefined;
     try {
+        // User messages this walk sees were never classified: a teammate's message
+        // that arrived since the last status (or since preflight) must not be
+        // dispatched over. They get the same own-echo / outside-activity
+        // classification as a status walk.
+        const userMessages = [];
+        const walkStartedAt = (0, runtime_support_js_1.nowFn)(deps)().toISOString();
+        const walkSeq = await (0, state_js_1.takeSeq)(deps.dataDir);
         const walk = await (0, activity_walk_js_1.walkActivities)({
             adapter,
             sessionResource,
@@ -438,9 +451,36 @@ async function readVendorFloor(deps, adapter, sessionResource, owner, deadline) 
             clock: deps.clock,
             deadline,
             pageCap: APPROVE_PAGE_CAP,
+            ring: owner.recentActivityIds,
+            ...(stored !== undefined ? { watermark: stored } : {}),
+            onActivity: (activity, info) => {
+                if (info.unseen &&
+                    activity.type === 'userMessaged' &&
+                    activity.message !== undefined) {
+                    userMessages.push({
+                        activityId: activity.activityId,
+                        digest: (0, state_js_1.messageDigest)(activity.message),
+                        createTime: activity.createTime,
+                        observedAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString(),
+                    });
+                }
+            },
         });
         if (!walk.complete)
             return undefined;
+        if (userMessages.length > 0) {
+            const held = [];
+            const outside = await (0, state_js_1.claimOwnEchoes)(deps.dataDir, sessionResource, userMessages, {
+                ownerRequestId: owner.localRequestId,
+                observedAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString(),
+                walkStartedAt,
+                walkSeq,
+            }, held, true);
+            // Unclaimed (outside) or held (an in-flight write might explain it):
+            // either way the session is not provably ours alone.
+            if (outside !== undefined || held.length > 0)
+                return 'outside';
+        }
         const newest = walk.newest !== undefined &&
             (stored === undefined || (0, activity_walk_js_1.compareStamp)(walk.newest, stored) > 0)
             ? walk.newest
@@ -663,6 +703,11 @@ async function replyInner(deps, args, ids) {
                 reconcileHint: SESSION_RECONCILE,
             });
         }
+        if (replyFloor === 'outside') {
+            return (0, write_gate_js_1.settleFailure)(deps, reservation, outsideBeforeWrite(), {
+                reconcileHint: SESSION_RECONCILE,
+            });
+        }
         await (0, write_gate_js_1.assertGrantLiveBeforeWrite)(deps, reservation, SESSION_RECONCILE, replyFloor);
         try {
             await adapter.sendMessage(target.sessionResource, message);
@@ -858,6 +903,11 @@ async function approveInner(deps, args, ids) {
         }
         if (approveFloor === undefined) {
             return (0, write_gate_js_1.settleFailure)(deps, reservation, floorUnreadable(), {
+                reconcileHint: SESSION_RECONCILE,
+            });
+        }
+        if (approveFloor === 'outside') {
+            return (0, write_gate_js_1.settleFailure)(deps, reservation, outsideBeforeWrite(), {
                 reconcileHint: SESSION_RECONCILE,
             });
         }
