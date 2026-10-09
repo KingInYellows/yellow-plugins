@@ -17,10 +17,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.reconcile = reconcile;
 const activity_walk_js_1 = require("./activity-walk.js");
-const authority_js_1 = require("./authority.js");
 const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
 const runtime_support_js_1 = require("./runtime-support.js");
+const slot_release_js_1 = require("./slot-release.js");
 const state_js_1 = require("./state.js");
 const validate_js_1 = require("./validate.js");
 const RECONCILE_SESSIONS_PAGE_SIZE = 100;
@@ -304,6 +304,12 @@ async function persist(deps, resolutions) {
                         }
                         : {}),
                 };
+                // A create bound to a session already terminal frees its slot in this
+                // run, like the normal status path would.
+                if (r.session !== undefined &&
+                    slot_release_js_1.TERMINAL_VENDOR_STATES.has(r.session.vendorState)) {
+                    released.add(current.localRequestId);
+                }
             }
             else if (r.outcome === 'released') {
                 next = { ...next, status: 'failed' };
@@ -397,17 +403,14 @@ async function reconcile(deps, journal, sessionResource, deadline) {
     // held, which only makes the grant stricter, and the entry says so.
     const slotStuck = new Set();
     for (const r of resolutions) {
-        if (r.outcome === 'released' &&
+        if ((r.outcome === 'released' || r.outcome === 'bound') &&
             released.has(r.record.localRequestId) &&
-            r.record.kind === 'create' &&
-            r.record.grantId !== undefined) {
-            try {
-                await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, r.record.grantId, r.record.localRequestId);
-            }
-            catch (err) {
+            r.record.kind === 'create') {
+            // `released` creates never reached a session; `bound` ones count only
+            // when the listed vendor state is terminal (checked by the helper).
+            const stuck = await (0, slot_release_js_1.releaseTerminalSlot)(deps.dataDir, r.record, r.outcome === 'released' ? 'failed' : r.session?.vendorState);
+            if (stuck)
                 slotStuck.add(r.record.localRequestId);
-                process.stderr.write(`warning: could not release the grant slot of ${r.record.localRequestId}: ${(0, errors_js_1.errorLabel)(err)}\n`);
-            }
         }
     }
     return resolutions.map((r) => slotStuck.has(r.record.localRequestId)

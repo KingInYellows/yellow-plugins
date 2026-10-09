@@ -21,9 +21,8 @@ import {
   STATUS_PAGE_SIZE,
   walkActivities,
 } from './activity-walk.js';
-import { releaseSlotInStore } from './authority.js';
 import { type Deadline, isExpired } from './deadline.js';
-import { AppErrorException, errorLabel } from './errors.js';
+import { AppErrorException } from './errors.js';
 import {
   type RuntimeDeps,
   nowFn,
@@ -31,6 +30,10 @@ import {
   withAdapter,
   conditionOf,
 } from './runtime-support.js';
+import {
+  releaseTerminalSlot,
+  TERMINAL_VENDOR_STATES,
+} from './slot-release.js';
 import {
   messageDigest,
   ownsSession,
@@ -414,6 +417,14 @@ async function persist(
               }
             : {}),
         };
+        // A create bound to a session already terminal frees its slot in this
+        // run, like the normal status path would.
+        if (
+          r.session !== undefined &&
+          TERMINAL_VENDOR_STATES.has(r.session.vendorState)
+        ) {
+          released.add(current.localRequestId);
+        }
       } else if (r.outcome === 'released') {
         next = { ...next, status: 'failed' };
         released.add(current.localRequestId);
@@ -552,23 +563,18 @@ export async function reconcile(
   const slotStuck = new Set<string>();
   for (const r of resolutions) {
     if (
-      r.outcome === 'released' &&
+      (r.outcome === 'released' || r.outcome === 'bound') &&
       released.has(r.record.localRequestId) &&
-      r.record.kind === 'create' &&
-      r.record.grantId !== undefined
+      r.record.kind === 'create'
     ) {
-      try {
-        await releaseSlotInStore(
-          deps.dataDir,
-          r.record.grantId,
-          r.record.localRequestId
-        );
-      } catch (err) {
-        slotStuck.add(r.record.localRequestId);
-        process.stderr.write(
-          `warning: could not release the grant slot of ${r.record.localRequestId}: ${errorLabel(err)}\n`
-        );
-      }
+      // `released` creates never reached a session; `bound` ones count only
+      // when the listed vendor state is terminal (checked by the helper).
+      const stuck = await releaseTerminalSlot(
+        deps.dataDir,
+        r.record,
+        r.outcome === 'released' ? 'failed' : r.session?.vendorState
+      );
+      if (stuck) slotStuck.add(r.record.localRequestId);
     }
   }
   return resolutions.map((r) =>

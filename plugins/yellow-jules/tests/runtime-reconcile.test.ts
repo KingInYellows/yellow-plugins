@@ -71,6 +71,21 @@ async function confirmArchiveVisibility(): Promise<void> {
 }
 
 describe('delegate reservations: one shared sessions walk', () => {
+  it('a create bound to an already-finished session frees its slot in the same run', async () => {
+    await lostResponse('scratch/done', 'lost-done');
+    const [listed] = [...h.adapter.sessions.values()];
+    h.adapter.calls.length = 0;
+    setVendorState(h, listed!.sessionResource, 'completed');
+    const result = await status(h.deps, { reconcile: true });
+
+    expect(result.reconciled).toEqual([
+      expect.objectContaining({ localRequestId: 'lost-done', outcome: 'bound' }),
+    ]);
+    expect(
+      loadGrants(h.dataDir).grants[grantId]?.usage.activeSessionRefs
+    ).toEqual([]);
+  });
+
   it('binds a tagged match with the reserved repository and branch', async () => {
     await lostResponse('scratch/a', 'lost-a');
     h.adapter.calls.length = 0;

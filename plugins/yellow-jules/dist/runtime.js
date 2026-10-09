@@ -55,7 +55,6 @@ const crypto = __importStar(require("node:crypto"));
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const activity_walk_js_1 = require("./activity-walk.js");
-const authority_js_1 = require("./authority.js");
 const config_js_1 = require("./config.js");
 const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
@@ -63,6 +62,7 @@ const reconcile_js_1 = require("./reconcile.js");
 const redact_js_1 = require("./redact.js");
 const runtime_support_js_1 = require("./runtime-support.js");
 const sdk_resolver_js_1 = require("./sdk-resolver.js");
+const slot_release_js_1 = require("./slot-release.js");
 const state_js_1 = require("./state.js");
 const validate_js_1 = require("./validate.js");
 var runtime_support_js_2 = require("./runtime-support.js");
@@ -244,10 +244,6 @@ function optionalBaseCommit(value) {
         return undefined;
     }
 }
-// ---------------------------------------------------------------------------
-// status
-// ---------------------------------------------------------------------------
-const TERMINAL_VENDOR_STATES = new Set(['completed', 'failed']);
 function walkStartFor(record, token) {
     const watermark = record.lastActivityCreateTime !== undefined &&
         record.lastActivityId !== undefined
@@ -439,18 +435,7 @@ async function status(deps, args) {
         // grant's active-session slot (tasks and corrective rounds stay spent).
         // status is a read command: a failed release keeps the slot held, which
         // only makes the grant stricter, and is reported instead of thrown.
-        let slotStuck = false;
-        if (TERMINAL_VENDOR_STATES.has(vendorState) &&
-            record.kind === 'create' &&
-            record.grantId !== undefined) {
-            try {
-                await (0, authority_js_1.releaseSlotInStore)(deps.dataDir, record.grantId, record.localRequestId);
-            }
-            catch (err) {
-                slotStuck = true;
-                process.stderr.write(`warning: could not release the grant slot of ${record.localRequestId}: ${(0, errors_js_1.errorLabel)(err)}\n`);
-            }
-        }
+        const slotStuck = await (0, slot_release_js_1.releaseTerminalSlot)(deps.dataDir, record, vendorState);
         const flags = [];
         if (slotStuck)
             flags.push('slotStuck');

@@ -22,7 +22,6 @@ import {
   walkActivities,
   type WalkStart,
 } from './activity-walk.js';
-import { releaseSlotInStore } from './authority.js';
 import {
   type CredentialSource,
   ensureOwnerOnlyDir,
@@ -36,7 +35,7 @@ import {
   deadlineIn,
   remainingMs,
 } from './deadline.js';
-import { errorLabel, throwAppError } from './errors.js';
+import { throwAppError } from './errors.js';
 import { reconcile } from './reconcile.js';
 import { redact, redactDeep, scanSecretShapes } from './redact.js';
 import {
@@ -57,6 +56,7 @@ import {
   probeSdkResolution,
   type SdkResolution,
 } from './sdk-resolver.js';
+import { releaseTerminalSlot } from './slot-release.js';
 import {
   claimOwnEchoes,
   findBySessionResource,
@@ -392,8 +392,6 @@ function optionalBaseCommit(value: string): string | undefined {
 // status
 // ---------------------------------------------------------------------------
 
-const TERMINAL_VENDOR_STATES = new Set(['completed', 'failed']);
-
 export interface StatusArgs {
   readonly session?: string;
   readonly reconcile: boolean;
@@ -711,25 +709,11 @@ export async function status(
     // grant's active-session slot (tasks and corrective rounds stay spent).
     // status is a read command: a failed release keeps the slot held, which
     // only makes the grant stricter, and is reported instead of thrown.
-    let slotStuck = false;
-    if (
-      TERMINAL_VENDOR_STATES.has(vendorState) &&
-      record.kind === 'create' &&
-      record.grantId !== undefined
-    ) {
-      try {
-        await releaseSlotInStore(
-          deps.dataDir,
-          record.grantId,
-          record.localRequestId
-        );
-      } catch (err) {
-        slotStuck = true;
-        process.stderr.write(
-          `warning: could not release the grant slot of ${record.localRequestId}: ${errorLabel(err)}\n`
-        );
-      }
-    }
+    const slotStuck = await releaseTerminalSlot(
+      deps.dataDir,
+      record,
+      vendorState
+    );
 
     const flags: string[] = [];
     if (slotStuck) flags.push('slotStuck');
