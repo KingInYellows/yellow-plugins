@@ -407,7 +407,10 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   neutralized instead: `core.fsmonitor=false` is forced for the whole process by
   `harden_git_config` and per call by `lgit` (`lib/resolve-paths.sh` `lgit`), and hooks
   are disabled by `disable_git_hooks` in `commit-resolve-fixes` (unless the
-  verified-tracked-hooks opt-in applies) and by `lgit_nohooks` in the rollbacks; reads config through `yr_git`;
+  verified-tracked-hooks opt-in applies) and by `lgit_nohooks` in the rollbacks;
+  `run-verify-command` starts the verify command on the caller's PATH behind a private
+  `git` shim directory (0700, outside the worktree) whose shim runs the validated git on the
+  screened PATH, so git-launched helpers never resolve on the caller's PATH; reads config through `yr_git`;
   does not set `core.hooksPath`; returns a code instead of exiting, with the
   unsigned-commit note in `YR_HARDEN_NOTE` for the caller to print;
   `harden_git_config_for_verify` drops `safe.bareRepository` for the user's

@@ -163,27 +163,58 @@ has_kill_after() {
   run --separate-stderr env "PATH=$caller" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt src/new.txt
   [ ! -e "$BATS_TEST_TMPDIR/util-ran" ]
   [ "$status" -eq 0 ] || { echo "status $status: $stderr" >&2; return 1; }
-  [ "$(cat "$seen")" = "$caller" ]
+  # the caller's PATH, behind the private git shim directory (outside the worktree)
+  seen_path=$(cat "$seen")
+  [ "${seen_path#*:}" = "$caller" ]
+  shim=${seen_path%%:*}
+  [[ "$shim" == /* && "$shim" != "$REPO"/* ]]
 }
 
-@test "a bare git helper name in a command variable is judged on the PATH the verify command gets" {
-  mkdir -p node_modules/.bin
-  printf 'node_modules/\n' >> .git/info/exclude
-  printf '#!/bin/sh\ntouch "%s/ssh-ran"\nexit 1\n' "$BATS_TEST_TMPDIR" >| node_modules/.bin/ssh
-  chmod +x node_modules/.bin/ssh
+# Git helpers the verify command's git starts (ssh, here) resolve on the
+# screened PATH, not the caller's: the command's PATH starts with a private
+# directory whose git shim runs the validated git on the screened PATH.
+vr_ssh_fixture() {
+  mkdir -p ignored node_modules/.bin "$BATS_TEST_TMPDIR/goodbin" "$BATS_TEST_TMPDIR/hardbin"
+  printf 'ignored/\nnode_modules/\n' >> .git/info/exclude
+  printf '#!/bin/sh\ntouch "%s/bad-ran"\nexit 255\n' "$BATS_TEST_TMPDIR" >| ignored/helper
+  chmod +x ignored/helper
+  touch -t 201901010000 ignored/helper
+  printf '#!/bin/sh\ntouch "%s/good-ran"\nexit 255\n' "$BATS_TEST_TMPDIR" >| "$BATS_TEST_TMPDIR/goodbin/ssh"
+  chmod +x "$BATS_TEST_TMPDIR/goodbin/ssh"
+  printf '%s\n' 'git ls-remote ssh://host.invalid/repo.git >/dev/null 2>&1 || true' >| "$CMD"
+}
+
+@test "git helpers named as 'env ssh' in GIT_SSH_COMMAND resolve on the screened PATH, not a tracked ssh on the caller's" {
+  vr_ssh_fixture
+  cp ignored/helper node_modules/.bin/ssh
   touch -t 201901010000 node_modules/.bin/ssh
-  printf '%s\n' 'touch "$BATS_TEST_TMPDIR/verify-ran"' >| "$CMD"
-  caller="$REPO/node_modules/.bin:$PATH"
-  for name in GIT_SSH_COMMAND GIT_SSH GIT_ASKPASS GIT_PAGER EDITOR; do
-    run --separate-stderr env "PATH=$caller" "$name=ssh" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt src/new.txt
-    [ "$status" -eq 2 ] || { echo "$name: status $status: $stderr" >&2; return 1; }
-    [[ "$stderr" == *"$name"* ]]
-    [ ! -e "$BATS_TEST_TMPDIR/verify-ran" ]
-    [ ! -e "$BATS_TEST_TMPDIR/ssh-ran" ]
+  caller="$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH"
+  for cmdline in 'env ssh' 'ssh' 'command ssh' 'exec ssh' 'nice ssh' 'timeout 5 ssh'; do
+    rm -f "$BATS_TEST_TMPDIR/bad-ran" "$BATS_TEST_TMPDIR/good-ran"
+    run --separate-stderr env "PATH=$caller" "GIT_SSH_COMMAND=$cmdline" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
+    [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ] || { echo "tracked ssh ran: $cmdline" >&2; return 1; }
+    [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside ssh did not run: $cmdline: $stderr" >&2; return 1; }
   done
-  # the same name resolving outside the worktree is fine
-  run --separate-stderr env "PATH=$PATH" "GIT_SSH_COMMAND=ssh" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt src/new.txt
-  [ "$status" -eq 0 ] || { echo "status $status: $stderr" >&2; return 1; }
+}
+
+@test "core.sshCommand=ssh in the user's own config file resolves on the screened PATH" {
+  vr_ssh_fixture
+  cp ignored/helper node_modules/.bin/ssh
+  touch -t 201901010000 node_modules/.bin/ssh
+  git config -f "$BATS_TEST_TMPDIR/user-gitconfig" core.sshCommand ssh
+  caller="$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH"
+  run --separate-stderr env "PATH=$caller" "GIT_CONFIG_GLOBAL=$BATS_TEST_TMPDIR/user-gitconfig" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
+  [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside ssh did not run: $stderr" >&2; return 1; }
+}
+
+@test "an ssh hard-linked to a worktree file in an outside PATH directory never runs from the verify command's git" {
+  vr_ssh_fixture
+  ln ignored/helper "$BATS_TEST_TMPDIR/hardbin/ssh"
+  caller="$BATS_TEST_TMPDIR/hardbin:$BATS_TEST_TMPDIR/goodbin:$PATH"
+  run --separate-stderr env "PATH=$caller" "GIT_SSH_COMMAND=ssh" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
+  [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside ssh did not run: $stderr" >&2; return 1; }
 }
 
 @test "a tr symlinked into the worktree never runs in the revert modes (rp_lower runs tr by name)" {

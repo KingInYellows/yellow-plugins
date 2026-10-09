@@ -754,9 +754,6 @@ cd -- "$TOP" || die 2 "cannot enter $TOP"
 # This script never commits, so the unsigned-commit note is not printed.
 if [ "$MODE" = run ]; then
     harden_git_config full || die 2 "$YR_HARDEN_MSG; the tree is untouched"
-    # The verify command runs on the caller's PATH, so a bare helper name in a
-    # command variable (GIT_SSH_COMMAND=ssh) is judged there too.
-    yr_check_git_env_on_path "$YR_ORIG_PATH" || die 2 "$YR_HARDEN_MSG; the verify command was not run; the tree is untouched"
 else
     harden_git_config revert || die 2 "$YR_HARDEN_MSG; the tree is untouched"
 fi
@@ -819,6 +816,7 @@ IGNORED_SCRATCH=""
 IGNORED_HITS=""
 DIR_LIST=""
 HIDDEN_HITS=""
+VR_SHIM=""
 # The snapshot is provisional until it is complete and credential-screened: any
 # exit before then (a signal, a die, a failed screen) removes it, so no
 # unscreened patch stays under .git.
@@ -829,6 +827,7 @@ cleanup() {
     for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$IGNORED_HITS" "$DIR_LIST" "$HIDDEN_HITS"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
+    [ -z "$VR_SHIM" ] || rm -rf -- "$VR_SHIM"
     if [ "$PATCH_PROVISIONAL" = 1 ] && [ -n "$PATCH" ]; then
         rm -f -- "$PATCH"
     fi
@@ -1537,11 +1536,25 @@ run_verify() {
     # bash and timeout are resolved on the screened PATH, then the command gets
     # the caller's.
     B=$(type -P bash) || die 2 "bash not found"
+    # Every git the command starts (and any tool that starts git) must find its
+    # own helpers (ssh, askpass, a pager, an editor, credential and config
+    # programs, whatever GIT_SSH_COMMAND or a config file names, even as
+    # `env ssh`) on the screened PATH, not the caller's. A private directory
+    # (0700, outside the worktree) goes first on the command's PATH with a git
+    # shim that runs the validated git on that PATH.
+    VR_SHIM=$(mktemp -d) || die 2 "mktemp failed; the verify command was not run"
+    chmod 700 "$VR_SHIM" || die 2 "cannot protect $VR_SHIM; the verify command was not run"
+    VR_SHIM_REAL=$(cd -- "$VR_SHIM" && pwd -P) || die 2 "cannot resolve the git shim directory; the verify command was not run"
+    ! yr_inside_root "$VR_SHIM_REAL" "$TOP" || die 2 "TMPDIR is inside the repository, so the git shim would be writable by a resolver; the verify command was not run"
+    vr_shq() { local q=${1//\'/\'\\\'\'}; printf "'%s'" "$q"; }
+    printf '#!/bin/sh\nPATH=%s exec %s "$@"\n' "$(vr_shq "$YR_GIT_PATH")" "$(vr_shq "$YELLOW_REVIEW_GIT")" >"$VR_SHIM/git" \
+        && chmod 700 "$VR_SHIM/git" || die 2 "cannot write the git shim; the verify command was not run"
+    VR_PATH="$VR_SHIM:$YR_ORIG_PATH"
     if T=$(vr_timeout_bin); then
-        ( harden_git_config_for_verify; PATH=$YR_ORIG_PATH; exec "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
+        ( harden_git_config_for_verify; PATH=$VR_PATH; exec "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
         CMD_PID=$!
     else
-        ( harden_git_config_for_verify; PATH=$YR_ORIG_PATH; exec "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
+        ( harden_git_config_for_verify; PATH=$VR_PATH; exec "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
         CMD_PID=$!
         ( vr_watchdog "$CMD_PID" "$TIMEOUT" "$MARKER" "$KILL_AFTER" ) &
         WD_PID=$!
