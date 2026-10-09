@@ -29,7 +29,7 @@ import {
   remainingMs,
 } from './deadline.js';
 import { AppErrorException, makeAppError, throwAppError } from './errors.js';
-import { fenceUntrusted, redact } from './redact.js';
+import { fenceAltersText, fenceUntrusted } from './redact.js';
 import {
   type Attention,
   attentionOf,
@@ -636,15 +636,21 @@ export async function superviseOnce(
   }
 
   if (condition === 'awaiting-approval' && seen.pendingPlan !== undefined) {
-    fenced.plan = fenceUntrusted(planText(seen.pendingPlan));
-    const actions: AllowedAction[] = [
-      ...(permits(grant, 'approve') ? (['approve'] as const) : []),
-      ...(permits(grant, 'reply') ? (['reply'] as const) : []),
-    ];
+    const shownPlan = planText(seen.pendingPlan);
+    fenced.plan = fenceUntrusted(shownPlan);
+    // A plan the fence rewrote (redaction, a forged delimiter) was not shown as
+    // it is: it is not offered for approval or a plan-bound reply.
+    const unactionable = fenceAltersText(shownPlan);
+    const actions: AllowedAction[] = unactionable
+      ? []
+      : [
+          ...(permits(grant, 'approve') ? (['approve'] as const) : []),
+          ...(permits(grant, 'reply') ? (['reply'] as const) : []),
+        ];
     return finish(
       'needs-plan-review',
       {
-        observedPlanId: seen.pendingPlan.planId,
+        ...(unactionable ? {} : { observedPlanId: seen.pendingPlan.planId }),
         nextCheck: acting,
         allowedActions: actions,
       },
@@ -653,7 +659,8 @@ export async function superviseOnce(
           planId: seen.pendingPlan.planId,
           evaluatedAt: now().toISOString(),
         },
-      }
+      },
+      unactionable ? ['planUnavailable'] : []
     );
   }
 
@@ -685,7 +692,7 @@ export async function superviseOnce(
     // guarded and the operator answers.
     const bindable =
       latest?.message !== undefined &&
-      redact(latest.message) === latest.message &&
+      !fenceAltersText(latest.message) &&
       latest.message.length <= BOUND_QUESTION_MAX_CHARS;
     return finish(
       'needs-answer',

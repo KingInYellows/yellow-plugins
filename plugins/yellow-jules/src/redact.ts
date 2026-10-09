@@ -196,3 +196,18 @@ export function fenceUntrusted(text: string): string {
     .join('\n');
   return `${FENCE_BEGIN}\n${neutralized}\n${FENCE_END}`;
 }
+
+/**
+ * True when `fenceUntrusted` shows something other than `text` (redaction,
+ * a rewritten delimiter or a `--- … ---` line; stripped carriage returns do not
+ * count). A digest bound to `text` must not be offered for such text, because
+ * the reviewer saw the rewritten version.
+ */
+export function fenceAltersText(text: string): boolean {
+  const fenced = fenceUntrusted(text);
+  const body = fenced.slice(
+    FENCE_BEGIN.length + 1,
+    fenced.length - FENCE_END.length - 1
+  );
+  return body !== text.replace(/\r/g, '');
+}

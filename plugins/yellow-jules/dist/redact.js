@@ -22,6 +22,7 @@ exports.redactDeep = redactDeep;
 exports.truncateRedacted = truncateRedacted;
 exports.scanSecretShapes = scanSecretShapes;
 exports.fenceUntrusted = fenceUntrusted;
+exports.fenceAltersText = fenceAltersText;
 const REDACTED = '***REDACTED***';
 const AUTHORIZATION_HEADER_RE = /authorization\s*:\s*(?:bearer\s+)?\S+/gi;
 const BEARER_TOKEN_RE = /\bBearer\s+\S+/gi;
@@ -177,4 +178,15 @@ function fenceUntrusted(text) {
         .map((line) => /^\s*---.*---\s*$/.test(line) ? '[fenced: redacted]' : line)
         .join('\n');
     return `${exports.FENCE_BEGIN}\n${neutralized}\n${exports.FENCE_END}`;
+}
+/**
+ * True when `fenceUntrusted` shows something other than `text` (redaction,
+ * a rewritten delimiter or a `--- … ---` line; stripped carriage returns do not
+ * count). A digest bound to `text` must not be offered for such text, because
+ * the reviewer saw the rewritten version.
+ */
+function fenceAltersText(text) {
+    const fenced = fenceUntrusted(text);
+    const body = fenced.slice(exports.FENCE_BEGIN.length + 1, fenced.length - exports.FENCE_END.length - 1);
+    return body !== text.replace(/\r/g, '');
 }

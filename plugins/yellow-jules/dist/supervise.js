@@ -421,13 +421,19 @@ async function superviseOnce(deps, args) {
         }, {}, ['policyDeviation']);
     }
     if (condition === 'awaiting-approval' && seen.pendingPlan !== undefined) {
-        fenced.plan = (0, redact_js_1.fenceUntrusted)(planText(seen.pendingPlan));
-        const actions = [
-            ...(permits(grant, 'approve') ? ['approve'] : []),
-            ...(permits(grant, 'reply') ? ['reply'] : []),
-        ];
+        const shownPlan = planText(seen.pendingPlan);
+        fenced.plan = (0, redact_js_1.fenceUntrusted)(shownPlan);
+        // A plan the fence rewrote (redaction, a forged delimiter) was not shown as
+        // it is: it is not offered for approval or a plan-bound reply.
+        const unactionable = (0, redact_js_1.fenceAltersText)(shownPlan);
+        const actions = unactionable
+            ? []
+            : [
+                ...(permits(grant, 'approve') ? ['approve'] : []),
+                ...(permits(grant, 'reply') ? ['reply'] : []),
+            ];
         return finish('needs-plan-review', {
-            observedPlanId: seen.pendingPlan.planId,
+            ...(unactionable ? {} : { observedPlanId: seen.pendingPlan.planId }),
             nextCheck: acting,
             allowedActions: actions,
         }, {
@@ -435,7 +441,7 @@ async function superviseOnce(deps, args) {
                 planId: seen.pendingPlan.planId,
                 evaluatedAt: now().toISOString(),
             },
-        });
+        }, unactionable ? ['planUnavailable'] : []);
     }
     if (condition === 'awaiting-approval') {
         // The vendor wants an approval but no plan could be read: a human looks.
@@ -456,7 +462,7 @@ async function superviseOnce(deps, args) {
         // shown in full: no binding is offered for it, so the reply cannot be
         // guarded and the operator answers.
         const bindable = latest?.message !== undefined &&
-            (0, redact_js_1.redact)(latest.message) === latest.message &&
+            !(0, redact_js_1.fenceAltersText)(latest.message) &&
             latest.message.length <= BOUND_QUESTION_MAX_CHARS;
         return finish('needs-answer', {
             ...(bindable
