@@ -2542,6 +2542,23 @@ crf_refuses_untouched() {
   [ ! -e "$marker" ]
 }
 
+@test "a true symlinked into the worktree never runs through the timeout probe" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/true-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$REPO/tools/true"
+  chmod +x "$REPO/tools/true"
+  # A directory holding only true: timeout, not the script, looks it up.
+  link="$BATS_TEST_TMPDIR/truebin"
+  mkdir -p "$link"
+  ln -s "$REPO/tools/true" "$link/true"
+  printf 'one\nfeature\nfix-true\n' >| src/a.txt
+  run_crf_path "$link:$old_path" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ] || { echo "refused: $stderr" >&2; return 1; }
+  [ ! -e "$marker" ]
+}
+
 @test "an inherited YR_GIT_PATH naming a worktree directory is ignored, so a planted awk never runs" {
   marker="$BATS_TEST_TMPDIR/inherited-ran"
   rm -f "$marker"

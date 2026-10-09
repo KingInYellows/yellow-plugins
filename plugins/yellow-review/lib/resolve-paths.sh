@@ -199,10 +199,12 @@ yr_safe_path() {
                 continue
             fi
             # Not "-e": a dangling link whose target is created later counts.
+            # true and false are listed because timeout looks up the command
+            # it runs through PATH (vr_timeout_bin probes with true).
             for helper in awk git git-lfs bash sh env timeout gtimeout \
                 grep sed sort uniq cut tr wc head tail cat nl tee od fold \
                 mktemp mkfifo rm mv ls mkdir chmod touch find dirname basename \
-                readlink date sleep; do
+                readlink date sleep true false; do
                 [ -L "$entry/$helper" ] || continue
                 hcanon=$(yr_canon_path "$entry/$helper" 2>/dev/null || true)
                 if [ -z "$hcanon" ] || yr_inside_root "$hcanon" "$root"; then
