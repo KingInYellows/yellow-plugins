@@ -86,7 +86,8 @@ run_recipe() {
   for kv in "$@"; do
     printf '%s\n' "${kv#*=}" > "$RECIPE_DIR/${kv%%=*}"
   done
-  run env PATH="$STUB:$PATH" $sh -c "${recipe//VALUES_DIR/$RECIPE_DIR}"
+  # shellcheck disable=SC2086 # RUN_OPTS is empty or a single bats run flag
+  run ${RUN_OPTS:-} env PATH="$STUB:$PATH" $sh -c "${recipe//VALUES_DIR/$RECIPE_DIR}"
 }
 
 argv_n() { awk -v n="$1" 'BEGIN{RS="\0"} NR==n{printf "%s", $0}' "$ARGV_FILE"; }
@@ -266,6 +267,9 @@ check_breakout() {
 @test "output is capped at 200 lines of at most 2000 bytes" {
   local doc longest
   export STUB_MODE=big
+  # Count stdout only: when SIGPIPE is ignored (as on CI runners) the stub's
+  # writes after head exits report "Broken pipe" on stderr.
+  RUN_OPTS=--separate-stderr
   for doc in "${DOCS[@]}"; do
     run_recipe "$PLUGIN_ROOT/$doc" bash 'pattern=console.log($A)' lang=js target=src
     [ "$status" -eq 0 ]
