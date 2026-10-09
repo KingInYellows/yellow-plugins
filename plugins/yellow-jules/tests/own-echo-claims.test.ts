@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { status } from '../src/runtime.js';
-import { claimOwnEchoes, readJournal } from '../src/state.js';
+import { claimOwnEchoes, messageDigest, readJournal } from '../src/state.js';
+import {
+  assertGrantLiveBeforeWrite,
+  reserveUnderGrant,
+  settleAccepted,
+} from '../src/write-gate.js';
 
 import {
   addActivity,
@@ -115,5 +120,58 @@ describe('each dispatched message explains at most one vendor activity', () => {
       activityId: 'activities/x1',
       observedAt: '2026-09-29T12:00:00.000Z',
     });
+  });
+});
+
+describe('identical text from a create and a later reply, newest first', () => {
+  it('each echo goes to the write that precedes it, not to journal order', async () => {
+    const grantId = await createGrant(h, { maxActiveSessions: 3 });
+    const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
+    const createSent = h.deps.clock.now();
+    h.deps.clock.time += 5 * 60_000;
+    const reservation = await reserveUnderGrant(h.deps, {
+      grantId,
+      ownerRequestId: session.localRequestId,
+      authority: {
+        repository: 'acme/widgets',
+        sourceResource: 'sources/github/acme/widgets',
+        branch: 'scratch/one',
+        taskRef: 't1',
+        operation: 'reply',
+      },
+      reservation: {
+        localRequestId: 'reply-same-text',
+        localId: `jl-${'d'.repeat(32)}`,
+        sessionResource: session.sessionResource,
+        promptDigest: messageDigest('Do the task.'),
+      },
+    });
+    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+    await settleAccepted(h.deps, reservation);
+    const digest = messageDigest('Do the task.');
+    const outside = await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [
+        {
+          activityId: 'act-reply',
+          digest,
+          createTime: new Date(h.deps.clock.now() + 1_000).toISOString(),
+        },
+        {
+          activityId: 'act-create',
+          digest,
+          createTime: new Date(createSent + 1_000).toISOString(),
+        },
+      ],
+      {
+        ownerRequestId: session.localRequestId,
+        observedAt: new Date(h.deps.clock.now()).toISOString(),
+      }
+    );
+    expect(outside).toBeUndefined();
+    const ops = (await readJournal(h.dataDir)).operations;
+    expect(ops['reply-same-text']?.echoActivityId).toBe('act-reply');
+    expect(ops[session.localRequestId]?.echoActivityId).toBe('act-create');
   });
 });

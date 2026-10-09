@@ -972,7 +972,17 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
                     !Number.isNaN(sent) &&
                     r.dispatchedAt !== undefined &&
                     sent < Date.parse(r.dispatchedAt) - activity_walk_js_1.DISPATCH_SKEW_MS);
-            const slot = landed.find((r) => matches(r) && !inFlight(r));
+            const eligible = landed.filter((r) => matches(r) && !inFlight(r));
+            // Vendor list order is unverified, so with a usable timestamp prefer
+            // the latest-dispatched write that precedes the message: an older
+            // identical write then keeps the older echo.
+            const slot = typeof sent === 'number' && !Number.isNaN(sent)
+                ? eligible.reduce((best, r) => best === undefined ||
+                    Date.parse(r.dispatchedAt ?? r.createdAt) >
+                        Date.parse(best.dispatchedAt ?? best.createdAt)
+                    ? r
+                    : best, undefined)
+                : eligible[0];
             if (slot === undefined && landed.some((r) => matches(r))) {
                 // Only a dispatched write whose outcome is unknown could explain it:
                 // `dispatchedAt` proves the POST began, not that it landed. Leave the
