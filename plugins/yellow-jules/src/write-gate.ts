@@ -50,6 +50,7 @@ import {
   blocksRepairLaunch,
   hasUnreconciledDeviation,
   markOperation,
+  nextSeq,
   readJournal,
   type ReservationInput,
   updateJournal,
@@ -446,7 +447,7 @@ async function finalDispatchCheck(
         `${why} after the write was reserved; nothing was sent`
       )
     );
-  return updateJournal(deps.dataDir, (operations) => {
+  return updateJournal(deps.dataDir, (operations, journal) => {
     // `authorize --revoke` writes grants.json under this same journal lock, so
     // reading the grant here serializes a revoke with the dispatch stamp.
     const { grant } = loadAuthorizedGrant(deps, record.grantId ?? '');
@@ -549,6 +550,8 @@ async function finalDispatchCheck(
     operations[record.localRequestId] = {
       ...fresh,
       dispatchedAt: new Date(now()).toISOString(),
+      // Orders the dispatch against evaluations and walks without a clock.
+      dispatchSeq: nextSeq(journal),
     };
     return undefined;
   });

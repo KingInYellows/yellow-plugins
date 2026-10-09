@@ -55,6 +55,9 @@ exports.emptyJournal = emptyJournal;
 exports.readJournal = readJournal;
 exports.writeJournal = writeJournal;
 exports.withJournalLock = withJournalLock;
+exports.nextSeq = nextSeq;
+exports.seqBefore = seqBefore;
+exports.takeSeq = takeSeq;
 exports.updateJournal = updateJournal;
 exports.ownsSession = ownsSession;
 exports.findBySessionResource = findBySessionResource;
@@ -64,6 +67,8 @@ exports.applyReservation = applyReservation;
 exports.reserveOperation = reserveOperation;
 exports.applyRetention = applyRetention;
 exports.markOperation = markOperation;
+exports.conflictingSessionOwner = conflictingSessionOwner;
+exports.absorbObservedOwners = absorbObservedOwners;
 exports.ensureObservedRecord = ensureObservedRecord;
 exports.upsertReadState = upsertReadState;
 exports.upsertArtifactResumeToken = upsertArtifactResumeToken;
@@ -248,7 +253,9 @@ function isValidSupervision(value) {
         !((0, shape_js_1.isPlainObject)(paused) &&
             typeof paused['reason'] === 'string' &&
             typeof paused['observedAt'] === 'string' &&
-            hasOptionalStrings(paused, ['activityId'])))
+            hasOptionalStrings(paused, ['activityId']) &&
+            (paused['observedSeq'] === undefined ||
+                (0, shape_js_1.isNonNegativeInt)(paused['observedSeq']))))
         return false;
     if (backoff !== undefined &&
         !((0, shape_js_1.isPlainObject)(backoff) &&
@@ -260,7 +267,13 @@ function isValidSupervision(value) {
         !((0, shape_js_1.isPlainObject)(outsideSeen) &&
             typeof outsideSeen['activityId'] === 'string' &&
             typeof outsideSeen['observedAt'] === 'string' &&
-            hasOptionalStrings(outsideSeen, ['createTime'])))
+            hasOptionalStrings(outsideSeen, ['createTime']) &&
+            (outsideSeen['observedSeq'] === undefined ||
+                (0, shape_js_1.isNonNegativeInt)(outsideSeen['observedSeq']))))
+        return false;
+    const heldSeqs = value['heldSeqs'];
+    if (heldSeqs !== undefined &&
+        !((0, shape_js_1.isPlainObject)(heldSeqs) && Object.values(heldSeqs).every(shape_js_1.isNonNegativeInt)))
         return false;
     const heldActivities = value['heldActivities'];
     if (heldActivities !== undefined &&
@@ -271,7 +284,12 @@ function isValidSupervision(value) {
     if (evaluatedPlan !== undefined &&
         !((0, shape_js_1.isPlainObject)(evaluatedPlan) &&
             typeof evaluatedPlan['planId'] === 'string' &&
-            typeof evaluatedPlan['evaluatedAt'] === 'string'))
+            typeof evaluatedPlan['evaluatedAt'] === 'string' &&
+            (evaluatedPlan['evaluatedSeq'] === undefined ||
+                (0, shape_js_1.isNonNegativeInt)(evaluatedPlan['evaluatedSeq']))))
+        return false;
+    const evaluatedPassSeq = value['evaluatedPassSeq'];
+    if (evaluatedPassSeq !== undefined && !(0, shape_js_1.isNonNegativeInt)(evaluatedPassSeq))
         return false;
     const evaluatedPassAt = value['evaluatedPassAt'];
     if (evaluatedPassAt !== undefined && typeof evaluatedPassAt !== 'string')
@@ -314,6 +332,14 @@ function isValidRecord(key, value) {
         return false;
     if (!(0, shape_js_1.isNonNegativeInt)(value['activityCount']))
         return false;
+    for (const field of [
+        'createSeq',
+        'dispatchSeq',
+        'lastCompleteWalkSeq',
+    ]) {
+        if (value[field] !== undefined && !(0, shape_js_1.isNonNegativeInt)(value[field]))
+            return false;
+    }
     if (!(0, shape_js_1.isNonNegativeInt)(value['resumeRestartCount']))
         return false;
     if (value['artifactResumeRestartCount'] !== undefined &&
@@ -356,6 +382,9 @@ function parseJournal(raw) {
         return undefined;
     if (typeof parsed['archiveVisibilityConfirmed'] !== 'boolean')
         return undefined;
+    const seq = parsed['seq'];
+    if (seq !== undefined && !(0, shape_js_1.isNonNegativeInt)(seq))
+        return undefined;
     const ops = parsed['operations'];
     if (!(0, shape_js_1.isPlainObject)(ops))
         return undefined;
@@ -368,6 +397,7 @@ function parseJournal(raw) {
     return {
         version: 1,
         archiveVisibilityConfirmed: parsed['archiveVisibilityConfirmed'],
+        ...(seq !== undefined ? { seq } : {}),
         operations,
     };
 }
@@ -557,6 +587,27 @@ async function withJournalLock(dataDir, fn, config = exports.DEFAULT_LOCK_CONFIG
         await releaseLock(lockPath, owner);
     }
 }
+/**
+ * Advances and returns the journal's ordering counter. Callers hold the journal
+ * lock and persist the journal afterwards; every value handed out is strictly
+ * greater than every earlier one, so two events can never tie.
+ */
+function nextSeq(journal) {
+    const next = (journal.seq ?? 0) + 1;
+    journal.seq = next;
+    return next;
+}
+/**
+ * Whether `earlier` is PROVEN to precede `later`. A missing sequence (a record
+ * written before sequences existed) has an unknown order, which proves nothing.
+ */
+function seqBefore(earlier, later) {
+    return earlier !== undefined && later !== undefined && earlier < later;
+}
+/** Reads and advances the ordering counter in one critical section (walk and pass starts). */
+async function takeSeq(dataDir, config = exports.DEFAULT_LOCK_CONFIG) {
+    return updateJournal(dataDir, (_operations, journal) => nextSeq(journal), config);
+}
 /** Read, mutate, and write the journal as one critical section; returns the mutator's value. */
 async function updateJournal(dataDir, mutate, config = exports.DEFAULT_LOCK_CONFIG) {
     return withJournalLock(dataDir, async () => {
@@ -566,6 +617,7 @@ async function updateJournal(dataDir, mutate, config = exports.DEFAULT_LOCK_CONF
         // by assignment, so an untouched record keeps its identity.
         const before = new Map(Object.entries(journal.operations));
         const confirmed = journal.archiveVisibilityConfirmed;
+        const seqBeforeMutation = journal.seq;
         const result = mutate(journal.operations, journal);
         const changed = Object.entries(journal.operations)
             .filter(([key, record]) => before.get(key) !== record)
@@ -573,7 +625,8 @@ async function updateJournal(dataDir, mutate, config = exports.DEFAULT_LOCK_CONF
         const expectedCount = before.size + changed.filter((k) => !before.has(k)).length;
         const unchanged = changed.length === 0 &&
             expectedCount === Object.keys(journal.operations).length &&
-            confirmed === journal.archiveVisibilityConfirmed;
+            confirmed === journal.archiveVisibilityConfirmed &&
+            seqBeforeMutation === journal.seq;
         // A mutation that changed nothing skips the fsync'd rewrite; a write only
         // secret-scans the records it changed (the rest passed when written).
         if (!unchanged)
@@ -613,9 +666,10 @@ function findUnresolvedOperations(journal, query) {
 // ---------------------------------------------------------------------------
 // Writers
 // ---------------------------------------------------------------------------
-function baseRecord(fields, nowIso) {
+function baseRecord(fields, nowIso, createSeq) {
     return {
         ...fields,
+        createSeq,
         recentActivityIds: [],
         activityCount: 0,
         resumeRestartCount: 0,
@@ -660,7 +714,7 @@ function applyReservation(operations, journal, input, now = () => new Date()) {
             kind: input.kind,
             origin: 'yellow',
             status: 'reserved',
-        }, now().toISOString()),
+        }, now().toISOString(), nextSeq(journal)),
         ...rest,
     };
     operations[input.localRequestId] = record;
@@ -684,15 +738,166 @@ function applyRetention(record) {
 }
 async function markOperation(dataDir, localRequestId, status, extra = {}, now = () => new Date(), config = exports.DEFAULT_LOCK_CONFIG) {
     return updateJournal(dataDir, (operations) => {
-        const next = applyRetention({
+        let bound = {
             ...requireRecord(operations, localRequestId),
             ...extra,
             status,
             updatedAt: now().toISOString(),
-        });
+        };
+        // Binding a create to a session an `observe` row already owns: that row's
+        // safety state moves onto the create, and the row is retired.
+        if (extra.sessionResource !== undefined) {
+            bound = absorbObservedOwners(operations, bound);
+        }
+        const next = applyRetention(bound);
         operations[localRequestId] = next;
         return next;
     }, config);
+}
+/**
+ * A row other than `record` that already owns the session `record` is being
+ * bound to, and that cannot be folded into it: a create (or collect) row. An
+ * `observe` row is not a conflict; `absorbObservedOwners` folds it in.
+ */
+function conflictingSessionOwner(operations, record, sessionResource) {
+    return Object.values(operations).find((r) => r.localRequestId !== record.localRequestId &&
+        ownsSession(r) &&
+        r.kind !== 'observe' &&
+        r.sessionResource === sessionResource);
+}
+function laterOf(a, b, seqOf, atOf) {
+    const sa = seqOf(a);
+    const sb = seqOf(b);
+    if (sa !== undefined && sb !== undefined)
+        return sb > sa ? b : a;
+    return atOf(b) > atOf(a) ? b : a;
+}
+function mergeSupervision(own, observed) {
+    if (observed === undefined)
+        return own;
+    if (own === undefined)
+        return observed;
+    const merged = { ...own };
+    // Every marker keeps the more restrictive (later-evidence) of the two: a
+    // clearing walk must postdate it.
+    if (observed.paused !== undefined) {
+        merged['paused'] =
+            own.paused === undefined
+                ? observed.paused
+                : laterOf(own.paused, observed.paused, (v) => v.observedSeq, (v) => v.observedAt);
+    }
+    if (observed.outsideSeen !== undefined) {
+        merged['outsideSeen'] =
+            own.outsideSeen === undefined ||
+                (0, activity_walk_js_1.compareStamp)({
+                    createTime: observed.outsideSeen.createTime ?? '',
+                    activityId: observed.outsideSeen.activityId,
+                }, {
+                    createTime: own.outsideSeen.createTime ?? '',
+                    activityId: own.outsideSeen.activityId,
+                }) > 0
+                ? observed.outsideSeen
+                : own.outsideSeen;
+    }
+    if (observed.backoff !== undefined) {
+        merged['backoff'] =
+            own.backoff === undefined ||
+                observed.backoff.nextCheckAt > own.backoff.nextCheckAt
+                ? observed.backoff
+                : own.backoff;
+    }
+    if (observed.lastDecision !== undefined) {
+        merged['lastDecision'] =
+            own.lastDecision === undefined ||
+                observed.lastDecision.decidedAt > own.lastDecision.decidedAt
+                ? observed.lastDecision
+                : own.lastDecision;
+    }
+    if (observed.evaluatedPlan !== undefined) {
+        const observedWins = own.evaluatedPlan === undefined ||
+            laterOf(own.evaluatedPlan, observed.evaluatedPlan, (v) => v.evaluatedSeq, (v) => v.evaluatedAt) === observed.evaluatedPlan;
+        if (observedWins) {
+            merged['evaluatedPlan'] = observed.evaluatedPlan;
+            delete merged['evaluatedPassAt'];
+            delete merged['evaluatedPassSeq'];
+            if (observed.evaluatedPassAt !== undefined)
+                merged['evaluatedPassAt'] = observed.evaluatedPassAt;
+            if (observed.evaluatedPassSeq !== undefined)
+                merged['evaluatedPassSeq'] = observed.evaluatedPassSeq;
+        }
+    }
+    // A held message keeps its EARLIEST first read: later writes then count as
+    // after it.
+    if (observed.heldActivities !== undefined) {
+        const held = { ...(own.heldActivities ?? {}) };
+        const seqs = { ...(own.heldSeqs ?? {}) };
+        for (const [id, at] of Object.entries(observed.heldActivities)) {
+            if (held[id] === undefined || at < held[id]) {
+                held[id] = at;
+                const q = observed.heldSeqs?.[id];
+                if (q !== undefined)
+                    seqs[id] = q;
+                else
+                    delete seqs[id];
+            }
+        }
+        merged['heldActivities'] = held;
+        if (Object.keys(seqs).length > 0)
+            merged['heldSeqs'] = seqs;
+        else
+            delete merged['heldSeqs'];
+    }
+    return merged;
+}
+/**
+ * Folds an `observe` row's safety state into the create that is being bound to
+ * the same session, then retires the observe row, so `findBySessionResource`
+ * has exactly one owner. Kept: every deviation (a deviation stays unreconciled
+ * if either copy was), the more restrictive supervision markers, and the
+ * artifacts. Read cursors are NOT carried: an observed walk never classified
+ * user messages (only a create's walk does), so the create starts from its own
+ * cursors and the next `status` rewalks the session under the create. The
+ * observe row's local id is retired with it. Callers hold the journal lock.
+ */
+function absorbObservedOwners(operations, create) {
+    if (create.kind !== 'create' || create.sessionResource === undefined) {
+        return create;
+    }
+    let merged = create;
+    for (const observed of Object.values(operations)) {
+        if (observed.kind !== 'observe' ||
+            observed.localRequestId === create.localRequestId ||
+            observed.sessionResource !== create.sessionResource) {
+            continue;
+        }
+        const deviations = [...merged.deviations];
+        for (const d of observed.deviations) {
+            const at = deviations.findIndex((x) => x.reason === d.reason && x.prUrl === d.prUrl);
+            if (at < 0)
+                deviations.push(d);
+            else {
+                const x = deviations[at];
+                deviations[at] = {
+                    ...x,
+                    observedAt: d.observedAt < x.observedAt ? d.observedAt : x.observedAt,
+                    reconciled: x.reconciled && d.reconciled,
+                };
+            }
+        }
+        const known = new Set(merged.artifacts.map(artifactKey));
+        const supervision = mergeSupervision(merged.supervision, observed.supervision);
+        merged = {
+            ...merged,
+            deviations,
+            artifacts: [
+                ...merged.artifacts,
+                ...observed.artifacts.filter((a) => !known.has(artifactKey(a))),
+            ],
+            ...(supervision !== undefined ? { supervision } : {}),
+        };
+        delete operations[observed.localRequestId];
+    }
+    return merged;
 }
 /**
  * First sight of a session with no journal row (it was created outside
@@ -712,12 +917,27 @@ async function ensureObservedRecord(dataDir, sessionResource, now = () => new Da
                 kind: 'observe',
                 origin: 'external',
                 status: 'observed',
-            }, now().toISOString()),
+            }, now().toISOString(), nextSeq(journal)),
             sessionResource,
         };
         operations[record.localRequestId] = record;
         return record;
     }, config);
+}
+/**
+ * Forward only: a delayed older walk must not pull the stamp back. Walks with a
+ * sequence are ordered by it (never a tie); a stamp without one is ordered by
+ * its timestamp, and a tie keeps the stored stamp.
+ */
+function completeWalkAdvances(current, update) {
+    if (update.completeWalkAt === undefined)
+        return false;
+    if (update.completeWalkSeq !== undefined &&
+        current.lastCompleteWalkSeq !== undefined) {
+        return update.completeWalkSeq > current.lastCompleteWalkSeq;
+    }
+    return (current.lastCompleteWalkAt === undefined ||
+        update.completeWalkAt > current.lastCompleteWalkAt);
 }
 /**
  * Activity read-state. Only the `status` path calls this (contract
@@ -843,10 +1063,13 @@ async function upsertReadState(dataDir, localRequestId, update, now = () => new 
                 }
                 : {}),
             // Forward only: a delayed older walk must not pull the stamp back.
-            ...(update.completeWalkAt !== undefined &&
-                (current.lastCompleteWalkAt === undefined ||
-                    update.completeWalkAt > current.lastCompleteWalkAt)
-                ? { lastCompleteWalkAt: update.completeWalkAt }
+            ...(completeWalkAdvances(current, update)
+                ? {
+                    lastCompleteWalkAt: update.completeWalkAt,
+                    ...(update.completeWalkSeq !== undefined
+                        ? { lastCompleteWalkSeq: update.completeWalkSeq }
+                        : {}),
+                }
                 : {}),
             ...(resumePageToken !== undefined ? { resumePageToken } : {}),
             ...(resumeApproval !== undefined ? { resumeApproval } : {}),
@@ -941,7 +1164,7 @@ function keep(key, previous, patch) {
 }
 /** Merges a patch into the session's supervision state; written by `supervise` and, for `outsideSeen`, by `status` (R32, R33). */
 async function updateSupervision(dataDir, localRequestId, patch, now = () => new Date(), config = exports.DEFAULT_LOCK_CONFIG) {
-    return updateJournal(dataDir, (operations) => {
+    return updateJournal(dataDir, (operations, journal) => {
         const current = requireRecord(operations, localRequestId);
         const previous = current.supervision ?? {};
         // `undefined` keeps the stored value, `null` clears it, anything else sets it.
@@ -972,24 +1195,46 @@ async function updateSupervision(dataDir, localRequestId, patch, now = () => new
         // it. An older pass, or one starting in the same millisecond (order
         // unknown), neither replaces nor clears what a newer one stored. A write
         // with no token (or none stored) keeps the old behaviour.
+        // Sequences order passes exactly (they cannot tie); the timestamp rule
+        // only applies when either side predates sequences.
         const planStale = patch.evaluatedPlan !== undefined &&
-            patch.passStartedAt !== undefined &&
-            previous.evaluatedPassAt !== undefined &&
-            patch.passStartedAt <= previous.evaluatedPassAt;
+            (patch.passSeq !== undefined && previous.evaluatedPassSeq !== undefined
+                ? patch.passSeq <= previous.evaluatedPassSeq
+                : patch.passStartedAt !== undefined &&
+                    previous.evaluatedPassAt !== undefined &&
+                    patch.passStartedAt <= previous.evaluatedPassAt);
         const planPatch = planStale ? undefined : patch.evaluatedPlan;
         const passAt = planPatch !== undefined && patch.passStartedAt !== undefined
             ? patch.passStartedAt
             : previous.evaluatedPassAt;
+        // The pass stamps travel together: a pass without a sequence drops the
+        // stored one rather than leaving it paired with another pass's time.
+        const passSeq = planPatch !== undefined && patch.passStartedAt !== undefined
+            ? patch.passSeq
+            : previous.evaluatedPassSeq;
+        // The evaluation is stamped under this lock, after the pass read the
+        // plan, so a reply cannot be proven to follow it unless it really did.
+        const stampedPlan = planPatch === null || planPatch === undefined
+            ? planPatch
+            : { ...planPatch, evaluatedSeq: nextSeq(journal) };
+        // A pause that replaces the stored one is stamped under this lock too.
+        const stampedPause = pausedPatch === null || pausedPatch === undefined
+            ? pausedPatch
+            : { ...pausedPatch, observedSeq: nextSeq(journal) };
         const next = {
-            ...keep('paused', previous.paused, pausedPatch),
+            ...keep('paused', previous.paused, stampedPause),
             ...keep('backoff', previous.backoff, patch.backoff),
             ...keep('lastDecision', previous.lastDecision, decisionPatch),
             ...keep('outsideSeen', previous.outsideSeen, outsidePatch),
-            ...keep('evaluatedPlan', previous.evaluatedPlan, planPatch),
+            ...keep('evaluatedPlan', previous.evaluatedPlan, stampedPlan),
             ...(passAt !== undefined ? { evaluatedPassAt: passAt } : {}),
+            ...(passSeq !== undefined ? { evaluatedPassSeq: passSeq } : {}),
             // Owned by claimOwnEchoes; a supervise patch must not drop it.
             ...(previous.heldActivities !== undefined
                 ? { heldActivities: previous.heldActivities }
+                : {}),
+            ...(previous.heldSeqs !== undefined
+                ? { heldSeqs: previous.heldSeqs }
                 : {}),
         };
         const updated = {
@@ -1015,7 +1260,7 @@ async function updateSupervision(dataDir, localRequestId, patch, now = () => new
  * landed and claims nothing; an abandoned one might have, so it can.
  */
 async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingOut, walkComplete = true, config = exports.DEFAULT_LOCK_CONFIG) {
-    return updateJournal(dataDir, (operations) => {
+    return updateJournal(dataDir, (operations, journal) => {
         const landed = Object.values(operations).filter((record) => {
             const neverLanded = (record.status === 'failed' && record.abandonedAt === undefined) ||
                 record.status === 'rejected';
@@ -1035,35 +1280,54 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
         const walkStartMs = mark?.walkStartedAt !== undefined
             ? Date.parse(mark.walkStartedAt)
             : Number.NaN;
+        const walkSeq = mark?.walkSeq;
         // Rebased under this lock, but only writes the walk could have raced:
-        // one created or dispatched after the walk began is not a candidate. A
-        // write stamped the same millisecond as the walk start cannot be ordered
-        // against it, so it counts as post-walk (fail closed: it cannot claim).
-        const postWalk = (r) => !Number.isNaN(walkStartMs) &&
-            (Date.parse(r.createdAt) >= walkStartMs ||
-                (r.dispatchedAt !== undefined &&
-                    Date.parse(r.dispatchedAt) >= walkStartMs));
+        // one created or dispatched after the walk began is not a candidate. By
+        // sequence a write is a candidate only when proven below the walk's; a
+        // write that predates sequences falls back to its timestamp, where the
+        // same millisecond cannot be ordered and counts as post-walk (fail closed).
+        const notBeforeWalk = (seq, at) => walkSeq !== undefined && seq !== undefined
+            ? !seqBefore(seq, walkSeq)
+            : !Number.isNaN(walkStartMs) && Date.parse(at) >= walkStartMs;
+        const postWalk = (r) => notBeforeWalk(r.createSeq, r.createdAt) ||
+            (r.dispatchedAt !== undefined &&
+                notBeforeWalk(r.dispatchSeq, r.dispatchedAt));
         const claimed = new Set(landed.flatMap((r) => r.echoActivityId !== undefined ? [r.echoActivityId] : []));
         // Held messages persist when they were first read: a write dispatched
         // after that can never explain them, however many walks later it is
         // compared (the 30 s dispatch allowance must not let it reach back).
         const heldBefore = (mark !== undefined ? operations[mark.ownerRequestId] : undefined)?.supervision?.heldActivities;
         const held = { ...(heldBefore ?? {}) };
+        const heldSeqBefore = (mark !== undefined ? operations[mark.ownerRequestId] : undefined)?.supervision?.heldSeqs;
+        const heldSeqs = { ...(heldSeqBefore ?? {}) };
         const afterFirstRead = (r, id) => {
             const since = held[id];
             if (since === undefined)
                 return false;
+            const sinceSeq = heldSeqs[id];
             const sinceMs = Date.parse(since);
-            return (!Number.isNaN(sinceMs) &&
-                (Date.parse(r.createdAt) >= sinceMs ||
-                    (r.dispatchedAt !== undefined &&
-                        Date.parse(r.dispatchedAt) >= sinceMs)));
+            // A write is before the first read only when proven so; equal or
+            // unknown order counts as after (it cannot be the echo).
+            const notBefore = (seq, at) => sinceSeq !== undefined && seq !== undefined
+                ? !seqBefore(seq, sinceSeq)
+                : !Number.isNaN(sinceMs) && Date.parse(at) >= sinceMs;
+            return (notBefore(r.createSeq, r.createdAt) ||
+                (r.dispatchedAt !== undefined &&
+                    notBefore(r.dispatchSeq, r.dispatchedAt)));
+        };
+        const release = (id) => {
+            delete held[id];
+            delete heldSeqs[id];
         };
         const hold = (message) => {
-            held[message.activityId] ??=
-                message.observedAt ?? mark?.walkStartedAt ?? mark?.observedAt ?? '';
-            if (held[message.activityId] === '')
-                delete held[message.activityId];
+            if (held[message.activityId] !== undefined)
+                return;
+            const at = message.observedAt ?? mark?.walkStartedAt ?? mark?.observedAt ?? '';
+            if (at === '')
+                return;
+            held[message.activityId] = at;
+            if (walkSeq !== undefined)
+                heldSeqs[message.activityId] = walkSeq;
         };
         // The newest outside message by `(createTime, activityId)`, the order
         // `compareStamp` uses: vendor list order is unverified, so neither the
@@ -1071,7 +1335,7 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
         let newestOutside;
         for (const message of messages) {
             if (claimed.has(message.activityId)) {
-                delete held[message.activityId];
+                release(message.activityId);
                 continue;
             }
             const sent = message.createTime && Date.parse(message.createTime);
@@ -1112,7 +1376,7 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
                 continue;
             }
             if (slot === undefined) {
-                delete held[message.activityId];
+                release(message.activityId);
                 if (newestOutside === undefined ||
                     (0, activity_walk_js_1.compareStamp)({
                         createTime: message.createTime ?? '',
@@ -1126,7 +1390,7 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
                 continue;
             }
             claimed.add(message.activityId);
-            delete held[message.activityId];
+            release(message.activityId);
             operations[slot.localRequestId] = {
                 ...slot,
                 echoActivityId: message.activityId,
@@ -1165,6 +1429,8 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
                         ...(evidence.createTime !== undefined
                             ? { createTime: evidence.createTime }
                             : {}),
+                        // Stamped under this lock: a clearing walk must have begun after it.
+                        observedSeq: nextSeq(journal),
                     },
                 },
                 updatedAt: mark.observedAt,
@@ -1191,15 +1457,19 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
         const current = mark !== undefined ? operations[mark.ownerRequestId] : undefined;
         if (current !== undefined && mark !== undefined) {
             const before = current.supervision?.heldActivities ?? {};
+            const beforeSeqs = current.supervision?.heldSeqs ?? {};
             const same = Object.keys(held).length === Object.keys(before).length &&
-                Object.entries(held).every(([id, at]) => before[id] === at);
+                Object.entries(held).every(([id, at]) => before[id] === at) &&
+                Object.keys(heldSeqs).length === Object.keys(beforeSeqs).length &&
+                Object.entries(heldSeqs).every(([id, q]) => beforeSeqs[id] === q);
             if (!same) {
-                const { heldActivities: _drop, ...rest } = current.supervision ?? {};
+                const { heldActivities: _drop, heldSeqs: _dropSeqs, ...rest } = current.supervision ?? {};
                 operations[mark.ownerRequestId] = {
                     ...current,
                     supervision: {
                         ...rest,
                         ...(Object.keys(held).length > 0 ? { heldActivities: held } : {}),
+                        ...(Object.keys(heldSeqs).length > 0 ? { heldSeqs } : {}),
                     },
                     updatedAt: mark.observedAt,
                 };

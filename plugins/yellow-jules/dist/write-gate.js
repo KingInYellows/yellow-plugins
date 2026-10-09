@@ -254,7 +254,7 @@ async function assertGrantLiveBeforeWrite(deps, record, reconcileHint) {
 async function finalDispatchCheck(deps, record) {
     const now = (0, runtime_support_js_1.nowFn)(deps);
     const paused = (why) => new errors_js_1.AppErrorException((0, errors_js_1.makeAppError)('JULES_SUPERVISION_PAUSED', `${why} after the write was reserved; nothing was sent`));
-    return (0, state_js_1.updateJournal)(deps.dataDir, (operations) => {
+    return (0, state_js_1.updateJournal)(deps.dataDir, (operations, journal) => {
         // `authorize --revoke` writes grants.json under this same journal lock, so
         // reading the grant here serializes a revoke with the dispatch stamp.
         const { grant } = loadAuthorizedGrant(deps, record.grantId ?? '');
@@ -311,6 +311,8 @@ async function finalDispatchCheck(deps, record) {
         operations[record.localRequestId] = {
             ...fresh,
             dispatchedAt: new Date(now()).toISOString(),
+            // Orders the dispatch against evaluations and walks without a clock.
+            dispatchSeq: (0, state_js_1.nextSeq)(journal),
         };
         return undefined;
     });

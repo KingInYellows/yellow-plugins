@@ -269,7 +269,7 @@ function walkStartFor(record, token) {
  * on the record. Only sessions this plugin created have a digest set to compare
  * against.
  */
-async function recordOutsideActivity(deps, record, messages, walkComplete, walkStartedAt) {
+async function recordOutsideActivity(deps, record, messages, walkComplete, walkStartedAt, walkSeq) {
     const pending = [];
     if (messages.length === 0 || record.kind !== 'create')
         return new Set();
@@ -279,6 +279,7 @@ async function recordOutsideActivity(deps, record, messages, walkComplete, walkS
         ownerRequestId: record.localRequestId,
         observedAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString(),
         walkStartedAt,
+        walkSeq,
     }, pending, walkComplete);
     return new Set(pending);
 }
@@ -324,6 +325,9 @@ async function status(deps, args) {
         // A complete walk vouches only for what it could see when it began: a
         // pause or outside marker recorded while it ran must postdate the stamp.
         const walkStartedAt = (0, runtime_support_js_1.nowFn)(deps)().toISOString();
+        // The sequence orders this walk against writes and pauses exactly; the
+        // timestamp above is for display (two events can share a millisecond).
+        const walkSeq = await (0, state_js_1.takeSeq)(deps.dataDir);
         const walk = await (0, activity_walk_js_1.walkActivities)({
             adapter,
             sessionResource,
@@ -386,7 +390,7 @@ async function status(deps, args) {
         // Messages only an in-flight (dispatched, unsettled) reply could explain are
         // held back: neither the watermark nor the ring may pass them, so the next
         // walk classifies them once the write has settled.
-        const held = await recordOutsideActivity(deps, record, newUserMessages, walk.complete, walkStartedAt);
+        const held = await recordOutsideActivity(deps, record, newUserMessages, walk.complete, walkStartedAt, walkSeq);
         const heldBack = held.size > 0;
         record = await (0, state_js_1.upsertReadState)(deps.dataDir, record.localRequestId, {
             vendorState,
@@ -405,7 +409,7 @@ async function status(deps, args) {
             // A walk that holds a message back has not classified it: stamping it
             // complete would let clearPause forget an older pause over that message.
             ...(walk.complete && !heldBack
-                ? { completeWalkAt: walkStartedAt }
+                ? { completeWalkAt: walkStartedAt, completeWalkSeq: walkSeq }
                 : {}),
             recentActivityIds: ring.filter((id) => !held.has(id)),
             activityCountDelta: walk.newIds.filter((id) => !held.has(id)).length,

@@ -401,7 +401,7 @@ describe('outside markers only move forward', () => {
       [older],
       mark('2026-09-29T12:00:05.000Z')
     );
-    expect((await owner())?.supervision?.outsideSeen).toEqual({
+    expect((await owner())?.supervision?.outsideSeen).toMatchObject({
       activityId: newer.activityId,
       observedAt: '2026-09-29T12:00:00.000Z',
       createTime: newer.createTime,

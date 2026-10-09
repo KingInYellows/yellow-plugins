@@ -48,6 +48,8 @@ import {
   messageDigest,
   type OwningCreate,
   readJournal,
+  seqBefore,
+  takeSeq,
   updateJournal,
   updateSupervision,
   type SupervisionPatch,
@@ -227,8 +229,10 @@ export async function superviseOnce(
     args.deadlineMs ?? DEFAULT_MUTATION_DEADLINE_MS
   );
   const now = nowFn(deps);
-  // Orders this pass's evaluated-plan write against overlapping passes.
+  // Orders this pass's evaluated-plan write against overlapping passes. The
+  // sequence is exact; the timestamp is the fallback for state that predates it.
   const passStartedAt = now().toISOString();
+  const passSeq = await takeSeq(deps.dataDir);
 
   let journal = await readJournal(deps.dataDir);
   const sessionResource = resolveSessionResource(journal, args.session);
@@ -314,7 +318,10 @@ export async function superviseOnce(
       },
       allowedActions: [],
       fenced: {},
-      pause: existingPause,
+      pause: {
+        reason: existingPause.reason,
+        observedAt: existingPause.observedAt,
+      },
       ...attentionOf(['paused']),
     };
   }
@@ -481,7 +488,14 @@ export async function superviseOnce(
         r.status !== 'rejected' &&
         // A reservation whose POST has not begun cannot have changed the plan.
         !(r.status === 'reserved' && r.dispatchedAt === undefined) &&
-        r.createdAt >= evaluated.evaluatedAt
+        // Suppresses the swap pause, so it must be PROVEN: the reply's dispatch
+        // (else its reservation) carries a sequence above the evaluation's.
+        // Equal or unknown order (a record from before sequences) is not
+        // proof, and the swap pauses.
+        seqBefore(
+          evaluated.evaluatedSeq,
+          r.dispatchedAt !== undefined ? r.dispatchSeq : r.createSeq
+        )
     );
   // A swap is caught whether this pass or an earlier plain `status` consumed
   // the new plan: the plan now pending is compared with the one evaluated.
@@ -548,6 +562,7 @@ export async function superviseOnce(
       ...(decision === 'needs-plan-review' ? {} : { evaluatedPlan: null }),
       ...patch,
       passStartedAt,
+      passSeq,
       ...decided(decision),
     });
     return {
@@ -827,17 +842,58 @@ export interface ClearPauseResult {
  * outside message after a pause was written, and the owner must inspect after
  * that message too, so a walk that predates it never vouches.
  */
-function effectivePause(
-  state: OperationRecord['supervision']
-): { readonly reason: string; readonly observedAt: string } | undefined {
+function effectivePause(state: OperationRecord['supervision']):
+  | {
+      readonly reason: string;
+      readonly observedAt: string;
+      readonly observedSeq?: number;
+    }
+  | undefined {
   const outside = state?.outsideSeen;
+  const evidenceOf = (
+    marker: { observedAt: string; observedSeq?: number },
+    reason: string
+  ): {
+    readonly reason: string;
+    readonly observedAt: string;
+    readonly observedSeq?: number;
+  } => ({
+    reason,
+    observedAt: marker.observedAt,
+    ...(marker.observedSeq !== undefined
+      ? { observedSeq: marker.observedSeq }
+      : {}),
+  });
   if (state?.paused !== undefined) {
-    return outside !== undefined && outside.observedAt > state.paused.observedAt
-      ? { reason: state.paused.reason, observedAt: outside.observedAt }
-      : state.paused;
+    const paused = state.paused;
+    if (outside === undefined) return evidenceOf(paused, paused.reason);
+    // The later evidence: by sequence when both have one, else by timestamp.
+    const outsideLater =
+      outside.observedSeq !== undefined && paused.observedSeq !== undefined
+        ? outside.observedSeq > paused.observedSeq
+        : outside.observedAt > paused.observedAt;
+    return outsideLater
+      ? evidenceOf(outside, paused.reason)
+      : evidenceOf(paused, paused.reason);
   }
   if (outside === undefined) return undefined;
-  return { reason: 'outside-user-message', observedAt: outside.observedAt };
+  return evidenceOf(outside, 'outside-user-message');
+}
+
+/**
+ * Whether a complete walk began after the pause evidence. By sequence when both
+ * carry one (never a tie); otherwise by timestamp, where equal is not "after".
+ */
+function walkFollowsPause(
+  record: Pick<OperationRecord, 'lastCompleteWalkAt' | 'lastCompleteWalkSeq'>,
+  paused: { readonly observedAt: string; readonly observedSeq?: number }
+): boolean {
+  if (record.lastCompleteWalkAt === undefined) return false;
+  if (paused.observedSeq !== undefined) {
+    // A pause stamped with a sequence is only vouched for by a walk that has one.
+    return seqBefore(paused.observedSeq, record.lastCompleteWalkSeq);
+  }
+  return record.lastCompleteWalkAt > paused.observedAt;
 }
 
 /**
@@ -861,10 +917,7 @@ export async function clearPause(
       recoveryAction: 'Nothing to clear.',
     });
   }
-  if (
-    owner.lastCompleteWalkAt === undefined ||
-    owner.lastCompleteWalkAt <= paused.observedAt
-  ) {
+  if (!walkFollowsPause(owner, paused)) {
     return throwAppError(
       'JULES_INVALID_STATE',
       'no complete status walk has run since the pause',
@@ -899,11 +952,11 @@ export async function clearPause(
       current === undefined ||
       state === undefined ||
       effectivePause(state)?.observedAt !== paused.observedAt ||
+      effectivePause(state)?.observedSeq !== paused.observedSeq ||
       effectivePause(state)?.reason !== paused.reason ||
       state.outsideSeen?.activityId !==
         owner.supervision?.outsideSeen?.activityId ||
-      current.lastCompleteWalkAt === undefined ||
-      current.lastCompleteWalkAt <= paused.observedAt
+      !walkFollowsPause(current, paused)
     ) {
       return throwAppError(
         'JULES_INVALID_STATE',

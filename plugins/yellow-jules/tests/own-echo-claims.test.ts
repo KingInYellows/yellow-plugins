@@ -68,12 +68,12 @@ describe('each dispatched message explains at most one vendor activity', () => {
     ).toBe(claimed);
   });
 
-  it('a write sharing the walk start millisecond cannot claim a same-text message', async () => {
+  it('a create sequenced before the walk claims its echo even when the clock has not moved', async () => {
     const grantId = await createGrant(h, { maxActiveSessions: 3 });
     const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
     setVendorState(h, session.sessionResource, 'inProgress');
-    // No clock advance: the create and the walk start share a millisecond, so
-    // the walk cannot tell whether a teammate's identical text is the echo.
+    // No clock advance: the create and the walk share a millisecond, but the
+    // journal sequence proves the create came first, so the echo is its own.
     addActivity(h, session.sessionResource, {
       type: 'userMessaged',
       message: 'Do the task.',
@@ -83,16 +83,8 @@ describe('each dispatched message explains at most one vendor activity', () => {
     expect(
       (await readJournal(h.dataDir)).operations[session.localRequestId]
         ?.echoActivityId
-    ).toBeUndefined();
-    // Held, not claimed; a later walk (strictly after the write) classifies it
-    // as the outside message it is.
-    h.deps.clock.time += 1;
-    await status(h.deps, { session: session.localId, reconcile: false });
-    expect(await outsideSeen(session.localRequestId)).toBe(true);
-    expect(
-      (await readJournal(h.dataDir)).operations[session.localRequestId]
-        ?.echoActivityId
-    ).toBeUndefined();
+    ).toBeDefined();
+    expect(await outsideSeen(session.localRequestId)).toBe(false);
   });
 
   it('an identical message older than the dispatch is outside, not the echo', async () => {
@@ -146,10 +138,11 @@ describe('each dispatched message explains at most one vendor activity', () => {
     const record = (await readJournal(h.dataDir)).operations[
       session.localRequestId
     ];
-    expect(record?.supervision?.outsideSeen).toEqual({
+    expect(record?.supervision?.outsideSeen).toMatchObject({
       activityId: 'activities/x1',
       observedAt: '2026-09-29T12:00:00.000Z',
     });
+    expect(record?.supervision?.outsideSeen?.observedSeq).toBeGreaterThan(0);
   });
 });
 

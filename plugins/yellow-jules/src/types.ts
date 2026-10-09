@@ -270,6 +270,8 @@ export interface OperationRecord {
   readonly lastActivityId?: string;
   /** When `status` last finished a COMPLETE walk; `supervise --clear-pause` needs one after the pause. */
   readonly lastCompleteWalkAt?: string;
+  /** Journal sequence taken when that walk began; `supervise --clear-pause` compares it with the pause's sequence. */
+  readonly lastCompleteWalkSeq?: number;
   readonly resumePageToken?: string;
   readonly recentActivityIds: readonly string[];
   readonly activityCount: number;
@@ -297,6 +299,10 @@ export interface OperationRecord {
   readonly invalidatedBy?: 'outside-activity';
   /** Set under the journal lock by the final pre-POST check; only a record carrying it may have landed, so only it can claim an echo. */
   readonly dispatchedAt?: string;
+  /** Journal sequence at reservation; absent on records written before sequences (order unknown). */
+  readonly createSeq?: number;
+  /** Journal sequence stamped with `dispatchedAt`, in the same critical section. */
+  readonly dispatchSeq?: number;
   /** Set only by `abandon`, which maps onto terminal `failed` (no new status). */
   readonly abandonedAt?: string;
   readonly abandonReason?: string;
@@ -338,6 +344,8 @@ export interface SupervisionState {
     readonly reason: string;
     readonly observedAt: string;
     readonly activityId?: string;
+    /** Journal sequence at which the pause was recorded; absent on pauses written before sequences. */
+    readonly observedSeq?: number;
   };
   readonly backoff?: {
     readonly failures: number;
@@ -362,6 +370,8 @@ export interface SupervisionState {
      * Absent on markers written before the stamp was kept.
      */
     readonly createTime?: string;
+    /** Journal sequence at which the marker was recorded; absent on markers written before sequences. */
+    readonly observedSeq?: number;
   };
   /**
    * User messages a walk saw but could not yet classify (a still-unsettled or
@@ -372,12 +382,20 @@ export interface SupervisionState {
    */
   readonly heldActivities?: Readonly<Record<string, string>>;
   /**
+   * The journal sequence of the walk that first read each held message (same
+   * keys as `heldActivities`). A write whose sequence is not below it cannot be
+   * proven to precede the first read. Absent on holds written before sequences.
+   */
+  readonly heldSeqs?: Readonly<Record<string, number>>;
+  /**
    * The plan a `needs-plan-review` pass presented, and when. A different plan
    * appearing before it is approved, with no reply of ours since, pauses (R32).
    */
   readonly evaluatedPlan?: {
     readonly planId: string;
     readonly evaluatedAt: string;
+    /** Journal sequence of the evaluation; absent on evaluations written before sequences (order unknown). */
+    readonly evaluatedSeq?: number;
   };
   /**
    * Start of the pass that last set or cleared `evaluatedPlan`. Passes run
@@ -385,12 +403,23 @@ export interface SupervisionState {
    * evaluation of one that began later.
    */
   readonly evaluatedPassAt?: string;
+  /** Journal sequence taken at the start of that pass; orders passes without relying on clocks. */
+  readonly evaluatedPassSeq?: number;
 }
 
 export interface Journal {
   readonly version: 1;
   /** Set only by the recorded R53 observation; until then a no-candidate reconcile never releases (contract `status`). */
   readonly archiveVisibilityConfirmed: boolean;
+  /**
+   * Strictly increasing ordering counter, advanced only under the journal lock.
+   * It orders events whose relative order decides authority (write create and
+   * dispatch, plan evaluation, walk and pass start, first read of a held
+   * message); ISO timestamps stay for display and TTLs because two events can
+   * share a millisecond. Absent in journals written before sequences: records
+   * without a sequence have an unknown order and never authorize.
+   */
+  seq?: number;
   /** Keyed by localRequestId; built with Object.create(null). */
   readonly operations: Record<string, OperationRecord>;
 }

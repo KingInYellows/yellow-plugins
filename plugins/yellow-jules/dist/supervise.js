@@ -100,8 +100,10 @@ async function superviseOnce(deps, args) {
     (0, runtime_support_js_1.prepare)(deps);
     const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, args.deadlineMs ?? deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS);
     const now = (0, runtime_support_js_1.nowFn)(deps);
-    // Orders this pass's evaluated-plan write against overlapping passes.
+    // Orders this pass's evaluated-plan write against overlapping passes. The
+    // sequence is exact; the timestamp is the fallback for state that predates it.
     const passStartedAt = now().toISOString();
+    const passSeq = await (0, state_js_1.takeSeq)(deps.dataDir);
     let journal = await (0, state_js_1.readJournal)(deps.dataDir);
     const sessionResource = (0, runtime_support_js_1.resolveSessionResource)(journal, args.session);
     const owner = owns(journal, sessionResource);
@@ -165,7 +167,10 @@ async function superviseOnce(deps, args) {
             },
             allowedActions: [],
             fenced: {},
-            pause: existingPause,
+            pause: {
+                reason: existingPause.reason,
+                observedAt: existingPause.observedAt,
+            },
             ...(0, runtime_support_js_1.attentionOf)(['paused']),
         };
     }
@@ -309,7 +314,11 @@ async function superviseOnce(deps, args) {
             r.status !== 'rejected' &&
             // A reservation whose POST has not begun cannot have changed the plan.
             !(r.status === 'reserved' && r.dispatchedAt === undefined) &&
-            r.createdAt >= evaluated.evaluatedAt);
+            // Suppresses the swap pause, so it must be PROVEN: the reply's dispatch
+            // (else its reservation) carries a sequence above the evaluation's.
+            // Equal or unknown order (a record from before sequences) is not
+            // proof, and the swap pauses.
+            (0, state_js_1.seqBefore)(evaluated.evaluatedSeq, r.dispatchedAt !== undefined ? r.dispatchSeq : r.createSeq));
     // A swap is caught whether this pass or an earlier plain `status` consumed
     // the new plan: the plan now pending is compared with the one evaluated.
     const swappedActivityId = evaluated !== undefined && !repliedSinceEvaluation
@@ -363,6 +372,7 @@ async function superviseOnce(deps, args) {
             ...(decision === 'needs-plan-review' ? {} : { evaluatedPlan: null }),
             ...patch,
             passStartedAt,
+            passSeq,
             ...decided(decision),
         });
         return {
@@ -563,14 +573,41 @@ async function superviseOnce(deps, args) {
  */
 function effectivePause(state) {
     const outside = state?.outsideSeen;
+    const evidenceOf = (marker, reason) => ({
+        reason,
+        observedAt: marker.observedAt,
+        ...(marker.observedSeq !== undefined
+            ? { observedSeq: marker.observedSeq }
+            : {}),
+    });
     if (state?.paused !== undefined) {
-        return outside !== undefined && outside.observedAt > state.paused.observedAt
-            ? { reason: state.paused.reason, observedAt: outside.observedAt }
-            : state.paused;
+        const paused = state.paused;
+        if (outside === undefined)
+            return evidenceOf(paused, paused.reason);
+        // The later evidence: by sequence when both have one, else by timestamp.
+        const outsideLater = outside.observedSeq !== undefined && paused.observedSeq !== undefined
+            ? outside.observedSeq > paused.observedSeq
+            : outside.observedAt > paused.observedAt;
+        return outsideLater
+            ? evidenceOf(outside, paused.reason)
+            : evidenceOf(paused, paused.reason);
     }
     if (outside === undefined)
         return undefined;
-    return { reason: 'outside-user-message', observedAt: outside.observedAt };
+    return evidenceOf(outside, 'outside-user-message');
+}
+/**
+ * Whether a complete walk began after the pause evidence. By sequence when both
+ * carry one (never a tie); otherwise by timestamp, where equal is not "after".
+ */
+function walkFollowsPause(record, paused) {
+    if (record.lastCompleteWalkAt === undefined)
+        return false;
+    if (paused.observedSeq !== undefined) {
+        // A pause stamped with a sequence is only vouched for by a walk that has one.
+        return (0, state_js_1.seqBefore)(paused.observedSeq, record.lastCompleteWalkSeq);
+    }
+    return record.lastCompleteWalkAt > paused.observedAt;
 }
 /**
  * Clears a pause. TTY-confirmed (it widens effective authority) and only after
@@ -590,8 +627,7 @@ async function clearPause(deps, args) {
             recoveryAction: 'Nothing to clear.',
         });
     }
-    if (owner.lastCompleteWalkAt === undefined ||
-        owner.lastCompleteWalkAt <= paused.observedAt) {
+    if (!walkFollowsPause(owner, paused)) {
         return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'no complete status walk has run since the pause', {
             recoveryAction: 'Run status for this session first, inspect it, then retry.',
         });
@@ -617,11 +653,11 @@ async function clearPause(deps, args) {
         if (current === undefined ||
             state === undefined ||
             effectivePause(state)?.observedAt !== paused.observedAt ||
+            effectivePause(state)?.observedSeq !== paused.observedSeq ||
             effectivePause(state)?.reason !== paused.reason ||
             state.outsideSeen?.activityId !==
                 owner.supervision?.outsideSeen?.activityId ||
-            current.lastCompleteWalkAt === undefined ||
-            current.lastCompleteWalkAt <= paused.observedAt) {
+            !walkFollowsPause(current, paused)) {
             return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'the supervision state changed while the confirmation was open; nothing was cleared', {
                 recoveryAction: 'Run status for this session, inspect it, then retry.',
             });

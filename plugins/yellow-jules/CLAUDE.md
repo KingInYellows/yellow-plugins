@@ -253,6 +253,26 @@ refused and a delayed overlapping walk cannot swap in an older message.
 `lastCompleteWalkAt`, a stored pause and `lastDecision` likewise only move
 forward.
 
+Relative order never rests on a clock. `journal.json` carries a `seq` counter
+that only advances under the journal lock; a write's create and dispatch, a
+walk's and a pass's start, a plan evaluation, a pause or outside marker, and a
+held message's first read each store the value they were given. Every "before"
+or "after" that decides an authority or pause outcome compares those values,
+which cannot tie, so two events in one millisecond are still ordered. Timestamps
+stay for display, TTLs and the vendor-clock windows in `reconcile.ts`. State
+written before sequences has an unknown order and never authorizes: such a
+reply cannot suppress a plan-swap pause, and a pause with a sequence is cleared
+only by a walk that has one. Where the old timestamp rule already failed closed
+on a tie it still applies to those older records, so they do not stall.
+
+Binding a create to a session that an `observe` row already owns (reconcile, or
+a create whose response arrived after a raw-resource `status`) folds that row
+into the create and retires its local id: deviations stay unreconciled if
+either copy was, pause and outside markers keep the later evidence, and read
+cursors reset so the next `status` rewalks the session under the create. A
+session already owned by another create is not bound: the create stays
+unresolved as `ambiguous-reconcile` (`session-already-owned`).
+
 The residual window is between that re-check and the vendor POST: local state
 and the remote call cannot be made atomic, so a revoke or an outside message
 landing in that interval does not stop the write. `delegate` is wider: the SDK

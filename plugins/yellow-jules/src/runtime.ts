@@ -67,6 +67,7 @@ import {
   recordArtifacts,
   upsertArtifactResumeToken,
   upsertReadState,
+  takeSeq,
   withJournalLock,
 } from './state.js';
 import type {
@@ -477,7 +478,8 @@ async function recordOutsideActivity(
     observedAt?: string;
   }>,
   walkComplete: boolean,
-  walkStartedAt: string
+  walkStartedAt: string,
+  walkSeq: number
 ): Promise<ReadonlySet<string>> {
   const pending: string[] = [];
   if (messages.length === 0 || record.kind !== 'create') return new Set();
@@ -490,6 +492,7 @@ async function recordOutsideActivity(
       ownerRequestId: record.localRequestId,
       observedAt: nowFn(deps)().toISOString(),
       walkStartedAt,
+      walkSeq,
     },
     pending,
     walkComplete
@@ -565,6 +568,9 @@ export async function status(
     // A complete walk vouches only for what it could see when it began: a
     // pause or outside marker recorded while it ran must postdate the stamp.
     const walkStartedAt = nowFn(deps)().toISOString();
+    // The sequence orders this walk against writes and pauses exactly; the
+    // timestamp above is for display (two events can share a millisecond).
+    const walkSeq = await takeSeq(deps.dataDir);
     const walk = await walkActivities({
       adapter,
       sessionResource,
@@ -652,7 +658,8 @@ export async function status(
       record,
       newUserMessages,
       walk.complete,
-      walkStartedAt
+      walkStartedAt,
+      walkSeq
     );
     const heldBack = held.size > 0;
     record = await upsertReadState(
@@ -676,7 +683,7 @@ export async function status(
         // A walk that holds a message back has not classified it: stamping it
         // complete would let clearPause forget an older pause over that message.
         ...(walk.complete && !heldBack
-          ? { completeWalkAt: walkStartedAt }
+          ? { completeWalkAt: walkStartedAt, completeWalkSeq: walkSeq }
           : {}),
         recentActivityIds: ring.filter((id) => !held.has(id)),
         activityCountDelta: walk.newIds.filter((id) => !held.has(id)).length,

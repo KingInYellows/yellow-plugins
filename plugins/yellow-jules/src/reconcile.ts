@@ -30,11 +30,10 @@ import {
   withAdapter,
   conditionOf,
 } from './runtime-support.js';
+import { releaseTerminalSlot, TERMINAL_VENDOR_STATES } from './slot-release.js';
 import {
-  releaseTerminalSlot,
-  TERMINAL_VENDOR_STATES,
-} from './slot-release.js';
-import {
+  absorbObservedOwners,
+  conflictingSessionOwner,
   messageDigest,
   ownsSession,
   UNRESOLVED_STATUSES,
@@ -388,15 +387,50 @@ function hasDispatchStamp(record: OperationRecord): boolean {
 async function persist(
   deps: RuntimeDeps,
   resolutions: readonly Resolution[]
-): Promise<ReadonlySet<string>> {
+): Promise<{
+  readonly released: ReadonlySet<string>;
+  /** Binds refused under the lock because another create already owns the session. */
+  readonly refused: ReadonlyMap<string, Resolution>;
+}> {
   const now = nowFn(deps)().toISOString();
   // The requests this pass actually moved to `failed`: only those give up a slot.
   const released = new Set<string>();
+  const refused = new Map<string, Resolution>();
   await updateJournal(deps.dataDir, (operations) => {
     for (const r of resolutions) {
       const current = operations[r.record.localRequestId];
       // Another process may have settled it since this pass read the journal.
       if (current === undefined || !UNRESOLVED_STATUSES.has(current.status)) {
+        continue;
+      }
+      // A second create owning the same session would leave two owners, and
+      // `findBySessionResource` would pick one of them. Refuse: the create
+      // stays unresolved for a human (an `observe` owner is folded in below).
+      if (
+        r.outcome === 'bound' &&
+        r.session !== undefined &&
+        current.kind === 'create' &&
+        conflictingSessionOwner(
+          operations,
+          current,
+          r.session.sessionResource
+        ) !== undefined
+      ) {
+        const reason = 'session-already-owned';
+        operations[current.localRequestId] = {
+          ...current,
+          lastReconcile: {
+            outcome: 'ambiguous-reconcile',
+            reason,
+            observedAt: now,
+          },
+          updatedAt: now,
+        };
+        refused.set(current.localRequestId, {
+          record: r.record,
+          outcome: 'ambiguous-reconcile',
+          reason,
+        });
         continue;
       }
       const lastReconcile = {
@@ -453,10 +487,15 @@ async function persist(
           };
         }
       }
+      // Binding to a session an `observe` row already owns: its deviations,
+      // pause and read state move onto the create and the row is retired.
+      if (r.outcome === 'bound' && next.kind === 'create') {
+        next = absorbObservedOwners(operations, next);
+      }
       operations[current.localRequestId] = applyRetention(next);
     }
   });
-  return released;
+  return { released, refused };
 }
 
 /**
@@ -554,10 +593,15 @@ export async function reconcile(
 
   // A young reservation is reported but not recorded: `not-reached` would make
   // it abandonable while its write may still be in flight.
-  const released = await persist(
+  const persisted = await persist(
     deps,
     resolutions.filter((r) => !early.includes(r))
   );
+  const released = persisted.released;
+  for (const [i, r] of resolutions.entries()) {
+    const refusal = persisted.refused.get(r.record.localRequestId);
+    if (refusal !== undefined) resolutions[i] = refusal;
+  }
   // One failed release must not hide the others or the report; the slot stays
   // held, which only makes the grant stricter, and the entry says so.
   const slotStuck = new Set<string>();
