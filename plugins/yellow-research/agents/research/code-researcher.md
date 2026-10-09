@@ -214,7 +214,9 @@ always passes a freshly created trusted `-c "$cfg"` config. When it finishes
 it deletes only its own files and the empty directory and releases the lock,
 so start again from the first block for the next search. Never edit either
 block or put a value or path into a Bash command. If output reaches 200
-lines, treat it as truncated and narrow the pattern or path. If `ast-grep` is not on PATH, use Grep for the local search and
+lines, treat it as truncated and narrow the pattern or path.
+
+If `ast-grep` is not on PATH, use Grep for the local search and
 say AST-level search was unavailable. If it returns no matches, fall through to
 `mcp__plugin_yellow-research_exa__get_code_context_exa` and report that
 AST-level search was inconclusive.
