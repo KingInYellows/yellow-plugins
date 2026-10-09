@@ -1269,7 +1269,8 @@ export async function updateSupervision(
  * plugin: the first matching activity claims the operation's `echoActivityId`,
  * and further matches have no operation left to explain them. A rewalk of an
  * already-claimed activity stays own. With `mark`, the first outside message is
- * also recorded as the owner's `outsideSeen` under the same journal lock. A cleanly rejected or released write never
+ * also recorded as the owner's `outsideSeen` under the same journal lock; later outside
+ * messages replace the marker, so a pending `--clear-pause` confirmation for the older one fails. A cleanly rejected or released write never
  * landed and claims nothing; an abandoned one might have, so it can.
  */
 export async function claimOwnEchoes(
@@ -1305,6 +1306,7 @@ export async function claimOwnEchoes(
         )
       );
       let outside: { activityId: string; digest: string } | undefined;
+      let newestOutside: { activityId: string; digest: string } | undefined;
       for (const message of messages) {
         if (claimed.has(message.activityId)) continue;
         const sent = message.createTime && Date.parse(message.createTime);
@@ -1322,6 +1324,7 @@ export async function claimOwnEchoes(
         );
         if (slot === undefined) {
           outside ??= message;
+          newestOutside = message;
           continue;
         }
         claimed.add(message.activityId);
@@ -1336,18 +1339,23 @@ export async function claimOwnEchoes(
       // slip between classifying the message and recording that it was seen.
       const owner =
         mark !== undefined ? operations[mark.ownerRequestId] : undefined;
-      if (
-        outside !== undefined &&
-        mark !== undefined &&
-        owner !== undefined &&
-        owner.supervision?.outsideSeen === undefined
-      ) {
+      // Outside evidence that is newer than the stored marker replaces it: a
+      // `--clear-pause` confirmed against the older id must then be refused.
+      const stored = owner?.supervision?.outsideSeen;
+      const evidence =
+        stored === undefined
+          ? outside
+          : newestOutside !== undefined &&
+              newestOutside.activityId !== stored.activityId
+            ? newestOutside
+            : undefined;
+      if (evidence !== undefined && mark !== undefined && owner !== undefined) {
         operations[mark.ownerRequestId] = {
           ...owner,
           supervision: {
             ...(owner.supervision ?? {}),
             outsideSeen: {
-              activityId: outside.activityId,
+              activityId: evidence.activityId,
               observedAt: mark.observedAt,
             },
           },

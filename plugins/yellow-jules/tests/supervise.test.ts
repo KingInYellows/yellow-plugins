@@ -751,6 +751,41 @@ describe('--clear-pause', () => {
     );
   });
 
+  it('refuses to clear when status records newer outside activity while the confirmation is open', async () => {
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const before = (await ownerRecord())?.supervision?.outsideSeen;
+    expect(before).toBeDefined();
+    const racing = {
+      ...h.deps,
+      openTty: () => {
+        const handle = h.tty.openTty();
+        return {
+          ...handle,
+          readLine: async (...a: Parameters<typeof handle.readLine>) => {
+            // A teammate writes again and a concurrent status consumes it.
+            addActivity(h, session.sessionResource, {
+              type: 'userMessaged',
+              message: 'a newer outside message',
+            });
+            await status(h.deps, {
+              session: session.localId,
+              reconcile: false,
+            });
+            return handle.readLine(...a);
+          },
+        };
+      },
+    };
+    expect(
+      await codeOf(() => clearPause(racing, { session: session.localId }))
+    ).toBe('JULES_INVALID_STATE');
+    const after = await ownerRecord();
+    expect(after?.supervision?.paused).toBeDefined();
+    expect(after?.supervision?.outsideSeen?.activityId).not.toBe(
+      before?.activityId
+    );
+  });
+
   it('outside activity recorded by status alone (no supervise pass) is clearable', async () => {
     const fresh = makeHarness('correct');
     try {
