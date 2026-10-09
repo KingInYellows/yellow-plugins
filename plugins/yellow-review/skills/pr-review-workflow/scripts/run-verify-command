@@ -64,7 +64,12 @@
 #                  patch is saved, and the patch holds the regular files and
 #                  symlinks inside it (as new files, after the deletion of the
 #                  replaced file), so they are recoverable unless the credential
-#                  screen withholds the patch.
+#                  screen withholds the patch. A listed FIFO, socket or device
+#                  is never opened. Revert modes rename it aside in its own
+#                  directory while the patch records the tracked deletion, then
+#                  put it back. It is removed only after that snapshot is
+#                  written. If the snapshot cannot be saved, the special file
+#                  stays and nothing is reverted.
 #   --revert-dirty: like --revert-only for every change in the tree, listed
 #                  by git itself (for refusals: never trust resolver text).
 #   --timeout, --command-file, --trusted and --unattended apply only when
@@ -574,9 +579,10 @@ if [ "$MODE" = run ]; then
 fi
 
 # Only a regular file or a symlink may reach `git diff` below: a FIFO blocks it
-# before any watchdog starts, and a socket, device or directory is no edit to
-# keep. Running refuses; the revert modes delete the entry without opening it,
-# so refusal cleanup still completes.
+# before any watchdog starts, and a socket, device or directory is no content
+# to read. Running refuses. The revert modes keep the entry until save_patch
+# has recorded a tracked deletion without opening it, and leave it in place
+# when that snapshot cannot be written.
 TOP_REAL=$(pwd -P)
 TO_REMOVE=()
 DIR_REMOVE=()
@@ -613,10 +619,11 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         [ "$HEAD_TYPE" = blob ] \
             || die 2 "refusing to remove a directory that is not a replaced file (HEAD has ${HEAD_TYPE:-nothing} there): $f"
     fi
-    # Validated; the removal waits until the output setup below has succeeded,
-    # so a setup failure exits before anything is deleted that the checkout
-    # restoring the tracked file would never reach. A directory waits longer:
-    # the recovery patch must hold its files first (save_patch).
+    # Validated. Nothing is deleted here: a setup failure, and a snapshot that
+    # cannot be written, must leave the path in place. A directory is removed
+    # only after save_patch holds its files. A FIFO, socket or device is
+    # removed only after save_patch has recorded the tracked deletion without
+    # opening it.
     if [ -d "$f" ] && [ ! -L "$f" ]; then
         DIR_REMOVE+=("$f")
     else
@@ -639,15 +646,6 @@ if [ "$MODE" = run ]; then
     LOG="$OUT_DIR/$STAMP.log"
     (umask 077 && : >"$LOG") || die 2 "cannot create $LOG"
 fi
-
-# Setup succeeded: now remove the entries validated above.
-for f in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
-    rm -f -- "$f" 2>/dev/null
-    if [ -e "$f" ] || [ -L "$f" ]; then
-        die 2 "cannot remove a path that is not a regular file or symlink: $f"
-    fi
-    add_reason "removed without reading, not a regular file or symlink: $f"
-done
 
 RC=0
 TIMED_OUT=0
@@ -760,16 +758,42 @@ run_verify() {
 # place: its deletion of the file blob is followed by the diff of every regular
 # file and symlink inside it, so the patch re-applies on HEAD. A file inside it
 # that is listed itself (--revert-dirty) has its own entry and is not repeated.
+# A FIFO, socket or device standing in for a tracked file stays in place too.
+# It is renamed aside in its own directory for the diff (a cross-device move
+# would copy it and open it), then renamed back. The caller unlinks it only
+# after both snapshots are written.
 save_patch() {
-    local out="$1" fmt="$2" f rc c p
+    local out="$1" fmt="$2" f rc c p held_dir="" held_parent=""
     umask 077
     : >"$out" || return 1
     for f in ${FILES[@]+"${FILES[@]}"}; do
         # Fixed flags so the patch re-applies whatever the user's diff config.
         if lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
             || git cat-file -e "HEAD:$f" 2>/dev/null; then
+            # stat only: -f is false for a FIFO, socket or device. Never open it.
+            held_dir=""
+            if [ -e "$f" ] && [ ! -L "$f" ] && [ ! -f "$f" ] && [ ! -d "$f" ]; then
+                case "$f" in
+                    */*) held_parent="${f%/*}" ;;
+                    *) held_parent="." ;;
+                esac
+                held_dir=$(mktemp -d -- "$held_parent/.yellow-review-hold-XXXXXX") || return 1
+                if ! mv -- "$f" "$held_dir/node"; then
+                    rmdir -- "$held_dir" 2>/dev/null || true
+                    return 1
+                fi
+            fi
+            rc=0
             lgit_nohooks diff --no-color --no-ext-diff --no-textconv "$fmt" \
-                --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$out" || return 1
+                --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$out" || rc=$?
+            if [ -n "$held_dir" ]; then
+                if ! mv -- "$held_dir/node" "$f"; then
+                    return 1
+                fi
+                rmdir -- "$held_dir" || return 1
+                held_dir=""
+            fi
+            [ "$rc" -eq 0 ] || return 1
         elif [ -L "$f" ] || [ -f "$f" ]; then
             # -L: a dangling symlink has no -e but is still an edit to keep.
             # Never a FIFO or other special file: git diff would open it.
@@ -976,6 +1000,16 @@ PATCH_PROVISIONAL=0
 
 # --- Revert the listed files ---
 REVERT_FAILS=()
+# The patch now holds each tracked deletion (save_patch), so a FIFO, socket or
+# device can go without ever being opened. A snapshot failure returns above
+# and leaves the special file in place. The checkout below restores the file.
+for f in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
+    rm -f -- "$f" 2>/dev/null
+    if [ -e "$f" ] || [ -L "$f" ]; then
+        die 2 "cannot remove a path that is not a regular file or symlink: $f"
+    fi
+    add_reason "removed without reading, not a regular file or symlink: $f"
+done
 # The patch now holds the files of each replacement directory (save_patch), so
 # the directories can go; the checkout below restores the file in their place.
 for f in ${DIR_REMOVE[@]+"${DIR_REMOVE[@]}"}; do

@@ -521,12 +521,16 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   withholds the patch like a content hit. Before any patch is built,
   every listed path is checked: only regular files, symlinks (dangling ones too)
   and absent paths are accepted. A FIFO, socket, device or directory in its
-  place is refused with exit 2 in run mode, and removed unopened by the revert
-  modes, so a special file cannot block `git diff` or the refusal cleanup. A
-  directory standing where HEAD has a regular file is the exception: the revert
-  modes save the patch first, with the deletion of the file followed by every
-  regular file and symlink inside the directory as new files, and only then
-  remove the directory. The patch is also withheld, with a `reason`, when the screen returns any status
+  place is refused with exit 2 in run mode, so a special file cannot block
+  `git diff` or the refusal cleanup. In the revert modes a FIFO, socket or
+  device is kept until the recovery patch has recorded its tracked deletion
+  without opening it: the entry is renamed aside in its own directory for that
+  diff, then put back, and unlinked only after the snapshot is written. If the
+  snapshot cannot be written, the special file stays and nothing is reverted.
+  A directory standing where HEAD has a regular file is handled the same way:
+  the revert modes save the patch first, with the deletion of the file followed
+  by every regular file and symlink inside the directory as new files, and only
+  then remove the directory. The patch is also withheld, with a `reason`, when the screen returns any status
   other than 0 or 1 (the screen could not answer). When the `--text` diff cannot
   be produced or read, the script exits 2 and reverts nothing. A failed revert
   step is listed in `reason` (the first five, then a count) and `treeClean` is

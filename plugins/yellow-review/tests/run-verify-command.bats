@@ -877,6 +877,34 @@ redact_log() {
   [ -z "$(git status --porcelain)" ]
 }
 
+@test "leave a FIFO in place when the snapshot cannot be saved" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v git)
+  {
+    printf '#!/bin/bash\n'
+    printf 'for a in "$@"; do [ "$a" = --binary ] && exit 128; done\n'
+    printf 'exec "%s" "$@"\n' "$real"
+  } >| "$shim/git"
+  chmod +x "$shim/git"
+  # The recovery patch is the only record of the tracked deletion. It is written
+  # without opening the FIFO; a snapshot that cannot be saved deletes nothing.
+  rm -f src/a.txt && mkfifo src/a.txt
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"nothing was reverted"* ]]
+  [ -p src/a.txt ]
+  [ -f src/new.txt ]
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"nothing was reverted"* ]]
+  [ -p src/a.txt ]
+  [ -f src/new.txt ]
+}
+
 @test "a failed pre-verification snapshot aborts with exit 2 before the command runs" {
   real_git=$(command -v git)
   cat >| "$STUB_BIN/git" <<STUB
