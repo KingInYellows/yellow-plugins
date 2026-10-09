@@ -12,8 +12,9 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - Prefer explicit over implicit. Name things clearly
 - Write tests for non-trivial logic
 - **Shell libraries and zsh:** Markdown blocks run under the user's shell,
-  often zsh with `noclobber`. `lib/compound-staging.sh`, `lib/repo-profile.sh`
-  and `lib/validate-fs.sh` are dual-shell (Tier 4) and are sourced directly;
+  often zsh with `noclobber`. `lib/compound-staging.sh`,
+  `lib/plan-gate-provenance.sh`, `lib/repo-profile.sh` and `lib/validate-fs.sh`
+  are dual-shell (Tier 4) and are sourced directly;
   keep them that way — `tests/shell-compat/` runs them under bash and zsh.
   Bash-only code goes in a `bash /dev/fd/3 3<<'__YELLOW_CORE_BASH__'` wrapper
   (as in `staging-reviewer`); see CONTRIBUTING.md "Bash and zsh".
@@ -128,7 +129,12 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   passes without prompting, captured in a `Plan-Verifier-FileProvenance:`
   commit trailer. This catches the routine case where a plan was
   expanded from a shell and implemented in the same PR, so the branch
-  name carries too few slug tokens for either slug-match tier. When
+  name carries too few slug tokens for either slug-match tier. Graphite
+  merge-queue PRs stay closed and unmerged, so GitHub associates none with
+  the commit; when that lookup succeeds with an empty result,
+  `lib/plan-gate-provenance.sh` falls back to the PR number in the commit
+  subject (trailer `via=commit-subject`; its header states the pass
+  conditions once). When
   provenance finds no commit or an ambiguous PR set, a strict tier
   (server-side `--state merged` + `--jq` word-boundary post-filter of
   the full slug on `headRefName`) runs, then a loose tier scoring the
@@ -334,6 +340,20 @@ cross-plugin pattern:
   yellow-core's `hooks/scripts/stop.sh`, `session-start.sh`,
   `_stop-capture-subshell.sh`, and the `/compound:review-staged` command, and
   by yellow-review's `lib/stage-learning.sh` and `lib/review-ledger.sh`
+- `plan-gate-provenance.sh` — `/plan:complete` Gate C file-provenance tier.
+  `pgp_tier_run <plan-file> <trunk>` is the whole Phase 4 tier: it prints the
+  log and the decision lines (`GATE_C_PROVENANCE=PASS|FALLTHROUGH`,
+  `GATE_C_REASON=<token> GATE_C_RETRYABLE=0|1`) and writes the evidence line
+  only on a pass. `pgp_provenance_via_subject <owner/repo> <file-sha>
+  <plans/file.md>` is the commit-subject fallback for Graphite merge-queue PRs
+  (closed, `merged: false`, so GitHub's commit-to-PR lookup returns nothing):
+  exit 0 with one `pr=#N sha=<sha> via=commit-subject` line, or exit 1 with a
+  reason token and a reason line. The header states the pass conditions once.
+  `pgp_evidence_line_is_valid` and `pgp_pr_num_is_valid` are the validators
+  Phase 4, the override block and Phase 7 share. Dual-shell (Tier 4),
+  idempotent via `_PLAN_GATE_PROVENANCE_LOADED`. Coverage in
+  `tests/shell-compat/` (driver with stub `gh` and `timeout`),
+  `tests/plan-gate-tier.bats` and `tests/plan-commands.bats`
 - `jev-prefilter.sh` — opt-in TypeSafe Jev shadow pre-filter for compound
   staging (see "Jev shadow pre-filter" under Compound Staging). Sourced only by
   `_stop-capture-subshell.sh`
@@ -562,7 +582,7 @@ inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
 `bats tests/` from the plugin directory (`compound-session-start-hook`,
 `compound-staging`, `compound-stop-hook`, `context-observer`,
 `credential-status`, `handoff`, `jev-prefilter`, `plan-commands`, `plan-status-parity`,
-`plugin-identity`, `pre-compact-hook`, `quote-ground`, `repo-profile`,
+`plan-gate-tier`, `plugin-identity`, `pre-compact-hook`, `quote-ground`, `repo-profile`,
 `setup-all-ruvector-probe`, `validate-fs`) plus `skills/git-worktree/tests/` (`worktree-manager.bats`,
 `worktree-restack.bats` with stub `gt` / `gh` / `git` shims under `tests/mocks/`).
 Manifest hook budgets: Stop 5s, SessionStart 3s, PreCompact 3s
