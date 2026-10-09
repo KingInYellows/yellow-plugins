@@ -923,17 +923,36 @@ JSEOF
   [ "$(cat "$SD/lock.d/pid")" = paused ]
 }
 
-@test "a provider abort whose marker cannot be written exits 31 with state kept, and a retry finishes" {
+@test "a provider abort whose marker cannot be written still finishes the abort" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
   [ "$status" -eq 10 ]
   mkdir "$SD/provider-aborted"
   run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  [[ $output == *"aborted"* ]]
+  assert_all_restored
+}
+
+@test "an unwritable marker plus a stuck rebase keeps state, names the manual step, and the retry finishes" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  plant_stuck_rebase "$(wtp c)" c
+  mkdir "$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 31 ]
-  [[ $output == *"marker"* ]]
+  [[ $output == *"provider's abort succeeded"* ]]
   [[ $output == *"could not be written"* ]]
+  [[ $output == *"git -C $(wtp c) rebase --abort"* ]]
   [ -e "$SD/state" ]
+  # The provider no longer reports a pause: fixing only the marker path would
+  # hit the lost-provider refusal, so the user clears the rebase by hand.
   rmdir "$SD/provider-aborted"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"no record of it"* ]]
+  rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 0 ]
   assert_all_restored

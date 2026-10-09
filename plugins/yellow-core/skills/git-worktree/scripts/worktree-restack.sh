@@ -1560,7 +1560,7 @@ cmd_abort() {
   load_state_or_exit
   need_lock
   report_all_floating
-  local provider_aborted=0 left start=${S_CHAIN[1]:-}
+  local provider_aborted=0 marker_failed=0 left start=${S_CHAIN[1]:-}
   if [ "$S_PROVIDER" = graphite ]; then
     command -v gt >/dev/null 2>&1 || die "$X_KEPT" "gt (Graphite CLI) is not installed; state kept"
     if gt_paused "$S_RUN"; then
@@ -1576,10 +1576,10 @@ cmd_abort() {
   fi
   if [ "$provider_aborted" = 1 ]; then
     # The marker tells a later --abort the provider already rolled back. A
-    # write that fails is no success: without it that retry would take the
-    # lost-provider branch and demand a manual whole-stack reset.
-    write_aborted_marker 2>/dev/null \
-      || die "$X_KEPT" "the provider's abort succeeded, but the marker $(v "$ABORTED_FILE") could not be written; state kept, nothing restored. Fix the cause (permissions, or a directory or link at that path), then run --abort again"
+    # failed write does not stop the abort: cleanup below can still finish and
+    # clear the state, which makes the marker moot. Only a cleanup that must
+    # be retried needs it; that case is handled where it can fail.
+    write_aborted_marker 2>/dev/null || marker_failed=1
   elif ! { [ -f "$ABORTED_FILE" ] && [ ! -L "$ABORTED_FILE" ]; } && left=$(chain_rebase_worktree); then
     # The provider lost its record (Graphite's .gtcontinue or gh-stack's
     # rebase state) mid-restack, so its whole-stack rollback cannot run.
@@ -1591,6 +1591,11 @@ cmd_abort() {
   # in-chain git rebase (a stack branch, in whichever worktree holds it),
   # then refuse to restore while one of those worktrees is still busy.
   if ! abort_in_chain_rebases; then
+    # The provider rollback already ran, so a retry must not reach the
+    # lost-provider branch: it needs the marker, or no rebase left to find.
+    if [ "$marker_failed" = 1 ] && ! write_aborted_marker 2>/dev/null; then
+      die "$X_KEPT" "the provider's abort succeeded, but the marker $(v "$ABORTED_FILE") could not be written and a rebase operation is still in progress in $(v "$ABORT_STUCK"); state kept, nothing restored. Abort that rebase by hand (git -C $(q "$ABORT_STUCK") rebase --abort) before running --abort again; fixing only the marker path is not enough, because a rerun with that rebase in place would wrongly ask for a manual whole-stack reset"
+    fi
     die "$X_KEPT" "a rebase operation is still in progress in $(v "$ABORT_STUCK"); state kept, nothing restored. Finish or abort it (git -C $(q "$ABORT_STUCK") rebase --abort), then run --abort again"
   fi
   if ! release_run_worktree "$start"; then

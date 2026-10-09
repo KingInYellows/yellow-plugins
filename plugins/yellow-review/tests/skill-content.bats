@@ -1336,3 +1336,43 @@ sweep_remote_pick() {
   [ "$output" = FAIL ]
   grep -qF 'fetch -q --no-tags -- "$REMOTE"' "$SWEEP"
 }
+
+# Runs sweep Step 1b's existing-path guard (the fenced block that starts at
+# 'p="$TOP/yellow-plugins.local.md"') in a scratch repo, under bash and zsh
+# noclobber when zsh is present.
+sweep_unignored_guard() {
+  local repo="$BATS_TEST_TMPDIR/guard-repo" sh="${2:-bash}"
+  rm -rf "$repo" && git init -q "$repo"
+  git -C "$repo" config status.showUntrackedFiles no
+  case "$1" in
+    file) printf 'resolve_pr:\n  verify_command: x\n' >"$repo/yellow-plugins.local.md" ;;
+    symlink) ln -s /nonexistent-target "$repo/yellow-plugins.local.md" ;;
+    absent) ;;
+  esac
+  awk '/^p="\$TOP\/yellow-plugins.local.md"$/ { p = 1 } p { print } p && /^fi$/ { exit }' "$SWEEP" >"$BATS_TEST_TMPDIR/guard.sh"
+  [ "$(wc -l <"$BATS_TEST_TMPDIR/guard.sh")" -eq 5 ]
+  (cd "$repo" && "$sh" -c 'setopt noclobber 2>/dev/null; set -C; TOP=$(git rev-parse --show-toplevel); . "$1"; echo CONTINUE' _ "$BATS_TEST_TMPDIR/guard.sh")
+}
+
+@test "sweep Step 1b: an existing unignored config file or symlink stops before the snapshot, an absent one continues" {
+  # status.showUntrackedFiles=no hides the file from the Step 1 clean-tree check.
+  run sweep_unignored_guard file
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'exists untracked and unignored on this branch'* ]]
+  [[ "$output" != *CONTINUE* ]]
+  run sweep_unignored_guard symlink
+  [ "$status" -eq 1 ]
+  run sweep_unignored_guard absent
+  [ "$status" -eq 0 ]
+  [ "$output" = CONTINUE ]
+  if command -v zsh >/dev/null 2>&1; then
+    run sweep_unignored_guard file zsh
+    [ "$status" -eq 1 ]
+    run sweep_unignored_guard absent zsh
+    [ "$status" -eq 0 ]
+  fi
+  # The guard sits after the tracked-abort and before the snapshot call.
+  guard=$(grep -n '^p="\$TOP/yellow-plugins.local.md"$' "$SWEEP" | cut -d: -f1)
+  snap=$(grep -n 'guard-local-config" snapshot' "$SWEEP" | head -1 | cut -d: -f1)
+  [ -n "$guard" ] && [ "$guard" -lt "$snap" ]
+}
