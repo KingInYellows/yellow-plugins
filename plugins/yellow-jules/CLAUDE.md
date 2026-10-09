@@ -310,9 +310,15 @@ When several unresolved writes (`reserved` past its window, or
 and keeps the message held; only a settled write is credited first. `approve`
 applies the question-reply rule to its complete re-read: a user message after
 the reviewed plan that is not a claimed echo refuses the approval
-(`JULES_INVALID_STATE`; a dry run reports `planChanged`). After the POST, the
-newest plan generated before the recorded approval must match the reviewed
-digest; the same id with other steps is reported as a policy deviation.
+(`JULES_INVALID_STATE`; a dry run reports `planChanged`). A plan-bound `reply`
+applies the same rule. For these freshness checks an equal `createTime` counts
+as after, because opaque activity ids carry no order. When plans with differing
+digests share the newest `createTime`, the current plan cannot be told: `approve`
+and a plan-bound `reply` refuse (`JULES_POLICY_DEVIATION` / `JULES_QUESTION_CHANGED`)
+instead of picking one by id. After the POST, the newest plan generated before
+the recorded approval must match the reviewed digest, and an equal-time tie
+there counts as changed; the same id with other steps is reported as a policy
+deviation.
 
 Activity ids are stored without their session, so every claimed-echo lookup
 (`claimOwnEchoes`, the reply and approve freshness checks, reconcile) is scoped

@@ -270,6 +270,82 @@ describe('stale plan observations', () => {
     expect(result.attention).toContain('policyDeviation');
   });
 
+  it('a user message at the same createTime as the reviewed plan, with a lower id, refuses the approval', async () => {
+    const owner = (await readJournal(h.dataDir)).operations[
+      session.localRequestId
+    ];
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      activityId: 'a-low-user',
+      createTime: owner!.pendingPlan!.activityCreateTime,
+      message: 'Actually, drop the migration step.',
+    });
+    const err = await fails(() => approve(h.deps, args()));
+    expect(err.appError.code).toBe('JULES_INVALID_STATE');
+    expect(h.adapter.writeCount()).toBe(0);
+  });
+
+  it('two differing plans at the newest createTime are ambiguous: refused with no POST', async () => {
+    const owner = (await readJournal(h.dataDir)).operations[
+      session.localRequestId
+    ];
+    // Same id, other steps, same time, lower activity id than the reviewed plan.
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      activityId: 'a-low-plan',
+      createTime: owner!.pendingPlan!.activityCreateTime,
+      plan: {
+        planId: 'plan-1',
+        steps: [{ id: 'st-swapped', title: 'Delete the repository', index: 0 }],
+      },
+    });
+    const err = await fails(() => approve(h.deps, args()));
+    expect(err.appError.code).toBe('JULES_POLICY_DEVIATION');
+    expect(h.adapter.writeCount()).toBe(0);
+    const dry = await approve(
+      h.deps,
+      args({ dryRun: true, grantId: undefined })
+    );
+    expect(dry.attention).toContain('planChanged');
+  });
+
+  it('an equal-time pair of plans generated before the approval is flagged after the POST', async () => {
+    const owner = (await readJournal(h.dataDir)).operations[
+      session.localRequestId
+    ];
+    const reviewed = owner!.pendingPlan!;
+    h.adapter.approvePlanImpl = async (sessionResource) => {
+      h.deps.clock.time += 1_000;
+      const createTime = new Date(h.deps.clock.now()).toISOString();
+      // The higher id carries the reviewed steps, so an id-order tie-break
+      // would pick it and call the approval unchanged.
+      addActivity(h, sessionResource, {
+        type: 'planGenerated',
+        activityId: 'a-low-plan',
+        createTime,
+        plan: {
+          planId: 'plan-1',
+          steps: [
+            { id: 'st-swapped', title: 'Delete the repository', index: 0 },
+          ],
+        },
+      });
+      addActivity(h, sessionResource, {
+        type: 'planGenerated',
+        activityId: 'z-high-plan',
+        createTime,
+        plan: { planId: reviewed.planId, steps: [...reviewed.steps] },
+      });
+      h.deps.clock.time += 1_000;
+      addActivity(h, sessionResource, {
+        type: 'planApproved',
+        approvedPlanId: 'plan-1',
+      });
+    };
+    const result = await approve(h.deps, args());
+    expect(result).toMatchObject({ policyDeviation: true });
+  });
+
   it('a post-approve mismatch records a deviation, flags it, and blocks further writes under the grant', async () => {
     // The vendor approved a different plan than the one evaluated.
     approvalLands('plan-9');

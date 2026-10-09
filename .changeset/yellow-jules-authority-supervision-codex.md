@@ -80,3 +80,8 @@ approved the reviewed plan id with different steps.
 Echo claims are scoped to their session, so an activity id claimed in one
 session can no longer hide a teammate's message in another from the reply and
 approve freshness checks or from reconciliation.
+
+`approve` and plan-bound `reply` now refuse when two different plans share the
+newest timestamp instead of choosing one by activity id, a plan-bound `reply`
+refuses after a teammate message that follows the reviewed plan, and the
+freshness checks treat a user message at the same timestamp as later.

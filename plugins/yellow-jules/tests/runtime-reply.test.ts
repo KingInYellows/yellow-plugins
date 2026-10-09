@@ -743,6 +743,28 @@ describe('races inside the write gate', () => {
       expect(h.adapter.callsTo('sendMessage')).toHaveLength(1);
     });
 
+    it('refuses when a user message sits at the same createTime as the question', async () => {
+      const q = ask();
+      addActivity(h, session.sessionResource, {
+        type: 'userMessaged',
+        activityId: 'a-low-user',
+        createTime: q.createTime,
+        message: 'Use sqlite.',
+      });
+      expect(
+        await code(() =>
+          reply(
+            h.deps,
+            args({
+              expectActivityId: q.activityId,
+              expectQuestionDigest: messageDigest(QUESTION),
+            })
+          )
+        )
+      ).toBe('JULES_QUESTION_CHANGED');
+      expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    });
+
     it('refuses when a newer agent message replaced the question', async () => {
       const q = ask();
       h.deps.clock.time += 1_000;
@@ -986,6 +1008,41 @@ describe('races inside the write gate', () => {
       const expected = await reviewed();
       h.deps.clock.time += 1_000;
       addPlanNow(h, session.sessionResource, 'plan-2');
+      expect(await code(() => reply(h.deps, args(expected)))).toBe(
+        'JULES_QUESTION_CHANGED'
+      );
+      expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    });
+
+    it('refuses when a teammate message follows the reviewed plan', async () => {
+      const expected = await reviewed();
+      h.deps.clock.time += 1_000;
+      addActivity(h, session.sessionResource, {
+        type: 'userMessaged',
+        message: 'Skip the migration step.',
+      });
+      expect(await code(() => reply(h.deps, args(expected)))).toBe(
+        'JULES_QUESTION_CHANGED'
+      );
+      expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    });
+
+    it('refuses when two differing plans share the newest createTime', async () => {
+      const expected = await reviewed();
+      const plan = (await readJournal(h.dataDir)).operations[
+        session.localRequestId
+      ]?.pendingPlan;
+      addActivity(h, session.sessionResource, {
+        type: 'planGenerated',
+        activityId: 'a-low-plan',
+        createTime: plan!.activityCreateTime,
+        plan: {
+          planId: expected.expectPlanId,
+          steps: [
+            { id: 'st-swapped', title: 'Delete the repository', index: 0 },
+          ],
+        },
+      });
       expect(await code(() => reply(h.deps, args(expected)))).toBe(
         'JULES_QUESTION_CHANGED'
       );

@@ -687,8 +687,43 @@ async function hasUnclaimedUserMessage(
         : []
     )
   );
+  // Freshness check: opaque activity ids carry no order, so a message at the
+  // same createTime as `after` may be later. Equal time counts as after.
   return userMessages.some(
-    (u) => !claimed.has(u.activityId) && compareStamp(u, after) > 0
+    (u) => !claimed.has(u.activityId) && !stampBefore(u, after)
+  );
+}
+
+/** Strictly earlier by createTime alone; equal time is never "before". */
+function stampBefore(
+  a: { readonly createTime: string },
+  b: { readonly createTime: string }
+): boolean {
+  return (
+    compareStamp(
+      { createTime: a.createTime, activityId: '' },
+      { createTime: b.createTime, activityId: '' }
+    ) < 0
+  );
+}
+
+/**
+ * True when more than one plan with differing digests shares the newest
+ * createTime: which one is current is unknowable from opaque ids, so the
+ * caller refuses rather than pick one by id order.
+ */
+function newestPlanAmbiguous(
+  plans: ReadonlyArray<{ createTime: string; digest: string }>
+): boolean {
+  let newest: { createTime: string } | undefined;
+  for (const p of plans) {
+    if (newest === undefined || stampBefore(newest, p)) newest = p;
+  }
+  if (newest === undefined) return false;
+  const top = newest;
+  return (
+    new Set(plans.filter((p) => !stampBefore(p, top)).map((p) => p.digest))
+      .size > 1
   );
 }
 
@@ -747,6 +782,8 @@ async function assertPlanStillPending(
   if (pending === undefined) {
     return changed('no pending plan is recorded for this session');
   }
+  const userMessages: Array<{ activityId: string; createTime: string }> = [];
+  const plans: Array<{ createTime: string; digest: string }> = [];
   const walk = await walkActivities({
     adapter,
     sessionResource: target.sessionResource,
@@ -759,8 +796,30 @@ async function assertPlanStillPending(
     clock: deps.clock,
     deadline,
     pageCap: APPROVE_PAGE_CAP,
+    onActivity: (activity) => {
+      if (activity.type === 'userMessaged') {
+        userMessages.push({
+          activityId: activity.activityId,
+          createTime: activity.createTime,
+        });
+      }
+      if (activity.type === 'planGenerated' && activity.plan !== undefined) {
+        plans.push({
+          createTime: activity.createTime,
+          digest: planDigest(
+            activity.plan.planId,
+            redactDeep({ steps: activity.plan.steps }).steps
+          ),
+        });
+      }
+    },
   });
   if (!walk.complete) return incompleteRefetch(walk);
+  if (newestPlanAmbiguous(plans)) {
+    return changed(
+      'two different plans share the newest timestamp, so the current one cannot be told'
+    );
+  }
   const current = walk.pendingPlan;
   if (current !== null && current !== undefined) assertPlanReviewable(current);
   if (
@@ -770,6 +829,16 @@ async function assertPlanStillPending(
     planDigest(current.planId, redactDeep(current).steps) !== expected.digest
   ) {
     return changed('the session no longer has the plan the pass showed');
+  }
+  if (
+    await hasUnclaimedUserMessage(deps, target.sessionResource, userMessages, {
+      activityId: current.activityId,
+      createTime: current.activityCreateTime,
+    })
+  ) {
+    return changed(
+      'a user message arrived after the reviewed plan and was not sent by this plugin'
+    );
   }
 }
 
@@ -1119,6 +1188,7 @@ async function approveInner(
       ? deadline
       : deadlineIn(deps.clock, Math.floor(totalMs * APPROVE_REFETCH_SHARE));
     const userMessages: Array<{ activityId: string; createTime: string }> = [];
+    const plans: Array<{ createTime: string; digest: string }> = [];
     const refetch = await walkActivities({
       adapter,
       sessionResource: target.sessionResource,
@@ -1134,9 +1204,19 @@ async function approveInner(
             createTime: activity.createTime,
           });
         }
+        if (activity.type === 'planGenerated' && activity.plan !== undefined) {
+          plans.push({
+            createTime: activity.createTime,
+            digest: planDigest(
+              activity.plan.planId,
+              redactDeep({ steps: activity.plan.steps }).steps
+            ),
+          });
+        }
       },
     });
     if (!refetch.complete) return incompleteRefetch(refetch);
+    const ambiguous = newestPlanAmbiguous(plans);
     const steered = await hasUnclaimedUserMessage(
       deps,
       target.sessionResource,
@@ -1154,6 +1234,7 @@ async function approveInner(
 
     if (args.dryRun) {
       const changed =
+        ambiguous ||
         newest.planId !== planId ||
         (args.expectPlanDigest !== undefined &&
           planDigest(newest.planId, redactDeep(newest).steps) !==
@@ -1187,6 +1268,16 @@ async function approveInner(
       );
     }
     assertPlanReviewable(newest);
+    if (ambiguous) {
+      return throwAppError(
+        'JULES_POLICY_DEVIATION',
+        'two different plans share the newest timestamp, so the current plan cannot be told; nothing was approved',
+        {
+          recoveryAction:
+            'Run status, evaluate the plans in the Jules console, and approve once one is clearly newest.',
+        }
+      );
+    }
     if (
       newest.planId !== planId ||
       planDigest(newest.planId, redactDeep(newest).steps) !==
@@ -1377,18 +1468,20 @@ async function verifyApproval(
     const stamp = approvedStamp as
       | { createTime: string; activityId: string }
       | undefined;
-    const before =
+    const candidates =
       stamp === undefined
-        ? undefined
-        : generated
-            .filter((g) => compareStamp(g, stamp) < 0)
-            .sort((a, b) => compareStamp(b, a))[0];
+        ? []
+        : generated.filter((g) => compareStamp(g, stamp) < 0);
+    const before = [...candidates].sort((a, b) => compareStamp(b, a))[0];
+    // Equal-time plans with differing digests: the approved one is unknowable.
+    const ambiguous = newestPlanAmbiguous(candidates);
     return {
       observedPlanIdAfter: observed,
       planChanged:
-        before !== undefined &&
-        expectedDigest !== undefined &&
-        before.digest !== expectedDigest,
+        ambiguous ||
+        (before !== undefined &&
+          expectedDigest !== undefined &&
+          before.digest !== expectedDigest),
       // A partial read, or a complete one that has not yet seen the approval, cannot confirm.
       deferred: !walk.complete || observed === null,
       partial: walk.partialPagination,
