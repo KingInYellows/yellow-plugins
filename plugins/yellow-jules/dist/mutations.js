@@ -919,6 +919,7 @@ async function approveInner(deps, args, ids) {
 async function verifyApproval(deps, adapter, sessionResource, start, deadline, expectedDigest) {
     const generated = [];
     let approvedPlanId;
+    let approvedAmbiguous = false;
     let approvedStamp;
     try {
         const walk = await (0, activity_walk_js_1.walkActivities)({
@@ -937,16 +938,27 @@ async function verifyApproval(deps, adapter, sessionResource, start, deadline, e
                         digest: (0, state_js_1.planDigest)(activity.plan.planId, (0, redact_js_1.redactDeep)({ steps: activity.plan.steps }).steps),
                     });
                 }
+                // Approvals are ordered by createTime alone: one at the reviewed plan's
+                // own time is unordered evidence (opaque ids carry no order), kept, not
+                // discarded. Several at the newest time that name different plans leave
+                // the approved plan unknowable.
                 if (activity.type === 'planApproved' &&
                     activity.approvedPlanId !== undefined &&
-                    (0, activity_walk_js_1.compareStamp)(activity, start) > 0 &&
-                    (approvedStamp === undefined ||
-                        (0, activity_walk_js_1.compareStamp)(activity, approvedStamp) > 0)) {
-                    approvedStamp = {
-                        createTime: activity.createTime,
-                        activityId: activity.activityId,
-                    };
-                    approvedPlanId = activity.approvedPlanId;
+                    !stampBefore(activity, start)) {
+                    const cmp = approvedStamp === undefined
+                        ? 1
+                        : (0, activity_walk_js_1.compareStamp)({ createTime: activity.createTime, activityId: '' }, { createTime: approvedStamp.createTime, activityId: '' });
+                    if (cmp > 0) {
+                        approvedStamp = {
+                            createTime: activity.createTime,
+                            activityId: activity.activityId,
+                        };
+                        approvedPlanId = activity.approvedPlanId;
+                        approvedAmbiguous = false;
+                    }
+                    else if (cmp === 0 && activity.approvedPlanId !== approvedPlanId) {
+                        approvedAmbiguous = true;
+                    }
                 }
             },
         });
@@ -955,17 +967,16 @@ async function verifyApproval(deps, adapter, sessionResource, start, deadline, e
         // approval. The same id with other steps is a replacement under the
         // reviewed id, which the id comparison alone cannot see.
         const stamp = approvedStamp;
-        const candidates = stamp === undefined
-            ? []
-            : generated.filter((g) => (0, activity_walk_js_1.compareStamp)(g, stamp) < 0);
-        const before = [...candidates].sort((a, b) => (0, activity_walk_js_1.compareStamp)(b, a))[0];
+        const candidates = stamp === undefined ? [] : generated.filter((g) => stampBefore(g, stamp));
+        const before = [...candidates].sort((a, b) => (0, activity_walk_js_1.compareStamp)({ createTime: b.createTime, activityId: '' }, { createTime: a.createTime, activityId: '' }))[0];
         // Equal-time plans with differing digests: the approved one is unknowable.
         // A plan stamped at the approval's own time is unordered against it (the
         // ids are opaque), so one that differs from the reviewed digest counts.
         const atApproval = stamp === undefined
             ? []
             : generated.filter((g) => !stampBefore(g, stamp) && !stampBefore(stamp, g));
-        const ambiguous = newestPlanAmbiguous(candidates) ||
+        const ambiguous = approvedAmbiguous ||
+            newestPlanAmbiguous(candidates) ||
             (expectedDigest !== undefined &&
                 atApproval.some((g) => g.digest !== expectedDigest));
         return {

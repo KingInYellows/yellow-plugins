@@ -266,6 +266,19 @@ the post-POST verifier's rule to the newest plan generated before the approval:
 a different digest (or an unorderable tie) binds the approve but records the
 policy deviation on the session's owner; an incomplete walk or no readable
 preceding plan leaves it `ambiguous-reconcile` (`approved-plan-unreadable`).
+Opaque activity ids never order events in a decision. Everywhere two activities
+share a `createTime` the result is unordered evidence, and a decision that
+depends on the order is ambiguous (pause, or blocked writes): outside messages
+(all tied ids kept), plans, approvals (several at one time naming different
+plans decide nothing), the post-approve verifier (an approval at the reviewed
+plan's own time is kept, not discarded), the surplus split of same-text
+messages, and the resume marker. Watermarks and the dedup ring still use id
+order as a cursor only. After a lost approve response, `status --reconcile`
+treats a `planApproved` that names a different plan as a candidate: a single
+one proven after dispatch binds as a changed-plan deviation, anything less
+certain stays `ambiguous-reconcile` (`approval-of-another-plan`); both record a
+deviation on the session's owner, so grant-backed writes stay blocked.
+
 A `planApproved` and a `planGenerated` that share a `createTime` are unordered
 (ids carry no order). The approval clears the plan only when it names that
 plan's id (a resumed walk carries it as `resumeApproval.approvedPlanId`; markers

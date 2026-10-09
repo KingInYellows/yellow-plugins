@@ -270,6 +270,39 @@ describe('stale plan observations', () => {
     expect(result.attention).toContain('policyDeviation');
   });
 
+  it('an approval at the reviewed plan createTime with a lower opaque id is unordered evidence, not discarded', async () => {
+    const pending = (await readJournal(h.dataDir)).operations[
+      session.localRequestId
+    ]?.pendingPlan;
+    const stamp = pending!.activityCreateTime;
+    h.adapter.approvePlanImpl = async (sessionResource) => {
+      // A same-id replacement and the approval, both at the reviewed plan's
+      // own time; the approval's id sorts BEFORE the plan's.
+      addActivity(h, sessionResource, {
+        type: 'planGenerated',
+        activityId: 'zzz-replacement',
+        createTime: stamp,
+        plan: {
+          planId: 'plan-1',
+          steps: [
+            { id: 'st-swapped', title: 'Delete the repository', index: 0 },
+          ],
+        },
+      });
+      addActivity(h, sessionResource, {
+        type: 'planApproved',
+        activityId: '000-approval',
+        approvedPlanId: 'plan-1',
+        createTime: stamp,
+      });
+    };
+    const result = await approve(h.deps, args());
+    expect(result).toMatchObject({
+      observedPlanIdAfter: 'plan-1',
+      policyDeviation: true,
+    });
+  });
+
   it('a user message at the same createTime as the reviewed plan, with a lower id, refuses the approval', async () => {
     const owner = (await readJournal(h.dataDir)).operations[
       session.localRequestId

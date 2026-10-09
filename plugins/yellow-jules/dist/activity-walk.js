@@ -73,6 +73,9 @@ async function walkActivities(params) {
     // The plan the newest approval named; carried in the resume marker, and
     // unknown for a marker written before it was kept.
     let latestApprovalPlanId = params.approval?.approvedPlanId;
+    // Every plan id named by approvals at the newest approval time: equal times
+    // are unordered, so a tie naming different plans decides nothing.
+    let approvalPlanIds = new Set(params.approval !== undefined ? [params.approval.approvedPlanId] : []);
     let newest;
     let pages = 0;
     let processed = 0;
@@ -192,6 +195,13 @@ async function walkActivities(params) {
                 }
             }
             else if (activity.type === 'planApproved') {
+                const approvalCmp = latestApproval === undefined
+                    ? 1
+                    : compareStamp({ createTime: activity.createTime, activityId: '' }, { createTime: latestApproval.createTime, activityId: '' });
+                if (approvalCmp > 0)
+                    approvalPlanIds = new Set();
+                if (approvalCmp >= 0)
+                    approvalPlanIds.add(activity.approvedPlanId);
                 if (latestApproval === undefined ||
                     compareStamp(activity, latestApproval) > 0) {
                     latestApproval = {
@@ -232,7 +242,9 @@ async function walkActivities(params) {
     const approvalTies = approvalVsPlan === 0;
     const approvalClears = approvalVsPlan !== undefined &&
         (approvalVsPlan > 0 ||
-            (approvalTies && latestApprovalPlanId === latestPlan?.planId));
+            (approvalTies &&
+                approvalPlanIds.size === 1 &&
+                approvalPlanIds.has(latestPlan?.planId)));
     const pendingPlan = approvalClears
         ? null
         : latestPlan !== undefined && (newestPlanKeys.size > 1 || approvalTies)
@@ -256,7 +268,7 @@ async function walkActivities(params) {
                 latestApproval: {
                     createTime: latestApproval.createTime,
                     activityId: latestApproval.activityId,
-                    ...(latestApprovalPlanId !== undefined
+                    ...(latestApprovalPlanId !== undefined && approvalPlanIds.size === 1
                         ? { approvedPlanId: latestApprovalPlanId }
                         : {}),
                 },

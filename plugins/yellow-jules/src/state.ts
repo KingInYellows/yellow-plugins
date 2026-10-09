@@ -1380,6 +1380,19 @@ export async function upsertReadState(
         ) {
           resumeApproval = freshApproval;
         }
+        // Approvals at the same createTime are unordered: whichever the id
+        // order kept, the plan they name is unknown (an older marker's shape).
+        if (
+          resumeApproval !== undefined &&
+          update.resumeApproval != null &&
+          freshApproval !== undefined &&
+          update.resumeApproval.activityId !== freshApproval.activityId &&
+          Date.parse(update.resumeApproval.createTime) ===
+            Date.parse(freshApproval.createTime)
+        ) {
+          const { approvedPlanId: _dropped, ...unnamed } = resumeApproval;
+          resumeApproval = unnamed;
+        }
         const fresh = current.pendingPlan;
         if (update.pendingPlan === undefined) {
           pendingPlan = fresh;
@@ -2028,15 +2041,31 @@ export async function claimOwnEchoes(
             operations[r.localRequestId] = marked;
             landed[landed.indexOf(r)] = marked;
           }
-          [...group]
-            .sort((a, b) =>
-              compareStamp(
-                { createTime: a.createTime ?? '', activityId: a.activityId },
-                { createTime: b.createTime ?? '', activityId: b.activityId }
-              )
-            )
-            .slice(settledCount)
-            .forEach((m) => surplusIds.add(m.activityId));
+          // Which messages the settled writes own is decided by vendor time
+          // alone. A tie (or a missing time) at the boundary cannot be ordered
+          // by opaque id, so every message from the boundary time on is surplus.
+          const byTime = [...group].sort(
+            (a, b) =>
+              Date.parse(a.createTime ?? '') - Date.parse(b.createTime ?? '')
+          );
+          const timeAt = (i: number): number =>
+            Date.parse(byTime[i]?.createTime ?? '');
+          const boundary = settledCount - 1;
+          const unprovable =
+            byTime.some((m) => Number.isNaN(Date.parse(m.createTime ?? ''))) ||
+            (boundary >= 0 &&
+              boundary + 1 < byTime.length &&
+              timeAt(boundary) === timeAt(boundary + 1));
+          byTime.forEach((m, i) => {
+            const t = Date.parse(m.createTime ?? '');
+            if (
+              unprovable
+                ? Number.isNaN(t) || boundary < 0 || t >= timeAt(boundary)
+                : i >= settledCount
+            ) {
+              surplusIds.add(m.activityId);
+            }
+          });
         }
       }
       // Same-text echoes are matched as a vendor-time-ordered batch, never in

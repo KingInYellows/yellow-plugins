@@ -915,6 +915,59 @@ describe('reply and approve reservations resolve on their own session', () => {
     expect(result.attention).toContain('reconciled:policyDeviation');
   });
 
+  it('an approval naming a different plan after a lost approve response binds as a changed-plan deviation', async () => {
+    const session = await strandedApprove();
+    const now = h.deps.clock.now();
+    addActivity(h, session.sessionResource, {
+      type: 'planGenerated',
+      createTime: new Date(now + 1_000).toISOString(),
+      plan: {
+        planId: 'plan-2',
+        steps: [{ id: 'st-2', title: 'Replacement', index: 0 }],
+      },
+    });
+    addActivity(h, session.sessionResource, {
+      type: 'planApproved',
+      approvedPlanId: 'plan-2',
+      createTime: new Date(now + 2_000).toISOString(),
+    });
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(result.reconciled?.[0]).toMatchObject({
+      localRequestId: 'approve-1',
+      outcome: 'bound',
+      policyDeviation: true,
+    });
+    const ops = (await readJournal(h.dataDir)).operations;
+    expect(ops[session.localRequestId]?.deviations).toHaveLength(1);
+  });
+
+  it('two approvals of other plans after a lost approve response stay ambiguous and block the session', async () => {
+    const session = await strandedApprove();
+    const now = h.deps.clock.now();
+    for (const [i, planId] of ['plan-2', 'plan-3'].entries()) {
+      addActivity(h, session.sessionResource, {
+        type: 'planApproved',
+        approvedPlanId: planId,
+        createTime: new Date(now + 1_000 + i * 1_000).toISOString(),
+      });
+    }
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(result.reconciled?.[0]).toMatchObject({
+      localRequestId: 'approve-1',
+      outcome: 'ambiguous-reconcile',
+      reason: 'approval-of-another-plan',
+    });
+    const ops = (await readJournal(h.dataDir)).operations;
+    expect(ops['approve-1']?.status).toBe('unknown-outcome');
+    expect(ops[session.localRequestId]?.deviations).toHaveLength(1);
+  });
+
   it('an approve that landed on the reviewed plan binds without a deviation', async () => {
     const session = await strandedApprove();
     addActivity(h, session.sessionResource, {

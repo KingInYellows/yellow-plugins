@@ -772,12 +772,15 @@ describe('races inside the write gate', () => {
       await assertGrantLiveBeforeWrite(h.deps, b, 'reconcile', 'empty');
       h.deps.clock.time += 1_000;
       setVendorState(h, session.sessionResource, 'inProgress');
-      for (const activityId of ['act-m1', 'act-m2']) {
+      // Distinct vendor times: which echo is the settled write's is decided by
+      // time, never by opaque id.
+      for (const [i, activityId] of ['act-m1', 'act-m2'].entries()) {
         addActivity(h, session.sessionResource, {
           type: 'userMessaged',
           message: MESSAGE,
           originator: 'user',
           activityId,
+          createTime: new Date(h.deps.clock.now() + i * 1_000).toISOString(),
         });
       }
       h.deps.clock.time += 10 * 60_000;
@@ -801,6 +804,33 @@ describe('races inside the write gate', () => {
       const again = await readJournal(h.dataDir);
       expect(again.operations['pend-a']?.echoActivityId).toBe('act-m1');
       expect(again.operations['pend-b']?.echoActivityId).toBeUndefined();
+      expect((await owner())?.supervision?.outsideSeen).toBeDefined();
+    });
+
+    it('equal vendor times cannot be ordered by opaque id: the settled write gets no echo either', async () => {
+      const a = await reserveUnderGrant(h.deps, replyGate('pend-t1'));
+      await assertGrantLiveBeforeWrite(h.deps, a, 'reconcile', 'empty');
+      await settleAccepted(h.deps, a);
+      h.deps.clock.time += 1_000;
+      const b = await reserveUnderGrant(h.deps, replyGate('pend-t2'));
+      await assertGrantLiveBeforeWrite(h.deps, b, 'reconcile', 'empty');
+      h.deps.clock.time += 1_000;
+      setVendorState(h, session.sessionResource, 'inProgress');
+      const createTime = new Date(h.deps.clock.now()).toISOString();
+      for (const activityId of ['act-t1', 'act-t2']) {
+        addActivity(h, session.sessionResource, {
+          type: 'userMessaged',
+          message: MESSAGE,
+          originator: 'user',
+          activityId,
+          createTime,
+        });
+      }
+      h.deps.clock.time += 10 * 60_000;
+      await readStatus();
+      const journal = await readJournal(h.dataDir);
+      expect(journal.operations['pend-t1']?.echoActivityId).toBeUndefined();
+      expect(journal.operations['pend-t2']?.echoActivityId).toBeUndefined();
       expect((await owner())?.supervision?.outsideSeen).toBeDefined();
     });
 

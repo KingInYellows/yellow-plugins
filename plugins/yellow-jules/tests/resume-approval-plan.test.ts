@@ -38,6 +38,48 @@ async function walkWith(approval: {
   });
 }
 
+describe('approvals at one createTime that name different plans', () => {
+  it('decide nothing: the plan stays pending and ambiguous whatever the ids', async () => {
+    const adapter = new FakeSdkAdapter();
+    adapter.activities.set(SESSION, [
+      {
+        activityId: 'mmm-plan',
+        createTime: STAMP,
+        type: 'planGenerated',
+        plan: { planId: 'plan-1', steps: [{ id: 's', title: 'W', index: 0 }] },
+        artifacts: [],
+      },
+      {
+        activityId: 'aaa-approval',
+        createTime: STAMP,
+        type: 'planApproved',
+        approvedPlanId: 'plan-1',
+        artifacts: [],
+      },
+      {
+        activityId: 'zzz-approval',
+        createTime: STAMP,
+        type: 'planApproved',
+        approvedPlanId: 'plan-0',
+        artifacts: [],
+      },
+    ]);
+    const clock = new FakeClock();
+    const walk = await walkActivities({
+      adapter,
+      sessionResource: SESSION,
+      pageSize: STATUS_PAGE_SIZE,
+      start: { kind: 'session-start' },
+      clock,
+      deadline: deadlineIn(clock, 60_000),
+    });
+    expect(walk.pendingPlan).toMatchObject({
+      planId: 'plan-1',
+      ambiguous: true,
+    });
+  });
+});
+
 describe('a resumed walk keeps the approved plan id of its stored approval', () => {
   it('an equal-time approval that names the plan clears it', async () => {
     const walk = await walkWith({

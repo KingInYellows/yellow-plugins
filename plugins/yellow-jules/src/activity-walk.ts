@@ -195,6 +195,11 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
   // unknown for a marker written before it was kept.
   let latestApprovalPlanId: string | undefined =
     params.approval?.approvedPlanId;
+  // Every plan id named by approvals at the newest approval time: equal times
+  // are unordered, so a tie naming different plans decides nothing.
+  let approvalPlanIds = new Set<string | undefined>(
+    params.approval !== undefined ? [params.approval.approvedPlanId] : []
+  );
   let newest: { createTime: string; activityId: string } | undefined;
   let pages = 0;
   let processed = 0;
@@ -329,6 +334,15 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
           };
         }
       } else if (activity.type === 'planApproved') {
+        const approvalCmp =
+          latestApproval === undefined
+            ? 1
+            : compareStamp(
+                { createTime: activity.createTime, activityId: '' },
+                { createTime: latestApproval.createTime, activityId: '' }
+              );
+        if (approvalCmp > 0) approvalPlanIds = new Set();
+        if (approvalCmp >= 0) approvalPlanIds.add(activity.approvedPlanId);
         if (
           latestApproval === undefined ||
           compareStamp(activity, latestApproval) > 0
@@ -379,7 +393,9 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
   const approvalClears =
     approvalVsPlan !== undefined &&
     (approvalVsPlan > 0 ||
-      (approvalTies && latestApprovalPlanId === latestPlan?.planId));
+      (approvalTies &&
+        approvalPlanIds.size === 1 &&
+        approvalPlanIds.has(latestPlan?.planId)));
   const pendingPlan: PendingPlan | null | undefined = approvalClears
     ? null
     : latestPlan !== undefined && (newestPlanKeys.size > 1 || approvalTies)
@@ -404,7 +420,7 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
           latestApproval: {
             createTime: latestApproval.createTime,
             activityId: latestApproval.activityId,
-            ...(latestApprovalPlanId !== undefined
+            ...(latestApprovalPlanId !== undefined && approvalPlanIds.size === 1
               ? { approvedPlanId: latestApprovalPlanId }
               : {}),
           },

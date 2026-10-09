@@ -106,6 +106,9 @@ function entryOf(r: Resolution): ReconciledEntry {
   };
 }
 
+const UNATTRIBUTED_APPROVAL_DEVIATION =
+  'a different plan was approved after an unresolved approve was sent, and it cannot be attributed to that approve';
+
 const APPROVED_PLAN_DEVIATION =
   'the plan approved by the vendor differs from the plan evaluated before approval';
 
@@ -380,6 +383,15 @@ async function resolveOnOwnSession(
     digest: string;
   }> = [];
   const createTimes = new Map<string, string>();
+  // planApproved activities after an approve's floor that name ANOTHER plan than
+  // the one it reserved: the only trace its POST may have left when a
+  // replacement became current before it landed.
+  const foreignOrdered = new Map<string, Set<string>>(
+    candidates.map((r) => [r.localRequestId, new Set<string>()])
+  );
+  const foreignUnordered = new Map<string, Set<string>>(
+    candidates.map((r) => [r.localRequestId, new Set<string>()])
+  );
   const walk = await walkActivities({
     adapter,
     sessionResource,
@@ -454,6 +466,17 @@ async function resolveOnOwnSession(
         ) {
           found.add(activity.activityId);
         }
+        if (
+          record.kind === 'approve' &&
+          activity.type === 'planApproved' &&
+          record.observedPlanId !== undefined &&
+          activity.approvedPlanId !== undefined &&
+          activity.approvedPlanId !== record.observedPlanId
+        ) {
+          (found === ordered ? foreignOrdered : foreignUnordered)
+            .get(record.localRequestId)
+            ?.add(activity.activityId);
+        }
       }
     },
   });
@@ -482,6 +505,30 @@ async function resolveOnOwnSession(
         outcome: 'ambiguous-reconcile',
         reason: 'dispatch-time-unknown',
       };
+    }
+    if (record.kind === 'approve' && found.size === 0) {
+      const ordered = foreignOrdered.get(record.localRequestId) ?? new Set();
+      const unorderedForeign =
+        foreignUnordered.get(record.localRequestId) ?? new Set();
+      if (ordered.size + unorderedForeign.size > 0) {
+        const [only] = ordered;
+        const shared = only !== undefined && (owners.get(only) ?? 0) > 1;
+        // One approval, proven after the dispatch: the POST landed on the
+        // replacement plan. Anything less certain still blocks later writes.
+        if (ordered.size === 1 && unorderedForeign.size === 0 && !shared) {
+          return {
+            record,
+            outcome: 'bound',
+            deviation: APPROVED_PLAN_DEVIATION,
+          };
+        }
+        return {
+          record,
+          outcome: 'ambiguous-reconcile',
+          reason: 'approval-of-another-plan',
+          deviation: UNATTRIBUTED_APPROVAL_DEVIATION,
+        };
+      }
     }
     if (found.size === 1) {
       const [echoId] = found;
@@ -615,31 +662,6 @@ async function persist(
         ) {
           released.add(current.localRequestId);
         }
-        // An approve that landed on other steps than the reviewed ones is a
-        // deviation on the session's owner, as the post-POST verifier records.
-        if (r.deviation !== undefined && next.sessionResource !== undefined) {
-          const owner = Object.values(operations).find(
-            (o) => ownsSession(o) && o.sessionResource === next.sessionResource
-          );
-          if (
-            owner !== undefined &&
-            !owner.deviations.some((d) => d.reason === r.deviation)
-          ) {
-            operations[owner.localRequestId] = {
-              ...owner,
-              deviations: [
-                ...owner.deviations,
-                {
-                  kind: 'policy-deviation',
-                  reason: r.deviation,
-                  observedAt: now,
-                  reconciled: false,
-                },
-              ],
-              updatedAt: now,
-            };
-          }
-        }
       } else if (r.outcome === 'released') {
         next = { ...next, status: 'failed' };
         released.add(current.localRequestId);
@@ -665,6 +687,36 @@ async function persist(
                 reconciled: false,
               },
             ],
+          };
+        }
+      }
+      // An approve that landed on other steps (or another plan), or whose
+      // approval cannot be attributed, is a deviation on the session's owner,
+      // as the post-POST verifier records: later grant-backed writes stay blocked.
+      if (
+        r.deviation !== undefined &&
+        (r.outcome === 'bound' || r.outcome === 'ambiguous-reconcile') &&
+        next.sessionResource !== undefined
+      ) {
+        const owner = Object.values(operations).find(
+          (o) => ownsSession(o) && o.sessionResource === next.sessionResource
+        );
+        if (
+          owner !== undefined &&
+          !owner.deviations.some((d) => d.reason === r.deviation)
+        ) {
+          operations[owner.localRequestId] = {
+            ...owner,
+            deviations: [
+              ...owner.deviations,
+              {
+                kind: 'policy-deviation',
+                reason: r.deviation,
+                observedAt: now,
+                reconciled: false,
+              },
+            ],
+            updatedAt: now,
           };
         }
       }
@@ -837,7 +889,8 @@ export async function reconcile(
           ...(slotSkipped.has(r.record.localRequestId)
             ? { slotReleaseSkipped: true as const }
             : {}),
-          ...(r.deviation !== undefined && r.outcome === 'bound'
+          ...(r.deviation !== undefined &&
+          (r.outcome === 'bound' || r.outcome === 'ambiguous-reconcile')
             ? { policyDeviation: true as const }
             : {}),
         }
