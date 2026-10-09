@@ -370,6 +370,18 @@ has_kill_after() {
   [[ "$(printf '%s' "$output" | jq -r .reason)" == *'left a nested git repository in place: .cursor/vendored/'* ]]
 }
 
+@test "--revert-denied withholds a credential-shaped nested repository path from the reason" {
+  tok=ghp_abcdefghijklmnopqrstuvwxyz0123456789
+  mkdir -p ".cursor/$tok"
+  git -C ".cursor/$tok" init -q
+  printf 'x\n' >| ".cursor/$tok/file"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 0 ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'left a nested git repository in place: <path withheld'* ]]
+  [[ "$output" != *"$tok"* ]]
+  [ -d ".cursor/$tok/.git" ]
+}
+
 @test "--revert-denied with only a nested repository is a noop that is not deniedClean" {
   mkdir -p .cursor/vendored
   git -C .cursor/vendored init -q
