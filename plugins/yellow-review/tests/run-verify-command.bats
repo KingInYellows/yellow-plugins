@@ -1917,6 +1917,72 @@ ignored_fixture() {
   grep -q 'resolver edit' src/a.txt
 }
 
+@test "--check-ignored refuses a payload edited behind a chain of two older nested symlinks" {
+  ignored_fixture
+  MID="$BATS_TEST_TMPDIR/mid"; EXT="$BATS_TEST_TMPDIR/payload-dir"
+  mkdir -p "$MID" "$EXT"
+  printf 'x\n' >| "$EXT/payload"
+  ln -s "$EXT" "$MID/l2"
+  ln -s "$MID" node_modules/l1
+  touch -t 201901010000 "$EXT/payload" "$EXT" "$MID"
+  touch -h -t 201901010000 "$MID/l2" node_modules/l1
+  touch -t 202001010000 "$IGN_MARKER"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  printf 'evil\n' >| "$EXT/payload"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/l1"* ]]
+}
+
+@test "--check-ignored skips a symlink loop below an external ignored directory link when nothing changed" {
+  ignored_fixture
+  MID="$BATS_TEST_TMPDIR/mid"
+  mkdir -p "$MID"
+  ln -s "$MID" "$MID/loop"
+  ln -s "$MID" node_modules/l1
+  touch -t 201901010000 "$MID"
+  touch -h -t 201901010000 "$MID/loop" node_modules/l1
+  touch -t 202001010000 "$IGN_MARKER"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+}
+
+@test "--check-ignored stays clean on a pnpm-like ignored tree with internal links and a cycle" {
+  ignored_fixture
+  for pkg in a b c; do
+    mkdir -p "node_modules/.pnpm/$pkg@1/node_modules/$pkg/lib"
+    for i in $(seq 1 40); do printf 'x\n' >| "node_modules/.pnpm/$pkg@1/node_modules/$pkg/lib/f$i.js"; done
+  done
+  ln -s ../../../b@1/node_modules/b node_modules/.pnpm/a@1/node_modules/a/dep-b
+  ln -s ../../../a@1/node_modules/a node_modules/.pnpm/b@1/node_modules/b/dep-a
+  ln -s ../../../c@1/node_modules/c node_modules/.pnpm/b@1/node_modules/b/dep-c
+  ln -s ../../../b@1/node_modules/b node_modules/.pnpm/c@1/node_modules/c/dep-b
+  ln -s .pnpm/a@1/node_modules/a node_modules/a
+  ln -s .pnpm/b@1/node_modules/b node_modules/b
+  find node_modules -depth -exec touch -h -t 201901010000 {} +
+  touch -t 202001010000 "$IGN_MARKER"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = clean ]
+}
+
+@test "--revert-denied counts an alias into an excluded path whose descendant is trusted under the link's name" {
+  mkdir -p .claude/agent-memory/x
+  printf 'm\n' >| .claude/agent-memory/x/CLAUDE.md
+  ln -s .claude/agent-memory/x cfg
+  git add -f .claude/agent-memory/x/CLAUDE.md cfg && git commit -q -m "track alias into agent-memory"
+  touch -t 201901010000 .claude/agent-memory/x/CLAUDE.md
+  touch -t 202001010000 "$IGN_MARKER"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  printf 'evil\n' >| cfg/CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'cfg'* ]]
+}
+
 @test "--check-ignored never runs a find or head from a PATH directory inside the worktree" {
   ignored_fixture
   for tool in find head; do
@@ -3203,6 +3269,86 @@ link_setup() {
   [[ "$stderr" == *'.claude/settings.json'* ]]
 }
 
+# An ordinary-named tracked link to an outside directory is an ancestor of
+# trusted-config paths below it (cfg -> /elsewhere, then cfg/.claude/settings.json).
+ancestor_link_setup() {
+  OUTDIR="$BATS_TEST_TMPDIR/outside-dir"
+  mkdir -p "$OUTDIR/.claude" "$OUTDIR/docs"
+  printf '{}\n' >| "$OUTDIR/.claude/settings.json"
+  printf 'x\n' >| "$OUTDIR/docs/a.md"
+  ln -s "$OUTDIR" cfg
+  git add cfg && git commit -q -m "track dir link"
+  touch -t 202001010000 "$IGN_MARKER"
+  touch -t 201901010000 "$OUTDIR/.claude/settings.json" "$OUTDIR/docs/a.md"
+}
+
+@test "--revert-denied reports deniedClean false when a write went through an ordinary-named dir link to cfg/.claude/settings.json" {
+  ancestor_link_setup
+  printf '{"hooks":"evil"}\n' >| cfg/.claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'cfg'* ]]
+  grep -q evil "$OUTDIR/.claude/settings.json"
+}
+
+@test "--revert-denied stays clean for an untouched ordinary-named dir link, and for a write outside trusted-config" {
+  ancestor_link_setup
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = noop ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  printf 'y\n' >| cfg/docs/a.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+}
+
+@test "--revert-denied --no-ignored-guard counts a dir link with a trusted-config descendant, not one without" {
+  ancestor_link_setup
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  rm -rf "$OUTDIR/.claude"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+}
+
+@test "--revert-denied counts an ordinary-named dir link whose walk passes the entry cap, without a trusted-config descendant" {
+  ancestor_link_setup
+  rm -rf "$OUTDIR/.claude"
+  mkdir "$OUTDIR/many"
+  (cd "$OUTDIR/many" && seq 1 100 | xargs touch)
+  run --separate-stderr env YR_DIR_LINK_WALK_CAP=50 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'cfg'* ]]
+  # Without the override (or with a value that would raise it) 100 entries are under the cap.
+  run --separate-stderr env YR_DIR_LINK_WALK_CAP=999999 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+}
+
+@test "--revert-denied counts an ordinary-named dir link whose tree holds more old files than the cap and no new file" {
+  ancestor_link_setup
+  rm -rf "$OUTDIR/.claude"
+  mkdir "$OUTDIR/many"
+  (cd "$OUTDIR/many" && seq 1 100 | xargs touch -t 201901010000)
+  run --separate-stderr env YR_DIR_LINK_WALK_CAP=50 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  run --separate-stderr env YR_DIR_LINK_WALK_CAP=999999 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+}
+
+@test "a verify run refuses when a write went through an ordinary-named dir link to cfg/.claude/settings.json" {
+  ancestor_link_setup
+  printf '{"hooks":"evil"}\n' >| cfg/.claude/settings.json
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'cfg'* ]]
+}
+
 # --- dir_has_mount without GNU find -printf or /proc (macOS, BSD) ---
 # Shims on PATH stand in for BSD find (no -printf), BSD stat (-f %d, no -c) and
 # mount(8) ("dev on /path (type, opts)").
@@ -3371,11 +3517,15 @@ dirlink_setup() {
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
 }
 
-@test "--revert-denied fails closed on a tracked trusted-config directory symlink holding a symlink loop" {
+@test "--revert-denied skips a symlink loop inside a tracked trusted-config directory symlink when nothing changed, and still sees a newer file" {
   dirlink_setup
   ln -s . "$EXTDIR/loop"
+  touch -h -t 201901010000 "$EXTDIR/loop"
   run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
   [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  printf 'x\n' >| "$EXTDIR/new"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
 }
 
