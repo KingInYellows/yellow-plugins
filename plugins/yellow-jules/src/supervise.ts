@@ -543,64 +543,98 @@ export async function superviseOnce(
   // R32: a plan that changed under an evaluation, or a walk that cannot rule
   // outside activity out. (Outside user messages were handled above.)
   const evaluated = fresh.supervision?.evaluatedPlan;
-  const repliedSinceEvaluation =
-    evaluated !== undefined &&
-    Object.values(journal.operations).some(
-      (r) =>
-        r.sessionResource === sessionResource &&
-        r.kind === 'reply' &&
-        // Only positive landing evidence explains a plan replacement: an
-        // accepted or reconciled reply, or one whose echo was claimed. A
-        // reserved or unknown-outcome reply may never have landed, a clean
-        // rejection or failure never reached Jules, and none of those may hide
-        // a swap: the pass fails safe and pauses.
-        (r.status === 'accepted' ||
-          r.status === 'reconciled' ||
-          ((r.status === 'reserved' || r.status === 'unknown-outcome') &&
-            r.echoActivityId !== undefined)) &&
-        // Suppresses the swap pause, so it must be PROVEN: the reply's dispatch
-        // (else its reservation) carries a sequence above the evaluation's.
-        // Equal or unknown order (a record from before sequences) is not
-        // proof, and the swap pauses.
-        seqBefore(
-          evaluated.evaluatedSeq,
-          r.dispatchedAt !== undefined ? r.dispatchSeq : r.createSeq
-        )
-    );
+  // Replies that give positive landing evidence after the evaluation. Only an
+  // accepted or reconciled reply, or one whose echo was claimed, explains a
+  // plan replacement; a reserved or unknown-outcome reply may never have landed,
+  // a clean rejection never reached Jules, and none of those may hide a swap.
+  // The order is PROVEN: the reply's dispatch (else its reservation) carries a
+  // sequence above the evaluation's. Equal or unknown order is not proof.
+  const landedReplies =
+    evaluated === undefined
+      ? []
+      : Object.values(journal.operations).filter(
+          (r) =>
+            r.sessionResource === sessionResource &&
+            r.kind === 'reply' &&
+            (r.status === 'accepted' ||
+              r.status === 'reconciled' ||
+              ((r.status === 'reserved' || r.status === 'unknown-outcome') &&
+                r.echoActivityId !== undefined)) &&
+            seqBefore(
+              evaluated.evaluatedSeq,
+              r.dispatchedAt !== undefined ? r.dispatchSeq : r.createSeq
+            )
+        );
+  // The reply must also precede the differing plan it would explain: a plan
+  // generated before the reply was dispatched (or at the same instant) is not
+  // the reply's doing. No dispatch time, or an unparsable one, fails closed.
+  const explainedByReply = (planCreateTime: string | undefined): boolean => {
+    const planMs = Date.parse(planCreateTime ?? '');
+    return landedReplies.some((r) => {
+      const dispatchMs = Date.parse(r.dispatchedAt ?? '');
+      return (
+        !Number.isNaN(planMs) &&
+        !Number.isNaN(dispatchMs) &&
+        dispatchMs < planMs
+      );
+    });
+  };
   // A swap is caught whether this pass or an earlier plain `status` consumed
   // the new plan: the plan now pending is compared with the one evaluated.
-  const swappedActivityId =
-    evaluated !== undefined && !repliedSinceEvaluation
-      ? (newActivities.find(
-          (a) =>
-            a.type === 'planGenerated' &&
-            a.planId !== undefined &&
-            planDiffers(evaluated, a.planId, a.planDigest)
-        )?.activityId ??
-        (seen.pendingPlan !== undefined &&
-        planDiffers(
-          evaluated,
+  const swapCandidates: Array<{
+    activityId: string;
+    createTime: string | undefined;
+  }> = [];
+  if (evaluated !== undefined) {
+    for (const a of newActivities) {
+      if (
+        a.type === 'planGenerated' &&
+        a.planId !== undefined &&
+        planDiffers(evaluated, a.planId, a.planDigest)
+      ) {
+        swapCandidates.push({
+          activityId: a.activityId,
+          createTime: a.createTime,
+        });
+      }
+    }
+    if (
+      seen.pendingPlan !== undefined &&
+      planDiffers(
+        evaluated,
+        seen.pendingPlan.planId,
+        planDigest(
           seen.pendingPlan.planId,
-          planDigest(
-            seen.pendingPlan.planId,
-            redactDeep({ steps: seen.pendingPlan.steps }).steps
-          )
+          redactDeep({ steps: seen.pendingPlan.steps }).steps
         )
-          ? seen.pendingPlan.activityId
-          : undefined) ??
-        // A plain status may have consumed the replacement AND its approval,
-        // leaving no pending plan: the retained latest-generated plan still
-        // shows the swap when it was first recorded after the evaluation.
-        (fresh.lastGeneratedPlan !== undefined &&
-        planDiffers(
-          evaluated,
-          fresh.lastGeneratedPlan.planId,
-          fresh.lastGeneratedPlan.planDigest
-        ) &&
-        seqBefore(evaluated.evaluatedSeq, fresh.lastGeneratedPlan.seq)
-          ? fresh.lastGeneratedPlan.activityId
-          : undefined))
-      : undefined;
+      )
+    ) {
+      swapCandidates.push({
+        activityId: seen.pendingPlan.activityId,
+        createTime: seen.pendingPlan.activityCreateTime,
+      });
+    }
+    // A plain status may have consumed the replacement AND its approval,
+    // leaving no pending plan: the retained latest-generated plan still
+    // shows the swap when it was first recorded after the evaluation.
+    if (
+      fresh.lastGeneratedPlan !== undefined &&
+      planDiffers(
+        evaluated,
+        fresh.lastGeneratedPlan.planId,
+        fresh.lastGeneratedPlan.planDigest
+      ) &&
+      seqBefore(evaluated.evaluatedSeq, fresh.lastGeneratedPlan.seq)
+    ) {
+      swapCandidates.push({
+        activityId: fresh.lastGeneratedPlan.activityId,
+        createTime: fresh.lastGeneratedPlan.activityCreateTime,
+      });
+    }
+  }
+  const swappedActivityId = swapCandidates.find(
+    (c) => !explainedByReply(c.createTime)
+  )?.activityId;
   let pauseReason: string | undefined;
   let pauseActivityId: string | undefined;
   if (swappedActivityId !== undefined) {

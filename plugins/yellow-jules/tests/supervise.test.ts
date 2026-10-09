@@ -899,6 +899,25 @@ describe('outside activity pauses (R32)', () => {
     expect((await ownerRecord())?.supervision?.outsideSeen).toBeDefined();
   });
 
+  it('a replacement plan generated before our accepted reply was dispatched still pauses', async () => {
+    addPlan(h, session.sessionResource, 'plan-1');
+    await sup();
+    h.deps.clock.time += 30_000;
+    addPlanNow(h, session.sessionResource, 'plan-2');
+    h.deps.clock.time += 1_000;
+    await reply(h.deps, {
+      session: session.localId,
+      message: 'please restructure the plan',
+      dryRun: false,
+      correction: true,
+      grantId,
+    });
+    expect(await sup()).toMatchObject({
+      decision: 'paused',
+      reason: 'plan-changed-after-evaluation',
+    });
+  });
+
   it('a new plan after OUR corrective reply is reviewed, not paused', async () => {
     addPlan(h, session.sessionResource, 'plan-1');
     await sup();

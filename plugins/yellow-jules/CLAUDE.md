@@ -332,6 +332,14 @@ activity. The unresolved write is
 also marked `echoAmbiguous` on its journal record: no later walk, even one that
 re-reads the surplus message, may give it an `echoActivityId`; only reconcile or
 abandon settles it. Older records without the field parse unchanged.
+Only writes that could own a message of the batch count: those dispatched before
+the walk began, not after the message was first read, and within the dispatch
+skew of it.
+
+A swap pause in `supervise` is suppressed by our own reply only when that reply
+has positive landing evidence and its dispatch time is strictly before the
+differing `planGenerated` activity; a plan generated before the reply was
+dispatched, or at the same instant, still pauses.
 
 Outside-activity markers treat an equal `createTime` as unordered: a second
 outside message at the marker's time, whatever its id, replaces the marker so a

@@ -784,6 +784,39 @@ describe('races inside the write gate', () => {
       expect((await owner())?.supervision?.outsideSeen).toBeDefined();
     });
 
+    it('a write dispatched after the walk began is not marked echo-ambiguous by the batch', async () => {
+      const a = await reserveUnderGrant(h.deps, replyGate('pend-a2'));
+      await assertGrantLiveBeforeWrite(h.deps, a, 'reconcile');
+      await settleAccepted(h.deps, a);
+      h.deps.clock.time += 1_000;
+      setVendorState(h, session.sessionResource, 'inProgress');
+      for (const activityId of ['act-n1', 'act-n2']) {
+        addActivity(h, session.sessionResource, {
+          type: 'userMessaged',
+          message: MESSAGE,
+          originator: 'user',
+          activityId,
+        });
+      }
+      h.deps.clock.time += 1_000;
+      // B is reserved and dispatched while the walk is reading: it cannot own
+      // messages the walk had already started to read.
+      const original = h.adapter.listActivitiesImpl;
+      let raced = false;
+      h.adapter.listActivitiesImpl = async (resource, options) => {
+        if (!raced) {
+          raced = true;
+          const b = await reserveUnderGrant(h.deps, replyGate('pend-b2'));
+          await assertGrantLiveBeforeWrite(h.deps, b, 'reconcile');
+        }
+        return original(resource, options);
+      };
+      await readStatus();
+      const journal = await readJournal(h.dataDir);
+      expect(raced).toBe(true);
+      expect(journal.operations['pend-b2']?.echoAmbiguous).toBeUndefined();
+    });
+
     it('a reservation stuck past its settle window no longer holds the walk', async () => {
       await dispatchedReplyWithMatchingMessage('pend-4');
       h.deps.clock.time += 10 * 60_000;

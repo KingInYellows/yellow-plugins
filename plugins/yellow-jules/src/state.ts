@@ -1903,6 +1903,22 @@ export async function claimOwnEchoes(
       // credit from this batch, and the surplus is possible outside activity.
       // Without this the first message goes to the settled write and the second
       // to the unresolved one, as false landing evidence.
+      const couldOwn = (
+        r: OperationRecord,
+        message: { activityId: string; createTime?: string }
+      ): boolean => {
+        const sentMs = message.createTime
+          ? Date.parse(message.createTime)
+          : Number.NaN;
+        return (
+          // A message older than the record's dispatch cannot be its echo.
+          !(
+            !Number.isNaN(sentMs) &&
+            r.dispatchedAt !== undefined &&
+            sentMs < Date.parse(r.dispatchedAt) - DISPATCH_SKEW_MS
+          ) && !afterFirstRead(r, message.activityId)
+        );
+      };
       const blockedDigests = new Set<string>();
       const surplusIds = new Set<string>();
       const byDigest = new Map<string, typeof messages>();
@@ -1911,11 +1927,16 @@ export async function claimOwnEchoes(
         byDigest.set(m.digest, [...(byDigest.get(m.digest) ?? []), m]);
       }
       for (const [digest, group] of byDigest) {
+        // Only writes that could own a message of this batch count: created
+        // and dispatched before the walk began, not dispatched after a message
+        // was first read, and not later than the message allows.
         const candidates = landed.filter(
           (r) =>
             r.echoActivityId === undefined &&
             r.echoAmbiguous !== true &&
-            r.promptDigest === digest
+            r.promptDigest === digest &&
+            !postWalk(r) &&
+            group.some((m) => couldOwn(r, m))
         );
         const settledCount = candidates.filter(
           (r) => r.status === 'accepted' || r.status === 'reconciled'

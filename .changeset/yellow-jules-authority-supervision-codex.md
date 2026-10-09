@@ -103,3 +103,8 @@ credited with the surplus message; it stays unresolved and the surplus is
 recorded as possible outside activity.
 The surplus message is consumed as outside evidence rather than held, so a later walk cannot hand it to the unresolved reply.
 That unresolved reply is also marked echo-ambiguous, so no later walk can credit it with an echo; only reconcile or abandon settles it.
+
+A plan replacement is explained by our own reply, and so does not pause
+`supervise`, only when the reply was dispatched strictly before that plan was
+generated. The batch echo-ambiguity rule counts only writes that could own the
+messages (dispatched before the walk began).

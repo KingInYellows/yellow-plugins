@@ -1404,6 +1404,16 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
         // credit from this batch, and the surplus is possible outside activity.
         // Without this the first message goes to the settled write and the second
         // to the unresolved one, as false landing evidence.
+        const couldOwn = (r, message) => {
+            const sentMs = message.createTime
+                ? Date.parse(message.createTime)
+                : Number.NaN;
+            return (
+            // A message older than the record's dispatch cannot be its echo.
+            !(!Number.isNaN(sentMs) &&
+                r.dispatchedAt !== undefined &&
+                sentMs < Date.parse(r.dispatchedAt) - activity_walk_js_1.DISPATCH_SKEW_MS) && !afterFirstRead(r, message.activityId));
+        };
         const blockedDigests = new Set();
         const surplusIds = new Set();
         const byDigest = new Map();
@@ -1413,9 +1423,14 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
             byDigest.set(m.digest, [...(byDigest.get(m.digest) ?? []), m]);
         }
         for (const [digest, group] of byDigest) {
+            // Only writes that could own a message of this batch count: created
+            // and dispatched before the walk began, not dispatched after a message
+            // was first read, and not later than the message allows.
             const candidates = landed.filter((r) => r.echoActivityId === undefined &&
                 r.echoAmbiguous !== true &&
-                r.promptDigest === digest);
+                r.promptDigest === digest &&
+                !postWalk(r) &&
+                group.some((m) => couldOwn(r, m)));
             const settledCount = candidates.filter((r) => r.status === 'accepted' || r.status === 'reconciled').length;
             const unresolvedCount = candidates.length - settledCount;
             if (settledCount > 0 &&
