@@ -489,6 +489,12 @@ _rt_scan() {
                             sub(lead, "", r2)
                             sub(/^[ \t]+/, "", o)
                             sub(/^[ \t]+/, "", r2)
+                            # Any other standalone non-ASCII token (checkmark,
+                            # arrow, emoji) is decoration too. A non-ASCII
+                            # letter inside a word is not followed by a space,
+                            # so accented prose is untouched.
+                            sub(/^([^\001-\177]+[ \t]+)+/, "", o)
+                            sub(/^([^\001-\177]+[ \t]+)+/, "", r2)
                         }
                         c = substr(o, 1, 1)
                         if (c !~ /["\047A-Z]/ && c ~ /^[\001-\177]/ && split(r2, wparts, /[ \t]+/) >= 3 && wordcred(r2)) flag("unquoted-keyword-value")

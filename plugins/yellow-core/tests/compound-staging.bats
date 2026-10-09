@@ -99,6 +99,13 @@ teardown() {
   [ "$result" = 'Authorization: Basic [REDACTED] and authorization: basic [REDACTED] and Authorization: Basic [REDACTED]' ]
 }
 
+@test "redact_secrets strips a bare Basic credential and leaves Basic prose" {
+  result=$(printf 'sent Basic dXNlcjpwYXNz1234 and basic YWI6Yw== ok\n' | cs_redact_secrets)
+  [ "$result" = 'sent Basic [REDACTED] and basic [REDACTED] ok' ]
+  result=$(printf 'Basic Authentication, Basic Only mode, basic setup and a Basic example\n' | cs_redact_secrets)
+  [ "$result" = 'Basic Authentication, Basic Only mode, basic setup and a Basic example' ]
+}
+
 @test "redact_secrets strips an unpadded 3-character Basic credential" {
   result=$(printf 'Authorization: Basic YTo and done\n' | cs_redact_secrets)
   [ "$result" = 'Authorization: Basic [REDACTED] and done' ]

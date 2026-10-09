@@ -136,6 +136,7 @@ cs_redact_secrets() {
     -e 's/hf_[A-Za-z0-9]{20,}/[REDACTED:huggingface-token]/g' \
     -e 's/Bearer[[:space:]]+[A-Za-z0-9._-]{20,}/Bearer [REDACTED]/g' \
     -e 's/(([Aa]uthorization|AUTHORIZATION)[[:space:]]*[=:][[:space:]]*([Bb]asic|BASIC))[[:space:]]+([A-Za-z0-9+\/]{4,}={0,2}|[A-Za-z0-9+\/]{3}=?|[A-Za-z0-9+\/]{2}==)/\1 [REDACTED]/g' \
+    -e 's/(^|[^[:alnum:]_])([Bb]asic|BASIC)[[:space:]]+([A-Za-z0-9+\/]{2,}={1,2}|[A-Za-z]*[0-9+\/][A-Za-z0-9+\/]{6,}|[A-Za-z0-9+\/]{7,}[0-9+\/][A-Za-z0-9+\/]*)/\1\2 [REDACTED]/g' \
     -e 's/eyJ[A-Za-z0-9_-]{10,500}\.eyJ[A-Za-z0-9_-]{10,500}\.[A-Za-z0-9_-]{10,500}/[REDACTED:jwt]/g' \
     -e 's/dckr_pat_[A-Za-z0-9_-]{32,}/[REDACTED:docker-token]/g' \
     -e 's/npm_[A-Za-z0-9]{36}/[REDACTED:npm-token]/g' \

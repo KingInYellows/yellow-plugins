@@ -1563,6 +1563,15 @@ rule=forged line=9.txt"
   done
 }
 
+@test "an unlisted leading symbol (checkmark, arrow, emoji) cannot exempt a multi-word credential" {
+  for bin in gawk mawk; do
+    awk_expect "$bin" 6 'password:\n  \xe2\x9c\x93 correct horse battery staple\n'
+    awk_expect "$bin" 6 'password:\n  \xe2\x86\x92 correct horse battery staple\n'
+    awk_expect "$bin" 6 'password:\n  \xf0\x9f\x94\x91 correct horse battery staple\n'
+    awk_expect "$bin" 0 'password:\n  \xe2\x9c\x93 Rotation is scheduled for Friday\n'
+  done
+}
+
 @test "a bare Basic word needs an interior colon: Only is prose, a header keeps edge colons" {
   edge=$(printf ':y' | base64 | tr -d '\n')
   for bin in gawk mawk; do
