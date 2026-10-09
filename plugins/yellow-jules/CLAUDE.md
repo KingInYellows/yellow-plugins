@@ -268,12 +268,15 @@ policy deviation on the session's owner; an incomplete walk or no readable
 preceding plan leaves it `ambiguous-reconcile` (`approved-plan-unreadable`).
 A `planApproved` and a `planGenerated` that share a `createTime` are unordered
 (ids carry no order). The approval clears the plan only when it names that
-plan's id; a different plan stays pending, marked `ambiguous`, so `supervise`
+plan's id (a resumed walk carries it as `resumeApproval.approvedPlanId`; markers
+without it stay ambiguous); a different plan stays pending, marked `ambiguous`, so `supervise`
 offers no action and `approve` / plan-bound `reply` refuse.
 
 Same-text echoes are matched as a vendor-time-ordered batch, not in arrival
 order: with several writes sharing a digest, the oldest echo goes to the
-oldest-dispatched write (by dispatch sequence, else `dispatchedAt`). Equal or
+oldest-dispatched write (by dispatch sequence, else `dispatchedAt`), checked per
+position: each echo must be eligible for its paired write, so differing vendor
+floors do not make the batch order-dependent. Equal or
 missing vendor times, unorderable dispatches, or a different number of echoes
 and writes make the batch ambiguous: the messages are recorded as outside
 activity (pause) and its unresolved writes are marked `echoAmbiguous`.

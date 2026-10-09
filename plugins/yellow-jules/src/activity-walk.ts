@@ -74,6 +74,7 @@ export interface WalkParams {
   readonly approval?: {
     readonly createTime: string;
     readonly activityId: string;
+    readonly approvedPlanId?: string;
   };
   /**
    * Called for every activity read, in page order (collect stages artifacts
@@ -118,6 +119,7 @@ export interface WalkResult {
   readonly latestApproval?: {
     readonly createTime: string;
     readonly activityId: string;
+    readonly approvedPlanId?: string;
   };
   readonly startedFromResume: boolean;
   /** The stored resume token was rejected (400/404) and the walk restarted from its fallback. */
@@ -189,8 +191,10 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
   );
   let latestApproval: { createTime: string; activityId: string } | undefined =
     params.approval;
-  // The plan the newest approval named; unknown for a stored (resumed) approval.
-  let latestApprovalPlanId: string | undefined;
+  // The plan the newest approval named; carried in the resume marker, and
+  // unknown for a marker written before it was kept.
+  let latestApprovalPlanId: string | undefined =
+    params.approval?.approvedPlanId;
   let newest: { createTime: string; activityId: string } | undefined;
   let pages = 0;
   let processed = 0;
@@ -395,7 +399,17 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
     seen,
     pendingPlan,
     ...(latestPlan !== undefined ? { generatedPlan: latestPlan } : {}),
-    ...(latestApproval !== undefined ? { latestApproval } : {}),
+    ...(latestApproval !== undefined
+      ? {
+          latestApproval: {
+            createTime: latestApproval.createTime,
+            activityId: latestApproval.activityId,
+            ...(latestApprovalPlanId !== undefined
+              ? { approvedPlanId: latestApprovalPlanId }
+              : {}),
+          },
+        }
+      : {}),
     startedFromResume: params.start.kind === 'resume',
     resumeRejected,
     filterRetried,

@@ -225,7 +225,7 @@ describe('identical text from a create and a later reply, newest first', () => {
 });
 
 describe('same-text echoes are paired as a vendor-time-ordered batch', () => {
-  async function setup() {
+  async function setup(floorOffsetMs?: number) {
     const grantId = await createGrant(h, { maxActiveSessions: 3 });
     const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
     h.deps.clock.time += 5 * 60_000;
@@ -246,7 +246,19 @@ describe('same-text echoes are paired as a vendor-time-ordered batch', () => {
         promptDigest: messageDigest('Do the task.'),
       },
     });
-    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile', 'empty');
+    await assertGrantLiveBeforeWrite(
+      h.deps,
+      reservation,
+      'reconcile',
+      floorOffsetMs === undefined
+        ? 'empty'
+        : {
+            createTime: new Date(
+              h.deps.clock.now() + floorOffsetMs
+            ).toISOString(),
+            activityId: 'act-floor',
+          }
+    );
     await settleAccepted(h.deps, reservation);
     return { session, digest: messageDigest('Do the task.') };
   }
@@ -288,6 +300,39 @@ describe('same-text echoes are paired as a vendor-time-ordered batch', () => {
       expect(
         Date.parse(ops[session.localRequestId]?.echoCreateTime ?? '')
       ).toBeLessThan(planSwapMs);
+    });
+  }
+
+  for (const order of ['oldest first', 'newest first'] as const) {
+    it(`pairs per position when the writes have different vendor floors (${order})`, async () => {
+      // The reply's floor sits between the two echoes: the older echo can only
+      // be the create's, the newer one is eligible for both writes.
+      const { session, digest } = await setup(5_000);
+      const createEcho = {
+        activityId: 'act-create',
+        digest,
+        createTime: at(1_000),
+      };
+      const replyEcho = {
+        activityId: 'act-reply',
+        digest,
+        createTime: at(9_000),
+      };
+      await claimOwnEchoes(
+        h.dataDir,
+        session.sessionResource,
+        order === 'oldest first'
+          ? [createEcho, replyEcho]
+          : [replyEcho, createEcho],
+        {
+          ownerRequestId: session.localRequestId,
+          observedAt: new Date(h.deps.clock.now()).toISOString(),
+        }
+      );
+      const ops = (await readJournal(h.dataDir)).operations;
+      expect(ops[session.localRequestId]?.echoActivityId).toBe('act-create');
+      expect(ops['reply-same-text']?.echoActivityId).toBe('act-reply');
+      expect(await outsideSeen(session.localRequestId)).toBe(false);
     });
   }
 

@@ -70,8 +70,9 @@ async function walkActivities(params) {
             ...(params.pendingPlan.ambiguous === true ? ['\0ambiguous'] : []),
         ]);
     let latestApproval = params.approval;
-    // The plan the newest approval named; unknown for a stored (resumed) approval.
-    let latestApprovalPlanId;
+    // The plan the newest approval named; carried in the resume marker, and
+    // unknown for a marker written before it was kept.
+    let latestApprovalPlanId = params.approval?.approvedPlanId;
     let newest;
     let pages = 0;
     let processed = 0;
@@ -250,7 +251,17 @@ async function walkActivities(params) {
         seen,
         pendingPlan,
         ...(latestPlan !== undefined ? { generatedPlan: latestPlan } : {}),
-        ...(latestApproval !== undefined ? { latestApproval } : {}),
+        ...(latestApproval !== undefined
+            ? {
+                latestApproval: {
+                    createTime: latestApproval.createTime,
+                    activityId: latestApproval.activityId,
+                    ...(latestApprovalPlanId !== undefined
+                        ? { approvedPlanId: latestApprovalPlanId }
+                        : {}),
+                },
+            }
+            : {}),
         startedFromResume: params.start.kind === 'resume',
         resumeRejected,
         filterRetried,

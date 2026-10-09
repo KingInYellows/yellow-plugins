@@ -311,6 +311,8 @@ export interface OperationRecord {
   readonly resumeApproval?: {
     readonly createTime: string;
     readonly activityId: string;
+    /** The plan the approval named; absent on markers written before it was kept (an equal-time plan then stays ambiguous). */
+    readonly approvedPlanId?: string;
   };
   readonly resumeRestartCount: number;
   // Written only by `collect`.

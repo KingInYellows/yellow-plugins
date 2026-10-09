@@ -417,7 +417,9 @@ function isValidRecord(key, value) {
     if (value['resumeApproval'] !== undefined &&
         !((0, shape_js_1.isPlainObject)(value['resumeApproval']) &&
             typeof value['resumeApproval']['createTime'] === 'string' &&
-            typeof value['resumeApproval']['activityId'] === 'string'))
+            typeof value['resumeApproval']['activityId'] === 'string' &&
+            (value['resumeApproval']['approvedPlanId'] === undefined ||
+                typeof value['resumeApproval']['approvedPlanId'] === 'string')))
         return false;
     if (value['lastReconcile'] !== undefined &&
         !isValidLastReconcile(value['lastReconcile']))
@@ -1532,30 +1534,38 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
             const live = group.filter((m) => !surplusIds.has(m.activityId));
             if (live.length < 2 || blockedDigests.has(digest))
                 continue;
-            const sets = live.map((m) => eligibleOf(m));
-            const first = sets[0] ?? [];
-            if (first.length < 2)
+            // Order first, then check each position: with differing floors the
+            // older echo can be eligible for fewer writes than the newer one, so
+            // the sets are not compared as a whole.
+            const msgs = [...live].sort((x, y) => timeOf(x) - timeOf(y));
+            const sets = msgs.map((m) => eligibleOf(m));
+            const writes = [];
+            for (const e of sets) {
+                for (const r of e) {
+                    if (!writes.some((w) => w.localRequestId === r.localRequestId)) {
+                        writes.push(r);
+                    }
+                }
+            }
+            if (writes.length < 2)
                 continue;
-            const sameSet = sets.every((e) => e.length === first.length &&
-                e.every((r) => first.some((f) => f.localRequestId === r.localRequestId)));
-            const times = live.map(timeOf);
+            const times = msgs.map(timeOf);
             const distinctTimes = times.every((t) => !Number.isNaN(t)) &&
                 new Set(times).size === times.length;
-            const bySeq = first.every((r) => r.dispatchSeq !== undefined);
+            const bySeq = writes.every((r) => r.dispatchSeq !== undefined);
             const dispatchKey = (r) => bySeq ? r.dispatchSeq : Date.parse(r.dispatchedAt ?? '');
-            const keys = first.map(dispatchKey);
+            const keys = writes.map(dispatchKey);
             const distinctDispatch = keys.every((k) => !Number.isNaN(k)) &&
                 new Set(keys).size === keys.length;
-            if (sameSet &&
-                distinctTimes &&
+            const recs = [...writes].sort((x, y) => dispatchKey(x) - dispatchKey(y));
+            if (distinctTimes &&
                 distinctDispatch &&
-                live.length === first.length) {
-                const msgs = [...live].sort((x, y) => timeOf(x) - timeOf(y));
-                const recs = [...first].sort((x, y) => dispatchKey(x) - dispatchKey(y));
-                msgs.forEach((m, i) => pairedSlots.set(m.activityId, recs[i]));
+                msgs.length === recs.length &&
+                recs.every((r, idx) => (sets[idx] ?? []).some((e) => e.localRequestId === r.localRequestId))) {
+                msgs.forEach((m, idx) => pairedSlots.set(m.activityId, recs[idx]));
                 continue;
             }
-            for (const r of first) {
+            for (const r of writes) {
                 if (r.status === 'accepted' || r.status === 'reconciled')
                     continue;
                 const marked = {
