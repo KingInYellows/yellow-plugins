@@ -17,7 +17,7 @@
 #             keep every status change behind the user's confirmation.
 # landed=no   the scan ran to the end of a complete history and found none.
 # landed=unknown  anything that could make "no" wrong: origin is not <owner/name>,
-#             origin/HEAD is unset, the clone is shallow, the fetch or git log
+#             origin/HEAD is unset or stale, the clone is shallow, the fetch or git log
 #             failed. Callers report "closed, landing unverified" and propose
 #             nothing.
 #
@@ -87,6 +87,14 @@ fi
 # git's own error text can carry the remote URL, so only fixed text is reported.
 GIT_TERMINAL_PROMPT=0 t git fetch --quiet origin "$default_branch" >/dev/null 2>&1 \
   || unknown "git fetch origin $default_branch failed"
+
+# A clone keeps origin/HEAD from when it was made; if the repository has since
+# changed its default branch, scanning the old one would read as "no".
+remote_head=$(GIT_TERMINAL_PROMPT=0 t git ls-remote --symref origin HEAD 2>/dev/null \
+  | awk '$1 == "ref:" && $3 == "HEAD" { sub("^refs/heads/", "", $2); print $2; exit }') || remote_head=''
+[ -n "$remote_head" ] || unknown "could not read origin's current default branch"
+[ "$remote_head" = "$default_branch" ] \
+  || unknown "origin/HEAD ($default_branch) is stale: origin's default branch has changed (run: git remote set-head origin --auto)"
 
 ref="refs/remotes/origin/$default_branch"
 git rev-parse --verify --quiet "$ref^{commit}" >/dev/null 2>&1 || unknown "$ref does not resolve after the fetch"

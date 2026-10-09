@@ -119,3 +119,13 @@ setup() {
     [[ $output != *landed=* ]]
   done
 }
+
+@test "a stale origin/HEAD after the default branch changed is landed=unknown with the fix named" {
+  git -C "$T/seed" checkout -q -b trunk
+  git -C "$T/seed" push -q origin trunk
+  git -C "$T/o/r.git" symbolic-ref HEAD refs/heads/trunk
+  run --separate-stderr "$SCRIPT" o/r 7
+  [ "$status" -eq 0 ]
+  [ "$output" = "landed=unknown" ]
+  [[ $stderr == *"origin/HEAD (main) is stale"*"set-head origin --auto"* ]]
+}

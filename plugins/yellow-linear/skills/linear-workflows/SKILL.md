@@ -394,7 +394,7 @@ stderr. This mapping is the one every consumer uses:
   that was fetched from `origin` and scanned to the end gives this.
 - `landed=unknown` — report "closed, landing unverified" with the reason and
   propose nothing. The script returns it when origin is not the PR's
-  repository, `origin/HEAD` is unset, the clone is shallow, or the fetch or
+  repository, `origin/HEAD` is unset or stale, the clone is shallow, or the fetch or
   `git log` failed.
 
 ## Shell Patterns
