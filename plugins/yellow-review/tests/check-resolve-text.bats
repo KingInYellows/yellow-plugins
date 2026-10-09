@@ -1571,6 +1571,11 @@ rule=forged line=9.txt"
     awk_expect "$bin" 6 'Authorization: Basic Only\n'
     awk_expect "$bin" 6 "Authorization: Basic ${edge}\n"
     awk_expect "$bin" 6 'This endpoint supports Basic YTpi mode\n'
+    # unpadded 3-character token (`a:`): a header flags it, bare prose does not
+    awk_expect "$bin" 6 'Authorization: Basic YTo\n'
+    awk_expect "$bin" 0 'Authorization: Basic Hey\n'
+    awk_expect "$bin" 0 'This endpoint supports Basic Hey mode\n'
+    awk_expect "$bin" 0 'bare basic YTo mode\n'
   done
 }
 

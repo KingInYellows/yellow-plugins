@@ -597,7 +597,7 @@ _rt_scan() {
                     blen = length(btok)
                     while (btok != "" && length(btok) % 4) btok = btok "="
                 }
-                if (scheme == "basic" && (blen >= 4 || (plen > 0 && blen >= 2)) && blen < 20 && basiccred(btok, !hdr)) flag("authorization-header")
+                if (scheme == "basic" && (blen >= 3 || (plen > 0 && blen >= 2)) && blen < 20 && basiccred(btok, !hdr)) flag("authorization-header")
                 else if (length(seg) >= 20) flag("authorization-header")
             }
             # split() keeps this linear on very long (minified) lines.
