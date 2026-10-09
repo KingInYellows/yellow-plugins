@@ -517,3 +517,47 @@ describe('/jules:reply refuses a preview that would hide part of the message', (
     expect(res.stderr).toContain('501 characters');
   });
 });
+
+describe('/jules:delegate previews the whole prompt it binds', () => {
+  const block = /```bash\n([\s\S]*?)```/.exec(step5)?.[1] ?? '';
+
+  const run = (prompt: string, title = '') => {
+    const dir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'yellow-jules-delegate.')
+    );
+    fs.writeFileSync(path.join(dir, 'prompt.txt'), prompt);
+    if (title !== '') fs.writeFileSync(path.join(dir, 'title.txt'), title);
+    const body = block
+      .replace('YELLOW_TODO_work_dir', dir)
+      .replace('YELLOW_TODO_repo', 'acme/widgets')
+      .replace('YELLOW_TODO_branch', 'scratch/one')
+      .replace('YELLOW_TODO_task_ref', 't1')
+      .replace('YELLOW_TODO_grant_id', 'g1')
+      .replace('YELLOW_TODO_request_id', 'r1')
+      .replace('YELLOW_TODO_1_or_0', '0');
+    const res = spawnSync('bash', ['-c', body], { encoding: 'utf8' });
+    fs.rmSync(dir, { recursive: true, force: true });
+    return res;
+  };
+
+  it('shows a prompt longer than 500 characters in full, with the title', () => {
+    const tail = 'END-OF-PROMPT';
+    const res = run(`${'x'.repeat(1500)}${tail}`, 'My title');
+    expect(res.status).toBe(0);
+    expect(res.stdout).toMatch(/binding=[0-9a-f]{64}/);
+    expect(res.stdout).toContain(tail);
+    expect(res.stdout).toContain('title: My title');
+  });
+
+  it('still flattens control characters', () => {
+    const res = run('a\u0007b‮c');
+    expect(res.stdout).toContain('a b c');
+  });
+
+  it('refuses a prompt too long to show in full, with no binding', () => {
+    const res = run('x'.repeat(20001));
+    expect(res.status).toBe(1);
+    expect(res.stdout).not.toContain('binding=');
+    expect(res.stderr).toContain('20001 characters');
+  });
+});

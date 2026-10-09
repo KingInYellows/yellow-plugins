@@ -188,7 +188,8 @@ Show the user:
 
 - **Repository / branch / task:** from the dry-run
 - **Grant:** the id, its limits, and what it has already used
-- **Prompt:** the first 500 characters, printed by the command below inside the
+- **Prompt:** the title and the whole prompt (a prompt over 20000 characters is
+  refused), printed by the command below inside the
   fence (never typed into your own message)
 - **Effect:** "Creates a Jules session. Plan approval is required and vendor
   auto-PR is off. It may run for a long time and is billed to your Jules
@@ -236,6 +237,11 @@ TITLE=''
 bind_hash() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
 }
+# The preview prints the whole prompt: a prompt too long to show in full cannot be confirmed.
+PROMPT_CHARS=$(printf '%s' "$PROMPT" | jq -Rrs 'length')
+if [ "$PROMPT_CHARS" -gt 20000 ]; then
+  printf 'ERROR: the prompt is %s characters; the preview shows at most 20000 in full, so it cannot be confirmed. Nothing was launched. Shorten the prompt and start again from Step 2.\n' "$PROMPT_CHARS" >&2; exit 1
+fi
 PROMPT_SHA=$(printf '%s' "$PROMPT" | bind_hash)
 TITLE_SHA=$(printf '%s' "$TITLE" | bind_hash)
 BINDING=$(printf '%s' "${REPO}|${BRANCH}|${TASK_REF}|${GRANT_ID}|${REQUEST_ID}|${CORRECTION}|${PROMPT_SHA}|${TITLE_SHA}" | bind_hash)
@@ -243,7 +249,8 @@ printf 'binding=%s\n' "$BINDING"
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
 printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
-printf '%s' "$PROMPT" | jq -Rrs 'gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | .[0:500]'
+jq -nr --arg title "$TITLE" --arg prompt "$PROMPT" 'def flat: gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ");
+  (if $title != "" then "title: \($title | flat)\n" else empty end), ($prompt | flat)'
 printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
 ```
 
