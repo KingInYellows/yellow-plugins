@@ -1322,6 +1322,26 @@ CFG_CMD_KEYS=(
   ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global"; rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 1 ] )
 }
 
+@test "harden_git_config judges an include whose path holds a tab, a newline or a percent sign" {
+  mkdir -p ignored
+  for name in $'inc\tx' $'inc\ty\tz' $'inc\nnl' 'inc%09x' 'inc%25'; do
+    : >| "ignored/$name"
+    git config -f "ignored/$name" core.sshCommand 'sh evil'
+    : >| "$BATS_TEST_TMPDIR/global"
+    git config -f "$BATS_TEST_TMPDIR/global" include.path "$PWD/ignored/$name"
+    rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { printf 'accepted: %q\n' "$name" >&2; return 1; }
+    rm -f "ignored/$name"
+  done
+  # an include outside the worktree with a tab in its name is still the user's own
+  : >| "$BATS_TEST_TMPDIR/out"$'\t'x
+  git config -f "$BATS_TEST_TMPDIR/out"$'\t'x core.sshCommand 'ssh -x'
+  : >| "$BATS_TEST_TMPDIR/global"
+  git config -f "$BATS_TEST_TMPDIR/global" include.path "$BATS_TEST_TMPDIR/out"$'\t'x
+  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
 @test "harden_git_config refuses a stock LFS filter command followed by a second line" {
   git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
   git config --local filter.lfs.process 'git-lfs filter-process'
