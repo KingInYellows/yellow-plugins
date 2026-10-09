@@ -230,7 +230,8 @@ harden_git_config() {
         }') || { YR_HARDEN_MSG="could not parse the git transport config"; return 1; }
     # A credential URL can carry userinfo: name the key without it.
     case "$tkey" in
-        credential.?*.helper) tkey="credential.<url>.helper" ;;
+        credential.helper) ;;
+        credential.*) tkey="credential.<url>.helper" ;;
         filter.*) tkey="filter.<driver>.${tkey##*.}" ;;
     esac
     if [ -n "$tkey" ]; then

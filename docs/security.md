@@ -415,6 +415,13 @@ prompt; an interactive run asks before filing an issue. The controls
   requires resolution, and is `unknown` only when neither source confirms
   enforcement and at least one remains unknown; both exit 0. Without either
   binary installed, no timeout applies.
+- **Local config guard.** `yellow-plugins.local.md` is gitignored per-user
+  config that `guard-local-config` protects. `/review:sweep` snapshots it
+  before `/review:pr` and classifies the PR head's root `.gitignore` through a
+  temporary work tree (`check-ignore -q --no-index`); it aborts when the file
+  is tracked here but ignored on the head, and fails closed (exit 2) when the
+  head's rules cannot be read, including a `.gitignore` that is not a regular
+  file. Step 2b re-checks after checkout.
 
 ### Unattended Review Learning Staging (yellow-review / yellow-core)
 
