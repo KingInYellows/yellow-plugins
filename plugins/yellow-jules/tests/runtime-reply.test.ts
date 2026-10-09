@@ -503,6 +503,29 @@ describe('races inside the write gate', () => {
     expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
   });
 
+  it('a complete walk is stamped with its start, so a pause recorded mid-walk postdates it', async () => {
+    setVendorState(h, session.sessionResource, 'inProgress');
+    addActivity(h, session.sessionResource, {
+      type: 'agentMessaged',
+      message: 'progress',
+    });
+    const start = h.deps.clock.now();
+    await status(h.deps, {
+      session: session.localId,
+      reconcile: false,
+      // The walk is slow: time passes while it reads.
+      observer: () => {
+        h.deps.clock.time += 10_000;
+      },
+    });
+    const pausedAt = new Date(start + 5_000).toISOString();
+    const stamp = (await readJournal(h.dataDir)).operations[
+      session.localRequestId
+    ]?.lastCompleteWalkAt;
+    expect(stamp).toBeDefined();
+    expect(Date.parse(stamp!)).toBeLessThanOrEqual(Date.parse(pausedAt));
+  });
+
   it('a settled dispatched reply claims its own echo', async () => {
     const reservation = await reserveUnderGrant(
       h.deps,

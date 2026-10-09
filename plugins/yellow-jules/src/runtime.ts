@@ -560,6 +560,9 @@ export async function status(
       digest: string;
       createTime?: string;
     }> = [];
+    // A complete walk vouches only for what it could see when it began: a
+    // pause or outside marker recorded while it ran must postdate the stamp.
+    const walkStartedAt = nowFn(deps)().toISOString();
     const walk = await walkActivities({
       adapter,
       sessionResource,
@@ -669,7 +672,7 @@ export async function status(
         // A walk that holds a message back has not classified it: stamping it
         // complete would let clearPause forget an older pause over that message.
         ...(walk.complete && !heldBack
-          ? { completeWalkAt: nowFn(deps)().toISOString() }
+          ? { completeWalkAt: walkStartedAt }
           : {}),
         recentActivityIds: ring.filter((id) => !held.has(id)),
         activityCountDelta: walk.newIds.filter((id) => !held.has(id)).length,
