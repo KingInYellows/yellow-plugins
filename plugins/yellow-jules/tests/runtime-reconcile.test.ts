@@ -5,6 +5,7 @@ import { AdapterError, AppErrorException } from '../src/errors.js';
 import { approve, delegate, reply } from '../src/mutations.js';
 import { status } from '../src/runtime.js';
 import {
+  ensureObservedRecord,
   readJournal,
   updateJournal,
   withJournalLock,
@@ -183,6 +184,30 @@ describe('delegate reservations: one shared sessions walk', () => {
     expect(result.reconciled?.[0]).toMatchObject({
       outcome: 'ambiguous-reconcile',
       reason: 'archive-visibility-unverified',
+    });
+    expect((await readJournal(h.dataDir)).operations['lost-a']?.status).toBe(
+      'unknown-outcome'
+    );
+  });
+
+  it('an untagged session already observed by status stays a candidate for the lost create', async () => {
+    await lostResponse('scratch/a', 'lost-a', false);
+    await confirmArchiveVisibility();
+    h.adapter.sessions.set(
+      'sessions/other1',
+      makeSession({
+        sessionResource: 'sessions/other1',
+        title: 'trimmed title',
+        sourceResource: 'sources/github/acme/widgets',
+        startingBranch: 'scratch/a',
+        createTime: new Date(h.deps.clock.now()).toISOString(),
+      })
+    );
+    await ensureObservedRecord(h.dataDir, 'sessions/other1');
+    const result = await status(h.deps, { reconcile: true });
+    expect(result.reconciled?.[0]).toMatchObject({
+      outcome: 'ambiguous-reconcile',
+      reason: 'untagged-candidate',
     });
     expect((await readJournal(h.dataDir)).operations['lost-a']?.status).toBe(
       'unknown-outcome'
@@ -432,6 +457,21 @@ describe('reply and approve reservations resolve on their own session', () => {
     expect((await readJournal(h.dataDir)).operations['reply-2']?.status).toBe(
       'unknown-outcome'
     );
+  });
+
+  it('a sessionless reconcile that binds a reply persists the echo it matched', async () => {
+    const session = await strandedReply('exact words', 'reply-1');
+    const echo = addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'exact words',
+    });
+    const result = await status(h.deps, { reconcile: true });
+    expect(
+      result.reconciled?.find((r) => r.localRequestId === 'reply-1')
+    ).toMatchObject({ outcome: 'bound' });
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-1']?.echoActivityId
+    ).toBe(echo.activityId);
   });
 
   it('a digest that matches after trimming edge whitespace still binds', async () => {

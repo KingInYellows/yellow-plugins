@@ -104,7 +104,12 @@ async function walkSessions(deps, adapter, oldestReservation, deadline) {
 }
 function resolveCreates(journal, creates, walk) {
     const boundElsewhere = new Set(Object.values(journal.operations)
-        .filter((r) => (0, state_js_1.ownsSession)(r) && r.sessionResource !== undefined)
+        // An `observe` owner is a guess made by status for a session it could not
+        // match to a create (a trimmed title): it must not hide the session from
+        // the lost create it may belong to.
+        .filter((r) => (0, state_js_1.ownsSession)(r) &&
+        r.kind !== 'observe' &&
+        r.sessionResource !== undefined)
         .map((r) => r.sessionResource));
     return creates.map((record) => {
         const tagged = walk.sessions.filter((s) => (0, validate_js_1.extractTitleTag)(s.title).localId === record.localId);
@@ -264,8 +269,16 @@ async function resolveOnOwnSession(deps, adapter, sessionResource, records, dead
                 reason: 'dispatch-time-unknown',
             };
         }
-        if (found.size === 1)
-            return { record, outcome: 'bound' };
+        if (found.size === 1) {
+            const [echoId] = found;
+            return {
+                record,
+                outcome: 'bound',
+                ...(record.kind === 'reply' && echoId !== undefined
+                    ? { echoActivityId: echoId }
+                    : {}),
+            };
+        }
         if (!walk.complete) {
             return notReached(record, `activity walk incomplete (${walk.stopReason ?? 'unknown'})`);
         }
@@ -325,6 +338,9 @@ async function persist(deps, resolutions) {
                 next = {
                     ...next,
                     status: 'accepted',
+                    ...(r.echoActivityId !== undefined
+                        ? { echoActivityId: r.echoActivityId }
+                        : {}),
                     ...(r.session !== undefined
                         ? {
                             sessionResource: r.session.sessionResource,

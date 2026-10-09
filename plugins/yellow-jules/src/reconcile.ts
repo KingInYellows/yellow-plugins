@@ -85,6 +85,8 @@ interface Resolution {
   readonly reason?: string;
   readonly session?: SessionProjection;
   readonly deviation?: string;
+  /** The userMessaged activity a reply was bound through; persisted so later passes cannot reuse it. */
+  readonly echoActivityId?: string;
 }
 
 function entryOf(r: Resolution): ReconciledEntry {
@@ -182,7 +184,15 @@ function resolveCreates(
 ): Resolution[] {
   const boundElsewhere = new Set(
     Object.values(journal.operations)
-      .filter((r) => ownsSession(r) && r.sessionResource !== undefined)
+      // An `observe` owner is a guess made by status for a session it could not
+      // match to a create (a trimmed title): it must not hide the session from
+      // the lost create it may belong to.
+      .filter(
+        (r) =>
+          ownsSession(r) &&
+          r.kind !== 'observe' &&
+          r.sessionResource !== undefined
+      )
       .map((r) => r.sessionResource as string)
   );
   return creates.map((record): Resolution => {
@@ -367,7 +377,16 @@ async function resolveOnOwnSession(
         reason: 'dispatch-time-unknown',
       };
     }
-    if (found.size === 1) return { record, outcome: 'bound' };
+    if (found.size === 1) {
+      const [echoId] = found;
+      return {
+        record,
+        outcome: 'bound',
+        ...(record.kind === 'reply' && echoId !== undefined
+          ? { echoActivityId: echoId }
+          : {}),
+      };
+    }
     if (!walk.complete) {
       return notReached(
         record,
@@ -448,6 +467,9 @@ async function persist(
         next = {
           ...next,
           status: 'accepted',
+          ...(r.echoActivityId !== undefined
+            ? { echoActivityId: r.echoActivityId }
+            : {}),
           ...(r.session !== undefined
             ? {
                 sessionResource: r.session.sessionResource,
