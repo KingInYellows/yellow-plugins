@@ -220,6 +220,8 @@ export interface ArtifactRecord {
   readonly baseCommit?: string;
   readonly prUrl?: string;
   readonly vendorPath?: string;
+  /** sha256 of the raw vendor path (identity only; the raw path is never persisted). */
+  readonly vendorPathDigest?: string;
   readonly secretShapedContent: boolean;
   readonly collectedAt: string;
   /** Never optional: initialized `unverified`, written only by the R43 verification step. */

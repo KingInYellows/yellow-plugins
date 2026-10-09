@@ -176,6 +176,7 @@ function isValidArtifact(value: unknown): value is ArtifactRecord {
       'baseCommit',
       'prUrl',
       'vendorPath',
+      'vendorPathDigest',
     ]) &&
     typeof value['secretShapedContent'] === 'boolean' &&
     typeof value['collectedAt'] === 'string' &&
@@ -1510,7 +1511,7 @@ export async function upsertArtifactResumeToken(
 function artifactKey(a: ArtifactRecord): string {
   return a.kind === 'pr-ref'
     ? `pr-ref:${a.prUrl ?? ''}`
-    : `${a.kind}:${a.sha256 ?? ''}:${a.vendorPath ?? ''}`;
+    : `${a.kind}:${a.sha256 ?? ''}:${a.vendorPathDigest ?? a.vendorPath ?? ''}`;
 }
 
 /**

@@ -194,6 +194,7 @@ function isValidArtifact(value) {
             'baseCommit',
             'prUrl',
             'vendorPath',
+            'vendorPathDigest',
         ]) &&
         typeof value['secretShapedContent'] === 'boolean' &&
         typeof value['collectedAt'] === 'string' &&
@@ -1145,7 +1146,7 @@ async function upsertArtifactResumeToken(dataDir, localRequestId, token, now = (
 function artifactKey(a) {
     return a.kind === 'pr-ref'
         ? `pr-ref:${a.prUrl ?? ''}`
-        : `${a.kind}:${a.sha256 ?? ''}:${a.vendorPath ?? ''}`;
+        : `${a.kind}:${a.sha256 ?? ''}:${a.vendorPathDigest ?? a.vendorPath ?? ''}`;
 }
 /**
  * Artifact provenance with digests (R35), written only by `collect`. An

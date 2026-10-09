@@ -785,6 +785,8 @@ export interface CollectedArtifact {
   readonly baseCommit?: string;
   readonly prUrl?: string;
   readonly vendorPath?: string;
+  /** sha256 of the RAW vendor path: identity for dedupe; the raw path itself is never stored. */
+  readonly vendorPathDigest?: string;
   readonly secretShapedContent: boolean;
   readonly verification: 'unverified';
 }
@@ -912,6 +914,11 @@ function readManifestArtifacts(
       ...(a.kind === 'generated-file' && typeof a.vendorPath === 'string'
         ? { vendorPath: redact(a.vendorPath) }
         : {}),
+      ...(a.kind === 'generated-file' &&
+      typeof a.vendorPathDigest === 'string' &&
+      /^[0-9a-f]{64}$/.test(a.vendorPathDigest)
+        ? { vendorPathDigest: a.vendorPathDigest }
+        : {}),
       secretShapedContent: scanSecretShapes(content),
       verification: 'unverified',
     });
@@ -919,9 +926,39 @@ function readManifestArtifacts(
   return out;
 }
 
-/** Dedupe key for a staged generated file; `safeVendorPath` is already redacted. */
-function generatedKey(digest: string, safeVendorPath: string): string {
-  return `${digest}:${safeVendorPath}`;
+/**
+ * Dedupe keys for a staged generated file. Identity is the content digest plus
+ * the digest of the RAW vendor path, so two paths that redact to the same
+ * string stay distinct. An entry staged before path digests existed has only
+ * the redacted path, so it is matched by the legacy key.
+ */
+function generatedKey(digest: string, vendorPathDigest: string): string {
+  return `${digest}:${vendorPathDigest}`;
+}
+
+function legacyGeneratedKey(digest: string, safeVendorPath: string): string {
+  return `${digest}:legacy:${safeVendorPath}`;
+}
+
+/** Records a staged entry as seen under whichever key identifies it. */
+function markGeneratedSeen(seen: Set<string>, a: CollectedArtifact): void {
+  if (a.sha256 === undefined) return;
+  seen.add(
+    a.vendorPathDigest !== undefined
+      ? generatedKey(a.sha256, a.vendorPathDigest)
+      : legacyGeneratedKey(a.sha256, a.vendorPath ?? '')
+  );
+}
+
+function isGeneratedSeen(
+  seen: ReadonlySet<string>,
+  contentDigest: string,
+  vendorPath: string
+): boolean {
+  return (
+    seen.has(generatedKey(contentDigest, sha256(vendorPath))) ||
+    seen.has(legacyGeneratedKey(contentDigest, redact(vendorPath)))
+  );
 }
 
 function countFiles(dir: string): number {
@@ -957,11 +994,8 @@ class Stager {
       this.artifacts.push(prior);
       if (prior.kind === 'patch' && prior.sha256 !== undefined)
         this.seenDigests.add(prior.sha256);
-      if (prior.kind === 'generated-file' && prior.sha256 !== undefined) {
-        this.seenGenerated.add(
-          generatedKey(prior.sha256, prior.vendorPath ?? '')
-        );
-      }
+      if (prior.kind === 'generated-file')
+        markGeneratedSeen(this.seenGenerated, prior);
       if (prior.kind === 'pr-ref' && prior.prUrl !== undefined)
         this.seenPrs.add(prior.prUrl);
     }
@@ -1022,9 +1056,9 @@ class Stager {
     // reported as skipped (which would set partialStaging for nothing).
     const digest = sha256(content);
     const safeVendorPath = redact(vendorPath);
-    const key = generatedKey(digest, safeVendorPath);
-    if (this.seenGenerated.has(key)) return;
-    this.seenGenerated.add(key);
+    const vendorPathDigest = sha256(vendorPath);
+    if (isGeneratedSeen(this.seenGenerated, digest, vendorPath)) return;
+    this.seenGenerated.add(generatedKey(digest, vendorPathDigest));
     const bytes = Buffer.byteLength(content, 'utf8');
     if (this.overCap(bytes)) {
       this.skipped.push({
@@ -1047,6 +1081,7 @@ class Stager {
       path: rel,
       sha256: digest,
       vendorPath: safeVendorPath,
+      vendorPathDigest,
       secretShapedContent: scanSecretShapes(content),
       verification: 'unverified',
     });
@@ -1093,7 +1128,7 @@ export class StagingBuffer {
       if (a.sha256 === undefined) continue;
       if (a.kind === 'patch') this.seenPatches.add(a.sha256);
       else if (a.kind === 'generated-file')
-        this.seenGenerated.add(generatedKey(a.sha256, a.vendorPath ?? ''));
+        markGeneratedSeen(this.seenGenerated, a);
     }
   }
 
@@ -1123,9 +1158,9 @@ export class StagingBuffer {
   }
 
   generated(vendorPath: string, content: string): void {
-    const key = generatedKey(sha256(content), redact(vendorPath));
-    if (this.seenGenerated.has(key)) return;
-    this.seenGenerated.add(key);
+    const contentDigest = sha256(content);
+    if (isGeneratedSeen(this.seenGenerated, contentDigest, vendorPath)) return;
+    this.seenGenerated.add(generatedKey(contentDigest, sha256(vendorPath)));
     const bytes = Buffer.byteLength(content, 'utf8');
     if (this.buffered + bytes > this.capBytes) {
       this.pending.push((s) =>
