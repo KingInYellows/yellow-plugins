@@ -111,29 +111,67 @@ describe('/jules:approve binds the approval to the reviewed plan', () => {
   });
 
   describe('Step 3 refuses a plan whose preview would be capped', () => {
+    const s6Block = /```bash\n([\s\S]*?)```/.exec(s6)?.[1] ?? '';
     const block = /```bash\n([\s\S]*?)```/.exec(s3)?.[1] ?? '';
-    const run = (title: string, description: string) => {
+    const runStatus = (status: unknown, script = block) => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), 'jules-approve-'));
       fs.mkdirSync(path.join(root, 'dist'));
-      const status = {
-        ok: true,
-        pendingPlan: {
-          planId: 'p1',
-          steps: [{ index: 0, title, description }],
-        },
-      };
       fs.writeFileSync(
         path.join(root, 'dist/cli.js'),
         `console.log(${JSON.stringify(JSON.stringify(status))});`
       );
       const res = spawnSync(
         'bash',
-        ['-c', block.replace('YELLOW_TODO_session', 'sessions/1')],
+        [
+          '-c',
+          script
+            .replace('YELLOW_TODO_session', 'sessions/1')
+            .replace('YELLOW_TODO_plan_id', 'p1'),
+        ],
         { env: { ...process.env, CLAUDE_PLUGIN_ROOT: root }, encoding: 'utf8' }
       );
       fs.rmSync(root, { recursive: true, force: true });
       return res;
     };
+    const run = (title: string, description: string) =>
+      runStatus({
+        ok: true,
+        pendingPlan: {
+          planId: 'p1',
+          steps: [{ index: 0, title, description }],
+        },
+      });
+
+    it.each([
+      ['status failed', { ok: false }],
+      ['no pending plan', { ok: true, pendingPlan: null }],
+      [
+        'a different plan',
+        { ok: true, pendingPlan: { planId: 'p2', steps: [] } },
+      ],
+    ])('Step 3 emits no digest when %s', (_n, status) => {
+      const res = runStatus(status);
+      expect(res.status).toBe(1);
+      expect(res.stdout).not.toContain('plan_digest=');
+      expect(res.stderr).toContain('could not be read as pending');
+    });
+
+    it.each([
+      ['status failed', { ok: false }],
+      ['no pending plan', { ok: true, pendingPlan: null }],
+    ])(
+      'Step 6 refuses before approving when the re-read shows %s',
+      (_n, status) => {
+        const script = s6Block
+          .replace('YELLOW_TODO_grant_id', 'g1')
+          .replace('YELLOW_TODO_request_id', 'r1')
+          .replace('YELLOW_TODO_deadline_or_empty', '')
+          .replace('YELLOW_TODO_binding_from_preview', 'a'.repeat(64));
+        const res = runStatus(status, script);
+        expect(res.status).toBe(1);
+        expect(res.stderr).toContain('could not be re-read as pending');
+      }
+    );
 
     it('binds a plan that fits the preview', () => {
       const res = run('Add tests', 'x'.repeat(300));

@@ -69,14 +69,20 @@ the one the user evaluated.
 
 ### Step 3: Show the Plan
 
-Read the plan under review so the preview shows what will start executing:
+Read the plan under review so the preview shows what will start executing. Use the
+plan id from Step 2 (`observedPlanId`); the block exits when that plan is not readable as pending:
 
 ```bash
 set -uo pipefail
 SESSION='YELLOW_TODO_session'
-case "$SESSION" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+PLAN_ID='YELLOW_TODO_plan_id'
+case "$SESSION$PLAN_ID" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 OUTPUT=$(node "$CLI" status --session "$SESSION")
+# An unreadable or absent plan must not produce a digest: it would hash [null, []] and bind an approval to nothing the user saw.
+if ! printf '%s\n' "$OUTPUT" | jq -e --arg id "$PLAN_ID" '.ok == true and .pendingPlan != null and .pendingPlan.planId == $id' >/dev/null 2>&1; then
+  printf 'ERROR: the plan %s could not be read as pending (status failed, no pending plan, or a different plan). Nothing was approved; run /jules:status --session %s.\n' "$PLAN_ID" "$SESSION" >&2; exit 1
+fi
 printf '%s\n' "$OUTPUT" | jq '{ok, vendorState, condition, pendingPlan: (if .pendingPlan then {planId: .pendingPlan.planId, stepCount: (.pendingPlan.steps | length)} else null end)} | with_entries(select(.value != null))'
 # Plan text is vendor-writable: fenced, flattened, capped.
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
@@ -194,6 +200,9 @@ CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 # differs from the one the user reviewed, or any changed value, refuses here.
 command -v jq >/dev/null 2>&1 || { printf 'ERROR: jq required.\n' >&2; exit 1; }
 FRESH=$(node "$CLI" status --session "$SESSION")
+if ! printf '%s\n' "$FRESH" | jq -e --arg id "$PLAN_ID" '.ok == true and .pendingPlan != null and .pendingPlan.planId == $id' >/dev/null 2>&1; then
+  printf 'ERROR: the plan %s could not be re-read as pending (status failed, no pending plan, or a different plan). Nothing was approved; start again from Step 3.\n' "$PLAN_ID" >&2; exit 1
+fi
 bind_hash() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
 }
