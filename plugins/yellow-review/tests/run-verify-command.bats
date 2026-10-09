@@ -3341,3 +3341,84 @@ SH
   [ "$status" -eq 2 ] || { echo "status $status: $stderr" >&2; return 1; }
   [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
 }
+
+# --- a tracked trusted-config symlink to a directory holding a nested symlink ---
+dirlink_setup() {
+  EXTDIR="$BATS_TEST_TMPDIR/ext-dir"
+  EXTFILE="$BATS_TEST_TMPDIR/ext-file"
+  mkdir -p "$EXTDIR"
+  printf '{}\n' >| "$EXTFILE"
+  ln -s "$EXTFILE" "$EXTDIR/settings.json"
+  ln -s "$EXTDIR" .claude
+  git add .claude && git commit -q -m "track .claude dir link"
+  touch -t 202001010000 "$IGN_MARKER"
+  touch -t 201901010000 "$EXTFILE" "$EXTDIR"
+  touch -h -t 201901010000 "$EXTDIR/settings.json"
+}
+
+@test "--revert-denied flags a tracked trusted-config directory symlink whose nested symlink's target was written" {
+  dirlink_setup
+  printf '{"hooks":"evil"}\n' >| "$EXTFILE"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "--revert-denied stays deniedClean for a directory symlink whose nested symlink target is unchanged" {
+  dirlink_setup
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+}
+
+@test "--revert-denied fails closed on a tracked trusted-config directory symlink holding a symlink loop" {
+  dirlink_setup
+  ln -s . "$EXTDIR/loop"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+# --- the HEAD target of a dirty trusted-config link ---
+@test "a dirty root-level trusted-config symlink with a ../ target is resolved from the repository root's parent" {
+  EXT="$(dirname "$PWD")/rootlink-ext"
+  mkdir -p "$EXT"
+  printf 'x\n' >| "$EXT/settings"
+  rel="../rootlink-ext/settings"
+  rm -f CLAUDE.md && ln -s "$rel" CLAUDE.md
+  git add CLAUDE.md && git commit -q -m "root link"
+  touch -t 202001010000 "$IGN_MARKER"
+  touch -t 201901010000 "$EXT/settings"
+  printf 'new\n' >| "$EXT/settings"
+  rm CLAUDE.md && ln -s nowhere CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ "$(readlink CLAUDE.md)" = "$rel" ]
+}
+
+@test "a dirty nested trusted-config symlink with a bare-name target is resolved from its own directory" {
+  mkdir -p sub
+  printf 'x\n' >| sub/real.txt
+  ln -s real.txt sub/CLAUDE.md
+  git add sub && git commit -q -m "nested link"
+  touch -t 202001010000 "$IGN_MARKER"
+  touch -t 201901010000 sub/real.txt
+  printf 'evil\n' >| sub/real.txt
+  rm sub/CLAUDE.md && ln -s nowhere sub/CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "a staged retarget of a trusted-config symlink does not hide the committed (HEAD) target" {
+  link_setup
+  printf '{"hooks":"evil"}\n' >| "$OUTSIDE/settings.json"
+  rm .claude/settings.json
+  ln -s "$BATS_TEST_TMPDIR/elsewhere" .claude/settings.json
+  git add .claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ "$(readlink .claude/settings.json)" = "$OUTSIDE/settings.json" ]
+}

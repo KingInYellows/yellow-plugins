@@ -1184,17 +1184,22 @@ rp_tree_changes() {
 # `.git` entries skipped). Returns 1 when it is unchanged, not a regular file or
 # directory, or dangling (nothing to write to). Returns 2 when it cannot tell:
 # the link cannot be read, the target directory cannot be walked, or the target
-# is hidden behind a directory that cannot be searched. Run it from the working
+# is hidden behind a directory that cannot be searched. An optional third
+# argument `follow` walks a target directory with find -L, so symlinks nested
+# below it are judged by their targets too; a loop or any other find error then
+# returns 2 (cannot tell). The trusted-config symlink check uses it; the
+# ignored-symlink guard does not. Run it from the working
 # tree root with a path that does not begin with `-`.
 rp_link_target_changed() {
-    local l="$1" marker="$2" t p d out skip="" rc=0
+    local l="$1" marker="$2" follow="${3:-}" t p d out skip="" rc=0 fl=-H
     if [ -e "$l" ]; then
         if [ -d "$l" ]; then
+            [ "$follow" != follow ] || fl=-L
             # The root `.ruvector` link: skip its session log as the literal
             # directory scan does (see rp_ignored_changed_since).
             case "$l" in .ruvector|./.ruvector) skip="$l/coedit-sessions" ;; esac
             out=$(set -o pipefail
-                find -H "$l" -name .git -prune -o -path "$skip" -prune -o -type f -newer "$marker" -print 2>/dev/null \
+                find "$fl" "$l" -name .git -prune -o -path "$skip" -prune -o -type f -newer "$marker" -print 2>/dev/null \
                     | head -n 1) || rc=$?
             [ -z "$out" ] || return 0
             [ "$rc" -eq 0 ] || return 2

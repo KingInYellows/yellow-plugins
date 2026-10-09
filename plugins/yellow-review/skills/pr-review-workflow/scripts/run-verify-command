@@ -792,7 +792,9 @@ add_unique_file() {
     FILES+=("$1")
 }
 
-# A write through a tracked symlink edits its target and leaves the link, which
+# The tracked links come from HEAD (ls-tree), the tree the revert restores from
+# (`checkout HEAD`), never the index: a staged retarget must not hide the
+# committed target. A write through a tracked symlink edits its target and leaves the link, which
 # is all rp_tree_changes sees. check_trusted_links fills LINK_HITS with every
 # tracked trusted-config symlink (.claude/settings.json -> a file elsewhere)
 # whose target may have been edited, so a clean listing is not read as a clean
@@ -812,7 +814,7 @@ check_trusted_links() {
     ls=$(mktemp) || die 2 "mktemp failed"
     out=$(mktemp) || { rm -f -- "$ls"; die 2 "mktemp failed"; }
     tdir=$(mktemp -d) || { rm -f -- "$ls" "$out"; die 2 "mktemp failed"; }
-    yr_git ls-files -s -z >|"$ls" 2>/dev/null \
+    yr_git ls-tree -r -z HEAD >|"$ls" 2>/dev/null \
         || { rm -rf -- "$ls" "$out" "$tdir"; die 2 "cannot list tracked symlinks to check trusted-config targets"; }
     safe=$(yr_walk_path) || { rm -rf -- "$ls" "$out" "$tdir"; die 2 "cannot build a safe PATH to check trusted-config symlinks"; }
     top=$(pwd -P)
@@ -837,14 +839,16 @@ check_trusted_links() {
                 # Git lists the link as changed and the revert restores the HEAD
                 # link, so judge the HEAD link's target through a scratch link.
                 sha="${rec#* }"
-                sha="${sha%% *}"
+                sha="${sha#* }"
+                sha="${sha%%$'\t'*}"
                 t=$(yr_git cat-file blob "$sha" 2>/dev/null; printf x) || t=""
                 t="${t%x}"
                 if [ -z "$t" ]; then printf '%s\0' "$f" >>"$out"; continue; fi
+                parent=.
+                case "$f" in */*) parent="${f%/*}" ;; esac
                 case "$t" in
                     /*) ;;
-                    */*) t="$top/${f%/*}/$t" ;;
-                    *) t="$top/$t" ;;
+                    *) t="$top/$parent/$t" ;;
                 esac
                 rm -f -- "$tdir/l"
                 ln -s -- "$t" "$tdir/l" 2>/dev/null || { printf '%s\0' "$f" >>"$out"; continue; }
@@ -856,7 +860,7 @@ check_trusted_links() {
             canon=$(yr_canon_path "$probe" 2>/dev/null) || canon=""
             if [ -n "$IGNORED_SINCE" ]; then
                 rc=0
-                rp_link_target_changed "$probe" "$IGNORED_SINCE" || rc=$?
+                rp_link_target_changed "$probe" "$IGNORED_SINCE" follow || rc=$?
                 [ "$rc" -eq 1 ] || hit=1
                 if [ "$hit" = 1 ] && [ "$rc" -eq 0 ] && [ -n "$canon" ] && yr_inside_root "$canon" "$top"; then
                     rel="${canon#"$top"/}"
