@@ -662,7 +662,7 @@ refuse_hidden_flags() {
         printf '%s\0' "$f" >>"$hits"
     done <"$out"
     rm -f -- "$out"
-    [ ! -s "$hits" ] || die 2 "tracked trusted-config or deny-listed files carry a skip-worktree or assume-unchanged flag, so edits to them are invisible to the tree check; clear the flag (git update-index --no-skip-worktree --no-assume-unchanged) and retry: $(safe_path_list_z <"$hits")"
+    [ ! -s "$hits" ] || die 2 "tracked files this mode checks carry a skip-worktree or assume-unchanged flag, so edits to them are invisible to the tree check; clear the flag (git update-index --no-skip-worktree --no-assume-unchanged) and retry: $(safe_path_list_z <"$hits")"
 }
 
 if [ "$MODE" != revert-only ]; then
