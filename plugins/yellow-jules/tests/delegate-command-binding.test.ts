@@ -82,6 +82,25 @@ describe('/jules:reply binds the send to the confirmed preview', () => {
   });
 });
 
+describe('the host-neutral skills carry the guarded CLI flags', () => {
+  const skill = (name: string): string =>
+    fs.readFileSync(
+      path.resolve(
+        path.dirname(fileURLToPath(import.meta.url)),
+        `../skills/${name}/SKILL.md`
+      ),
+      'utf8'
+    );
+
+  it('jules-delegation approves with the reviewed plan digest', () => {
+    const text = skill('jules-delegation');
+    expect(text).toContain('--expect-plan-digest <hex>');
+    expect(text).not.toMatch(
+      /approve --session <ref> --plan-id <id> --grant-id/
+    );
+  });
+});
+
 describe('approve always carries the reviewed plan digest', () => {
   it.each(['approve', 'supervise'])(
     '/jules:%s passes it to the CLI',

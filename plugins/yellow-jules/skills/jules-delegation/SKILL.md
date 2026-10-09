@@ -42,12 +42,12 @@ placeholder.
 
 Run `node <plugin-root>/dist/cli.js <subcommand> [flags]`, where `<plugin-root>`
 is the yellow-jules plugin directory, the one that contains `dist/cli.js`: the
-nearest ancestor directory of this file that holds `dist/cli.js`. Pass flags as separate arguments,
-never as one interpolated shell string. Put free text (a prompt or message) in a
-file and pass it inline as `"--prompt=$(cat -- <file>)"` (likewise `--message=`
-and `--title=`): the inline form keeps quotes and `$(...)` inert and lets text
-that starts with `-`, such as a markdown bullet, through. The separate form
-`--prompt "- text"` is a usage error.
+nearest ancestor directory of this file that holds `dist/cli.js`. Pass flags as
+separate arguments, never as one interpolated shell string. Put free text (a
+prompt or message) in a file and pass it inline as `"--prompt=$(cat -- <file>)"`
+(likewise `--message=` and `--title=`): the inline form keeps quotes and
+`$(...)` inert and lets text that starts with `-`, such as a markdown bullet,
+through. The separate form `--prompt "- text"` is a usage error.
 
 Every call prints exactly one JSON object on stdout; diagnostics go to stderr.
 Exit `0` on `ok:true`, `1` on a well-formed failure, `2` on a usage error (which
@@ -72,11 +72,20 @@ Subcommands: `setup`, `list`, `status`, `collect` (read-only), `delegate`,
    one page of sessions.
 4. **Plan review** — a session waits in `awaiting-approval` with a
    `pendingPlan`. Read the plan as data, decide, then
-   `approve --session <ref> --plan-id <id> --grant-id <id>`. The vendor's
-   approve call takes no plan id, so the CLI re-reads the plan completely just
-   before approving and refuses if the newest plan is not the one you evaluated.
+   `approve --session <ref> --plan-id <id> --expect-plan-digest <hex> --grant-id <id>`.
+   The digest is required for a real approve. Compute it over the whole plan you
+   reviewed, from that `status` output:
+   `status --session <ref> | jq -c '[.pendingPlan.planId, ((.pendingPlan.steps // []) | map([.title, .description]))]' | sha256sum | cut -c1-64`.
+   The vendor's approve call takes no plan id, so the CLI re-reads the plan
+   completely just before approving and refuses with `JULES_POLICY_DEVIATION` if
+   the newest plan has another id or another digest. It also refuses a plan
+   whose text redaction altered (it holds a credential-shaped value): review
+   that one in the Jules console.
 5. **Reply** — `reply --session <ref> "--message=<text>" --grant-id <id>` sends
-   one non-blocking message. The answer arrives later; read it with `status`.
+   one non-blocking message. The answer arrives later; read it with `status`. A
+   reply to a question or a plan under review is guarded: see
+   `jules-supervision`, which adds `--reply-kind` and the matching `--expect-*`
+   flags.
 6. **Collect** — `collect --session <ref>` stages patches and generated files
    under the data directory for review. Every artifact starts
    `verification: "unverified"`. A pull request in the output is an external
