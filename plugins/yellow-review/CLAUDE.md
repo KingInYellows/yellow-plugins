@@ -288,7 +288,14 @@ entry) is refused. An injected `include.path` or `includeIf.*.path` (either vari
 any case) is refused outright: git loads the file as command-line config, which the
 scans skip. A quote that opens in one word and closes in another (a quoted span
 containing whitespace, `sh 'dir with space/evil'`) is refused as unjudgeable;
-single-word wrappers such as `'/usr/bin/ssh'` still pass. Any inherited `GIT_EXEC_PATH` is refused (git runs `git-remote-*` and
+single-word wrappers such as `'/usr/bin/ssh'` still pass. `GIT_SSH`, `GIT_ASKPASS`, `SSH_ASKPASS` and the keys `core.askpass` and `gpg.program` hold one
+program path that git execs whole, so `yr_prog_enters` judges them unsplit (`dir with space/evil`
+is one path). For every program value, whatever its origin (environment, injected config, or an
+entry in a global or system file outside the worktree), a word containing `/` skips `PATH`: it is
+resolved against the current directory and the worktree and refused when it, its link target, a
+`#!` interpreter or a hard link behind it is inside the worktree (`core.sshCommand=./evil` in an
+otherwise trusted global config). Shell syntax the check cannot judge is tolerated in those
+trusted files, so a user's own `!` alias or pager keeps working. Any inherited `GIT_EXEC_PATH` is refused (git runs `git-remote-*` and
 other dashed helpers from it, and a link there can reach the worktree; the default exec
 path is right for these scripts). The `#!` check follows an interpreter that is itself a
 `#!` script, to a depth of 4 (an interpreter script at depth 5 counts as entering the
