@@ -3032,3 +3032,40 @@ SHIM
     git update-index --no-skip-worktree --no-assume-unchanged src/helper.sh
   done
 }
+
+@test "--revert-denied keeps a directory holding a FIFO that replaced a tracked trusted-config file" {
+  printf 'tracked\n' >| .cursor
+  git add .cursor && git commit -q -m "add .cursor file"
+  rm -f .cursor
+  mkdir .cursor
+  mkfifo .cursor/pipe
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ -p .cursor/pipe ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'special file or empty directory'*'.cursor'* ]]
+}
+
+@test "--revert-denied keeps a directory holding an empty subdirectory that replaced a tracked trusted-config file" {
+  printf 'tracked\n' >| .cursor
+  git add .cursor && git commit -q -m "add .cursor file"
+  rm -f .cursor
+  mkdir -p .cursor/empty
+  printf 'x\n' >| .cursor/f.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ -d .cursor/empty ]
+}
+
+@test "--revert-dirty refuses to remove a directory holding a FIFO that replaced a tracked file" {
+  printf 'tracked\n' >| src/blob
+  git add src/blob && git commit -q -m "add blob"
+  rm -f src/blob
+  mkdir src/blob
+  mkfifo src/blob/pipe
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'cannot encode'* ]]
+  [ -p src/blob/pipe ]
+}

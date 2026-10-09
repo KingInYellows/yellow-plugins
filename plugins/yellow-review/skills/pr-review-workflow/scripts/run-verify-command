@@ -892,6 +892,21 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
                     rp_trusted_config "$c" || { printf 1; break; }
                 done)
         fi
+        # The recovery patch encodes regular files and symlinks only. A FIFO,
+        # socket, device or empty directory in the subtree would vanish with
+        # the recursive removal and be absent from the patch, so keep the tree.
+        UNENCODABLE=""
+        if [ -z "$NESTED" ] && [ -z "$EXCLUDED" ]; then
+            UNENCODABLE=$(find -- "$f" ! -type f ! -type l \( ! -type d -o -empty \) -print -quit 2>/dev/null) \
+                || die 2 "cannot scan the directory for entries the recovery patch cannot hold: $(safe_path_label "$f")"
+        fi
+        if [ -n "$UNENCODABLE" ]; then
+            [ "$MODE" = revert-denied ] \
+                || die 2 "refusing to remove a directory holding an entry the recovery patch cannot encode (special file or empty directory): $(safe_path_label "$f")"
+            add_path_reason "left a directory holding a special file or empty directory in place" "$f"
+            NESTED_KEPT+=("$f")
+            continue
+        fi
         if [ -n "$NESTED" ] || [ -n "$EXCLUDED" ]; then
             # --revert-denied judges each trusted-config path on its own, so a
             # repository it must not delete does not stop the other reverts.
