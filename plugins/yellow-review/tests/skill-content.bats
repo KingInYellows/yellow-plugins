@@ -1301,3 +1301,38 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [ "$status" -eq 1 ]
   grep -qF 'compound-staging drain; sweep-all runs no compounding pass of its own' "$SWEEP_ALL"
 }
+
+# Runs sweep Step 1b's remote selection (lines 'REMOTE=origin' through its
+# 'case' guard) against a scratch repo whose remotes are the arguments.
+sweep_remote_pick() {
+  local repo="$BATS_TEST_TMPDIR/remote-repo" r
+  rm -rf "$repo" && git init -q "$repo"
+  for r in "$@"; do git -C "$repo" remote add -- "$r" https://example.invalid/x.git; done
+  awk '/^REMOTE=origin$/ { p = 1 } p { print } /^case "\$REMOTE" in/ { exit }' "$SWEEP" >"$BATS_TEST_TMPDIR/pick.sh"
+  [ "$(wc -l <"$BATS_TEST_TMPDIR/pick.sh")" -eq 3 ]
+  TOP="$repo" bash -c 'head_fail() { echo FAIL; exit 2; }; . "$1"; printf "%s\n" "$REMOTE"' _ "$BATS_TEST_TMPDIR/pick.sh"
+}
+
+@test "sweep Step 1b: any git-valid sole remote name is accepted, not a character allowlist" {
+  for name in team+upstream team@upstream team/up.stream up_stream; do
+    run sweep_remote_pick "$name"
+    [ "$status" -eq 0 ]
+    [ "$output" = "$name" ]
+  done
+}
+
+@test "sweep Step 1b: several remotes without origin fail; origin wins among several" {
+  run sweep_remote_pick a b
+  [ "$status" -eq 2 ]
+  [ "$output" = FAIL ]
+  run sweep_remote_pick a origin
+  [ "$status" -eq 0 ]
+  [ "$output" = origin ]
+}
+
+@test "sweep Step 1b: an option-shaped remote name is refused, and fetch passes it after --" {
+  run sweep_remote_pick -x
+  [ "$status" -eq 2 ]
+  [ "$output" = FAIL ]
+  grep -qF 'fetch -q --no-tags -- "$REMOTE"' "$SWEEP"
+}

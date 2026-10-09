@@ -126,7 +126,8 @@ Step 2's checkout. Once that head ignores the file, `/review:pr` can write it.
 only that commit's root `.gitignore`. Use `--no-index` and the `-q` exit
 (`0` ignored, `1` not): this branch's index can still track the file, and
 `-v` exits `0` for a negation too. The remote is `origin`, else the sole
-remote; several remotes without `origin` is a failure. On failure, before any snapshot, print
+remote, taken as git printed it (one line, no leading `-`); several remotes
+without `origin` is a failure. On failure, before any snapshot, print
 `[review:sweep] Error: could not read the PR head ignore rules.` and stop
 with no skip line.
 
@@ -140,7 +141,7 @@ TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
 [ -n "$TOP" ] || head_fail
 REMOTE=origin
 git -C "$TOP" remote get-url origin >/dev/null 2>&1 || REMOTE=$(git -C "$TOP" remote 2>/dev/null)
-case "$REMOTE" in ''|-*|*[!A-Za-z0-9._/-]*) head_fail ;; esac
+case "$REMOTE" in ''|-*|*[[:space:]]*|*[[:cntrl:]]*) head_fail ;; esac
 GOT=""
 for delay in 0 1 2 4 8 16; do
   sleep "$delay"
