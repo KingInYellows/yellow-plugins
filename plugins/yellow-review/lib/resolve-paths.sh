@@ -116,24 +116,96 @@ yr_inside_root() {
     return 1
 }
 
+# yr_has_root <string> <root>: succeed when <string> contains <root> as a whole
+# path: not preceded by a path character and followed by / or a character that
+# cannot continue a name. A sibling such as <root>2 or <root>-keys is not it.
+yr_has_root() {
+    local rest="$1" root="$2" pre post prev next
+    while :; do
+        case "$rest" in *"$root"*) ;; *) return 1 ;; esac
+        pre=${rest%%"$root"*}
+        post=${rest#*"$root"}
+        prev=${pre: -1}
+        next=${post:0:1}
+        case "$prev" in [A-Za-z0-9._/-]) ;; *)
+            case "$next" in [A-Za-z0-9._-]) ;; *) return 0 ;; esac
+        esac
+        rest=$post
+    done
+}
+
+# yr_args_enter <string> <root> <skip-bare-first>: succeed when <string>, read
+# as a word list, names anything inside <root>: the raw text holds the root as
+# a whole path (yr_has_root), or a word (leading ! and quotes stripped; for
+# --opt=VALUE both the word and VALUE) is an absolute path, or an existing path
+# relative to the current directory, that canonicalizes inside <root>, or a
+# path that cannot be canonicalized. With <skip-bare-first> 1 the first word is
+# left alone when it has no slash (a program name is looked up on PATH, never
+# in the current directory). Words starting with ~ or $ are not judged here.
+yr_args_enter() {
+    local v="$1" root="$2" skipfirst="${3:-0}" phys tok t u c first=1 noglob=1
+    local -a toks=()
+    phys=$(pwd -P) || return 0
+    yr_has_root "$v" "$root" && return 0
+    case $- in *f*) noglob=0 ;; esac
+    {
+        local IFS=$' \t\n'
+        set -f
+        toks=($v)
+        [ "$noglob" -eq 0 ] || set +f
+    }
+    for tok in ${toks[@]+"${toks[@]}"}; do
+        t=${tok#!}
+        t=${t#[\"\']}
+        t=${t%[\"\']}
+        for u in "$t" "${t#*=}"; do
+            case "$u" in
+                ''|'~'*|'$'*) continue ;;
+                /*)
+                    c=$(yr_canon_path "$u" 2>/dev/null) || return 0
+                    yr_inside_root "$c" "$root" && return 0
+                    yr_inside_root "$u" "$root" && return 0
+                    ;;
+                *)
+                    if [ "$first" -eq 1 ] && [ "$skipfirst" -eq 1 ]; then
+                        case "$u" in */*) ;; *) continue ;; esac
+                    fi
+                    [ -e "$u" ] || continue
+                    c=$(yr_canon_path "$phys/$u" 2>/dev/null) || return 0
+                    yr_inside_root "$c" "$root" && return 0
+                    ;;
+            esac
+            case "$t" in -*=*) ;; *) break ;; esac
+        done
+        first=0
+    done
+    return 1
+}
+
 # yr_file_shebang_enters <file> <root>: succeed when <file> starts with a #!
-# line whose interpreter, or the program `env` is asked to run, is inside
-# <root> by canonical path or identity, or cannot be canonicalized (fail
-# closed). The interpreter comes from the first line only and is never run.
-# `env` operands follow env(1): options with an argument (-u, -C, -P, -a and
-# their long forms), NAME=value words, and -S / --split-string, whose string is
-# split into words that continue the operand list (attached or separate, and
-# inside a short cluster such as -vS). A bare operand is looked up on the
-# caller's PATH (YR_ORIG_PATH), the way the tool itself would be. Copies of
-# this function sit in the two scripts' bootstrap resolvers, which run before
-# this library is sourced; keep them identical.
+# line that would run anything inside <root> by canonical path or identity, or
+# cannot be canonicalized (fail closed): the interpreter, the program `env` is
+# asked to run, or a path in the optional argument (Linux passes the rest of
+# the line as one argument, BSD splits it; both are judged, see yr_args_enter).
+# The first line is read and never run. `env` operands follow env(1): options
+# with an argument (-u, -C, -P, -a and their long forms), NAME=value words, and
+# -S / --split-string, whose string is split into words that continue the
+# operand list (attached or separate, and inside a short cluster such as
+# -vS; a `$`, backslash or quote in that string, which env expands or decodes,
+# counts as entering, and so do a NAME=value operand, -P (env searches a path
+# other than PATH) and -C/--chdir (env resolves the utility elsewhere)). A bare
+# operand is looked up on the caller's PATH (YR_ORIG_PATH), the
+# way the tool itself would be. Copies of this block (through
+# yr_file_shebang_enters) sit in the two scripts' bootstrap resolvers, which
+# run before this library is sourced; keep them identical.
 yr_file_shebang_enters() {
-    local f="$1" root="$2" line rest i x idx last k c cl val p
+    local f="$1" root="$2" line rest i x idx last k c cl val p args=""
     local -a w=() v=() nw=()
     [ -f "$f" ] || return 1
     IFS= read -r -n 512 line <"$f" 2>/dev/null || true
     case "$line" in '#!'*) ;; *) return 1 ;; esac
     rest=${line#\#!}
+    rest=${rest#"${rest%%[![:space:]]*}"}
     read -r -a w <<<"$rest" || true
     i=${w[0]-}
     [ -n "$i" ] || return 1
@@ -149,7 +221,9 @@ yr_file_shebang_enters() {
                     --) idx=$((idx + 1)); continue ;;
                     --split-string) val=${w[idx + 1]-}; last=$((idx + 1)) ;;
                     --split-string=*) val=${x#*=}; last=$idx ;;
-                    --chdir|--unset|--argv0) idx=$((idx + 2)); continue ;;
+                    # env resolves the utility after a chdir: fail closed.
+                    --chdir|--chdir=*) return 0 ;;
+                    --unset|--argv0) idx=$((idx + 2)); continue ;;
                     --*) idx=$((idx + 1)); continue ;;
                     -?*)
                         cl=${x#-}
@@ -157,12 +231,17 @@ yr_file_shebang_enters() {
                         while [ "$k" -lt "${#cl}" ]; do
                             c=${cl:k:1}
                             case "$c" in
+                                P|C)
+                                    # env searches another path than PATH, or
+                                    # chdirs first: fail closed.
+                                    return 0
+                                    ;;
                                 S)
                                     val=${cl:k+1}; last=$idx
                                     if [ -z "$val" ]; then val=${w[idx + 1]-}; last=$((idx + 1)); fi
                                     break
                                     ;;
-                                u|C|P|a)
+                                u|a)
                                     [ -n "${cl:k+1}" ] || idx=$((idx + 1))
                                     break
                                     ;;
@@ -170,10 +249,16 @@ yr_file_shebang_enters() {
                             k=$((k + 1))
                         done
                         ;;
-                    *=*) idx=$((idx + 1)); continue ;;
+                    # NAME=value before the utility (PATH=tools changes where it
+                    # is looked up): fail closed.
+                    *=*) return 0 ;;
                     *) i="$x"; break ;;
                 esac
                 if [ "$last" -ge 0 ]; then
+                    # env expands ${VAR} and decodes \_ and quotes in a -S string,
+                    # and Linux hands it the whole rest of the line: fail closed
+                    # on any $, backslash or quote from here on.
+                    case "${w[*]:idx}" in *[\$\\\"\']*) return 0 ;; esac
                     # Splice the -S string's words in place of the option.
                     v=()
                     read -r -a v <<<"$val" || true
@@ -185,6 +270,8 @@ yr_file_shebang_enters() {
                     idx=$((idx + 1))
                 fi
             done
+            # What follows the operand is its argument list.
+            [ "$idx" -lt "${#w[@]}" ] && args="${w[*]:idx+1}"
             i=${i#[\"\']}
             i=${i%[\"\']}
             [ -n "$i" ] || return 1
@@ -193,7 +280,11 @@ yr_file_shebang_enters() {
                 *) i=$(PATH=${YR_ORIG_PATH-$PATH}; type -P "$i" 2>/dev/null) || return 1 ;;
             esac
             ;;
+        *) args=${rest#"$i"} ;;
     esac
+    if [ -n "$args" ] && yr_args_enter "$args" "$root" 0; then
+        return 0
+    fi
     case "$i" in /*) p="$i" ;; *) p="$(pwd -P)/$i" ;; esac
     c=$(yr_canon_path "$p" 2>/dev/null) || return 0
     yr_inside_root "$c" "$root" || yr_inside_root "$p" "$root"
@@ -287,7 +378,8 @@ yr_any_inside() {
 }
 
 # yr_batch_inside <root> <find> <realpath> <awk> <dir>...: succeed when any symlink
-# directly in any <dir>, dangling or not (a link to a directory counts), has a
+# directly in any <dir> (a <dir> that is itself a symlink is followed: -H),
+# dangling or not (a link to a directory counts), has a
 # canonical target inside <root>. Cost is counted in shell commands, not
 # forks: the bats suites run under a DEBUG trap that makes every command
 # slow, and a per-link or per-directory shell loop (hundreds of links in
@@ -302,7 +394,7 @@ yr_any_inside() {
 yr_batch_inside() {
     local root="$1" find="$2" rp="$3" awk="$4" out out_same
     shift 4
-    out=$("$find" "$@" -maxdepth 1 -type l -exec "$rp" -m -- {} + 2>/dev/null) || true
+    out=$("$find" -H "$@" -maxdepth 1 -type l -exec "$rp" -m -- {} + 2>/dev/null) || true
     [ -n "$out" ] || return 1
     yr_batch_canon_inside "$root" "$out" "$find" "$awk" && return 0
     out_same=$("$find" -L "$@" -maxdepth 1 -samefile "$root" -print -quit 2>/dev/null) || true
@@ -339,7 +431,7 @@ yr_shebang_inside() {
     local root="$1" find="$2" rp="$3" awk="$4" out dirs
     shift 4
     dirs=$(IFS=:; printf '%s' "$*")
-    out=$(YR_SB_DIRS="$dirs" YR_SB_CWD="$(pwd -P)" "$find" -L "$@" -maxdepth 1 -type f \( -perm -100 -o -perm -010 -o -perm -001 \) \
+    out=$(YR_SB_DIRS="$dirs" YR_SB_CWD="$(pwd -P)" YR_SB_ROOT="$root" "$find" -L "$@" -maxdepth 1 -type f \( -perm -100 -o -perm -010 -o -perm -001 \) \
         -exec "$awk" 'function splice(val, last,    m, v, j, nn, t) {
             m = split(val, v, /[ \t]+/)
             nn = 0
@@ -361,7 +453,8 @@ yr_shebang_inside() {
                         if (x ~ /=/) { val = x; sub(/^[^=]*=/, "", val); last = idx }
                         else { val = w[idx + 1]; last = idx + 1 }
                     } else {
-                        if ((name == "--chdir" || name == "--unset" || name == "--argv0") && x !~ /=/) idx++
+                        if (name == "--chdir") { pr(root); return "" }
+                        if ((name == "--unset" || name == "--argv0") && x !~ /=/) idx++
                         idx++; continue
                     }
                 } else if (x ~ /^-./) {
@@ -373,23 +466,53 @@ yr_shebang_inside() {
                             if (val == "") { val = w[idx + 1]; last = idx + 1 }
                             break
                         }
-                        if (c ~ /[uCPa]/) { if (substr(cl, k + 1) == "") idx++; break }
+                        if (c == "P" || c == "C") { pr(root); return "" }
+                        if (c ~ /[ua]/) { if (substr(cl, k + 1) == "") idx++; break }
                     }
-                } else if (x ~ /=/) { idx++; continue }
+                } else if (x ~ /=/) { pr(root); return "" }
                 else { gsub(/^["\047]|["\047]$/, "", x); return x }
-                if (last >= 0) splice(val, last); else idx++
+                if (last >= 0) { for (k = idx; k <= n; k++) if (w[k] ~ /[$\\"\047]/) { pr(root); return "" } splice(val, last) } else idx++
             }
             return ""
         }
-        BEGIN { nd = split(ENVIRON["YR_SB_DIRS"], D, ":"); cwd = ENVIRON["YR_SB_CWD"] }
+        function pr(x) { if (!(x in pp)) { pp[x] = 1; print x } }
+        function hasroot(t,    p, pc, nc) {
+            while ((p = index(t, root)) > 0) {
+                pc = (p > 1) ? substr(t, p - 1, 1) : ""
+                nc = substr(t, p + length(root), 1)
+                if (pc !~ /[A-Za-z0-9._\/-]/ && nc !~ /[A-Za-z0-9._-]/) return 1
+                t = substr(t, p + length(root))
+            }
+            return 0
+        }
+        function argpaths(from,    j, k, a, c, pc, pn, t, txt) {
+            txt = ""
+            for (j = from; j <= n; j++) txt = txt " " w[j]
+            if (hasroot(txt)) pr(root)
+            for (j = from; j <= n; j++) {
+                a = w[j]; sub(/^!/, "", a); gsub(/^["\047]|["\047]$/, "", a)
+                pn = 1; pc[1] = a
+                if (a ~ /^-.*=/) { pn = 2; t = a; sub(/^[^=]*=/, "", t); pc[2] = t }
+                for (k = 1; k <= pn; k++) {
+                    c = pc[k]
+                    if (c ~ /^\//) pr(c)
+                    else if (c != "" && c !~ /^[~$]/) {
+                        t = cwd "/" c
+                        if ((getline tmp < t) >= 0) { close(t); pr(t) } else close(t)
+                    }
+                }
+            }
+        }
+        BEGIN { nd = split(ENVIRON["YR_SB_DIRS"], D, ":"); cwd = ENVIRON["YR_SB_CWD"]; root = ENVIRON["YR_SB_ROOT"] }
         FNR == 1 && substr($0, 1, 2) == "#!" {
-            s = substr($0, 3); sub(/^[ \t]+/, "", s); n = split(s, w, /[ \t]+/); i = w[1]; e = ""
-            if (i ~ /(^|\/)env$/) { i = envcmd(); e = 1 }
+            s = substr($0, 3); sub(/^[ \t]+/, "", s); n = split(s, w, /[ \t]+/); i = w[1]; e = ""; from = 2
+            if (i ~ /(^|\/)env$/) { i = envcmd(); e = 1; from = idx + 1 }
+            if (from <= n) argpaths(from)
             if (i == "" || (i in seen)) next
             seen[i] = 1
-            if (i ~ /\//) print (i ~ /^\// ? i : cwd "/" i)
-            else if (e) { for (j = 1; j <= nd; j++) print D[j] "/" i }
-            else print cwd "/" i
+            if (i ~ /\//) pr(i ~ /^\// ? i : cwd "/" i)
+            else if (e) { for (j = 1; j <= nd; j++) pr(D[j] "/" i) }
+            else pr(cwd "/" i)
         } { nextfile }' {} + 2>/dev/null) || true
     [ -n "$out" ] || return 1
     yr_split_lines "$out"
@@ -496,6 +619,11 @@ yr_safe_path() {
                 fi
             done
         fi
+        # A directory that exists but cannot be listed (execute-only) cannot be
+        # screened, and its entries still run: drop it.
+        if [ "${verdict[i]}" = k ] && [ -d "$entry" ] && { [ ! -r "$entry" ] || [ ! -x "$entry" ]; }; then
+            verdict[i]=x
+        fi
         [ "${verdict[i]}" != k ] || cand+=("$i")
     done
     if [ "${#cand[@]}" -gt 0 ] && [ -n "$root" ]; then
@@ -575,39 +703,30 @@ lgit() { yr_git -c core.fsmonitor=false -c core.untrackedCache=false --literal-p
 # (post-checkout, post-index-change).
 lgit_nohooks() { yr_git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.untrackedCache=false --literal-pathspecs "$@"; }
 
-# yr_cmd_enters <value> <root>: succeed when a command string would run
-# anything inside <root>, or a path cannot be canonicalized (fail closed). The
-# value is a shell command line (GIT_SSH_COMMAND, a pager or editor, a
-# credential helper, a program-running config value), so `sh <root>/script`
-# and `ssh -F <root>/cfg` count, not only a first word that is a path. It
-# fails when
-#   - the raw value contains the worktree path, spelled physically or through
-#     the logical $PWD;
-#   - any whitespace-separated token (leading ! and quotes stripped, and for
-#     --opt=VALUE both the token and VALUE) is an absolute path, or an
-#     existing path relative to the current directory, that canonicalizes
-#     inside <root> or is identical to it (tokens starting with ~ or $ are
-#     not expanded here and are skipped);
-#   - the first word is a bare name that the screened PATH (YR_GIT_PATH, else
-#     the current PATH) resolves to a script whose #! interpreter enters
-#     <root>, or to a file inside it.
-# Values that point only outside the worktree keep working.
+# yr_cmd_enters <value> <root>: judge a shell command line (GIT_SSH_COMMAND, a
+# pager or editor, a credential helper, a program-running config value). Git
+# hands it to the shell, so `sh <root>/script` and `ssh -F <root>/cfg` count,
+# not only a first word that is a path. Returns
+#   0  it would run or read something inside <root> (or a path cannot be
+#      canonicalized: fail closed);
+#   2  it uses shell syntax this check cannot judge: $ (expansion), backtick,
+#      ; & | < > ( ) * ? [ a backslash, a quote inside a word or a newline,
+#      or a ~ other than a word starting
+#      with ~ or ~/ (which is expanded to $HOME and judged);
+#   1  it is fine.
+# The checks are those of yr_args_enter (whole-path match of the worktree in
+# the raw text, absolute and existing relative words), plus: the first word,
+# when bare, is looked up on the screened PATH only (YR_GIT_PATH, else the
+# current PATH), never in the current directory, and must not be a file inside
+# <root> or a script whose #! enters it. Values that point only outside the
+# worktree keep working.
 yr_cmd_enters() {
-    local v="$1" root="$2" lroot="" phys tok t u bin c first=1 noglob=1
+    local v="$1" root="$2" tok t bin c first="" noglob=1 phys
     local -a toks=()
-    phys=$(pwd -P) || return 0
-    case "$PWD" in
-        "$phys") ;;
-        *)
-            # Logical spelling of the root: $PWD minus the part below it.
-            t=${phys#"$root"}
-            [ "$t" != "$phys" ] && case "$PWD" in *"$t") lroot=${PWD%"$t"} ;; esac
-            ;;
+    case "$v" in
+        *[\$\`\;\&\|\<\>\(\)\*\?\[\\]*|*$'\n'*) return 2 ;;
     esac
-    case "$v" in *"$root"*) return 0 ;; esac
-    if [ -n "$lroot" ]; then
-        case "$v" in *"$lroot"*) return 0 ;; esac
-    fi
+    phys=$(pwd -P) || return 0
     case $- in *f*) noglob=0 ;; esac
     {
         local IFS=$' \t\n'
@@ -616,49 +735,44 @@ yr_cmd_enters() {
         [ "$noglob" -eq 0 ] || set +f
     }
     for tok in ${toks[@]+"${toks[@]}"}; do
+        # Quotes are only judged at the edges of a word (yr_args_enter strips
+        # one on each side); one inside a word, or after --opt=, is removed by
+        # the shell and joins the pieces into a path this check never sees.
         t=${tok#!}
         t=${t#[\"\']}
         t=${t%[\"\']}
-        for u in "$t" "${t#*=}"; do
-            case "$u" in
-                ''|'~'*|'$'*) continue ;;
-                /*)
-                    c=$(yr_canon_path "$u" 2>/dev/null) || return 0
-                    yr_inside_root "$c" "$root" && return 0
-                    yr_inside_root "$u" "$root" && return 0
-                    ;;
-                *)
-                    [ -e "$u" ] || continue
-                    c=$(yr_canon_path "$phys/$u" 2>/dev/null) || return 0
-                    yr_inside_root "$c" "$root" && return 0
-                    ;;
-            esac
-            case "$t" in -*=*) ;; *) break ;; esac
-        done
-        if [ "$first" -eq 1 ]; then
-            first=0
-            case "$t" in
-                */*|-*) ;;
-                *)
-                    bin=$(PATH=${YR_GIT_PATH:-$PATH}; type -P "$t" 2>/dev/null) || bin=""
-                    if [ -n "$bin" ]; then
-                        c=$(yr_canon_path "$bin" 2>/dev/null) || return 0
-                        yr_inside_root "$c" "$root" && return 0
-                        yr_file_shebang_enters "$c" "$root" && return 0
-                    fi
-                    ;;
-            esac
-            case "$t" in
-                */*)
-                    case "$t" in /*) bin="$t" ;; *) bin="$phys/$t" ;; esac
-                    if [ -e "$bin" ]; then
-                        c=$(yr_canon_path "$bin" 2>/dev/null) || return 0
-                        yr_file_shebang_enters "$c" "$root" && return 0
-                    fi
-                    ;;
-            esac
-        fi
+        case "$t" in *[\"\']*) return 2 ;; esac
+        case "$tok" in
+            '~'|'~/'*)
+                [ -n "${HOME:-}" ] || return 2
+                yr_args_enter "$HOME${tok#\~}" "$root" 0 && return 0
+                ;;
+            '~'*) return 2 ;;
+        esac
     done
+    yr_args_enter "$v" "$root" 1 && return 0
+    first=${toks[0]-}
+    t=${first#!}
+    t=${t#[\"\']}
+    t=${t%[\"\']}
+    case "$t" in
+        ''|-*|'~'*) ;;
+        */*)
+            case "$t" in /*) bin="$t" ;; *) bin="$phys/$t" ;; esac
+            if [ -e "$bin" ]; then
+                c=$(yr_canon_path "$bin" 2>/dev/null) || return 0
+                yr_file_shebang_enters "$c" "$root" && return 0
+            fi
+            ;;
+        *)
+            bin=$(PATH=${YR_GIT_PATH:-$PATH}; type -P "$t" 2>/dev/null) || bin=""
+            if [ -n "$bin" ]; then
+                c=$(yr_canon_path "$bin" 2>/dev/null) || return 0
+                yr_inside_root "$c" "$root" && return 0
+                yr_file_shebang_enters "$c" "$root" && return 0
+            fi
+            ;;
+    esac
     return 1
 }
 
@@ -673,6 +787,19 @@ yr_cmd_key() {
     return $r
 }
 
+# yr_env_cmd_verdict <name> <value> <root> [note]: run yr_cmd_enters and set
+# YR_HARDEN_MSG (variable name only, never the value) when it refuses.
+yr_env_cmd_verdict() {
+    local rc=0
+    yr_cmd_enters "$2" "$3" || rc=$?
+    case "$rc" in
+        0) YR_HARDEN_MSG="$1${4:+ $4} runs a program inside the repository; unset it or point it outside the repository" ;;
+        2) YR_HARDEN_MSG="$1${4:+ $4} uses shell syntax (\$, backticks, ; & | < > ( ) * ? [ backslashes, quotes inside a word or ~user) that cannot be checked against the repository; use a plain command line or a script outside the repository" ;;
+        *) return 0 ;;
+    esac
+    return 1
+}
+
 # yr_check_git_env: refuse an inherited git environment that runs a program, or
 # loads config or helpers, from inside the worktree. A resolver can write any
 # file there, and the submit step's git, ssh, gpg and pager run with
@@ -682,7 +809,8 @@ yr_cmd_key() {
 # command variables (GIT_SSH_COMMAND, GIT_SSH, GIT_ASKPASS, SSH_ASKPASS,
 # GIT_PROXY_COMMAND, GIT_EXTERNAL_DIFF, GIT_PAGER, PAGER, GIT_EDITOR, EDITOR,
 # VISUAL), the path variables (GIT_EXEC_PATH, GIT_TEMPLATE_DIR,
-# GIT_CONFIG_GLOBAL, GIT_CONFIG_SYSTEM) and config injected through
+# GIT_CONFIG_GLOBAL, GIT_CONFIG_SYSTEM; any GIT_CONFIG is refused) and config
+# injected through
 # GIT_CONFIG_KEY_<i>/GIT_CONFIG_VALUE_<i> (below GIT_CONFIG_COUNT) and
 # GIT_CONFIG_PARAMETERS, judged by the same rules as the repository's own
 # config. A GIT_CONFIG_COUNT that is not a number is refused by
@@ -695,10 +823,7 @@ yr_check_git_env() {
         GIT_EXTERNAL_DIFF GIT_PAGER PAGER GIT_EDITOR EDITOR VISUAL; do
         val="${!name-}"
         [ -n "$val" ] || continue
-        if yr_cmd_enters "$val" "$root"; then
-            YR_HARDEN_MSG="$name runs a program inside the repository; unset it or point it outside the repository"
-            return 1
-        fi
+        yr_env_cmd_verdict "$name" "$val" "$root" || return 1
     done
     for name in GIT_EXEC_PATH GIT_TEMPLATE_DIR GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM; do
         val="${!name-}"
@@ -710,24 +835,56 @@ yr_check_git_env() {
             return 1
         fi
     done
+    # GIT_CONFIG makes `git config` read that one file and nothing else, so
+    # every config scan would miss the repository's own entries: refuse it,
+    # whatever it points at.
+    if [ -n "${GIT_CONFIG+x}" ]; then
+        YR_HARDEN_MSG="GIT_CONFIG is set, which hides the repository config from the checks; unset it"
+        return 1
+    fi
+    # Without GIT_CONFIG_GLOBAL, git reads $XDG_CONFIG_HOME/git/config (else
+    # $HOME/.config/git/config) and $HOME/.gitconfig.
+    if [ -z "${GIT_CONFIG_GLOBAL+x}" ]; then
+        for val in "${XDG_CONFIG_HOME:-${HOME:+$HOME/.config}}/git/config" "${HOME:+$HOME/.gitconfig}"; do
+            case "$val" in /*) ;; *) continue ;; esac
+            k=$(yr_canon_path "$val" 2>/dev/null) || k=""
+            if [ -z "$k" ] || yr_inside_root "$k" "$root" || yr_inside_root "$val" "$root"; then
+                YR_HARDEN_MSG="HOME or XDG_CONFIG_HOME puts git's global config inside the repository; point it outside the repository or set GIT_CONFIG_GLOBAL"
+                return 1
+            fi
+        done
+    fi
     n="${GIT_CONFIG_COUNT:-0}"
     case "$n" in ''|*[!0-9]*) n=0 ;; esac
     for ((i = 0; i < 10#$n; i++)); do
         name="GIT_CONFIG_KEY_$i"; k="${!name-}"
         name="GIT_CONFIG_VALUE_$i"; v="${!name-}"
-        if yr_cmd_key "$k" && yr_cmd_enters "$v" "$root"; then
-            YR_HARDEN_MSG="GIT_CONFIG_VALUE_$i (injected config) runs a program inside the repository; unset it or point it outside the repository"
-            return 1
+        if yr_cmd_key "$k"; then
+            yr_env_cmd_verdict "GIT_CONFIG_VALUE_$i" "$v" "$root" "(injected config)" || return 1
         fi
     done
-    # GIT_CONFIG_PARAMETERS holds 'key'='value' (or 'key=value') entries that
-    # git itself exports to child processes; judge each one the same way.
+    # GIT_CONFIG_PARAMETERS is git's own quoting: entries 'key'='value',
+    # 'key=value' or 'key', separated by blanks; an embedded quote is written
+    # '\''. Each entry is read from the start of what is left and must end at a
+    # blank or the end; anything else (an escaped quote, junk, an unterminated
+    # entry) cannot be decoded exactly and is refused, never skipped.
     rest="${GIT_CONFIG_PARAMETERS-}"
-    while [[ "$rest" =~ \'([^\'=]+)\'=\'([^\']*)\'(.*)$ || "$rest" =~ \'([^\'=]+)=([^\']*)\'(.*)$ ]]; do
-        k="${BASH_REMATCH[1]}"; v="${BASH_REMATCH[2]}"; rest="${BASH_REMATCH[3]}"
-        if yr_cmd_key "$k" && yr_cmd_enters "$v" "$root"; then
-            YR_HARDEN_MSG="GIT_CONFIG_PARAMETERS (injected config) runs a program inside the repository; unset it or point it outside the repository"
+    local re1="^[[:space:]]*'([^'=]+)'='([^']*)'(.*)\$" re2="^[[:space:]]*'([^'=]+)=([^']*)'(.*)\$" re3="^[[:space:]]*'([^']+)'(.*)\$"
+    while [[ -n "${rest//[[:space:]]/}" ]]; do
+        if [[ "$rest" =~ $re1 || "$rest" =~ $re2 ]]; then
+            k="${BASH_REMATCH[1]}"; v="${BASH_REMATCH[2]}"; rest="${BASH_REMATCH[3]}"
+        elif [[ "$rest" =~ $re3 ]]; then
+            k="${BASH_REMATCH[1]}"; v=""; rest="${BASH_REMATCH[2]}"
+        else
+            YR_HARDEN_MSG="GIT_CONFIG_PARAMETERS has an entry that cannot be decoded exactly; unset it"
             return 1
+        fi
+        if [ -n "$rest" ] && [[ "$rest" != [[:space:]]* ]]; then
+            YR_HARDEN_MSG="GIT_CONFIG_PARAMETERS has an entry that cannot be decoded exactly; unset it"
+            return 1
+        fi
+        if yr_cmd_key "$k"; then
+            yr_env_cmd_verdict GIT_CONFIG_PARAMETERS "$v" "$root" "(injected config)" || return 1
         fi
     done
     return 0
@@ -818,6 +975,30 @@ harden_git_config() {
             YR_HARDEN_MSG="the repository config sets $tkey, which would run a command with submission authority; remove it from the repository config (a global or system config is fine)"
         fi
         return 1
+    fi
+    # The scan above skips the global and system scopes, which are the user's
+    # own. A file of those scopes that lies inside the worktree is not: HOME,
+    # XDG_CONFIG_HOME or an include can point there, and a resolver can write
+    # it. Judge each command-bearing entry by the file it came from.
+    local ore org o ofile c
+    ore='^(core\.(sshcommand|askpass|gitproxy|pager|editor)|credential\.(.*\.)?helper|diff\.external|gpg\.(.*\.)?program|filter\..*\.(clean|smudge|process))$'
+    [ "$scope" = revert ] && ore='^filter\..*\.(clean|smudge|process)$'
+    org=$(set -o pipefail; yr_git config --show-scope --show-origin --name-only --list 2>/dev/null \
+        | YR_ORE="$ore" yr_awk -F'\t' '$1 != "local" && $1 != "worktree" && $1 != "command" && tolower($3) ~ ENVIRON["YR_ORE"] { if (!($2 in s)) { s[$2] = 1; print $2 } }') \
+        || { YR_HARDEN_MSG="could not read the git config origins"; return 1; }
+    yr_split_lines "$org"
+    local oroot
+    oroot=$(yr_worktree_root || true)
+    if [ -n "$oroot" ]; then
+        for o in ${YR_LINES[@]+"${YR_LINES[@]}"}; do
+            case "$o" in file:*) ofile=${o#file:} ;; *) continue ;; esac
+            case "$ofile" in /*) ;; *) ofile="$(pwd -P)/$ofile" ;; esac
+            c=$(yr_canon_path "$ofile" 2>/dev/null) || c=""
+            if [ -z "$c" ] || yr_inside_root "$c" "$oroot" || yr_inside_root "$ofile" "$oroot"; then
+                YR_HARDEN_MSG="a global or system git config file inside the repository sets a command that git would run; point HOME, XDG_CONFIG_HOME or the include outside the repository"
+                return 1
+            fi
+        done
     fi
     [ "$scope" = revert ] && return 0
     # A resolver can also write commit.gpgSign and gpg.program (or
@@ -1184,17 +1365,23 @@ rp_tree_changes() {
 # `.git` entries skipped). Returns 1 when it is unchanged, not a regular file or
 # directory, or dangling (nothing to write to). Returns 2 when it cannot tell:
 # the link cannot be read, the target directory cannot be walked, or the target
-# is hidden behind a directory that cannot be searched. Run it from the working
+# is hidden behind a directory that cannot be searched. An optional third
+# argument `follow` walks a target directory with find -L, so symlinks nested
+# below it are judged by their targets too; a loop or any other find error then
+# returns 2 (cannot tell). The trusted-config symlink check uses it, and so
+# does rp_ignored_changed_since when given a path predicate; its unfiltered
+# form does not. Run it from the working
 # tree root with a path that does not begin with `-`.
 rp_link_target_changed() {
-    local l="$1" marker="$2" t p d out skip="" rc=0
+    local l="$1" marker="$2" follow="${3:-}" t p d out skip="" rc=0 fl=-H
     if [ -e "$l" ]; then
         if [ -d "$l" ]; then
+            [ "$follow" != follow ] || fl=-L
             # The root `.ruvector` link: skip its session log as the literal
             # directory scan does (see rp_ignored_changed_since).
             case "$l" in .ruvector|./.ruvector) skip="$l/coedit-sessions" ;; esac
             out=$(set -o pipefail
-                find -H "$l" -name .git -prune -o -path "$skip" -prune -o -type f -newer "$marker" -print 2>/dev/null \
+                find "$fl" "$l" -name .git -prune -o -path "$skip" -prune -o -type f -newer "$marker" -print 2>/dev/null \
                     | head -n 1) || rc=$?
             [ -z "$out" ] || return 0
             [ "$rc" -eq 0 ] || return 2
@@ -1252,7 +1439,9 @@ rp_link_target_changed() {
 # <scratch>, a scratch file for git's NUL-delimited listing. An optional fourth
 # argument names a path predicate (rp_trusted_config; pass an empty <hitsfile>
 # to keep the printed form): only paths it accepts count, and a directory walk
-# filters before its 20-path cut.
+# filters before its 20-path cut. With a predicate a symlink's target is walked
+# with `follow`, so a link nested below a linked directory is judged by its own
+# target (a loop returns 2).
 rp_ignored_changed_since() {
     local marker="$1" scratch="$2" hitsfile="${3:-}" keep="${4:-}" safe own=""
     [ -z "$keep" ] || declare -F -- "$keep" >/dev/null || return 2
@@ -1303,7 +1492,7 @@ rp_ignored_changed_since() {
                         # target is not examined (it could abort the guard).
                         kept "$l" || continue
                         lrc=0
-                        rp_link_target_changed "$l" "$marker" || lrc=$?
+                        rp_link_target_changed "$l" "$marker" ${keep:+follow} || lrc=$?
                         case "$lrc" in
                             0) if kept "$l"; then printf '%s\0' "$l" >|"$outfile" || exit 2; break; fi ;;
                             1) ;;
@@ -1316,7 +1505,7 @@ rp_ignored_changed_since() {
                 kept "$f" || : >|"$outfile"
                 if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ] && kept "$f"; then
                     lrc=0
-                    rp_link_target_changed "./$f" "$marker" || lrc=$?
+                    rp_link_target_changed "./$f" "$marker" ${keep:+follow} || lrc=$?
                     case "$lrc" in
                         0) if kept "$f"; then printf '%s\0' "./$f" >|"$outfile" || exit 2; fi ;;
                         1) ;;
