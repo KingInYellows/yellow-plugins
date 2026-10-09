@@ -397,15 +397,18 @@ yr_args_enter() {
 # counts as entering, and so do a NAME=value operand, -P (env searches a path
 # other than PATH) and -C/--chdir (env resolves the utility elsewhere)). A bare
 # operand is looked up on the caller's PATH (YR_ORIG_PATH), the
-# way the tool itself would be. Copies of this block (through
+# way the tool itself would be. An interpreter that is itself a #! script is
+# judged the same way, to a depth of 4; a script at depth 5 counts as entering
+# (the kernel follows such chains). Copies of this block (through
 # yr_file_shebang_enters) sit in the two scripts' bootstrap resolvers, which
 # run before this library is sourced; keep them identical.
 yr_file_shebang_enters() {
-    local f="$1" root="$2" line rest i x idx last k c cl val p args=""
+    local f="$1" root="$2" depth="${3:-0}" line rest i x idx last k c cl val p args=""
     local -a w=() v=() nw=()
     [ -f "$f" ] || return 1
     IFS= read -r -n 512 line <"$f" 2>/dev/null || true
     case "$line" in '#!'*) ;; *) return 1 ;; esac
+    [ "$depth" -le 4 ] || return 0
     rest=${line#\#!}
     rest=${rest#"${rest%%[![:space:]]*}"}
     read -r -a w <<<"$rest" || true
@@ -489,7 +492,28 @@ yr_file_shebang_enters() {
     fi
     case "$i" in /*) p="$i" ;; *) p="$(pwd -P)/$i" ;; esac
     c=$(yr_canon_path "$p" 2>/dev/null) || return 0
-    yr_inside_root "$c" "$root" || yr_inside_root "$p" "$root"
+    yr_inside_root "$c" "$root" && return 0
+    yr_inside_root "$p" "$root" && return 0
+    yr_file_shebang_enters "$c" "$root" $((depth + 1))
+}
+
+# yr_hardlink_enters <file> <root>: succeed when <file> has other hard links
+# and one of them is inside <root> (a link to an ignored script there keeps
+# the script's content under an outside name), or when that cannot be told
+# (the link count unreadable, or the walk of <root> failed before a match).
+# find comes from yr_helper, never PATH. The tree is walked only for a file
+# with a link count above 1 that is on the worktree's device.
+yr_hardlink_enters() {
+    local f="$1" root="$2" find fd rd hit
+    [ -f "$f" ] || return 1
+    find=$(yr_helper find) || return 0
+    hit=$("$find" "$f" -maxdepth 0 -links +1 -print 2>/dev/null) || return 0
+    [ -n "$hit" ] || return 1
+    fd=$("$find" "$f" -maxdepth 0 -printf '%D' 2>/dev/null) || fd=""
+    rd=$("$find" "$root" -maxdepth 0 -printf '%D' 2>/dev/null) || rd=""
+    if [ -n "$fd" ] && [ -n "$rd" ] && [ "$fd" != "$rd" ]; then return 1; fi
+    hit=$("$find" "$root" -xdev -type f -samefile "$f" -print -quit 2>/dev/null) || return 0
+    [ -n "$hit" ]
 }
 
 # yr_resolve_tool <name>: print one absolute path whose canonical file is
@@ -516,6 +540,8 @@ yr_resolve_tool() {
         yr_inside_root "$invoke" "$root" && return 2
         # A script whose #! interpreter is inside the worktree runs it.
         yr_file_shebang_enters "$canon" "$root" && return 2
+        # A hard link to a file inside the worktree is that file.
+        yr_hardlink_enters "$canon" "$root" && return 2
     fi
     printf '%s\n' "$invoke"
 }
