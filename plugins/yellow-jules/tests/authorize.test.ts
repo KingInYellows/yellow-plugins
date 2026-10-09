@@ -205,12 +205,16 @@ describe('authorize --list / --revoke', () => {
   it('need no terminal', async () => {
     const id = await createGrant(h);
     const noTty = { ...h.deps, openTty: makeHarness('no-tty').tty.openTty };
-    const listed = authorizeList(noTty);
+    const listed = await authorizeList(noTty);
     expect(listed.grants.map((g) => g.grantId)).toEqual([id]);
-    expect(listed.grants[0]).toMatchObject({ expired: false, revoked: false });
+    expect(listed.grants[0]).toMatchObject({
+      expired: false,
+      revoked: false,
+      unreconciledDeviation: false,
+    });
     const revoked = await authorizeRevoke(noTty, id);
     expect(revoked.grantId).toBe(id);
-    expect(authorizeList(noTty).grants[0]).toMatchObject({ revoked: true });
+    expect((await authorizeList(noTty)).grants[0]).toMatchObject({ revoked: true });
   });
 
   it('revoke rejects a malformed id', async () => {

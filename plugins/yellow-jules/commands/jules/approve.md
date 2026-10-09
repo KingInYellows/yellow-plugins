@@ -114,6 +114,7 @@ fi
 GRANT_ID=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO" --arg branch "$BRANCH" --arg task "$TASK_REF" '
   [ .grants[]?
     | select((.revoked | not) and (.expired | not)
+        and (.unreconciledDeviation | not)
         and .repository == $repo
         and ((.operations | index("approve")) != null)
         and ((.taskRefs | index($task)) != null)

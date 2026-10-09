@@ -376,12 +376,13 @@ function requireGrant(file, grantId) {
     }
     return grant;
 }
-function listGrants(dataDir, now) {
+function listGrants(dataDir, now, journal) {
     const file = loadGrants(dataDir);
     return Object.values(file.grants).map((grant) => ({
         ...grant,
         expired: grantIsExpired(grant, now),
         revoked: grant.revokedAt !== undefined,
+        unreconciledDeviation: grantHasUnreconciledDeviation(journal, grant.grantId),
     }));
 }
 async function revokeGrant(dataDir, grantId, now) {

@@ -155,11 +155,12 @@ async function authorizeCreate(deps, args) {
         };
     });
 }
-function authorizeList(deps) {
+async function authorizeList(deps) {
     (0, runtime_support_js_1.prepare)(deps);
+    const journal = await (0, state_js_1.readJournal)(deps.dataDir);
     return {
         operation: 'authorize',
-        grants: (0, authority_js_1.listGrants)(deps.dataDir, (0, runtime_support_js_1.nowFn)(deps)()),
+        grants: (0, authority_js_1.listGrants)(deps.dataDir, (0, runtime_support_js_1.nowFn)(deps)(), journal),
     };
 }
 async function authorizeRevoke(deps, grantId) {

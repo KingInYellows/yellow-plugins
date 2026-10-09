@@ -511,14 +511,24 @@ export function requireGrant(file: GrantsFile, grantId: string): GrantRecord {
 export interface GrantView extends GrantRecord {
   readonly expired: boolean;
   readonly revoked: boolean;
+  /** R13: a session under this grant has an unreconciled policy deviation, so every write under it is denied. */
+  readonly unreconciledDeviation: boolean;
 }
 
-export function listGrants(dataDir: string, now: Date): GrantView[] {
+export function listGrants(
+  dataDir: string,
+  now: Date,
+  journal: Journal
+): GrantView[] {
   const file = loadGrants(dataDir);
   return Object.values(file.grants).map((grant) => ({
     ...grant,
     expired: grantIsExpired(grant, now),
     revoked: grant.revokedAt !== undefined,
+    unreconciledDeviation: grantHasUnreconciledDeviation(
+      journal,
+      grant.grantId
+    ),
   }));
 }
 

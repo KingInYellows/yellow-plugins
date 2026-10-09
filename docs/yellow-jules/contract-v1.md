@@ -596,7 +596,10 @@ transient failure from an undetermined one.
   is TTY-confirmed. It writes epoch+1 for this host and the canonical data-dir
   path, then rewrites every grant's controller id and epoch reference.
 - `authorize --list` →
-  `{ grants: [{ grantId, repository, sourceResource, branchPattern, taskRefs, operations, limits, usage, expiresAt, expired, revoked }] }`.
+  `{ grants: [{ grantId, repository, sourceResource, branchPattern, taskRefs, operations, limits, usage, expiresAt, expired, revoked, unreconciledDeviation }] }`.
+  `unreconciledDeviation` is true when a session under the grant carries an
+  unreconciled policy deviation (R13), so every write under it is denied with
+  `JULES_POLICY_DEVIATION`; wrappers skip such grants when choosing one.
   Read-only; no TTY.
 - `authorize --revoke <grant-id>` → `{ grantId, revokedAt }`. No TTY, because
   revocation only narrows authority.

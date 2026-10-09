@@ -124,7 +124,7 @@ attempt reuses it.
 A grant covers this launch when it is unexpired, unrevoked, permits `create`,
 and matches the repository, task ref, and branch (an exact ref, or a prefix when
 the pattern ends in `*`). A grant that is full (all session slots held or all
-tasks spent) never covers; of several that do, the latest expiry wins. Use the
+tasks spent) or carrying an unreconciled policy deviation never covers; of several that do, the latest expiry wins. Use the
 same single-quoted substitution rule; `CORRECTION` is `1` for a repair launch
 and `0` otherwise. For a repair, only a grant that owns a plain launch of the
 task qualifies: set `LAUNCH_GRANTS` to the dry-run's `launchGrantIds` as a
@@ -149,6 +149,7 @@ fi
 GRANT_ID=$(printf '%s' "$LIST" | jq -r --arg repo "$REPO" --arg branch "$BRANCH" --arg task "$TASK_REF" --argjson corr "$CORRECTION" --arg launch "$LAUNCH_GRANTS" '
   [ .grants[]?
     | select((.revoked | not) and (.expired | not)
+        and (.unreconciledDeviation | not)
         and .repository == $repo
         and ((.operations | index("create")) != null)
         and ((.taskRefs | index($task)) != null)

@@ -38,7 +38,7 @@ import {
   type WriteDeps,
   withAdapter,
 } from './runtime-support.js';
-import { withJournalLock } from './state.js';
+import { readJournal, withJournalLock } from './state.js';
 import type { GrantOperation, GrantRecord } from './types.js';
 import {
   mintGrantId,
@@ -313,11 +313,14 @@ export async function authorizeCreate(
   });
 }
 
-export function authorizeList(deps: WriteDeps): AuthorizeListResult {
+export async function authorizeList(
+  deps: WriteDeps
+): Promise<AuthorizeListResult> {
   prepare(deps);
+  const journal = await readJournal(deps.dataDir);
   return {
     operation: 'authorize',
-    grants: listGrants(deps.dataDir, nowFn(deps)()),
+    grants: listGrants(deps.dataDir, nowFn(deps)(), journal),
   };
 }
 

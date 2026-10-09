@@ -298,16 +298,14 @@ describe('chargeGrant / releaseGrant', () => {
   });
 });
 
-describe('grantHasUnreconciledDeviation', () => {
-  it('finds a deviation only on records under that grant', () => {
-    const journal = emptyJournal();
-    const base = {
+function deviatingRecord(grantId: string): OperationRecord {
+  return {
       localRequestId: 'r1',
       localId: 'jl-00000000000000000000000000000001',
       kind: 'create',
       origin: 'yellow',
       status: 'accepted',
-      grantId: 'jg-00000000000000000000000000000001',
+      grantId,
       recentActivityIds: [],
       activityCount: 0,
       resumeRestartCount: 0,
@@ -323,7 +321,14 @@ describe('grantHasUnreconciledDeviation', () => {
       createdAt: 'now',
       updatedAt: 'now',
     } as unknown as OperationRecord;
-    journal.operations['r1'] = base;
+}
+
+describe('grantHasUnreconciledDeviation', () => {
+  it('finds a deviation only on records under that grant', () => {
+    const journal = emptyJournal();
+    journal.operations['r1'] = deviatingRecord(
+      'jg-00000000000000000000000000000001'
+    );
     expect(
       grantHasUnreconciledDeviation(
         journal,
@@ -452,10 +457,29 @@ describe('grants file', () => {
     );
     expect(again.revokedAt).toBe(first.revokedAt);
 
-    const views = listGrants(dataDir, NOW);
+    const views = listGrants(dataDir, NOW, emptyJournal());
     const byId = Object.fromEntries(views.map((v) => [v.grantId, v]));
     expect(byId[live.grantId]).toMatchObject({ revoked: true, expired: false });
     expect(byId[old.grantId]).toMatchObject({ revoked: false, expired: true });
+  });
+
+  it('flags only the grant that has an unreconciled deviation', () => {
+    const file = emptyGrants();
+    const clean = makeGrant({ grantId: 'jg-00000000000000000000000000000001' });
+    const blocked = makeGrant({
+      grantId: 'jg-00000000000000000000000000000002',
+    });
+    file.grants[clean.grantId] = clean;
+    file.grants[blocked.grantId] = blocked;
+    writeGrants(dataDir, file);
+    const journal = emptyJournal();
+    journal.operations['r1'] = deviatingRecord(blocked.grantId);
+
+    const byId = Object.fromEntries(
+      listGrants(dataDir, NOW, journal).map((v) => [v.grantId, v])
+    );
+    expect(byId[clean.grantId]?.unreconciledDeviation).toBe(false);
+    expect(byId[blocked.grantId]?.unreconciledDeviation).toBe(true);
   });
 
   it('revoking an unknown grant is JULES_NOT_FOUND', async () => {
