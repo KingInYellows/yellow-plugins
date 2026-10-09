@@ -240,7 +240,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   file list; `--revert-denied` reverts only trusted-config dirty paths
   (`rp_trusted_config`, a subset of the deny list), takes no file list, and
   needs `--ignored-since <marker-file>` (refusing on a changed gitignored
-  trusted-config file) or `--no-ignored-guard`; a tracked trusted-config symlink whose target was written since the marker (or, with `--no-ignored-guard`, resolves outside the worktree, onto a directory, onto anything but a tracked regular file with a plain `H` tag, or onto a target git lists as modified unless that target is itself trusted-config) is reported with `deniedClean: false` (a clean link is left alone; a redirected or replaced one is restored and its HEAD target judged the same way), and a verify run refuses on one; `--check-ignored --ignored-since <marker-file>` runs only the
+  trusted-config file) or `--no-ignored-guard`; a tracked trusted-config symlink whose target was written since the marker (or, with `--no-ignored-guard`, resolves outside the worktree, onto a directory, onto anything but a tracked regular file with a plain `H` tag, or onto a target git lists as modified unless that target is itself trusted-config) is reported with `deniedClean: false` (a clean link is left alone; a redirected or replaced one is restored and its HEAD target judged the same way), and a verify run refuses on one; a tracked symlink with an ordinary name that resolves to a directory outside the worktree is checked the same way for trusted-config descendants (`cfg -> /elsewhere`, then a write to `cfg/.claude/settings.json`): it counts when such a file is newer than the marker (nested links followed, a loop or find error counts) or, with `--no-ignored-guard`, when one exists, and the walk counts after 50000 entries; `--check-ignored --ignored-since <marker-file>` runs only the
   gitignored-file guard, for a resolve with no verify command.
   `/review:resolve-stack` and `/review:sweep-all` run it after a
   dirty resolve only when every dirty path is owned by the run (a PR file
@@ -284,7 +284,24 @@ inside it, and injected `GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` or
 `gpg.program` and the like) that does; trusted values outside the worktree are
 kept. `GIT_CONFIG_PARAMETERS` is decoded in git's own quoting; an entry that
 cannot be decoded exactly (an escaped quote `'\''`, junk, an unterminated
-entry) is refused. Any inherited `GIT_CONFIG` (it makes `git config` read only that file,
+entry) is refused. An injected `include.path` or `includeIf.*.path` (either variable form,
+any case) is refused outright: git loads the file as command-line config, which the
+scans skip. A quote that opens in one word and closes in another (a quoted span
+containing whitespace, `sh 'dir with space/evil'`) is refused as unjudgeable;
+single-word wrappers such as `'/usr/bin/ssh'` still pass. Any inherited `GIT_EXEC_PATH` is refused (git runs `git-remote-*` and
+other dashed helpers from it, and a link there can reach the worktree; the default exec
+path is right for these scripts). The `#!` check follows an interpreter that is itself a
+`#!` script, to a depth of 4 (an interpreter script at depth 5 counts as entering the
+worktree), in `yr_file_shebang_enters`, the batched awk screen and the bootstrap copies.
+The PATH screen also drops a directory holding a hard link (link count above 1, same
+device and inode) to a regular file inside the worktree, and `yr_resolve_tool` refuses a
+tool that is such a link (one `find -xdev` pass over the worktree, only when a PATH
+directory on its device holds a multi-link file). Without a `-printf` find or GNU
+`realpath`, a directory on the worktree's device holding any multi-link file is dropped,
+and one whose link counts `stat` cannot report is dropped too. A worktree walk that fails part way (an unreadable directory) is not
+cached or trusted: every same-device directory holding a multi-link file is dropped. A
+global or system config file that sets a command and is a hard link to a worktree file
+(or whose link count cannot be read) is refused by `harden_git_config`. Any inherited `GIT_CONFIG` (it makes `git config` read only that file,
 hiding the repository config from the scans) is refused. Command lines are judged whole: the raw value must not contain the
 worktree path as a whole path (`<root>2` and `<root>-keys` are siblings and
 pass), no word (quotes, a leading `!` and `--opt=VALUE` handled) may be an
@@ -375,7 +392,23 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   `safe.bareRepository=explicit` for the process tree; scope `full` also
   refuses a repository-local transport, credential or non-LFS filter config
   and forces signing off, scope `revert` (the rollback and check-ignored
-  modes) refuses only a non-LFS filter; reads config through `yr_git`;
+  modes) refuses only a non-LFS filter; both scopes also refuse a
+  config entry that `yr_cfg_key_runs_command` matches (the one list of keys
+  that name a program: `filter.*`, `merge.*.driver`, `diff.*`, `core.sshCommand`
+  and the other `core.*` programs, `credential.*.helper`, `gpg.*`, `sequence.editor`,
+  `pager.*`, `remote.*.uploadpack|receivepack|vcs`, `lfs.customtransfer.*`,
+  `lfs.standalonetransferagent`, `lfs.extension.*`, `alias.*` and
+  `submodule.*.update` with a `!` value, `url.ext::*.insteadOf`, and more; case
+  insensitive), judged by origin and not by scope: refused in the repository's
+  local or worktree config, and in any global or system file that is inside the
+  worktree or hard-linked to a file in it (a global config can include one and
+  keeps its scope); `gpg.*` in the local scopes is tolerated because signing is
+  forced off, and `.lfsconfig` ignores the lfs keys, so only git config is read.
+  `core.hooksPath` and `core.fsmonitor` are not in the list because they are
+  neutralized instead: `core.fsmonitor=false` is forced for the whole process by
+  `harden_git_config` and per call by `lgit` (`lib/resolve-paths.sh` `lgit`), and hooks
+  are disabled by `disable_git_hooks` in `commit-resolve-fixes` (unless the
+  verified-tracked-hooks opt-in applies) and by `lgit_nohooks` in the rollbacks; reads config through `yr_git`;
   does not set `core.hooksPath`; returns a code instead of exiting, with the
   unsigned-commit note in `YR_HARDEN_NOTE` for the caller to print;
   `harden_git_config_for_verify` drops `safe.bareRepository` for the user's

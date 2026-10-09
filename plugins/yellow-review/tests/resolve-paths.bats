@@ -848,7 +848,7 @@ old_link() {
   [[ "$output" == *node_modules/.bin/hop1* ]]
 }
 
-@test "rp_ignored_changed_since does not follow symlinks nested below a target directory" {
+@test "rp_ignored_changed_since follows symlinks nested below a target directory without a predicate too" {
   link_repo
   mkdir "$BATS_TEST_TMPDIR/deep"
   printf 'new\n' >| "$BATS_TEST_TMPDIR/deep/file"
@@ -857,7 +857,7 @@ old_link() {
   touch -t 201901010000 real/dir
   old_link ../real/dir src/dir.cache
   run rp_ignored_changed_since "$MARKER" "$SCRATCH"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
 }
 
 @test "rp_ignored_changed_since with a predicate follows symlinks nested below a trusted-config link target" {
@@ -1226,6 +1226,102 @@ commit_repo() {
   ( rc=0; harden_git_config revert || rc=$?; [ "$rc" -eq 1 ] )
 }
 
+@test "harden_git_config refuses repository-local Git LFS settings that name a program, in full and revert" {
+  git config --local filter.lfs.clean 'git-lfs clean -- %f'
+  git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
+  git config --local filter.lfs.process 'git-lfs filter-process'
+  mkdir -p tools
+  : >| tools/evil
+  # git lowercases the section and variable, so mixed-case spellings are the same keys
+  for setting in "LFS.StandaloneTransferAgent evil" "lfs.customtransfer.evil.path $PWD/tools/evil" \
+                 "lfs.extension.ext.clean $PWD/tools/evil"; do
+    git config --local "${setting%% *}" "${setting#* }"
+    for scope in full revert; do
+      rc=0; ( harden_git_config "$scope" || { [[ "$YR_HARDEN_MSG" == *lfs* && "$YR_HARDEN_MSG" != *"$PWD/tools"* ]] || exit 2; exit 1; } ) || rc=$?
+      [ "$rc" -eq 1 ] || { echo "$scope accepted or leaked: ${setting%% *}" >&2; return 1; }
+    done
+    git config --local --unset-all "${setting%% *}"
+  done
+  # Without them the stock filter is still allowed, and lfs.url is not a program.
+  git config --local lfs.url https://example.com/lfs
+  ( rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 0 ] )
+  # A global LFS transfer agent is the user's own.
+  git config --local --unset lfs.url
+  printf '[lfs]\n\tstandalonetransferagent = mine\n' >| "$BATS_TEST_TMPDIR/gcfg"
+  ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/gcfg"; rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 0 ] )
+}
+
+# One classifier (yr_cfg_key_runs_command) for every scope: each key is
+# refused in the repository's own config and in a global config that includes
+# a file inside the worktree. The table is the keys that name a program.
+CFG_CMD_KEYS=(
+  "filter.evil.clean|sh evil" "filter.evil.smudge|sh evil" "filter.evil.process|sh evil"
+  "merge.m.driver|sh evil %O %A %B" "diff.d.command|sh evil" "diff.d.textconv|sh evil" "diff.external|sh evil"
+  "core.sshCommand|sh evil" "core.askPass|evil" "core.gitProxy|evil" "core.editor|evil" "core.pager|evil"
+  "core.alternateRefsCommand|evil" "credential.helper|evil" "credential.https://h.example/.helper|evil"
+  "sequence.editor|evil" "uploadpack.packObjectsHook|evil" "remote.o.uploadpack|evil" "remote.o.receivepack|evil"
+  "remote.o.vcs|evil" "difftool.t.cmd|evil" "mergetool.t.path|evil" "trailer.t.cmd|evil"
+  "lfs.customtransfer.e.path|evil" "lfs.standalonetransferagent|e" "lfs.extension.e.clean|evil"
+  "alias.a|!sh evil" "submodule.s.update|!sh evil" "pager.log|sh evil" "url.ext::sh evil.insteadOf|https://h.example/"
+)
+
+@test "yr_cfg_key_runs_command matches every key in the table, in any case, and not the ordinary ones" {
+  for entry in "${CFG_CMD_KEYS[@]}"; do
+    key=${entry%%|*}; val=${entry#*|}
+    yr_cfg_key_runs_command "$key" "$val" || { echo "not matched: $key" >&2; return 1; }
+    up=$(printf '%s' "$key" | tr 'a-z' 'A-Z')
+    yr_cfg_key_runs_command "$up" "$val" || { echo "not matched (upper): $up" >&2; return 1; }
+  done
+  for entry in "user.name|x" "core.hooksPath|.hooks" "core.fsmonitor|false" "lfs.url|https://x" "alias.s|status" \
+               "submodule.s.update|checkout" "pager.log|true" "pager.log|false" "branch.main.remote|origin" "url.https://h/.insteadOf|x"; do
+    yr_cfg_key_runs_command "${entry%%|*}" "${entry#*|}" && { echo "matched: $entry" >&2; return 1; }
+  done
+  # the rollback modes judge the checkout subset of the same list
+  yr_cfg_key_runs_command filter.x.clean evil checkout
+  yr_cfg_key_runs_command lfs.standalonetransferagent e checkout
+  ! yr_cfg_key_runs_command merge.m.driver evil checkout
+  ! yr_cfg_key_runs_command core.sshCommand evil checkout
+}
+
+@test "harden_git_config refuses every table key set in the repository config, naming the key and not the value" {
+  for entry in "${CFG_CMD_KEYS[@]}"; do
+    key=${entry%%|*}; val=${entry#*|}
+    git config --local "$key" "$val"
+    rc=0; ( harden_git_config full || { [[ "$YR_HARDEN_MSG" != *evil* && "$YR_HARDEN_MSG" != *h.example* ]] || exit 1; exit 2; } ) || rc=$?
+    [ "$rc" -eq 2 ] || { echo "full not refused or leaked: $key (rc=$rc)" >&2; return 1; }
+    git config --local --unset-all "$key"
+  done
+}
+
+@test "harden_git_config refuses every table key reached through a global include that points inside the worktree" {
+  mkdir -p ignored
+  printf '[include]\n\tpath = %s/ignored/inc\n' "$PWD" >| "$BATS_TEST_TMPDIR/global"
+  for entry in "${CFG_CMD_KEYS[@]}"; do
+    key=${entry%%|*}; val=${entry#*|}
+    : >| ignored/inc
+    git config -f ignored/inc "$key" "$val"
+    rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "include not refused: $key" >&2; return 1; }
+  done
+}
+
+@test "harden_git_config accepts ordinary keys, a merge driver in a global file outside the worktree, and tolerates gpg.program locally" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/out"
+  git config --local core.hooksPath .hooks
+  git config --local pager.log true
+  git config --local alias.s status
+  git config --local lfs.url https://example.com/lfs
+  git config --local gpg.program gpg
+  ( rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 0 ] )
+  git config -f "$BATS_TEST_TMPDIR/out/inc" merge.m.driver 'mymerge %O %A %B'
+  printf '[include]\n\tpath = %s/out/inc\n' "$BATS_TEST_TMPDIR" >| "$BATS_TEST_TMPDIR/global"
+  ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global"; rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 0 ] )
+  # a gpg program in a global file inside the worktree is not the user's own
+  git config -f ignored/inc gpg.program evil
+  printf '[include]\n\tpath = %s/ignored/inc\n' "$PWD" >| "$BATS_TEST_TMPDIR/global"
+  ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global"; rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 1 ] )
+}
+
 @test "harden_git_config refuses a stock LFS filter command followed by a second line" {
   git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
   git config --local filter.lfs.process 'git-lfs filter-process'
@@ -1381,6 +1477,17 @@ commit_repo() {
   [ "$out" = "$BATS_TEST_TMPDIR/biggood:$BATS_TEST_TMPDIR/biggood-again" ]
 }
 
+@test "yr_safe_path without GNU realpath drops a same-device directory holding a multi-link file, and keeps one without" {
+  mkdir -p "$BATS_TEST_TMPDIR/hbin" "$BATS_TEST_TMPDIR/hok"
+  : >| "$BATS_TEST_TMPDIR/hbin/a"
+  ln "$BATS_TEST_TMPDIR/hbin/a" "$BATS_TEST_TMPDIR/hbin/b"
+  : >| "$BATS_TEST_TMPDIR/hok/a"
+  yr_helper() { case "$1" in realpath) return 1 ;; *) command -p which "$1" 2>/dev/null || return 1 ;; esac; }
+  out=$(PATH="$BATS_TEST_TMPDIR/hbin:$BATS_TEST_TMPDIR/hok:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *hbin* ]]
+  [[ ":$out:" == *":$BATS_TEST_TMPDIR/hok:"* ]]
+}
+
 @test "yr_safe_path falls back to yr_canon_path per link when no GNU realpath is available" {
   mkdir -p tools "$BATS_TEST_TMPDIR/badbin" "$BATS_TEST_TMPDIR/okbin"
   ln -s "$PWD/tools/none" "$BATS_TEST_TMPDIR/badbin/ssh"
@@ -1389,7 +1496,7 @@ commit_repo() {
   yr_helper() { case "$1" in realpath) return 1 ;; *) command -p which "$1" 2>/dev/null || return 1 ;; esac; }
   out=$(PATH="$BATS_TEST_TMPDIR/badbin:$BATS_TEST_TMPDIR/okbin:/usr/bin:/bin" yr_safe_path)
   [[ "$out" != *badbin* ]]
-  [[ "$out" == "$BATS_TEST_TMPDIR/okbin:"* ]]
+  [[ ":$out:" == *":$BATS_TEST_TMPDIR/okbin:"* ]]
 }
 
 @test "yr_safe_path drops an outside directory holding a script whose #! interpreter is inside the worktree" {
@@ -1416,6 +1523,92 @@ commit_repo() {
   printf '#!%s/venv/python\n' "$PWD" >| "$BATS_TEST_TMPDIR/okbin/notes"
   out=$(PATH="$BATS_TEST_TMPDIR/okbin:/usr/bin:/bin" yr_safe_path)
   [[ "$out" == "$BATS_TEST_TMPDIR/okbin:"* ]]
+}
+
+@test "yr_safe_path follows an interpreter script's own #! line, to a depth of 4" {
+  mkdir -p venv "$BATS_TEST_TMPDIR/nbin" "$BATS_TEST_TMPDIR/interp" "$BATS_TEST_TMPDIR/deep"
+  printf '#!/bin/sh\nexit 0\n' >| venv/python
+  chmod +x venv/python
+  # tool -> outside interpreter script -> in-worktree executable
+  printf '#!%s/interp/i1\n' "$BATS_TEST_TMPDIR" >| "$BATS_TEST_TMPDIR/nbin/tool"
+  printf '#!%s/venv/python\n' "$PWD" >| "$BATS_TEST_TMPDIR/interp/i1"
+  chmod +x "$BATS_TEST_TMPDIR"/nbin/tool "$BATS_TEST_TMPDIR"/interp/i1
+  out=$(PATH="$BATS_TEST_TMPDIR/nbin:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *nbin* ]]
+  rc=0; PATH="$BATS_TEST_TMPDIR/nbin:$PATH" yr_resolve_tool tool >/dev/null || rc=$?
+  [ "$rc" -eq 2 ]
+  # a chain of outside scripts that stays outside is kept; one deeper than 4 is not
+  printf 'plain\n' >| "$BATS_TEST_TMPDIR/interp/ok"
+  chmod +x "$BATS_TEST_TMPDIR/interp/ok"
+  prev="$BATS_TEST_TMPDIR/interp/ok"
+  for n in 1 2 3 4; do
+    printf '#!%s\n' "$prev" >| "$BATS_TEST_TMPDIR/interp/c$n"
+    chmod +x "$BATS_TEST_TMPDIR/interp/c$n"
+    prev="$BATS_TEST_TMPDIR/interp/c$n"
+  done
+  printf '#!%s\n' "$prev" >| "$BATS_TEST_TMPDIR/deep/short"
+  chmod +x "$BATS_TEST_TMPDIR/deep/short"
+  out=$(PATH="$BATS_TEST_TMPDIR/deep:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" == "$BATS_TEST_TMPDIR/deep:"* ]]
+  printf '#!%s\n' "$BATS_TEST_TMPDIR/interp/c4" >| "$BATS_TEST_TMPDIR/interp/c5"
+  printf '#!%s\n' "$BATS_TEST_TMPDIR/interp/c5" >| "$BATS_TEST_TMPDIR/interp/c6"
+  chmod +x "$BATS_TEST_TMPDIR"/interp/c5 "$BATS_TEST_TMPDIR"/interp/c6
+  printf '#!%s\n' "$BATS_TEST_TMPDIR/interp/c6" >| "$BATS_TEST_TMPDIR/deep/short"
+  out=$(PATH="$BATS_TEST_TMPDIR/deep:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *deep* ]]
+}
+
+@test "yr_safe_path drops an outside directory holding a hard link to a file inside the worktree" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/hbin" "$BATS_TEST_TMPDIR/hok"
+  printf '#!/bin/sh\nexit 0\n' >| ignored/helper
+  chmod +x ignored/helper
+  ln ignored/helper "$BATS_TEST_TMPDIR/hbin/git-remote-https"
+  printf '#!/bin/sh\nexit 0\n' >| "$BATS_TEST_TMPDIR/hok/a"
+  chmod +x "$BATS_TEST_TMPDIR/hok/a"
+  ln "$BATS_TEST_TMPDIR/hok/a" "$BATS_TEST_TMPDIR/hok/b"
+  out=$(PATH="$BATS_TEST_TMPDIR/hbin:$BATS_TEST_TMPDIR/hok:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *hbin* ]]
+  # a multi-link file that is not linked into the worktree is fine
+  [[ "$out" == "$BATS_TEST_TMPDIR/hok:"* ]]
+}
+
+@test "yr_safe_path drops a directory holding a multi-link file when the worktree walk fails part way" {
+  mkdir -p "$BATS_TEST_TMPDIR/hok" "$BATS_TEST_TMPDIR/plain"
+  : >| "$BATS_TEST_TMPDIR/hok/a"
+  ln "$BATS_TEST_TMPDIR/hok/a" "$BATS_TEST_TMPDIR/hok/b"
+  : >| "$BATS_TEST_TMPDIR/plain/a"
+  # A find that lists the worktree but then exits non-zero, as one does when a
+  # directory under it cannot be read.
+  printf '#!/bin/sh\n/usr/bin/find "$@"\nrc=$?\ncase " $* " in *" -xdev "*) exit 1 ;; esac\nexit $rc\n' >| "$BATS_TEST_TMPDIR/failfind"
+  chmod +x "$BATS_TEST_TMPDIR/failfind"
+  yr_helper() { case "$1" in find) printf '%s\n' "$BATS_TEST_TMPDIR/failfind" ;; *) command -p which "$1" 2>/dev/null || return 1 ;; esac; }
+  out=$(PATH="$BATS_TEST_TMPDIR/hok:$BATS_TEST_TMPDIR/plain:/usr/bin:/bin" yr_safe_path)
+  [[ ":$out:" != *":$BATS_TEST_TMPDIR/hok:"* ]]
+  # a directory without a multi-link file does not need the walk
+  [[ ":$out:" == *":$BATS_TEST_TMPDIR/plain:"* ]]
+}
+
+@test "harden_git_config refuses a global config hard-linked to a file inside the worktree" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/home"
+  printf '[core]\n\tsshCommand = true\n' >| ignored/gitcfg
+  ln ignored/gitcfg "$BATS_TEST_TMPDIR/home/.gitconfig"
+  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/home/.gitconfig"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/home/.gitconfig"; harden_git_config full; [[ "$YR_HARDEN_MSG" == *"hard-linked"* ]] ) || rc=$?
+  # a multi-link global config that is not linked into the worktree is the user's own
+  printf '[core]\n\tsshCommand = ssh -x\n' >| "$BATS_TEST_TMPDIR/home/own"
+  ln "$BATS_TEST_TMPDIR/home/own" "$BATS_TEST_TMPDIR/home/own2"
+  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/home/own"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
+@test "yr_resolve_tool refuses a tool that is a hard link to a file inside the worktree (exit 2)" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/hbin"
+  printf '#!/bin/sh\nexit 0\n' >| ignored/helper
+  chmod +x ignored/helper
+  ln ignored/helper "$BATS_TEST_TMPDIR/hbin/mytool"
+  rc=0; PATH="$BATS_TEST_TMPDIR/hbin:$PATH" yr_resolve_tool mytool >/dev/null || rc=$?
+  [ "$rc" -eq 2 ]
 }
 
 @test "yr_safe_path judges a script reached through an outside symlink by its interpreter" {
@@ -1569,7 +1762,7 @@ commit_repo() {
   rc=0; ( export GIT_CONFIG_PARAMETERS="'credential.helper'='!f() { x; }; f'"; harden_git_config full ) || rc=$?
   [ "$rc" -eq 1 ]
   # Other config keys are not command-bearing: shell syntax there is fine.
-  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.x GIT_CONFIG_VALUE_0='!f() { x; }; f'; harden_git_config full ) || rc=$?
+  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0='!f() { x; }; f'; harden_git_config full ) || rc=$?
   [ "$rc" -eq 0 ]
 }
 
@@ -1651,16 +1844,30 @@ commit_repo() {
   [ "$rc" -eq 1 ]
 }
 
-@test "harden_git_config refuses GIT_EXEC_PATH, GIT_TEMPLATE_DIR and GIT_CONFIG_GLOBAL inside the worktree" {
+@test "harden_git_config refuses GIT_TEMPLATE_DIR and GIT_CONFIG_GLOBAL inside the worktree" {
   mkdir -p tools/dir
   : >| tools/cfg
-  for name in GIT_EXEC_PATH GIT_TEMPLATE_DIR GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM; do
+  for name in GIT_TEMPLATE_DIR GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM; do
     rc=0; ( export "$name=$PWD/tools/dir"; harden_git_config full ) || rc=$?
     [ "$rc" -eq 1 ] || { echo "$name accepted" >&2; return 1; }
     rc=0; ( export "$name=tools/cfg"; harden_git_config full ) || rc=$?
     [ "$rc" -eq 1 ] || { echo "$name relative accepted" >&2; return 1; }
   done
-  rc=0; ( export GIT_EXEC_PATH=/usr/lib/git-core GIT_TEMPLATE_DIR=/usr/share/git-core/templates; harden_git_config full ) || rc=$?
+  rc=0; ( export GIT_TEMPLATE_DIR=/usr/share/git-core/templates; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
+@test "harden_git_config refuses any inherited GIT_EXEC_PATH, naming the variable and not the value" {
+  mkdir -p "$BATS_TEST_TMPDIR/xp" ignored
+  : >| ignored/helper
+  chmod +x ignored/helper
+  ln -s "$PWD/ignored/helper" "$BATS_TEST_TMPDIR/xp/git-remote-https"
+  for val in "$BATS_TEST_TMPDIR/xp" /usr/lib/git-core; do
+    rc=0; ( export GIT_EXEC_PATH="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "accepted: $val" >&2; return 1; }
+  done
+  ( export GIT_EXEC_PATH="$BATS_TEST_TMPDIR/xp"; harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_EXEC_PATH"* && "$YR_HARDEN_MSG" != *"$BATS_TEST_TMPDIR"* ]] )
+  rc=0; ( unset GIT_EXEC_PATH; harden_git_config full ) || rc=$?
   [ "$rc" -eq 0 ]
 }
 
@@ -1950,10 +2157,47 @@ EOF
   done
   ( export GIT_SSH_COMMAND='ssh\ x'; harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_SSH_COMMAND uses shell syntax"* && "$YR_HARDEN_MSG" != *'ssh\ x'* ]] )
   # Quotes that wrap whole words are still judged by the existing rules and pass.
-  for val in 'ssh -i "/nonexistent/key"' "ssh -o 'StrictHostKeyChecking no'"; do
+  for val in 'ssh -i "/nonexistent/key"' "'/usr/bin/ssh' -x" 'ssh -i /home/u/.ssh/key' 'less -R'; do
     rc=0; ( export GIT_SSH_COMMAND="$val"; harden_git_config full ) || rc=$?
     [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
   done
+}
+
+@test "harden_git_config refuses a quoted span that contains whitespace" {
+  mkdir -p "dir with space"
+  : >| "dir with space/evil"
+  for val in "sh 'dir with space/evil'" 'sh "dir with space/evil"' "ssh -o 'StrictHostKeyChecking no'" "sh 'a b"; do
+    for name in GIT_SSH_COMMAND GIT_PAGER EDITOR GIT_ASKPASS; do
+      rc=0; ( export "$name=$val"; harden_git_config full ) || rc=$?
+      [ "$rc" -eq 1 ] || { echo "$name accepted: $val" >&2; return 1; }
+    done
+  done
+  rc=0; ( export GIT_CONFIG_PARAMETERS="'core.sshcommand'='sh \"dir with space/evil\"'"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.sshCommand GIT_CONFIG_VALUE_0="sh 'dir with space/evil'"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  for val in 'ssh -i /home/u/.ssh/key' 'less -R' "'/usr/bin/ssh' -x"; do
+    rc=0; ( export GIT_SSH_COMMAND="$val" GIT_PAGER="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
+  done
+}
+
+@test "harden_git_config refuses an injected include.path or includeIf path, naming the variable and not the value" {
+  mkdir -p tools
+  : >| tools/inc
+  for key in include.path includeIf.gitdir:/x/.path INCLUDE.PATH includeif.onbranch:main.path; do
+    for val in "$PWD/tools/inc" tools/inc "$BATS_TEST_TMPDIR/outside"; do
+      rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="$key" GIT_CONFIG_VALUE_0="$val"; harden_git_config full ) || rc=$?
+      [ "$rc" -eq 1 ] || { echo "KEY accepted: $key $val" >&2; return 1; }
+      rc=0; ( export GIT_CONFIG_PARAMETERS="'user.name'='x' '$key'='$val'"; harden_git_config full ) || rc=$?
+      [ "$rc" -eq 1 ] || { echo "PARAMETERS accepted: $key $val" >&2; return 1; }
+    done
+  done
+  ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=include.path GIT_CONFIG_VALUE_0="$PWD/tools/inc"
+    harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_CONFIG_KEY_0"* && "$YR_HARDEN_MSG" != *tools/inc* ]] )
+  # A non-include key whose value merely looks like one stays accepted.
+  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=include.path; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
 }
 
 @test "harden_git_config refuses an escaped worktree path that contains a space" {
@@ -2101,4 +2345,41 @@ unprivileged() {
     rc=0; ( export GIT_CONFIG_PARAMETERS="$val"; harden_git_config full ) || rc=$?
     [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
   done
+}
+
+# --- rp_link_target_changed: the directory walk is bounded (rp_walk_cap) ---
+
+walk_fixture() {
+  EXT="$BATS_TEST_TMPDIR/ext"
+  mkdir -p "$EXT/sub"
+  (cd "$EXT/sub" && seq 1 100 | xargs touch -t 201901010000)
+  ln -s "$EXT" lnk
+  MARKER="$BATS_TEST_TMPDIR/marker"
+  touch -t 202001010000 "$MARKER"
+}
+
+@test "rp_walk_cap only lowers the default and ignores other values" {
+  [ "$(rp_walk_cap)" = 50000 ]
+  [ "$(YR_DIR_LINK_WALK_CAP=50 rp_walk_cap)" = 50 ]
+  for v in 0 007 -5 abc 5.5 50000 99999 100000 999999999 ''; do
+    [ "$(YR_DIR_LINK_WALK_CAP=$v rp_walk_cap)" = 50000 ] || { echo "accepted: $v"; false; }
+  done
+}
+
+@test "rp_link_target_changed counts a linked tree with more old files than the cap as changed" {
+  walk_fixture
+  YR_DIR_LINK_WALK_CAP=50 run rp_link_target_changed lnk "$MARKER"
+  [ "$status" -eq 0 ]
+  YR_DIR_LINK_WALK_CAP=50 run rp_link_target_changed lnk "$MARKER" follow
+  [ "$status" -eq 0 ]
+  # Under the cap the same tree is unchanged.
+  run rp_link_target_changed lnk "$MARKER"
+  [ "$status" -eq 1 ]
+}
+
+@test "rp_link_target_changed still finds a newer file under the cap" {
+  walk_fixture
+  touch "$EXT/sub/new"
+  run rp_link_target_changed lnk "$MARKER"
+  [ "$status" -eq 0 ]
 }
