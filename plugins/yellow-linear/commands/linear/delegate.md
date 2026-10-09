@@ -852,6 +852,19 @@ case "$PACKET_FILE" in
   /*/yellow-linear-packet.??????/packet.txt) ;;
   *) printf 'ERROR: PACKET_FILE is not an allocated packet path.\n' >&2; exit 1 ;;
 esac
+# Same allocation binding as the launch block: the preview reads the file, so a
+# look-alike path must not be disclosed.
+GIT_DIR_ABS=$(git rev-parse --absolute-git-dir 2>/dev/null || true)
+if [ -n "$GIT_DIR_ABS" ]; then GIT_TMP="${GIT_DIR_ABS}/tmp"; else GIT_TMP="${TMPDIR:-/tmp}"; fi
+PACKET_DIR=$(dirname -- "$PACKET_FILE")
+GIT_TMP_REAL=$(cd -P -- "$GIT_TMP" 2>/dev/null && pwd -P || true)
+PACKET_PARENT_REAL=$(cd -P -- "$(dirname -- "$PACKET_DIR")" 2>/dev/null && pwd -P || true)
+if [ -z "$GIT_TMP_REAL" ] || [ "$PACKET_PARENT_REAL" != "$GIT_TMP_REAL" ] \
+  || [ -L "$PACKET_DIR" ] || [ ! -d "$PACKET_DIR" ] || [ ! -O "$PACKET_DIR" ] \
+  || [ -L "$PACKET_FILE" ]; then
+  printf 'ERROR: PACKET_FILE is not inside a packet directory allocated under %s.\n' "$GIT_TMP" >&2
+  exit 1
+fi
 command -v jq >/dev/null 2>&1 || { printf 'ERROR: jq required.\n' >&2; exit 1; }
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"

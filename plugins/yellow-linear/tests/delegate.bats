@@ -335,6 +335,17 @@ setup() {
   printf '%s\n' "$jules_block" | grep -qF '[ -L "$PACKET_FILE" ]'
 }
 
+@test "the jules confirmation preview applies the same allocation binding before reading the packet" {
+  preview=$(awk '/^\*\*Confirm\.\*\*/{found=1} found{print} /FENCE_TAG ---/ && found{exit}' "$DELEGATE_MD")
+  printf '%s\n' "$preview" | grep -qF '[ "$PACKET_PARENT_REAL" != "$GIT_TMP_REAL" ]'
+  printf '%s\n' "$preview" | grep -qF '[ -L "$PACKET_DIR" ]'
+  printf '%s\n' "$preview" | grep -qF '[ ! -O "$PACKET_DIR" ]'
+  printf '%s\n' "$preview" | grep -qF '[ -L "$PACKET_FILE" ]'
+  bind_line=$(printf '%s\n' "$preview" | grep -nF '[ -L "$PACKET_FILE" ]' | head -1 | cut -d: -f1)
+  jq_line=$(printf '%s\n' "$preview" | grep -n '^jq -Rrs' | head -1 | cut -d: -f1)
+  [ "$bind_line" -lt "$jq_line" ]
+}
+
 @test "the jules launch passes the packet as an inline --prompt= so a leading dash is not a flag" {
   run grep -cF '"--prompt=$(cat -- "$PACKET_FILE")"' "$DELEGATE_MD"
   [ "$status" -eq 0 ]
