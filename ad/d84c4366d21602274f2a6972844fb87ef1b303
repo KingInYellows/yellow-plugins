@@ -1,0 +1,27 @@
+plugins/yellow-review/lib/resolve-paths.sh
+  s_7acef71c5d81d1::t_ce489ccdace1ef 154,158-172,175-177,193-221,240-241,304,310-325,328,334,764-770,774-777,779,784-789,793,801-803,808,811-813,815-820,827,834-836,840,846,848,852,857-863,866,869,871-892
+plugins/yellow-review/skills/pr-review-workflow/scripts/commit-resolve-fixes
+  s_7acef71c5d81d1::t_31034f4a214588 394-395
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_7acef71c5d81d1::t_62ee230e052591 395-396,591,601,620,622,628,698,700,704,755,757,761
+plugins/yellow-review/tests/resolve-paths.bats
+  s_7acef71c5d81d1::t_9103251836e0f9 503,507,517,521,523,1153-1162,1174-1190
+plugins/yellow-review/tests/run-verify-command.bats
+  s_7acef71c5d81d1::t_4c42500bb9b23a 1640-1652
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "add84c4366d21602274f2a6972844fb87ef1b303",
+  "prompts": {},
+  "sessions": {
+    "s_7acef71c5d81d1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "93619395-9e75-47ca-a284-258645abbf2a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
