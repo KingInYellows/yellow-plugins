@@ -1262,13 +1262,15 @@ export async function updateSupervision(
  * teammate later repeating an earlier prompt verbatim is not mistaken for the
  * plugin: the first matching activity claims the operation's `echoActivityId`,
  * and further matches have no operation left to explain them. A rewalk of an
- * already-claimed activity stays own. A cleanly rejected or released write never
+ * already-claimed activity stays own. With `mark`, the first outside message is
+ * also recorded as the owner's `outsideSeen` under the same journal lock. A cleanly rejected or released write never
  * landed and claims nothing; an abandoned one might have, so it can.
  */
 export async function claimOwnEchoes(
   dataDir: string,
   sessionResource: string,
   messages: ReadonlyArray<{ activityId: string; digest: string }>,
+  mark?: { readonly ownerRequestId: string; readonly observedAt: string },
   config: LockConfig = DEFAULT_LOCK_CONFIG
 ): Promise<{ activityId: string; digest: string } | undefined> {
   return updateJournal(
@@ -1295,8 +1297,7 @@ export async function claimOwnEchoes(
         if (claimed.has(message.activityId)) continue;
         const slot = landed.find(
           (r) =>
-            r.echoActivityId === undefined &&
-            r.promptDigest === message.digest
+            r.echoActivityId === undefined && r.promptDigest === message.digest
         );
         if (slot === undefined) {
           outside ??= message;
@@ -1309,6 +1310,28 @@ export async function claimOwnEchoes(
         };
         // `landed` holds the replaced record; keep it current for later matches.
         landed[landed.indexOf(slot)] = operations[slot.localRequestId]!;
+      }
+      // The marker is written in this same critical section: a reserve cannot
+      // slip between classifying the message and recording that it was seen.
+      const owner =
+        mark !== undefined ? operations[mark.ownerRequestId] : undefined;
+      if (
+        outside !== undefined &&
+        mark !== undefined &&
+        owner !== undefined &&
+        owner.supervision?.outsideSeen === undefined
+      ) {
+        operations[mark.ownerRequestId] = {
+          ...owner,
+          supervision: {
+            ...(owner.supervision ?? {}),
+            outsideSeen: {
+              activityId: outside.activityId,
+              observedAt: mark.observedAt,
+            },
+          },
+          updatedAt: mark.observedAt,
+        };
       }
       return outside;
     },

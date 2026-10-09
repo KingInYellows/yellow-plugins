@@ -278,19 +278,10 @@ async function recordOutsideActivity(deps, record, messages) {
         return;
     if (record.sessionResource === undefined)
         return;
-    const outside = await (0, state_js_1.claimOwnEchoes)(deps.dataDir, record.sessionResource, messages);
-    if (outside === undefined)
-        return;
-    const journal = await (0, state_js_1.readJournal)(deps.dataDir);
-    const current = journal.operations[record.localRequestId]?.supervision;
-    if (current?.outsideSeen !== undefined)
-        return;
-    await (0, state_js_1.updateSupervision)(deps.dataDir, record.localRequestId, {
-        outsideSeen: {
-            activityId: outside.activityId,
-            observedAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString(),
-        },
-    }, (0, runtime_support_js_1.nowFn)(deps));
+    await (0, state_js_1.claimOwnEchoes)(deps.dataDir, record.sessionResource, messages, {
+        ownerRequestId: record.localRequestId,
+        observedAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString(),
+    });
 }
 async function status(deps, args) {
     if (args.session === undefined && !args.reconcile) {

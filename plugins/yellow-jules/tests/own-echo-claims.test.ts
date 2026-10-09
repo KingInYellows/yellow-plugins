@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { status } from '../src/runtime.js';
-import { readJournal } from '../src/state.js';
+import { claimOwnEchoes, readJournal } from '../src/state.js';
 
 import {
   addActivity,
@@ -74,5 +74,28 @@ describe('each dispatched message explains at most one vendor activity', () => {
     }
     await status(h.deps, { session: session.localId, reconcile: false });
     expect(await outsideSeen(session.localRequestId)).toBe(true);
+  });
+
+  it('classifying an outside message and recording outsideSeen is one journal update', async () => {
+    const grantId = await createGrant(h, { maxActiveSessions: 3 });
+    const session = await delegateOk(h, grantId, { prompt: 'Do the task.' });
+    const outside = await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [{ activityId: 'activities/x1', digest: 'not-ours' }],
+      {
+        ownerRequestId: session.localRequestId,
+        observedAt: '2026-09-29T12:00:00.000Z',
+      }
+    );
+    expect(outside?.activityId).toBe('activities/x1');
+    // No second step ran: the marker is already in the journal.
+    const record = (await readJournal(h.dataDir)).operations[
+      session.localRequestId
+    ];
+    expect(record?.supervision?.outsideSeen).toEqual({
+      activityId: 'activities/x1',
+      observedAt: '2026-09-29T12:00:00.000Z',
+    });
   });
 });

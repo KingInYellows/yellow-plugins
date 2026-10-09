@@ -930,10 +930,11 @@ async function updateSupervision(dataDir, localRequestId, patch, now = () => new
  * teammate later repeating an earlier prompt verbatim is not mistaken for the
  * plugin: the first matching activity claims the operation's `echoActivityId`,
  * and further matches have no operation left to explain them. A rewalk of an
- * already-claimed activity stays own. A cleanly rejected or released write never
+ * already-claimed activity stays own. With `mark`, the first outside message is
+ * also recorded as the owner's `outsideSeen` under the same journal lock. A cleanly rejected or released write never
  * landed and claims nothing; an abandoned one might have, so it can.
  */
-async function claimOwnEchoes(dataDir, sessionResource, messages, config = exports.DEFAULT_LOCK_CONFIG) {
+async function claimOwnEchoes(dataDir, sessionResource, messages, mark, config = exports.DEFAULT_LOCK_CONFIG) {
     return updateJournal(dataDir, (operations) => {
         const landed = Object.values(operations).filter((record) => {
             const neverLanded = (record.status === 'failed' && record.abandonedAt === undefined) ||
@@ -948,8 +949,7 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, config = expor
         for (const message of messages) {
             if (claimed.has(message.activityId))
                 continue;
-            const slot = landed.find((r) => r.echoActivityId === undefined &&
-                r.promptDigest === message.digest);
+            const slot = landed.find((r) => r.echoActivityId === undefined && r.promptDigest === message.digest);
             if (slot === undefined) {
                 outside ??= message;
                 continue;
@@ -961,6 +961,25 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, config = expor
             };
             // `landed` holds the replaced record; keep it current for later matches.
             landed[landed.indexOf(slot)] = operations[slot.localRequestId];
+        }
+        // The marker is written in this same critical section: a reserve cannot
+        // slip between classifying the message and recording that it was seen.
+        const owner = mark !== undefined ? operations[mark.ownerRequestId] : undefined;
+        if (outside !== undefined &&
+            mark !== undefined &&
+            owner !== undefined &&
+            owner.supervision?.outsideSeen === undefined) {
+            operations[mark.ownerRequestId] = {
+                ...owner,
+                supervision: {
+                    ...(owner.supervision ?? {}),
+                    outsideSeen: {
+                        activityId: outside.activityId,
+                        observedAt: mark.observedAt,
+                    },
+                },
+                updatedAt: mark.observedAt,
+            };
         }
         return outside;
     }, config);

@@ -67,7 +67,6 @@ import {
   recordArtifacts,
   upsertArtifactResumeToken,
   upsertReadState,
-  updateSupervision,
   withJournalLock,
 } from './state.js';
 import type {
@@ -477,26 +476,10 @@ async function recordOutsideActivity(
 ): Promise<void> {
   if (messages.length === 0 || record.kind !== 'create') return;
   if (record.sessionResource === undefined) return;
-  const outside = await claimOwnEchoes(
-    deps.dataDir,
-    record.sessionResource,
-    messages
-  );
-  if (outside === undefined) return;
-  const journal = await readJournal(deps.dataDir);
-  const current = journal.operations[record.localRequestId]?.supervision;
-  if (current?.outsideSeen !== undefined) return;
-  await updateSupervision(
-    deps.dataDir,
-    record.localRequestId,
-    {
-      outsideSeen: {
-        activityId: outside.activityId,
-        observedAt: nowFn(deps)().toISOString(),
-      },
-    },
-    nowFn(deps)
-  );
+  await claimOwnEchoes(deps.dataDir, record.sessionResource, messages, {
+    ownerRequestId: record.localRequestId,
+    observedAt: nowFn(deps)().toISOString(),
+  });
 }
 
 export async function status(
