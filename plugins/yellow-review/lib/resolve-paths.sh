@@ -289,23 +289,32 @@ harden_git_config() {
     # naming the key only. Global and system scopes are not judged, and the
     # values are never overridden, which would also disable the user's own
     # credential helper.
-    local tcfg trc=0 tkey tre
+    local trc=0 tkey tre
     # A clean, smudge or process filter runs on `git add` and on checkout, so a
     # repository-local one is judged the same way; the three stock Git LFS
     # commands (`git lfs install --local`) are allowed by exact value.
     tre='^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process))$'
     [ "$scope" = revert ] && tre='^filter\..*\.(clean|smudge|process)$'
-    tcfg=$(yr_git config --show-scope --get-regexp "$tre" 2>/dev/null) || trc=$?
-    case "$trc" in
-        0|1) ;;
-        *) YR_HARDEN_MSG="could not read the git transport config"; return 1 ;;
-    esac
-    tkey=$(printf '%s\n' "$tcfg" | yr_awk -F'\t' '
-        ($1 == "local" || $1 == "worktree") {
-            k = $2; v = $2; sub(/ .*/, "", k); sub(/^[^ ]* /, "", v)
+    # --null --show-scope emits `scope NUL key NL value NUL` per entry, so a
+    # value holding newlines is read whole. The records go straight into awk
+    # (a command substitution would drop the NULs); git's status 0 or 1 (no
+    # match) is fine, anything else fails closed. The LFS exemption needs a
+    # single-line value that matches exactly, and an awk that cannot split on
+    # NUL sees mangled records that match nothing and are refused.
+    tkey=$(set -o pipefail; yr_git config --null --show-scope --get-regexp "$tre" 2>/dev/null | yr_awk 'BEGIN { RS = "\0" }
+        NR % 2 == 1 { sc = $0; next }
+        {
+            i = index($0, "\n")
+            if (i == 0) { print "filter.<unparsed>.clean"; exit }
+            k = substr($0, 1, i - 1); v = substr($0, i + 1)
+            if (sc != "local" && sc != "worktree") next
             if (k ~ /^filter\.lfs\.(clean|smudge|process)$/ && (v == "git-lfs clean -- %f" || v == "git-lfs smudge -- %f" || v == "git-lfs filter-process" || v == "git-lfs smudge --skip -- %f" || v == "git-lfs filter-process --skip")) next
             print k; exit
-        }') || { YR_HARDEN_MSG="could not parse the git transport config"; return 1; }
+        }') || trc=$?
+    case "$trc" in
+        0|1) ;;
+        *) YR_HARDEN_MSG="could not parse the git transport config"; return 1 ;;
+    esac
     # A credential URL can carry userinfo: name the key without it.
     case "$tkey" in
         credential.helper) ;;
