@@ -116,10 +116,32 @@ function expiredBeforeWrite() {
         recoveryAction: 'Nothing was sent. Retry with a larger --deadline-ms.',
     });
 }
+/** Cap on chained retries so a runaway journal cannot grow the id without bound. */
+const MAX_RETRY_ATTEMPTS = 50;
+async function nextAttemptRequestId(deps, base) {
+    const { operations } = await (0, state_js_1.readJournal)(deps.dataDir);
+    let candidate = base;
+    for (let attempt = 2; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
+        const record = operations[candidate];
+        if (record === undefined ||
+            record.kind !== 'create' ||
+            record.status !== 'failed' ||
+            record.sessionResource !== undefined) {
+            break;
+        }
+        candidate = `${base}.a${attempt}`;
+    }
+    return (0, validate_js_1.validateRequestId)(candidate);
+}
 async function delegate(deps, args) {
-    const localRequestId = args.requestId !== undefined
+    const requested = args.requestId !== undefined
         ? (0, validate_js_1.validateRequestId)(args.requestId)
-        : mintRequestId();
+        : undefined;
+    const localRequestId = requested === undefined
+        ? mintRequestId()
+        : args.retryFailed === true
+            ? await nextAttemptRequestId(deps, requested)
+            : requested;
     const localId = (0, validate_js_1.mintLocalId)();
     try {
         return await delegateInner(deps, args, { localRequestId, localId });

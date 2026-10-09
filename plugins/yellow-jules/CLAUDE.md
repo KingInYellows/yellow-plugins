@@ -173,6 +173,10 @@ data-directory path this host may write from.
     corrective round, and the caller sets that flag. A plain reply is not
     counted, so a grant bounds repair sessions and approvals but not the number
     of messages sent to a session it covers.
+  - `delegate --request-id <id> --retry-failed` (used by `/linear:delegate`)
+    resolves the id to `<id>.a<N>`, N = prior clean `failed` creates + 1. Any
+    reserved, accepted, unknown-outcome or session-bearing record still
+    collides, so one in-flight attempt is never relaunched.
   - A prompt or message travels as a command-line argument, which other local
     users can read in `/proc/<pid>/cmdline` for as long as the call runs (unless
     `/proc` is mounted with `hidepid`). Do not put secrets in a prompt on a

@@ -226,6 +226,8 @@ setup() {
   printf '%s\n' "$jules_block" | grep -qF -- '--dry-run)'
   printf '%s\n' "$jules_block" | grep -qF -- '--grant-id "$GRANT_ID")'
   printf '%s\n' "$jules_block" | grep -qF -- '--request-id "$REQUEST_ID"'
+  # A clean failure must not spend the id forever: both calls advance past failed records.
+  [ "$(printf '%s\n' "$jules_block" | grep -cF -- '--request-id "$REQUEST_ID" --retry-failed')" -eq 2 ]
   # The CLI comes from the resolved plugin root, never a relative guess.
   printf '%s\n' "$jules_block" | grep -qF 'CLI="${YELLOW_JULES_ROOT}/dist/cli.js"'
   # The old fail-closed stub is gone.

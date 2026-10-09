@@ -197,7 +197,39 @@ export interface DelegateArgs {
   readonly grantId?: string;
   /** A repair task (R44): spends a corrective round on `--task-ref` instead of a task. */
   readonly correction: boolean;
+  /**
+   * With `requestId`: advance past earlier attempts that ended in a clean
+   * `failed` record (no session was created) by suffixing `.a<N>`, N = prior
+   * failed attempts + 1. A reserved, accepted, unknown-outcome or otherwise
+   * non-failed record still collides, so the same in-flight attempt is never
+   * relaunched.
+   */
+  readonly retryFailed?: boolean;
   readonly deadlineMs?: number;
+}
+
+/** Cap on chained retries so a runaway journal cannot grow the id without bound. */
+const MAX_RETRY_ATTEMPTS = 50;
+
+async function nextAttemptRequestId(
+  deps: WriteDeps,
+  base: string
+): Promise<string> {
+  const { operations } = await readJournal(deps.dataDir);
+  let candidate = base;
+  for (let attempt = 2; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
+    const record = operations[candidate];
+    if (
+      record === undefined ||
+      record.kind !== 'create' ||
+      record.status !== 'failed' ||
+      record.sessionResource !== undefined
+    ) {
+      break;
+    }
+    candidate = `${base}.a${attempt}`;
+  }
+  return validateRequestId(candidate);
 }
 
 export interface DelegateResult extends Attention {
@@ -231,10 +263,16 @@ export async function delegate(
   deps: WriteDeps,
   args: DelegateArgs
 ): Promise<DelegateResult | DelegateDryRunResult> {
-  const localRequestId =
+  const requested =
     args.requestId !== undefined
       ? validateRequestId(args.requestId)
-      : mintRequestId();
+      : undefined;
+  const localRequestId =
+    requested === undefined
+      ? mintRequestId()
+      : args.retryFailed === true
+        ? await nextAttemptRequestId(deps, requested)
+        : requested;
   const localId = mintLocalId();
   try {
     return await delegateInner(deps, args, { localRequestId, localId });

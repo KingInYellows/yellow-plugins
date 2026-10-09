@@ -229,6 +229,114 @@ describe('a covered delegate', () => {
     expect(h.adapter.callsTo('createSession')).toHaveLength(1);
   });
 
+  describe('--retry-failed', () => {
+    it('advances past a clean failed record, deterministically and idempotently within one attempt', async () => {
+      const grantId = await createGrant(h, { maxActiveSessions: 3 });
+      h.adapter.createSessionImpl = async () => {
+        throw new AdapterError('invalid-request', 'rejected', {
+          status: 400,
+          dispatched: true,
+        });
+      };
+      const first = await fails(() =>
+        delegate(h.deps, args({ grantId, requestId: 'base-req' }))
+      );
+      expect(first.localRequestId).toBe('base-req');
+      h.adapter.restoreWrites();
+
+      // Without the flag the failed id stays spent.
+      expect(
+        await codeOf(() =>
+          delegate(h.deps, args({ grantId, requestId: 'base-req' }))
+        )
+      ).toBe('JULES_DUPLICATE_LAUNCH');
+
+      // A dry run resolves the same next id the launch will use.
+      const dry = await delegate(
+        h.deps,
+        args({ dryRun: true, requestId: 'base-req', retryFailed: true })
+      );
+      expect(dry.localRequestId).toBe('base-req.a2');
+
+      const second = await delegate(
+        h.deps,
+        args({ grantId, requestId: 'base-req', retryFailed: true })
+      );
+      expect(second).toMatchObject({ localRequestId: 'base-req.a2' });
+      expect(second).toHaveProperty('sessionResource');
+
+      // The attempt that landed is not relaunched: same base id now collides on .a2.
+      expect(
+        await codeOf(() =>
+          delegate(
+            h.deps,
+            args({ grantId, requestId: 'base-req', retryFailed: true })
+          )
+        )
+      ).toBe('JULES_DUPLICATE_LAUNCH');
+      expect(h.adapter.callsTo('createSession')).toHaveLength(2);
+    });
+
+    it('chains a second failure to .a3', async () => {
+      const grantId = await createGrant(h, { maxActiveSessions: 3 });
+      h.adapter.createSessionImpl = async () => {
+        throw new AdapterError('invalid-request', 'rejected', {
+          status: 400,
+          dispatched: true,
+        });
+      };
+      for (const expected of ['base-req', 'base-req.a2']) {
+        const err = await fails(() =>
+          delegate(
+            h.deps,
+            args({ grantId, requestId: 'base-req', retryFailed: true })
+          )
+        );
+        expect(err.localRequestId).toBe(expected);
+      }
+      const dry = await delegate(
+        h.deps,
+        args({ dryRun: true, requestId: 'base-req', retryFailed: true })
+      );
+      expect(dry.localRequestId).toBe('base-req.a3');
+    });
+
+    it('does not advance past an in-flight or unknown-outcome record', async () => {
+      const grantId = await createGrant(h, { maxActiveSessions: 3 });
+      h.adapter.createSessionImpl = async () => {
+        throw new TypeError('boom');
+      };
+      expect(
+        await codeOf(() =>
+          delegate(h.deps, args({ grantId, requestId: 'base-req' }))
+        )
+      ).toBe('JULES_UNKNOWN_OUTCOME');
+      h.adapter.restoreWrites();
+      expect(
+        await codeOf(() =>
+          delegate(
+            h.deps,
+            args({ grantId, requestId: 'base-req', retryFailed: true })
+          )
+        )
+      ).toBe('JULES_DUPLICATE_LAUNCH');
+      expect(h.adapter.callsTo('createSession')).toHaveLength(1);
+    });
+
+    it('does not advance past an accepted launch', async () => {
+      const grantId = await createGrant(h, { maxActiveSessions: 3 });
+      await delegate(h.deps, args({ grantId, requestId: 'base-req' }));
+      expect(
+        await codeOf(() =>
+          delegate(
+            h.deps,
+            args({ grantId, requestId: 'base-req', retryFailed: true })
+          )
+        )
+      ).toBe('JULES_DUPLICATE_LAUNCH');
+    });
+  });
+
   it.each([
     ['an empty prompt', { prompt: '   ' }],
     ['a malformed branch', { branch: 'bad branch;rm' }],

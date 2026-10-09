@@ -229,6 +229,7 @@ async function dispatch(operation, rest, deps) {
                     'grant-id': { type: 'string' },
                     'dry-run': { type: 'boolean', default: false },
                     correction: { type: 'boolean', default: false },
+                    'retry-failed': { type: 'boolean', default: false },
                     ...deadline,
                 },
                 strict: true,
@@ -250,6 +251,7 @@ async function dispatch(operation, rest, deps) {
                     : {}),
                 dryRun: values['dry-run'] === true,
                 correction: values.correction === true,
+                retryFailed: values['retry-failed'] === true,
                 deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS),
             });
         }

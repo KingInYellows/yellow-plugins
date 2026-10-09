@@ -769,6 +769,8 @@ else
   exit 1
 fi
 REQUEST_ID="jr-linear-${KEY}"
+# --retry-failed: after a clean failure (no session created) the next call uses
+# "${REQUEST_ID}.a<N>"; any non-failed record for the id still collides.
 
 # Read the packet once: the digest and the dispatched prompt are the same bytes.
 PROMPT=$(cat -- "$PACKET_FILE")
@@ -805,7 +807,7 @@ if [ "$MODE" = "launch" ]; then
     printf 'ERROR: the remote, branch, packet, issue revision or grant changed since the confirmed dry run. Run a new dry run and ask for confirmation again.\n' >&2
     exit 1
   fi
-  OUTPUT=$(node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" "--prompt=$PROMPT" --request-id "$REQUEST_ID" --grant-id "$GRANT_ID")
+  OUTPUT=$(node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" "--prompt=$PROMPT" --request-id "$REQUEST_ID" --retry-failed --grant-id "$GRANT_ID")
   printf 'exit=%s\n' "$?"
   printf '%s\n' "$OUTPUT" | jq '{ok, localRequestId, localId, sessionResource, vendorState, condition, repository, requestedBranch, details, requiresAttention, attention, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
   # Vendor-writable text only inside a fence with a random tag.
@@ -818,7 +820,7 @@ if [ "$MODE" = "launch" ]; then
   exit 0
 fi
 
-OUTPUT=$(node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" "--prompt=$PROMPT" --request-id "$REQUEST_ID" --dry-run)
+OUTPUT=$(node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" "--prompt=$PROMPT" --request-id "$REQUEST_ID" --retry-failed --dry-run)
 printf 'dry_run_exit=%s\n' "$?"
 printf '%s\n' "$OUTPUT" | jq '{ok, localRequestId, repository, requestedBranch, taskRef, dryRun, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
 if [ "$(printf '%s' "$OUTPUT" | jq -r '.ok')" != "true" ]; then
