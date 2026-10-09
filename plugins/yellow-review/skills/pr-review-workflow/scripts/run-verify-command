@@ -367,7 +367,7 @@ die() { printf '[run-verify-command] Error: %s\n' "$2" >&2; exit "$1"; }
 # From here PATH is yr_safe_path's result: a bare mktemp, rm, tail, tr, cat and
 # the rest resolve only to a file outside the worktree, however the verify
 # command or the resolvers changed the tree. A directory that is inside it, or
-# holds one of those tools as a symlink into it, is dropped. The verify command
+# holds any symlink into it, is dropped. The verify command
 # itself keeps the caller's PATH (YR_ORIG_PATH; it may need node_modules/.bin).
 yr_adopt_path || die 2 "no PATH directory is left once those that reach into the repository are dropped; the tree is untouched"
 

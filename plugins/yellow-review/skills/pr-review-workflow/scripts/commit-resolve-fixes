@@ -411,7 +411,7 @@ die() { printf '[commit-resolve-fixes] Error: %s\n' "$2" >&2; exit "$1"; }
 # name after the resolvers wrote the tree (grep decides which paths belong to
 # the PR; sed, tr, cat, mktemp, rm and the rest handle what is committed)
 # resolves only to a file outside the worktree: a directory that is inside it,
-# or that holds one of those tools as a symlink into it, is dropped. Tools
+# or that holds any symlink into it, is dropped. Tools
 # bound by absolute path below (git, gh, jq, gt, node, awk, timeout) are still
 # resolved against the caller's PATH and refused, not skipped; see
 # yr_resolve_tool. Before any argument is parsed.
@@ -625,7 +625,7 @@ cd -- "$TOP"
 #      absolute PATH hit is kept in TOOL_BIN_<tool> and run by that path.
 #   3. PATH is already yr_safe_path's result (yr_adopt_path, before any
 #      argument is parsed): entries inside the worktree, and entries that hold a
-#      tool as a symlink into it, are dropped, so a child lookup of any other
+#      symlink into it, are dropped, so a child lookup of any other
 #      name (git, env, gh, grep) cannot land in a resolver-writable file either.
 # A tool outside the worktree is not judged, and one that cannot be found is
 # left to the "not found" handling. gh and jq were bound above. No tool has run.
