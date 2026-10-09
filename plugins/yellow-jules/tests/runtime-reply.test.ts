@@ -479,6 +479,50 @@ describe('races inside the write gate', () => {
     ).toBe('act-own');
   });
 
+  it('a partial walk holds a same-digest message instead of claiming it as the echo', async () => {
+    const reservation = await reserveUnderGrant(
+      h.deps,
+      replyGate('reply-partial-1')
+    );
+    await assertGrantLiveBeforeWrite(h.deps, reservation, 'reconcile');
+    await settleAccepted(h.deps, reservation);
+    const mark = {
+      ownerRequestId: session.localRequestId,
+      observedAt: new Date(h.deps.clock.now()).toISOString(),
+    };
+    const message = {
+      activityId: 'act-teammate',
+      digest: messageDigest(MESSAGE),
+    };
+    const held: string[] = [];
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [message],
+      mark,
+      held,
+      false
+    );
+    expect(held).toEqual(['act-teammate']);
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-partial-1']
+        ?.echoActivityId
+    ).toBeUndefined();
+    // A complete walk then classifies it normally.
+    await claimOwnEchoes(
+      h.dataDir,
+      session.sessionResource,
+      [message],
+      mark,
+      [],
+      true
+    );
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-partial-1']
+        ?.echoActivityId
+    ).toBe('act-teammate');
+  });
+
   describe('a message matching a dispatched reply whose outcome is unknown', () => {
     const readStatus = () =>
       status(h.deps, { session: session.localId, reconcile: false });

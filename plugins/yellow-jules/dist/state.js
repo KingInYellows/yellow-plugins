@@ -937,10 +937,10 @@ async function updateSupervision(dataDir, localRequestId, patch, now = () => new
  * also recorded as the owner's `outsideSeen` under the same journal lock; later outside
  * messages replace the marker, so a pending `--clear-pause` confirmation for the older one fails. A message that only a dispatched write
  * still in flight could explain is reported in `pendingOut` and neither claimed nor
- * classified, so the caller leaves it for a later walk. A cleanly rejected or released write never
+ * classified, so the caller leaves it for a later walk. On a partial walk (`walkComplete` false) a message that would claim an echo is held the same way. A cleanly rejected or released write never
  * landed and claims nothing; an abandoned one might have, so it can.
  */
-async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingOut, config = exports.DEFAULT_LOCK_CONFIG) {
+async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingOut, walkComplete = true, config = exports.DEFAULT_LOCK_CONFIG) {
     return updateJournal(dataDir, (operations) => {
         const landed = Object.values(operations).filter((record) => {
             const neverLanded = (record.status === 'failed' && record.abandonedAt === undefined) ||
@@ -977,6 +977,13 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
                 // Only a dispatched write whose outcome is unknown could explain it:
                 // `dispatchedAt` proves the POST began, not that it landed. Leave the
                 // message unclassified; the caller must not consume it yet.
+                pendingOut?.push(message.activityId);
+                continue;
+            }
+            if (slot !== undefined && !walkComplete) {
+                // A partial walk may not have reached the write's real, older echo:
+                // claiming this same-digest message now could be a teammate's. Hold
+                // it until a complete walk can tell which match is earliest.
                 pendingOut?.push(message.activityId);
                 continue;
             }

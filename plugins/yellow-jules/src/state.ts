@@ -1273,7 +1273,7 @@ export async function updateSupervision(
  * also recorded as the owner's `outsideSeen` under the same journal lock; later outside
  * messages replace the marker, so a pending `--clear-pause` confirmation for the older one fails. A message that only a dispatched write
  * still in flight could explain is reported in `pendingOut` and neither claimed nor
- * classified, so the caller leaves it for a later walk. A cleanly rejected or released write never
+ * classified, so the caller leaves it for a later walk. On a partial walk (`walkComplete` false) a message that would claim an echo is held the same way. A cleanly rejected or released write never
  * landed and claims nothing; an abandoned one might have, so it can.
  */
 export async function claimOwnEchoes(
@@ -1286,6 +1286,7 @@ export async function claimOwnEchoes(
   }>,
   mark?: { readonly ownerRequestId: string; readonly observedAt: string },
   pendingOut?: string[],
+  walkComplete = true,
   config: LockConfig = DEFAULT_LOCK_CONFIG
 ): Promise<{ activityId: string; digest: string } | undefined> {
   return updateJournal(
@@ -1336,6 +1337,13 @@ export async function claimOwnEchoes(
           // Only a dispatched write whose outcome is unknown could explain it:
           // `dispatchedAt` proves the POST began, not that it landed. Leave the
           // message unclassified; the caller must not consume it yet.
+          pendingOut?.push(message.activityId);
+          continue;
+        }
+        if (slot !== undefined && !walkComplete) {
+          // A partial walk may not have reached the write's real, older echo:
+          // claiming this same-digest message now could be a teammate's. Hold
+          // it until a complete walk can tell which match is earliest.
           pendingOut?.push(message.activityId);
           continue;
         }

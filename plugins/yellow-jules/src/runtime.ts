@@ -476,7 +476,8 @@ async function recordOutsideActivity(
     activityId: string;
     digest: string;
     createTime?: string;
-  }>
+  }>,
+  walkComplete: boolean
 ): Promise<ReadonlySet<string>> {
   const pending: string[] = [];
   if (messages.length === 0 || record.kind !== 'create') return new Set();
@@ -489,7 +490,8 @@ async function recordOutsideActivity(
       ownerRequestId: record.localRequestId,
       observedAt: nowFn(deps)().toISOString(),
     },
-    pending
+    pending,
+    walkComplete
   );
   return new Set(pending);
 }
@@ -639,7 +641,12 @@ export async function status(
     // Messages only an in-flight (dispatched, unsettled) reply could explain are
     // held back: neither the watermark nor the ring may pass them, so the next
     // walk classifies them once the write has settled.
-    const held = await recordOutsideActivity(deps, record, newUserMessages);
+    const held = await recordOutsideActivity(
+      deps,
+      record,
+      newUserMessages,
+      walk.complete
+    );
     const heldBack = held.size > 0;
     record = await upsertReadState(
       deps.dataDir,
