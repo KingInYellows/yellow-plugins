@@ -455,6 +455,7 @@ export async function superviseOnce(
   // Only the fields below are read; plan steps and artifacts (patch text) are not kept.
   const newActivities: ActivityView[] = [];
   const newest: { agent?: ActivityView } = {};
+  const agentMessages: ActivityView[] = [];
   let seen: StatusResult;
   try {
     const result = await status(deps, {
@@ -463,6 +464,9 @@ export async function superviseOnce(
       deadlineMs: Math.max(1, remainingMs(deps.clock, deadline)),
       observer: (activity, info) => {
         if (info.unseen) newActivities.push(viewOf(activity));
+        if (activity.type === 'agentMessaged') {
+          agentMessages.push(viewOf(activity));
+        }
         if (
           activity.type === 'agentMessaged' &&
           (newest.agent === undefined ||
@@ -805,7 +809,19 @@ export async function superviseOnce(
     // and carriage returns become spaces), or that is too long to show in full,
     // was not shown as it is: no binding and no reply action are offered for it, so the
     // operator answers.
+    // Two different questions at the newest createTime cannot be ordered by
+    // their opaque ids, so none is offered.
+    const tiedQuestions =
+      latest !== undefined &&
+      new Set(
+        agentMessages
+          .filter(
+            (m) => Date.parse(m.createTime) === Date.parse(latest.createTime)
+          )
+          .map((m) => m.message)
+      ).size > 1;
     const bindable =
+      !tiedQuestions &&
       latest?.message !== undefined &&
       latest.message.trim() !== '' &&
       !HIDDEN_CHARS_RE.test(latest.message) &&

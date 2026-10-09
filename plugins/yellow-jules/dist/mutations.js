@@ -176,7 +176,7 @@ async function delegateInner(deps, args, ids) {
         }, ids);
     }
     const grantId = args.grantId !== undefined ? (0, validate_js_1.validateGrantId)(args.grantId) : undefined;
-    return (0, runtime_support_js_1.withAdapter)(deps, async (adapter) => {
+    return (0, runtime_support_js_1.withMutationAdapter)(deps, async (adapter) => {
         // R17: the source is discovered, never synthesized.
         const source = await (0, runtime_support_js_1.read)(deps, deadline, () => adapter.getSource(repo.owner, repo.repo));
         if (source.sourceResource !== sourceResource) {
@@ -330,6 +330,7 @@ async function assertQuestionStillOpen(deps, adapter, sessionResource, liveCondi
     }
     let newest;
     const userMessages = [];
+    const agentMessages = [];
     const walk = await (0, activity_walk_js_1.walkActivities)({
         adapter,
         sessionResource,
@@ -343,6 +344,12 @@ async function assertQuestionStillOpen(deps, adapter, sessionResource, liveCondi
                 userMessages.push({
                     activityId: activity.activityId,
                     createTime: activity.createTime,
+                });
+            }
+            if (activity.type === 'agentMessaged') {
+                agentMessages.push({
+                    createTime: activity.createTime,
+                    digest: (0, state_js_1.messageDigest)(activity.message ?? ''),
                 });
             }
             if (activity.type === 'agentMessaged' &&
@@ -359,6 +366,9 @@ async function assertQuestionStillOpen(deps, adapter, sessionResource, liveCondi
     });
     if (!walk.complete) {
         return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'the session activity could not be completely re-read; nothing was sent', { recoveryAction: 'Retry with a larger --deadline-ms.' });
+    }
+    if (newestPlanAmbiguous(agentMessages)) {
+        return changed('two different questions share the newest timestamp, so the current one cannot be told');
     }
     const current = newest;
     // The review saw the redacted question; an answer to text redaction hid
@@ -546,7 +556,7 @@ async function replyInner(deps, args, ids) {
     if (!args.dryRun && args.grantId === undefined) {
         throw (0, write_gate_js_1.confirmationRequired)(deps, { operation: 'reply', ...scopeOf(target) }, ids);
     }
-    return (0, runtime_support_js_1.withAdapter)(deps, async (adapter) => {
+    return (0, runtime_support_js_1.withMutationAdapter)(deps, async (adapter) => {
         if (args.dryRun) {
             await (0, runtime_support_js_1.read)(deps, deadline, () => adapter.getSession(target.sessionResource));
             return {
@@ -677,7 +687,7 @@ async function approveInner(deps, args, ids) {
         createTime: pending.activityCreateTime,
         activityId: pending.activityId,
     };
-    return (0, runtime_support_js_1.withAdapter)(deps, async (adapter) => {
+    return (0, runtime_support_js_1.withMutationAdapter)(deps, async (adapter) => {
         const session = await (0, runtime_support_js_1.read)(deps, deadline, () => adapter.getSession(target.sessionResource));
         if (session.vendorState !== 'awaitingPlanApproval') {
             return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', `the session is ${(0, runtime_support_js_1.conditionOf)(session.vendorState)}, not awaiting plan approval`);
@@ -883,7 +893,14 @@ async function verifyApproval(deps, adapter, sessionResource, start, deadline, e
             : generated.filter((g) => (0, activity_walk_js_1.compareStamp)(g, stamp) < 0);
         const before = [...candidates].sort((a, b) => (0, activity_walk_js_1.compareStamp)(b, a))[0];
         // Equal-time plans with differing digests: the approved one is unknowable.
-        const ambiguous = newestPlanAmbiguous(candidates);
+        // A plan stamped at the approval's own time is unordered against it (the
+        // ids are opaque), so one that differs from the reviewed digest counts.
+        const atApproval = stamp === undefined
+            ? []
+            : generated.filter((g) => !stampBefore(g, stamp) && !stampBefore(stamp, g));
+        const ambiguous = newestPlanAmbiguous(candidates) ||
+            (expectedDigest !== undefined &&
+                atApproval.some((g) => g.digest !== expectedDigest));
         return {
             observedPlanIdAfter: observed,
             planChanged: ambiguous ||

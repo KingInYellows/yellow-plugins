@@ -280,6 +280,39 @@ describe('our own integrity verdicts on the write path are not flattened', () =>
   });
 });
 
+describe('a scratch-tripwire failure at adapter close after dispatch', () => {
+  function closeViolates(): void {
+    h.adapter.close = async () => {
+      throw new AppErrorException(
+        makeAppError('JULES_SDK_INTEGRITY', 'scratch tripwire fired')
+      );
+    };
+  }
+
+  it('keeps the settled success and reports the violation', async () => {
+    closeViolates();
+    const result = (await reply(h.deps, args())) as unknown as Record<
+      string,
+      unknown
+    >;
+    expect(result['sent']).toBe(true);
+    expect(result['requiresAttention']).toBe(true);
+    expect(result['attention']).toContain('adapterCleanupViolation');
+    expect(result['cleanupViolation']).toBe('scratch tripwire fired');
+    expect(h.adapter.callsTo('sendMessage')).toHaveLength(1);
+  });
+
+  it('keeps JULES_UNKNOWN_OUTCOME instead of presenting an integrity failure', async () => {
+    closeViolates();
+    h.adapter.sendMessageImpl = async () => {
+      throw new AdapterError('network', 'reset', { dispatched: true });
+    };
+    const err = await fails(() => reply(h.deps, args()));
+    expect(err.appError.code).toBe('JULES_UNKNOWN_OUTCOME');
+    expect(h.adapter.callsTo('sendMessage')).toHaveLength(1);
+  });
+});
+
 describe('ambiguous reply outcomes', () => {
   it.each([
     [
@@ -750,6 +783,28 @@ describe('races inside the write gate', () => {
         activityId: 'a-low-user',
         createTime: q.createTime,
         message: 'Use sqlite.',
+      });
+      expect(
+        await code(() =>
+          reply(
+            h.deps,
+            args({
+              expectActivityId: q.activityId,
+              expectQuestionDigest: messageDigest(QUESTION),
+            })
+          )
+        )
+      ).toBe('JULES_QUESTION_CHANGED');
+      expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    });
+
+    it('refuses when two different questions share the newest createTime', async () => {
+      const q = ask();
+      addActivity(h, session.sessionResource, {
+        type: 'agentMessaged',
+        activityId: 'a-low-question',
+        createTime: q.createTime,
+        message: 'Which cloud should I use?',
       });
       expect(
         await code(() =>

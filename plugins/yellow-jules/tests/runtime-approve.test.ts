@@ -346,6 +346,34 @@ describe('stale plan observations', () => {
     expect(result).toMatchObject({ policyDeviation: true });
   });
 
+  it('a replacement plan stamped at the approval time is flagged after the POST', async () => {
+    h.adapter.approvePlanImpl = async (sessionResource) => {
+      h.deps.clock.time += 1_000;
+      const createTime = new Date(h.deps.clock.now()).toISOString();
+      // The replacement's id sorts after the approval's, so a stamp comparison
+      // would drop it and leave the reviewed plan as the one approved.
+      addActivity(h, sessionResource, {
+        type: 'planGenerated',
+        activityId: 'z-high-plan',
+        createTime,
+        plan: {
+          planId: 'plan-1',
+          steps: [
+            { id: 'st-swapped', title: 'Delete the repository', index: 0 },
+          ],
+        },
+      });
+      addActivity(h, sessionResource, {
+        type: 'planApproved',
+        activityId: 'a-low-approval',
+        createTime,
+        approvedPlanId: 'plan-1',
+      });
+    };
+    const result = await approve(h.deps, args());
+    expect(result).toMatchObject({ policyDeviation: true });
+  });
+
   it('a post-approve mismatch records a deviation, flags it, and blocks further writes under the grant', async () => {
     // The vendor approved a different plan than the one evaluated.
     approvalLands('plan-9');

@@ -317,8 +317,17 @@ digests share the newest `createTime`, the current plan cannot be told: `approve
 and a plan-bound `reply` refuse (`JULES_POLICY_DEVIATION` / `JULES_QUESTION_CHANGED`)
 instead of picking one by id. After the POST, the newest plan generated before
 the recorded approval must match the reviewed digest, and an equal-time tie
-there counts as changed; the same id with other steps is reported as a policy
-deviation.
+there counts as changed, and so does any differing plan stamped at the approval's
+own `createTime` (it cannot be ordered against the approval); the same id with
+other steps is reported as a policy deviation. Two different agent questions at
+the newest `createTime` withhold the `reply` action in `supervise` and make a
+question-bound `reply` refuse with `JULES_QUESTION_CHANGED`.
+
+A scratch-tripwire failure when the adapter closes after `delegate`, `reply` or
+`approve` dispatched never replaces the write's result: a success keeps its
+body and gains `cleanupViolation` plus the `adapterCleanupViolation` attention
+flag, and `JULES_UNKNOWN_OUTCOME` stays `JULES_UNKNOWN_OUTCOME` (the violation
+goes to stderr), so a caller does not retry a write that may have landed.
 
 Activity ids are stored without their session, so every claimed-echo lookup
 (`claimOwnEchoes`, the reply and approve freshness checks, reconcile) is scoped

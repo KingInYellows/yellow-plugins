@@ -44,6 +44,7 @@ exports.ACTIVE_GRANT_ENV = exports.REAL_CLOCK = void 0;
 exports.nowFn = nowFn;
 exports.prepare = prepare;
 exports.withAdapter = withAdapter;
+exports.withMutationAdapter = withMutationAdapter;
 exports.read = read;
 exports.isTerminalCondition = isTerminalCondition;
 exports.conditionOf = conditionOf;
@@ -96,6 +97,56 @@ async function withAdapter(deps, fn) {
     }
     await adapter.close();
     return result;
+}
+/**
+ * `withAdapter` for the three vendor writes. Once the POST was dispatched, a
+ * scratch-tripwire failure in `close()` must not turn the settled result into
+ * an ordinary failed call, nor replace JULES_UNKNOWN_OUTCOME: a caller that
+ * retried would repeat a write that may have landed. The violation is still
+ * reported: a `cleanupViolation` field and an attention flag on a success, a
+ * stderr warning on an unknown outcome.
+ */
+async function withMutationAdapter(deps, fn) {
+    const adapter = await deps.adapterFactory();
+    const violation = async () => {
+        try {
+            await adapter.close();
+        }
+        catch (closeErr) {
+            if (closeErr instanceof errors_js_1.AppErrorException &&
+                closeErr.appError.code === 'JULES_SDK_INTEGRITY')
+                return closeErr;
+        }
+        return undefined;
+    };
+    let result;
+    try {
+        result = await fn(adapter);
+    }
+    catch (err) {
+        const closeErr = await violation();
+        if (closeErr === undefined)
+            throw err;
+        if (err instanceof errors_js_1.AppErrorException &&
+            err.appError.code === 'JULES_UNKNOWN_OUTCOME') {
+            process.stderr.write(`warning: the write outcome is unknown and the adapter cleanup also failed: ${closeErr.appError.message}\n`);
+            throw err;
+        }
+        throw closeErr;
+    }
+    const closeErr = await violation();
+    if (closeErr === undefined)
+        return result;
+    // A dry run sent nothing, so the violation keeps its own code.
+    if (result.dryRun === true)
+        throw closeErr;
+    const prior = result.attention ?? [];
+    return {
+        ...result,
+        requiresAttention: true,
+        attention: [...prior, 'adapterCleanupViolation'],
+        cleanupViolation: closeErr.appError.message,
+    };
 }
 /** Adapter failures on a read are mapped with the pre-dispatch/read column; nothing here is after dispatch. */
 async function read(deps, deadline, fn) {

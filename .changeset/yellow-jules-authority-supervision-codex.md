@@ -85,3 +85,9 @@ approve freshness checks or from reconciliation.
 newest timestamp instead of choosing one by activity id, a plan-bound `reply`
 refuses after a teammate message that follows the reviewed plan, and the
 freshness checks treat a user message at the same timestamp as later.
+
+A plan generated at the same timestamp as the recorded approval is flagged as a
+changed plan, two different questions at the newest timestamp withhold the
+`reply` action and refuse a question-bound `reply`, and a scratch-tripwire
+failure when the adapter closes after a dispatched write no longer replaces the
+write's result or an unknown outcome (it is reported as `cleanupViolation`).

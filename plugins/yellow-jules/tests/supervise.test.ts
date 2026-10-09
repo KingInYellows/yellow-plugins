@@ -211,6 +211,26 @@ describe('needs-answer', () => {
     expect(r.fenced.question?.startsWith(FENCE_BEGIN)).toBe(true);
   });
 
+  it('withholds reply when two different questions share the newest createTime', async () => {
+    setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
+    const q = addActivity(h, session.sessionResource, {
+      type: 'agentMessaged',
+      message: 'Which database should I use?',
+    });
+    addActivity(h, session.sessionResource, {
+      type: 'agentMessaged',
+      activityId: 'a-low-question',
+      createTime: q.createTime,
+      message: 'Which cloud should I use?',
+    });
+    const r = await sup();
+    expect(r.decision).toBe('needs-answer');
+    expect(r.observedActivityId).toBeUndefined();
+    expect(r.observedQuestionDigest).toBeUndefined();
+    expect(r.allowedActions).toEqual([]);
+    expect(r.attention).toContain('questionUnavailable');
+  });
+
   it('withholds the question bindings when redaction altered the question', async () => {
     setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
     addActivity(h, session.sessionResource, {

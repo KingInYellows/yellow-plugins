@@ -50,7 +50,7 @@ import {
   prepare,
   read,
   resolveSessionResource,
-  withAdapter,
+  withMutationAdapter,
   type WriteDeps,
   refuseInsideSupervisedSession,
   resolveControllerContext,
@@ -326,7 +326,7 @@ async function delegateInner(
   const grantId =
     args.grantId !== undefined ? validateGrantId(args.grantId) : undefined;
 
-  return withAdapter(deps, async (adapter) => {
+  return withMutationAdapter(deps, async (adapter) => {
     // R17: the source is discovered, never synthesized.
     const source = await read(deps, deadline, () =>
       adapter.getSource(repo.owner, repo.repo)
@@ -597,6 +597,7 @@ async function assertQuestionStillOpen(
     | { activityId: string; createTime: string; message?: string }
     | undefined;
   const userMessages: Array<{ activityId: string; createTime: string }> = [];
+  const agentMessages: Array<{ createTime: string; digest: string }> = [];
   const walk = await walkActivities({
     adapter,
     sessionResource,
@@ -610,6 +611,12 @@ async function assertQuestionStillOpen(
         userMessages.push({
           activityId: activity.activityId,
           createTime: activity.createTime,
+        });
+      }
+      if (activity.type === 'agentMessaged') {
+        agentMessages.push({
+          createTime: activity.createTime,
+          digest: messageDigest(activity.message ?? ''),
         });
       }
       if (
@@ -631,6 +638,11 @@ async function assertQuestionStillOpen(
       'JULES_INVALID_STATE',
       'the session activity could not be completely re-read; nothing was sent',
       { recoveryAction: 'Retry with a larger --deadline-ms.' }
+    );
+  }
+  if (newestPlanAmbiguous(agentMessages)) {
+    return changed(
+      'two different questions share the newest timestamp, so the current one cannot be told'
     );
   }
   const current = newest as
@@ -927,7 +939,7 @@ async function replyInner(
     );
   }
 
-  return withAdapter(deps, async (adapter) => {
+  return withMutationAdapter(deps, async (adapter) => {
     if (args.dryRun) {
       await read(deps, deadline, () =>
         adapter.getSession(target.sessionResource)
@@ -1173,7 +1185,7 @@ async function approveInner(
     activityId: pending.activityId,
   };
 
-  return withAdapter(deps, async (adapter) => {
+  return withMutationAdapter(deps, async (adapter) => {
     const session = await read(deps, deadline, () =>
       adapter.getSession(target.sessionResource)
     );
@@ -1474,7 +1486,18 @@ async function verifyApproval(
         : generated.filter((g) => compareStamp(g, stamp) < 0);
     const before = [...candidates].sort((a, b) => compareStamp(b, a))[0];
     // Equal-time plans with differing digests: the approved one is unknowable.
-    const ambiguous = newestPlanAmbiguous(candidates);
+    // A plan stamped at the approval's own time is unordered against it (the
+    // ids are opaque), so one that differs from the reviewed digest counts.
+    const atApproval =
+      stamp === undefined
+        ? []
+        : generated.filter(
+            (g) => !stampBefore(g, stamp) && !stampBefore(stamp, g)
+          );
+    const ambiguous =
+      newestPlanAmbiguous(candidates) ||
+      (expectedDigest !== undefined &&
+        atApproval.some((g) => g.digest !== expectedDigest));
     return {
       observedPlanIdAfter: observed,
       planChanged:

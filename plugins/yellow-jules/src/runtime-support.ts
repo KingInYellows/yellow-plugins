@@ -105,6 +105,61 @@ export async function withAdapter<T>(
   return result;
 }
 
+/**
+ * `withAdapter` for the three vendor writes. Once the POST was dispatched, a
+ * scratch-tripwire failure in `close()` must not turn the settled result into
+ * an ordinary failed call, nor replace JULES_UNKNOWN_OUTCOME: a caller that
+ * retried would repeat a write that may have landed. The violation is still
+ * reported: a `cleanupViolation` field and an attention flag on a success, a
+ * stderr warning on an unknown outcome.
+ */
+export async function withMutationAdapter<T extends object>(
+  deps: RuntimeDeps,
+  fn: (adapter: SdkAdapter) => Promise<T>
+): Promise<T> {
+  const adapter = await deps.adapterFactory();
+  const violation = async (): Promise<AppErrorException | undefined> => {
+    try {
+      await adapter.close();
+    } catch (closeErr) {
+      if (
+        closeErr instanceof AppErrorException &&
+        closeErr.appError.code === 'JULES_SDK_INTEGRITY'
+      )
+        return closeErr;
+    }
+    return undefined;
+  };
+  let result: T;
+  try {
+    result = await fn(adapter);
+  } catch (err) {
+    const closeErr = await violation();
+    if (closeErr === undefined) throw err;
+    if (
+      err instanceof AppErrorException &&
+      err.appError.code === 'JULES_UNKNOWN_OUTCOME'
+    ) {
+      process.stderr.write(
+        `warning: the write outcome is unknown and the adapter cleanup also failed: ${closeErr.appError.message}\n`
+      );
+      throw err;
+    }
+    throw closeErr;
+  }
+  const closeErr = await violation();
+  if (closeErr === undefined) return result;
+  // A dry run sent nothing, so the violation keeps its own code.
+  if ((result as { dryRun?: boolean }).dryRun === true) throw closeErr;
+  const prior = (result as { attention?: readonly string[] }).attention ?? [];
+  return {
+    ...result,
+    requiresAttention: true,
+    attention: [...prior, 'adapterCleanupViolation'],
+    cleanupViolation: closeErr.appError.message,
+  };
+}
+
 /** Adapter failures on a read are mapped with the pre-dispatch/read column; nothing here is after dispatch. */
 export async function read<T>(
   deps: RuntimeDeps,

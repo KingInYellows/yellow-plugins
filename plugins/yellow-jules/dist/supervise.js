@@ -272,6 +272,7 @@ async function superviseOnce(deps, args) {
     // Only the fields below are read; plan steps and artifacts (patch text) are not kept.
     const newActivities = [];
     const newest = {};
+    const agentMessages = [];
     let seen;
     try {
         const result = await (0, runtime_js_1.status)(deps, {
@@ -281,6 +282,9 @@ async function superviseOnce(deps, args) {
             observer: (activity, info) => {
                 if (info.unseen)
                     newActivities.push(viewOf(activity));
+                if (activity.type === 'agentMessaged') {
+                    agentMessages.push(viewOf(activity));
+                }
                 if (activity.type === 'agentMessaged' &&
                     (newest.agent === undefined ||
                         (0, activity_walk_js_1.compareStamp)(activity, newest.agent) > 0)) {
@@ -529,7 +533,14 @@ async function superviseOnce(deps, args) {
         // and carriage returns become spaces), or that is too long to show in full,
         // was not shown as it is: no binding and no reply action are offered for it, so the
         // operator answers.
-        const bindable = latest?.message !== undefined &&
+        // Two different questions at the newest createTime cannot be ordered by
+        // their opaque ids, so none is offered.
+        const tiedQuestions = latest !== undefined &&
+            new Set(agentMessages
+                .filter((m) => Date.parse(m.createTime) === Date.parse(latest.createTime))
+                .map((m) => m.message)).size > 1;
+        const bindable = !tiedQuestions &&
+            latest?.message !== undefined &&
             latest.message.trim() !== '' &&
             !redact_js_1.HIDDEN_CHARS_RE.test(latest.message) &&
             !(0, redact_js_1.fenceAltersText)(latest.message) &&
