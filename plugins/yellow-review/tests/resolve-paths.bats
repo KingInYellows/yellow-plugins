@@ -860,6 +860,24 @@ old_link() {
   [ "$status" -eq 0 ]
 }
 
+@test "rp_ignored_changed_since with a predicate follows symlinks nested below a trusted-config link target" {
+  link_repo
+  printf '.claude/\n' >> .gitignore
+  mkdir -p "$BATS_TEST_TMPDIR/deep" .claude
+  printf 'old\n' >| "$BATS_TEST_TMPDIR/deep/file"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/deep/file"
+  ln -s "$BATS_TEST_TMPDIR/deep" real/dir/nested
+  touch -h -t 201901010000 real/dir/nested
+  touch -t 201901010000 real/dir
+  old_link ../real/dir .claude/commands
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" "" rp_trusted_config
+  [ "$status" -eq 0 ]
+  printf 'new\n' >| "$BATS_TEST_TMPDIR/deep/file"
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" "" rp_trusted_config
+  [ "$status" -eq 1 ]
+  [[ "$output" == *.claude/commands* ]]
+}
+
 @test "rp_ignored_changed_since treats a dangling symlink target as no change" {
   link_repo
   old_link /nonexistent-target-dir/tool node_modules/.bin/dangling

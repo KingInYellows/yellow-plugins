@@ -3454,6 +3454,18 @@ dirlink_setup() {
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
 }
 
+@test "--revert-denied --no-ignored-guard flags a tracked trusted-config symlink to a directory with a tracked descendant" {
+  mkdir -p config
+  printf 'x\n' >| config/placeholder
+  printf 'config/settings.local.json\n' >> .git/info/exclude
+  printf '{}\n' >| config/settings.local.json
+  ln -s config .claude
+  git add -f .claude config/placeholder && git commit -q -m "link to dir"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
 @test "--revert-denied --no-ignored-guard flags a link to a tracked in-worktree target marked skip-worktree" {
   mkdir -p .claude
   ln -s ../src/a.txt .claude/settings.json

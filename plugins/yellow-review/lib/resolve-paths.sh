@@ -1330,8 +1330,9 @@ rp_tree_changes() {
 # is hidden behind a directory that cannot be searched. An optional third
 # argument `follow` walks a target directory with find -L, so symlinks nested
 # below it are judged by their targets too; a loop or any other find error then
-# returns 2 (cannot tell). The trusted-config symlink check uses it; the
-# ignored-symlink guard does not. Run it from the working
+# returns 2 (cannot tell). The trusted-config symlink check uses it, and so
+# does rp_ignored_changed_since when given a path predicate; its unfiltered
+# form does not. Run it from the working
 # tree root with a path that does not begin with `-`.
 rp_link_target_changed() {
     local l="$1" marker="$2" follow="${3:-}" t p d out skip="" rc=0 fl=-H
@@ -1400,7 +1401,9 @@ rp_link_target_changed() {
 # <scratch>, a scratch file for git's NUL-delimited listing. An optional fourth
 # argument names a path predicate (rp_trusted_config; pass an empty <hitsfile>
 # to keep the printed form): only paths it accepts count, and a directory walk
-# filters before its 20-path cut.
+# filters before its 20-path cut. With a predicate a symlink's target is walked
+# with `follow`, so a link nested below a linked directory is judged by its own
+# target (a loop returns 2).
 rp_ignored_changed_since() {
     local marker="$1" scratch="$2" hitsfile="${3:-}" keep="${4:-}" safe own=""
     [ -z "$keep" ] || declare -F -- "$keep" >/dev/null || return 2
@@ -1451,7 +1454,7 @@ rp_ignored_changed_since() {
                         # target is not examined (it could abort the guard).
                         kept "$l" || continue
                         lrc=0
-                        rp_link_target_changed "$l" "$marker" || lrc=$?
+                        rp_link_target_changed "$l" "$marker" ${keep:+follow} || lrc=$?
                         case "$lrc" in
                             0) if kept "$l"; then printf '%s\0' "$l" >|"$outfile" || exit 2; break; fi ;;
                             1) ;;
@@ -1464,7 +1467,7 @@ rp_ignored_changed_since() {
                 kept "$f" || : >|"$outfile"
                 if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ] && kept "$f"; then
                     lrc=0
-                    rp_link_target_changed "./$f" "$marker" || lrc=$?
+                    rp_link_target_changed "./$f" "$marker" ${keep:+follow} || lrc=$?
                     case "$lrc" in
                         0) if kept "$f"; then printf '%s\0' "./$f" >|"$outfile" || exit 2; fi ;;
                         1) ;;
