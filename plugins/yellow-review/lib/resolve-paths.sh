@@ -927,6 +927,15 @@ yr_cfg_key_runs_command() {
     return $r
 }
 
+# yr_pct_decode <text>: set YR_DECODED to <text> with %09 (tab), %0A (newline)
+# and %25 (%) decoded, in that order, so an encoded %09 stays literal.
+yr_pct_decode() {
+    local x="$1"
+    x=${x//%09/$'\t'}
+    x=${x//%0A/$'\n'}
+    YR_DECODED=${x//%25/%}
+}
+
 # yr_cfg_key_label <key>: a name for <key> that never carries its subsection
 # (a URL can hold userinfo) or the value.
 yr_cfg_key_label() {
@@ -1139,12 +1148,15 @@ harden_git_config() {
     # --null --show-scope --show-origin emits `scope NUL origin NUL key NL
     # value NUL` per entry, so a value holding newlines is read whole. awk
     # pre-filters with the same list and prints one tab-separated line per
-    # candidate (M marks a multi-line value); git's status 0 is required, an
+    # candidate (M marks a multi-line value). Every field is percent-encoded
+    # (%, tab and newline) so a path or value holding a tab cannot shift the
+    # columns; the shell decodes them (yr_pct_decode); git's status 0 is required, an
     # awk that cannot split on NUL leaves a record count that is not a
     # multiple of 3 and is refused.
     local tkey="" tscope trigin tkeyname tml tval ofile c oroot cache=$'\n'
     local recs
-    recs=$(set -o pipefail; yr_git config --null --show-scope --show-origin --list 2>/dev/null | YR_RE="$YR_CFG_CMD_KEY_RE" yr_awk 'BEGIN { RS = "\0" }
+    recs=$(set -o pipefail; yr_git config --null --show-scope --show-origin --list 2>/dev/null | YR_RE="$YR_CFG_CMD_KEY_RE" yr_awk 'function pe(x) { gsub(/%/, "%25", x); gsub(/\t/, "%09", x); gsub(/\n/, "%0A", x); return x }
+        BEGIN { RS = "\0" }
         NR % 3 == 1 { sc = $0; next }
         NR % 3 == 2 { og = $0; next }
         {
@@ -1153,8 +1165,7 @@ harden_git_config() {
             if (sc == "command") next
             if (tolower(k) !~ ENVIRON["YR_RE"]) next
             ml = (index(v, "\n") > 0) ? "M" : "S"
-            gsub(/[\t\n]/, " ", v)
-            printf "%s\t%s\t%s\t%s\t%s\n", sc, og, k, ml, v
+            printf "%s\t%s\t%s\t%s\t%s\n", pe(sc), pe(og), pe(k), ml, pe(v)
         }
         END { if (NR % 3 != 0) printf "local\t-\t<unparsed>\tM\t\n" }') \
         || { YR_HARDEN_MSG="could not parse the git transport config"; return 1; }
@@ -1163,6 +1174,9 @@ harden_git_config() {
     [ "$scope" = revert ] && ckmode=checkout
     while IFS=$'\t' read -r tscope trigin tkeyname tml tval; do
         [ -n "$tkeyname" ] || continue
+        yr_pct_decode "$trigin"; trigin=$YR_DECODED
+        yr_pct_decode "$tval"; tval=$YR_DECODED
+        yr_pct_decode "$tkeyname"; tkeyname=$YR_DECODED
         if [ "$tkeyname" = "<unparsed>" ]; then
             YR_HARDEN_MSG="could not parse the git transport config"
             return 1
