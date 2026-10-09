@@ -152,8 +152,8 @@ types a confirmation code there.
 ### Step 5: Preview and Confirm
 
 Show the session, the grant id, and whether this is a corrective message (and how
-many rounds the grant has left). Then print the first 500 characters of the
-message fenced, with this Bash call (same substitution rule; also substitute the
+many rounds the grant has left). Then print the message fenced (a message over 500
+characters is refused: the preview must show everything that is sent), with this Bash call (same substitution rule; also substitute the
 grant id from Step 4 and the request id from Step 3). It prints the confirmation
 `binding=` value:
 
@@ -191,6 +191,11 @@ MESSAGE=$(cat -- "$WORK_DIR/message.txt")
 bind_hash() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
 }
+# The preview shows 500 characters but the binding covers, and Step 6 sends, the whole message.
+MESSAGE_CHARS=$(printf '%s' "$MESSAGE" | jq -Rrs 'length')
+if [ "$MESSAGE_CHARS" -gt 500 ]; then
+  printf 'ERROR: the message is %s characters; the preview shows at most 500, so it cannot be confirmed. Nothing was sent. Shorten the message to 500 characters or fewer and start again from Step 2.\n' "$MESSAGE_CHARS" >&2; exit 1
+fi
 MESSAGE_SHA=$(printf '%s' "$MESSAGE" | bind_hash)
 BINDING=$(printf '%s' "${SESSION}|${GRANT_ID}|${REQUEST_ID}|${CORRECTION}|${MESSAGE_SHA}" | bind_hash)
 printf 'binding=%s\n' "$BINDING"

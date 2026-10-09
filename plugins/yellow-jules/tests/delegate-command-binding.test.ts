@@ -412,3 +412,40 @@ describe('/jules:supervise binds the reply to the pass decision', () => {
     fs.rmSync(ctx.root, { recursive: true, force: true });
   });
 });
+
+describe('/jules:reply refuses a preview that would hide part of the message', () => {
+  const reply = cmd('reply');
+  const s5 = reply.slice(
+    reply.indexOf('### Step 5'),
+    reply.indexOf('### Step 6')
+  );
+  const block = /```bash\n([\s\S]*?)```/.exec(s5)?.[1] ?? '';
+
+  const run = (message: string) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yellow-jules-reply.'));
+    fs.writeFileSync(path.join(dir, 'message.txt'), message);
+    const body = block
+      .replace('YELLOW_TODO_work_dir', dir)
+      .replace('YELLOW_TODO_session', 'sessions/1')
+      .replace('YELLOW_TODO_grant_id', 'g1')
+      .replace('YELLOW_TODO_request_id', 'r1')
+      .replace('YELLOW_TODO_1_or_0', '0');
+    const res = spawnSync('bash', ['-c', body], { encoding: 'utf8' });
+    fs.rmSync(dir, { recursive: true, force: true });
+    return res;
+  };
+
+  it('prints the binding and the whole message when it fits', () => {
+    const res = run('x'.repeat(500));
+    expect(res.status).toBe(0);
+    expect(res.stdout).toMatch(/binding=[0-9a-f]{64}/);
+    expect(res.stdout).toContain('x'.repeat(500));
+  });
+
+  it('exits without a binding when the message is over 500 characters', () => {
+    const res = run('x'.repeat(501));
+    expect(res.status).toBe(1);
+    expect(res.stdout).not.toContain('binding=');
+    expect(res.stderr).toContain('501 characters');
+  });
+});
