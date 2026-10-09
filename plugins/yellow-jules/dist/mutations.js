@@ -983,12 +983,13 @@ async function abandon(deps, args) {
         // no slot, but one that does must still be bound to this controller.
         let grants;
         let grantId;
-        if (record.kind === 'create' && record.grantId !== undefined) {
+        if (record.grantId !== undefined) {
             const loaded = (0, authority_js_1.loadGrants)(deps.dataDir);
             const grant = loaded.grants[record.grantId];
             if (grant !== undefined) {
                 (0, controller_js_1.assertControllerAuthority)(ctx.controllerDir, deps.dataDir, grant.epochRef, ctx.controllerId);
-                if (grant.usage.activeSessionRefs.includes(record.localRequestId)) {
+                if (record.kind === 'create' &&
+                    grant.usage.activeSessionRefs.includes(record.localRequestId)) {
                     grants = loaded;
                     grantId = grant.grantId;
                 }

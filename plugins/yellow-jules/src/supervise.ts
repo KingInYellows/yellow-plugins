@@ -789,6 +789,7 @@ export async function superviseOnce(
     // the signal. The supervisor judged incomplete text, so nothing is offered.
     const unactionable =
       seen.pendingPlan.redacted === true ||
+      seen.pendingPlan.ambiguous === true ||
       fenceAltersText(shownPlan) ||
       HIDDEN_CHARS_RE.test(shownPlan);
     const actions: AllowedAction[] = unactionable

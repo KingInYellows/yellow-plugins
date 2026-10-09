@@ -1367,7 +1367,31 @@ export async function upsertReadState(
                 activityId: fresh.activityId,
               }
             ) > 0;
-          pendingPlan = newer ? update.pendingPlan : fresh;
+          const winner = newer ? update.pendingPlan : fresh;
+          // Equal createTimes are unordered: two plans there that differ in id
+          // and content leave the current plan unknown, whichever side wins.
+          // The flag is sticky once either side carries it.
+          const sameTime =
+            compareStamp(
+              {
+                createTime: update.pendingPlan.activityCreateTime,
+                activityId: '',
+              },
+              { createTime: fresh.activityCreateTime, activityId: '' }
+            ) === 0;
+          const differs =
+            update.pendingPlan.activityId !== fresh.activityId &&
+            JSON.stringify([
+              update.pendingPlan.planId,
+              update.pendingPlan.steps,
+            ]) !== JSON.stringify([fresh.planId, fresh.steps]);
+          pendingPlan =
+            sameTime &&
+            (differs ||
+              update.pendingPlan.ambiguous === true ||
+              fresh.ambiguous === true)
+              ? { ...winner, ambiguous: true as const }
+              : winner;
         } else if (
           current.lastActivityCreateTime !== undefined &&
           current.lastActivityId !== undefined &&

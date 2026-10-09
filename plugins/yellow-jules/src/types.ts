@@ -242,6 +242,8 @@ export interface PendingPlan {
   readonly steps: readonly PlanStepRecord[];
   readonly activityCreateTime: string;
   readonly activityId: string;
+  /** Set by the walk when plans with differing content share the newest createTime: which is current is unknowable, so the plan is never actionable. */
+  readonly ambiguous?: true;
   /** Set by `status` when redaction changed the plan text it persisted; such a plan is never actionable. */
   readonly redacted?: true;
 }

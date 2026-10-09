@@ -1627,7 +1627,7 @@ export async function abandon(
     // no slot, but one that does must still be bound to this controller.
     let grants: GrantsFile | undefined;
     let grantId: string | undefined;
-    if (record.kind === 'create' && record.grantId !== undefined) {
+    if (record.grantId !== undefined) {
       const loaded = loadGrants(deps.dataDir);
       const grant = loaded.grants[record.grantId];
       if (grant !== undefined) {
@@ -1637,7 +1637,10 @@ export async function abandon(
           grant.epochRef,
           ctx.controllerId
         );
-        if (grant.usage.activeSessionRefs.includes(record.localRequestId)) {
+        if (
+          record.kind === 'create' &&
+          grant.usage.activeSessionRefs.includes(record.localRequestId)
+        ) {
           grants = loaded;
           grantId = grant.grantId;
         }

@@ -231,6 +231,39 @@ describe('abandon', () => {
     ).toBe('failed');
   });
 
+  it('a grant-backed reply abandonment from a host without the controller file refuses before any write', async () => {
+    const { delegateOk } = await import('./support/grants.js');
+    const { reply } = await import('../src/mutations.js');
+    h.adapter.restoreWrites();
+    const roomy = await createGrant(h, { maxActiveSessions: 3 });
+    const session = await delegateOk(h, roomy, {
+      branch: 'scratch/two',
+      requestId: 'sess-2',
+    });
+    h.adapter.sendMessageImpl = async () => {
+      throw new AdapterError('network', 'reset', { dispatched: true });
+    };
+    await expect(
+      reply(h.deps, {
+        session: session.localId,
+        message: 'lost',
+        dryRun: false,
+        correction: false,
+        grantId: roomy,
+        requestId: 'stuck-reply',
+      })
+    ).rejects.toBeInstanceOf(AppErrorException);
+    h.deps.clock.time = Date.now() + 10 * 60_000;
+    await status(h.deps, { session: session.localId, reconcile: true });
+    fs.rmSync(controllerFilePath(h.controllerDir, 'testhost'));
+    expect(
+      await codeOf(() => abandon(h.deps, { requestId: 'stuck-reply' }))
+    ).toBe('JULES_CONTROLLER_MISMATCH');
+    const record = (await readJournal(h.dataDir)).operations['stuck-reply'];
+    expect(record?.status).toBe('unknown-outcome');
+    expect(record?.abandonedAt).toBeUndefined();
+  });
+
   it('a record that was already settled is not abandonable', async () => {
     await status(h.deps, { reconcile: true });
     await abandon(h.deps, { requestId });

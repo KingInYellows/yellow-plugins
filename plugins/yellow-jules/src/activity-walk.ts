@@ -179,6 +179,20 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
   const seen: Array<{ activityId: string; createTime: string }> = [];
   const newIds: string[] = [];
   let latestPlan: PendingPlan | undefined = params.pendingPlan;
+  // Content keys of the plans at the newest plan createTime: equal times are
+  // unordered, so more than one distinct key leaves the current plan unknown.
+  const planKeyOf = (p: {
+    planId: string;
+    steps: readonly unknown[];
+  }): string => JSON.stringify([p.planId, p.steps]);
+  let newestPlanKeys = new Set<string>(
+    params.pendingPlan === undefined
+      ? []
+      : [
+          planKeyOf(params.pendingPlan),
+          ...(params.pendingPlan.ambiguous === true ? ['\0ambiguous'] : []),
+        ]
+  );
   let latestApproval: { createTime: string; activityId: string } | undefined =
     params.approval;
   let newest: { createTime: string; activityId: string } | undefined;
@@ -291,6 +305,15 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
           createTime: activity.createTime,
           activityId: activity.activityId,
         };
+        const timeCmp =
+          latestPlan == null
+            ? 1
+            : compareStamp(
+                { createTime: stamp.createTime, activityId: '' },
+                { createTime: latestPlan.activityCreateTime, activityId: '' }
+              );
+        if (timeCmp > 0) newestPlanKeys = new Set();
+        if (timeCmp >= 0) newestPlanKeys.add(planKeyOf(activity.plan));
         if (
           latestPlan == null ||
           compareStamp(stamp, {
@@ -349,7 +372,9 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
       activityId: latestPlan.activityId,
     }) > 0
       ? null
-      : latestPlan;
+      : latestPlan !== undefined && newestPlanKeys.size > 1
+        ? { ...latestPlan, ambiguous: true as const }
+        : latestPlan;
 
   return {
     pages,

@@ -342,6 +342,12 @@ has positive landing evidence and its echo's vendor `createTime` (recorded as
 The local dispatch clock is never compared with the vendor's: a reply without an
 echo `createTime` explains no plan swap, and the swap pauses.
 
+Plans with differing content that share the newest `createTime` are unordered:
+the walk marks the pending plan `ambiguous`, and `supervise` offers no action
+for it (`allowedActions` empty, `planUnavailable`), as for a redacted plan.
+`abandon` asserts controller authority for every record carrying a `grantId`;
+only a create releases a grant slot.
+
 Outside-activity markers treat an equal `createTime` as unordered: outside
 messages tied on the newest time are all kept (`alsoActivityIds` beside
 `activityId`, merged across walks), so the `--clear-pause` prompt lists every

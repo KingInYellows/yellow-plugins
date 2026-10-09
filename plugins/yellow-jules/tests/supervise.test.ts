@@ -757,6 +757,30 @@ describe('outside activity pauses (R32)', () => {
     expect(r.attention).toContain('planUnavailable');
   });
 
+  it('withholds approve and reply when two different plans share the newest createTime', async () => {
+    const stamp = new Date(h.deps.clock.now()).toISOString();
+    for (const [id, planId] of [
+      ['plan-aaa', 'plan-a'],
+      ['plan-zzz', 'plan-z'],
+    ] as const) {
+      addActivity(h, session.sessionResource, {
+        type: 'planGenerated',
+        activityId: id,
+        createTime: stamp,
+        plan: {
+          planId,
+          steps: [{ id: `st-${id}`, title: `Work ${id}`, index: 0 }],
+        },
+      });
+    }
+    setVendorState(h, session.sessionResource, 'awaitingPlanApproval');
+    const r = await sup();
+    expect(r.decision).toBe('needs-plan-review');
+    expect(r.allowedActions).toEqual([]);
+    expect(r.observedPlanId).toBeUndefined();
+    expect(r.attention).toContain('planUnavailable');
+  });
+
   it('a plan swap consumed by an intervening plain status still pauses', async () => {
     addPlan(h, session.sessionResource, 'plan-1');
     expect((await sup()).decision).toBe('needs-plan-review');

@@ -477,6 +477,49 @@ describe('read-state, external records, deviations, retention', () => {
     expect(cleared.pendingPlan?.activityId).toBe('a3');
   });
 
+  it('marks the pending plan ambiguous when a rebase meets a different plan at the same createTime', async () => {
+    const t = '2026-01-01T00:01:00Z';
+    const plan = (id: string) => ({
+      planId: `p-${id}`,
+      steps: [],
+      activityCreateTime: t,
+      activityId: id,
+    });
+    for (const [stored, walked, winner] of [
+      ['zzz', 'aaa', 'zzz'],
+      ['aaa', 'zzz', 'zzz'],
+    ] as const) {
+      const rec = await ensureObservedRecord(dataDir, `sessions/tie-${stored}`);
+      await upsertReadState(dataDir, rec.localRequestId, {
+        pendingPlan: plan(stored),
+        rebase: { ring: [] },
+      });
+      const next = await upsertReadState(dataDir, rec.localRequestId, {
+        pendingPlan: plan(walked),
+        rebase: { ring: [] },
+      });
+      expect(next.pendingPlan?.activityId).toBe(winner);
+      expect(next.pendingPlan?.ambiguous).toBe(true);
+      // Sticky: re-walking the winner alone keeps the flag.
+      const again = await upsertReadState(dataDir, rec.localRequestId, {
+        pendingPlan: plan(winner),
+        rebase: { ring: [] },
+      });
+      expect(again.pendingPlan?.ambiguous).toBe(true);
+    }
+    // The same plan seen twice is not ambiguous.
+    const same = await ensureObservedRecord(dataDir, 'sessions/tie-same');
+    await upsertReadState(dataDir, same.localRequestId, {
+      pendingPlan: plan('aaa'),
+      rebase: { ring: [] },
+    });
+    const once = await upsertReadState(dataDir, same.localRequestId, {
+      pendingPlan: plan('aaa'),
+      rebase: { ring: [] },
+    });
+    expect(once.pendingPlan?.ambiguous).toBeUndefined();
+  });
+
   it('rebases resumeApproval so a stale walk keeps a newer stored approval', async () => {
     const rec = await ensureObservedRecord(dataDir, 'sessions/s1');
     const older = { createTime: '2026-01-01T00:01:00Z', activityId: 'a2' };

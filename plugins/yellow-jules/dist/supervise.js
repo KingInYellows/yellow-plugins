@@ -526,6 +526,7 @@ async function superviseOnce(deps, args) {
         // the shown text carries no trace of it: the persisted `redacted` mark is
         // the signal. The supervisor judged incomplete text, so nothing is offered.
         const unactionable = seen.pendingPlan.redacted === true ||
+            seen.pendingPlan.ambiguous === true ||
             (0, redact_js_1.fenceAltersText)(shownPlan) ||
             redact_js_1.HIDDEN_CHARS_RE.test(shownPlan);
         const actions = unactionable

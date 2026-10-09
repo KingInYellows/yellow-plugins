@@ -66,6 +66,15 @@ async function walkActivities(params) {
     const seen = [];
     const newIds = [];
     let latestPlan = params.pendingPlan;
+    // Content keys of the plans at the newest plan createTime: equal times are
+    // unordered, so more than one distinct key leaves the current plan unknown.
+    const planKeyOf = (p) => JSON.stringify([p.planId, p.steps]);
+    let newestPlanKeys = new Set(params.pendingPlan === undefined
+        ? []
+        : [
+            planKeyOf(params.pendingPlan),
+            ...(params.pendingPlan.ambiguous === true ? ['\0ambiguous'] : []),
+        ]);
     let latestApproval = params.approval;
     let newest;
     let pages = 0;
@@ -165,6 +174,13 @@ async function walkActivities(params) {
                     createTime: activity.createTime,
                     activityId: activity.activityId,
                 };
+                const timeCmp = latestPlan == null
+                    ? 1
+                    : compareStamp({ createTime: stamp.createTime, activityId: '' }, { createTime: latestPlan.activityCreateTime, activityId: '' });
+                if (timeCmp > 0)
+                    newestPlanKeys = new Set();
+                if (timeCmp >= 0)
+                    newestPlanKeys.add(planKeyOf(activity.plan));
                 if (latestPlan == null ||
                     compareStamp(stamp, {
                         createTime: latestPlan.activityCreateTime,
@@ -216,7 +232,9 @@ async function walkActivities(params) {
             activityId: latestPlan.activityId,
         }) > 0
         ? null
-        : latestPlan;
+        : latestPlan !== undefined && newestPlanKeys.size > 1
+            ? { ...latestPlan, ambiguous: true }
+            : latestPlan;
     return {
         pages,
         processed,
