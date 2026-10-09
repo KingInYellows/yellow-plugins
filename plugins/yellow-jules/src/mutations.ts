@@ -634,7 +634,7 @@ async function assertQuestionStillOpen(
     );
   }
   const current = newest as
-    | { activityId: string; message?: string }
+    | { activityId: string; createTime: string; message?: string }
     | undefined;
   // The review saw the redacted question; an answer to text redaction hid
   // cannot be bound to what was shown.
@@ -659,27 +659,31 @@ async function assertQuestionStillOpen(
   ) {
     return changed('the session no longer awaits the question the pass showed');
   }
-  // A user message after the question that is not one of this plugin's claimed
-  // echoes is someone else answering (or steering) the session. This read does
-  // not classify it, so the reply fails closed and the next `status` records it.
+  if (await hasUnclaimedUserMessage(deps, userMessages, current)) {
+    return changed(
+      'a user message arrived after the question and was not sent by this plugin'
+    );
+  }
+}
+
+/**
+ * True when a user message newer than `after` is not one of this plugin's
+ * claimed echoes: someone else is steering the session. A complete re-read does
+ * not classify it, so the write fails closed and the next `status` records it.
+ */
+async function hasUnclaimedUserMessage(
+  deps: WriteDeps,
+  userMessages: ReadonlyArray<{ activityId: string; createTime: string }>,
+  after: { activityId: string; createTime: string }
+): Promise<boolean> {
   const claimed = new Set(
     Object.values((await readJournal(deps.dataDir)).operations).flatMap((r) =>
       r.echoActivityId !== undefined ? [r.echoActivityId] : []
     )
   );
-  const question = newest as unknown as {
-    activityId: string;
-    createTime: string;
-  };
-  if (
-    userMessages.some(
-      (u) => !claimed.has(u.activityId) && compareStamp(u, question) > 0
-    )
-  ) {
-    return changed(
-      'a user message arrived after the question and was not sent by this plugin'
-    );
-  }
+  return userMessages.some(
+    (u) => !claimed.has(u.activityId) && compareStamp(u, after) > 0
+  );
 }
 
 function validateExpectedPlan(
@@ -1108,6 +1112,7 @@ async function approveInner(
     const refetchDeadline: Deadline = args.dryRun
       ? deadline
       : deadlineIn(deps.clock, Math.floor(totalMs * APPROVE_REFETCH_SHARE));
+    const userMessages: Array<{ activityId: string; createTime: string }> = [];
     const refetch = await walkActivities({
       adapter,
       sessionResource: target.sessionResource,
@@ -1116,8 +1121,17 @@ async function approveInner(
       clock: deps.clock,
       deadline: refetchDeadline,
       pageCap: APPROVE_PAGE_CAP,
+      onActivity: (activity) => {
+        if (activity.type === 'userMessaged') {
+          userMessages.push({
+            activityId: activity.activityId,
+            createTime: activity.createTime,
+          });
+        }
+      },
     });
     if (!refetch.complete) return incompleteRefetch(refetch);
+    const steered = await hasUnclaimedUserMessage(deps, userMessages, start);
     const newest = refetch.pendingPlan;
     if (newest === null || newest === undefined) {
       return throwAppError(
@@ -1141,8 +1155,25 @@ async function approveInner(
         dryRun: true as const,
         observedPlanId: newest.planId,
         ...scopeOf(target),
-        ...attentionOf(changed ? ['planChanged'] : []),
+        ...attentionOf(changed || steered ? ['planChanged'] : []),
       };
+    }
+    // A user message after the reviewed plan that this plugin did not send may
+    // have changed what the plan means; the re-read does not classify it.
+    // Already-recorded outside activity is refused by the reservation below
+    // with the more specific JULES_SUPERVISION_PAUSED.
+    const alreadyPaused =
+      target.owner?.supervision?.paused !== undefined ||
+      target.owner?.supervision?.outsideSeen !== undefined;
+    if (steered && !alreadyPaused) {
+      return throwAppError(
+        'JULES_INVALID_STATE',
+        'a user message arrived after the reviewed plan and was not sent by this plugin; nothing was approved',
+        {
+          recoveryAction:
+            'Run status to record it, read the session, then evaluate the plan again.',
+        }
+      );
     }
     assertPlanReviewable(newest);
     if (
@@ -1208,13 +1239,15 @@ async function approveInner(
       adapter,
       target.sessionResource,
       start,
-      deadline
+      deadline,
+      args.expectPlanDigest
     );
     let deviated = false;
     let deviationUnrecorded = false;
     if (
-      verified.observedPlanIdAfter !== null &&
-      verified.observedPlanIdAfter !== planId &&
+      ((verified.observedPlanIdAfter !== null &&
+        verified.observedPlanIdAfter !== planId) ||
+        verified.planChanged) &&
       target.owner !== undefined
     ) {
       deviated = true;
@@ -1267,6 +1300,8 @@ interface Verification {
   readonly deferred: boolean;
   readonly partial: boolean;
   readonly pages: number;
+  /** The plan generated just before the approval has other steps than the reviewed digest (same id or not). */
+  readonly planChanged: boolean;
 }
 
 /** Post-POST re-read from the same start: which plan did the vendor record as approved? */
@@ -1279,8 +1314,14 @@ async function verifyApproval(
     readonly createTime: string;
     readonly activityId: string;
   },
-  deadline: Deadline
+  deadline: Deadline,
+  expectedDigest?: string
 ): Promise<Verification> {
+  const generated: Array<{
+    createTime: string;
+    activityId: string;
+    digest: string;
+  }> = [];
   let approvedPlanId: string | undefined;
   let approvedStamp: { createTime: string; activityId: string } | undefined;
   try {
@@ -1293,6 +1334,16 @@ async function verifyApproval(
       deadline,
       pageCap: APPROVE_PAGE_CAP,
       onActivity: (activity) => {
+        if (activity.type === 'planGenerated' && activity.plan !== undefined) {
+          generated.push({
+            createTime: activity.createTime,
+            activityId: activity.activityId,
+            digest: planDigest(
+              activity.plan.planId,
+              redactDeep({ steps: activity.plan.steps }).steps
+            ),
+          });
+        }
         if (
           activity.type === 'planApproved' &&
           activity.approvedPlanId !== undefined &&
@@ -1309,8 +1360,24 @@ async function verifyApproval(
       },
     });
     const observed = approvedPlanId ?? null;
+    // The plan the vendor approved is the newest one generated before the
+    // approval. The same id with other steps is a replacement under the
+    // reviewed id, which the id comparison alone cannot see.
+    const stamp = approvedStamp as
+      | { createTime: string; activityId: string }
+      | undefined;
+    const before =
+      stamp === undefined
+        ? undefined
+        : generated
+            .filter((g) => compareStamp(g, stamp) < 0)
+            .sort((a, b) => compareStamp(b, a))[0];
     return {
       observedPlanIdAfter: observed,
+      planChanged:
+        before !== undefined &&
+        expectedDigest !== undefined &&
+        before.digest !== expectedDigest,
       // A partial read, or a complete one that has not yet seen the approval, cannot confirm.
       deferred: !walk.complete || observed === null,
       partial: walk.partialPagination,
@@ -1327,6 +1394,7 @@ async function verifyApproval(
       deferred: true,
       partial: true,
       pages: 0,
+      planChanged: false,
     };
   }
 }

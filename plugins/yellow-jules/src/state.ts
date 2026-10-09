@@ -1898,11 +1898,16 @@ export async function claimOwnEchoes(
           (r) => r.status === 'accepted' || r.status === 'reconciled'
         );
         const eligible = settledOpen.length > 0 ? settledOpen : open;
+        // Several unresolved writes can own one message and nothing proves
+        // which landed: crediting the latest would mark a write landed on a
+        // guess. The message stays held until reconcile or abandon settles them.
+        const ambiguousUnresolved = settledOpen.length === 0 && open.length > 1;
         // Vendor list order is unverified, so with a usable timestamp prefer
         // the latest-dispatched write that precedes the message: an older
         // identical write then keeps the older echo.
-        const slot =
-          typeof sent === 'number' && !Number.isNaN(sent)
+        const slot = ambiguousUnresolved
+          ? undefined
+          : typeof sent === 'number' && !Number.isNaN(sent)
             ? eligible.reduce<OperationRecord | undefined>(
                 (best, r) =>
                   best === undefined ||

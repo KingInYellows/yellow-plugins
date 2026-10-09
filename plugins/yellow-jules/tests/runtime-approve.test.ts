@@ -220,6 +220,56 @@ describe('stale plan observations', () => {
     expect(h.adapter.writeCount()).toBe(0);
   });
 
+  it('a user message after the reviewed plan that is not our echo refuses the approval', async () => {
+    h.deps.clock.time += 1_000;
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'Actually, drop the migration step.',
+    });
+    const err = await fails(() => approve(h.deps, args()));
+    expect(err.appError.code).toBe('JULES_INVALID_STATE');
+    expect(h.adapter.writeCount()).toBe(0);
+  });
+
+  it('a user message after the reviewed plan flags a dry run as planChanged', async () => {
+    h.deps.clock.time += 1_000;
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'Actually, drop the migration step.',
+    });
+    const dry = await approve(
+      h.deps,
+      args({ dryRun: true, grantId: undefined })
+    );
+    expect(dry.attention).toContain('planChanged');
+  });
+
+  it('a same-id plan replacement between the re-read and the POST is a deviation', async () => {
+    h.adapter.approvePlanImpl = async (sessionResource) => {
+      h.deps.clock.time += 1_000;
+      addActivity(h, sessionResource, {
+        type: 'planGenerated',
+        plan: {
+          planId: 'plan-1',
+          steps: [
+            { id: 'st-swapped', title: 'Delete the repository', index: 0 },
+          ],
+        },
+      });
+      h.deps.clock.time += 1_000;
+      addActivity(h, sessionResource, {
+        type: 'planApproved',
+        approvedPlanId: 'plan-1',
+      });
+    };
+    const result = await approve(h.deps, args());
+    expect(result).toMatchObject({
+      observedPlanIdAfter: 'plan-1',
+      policyDeviation: true,
+    });
+    expect(result.attention).toContain('policyDeviation');
+  });
+
   it('a post-approve mismatch records a deviation, flags it, and blocks further writes under the grant', async () => {
     // The vendor approved a different plan than the one evaluated.
     approvalLands('plan-9');

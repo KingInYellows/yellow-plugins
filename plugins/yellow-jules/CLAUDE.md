@@ -305,6 +305,15 @@ redacted (`redacted: true` on `pendingPlan`); `supervise` then offers no
 when a user message that is not one of this plugin's claimed echoes follows the
 question.
 
+When several unresolved writes (`reserved` past its window, or
+`unknown-outcome`) could own one matching message, `status` credits none of them
+and keeps the message held; only a settled write is credited first. `approve`
+applies the question-reply rule to its complete re-read: a user message after
+the reviewed plan that is not a claimed echo refuses the approval
+(`JULES_INVALID_STATE`; a dry run reports `planChanged`). After the POST, the
+newest plan generated before the recorded approval must match the reviewed
+digest; the same id with other steps is reported as a policy deviation.
+
 Binding a create to a session that an `observe` row already owns (reconcile, or
 a create whose response arrived after a raw-resource `status`) folds that row
 into the create and retires its local id: deviations stay unreconciled if either

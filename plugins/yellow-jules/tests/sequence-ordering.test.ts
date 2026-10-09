@@ -232,6 +232,37 @@ describe('supervise: a reply "since the evaluation" must be proven to follow it'
     expect(result.reason).not.toBe('plan-changed-after-evaluation');
   });
 
+  it('two unknown-outcome replies with one matching message: neither is credited, so a swap still pauses', async () => {
+    addPlan(h, session.sessionResource, 'plan-1');
+    expect((await sup()).decision).toBe('needs-plan-review');
+    await dispatchReply(
+      'rep-x',
+      'please restructure the plan',
+      'unknown-outcome'
+    );
+    await dispatchReply(
+      'rep-y',
+      'please restructure the plan',
+      'unknown-outcome'
+    );
+    h.deps.clock.time += 1_000;
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'please restructure the plan',
+      originator: 'user',
+    });
+    await status(h.deps, { session: session.localId, reconcile: false });
+    const ops = (await readJournal(h.dataDir)).operations;
+    expect(ops['rep-x']?.echoActivityId).toBeUndefined();
+    expect(ops['rep-y']?.echoActivityId).toBeUndefined();
+    h.deps.clock.time += 1_000;
+    addPlanNow(h, session.sessionResource, 'plan-2');
+    expect(await sup()).toMatchObject({
+      decision: 'paused',
+      reason: 'plan-changed-after-evaluation',
+    });
+  });
+
   it('a reply dispatched before the evaluation, same millisecond, does not hide a plan swap', async () => {
     addPlan(h, session.sessionResource, 'plan-1');
     await landReply('rep-before', 'please restructure the plan');

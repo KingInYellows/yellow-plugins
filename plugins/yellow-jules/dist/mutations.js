@@ -375,14 +375,18 @@ async function assertQuestionStillOpen(deps, adapter, sessionResource, liveCondi
         (0, state_js_1.messageDigest)(current.message) !== expected.digest) {
         return changed('the session no longer awaits the question the pass showed');
     }
-    // A user message after the question that is not one of this plugin's claimed
-    // echoes is someone else answering (or steering) the session. This read does
-    // not classify it, so the reply fails closed and the next `status` records it.
-    const claimed = new Set(Object.values((await (0, state_js_1.readJournal)(deps.dataDir)).operations).flatMap((r) => r.echoActivityId !== undefined ? [r.echoActivityId] : []));
-    const question = newest;
-    if (userMessages.some((u) => !claimed.has(u.activityId) && (0, activity_walk_js_1.compareStamp)(u, question) > 0)) {
+    if (await hasUnclaimedUserMessage(deps, userMessages, current)) {
         return changed('a user message arrived after the question and was not sent by this plugin');
     }
+}
+/**
+ * True when a user message newer than `after` is not one of this plugin's
+ * claimed echoes: someone else is steering the session. A complete re-read does
+ * not classify it, so the write fails closed and the next `status` records it.
+ */
+async function hasUnclaimedUserMessage(deps, userMessages, after) {
+    const claimed = new Set(Object.values((await (0, state_js_1.readJournal)(deps.dataDir)).operations).flatMap((r) => r.echoActivityId !== undefined ? [r.echoActivityId] : []));
+    return userMessages.some((u) => !claimed.has(u.activityId) && (0, activity_walk_js_1.compareStamp)(u, after) > 0);
 }
 function validateExpectedPlan(args, haveQuestion) {
     const { expectPlanId: id, expectPlanDigest: digest } = args;
@@ -630,6 +634,7 @@ async function approveInner(deps, args, ids) {
         const refetchDeadline = args.dryRun
             ? deadline
             : (0, deadline_js_1.deadlineIn)(deps.clock, Math.floor(totalMs * APPROVE_REFETCH_SHARE));
+        const userMessages = [];
         const refetch = await (0, activity_walk_js_1.walkActivities)({
             adapter,
             sessionResource: target.sessionResource,
@@ -638,9 +643,18 @@ async function approveInner(deps, args, ids) {
             clock: deps.clock,
             deadline: refetchDeadline,
             pageCap: APPROVE_PAGE_CAP,
+            onActivity: (activity) => {
+                if (activity.type === 'userMessaged') {
+                    userMessages.push({
+                        activityId: activity.activityId,
+                        createTime: activity.createTime,
+                    });
+                }
+            },
         });
         if (!refetch.complete)
             return incompleteRefetch(refetch);
+        const steered = await hasUnclaimedUserMessage(deps, userMessages, start);
         const newest = refetch.pendingPlan;
         if (newest === null || newest === undefined) {
             return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'the vendor shows no pending plan for this session', { recoveryAction: 'Run status for this session, then retry.' });
@@ -658,8 +672,19 @@ async function approveInner(deps, args, ids) {
                 dryRun: true,
                 observedPlanId: newest.planId,
                 ...scopeOf(target),
-                ...(0, runtime_support_js_1.attentionOf)(changed ? ['planChanged'] : []),
+                ...(0, runtime_support_js_1.attentionOf)(changed || steered ? ['planChanged'] : []),
             };
+        }
+        // A user message after the reviewed plan that this plugin did not send may
+        // have changed what the plan means; the re-read does not classify it.
+        // Already-recorded outside activity is refused by the reservation below
+        // with the more specific JULES_SUPERVISION_PAUSED.
+        const alreadyPaused = target.owner?.supervision?.paused !== undefined ||
+            target.owner?.supervision?.outsideSeen !== undefined;
+        if (steered && !alreadyPaused) {
+            return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'a user message arrived after the reviewed plan and was not sent by this plugin; nothing was approved', {
+                recoveryAction: 'Run status to record it, read the session, then evaluate the plan again.',
+            });
         }
         assertPlanReviewable(newest);
         if (newest.planId !== planId ||
@@ -705,11 +730,12 @@ async function approveInner(deps, args, ids) {
         await (0, write_gate_js_1.settleAcceptedOrUnknown)(deps, reservation, { sessionResource: target.sessionResource }, { what: 'plan approved', reconcileHint: SESSION_RECONCILE });
         // The POST was answered 2xx. Everything below is verification and can never
         // turn the success into a failure envelope.
-        const verified = await verifyApproval(deps, adapter, target.sessionResource, start, deadline);
+        const verified = await verifyApproval(deps, adapter, target.sessionResource, start, deadline, args.expectPlanDigest);
         let deviated = false;
         let deviationUnrecorded = false;
-        if (verified.observedPlanIdAfter !== null &&
-            verified.observedPlanIdAfter !== planId &&
+        if (((verified.observedPlanIdAfter !== null &&
+            verified.observedPlanIdAfter !== planId) ||
+            verified.planChanged) &&
             target.owner !== undefined) {
             deviated = true;
             try {
@@ -747,7 +773,8 @@ async function approveInner(deps, args, ids) {
     });
 }
 /** Post-POST re-read from the same start: which plan did the vendor record as approved? */
-async function verifyApproval(deps, adapter, sessionResource, start, deadline) {
+async function verifyApproval(deps, adapter, sessionResource, start, deadline, expectedDigest) {
+    const generated = [];
     let approvedPlanId;
     let approvedStamp;
     try {
@@ -760,6 +787,13 @@ async function verifyApproval(deps, adapter, sessionResource, start, deadline) {
             deadline,
             pageCap: APPROVE_PAGE_CAP,
             onActivity: (activity) => {
+                if (activity.type === 'planGenerated' && activity.plan !== undefined) {
+                    generated.push({
+                        createTime: activity.createTime,
+                        activityId: activity.activityId,
+                        digest: (0, state_js_1.planDigest)(activity.plan.planId, (0, redact_js_1.redactDeep)({ steps: activity.plan.steps }).steps),
+                    });
+                }
                 if (activity.type === 'planApproved' &&
                     activity.approvedPlanId !== undefined &&
                     (0, activity_walk_js_1.compareStamp)(activity, start) > 0 &&
@@ -774,8 +808,20 @@ async function verifyApproval(deps, adapter, sessionResource, start, deadline) {
             },
         });
         const observed = approvedPlanId ?? null;
+        // The plan the vendor approved is the newest one generated before the
+        // approval. The same id with other steps is a replacement under the
+        // reviewed id, which the id comparison alone cannot see.
+        const stamp = approvedStamp;
+        const before = stamp === undefined
+            ? undefined
+            : generated
+                .filter((g) => (0, activity_walk_js_1.compareStamp)(g, stamp) < 0)
+                .sort((a, b) => (0, activity_walk_js_1.compareStamp)(b, a))[0];
         return {
             observedPlanIdAfter: observed,
+            planChanged: before !== undefined &&
+                expectedDigest !== undefined &&
+                before.digest !== expectedDigest,
             // A partial read, or a complete one that has not yet seen the approval, cannot confirm.
             deferred: !walk.complete || observed === null,
             partial: walk.partialPagination,
@@ -791,6 +837,7 @@ async function verifyApproval(deps, adapter, sessionResource, start, deadline) {
             deferred: true,
             partial: true,
             pages: 0,
+            planChanged: false,
         };
     }
 }

@@ -71,3 +71,8 @@ authority for the pause's grant.
 different steps, and offers no approve or reply for a plan whose text `status`
 redacted. A question-bound `reply` is refused when a user message that this
 plugin did not send follows the question.
+
+`status` no longer credits an echo to the latest of several unresolved
+same-text replies. `approve` refuses when a user message this plugin did not
+send follows the reviewed plan, and reports a policy deviation when the vendor
+approved the reviewed plan id with different steps.

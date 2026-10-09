@@ -1403,16 +1403,22 @@ async function claimOwnEchoes(dataDir, sessionResource, messages, mark, pendingO
             // an echo that may be a settled write's would mark it landed.
             const settledOpen = open.filter((r) => r.status === 'accepted' || r.status === 'reconciled');
             const eligible = settledOpen.length > 0 ? settledOpen : open;
+            // Several unresolved writes can own one message and nothing proves
+            // which landed: crediting the latest would mark a write landed on a
+            // guess. The message stays held until reconcile or abandon settles them.
+            const ambiguousUnresolved = settledOpen.length === 0 && open.length > 1;
             // Vendor list order is unverified, so with a usable timestamp prefer
             // the latest-dispatched write that precedes the message: an older
             // identical write then keeps the older echo.
-            const slot = typeof sent === 'number' && !Number.isNaN(sent)
-                ? eligible.reduce((best, r) => best === undefined ||
-                    Date.parse(r.dispatchedAt ?? r.createdAt) >
-                        Date.parse(best.dispatchedAt ?? best.createdAt)
-                    ? r
-                    : best, undefined)
-                : eligible[0];
+            const slot = ambiguousUnresolved
+                ? undefined
+                : typeof sent === 'number' && !Number.isNaN(sent)
+                    ? eligible.reduce((best, r) => best === undefined ||
+                        Date.parse(r.dispatchedAt ?? r.createdAt) >
+                            Date.parse(best.dispatchedAt ?? best.createdAt)
+                        ? r
+                        : best, undefined)
+                    : eligible[0];
             if (slot === undefined && possible.length > 0) {
                 // Only a dispatched write whose outcome is unknown could explain it:
                 // `dispatchedAt` proves the POST began, not that it landed. Leave the
