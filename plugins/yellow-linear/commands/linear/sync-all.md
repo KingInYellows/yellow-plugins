@@ -85,14 +85,14 @@ PR_JSON=$(gh pr list \
   --state all \
   --search "${IDENTIFIER_LOWER} in:title" \
   --json number,state,mergedAt,title,headRefName \
-  --limit 5 2>&1) || {
+  --limit 30 2>&1) || {
   # Detect rate limit
   if printf '%s' "$PR_JSON" | grep -qi 'rate limit'; then
     printf '[sync-all] Rate limited — waiting 60s\n' >&2
     sleep 60
     PR_JSON=$(gh pr list --repo "$REPO" --state all \
       --search "${IDENTIFIER_LOWER} in:title" \
-      --json number,state,mergedAt,title,headRefName --limit 5 2>&1) || {
+      --json number,state,mergedAt,title,headRefName --limit 30 2>&1) || {
       printf '[sync-all] ERROR: gh pr list failed for %s: %s\n' \
         "$IDENTIFIER" "$PR_JSON" >&2
       PR_JSON=""
@@ -108,6 +108,11 @@ PR_JSON=$(gh pr list \
 If `PR_JSON` is empty after error handling, classify the issue as `gh-error`
 and skip it from transition candidates (report in summary as "skipped — gh
 error").
+
+If the search returned exactly 30 PRs, the list may be truncated and an `OPEN`
+or merged PR could be missing. Classify the issue as not decidable ("too many
+matching PRs — review manually"), make no suggestion, and skip the steps below
+for it.
 
 The search matches titles, so keep only the PRs whose `headRefName` contains
 the lowercased identifier as a whole segment (bounded by the start or end of
@@ -140,8 +145,10 @@ Classify each issue:
 An issue can match several PRs (for example an abandoned closed PR and its open
 replacement). Decide once per issue, in this order: any `OPEN` PR wins ("PR
 open, no action", and drop every closed-PR suggestion); else any `MERGED` PR or
-`CLOSED` with `landed=yes` → Done; else `CLOSED` with `landed=no` →
-cancelled/backlog; else "closed, landing unverified". Run `pr-landed.sh` only
+`CLOSED` with `landed=yes` → Done; else any `CLOSED` with `landed=unknown` →
+"closed, landing unverified" with no suggestion (an unverified PR may have
+landed, so it outranks `landed=no`); else `CLOSED` with `landed=no` →
+cancelled/backlog. Run `pr-landed.sh` only
 for an issue with no `OPEN` and no `MERGED` PR.
 
 ### Step 5: Present Proposed Transitions
@@ -188,6 +195,7 @@ Conflicts:     N issues (state changed before update — skipped)
 No PR found:   N issues (potentially stale — review manually)
 PR open:       N issues (no action taken)
 gh errors:     N issues (skipped — check gh auth or network)
+Too many PRs:  N issues (review manually — PR list may be truncated)
 ```
 
 For any conflicts, list the issue identifiers and their current status so the
