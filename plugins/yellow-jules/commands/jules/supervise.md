@@ -132,6 +132,20 @@ case "$WORK_DIR" in
   /*/yellow-jules-supervise.??????) ;;
   *) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
 esac
+# Bind WORK_DIR to the directory the allocation step made: same scratch root,
+# no symlinked components, owned by this user. Later lines read its files into
+# the vendor request and delete it recursively.
+SCRATCH_REAL=$(cd -P -- "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P || true)
+WORK_PARENT_REAL=$(cd -P -- "$(dirname -- "$WORK_DIR")" 2>/dev/null && pwd -P || true)
+if [ -z "$SCRATCH_REAL" ] || [ "$WORK_PARENT_REAL" != "$SCRATCH_REAL" ] \
+  || [ -L "$WORK_DIR" ] || [ ! -d "$WORK_DIR" ] || [ ! -O "$WORK_DIR" ]; then
+  printf 'ERROR: WORK_DIR is not a directory allocated under %s.\n' "${TMPDIR:-/tmp}" >&2; exit 1
+fi
+for f in message.txt; do
+  if [ -e "$WORK_DIR/$f" ] || [ -L "$WORK_DIR/$f" ]; then
+    { [ -f "$WORK_DIR/$f" ] && [ ! -L "$WORK_DIR/$f" ] && [ -O "$WORK_DIR/$f" ]; } || { printf 'ERROR: %s/%s is not a regular file owned by you.\n' "$WORK_DIR" "$f" >&2; exit 1; }
+  fi
+done
 export YELLOW_JULES_ACTIVE_GRANT="$GRANT_ID"
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 [ -s "$WORK_DIR/message.txt" ] || { printf 'ERROR: write the message to %s/message.txt first.\n' "$WORK_DIR" >&2; exit 1; }
@@ -140,7 +154,19 @@ args=(reply --session "$SESSION" "--message=$(cat -- "$WORK_DIR/message.txt")" -
 OUTPUT=$(node "$CLI" "${args[@]}")
 printf 'exit=%s\n' "$?"
 printf '%s\n' "$OUTPUT" | jq '{ok, operation, localRequestId, sent, requiresAttention, attention, details, error: (if .error then {code: .error.code, retryable: .error.retryable} else null end)} | with_entries(select(.value != null))'
-case "$WORK_DIR" in *..*) ;; /*/yellow-jules-supervise.??????) [ -d "$WORK_DIR" ] && [ ! -L "$WORK_DIR" ] && rm -rf -- "$WORK_DIR" ;; esac
+case "$WORK_DIR" in
+  *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
+  /*/yellow-jules-supervise.??????) ;;
+  *) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
+esac
+SCRATCH_REAL=$(cd -P -- "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P || true)
+WORK_PARENT_REAL=$(cd -P -- "$(dirname -- "$WORK_DIR")" 2>/dev/null && pwd -P || true)
+if [ -n "$SCRATCH_REAL" ] && [ "$WORK_PARENT_REAL" = "$SCRATCH_REAL" ] \
+  && [ -d "$WORK_DIR" ] && [ ! -L "$WORK_DIR" ] && [ -O "$WORK_DIR" ]; then
+  rm -rf -- "$WORK_DIR"
+else
+  printf 'ERROR: WORK_DIR is not a directory allocated under %s; not removing it.\n' "${TMPDIR:-/tmp}" >&2; exit 1
+fi
 ```
 
 A repair delegate is
@@ -212,5 +238,17 @@ chosen, or the run block refused), remove it with the printed path:
 ```bash
 WORK_DIR='YELLOW_TODO_work_dir'
 case "$WORK_DIR" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
-case "$WORK_DIR" in *..*) ;; /*/yellow-jules-supervise.??????) [ -d "$WORK_DIR" ] && [ ! -L "$WORK_DIR" ] && rm -rf -- "$WORK_DIR" ;; esac
+case "$WORK_DIR" in
+  *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
+  /*/yellow-jules-supervise.??????) ;;
+  *) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
+esac
+SCRATCH_REAL=$(cd -P -- "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P || true)
+WORK_PARENT_REAL=$(cd -P -- "$(dirname -- "$WORK_DIR")" 2>/dev/null && pwd -P || true)
+if [ -n "$SCRATCH_REAL" ] && [ "$WORK_PARENT_REAL" = "$SCRATCH_REAL" ] \
+  && [ -d "$WORK_DIR" ] && [ ! -L "$WORK_DIR" ] && [ -O "$WORK_DIR" ]; then
+  rm -rf -- "$WORK_DIR"
+else
+  printf 'ERROR: WORK_DIR is not a directory allocated under %s; not removing it.\n' "${TMPDIR:-/tmp}" >&2; exit 1
+fi
 ```

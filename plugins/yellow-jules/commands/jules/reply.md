@@ -67,6 +67,20 @@ case "$WORK_DIR" in
   /*/yellow-jules-reply.??????) ;;
   *) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
 esac
+# Bind WORK_DIR to the directory the allocation step made: same scratch root,
+# no symlinked components, owned by this user. Later lines read its files into
+# the vendor request and delete it recursively.
+SCRATCH_REAL=$(cd -P -- "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P || true)
+WORK_PARENT_REAL=$(cd -P -- "$(dirname -- "$WORK_DIR")" 2>/dev/null && pwd -P || true)
+if [ -z "$SCRATCH_REAL" ] || [ "$WORK_PARENT_REAL" != "$SCRATCH_REAL" ] \
+  || [ -L "$WORK_DIR" ] || [ ! -d "$WORK_DIR" ] || [ ! -O "$WORK_DIR" ]; then
+  printf 'ERROR: WORK_DIR is not a directory allocated under %s.\n' "${TMPDIR:-/tmp}" >&2; exit 1
+fi
+for f in message.txt; do
+  if [ -e "$WORK_DIR/$f" ] || [ -L "$WORK_DIR/$f" ]; then
+    { [ -f "$WORK_DIR/$f" ] && [ ! -L "$WORK_DIR/$f" ] && [ -O "$WORK_DIR/$f" ]; } || { printf 'ERROR: %s/%s is not a regular file owned by you.\n' "$WORK_DIR" "$f" >&2; exit 1; }
+  fi
+done
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 [ -f "$CLI" ] || { printf 'ERROR: yellow-jules CLI not found at %s. Reinstall the plugin.\n' "$CLI" >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { printf 'ERROR: jq required. Install: https://jqlang.github.io/jq/download/\n' >&2; exit 1; }
@@ -148,6 +162,20 @@ case "$WORK_DIR" in
   /*/yellow-jules-reply.??????) ;;
   *) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
 esac
+# Bind WORK_DIR to the directory the allocation step made: same scratch root,
+# no symlinked components, owned by this user. Later lines read its files into
+# the vendor request and delete it recursively.
+SCRATCH_REAL=$(cd -P -- "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P || true)
+WORK_PARENT_REAL=$(cd -P -- "$(dirname -- "$WORK_DIR")" 2>/dev/null && pwd -P || true)
+if [ -z "$SCRATCH_REAL" ] || [ "$WORK_PARENT_REAL" != "$SCRATCH_REAL" ] \
+  || [ -L "$WORK_DIR" ] || [ ! -d "$WORK_DIR" ] || [ ! -O "$WORK_DIR" ]; then
+  printf 'ERROR: WORK_DIR is not a directory allocated under %s.\n' "${TMPDIR:-/tmp}" >&2; exit 1
+fi
+for f in message.txt; do
+  if [ -e "$WORK_DIR/$f" ] || [ -L "$WORK_DIR/$f" ]; then
+    { [ -f "$WORK_DIR/$f" ] && [ ! -L "$WORK_DIR/$f" ] && [ -O "$WORK_DIR/$f" ]; } || { printf 'ERROR: %s/%s is not a regular file owned by you.\n' "$WORK_DIR" "$f" >&2; exit 1; }
+  fi
+done
 command -v jq >/dev/null 2>&1 || { printf 'ERROR: jq required.\n' >&2; exit 1; }
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
@@ -179,6 +207,20 @@ case "$WORK_DIR" in
   /*/yellow-jules-reply.??????) ;;
   *) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
 esac
+# Bind WORK_DIR to the directory the allocation step made: same scratch root,
+# no symlinked components, owned by this user. Later lines read its files into
+# the vendor request and delete it recursively.
+SCRATCH_REAL=$(cd -P -- "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P || true)
+WORK_PARENT_REAL=$(cd -P -- "$(dirname -- "$WORK_DIR")" 2>/dev/null && pwd -P || true)
+if [ -z "$SCRATCH_REAL" ] || [ "$WORK_PARENT_REAL" != "$SCRATCH_REAL" ] \
+  || [ -L "$WORK_DIR" ] || [ ! -d "$WORK_DIR" ] || [ ! -O "$WORK_DIR" ]; then
+  printf 'ERROR: WORK_DIR is not a directory allocated under %s.\n' "${TMPDIR:-/tmp}" >&2; exit 1
+fi
+for f in message.txt; do
+  if [ -e "$WORK_DIR/$f" ] || [ -L "$WORK_DIR/$f" ]; then
+    { [ -f "$WORK_DIR/$f" ] && [ ! -L "$WORK_DIR/$f" ] && [ -O "$WORK_DIR/$f" ]; } || { printf 'ERROR: %s/%s is not a regular file owned by you.\n' "$WORK_DIR" "$f" >&2; exit 1; }
+  fi
+done
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 [ -f "$CLI" ] || { printf 'ERROR: yellow-jules CLI not found at %s. Reinstall the plugin.\n' "$CLI" >&2; exit 1; }
 args=(reply --session "$SESSION" "--message=$(cat -- "$WORK_DIR/message.txt")" --grant-id "$GRANT_ID" --request-id "$REQUEST_ID")
@@ -193,7 +235,19 @@ FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
 printf '%s\n' "$OUTPUT" | jq -r 'def safe: tostring | gsub("[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | gsub("[\\p{Pd}\u2500-\u257f\u2e3a\u2e3b\u30fc\u2043\u207b\u208b\u02d7\u2796\ufe31\ufe32\u2212\ufe58\ufe63\uff0d-]+"; "-") | gsub("-(\\s*-)+"; "-") | .[0:300]; if .error then "error: \(.error.message | safe)", "recovery: \(.error.recoveryAction | safe)" else empty end'
 printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
-case "$WORK_DIR" in *..*) ;; /*/yellow-jules-reply.??????) [ -d "$WORK_DIR" ] && [ ! -L "$WORK_DIR" ] && rm -rf -- "$WORK_DIR" ;; esac
+case "$WORK_DIR" in
+  *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
+  /*/yellow-jules-reply.??????) ;;
+  *) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
+esac
+SCRATCH_REAL=$(cd -P -- "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P || true)
+WORK_PARENT_REAL=$(cd -P -- "$(dirname -- "$WORK_DIR")" 2>/dev/null && pwd -P || true)
+if [ -n "$SCRATCH_REAL" ] && [ "$WORK_PARENT_REAL" = "$SCRATCH_REAL" ] \
+  && [ -d "$WORK_DIR" ] && [ ! -L "$WORK_DIR" ] && [ -O "$WORK_DIR" ]; then
+  rm -rf -- "$WORK_DIR"
+else
+  printf 'ERROR: WORK_DIR is not a directory allocated under %s; not removing it.\n' "${TMPDIR:-/tmp}" >&2; exit 1
+fi
 ```
 
 ### Step 7: Report
@@ -238,5 +292,17 @@ dry-run) leaves the work directory behind. Remove it with the printed path:
 ```bash
 WORK_DIR='YELLOW_TODO_work_dir'
 case "$WORK_DIR" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
-case "$WORK_DIR" in *..*) ;; /*/yellow-jules-reply.??????) [ -d "$WORK_DIR" ] && [ ! -L "$WORK_DIR" ] && rm -rf -- "$WORK_DIR" ;; esac
+case "$WORK_DIR" in
+  *..*) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
+  /*/yellow-jules-reply.??????) ;;
+  *) printf 'ERROR: WORK_DIR is not an allocated directory.\n' >&2; exit 1 ;;
+esac
+SCRATCH_REAL=$(cd -P -- "${TMPDIR:-/tmp}" 2>/dev/null && pwd -P || true)
+WORK_PARENT_REAL=$(cd -P -- "$(dirname -- "$WORK_DIR")" 2>/dev/null && pwd -P || true)
+if [ -n "$SCRATCH_REAL" ] && [ "$WORK_PARENT_REAL" = "$SCRATCH_REAL" ] \
+  && [ -d "$WORK_DIR" ] && [ ! -L "$WORK_DIR" ] && [ -O "$WORK_DIR" ]; then
+  rm -rf -- "$WORK_DIR"
+else
+  printf 'ERROR: WORK_DIR is not a directory allocated under %s; not removing it.\n' "${TMPDIR:-/tmp}" >&2; exit 1
+fi
 ```
