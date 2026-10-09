@@ -482,7 +482,8 @@ pgp_tier_run() {
           *) _pgt_reason=lookup-failed ;;
         esac
       fi
-      printf '[plan:complete] WARNING: gh api commits/pulls lookup failed: %s\n' "$(tr -d '[:cntrl:]' < "$_pgt_err" | cut -c1-300)" >&2
+      # Fixed classification only: gh's stderr is GitHub-controlled text.
+      printf '[plan:complete] WARNING: gh api commits/pulls lookup failed (%s)\n' "$_pgt_reason" >&2
     fi
     [ "$_pgt_err" = /dev/null ] || rm -f -- "$_pgt_err"
   fi
