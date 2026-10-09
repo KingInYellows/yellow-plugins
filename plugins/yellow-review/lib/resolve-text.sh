@@ -210,7 +210,7 @@ _rt_scan() {
             if (c == "/") return 63
             return -1
         }
-        function basiccred(tok, bare,    n, i, a, b, c, d, va, vb, vc, vd, nb, bv, k, x, need, colon) {
+        function basiccred(tok, bare,    n, i, a, b, c, d, va, vb, vc, vd, nb, bv, k, x, need, colon, icolon) {
             n = length(tok)
             if (n < 4 || n % 4 != 0) return 0
             nb = 0
@@ -233,11 +233,11 @@ _rt_scan() {
             # its continuation bytes); `httpOnly` decodes to such bytes.
             # Overlong E0/F0 and surrogate or beyond-U+10FFFF second bytes
             # are not checked: they cost nothing to accept here.
-            colon = 0
+            colon = 0; icolon = 0
             for (k = 1; k <= nb; k++) {
                 x = bv[k]
                 if (x < 32 || x == 127) return 0
-                if (x == 58 && !colon) colon = k
+                if (x == 58) { if (!colon) colon = k; if (k > 1 && k < nb) icolon = 1 }
                 if (x < 128) continue
                 if (x < 194 || x > 244) return 0
                 need = (x < 224) ? 1 : (x < 240) ? 2 : 3
@@ -251,10 +251,10 @@ _rt_scan() {
             # with a blank password), but a lone `:` has no secret side.
             # A bare `Basic` word (no Authorization header) is also ordinary
             # prose, and a short letters-only word such as `Only` decodes to
-            # `:yr`. There the colon must sit between two other bytes, so a
+            # `:yr`. There some colon must sit between two other bytes, so a
             # word whose decoded text only begins or ends with a colon is
             # not a credential.
-            if (bare && !(colon > 1 && colon < nb)) return 0
+            if (bare && !icolon) return 0
             return (colon && nb > 1) ? 1 : 0
         }
         # Multi-line quoted value. A credential keyword whose value opens a

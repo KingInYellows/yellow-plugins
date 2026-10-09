@@ -1578,6 +1578,9 @@ rule=forged line=9.txt"
     awk_expect "$bin" 0 'This endpoint supports Basic Only mode\n'
     awk_expect "$bin" 0 "bare basic ${edge}\n"
     awk_expect "$bin" 6 'Authorization: Basic Only\n'
+    # a later interior colon counts: empty user, password containing a colon
+    colons=$(printf ':pa:ss' | base64 | tr -d '\n')
+    awk_expect "$bin" 6 "bare basic ${colons}\n"
     awk_expect "$bin" 6 "Authorization: Basic ${edge}\n"
     awk_expect "$bin" 6 'This endpoint supports Basic YTpi mode\n'
     # unpadded 3-character token (`a:`): a header flags it, bare prose does not
