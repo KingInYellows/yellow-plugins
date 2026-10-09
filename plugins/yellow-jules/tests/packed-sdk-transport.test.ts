@@ -528,6 +528,26 @@ describe('reads through the shipped adapter (R9, R15, R18, R10)', () => {
     expect(fs.readdirSync(resolveSdkScratchDir(dataDir))).toEqual([]);
   });
 
+  it("tolerates another process's writability probe in the shared scratch, but not a stray file", async () => {
+    const scratch = resolveSdkScratchDir(dataDir);
+    fs.mkdirSync(scratch, { recursive: true, mode: 0o700 });
+    const probe = path.join(scratch, `.probe-${crypto.randomUUID()}`);
+    fs.writeFileSync(probe, '', { mode: 0o600 });
+    const adapter = JulesSdkAdapter.connect({
+      sdk,
+      dataDir,
+      apiKey: API_KEY,
+      baseUrl,
+    });
+    await adapter.close();
+    fs.rmSync(probe);
+    fs.writeFileSync(path.join(scratch, 'stray.json'), '{}');
+    expect(() =>
+      JulesSdkAdapter.connect({ sdk, dataDir, apiKey: API_KEY, baseUrl })
+    ).toThrow(/not empty/);
+    fs.rmSync(path.join(scratch, 'stray.json'));
+  });
+
   it('a sessions page never primes the cache: getSession issues its own network read', async () => {
     server.state.sessions.set('s1', restSession('s1', { state: 'COMPLETED' }));
     const adapter = JulesSdkAdapter.connect({

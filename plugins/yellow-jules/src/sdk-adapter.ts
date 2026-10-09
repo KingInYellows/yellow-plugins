@@ -433,8 +433,15 @@ export interface ConnectInput {
   readonly postCount?: () => number;
 }
 
+// Concurrent processes share one sdk-scratch/, and each creates then removes
+// an empty `.probe-<uuid>` file to prove it is writable. Another process's
+// probe is not an SDK write; anything else is.
+const WRITABILITY_PROBE = /^\.probe-[0-9a-f-]{36}$/;
+
 function assertScratchEmpty(scratch: string, when: string): void {
-  const entries = fs.readdirSync(scratch);
+  const entries = fs
+    .readdirSync(scratch)
+    .filter((name) => !WRITABILITY_PROBE.test(name));
   if (entries.length > 0) {
     throwAppError(
       'JULES_SDK_INTEGRITY',
