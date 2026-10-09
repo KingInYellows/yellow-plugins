@@ -265,7 +265,8 @@ async function resolveOnOwnSession(
   adapter: SdkAdapter,
   sessionResource: string,
   records: readonly OperationRecord[],
-  deadline: Deadline
+  deadline: Deadline,
+  claimedEchoes: ReadonlySet<string>
 ): Promise<Resolution[]> {
   try {
     await read(deps, deadline, () => adapter.getSession(sessionResource));
@@ -314,6 +315,9 @@ async function resolveOnOwnSession(
     onActivity: (activity) => {
       const created = Date.parse(activity.createTime);
       if (Number.isNaN(created)) return;
+      // An echo a settled operation already claimed explains that operation,
+      // not a later one with the same message.
+      const claimed = claimedEchoes.has(activity.activityId);
       for (const record of records) {
         // Only activities at or after this reservation (minus the overlap window).
         if (created < (floors.get(record.localRequestId) ?? Infinity)) continue;
@@ -321,6 +325,7 @@ async function resolveOnOwnSession(
         if (found === undefined) continue;
         if (
           record.kind === 'reply' &&
+          !claimed &&
           activity.type === 'userMessaged' &&
           activity.message !== undefined &&
           record.promptDigest !== undefined &&
@@ -553,6 +558,11 @@ export async function reconcile(
             const walk = await walkSessions(deps, adapter, oldest, deadline);
             out.push(...resolveCreates(journal, creates, walk));
           }
+          const claimedEchoes = new Set(
+            Object.values(journal.operations).flatMap((r) =>
+              r.echoActivityId !== undefined ? [r.echoActivityId] : []
+            )
+          );
           const bySession = new Map<string, OperationRecord[]>();
           for (const record of others) {
             if (record.sessionResource === undefined) {
@@ -583,7 +593,8 @@ export async function reconcile(
                 adapter,
                 session,
                 records,
-                deadline
+                deadline,
+                claimedEchoes
               ))
             );
           }

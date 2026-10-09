@@ -387,6 +387,53 @@ describe('reply and approve reservations resolve on their own session', () => {
     expect(h.adapter.callsTo('getSession').length).toBeGreaterThan(0);
   });
 
+  it('an echo already claimed by a settled reply is not bound to a later unknown-outcome reply', async () => {
+    const session = await delegateOk(h, grantId);
+    await reply(h.deps, {
+      session: session.localId,
+      message: 'same words',
+      dryRun: false,
+      correction: false,
+      grantId,
+      requestId: 'reply-1',
+    });
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'same words',
+    });
+    // A plain status claims that echo for the settled reply.
+    await status(h.deps, { session: session.localId, reconcile: false });
+    expect(
+      (await readJournal(h.dataDir)).operations['reply-1']?.echoActivityId
+    ).toBeDefined();
+
+    h.deps.clock.time += 5_000;
+    h.adapter.sendMessageImpl = async () => {
+      throw new AdapterError('network', 'reset', { dispatched: true });
+    };
+    await expect(
+      reply(h.deps, {
+        session: session.localId,
+        message: 'same words',
+        dryRun: false,
+        correction: false,
+        grantId,
+        requestId: 'reply-2',
+      })
+    ).rejects.toBeInstanceOf(AppErrorException);
+
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(
+      result.reconciled?.find((r) => r.localRequestId === 'reply-2')
+    ).toMatchObject({ outcome: 'unknown-outcome' });
+    expect((await readJournal(h.dataDir)).operations['reply-2']?.status).toBe(
+      'unknown-outcome'
+    );
+  });
+
   it('a digest that matches after trimming edge whitespace still binds', async () => {
     const session = await strandedReply('padded', 'reply-1');
     addActivity(h, session.sessionResource, {

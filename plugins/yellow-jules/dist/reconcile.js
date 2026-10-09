@@ -170,7 +170,7 @@ function resolveCreates(journal, creates, walk) {
  * and one activity walk from the earliest reservation, so ten stuck operations
  * on a session cost one walk, not ten.
  */
-async function resolveOnOwnSession(deps, adapter, sessionResource, records, deadline) {
+async function resolveOnOwnSession(deps, adapter, sessionResource, records, deadline, claimedEchoes) {
     try {
         await (0, runtime_support_js_1.read)(deps, deadline, () => adapter.getSession(sessionResource));
     }
@@ -213,6 +213,9 @@ async function resolveOnOwnSession(deps, adapter, sessionResource, records, dead
             const created = Date.parse(activity.createTime);
             if (Number.isNaN(created))
                 return;
+            // An echo a settled operation already claimed explains that operation,
+            // not a later one with the same message.
+            const claimed = claimedEchoes.has(activity.activityId);
             for (const record of records) {
                 // Only activities at or after this reservation (minus the overlap window).
                 if (created < (floors.get(record.localRequestId) ?? Infinity))
@@ -221,6 +224,7 @@ async function resolveOnOwnSession(deps, adapter, sessionResource, records, dead
                 if (found === undefined)
                     continue;
                 if (record.kind === 'reply' &&
+                    !claimed &&
                     activity.type === 'userMessaged' &&
                     activity.message !== undefined &&
                     record.promptDigest !== undefined &&
@@ -406,6 +410,7 @@ async function reconcile(deps, journal, sessionResource, deadline) {
                     const walk = await walkSessions(deps, adapter, oldest, deadline);
                     out.push(...resolveCreates(journal, creates, walk));
                 }
+                const claimedEchoes = new Set(Object.values(journal.operations).flatMap((r) => r.echoActivityId !== undefined ? [r.echoActivityId] : []));
                 const bySession = new Map();
                 for (const record of others) {
                     if (record.sessionResource === undefined) {
@@ -421,7 +426,7 @@ async function reconcile(deps, journal, sessionResource, deadline) {
                         out.push(...records.map((record) => notReached(record, 'the deadline expired before this operation was checked')));
                         continue;
                     }
-                    out.push(...(await resolveOnOwnSession(deps, adapter, session, records, deadline)));
+                    out.push(...(await resolveOnOwnSession(deps, adapter, session, records, deadline, claimedEchoes)));
                 }
                 return out;
             })),
