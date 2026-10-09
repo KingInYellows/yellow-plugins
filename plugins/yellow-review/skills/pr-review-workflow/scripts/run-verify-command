@@ -1176,8 +1176,10 @@ if [ "$MODE" = revert-denied ]; then
     REVERTED_COUNT=${#REVERTED[@]}
     if [ "$REVERTED_COUNT" -gt 0 ]; then
         # File names can look like a credential: screen the list as the patch
-        # is, and bound it. The count stays whole.
-        printf '%s\n' "${REVERTED[@]}" >|"$ADDED_FILE"
+        # is, and bound it. The count stays whole. Each path is scanned whole
+        # and as its /-split segments: the scanner keeps "/" inside a word, so a
+        # credential prefix after a slash would otherwise go unseen.
+        printf '%s\n' "${REVERTED[@]}" "${REVERTED[@]//\//$'\n'}" >|"$ADDED_FILE"
         rt_code_clean "$ADDED_FILE"
         case $? in
             0)
