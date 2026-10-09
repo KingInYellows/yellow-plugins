@@ -297,12 +297,14 @@ function mapActivity(activity) {
         createTime === '') {
         (0, errors_js_1.throwAppError)('JULES_MALFORMED_RESPONSE', `plan activity ${activityId} has no usable createTime`);
     }
-    // A user message is outside-activity evidence, which is ordered by time: one
-    // with no usable time would sort before every watermark and never be
-    // recorded, so it is malformed too and the walk stops on it (supervise
-    // pauses on a partial walk).
-    if (activity.type === 'userMessaged' && createTime === '') {
-        (0, errors_js_1.throwAppError)('JULES_MALFORMED_RESPONSE', `user message ${activityId} has no usable createTime`);
+    // Messages are ordered by time too. A user message with no usable time would
+    // sort before every watermark and never be recorded as outside activity, and
+    // an agent message without one would lose to an older question when the
+    // newest is picked, so both are malformed and the walk stops on them
+    // (supervise pauses on a partial walk).
+    if ((activity.type === 'userMessaged' || activity.type === 'agentMessaged') &&
+        createTime === '') {
+        (0, errors_js_1.throwAppError)('JULES_MALFORMED_RESPONSE', `message ${activityId} has no usable createTime`);
     }
     const base = {
         activityId,

@@ -38,7 +38,7 @@ describe('vendor fields that render bare are allowlisted', () => {
     const activity = (createTime: unknown) =>
       mapActivity({
         id: 'a1',
-        type: 'agentMessaged',
+        type: 'progressUpdated',
         createTime,
         artifacts: [],
       } as unknown as Parameters<typeof mapActivity>[0]);
@@ -74,6 +74,29 @@ describe('vendor fields that render bare are allowlisted', () => {
     expect(user('2026-09-10T00:00:01Z').message).toBe('stop');
     expect(() => user(undefined)).toThrow(/no usable createTime/);
     expect(() => user('soon')).toThrow(/no usable createTime/);
+  });
+
+  it.each([
+    ['agentMessaged', true],
+    ['userMessaged', true],
+    ['planGenerated', true],
+    ['planApproved', true],
+    ['progressUpdated', false],
+    ['sessionCompleted', false],
+    ['sessionFailed', false],
+  ])('%s with no usable time: rejected=%s', (type, rejected) => {
+    const map = () =>
+      mapActivity({
+        id: 'x1',
+        type,
+        createTime: 'soon',
+        message: 'm',
+        planId: 'p1',
+        plan: { id: 'p1', steps: [] },
+        artifacts: [],
+      } as unknown as Parameters<typeof mapActivity>[0]);
+    if (rejected) expect(map).toThrow(/no usable createTime/);
+    else expect(map().createTime).toBe('');
   });
 
   it('plan step indexes that are not non-negative integers fall back to position', () => {
