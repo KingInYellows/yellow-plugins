@@ -178,8 +178,13 @@ outside the worktree that points at one, and drops empty or relative `PATH`
 entries before that check. Every other tool they run by bare name, and
 every program git or its children look up through `PATH` (`grep`, `sed`,
 `ssh`, `git-credential-*`, `gpg`, pagers and so on), runs from a `PATH` that
-drops directories inside the worktree and any directory that holds a symlink
-(dangling or not) whose target is inside it, whatever the link is named.
+drops directories inside the worktree, any directory that holds a symlink
+(dangling or not) whose target is inside it, whatever the link is named, and any
+directory with an executable script whose `#!` interpreter is inside it. Both
+scripts also refuse an inherited `GIT_SSH_COMMAND`, `GIT_ASKPASS`, `GIT_PAGER`,
+`EDITOR`, `GIT_EXEC_PATH` or injected git config (`core.sshCommand`,
+`credential.helper`, ...) that runs a program from inside the worktree; values
+outside it keep working.
 
 Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-gh.sh`,
 `resolve-paths.sh`, `gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.

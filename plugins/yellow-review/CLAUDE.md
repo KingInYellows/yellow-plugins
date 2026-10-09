@@ -254,11 +254,24 @@ arguments and run on `yr_safe_path`'s result. It drops a `PATH` directory
 inside the worktree and any directory that holds a symlink, whatever its name,
 dangling or not, whose canonical target (a file or a directory) is inside the
 worktree, so the name resolves to a file outside the worktree or not at all.
-There is no name list to extend. The screen runs no `PATH` tool: it uses
-shell globs and tests, plus `find` and GNU `realpath -m` from fixed system
-directories (one `realpath` call for all ordinary directories, one `find` for
-a directory over 300 entries). Without them it canonicalizes each link in the
-shell, and a link it cannot resolve drops the directory.
+It also drops a directory with an executable script whose `#!` interpreter
+(or `env` operand) canonicalizes inside the worktree, such as a console
+script of a venv kept in the repository, and `commit-resolve-fixes` and
+`run-verify-command` refuse a `git`, `gh`, `jq`, `gt`, `node` or `awk` that is
+such a script. There is no name list to extend. The screen runs no `PATH`
+tool: it uses `find`, `awk`, GNU `realpath -m`, `sed` and `sort` from fixed
+system directories, in a handful of batched calls for all directories (about
+0.1 s). Without them it canonicalizes each link and reads each script's first
+line in the shell, and a link it cannot resolve drops the directory.
+`harden_git_config` also refuses (names the variable, never the value) an
+inherited `GIT_SSH_COMMAND`, `GIT_SSH`, `GIT_ASKPASS`, `SSH_ASKPASS`,
+`GIT_PROXY_COMMAND`, `GIT_EXTERNAL_DIFF`, `GIT_PAGER`, `PAGER`, `GIT_EDITOR`,
+`EDITOR` or `VISUAL` whose first word resolves inside the worktree, a
+`GIT_EXEC_PATH`, `GIT_TEMPLATE_DIR`, `GIT_CONFIG_GLOBAL` or `GIT_CONFIG_SYSTEM`
+inside it, and injected `GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` or
+`GIT_CONFIG_PARAMETERS` config (`core.sshCommand`, `credential.helper`,
+`gpg.program` and the like) that does; trusted values outside the worktree are
+kept. Only the first word is judged, so `sh -c '...'` wrappers are not.
 `run-verify-command` still gives the verify command the caller's `PATH`
 (`YR_ORIG_PATH`). Both scripts take their own directory by parameter expansion,
 not `dirname`.
