@@ -1456,6 +1456,18 @@ rule=forged line=9.txt"
   done
 }
 
+@test "stacked leading decorations separated by whitespace are all stripped before the prose test, under gawk and mawk" {
+  for bin in gawk mawk; do
+    command -v "$bin" >/dev/null 2>&1 || { echo "missing $bin"; false; }
+    # bullet + space + curly quote, then an ASCII multiword credential
+    awk_expect "$bin" 6 'password:\n  \xe2\x80\xa2 \xe2\x80\x9cmy correct horse battery staple\n'
+    # three stacked decorations with mixed whitespace
+    awk_expect "$bin" 6 'password:\n  \xe2\x80\xa2 \xc2\xab\t\xe2\x80\x9cmy correct horse battery staple\n'
+    # non-ASCII prose after stacked decorations stays clean
+    awk_expect "$bin" 0 'password:\n  \xe2\x80\xa2 \xe2\x80\x9c\xc3\xa9l\xc3\xa8ve a trois mots ici\n'
+  done
+}
+
 @test "Basic tokens: padding, colon position, trailing punctuation and malformed shapes agree under gawk and mawk" {
   one=$(printf 'ab:cd' | base64 | tr -d '\n')
   two=$(printf 'ab:c' | base64 | tr -d '\n')

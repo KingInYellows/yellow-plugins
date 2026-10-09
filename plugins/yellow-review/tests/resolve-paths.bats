@@ -495,6 +495,35 @@ ignored_repo() {
   [[ "$output" != *new* ]]
 }
 
+@test "rp_ignored_changed_since with a predicate counts only the paths it accepts" {
+  ignored_repo
+  printf '.claude/settings.local.json\n' >> .gitignore
+  mkdir -p .claude
+  printf 'new\n' >| node_modules/.bin/runner
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" rp_trusted_config
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  printf '{}\n' >| .claude/settings.local.json
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" rp_trusted_config
+  [ "$status" -eq 1 ]
+  [ "$output" = .claude/settings.local.json ]
+}
+
+@test "rp_ignored_changed_since with a predicate filters a directory walk before its 20-path cut" {
+  ignored_repo
+  for i in $(seq 1 25); do printf 'new\n' >| "node_modules/f$i"; done
+  mkdir -p node_modules/pkg/.claude
+  printf '{}\n' >| node_modules/pkg/.claude/settings.json
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" rp_trusted_config
+  [ "$status" -eq 1 ]
+  [ "$output" = node_modules/pkg/.claude/settings.json ]
+  rm -rf node_modules/pkg
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" rp_trusted_config
+  [ "$status" -eq 0 ]
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" no_such_predicate
+  [ "$status" -eq 2 ]
+}
+
 @test "rp_ignored_changed_since ignores the ruvector coedit-sessions log but not its siblings" {
   ignored_repo
   printf '.ruvector/\n' >> .gitignore
