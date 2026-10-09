@@ -524,6 +524,43 @@ ignored_repo() {
   [ "$status" -eq 2 ]
 }
 
+# A full temporary filesystem: the collector's output file (the third mktemp
+# call, after the hits file and the symlink list) is a symlink to
+# /dev/full, so every write to it fails. A lost write must not read as "no
+# change".
+full_outfile_shim() {
+  [ -c /dev/full ] || skip "needs /dev/full"
+  mkdir -p "$BATS_TEST_TMPDIR/shim"
+  REAL_MKTEMP=$(type -P mktemp)
+  cat >| "$BATS_TEST_TMPDIR/shim/mktemp" <<SH
+#!/bin/sh
+n=\$(cat "$BATS_TEST_TMPDIR/shim/count" 2>/dev/null || echo 0)
+n=\$((n + 1)); echo "\$n" >| "$BATS_TEST_TMPDIR/shim/count"
+if [ "\$n" -eq 3 ]; then
+  ln -s /dev/full "$BATS_TEST_TMPDIR/full.\$n" && echo "$BATS_TEST_TMPDIR/full.\$n"
+else
+  exec "$REAL_MKTEMP" "\$@"
+fi
+SH
+  chmod +x "$BATS_TEST_TMPDIR/shim/mktemp"
+}
+
+@test "rp_ignored_changed_since fails closed when a changed name in an ignored directory cannot be recorded" {
+  ignored_repo
+  printf 'new\n' >| node_modules/.bin/runner
+  full_outfile_shim
+  PATH="$BATS_TEST_TMPDIR/shim:$PATH" run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 2 ]
+}
+
+@test "rp_ignored_changed_since fails closed when a changed ignored file cannot be recorded" {
+  ignored_repo
+  printf 'new\n' >| src/gen.cache
+  full_outfile_shim
+  PATH="$BATS_TEST_TMPDIR/shim:$PATH" run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 2 ]
+}
+
 @test "rp_ignored_changed_since ignores the ruvector coedit-sessions log but not its siblings" {
   ignored_repo
   printf '.ruvector/\n' >> .gitignore
@@ -1238,6 +1275,46 @@ commit_repo() {
   [ "$rc" -ne 0 ]
   harden_git_config_for_verify
   git rev-parse --git-dir >/dev/null
+}
+
+@test "yr_safe_path drops an outside directory whose grep, sed or mktemp is a symlink into the worktree" {
+  mkdir -p tools "$BATS_TEST_TMPDIR/goodbin" "$BATS_TEST_TMPDIR/badbin"
+  printf '#!/bin/sh\nexit 0\n' >| tools/canary
+  chmod +x tools/canary
+  for tool in grep sed mktemp; do
+    # Dangling, so a target created later counts too.
+    ln -s "$PWD/tools/not-yet-$tool" "$BATS_TEST_TMPDIR/badbin/$tool"
+    out=$(PATH="$BATS_TEST_TMPDIR/badbin:$BATS_TEST_TMPDIR/goodbin:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *badbin* ]] || { echo "kept: $tool: $out" >&2; return 1; }
+    [[ "$out" == *goodbin* ]]
+    rm -f "$BATS_TEST_TMPDIR/badbin/$tool"
+  done
+}
+
+@test "yr_safe_path keeps an outside directory whose tools are symlinks to files outside the worktree" {
+  mkdir -p "$BATS_TEST_TMPDIR/okbin"
+  ln -s "$(command -v grep)" "$BATS_TEST_TMPDIR/okbin/grep"
+  out=$(PATH="$BATS_TEST_TMPDIR/okbin:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" == "$BATS_TEST_TMPDIR/okbin:"* ]]
+}
+
+@test "yr_adopt_path runs bare names on the screened PATH and keeps the caller's PATH in YR_ORIG_PATH" {
+  mkdir -p tools "$BATS_TEST_TMPDIR/badbin"
+  printf '#!/bin/sh\ntouch "%s/grep-ran"\nexit 0\n' "$BATS_TEST_TMPDIR" >| tools/canary
+  chmod +x tools/canary
+  ln -s "$PWD/tools/canary" "$BATS_TEST_TMPDIR/badbin/grep"
+  orig="$BATS_TEST_TMPDIR/badbin:$PATH"
+  PATH="$orig"
+  yr_adopt_path
+  [ "$YR_ORIG_PATH" = "$orig" ]
+  [[ "$PATH" != *badbin* ]]
+  printf 'x\n' | grep -q y && return 1
+  [ ! -e "$BATS_TEST_TMPDIR/grep-ran" ]
+  # yr_resolve_tool still judges the caller's PATH, so a tool that reaches into
+  # the worktree is refused rather than skipped.
+  ln -s "$PWD/tools/canary" "$BATS_TEST_TMPDIR/badbin/zzcanary"
+  rc=0; yr_resolve_tool zzcanary >/dev/null || rc=$?
+  [ "$rc" -eq 2 ]
 }
 
 @test "harden_git_config fails closed when awk fails while reading the transport config" {

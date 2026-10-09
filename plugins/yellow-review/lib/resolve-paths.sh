@@ -126,7 +126,9 @@ yr_inside_root() {
 # git-ai's canonical file ignores git commands unless argv[0] is named git.
 yr_resolve_tool() {
     local name="$1" bin canon root invoke
-    bin=$(type -P "$name" 2>/dev/null) || return 1
+    # The caller's own PATH, not the screened one yr_adopt_path installed: a
+    # tool that reaches into the worktree must be refused, not skipped.
+    bin=$(PATH=${YR_ORIG_PATH-$PATH}; type -P "$name" 2>/dev/null) || return 1
     [ -n "$bin" ] || return 1
     case "$bin" in
         /*) invoke="$bin" ;;
@@ -172,10 +174,17 @@ yr_prime_path() {
 
 # yr_safe_path: print PATH without empty or relative entries and without any
 # entry inside the worktree (by spelling, canonical path or identity) and
-# without an entry whose awk, git or git-lfs resolves into it. Every yr_git
-# and yr_awk call pays for this, so the ignored-walk helpers are checked
-# separately, once per walk, by yr_walk_path. Returns 1 when nothing is left. The caller's PATH is not changed;
-# the verify command keeps its own PATH (it may need node_modules/.bin).
+# without an entry in which a tool this plugin runs by name is a symlink whose
+# canonical file is inside it. The tools are the ones git, yr_awk, the ignored-
+# file walk and the two scripts (commit-resolve-fixes, run-verify-command) call
+# by bare name after the resolvers have written the tree: git helpers and
+# text, file and process utilities, including grep, which decides whether a
+# path belongs to the PR. One list, one pass; a symlink is the only way an
+# outside directory reaches the worktree, so only symlinks are canonicalized
+# and a directory without one costs a few shell tests. Returns 1 when nothing
+# is left. The caller's PATH is not changed here; yr_prime_path caches the
+# result, and each script runs on it (the verify command keeps its own PATH,
+# it may need node_modules/.bin).
 yr_safe_path() {
     local root rest entry canon helper hcanon kept=""
     root=$(yr_worktree_root || true)
@@ -189,11 +198,14 @@ yr_safe_path() {
             if yr_inside_root "$entry" "$root" || { [ -n "$canon" ] && yr_inside_root "$canon" "$root"; }; then
                 continue
             fi
-            # An outside directory can still hold a symlink to a file inside
-            # the worktree (awk, git-lfs, git): drop it when any helper
-            # git or yr_awk would find there canonicalizes into the worktree.
-            for helper in awk git git-lfs; do
-                [ -e "$entry/$helper" ] || continue
+            # Not "-e": a dangling link whose target is created later counts.
+            # true and false are listed because timeout looks up the command
+            # it runs through PATH (vr_timeout_bin probes with true).
+            for helper in awk git git-lfs bash sh env timeout gtimeout \
+                grep sed sort uniq cut tr wc head tail cat nl tee od fold \
+                mktemp mkfifo rm mv ls mkdir chmod touch find dirname basename \
+                readlink date sleep true false; do
+                [ -L "$entry/$helper" ] || continue
                 hcanon=$(yr_canon_path "$entry/$helper" 2>/dev/null || true)
                 if [ -z "$hcanon" ] || yr_inside_root "$hcanon" "$root"; then
                     continue 2
@@ -206,30 +218,25 @@ yr_safe_path() {
     printf '%s\n' "$kept"
 }
 
-# yr_walk_path: yr_safe_path, minus any entry whose find, head, mktemp, rm,
-# dirname, basename or readlink resolves into the worktree. Only the ignored-
-# file walk runs those by name, so it pays for this check once per walk.
+# yr_walk_path: the PATH for the ignored-file walk (find, head, mktemp, rm,
+# dirname, basename, readlink). yr_safe_path already screens those names.
 yr_walk_path() {
-    local root rest entry helper hcanon kept="" safe
-    safe=$(yr_safe_path) || return $?
-    root=$(yr_worktree_root || true)
-    rest="${safe}:"
-    while [ -n "$rest" ]; do
-        entry="${rest%%:*}"
-        rest="${rest#*:}"
-        if [ -n "$root" ]; then
-            for helper in find head mktemp rm dirname basename readlink; do
-                [ -e "$entry/$helper" ] || continue
-                hcanon=$(yr_canon_path "$entry/$helper" 2>/dev/null || true)
-                if [ -z "$hcanon" ] || yr_inside_root "$hcanon" "$root"; then
-                    continue 2
-                fi
-            done
-        fi
-        kept="${kept:+$kept:}$entry"
-    done
-    [ -n "$kept" ] || return 1
-    printf '%s\n' "$kept"
+    yr_safe_path
+}
+
+# yr_adopt_path: run the rest of the process on yr_safe_path's result, so a
+# bare tool name resolves only to a file outside the worktree. Call once in the
+# main shell, after the caller's own checks of the tools it binds by absolute
+# path. Returns 1 when no directory is left. Children (gt, node, git hooks)
+# inherit the screened PATH. YR_ORIG_PATH keeps the caller's PATH for the one
+# command that must see it (the verify command).
+yr_adopt_path() {
+    yr_prime_path || return 1
+    YR_ORIG_PATH=$PATH
+    PATH=$YR_GIT_PATH
+    export PATH
+    hash -r 2>/dev/null || true
+    YR_PATH_KEY="$PATH|$PWD"
 }
 
 # yr_awk: awk looked up through the same worktree-free PATH as yr_git, so a
@@ -816,7 +823,7 @@ rp_ignored_changed_since() {
                 # past 20 rejected ones still counts.
                 (set -o pipefail
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o \( -type f -o -type l \) -newer "$marker" -print0 2>/dev/null \
-                        | { k=0; while IFS= read -r -d '' x; do kept "$x" || continue; [ "$k" -ge 20 ] || printf '%s\0' "$x"; k=$((k + 1)); done; }) >|"$outfile" || rc=$?
+                        | { k=0; while IFS= read -r -d '' x; do kept "$x" || continue; [ "$k" -ge 20 ] || printf '%s\0' "$x" || exit 2; k=$((k + 1)); done; }) >|"$outfile" || rc=$?
                 if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ]; then
                     # Nothing newer: judge the target of each symlink inside.
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o -type l -print0 >|"$symlist" 2>/dev/null || exit 2
@@ -824,7 +831,7 @@ rp_ignored_changed_since() {
                         lrc=0
                         rp_link_target_changed "$l" "$marker" || lrc=$?
                         case "$lrc" in
-                            0) if kept "$l"; then printf '%s\0' "$l" >|"$outfile"; break; fi ;;
+                            0) if kept "$l"; then printf '%s\0' "$l" >|"$outfile" || exit 2; break; fi ;;
                             1) ;;
                             *) exit 2 ;;
                         esac
@@ -837,13 +844,13 @@ rp_ignored_changed_since() {
                     lrc=0
                     rp_link_target_changed "./$f" "$marker" || lrc=$?
                     case "$lrc" in
-                        0) if kept "$f"; then printf '%s\0' "./$f" >|"$outfile"; fi ;;
+                        0) if kept "$f"; then printf '%s\0' "./$f" >|"$outfile" || exit 2; fi ;;
                         1) ;;
                         *) exit 2 ;;
                     esac
                 fi
             elif [ -f "./$f" ]; then
-                [ "./$f" -nt "$marker" ] && kept "$f" && printf '%s\0' "./$f" >|"$outfile"
+                if [ "./$f" -nt "$marker" ] && kept "$f"; then printf '%s\0' "./$f" >|"$outfile" || exit 2; fi
             fi
             if [ ! -s "$outfile" ]; then
                 [ "$rc" -eq 0 ] || exit 2
@@ -860,7 +867,7 @@ rp_ignored_changed_since() {
                 done
                 [ -z "$dup" ] || continue
                 seen+=("$p")
-                printf '%s\0' "$p" >>"$hitsfile"
+                printf '%s\0' "$p" >>"$hitsfile" || exit 2
                 n=$((n + 1))
                 [ "$n" -lt 20 ] || break
             done <"$outfile"
