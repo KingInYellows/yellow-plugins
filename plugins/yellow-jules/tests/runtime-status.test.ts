@@ -864,3 +864,25 @@ describe('journal corruption and read errors', () => {
     expect(fake.closed).toBe(true);
   });
 });
+
+describe('terminal observations are monotonic across overlapping status walks', () => {
+  it('a delayed walk that read inProgress cannot regress a completed record', async () => {
+    fake.sessions.set(S, makeSession({ vendorState: 'inProgress' }));
+    const deps = makeDeps(dataDir, fake);
+    const original = fake.listActivitiesImpl;
+    let nested = false;
+    fake.listActivitiesImpl = async (resource, options) => {
+      if (!nested) {
+        nested = true;
+        // The newer call observes completion and persists it first.
+        fake.sessions.set(S, makeSession({ vendorState: 'completed' }));
+        await status(deps, { session: S, reconcile: false });
+      }
+      return original(resource, options);
+    };
+    await status(deps, { session: S, reconcile: false });
+    const record = await recordFor();
+    expect(record?.condition).toBe('remote-completed');
+    expect(record?.vendorState).toBe('completed');
+  });
+});

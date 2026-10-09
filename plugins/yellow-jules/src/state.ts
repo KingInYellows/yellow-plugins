@@ -1080,12 +1080,22 @@ export async function upsertReadState(
           ).length;
         }
       }
+      // A status walk runs unlocked, so an older observation can land after a
+      // newer one. A finished session does not run again (reply refuses it), so
+      // a terminal condition already stored is never regressed by a walk that
+      // read the session earlier: the write gate's terminal-owner check and the
+      // released slot both rely on it.
+      const keepTerminal =
+        rebase !== undefined &&
+        (current.condition === 'remote-completed' ||
+          current.condition === 'failed') &&
+        update.condition !== current.condition;
       const next: OperationRecord = applyRetention({
         ...base,
-        ...(update.vendorState !== undefined
+        ...(update.vendorState !== undefined && !keepTerminal
           ? { vendorState: update.vendorState }
           : {}),
-        ...(update.condition !== undefined
+        ...(update.condition !== undefined && !keepTerminal
           ? { condition: update.condition }
           : {}),
         ...(watermark !== undefined
