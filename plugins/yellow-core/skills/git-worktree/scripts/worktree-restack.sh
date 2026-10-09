@@ -604,6 +604,22 @@ validate_state() {
         ;;
     esac
   done
+  # Tips are recorded once per restacked branch, in chain order. A partial or
+  # duplicated list would leave a branch out of moved_tips while still passing
+  # the no-tips guard, so anything but that exact list is invalid. No tips at
+  # all is a legacy state, handled by its own guard.
+  if [ "${#T_BRANCH[@]}" -gt 0 ]; then
+    [ "${#T_BRANCH[@]}" -eq $((${#S_CHAIN[@]} - 1)) ] || {
+      STATE_ERR="recorded tips do not cover each restacked branch exactly once"
+      return 1
+    }
+    for ((i = 0; i < ${#T_BRANCH[@]}; i++)); do
+      [ "${T_BRANCH[i]}" = "${S_CHAIN[i + 1]}" ] || {
+        STATE_ERR="recorded tips do not cover each restacked branch exactly once"
+        return 1
+      }
+    done
+  fi
   for ((i = 0; i < ${#E_PATH[@]}; i++)); do
     p=${E_PATH[i]}
     case $p in /*) ;; *)
@@ -1681,6 +1697,14 @@ cmd_continue() {
 MARKER_PENDING=0
 rollback_recorded() {
   [ "$MARKER_PENDING" = 1 ] || return 0
+  # A state without a run id (written before ids existed) can never hold a
+  # marker; its record is `phase aborted` in the state file, retried here.
+  if [ -z "$S_RUNID" ]; then
+    S_PHASE=aborted
+    write_state 2>/dev/null || return 1
+    MARKER_PENDING=0
+    return 0
+  fi
   if write_aborted_marker 2>/dev/null; then
     MARKER_PENDING=0
     return 0
@@ -1790,8 +1814,14 @@ cmd_abort() {
     # Record the abort in the state file first, so --continue refuses even when
     # the marker path is unusable; the marker stays the retry shortcut.
     S_PHASE=aborted
-    write_state 2>/dev/null || err "could not record the abort in the state file"
-    write_aborted_marker 2>/dev/null || MARKER_PENDING=1
+    # A legacy state (no run id) has no marker: the phase is its only record.
+    if ! write_state 2>/dev/null; then
+      err "could not record the abort in the state file"
+      [ -n "$S_RUNID" ] || MARKER_PENDING=1
+    fi
+    if [ -n "$S_RUNID" ]; then
+      write_aborted_marker 2>/dev/null || MARKER_PENDING=1
+    fi
   elif ! abort_recorded && left=$(chain_rebase_worktree); then
     # The provider lost its record (Graphite's .gtcontinue or gh-stack's
     # rebase state) mid-restack, so its whole-stack rollback cannot run.

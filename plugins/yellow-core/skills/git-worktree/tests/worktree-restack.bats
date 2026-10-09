@@ -455,6 +455,30 @@ forge() {
   [ -z "$(branch_of "$wtb")" ]
 }
 
+@test "a state whose tips omit or repeat a restacked branch is rejected" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  cp "$SD/state" "$BATS_TEST_TMPDIR/state.orig"
+  [ "$(grep -c '^tip' "$SD/state")" -ge 2 ]
+  last=$(grep '^tip' "$SD/state" | tail -1)
+  # One tip missing.
+  grep -vxF "$last" "$BATS_TEST_TMPDIR/state.orig" >|"$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 4 ]
+  [[ $output == *"exactly once"* ]]
+  # One tip recorded twice in place of another.
+  first=$(grep '^tip' "$BATS_TEST_TMPDIR/state.orig" | head -1)
+  { grep -vxF "$last" "$BATS_TEST_TMPDIR/state.orig"; printf '%s\n' "$first"; } >|"$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 4 ]
+  [[ $output == *"exactly once"* ]]
+  cp "$BATS_TEST_TMPDIR/state.orig" "$SD/state"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
 @test "a state file that is a symlink is rejected" {
   mk_stack
   mkdir -p "$SD"
@@ -953,6 +977,24 @@ JSEOF
   [ "$status" -eq 31 ]
   [[ $output == *"still in progress"* ]]
   [[ $output != *"no record of it"* ]]
+  rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "a legacy state without a run id records the abort in its phase, not as an unwritable marker" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  sed -i '/^runid\t/d' "$SD/state"
+  plant_stuck_rebase "$(wtp c)" c
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"still in progress"* ]]
+  [[ $output != *"could not be written"* ]]
+  [ ! -e "$SD/provider-aborted" ]
+  grep -q '^phase.aborted$' "$SD/state"
   rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 0 ]
