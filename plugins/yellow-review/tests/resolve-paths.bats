@@ -848,7 +848,7 @@ old_link() {
   [[ "$output" == *node_modules/.bin/hop1* ]]
 }
 
-@test "rp_ignored_changed_since does not follow symlinks nested below a target directory" {
+@test "rp_ignored_changed_since follows symlinks nested below a target directory without a predicate too" {
   link_repo
   mkdir "$BATS_TEST_TMPDIR/deep"
   printf 'new\n' >| "$BATS_TEST_TMPDIR/deep/file"
@@ -857,7 +857,7 @@ old_link() {
   touch -t 201901010000 real/dir
   old_link ../real/dir src/dir.cache
   run rp_ignored_changed_since "$MARKER" "$SCRATCH"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 1 ]
 }
 
 @test "rp_ignored_changed_since with a predicate follows symlinks nested below a trusted-config link target" {

@@ -1917,6 +1917,37 @@ ignored_fixture() {
   grep -q 'resolver edit' src/a.txt
 }
 
+@test "--check-ignored refuses a payload edited behind a chain of two older nested symlinks" {
+  ignored_fixture
+  MID="$BATS_TEST_TMPDIR/mid"; EXT="$BATS_TEST_TMPDIR/payload-dir"
+  mkdir -p "$MID" "$EXT"
+  printf 'x\n' >| "$EXT/payload"
+  ln -s "$EXT" "$MID/l2"
+  ln -s "$MID" node_modules/l1
+  touch -t 201901010000 "$EXT/payload" "$EXT" "$MID"
+  touch -h -t 201901010000 "$MID/l2" node_modules/l1
+  touch -t 202001010000 "$IGN_MARKER"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  printf 'evil\n' >| "$EXT/payload"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/l1"* ]]
+}
+
+@test "--check-ignored fails closed on a symlink loop below an ignored directory link" {
+  ignored_fixture
+  MID="$BATS_TEST_TMPDIR/mid"
+  mkdir -p "$MID"
+  ln -s "$MID" "$MID/loop"
+  ln -s "$MID" node_modules/l1
+  touch -t 201901010000 "$MID"
+  touch -h -t 201901010000 "$MID/loop" node_modules/l1
+  touch -t 202001010000 "$IGN_MARKER"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+}
+
 @test "--check-ignored never runs a find or head from a PATH directory inside the worktree" {
   ignored_fixture
   for tool in find head; do
