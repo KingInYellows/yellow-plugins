@@ -651,6 +651,18 @@ refuse_hidden_flags() {
     [ ! -s "$hits" ] || die 2 "tracked files this mode checks carry a skip-worktree or assume-unchanged flag, so edits to them are invisible to the tree check; clear the flag (git update-index --no-skip-worktree --no-assume-unchanged) and retry: $(safe_path_list_z <"$hits")"
 }
 
+# FILES += <path> unless already present. The tree listing (rp_tree_changes)
+# is `diff --name-only HEAD` followed by `ls-files --others`, so a path staged
+# for deletion and recreated in the worktree appears in both halves; listed
+# twice it would put two identical deletion diffs into the recovery patch.
+add_unique_file() {
+    local p
+    for p in ${FILES[@]+"${FILES[@]}"}; do
+        [ "$p" = "$1" ] && return 0
+    done
+    FILES+=("$1")
+}
+
 if [ "$MODE" != revert-only ]; then
     list_tree_changes || die 2 "cannot list tree changes"
     refuse_hidden_flags
@@ -659,14 +671,14 @@ fi
 if [ "$MODE" = revert-dirty ]; then
     [ "${#FILES[@]}" -eq 0 ] || die 2 "--revert-dirty takes no file list"
     while IFS= read -r -d '' f; do
-        [ -n "$f" ] && FILES+=("$f")
+        [ -n "$f" ] && add_unique_file "$f"
     done <"$CHANGES_FILE"
 elif [ "$MODE" = revert-denied ]; then
     # Git lists the paths. Only trusted-config paths are reverted; the caller
     # never passes resolver-derived paths on the command line.
     [ "${#FILES[@]}" -eq 0 ] || die 2 "--revert-denied takes no file list"
     while IFS= read -r -d '' f; do
-        [ -n "$f" ] && rp_trusted_config "$f" && FILES+=("$f")
+        [ -n "$f" ] && rp_trusted_config "$f" && add_unique_file "$f"
     done <"$CHANGES_FILE"
 else
     # KEEP_FILES is the deduplicated list (first-seen order). A path listed
@@ -953,6 +965,17 @@ save_patch() {
             || lgit cat-file -e "HEAD:$f" 2>/dev/null; then
             lgit_nohooks diff --no-color --no-ext-diff --no-textconv "$fmt" \
                 --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$out" || return 1
+            # In HEAD but not in the index (staged deletion) and present in the
+            # worktree again: the diff above holds only the deletion. Append
+            # the worktree content as a creation so the patch, applied to the
+            # reverted tree (HEAD's file), recreates the replacement.
+            if ! lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
+                && { [ -L "$f" ] || [ -f "$f" ]; }; then
+                rc=0
+                lgit diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
+                    --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$f" >>"$out" || rc=$?
+                [ "$rc" -le 1 ] || return 1
+            fi
         elif [ -L "$f" ] || [ -f "$f" ]; then
             # -L: a dangling symlink has no -e but is still an edit to keep.
             # Never a FIFO or other special file: git diff would open it.

@@ -331,6 +331,78 @@ has_kill_after() {
   grep -q 'secret-denied-content' CLAUDE.md
 }
 
+# A path staged for deletion and recreated in the worktree is listed by both
+# halves of the tree listing (diff --name-only HEAD, ls-files --others).
+# The recovery patch must hold it once, carry the recreated content, and apply
+# to the reverted tree.
+assert_recreated_patch_restores() {
+  local path="$1" want="$2" patch
+  patch=$(printf '%s' "$output" | jq -r .patch)
+  [ -f "$patch" ]
+  # One deletion plus one creation of the path; never two deletions.
+  [ "$(grep -cxF "diff --git a/$path b/$path" "$patch")" = 2 ]
+  [ "$(awk -v p="$path" '$0 == "diff --git a/" p " b/" p { getline; if ($0 ~ /^deleted file mode/) n++ } END { print n + 0 }' "$patch")" = 1 ]
+  # Reverted: HEAD's content is back, in the index and the worktree.
+  [ "$(cat "$path")" = "head version" ]
+  [ -z "$(git diff --cached --name-only -- "$path")" ]
+  git apply --check "$patch"
+  git apply "$patch"
+  [ "$(cat "$path")" = "$want" ]
+}
+
+@test "--revert-denied saves a staged-deleted and recreated trusted-config file once, with the recreated content" {
+  printf 'head version\n' >| CLAUDE.md
+  git add CLAUDE.md
+  git commit -q -m "add CLAUDE.md"
+  git rm -q --cached CLAUDE.md
+  printf 'replacement content\n' >| CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ "$(printf '%s' "$output" | jq -c .reverted)" = '["CLAUDE.md"]' ]
+  [ "$(printf '%s' "$output" | jq -r .revertedCount)" = 1 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  assert_recreated_patch_restores CLAUDE.md "replacement content"
+}
+
+@test "--revert-dirty saves a staged-deleted and recreated file once, with the recreated content" {
+  printf 'head version\n' >| src/swap.txt
+  git add src/swap.txt
+  git commit -q -m "add swap"
+  git rm -q --cached src/swap.txt
+  printf 'replacement content\n' >| src/swap.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = true ]
+  assert_recreated_patch_restores src/swap.txt "replacement content"
+}
+
+@test "--revert-only saves a staged-deleted and recreated listed file with the recreated content" {
+  printf 'head version\n' >| src/swap.txt
+  git add src/swap.txt
+  git commit -q -m "add swap"
+  git rm -q --cached src/swap.txt
+  printf 'replacement content\n' >| src/swap.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/swap.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  assert_recreated_patch_restores src/swap.txt "replacement content"
+}
+
+@test "a failing verify run saves a staged-deleted and recreated listed file with the recreated content" {
+  sed -i 's|echo src/new.txt|echo src/new.txt; echo src/swap.txt|' "$STUB_BIN/gh"
+  printf 'head version\n' >| src/swap.txt
+  git add src/swap.txt
+  git commit -q -m "add swap"
+  git rm -q --cached src/swap.txt
+  printf 'replacement content\n' >| src/swap.txt
+  verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt src/swap.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = fail ]
+  assert_recreated_patch_restores src/swap.txt "replacement content"
+}
+
 @test "--revert-denied rejects a file list and leaves every change in place" {
   run --separate-stderr "$SCRIPT" --pr 7 --revert-denied -- src/a.txt
   [ "$status" -eq 2 ]
