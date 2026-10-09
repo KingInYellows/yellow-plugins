@@ -84,7 +84,13 @@ FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
 printf '%s\n' "$OUTPUT" | jq -r 'def safe: tostring | gsub("[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ") | gsub("[\\p{Pd}\u2500-\u257f\u2e3a\u2e3b\u30fc\u2043\u207b\u208b\u02d7\u2796\ufe31\ufe32\u2212\ufe58\ufe63\uff0d-]+"; "-") | gsub("-(\\s*-)+"; "-") | .[0:300]; (.pendingPlan.steps // [])[] | "\(.index + 1). \(.title | safe)" + (if .description then "\n   \(.description | safe)" else "" end)'
 printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
+bind_hash() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
+}
+printf 'plan_digest=%s\n' "$(printf '%s\n' "$OUTPUT" | jq -c '[.pendingPlan.planId, ((.pendingPlan.steps // []) | map([.title, .description]))]' | bind_hash)"
 ```
+
+Keep the printed `plan_digest=` value: it identifies the plan the user is shown.
 
 ### Step 4: Find a Covering Grant
 
@@ -134,12 +140,31 @@ types a confirmation code there.
 
 Show the session, the plan id and the fenced step list from Step 3, and the
 grant id. State that approval starts execution, and that the endpoint approves
-the plan pending at that moment. Then AskUserQuestion: "Approve this plan now?"
-with "Yes, approve" and "No, cancel". If the user declines, stop.
+the plan pending at that moment. Print the confirmation binding with this Bash
+call, substituting the values from Steps 2 to 4 and the `plan_digest=` from Step 3:
+
+```bash
+set -uo pipefail
+SESSION='YELLOW_TODO_session'
+PLAN_ID='YELLOW_TODO_plan_id'
+GRANT_ID='YELLOW_TODO_grant_id'
+REQUEST_ID='YELLOW_TODO_request_id'
+PLAN_DIGEST='YELLOW_TODO_plan_digest_from_step_3'
+case "$SESSION$PLAN_ID$GRANT_ID$REQUEST_ID$PLAN_DIGEST" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+bind_hash() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
+}
+printf 'binding=%s\n' "$(printf '%s' "${SESSION}|${PLAN_ID}|${GRANT_ID}|${REQUEST_ID}|${PLAN_DIGEST}" | bind_hash)"
+```
+
+Then AskUserQuestion: "Approve this plan now?" with "Yes, approve" and "No, cancel".
+If the user declines, stop. Keep the printed `binding=` value for Step 6.
 
 ### Step 6: Approve
 
-Immediately after confirmation. Bash timeout 300000 ms. Same substitution rule:
+Immediately after confirmation, with the `binding=` value from Step 5. The block
+re-reads the plan, recomputes the binding and refuses to call the CLI when it
+differs. Bash timeout 300000 ms. Same substitution rule:
 
 ```bash
 set -uo pipefail
@@ -148,9 +173,25 @@ PLAN_ID='YELLOW_TODO_plan_id'
 GRANT_ID='YELLOW_TODO_grant_id'
 REQUEST_ID='YELLOW_TODO_request_id'
 DEADLINE='YELLOW_TODO_deadline_or_empty'
-case "$SESSION$PLAN_ID$GRANT_ID$REQUEST_ID$DEADLINE" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
+CONFIRMED_BINDING='YELLOW_TODO_binding_from_preview'
+case "$SESSION$PLAN_ID$GRANT_ID$REQUEST_ID$DEADLINE$CONFIRMED_BINDING" in *YELLOW_TODO_*) printf 'ERROR: a YELLOW_TODO_ placeholder was not substituted.\n' >&2; exit 1 ;; esac
 CLI="${CLAUDE_PLUGIN_ROOT}/dist/cli.js"
 [ -f "$CLI" ] || { printf 'ERROR: yellow-jules CLI not found at %s. Reinstall the plugin.\n' "$CLI" >&2; exit 1; }
+# Re-read the plan and rebuild the binding from what is pending now: a plan that
+# differs from the one the user reviewed, or any changed value, refuses here.
+command -v jq >/dev/null 2>&1 || { printf 'ERROR: jq required.\n' >&2; exit 1; }
+FRESH=$(node "$CLI" status --session "$SESSION")
+bind_hash() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -c1-64; else shasum -a 256 | cut -c1-64; fi
+}
+PLAN_DIGEST=$(printf '%s\n' "$FRESH" | jq -c '[.pendingPlan.planId, ((.pendingPlan.steps // []) | map([.title, .description]))]' | bind_hash)
+BINDING=$(printf '%s' "${SESSION}|${PLAN_ID}|${GRANT_ID}|${REQUEST_ID}|${PLAN_DIGEST}" | bind_hash)
+if ! printf '%s' "$CONFIRMED_BINDING" | grep -qE '^[0-9a-f]{64}$'; then
+  printf 'ERROR: CONFIRMED_BINDING must be the 64-hex binding= value printed by the Step 5 preview.\n' >&2; exit 1
+fi
+if [ "$CONFIRMED_BINDING" != "$BINDING" ]; then
+  printf 'ERROR: the session, plan, grant or request id changed since the confirmed preview. Nothing was approved; start again from Step 3.\n' >&2; exit 1
+fi
 args=(approve --session "$SESSION" --plan-id "$PLAN_ID" --grant-id "$GRANT_ID" --request-id "$REQUEST_ID")
 [ -n "$DEADLINE" ] && args+=(--deadline-ms "$DEADLINE")
 OUTPUT=$(node "$CLI" "${args[@]}")
