@@ -316,6 +316,12 @@ be the reviewed one and not ambiguous (approve: `JULES_POLICY_DEVIATION`;
 guarded reply: `JULES_QUESTION_CHANGED`), and a guarded question must have no
 newer or tied agent message; a mismatch settles as a clean failure before the POST.
 
+`authorize --take-over` stamps the journal with `controllerTakeover` (the new host's
+clock and a sequence). Reconcile ages a `reserved` row created before it (by
+sequence, or without one) from that stamp, not from its own `createdAt`, which
+is the earlier controller's clock: the row stays in flight for the settle
+interval after the take-over.
+
 `authorize` (create) refuses under the lock when any existing grant is bound to
 another controller id or epoch (for example after another host's take-over): a
 stale local epoch never mints a grant beside them; run `--take-over` explicitly.

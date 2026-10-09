@@ -739,10 +739,20 @@ export async function reconcile(
   // reservation younger than the longest write deadline is left alone, so
   // reconcile can never free (and then be overwritten by) a live write.
   const nowMs = deps.clock.now();
+  // A reservation made under an earlier controller epoch carries that host's
+  // clock; it is aged from the take-over on this host's clock instead, so a
+  // skewed `createdAt` cannot make a live POST look settled.
+  const takeover = journal.controllerTakeover;
+  const takeoverMs = takeover !== undefined ? Date.parse(takeover.at) : NaN;
+  const ageStartMs = (r: OperationRecord): number =>
+    takeover !== undefined &&
+    !Number.isNaN(takeoverMs) &&
+    (r.createSeq === undefined || r.createSeq < takeover.seq)
+      ? takeoverMs
+      : Date.parse(r.createdAt);
   const inFlight = targets.filter(
     (r) =>
-      r.status === 'reserved' &&
-      nowMs - Date.parse(r.createdAt) < RESERVATION_SETTLE_MS
+      r.status === 'reserved' && nowMs - ageStartMs(r) < RESERVATION_SETTLE_MS
   );
   const settled = targets.filter((r) => !inFlight.includes(r));
   const early: Resolution[] = inFlight.map((record) =>

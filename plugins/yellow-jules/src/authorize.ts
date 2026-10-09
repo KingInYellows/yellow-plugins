@@ -39,7 +39,12 @@ import {
   type WriteDeps,
   withAdapter,
 } from './runtime-support.js';
-import { readJournal, withJournalLock } from './state.js';
+import {
+  nextSeq,
+  readJournal,
+  withJournalLock,
+  writeJournal,
+} from './state.js';
 import type { GrantOperation, GrantRecord } from './types.js';
 import {
   mintGrantId,
@@ -402,6 +407,14 @@ export async function authorizeTakeOver(
     const grants = loadGrants(deps.dataDir);
     const result = takeOverController(ctx, deps.dataDir, grants);
     writeGrants(deps.dataDir, result.grants);
+    // Reservations from the earlier epoch carry the old host's clock; reconcile
+    // ages them from this moment on this host's clock.
+    const journal = await readJournal(deps.dataDir);
+    const seq = nextSeq(journal);
+    await writeJournal(deps.dataDir, {
+      ...journal,
+      controllerTakeover: { at: nowFn(deps)().toISOString(), seq },
+    });
     return {
       operation: 'authorize' as const,
       controllerId: result.authority.controllerId,

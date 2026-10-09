@@ -449,6 +449,13 @@ function parseJournal(raw) {
     const seq = parsed['seq'];
     if (seq !== undefined && !(0, shape_js_1.isNonNegativeInt)(seq))
         return undefined;
+    const takeover = parsed['controllerTakeover'];
+    if (takeover !== undefined &&
+        !((0, shape_js_1.isPlainObject)(takeover) &&
+            typeof takeover['at'] === 'string' &&
+            !Number.isNaN(Date.parse(takeover['at'])) &&
+            (0, shape_js_1.isNonNegativeInt)(takeover['seq'])))
+        return undefined;
     const ops = parsed['operations'];
     if (!(0, shape_js_1.isPlainObject)(ops))
         return undefined;
@@ -462,6 +469,14 @@ function parseJournal(raw) {
         version: 1,
         archiveVisibilityConfirmed: parsed['archiveVisibilityConfirmed'],
         ...(seq !== undefined ? { seq } : {}),
+        ...(takeover !== undefined
+            ? {
+                controllerTakeover: {
+                    at: takeover['at'],
+                    seq: takeover['seq'],
+                },
+            }
+            : {}),
         operations,
     };
 }

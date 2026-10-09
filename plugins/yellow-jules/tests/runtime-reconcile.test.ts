@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadGrants } from '../src/authority.js';
+import { authorizeTakeOver } from '../src/authorize.js';
 import { resolveGrantsPath } from '../src/config.js';
 import { controllerFilePath } from '../src/controller.js';
 import { AdapterError, AppErrorException } from '../src/errors.js';
@@ -18,6 +19,7 @@ import {
   writeJournal,
 } from '../src/state.js';
 import type { AdapterSession } from '../src/types.js';
+import { reserveUnderGrant } from '../src/write-gate.js';
 
 import { makeSession } from './fake-sdk.js';
 import {
@@ -414,6 +416,51 @@ describe('delegate reservations: one shared sessions walk', () => {
     const result = await status(h.deps, { reconcile: true });
     expect(result.reconciled).toEqual([]);
     expect(h.adapter.callsTo('listSessions')).toEqual([]);
+  });
+});
+
+describe('a reservation from an earlier controller epoch', () => {
+  it('is aged from the take-over on the new host clock, not from its own createdAt', async () => {
+    const session = await delegateOk(h, grantId);
+    await reserveUnderGrant(h.deps, {
+      grantId,
+      ownerRequestId: session.localRequestId,
+      authority: {
+        repository: 'acme/widgets',
+        sourceResource: 'sources/github/acme/widgets',
+        branch: 'scratch/one',
+        taskRef: 't1',
+        operation: 'reply',
+      },
+      reservation: {
+        localRequestId: 'old-epoch-reply',
+        localId: `jl-${'c'.repeat(32)}`,
+        sessionResource: session.sessionResource,
+        promptDigest: 'd'.repeat(64),
+      },
+    });
+    // The new host's clock runs well ahead of the old host's: by its own
+    // createdAt the reservation is long settled.
+    h.deps.clock.time += 30 * 60_000;
+    await authorizeTakeOver(h.deps);
+    const first = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(first.reconciled).toEqual([
+      expect.objectContaining({
+        localRequestId: 'old-epoch-reply',
+        outcome: 'not-reached',
+        reason: expect.stringContaining('in flight'),
+      }),
+    ]);
+    // Once the settle interval has elapsed from the take-over it is resolved.
+    h.deps.clock.time += 270_000;
+    const later = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(later.reconciled?.[0]?.reason ?? '').not.toContain('in flight');
   });
 });
 

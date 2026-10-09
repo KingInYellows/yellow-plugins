@@ -214,6 +214,14 @@ async function authorizeTakeOver(deps) {
         const grants = (0, authority_js_1.loadGrants)(deps.dataDir);
         const result = (0, controller_js_1.takeOverController)(ctx, deps.dataDir, grants);
         (0, authority_js_1.writeGrants)(deps.dataDir, result.grants);
+        // Reservations from the earlier epoch carry the old host's clock; reconcile
+        // ages them from this moment on this host's clock.
+        const journal = await (0, state_js_1.readJournal)(deps.dataDir);
+        const seq = (0, state_js_1.nextSeq)(journal);
+        await (0, state_js_1.writeJournal)(deps.dataDir, {
+            ...journal,
+            controllerTakeover: { at: (0, runtime_support_js_1.nowFn)(deps)().toISOString(), seq },
+        });
         return {
             operation: 'authorize',
             controllerId: result.authority.controllerId,

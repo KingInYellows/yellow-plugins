@@ -495,6 +495,17 @@ function parseJournal(raw: string): Journal | undefined {
     return undefined;
   const seq = parsed['seq'];
   if (seq !== undefined && !isNonNegativeInt(seq)) return undefined;
+  const takeover = parsed['controllerTakeover'];
+  if (
+    takeover !== undefined &&
+    !(
+      isPlainObject(takeover) &&
+      typeof takeover['at'] === 'string' &&
+      !Number.isNaN(Date.parse(takeover['at'])) &&
+      isNonNegativeInt(takeover['seq'])
+    )
+  )
+    return undefined;
   const ops = parsed['operations'];
   if (!isPlainObject(ops)) return undefined;
   const operations = Object.create(null) as Record<string, OperationRecord>;
@@ -506,6 +517,14 @@ function parseJournal(raw: string): Journal | undefined {
     version: 1,
     archiveVisibilityConfirmed: parsed['archiveVisibilityConfirmed'],
     ...(seq !== undefined ? { seq } : {}),
+    ...(takeover !== undefined
+      ? {
+          controllerTakeover: {
+            at: takeover['at'] as string,
+            seq: takeover['seq'] as number,
+          },
+        }
+      : {}),
     operations,
   };
 }

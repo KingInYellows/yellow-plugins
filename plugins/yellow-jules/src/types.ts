@@ -476,6 +476,14 @@ export interface Journal {
    * without a sequence have an unknown order and never authorize.
    */
   seq?: number;
+  /**
+   * The latest `authorize --take-over`, stamped on the new controller's own
+   * clock with the journal sequence at that moment. A reservation created
+   * before it (by sequence, or without one) came from an earlier controller
+   * epoch: its `createdAt` is another host's clock, so reconcile ages it from
+   * `at` instead.
+   */
+  controllerTakeover?: { readonly at: string; readonly seq: number };
   /** Keyed by localRequestId; built with Object.create(null). */
   readonly operations: Record<string, OperationRecord>;
 }
