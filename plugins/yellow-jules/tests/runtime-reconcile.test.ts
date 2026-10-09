@@ -545,6 +545,34 @@ describe('reply and approve reservations resolve on their own session', () => {
     expect(ops['reply-b']?.echoActivityId).toBeUndefined();
   });
 
+  it('an echo id claimed in another session does not block binding here', async () => {
+    const session = await strandedReply('exact words', 'reply-1');
+    // Activity ids carry no session: another session's reply claimed this id.
+    await updateJournal(h.dataDir, (operations) => {
+      const base = operations['reply-1']!;
+      operations['other-session-reply'] = {
+        ...base,
+        localRequestId: 'other-session-reply',
+        localId: `jl-${'e'.repeat(32)}`,
+        status: 'accepted',
+        sessionResource: 'sessions/other999',
+        echoActivityId: 'act-shared-id',
+      };
+    });
+    addActivity(h, session.sessionResource, {
+      activityId: 'act-shared-id',
+      type: 'userMessaged',
+      message: 'exact words',
+    });
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    expect(
+      result.reconciled?.find((r) => r.localRequestId === 'reply-1')
+    ).toMatchObject({ outcome: 'bound' });
+  });
+
   it('a sessionless reconcile that binds a reply persists the echo it matched', async () => {
     const session = await strandedReply('exact words', 'reply-1');
     const echo = addActivity(h, session.sessionResource, {

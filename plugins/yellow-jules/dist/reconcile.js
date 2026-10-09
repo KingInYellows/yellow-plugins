@@ -437,7 +437,10 @@ async function reconcile(deps, journal, sessionResource, deadline) {
                     const walk = await walkSessions(deps, adapter, oldest, deadline);
                     out.push(...resolveCreates(journal, creates, walk));
                 }
-                const claimedEchoes = new Map(Object.values(journal.operations).flatMap((r) => r.echoActivityId !== undefined
+                // Activity ids are stored without their session, so two sessions can
+                // hold the same id: claims are scoped to the session being resolved.
+                const claimedEchoesOf = (session) => new Map(Object.values(journal.operations).flatMap((r) => r.echoActivityId !== undefined &&
+                    r.sessionResource === session
                     ? [[r.echoActivityId, r.localRequestId]]
                     : []));
                 const settledReplies = Object.values(journal.operations).filter((r) => (r.kind === 'reply' || r.kind === 'approve') &&
@@ -457,7 +460,7 @@ async function reconcile(deps, journal, sessionResource, deadline) {
                         out.push(...records.map((record) => notReached(record, 'the deadline expired before this operation was checked')));
                         continue;
                     }
-                    out.push(...(await resolveOnOwnSession(deps, adapter, session, records, deadline, claimedEchoes, settledReplies.filter((c) => c.sessionResource === session))));
+                    out.push(...(await resolveOnOwnSession(deps, adapter, session, records, deadline, claimedEchoesOf(session), settledReplies.filter((c) => c.sessionResource === session))));
                 }
                 return out;
             })),

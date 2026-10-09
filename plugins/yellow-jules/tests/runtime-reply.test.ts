@@ -820,6 +820,41 @@ describe('races inside the write gate', () => {
       expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
     });
 
+    it("an echo claimed in another session does not hide this session's user message", async () => {
+      const q = ask();
+      h.deps.clock.time += 1_000;
+      const outside = addActivity(h, session.sessionResource, {
+        type: 'userMessaged',
+        message: 'Use Postgres.',
+        createTime: new Date(h.deps.clock.now()).toISOString(),
+      });
+      // Activity ids carry no session: another session claimed the same id.
+      await updateJournal(h.dataDir, (operations) => {
+        const base = Object.values(operations)[0]!;
+        operations['other-session-reply'] = {
+          ...base,
+          localRequestId: 'other-session-reply',
+          localId: `jl-${'d'.repeat(32)}`,
+          kind: 'reply',
+          status: 'accepted',
+          sessionResource: 'sessions/other999',
+          echoActivityId: outside.activityId,
+        };
+      });
+      expect(
+        await code(() =>
+          reply(
+            h.deps,
+            args({
+              expectActivityId: q.activityId,
+              expectQuestionDigest: messageDigest(QUESTION),
+            })
+          )
+        )
+      ).toBe('JULES_QUESTION_CHANGED');
+      expect(h.adapter.callsTo('sendMessage')).toHaveLength(0);
+    });
+
     it('refuses an expected id that is not the newest question', async () => {
       ask();
       expect(

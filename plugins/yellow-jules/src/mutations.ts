@@ -659,7 +659,9 @@ async function assertQuestionStillOpen(
   ) {
     return changed('the session no longer awaits the question the pass showed');
   }
-  if (await hasUnclaimedUserMessage(deps, userMessages, current)) {
+  if (
+    await hasUnclaimedUserMessage(deps, sessionResource, userMessages, current)
+  ) {
     return changed(
       'a user message arrived after the question and was not sent by this plugin'
     );
@@ -673,12 +675,16 @@ async function assertQuestionStillOpen(
  */
 async function hasUnclaimedUserMessage(
   deps: WriteDeps,
+  sessionResource: string,
   userMessages: ReadonlyArray<{ activityId: string; createTime: string }>,
   after: { activityId: string; createTime: string }
 ): Promise<boolean> {
   const claimed = new Set(
+    // Activity ids carry no session, so only this session's claims count.
     Object.values((await readJournal(deps.dataDir)).operations).flatMap((r) =>
-      r.echoActivityId !== undefined ? [r.echoActivityId] : []
+      r.echoActivityId !== undefined && r.sessionResource === sessionResource
+        ? [r.echoActivityId]
+        : []
     )
   );
   return userMessages.some(
@@ -1131,7 +1137,12 @@ async function approveInner(
       },
     });
     if (!refetch.complete) return incompleteRefetch(refetch);
-    const steered = await hasUnclaimedUserMessage(deps, userMessages, start);
+    const steered = await hasUnclaimedUserMessage(
+      deps,
+      target.sessionResource,
+      userMessages,
+      start
+    );
     const newest = refetch.pendingPlan;
     if (newest === null || newest === undefined) {
       return throwAppError(

@@ -375,7 +375,7 @@ async function assertQuestionStillOpen(deps, adapter, sessionResource, liveCondi
         (0, state_js_1.messageDigest)(current.message) !== expected.digest) {
         return changed('the session no longer awaits the question the pass showed');
     }
-    if (await hasUnclaimedUserMessage(deps, userMessages, current)) {
+    if (await hasUnclaimedUserMessage(deps, sessionResource, userMessages, current)) {
         return changed('a user message arrived after the question and was not sent by this plugin');
     }
 }
@@ -384,8 +384,12 @@ async function assertQuestionStillOpen(deps, adapter, sessionResource, liveCondi
  * claimed echoes: someone else is steering the session. A complete re-read does
  * not classify it, so the write fails closed and the next `status` records it.
  */
-async function hasUnclaimedUserMessage(deps, userMessages, after) {
-    const claimed = new Set(Object.values((await (0, state_js_1.readJournal)(deps.dataDir)).operations).flatMap((r) => r.echoActivityId !== undefined ? [r.echoActivityId] : []));
+async function hasUnclaimedUserMessage(deps, sessionResource, userMessages, after) {
+    const claimed = new Set(
+    // Activity ids carry no session, so only this session's claims count.
+    Object.values((await (0, state_js_1.readJournal)(deps.dataDir)).operations).flatMap((r) => r.echoActivityId !== undefined && r.sessionResource === sessionResource
+        ? [r.echoActivityId]
+        : []));
     return userMessages.some((u) => !claimed.has(u.activityId) && (0, activity_walk_js_1.compareStamp)(u, after) > 0);
 }
 function validateExpectedPlan(args, haveQuestion) {
@@ -654,7 +658,7 @@ async function approveInner(deps, args, ids) {
         });
         if (!refetch.complete)
             return incompleteRefetch(refetch);
-        const steered = await hasUnclaimedUserMessage(deps, userMessages, start);
+        const steered = await hasUnclaimedUserMessage(deps, target.sessionResource, userMessages, start);
         const newest = refetch.pendingPlan;
         if (newest === null || newest === undefined) {
             return (0, errors_js_1.throwAppError)('JULES_INVALID_STATE', 'the vendor shows no pending plan for this session', { recoveryAction: 'Run status for this session, then retry.' });

@@ -314,6 +314,11 @@ the reviewed plan that is not a claimed echo refuses the approval
 newest plan generated before the recorded approval must match the reviewed
 digest; the same id with other steps is reported as a policy deviation.
 
+Activity ids are stored without their session, so every claimed-echo lookup
+(`claimOwnEchoes`, the reply and approve freshness checks, reconcile) is scoped
+to the session it reads; an echo claimed in one session never explains a message
+in another.
+
 Binding a create to a session that an `observe` row already owns (reconcile, or
 a create whose response arrived after a raw-resource `status`) folds that row
 into the create and retires its local id: deviations stay unreconciled if either

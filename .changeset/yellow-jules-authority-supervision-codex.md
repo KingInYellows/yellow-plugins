@@ -76,3 +76,7 @@ plugin did not send follows the question.
 same-text replies. `approve` refuses when a user message this plugin did not
 send follows the reviewed plan, and reports a policy deviation when the vendor
 approved the reviewed plan id with different steps.
+
+Echo claims are scoped to their session, so an activity id claimed in one
+session can no longer hide a teammate's message in another from the reply and
+approve freshness checks or from reconciliation.
