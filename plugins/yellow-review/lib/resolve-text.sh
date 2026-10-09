@@ -343,9 +343,11 @@ _rt_scan() {
             # but count as words: the safe side for prose. The fullwidth
             # punctuation of EF BC 80-8F (U+FF00-FF0F) and EF BD 9B-A5
             # (U+FF5B-FF65) is a symbol too; fullwidth letters and digits are
-            # words. symlead is the same class with no whitespace required: a
-            # symbol attached directly to the first word (a fullwidth quote or
-            # an emoji glued to a passphrase) is consumed as well.
+            # words. symlead consumes a symbol run attached directly to the first
+            # word (a fullwidth quote or an emoji glued to a passphrase),
+            # with no whitespace required: symbol-only characters in a
+            # multibyte locale, a non-ASCII byte run glued to ASCII in byte-wise mode.
+            bytewise = 0
             if (length("\303\251") == 1) {
                 symtok = "^([^\001-\177[:alpha:][:digit:]]+[ \t]+)+"
                 symlead = "^[^\001-\177[:alpha:][:digit:]]+"
@@ -353,7 +355,14 @@ _rt_scan() {
                 symb = "[\200-\277]"
                 symc = "(\342[\200-\257]" symb "|\342[\270\271]" symb "|\303[\227\267]|\343\200" symb "|\357\270" symb "|\360\237" symb symb "|\302" symb "|\357\274[\200-\217]|\357\275[\233-\245])"
                 symtok = "^(" symc "+[ \t]+)+"
-                symlead = "^" symc "+"
+                # Fail closed: a non-ASCII byte run glued to a printable
+                # ASCII character is dropped, so the ASCII words after it are
+                # judged like plain ASCII. Byte-wise awk cannot tell a letter
+                # from punctuation, so an accented first word (`éclair recipe
+                # is great`) may be refused here; the multibyte path keeps it.
+                # A non-ASCII word followed by whitespace stays prose.
+                symlead = "^[\200-\377]+[\041-\176]"
+                bytewise = 1
             }
             kw = "(pass([_-]?(phrase|code)|word|wd)?|pwd|secret([_ \t-]?key)?|(private|access)[_ \t-]?key|token|api[_ \t-]?key|credentials?)"
             ph =" string number integer boolean object array unknown undefined"
@@ -522,8 +531,13 @@ _rt_scan() {
                             sub(symtok, "", r2)
                             # A symbol run attached to the first word (no
                             # whitespace) goes too; a letter or digit stops it.
-                            sub(symlead, "", o)
-                            sub(symlead, "", r2)
+                            if (bytewise) {
+                                if (match(o, symlead)) o = substr(o, RLENGTH)
+                                if (match(r2, symlead)) r2 = substr(r2, RLENGTH)
+                            } else {
+                                sub(symlead, "", o)
+                                sub(symlead, "", r2)
+                            }
                         }
                         c = substr(o, 1, 1)
                         if (c !~ /["\047A-Z]/ && c ~ /^[\001-\177]/ && split(r2, wparts, /[ \t]+/) >= 3 && wordcred(r2)) flag("unquoted-keyword-value")
