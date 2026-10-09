@@ -181,6 +181,16 @@ yr_safe_path() {
     printf '%s\n' "$kept"
 }
 
+# yr_awk: awk looked up through the same worktree-free PATH as yr_git, so a
+# resolver-written awk in a PATH directory inside the worktree cannot run.
+# Recomputes the path when YR_GIT_PATH is unset (yr_git sets it in a subshell
+# when called inside $(...), so the parent may not have it).
+yr_awk() {
+    local safe=${YR_GIT_PATH:-}
+    [ -n "$safe" ] || safe=$(yr_safe_path) || return $?
+    PATH=$safe awk "$@"
+}
+
 # Git with listed paths taken literally (no globs or pathspec magic). A
 # per-call flag, not GIT_LITERAL_PATHSPECS, so hooks, gt and the verify
 # command never inherit it.
@@ -252,7 +262,7 @@ harden_git_config() {
         0|1) ;;
         *) YR_HARDEN_MSG="could not read the git transport config"; return 1 ;;
     esac
-    tkey=$(printf '%s\n' "$tcfg" | awk -F'\t' '
+    tkey=$(printf '%s\n' "$tcfg" | yr_awk -F'\t' '
         ($1 == "local" || $1 == "worktree") {
             k = $2; v = $2; sub(/ .*/, "", k); sub(/^[^ ]* /, "", v)
             if (k ~ /^filter\.lfs\.(clean|smudge|process)$/ && (v == "git-lfs clean -- %f" || v == "git-lfs smudge -- %f" || v == "git-lfs filter-process" || v == "git-lfs smudge --skip -- %f" || v == "git-lfs filter-process --skip")) next
@@ -285,7 +295,7 @@ harden_git_config() {
         0|1) ;;
         *) YR_HARDEN_MSG="could not read the git signing config"; return 1 ;;
     esac
-    hit=$(printf '%s\n' "$cfg" | awk -F'\t' '($1 == "local" || $1 == "worktree") && tolower($2) !~ /^commit\.gpgsign (false|no|off|0)$/ { print "y"; exit }') \
+    hit=$(printf '%s\n' "$cfg" | yr_awk -F'\t' '($1 == "local" || $1 == "worktree") && tolower($2) !~ /^commit\.gpgsign (false|no|off|0)$/ { print "y"; exit }') \
         || { YR_HARDEN_MSG="could not parse the git signing config"; return 1; }
     [ -n "$hit" ] || return 0
     n=$((n + 3))
