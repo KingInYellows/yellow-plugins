@@ -212,8 +212,13 @@ that rebase by hand, reset any stack branch that already restacked, then run
 `--abort` also refuses, with exit `31`, when no rebase is left but a stack
 branch is no longer at the commit recorded at start (a paused rebase finished
 with `git rebase --continue`). It lists each moved branch and its starting
-commit and restores nothing. Point those branches back by hand and run
-`--abort` again, or run `--continue` to keep them.
+commit and restores nothing, printing a fix line per branch: `git reset --hard`
+in the worktree that has it checked out, else `git branch -f` (git refuses to
+force-update a checked-out branch). Run them, then `--abort` again, or run
+`--continue` to keep the branches.
+
+`--continue` refuses with exit `31` once the provider's abort has succeeded
+(a valid marker) but the abort cleanup is unfinished; run `--abort` to finish.
 
 ## Recovery
 

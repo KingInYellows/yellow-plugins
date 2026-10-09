@@ -1609,6 +1609,11 @@ cmd_continue() {
   load_state_or_exit
   need_lock
   report_all_floating
+  # A valid marker means this run was aborted at the provider and only the
+  # abort cleanup is pending; continuing would treat the rollback as success.
+  if aborted_marker_valid; then
+    die "$X_KEPT" "this restack was already aborted at the provider and only the abort cleanup is unfinished; state kept. Run --abort to finish it. --continue would treat the rolled-back stack as restacked"
+  fi
   # A git rebase still in progress that the provider has no record of (an
   # adapter timeout, a lost marker) is not "nothing paused": finishing now
   # would clear the state and the lock over a half-applied restack.
@@ -1682,16 +1687,22 @@ cmd_abort() {
     # No rebase directory is left, yet stack branches are not where they
     # started: the user finished the paused rebase with git, or the provider
     # lost its record. Nothing can roll those branches back from here.
-    local mline mb mold mnew
+    local mb mold mnew mholder
     note "stack branches have moved since the restack started and the provider has no paused restack to roll back:"
     while IFS=$'\t' read -r mb mold mnew; do
       note "  $(v "$mb"): started at $(v "$mold"), now $(v "$mnew")"
+      # git refuses to force-update a branch checked out in any worktree.
+      if mholder=$(branch_holder "refs/heads/$mb"); then
+        note "    fix: git -C $(q "$mholder") reset --hard $(v "$mold")"
+      else
+        note "    fix: git branch -f $(q "$mb") $(v "$mold")"
+      fi
     done <<<"$moved"
-    die "$X_KEPT" "state kept, nothing aborted or restored. Point each branch above back at its starting commit by hand (git branch -f <branch> <commit>, from a worktree that does not have that branch checked out), then run --abort again. To keep the restacked branches instead, run --continue"
+    die "$X_KEPT" "state kept, nothing aborted or restored. Run each fix line above to point the branch back at its starting commit, then run --abort again. To keep the restacked branches instead, run --continue"
   elif [ "${#T_BRANCH[@]}" -eq 0 ] && ! aborted_marker_valid; then
     # A state file from before tips were recorded: with no provider rollback
     # and no rebase to abort, nothing shows whether branches were restacked.
-    die "$X_KEPT" "the provider has no paused restack to roll back and this state file has no recorded start tips, so it cannot tell whether stack branches were already restacked; state kept, nothing aborted or restored. Inspect the stack branches and, if needed, point them back by hand (git branch -f <branch> <commit>, from a worktree that does not have that branch checked out). Then run --continue to keep them, or run restore (no provider) to put the worktrees back and clear the state"
+    die "$X_KEPT" "the provider has no paused restack to roll back and this state file has no recorded start tips, so it cannot tell whether stack branches were already restacked; state kept, nothing aborted or restored. Inspect the stack branches and, if needed, point them back by hand (git reset --hard <commit> in the worktree that has the branch checked out, else git branch -f <branch> <commit>). Then run --continue to keep them, or run restore (no provider) to put the worktrees back and clear the state"
   fi
   # The provider abort only clears the rebase it recorded. Abort any other
   # in-chain git rebase (a stack branch, in whichever worktree holds it),

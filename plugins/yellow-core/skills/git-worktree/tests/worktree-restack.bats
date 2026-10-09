@@ -1094,6 +1094,32 @@ moved_by_hand() {
   [ -e "$SD/state" ]
 }
 
+@test "--continue refuses after a successful provider abort left the cleanup unfinished" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite --submit
+  [ "$status" -eq 10 ]
+  plant_stuck_rebase "$(wtp c)" c
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [ -f "$SD/provider-aborted" ]
+  rm -rf "$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)/rebase-merge"
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"Run --abort"* ]]
+  [ -e "$SD/state" ]
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
+@test "the moved-branch message names git reset --hard in the worktree that holds the branch" {
+  moved_by_hand
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"fix: git -C $(wtp a) reset --hard $(git rev-parse b)"* || $output == *"fix: git -C $(wtp a) reset --hard"* ]]
+  [[ $output == *"fix: git branch -f a "* ]]
+}
+
 @test "--continue after the user finished the provider's continue by hand verifies and restores" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
@@ -1371,8 +1397,9 @@ moved_by_hand() {
 }
 
 @test "the script has no force, merge, stash, hard-reset or ignore-other-worktrees path" {
-  # Comments may mention the words; only code lines count.
-  code=$(grep -v '^[[:space:]]*#' "$SCRIPT")
+  # Comments may mention the words, and the printed "fix: git ..." recovery
+  # lines are advice for the user, never run; only other code lines count.
+  code=$(grep -v '^[[:space:]]*#' "$SCRIPT" | grep -v 'note "    fix: git ')
   run grep -nE '(checkout|switch)[^|;&]*[[:space:]](-f|--force|-m|--merge)([[:space:]]|$)|reset --hard|--ignore-other-worktrees|stash' <<<"$code"
   [ "$status" -eq 1 ]
 }
