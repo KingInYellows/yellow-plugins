@@ -466,12 +466,13 @@ diff_for() {
 
 # changed_lines <staged|worktree|commit> <file>...: the larger side of each hunk,
 # summed over the files (a replaced line counts once, an insertion counts its
-# length). Fails when git or awk fails.
+# length). Fails when git or awk fails. These parsers use yr_awk because
+# --check-ranges exits before check_tools_outside_repo binds awk.
 changed_lines() {
     local mode="$1" f total=0 n
     shift
     for f in "$@"; do
-        n=$(diff_for "$f" "$mode" | awk '/^@@/ {
+        n=$(diff_for "$f" "$mode" | yr_awk '/^@@/ {
                 split($2, a, ","); split($3, b, ",")
                 o = (a[2] == "" ? 1 : a[2] + 0); c = (b[2] == "" ? 1 : b[2] + 0)
                 t += (o > c ? o : c)
@@ -483,12 +484,12 @@ changed_lines() {
 
 out_of_range_spans() {
     local f="$1" file_ranges
-    file_ranges=$(awk -v p="$f" '$1 == p { print $2; exit }' <<<"$RANGE_ROWS")
+    file_ranges=$(yr_awk -v p="$f" '$1 == p { print $2; exit }' <<<"$RANGE_ROWS")
     case "$file_ranges" in
         ''|none|unknown) file_ranges="" ;;
     esac
     diff_for "$f" "$2" \
-        | awk -v ranges="$file_ranges" -v m="$RANGE_MARGIN" '
+        | yr_awk -v ranges="$file_ranges" -v m="$RANGE_MARGIN" '
             BEGIN {
                 n = split(ranges, r, ",")
                 for (i = 1; i <= n && ranges != ""; i++) { split(r[i], b, "-"); lo[i] = b[1] - m; hi[i] = b[2] + m }
