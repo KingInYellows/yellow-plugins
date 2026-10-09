@@ -413,6 +413,41 @@ describe('reply and approve reservations resolve on their own session', () => {
     });
   });
 
+  it('two unresolved replies with one digest never both bind to a single activity', async () => {
+    const session = await strandedReply('same words', 'reply-1');
+    h.adapter.sendMessageImpl = async () => {
+      throw new AdapterError('network', 'reset', { dispatched: true });
+    };
+    await expect(
+      reply(h.deps, {
+        session: session.localId,
+        message: 'same words',
+        dryRun: false,
+        correction: false,
+        grantId,
+        requestId: 'reply-2',
+      })
+    ).rejects.toBeInstanceOf(AppErrorException);
+    addActivity(h, session.sessionResource, {
+      type: 'userMessaged',
+      message: 'same words',
+    });
+    const result = await status(h.deps, {
+      session: session.localId,
+      reconcile: true,
+    });
+    const outcomes = Object.fromEntries(
+      (result.reconciled ?? []).map((r) => [r.localRequestId, r.outcome])
+    );
+    expect(outcomes).toEqual({
+      'reply-1': 'ambiguous-reconcile',
+      'reply-2': 'ambiguous-reconcile',
+    });
+    const ops = (await readJournal(h.dataDir)).operations;
+    expect(ops['reply-1']?.status).toBe('unknown-outcome');
+    expect(ops['reply-2']?.status).toBe('unknown-outcome');
+  });
+
   it('an older matching send is a prior send, never this one', async () => {
     const session = await strandedReply('repeat me', 'reply-1');
     addActivity(h, session.sessionResource, {

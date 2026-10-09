@@ -227,9 +227,17 @@ async function resolveOnOwnSession(deps, adapter, sessionResource, records, dead
             }
         },
     });
+    // One vendor activity can explain only one record: two unresolved records with
+    // the same digest (or two approvals of the same plan) that share an activity
+    // cannot both be bound to it, and nothing says which one landed.
+    const owners = new Map();
+    for (const found of matches.values()) {
+        for (const id of found)
+            owners.set(id, (owners.get(id) ?? 0) + 1);
+    }
     return records.map((record) => {
         const found = matches.get(record.localRequestId) ?? new Set();
-        if (found.size > 1) {
+        if (found.size > 1 || [...found].some((id) => (owners.get(id) ?? 0) > 1)) {
             return {
                 record,
                 outcome: 'ambiguous-reconcile',
