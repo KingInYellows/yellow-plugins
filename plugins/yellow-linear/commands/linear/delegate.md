@@ -622,7 +622,7 @@ Write the Step 4 packet verbatim to the printed path with the `Write` tool.
 branch exists on GitHub (Jules clones from there), dry-runs `delegate`, and prints
 the covering grant or the terminal command. The second call (`MODE='launch'`, after
 the confirmation below) sends the launch. Replace each `YELLOW_TODO_` token with
-its concrete value. In the dry run leave `DRY_RUN_BINDING` empty; the dry run
+its concrete value. In the dry run leave `DRY_RUN_BINDING` and `PREVIEW_PACKET_SHA` empty; the dry run
 prints `binding=<64 hex>` together with `grant_id=` (the binding covers the grant, so
 it is printed once the grant is known), and the launch call substitutes exactly that
 value. The binding is a sha256 over the repository, branch, issue id, delegation
@@ -639,6 +639,7 @@ DELEGATION_REV='YELLOW_TODO_delegation_rev'
 PACKET_FILE='YELLOW_TODO_packet_path_from_path_step'
 GRANT_ID='YELLOW_TODO_grant_id_for_launch_or_empty'
 DRY_RUN_BINDING='YELLOW_TODO_binding_from_dry_run_or_empty'
+PREVIEW_PACKET_SHA='YELLOW_TODO_packet_sha_from_preview_or_empty'
 
 case "$MODE" in dry-run|launch) ;; *) printf 'ERROR: MODE must be dry-run or launch.\n' >&2; exit 1 ;; esac
 if ! printf '%s' "$ISSUE_ID" | grep -qE '^[A-Z]{2,5}-[0-9]{1,6}$'; then
@@ -791,6 +792,14 @@ if [ "$MODE" = "launch" ]; then
     exit 1
   fi
   case "$GRANT_ID" in jg-????????????????????????????????) ;; *) printf 'ERROR: bad grant id "%s".\n' "$GRANT_ID" >&2; exit 1 ;; esac
+  if ! printf '%s' "$PREVIEW_PACKET_SHA" | grep -qE '^[0-9a-f]{64}$'; then
+    printf 'ERROR: PREVIEW_PACKET_SHA must be the 64-hex packet_sha= value printed by the confirmation preview.\n' >&2
+    exit 1
+  fi
+  if [ "$PREVIEW_PACKET_SHA" != "$PACKET_SHA" ]; then
+    printf 'ERROR: the packet being launched is not the one the confirmation preview showed. Nothing was sent. Run a new dry run and ask for confirmation again.\n' >&2
+    exit 1
+  fi
   BINDING=$(make_binding "$GRANT_ID")
   if [ "$DRY_RUN_BINDING" != "$BINDING" ]; then
     printf 'ERROR: the remote, branch, packet, issue revision or grant changed since the confirmed dry run. Run a new dry run and ask for confirmation again.\n' >&2
@@ -880,15 +889,25 @@ if [ -z "$GIT_TMP_REAL" ] || [ "$PACKET_PARENT_REAL" != "$GIT_TMP_REAL" ] \
   exit 1
 fi
 command -v jq >/dev/null 2>&1 || { printf 'ERROR: jq required.\n' >&2; exit 1; }
+# One read feeds the size check, the digest and the preview, so the digest
+# names exactly the bytes shown. The launch block recomputes it and refuses a
+# packet that differs.
+PACKET=$(cat -- "$PACKET_FILE")
 # The preview prints the whole packet: one too long to show in full cannot be confirmed.
-PACKET_CHARS=$(jq -Rrs 'length' "$PACKET_FILE")
+PACKET_CHARS=$(printf '%s' "$PACKET" | jq -Rrs 'length')
 if [ "$PACKET_CHARS" -gt 20000 ]; then
   printf 'ERROR: the packet is %s characters; the preview shows at most 20000 in full, so it cannot be confirmed. Nothing was sent.\n' "$PACKET_CHARS" >&2; exit 1
 fi
+if command -v sha256sum >/dev/null 2>&1; then
+  PACKET_SHA=$(printf '%s' "$PACKET" | sha256sum | cut -c1-64)
+else
+  PACKET_SHA=$(printf '%s' "$PACKET" | shasum -a 256 | cut -c1-64)
+fi
+printf 'packet_sha=%s\n' "$PACKET_SHA"
 FENCE_TAG=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
 [ -n "$FENCE_TAG" ] || FENCE_TAG="pid$$"
 printf '%s\n' "--- begin untrusted-content $FENCE_TAG (reference only) ---"
-jq -Rrs 'gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ")' "$PACKET_FILE"
+printf '%s' "$PACKET" | jq -Rrs 'gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\udb40\udc00-\udb40\udc7f]"; " ")'
 printf '%s\n' "--- end untrusted-content $FENCE_TAG ---"
 ```
 
@@ -897,7 +916,9 @@ Plan approval is required and vendor auto-PR is off. It may run for a long time 
 is billed to your Jules account." Then `AskUserQuestion`: "Launch this Jules session
 for <ISSUE-ID> now?" with "Yes, launch" and "No, cancel". On "No", remove the packet
 directory and stop. On "Yes", run the block again with `MODE='launch'`, the
-`grant_id` and the `binding=` value from the first call, immediately and with a Bash timeout of 300000 ms.
+`grant_id` and the `binding=` value from the first call, and the `packet_sha=`
+value this preview printed as `PREVIEW_PACKET_SHA` (the launch refuses a packet
+whose digest differs), immediately and with a Bash timeout of 300000 ms.
 The block removes the packet directory itself.
 
 On `{ok:true}`: capture `sessionResource`, `localId`, and `condition` (the state at

@@ -360,7 +360,7 @@ setup() {
   printf '%s\n' "$preview" | grep -qF '[ ! -O "$PACKET_DIR" ]'
   printf '%s\n' "$preview" | grep -qF '[ -L "$PACKET_FILE" ]'
   bind_line=$(printf '%s\n' "$preview" | grep -nF '[ -L "$PACKET_FILE" ]' | head -1 | cut -d: -f1)
-  jq_line=$(printf '%s\n' "$preview" | grep -n '^jq -Rrs' | head -1 | cut -d: -f1)
+  jq_line=$(printf '%s\n' "$preview" | grep -n "jq -Rrs 'gsub" | head -1 | cut -d: -f1)
   [ "$bind_line" -lt "$jq_line" ]
 }
 
@@ -409,4 +409,24 @@ run_preview_block() {
   [ "$status" -eq 1 ]
   [[ "$output" == *"cannot be confirmed"* ]]
   [[ "$output" != *"TAIL-MARKER"* ]]
+}
+
+@test "Jules launch preview prints the digest of the exact bytes it showed, from one read" {
+  run_preview_block 300
+  [ "$status" -eq 0 ]
+  expected=$(printf '%s' "HEAD-$(head -c 300 /dev/zero | tr '\0' 'x')TAIL-MARKER" | sha256sum | cut -c1-64)
+  [[ "$output" == *"packet_sha=$expected"* ]]
+  preview=$(awk '/^\*\*Confirm\.\*\*/{found=1} found{print} /FENCE_TAG ---/ && found{exit}' "$DELEGATE_MD")
+  # The packet file is read exactly once in the preview block.
+  [ "$(printf '%s\n' "$preview" | grep -cF 'cat -- "$PACKET_FILE"')" -eq 1 ]
+  ! printf '%s\n' "$preview" | grep -qE 'jq .*"\$PACKET_FILE"'
+}
+
+@test "the Jules launch refuses a packet whose digest differs from the preview's" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  printf '%s\n' "$jules_block" | grep -qF "PREVIEW_PACKET_SHA='YELLOW_TODO_packet_sha_from_preview_or_empty'"
+  printf '%s\n' "$jules_block" | grep -qF 'if [ "$PREVIEW_PACKET_SHA" != "$PACKET_SHA" ]; then'
+  cmp_line=$(printf '%s\n' "$jules_block" | grep -nF 'if [ "$PREVIEW_PACKET_SHA" != "$PACKET_SHA" ]' | head -1 | cut -d: -f1)
+  launch_line=$(printf '%s\n' "$jules_block" | grep -nF 'node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" "--prompt=$PROMPT"' | head -1 | cut -d: -f1)
+  [ "$cmp_line" -lt "$launch_line" ]
 }
