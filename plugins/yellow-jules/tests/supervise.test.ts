@@ -14,7 +14,7 @@ import {
 import { approve, reply } from '../src/mutations.js';
 import { FENCE_BEGIN, FENCE_END } from '../src/redact.js';
 import { status } from '../src/runtime.js';
-import { readJournal, upsertReadState } from '../src/state.js';
+import { readJournal, updateJournal, upsertReadState } from '../src/state.js';
 import {
   BACKOFF_CAP_SECONDS,
   clearPause,
@@ -189,6 +189,50 @@ describe('needs-answer', () => {
     expect(r.decision).toBe('needs-answer');
     expect(r.fenced.question).toBeUndefined();
     expect(r.attention).toContain('questionUnavailable');
+  });
+});
+
+describe('a deviation on another session under the grant', () => {
+  async function deviateSibling(): Promise<void> {
+    const other = await delegateOk(h, grantId, { prompt: 'a second task' });
+    await updateJournal(h.dataDir, (operations) => {
+      const record = operations[other.localRequestId]!;
+      operations[other.localRequestId] = {
+        ...record,
+        deviations: [
+          {
+            kind: 'policy-deviation',
+            reason: 'vendor-pull-request',
+            observedAt: '2026-01-01T00:00:00Z',
+            reconciled: false,
+          },
+        ],
+      };
+    });
+  }
+
+  it('escalates a reply decision instead of advertising a write that must fail', async () => {
+    setVendorState(h, session.sessionResource, 'awaitingUserFeedback');
+    await deviateSibling();
+    const r = await sup();
+    expect(r).toMatchObject({
+      decision: 'escalate',
+      reason: 'grant-policy-deviation',
+      allowedActions: [],
+    });
+    expect(r.attention).toContain('policyDeviation');
+  });
+
+  it('escalates a plan review without approve or reply', async () => {
+    setVendorState(h, session.sessionResource, 'awaitingPlanApproval');
+    addPlanNow(h, session.sessionResource, 'plan-1');
+    await deviateSibling();
+    const r = await sup();
+    expect(r).toMatchObject({
+      decision: 'escalate',
+      reason: 'grant-policy-deviation',
+      allowedActions: [],
+    });
   });
 });
 
@@ -721,14 +765,18 @@ describe('--clear-pause', () => {
       await status(fresh.deps, { session: s2.localId, reconcile: false });
       const before = Object.values(
         (await readJournal(fresh.dataDir)).operations
-      ).find((r) => r.sessionResource === s2.sessionResource && r.kind === 'create');
+      ).find(
+        (r) => r.sessionResource === s2.sessionResource && r.kind === 'create'
+      );
       expect(before?.supervision?.paused).toBeUndefined();
       expect(before?.supervision?.outsideSeen).toBeDefined();
       const result = await clearPause(fresh.deps, { session: s2.localId });
       expect(result).toMatchObject({ cleared: true });
       const after = Object.values(
         (await readJournal(fresh.dataDir)).operations
-      ).find((r) => r.sessionResource === s2.sessionResource && r.kind === 'create');
+      ).find(
+        (r) => r.sessionResource === s2.sessionResource && r.kind === 'create'
+      );
       expect(after?.supervision?.outsideSeen).toBeUndefined();
     } finally {
       fresh.cleanup();

@@ -404,6 +404,18 @@ async function superviseOnce(deps, args) {
         afterSeconds: AFTER_ACTING_SECONDS,
         reason: 'after acting on this decision',
     };
+    // R13: another session under this grant carries an unreconciled policy
+    // deviation, so every write under it is denied. Advertising approve or reply
+    // would send the caller into a write that must fail; a human reconciles first.
+    const grantBlocked = (0, authority_js_1.grantHasUnreconciledDeviation)(journal, grant.grantId);
+    if (grantBlocked &&
+        (condition === 'awaiting-approval' || condition === 'awaiting-reply')) {
+        return finish('escalate', {
+            reason: 'grant-policy-deviation',
+            nextCheck: waitForHuman,
+            allowedActions: [],
+        }, {}, ['policyDeviation']);
+    }
     if (condition === 'awaiting-approval' && seen.pendingPlan !== undefined) {
         fenced.plan = (0, redact_js_1.fenceUntrusted)(planText(seen.pendingPlan));
         const actions = [
@@ -480,7 +492,8 @@ async function superviseOnce(deps, args) {
         const repair = 
         // The write gate requires a plain launch under the SAME grant for a
         // correction, so only advertise the repair when this grant has one.
-        permits(grant, 'create') &&
+        !grantBlocked &&
+            permits(grant, 'create') &&
             owner.taskRef !== undefined &&
             (0, write_gate_js_1.hasPlainLaunch)(journal, grant.grantId, owner.taskRef)
             ? ['repair-delegate']

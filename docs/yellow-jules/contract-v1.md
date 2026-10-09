@@ -617,6 +617,11 @@ transient failure from an undetermined one.
   permitted verdicts are correction or escalate, never accept. An
   `awaiting-approval` session whose plan could not be read is `escalate` with
   `reason: "awaiting-approval-without-plan"` and attention `planUnavailable`.
+  When another session under the grant carries an unreconciled policy
+  deviation (R13), every write under it is denied, so an `awaiting-approval` or
+  `awaiting-reply` session is `escalate` with `reason: "grant-policy-deviation"`,
+  attention `policyDeviation`, and no `approve`, `reply`, or `repair-delegate`
+  in `allowedActions`.
 - `supervise --clear-pause --session <ref>` →
   `{ operation, localId, sessionResource, cleared: true }`. TTY-confirmed;
   requires a complete `status` walk since the pause, otherwise
