@@ -3422,3 +3422,34 @@ dirlink_setup() {
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
   [ "$(readlink .claude/settings.json)" = "$OUTSIDE/settings.json" ]
 }
+
+# --- --no-ignored-guard: an in-worktree target must be provably covered by the tree check ---
+@test "--revert-denied --no-ignored-guard flags a tracked trusted-config symlink to .git/config" {
+  mkdir -p .claude
+  ln -s ../.git/config .claude/settings.json
+  git add -f .claude/settings.json && git commit -q -m "link into .git"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "--revert-denied --no-ignored-guard flags a tracked trusted-config symlink to a gitignored in-worktree file" {
+  mkdir -p .claude
+  printf 'ignored-target\n' >> .git/info/exclude
+  printf 'x\n' >| ignored-target
+  ln -s ../ignored-target .claude/settings.json
+  git add -f .claude/settings.json && git commit -q -m "link to ignored"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "--revert-denied --no-ignored-guard accepts a tracked trusted-config symlink to a tracked in-worktree file" {
+  mkdir -p .claude
+  ln -s ../src/a.txt .claude/settings.json
+  git add -f .claude/settings.json && git commit -q -m "link to tracked"
+  git checkout -q HEAD -- src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+}

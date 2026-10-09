@@ -803,7 +803,8 @@ add_unique_file() {
 # A target inside the worktree that is itself trusted-config is skipped: the
 # tree listing already covers it. Without a marker (--revert-denied
 # --no-ignored-guard) nothing can be compared, so a link that resolves outside
-# the worktree or cannot be resolved counts. A link that git lists as changed is
+# the worktree, cannot be resolved, or lands on an untracked, ignored or .git
+# path inside it (the tree check cannot see those) counts. A link that git lists as changed is
 # judged by its HEAD target, which the revert restores (an edited original
 # target must not be laundered by redirecting the link). Nothing is written,
 # outside the worktree included (a scratch link lives in a mktemp directory).
@@ -867,7 +868,18 @@ check_trusted_links() {
                     ! rp_trusted_config "$rel" || hit=0
                 fi
             else
-                if [ -z "$canon" ] || ! yr_inside_root "$canon" "$top"; then hit=1; fi
+                # Inside the worktree counts as covered only for a tracked path
+                # outside .git: the tree check never sees an ignored file or
+                # anything under .git.
+                if [ -z "$canon" ] || ! yr_inside_root "$canon" "$top"; then
+                    hit=1
+                else
+                    rel="${canon#"$top"/}"
+                    case "$canon:$rel" in
+                        "$top:"*|*:.git|*:.git/*) hit=1 ;;
+                        *) yr_git ls-files --error-unmatch -- "$rel" >/dev/null 2>&1 || hit=1 ;;
+                    esac
+                fi
             fi
             [ "$hit" = 0 ] || printf '%s\0' "$f" >>"$out"
         done <"$ls"
