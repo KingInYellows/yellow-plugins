@@ -1141,7 +1141,14 @@ moved_by_hand() {
   [ "$status" -eq 31 ]
   [[ $output == *"not at their starting commits"* ]]
   [[ $output == *"fix: "* ]]
+  [[ $output == *"run restore"* ]]
+  [[ $output != *"run --continue"* ]]
   [ -e "$SD/state" ]
+  # restore keeps the branches where they are, puts the worktrees back and clears the state.
+  run bash "$SCRIPT" restore --provider graphite
+  [ "$status" -eq 0 ]
+  [ ! -e "$SD/state" ]
+  [ ! -e "$SD/provider-aborted" ]
 }
 
 @test "--continue after the user finished the provider's continue by hand verifies and restores" {

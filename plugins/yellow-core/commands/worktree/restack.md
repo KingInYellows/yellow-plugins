@@ -221,6 +221,10 @@ After aborting in-chain rebases, `--abort` checks the recorded start tips once
 more: a rebase abort restores that rebase's own starting tip, which can put a
 stack branch back on its restacked commit. If any branch moved, it exits `31`
 with the same fix lines and keeps the state; it never resets branches itself.
+The provider abort has already succeeded there (a valid marker), so
+`--continue` is refused: reset the branches and run `--abort` again, or run
+`restore` to keep them where they are, put the worktrees back and clear the
+state.
 
 `--continue` refuses with exit `31` once the provider's abort has succeeded
 (a valid marker) but the abort cleanup is unfinished; run `--abort` to finish.

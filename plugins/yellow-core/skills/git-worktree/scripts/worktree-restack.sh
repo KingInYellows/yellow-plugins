@@ -1662,6 +1662,11 @@ refuse_moved() {
       note "    fix: git branch -f $(q "$mb") $(v "$mold")"
     fi
   done <<<"$2"
+  if aborted_marker_valid; then
+    # --continue refuses once the provider abort has succeeded; restore is the
+    # path that accepts an already-aborted provider.
+    die "$X_KEPT" "state kept, nothing restored. Run each fix line above to point the branch back at its starting commit, then run --abort again. To keep the branches where they are instead, run restore, which puts the worktrees back and clears the state"
+  fi
   die "$X_KEPT" "state kept, nothing aborted or restored. Run each fix line above to point the branch back at its starting commit, then run --abort again. To keep the restacked branches instead, run --continue"
 }
 
