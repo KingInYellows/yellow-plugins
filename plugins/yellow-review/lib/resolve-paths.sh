@@ -294,6 +294,10 @@ yr_file_shebang_enters() {
     # $PWD/evil`, which BSD and macOS pass as separate arguments), so no path
     # in it can be judged: fail closed.
     case "$args" in *[\$\`~\\*?[]*) return 0 ;; esac
+    # A shell control operator, redirection or grouping (`#!/bin/sh -c
+    # PATH=tools:/usr/bin;evil`) lets a `-c` string run a command no path
+    # check sees: fail closed.
+    case "$args" in *[\;\&\|\<\>\(\)]*) return 0 ;; esac
     if [ -n "$args" ] && yr_args_enter "$args" "$root" 0; then
         return 0
     fi
@@ -522,7 +526,7 @@ yr_shebang_inside() {
         function argpaths(from,    j, k, a, c, pc, pn, t, txt) {
             txt = ""
             for (j = from; j <= n; j++) txt = txt " " w[j]
-            if (txt ~ /[$`~\\*?[]/) { pr(root); return }
+            if (txt ~ /[$`~\\*?[;&|<>()]/) { pr(root); return }
             if (hasroot(txt)) pr(root)
             for (j = from; j <= n; j++) {
                 a = w[j]; sub(/^!/, "", a); gsub(/^["\047]|["\047]$/, "", a)
@@ -1077,9 +1081,22 @@ yr_cfg_value_path_key() {
 # outside the worktree, whose origin is trusted but whose value can still name
 # `./evil`, which resolves against the worktree. Shell syntax this check cannot
 # judge is tolerated here (the user's own global alias or pager keeps working);
-# only a definite hit refuses.
+# only a definite hit refuses. For url.ext::<command>.insteadOf the command
+# in the key is judged too.
 yr_cfg_value_enters() {
-    local k="$1" v="$2" root="$3" rc=0
+    local k="$1" v="$2" root="$3" rc=0 l
+    # url.ext::<command>.insteadOf keeps the command git runs in the key's
+    # subsection, not the value (which is only the URL it rewrites).
+    l=$(rp_lower "$k")
+    case "$l" in
+        url.ext::*.insteadof|url.ext::*.pushinsteadof)
+            l=${k:9}
+            l=${l%.*}
+            yr_cmd_enters "$l" "$root" || rc=$?
+            [ "$rc" -ne 0 ] || return 0
+            rc=0
+            ;;
+    esac
     [ -n "$v" ] || return 1
     if yr_cfg_value_path_key "$k"; then
         yr_prog_enters "$v" "$root"
