@@ -1737,6 +1737,10 @@ refuse_moved() {
     note "  $(v "$mb"): started at $(v "$mold"), now $(v "$mnew")"
     # git refuses to force-update a branch checked out in any worktree.
     if mholder=$(branch_holder "refs/heads/$mb"); then
+      # reset --hard discards that worktree's own changes too: say so first.
+      if wt_dirty "$mholder"; then
+        note "    warning: $(q "$mholder") has uncommitted changes that this reset would discard; commit or save them first"
+      fi
       note "    fix: git -C $(q "$mholder") reset --hard $(v "$mold")"
     else
       note "    fix: git branch -f $(q "$mb") $(v "$mold")"

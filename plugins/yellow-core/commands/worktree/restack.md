@@ -223,8 +223,11 @@ branch is no longer at the commit recorded at start (a paused rebase finished
 with `git rebase --continue`). It lists each moved branch and its starting
 commit and restores nothing, printing a fix line per branch: `git reset --hard`
 in the worktree that has it checked out, else `git branch -f` (git refuses to
-force-update a checked-out branch). Run them, then `--abort` again, or run
-`--continue` to keep the branches.
+force-update a checked-out branch). A `warning:` line before a `reset --hard`
+fix means that worktree has uncommitted changes the reset would discard: do
+not run that fix; show the warning and ask the user to commit or save the
+changes first. Run the fix lines, then `--abort` again, or run `--continue`
+to keep the branches.
 
 After aborting in-chain rebases, `--abort` checks the recorded start tips once
 more: a rebase abort restores that rebase's own starting tip, which can put a

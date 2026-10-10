@@ -1347,6 +1347,16 @@ SH
   [ "$status" -eq 31 ]
   [[ $output == *"fix: git -C $(wtp a) reset --hard $(git rev-parse b)"* || $output == *"fix: git -C $(wtp a) reset --hard"* ]]
   [[ $output == *"fix: git branch -f a "* ]]
+  [[ $output != *"warning: "* ]]
+}
+
+@test "the moved-branch message warns before a reset --hard that would discard uncommitted changes" {
+  moved_by_hand
+  printf 'local edit\n' >|"$(wtp a)/scratch.txt"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"warning: "*"has uncommitted changes that this reset would discard"* ]]
+  [[ $output == *"fix: git -C $(wtp a) reset --hard"* ]]
 }
 
 @test "--abort refuses when an auxiliary rebase abort puts a stack branch back on its restacked tip" {
