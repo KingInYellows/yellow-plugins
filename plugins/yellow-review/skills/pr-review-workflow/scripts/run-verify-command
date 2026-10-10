@@ -453,9 +453,10 @@ yr_file_shebang_enters() {
             i=${i#[\"\']}
             i=${i%[\"\']}
             [ -n "$i" ] || return 1
-            # A nested env (`env -S env PATH=tools evil`) takes its own
-            # operands, which change the lookup: fail closed.
-            case "$i" in env|*/env) return 0 ;; esac
+            # A nested env or other launcher (`env -S env PATH=tools evil`,
+            # `env nice sudo evil`) takes operands this parser does not
+            # follow: fail closed.
+            case "${i##*/}" in env|nice|nohup|timeout|stdbuf|sudo|doas|xargs|setsid|ionice|chrt|taskset|flock|unbuffer|chroot|runuser|su|caffeinate) return 0 ;; esac
             case "$i" in
                 */*) ;;
                 *) i=$(PATH=${YR_ORIG_PATH-$PATH}; type -P "$i" 2>/dev/null) || return 1 ;;

@@ -15,6 +15,9 @@ resolution, and sequential stack review.
 - `gh` CLI (GitHub) installed and authenticated
 - `jq` installed
 - Graphite CLI (`gt`) for branch management
+- An `awk` that splits NUL-separated records (gawk or mawk) first on `PATH`
+  for `/review:resolve`; stock macOS `/usr/bin/awk` cannot. On macOS:
+  `brew install gawk` and put its `libexec/gnubin` first on `PATH`
 - Clean working directory before running review commands
 - For the review-findings ledger: `flock`, `realpath`, git 2.31+ and the
   yellow-core plugin (credential redaction). On macOS:
