@@ -165,6 +165,21 @@ teardown() {
   [[ "$output" != *$'\na'* ]]
 }
 
+@test "redact_secrets in streaming mode writes no temp file, still redacts, and reports a sed failure" {
+  mkdir -p "$STAGING_TEST_ROOT/spool"
+  tok=$(printf ':abcdefghij0123456789' | base64)
+  result=$(printf 'a\nAuthorization Basic %s\n' "$tok" \
+    | TMPDIR=/nonexistent/spool CS_REDACT_STREAM=1 cs_redact_secrets)
+  [ "$result" = $'a\nAuthorization Basic [REDACTED]' ]
+  mkdir -p "$STAGING_TEST_ROOT/bin"
+  printf '#!/bin/sh\nprintf "partial\\n"\nexit 2\n' > "$STAGING_TEST_ROOT/bin/sed"
+  chmod +x "$STAGING_TEST_ROOT/bin/sed"
+  run bash -c 'PATH="$1:$PATH"; . "$2"; printf "x\n" | CS_REDACT_STREAM=1 cs_redact_secrets' _ \
+    "$STAGING_TEST_ROOT/bin" "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'[REDACTED: sanitization failed]' ]]
+}
+
 @test "redact_secrets passes input that contains a failure-marker lookalike" {
   run bash -c '. "$1"; printf "a\n@@cs-redact-sed-failed@@\nb\n" | cs_redact_secrets' _ \
     "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
