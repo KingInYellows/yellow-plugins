@@ -113,8 +113,8 @@ cs_atomic_jsonl_write() {
 # Bearer, basic auth, plus the high-value vendor token prefixes
 # (including tvly-, pplx- and sgp_) and PEM key blocks. A bare Basic payload
 # the sed shapes miss is ambiguous with prose, so _cs_redact_bare_basic decodes it
-# and redacts only a control-free user:pass. Pipes sed into awk, which holds
-# the output until the input ends (memory grows with the input).
+# and redacts only a control-free user:pass. Pipes sed into awk, whose output
+# is spooled to a private temp file until the input ends (memory stays flat).
 #
 # Future consolidation: when yellow-ci's redact.sh is relocated to a
 # shared yellow-core/lib/redact.sh, this wrapper can `. ` that file.
@@ -125,8 +125,13 @@ cs_atomic_jsonl_write() {
 # before the keyword matches the sed rule. POSIX awk only (mawk, gawk, BSD
 # awk): no gensub, IGNORECASE or bit functions. A line equal to $1 marks a
 # sed failure upstream: nothing is printed and awk exits 3 after the input
-# drains. Output is held until then, so a failure leaves no partial result.
+# drains. Output is spooled to a 0600 temp file (already redacted) and printed
+# only after awk succeeds, so a failure leaves no partial result and a large
+# verifier log does not grow memory. No temp file means failure.
 _cs_redact_bare_basic() {
+  local _cs_hold _cs_rc=0
+  _cs_hold=$(umask 077; mktemp "${TMPDIR:-/tmp}/cs-redact.XXXXXX" 2>/dev/null) \
+    || { cat >/dev/null; return 1; }
   awk -v fail_mark="$1" '
     BEGIN {
       b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
@@ -181,13 +186,15 @@ _cs_redact_bare_basic() {
           rest = substr(rest, RSTART + 5)
         }
       }
-      held[++nh] = out rest
+      print out rest
     }
-    END {
-      if (failed) exit 3
-      for (i = 1; i <= nh; i++) print held[i]
-    }
-  '
+    END { if (failed) exit 3 }
+  ' >| "$_cs_hold" || _cs_rc=$?
+  if [ "$_cs_rc" -eq 0 ]; then
+    cat -- "$_cs_hold" || _cs_rc=$?
+  fi
+  rm -f -- "$_cs_hold" 2>/dev/null
+  return "$_cs_rc"
 }
 
 cs_redact_secrets() {
@@ -198,7 +205,7 @@ cs_redact_secrets() {
   # The left side of the pipe is a subshell, so a sed failure reaches the
   # awk stage as a marker line rather than as an exit status; the leading
   # newline keeps it off a partial last line sed wrote before failing. The
-  # awk stage holds every line until the input ends, so a failed run prints
+  # awk stage spools every line until the input ends, so a failed run prints
   # only the fallback line, never a partial result.
   # A per-call nonce keeps input text from forging the marker line.
   local _cs_fail_mark="@@cs-redact-sed-failed-$$-${RANDOM:-0}${RANDOM:-0}@@"
