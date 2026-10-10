@@ -669,9 +669,12 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   [[ "$text" == *'When `ratelimited=1`, the next `gh` call would hit the same limit'* ]]
 }
 
-@test "sweep-all: the pre-check prints the gh error cause inside a reference-only fence" {
+@test "sweep-all: the pre-check reports a fixed gh error category and never echoes the gh output" {
   text=$(flat "$SWEEP_ALL")
-  [[ "$text" == *"--- begin gh-error (reference only) ---"*"cause=%s"*"--- end gh-error ---"* ]]
+  [[ "$text" == *"CAUSE='gh auth failed'"*"CAUSE='network error'"*'CAUSE="gh exited $RC"'* ]]
+  [[ "$text" == *"ratelimited=0 cause=%s"* ]]
+  [[ "$text" != *"gh-error"* ]]
+  [[ "$text" != *'head -n 1 | tr -cd'* ]]
 }
 
 @test "sweep: the PR head ignore probe refuses content-transforming attributes on .gitignore" {
@@ -986,7 +989,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -qF '`Outcome` `skipped`, `Skip Reason` `state unreadable` and `Blocking` `?`' <<<"$item1b"
   grep -qF 'record `state unreadable: <cause>`' <<<"$item1b"
   grep -qF 'Do not continue to the next PR.' <<<"$item1b"
-  grep -qF "printf 'cause=%s" <<<"$item1b"
+  grep -qF "ratelimited=0 cause=%s" <<<"$item1b"
   # The intro names the stop.
   grep -qF 'verify-skipped and state-unreadable stops in Step 4' <<<"$(tr '\n' ' ' <"$SWEEP_ALL" | tr -s ' ')"
 }
