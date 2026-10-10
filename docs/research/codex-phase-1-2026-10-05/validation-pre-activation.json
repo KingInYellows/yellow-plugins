@@ -1,0 +1,132 @@
+{
+  "date": "2026-10-05",
+  "startedAt": "2026-10-05T23:44:30.560510+00:00",
+  "sourceRevision": "cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0",
+  "node": "22.22.0",
+  "pnpm": "8.15.0",
+  "codexCli": "0.157.0",
+  "windowsDesktopPackage": "OpenAI.Codex 26.930.4958.0",
+  "windowsRuntime": "not-tested",
+  "checks": [
+    {
+      "command": "pnpm validate:schemas",
+      "exitCode": 0,
+      "elapsedSeconds": 2.92,
+      "log": "/tmp/yellow-phase1-final-check-0.log"
+    },
+    {
+      "command": "pnpm validate:versions",
+      "exitCode": 0,
+      "elapsedSeconds": 0.36,
+      "log": "/tmp/yellow-phase1-final-check-1.log"
+    },
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "elapsedSeconds": 31.04,
+      "log": "/tmp/yellow-phase1-final-check-2.log"
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "elapsedSeconds": 5.79,
+      "log": "/tmp/yellow-phase1-final-check-3.log"
+    },
+    {
+      "command": "pnpm lint:plugins",
+      "exitCode": 0,
+      "elapsedSeconds": 2.7,
+      "log": "/tmp/yellow-phase1-final-check-4.log"
+    },
+    {
+      "command": "pnpm test:unit --maxWorkers=2 --minWorkers=1",
+      "exitCode": 0,
+      "elapsedSeconds": 39.8,
+      "log": "/tmp/yellow-phase1-final-check-5.log",
+      "summaries": [
+        "Test Files  1 passed (1)",
+        "Tests  3 passed (3)",
+        "Test Files  9 passed (9)",
+        "Tests  125 passed (125)",
+        "Test Files  8 passed (8)",
+        "Tests  323 passed (323)",
+        "Test Files  18 passed (18)",
+        "Tests  336 passed (336)"
+      ],
+      "passed": 787
+    },
+    {
+      "command": "pnpm test:integration --maxWorkers=2 --minWorkers=1",
+      "exitCode": 0,
+      "elapsedSeconds": 37.61,
+      "log": "/tmp/yellow-phase1-final-check-6.log",
+      "summaries": ["Test Files  56 passed (56)", "Tests  1780 passed | 1 skipped (1781)"],
+      "passed": 1780,
+      "skipped": 1,
+      "filesPassed": 56
+    },
+    {
+      "command": "bats plugins/gt-workflow/tests/ plugins/yellow-ci/tests/",
+      "exitCode": 0,
+      "elapsedSeconds": 215.64,
+      "log": "/tmp/yellow-phase1-final-check-7.log",
+      "tests": 393,
+      "failed": 0
+    },
+    {
+      "command": "pnpm validate:solutions",
+      "exitCode": 0,
+      "elapsedSeconds": 0.92,
+      "log": "/tmp/yellow-phase1-final-check-8.log",
+      "scopedPaths": 2,
+      "environmentOverride": {
+        "VALIDATE_SOLUTIONS_DIFF": "A\tdocs/solutions/integration-issues/codex-command-migration-bypasses-skill-allowlist.md\nM\tdocs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md\n"
+      }
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0,
+      "elapsedSeconds": 0.04,
+      "log": "/tmp/yellow-phase1-final-check-9.log"
+    },
+    {
+      "command": "focused Vitest smoke lifecycle/install + Codex generator/schema",
+      "exitCode": 0,
+      "passed": 131,
+      "filesPassed": 4
+    },
+    {
+      "command": "node scripts/smoke-codex-plugin-install.js --ci",
+      "exitCode": 0,
+      "installedPlugins": 4,
+      "loadedPluginSkills": 23,
+      "untrustedHooks": 3,
+      "receipt": "discovery-final.json"
+    },
+    {
+      "command": "node scripts/smoke-codex-plugin-lifecycle.js --keep-temp",
+      "exitCode": 0,
+      "untrustedPushStubCalls": 1,
+      "trustedPushStubCalls": 0,
+      "trustedHookPairs": 4,
+      "mcpRuntimeStatus": "connected",
+      "mcpTools": ["run_gt_cmd", "learn_gt"],
+      "mcpAuthentication": "not-proven",
+      "receipt": "lifecycle-after.json"
+    }
+  ],
+  "remainingBlockers": [
+    "authorized credential-safe model runtime for installed direct/indirect/negative skill activation",
+    "authenticated Graphite availability"
+  ],
+  "phase1Acceptance": "partial",
+  "finishedAt": "2026-10-05T23:50:07.522802+00:00",
+  "allRequiredCodeChecksPassed": true,
+  "runtimePrerequisiteProbe": {
+    "windowsKnownModelProcesses": "none found by named process check",
+    "wslKnownModelExecutables": "none found",
+    "wslCommonModelPorts": [11434, 1234, 8000],
+    "wslCommonModelListeners": "none found",
+    "scope": "bounded local check; no claim about every possible endpoint"
+  }
+}

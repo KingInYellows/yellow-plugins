@@ -1,0 +1,380 @@
+{
+  "recordedAt": "2026-10-06T15:13:12.805136+00:00",
+  "status": "accepted-local-implementation",
+  "canonicalWorktree": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04",
+  "baseRevision": "cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0",
+  "phases": {
+    "2": {
+      "status": "complete",
+      "evidence": [
+        "phase2.md",
+        "policy-final.json",
+        "generation-determinism.json",
+        "provenance-final.json"
+      ]
+    },
+    "3": {
+      "status": "complete",
+      "evidence": [
+        "phase3.md",
+        "phase3-sizes.json",
+        "task-metrics.json",
+        "pilot-before.json",
+        "pilot-after-final.json",
+        "gt-before.json",
+        "gt-after-final.json"
+      ]
+    },
+    "4": {
+      "status": "complete",
+      "selectedWorkflowByWave": {
+        "1": "yellow-core:worktree-inventory",
+        "2": "yellow-docs:docs-audit",
+        "3": "yellow-debt:debt-complexity-scan",
+        "4": "yellow-research:research-public-repo",
+        "5": "yellow-cursor:cursor-plan",
+        "6": "yellow-codex:codex-readiness"
+      },
+      "candidateGatesBeforeEnablement": true,
+      "evidence": [
+        "developer-docs-candidate.json",
+        "analysis-candidate.json",
+        "research-candidate.json",
+        "research-negatives-candidate.json",
+        "remote-candidate.json",
+        "runtime-final-index.json"
+      ]
+    },
+    "5": {
+      "status": "complete-local-deliverables",
+      "publicPublication": "deliberately-deferred",
+      "portableRootManifest": "not-applicable-no-demonstrated-need",
+      "separateDistributionRepository": "not-applicable-no-demonstrated-need",
+      "windowsDesktopRuntime": "untested",
+      "evidence": ["phase5.md", "cache-refresh.json", "../../codex-distribution.md"]
+    }
+  },
+  "exposure": {
+    "plugins": 9,
+    "skills": 29,
+    "catalogAllowlist": {
+      "gt-workflow": [
+        "gt-setup",
+        "gt-nav",
+        "gt-stack-plan",
+        "gt-sync",
+        "smart-submit",
+        "gt-amend",
+        "gt-cleanup",
+        "audit-review",
+        "stack-decomposition-format",
+        "stack-plan-style",
+        "gt-merge"
+      ],
+      "yellow-ci": [
+        "ci-setup",
+        "ci-setup-runner-targets",
+        "ci-status",
+        "ci-diagnose",
+        "ci-lint-workflows",
+        "ci-runner-health",
+        "ci-conventions",
+        "diagnose-ci"
+      ],
+      "yellow-codex": ["codex-readiness"],
+      "yellow-core": [
+        "agent-native-architecture",
+        "agent-native-audit",
+        "plan-status",
+        "worktree-inventory"
+      ],
+      "yellow-cursor": ["cursor-plan"],
+      "yellow-debt": ["debt-complexity-scan"],
+      "yellow-docs": ["docs-audit"],
+      "yellow-research": ["research-public-repo"],
+      "yellow-review": ["yellow-thermonuclear-review"]
+    },
+    "matchesActualInstalledDiscovery": true,
+    "receipt": "discovery-final.json"
+  },
+  "runtime": {
+    "cli": "0.157.0",
+    "model": "gpt-6-astra",
+    "expansionCases": [
+      {
+        "suite": "policy",
+        "case": "thermonuclear-explicit",
+        "status": "passed",
+        "receipt": "policy-final.json"
+      },
+      {
+        "suite": "policy",
+        "case": "thermonuclear-implicit-control",
+        "status": "passed",
+        "receipt": "policy-final.json"
+      },
+      {
+        "suite": "policy",
+        "case": "yellow-review-unrelated",
+        "status": "passed",
+        "receipt": "policy-final.json"
+      },
+      {
+        "suite": "developer-docs",
+        "case": "worktrees-success",
+        "status": "passed",
+        "receipt": "developer-docs-final.json"
+      },
+      {
+        "suite": "developer-docs",
+        "case": "worktrees-missing-git",
+        "status": "passed",
+        "receipt": "developer-docs-final.json"
+      },
+      {
+        "suite": "developer-docs",
+        "case": "yellow-core-unrelated",
+        "status": "passed",
+        "receipt": "developer-docs-final.json"
+      },
+      {
+        "suite": "developer-docs",
+        "case": "docs-success",
+        "status": "passed",
+        "receipt": "developer-docs-final.json"
+      },
+      {
+        "suite": "developer-docs",
+        "case": "docs-missing-tools",
+        "status": "passed",
+        "receipt": "developer-docs-final.json"
+      },
+      {
+        "suite": "developer-docs",
+        "case": "yellow-docs-unrelated",
+        "status": "passed",
+        "receipt": "developer-docs-final.json"
+      },
+      {
+        "suite": "analysis",
+        "case": "debt-success",
+        "status": "passed",
+        "receipt": "analysis-final.json"
+      },
+      {
+        "suite": "analysis",
+        "case": "debt-unsafe-path",
+        "status": "passed",
+        "receipt": "analysis-final.json"
+      },
+      {
+        "suite": "analysis",
+        "case": "debt-missing-python",
+        "status": "passed",
+        "receipt": "analysis-final.json"
+      },
+      {
+        "suite": "analysis",
+        "case": "yellow-debt-unrelated",
+        "status": "passed",
+        "receipt": "analysis-final.json"
+      },
+      {
+        "suite": "remote-orchestration",
+        "case": "cursor-success-no-auth",
+        "status": "passed",
+        "receipt": "remote-orchestration-final.json"
+      },
+      {
+        "suite": "remote-orchestration",
+        "case": "cursor-missing-runtime",
+        "status": "passed",
+        "receipt": "remote-orchestration-final.json"
+      },
+      {
+        "suite": "remote-orchestration",
+        "case": "yellow-cursor-unrelated",
+        "status": "passed",
+        "receipt": "remote-orchestration-final.json"
+      },
+      {
+        "suite": "remote-orchestration",
+        "case": "codex-ready-native",
+        "status": "passed",
+        "receipt": "remote-orchestration-final.json"
+      },
+      {
+        "suite": "remote-orchestration",
+        "case": "codex-missing-cli",
+        "status": "passed",
+        "receipt": "remote-orchestration-final.json"
+      },
+      {
+        "suite": "remote-orchestration",
+        "case": "yellow-codex-unrelated",
+        "status": "passed",
+        "receipt": "remote-orchestration-final.json"
+      },
+      {
+        "suite": "research",
+        "case": "deepwiki-live-success",
+        "status": "passed",
+        "receipt": "research-final.json"
+      },
+      {
+        "suite": "research-negative",
+        "case": "research-unavailable",
+        "status": "passed",
+        "receipt": "research-negative-final.json"
+      },
+      {
+        "suite": "research-negative",
+        "case": "research-auth-error",
+        "status": "passed",
+        "receipt": "research-negative-final.json"
+      },
+      {
+        "suite": "research-negative",
+        "case": "research-private-refusal",
+        "status": "passed",
+        "receipt": "research-negative-final.json"
+      },
+      {
+        "suite": "research-negative",
+        "case": "research-unrelated",
+        "status": "passed",
+        "receipt": "research-negative-final.json"
+      },
+      {
+        "suite": "gt-after",
+        "case": "gt-prerequisites",
+        "status": "passed",
+        "receipt": "gt-after-final.json"
+      },
+      {
+        "suite": "gt-after",
+        "case": "gt-missing-tool",
+        "status": "passed",
+        "receipt": "gt-after-final.json"
+      },
+      {
+        "suite": "gt-after",
+        "case": "gt-unrelated",
+        "status": "passed",
+        "receipt": "gt-after-final.json"
+      },
+      {
+        "suite": "pilot-after",
+        "case": "ci-diagnose-success",
+        "status": "passed",
+        "receipt": "pilot-after-final.json"
+      },
+      {
+        "suite": "pilot-after",
+        "case": "ci-diagnose-missing-auth",
+        "status": "passed",
+        "receipt": "pilot-after-final.json"
+      },
+      {
+        "suite": "pilot-after",
+        "case": "ci-runner-refusal",
+        "status": "passed",
+        "receipt": "pilot-after-final.json"
+      },
+      {
+        "suite": "pilot-after",
+        "case": "ci-unrelated",
+        "status": "passed",
+        "receipt": "pilot-after-final.json"
+      },
+      {
+        "suite": "codex-missing-auth",
+        "case": "codex-missing-auth-native-evidence",
+        "status": "passed",
+        "receipt": "codex-missing-auth-final.json"
+      }
+    ],
+    "expansionPassed": 32,
+    "planStatusRegressionPassed": 3,
+    "modelBeforeCasesPassed": 7,
+    "finalRealModelCasesPassed": 35,
+    "policy": "explicit activates; implicit ordinary review and unrelated tasks do not",
+    "nativeOperations": [
+      "Git worktree inventory",
+      "installed Cursor CLI offline dry run",
+      "installed-reference Python source snapshot",
+      "sanitized native Codex CLI and login status",
+      "Graphite account and repository-access check",
+      "installed-reference Codex login probe in empty isolated profile; missing authentication"
+    ],
+    "liveIntegration": "DeepWiki public repository question, actual advertised ask_wiki_question",
+    "fixtureBoundaries": [
+      "CI metadata/logs and gh prerequisite results are fixtures; no live CI diagnosis",
+      "SSH refusal does not establish runner health",
+      "missing prerequisite/auth controls are synthetic/isolated",
+      "hook lifecycle uses loopback model responses and disconnected mutation stubs; semantic skill turns use native authenticated provider",
+      "Graphite MCP startup uses synthetic Git state; account/repository authentication is separate"
+    ],
+    "lifecycleReceipt": "lifecycle-final.json",
+    "graphiteAuthReceipt": "graphite-auth-final.json",
+    "planRegressionReceipt": "plan-activation-final.json",
+    "nativeAbsentAuthReceipt": "codex-absent-auth-native.json"
+  },
+  "validation": {
+    "status": "passed-after-resolved-stale-inventory-test-expectations",
+    "unitPassed": 787,
+    "integrationPassed": 1876,
+    "integrationSkipped": 1,
+    "bats": {
+      "shell-compat": {
+        "cases": 21,
+        "skipped": 0,
+        "exitCode": 0
+      },
+      "yellow-ci": {
+        "cases": 286,
+        "skipped": 1,
+        "exitCode": 0
+      },
+      "gt-workflow": {
+        "cases": 107,
+        "skipped": 1,
+        "exitCode": 0
+      },
+      "yellow-review": {
+        "cases": 1151,
+        "skipped": 2,
+        "exitCode": 0
+      }
+    },
+    "receipts": ["validation-final.json", "validation-postfix.json", "intermediate-checks.json"],
+    "schemaVersionGeneratedLintTypecheckMarkdownShell": "passed",
+    "finalDocumentationChecks": {
+      "status": "passed",
+      "dirtySolutionDocsValidated": 2,
+      "receipt": "validation-completion.json"
+    }
+  },
+  "preservation": {
+    "historicalFilesHashed": 54,
+    "historicalHashMismatches": [],
+    "ownerAuthenticationMetadataUnchanged": true,
+    "sourceAndInstalledArtifactProvenance": "provenance-final.json",
+    "noCommitsPushesPRsPublication": true,
+    "noOwnerProfileInstallOrTrust": true,
+    "noCredentialCopyOrChange": true,
+    "noRealRemoteMutationOrRestart": true,
+    "changesetsUnapplied": true,
+    "finalExposedArtifactProvenanceRechecked": true
+  },
+  "limits": [
+    "Nine-plugin exposure is not full runtime acceptance of every selected skill",
+    "Windows desktop runtime untested",
+    "No live runner SSH or CI API acceptance",
+    "No Cursor authenticated remote launch or recursive Codex model delegation",
+    "No causal token-cost savings claim",
+    "Public submission and real-profile deployment outside scope"
+  ],
+  "remainingBlockers": [],
+  "nextAuthorizedAction": "Local review of uncommitted diff; external/release actions require their own authority"
+}

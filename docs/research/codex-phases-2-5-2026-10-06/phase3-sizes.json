@@ -1,0 +1,74 @@
+{
+  "ci-runner-health": {
+    "lines": 995,
+    "bytes": 55751,
+    "sha256": "44c0308a140e17d4c69cc08164cacf799e6e67e45730c689650e1badde19e3b6",
+    "after_lines": 67,
+    "after_bytes": 3776,
+    "shell_blocks_preserved": 6,
+    "after_sha256": "fcf1406fa3869bb8e308023da29c2dac036e0578ddbefb1e1a498ac009c3d8e6",
+    "references": {
+      "configuration.md": {
+        "lines": 181,
+        "bytes": 10729
+      },
+      "investigation.md": {
+        "lines": 234,
+        "bytes": 13732
+      },
+      "ssh-probes.md": {
+        "lines": 506,
+        "bytes": 27645
+      }
+    },
+    "after_resource_bytes": 55882
+  },
+  "ci-diagnose": {
+    "lines": 612,
+    "bytes": 36330,
+    "sha256": "d628a52385992bead2636876013624e91299f7e0137c4de71ad54344e77ed62e",
+    "after_lines": 60,
+    "after_bytes": 3384,
+    "shell_blocks_preserved": 6,
+    "after_sha256": "3a75ad8d5de93ef7c6df64c44b3e3fed6c49de09d477083b1ab71a03ac3b8ac6",
+    "references": {
+      "failure-analysis.md": {
+        "lines": 57,
+        "bytes": 4682
+      },
+      "fetch-logs.md": {
+        "lines": 186,
+        "bytes": 11383
+      },
+      "resolve-run.md": {
+        "lines": 329,
+        "bytes": 19784
+      }
+    },
+    "after_resource_bytes": 39233
+  },
+  "gt-setup": {
+    "lines": 440,
+    "bytes": 18953,
+    "sha256": "2c5781277953adb48b28e596c8ac468169129a7e019d062d1f2e66ac2f2cb6d1",
+    "after_lines": 40,
+    "after_bytes": 1949,
+    "shell_blocks_preserved": 7,
+    "after_sha256": "88e2e8e2bb72ff9627d7f0e361bf759c3fe97cd074497bfeba13f04233801d71",
+    "references": {
+      "agent-settings.md": {
+        "lines": 105,
+        "bytes": 4135
+      },
+      "convention-files.md": {
+        "lines": 146,
+        "bytes": 4356
+      },
+      "prerequisites.md": {
+        "lines": 210,
+        "bytes": 9953
+      }
+    },
+    "after_resource_bytes": 20393
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "status": "prepared-corpus",
+  "skill": "yellow-core:plan-status",
+  "cases": [
+    {
+      "id": "direct",
+      "prompt": "Use the installed plan-status skill to show this fixture's open and archived plan progress.",
+      "attachInstalledSkill": true,
+      "expectedActivation": true
+    },
+    {
+      "id": "indirect",
+      "prompt": "Show which local plans are in flight and which are ready to archive, plus the archived plan count and progress.",
+      "attachInstalledSkill": false,
+      "expectedActivation": true
+    },
+    {
+      "id": "unrelated",
+      "prompt": "What is 2 + 2? Reply with only the number.",
+      "attachInstalledSkill": false,
+      "expectedActivation": false,
+      "expectedOutput": "4"
+    }
+  ],
+  "expectedDashboard": {
+    "open": {
+      "plans/in-flight.md": {
+        "checked": 1,
+        "total": 3,
+        "ready": false
+      },
+      "plans/ready.md": {
+        "checked": 2,
+        "total": 2,
+        "ready": true
+      },
+      "plans/research.md": {
+        "checked": 0,
+        "total": 0,
+        "ready": false
+      }
+    },
+    "archived": {
+      "plans/complete/shipped.md": {
+        "checked": 1,
+        "total": 1,
+        "ready": false
+      }
+    },
+    "archivedCount": 1
+  },
+  "acceptance": [
+    "Resolve installed identity and path from actual skills/list; never use the source skill path.",
+    "Use a fresh isolated thread for each case with only the fixture as the read-only project.",
+    "For direct input attach {type: skill, name, path} from installed discovery.",
+    "For indirect input do not attach or mention a skill; record model-requested reads of the installed SKILL.md.",
+    "Record output, commands, read paths and unchanged fixture hashes. Correct arithmetic alone is insufficient evidence of skill activation.",
+    "No mutation commands or MCP tools; no credentials copied to the disposable profile.",
+    "Mocked Responses cannot pass these semantic checks."
+  ]
+}

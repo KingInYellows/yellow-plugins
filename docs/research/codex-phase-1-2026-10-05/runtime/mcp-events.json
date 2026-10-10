@@ -1,0 +1,84 @@
+[
+  {
+    "method": "remoteControl/status/changed",
+    "params": {
+      "status": "disabled",
+      "serverName": "A8",
+      "installationId": "c41259b4-013e-4684-97cf-054406efd799",
+      "environmentId": null
+    },
+    "emittedAtMs": 1791245885146
+  },
+  {
+    "method": "thread/started",
+    "params": {
+      "thread": {
+        "id": "01a10e93-1ef8-7b23-b7ff-b3bd739b6009",
+        "environments": [
+          {
+            "environmentId": "local",
+            "cwd": "/tmp/yellow-codex-lifecycle-Kzi7Ft/project",
+            "runtimeWorkspaceRoots": [
+              "/tmp/yellow-codex-lifecycle-Kzi7Ft/project"
+            ]
+          }
+        ],
+        "extra": null,
+        "sessionId": "01a10e93-1ef8-7b23-b7ff-b3bd739b6009",
+        "forkedFromId": null,
+        "parentThreadId": null,
+        "preview": "",
+        "ephemeral": true,
+        "section": null,
+        "sectionEnteredAt": null,
+        "projectId": null,
+        "historyMode": "legacy",
+        "modelProvider": "fixture",
+        "model": "fixture",
+        "reasoningEffort": null,
+        "createdAt": 1791245885,
+        "updatedAt": 1791245885,
+        "recencyAt": 1791245885,
+        "status": {
+          "type": "idle"
+        },
+        "path": null,
+        "cwd": "/tmp/yellow-codex-lifecycle-Kzi7Ft/project",
+        "cliVersion": "0.157.0",
+        "originator": "yellow_lifecycle_smoke",
+        "source": "vscode",
+        "canAcceptDirectInput": true,
+        "threadSource": null,
+        "agentNickname": null,
+        "agentRole": null,
+        "gitInfo": null,
+        "name": null,
+        "daybreakEnabled": null,
+        "turns": []
+      }
+    },
+    "emittedAtMs": 1791245885252
+  },
+  {
+    "method": "mcpServer/startupStatus/updated",
+    "params": {
+      "threadId": "01a10e93-1ef8-7b23-b7ff-b3bd739b6009",
+      "name": "graphite",
+      "status": "starting",
+      "error": null,
+      "failureReason": null
+    },
+    "emittedAtMs": 1791245885253
+  },
+  {
+    "method": "mcpServer/startupStatus/updated",
+    "params": {
+      "threadId": "01a10e93-1ef8-7b23-b7ff-b3bd739b6009",
+      "name": "graphite",
+      "status": "ready",
+      "error": null,
+      "failureReason": null
+    },
+    "emittedAtMs": 1791245888625
+  }
+]

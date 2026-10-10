@@ -1,0 +1,8 @@
+{
+  "pluginId": "yellow-review@yellow-plugins",
+  "name": "yellow-review",
+  "marketplaceName": "yellow-plugins",
+  "version": "3.5.3",
+  "installedPath": "/tmp/yellow-codex-eval-eXZKFV/codex/plugins/cache/yellow-plugins/yellow-review/3.5.3",
+  "authPolicy": "ON_INSTALL"
+}

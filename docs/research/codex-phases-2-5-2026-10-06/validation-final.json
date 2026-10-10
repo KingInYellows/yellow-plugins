@@ -1,0 +1,161 @@
+{
+  "recordedAt": "2026-10-06T15:09:10.722854+00:00",
+  "checks": [
+    {
+      "command": [
+        "pnpm",
+        "validate:schemas"
+      ],
+      "exitCode": 0,
+      "seconds": 7.74,
+      "log": "/tmp/yellow-integrated-check-0.log",
+      "tail": " advisory] plugins/yellow-debt/agents/remediation/debt-fixer.md: 303 lines (agent ceiling 300) \u2014 delete prose that does not change behaviour, then move late-sequence detail into references/ behind an imperative load stub.\n\u001b[33m\u26a0 WARN:\u001b[0m [RULE 21 advisory] plugins/yellow-debt/agents/synthesis/audit-synthesizer.md: 386 lines (agent ceiling 300) \u2014 delete prose that does not change behaviour, then move late-sequence detail into references/ behind an imperative load stub.\n\u001b[32m\u2713 PASS:\u001b[0m Validated 78 agents and 443 markdown files\n[lint-error-codes] \u2713 no scripts/ file re-implements any of the 70 catalog error codes\n[sync-shell-snippets] \u2713 all 3 install scripts are in sync with scripts/snippets/\n[validate-solutions] no docs/solutions/ changes in diff \u2014 nothing to validate\n[generate-manifests] All 85 generated files match catalog/ sources\n[validate-provider-groups] OK: 2 capability group(s) verified \u2014 stacked-pr (graphite, github); remote-agent (cursor, devin, jules)\n[validate-codex] \u2713 9 Codex-enabled plugin(s) pass artifact validation and the exposure lint\n[validate-cursor] \u2713 2 Cursor-enabled plugin(s) pass artifact validation, the exposure lint, and the lifecycle non-emission scan\n[validate-jules] OK: 7 replica unit(s) match yellow-cursor\n[validate-flow-namespace] \u2713 no `workflows:` references remain outside permanent pins (36 pinned references across 10 permanent files)\n[validate-provider-neutral-commands] OK: 624 markdown file(s) scanned, no unallowlisted mutating gt/gh-stack references outside provider-owned or historical paths.\n\u001b[32m\u2713 PASS:\u001b[0m council roster consistent (4 reviewers, 3 CLI, epoch 1efa59b3)\n\u001b[32m\u2713 PASS:\u001b[0m doc counts match marketplace canonical (20 plugins)\n[validate-shell-compat] OK: 385 markdown and 54 shell file(s) scanned, 0 allowlisted finding(s).\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "validate:versions"
+      ],
+      "exitCode": 0,
+      "seconds": 0.26,
+      "log": "/tmp/yellow-integrated-check-1.log",
+      "tail": "\n> yellow-plugins-root@2.1.16 validate:versions /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> node scripts/validate-versions.js\n\n[validate-versions] OK: 20 plugins \u2014 all versions in sync\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "test:unit",
+        "--maxWorkers=2",
+        "--minWorkers=1"
+      ],
+      "exitCode": 0,
+      "seconds": 34.64,
+      "log": "/tmp/yellow-integrated-check-2.log",
+      "tail": "ed (323)\n   Start at  09:58:28\n   Duration  16.17s (transform 648ms, setup 3ms, collect 1.40s, tests 33.20s, environment 1ms, prepare 1.11s)\n\n\n> yellow-jules@0.2.0 test /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-jules\n> vitest run --dir tests \"--maxWorkers=2\" \"--minWorkers=1\"\n\n\u001b[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.\u001b[39m\n\n RUN  v1.6.1 /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-jules\n\n \u2713 tests/runtime-status.test.ts  (53 tests) 1164ms\n \u2713 tests/packed-sdk-transport.test.ts  (31 tests) 2980ms\n \u2713 tests/runtime-collect.test.ts  (19 tests) 1661ms\n \u2713 tests/state-store.test.ts  (35 tests) 1319ms\n \u2713 tests/config-resolution.test.ts  (21 tests) 41ms\n \u2713 tests/input-validation.test.ts  (26 tests) 7ms\n \u2713 tests/error-mapping.test.ts  (38 tests) 13ms\n \u2713 tests/credential-redaction.test.ts  (28 tests) 8ms\n \u2713 tests/runtime-list.test.ts  (9 tests) 121ms\n \u2713 tests/runtime-setup.test.ts  (10 tests) 27ms\n \u2713 tests/cli-json-contract.test.ts  (21 tests) 1769ms\n \u2713 tests/sdk-install-deadline.test.ts  (3 tests) 65ms\n \u2713 tests/runtime-deadline.test.ts  (3 tests) 233ms\n \u2713 tests/sdk-mapping.test.ts  (4 tests) 4ms\n \u2713 tests/fetch-guard-response-cap.test.ts  (4 tests) 26ms\n \u2713 tests/unsupported-capability.test.ts  (6 tests) 4ms\n \u2713 tests/offline-coverage.test.ts  (22 tests) 8166ms\n \u2713 tests/npm-spawn-config.test.ts  (3 tests) 2ms\n\n Test Files  18 passed (18)\n      Tests  336 passed (336)\n   Start at  09:58:46\n   Duration  11.84s (transform 311ms, setup 2ms, collect 673ms, tests 17.61s, environment 2ms, prepare 953ms)\n\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "test:integration",
+        "--maxWorkers=2",
+        "--minWorkers=1"
+      ],
+      "exitCode": 1,
+      "seconds": 29.9,
+      "log": "/tmp/yellow-integrated-check-3.log",
+      "tail": "da50a7b2abc7cf721389fd829c2f8\"\n    }\n  ],\n  \"loadedSkills\": [\n    {\n      \"name\": \"yellow-core:agent-native-architecture\",\n      \"pluginId\": \"yellow-core@yellow-plugins\",\n      \"path\": \"/tmp/yellow-codex-smoke-SYBApE/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/agent-native-architecture/SKILL.md\",\n      \"enabled\": true\n    },\n    {\n      \"name\": \"yellow-core:agent-native-audit\",\n      \"pluginId\": \"yellow-core@yellow-plugins\",\n      \"path\": \"/tmp/yellow-codex-smoke-SYBApE/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/agent-native-audit/SKILL.md\",\n      \"enabled\": true\n    },\n    {\n      \"name\": \"yellow-core:plan-status\",\n      \"pluginId\": \"yellow-core@yellow-plugins\",\n      \"path\": \"/tmp/yellow-codex-smoke-SYBApE/codex/plugins/cache/yellow-plugins/yellow-core/2.6.2/codex/skills/plan-status/SKILL.md\",\n      \"enabled\": true\n    }\n  ],\n  \"hooks\": [],\n  \"scratch\": \"/tmp/yellow-codex-smoke-SYBApE\",\n  \"scratchRetained\": false\n}\n: expected 1 to be +0 // Object.is equality\n\n- Expected\n+ Received\n\n- 0\n+ 1\n\n \u276f tests/integration/smoke-codex-plugin-install.test.ts:108:58\n    106|   it('isolates profiles/env and verifies actual discovered paths witho\u2026\n    107|     const result = fakeRun('success');\n    108|     expect(result.status, result.stderr + result.stdout).toBe(0);\n       |                                                          ^\n    109|     const report = JSON.parse(result.stdout);\n    110|     expect(report.status).toBe('passed');\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[3/3]\u23af\n\n Test Files  1 failed | 61 passed (62)\n      Tests  3 failed | 1873 passed | 1 skipped (1877)\n   Start at  09:58:58\n   Duration  29.26s (transform 623ms, setup 5ms, collect 1.65s, tests 46.37s, environment 8ms, prepare 3.59s)\n\n\u2009ELIFECYCLE\u2009 Command failed with exit code 1.\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "lint"
+      ],
+      "exitCode": 0,
+      "seconds": 20.83,
+      "log": "/tmp/yellow-integrated-check-4.log",
+      "tail": "\n> yellow-plugins-root@2.1.16 lint /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> eslint . --ext .js,.ts\n\n\n/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/tests/fixtures/codex-waves-analysis-integration/src/complexity.js\n  1:8  warning  Missing return type on function  @typescript-eslint/explicit-function-return-type\n\n\u2716 1 problem (0 errors, 1 warning)\n\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "seconds": 3.77,
+      "log": "/tmp/yellow-integrated-check-5.log",
+      "tail": "\n> yellow-plugins-root@2.1.16 typecheck /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> tsc --noEmit && pnpm --filter yellow-cursor run typecheck && pnpm --filter yellow-goal run typecheck && pnpm --filter yellow-jules run typecheck\n\n\n> yellow-cursor@0.2.4 typecheck /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-cursor\n> tsc --noEmit -p tsconfig.json\n\n\n> yellow-goal@0.2.2 typecheck /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-goal\n> tsc --noEmit -p tsconfig.json\n\n\n> yellow-jules@0.2.0 typecheck /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/plugins/yellow-jules\n> tsc --noEmit -p tsconfig.json\n\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "lint:plugins"
+      ],
+      "exitCode": 0,
+      "seconds": 2.42,
+      "log": "/tmp/yellow-integrated-check-6.log",
+      "tail": "\n> yellow-plugins-root@2.1.16 lint:plugins /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> bash scripts/lint-plugins.sh\n\n\n[lint-plugins] Summary: 0 error(s), 0 warning(s)\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "validate:shell-compat"
+      ],
+      "exitCode": 0,
+      "seconds": 0.62,
+      "log": "/tmp/yellow-integrated-check-7.log",
+      "tail": "\n> yellow-plugins-root@2.1.16 validate:shell-compat /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> node scripts/validate-shell-compat.js\n\n[validate-shell-compat] OK: 385 markdown and 54 shell file(s) scanned, 0 allowlisted finding(s).\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "check:shell-parse"
+      ],
+      "exitCode": 0,
+      "seconds": 4.17,
+      "log": "/tmp/yellow-integrated-check-8.log",
+      "tail": "\n> yellow-plugins-root@2.1.16 check:shell-parse /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> node scripts/check-shell-parse.js\n\n[check-shell-parse] OK: 833 shell block(s) and 33 wrapper body(ies) parsed; 37 template(s) parsed with placeholders replaced.\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "test:shell-compat"
+      ],
+      "exitCode": 0,
+      "seconds": 9.79,
+      "log": "/tmp/yellow-integrated-check-9.log",
+      "tail": "\n> yellow-plugins-root@2.1.16 test:shell-compat /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> bats tests/shell-compat/\n\n1..21\nok 1 zsh-snapshot refuses to clobber an existing file\nok 2 plain zsh and bash overwrite an existing file\nok 3 zsh-snapshot has extendedglob and rcquotes on\nok 4 zsh-snapshot globs case-insensitively (nocaseglob) and plain zsh does not\nok 5 zsh -f ignores the contributor's ~/.zshrc\nok 6 skips locally when CI is unset, empty, false or 0\nok 7 fails when CI is set to true or any other value\nok 8 fails when SHELL_COMPAT_REQUIRE_ZSH=1 outside CI\nok 9 every Tier 4 library has a driver\nok 10 every Tier 4 library driver behaves the same under all profiles\nok 11 yellow-core repo-profile.sh behaves the same in bash and zsh\nok 12 yellow-core compound-staging.sh behaves the same in bash and zsh\nok 13 yellow-core validate-fs.sh behaves the same in bash and zsh\nok 14 yellow-morph install-morphmcp.sh behaves the same in bash and zsh\nok 15 yellow-ruvector hooks/scripts/lib/validate.sh behaves the same in bash and zsh\nok 16 yellow-ci redact.sh behaves the same in bash and zsh\nok 17 every Tier 3 library has a probe function in this suite\nok 18 each Tier 3 library sources through the wrapper from a zsh noclobber parent\nok 19 the wrapper keeps the caller's stdin and passes the exit status through\nok 20 control: bash <<'TAG' lets a stdin reader swallow the rest of the script (SHC-009)\nok 21 /debt:triage accept block transitions a todo when run under zsh\n"
+    },
+    {
+      "command": [
+        "bats",
+        "plugins/yellow-ci/tests/"
+      ],
+      "exitCode": 0,
+      "seconds": 159.32,
+      "log": "/tmp/yellow-integrated-check-10.log",
+      "tail": "41 ssh_user: reject starts with number\nok 242 ssh_user: reject uppercase\nok 243 ssh_user: reject 33+ chars\nok 244 cache_dir: valid /home/runner/.cache\nok 245 cache_dir: valid /tmp/build\nok 246 cache_dir: valid /var/cache/apt\nok 247 cache_dir: reject /etc/passwd\nok 248 cache_dir: reject /root\nok 249 cache_dir: reject path traversal\nok 250 cache_dir: reject empty\nok 251 numeric_range: valid within bounds\nok 252 numeric_range: valid at min\nok 253 numeric_range: valid at max\nok 254 numeric_range: reject below min\nok 255 numeric_range: reject above max\nok 256 numeric_range: reject non-numeric\nok 257 numeric_range: reject empty\nok 258 ssh_command: valid simple\nok 259 ssh_command: reject semicolon\nok 260 ssh_command: reject pipe\nok 261 ssh_command: reject backtick\nok 262 ssh_command: reject command substitution\nok 263 ssh_command: reject ampersand\nok 264 ssh_command: reject newline\nok 265 file_path: valid relative path\nok 266 file_path: reject path traversal with ..\nok 267 file_path: reject absolute path\nok 268 file_path: reject tilde path\nok 269 file_path: reject empty path\nok 270 file_path: reject newline injection\nok 271 file_path: reject carriage return injection\nok 272 file_path: valid nested path\nok 273 file_path: reject double-dot in middle\nok 274 file_path: valid file in root\nok 275 ssh_key_path: valid empty (default key)\nok 276 ssh_key_path: valid tilde path\nok 277 ssh_key_path: valid absolute path\nok 278 ssh_key_path: valid path with hyphens\nok 279 ssh_key_path: reject path traversal\nok 280 ssh_key_path: reject semicolon injection\nok 281 ssh_key_path: reject backtick injection\nok 282 ssh_key_path: reject pipe\nok 283 ssh_key_path: reject dollar\nok 284 ssh_key_path: reject relative path (no ~ or /)\nok 285 ssh_key_path: reject newline\nok 286 ssh_key_path: reject spaces\n"
+    },
+    {
+      "command": [
+        "bats",
+        "plugins/gt-workflow/tests/"
+      ],
+      "exitCode": 0,
+      "seconds": 5.08,
+      "log": "/tmp/yellow-integrated-check-11.log",
+      "tail": "k 81 check-git-push: exec 3<<X \u2026 then bash /dev/fd/3 is blocked (script descriptor has no source on the reader)\nok 82 check-git-push: a glob case pattern (R*|C*) or *)) is allowed (patterns are matched, not run)\nok 83 check-commit-message: conventional-allow-silent matches golden\nok 84 check-commit-message: non-conventional-warn matches golden\nok 85 check-commit-message: multi-m-first-only matches golden\nok 86 check-commit-message: double-quoted-m matches golden\nok 87 check-commit-message: single-quoted-m matches golden\nok 88 check-commit-message: nonzero-exit-skip matches golden\nok 89 check-commit-message: missing-exit-code-validates matches golden\nok 90 check-commit-message: null-envelope does not crash (regression, PR #661)\nok 91 check-commit-message: codex-tool-response-nonzero-exit-skip matches golden (regression, PR #661)\nok 92 clamp_audit_agents: empty stays empty (caller applies hardcoded default)\nok 93 clamp_audit_agents: valid in-range value passes through\nok 94 clamp_audit_agents: non-integer clamps to default 3\nok 95 clamp_audit_agents: below minimum clamps to 1\nok 96 clamp_audit_agents: above maximum clamps to 3\nok 97 validate_branch_prefix: empty stays empty\nok 98 validate_branch_prefix: valid prefix passes through\nok 99 validate_branch_prefix: invalid characters reset to empty\nok 100 validate_branch_prefix: uppercase leading char is rejected\nok 101 build_submit_flags: no config flags produces empty string\nok 102 build_submit_flags: draft=true adds --draft\nok 103 build_submit_flags: draft=true with --publish suppresses --draft\nok 104 build_submit_flags: merge_when_ready=true adds --merge-when-ready\nok 105 build_submit_flags: both flags set adds both\nok 106 maybe_submit: dry-run never invokes gt submit\nok 107 maybe_submit: non-dry-run does invoke gt submit\n"
+    },
+    {
+      "command": [
+        "bats",
+        "plugins/yellow-review/tests/"
+      ],
+      "exitCode": 0,
+      "seconds": 355.78,
+      "log": "/tmp/yellow-integrated-check-12.log",
+      "tail": "lk or nested resolve, stop and report the path on failure\nok 1133 sweep-all: an unknown Blocking row renders the total as <n>+? or unknown, never 0\nok 1134 pr-review-workflow: SKILL.md stays within 500 lines and points at its local-scripts reference\nok 1135 resolve-pr: a timeout stop is recorded in Step 7 and blocks the Step 8 re-pass\nok 1136 dispositions: the re-pass is skipped after any exit 4, rate limit or timeout\nok 1137 README: documents the optional yellow-linear routing, dedupe, fallback and text check\nok 1138 dispositions: the prose allowlist is the single source for evidence and oos_reason\nok 1139 dispositions: the known-limits bullet no longer claims mentions can appear in resolver prose\nok 1140 resolve-pr and the resolver agent point at the dispositions prose allowlist\nok 1141 write-phase Bash budget covers the worst case at the per-call gh timeout cap\nok 1142 resolve-pr: the read-only fetch calls get a Bash timeout that covers their capped gh calls\nok 1143 resolve-pr: the marker mint strips a trailing slash from TMPDIR so Step 6 accepts the path\nok 1144 resolve-pr: a refusal reverts only reported files and asks before touching other changes\nok 1145 resolve-pr: keeping the partial edits of a conflicted cluster stops the run and reverts nothing\nok 1146 resolve-pr: a rate-limited blocker lookup stops before any dispatch or write\nok 1147 resolve-stack: a verify=skipped contract line ends the walk like a missing contract\nok 1148 local-scripts: check-resolve-text documents exit 6 for refused text and exit 2 for usage\nok 1149 sweep-all: a verify=skipped contract line ends the batch after the clean-tree check\nok 1150 sweep-all: no /flow:compound after a verify-skipped stop\nok 1151 dispositions: the addressed path:line evidence refuses an option-shaped path segment\n"
+    },
+    {
+      "command": [
+        "pnpm",
+        "validate:generated"
+      ],
+      "exitCode": 0,
+      "seconds": 0.37,
+      "log": "/tmp/yellow-integrated-check-13.log",
+      "tail": "\n> yellow-plugins-root@2.1.16 validate:generated /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n> node scripts/generate-manifests.js --check\n\n[generate-manifests] All 85 generated files match catalog/ sources\n"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "seconds": 0.02,
+      "log": "/tmp/yellow-integrated-check-14.log",
+      "tail": ""
+    }
+  ],
+  "complete": true
+}

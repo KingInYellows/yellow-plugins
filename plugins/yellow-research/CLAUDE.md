@@ -117,6 +117,11 @@ yellow-research — DeepWiki's canonical home is here.
 
 ### Skills
 
+- `research-public-repo` — Shared read-only public repository Q&A with DeepWiki,
+  inline status/answer/source JSON and a flat packaged contract. Discover host
+  tool names; do not read credentials, upload local code, invoke other sources,
+  save reports or dispatch agents. Codex's selected slice exports only DeepWiki
+  and omits Claude credential-status hooks and userConfig expansion.
 - `research-patterns` — Reference conventions for authoring yellow-research
   output: slug naming, report format, save location, source selection, API key
   setup, graceful degradation, and when to compound findings.
@@ -252,3 +257,7 @@ do not apply.
 - `research-conductor` auto-triggers via `/research:deep` and
   `/flow:deepen-plan` — do not call directly
 - `code-researcher` auto-triggers via `/research:code` — do not call directly
+
+Installed Codex acceptance passed for the selected skill, including safe
+failure and unrelated controls. Other plugin components remain excluded.
+See [integrated evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md).

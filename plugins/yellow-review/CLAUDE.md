@@ -527,6 +527,10 @@ with `cache_read_input_tokens` in the transcript (Ctrl-O) on a second
 
 ## Codex and Cursor Distribution
 
+The generated Codex manifest sets `commands: []` to prevent automatic
+conversion of Claude command wrappers into additional skills. Codex exposes
+only the skills selected by the catalog allowlist.
+
 `targets.codex.enabled: true` and `targets.cursor.enabled: true` in
 `catalog/plugins/yellow-review.json`, each with a `skillAllowlist` of exactly
 one entry: `yellow-thermonuclear-review`. Every command, agent, and other skill

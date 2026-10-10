@@ -1,0 +1,27 @@
+[
+  {
+    "bin": "git",
+    "args": [
+      "-c",
+      "safe.bareRepository=explicit",
+      "ls-remote",
+      "https://github.com/openai/plugins.git",
+      "HEAD"
+    ]
+  },
+  {
+    "bin": "gh",
+    "args": [
+      "auth",
+      "status"
+    ]
+  },
+  {
+    "bin": "gt",
+    "args": [
+      "modify",
+      "-m",
+      "bad message"
+    ]
+  }
+]

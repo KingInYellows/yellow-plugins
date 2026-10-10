@@ -1,0 +1,126 @@
+[
+  {
+    "bin": "git",
+    "args": [
+      "-c",
+      "safe.bareRepository=explicit",
+      "ls-remote",
+      "https://github.com/openai/plugins.git",
+      "HEAD"
+    ]
+  },
+  {
+    "bin": "git",
+    "args": [
+      "rev-parse",
+      "--path-format=absolute",
+      "--show-toplevel",
+      "--git-common-dir",
+      "--git-dir"
+    ]
+  },
+  {
+    "bin": "git",
+    "args": [
+      "--version"
+    ]
+  },
+  {
+    "bin": "git",
+    "args": [
+      "for-each-ref",
+      "--format=%(refname):%(objectname)",
+      "refs/branch-metadata/"
+    ]
+  },
+  {
+    "bin": "git",
+    "args": [
+      "for-each-ref",
+      "--format=%(refname:short):%(objectname)",
+      "--sort=-committerdate",
+      "refs/heads/"
+    ]
+  },
+  {
+    "bin": "git",
+    "args": [
+      "branch",
+      "--show-current"
+    ]
+  },
+  {
+    "bin": "git",
+    "args": [
+      "remote",
+      "get-url",
+      "origin",
+      "--push"
+    ]
+  },
+  {
+    "bin": "git",
+    "args": [
+      "config",
+      "--get",
+      "user.email"
+    ]
+  },
+  {
+    "bin": "git",
+    "args": [
+      "rev-parse",
+      "--path-format=absolute",
+      "--show-toplevel",
+      "--git-common-dir",
+      "--git-dir"
+    ]
+  },
+  {
+    "bin": "git",
+    "args": [
+      "--version"
+    ]
+  },
+  {
+    "bin": "git",
+    "args": [
+      "for-each-ref",
+      "--format=%(refname):%(objectname)",
+      "refs/branch-metadata/"
+    ]
+  },
+  {
+    "bin": "git",
+    "args": [
+      "for-each-ref",
+      "--format=%(refname:short):%(objectname)",
+      "--sort=-committerdate",
+      "refs/heads/"
+    ]
+  },
+  {
+    "bin": "git",
+    "args": [
+      "branch",
+      "--show-current"
+    ]
+  },
+  {
+    "bin": "git",
+    "args": [
+      "remote",
+      "get-url",
+      "origin",
+      "--push"
+    ]
+  },
+  {
+    "bin": "git",
+    "args": [
+      "config",
+      "--get",
+      "user.email"
+    ]
+  }
+]

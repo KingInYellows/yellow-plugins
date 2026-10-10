@@ -1,0 +1,71 @@
+{
+  "data": [
+    {
+      "name": "graphite",
+      "runtimeStatus": "connected",
+      "pluginId": "gt-workflow@yellow-plugins",
+      "httpOrigin": null,
+      "serverInfo": {
+        "name": "gt",
+        "title": null,
+        "version": "0.0.1",
+        "description": null,
+        "icons": null,
+        "websiteUrl": null
+      },
+      "serverCapabilities": {
+        "tools": {
+          "listChanged": true
+        }
+      },
+      "tools": {
+        "run_gt_cmd": {
+          "name": "run_gt_cmd",
+          "description": "Graphite (gt) simplifies the entire code authoring & reviewing lifecycle.\nIt enables stacking PRs on top of each other to keep you unblocked & your changes small, focused, and reviewable.\n\nUSAGE\n  $ gt <command> [flags]\n\nTERMS\n  stack:     A sequence of pull requests, each building off of its parent. (ex: main <- PR \"add API\" <- PR \"update frontend\" <- PR \"docs\")\n  trunk:     The branch that stacks are merged into. (ex: main)\n  downstack: The PRs below the given PR in a stack, i.e. its ancestors.\n  upstack:   The PRs above the given PR in a stack, i.e. its descendants.\n\nCORE COMMANDS\n  gt init: Initializes your Git repo to work with Graphite\n  gt create: Creates a new branch and commit your changes\n  gt submit: Submits the current branch & all downstack branches to Graphite\n  gt submit --stack: Submits your current stack to Graphite\n  gt modify: Amends your current branch with new changes and rebases all PRs above it\n  gt restack: Rebases every PR in a stack to have the latest changes\n  gt sync: Pulls the latest trunk branch, rebases all open PRs/stacks on top of the latest changes, and prompts to delete any stale/old/merged branches\n  gt checkout: Interactively checks out any of your branches\n  gt state: Prints out the state of the repository\n  gt up: Checks out the branch directly upstack\n  gt down: Checks out the branch directly downstack\n\nCORE WORKFLOW\n  Run the learn tool to learn how to use gt.\n\nTo run a `gt` command, call this tool. This tool is part of plugin `Graphite Workflow`.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "The arguments to pass to gt. For example, to run `gt create -m \"feat: foo\"` pass in the arguments: [\"create\", \"-m\", \"feat: foo\"]. "
+              },
+              "cwd": {
+                "type": "string",
+                "description": "The root working directory of the project. Must be an absolute path."
+              },
+              "why": {
+                "type": "string",
+                "description": "A one line description of why you're running this command."
+              }
+            },
+            "required": [
+              "args",
+              "cwd",
+              "why"
+            ],
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        },
+        "learn_gt": {
+          "name": "learn_gt",
+          "description": "Learn about stacking PRs with Graphite (gt). This tool is part of plugin `Graphite Workflow`.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        }
+      },
+      "toolsError": null,
+      "resources": [],
+      "resourceTemplates": [],
+      "authStatus": "unsupported"
+    }
+  ],
+  "nextCursor": null
+}

@@ -1,0 +1,18 @@
+{
+  "status": "passed",
+  "harnessSha256": "d5cdf7c866ba48bb7233638036c752598519d16cbb0024928af67d13df740a35",
+  "recordedAt": "2026-10-06T00:22:56.123Z",
+  "graphiteVersion": "1.7.20",
+  "command": [
+    "gt",
+    "internal-only",
+    "check-auth"
+  ],
+  "credentialHandling": "native CLI read-only bind; no harness read or copy",
+  "scratch": "/tmp/yellow-graphite-auth-3igorP",
+  "exitCode": 0,
+  "observedStatus": "ok",
+  "authenticated": true,
+  "repositoryAccess": true,
+  "ownerConfigMetadataUnchanged": true
+}
