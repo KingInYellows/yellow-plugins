@@ -177,4 +177,7 @@ Closing a todo does not close its Linear issue.
   tools silently.
 - **ast-grep CLI** — Optional structural code search for duplication-scanner
   and complexity-scanner, run through Bash when `ast-grep` is on PATH; falls
-  back to Grep otherwise. No MCP server or plugin dependency.
+  back to Grep otherwise. No MCP server or plugin dependency. The scanners
+  have the `Write` tool and use it only to save ast-grep values into a
+  private temp directory the recipe creates (see yellow-research's CLAUDE.md,
+  "Optional ast-grep CLI", and `docs/security.md` "ast-grep value files").
