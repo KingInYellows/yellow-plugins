@@ -124,19 +124,23 @@ cs_atomic_jsonl_write() {
 # "BASIC SETTINGS" decode to binary, "Basic Only" to ":yr". The boundary
 # before the keyword matches the sed rule. POSIX awk only (mawk, gawk, BSD
 # awk): no gensub, IGNORECASE or bit functions. A line equal to $1 marks a
-# sed failure upstream: nothing is printed and awk exits 3 after the input
-# drains. Output is spooled to a 0600 temp file (already redacted) and printed
-# only after awk succeeds, so a failure leaves no partial result and a large
-# verifier log does not grow memory. No temp file means failure.
+# sed failure upstream: nothing more is printed and awk exits 3 after the
+# input drains. By default every line is held in memory and printed only after
+# the input ends cleanly, so a failure leaves no partial result and nothing is
+# written to disk; callers pass bounded text (a 100-line transcript tail, an
+# 8 KiB narrative, quote lines). With CS_REDACT_STREAM=1 each line is printed
+# as soon as it is redacted, so memory does not grow with the input; a failure
+# then leaves the lines sed had already redacted, and the caller must treat a
+# nonzero status as an incomplete result. Use it only for an unbounded stream
+# whose caller caps and re-scans the output (yellow-review's verify log).
 _cs_redact_bare_basic() {
-  local _cs_hold _cs_rc=0
-  _cs_hold=$(umask 077; mktemp "${TMPDIR:-/tmp}/cs-redact.XXXXXX" 2>/dev/null) \
-    || { cat >/dev/null; return 1; }
-  awk -v fail_mark="$1" '
+  local _cs_stream=0
+  [ "${CS_REDACT_STREAM:-0}" != 1 ] || _cs_stream=1
+  local _cs_prog='
     BEGIN {
       b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
       kw = "[Bb][Aa][Ss][Ii][Cc][ \t\r\v\f]+[A-Za-z0-9+/]+=*"
-      failed = 0
+      failed = 0; nh = 0
     }
     function is_cred(tok,    n, i, acc, bits, p, byte, nb, fc, lead) {
       n = length(tok)
@@ -186,15 +190,15 @@ _cs_redact_bare_basic() {
           rest = substr(rest, RSTART + 5)
         }
       }
-      print out rest
+      if (stream) print out rest
+      else held[++nh] = out rest
     }
-    END { if (failed) exit 3 }
-  ' >| "$_cs_hold" || _cs_rc=$?
-  if [ "$_cs_rc" -eq 0 ]; then
-    cat -- "$_cs_hold" || _cs_rc=$?
-  fi
-  rm -f -- "$_cs_hold" 2>/dev/null
-  return "$_cs_rc"
+    END {
+      if (failed) exit 3
+      for (i = 1; i <= nh; i++) print held[i]
+    }
+  '
+  awk -v fail_mark="$1" -v stream="$_cs_stream" "$_cs_prog"
 }
 
 cs_redact_secrets() {
@@ -205,8 +209,9 @@ cs_redact_secrets() {
   # The left side of the pipe is a subshell, so a sed failure reaches the
   # awk stage as a marker line rather than as an exit status; the leading
   # newline keeps it off a partial last line sed wrote before failing. The
-  # awk stage spools every line until the input ends, so a failed run prints
-  # only the fallback line, never a partial result.
+  # awk stage holds every line until the input ends, so a failed run prints
+  # only the fallback line, never a partial result (unless CS_REDACT_STREAM=1;
+  # see _cs_redact_bare_basic).
   # A per-call nonce keeps input text from forging the marker line.
   local _cs_fail_mark="@@cs-redact-sed-failed-$$-${RANDOM:-0}${RANDOM:-0}@@"
   { sed -E \
