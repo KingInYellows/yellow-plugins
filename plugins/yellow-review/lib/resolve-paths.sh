@@ -556,7 +556,11 @@ yr_shebang_inside() {
         yr_batch_canon_inside "$root" "$out" "$find" "$awk" && return 0
         [ -n "$out" ] || return 1
         yr_split_lines "$out"
-        out=$(YR_SB_DIRS="$dirs" YR_SB_CWD="$(pwd -P)" YR_SB_ROOT="$root" "$awk" "$prog" "${YR_LINES[@]}" 2>/dev/null) || true
+        # realpath -m keeps candidates that do not exist (an env operand is
+        # tried in every <dir>), and awk stops at the first file it cannot
+        # open: hand it only existing regular files.
+        out=$(YR_SB_DIRS="$dirs" YR_SB_CWD="$(pwd -P)" YR_SB_ROOT="$root" "$find" -L "${YR_LINES[@]}" -maxdepth 0 -type f \
+            -exec "$awk" "$prog" {} + 2>/dev/null) || true
         [ -n "$out" ] || return 1
         [ "$depth" -lt 5 ] || return 0
         depth=$((depth + 1))

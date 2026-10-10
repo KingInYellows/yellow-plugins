@@ -1790,6 +1790,28 @@ CFG_CMD_KEYS=(
   done
 }
 
+@test "yr_shebang_inside follows every interpreter when an earlier candidate does not exist" {
+  # realpath -m keeps a missing candidate; awk would stop at it and never read
+  # the later interpreter, whose own #! enters the worktree.
+  mkdir -p venv "$BATS_TEST_TMPDIR/sbd" "$BATS_TEST_TMPDIR/sbo"
+  printf '#!/bin/sh\nexit 0\n' >| venv/python
+  chmod +x venv/python
+  printf '#!%s/venv/python\n' "$PWD" >| "$BATS_TEST_TMPDIR/sbo/mid"
+  chmod +x "$BATS_TEST_TMPDIR/sbo/mid"
+  printf '#!%s/sbo/mid /nonexistent/arg\n' "$BATS_TEST_TMPDIR" >| "$BATS_TEST_TMPDIR/sbd/tool"
+  chmod +x "$BATS_TEST_TMPDIR/sbd/tool"
+  n=0
+  for a in awk mawk gawk original-awk; do
+    aw=$(command -v "$a") || continue
+    n=$((n + 1))
+    yr_shebang_inside "$PWD" "$(command -v find)" "$(command -v realpath)" "$aw" "$BATS_TEST_TMPDIR/sbd" \
+      || { echo "$a missed the chain" >&2; return 1; }
+  done
+  [ "$n" -gt 0 ]
+  out=$(PATH="$BATS_TEST_TMPDIR/sbd:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *"$BATS_TEST_TMPDIR/sbd"* ]]
+}
+
 @test "yr_has_root matches the worktree only as a whole path" {
   root="$PWD"
   yr_has_root "ssh -i $root/key" "$root"
