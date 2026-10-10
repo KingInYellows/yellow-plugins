@@ -1860,6 +1860,28 @@ CFG_CMD_KEYS=(
   done
 }
 
+@test "yr_shebang_inside follows every interpreter when an earlier candidate does not exist" {
+  # realpath -m keeps a missing candidate; awk would stop at it and never read
+  # the later interpreter, whose own #! enters the worktree.
+  mkdir -p venv "$BATS_TEST_TMPDIR/sbd" "$BATS_TEST_TMPDIR/sbo"
+  printf '#!/bin/sh\nexit 0\n' >| venv/python
+  chmod +x venv/python
+  printf '#!%s/venv/python\n' "$PWD" >| "$BATS_TEST_TMPDIR/sbo/mid"
+  chmod +x "$BATS_TEST_TMPDIR/sbo/mid"
+  printf '#!%s/sbo/mid /nonexistent/arg\n' "$BATS_TEST_TMPDIR" >| "$BATS_TEST_TMPDIR/sbd/tool"
+  chmod +x "$BATS_TEST_TMPDIR/sbd/tool"
+  n=0
+  for a in awk mawk gawk original-awk; do
+    aw=$(command -v "$a") || continue
+    n=$((n + 1))
+    yr_shebang_inside "$PWD" "$(command -v find)" "$(command -v realpath)" "$aw" "$BATS_TEST_TMPDIR/sbd" \
+      || { echo "$a missed the chain" >&2; return 1; }
+  done
+  [ "$n" -gt 0 ]
+  out=$(PATH="$BATS_TEST_TMPDIR/sbd:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *"$BATS_TEST_TMPDIR/sbd"* ]]
+}
+
 @test "yr_has_root matches the worktree only as a whole path" {
   root="$PWD"
   yr_has_root "ssh -i $root/key" "$root"
@@ -1881,6 +1903,43 @@ CFG_CMD_KEYS=(
     [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
   done
   rm -rf "${PWD}-keys" "${PWD}2"
+}
+
+@test "harden_git_config refuses when awk cannot split NUL records (BWK awk) instead of skipping keys" {
+  # BWK awk reads RS = "\0" as RS = "" (paragraph mode) and cuts each line at
+  # its first NUL; a value with blank lines then makes the record count a
+  # multiple of 3 and the refused key is never seen.
+  git config core.sshCommand evil
+  git config x.y "$(printf 'a\n\nb\n\nc')"
+  # Emulate that awk with the system one, then use the real one when present.
+  yr_awk() { local p="${1//'RS = "\0"'/RS = \"\"}"; shift; sed 's/\x00.*//' | command awk "$p" "$@"; }
+  rc=0; ( harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  if command -v original-awk >/dev/null; then
+    yr_awk() { original-awk "$@"; }
+    rc=0; ( harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ]
+  fi
+}
+
+@test "harden_git_config refuses a command line that starts with a NAME=value assignment" {
+  # The shell applies a leading assignment to the command it runs:
+  # PATH=tools:/usr/bin ssh looks ssh up in the worktree's tools/.
+  mkdir -p tools
+  printf '#!/bin/sh\nexit 0\n' >| tools/ssh
+  chmod +x tools/ssh
+  for val in "PATH=tools:/usr/bin ssh" "PATH=./tools ssh host" "A=1 PATH=tools ssh" "FOO=bar ssh" "!PATH=tools ssh"; do
+    for name in GIT_SSH_COMMAND GIT_PAGER EDITOR GIT_PROXY_COMMAND; do
+      rc=0; ( export "$name=$val"; harden_git_config full ) || rc=$?
+      [ "$rc" -eq 1 ] || { echo "$name accepted: $val" >&2; return 1; }
+    done
+  done
+  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.sshCommand GIT_CONFIG_VALUE_0="PATH=tools:/usr/bin ssh"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  ( export GIT_SSH_COMMAND="PATH=tools:/usr/bin ssh"; harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_SSH_COMMAND runs"* && "$YR_HARDEN_MSG" != *tools* ]] )
+  # An assignment-shaped later word is an argument, not an assignment.
+  rc=0; ( export GIT_SSH_COMMAND="ssh -o ProxyCommand=nc"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
 }
 
 @test "harden_git_config still checks later bare words and slash words against the current directory" {
