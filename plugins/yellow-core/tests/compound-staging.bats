@@ -124,6 +124,36 @@ teardown() {
   [ "$result" = 'Basic Authentication, Basic Only mode, BASIC SETTINGS, basic setup, xBasic Znpvejph' ]
 }
 
+@test "redact_secrets decodes a short bare Basic payload that contains a digit" {
+  # YTE6YjI = a1:b2, eHk6ejk = xy:z9 (unpadded, 7 characters, digits inside).
+  result=$(printf 'sent Basic YTE6YjI and basic eHk6ejk= ok, Basic 2FA\n' | cs_redact_secrets)
+  [ "$result" = 'sent Basic [REDACTED] and basic [REDACTED] ok, Basic 2FA' ]
+}
+
+@test "redact_secrets matches the Basic scheme in any letter case" {
+  result=$(printf 'Authorization: bAsIc YTo and sent bAsIc YTE6YjI ok\n' | cs_redact_secrets)
+  [ "$result" = 'Authorization: bAsIc [REDACTED] and sent bAsIc [REDACTED] ok' ]
+}
+
+@test "redact_secrets redacts a bare Basic payload with legacy-charset or UTF-8 bytes" {
+  # 6WE6Yg = 0xE9 "a:b" (ISO-8859-1), w6lhOsOx = UTF-8 "\u00e9a:\u00f1".
+  result=$(printf 'sent Basic 6WE6Yg and basic w6lhOsOx ok\n' | cs_redact_secrets)
+  [ "$result" = 'sent Basic [REDACTED] and basic [REDACTED] ok' ]
+}
+
+@test "redact_secrets redacts a bare Basic payload with an empty user and a colon in the password" {
+  # OmE6Yg = ":a:b" (empty user, password "a:b").
+  result=$(printf 'sent Basic OmE6Yg ok\n' | cs_redact_secrets)
+  [ "$result" = 'sent Basic [REDACTED] ok' ]
+}
+
+@test "redact_secrets passes input that contains a failure-marker lookalike" {
+  run bash -c '. "$1"; printf "a\n@@cs-redact-sed-failed@@\nb\n" | cs_redact_secrets' _ \
+    "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
+  [ "$status" -eq 0 ]
+  [ "$output" = $'a\n@@cs-redact-sed-failed@@\nb' ]
+}
+
 @test "redact_secrets fails closed when the sed stage fails" {
   mkdir -p "$STAGING_TEST_ROOT/bin"
   printf '#!/bin/sh\nprintf "partial\\n"\nexit 2\n' > "$STAGING_TEST_ROOT/bin/sed"
@@ -132,6 +162,17 @@ teardown() {
     "$STAGING_TEST_ROOT/bin" "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
   [ "$status" -eq 1 ]
   [[ "$output" == *'[REDACTED: sanitization failed]'* ]]
+}
+
+@test "redact_secrets fails closed when sed fails after a partial last line" {
+  mkdir -p "$STAGING_TEST_ROOT/bin"
+  printf '#!/bin/sh\nprintf "kept line\\npartial"\nexit 2\n' > "$STAGING_TEST_ROOT/bin/sed"
+  chmod +x "$STAGING_TEST_ROOT/bin/sed"
+  run --separate-stderr bash -c 'PATH="$1:$PATH"; . "$2"; printf "x\n" | cs_redact_secrets' _ \
+    "$STAGING_TEST_ROOT/bin" "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
+  [ "$status" -eq 1 ]
+  # Nothing sed wrote before failing reaches stdout, only the fallback line.
+  [ "$output" = '[REDACTED: sanitization failed]' ]
 }
 
 @test "redact_secrets strips an unpadded 3-character Basic credential" {

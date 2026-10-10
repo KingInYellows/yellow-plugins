@@ -111,31 +111,32 @@ cs_atomic_jsonl_write() {
 # Self-contained subset of yellow-ci's lib/redact.sh — the patterns Brad
 # called out in the plan (D12): password=, token=, api_key=, secret=,
 # Bearer, basic auth, plus the high-value vendor token prefixes
-# (including tvly-, pplx- and sgp_) and PEM key blocks. A bare letters-only
-# Basic payload is ambiguous with prose, so _cs_redact_bare_basic decodes it
-# and redacts only a printable user:pass. Streams sed then awk to stdout
-# (constant memory).
+# (including tvly-, pplx- and sgp_) and PEM key blocks. A bare Basic payload
+# the sed shapes miss is ambiguous with prose, so _cs_redact_bare_basic decodes it
+# and redacts only a control-free user:pass. Pipes sed into awk, which holds
+# the output until the input ends (memory grows with the input).
 #
 # Future consolidation: when yellow-ci's redact.sh is relocated to a
 # shared yellow-core/lib/redact.sh, this wrapper can `. ` that file.
-# Redact a bare `Basic <letters>` payload that base64-decodes to a printable
-# `user:pass` (non-empty user). Shape heuristics cannot tell a letters-only
+# Redact a bare `Basic <base64>` payload that base64-decodes to a control-free
+# `user:pass` (non-empty user). Shape heuristics cannot tell a short
 # credential from prose, and decoding can: "Basic Authentication" and
 # "BASIC SETTINGS" decode to binary, "Basic Only" to ":yr". The boundary
 # before the keyword matches the sed rule. POSIX awk only (mawk, gawk, BSD
 # awk): no gensub, IGNORECASE or bit functions. A line equal to $1 marks a
-# sed failure upstream, and exits 3 after the input drains.
+# sed failure upstream: nothing is printed and awk exits 3 after the input
+# drains. Output is held until then, so a failure leaves no partial result.
 _cs_redact_bare_basic() {
   awk -v fail_mark="$1" '
     BEGIN {
       b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-      kw = "(Basic|basic|BASIC)[ \t\r\v\f]+[A-Za-z]+"
+      kw = "[Bb][Aa][Ss][Ii][Cc][ \t\r\v\f]+[A-Za-z0-9+/]+=*"
       failed = 0
     }
-    function is_cred(tok,    n, i, acc, bits, p, byte, pos) {
+    function is_cred(tok,    n, i, acc, bits, p, byte, nb, fc) {
       n = length(tok)
       if (n < 4 || n % 4 == 1) return 0
-      acc = 0; bits = 0; pos = 0
+      acc = 0; bits = 0; nb = 0; fc = 0
       for (i = 1; i <= n; i++) {
         acc = acc * 64 + index(b64, substr(tok, i, 1)) - 1
         bits += 6
@@ -144,14 +145,21 @@ _cs_redact_bare_basic() {
           p = (bits == 4) ? 16 : (bits == 2) ? 4 : 1
           byte = int(acc / p)
           acc = acc % p
-          if (byte < 32 || byte > 126) return 0
-          if (byte == 58 && pos == 0) pos = int((i * 6 - bits) / 8)
+          # Controls only: C0, DEL and C1 (0x80-0x9F). RFC 7617 allows a
+          # legacy charset, so 0xA0-0xFF is credential text, as in
+          # resolve-text.sh in yellow-review.
+          if (byte < 32 || (byte >= 127 && byte < 160)) return 0
+          nb++
+          if (byte == 58 && nb > 1 && fc == 0) fc = nb
         }
       }
-      return pos > 1
+      # Some colon must sit between two other bytes (an empty user with a
+      # colon in the password counts; a leading or trailing colon alone does
+      # not), as in resolve-text.sh.
+      return fc > 1 && fc < nb
     }
     {
-      if (index($0, fail_mark)) { failed = 1; next }
+      if ($0 == fail_mark) { failed = 1; next }
       out = ""; rest = $0; prev = ""
       while (match(rest, kw)) {
         pre = substr(rest, 1, RSTART - 1)
@@ -159,6 +167,7 @@ _cs_redact_bare_basic() {
         before = (RSTART > 1) ? substr(rest, RSTART - 1, 1) : prev
         tok = m
         sub(/^[A-Za-z]+[ \t\r\v\f]+/, "", tok)
+        sub(/=+$/, "", tok)
         if (before !~ /[A-Za-z0-9_]/ && is_cred(tok)) {
           out = out pre substr(m, 1, 5) " [REDACTED]"
           prev = "]"
@@ -169,9 +178,12 @@ _cs_redact_bare_basic() {
           rest = substr(rest, RSTART + 5)
         }
       }
-      print out rest
+      held[++nh] = out rest
     }
-    END { if (failed) exit 3 }
+    END {
+      if (failed) exit 3
+      for (i = 1; i <= nh; i++) print held[i]
+    }
   '
 }
 
@@ -181,8 +193,12 @@ cs_redact_secrets() {
   # Case-insensitive matching is achieved by enumerating both cases
   # explicitly in the keyword groups — the GNU `I` flag is non-portable.
   # The left side of the pipe is a subshell, so a sed failure reaches the
-  # awk stage as a marker line rather than as an exit status.
-  local _cs_fail_mark='@@cs-redact-sed-failed@@'
+  # awk stage as a marker line rather than as an exit status; the leading
+  # newline keeps it off a partial last line sed wrote before failing. The
+  # awk stage holds every line until the input ends, so a failed run prints
+  # only the fallback line, never a partial result.
+  # A per-call nonce keeps input text from forging the marker line.
+  local _cs_fail_mark="@@cs-redact-sed-failed-$$-${RANDOM:-0}${RANDOM:-0}@@"
   { sed -E \
     -e 's/ghp_[A-Za-z0-9_]{36,255}/[REDACTED:github-token]/g' \
     -e 's/ghs_[A-Za-z0-9_]{36,255}/[REDACTED:github-token]/g' \
@@ -197,8 +213,8 @@ cs_redact_secrets() {
     -e 's/rk_live_[A-Za-z0-9]{24,}/[REDACTED:stripe-key]/g' \
     -e 's/hf_[A-Za-z0-9]{20,}/[REDACTED:huggingface-token]/g' \
     -e 's/Bearer[[:space:]]+[A-Za-z0-9._-]{20,}/Bearer [REDACTED]/g' \
-    -e 's/(([Aa]uthorization|AUTHORIZATION)[[:space:]]*[=:][[:space:]]*([Bb]asic|BASIC))[[:space:]]+([A-Za-z0-9+\/]{4,}={0,2}|[A-Za-z0-9+\/]{3}=?|[A-Za-z0-9+\/]{2}==)/\1 [REDACTED]/g' \
-    -e 's/(^|[^[:alnum:]_])([Bb]asic|BASIC)[[:space:]]+([A-Za-z0-9+\/]{2,}={1,2}|[A-Za-z]*[0-9+\/][A-Za-z0-9+\/]{6,}|[A-Za-z0-9+\/]{7,}[0-9+\/][A-Za-z0-9+\/]*|[A-Za-z]{6,}[a-z][A-Z][A-Za-z]*|[A-Za-z]*[a-z][A-Z][A-Za-z]{6,})/\1\2 [REDACTED]/g' \
+    -e 's/(([Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn])[[:space:]]*[=:][[:space:]]*([Bb][Aa][Ss][Ii][Cc]))[[:space:]]+([A-Za-z0-9+\/]{4,}={0,2}|[A-Za-z0-9+\/]{3}=?|[A-Za-z0-9+\/]{2}==)/\1 [REDACTED]/g' \
+    -e 's/(^|[^[:alnum:]_])([Bb][Aa][Ss][Ii][Cc])[[:space:]]+([A-Za-z0-9+\/]{2,}={1,2}|[A-Za-z]*[0-9+\/][A-Za-z0-9+\/]{6,}|[A-Za-z0-9+\/]{7,}[0-9+\/][A-Za-z0-9+\/]*|[A-Za-z]{6,}[a-z][A-Z][A-Za-z]*|[A-Za-z]*[a-z][A-Z][A-Za-z]{6,})/\1\2 [REDACTED]/g' \
     -e 's/eyJ[A-Za-z0-9_-]{10,500}\.eyJ[A-Za-z0-9_-]{10,500}\.[A-Za-z0-9_-]{10,500}/[REDACTED:jwt]/g' \
     -e 's/dckr_pat_[A-Za-z0-9_-]{32,}/[REDACTED:docker-token]/g' \
     -e 's/npm_[A-Za-z0-9]{36}/[REDACTED:npm-token]/g' \
@@ -212,7 +228,7 @@ cs_redact_secrets() {
     -e 's/("(password|secret|token|api_key|credential|Password|Secret|Token|API_KEY|Credential|PASSWORD|SECRET|TOKEN|CREDENTIAL)"[[:space:]]*:[[:space:]]*")[^"]*"/\1[REDACTED]"/g' \
     -e "s/('(password|secret|token|api_key|credential|Password|Secret|Token|API_KEY|Credential|PASSWORD|SECRET|TOKEN|CREDENTIAL)'[[:space:]]*:[[:space:]]*')[^']*'/\\1[REDACTED]'/g" \
     -e 's/(password|secret|token|api_key|credential|Password|Secret|Token|API_KEY|Credential|PASSWORD|SECRET|TOKEN|CREDENTIAL)[[:space:]]*[=:][[:space:]]*[^[:space:]"'"'"']{4,}/\1=[REDACTED]/g' \
-  || printf '%s\n' "$_cs_fail_mark"; } | _cs_redact_bare_basic "$_cs_fail_mark" \
+  || printf '\n%s\n' "$_cs_fail_mark"; } | _cs_redact_bare_basic "$_cs_fail_mark" \
   || {
     printf '[yellow-core] compound-staging: redaction pipeline failed; suppressing output\n' >&2
     printf '[REDACTED: sanitization failed]\n'
