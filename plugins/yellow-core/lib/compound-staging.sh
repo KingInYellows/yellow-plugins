@@ -110,7 +110,9 @@ cs_atomic_jsonl_write() {
 # Redact secrets from stdin, write to stdout.
 # Self-contained subset of yellow-ci's lib/redact.sh — the patterns Brad
 # called out in the plan (D12): password=, token=, api_key=, secret=,
-# Bearer, basic auth, plus the high-value vendor token prefixes
+# Bearer, basic auth (a bare letters-only Basic payload counts when it is
+# 8+ characters with a lower-to-upper case change, as base64 nearly always
+# has and prose after "Basic" rarely does), plus the high-value vendor token prefixes
 # (including tvly-, pplx- and sgp_) and PEM key blocks. Streams sed
 # directly to stdout (constant memory).
 #
@@ -136,7 +138,7 @@ cs_redact_secrets() {
     -e 's/hf_[A-Za-z0-9]{20,}/[REDACTED:huggingface-token]/g' \
     -e 's/Bearer[[:space:]]+[A-Za-z0-9._-]{20,}/Bearer [REDACTED]/g' \
     -e 's/(([Aa]uthorization|AUTHORIZATION)[[:space:]]*[=:][[:space:]]*([Bb]asic|BASIC))[[:space:]]+([A-Za-z0-9+\/]{4,}={0,2}|[A-Za-z0-9+\/]{3}=?|[A-Za-z0-9+\/]{2}==)/\1 [REDACTED]/g' \
-    -e 's/(^|[^[:alnum:]_])([Bb]asic|BASIC)[[:space:]]+([A-Za-z0-9+\/]{2,}={1,2}|[A-Za-z]*[0-9+\/][A-Za-z0-9+\/]{6,}|[A-Za-z0-9+\/]{7,}[0-9+\/][A-Za-z0-9+\/]*)/\1\2 [REDACTED]/g' \
+    -e 's/(^|[^[:alnum:]_])([Bb]asic|BASIC)[[:space:]]+([A-Za-z0-9+\/]{2,}={1,2}|[A-Za-z]*[0-9+\/][A-Za-z0-9+\/]{6,}|[A-Za-z0-9+\/]{7,}[0-9+\/][A-Za-z0-9+\/]*|[A-Za-z]{6,}[a-z][A-Z][A-Za-z]*|[A-Za-z]*[a-z][A-Z][A-Za-z]{6,})/\1\2 [REDACTED]/g' \
     -e 's/eyJ[A-Za-z0-9_-]{10,500}\.eyJ[A-Za-z0-9_-]{10,500}\.[A-Za-z0-9_-]{10,500}/[REDACTED:jwt]/g' \
     -e 's/dckr_pat_[A-Za-z0-9_-]{32,}/[REDACTED:docker-token]/g' \
     -e 's/npm_[A-Za-z0-9]{36}/[REDACTED:npm-token]/g' \
