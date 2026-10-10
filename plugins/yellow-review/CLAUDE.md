@@ -363,6 +363,11 @@ include) lies inside the worktree is refused. The pre-source bootstrap
 resolvers of both scripts apply the same `#!` check to the first `git` (and
 every tool). In `#!` lines the optional argument of a non-`env` interpreter and
 an `env` command's arguments are judged like command-line words.
+A language interpreter (`python`, `node`, `perl`, `ruby` and the like) named
+by a `#!` line passes only absolute paths, `--` and flags that load nothing
+(python `-E -s -u`, perl `-w -T`, ruby `-w`, awk `-f`); a code-loading option
+(`env -S python3 -m evil`, `perl -Mevil`) or a relative operand counts as
+entering, in the shell, batched and bootstrap checks alike.
 `env -S`/`--split-string` (attached or separate, also in a cluster such as
 `-vS`) and options with arguments (`-u`, `-C`, `-P`, `-a` and long forms) are
 parsed. Fail closed: an `env` line with a `NAME=value` operand before the
