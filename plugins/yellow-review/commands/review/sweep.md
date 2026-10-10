@@ -137,7 +137,11 @@ skip line, on any value other than unspecified (`eol` may also be `lf`). Each
 attribute is checked on its own line. A PR can set `filter=unspecified` as a
 literal value, which `check-attr` prints the same as the unset sentinel, so
 `filter: unspecified` passes only when no `filter.unspecified.*` driver is
-configured.
+configured. A root entry that differs from `.gitignore` or
+`yellow-plugins.local.md` only in ASCII case (`.GITIGNORE`) is an alias of
+that file on a case-insensitive filesystem (default macOS APFS), which the
+exact-name probes would miss, so it stops with its own `Error:` line, no skip
+line.
 
 ```bash
 set -u
@@ -158,6 +162,14 @@ for delay in 0 1 2 4 8 16; do
   [ "$GOT" = "$HEAD_SHA" ] && break
 done
 [ "$GOT" = "$HEAD_SHA" ] || head_fail
+NAMES=$(mktemp) || head_fail
+git -C "$TOP" ls-tree -z --name-only "$GOT" >| "$NAMES" 2>/dev/null || { rm -f -- "$NAMES"; head_fail; }
+ALIAS=$(tr '\000\n' '\n\001' < "$NAMES" | LC_ALL=C grep -Fix -e .gitignore -e yellow-plugins.local.md | LC_ALL=C grep -Fvx -e .gitignore -e yellow-plugins.local.md)
+rm -f -- "$NAMES"
+if [ -n "$ALIAS" ]; then
+  printf '[review:sweep] Error: the PR head has a root entry that differs from .gitignore or yellow-plugins.local.md only in case, which a case-insensitive filesystem treats as that file.\n' >&2
+  exit 2
+fi
 if git -C "$TOP" cat-file -e "${GOT}:yellow-plugins.local.md" 2>/dev/null; then
   printf 'head=tracked\n'
 else
