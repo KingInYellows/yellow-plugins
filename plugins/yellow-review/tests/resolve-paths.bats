@@ -1825,6 +1825,15 @@ CFG_CMD_KEYS=(
   [ "$rc" -eq 0 ]
 }
 
+@test "harden_git_config refuses an interpreter option or relative operand, which loads code it resolves itself" {
+  printf '1;\n' >| evil.js
+  for val in "node -r ./evil" "node --require=./evil" "nodejs -r evil" "perl -I. -Mevil" \
+             "ruby -r./evil" "python3 -c pass" "node evil" "env node -r ./evil"; do
+    rc=0; ( export GIT_SSH_COMMAND="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "accepted: $val" >&2; return 1; }
+  done
+}
+
 @test "harden_git_config judges every token: logical spelling, a bare first word that is a script entering the worktree" {
   mkdir -p tools venv "$BATS_TEST_TMPDIR/hbin"
   printf '#!/bin/sh\nexit 0\n' >| venv/python
