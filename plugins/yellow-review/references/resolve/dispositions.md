@@ -531,6 +531,8 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   names the remaining path.
   A rewrite of that ledger replaces it only after the new copy is complete, so
   a failed rewrite leaves the recorded path in place.
+  Each record is the held path, a NUL, the original path, and a NUL, so a
+  newline in the name cannot split it.
   `save_patch` runs in a subshell, so a rename back that fails is retried by
   the parent. If the entry is back, a snapshot failure still reverts nothing.
   If it is still held, `reason` names that path and does not claim the tree

@@ -1035,6 +1035,25 @@ SHIM
   [[ "$stderr" != *"special file remains"* ]]
 }
 
+@test "--revert-dirty restores a FIFO whose tracked name contains a newline" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  name=$(printf 'src/a\nb.txt')
+  printf 'newline-name\n' >| "$name"
+  git add -- "$name"
+  git commit -q -m "test: newline name" -- "$name"
+  rm -f -- "$name" && mkfifo -- "$name"
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [[ "$(printf '%s' "$output" | jq -r '.reason // empty')" != *"could not restore"* ]]
+  [ -f "$name" ]
+  [ ! -p "$name" ]
+  [ "$(cat -- "$name")" = "$(printf 'newline-name\n')" ]
+  [ ! -e src/new.txt ]
+  [ -z "$(find src -name .yellow-review-hold-\* -print -quit)" ]
+  [[ "$stderr" != *"Error:"* ]]
+}
+
 @test "a special-file removal failure still restores one already removed" {
   command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
   shim="$BATS_TEST_TMPDIR/shim"

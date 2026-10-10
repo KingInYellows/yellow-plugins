@@ -74,9 +74,11 @@
 #                  written. If the snapshot cannot be saved and the rename back
 #                  succeeded, the special file stays and nothing is reverted.
 #                  save_patch runs in a subshell, so a rename back that fails
-#                  is retried outside it. A rewrite of the hold ledger replaces
-#                  it only after the new copy is complete, so a failed rewrite
-#                  leaves the record. If the entry is still held, the
+#                  is retried outside it. A record is the held path, a NUL, the
+#                  original path, and a NUL, so a newline in the name cannot
+#                  split it. A rewrite of the hold ledger replaces it only
+#                  after the new copy is complete, so a failed rewrite leaves
+#                  the record. If the entry is still held, the
 #                  reason names that path and does not claim the tree was left
 #                  untouched. An unlink that fails is recorded and the revert
 #                  continues, so a special file already removed is still
@@ -773,7 +775,8 @@ run_verify() {
 # A FIFO, socket or device standing in for a tracked file stays in place too.
 # It is renamed aside in its own directory for the diff (a cross-device move
 # would copy it and open it), then renamed back. The hold path is recorded
-# before that rename. A failed ledger write puts the file back when it can.
+# before that rename, as a NUL-delimited pair with the original path. A failed
+# ledger write puts the file back when it can.
 # The caller unlinks it only after both snapshots are written. This function
 # runs in a subshell, so a rename back that fails is already in HOLD_LEFTOVER
 # for the parent to retry.
@@ -794,14 +797,30 @@ replace_hold_ledger() {
     return 1
 }
 
-# Drop one hold line after the special file is back at its path.
+# One record: <held-path> NUL <original-path> NUL. A newline in either path
+# stays inside its field. Git paths cannot contain NUL.
+append_hold_record() {
+    printf '%s\0%s\0' "$1" "$2" >>"$3"
+}
+
+# Next record on stdin into the caller's variables. 1 at EOF or when the
+# second NUL is missing, so a truncated record is not applied.
+read_hold_record() {
+    local -n _hold_src="$1" _hold_dest="$2"
+    local _src="" _dest=""
+    IFS= read -r -d '' _src || return 1
+    IFS= read -r -d '' _dest || return 1
+    _hold_src="$_src"
+    _hold_dest="$_dest"
+}
+
+# Drop one hold record after the special file is back at its path.
 drop_hold_line() {
-    local src="$1" dest="$2" line want tmp
-    want="${src}"$'\037'"${dest}"
+    local src="$1" dest="$2" got_src="" got_dest="" tmp
     tmp=$(hold_ledger_tmp) || return 1
-    while IFS= read -r line || [ -n "$line" ]; do
-        [ "$line" = "$want" ] && continue
-        if ! printf '%s\n' "$line" >>"$tmp"; then
+    while read_hold_record got_src got_dest; do
+        [ "$got_src" = "$src" ] && [ "$got_dest" = "$dest" ] && continue
+        if ! append_hold_record "$got_src" "$got_dest" "$tmp"; then
             rm -f -- "$tmp"
             return 1
         fi
@@ -832,7 +851,7 @@ save_patch() {
                 # Before the rename back. A failed append after a failed
                 # restore would leave this ledger empty, and cleanup would
                 # delete it while the special file stayed under the hold dir.
-                if ! printf '%s%s%s\n' "$held_dir/node" $'\037' "$f" >>"$HOLD_LEFTOVER"; then
+                if ! append_hold_record "$held_dir/node" "$f" "$HOLD_LEFTOVER"; then
                     if mv -- "$held_dir/node" "$f"; then
                         rmdir -- "$held_dir" 2>/dev/null || true
                     else
@@ -883,21 +902,10 @@ save_patch() {
 # Retry each recorded rename here. Whatever is still held is named in the
 # failure reason; the caller must not claim the tree was left untouched.
 rehome_held() {
-    local line src dest tmp
+    local src="" dest="" tmp
     [ -s "$HOLD_LEFTOVER" ] || return 0
     tmp=$(hold_ledger_tmp) || return 1
-    while IFS= read -r line || [ -n "$line" ]; do
-        [ -n "$line" ] || continue
-        case "$line" in
-            *$'\037'*)
-                src="${line%%$'\037'*}"
-                dest="${line#*$'\037'}"
-                ;;
-            *)
-                src="$line"
-                dest=""
-                ;;
-        esac
+    while read_hold_record src dest; do
         if [ -n "$dest" ] && { [ -e "$src" ] || [ -L "$src" ]; } \
             && mv -- "$src" "$dest"; then
             rmdir -- "${src%/*}" 2>/dev/null || true
@@ -910,7 +918,7 @@ rehome_held() {
         fi
         # Keep the old ledger if this copy fails. Truncating it first would
         # drop the held path and the caller would say nothing was reverted.
-        if ! printf '%s\n' "$line" >>"$tmp"; then
+        if ! append_hold_record "$src" "$dest" "$tmp"; then
             rm -f -- "$tmp"
             return 1
         fi
@@ -920,20 +928,9 @@ rehome_held() {
 
 # Empty when every held special file is back at its path.
 held_unrestored_reason() {
-    local line src dest n=0 list=""
+    local src="" dest="" n=0 list=""
     [ -s "$HOLD_LEFTOVER" ] || return 0
-    while IFS= read -r line || [ -n "$line" ]; do
-        [ -n "$line" ] || continue
-        case "$line" in
-            *$'\037'*)
-                src="${line%%$'\037'*}"
-                dest="${line#*$'\037'}"
-                ;;
-            *)
-                src="$line"
-                dest=""
-                ;;
-        esac
+    while read_hold_record src dest; do
         n=$((n + 1))
         if [ "$n" -le 5 ]; then
             list="${list:+$list, }${dest:-unknown} (held at ${src})"
