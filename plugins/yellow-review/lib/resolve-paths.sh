@@ -896,7 +896,7 @@ yr_prog_enters() {
 # <root> or a script whose #! enters it. Values that point only outside the
 # worktree keep working.
 yr_cmd_enters() {
-    local v="$1" root="$2" tok t bin c first="" noglob=1 phys inenv optprev
+    local v="$1" root="$2" tok t bin c first="" noglob=1 phys inenv optprev seen
     local -a toks=()
     case "$v" in
         *[\$\`\;\&\|\<\>\(\)\*\?\[\\]*|*$'\n'*) return 2 ;;
@@ -978,13 +978,22 @@ yr_cmd_enters() {
             done
             ;;
     esac
-    # python -m looks the module up in the current directory first
-    # (`python3 -m evil` runs ./evil.py): fail closed on any -m.
+    # A language interpreter loads code by names it resolves itself, often
+    # from the current directory first (`python3 -m evil`, `node -r ./evil`
+    # finding evil.js, `perl -I. -Mevil`, `ruby -r./evil`), which the path
+    # checks above cannot follow. After the interpreter word, accept only
+    # absolute paths (judged above); any option or other word fails closed.
     case "${t##*/}" in
-        python|python[0-9]*|pypy|pypy[0-9]*)
+        python|python[0-9]*|pypy|pypy[0-9]*|node|nodejs|deno|bun|perl|perl[0-9]*|ruby|ruby[0-9]*|php|php[0-9]*|lua|lua[0-9]*|luajit|Rscript|java|jshell|osascript|tclsh*|wish*|awk|gawk|mawk|nawk)
+            seen=0
             for tok in ${toks[@]+"${toks[@]}"}; do
                 tok=${tok#[\"\']}
-                case "$tok" in --*) ;; -*m*) return 0 ;; esac
+                tok=${tok%[\"\']}
+                if [ "$seen" -eq 0 ]; then
+                    [ "${tok#!}" = "$t" ] && seen=1
+                    continue
+                fi
+                case "$tok" in /*) ;; *) return 0 ;; esac
             done
             ;;
     esac
