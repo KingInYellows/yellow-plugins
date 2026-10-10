@@ -84,12 +84,40 @@ def inspect(parent_fd, name, relative):
     lines_left -= len(selected)
     numbered = []
     continued = False
+    delimiter = None
+    block_indent = None
+    in_pem = False
     for number, line in enumerate(selected, 1):
-        if continued or re.search(r"(?i)(?:(?:api[_-]?key|token|password|secret|private[_-]?key)[A-Za-z0-9_.-]*[\"']?\s*[=:]|authorization[\"']?\s*[=:,]|\bbearer\s+\S|\b[a-z][a-z0-9+.-]*://[^\s/:@]+:[^\s/@]+@)", line):
-            continued = line.rstrip().endswith(("=", ":", "(", "[", "{", ",", "+", "\\", "`", '"""', "'''"))
-            line = "--- redacted possible credential at line " + str(number) + " ---"
-        else:
+        hidden = True
+        if delimiter:
+            # Inside a backtick or triple-quoted literal: hide through the closing delimiter.
+            if delimiter in line:
+                delimiter = None
             continued = False
+        elif in_pem:
+            in_pem = re.search(r"-----END [A-Z ]*-----", line) is None
+            continued = False
+        elif block_indent is not None and (not line.strip() or len(line) - len(line.lstrip()) > block_indent):
+            # Inside a YAML block scalar: hide blank and deeper-indented lines.
+            continued = False
+        else:
+            block_indent = None
+            if re.search(r"-----BEGIN [A-Z ]*PRIVATE KEY-----", line):
+                in_pem = re.search(r"-----END [A-Z ]*-----", line) is None
+                continued = False
+            elif continued or re.search(r"(?i)(?:(?:api[_-]?key|token|password|secret|private[_-]?key)[A-Za-z0-9_.-]*[\"']?\s*[=:]|authorization[\"']?\s*[=:,]|\bbearer\s+\S|\b[a-z][a-z0-9+.-]*://[^\s/:@]+:[^\s/@]+@)", line):
+                continued = line.rstrip().endswith(("=", ":", "(", "[", "{", ",", "+", "\\"))
+                for opener in ("`", '"""', "'''"):
+                    if line.count(opener) % 2 == 1:
+                        delimiter = opener
+                        break
+                if re.search(r":\s*[|>][-+0-9]*\s*$", line):
+                    block_indent = len(line) - len(line.lstrip())
+            else:
+                hidden = False
+                continued = False
+        if hidden:
+            line = "--- redacted possible credential at line " + str(number) + " ---"
         numbered.append({"line": number, "text": line})
     files.append({"path": relative, "lines": numbered})
 
