@@ -176,6 +176,37 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     expect(result.output.files[0].lines[4].text).toBe('const amount = 1;');
   });
 
+  it('redacts compound credential names and credential-bearing URLs', () => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'AWS_SECRET_ACCESS_KEY = "synthetic-one"\n' +
+          'GITHUB_TOKEN=synthetic-two\n' +
+          'db_password: synthetic-three\n' +
+          'const d = { "api_key_v2": "synthetic-four" };\n' +
+          'const u = "postgres://user:synthetic-five@host/db";\n' +
+          'fetch("https://user:synthetic-six@host/path");\n' +
+          'const keyboardLayout = "us";\n' +
+          'parseToken(input);\n' +
+          'const url = "https://example.com/path";\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    const text = JSON.stringify(result.output);
+    for (const secret of ['one', 'two', 'three', 'four', 'five', 'six']) {
+      expect(text).not.toContain('synthetic-' + secret);
+    }
+    const lines = result.output.files[0].lines;
+    for (let index = 0; index < 6; index += 1) {
+      expect(lines[index].text).toBe(
+        '--- redacted possible credential at line ' + (index + 1) + ' ---'
+      );
+    }
+    expect(lines[6].text).toBe('const keyboardLayout = "us";');
+    expect(lines[7].text).toBe('parseToken(input);');
+    expect(lines[8].text).toBe('const url = "https://example.com/path";');
+  });
+
   it('bounds directory scans to twenty supported source files', () => {
     const result = inspect('src', (workspace) => {
       for (let index = 0; index < 21; index += 1) {
