@@ -1,0 +1,20 @@
+.changeset/defer-revert-special-file.md
+  h_6000354274ce50 12-15
+plugins/yellow-review/references/resolve/dispositions.md
+  h_6000354274ce50 534-535
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  h_6000354274ce50 77-81,778-779,800-817,819,821-823,854,905,908,921,931,933
+plugins/yellow-review/tests/run-verify-command.bats
+  h_6000354274ce50 1038-1056
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8daa63028a888b00fb5ca6c9085910992a27ff46",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
