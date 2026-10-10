@@ -1,6 +1,7 @@
 # yellow-jules provider CLI contract, version 1
 
-**Version:** 1 **Status:** Accepted (PR2 landed read-only surface, 2026-09-29)
+**Version:** 1 **Status:** Accepted (PR2 landed the read-only surface,
+2026-09-29; PR3 landed the grants-only mutating surface, 2026-10-08)
 **Reconciled to:** `main` `8baa0bdd` (2026-09-10); PR2 revisions below **Spec:**
 `plans/specs/yellow-jules-integration.md` **Evidence:**
 [sdk-investigation.md](sdk-investigation.md),
@@ -43,13 +44,15 @@ mechanism, and none widens a guarantee.
   with it (complete walk, restart, or terminal retention), so newest-first
   listings interrupted between an approval and its older plan do not leave the
   plan pending.
-- **External sessions.** PR2 ships no `delegate`, so every session it can
-  observe was created outside yellow. `status` and `collect` on a
-  `sessions/{id}` absent from the journal mint a local id and write an operation
-  record with `origin: "external"`, `kind: "observe"`, and `status: "observed"`.
-  R13's `policy-deviation` applies only to records whose create requested
-  `autoPr: false`, which PR2 reaches only through test-planted create records;
-  an external session's vendor PR is an external reference (R42).
+- **External sessions.** (As of PR2, historical: before `delegate` existed,
+  every observable session was created outside yellow. Sessions this plugin
+  creates now carry `origin: "yellow"`; the rules below still govern the rest.)
+  `status` and `collect` on a `sessions/{id}` absent from the journal mint a
+  local id and write an operation record with `origin: "external"`,
+  `kind: "observe"`, and `status: "observed"`. R13's `policy-deviation` applies
+  only to records whose create requested `autoPr: false`, which PR2 reaches only
+  through test-planted create records; an external session's vendor PR is an
+  external reference (R42).
 - **Runtime lockfile location.** The data-dir install manifest and lockfile ship
   as `plugins/yellow-jules/runtime/package.json` and `runtime/package-lock.json`
   (outside the pnpm workspace glob); `setup --install-sdk` copies both into
@@ -82,10 +85,9 @@ mechanism, and none widens a guarantee.
   is stale (`JULES_STALE_LOCK`, never taken over). A live holder is waited on
   for at most 15 s, then the call fails with `JULES_STALE_LOCK`,
   `retryable: true`, and a recovery action that names the contention.
-- **`status --reconcile` in PR2.** With no reachable reservation it returns
-  `reconciled: []`. A hand-planted unresolved record is reported as
-  `not-reached` with `reason: "reconcile ships with delegate in PR3"` rather
-  than ignored.
+- **`status --reconcile`.** With no reachable reservation it returns
+  `reconciled: []`. (PR2 reported a hand-planted unresolved record as
+  `not-reached`; reconcile now resolves reservations, see `status`.)
 - **Title tags in `list`.** The `[yellow:<local-id>]` tag is vendor-writable, so
   `list` strips it from the displayed title but surfaces a `localId` only when
   the journal binds that id to the same session. Reconcile (PR3) still matches
@@ -113,9 +115,9 @@ mechanism, and none widens a guarantee.
   dropped, since both are rendered bare and persisted. A plan activity without a
   usable timestamp stops the walk as `unmappedActivity`.
 - **Unsupported subcommands.** `cancel`, `pause`, `resume`, and `cost` are
-  recognized and answer `JULES_UNSUPPORTED_CAPABILITY` (exit 1); `delegate`,
-  `reply`, `approve`, `authorize`, `supervise`, and `integrate` are usage errors
-  (exit 2) until they ship.
+  recognized and answer `JULES_UNSUPPORTED_CAPABILITY` (exit 1); `integrate` is
+  a usage error (exit 2) until PR4. `delegate`, `reply`, `approve`, `authorize`,
+  `abandon`, and `supervise` ship in PR3.
 
 ## Motivation
 
@@ -333,18 +335,19 @@ remaining unknown until the R53 smoke.
 
 `node dist/cli.js <subcommand> [flags]`. Ships: PR2 unless marked.
 
-| Subcommand  | Runtime op                                                          | Authority            | Confirm              | Ships |
-| ----------- | ------------------------------------------------------------------- | -------------------- | -------------------- | ----- |
-| `setup`     | probe credentials, resolve SDK, probe sources                       | none                 | install consent only | PR2   |
-| `delegate`  | validate packet, reserve, create session (R12)                      | grant or interactive | yes                  | PR3   |
-| `list`      | one page of fresh session reads, page-scoped journal match          | none                 | no                   | PR2   |
-| `status`    | fresh session read, watermarked activity paging, optional reconcile | none                 | no                   | PR2   |
-| `reply`     | send message                                                        | grant or interactive | yes                  | PR3   |
-| `approve`   | approve after complete re-fetch (R34)                               | grant or interactive | yes                  | PR3   |
-| `collect`   | bounded artifact read, stage to disk                                | none                 | no                   | PR2   |
-| `authorize` | write grant (R30)                                                   | owner                | yes                  | PR3   |
-| `supervise` | one R33 pass; may call reply/approve/collect under grant            | grant required       | per grant            | PR3   |
-| `integrate` | base check, worktree, apply, verify, stack handoff (R41)            | interactive          | yes                  | PR4   |
+| Subcommand  | Runtime op                                                                           | Authority      | Confirm                           | Ships |
+| ----------- | ------------------------------------------------------------------------------------ | -------------- | --------------------------------- | ----- |
+| `setup`     | probe credentials, resolve SDK, probe sources                                        | none           | install consent only              | PR2   |
+| `delegate`  | validate packet, reserve, create session (R12)                                       | grant          | grant                             | PR3   |
+| `list`      | one page of fresh session reads, page-scoped journal match                           | none           | no                                | PR2   |
+| `status`    | fresh session read, watermarked activity paging, optional reconcile                  | none           | no                                | PR2   |
+| `reply`     | send message                                                                         | grant          | grant                             | PR3   |
+| `approve`   | approve after complete re-fetch (R34)                                                | grant          | grant                             | PR3   |
+| `collect`   | bounded artifact read, stage to disk                                                 | none           | no                                | PR2   |
+| `authorize` | write, list, or revoke a grant (R30); `--take-over` (R38)                            | owner, TTY     | TTY challenge (create, take-over) | PR3   |
+| `supervise` | one R33 pass; stages artifacts via collect, returns allowedActions (the caller acts) | grant required | per grant                         | PR3   |
+| `abandon`   | mark an ambiguous or unreached reservation terminal `failed`                         | owner, TTY     | TTY challenge                     | PR3   |
+| `integrate` | base check, worktree, apply, verify, stack handoff (R41)                             | interactive    | yes                               | PR4   |
 
 `delegate`, `reply`, and `approve` ship in PR3 together with `authorize` (Open
 Question 6 decision, see "Confirmation token"), so PR2 ships no mutating
@@ -359,12 +362,12 @@ ships `delegate`; PR2's fixture and test for it cover only the empty
 Flags are `parseArgs` strict, no positionals. `<local-id>` is the locally minted
 id (see "Identifier allowlist"); `--session` accepts a local id or a vendor
 `sessions/{id}` resource and resolves it through the journal. Every subcommand
-accepts `--deadline-ms <n>` (absolute operation deadline; defaults 120 000 for
-reads, 180 000 for `delegate`, `reply`, `approve`, and `collect`). The deadline,
-not a page cap, is the binding limit under slow responses: four 30 s reads
-exhaust a 120 s deadline. `title` values returned by `list` and `status` have
-the reconcile tag stripped for display; the tag is surfaced as `localId`
-instead.
+accepts `--deadline-ms <n>` (except `abandon`; absolute operation deadline;
+defaults 120 000 for reads, 180 000 for `delegate`, `reply`, `approve`, and
+`collect`). The deadline, not a page cap, is the binding limit under slow
+responses: four 30 s reads exhaust a 120 s deadline. `title` values returned by
+`list` and `status` have the reconcile tag stripped for display; the tag is
+surfaced as `localId` instead.
 
 **Activity walk (used by `status`, `approve`, and `collect`; only `status`
 writes journal read-state).** The walk is one unit in the runtime, parameterised
@@ -418,7 +421,10 @@ being read, parsed, or used to extract plan or artifact state by `status`,
 later `(createTime, activityId)` than the journal's stored `pendingPlan`
 replaces it (`{ planId, steps, activityCreateTime }`); `planApproved` clears it;
 an empty delta never clears it. `status` therefore renders the newest plan the
-runtime has observed, and `approve` compares against the same field.
+runtime has observed, and `approve` compares against the same field. A partial
+walk reports why it stopped as `activities.stopReason` (`page-cap`,
+`page-failure`, `deadline`, or `unmapped`), which `supervise` uses to tell a
+transient failure from an undetermined one.
 
 - `setup [--install-sdk]` →
   `{ credentialSource: "env" | "none", sdkResolution: "workspace" | "data-dir" | "missing", sdkVersion?, sdkIntegrity?, sdkEntrySha256?, sourcesReachable: CapabilityResult<{ count, truncated }> }`
@@ -439,13 +445,14 @@ runtime has observed, and `approve` compares against the same field.
   verified against its lockfile hash as it is installed, and `runtime/pin.json`
   records that set for the resolver to re-check; `docs/upstream-pins.md` carries
   the pinned tree from PR2.
-- `delegate --repo <owner/repo> --branch <ref> --prompt <text> [--title <text>] [--task-ref <id>] [--request-id <local-request-id>] [--dry-run] [--grant-id <id>]`
+- `delegate --repo <owner/repo> --branch <ref> --prompt <text> --task-ref <id> [--title <text>] [--correction] [--request-id <local-request-id>] [--dry-run] [--grant-id <id>]`
   →
-  `{ localRequestId, localId, sessionResource, vendorState, condition, repository, requestedBranch, observedHead?, sourceResource }`;
+  `{ localRequestId, localId, sessionResource, vendorState, condition, repository, requestedBranch, sourceResource }`;
   on failure the envelope carries `localRequestId` and `localId` so a
-  reservation can be reconciled. `--dry-run` performs validation and the source
-  read only and returns a distinct shape,
-  `{ localRequestId, localId, repository, requestedBranch, observedHead?, sourceResource, dryRun: true }`
+  reservation can be reconciled. `vendorState` and `condition` are the state at
+  creation (`queued`, `starting`), not a fresh read. `--dry-run` performs
+  validation and the source read only and returns a distinct shape,
+  `{ localRequestId, localId, repository, requestedBranch, sourceResource, dryRun: true }`
   — no `sessionResource`, `vendorState`, or `condition`, because no session
   exists and no reservation is written; the confirmation binding is described
   under "Confirmation token". The real call always resolves the source through
@@ -457,10 +464,9 @@ runtime has observed, and `approve` compares against the same field.
   `[yellow:` is `JULES_INVALID_INPUT`. R36 duplicate-launch refusal has no
   automatic override: the recovery is `status --reconcile`, whose `released`
   outcome (reachable only once archive visibility is confirmed, see `status`)
-  frees the repository and branch. A confirmation-gated `abandon` path, which
+  frees the repository and branch. The TTY-confirmed `abandon` subcommand below
   marks a reservation reconcile left `ambiguous-reconcile` or `not-reached` as
-  terminal `failed`, ships with `delegate` in PR3 and is owned by shell 03
-  (shape fixed there).
+  terminal `failed`.
 - `list [--limit <n>] [--page-token <token>]` →
   `{ sessions: [{ localId?, sessionResource, vendorState, condition, title, createTime }], nextPageToken?, journalOnly: [{ localId, sessionResource?, condition }] }`.
   One `GET sessions` page (`pageSize` = `--limit`, default 20, max 100,
@@ -505,19 +511,38 @@ runtime has observed, and `approve` compares against the same field.
   sessions walk: one `info()` plus the activity walk, looking for a
   `userMessaged` activity whose message digest equals the reservation's payload
   digest, or a `planApproved` whose `planId` equals the reservation's observed
-  plan id, in either case with a `createTime` at or after the reservation time
-  minus the 5-minute overlap window — an older match is a prior send, never this
-  one. Exactly one qualifying match binds; more than one is
+  plan id, in either case with a `createTime` at or after the record's `dispatchedAt`
+  stamp minus a 30-second clock-skew tolerance — an older match predates the
+  POST and is a prior send, never this one. A record with no `dispatchedAt`
+  (reserved before the stamp existed) is never bound: a match at or after the
+  reservation time minus the 5-minute overlap window is `ambiguous-reconcile`
+  with `reason: "dispatch-time-unknown"`. The status walk's own-echo claim
+  applies the same lower bound. Exactly one qualifying match binds; more than one is
   `ambiguous-reconcile` with `reason: "multiple-candidates"`; none after a
   complete walk leaves `unknown-outcome`, and a partial walk leaves
   `not-reached`. Operations the deadline prevented from being checked are
   reported as `not-reached`, never as resolved.
-- `reply --session <ref> --message <text> [--request-id <id>] [--dry-run] [--grant-id <id>]`
+- `reply --session <ref> --message <text> [--correction] [--reply-kind question|plan|other] [--expect-activity-id <id> --expect-question-digest <hex> | --expect-plan-id <id> --expect-plan-digest <hex>] [--request-id <id>] [--dry-run] [--grant-id <id>]`
   → `{ localRequestId, localId, sessionResource, sent: true }`. `--dry-run`
   validates, performs one `info()`, and returns the same fields with
-  `sent: false, dryRun: true`. A dry-run never reports `sent: true`, because it
-  issues no POST. The real call is one POST, non-blocking (R9).
-- `approve --session <ref> --plan-id <evaluated plan id> [--request-id <id>] [--dry-run] [--grant-id <id>]`
+  `sent: false, dryRun: true`, plus `repository`, `requestedBranch`, and
+  `taskRef` of the session when this plugin created it (the scope a covering
+  grant must match). A dry-run never reports `sent: true`, because it issues no
+  POST. The real call is one POST, non-blocking (R9). With both `--expect-*`
+  values (the `supervise` `needs-answer` `observedActivityId` and
+  `observedQuestionDigest`; one alone is `JULES_INVALID_INPUT`), a real call
+  re-reads the session's activities before reserving and fails with
+  `JULES_QUESTION_CHANGED` unless the session still awaits a reply and its
+  newest agent message has that id and digest. `--expect-plan-id` and
+  `--expect-plan-digest` (the `needs-plan-review` plan id and the sha256 of the
+  compact JSON `[planId, [[title, description], ...]]` plus a newline, as `approve.md` prints
+  it) do the same for a pending plan and cannot be combined with the question
+  pair. Like approve's plan check, the read narrows the race without closing it.
+  `--reply-kind` (what `supervise` sends) makes the pair mandatory: `question`
+  needs the question pair, `plan` the plan pair, and `other` refuses both, each
+  failing with `JULES_INVALID_INPUT` before any read. Omitted, the pairs stay
+  optional.
+- `approve --session <ref> --plan-id <evaluated plan id> --expect-plan-digest <hex> [--request-id <id>] [--dry-run] [--grant-id <id>]`
   →
   `{ localRequestId, localId, sessionResource, approvedPlanId, observedPlanIdAfter: string | null, verificationDeferred: bool, verification: { pages: n, partialPagination: bool }, policyDeviation? }`.
   `--dry-run` performs the R34 re-fetch: one `info()` (state must be
@@ -526,7 +551,7 @@ runtime has observed, and `approve` compares against the same field.
   `pendingPlan` in the journal is `JULES_INVALID_STATE`, recovery "run
   `status`"), **not** at the watermark, so the plan is always re-read fresh from
   the vendor and the read stays bounded when the filter is honoured; it returns
-  `{ localRequestId, localId, sessionResource, dryRun: true, observedPlanId }`,
+  `{ localRequestId, localId, sessionResource, dryRun: true, observedPlanId, repository?, requestedBranch?, taskRef? }`,
   where `observedPlanId` is the plan id the confirmation binds to. The dry-run
   envelope carries neither `approvedPlanId` nor the post-POST verification
   fields (`observedPlanIdAfter`, `verificationDeferred`, `verification`),
@@ -541,7 +566,16 @@ runtime has observed, and `approve` compares against the same field.
   "retry; if it repeats, run `status`"; an activity the SDK mapper cannot parse
   (`unmappedActivity`) — "re-verify the SDK pin with `/jules:setup`; a larger
   deadline will not help"; a complete re-fetch whose newest `planGenerated`
-  differs from `--plan-id` fails closed with `JULES_POLICY_DEVIATION`. Only then
+  differs from `--plan-id`, or whose `planDigest` (the same sha256 `reply`
+  takes) differs from `--expect-plan-digest`, fails closed with
+  `JULES_POLICY_DEVIATION`, so text changed under the same plan id is never
+  approved. The digest is required for a real call (missing or not 64
+  lowercase hex is `JULES_INVALID_INPUT`, before any vendor call, but after the
+  grant check); on `--dry-run` it is optional and a mismatch reports
+  `planChanged`. A real call also refuses a newest plan whose text redaction
+  would change (a credential-shaped value hidden from the review) with
+  `JULES_INVALID_STATE`, because the digest hashes the redacted text and could
+  not tell two such plans apart. Only then
   does it issue the POST (the endpoint takes no plan id), then re-read from the
   same start point within the remaining budget and record a deviation on
   mismatch (R34). If the post-POST re-read is partial for any reason (page cap,
@@ -572,29 +606,91 @@ runtime has observed, and `approve` compares against the same field.
   smoke), staging stops, remaining artifacts are listed in `skipped` with
   `aggregate-cap-reached`, and `partialStaging: true` is set. Never touches a
   checkout (R40).
-- `authorize` (PR3): R30 fields; shape fixed in shell 03.
-- `supervise` (PR3): `{ decision, nextCheck, ... }` per R33; shape fixed in
-  shell 03.
+- `authorize --repo <owner/repo> --branch <ref|pattern> [--source <resource>] --task-ref <id> [--task-ref <id> ...] --operations <create,reply,approve,collect> [--max-active-sessions <n>] [--max-total-tasks <n>] [--max-corrective-rounds <n>] [--ttl-minutes <n>] --owner <name>`
+  →
+  `{ grantId, repository, sourceResource, branchPattern, taskRefs, operations, limits: { maxActiveSessions, maxTotalTasks, maxCorrectiveRounds }, expiresAt, controllerId, epoch }`.
+  The runtime opens `/dev/tty` itself (see "Confirmation token"), so a caller
+  without a controlling terminal gets `JULES_CONFIRMATION_REQUIRED`. The source
+  is resolved through `getSource` (R17). Defaults (R30): 1 active session, 3
+  tasks, 2 corrective rounds, 120 minutes. Ceilings, enforced by the runtime and
+  stated here: 3 active sessions, 10 tasks, 3 corrective rounds, 24 hours (1440
+  minutes); a value above a ceiling is `JULES_INVALID_INPUT`. `authorize` takes
+  no `--grant-id` and refuses when `YELLOW_JULES_ACTIVE_GRANT` is set, so a
+  grant is never created or widened from inside a supervised session.
+- `authorize --take-over` → `{ controllerId, epoch, dataDir, grantsRebound }`.
+  The R38 handoff (see "Local state"), standalone: it takes no grant flags and
+  is TTY-confirmed. It writes epoch+1 for this host and the canonical data-dir
+  path, then rewrites every grant's controller id and epoch reference.
+- `authorize --list` →
+  `{ grants: [{ grantId, repository, sourceResource, branchPattern, taskRefs, operations, limits, usage, expiresAt, expired, revoked, unreconciledDeviation }] }`.
+  `unreconciledDeviation` is true when a session under the grant carries an
+  unreconciled policy deviation (R13), so every write under it is denied with
+  `JULES_POLICY_DEVIATION`; wrappers skip such grants when choosing one.
+  Read-only; no TTY.
+- `authorize --revoke <grant-id>` → `{ grantId, revokedAt }`. No TTY, because
+  revocation only narrows authority.
+- `supervise --session <ref> --grant-id <id> [--deadline-ms <n>]` →
+  `{ decision, condition, vendorState, nextCheck: { afterSeconds, reason }, allowedActions: [...], correctiveRoundsLeft, fenced: { plan?, question?, activities? }, attention? }`.
+  One bounded pass, never a loop and never a sleep. `decision` is one of
+  `no-change`, `check-failed`, `pass-aborted`, `needs-plan-review`,
+  `needs-answer`, `needs-verification`, `escalate`, `paused` (R33). Vendor text
+  appears only inside `fenced`. While R43 verification tooling is absent (before
+  PR4), `needs-verification` reports `verification: "unavailable"` and the only
+  permitted verdicts are correction or escalate, never accept. An
+  `awaiting-approval` session whose plan could not be read is `escalate` with
+  `reason: "awaiting-approval-without-plan"` and attention `planUnavailable`.
+  When another session under the grant carries an unreconciled policy
+  deviation (R13), every write under it is denied, so an `awaiting-approval` or
+  `awaiting-reply` session is `escalate` with `reason: "grant-policy-deviation"`,
+  attention `policyDeviation`, and no `approve`, `reply`, or `repair-delegate`
+  in `allowedActions`.
+- `supervise --clear-pause --session <ref>` →
+  `{ operation, localId, sessionResource, cleared: true }`. TTY-confirmed;
+  requires a complete `status` walk since the pause, otherwise
+  `JULES_INVALID_STATE` with recovery "run `status` first". The prompt lists any
+  recorded outside activity (clearing forgets it), and the clear is refused if
+  the pause or that activity changed while the prompt was open.
+- `abandon --request-id <id>` →
+  `{ localRequestId, localId, abandoned: true, released: {...} }`.
+  TTY-confirmed. Accepts only an operation whose last reconcile outcome was
+  `ambiguous-reconcile` or `not-reached` (or, for a `reply` or `approve`,
+  `unknown-outcome`, which a complete walk can leave for good); anything else is
+  `JULES_INVALID_STATE`. Marks the operation terminal `failed` with
+  `abandonedAt` and `abandonReason`; no new status is added.
 - `integrate` (PR4): R41; shape fixed in shell 04.
 
 ### Confirmation token
 
-Every mutating subcommand (`delegate`, `reply`, `approve`, `authorize`,
-`integrate`, and `supervise`'s writes) requires either a valid `--grant-id` or a
-single-use confirmation bound to the exact operation (R29). Binding fields by
-kind: `delegate` binds kind, repository, branch, request id, task ref, source
-resource, and a sha256 of the prompt; `reply` binds kind, target session,
-request id, and a sha256 of the message; `approve` binds kind, target session,
-request id, and the observed plan id. The confirmation never travels in argv
-(argv is world-readable on Linux and lands in shell history and transcripts).
-How it is minted, carried, and authenticated on each host is Open Question 6,
-fixed in shell 03 together with `authorize`; this contract adds no interim
-mechanism. Its format is fixed there too, under one constraint recorded now: it
-must not match any redaction layer (in particular the layer-4 prefixed-secret
-shapes), and the redaction tests assert that a minted confirmation survives
-`redactDeep` unchanged in a dry-run envelope.
+Superseded: there is no per-operation confirmation token. Every real
+(non-dry-run) mutation (`delegate`, `reply`, `approve`, and the writes
+`supervise` triggers) requires `--grant-id` (R29). A call without one returns
+`JULES_CONFIRMATION_REQUIRED`, and its `recoveryAction` names the exact
+`authorize` command to run. `--dry-run` needs no grant and writes nothing.
 
-**Open Question 6, decided.** The spec was self-contradictory: R29 says OQ6 is
+**`authorize` is the only trust root.** The runtime opens `/dev/tty` itself,
+prints the grant summary there, and requires the owner to type back a random
+6-character challenge. A caller with no controlling terminal cannot satisfy that
+prompt: the agent's Bash tool, the Codex sandbox, the engine's closed-stdin
+process interface (R59), and CI all fail with `JULES_CONFIRMATION_REQUIRED`.
+Whether stdin is a TTY is never consulted. The challenge code never appears in
+any envelope, argv, journal record, or log; the prompt is written to the TTY
+only. The same TTY gate guards `abandon`, `supervise --clear-pause`, and
+`authorize --take-over`, because each widens effective authority.
+`authorize --list` and `authorize --revoke` need no TTY.
+
+The Claude wrappers keep an AskUserQuestion preview before using a grant (R8's
+UX gate), but enforcement is the grant, never the wrapper. Host hooks, prompt
+wording, and sandbox settings are never the sole enforcement layer (R31).
+
+**Residual risk (Open Question 5, decided 2026-10-08: no MAC).** Any key the
+runtime can read is readable by a process running as the same UID, the agent
+included, so a same-UID process can forge `state/grants.json`. Integrity rests
+on four controls: `0600` permissions, the separate `state/grants.json` written
+only by the TTY-confirmed `authorize` path, the R38 host-local controller epoch
+and path binding, and the fact that a grant can only narrow under the runtime.
+The forgery risk is recorded in `plugins/yellow-jules/CLAUDE.md`.
+
+**Open Question 6, history.** The spec was self-contradictory: R29 says OQ6 is
 "settled in shell 03 before any non-grant mutation ships"; Open Question 6 says
 "until then the runtime treats wrapper-minted tokens as unproven and requires a
 grant"; and R53 required an owner-run smoke after PR2 with "no grant exists
@@ -602,9 +698,9 @@ yet". Decision, 2026-09-10, taken under owner authority delegated in the PR #793
 review and recorded in the spec's Open Question 6: **option (b)**. `delegate`,
 `reply`, and `approve` ship in PR3 behind `authorize`; PR2 ships the read-only
 surface (`setup`, `list`, `status`, `collect`) with the fake-server tests; the
-R53 smoke runs after PR3 under a grant bound to the scratch branch. The decision
-is reversible by moving the three Ships cells back to PR2 and specifying an
-interim mechanism in shell 03. Under either option, interactive versus
+R53 smoke runs after PR3 under a grant bound to the scratch branch. The
+authentication mechanism was fixed at shell 03 expansion on 2026-10-08: grants
+only, with a TTY-confirmed `authorize`. Under either option, interactive versus
 non-interactive callers is never the discriminator.
 
 ## Output envelope
@@ -618,7 +714,7 @@ until the engine milestone introduces the versioned process interface
 { "ok": true, "operation": "<subcommand>", ...result fields,
   "requiresAttention"?: true, "attention"?: ["<flag-or-outcome>", ...] }
 { "ok": false, "operation": "<subcommand>", "localRequestId"?: "...",
-  "localId"?: "...",
+  "localId"?: "...", "details"?: { ... },
   "error": { "code": "JULES_*", "message": "...", "retryable": bool,
              "requestId"?: "...", "recoveryAction": "..." } }
 ```
@@ -642,6 +738,12 @@ reconcile outcome has one disposition:
 | `policy-deviation`    | kept            | `attention`, top-level `policyDeviation: true`; `supervise` stops acting (R33) | reconcile by hand before any further write           |
 | `unknown-outcome`     | kept            | `attention`                                                                    | rerun `status --reconcile` later                     |
 | `not-reached`         | kept            | `attention`                                                                    | rerun with a larger `--deadline-ms`                  |
+
+`details` appears on a few mutating failures and is structured data, never
+prose: `runningSessions: ["sessions/<id>", ...]` on `JULES_GRANT_EXPIRED` (the
+sessions under the grant that may still be running, R39), and `sessionResource`
+(plus `journalRecorded: false` when the local bookkeeping itself failed) on
+`JULES_UNKNOWN_OUTCOME`.
 
 `operation` is the subcommand name, or the literal `"unknown"` on a usage error
 where no valid subcommand was given (mirrors `yellow-cursor`). `localRequestId`
@@ -671,8 +773,8 @@ Every status-bearing result carries both `vendorState` (the SDK's
 step) are three distinct recorded states; a `condition` never advances past
 `remote-completed` without a journal record from the later step. The SDK maps
 any unknown REST state to `unspecified` (`index.mjs` L689-690), so the adapter
-also carries the raw REST string when it differs, and `unspecified` always lands
-in `needs-inspection`, never in a completed bucket.
+does not carry the raw string, and `unspecified` always lands in
+`needs-inspection`, never in a completed bucket.
 
 ## Error catalog
 
@@ -687,30 +789,34 @@ not the only permitted text. `sdk-adapter.ts` classifies SDK errors by
 (`JulesRateLimitError` and `JulesAuthenticationError` before their
 `JulesApiError` base), because a 429 is an instance of both.
 
-| Code                           | Retryable | Recovery action (default)                                                                                                                 |
-| ------------------------------ | --------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `JULES_AUTH_FAILED`            | false     | set `JULES_API_KEY` (401/403 or missing key), then retry                                                                                  |
-| `JULES_INVALID_INPUT`          | false     | fix the reported input or invocation and retry                                                                                            |
-| `JULES_SOURCE_ACCESS`          | false     | connect the repository to Jules; sources are discovered, never synthesized (R17)                                                          |
-| `JULES_RATE_LIMITED`           | true      | wait at least 60 s and retry; the runtime never retries a 429 itself                                                                      |
-| `JULES_SERVICE_UNAVAILABLE`    | true      | retry later (pre-dispatch only; see ambiguous-outcome design)                                                                             |
-| `JULES_NOT_FOUND`              | false     | verify the session or activity reference                                                                                                  |
-| `JULES_MALFORMED_RESPONSE`     | false     | report; the SDK response shape was unexpected (non-walk reads and pre-dispatch only)                                                      |
-| `JULES_INVALID_STATE`          | false     | the session is not awaiting approval, or its pending plan could not be completely re-read; run `status`                                   |
-| `JULES_UNSUPPORTED_CAPABILITY` | false     | not available on the vendor contract; no retry will help (R11)                                                                            |
-| `JULES_UNKNOWN_OUTCOME`        | false     | run `status --reconcile` (a `delegate`), or `status --session <ref> --reconcile` (a `reply` or `approve`); never relaunch (R16)           |
-| `JULES_JOURNAL_CORRUPT`        | false     | reconcile the journal by hand; writes are blocked (R37)                                                                                   |
-| `JULES_DUPLICATE_LAUNCH`       | false     | an unresolved operation exists for this repo/branch; run `status --reconcile` first; a complete walk with no candidate releases it (R36)  |
-| `JULES_CONFIRMATION_REQUIRED`  | false     | confirm through the wrapper as fixed in shell 03, or pass a grant written by `authorize` (PR3) (R29)                                      |
-| `JULES_AUTHORITY_DENIED`       | false     | the grant does not cover this operation, repo, branch, or limit (R31)                                                                     |
-| `JULES_GRANT_EXPIRED`          | false     | the grant or deadline expired; remote session may still run; see containment                                                              |
-| `JULES_POLICY_DEVIATION`       | false     | a vendor PR, plan change, or repository mismatch was observed; reconcile before further writes (R13)                                      |
-| `JULES_DEADLINE_EXCEEDED`      | false     | the absolute operation deadline fired before any write was dispatched; no verdict recorded (R14, R33)                                     |
-| `JULES_STALE_LOCK`             | false     | a lock from a crashed process exists; remove by hand after inspection (R38)                                                               |
-| `JULES_NO_PROGRESS`            | false     | two consecutive activity walks restarted from the watermark without advancing; run `status` later, and re-verify the SDK pin if it recurs |
-| `JULES_SDK_MISSING`            | false     | run `/jules:setup` to install the pinned SDK (R4)                                                                                         |
-| `JULES_SDK_INTEGRITY`          | false     | the SDK tarball, entry file, or storage binding failed verification; do not use it (R4)                                                   |
-| `JULES_DATA_DIR`               | false     | the data directory is not owner-only, not owned by you, or its scratch dir is not writable (R35)                                          |
+| Code                           | Retryable | Recovery action (default)                                                                                                                    |
+| ------------------------------ | --------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JULES_AUTH_FAILED`            | false     | set `JULES_API_KEY` (401/403 or missing key), then retry                                                                                     |
+| `JULES_INVALID_INPUT`          | false     | fix the reported input or invocation and retry                                                                                               |
+| `JULES_SOURCE_ACCESS`          | false     | connect the repository to Jules; sources are discovered, never synthesized (R17)                                                             |
+| `JULES_RATE_LIMITED`           | true      | wait at least 60 s and retry; the runtime never retries a 429 itself                                                                         |
+| `JULES_SERVICE_UNAVAILABLE`    | true      | retry later (pre-dispatch only; see ambiguous-outcome design)                                                                                |
+| `JULES_NOT_FOUND`              | false     | verify the session or activity reference                                                                                                     |
+| `JULES_MALFORMED_RESPONSE`     | false     | report; the SDK response shape was unexpected (non-walk reads and pre-dispatch only)                                                         |
+| `JULES_INVALID_STATE`          | false     | the session is not awaiting approval, or its pending plan could not be completely re-read; run `status`                                      |
+| `JULES_UNSUPPORTED_CAPABILITY` | false     | not available on the vendor contract; no retry will help (R11)                                                                               |
+| `JULES_UNKNOWN_OUTCOME`        | false     | run `status --reconcile` (a `delegate`), or `status --session <ref> --reconcile` (a `reply` or `approve`); never relaunch (R16)              |
+| `JULES_JOURNAL_CORRUPT`        | false     | reconcile the journal by hand; writes are blocked (R37)                                                                                      |
+| `JULES_DUPLICATE_LAUNCH`       | false     | an unresolved operation exists for this repo/branch; run `status --reconcile` first; a complete walk with no candidate releases it (R36)     |
+| `JULES_CONFIRMATION_REQUIRED`  | false     | pass `--grant-id` from a grant written by `authorize`, or run the named `authorize` command yourself in a terminal (R29)                     |
+| `JULES_AUTHORITY_DENIED`       | false     | the grant does not cover this operation, repo, branch, or limit (R31)                                                                        |
+| `JULES_GRANT_EXPIRED`          | false     | the grant expired; remote work may still run; contain out of band: vendor console stop, source-connection revocation, API-key rotation (R39) |
+| `JULES_POLICY_DEVIATION`       | false     | a vendor PR, plan change, or repository mismatch was observed; reconcile before further writes (R13)                                         |
+| `JULES_DEADLINE_EXCEEDED`      | false     | the absolute operation deadline fired before any write was dispatched; no verdict recorded (R14, R33)                                        |
+| `JULES_STALE_LOCK`             | false     | a lock from a crashed process exists; remove by hand after inspection (R38)                                                                  |
+| `JULES_NO_PROGRESS`            | false     | two consecutive activity walks restarted from the watermark without advancing; run `status` later, and re-verify the SDK pin if it recurs    |
+| `JULES_SDK_MISSING`            | false     | run `/jules:setup` to install the pinned SDK (R4)                                                                                            |
+| `JULES_SDK_INTEGRITY`          | false     | the SDK tarball, entry file, or storage binding failed verification; do not use it (R4)                                                      |
+| `JULES_DATA_DIR`               | false     | the data directory is not owner-only, not owned by you, or its scratch dir is not writable (R35)                                             |
+| `JULES_CONTROLLER_MISMATCH`    | false     | this data directory is not the authorized controller copy; follow the handoff procedure in the plugin CLAUDE.md (R38)                        |
+| `JULES_GRANT_EXHAUSTED`        | false     | create a new grant with `authorize`                                                                                                          |
+| `JULES_SUPERVISION_PAUSED`     | false     | inspect the session, then run `supervise --clear-pause` in a terminal (R32)                                                                  |
+| `JULES_QUESTION_CHANGED`       | false     | `reply --expect-*`: the session no longer awaits the question or has the plan the pass showed; nothing was sent                              |
 
 SDK class to code (all eleven classes in `dist/errors.d.ts`). "After dispatch"
 means a mutating POST has been sent and no clear rejection was received. A
@@ -861,18 +967,31 @@ as remote termination (R39).
 
 ## Autonomy boundaries
 
-- **Interactive confirmation is the default** for every mutating command
-  (`delegate`, `reply`, `approve`, `authorize`, `integrate`, and `supervise`'s
-  writes) until a valid grant covers it (R29), through the confirmation-token
-  mechanism above, with its residual risk and the pending owner decision
-  recorded there. Host hooks, prompt wording, and sandbox settings are never the
-  sole enforcement layer (R31).
+- **A grant is required** for every real mutation (`delegate`, `reply`,
+  `approve`, and `supervise`'s writes) (R29). `authorize`, `abandon`,
+  `supervise --clear-pause`, and `authorize --take-over` are TTY-confirmed by
+  the runtime (see "Confirmation token"). Host hooks, prompt wording, and
+  sandbox settings are never the sole enforcement layer (R31).
 - **Grants** (R30, PR3): grant id, repository and source resource, branch or
   pattern, task/goal identifiers, permitted operations (subset of `create`,
   `reply`, `approve`, `collect`), max active sessions, max total tasks, max
   corrective rounds per task, absolute expiry, owner, controller identity, epoch
   reference. Trial defaults: 1 active session, 3 tasks, 2 corrective rounds, 2
-  hours; never widened by the runtime or from within a session under a grant.
+  hours. Documented ceilings, enforced by `authorize`: 3 active sessions, 10
+  tasks, 3 corrective rounds, 24 hours. Never widened by the runtime or from
+  within a session under a grant. Counters (R31): reserved and unknown-outcome
+  operations count; a `create` takes an active-session slot and, unless it is a
+  repair, one task; a repair `create` and a corrective `reply` spend one
+  corrective round instead. The slot is freed when the session is observed
+  terminal, or by reconcile `released`, `abandon`, or a clean rejection (a
+  rejection the vendor answered, or a failure before anything was sent); tasks
+  and corrective rounds never decrement. A repair `create` is allowed only after
+  a plain (non-repair) launch of the same task ref under the same grant that did
+  not fail or get abandoned; otherwise it is `JULES_AUTHORITY_DENIED`, so
+  corrective rounds cannot mint sessions for tasks that were never launched.
+  Copying a home directory to a host with a different host name does not carry
+  the right to write; two hosts that share a host name (a cloned VM) still look
+  identical to this check.
 - **Single controller host** (R38): one data directory is the only writer; a
   local lock serializes it; stale locks fail loud; the copy-detection control is
   in Local state; the manual handoff procedure lives in
@@ -899,10 +1018,11 @@ are enforced at open; a non-owned or group- or world-writable data directory,
 **every** invocation that reads state or resolves the SDK (not only
 grant-consuming ones), because `runtime/node_modules/` is executable code loaded
 into the process. Layout: `state/journal.json` (operation records),
-`state/grants.json` (written only by `authorize`), `state/.lock`,
-`artifacts/<local-id>/`, `sdk-scratch/` (created `0700`, must stay empty), and
-`runtime/node_modules/` (the data-dir SDK install, with `sdkIntegrity` and
-`sdkEntrySha256` recorded in `runtime/pin.json`).
+`state/grants.json` (created and widened only by the TTY-confirmed `authorize`;
+the runtime only narrows it: revoke, counter charges, slot releases),
+`state/.lock`, `artifacts/<local-id>/`, `sdk-scratch/` (created `0700`, must
+stay empty), and `runtime/node_modules/` (the data-dir SDK install, with
+`sdkIntegrity` and `sdkEntrySha256` recorded in `runtime/pin.json`).
 
 Each operation record carries the R35 fields plus the activity read-state that
 makes reads bounded across processes, written only by `status` (see "Activity
@@ -921,20 +1041,28 @@ terminal records is deferred until usage data justifies a policy (PR1 default:
 none). Journal and grant maps are built with `Object.create(null)` (or `Map`),
 never by plain property assignment, so caller-supplied keys cannot reach the
 prototype. Writes are reservation-first and atomic (temp file plus rename) under
-the lock, and the R36 unresolved-operation lookup, authority evaluation,
-confirmation consumption, counter increment, and reservation write are one
-critical section under that lock (R31); the local request id is local
+the lock, and the controller check, grant lookup, authority evaluation, the R36
+unresolved-operation lookup, the counter charge, and the reservation write are
+one critical section under that lock (R31); the local request id is local
 deduplication only, never a vendor idempotency guarantee (R36).
 
-R38 copy detection (shape fixed in shell 03): a controller-identity and epoch
-authority file lives **outside** `<dataDir>` on the host, records the canonical
-absolute path of the data directory it authorizes, is re-read and matched on
-every write, and a missing or mismatched value fails loud (`JULES_STALE_LOCK` or
-a dedicated code); the journal holds only a reference to it, so a copied or
-restored data directory cannot write in parallel. Until shell 03 ships it, a
-copied data directory is undetected; because the mutating commands ship in the
-same PR as this check (Open Question 6 decision), PR2's exposure is limited to
-journal read-state.
+R38 copy detection: a controller authority file lives **outside** `<dataDir>` at
+`<controllerDir>/<controllerId>.json` with shape
+`{ controllerId, epoch, dataDir, updatedAt }`, where `dataDir` is the canonical
+realpath of the data directory it authorizes. The file must be `0600` and
+owner-owned. `<controllerDir>` is `YELLOW_JULES_CONTROLLER_DIR` >
+`$XDG_STATE_HOME/yellow-jules-controller` >
+`~/.local/state/yellow-jules-controller`, created `0700`, and must resolve
+outside `<dataDir>` by canonical path (otherwise `JULES_DATA_DIR`). The
+controller id defaults to the host name. Every grant carries
+`epochRef: { controllerId, epoch }`. The file is re-read and matched on every
+write; a grant whose `controllerId` is not this host's, a missing file, a
+different epoch, or a different canonical data-dir path fails loud with
+`JULES_CONTROLLER_MISMATCH`, so a copied or restored data directory cannot write
+in parallel. The first `authorize` on a host with no controller file and no
+grants writes epoch 1; `authorize --take-over` writes epoch+1 for this host and
+path and rewrites every grant's `epochRef` under the lock. The handoff procedure
+lives in `plugins/yellow-jules/CLAUDE.md`.
 
 The SDK's own storage is the per-process memory factory; the runtime never
 creates `.jules/` anywhere and treats a populated `sdk-scratch/` as
@@ -960,9 +1088,9 @@ creates `.jules/` anywhere and treats a populated `sdk-scratch/` as
 **MVP (PR1 + PR2 + PR3 + the R53 smoke; Open Question 6 decision):** an owner
 can `setup`, `delegate` with explicit flags, observe with `list`/`status`,
 `reply`, `approve`, and `collect` a patch to staging, with each mutating write
-confirmed through the confirmation-token mechanism (presented via
-AskUserQuestion; the mechanism itself is fixed in shell 03) unless a valid grant
-(R30) covers the operation; `docs/yellow-jules/smoke-result.md` exists with
-`result: pass` recording one session created, plan inspected, one reply or
-approval within authority, an interruption that did not duplicate the task, an
-independently checked patch, no vendor PR, and no merge.
+authorized by a grant (`--grant-id`, R30) that the owner wrote with the
+TTY-confirmed `authorize`; there is no per-operation confirmation token;
+`docs/yellow-jules/smoke-result.md` exists with `result: pass` recording one
+session created, plan inspected, one reply or approval within authority, an
+interruption that did not duplicate the task, an independently checked patch, no
+vendor PR, and no merge.
