@@ -328,7 +328,8 @@ directory) and must not be a script whose `#!` interpreter enters the worktree.
 refused. A value that uses shell syntax the check cannot judge (`$`, backtick,
 `;`, `&`, `|`, `<`, `>`, parentheses, `*`, `?`, `[`, a backslash, a newline,
 `~user`, or a quote inside a word rather than at its edge) is refused with a
-message naming the variable; a leading `~/` is expanded to
+message naming the variable; one whose first word is a `NAME=value`
+assignment (`PATH=tools:/usr/bin ssh`) counts as entering the worktree; a leading `~/` is expanded to
 `HOME` and judged. When `GIT_CONFIG_GLOBAL` is unset, a `HOME` or
 `XDG_CONFIG_HOME` that puts git's global config inside the worktree is refused
 (a dotfiles repository rooted at `HOME` therefore needs `GIT_CONFIG_GLOBAL`

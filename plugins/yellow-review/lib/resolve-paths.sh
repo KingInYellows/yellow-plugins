@@ -865,7 +865,8 @@ yr_prog_enters() {
 # hands it to the shell, so `sh <root>/script` and `ssh -F <root>/cfg` count,
 # not only a first word that is a path. Returns
 #   0  it would run or read something inside <root> (or a path cannot be
-#      canonicalized: fail closed);
+#      canonicalized, or the first word is a NAME=value assignment: fail
+#      closed);
 #   2  it uses shell syntax this check cannot judge: $ (expansion), backtick,
 #      ; & | < > ( ) * ? [ a backslash, a quote inside a word, a quote that
 #      does not wrap exactly one word (a quoted span containing whitespace) or a newline,
@@ -920,6 +921,9 @@ yr_cmd_enters() {
     t=${first#!}
     t=${t#[\"\']}
     t=${t%[\"\']}
+    # A leading NAME=value is a shell assignment applied to the command, and
+    # PATH=tools (or IFS, ENV, ...) changes what runs: fail closed on any.
+    [[ "$t" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] && return 0
     case "$t" in
         ''|-*|'~'*) ;;
         */*) yr_prog_enters "$t" "$root" && return 0 ;;

@@ -1813,6 +1813,26 @@ CFG_CMD_KEYS=(
   rm -rf "${PWD}-keys" "${PWD}2"
 }
 
+@test "harden_git_config refuses a command line that starts with a NAME=value assignment" {
+  # The shell applies a leading assignment to the command it runs:
+  # PATH=tools:/usr/bin ssh looks ssh up in the worktree's tools/.
+  mkdir -p tools
+  printf '#!/bin/sh\nexit 0\n' >| tools/ssh
+  chmod +x tools/ssh
+  for val in "PATH=tools:/usr/bin ssh" "PATH=./tools ssh host" "A=1 PATH=tools ssh" "FOO=bar ssh" "!PATH=tools ssh"; do
+    for name in GIT_SSH_COMMAND GIT_PAGER EDITOR GIT_PROXY_COMMAND; do
+      rc=0; ( export "$name=$val"; harden_git_config full ) || rc=$?
+      [ "$rc" -eq 1 ] || { echo "$name accepted: $val" >&2; return 1; }
+    done
+  done
+  rc=0; ( export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.sshCommand GIT_CONFIG_VALUE_0="PATH=tools:/usr/bin ssh"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  ( export GIT_SSH_COMMAND="PATH=tools:/usr/bin ssh"; harden_git_config full || [[ "$YR_HARDEN_MSG" == "GIT_SSH_COMMAND runs"* && "$YR_HARDEN_MSG" != *tools* ]] )
+  # An assignment-shaped later word is an argument, not an assignment.
+  rc=0; ( export GIT_SSH_COMMAND="ssh -o ProxyCommand=nc"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
 @test "harden_git_config still checks later bare words and slash words against the current directory" {
   : >| evil
   mkdir -p tools
