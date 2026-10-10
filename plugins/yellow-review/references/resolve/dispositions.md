@@ -532,12 +532,31 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   withholds the patch like a content hit. Before any patch is built,
   every listed path is checked: only regular files, symlinks (dangling ones too)
   and absent paths are accepted. A FIFO, socket, device or directory in its
-  place is refused with exit 2 in run mode, and removed unopened by the revert
-  modes, so a special file cannot block `git diff` or the refusal cleanup. A
-  directory standing where HEAD has a regular file is the exception: the revert
-  modes save the patch first, with the deletion of the file followed by every
-  regular file and symlink inside the directory as new files, and only then
-  remove the directory. The patch is also withheld, with a `reason`, when the screen returns any status
+  place is refused with exit 2 in run mode, so a special file cannot block
+  `git diff` or the refusal cleanup. In the revert modes a FIFO, socket or
+  device is kept until the recovery patch has recorded its tracked deletion
+  without opening it: the entry is renamed aside in its own directory for that
+  diff, then put back, and unlinked only after the snapshot is written.
+  The hold path is recorded before the rename back. If that ledger write fails,
+  the file is put back when it can and nothing is reverted; if it cannot, stderr
+  names the remaining path.
+  A rewrite of that ledger replaces it only after the new copy is complete, so
+  a failed rewrite leaves the recorded path in place.
+  Each record is the held path, a NUL, the original path, and a NUL, so a
+  newline in the name cannot split it. The reader assigns those fields with
+  `printf -v` into the caller's variables. macOS bash 3.2 has no namerefs, and
+  the script does not require a newer bash before it restores a hold.
+  `save_patch` runs in a subshell, so a rename back that fails is retried by
+  the parent. If the entry is back, a snapshot failure still reverts nothing.
+  If it is still held, `reason` names that path and does not claim the tree
+  was untouched. An `rm` that cannot unlink one special file is recorded in
+  `reason` and does not abort the revert, so a special file already removed
+  is still restored from HEAD. Checkout does not open a special file that is
+  still present.
+  A directory standing where HEAD has a regular file is handled the same way:
+  the revert modes save the patch first, with the deletion of the file followed
+  by every regular file and symlink inside the directory as new files, and only
+  then remove the directory. The patch is also withheld, with a `reason`, when the screen returns any status
   other than 0 or 1 (the screen could not answer). When the `--text` diff cannot
   be produced or read, the script exits 2 and reverts nothing. A failed revert
   step is listed in `reason` (the first five, then a count) and `treeClean` is
