@@ -315,7 +315,8 @@ entry in a global or system file outside the worktree), a word containing `/` sk
 resolved against the current directory and the worktree and refused when it, its link target, a
 `#!` interpreter or a hard link behind it is inside the worktree (`core.sshCommand=./evil` in an
 otherwise trusted global config). For `url.ext::<command>.insteadOf` the command in the key is
-judged the same way. Shell syntax the check cannot judge is tolerated in those
+judged the same way. A short option's attached value (`ssh -Fconfig`) is judged as a path, and
+a `python -m` module (looked up in the current directory first) fails closed. Shell syntax the check cannot judge is tolerated in those
 trusted files, so a user's own `!` alias or pager keeps working. Any inherited `GIT_EXEC_PATH` is refused (git runs `git-remote-*` and
 other dashed helpers from it, and a link there can reach the worktree; the default exec
 path is right for these scripts). The `#!` check follows an interpreter that is itself a
