@@ -1804,7 +1804,8 @@ CFG_CMD_KEYS=(
               GIT_PAGER PAGER GIT_EDITOR EDITOR VISUAL; do
     for val in "$PWD/tools/cmd" "$PWD/tools/cmd -o x" "\"$PWD/tools/cmd\" arg" "tools/cmd" \
                "sh $PWD/tools/cmd" "sh tools/cmd" "sh -c 'exec $PWD/tools/cmd'" "ssh -F $PWD/tools/cmd host" \
-               "ssh --config=tools/cmd host" "env X=1 sh '$PWD/tools/cmd'" "less -R !$PWD/tools/cmd"; do
+               "ssh --config=tools/cmd host" "env X=1 sh '$PWD/tools/cmd'" "less -R !$PWD/tools/cmd" \
+               "ssh -Ftools/cmd host" "ssh -F$PWD/tools/cmd host"; do
       for scope in full revert; do
         rc=0; ( export "$name=$val"; harden_git_config "$scope" ) || rc=$?
         [ "$rc" -eq 1 ] || { echo "$name=$val ($scope) rc=$rc" >&2; return 1; }
@@ -1812,6 +1813,16 @@ CFG_CMD_KEYS=(
     done
     ( export "$name=$PWD/tools/cmd"; harden_git_config full || [[ "$YR_HARDEN_MSG" == "$name runs"* && "$YR_HARDEN_MSG" != *tools/cmd* ]] )
   done
+}
+
+@test "harden_git_config refuses python -m, which finds the module in the current directory" {
+  printf 'print(1)\n' >| evil.py
+  for val in "python3 -m evil" "python3 -mevil" "python3 -Bm evil" "env python3 -m evil"; do
+    rc=0; ( export GIT_SSH_COMMAND="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "accepted: $val" >&2; return 1; }
+  done
+  rc=0; ( export GIT_SSH_COMMAND="ssh -p22 -oBatchMode=yes"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
 }
 
 @test "harden_git_config judges every token: logical spelling, a bare first word that is a script entering the worktree" {
