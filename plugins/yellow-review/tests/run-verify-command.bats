@@ -905,6 +905,82 @@ redact_log() {
   [ -f src/new.txt ]
 }
 
+@test "a failed special-file restore is retried before claiming nothing was reverted" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v mv)
+  # Fail only the first rename back onto src/a.txt. The parent retries it.
+  {
+    printf '#!/bin/bash\n'
+    printf 'if [ "$1" = -- ] && [ "$3" = src/a.txt ]; then\n'
+    printf '  if [ ! -e %q ]; then : >| %q; exit 1; fi\n' "$BATS_TEST_TMPDIR/mv-once" "$BATS_TEST_TMPDIR/mv-once"
+    printf 'fi\n'
+    printf 'exec %q "$@"\n' "$real"
+  } >| "$shim/mv"
+  chmod +x "$shim/mv"
+  rm -f src/a.txt && mkfifo src/a.txt
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"nothing was reverted"* ]]
+  [ -p src/a.txt ]
+  [ -f src/new.txt ]
+  [ -z "$(find src -name .yellow-review-hold-\* -print -quit)" ]
+}
+
+@test "a special file that cannot be restored is named and not described as untouched" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v mv)
+  {
+    printf '#!/bin/bash\n'
+    printf 'if [ "$1" = -- ] && [ "$3" = src/a.txt ]; then exit 1; fi\n'
+    printf 'exec %q "$@"\n' "$real"
+  } >| "$shim/mv"
+  chmod +x "$shim/mv"
+  rm -f src/a.txt && mkfifo src/a.txt
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  reason=$(printf '%s' "$output" | jq -r .reason)
+  [[ "$reason" == *"could not restore a special file: src/a.txt (held at src/.yellow-review-hold-"* ]]
+  [[ "$reason" != *"nothing was reverted"* ]]
+  [[ "$reason" != *"untouched"* ]]
+  [ ! -e src/a.txt ]
+  [ -p src/.yellow-review-hold-*/node ]
+  [ -f src/new.txt ]
+  [[ "$stderr" != *"Error:"* ]]
+}
+
+@test "a special-file removal failure still restores one already removed" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v rm)
+  {
+    printf '#!/bin/bash\n'
+    printf 'for a in "$@"; do [ "$a" = src/b.txt ] && exit 1; done\n'
+    printf 'exec %q "$@"\n' "$real"
+  } >| "$shim/rm"
+  chmod +x "$shim/rm"
+  rm -f src/a.txt src/b.txt
+  mkfifo src/a.txt
+  mkfifo src/b.txt
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/b.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = false ]
+  reason=$(printf '%s' "$output" | jq -r .reason)
+  [[ "$reason" == *"not a regular file or symlink: src/a.txt"* ]]
+  [[ "$reason" == *"revert failed: rm src/b.txt"* ]]
+  [ -f src/a.txt ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
+  [ -p src/b.txt ]
+  [[ "$stderr" != *"Error:"* ]]
+}
+
 @test "a failed pre-verification snapshot aborts with exit 2 before the command runs" {
   real_git=$(command -v git)
   cat >| "$STUB_BIN/git" <<STUB

@@ -525,8 +525,14 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   `git diff` or the refusal cleanup. In the revert modes a FIFO, socket or
   device is kept until the recovery patch has recorded its tracked deletion
   without opening it: the entry is renamed aside in its own directory for that
-  diff, then put back, and unlinked only after the snapshot is written. If the
-  snapshot cannot be written, the special file stays and nothing is reverted.
+  diff, then put back, and unlinked only after the snapshot is written.
+  `save_patch` runs in a subshell, so a rename back that fails is retried by
+  the parent. If the entry is back, a snapshot failure still reverts nothing.
+  If it is still held, `reason` names that path and does not claim the tree
+  was untouched. An `rm` that cannot unlink one special file is recorded in
+  `reason` and does not abort the revert, so a special file already removed
+  is still restored from HEAD. Checkout does not open a special file that is
+  still present.
   A directory standing where HEAD has a regular file is handled the same way:
   the revert modes save the patch first, with the deletion of the file followed
   by every regular file and symlink inside the directory as new files, and only

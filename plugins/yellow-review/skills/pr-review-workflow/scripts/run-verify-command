@@ -68,8 +68,14 @@
 #                  is never opened. Revert modes rename it aside in its own
 #                  directory while the patch records the tracked deletion, then
 #                  put it back. It is removed only after that snapshot is
-#                  written. If the snapshot cannot be saved, the special file
-#                  stays and nothing is reverted.
+#                  written. If the snapshot cannot be saved and the rename back
+#                  succeeded, the special file stays and nothing is reverted.
+#                  save_patch runs in a subshell, so a rename back that fails
+#                  is retried outside it. If the entry is still held, the
+#                  reason names that path and does not claim the tree was left
+#                  untouched. An unlink that fails is recorded and the revert
+#                  continues, so a special file already removed is still
+#                  restored. Checkout does not open one that is still present.
 #   --revert-dirty: like --revert-only for every change in the tree, listed
 #                  by git itself (for refusals: never trust resolver text).
 #   --timeout, --command-file, --trusted and --unattended apply only when
@@ -465,6 +471,7 @@ MARKER=""
 STREAM_FILE=""
 IGNORED_SCRATCH=""
 DIR_LIST=""
+HOLD_LEFTOVER=""
 # The snapshot is provisional until it is complete and credential-screened: any
 # exit before then (a signal, a die, a failed screen) removes it, so no
 # unscreened patch stays under .git.
@@ -472,7 +479,7 @@ PATCH=""
 PATCH_PROVISIONAL=0
 cleanup() {
     local f
-    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST"; do
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST" "$HOLD_LEFTOVER"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
     if [ "$PATCH_PROVISIONAL" = 1 ] && [ -n "$PATCH" ]; then
@@ -761,7 +768,8 @@ run_verify() {
 # A FIFO, socket or device standing in for a tracked file stays in place too.
 # It is renamed aside in its own directory for the diff (a cross-device move
 # would copy it and open it), then renamed back. The caller unlinks it only
-# after both snapshots are written.
+# after both snapshots are written. This function runs in a subshell, so a
+# rename back that fails is recorded in HOLD_LEFTOVER for the parent to retry.
 save_patch() {
     local out="$1" fmt="$2" f rc c p held_dir="" held_parent=""
     umask 077
@@ -788,6 +796,9 @@ save_patch() {
                 --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$out" || rc=$?
             if [ -n "$held_dir" ]; then
                 if ! mv -- "$held_dir/node" "$f"; then
+                    # The entry is not at its path. The parent retries; until
+                    # that succeeds the tree has changed.
+                    printf '%s%s%s\n' "$held_dir/node" $'\037' "$f" >>"$HOLD_LEFTOVER"
                     return 1
                 fi
                 rmdir -- "$held_dir" || return 1
@@ -816,9 +827,73 @@ save_patch() {
         fi
     done
 }
+
+# save_patch's subshell cannot put a special file back after it returns.
+# Retry each recorded rename here. Whatever is still held is named in the
+# failure reason; the caller must not claim the tree was left untouched.
+rehome_held() {
+    local line src dest tmp
+    [ -s "$HOLD_LEFTOVER" ] || return 0
+    tmp=$(mktemp) || return 1
+    : >"$tmp"
+    while IFS= read -r line || [ -n "$line" ]; do
+        [ -n "$line" ] || continue
+        case "$line" in
+            *$'\037'*)
+                src="${line%%$'\037'*}"
+                dest="${line#*$'\037'}"
+                ;;
+            *)
+                src="$line"
+                dest=""
+                ;;
+        esac
+        if [ -n "$dest" ] && { [ -e "$src" ] || [ -L "$src" ]; } \
+            && mv -- "$src" "$dest"; then
+            rmdir -- "${src%/*}" 2>/dev/null || true
+            continue
+        fi
+        if [ -n "$dest" ] && { [ -e "$dest" ] || [ -L "$dest" ]; } \
+            && [ ! -e "$src" ] && [ ! -L "$src" ]; then
+            rmdir -- "${src%/*}" 2>/dev/null || true
+            continue
+        fi
+        printf '%s\n' "$line" >>"$tmp"
+    done <"$HOLD_LEFTOVER"
+    cat -- "$tmp" >|"$HOLD_LEFTOVER"
+    rm -f -- "$tmp"
+}
+
+# Empty when every held special file is back at its path.
+held_unrestored_reason() {
+    local line src dest n=0 list=""
+    [ -s "$HOLD_LEFTOVER" ] || return 0
+    while IFS= read -r line || [ -n "$line" ]; do
+        [ -n "$line" ] || continue
+        case "$line" in
+            *$'\037'*)
+                src="${line%%$'\037'*}"
+                dest="${line#*$'\037'}"
+                ;;
+            *)
+                src="$line"
+                dest=""
+                ;;
+        esac
+        n=$((n + 1))
+        if [ "$n" -le 5 ]; then
+            list="${list:+$list, }${dest:-unknown} (held at ${src})"
+        fi
+    done <"$HOLD_LEFTOVER"
+    [ "$n" -gt 0 ] || return 0
+    [ "$n" -le 5 ] || list="$list (+$((n - 5)) more)"
+    printf '%s' "could not restore a special file: $list"
+}
+
 TEXT_FILE=$(mktemp) || die 2 "mktemp failed"
 DIR_LIST=$(mktemp) || die 2 "mktemp failed"
 ADDED_FILE=$(mktemp) || die 2 "mktemp failed"
+HOLD_LEFTOVER=$(mktemp) || die 2 "mktemp failed"
 SAVE_BIN_OK=0 SAVE_TEXT_OK=0
 PATCH_OUT="$PATCH"
 PATCH_SCREENED=0
@@ -865,8 +940,13 @@ patch_hunk_lines() {
     '
 }
 screen_patch() {
+    local held=""
     if [ "$SAVE_TEXT_OK" != 1 ] || ! patch_hunk_lines <"$TEXT_FILE" >"$ADDED_FILE"; then
         rm -f -- "$PATCH"
+        held=$(held_unrestored_reason)
+        if [ -n "$held" ]; then
+            die 2 "cannot screen the recovery patch; $held"
+        fi
         die 2 "cannot screen the recovery patch; the command was not run and the tree is untouched"
     fi
     rt_code_clean "$ADDED_FILE"
@@ -902,8 +982,13 @@ if [ "$MODE" = run ]; then
     # still holds the resolver's work. Abort with the tree untouched.
     (save_patch "$PATCH" --binary) && SAVE_BIN_OK=1
     (save_patch "$TEXT_FILE" --text) && SAVE_TEXT_OK=1
+    rehome_held
     if [ "$SAVE_BIN_OK" != 1 ] || [ "$SAVE_TEXT_OK" != 1 ]; then
         rm -f -- "$PATCH"
+        held=$(held_unrestored_reason)
+        if [ -n "$held" ]; then
+            die 2 "could not snapshot the listed files before the verify command; $held"
+        fi
         die 2 "could not snapshot the listed files before the verify command; the command was not run and the tree is untouched"
     fi
     screen_patch
@@ -983,12 +1068,19 @@ if [ "$MODE" != run ]; then
     SAVE_BIN_OK=0 SAVE_TEXT_OK=0
     (save_patch "$PATCH" --binary) && SAVE_BIN_OK=1
     (save_patch "$TEXT_FILE" --text) && SAVE_TEXT_OK=1
+    rehome_held
 fi
-if [ "$SAVE_BIN_OK" != 1 ]; then
+held=$(held_unrestored_reason)
+if [ "$SAVE_BIN_OK" != 1 ] || [ -n "$held" ]; then
     rm -f -- "$PATCH"
-    jq -nc --arg r "$RESULT" --arg log "$LOG" --arg why "$REASON" \
+    if [ -n "$held" ]; then
+        msg="$held"
+    else
+        msg="could not save the recovery patch; nothing was reverted"
+    fi
+    jq -nc --arg r "$RESULT" --arg log "$LOG" --arg why "$REASON" --arg msg "$msg" \
         '{result: $r, patch: null, log: (if $log == "" then null else $log end), treeClean: false,
-          reason: (($why | if . == "" then "" else . + "; " end) + "could not save the recovery patch; nothing was reverted")}'
+          reason: (($why | if . == "" then "" else . + "; " end) + $msg)}'
     exit 0
 fi
 
@@ -1000,15 +1092,20 @@ PATCH_PROVISIONAL=0
 
 # --- Revert the listed files ---
 REVERT_FAILS=()
+SKIP_SPECIAL=()
 # The patch now holds each tracked deletion (save_patch), so a FIFO, socket or
 # device can go without ever being opened. A snapshot failure returns above
-# and leaves the special file in place. The checkout below restores the file.
+# and leaves the special file in place. Record an unlink that fails and keep
+# going: die would skip checkout of a special file this loop already removed.
+# Checkout below skips a path that is still special, so git does not open it.
 for f in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
     rm -f -- "$f" 2>/dev/null
     if [ -e "$f" ] || [ -L "$f" ]; then
-        die 2 "cannot remove a path that is not a regular file or symlink: $f"
+        REVERT_FAILS+=("rm $f")
+        SKIP_SPECIAL+=("$f")
+    else
+        add_reason "removed without reading, not a regular file or symlink: $f"
     fi
-    add_reason "removed without reading, not a regular file or symlink: $f"
 done
 # The patch now holds the files of each replacement directory (save_patch), so
 # the directories can go; the checkout below restores the file in their place.
@@ -1021,6 +1118,9 @@ for f in ${DIR_REMOVE[@]+"${DIR_REMOVE[@]}"}; do
     fi
 done
 for f in ${FILES[@]+"${FILES[@]}"}; do
+    for s in ${SKIP_SPECIAL[@]+"${SKIP_SPECIAL[@]}"}; do
+        [ "$s" = "$f" ] && continue 2
+    done
     if git cat-file -e "HEAD:$f" 2>/dev/null; then
         # Hooks off: post-checkout and post-index-change would run any hook a
         # resolver planted, including an ignored one under core.hooksPath.
