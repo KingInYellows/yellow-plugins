@@ -1054,6 +1054,13 @@ SHIM
   [[ "$stderr" != *"Error:"* ]]
 }
 
+@test "the hold-ledger reader does not use bash namerefs" {
+  # Stock macOS /bin/bash is 3.2. local -n and declare -n are runtime errors
+  # there, and this script does not refuse to run before drop_hold_line.
+  run grep -n -E 'local -n|declare -n' "$SCRIPT"
+  [ "$status" -eq 1 ]
+}
+
 @test "a special-file removal failure still restores one already removed" {
   command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
   shim="$BATS_TEST_TMPDIR/shim"

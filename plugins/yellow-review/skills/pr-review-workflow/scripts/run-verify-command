@@ -803,15 +803,17 @@ append_hold_record() {
     printf '%s\0%s\0' "$1" "$2" >>"$3"
 }
 
-# Next record on stdin into the caller's variables. 1 at EOF or when the
-# second NUL is missing, so a truncated record is not applied.
+# Next record on stdin into the caller variables named by $1 and $2.
+# printf -v follows bash dynamic scope. macOS /bin/bash is 3.2 and has no
+# namerefs; this file's shebang is /bin/bash and nothing checks BASH_VERSINFO
+# before drop_hold_line. 1 at EOF or when the second NUL is missing, so a
+# truncated record is not applied.
 read_hold_record() {
-    local -n _hold_src="$1" _hold_dest="$2"
     local _src="" _dest=""
     IFS= read -r -d '' _src || return 1
     IFS= read -r -d '' _dest || return 1
-    _hold_src="$_src"
-    _hold_dest="$_dest"
+    printf -v "$1" '%s' "$_src" || return 1
+    printf -v "$2" '%s' "$_dest" || return 1
 }
 
 # Drop one hold record after the special file is back at its path.
