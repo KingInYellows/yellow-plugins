@@ -1835,6 +1835,23 @@ CFG_CMD_KEYS=(
   rm -rf "${PWD}-keys" "${PWD}2"
 }
 
+@test "harden_git_config refuses when awk cannot split NUL records (BWK awk) instead of skipping keys" {
+  # BWK awk reads RS = "\0" as RS = "" (paragraph mode) and cuts each line at
+  # its first NUL; a value with blank lines then makes the record count a
+  # multiple of 3 and the refused key is never seen.
+  git config core.sshCommand evil
+  git config x.y "$(printf 'a\n\nb\n\nc')"
+  # Emulate that awk with the system one, then use the real one when present.
+  yr_awk() { local p="${1//'RS = "\0"'/RS = \"\"}"; shift; sed 's/\x00.*//' | command awk "$p" "$@"; }
+  rc=0; ( harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  if command -v original-awk >/dev/null; then
+    yr_awk() { original-awk "$@"; }
+    rc=0; ( harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ]
+  fi
+}
+
 @test "harden_git_config refuses a command line that starts with a NAME=value assignment" {
   # The shell applies a leading assignment to the command it runs:
   # PATH=tools:/usr/bin ssh looks ssh up in the worktree's tools/.

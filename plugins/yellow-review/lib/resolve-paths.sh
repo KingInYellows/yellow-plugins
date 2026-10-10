@@ -1253,11 +1253,18 @@ harden_git_config() {
     # pre-filters with the same list and prints one tab-separated line per
     # candidate (M marks a multi-line value). Every field is percent-encoded
     # (%, tab and newline) so a path or value holding a tab cannot shift the
-    # columns; the shell decodes them (yr_pct_decode); git's status 0 is required, an
-    # awk that cannot split on NUL leaves a record count that is not a
-    # multiple of 3 and is refused.
+    # columns; the shell decodes them (yr_pct_decode); git's status 0 is required, and
+    # an awk that cannot split on NUL is refused by the probe below.
     local tkey="" tscope trigin tkeyname tml tval ofile c oroot cache=$'\n'
     local recs
+    # BWK awk (macOS /usr/bin/awk) reads RS = "\0" as paragraph mode and cuts
+    # lines at NUL; blank lines in a value can then make the count a multiple
+    # of 3 and hide a key. Refuse unless awk splits NUL records.
+    recs=$(printf 'a\0b\0c\0' | yr_awk 'BEGIN { RS = "\0" } END { print NR }' 2>/dev/null) || recs=""
+    if [ "$recs" != 3 ]; then
+        YR_HARDEN_MSG="could not parse the git transport config: awk cannot split NUL-separated records (install gawk or mawk)"
+        return 1
+    fi
     recs=$(set -o pipefail; yr_git config --null --show-scope --show-origin --list 2>/dev/null | YR_RE="$YR_CFG_CMD_KEY_RE" yr_awk 'function pe(x) { gsub(/%/, "%25", x); gsub(/\t/, "%09", x); gsub(/\n/, "%0A", x); return x }
         BEGIN { RS = "\0" }
         NR % 3 == 1 { sc = $0; next }

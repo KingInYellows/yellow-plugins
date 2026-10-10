@@ -687,6 +687,9 @@ explicit-invocation wording live in the skill body and description.
 ## Known Limitations
 
 - GraphQL scripts require `gh` and `jq` to be installed
+- `harden_git_config` needs an `awk` that splits NUL-separated records (gawk,
+  mawk); with BWK awk (macOS `/usr/bin/awk`) first on `PATH` it refuses, so
+  `commit-resolve-fixes` and `run-verify-command` stop
 - Cross-plugin agents require the `yellow-core` plugin to be installed
 - Very large PRs (1000+ lines) may cause agent context overflow — consider
   splitting
