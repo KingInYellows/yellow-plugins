@@ -27,7 +27,11 @@
 #                  it leaves the link's own mtime alone): a target file, or a
 #                  file inside a target directory, newer than the marker
 #                  refuses, a dangling target does not, and a target that cannot
-#                  be examined refuses (fail closed). A
+#                  be examined refuses (fail closed). Skipped
+#                  while a regular file: .ruvector/coedit.json,
+#                  .ruvector/coedit-sessions/ and
+#                  node_modules/.vite/vitest/results.json at any depth;
+#                  everything else still refuses. A
 #                  marker that is missing, unreadable, a symlink or not a
 #                  regular file also refuses (fail closed), as does a listing
 #                  failure. Attended runs may omit it. The revert modes ignore
