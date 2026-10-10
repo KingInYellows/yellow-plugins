@@ -133,10 +133,10 @@ _cs_redact_bare_basic() {
       kw = "[Bb][Aa][Ss][Ii][Cc][ \t\r\v\f]+[A-Za-z0-9+/]+=*"
       failed = 0
     }
-    function is_cred(tok,    n, i, acc, bits, p, byte, nb, fc) {
+    function is_cred(tok,    n, i, acc, bits, p, byte, nb, fc, lead) {
       n = length(tok)
       if (n < 4 || n % 4 == 1) return 0
-      acc = 0; bits = 0; nb = 0; fc = 0
+      acc = 0; bits = 0; nb = 0; fc = 0; lead = 0
       for (i = 1; i <= n; i++) {
         acc = acc * 64 + index(b64, substr(tok, i, 1)) - 1
         bits += 6
@@ -150,13 +150,16 @@ _cs_redact_bare_basic() {
           # resolve-text.sh in yellow-review.
           if (byte < 32 || (byte >= 127 && byte < 160)) return 0
           nb++
+          if (byte == 58 && nb == 1) lead = 1
           if (byte == 58 && nb > 1 && fc == 0) fc = nb
         }
       }
       # Some colon must sit between two other bytes (an empty user with a
-      # colon in the password counts; a leading or trailing colon alone does
-      # not), as in resolve-text.sh.
-      return fc > 1 && fc < nb
+      # colon in the password counts; a trailing colon alone does not), as in
+      # resolve-text.sh. An empty user with a token password (":<PAT>", as
+      # Azure DevOps sends) counts once the password is 16 bytes or longer;
+      # a shorter leading-colon payload stays prose ("Only" decodes to ":yr").
+      return (fc > 1 && fc < nb) || (lead && nb >= 17)
     }
     {
       if ($0 == fail_mark) { failed = 1; next }
