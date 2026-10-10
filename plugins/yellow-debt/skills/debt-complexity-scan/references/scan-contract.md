@@ -38,6 +38,19 @@ def safe_name(name):
     lower = name.lower()
     return bool(re.fullmatch(r"[A-Za-z0-9_.-]+", name)) and name not in {".", ".."} and not name.startswith("-") and lower not in EXCLUDED and not lower.startswith(".env") and not re.search(r"secret|credential|password|token|private[-_]?key", lower)
 
+def delimiter_hits(line, delimiter):
+    # Positions of delimiter not escaped by an odd run of backslashes.
+    hits = []
+    start = 0
+    while True:
+        index = line.find(delimiter, start)
+        if index < 0:
+            return hits
+        before = line[:index]
+        if (len(before) - len(before.rstrip("\\"))) % 2 == 0:
+            hits.append(index)
+        start = index + len(delimiter)
+
 def inspect(parent_fd, name, relative):
     global lines_left, visited, partial
     visited += 1
@@ -91,7 +104,7 @@ def inspect(parent_fd, name, relative):
         hidden = True
         if delimiter:
             # Inside a backtick or triple-quoted literal: hide through the closing delimiter.
-            if delimiter in line:
+            if delimiter_hits(line, delimiter):
                 delimiter = None
             continued = False
         elif in_pem:
@@ -108,7 +121,7 @@ def inspect(parent_fd, name, relative):
             elif continued or re.search(r"(?i)(?:(?:api[_-]?key|token|password|secret|private[_-]?key)[A-Za-z0-9_.-]*[\"']?\s*[=:]|authorization[\"']?\s*[=:,]|\bbearer\s+\S|\b[a-z][a-z0-9+.-]*://[^\s/:@]+:[^\s/@]+@)", line):
                 continued = line.rstrip().endswith(("=", ":", "(", "[", "{", ",", "+", "\\"))
                 for opener in ("`", '"""', "'''"):
-                    if line.count(opener) % 2 == 1:
+                    if len(delimiter_hits(line, opener)) % 2 == 1:
                         delimiter = opener
                         break
                 if re.search(r":\s*[|>][-+0-9]*\s*$", line):

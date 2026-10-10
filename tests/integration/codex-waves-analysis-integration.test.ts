@@ -267,6 +267,63 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     expect(lines[3].text).toBe('amount = 1');
   });
 
+  it('keeps a backtick span open past an escaped backtick', () => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'const privateKey = `\n' +
+          'fake-payload-iota \\` still-hidden\n' +
+          'fake-payload-kappa\n' +
+          '`;\n' +
+          'const amount = 1;\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    expect(JSON.stringify(result.output)).not.toContain('fake-payload');
+    const lines = result.output.files[0].lines;
+    for (let index = 0; index < 4; index += 1) {
+      expect(lines[index].text).toBe(redactedAt(index + 1));
+    }
+    expect(lines[4].text).toBe('const amount = 1;');
+  });
+
+  it('keeps a triple-quoted span open past an escaped triple quote', () => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'password = """\n' +
+          'fake-payload-lambda \\""" still-hidden\n' +
+          'fake-payload-mu\n' +
+          '"""\n' +
+          'amount = 1\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    expect(JSON.stringify(result.output)).not.toContain('fake-payload');
+    const lines = result.output.files[0].lines;
+    for (let index = 0; index < 4; index += 1) {
+      expect(lines[index].text).toBe(redactedAt(index + 1));
+    }
+    expect(lines[4].text).toBe('amount = 1');
+  });
+
+  it('closes a span when an escaped backslash precedes the real backtick', () => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'const privateKey = `\n' +
+          'fake-payload-nu \\\\`;\n' +
+          'const amount = 1;\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    expect(JSON.stringify(result.output)).not.toContain('fake-payload');
+    const lines = result.output.files[0].lines;
+    expect(lines[0].text).toBe(redactedAt(1));
+    expect(lines[1].text).toBe(redactedAt(2));
+    expect(lines[2].text).toBe('const amount = 1;');
+  });
+
   it('redacts a YAML block scalar until the indentation returns', () => {
     const result = inspect('src/file.js', (workspace) => {
       writeFileSync(
