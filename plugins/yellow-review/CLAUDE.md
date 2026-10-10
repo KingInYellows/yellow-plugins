@@ -346,7 +346,9 @@ does an `env` first word with an assignment or option before its utility
 shell's `command`, `exec`, `time`, `builtin`, or a program such as `nice`,
 `sudo` or `timeout`) is skipped with its options and numeric operands, so
 `timeout 5 ssh` is judged by `ssh`, and an assignment, `env` option or `eval`
-behind it counts as entering (`command env PATH=tools ssh`); an `eval` first
+behind it counts as entering (`command env PATH=tools ssh`), as does a
+non-numeric word right after a launcher option, which may be that option's
+operand (`stdbuf -o L env PATH=tools ssh`, `sudo -u git ssh`); an `eval` first
 word always does; a leading `~/` is expanded to
 `HOME` and judged. When `GIT_CONFIG_GLOBAL` is unset, a `HOME` or
 `XDG_CONFIG_HOME` that puts git's global config inside the worktree is refused
