@@ -285,10 +285,11 @@ yr_file_shebang_enters() {
             ;;
         *) args=${rest#"$i"} ;;
     esac
-    # A $, backtick, ~ or backslash in an argument is expanded or decoded by the
-    # program the line starts (`#!/bin/sh -c $PWD/evil`, which BSD and macOS
-    # pass as separate arguments), so no path in it can be judged: fail closed.
-    case "$args" in *[\$\`~\\]*) return 0 ;; esac
+    # A $, backtick, ~, backslash or glob character (* ? [) in an argument is
+    # expanded or decoded by the program the line starts (`#!/bin/sh -c
+    # $PWD/evil`, which BSD and macOS pass as separate arguments), so no path
+    # in it can be judged: fail closed.
+    case "$args" in *[\$\`~\\*?[]*) return 0 ;; esac
     if [ -n "$args" ] && yr_args_enter "$args" "$root" 0; then
         return 0
     fi
@@ -517,7 +518,7 @@ yr_shebang_inside() {
         function argpaths(from,    j, k, a, c, pc, pn, t, txt) {
             txt = ""
             for (j = from; j <= n; j++) txt = txt " " w[j]
-            if (txt ~ /[$`~\\]/) { pr(root); return }
+            if (txt ~ /[$`~\\*?[]/) { pr(root); return }
             if (hasroot(txt)) pr(root)
             for (j = from; j <= n; j++) {
                 a = w[j]; sub(/^!/, "", a); gsub(/^["\047]|["\047]$/, "", a)

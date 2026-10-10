@@ -1647,13 +1647,13 @@ CFG_CMD_KEYS=(
   [ "$rc" -eq 2 ]
 }
 
-@test "a #! optional argument with expansion syntax counts as entering, in awk and in the shell" {
+@test "a #! optional argument with expansion or glob syntax counts as entering, in awk and in the shell" {
   mkdir -p tools "$BATS_TEST_TMPDIR/xbin" "$BATS_TEST_TMPDIR/okx"
   printf '#!/bin/sh\nexit 0\n' >| tools/evil
   chmod +x tools/evil
   n=0
   for line in '#!/bin/sh -c $PWD/tools/evil' '#!/bin/sh -c `pwd`/tools/evil' '#!/bin/sh -c ~/tools/evil' '#!/bin/sh -c \tools/evil' \
-              '#!/usr/bin/env sh -c $PWD/tools/evil'; do
+              '#!/usr/bin/env sh -c $PWD/tools/evil' '#!/bin/sh -c ?ools/evil' '#!/bin/sh -c t*/evil' '#!/bin/sh -c [t]ools/evil'; do
     n=$((n + 1))
     printf '%s\n' "$line" >| "$BATS_TEST_TMPDIR/xbin/tool$n"
     chmod +x "$BATS_TEST_TMPDIR/xbin/tool$n"

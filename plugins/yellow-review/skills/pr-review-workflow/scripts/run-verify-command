@@ -460,10 +460,11 @@ yr_file_shebang_enters() {
             ;;
         *) args=${rest#"$i"} ;;
     esac
-    # A $, backtick, ~ or backslash in an argument is expanded or decoded by the
-    # program the line starts (`#!/bin/sh -c $PWD/evil`, which BSD and macOS
-    # pass as separate arguments), so no path in it can be judged: fail closed.
-    case "$args" in *[\$\`~\\]*) return 0 ;; esac
+    # A $, backtick, ~, backslash or glob character (* ? [) in an argument is
+    # expanded or decoded by the program the line starts (`#!/bin/sh -c
+    # $PWD/evil`, which BSD and macOS pass as separate arguments), so no path
+    # in it can be judged: fail closed.
+    case "$args" in *[\$\`~\\*?[]*) return 0 ;; esac
     if [ -n "$args" ] && yr_args_enter "$args" "$root" 0; then
         return 0
     fi
