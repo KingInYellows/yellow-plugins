@@ -1408,6 +1408,19 @@ CFG_CMD_KEYS=(
   ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global"; rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 1 ] )
 }
 
+@test "harden_git_config judges the command a global url.ext::<command>.insteadOf key carries" {
+  printf '#!/bin/sh\nexit 0\n' >| evil
+  chmod +x evil
+  git config -f "$BATS_TEST_TMPDIR/global" 'url.ext::./evil .insteadOf' https://example.invalid/
+  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  msg=$(export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global"; harden_git_config full >/dev/null 2>&1; printf '%s' "$YR_HARDEN_MSG")
+  [[ "$msg" == *'url.<ext::...>.insteadOf'* ]]
+  : >| "$BATS_TEST_TMPDIR/global"
+  git config -f "$BATS_TEST_TMPDIR/global" 'url.ext::/usr/bin/ssh %S .pushInsteadOf' https://example.invalid/
+  ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global"; rc=0; harden_git_config full || rc=$?; [ "$rc" -eq 0 ] )
+}
+
 @test "harden_git_config judges an include whose path holds a tab, a newline or a percent sign" {
   mkdir -p ignored
   for name in $'inc\tx' $'inc\ty\tz' $'inc\nnl' 'inc%09x' 'inc%25'; do
@@ -1717,13 +1730,14 @@ CFG_CMD_KEYS=(
   [ "$rc" -eq 2 ]
 }
 
-@test "a #! optional argument with expansion or glob syntax counts as entering, in awk and in the shell" {
+@test "a #! optional argument with expansion, glob or shell operator syntax counts as entering, in awk and in the shell" {
   mkdir -p tools "$BATS_TEST_TMPDIR/xbin" "$BATS_TEST_TMPDIR/okx"
   printf '#!/bin/sh\nexit 0\n' >| tools/evil
   chmod +x tools/evil
   n=0
   for line in '#!/bin/sh -c $PWD/tools/evil' '#!/bin/sh -c `pwd`/tools/evil' '#!/bin/sh -c ~/tools/evil' '#!/bin/sh -c \tools/evil' \
-              '#!/usr/bin/env sh -c $PWD/tools/evil' '#!/bin/sh -c ?ools/evil' '#!/bin/sh -c t*/evil' '#!/bin/sh -c [t]ools/evil'; do
+              '#!/usr/bin/env sh -c $PWD/tools/evil' '#!/bin/sh -c ?ools/evil' '#!/bin/sh -c t*/evil' '#!/bin/sh -c [t]ools/evil' \
+              '#!/bin/sh -c PATH=tools:/usr/bin;evil' '#!/bin/sh -c true&&evil' '#!/bin/sh -c true|evil' '#!/bin/sh -c (evil)' '#!/bin/sh -c evil<x'; do
     n=$((n + 1))
     printf '%s\n' "$line" >| "$BATS_TEST_TMPDIR/xbin/tool$n"
     chmod +x "$BATS_TEST_TMPDIR/xbin/tool$n"
