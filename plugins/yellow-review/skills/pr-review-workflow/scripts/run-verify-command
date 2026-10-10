@@ -74,7 +74,9 @@
 #                  written. If the snapshot cannot be saved and the rename back
 #                  succeeded, the special file stays and nothing is reverted.
 #                  save_patch runs in a subshell, so a rename back that fails
-#                  is retried outside it. If the entry is still held, the
+#                  is retried outside it. A rewrite of the hold ledger replaces
+#                  it only after the new copy is complete, so a failed rewrite
+#                  leaves the record. If the entry is still held, the
 #                  reason names that path and does not claim the tree was left
 #                  untouched. An unlink that fails is recorded and the revert
 #                  continues, so a special file already removed is still
@@ -775,20 +777,36 @@ run_verify() {
 # The caller unlinks it only after both snapshots are written. This function
 # runs in a subshell, so a rename back that fails is already in HOLD_LEFTOVER
 # for the parent to retry.
-# Drop one hold line after the special file is back at its path. A temp and
-# cat, not mv: a caller that rejects mv onto the original path must not
-# intercept this rewrite.
+# A sibling of HOLD_LEFTOVER. Renaming it over the ledger is atomic and does
+# not use `mv -- <held> <original>`, which callers shim to fail.
+hold_ledger_tmp() {
+    (umask 077 && mktemp -- "${HOLD_LEFTOVER}.XXXXXX")
+}
+
+# Replace HOLD_LEFTOVER only after the temp holds the full rewrite. A failed
+# write or rename leaves the previous ledger in place.
+replace_hold_ledger() {
+    local tmp="$1"
+    if mv -f -- "$tmp" "$HOLD_LEFTOVER"; then
+        return 0
+    fi
+    rm -f -- "$tmp"
+    return 1
+}
+
+# Drop one hold line after the special file is back at its path.
 drop_hold_line() {
     local src="$1" dest="$2" line want tmp
     want="${src}"$'\037'"${dest}"
-    tmp=$(mktemp) || return 1
-    : >"$tmp"
+    tmp=$(hold_ledger_tmp) || return 1
     while IFS= read -r line || [ -n "$line" ]; do
         [ "$line" = "$want" ] && continue
-        printf '%s\n' "$line" >>"$tmp"
+        if ! printf '%s\n' "$line" >>"$tmp"; then
+            rm -f -- "$tmp"
+            return 1
+        fi
     done <"$HOLD_LEFTOVER"
-    cat -- "$tmp" >|"$HOLD_LEFTOVER"
-    rm -f -- "$tmp"
+    replace_hold_ledger "$tmp"
 }
 
 save_patch() {
@@ -867,8 +885,7 @@ save_patch() {
 rehome_held() {
     local line src dest tmp
     [ -s "$HOLD_LEFTOVER" ] || return 0
-    tmp=$(mktemp) || return 1
-    : >"$tmp"
+    tmp=$(hold_ledger_tmp) || return 1
     while IFS= read -r line || [ -n "$line" ]; do
         [ -n "$line" ] || continue
         case "$line" in
@@ -891,10 +908,14 @@ rehome_held() {
             rmdir -- "${src%/*}" 2>/dev/null || true
             continue
         fi
-        printf '%s\n' "$line" >>"$tmp"
+        # Keep the old ledger if this copy fails. Truncating it first would
+        # drop the held path and the caller would say nothing was reverted.
+        if ! printf '%s\n' "$line" >>"$tmp"; then
+            rm -f -- "$tmp"
+            return 1
+        fi
     done <"$HOLD_LEFTOVER"
-    cat -- "$tmp" >|"$HOLD_LEFTOVER"
-    rm -f -- "$tmp"
+    replace_hold_ledger "$tmp"
 }
 
 # Empty when every held special file is back at its path.

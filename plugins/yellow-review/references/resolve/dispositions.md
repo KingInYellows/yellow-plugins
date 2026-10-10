@@ -529,6 +529,8 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   The hold path is recorded before the rename back. If that ledger write fails,
   the file is put back when it can and nothing is reverted; if it cannot, stderr
   names the remaining path.
+  A rewrite of that ledger replaces it only after the new copy is complete, so
+  a failed rewrite leaves the recorded path in place.
   `save_patch` runs in a subshell, so a rename back that fails is retried by
   the parent. If the entry is back, a snapshot failure still reverts nothing.
   If it is still held, `reason` names that path and does not claim the tree

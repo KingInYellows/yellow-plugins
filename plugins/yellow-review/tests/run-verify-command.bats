@@ -954,6 +954,49 @@ redact_log() {
   [[ "$stderr" != *"Error:"* ]]
 }
 
+@test "a failed hold-ledger rewrite still names the unrestored special file" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real_mv=$(command -v mv)
+  real_mktemp=$(command -v mktemp)
+  {
+    printf '#!/bin/bash\n'
+    printf 'if [ "$1" = -- ] && [ "$3" = src/a.txt ]; then exit 1; fi\n'
+    printf 'exec %q "$@"\n' "$real_mv"
+  } >| "$shim/mv"
+  # The rewrite temp is a sibling of the default mktemp file
+  # (${HOLD_LEFTOVER}.XXXXXX). Mode 000 makes that copy fail before the old
+  # ledger is replaced. Other mktemp calls, including bats' own, stay writable.
+  cat >| "$shim/mktemp" <<SHIM
+#!/bin/bash
+if [ "\${1:-}" = -- ]; then
+  case "\${2:-}" in
+    */tmp.*.XXXXXX)
+      out=\$("$real_mktemp" "\$@") || exit \$?
+      chmod 000 -- "\$out" || exit 1
+      printf '%s\n' "\$out"
+      exit 0
+      ;;
+  esac
+fi
+exec "$real_mktemp" "\$@"
+SHIM
+  chmod +x "$shim/mv" "$shim/mktemp"
+  rm -f src/a.txt && mkfifo src/a.txt
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  reason=$(printf '%s' "$output" | jq -r .reason)
+  [[ "$reason" == *"could not restore a special file: src/a.txt (held at src/.yellow-review-hold-"* ]]
+  [[ "$reason" != *"nothing was reverted"* ]]
+  [[ "$reason" != *"untouched"* ]]
+  [ ! -e src/a.txt ]
+  [ -p src/.yellow-review-hold-*/node ]
+  [ -f src/new.txt ]
+  [[ "$stderr" != *"Error:"* ]]
+}
+
 @test "an unwritable hold ledger puts the special file back instead of stranding it" {
   command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
   shim="$BATS_TEST_TMPDIR/shim"
