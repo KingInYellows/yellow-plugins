@@ -153,19 +153,16 @@ teardown() {
   [ "$result" = 'sent Basic [REDACTED] ok, Basic Only mode' ]
 }
 
-@test "redact_secrets spools through a private temp file it removes, and fails closed without one" {
+@test "redact_secrets writes no temp file, whatever TMPDIR holds" {
   mkdir -p "$STAGING_TEST_ROOT/spool"
   result=$(printf 'a\nb\n' | TMPDIR="$STAGING_TEST_ROOT/spool" cs_redact_secrets)
   [ "$result" = $'a\nb' ]
   [ -z "$(ls -A "$STAGING_TEST_ROOT/spool")" ]
-  run bash -c '. "$1"; printf "a\n" | TMPDIR=/nonexistent/spool cs_redact_secrets' _ \
-    "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *'[REDACTED: sanitization failed]'* ]]
-  [[ "$output" != *$'\na'* ]]
+  result=$(printf 'a\n' | TMPDIR=/nonexistent/spool cs_redact_secrets)
+  [ "$result" = a ]
 }
 
-@test "redact_secrets in streaming mode writes no temp file, still redacts, and reports a sed failure" {
+@test "redact_secrets in streaming mode still redacts and reports a sed failure" {
   mkdir -p "$STAGING_TEST_ROOT/spool"
   tok=$(printf ':abcdefghij0123456789' | base64)
   result=$(printf 'a\nAuthorization Basic %s\n' "$tok" \
