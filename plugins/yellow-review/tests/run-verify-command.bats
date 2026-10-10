@@ -1470,13 +1470,16 @@ redact_log() {
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
 }
 
-@test "--revert-dirty refuses to delete a tracked file's FIFO replacement" {
+@test "--revert-dirty deletes a tracked file's FIFO replacement unopened and restores the file" {
   command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
   rm -f src/a.txt && mkfifo src/a.txt
   run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
-  [ "$status" -eq 2 ]
-  [[ "$stderr" == *"special file the recovery patch cannot encode: src/a.txt"* ]]
-  [ -p src/a.txt ]
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"not a regular file or symlink: src/a.txt"* ]]
+  [ -f src/a.txt ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
+  [ -z "$(git status --porcelain)" ]
 }
 
 @test "--revert-denied keeps a FIFO that replaced a tracked trusted-config file" {
@@ -1500,6 +1503,217 @@ redact_log() {
   [ -f src/a.txt ]
   [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
   [ -z "$(git status --porcelain)" ]
+}
+
+@test "leave a FIFO in place when the snapshot cannot be saved" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v git)
+  {
+    printf '#!/bin/bash\n'
+    printf 'for a in "$@"; do [ "$a" = --binary ] && exit 128; done\n'
+    printf 'exec "%s" "$@"\n' "$real"
+  } >| "$shim/git"
+  chmod +x "$shim/git"
+  # The recovery patch is the only record of the tracked deletion. It is written
+  # without opening the FIFO; a snapshot that cannot be saved deletes nothing.
+  rm -f src/a.txt && mkfifo src/a.txt
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"nothing was reverted"* ]]
+  [ -p src/a.txt ]
+  [ -f src/new.txt ]
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"nothing was reverted"* ]]
+  [ -p src/a.txt ]
+  [ -f src/new.txt ]
+}
+
+@test "a failed special-file restore is retried before claiming nothing was reverted" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v mv)
+  # Fail only the first rename back onto src/a.txt. The parent retries it.
+  {
+    printf '#!/bin/bash\n'
+    printf 'if [ "$1" = -- ] && [ "$3" = src/a.txt ]; then\n'
+    printf '  if [ ! -e %q ]; then : >| %q; exit 1; fi\n' "$BATS_TEST_TMPDIR/mv-once" "$BATS_TEST_TMPDIR/mv-once"
+    printf 'fi\n'
+    printf 'exec %q "$@"\n' "$real"
+  } >| "$shim/mv"
+  chmod +x "$shim/mv"
+  rm -f src/a.txt && mkfifo src/a.txt
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"nothing was reverted"* ]]
+  [ -p src/a.txt ]
+  [ -f src/new.txt ]
+  [ -z "$(find src -name .yellow-review-hold-\* -print -quit)" ]
+}
+
+@test "a special file that cannot be restored is named and not described as untouched" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v mv)
+  {
+    printf '#!/bin/bash\n'
+    printf 'if [ "$1" = -- ] && [ "$3" = src/a.txt ]; then exit 1; fi\n'
+    printf 'exec %q "$@"\n' "$real"
+  } >| "$shim/mv"
+  chmod +x "$shim/mv"
+  rm -f src/a.txt && mkfifo src/a.txt
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  reason=$(printf '%s' "$output" | jq -r .reason)
+  [[ "$reason" == *"could not restore a special file: src/a.txt (held at src/.yellow-review-hold-"* ]]
+  [[ "$reason" != *"nothing was reverted"* ]]
+  [[ "$reason" != *"untouched"* ]]
+  [ ! -e src/a.txt ]
+  [ -p src/.yellow-review-hold-*/node ]
+  [ -f src/new.txt ]
+  [[ "$stderr" != *"Error:"* ]]
+}
+
+@test "a failed hold-ledger rewrite still names the unrestored special file" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real_mv=$(command -v mv)
+  real_mktemp=$(command -v mktemp)
+  {
+    printf '#!/bin/bash\n'
+    printf 'if [ "$1" = -- ] && [ "$3" = src/a.txt ]; then exit 1; fi\n'
+    printf 'exec %q "$@"\n' "$real_mv"
+  } >| "$shim/mv"
+  # The rewrite temp is a sibling of the default mktemp file
+  # (${HOLD_LEFTOVER}.XXXXXX). Mode 000 makes that copy fail before the old
+  # ledger is replaced. Other mktemp calls, including bats' own, stay writable.
+  cat >| "$shim/mktemp" <<SHIM
+#!/bin/bash
+if [ "\${1:-}" = -- ]; then
+  case "\${2:-}" in
+    */tmp.*.XXXXXX)
+      out=\$("$real_mktemp" "\$@") || exit \$?
+      chmod 000 -- "\$out" || exit 1
+      printf '%s\n' "\$out"
+      exit 0
+      ;;
+  esac
+fi
+exec "$real_mktemp" "\$@"
+SHIM
+  chmod +x "$shim/mv" "$shim/mktemp"
+  rm -f src/a.txt && mkfifo src/a.txt
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  reason=$(printf '%s' "$output" | jq -r .reason)
+  [[ "$reason" == *"could not restore a special file: src/a.txt (held at src/.yellow-review-hold-"* ]]
+  [[ "$reason" != *"nothing was reverted"* ]]
+  [[ "$reason" != *"untouched"* ]]
+  [ ! -e src/a.txt ]
+  [ -p src/.yellow-review-hold-*/node ]
+  [ -f src/new.txt ]
+  [[ "$stderr" != *"Error:"* ]]
+}
+
+@test "an unwritable hold ledger puts the special file back instead of stranding it" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v mktemp)
+  count="$BATS_TEST_TMPDIR/mktemp-n"
+  # Revert-only calls argument-less mktemp for TEXT_FILE, DIR_LIST, ADDED_FILE,
+  # then HOLD_LEFTOVER. mktemp -d (the hold directory) keeps the real binary.
+  cat >| "$shim/mktemp" <<SHIM
+#!/bin/bash
+if [ "\$#" -eq 0 ]; then
+  n="$count"
+  c=0
+  if [ -f "\$n" ]; then c=\$(cat -- "\$n"); fi
+  c=\$((c + 1))
+  printf '%s' "\$c" >| "\$n"
+  out=\$("$real") || exit \$?
+  if [ "\$c" -eq 4 ]; then chmod 000 -- "\$out" || exit 1; fi
+  printf '%s\n' "\$out"
+  exit 0
+fi
+exec "$real" "\$@"
+SHIM
+  chmod +x "$shim/mktemp"
+  rm -f src/a.txt && mkfifo src/a.txt
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(cat -- "$count")" -ge 4 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"nothing was reverted"* ]]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" != *"could not restore"* ]]
+  [ -p src/a.txt ]
+  [ -f src/new.txt ]
+  [ -z "$(find src -name .yellow-review-hold-\* -print -quit)" ]
+  [[ "$stderr" != *"Error:"* ]]
+  [[ "$stderr" != *"special file remains"* ]]
+}
+
+@test "--revert-dirty restores a FIFO whose tracked name contains a newline" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  name=$(printf 'src/a\nb.txt')
+  printf 'newline-name\n' >| "$name"
+  git add -- "$name"
+  git commit -q -m "test: newline name" -- "$name"
+  rm -f -- "$name" && mkfifo -- "$name"
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["reverted",true]' ]
+  [[ "$(printf '%s' "$output" | jq -r '.reason // empty')" != *"could not restore"* ]]
+  [ -f "$name" ]
+  [ ! -p "$name" ]
+  [ "$(cat -- "$name")" = "$(printf 'newline-name\n')" ]
+  [ ! -e src/new.txt ]
+  [ -z "$(find src -name .yellow-review-hold-\* -print -quit)" ]
+  [[ "$stderr" != *"Error:"* ]]
+}
+
+@test "the hold-ledger reader does not use bash namerefs" {
+  # Stock macOS /bin/bash is 3.2. local -n and declare -n are runtime errors
+  # there, and this script does not refuse to run before drop_hold_line.
+  run grep -n -E 'local -n|declare -n' "$SCRIPT"
+  [ "$status" -eq 1 ]
+}
+
+@test "a special-file removal failure still restores one already removed" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v rm)
+  {
+    printf '#!/bin/bash\n'
+    printf 'for a in "$@"; do [ "$a" = src/b.txt ] && exit 1; done\n'
+    printf 'exec %q "$@"\n' "$real"
+  } >| "$shim/rm"
+  chmod +x "$shim/rm"
+  rm -f src/a.txt src/b.txt
+  mkfifo src/a.txt
+  mkfifo src/b.txt
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/b.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ "$(printf '%s' "$output" | jq -r .treeClean)" = false ]
+  reason=$(printf '%s' "$output" | jq -r .reason)
+  [[ "$reason" == *"not a regular file or symlink: src/a.txt"* ]]
+  [[ "$reason" == *"revert failed: rm src/b.txt"* ]]
+  [ -f src/a.txt ]
+  [ "$(cat src/a.txt)" = "$(printf 'one\nfeature')" ]
+  [ -p src/b.txt ]
+  [[ "$stderr" != *"Error:"* ]]
 }
 
 @test "a failed pre-verification snapshot aborts with exit 2 before the command runs" {
