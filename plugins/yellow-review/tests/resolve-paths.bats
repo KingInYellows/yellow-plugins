@@ -1942,6 +1942,23 @@ CFG_CMD_KEYS=(
   [ "$rc" -eq 0 ]
 }
 
+@test "harden_git_config refuses an env-wrapped assignment or env option before the utility" {
+  # env applies NAME=value before it looks the utility up, as the shell does.
+  mkdir -p tools
+  printf '#!/bin/sh\nexit 0\n' >| tools/ssh
+  chmod +x tools/ssh
+  for val in "env PATH=tools:/usr/bin ssh" "/usr/bin/env PATH=tools ssh" "env -i PATH=tools ssh" \
+             "env env PATH=tools ssh" "env -S ssh" "env -P tools ssh" "'env' PATH=tools ssh"; do
+    rc=0; ( export GIT_SSH_COMMAND="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 1 ] || { echo "accepted: $val" >&2; return 1; }
+  done
+  # After the utility, an assignment-shaped word is its argument.
+  for val in "env ssh" "env ssh -o ProxyCommand=nc"; do
+    rc=0; ( export GIT_SSH_COMMAND="$val"; harden_git_config full ) || rc=$?
+    [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
+  done
+}
+
 @test "harden_git_config still checks later bare words and slash words against the current directory" {
   : >| evil
   mkdir -p tools
@@ -2427,7 +2444,8 @@ EOF
   n=0
   for shebang in '#!/usr/bin/env -S PATH=tools evil' '#!/usr/bin/env PATH=tools evil' '#!/usr/bin/env A=1 sh' \
                  '#!/usr/bin/env -S "/tmp/my\_repo/evil"' "#!/usr/bin/env -S '/tmp/x/evil'" \
-                 '#!/usr/bin/env -S sh\_x' '#!/usr/bin/env --split-string=/tmp/a\_b' '#!/usr/bin/env -vS "sh" x'; do
+                 '#!/usr/bin/env -S sh\_x' '#!/usr/bin/env --split-string=/tmp/a\_b' '#!/usr/bin/env -vS "sh" x' \
+                 '#!/usr/bin/env -S env PATH=tools:/usr/bin evil' '#!/usr/bin/env env evil' '#!/usr/bin/env -S /usr/bin/env sh'; do
     n=$((n + 1))
     d="$BATS_TEST_TMPDIR/ea$n"
     mkdir -p "$d"
