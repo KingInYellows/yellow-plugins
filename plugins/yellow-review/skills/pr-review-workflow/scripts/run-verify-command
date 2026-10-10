@@ -67,7 +67,10 @@
 #                  screen withholds the patch. A listed FIFO, socket or device
 #                  is never opened. Revert modes rename it aside in its own
 #                  directory while the patch records the tracked deletion, then
-#                  put it back. It is removed only after that snapshot is
+#                  put it back. The hold path is recorded before that rename.
+#                  If the ledger write fails, the file is put back when it can
+#                  and nothing is reverted; if it cannot, stderr names the
+#                  remaining path. It is removed only after that snapshot is
 #                  written. If the snapshot cannot be saved and the rename back
 #                  succeeded, the special file stays and nothing is reverted.
 #                  save_patch runs in a subshell, so a rename back that fails
@@ -767,9 +770,27 @@ run_verify() {
 # that is listed itself (--revert-dirty) has its own entry and is not repeated.
 # A FIFO, socket or device standing in for a tracked file stays in place too.
 # It is renamed aside in its own directory for the diff (a cross-device move
-# would copy it and open it), then renamed back. The caller unlinks it only
-# after both snapshots are written. This function runs in a subshell, so a
-# rename back that fails is recorded in HOLD_LEFTOVER for the parent to retry.
+# would copy it and open it), then renamed back. The hold path is recorded
+# before that rename. A failed ledger write puts the file back when it can.
+# The caller unlinks it only after both snapshots are written. This function
+# runs in a subshell, so a rename back that fails is already in HOLD_LEFTOVER
+# for the parent to retry.
+# Drop one hold line after the special file is back at its path. A temp and
+# cat, not mv: a caller that rejects mv onto the original path must not
+# intercept this rewrite.
+drop_hold_line() {
+    local src="$1" dest="$2" line want tmp
+    want="${src}"$'\037'"${dest}"
+    tmp=$(mktemp) || return 1
+    : >"$tmp"
+    while IFS= read -r line || [ -n "$line" ]; do
+        [ "$line" = "$want" ] && continue
+        printf '%s\n' "$line" >>"$tmp"
+    done <"$HOLD_LEFTOVER"
+    cat -- "$tmp" >|"$HOLD_LEFTOVER"
+    rm -f -- "$tmp"
+}
+
 save_patch() {
     local out="$1" fmt="$2" f rc c p held_dir="" held_parent=""
     umask 077
@@ -790,17 +811,29 @@ save_patch() {
                     rmdir -- "$held_dir" 2>/dev/null || true
                     return 1
                 fi
+                # Before the rename back. A failed append after a failed
+                # restore would leave this ledger empty, and cleanup would
+                # delete it while the special file stayed under the hold dir.
+                if ! printf '%s%s%s\n' "$held_dir/node" $'\037' "$f" >>"$HOLD_LEFTOVER"; then
+                    if mv -- "$held_dir/node" "$f"; then
+                        rmdir -- "$held_dir" 2>/dev/null || true
+                    else
+                        printf 'special file remains at %s; hold ledger was not written\n' \
+                            "$held_dir/node" >&2
+                    fi
+                    return 1
+                fi
             fi
             rc=0
             lgit_nohooks diff --no-color --no-ext-diff --no-textconv "$fmt" \
                 --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$out" || rc=$?
             if [ -n "$held_dir" ]; then
                 if ! mv -- "$held_dir/node" "$f"; then
-                    # The entry is not at its path. The parent retries; until
-                    # that succeeds the tree has changed.
-                    printf '%s%s%s\n' "$held_dir/node" $'\037' "$f" >>"$HOLD_LEFTOVER"
+                    # Already recorded. The parent retries; until that
+                    # succeeds the tree has changed.
                     return 1
                 fi
+                drop_hold_line "$held_dir/node" "$f" || true
                 rmdir -- "$held_dir" || return 1
                 held_dir=""
             fi

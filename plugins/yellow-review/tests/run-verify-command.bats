@@ -954,6 +954,44 @@ redact_log() {
   [[ "$stderr" != *"Error:"* ]]
 }
 
+@test "an unwritable hold ledger puts the special file back instead of stranding it" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  shim="$BATS_TEST_TMPDIR/shim"
+  mkdir -p "$shim"
+  real=$(command -v mktemp)
+  count="$BATS_TEST_TMPDIR/mktemp-n"
+  # Revert-only calls argument-less mktemp for TEXT_FILE, DIR_LIST, ADDED_FILE,
+  # then HOLD_LEFTOVER. mktemp -d (the hold directory) keeps the real binary.
+  cat >| "$shim/mktemp" <<SHIM
+#!/bin/bash
+if [ "\$#" -eq 0 ]; then
+  n="$count"
+  c=0
+  if [ -f "\$n" ]; then c=\$(cat -- "\$n"); fi
+  c=\$((c + 1))
+  printf '%s' "\$c" >| "\$n"
+  out=\$("$real") || exit \$?
+  if [ "\$c" -eq 4 ]; then chmod 000 -- "\$out" || exit 1; fi
+  printf '%s\n' "\$out"
+  exit 0
+fi
+exec "$real" "\$@"
+SHIM
+  chmod +x "$shim/mktemp"
+  rm -f src/a.txt && mkfifo src/a.txt
+  PATH="$shim:$PATH" run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(cat -- "$count")" -ge 4 ]
+  [ "$(printf '%s' "$output" | jq -c '[.patch, .treeClean]')" = '[null,false]' ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"nothing was reverted"* ]]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" != *"could not restore"* ]]
+  [ -p src/a.txt ]
+  [ -f src/new.txt ]
+  [ -z "$(find src -name .yellow-review-hold-\* -print -quit)" ]
+  [[ "$stderr" != *"Error:"* ]]
+  [[ "$stderr" != *"special file remains"* ]]
+}
+
 @test "a special-file removal failure still restores one already removed" {
   command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
   shim="$BATS_TEST_TMPDIR/shim"
