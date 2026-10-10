@@ -153,6 +153,18 @@ teardown() {
   [ "$result" = 'sent Basic [REDACTED] ok, Basic Only mode' ]
 }
 
+@test "redact_secrets spools through a private temp file it removes, and fails closed without one" {
+  mkdir -p "$STAGING_TEST_ROOT/spool"
+  result=$(printf 'a\nb\n' | TMPDIR="$STAGING_TEST_ROOT/spool" cs_redact_secrets)
+  [ "$result" = $'a\nb' ]
+  [ -z "$(ls -A "$STAGING_TEST_ROOT/spool")" ]
+  run bash -c '. "$1"; printf "a\n" | TMPDIR=/nonexistent/spool cs_redact_secrets' _ \
+    "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *'[REDACTED: sanitization failed]'* ]]
+  [[ "$output" != *$'\na'* ]]
+}
+
 @test "redact_secrets passes input that contains a failure-marker lookalike" {
   run bash -c '. "$1"; printf "a\n@@cs-redact-sed-failed@@\nb\n" | cs_redact_secrets' _ \
     "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
