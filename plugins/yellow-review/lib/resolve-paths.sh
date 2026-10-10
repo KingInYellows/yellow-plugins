@@ -278,9 +278,10 @@ yr_file_shebang_enters() {
             i=${i#[\"\']}
             i=${i%[\"\']}
             [ -n "$i" ] || return 1
-            # A nested env (`env -S env PATH=tools evil`) takes its own
-            # operands, which change the lookup: fail closed.
-            case "$i" in env|*/env) return 0 ;; esac
+            # A nested env or other launcher (`env -S env PATH=tools evil`,
+            # `env nice sudo evil`) takes operands this parser does not
+            # follow: fail closed.
+            case "${i##*/}" in env|nice|nohup|timeout|stdbuf|sudo|doas|xargs|setsid|ionice|chrt|taskset|flock|unbuffer|chroot|runuser|su|caffeinate) return 0 ;; esac
             case "$i" in
                 */*) ;;
                 *) i=$(PATH=${YR_ORIG_PATH-$PATH}; type -P "$i" 2>/dev/null) || return 1 ;;
@@ -503,7 +504,7 @@ yr_shebang_inside() {
                         if (c ~ /[ua]/) { if (substr(cl, k + 1) == "") idx++; break }
                     }
                 } else if (x ~ /=/) { pr(root); return "" }
-                else { gsub(/^["\047]|["\047]$/, "", x); if (x ~ /(^|\/)env$/) { pr(root); return "" } return x }
+                else { gsub(/^["\047]|["\047]$/, "", x); if (x ~ /(^|\/)(env|nice|nohup|timeout|stdbuf|sudo|doas|xargs|setsid|ionice|chrt|taskset|flock|unbuffer|chroot|runuser|su|caffeinate)$/) { pr(root); return "" } return x }
                 if (last >= 0) { for (k = idx; k <= n; k++) if (w[k] ~ /[$\\"\047]/) { pr(root); return "" } splice(val, last) } else idx++
             }
             return ""
@@ -887,7 +888,7 @@ yr_prog_enters() {
 # <root> or a script whose #! enters it. Values that point only outside the
 # worktree keep working.
 yr_cmd_enters() {
-    local v="$1" root="$2" tok t bin c first="" noglob=1 phys
+    local v="$1" root="$2" tok t bin c first="" noglob=1 phys inenv
     local -a toks=()
     case "$v" in
         *[\$\`\;\&\|\<\>\(\)\*\?\[\\]*|*$'\n'*) return 2 ;;
@@ -931,21 +932,38 @@ yr_cmd_enters() {
     # A leading NAME=value is a shell assignment applied to the command, and
     # PATH=tools (or IFS, ENV, ...) changes what runs: fail closed on any.
     [[ "$t" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] && return 0
-    # So is one passed through env (`env PATH=tools:/usr/bin ssh`), and an
-    # env option (-S, -P, -C, -u ...) changes how the utility is found: fail
-    # closed on either before the utility, including after a nested env.
-    if [ "${t##*/}" = env ]; then
-        for tok in ${toks[@]+"${toks[@]:1}"}; do
-            tok=${tok#[\"\']}
-            tok=${tok%[\"\']}
-            [[ "$tok" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] && return 0
-            case "$tok" in
-                -*) return 0 ;;
-                env|*/env) ;;
-                *) break ;;
-            esac
-        done
-    fi
+    # eval re-parses its operands as shell syntax this check cannot judge.
+    [ "${t##*/}" = eval ] && return 0
+    # A launcher word (the shell's command, exec, time, builtin, or a program
+    # such as nice, sudo or timeout) and env run the words after them, so the
+    # utility is the first word that is not a launcher, an option or a number
+    # (`timeout 5 ssh`), looked up below like a first word. An assignment or
+    # eval before it fails closed (`command env PATH=tools ssh`), and so does
+    # any option given to env (-S, -P, -C, -u ... change how the utility is
+    # found); a launcher's own options are skipped.
+    case "${t##*/}" in
+        command|exec|time|builtin|env|nice|nohup|timeout|stdbuf|sudo|doas|xargs|setsid|ionice|chrt|taskset|flock|unbuffer|chroot|runuser|su|caffeinate)
+            inenv=0
+            [ "${t##*/}" = env ] && inenv=1
+            t=""
+            for tok in ${toks[@]+"${toks[@]:1}"}; do
+                tok=${tok#[\"\']}
+                tok=${tok%[\"\']}
+                [[ "$tok" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] && return 0
+                case "${tok##*/}" in
+                    eval) return 0 ;;
+                    env) inenv=1; continue ;;
+                    command|exec|time|builtin|nice|nohup|timeout|stdbuf|sudo|doas|xargs|setsid|ionice|chrt|taskset|flock|unbuffer|chroot|runuser|su|caffeinate) inenv=0; continue ;;
+                esac
+                case "$tok" in
+                    -*) [ "$inenv" -eq 0 ] || return 0; continue ;;
+                    [0-9]*) [ "$inenv" -eq 1 ] || continue ;;
+                esac
+                t=$tok
+                break
+            done
+            ;;
+    esac
     case "$t" in
         ''|-*|'~'*) ;;
         */*) yr_prog_enters "$t" "$root" && return 0 ;;
