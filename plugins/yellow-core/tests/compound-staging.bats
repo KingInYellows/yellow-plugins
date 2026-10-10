@@ -147,6 +147,12 @@ teardown() {
   [ "$result" = 'sent Basic [REDACTED] ok' ]
 }
 
+@test "redact_secrets redacts a bare Basic payload with an empty user and a token password" {
+  # OmFiY2RlZmdoaWowMTIzNDU2Nzg5 = ":abcdefghij0123456789" (empty user, 20-byte token password).
+  result=$(printf 'sent Basic OmFiY2RlZmdoaWowMTIzNDU2Nzg5 ok, Basic Only mode\n' | cs_redact_secrets)
+  [ "$result" = 'sent Basic [REDACTED] ok, Basic Only mode' ]
+}
+
 @test "redact_secrets passes input that contains a failure-marker lookalike" {
   run bash -c '. "$1"; printf "a\n@@cs-redact-sed-failed@@\nb\n" | cs_redact_secrets' _ \
     "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
