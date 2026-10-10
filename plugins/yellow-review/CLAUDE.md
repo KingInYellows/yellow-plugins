@@ -340,7 +340,9 @@ refused. A value that uses shell syntax the check cannot judge (`$`, backtick,
 `;`, `&`, `|`, `<`, `>`, parentheses, `*`, `?`, `[`, a backslash, a newline,
 `~user`, or a quote inside a word rather than at its edge) is refused with a
 message naming the variable; one whose first word is a `NAME=value`
-assignment (`PATH=tools:/usr/bin ssh`) counts as entering the worktree; a leading `~/` is expanded to
+assignment (`PATH=tools:/usr/bin ssh`) counts as entering the worktree, and so
+does an `env` first word with an assignment or option before its utility
+(`env PATH=tools ssh`, also after a nested `env`); a leading `~/` is expanded to
 `HOME` and judged. When `GIT_CONFIG_GLOBAL` is unset, a `HOME` or
 `XDG_CONFIG_HOME` that puts git's global config inside the worktree is refused
 (a dotfiles repository rooted at `HOME` therefore needs `GIT_CONFIG_GLOBAL`
@@ -355,7 +357,8 @@ parsed. Fail closed: an `env` line with a `NAME=value` operand before the
 utility (`PATH=tools` changes where it is looked up), or with a `$`, backslash
 or quote after `-S` (env expands and decodes them), with `-P` (env then
 searches another path than `PATH`), or with `-C`/`--chdir` (the utility is
-resolved elsewhere), counts as entering the worktree.
+resolved elsewhere), or whose utility is itself `env` (`env -S env PATH=tools
+evil`), counts as entering the worktree.
 `run-verify-command` still gives the verify command the caller's `PATH`
 (`YR_ORIG_PATH`). Both scripts take their own directory by parameter expansion,
 not `dirname`.
