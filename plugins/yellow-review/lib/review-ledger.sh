@@ -948,6 +948,8 @@ RL_FOLD_JQ='
   | {
       pending: ([ $findings[] | select(.state == "open" or .state == "reopened" or .state == "applied") ] | length),
       attention: ([ $findings[] | select(.state == "report_only" or .state == "stale") ] | length),
+      merge_blocking: ([ $findings[] | select((.state == "open" or .state == "reopened" or .state == "applied")
+                                              and (.obs.severity | IN("P0", "P1", "P2"))) ] | length),
       by_state: (reduce $findings[] as $x ({}; .[$x.state] += 1)),
       category_split: ([ $findings[] | {k: "\(.obs.file)\u0000\(.obs.anchor_hash)", c: .obs.category} ]
                        | group_by(.k) | map(select((map(.c) | unique | length) > 1)) | length),
@@ -958,7 +960,7 @@ RL_FOLD_JQ='
 rl_fold_file() {
   local file="$1"
   if [ ! -s "$file" ]; then
-    printf '%s' '{"pending":0,"attention":0,"by_state":{},"category_split":0,"skipped":0,"findings":[]}'
+    printf '%s' '{"pending":0,"attention":0,"merge_blocking":0,"by_state":{},"category_split":0,"skipped":0,"findings":[]}'
     return 0
   fi
   jq -R -s -c "$RL_FOLD_JQ" "$file"
@@ -2005,16 +2007,18 @@ cmd_refresh_state() {
   rl_locked "$pr" rl_refresh_state_locked || exit $?
 }
 
-# Per-PR counts: the sidecar when its byte count matches, else a fold.
+# Per-PR counts: the sidecar when its byte count matches and nothing is
+# pending, else a fold. merge_blocking (pending P0-P2 findings) is not in the
+# sidecar, so a PR with pending findings always folds.
 rl_summary_one() {
   local d="$1" pr="$2" p a b fold
   if [ -f "$d/$pr.pending" ] && read -r p a b <"$d/$pr.pending" && [[ "$p$a$b" =~ ^[0-9]+$ ]] &&
-    [ "$b" = "$(rl_file_size "$d/$pr.jsonl")" ]; then
-    printf '{"pending":%s,"attention":%s}' "$p" "$a"
+    [ "$p" = 0 ] && [ "$b" = "$(rl_file_size "$d/$pr.jsonl")" ]; then
+    printf '{"pending":0,"attention":%s,"merge_blocking":0}' "$a"
     return 0
   fi
   fold=$(rl_read_fold "$pr") || return 1
-  printf '%s' "$fold" | jq -c '{pending, attention}'
+  printf '%s' "$fold" | jq -c '{pending, attention, merge_blocking}'
 }
 
 cmd_summary() {
@@ -2022,15 +2026,19 @@ cmd_summary() {
   d=$(rl_ensure_dir) || rl_die 1 "cannot create ledger directory"
   if [ -n "${1:-}" ] && [ "$1" != --all ]; then
     rl_need_pr "$1"
-    [ -f "$d/$1.jsonl" ] || { printf '{}\n'; return 0; }
+    # A review with no findings leaves only the sidecar (observe of `[]`), so
+    # either file means the PR has a ledger record.
+    [ -f "$d/$1.jsonl" ] || [ -f "$d/$1.pending" ] || { printf '{}\n'; return 0; }
     one=$(rl_summary_one "$d" "$1") || exit $?
     jq -cn --arg pr "$1" --argjson v "$one" '{($pr): $v}'
     return 0
   fi
-  for f in "$d"/*.jsonl; do
+  for f in "$d"/*.jsonl "$d"/*.pending; do
     [ -f "$f" ] || continue
-    pr=$(basename -- "$f" .jsonl)
+    pr=$(basename -- "$f")
+    pr=${pr%.*}
     rl_validate_pr "$pr" || continue
+    [ "$(jq -r --arg pr "$pr" 'has($pr)' <<<"$out")" = false ] || continue
     one=$(rl_summary_one "$d" "$pr") || one='null'
     out=$(jq -c --arg pr "$pr" --argjson v "$one" '. + {($pr): $v}' <<<"$out")
   done

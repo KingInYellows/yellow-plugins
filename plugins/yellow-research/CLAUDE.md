@@ -1,6 +1,6 @@
 # yellow-research Plugin
 
-Deep research plugin with 7 bundled MCP servers. Three workflows:
+Deep research plugin with 6 bundled MCP servers. Three workflows:
 `/research:code` (inline, fast), `/research:deep` (multi-source, saved to
 `docs/research/`), and `/flow:deepen-plan` (enrich plans with codebase +
 external research).
@@ -39,16 +39,6 @@ currently enables all seven exa tools, including these heavier ones:
 - `crawling_exa` — Full content of a specific URL
 - `deep_researcher_start` — Start async EXA deep research report
 - `deep_researcher_check` — Poll async research status
-
-### ast-grep — No API key (requires `ast-grep` binary and `uv`)
-
-- `find_code` — Pattern-based code search using AST
-- `find_code_by_rule` — Search using YAML rule definitions
-- `dump_syntax_tree` — Dump AST structure of code snippets
-- `test_match_code_rule` — Test a rule against sample code
-
-Graceful degradation: missing `ast-grep` binary → server starts but tools fail
-on invocation with "Command 'ast-grep' not found"; other servers unaffected.
 
 ### parallel — OAuth (auto-managed by Claude Code)
 
@@ -139,21 +129,30 @@ yellow-research — DeepWiki's canonical home is here.
   runtime-writeback API); read on demand, not auto-injected by `skills:`
   preload.
 
-## Prerequisites
+## Optional ast-grep CLI
 
-For the **ast-grep** MCP server (other servers have no system prerequisites):
+`code-researcher` (and yellow-debt's duplication and complexity scanners) run
+the `ast-grep` CLI through Bash for structural code search when
+`command -v ast-grep` succeeds, and fall back to Grep otherwise. It is a plain
+binary, not an MCP server: no uv, Python, or restart is involved.
+`/research:setup` offers `scripts/install-ast-grep.sh` (npm
+`@ast-grep/cli`); alternatives are `brew install ast-grep`,
+`cargo install ast-grep --locked`, or `pip install ast-grep-cli`. Agents check
+for `ast-grep` only, since `sg` collides with shadow-utils on Linux.
+`research-conductor` has no Bash, so it routes repo-local AST questions to
+`/research:code`.
 
-- `ast-grep` binary — `/research:setup` offers to install this automatically via
-  `npm install -g @ast-grep/cli`. Manual alternatives: `brew install ast-grep`,
-  `cargo install ast-grep --locked`, or `pip install ast-grep-cli`
-- `uv` — `curl -LsSf https://astral.sh/uv/install.sh | sh` (the install script
-  offers to install this automatically)
-- `uv` manages Python 3.13 automatically via `uvx --python 3.13` — no system
-  Python upgrade needed. Python 3.13 is downloaded into
-  `~/.local/share/uv/python/` on first use without touching the system Python.
-
-If any prerequisite is missing, the ast-grep MCP server still starts (lazy
-check) but tools will fail on invocation. Other servers are unaffected.
+**Write permission and temp files.** `code-researcher` holds `Write` solely to
+save ast-grep values (`pattern`, `lang`, `target` or `rule`). A tool grant
+cannot be path-scoped, so the limit is an instruction in the agent: write only
+into the directory the first recipe block prints, and never save research
+output (results stay inline). The first block takes a per-user lock in a 0700
+directory (`$XDG_RUNTIME_DIR` or `~/.cache`, under `yellow-ast-grep`) and
+creates a `mktemp -d` values directory under TMPDIR. The second block reads
+the values as data, runs ast-grep with a trusted `-c` config, deletes only its
+own files plus the empty directory (never `rm -rf`) and releases the lock. A
+lock older than 15 minutes counts as abandoned. See `docs/security.md`
+"ast-grep value files".
 
 ## Required Credentials
 
@@ -217,8 +216,8 @@ These external tools improve research quality but are not required:
   installed. Install: `/plugin marketplace add KingInYellows/yellow-plugins`
   (select yellow-core)
 - **grep MCP** — provides `mcp__grep__searchGitHub` for GitHub code search via
-  grep.app (web-based GitHub search). This is distinct from the bundled ast-grep
-  MCP which does local AST-based code search. Used by `/research:code` and
+  grep.app (web-based GitHub search). This is distinct from the optional
+  ast-grep CLI, which does local AST-based code search. Used by `/research:code` and
   `/research:deep`. No API key required. Configure globally in Claude Code MCP
   settings.
 - **yellow-morph plugin** (preferred) — provides WarpGrep

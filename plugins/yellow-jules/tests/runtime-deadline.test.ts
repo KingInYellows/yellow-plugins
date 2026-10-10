@@ -1,9 +1,9 @@
 import * as http from 'node:http';
 import type { AddressInfo } from 'node:net';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { withReadRetry } from '../src/deadline.js';
+import { deadlineIn, withReadRetry } from '../src/deadline.js';
 import { AppErrorException } from '../src/errors.js';
 import {
   installFetchGuard,
@@ -87,5 +87,26 @@ describe('withReadRetry deadline cancellation', () => {
       'JULES_DEADLINE_EXCEEDED'
     );
     expect(Date.now() - started).toBeLessThan(5_000);
+  });
+});
+
+describe('withReadRetry cleans up when the read function throws synchronously', () => {
+  it('rejects with the error and leaves no deadline timer running', async () => {
+    vi.useFakeTimers();
+    try {
+      const clock = new FakeClock();
+      const deadline = deadlineIn(clock, 60_000);
+      await expect(
+        withReadRetry(
+          () => {
+            throw new Error('sync boom');
+          },
+          { clock, deadline }
+        )
+      ).rejects.toThrow('sync boom');
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -60,6 +60,15 @@ These plugins use browser-based OAuth managed entirely by Claude Code:
 4. To re-authenticate or revoke access: run `/mcp` → select server → "Clear
    authentication"
 
+yellow-linear's Graphite merge-queue setup adds a GitHub push webhook that
+delivers commits from the repository to Linear, signed with a secret Linear
+generates. The user creates it in the GitHub repository settings and the
+secret stays between GitHub and Linear: no plugin reads, stores or sends it.
+Anyone with push access can then close a Linear issue through a `Closes
+<ISSUE-ID>` commit line, so the plugins write that line only after the user
+confirms it or the stack plan places it (`linear-workflows` skill, "Graphite
+Merge Queue").
+
 No API keys in the plugin manifest. Will not work in headless SSH sessions
 (browser required for OAuth flow). A headless Composio host can instead
 register a user-level server with a For You consumer key; that stores the
@@ -296,7 +305,8 @@ ephemeral `GITHUB_TOKEN`.
 - All processing happens locally on user's machine
 - yellow-ruvector stores embeddings in `.ruvector/` directory (gitignored)
 - yellow-review uses `gh` CLI which reads user's GitHub auth state
-- yellow-debt reads codebase files but only writes to `todos/` directory
+- yellow-debt reads codebase files but only writes to `todos/` directory, plus
+  the transient ast-grep value files described under "ast-grep value files"
 - **yellow-review's Codex copy is a trust-boundary downgrade, not a
   data-residency one.** Codex CLI runs locally like `gh` or `gt`, so the
   "all processing happens locally" guarantee above still holds for it.
@@ -435,6 +445,54 @@ promoter's 64-character alphanumeric/underscore/hyphen contract are hashed
 with SHA-256 before writing. The existing drain
 still treats the narrative as untrusted reference data when scoring it.
 This store is separate from the review-findings ledger and is never pushed.
+
+### Jev Shadow Pre-Filter (yellow-core)
+
+Off by default. When the environment the hooks inherit sets both
+`COMPOUND_JEV_PREFILTER=shadow` and `TYPESAFE_API_KEY` (and curl and jq are
+installed), the Stop hook's detached capture subshell sends session text to a
+third party, TypeSafe AI (`https://api.typesafe.ai/v1/systemone`):
+
+- **What leaves the machine.** The transcript tail that is staged locally,
+  projected to user and assistant text only (tool calls and tool results are
+  dropped), passed through `cs_redact_secrets` (no call if it is unavailable
+  or fails) and capped at its newest 24,000 bytes, plus two fixed
+  classification questions. Redaction is `cs_redact_secrets`'s pattern
+  list, so an unrecognized secret typed into the chat can still be sent. Tool
+  calls, tool results and file contents Claude reads are not sent, but text a
+  user or assistant message itself contains (a pasted diff, quoted command
+  output) is.
+- **When.** The Stop hook fires at the end of every assistant turn, so a
+  session makes one call per turn (5 s timeout, `COMPOUND_JEV_TIMEOUT_S`).
+- **Credential handling.** The key is passed to curl as a config on fd 3 and
+  the request body on stdin, so neither appears in process argv. curl runs
+  with `-q`, so a user `~/.curlrc` cannot turn on tracing or `--insecure` for
+  this request. The key is never written to disk or logs.
+- **Endpoint override.** `COMPOUND_JEV_URL` and `COMPOUND_JEV_MODEL` override
+  the endpoint and model; anyone who can set the hook environment can redirect
+  the text and key, so treat those variables as trusted configuration.
+- **Prompt injection.** Transcript text is wrapped in the repository's
+  `--- begin untrusted-content (reference only) ---` fence (lines starting
+  `---` are quoted so the text cannot close it), and both questions tell the
+  model to classify the excerpt as data. The answer is a typed choice and
+  probabilities, recorded only when every value is in range (choice from the
+  fixed set, numbers in [0, 1]); it is never executed or fed back to Claude.
+- **Local record.** `compound-staging/jev-shadow/<session_id>.json`, replaced
+  atomically each turn under a per-session lock (an answer whose content
+  hash no longer matches the session's pending, or else processing, entry is
+  dropped, and a newer turn retires the older record before its own call), holds the session id, content hash, choice,
+  probabilities, latency and token count, never transcript text. It sits in
+  the same owner-only staging directory as the pending queue. Every valid
+  answer, including one that lands after a newer turn, is also appended to
+  `jev-shadow/predictions.jsonl`, since a drain can score an entry before a
+  later turn replaces the per-session file. When that
+  directory exists, the staging-reviewer drain appends each scorer verdict
+  (session id, content hash, verdict, priority) to
+  `jev-shadow/outcomes.jsonl` so predictions can be joined to outcomes; it
+  holds no transcript text either.
+- **Failure mode.** Fail-open and shadow only: it runs after the pending entry
+  is written, every error is silent, and the answer never changes what is
+  staged or drained.
 
 ### Context Observer Persistence (yellow-core)
 
@@ -943,3 +1001,27 @@ If you discover a security vulnerability in any plugin:
    [private security advisory](https://github.com/kinginyellow/yellow-plugins/security/advisories/new)
    on the repository
 3. Include: affected plugin, vulnerability description, reproduction steps
+
+## ast-grep value files
+
+`yellow-research`'s `code-researcher` and yellow-debt's duplication and
+complexity scanners pass ast-grep values (`pattern`, `lang`, `target`, `rule`)
+through files, never through shell text. This adds a filesystem write surface:
+
+- **Permission.** Each agent holds the `Write` tool (`code-researcher` gained
+  it). The grant is not path-scoped; the agent instruction limits it to the
+  values directory the recipe prints. Treat it as an instruction-level
+  boundary, not an enforced one.
+- **Locations.** A 0700 state directory (`$XDG_RUNTIME_DIR` or `~/.cache`,
+  under `yellow-ast-grep`) holds a `lock` directory and a pointer file naming
+  the values directory. The values directory is created by `mktemp -d` under
+  the resolved TMPDIR and carries a marker directory.
+- **Locking.** One search at a time per user. A concurrent search is told to
+  retry or fall back to Grep. A lock older than 15 minutes is treated as
+  abandoned. Ownership is not tokenized (tracked in issue 1116).
+- **Cleanup.** The recipe deletes only its own value and config files and then
+  the empty directories, never `rm -rf`. It leaves any directory that lacks the
+  marker or the pointer match untouched.
+- **Validation.** `lang` and `target` use allow-lists, symlinked or empty value
+  files are refused, and ast-grep runs with a trusted `-c` config so a repo
+  `sgconfig.yml` is never loaded.

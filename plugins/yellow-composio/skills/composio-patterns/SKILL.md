@@ -257,8 +257,7 @@ silently when absent.
    note degradation briefly
 ```
 
-This matches the pattern used by `review:pr` for ruvector/morph detection and
-by debt scanners for ast-grep detection.
+This matches the pattern used by `review:pr` for ruvector/morph detection.
 
 ### Consumer Integration Pattern
 

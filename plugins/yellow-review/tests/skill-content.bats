@@ -1269,3 +1269,38 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [ "$status" -eq 1 ]
   grep -qF 'compound-staging drain; sweep-all runs no compounding pass of its own' "$SWEEP_ALL"
 }
+
+@test "review:pr: high-confidence P2 safe_auto tier is capped and anchor-100 only" {
+  grep -q '^\*\*High-confidence P2 tier\.\*\* Also apply, after the P0/P1 fixes, up to 5$' "$REVIEW_PR"
+  grep -q 'and `owner: review-fixer`) that have a non-null `suggested_fix` and anchor 100' "$REVIEW_PR"
+  grep -q '^into its high-confidence tier (every P2 `safe_auto` finding owned by$' "$REVIEW_PR"
+  grep -q 'run before the ledger write, so a dropped candidate is never recorded as' "$REVIEW_PR"
+  grep -q '^P2 `safe_auto` findings below anchor 100 or past the cap are NOT auto-applied$' "$REVIEW_PR"
+  grep -q 'high-confidence P2 tier exactly as `review-pr.md` Step 7 defines it' "$REVIEW_ALL"
+}
+
+@test "sweep: the summary flags pending P0-P2 ledger findings as not merge-ready" {
+  grep -q '"merge_blocking": K' "$SWEEP"
+  grep -q '^  Merge:   not ready — <merge_blocking> pending P0-P2 findings' "$SWEEP"
+  grep -q 'it never changes the exit code or the contract line' "$SWEEP"
+}
+
+@test "sweep-all: prints a not-merge-ready line from merge_blocking" {
+  grep -q '^Not merge-ready (pending P0-P2 findings): ' "$SWEEP_ALL"
+}
+
+@test "sweep: a missing ledger is never reported merge-ready" {
+  grep -q 'pending P0-P2 findings)` only when an existing ledger was read and' "$SWEEP"
+  grep -q 'empty array), so it reads `unknown (no ledger)` when `summary` returned `{}`:' "$SWEEP"
+}
+
+@test "sweep-all: PRs without a readable ledger are listed as merge readiness unknown" {
+  grep -q '^Merge readiness unknown (no readable ledger): ' "$SWEEP_ALL"
+  grep -q 'a PR is never treated as merge-ready without a ledger' "$SWEEP_ALL"
+}
+
+@test "review-pr/review-all: version-only plugin.json edits do not trigger plugin reviewers" {
+  grep -q '^\*\*Version-only manifest edits do not trigger\.\*\*' "$REVIEW_PR"
+  grep -q 'line is `"version"` does not count as touching `plugin.json` for the triggers' "$REVIEW_PR"
+  grep -q 'conditional personas (version-only `plugin.json` edits do not' "$REVIEW_ALL"
+}
