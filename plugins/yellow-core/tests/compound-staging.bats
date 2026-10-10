@@ -113,6 +113,27 @@ teardown() {
   [ "$result" = 'Basic Authentication, BASIC SETTINGS and basic usage' ]
 }
 
+@test "redact_secrets decodes a letters-only bare Basic payload with no case change" {
+  # Znpvejph = fzoz:a, ejpzenpn = z:szzg, Yjpycndm = b:rrwf, amtkczpo = jkds:h —
+  # none has a lower-to-upper transition, so only decoding catches them.
+  result=$(printf 'sent Basic Znpvejph and basic ejpzenpn, BASIC Yjpycndm (Basic\tamtkczpo)\n' | cs_redact_secrets)
+  [ "$result" = 'sent Basic [REDACTED] and basic [REDACTED], BASIC [REDACTED] (Basic [REDACTED])' ]
+  # Prose decodes to binary ("Authentication", "SETTINGS") or to ":yr" with
+  # no user ("Only"), and a word-glued keyword is not a boundary.
+  result=$(printf 'Basic Authentication, Basic Only mode, BASIC SETTINGS, basic setup, xBasic Znpvejph\n' | cs_redact_secrets)
+  [ "$result" = 'Basic Authentication, Basic Only mode, BASIC SETTINGS, basic setup, xBasic Znpvejph' ]
+}
+
+@test "redact_secrets fails closed when the sed stage fails" {
+  mkdir -p "$STAGING_TEST_ROOT/bin"
+  printf '#!/bin/sh\nprintf "partial\\n"\nexit 2\n' > "$STAGING_TEST_ROOT/bin/sed"
+  chmod +x "$STAGING_TEST_ROOT/bin/sed"
+  run bash -c 'PATH="$1:$PATH"; . "$2"; printf "x\n" | cs_redact_secrets' _ \
+    "$STAGING_TEST_ROOT/bin" "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'[REDACTED: sanitization failed]'* ]]
+}
+
 @test "redact_secrets strips an unpadded 3-character Basic credential" {
   result=$(printf 'Authorization: Basic YTo and done\n' | cs_redact_secrets)
   [ "$result" = 'Authorization: Basic [REDACTED] and done' ]
