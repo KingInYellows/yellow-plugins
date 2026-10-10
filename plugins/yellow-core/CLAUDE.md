@@ -12,8 +12,9 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - Prefer explicit over implicit. Name things clearly
 - Write tests for non-trivial logic
 - **Shell libraries and zsh:** Markdown blocks run under the user's shell,
-  often zsh with `noclobber`. `lib/compound-staging.sh`, `lib/repo-profile.sh`
-  and `lib/validate-fs.sh` are dual-shell (Tier 4) and are sourced directly;
+  often zsh with `noclobber`. `lib/compound-staging.sh`,
+  `lib/plan-gate-provenance.sh`, `lib/repo-profile.sh` and `lib/validate-fs.sh`
+  are dual-shell (Tier 4) and are sourced directly;
   keep them that way — `tests/shell-compat/` runs them under bash and zsh.
   Bash-only code goes in a `bash /dev/fd/3 3<<'__YELLOW_CORE_BASH__'` wrapper
   (as in `staging-reviewer`); see CONTRIBUTING.md "Bash and zsh".
@@ -128,7 +129,12 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   passes without prompting, captured in a `Plan-Verifier-FileProvenance:`
   commit trailer. This catches the routine case where a plan was
   expanded from a shell and implemented in the same PR, so the branch
-  name carries too few slug tokens for either slug-match tier. When
+  name carries too few slug tokens for either slug-match tier. Graphite
+  merge-queue PRs stay closed and unmerged, so GitHub associates none with
+  the commit; when that lookup succeeds with an empty result,
+  `lib/plan-gate-provenance.sh` falls back to the PR number in the commit
+  subject (trailer `via=commit-subject`; its header states the pass
+  conditions once). When
   provenance finds no commit or an ambiguous PR set, a strict tier
   (server-side `--state merged` + `--jq` word-boundary post-filter of
   the full slug on `headRefName`) runs, then a loose tier scoring the
@@ -334,6 +340,23 @@ cross-plugin pattern:
   yellow-core's `hooks/scripts/stop.sh`, `session-start.sh`,
   `_stop-capture-subshell.sh`, and the `/compound:review-staged` command, and
   by yellow-review's `lib/stage-learning.sh` and `lib/review-ledger.sh`
+- `plan-gate-provenance.sh` — `/plan:complete` Gate C file-provenance tier.
+  `pgp_tier_run <plan-file> <trunk>` is the whole Phase 4 tier: it prints the
+  log and the decision lines (`GATE_C_PROVENANCE=PASS|FALLTHROUGH`,
+  `GATE_C_REASON=<token> GATE_C_RETRYABLE=0|1`) and writes the evidence line
+  only on a pass. `pgp_provenance_via_subject <owner/repo> <file-sha>
+  <plans/file.md>` is the commit-subject fallback for Graphite merge-queue PRs
+  (closed, `merged: false`, so GitHub's commit-to-PR lookup returns nothing):
+  exit 0 with one `pr=#N sha=<sha> via=commit-subject` line, or exit 1 with a
+  reason token and a reason line. The header states the pass conditions once.
+  `pgp_evidence_line_is_valid` and `pgp_pr_num_is_valid` are the validators
+  Phase 4, the override block and Phase 7 share. Dual-shell (Tier 4),
+  idempotent via `_PLAN_GATE_PROVENANCE_LOADED`. Coverage in
+  `tests/shell-compat/` (driver with stub `gh` and `timeout`),
+  `tests/plan-gate-tier.bats` and `tests/plan-commands.bats`
+- `jev-prefilter.sh` — opt-in TypeSafe Jev shadow pre-filter for compound
+  staging (see "Jev shadow pre-filter" under Compound Staging). Sourced only by
+  `_stop-capture-subshell.sh`
 - `validate-fs.sh` — `validate_file_path()` and `canonicalize_project_dir()`
   path-traversal validators (consumed by yellow-ci, yellow-ruvector,
   yellow-debt; yellow-debt declares it as a required dependency). Idempotent
@@ -495,6 +518,29 @@ detail):**
   hard-deny (D8 in the plan). RULE 14 in
   `scripts/validate-agent-authoring.js` blocks any removal of this deny.
 
+**Jev shadow pre-filter (opt-in, log only):** with
+`COMPOUND_JEV_PREFILTER=shadow` and `TYPESAFE_API_KEY` set in the environment
+the hooks inherit, the capture subshell sends the redacted tail's user and
+assistant text (tool calls and results dropped, capped at the newest 24,000
+bytes) to TypeSafe's Jev, fenced as untrusted reference data (`jev-1.13.0`
+unless `COMPOUND_JEV_MODEL` is set; timeout `COMPOUND_JEV_TIMEOUT_S`, default 5
+s). It runs after the pending entry is written and never changes what is staged.
+Like the pending entry, the record is per session and each turn's answer
+atomically replaces the last unless a newer turn's pending entry has superseded
+it: `compound-staging/jev-shadow/<session_id>.json` holds session id, content
+hash, the `durable` choice with confidence and probabilities, the
+`has_instruction` probability, latency and a `would_skip` flag (trivial or
+routine at confidence >= 0.9 and instruction probability <= 0.2). No transcript
+text is logged. Every valid answer, even one that lands after a newer turn, is
+also appended to `jev-shadow/predictions.jsonl`, because a drain can score an entry before a
+later turn replaces the per-session file. When `jev-shadow/` exists, the staging-reviewer drain also
+appends each scorer verdict (session id, content hash, verdict, priority) to
+`jev-shadow/outcomes.jsonl`, the join key for that comparison. The key reaches curl as a config on fd 3 and the body on stdin,
+so neither is in argv, and every failure is silent. The log exists to compare
+against staging-scorer outcomes before any skip behaviour ships; this sends
+session text to a third party, so leave it unset unless you accept that (trust
+boundary: `docs/security.md` "Jev Shadow Pre-Filter").
+
 **Manual override:** `/compound:review-staged` triggers a drain
 immediately (skips threshold check) with an `AskUserQuestion` M3
 confirmation gate showing pending count + sample titles.
@@ -535,8 +581,8 @@ inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
 
 `bats tests/` from the plugin directory (`compound-session-start-hook`,
 `compound-staging`, `compound-stop-hook`, `context-observer`,
-`credential-status`, `handoff`, `plan-commands`, `plan-status-parity`,
-`plugin-identity`, `pre-compact-hook`, `quote-ground`, `repo-profile`,
+`credential-status`, `handoff`, `jev-prefilter`, `plan-commands`, `plan-status-parity`,
+`plan-gate-tier`, `plugin-identity`, `pre-compact-hook`, `quote-ground`, `repo-profile`,
 `setup-all-ruvector-probe`, `validate-fs`) plus `skills/git-worktree/tests/` (`worktree-manager.bats`,
 `worktree-restack.bats` with stub `gt` / `gh` / `git` shims under `tests/mocks/`).
 Manifest hook budgets: Stop 5s, SessionStart 3s, PreCompact 3s

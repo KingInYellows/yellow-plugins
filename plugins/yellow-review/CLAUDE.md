@@ -61,7 +61,9 @@ resolution, and sequential stack review. Graphite-native workflow.
   review-ledger prerequisites (flock, realpath, git 2.31+, optional
   universal-ctags) before reviewing PRs
 - `/review:pr` — Adaptive multi-agent review of a single PR with automatic fix
-  application; persists every reported-but-unapplied finding to the
+  application (P0/P1 `safe_auto`, plus up to 5 `review-fixer`-owned P2
+  `safe_auto` at anchor 100);
+  persists every reported-but-unapplied finding to the
   review-findings ledger. Accepts `--non-interactive` to suppress its Step 9
   push-confirmation prompt and its Step 9b "save learnings" prompt (used by
   `/review:sweep`)
@@ -87,7 +89,8 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `/review:sweep` — Wrapper that runs `/review:pr --non-interactive` then
   `/review:resolve --non-interactive` on the same PR with no gates in
   between — fully unattended — then `/review:triage --non-interactive`
-  (reconcile only) and a Ledger line in its summary. Before `/review:pr` it
+  (reconcile only), a Ledger line and a `Merge:` row (not ready while P0-P2
+  ledger findings are pending) in its summary. Before `/review:pr` it
   snapshots `yellow-plugins.local.md` when this work tree ignores it, or when
   the file is absent here and the fetched PR head ignores it; a config
   tracked here but ignored on the PR head, or an existing untracked unignored
@@ -97,9 +100,10 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `/review:sweep-all` — Run `/review:sweep` on every open non-draft PR you
   authored sequentially, with one upfront confirmation, skip-and-continue per
   PR, end-of-loop summary (with `Blocking` and `Residual` pending/attention
-  columns). Each PR stages its learnings for the compound-staging drain;
-  there is no end-of-loop compounding pass. A rate limit, an unreadable PR
-  state, a dirty tree or a missing `Resolve:` contract line ends the batch and exits 1;
+  columns, and a `Not merge-ready` line from the ledger's `merge_blocking`).
+  Each PR stages its learnings for the compound-staging drain; there is no
+  end-of-loop compounding pass. A rate limit, an unreadable PR state, a
+  dirty tree or a missing `Resolve:` contract line ends the batch and exits 1;
   a PR-specific stop (`Sweep: skipped`) is skipped and the batch continues. It lists the ledgers of PRs
   missing from an all-authors open-PR query and deletes them via
   `/review:triage --prune` only after the confirmation (a prune-only prompt
@@ -135,7 +139,9 @@ resolution, and sequential stack review. Graphite-native workflow.
   changes, hook contract changes); selected when diff touches
   `plugins/*/.claude-plugin/plugin.json`, `plugins/*/agents/**/*.md`,
   `plugins/*/commands/**/*.md`, `plugins/*/skills/**/SKILL.md`, or
-  `plugins/*/hooks/`. Sister to `pattern-recognition-specialist`
+  `plugins/*/hooks/` (a `plugin.json` whose only changed line is
+  `"version"` does not count, for this persona or the other plugin-surface
+  ones). Sister to `pattern-recognition-specialist`
   (yellow-core) — pattern-rec catches new convention drift,
   plugin-contract catches breaks to existing surface.
 - `cli-readiness-reviewer` — Conditional persona that reviews CLI command
@@ -234,8 +240,9 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `run-verify-command` — Run `resolve_pr.verify_command` under a timeout;
   on failure save a patch, revert the files and report the tree state
   (`--ignored-since <marker-file>` is required for every run, attended or
-  not, and refuses when a gitignored file is newer than the marker;
-  `--unattended` also skips runner files;
+  not, and refuses when a gitignored file is newer than the marker, except
+  regular-file tool state (`.ruvector/coedit.json`, `.ruvector/coedit-sessions/`,
+  `node_modules/.vite/vitest/results.json`); `--unattended` also skips runner files;
   `--revert-only` reverts the listed files; `--revert-dirty` reverts every change in the tree and takes no
   file list; `--revert-denied` reverts only trusted-config dirty paths
   (`rp_trusted_config`, a subset of the deny list), takes no file list, and
@@ -628,9 +635,6 @@ with `cache_read_input_tokens` in the transcript (Ctrl-O) on a second
 - **morph** — Preferred for intent-based code search (blast radius, callers,
   similar patterns) in review agents. Discovered via ToolSearch at runtime;
   falls back to built-in Grep silently.
-- **ast-grep** (yellow-research) — Optional structural code search for
-  silent-failure-hunter and type-design-analyzer. Discovered via ToolSearch at
-  runtime; falls back to Grep if yellow-research not installed.
 
 ## Codex and Cursor Distribution
 

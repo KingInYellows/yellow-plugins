@@ -96,6 +96,9 @@ anything, so an interrupted run loses nothing.
    Security & Prompt-Injection Rules) — the raw finding can quote a value the
    reviewer copied from the diff, and this file is written before the
    ledger's own redaction pass runs.
+   Run this section even when the array is empty (`[]`): observing nothing
+   still writes the PR's `<pr>.pending` sidecar, which is how `/review:sweep`
+   tells a review that finished clean from one that failed before this step.
 2. Write the redacted array with the Write tool to a file under a fresh
    `mktemp -d` directory, and remember the element order: the library reports
    results by 1-based ordinal.

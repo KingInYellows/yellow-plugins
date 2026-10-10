@@ -80,7 +80,7 @@ mkdir -p docs/research
 | Recent news, current events    | Perplexity `perplexity_search`   | Tavily `tavily_search`       |
 | Competitive / company research | EXA `company_research_exa`       | Perplexity                   |
 | Deep technical report          | Perplexity `perplexity_research` | Tavily `tavily_research`     |
-| AST / structural code patterns | ast-grep `find_code`             | ast-grep `find_code_by_rule` |
+| AST / structural code patterns | `ast-grep run` CLI (local repo)  | Grep                         |
 | Long-horizon async report      | Parallel `createDeepResearch`    | EXA `deep_researcher_start`  |
 | Specific URL content           | EXA `crawling_exa`               | Tavily `tavily_extract`      |
 
@@ -168,18 +168,6 @@ Tool name: mcp__plugin_yellow-research_parallel__...
 
 ToolSearch keyword: "ceramic_search"
 Tool name: mcp__plugin_yellow-research_ceramic__ceramic_search
-
-ToolSearch keyword: "ast-grep__find_code"
-Tool name: mcp__plugin_yellow-research_ast-grep__find_code
-
-ToolSearch keyword: "ast-grep__find_code_by_rule"
-Tool name: mcp__plugin_yellow-research_ast-grep__find_code_by_rule
-
-ToolSearch keyword: "ast-grep__dump_syntax_tree"
-Tool name: mcp__plugin_yellow-research_ast-grep__dump_syntax_tree
-
-ToolSearch keyword: "ast-grep__test_match_code_rule"
-Tool name: mcp__plugin_yellow-research_ast-grep__test_match_code_rule
 ```
 
 Naming convention: `mcp__plugin_yellow-research_<server>__<tool>`.
