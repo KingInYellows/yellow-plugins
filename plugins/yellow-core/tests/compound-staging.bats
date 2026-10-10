@@ -124,6 +124,19 @@ teardown() {
   [ "$result" = 'Basic Authentication, Basic Only mode, BASIC SETTINGS, basic setup, xBasic Znpvejph' ]
 }
 
+@test "redact_secrets decodes a short bare Basic payload that contains a digit" {
+  # YTE6YjI = a1:b2, eHk6ejk = xy:z9 (unpadded, 7 characters, digits inside).
+  result=$(printf 'sent Basic YTE6YjI and basic eHk6ejk= ok, Basic 2FA\n' | cs_redact_secrets)
+  [ "$result" = 'sent Basic [REDACTED] and basic [REDACTED] ok, Basic 2FA' ]
+}
+
+@test "redact_secrets passes input that contains a failure-marker lookalike" {
+  run bash -c '. "$1"; printf "a\n@@cs-redact-sed-failed@@\nb\n" | cs_redact_secrets' _ \
+    "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
+  [ "$status" -eq 0 ]
+  [ "$output" = $'a\n@@cs-redact-sed-failed@@\nb' ]
+}
+
 @test "redact_secrets fails closed when the sed stage fails" {
   mkdir -p "$STAGING_TEST_ROOT/bin"
   printf '#!/bin/sh\nprintf "partial\\n"\nexit 2\n' > "$STAGING_TEST_ROOT/bin/sed"

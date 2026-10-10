@@ -111,15 +111,15 @@ cs_atomic_jsonl_write() {
 # Self-contained subset of yellow-ci's lib/redact.sh — the patterns Brad
 # called out in the plan (D12): password=, token=, api_key=, secret=,
 # Bearer, basic auth, plus the high-value vendor token prefixes
-# (including tvly-, pplx- and sgp_) and PEM key blocks. A bare letters-only
-# Basic payload is ambiguous with prose, so _cs_redact_bare_basic decodes it
+# (including tvly-, pplx- and sgp_) and PEM key blocks. A bare Basic payload
+# the sed shapes miss is ambiguous with prose, so _cs_redact_bare_basic decodes it
 # and redacts only a printable user:pass. Streams sed then awk to stdout
 # (constant memory).
 #
 # Future consolidation: when yellow-ci's redact.sh is relocated to a
 # shared yellow-core/lib/redact.sh, this wrapper can `. ` that file.
-# Redact a bare `Basic <letters>` payload that base64-decodes to a printable
-# `user:pass` (non-empty user). Shape heuristics cannot tell a letters-only
+# Redact a bare `Basic <base64>` payload that base64-decodes to a printable
+# `user:pass` (non-empty user). Shape heuristics cannot tell a short
 # credential from prose, and decoding can: "Basic Authentication" and
 # "BASIC SETTINGS" decode to binary, "Basic Only" to ":yr". The boundary
 # before the keyword matches the sed rule. POSIX awk only (mawk, gawk, BSD
@@ -129,7 +129,7 @@ _cs_redact_bare_basic() {
   awk -v fail_mark="$1" '
     BEGIN {
       b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-      kw = "(Basic|basic|BASIC)[ \t\r\v\f]+[A-Za-z]+"
+      kw = "(Basic|basic|BASIC)[ \t\r\v\f]+[A-Za-z0-9+/]+=*"
       failed = 0
     }
     function is_cred(tok,    n, i, acc, bits, p, byte, pos) {
@@ -151,7 +151,7 @@ _cs_redact_bare_basic() {
       return pos > 1
     }
     {
-      if (index($0, fail_mark)) { failed = 1; next }
+      if ($0 == fail_mark) { failed = 1; next }
       out = ""; rest = $0; prev = ""
       while (match(rest, kw)) {
         pre = substr(rest, 1, RSTART - 1)
@@ -159,6 +159,7 @@ _cs_redact_bare_basic() {
         before = (RSTART > 1) ? substr(rest, RSTART - 1, 1) : prev
         tok = m
         sub(/^[A-Za-z]+[ \t\r\v\f]+/, "", tok)
+        sub(/=+$/, "", tok)
         if (before !~ /[A-Za-z0-9_]/ && is_cred(tok)) {
           out = out pre substr(m, 1, 5) " [REDACTED]"
           prev = "]"
@@ -182,7 +183,8 @@ cs_redact_secrets() {
   # explicitly in the keyword groups — the GNU `I` flag is non-portable.
   # The left side of the pipe is a subshell, so a sed failure reaches the
   # awk stage as a marker line rather than as an exit status.
-  local _cs_fail_mark='@@cs-redact-sed-failed@@'
+  # A per-call nonce keeps input text from forging the marker line.
+  local _cs_fail_mark="@@cs-redact-sed-failed-$$-${RANDOM:-0}${RANDOM:-0}@@"
   { sed -E \
     -e 's/ghp_[A-Za-z0-9_]{36,255}/[REDACTED:github-token]/g' \
     -e 's/ghs_[A-Za-z0-9_]{36,255}/[REDACTED:github-token]/g' \
