@@ -278,6 +278,9 @@ yr_file_shebang_enters() {
             i=${i#[\"\']}
             i=${i%[\"\']}
             [ -n "$i" ] || return 1
+            # A nested env (`env -S env PATH=tools evil`) takes its own
+            # operands, which change the lookup: fail closed.
+            case "$i" in env|*/env) return 0 ;; esac
             case "$i" in
                 */*) ;;
                 *) i=$(PATH=${YR_ORIG_PATH-$PATH}; type -P "$i" 2>/dev/null) || return 1 ;;
@@ -500,7 +503,7 @@ yr_shebang_inside() {
                         if (c ~ /[ua]/) { if (substr(cl, k + 1) == "") idx++; break }
                     }
                 } else if (x ~ /=/) { pr(root); return "" }
-                else { gsub(/^["\047]|["\047]$/, "", x); return x }
+                else { gsub(/^["\047]|["\047]$/, "", x); if (x ~ /(^|\/)env$/) { pr(root); return "" } return x }
                 if (last >= 0) { for (k = idx; k <= n; k++) if (w[k] ~ /[$\\"\047]/) { pr(root); return "" } splice(val, last) } else idx++
             }
             return ""
@@ -928,6 +931,21 @@ yr_cmd_enters() {
     # A leading NAME=value is a shell assignment applied to the command, and
     # PATH=tools (or IFS, ENV, ...) changes what runs: fail closed on any.
     [[ "$t" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] && return 0
+    # So is one passed through env (`env PATH=tools:/usr/bin ssh`), and an
+    # env option (-S, -P, -C, -u ...) changes how the utility is found: fail
+    # closed on either before the utility, including after a nested env.
+    if [ "${t##*/}" = env ]; then
+        for tok in ${toks[@]+"${toks[@]:1}"}; do
+            tok=${tok#[\"\']}
+            tok=${tok%[\"\']}
+            [[ "$tok" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] && return 0
+            case "$tok" in
+                -*) return 0 ;;
+                env|*/env) ;;
+                *) break ;;
+            esac
+        done
+    fi
     case "$t" in
         ''|-*|'~'*) ;;
         */*) yr_prog_enters "$t" "$root" && return 0 ;;
