@@ -43,10 +43,10 @@ before relying on it:
 - `harden_git_config` must not set `core.hooksPath`. Hooks stay in
   `disable_git_hooks` unless `YELLOW_REVIEW_COMMIT_HOOKS=1`.
 - `run-verify-command` handles a FIFO, socket, or device path differently per
-  mode. Run mode refuses it (exit 2). `--revert-only` deletes it with `rm -f` of
-  `TO_REMOVE` without opening it and restores the file. `--revert-dirty` refuses
-  it (exit 2). `--revert-denied` leaves it in place and reports
-  `deniedClean: false`. `run-verify-command.bats` is the spec.
+  mode. Run mode refuses it (exit 2). `--revert-only` and `--revert-dirty` hold
+  it aside until `save_patch` records the deletion, then remove it without
+  opening it and restore the file. `--revert-denied` leaves it in place and
+  reports `deniedClean: false`. `run-verify-command.bats` is the spec.
 - `--revert-dirty` still reverts every dirty path and takes no path list. The
   deny-list mode is a separate flag, `--revert-denied`.
 - Sweep-all Step 6 was already removed. Do not put it back.

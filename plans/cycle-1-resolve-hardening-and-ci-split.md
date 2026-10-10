@@ -1,10 +1,10 @@
 # Feature: Cycle 1 — resolve-flow hardening, CI split, restack abort guard
 
-> **Status (2026-10-09):** reconciled against the stack tree. 30 of 40 boxes
-> are `[x]`, 1 is `[-]` (4.4, not applicable) and 9 are open. Phases 3 and 6
-> are implemented, and Phase 1 except 1.7. Phase 2 lacks 2.5 and 2.6 (the
-> special-file deletion is still not deferred until `save_patch`, so its
-> snapshot-failure test does not exist). Phase 4 lacks 4.3 (`resolve-stack.md`
+> **Status (2026-10-10):** reconciled against the stack tree. 32 of 40 boxes
+> are `[x]`, 1 is `[-]` (4.4, not applicable) and 7 are open. Phases 2, 3
+> and 6 are implemented, and Phase 1 except 1.7. Tasks 2.5 and 2.6 landed
+> with #1125 on `main` (special files held aside until `save_patch`, and the
+> snapshot-failure FIFO test in `run-verify-command.bats`). Phase 4 lacks 4.3 (`resolve-stack.md`
 > is 502 lines, over the 500-line target). Phase 5 lacks only the
 > `plugins/yellow-review/CLAUDE.md` update in 5.4. Open and not code: 0.1
 > (`/stack:status` gate), 1.7 (CI counts and green jobs), 7.1 to 7.3 (ledger
@@ -235,12 +235,12 @@ only yellow-core and may be unstacked to reduce restack risk.
   `cat-file` L430/L588/L808).
 - [x] 2.4: (verified still open 2026-10-06: `run-verify-command` requires
   `--ignored-since` only when `--unattended`.) Make `--ignored-since` required in attended runs (L254–263).
-- [ ] 2.5: (verified still open 2026-10-06: `TO_REMOVE` entries are deleted
+- [x] 2.5: (verified still open 2026-10-06: `TO_REMOVE` entries are deleted
   before `save_patch`, while `DIR_REMOVE` is deferred. Decide first whether to
   keep today's behaviour; see the correction note under Phase 2.) Defer deletion of FIFO/socket/device entries (`TO_REMOVE`, L461–468)
   until `save_patch` has written the snapshot, as `DIR_REMOVE` does at
   L797–806. If the snapshot cannot be written, delete nothing and refuse.
-- [ ] 2.6: (rescoped 2026-10-06: #1025's nine `trust:` bats cases already cover
+- [x] 2.6: (rescoped 2026-10-06: #1025's nine `trust:` bats cases already cover
   a hostile `git` on PATH and an outside symlink to an in-tree executable.
   Remaining: the `core.fsmonitor` canary in the rollback status, attended run
   without `--ignored-since`, and the FIFO and snapshot-failure cases.) Tests (`tests/commit-resolve-fixes.bats`, `tests/run-verify-command.bats`),
