@@ -236,9 +236,9 @@ For each iteration:
      printf 'state=unreadable exit=%s ratelimited=1\n' "$RC"
    else
      case $(printf '%s' "$OUT" | tr 'A-Z' 'a-z') in
-       *'http 401'*|*'http 403'*|*auth*|*credential*|*token*) CAUSE='gh auth failed' ;;
-       *'http 404'*|*'not found'*|*'could not resolve'*) CAUSE='PR or repository not found' ;;
-       *timeout*|*'timed out'*|*connect*|*network*|*proxy*|*tls*|*dns*) CAUSE='network error' ;;
+       *timeout*|*'timed out'*|*connect*|*network*|*proxy*|*tls*|*dns*|*'could not resolve host'*) CAUSE='network error' ;;
+       *'http 401'*|*'http 403'*|*'gh auth login'*|*'bad credentials'*|*authenticat*) CAUSE='gh auth failed' ;;
+       *'http 404'*|*'not found'*|*'could not resolve to'*) CAUSE='PR or repository not found' ;;
        *) CAUSE="gh exited $RC" ;;
      esac
      printf 'state=unreadable exit=%s ratelimited=0 cause=%s\n' "$RC" "$CAUSE"

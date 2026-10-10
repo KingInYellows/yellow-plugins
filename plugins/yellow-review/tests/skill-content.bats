@@ -671,7 +671,9 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
 
 @test "sweep-all: the pre-check reports a fixed gh error category and never echoes the gh output" {
   text=$(flat "$SWEEP_ALL")
-  [[ "$text" == *"CAUSE='gh auth failed'"*"CAUSE='network error'"*'CAUSE="gh exited $RC"'* ]]
+  # Network first, so "could not resolve host" is not read as a missing PR.
+  [[ "$text" == *"CAUSE='network error'"*"CAUSE='gh auth failed'"*"CAUSE='PR or repository not found'"*'CAUSE="gh exited $RC"'* ]]
+  [[ "$text" == *"*'could not resolve host'*) CAUSE='network error'"* ]]
   [[ "$text" == *"ratelimited=0 cause=%s"* ]]
   [[ "$text" != *"gh-error"* ]]
   [[ "$text" != *'head -n 1 | tr -cd'* ]]

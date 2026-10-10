@@ -126,6 +126,10 @@ vr_load_redactor() {
 # (vr_publish_log, vr_redact_log) withholds the stream instead of publishing
 # it. Counts that cannot be read count as a boundary. The counts travel on fd 4
 # through a command substitution; the data goes to fd 3, this function's stdout.
+# cs_redact_secrets runs in streaming mode (CS_REDACT_STREAM=1), so neither
+# memory nor a temp file grows with the verifier's output before the caller's
+# tail cap; a failure returns nonzero with only already-redacted lines, which
+# the caller reports and its final rt_code_clean scan still covers.
 VR_FOLD_SENTINEL='[yellow-review: output had a record longer than 64 KiB]'
 vr_redact_filter() {
     local counts rc=0 tag val n_in="" n_out=""
@@ -134,7 +138,7 @@ vr_redact_filter() {
             tee >(printf 'in %s\n' "$(wc -l)" >&4) \
                 | fold -b -s -w 65536 \
                 | tee >(printf 'out %s\n' "$(wc -l)" >&4) \
-                | cs_redact_secrets 2>/dev/null \
+                | CS_REDACT_STREAM=1 cs_redact_secrets 2>/dev/null \
                 | sed -E 's/(^|[^A-Za-z0-9_])([A-Z][A-Z0-9_]*(_KEY|_TOKEN|_SECRET|_ID|_PASSWORD)[[:space:]]*[=:][[:space:]]*).*/\1\2[REDACTED]/'
         } 4>&1 >&3
     ) || rc=$?; } 3>&1
