@@ -1,0 +1,22 @@
+.changeset/defer-revert-special-file.md
+  h_6000354274ce50 7-11
+docs/solutions/logic-errors/special-file-rename-before-diff.md
+  h_6000354274ce50 1-71
+plugins/yellow-review/references/resolve/dispositions.md
+  h_6000354274ce50 528-535
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  h_6000354274ce50 71-78,474,482,771-772,799-801,830-892,896,943,946-949,985,988-991,1071,1073-1074,1076-1081,1083,1095,1098-1100,1104-1107,1121-1123
+plugins/yellow-review/tests/run-verify-command.bats
+  h_6000354274ce50 908-983
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fdd6bc30c5927a0ba77f3b1229bd4326d9aef725",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
