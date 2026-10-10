@@ -1950,14 +1950,15 @@ CFG_CMD_KEYS=(
   for val in "env PATH=tools:/usr/bin ssh" "/usr/bin/env PATH=tools ssh" "env -i PATH=tools ssh" \
              "env env PATH=tools ssh" "env -S ssh" "env -P tools ssh" "'env' PATH=tools ssh" \
              "command env PATH=tools ssh" "exec env PATH=tools ssh" "eval PATH=tools ssh" "time env PATH=tools ssh" \
-             "nice env PATH=tools ssh" "sudo -n env PATH=tools ssh" "env nice env -i ssh" "command eval ssh"; do
+             "nice env PATH=tools ssh" "sudo -n env PATH=tools ssh" "env nice env -i ssh" "command eval ssh" \
+             "stdbuf -o L env PATH=tools ssh" "stdbuf -oL ssh" "sudo -u git ssh" "timeout -s KILL 5 ssh" "nice -n 5 env PATH=tools ssh"; do
     rc=0; ( export GIT_SSH_COMMAND="$val"; harden_git_config full ) || rc=$?
     [ "$rc" -eq 1 ] || { echo "accepted: $val" >&2; return 1; }
   done
   # After the utility, an assignment-shaped word is its argument; a launcher
   # with no assignment before the utility is judged by that utility.
   for val in "env ssh" "env ssh -o ProxyCommand=nc" "builtin command ssh" "/usr/bin/timeout 5 ssh" \
-             "env command ssh" "env nice ssh" "nice -n 5 ssh -o User=git"; do
+             "env command ssh" "env nice ssh" "nice -n 5 ssh -o User=git" "timeout --signal=KILL 5 ssh"; do
     rc=0; ( export GIT_SSH_COMMAND="$val"; harden_git_config full ) || rc=$?
     [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
   done

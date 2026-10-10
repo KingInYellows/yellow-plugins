@@ -888,7 +888,7 @@ yr_prog_enters() {
 # <root> or a script whose #! enters it. Values that point only outside the
 # worktree keep working.
 yr_cmd_enters() {
-    local v="$1" root="$2" tok t bin c first="" noglob=1 phys inenv
+    local v="$1" root="$2" tok t bin c first="" noglob=1 phys inenv optprev
     local -a toks=()
     case "$v" in
         *[\$\`\;\&\|\<\>\(\)\*\?\[\\]*|*$'\n'*) return 2 ;;
@@ -940,10 +940,14 @@ yr_cmd_enters() {
     # (`timeout 5 ssh`), looked up below like a first word. An assignment or
     # eval before it fails closed (`command env PATH=tools ssh`), and so does
     # any option given to env (-S, -P, -C, -u ... change how the utility is
-    # found); a launcher's own options are skipped.
+    # found); a launcher's own options are skipped. A launcher option may
+    # take the next word as its operand (`stdbuf -o L env PATH=tools ssh`),
+    # which this check cannot tell from the utility, so a non-numeric word
+    # right after a launcher option fails closed (`sudo -u git ssh` too).
     case "${t##*/}" in
         command|exec|time|builtin|env|nice|nohup|timeout|stdbuf|sudo|doas|xargs|setsid|ionice|chrt|taskset|flock|unbuffer|chroot|runuser|su|caffeinate)
             inenv=0
+            optprev=0
             [ "${t##*/}" = env ] && inenv=1
             t=""
             for tok in ${toks[@]+"${toks[@]:1}"}; do
@@ -952,13 +956,15 @@ yr_cmd_enters() {
                 [[ "$tok" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] && return 0
                 case "${tok##*/}" in
                     eval) return 0 ;;
-                    env) inenv=1; continue ;;
-                    command|exec|time|builtin|nice|nohup|timeout|stdbuf|sudo|doas|xargs|setsid|ionice|chrt|taskset|flock|unbuffer|chroot|runuser|su|caffeinate) inenv=0; continue ;;
+                    env) [ "$optprev" -eq 0 ] || return 0; inenv=1; continue ;;
+                    command|exec|time|builtin|nice|nohup|timeout|stdbuf|sudo|doas|xargs|setsid|ionice|chrt|taskset|flock|unbuffer|chroot|runuser|su|caffeinate)
+                        [ "$optprev" -eq 0 ] || return 0; inenv=0; continue ;;
                 esac
                 case "$tok" in
-                    -*) [ "$inenv" -eq 0 ] || return 0; continue ;;
-                    [0-9]*) [ "$inenv" -eq 1 ] || continue ;;
+                    -*) [ "$inenv" -eq 0 ] || return 0; optprev=1; continue ;;
+                    [0-9]*) [ "$inenv" -eq 1 ] || { optprev=0; continue; } ;;
                 esac
+                [ "$optprev" -eq 0 ] || return 0
                 t=$tok
                 break
             done
