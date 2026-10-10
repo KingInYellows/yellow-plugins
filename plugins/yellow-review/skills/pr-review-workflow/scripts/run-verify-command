@@ -64,7 +64,25 @@
 #                  patch is saved, and the patch holds the regular files and
 #                  symlinks inside it (as new files, after the deletion of the
 #                  replaced file), so they are recoverable unless the credential
-#                  screen withholds the patch.
+#                  screen withholds the patch. A listed FIFO, socket or device
+#                  is never opened. Revert modes rename it aside in its own
+#                  directory while the patch records the tracked deletion, then
+#                  put it back. The hold path is recorded before that rename.
+#                  If the ledger write fails, the file is put back when it can
+#                  and nothing is reverted; if it cannot, stderr names the
+#                  remaining path. It is removed only after that snapshot is
+#                  written. If the snapshot cannot be saved and the rename back
+#                  succeeded, the special file stays and nothing is reverted.
+#                  save_patch runs in a subshell, so a rename back that fails
+#                  is retried outside it. A record is the held path, a NUL, the
+#                  original path, and a NUL, so a newline in the name cannot
+#                  split it. A rewrite of the hold ledger replaces it only
+#                  after the new copy is complete, so a failed rewrite leaves
+#                  the record. If the entry is still held, the
+#                  reason names that path and does not claim the tree was left
+#                  untouched. An unlink that fails is recorded and the revert
+#                  continues, so a special file already removed is still
+#                  restored. Checkout does not open one that is still present.
 #   --revert-dirty: like --revert-only for every change in the tree, listed
 #                  by git itself (for refusals: never trust resolver text).
 #   --timeout, --command-file, --trusted and --unattended apply only when
@@ -460,6 +478,7 @@ MARKER=""
 STREAM_FILE=""
 IGNORED_SCRATCH=""
 DIR_LIST=""
+HOLD_LEFTOVER=""
 # The snapshot is provisional until it is complete and credential-screened: any
 # exit before then (a signal, a die, a failed screen) removes it, so no
 # unscreened patch stays under .git.
@@ -467,7 +486,7 @@ PATCH=""
 PATCH_PROVISIONAL=0
 cleanup() {
     local f
-    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST"; do
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST" "$HOLD_LEFTOVER"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
     if [ "$PATCH_PROVISIONAL" = 1 ] && [ -n "$PATCH" ]; then
@@ -574,9 +593,10 @@ if [ "$MODE" = run ]; then
 fi
 
 # Only a regular file or a symlink may reach `git diff` below: a FIFO blocks it
-# before any watchdog starts, and a socket, device or directory is no edit to
-# keep. Running refuses; the revert modes delete the entry without opening it,
-# so refusal cleanup still completes.
+# before any watchdog starts, and a socket, device or directory is no content
+# to read. Running refuses. The revert modes keep the entry until save_patch
+# has recorded a tracked deletion without opening it, and leave it in place
+# when that snapshot cannot be written.
 TOP_REAL=$(pwd -P)
 TO_REMOVE=()
 DIR_REMOVE=()
@@ -613,10 +633,11 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         [ "$HEAD_TYPE" = blob ] \
             || die 2 "refusing to remove a directory that is not a replaced file (HEAD has ${HEAD_TYPE:-nothing} there): $f"
     fi
-    # Validated; the removal waits until the output setup below has succeeded,
-    # so a setup failure exits before anything is deleted that the checkout
-    # restoring the tracked file would never reach. A directory waits longer:
-    # the recovery patch must hold its files first (save_patch).
+    # Validated. Nothing is deleted here: a setup failure, and a snapshot that
+    # cannot be written, must leave the path in place. A directory is removed
+    # only after save_patch holds its files. A FIFO, socket or device is
+    # removed only after save_patch has recorded the tracked deletion without
+    # opening it.
     if [ -d "$f" ] && [ ! -L "$f" ]; then
         DIR_REMOVE+=("$f")
     else
@@ -639,15 +660,6 @@ if [ "$MODE" = run ]; then
     LOG="$OUT_DIR/$STAMP.log"
     (umask 077 && : >"$LOG") || die 2 "cannot create $LOG"
 fi
-
-# Setup succeeded: now remove the entries validated above.
-for f in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
-    rm -f -- "$f" 2>/dev/null
-    if [ -e "$f" ] || [ -L "$f" ]; then
-        die 2 "cannot remove a path that is not a regular file or symlink: $f"
-    fi
-    add_reason "removed without reading, not a regular file or symlink: $f"
-done
 
 RC=0
 TIMED_OUT=0
@@ -760,16 +772,111 @@ run_verify() {
 # place: its deletion of the file blob is followed by the diff of every regular
 # file and symlink inside it, so the patch re-applies on HEAD. A file inside it
 # that is listed itself (--revert-dirty) has its own entry and is not repeated.
+# A FIFO, socket or device standing in for a tracked file stays in place too.
+# It is renamed aside in its own directory for the diff (a cross-device move
+# would copy it and open it), then renamed back. The hold path is recorded
+# before that rename, as a NUL-delimited pair with the original path. A failed
+# ledger write puts the file back when it can.
+# The caller unlinks it only after both snapshots are written. This function
+# runs in a subshell, so a rename back that fails is already in HOLD_LEFTOVER
+# for the parent to retry.
+# A sibling of HOLD_LEFTOVER. Renaming it over the ledger is atomic and does
+# not use `mv -- <held> <original>`, which callers shim to fail.
+hold_ledger_tmp() {
+    (umask 077 && mktemp -- "${HOLD_LEFTOVER}.XXXXXX")
+}
+
+# Replace HOLD_LEFTOVER only after the temp holds the full rewrite. A failed
+# write or rename leaves the previous ledger in place.
+replace_hold_ledger() {
+    local tmp="$1"
+    if mv -f -- "$tmp" "$HOLD_LEFTOVER"; then
+        return 0
+    fi
+    rm -f -- "$tmp"
+    return 1
+}
+
+# One record: <held-path> NUL <original-path> NUL. A newline in either path
+# stays inside its field. Git paths cannot contain NUL.
+append_hold_record() {
+    printf '%s\0%s\0' "$1" "$2" >>"$3"
+}
+
+# Next record on stdin into the caller variables named by $1 and $2.
+# printf -v follows bash dynamic scope. macOS /bin/bash is 3.2 and has no
+# namerefs; this file's shebang is /bin/bash and nothing checks BASH_VERSINFO
+# before drop_hold_line. 1 at EOF or when the second NUL is missing, so a
+# truncated record is not applied.
+read_hold_record() {
+    local _src="" _dest=""
+    IFS= read -r -d '' _src || return 1
+    IFS= read -r -d '' _dest || return 1
+    printf -v "$1" '%s' "$_src" || return 1
+    printf -v "$2" '%s' "$_dest" || return 1
+}
+
+# Drop one hold record after the special file is back at its path.
+drop_hold_line() {
+    local src="$1" dest="$2" got_src="" got_dest="" tmp
+    tmp=$(hold_ledger_tmp) || return 1
+    while read_hold_record got_src got_dest; do
+        [ "$got_src" = "$src" ] && [ "$got_dest" = "$dest" ] && continue
+        if ! append_hold_record "$got_src" "$got_dest" "$tmp"; then
+            rm -f -- "$tmp"
+            return 1
+        fi
+    done <"$HOLD_LEFTOVER"
+    replace_hold_ledger "$tmp"
+}
+
 save_patch() {
-    local out="$1" fmt="$2" f rc c p
+    local out="$1" fmt="$2" f rc c p held_dir="" held_parent=""
     umask 077
     : >"$out" || return 1
     for f in ${FILES[@]+"${FILES[@]}"}; do
         # Fixed flags so the patch re-applies whatever the user's diff config.
         if lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
             || git cat-file -e "HEAD:$f" 2>/dev/null; then
+            # stat only: -f is false for a FIFO, socket or device. Never open it.
+            held_dir=""
+            if [ -e "$f" ] && [ ! -L "$f" ] && [ ! -f "$f" ] && [ ! -d "$f" ]; then
+                case "$f" in
+                    */*) held_parent="${f%/*}" ;;
+                    *) held_parent="." ;;
+                esac
+                held_dir=$(mktemp -d -- "$held_parent/.yellow-review-hold-XXXXXX") || return 1
+                if ! mv -- "$f" "$held_dir/node"; then
+                    rmdir -- "$held_dir" 2>/dev/null || true
+                    return 1
+                fi
+                # Before the rename back. A failed append after a failed
+                # restore would leave this ledger empty, and cleanup would
+                # delete it while the special file stayed under the hold dir.
+                if ! append_hold_record "$held_dir/node" "$f" "$HOLD_LEFTOVER"; then
+                    if mv -- "$held_dir/node" "$f"; then
+                        rmdir -- "$held_dir" 2>/dev/null || true
+                    else
+                        printf 'special file remains at %s; hold ledger was not written\n' \
+                            "$held_dir/node" >&2
+                    fi
+                    return 1
+                fi
+            fi
+            rc=0
             lgit_nohooks diff --no-color --no-ext-diff --no-textconv "$fmt" \
-                --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$out" || return 1
+                --src-prefix=a/ --dst-prefix=b/ HEAD -- "$f" >>"$out" || rc=$?
+            if [ -n "$held_dir" ]; then
+                if ! mv -- "$held_dir/node" "$f"; then
+                    # Already recorded. The parent retries; until that
+                    # succeeds the tree has changed.
+                    return 1
+                fi
+                drop_hold_line "$held_dir/node" "$f" || true
+                rmdir -- "$held_dir" || return 1
+                held_dir=""
+            fi
+            [ "$rc" -eq 0 ] || return 1
         elif [ -L "$f" ] || [ -f "$f" ]; then
             # -L: a dangling symlink has no -e but is still an edit to keep.
             # Never a FIFO or other special file: git diff would open it.
@@ -792,9 +899,54 @@ save_patch() {
         fi
     done
 }
+
+# save_patch's subshell cannot put a special file back after it returns.
+# Retry each recorded rename here. Whatever is still held is named in the
+# failure reason; the caller must not claim the tree was left untouched.
+rehome_held() {
+    local src="" dest="" tmp
+    [ -s "$HOLD_LEFTOVER" ] || return 0
+    tmp=$(hold_ledger_tmp) || return 1
+    while read_hold_record src dest; do
+        if [ -n "$dest" ] && { [ -e "$src" ] || [ -L "$src" ]; } \
+            && mv -- "$src" "$dest"; then
+            rmdir -- "${src%/*}" 2>/dev/null || true
+            continue
+        fi
+        if [ -n "$dest" ] && { [ -e "$dest" ] || [ -L "$dest" ]; } \
+            && [ ! -e "$src" ] && [ ! -L "$src" ]; then
+            rmdir -- "${src%/*}" 2>/dev/null || true
+            continue
+        fi
+        # Keep the old ledger if this copy fails. Truncating it first would
+        # drop the held path and the caller would say nothing was reverted.
+        if ! append_hold_record "$src" "$dest" "$tmp"; then
+            rm -f -- "$tmp"
+            return 1
+        fi
+    done <"$HOLD_LEFTOVER"
+    replace_hold_ledger "$tmp"
+}
+
+# Empty when every held special file is back at its path.
+held_unrestored_reason() {
+    local src="" dest="" n=0 list=""
+    [ -s "$HOLD_LEFTOVER" ] || return 0
+    while read_hold_record src dest; do
+        n=$((n + 1))
+        if [ "$n" -le 5 ]; then
+            list="${list:+$list, }${dest:-unknown} (held at ${src})"
+        fi
+    done <"$HOLD_LEFTOVER"
+    [ "$n" -gt 0 ] || return 0
+    [ "$n" -le 5 ] || list="$list (+$((n - 5)) more)"
+    printf '%s' "could not restore a special file: $list"
+}
+
 TEXT_FILE=$(mktemp) || die 2 "mktemp failed"
 DIR_LIST=$(mktemp) || die 2 "mktemp failed"
 ADDED_FILE=$(mktemp) || die 2 "mktemp failed"
+HOLD_LEFTOVER=$(mktemp) || die 2 "mktemp failed"
 SAVE_BIN_OK=0 SAVE_TEXT_OK=0
 PATCH_OUT="$PATCH"
 PATCH_SCREENED=0
@@ -841,8 +993,13 @@ patch_hunk_lines() {
     '
 }
 screen_patch() {
+    local held=""
     if [ "$SAVE_TEXT_OK" != 1 ] || ! patch_hunk_lines <"$TEXT_FILE" >"$ADDED_FILE"; then
         rm -f -- "$PATCH"
+        held=$(held_unrestored_reason)
+        if [ -n "$held" ]; then
+            die 2 "cannot screen the recovery patch; $held"
+        fi
         die 2 "cannot screen the recovery patch; the command was not run and the tree is untouched"
     fi
     rt_code_clean "$ADDED_FILE"
@@ -878,8 +1035,13 @@ if [ "$MODE" = run ]; then
     # still holds the resolver's work. Abort with the tree untouched.
     (save_patch "$PATCH" --binary) && SAVE_BIN_OK=1
     (save_patch "$TEXT_FILE" --text) && SAVE_TEXT_OK=1
+    rehome_held
     if [ "$SAVE_BIN_OK" != 1 ] || [ "$SAVE_TEXT_OK" != 1 ]; then
         rm -f -- "$PATCH"
+        held=$(held_unrestored_reason)
+        if [ -n "$held" ]; then
+            die 2 "could not snapshot the listed files before the verify command; $held"
+        fi
         die 2 "could not snapshot the listed files before the verify command; the command was not run and the tree is untouched"
     fi
     screen_patch
@@ -959,12 +1121,19 @@ if [ "$MODE" != run ]; then
     SAVE_BIN_OK=0 SAVE_TEXT_OK=0
     (save_patch "$PATCH" --binary) && SAVE_BIN_OK=1
     (save_patch "$TEXT_FILE" --text) && SAVE_TEXT_OK=1
+    rehome_held
 fi
-if [ "$SAVE_BIN_OK" != 1 ]; then
+held=$(held_unrestored_reason)
+if [ "$SAVE_BIN_OK" != 1 ] || [ -n "$held" ]; then
     rm -f -- "$PATCH"
-    jq -nc --arg r "$RESULT" --arg log "$LOG" --arg why "$REASON" \
+    if [ -n "$held" ]; then
+        msg="$held"
+    else
+        msg="could not save the recovery patch; nothing was reverted"
+    fi
+    jq -nc --arg r "$RESULT" --arg log "$LOG" --arg why "$REASON" --arg msg "$msg" \
         '{result: $r, patch: null, log: (if $log == "" then null else $log end), treeClean: false,
-          reason: (($why | if . == "" then "" else . + "; " end) + "could not save the recovery patch; nothing was reverted")}'
+          reason: (($why | if . == "" then "" else . + "; " end) + $msg)}'
     exit 0
 fi
 
@@ -976,6 +1145,21 @@ PATCH_PROVISIONAL=0
 
 # --- Revert the listed files ---
 REVERT_FAILS=()
+SKIP_SPECIAL=()
+# The patch now holds each tracked deletion (save_patch), so a FIFO, socket or
+# device can go without ever being opened. A snapshot failure returns above
+# and leaves the special file in place. Record an unlink that fails and keep
+# going: die would skip checkout of a special file this loop already removed.
+# Checkout below skips a path that is still special, so git does not open it.
+for f in ${TO_REMOVE[@]+"${TO_REMOVE[@]}"}; do
+    rm -f -- "$f" 2>/dev/null
+    if [ -e "$f" ] || [ -L "$f" ]; then
+        REVERT_FAILS+=("rm $f")
+        SKIP_SPECIAL+=("$f")
+    else
+        add_reason "removed without reading, not a regular file or symlink: $f"
+    fi
+done
 # The patch now holds the files of each replacement directory (save_patch), so
 # the directories can go; the checkout below restores the file in their place.
 for f in ${DIR_REMOVE[@]+"${DIR_REMOVE[@]}"}; do
@@ -987,6 +1171,9 @@ for f in ${DIR_REMOVE[@]+"${DIR_REMOVE[@]}"}; do
     fi
 done
 for f in ${FILES[@]+"${FILES[@]}"}; do
+    for s in ${SKIP_SPECIAL[@]+"${SKIP_SPECIAL[@]}"}; do
+        [ "$s" = "$f" ] && continue 2
+    done
     if git cat-file -e "HEAD:$f" 2>/dev/null; then
         # Hooks off: post-checkout and post-index-change would run any hook a
         # resolver planted, including an ignored one under core.hooksPath.
