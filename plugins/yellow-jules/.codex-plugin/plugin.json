@@ -1,0 +1,26 @@
+{
+  "name": "yellow-jules",
+  "version": "0.2.0",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "license": "MIT",
+  "keywords": [
+    "jules",
+    "google",
+    "remote-agent",
+    "delegation",
+    "ai-agent",
+    "automation"
+  ],
+  "interface": {
+    "displayName": "Jules",
+    "category": "Developer Tools",
+    "developerName": "KingInYellows",
+    "websiteURL": "https://github.com/KingInYellows/yellow-plugins#yellow-jules"
+  },
+  "description": "Two read-only reference skills — the Jules delegation lifecycle and CLI contract, and the one-pass supervision loop. Writes always need a grant the owner creates on a terminal. Excludes all of yellow-jules' commands.",
+  "commands": [],
+  "skills": "./codex/skills"
+}

@@ -35,7 +35,7 @@ and runs the **exposure lint** (below).
 
 ## Codex-enabled plugins
 
-The catalog now selects **nine plugins and exactly 29 skills**. The final
+The catalog now selects **ten plugins and exactly 31 skills**. The final
 installed gate derives this inventory from the catalog and rejects migrated
 commands, unselected skills and undeclared resources.
 
@@ -50,6 +50,7 @@ commands, unselected skills and undeclared resources.
 | yellow-research | research-public-repo                                                           | Public DeepWiki only; actual read-only repository Q&A                 |
 | yellow-cursor   | cursor-plan                                                                    | Installed offline CLI dry-run; no remote launch/auth claim            |
 | yellow-codex    | codex-readiness                                                                | Local CLI/native login classification; no nested model                |
+| yellow-jules    | jules-delegation, jules-supervision                                            | Reference skills only; every command stays Claude-only, no hooks; `authorize`, `abandon` and `supervise --clear-pause` are owner terminal commands (see "Jules and the terminal") |
 
 This is bounded skill support, not all commands/agents/hooks or all-plugin
 compatibility. Full Claude setup remains separate from this Codex selection. The
@@ -76,6 +77,21 @@ per-repo overrides in prose, inline validation instead of
 logic lives in the **non-linted** layer — the hook Node runtime, the bash libs,
 and the command wrappers. See
 [codex-config-retention-exposure-lint-conflict](solutions/integration-issues/codex-config-retention-exposure-lint-conflict.md).
+
+## Jules and the terminal
+
+`yellow-jules` exposes only reference skills to Codex. Its writes are gated by a
+grant, and a grant is written by `authorize`, which opens the controlling terminal
+itself and requires the owner to type a random code back. A Codex session has no
+controlling terminal for its commands, so it cannot satisfy that prompt, and no
+Codex skill wraps `authorize`; the owner runs it in their own terminal on the
+controller host. Codex 0.156.0 offers no host-neutral confirmation primitive to
+build on instead (see
+[capability-matrix.md](yellow-jules/capability-matrix.md#codex-supervision-capabilities-spec-open-question-2)).
+The exposed skills therefore tell the agent to show the operator the command and
+stop. The terminal check stops a caller with no terminal, not one that allocates
+its own pseudo-terminal; that residual risk is stated in
+`plugins/yellow-jules/CLAUDE.md`.
 
 ## Cross-host hooks
 

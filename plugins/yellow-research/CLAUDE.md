@@ -147,6 +147,18 @@ for `ast-grep` only, since `sg` collides with shadow-utils on Linux.
 `research-conductor` has no Bash, so it routes repo-local AST questions to
 `/research:code`.
 
+**Write permission and temp files.** `code-researcher` holds `Write` solely to
+save ast-grep values (`pattern`, `lang`, `target` or `rule`). A tool grant
+cannot be path-scoped, so the limit is an instruction in the agent: write only
+into the directory the first recipe block prints, and never save research
+output (results stay inline). The first block takes a per-user lock in a 0700
+directory (`$XDG_RUNTIME_DIR` or `~/.cache`, under `yellow-ast-grep`) and
+creates a `mktemp -d` values directory under TMPDIR. The second block reads
+the values as data, runs ast-grep with a trusted `-c` config, deletes only its
+own files plus the empty directory (never `rm -rf`) and releases the lock. A
+lock older than 15 minutes counts as abandoned. See `docs/security.md`
+"ast-grep value files".
+
 ## Required Credentials
 
 Each of the three API keys (perplexity, tavily, exa) is **optional** — the

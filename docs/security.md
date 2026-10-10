@@ -337,7 +337,8 @@ ephemeral `GITHUB_TOKEN`.
 - All processing happens locally on user's machine
 - yellow-ruvector stores embeddings in `.ruvector/` directory (gitignored)
 - yellow-review uses `gh` CLI which reads user's GitHub auth state
-- yellow-debt reads codebase files but only writes to `todos/` directory
+- yellow-debt reads codebase files but only writes to `todos/` directory, plus
+  the transient ast-grep value files described under "ast-grep value files"
 - **yellow-review's Codex copy is a trust-boundary downgrade, not a
   data-residency one.** Codex CLI runs locally like `gh` or `gt`, so the "all
   processing happens locally" guarantee above still holds for it. Claude's
@@ -1076,3 +1077,27 @@ fence MCP writes, so only the selected public read operations are exposed.
 Public publication, real-profile installs/hook trust and remote mutations remain
 outside the local work. Runtime and conditional distribution evidence:
 [Phases 2–5 report](research/codex-phases-2-5-2026-10-06/report.md).
+
+## ast-grep value files
+
+`yellow-research`'s `code-researcher` and yellow-debt's duplication and
+complexity scanners pass ast-grep values (`pattern`, `lang`, `target`, `rule`)
+through files, never through shell text. This adds a filesystem write surface:
+
+- **Permission.** Each agent holds the `Write` tool (`code-researcher` gained
+  it). The grant is not path-scoped; the agent instruction limits it to the
+  values directory the recipe prints. Treat it as an instruction-level
+  boundary, not an enforced one.
+- **Locations.** A 0700 state directory (`$XDG_RUNTIME_DIR` or `~/.cache`,
+  under `yellow-ast-grep`) holds a `lock` directory and a pointer file naming
+  the values directory. The values directory is created by `mktemp -d` under
+  the resolved TMPDIR and carries a marker directory.
+- **Locking.** One search at a time per user. A concurrent search is told to
+  retry or fall back to Grep. A lock older than 15 minutes is treated as
+  abandoned. Ownership is not tokenized (tracked in issue 1116).
+- **Cleanup.** The recipe deletes only its own value and config files and then
+  the empty directories, never `rm -rf`. It leaves any directory that lacks the
+  marker or the pointer match untouched.
+- **Validation.** `lang` and `target` use allow-lists, symlinked or empty value
+  files are refused, and ast-grep runs with a trusted `-c` config so a repo
+  `sgconfig.yml` is never loaded.

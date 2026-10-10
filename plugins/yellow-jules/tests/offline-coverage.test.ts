@@ -4,8 +4,10 @@
  * inputs, SDK module loading (workspace and data-dir branches, entry-digest
  * mismatch, storage binding), installed-cache execution, unknown states,
  * duplicate activities, pagination and partial pagination, corrupt journal
- * reads, and the negative test — every shipped subcommand issues zero
- * POST/PATCH/PUT/DELETE requests.
+ * reads, and the negative tests — the read-only subcommands (`setup`, `list`,
+ * `status`, `collect`, `authorize --list`) issue zero POST/PATCH/PUT/DELETE
+ * requests, and every mutating subcommand refuses without a grant and without
+ * a terminal before it sends anything (PR3).
  *
  * "Installed cache" means a plugin root holding dist/, package.json, and
  * runtime/ with no node_modules, as Claude Code installs it; the SDK can then
@@ -411,8 +413,8 @@ describe('vendor data shapes through the CLI', () => {
   });
 });
 
-describe('negative test (R52): the shipped surface never mutates the vendor', () => {
-  it('every shipped subcommand issues zero POST/PATCH/PUT/DELETE requests', async () => {
+describe('negative test (R52): the read-only subcommands never mutate the vendor', () => {
+  it('setup, list, status, collect and authorize --list issue zero POST/PATCH/PUT/DELETE requests', async () => {
     seedSession();
     const runs: Array<[string[], number]> = [
       [['setup'], 0],
@@ -422,6 +424,7 @@ describe('negative test (R52): the shipped surface never mutates the vendor', ()
       [['status', '--reconcile'], 0],
       [['status', '--session', 'sessions/s1', '--reconcile'], 0],
       [['collect', '--session', 'sessions/s1'], 0],
+      [['authorize', '--list'], 0],
     ];
     for (const [args, code] of runs) {
       const r = await cli(cachePlugin, args);
@@ -450,5 +453,203 @@ describe('negative test (R52): the shipped surface never mutates the vendor', ()
 
   it('no trapped tool was invoked', () => {
     expect(traps.entries()).toEqual([]);
+  });
+});
+
+describe('mutating subcommands refuse before sending anything (PR3)', () => {
+  function requestsSeen(): number {
+    return server.log.length;
+  }
+
+  it('delegate without --grant-id is JULES_CONFIRMATION_REQUIRED, echoes both ids, and sends nothing', async () => {
+    seedSession();
+    const r = await cli(workspacePlugin, [
+      'delegate',
+      '--repo',
+      'octo/repo',
+      '--branch',
+      'scratch/one',
+      '--task-ref',
+      't1',
+      '--prompt',
+      'do the thing',
+    ]);
+    expect({ code: r.code, lines: r.stdoutLines }).toEqual({
+      code: 1,
+      lines: 1,
+    });
+    expect(r.json['ok']).toBe(false);
+    expect(r.json['operation']).toBe('delegate');
+    expect(errorCode(r)).toBe('JULES_CONFIRMATION_REQUIRED');
+    expect(r.json['localRequestId']).toMatch(/^jr-[0-9a-f]{32}$/);
+    expect(r.json['localId']).toMatch(/^jl-[0-9a-f]{32}$/);
+    const error = r.json['error'] as Record<string, string>;
+    expect(error['recoveryAction']).toContain('authorize');
+    expect(r.stderr.trim()).toBe('JULES_CONFIRMATION_REQUIRED');
+    expect(requestsSeen()).toBe(0);
+    expect(server.mutatingCount).toBe(0);
+  });
+
+  it('delegate --dry-run reads the source but never POSTs, and needs no grant', async () => {
+    seedSession();
+    const r = await cli(workspacePlugin, [
+      'delegate',
+      '--repo',
+      'octo/repo',
+      '--branch',
+      'scratch/one',
+      '--task-ref',
+      't1',
+      '--prompt',
+      'do the thing',
+      '--dry-run',
+    ]);
+    expect(r.code).toBe(0);
+    expect(r.json).toMatchObject({
+      ok: true,
+      operation: 'delegate',
+      dryRun: true,
+      repository: 'octo/repo',
+      requestedBranch: 'scratch/one',
+      sourceResource: 'sources/github/octo/repo',
+    });
+    expect(server.paths()).toEqual(['GET /v1alpha/sources/github/octo/repo']);
+    expect(server.mutatingCount).toBe(0);
+  });
+
+  it.each([
+    [['reply', '--session', 'sessions/s1', '--message', 'hi']],
+    [['approve', '--session', 'sessions/s1', '--plan-id', 'plan-1']],
+  ])(
+    '%j without --grant-id is JULES_CONFIRMATION_REQUIRED with no vendor request',
+    async (args) => {
+      seedSession();
+      const r = await cli(workspacePlugin, args);
+      expect(r.code).toBe(1);
+      expect(errorCode(r)).toBe('JULES_CONFIRMATION_REQUIRED');
+      expect(r.json['localRequestId']).toBeDefined();
+      expect(requestsSeen()).toBe(0);
+    }
+  );
+
+  it('a real delegate with a grant id that does not exist is JULES_AUTHORITY_DENIED and sends nothing', async () => {
+    seedSession();
+    const r = await cli(workspacePlugin, [
+      'delegate',
+      '--repo',
+      'octo/repo',
+      '--branch',
+      'scratch/one',
+      '--task-ref',
+      't1',
+      '--prompt',
+      'x',
+      '--grant-id',
+      `jg-${'0'.repeat(32)}`,
+    ]);
+    expect(r.code).toBe(1);
+    expect(errorCode(r)).toBe('JULES_AUTHORITY_DENIED');
+    expect(server.mutatingCount).toBe(0);
+  });
+
+  it('authorize without a controlling terminal is refused and writes no grant', async () => {
+    const r = await cli(workspacePlugin, [
+      'authorize',
+      '--repo',
+      'octo/repo',
+      '--branch',
+      'scratch/one',
+      '--task-ref',
+      't1',
+      '--operations',
+      'create',
+      '--owner',
+      'me',
+    ]);
+    expect(r.code).toBe(1);
+    expect(errorCode(r)).toBe('JULES_CONFIRMATION_REQUIRED');
+    expect(
+      fs.existsSync(path.join(resolveStateDir(iso.dataDir), 'grants.json'))
+    ).toBe(false);
+  });
+
+  it('abandon and supervise --clear-pause cannot be satisfied without a terminal', async () => {
+    const unknown = await cli(workspacePlugin, [
+      'abandon',
+      '--request-id',
+      'nope',
+    ]);
+    expect(unknown.code).toBe(1);
+    expect(errorCode(unknown)).toBe('JULES_NOT_FOUND');
+    const clear = await cli(workspacePlugin, [
+      'supervise',
+      '--clear-pause',
+      '--session',
+      'sessions/s1',
+    ]);
+    expect(clear.code).toBe(1);
+    expect(['JULES_INVALID_STATE', 'JULES_AUTHORITY_DENIED']).toContain(
+      errorCode(clear)
+    );
+  });
+
+  it.each([
+    [['delegate'], 'delegate'],
+    [['delegate', '--repo', 'a/b', '--branch', 'x'], 'delegate'],
+    [['reply', '--session', 'sessions/s1'], 'reply'],
+    [['approve', '--session', 'sessions/s1'], 'approve'],
+    [['abandon'], 'abandon'],
+    [['supervise'], 'supervise'],
+    [
+      [
+        'supervise',
+        '--clear-pause',
+        '--session',
+        'sessions/s1',
+        '--grant-id',
+        'jg-x',
+      ],
+      'supervise',
+    ],
+    [['authorize', '--grant-id', 'jg-x'], 'authorize'],
+    [['authorize', '--list', '--take-over'], 'authorize'],
+    [
+      [
+        'delegate',
+        '--repo',
+        'a/b',
+        '--branch',
+        'x',
+        '--task-ref',
+        't',
+        '--prompt',
+        'p',
+        '--nope',
+      ],
+      'delegate',
+    ],
+  ])(
+    '%j is a usage error: exit 2, one JSON line, the code on stderr',
+    async (args, operation) => {
+      const r = await cli(workspacePlugin, args);
+      expect({ code: r.code, lines: r.stdoutLines }).toEqual({
+        code: 2,
+        lines: 1,
+      });
+      expect(r.json['ok']).toBe(false);
+      expect(r.json['operation']).toBe(operation);
+      expect(errorCode(r)).toBe('JULES_INVALID_INPUT');
+      expect(r.stderr.length).toBeGreaterThan(0);
+    }
+  );
+
+  it('integrate is still not available in this release', async () => {
+    const r = await cli(workspacePlugin, ['integrate']);
+    expect(r.code).toBe(2);
+    expect(errorCode(r)).toBe('JULES_INVALID_INPUT');
+  });
+
+  it('no mutating request reached the server across all of the above', () => {
+    expect(server.mutatingCount).toBe(0);
   });
 });

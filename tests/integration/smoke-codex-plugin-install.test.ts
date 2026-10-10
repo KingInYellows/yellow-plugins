@@ -55,7 +55,7 @@ describe('Codex isolated install smoke', () => {
     ['--bad'],
     ['--plugin'],
     ['--plugin', '../yellow-core'],
-    ['--plugin', 'yellow-jules'],
+    ['--plugin', 'yellow-linear'],
   ])('rejects invalid arguments %j', (...args) => {
     expect(run(args).status).toBe(2);
   });

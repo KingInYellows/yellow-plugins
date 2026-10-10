@@ -835,6 +835,83 @@ describe('targets.codex.includeHooks opt-out (R22)', () => {
   });
 });
 
+describe('a two-skill allowlist with an interface and includeHooks:false (the yellow-jules shape)', () => {
+  const SKILLS = {
+    'one-skill': { name: 'one-skill', description: 'First host-neutral reference skill.' },
+    'two-skill': { name: 'two-skill', description: 'Second host-neutral reference skill.' },
+    'claude-only': { name: 'claude-only', description: 'Stays out of the Codex tree.' },
+  };
+
+  function generate(): string {
+    const root = makeCodexFixtureRoot([
+      {
+        name: 'pair-plugin',
+        codexEnabled: true,
+        includeHooks: false,
+        skillAllowlist: ['one-skill', 'two-skill'],
+        skills: SKILLS,
+        hooks: {
+          SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'bash ${CLAUDE_PLUGIN_ROOT}/real.sh', timeout: 3 }] }],
+        },
+      },
+    ]);
+    const result = generateManifests({ mode: 'apply', rootDir: root });
+    expect(result.status).toBe('ok');
+    return root;
+  }
+
+  it('emits exactly the two allowlisted skills, the interface, and no hooks', () => {
+    const root = generate();
+    const manifest = JSON.parse(
+      readFileSync(join(root, 'plugins', 'pair-plugin', '.codex-plugin', 'plugin.json'), 'utf8')
+    );
+    expect(manifest.interface).toMatchObject({ displayName: 'pair-plugin', category: 'Developer Tools' });
+    expect(manifest.skills).toBe('./codex/skills');
+    expect(manifest.hooks).toBeUndefined();
+
+    for (const name of ['one-skill', 'two-skill']) {
+      expect(existsSync(join(root, 'plugins', 'pair-plugin', 'codex', 'skills', name, 'SKILL.md'))).toBe(true);
+    }
+    expect(existsSync(join(root, 'plugins', 'pair-plugin', 'codex', 'skills', 'claude-only'))).toBe(false);
+    expect(existsSync(join(root, 'plugins', 'pair-plugin', 'hooks', 'codex-hooks.json'))).toBe(false);
+  });
+
+  it('normalizes the exposed frontmatter to name plus a single-line description', () => {
+    const root = generate();
+    const text = readFileSync(
+      join(root, 'plugins', 'pair-plugin', 'codex', 'skills', 'one-skill', 'SKILL.md'),
+      'utf8'
+    );
+    const frontmatter = text.split('---')[1] ?? '';
+    const keys = frontmatter
+      .split('\n')
+      .filter((line) => /^[a-z-]+:/.test(line))
+      .map((line) => line.split(':')[0]);
+    expect(keys).toEqual(['name', 'description']);
+  });
+
+  it('lists the plugin in the Codex marketplace and passes artifact validation and the exposure lint', () => {
+    const root = generate();
+    const marketplace = JSON.parse(readFileSync(join(root, '.agents', 'plugins', 'marketplace.json'), 'utf8'));
+    expect(marketplace.plugins.map((p: { name: string }) => p.name)).toEqual(['pair-plugin']);
+
+    const catalog = loadCatalog(join(root, 'catalog')).data;
+    const sources = loadPluginSources(join(root, 'catalog'), catalog.pluginOrder).sources;
+    expect(runExposureLint({ rootDir: root, catalog, sources })).toEqual([]);
+    const ajv = new Ajv({ strict: true, allErrors: true, verbose: true, allowUnionTypes: true });
+    addFormats(ajv);
+    const schemasDir = join(__dirname, '..', '..', 'schemas');
+    expect(validateArtifacts({ rootDir: root, catalog, sources, ajv, schemasDir })).toEqual([]);
+  });
+
+  it('is byte-identical on regeneration', () => {
+    const root = generate();
+    const again = generateManifests({ mode: 'apply', rootDir: root });
+    expect(again.status).toBe('ok');
+    expect(again.written).toEqual([]);
+  });
+});
+
 describe('validateArtifacts — declared-but-missing hooks file (P2)', () => {
   it('flags a manifest "hooks" pointer whose target file is missing from disk, instead of silently passing', () => {
     const inlineHooks = {
