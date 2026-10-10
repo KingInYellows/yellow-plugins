@@ -318,7 +318,7 @@ yr_has_root() {
 # left alone when it has no slash (a program name is looked up on PATH, never
 # in the current directory). Words starting with ~ or $ are not judged here.
 yr_args_enter() {
-    local v="$1" root="$2" skipfirst="${3:-0}" phys tok t u c first=1 noglob=1
+    local v="$1" root="$2" skipfirst="${3:-0}" phys tok t u c rest first=1 noglob=1
     local -a toks=()
     phys=$(pwd -P) || return 0
     yr_has_root "$v" "$root" && return 0
@@ -333,7 +333,11 @@ yr_args_enter() {
         t=${tok#!}
         t=${t#[\"\']}
         t=${t%[\"\']}
-        for u in "$t" "${t#*=}"; do
+        # A short option with its value attached (`ssh -Fconfig`, `-I.`)
+        # names that value as a path too.
+        rest=""
+        case "$t" in -[A-Za-z]?*) rest=${t#-?} ;; esac
+        for u in "$t" "${t#*=}" "$rest"; do
             case "$u" in
                 ''|'~'*|'$'*) continue ;;
                 /*)
@@ -350,7 +354,7 @@ yr_args_enter() {
                     yr_inside_root "$c" "$root" && return 0
                     ;;
             esac
-            case "$t" in -*=*) ;; *) break ;; esac
+            case "$t" in -*=*|-[A-Za-z]?*) ;; *) break ;; esac
         done
         first=0
     done
