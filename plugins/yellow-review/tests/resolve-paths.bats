@@ -2410,7 +2410,7 @@ EOF
     out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
     [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
   done
-  for shebang in '#!/usr/bin/env python3' '#!/usr/bin/env -S node --flag' '#!/usr/bin/env -S sh -c true'; do
+  for shebang in '#!/usr/bin/env python3' '#!/usr/bin/env -S python3 -u' '#!/usr/bin/env -S sh -c true'; do
     d="$BATS_TEST_TMPDIR/eaok"
     mkdir -p "$d"
     printf '%s\n' "$shebang" >| "$d/tool"
@@ -2470,12 +2470,40 @@ unprivileged() {
     out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
     [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
   done
-  for shebang in '#!/usr/bin/env python3' '#!/usr/bin/env -S node --flag' '#!/usr/bin/env -u P sh' '#!/usr/bin/env sh -P'; do
+  for shebang in '#!/usr/bin/env python3' '#!/usr/bin/env -S python3 -Es' '#!/usr/bin/env -u P sh' '#!/usr/bin/env sh -P'; do
     d="$BATS_TEST_TMPDIR/epok"
     mkdir -p "$d"
     printf '%s\n' "$shebang" >| "$d/tool"
     chmod +x "$d/tool"
     ! yr_file_shebang_enters "$d/tool" "$PWD" || { echo "shell false hit: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" == "$d:"* ]] || { echo "awk false hit: $shebang" >&2; return 1; }
+  done
+}
+
+@test "#! lines that hand an interpreter a code-loading option or a relative operand drop the directory, in awk and in the shell" {
+  printf 'open("%s/marker", "w")\n' "$BATS_TEST_TMPDIR" >| evil.py
+  n=0
+  for shebang in '#!/usr/bin/env -S python3 -m evil' '#!/usr/bin/python3 -m evil' '#!/usr/bin/python3 -Em evil' \
+                 '#!/usr/bin/python3 -c import evil' '#!/usr/bin/env -S node -r ./evil' '#!/usr/bin/env -S node --require=./evil' \
+                 '#!/usr/bin/perl -Mevil' '#!/usr/bin/perl -I. -Mevil' '#!/usr/bin/env -S ruby -r./evil' \
+                 '#!/usr/bin/env -S python3 evil.py' '#!/usr/bin/awk -f evil'; do
+    n=$((n + 1))
+    d="$BATS_TEST_TMPDIR/ie$n"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/ssh"
+    chmod +x "$d/ssh"
+    yr_file_shebang_enters "$d/ssh" "$PWD" || { echo "shell missed: $shebang" >&2; return 1; }
+    out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+    [[ "$out" != *"$d"* ]] || { echo "awk missed: $shebang" >&2; return 1; }
+  done
+  for shebang in '#!/usr/bin/python3 -Es' '#!/usr/bin/perl -wT' '#!/usr/bin/perl -w' '#!/usr/bin/ruby -w' \
+                 '#!/usr/bin/awk -f' '#!/usr/bin/env node' '#!/usr/bin/python3 /usr/lib/x.py'; do
+    d="$BATS_TEST_TMPDIR/ieok"
+    mkdir -p "$d"
+    printf '%s\n' "$shebang" >| "$d/ssh"
+    chmod +x "$d/ssh"
+    ! yr_file_shebang_enters "$d/ssh" "$PWD" || { echo "shell false hit: $shebang" >&2; return 1; }
     out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
     [[ "$out" == "$d:"* ]] || { echo "awk false hit: $shebang" >&2; return 1; }
   done

@@ -468,6 +468,28 @@ yr_file_shebang_enters() {
             ;;
         *) args=${rest#"$i"} ;;
     esac
+    # An interpreter given an option that runs or loads code by name
+    # (`python3 -m evil`, `perl -Mevil`, `node -r ./evil`) or a relative
+    # operand it resolves itself runs a worktree file no path check sees: fail
+    # closed. Only absolute paths, `--` and flags that load nothing pass
+    # (python -E -s -u, perl -w -T, ruby -w, awk -f); both splittings of the
+    # argument are judged.
+    case "${i##*/}" in
+        python|python[0-9]*|pypy|pypy[0-9]*|node|nodejs|deno|bun|perl|perl[0-9]*|ruby|ruby[0-9]*|php|php[0-9]*|lua|lua[0-9]*|luajit|Rscript|java|jshell|osascript|tclsh*|wish*|awk|gawk|mawk|nawk)
+            v=()
+            read -r -a v <<<"$args" || true
+            for x in ${v[@]+"${v[@]}"}; do
+                case "$x" in /*|--) continue ;; esac
+                case "${i##*/}:$x" in
+                    python*:-?*|pypy*:-?*) case "${x#-}" in *[!bBdEIOqsSuv]*) return 0 ;; esac ;;
+                    perl*:-?*) case "${x#-}" in *[!wWXTtsalnU0-9]*) return 0 ;; esac ;;
+                    ruby*:-?*) case "${x#-}" in *[!wWvsanl]*) return 0 ;; esac ;;
+                    awk:-f|gawk:-f|mawk:-f|nawk:-f) ;;
+                    *) return 0 ;;
+                esac
+            done
+            ;;
+    esac
     # A $, backtick, ~, backslash or glob character (* ? [) in an argument is
     # expanded or decoded by the program the line starts (`#!/bin/sh -c
     # $PWD/evil`, which BSD and macOS pass as separate arguments), so no path

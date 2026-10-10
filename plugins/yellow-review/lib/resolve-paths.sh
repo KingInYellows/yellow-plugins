@@ -293,6 +293,28 @@ yr_file_shebang_enters() {
             ;;
         *) args=${rest#"$i"} ;;
     esac
+    # An interpreter given an option that runs or loads code by name
+    # (`python3 -m evil`, `perl -Mevil`, `node -r ./evil`) or a relative
+    # operand it resolves itself runs a worktree file no path check sees: fail
+    # closed. Only absolute paths, `--` and flags that load nothing pass
+    # (python -E -s -u, perl -w -T, ruby -w, awk -f); both splittings of the
+    # argument are judged.
+    case "${i##*/}" in
+        python|python[0-9]*|pypy|pypy[0-9]*|node|nodejs|deno|bun|perl|perl[0-9]*|ruby|ruby[0-9]*|php|php[0-9]*|lua|lua[0-9]*|luajit|Rscript|java|jshell|osascript|tclsh*|wish*|awk|gawk|mawk|nawk)
+            v=()
+            read -r -a v <<<"$args" || true
+            for x in ${v[@]+"${v[@]}"}; do
+                case "$x" in /*|--) continue ;; esac
+                case "${i##*/}:$x" in
+                    python*:-?*|pypy*:-?*) case "${x#-}" in *[!bBdEIOqsSuv]*) return 0 ;; esac ;;
+                    perl*:-?*) case "${x#-}" in *[!wWXTtsalnU0-9]*) return 0 ;; esac ;;
+                    ruby*:-?*) case "${x#-}" in *[!wWvsanl]*) return 0 ;; esac ;;
+                    awk:-f|gawk:-f|mawk:-f|nawk:-f) ;;
+                    *) return 0 ;;
+                esac
+            done
+            ;;
+    esac
     # A $, backtick, ~, backslash or glob character (* ? [) in an argument is
     # expanded or decoded by the program the line starts (`#!/bin/sh -c
     # $PWD/evil`, which BSD and macOS pass as separate arguments), so no path
@@ -518,6 +540,20 @@ yr_shebang_inside() {
             return ""
         }
         function pr(x) { if (!(x in pp)) { pp[x] = 1; print x } }
+        function interp(    b, j, x, ok) {
+            b = i; sub(/.*\//, "", b)
+            if (b !~ /^(python[0-9.]*|pypy[0-9.]*|node|nodejs|deno|bun|perl[0-9.]*|ruby[0-9.]*|php[0-9.]*|lua[0-9.]*|luajit|Rscript|java|jshell|osascript|tclsh.*|wish.*|awk|gawk|mawk|nawk)$/) return
+            for (j = from; j <= n; j++) {
+                x = w[j]
+                if (x == "" || x == "--" || x ~ /^\//) continue
+                ok = 0
+                if (b ~ /^(python|pypy)/) ok = (x ~ /^-[bBdEIOqsSuv]+$/)
+                else if (b ~ /^perl/) ok = (x ~ /^-[wWXTtsalnU0-9]+$/)
+                else if (b ~ /^ruby/) ok = (x ~ /^-[wWvsanl]+$/)
+                else if (b ~ /^[gmn]?awk$/) ok = (x == "-f")
+                if (!ok) { pr(root); return }
+            }
+        }
         function hasroot(t,    p, pc, nc) {
             while ((p = index(t, root)) > 0) {
                 pc = (p > 1) ? substr(t, p - 1, 1) : ""
@@ -551,6 +587,7 @@ yr_shebang_inside() {
             s = substr($0, 3); sub(/^[ \t]+/, "", s); n = split(s, w, /[ \t]+/); i = w[1]; e = ""; from = 2
             if (i ~ /(^|\/)env$/) { i = envcmd(); e = 1; from = idx + 1 }
             if (from <= n) argpaths(from)
+            if (i != "") interp()
             if (i == "" || (i in seen)) next
             seen[i] = 1
             if (i ~ /\//) pr(i ~ /^\// ? i : cwd "/" i)
