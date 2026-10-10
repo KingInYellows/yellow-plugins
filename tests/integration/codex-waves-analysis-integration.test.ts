@@ -207,6 +207,27 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     expect(lines[8].text).toBe('const url = "https://example.com/path";');
   });
 
+  it('redacts credential values wrapped onto continuation lines', () => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'const apiKey =\n' +
+          '  "sk-live-abc123"\n' +
+          'const amount = 1;\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    expect(JSON.stringify(result.output)).not.toContain('sk-live-abc123');
+    const lines = result.output.files[0].lines;
+    expect(lines[0].text).toBe(
+      '--- redacted possible credential at line 1 ---'
+    );
+    expect(lines[1].text).toBe(
+      '--- redacted possible credential at line 2 ---'
+    );
+    expect(lines[2].text).toBe('const amount = 1;');
+  });
+
   it('bounds directory scans to twenty supported source files', () => {
     const result = inspect('src', (workspace) => {
       for (let index = 0; index < 21; index += 1) {
