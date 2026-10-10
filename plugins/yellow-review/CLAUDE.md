@@ -313,7 +313,8 @@ is one path). For every program value, whatever its origin (environment, injecte
 entry in a global or system file outside the worktree), a word containing `/` skips `PATH`: it is
 resolved against the current directory and the worktree and refused when it, its link target, a
 `#!` interpreter or a hard link behind it is inside the worktree (`core.sshCommand=./evil` in an
-otherwise trusted global config). Shell syntax the check cannot judge is tolerated in those
+otherwise trusted global config). For `url.ext::<command>.insteadOf` the command in the key is
+judged the same way. Shell syntax the check cannot judge is tolerated in those
 trusted files, so a user's own `!` alias or pager keeps working. Any inherited `GIT_EXEC_PATH` is refused (git runs `git-remote-*` and
 other dashed helpers from it, and a link there can reach the worktree; the default exec
 path is right for these scripts). The `#!` check follows an interpreter that is itself a
@@ -365,7 +366,9 @@ utility (`PATH=tools` changes where it is looked up), or with a `$`, backslash
 or quote after `-S` (env expands and decodes them), with `-P` (env then
 searches another path than `PATH`), or with `-C`/`--chdir` (the utility is
 resolved elsewhere), or whose utility is itself `env` or another launcher (`env -S env PATH=tools
-evil`, `env nice evil`), counts as entering the worktree.
+evil`, `env nice evil`), counts as entering the worktree. So does a `#!`
+argument with expansion or glob syntax, or with a shell operator, redirection
+or parenthesis (`#!/bin/sh -c PATH=tools:/usr/bin;evil`).
 `run-verify-command` still gives the verify command the caller's `PATH`
 (`YR_ORIG_PATH`). Both scripts take their own directory by parameter expansion,
 not `dirname`.
