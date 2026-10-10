@@ -228,6 +228,102 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     expect(lines[2].text).toBe('const amount = 1;');
   });
 
+  const redactedAt = (line: number) =>
+    '--- redacted possible credential at line ' + line + ' ---';
+
+  it('redacts a backtick template literal through its closing delimiter', () => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'const privateKey = `\n' +
+          'fake-payload-alpha\n' +
+          'fake-payload-beta\n' +
+          '`;\n' +
+          'const amount = 1;\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    expect(JSON.stringify(result.output)).not.toContain('fake-payload');
+    const lines = result.output.files[0].lines;
+    for (let index = 0; index < 4; index += 1) {
+      expect(lines[index].text).toBe(redactedAt(index + 1));
+    }
+    expect(lines[4].text).toBe('const amount = 1;');
+  });
+
+  it('redacts a triple-quoted literal through its closing delimiter', () => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'password = """\n' + 'fake-payload-gamma\n' + '"""\n' + 'amount = 1\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    expect(JSON.stringify(result.output)).not.toContain('fake-payload');
+    const lines = result.output.files[0].lines;
+    for (let index = 0; index < 3; index += 1) {
+      expect(lines[index].text).toBe(redactedAt(index + 1));
+    }
+    expect(lines[3].text).toBe('amount = 1');
+  });
+
+  it('redacts a YAML block scalar until the indentation returns', () => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'api_key: |\n' +
+          '  fake-payload-delta\n' +
+          '  fake-payload-epsilon\n' +
+          'other: 1\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    expect(JSON.stringify(result.output)).not.toContain('fake-payload');
+    const lines = result.output.files[0].lines;
+    for (let index = 0; index < 3; index += 1) {
+      expect(lines[index].text).toBe(redactedAt(index + 1));
+    }
+    expect(lines[3].text).toBe('other: 1');
+  });
+
+  it('redacts a bare PEM private key block without any assignment marker', () => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        '-----BEGIN RSA PRIVATE KEY-----\n' +
+          'fake-payload-zeta\n' +
+          '-----END RSA PRIVATE KEY-----\n' +
+          'const amount = 1;\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    expect(JSON.stringify(result.output)).not.toContain('fake-payload');
+    const lines = result.output.files[0].lines;
+    for (let index = 0; index < 3; index += 1) {
+      expect(lines[index].text).toBe(redactedAt(index + 1));
+    }
+    expect(lines[3].text).toBe('const amount = 1;');
+  });
+
+  it('redacts through end of file when a literal span is still open', () => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'const amount = 1;\n' +
+          'const secret = `\n' +
+          'fake-payload-eta\n' +
+          'fake-payload-theta\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    expect(JSON.stringify(result.output)).not.toContain('fake-payload');
+    const lines = result.output.files[0].lines;
+    expect(lines[0].text).toBe('const amount = 1;');
+    for (let index = 1; index < 4; index += 1) {
+      expect(lines[index].text).toBe(redactedAt(index + 1));
+    }
+  });
+
   it('bounds directory scans to twenty supported source files', () => {
     const result = inspect('src', (workspace) => {
       for (let index = 0; index < 21; index += 1) {
