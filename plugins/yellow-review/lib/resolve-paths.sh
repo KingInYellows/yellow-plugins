@@ -556,7 +556,11 @@ yr_shebang_inside() {
         yr_batch_canon_inside "$root" "$out" "$find" "$awk" && return 0
         [ -n "$out" ] || return 1
         yr_split_lines "$out"
-        out=$(YR_SB_DIRS="$dirs" YR_SB_CWD="$(pwd -P)" YR_SB_ROOT="$root" "$awk" "$prog" "${YR_LINES[@]}" 2>/dev/null) || true
+        # realpath -m keeps candidates that do not exist (an env operand is
+        # tried in every <dir>), and awk stops at the first file it cannot
+        # open: hand it only existing regular files.
+        out=$(YR_SB_DIRS="$dirs" YR_SB_CWD="$(pwd -P)" YR_SB_ROOT="$root" "$find" -L "${YR_LINES[@]}" -maxdepth 0 -type f \
+            -exec "$awk" "$prog" {} + 2>/dev/null) || true
         [ -n "$out" ] || return 1
         [ "$depth" -lt 5 ] || return 0
         depth=$((depth + 1))
@@ -865,7 +869,8 @@ yr_prog_enters() {
 # hands it to the shell, so `sh <root>/script` and `ssh -F <root>/cfg` count,
 # not only a first word that is a path. Returns
 #   0  it would run or read something inside <root> (or a path cannot be
-#      canonicalized: fail closed);
+#      canonicalized, or the first word is a NAME=value assignment: fail
+#      closed);
 #   2  it uses shell syntax this check cannot judge: $ (expansion), backtick,
 #      ; & | < > ( ) * ? [ a backslash, a quote inside a word, a quote that
 #      does not wrap exactly one word (a quoted span containing whitespace) or a newline,
@@ -920,6 +925,9 @@ yr_cmd_enters() {
     t=${first#!}
     t=${t#[\"\']}
     t=${t%[\"\']}
+    # A leading NAME=value is a shell assignment applied to the command, and
+    # PATH=tools (or IFS, ENV, ...) changes what runs: fail closed on any.
+    [[ "$t" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] && return 0
     case "$t" in
         ''|-*|'~'*) ;;
         */*) yr_prog_enters "$t" "$root" && return 0 ;;
@@ -1245,11 +1253,18 @@ harden_git_config() {
     # pre-filters with the same list and prints one tab-separated line per
     # candidate (M marks a multi-line value). Every field is percent-encoded
     # (%, tab and newline) so a path or value holding a tab cannot shift the
-    # columns; the shell decodes them (yr_pct_decode); git's status 0 is required, an
-    # awk that cannot split on NUL leaves a record count that is not a
-    # multiple of 3 and is refused.
+    # columns; the shell decodes them (yr_pct_decode); git's status 0 is required, and
+    # an awk that cannot split on NUL is refused by the probe below.
     local tkey="" tscope trigin tkeyname tml tval ofile c oroot cache=$'\n'
     local recs
+    # BWK awk (macOS /usr/bin/awk) reads RS = "\0" as paragraph mode and cuts
+    # lines at NUL; blank lines in a value can then make the count a multiple
+    # of 3 and hide a key. Refuse unless awk splits NUL records.
+    recs=$(printf 'a\0b\0c\0' | yr_awk 'BEGIN { RS = "\0" } END { print NR }' 2>/dev/null) || recs=""
+    if [ "$recs" != 3 ]; then
+        YR_HARDEN_MSG="could not parse the git transport config: awk cannot split NUL-separated records (install gawk or mawk)"
+        return 1
+    fi
     recs=$(set -o pipefail; yr_git config --null --show-scope --show-origin --list 2>/dev/null | YR_RE="$YR_CFG_CMD_KEY_RE" yr_awk 'function pe(x) { gsub(/%/, "%25", x); gsub(/\t/, "%09", x); gsub(/\n/, "%0A", x); return x }
         BEGIN { RS = "\0" }
         NR % 3 == 1 { sc = $0; next }
