@@ -133,7 +133,11 @@ with no skip line. The raw blob is only what checkout writes when `.gitignore`
 has no content-transforming attribute, so the probe also reads the commit's
 `filter`, `eol`, `working-tree-encoding` and `ident` attributes
 (`check-attr --cached` on a throwaway index of that commit) and stops with its own `Error:` line, no
-skip line, on any value other than unspecified (`eol` may also be `lf`).
+skip line, on any value other than unspecified (`eol` may also be `lf`). Each
+attribute is checked on its own line. A PR can set `filter=unspecified` as a
+literal value, which `check-attr` prints the same as the unset sentinel, so
+`filter: unspecified` passes only when no `filter.unspecified.*` driver is
+configured.
 
 ```bash
 set -u
@@ -164,7 +168,23 @@ else
     GIT_INDEX_FILE="$WT/idx" git -C "$TOP" read-tree "$GOT" 2>/dev/null || { rm -rf -- "$WT"; head_fail; }
     ATTRS=$(GIT_INDEX_FILE="$WT/idx" git -C "$TOP" check-attr --cached filter eol working-tree-encoding ident -- .gitignore 2>/dev/null) || { rm -rf -- "$WT"; head_fail; }
     [ -n "$ATTRS" ] || { rm -rf -- "$WT"; head_fail; }
-    if printf '%s\n' "$ATTRS" | grep -vE ': (unspecified|lf)$' >/dev/null; then
+    git -C "$TOP" config --get-regexp '^filter\.unspecified\.' >/dev/null 2>&1
+    case $? in 0) DRV=1 ;; 1) DRV=0 ;; *) rm -rf -- "$WT"; head_fail ;; esac
+    BAD=0
+    N=0
+    while IFS= read -r line; do
+      N=$((N + 1))
+      case "$line" in
+        '.gitignore: filter: unspecified') [ "$DRV" -eq 0 ] || BAD=1 ;;
+        '.gitignore: eol: unspecified'|'.gitignore: eol: lf') ;;
+        '.gitignore: working-tree-encoding: unspecified'|'.gitignore: ident: unspecified') ;;
+        *) BAD=1 ;;
+      esac
+    done <<EOF
+$ATTRS
+EOF
+    [ "$N" -eq 4 ] || { rm -rf -- "$WT"; head_fail; }
+    if [ "$BAD" -ne 0 ]; then
       rm -rf -- "$WT"
       printf '[review:sweep] Error: the PR head sets content-transforming attributes on .gitignore, so its ignore rules cannot be read from the blob.\n' >&2
       exit 2

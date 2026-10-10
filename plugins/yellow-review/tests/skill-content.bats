@@ -676,6 +676,14 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   [[ "$text" == *'sets content-transforming attributes on .gitignore'* ]]
 }
 
+@test "sweep: a literal filter=unspecified is refused when a filter.unspecified driver is configured" {
+  text=$(flat "$SWEEP")
+  [[ "$text" == *"config --get-regexp '^filter\.unspecified\.'"* ]]
+  [[ "$text" == *"'.gitignore: filter: unspecified') [ \"\$DRV\" -eq 0 ] || BAD=1 ;;"* ]]
+  # The old global allowlist accepted any attribute printing "unspecified".
+  [[ "$text" != *"grep -vE ': (unspecified|lf)\$'"* ]]
+}
+
 # Collapse line wraps so a phrase can be matched across them.
 flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
 
