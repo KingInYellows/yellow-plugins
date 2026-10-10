@@ -113,8 +113,8 @@ cs_atomic_jsonl_write() {
 # Bearer, basic auth, plus the high-value vendor token prefixes
 # (including tvly-, pplx- and sgp_) and PEM key blocks. A bare Basic payload
 # the sed shapes miss is ambiguous with prose, so _cs_redact_bare_basic decodes it
-# and redacts only a control-free user:pass. Streams sed then awk to stdout
-# (constant memory).
+# and redacts only a control-free user:pass. Pipes sed into awk, which holds
+# the output until the input ends (memory grows with the input).
 #
 # Future consolidation: when yellow-ci's redact.sh is relocated to a
 # shared yellow-core/lib/redact.sh, this wrapper can `. ` that file.
@@ -124,7 +124,8 @@ cs_atomic_jsonl_write() {
 # "BASIC SETTINGS" decode to binary, "Basic Only" to ":yr". The boundary
 # before the keyword matches the sed rule. POSIX awk only (mawk, gawk, BSD
 # awk): no gensub, IGNORECASE or bit functions. A line equal to $1 marks a
-# sed failure upstream, and exits 3 after the input drains.
+# sed failure upstream: nothing is printed and awk exits 3 after the input
+# drains. Output is held until then, so a failure leaves no partial result.
 _cs_redact_bare_basic() {
   awk -v fail_mark="$1" '
     BEGIN {
@@ -177,9 +178,12 @@ _cs_redact_bare_basic() {
           rest = substr(rest, RSTART + 5)
         }
       }
-      print out rest
+      held[++nh] = out rest
     }
-    END { if (failed) exit 3 }
+    END {
+      if (failed) exit 3
+      for (i = 1; i <= nh; i++) print held[i]
+    }
   '
 }
 
@@ -190,7 +194,9 @@ cs_redact_secrets() {
   # explicitly in the keyword groups — the GNU `I` flag is non-portable.
   # The left side of the pipe is a subshell, so a sed failure reaches the
   # awk stage as a marker line rather than as an exit status; the leading
-  # newline keeps it off a partial last line sed wrote before failing.
+  # newline keeps it off a partial last line sed wrote before failing. The
+  # awk stage holds every line until the input ends, so a failed run prints
+  # only the fallback line, never a partial result.
   # A per-call nonce keeps input text from forging the marker line.
   local _cs_fail_mark="@@cs-redact-sed-failed-$$-${RANDOM:-0}${RANDOM:-0}@@"
   { sed -E \

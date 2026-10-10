@@ -166,12 +166,13 @@ teardown() {
 
 @test "redact_secrets fails closed when sed fails after a partial last line" {
   mkdir -p "$STAGING_TEST_ROOT/bin"
-  printf '#!/bin/sh\nprintf "partial"\nexit 2\n' > "$STAGING_TEST_ROOT/bin/sed"
+  printf '#!/bin/sh\nprintf "kept line\\npartial"\nexit 2\n' > "$STAGING_TEST_ROOT/bin/sed"
   chmod +x "$STAGING_TEST_ROOT/bin/sed"
-  run bash -c 'PATH="$1:$PATH"; . "$2"; printf "x\n" | cs_redact_secrets' _ \
+  run --separate-stderr bash -c 'PATH="$1:$PATH"; . "$2"; printf "x\n" | cs_redact_secrets' _ \
     "$STAGING_TEST_ROOT/bin" "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
   [ "$status" -eq 1 ]
-  [[ "$output" == *'[REDACTED: sanitization failed]'* ]]
+  # Nothing sed wrote before failing reaches stdout, only the fallback line.
+  [ "$output" = '[REDACTED: sanitization failed]' ]
 }
 
 @test "redact_secrets strips an unpadded 3-character Basic credential" {
