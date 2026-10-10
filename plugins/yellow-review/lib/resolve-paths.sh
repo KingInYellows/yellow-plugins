@@ -455,11 +455,13 @@ rp_link_target_changed() {
     local l="$1" marker="$2" t p d out skip="" rc=0
     if [ -e "$l" ]; then
         if [ -d "$l" ]; then
-            # The root `.ruvector` link: skip its session log as the literal
+            # The root `.ruvector` link: skip its co-edit state as the literal
             # directory scan does (see rp_ignored_changed_since).
-            case "$l" in .ruvector|./.ruvector) skip="$l/coedit-sessions" ;; esac
+            case "$l" in .ruvector|./.ruvector) skip="$l" ;; esac
             out=$(set -o pipefail
-                find -H "$l" -name .git -prune -o -path "$skip" -prune -o -type f -newer "$marker" -print 2>/dev/null \
+                find -H "$l" -name .git -prune -o -path "$skip/coedit-sessions" -prune \
+                    -o \( -path "$skip/coedit.json" -type f \) -prune \
+                    -o \( \( -path '*/node_modules/.vite/vitest/results.json' -o -path 'node_modules/.vite/vitest/results.json' \) -type f \) -prune -o -type f -newer "$marker" -print 2>/dev/null \
                     | head -n 1) || rc=$?
             [ -z "$out" ] || return 0
             [ "$rc" -eq 0 ] || return 2
@@ -502,9 +504,15 @@ rp_link_target_changed() {
 # write through the link leaves the link's mtime alone: see
 # rp_link_target_changed. Every ignored symlink is examined, those inside
 # ignored directories included. `.git` is skipped as a walked directory, not
-# as a link target. `.ruvector/coedit-sessions` (the session log yellow-ruvector's
-# PostToolUse hook rewrites on every resolver Edit) is skipped entirely: it is
-# data nothing executes, and counting it would refuse every verify run. Prints up to 20
+# as a link target. yellow-ruvector's co-edit state is skipped: the session log
+# `.ruvector/coedit-sessions` (its PostToolUse hook rewrites it on every
+# resolver Edit) entirely, and the pair store `.ruvector/coedit.json` (rewritten
+# whenever one session edits a second file) while it is a regular file. Both
+# are JSON data nothing executes, and counting them would refuse every resolve
+# that edits two files. Anything else under `.ruvector/` still counts. Vitest's
+# run cache `node_modules/.vite/vitest/results.json` (at any depth; a regular
+# file only) is skipped too: every vitest run rewrites it, and vitest reads it
+# only to order test files. Every other file under node_modules still counts. Prints up to 20
 # repository-relative paths, one per line (control characters shown as `?`,
 # never file contents), and returns 1 when any file changed; a symlink is named
 # by its own path. Returns 0 when none did and 2 when it cannot tell: the
@@ -527,6 +535,10 @@ rp_ignored_changed_since() {
         while IFS= read -r -d '' f; do
             case "$f" in .git|.git/*|*/.git|*/.git/*) continue ;; esac
             case "$f" in .ruvector/coedit-sessions|.ruvector/coedit-sessions/) continue ;; esac
+            case "$f" in
+                .ruvector/coedit.json|node_modules/.vite/vitest/results.json|*/node_modules/.vite/vitest/results.json)
+                    if [ -f "./$f" ] && [ ! -L "./$f" ]; then continue; fi ;;
+            esac
             out=""
             rc=0
             if [ "${f%/}" != "$f" ]; then
@@ -534,7 +546,9 @@ rp_ignored_changed_since() {
                 # tree rewritten end to end cannot fill memory; a find that
                 # fails with nothing found is "cannot tell".
                 out=$(set -o pipefail
-                    find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o \( -type f -o -type l \) -newer "$marker" -print 2>/dev/null \
+                    find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune \
+                        -o \( -path ./.ruvector/coedit.json -type f \) -prune \
+                        -o \( -path '*/node_modules/.vite/vitest/results.json' -type f \) -prune -o \( -type f -o -type l \) -newer "$marker" -print 2>/dev/null \
                         | head -n 20) || rc=$?
                 if [ -z "$out" ] && [ "$rc" -eq 0 ]; then
                     # Nothing newer: judge the target of each symlink inside.

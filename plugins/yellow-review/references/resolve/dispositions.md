@@ -879,6 +879,16 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   own; `/review:resolve-stack` and `/review:sweep-all` read `verify=skipped` as
   the stop and end the walk or batch after that PR: restore the named files
   before running anything again.
+- The ignored-file guard skips three tool-owned paths it would otherwise
+  count on every run: yellow-ruvector's session log `.ruvector/coedit-sessions/`
+  and pair store `.ruvector/coedit.json` (its PostToolUse hook rewrites them on
+  resolver edits), and vitest's run cache
+  `node_modules/.vite/vitest/results.json` at any depth. The two files are
+  skipped only while they are regular files (a symlink there is still judged by
+  its target). They are JSON data nothing executes; every other path under
+  `.ruvector/` or `node_modules/` still stops the run. Other test runs can
+  still write ignored files (coverage, `*.tsbuildinfo`, pre-bundled deps), so
+  run no project command between Step 3f's marker and Step 6's guard.
 - Issue dedupe follows every page of the viewer's issues, but the whole scan is
   one `gh` call under one `YELLOW_REVIEW_GH_TIMEOUT`. A viewer with a very large
   issue history can time it out (exit 4); raise the variable for that

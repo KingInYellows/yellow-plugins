@@ -179,9 +179,9 @@ Closing a todo does not close its Linear issue.
 - **morph** — Preferred for intent-based anti-pattern search and large file
   remediation. Discovered via ToolSearch at runtime; falls back to built-in
   tools silently.
-- **ast-grep** (yellow-research) — Optional structural code search for
-  duplication-scanner and complexity-scanner. Discovered via ToolSearch at
-  runtime; falls back to Grep if yellow-research not installed.
+- **ast-grep CLI** — Optional structural code search for duplication-scanner
+  and complexity-scanner, run through Bash when `ast-grep` is on PATH; falls
+  back to Grep otherwise. No MCP server or plugin dependency.
 
 Installed Codex acceptance passed for the selected skill, including safe
 failure and unrelated controls. Other plugin components remain excluded.

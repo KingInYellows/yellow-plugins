@@ -38,7 +38,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-goal`         | Process bridge to the yellow-goal `goal-gen` engine (setup/request, stub run, approval-gated real run that may spend)                  | 4 commands                                     |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents                                      | 3 agents, 9 commands, 1 skill, 1 MCP           |
 | `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                                                  | 2 commands, 1 MCP                              |
-| `yellow-research`     | Deep research with Ceramic, DeepWiki, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                                        | 2 agents, 4 commands, 3 skills, 7 MCPs         |
+| `yellow-research`     | Deep research with Ceramic, DeepWiki, Perplexity, Tavily, EXA, and Parallel Task MCPs                                                  | 2 agents, 4 commands, 3 skills, 6 MCPs         |
 | `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review                                     | 16 agents, 8 commands, 2 skills                |
 | `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                                                  | 2 agents, 8 commands, 3 skills, 4 hooks, 1 MCP |
 | `yellow-semgrep`      | Semgrep security finding remediation — fetch, fix, and verify "to fix" findings from the Semgrep platform                              | 2 agents, 5 commands, 1 skill, 1 MCP           |
@@ -80,7 +80,6 @@ Eight plugins bundle MCP servers. Authentication requirements vary by server.
 | `yellow-research` | Tavily     | `TAVILY_API_KEY` required                                                                                                                    |
 | `yellow-research` | EXA        | `EXA_API_KEY` required                                                                                                                       |
 | `yellow-research` | Parallel   | No API key — auto-authenticated by Claude Code                                                                                               |
-| `yellow-research` | ast-grep   | No API key — requires local `ast-grep` binary                                                                                                |
 | `yellow-ruvector` | ruvector   | Local stdio — no auth required                                                                                                               |
 | `yellow-semgrep`  | semgrep    | `SEMGREP_APP_TOKEN` required                                                                                                                 |
 
@@ -141,6 +140,11 @@ automatically.
 To re-authenticate or revoke access: run `/mcp` in Claude Code, select the
 server, and choose "Clear authentication".
 
+With Graphite's merge queue, Linear moves an issue to Done only through
+commit magic words, which needs a one-time GitHub push webhook from Linear's
+GitHub integration. The plugin never sees that webhook's secret; the setup
+steps are in `plugins/yellow-linear/README.md` "Graphite Merge Queue".
+
 These plugins require browser access and **will not work in headless SSH
 sessions**.
 
@@ -158,10 +162,10 @@ health and tool availability.
 
 ### yellow-research (API keys)
 
-Bundles seven MCP servers for multi-source deep research. Three search providers
-require API keys. Ceramic and Parallel use OAuth managed by Claude Code (no API
-key), DeepWiki needs none, and `ast-grep` requires a local binary instead of a
-key.
+Bundles six MCP servers for multi-source deep research. Three search providers
+require API keys. Ceramic and Parallel use OAuth managed by Claude Code (no
+API key), and DeepWiki needs none. The optional `ast-grep` CLI is a local
+binary, not an MCP server.
 
 ```bash
 # Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
@@ -181,8 +185,8 @@ environment variables at startup.
   `ceramic_search` use)
 - **Parallel Task MCP:** No API key needed — Claude Code handles authentication
   automatically
-- **ast-grep MCP:** No API key needed — install the `ast-grep` binary locally or
-  run `/research:setup`
+- **ast-grep CLI (optional):** No API key needed — install the `ast-grep` binary
+  locally or run `/research:setup`
 
 Plugins degrade gracefully: if a key is missing, that provider is skipped and
 research continues with the remaining sources.
@@ -200,6 +204,20 @@ export SEMGREP_APP_TOKEN="sgp_your_token_here"
 The plugin also expects the `semgrep` CLI, `curl`, `jq`, and Graphite CLI
 (`gt`). Run `/semgrep:setup` to validate credentials, detect your deployment
 slug, and verify MCP tools.
+
+### Jev shadow pre-filter (yellow-core, optional)
+
+yellow-core's Stop hook can ask TypeSafe's Jev model whether a finished session
+looks worth staging for knowledge capture, and log the answer without changing
+what is staged. It is off unless both variables are set in the environment
+Claude Code's hooks inherit, and it sends redacted session text to TypeSafe:
+
+```bash
+export COMPOUND_JEV_PREFILTER=shadow
+export TYPESAFE_API_KEY="..."
+```
+
+See `docs/security.md` "Jev Shadow Pre-Filter" for exactly what is sent.
 
 ### ruvector (yellow-ruvector)
 

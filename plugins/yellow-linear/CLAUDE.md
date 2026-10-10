@@ -136,6 +136,14 @@ Linear MCP are untrusted:
 - The sanitized text is then wrapped in `--- begin/end ---` reference-only
   fences. Only the sanitized copy is shown or persisted.
 
+## Graphite Merge Queue
+
+Graphite's merge queue closes PRs that landed, so a `CLOSED` PR is not
+"closed without merge" on its own. The `linear-workflows` skill's "Graphite
+Merge Queue" section is the single source for the closing-line rule and the
+merged-PR mapping (`scripts/pr-landed.sh`, covered by `tests/pr-landed.bats`);
+state those rules there, not in the commands. Setup steps are in `README.md`.
+
 ## Known Limitations
 
 - MCP-only — no offline mode, no direct GraphQL fallback

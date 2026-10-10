@@ -362,8 +362,12 @@ the other.
   plan files (written by `/flow:plan` when Linear context is detected).
   When present, defaults to 1:1 issue-to-branch mapping with
   `feat/<ISSUE-ID>-<slug>` naming and includes issue IDs as `Linear:` fields in
-  the `## Stack Decomposition` output. This is input-only (reads plan metadata)
-  and does not create a runtime dependency on yellow-linear.
+  the `## Stack Decomposition` output. Reading plan metadata is input-only and
+  creates no runtime dependency on yellow-linear. In the other direction,
+  `smart-submit` writes (and `gt-amend` keeps) a text-only Linear closing line
+  (`Part of` or `Closes <ISSUE-ID>`) taken from the branch name; the rule lives
+  in yellow-linear's `linear-workflows` skill and needs no yellow-linear
+  install.
 
 ### MCP Tool Integration
 
