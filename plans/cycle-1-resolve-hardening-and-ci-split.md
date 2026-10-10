@@ -148,7 +148,8 @@ only yellow-core and may be unstacked to reduce restack risk.
 
 - [x] 1.1: Add a `yellow-review` shell-test job modelled on `ruvector-shell-tests`
   (`validate-schemas.yml` ~L1548). Copy the fork-PR `if:` guard from
-  `plugin-shell-tests`, `needs: [validate-schemas]`, `timeout-minutes: 15`,
+  `plugin-shell-tests`, `needs: [validate-schemas]`, `timeout-minutes: 15` (raised to 30 by #1076
+  once the suite grew),
   and install `bats@1.11.0`, gawk, zsh and `universal-ctags`. Run
   `bats plugins/yellow-review/tests/`. No `continue-on-error`.
 - [x] 1.2: Remove the yellow-review step (~L1498) from `plugin-shell-tests`.
