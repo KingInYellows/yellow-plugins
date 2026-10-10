@@ -219,8 +219,9 @@ setup() {
   H=$(commit_all handlers)
   observe "$H" "[$(finding h.sh 2 '{"scope":"admin_create"}'), $(finding h.sh 5 '{"scope":"handlers_create"}')]" >/dev/null
   [ "$(fold | jq '.findings | length')" -eq 2 ]
-  # re-observing both at the same head merges each into its own finding
-  out=$(observe "$H" "[$(finding h.sh 2), $(finding h.sh 5)]")
+  # re-observing both at the same head merges each into its own finding; the
+  # claims repeat because a ctags-verified scope is part of the identity
+  out=$(observe "$H" "[$(finding h.sh 2 '{"scope":"admin_create"}'), $(finding h.sh 5 '{"scope":"handlers_create"}')]")
   [ "$(printf '%s' "$out" | jq '.merged')" -eq 2 ]
 }
 
@@ -759,14 +760,46 @@ pr_with_finding() {
     p=$(command -v "$b") && ln -sf "$p" "$BATS_TEST_TMPDIR/noctags/$b"
   done
   ln -sf "$BATS_TEST_DIRNAME/mocks/gh" "$BATS_TEST_TMPDIR/noctags/gh"
+  PATH="$BATS_TEST_TMPDIR/noctags" run command -v ctags
+  [ "$status" -eq 1 ]
   PATH="$BATS_TEST_TMPDIR/noctags" observe "$H" "[$(finding u.js 2 '{"scope":"handlers.createUser"}'), $(finding u.js 5 '{"scope":"admin.createUser"}')]" >/dev/null
   [ "$(fold | jq '.findings | length')" -eq 2 ]
   [ "$(fold | jq -r '[.findings[].obs.scope_status] | unique | join(",")')" = unscoped ]
 }
 
+# A missing or unusable universal-ctags skips locally. CI installs it in
+# yellow-review-shell-tests, so a skip there would hide these two cases.
+require_universal_ctags() {
+  rl_ctags_usable && return 0
+  [ -z "${CI:-}" ] || { echo "universal-ctags is required in CI (missing or unusable)"; return 1; }
+  skip "universal-ctags missing or unusable"
+}
+
+@test "CLAUDE-49: require_universal_ctags fails under CI and skips locally when ctags is unusable" {
+  source "$RL"
+  skip() { echo "skipped: $*"; }
+  RL_CTAGS_STATE=no CI=1 run require_universal_ctags
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"required in CI"* ]]
+  RL_CTAGS_STATE=no CI= run require_universal_ctags
+  [ "$status" -eq 0 ]
+  [[ "$output" == "skipped: "* ]]
+}
+
+@test "CLAUDE-49: a failing ctags is reported on stderr and the scope stays unverified" {
+  source "$RL"
+  mkdir -p "$BATS_TEST_TMPDIR/badctags"
+  printf '#!/bin/sh\necho "ctags: boom" >&2\nexit 3\n' >|"$BATS_TEST_TMPDIR/badctags/ctags"
+  chmod +x "$BATS_TEST_TMPDIR/badctags/ctags"
+  printf 'def run():\n    pass\n' >|blob.content
+  RL_CTAGS_STATE=yes PATH="$BATS_TEST_TMPDIR/badctags:$PATH" run rl_ctags_scope "$PWD/blob.content" a.py 1 run
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"[review-ledger] ctags exited 3: ctags: boom"* ]]
+}
+
 @test "CLAUDE-49: with universal-ctags, swapped claims resolve to the true scope" {
   source "$RL"
-  rl_ctags_usable || skip "universal-ctags not installed"
+  require_universal_ctags
   printf 'class Admin:\n    def create_user(self):\n        run(x)\n\nclass Handlers:\n    def create_user(self):\n        run(x)\n' >|u.py
   H=$(commit_all py)
   observe "$H" "[$(finding u.py 3 '{"scope":"Handlers.create_user"}'), $(finding u.py 7 '{"scope":"Admin.create_user"}')]" >/dev/null
@@ -777,7 +810,7 @@ pr_with_finding() {
 
 @test "CLAUDE-49: ctags cache is keyed by filename, not just content" {
   source "$RL"
-  rl_ctags_usable || skip "universal-ctags not installed"
+  require_universal_ctags
   printf 'def run():\n    pass\n' >|blob.content
   content="$PWD/blob.content"
   r=$(rl_ctags_scope "$content" a.py 1 run)

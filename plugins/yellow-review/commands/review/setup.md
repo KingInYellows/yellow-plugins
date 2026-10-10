@@ -79,7 +79,9 @@ if [ -x "$ledger" ]; then
 else
   printf 'ledger_lib:    NOT FOUND\n'
 fi
-if [ -x "$ledger" ] && bash -c '. "$1" && rl_ctags_usable' _ "$ledger"; then
+if [ -x "$ledger" ] && ! bash -c '. "$1"' _ "$ledger" >/dev/null 2>&1; then
+  printf 'ctags:         unknown (ledger library failed to load)\n'
+elif [ -x "$ledger" ] && bash -c '. "$1" && rl_ctags_usable' _ "$ledger"; then
   printf 'ctags:         universal-ctags\n'
 elif command -v ctags >/dev/null 2>&1 && ctags --version 2>/dev/null | grep -q 'Universal Ctags'; then
   if ! command -v timeout >/dev/null 2>&1; then
@@ -125,6 +127,10 @@ If `redaction` is missing, warn but continue:
 If `ctags` is `optional-missing`, note it: "universal-ctags is not installed;
 the ledger records code-scope findings as `unscoped` (line-keyed). Optional:
 `brew install universal-ctags` or `apt install universal-ctags`."
+
+If `ctags` is `unknown (ledger library failed to load)`, note it: "the ledger
+library could not be sourced, so ctags was not checked; fix `ledger_lib`
+first."
 
 If `ctags` is `universal-ctags (unusable: ...)`, note it: "universal-ctags
 is installed but the ledger cannot use it (missing `timeout` or an `end`

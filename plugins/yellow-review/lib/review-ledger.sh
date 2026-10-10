@@ -827,7 +827,7 @@ rl_ctags_usable() {
 # by [line, end] when ctags reports `end` (Go, Python), otherwise from the
 # tag line to the next sibling tag. Prints "<full>\t<start>\t<end>".
 rl_ctags_scope() {
-  local content="$1" path="$2" L="$3" claim="$4" dir tags base
+  local content="$1" path="$2" L="$3" claim="$4" dir tags base rc out
   rl_ctags_usable || return 1
   base=$(basename -- "$path")
   dir="$content.ctags/$base"
@@ -835,13 +835,22 @@ rl_ctags_scope() {
   if [ ! -f "$tags" ]; then
     mkdir -p -- "$dir" || return 1
     cp -- "$content" "$dir/$base" || return 1
-    (cd -- "$dir" && timeout "$RL_CTAGS_TIMEOUT" ctags --options=NONE --fields=+neKZ --output-format=json -o - -- "$base") >|"$tags" 2>/dev/null || {
+    # Universal Ctags 5.9 (the Ubuntu package) rejects `--`; `./` keeps a
+    # leading `-` in the name from reading as an option.
+    rc=0
+    (cd -- "$dir" && timeout "$RL_CTAGS_TIMEOUT" ctags --options=NONE --fields=+neKZ --output-format=json -o - "./$base") >|"$tags" 2>|"$dir/ctags.err" || rc=$?
+    if [ "$rc" -ne 0 ]; then
       : >|"$tags"
+      if [ "$rc" -eq 124 ]; then
+        rl_err "ctags timed out after ${RL_CTAGS_TIMEOUT}s: scope unverified"
+      else
+        rl_err "ctags exited $rc: $(head -n 1 "$dir/ctags.err" | tr -cd '[:print:]')"
+      fi
       return 1
-    }
+    fi
   fi
   [ -s "$tags" ] || return 1
-  jq -rs --argjson L "$L" --arg claim "$claim" '
+  out=$(jq -rs --argjson L "$L" --arg claim "$claim" '
     map(select(._type == "tag") | . + {full: (if (.scope // "") != "" then .scope + "." + .name else .name end)}) as $t
     | def span($x): ($x.end // ([ $t[] | select((.scope // "") == ($x.scope // "") and .line > $x.line) | .line ] | min | if . == null then 1e9 else . - 1 end));
       def holds($x): $x.line <= $L and $L <= span($x);
@@ -853,7 +862,12 @@ rl_ctags_scope() {
           | ($c.full | split(".") | .[0:$i] | join(".")) as $pre
           | any($t[]; .full == $pre and holds(.)) ] | all))
     | first // empty
-    | "\(.full)\t\(.line)\t\(span(.) | if . >= 1e9 then 0 else . end)"' "$tags" 2>/dev/null | grep . || return 1
+    | "\(.full)\t\(.line)\t\(span(.) | if . >= 1e9 then 0 else . end)"' "$tags" 2>|"$dir/jq.err") || {
+    rl_err "ctags tag parse failed: $(head -n 1 "$dir/jq.err" | tr -cd '[:print:]')"
+    return 1
+  }
+  [ -n "$out" ] || return 1
+  printf '%s\n' "$out"
 }
 
 # rl_verify_scope <content-file> <path> <line> <claimed>

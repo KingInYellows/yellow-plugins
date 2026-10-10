@@ -62,8 +62,8 @@ test:shell-compat`; needs zsh). CI installs `bats@1.11.0` via npm; locally
 && pnpm typecheck` is a local baseline, not the full CI gate — the
 `ci-status` job in `.github/workflows/validate-schemas.yml` additionally
 requires `validate-versions`, `contract-drift`, `security-audit`, `build`,
-`changeset-check`, `plugin-shell-tests`, `shell-compat-tests`, and
-`goal-engine-compat`.
+`changeset-check`, `plugin-shell-tests`, `yellow-review-shell-tests`,
+`shell-compat-tests`, and `goal-engine-compat`.
 
 ## Architecture in Four Facts
 
