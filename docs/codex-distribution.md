@@ -35,20 +35,26 @@ runs the **exposure lint** (below).
 
 ## Codex-enabled plugins
 
-**Four** plugins enable Codex, in canonical order:
+**Five** plugins enable Codex, in canonical order:
 
 1. `gt-workflow` — entire skill surface (thin command wrappers, no Claude-only
    logic).
 2. `yellow-core` — a narrow read-only skill allowlist (excludes most skills, all
    agents, and both hooks).
-3. `yellow-review` — a single read-only skill (`yellow-thermonuclear-review`);
+3. `yellow-jules` — two host-neutral reference skills (`jules-delegation`,
+   `jules-supervision`) describing the Jules CLI, its grant rules, and the
+   one-pass supervision loop; every command stays Claude-only, `includeHooks` is
+   `false`, and no skill wraps `authorize`, `abandon`, or
+   `supervise --clear-pause` — those are terminal commands the owner runs
+   themselves (see "Jules and the terminal" below).
+4. `yellow-review` — a single read-only skill (`yellow-thermonuclear-review`);
    every command, agent, and other skill of the plugin stays Claude-only, and
    the plugin has no hooks to carry.
-4. `yellow-ci` — the read-mostly pilot: 8 allowlisted skills (6 operational + 2
+5. `yellow-ci` — the read-mostly pilot: 8 allowlisted skills (6 operational + 2
    reference), hooks carried (`includeHooks` default `true`).
 
 Filtering `pluginOrder` by `targets.codex.enabled` yields
-`[gt-workflow, yellow-core, yellow-review, yellow-ci]` automatically
+`[gt-workflow, yellow-core, yellow-jules, yellow-review, yellow-ci]` automatically
 (generated `.agents/plugins/marketplace.json` order).
 
 ## Host-neutral skill bodies + the exposure lint (R15)
@@ -69,6 +75,21 @@ inline validation instead of `source ${CLAUDE_PLUGIN_ROOT}/...`), while all
 `.claude/`-specific and env-var logic lives in the **non-linted** layer — the
 hook Node runtime, the bash libs, and the command wrappers. See
 [codex-config-retention-exposure-lint-conflict](solutions/integration-issues/codex-config-retention-exposure-lint-conflict.md).
+
+## Jules and the terminal
+
+`yellow-jules` exposes only reference skills to Codex. Its writes are gated by a
+grant, and a grant is written by `authorize`, which opens the controlling terminal
+itself and requires the owner to type a random code back. A Codex session has no
+controlling terminal for its commands, so it cannot satisfy that prompt, and no
+Codex skill wraps `authorize`; the owner runs it in their own terminal on the
+controller host. Codex 0.156.0 offers no host-neutral confirmation primitive to
+build on instead (see
+[capability-matrix.md](yellow-jules/capability-matrix.md#codex-supervision-capabilities-spec-open-question-2)).
+The exposed skills therefore tell the agent to show the operator the command and
+stop. The terminal check stops a caller with no terminal, not one that allocates
+its own pseudo-terminal; that residual risk is stated in
+`plugins/yellow-jules/CLAUDE.md`.
 
 ## Cross-host hooks
 

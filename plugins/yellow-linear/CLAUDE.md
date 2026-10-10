@@ -46,8 +46,9 @@ cycles, and documents.
   `remote-agent` capability group. Resolves the enabled provider automatically
   (`--provider cursor|devin|jules` breaks a tie only when more than one is
   enabled) — yellow-cursor is the preferred provider, yellow-devin is the
-  legacy path, and experimental yellow-jules stops before any vendor call
-  until its delegate command ships.
+  legacy path, and experimental yellow-jules launches only under a grant the
+  owner wrote in a terminal (no covering grant: it prints the terminal command
+  and stops before any vendor call).
   Requires yellow-core installed (owns the group's classifier)
 
 ### Agents (3)
@@ -113,9 +114,15 @@ going through commands. Bundled-server tool names carry the plugin prefix:
   `Skill`, which owns its own credential validation and Devin session creation
   entirely.
 - **yellow-jules** (optional, experimental remote-agent provider) — recognized
-  by the classifier (`READY_JULES`, `--tooling-jules`), but `/linear:delegate`
-  has no launch path for it yet: a resolved `jules` provider stops with an
-  explanation, writes no packet, and makes no vendor call.
+  by the classifier (`READY_JULES`, `--tooling-jules`). `/linear:delegate`
+  launches through the yellow-jules CLI (resolved via `installPath`) in a branch
+  that dry-runs, finds a grant covering the repository, branch, and issue,
+  previews it, and asks before launching. It can run `authorize --list` but never
+  grant creation: with no covering grant it prints the exact terminal command and
+  stops, sending nothing and posting no Linear comment.
+  The Jules branch needs the yellow-jules release that ships `delegate` and
+  `authorize --list` (the grants release); an older read-only install fails
+  the dry run with a usage error and sends nothing.
 
 ## Testing
 
@@ -135,6 +142,14 @@ Linear MCP are untrusted:
   Sanitization" section and include the repo's named credential variables.
 - The sanitized text is then wrapped in `--- begin/end ---` reference-only
   fences. Only the sanitized copy is shown or persisted.
+
+## Graphite Merge Queue
+
+Graphite's merge queue closes PRs that landed, so a `CLOSED` PR is not
+"closed without merge" on its own. The `linear-workflows` skill's "Graphite
+Merge Queue" section is the single source for the closing-line rule and the
+merged-PR mapping (`scripts/pr-landed.sh`, covered by `tests/pr-landed.bats`);
+state those rules there, not in the commands. Setup steps are in `README.md`.
 
 ## Known Limitations
 

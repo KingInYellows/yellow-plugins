@@ -43,78 +43,16 @@ cleanup() {
 trap cleanup EXIT
 
 # --- Check if already installed ---
-# @ast-grep/cli provides both 'sg' and 'ast-grep' binaries.
-# Note: 'sg' can collide with shadow-utils on Linux, so verify via --version.
+# Agents call the 'ast-grep' binary by name. Every install channel ships it;
+# 'sg' is not checked because it collides with shadow-utils on Linux.
 AST_GREP_CMD=""
 if command -v ast-grep >/dev/null 2>&1; then
   AST_GREP_CMD="ast-grep"
-elif command -v sg >/dev/null 2>&1 && sg --version 2>&1 | grep -qi 'ast-grep'; then
-  AST_GREP_CMD="sg"
 fi
 
 if [ -n "$AST_GREP_CMD" ]; then
   installed_version=$("$AST_GREP_CMD" --version 2>/dev/null || true)
   success "ast-grep already installed (${AST_GREP_CMD}): ${installed_version:-unknown version}"
-fi
-
-# --- Ensure uv is installed (needed for ast-grep MCP server) ---
-if ! command -v uv >/dev/null 2>&1; then
-  if ! command -v curl >/dev/null 2>&1; then
-    warning "curl not found. Cannot auto-install uv."
-    warning "Install uv manually: https://docs.astral.sh/uv/getting-started/installation/"
-    printf '[yellow-research] uv: NOT FOUND (curl missing, cannot auto-install)\n'
-  else
-    printf '[yellow-research] uv not found — installing (needed for ast-grep MCP server)...\n'
-    # Note: uv installer is from Astral (uv maintainers). User confirmation
-    # happens in research:setup via AskUserQuestion before this script runs.
-    #
-    # Security (debt finding 006): never pipe a remote URL straight to a
-    # shell. Download the installer to a temp file over HTTPS, sanity-check
-    # it (non-empty, has a shebang), then execute the local copy — a
-    # truncated or tampered stream cannot partially execute, and the file is
-    # auditable on disk. The URL is version-pinned (not the floating
-    # /uv/install.sh) so the fetched script is reproducible.
-    # `mktemp` with no template fails on macOS (BSD mktemp requires the
-    # template argument). Pass a template that works on both GNU and BSD.
-    uv_installer=$(mktemp "${TMPDIR:-/tmp}/uv-install.XXXXXX" 2>/dev/null) || \
-      error "Cannot create temp file for uv installer"
-    uv_install_ok=false
-    if curl -fLsS --proto '=https' --proto-redir '=https' --tlsv1.2 \
-         "https://astral.sh/uv/0.5.11/install.sh" -o "$uv_installer" \
-       && [ -s "$uv_installer" ] \
-       && head -n1 "$uv_installer" | grep -q '^#!'; then
-      if sh "$uv_installer"; then
-        uv_install_ok=true
-      fi
-    fi
-    rm -f "$uv_installer"
-    if [ "$uv_install_ok" = true ]; then
-      # Source uv into current session
-      export PATH="${HOME}/.local/bin:${PATH}"
-      if command -v uv >/dev/null 2>&1; then
-        success "uv installed: $(uv --version 2>/dev/null)"
-      else
-        warning "uv installed but not in PATH for current session. Add ~/.local/bin to PATH permanently."
-        printf '[yellow-research] uv: NOT FOUND (not in PATH after install)\n'
-      fi
-    else
-      warning "uv installation failed. ast-grep MCP server will not work without uv."
-      warning "Install manually — see https://docs.astral.sh/uv/getting-started/installation/"
-      printf '[yellow-research] uv: NOT FOUND (installation failed)\n'
-    fi
-  fi
-else
-  printf '[yellow-research] uv: ok (%s)\n' "$(uv --version 2>/dev/null)"
-fi
-
-# --- Pre-warm Python 3.13 for ast-grep MCP server ---
-if command -v uv >/dev/null 2>&1; then
-  printf '[yellow-research] Pre-warming Python 3.13 for ast-grep MCP...\n'
-  uv python install 3.13 2>&1 || warning "Python 3.13 pre-warm failed (uvx will retry on first use)"
-fi
-
-# If ast-grep binary was already found, exit now (after ensuring uv + Python)
-if [ -n "$AST_GREP_CMD" ]; then
   exit 0
 fi
 
@@ -201,19 +139,15 @@ INSTRUCTIONS
 fi
 
 # --- Verify installation ---
-# @ast-grep/cli provides both 'sg' and 'ast-grep' binaries — prefer ast-grep
-# to avoid collision with shadow-utils sg on Linux.
 VERIFIED_CMD=""
 if command -v ast-grep >/dev/null 2>&1; then
   VERIFIED_CMD="ast-grep"
-elif command -v sg >/dev/null 2>&1 && sg --version 2>&1 | grep -qi 'ast-grep'; then
-  VERIFIED_CMD="sg"
 fi
 
 if [ -z "$VERIFIED_CMD" ]; then
   npm_global_prefix=$(npm prefix -g 2>/dev/null || true)
   npm_global_bin="${npm_global_prefix}/bin"
-  if [ -n "$npm_global_prefix" ] && { [ -x "${npm_global_bin}/ast-grep" ] || [ -x "${npm_global_bin}/sg" ]; }; then
+  if [ -n "$npm_global_prefix" ] && [ -x "${npm_global_bin}/ast-grep" ]; then
     error "ast-grep installed at ${npm_global_bin} but that directory is not in PATH. Add to your shell profile: export PATH=\"${npm_global_bin}:\$PATH\""
   fi
   error "ast-grep not found in PATH after install."

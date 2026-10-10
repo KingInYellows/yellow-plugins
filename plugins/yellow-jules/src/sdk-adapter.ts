@@ -9,11 +9,12 @@
  * silently ignored), and a recording in-memory `storageFactory` whose
  * bindings are asserted after `connect()` and on first per-session use.
  *
- * PR2 exposes reads only. `buildCreateSessionConfig` is a pure builder for
- * the packed-SDK transport suite; the runtime never calls `session(config)`,
- * `send()`, or `approve()` (shell 03 wires them). Never used here: `run`,
- * `all`, `result`, `ask`, `waitFor`, `stream`, `updates`, `history`,
- * `hydrate`, `sync` (R9).
+ * Writes are exactly three: `session(config)`, `send()` and `approve()`, each
+ * one POST and never retried. A write failure is classified by whether a POST
+ * was dispatched (the fetch guard's POST counter): before dispatch it maps like
+ * a read, after dispatch only a clear rejection keeps its code and everything
+ * else is an unknown outcome (R16). Never used here: `run`, `all`, `result`,
+ * `ask`, `waitFor`, `stream`, `updates`, `history`, `hydrate`, `sync` (R9).
  */
 
 import * as crypto from 'node:crypto';
@@ -44,6 +45,8 @@ import type {
   AdapterOutput,
   AdapterSession,
   AdapterSource,
+  CreatedSession,
+  CreateSessionRequest,
   PageOptions,
   PlanStepRecord,
   SdkAdapter,
@@ -66,7 +69,7 @@ export type SdkModule = typeof Sdk;
 export const CREATE_REQUEST_TIMEOUT_MS = 60_000;
 
 // ---------------------------------------------------------------------------
-// Pure builders (used by the runtime and, for create, only by tests in PR2)
+// Pure builders (used by the adapter; `buildCreateSessionConfig` is also exercised directly by the packed-SDK tests)
 // ---------------------------------------------------------------------------
 
 export interface StorageRecorder {
@@ -113,13 +116,7 @@ export function buildClientOptions(
   return { options, recorder };
 }
 
-export interface CreateSessionInput {
-  readonly prompt: string;
-  readonly owner: string;
-  readonly repo: string;
-  readonly baseBranch: string;
-  readonly title: string;
-}
+export type CreateSessionInput = CreateSessionRequest;
 
 /** R12: plan approval required and vendor auto-PR off, always explicit. */
 export function buildCreateSessionConfig(
@@ -166,6 +163,28 @@ function kindForApiStatus(status: number, url: string): AdapterErrorKind {
 }
 
 /**
+ * A failure of the connection itself (aborted, timed out, `fetch failed`, a
+ * socket error code), as opposed to a mapper throw on a body that arrived.
+ * Looks down the `cause` chain because the SDK wraps what the transport threw.
+ */
+function isTransportFailure(err: unknown): boolean {
+  for (let e: unknown = err, i = 0; e instanceof Error && i < 5; i++) {
+    const code = (e as { code?: unknown }).code;
+    if (
+      e.name === 'AbortError' ||
+      e.name === 'TimeoutError' ||
+      (e instanceof TypeError && e.message === 'fetch failed') ||
+      (typeof code === 'string' &&
+        /^(ECONN|ETIMEDOUT|ENOTFOUND|EAI_|EPIPE|UND_ERR_)/.test(code))
+    ) {
+      return true;
+    }
+    e = e.cause;
+  }
+  return false;
+}
+
+/**
  * SDK error -> transport-neutral AdapterError. Message text is never used to
  * classify, and it is redacted and cut to 512 bytes before it leaves here
  * (JulesApiError embeds the response body in its message).
@@ -200,6 +219,7 @@ export function toAdapterError(
   if (err instanceof sdk.JulesNetworkError) return make('network');
   if (err instanceof sdk.InvalidStateError) return make('invalid-state');
   if (err instanceof sdk.TimeoutError) return make('timeout');
+  if (isTransportFailure(err)) return make('network');
   return make('malformed');
 }
 
@@ -342,6 +362,20 @@ export function mapActivity(activity: Sdk.Activity): AdapterActivity {
       `plan activity ${activityId} has no usable createTime`
     );
   }
+  // Messages are ordered by time too. A user message with no usable time would
+  // sort before every watermark and never be recorded as outside activity, and
+  // an agent message without one would lose to an older question when the
+  // newest is picked, so both are malformed and the walk stops on them
+  // (supervise pauses on a partial walk).
+  if (
+    (activity.type === 'userMessaged' || activity.type === 'agentMessaged') &&
+    createTime === ''
+  ) {
+    throwAppError(
+      'JULES_MALFORMED_RESPONSE',
+      `message ${activityId} has no usable createTime`
+    );
+  }
   const base = {
     activityId,
     createTime,
@@ -352,23 +386,48 @@ export function mapActivity(activity: Sdk.Activity): AdapterActivity {
     artifacts: (activity.artifacts ?? []).map(mapArtifact),
   };
   if (activity.type === 'planGenerated') {
-    const steps: PlanStepRecord[] = (activity.plan?.steps ?? []).map(
-      (step, i) => ({
+    const steps: PlanStepRecord[] = (activity.plan?.steps ?? []).map((step) => {
+      // The index is part of the executable plan the reviewer approves, so a
+      // value the journal cannot hold is a malformed activity (the walk stops
+      // on it), never replaced by the array position.
+      if (
+        typeof step.index !== 'number' ||
+        !Number.isInteger(step.index) ||
+        step.index < 0
+      ) {
+        throwAppError(
+          'JULES_MALFORMED_RESPONSE',
+          `plan activity ${activityId} has a step with a malformed index`
+        );
+      }
+      // The title and description are part of what the reviewer approves: a
+      // missing or non-string title, or a present non-string description, is a
+      // malformed activity (the walk stops on it), never normalized to ''.
+      if (typeof step.title !== 'string') {
+        throwAppError(
+          'JULES_MALFORMED_RESPONSE',
+          `plan activity ${activityId} has a step with a malformed title`
+        );
+      }
+      if (
+        step.description !== undefined &&
+        step.description !== null &&
+        typeof step.description !== 'string'
+      ) {
+        throwAppError(
+          'JULES_MALFORMED_RESPONSE',
+          `plan activity ${activityId} has a step with a malformed description`
+        );
+      }
+      return {
         id: validatePlanId(step.id, 'response'),
-        title: str(step.title),
+        title: step.title,
         ...(typeof step.description === 'string'
           ? { description: step.description }
           : {}),
-        // Journal validation requires a non-negative integer; fall back to
-        // the array position for negative, fractional, or non-finite values.
-        index:
-          typeof step.index === 'number' &&
-          Number.isInteger(step.index) &&
-          step.index >= 0
-            ? step.index
-            : i,
-      })
-    );
+        index: step.index,
+      };
+    });
     return {
       ...base,
       plan: { planId: validatePlanId(activity.plan?.id, 'response'), steps },
@@ -379,6 +438,17 @@ export function mapActivity(activity: Sdk.Activity): AdapterActivity {
       ...base,
       approvedPlanId: validatePlanId(activity.planId, 'response'),
     };
+  }
+  if (activity.type === 'userMessaged' || activity.type === 'agentMessaged') {
+    // A body that is not a string must not become '' (a bindable empty
+    // message): the activity is malformed and the walk stops on it.
+    if (typeof activity.message !== 'string') {
+      throwAppError(
+        'JULES_MALFORMED_RESPONSE',
+        `message ${activityId} has no string body`
+      );
+    }
+    return { ...base, message: activity.message };
   }
   return base;
 }
@@ -392,10 +462,23 @@ export interface ConnectInput {
   readonly dataDir: string;
   readonly apiKey: string;
   readonly baseUrl?: string;
+  /**
+   * The fetch guard's POST counter. A write that fails with the count
+   * unchanged was never dispatched. Absent, every write failure is treated as
+   * dispatched (the safe default: unknown outcome unless clearly rejected).
+   */
+  readonly postCount?: () => number;
 }
 
+// Concurrent processes share one sdk-scratch/, and each creates then removes
+// an empty `.probe-<uuid>` file to prove it is writable. Another process's
+// probe is not an SDK write; anything else is.
+const WRITABILITY_PROBE = /^\.probe-[0-9a-f-]{36}$/;
+
 function assertScratchEmpty(scratch: string, when: string): void {
-  const entries = fs.readdirSync(scratch);
+  const entries = fs
+    .readdirSync(scratch)
+    .filter((name) => !WRITABILITY_PROBE.test(name));
   if (entries.length > 0) {
     throwAppError(
       'JULES_SDK_INTEGRITY',
@@ -424,7 +507,8 @@ export class JulesSdkAdapter implements SdkAdapter {
     private readonly client: Sdk.JulesClient,
     private readonly recorder: StorageRecorder,
     private readonly scratch: string,
-    previousJulesHome: string | undefined
+    previousJulesHome: string | undefined,
+    private readonly postCount: (() => number) | undefined
   ) {
     this.previousJulesHome = previousJulesHome;
   }
@@ -443,27 +527,38 @@ export class JulesSdkAdapter implements SdkAdapter {
     const previousJulesHome = process.env['JULES_HOME'];
     process.env['JULES_HOME'] = scratch;
 
-    const { options, recorder } = buildClientOptions(input.sdk, {
-      apiKey: input.apiKey,
-      ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
-    });
-    const client = input.sdk.connect(options);
-    if (
-      recorder.sessionStorages.length !== 1 ||
-      client.storage !== recorder.sessionStorages[0]
-    ) {
-      throwAppError(
-        'JULES_SDK_INTEGRITY',
-        'the SDK did not bind the injected in-memory session storage'
-      );
+    let built: ReturnType<typeof buildClientOptions>;
+    let client: ReturnType<SdkModule['connect']>;
+    try {
+      built = buildClientOptions(input.sdk, {
+        apiKey: input.apiKey,
+        ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
+      });
+      client = input.sdk.connect(built.options);
+      if (
+        built.recorder.sessionStorages.length !== 1 ||
+        client.storage !== built.recorder.sessionStorages[0]
+      ) {
+        throwAppError(
+          'JULES_SDK_INTEGRITY',
+          'the SDK did not bind the injected in-memory session storage'
+        );
+      }
+      assertScratchEmpty(scratch, 'after connect()');
+    } catch (err) {
+      // No adapter exists to close, so put the environment back here.
+      if (previousJulesHome === undefined) delete process.env['JULES_HOME'];
+      else process.env['JULES_HOME'] = previousJulesHome;
+      throw err;
     }
-    assertScratchEmpty(scratch, 'after connect()');
+    const { recorder } = built;
     return new JulesSdkAdapter(
       input.sdk,
       client,
       recorder,
       scratch,
-      previousJulesHome
+      previousJulesHome,
+      input.postCount
     );
   }
 
@@ -580,6 +675,8 @@ export class JulesSdkAdapter implements SdkAdapter {
       // Our own refusals are never downgraded to an "unmappable SDK type" signal.
       if (err instanceof AppErrorException || err instanceof FetchGuardRefusal)
         throw err;
+      // A dropped connection is a retryable read failure, not an unmappable type.
+      if (isTransportFailure(err)) return this.fail(err);
       return { activities: [], unmappedActivity: true };
     }
     // An activity the SDK mapped but whose ids fail the allowlist, or a page
@@ -656,6 +753,7 @@ export class JulesSdkAdapter implements SdkAdapter {
       // Our own refusals are never downgraded to an "unmappable SDK type" signal.
       if (err instanceof AppErrorException || err instanceof FetchGuardRefusal)
         throw err;
+      if (isTransportFailure(err)) return this.fail(err);
       unsupportedReason =
         'a connected source has a type the pinned SDK cannot map';
     }
@@ -664,6 +762,84 @@ export class JulesSdkAdapter implements SdkAdapter {
       truncated,
       ...(unsupportedReason !== undefined ? { unsupportedReason } : {}),
     };
+  }
+
+  // -------------------------------------------------------------------------
+  // Writes: one POST each, never retried
+  // -------------------------------------------------------------------------
+
+  /** A POST was sent since `before` was sampled; without a counter, assume it was. */
+  private dispatchedSince(before: number | undefined): boolean {
+    if (this.postCount === undefined || before === undefined) return true;
+    return this.postCount() > before;
+  }
+
+  /** SDK error -> AdapterError tagged with whether a POST had been dispatched. */
+  private writeFailure(
+    err: unknown,
+    before: number | undefined,
+    sessionResource?: string
+  ): AdapterError {
+    const base = toAdapterError(this.sdk, err);
+    return new AdapterError(base.kind, base.message, {
+      ...(base.requestId !== undefined ? { requestId: base.requestId } : {}),
+      ...(base.status !== undefined ? { status: base.status } : {}),
+      cause: base.cause ?? err,
+      dispatched: this.dispatchedSince(before),
+      ...(sessionResource !== undefined ? { sessionResource } : {}),
+    });
+  }
+
+  /**
+   * `jules.session(config)`: the SDK reads the source (a GET) and then issues
+   * one `POST sessions` with `requirePlanApproval: true` and
+   * `automationMode: AUTOMATION_MODE_UNSPECIFIED` (R12). A throw while mapping
+   * the answer is after dispatch by construction.
+   */
+  async createSession(input: CreateSessionRequest): Promise<CreatedSession> {
+    const before = this.postCount?.();
+    let created: Sdk.SessionClient;
+    try {
+      created = await this.client.session(buildCreateSessionConfig(input));
+    } catch (err) {
+      throw this.writeFailure(err, before);
+    }
+    try {
+      return {
+        sessionResource: validateSessionResource(
+          `sessions/${String(created.id)}`,
+          'response'
+        ),
+      };
+    } catch (err) {
+      throw new AdapterError(
+        'malformed',
+        'the created session has an unexpected shape',
+        { cause: err, dispatched: true }
+      );
+    }
+  }
+
+  async sendMessage(sessionResource: string, message: string): Promise<void> {
+    // Resolved before anything can be sent: an integrity or allowlist verdict
+    // here is our own, not an SDK failure, and must not be flattened.
+    const client = this.sessionClient(sessionResource);
+    const before = this.postCount?.();
+    try {
+      await client.send(message);
+    } catch (err) {
+      throw this.writeFailure(err, before, sessionResource);
+    }
+  }
+
+  async approvePlan(sessionResource: string): Promise<void> {
+    const client = this.sessionClient(sessionResource);
+    const before = this.postCount?.();
+    try {
+      await client.approve();
+    } catch (err) {
+      throw this.writeFailure(err, before, sessionResource);
+    }
   }
 
   /** Checks the scratch tripwire again before exit and restores JULES_HOME. */

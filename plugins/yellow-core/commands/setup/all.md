@@ -50,14 +50,7 @@ command -v semgrep >/dev/null 2>&1 && printf 'semgrep:            OK\n' || print
 command -v yq >/dev/null 2>&1 && printf 'yq:                 OK\n' || printf 'yq:                 NOT FOUND\n'
 command -v realpath >/dev/null 2>&1 && printf 'realpath:           OK\n' || printf 'realpath:           NOT FOUND\n'
 command -v flock >/dev/null 2>&1 && printf 'flock:              OK\n' || printf 'flock:              NOT FOUND\n'
-if command -v ast-grep >/dev/null 2>&1; then
-  printf 'ast-grep:           OK\n'
-elif command -v sg >/dev/null 2>&1 && sg --version 2>&1 | grep -qi 'ast-grep'; then
-  printf 'ast-grep:           OK (via sg)\n'
-else
-  printf 'ast-grep:           NOT FOUND\n'
-fi
-command -v uv >/dev/null 2>&1 && printf 'uv:                 OK\n' || printf 'uv:                 NOT FOUND\n'
+command -v ast-grep >/dev/null 2>&1 && printf 'ast-grep:           OK\n' || printf 'ast-grep:           NOT FOUND\n'
 command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' || printf 'agent-browser:      NOT FOUND\n'
 [ -n "$_gt" ] && printf 'gt:                 OK (%s)\n' "$("$_gt" --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'
 # yellow-ruvector installs ruvector into its own plugin data dir (not PATH):
@@ -454,11 +447,10 @@ fi
 ### Step 1.5: Session MCP Visibility (ToolSearch probes)
 
 <!-- setup-all-toolsearch-probes:start -->
-Run five ToolSearch probes to capture current-session MCP visibility:
+Run four ToolSearch probes to capture current-session MCP visibility:
 
 - `list_teams`
 - `parallel__createDeepResearch`
-- `ast-grep__find_code`
 - `ceramic_search`
 - `COMPOSIO_SEARCH_TOOLS`
 
@@ -466,7 +458,6 @@ Record whether these exact tools are present in the results:
 
 - `mcp__plugin_yellow-linear_linear__list_teams`
 - `mcp__plugin_yellow-research_parallel__createDeepResearch`
-- `mcp__plugin_yellow-research_ast-grep__find_code`
 - `mcp__plugin_yellow-research_ceramic__ceramic_search`
 - `mcp__plugin_yellow-composio_composio-server__COMPOSIO_SEARCH_TOOLS`
 <!-- setup-all-toolsearch-probes:end -->
@@ -644,21 +635,18 @@ The 3-element fallback wrapper means keys may be resolved from the keychain
 (invisible to the dashboard's Bash subprocess) — the status file is the
 only accurate signal.
 
-Compute bundled source availability out of 6:
+Compute bundled source availability out of 5:
 
 1. `exa_api_key` present per status file, OR `EXA_API_KEY` set in shell env
    (legacy path when status file absent)
 2. `tavily_api_key` present per status file, OR `TAVILY_API_KEY` set
 3. `perplexity_api_key` present per status file, OR `PERPLEXITY_API_KEY` set
 4. Parallel Task tool visible via ToolSearch
-5. ast-grep counts only when the exact ToolSearch match is present **and**
-   `ast-grep` OK **and** `uv` OK (uv manages Python 3.13 transparently via
-   `--python 3.13` in plugin.json — no system Python check needed)
-6. Ceramic counts when `ceramic_search` is visible via ToolSearch (OAuth;
+5. Ceramic counts when `ceramic_search` is visible via ToolSearch (OAuth;
    no API key).
 
-- READY: all 6 bundled sources available
-- PARTIAL: 1-5 bundled sources available
+- READY: all 5 bundled sources available
+- PARTIAL: 1-4 bundled sources available
 - NEEDS SETUP: 0 bundled sources available
 
 If the status file is absent AND no shell env vars are set, surface a hint:
@@ -813,7 +801,7 @@ Marketplace Setup Dashboard
   yellow-devin         NEEDS SETUP     DEVIN_SERVICE_USER_TOKEN not set
   yellow-jules         NEEDS SETUP     JULES_API_KEY not set (experimental provider — not enabled)
   yellow-semgrep       PARTIAL         Token set, semgrep CLI missing
-  yellow-research      PARTIAL         2/6 bundled sources available
+  yellow-research      PARTIAL         2/5 bundled sources available
   yellow-linear        READY           Linear MCP visible, Graphite available
   yellow-debt          PARTIAL         Required tools ready, yellow-linear missing
   yellow-ci            READY           gh authenticated, runner config present

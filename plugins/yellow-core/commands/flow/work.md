@@ -360,10 +360,31 @@ in order from bottom (item 1) to top:
 
    Use the **Write tool** (not Bash, not a heredoc — Write takes content as
    a structured parameter, never shell-parsed) to create the file at the
-   literal `$msgfile` path just printed, with content exactly `<type>:
-   <description>`. `mktemp -u` only mints the name — the file doesn't
+   literal `$msgfile` path just printed, with content `<type>:
+   <description>` plus the Linear closing line below when it applies.
+   `mktemp -u` only mints the name — the file doesn't
    exist yet, so Write can create it directly without needing to Read it
    first.
+
+   **Linear closing line.** Take the Linear ID only from the last path segment of the branch name, which must start with `[A-Z]{2,5}-[0-9]{1,6}` followed by `-` or the end of the name, or from the stack item's `Linear:` field; ignore IDs mentioned anywhere else.
+   When an ID qualifies, write the file as `<type>: <description>`, a blank
+   line, then `Closes <ISSUE-ID>` on the topmost stack item that carries the ID
+   and `Part of <ISSUE-ID>` on every item below it (the plan lists the whole
+   stack, so this is known up front). Graphite turns the commit body into the PR
+   description and the merge queue builds the squash commit from it, which is
+   how Linear learns the issue is done. When yellow-linear is installed, the
+   `yellow-linear:linear-workflows` skill ("Graphite Merge Queue") is the
+   source of this rule. Keep the line in every later message you write for the
+   same branch, because amending with `-m` rewrites the message. The Phase 4
+   fallback commits below use this rule too.
+
+   In single-branch mode there is no stack to place the line by, so the
+   Phase 2 and Phase 3 commits use `Part of <ISSUE-ID>`. Before the first of
+   them, ask once with `AskUserQuestion` whether this branch completes the
+   issue; write `Closes <ISSUE-ID>` instead only on a yes. Every later
+   message for the branch keeps the chosen line, because each amend
+   rewrites the whole message and Phase 4's `smart-submit` exits on a branch
+   with no uncommitted changes.
 
    Then, in a fresh Bash call, re-declare `msgfile=<the literal path
    printed above>` (Bash variables don't survive across separate tool
@@ -582,7 +603,9 @@ Phase 3 (Quality Check) in stack summary mode.
    pattern as Phase 1b step 5 (never embed generated text directly in
    `-m "..."`; a message summarizing the diff can contain `$(...)`,
    backticks, or quotes a literal `-m` argument would let the shell
-   execute) — with content shaped like:
+   execute) — with content shaped like the block below, ending with the
+   single-branch Linear closing line from Phase 1b step 5 when an ID
+   qualifies:
 
    ```
    feat(scope): implement X component
@@ -827,7 +850,8 @@ it at a Phase 1b checkpoint.
 6. Make final quality commit if changes needed, using the provider resolved
    in Phase 1 step 4. Write the message to a file first — same `mktemp -u`
    plus Write-tool pattern as Phase 1b step 5 (never embed generated text
-   directly in `-m "..."`) — with content shaped like:
+   directly in `-m "..."`) — with content shaped like the block below, keeping
+   the Linear closing line the earlier commits carry:
 
    ```
    refactor: address code review feedback
@@ -939,7 +963,8 @@ step 5. Phase 4 becomes a summary phase:
    plugin not installed, or any error), generate a conventional commit message
    from the changes and submit directly:
 
-   1. Generate a conventional commit message summarizing the work done.
+   1. Generate a conventional commit message summarizing the work done, with
+      the Linear closing line from Phase 1b step 5 when it applies.
    2. Stage changed files safely — same NUL-delimited array pattern as
       Phase 1b step 5 (never interpolate filenames as literal text):
       ```bash
@@ -963,7 +988,8 @@ step 5. Phase 4 becomes a summary phase:
    github-workflow plugin not installed, or any error), generate a
    conventional commit message from the changes and submit directly:
 
-   1. Generate a conventional commit message summarizing the work done.
+   1. Generate a conventional commit message summarizing the work done, with
+      the Linear closing line from Phase 1b step 5 when it applies.
    2. Stage changed files safely — same NUL-delimited array pattern as
       Phase 1b step 5:
       ```bash

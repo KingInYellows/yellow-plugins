@@ -218,19 +218,116 @@ setup() {
   printf '%s\n' "$providers_block" | grep -qF '`cursor`, `devin`, or `jules`'
 }
 
-@test "the jules dispatch branch is a fail-closed stub" {
+@test "the jules branch launches through the yellow-jules CLI, and only with a --grant-id" {
   jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
   [ -n "$jules_block" ]
-  printf '%s\n' "$jules_block" | grep -qF 'Jules delegation is not available yet'
-  printf '%s\n' "$jules_block" | grep -qE '^exit 1$'
+  # The live path: dry-run first, then a real delegate that carries the grant.
+  printf '%s\n' "$jules_block" | grep -qF 'delegate --repo "$REPO_PATH"'
+  printf '%s\n' "$jules_block" | grep -qF -- '--dry-run)'
+  printf '%s\n' "$jules_block" | grep -qF -- '--grant-id "$GRANT_ID")'
+  printf '%s\n' "$jules_block" | grep -qF -- '--request-id "$REQUEST_ID"'
+  # A clean failure must not spend the id forever: both calls advance past failed records.
+  [ "$(printf '%s\n' "$jules_block" | grep -cF -- '--request-id "$REQUEST_ID" --retry-failed')" -eq 2 ]
+  # The CLI comes from the resolved plugin root, never a relative guess.
+  printf '%s\n' "$jules_block" | grep -qF 'CLI="${YELLOW_JULES_ROOT}/dist/cli.js"'
+  # The old fail-closed stub is gone.
+  run grep -F 'Jules delegation is not available yet' "$DELEGATE_MD"
+  [ "$status" -eq 1 ]
 }
 
-@test "the jules branch never invokes the yellow-jules CLI or any vendor surface" {
+@test "the jules branch previews the covering grant and confirms with AskUserQuestion before launching" {
   jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
-  run bash -c 'printf "%s\n" "$1" | grep -E "dist/cli\.js|jules\.googleapis|node " ' _ "$jules_block"
+  printf '%s\n' "$jules_block" | grep -qF '`AskUserQuestion`: "Launch this Jules session'
+  printf '%s\n' "$jules_block" | grep -qF 'MODE='"'"'launch'"'"''
+  # The launch path is only reachable behind MODE=launch, after the confirmation.
+  printf '%s\n' "$jules_block" | grep -qF 'if [ "$MODE" = "launch" ]; then'
+  printf '%s\n' "$jules_block" | grep -qF 'plan approval is required'  || printf '%s\n' "$jules_block" | grep -qF 'Plan approval is required'
+}
+
+@test "the jules launch is bound to the confirmed dry run's remote and branch" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  printf '%s\n' "$jules_block" | grep -qF "DRY_RUN_BINDING='YELLOW_TODO_binding_from_dry_run_or_empty'"
+  # The binding covers repo, branch, issue, revision, packet bytes and grant.
+  printf '%s\n' "$jules_block" | grep -qF '${REPO_PATH}|${BRANCH}|${ISSUE_ID}|${DELEGATION_REV}|${PACKET_SHA}|$1'
+  printf '%s\n' "$jules_block" | grep -qF 'PACKET_SHA=$(printf '"'"'%s'"'"' "$PROMPT" | bind_hash)'
+  printf '%s\n' "$jules_block" | grep -qF 'BINDING=$(make_binding "$GRANT_ID")'
+  printf '%s\n' "$jules_block" | grep -qF "printf 'binding=%s\\n' \"\$(make_binding \"\$FOUND\")\""
+  # The dispatched prompt is the hashed variable, not a second read of the file.
+  printf '%s\n' "$jules_block" | grep -qF '"--prompt=$PROMPT"'
+  ! printf '%s\n' "$jules_block" | grep -qF '"--prompt=$(cat'
+  printf '%s\n' "$jules_block" | grep -qF "grep -qE '^[0-9a-f]{64}\$'"
+  printf '%s\n' "$jules_block" | grep -qF 'if [ "$DRY_RUN_BINDING" != "$BINDING" ]; then'
+  printf '%s\n' "$jules_block" | grep -qF 'ask for confirmation again'
+  # Remote and branch are still never substituted into the template.
+  ! printf '%s\n' "$jules_block" | grep -qE "(REPO_URL|REPO_PATH|BRANCH)='YELLOW_TODO"
+  # The comparison precedes the launch call.
+  cmp_line=$(printf '%s\n' "$jules_block" | grep -nF 'if [ "$DRY_RUN_BINDING" != "$BINDING" ]' | head -1 | cut -d: -f1)
+  launch_line=$(printf '%s\n' "$jules_block" | grep -nF -- '--grant-id "$GRANT_ID")' | head -1 | cut -d: -f1)
+  [ -n "$cmp_line" ] && [ -n "$launch_line" ] && [ "$cmp_line" -lt "$launch_line" ]
+}
+
+@test "with no covering grant the jules branch prints the terminal authorize command and sends nothing" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  printf '%s\n' "$jules_block" | grep -qF 'grant_id=NONE'
+  printf '%s\n' "$jules_block" | grep -qF 'authorize --repo %s --branch %s --task-ref %s --operations create,approve,reply --owner YOUR_NAME'
+  printf '%s\n' "$jules_block" | grep -qF 'separate terminal window'
+  printf '%s\n' "$jules_block" | grep -qF 'Do not try to run `authorize` yourself'
+  # The refusal path ends before any launch and posts no Linear comment.
+  printf '%s\n' "$jules_block" | grep -qF 'no Linear comment is posted'
+}
+
+@test "the jules grant selection skips a grant with an unreconciled deviation" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  printf '%s\n' "$jules_block" | grep -qF 'and (.unreconciledDeviation | not)'
+  # Run the real selection program: the blocked grant expires last but must lose.
+  program=$(printf '%s\n' "$jules_block" | awk -v q="'" '/^FOUND=\$\(/{f=1; sub(/.*\x27/, "")} f{ if (substr($0, length($0) - 1) == q ")") {print substr($0, 1, length($0) - 2); exit} print }')
+  grant='{"repository":"o/r","operations":["create"],"taskRefs":["T-1"],"branchPattern":"b","revoked":false,"expired":false,"maxActiveSessions":2,"maxTotalTasks":5,"usage":{"activeSessionRefs":[],"totalTasks":0}}'
+  list=$(jq -n --argjson g "$grant" '{grants: [($g + {grantId:"blocked", expiresAt:"2030-01-02T00:00:00Z", unreconciledDeviation:true}), ($g + {grantId:"usable", expiresAt:"2030-01-01T00:00:00Z", unreconciledDeviation:false})]}')
+  run bash -c 'printf "%s" "$1" | jq -r --arg repo o/r --arg branch b --arg task T-1 "$2"' _ "$list" "$program"
+  [ "$status" -eq 0 ]
+  [ "$output" = "usable" ]
+}
+
+@test "the jules branch can only ever run authorize --list, never grant creation" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  # Every executed (node ...) authorize call is --list; creation appears only inside printf text.
+  run bash -c 'printf "%s\n" "$1" | grep -E "^[[:space:]]*[A-Z_]+=\$\(node .* authorize " | grep -v -- "--list"' _ "$jules_block"
+  [ "$status" -eq 1 ]
+  run bash -c 'printf "%s\n" "$1" | grep -E "^[[:space:]]*node .* authorize "' _ "$jules_block"
+  [ "$status" -eq 1 ]
+}
+
+@test "the jules branch never talks to the vendor API directly" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  run bash -c 'printf "%s\n" "$1" | grep -E "curl|jules\.googleapis|JULES_API_KEY"' _ "$jules_block"
   [ "$status" -eq 1 ]
   run grep -F 'jules.googleapis.com' "$DELEGATE_MD"
   [ "$status" -eq 1 ]
+}
+
+@test "the jules branch checks the branch exists on origin and the remote is github.com" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  printf '%s\n' "$jules_block" | grep -qF 'git ls-remote --exit-code --heads origin "refs/heads/$BRANCH"'
+  printf '%s\n' "$jules_block" | grep -qF 'https://github.com/*) REPO_PATH='
+  printf '%s\n' "$jules_block" | grep -qF 'git@github.com:*) REPO_PATH='
+}
+
+@test "the jules branch substitutes values into single quotes and shape-checks the packet path" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  printf '%s\n' "$jules_block" | grep -qF "ISSUE_ID='YELLOW_TODO_issue_id'"
+  printf '%s\n' "$jules_block" | grep -qF "PACKET_FILE='YELLOW_TODO_packet_path_from_path_step'"
+  printf '%s\n' "$jules_block" | grep -qF '/*/yellow-linear-packet.??????/packet.txt) ;;'
+}
+
+@test "the intro and error table describe the live jules path" {
+  run grep -F 'cannot launch yet' "$DELEGATE_MD"
+  [ "$status" -eq 1 ]
+  run grep -F 'Provider resolves to `jules` and no grant covers the issue' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F 'Jules CLI returns `{ok:false}`' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F 'JULES_UNKNOWN_OUTCOME' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
 }
 
 @test "the classifier receives the jules tooling probe" {
@@ -240,4 +337,190 @@ setup() {
   [ "$status" -eq 0 ]
   run grep -F 'resolve_plugin_root yellow-jules dist/cli.js' "$DELEGATE_MD"
   [ "$status" -eq 0 ]
+}
+
+@test "the jules block re-resolves the CLI from installPath instead of a substituted root" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  run bash -c 'printf "%s\n" "$1" | grep -F "YELLOW_TODO_yellow_jules_root"' _ "$jules_block"
+  [ "$status" -eq 1 ]
+  printf '%s\n' "$jules_block" | grep -qF 'YELLOW_JULES_ROOT=$(resolve_plugin_root yellow-jules dist/cli.js)'
+  printf '%s\n' "$jules_block" | grep -qF '_plugin_list_json=$(claude plugin list --json 2>/dev/null)'
+}
+
+@test "the jules block binds the packet to an allocated, unlinked directory under the git scratch root" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  printf '%s\n' "$jules_block" | grep -qF '[ "$PACKET_PARENT_REAL" != "$GIT_TMP_REAL" ]'
+  printf '%s\n' "$jules_block" | grep -qF '[ -L "$PACKET_DIR" ]'
+  printf '%s\n' "$jules_block" | grep -qF '[ ! -O "$PACKET_DIR" ]'
+  printf '%s\n' "$jules_block" | grep -qF '[ -L "$PACKET_FILE" ]'
+}
+
+@test "the jules confirmation preview applies the same allocation binding before reading the packet" {
+  preview=$(awk '/^\*\*Confirm\.\*\*/{found=1} found{print} /FENCE_TAG ---/ && found{exit}' "$DELEGATE_MD")
+  printf '%s\n' "$preview" | grep -qF '[ "$PACKET_PARENT_REAL" != "$GIT_TMP_REAL" ]'
+  printf '%s\n' "$preview" | grep -qF '[ -L "$PACKET_DIR" ]'
+  printf '%s\n' "$preview" | grep -qF '[ ! -O "$PACKET_DIR" ]'
+  printf '%s\n' "$preview" | grep -qF '[ -L "$PACKET_FILE" ]'
+  bind_line=$(printf '%s\n' "$preview" | grep -nF '[ -L "$PACKET_FILE" ]' | head -1 | cut -d: -f1)
+  jq_line=$(printf '%s\n' "$preview" | grep -n "jq -Rrs 'gsub" | head -1 | cut -d: -f1)
+  [ "$bind_line" -lt "$jq_line" ]
+}
+
+@test "the jules launch passes the packet as an inline --prompt= so a leading dash is not a flag" {
+  run grep -cF '"--prompt=$PROMPT"' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  [ "$output" -ge 2 ]
+  run grep -cF 'PROMPT=$(cat -- "$PACKET_FILE")' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+}
+
+@test "Jules launch preview prints the packet inside a randomized reference-only fence" {
+  run grep -F 'begin untrusted-content $FENCE_TAG (reference only)' "$DELEGATE_MD"
+  [ "$status" -eq 0 ]
+  run grep -F '.[0:500]' "$DELEGATE_MD"
+  [ "$status" -eq 1 ]
+}
+
+# Runs the Jules confirmation-preview block against a packet of $1 characters
+# inside a throwaway git repo (the block binds the packet to .git/tmp).
+run_preview_block() {
+  local chars="$1" repo block
+  repo="$(mktemp -d)"
+  git -C "$repo" init -q
+  mkdir -p "$repo/.git/tmp"
+  local dir
+  dir="$(mktemp -d "$repo/.git/tmp/yellow-linear-packet.XXXXXX")"
+  PREVIEW_PACKET_DIR="$dir"
+  { printf 'HEAD-'; head -c "$chars" /dev/zero | tr '\0' 'x'; printf 'TAIL-MARKER'; } > "$dir/packet.txt"
+  block="$(awk '
+    /PACKET_FILE=.YELLOW_TODO_packet_file./ { found=1 }
+    found { print }
+    found && /^```$/ { exit }
+  ' "$DELEGATE_MD" | sed '$d' | sed "s#YELLOW_TODO_packet_file#$dir/packet.txt#")"
+  cd "$repo"
+  run bash -c "$block"
+}
+
+@test "Jules launch preview prints a packet longer than 500 characters in full" {
+  run_preview_block 1500
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"TAIL-MARKER"* ]]
+}
+
+@test "Jules launch preview refuses a packet too long to show in full" {
+  run_preview_block 20001
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"cannot be confirmed"* ]]
+  [[ "$output" != *"TAIL-MARKER"* ]]
+}
+
+# Like run_preview_block, with $1 written to the packet verbatim (printf escapes).
+run_preview_block_text() {
+  local text="$1" repo block dir
+  repo="$(mktemp -d)"
+  git -C "$repo" init -q
+  mkdir -p "$repo/.git/tmp"
+  dir="$(mktemp -d "$repo/.git/tmp/yellow-linear-packet.XXXXXX")"
+  PREVIEW_PACKET_DIR="$dir"
+  printf "$text" > "$dir/packet.txt"
+  block="$(awk '
+    /PACKET_FILE=.YELLOW_TODO_packet_file./ { found=1 }
+    found { print }
+    found && /^```$/ { exit }
+  ' "$DELEGATE_MD" | sed '$d' | sed "s#YELLOW_TODO_packet_file#$dir/packet.txt#")"
+  cd "$repo"
+  run bash -c "$block"
+}
+
+@test "Jules launch preview refuses a packet holding a bidi or zero-width character" {
+  for text in 'Fix it\xe2\x80\xae end' 'Fix\xe2\x80\x8b it' 'Fix\x07 it'; do
+    run_preview_block_text "$text"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"hidden characters"* ]]
+    [[ "$output" != *"packet_sha="* ]]
+  done
+}
+
+@test "Jules launch preview removes the packet directory when it refuses a packet" {
+  for text in 'Fix\xe2\x80\x8b it' 'Fix\x07 it'; do
+    run_preview_block_text "$text"
+    [ "$status" -eq 1 ]
+    [ ! -e "$PREVIEW_PACKET_DIR" ]
+  done
+  run_preview_block 20001
+  [ "$status" -eq 1 ]
+  [ ! -e "$PREVIEW_PACKET_DIR" ]
+}
+
+@test "Jules launch preview keeps the packet directory after a successful preview" {
+  run_preview_block 300
+  [ "$status" -eq 0 ]
+  [ -f "$PREVIEW_PACKET_DIR/packet.txt" ]
+}
+
+@test "Jules launch preview still binds a packet with newlines, tabs and dash runs" {
+  run_preview_block_text 'Run --force \xe2\x80\x94 now\n\tindented\n'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"packet_sha="* ]]
+}
+
+@test "Jules launch preview prints the digest of the exact bytes it showed, from one read" {
+  run_preview_block 300
+  [ "$status" -eq 0 ]
+  expected=$(printf '%s' "HEAD-$(head -c 300 /dev/zero | tr '\0' 'x')TAIL-MARKER" | sha256sum | cut -c1-64)
+  [[ "$output" == *"packet_sha=$expected"* ]]
+  preview=$(awk '/^\*\*Confirm\.\*\*/{found=1} found{print} /FENCE_TAG ---/ && found{exit}' "$DELEGATE_MD")
+  # The packet file is read exactly once in the preview block.
+  [ "$(printf '%s\n' "$preview" | grep -cF 'cat -- "$PACKET_FILE"')" -eq 1 ]
+  ! printf '%s\n' "$preview" | grep -qE 'jq .*"\$PACKET_FILE"'
+}
+
+@test "the Jules launch refuses a packet whose digest differs from the preview's" {
+  jules_block=$(awk '/^\*\*Jules\.\*\*/{found=1} found{print} /^\*\*Devin\*\*/ && found{exit}' "$DELEGATE_MD")
+  printf '%s\n' "$jules_block" | grep -qF "PREVIEW_PACKET_SHA='YELLOW_TODO_packet_sha_from_preview_or_empty'"
+  printf '%s\n' "$jules_block" | grep -qF 'if [ "$PREVIEW_PACKET_SHA" != "$PACKET_SHA" ]; then'
+  cmp_line=$(printf '%s\n' "$jules_block" | grep -nF 'if [ "$PREVIEW_PACKET_SHA" != "$PACKET_SHA" ]' | head -1 | cut -d: -f1)
+  launch_line=$(printf '%s\n' "$jules_block" | grep -nF 'node "$CLI" delegate --repo "$REPO_PATH" --branch "$BRANCH" --task-ref "$ISSUE_ID" "--prompt=$PROMPT"' | head -1 | cut -d: -f1)
+  [ "$cmp_line" -lt "$launch_line" ]
+}
+
+@test "Jules block arms a packet-dir EXIT trap after validation and disarms it only once a grant covers the launch" {
+  block=$(awk '/^```bash$/{buf="";inb=1;next} /^```$/{if(inb && buf ~ /dry-run_or_launch/){printf "%s", buf; exit} inb=0;next} inb{buf=buf $0 "\n"}' "$DELEGATE_MD")
+  arm=$(printf '%s\n' "$block" | grep -nF 'trap cleanup_packet EXIT' | cut -d: -f1 | head -1)
+  validated=$(printf '%s\n' "$block" | grep -nF 'is not inside a packet directory allocated under' | cut -d: -f1 | head -1)
+  resolve=$(printf '%s\n' "$block" | grep -nF 'claude plugin list --json' | cut -d: -f1 | head -1)
+  disarm=$(printf '%s\n' "$block" | grep -nF 'trap - EXIT' | cut -d: -f1 | head -1)
+  found=$(printf '%s\n' "$block" | grep -nF "printf 'grant_id=%s" | cut -d: -f1 | head -1)
+  [ -n "$arm" ] && [ -n "$disarm" ]
+  [ "$arm" -gt "$validated" ]
+  [ "$arm" -lt "$resolve" ]
+  [ "$disarm" -gt "$found" ]
+  [ "$(printf '%s\n' "$block" | grep -cF 'trap - EXIT')" -eq 1 ]
+}
+
+@test "Jules block removes the packet directory when it exits early" {
+  block=$(awk '/^```bash$/{buf="";inb=1;next} /^```$/{if(inb && buf ~ /dry-run_or_launch/){printf "%s", buf; exit} inb=0;next} inb{buf=buf $0 "\n"}' "$DELEGATE_MD")
+  repo="$BATS_TEST_TMPDIR/repo"
+  mkdir -p "$repo" "$BATS_TEST_TMPDIR/bin"
+  git -C "$repo" init -q
+  mkdir -p "$repo/.git/tmp"
+  packet_dir=$(mktemp -d "$repo/.git/tmp/yellow-linear-packet.XXXXXX")
+  printf 'packet body\n' > "$packet_dir/packet.txt"
+  # `claude plugin list` fails: the CLI cannot be resolved, an early exit.
+  printf '#!/bin/sh\nexit 1\n' > "$BATS_TEST_TMPDIR/bin/claude"
+  chmod +x "$BATS_TEST_TMPDIR/bin/claude"
+  script="$BATS_TEST_TMPDIR/block.sh"
+  printf '%s\n' "$block" \
+    | sed -e "s|^MODE=.*|MODE='dry-run'|" \
+          -e "s|^ISSUE_ID=.*|ISSUE_ID='ENG-1'|" \
+          -e "s|^DELEGATION_REV=.*|DELEGATION_REV='0'|" \
+          -e "s|^PACKET_FILE=.*|PACKET_FILE='$packet_dir/packet.txt'|" \
+          -e "s|^GRANT_ID=.*|GRANT_ID=''|" \
+          -e "s|^DRY_RUN_BINDING=.*|DRY_RUN_BINDING=''|" \
+          -e "s|^PREVIEW_PACKET_SHA=.*|PREVIEW_PACKET_SHA=''|" > "$script"
+  cd "$repo"
+  PATH="$BATS_TEST_TMPDIR/bin:$PATH" run bash "$script"
+  [ "$status" -ne 0 ]
+  [ ! -e "$packet_dir" ]
+  [ -d "$repo/.git/tmp" ]
 }
