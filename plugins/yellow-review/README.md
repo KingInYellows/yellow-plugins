@@ -177,6 +177,20 @@ fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
 | `guard-local-config` | Snapshot the gitignored `yellow-plugins.local.md` and restore it if a resolver changed, created or deleted it; refuses a symlinked config (`/review:resolve-stack` checks after each PR) |
 | `file-line-counts` | Base/head line counts per changed file for `thermonuclear-reviewer` |
 
+In revert modes `run-verify-command` never opens a FIFO, socket, or device
+standing in for a tracked file. It renames the entry aside in its own
+directory (`.yellow-review-hold-*/node`) so the recovery patch records the
+tracked deletion, then renames it back. The hold path is recorded before
+that rename. If the ledger write fails, the file is put back when it can
+and nothing is reverted; if it cannot, stderr names the remaining path. If
+the rename back fails, the parent retries it. If the entry is still held,
+the reason names that path and does not say the tree was left untouched.
+The special file is unlinked only after both snapshots succeed. An `rm`
+that cannot unlink one special file is recorded and the revert continues,
+so one already removed is still restored. Checkout does not open a special
+file that is still present. `--revert-denied` leaves a special file in place
+and reports `deniedClean: false`.
+
 `commit-resolve-fixes` and `run-verify-command` refuse a `git`, `gh`, or
 `jq` whose canonical file is inside the worktree, and they exec only the
 absolute path outside it. `commit-resolve-fixes` also refuses a `gt` or

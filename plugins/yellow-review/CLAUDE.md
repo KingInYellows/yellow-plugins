@@ -248,7 +248,20 @@ resolution, and sequential stack review. Graphite-native workflow.
   only the trusted-config paths and leaves unrecognized changes in place, so the
   tree can stay dirty and the walk stops
   (`references/review-resolve-stack/dirty-tree-cleanup.md`); every revert flag rejects `--timeout`,
-  `--command-file`, `--trusted` and `--unattended`, and only one mode flag may be given). The verify gate: interactive runs ask
+  `--command-file`, `--trusted` and `--unattended`, and only one mode flag may be given).
+  In `--revert-only` and `--revert-dirty` a FIFO, socket or device is
+  never opened: it is renamed aside in its own directory
+  (`.yellow-review-hold-*/node`) so the recovery patch records the tracked
+  deletion, then renamed back. The hold path is recorded before that rename.
+  If the ledger write fails, the file is put back when it can and nothing is
+  reverted; if it cannot, stderr names the remaining path. If the rename back
+  fails, the parent retries; if the entry is still held, `reason` names that
+  path and does not say the tree was untouched. It is unlinked only after both
+  snapshots succeed. An `rm` that cannot unlink one special file is recorded
+  and the revert continues, so one already removed is still restored. Checkout
+  does not open a special file that is still present. `--revert-denied` leaves
+  a special file in place and reports `deniedClean: false`.
+  The verify gate: interactive runs ask
   first, unattended runs need `verify_unattended: true` and an untracked
   config
 
