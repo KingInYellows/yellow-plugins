@@ -45,7 +45,7 @@ Add the marketplace, then install individual plugins:
 
 ## Codex Distribution
 
-The private/local Codex catalog selects nine plugins and 29 skills. The six new
+The private/local Codex catalog selects ten plugins and 31 skills. The six new
 workflow slices are worktree inventory, documentation audit, complexity scan,
 public DeepWiki research, offline Cursor planning and local Codex readiness. See
 the exact support, setup, cache-refresh and unsupported states in
