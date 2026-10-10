@@ -1,7 +1,7 @@
 # yellow-research
 
-Deep research plugin for Claude Code. Bundles Ceramic, Perplexity, Tavily,
-EXA, Parallel Task, and ast-grep MCP servers with three workflows:
+Deep research plugin for Claude Code. Bundles Ceramic, DeepWiki, Perplexity,
+Tavily, EXA, and Parallel Task MCP servers with three workflows:
 
 - **`/research:code`** — Inline code research for active development
 - **`/research:deep`** — Multi-source deep research saved to `docs/research/`
@@ -20,9 +20,10 @@ in `/research:code` (`/plugin install context7@upstash`). If absent, the
 code-researcher falls back to EXA. Install the `yellow-core` plugin for the
 `repo-research-analyst` agent.
 
-**ast-grep:** The ast-grep MCP server requires the `ast-grep` binary. Run
-`/research:setup` which offers to install it automatically via npm. Or install
-manually: `npm install -g @ast-grep/cli`.
+**ast-grep (optional):** `/research:code` runs the `ast-grep` CLI through Bash
+for structural code search when it is on PATH, and uses Grep otherwise. Run
+`/research:setup` to install it via npm, or install manually:
+`npm install -g @ast-grep/cli`. There is no ast-grep MCP server.
 
 ## API Key Setup
 
@@ -97,11 +98,11 @@ run `/compound` to add to institutional knowledge.
 | Server | Package | Purpose |
 |--------|---------|---------|
 | Ceramic | `mcp.ceramic.ai` | Lexical web search, ~$0.05/1K queries |
+| DeepWiki | `mcp.deepwiki.com` | AI docs for public GitHub repos, no key |
 | Perplexity | `@perplexity-ai/mcp-server` | Web-grounded research and reasoning |
 | Tavily | `tavily-mcp` | Fast web search and page extraction |
 | EXA | `exa-mcp-server` | Neural web search, code examples |
 | Parallel Task | `task-mcp.parallel.ai` | Async long-horizon research reports |
-| ast-grep | `ast-grep-mcp` (via uvx) | AST-based structural code search |
 
 ## Research Conductor
 

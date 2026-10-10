@@ -259,7 +259,11 @@ printed path has the single-slash prefix Step 6 checks.
 Keep the printed path as `<marker-dir>` for Step 6. A non-zero exit stops the
 run before any edit (`[review:resolve] Error: could not create the
 ignored-file marker.`), because no verify run can start without it.
-Step 8's second round mints a fresh marker before its resolvers.
+Step 8's second round mints a fresh marker before its resolvers. Between the
+marker and Step 6's guard, run no project command (tests, builds, linters):
+anything it writes to an ignored path other than the tool state the guard skips
+(dispositions.md, Known limits) is the ignored-file stop, and the fixes are
+reverted.
 
 ### Step 4: Spawn Parallel Resolvers
 

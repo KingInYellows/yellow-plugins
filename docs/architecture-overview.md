@@ -94,7 +94,7 @@ Source of truth for membership and order: `pluginOrder` in
 
 - **yellow-linear** — Linear MCP + PM workflows (OAuth).
 - **yellow-research** — Multi-source research MCPs (Ceramic, DeepWiki,
-  Perplexity, Tavily, EXA, Parallel, ast-grep); missing-key behavior varies by
+  Perplexity, Tavily, EXA, Parallel); missing-key behavior varies by
   server (see MCP and credentials).
 - **yellow-morph** — Morph Fast Apply + WarpGrep MCP.
 - **yellow-composio** — Composio Connect as a bundled HTTP MCP
@@ -461,7 +461,7 @@ credentials skip startup. Perplexity hard-fails at MCP start; Tavily and Exa
 still exec and return runtime errors on tool calls; Semgrep execs
 unconditionally; Morph lets morphmcp emit its own warning and exit. Siblings
 keep running when one server fails. Non-credential stdio servers launch directly
-(for example ast-grep via `uvx`, Graphite via `.mcp.json`). ruvector uses a
+(for example Graphite via `.mcp.json`). ruvector uses a
 morph-style wrapper (`bin/start-ruvector.sh`) that installs the pinned package
 into the plugin data dir and starts the server from the git toplevel.
 

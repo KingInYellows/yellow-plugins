@@ -16,15 +16,11 @@ allowed-tools:
   - mcp__context7__query-docs
   - mcp__grep__searchGitHub
   - mcp__plugin_yellow-research_perplexity__perplexity_search
-  - mcp__plugin_yellow-research_ast-grep__find_code
-  - mcp__plugin_yellow-research_ast-grep__find_code_by_rule
-  - mcp__plugin_yellow-research_ast-grep__dump_syntax_tree
-  - mcp__plugin_yellow-research_ast-grep__test_match_code_rule
 ---
 
 # Code Research
 
-Research code topics inline using Ceramic, EXA, GitHub, Perplexity, ast-grep,
+Research code topics inline using Ceramic, EXA, GitHub, Perplexity, the ast-grep CLI,
 and Context7 (user-level optional MCP — install via `/plugin install context7@upstash`).
 Results are returned in-context — no file is saved.
 

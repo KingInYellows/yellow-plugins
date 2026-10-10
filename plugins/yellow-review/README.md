@@ -130,6 +130,13 @@ drain thresholds; interactive review behavior is unchanged.
 | `silent-failure-hunter`        | Silent failure and error handling analysis                                                                   |
 | `thermonuclear-reviewer`       | Strict structural-quality lane: code-judo restructurings, spaghetti-condition growth, weak type/module boundaries, misplaced ownership, evidence-gated file-size threshold crossings. **Opt-in only** — never auto-selected; enable via `reviewer_set.include` |
 
+A `plugin.json` whose only changed line is `"version"` (Changesets' "chore:
+version packages" PRs) does not select the plugin-surface personas
+(`plugin-contract-reviewer`, `cli-readiness-reviewer`,
+`agent-cli-readiness-reviewer`, `agent-native-reviewer`, and yellow-core's
+`pattern-recognition-specialist`) in `/review:pr` or `/review:all`; any other
+manifest change or plugin-authoring path still does.
+
 ### Workflow (1)
 
 | Agent                 | Description                                |
@@ -166,7 +173,7 @@ fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
 | `poll-new-threads` | Bounded re-pass poll for threads that appeared after round 1 |
 | `check-resolve-text` | Refuse credential-shaped or unsafe text (image, `@` mention, foreign URL) before it is posted outside the resolve scripts (for example a Linear issue) |
 | `commit-resolve-fixes` | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files |
-| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--ignored-since <marker-file>` is required for every run and refuses when a gitignored file is newer than the marker; `--unattended` also skips runner files; `--revert-only` and `--revert-dirty` revert without running and ignore the marker; `--check-ignored` runs only the gitignored-file guard) |
+| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--ignored-since <marker-file>` is required for every run and refuses when a gitignored file is newer than the marker, except regular-file tool state: `.ruvector/coedit.json`, `.ruvector/coedit-sessions/` and `node_modules/.vite/vitest/results.json`; `--unattended` also skips runner files; `--revert-only` and `--revert-dirty` revert without running and ignore the marker; `--check-ignored` runs only the gitignored-file guard) |
 | `guard-local-config` | Snapshot the gitignored `yellow-plugins.local.md` and restore it if a resolver changed, created or deleted it; refuses a symlinked config (`/review:resolve-stack` checks after each PR) |
 | `file-line-counts` | Base/head line counts per changed file for `thermonuclear-reviewer` |
 
@@ -250,8 +257,10 @@ Two caveats worth knowing before enabling it:
 
 `/review:pr` and `/review:all` persist every finding they report but do not
 apply, so an unattended sweep no longer loses them with the transcript. That
-covers P2/P3 `safe_auto`, `gated_auto`, `manual`, the code-simplifier's
-findings and the report-only queue, P0 `human` findings included.
+covers P2/P3 `safe_auto` below the auto-apply tier, `gated_auto`, `manual`, the
+code-simplifier's findings and the report-only queue, P0 `human` findings
+included. Step 7 auto-applies P0/P1 `safe_auto` fixes plus up to 5 P2
+`safe_auto` fixes at confidence anchor 100.
 
 - **Where:** one append-only JSONL file per PR at
   `$(git rev-parse --git-common-dir)/yellow-review/findings/<pr>.jsonl`. It
@@ -314,9 +323,12 @@ Trade-offs: the ledger is local to one clone on one machine. Deleting the
 clone deletes it, and nothing is posted to GitHub.
 
 `/review:sweep` runs `/review:triage --non-interactive` after its resolve
-pass and prints `Ledger: <pending> pending, <attention> need attention`.
-`/review:sweep-all` adds a `Residual` column (`pending/attention`) to its
-summary table. After its confirmation it also prunes the ledgers of PRs that
+pass and prints `Ledger: <pending> pending, <attention> need attention`,
+then a `Merge:` row that reads `not ready` while any P0-P2 finding is still
+pending (the ledger refuses writes once a PR closes, so findings left at merge
+are stranded). `/review:sweep-all` adds a `Residual` column
+(`pending/attention`) to its summary table and a `Not merge-ready` line naming
+those PRs. After its confirmation it also prunes the ledgers of PRs that
 no longer appear in an all-authors open-PR query, and skips the prune when
 that query fails or may be truncated.
 
