@@ -12,21 +12,28 @@
  * override `recoveryAction` with a more specific instruction.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ALL_APP_ERROR_CODES = exports.AppErrorException = exports.AdapterError = void 0;
+exports.MutationErrorException = exports.ALL_APP_ERROR_CODES = exports.AppErrorException = exports.AdapterError = void 0;
 exports.makeAppError = makeAppError;
 exports.throwAppError = throwAppError;
 exports.mapAdapterError = mapAdapterError;
 exports.toAppError = toAppError;
+exports.phaseOfWrite = phaseOfWrite;
+exports.rethrowWithContext = rethrowWithContext;
+exports.errorLabel = errorLabel;
 class AdapterError extends Error {
     kind;
     requestId;
     status;
+    dispatched;
+    sessionResource;
     constructor(kind, message, options = {}) {
         super(message, options.cause !== undefined ? { cause: options.cause } : undefined);
         this.name = 'AdapterError';
         this.kind = kind;
         this.requestId = options.requestId;
         this.status = options.status;
+        this.dispatched = options.dispatched === true;
+        this.sessionResource = options.sessionResource;
     }
 }
 exports.AdapterError = AdapterError;
@@ -82,7 +89,7 @@ const CODE_TABLE = {
     },
     JULES_CONFIRMATION_REQUIRED: {
         retryable: false,
-        recoveryAction: 'Confirm through the command wrapper, or pass a grant written by authorize.',
+        recoveryAction: 'Pass --grant-id from a grant written by authorize, or run the authorize command yourself in a terminal on the controller host.',
     },
     JULES_AUTHORITY_DENIED: {
         retryable: false,
@@ -90,7 +97,7 @@ const CODE_TABLE = {
     },
     JULES_GRANT_EXPIRED: {
         retryable: false,
-        recoveryAction: 'The grant or deadline expired; the remote session may still run. Stop it from the Jules console, revoke the source connection, or rotate JULES_API_KEY.',
+        recoveryAction: 'The grant expired; remote work may still run and expiry does not stop it. Contain it out of band: stop the session from the Jules console, revoke the source connection, or rotate JULES_API_KEY.',
     },
     JULES_POLICY_DEVIATION: {
         retryable: false,
@@ -119,6 +126,22 @@ const CODE_TABLE = {
     JULES_DATA_DIR: {
         retryable: false,
         recoveryAction: 'Make the data directory owner-only (0700), owned by you, outside any git work tree and the plugin directory, with a writable sdk-scratch/.',
+    },
+    JULES_CONTROLLER_MISMATCH: {
+        retryable: false,
+        recoveryAction: 'This data directory is not the authorized controller copy; follow the handoff procedure in the plugin CLAUDE.md.',
+    },
+    JULES_GRANT_EXHAUSTED: {
+        retryable: false,
+        recoveryAction: 'Create a new grant with authorize.',
+    },
+    JULES_SUPERVISION_PAUSED: {
+        retryable: false,
+        recoveryAction: 'Inspect the session, then run supervise --clear-pause in a terminal.',
+    },
+    JULES_QUESTION_CHANGED: {
+        retryable: false,
+        recoveryAction: 'The session no longer awaits the question or has the plan the pass showed; nothing was sent. Run supervise again.',
     },
 };
 // replica:makeAppError:start
@@ -199,4 +222,59 @@ function toAppError(err, phase = 'read') {
     return makeAppError(phase === 'after-dispatch'
         ? 'JULES_UNKNOWN_OUTCOME'
         : 'JULES_MALFORMED_RESPONSE', message);
+}
+/** The `CallPhase` a write failure must be mapped with: after dispatch only a clear rejection keeps its code. */
+function phaseOfWrite(err) {
+    return err.dispatched ? 'after-dispatch' : 'pre-dispatch';
+}
+/**
+ * An AppError that also carries what a mutating failure envelope echoes: the
+ * local request id and local id (so a reservation can be reconciled) and
+ * structured `details` (R39: `runningSessions[]` on an expired grant).
+ */
+class MutationErrorException extends AppErrorException {
+    localRequestId;
+    localId;
+    details;
+    constructor(appError, context = {}) {
+        super(appError);
+        this.name = 'MutationErrorException';
+        this.localRequestId = context.localRequestId;
+        this.localId = context.localId;
+        this.details = context.details;
+    }
+}
+exports.MutationErrorException = MutationErrorException;
+/** Re-throws any failure with the mutation's ids attached; an existing context is kept. */
+function rethrowWithContext(err, context) {
+    if (err instanceof MutationErrorException) {
+        throw new MutationErrorException(err.appError, {
+            ...context,
+            ...(err.localRequestId !== undefined
+                ? { localRequestId: err.localRequestId }
+                : {}),
+            ...(err.localId !== undefined ? { localId: err.localId } : {}),
+            ...(err.details !== undefined ? { details: err.details } : {}),
+        });
+    }
+    if (err instanceof AppErrorException) {
+        throw new MutationErrorException(err.appError, context);
+    }
+    throw err;
+}
+/**
+ * A short, safe label for a caught error in a stderr warning: the JULES_ code
+ * for our own errors, the errno code for filesystem errors, else the error name.
+ * Never the message, which can carry paths or vendor text.
+ */
+function errorLabel(err) {
+    if (err instanceof AppErrorException)
+        return err.appError.code;
+    if (err instanceof Error) {
+        const code = err.code;
+        return typeof code === 'string' && /^[A-Z0-9_]{1,40}$/.test(code)
+            ? code
+            : err.name;
+    }
+    return 'error';
 }

@@ -2,6 +2,11 @@
  * The stdout/stderr/exit contract (R7, contract "Output envelope" and "Exit
  * codes"), exercised on a CLI compiled with `tsc --outDir <mkdtemp>` — never
  * the committed dist/ — and spawned with the loopback preload.
+ *
+ * Since PR3 the contract also covers the mutating subcommands: a usage error
+ * still exits 2 with a valid envelope, and a mutating failure exits 1 with the
+ * `localRequestId` and `localId` echoed (the scenario detail lives in
+ * offline-coverage.test.ts and cli-mutations-e2e.test.ts).
  */
 
 import * as fs from 'node:fs';
@@ -73,9 +78,13 @@ describe('usage errors exit 2 with a valid envelope', () => {
     [['list', 'positional'], 'list'],
     [['collect'], 'collect'],
     [['status'], 'status'],
-    [['delegate', '--repo', 'a/b'], 'unknown'],
-    [['reply'], 'unknown'],
-    [['approve'], 'unknown'],
+    [['delegate', '--repo', 'a/b'], 'delegate'],
+    [['reply'], 'reply'],
+    [['approve'], 'approve'],
+    [['abandon'], 'abandon'],
+    [['authorize', '--list', '--revoke', 'jg-x'], 'authorize'],
+    [['authorize', '--grant-id', 'jg-x'], 'authorize'],
+    [['authorize', '--repo', 'a/b'], 'authorize'],
   ])('%j -> operation %s', async (args, operation) => {
     const r = await run(args);
     expectEnvelope(r, 2, false, operation);

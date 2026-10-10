@@ -1,0 +1,111 @@
+---
+'yellow-jules': minor
+---
+
+Add the mutating and supervision surface, gated by owner-written grants.
+`delegate`, `reply`, and `approve` send a single, never-retried request under
+`--grant-id`; `authorize` writes, lists, and revokes grants and moves the
+controller between hosts; `abandon` gives up an unresolved operation;
+`supervise` runs one bounded pass and returns one decision. The runtime opens
+`/dev/tty` itself and requires a typed challenge for `authorize`, `abandon`,
+`supervise --clear-pause`, and `authorize --take-over`, so a caller without a
+terminal cannot widen what it may do; the terminal check does not stop a
+same-UID process that allocates its own pseudo-terminal, and grants do not
+constrain a process that holds `JULES_API_KEY` itself; the README and CLAUDE.md
+state both. Every write runs inside one authority critical section, a lost
+response is reported as an unknown outcome and reconciled by
+`status --reconcile` rather than replayed, and a data directory copied to
+another path cannot write. Adds six command wrappers, the host-neutral
+`jules-delegation` and `jules-supervision` skills, and enables both for Codex.
+Live Jules behavior is still unexercised: the owner smoke in
+`docs/yellow-jules/smoke-procedure.md` comes next.
+
+A write stamped in the same millisecond as a status walk's start can no longer
+claim a same-text teammate message as its echo (it is held, then classified as
+outside), and `status --reconcile` frees the grant slot of a create it binds to
+an already completed or failed session in the same run.
+
+Overlapping `supervise` passes for one session no longer let an older pass
+clear or replace the plan a newer pass evaluated, so a plan swap is neither
+missed nor falsely paused.
+
+Relative order no longer depends on clock resolution. The journal keeps a
+`seq` counter that only advances under its lock, and the order of writes,
+walks, supervise passes, plan evaluations, pauses and held messages is decided
+by it, so two events in one millisecond are still ordered: a reply dispatched
+after a plan evaluation explains a later plan change, one made before it does
+not, and a write counts as an echo only when proven to precede the walk. State
+written before this change has an unknown order and never authorizes anything
+(a pause it holds is cleared only by a walk that carries a sequence).
+`status --reconcile` and a create's own bind now fold an `observe` row for the
+same session into the create (deviations, pause and outside markers; read
+cursors reset) and retire that row, and refuse to bind a session another create
+already owns (`session-already-owned`), so a recorded policy deviation can no
+longer be hidden from the write gate.
+
+A `reserved` or `unknown-outcome` reply no longer hides a plan replacement from
+`supervise`: only an accepted, reconciled, or echo-confirmed reply explains it,
+so an unproven reply fails safe and the pass pauses. `status --reconcile` now
+resolves an unknown-outcome reply as landed when a plain `status` had already
+recorded its echo, instead of leaving it unknown.
+
+`status --reconcile` no longer binds an unknown-outcome reply to an echo that a
+settled reply with the same text may own; it stays unresolved and `status`
+credits such an echo to the settled reply first. `supervise` withholds `reply`
+for a question the command wrapper would display differently (for example
+`git push --force`, tabs, or text over 6000 characters), the same rule plan
+review follows.
+
+The same holds for an unknown-outcome approval when a settled approval of the
+same plan could own the single `planApproved` activity.
+
+A plan step with a missing or non-string title, or a present non-string
+description, is now an unmapped activity instead of being read as empty text,
+so such a plan is neither shown as reviewed nor approved. `delegate
+--retry-failed` checks the data directory location before it reads the journal,
+so a data directory inside the checkout or plugin cache is refused without
+creating anything. `supervise --clear-pause` requires this host's controller
+authority for the pause's grant.
+
+`supervise` now pauses when a newer plan reuses the evaluated plan id with
+different steps, and offers no approve or reply for a plan whose text `status`
+redacted. A question-bound `reply` is refused when a user message that this
+plugin did not send follows the question.
+
+`status` no longer credits an echo to the latest of several unresolved
+same-text replies. `approve` refuses when a user message this plugin did not
+send follows the reviewed plan, and reports a policy deviation when the vendor
+approved the reviewed plan id with different steps.
+
+Echo claims are scoped to their session, so an activity id claimed in one
+session can no longer hide a teammate's message in another from the reply and
+approve freshness checks or from reconciliation.
+
+`approve` and plan-bound `reply` now refuse when two different plans share the
+newest timestamp instead of choosing one by activity id, a plan-bound `reply`
+refuses after a teammate message that follows the reviewed plan, and the
+freshness checks treat a user message at the same timestamp as later.
+
+A plan generated at the same timestamp as the recorded approval is flagged as a
+changed plan, two different questions at the newest timestamp withhold the
+`reply` action and refuse a question-bound `reply`, and a scratch-tripwire
+failure when the adapter closes after a dispatched write no longer replaces the
+write's result or an unknown outcome (it is reported as `cleanupViolation`).
+
+A second outside message at the same timestamp as the recorded marker now
+replaces it, so `supervise --clear-pause` cannot forget it, and `approve`
+rejects observed steering even when the pause it read earlier was cleared
+before the reservation.
+
+When an accepted reply and an unresolved one share their text and a walk sees
+more matching messages than accepted replies, the unresolved reply is no longer
+credited with the surplus message; it stays unresolved and the surplus is
+recorded as possible outside activity.
+The surplus message is consumed as outside evidence rather than held, so a later walk cannot hand it to the unresolved reply.
+That unresolved reply is also marked echo-ambiguous, so no later walk can credit it with an echo; only reconcile or abandon settles it.
+
+A plan replacement is explained by our own reply, and so does not pause
+`supervise`, only when the reply was dispatched strictly before that plan was
+generated. The batch echo-ambiguity rule counts only writes that could own the
+messages (dispatched before the walk began).
+That ordering uses the reply echo's vendor timestamp (new `echoCreateTime` on the journal record), not the local dispatch clock.
