@@ -130,6 +130,17 @@ teardown() {
   [ "$result" = 'sent Basic [REDACTED] and basic [REDACTED] ok, Basic 2FA' ]
 }
 
+@test "redact_secrets matches the Basic scheme in any letter case" {
+  result=$(printf 'Authorization: bAsIc YTo and sent bAsIc YTE6YjI ok\n' | cs_redact_secrets)
+  [ "$result" = 'Authorization: bAsIc [REDACTED] and sent bAsIc [REDACTED] ok' ]
+}
+
+@test "redact_secrets redacts a bare Basic payload with legacy-charset or UTF-8 bytes" {
+  # 6WE6Yg = 0xE9 "a:b" (ISO-8859-1), w6lhOsOx = UTF-8 "\u00e9a:\u00f1".
+  result=$(printf 'sent Basic 6WE6Yg and basic w6lhOsOx ok\n' | cs_redact_secrets)
+  [ "$result" = 'sent Basic [REDACTED] and basic [REDACTED] ok' ]
+}
+
 @test "redact_secrets passes input that contains a failure-marker lookalike" {
   run bash -c '. "$1"; printf "a\n@@cs-redact-sed-failed@@\nb\n" | cs_redact_secrets' _ \
     "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
@@ -140,6 +151,16 @@ teardown() {
 @test "redact_secrets fails closed when the sed stage fails" {
   mkdir -p "$STAGING_TEST_ROOT/bin"
   printf '#!/bin/sh\nprintf "partial\\n"\nexit 2\n' > "$STAGING_TEST_ROOT/bin/sed"
+  chmod +x "$STAGING_TEST_ROOT/bin/sed"
+  run bash -c 'PATH="$1:$PATH"; . "$2"; printf "x\n" | cs_redact_secrets' _ \
+    "$STAGING_TEST_ROOT/bin" "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'[REDACTED: sanitization failed]'* ]]
+}
+
+@test "redact_secrets fails closed when sed fails after a partial last line" {
+  mkdir -p "$STAGING_TEST_ROOT/bin"
+  printf '#!/bin/sh\nprintf "partial"\nexit 2\n' > "$STAGING_TEST_ROOT/bin/sed"
   chmod +x "$STAGING_TEST_ROOT/bin/sed"
   run bash -c 'PATH="$1:$PATH"; . "$2"; printf "x\n" | cs_redact_secrets' _ \
     "$STAGING_TEST_ROOT/bin" "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
