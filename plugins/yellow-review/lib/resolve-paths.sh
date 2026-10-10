@@ -1702,12 +1702,12 @@ rp_walk_cap() {
 # does rp_ignored_changed_since, filtered or not. The walk is bounded: see rp_walk_cap (at the cap the target counts as changed). Run it from the working
 # tree root with a path that does not begin with `-`.
 rp_link_target_changed() {
-    local l="$1" marker="$2" follow="${3:-}" t p d x n=0 cap skip="" top c v dup qi queue seen
+    local l="$1" marker="$2" follow="${3:-}" t p d x n=0 cap skip="" cjson="" top c v dup qi queue seen
     if [ -e "$l" ]; then
         if [ -d "$l" ]; then
-            # The root `.ruvector` link: skip its session log as the literal
+            # The root `.ruvector` link: skip its co-edit state as the literal
             # directory scan does (see rp_ignored_changed_since).
-            case "$l" in .ruvector|./.ruvector) skip="$l/coedit-sessions" ;; esac
+            case "$l" in .ruvector|./.ruvector) skip="$l/coedit-sessions" cjson="$l/coedit.json" ;; esac
             # Every visited entry counts against rp_walk_cap; the walk is
             # streamed and stops at the first newer file (changed), at the cap
             # (changed: too large to judge) or at a find error (cannot tell).
@@ -1752,7 +1752,9 @@ rp_link_target_changed() {
                     fi
                     [ -f "$x" ] || continue
                     [ "$x" -nt "$marker" ] && return 0
-                done < <(find -H "$d" -name .git -prune -o -path "$skip" -prune -o -print0 2>/dev/null || printf '\001ERR\0')
+                done < <(find -H "$d" -name .git -prune -o -path "$skip" -prune \
+                    -o \( -path "$cjson" -type f \) -prune \
+                    -o \( \( -path '*/node_modules/.vite/vitest/results.json' -o -path 'node_modules/.vite/vitest/results.json' \) -type f \) -prune -o -print0 2>/dev/null || printf '\001ERR\0')
             done
             return 1
         fi
@@ -1793,15 +1795,21 @@ rp_link_target_changed() {
 # write through the link leaves the link's mtime alone: see
 # rp_link_target_changed. Every ignored symlink is examined, those inside
 # ignored directories included. `.git` is skipped as a walked directory, not
-# as a link target. `.ruvector/coedit-sessions` (the session log yellow-ruvector's
-# PostToolUse hook rewrites on every resolver Edit) is skipped entirely: it is
-# data nothing executes, and counting it would refuse every verify run. Collects
-# up to 20 repository-relative paths and returns 1 when any file changed; a
-# symlink is named by its own path. With a third argument <hitsfile> the raw
-# names are written there NUL-terminated (a name may hold a newline) and
-# nothing is printed; print them with rp_format_ignored_hits. Without it the
-# names are printed one per line, control characters shown as `?`, never file
-# contents. Returns 0 when none did and 2 when it cannot tell: the
+# as a link target. yellow-ruvector's co-edit state is skipped: the session log
+# `.ruvector/coedit-sessions` (its PostToolUse hook rewrites it on every
+# resolver Edit) entirely, and the pair store `.ruvector/coedit.json` (rewritten
+# whenever one session edits a second file) while it is a regular file. Both
+# are JSON data nothing executes, and counting them would refuse every resolve
+# that edits two files. Anything else under `.ruvector/` still counts. Vitest's
+# run cache `node_modules/.vite/vitest/results.json` (at any depth; a regular
+# file only) is skipped too: every vitest run rewrites it, and vitest reads it
+# only to order test files. Every other file under node_modules still counts.
+# Collects up to 20 repository-relative paths and returns 1 when any file
+# changed; a symlink is named by its own path. With a third argument <hitsfile>
+# the raw names are written there NUL-terminated (a name may hold a newline)
+# and nothing is printed; print them with rp_format_ignored_hits. Without it
+# the names are printed one per line, control characters shown as `?`, never
+# file contents. Returns 0 when none did and 2 when it cannot tell: the
 # marker is missing, unreadable, not a regular file or a symlink, git or find
 # fails, or a symlink's target cannot be examined. A caller must treat 2 as a
 # refusal. Whole ignored directories are walked with find; the caller owns
@@ -1842,6 +1850,10 @@ rp_ignored_changed_since() {
         while IFS= read -r -d '' f; do
             case "$f" in .git|.git/*|*/.git|*/.git/*) continue ;; esac
             case "$f" in .ruvector/coedit-sessions|.ruvector/coedit-sessions/) continue ;; esac
+            case "$f" in
+                .ruvector/coedit.json|node_modules/.vite/vitest/results.json|*/node_modules/.vite/vitest/results.json)
+                    if [ -f "./$f" ] && [ ! -L "./$f" ]; then continue; fi ;;
+            esac
             : >|"$outfile"
             rc=0
             if [ "${f%/}" != "$f" ]; then
@@ -1852,7 +1864,9 @@ rp_ignored_changed_since() {
                 # A predicate filters before the cut, so an accepted name
                 # past 20 rejected ones still counts.
                 (set -o pipefail
-                    find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o \( -type f -o -type l \) -newer "$marker" -print0 2>/dev/null \
+                    find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune \
+                        -o \( -path ./.ruvector/coedit.json -type f \) -prune \
+                        -o \( -path '*/node_modules/.vite/vitest/results.json' -type f \) -prune -o \( -type f -o -type l \) -newer "$marker" -print0 2>/dev/null \
                         | { k=0; while IFS= read -r -d '' x; do kept "$x" || continue; [ "$k" -ge 20 ] || printf '%s\0' "$x" || exit 2; k=$((k + 1)); done; }) >|"$outfile" || rc=$?
                 if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ]; then
                     # Nothing newer: judge the target of each symlink inside.

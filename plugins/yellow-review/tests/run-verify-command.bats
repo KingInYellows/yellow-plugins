@@ -2047,6 +2047,45 @@ ignored_fixture() {
   [[ "$stderr" == *"node_modules/.bin"* ]]
 }
 
+@test "--check-ignored passes when only yellow-ruvector's co-edit state changed (CLAUDE-87)" {
+  ignored_fixture
+  printf '.ruvector/\n' >> "$REPO/.git/info/exclude"
+  mkdir -p .ruvector/coedit-sessions
+  printf '{"version":1,"pairs":{}}\n' >| .ruvector/coedit.json
+  printf '{}\n' >| .ruvector/coedit-sessions/s1
+  printf 'old\n' >| .ruvector/intelligence.json
+  touch -t 201901010000 .ruvector/coedit.json .ruvector/coedit-sessions/s1 .ruvector/intelligence.json
+  # What the PostToolUse hook does after a resolver edits a second file.
+  printf '{"version":1,"pairs":{"a":{"b":1},"b":{"a":1}}}\n' >| .ruvector/coedit.json
+  printf '{"last":"b","epoch":1}\n' >| .ruvector/coedit-sessions/s1
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = clean ]
+  # Any other file under .ruvector/ is still the ignored-file stop.
+  printf 'new\n' >| .ruvector/intelligence.json
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"gitignored files changed since"* ]]
+  [[ "$stderr" == *".ruvector/intelligence.json"* ]]
+  [[ "$stderr" != *coedit* ]]
+}
+
+@test "--check-ignored passes when a vitest run only rewrote its results cache" {
+  ignored_fixture
+  mkdir -p node_modules/.vite/vitest
+  printf '{}\n' >| node_modules/.vite/vitest/results.json
+  touch -t 201901010000 node_modules/.vite/vitest/results.json
+  printf '{"version":"1.6.0","results":{}}\n' >| node_modules/.vite/vitest/results.json
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = clean ]
+  printf '#!/bin/sh\necho pwned\n' >| node_modules/.bin/runner
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [ "$stderr" != "${stderr/node_modules\/.bin\/runner/}" ]
+  [[ "$stderr" != *results.json* ]]
+}
+
 @test "--check-ignored needs a readable marker and takes no file list" {
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored
   [ "$status" -eq 2 ]

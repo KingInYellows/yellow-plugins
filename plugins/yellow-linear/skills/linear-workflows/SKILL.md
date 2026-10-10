@@ -345,6 +345,58 @@ line N]`, so remote text can't close a reference-only fence early.
 - Never use `gh pr create` for PR creation
 - Link issues to PRs by adding a comment with the PR URL
 
+## Graphite Merge Queue
+
+Graphite's merge queue (Parallel CI) lands a PR by pushing its squash commit to
+the default branch and then closing the PR. GitHub reports `state: CLOSED` with
+`mergedAt: null` for work that did land, so Linear's "PR merged" automation
+never fires. Two rules cover it; this section is their single source, and the
+commands and agents point here instead of restating them.
+
+**Closing words.** Linear moves an issue to Done when a commit with a closing
+magic word reaches the default branch (team setting "On PR or commit merge",
+plus Linear's commit-linking webhook on the repository). The queue builds the
+squash commit message from the PR title and description, so the words must be
+in the PR description. Graphite builds that description from the commit body.
+The writers (`smart-submit`, `gt-amend`, `/flow:work`) cannot call Linear, so
+the ID rule is text-only and identical in each of them (a content test pins the
+copies):
+
+Take the Linear ID only from the last path segment of the branch name, which must start with `[A-Z]{2,5}-[0-9]{1,6}` followed by `-` or the end of the name, or from the stack item's `Linear:` field; ignore IDs mentioned anywhere else.
+
+End the commit body with `Part of <ISSUE-ID>`, or with `Closes <ISSUE-ID>` only
+on the one commit that completes the issue: the topmost stack item that carries
+the ID (`/flow:work` knows the whole stack) or a single branch the user confirms
+(`smart-submit`, or `/flow:work` in single-branch mode). `Part of` never moves the issue, so a lower branch built first
+can never close it early. `gt-amend` keeps whatever line the commit already has.
+The Linear commands that act on an ID (`/linear:sync`, `linear-pr-linker`)
+validate it with `get_issue`; the writers do not.
+
+**Merged-PR detection.** Treat a PR as merged when `state` is `MERGED`, when
+`mergedAt` is set, or when `state` is `CLOSED` with `mergedAt` null and
+`scripts/pr-landed.sh` prints `landed=yes`. Run it once per such PR with literal
+arguments: the repository the PR was read from, and the `number` that `gh`
+returned. It fetches, scans and prints on its own, so nothing has to survive
+between Bash calls:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/pr-landed.sh" "<owner/name>" "<pr number>"
+```
+
+It prints exactly one `landed=` line and, for `unknown`, a one-line reason on
+stderr. This mapping is the one every consumer uses:
+
+- `landed=yes` — merged. The test is the default branch having a commit whose
+  subject ends in `(#<number>)`, which is a heuristic: a cherry-pick or a
+  re-land carries the same suffix. Every status change it leads to therefore
+  stays behind the user's confirmation.
+- `landed=no` — closed without merge. Only a complete (non-shallow) history
+  that was fetched from `origin` and scanned to the end gives this.
+- `landed=unknown` — report "closed, landing unverified" with the reason and
+  propose nothing. The script returns it when origin is not the PR's
+  repository, `origin/HEAD` is unset or stale, the clone is shallow, or the fetch or
+  `git log` failed.
+
 ## Shell Patterns
 
 Always quote variables when handling Linear-derived data:

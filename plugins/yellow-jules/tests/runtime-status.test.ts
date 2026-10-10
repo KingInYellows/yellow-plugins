@@ -762,28 +762,60 @@ describe('policy deviation (R13)', () => {
   });
 });
 
-describe('--reconcile in PR2', () => {
+describe('--reconcile', () => {
   it('returns an empty reconciled list with no reservations', async () => {
     const result = await status(makeDeps(dataDir, fake), { reconcile: true });
     expect(result).toEqual({ operation: 'status', reconciled: [] });
     expect(fake.calls).toEqual([]);
   });
 
-  it('reports a planted reservation as not-reached rather than ignoring it', async () => {
+  it('a reservation with no candidate is never released until archive visibility is confirmed', async () => {
     await reserveOperation(dataDir, {
       localRequestId: 'req-1',
       kind: 'create',
       repository: 'acme/widgets',
       requestedBranch: 'main',
+      sourceResource: 'sources/github/acme/widgets',
     });
-    const result = await status(makeDeps(dataDir, fake), { reconcile: true });
+    // No candidate at all: the fixture session would otherwise count as an
+    // unowned same-repo/branch candidate (there is no create-time floor).
+    fake.sessions.clear();
+    // Old enough that its write cannot still be in flight.
+    const deps = makeDeps(dataDir, fake);
+    deps.clock.time = Date.now() + 10 * 60_000;
+    const result = await status(deps, { reconcile: true });
     expect(result.reconciled).toEqual([
       expect.objectContaining({
         localRequestId: 'req-1',
-        outcome: 'not-reached',
+        outcome: 'ambiguous-reconcile',
+        reason: 'archive-visibility-unverified',
       }),
     ]);
-    expect(result.attention).toEqual(['reconciled:not-reached']);
+    expect(result.attention).toEqual(['reconciled:ambiguous-reconcile']);
+  });
+
+  it('a young `reserved` row may still be in flight: reported not-reached, never recorded, never abandonable', async () => {
+    await reserveOperation(dataDir, {
+      localRequestId: 'req-young',
+      kind: 'create',
+      repository: 'acme/widgets',
+      requestedBranch: 'main',
+      sourceResource: 'sources/github/acme/widgets',
+    });
+    const deps = makeDeps(dataDir, fake);
+    deps.clock.time = Date.now() + 30_000;
+    const result = await status(deps, { reconcile: true });
+    expect(result.reconciled).toEqual([
+      expect.objectContaining({
+        localRequestId: 'req-young',
+        outcome: 'not-reached',
+        reason: expect.stringContaining('in flight'),
+      }),
+    ]);
+    expect(fake.calls).toEqual([]);
+    const row = (await readJournal(dataDir)).operations['req-young'];
+    expect(row?.lastReconcile).toBeUndefined();
+    expect(row?.status).toBe('reserved');
   });
 
   it('requires --session unless --reconcile is given', async () => {
@@ -833,5 +865,27 @@ describe('journal corruption and read errors', () => {
     ).resolves.toBe(code);
     expect(fake.callsTo('getSession')).toHaveLength(attempts);
     expect(fake.closed).toBe(true);
+  });
+});
+
+describe('terminal observations are monotonic across overlapping status walks', () => {
+  it('a delayed walk that read inProgress cannot regress a completed record', async () => {
+    fake.sessions.set(S, makeSession({ vendorState: 'inProgress' }));
+    const deps = makeDeps(dataDir, fake);
+    const original = fake.listActivitiesImpl;
+    let nested = false;
+    fake.listActivitiesImpl = async (resource, options) => {
+      if (!nested) {
+        nested = true;
+        // The newer call observes completion and persists it first.
+        fake.sessions.set(S, makeSession({ vendorState: 'completed' }));
+        await status(deps, { session: S, reconcile: false });
+      }
+      return original(resource, options);
+    };
+    await status(deps, { session: S, reconcile: false });
+    const record = await recordFor();
+    expect(record?.condition).toBe('remote-completed');
+    expect(record?.vendorState).toBe('completed');
   });
 });
