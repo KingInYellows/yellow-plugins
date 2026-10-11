@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.2
+
+### Patch Changes
+
+- [`192f761`](https://github.com/KingInYellows/yellow-plugins/commit/192f76173880f54cb3c1b5f4898277f3c2ccc5c2)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Lower the
+  `RUVECTOR_INSTALL_WAIT` default from 25 s to 20 s so the launcher's wait stays
+  under Claude Code's measured ~26 s MCP startup timeout, and make the timeout
+  hint name both `MCP_TIMEOUT` and `RUVECTOR_INSTALL_WAIT`.
+
 ## 2.0.1
 
 ### Patch Changes

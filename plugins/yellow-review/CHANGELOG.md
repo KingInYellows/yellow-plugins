@@ -1,5 +1,214 @@
 # Changelog
 
+## 3.8.0
+
+### Minor Changes
+
+- [`97913e4`](https://github.com/KingInYellows/yellow-plugins/commit/97913e4fa3f3695142eafed0ff7206da00b43b8a)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/review:pr`
+  and `/review:all` now auto-apply up to 5 P2 `safe_auto` findings at confidence
+  anchor 100, after the P0/P1 fixes. `/review:sweep` adds a `Merge:` row and
+  `/review:sweep-all` a `Not merge-ready` line when P0-P2 ledger findings are
+  still pending, and `review-ledger.sh summary` reports a `merge_blocking`
+  count.
+
+- [`721f437`](https://github.com/KingInYellows/yellow-plugins/commit/721f4376cffe02dcc1b73a24d932d3de9d9fb819)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `run-verify-command --revert-denied`: `/review:resolve` now reverts unreported
+  trusted-config edits (agent instruction and tool-config files,
+  `rp_trusted_config`) automatically after a refusal, without a path list, and
+  reports `deniedClean`, `reverted` and `revertedCount` (`noop` when nothing
+  changed). Other deny-listed paths such as `.env*`, keys, CI and Docker files
+  are asked about or left in place, an untracked nested repository is left in
+  place without stopping the other reverts, and `--revert-denied` requires
+  `--ignored-since` (or an explicit `--no-ignored-guard`) and refuses, reverting
+  nothing, when a gitignored trusted-config file changed since the marker.
+  `/review:resolve` keeps the marker until the end of Step 6, and a refusal
+  before the verify call also runs the gitignored-file guard.
+  `/review:resolve-stack` and `/review:sweep-all` dirty-tree cleanup use the
+  same predicate through `--revert-denied`. Combining revert and check-ignored
+  mode flags now exits 2 instead of resolving by argument order. The blocker
+  lookup and stack self-verify also get their own Bash timeouts. A tracked
+  trusted-config symlink (for example `.claude/settings.json` pointing outside
+  the worktree) whose target was written since the marker is no longer read as a
+  clean denied set: `--revert-denied` reports `deniedClean: false` (a link the
+  resolver redirected or replaced is restored, with its HEAD target judged the
+  same way) (under `--no-ignored-guard`, any such link resolving outside the
+  worktree counts), and a verify run refuses. The mount check for a replacement
+  directory now also works on macOS: without GNU `find -printf` it compares
+  device numbers with `stat`, and without `/proc/self/mountinfo` it parses
+  `mount` output. A tracked trusted-config symlink to a directory is walked with
+  every nested symlink followed; a loop or unreadable entry counts as a changed
+  target. Without a marker, a link into the worktree counts as covered only when
+  its target is a tracked path outside `.git` with no skip-worktree or
+  assume-unchanged flag. The ignored-file guard now follows symlinks nested
+  below a linked trusted-config directory when it is given a path predicate (a
+  loop fails closed), and with `--no-ignored-guard` a tracked trusted-config
+  link whose target is a directory counts as a hit, so a tracked descendant no
+  longer covers an ignored sibling. A tracked target that git lists as modified
+  also counts as a hit, unless it is trusted-config and so reverted. A tracked
+  symlink with an ordinary name that resolves to a directory outside the
+  worktree (`cfg -> /elsewhere`) is now inspected for trusted-config
+  descendants: a write to `cfg/.claude/settings.json` after the marker reports
+  `deniedClean: false` (and a verify run refuses), and with `--no-ignored-guard`
+  such a link counts when a trusted-config descendant exists. The directory walk
+  behind every symlink check (`rp_link_target_changed`: ignored-file guard and
+  trusted-config links) now streams `find`, counts every visited entry, and
+  counts the link as changed once it passes 50000 entries
+  (`YR_DIR_LINK_WALK_CAP` can only lower that), so a link to a huge tree no
+  longer walks it in full. The ignored-file guard follows symlinks nested below
+  a linked directory, with or without a path predicate, so `--check-ignored` and
+  a verify run catch a payload edited behind a chain of older links. The follow
+  is targeted: a nested link whose target lies inside the worktree is skipped
+  (the tree listing and the ignored scan cover it, so pnpm-style stores with
+  cyclic links no longer refuse), a target outside it is walked once (a repeat,
+  a loop or a dangling link is skipped), every visited entry counts against the
+  cap, and a real `find` error still refuses. A tracked symlink that aliases an
+  in-worktree path into a trusted-config name (`cfg -> .claude/agent-memory/x`,
+  then `cfg/CLAUDE.md`) now counts as a hit when the descendant is trusted under
+  the link's name but not under its physical path.
+
+### Patch Changes
+
+- [`e4b7b84`](https://github.com/KingInYellows/yellow-plugins/commit/e4b7b84aeeb6b0a2f6ec5303096b9f350b4280c1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Remove the
+  bundled ast-grep MCP server and use the `ast-grep` CLI directly. The MCP
+  server needed `uvx`, git, Python 3.13 and the binary on the PATH Claude Code
+  launched with, and `/research:setup` could never confirm it: its probe called
+  `find_code` without the required `project_folder`, uv was only installed when
+  ast-grep was missing, and an install mid-session could not start a server that
+  had already failed. The four `mcp__plugin_yellow-research_ast-grep__*` tools
+  are gone.
+
+  `code-researcher` and yellow-debt's duplication and complexity scanners now
+  run `ast-grep run` / `ast-grep scan --inline-rules` through Bash when
+  `ast-grep` is on PATH and fall back to Grep otherwise. `research-conductor`
+  and yellow-review's `silent-failure-hunter` and `type-design-analyzer` have no
+  Bash and use their existing search tools. `install-ast-grep.sh` no longer
+  installs uv or pre-warms Python, `/research:setup` reports the CLI as a local
+  tool (MCP sources now count out of six), and `/setup:all` no longer probes the
+  removed tool or checks `uv` (yellow-research bundled sources now count out of
+  five).
+
+- [`c49559a`](https://github.com/KingInYellows/yellow-plugins/commit/c49559a68b7c3655fb0465010984e998c23b3fec)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - In revert
+  modes, `run-verify-command` keeps a listed FIFO, socket, or device until the
+  recovery patch has recorded its tracked deletion without opening it. If that
+  snapshot cannot be written and the special file was put back, it stays in
+  place and nothing is reverted. The hold path is recorded before the rename
+  back. If that ledger write fails, the file is put back when it can; if it
+  cannot, stderr names the remaining path. A rewrite of the ledger replaces it
+  only after the new copy is complete, so a failed rewrite leaves the recorded
+  hold in place. Each record is the held path, a NUL, the original path, and a
+  NUL, so a newline in a tracked name cannot split the record. Those fields are
+  assigned with `printf -v`, not a nameref, so macOS bash 3.2 can drop and
+  restore the record. A rename back that fails is retried; if the entry is still
+  held, the reason names that path instead of claiming the tree was untouched.
+  An unlink that fails is reported and the revert continues, so a special file
+  already removed is still restored.
+
+- [`dfcba39`](https://github.com/KingInYellows/yellow-plugins/commit/dfcba3943ac8a2b39b5c5eae0ae78d207fb8a9db)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Stop the
+  `/review:resolve` ignored-file guard from refusing valid fixes over tool-owned
+  state. The `--ignored-since` scan now skips yellow-ruvector's
+  `.ruvector/coedit.json` pair store (rewritten whenever a resolver edits a
+  second file) and vitest's `node_modules/.vite/vitest/results.json` run cache,
+  each only while it is a regular file. Every other gitignored file, including
+  the rest of `.ruvector/` and `node_modules/`, still stops the run.
+
+- [`e7a3024`](https://github.com/KingInYellows/yellow-plugins/commit/e7a3024d68f5f431fb17a94250c1635b1f6b5212)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/review:pr`
+  and `/review:all` no longer select the plugin-surface reviewers
+  (`pattern-recognition-specialist`, `plugin-contract-reviewer`,
+  `cli-readiness-reviewer`, `agent-cli-readiness-reviewer`,
+  `agent-native-reviewer`) when a `plugin.json` diff changes only its
+  `"version"` line, as in Changesets' version-packages PRs. Any other manifest
+  change still selects them.
+
+- [`728ea9c`](https://github.com/KingInYellows/yellow-plugins/commit/728ea9c47aa982374da94ee0355f983f15182c43)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - State the
+  anchor-only re-verify limit in the review-pr ledger reference, and record the
+  check-the-tree-before-decomposing lesson as a solution doc.
+
+- [`2d877ca`](https://github.com/KingInYellows/yellow-plugins/commit/2d877ca9aa90f0ff92e6d4b7f3786341413871af)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Stop flagging
+  capitalised non-English prose in the resolve text scan, flag short Basic
+  credentials and the tvly-, pplx- and sgp\_ prefixes, and let an oos reply
+  upgrade to fixed or addressed. A leading non-ASCII quote, bullet, dash or
+  no-break space no longer exempts the ASCII words after it, and a short Basic
+  credential followed by punctuation or without padding is decoded. A bare
+  `Basic` word is judged on a stricter rule (an interior colon), so prose such
+  as `Basic Only` stays clean, and a 3-character padded Basic credential such as
+  `a:` is decoded. A short Basic credential in a legacy charset (ISO-8859-1
+  octets, not valid UTF-8) is now flagged, and a leading all-non-ASCII word
+  (CJK, Cyrillic, accented) is kept as prose instead of being stripped as
+  decoration, so it still exempts non-English text. Standalone x and division
+  signs count as decoration, and E2-lead letters (Glagolitic, Coptic, Tifinagh)
+  as words. A symbol attached directly to the first word (a fullwidth quotation
+  mark, curly quote, emoji or other fullwidth punctuation) is consumed like a
+  standalone symbol token, so it no longer exempts a multiword ASCII passphrase;
+  fullwidth letters and digits still count as words. In byte-wise awk (mawk,
+  gawk in the C locale) a non-ASCII prefix glued to an ASCII first word is
+  dropped, so punctuation outside the known blocks (Arabic comma, ideographic
+  comma) cannot exempt a passphrase; that mode may now refuse prose such as an
+  accented first word glued to ASCII words, while multibyte gawk keeps
+  letter-leading words as prose.
+
+- [`efa1231`](https://github.com/KingInYellows/yellow-plugins/commit/efa1231575139be156aa3614baeda4bb883d62b5)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fail the two
+  universal-ctags ledger tests when CI is set, so a runner without
+  universal-ctags cannot skip them inside the required yellow-review bats job.
+  Scope verification now runs on Universal Ctags 5.9 (the Ubuntu package), which
+  rejects the `--` end-of-options marker the ledger passed, so every code scope
+  fell back to unscoped. A ctags failure, timeout or tag-parse error now prints
+  a one-line `[review-ledger]` warning instead of silently falling back, and
+  `/review:setup` reports a ledger library that fails to load instead of blaming
+  ctags.
+
+- [`1d68e0c`](https://github.com/KingInYellows/yellow-plugins/commit/1d68e0cc18c1d7456fb09f3380f80a9b3050ea45)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Share git
+  hardening between the resolve commit and verify scripts, refuse a gt or node
+  symlink into the worktree, and require --ignored-since on every verify run.
+  The commit script now drops in-worktree PATH entries before it runs gt or node
+  by absolute path, refuses an empty cleaned PATH, and checks `timeout` and
+  `gtimeout` before the probe that runs them. The revert and check-ignored modes
+  of run-verify-command no longer refuse a repository-local transport,
+  credential or signing config (a resolver could block its own rollback that
+  way), the verify command no longer inherits `safe.bareRepository=explicit`,
+  and `harden_git_config` reads config through `yr_git` and fails closed when
+  awk fails. Both scripts now run on a screened PATH from startup
+  (`yr_adopt_path`): a directory inside the worktree, or one holding any symlink
+  (dangling or not, whatever its name: grep, ssh, git-credential-_) whose target
+  is inside it, is dropped, so a resolver cannot replace the PR-file membership
+  check or any other post-edit helper. The same screen drops a directory holding
+  an executable script whose `#!` interpreter (or `env` operand) is inside the
+  worktree, and a git, gh, jq, gt, node or awk that is such a script is refused.
+  `harden_git_config` refuses an inherited command or config variable
+  (GIT_SSH_COMMAND, GIT_SSH, GIT_ASKPASS, SSH_ASKPASS, GIT_PROXY_COMMAND,
+  GIT_EXTERNAL_DIFF, GIT_PAGER, PAGER, GIT_EDITOR, EDITOR, VISUAL,
+  GIT_EXEC_PATH, GIT_TEMPLATE_DIR, GIT_CONFIG_GLOBAL/SYSTEM, injected
+  GIT_CONFIG_KEY/VALUE and GIT_CONFIG_PARAMETERS) whose command line names a
+  path inside the worktree (every token is judged, so `sh <worktree>/script` is
+  refused, and a bare first word that resolves to a script with such an
+  interpreter). Command lines are matched on whole paths (siblings such as repo2
+  pass), a bare first word is resolved on PATH only, shell syntax the check
+  cannot judge
+  ($VAR, backticks, ;, |, ...) is refused, a HOME or XDG_CONFIG_HOME that puts the global git config inside the worktree is refused (set GIT_CONFIG_GLOBAL for a dotfiles repository), global-scope command entries are judged by their file, and a #! optional argument that names the worktree counts like the interpreter. The first git, gh and jq are checked for a #! interpreter inside the worktree before the library is sourced, and `env -S`/`--split-string` forms in #! lines are parsed. The verify command keeps the caller's PATH. The PATH screen follows a symlinked PATH entry into its children (`find -H`), a `#!` line with `env -S` and a `$`is treated as entering the worktree (the bootstrap resolvers included), and a git command variable containing a backslash, or a quote inside a word, is refused as unjudgeable shell syntax. A`#!`line whose`env`has a`NAME=value`operand before the utility, or a backslash or quote after`-S`, is treated the same way. An `env
+  -P`in a`#!`line is treated the same way, and a`PATH`directory that exists but cannot be listed (execute-only) is dropped. An inherited`GIT_CONFIG`is refused, since it makes the config scans read only that file. An`env
+  -C`/`--chdir`in a`#!`line counts as entering the worktree, and a`GIT_CONFIG_PARAMETERS`entry that cannot be decoded exactly is refused instead of skipped. An injected`include.path`or`includeIf._.path`(GIT_CONFIG_KEY_n or GIT_CONFIG_PARAMETERS) is refused, since git loads the file as command-line config that the scans skip, and a quote that opens in one word and closes in another (a quoted span with whitespace) in a command variable is refused. Any inherited`GIT_EXEC_PATH`is refused, the`#!`check follows interpreter scripts to a depth of 4 (a deeper chain counts as entering the worktree), and the PATH screen and the tool resolvers drop a directory or tool that is a hard link to a file inside the worktree. A hard-link walk of the worktree that fails part way drops every same-device PATH directory holding a multi-link file instead of trusting the partial result, and a global or system git config file that sets a command and is hard-linked to a file inside the worktree is refused.`harden_git_config`(both scopes) also refuses a repository-local`lfs.customtransfer._`, `lfs.standalonetransferagent`or`lfs.extension._`, which the stock Git LFS filter would run when it downloads an object. `harden_git_config` screens PATH once in the calling shell instead of once per git call, cutting a call from about 1.4 s to 0.3 s. The two lists of command-bearing git config keys are now one classifier (`yr_cfg_key_runs_command`) applied by origin: a matching entry in the repository's local or worktree config, or in a global or system file inside the worktree or hard-linked to a file in it (including one reached through an include), is refused. It adds `merge._.driver`, `diff._.command|textconv`, `core.editor|pager|alternateRefsCommand`, `sequence.editor`, `pager._`, `remote._.uploadpack|receivepack|vcs`, `lfs._`program keys,`alias._`and`submodule._.update`with a`!`value, and`url.ext::_.insteadOf`. The config scan percent-encodes each field it hands to the shell, so a config path or value holding a tab or newline cannot shift the columns and hide an in-worktree include. A `$`, backtick, `~`or backslash in the optional argument of a`#!` line (`#!/bin/sh
+  -c
+  $PWD/evil`, passed as separate arguments on macOS) counts as entering the worktree, in the shell check, the awk screen and the bootstrap copies. The verify command's PATH starts with a private directory (0700, outside the worktree) holding a `git`shim that runs the validated git on the screened PATH, so every helper a git it starts resolves (ssh, askpass, a pager,`GIT_SSH_COMMAND='env
+  ssh'`, a `core.sshCommand` from the user's own config) comes from that PATH
+  and never from a tracked file on the caller's. Program values from trusted
+  global or system config are judged too (a relative or absolute program word
+  that resolves into the worktree is refused), and GIT_SSH, GIT_ASKPASS and
+  SSH_ASKPASS are validated as one unsplit path.
+
+- [`a1798c1`](https://github.com/KingInYellows/yellow-plugins/commit/a1798c17163a0a563a197f3be118cbf0ea1ade05)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Snapshot the
+  local config from the PR head's ignore rules before a sweep review, and stop a
+  sweep-all batch when a PR's state cannot be read.
+
 ## 3.7.0
 
 ### Minor Changes

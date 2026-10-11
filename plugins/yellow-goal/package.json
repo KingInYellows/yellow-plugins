@@ -1,6 +1,6 @@
 {
   "name": "yellow-goal",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "yellow-goal engine bridge — spawn goal-gen as a process (read-only requests, protocol v2 stub runs, and a user-only approval-gated real run), never import it",
   "scripts": {
