@@ -268,19 +268,21 @@ function rpc(
             ].includes(item.type)
           )
             return fail(new Error('Unexpected built-in tool: ' + item.type));
-          if (item && item.type === 'mcpToolCall') {
-            check(
+          if (
+            item &&
+            item.type === 'mcpToolCall' &&
+            !(
               options.mcpServer &&
-                item.server === options.mcpServer &&
-                [
-                  'ask_question',
-                  'ask_wiki_question',
-                  'read_wiki_structure',
-                  'read_wiki_contents',
-                ].includes(item.tool),
-              'Unapproved MCP tool'
-            );
-          }
+              item.server === options.mcpServer &&
+              [
+                'ask_question',
+                'ask_wiki_question',
+                'read_wiki_structure',
+                'read_wiki_contents',
+              ].includes(item.tool)
+            )
+          )
+            return fail(new Error('Unapproved MCP tool'));
           if (message.method.startsWith('hook/'))
             return fail(new Error('Unexpected hook execution'));
           events.push(message);

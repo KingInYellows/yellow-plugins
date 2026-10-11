@@ -1,8 +1,17 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, symlinkSync, rmSync } from 'node:fs';
+import { EventEmitter } from 'node:events';
+import {
+  mkdtempSync,
+  writeFileSync,
+  symlinkSync,
+  rmSync,
+  readFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
+import { PassThrough } from 'node:stream';
+import { runInNewContext } from 'node:vm';
 
 import { describe, expect, it } from 'vitest';
 
@@ -35,6 +44,55 @@ const negative = {
 };
 
 describe('real-model installed skill acceptance', () => {
+  it('rejects an unapproved MCP event through RPC failure instead of throwing in the callback', async () => {
+    const child = Object.assign(new EventEmitter(), {
+      stdin: new PassThrough(),
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+    });
+    const localRequire = createRequire(import.meta.url);
+    const module = { exports: {} as { rpc?: typeof Function } };
+    runInNewContext(readFileSync(script, 'utf8'), {
+      module,
+      __dirname: dirname(script),
+      process,
+      Buffer,
+      setTimeout,
+      clearTimeout,
+      require: (name: string) =>
+        name === 'node:child_process'
+          ? { spawn: () => child, spawnSync }
+          : localRequire(name),
+    });
+    const host = module.exports.rpc!(
+      [],
+      {},
+      new Set(),
+      [],
+      {},
+      { mcpServer: 'deepwiki' }
+    );
+    const pending = host.request('initialize', {});
+    const rejected = expect(pending).rejects.toThrow('Unapproved MCP tool');
+    expect(() =>
+      child.stdout.write(
+        JSON.stringify({
+          method: 'item/completed',
+          params: {
+            item: {
+              type: 'mcpToolCall',
+              server: 'unapproved',
+              tool: 'write_data',
+            },
+          },
+        }) + '\n'
+      )
+    ).not.toThrow();
+    await rejected;
+    expect(host.events).toEqual([]);
+    host.close();
+  });
+
   it('prints requirements without accessing credentials', () => {
     const result = spawnSync(process.execPath, [script, '--help'], {
       encoding: 'utf8',

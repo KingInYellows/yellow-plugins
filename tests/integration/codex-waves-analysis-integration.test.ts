@@ -173,7 +173,9 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     for (const secret of ['one', 'two', 'three', 'four']) {
       expect(text).not.toContain('synthetic-' + secret);
     }
-    expect(result.output.files[0].lines[4].text).toBe('const amount = 1;');
+    expect(result.output.files[0].lines[4].text).toBe(
+      '--- redacted possible credential at line 5 ---'
+    );
   });
 
   it('redacts compound credential names and credential-bearing URLs', () => {
@@ -202,18 +204,53 @@ describe('installed flat-reference snapshot enforces paths before source reads',
         '--- redacted possible credential at line ' + (index + 1) + ' ---'
       );
     }
-    expect(lines[6].text).toBe('const keyboardLayout = "us";');
-    expect(lines[7].text).toBe('parseToken(input);');
-    expect(lines[8].text).toBe('const url = "https://example.com/path";');
+    expect(lines[6].text).toBe(redactedAt(7));
+    expect(lines[7].text).toBe(redactedAt(8));
+    expect(lines[8].text).toBe(redactedAt(9));
+  });
+
+  it.each(['??', '||', '&&', '?', ':', '+', '/* continuation */'])(
+    'fails closed through a credential expression using %s',
+    (operator) => {
+      const result = inspect('src/file.js', (workspace) => {
+        writeFileSync(
+          join(workspace, 'src/file.js'),
+          'const amount = 1;\nconst apiKey =\n  process.env.API_KEY ' +
+            operator +
+            '\n  "synthetic-chained-fallback";\nconst later = 2;\n'
+        );
+      });
+      expect(result.exit).toBe(0);
+      expect(result.output.status).toBe('partial');
+      expect(JSON.stringify(result.output)).not.toContain(
+        'synthetic-chained-fallback'
+      );
+      const lines = result.output.files[0].lines;
+      expect(lines[0].text).toBe('const amount = 1;');
+      for (let index = 1; index < lines.length; index += 1)
+        expect(lines[index].text).toBe(redactedAt(index + 1));
+    }
+  );
+
+  it('preserves noncredential identifiers and plain URLs in an independent file', () => {
+    const content =
+      'const keyboardLayout = "us";\nparseToken(input);\nconst url = "https://example.com/path";\n';
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(join(workspace, 'src/file.js'), content);
+    });
+    expect(result.output.status).toBe('success');
+    expect(
+      result.output.files[0].lines
+        .map((line: { text: string }) => line.text)
+        .join('\n') + '\n'
+    ).toBe(content);
   });
 
   it('redacts credential values wrapped onto continuation lines', () => {
     const result = inspect('src/file.js', (workspace) => {
       writeFileSync(
         join(workspace, 'src/file.js'),
-        'const apiKey =\n' +
-          '  "sk-live-abc123"\n' +
-          'const amount = 1;\n'
+        'const apiKey =\n' + '  "sk-live-abc123"\n' + 'const amount = 1;\n'
       );
     });
     expect(result.exit).toBe(0);
@@ -225,7 +262,9 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     expect(lines[1].text).toBe(
       '--- redacted possible credential at line 2 ---'
     );
-    expect(lines[2].text).toBe('const amount = 1;');
+    expect(lines[2].text).toBe(
+      '--- redacted possible credential at line 3 ---'
+    );
   });
 
   const redactedAt = (line: number) =>
@@ -248,7 +287,9 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     for (let index = 0; index < 4; index += 1) {
       expect(lines[index].text).toBe(redactedAt(index + 1));
     }
-    expect(lines[4].text).toBe('const amount = 1;');
+    expect(lines[4].text).toBe(
+      '--- redacted possible credential at line 5 ---'
+    );
   });
 
   it('redacts a triple-quoted literal through its closing delimiter', () => {
@@ -264,7 +305,9 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     for (let index = 0; index < 3; index += 1) {
       expect(lines[index].text).toBe(redactedAt(index + 1));
     }
-    expect(lines[3].text).toBe('amount = 1');
+    expect(lines[3].text).toBe(
+      '--- redacted possible credential at line 4 ---'
+    );
   });
 
   it('keeps a backtick span open past an escaped backtick', () => {
@@ -284,7 +327,9 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     for (let index = 0; index < 4; index += 1) {
       expect(lines[index].text).toBe(redactedAt(index + 1));
     }
-    expect(lines[4].text).toBe('const amount = 1;');
+    expect(lines[4].text).toBe(
+      '--- redacted possible credential at line 5 ---'
+    );
   });
 
   it('keeps a triple-quoted span open past an escaped triple quote', () => {
@@ -304,7 +349,9 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     for (let index = 0; index < 4; index += 1) {
       expect(lines[index].text).toBe(redactedAt(index + 1));
     }
-    expect(lines[4].text).toBe('amount = 1');
+    expect(lines[4].text).toBe(
+      '--- redacted possible credential at line 5 ---'
+    );
   });
 
   it('closes a span when an escaped backslash precedes the real backtick', () => {
@@ -321,7 +368,9 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     const lines = result.output.files[0].lines;
     expect(lines[0].text).toBe(redactedAt(1));
     expect(lines[1].text).toBe(redactedAt(2));
-    expect(lines[2].text).toBe('const amount = 1;');
+    expect(lines[2].text).toBe(
+      '--- redacted possible credential at line 3 ---'
+    );
   });
 
   it('redacts a YAML block scalar until the indentation returns', () => {
@@ -340,7 +389,9 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     for (let index = 0; index < 3; index += 1) {
       expect(lines[index].text).toBe(redactedAt(index + 1));
     }
-    expect(lines[3].text).toBe('other: 1');
+    expect(lines[3].text).toBe(
+      '--- redacted possible credential at line 4 ---'
+    );
   });
 
   it('redacts a bare PEM private key block without any assignment marker', () => {
@@ -359,7 +410,9 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     for (let index = 0; index < 3; index += 1) {
       expect(lines[index].text).toBe(redactedAt(index + 1));
     }
-    expect(lines[3].text).toBe('const amount = 1;');
+    expect(lines[3].text).toBe(
+      '--- redacted possible credential at line 4 ---'
+    );
   });
 
   it('redacts through end of file when a literal span is still open', () => {

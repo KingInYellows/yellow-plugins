@@ -177,6 +177,7 @@ function rpc(env, cwd) {
 function responseFixture() {
   let calls = 0;
   const commands = [];
+  const failures = [];
   const server = http.createServer((req, res) => {
     let body = '';
     req.on('data', (chunk) => {
@@ -207,7 +208,12 @@ function responseFixture() {
       const responseId = 'resp_fixture_' + index;
       let output;
       if (index < COMMANDS.length) {
-        check(tool, 'No shell tool offered');
+        if (!tool) {
+          failures.push('No shell tool offered');
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'No shell tool offered' }));
+          return;
+        }
         const command = COMMANDS[index];
         commands.push({ name: tool.name, command });
         const args =
@@ -286,9 +292,11 @@ function responseFixture() {
   return {
     server,
     commands,
+    failures,
     reset() {
       calls = 0;
       commands.length = 0;
+      failures.length = 0;
     },
   };
 }
@@ -621,6 +629,7 @@ async function inside(scratch) {
           ),
           stubs
         );
+        check(!fixture.failures.length, fixture.failures.join('; '));
         report.controls.push(summarizeControl(client.events, stubs, trusted));
         report.controls.at(-1).requestedCommands = [...fixture.commands];
         if (!trusted) {
@@ -956,7 +965,7 @@ async function main() {
     process.removeListener('SIGTERM', interrupt);
   }
 }
-module.exports = { summarizeControl };
+module.exports = { summarizeControl, responseFixture };
 if (require.main === module)
   main().catch((error) => {
     console.error(error.message);

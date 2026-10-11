@@ -311,3 +311,9 @@ Missing snapshot facilities return an explicit error instead of findings.
 Installed Codex acceptance passed for the selected skill, including safe
 failure and unrelated controls. Other plugin components remain excluded.
 See [integrated evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md).
+
+Credential markers make the bounded snapshot return `partial` and redact the
+rest of that source file. It retains line numbers but sacrifices later benign
+code rather than guessing expression endings across languages. Other source
+files are scanned independently. Marker detection is not a comprehensive secret
+scanner; exclude sources known to contain unmarked credentials.

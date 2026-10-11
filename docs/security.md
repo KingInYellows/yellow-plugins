@@ -1112,3 +1112,12 @@ through files, never through shell text. This adds a filesystem write surface:
 - **Validation.** `lang` and `target` use allow-lists, symlinked or empty value
   files are refused, and ast-grep runs with a trusted `-c` config so a repo
   `sgconfig.yml` is never loaded.
+
+### Complexity snapshot credential quarantine
+
+The shared `debt-complexity-scan` snapshot redacts from a detected credential
+marker through the end of that source file and returns `partial`. It does not
+guess where language-specific expressions, chained fallbacks or literals end.
+This prevents the known chained-assignment leak while reducing available code
+context. Marker detection cannot identify every secret; do not scan sources
+known to contain credentials without recognizable markers.

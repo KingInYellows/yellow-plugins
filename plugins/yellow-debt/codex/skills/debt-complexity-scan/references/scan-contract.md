@@ -18,6 +18,14 @@ validation and reading cannot be separated by a symlink replacement. It emits
 source data only; analyze it without executing it. A harness may run the program
 and provide its unchanged output as an observation.
 
+After a credential assignment, authorization value, URL userinfo or private-key
+marker, the snapshot redacts that line and every remaining line in the same file
+and returns `partial`. This deliberately sacrifices later benign code: without a
+language parser, delimiter and operator heuristics cannot establish where
+credential expressions end. Other files retain their independent bounds. The
+marker detection is not a comprehensive secret scanner; do not use this workflow
+on a source known to contain credentials that lack these markers.
+
 ```python
 import json
 import os
@@ -37,19 +45,6 @@ partial = False
 def safe_name(name):
     lower = name.lower()
     return bool(re.fullmatch(r"[A-Za-z0-9_.-]+", name)) and name not in {".", ".."} and not name.startswith("-") and lower not in EXCLUDED and not lower.startswith(".env") and not re.search(r"secret|credential|password|token|private[-_]?key", lower)
-
-def delimiter_hits(line, delimiter):
-    # Positions of delimiter not escaped by an odd run of backslashes.
-    hits = []
-    start = 0
-    while True:
-        index = line.find(delimiter, start)
-        if index < 0:
-            return hits
-        before = line[:index]
-        if (len(before) - len(before.rstrip("\\"))) % 2 == 0:
-            hits.append(index)
-        start = index + len(delimiter)
 
 def inspect(parent_fd, name, relative):
     global lines_left, visited, partial
@@ -96,40 +91,14 @@ def inspect(parent_fd, name, relative):
         partial = True
     lines_left -= len(selected)
     numbered = []
-    continued = False
-    delimiter = None
-    block_indent = None
-    in_pem = False
+    # Do not infer expression endings across the supported source languages.
+    # A detected credential marker quarantines the remainder of this file.
+    hidden = False
     for number, line in enumerate(selected, 1):
-        hidden = True
-        if delimiter:
-            # Inside a backtick or triple-quoted literal: hide through the closing delimiter.
-            if delimiter_hits(line, delimiter):
-                delimiter = None
-            continued = False
-        elif in_pem:
-            in_pem = re.search(r"-----END [A-Z ]*-----", line) is None
-            continued = False
-        elif block_indent is not None and (not line.strip() or len(line) - len(line.lstrip()) > block_indent):
-            # Inside a YAML block scalar: hide blank and deeper-indented lines.
-            continued = False
-        else:
-            block_indent = None
-            if re.search(r"-----BEGIN [A-Z ]*PRIVATE KEY-----", line):
-                in_pem = re.search(r"-----END [A-Z ]*-----", line) is None
-                continued = False
-            elif continued or re.search(r"(?i)(?:(?:api[_-]?key|token|password|secret|private[_-]?key)[A-Za-z0-9_.-]*[\"']?\s*[=:]|authorization[\"']?\s*[=:,]|\bbearer\s+\S|\b[a-z][a-z0-9+.-]*://[^\s/:@]+:[^\s/@]+@)", line):
-                continued = line.rstrip().endswith(("=", ":", "(", "[", "{", ",", "+", "\\"))
-                for opener in ("`", '"""', "'''"):
-                    if len(delimiter_hits(line, opener)) % 2 == 1:
-                        delimiter = opener
-                        break
-                if re.search(r":\s*[|>][-+0-9]*\s*$", line):
-                    block_indent = len(line) - len(line.lstrip())
-            else:
-                hidden = False
-                continued = False
+        if re.search(r"(?i)(?:(?:api[_-]?key|token|password|secret|private[_-]?key)[A-Za-z0-9_.-]*[\"']?\s*[=:]|authorization[\"']?\s*[=:,]|\bbearer\s+\S|\b[a-z][a-z0-9+.-]*://[^\s/:@]+:[^\s/@]+@|-----BEGIN [A-Z ]*PRIVATE KEY-----)", line):
+            hidden = True
         if hidden:
+            partial = True
             line = "--- redacted possible credential at line " + str(number) + " ---"
         numbered.append({"line": number, "text": line})
     files.append({"path": relative, "lines": numbered})
@@ -204,12 +173,12 @@ except (ValueError, TypeError, OSError, AttributeError) as error:
 Use the actual timestamp and measured duration when available; otherwise use
 null rather than guessing. Status is success, partial or error. Put errors,
 scope and exclusions in an optional limitations array inside the JSON. Emit
-exactly one JSON object and no surrounding prose. Include at most ten findings ranked by
-severity. Lines are a single positive line number or a positive start-end range.
-Confidence is a float from 0 to 1; do not silently suppress observed findings
-with a confidence threshold. Failure scenario names a concrete trigger, path and
-outcome, or is null when evidence is insufficient. Findings count equals the
-array length; files scanned counts only files actually read.
+exactly one JSON object and no surrounding prose. Include at most ten findings
+ranked by severity. Lines are a single positive line number or a positive
+start-end range. Confidence is a float from 0 to 1; do not silently suppress
+observed findings with a confidence threshold. Failure scenario names a concrete
+trigger, path and outcome, or is null when evidence is insufficient. Findings
+count equals the array length; files scanned counts only files actually read.
 
 If quoting source in explanatory text, fence it as follows:
 

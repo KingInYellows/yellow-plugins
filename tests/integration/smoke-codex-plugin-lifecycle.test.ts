@@ -8,7 +8,9 @@ const script = resolve(
   __dirname,
   '../../scripts/smoke-codex-plugin-lifecycle.js'
 );
-const { summarizeControl } = createRequire(import.meta.url)(script);
+const { summarizeControl, responseFixture } = createRequire(import.meta.url)(
+  script
+);
 const commands = [
   { type: 'commandExecution', command: 'git push', exitCode: 0 },
   {
@@ -51,6 +53,29 @@ const modify = { bin: 'gt', args: ['modify', '-m', 'bad message'] };
 const push = { bin: 'git', args: ['push'] };
 
 describe('optional Codex lifecycle gate', () => {
+  it('reports missing shell tools through HTTP without crashing the harness', async () => {
+    const fixture = responseFixture();
+    await new Promise<void>((resolve) =>
+      fixture.server.listen(0, '127.0.0.1', resolve)
+    );
+    try {
+      const response = await fetch(
+        'http://127.0.0.1:' + fixture.server.address().port + '/v1/responses',
+        {
+          method: 'POST',
+          body: JSON.stringify({ tools: [] }),
+        }
+      );
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'No shell tool offered' });
+      expect(fixture.failures).toEqual(['No shell tool offered']);
+      expect(fixture.commands).toEqual([]);
+    } finally {
+      fixture.server.closeAllConnections();
+      await new Promise<void>((resolve) => fixture.server.close(resolve));
+    }
+  });
+
   it('plans controls without using CLI, profiles, or isolation tools', () => {
     const result = spawnSync(process.execPath, [script, '--dry-run'], {
       encoding: 'utf8',
