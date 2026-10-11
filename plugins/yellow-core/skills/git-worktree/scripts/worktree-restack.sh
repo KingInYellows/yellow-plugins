@@ -1573,23 +1573,23 @@ release_run_worktree() {
 
 # abort_in_chain_rebases: clear every in-chain rebase. Each worktree is tried
 # once, so a marker that will not clear cannot spin and cannot hide the
-# abortable rebases in later worktrees. A failed attempt prints git's first
-# line and sets ABORT_STUCK to the first worktree that is still mid-rebase.
+# abortable rebases in later worktrees. A failed attempt prints a fixed line
+# (git's own error can carry repository-controlled text, so it is not echoed)
+# and sets ABORT_STUCK to the first worktree that is still mid-rebase.
 # Nonzero when any attempt failed.
 ABORT_STUCK=""
 abort_in_chain_rebases() {
-  local i p out why rc=0
+  local i p rc=0
   ABORT_STUCK=""
   for ((i = 0; i < ${#WT_PATH[@]}; i++)); do
     p=${WT_PATH[i]}
     worktree_in_chain_rebase "$p" || continue
-    if out=$(git -C "$p" rebase --abort 2>&1) && ! worktree_in_chain_rebase "$p"; then
+    if git -C "$p" rebase --abort >/dev/null 2>&1 && ! worktree_in_chain_rebase "$p"; then
       continue
     fi
     rc=1
     [ -n "$ABORT_STUCK" ] || ABORT_STUCK=$p
-    why=$(printf '%s' "$out" | head -n 1 | tr -d '\000-\037\177')
-    err "git rebase --abort did not clear the rebase in $(v "$p"): ${why:-the rebase marker is still present}"
+    err "git rebase --abort did not clear the rebase in $(v "$p"); run it there by hand to see git's error"
   done
   return "$rc"
 }

@@ -1594,6 +1594,8 @@ legacy_tipless() {
   [[ $output == *"still in progress in $(wtp c)"* ]]
   [[ $output == *"git -C $(wtp c) rebase --abort"* ]]
   [[ $output == *"did not clear the rebase in $(wtp c)"* ]]
+  # git's own abort error is not echoed: it can carry repository-controlled text.
+  [[ $output == *"run it there by hand to see git's error"* ]]
   # Nothing was restored: the state and the lock are kept and the stack
   # worktrees are still detached.
   [ -e "$SD/state" ]
