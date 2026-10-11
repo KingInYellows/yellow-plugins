@@ -1124,14 +1124,14 @@ check_trusted_links() {
                             # Only a tracked regular file with a plain H tag
                             # counts: ls-files lists a directory's tracked
                             # descendants, which would cover an ignored one.
-                            tagged=$(yr_git ls-files -v -- "$rel" 2>/dev/null | head -n 1) || tagged=""
+                            # The target name is a literal pathspec, and only
+                            # an entry for exactly that path counts: a glob
+                            # name (config/*) must not borrow another file's tag.
+                            tagged=$(lgit ls-files -v -z -- "$rel" 2>/dev/null | tr '\0' '\n' | head -n 1) || tagged=""
                             if [ ! -f "$canon" ]; then
                                 hit=1
                             else
-                                case "$tagged" in
-                                    "H "*) ;;
-                                    *) hit=1 ;;
-                                esac
+                                [ "$tagged" = "H $rel" ] || hit=1
                                 # A target git lists as changed is live edited
                                 # content; only a trusted-config one is reverted.
                                 if [ "$hit" = 0 ] && ! rp_trusted_config "$rel"; then
