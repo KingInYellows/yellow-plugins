@@ -162,11 +162,40 @@ require_timeout() {
 
 pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
 
+# awk_expect <awk binary> <expected status> <text> [locale]: scan <text> (printf
+# %b escapes) with <binary> exposed as `awk`, under <locale> when given.
+awk_expect() {
+  local dir="${BATS_TEST_TMPDIR}/awkbin-$1"
+  mkdir -p "$dir"
+  ln -sfn "$(command -v "$1")" "$dir/awk"
+  printf '%b' "$3" >| "$A"
+  PATH="$dir:${PATH}" LC_ALL="${4-}" run "$SCRIPT" "$A"
+  [ "$status" -eq "$2" ] || { echo "$1 ${4:-default locale}: want $2 got $status for [$3]"; false; }
+}
+
+# accented_status <awk binary> [locale]: the expected status for an accented
+# first word followed by ASCII words. Only a multibyte gawk can tell the letter
+# from punctuation (prose, 0); byte-wise awk (mawk, gawk in C) fails closed (6).
+accented_status() {
+  local loc="${2-}"
+  [ -n "$loc" ] || loc="${LC_ALL:-${LC_CTYPE:-${LANG-}}}"
+  case "$1:$loc" in
+    gawk:*[Uu][Tt][Ff]-8 | gawk:*[Uu][Tt][Ff]8) echo 0 ;;
+    *) echo 6 ;;
+  esac
+}
+
+# locale_installed <name>: C.UTF-8 is listed as C.utf8 by `locale -a`.
+locale_installed() {
+  locale -a 2>/dev/null | tr 'A-Z' 'a-z' | grep -qx "$(printf '%s' "$1" | tr -d '-' | tr 'A-Z' 'a-z')"
+}
+
 @test "each token prefix is flagged at its length floor and clean one below" {
   # prefix:floor (token length including the prefix)
   for spec in 'gh''p_:24' 'gh''o_:24' 'gh''u_:24' 'gh''s_:24' 'gh''r_:24' \
               'github''_pat_:30' 'AK''IA:20' 'xo''xb-:14' 'xo''xp-:14' \
-              'sk''-:23' 'sk''_live_:24' 'rk''_live_:24' 'pk''_live_:24'; do
+              'sk''-:23' 'sk''_live_:24' 'rk''_live_:24' 'pk''_live_:24' \
+              'tv''ly-:25' 'pp''lx-:45' 'sg''p_:24'; do
     prefix=${spec%:*}
     floor=${spec##*:}
     printf 'x %s%s y\n' "$prefix" "$(pad $((floor - ${#prefix})))" >| "$A"
@@ -339,8 +368,28 @@ pad() { head -c "$1" /dev/zero | tr '\0' 'A'; }
   [ "$status" -eq 0 ]
 }
 
+@test "an unpadded Basic credential of 18 or 19 characters exits 6" {
+  for cred in 'user:pass1234' 'user:pass12345'; do
+    tok=$(printf '%s' "$cred" | base64 | tr -d '\n=')
+    echo "len ${#tok}"
+    [ "${#tok}" -ge 18 ] && [ "${#tok}" -le 19 ]
+    printf 'Authorization: Basic %s\n' "$tok" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 6 ]
+    printf 'sent basic %s.\n' "$tok" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 6 ]
+  done
+  # 18/19 characters of non-credential text stay clean
+  for tok in 'AuthenticationHelp' 'AuthenticationHelpe'; do
+    printf 'Authorization: Basic %s\n' "$tok" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 0 ]
+  done
+}
+
 @test "a token prefix after an = is flagged at its length floor and clean one below" {
-  for spec in 'gh''p_:24' 'github''_pat_:30' 'AK''IA:20' 'xo''xb-:14' 'sk''-:23' 'sk''_live_:24'; do
+  for spec in 'gh''p_:24' 'github''_pat_:30' 'AK''IA:20' 'xo''xb-:14' 'sk''-:23' 'sk''_live_:24' 'tv''ly-:25' 'pp''lx-:45' 'sg''p_:24'; do
     prefix=${spec%:*}
     floor=${spec##*:}
     printf 'x auth=%s%s y\n' "$prefix" "$(pad $((floor - ${#prefix})))" >| "$A"
@@ -1376,4 +1425,320 @@ rule=forged line=9.txt"
   stays_clean 'password:\n  optional string or number\n'
   stays_clean 'bypass:\n  my correct horse battery staple\n'
   stays_clean 'password:\n\nNext paragraph of prose.\n'
+}
+
+@test "prose, basic auth and vendor prefixes agree under gawk and mawk" {
+  # PATH shim: the scanner calls `awk`, so each binary is exposed under that name.
+  with_awk() { # <binary> <expected status> <text>
+    dir="${BATS_TEST_TMPDIR}/awkbin-$1"
+    mkdir -p "$dir"
+    ln -sfn "$(command -v "$1")" "$dir/awk"
+    printf '%b' "$3" >| "$A"
+    PATH="$dir:${PATH}" run "$SCRIPT" "$A"
+    [ "$status" -eq "$2" ] || { echo "$1: want $2 got $status for [$3]"; false; }
+  }
+  tok4=$(printf 'a:b' | base64 | tr -d '\n')
+  tok8=$(printf 'ab:cde' | base64 | tr -d '\n')
+  tv=$(printf 'tv%s-' 'ly')
+  px=$(printf 'pp%s-' 'lx')
+  sg=$(printf 'sg%s_' 'p')
+  a20=$(printf 'A%.0s' $(seq 1 20))
+  a19=$(printf 'A%.0s' $(seq 1 19))
+  a40=$(printf 'A%.0s' $(seq 1 40))
+  a39=$(printf 'A%.0s' $(seq 1 39))
+  for bin in gawk mawk; do
+    command -v "$bin" >/dev/null 2>&1 || { echo "missing $bin"; false; }
+    with_awk "$bin" 6 'password:\n  my correct horse battery staple\n'
+    with_awk "$bin" 0 'password:\n  Rotation is scheduled for Friday\n'
+    with_awk "$bin" "$(accented_status "$bin")" 'password:\n  Élève a trois mots ici\n'
+    with_awk "$bin" "$(accented_status "$bin")" 'password:\n  élève a trois mots ici\n'
+    with_awk "$bin" 6 "Authorization: Basic ${tok4}\n"
+    with_awk "$bin" 6 "Authorization: Basic ${tok8}\n"
+    with_awk "$bin" 0 'Authorization: Basic AAAA\n'
+    with_awk "$bin" 0 'Authorization: Basic Authentication\n'
+    with_awk "$bin" 0 'Authorization: Authentication\n'
+    with_awk "$bin" 6 "Authorization: Bearer $(pad 20)\n"
+    with_awk "$bin" 0 "Authorization: Bearer $(pad 19)\n"
+    with_awk "$bin" 6 "x ${tv}${a20} y\n"
+    with_awk "$bin" 0 "x ${tv}${a19} y\n"
+    with_awk "$bin" 6 "x ${px}${a40} y\n"
+    with_awk "$bin" 0 "x ${px}${a39} y\n"
+    with_awk "$bin" 6 "x ${sg}${a20} y\n"
+    with_awk "$bin" 0 "x ${sg}${a19} y\n"
+  done
+}
+
+@test "stacked leading decorations separated by whitespace are all stripped before the prose test, under gawk and mawk" {
+  for bin in gawk mawk; do
+    command -v "$bin" >/dev/null 2>&1 || { echo "missing $bin"; false; }
+    # bullet + space + curly quote, then an ASCII multiword credential
+    awk_expect "$bin" 6 'password:\n  \xe2\x80\xa2 \xe2\x80\x9cmy correct horse battery staple\n'
+    # three stacked decorations with mixed whitespace
+    awk_expect "$bin" 6 'password:\n  \xe2\x80\xa2 \xc2\xab\t\xe2\x80\x9cmy correct horse battery staple\n'
+    # non-ASCII prose after stacked decorations stays clean
+    awk_expect "$bin" "$(accented_status "$bin")" 'password:\n  \xe2\x80\xa2 \xe2\x80\x9c\xc3\xa9l\xc3\xa8ve a trois mots ici\n'
+  done
+}
+
+@test "Basic tokens: padding, colon position, trailing punctuation and malformed shapes agree under gawk and mawk" {
+  one=$(printf 'ab:cd' | base64 | tr -d '\n')
+  two=$(printf 'ab:c' | base64 | tr -d '\n')
+  colonfirst=$(printf ':abc' | base64 | tr -d '\n')
+  colonlast=$(printf 'abc:' | base64 | tr -d '\n')
+  for bin in gawk mawk; do
+    command -v "$bin" >/dev/null 2>&1 || { echo "missing $bin"; false; }
+    # padded with one and with two =
+    awk_expect "$bin" 6 "Authorization: Basic ${one}\n"
+    awk_expect "$bin" 6 "Authorization: Basic ${two}\n"
+    # sentence punctuation after the token
+    awk_expect "$bin" 6 "Authorization: Basic ${two}.\n"
+    awk_expect "$bin" 6 "Authorization: Basic ${one},\n"
+    # no padding at all
+    awk_expect "$bin" 6 "Authorization: Basic ${two%%=*}\n"
+    # a colon first or last is an empty user or password, still a credential
+    awk_expect "$bin" 6 "Authorization: Basic ${colonfirst}\n"
+    awk_expect "$bin" 6 "Authorization: Basic ${colonlast}\n"
+    # = in the middle, and a length that cannot be base64
+    awk_expect "$bin" 0 'Authorization: Basic YW=I6Yw==\n'
+    awk_expect "$bin" 0 'Authorization: Basic YWI6Y\n'
+    awk_expect "$bin" 0 'Authorization: Basic Authentication.\n'
+  done
+}
+
+@test "Basic prose, a malformed padded token and short vendor prefixes followed by + or / are clean under gawk and mawk" {
+  tv=$(printf 'tv%s-' 'ly')
+  sg=$(printf 'sg%s_' 'p')
+  for bin in gawk mawk; do
+    command -v "$bin" >/dev/null 2>&1 || { echo "missing $bin"; false; }
+    # decodes with an interior colon, but not to printable ASCII
+    awk_expect "$bin" 0 'This handler uses Basic httpOnly mode.\n'
+    # padding followed by another base64 character is no token
+    awk_expect "$bin" 0 'Authorization: Basic YWI6Yw=Z\n'
+    # excess or miscounted padding is malformed base64, not a credential
+    awk_expect "$bin" 0 'Authorization: Basic YWI6Yw===\n'
+    awk_expect "$bin" 0 'Authorization: Basic YWI6Yw=\n'
+    awk_expect "$bin" 6 'Authorization: Basic YWI6Yw==\n'
+    # non-zero unused bits are non-canonical base64, so malformed and clean
+    awk_expect "$bin" 0 'Authorization: Basic YWI6Yx==\n'
+    awk_expect "$bin" 6 'Authorization: Basic YTo=\n'
+    awk_expect "$bin" 0 'Authorization: Basic YTp=\n'
+    # the floor counts the leading run, not the whole word
+    awk_expect "$bin" 0 "x ${tv}abcdefghij+abcdefghij y\n"
+    awk_expect "$bin" 0 "x ${sg}abcdefghij/abcdefghij y\n"
+    awk_expect "$bin" 6 "x ${tv}abcdefghijabcdefghijabcde+abc y\n"
+  done
+}
+
+@test "short Basic credentials with an empty side or UTF-8 text are refused; a lone colon and colon-free binary prose are not" {
+  for bin in gawk mawk; do
+    for cred in 'key:' ':pw' 'jörg:pw' 'ab:wörd'; do
+      tok=$(printf '%s' "$cred" | base64 | tr -d '\n')
+      [ "${#tok}" -lt 20 ]
+      awk_expect "$bin" 6 "Authorization: Basic ${tok}\n"
+    done
+    # a bare colon has no secret side; httpOnly decodes to malformed UTF-8
+    awk_expect "$bin" 0 'Authorization: Basic Og==\n'
+    awk_expect "$bin" 0 'This handler uses Basic httpOnly mode.\n'
+    # a control byte (here a tab) is not text
+    tok=$(printf 'a\tb:c' | base64 | tr -d '\n')
+    awk_expect "$bin" 0 "Authorization: Basic ${tok}\n"
+  done
+}
+
+@test "sgp_ prefix counts the alphanumeric leading run only, under gawk and mawk" {
+  sg=$(printf 'sg%s_' 'p')
+  for bin in gawk mawk; do
+    awk_expect "$bin" 0 "x ${sg}abcdefghij-abcdefghij_ y\n"
+    awk_expect "$bin" 0 "x ${sg}abcdefghij_abcdefghij_abcdefghij y\n"
+    awk_expect "$bin" 6 "x ${sg}abcdefghijabcdefghij y\n"
+    awk_expect "$bin" 6 "x ${sg}abcdefghijabcdefghij-abc y\n"
+  done
+}
+
+@test "Basic tokens: two on one line, an upper-case header and a bare scheme are all found" {
+  tok4=$(printf 'a:b' | base64 | tr -d '\n')
+  for bin in gawk mawk; do
+    awk_expect "$bin" 6 "see Authorization: Basic AAAA then Authorization: Basic ${tok4}\n"
+    awk_expect "$bin" 6 "AUTHORIZATION: BASIC ${tok4}\n"
+    awk_expect "$bin" 6 "got basic ${tok4} back\n"
+    awk_expect "$bin" 0 'see Authorization: Basic AAAA and Authorization: Basic AAAB\n'
+  done
+}
+
+@test "ordinary prose that follows the word basic stays clean; a bare basic token is the pinned exception" {
+  tok4=$(printf 'a:b' | base64 | tr -d '\n')
+  for bin in gawk mawk; do
+    for text in 'basic setup' 'basic usage' 'basic tests' 'This is the basic example.' \
+                'See the basic overview and the basic concepts.' 'basic configuration' 'basic authentication'; do
+      awk_expect "$bin" 0 "${text}\n"
+    done
+    awk_expect "$bin" 6 "basic ${tok4}\n"
+  done
+}
+
+@test "an unlisted leading symbol (checkmark, arrow, emoji) cannot exempt a multi-word credential" {
+  for bin in gawk mawk; do
+    awk_expect "$bin" 6 'password:\n  \xe2\x9c\x93 correct horse battery staple\n'
+    awk_expect "$bin" 6 'password:\n  \xe2\x86\x92 correct horse battery staple\n'
+    awk_expect "$bin" 6 'password:\n  \xf0\x9f\x94\x91 correct horse battery staple\n'
+    awk_expect "$bin" 0 'password:\n  \xe2\x9c\x93 Rotation is scheduled for Friday\n'
+  done
+}
+
+@test "short Basic credentials in a legacy charset (ISO-8859-1 octets) are refused, under gawk and mawk" {
+  for bin in gawk mawk; do
+    # RFC 7617 allows a non-UTF-8 charset: the decoded bytes are not valid
+    # UTF-8 but still look like user:pass, so they must not post.
+    for cred in 'j\366rg:pw' 'ab:w\366rd' 'jos\351:x' 'ab:c\303'; do
+      tok=$(printf "$cred" | base64 | tr -d '\n')
+      [ "${#tok}" -lt 20 ]
+      awk_expect "$bin" 6 "Authorization: Basic ${tok}\n"
+    done
+    # no colon, a control byte and a lone colon stay clean
+    tok=$(printf 'j\366rgpw' | base64 | tr -d '\n')
+    awk_expect "$bin" 0 "Authorization: Basic ${tok}\n"
+    tok=$(printf 'j\366\tg:pw' | base64 | tr -d '\n')
+    awk_expect "$bin" 0 "Authorization: Basic ${tok}\n"
+    awk_expect "$bin" 0 'This handler uses Basic httpOnly mode.\n'
+  done
+}
+
+@test "short Basic credentials whose UTF-8 continuation bytes fall in 0x80-0x9F are refused, under gawk and mawk" {
+  for bin in gawk mawk; do
+    # U+0100 is C4 80 and U+1F511 is F0 9F 94 91: valid UTF-8, not C1 controls.
+    for cred in '\304\200b:cd' 'ab:\360\237\224\221x'; do
+      tok=$(printf "$cred" | base64 | tr -d '\n')
+      [ "${#tok}" -lt 20 ]
+      awk_expect "$bin" 6 "Authorization: Basic ${tok}\n"
+      awk_expect "$bin" 6 "sent Basic ${tok} here\n"
+    done
+    # A C1 byte outside any UTF-8 sequence is still a control.
+    tok=$(printf 'a\200b:cd' | base64 | tr -d '\n')
+    awk_expect "$bin" 0 "Authorization: Basic ${tok}\n"
+  done
+}
+
+@test "an all-non-ASCII leading word is prose, not decoration; symbols are still stripped, under gawk and mawk" {
+  ran=0
+  for loc in C C.UTF-8; do
+    locale_installed "$loc" || continue
+    for bin in gawk mawk; do
+      ran=$((ran + 1))
+      # CJK, Cyrillic and Greek words followed by lowercase English stay prose
+      awk_expect "$bin" 0 'password:\n  \xe5\xaf\x86\xe7\xa0\x81 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xd0\xbf\xd0\xb0\xd1\x80\xd0\xbe\xd0\xbb\xd1\x8c correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xce\xb1\xce\xb2 correct horse battery staple\n' "$loc"
+      # symbols and emoji, alone or stacked, are still decoration
+      awk_expect "$bin" 6 'password:\n  \xe2\x9c\x93 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xe2\x9a\xa0\xef\xb8\x8f \xf0\x9f\x94\x91 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xe3\x80\x8c correct horse battery staple\n' "$loc"
+    done
+  done
+  [ "$ran" -ge 2 ]
+}
+
+@test "Latin-1 multiply and divide signs are decoration; E2-lead letters (Glagolitic, Coptic, Tifinagh) are words, under gawk and mawk" {
+  ran=0
+  for loc in C C.UTF-8; do
+    locale_installed "$loc" || continue
+    for bin in gawk mawk; do
+      ran=$((ran + 1))
+      awk_expect "$bin" 6 'password:\n  \xc3\x97 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xc3\xb7 correct horse battery staple\n' "$loc"
+      # accented C3 letters stay words
+      awk_expect "$bin" "$(accented_status "$bin" "$loc")" 'password:\n  \xc3\xa9l\xc3\xa8ve correct horse battery staple\n' "$loc"
+      # Glagolitic, Coptic, Tifinagh, Georgian Supplement
+      awk_expect "$bin" 0 'password:\n  \xe2\xb0\x80\xe2\xb0\x81 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xe2\xb2\x80\xe2\xb2\x81 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xe2\xb4\xb0\xe2\xb4\xb1 correct horse battery staple\n' "$loc"
+      # real symbols and supplemental punctuation are still decoration
+      awk_expect "$bin" 6 'password:\n  \xe2\x9c\x93 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xe2\xb8\xa2 correct horse battery staple\n' "$loc"
+    done
+  done
+  [ "$ran" -ge 2 ]
+}
+
+@test "a bare Basic word needs an interior colon: Only is prose, a header keeps edge colons" {
+  edge=$(printf ':y' | base64 | tr -d '\n')
+  for bin in gawk mawk; do
+    awk_expect "$bin" 0 'This endpoint supports Basic Only mode\n'
+    awk_expect "$bin" 0 "bare basic ${edge}\n"
+    awk_expect "$bin" 6 'Authorization: Basic Only\n'
+    # a later interior colon counts: empty user, password containing a colon
+    colons=$(printf ':pa:ss' | base64 | tr -d '\n')
+    awk_expect "$bin" 6 "bare basic ${colons}\n"
+    awk_expect "$bin" 6 "Authorization: Basic ${edge}\n"
+    awk_expect "$bin" 6 'This endpoint supports Basic YTpi mode\n'
+    # unpadded 3-character token (`a:`): a header flags it, bare prose does not
+    awk_expect "$bin" 6 'Authorization: Basic YTo\n'
+    awk_expect "$bin" 0 'Authorization: Basic Hey\n'
+    awk_expect "$bin" 0 'This endpoint supports Basic Hey mode\n'
+    awk_expect "$bin" 0 'bare basic YTo mode\n'
+  done
+}
+
+@test "a leading non-ASCII quote, bullet, dash or no-break space cannot exempt a multi-word credential; accented letters stay prose" {
+  ran=0
+  for loc in C C.UTF-8; do
+    locale_installed "$loc" || continue
+    for bin in gawk mawk; do
+      ran=$((ran + 1))
+      awk_expect "$bin" 6 'password:\n  “correct horse battery staple”\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  • correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  — correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xc2\xa0correct horse battery staple\n' "$loc"
+      awk_expect "$bin" "$(accented_status "$bin" "$loc")" 'password:\n  élève a trois mots ici\n' "$loc"
+      awk_expect "$bin" "$(accented_status "$bin" "$loc")" 'password:\n  Élève a trois mots ici\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  “Correct horse battery staple”\n' "$loc"
+    done
+  done
+  [ "$ran" -ge 2 ]
+}
+
+@test "a non-ASCII prefix attached to the first word cannot exempt a multi-word credential; byte-wise awk fails closed" {
+  ran=0
+  for loc in C C.UTF-8; do
+    locale_installed "$loc" || continue
+    for bin in gawk mawk; do
+      ran=$((ran + 1))
+      # fullwidth quotation mark, curly quote, guillemet, emoji, fullwidth
+      # punctuation (EF BC 80-8F and EF BD 9B-A5), all glued to the word
+      awk_expect "$bin" 6 'password:\n  \xef\xbc\x82correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xe2\x80\x9ccorrect horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xc2\xabcorrect horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xf0\x9f\x94\x91correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xef\xbc\x81correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xef\xbd\x9bcorrect horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xef\xbd\xa5correct horse battery staple\n' "$loc"
+      # punctuation outside the symbol blocks: Arabic comma, ideographic comma
+      awk_expect "$bin" 6 'password:\n  \xd8\x8ccorrect horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xe3\x80\x81correct horse battery staple\n' "$loc"
+      # Byte-wise awk (mawk, gawk in C) cannot tell a letter from punctuation,
+      # so it fails closed on any non-ASCII prefix glued to the first word.
+      # Only a multibyte gawk keeps letter-leading words as prose.
+      if [ "$bin" = gawk ] && [ "$loc" = C.UTF-8 ]; then
+        awk_expect "$bin" 0 'password:\n  éclair recipe is great\n' "$loc"
+        awk_expect "$bin" 0 'password:\n  \xef\xbc\x90correct horse battery staple\n' "$loc"
+        awk_expect "$bin" 0 'password:\n  \xef\xbc\xa1correct horse battery staple\n' "$loc"
+      else
+        awk_expect "$bin" 6 'password:\n  éclair recipe is great\n' "$loc"
+      fi
+    done
+  done
+  [ "$ran" -ge 2 ]
+}
+
+@test "the tvly-, pplx- and sgp_ prefixes end at an invalid character; sgp_ takes an alphanumeric body only" {
+  body=$(printf 'A-B_%.0s' $(seq 1 12))
+  for prefix in 'tv''ly-' 'pp''lx-'; do
+    printf 'x %s%s y\n' "$prefix" "$body" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 6 ] || { echo "not flagged with - and _ in the body: $prefix"; false; }
+  done
+  for prefix in 'tv''ly-' 'pp''lx-' 'sg''p_'; do
+    printf 'x %s%s!%s y\n' "$prefix" "$(pad 10)" "$(pad 10)" >| "$A"
+    run "$SCRIPT" "$A"
+    [ "$status" -eq 0 ] || { echo "flagged across an invalid character: $prefix"; false; }
+  done
 }

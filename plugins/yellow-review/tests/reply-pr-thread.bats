@@ -136,6 +136,33 @@ stub_sleep() {
   done
 }
 
+@test "a prior oos marker does not block a fixed or addressed reply" {
+  for d in fixed addressed; do
+    rm -f "$POSTED" "$CALLS"
+    run --separate-stderr "$SCRIPT" PRRT_reply_prioroos "$d" "$BODY"
+    [ "$status" -eq 0 ]
+    [ "$(printf '%s' "$output" | jq -r '.replied')" = "true" ]
+    [ "$(tail -n 1 "$POSTED")" = "<!-- yellow-review:resolve v1 thread=PRRT_reply_prioroos disposition=$d -->" ]
+  done
+}
+
+@test "a prior oos marker still skips a disagree or unclear reply" {
+  for d in disagree unclear; do
+    rm -f "$POSTED" "$CALLS"
+    run --separate-stderr "$SCRIPT" PRRT_reply_prioroos "$d" "$BODY"
+    [ "$status" -eq 0 ]
+    [ "$(printf '%s' "$output" | jq -c '[.replied, .skipped, .disposition]')" = '[false,"already-replied","oos"]' ]
+    [ ! -f "$CALLS" ]
+  done
+}
+
+@test "a prior oos marker still skips an oos reply" {
+  run --separate-stderr "$SCRIPT" PRRT_reply_prioroos oos "$BODY"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.replied, .skipped, .disposition]')" = '[false,"already-replied","oos"]' ]
+  [ ! -f "$CALLS" ]
+}
+
 @test "a prior unclear marker still skips an unclear or disagree reply" {
   for d in unclear disagree; do
     rm -f "$POSTED" "$CALLS"

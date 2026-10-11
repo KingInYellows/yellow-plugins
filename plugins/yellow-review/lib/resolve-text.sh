@@ -195,6 +195,75 @@ _rt_scan() {
             for (j = 1; j <= np; j++) if (!benignword(parts[j])) return 1
             return 0
         }
+        # b64digit / basiccred: Basic-auth tokens are judged on the original
+        # bytes. The line scan lowercases, and base64 is case-sensitive.
+        # `YTpi` is `a:b`, the shortest `user:pass`. Padding is only `=` at
+        # the end, and only in the last quad; the per-quad checks below are the
+        # one place that is judged. A decoded value of control-free bytes
+        # with a colon and at least one other byte is a credential;
+        # prose such as `Authentication` or `httpOnly` is not.
+        function b64digit(c) {
+            if (c >= "A" && c <= "Z") return index("ABCDEFGHIJKLMNOPQRSTUVWXYZ", c) - 1
+            if (c >= "a" && c <= "z") return index("abcdefghijklmnopqrstuvwxyz", c) - 1 + 26
+            if (c >= "0" && c <= "9") return index("0123456789", c) - 1 + 52
+            if (c == "+") return 62
+            if (c == "/") return 63
+            return -1
+        }
+        function basiccred(tok, bare,    n, i, a, b, c, d, va, vb, vc, vd, nb, bv, k, x, colon, icolon, need, j) {
+            n = length(tok)
+            if (n < 4 || n % 4 != 0) return 0
+            nb = 0
+            for (i = 1; i <= n; i += 4) {
+                a = substr(tok, i, 1); b = substr(tok, i + 1, 1)
+                c = substr(tok, i + 2, 1); d = substr(tok, i + 3, 1)
+                if (c == "=" && d != "=") return 0
+                if ((c == "=" || d == "=") && i + 4 <= n) return 0
+                va = b64digit(a); vb = b64digit(b)
+                vc = (c == "=") ? 0 : b64digit(c)
+                vd = (d == "=") ? 0 : b64digit(d)
+                if (va < 0 || vb < 0 || vc < 0 || vd < 0) return 0
+                # Unused bits must be zero (canonical padding): `YWI6Yx==`
+                # is malformed, so it is left clean like other bad shapes.
+                if (c == "=" && vb % 16 != 0) return 0
+                if (c != "=" && d == "=" && vc % 4 != 0) return 0
+                bv[++nb] = int(va * 4 + int(vb / 16))
+                if (c != "=") bv[++nb] = int((vb % 16) * 16 + int(vc / 4))
+                if (d != "=") bv[++nb] = int((vc % 4) * 64 + vd)
+            }
+            # Decoded bytes are numeric, so no locale or %c handling is
+            # involved. Reject controls only: C0, DEL and the C1 range
+            # 0x80-0x9F. RFC 7617 lets a client use a legacy charset
+            # (ISO-8859-1 and the like), so 0xA0-0xFF is credential text
+            # whether or not it forms valid UTF-8. `httpOnly` decodes to
+            # 86 DB 69 3A 79 72, so the C1 byte 0x86 keeps it clean.
+            # Windows-1252 text using 0x80-0x9F (euro, curly quotes) is the
+            # accepted residual.
+            # A complete UTF-8 sequence is text, though its continuation
+            # bytes can fall in 0x80-0x9F (U+0100 is C4 80): only a byte
+            # outside such a sequence is judged as a control.
+            colon = 0; icolon = 0; need = 0
+            for (k = 1; k <= nb; k++) {
+                x = bv[k]
+                if (need > 0) { need--; continue }
+                if (x >= 194 && x <= 244) {
+                    need = (x < 224) ? 1 : (x < 240) ? 2 : 3
+                    for (j = 1; j <= need; j++) if (k + j > nb || bv[k + j] < 128 || bv[k + j] >= 192) need = 0
+                    continue
+                }
+                if (x < 32 || (x >= 127 && x < 160)) return 0
+                if (x == 58) { if (!colon) colon = k; if (k > 1 && k < nb) icolon = 1 }
+            }
+            # A colon is required. At either edge it still counts (an API key
+            # with a blank password), but a lone `:` has no secret side.
+            # A bare `Basic` word (no Authorization header) is also ordinary
+            # prose, and a short letters-only word such as `Only` decodes to
+            # `:yr`. There some colon must sit between two other bytes, so a
+            # word whose decoded text only begins or ends with a colon is
+            # not a credential.
+            if (bare && !icolon) return 0
+            return (colon && nb > 1) ? 1 : 0
+        }
         # Multi-line quoted value. A credential keyword whose value opens a
         # quote that does not close on its line starts a carry (mqo): the
         # following lines are joined with a space until the closing quote,
@@ -264,6 +333,46 @@ _rt_scan() {
             # `secret` (the `_`, `-` or capital starts the keyword). Do not add
             # a `client`/`api` prefix here: it would start the match earlier,
             # and `myclient_secret` would then count as in-word.
+            # Leading non-ASCII punctuation or space (curly quotes, bullet,
+            # middle dot, guillemets, en and em dash, ellipsis, no-break space
+            # as its UTF-8 bytes). One regex for gawk (either locale) and mawk.
+            lead = "^((“|”|‘|’|•|·|«|»|–|—|…|\302\240)[ \t]*)+"
+            # symtok: a run of symbol-only non-ASCII tokens, each followed by
+            # whitespace. With a multibyte locale (gawk in UTF-8) a token is
+            # symbolic when it holds no [:alpha:] character. Byte-wise awk
+            # (mawk, BWK awk, gawk in C) cannot classify letters, so the token
+            # is matched by UTF-8 symbol blocks instead: E2 80-AF (U+2000-2BFF
+            # punctuation, arrows, dingbats, shapes), E2 B8-B9 (U+2E00-2E7F
+            # supplemental punctuation), E3 80 (CJK punctuation), EF B8
+            # (variation selectors), F0 9F (emoji), C2 (Latin-1 punctuation)
+            # and the two C3 symbols x (97) and division (B7). Every other
+            # lead byte (accented Latin, Greek, Cyrillic, CJK, Hangul, and E2
+            # B0-B7 Glagolitic/Coptic/Tifinagh) is a word. E2 BA-BF (CJK
+            # radicals, Kangxi, ideographic description) are arguably symbols
+            # but count as words: the safe side for prose. The fullwidth
+            # punctuation of EF BC 80-8F (U+FF00-FF0F) and EF BD 9B-A5
+            # (U+FF5B-FF65) is a symbol too; fullwidth letters and digits are
+            # words. symlead consumes a symbol run attached directly to the first
+            # word (a fullwidth quote or an emoji glued to a passphrase),
+            # with no whitespace required: symbol-only characters in a
+            # multibyte locale, a non-ASCII byte run glued to ASCII in byte-wise mode.
+            bytewise = 0
+            if (length("\303\251") == 1) {
+                symtok = "^([^\001-\177[:alpha:][:digit:]]+[ \t]+)+"
+                symlead = "^[^\001-\177[:alpha:][:digit:]]+"
+            } else {
+                symb = "[\200-\277]"
+                symc = "(\342[\200-\257]" symb "|\342[\270\271]" symb "|\303[\227\267]|\343\200" symb "|\357\270" symb "|\360\237" symb symb "|\302" symb "|\357\274[\200-\217]|\357\275[\233-\245])"
+                symtok = "^(" symc "+[ \t]+)+"
+                # Fail closed: a non-ASCII byte run glued to a printable
+                # ASCII character is dropped, so the ASCII words after it are
+                # judged like plain ASCII. Byte-wise awk cannot tell a letter
+                # from punctuation, so an accented first word (`éclair recipe
+                # is great`) may be refused here; the multibyte path keeps it.
+                # A non-ASCII word followed by whitespace stays prose.
+                symlead = "^[\200-\377]+[\041-\176]"
+                bytewise = 1
+            }
             kw = "(pass([_-]?(phrase|code)|word|wd)?|pwd|secret([_ \t-]?key)?|(private|access)[_ \t-]?key|token|api[_ \t-]?key|credentials?)"
             ph =" string number integer boolean object array unknown undefined"
             ph = ph " nullable optional required redacted placeholder example"
@@ -402,17 +511,45 @@ _rt_scan() {
                     rraw = r
                     sub(/[ \t]+#.*$/, "", r)
                     valueline(r, carryin, carry == 1, rraw, carrypin)
-                    # A plain-carry value line of 3+ unquoted words that does
-                    # not start with a capital (`password:` then `my correct
-                    # horse battery staple`) is judged whole, like a same-line
-                    # assignment (wordcred). Sentence-case prose
-                    # (`Rotation is scheduled for Friday`) and a two-word
-                    # line stay clean; a capitalised passphrase of 3+ words
-                    # is the accepted residual.
+                    # A plain-carry value line of 3+ unquoted words is judged
+                    # whole (wordcred), like a same-line assignment. Sentence-case
+                    # prose (`Rotation is scheduled for Friday`) and a two-word
+                    # line stay clean; a capitalised passphrase of 3+ ASCII words
+                    # is the accepted residual. The first character must also be
+                    # ASCII. Under gawk in UTF-8, substr returns one character,
+                    # so a non-ASCII first letter (including a lowercase
+                    # accented word) is prose and stays clean. A leading
+                    # non-ASCII quote, bullet, guillemet, dash, ellipsis or
+                    # no-break space is not a letter: it is stripped first, so
+                    # it cannot exempt the ASCII words that follow. An ASCII
+                    # credential after a bare keyword still flags.
                     if (carry == 1 && !carryin && !hit) {
                         o = $0
                         sub(/^[ \t]*(-[ \t]*)?/, "", o)
-                        if (substr(o, 1, 1) !~ /["\047A-Z]/ && split(r, wparts, /[ \t]+/) >= 3 && wordcred(r)) flag("unquoted-keyword-value")
+                        r2 = r
+                        if (o !~ /^[\001-\177]/) {
+                            sub(lead, "", o)
+                            sub(lead, "", r2)
+                            sub(/^[ \t]+/, "", o)
+                            sub(/^[ \t]+/, "", r2)
+                            # Any other standalone symbol token (checkmark,
+                            # arrow, emoji) is decoration too. A token that
+                            # holds a non-ASCII letter or word (CJK, Cyrillic,
+                            # accented) is prose and is kept (symtok).
+                            sub(symtok, "", o)
+                            sub(symtok, "", r2)
+                            # A symbol run attached to the first word (no
+                            # whitespace) goes too; a letter or digit stops it.
+                            if (bytewise) {
+                                if (match(o, symlead)) o = substr(o, RLENGTH)
+                                if (match(r2, symlead)) r2 = substr(r2, RLENGTH)
+                            } else {
+                                sub(symlead, "", o)
+                                sub(symlead, "", r2)
+                            }
+                        }
+                        c = substr(o, 1, 1)
+                        if (c !~ /["\047A-Z]/ && c ~ /^[\001-\177]/ && split(r2, wparts, /[ \t]+/) >= 3 && wordcred(r2)) flag("unquoted-keyword-value")
                     }
                     if (carry == 2 && !carryin && ind > hind) {
                         t = l
@@ -459,18 +596,67 @@ _rt_scan() {
                 if (seg ~ /^%[a-z_][a-z0-9_]*%$/ || seg ~ /^%[0-9]*[a-z]$/ || seg ~ /^%\([a-z_][a-z0-9_]*\)[a-z]$/) continue
                 flag("url-userinfo")
             }
-            # Authorization header or Bearer/Basic scheme with an opaque
-            # token of 20+ characters; `Authorization: none` stays clean.
-            # Strip only the header name and scheme: a greedy strip through
-            # the last `=` would empty a base64 token padded with `==`.
+            # Authorization header or Bearer/Basic scheme. Bearer and a bare
+            # Authorization token keep the floor of 20. `Authorization: Basic`
+            # also flags a token of 4+ characters when the original bytes
+            # (not this lowercased line) are base64 for `user:pass`
+            # (`YTpi` is `a:b`). A length floor alone would flag prose such
+            # as `Authentication` (14 characters). `Authorization: none`
+            # stays clean. Strip only the header name and scheme: a greedy
+            # strip through the last `=` would empty a base64 token padded
+            # with `==`.
             r = l
+            oline = $0
             while (match(r, /(authorization[ \t]*[=:][ \t]*([a-z]+[ \t]+)?|(bearer|basic)[ \t]+)[a-z0-9._~+\/=-]+/)) {
                 seg = substr(r, RSTART, RLENGTH)
+                segorig = substr(oline, RSTART, RLENGTH)
                 if (++nauth > 200) { flag("too-many-matches"); break }
                 r = substr(r, RSTART + RLENGTH)
-                sub(/^authorization[ \t]*[=:][ \t]*/, "", seg)
-                sub(/^[a-z]+[ \t]+/, "", seg)
-                if (length(seg) >= 20) flag("authorization-header")
+                oline = substr(oline, RSTART + RLENGTH)
+                hdr = 0
+                if (match(seg, /^authorization[ \t]*[=:][ \t]*/)) {
+                    hdr = 1
+                    seg = substr(seg, RLENGTH + 1)
+                    segorig = substr(segorig, RLENGTH + 1)
+                }
+                scheme = ""
+                if (match(seg, /^(bearer|basic)[ \t]+/)) {
+                    scheme = substr(seg, 1, RLENGTH)
+                    sub(/[ \t]+$/, "", scheme)
+                    seg = substr(seg, RLENGTH + 1)
+                    segorig = substr(segorig, RLENGTH + 1)
+                } else if (match(seg, /^[a-z]+[ \t]+/)) {
+                    seg = substr(seg, RLENGTH + 1)
+                    segorig = substr(segorig, RLENGTH + 1)
+                }
+                # The token class admits `. ~ -`, so a credential followed by
+                # sentence punctuation would keep it and fail the length check.
+                # Cut to the leading base64 run and pad it to a multiple of 4.
+                # A run of 20+ characters is flagged by the floor below without
+                # decoding, so a hostile long token never reaches the
+                # per-byte decoder (mawk concatenation is quadratic).
+                btok = ""
+                blen = 0
+                plen = 0
+                # A run followed by more base64 characters or `=` is not a
+                # token (`YWI6Yw=Z`): leave btok empty.
+                if (scheme == "basic" && match(segorig, /^[A-Za-z0-9+\/]+=*/)) {
+                    btok = substr(segorig, 1, RLENGTH)
+                    if (substr(segorig, RLENGTH + 1, 1) ~ /[A-Za-z0-9+\/=]/) btok = ""
+                    # Valid padding is 0-2 `=` that bring the length to a
+                    # multiple of 4. `YWI6Yw===` and `YWI6Yw=` are malformed,
+                    # not credentials: do not normalize them into valid ones.
+                    plen = length(btok)
+                    sub(/=+$/, "", btok)
+                    plen -= length(btok)
+                    if (plen > 2 || (plen > 0 && (length(btok) + plen) % 4)) btok = ""
+                    # The threshold below uses this unpadded length: padding
+                    # an 18 or 19 character run to 20 must not skip basiccred.
+                    blen = length(btok)
+                    while (btok != "" && length(btok) % 4) btok = btok "="
+                }
+                if (scheme == "basic" && (blen >= 3 || (plen > 0 && blen >= 2)) && blen < 20 && basiccred(btok, !hdr)) flag("authorization-header")
+                else if (length(seg) >= 20) flag("authorization-header")
             }
             # split() keeps this linear on very long (minified) lines.
             n = split($0, ws, /[^A-Za-z0-9+\/_=-]+/)
@@ -496,6 +682,12 @@ _rt_scan() {
                     if (v ~ /^sk-/ && mv >= 23) flag("token-prefix")
                     if (v ~ /^(sk|rk|pk)_live_/ && mv >= 24) flag("token-prefix")
                     if (v ~ /^glpat-/ && mv >= 26) flag("token-prefix")
+                    # In-repo floors: tvly- plus 20, pplx- plus 40, sgp_ plus 20.
+                    # The floor counts the leading token run only, not a later
+                    # `+ / =` segment of the same word.
+                    if (match(v, /^tvly-[A-Za-z0-9_-]+/) && RLENGTH >= 25) flag("token-prefix")
+                    if (match(v, /^pplx-[A-Za-z0-9_-]+/) && RLENGTH >= 45) flag("token-prefix")
+                    if (match(v, /^sgp_[A-Za-z0-9]+/) && RLENGTH >= 24) flag("token-prefix")
                     # hooks.slack.com/services/T<id>/B<id>/<secret>: the dot
                     # splits the host off, and the slashes would otherwise earn
                     # the path exemption below.

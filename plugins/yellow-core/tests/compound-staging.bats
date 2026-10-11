@@ -94,6 +94,141 @@ teardown() {
   echo "$result" | grep -q 'api_key=\[REDACTED\]'
 }
 
+@test "redact_secrets strips a short Basic credential with an empty side" {
+  result=$(printf 'Authorization: Basic YTo= and authorization: basic OmI= and Authorization: Basic Og==\n' | cs_redact_secrets)
+  [ "$result" = 'Authorization: Basic [REDACTED] and authorization: basic [REDACTED] and Authorization: Basic [REDACTED]' ]
+}
+
+@test "redact_secrets strips a bare Basic credential and leaves Basic prose" {
+  result=$(printf 'sent Basic dXNlcjpwYXNz1234 and basic YWI6Yw== ok\n' | cs_redact_secrets)
+  [ "$result" = 'sent Basic [REDACTED] and basic [REDACTED] ok' ]
+  result=$(printf 'Basic Authentication, Basic Only mode, basic setup and a Basic example\n' | cs_redact_secrets)
+  [ "$result" = 'Basic Authentication, Basic Only mode, basic setup and a Basic example' ]
+}
+
+@test "redact_secrets strips a letters-only bare Basic credential" {
+  result=$(printf 'sent Basic dXNlcjpwYXNz and basic YWRtaW46c2VjcmV0 ok\n' | cs_redact_secrets)
+  [ "$result" = 'sent Basic [REDACTED] and basic [REDACTED] ok' ]
+  result=$(printf 'Basic Authentication, BASIC SETTINGS and basic usage\n' | cs_redact_secrets)
+  [ "$result" = 'Basic Authentication, BASIC SETTINGS and basic usage' ]
+}
+
+@test "redact_secrets decodes a letters-only bare Basic payload with no case change" {
+  # Znpvejph = fzoz:a, ejpzenpn = z:szzg, Yjpycndm = b:rrwf, amtkczpo = jkds:h —
+  # none has a lower-to-upper transition, so only decoding catches them.
+  result=$(printf 'sent Basic Znpvejph and basic ejpzenpn, BASIC Yjpycndm (Basic\tamtkczpo)\n' | cs_redact_secrets)
+  [ "$result" = 'sent Basic [REDACTED] and basic [REDACTED], BASIC [REDACTED] (Basic [REDACTED])' ]
+  # Prose decodes to binary ("Authentication", "SETTINGS") or to ":yr" with
+  # no user ("Only"), and a word-glued keyword is not a boundary.
+  result=$(printf 'Basic Authentication, Basic Only mode, BASIC SETTINGS, basic setup, xBasic Znpvejph\n' | cs_redact_secrets)
+  [ "$result" = 'Basic Authentication, Basic Only mode, BASIC SETTINGS, basic setup, xBasic Znpvejph' ]
+}
+
+@test "redact_secrets decodes a short bare Basic payload that contains a digit" {
+  # YTE6YjI = a1:b2, eHk6ejk = xy:z9 (unpadded, 7 characters, digits inside).
+  result=$(printf 'sent Basic YTE6YjI and basic eHk6ejk= ok, Basic 2FA\n' | cs_redact_secrets)
+  [ "$result" = 'sent Basic [REDACTED] and basic [REDACTED] ok, Basic 2FA' ]
+}
+
+@test "redact_secrets matches the Basic scheme in any letter case" {
+  result=$(printf 'Authorization: bAsIc YTo and sent bAsIc YTE6YjI ok\n' | cs_redact_secrets)
+  [ "$result" = 'Authorization: bAsIc [REDACTED] and sent bAsIc [REDACTED] ok' ]
+}
+
+@test "redact_secrets redacts a bare Basic payload with legacy-charset or UTF-8 bytes" {
+  # 6WE6Yg = 0xE9 "a:b" (ISO-8859-1), w6lhOsOx = UTF-8 "\u00e9a:\u00f1".
+  result=$(printf 'sent Basic 6WE6Yg and basic w6lhOsOx ok\n' | cs_redact_secrets)
+  [ "$result" = 'sent Basic [REDACTED] and basic [REDACTED] ok' ]
+}
+
+@test "redact_secrets redacts a bare Basic payload whose UTF-8 continuation bytes fall in 0x80-0x9F" {
+  # U+0100 is C4 80 and U+1F511 is F0 9F 94 91; a lone 0x80 stays a control.
+  t1=$(printf '\304\200b:cd' | base64)
+  t2=$(printf 'ab:\360\237\224\221x' | base64)
+  t3=$(printf 'a\200b:cd' | base64)
+  result=$(printf 'Basic %s and Basic %s and Basic %s\n' "$t1" "$t2" "$t3" | cs_redact_secrets)
+  [ "$result" = "Basic [REDACTED] and Basic [REDACTED] and Basic $t3" ]
+}
+
+@test "redact_secrets redacts a bare Basic payload with an empty user and a colon in the password" {
+  # OmE6Yg = ":a:b" (empty user, password "a:b").
+  result=$(printf 'sent Basic OmE6Yg ok\n' | cs_redact_secrets)
+  [ "$result" = 'sent Basic [REDACTED] ok' ]
+}
+
+@test "redact_secrets redacts a bare Basic payload with an empty user and a token password" {
+  # OmFiY2RlZmdoaWowMTIzNDU2Nzg5 = ":abcdefghij0123456789" (empty user, 20-byte token password).
+  result=$(printf 'sent Basic OmFiY2RlZmdoaWowMTIzNDU2Nzg5 ok, Basic Only mode\n' | cs_redact_secrets)
+  [ "$result" = 'sent Basic [REDACTED] ok, Basic Only mode' ]
+}
+
+@test "redact_secrets writes no temp file, whatever TMPDIR holds" {
+  mkdir -p "$STAGING_TEST_ROOT/spool"
+  result=$(printf 'a\nb\n' | TMPDIR="$STAGING_TEST_ROOT/spool" cs_redact_secrets)
+  [ "$result" = $'a\nb' ]
+  [ -z "$(ls -A "$STAGING_TEST_ROOT/spool")" ]
+  result=$(printf 'a\n' | TMPDIR=/nonexistent/spool cs_redact_secrets)
+  [ "$result" = a ]
+}
+
+@test "redact_secrets in streaming mode still redacts and reports a sed failure" {
+  mkdir -p "$STAGING_TEST_ROOT/spool"
+  tok=$(printf ':abcdefghij0123456789' | base64)
+  result=$(printf 'a\nAuthorization Basic %s\n' "$tok" \
+    | TMPDIR=/nonexistent/spool CS_REDACT_STREAM=1 cs_redact_secrets)
+  [ "$result" = $'a\nAuthorization Basic [REDACTED]' ]
+  mkdir -p "$STAGING_TEST_ROOT/bin"
+  printf '#!/bin/sh\nprintf "partial\\n"\nexit 2\n' > "$STAGING_TEST_ROOT/bin/sed"
+  chmod +x "$STAGING_TEST_ROOT/bin/sed"
+  run bash -c 'PATH="$1:$PATH"; . "$2"; printf "x\n" | CS_REDACT_STREAM=1 cs_redact_secrets' _ \
+    "$STAGING_TEST_ROOT/bin" "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'[REDACTED: sanitization failed]' ]]
+}
+
+@test "redact_secrets passes input that contains a failure-marker lookalike" {
+  run bash -c '. "$1"; printf "a\n@@cs-redact-sed-failed@@\nb\n" | cs_redact_secrets' _ \
+    "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
+  [ "$status" -eq 0 ]
+  [ "$output" = $'a\n@@cs-redact-sed-failed@@\nb' ]
+}
+
+@test "redact_secrets fails closed when the sed stage fails" {
+  mkdir -p "$STAGING_TEST_ROOT/bin"
+  printf '#!/bin/sh\nprintf "partial\\n"\nexit 2\n' > "$STAGING_TEST_ROOT/bin/sed"
+  chmod +x "$STAGING_TEST_ROOT/bin/sed"
+  run bash -c 'PATH="$1:$PATH"; . "$2"; printf "x\n" | cs_redact_secrets' _ \
+    "$STAGING_TEST_ROOT/bin" "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'[REDACTED: sanitization failed]'* ]]
+}
+
+@test "redact_secrets fails closed when sed fails after a partial last line" {
+  mkdir -p "$STAGING_TEST_ROOT/bin"
+  printf '#!/bin/sh\nprintf "kept line\\npartial"\nexit 2\n' > "$STAGING_TEST_ROOT/bin/sed"
+  chmod +x "$STAGING_TEST_ROOT/bin/sed"
+  run --separate-stderr bash -c 'PATH="$1:$PATH"; . "$2"; printf "x\n" | cs_redact_secrets' _ \
+    "$STAGING_TEST_ROOT/bin" "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
+  [ "$status" -eq 1 ]
+  # Nothing sed wrote before failing reaches stdout, only the fallback line.
+  [ "$output" = '[REDACTED: sanitization failed]' ]
+}
+
+@test "redact_secrets strips an unpadded 3-character Basic credential" {
+  result=$(printf 'Authorization: Basic YTo and done\n' | cs_redact_secrets)
+  [ "$result" = 'Authorization: Basic [REDACTED] and done' ]
+}
+
+@test "redact_secrets strips an Authorization Basic token and leaves prose that says basic alone" {
+  result=$(printf 'curl -H "Authorization: Basic YWI6Y2Q=" and AUTHORIZATION: BASIC YTpi done\n' | cs_redact_secrets)
+  echo "$result" | grep -q 'Authorization: Basic \[REDACTED\]'
+  echo "$result" | grep -q 'AUTHORIZATION: BASIC \[REDACTED\]'
+  ! echo "$result" | grep -q 'YWI6Y2Q'
+  ! echo "$result" | grep -q 'YTpi'
+  result=$(printf 'the basic setup, basic usage and a Basic example\n' | cs_redact_secrets)
+  [ "$result" = 'the basic setup, basic usage and a Basic example' ]
+}
+
 @test "redact_secrets strips Bearer tokens" {
   result=$(printf 'Authorization: Bearer abc123def456ghi789jkl\n' | cs_redact_secrets)
   echo "$result" | grep -q 'Bearer \[REDACTED\]'
@@ -148,6 +283,39 @@ teardown() {
   result=$(printf 'https://user:pass@host/x\n' | cs_redact_secrets)
   echo "$result" | grep -q '\[REDACTED:basic-auth\]'
   ! echo "$result" | grep -q 'user:pass'
+}
+
+@test "redact_secrets strips tavily, perplexity and semgrep tokens at their floors" {
+  tv=$(printf 'tv%s-' 'ly')
+  px=$(printf 'pp%s-' 'lx')
+  sg=$(printf 'sg%s_' 'p')
+  s20=$(printf 'a%.0s' $(seq 1 20))
+  s19=$(printf 'a%.0s' $(seq 1 19))
+  s40=$(printf 'a%.0s' $(seq 1 40))
+  s39=$(printf 'a%.0s' $(seq 1 39))
+  out="$STAGING_TEST_ROOT/redact-out"
+  result=$(printf 'saw %s%s and %s%s and %s%s in the log\n' "$tv" "$s20" "$px" "$s40" "$sg" "$s20" | cs_redact_secrets)
+  printf '%s\n' "$result" >| "$out"
+  run grep -F 'REDACTED:tavily-key' "$out"
+  [ "$status" -eq 0 ]
+  run grep -F 'REDACTED:perplexity-key' "$out"
+  [ "$status" -eq 0 ]
+  run grep -F 'REDACTED:semgrep-token' "$out"
+  [ "$status" -eq 0 ]
+  run grep -F "${tv}${s20}" "$out"
+  [ "$status" -eq 1 ]
+  run grep -F "${px}${s40}" "$out"
+  [ "$status" -eq 1 ]
+  run grep -F "${sg}${s20}" "$out"
+  [ "$status" -eq 1 ]
+  result=$(printf 'saw %s%s and %s%s and %s%s in the log\n' "$tv" "$s19" "$px" "$s39" "$sg" "$s19" | cs_redact_secrets)
+  printf '%s\n' "$result" >| "$out"
+  run grep -F "${tv}${s19}" "$out"
+  [ "$status" -eq 0 ]
+  run grep -F "${px}${s39}" "$out"
+  [ "$status" -eq 0 ]
+  run grep -F "${sg}${s19}" "$out"
+  [ "$status" -eq 0 ]
 }
 
 @test "redact_secrets passes innocuous text through unchanged" {

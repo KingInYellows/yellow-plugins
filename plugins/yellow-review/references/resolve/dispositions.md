@@ -704,15 +704,21 @@ written by a Bot author. A later comment from anyone else, including the
 viewer's own human account, or with no author type, means the thread moved on
 and it is processed again. The skip JSON reports the posted marker's
 disposition. A re-run after a reply that landed but whose resolve failed
-therefore never posts a second, contradicting reply, even when a bot
-acknowledgement arrived in between. This holds when `gh` authenticates as a bot
+therefore never posts a second reply of the same disposition, even when a bot
+acknowledgement arrived in between; the only second reply is the upgrade below.
+This holds when `gh` authenticates as a bot
 account: its own acknowledgement is `viewerDidAuthor` and `Bot` too, but carries
 no marker, so it never displaces the marker comment, and a bot-authored marker
 still counts. Two rules follow:
 
 - Upgrade: a prior `disagree` or `unclear` marker does not block a `fixed`,
-  `addressed` or `oos` reply. That reply carries the evidence the resolve needs,
-  so it is posted.
+  `addressed` or `oos` reply, and a prior `oos` marker does not block a
+  `fixed` or `addressed` reply. That reply carries the evidence the resolve
+  needs, so it is posted. A second `oos` reply to an `oos` marker is a skip,
+  and so is `disagree` or `unclear` after `oos`. An `oos` → `fixed` or
+  `addressed` upgrade posts a reply that supersedes the earlier one; the script
+  neither closes nor links the follow-up issue filed for the `oos` reply, so
+  that issue stays open.
 - Compare before resolving: after a skip, the orchestrator retries the resolve
   (when the lane allows it) only if the reported `disposition` equals the one it
   asked for. Any other posted disposition leaves the thread open and is reported
