@@ -1,0 +1,20 @@
+docs/solutions/security-issues/complexity-snapshot-expression-end-heuristics.md
+  h_6000354274ce50 28-29
+plugins/yellow-debt/codex/skills/debt-complexity-scan/references/scan-contract.md
+  h_6000354274ce50 22-23,101
+plugins/yellow-debt/skills/debt-complexity-scan/references/scan-contract.md
+  h_6000354274ce50 22-23,101
+tests/integration/codex-waves-analysis-integration.test.ts
+  h_6000354274ce50 236-263,289
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "af71d73ff939baef8290e4e29c9353e4ef21c414",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
