@@ -629,3 +629,8 @@ Manifest hook budgets: Stop 5s, SessionStart 3s, PreCompact 3s
   NOT delete `~/.claude/projects/<slug>/compound-staging/` or any
   pending/processing entries. Manually `rm -rf` the staging dir to
   reclaim disk; the directory is inert without the hooks installed.
+- **`$ARGUMENTS` word-splitting in `/worktree:restack` (won't-fix).**
+  `commands/worktree/restack.md` (the flag block at the `$ARGUMENTS`
+  assignment, about lines 41–60) parses flags in a `bash /dev/fd/3` child
+  because zsh does not word-split `$ARGUMENTS`. That heredoc is a host-shell
+  limitation. Do not replace it with a zsh-native parser.
