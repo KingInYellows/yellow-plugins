@@ -349,6 +349,61 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     expect(result.output.files[0].lines[2].text).toBe(redactedAt(3));
   });
 
+  it.each([
+    'DEVIN_SERVICE_USER_TOKEN',
+    'DEVIN_ORG_ID',
+    'PERPLEXITY_API_KEY',
+    'TAVILY_API_KEY',
+    'EXA_API_KEY',
+    'SEMGREP_APP_TOKEN',
+    'MORPH_API_KEY',
+    'CERAMIC_API_KEY',
+  ])('quarantines credential %s enumerated by repository policy', (name) => {
+    expect(readFileSync(join(root, 'AGENTS.md'), 'utf8')).toContain(
+      '`' + name + '`'
+    );
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'const amount = 1;\nconst ' +
+          name +
+          ' = "synthetic-policy-secret";\nconst later = 2;\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    expect(result.output.status).toBe('partial');
+    expect(JSON.stringify(result.output)).not.toContain(
+      'synthetic-policy-secret'
+    );
+    expect(result.output.files[0].lines[0].text).toBe('const amount = 1;');
+    expect(result.output.files[0].lines[1].text).toBe(redactedAt(2));
+    expect(result.output.files[0].lines[2].text).toBe(redactedAt(3));
+  });
+
+  it.each([
+    '"DEVIN_ORG_ID":',
+    'devin_org_id =',
+    'DEVIN_ORG_ID',
+    'DEVIN_ORG_ID /* assignment comment */',
+  ])('quarantines listed ID marker variant %s', (marker) => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'const amount = 1;\n' +
+          marker +
+          '\n= "synthetic-policy-variant";\nconst later = 2;\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    expect(result.output.status).toBe('partial');
+    expect(JSON.stringify(result.output)).not.toContain(
+      'synthetic-policy-variant'
+    );
+    expect(result.output.files[0].lines[0].text).toBe('const amount = 1;');
+    expect(result.output.files[0].lines[1].text).toBe(redactedAt(2));
+    expect(result.output.files[0].lines[2].text).toBe(redactedAt(3));
+  });
+
   it.each(['??', '||', '&&', '?', ':', '+', '/* continuation */'])(
     'fails closed through a credential expression using %s',
     (operator) => {
