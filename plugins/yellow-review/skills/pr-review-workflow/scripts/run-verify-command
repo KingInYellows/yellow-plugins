@@ -165,7 +165,8 @@
 #   or worktree non-LFS filter command; a run also refuses a local
 #   core.sshCommand, core.askPass, core.gitProxy or credential helper, which
 #   the revert and check-ignored modes leave alone; the tree is untouched), a
-#   refused path (not canonical, deny-listed when running, gitignored or
+#   git-lfs on PATH that resolves inside the worktree while any filter is
+#   configured, a refused path (not canonical, deny-listed when running, gitignored or
 #   unverifiable, or without changes when running), a change outside the
 #   listed files, an ignored file (for --revert-denied, an ignored
 #   trusted-config file) changed since the --ignored-since marker (or
@@ -794,10 +795,15 @@ if [ "$MODE" = run ]; then
     [ -n "$(tr -d '[:space:]' <"$COMMAND_FILE")" ] || die 2 "--command-file is empty"
     COMMAND_FILE=$(cd -- "$(dirname -- "$COMMAND_FILE")" && pwd)/$(basename -- "$COMMAND_FILE")
     # Every run, attended or not: nothing else sees resolver edits to
-    # gitignored files, so the marker is required. Revert modes do not enter
-    # this block.
+    # gitignored files, and an attended command the user approved still
+    # executes a resolver edit to an ignored executable, so the marker is
+    # required. Revert modes do not enter this block.
+    if [ "$UNATTENDED" = 1 ] && [ -z "$IGNORED_SINCE" ]; then
+        printf '[run-verify-command] Error: --unattended requires --ignored-since <marker-file> (touch the file before the resolvers start)\n' >&2
+        exit 2
+    fi
     if [ -z "$IGNORED_SINCE" ]; then
-        printf '[run-verify-command] Error: --ignored-since <marker-file> is required (touch the file before the resolvers start)\n' >&2
+        printf '[run-verify-command] Error: a verify run requires --ignored-since <marker-file>, attended or not (touch the file before the resolvers start)\n' >&2
         exit 2
     fi
 fi
@@ -823,6 +829,22 @@ if [ "$MODE" = run ]; then
 else
     harden_git_config revert || die 2 "$YR_HARDEN_MSG; the tree is untouched"
 fi
+
+# harden_git_config above refused a repository-local non-LFS clean, smudge or
+# process filter in every mode. An allowed git-lfs command is still resolved
+# through PATH when git runs the filter, so a repository-local git-lfs would
+# run with the runner's authority on the first diff or status. yr_adopt_path
+# already dropped such PATH entries; this also refuses outright, judging the
+# caller's PATH. When any filter is configured (global and system scopes
+# included), refuse a git-lfs whose canonical file is in the worktree. A
+# git-lfs that is not on PATH is left to fail on its own.
+frc=0
+yr_git config -z --get-regexp '^filter\..*\.(clean|smudge|process)$' >/dev/null 2>&1 || frc=$?
+case "$frc" in
+    0) yr_bind_outside git-lfs YELLOW_REVIEW_GIT_LFS || true ;;
+    1) ;;
+    *) die 2 "could not read the git filter config; the tree is untouched" ;;
+esac
 
 REASON=""
 add_reason() { REASON="${REASON:+$REASON; }$1"; }
@@ -2127,6 +2149,7 @@ fi
 # The caller starts from a clean tree, so any remaining change (tracked or
 # untracked) means the revert did not fully restore it. A status that cannot
 # be read is not clean.
+# lgit_nohooks forces core.fsmonitor off: this status would run a command set in .git/config.
 CLEAN=true
 if ! STATUS=$(lgit_nohooks status --porcelain --untracked-files=all 2>/dev/null) || [ -n "$STATUS" ]; then
     CLEAN=false
