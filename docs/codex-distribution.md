@@ -39,17 +39,17 @@ The catalog now selects **ten plugins and exactly 31 skills**. The final
 installed gate derives this inventory from the catalog and rejects migrated
 commands, unselected skills and undeclared resources.
 
-| Plugin          | Selected skill surface                                                         | Runtime scope                                                         |
-| --------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
-| gt-workflow     | Existing 11 skills                                                             | Original pilot; setup references verified; live mutations excluded    |
-| yellow-core     | agent-native-architecture, agent-native-audit, plan-status, worktree-inventory | Read-only references/dashboard/native Git inventory                   |
-| yellow-review   | yellow-thermonuclear-review                                                    | Explicit-only structural findings; no edits                           |
-| yellow-ci       | Existing 8 skills                                                              | CI pilot; diagnosis and runner approval/refusal fixtures; no live SSH |
-| yellow-docs     | docs-audit                                                                     | Sequential current-checkout audit; findings only                      |
-| yellow-debt     | debt-complexity-scan                                                           | Bounded Python-validated local source snapshots; no fixes             |
-| yellow-research | research-public-repo                                                           | Public DeepWiki only; actual read-only repository Q&A                 |
-| yellow-cursor   | cursor-plan                                                                    | Installed offline CLI dry-run; no remote launch/auth claim            |
-| yellow-codex    | codex-readiness                                                                | Local CLI/native login classification; no nested model                |
+| Plugin          | Selected skill surface                                                         | Runtime scope                                                                                                                                                                     |
+| --------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| gt-workflow     | Existing 11 skills                                                             | Original pilot; setup references verified; live mutations excluded                                                                                                                |
+| yellow-core     | agent-native-architecture, agent-native-audit, plan-status, worktree-inventory | Read-only references/dashboard/native Git inventory                                                                                                                               |
+| yellow-review   | yellow-thermonuclear-review                                                    | Explicit-only structural findings; no edits                                                                                                                                       |
+| yellow-ci       | Existing 8 skills                                                              | CI pilot; diagnosis and runner approval/refusal fixtures; no live SSH                                                                                                             |
+| yellow-docs     | docs-audit                                                                     | Sequential current-checkout audit; findings only                                                                                                                                  |
+| yellow-debt     | debt-complexity-scan                                                           | Bounded Python-validated local source snapshots; no fixes                                                                                                                         |
+| yellow-research | research-public-repo                                                           | Public DeepWiki only; actual read-only repository Q&A                                                                                                                             |
+| yellow-cursor   | cursor-plan                                                                    | Installed offline CLI dry-run; no remote launch/auth claim                                                                                                                        |
+| yellow-codex    | codex-readiness                                                                | Local CLI/native login classification; no nested model                                                                                                                            |
 | yellow-jules    | jules-delegation, jules-supervision                                            | Reference skills only; every command stays Claude-only, no hooks; `authorize`, `abandon` and `supervise --clear-pause` are owner terminal commands (see "Jules and the terminal") |
 
 This is bounded skill support, not all commands/agents/hooks or all-plugin
@@ -63,10 +63,13 @@ mutation authority.
 
 ## Host-neutral skill bodies + the exposure lint (R15)
 
-`validate-codex.js` scans the generated **manifest +
-`codex/skills/**`** only — never hooks, libs, or command wrappers. It unconditionally rejects Claude-only constructs in exposed content: `.claude/`, `${CLAUDE_PLUGIN_ROOT}` /
-`CLAUDE_PLUGIN_DATA` (and other `CLAUDE_*` runtime vars), `$ARGUMENTS`, `subagent*type`, `userConfig`, `outputStyles`, plus registry-gated real sibling-plugin paths, real `mcp\_\_plugin*\*`
-tool names, and real slash-command names.
+`validate-codex.js` scans the generated manifest and `codex/skills/**` only —
+never hooks, libs, or command wrappers. It unconditionally rejects Claude-only
+constructs in exposed content: `.claude/`, `${CLAUDE_PLUGIN_ROOT}` /
+`CLAUDE_PLUGIN_DATA` (and other `CLAUDE_*` runtime vars), `$ARGUMENTS`,
+`subagent*type`, `userConfig`, `outputStyles`, plus registry-gated real
+sibling-plugin paths, real `mcp\_\_plugin*\*` tool names, and real slash-command
+names.
 
 The resolution for a plugin whose skills need Claude-only config (e.g. yellow-ci
 retaining `.claude/`-rooted config while exposing those skills) is

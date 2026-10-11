@@ -9,10 +9,11 @@ shared attribution and real existing homepage links. No icons, invented URLs or
 public submission requirements are added.
 
 Primary sources:
-- https://github.com/openai/codex/blob/rust-v0.157.0/codex-rs/skills/src/model.rs
-- https://github.com/openai/codex/blob/rust-v0.157.0/codex-rs/core-plugins/src/manifest.rs
-- https://learn.chatgpt.com/docs/build-skills
-- https://github.com/openai/codex/blob/rust-v0.157.0/codex-rs/config/src/mcp_types.rs
+
+- [Pinned skill model](https://github.com/openai/codex/blob/rust-v0.157.0/codex-rs/skills/src/model.rs)
+- [Pinned plugin manifest parser](https://github.com/openai/codex/blob/rust-v0.157.0/codex-rs/core-plugins/src/manifest.rs)
+- [Skill authoring documentation](https://learn.chatgpt.com/docs/build-skills)
+- [Pinned MCP configuration](https://github.com/openai/codex/blob/rust-v0.157.0/codex-rs/config/src/mcp_types.rs)
 
 The generated skill tree supports exactly SKILL.md, flat references/*.md and
 agents/openai.yaml containing only policy.allow_implicit_invocation:boolean.

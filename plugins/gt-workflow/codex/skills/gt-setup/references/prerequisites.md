@@ -144,9 +144,9 @@ fi
 **Failures (hard stop)** — stop after reporting all that apply:
 
 - `gt` missing: "Graphite CLI is required. Install it from
-  https://graphite.dev/docs/cli and re-run `gt-setup`."
+  [Graphite CLI documentation](https://graphite.dev/docs/cli) and re-run `gt-setup`."
 - `jq` missing: "jq is required by gt-workflow (the gt-cleanup skill uses it to
-  parse PR-status JSON). Install it from https://jqlang.github.io/jq/download/."
+  parse PR-status JSON). Install it from [the jq download page](https://jqlang.github.io/jq/download/)."
 - `git_repo` not ok: "gt-workflow must be run inside a git repository."
 - `auth_config` missing: "Graphite auth was not detected. Run `gt auth` or sign
   in through the Graphite CLI, then re-run `gt-setup`."
@@ -173,7 +173,7 @@ If any hard-stop failures exist, stop here. Do not proceed to Phase 2.
   configured for this repo. Graphite and GitHub native merge queue are
   incompatible — running both causes Graphite to restart CI on queued commits
   and may produce out-of-order merges. To disable: open
-  https://github.com/<owner>/<repo>/settings/branches, edit the branch
+  `https://github.com/<owner>/<repo>/settings/branches`, edit the branch
   protection rule for your trunk branch, and uncheck **Require merge queue**.
   Setup proceeds, but the warning will repeat each time you run `gt-setup` until
   resolved."
