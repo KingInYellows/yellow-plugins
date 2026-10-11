@@ -142,7 +142,7 @@ _cs_redact_bare_basic() {
       kw = "[Bb][Aa][Ss][Ii][Cc][ \t\r\v\f]+[A-Za-z0-9+/]+=*"
       failed = 0; nh = 0
     }
-    function is_cred(tok,    n, i, acc, bits, p, byte, nb, fc, lead) {
+    function is_cred(tok,    n, i, acc, bits, p, byte, nb, fc, lead, bv, k, j, need) {
       n = length(tok)
       if (n < 4 || n % 4 == 1) return 0
       acc = 0; bits = 0; nb = 0; fc = 0; lead = 0
@@ -152,16 +152,26 @@ _cs_redact_bare_basic() {
         if (bits >= 8) {
           bits -= 8
           p = (bits == 4) ? 16 : (bits == 2) ? 4 : 1
-          byte = int(acc / p)
+          bv[++nb] = int(acc / p)
           acc = acc % p
-          # Controls only: C0, DEL and C1 (0x80-0x9F). RFC 7617 allows a
-          # legacy charset, so 0xA0-0xFF is credential text, as in
-          # resolve-text.sh in yellow-review.
-          if (byte < 32 || (byte >= 127 && byte < 160)) return 0
-          nb++
-          if (byte == 58 && nb == 1) lead = 1
-          if (byte == 58 && nb > 1 && fc == 0) fc = nb
         }
+      }
+      # Controls only: C0, DEL and C1 (0x80-0x9F). RFC 7617 allows a legacy
+      # charset, so 0xA0-0xFF is credential text, and a complete UTF-8
+      # sequence is text though its continuation bytes can fall in 0x80-0x9F
+      # (U+0100 is C4 80), as in resolve-text.sh in yellow-review.
+      need = 0
+      for (k = 1; k <= nb; k++) {
+        byte = bv[k]
+        if (need > 0) { need--; continue }
+        if (byte >= 194 && byte <= 244) {
+          need = (byte < 224) ? 1 : (byte < 240) ? 2 : 3
+          for (j = 1; j <= need; j++) if (k + j > nb || bv[k + j] < 128 || bv[k + j] >= 192) need = 0
+          continue
+        }
+        if (byte < 32 || (byte >= 127 && byte < 160)) return 0
+        if (byte == 58 && k == 1) lead = 1
+        if (byte == 58 && k > 1 && fc == 0) fc = k
       }
       # Some colon must sit between two other bytes (an empty user with a
       # colon in the password counts; a trailing colon alone does not), as in

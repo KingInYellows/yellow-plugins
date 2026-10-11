@@ -434,6 +434,13 @@ yr_file_shebang_enters() {
     local f="$1" root="$2" depth="${3:-0}" line rest i x idx last k c cl val p args=""
     local -a w=() v=() nw=()
     [ -f "$f" ] || return 1
+    # An executable that cannot be read hides its #! line from this check,
+    # but the kernel still reads it: fail closed. A setuid or setgid file is
+    # left alone (an execute-only sudo is a binary on some systems).
+    if [ ! -r "$f" ]; then
+        [ -x "$f" ] && [ ! -u "$f" ] && [ ! -g "$f" ] && return 0
+        return 1
+    fi
     IFS= read -r -n 512 line <"$f" 2>/dev/null || true
     case "$line" in '#!'*) ;; *) return 1 ;; esac
     [ "$depth" -le 4 ] || return 0
@@ -1124,14 +1131,14 @@ check_trusted_links() {
                             # Only a tracked regular file with a plain H tag
                             # counts: ls-files lists a directory's tracked
                             # descendants, which would cover an ignored one.
-                            tagged=$(yr_git ls-files -v -- "$rel" 2>/dev/null | head -n 1) || tagged=""
+                            # The target name is a literal pathspec, and only
+                            # an entry for exactly that path counts: a glob
+                            # name (config/*) must not borrow another file's tag.
+                            tagged=$(lgit ls-files -v -z -- "$rel" 2>/dev/null | tr '\0' '\n' | head -n 1) || tagged=""
                             if [ ! -f "$canon" ]; then
                                 hit=1
                             else
-                                case "$tagged" in
-                                    "H "*) ;;
-                                    *) hit=1 ;;
-                                esac
+                                [ "$tagged" = "H $rel" ] || hit=1
                                 # A target git lists as changed is live edited
                                 # content; only a trusted-config one is reverted.
                                 if [ "$hit" = 0 ] && ! rp_trusted_config "$rel"; then
