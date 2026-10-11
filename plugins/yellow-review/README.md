@@ -176,7 +176,7 @@ fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
 | `poll-new-threads` | Bounded re-pass poll for threads that appeared after round 1 |
 | `check-resolve-text` | Refuse credential-shaped or unsafe text (image, `@` mention, foreign URL) before it is posted outside the resolve scripts (for example a Linear issue) |
 | `commit-resolve-fixes` | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files |
-| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--ignored-since <marker-file>` is required for every run and refuses when a gitignored file is newer than the marker, except regular-file tool state: `.ruvector/coedit.json`, `.ruvector/coedit-sessions/` and `node_modules/.vite/vitest/results.json`; `--unattended` also skips runner files; `--revert-only` and `--revert-dirty` revert without running and ignore the marker; `--check-ignored` runs only the gitignored-file guard) |
+| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--ignored-since <marker-file>` is required for every run and refuses when a gitignored file is newer than the marker, except regular-file tool state: `.ruvector/coedit.json`, `.ruvector/coedit-sessions/` and `node_modules/.vite/vitest/results.json`; `--unattended` also skips runner files; `--revert-only` and `--revert-dirty` revert without running and ignore the marker; `--revert-denied` reverts only trusted-config dirty paths (a subset of the deny list), takes no file list, and needs `--ignored-since` (refusing on a changed gitignored trusted-config file) or `--no-ignored-guard`, and leaves a tracked trusted-config symlink whose target was written (or, without the marker, points outside the worktree) in place with `deniedClean` false; `--check-ignored` runs only the gitignored-file guard) |
 | `guard-local-config` | Snapshot the gitignored `yellow-plugins.local.md` and restore it if a resolver changed, created or deleted it; refuses a symlinked config (`/review:resolve-stack` checks after each PR) |
 | `file-line-counts` | Base/head line counts per changed file for `thermonuclear-reviewer` |
 
@@ -191,7 +191,8 @@ the reason names that path and does not say the tree was left untouched.
 The special file is unlinked only after both snapshots succeed. An `rm`
 that cannot unlink one special file is recorded and the revert continues,
 so one already removed is still restored. Checkout does not open a special
-file that is still present.
+file that is still present. `--revert-denied` leaves a special file in place
+and reports `deniedClean: false`.
 
 `commit-resolve-fixes` and `run-verify-command` refuse a `git`, `gh`, or
 `jq` whose canonical file is inside the worktree, and they exec only the

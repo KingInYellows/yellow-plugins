@@ -237,15 +237,19 @@ resolution, and sequential stack review. Graphite-native workflow.
   regular-file tool state (`.ruvector/coedit.json`, `.ruvector/coedit-sessions/`,
   `node_modules/.vite/vitest/results.json`); `--unattended` also skips runner files;
   `--revert-only` reverts the listed files; `--revert-dirty` reverts every change in the tree and takes no
-  file list; `--check-ignored --ignored-since <marker-file>` runs only the
+  file list; `--revert-denied` reverts only trusted-config dirty paths
+  (`rp_trusted_config`, a subset of the deny list), takes no file list, and
+  needs `--ignored-since <marker-file>` (refusing on a changed gitignored
+  trusted-config file) or `--no-ignored-guard`; a tracked trusted-config symlink whose target was written since the marker (or, with `--no-ignored-guard`, resolves outside the worktree, onto a directory, onto anything but a tracked regular file with a plain `H` tag, or onto a target git lists as modified unless that target is itself trusted-config) is reported with `deniedClean: false` (a clean link is left alone; a redirected or replaced one is restored and its HEAD target judged the same way), and a verify run refuses on one; a tracked symlink with an ordinary name that resolves to a directory outside the worktree is checked the same way for trusted-config descendants (`cfg -> /elsewhere`, then a write to `cfg/.claude/settings.json`): it counts when such a file is newer than the marker (nested links followed, a loop or find error counts) or, with `--no-ignored-guard`, when one exists, and the walk counts after 50000 entries; `--check-ignored --ignored-since <marker-file>` runs only the
   gitignored-file guard, for a resolve with no verify command.
   `/review:resolve-stack` and `/review:sweep-all` run it after a
   dirty resolve only when every dirty path is owned by the run (a PR file
-  or trusted-config path); otherwise they run `--revert-only` on the owned
-  trusted-config paths, which leaves unrecognized changes in place, so the
+  or trusted-config path); otherwise they run `--revert-denied --no-ignored-guard`, which reverts
+  only the trusted-config paths and leaves unrecognized changes in place, so the
   tree can stay dirty and the walk stops
-  (`references/review-resolve-stack/dirty-tree-cleanup.md`); both reject `--timeout`, `--command-file`,
-  `--trusted` and `--unattended`). In revert modes a FIFO, socket or device is
+  (`references/review-resolve-stack/dirty-tree-cleanup.md`); every revert flag rejects `--timeout`,
+  `--command-file`, `--trusted` and `--unattended`, and only one mode flag may be given).
+  In `--revert-only` and `--revert-dirty` a FIFO, socket or device is
   never opened: it is renamed aside in its own directory
   (`.yellow-review-hold-*/node`) so the recovery patch records the tracked
   deletion, then renamed back. The hold path is recorded before that rename.
@@ -255,7 +259,8 @@ resolution, and sequential stack review. Graphite-native workflow.
   path and does not say the tree was untouched. It is unlinked only after both
   snapshots succeed. An `rm` that cannot unlink one special file is recorded
   and the revert continues, so one already removed is still restored. Checkout
-  does not open a special file that is still present.
+  does not open a special file that is still present. `--revert-denied` leaves
+  a special file in place and reports `deniedClean: false`.
   The verify gate: interactive runs ask
   first, unattended runs need `verify_unattended: true` and an untracked
   config

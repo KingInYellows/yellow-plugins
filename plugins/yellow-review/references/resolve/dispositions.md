@@ -512,8 +512,25 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   the credential screen withheld it (a pre-resolve baseline is tracked in #973).
   `--revert-dirty` does the same for every change in the tree. It rejects a file
   list: git itself lists the changes (`git diff --name-only HEAD` plus
-  `git ls-files --others --exclude-standard`), never resolver text. Either
-  revert flag combined with `--timeout`, `--command-file`, `--trusted` or
+  `git ls-files --others --exclude-standard`), never resolver text.
+  `--revert-denied` uses that same listing and reverts only paths on the
+  resolver deny list that are trusted config (`rp_trusted_config`: agent
+  instruction and tool-config names, without `.claude/agent-memory/`); other
+  dirty paths stay, the rest of the deny list (`.env*`, keys, CI and Docker
+  files) included, and a file list is rejected. It deletes an untracked
+  trusted-config file whoever created it (the saved patch holds the content
+  unless the credential screen withheld it), and leaves an untracked nested
+  git repository in place, named in `reason`, while still reverting the other
+  paths. It lists no gitignored file, so it requires `--ignored-since
+  <marker-file>` (or an explicit `--no-ignored-guard` from a caller that holds
+  no marker, such as the stack and sweep dirty-tree cleanup) and, with the
+  marker, refuses (exit 2, nothing reverted) when a gitignored trusted-config
+  file is newer than it. It reports
+  `deniedClean` (no deny-listed change remains), `reverted` (at most 20 paths,
+  screened like the patch) and `revertedCount`; an empty match is
+  `result: "noop"` with no patch. `treeClean` still covers the whole tree and is
+  false whenever the kept changes remain, so it is not the success signal.
+  A revert flag combined with `--timeout`, `--command-file`, `--trusted` or
   `--unattended` exits 2. The patch is written and checked before anything is
   reverted. If any patch command fails (full disk, unsupported entry), nothing
   is reverted and the result carries `patch: null`, `treeClean: false` and a
@@ -552,7 +569,8 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   was untouched. An `rm` that cannot unlink one special file is recorded in
   `reason` and does not abort the revert, so a special file already removed
   is still restored from HEAD. Checkout does not open a special file that is
-  still present.
+  still present. `--revert-denied` leaves a special file in place and reports
+  `deniedClean: false`.
   A directory standing where HEAD has a regular file is handled the same way:
   the revert modes save the patch first, with the deletion of the file followed
   by every regular file and symlink inside the directory as new files, and only
@@ -595,11 +613,17 @@ to commit.) A refused edit must not stay on disk: a deny-listed file such as
 a change outside the set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify
 `skipped` — the orchestrator runs `run-verify-command --pr <N> --revert-only`
 on the files the clusters reported under `Files modified`, which saves a patch
-first. Step 2 guarantees a clean start, but not a quiet tree: a changed path no
-cluster reported is not proven to be a resolver's edit, so it is never reverted
-unasked. An interactive run asks (`--revert-dirty` on "Revert them", patch
-saved); an unattended run leaves it in place and Step 9 names it under Blocking
-merge. Exit 4 leaves no new commit behind, so the revert only has to clear the tree;
+first. Then `--revert-denied` (no file list) reverts dirty trusted-config
+paths on the contract deny list without asking, with the `--ignored-since`
+marker (it refuses on a changed gitignored trusted-config file: the ignored-file
+stop), and a refusal before the verify call also runs `--check-ignored` for the
+other gitignored files. The marker lives until the end of Step 6. Step 2
+guarantees a clean start, but not a quiet tree: a changed path no cluster
+reported and that is not trusted config (`.env*`, keys, CI and Docker files
+included) is not proven to be a resolver's edit, so it is never reverted
+unasked. An interactive run asks (`--revert-dirty`
+on "Revert them", patch saved); an unattended run leaves it in place and Step 9
+names it under Blocking merge. Exit 4 leaves no new commit behind, so the revert only has to clear the tree;
 `fixed` threads become `unclear` and the write phase still runs for the other
 threads (exit 4 here is a refusal, not a rate limit). The interactive "push
 rejected" path is the only one that leaves edits in place. After exit 5 or 6 the
@@ -643,7 +667,7 @@ hard cap and the `--wait` + 60 s bound do not hold: the script prints a note and
 fetches run with no time limit, so only the between-page deadline applies and a
 hung `gh` call is not cut short.
 
-`get-pr-comments` (Step 3, with `get-pr-blockers`) gets a `timeout` of 300000
+`get-pr-comments` (Step 3) gets a `timeout` of 300000
 ms. It can fetch 10 pages, so it adds a wall-clock deadline to the per-call cap:
 `YELLOW_REVIEW_FETCH_DEADLINE` (default 270 s, clamped to 1..270; a non-number,
 0 or over-4-digit value falls back to 270), checked before each page. On expiry
@@ -652,7 +676,11 @@ array, the same as a page-cap truncation. From page 2 on each `gh` call's limit
 is also cut to the time left, so the worst case is the 270 s deadline plus `jq`
 and startup, inside 300000 ms. Page 1 gets the full per-call limit; a call
 killed by it exits 1 (`gh timed out`). Without `timeout` or `gtimeout` the calls
-run unbounded, as in the other scripts.
+run unbounded, as in the other scripts. `get-pr-blockers` (Step 3) gets its
+own `timeout` of 360000 ms. The worst case is five `gh` calls: the review
+GraphQL query, then classic protection and rules for the PR base, and the
+same two reads for the default branch when the two differ. Five calls at the
+60 s cap is 300 s, inside 360000 ms.
 
 `commit-resolve-fixes` and `run-verify-command` bound their network calls with a
 `timeout`/`gtimeout` binary that supports `--kill-after`; without one the calls

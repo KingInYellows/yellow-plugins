@@ -1578,6 +1578,36 @@ rp_denied() {
     return 1
 }
 
+# rp_trusted_config <path>: the subset of rp_denied a later agent session
+# trusts as instructions or tool config, matched the same way. These are the
+# only dirty paths a refusal cleanup reverts without asking (--revert-denied,
+# the stack and sweep dirty-tree cleanup); other deny-listed paths (.env*,
+# keys, CI and Docker files) can hold the user's own work and are asked about
+# or left in place. .claude/agent-memory/ at the repository root is excluded:
+# agents with `memory: project` write there during a normal run.
+rp_trusted_config() {
+    local l
+    l=$(rp_lower "$1")
+    case "$l" in
+        .claude/agent-memory|.claude/agent-memory/*) return 1 ;;
+        .claude|*/.claude|.claude/*|*/.claude/*) return 0 ;;
+        .vscode|*/.vscode|.vscode/*|*/.vscode/*) return 0 ;;
+        .devcontainer|*/.devcontainer|.devcontainer/*|*/.devcontainer/*) return 0 ;;
+        .idea|*/.idea|.idea/*|*/.idea/*) return 0 ;;
+        .cursor|*/.cursor|.cursor/*|*/.cursor/*) return 0 ;;
+        .codex|*/.codex|.codex/*|*/.codex/*) return 0 ;;
+        .agents|*/.agents|.agents/*|*/.agents/*) return 0 ;;
+        .gemini|*/.gemini|.gemini/*|*/.gemini/*) return 0 ;;
+        .windsurf|*/.windsurf|.windsurf/*|*/.windsurf/*) return 0 ;;
+        .cline|*/.cline|.cline/*|*/.cline/*) return 0 ;;
+    esac
+    case "${l##*/}" in
+        yellow-plugins.local.md|claude.md|agents.md|gemini.md|.mcp.json) return 0 ;;
+        .cursorrules|.windsurfrules|.clinerules|copilot-instructions.md) return 0 ;;
+    esac
+    return 1
+}
+
 # rp_runtime_override_rels: the repository-relative, lowercased path(s) that
 # YELLOW_REVIEW_GITHUB_STACK_RUNTIME names, one per line. The path is walked
 # component by component as the kernel does, and every node on the way that
@@ -1802,6 +1832,19 @@ rp_tree_changes() {
     fi
 }
 
+# rp_walk_cap: the most entries a symlinked-directory walk visits before it
+# stops and counts the link as changed (fail closed). YR_DIR_LINK_WALK_CAP can
+# only lower the 50000 default: a positive integer without a leading zero;
+# anything else is ignored.
+rp_walk_cap() {
+    local cap=50000
+    case "${YR_DIR_LINK_WALK_CAP:-}" in
+        ''|*[!0-9]*|0|0[0-9]*) ;;
+        *) [ "${#YR_DIR_LINK_WALK_CAP}" -gt 5 ] || [ "$YR_DIR_LINK_WALK_CAP" -ge "$cap" ] || cap=$YR_DIR_LINK_WALK_CAP ;;
+    esac
+    printf '%s' "$cap"
+}
+
 # rp_link_target_changed <symlink> <marker>: judge what a symlink points to,
 # not the link: a write through it changes the target's mtime and leaves the
 # link's alone. The operating system resolves the chain, so a relative target
@@ -1811,22 +1854,68 @@ rp_tree_changes() {
 # `.git` entries skipped). Returns 1 when it is unchanged, not a regular file or
 # directory, or dangling (nothing to write to). Returns 2 when it cannot tell:
 # the link cannot be read, the target directory cannot be walked, or the target
-# is hidden behind a directory that cannot be searched. Run it from the working
+# is hidden behind a directory that cannot be searched. An optional third
+# argument `follow` also judges the symlinks nested below the target by their
+# targets: those inside the worktree are skipped (covered by the tree listing
+# and the ignored scan), those outside are walked once each (a repeat, a loop
+# or a dangling link is skipped); a find error returns 2 (cannot tell). The trusted-config symlink check uses it, and so
+# does rp_ignored_changed_since, filtered or not. The walk is bounded: see rp_walk_cap (at the cap the target counts as changed). Run it from the working
 # tree root with a path that does not begin with `-`.
 rp_link_target_changed() {
-    local l="$1" marker="$2" t p d out skip="" rc=0
+    local l="$1" marker="$2" follow="${3:-}" t p d x n=0 cap skip="" cjson="" top c v dup qi queue seen
     if [ -e "$l" ]; then
         if [ -d "$l" ]; then
             # The root `.ruvector` link: skip its co-edit state as the literal
             # directory scan does (see rp_ignored_changed_since).
-            case "$l" in .ruvector|./.ruvector) skip="$l" ;; esac
-            out=$(set -o pipefail
-                find -H "$l" -name .git -prune -o -path "$skip/coedit-sessions" -prune \
-                    -o \( -path "$skip/coedit.json" -type f \) -prune \
-                    -o \( \( -path '*/node_modules/.vite/vitest/results.json' -o -path 'node_modules/.vite/vitest/results.json' \) -type f \) -prune -o -type f -newer "$marker" -print 2>/dev/null \
-                    | head -n 1) || rc=$?
-            [ -z "$out" ] || return 0
-            [ "$rc" -eq 0 ] || return 2
+            case "$l" in .ruvector|./.ruvector) skip="$l/coedit-sessions" cjson="$l/coedit.json" ;; esac
+            # Every visited entry counts against rp_walk_cap; the walk is
+            # streamed and stops at the first newer file (changed), at the cap
+            # (changed: too large to judge) or at a find error (cannot tell).
+            # With `follow` the walk is breadth-first over link targets, each
+            # directory listed with find -H so a nested symlink is an entry,
+            # not a descent: a nested link whose target lies inside the
+            # worktree is skipped (the tree listing and the ignored scan cover
+            # that content, and pnpm-style stores are full of such links), a
+            # target outside it is queued once (a visited set of canonical
+            # paths skips a repeat, a loop or a dangling link silently), and a
+            # link to a file is judged by its target.
+            cap=$(rp_walk_cap)
+            queue=("$l")
+            if [ "$follow" = follow ]; then
+                top=$(pwd -P) || return 2
+                seen=$(yr_canon_path "$l") || return 2
+                seen=("$seen")
+            fi
+            qi=0
+            while [ "$qi" -lt "${#queue[@]}" ]; do
+                d="${queue[qi]}"
+                qi=$((qi + 1))
+                while IFS= read -r -d '' x; do
+                    [ "$x" != $'\001ERR' ] || return 2
+                    n=$((n + 1))
+                    [ "$n" -le "$cap" ] || return 0
+                    if [ -L "$x" ]; then
+                        [ "$follow" = follow ] && [ "$x" != "$d" ] || continue
+                        [ -e "$x" ] || continue
+                        c=$(yr_canon_path "$x") || continue
+                        ! yr_inside_root "$c" "$top" || continue
+                        if [ -d "$c" ]; then
+                            dup=""
+                            for v in "${seen[@]}"; do
+                                [ "$v" != "$c" ] || { dup=1; break; }
+                            done
+                            [ -n "$dup" ] || { seen+=("$c"); queue+=("$x"); }
+                        elif [ -f "$c" ] && [ "$c" -nt "$marker" ]; then
+                            return 0
+                        fi
+                        continue
+                    fi
+                    [ -f "$x" ] || continue
+                    [ "$x" -nt "$marker" ] && return 0
+                done < <(find -H "$d" -name .git -prune -o -path "$skip" -prune \
+                    -o \( -path "$cjson" -type f \) -prune \
+                    -o \( \( -path '*/node_modules/.vite/vitest/results.json' -o -path 'node_modules/.vite/vitest/results.json' \) -type f \) -prune -o -print0 2>/dev/null || printf '\001ERR\0')
+            done
             return 1
         fi
         [ -f "$l" ] || return 1
@@ -1884,9 +1973,16 @@ rp_link_target_changed() {
 # marker is missing, unreadable, not a regular file or a symlink, git or find
 # fails, or a symlink's target cannot be examined. A caller must treat 2 as a
 # refusal. Whole ignored directories are walked with find; the caller owns
-# <scratch>, a scratch file for git's NUL-delimited listing.
+# <scratch>, a scratch file for git's NUL-delimited listing. An optional fourth
+# argument names a path predicate (rp_trusted_config; pass an empty <hitsfile>
+# to keep the printed form): only paths it accepts count, and a directory walk
+# filters before its 20-path cut. A symlink's target is always walked with
+# `follow`, so a link nested below a linked directory is judged by its own
+# target when that lies outside the worktree (a loop is skipped; the walk is
+# capped, see rp_walk_cap).
 rp_ignored_changed_since() {
-    local marker="$1" scratch="$2" hitsfile="${3:-}" safe own=""
+    local marker="$1" scratch="$2" hitsfile="${3:-}" keep="${4:-}" safe own=""
+    [ -z "$keep" ] || declare -F -- "$keep" >/dev/null || return 2
     [ -f "$marker" ] && [ ! -L "$marker" ] && [ -r "$marker" ] || return 2
     # find, head, mktemp and the rest run by name after the resolvers wrote
     # the tree, so the walk uses the worktree-free PATH, as yr_git does.
@@ -1902,6 +1998,8 @@ rp_ignored_changed_since() {
         local mdir top f p l rc lrc symlist outfile x k dup n=0 seen=()
         mdir=$(cd -- "$(dirname -- "$marker")" 2>/dev/null && pwd) || exit 2
         marker="$mdir/$(basename -- "$marker")"
+        # kept <path>: no predicate, or the predicate accepts the path.
+        kept() { [ -z "$keep" ] || "$keep" "${1#./}"; }
         top=$(yr_git rev-parse --show-toplevel 2>/dev/null) || exit 2
         cd -- "$top" 2>/dev/null || exit 2
         symlist=$(mktemp) || exit 2
@@ -1923,19 +2021,24 @@ rp_ignored_changed_since() {
                 # name can hold a newline) and only the first 20 are kept, so
                 # a tree rewritten end to end cannot fill memory; a find that
                 # fails with nothing found is "cannot tell".
+                # A predicate filters before the cut, so an accepted name
+                # past 20 rejected ones still counts.
                 (set -o pipefail
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune \
                         -o \( -path ./.ruvector/coedit.json -type f \) -prune \
                         -o \( -path '*/node_modules/.vite/vitest/results.json' -type f \) -prune -o \( -type f -o -type l \) -newer "$marker" -print0 2>/dev/null \
-                        | { k=0; while IFS= read -r -d '' x; do [ "$k" -ge 20 ] || printf '%s\0' "$x" || exit 2; k=$((k + 1)); done; }) >|"$outfile" || rc=$?
+                        | { k=0; while IFS= read -r -d '' x; do kept "$x" || continue; [ "$k" -ge 20 ] || printf '%s\0' "$x" || exit 2; k=$((k + 1)); done; }) >|"$outfile" || rc=$?
                 if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ]; then
                     # Nothing newer: judge the target of each symlink inside.
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune -o -type l -print0 >|"$symlist" 2>/dev/null || exit 2
                     while IFS= read -r -d '' l; do
+                        # A path the predicate rejects never counts, so its
+                        # target is not examined (it could abort the guard).
+                        kept "$l" || continue
                         lrc=0
-                        rp_link_target_changed "$l" "$marker" || lrc=$?
+                        rp_link_target_changed "$l" "$marker" follow || lrc=$?
                         case "$lrc" in
-                            0) printf '%s\0' "$l" >|"$outfile" || exit 2; break ;;
+                            0) if kept "$l"; then printf '%s\0' "$l" >|"$outfile" || exit 2; break; fi ;;
                             1) ;;
                             *) exit 2 ;;
                         esac
@@ -1943,17 +2046,18 @@ rp_ignored_changed_since() {
                 fi
             elif [ -L "./$f" ]; then
                 find "./$f" -type l -newer "$marker" -print0 >|"$outfile" 2>/dev/null || rc=$?
-                if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ]; then
+                kept "$f" || : >|"$outfile"
+                if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ] && kept "$f"; then
                     lrc=0
-                    rp_link_target_changed "./$f" "$marker" || lrc=$?
+                    rp_link_target_changed "./$f" "$marker" follow || lrc=$?
                     case "$lrc" in
-                        0) printf '%s\0' "./$f" >|"$outfile" || exit 2 ;;
+                        0) if kept "$f"; then printf '%s\0' "./$f" >|"$outfile" || exit 2; fi ;;
                         1) ;;
                         *) exit 2 ;;
                     esac
                 fi
             elif [ -f "./$f" ]; then
-                if [ "./$f" -nt "$marker" ]; then printf '%s\0' "./$f" >|"$outfile" || exit 2; fi
+                if [ "./$f" -nt "$marker" ] && kept "$f"; then printf '%s\0' "./$f" >|"$outfile" || exit 2; fi
             fi
             if [ ! -s "$outfile" ]; then
                 [ "$rc" -eq 0 ] || exit 2

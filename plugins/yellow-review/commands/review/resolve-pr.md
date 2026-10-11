@@ -171,11 +171,12 @@ would stay open without a report. Then:
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-blockers" "<owner/repo>" "<PR#>"
 ```
 
-Give both of these read-only calls a Bash tool `timeout` of 300000 ms: each
-makes several `gh` calls bounded at 60 s apiece, so the 120 s default could
-kill a slow lookup. `get-pr-comments` can fetch 10 pages, so it also stops
-paginating at a 270 s deadline and ends inside that budget. The contract's
-"Bash timeouts" is the single source for these numbers.
+Give `get-pr-comments` a Bash tool `timeout` of 300000 ms and `get-pr-blockers`
+a timeout of 360000 ms: each makes several `gh` calls bounded at 60 s apiece, so
+the 120 s default could kill a slow lookup. `get-pr-comments` can fetch 10
+pages, so it also stops paginating at a 270 s deadline and ends inside that
+budget. The contract's "Bash timeouts" is the single source for these numbers,
+including the `get-pr-blockers` derivation.
 
 It never fails the run; keep its JSON (`changesRequested`,
 `conversationResolution`, `lookupFailed`) for Step 9. When `lookupReason` or
@@ -440,9 +441,30 @@ script exit 2, 3 or 4 (exit 4 also covers a failed commit or hook; a
 `skipped` verify — make every `fixed` thread `unclear` and roll back what the
 resolvers are known to have changed: a refused edit must not stay on disk. Run
 `run-verify-command --pr "<PR#>" --revert-only --files-from "<file>"` (patch
-saved) on every file a cluster reported under `Files modified`. A changed path
-that no cluster reported is not proven to be a resolver's: it can be work done
-in this tree after Step 2. Interactive: name those paths in one
+saved) on every file a cluster reported under `Files modified`. Then run
+`run-verify-command --pr "<PR#>" --revert-denied --ignored-since "$MARK_DIR/ignored-marker"`
+(no file list; patch saved) after the marker re-validation under Verify; the
+marker lives until Marker cleanup, so every refusal has it.
+It reverts only dirty paths on the contract deny list that are trusted config
+(`rp_trusted_config` in `lib/resolve-paths.sh`: agent instruction and
+tool-config names): such a file would be trusted by the next session, and
+Step 6 still never puts a resolver path on a command line. Read its JSON like the
+per-file revert: a non-zero exit, or a `reason` containing `revert failed:` or
+`nothing was reverted`, means a deny-listed edit may still be on disk; report
+each remaining trusted-config dirty path in Step 9 under Blocking merge as
+`<path>: deny-listed edit left on disk (revert incomplete)`. `deniedClean` is
+the success signal, and `treeClean` is false whenever the other changes remain,
+so it is not one; `noop` means no trusted-config path had changed. A
+gitignored trusted-config file has no HEAD copy, so it first refuses (exit 2,
+nothing reverted) with `gitignored trusted-config files changed since` on
+stderr when one is newer than the marker: that is the **ignored-file stop**.
+Other gitignored files are not its concern. When the refusal came before the
+verify or `--check-ignored` call below, run that `--check-ignored` call too;
+exit 2 with `gitignored files changed since` is the ignored-file stop. A changed path
+that no cluster reported and that is not trusted config (the rest of the deny
+list, such as `.env*`, keys, CI and Docker files, included) is not proven to be
+a resolver's:
+it can be work done in this tree after Step 2. Interactive: name those paths in one
 `AskUserQuestion` with "Revert them / Leave them"; Revert runs
 `run-verify-command --pr "<PR#>" --revert-dirty` (patch saved). Non-interactive:
 leave them in place and report each in Step 9 under Blocking merge as
@@ -484,8 +506,8 @@ PR) and `--ignored-since` with Step 3f's marker (required for every run,
 attended or not: the script refuses when any gitignored file is newer than
 the marker). Write the command with the Write tool to a
 `mktemp` path and pass the Bash tool a `timeout` of `(<seconds> + 60) × 1000`
-ms. The trap lives in this consuming call, after the path is re-validated, and
-removes the marker directory on every exit:
+ms. Every call that uses the marker starts with this re-validation; none of
+them removes it (Marker cleanup does):
 
 ```bash
 TMP_ROOT="${TMPDIR:-/tmp}"; TMP_ROOT="${TMP_ROOT%/}"
@@ -498,17 +520,19 @@ esac
 [ -d "$MARK_DIR" ] && [ ! -L "$MARK_DIR" ] && [ -O "$MARK_DIR" ] &&
   [ -f "$MARK_DIR/ignored-marker" ] && [ ! -L "$MARK_DIR/ignored-marker" ] || {
   printf '[review:resolve] Error: marker path rejected.\n' >&2; exit 1; }
-trap 'rm -rf -- "$MARK_DIR"' EXIT
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --timeout "<seconds>" --command-file "<command-file>" --trusted --ignored-since "$MARK_DIR/ignored-marker" --files-from "<files-file>"
 ```
 
 A rejected marker path is a setup failure: treat it as `verify=skipped
-(marker unavailable)` and revert as above.
+(marker unavailable)` and revert as above, with `--no-ignored-guard` in place
+of `--ignored-since` on the `--revert-denied` call (the only caller in this
+command that may omit the marker), and name `gitignored files unchecked
+(marker unavailable)` in Step 9 under Blocking merge.
 
 **No verify command.** When there is no `verify_command`, or an unattended run
 has not opted in, still guard the gitignored files before committing: the
 commit runs hooks and an ignored file a resolver edited outlives the run. In
-the same re-validated call, with the same trap, run
+the same re-validated call, run
 `run-verify-command --pr "<PR#>" --check-ignored --ignored-since "$MARK_DIR/ignored-marker"`
 instead of the verify line above. Exit 0 → `verify=none` and the commit
 proceeds. Exit 2 with `gitignored files changed since` on stderr (the verify
@@ -527,10 +551,18 @@ as `<path>: restore by hand (not tracked, no HEAD copy)` and ends with the
 contract's `Resolve:` line (`push=skipped`, `verify=skipped`). The run is a
 stop: callers must not continue past it until the files are restored.
 
-**Marker cleanup.** When no call ran at all (a stop before this step, or a
-declined command), run the same re-validation, then `rm -rf -- "$MARK_DIR"`
-instead of the script, before Step 9; a rejected path is left for the OS temp
-sweep, never deleted.
+**Marker cleanup.** Once Step 6 is done (after Push, after a refusal's
+rollback, or at a stop), and before Step 9, remove the marker. When no call
+ran at all (a stop before this step, or a declined command) and resolvers ran,
+first run the `--check-ignored` call above in this same call: exit 2 with
+`gitignored files changed since` is the ignored-file stop. Re-validate the
+path as under Verify, then:
+
+```bash
+trap 'rm -rf -- "$MARK_DIR"' EXIT
+```
+
+A rejected path is left for the OS temp sweep, never deleted.
 
 `pass` → `verify=pass`. No `verify_command`, or an unattended run that has not
 opted in → `verify=none` after the `--check-ignored` guard above, and the
@@ -676,9 +708,11 @@ rate limit / gh timeout), per-stage failures such as `oos: issue #12 filed, repl
 failed`, and `CHANGES_REQUESTED` reviewers from `get-pr-blockers`, or
 `CHANGES_REQUESTED unknown` when `lookupFailed` is true or `changesRequested`
 is null),
-**Follow-up issues filed** (links, with `tracker=`), and **Conversation
-resolution** (`enforced` / `not enforced` / `unknown`). The final line is
-exactly the contract's `Resolve:` line.
+**Follow-up issues filed** (links, with `tracker=`), **Reverted deny-listed
+paths** when Step 6's `--revert-denied` removed any (each path in its `reverted`
+list with the patch path, or `revert incomplete` when it failed), and
+**Conversation resolution** (`enforced` / `not enforced` / `unknown`). The final
+line is exactly the contract's `Resolve:` line.
 
 ## Error Handling
 

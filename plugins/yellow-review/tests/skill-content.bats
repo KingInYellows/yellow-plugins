@@ -726,7 +726,12 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -qF 'git status --porcelain=v1 -z --untracked-files=all' "$DIRTY_REF"
   grep -qF 'pr-changed-ranges" "<PR#>"' "$DIRTY_REF"
   grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-dirty' "$DIRTY_REF"
-  grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-only -- ' "$DIRTY_REF"
+  # The unrecognized branch reverts trusted config through the shared predicate,
+  # never a model-built path list.
+  grep -qF '${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-denied --no-ignored-guard' "$DIRTY_REF"
+  run ! grep -qF -- '--revert-only -- ' "$DIRTY_REF"
+  grep -qF 'rp_trusted_config' "$DIRTY_REF"
+  grep -q 'deniedClean: false' "$DIRTY_REF"
   grep -q 'do NOT run `--revert-dirty`' "$DIRTY_REF"
   grep -q 'treeClean: false' "$DIRTY_REF"
   grep -q 'revert incomplete' "$DIRTY_REF"
@@ -1129,8 +1134,15 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 
 @test "resolve-pr: the read-only fetch calls get a Bash timeout that covers their capped gh calls" {
   text=$(tr '\n' ' ' <"$RESOLVE_PR" | tr -s ' ')
-  [[ "$text" == *'Give both of these read-only calls a Bash tool `timeout` of 300000 ms'* ]]
+  [[ "$text" == *'Give `get-pr-comments` a Bash tool `timeout` of 300000 ms'* ]]
+  [[ "$text" == *'`get-pr-blockers` a timeout of 360000 ms'* ]]
   [[ "$text" == *'bounded at 60 s apiece'* ]]
+  [[ "$text" == *'including the `get-pr-blockers` derivation'* ]]
+  refs=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')
+  [[ "$refs" == *'`get-pr-blockers` (Step 3) gets its own `timeout` of 360000 ms'* ]]
+  [[ "$refs" == *'five `gh` calls'* ]]
+  stack=$(tr '\n' ' ' <"$RESOLVE_STACK" | tr -s ' ')
+  [[ "$stack" == *'Give this block a Bash tool `timeout` of 300000 ms'* ]]
 }
 
 @test "resolve-pr: the marker mint strips a trailing slash from TMPDIR so Step 6 accepts the path" {
@@ -1150,9 +1162,33 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 @test "resolve-pr: a refusal reverts only reported files and asks before touching other changes" {
   step6flat=$(sed -n '/^### Step 6/,/^### Step 7/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
   [[ "$step6flat" == *'--revert-only --files-from "<file>"` (patch saved) on every file a cluster reported under `Files modified`'* ]]
+  [[ "$step6flat" == *'--revert-denied'* ]]
+  [[ "$step6flat" == *'only dirty paths on the contract deny list'* ]]
   [[ "$step6flat" == *'not proven to be a resolver'* ]]
   [[ "$step6flat" == *'"Revert them / Leave them"'* ]]
   [[ "$step6flat" == *'left in place'* ]]
+  # The per-file revert comes first, then --revert-denied with no argument.
+  [[ "$step6flat" == *'--revert-only --files-from "<file>"'*'--revert-denied --ignored-since "$MARK_DIR/ignored-marker"` (no file list; patch saved)'* ]]
+  # The marker outlives the verify call, so every refusal can pass it.
+  [[ "$step6flat" == *'the marker lives until Marker cleanup, so every refusal has it'* ]]
+  [[ "$step6flat" == *'`gitignored trusted-config files changed since`'* ]]
+  [[ "$step6flat" == *'with `--no-ignored-guard` in place of `--ignored-since`'* ]]
+  # The refusal path judges --revert-denied's JSON and names what stays on disk.
+  [[ "$step6flat" == *'`deniedClean` is the success signal'* ]]
+  [[ "$step6flat" == *'deny-listed edit left on disk (revert incomplete)'* ]]
+  # Only trusted config is reverted unasked; the rest of the deny list is asked
+  # about or left, and a refusal before the verify call still guards ignored files.
+  [[ "$step6flat" == *'`rp_trusted_config` in `lib/resolve-paths.sh`'* ]]
+  [[ "$step6flat" == *'the rest of the deny list, such as `.env*`, keys, CI and Docker files, included'* ]]
+  [[ "$step6flat" == *'When the refusal came before the verify or `--check-ignored` call below, run that `--check-ignored` call too'* ]]
+  [[ "$step6flat" == *'When no call ran at all (a stop before this step, or a declined command) and resolvers ran, first run the `--check-ignored` call above'* ]]
+  step9flat=$(sed -n '/^### Step 9/,/^## Error Handling/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step9flat" == *'**Reverted deny-listed paths**'* ]]
+  dispo=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')
+  [[ "$dispo" == *'--revert-denied'* ]]
+  [[ "$dispo" == *'reverts only paths on the resolver deny list that are trusted config'* ]]
+  [[ "$dispo" == *'`deniedClean` (no deny-listed change remains)'* ]]
+  [[ "$dispo" == *'an empty match is `result: "noop"` with no patch'* ]]
 }
 
 @test "resolve-pr: keeping the partial edits of a conflicted cluster stops the run and reverts nothing" {

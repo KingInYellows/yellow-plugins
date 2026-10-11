@@ -71,6 +71,29 @@ setup() {
   done
 }
 
+@test "rp_trusted_config matches instruction and tool-config paths at any depth, case-insensitively" {
+  for p in .claude/settings.json .Claude/x .vscode/tasks.json .devcontainer/devcontainer.json \
+           .idea/x.xml .cursor/rules/a.mdc .codex/config.toml .agents/skills/x.md \
+           .gemini/settings.json .windsurf/rules/a.md .cline/x.md yellow-plugins.local.md \
+           CLAUDE.md AGENTS.md GEMINI.md .mcp.json .cursorrules .windsurfrules .clinerules \
+           copilot-instructions.md a/b/.claude/settings.json docs/AGENTS.md pkg/.cursor/x \
+           .claude docs/.claude/agent-memory/x.md; do
+    rp_trusted_config "$p" || { echo "not trusted config: $p"; false; }
+    rp_denied "$p" || { echo "trusted config outside the deny list: $p"; false; }
+  done
+}
+
+@test "rp_trusted_config leaves the rest of the deny list and root agent memory to the caller" {
+  for p in .github/workflows/ci.yml .circleci/config.yml .git/config .gitlab-ci.yml Jenkinsfile \
+           Dockerfile deploy/Dockerfile docker-compose.yml compose.yaml .env .env.local \
+           config/.env.prod secrets.yaml keys/a.key keys/server.PEM certs/a.p12 infra/prod.tfvars \
+           .claude/agent-memory .claude/agent-memory/notes.md .Claude/Agent-Memory/x.md \
+           src/a.ts README.md src/my.claude/a; do
+    run rp_trusted_config "$p"
+    [ "$status" -ne 0 ] || { echo "trusted config: $p"; false; }
+  done
+}
+
 @test "rp_runner flags files hooks or verify commands execute" {
   for p in package.json web/package.json pnpm-lock.yaml Makefile conftest.py tests/conftest.py \
            vitest.config.ts .pre-commit-config.yaml lefthook.yml .lintstagedrc.json \
@@ -470,6 +493,35 @@ ignored_repo() {
   [[ "$output" == *node_modules/.bin/runner* ]]
   [[ "$output" == *src/gen.cache* ]]
   [[ "$output" != *new* ]]
+}
+
+@test "rp_ignored_changed_since with a predicate counts only the paths it accepts" {
+  ignored_repo
+  printf '.claude/settings.local.json\n' >> .gitignore
+  mkdir -p .claude
+  printf 'new\n' >| node_modules/.bin/runner
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" "" rp_trusted_config
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  printf '{}\n' >| .claude/settings.local.json
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" "" rp_trusted_config
+  [ "$status" -eq 1 ]
+  [ "$output" = .claude/settings.local.json ]
+}
+
+@test "rp_ignored_changed_since with a predicate filters a directory walk before its 20-path cut" {
+  ignored_repo
+  for i in $(seq 1 25); do printf 'new\n' >| "node_modules/f$i"; done
+  mkdir -p node_modules/pkg/.claude
+  printf '{}\n' >| node_modules/pkg/.claude/settings.json
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" "" rp_trusted_config
+  [ "$status" -eq 1 ]
+  [ "$output" = node_modules/pkg/.claude/settings.json ]
+  rm -rf node_modules/pkg
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" "" rp_trusted_config
+  [ "$status" -eq 0 ]
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" "" no_such_predicate
+  [ "$status" -eq 2 ]
 }
 
 # A full temporary filesystem: the collector's output file (the third mktemp
@@ -882,7 +934,7 @@ old_link() {
   [[ "$output" == *node_modules/.bin/hop1* ]]
 }
 
-@test "rp_ignored_changed_since does not follow symlinks nested below a target directory" {
+@test "rp_ignored_changed_since follows symlinks nested below a target directory without a predicate too" {
   link_repo
   mkdir "$BATS_TEST_TMPDIR/deep"
   printf 'new\n' >| "$BATS_TEST_TMPDIR/deep/file"
@@ -891,7 +943,25 @@ old_link() {
   touch -t 201901010000 real/dir
   old_link ../real/dir src/dir.cache
   run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+}
+
+@test "rp_ignored_changed_since with a predicate follows symlinks nested below a trusted-config link target" {
+  link_repo
+  printf '.claude/\n' >> .gitignore
+  mkdir -p "$BATS_TEST_TMPDIR/deep" .claude
+  printf 'old\n' >| "$BATS_TEST_TMPDIR/deep/file"
+  touch -t 201901010000 "$BATS_TEST_TMPDIR/deep/file"
+  ln -s "$BATS_TEST_TMPDIR/deep" real/dir/nested
+  touch -h -t 201901010000 real/dir/nested
+  touch -t 201901010000 real/dir
+  old_link ../real/dir .claude/commands
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" "" rp_trusted_config
   [ "$status" -eq 0 ]
+  printf 'new\n' >| "$BATS_TEST_TMPDIR/deep/file"
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" "" rp_trusted_config
+  [ "$status" -eq 1 ]
+  [[ "$output" == *.claude/commands* ]]
 }
 
 @test "rp_ignored_changed_since treats a dangling symlink target as no change" {
@@ -2271,6 +2341,21 @@ EOF
   esac
 }
 
+@test "rp_ignored_changed_since never inspects the target of a symlink the predicate rejects" {
+  link_repo
+  old_link ../real/tool src/skip.cache
+  mkdir -p .cache/d
+  ln -s ../../real/tool .cache/d/link
+  # A target that cannot be examined (an unsearchable directory) reports 2.
+  rp_link_target_changed() { return 2; }
+  only_claude() { [ "$1" = CLAUDE.md ]; }
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH" "" only_claude
+  [ "$status" -eq 0 ]
+  # Without a predicate the unexaminable target still fails closed.
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 2 ]
+}
+
 @test "yr_safe_path drops a symlinked outside directory whose child links into the worktree, in find and in the shell" {
   mkdir -p ignored "$BATS_TEST_TMPDIR/realbin" "$BATS_TEST_TMPDIR/realscript"
   printf '#!/bin/sh\nexit 0\n' >| ignored/awk
@@ -2579,6 +2664,43 @@ unprivileged() {
     rc=0; ( export GIT_CONFIG_PARAMETERS="$val"; harden_git_config full ) || rc=$?
     [ "$rc" -eq 0 ] || { echo "refused: $val" >&2; return 1; }
   done
+}
+
+# --- rp_link_target_changed: the directory walk is bounded (rp_walk_cap) ---
+
+walk_fixture() {
+  EXT="$BATS_TEST_TMPDIR/ext"
+  mkdir -p "$EXT/sub"
+  (cd "$EXT/sub" && seq 1 100 | xargs touch -t 201901010000)
+  ln -s "$EXT" lnk
+  MARKER="$BATS_TEST_TMPDIR/marker"
+  touch -t 202001010000 "$MARKER"
+}
+
+@test "rp_walk_cap only lowers the default and ignores other values" {
+  [ "$(rp_walk_cap)" = 50000 ]
+  [ "$(YR_DIR_LINK_WALK_CAP=50 rp_walk_cap)" = 50 ]
+  for v in 0 007 -5 abc 5.5 50000 99999 100000 999999999 ''; do
+    [ "$(YR_DIR_LINK_WALK_CAP=$v rp_walk_cap)" = 50000 ] || { echo "accepted: $v"; false; }
+  done
+}
+
+@test "rp_link_target_changed counts a linked tree with more old files than the cap as changed" {
+  walk_fixture
+  YR_DIR_LINK_WALK_CAP=50 run rp_link_target_changed lnk "$MARKER"
+  [ "$status" -eq 0 ]
+  YR_DIR_LINK_WALK_CAP=50 run rp_link_target_changed lnk "$MARKER" follow
+  [ "$status" -eq 0 ]
+  # Under the cap the same tree is unchanged.
+  run rp_link_target_changed lnk "$MARKER"
+  [ "$status" -eq 1 ]
+}
+
+@test "rp_link_target_changed still finds a newer file under the cap" {
+  walk_fixture
+  touch "$EXT/sub/new"
+  run rp_link_target_changed lnk "$MARKER"
+  [ "$status" -eq 0 ]
 }
 
 @test "harden_git_config refuses a global config whose program value names a file inside the worktree" {
