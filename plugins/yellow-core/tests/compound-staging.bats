@@ -141,6 +141,15 @@ teardown() {
   [ "$result" = 'sent Basic [REDACTED] and basic [REDACTED] ok' ]
 }
 
+@test "redact_secrets redacts a bare Basic payload whose UTF-8 continuation bytes fall in 0x80-0x9F" {
+  # U+0100 is C4 80 and U+1F511 is F0 9F 94 91; a lone 0x80 stays a control.
+  t1=$(printf '\304\200b:cd' | base64)
+  t2=$(printf 'ab:\360\237\224\221x' | base64)
+  t3=$(printf 'a\200b:cd' | base64)
+  result=$(printf 'Basic %s and Basic %s and Basic %s\n' "$t1" "$t2" "$t3" | cs_redact_secrets)
+  [ "$result" = "Basic [REDACTED] and Basic [REDACTED] and Basic $t3" ]
+}
+
 @test "redact_secrets redacts a bare Basic payload with an empty user and a colon in the password" {
   # OmE6Yg = ":a:b" (empty user, password "a:b").
   result=$(printf 'sent Basic OmE6Yg ok\n' | cs_redact_secrets)

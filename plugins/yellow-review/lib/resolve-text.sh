@@ -210,7 +210,7 @@ _rt_scan() {
             if (c == "/") return 63
             return -1
         }
-        function basiccred(tok, bare,    n, i, a, b, c, d, va, vb, vc, vd, nb, bv, k, x, colon, icolon) {
+        function basiccred(tok, bare,    n, i, a, b, c, d, va, vb, vc, vd, nb, bv, k, x, colon, icolon, need, j) {
             n = length(tok)
             if (n < 4 || n % 4 != 0) return 0
             nb = 0
@@ -239,9 +239,18 @@ _rt_scan() {
             # 86 DB 69 3A 79 72, so the C1 byte 0x86 keeps it clean.
             # Windows-1252 text using 0x80-0x9F (euro, curly quotes) is the
             # accepted residual.
-            colon = 0; icolon = 0
+            # A complete UTF-8 sequence is text, though its continuation
+            # bytes can fall in 0x80-0x9F (U+0100 is C4 80): only a byte
+            # outside such a sequence is judged as a control.
+            colon = 0; icolon = 0; need = 0
             for (k = 1; k <= nb; k++) {
                 x = bv[k]
+                if (need > 0) { need--; continue }
+                if (x >= 194 && x <= 244) {
+                    need = (x < 224) ? 1 : (x < 240) ? 2 : 3
+                    for (j = 1; j <= need; j++) if (k + j > nb || bv[k + j] < 128 || bv[k + j] >= 192) need = 0
+                    continue
+                }
                 if (x < 32 || (x >= 127 && x < 160)) return 0
                 if (x == 58) { if (!colon) colon = k; if (k > 1 && k < nb) icolon = 1 }
             }
