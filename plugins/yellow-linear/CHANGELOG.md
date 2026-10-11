@@ -1,5 +1,39 @@
 # Changelog
 
+## 2.2.0
+
+### Minor Changes
+
+- [`305322e`](https://github.com/KingInYellows/yellow-plugins/commit/305322e36cc28d07c11fb423585a3a8d02ace1f0)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/linear:delegate` now launches Jules sessions. When yellow-jules is the
+  resolved remote-agent provider, the command dry-runs the launch, finds an
+  unexpired grant covering the repository, branch, and issue, previews it, and
+  asks before launching. With no covering grant it prints the exact terminal
+  command that writes one and stops without contacting Jules or posting a Linear
+  comment. The Cursor and Devin paths are unchanged.
+
+  The Jules block removes its packet directory on every early exit through an
+  `EXIT` trap; only a dry run that found a covering grant keeps it for the
+  confirmation.
+
+### Patch Changes
+
+- [`e09f7a8`](https://github.com/KingInYellows/yellow-plugins/commit/e09f7a8b17d5a1d8d5a267eb69dd651b9ee6d549)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make Linear
+  follow PRs landed through Graphite's merge queue. The queue closes PRs instead
+  of merging them, so Linear's "PR merged" automation never fired.
+  `smart-submit` and `/flow:work` now end the commit body with a Linear closing
+  line (`Part of <ISSUE-ID>`, or `Closes <ISSUE-ID>` on the commit that
+  completes the issue) taken only from the branch name's ID segment or the
+  plan's `Linear:` field, and `gt-amend` keeps an existing line. `/linear:sync`,
+  `/linear:sync-all` and `linear-pr-linker` no longer read a `CLOSED` PR whose
+  `(#<number>)` squash commit is on the default branch as closed without merge;
+  the check is the new tested `scripts/pr-landed.sh`, which answers `unknown`
+  for a shallow clone, a mismatched origin or any fetch or log failure.
+  `/linear:sync-all` now lists PRs with `--state all`. The Linear and GitHub
+  setup steps are in the yellow-linear README.
+
 ## 2.1.0
 
 ### Minor Changes

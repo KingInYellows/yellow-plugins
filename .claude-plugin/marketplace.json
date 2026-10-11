@@ -14,7 +14,7 @@
     {
       "name": "gt-workflow",
       "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
-      "version": "2.0.6",
+      "version": "2.0.7",
       "author": {
         "name": "KingInYellows"
       },
@@ -34,7 +34,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "2.8.0",
+      "version": "2.9.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -44,7 +44,7 @@
     {
       "name": "yellow-linear",
       "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -74,7 +74,7 @@
     {
       "name": "yellow-jules",
       "description": "Google Jules integration (experimental) — delegate, supervise, and review Jules remote-agent sessions under owner-written grants",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -84,7 +84,7 @@
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.7.0",
+      "version": "3.8.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -94,7 +94,7 @@
     {
       "name": "yellow-ruvector",
       "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
-      "version": "2.0.1",
+      "version": "2.0.2",
       "author": {
         "name": "KingInYellows"
       },
@@ -114,7 +114,7 @@
     {
       "name": "yellow-debt",
       "description": "Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns",
-      "version": "1.8.0",
+      "version": "1.8.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -134,7 +134,7 @@
     {
       "name": "yellow-composio",
       "description": "Optional Composio accelerator for batch workflows with usage tracking",
-      "version": "3.0.2",
+      "version": "3.0.3",
       "author": {
         "name": "KingInYellows"
       },
@@ -144,7 +144,7 @@
     {
       "name": "yellow-research",
       "description": "Deep research plugin with Ceramic, DeepWiki, Perplexity, Tavily, EXA, and Parallel Task MCP servers, plus optional ast-grep CLI code search. Code research inline; deep research saved to docs/research/.",
-      "version": "4.2.3",
+      "version": "5.0.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -204,7 +204,7 @@
     {
       "name": "yellow-goal",
       "description": "yellow-goal engine bridge — probe a pinned goal-gen process, create/validate request packets, run zero-spend stub scenarios, and forward a user-only approval-gated real run. Never imports the engine.",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "author": {
         "name": "KingInYellows"
       },

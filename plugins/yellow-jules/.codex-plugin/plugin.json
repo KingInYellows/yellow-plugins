@@ -1,6 +1,6 @@
 {
   "name": "yellow-jules",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "interface": {
     "displayName": "Jules",
     "category": "Developer Tools"
