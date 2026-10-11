@@ -1,0 +1,36 @@
+.changeset/complexity-snapshot-quarantine.md
+  h_6000354274ce50 1-6
+docs/security.md
+  h_6000354274ce50 1115-1123
+docs/solutions/security-issues/complexity-snapshot-expression-end-heuristics.md
+  h_6000354274ce50 1-36
+plugins/yellow-debt/README.md
+  h_6000354274ce50 314-319
+plugins/yellow-debt/codex/skills/debt-complexity-scan/references/scan-contract.md
+  h_6000354274ce50 21-28,94-96,98-99,101,176-181
+plugins/yellow-debt/skills/debt-complexity-scan/references/scan-contract.md
+  h_6000354274ce50 21-28,94-96,98-99,101,176-181
+scripts/smoke-codex-plugin-lifecycle.js
+  h_6000354274ce50 180,211-216,295,299,632,968
+scripts/smoke-codex-skill-activation.js
+  h_6000354274ce50 271-274,276-285
+tests/integration/codex-waves-analysis-integration.test.ts
+  h_6000354274ce50 176-178,207-246,253,265-267,290-292,308-310,330-332,352-354,371-373,392-394,413-415
+tests/integration/smoke-codex-plugin-install.test.ts
+  h_6000354274ce50 58
+tests/integration/smoke-codex-plugin-lifecycle.test.ts
+  h_6000354274ce50 11-13,56-78
+tests/integration/smoke-codex-skill-activation.test.ts
+  h_6000354274ce50 2-9,12-14,47-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0df390586f87bc3efcf4f4641b42413d65a74037",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
