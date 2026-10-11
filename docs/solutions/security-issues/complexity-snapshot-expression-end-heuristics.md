@@ -25,7 +25,8 @@ the same class of failure open.
 After a recognized credential marker, redact every remaining line in that file
 and return `partial`. Preserve line numbers and earlier source; each other file
 starts independently. This intentionally loses later benign context. The
-marker regex remains a limited detector, so sources known to contain unmarked
+marker regex includes generic `credential` and `credentials` assignments but
+remains a limited detector, so sources known to contain unmarked
 credentials must remain outside this workflow.
 
 ## Verification

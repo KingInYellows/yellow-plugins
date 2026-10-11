@@ -209,6 +209,30 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     expect(lines[8].text).toBe(redactedAt(9));
   });
 
+  it.each([
+    'credential = ',
+    'credentials = ',
+    '"credential": ',
+    "'credentials': ",
+    'DB_CREDENTIAL = ',
+    'service_credentials_v2: ',
+    'CrEdEnTiAlS = ',
+  ])('quarantines generic credential assignment %s', (assignment) => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'const amount = 1;\n' + assignment +
+          '"synthetic-generic-credential";\nconst later = 2;\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    expect(result.output.status).toBe('partial');
+    expect(JSON.stringify(result.output)).not.toContain('synthetic-generic-credential');
+    expect(result.output.files[0].lines[0].text).toBe('const amount = 1;');
+    expect(result.output.files[0].lines[1].text).toBe(redactedAt(2));
+    expect(result.output.files[0].lines[2].text).toBe(redactedAt(3));
+  });
+
   it.each(['??', '||', '&&', '?', ':', '+', '/* continuation */'])(
     'fails closed through a credential expression using %s',
     (operator) => {
@@ -234,7 +258,7 @@ describe('installed flat-reference snapshot enforces paths before source reads',
 
   it('preserves noncredential identifiers and plain URLs in an independent file', () => {
     const content =
-      'const keyboardLayout = "us";\nparseToken(input);\nconst url = "https://example.com/path";\n';
+      'const keyboardLayout = "us";\nparseToken(input);\ngetCredentials(input);\ncredentialize(input);\nconst url = "https://example.com/path";\n';
     const result = inspect('src/file.js', (workspace) => {
       writeFileSync(join(workspace, 'src/file.js'), content);
     });

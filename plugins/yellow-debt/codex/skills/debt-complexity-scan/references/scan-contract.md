@@ -18,8 +18,10 @@ validation and reading cannot be separated by a symlink replacement. It emits
 source data only; analyze it without executing it. A harness may run the program
 and provide its unchanged output as an observation.
 
-After a credential assignment, authorization value, URL userinfo or private-key
-marker, the snapshot redacts that line and every remaining line in the same file
+After a recognized credential-assignment marker (`apiKey`, `token`, `password`,
+`secret`, `privateKey`, or `credential`, including compound/plural names), an
+authorization value, URL userinfo or private-key marker, the snapshot redacts that
+line and every remaining line in the same file
 and returns `partial`. This deliberately sacrifices later benign code: without a
 language parser, delimiter and operator heuristics cannot establish where
 credential expressions end. Other files retain their independent bounds. The
@@ -95,7 +97,7 @@ def inspect(parent_fd, name, relative):
     # A detected credential marker quarantines the remainder of this file.
     hidden = False
     for number, line in enumerate(selected, 1):
-        if re.search(r"(?i)(?:(?:api[_-]?key|token|password|secret|private[_-]?key)[A-Za-z0-9_.-]*[\"']?\s*[=:]|authorization[\"']?\s*[=:,]|\bbearer\s+\S|\b[a-z][a-z0-9+.-]*://[^\s/:@]+:[^\s/@]+@|-----BEGIN [A-Z ]*PRIVATE KEY-----)", line):
+        if re.search(r"(?i)(?:(?:api[_-]?key|token|password|secret|private[_-]?key|credentials?)[A-Za-z0-9_.-]*[\"']?\s*[=:]|authorization[\"']?\s*[=:,]|\bbearer\s+\S|\b[a-z][a-z0-9+.-]*://[^\s/:@]+:[^\s/@]+@|-----BEGIN [A-Z ]*PRIVATE KEY-----)", line):
             hidden = True
         if hidden:
             partial = True
