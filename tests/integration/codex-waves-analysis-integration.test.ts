@@ -233,6 +233,34 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     expect(result.output.files[0].lines[2].text).toBe(redactedAt(3));
   });
 
+  it.each([
+    'Cookie: SID=',
+    'Set-Cookie: SID=',
+    'sessionCookie = ',
+    'session_id: ',
+    'JSESSIONID = ',
+    'PHPSESSID = ',
+    'SID = ',
+    'AUTH_SID = ',
+    'user_sid = ',
+    'userSid = ',
+    '"sId": ',
+  ])('quarantines cookie/session credential %s', (assignment) => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'const amount = 1;\n' + assignment +
+          '"synthetic-cookie-session";\nconst later = 2;\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    expect(result.output.status).toBe('partial');
+    expect(JSON.stringify(result.output)).not.toContain('synthetic-cookie-session');
+    expect(result.output.files[0].lines[0].text).toBe('const amount = 1;');
+    expect(result.output.files[0].lines[1].text).toBe(redactedAt(2));
+    expect(result.output.files[0].lines[2].text).toBe(redactedAt(3));
+  });
+
   it.each(['??', '||', '&&', '?', ':', '+', '/* continuation */'])(
     'fails closed through a credential expression using %s',
     (operator) => {
@@ -258,7 +286,7 @@ describe('installed flat-reference snapshot enforces paths before source reads',
 
   it('preserves noncredential identifiers and plain URLs in an independent file', () => {
     const content =
-      'const keyboardLayout = "us";\nparseToken(input);\ngetCredentials(input);\ncredentialize(input);\nconst url = "https://example.com/path";\n';
+      'const keyboardLayout = "us";\nparseToken(input);\ngetCredentials(input);\ncredentialize(input);\nconst side = 1;\nconst sidebar = 2;\nconst inside = 3;\nconst aside = 4;\nconst url = "https://example.com/path";\n';
     const result = inspect('src/file.js', (workspace) => {
       writeFileSync(join(workspace, 'src/file.js'), content);
     });
