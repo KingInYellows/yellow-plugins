@@ -2509,6 +2509,30 @@ unprivileged() {
   done
 }
 
+@test "a #! short option with its value attached names a path, in awk and in the shell" {
+  printf 'Host *\n' >| config
+  d="$BATS_TEST_TMPDIR/sf"
+  mkdir -p "$d"
+  printf '#!/usr/bin/ssh -Fconfig\n' >| "$d/tool"
+  chmod +x "$d/tool"
+  yr_file_shebang_enters "$d/tool" "$PWD"
+  out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *"$d"* ]]
+}
+
+@test "an executable that cannot be read drops its directory, unless it is setuid or setgid" {
+  [ "$(id -u)" -ne 0 ] || skip "root reads every file"
+  d="$BATS_TEST_TMPDIR/xo"
+  mkdir -p "$d"
+  printf '#!%s/interp\n' "$PWD" >| "$d/tool"
+  chmod 0111 "$d/tool"
+  yr_file_shebang_enters "$d/tool" "$PWD"
+  out=$(PATH="$d:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *"$d"* ]]
+  chmod 4111 "$d/tool"
+  ! yr_file_shebang_enters "$d/tool" "$PWD"
+}
+
 @test "harden_git_config refuses an inherited GIT_CONFIG, which would hide the repository config from its scans" {
   git config filter.evil.clean 'sh -c evil'
   printf '[core]\n\tfsmonitor = false\n\tuntrackedCache = false\n[safe]\n\tbareRepository = explicit\n' >| "$BATS_TEST_TMPDIR/alt.conf"

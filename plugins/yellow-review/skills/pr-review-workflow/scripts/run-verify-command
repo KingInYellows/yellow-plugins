@@ -383,6 +383,13 @@ yr_file_shebang_enters() {
     local f="$1" root="$2" depth="${3:-0}" line rest i x idx last k c cl val p args=""
     local -a w=() v=() nw=()
     [ -f "$f" ] || return 1
+    # An executable that cannot be read hides its #! line from this check,
+    # but the kernel still reads it: fail closed. A setuid or setgid file is
+    # left alone (an execute-only sudo is a binary on some systems).
+    if [ ! -r "$f" ]; then
+        [ -x "$f" ] && [ ! -u "$f" ] && [ ! -g "$f" ] && return 0
+        return 1
+    fi
     IFS= read -r -n 512 line <"$f" 2>/dev/null || true
     case "$line" in '#!'*) ;; *) return 1 ;; esac
     [ "$depth" -le 4 ] || return 0

@@ -208,6 +208,13 @@ yr_file_shebang_enters() {
     local f="$1" root="$2" depth="${3:-0}" line rest i x idx last k c cl val p args=""
     local -a w=() v=() nw=()
     [ -f "$f" ] || return 1
+    # An executable that cannot be read hides its #! line from this check,
+    # but the kernel still reads it: fail closed. A setuid or setgid file is
+    # left alone (an execute-only sudo is a binary on some systems).
+    if [ ! -r "$f" ]; then
+        [ -x "$f" ] && [ ! -u "$f" ] && [ ! -g "$f" ] && return 0
+        return 1
+    fi
     IFS= read -r -n 512 line <"$f" 2>/dev/null || true
     case "$line" in '#!'*) ;; *) return 1 ;; esac
     [ "$depth" -le 4 ] || return 0
@@ -493,8 +500,24 @@ yr_batch_canon_inside() {
 # print nothing, so yr_safe_path probes for it and otherwise falls back
 # to yr_links_inside.
 yr_shebang_inside() {
-    local root="$1" find="$2" rp="$3" awk="$4" out dirs prog depth=1
+    local root="$1" find="$2" rp="$3" awk="$4" out dirs prog depth=1 d f
     shift 4
+    # An executable the scan cannot read hides its #! line, but the kernel
+    # still reads it: fail closed, as yr_file_shebang_enters does (setuid and
+    # setgid files excepted). GNU find tests readability in one pass; without
+    # -readable the shell tests each entry.
+    if "$find" / -maxdepth 0 -readable >/dev/null 2>&1; then
+        out=$("$find" -L "$@" -maxdepth 1 -type f \( -perm -100 -o -perm -010 -o -perm -001 \) \
+            ! -readable ! -perm -4000 ! -perm -2000 -print -quit 2>/dev/null) || true
+        [ -z "$out" ] || return 0
+    else
+        for d in "$@"; do
+            for f in "$d"/* "$d"/.[!.]* "$d"/..?*; do
+                [ -f "$f" ] && [ -x "$f" ] && [ ! -r "$f" ] && [ ! -u "$f" ] && [ ! -g "$f" ] && return 0
+            done
+        done
+    fi
+    out=""
     dirs=$(IFS=:; printf '%s' "$*")
     prog='function splice(val, last,    m, v, j, nn, t) {
             m = split(val, v, /[ \t]+/)
@@ -572,6 +595,8 @@ yr_shebang_inside() {
                 a = w[j]; sub(/^!/, "", a); gsub(/^["\047]|["\047]$/, "", a)
                 pn = 1; pc[1] = a
                 if (a ~ /^-.*=/) { pn = 2; t = a; sub(/^[^=]*=/, "", t); pc[2] = t }
+                # A short option with its value attached (`ssh -Fconfig`).
+                if (a ~ /^-[A-Za-z]./) pc[++pn] = substr(a, 3)
                 for (k = 1; k <= pn; k++) {
                     c = pc[k]
                     if (c ~ /^\//) pr(c)
