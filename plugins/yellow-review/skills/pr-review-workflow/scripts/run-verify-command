@@ -3,7 +3,7 @@
 # failure, timeout or interruption, save the resolver diff as a patch, revert
 # the listed files and report whether the tree is clean again.
 # Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted
-#                           [--unattended] [--ignored-since <marker-file>]
+#                           [--unattended] --ignored-since <marker-file>
 #                           [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-dirty
@@ -15,7 +15,6 @@
 #                  (a file a git hook, package manager or verify command would
 #                  execute); report result "skipped". Every run, attended or
 #                  not, skips when a file is outside the PR's changed files.
-#                  Requires --ignored-since (usage error, exit 2, without it).
 #   --ignored-since <marker-file>: guard for gitignored files, which the tree
 #                  listing cannot see (a resolver edit to an ignored executable
 #                  such as node_modules/.bin/<runner> would run with the
@@ -34,9 +33,10 @@
 #                  everything else still refuses. A
 #                  marker that is missing, unreadable, a symlink or not a
 #                  regular file also refuses (fail closed), as does a listing
-#                  failure. Attended runs may omit it. The revert modes ignore
-#                  it. Ignored changes are refused, never reported as a clean
-#                  tree: treeClean covers tracked and untracked-unignored files.
+#                  failure. Every run requires it (usage error, exit 2, without
+#                  it). The revert modes ignore it. Ignored changes are refused,
+#                  never reported as a clean tree: treeClean covers tracked and
+#                  untracked-unignored files.
 #   --check-ignored: run nothing and revert nothing; only the --ignored-since
 #                  guard, for a resolve run that has no verify command (the
 #                  commit still runs hooks, and an ignored file edited by a
@@ -107,9 +107,14 @@
 #   that left changes outside the listed files reports result "pass" with
 #   treeClean false and a reason; nothing is reverted.
 # Exit codes: 0 ran (read "result"), 2 refused or could not start: usage
-#   error (including run-only flags next to a revert flag, and --unattended
+#   error (including run-only flags next to a revert flag, and a run
 #   without --ignored-since), no --trusted,
 #   unreadable --command-file or --files-from, not in a git repository, a
+#   git config harden_git_config refuses in any mode (a non-numeric
+#   GIT_CONFIG_COUNT, an override that did not take, or a repository-local
+#   or worktree non-LFS filter command; a run also refuses a local
+#   core.sshCommand, core.askPass, core.gitProxy or credential helper, which
+#   the revert and check-ignored modes leave alone; the tree is untouched), a
 #   refused path (not canonical, deny-listed when running, gitignored or
 #   unverifiable, or without changes when running), a change outside the
 #   listed files, an ignored file changed since the --ignored-since marker (or
@@ -161,7 +166,14 @@ LOG_CAP_BYTES=1048576
 LOG_CONTEXT_BYTES=65536
 KEEP=10
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd) || exit 2
+# By parameter expansion, not dirname: a PATH lookup could land in the
+# worktree, where a resolver may have planted a dirname.
+case "$0" in
+    */*) _rv_dir=${0%/*}; [ -n "$_rv_dir" ] || _rv_dir=/ ;;
+    *) _rv_dir=. ;;
+esac
+SCRIPT_DIR=$(cd -- "$_rv_dir" && pwd) || exit 2
+unset _rv_dir
 PLUGIN_ROOT=$(cd -- "$SCRIPT_DIR/../../.." && pwd) || exit 2
 
 # The libraries below run before any tree check. In a source checkout they sit
@@ -176,7 +188,7 @@ PLUGIN_ROOT=$(cd -- "$SCRIPT_DIR/../../.." && pwd) || exit 2
 # check_lib_integrity runs before that file is sourced: a function that
 # exists only there cannot resolve the first git. A caller-supplied path is
 # ignored. The result stays in the shell; it is not written to a file.
-unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ
+unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ YR_GIT_PATH YR_ORIG_PATH
 # yr_helper <name>: a helper the trust check itself must run (readlink). Looked
 # up in fixed system directories, never on PATH: a PATH directory inside the
 # worktree could hold a planted one that runs before any check. Fails closed
@@ -279,6 +291,250 @@ yr_inside_root() {
     return 1
 }
 
+# yr_has_root <string> <root>: succeed when <string> contains <root> as a whole
+# path: not preceded by a path character and followed by / or a character that
+# cannot continue a name. A sibling such as <root>2 or <root>-keys is not it.
+yr_has_root() {
+    local rest="$1" root="$2" pre post prev next
+    while :; do
+        case "$rest" in *"$root"*) ;; *) return 1 ;; esac
+        pre=${rest%%"$root"*}
+        post=${rest#*"$root"}
+        prev=${pre: -1}
+        next=${post:0:1}
+        case "$prev" in [A-Za-z0-9._/-]) ;; *)
+            case "$next" in [A-Za-z0-9._-]) ;; *) return 0 ;; esac
+        esac
+        rest=$post
+    done
+}
+
+# yr_args_enter <string> <root> <skip-bare-first>: succeed when <string>, read
+# as a word list, names anything inside <root>: the raw text holds the root as
+# a whole path (yr_has_root), or a word (leading ! and quotes stripped; for
+# --opt=VALUE both the word and VALUE) is an absolute path, or an existing path
+# relative to the current directory, that canonicalizes inside <root>, or a
+# path that cannot be canonicalized. With <skip-bare-first> 1 the first word is
+# left alone when it has no slash (a program name is looked up on PATH, never
+# in the current directory). Words starting with ~ or $ are not judged here.
+yr_args_enter() {
+    local v="$1" root="$2" skipfirst="${3:-0}" phys tok t u c rest first=1 noglob=1
+    local -a toks=()
+    phys=$(pwd -P) || return 0
+    yr_has_root "$v" "$root" && return 0
+    case $- in *f*) noglob=0 ;; esac
+    {
+        local IFS=$' \t\n'
+        set -f
+        toks=($v)
+        [ "$noglob" -eq 0 ] || set +f
+    }
+    for tok in ${toks[@]+"${toks[@]}"}; do
+        t=${tok#!}
+        t=${t#[\"\']}
+        t=${t%[\"\']}
+        # A short option with its value attached (`ssh -Fconfig`, `-I.`)
+        # names that value as a path too.
+        rest=""
+        case "$t" in -[A-Za-z]?*) rest=${t#-?} ;; esac
+        for u in "$t" "${t#*=}" "$rest"; do
+            case "$u" in
+                ''|'~'*|'$'*) continue ;;
+                /*)
+                    c=$(yr_canon_path "$u" 2>/dev/null) || return 0
+                    yr_inside_root "$c" "$root" && return 0
+                    yr_inside_root "$u" "$root" && return 0
+                    ;;
+                *)
+                    if [ "$first" -eq 1 ] && [ "$skipfirst" -eq 1 ]; then
+                        case "$u" in */*) ;; *) continue ;; esac
+                    fi
+                    [ -e "$u" ] || continue
+                    c=$(yr_canon_path "$phys/$u" 2>/dev/null) || return 0
+                    yr_inside_root "$c" "$root" && return 0
+                    ;;
+            esac
+            case "$t" in -*=*|-[A-Za-z]?*) ;; *) break ;; esac
+        done
+        first=0
+    done
+    return 1
+}
+
+# yr_file_shebang_enters <file> <root>: succeed when <file> starts with a #!
+# line that would run anything inside <root> by canonical path or identity, or
+# cannot be canonicalized (fail closed): the interpreter, the program `env` is
+# asked to run, or a path in the optional argument (Linux passes the rest of
+# the line as one argument, BSD splits it; both are judged, see yr_args_enter).
+# The first line is read and never run. `env` operands follow env(1): options
+# with an argument (-u, -C, -P, -a and their long forms), NAME=value words, and
+# -S / --split-string, whose string is split into words that continue the
+# operand list (attached or separate, and inside a short cluster such as
+# -vS; a `$`, backslash or quote in that string, which env expands or decodes,
+# counts as entering, and so do a NAME=value operand, -P (env searches a path
+# other than PATH) and -C/--chdir (env resolves the utility elsewhere)). A bare
+# operand is looked up on the caller's PATH (YR_ORIG_PATH), the
+# way the tool itself would be. An interpreter that is itself a #! script is
+# judged the same way, to a depth of 4; a script at depth 5 counts as entering
+# (the kernel follows such chains). Copies of this block (through
+# yr_file_shebang_enters) sit in the two scripts' bootstrap resolvers, which
+# run before this library is sourced; keep them identical.
+yr_file_shebang_enters() {
+    local f="$1" root="$2" depth="${3:-0}" line rest i x idx last k c cl val p args=""
+    local -a w=() v=() nw=()
+    [ -f "$f" ] || return 1
+    # An executable that cannot be read hides its #! line from this check,
+    # but the kernel still reads it: fail closed. A setuid or setgid file is
+    # left alone (an execute-only sudo is a binary on some systems).
+    if [ ! -r "$f" ]; then
+        [ -x "$f" ] && [ ! -u "$f" ] && [ ! -g "$f" ] && return 0
+        return 1
+    fi
+    IFS= read -r -n 512 line <"$f" 2>/dev/null || true
+    case "$line" in '#!'*) ;; *) return 1 ;; esac
+    [ "$depth" -le 4 ] || return 0
+    rest=${line#\#!}
+    rest=${rest#"${rest%%[![:space:]]*}"}
+    read -r -a w <<<"$rest" || true
+    i=${w[0]-}
+    [ -n "$i" ] || return 1
+    case "$i" in
+        env|*/env)
+            i=""
+            idx=1
+            while [ "$idx" -lt "${#w[@]}" ]; do
+                x=${w[idx]}
+                val=""; last=-1
+                case "$x" in
+                    "") idx=$((idx + 1)); continue ;;
+                    --) idx=$((idx + 1)); continue ;;
+                    --split-string) val=${w[idx + 1]-}; last=$((idx + 1)) ;;
+                    --split-string=*) val=${x#*=}; last=$idx ;;
+                    # env resolves the utility after a chdir: fail closed.
+                    --chdir|--chdir=*) return 0 ;;
+                    --unset|--argv0) idx=$((idx + 2)); continue ;;
+                    --*) idx=$((idx + 1)); continue ;;
+                    -?*)
+                        cl=${x#-}
+                        k=0
+                        while [ "$k" -lt "${#cl}" ]; do
+                            c=${cl:k:1}
+                            case "$c" in
+                                P|C)
+                                    # env searches another path than PATH, or
+                                    # chdirs first: fail closed.
+                                    return 0
+                                    ;;
+                                S)
+                                    val=${cl:k+1}; last=$idx
+                                    if [ -z "$val" ]; then val=${w[idx + 1]-}; last=$((idx + 1)); fi
+                                    break
+                                    ;;
+                                u|a)
+                                    [ -n "${cl:k+1}" ] || idx=$((idx + 1))
+                                    break
+                                    ;;
+                            esac
+                            k=$((k + 1))
+                        done
+                        ;;
+                    # NAME=value before the utility (PATH=tools changes where it
+                    # is looked up): fail closed.
+                    *=*) return 0 ;;
+                    *) i="$x"; break ;;
+                esac
+                if [ "$last" -ge 0 ]; then
+                    # env expands ${VAR} and decodes \_ and quotes in a -S string,
+                    # and Linux hands it the whole rest of the line: fail closed
+                    # on any $, backslash or quote from here on.
+                    case "${w[*]:idx}" in *[\$\\\"\']*) return 0 ;; esac
+                    # Splice the -S string's words in place of the option.
+                    v=()
+                    read -r -a v <<<"$val" || true
+                    nw=()
+                    [ "$idx" -eq 0 ] || nw=("${w[@]:0:idx}")
+                    nw=(${nw[@]+"${nw[@]}"} ${v[@]+"${v[@]}"} ${w[@]+"${w[@]:last+1}"})
+                    w=(${nw[@]+"${nw[@]}"})
+                else
+                    idx=$((idx + 1))
+                fi
+            done
+            # What follows the operand is its argument list.
+            [ "$idx" -lt "${#w[@]}" ] && args="${w[*]:idx+1}"
+            i=${i#[\"\']}
+            i=${i%[\"\']}
+            [ -n "$i" ] || return 1
+            # A nested env or other launcher (`env -S env PATH=tools evil`,
+            # `env nice sudo evil`) takes operands this parser does not
+            # follow: fail closed.
+            case "${i##*/}" in env|nice|nohup|timeout|stdbuf|sudo|doas|xargs|setsid|ionice|chrt|taskset|flock|unbuffer|chroot|runuser|su|caffeinate) return 0 ;; esac
+            case "$i" in
+                */*) ;;
+                *) i=$(PATH=${YR_ORIG_PATH-$PATH}; type -P "$i" 2>/dev/null) || return 1 ;;
+            esac
+            ;;
+        *) args=${rest#"$i"} ;;
+    esac
+    # An interpreter given an option that runs or loads code by name
+    # (`python3 -m evil`, `perl -Mevil`, `node -r ./evil`) or a relative
+    # operand it resolves itself runs a worktree file no path check sees: fail
+    # closed. Only absolute paths, `--` and flags that load nothing pass
+    # (python -E -s -u, perl -w -T, ruby -w, awk -f); both splittings of the
+    # argument are judged.
+    case "${i##*/}" in
+        python|python[0-9]*|pypy|pypy[0-9]*|node|nodejs|deno|bun|perl|perl[0-9]*|ruby|ruby[0-9]*|php|php[0-9]*|lua|lua[0-9]*|luajit|Rscript|java|jshell|osascript|tclsh*|wish*|awk|gawk|mawk|nawk)
+            v=()
+            read -r -a v <<<"$args" || true
+            for x in ${v[@]+"${v[@]}"}; do
+                case "$x" in /*|--) continue ;; esac
+                case "${i##*/}:$x" in
+                    python*:-?*|pypy*:-?*) case "${x#-}" in *[!bBdEIOqsSuv]*) return 0 ;; esac ;;
+                    perl*:-?*) case "${x#-}" in *[!wWXTtsalnU0-9]*) return 0 ;; esac ;;
+                    ruby*:-?*) case "${x#-}" in *[!wWvsanl]*) return 0 ;; esac ;;
+                    awk:-f|gawk:-f|mawk:-f|nawk:-f) ;;
+                    *) return 0 ;;
+                esac
+            done
+            ;;
+    esac
+    # A $, backtick, ~, backslash or glob character (* ? [) in an argument is
+    # expanded or decoded by the program the line starts (`#!/bin/sh -c
+    # $PWD/evil`, which BSD and macOS pass as separate arguments), so no path
+    # in it can be judged: fail closed.
+    case "$args" in *[\$\`~\\*?[]*) return 0 ;; esac
+    # A shell control operator, redirection or grouping (`#!/bin/sh -c
+    # PATH=tools:/usr/bin;evil`) lets a `-c` string run a command no path
+    # check sees: fail closed.
+    case "$args" in *[\;\&\|\<\>\(\)]*) return 0 ;; esac
+    if [ -n "$args" ] && yr_args_enter "$args" "$root" 0; then
+        return 0
+    fi
+    case "$i" in /*) p="$i" ;; *) p="$(pwd -P)/$i" ;; esac
+    c=$(yr_canon_path "$p" 2>/dev/null) || return 0
+    yr_inside_root "$c" "$root" && return 0
+    yr_inside_root "$p" "$root" && return 0
+    yr_file_shebang_enters "$c" "$root" $((depth + 1))
+}
+
+# yr_hardlink_enters <file> <root>: succeed when <file> has other hard links
+# and one of them is inside <root> (a link to an ignored script there keeps
+# the script's content under an outside name), or when that cannot be told
+# (the link count unreadable, or the walk of <root> failed before a match).
+# find comes from yr_helper, never PATH. The tree is walked only for a file
+# with a link count above 1 that is on the worktree's device.
+yr_hardlink_enters() {
+    local f="$1" root="$2" find fd rd hit
+    [ -f "$f" ] || return 1
+    find=$(yr_helper find) || return 0
+    hit=$("$find" "$f" -maxdepth 0 -links +1 -print 2>/dev/null) || return 0
+    [ -n "$hit" ] || return 1
+    fd=$("$find" "$f" -maxdepth 0 -printf '%D' 2>/dev/null) || fd=""
+    rd=$("$find" "$root" -maxdepth 0 -printf '%D' 2>/dev/null) || rd=""
+    if [ -n "$fd" ] && [ -n "$rd" ] && [ "$fd" != "$rd" ]; then return 1; fi
+    hit=$("$find" "$root" -xdev -type f -samefile "$f" -print -quit 2>/dev/null) || return 0
+    [ -n "$hit" ]
+}
+
 # yr_resolve_tool <name>: print one absolute path whose canonical file is
 # outside the worktree. Return 1 when <name> is not on PATH, 2 when that
 # canonical file is inside the worktree, 3 when the path cannot be
@@ -301,6 +557,10 @@ yr_resolve_tool() {
     if [ -n "$root" ]; then
         yr_inside_root "$canon" "$root" && return 2
         yr_inside_root "$invoke" "$root" && return 2
+        # A script whose #! interpreter is inside the worktree runs it.
+        yr_file_shebang_enters "$canon" "$root" && return 2
+        # A hard link to a file inside the worktree is that file.
+        yr_hardlink_enters "$canon" "$root" && return 2
     fi
     printf '%s\n' "$invoke"
 }
@@ -365,12 +625,21 @@ check_lib_integrity || exit 2
 
 # shellcheck source=../../../lib/resolve-paths.sh
 . "$PLUGIN_ROOT/lib/resolve-paths.sh" || { printf '[run-verify-command] Error: cannot load lib/resolve-paths.sh\n' >&2; exit 2; }
+# Resolve git and the worktree-free PATH once, here, so later subshells reuse them.
+yr_git --version >/dev/null 2>&1 || true
 # shellcheck source=../../../lib/resolve-text.sh
 . "$PLUGIN_ROOT/lib/resolve-text.sh" || { printf '[run-verify-command] Error: cannot load lib/resolve-text.sh\n' >&2; exit 2; }
 # shellcheck source=../../../lib/verify-run.sh
 . "$PLUGIN_ROOT/lib/verify-run.sh" || { printf '[run-verify-command] Error: cannot load lib/verify-run.sh\n' >&2; exit 2; }
 
 die() { printf '[run-verify-command] Error: %s\n' "$2" >&2; exit "$1"; }
+
+# From here PATH is yr_safe_path's result: a bare mktemp, rm, tail, tr, cat and
+# the rest resolve only to a file outside the worktree, however the verify
+# command or the resolvers changed the tree. A directory that is inside it, or
+# holds any symlink into it, is dropped. The verify command
+# itself keeps the caller's PATH (YR_ORIG_PATH; it may need node_modules/.bin).
+yr_adopt_path || die 2 "no PATH directory is left once those that reach into the repository are dropped; the tree is untouched"
 
 # Bound the gh call that lists the PR's files (shadows gh for the sourced
 # rp_pr_files). Without a timeout binary it runs unbounded, as in
@@ -394,9 +663,9 @@ gh() {
     fi
 }
 usage() {
-    printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] [--ignored-since <marker-file>] | --revert-only | --revert-dirty) [--files-from <file>] [-- <files...>]\n' >&2
+    printf 'Usage: run-verify-command --pr <N> (--timeout <s> --command-file <f> --trusted [--unattended] --ignored-since <marker-file> | --revert-only | --revert-dirty) [--files-from <file>] [-- <files...>]\n' >&2
     printf '       run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>\n' >&2
-    printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required with --unattended\n' >&2
+    printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required for every run; revert modes ignore it\n' >&2
     exit 2
 }
 
@@ -438,10 +707,6 @@ fi
 if [ "$MODE" = check-ignored ]; then
     [ -n "$IGNORED_SINCE" ] || die 2 "--check-ignored requires --ignored-since <marker-file>"
     [ "${#FILES[@]}" -eq 0 ] || die 2 "--check-ignored takes no file list"
-    [ -f "$IGNORED_SINCE" ] && [ ! -L "$IGNORED_SINCE" ] && [ -r "$IGNORED_SINCE" ] \
-        || die 2 "--ignored-since marker is not a readable regular file: $IGNORED_SINCE"
-    IGNORED_SINCE=$(cd -- "$(dirname -- "$IGNORED_SINCE")" && pwd)/$(basename -- "$IGNORED_SINCE") \
-        || die 2 "cannot resolve --ignored-since: $IGNORED_SINCE"
 fi
 if [ "$MODE" = run ]; then
     [ "$TRUSTED" = 1 ] || die 2 "refusing to run an untrusted verify command (pass --trusted only after the tracked-file check or user approval)"
@@ -449,22 +714,36 @@ if [ "$MODE" = run ]; then
     [ -f "$COMMAND_FILE" ] && [ -r "$COMMAND_FILE" ] || die 2 "--command-file not readable: $COMMAND_FILE"
     [ -n "$(tr -d '[:space:]' <"$COMMAND_FILE")" ] || die 2 "--command-file is empty"
     COMMAND_FILE=$(cd -- "$(dirname -- "$COMMAND_FILE")" && pwd)/$(basename -- "$COMMAND_FILE")
-    # Unattended, nothing else sees resolver edits to gitignored files, so the
-    # marker is required. Resolve it now: the script changes directory below.
-    if [ "$UNATTENDED" = 1 ] && [ -z "$IGNORED_SINCE" ]; then
-        printf '[run-verify-command] Error: --unattended requires --ignored-since <marker-file> (touch the file before the resolvers start)\n' >&2
+    # Every run, attended or not: nothing else sees resolver edits to
+    # gitignored files, so the marker is required. Revert modes do not enter
+    # this block.
+    if [ -z "$IGNORED_SINCE" ]; then
+        printf '[run-verify-command] Error: --ignored-since <marker-file> is required (touch the file before the resolvers start)\n' >&2
         exit 2
     fi
-    if [ -n "$IGNORED_SINCE" ]; then
-        [ -f "$IGNORED_SINCE" ] && [ ! -L "$IGNORED_SINCE" ] && [ -r "$IGNORED_SINCE" ] \
-            || die 2 "--ignored-since marker is not a readable regular file: $IGNORED_SINCE"
-        IGNORED_SINCE=$(cd -- "$(dirname -- "$IGNORED_SINCE")" && pwd)/$(basename -- "$IGNORED_SINCE") \
-            || die 2 "cannot resolve --ignored-since: $IGNORED_SINCE"
-    fi
+fi
+# The marker is validated and resolved once for both modes that take it; the
+# script changes directory below.
+if [ "$MODE" = check-ignored ] || [ "$MODE" = run ]; then
+    [ -f "$IGNORED_SINCE" ] && [ ! -L "$IGNORED_SINCE" ] && [ -r "$IGNORED_SINCE" ] \
+        || die 2 "--ignored-since marker is not a readable regular file: $IGNORED_SINCE"
+    IGNORED_SINCE=$(cd -- "$(dirname -- "$IGNORED_SINCE")" && pwd)/$(basename -- "$IGNORED_SINCE") \
+        || die 2 "cannot resolve --ignored-since: $IGNORED_SINCE"
 fi
 
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
 cd -- "$TOP" || die 2 "cannot enter $TOP"
+# Every mode, including revert: a resolver-planted fsmonitor would run on the
+# status below. Hooks stay out of this override. Only a run refuses a local
+# transport, credential or signing config (it is the mode that may reach a
+# submit step); the revert and check-ignored modes refuse only a non-LFS
+# filter, so a resolver cannot block its own rollback with core.sshCommand.
+# This script never commits, so the unsigned-commit note is not printed.
+if [ "$MODE" = run ]; then
+    harden_git_config full || die 2 "$YR_HARDEN_MSG; the tree is untouched"
+else
+    harden_git_config revert || die 2 "$YR_HARDEN_MSG; the tree is untouched"
+fi
 
 REASON=""
 add_reason() { REASON="${REASON:+$REASON; }$1"; }
@@ -477,7 +756,9 @@ FIFO=""
 MARKER=""
 STREAM_FILE=""
 IGNORED_SCRATCH=""
+IGNORED_HITS=""
 DIR_LIST=""
+VR_SHIM=""
 HOLD_LEFTOVER=""
 # The snapshot is provisional until it is complete and credential-screened: any
 # exit before then (a signal, a die, a failed screen) removes it, so no
@@ -486,9 +767,10 @@ PATCH=""
 PATCH_PROVISIONAL=0
 cleanup() {
     local f
-    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$DIR_LIST" "$HOLD_LEFTOVER"; do
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$IGNORED_HITS" "$DIR_LIST" "$HOLD_LEFTOVER"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
+    [ -z "$VR_SHIM" ] || rm -rf -- "$VR_SHIM"
     if [ "$PATCH_PROVISIONAL" = 1 ] && [ -n "$PATCH" ]; then
         rm -f -- "$PATCH"
     fi
@@ -505,14 +787,15 @@ list_tree_changes() {
 
 if [ "$MODE" = check-ignored ]; then
     IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"
+    IGNORED_HITS=$(mktemp) || die 2 "mktemp failed"
     IGN_RC=0
-    IGN_HITS=$(rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH") || IGN_RC=$?
+    rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH" "$IGNORED_HITS" || IGN_RC=$?
     case "$IGN_RC" in
         # No treeClean: this guard never looks at tracked or untracked-unignored
         # changes (the resolver edits are in the tree by design), so claiming
         # a clean tree would let the caller skip its own dirty-tree stop.
         0) jq -nc '{result: "clean", patch: null, log: null}'; exit 0 ;;
-        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored file): ${IGN_HITS//$'\n'/, }" ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored file): $(rp_format_ignored_hits "$IGNORED_HITS")" ;;
         *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
     esac
 fi
@@ -544,8 +827,10 @@ else
         # Reverting is always safe; the deny list only stops running and committing.
         [ "$MODE" = run ] && rp_denied "$f" && die 2 "refusing a deny-listed path: $f"
         # Fail closed unless check-ignore positively says "not ignored" (exit 1).
+        # check-ignore rejects --literal-pathspecs, so this is not lgit; the
+        # two -c overrides are what stop a planted fsmonitor on this call.
         IGN=0
-        git check-ignore -q -- "$f" || IGN=$?
+        yr_git -c core.fsmonitor=false -c core.untrackedCache=false check-ignore -q -- "$f" || IGN=$?
         [ "$IGN" = 1 ] || die 2 "refusing a gitignored (or unverifiable) path: $f"
         if [ -z "$(lgit_nohooks status --porcelain --untracked-files=all -- "$f")" ]; then
             [ "$MODE" = run ] && die 2 "listed file has no changes: $f"
@@ -567,17 +852,16 @@ if [ "$MODE" = run ]; then
     # tree listing above cannot see ignored files, and one may be an executable
     # the command runs (node_modules/.bin/<runner>). Exit 1 means files changed,
     # exit 2 means the check could not tell; both refuse.
-    if [ -n "$IGNORED_SINCE" ]; then
-        IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"
-        IGN_RC=0
-        IGN_HITS=$(rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH") || IGN_RC=$?
-        rm -f -- "$IGNORED_SCRATCH"
-        case "$IGN_RC" in
-            0) ;;
-            1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: ${IGN_HITS//$'\n'/, }" ;;
-            *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
-        esac
-    fi
+    IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"
+    IGNORED_HITS=$(mktemp) || die 2 "mktemp failed"
+    IGN_RC=0
+    rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH" "$IGNORED_HITS" || IGN_RC=$?
+    rm -f -- "$IGNORED_SCRATCH"
+    case "$IGN_RC" in
+        0) ;;
+        1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: $(rp_format_ignored_hits "$IGNORED_HITS")" ;;
+        *) die 2 "cannot check gitignored files against the --ignored-since marker: $IGNORED_SINCE" ;;
+    esac
 
     # Never execute files outside the PR (the resolver's list is untrusted),
     # attended or not. Unattended also never runs runner files.
@@ -629,7 +913,7 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
         # file. A tracked directory (tree), a gitlink or nothing at HEAD holds
         # work that `git checkout HEAD` would not bring back (untracked
         # siblings), so refuse rather than remove it.
-        HEAD_TYPE=$(git cat-file -t "HEAD:$f" 2>/dev/null) || HEAD_TYPE=""
+        HEAD_TYPE=$(lgit cat-file -t "HEAD:$f" 2>/dev/null) || HEAD_TYPE=""
         [ "$HEAD_TYPE" = blob ] \
             || die 2 "refusing to remove a directory that is not a replaced file (HEAD has ${HEAD_TYPE:-nothing} there): $f"
     fi
@@ -712,11 +996,28 @@ run_verify() {
     ( vr_redact_stream <"$FIFO" | tail -c $((LOG_CAP_BYTES + LOG_CONTEXT_BYTES)) >|"$STREAM_FILE" ) &
     TAIL_PID=$!
     start=$SECONDS
+    # bash and timeout are resolved on the screened PATH, then the command gets
+    # the caller's.
+    B=$(type -P bash) || die 2 "bash not found"
+    # Every git the command starts (and any tool that starts git) must find its
+    # own helpers (ssh, askpass, a pager, an editor, credential and config
+    # programs, whatever GIT_SSH_COMMAND or a config file names, even as
+    # `env ssh`) on the screened PATH, not the caller's. A private directory
+    # (0700, outside the worktree) goes first on the command's PATH with a git
+    # shim that runs the validated git on that PATH.
+    VR_SHIM=$(mktemp -d) || die 2 "mktemp failed; the verify command was not run"
+    chmod 700 "$VR_SHIM" || die 2 "cannot protect $VR_SHIM; the verify command was not run"
+    VR_SHIM_REAL=$(cd -- "$VR_SHIM" && pwd -P) || die 2 "cannot resolve the git shim directory; the verify command was not run"
+    ! yr_inside_root "$VR_SHIM_REAL" "$TOP" || die 2 "TMPDIR is inside the repository, so the git shim would be writable by a resolver; the verify command was not run"
+    vr_shq() { local q=${1//\'/\'\\\'\'}; printf "'%s'" "$q"; }
+    printf '#!/bin/sh\nPATH=%s exec %s "$@"\n' "$(vr_shq "$YR_GIT_PATH")" "$(vr_shq "$YELLOW_REVIEW_GIT")" >"$VR_SHIM/git" \
+        && chmod 700 "$VR_SHIM/git" || die 2 "cannot write the git shim; the verify command was not run"
+    VR_PATH="$VR_SHIM:$YR_ORIG_PATH"
     if T=$(vr_timeout_bin); then
-        "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" bash -c "$cmd" >"$FIFO" 2>&1 </dev/null &
+        ( harden_git_config_for_verify; PATH=$VR_PATH; exec "$T" --kill-after="$KILL_AFTER" "$TIMEOUT" "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
         CMD_PID=$!
     else
-        bash -c "$cmd" >"$FIFO" 2>&1 </dev/null &
+        ( harden_git_config_for_verify; PATH=$VR_PATH; exec "$B" -c "$cmd" ) >"$FIFO" 2>&1 </dev/null &
         CMD_PID=$!
         ( vr_watchdog "$CMD_PID" "$TIMEOUT" "$MARKER" "$KILL_AFTER" ) &
         WD_PID=$!
@@ -764,7 +1065,7 @@ run_verify() {
 # deletes a listed file and then fails must not change what the recovery patch
 # holds, because the revert below discards the tree. Every git call must
 # succeed, or the revert would destroy edits the patch does not hold.
-# `git diff --no-index` exits 1 when files differ. A file is a tracked edit
+# `lgit diff --no-index` exits 1 when files differ. A file is a tracked edit
 # when it is in the index or in HEAD (a staged deletion is in HEAD only).
 # <fmt> is --binary for the kept patch and --text for the credential screen:
 # a binary-marked file still hides text a --binary patch would keep.
@@ -837,7 +1138,7 @@ save_patch() {
     for f in ${FILES[@]+"${FILES[@]}"}; do
         # Fixed flags so the patch re-applies whatever the user's diff config.
         if lgit ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
-            || git cat-file -e "HEAD:$f" 2>/dev/null; then
+            || lgit cat-file -e "HEAD:$f" 2>/dev/null; then
             # stat only: -f is false for a FIFO, socket or device. Never open it.
             held_dir=""
             if [ -e "$f" ] && [ ! -L "$f" ] && [ ! -f "$f" ] && [ ! -d "$f" ]; then
@@ -881,7 +1182,7 @@ save_patch() {
             # -L: a dangling symlink has no -e but is still an edit to keep.
             # Never a FIFO or other special file: git diff would open it.
             rc=0
-            git diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
+            lgit diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
                 --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$f" >>"$out" || rc=$?
             [ "$rc" -le 1 ] || return 1
         fi
@@ -892,7 +1193,7 @@ save_patch() {
                     [ "$p" = "$c" ] && continue 2
                 done
                 rc=0
-                git diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
+                lgit diff --no-index --no-color --no-ext-diff --no-textconv "$fmt" \
                     --src-prefix=a/ --dst-prefix=b/ -- /dev/null "$c" >>"$out" || rc=$?
                 [ "$rc" -le 1 ] || return 1
             done <"$DIR_LIST"
@@ -973,7 +1274,7 @@ PATCH_SCREENED=0
 # embedded in a name that anchor. The rules themselves are unchanged.
 # A hunk header keeps its trailing section text, which is file content.
 patch_hunk_lines() {
-    awk '
+    yr_awk '
         /^diff --git / {
             h = 0
             s = substr($0, 12)
@@ -1174,7 +1475,7 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
     for s in ${SKIP_SPECIAL[@]+"${SKIP_SPECIAL[@]}"}; do
         [ "$s" = "$f" ] && continue 2
     done
-    if git cat-file -e "HEAD:$f" 2>/dev/null; then
+    if lgit cat-file -e "HEAD:$f" 2>/dev/null; then
         # Hooks off: post-checkout and post-index-change would run any hook a
         # resolver planted, including an ignored one under core.hooksPath.
         lgit_nohooks checkout -q HEAD -- "$f" >/dev/null 2>&1 || REVERT_FAILS+=("git checkout $f")
@@ -1199,7 +1500,7 @@ fi
 # untracked) means the revert did not fully restore it. A status that cannot
 # be read is not clean.
 CLEAN=true
-if ! STATUS=$(git -c core.hooksPath=/dev/null status --porcelain --untracked-files=all 2>/dev/null) || [ -n "$STATUS" ]; then
+if ! STATUS=$(lgit_nohooks status --porcelain --untracked-files=all 2>/dev/null) || [ -n "$STATUS" ]; then
     CLEAN=false
     [ "${#REVERT_FAILS[@]}" -gt 0 ] || add_reason "changes remain after the revert"
 fi

@@ -26,7 +26,7 @@ case "$*" in
 esac
 STUB
   chmod +x "$STUB_BIN/gh"
-  # The mtime marker --ignored-since compares against (unattended runs need it).
+  # The mtime marker --ignored-since compares against (every run needs it).
   IGN_MARKER="$BATS_TEST_TMPDIR/ignored-marker"
   touch "$IGN_MARKER"
 }
@@ -34,7 +34,9 @@ STUB
 verify() {
   printf '%s\n' "$1" >| "$CMD"
   shift
-  run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" "$@"
+  # Every run requires the marker. A later --ignored-since in "$@" replaces it,
+  # so a test can still pass a bad marker. Tests that omit it call the script.
+  run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" "$@"
 }
 
 mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
@@ -109,6 +111,136 @@ has_kill_after() {
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"change outside the listed files: src/b.txt"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "a fake git-lfs in a PATH directory inside the worktree never runs" {
+  mkdir -p fakebin
+  printf '#!/bin/sh\ntouch "%s/lfs-ran"\nexit 1\n' "$BATS_TEST_TMPDIR" >| fakebin/git-lfs
+  chmod +x fakebin/git-lfs
+  git config --local filter.lfs.clean 'git-lfs clean -- %f'
+  git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
+  git config --local filter.lfs.process 'git-lfs filter-process'
+  printf '*.txt filter=lfs\n' >| .git/info/attributes
+  PATH="$REPO/fakebin:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/lfs-ran" ]
+}
+
+@test "a fake awk in a PATH directory inside the worktree never runs" {
+  mkdir -p fakebin
+  printf '#!/bin/sh\ntouch "%s/awk-ran"\nexit 1\n' "$BATS_TEST_TMPDIR" >| fakebin/awk
+  chmod +x fakebin/awk
+  git config --local filter.x.clean 'cat'
+  PATH="$REPO/fakebin:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/awk-ran" ]
+}
+
+@test "a symlink to an executable inside the worktree in an outside PATH directory never runs" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/outbin"
+  printf '#!/bin/sh\ntouch "%s/helper-ran"\nexit 1\n' "$BATS_TEST_TMPDIR" >| ignored/helper
+  chmod +x ignored/helper
+  ln -s "$REPO/ignored/helper" "$BATS_TEST_TMPDIR/outbin/awk"
+  ln -s "$REPO/ignored/helper" "$BATS_TEST_TMPDIR/outbin/git-lfs"
+  git config --local filter.lfs.clean 'git-lfs clean -- %f'
+  git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
+  git config --local filter.lfs.process 'git-lfs filter-process'
+  printf '*.txt filter=lfs\n' >| .git/info/attributes
+  PATH="$BATS_TEST_TMPDIR/outbin:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/helper-ran" ]
+}
+
+@test "a utility symlinked into the worktree from an outside PATH directory never runs, and the verify command keeps the caller's PATH" {
+  mkdir -p ignored node_modules/.bin "$BATS_TEST_TMPDIR/outbin"
+  printf 'ignored/\nnode_modules/\n' >> .git/info/exclude
+  printf '#!/bin/sh\ntouch "%s/util-ran"\nexit 1\n' "$BATS_TEST_TMPDIR" >| ignored/helper
+  chmod +x ignored/helper
+  touch -t 201901010000 ignored/helper
+  for tool in grep sed tr cut sort wc head tail cat mktemp rm mv find basename date mkdir chmod touch; do
+    ln -s "$REPO/ignored/helper" "$BATS_TEST_TMPDIR/outbin/$tool"
+  done
+  seen="$BATS_TEST_TMPDIR/seen-path"
+  caller="$BATS_TEST_TMPDIR/outbin:$REPO/node_modules/.bin:$PATH"
+  printf '%s\n' 'printf "%s" "$PATH" >| "$BATS_TEST_TMPDIR/seen-path"' >| "$CMD"
+  run --separate-stderr env "PATH=$caller" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/util-ran" ]
+  [ "$status" -eq 0 ] || { echo "status $status: $stderr" >&2; return 1; }
+  # the caller's PATH, behind the private git shim directory (outside the worktree)
+  seen_path=$(cat "$seen")
+  [ "${seen_path#*:}" = "$caller" ]
+  shim=${seen_path%%:*}
+  [[ "$shim" == /* && "$shim" != "$REPO"/* ]]
+}
+
+# Git helpers the verify command's git starts (ssh, here) resolve on the
+# screened PATH, not the caller's: the command's PATH starts with a private
+# directory whose git shim runs the validated git on the screened PATH.
+vr_ssh_fixture() {
+  mkdir -p ignored node_modules/.bin "$BATS_TEST_TMPDIR/goodbin" "$BATS_TEST_TMPDIR/hardbin"
+  printf 'ignored/\nnode_modules/\n' >> .git/info/exclude
+  printf '#!/bin/sh\ntouch "%s/bad-ran"\nexit 255\n' "$BATS_TEST_TMPDIR" >| ignored/helper
+  chmod +x ignored/helper
+  touch -t 201901010000 ignored/helper
+  printf '#!/bin/sh\ntouch "%s/good-ran"\nexit 255\n' "$BATS_TEST_TMPDIR" >| "$BATS_TEST_TMPDIR/goodbin/ssh"
+  chmod +x "$BATS_TEST_TMPDIR/goodbin/ssh"
+  printf '%s\n' 'git ls-remote ssh://host.invalid/repo.git >/dev/null 2>&1 || true' >| "$CMD"
+}
+
+@test "git helpers named as 'env ssh' in GIT_SSH_COMMAND resolve on the screened PATH, not a tracked ssh on the caller's" {
+  vr_ssh_fixture
+  cp ignored/helper node_modules/.bin/ssh
+  touch -t 201901010000 node_modules/.bin/ssh
+  caller="$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH"
+  for cmdline in 'env ssh' 'ssh' 'command ssh' 'exec ssh' 'nice ssh' 'timeout 5 ssh'; do
+    rm -f "$BATS_TEST_TMPDIR/bad-ran" "$BATS_TEST_TMPDIR/good-ran"
+    run --separate-stderr env "PATH=$caller" "GIT_SSH_COMMAND=$cmdline" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
+    [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ] || { echo "tracked ssh ran: $cmdline" >&2; return 1; }
+    [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside ssh did not run: $cmdline: $stderr" >&2; return 1; }
+  done
+}
+
+@test "core.sshCommand=ssh in the user's own config file resolves on the screened PATH" {
+  vr_ssh_fixture
+  cp ignored/helper node_modules/.bin/ssh
+  touch -t 201901010000 node_modules/.bin/ssh
+  git config -f "$BATS_TEST_TMPDIR/user-gitconfig" core.sshCommand ssh
+  caller="$REPO/node_modules/.bin:$BATS_TEST_TMPDIR/goodbin:$PATH"
+  run --separate-stderr env "PATH=$caller" "GIT_CONFIG_GLOBAL=$BATS_TEST_TMPDIR/user-gitconfig" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
+  [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside ssh did not run: $stderr" >&2; return 1; }
+}
+
+@test "an ssh hard-linked to a worktree file in an outside PATH directory never runs from the verify command's git" {
+  vr_ssh_fixture
+  ln ignored/helper "$BATS_TEST_TMPDIR/hardbin/ssh"
+  caller="$BATS_TEST_TMPDIR/hardbin:$BATS_TEST_TMPDIR/goodbin:$PATH"
+  run --separate-stderr env "PATH=$caller" "GIT_SSH_COMMAND=ssh" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
+  [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside ssh did not run: $stderr" >&2; return 1; }
+}
+
+@test "a tr symlinked into the worktree never runs in the revert modes (rp_lower runs tr by name)" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/outbin"
+  printf '#!/bin/sh\ntouch "%s/tr-ran"\ncat\n' "$BATS_TEST_TMPDIR" >| ignored/helper
+  chmod +x ignored/helper
+  ln -s "$REPO/ignored/helper" "$BATS_TEST_TMPDIR/outbin/tr"
+  for mode in --revert-only --revert-dirty; do
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/outbin:$PATH" "$SCRIPT" --pr 7 $mode -- src/a.txt src/new.txt
+    [ ! -e "$BATS_TEST_TMPDIR/tr-ran" ] || { echo "tr ran: $mode" >&2; return 1; }
+    printf 'one\nfeature\nresolver edit\n' >| src/a.txt
+    printf 'new\n' >| src/new.txt
+  done
+}
+
+@test "an inherited YR_GIT_PATH naming a worktree directory is ignored, so a planted awk or git-lfs never runs" {
+  mkdir -p fakebin
+  printf '#!/bin/sh\ntouch "%s/inherited-ran"\nexit 1\n' "$BATS_TEST_TMPDIR" >| fakebin/awk
+  cp fakebin/awk fakebin/git-lfs
+  chmod +x fakebin/awk fakebin/git-lfs
+  git config --local filter.lfs.clean 'git-lfs clean -- %f'
+  git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
+  git config --local filter.lfs.process 'git-lfs filter-process'
+  printf '*.txt filter=lfs\n' >| .git/info/attributes
+  YR_GIT_PATH="$REPO/fakebin:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/inherited-ran" ]
 }
 
 @test "an unlisted dirty file left after --revert-only makes treeClean false" {
@@ -470,7 +602,7 @@ has_kill_after() {
 terminate_while_running() {
   printf '%s\n' 'touch "$BATS_TEST_TMPDIR/started"; sleep 31.1 & sleep 31.1; wait' >| "$CMD"
   set -m
-  "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 60 --trusted -- src/a.txt src/new.txt \
+  "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 60 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt \
     >| "$BATS_TEST_TMPDIR/out" 2>/dev/null 3>&- &
   local pid=$!
   set +m
@@ -627,7 +759,7 @@ SECRET_COMMAND='echo "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789"; ec
 @test "without yellow-core the log is withheld rather than kept raw" {
   copy=$(copy_plugin "$BATS_TEST_TMPDIR/solo/yellow-review")
   printf '%s\n' "$SECRET_COMMAND" >| "$CMD"
-  run --separate-stderr "$copy" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr "$copy" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   log=$(printf '%s' "$output" | jq -r .log)
   [ "$(cat "$log")" = '[withheld: log redaction unavailable]' ]
@@ -642,7 +774,7 @@ SECRET_COMMAND='echo "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789"; ec
   printf 'cs_redact_secrets() { cat; }\n' >| "$market/yellow-core/1.9.0/lib/compound-staging.sh"
   cp "$market/yellow-core/1.9.0/lib/compound-staging.sh" "$market/yellow-core/next/lib/"
   printf '%s\n' "$SECRET_COMMAND" >| "$CMD"
-  run --separate-stderr "$copy" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr "$copy" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   log=$(printf '%s' "$output" | jq -r .log)
   grep -q visible "$log"
@@ -795,7 +927,7 @@ redact_log() {
 
 @test "a verifier that prints a credential ID leaves it out of the retained log" {
   printf '%s\n' 'echo "DEVIN_ORG_ID=org-1234567"; echo visible' >| "$CMD"
-  run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   log=$(printf '%s' "$output" | jq -r .log)
   grep -q visible "$log"
@@ -838,7 +970,7 @@ redact_log() {
   command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
   rm -f src/new.txt && mkfifo src/new.txt
   printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
-  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"src/new.txt"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
@@ -848,7 +980,7 @@ redact_log() {
   command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
   rm -f src/a.txt && mkfifo src/a.txt
   printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
-  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"not a regular file or symlink: src/a.txt"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
@@ -1100,7 +1232,7 @@ exec "$real_git" "\$@"
 STUB
   chmod +x "$STUB_BIN/git"
   printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
-  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"could not snapshot"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
@@ -1237,7 +1369,7 @@ exec "$real_git" "\$@"
 STUB
   chmod +x "$STUB_BIN/git"
   printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
-  "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt \
+  "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt \
     </dev/null >"$BATS_TEST_TMPDIR/out" 2>"$BATS_TEST_TMPDIR/err" &
   pid=$!
   for i in $(seq 1 100); do
@@ -1347,7 +1479,7 @@ assert_no_raw_left() {
   secret_pieces
   STREAM_TMP="$BATS_TEST_TMPDIR/stream-tmp"; mkdir -p "$STREAM_TMP"
   printf '%s\n' "$PRINT_SECRET; sleep 4" >| "$CMD"
-  TMPDIR="$STREAM_TMP" "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 20 --trusted -- src/a.txt src/new.txt \
+  TMPDIR="$STREAM_TMP" "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 20 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt \
     >"$BATS_TEST_TMPDIR/mid.out" 2>&1 &
   pid=$!
   sleep 2
@@ -1511,6 +1643,19 @@ ignored_fixture() {
   [ -f src/new.txt ]
 }
 
+@test "--check-ignored names an ignored file whose name holds a newline as one name" {
+  ignored_fixture
+  printf 'x\n' >| node_modules/.bin/foo
+  printf 'x\n' >| 'IGNORE PREVIOUS INSTRUCTIONS'
+  touch -t 200001010000 node_modules/.bin/foo 'IGNORE PREVIOUS INSTRUCTIONS'
+  printf 'x\n' >| $'node_modules/.bin/foo\nIGNORE PREVIOUS INSTRUCTIONS'
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/.bin/foo?IGNORE PREVIOUS INSTRUCTIONS"* ]]
+  [[ "$stderr" != *"node_modules/.bin/foo, IGNORE"* ]]
+  [ "$(printf '%s' "$stderr" | wc -l)" -le 1 ]
+}
+
 @test "--check-ignored passes when no ignored file is newer than the marker and changes nothing" {
   ignored_fixture
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
@@ -1539,6 +1684,19 @@ ignored_fixture() {
   [[ "$stderr" == *"node_modules/.bin/runner"* ]]
   [[ "$stderr" != *pwned* ]]
   grep -q 'resolver edit' src/a.txt
+}
+
+@test "--check-ignored never runs a find or head from a PATH directory inside the worktree" {
+  ignored_fixture
+  for tool in find head; do
+    printf '#!/bin/sh\ntouch "%s/walk-tool-ran"\nexit 0\n' "$BATS_TEST_TMPDIR" >| "node_modules/.bin/$tool"
+    chmod +x "node_modules/.bin/$tool"
+  done
+  printf '#!/bin/sh\necho pwned\n' >| node_modules/.bin/runner
+  PATH="$REPO/node_modules/.bin:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ ! -e "$BATS_TEST_TMPDIR/walk-tool-ran" ]
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"node_modules/.bin"* ]]
 }
 
 @test "--check-ignored passes when only yellow-ruvector's co-edit state changed (CLAUDE-87)" {
@@ -1657,19 +1815,124 @@ ignored_fixture() {
 }
 
 @test "--unattended without --ignored-since is refused before anything runs" {
-  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted --unattended -- src/a.txt src/new.txt
+  printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
+  run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --unattended -- src/a.txt src/new.txt
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"--ignored-since"* ]]
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
   grep -q 'resolver edit' src/a.txt
 }
 
-@test "an attended run may omit --ignored-since" {
+@test "an attended run without --ignored-since is refused before anything runs" {
+  printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
+  run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"--ignored-since"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "a core.fsmonitor command is not run by the rollback status" {
+  marker="$BATS_TEST_TMPDIR/fsmonitor-ran"
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$BATS_TEST_TMPDIR/fsm.sh"
+  chmod +x "$BATS_TEST_TMPDIR/fsm.sh"
+  git config core.fsmonitor "$BATS_TEST_TMPDIR/fsm.sh"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ ! -e "$marker" ]
+}
+
+@test "a core.fsmonitor command is not run by a failing verify's patch save and rollback" {
+  marker="$BATS_TEST_TMPDIR/fsmonitor-ran"
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$BATS_TEST_TMPDIR/fsm.sh"
+  chmod +x "$BATS_TEST_TMPDIR/fsm.sh"
+  git config core.fsmonitor "$BATS_TEST_TMPDIR/fsm.sh"
+  verify 'exit 3' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c '[.result, .treeClean]')" = '["fail",true]' ]
+  [ ! -e "$marker" ]
+}
+
+@test "a core.fsmonitor command is not run by --check-ignored or by the verify command's own git" {
   ignored_fixture
-  printf '#!/bin/sh\necho changed\n' >| node_modules/.bin/runner
-  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  marker="$BATS_TEST_TMPDIR/fsmonitor-ran"
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$BATS_TEST_TMPDIR/fsm.sh"
+  chmod +x "$BATS_TEST_TMPDIR/fsm.sh"
+  git config core.fsmonitor "$BATS_TEST_TMPDIR/fsm.sh"
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ ! -e "$marker" ]
+  verify 'git status --porcelain >/dev/null' --timeout 10 --trusted -- src/a.txt src/new.txt
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+  [ ! -e "$marker" ]
+}
+
+@test "the verify command does not inherit safe.bareRepository=explicit" {
+  git init -q --bare "$BATS_TEST_TMPDIR/bare.git"
+  verify 'cd "$BATS_TEST_TMPDIR/bare.git" && git rev-parse --git-dir >/dev/null' --timeout 10 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = pass ]
+}
+
+@test "a local core.sshCommand refuses a run but does not block --revert-only or --revert-dirty" {
+  git config core.sshCommand 'touch "$BATS_TEST_TMPDIR/ssh-ran"'
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *core.sshcommand* ]]
+  [[ "$stderr" != *ssh-ran* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  ! grep -q 'resolver edit' src/a.txt
+  printf 'again\n' >| src/a.txt
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ ! -e "$BATS_TEST_TMPDIR/ssh-ran" ]
+}
+
+@test "a local credential helper refuses a run, with the edit still on disk" {
+  git config credential.helper '!touch "$BATS_TEST_TMPDIR/cred-ran"'
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *credential.helper* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "a non-numeric GIT_CONFIG_COUNT refuses every mode with the edit still on disk" {
+  # git itself rejects the value at rev-parse, so the refusal is exit 2 either way.
+  ignored_fixture
+  for args in "--revert-only -- src/a.txt src/new.txt" "--revert-dirty" "--check-ignored --ignored-since $IGN_MARKER"; do
+    # shellcheck disable=SC2086
+    GIT_CONFIG_COUNT=zz run --separate-stderr "$SCRIPT" --pr 7 $args
+    [ "$status" -eq 2 ] || { echo "status $status for: $args" >&2; return 1; }
+    grep -q 'resolver edit' src/a.txt
+  done
+  printf 'touch "$BATS_TEST_TMPDIR/ran"\n' >| "$CMD"
+  GIT_CONFIG_COUNT=zz run --separate-stderr "$SCRIPT" --pr 7 --command-file "$CMD" --timeout 5 --trusted --ignored-since "$IGN_MARKER" -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  grep -q 'resolver edit' src/a.txt
+}
+
+@test "a non-LFS clean filter refuses the revert modes and a run, with the edit still on disk" {
+  git config filter.evil.clean 'touch "$BATS_TEST_TMPDIR/filter-ran"'
+  for args in "--revert-only -- src/a.txt src/new.txt" "--revert-dirty"; do
+    # shellcheck disable=SC2086
+    run --separate-stderr "$SCRIPT" --pr 7 $args
+    [ "$status" -eq 2 ] || { echo "status $status for: $args" >&2; return 1; }
+    [[ "$stderr" == *"filter.<driver>.clean"* ]]
+    grep -q 'resolver edit' src/a.txt
+  done
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 2 ]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+  [ ! -e "$BATS_TEST_TMPDIR/filter-ran" ]
 }
 
 @test "the revert modes ignore --ignored-since" {
@@ -1904,6 +2167,9 @@ hooks_fire_control() {
   printf '.hooks/\n' >> .git/info/exclude
   git config core.hooksPath .hooks
   hooks_fire_control
+  # These hooks are the fixture, not a resolver edit. The marker has to
+  # postdate them or the required --ignored-since guard refuses the run.
+  touch "$IGN_MARKER"
   verify 'exit 1' --timeout 5 --trusted -- src/a.txt src/new.txt
   [ "$(printf '%s' "$output" | jq -r .result)" = fail ]
   [ "$(cat src/a.txt)" = $'one\nfeature' ]
@@ -2382,4 +2648,70 @@ trust_assert_absolute() {
   grep -F -- "--kill-after=1 1 true" "$TRUST_TIMEOUT_LOG" >/dev/null
   grep -F -- "--kill-after=5 30 $TRUST_BIN/gh" "$TRUST_TIMEOUT_LOG" >/dev/null
   grep -F -- "--kill-after=10" "$TRUST_TIMEOUT_LOG" >/dev/null
+}
+
+@test "a git script whose #! interpreter is inside the worktree is refused before the bootstrap runs it (run-verify-command)" {
+  marker="$BATS_TEST_TMPDIR/boot-git-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/interp"
+  chmod +x "$REPO/tools/interp"
+  printf '#!%s/tools/interp\n' "$REPO" >| "$BATS_TEST_TMPDIR/gitbin/git"
+  chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+  printf '%s\n' 'true' >| "$CMD"
+  run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the bootstrap ran the planted git" >&2; return 1; }
+  [ "$status" -eq 2 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
+}
+
+@test "a git script whose #! uses env -S with a variable is refused before the bootstrap runs it (run-verify-command)" {
+  marker="$BATS_TEST_TMPDIR/boot-envs-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/interp"
+  chmod +x "$REPO/tools/interp"
+  printf '%s\n' '#!/usr/bin/env -S ${INTERP}' >| "$BATS_TEST_TMPDIR/gitbin/git"
+  chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+  printf '%s\n' 'true' >| "$CMD"
+  run --separate-stderr env "INTERP=$REPO/tools/interp" "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the bootstrap ran the planted git" >&2; return 1; }
+  [ "$status" -eq 2 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
+}
+
+@test "a git script whose #! has an env assignment or an -S escape is refused before the bootstrap runs it (run-verify-command)" {
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '%s\n' 'true' >| "$CMD"
+  for shebang in '#!/usr/bin/env -S PATH=tools git' '#!/usr/bin/env -S "/tmp/my\_repo/git"'; do
+    printf '%s\n' "$shebang" >| "$BATS_TEST_TMPDIR/gitbin/git"
+    chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt
+    [ "$status" -eq 2 ] || { echo "status $status: $shebang: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git resolves to a path inside the repository"* ]] || { echo "accepted: $shebang" >&2; return 1; }
+  done
+}
+
+@test "a git script whose #! has an env -P is refused before the bootstrap runs it (run-verify-command)" {
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '%s\n' 'true' >| "$CMD"
+  for shebang in '#!/usr/bin/env -P tools git' '#!/usr/bin/env -S -P/usr/bin git'; do
+    printf '%s\n' "$shebang" >| "$BATS_TEST_TMPDIR/gitbin/git"
+    chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt
+    [ "$status" -eq 2 ] || { echo "status $status: $shebang: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git resolves to a path inside the repository"* ]] || { echo "accepted: $shebang" >&2; return 1; }
+  done
+}
+
+@test "a git script whose #! has an env -C is refused before the bootstrap runs it (run-verify-command)" {
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '%s\n' 'true' >| "$CMD"
+  for shebang in '#!/usr/bin/env -C tools git' '#!/usr/bin/env -S --chdir=tools git'; do
+    printf '%s\n' "$shebang" >| "$BATS_TEST_TMPDIR/gitbin/git"
+    chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 5 --trusted -- src/a.txt
+    [ "$status" -eq 2 ] || { echo "status $status: $shebang: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git resolves to a path inside the repository"* ]] || { echo "accepted: $shebang" >&2; return 1; }
+  done
 }

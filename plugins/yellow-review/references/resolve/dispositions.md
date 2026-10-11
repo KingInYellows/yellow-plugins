@@ -428,11 +428,12 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   value) and committing nothing; the user's global or system config is not
   judged, and no key is overridden with an empty value (that would disable the
   user's own credential helper). `gt` (Graphite) or `node` (GitHub), `gh` and
-  `jq` are found through `PATH`: one whose canonical directory is inside the
-  repository's working tree (an ignored `node_modules/.bin`, say) could be
-  replaced by a resolver without a tracked change, so it exits 3 naming the tool
-  and directory before any of them runs. A tool outside the repository, the
-  normal case, is not judged. The Graphite submit's output reaches
+  `jq` are found through `PATH`: one whose canonical file is inside the
+  repository's working tree (an ignored `node_modules/.bin`, or a symlink
+  outside the worktree to a file inside it) could be replaced by a resolver
+  without a tracked change, so it exits 3 naming the tool before any of them
+  runs. Empty and relative `PATH` entries are dropped first. A tool outside the
+  repository, the normal case, is not judged. The Graphite submit's output reaches
   stderr only through the credential redactor, and is withheld when the redactor
   is unavailable;
 - `commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`,
@@ -474,18 +475,28 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
     the range, and a malformed ranges file is exit 2. After a clean pre-check it
     does not fire; an interactive "include them" answer omits the flag for that
     run (file-membership checks still apply);
+- `run-verify-command` hardens git before any tree check (`harden_git_config`
+  in `lib/resolve-paths.sh`) and exits 2 with the tree untouched when it
+  refuses. Every mode refuses a non-numeric `GIT_CONFIG_COUNT`, an override
+  that did not take, and a repository-local or worktree
+  `filter.<driver>.clean|smudge|process` command (the stock Git LFS commands
+  excepted), because a checkout runs it. A run also refuses a repository-local
+  or worktree `core.sshCommand`, `core.askPass`, `core.gitProxy` or
+  `credential.helper`, as `commit-resolve-fixes` does; `--revert-only`,
+  `--revert-dirty` and `--check-ignored` leave those alone, so a resolver
+  cannot block its own rollback with one. The key is named, never its value.
 - `run-verify-command` refuses gitignored files, and when running a command also
   unchanged files, and refuses to run when the tree has changes outside the
   listed files. It does not run the command when a file is outside the PR (or
   the PR's file list cannot be fetched), and with `--unattended` also when a
   file is a runner file; it reports `result: skipped`; a PR file listing that
-  times out (`YELLOW_REVIEW_NET_TIMEOUT`) is skipped the same way. With
-  `--unattended`, `--ignored-since <marker-file>` is required: the command
+  times out (`YELLOW_REVIEW_NET_TIMEOUT`) is skipped the same way. For every
+  run, attended or `--unattended`, `--ignored-since <marker-file>` is required: the command
   refuses when any gitignored file is newer than the marker, because the
   resolver has no shell and cannot backdate an mtime. `/review:resolve` Step 3f
   mints the marker in a private `mktemp -d` directory before any resolver runs,
-  and Step 6 passes it to every verify call (interactive runs may pass it too)
-  and removes the directory. When no verify command runs, Step 6 still calls
+  and Step 6 passes it to every verify call
+  and removes the directory. Revert modes ignore the flag. When no verify command runs, Step 6 still calls
   `run-verify-command --check-ignored --ignored-since <marker-file>`, which runs
   the same guard and nothing else; a refusal reverts and downgrades `fixed`
   threads like any other, except that a changed gitignored file is the

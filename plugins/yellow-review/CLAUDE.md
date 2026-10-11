@@ -232,10 +232,10 @@ resolution, and sequential stack review. Graphite-native workflow.
   exits 2, 3 and 4 are refusals and 5 and 6 keep the local commit
 - `run-verify-command` — Run `resolve_pr.verify_command` under a timeout;
   on failure save a patch, revert the files and report the tree state
-  (`--unattended` skips runner files and requires `--ignored-since
-  <marker-file>`, which refuses when a gitignored file is newer than the marker, except
+  (`--ignored-since <marker-file>` is required for every run, attended or
+  not, and refuses when a gitignored file is newer than the marker, except
   regular-file tool state (`.ruvector/coedit.json`, `.ruvector/coedit-sessions/`,
-  `node_modules/.vite/vitest/results.json`);
+  `node_modules/.vite/vitest/results.json`); `--unattended` also skips runner files;
   `--revert-only` reverts the listed files; `--revert-dirty` reverts every change in the tree and takes no
   file list; `--check-ignored --ignored-since <marker-file>` runs only the
   gitignored-file guard, for a resolve with no verify command.
@@ -262,7 +262,117 @@ resolution, and sequential stack review. Graphite-native workflow.
 
 `commit-resolve-fixes` and `run-verify-command` refuse a `git`, `gh`, or
 `jq` whose canonical file is inside the worktree, and they exec only the
-absolute path outside it.
+absolute path outside it. `commit-resolve-fixes` also refuses a `gt`, `node` or
+`awk` whose canonical file is inside the worktree, including a symlink
+outside the worktree that points at one, and drops empty or relative `PATH`
+entries before that check. Every other program either script, git or a git child
+(`ssh`, `git-credential-*`, `gpg`, pagers, `git-remote-*`) looks up by bare
+name is not refused: both scripts call `yr_adopt_path` before parsing
+arguments and run on `yr_safe_path`'s result. It drops a `PATH` directory
+inside the worktree and any directory (a symlinked `PATH` entry is followed
+into its real children) that holds a symlink, whatever its name,
+dangling or not, whose canonical target (a file or a directory) is inside the
+worktree, and any existing directory it cannot list (execute-only), so the name resolves to a file outside the worktree or not at all.
+It also drops a directory with an executable script whose `#!` interpreter
+(or `env` operand) canonicalizes inside the worktree, such as a console
+script of a venv kept in the repository, and `commit-resolve-fixes` and
+`run-verify-command` refuse a `git`, `gh`, `jq`, `gt`, `node` or `awk` that is
+such a script. There is no name list to extend. The screen runs no `PATH`
+tool: it uses `find`, `awk`, GNU `realpath -m`, `sed` and `sort` from fixed
+system directories, in a handful of batched calls for all directories (about
+0.1 s). Without them it canonicalizes each link and reads each script's first
+line in the shell, and a link it cannot resolve drops the directory.
+`harden_git_config` also refuses (names the variable, never the value) an
+inherited `GIT_SSH_COMMAND`, `GIT_SSH`, `GIT_ASKPASS`, `SSH_ASKPASS`,
+`GIT_PROXY_COMMAND`, `GIT_EXTERNAL_DIFF`, `GIT_PAGER`, `PAGER`, `GIT_EDITOR`,
+`EDITOR` or `VISUAL` whose command line names the worktree, a
+`GIT_EXEC_PATH`, `GIT_TEMPLATE_DIR`, `GIT_CONFIG_GLOBAL` or `GIT_CONFIG_SYSTEM`
+inside it, and injected `GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` or
+`GIT_CONFIG_PARAMETERS` config (`core.sshCommand`, `credential.helper`,
+`gpg.program` and the like) that does; trusted values outside the worktree are
+kept. `GIT_CONFIG_PARAMETERS` is decoded in git's own quoting; an entry that
+cannot be decoded exactly (an escaped quote `'\''`, junk, an unterminated
+entry) is refused. An injected `include.path` or `includeIf.*.path` (either variable form,
+any case) is refused outright: git loads the file as command-line config, which the
+scans skip. A quote that opens in one word and closes in another (a quoted span
+containing whitespace, `sh 'dir with space/evil'`) is refused as unjudgeable;
+single-word wrappers such as `'/usr/bin/ssh'` still pass. `GIT_SSH`, `GIT_ASKPASS`, `SSH_ASKPASS` and the keys `core.askpass` and `gpg.program` hold one
+program path that git execs whole, so `yr_prog_enters` judges them unsplit (`dir with space/evil`
+is one path). For every program value, whatever its origin (environment, injected config, or an
+entry in a global or system file outside the worktree), a word containing `/` skips `PATH`: it is
+resolved against the current directory and the worktree and refused when it, its link target, a
+`#!` interpreter or a hard link behind it is inside the worktree (`core.sshCommand=./evil` in an
+otherwise trusted global config). For `url.ext::<command>.insteadOf` the command in the key is
+judged the same way. A short option's attached value (`ssh -Fconfig`) is judged as a path, and
+a language interpreter first word (`python`, `node`, `perl`, `ruby` and the like, which
+resolve modules and `-r`/`-m` operands themselves, often from the current directory) fails
+closed unless every word after it is an absolute path. Shell syntax the check cannot judge is
+tolerated in those trusted files, so a user's own `!` alias or pager keeps working.
+Any inherited `GIT_EXEC_PATH` is refused (git runs `git-remote-*` and
+other dashed helpers from it, and a link there can reach the worktree; the default exec
+path is right for these scripts). The `#!` check follows an interpreter that is itself a
+`#!` script, to a depth of 4 (an interpreter script at depth 5 counts as entering the
+worktree), in `yr_file_shebang_enters`, the batched awk screen and the bootstrap copies.
+The PATH screen also drops a directory holding a hard link (link count above 1, same
+device and inode) to a regular file inside the worktree, and `yr_resolve_tool` refuses a
+tool that is such a link (one `find -xdev` pass over the worktree, only when a PATH
+directory on its device holds a multi-link file). Without a `-printf` find or GNU
+`realpath`, a directory on the worktree's device holding any multi-link file is dropped,
+and one whose link counts `stat` cannot report is dropped too. A worktree walk that fails part way (an unreadable directory) is not
+cached or trusted: every same-device directory holding a multi-link file is dropped. A
+global or system config file that sets a command and is a hard link to a worktree file
+(or whose link count cannot be read) is refused by `harden_git_config`. Any inherited `GIT_CONFIG` (it makes `git config` read only that file,
+hiding the repository config from the scans) is refused. Command lines are judged whole: the raw value must not contain the
+worktree path as a whole path (`<root>2` and `<root>-keys` are siblings and
+pass), no word (quotes, a leading `!` and `--opt=VALUE` handled) may be an
+absolute path, or an existing path relative to the current directory, that
+resolves inside it, and a bare first word is looked up on the screened `PATH`
+only (never the current directory, so `PAGER=less` is fine next to a `less/`
+directory) and must not be a script whose `#!` interpreter enters the worktree.
+`sh <worktree>/script` and `sh evil` (with `evil` in the current directory) are
+refused. A value that uses shell syntax the check cannot judge (`$`, backtick,
+`;`, `&`, `|`, `<`, `>`, parentheses, `*`, `?`, `[`, a backslash, a newline,
+`~user`, or a quote inside a word rather than at its edge) is refused with a
+message naming the variable; one whose first word is a `NAME=value`
+assignment (`PATH=tools:/usr/bin ssh`) counts as entering the worktree, and so
+does an `env` first word with an assignment or option before its utility
+(`env PATH=tools ssh`, also after a nested `env`). A launcher first word (the
+shell's `command`, `exec`, `time`, `builtin`, or a program such as `nice`,
+`sudo` or `timeout`) is skipped with its options and numeric operands, so
+`timeout 5 ssh` is judged by `ssh`, and an assignment, `env` option or `eval`
+behind it counts as entering (`command env PATH=tools ssh`), as does a
+non-numeric word right after a launcher option, which may be that option's
+operand (`stdbuf -o L env PATH=tools ssh`, `sudo -u git ssh`); an `eval` first
+word always does; a leading `~/` is expanded to
+`HOME` and judged. When `GIT_CONFIG_GLOBAL` is unset, a `HOME` or
+`XDG_CONFIG_HOME` that puts git's global config inside the worktree is refused
+(a dotfiles repository rooted at `HOME` therefore needs `GIT_CONFIG_GLOBAL`
+set), and a command-bearing entry whose global or system config file (also an
+include) lies inside the worktree is refused. The pre-source bootstrap
+resolvers of both scripts apply the same `#!` check to the first `git` (and
+every tool). In `#!` lines the optional argument of a non-`env` interpreter and
+an `env` command's arguments are judged like command-line words.
+A language interpreter (`python`, `node`, `perl`, `ruby` and the like) named
+by a `#!` line passes only absolute paths, `--` and flags that load nothing
+(python `-E -s -u`, perl `-w -T`, ruby `-w`, awk `-f`); a code-loading option
+(`env -S python3 -m evil`, `perl -Mevil`) or a relative operand counts as
+entering, in the shell, batched and bootstrap checks alike.
+An executable these checks cannot read (mode `0111`) counts as entering too, since the kernel
+still reads its `#!` line; a setuid or setgid file is left alone. A short option's attached
+value in a `#!` line (`ssh -Fconfig`) is judged as a path in the batched scan as well.
+`env -S`/`--split-string` (attached or separate, also in a cluster such as
+`-vS`) and options with arguments (`-u`, `-C`, `-P`, `-a` and long forms) are
+parsed. Fail closed: an `env` line with a `NAME=value` operand before the
+utility (`PATH=tools` changes where it is looked up), or with a `$`, backslash
+or quote after `-S` (env expands and decodes them), with `-P` (env then
+searches another path than `PATH`), or with `-C`/`--chdir` (the utility is
+resolved elsewhere), or whose utility is itself `env` or another launcher (`env -S env PATH=tools
+evil`, `env nice evil`), counts as entering the worktree. So does a `#!`
+argument with expansion or glob syntax, or with a shell operator, redirection
+or parenthesis (`#!/bin/sh -c PATH=tools:/usr/bin;evil`).
+`run-verify-command` still gives the verify command the caller's `PATH`
+(`YR_ORIG_PATH`). Both scripts take their own directory by parameter expansion,
+not `dirname`.
 
 - `guard-local-config snapshot | check <dir> <digest> | clear <dir>` — Snapshot the
   ignored `yellow-plugins.local.md` (printing the path and a `digest=<hex>`
@@ -318,8 +428,36 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   `run-verify-command`) — canonical-path check, the case-insensitive
   resolver deny list (agent-tool config dirs and instruction files
   included), the runner-file list (files a git hook or verify command would
-  execute) and `rp_tree_changes`; a `git config` failure other than exit 1
-  fails closed
+  execute), `rp_tree_changes`, and `harden_git_config` (forces
+  `core.fsmonitor` and `core.untrackedCache` off and
+  `safe.bareRepository=explicit` for the process tree; scope `full` also
+  refuses a repository-local transport, credential or non-LFS filter config
+  and forces signing off, scope `revert` (the rollback and check-ignored
+  modes) refuses only a non-LFS filter; both scopes also refuse a
+  config entry that `yr_cfg_key_runs_command` matches (the one list of keys
+  that name a program: `filter.*`, `merge.*.driver`, `diff.*`, `core.sshCommand`
+  and the other `core.*` programs, `credential.*.helper`, `gpg.*`, `sequence.editor`,
+  `pager.*`, `remote.*.uploadpack|receivepack|vcs`, `lfs.customtransfer.*`,
+  `lfs.standalonetransferagent`, `lfs.extension.*`, `alias.*` and
+  `submodule.*.update` with a `!` value, `url.ext::*.insteadOf`, and more; case
+  insensitive), judged by origin and not by scope: refused in the repository's
+  local or worktree config, and in any global or system file that is inside the
+  worktree or hard-linked to a file in it (a global config can include one and
+  keeps its scope); `gpg.*` in the local scopes is tolerated because signing is
+  forced off, and `.lfsconfig` ignores the lfs keys, so only git config is read.
+  `core.hooksPath` and `core.fsmonitor` are not in the list because they are
+  neutralized instead: `core.fsmonitor=false` is forced for the whole process by
+  `harden_git_config` and per call by `lgit` (`lib/resolve-paths.sh` `lgit`), and hooks
+  are disabled by `disable_git_hooks` in `commit-resolve-fixes` (unless the
+  verified-tracked-hooks opt-in applies) and by `lgit_nohooks` in the rollbacks;
+  `run-verify-command` starts the verify command on the caller's PATH behind a private
+  `git` shim directory (0700, outside the worktree) whose shim runs the validated git on the
+  screened PATH, so git-launched helpers never resolve on the caller's PATH; reads config through `yr_git`;
+  does not set `core.hooksPath`; returns a code instead of exiting, with the
+  unsigned-commit note in `YR_HARDEN_NOTE` for the caller to print;
+  `harden_git_config_for_verify` drops `safe.bareRepository` for the user's
+  verify command); a `git config`
+  failure other than exit 1 fails closed
 - `lib/resolve-text.sh` (POSIX sh, sourced by `reply-pr-thread`,
   `file-followup-issue`, `check-resolve-text`, `commit-resolve-fixes` and
   `run-verify-command`) — the text screen for
@@ -574,6 +712,11 @@ explicit-invocation wording live in the skill body and description.
 ## Known Limitations
 
 - GraphQL scripts require `gh` and `jq` to be installed
+- `/review:setup` reports `awk_nul` when the `awk` on `PATH` cannot split NUL
+  records (see the `harden_git_config` limitation below)
+- `harden_git_config` needs an `awk` that splits NUL-separated records (gawk,
+  mawk); with BWK awk (macOS `/usr/bin/awk`) first on `PATH` it refuses, so
+  `commit-resolve-fixes` and `run-verify-command` stop
 - Cross-plugin agents require the `yellow-core` plugin to be installed
 - Very large PRs (1000+ lines) may cause agent context overflow — consider
   splitting

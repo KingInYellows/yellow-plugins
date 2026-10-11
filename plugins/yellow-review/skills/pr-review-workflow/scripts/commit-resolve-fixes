@@ -130,7 +130,9 @@
 # (assume-unchanged or skip-worktree: `ls-files -v` tag other than H).
 # core.fsmonitor and core.untrackedCache are forced off for every git call,
 # including the commit and the child gt and git (GIT_CONFIG_COUNT override,
-# checked), because a resolver can set an fsmonitor command in .git/config.
+# checked), and safe.bareRepository is forced to explicit, because a resolver
+# can set an fsmonitor command in .git/config. The override is
+# lib/resolve-paths.sh harden_git_config. It does not set core.hooksPath.
 # Commit signing is forced off the same way (commit.gpgSign=false, checked, one
 # note on stderr) when the repository's local or worktree config sets
 # commit.gpgsign (to anything but false) or any gpg.* key, because signing runs
@@ -147,11 +149,13 @@
 # user's global or system config is not judged, and no key is overridden with an
 # empty value, which would also disable the user's own credential helper.
 # Tools: gt (graphite) or node (github), gh and jq are found through PATH. One
-# whose canonical directory lies inside the repository's working tree (an
-# ignored <repo>/node_modules/.bin, say) could be replaced by a resolver without
-# a tracked change, so exit 3 naming the tool and directory, nothing committed.
-# A tool outside the repository is not judged; one that cannot be found keeps
-# the "<tool> not found" handling. The check runs before any of them is called.
+# whose canonical file lies inside the repository's working tree (an ignored
+# <repo>/node_modules/.bin, or a symlink outside the worktree to a file inside
+# it) could be replaced by a resolver without a tracked change, so exit 3
+# naming the tool, nothing committed. Empty and relative PATH entries are
+# dropped before the check, so a later bare name cannot use one. A tool outside
+# the repository is not judged; one that cannot be found keeps the "<tool> not
+# found" handling. The check runs before any of them is called.
 # Libraries: lib/resolve-paths.sh, sibling-plugin.sh, resolve-text.sh and
 # verify-run.sh are sourced before any dirty-set check. When the plugin's lib
 # directory is inside the repository's working tree (a source checkout), each
@@ -198,7 +202,14 @@ MAX_CHANGED_LINES=50
 # check_lib_integrity runs before that file is sourced: a function that
 # exists only there cannot resolve the first git. A caller-supplied path is
 # ignored. The result stays in the shell; it is not written to a file.
-unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ
+unset YELLOW_REVIEW_GIT YELLOW_REVIEW_GH YELLOW_REVIEW_JQ YR_GIT_PATH YR_ORIG_PATH
+# This script's own directory by parameter expansion: dirname is a PATH lookup,
+# and a PATH directory inside the worktree could hold a planted one that runs
+# before any check.
+case "$0" in
+    */*) CRF_DIR=${0%/*}; [ -n "$CRF_DIR" ] || CRF_DIR=/ ;;
+    *) CRF_DIR=. ;;
+esac
 # yr_helper <name>: a helper the trust check itself must run (readlink). Looked
 # up in fixed system directories, never on PATH: a PATH directory inside the
 # worktree could hold a planted one that runs before any check. Fails closed
@@ -301,6 +312,250 @@ yr_inside_root() {
     return 1
 }
 
+# yr_has_root <string> <root>: succeed when <string> contains <root> as a whole
+# path: not preceded by a path character and followed by / or a character that
+# cannot continue a name. A sibling such as <root>2 or <root>-keys is not it.
+yr_has_root() {
+    local rest="$1" root="$2" pre post prev next
+    while :; do
+        case "$rest" in *"$root"*) ;; *) return 1 ;; esac
+        pre=${rest%%"$root"*}
+        post=${rest#*"$root"}
+        prev=${pre: -1}
+        next=${post:0:1}
+        case "$prev" in [A-Za-z0-9._/-]) ;; *)
+            case "$next" in [A-Za-z0-9._-]) ;; *) return 0 ;; esac
+        esac
+        rest=$post
+    done
+}
+
+# yr_args_enter <string> <root> <skip-bare-first>: succeed when <string>, read
+# as a word list, names anything inside <root>: the raw text holds the root as
+# a whole path (yr_has_root), or a word (leading ! and quotes stripped; for
+# --opt=VALUE both the word and VALUE) is an absolute path, or an existing path
+# relative to the current directory, that canonicalizes inside <root>, or a
+# path that cannot be canonicalized. With <skip-bare-first> 1 the first word is
+# left alone when it has no slash (a program name is looked up on PATH, never
+# in the current directory). Words starting with ~ or $ are not judged here.
+yr_args_enter() {
+    local v="$1" root="$2" skipfirst="${3:-0}" phys tok t u c rest first=1 noglob=1
+    local -a toks=()
+    phys=$(pwd -P) || return 0
+    yr_has_root "$v" "$root" && return 0
+    case $- in *f*) noglob=0 ;; esac
+    {
+        local IFS=$' \t\n'
+        set -f
+        toks=($v)
+        [ "$noglob" -eq 0 ] || set +f
+    }
+    for tok in ${toks[@]+"${toks[@]}"}; do
+        t=${tok#!}
+        t=${t#[\"\']}
+        t=${t%[\"\']}
+        # A short option with its value attached (`ssh -Fconfig`, `-I.`)
+        # names that value as a path too.
+        rest=""
+        case "$t" in -[A-Za-z]?*) rest=${t#-?} ;; esac
+        for u in "$t" "${t#*=}" "$rest"; do
+            case "$u" in
+                ''|'~'*|'$'*) continue ;;
+                /*)
+                    c=$(yr_canon_path "$u" 2>/dev/null) || return 0
+                    yr_inside_root "$c" "$root" && return 0
+                    yr_inside_root "$u" "$root" && return 0
+                    ;;
+                *)
+                    if [ "$first" -eq 1 ] && [ "$skipfirst" -eq 1 ]; then
+                        case "$u" in */*) ;; *) continue ;; esac
+                    fi
+                    [ -e "$u" ] || continue
+                    c=$(yr_canon_path "$phys/$u" 2>/dev/null) || return 0
+                    yr_inside_root "$c" "$root" && return 0
+                    ;;
+            esac
+            case "$t" in -*=*|-[A-Za-z]?*) ;; *) break ;; esac
+        done
+        first=0
+    done
+    return 1
+}
+
+# yr_file_shebang_enters <file> <root>: succeed when <file> starts with a #!
+# line that would run anything inside <root> by canonical path or identity, or
+# cannot be canonicalized (fail closed): the interpreter, the program `env` is
+# asked to run, or a path in the optional argument (Linux passes the rest of
+# the line as one argument, BSD splits it; both are judged, see yr_args_enter).
+# The first line is read and never run. `env` operands follow env(1): options
+# with an argument (-u, -C, -P, -a and their long forms), NAME=value words, and
+# -S / --split-string, whose string is split into words that continue the
+# operand list (attached or separate, and inside a short cluster such as
+# -vS; a `$`, backslash or quote in that string, which env expands or decodes,
+# counts as entering, and so do a NAME=value operand, -P (env searches a path
+# other than PATH) and -C/--chdir (env resolves the utility elsewhere)). A bare
+# operand is looked up on the caller's PATH (YR_ORIG_PATH), the
+# way the tool itself would be. An interpreter that is itself a #! script is
+# judged the same way, to a depth of 4; a script at depth 5 counts as entering
+# (the kernel follows such chains). Copies of this block (through
+# yr_file_shebang_enters) sit in the two scripts' bootstrap resolvers, which
+# run before this library is sourced; keep them identical.
+yr_file_shebang_enters() {
+    local f="$1" root="$2" depth="${3:-0}" line rest i x idx last k c cl val p args=""
+    local -a w=() v=() nw=()
+    [ -f "$f" ] || return 1
+    # An executable that cannot be read hides its #! line from this check,
+    # but the kernel still reads it: fail closed. A setuid or setgid file is
+    # left alone (an execute-only sudo is a binary on some systems).
+    if [ ! -r "$f" ]; then
+        [ -x "$f" ] && [ ! -u "$f" ] && [ ! -g "$f" ] && return 0
+        return 1
+    fi
+    IFS= read -r -n 512 line <"$f" 2>/dev/null || true
+    case "$line" in '#!'*) ;; *) return 1 ;; esac
+    [ "$depth" -le 4 ] || return 0
+    rest=${line#\#!}
+    rest=${rest#"${rest%%[![:space:]]*}"}
+    read -r -a w <<<"$rest" || true
+    i=${w[0]-}
+    [ -n "$i" ] || return 1
+    case "$i" in
+        env|*/env)
+            i=""
+            idx=1
+            while [ "$idx" -lt "${#w[@]}" ]; do
+                x=${w[idx]}
+                val=""; last=-1
+                case "$x" in
+                    "") idx=$((idx + 1)); continue ;;
+                    --) idx=$((idx + 1)); continue ;;
+                    --split-string) val=${w[idx + 1]-}; last=$((idx + 1)) ;;
+                    --split-string=*) val=${x#*=}; last=$idx ;;
+                    # env resolves the utility after a chdir: fail closed.
+                    --chdir|--chdir=*) return 0 ;;
+                    --unset|--argv0) idx=$((idx + 2)); continue ;;
+                    --*) idx=$((idx + 1)); continue ;;
+                    -?*)
+                        cl=${x#-}
+                        k=0
+                        while [ "$k" -lt "${#cl}" ]; do
+                            c=${cl:k:1}
+                            case "$c" in
+                                P|C)
+                                    # env searches another path than PATH, or
+                                    # chdirs first: fail closed.
+                                    return 0
+                                    ;;
+                                S)
+                                    val=${cl:k+1}; last=$idx
+                                    if [ -z "$val" ]; then val=${w[idx + 1]-}; last=$((idx + 1)); fi
+                                    break
+                                    ;;
+                                u|a)
+                                    [ -n "${cl:k+1}" ] || idx=$((idx + 1))
+                                    break
+                                    ;;
+                            esac
+                            k=$((k + 1))
+                        done
+                        ;;
+                    # NAME=value before the utility (PATH=tools changes where it
+                    # is looked up): fail closed.
+                    *=*) return 0 ;;
+                    *) i="$x"; break ;;
+                esac
+                if [ "$last" -ge 0 ]; then
+                    # env expands ${VAR} and decodes \_ and quotes in a -S string,
+                    # and Linux hands it the whole rest of the line: fail closed
+                    # on any $, backslash or quote from here on.
+                    case "${w[*]:idx}" in *[\$\\\"\']*) return 0 ;; esac
+                    # Splice the -S string's words in place of the option.
+                    v=()
+                    read -r -a v <<<"$val" || true
+                    nw=()
+                    [ "$idx" -eq 0 ] || nw=("${w[@]:0:idx}")
+                    nw=(${nw[@]+"${nw[@]}"} ${v[@]+"${v[@]}"} ${w[@]+"${w[@]:last+1}"})
+                    w=(${nw[@]+"${nw[@]}"})
+                else
+                    idx=$((idx + 1))
+                fi
+            done
+            # What follows the operand is its argument list.
+            [ "$idx" -lt "${#w[@]}" ] && args="${w[*]:idx+1}"
+            i=${i#[\"\']}
+            i=${i%[\"\']}
+            [ -n "$i" ] || return 1
+            # A nested env or other launcher (`env -S env PATH=tools evil`,
+            # `env nice sudo evil`) takes operands this parser does not
+            # follow: fail closed.
+            case "${i##*/}" in env|nice|nohup|timeout|stdbuf|sudo|doas|xargs|setsid|ionice|chrt|taskset|flock|unbuffer|chroot|runuser|su|caffeinate) return 0 ;; esac
+            case "$i" in
+                */*) ;;
+                *) i=$(PATH=${YR_ORIG_PATH-$PATH}; type -P "$i" 2>/dev/null) || return 1 ;;
+            esac
+            ;;
+        *) args=${rest#"$i"} ;;
+    esac
+    # An interpreter given an option that runs or loads code by name
+    # (`python3 -m evil`, `perl -Mevil`, `node -r ./evil`) or a relative
+    # operand it resolves itself runs a worktree file no path check sees: fail
+    # closed. Only absolute paths, `--` and flags that load nothing pass
+    # (python -E -s -u, perl -w -T, ruby -w, awk -f); both splittings of the
+    # argument are judged.
+    case "${i##*/}" in
+        python|python[0-9]*|pypy|pypy[0-9]*|node|nodejs|deno|bun|perl|perl[0-9]*|ruby|ruby[0-9]*|php|php[0-9]*|lua|lua[0-9]*|luajit|Rscript|java|jshell|osascript|tclsh*|wish*|awk|gawk|mawk|nawk)
+            v=()
+            read -r -a v <<<"$args" || true
+            for x in ${v[@]+"${v[@]}"}; do
+                case "$x" in /*|--) continue ;; esac
+                case "${i##*/}:$x" in
+                    python*:-?*|pypy*:-?*) case "${x#-}" in *[!bBdEIOqsSuv]*) return 0 ;; esac ;;
+                    perl*:-?*) case "${x#-}" in *[!wWXTtsalnU0-9]*) return 0 ;; esac ;;
+                    ruby*:-?*) case "${x#-}" in *[!wWvsanl]*) return 0 ;; esac ;;
+                    awk:-f|gawk:-f|mawk:-f|nawk:-f) ;;
+                    *) return 0 ;;
+                esac
+            done
+            ;;
+    esac
+    # A $, backtick, ~, backslash or glob character (* ? [) in an argument is
+    # expanded or decoded by the program the line starts (`#!/bin/sh -c
+    # $PWD/evil`, which BSD and macOS pass as separate arguments), so no path
+    # in it can be judged: fail closed.
+    case "$args" in *[\$\`~\\*?[]*) return 0 ;; esac
+    # A shell control operator, redirection or grouping (`#!/bin/sh -c
+    # PATH=tools:/usr/bin;evil`) lets a `-c` string run a command no path
+    # check sees: fail closed.
+    case "$args" in *[\;\&\|\<\>\(\)]*) return 0 ;; esac
+    if [ -n "$args" ] && yr_args_enter "$args" "$root" 0; then
+        return 0
+    fi
+    case "$i" in /*) p="$i" ;; *) p="$(pwd -P)/$i" ;; esac
+    c=$(yr_canon_path "$p" 2>/dev/null) || return 0
+    yr_inside_root "$c" "$root" && return 0
+    yr_inside_root "$p" "$root" && return 0
+    yr_file_shebang_enters "$c" "$root" $((depth + 1))
+}
+
+# yr_hardlink_enters <file> <root>: succeed when <file> has other hard links
+# and one of them is inside <root> (a link to an ignored script there keeps
+# the script's content under an outside name), or when that cannot be told
+# (the link count unreadable, or the walk of <root> failed before a match).
+# find comes from yr_helper, never PATH. The tree is walked only for a file
+# with a link count above 1 that is on the worktree's device.
+yr_hardlink_enters() {
+    local f="$1" root="$2" find fd rd hit
+    [ -f "$f" ] || return 1
+    find=$(yr_helper find) || return 0
+    hit=$("$find" "$f" -maxdepth 0 -links +1 -print 2>/dev/null) || return 0
+    [ -n "$hit" ] || return 1
+    fd=$("$find" "$f" -maxdepth 0 -printf '%D' 2>/dev/null) || fd=""
+    rd=$("$find" "$root" -maxdepth 0 -printf '%D' 2>/dev/null) || rd=""
+    if [ -n "$fd" ] && [ -n "$rd" ] && [ "$fd" != "$rd" ]; then return 1; fi
+    hit=$("$find" "$root" -xdev -type f -samefile "$f" -print -quit 2>/dev/null) || return 0
+    [ -n "$hit" ]
+}
+
 # yr_resolve_tool <name>: print one absolute path whose canonical file is
 # outside the worktree. Return 1 when <name> is not on PATH, 2 when that
 # canonical file is inside the worktree, 3 when the path cannot be
@@ -323,6 +578,10 @@ yr_resolve_tool() {
     if [ -n "$root" ]; then
         yr_inside_root "$canon" "$root" && return 2
         yr_inside_root "$invoke" "$root" && return 2
+        # A script whose #! interpreter is inside the worktree runs it.
+        yr_file_shebang_enters "$canon" "$root" && return 2
+        # A hard link to a file inside the worktree is that file.
+        yr_hardlink_enters "$canon" "$root" && return 2
     fi
     printf '%s\n' "$invoke"
 }
@@ -367,7 +626,7 @@ unset _yr_rc
 
 check_lib_integrity() {
     local libdir top rel name st blob
-    libdir=$(cd -- "$(dirname -- "$0")/../../../lib" 2>/dev/null && pwd -P) || return 0
+    libdir=$(cd -- "$CRF_DIR/../../../lib" 2>/dev/null && pwd -P) || return 0
     [ -n "${YELLOW_REVIEW_GIT:-}" ] || return 0
     top=$("$YELLOW_REVIEW_GIT" rev-parse --show-toplevel 2>/dev/null) || return 0
     top=$(cd -- "$top" 2>/dev/null && pwd -P) || { printf '[commit-resolve-fixes] Error: cannot resolve the repository root to verify the plugin libraries; nothing committed\n' >&2; return 1; }
@@ -386,16 +645,28 @@ check_lib_integrity() {
 check_lib_integrity || exit 3
 
 # shellcheck source=../../../lib/resolve-paths.sh
-. "$(dirname -- "$0")/../../../lib/resolve-paths.sh"
+. "$CRF_DIR/../../../lib/resolve-paths.sh"
+# Resolve git and the worktree-free PATH once, here, so later subshells reuse them.
+yr_git --version >/dev/null 2>&1 || true
 # shellcheck source=../../../lib/resolve-text.sh
-. "$(dirname -- "$0")/../../../lib/resolve-text.sh"
+. "$CRF_DIR/../../../lib/resolve-text.sh"
 # shellcheck source=../../../lib/verify-run.sh
-. "$(dirname -- "$0")/../../../lib/verify-run.sh" || { printf '[commit-resolve-fixes] Error: cannot load lib/verify-run.sh\n' >&2; exit 2; }
+. "$CRF_DIR/../../../lib/verify-run.sh" || { printf '[commit-resolve-fixes] Error: cannot load lib/verify-run.sh\n' >&2; exit 2; }
 
 die() { printf '[commit-resolve-fixes] Error: %s\n' "$2" >&2; exit "$1"; }
 
+# From here PATH is yr_safe_path's result. Everything this script runs by bare
+# name after the resolvers wrote the tree (grep decides which paths belong to
+# the PR; sed, tr, cat, mktemp, rm and the rest handle what is committed)
+# resolves only to a file outside the worktree: a directory that is inside it,
+# or that holds any symlink into it, is dropped. Tools
+# bound by absolute path below (git, gh, jq, gt, node, awk, timeout) are still
+# resolved against the caller's PATH and refused, not skipped; see
+# yr_resolve_tool. Before any argument is parsed.
+yr_adopt_path || die 3 "no PATH directory is left once those that reach into the repository are dropped; nothing committed"
+
 # Resolved before the script changes directory: $0 may be relative.
-PLUGIN_ROOT=$(cd -- "$(dirname -- "$0")/../../.." && pwd) || { printf '[commit-resolve-fixes] Error: cannot resolve the plugin root\n' >&2; exit 2; }
+PLUGIN_ROOT=$(cd -- "$CRF_DIR/../../.." && pwd) || { printf '[commit-resolve-fixes] Error: cannot resolve the plugin root\n' >&2; exit 2; }
 
 usage() {
     printf 'Usage: commit-resolve-fixes --provider graphite|github --pr <N> --message <msg> [--unattended] [--allow-credential-shaped] [--files-from <file>] [--ranges-from <file>] [-- <files...>]\n       commit-resolve-fixes --check-ranges --ranges-from <file> [--files-from <file>] [-- <files...>]\n' >&2
@@ -462,12 +733,13 @@ diff_for() {
 
 # changed_lines <staged|worktree|commit> <file>...: the larger side of each hunk,
 # summed over the files (a replaced line counts once, an insertion counts its
-# length). Fails when git or awk fails.
+# length). Fails when git or awk fails. These parsers use yr_awk because
+# --check-ranges exits before check_tools_outside_repo binds awk.
 changed_lines() {
     local mode="$1" f total=0 n
     shift
     for f in "$@"; do
-        n=$(diff_for "$f" "$mode" | awk '/^@@/ {
+        n=$(diff_for "$f" "$mode" | yr_awk '/^@@/ {
                 split($2, a, ","); split($3, b, ",")
                 o = (a[2] == "" ? 1 : a[2] + 0); c = (b[2] == "" ? 1 : b[2] + 0)
                 t += (o > c ? o : c)
@@ -479,12 +751,12 @@ changed_lines() {
 
 out_of_range_spans() {
     local f="$1" file_ranges
-    file_ranges=$(awk -v p="$f" '$1 == p { print $2; exit }' <<<"$RANGE_ROWS")
+    file_ranges=$(yr_awk -v p="$f" '$1 == p { print $2; exit }' <<<"$RANGE_ROWS")
     case "$file_ranges" in
         ''|none|unknown) file_ranges="" ;;
     esac
     diff_for "$f" "$2" \
-        | awk -v ranges="$file_ranges" -v m="$RANGE_MARGIN" '
+        | yr_awk -v ranges="$file_ranges" -v m="$RANGE_MARGIN" '
             BEGIN {
                 n = split(ranges, r, ",")
                 for (i = 1; i <= n && ranges != ""; i++) { split(r[i], b, "-"); lo[i] = b[1] - m; hi[i] = b[2] + m }
@@ -568,7 +840,7 @@ SUBMIT_TIMEOUT="${YELLOW_REVIEW_SUBMIT_TIMEOUT:-300}"
 NET_TIMEOUT="${YELLOW_REVIEW_NET_TIMEOUT:-30}"
 [[ "$SUBMIT_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "YELLOW_REVIEW_SUBMIT_TIMEOUT must be a positive integer"
 [[ "$NET_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || die 2 "YELLOW_REVIEW_NET_TIMEOUT must be a positive integer"
-TIMEOUT_BIN=$(vr_timeout_bin || true)
+TIMEOUT_BIN=
 # TERM first, then KILL after a short grace so a process that traps TERM
 # cannot outlive the bound.
 KILL_GRACE=5
@@ -589,108 +861,83 @@ gh() { bounded "$NET_TIMEOUT" "$GH_BIN" "$@"; }
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || die 2 "not inside a git repository"
 cd -- "$TOP"
 
-# gt, gh, jq and node are found through PATH. A PATH entry inside the working
-# tree (an ignored <repo>/node_modules/.bin, say) lets a resolver replace one
-# with no tracked change, and the first call would run it with submission
-# authority. Refuse a tool whose canonical directory is inside the repository;
-# a tool outside it (the normal case) is not judged, and one that cannot be
-# resolved is left to the "not found" handling. No tool has run before this.
+# gt, node and the timeout binaries are found through PATH. A PATH entry inside
+# the working tree (an ignored <repo>/node_modules/.bin, say), or a symlink
+# outside it whose canonical file is inside, lets a resolver replace one with no
+# tracked change, and the first call would run it with submission authority.
+# This runs before anything on PATH executes (the timeout probe included):
+#   1. Empty and relative entries are dropped, and an empty result is refused,
+#      because an empty PATH makes bash search the working directory.
+#   2. Each tool is resolved through yr_resolve_tool and refused when its
+#      canonical file, or the PATH hit itself, is inside the worktree. The
+#      absolute PATH hit is kept in TOOL_BIN_<tool> and run by that path.
+#   3. PATH is already yr_safe_path's result (yr_adopt_path, before any
+#      argument is parsed): entries inside the worktree, and entries that hold a
+#      symlink into it, are dropped, so a child lookup of any other
+#      name (git, env, gh, grep) cannot land in a resolver-writable file either.
+# A tool outside the worktree is not judged, and one that cannot be found is
+# left to the "not found" handling. gh and jq were bound above. No tool has run.
 check_tools_outside_repo() {
-    local real_top tool bin dir
-    real_top=$(pwd -P) || die 3 "cannot resolve the repository root to verify the tools on PATH; nothing committed"
+    local tool root canon hit rc entry rest cleaned
+    root=$(yr_worktree_root) || die 3 "cannot resolve the repository root to verify the tools on PATH; nothing committed"
+    cleaned=""
+    rest="${YR_ORIG_PATH}:"
+    while [ -n "$rest" ]; do
+        entry="${rest%%:*}"
+        rest="${rest#*:}"
+        case "$entry" in
+            /*) cleaned="${cleaned:+$cleaned:}$entry" ;;
+        esac
+    done
+    [ -n "$cleaned" ] || die 3 "PATH has no absolute entry, so the tools on it cannot be verified; nothing committed"
+    # The lookups below judge the caller's PATH minus its relative entries.
+    # PATH itself is already the screened one (yr_adopt_path).
+    YR_ORIG_PATH=$cleaned
     for tool in "$@"; do
-        # type -P: the file on PATH, not the gh function defined above.
-        bin=$(type -P "$tool" 2>/dev/null) || continue
-        [ -n "$bin" ] || continue
-        dir=$(cd -- "$(dirname -- "$bin")" 2>/dev/null && pwd -P) \
-            || die 3 "cannot resolve the directory of $tool; nothing committed"
-        case "$dir" in
-            "$real_top"/*|"$real_top") die 3 "$tool resolves to $dir inside the repository, where a resolver can replace it; remove that directory from PATH; nothing committed" ;;
+        rc=0
+        hit=$(yr_resolve_tool "$tool") || rc=$?
+        case "$rc" in
+            0) printf -v "TOOL_BIN_$tool" '%s' "$hit" ;;
+            1) ;;
+            2)
+                canon=$(yr_canon_path "$(PATH=$YR_ORIG_PATH; type -P "$tool")" 2>/dev/null || true)
+                die 3 "$tool resolves to ${canon:-a file} inside the repository, where a resolver can replace it; remove that directory from PATH; nothing committed"
+                ;;
+            *) die 3 "cannot resolve $tool; nothing committed" ;;
         esac
     done
 }
-# gh and jq were bound above to a canonical file outside the worktree.
-# gt and node stay on this directory check; their argv is not rewritten.
+# gh and jq were bound above to a canonical file outside the worktree. awk is
+# checked here too: the hunk and range parsers below run it by name. gt and
+# node are bound by check_tools_outside_repo to the absolute PATH hit (argv is
+# not rewritten to the canonical file), and every call below uses that path.
+TOOL_BIN_gt="" TOOL_BIN_node=""
 if [ "$PROVIDER" = github ]; then
-    check_tools_outside_repo node
+    check_tools_outside_repo node timeout gtimeout awk
 else
-    check_tools_outside_repo gt
+    check_tools_outside_repo gt timeout gtimeout awk
+    [ -n "$TOOL_BIN_gt" ] || die 2 "gt not found"
 fi
+gt() { "${TOOL_BIN_gt:-gt}" "$@"; }
+TIMEOUT_BIN=$(vr_timeout_bin || true)
 BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || die 2 "HEAD is detached; check out the PR branch"
 
-# A core.fsmonitor command a resolver wrote into .git/config would run on any
-# later git call that refreshes the index: the plain `git commit` below, and
-# the git that gt and the submit step spawn. lgit overrides it per call; this
-# overrides it for the rest of the process tree. It is environment config
-# (GIT_CONFIG_COUNT), appended to the caller's, and verified, failing closed on
-# a git too old to read it.
-harden_git_config() {
-    local n="${GIT_CONFIG_COUNT:-0}"
-    case "$n" in ''|*[!0-9]*) die 3 "GIT_CONFIG_COUNT is not a number, so core.fsmonitor cannot be disabled; nothing committed" ;; esac
-    n=$((10#$n))
-    export "GIT_CONFIG_KEY_$n=core.fsmonitor" "GIT_CONFIG_VALUE_$n=false" \
-        "GIT_CONFIG_KEY_$((n + 1))=core.untrackedCache" "GIT_CONFIG_VALUE_$((n + 1))=false" \
-        "GIT_CONFIG_COUNT=$((n + 2))"
-    [ "$(git config --get core.fsmonitor 2>/dev/null)" = false ] \
-        && [ "$(git config --get core.untrackedCache 2>/dev/null)" = false ] \
-        || die 3 "could not disable core.fsmonitor; nothing committed"
-    # A repository-local or worktree-scope transport command is run by the
-    # submit step's git (and gt, gh) with submission authority: refuse it,
-    # naming the key only. Global and system scopes are not judged, and the
-    # values are never overridden, which would also disable the user's own
-    # credential helper.
-    local tcfg trc=0 tkey
-    # A clean, smudge or process filter runs on `git add` and on checkout, so a
-    # repository-local one is judged the same way; the three stock Git LFS
-    # commands (`git lfs install --local`) are allowed by exact value.
-    tcfg=$(git config --show-scope --get-regexp '^(core\.(sshcommand|askpass|gitproxy)|credential\.(.*\.)?helper|filter\..*\.(clean|smudge|process))$' 2>/dev/null) || trc=$?
-    case "$trc" in 0|1) ;; *) die 3 "could not read the git transport config; nothing committed" ;; esac
-    tkey=$(printf '%s\n' "$tcfg" | awk -F'\t' '
-        ($1 == "local" || $1 == "worktree") {
-            k = $2; v = $2; sub(/ .*/, "", k); sub(/^[^ ]* /, "", v)
-            if (k ~ /^filter\.lfs\.(clean|smudge|process)$/ && (v == "git-lfs clean -- %f" || v == "git-lfs smudge -- %f" || v == "git-lfs filter-process" || v == "git-lfs smudge --skip -- %f" || v == "git-lfs filter-process --skip")) next
-            print k; exit
-        }')
-    # A credential URL can carry userinfo: name the key without it.
-    case "$tkey" in credential.?*.helper) tkey="credential.<url>.helper" ;; filter.*) tkey="filter.<driver>.${tkey##*.}" ;; esac
-    [ -z "$tkey" ] || die 3 "the repository config sets $tkey, which would run a command with submission authority; remove it from the repository config (a global or system config is fine); nothing committed"
-    # A resolver can also write commit.gpgSign and gpg.program (or
-    # gpg.<format>.program) into the repository's own config: signing the commit
-    # would run that program. Only the local and worktree scopes are judged
-    # (includes resolved, which --show-scope does), so the user's own global or
-    # system signing config keeps working. A local commit.gpgsign=false is no
-    # signing config.
-    local cfg rc=0 hit
-    cfg=$(git config --show-scope --get-regexp '^(commit\.gpgsign|gpg\.)' 2>/dev/null) || rc=$?
-    case "$rc" in 0|1) ;; *) die 3 "could not read the git signing config; nothing committed" ;; esac
-    hit=$(printf '%s\n' "$cfg" | awk -F'\t' '($1 == "local" || $1 == "worktree") && tolower($2) !~ /^commit\.gpgsign (false|no|off|0)$/ { print "y"; exit }')
-    [ -n "$hit" ] || return 0
-    n=$((n + 2))
-    # push.gpgSign and log.showSignature reach gpg.program in the child git of
-    # the submit step, so they are forced off with commit signing.
-    export "GIT_CONFIG_KEY_$n=commit.gpgSign" "GIT_CONFIG_VALUE_$n=false" \
-        "GIT_CONFIG_KEY_$((n + 1))=push.gpgSign" "GIT_CONFIG_VALUE_$((n + 1))=false" \
-        "GIT_CONFIG_KEY_$((n + 2))=log.showSignature" "GIT_CONFIG_VALUE_$((n + 2))=false" \
-        "GIT_CONFIG_COUNT=$((n + 3))"
-    [ "$(git config --bool --get commit.gpgsign 2>/dev/null)" = false ] \
-        && [ "$(git config --bool --get push.gpgsign 2>/dev/null)" = false ] \
-        && [ "$(git config --bool --get log.showsignature 2>/dev/null)" = false ] \
-        || die 3 "could not disable commit signing; nothing committed"
-    printf '[commit-resolve-fixes] Note: the repository'"'"'s own config sets commit signing (commit.gpgsign or gpg.*), which could run a program, so the commit is made unsigned\n' >&2
-}
-harden_git_config
+# Shared with run-verify-command. Return codes only: this script's refusal is
+# exit 3 and commits nothing. Hooks stay in disable_git_hooks.
+harden_git_config || die 3 "$YR_HARDEN_MSG; nothing committed"
+[ -z "$YR_HARDEN_NOTE" ] || printf '[commit-resolve-fixes] Note: %s\n' "$YR_HARDEN_NOTE" >&2
 
 # The github-workflow runtime sits beside this plugin: plugins/<name>/ in the
 # source tree, <marketplace>/<name>/<version>/ in the installed cache.
 find_runtime() {
     local root
-    root=$(cd -- "$(dirname -- "$0")/../../.." && pwd) || return 1
+    root=$(cd -- "$CRF_DIR/../../.." && pwd) || return 1
     sp_sibling_file "$root" github-workflow lib/github-stack-runtime.js
 }
 
 if [ "$PROVIDER" = github ]; then
     RUNTIME="${YELLOW_REVIEW_GITHUB_STACK_RUNTIME:-$(find_runtime || true)}"
-    command -v node >/dev/null 2>&1 || die 2 "node not found"
+    [ -n "$TOOL_BIN_node" ] || die 2 "node not found"
     [ -n "$RUNTIME" ] && [ -f "$RUNTIME" ] || die 2 "github-stack-runtime.js not found (is github-workflow installed?)"
 fi
 
@@ -1208,7 +1455,7 @@ case "$PROVIDER" in
         # Its output can carry a credential (a remote URL, a token in an error):
         # it goes to the scratch file, then to stderr through the redactor only.
         SUBMIT_RC=0
-        bounded "$SUBMIT_TIMEOUT" gt submit --stack --no-interactive --no-edit >|"$NET_ERR" 2>&1 || SUBMIT_RC=$?
+        bounded "$SUBMIT_TIMEOUT" "${TOOL_BIN_gt:-gt}" submit --stack --no-interactive --no-edit >|"$NET_ERR" 2>&1 || SUBMIT_RC=$?
         print_submit_output
         [ "$SUBMIT_RC" -eq 0 ] || die 5 "gt submit failed or timed out after ${SUBMIT_TIMEOUT}s"
         ;;
@@ -1219,7 +1466,7 @@ case "$PROVIDER" in
         runtime_override_check undo_commit "nothing submitted"
         REMOTE_ARGS=()
         [ "$REMOTE_EXPLICIT" = 1 ] && REMOTE_ARGS=(--remote "$REMOTE_NAME")
-        OUT=$(bounded "$SUBMIT_TIMEOUT" node "$RUNTIME" submit ${REMOTE_ARGS[@]+"${REMOTE_ARGS[@]}"}) \
+        OUT=$(bounded "$SUBMIT_TIMEOUT" "${TOOL_BIN_node:-node}" "$RUNTIME" submit ${REMOTE_ARGS[@]+"${REMOTE_ARGS[@]}"}) \
             || die 5 "github-stack-runtime submit crashed or timed out after ${SUBMIT_TIMEOUT}s"
         ST=$(printf '%s' "$OUT" | jq -r '.status // empty' 2>/dev/null || true)
         if [ "$ST" != SUCCESS ]; then

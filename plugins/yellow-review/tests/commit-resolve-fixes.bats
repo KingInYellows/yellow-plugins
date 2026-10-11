@@ -56,6 +56,19 @@ run_crf() {
     run --separate-stderr "$SCRIPT" "$@"
 }
 
+# run_crf with PATH set for the script only (the first argument), so a planted
+# tool on it cannot run in the test harness itself.
+run_crf_path() {
+  local p="$1"
+  shift
+  GIT_CONFIG_COUNT=2 \
+    GIT_CONFIG_KEY_0="url.https://github.com/acme/widgets.git.pushInsteadOf" \
+    GIT_CONFIG_VALUE_0="$BATS_TEST_TMPDIR/origin.git" \
+    GIT_CONFIG_KEY_1="url.https://github.com/acme/widgets.git.pushInsteadOf" \
+    GIT_CONFIG_VALUE_1="$BATS_TEST_TMPDIR/other.git" \
+    run --separate-stderr env "PATH=$(ls_remote_shim_dir):$p" "$SCRIPT" "$@"
+}
+
 # --- Usage ---
 
 @test "rejects a missing provider with exit 2" {
@@ -469,6 +482,23 @@ run_check() { run --separate-stderr "$SCRIPT" --check-ranges "$@"; }
   run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
   [ "$status" -eq 0 ]
   [ "$output" = '{"out_of_range":[]}' ]
+}
+
+@test "--check-ranges never runs an awk from a PATH directory inside the worktree" {
+  marker="$BATS_TEST_TMPDIR/check-awk-ran"
+  rm -f "$marker"
+  printf 'canary-chk/\n' >> .git/info/exclude
+  mkdir -p canary-chk
+  printf '#!/bin/sh\ntouch "%s"\necho 0\n' "$marker" >| canary-chk/awk
+  chmod +x canary-chk/awk
+  seq 1 30 >| src/a.txt
+  git add src/a.txt && git commit -q -m "chore: long file"
+  sed -i.bak 's/^25$/changed/' src/a.txt && rm -f src/a.txt.bak
+  printf 'src/a.txt 1-5\n' >| "$BATS_TEST_TMPDIR/ranges"
+  PATH="$REPO/canary-chk:$PATH" run_check --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ ! -e "$marker" ]
+  [ "$status" -eq 0 ]
+  [ "$(jq -c . <<<"$output")" = '{"out_of_range":[{"path":"src/a.txt","old_lines":["25-25"]}]}' ]
 }
 
 @test "--check-ranges lists an out-of-range file with its old-line span" {
@@ -2426,12 +2456,414 @@ crf_refuses_untouched() {
   done
 }
 
+@test "a missing gt is a clear exit 2 under the graphite provider" {
+  rm -f "$STUB_BIN/gt"
+  if PATH="$PATH" command -v gt >/dev/null 2>&1; then skip "a real gt is on PATH"; fi
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"gt not found"* ]]
+}
+
+@test "a symlink outside the worktree to an in-tree gt, node or awk is refused before it runs" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/tool-canary"
+  rm -f "$marker"
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 99\n' "$marker" >| "$REPO/tools/canary"
+  chmod +x "$REPO/tools/canary"
+  ln -s canary "$REPO/tools/gt"
+  ln -s canary "$REPO/tools/node"
+  ln -s canary "$REPO/tools/awk"
+  link="$BATS_TEST_TMPDIR/linkbin"
+  mkdir -p "$link"
+  link_dir=$(cd "$link" && pwd -P)
+  repo_dir=$(pwd -P)
+  case "$link_dir" in
+    "$repo_dir"|"$repo_dir"/*) echo "symlink directory is inside the worktree"; return 1 ;;
+  esac
+  for spec in "graphite gt" "github node" "graphite awk" "github awk"; do
+    provider=${spec%% *}
+    tool=${spec#* }
+    rm -f "$marker" "$link"/*
+    ln -s "$REPO/tools/$tool" "$link/$tool"
+    PATH="$link:$old_path"
+    crf_refuses_untouched "$provider" || { PATH="$old_path"; echo "not refused: $spec" >&2; return 1; }
+    PATH="$old_path"
+    [ ! -e "$marker" ]
+    [[ "$stderr" == *"$tool resolves to"* ]]
+    [[ "$stderr" == *"inside the repository"* ]]
+    [[ "$stderr" == *"nothing committed"* ]]
+  done
+}
+
+@test "a grep symlinked into the worktree from an outside PATH directory never runs, so the PR-file gate still refuses" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/grep-canary"
+  rm -f "$marker"
+  mkdir -p "$REPO/tools"
+  # A planted grep that reports a match for everything.
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$REPO/tools/grep"
+  chmod +x "$REPO/tools/grep"
+  link="$BATS_TEST_TMPDIR/linkbin"
+  mkdir -p "$link"
+  ln -s "$REPO/tools/grep" "$link/grep"
+  link_dir=$(cd "$link" && pwd -P)
+  repo_dir=$(pwd -P)
+  case "$link_dir" in
+    "$repo_dir"|"$repo_dir"/*) echo "symlink directory is inside the worktree"; return 1 ;;
+  esac
+  for provider in graphite github; do
+    printf 'edited\n' >| src/c.txt
+    run_crf_path "$link:$old_path" --provider "$provider" --pr 7 --message "$MSG" -- src/c.txt
+    [ ! -e "$marker" ] || { echo "the planted grep ran ($provider)" >&2; return 1; }
+    [ "$status" -eq 3 ]
+    [[ "$stderr" == *"not one of PR #7's changed files: src/c.txt"* ]]
+    [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+    git checkout -q -- src/c.txt
+  done
+}
+
+@test "a utility symlinked into the worktree from an outside PATH directory never runs, and the run still commits" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/util-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 99\n' "$marker" >| "$REPO/tools/canary"
+  chmod +x "$REPO/tools/canary"
+  link="$BATS_TEST_TMPDIR/linkbin"
+  mkdir -p "$link"
+  # Not dirname: the fixture's git shim runs it before the script's PATH exists.
+  for tool in grep sed tr cut sort wc head tail cat mktemp rm mv find basename date; do
+    ln -s "$REPO/tools/canary" "$link/$tool"
+  done
+  printf 'one\nfeature\nfix-links\n' >| src/a.txt
+  run_crf_path "$link:$old_path" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ] || { echo "refused: $stderr" >&2; return 1; }
+  [ ! -e "$marker" ]
+}
+
+@test "a true symlinked into the worktree never runs through the timeout probe" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/true-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "$REPO/tools/true"
+  chmod +x "$REPO/tools/true"
+  # A directory holding only true: timeout, not the script, looks it up.
+  link="$BATS_TEST_TMPDIR/truebin"
+  mkdir -p "$link"
+  ln -s "$REPO/tools/true" "$link/true"
+  printf 'one\nfeature\nfix-true\n' >| src/a.txt
+  run_crf_path "$link:$old_path" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ] || { echo "refused: $stderr" >&2; return 1; }
+  [ ! -e "$marker" ]
+}
+
+@test "an ssh symlinked into the worktree never runs when git spawns it for the post-submit ls-remote" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/ssh-canary"
+  rm -f "$marker"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/ssh"
+  chmod +x "$REPO/tools/ssh"
+  # A directory holding only ssh: git looks it up through PATH, not the script.
+  link="$BATS_TEST_TMPDIR/sshbin"
+  mkdir -p "$link"
+  ln -s "$REPO/tools/ssh" "$link/ssh"
+  remote_with_push_url fork ssh://git@example.invalid/acme/widgets.git
+  git config branch.feature.pushRemote fork
+  printf 'one\nfeature\nfix-ssh\n' >| src/a.txt
+  # No ls-remote shim here: git must resolve ssh itself.
+  GH_HOST=example.invalid run --separate-stderr env "PATH=$link:$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the planted ssh ran: $stderr" >&2; return 1; }
+  # Prove the fixture reaches git's ssh spawn: a trusted ssh on PATH runs.
+  good="$BATS_TEST_TMPDIR/goodssh"
+  mkdir -p "$good"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$BATS_TEST_TMPDIR/good-ssh-ran" >| "$good/ssh"
+  chmod +x "$good/ssh"
+  git reset -q --hard "$FIRST_SHA"
+  printf 'one\nfeature\nfix-ssh2\n' >| src/a.txt
+  GH_HOST=example.invalid run --separate-stderr env "PATH=$good:$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ -e "$BATS_TEST_TMPDIR/good-ssh-ran" ] || { echo "ssh was never spawned: $status $stderr" >&2; return 1; }
+}
+
+# An ssh remote with no ls-remote shim, so git itself spawns ssh for the
+# post-submit check (host example.invalid, never reached).
+crf_ssh_remote() {
+  remote_with_push_url fork ssh://git@example.invalid/acme/widgets.git
+  git config branch.feature.pushRemote fork
+  printf 'one\nfeature\nfix-env\n' >| src/a.txt
+}
+
+@test "a GIT_SSH_COMMAND inside the worktree is refused before anything runs (exit 3)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/sshcmd-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/sshcmd"
+  chmod +x "$REPO/tools/sshcmd"
+  crf_ssh_remote
+  GH_HOST=example.invalid GIT_SSH_COMMAND="$REPO/tools/sshcmd -o BatchMode=yes" \
+    run --separate-stderr env "PATH=$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the planted GIT_SSH_COMMAND ran" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"GIT_SSH_COMMAND runs a program inside the repository"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
+@test "a GIT_SSH_COMMAND of the form sh <worktree script> is refused and never runs (exit 3)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/shwrap-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf 'touch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/wrapped.sh"
+  crf_ssh_remote
+  GH_HOST=example.invalid GIT_SSH_COMMAND="sh $REPO/tools/wrapped.sh" \
+    run --separate-stderr env "PATH=$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the wrapped script ran" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"GIT_SSH_COMMAND runs a program inside the repository"* ]]
+}
+
+@test "a git script whose #! interpreter is inside the worktree is refused before the bootstrap runs it (commit-resolve-fixes)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/boot-git-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/interp"
+  chmod +x "$REPO/tools/interp"
+  printf '#!%s/tools/interp\n' "$REPO" >| "$BATS_TEST_TMPDIR/gitbin/git"
+  chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+  printf 'one\nfeature\nfix-boot\n' >| src/a.txt
+  run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$old_path" "$SCRIPT" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the bootstrap ran the planted git" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
+}
+
+@test "a git script whose #! uses env -S with a variable is refused before the bootstrap runs it (commit-resolve-fixes)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/boot-envs-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/interp"
+  chmod +x "$REPO/tools/interp"
+  printf '%s\n' '#!/usr/bin/env -S ${INTERP}' >| "$BATS_TEST_TMPDIR/gitbin/git"
+  chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+  printf 'one\nfeature\nfix-boot\n' >| src/a.txt
+  run --separate-stderr env "INTERP=$REPO/tools/interp" "PATH=$BATS_TEST_TMPDIR/gitbin:$old_path" "$SCRIPT" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the bootstrap ran the planted git" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
+}
+
+@test "a git script whose #! has an env assignment or an -S escape is refused before the bootstrap runs it (commit-resolve-fixes)" {
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf 'one\nfeature\nfix-boot\n' >| src/a.txt
+  for shebang in '#!/usr/bin/env -S PATH=tools git' '#!/usr/bin/env -S "/tmp/my\_repo/git"'; do
+    printf '%s\n' "$shebang" >| "$BATS_TEST_TMPDIR/gitbin/git"
+    chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "status $status: $shebang: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git resolves to a path inside the repository"* ]] || { echo "accepted: $shebang" >&2; return 1; }
+  done
+}
+
+@test "a git script whose #! has an env -P is refused before the bootstrap runs it (commit-resolve-fixes)" {
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf 'one\nfeature\nfix-boot\n' >| src/a.txt
+  for shebang in '#!/usr/bin/env -P tools git' '#!/usr/bin/env -S -P/usr/bin git'; do
+    printf '%s\n' "$shebang" >| "$BATS_TEST_TMPDIR/gitbin/git"
+    chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "status $status: $shebang: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git resolves to a path inside the repository"* ]] || { echo "accepted: $shebang" >&2; return 1; }
+  done
+}
+
+@test "a git script whose #! has an env -C is refused before the bootstrap runs it (commit-resolve-fixes)" {
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf 'one\nfeature\nfix-boot\n' >| src/a.txt
+  for shebang in '#!/usr/bin/env -C tools git' '#!/usr/bin/env -S --chdir=tools git'; do
+    printf '%s\n' "$shebang" >| "$BATS_TEST_TMPDIR/gitbin/git"
+    chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+    run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 3 ] || { echo "status $status: $shebang: $stderr" >&2; return 1; }
+    [[ "$stderr" == *"git resolves to a path inside the repository"* ]] || { echo "accepted: $shebang" >&2; return 1; }
+  done
+}
+
+@test "a GIT_SSH_COMMAND using a shell variable is refused as unjudgeable and never runs (exit 3)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/dollar-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/sshcmd"
+  chmod +x "$REPO/tools/sshcmd"
+  crf_ssh_remote
+  GH_HOST=example.invalid GIT_SSH_COMMAND='$PWD/tools/sshcmd' \
+    run --separate-stderr env "PATH=$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the expanded command ran" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"GIT_SSH_COMMAND uses shell syntax"* ]]
+}
+
+@test "a HOME inside the worktree whose .gitconfig sets core.sshCommand is refused and never runs (exit 3)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/home-canary"
+  printf 'tools/\n.gitconfig\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/sshcmd"
+  chmod +x "$REPO/tools/sshcmd"
+  printf '[core]\n\tsshCommand = %s/tools/sshcmd\n' "$REPO" >| "$REPO/.gitconfig"
+  crf_ssh_remote
+  GH_HOST=example.invalid run --separate-stderr env -u GIT_CONFIG_GLOBAL -u XDG_CONFIG_HOME "HOME=$REPO" "PATH=$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the HOME config command ran" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"global config inside the repository"* ]]
+}
+
+@test "a trusted GIT_SSH_COMMAND outside the worktree is kept and used by the ls-remote check" {
+  old_path="$PATH"
+  good="$BATS_TEST_TMPDIR/goodssh"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$BATS_TEST_TMPDIR/good-sshcmd-ran" >| "$good"
+  chmod +x "$good"
+  crf_ssh_remote
+  GH_HOST=example.invalid GIT_SSH_COMMAND="$good -o BatchMode=yes" \
+    run --separate-stderr env "PATH=$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ -e "$BATS_TEST_TMPDIR/good-sshcmd-ran" ] || { echo "not used: $status $stderr" >&2; return 1; }
+}
+
+@test "an awk script whose #! interpreter is inside the worktree is refused, so it never runs" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/shebang-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 99\n' "$marker" >| "$REPO/tools/interp"
+  chmod +x "$REPO/tools/interp"
+  link="$BATS_TEST_TMPDIR/awkbin"
+  mkdir -p "$link"
+  printf '#!%s/tools/interp\n' "$REPO" >| "$link/awk"
+  chmod +x "$link/awk"
+  printf 'one\nfeature\nfix-shebang\n' >| src/a.txt
+  run_crf_path "$link:$old_path" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the interpreter inside the worktree ran" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+}
+
+@test "an ssh script with a #! interpreter inside the worktree never runs for the ls-remote check" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/ssh-shebang-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools"
+  printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$marker" >| "$REPO/tools/interp"
+  chmod +x "$REPO/tools/interp"
+  link="$BATS_TEST_TMPDIR/sshshbin"
+  mkdir -p "$link"
+  printf '#!%s/tools/interp\n' "$REPO" >| "$link/ssh"
+  chmod +x "$link/ssh"
+  crf_ssh_remote
+  GH_HOST=example.invalid run --separate-stderr env "PATH=$link:$old_path" "$SCRIPT" \
+    --provider github --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the planted ssh interpreter ran: $stderr" >&2; return 1; }
+}
+
+@test "an inherited YR_GIT_PATH naming a worktree directory is ignored, so a planted awk never runs" {
+  marker="$BATS_TEST_TMPDIR/inherited-ran"
+  rm -f "$marker"
+  printf 'canary-inh/\n' >> .git/info/exclude
+  mkdir -p canary-inh
+  printf '#!/bin/sh\ntouch "%s"\nexit 99\n' "$marker" >| canary-inh/awk
+  chmod +x canary-inh/awk
+  printf 'one\nfeature\nfix-inherited\n' >| src/a.txt
+  YR_GIT_PATH="$REPO/canary-inh:$PATH" run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ]
+}
+
 @test "tools outside the repository still work" {
   for provider in graphite github; do
     printf 'one\nfeature\nfix-%s\n' "$provider" >| src/a.txt
     run_crf --provider "$provider" --pr 7 --message "$MSG" -- src/a.txt
     [ "$status" -eq 0 ] || { echo "refused: $provider: $stderr" >&2; return 1; }
   done
+}
+
+@test "PATH cleaning drops empty, relative and in-worktree entries, so no planted file runs and the child sees the cleaned PATH" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/planted-ran"
+  rm -f "$marker"
+  printf 'canary-abs/\ncanary-rel/\n' >> .git/info/exclude
+  mkdir -p canary-abs canary-rel
+  # Wrappers for tools a submit-time child may call by bare name: each marks the
+  # run, then execs the real tool, so a missing drop shows up as the marker, not
+  # a failure. (awk, cat and mktemp are left out: argument handling runs them
+  # before the tool check.)
+  for tool in sed tr date sort head env; do
+    real=$(command -v "$tool") || continue
+    for d in canary-abs canary-rel; do
+      printf '#!/bin/sh\necho "%s %s" >> "%s"\nexec "%s" "$@"\n' "$d" "$tool" "$marker" "$real" >| "$d/$tool"
+      chmod +x "$d/$tool"
+    done
+  done
+  printf '#!/bin/sh\ntouch "%s"\nexit 99\n' "$marker" >| canary-rel/gt
+  printf '#!/bin/sh\ntouch "%s"\nexit 99\n' "$marker" >| canary-rel/node
+  chmod +x canary-rel/gt canary-rel/node
+  # A gt in front of the fixture stub that records the PATH its child gets.
+  rec="$BATS_TEST_TMPDIR/pathrec"
+  mkdir -p "$rec"
+  printf '#!/bin/sh\nprintf "%%s\\n" "$PATH" >> "%s/gt-path"\nexec "%s/gt" "$@"\n' "$BATS_TEST_TMPDIR" "$STUB_BIN" >| "$rec/gt"
+  chmod +x "$rec/gt"
+  for provider in graphite github; do
+    rm -f "$BATS_TEST_TMPDIR/gt-path"
+    printf 'one\nfeature\nfix-%s\n' "$provider" >| src/a.txt
+    PATH="$REPO/canary-abs::canary-rel:$rec:$old_path:" run_crf --provider "$provider" --pr 7 --message "$MSG" -- src/a.txt
+    [ "$status" -eq 0 ] || { echo "refused: $provider: $stderr" >&2; return 1; }
+    [ ! -e "$marker" ] || { echo "a planted file ran ($provider): $(sort -u "$marker" | tr '\n' ';')" >&2; return 1; }
+    [ "$provider" = graphite ] || continue
+    # The PATH gt (and so its children) was started with.
+    seen=$(cat "$BATS_TEST_TMPDIR/gt-path")
+    [[ "$seen" != *"$REPO/canary-abs"* ]]
+    [[ "$seen" != *canary-rel* ]]
+    [[ "$seen" != :* && "$seen" != *::* && "$seen" != *: ]]
+    [[ "$seen" == *"$rec"* ]]
+  done
+}
+
+@test "a timeout or gtimeout planted inside the repository is refused before the timeout probe runs it" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/planted-timeout-ran"
+  printf 'canary-abs/\n' >> .git/info/exclude
+  for tool in timeout gtimeout; do
+    rm -rf canary-abs "$marker"
+    mkdir canary-abs
+    printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$marker" >| "canary-abs/$tool"
+    chmod +x "canary-abs/$tool"
+    PATH="$REPO/canary-abs:$old_path"
+    crf_refuses_untouched graphite || { PATH="$old_path"; echo "not refused: $tool" >&2; return 1; }
+    PATH="$old_path"
+    [ ! -e "$marker" ]
+    [[ "$stderr" == *"$tool resolves to"* ]]
+    [[ "$stderr" == *"inside the repository"* ]]
+  done
+}
+
+@test "the signing note carries this script's prefix" {
+  git config gpg.program /nonexistent-gpg
+  git config commit.gpgsign true
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"[commit-resolve-fixes] Note: the repository's own config sets commit signing"* ]]
+  [[ "$stderr" == *"the commit is made unsigned"* ]]
 }
 
 # gt_stub_submit <stderr-line> <exit>: gt submit prints the line to stderr and

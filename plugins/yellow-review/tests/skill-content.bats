@@ -684,7 +684,7 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   [[ "$text" == *'"Linear response checks", which every reused `list_issues` hit and the `save_issue` response must pass'* ]]
 }
 
-@test "resolve-pr: the ignored-file marker is minted before resolvers spawn and passed to the unattended verify" {
+@test "resolve-pr: the ignored-file marker is minted before resolvers spawn and passed to every verify run" {
   mint=$(grep -n '^### Step 3f: Mint the Ignored-File Marker' "$RESOLVE_PR" | cut -d: -f1)
   clean=$(grep -n '^### Step 2: Check Working Directory' "$RESOLVE_PR" | cut -d: -f1)
   spawn=$(grep -n '^### Step 4: Spawn Parallel Resolvers' "$RESOLVE_PR" | cut -d: -f1)
@@ -702,7 +702,7 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   printf '%s\n' "$step6" | grep -qF "trap 'rm -rf -- \"\$MARK_DIR\"' EXIT"
   step6flat=$(printf '%s\n' "$step6" | tr '\n' ' ' | tr -s ' ')
   [[ "$step6flat" == *'`--ignored-since` with Step 3f'* ]]
-  [[ "$step6flat" == *'required unattended'* ]]
+  [[ "$step6flat" == *'required for every run'* ]]
   [[ "$step6flat" == *'**Marker cleanup.**'* ]]
   flat "$RESOLVE_REFS/dispositions.md" | grep -qF -- '`--ignored-since <marker-file>` is required'
 }

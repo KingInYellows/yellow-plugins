@@ -258,7 +258,7 @@ The trailing `/` is stripped first (macOS sets `TMPDIR` with one), so the
 printed path has the single-slash prefix Step 6 checks.
 Keep the printed path as `<marker-dir>` for Step 6. A non-zero exit stops the
 run before any edit (`[review:resolve] Error: could not create the
-ignored-file marker.`), because an unattended verify cannot run without it.
+ignored-file marker.`), because no verify run can start without it.
 Step 8's second round mints a fresh marker before its resolvers. Between the
 marker and Step 6's guard, run no project command (tests, builds, linters):
 anything it writes to an ignored path other than the tool state the guard skips
@@ -480,9 +480,9 @@ Push (`verify=none`, `push=skipped`).
 (interactive: ask with the command and `git diff --stat`; unattended: only
 with `verify_unattended: true` and an untracked config; add `--unattended`,
 which reports `skipped` with a reason for runner files or files outside the
-PR) and `--ignored-since` with Step 3f's marker (required unattended, where
-the script refuses when any gitignored file is newer than the marker; the
-interactive call passes it too). Write the command with the Write tool to a
+PR) and `--ignored-since` with Step 3f's marker (required for every run,
+attended or not: the script refuses when any gitignored file is newer than
+the marker). Write the command with the Write tool to a
 `mktemp` path and pass the Bash tool a `timeout` of `(<seconds> + 60) × 1000`
 ms. The trap lives in this consuming call, after the path is re-validated, and
 removes the marker directory on every exit:
