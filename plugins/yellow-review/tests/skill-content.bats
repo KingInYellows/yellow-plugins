@@ -391,9 +391,10 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   [[ "$step1b" == *"printf 'head=tracked\\n'"* ]]
   [[ "$step1b" == *"printf 'head=unignored\\n'"* ]]
   [[ "$step1b" == *'could not read the PR head ignore rules'* ]]
-  # A case-folded alias of .gitignore or the config at the head root stops before classification.
-  [[ "$step1b" == *'grep -Fix -e .gitignore -e yellow-plugins.local.md'* ]]
-  [[ "$step1b" == *'differs from .gitignore or yellow-plugins.local.md only in case'* ]]
+  # A case-folded alias of .gitignore, .gitattributes or the config at the head root stops before classification.
+  [[ "$step1b" == *'grep -Fix -e .gitignore -e .gitattributes -e yellow-plugins.local.md'* ]]
+  [[ "$step1b" == *'grep -Fvx -e .gitignore -e .gitattributes -e yellow-plugins.local.md'* ]]
+  [[ "$step1b" == *'differs from .gitignore, .gitattributes or yellow-plugins.local.md only in case'* ]]
   aliasline=$(grep -n 'grep -Fix -e .gitignore' "$SWEEP" | head -1 | cut -d: -f1)
   trackline=$(grep -n 'cat-file -e "${GOT}:yellow-plugins.local.md"' "$SWEEP" | head -1 | cut -d: -f1)
   [ -n "$aliasline" ] && [ -n "$trackline" ] && [ "$aliasline" -lt "$trackline" ]
