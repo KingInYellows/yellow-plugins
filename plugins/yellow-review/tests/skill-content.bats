@@ -382,6 +382,29 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   step2a=$(awk '/^### Step 2a:/ { p = 1; next } /^### Step 2b:/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
   step3=$(awk '/^### Step 3: Run \/review:resolve/ { p = 1; next } /^### Step 3a:/ { p = 0 } p' "$SWEEP" | tr '\n' ' ' | tr -s ' ')
   [[ "$step1b" == *'first runs the guard exit check in Step 3a'* ]]
+  # The PR head is classified before the snapshot, which stays before /review:pr.
+  fetchline=$(grep -n 'fetch -q --no-tags -- "$REMOTE" "refs/pull/<PR#>/head"' "$SWEEP" | head -1 | cut -d: -f1)
+  [ -n "$fetchline" ]
+  [ "$fetchline" -lt "$snap" ]
+  [[ "$step1b" == *'--work-tree="$WT" check-ignore -q --no-index'* ]]
+  [[ "$step1b" == *'head=ignored'* ]]
+  [[ "$step1b" == *"printf 'head=tracked\\n'"* ]]
+  [[ "$step1b" == *"printf 'head=unignored\\n'"* ]]
+  [[ "$step1b" == *'could not read the PR head ignore rules'* ]]
+  # A case-folded alias of .gitignore, .gitattributes or the config at the head root stops before classification.
+  [[ "$step1b" == *'grep -Fix -e .gitignore -e .gitattributes -e yellow-plugins.local.md'* ]]
+  [[ "$step1b" == *'grep -Fvx -e .gitignore -e .gitattributes -e yellow-plugins.local.md'* ]]
+  [[ "$step1b" == *'differs from .gitignore, .gitattributes or yellow-plugins.local.md only in case'* ]]
+  aliasline=$(grep -n 'grep -Fix -e .gitignore' "$SWEEP" | head -1 | cut -d: -f1)
+  trackline=$(grep -n 'cat-file -e "${GOT}:yellow-plugins.local.md"' "$SWEEP" | head -1 | cut -d: -f1)
+  [ -n "$aliasline" ] && [ -n "$trackline" ] && [ "$aliasline" -lt "$trackline" ]
+  # A config tracked here and ignored on the PR head is never snapshotted: the abort is pinned.
+  [[ "$step1b" == *'do not snapshot: the snapshot would keep the tracked repository bytes'* ]]
+  [[ "$step1b" == *'is tracked on this branch but ignored on the PR head; rerun /review:sweep from the PR'* ]]
+  [[ "$step1b" == *'stop before Step 2, with no `Sweep:` or `Resolve:` line'* ]]
+  # The snapshot condition itself: ignored here, or unignored here and ignored on the head.
+  [[ "$step1b" == *'snapshot when the work-tree probe printed `ignored`, or when it printed `unignored` and this probe printed `head=ignored`'* ]]
+  [[ "$step1b" == *'not an ignored untracked file; not guarded'* ]]
   [[ "$step2a" == *'Exit 2 means `gh pr view` or `git rev-parse` failed or printed nothing, so no mismatch was established'* ]]
   [[ "$step2a" == *'print no `Sweep:` or `Resolve:` line, so `/review:sweep-all` records `no contract`'* ]]
   # Only a read-and-differ comparison reaches the skip line; a failed read exits 2 first.
@@ -398,7 +421,7 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   [[ "$step2b" == *'Anything but `ignored`, and `<guard-dir>` is not `none`'* ]]
   [[ "$step2b" == *'Run no `guard-local-config` call'* ]]
   [[ "$step2b" == *'set `<guard-dir>` to `none`, and continue unguarded'* ]]
-  [[ "$step2b" == *'Run the Step 1b classification probe again'* ]]
+  [[ "$step2b" == *"Run Step 1b's first probe (the work-tree classification, not the PR head probe) again"* ]]
   [[ "$step2b" == *'git -C "$TOP" check-ignore -q -- yellow-plugins.local.md'* ]]
   [[ "$step2b" == *'**`ignored` and `<guard-dir>` is `none`:** the config was not snapshotted before the review'* ]]
   [[ "$step2b" == *'is ignored on the PR branch but was not snapshotted before the review; rerun /review:sweep from the PR'* ]]
@@ -645,6 +668,32 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   text=$(flat "$SWEEP_ALL")
   [[ "$text" == *'grep -qiE '"'"'rate limit|abuse|HTTP 429'"'"''* ]]
   [[ "$text" == *'When `ratelimited=1`, the next `gh` call would hit the same limit'* ]]
+}
+
+@test "sweep-all: the pre-check reports a fixed gh error category and never echoes the gh output" {
+  text=$(flat "$SWEEP_ALL")
+  # Network first, so "could not resolve host" is not read as a missing PR.
+  [[ "$text" == *"CAUSE='network error'"*"CAUSE='gh auth failed'"*"CAUSE='PR or repository not found'"*'CAUSE="gh exited $RC"'* ]]
+  [[ "$text" == *"*'could not resolve host'*) CAUSE='network error'"* ]]
+  [[ "$text" == *"ratelimited=0 cause=%s"* ]]
+  [[ "$text" != *"gh-error"* ]]
+  [[ "$text" != *'head -n 1 | tr -cd'* ]]
+}
+
+@test "sweep: the PR head ignore probe refuses content-transforming attributes on .gitignore" {
+  text=$(flat "$SWEEP")
+  [[ "$text" == *'read-tree "$GOT"'* ]]
+  [[ "$text" == *'check-attr --cached filter eol working-tree-encoding ident -- .gitignore'* ]]
+  [[ "$text" != *'check-attr --source'* ]]
+  [[ "$text" == *'sets content-transforming attributes on .gitignore'* ]]
+}
+
+@test "sweep: a literal filter=unspecified is refused when a filter.unspecified driver is configured" {
+  text=$(flat "$SWEEP")
+  [[ "$text" == *"config --get-regexp '^filter\.unspecified\.'"* ]]
+  [[ "$text" == *"'.gitignore: filter: unspecified') [ \"\$DRV\" -eq 0 ] || BAD=1 ;;"* ]]
+  # The old global allowlist accepted any attribute printing "unspecified".
+  [[ "$text" != *"grep -vE ': (unspecified|lf)\$'"* ]]
 }
 
 # Collapse line wraps so a phrase can be matched across them.
@@ -916,23 +965,43 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   grep -qF '`/review:sweep-all` treats it as `no contract`' <<<"$flat_sweep"
 }
 
-@test "sweep-all: an open-PR pre-check skips a closed or unreadable PR before the no-contract stop can misread it" {
+@test "sweep-all: an open-PR pre-check skips a closed PR and stops when the state is unreadable" {
   step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
   flat4=$(tr '\n' ' ' <<<"$step4" | tr -s ' ')
   grep -qF '**Open-PR pre-check**' <<<"$flat4"
   grep -qF 'gh pr view <PR#> --json state -q .state' <<<"$flat4"
-  grep -qF 'record `skipped — state unreadable`' <<<"$flat4"
+  grep -qF 'record `state unreadable: <cause>`' <<<"$flat4"
+  grep -qF 'skipped — not attempted (state unreadable)' <<<"$flat4"
+  run grep -qF 'record `skipped — state unreadable`' <<<"$flat4"
+  [ "$status" -eq 1 ]
   grep -qF 'record `skipped — PR closed before sweep`' <<<"$flat4"
   grep -qF 'do NOT invoke the Skill: go to item 6' <<<"$flat4"
   # the pre-check precedes the Skill invocation
   pre=$(grep -n 'Open-PR pre-check' "$SWEEP_ALL" | head -1 | cut -d: -f1)
   inv=$(grep -n '\*\*Invoke sweep\*\*' "$SWEEP_ALL" | head -1 | cut -d: -f1)
   [ "$pre" -lt "$inv" ]
+  # Item 1b alone: the unreadable-state stop is pinned to its recording, the
+  # Step 5 jump and the no-continue rule, and the rate-limit stop stays apart.
+  item1b=${flat4#*'**Open-PR pre-check**'}
+  item1b=${item1b%%'**Invoke sweep**'*}
+  [ "$(grep -o 'record `pending-exit-1`' <<<"$item1b" | wc -l)" -eq 2 ]
+  [ "$(grep -o 'go to `### Step 5: End-of-loop summary table`' <<<"$item1b" | wc -l)" -eq 2 ]
+  grep -qF 'When `ratelimited=1`' <<<"$item1b"
+  grep -qF 'skipped — not attempted (rate limit)' <<<"$item1b"
+  grep -qF 'When `exit` is non-zero and `ratelimited` is not `1`' <<<"$item1b"
+  grep -qF '`Outcome` `skipped`, `Skip Reason` `state unreadable` and `Blocking` `?`' <<<"$item1b"
+  grep -qF 'record `state unreadable: <cause>`' <<<"$item1b"
+  grep -qF 'Do not continue to the next PR.' <<<"$item1b"
+  grep -qF "ratelimited=0 cause=%s" <<<"$item1b"
+  # The intro names the stop.
+  grep -qF 'verify-skipped and state-unreadable stops in Step 4' <<<"$(tr '\n' ' ' <"$SWEEP_ALL" | tr -s ' ')"
 }
 
 @test "sweep-all: an early stop exits 1 after the summary, even with zero attempts" {
   step4=$(awk '/^### Step 4:/ { p = 1; next } /^### Step 5:/ { p = 0 } p' "$SWEEP_ALL")
   [ "$(grep -c 'Record `pending-exit-1`' <<<"$step4")" -eq 4 ]
+  # Item 1b records it too, in lowercase, for the rate-limit and unreadable-state stops.
+  [ "$(grep -ci 'record `pending-exit-1`' <<<"$step4")" -ge 6 ]
   grep -qF '**Final exit (every path, including zero attempts):** read `pending-exit-1`.' "$SWEEP_ALL"
   grep -qF 'If set, the command exits `1`; otherwise (`pending-exit-1` unset), exit `0`.' "$SWEEP_ALL"
 }
@@ -1224,7 +1293,7 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$flat" == *'`blocking` count `<b>`, `verify` and `ratelimited`'* ]]
   [[ "$flat" == *'5c. **Verify-skipped stop** — only after item 4'* ]]
   [[ "$flat" == *'`skipped — not attempted (verify skipped)`'* ]]
-  [[ "$flat" == *'Unless item 4, 5, 5b or 5c stopped the loop'* ]]
+  [[ "$flat" == *'Unless item 1b, 4, 5, 5b or 5c stopped the loop'* ]]
 }
 
 @test "sweep-all: no project command after a verify-skipped stop" {
@@ -1268,6 +1337,81 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   run grep -n '^### Step 6' "$SWEEP_ALL"
   [ "$status" -eq 1 ]
   grep -qF 'compound-staging drain; sweep-all runs no compounding pass of its own' "$SWEEP_ALL"
+}
+
+# Runs sweep Step 1b's remote selection (lines 'REMOTE=origin' through its
+# 'case' guard) against a scratch repo whose remotes are the arguments.
+sweep_remote_pick() {
+  local repo="$BATS_TEST_TMPDIR/remote-repo" r
+  rm -rf "$repo" && git init -q "$repo"
+  for r in "$@"; do git -C "$repo" remote add -- "$r" https://example.invalid/x.git; done
+  awk '/^REMOTE=origin$/ { p = 1 } p { print } /^case "\$REMOTE" in/ { exit }' "$SWEEP" >"$BATS_TEST_TMPDIR/pick.sh"
+  [ "$(wc -l <"$BATS_TEST_TMPDIR/pick.sh")" -eq 3 ]
+  TOP="$repo" bash -c 'head_fail() { echo FAIL; exit 2; }; . "$1"; printf "%s\n" "$REMOTE"' _ "$BATS_TEST_TMPDIR/pick.sh"
+}
+
+@test "sweep Step 1b: any git-valid sole remote name is accepted, not a character allowlist" {
+  for name in team+upstream team@upstream team/up.stream up_stream; do
+    run sweep_remote_pick "$name"
+    [ "$status" -eq 0 ]
+    [ "$output" = "$name" ]
+  done
+}
+
+@test "sweep Step 1b: several remotes without origin fail; origin wins among several" {
+  run sweep_remote_pick a b
+  [ "$status" -eq 2 ]
+  [ "$output" = FAIL ]
+  run sweep_remote_pick a origin
+  [ "$status" -eq 0 ]
+  [ "$output" = origin ]
+}
+
+@test "sweep Step 1b: an option-shaped remote name is refused, and fetch passes it after --" {
+  run sweep_remote_pick -x
+  [ "$status" -eq 2 ]
+  [ "$output" = FAIL ]
+  grep -qF 'fetch -q --no-tags -- "$REMOTE"' "$SWEEP"
+}
+
+# Runs sweep Step 1b's existing-path guard (the fenced block that starts at
+# 'p="$TOP/yellow-plugins.local.md"') in a scratch repo, under bash and zsh
+# noclobber when zsh is present.
+sweep_unignored_guard() {
+  local repo="$BATS_TEST_TMPDIR/guard-repo" sh="${2:-bash}"
+  rm -rf "$repo" && git init -q "$repo"
+  git -C "$repo" config status.showUntrackedFiles no
+  case "$1" in
+    file) printf 'resolve_pr:\n  verify_command: x\n' >"$repo/yellow-plugins.local.md" ;;
+    symlink) ln -s /nonexistent-target "$repo/yellow-plugins.local.md" ;;
+    absent) ;;
+  esac
+  awk '/^p="\$TOP\/yellow-plugins.local.md"$/ { p = 1 } p { print } p && /^fi$/ { exit }' "$SWEEP" >"$BATS_TEST_TMPDIR/guard.sh"
+  [ "$(wc -l <"$BATS_TEST_TMPDIR/guard.sh")" -eq 5 ]
+  (cd "$repo" && "$sh" -c 'setopt noclobber 2>/dev/null; set -C; TOP=$(git rev-parse --show-toplevel); . "$1"; echo CONTINUE' _ "$BATS_TEST_TMPDIR/guard.sh")
+}
+
+@test "sweep Step 1b: an existing unignored config file or symlink stops before the snapshot, an absent one continues" {
+  # status.showUntrackedFiles=no hides the file from the Step 1 clean-tree check.
+  run sweep_unignored_guard file
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'exists untracked and unignored on this branch'* ]]
+  [[ "$output" != *CONTINUE* ]]
+  run sweep_unignored_guard symlink
+  [ "$status" -eq 1 ]
+  run sweep_unignored_guard absent
+  [ "$status" -eq 0 ]
+  [ "$output" = CONTINUE ]
+  if command -v zsh >/dev/null 2>&1; then
+    run sweep_unignored_guard file zsh
+    [ "$status" -eq 1 ]
+    run sweep_unignored_guard absent zsh
+    [ "$status" -eq 0 ]
+  fi
+  # The guard sits after the tracked-abort and before the snapshot call.
+  guard=$(grep -n '^p="\$TOP/yellow-plugins.local.md"$' "$SWEEP" | cut -d: -f1)
+  snap=$(grep -n 'guard-local-config" snapshot' "$SWEEP" | head -1 | cut -d: -f1)
+  [ -n "$guard" ] && [ "$guard" -lt "$snap" ]
 }
 
 @test "review:pr: high-confidence P2 safe_auto tier is capped and anchor-100 only" {

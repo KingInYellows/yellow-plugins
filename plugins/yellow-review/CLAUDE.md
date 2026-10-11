@@ -90,13 +90,19 @@ resolution, and sequential stack review. Graphite-native workflow.
   `/review:resolve --non-interactive` on the same PR with no gates in
   between — fully unattended — then `/review:triage --non-interactive`
   (reconcile only), a Ledger line and a `Merge:` row (not ready while P0-P2
-  ledger findings are pending) in its summary
+  ledger findings are pending) in its summary. Before `/review:pr` it
+  snapshots `yellow-plugins.local.md` when this work tree ignores it, or when
+  the file is absent here and the fetched PR head ignores it; a config
+  tracked here but ignored on the PR head, or an existing untracked unignored
+  file there, aborts before the checkout, and an
+  unreadable PR head ignore rule set stops with exit 2 (neither prints a skip
+  line)
 - `/review:sweep-all` — Run `/review:sweep` on every open non-draft PR you
   authored sequentially, with one upfront confirmation, skip-and-continue per
   PR, end-of-loop summary (with `Blocking` and `Residual` pending/attention
   columns, and a `Not merge-ready` line from the ledger's `merge_blocking`).
   Each PR stages its learnings for the compound-staging drain; there is no
-  end-of-loop compounding pass. A rate limit, a
+  end-of-loop compounding pass. A rate limit, an unreadable PR state, a
   dirty tree or a missing `Resolve:` contract line ends the batch and exits 1;
   a PR-specific stop (`Sweep: skipped`) is skipped and the batch continues. It lists the ledgers of PRs
   missing from an all-authors open-PR query and deletes them via
