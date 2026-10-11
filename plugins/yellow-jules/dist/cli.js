@@ -7,9 +7,11 @@
  * subcommand, missing flag, unparseable argv), which still prints a valid
  * `{ ok: false, operation, error }` envelope (R7).
  *
- * PR2 ships the read-only surface only. `delegate`, `reply`, and `approve`
- * are usage errors until PR3; `cancel`, `pause`, `resume`, and `cost` are
- * recognized and answer JULES_UNSUPPORTED_CAPABILITY (R11).
+ * The reads (`setup`, `list`, `status`, `collect`), the grant-gated writes
+ * (`delegate`, `reply`, `approve`), `authorize`, `abandon`, and `supervise`
+ * are all wired here; a mutating failure echoes `localRequestId` and `localId`.
+ * `cancel`, `pause`, `resume`, and `cost` are recognized and answer
+ * JULES_UNSUPPORTED_CAPABILITY (R11); `integrate` is not available yet.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -46,26 +48,34 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_util_1 = require("node:util");
+const authority_js_1 = require("./authority.js");
+const authorize_js_1 = require("./authorize.js");
 const config_js_1 = require("./config.js");
 const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
 const fetch_guard_js_1 = require("./fetch-guard.js");
+const mutations_js_1 = require("./mutations.js");
 const redact_js_1 = require("./redact.js");
 const runtime = __importStar(require("./runtime.js"));
 const sdk_adapter_js_1 = require("./sdk-adapter.js");
 const sdk_resolver_js_1 = require("./sdk-resolver.js");
+const supervise_js_1 = require("./supervise.js");
 const test_seam_js_1 = require("./test-seam.js");
 const validate_js_1 = require("./validate.js");
-const KNOWN_OPERATIONS = ['setup', 'list', 'status', 'collect'];
-const UNSUPPORTED_OPERATIONS = ['cancel', 'pause', 'resume', 'cost'];
-const LATER_OPERATIONS = [
+const KNOWN_OPERATIONS = [
+    'setup',
+    'list',
+    'status',
+    'collect',
     'delegate',
     'reply',
     'approve',
     'authorize',
+    'abandon',
     'supervise',
-    'integrate',
 ];
+const UNSUPPORTED_OPERATIONS = ['cancel', 'pause', 'resume', 'cost'];
+const LATER_OPERATIONS = ['integrate'];
 // Deadline plus one in-flight read (up to the 60 s client timeout) plus the
 // post-walk staging and journal writes must fit inside the wrappers' 300 s
 // Bash timeout, or the run is killed mid-write.
@@ -84,6 +94,14 @@ function requireString(value, flag) {
         throw new UsageError(`missing required flag ${flag}`);
     return value;
 }
+function replyKindOf(value) {
+    if (value === undefined)
+        return {};
+    if (value === 'question' || value === 'plan' || value === 'other') {
+        return { replyKind: value };
+    }
+    throw new UsageError('--reply-kind must be question, plan, or other');
+}
 function deadlineFlag(value, fallback) {
     return typeof value === 'string'
         ? (0, validate_js_1.validatePositiveInt)(value, '--deadline-ms', 1, MAX_DEADLINE_MS)
@@ -91,6 +109,12 @@ function deadlineFlag(value, fallback) {
 }
 function buildDeps() {
     const dataDir = (0, config_js_1.resolveDataDir)();
+    // The guard patches global fetch and can be installed once per process, but
+    // one invocation may open several adapters (reconcile, then status; status,
+    // then collect). Install on first use and share the handle: its POST counter
+    // is cumulative, and each adapter only compares samples taken within its own
+    // write, so sharing is safe.
+    let guard;
     return {
         dataDir,
         clock: runtime.REAL_CLOCK,
@@ -103,7 +127,7 @@ function buildDeps() {
             const resolved = await (0, sdk_resolver_js_1.resolveSdk)(dataDir);
             const transport = (0, test_seam_js_1.getTestTransport)();
             // Installed before the adapter exists, so no SDK request can bypass it.
-            (0, fetch_guard_js_1.installFetchGuard)({
+            guard ??= (0, fetch_guard_js_1.installFetchGuard)({
                 allowedOrigins: transport?.allowedOrigins ?? [fetch_guard_js_1.VENDOR_ORIGIN],
                 readTimeoutMs: fetch_guard_js_1.READ_TIMEOUT_MS,
             });
@@ -111,6 +135,7 @@ function buildDeps() {
                 sdk: resolved.module,
                 dataDir,
                 apiKey,
+                postCount: guard.postCount,
                 ...(transport !== undefined ? { baseUrl: transport.baseUrl } : {}),
             });
         },
@@ -191,12 +216,238 @@ async function dispatch(operation, rest, deps) {
                 deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_COLLECT_DEADLINE_MS),
             });
         }
+        case 'delegate': {
+            const { values } = (0, node_util_1.parseArgs)({
+                args: [...rest],
+                options: {
+                    repo: { type: 'string' },
+                    branch: { type: 'string' },
+                    prompt: { type: 'string' },
+                    title: { type: 'string' },
+                    'task-ref': { type: 'string' },
+                    'request-id': { type: 'string' },
+                    'grant-id': { type: 'string' },
+                    'dry-run': { type: 'boolean', default: false },
+                    correction: { type: 'boolean', default: false },
+                    'retry-failed': { type: 'boolean', default: false },
+                    ...deadline,
+                },
+                strict: true,
+                allowPositionals: false,
+            });
+            return (0, mutations_js_1.delegate)(deps, {
+                repo: requireString(values.repo, '--repo'),
+                branch: requireString(values.branch, '--branch'),
+                prompt: requireString(values.prompt, '--prompt'),
+                ...(typeof values.title === 'string' ? { title: values.title } : {}),
+                ...(typeof values['task-ref'] === 'string'
+                    ? { taskRef: values['task-ref'] }
+                    : {}),
+                ...(typeof values['request-id'] === 'string'
+                    ? { requestId: values['request-id'] }
+                    : {}),
+                ...(typeof values['grant-id'] === 'string'
+                    ? { grantId: values['grant-id'] }
+                    : {}),
+                dryRun: values['dry-run'] === true,
+                correction: values.correction === true,
+                retryFailed: values['retry-failed'] === true,
+                deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS),
+            });
+        }
+        case 'reply': {
+            const { values } = (0, node_util_1.parseArgs)({
+                args: [...rest],
+                options: {
+                    session: { type: 'string' },
+                    message: { type: 'string' },
+                    'request-id': { type: 'string' },
+                    'grant-id': { type: 'string' },
+                    'dry-run': { type: 'boolean', default: false },
+                    correction: { type: 'boolean', default: false },
+                    'expect-activity-id': { type: 'string' },
+                    'expect-question-digest': { type: 'string' },
+                    'expect-plan-id': { type: 'string' },
+                    'expect-plan-digest': { type: 'string' },
+                    'reply-kind': { type: 'string' },
+                    ...deadline,
+                },
+                strict: true,
+                allowPositionals: false,
+            });
+            return (0, mutations_js_1.reply)(deps, {
+                session: requireString(values.session, '--session'),
+                message: requireString(values.message, '--message'),
+                ...(typeof values['request-id'] === 'string'
+                    ? { requestId: values['request-id'] }
+                    : {}),
+                ...(typeof values['grant-id'] === 'string'
+                    ? { grantId: values['grant-id'] }
+                    : {}),
+                dryRun: values['dry-run'] === true,
+                correction: values.correction === true,
+                ...(typeof values['expect-activity-id'] === 'string'
+                    ? { expectActivityId: values['expect-activity-id'] }
+                    : {}),
+                ...(typeof values['expect-question-digest'] === 'string'
+                    ? { expectQuestionDigest: values['expect-question-digest'] }
+                    : {}),
+                ...(typeof values['expect-plan-id'] === 'string'
+                    ? { expectPlanId: values['expect-plan-id'] }
+                    : {}),
+                ...(typeof values['expect-plan-digest'] === 'string'
+                    ? { expectPlanDigest: values['expect-plan-digest'] }
+                    : {}),
+                ...replyKindOf(values['reply-kind']),
+                deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS),
+            });
+        }
+        case 'approve': {
+            const { values } = (0, node_util_1.parseArgs)({
+                args: [...rest],
+                options: {
+                    session: { type: 'string' },
+                    'plan-id': { type: 'string' },
+                    'expect-plan-digest': { type: 'string' },
+                    'request-id': { type: 'string' },
+                    'grant-id': { type: 'string' },
+                    'dry-run': { type: 'boolean', default: false },
+                    ...deadline,
+                },
+                strict: true,
+                allowPositionals: false,
+            });
+            return (0, mutations_js_1.approve)(deps, {
+                session: requireString(values.session, '--session'),
+                planId: requireString(values['plan-id'], '--plan-id'),
+                ...(typeof values['expect-plan-digest'] === 'string'
+                    ? { expectPlanDigest: values['expect-plan-digest'] }
+                    : {}),
+                ...(typeof values['request-id'] === 'string'
+                    ? { requestId: values['request-id'] }
+                    : {}),
+                ...(typeof values['grant-id'] === 'string'
+                    ? { grantId: values['grant-id'] }
+                    : {}),
+                dryRun: values['dry-run'] === true,
+                deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS),
+            });
+        }
+        case 'abandon': {
+            const { values } = (0, node_util_1.parseArgs)({
+                args: [...rest],
+                options: { 'request-id': { type: 'string' } },
+                strict: true,
+                allowPositionals: false,
+            });
+            return (0, mutations_js_1.abandon)(deps, {
+                requestId: requireString(values['request-id'], '--request-id'),
+            });
+        }
+        case 'supervise': {
+            const { values } = (0, node_util_1.parseArgs)({
+                args: [...rest],
+                options: {
+                    session: { type: 'string' },
+                    'grant-id': { type: 'string' },
+                    'clear-pause': { type: 'boolean', default: false },
+                    ...deadline,
+                },
+                strict: true,
+                allowPositionals: false,
+            });
+            if (values['clear-pause'] === true) {
+                if (typeof values['grant-id'] === 'string') {
+                    throw new UsageError('--clear-pause takes only --session; it is confirmed on the terminal, not by a grant');
+                }
+                return (0, supervise_js_1.clearPause)(deps, {
+                    session: requireString(values.session, '--session'),
+                });
+            }
+            return (0, supervise_js_1.superviseOnce)(deps, {
+                session: requireString(values.session, '--session'),
+                ...(typeof values['grant-id'] === 'string'
+                    ? { grantId: values['grant-id'] }
+                    : {}),
+                deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_MUTATION_DEADLINE_MS),
+            });
+        }
+        case 'authorize': {
+            const { values } = (0, node_util_1.parseArgs)({
+                args: [...rest],
+                options: {
+                    repo: { type: 'string' },
+                    branch: { type: 'string' },
+                    source: { type: 'string' },
+                    'task-ref': { type: 'string', multiple: true },
+                    operations: { type: 'string' },
+                    'max-active-sessions': { type: 'string' },
+                    'max-total-tasks': { type: 'string' },
+                    'max-corrective-rounds': { type: 'string' },
+                    'ttl-minutes': { type: 'string' },
+                    owner: { type: 'string' },
+                    'take-over': { type: 'boolean', default: false },
+                    list: { type: 'boolean', default: false },
+                    revoke: { type: 'string' },
+                    ...deadline,
+                },
+                strict: true,
+                allowPositionals: false,
+            });
+            const modes = [
+                values.list === true,
+                typeof values.revoke === 'string',
+                values['take-over'] === true,
+            ].filter(Boolean).length;
+            const creationFlags = [
+                values.repo,
+                values.branch,
+                values.source,
+                values['task-ref'],
+                values.operations,
+                values['max-active-sessions'],
+                values['max-total-tasks'],
+                values['max-corrective-rounds'],
+                values['ttl-minutes'],
+                values.owner,
+            ].some((v) => v !== undefined);
+            if (modes > 1 || (modes === 1 && creationFlags)) {
+                throw new UsageError('authorize takes exactly one of: grant-creation flags, --list, --revoke <grant-id>, or --take-over');
+            }
+            if (values.list === true)
+                return (0, authorize_js_1.authorizeList)(deps);
+            if (typeof values.revoke === 'string') {
+                return (0, authorize_js_1.authorizeRevoke)(deps, values.revoke);
+            }
+            if (values['take-over'] === true)
+                return (0, authorize_js_1.authorizeTakeOver)(deps);
+            const intFlag = (raw, flag, min, max) => typeof raw === 'string'
+                ? (0, validate_js_1.validatePositiveInt)(raw, flag, min, max)
+                : undefined;
+            const maxActiveSessions = intFlag(values['max-active-sessions'], '--max-active-sessions', 1, authority_js_1.GRANT_CEILINGS.maxActiveSessions);
+            const maxTotalTasks = intFlag(values['max-total-tasks'], '--max-total-tasks', 1, authority_js_1.GRANT_CEILINGS.maxTotalTasks);
+            const maxCorrectiveRounds = intFlag(values['max-corrective-rounds'], '--max-corrective-rounds', 0, authority_js_1.GRANT_CEILINGS.maxCorrectiveRounds);
+            const ttlMinutes = intFlag(values['ttl-minutes'], '--ttl-minutes', 1, authority_js_1.GRANT_CEILINGS.ttlMinutes);
+            return (0, authorize_js_1.authorizeCreate)(deps, {
+                repo: requireString(values.repo, '--repo'),
+                branch: requireString(values.branch, '--branch'),
+                ...(typeof values.source === 'string' ? { source: values.source } : {}),
+                taskRefs: values['task-ref'] ?? [],
+                operations: requireString(values.operations, '--operations'),
+                owner: requireString(values.owner, '--owner'),
+                ...(maxActiveSessions !== undefined ? { maxActiveSessions } : {}),
+                ...(maxTotalTasks !== undefined ? { maxTotalTasks } : {}),
+                ...(maxCorrectiveRounds !== undefined ? { maxCorrectiveRounds } : {}),
+                ...(ttlMinutes !== undefined ? { ttlMinutes } : {}),
+                deadlineMs: deadlineFlag(values['deadline-ms'], deadline_js_1.DEFAULT_READ_DEADLINE_MS),
+            });
+        }
         default:
             if (UNSUPPORTED_OPERATIONS.includes(operation)) {
                 return runtime.unsupportedCapability(operation);
             }
             if (LATER_OPERATIONS.includes(operation)) {
-                throw new UsageError(`"${operation}" is not available in this release; the read-only surface is: ${KNOWN_OPERATIONS.join(', ')}`);
+                throw new UsageError(`"${operation}" is not available in this release; available: ${KNOWN_OPERATIONS.join(', ')}`);
             }
             throw new UsageError(`unknown subcommand "${operation}"; expected one of: ${KNOWN_OPERATIONS.join(', ')}`);
     }
@@ -246,7 +497,18 @@ async function main() {
         // The message can carry vendor text; it travels only inside the JSON
         // envelope, which the wrappers fence. stderr gets the code alone.
         process.stderr.write(`${appError.code}\n`);
-        printJson({ ok: false, operation: name, error: appError });
+        // A mutating failure echoes the ids a reservation can be reconciled by.
+        const context = err instanceof errors_js_1.MutationErrorException ? err : undefined;
+        printJson({
+            ok: false,
+            operation: name,
+            ...(context?.localRequestId !== undefined
+                ? { localRequestId: context.localRequestId }
+                : {}),
+            ...(context?.localId !== undefined ? { localId: context.localId } : {}),
+            ...(context?.details !== undefined ? { details: context.details } : {}),
+            error: appError,
+        });
         process.exitCode = 1;
     }
 }

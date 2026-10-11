@@ -35,21 +35,50 @@ describe('unsupported capabilities (R11)', () => {
     }
   );
 
-  it('the shipped adapter exposes no mutating or cancelling method', () => {
+  it('the shipped adapter exposes exactly three writes and no cancel, pause, resume or blocking method', () => {
     const methods = Object.getOwnPropertyNames(JulesSdkAdapter.prototype)
       .filter((name) => name !== 'constructor')
       .sort();
+    // Public surface: reads, plus createSession / sendMessage / approvePlan.
+    // The rest are private helpers (fail, sessionClient, dispatchedSince, writeFailure).
     expect(methods).toEqual(
       [
+        'approvePlan',
         'close',
+        'createSession',
+        'dispatchedSince',
         'fail',
         'getSession',
         'getSource',
         'listActivities',
         'listSessions',
         'listSources',
+        'sendMessage',
         'sessionClient',
+        'writeFailure',
       ].sort()
+    );
+    for (const forbidden of [
+      'cancel',
+      'pause',
+      'resume',
+      'run',
+      'all',
+      'result',
+      'ask',
+      'waitFor',
+      'stream',
+      'delete',
+    ]) {
+      expect(methods).not.toContain(forbidden);
+    }
+    const writes = methods.filter((m) =>
+      /^(create|send|approve|cancel|pause|resume|delete|archive|unarchive)/.test(
+        m
+      )
+    );
+    expect(writes.sort()).toEqual(
+      ['approvePlan', 'createSession', 'sendMessage'].sort()
     );
   });
 });

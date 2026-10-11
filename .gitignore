@@ -121,3 +121,8 @@ temp/
 # written next to docs/solutions/ files by yellow-core's staging-promoter;
 # local pipeline state, never committed.
 *.promote-done
+
+# Local interpreter caches
+node-compile-cache/
+__pycache__/
+*.pyc

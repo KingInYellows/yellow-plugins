@@ -48,9 +48,37 @@ export interface ScriptedResponse {
   /** Raw body text, e.g. invalid JSON for a "2xx that does not parse" fixture. */
   readonly rawBody?: string;
   readonly headers?: Readonly<Record<string, string>>;
-  /** Accept the request, then destroy the socket without answering ("lost 2xx"). */
+  /** Destroy the socket without answering, BEFORE the route runs: the vendor never saw it. */
   readonly lost?: true;
+  /**
+   * Run the default route (so the vendor-side state changes — a session is
+   * created) and THEN destroy the socket without answering: the vendor
+   * accepted the write but the caller never learns it ("lost 2xx").
+   */
+  readonly acceptThenDrop?: true;
 }
+
+/** Named failure modes for `inject`, one per row of the R52 injection list. */
+export type Failure =
+  | 'http-429'
+  | 'http-500'
+  | 'http-502'
+  | 'http-503'
+  | 'http-504'
+  | 'drop-before-accept'
+  | 'drop-after-accept'
+  | 'invalid-2xx';
+
+const FAILURES: Readonly<Record<Failure, ScriptedResponse>> = {
+  'http-429': { status: 429, body: { error: { code: 429, message: 'slow' } } },
+  'http-500': { status: 500, body: { error: { code: 500, message: 'x' } } },
+  'http-502': { status: 502, body: { error: { code: 502, message: 'x' } } },
+  'http-503': { status: 503, body: { error: { code: 503, message: 'x' } } },
+  'http-504': { status: 504, body: { error: { code: 504, message: 'x' } } },
+  'drop-before-accept': { lost: true },
+  'drop-after-accept': { acceptThenDrop: true },
+  'invalid-2xx': { status: 200, rawBody: '{not json' },
+};
 
 /** Return a response to override the default route, or undefined to fall through. */
 export type Override = (req: LoggedRequest) => ScriptedResponse | undefined;
@@ -212,6 +240,28 @@ export class FakeJulesServer {
     return this.log.map((r) => `${r.method} ${r.path}`);
   }
 
+  /**
+   * Fails the next `times` requests whose method matches and whose path
+   * matches `path`, with a named failure. Later requests are unaffected.
+   */
+  inject(method: string, path: RegExp, failure: Failure, times = 1): void {
+    let remaining = times;
+    this.state.overrides.push((req) => {
+      if (remaining <= 0 || req.method !== method || !path.test(req.path)) {
+        return undefined;
+      }
+      remaining -= 1;
+      return FAILURES[failure];
+    });
+  }
+
+  /** Captured request bodies (a `prompt` is logged as `promptDigest`) for requests matching the route. */
+  bodiesTo(method: string, path: RegExp): unknown[] {
+    return this.log
+      .filter((r) => r.method === method && path.test(r.path))
+      .map((r) => r.body);
+  }
+
   private handle(req: http.IncomingMessage, res: http.ServerResponse): void {
     const chunks: Buffer[] = [];
     let size = 0;
@@ -284,7 +334,13 @@ export class FakeJulesServer {
         });
       for (const override of this.state.overrides) {
         const scripted = override(entry);
-        if (scripted !== undefined) return this.send(res, scripted);
+        if (scripted === undefined) continue;
+        if (scripted.acceptThenDrop === true) {
+          this.route(entry);
+          res.socket?.destroy();
+          return;
+        }
+        return this.send(res, scripted);
       }
       this.send(res, this.route(entry));
     });

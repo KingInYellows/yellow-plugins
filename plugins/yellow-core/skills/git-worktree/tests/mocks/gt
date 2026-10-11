@@ -53,6 +53,8 @@ case "${1:-}" in
     case " $* " in *" --force "*) ;; *) echo "Cannot perform interactive operation" >&2; exit 1 ;; esac
     if [ "${STUB_FAIL:-}" = abort ]; then echo "ERROR: abort failed (stub)" >&2; exit 1; fi
     eng_abort cwd || { echo "ERROR: abort failed, the rebase is still in progress (stub)" >&2; exit 1; }
+    # The rollback happened, but the command still reports a failure.
+    if [ "${STUB_FAIL:-}" = abort-after ]; then rm -f "$(gitdir)/.gtcontinue"; echo "ERROR: interrupted (stub)" >&2; exit 1; fi
     echo "Successfully aborted gt restack."
     exit 0
     ;;

@@ -69,6 +69,7 @@ job-level `if:`). On a fork pull request every job here is skipped, and
 - `security-audit`
 - `build`
 - `plugin-shell-tests` (needs `validate-schemas`; required by `ci-status`)
+- `yellow-review-shell-tests` (needs `validate-schemas`; required by `ci-status`; installs `universal-ctags`)
 - `shell-compat-tests` (needs `validate-schemas`; required by `ci-status`)
 - `goal-engine-compat` (needs `build`; required by `ci-status`)
 - `codex-install-verification` (advisory; not in `ci-status` `needs`)
@@ -116,12 +117,13 @@ validate-schemas -> contract-drift
 validate-schemas + lint-and-typecheck + unit-tests
   -> build
 validate-schemas -> plugin-shell-tests
+validate-schemas -> yellow-review-shell-tests
 validate-schemas -> shell-compat-tests
 build -> goal-engine-compat
-ci-status needs the blocking jobs above, including plugin-shell-tests, shell-compat-tests and goal-engine-compat
+ci-status needs the blocking jobs above, including plugin-shell-tests, yellow-review-shell-tests, shell-compat-tests and goal-engine-compat
 codex-install-verification and validate-solutions-advisory do not feed ci-status
 report-metrics needs validate-schemas, validate-versions, lint-and-typecheck, unit-tests, integration-tests, contract-drift, security-audit, build, changeset-check, and plugin-shell-tests
-report-metrics does not need goal-engine-compat, shell-compat-tests, the two advisory jobs, or ci-status
+report-metrics does not need yellow-review-shell-tests, goal-engine-compat, shell-compat-tests, the two advisory jobs, or ci-status
 ```
 
 ### Matrix Strategy: validate-schemas

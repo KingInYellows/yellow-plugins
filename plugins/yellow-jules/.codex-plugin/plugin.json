@@ -1,0 +1,10 @@
+{
+  "name": "yellow-jules",
+  "version": "0.2.0",
+  "interface": {
+    "displayName": "Jules",
+    "category": "Developer Tools"
+  },
+  "description": "Two read-only reference skills — the Jules delegation lifecycle and CLI contract, and the one-pass supervision loop. Writes always need a grant the owner creates on a terminal. Excludes all of yellow-jules' commands.",
+  "skills": "./codex/skills"
+}

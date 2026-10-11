@@ -244,6 +244,16 @@ Generate a conventional commit message following this format:
 The message should be concise (under 72 chars for the subject line). Include a
 body if the changes are complex.
 
+Take the Linear ID only from the last path segment of the branch name, which must start with `[A-Z]{2,5}-[0-9]{1,6}` followed by `-` or the end of the name, or from the stack item's `Linear:` field; ignore IDs mentioned anywhere else.
+When an ID qualifies, end the body with `Part of <ISSUE-ID>`, and write `Closes
+<ISSUE-ID>` instead only when the user confirms through `AskUserQuestion` that
+this change completes the issue (a stack built bottom-up would otherwise close
+the issue from its first branch). Skip the line when no ID qualifies. Graphite
+turns the commit body into the PR description, and the merge queue builds the
+squash commit from it; the closing word is how Linear moves the issue to Done
+even though the queue closes the PR instead of merging it. Keep the line when
+`--amend` rewrites the message.
+
 #### 3. Create Commit via Graphite
 
 **If on trunk** (creating new branch):

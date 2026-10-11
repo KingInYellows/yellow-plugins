@@ -428,11 +428,12 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   value) and committing nothing; the user's global or system config is not
   judged, and no key is overridden with an empty value (that would disable the
   user's own credential helper). `gt` (Graphite) or `node` (GitHub), `gh` and
-  `jq` are found through `PATH`: one whose canonical directory is inside the
-  repository's working tree (an ignored `node_modules/.bin`, say) could be
-  replaced by a resolver without a tracked change, so it exits 3 naming the tool
-  and directory before any of them runs. A tool outside the repository, the
-  normal case, is not judged. The Graphite submit's output reaches
+  `jq` are found through `PATH`: one whose canonical file is inside the
+  repository's working tree (an ignored `node_modules/.bin`, or a symlink
+  outside the worktree to a file inside it) could be replaced by a resolver
+  without a tracked change, so it exits 3 naming the tool before any of them
+  runs. Empty and relative `PATH` entries are dropped first. A tool outside the
+  repository, the normal case, is not judged. The Graphite submit's output reaches
   stderr only through the credential redactor, and is withheld when the redactor
   is unavailable;
 - `commit-resolve-fixes` and `run-verify-command` source `lib/resolve-paths.sh`,
@@ -474,6 +475,16 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
     the range, and a malformed ranges file is exit 2. After a clean pre-check it
     does not fire; an interactive "include them" answer omits the flag for that
     run (file-membership checks still apply);
+- `run-verify-command` hardens git before any tree check (`harden_git_config`
+  in `lib/resolve-paths.sh`) and exits 2 with the tree untouched when it
+  refuses. Every mode refuses a non-numeric `GIT_CONFIG_COUNT`, an override
+  that did not take, and a repository-local or worktree
+  `filter.<driver>.clean|smudge|process` command (the stock Git LFS commands
+  excepted), because a checkout runs it. A run also refuses a repository-local
+  or worktree `core.sshCommand`, `core.askPass`, `core.gitProxy` or
+  `credential.helper`, as `commit-resolve-fixes` does; `--revert-only`,
+  `--revert-dirty` and `--check-ignored` leave those alone, so a resolver
+  cannot block its own rollback with one. The key is named, never its value.
 - `run-verify-command` refuses gitignored files, and when running a command also
   unchanged files, and refuses to run when the tree has changes outside the
   listed files. It does not run the command when a file is outside the PR (or
@@ -484,8 +495,8 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   refuses when any gitignored file is newer than the marker, because the
   resolver has no shell and cannot backdate an mtime. `/review:resolve` Step 3f
   mints the marker in a private `mktemp -d` directory before any resolver runs,
-  and Step 6 passes it to every verify call and removes the directory. When no
-  verify command runs, Step 6 still calls
+  and Step 6 passes it to every verify call and removes the directory. Revert
+  modes ignore the flag. When no verify command runs, Step 6 still calls
   `run-verify-command --check-ignored --ignored-since <marker-file>`, which runs
   the same guard and nothing else; a refusal reverts and downgrades `fixed`
   threads like any other, except that a changed gitignored file is the
@@ -501,8 +512,25 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   the credential screen withheld it (a pre-resolve baseline is tracked in #973).
   `--revert-dirty` does the same for every change in the tree. It rejects a file
   list: git itself lists the changes (`git diff --name-only HEAD` plus
-  `git ls-files --others --exclude-standard`), never resolver text. Either
-  revert flag combined with `--timeout`, `--command-file`, `--trusted` or
+  `git ls-files --others --exclude-standard`), never resolver text.
+  `--revert-denied` uses that same listing and reverts only paths on the
+  resolver deny list that are trusted config (`rp_trusted_config`: agent
+  instruction and tool-config names, without `.claude/agent-memory/`); other
+  dirty paths stay, the rest of the deny list (`.env*`, keys, CI and Docker
+  files) included, and a file list is rejected. It deletes an untracked
+  trusted-config file whoever created it (the saved patch holds the content
+  unless the credential screen withheld it), and leaves an untracked nested
+  git repository in place, named in `reason`, while still reverting the other
+  paths. It lists no gitignored file, so it requires `--ignored-since
+  <marker-file>` (or an explicit `--no-ignored-guard` from a caller that holds
+  no marker, such as the stack and sweep dirty-tree cleanup) and, with the
+  marker, refuses (exit 2, nothing reverted) when a gitignored trusted-config
+  file is newer than it. It reports
+  `deniedClean` (no deny-listed change remains), `reverted` (at most 20 paths,
+  screened like the patch) and `revertedCount`; an empty match is
+  `result: "noop"` with no patch. `treeClean` still covers the whole tree and is
+  false whenever the kept changes remain, so it is not the success signal.
+  A revert flag combined with `--timeout`, `--command-file`, `--trusted` or
   `--unattended` exits 2. The patch is written and checked before anything is
   reverted. If any patch command fails (full disk, unsupported entry), nothing
   is reverted and the result carries `patch: null`, `treeClean: false` and a
@@ -521,12 +549,32 @@ scripts enforce the boundary themselves (`lib/resolve-paths.sh`):
   withholds the patch like a content hit. Before any patch is built,
   every listed path is checked: only regular files, symlinks (dangling ones too)
   and absent paths are accepted. A FIFO, socket, device or directory in its
-  place is refused with exit 2 in run mode, and removed unopened by the revert
-  modes, so a special file cannot block `git diff` or the refusal cleanup. A
-  directory standing where HEAD has a regular file is the exception: the revert
-  modes save the patch first, with the deletion of the file followed by every
-  regular file and symlink inside the directory as new files, and only then
-  remove the directory. The patch is also withheld, with a `reason`, when the screen returns any status
+  place is refused with exit 2 in run mode, so a special file cannot block
+  `git diff` or the refusal cleanup. In the revert modes a FIFO, socket or
+  device is kept until the recovery patch has recorded its tracked deletion
+  without opening it: the entry is renamed aside in its own directory for that
+  diff, then put back, and unlinked only after the snapshot is written.
+  The hold path is recorded before the rename back. If that ledger write fails,
+  the file is put back when it can and nothing is reverted; if it cannot, stderr
+  names the remaining path.
+  A rewrite of that ledger replaces it only after the new copy is complete, so
+  a failed rewrite leaves the recorded path in place.
+  Each record is the held path, a NUL, the original path, and a NUL, so a
+  newline in the name cannot split it. The reader assigns those fields with
+  `printf -v` into the caller's variables. macOS bash 3.2 has no namerefs, and
+  the script does not require a newer bash before it restores a hold.
+  `save_patch` runs in a subshell, so a rename back that fails is retried by
+  the parent. If the entry is back, a snapshot failure still reverts nothing.
+  If it is still held, `reason` names that path and does not claim the tree
+  was untouched. An `rm` that cannot unlink one special file is recorded in
+  `reason` and does not abort the revert, so a special file already removed
+  is still restored from HEAD. Checkout does not open a special file that is
+  still present. `--revert-denied` leaves a special file in place and reports
+  `deniedClean: false`.
+  A directory standing where HEAD has a regular file is handled the same way:
+  the revert modes save the patch first, with the deletion of the file followed
+  by every regular file and symlink inside the directory as new files, and only
+  then remove the directory. The patch is also withheld, with a `reason`, when the screen returns any status
   other than 0 or 1 (the screen could not answer). When the `--text` diff cannot
   be produced or read, the script exits 2 and reverts nothing. A failed revert
   step is listed in `reason` (the first five, then a count) and `treeClean` is
@@ -565,11 +613,17 @@ to commit.) A refused edit must not stay on disk: a deny-listed file such as
 a change outside the set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify
 `skipped` — the orchestrator runs `run-verify-command --pr <N> --revert-only`
 on the files the clusters reported under `Files modified`, which saves a patch
-first. Step 2 guarantees a clean start, but not a quiet tree: a changed path no
-cluster reported is not proven to be a resolver's edit, so it is never reverted
-unasked. An interactive run asks (`--revert-dirty` on "Revert them", patch
-saved); an unattended run leaves it in place and Step 9 names it under Blocking
-merge. Exit 4 leaves no new commit behind, so the revert only has to clear the tree;
+first. Then `--revert-denied` (no file list) reverts dirty trusted-config
+paths on the contract deny list without asking, with the `--ignored-since`
+marker (it refuses on a changed gitignored trusted-config file: the ignored-file
+stop), and a refusal before the verify call also runs `--check-ignored` for the
+other gitignored files. The marker lives until the end of Step 6. Step 2
+guarantees a clean start, but not a quiet tree: a changed path no cluster
+reported and that is not trusted config (`.env*`, keys, CI and Docker files
+included) is not proven to be a resolver's edit, so it is never reverted
+unasked. An interactive run asks (`--revert-dirty`
+on "Revert them", patch saved); an unattended run leaves it in place and Step 9
+names it under Blocking merge. Exit 4 leaves no new commit behind, so the revert only has to clear the tree;
 `fixed` threads become `unclear` and the write phase still runs for the other
 threads (exit 4 here is a refusal, not a rate limit). The interactive "push
 rejected" path is the only one that leaves edits in place. After exit 5 or 6 the
@@ -613,7 +667,7 @@ hard cap and the `--wait` + 60 s bound do not hold: the script prints a note and
 fetches run with no time limit, so only the between-page deadline applies and a
 hung `gh` call is not cut short.
 
-`get-pr-comments` (Step 3, with `get-pr-blockers`) gets a `timeout` of 300000
+`get-pr-comments` (Step 3) gets a `timeout` of 300000
 ms. It can fetch 10 pages, so it adds a wall-clock deadline to the per-call cap:
 `YELLOW_REVIEW_FETCH_DEADLINE` (default 270 s, clamped to 1..270; a non-number,
 0 or over-4-digit value falls back to 270), checked before each page. On expiry
@@ -622,7 +676,11 @@ array, the same as a page-cap truncation. From page 2 on each `gh` call's limit
 is also cut to the time left, so the worst case is the 270 s deadline plus `jq`
 and startup, inside 300000 ms. Page 1 gets the full per-call limit; a call
 killed by it exits 1 (`gh timed out`). Without `timeout` or `gtimeout` the calls
-run unbounded, as in the other scripts.
+run unbounded, as in the other scripts. `get-pr-blockers` (Step 3) gets its
+own `timeout` of 360000 ms. The worst case is five `gh` calls: the review
+GraphQL query, then classic protection and rules for the PR base, and the
+same two reads for the default branch when the two differ. Five calls at the
+60 s cap is 300 s, inside 360000 ms.
 
 `commit-resolve-fixes` and `run-verify-command` bound their network calls with a
 `timeout`/`gtimeout` binary that supports `--kill-after`; without one the calls
@@ -646,15 +704,21 @@ written by a Bot author. A later comment from anyone else, including the
 viewer's own human account, or with no author type, means the thread moved on
 and it is processed again. The skip JSON reports the posted marker's
 disposition. A re-run after a reply that landed but whose resolve failed
-therefore never posts a second, contradicting reply, even when a bot
-acknowledgement arrived in between. This holds when `gh` authenticates as a bot
+therefore never posts a second reply of the same disposition, even when a bot
+acknowledgement arrived in between; the only second reply is the upgrade below.
+This holds when `gh` authenticates as a bot
 account: its own acknowledgement is `viewerDidAuthor` and `Bot` too, but carries
 no marker, so it never displaces the marker comment, and a bot-authored marker
 still counts. Two rules follow:
 
 - Upgrade: a prior `disagree` or `unclear` marker does not block a `fixed`,
-  `addressed` or `oos` reply. That reply carries the evidence the resolve needs,
-  so it is posted.
+  `addressed` or `oos` reply, and a prior `oos` marker does not block a
+  `fixed` or `addressed` reply. That reply carries the evidence the resolve
+  needs, so it is posted. A second `oos` reply to an `oos` marker is a skip,
+  and so is `disagree` or `unclear` after `oos`. An `oos` → `fixed` or
+  `addressed` upgrade posts a reply that supersedes the earlier one; the script
+  neither closes nor links the follow-up issue filed for the `oos` reply, so
+  that issue stays open.
 - Compare before resolving: after a skip, the orchestrator retries the resolve
   (when the lane allows it) only if the reported `disposition` equals the one it
   asked for. Any other posted disposition leaves the thread open and is reported
@@ -879,6 +943,16 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   own; `/review:resolve-stack` and `/review:sweep-all` read `verify=skipped` as
   the stop and end the walk or batch after that PR: restore the named files
   before running anything again.
+- The ignored-file guard skips three tool-owned paths it would otherwise
+  count on every run: yellow-ruvector's session log `.ruvector/coedit-sessions/`
+  and pair store `.ruvector/coedit.json` (its PostToolUse hook rewrites them on
+  resolver edits), and vitest's run cache
+  `node_modules/.vite/vitest/results.json` at any depth. The two files are
+  skipped only while they are regular files (a symlink there is still judged by
+  its target). They are JSON data nothing executes; every other path under
+  `.ruvector/` or `node_modules/` still stops the run. Other test runs can
+  still write ignored files (coverage, `*.tsbuildinfo`, pre-bundled deps), so
+  run no project command between Step 3f's marker and Step 6's guard.
 - Issue dedupe follows every page of the viewer's issues, but the whole scan is
   one `gh` call under one `YELLOW_REVIEW_GH_TIMEOUT`. A viewer with a very large
   issue history can time it out (exit 4); raise the variable for that

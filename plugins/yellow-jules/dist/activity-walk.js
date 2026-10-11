@@ -1,7 +1,7 @@
 "use strict";
 /**
  * The single activity-walk unit (contract "Activity walk"). `status`,
- * `approve` (PR3), and `collect` differ only in the parameters they pass:
+ * `approve`, and `collect` differ only in the parameters they pass:
  * page size, start point, and whether the caller will write read-state
  * (only `status` does; this module never touches the journal).
  *
@@ -12,7 +12,7 @@
  * `400` on a filtered first page is retried once unfiltered.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEDUP_RING_CAP = exports.OVERLAP_WINDOW_MS = exports.PAGE_CAP = exports.COLLECT_PAGE_SIZE = exports.STATUS_PAGE_SIZE = void 0;
+exports.DEDUP_RING_CAP = exports.RESERVATION_SETTLE_MS = exports.OVERLAP_WINDOW_MS = exports.PAGE_CAP = exports.COLLECT_PAGE_SIZE = exports.STATUS_PAGE_SIZE = void 0;
 exports.compareStamp = compareStamp;
 exports.watermarkFilter = watermarkFilter;
 exports.walkActivities = walkActivities;
@@ -23,6 +23,8 @@ exports.STATUS_PAGE_SIZE = 50;
 exports.COLLECT_PAGE_SIZE = 10;
 exports.PAGE_CAP = 20;
 exports.OVERLAP_WINDOW_MS = 5 * 60_000;
+/** Longer than any write deadline (cli MAX_DEADLINE_MS 200 s) plus a minute of slack. */
+exports.RESERVATION_SETTLE_MS = 260_000;
 exports.DEDUP_RING_CAP = 1000;
 function timeOf(createTime) {
     const t = Date.parse(createTime);
@@ -58,7 +60,22 @@ async function walkActivities(params) {
     const seen = [];
     const newIds = [];
     let latestPlan = params.pendingPlan;
+    // Content keys of the plans at the newest plan createTime: equal times are
+    // unordered, so more than one distinct key leaves the current plan unknown.
+    const planKeyOf = (p) => JSON.stringify([p.planId, p.steps]);
+    let newestPlanKeys = new Set(params.pendingPlan === undefined
+        ? []
+        : [
+            planKeyOf(params.pendingPlan),
+            ...(params.pendingPlan.ambiguous === true ? ['\0ambiguous'] : []),
+        ]);
     let latestApproval = params.approval;
+    // The plan the newest approval named; carried in the resume marker, and
+    // unknown for a marker written before it was kept.
+    let latestApprovalPlanId = params.approval?.approvedPlanId;
+    // Every plan id named by approvals at the newest approval time: equal times
+    // are unordered, so a tie naming different plans decides nothing.
+    let approvalPlanIds = new Set(params.approval !== undefined ? [params.approval.approvedPlanId] : []);
     let newest;
     let pages = 0;
     let processed = 0;
@@ -119,6 +136,8 @@ async function walkActivities(params) {
         firstPageOfSegment = false;
         for (const activity of page.activities) {
             processed += 1;
+            let isNew = false;
+            let unseen = false;
             if (!seenIds.has(activity.activityId)) {
                 seenIds.add(activity.activityId);
                 seen.push({
@@ -127,8 +146,19 @@ async function walkActivities(params) {
                 });
                 const afterWatermark = params.watermark === undefined ||
                     compareStamp(activity, params.watermark) > 0;
-                if (!ring.has(activity.activityId) && afterWatermark)
+                // The ring covers every id within the overlap window below the
+                // watermark, so an id absent from it there was never seen, even when
+                // it sorts at or before the watermark (equal time, lower opaque id).
+                if (!ring.has(activity.activityId) &&
+                    (afterWatermark ||
+                        timeOf(activity.createTime) >=
+                            timeOf(params.watermark?.createTime ?? '') - exports.OVERLAP_WINDOW_MS)) {
+                    unseen = true;
+                }
+                if (!ring.has(activity.activityId) && afterWatermark) {
                     newIds.push(activity.activityId);
+                    isNew = true;
+                }
             }
             if (newest === undefined || compareStamp(activity, newest) > 0) {
                 newest = {
@@ -144,6 +174,13 @@ async function walkActivities(params) {
                     createTime: activity.createTime,
                     activityId: activity.activityId,
                 };
+                const timeCmp = latestPlan == null
+                    ? 1
+                    : compareStamp({ createTime: stamp.createTime, activityId: '' }, { createTime: latestPlan.activityCreateTime, activityId: '' });
+                if (timeCmp > 0)
+                    newestPlanKeys = new Set();
+                if (timeCmp >= 0)
+                    newestPlanKeys.add(planKeyOf(activity.plan));
                 if (latestPlan == null ||
                     compareStamp(stamp, {
                         createTime: latestPlan.activityCreateTime,
@@ -158,15 +195,23 @@ async function walkActivities(params) {
                 }
             }
             else if (activity.type === 'planApproved') {
+                const approvalCmp = latestApproval === undefined
+                    ? 1
+                    : compareStamp({ createTime: activity.createTime, activityId: '' }, { createTime: latestApproval.createTime, activityId: '' });
+                if (approvalCmp > 0)
+                    approvalPlanIds = new Set();
+                if (approvalCmp >= 0)
+                    approvalPlanIds.add(activity.approvedPlanId);
                 if (latestApproval === undefined ||
                     compareStamp(activity, latestApproval) > 0) {
                     latestApproval = {
                         createTime: activity.createTime,
                         activityId: activity.activityId,
                     };
+                    latestApprovalPlanId = activity.approvedPlanId;
                 }
             }
-            await params.onActivity?.(activity);
+            await params.onActivity?.(activity, { isNew, unseen });
         }
         if (page.unmappedActivity === true) {
             unmappedActivity = true;
@@ -188,14 +233,24 @@ async function walkActivities(params) {
     }
     // An approval newer than the newest plan clears it; an approval alone,
     // with no plan known, leaves the result undefined.
-    const pendingPlan = latestPlan !== undefined &&
-        latestApproval !== undefined &&
-        compareStamp(latestApproval, {
-            createTime: latestPlan.activityCreateTime,
-            activityId: latestPlan.activityId,
-        }) > 0
+    // Across types an equal createTime is unordered (opaque ids carry no order):
+    // an approval at the plan's own time clears it only when it names that plan's
+    // id; a different plan stays pending and the tie is marked ambiguous.
+    const approvalVsPlan = latestPlan !== undefined && latestApproval !== undefined
+        ? compareStamp({ createTime: latestApproval.createTime, activityId: '' }, { createTime: latestPlan.activityCreateTime, activityId: '' })
+        : undefined;
+    const approvalTies = approvalVsPlan === 0;
+    const approvalClears = approvalVsPlan !== undefined &&
+        (approvalVsPlan > 0 ||
+            (approvalTies &&
+                newestPlanKeys.size <= 1 &&
+                approvalPlanIds.size === 1 &&
+                approvalPlanIds.has(latestPlan?.planId)));
+    const pendingPlan = approvalClears
         ? null
-        : latestPlan;
+        : latestPlan !== undefined && (newestPlanKeys.size > 1 || approvalTies)
+            ? { ...latestPlan, ambiguous: true }
+            : latestPlan;
     return {
         pages,
         processed,
@@ -208,7 +263,24 @@ async function walkActivities(params) {
         ...(newest !== undefined ? { newest } : {}),
         seen,
         pendingPlan,
-        ...(latestApproval !== undefined ? { latestApproval } : {}),
+        ...(latestPlan !== undefined
+            ? {
+                generatedPlan: newestPlanKeys.size > 1
+                    ? { ...latestPlan, ambiguous: true }
+                    : latestPlan,
+            }
+            : {}),
+        ...(latestApproval !== undefined
+            ? {
+                latestApproval: {
+                    createTime: latestApproval.createTime,
+                    activityId: latestApproval.activityId,
+                    ...(latestApprovalPlanId !== undefined && approvalPlanIds.size === 1
+                        ? { approvedPlanId: latestApprovalPlanId }
+                        : {}),
+                },
+            }
+            : {}),
         startedFromResume: params.start.kind === 'resume',
         resumeRejected,
         filterRetried,

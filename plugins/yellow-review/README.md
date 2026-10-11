@@ -15,6 +15,9 @@ resolution, and sequential stack review.
 - `gh` CLI (GitHub) installed and authenticated
 - `jq` installed
 - Graphite CLI (`gt`) for branch management
+- An `awk` that splits NUL-separated records (gawk or mawk) first on `PATH`
+  for `/review:resolve`; stock macOS `/usr/bin/awk` cannot. On macOS:
+  `brew install gawk` and put its `libexec/gnubin` first on `PATH`
 - Clean working directory before running review commands
 - For the review-findings ledger: `flock`, `realpath`, git 2.31+ and the
   yellow-core plugin (credential redaction). On macOS:
@@ -62,7 +65,7 @@ Linear.
 | `/review:resolve-stack` | Walk a Graphite stack bottom-up and run `/review:resolve` on every open PR autonomously; stops on a dirty tree, exits 1 when anything blocks |
 | `/review:all`           | Sequential review of multiple PRs (Graphite stack, all open, or single)   |
 | `/review:sweep`         | Run `/review:pr --non-interactive` then `/review:resolve --non-interactive` on the same PR in one unattended pass |
-| `/review:sweep-all`     | Run `/review:sweep` on every open non-draft PR you authored, sequentially, with one upfront confirmation; stops and exits 1 on a rate limit, a dirty tree or a missing `Resolve:` line |
+| `/review:sweep-all`     | Run `/review:sweep` on every open non-draft PR you authored, sequentially, with one upfront confirmation; stops and exits 1 on a rate limit, an unreadable PR state, a dirty tree or a missing `Resolve:` line |
 | `/review:triage`        | Re-verify a PR's review-findings ledger, then fix, dismiss, restore or skip each residual finding (`--non-interactive`, `--prune <PR#>`) |
 
 ### Dispositions
@@ -130,6 +133,13 @@ drain thresholds; interactive review behavior is unchanged.
 | `silent-failure-hunter`        | Silent failure and error handling analysis                                                                   |
 | `thermonuclear-reviewer`       | Strict structural-quality lane: code-judo restructurings, spaghetti-condition growth, weak type/module boundaries, misplaced ownership, evidence-gated file-size threshold crossings. **Opt-in only** — never auto-selected; enable via `reviewer_set.include` |
 
+A `plugin.json` whose only changed line is `"version"` (Changesets' "chore:
+version packages" PRs) does not select the plugin-surface personas
+(`plugin-contract-reviewer`, `cli-readiness-reviewer`,
+`agent-cli-readiness-reviewer`, `agent-native-reviewer`, and yellow-core's
+`pattern-recognition-specialist`) in `/review:pr` or `/review:all`; any other
+manifest change or plugin-authoring path still does.
+
 ### Workflow (1)
 
 | Agent                 | Description                                |
@@ -166,13 +176,43 @@ fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
 | `poll-new-threads` | Bounded re-pass poll for threads that appeared after round 1 |
 | `check-resolve-text` | Refuse credential-shaped or unsafe text (image, `@` mention, foreign URL) before it is posted outside the resolve scripts (for example a Linear issue) |
 | `commit-resolve-fixes` | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files |
-| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--unattended` skips runner files; every run requires `--ignored-since <marker-file>`, which refuses when a gitignored file is newer than the marker; `--revert-only` and `--revert-dirty` revert without running; `--check-ignored` runs only the gitignored-file guard) |
+| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--ignored-since <marker-file>` is required for every run and refuses when a gitignored file is newer than the marker, except regular-file tool state: `.ruvector/coedit.json`, `.ruvector/coedit-sessions/` and `node_modules/.vite/vitest/results.json`; `--unattended` also skips runner files; `--revert-only` and `--revert-dirty` revert without running and ignore the marker; `--revert-denied` reverts only trusted-config dirty paths (a subset of the deny list), takes no file list, and needs `--ignored-since` (refusing on a changed gitignored trusted-config file) or `--no-ignored-guard`, and leaves a tracked trusted-config symlink whose target was written (or, without the marker, points outside the worktree) in place with `deniedClean` false; `--check-ignored` runs only the gitignored-file guard) |
 | `guard-local-config` | Snapshot the gitignored `yellow-plugins.local.md` and restore it if a resolver changed, created or deleted it; refuses a symlinked config (`/review:resolve-stack` checks after each PR) |
 | `file-line-counts` | Base/head line counts per changed file for `thermonuclear-reviewer` |
 
+In revert modes `run-verify-command` never opens a FIFO, socket, or device
+standing in for a tracked file. It renames the entry aside in its own
+directory (`.yellow-review-hold-*/node`) so the recovery patch records the
+tracked deletion, then renames it back. The hold path is recorded before
+that rename. If the ledger write fails, the file is put back when it can
+and nothing is reverted; if it cannot, stderr names the remaining path. If
+the rename back fails, the parent retries it. If the entry is still held,
+the reason names that path and does not say the tree was left untouched.
+The special file is unlinked only after both snapshots succeed. An `rm`
+that cannot unlink one special file is recorded and the revert continues,
+so one already removed is still restored. Checkout does not open a special
+file that is still present. `--revert-denied` leaves a special file in place
+and reports `deniedClean: false`.
+
 `commit-resolve-fixes` and `run-verify-command` refuse a `git`, `gh`, or
 `jq` whose canonical file is inside the worktree, and they exec only the
-absolute path outside it.
+absolute path outside it. `commit-resolve-fixes` also refuses a `gt` or
+`node` whose canonical file is inside the worktree, including a symlink
+outside the worktree that points at one, and drops empty or relative `PATH`
+entries before that check. Every other tool they run by bare name, and
+every program git or its children look up through `PATH` (`grep`, `sed`,
+`ssh`, `git-credential-*`, `gpg`, pagers and so on), runs from a `PATH` that
+drops directories inside the worktree, any directory that holds a symlink
+(dangling or not) whose target is inside it, whatever the link is named, and any
+directory with an executable script whose `#!` interpreter is inside it. Both
+scripts also refuse an inherited `GIT_SSH_COMMAND`, `GIT_ASKPASS`, `GIT_PAGER`,
+`EDITOR`, `GIT_EXEC_PATH` or injected git config (`core.sshCommand`,
+`credential.helper`, ...) whose command line names a path inside the worktree
+(`sh <worktree>/script` included), or uses shell syntax that cannot be judged
+(`$VAR`, backticks, `;`, `|`, ...), or a `HOME`/`XDG_CONFIG_HOME` that puts git's
+global config inside the worktree; values outside it keep working. A script
+whose `#!` line passes a path inside the worktree as an argument is treated like
+one whose interpreter is inside it.
 
 Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-gh.sh`,
 `resolve-paths.sh`, `gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.

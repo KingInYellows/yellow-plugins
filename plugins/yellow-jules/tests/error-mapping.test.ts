@@ -17,8 +17,8 @@ import {
 } from '../src/sdk-adapter.js';
 
 describe('code table', () => {
-  it('holds exactly the 22 contract codes, each with a recovery action', () => {
-    expect(ALL_APP_ERROR_CODES).toHaveLength(22);
+  it('holds exactly the 26 contract codes, each with a recovery action', () => {
+    expect(ALL_APP_ERROR_CODES).toHaveLength(26);
     for (const code of ALL_APP_ERROR_CODES) {
       expect(code).toMatch(/^JULES_[A-Z_]+$/);
       expect(makeAppError(code, 'm').recoveryAction.length).toBeGreaterThan(0);
@@ -251,6 +251,29 @@ describe('classifyAdapterError: every SDK class by phase (contract table)', () =
     const err = new sdk.JulesRateLimitError(S, 429, 'Too Many');
     expect(err).toBeInstanceOf(sdk.JulesApiError);
     expect(toAdapterError(sdk, err).kind).toBe('rate-limited');
+  });
+
+  it.each([
+    ['a dropped fetch', () => new TypeError('fetch failed')],
+    [
+      'an aborted request',
+      () => Object.assign(new Error('aborted'), { name: 'AbortError' }),
+    ],
+    [
+      'a wrapped socket reset',
+      () =>
+        new Error('wrapped', {
+          cause: Object.assign(new Error('reset'), { code: 'ECONNRESET' }),
+        }),
+    ],
+  ])('classifies %s as a network failure, not a malformed body', (_n, make) => {
+    expect(toAdapterError(sdk, make()).kind).toBe('network');
+  });
+
+  it('still calls an unrecognised error malformed', () => {
+    expect(toAdapterError(sdk, new Error('mapper broke')).kind).toBe(
+      'malformed'
+    );
   });
 
   it('redacts and truncates vendor error text', () => {

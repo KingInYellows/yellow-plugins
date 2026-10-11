@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "description": "Google Jules integration (experimental) — observe Jules remote-agent sessions and stage their artifacts for local review",
+  "description": "Google Jules integration (experimental) — delegate, supervise, and review Jules remote-agent sessions under owner-written grants",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"
@@ -24,7 +24,17 @@
   "targets": {
     "claude": true,
     "codex": {
-      "enabled": false
+      "enabled": true,
+      "includeHooks": false,
+      "interface": {
+        "displayName": "Jules",
+        "category": "Developer Tools"
+      },
+      "description": "Two read-only reference skills — the Jules delegation lifecycle and CLI contract, and the one-pass supervision loop. Writes always need a grant the owner creates on a terminal. Excludes all of yellow-jules' commands.",
+      "skillAllowlist": ["jules-delegation", "jules-supervision"],
+      "componentPaths": {
+        "skills": "./codex/skills"
+      }
     }
   }
 }

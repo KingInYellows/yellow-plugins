@@ -105,7 +105,8 @@ deeper-audit variants (`security-sentinel`, `performance-oracle`).
 
 - PR introduces new patterns (new directories, new file type conventions)
 - OR changes to `agents/*.md`, `commands/*.md`, `skills/*/SKILL.md`,
-  `plugin.json` (plugin authoring convention checks)
+  `plugin.json` (plugin authoring convention checks). A `plugin.json` whose
+  only changed line is `"version"` does not count.
 
 **code-simplicity-reviewer** (yellow-core) — Available as additional pass when:
 

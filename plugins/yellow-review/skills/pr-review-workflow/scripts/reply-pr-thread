@@ -12,8 +12,10 @@
 #     not count as a marker, so a bot account's own acknowledgement cannot
 #     hide it, but a later comment from our own human account is new input.
 #     The one exception: a prior disagree or unclear marker never blocks a
-#     fixed, addressed or oos reply, because that reply carries the evidence
-#     the later resolve needs. A caller resolves after a skip only when
+#     fixed, addressed or oos reply, and a prior oos marker never blocks a
+#     fixed or addressed reply, because that reply carries the evidence the
+#     later resolve needs. A prior oos marker still blocks another oos reply.
+#     A caller resolves after a skip only when
 #     "disposition" equals the one it asked for.)
 # Concurrency: the marker makes re-runs idempotent, not the pre-check and
 #   the reply atomic. Two runs as the same viewer that reach one thread at
@@ -194,7 +196,9 @@ fi
 # a contradictory reply. The exception is an upgrade from a reply that left
 # the thread open (disagree, unclear) to one that lets the caller resolve it
 # (fixed, addressed, oos): skipping would resolve the thread with no evidence
-# posted. No match prints nothing and exits 0; a jq failure must not read as
+# posted. A prior oos also upgrades to fixed or addressed (the code was fixed
+# after all); a second oos, and an oos followed by disagree or unclear, still
+# skip. No match prints nothing and exits 0; a jq failure must not read as
 # "no marker", or the reply the marker exists to prevent would be posted.
 if ! PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
     ("<!-- yellow-review:resolve v1 thread=" + $thread + " disposition=(?<d>fixed|addressed|oos|disagree|unclear) -->$") as $re
@@ -213,7 +217,7 @@ if ! PRIOR_DISPOSITION=$(jq -r --arg thread "$THREAD_ID" '
     exit 1
 fi
 case "$PRIOR_DISPOSITION:$DISPOSITION" in
-    disagree:fixed|disagree:addressed|disagree:oos|unclear:fixed|unclear:addressed|unclear:oos)
+    disagree:fixed|disagree:addressed|disagree:oos|unclear:fixed|unclear:addressed|unclear:oos|oos:fixed|oos:addressed)
         PRIOR_DISPOSITION="" ;;
 esac
 if [ -n "$PRIOR_DISPOSITION" ]; then

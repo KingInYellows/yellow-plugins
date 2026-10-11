@@ -18,7 +18,11 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { compareStamp, DEDUP_RING_CAP } from './activity-walk.js';
+import {
+  compareStamp,
+  DEDUP_RING_CAP,
+  RESERVATION_SETTLE_MS,
+} from './activity-walk.js';
 import {
   assertOwnerOnlyFile,
   ensureOwnerOnlyDir,
@@ -27,7 +31,8 @@ import {
   resolveStateDir,
 } from './config.js';
 import { throwAppError } from './errors.js';
-import { assertNoSecretShapedValues } from './redact.js';
+import { assertNoSecretShapedValues, redactDeep } from './redact.js';
+import { isNonNegativeInt, isPlainObject, isStringArray } from './shape.js';
 import type {
   ArtifactRecord,
   DeviationRecord,
@@ -36,6 +41,7 @@ import type {
   OperationRecord,
   OperationStatus,
   PendingPlan,
+  SupervisionState,
 } from './types.js';
 import {
   isValidPageToken,
@@ -45,6 +51,85 @@ import {
 
 export function digestText(text: string): string {
   return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
+}
+
+/**
+ * Digest of a plan under review: sha256 of the compact JSON
+ * `[planId, [[id, index, title, description], ...]]` (every reviewed `PlanStepRecord` field) plus the newline `jq -c` prints. The commands compute the same value
+ * with `jq -c` over `status` output, so DEL is escaped the way jq escapes it.
+ */
+/**
+ * True when `next` is outside evidence the stored marker has not recorded: a
+ * different activity that is not strictly older by createTime. Equal times are
+ * unordered (opaque ids carry no order), so they refresh the marker rather than
+ * lose to an id comparison.
+ */
+/**
+ * Whether a message/activity is proven to follow the record's dispatch, by the
+ * vendor's clock alone. A create's session did not exist before its POST, so
+ * everything in it follows. Otherwise the echo must be strictly newer by
+ * `createTime` than the newest activity read before dispatch (equal time is
+ * unordered), or the session must have been empty. No floor: unproven.
+ */
+export function followsDispatch(
+  r: OperationRecord,
+  createTime: string | undefined,
+  activityId?: string
+): boolean {
+  if (r.kind === 'create') return true;
+  // The floor activity itself was read before dispatch.
+  if (activityId !== undefined && activityId === r.vendorFloorActivityId) {
+    return false;
+  }
+  if (r.vendorFloorEmpty === true) return true;
+  if (r.vendorFloorCreateTime === undefined || createTime === undefined) {
+    return false;
+  }
+  return (
+    compareStamp(
+      { createTime, activityId: '' },
+      { createTime: r.vendorFloorCreateTime, activityId: '' }
+    ) > 0
+  );
+}
+
+function outsideSupersedes(
+  next: { createTime?: string; activityId: string },
+  prev: { createTime?: string; activityId: string }
+): boolean {
+  if (next.activityId === prev.activityId) return false;
+  return (
+    compareStamp(
+      { createTime: next.createTime ?? '', activityId: '' },
+      { createTime: prev.createTime ?? '', activityId: '' }
+    ) >= 0
+  );
+}
+
+export function planDigest(
+  planId: string,
+  steps: ReadonlyArray<{
+    readonly id: string;
+    readonly index: number;
+    readonly title: string;
+    readonly description?: string;
+  }>
+): string {
+  const json = JSON.stringify([
+    planId,
+    steps.map((step) => [
+      step.id,
+      step.index,
+      step.title,
+      step.description ?? null,
+    ]),
+  ]).replace(/\u007f/g, '\\u007f');
+  return digestText(`${json}\n`);
+}
+
+/** Digest of a message for reply matching: the vendor may trim edge whitespace, so both sides are trimmed. */
+export function messageDigest(text: string): string {
+  return digestText(text.trim());
 }
 
 export function emptyJournal(): Journal {
@@ -93,26 +178,24 @@ const OPTIONAL_STRING_FIELDS = [
   'taskRef',
   'grantId',
   'promptDigest',
+  'echoActivityId',
+  'echoCreateTime',
   'observedPlanId',
+  'observedPlanDigest',
   'vendorState',
   'condition',
   'lastActivityCreateTime',
   'lastActivityId',
+  'lastCompleteWalkAt',
   'resumePageToken',
   'artifactResumePageToken',
+  'abandonedAt',
+  'abandonReason',
+  'invalidatedBy',
+  'dispatchedAt',
+  'vendorFloorCreateTime',
+  'vendorFloorActivityId',
 ] as const;
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((v) => typeof v === 'string');
-}
-
-function isNonNegativeInt(value: unknown): boolean {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
-}
 
 const ARTIFACT_KINDS = new Set(['patch', 'pr-ref', 'generated-file']);
 const ARTIFACT_VERIFICATIONS = new Set([
@@ -144,6 +227,7 @@ function isValidArtifact(value: unknown): value is ArtifactRecord {
       'baseCommit',
       'prUrl',
       'vendorPath',
+      'vendorPathDigest',
     ]) &&
     typeof value['secretShapedContent'] === 'boolean' &&
     typeof value['collectedAt'] === 'string' &&
@@ -183,6 +267,116 @@ function isValidPendingPlan(value: unknown): value is PendingPlan {
   );
 }
 
+const RECONCILE_OUTCOMES = new Set([
+  'bound',
+  'released',
+  'ambiguous-reconcile',
+  'policy-deviation',
+  'unknown-outcome',
+  'not-reached',
+]);
+const DECISIONS = new Set([
+  'no-change',
+  'check-failed',
+  'pass-aborted',
+  'needs-plan-review',
+  'needs-answer',
+  'needs-verification',
+  'escalate',
+  'paused',
+]);
+
+function isValidLastReconcile(value: unknown): boolean {
+  if (!isPlainObject(value)) return false;
+  return (
+    RECONCILE_OUTCOMES.has(value['outcome'] as string) &&
+    hasOptionalStrings(value, ['reason']) &&
+    typeof value['observedAt'] === 'string'
+  );
+}
+
+function isValidSupervision(value: unknown): boolean {
+  if (!isPlainObject(value)) return false;
+  const { paused, backoff, lastDecision } = value;
+  if (
+    paused !== undefined &&
+    !(
+      isPlainObject(paused) &&
+      typeof paused['reason'] === 'string' &&
+      typeof paused['observedAt'] === 'string' &&
+      hasOptionalStrings(paused, ['activityId']) &&
+      (paused['observedSeq'] === undefined ||
+        isNonNegativeInt(paused['observedSeq']))
+    )
+  )
+    return false;
+  if (
+    backoff !== undefined &&
+    !(
+      isPlainObject(backoff) &&
+      isNonNegativeInt(backoff['failures']) &&
+      typeof backoff['nextCheckAt'] === 'string'
+    )
+  )
+    return false;
+  const outsideSeen = value['outsideSeen'];
+  if (
+    outsideSeen !== undefined &&
+    !(
+      isPlainObject(outsideSeen) &&
+      typeof outsideSeen['activityId'] === 'string' &&
+      typeof outsideSeen['observedAt'] === 'string' &&
+      hasOptionalStrings(outsideSeen, ['createTime']) &&
+      (outsideSeen['observedSeq'] === undefined ||
+        isNonNegativeInt(outsideSeen['observedSeq']))
+    )
+  )
+    return false;
+  const heldSeqs = value['heldSeqs'];
+  if (
+    heldSeqs !== undefined &&
+    !(
+      isPlainObject(heldSeqs) && Object.values(heldSeqs).every(isNonNegativeInt)
+    )
+  )
+    return false;
+  const heldActivities = value['heldActivities'];
+  if (
+    heldActivities !== undefined &&
+    !(
+      isPlainObject(heldActivities) &&
+      Object.values(heldActivities).every((v) => typeof v === 'string')
+    )
+  )
+    return false;
+  const evaluatedPlan = value['evaluatedPlan'];
+  if (
+    evaluatedPlan !== undefined &&
+    !(
+      isPlainObject(evaluatedPlan) &&
+      typeof evaluatedPlan['planId'] === 'string' &&
+      typeof evaluatedPlan['evaluatedAt'] === 'string' &&
+      (evaluatedPlan['planDigest'] === undefined ||
+        typeof evaluatedPlan['planDigest'] === 'string') &&
+      (evaluatedPlan['evaluatedSeq'] === undefined ||
+        isNonNegativeInt(evaluatedPlan['evaluatedSeq']))
+    )
+  )
+    return false;
+  const evaluatedPassSeq = value['evaluatedPassSeq'];
+  if (evaluatedPassSeq !== undefined && !isNonNegativeInt(evaluatedPassSeq))
+    return false;
+  const evaluatedPassAt = value['evaluatedPassAt'];
+  if (evaluatedPassAt !== undefined && typeof evaluatedPassAt !== 'string')
+    return false;
+  return (
+    lastDecision === undefined ||
+    (isPlainObject(lastDecision) &&
+      DECISIONS.has(lastDecision['decision'] as string) &&
+      typeof lastDecision['decidedAt'] === 'string')
+  );
+}
+
 function isValidRecord(key: string, value: unknown): value is OperationRecord {
   if (!isPlainObject(value)) return false;
   if (value['localRequestId'] !== key) return false;
@@ -204,14 +398,26 @@ function isValidRecord(key: string, value: unknown): value is OperationRecord {
     if (value[field] !== undefined && !isValidPageToken(value[field]))
       return false;
   }
-  if (
-    value['autoPrRequested'] !== undefined &&
-    typeof value['autoPrRequested'] !== 'boolean'
-  ) {
-    return false;
+  for (const field of [
+    'autoPrRequested',
+    'correction',
+    'echoAmbiguous',
+    'vendorFloorEmpty',
+  ] as const) {
+    if (value[field] !== undefined && typeof value[field] !== 'boolean') {
+      return false;
+    }
   }
   if (!isStringArray(value['recentActivityIds'])) return false;
   if (!isNonNegativeInt(value['activityCount'])) return false;
+  for (const field of [
+    'createSeq',
+    'dispatchSeq',
+    'lastCompleteWalkSeq',
+  ] as const) {
+    if (value[field] !== undefined && !isNonNegativeInt(value[field]))
+      return false;
+  }
   if (!isNonNegativeInt(value['resumeRestartCount'])) return false;
   if (
     value['artifactResumeRestartCount'] !== undefined &&
@@ -234,12 +440,40 @@ function isValidRecord(key: string, value: unknown): value is OperationRecord {
   )
     return false;
   if (
+    value['lastGeneratedPlan'] !== undefined &&
+    !(
+      isPlainObject(value['lastGeneratedPlan']) &&
+      typeof value['lastGeneratedPlan']['planId'] === 'string' &&
+      typeof value['lastGeneratedPlan']['activityId'] === 'string' &&
+      typeof value['lastGeneratedPlan']['activityCreateTime'] === 'string' &&
+      (value['lastGeneratedPlan']['planDigest'] === undefined ||
+        typeof value['lastGeneratedPlan']['planDigest'] === 'string') &&
+      (value['lastGeneratedPlan']['seq'] === undefined ||
+        isNonNegativeInt(value['lastGeneratedPlan']['seq'])) &&
+      (value['lastGeneratedPlan']['ambiguous'] === undefined ||
+        value['lastGeneratedPlan']['ambiguous'] === true)
+    )
+  )
+    return false;
+  if (
     value['resumeApproval'] !== undefined &&
     !(
       isPlainObject(value['resumeApproval']) &&
       typeof value['resumeApproval']['createTime'] === 'string' &&
-      typeof value['resumeApproval']['activityId'] === 'string'
+      typeof value['resumeApproval']['activityId'] === 'string' &&
+      (value['resumeApproval']['approvedPlanId'] === undefined ||
+        typeof value['resumeApproval']['approvedPlanId'] === 'string')
     )
+  )
+    return false;
+  if (
+    value['lastReconcile'] !== undefined &&
+    !isValidLastReconcile(value['lastReconcile'])
+  )
+    return false;
+  if (
+    value['supervision'] !== undefined &&
+    !isValidSupervision(value['supervision'])
   )
     return false;
   return (
@@ -259,6 +493,19 @@ function parseJournal(raw: string): Journal | undefined {
   if (parsed['version'] !== 1) return undefined;
   if (typeof parsed['archiveVisibilityConfirmed'] !== 'boolean')
     return undefined;
+  const seq = parsed['seq'];
+  if (seq !== undefined && !isNonNegativeInt(seq)) return undefined;
+  const takeover = parsed['controllerTakeover'];
+  if (
+    takeover !== undefined &&
+    !(
+      isPlainObject(takeover) &&
+      typeof takeover['at'] === 'string' &&
+      !Number.isNaN(Date.parse(takeover['at'])) &&
+      isNonNegativeInt(takeover['seq'])
+    )
+  )
+    return undefined;
   const ops = parsed['operations'];
   if (!isPlainObject(ops)) return undefined;
   const operations = Object.create(null) as Record<string, OperationRecord>;
@@ -269,6 +516,15 @@ function parseJournal(raw: string): Journal | undefined {
   return {
     version: 1,
     archiveVisibilityConfirmed: parsed['archiveVisibilityConfirmed'],
+    ...(seq !== undefined ? { seq } : {}),
+    ...(takeover !== undefined
+      ? {
+          controllerTakeover: {
+            at: takeover['at'] as string,
+            seq: takeover['seq'] as number,
+          },
+        }
+      : {}),
     operations,
   };
 }
@@ -303,9 +559,18 @@ export async function readJournal(dataDir: string): Promise<Journal> {
 /** Atomic whole-file rewrite. Callers must hold the journal lock. */
 export async function writeJournal(
   dataDir: string,
-  journal: Journal
+  journal: Journal,
+  /** Keys of the records that changed; when given, only those are secret-scanned. */
+  changedKeys?: readonly string[]
 ): Promise<void> {
-  for (const record of Object.values(journal.operations)) {
+  const toScan =
+    changedKeys === undefined
+      ? Object.values(journal.operations)
+      : changedKeys.flatMap((key) => {
+          const record = journal.operations[key];
+          return record === undefined ? [] : [record];
+        });
+  for (const record of toScan) {
     assertNoSecretShapedValues(record);
   }
   const stateDir = resolveStateDir(dataDir);
@@ -401,16 +666,18 @@ async function acquireLock(
 ): Promise<string> {
   const owner = crypto.randomUUID();
   const deadline = Date.now() + config.timeoutMs;
-  const content: LockOwner = {
-    owner,
-    pid: process.pid,
-    hostname: os.hostname(),
-    startedAt: Date.now(),
-  };
 
   for (;;) {
     try {
       const handle = await fs.promises.open(lockPath, 'wx', 0o600);
+      // Stamped when the lock is actually taken, not when waiting began: a
+      // process that waited 14 s must not look 14 s older than it is.
+      const content: LockOwner = {
+        owner,
+        pid: process.pid,
+        hostname: os.hostname(),
+        startedAt: Date.now(),
+      };
       try {
         await handle.writeFile(JSON.stringify(content));
       } catch (writeErr) {
@@ -494,6 +761,40 @@ export async function withJournalLock<T>(
 
 type MutableOperations = Record<string, OperationRecord>;
 
+/**
+ * Advances and returns the journal's ordering counter. Callers hold the journal
+ * lock and persist the journal afterwards; every value handed out is strictly
+ * greater than every earlier one, so two events can never tie.
+ */
+export function nextSeq(journal: Journal): number {
+  const next = (journal.seq ?? 0) + 1;
+  journal.seq = next;
+  return next;
+}
+
+/**
+ * Whether `earlier` is PROVEN to precede `later`. A missing sequence (a record
+ * written before sequences existed) has an unknown order, which proves nothing.
+ */
+export function seqBefore(
+  earlier: number | undefined,
+  later: number | undefined
+): boolean {
+  return earlier !== undefined && later !== undefined && earlier < later;
+}
+
+/** Reads and advances the ordering counter in one critical section (walk and pass starts). */
+export async function takeSeq(
+  dataDir: string,
+  config: LockConfig = DEFAULT_LOCK_CONFIG
+): Promise<number> {
+  return updateJournal(
+    dataDir,
+    (_operations, journal) => nextSeq(journal),
+    config
+  );
+}
+
 /** Read, mutate, and write the journal as one critical section; returns the mutator's value. */
 export async function updateJournal<T>(
   dataDir: string,
@@ -504,11 +805,26 @@ export async function updateJournal<T>(
     dataDir,
     async () => {
       const journal = await readJournal(dataDir);
-      const before = JSON.stringify(journal);
+      // Change detection by reference, not by serializing the whole journal
+      // twice: every record type is readonly and every mutator replaces a record
+      // by assignment, so an untouched record keeps its identity.
+      const before = new Map(Object.entries(journal.operations));
+      const confirmed = journal.archiveVisibilityConfirmed;
+      const seqBeforeMutation = journal.seq;
       const result = mutate(journal.operations, journal);
-      // A mutation that changed nothing skips the fsync'd rewrite.
-      if (JSON.stringify(journal) !== before)
-        await writeJournal(dataDir, journal);
+      const changed = Object.entries(journal.operations)
+        .filter(([key, record]) => before.get(key) !== record)
+        .map(([key]) => key);
+      const expectedCount =
+        before.size + changed.filter((k) => !before.has(k)).length;
+      const unchanged =
+        changed.length === 0 &&
+        expectedCount === Object.keys(journal.operations).length &&
+        confirmed === journal.archiveVisibilityConfirmed &&
+        seqBeforeMutation === journal.seq;
+      // A mutation that changed nothing skips the fsync'd rewrite; a write only
+      // secret-scans the records it changed (the rest passed when written).
+      if (!unchanged) await writeJournal(dataDir, journal, changed);
       return result;
     },
     config
@@ -533,12 +849,18 @@ function requireRecord(
 // Lookups (pure)
 // ---------------------------------------------------------------------------
 
+/** Kinds that own a session's read-state; a `reply` or `approve` row only points at the session. */
+export function ownsSession(record: OperationRecord): boolean {
+  return record.kind !== 'reply' && record.kind !== 'approve';
+}
+
+/** The create (or first-seen) record that owns the session; reply and approve rows never match. */
 export function findBySessionResource(
   journal: Journal,
   sessionResource: string
 ): OperationRecord | undefined {
   return Object.values(journal.operations).find(
-    (r) => r.sessionResource === sessionResource
+    (r) => ownsSession(r) && r.sessionResource === sessionResource
   );
 }
 
@@ -579,10 +901,12 @@ function baseRecord(
     OperationRecord,
     'localRequestId' | 'localId' | 'kind' | 'origin' | 'status'
   >,
-  nowIso: string
+  nowIso: string,
+  createSeq: number
 ): OperationRecord {
   return {
     ...fields,
+    createSeq,
     recentActivityIds: [],
     activityCount: 0,
     resumeRestartCount: 0,
@@ -604,8 +928,72 @@ export interface ReservationInput {
   readonly taskRef?: string;
   readonly grantId?: string;
   readonly autoPrRequested?: boolean;
+  readonly correction?: boolean;
   readonly promptDigest?: string;
   readonly observedPlanId?: string;
+  readonly observedPlanDigest?: string;
+}
+
+/**
+ * The pure core of the reservation (R36): refuses a recorded request id and,
+ * for a create, any unresolved operation on the same repository and branch,
+ * then adds the `reserved` record. Callers hold the journal lock;
+ * `reserveOperation` wraps it for the one-file case and `write-gate.ts` runs it
+ * inside the larger authority critical section (R31).
+ */
+export function applyReservation(
+  operations: Record<string, OperationRecord>,
+  journal: Journal,
+  input: ReservationInput,
+  now: () => Date = () => new Date()
+): OperationRecord {
+  validateRequestId(input.localRequestId);
+  if (operations[input.localRequestId] !== undefined) {
+    return throwAppError(
+      'JULES_DUPLICATE_LAUNCH',
+      `request id ${input.localRequestId} is already recorded`,
+      {
+        recoveryAction:
+          'Run status --reconcile; never reuse a request id for a new operation.',
+      }
+    );
+  }
+  if (input.kind === 'create') {
+    if (input.repository === undefined || input.requestedBranch === undefined) {
+      return throwAppError(
+        'JULES_INVALID_INPUT',
+        'a create reservation needs a repository and branch'
+      );
+    }
+    const unresolved = findUnresolvedOperations(journal, {
+      repository: input.repository,
+      requestedBranch: input.requestedBranch,
+      ...(input.taskRef !== undefined ? { taskRef: input.taskRef } : {}),
+    });
+    if (unresolved.length > 0) {
+      return throwAppError(
+        'JULES_DUPLICATE_LAUNCH',
+        `unresolved operation ${unresolved[0]?.localRequestId ?? ''} exists for ${input.repository} ${input.requestedBranch}`
+      );
+    }
+  }
+  const { localId, ...rest } = input;
+  const record: OperationRecord = {
+    ...baseRecord(
+      {
+        localRequestId: input.localRequestId,
+        localId: localId ?? mintLocalId(),
+        kind: input.kind,
+        origin: 'yellow',
+        status: 'reserved',
+      },
+      now().toISOString(),
+      nextSeq(journal)
+    ),
+    ...rest,
+  };
+  operations[input.localRequestId] = record;
+  return record;
 }
 
 /**
@@ -622,62 +1010,13 @@ export async function reserveOperation(
   validateRequestId(input.localRequestId);
   return updateJournal(
     dataDir,
-    (operations, journal) => {
-      if (operations[input.localRequestId] !== undefined) {
-        return throwAppError(
-          'JULES_DUPLICATE_LAUNCH',
-          `request id ${input.localRequestId} is already recorded`,
-          {
-            recoveryAction:
-              'Run status --reconcile; never reuse a request id for a new operation.',
-          }
-        );
-      }
-      if (input.kind === 'create') {
-        if (
-          input.repository === undefined ||
-          input.requestedBranch === undefined
-        ) {
-          return throwAppError(
-            'JULES_INVALID_INPUT',
-            'a create reservation needs a repository and branch'
-          );
-        }
-        const unresolved = findUnresolvedOperations(journal, {
-          repository: input.repository,
-          requestedBranch: input.requestedBranch,
-          ...(input.taskRef !== undefined ? { taskRef: input.taskRef } : {}),
-        });
-        if (unresolved.length > 0) {
-          return throwAppError(
-            'JULES_DUPLICATE_LAUNCH',
-            `unresolved operation ${unresolved[0]?.localRequestId ?? ''} exists for ${input.repository} ${input.requestedBranch}`
-          );
-        }
-      }
-      const { localId, ...rest } = input;
-      const record: OperationRecord = {
-        ...baseRecord(
-          {
-            localRequestId: input.localRequestId,
-            localId: localId ?? mintLocalId(),
-            kind: input.kind,
-            origin: 'yellow',
-            status: 'reserved',
-          },
-          now().toISOString()
-        ),
-        ...rest,
-      };
-      operations[input.localRequestId] = record;
-      return record;
-    },
+    (operations, journal) => applyReservation(operations, journal, input, now),
     config
   );
 }
 
 /** Retention: once terminal, the dedup ring and both resume tokens are dropped. */
-function applyRetention(record: OperationRecord): OperationRecord {
+export function applyRetention(record: OperationRecord): OperationRecord {
   if (!TERMINAL_STATUSES.has(record.status)) return record;
   const {
     resumePageToken: _r,
@@ -701,12 +1040,18 @@ export async function markOperation(
   return updateJournal(
     dataDir,
     (operations) => {
-      const next = applyRetention({
+      let bound: OperationRecord = {
         ...requireRecord(operations, localRequestId),
         ...extra,
         status,
         updatedAt: now().toISOString(),
-      });
+      };
+      // Binding a create to a session an `observe` row already owns: that row's
+      // safety state moves onto the create, and the row is retired.
+      if (extra.sessionResource !== undefined) {
+        bound = absorbObservedOwners(operations, bound);
+      }
+      const next = applyRetention(bound);
       operations[localRequestId] = next;
       return next;
     },
@@ -715,8 +1060,179 @@ export async function markOperation(
 }
 
 /**
- * First sight of a session with no journal row (PR2: every observable
- * session was created outside yellow): mint a local id and record it with
+ * A row other than `record` that already owns the session `record` is being
+ * bound to, and that cannot be folded into it: a create (or collect) row. An
+ * `observe` row is not a conflict; `absorbObservedOwners` folds it in.
+ */
+export function conflictingSessionOwner(
+  operations: Readonly<Record<string, OperationRecord>>,
+  record: OperationRecord,
+  sessionResource: string
+): OperationRecord | undefined {
+  return Object.values(operations).find(
+    (r) =>
+      r.localRequestId !== record.localRequestId &&
+      ownsSession(r) &&
+      r.kind !== 'observe' &&
+      r.sessionResource === sessionResource
+  );
+}
+
+function laterOf<T>(
+  a: T,
+  b: T,
+  seqOf: (v: T) => number | undefined,
+  atOf: (v: T) => string
+): T {
+  const sa = seqOf(a);
+  const sb = seqOf(b);
+  if (sa !== undefined && sb !== undefined) return sb > sa ? b : a;
+  return atOf(b) > atOf(a) ? b : a;
+}
+
+function mergeSupervision(
+  own: SupervisionState | undefined,
+  observed: SupervisionState | undefined
+): SupervisionState | undefined {
+  if (observed === undefined) return own;
+  if (own === undefined) return observed;
+  const merged: Record<string, unknown> = { ...own };
+  // Every marker keeps the more restrictive (later-evidence) of the two: a
+  // clearing walk must postdate it.
+  if (observed.paused !== undefined) {
+    merged['paused'] =
+      own.paused === undefined
+        ? observed.paused
+        : laterOf(
+            own.paused,
+            observed.paused,
+            (v) => v.observedSeq,
+            (v) => v.observedAt
+          );
+  }
+  if (observed.outsideSeen !== undefined) {
+    merged['outsideSeen'] =
+      own.outsideSeen === undefined ||
+      outsideSupersedes(observed.outsideSeen, own.outsideSeen)
+        ? observed.outsideSeen
+        : own.outsideSeen;
+  }
+  if (observed.backoff !== undefined) {
+    merged['backoff'] =
+      own.backoff === undefined ||
+      observed.backoff.nextCheckAt > own.backoff.nextCheckAt
+        ? observed.backoff
+        : own.backoff;
+  }
+  if (observed.lastDecision !== undefined) {
+    merged['lastDecision'] =
+      own.lastDecision === undefined ||
+      observed.lastDecision.decidedAt > own.lastDecision.decidedAt
+        ? observed.lastDecision
+        : own.lastDecision;
+  }
+  if (observed.evaluatedPlan !== undefined) {
+    const observedWins =
+      own.evaluatedPlan === undefined ||
+      laterOf(
+        own.evaluatedPlan,
+        observed.evaluatedPlan,
+        (v) => v.evaluatedSeq,
+        (v) => v.evaluatedAt
+      ) === observed.evaluatedPlan;
+    if (observedWins) {
+      merged['evaluatedPlan'] = observed.evaluatedPlan;
+      delete merged['evaluatedPassAt'];
+      delete merged['evaluatedPassSeq'];
+      if (observed.evaluatedPassAt !== undefined)
+        merged['evaluatedPassAt'] = observed.evaluatedPassAt;
+      if (observed.evaluatedPassSeq !== undefined)
+        merged['evaluatedPassSeq'] = observed.evaluatedPassSeq;
+    }
+  }
+  // A held message keeps its EARLIEST first read: later writes then count as
+  // after it.
+  if (observed.heldActivities !== undefined) {
+    const held: Record<string, string> = { ...(own.heldActivities ?? {}) };
+    const seqs: Record<string, number> = { ...(own.heldSeqs ?? {}) };
+    for (const [id, at] of Object.entries(observed.heldActivities)) {
+      if (held[id] === undefined || at < held[id]) {
+        held[id] = at;
+        const q = observed.heldSeqs?.[id];
+        if (q !== undefined) seqs[id] = q;
+        else delete seqs[id];
+      }
+    }
+    merged['heldActivities'] = held;
+    if (Object.keys(seqs).length > 0) merged['heldSeqs'] = seqs;
+    else delete merged['heldSeqs'];
+  }
+  return merged as SupervisionState;
+}
+
+/**
+ * Folds an `observe` row's safety state into the create that is being bound to
+ * the same session, then retires the observe row, so `findBySessionResource`
+ * has exactly one owner. Kept: every deviation (a deviation stays unreconciled
+ * if either copy was), the more restrictive supervision markers, and the
+ * artifacts. Read cursors are NOT carried: an observed walk never classified
+ * user messages (only a create's walk does), so the create starts from its own
+ * cursors and the next `status` rewalks the session under the create. The
+ * observe row's local id is retired with it. Callers hold the journal lock.
+ */
+export function absorbObservedOwners(
+  operations: MutableOperations,
+  create: OperationRecord
+): OperationRecord {
+  if (create.kind !== 'create' || create.sessionResource === undefined) {
+    return create;
+  }
+  let merged = create;
+  for (const observed of Object.values(operations)) {
+    if (
+      observed.kind !== 'observe' ||
+      observed.localRequestId === create.localRequestId ||
+      observed.sessionResource !== create.sessionResource
+    ) {
+      continue;
+    }
+    const deviations = [...merged.deviations];
+    for (const d of observed.deviations) {
+      const at = deviations.findIndex(
+        (x) => x.reason === d.reason && x.prUrl === d.prUrl
+      );
+      if (at < 0) deviations.push(d);
+      else {
+        const x = deviations[at]!;
+        deviations[at] = {
+          ...x,
+          observedAt: d.observedAt < x.observedAt ? d.observedAt : x.observedAt,
+          reconciled: x.reconciled && d.reconciled,
+        };
+      }
+    }
+    const known = new Set(merged.artifacts.map(artifactKey));
+    const supervision = mergeSupervision(
+      merged.supervision,
+      observed.supervision
+    );
+    merged = {
+      ...merged,
+      deviations,
+      artifacts: [
+        ...merged.artifacts,
+        ...observed.artifacts.filter((a) => !known.has(artifactKey(a))),
+      ],
+      ...(supervision !== undefined ? { supervision } : {}),
+    };
+    delete operations[observed.localRequestId];
+  }
+  return merged;
+}
+
+/**
+ * First sight of a session with no journal row (it was created outside
+ * yellow, or by another copy of this data): mint a local id and record it with
  * `origin: "external"`. Returns the existing record when one is bound.
  */
 export async function ensureObservedRecord(
@@ -740,7 +1256,8 @@ export async function ensureObservedRecord(
             origin: 'external',
             status: 'observed',
           },
-          now().toISOString()
+          now().toISOString(),
+          nextSeq(journal)
         ),
         sessionResource,
       };
@@ -765,11 +1282,18 @@ export interface ReadStateUpdate {
   readonly resumeApproval?: {
     readonly createTime: string;
     readonly activityId: string;
+    readonly approvedPlanId?: string;
   } | null;
   readonly recentActivityIds?: readonly string[];
   readonly activityCountDelta?: number;
+  /** Present only after a COMPLETE walk. */
+  readonly completeWalkAt?: string;
+  /** The journal sequence taken when that walk began; orders it against pauses. */
+  readonly completeWalkSeq?: number;
   /** `null` clears the pending plan (a `planApproved` was seen). */
   readonly pendingPlan?: PendingPlan | null;
+  /** The newest plan the walk read, approved or not; recorded forward-only and never cleared. */
+  readonly generatedPlan?: PendingPlan;
   readonly resumeRestartCount?: number;
   /**
    * The ids the walk counted as new. When given with `rebase`, the count added
@@ -795,6 +1319,28 @@ export interface ReadStateUpdate {
 }
 
 /**
+ * Forward only: a delayed older walk must not pull the stamp back. Walks with a
+ * sequence are ordered by it (never a tie); a stamp without one is ordered by
+ * its timestamp, and a tie keeps the stored stamp.
+ */
+function completeWalkAdvances(
+  current: OperationRecord,
+  update: ReadStateUpdate
+): boolean {
+  if (update.completeWalkAt === undefined) return false;
+  if (
+    update.completeWalkSeq !== undefined &&
+    current.lastCompleteWalkSeq !== undefined
+  ) {
+    return update.completeWalkSeq > current.lastCompleteWalkSeq;
+  }
+  return (
+    current.lastCompleteWalkAt === undefined ||
+    update.completeWalkAt > current.lastCompleteWalkAt
+  );
+}
+
+/**
  * Activity read-state. Only the `status` path calls this (contract
  * "Activity walk": status is the sole writer of the watermark, resume token,
  * and dedup ring; approve and collect walks only read them).
@@ -808,7 +1354,7 @@ export async function upsertReadState(
 ): Promise<OperationRecord> {
   return updateJournal(
     dataDir,
-    (operations) => {
+    (operations, journal) => {
       const current = requireRecord(operations, localRequestId);
       const {
         resumePageToken: _drop,
@@ -855,6 +1401,19 @@ export async function upsertReadState(
         ) {
           resumeApproval = freshApproval;
         }
+        // Approvals at the same createTime are unordered: whichever the id
+        // order kept, the plan they name is unknown (an older marker's shape).
+        if (
+          resumeApproval !== undefined &&
+          update.resumeApproval != null &&
+          freshApproval !== undefined &&
+          update.resumeApproval.activityId !== freshApproval.activityId &&
+          Date.parse(update.resumeApproval.createTime) ===
+            Date.parse(freshApproval.createTime)
+        ) {
+          const { approvedPlanId: _dropped, ...unnamed } = resumeApproval;
+          resumeApproval = unnamed;
+        }
         const fresh = current.pendingPlan;
         if (update.pendingPlan === undefined) {
           pendingPlan = fresh;
@@ -863,7 +1422,8 @@ export async function upsertReadState(
           // different (newer) plan a concurrent update stored since.
           pendingPlan =
             fresh === undefined ||
-            fresh.activityId === rebase.pendingPlan?.activityId
+            (fresh.ambiguous !== true &&
+              fresh.activityId === rebase.pendingPlan?.activityId)
               ? undefined
               : fresh;
         } else if (fresh !== undefined) {
@@ -878,7 +1438,31 @@ export async function upsertReadState(
                 activityId: fresh.activityId,
               }
             ) > 0;
-          pendingPlan = newer ? update.pendingPlan : fresh;
+          const winner = newer ? update.pendingPlan : fresh;
+          // Equal createTimes are unordered: two plans there that differ in id
+          // and content leave the current plan unknown, whichever side wins.
+          // The flag is sticky once either side carries it.
+          const sameTime =
+            compareStamp(
+              {
+                createTime: update.pendingPlan.activityCreateTime,
+                activityId: '',
+              },
+              { createTime: fresh.activityCreateTime, activityId: '' }
+            ) === 0;
+          const differs =
+            update.pendingPlan.activityId !== fresh.activityId &&
+            JSON.stringify([
+              update.pendingPlan.planId,
+              update.pendingPlan.steps,
+            ]) !== JSON.stringify([fresh.planId, fresh.steps]);
+          pendingPlan =
+            sameTime &&
+            (differs ||
+              update.pendingPlan.ambiguous === true ||
+              fresh.ambiguous === true)
+              ? { ...winner, ambiguous: true as const }
+              : winner;
         } else if (
           current.lastActivityCreateTime !== undefined &&
           current.lastActivityId !== undefined &&
@@ -923,18 +1507,95 @@ export async function upsertReadState(
           ).length;
         }
       }
+      // A status walk runs unlocked, so an older observation can land after a
+      // newer one. A finished session does not run again (reply refuses it), so
+      // a terminal condition already stored is never regressed by a walk that
+      // read the session earlier: the write gate's terminal-owner check and the
+      // released slot both rely on it.
+      const keepTerminal =
+        rebase !== undefined &&
+        (current.condition === 'remote-completed' ||
+          current.condition === 'failed') &&
+        update.condition !== current.condition;
+      // Forward only by activity stamp; the sequence is taken when a plan id is
+      // first recorded, so it orders the swap against an evaluation.
+      const gen = update.generatedPlan;
+      const prevGen = current.lastGeneratedPlan;
+      const genAdvances =
+        gen !== undefined &&
+        (prevGen === undefined ||
+          compareStamp(
+            { createTime: gen.activityCreateTime, activityId: gen.activityId },
+            {
+              createTime: prevGen.activityCreateTime,
+              activityId: prevGen.activityId,
+            }
+          ) > 0);
+      const genDigest =
+        gen !== undefined
+          ? planDigest(gen.planId, redactDeep({ steps: gen.steps }).steps)
+          : undefined;
+      // The sequence marks when this plan CONTENT was first recorded: the same
+      // id with different steps is a new plan and takes a new sequence.
+      const sameGen =
+        gen !== undefined &&
+        prevGen?.planId === gen.planId &&
+        prevGen.seq !== undefined &&
+        (prevGen.planDigest === undefined || prevGen.planDigest === genDigest);
+      // A tie at the newest createTime (different content, opaque ids) leaves
+      // the current plan unknown. The flag is sticky for that stamp, and
+      // recording it afresh takes a new sequence so supervision sees it as a
+      // replacement that appeared after its evaluation.
+      const sameStamp =
+        gen !== undefined &&
+        prevGen !== undefined &&
+        compareStamp(
+          { createTime: gen.activityCreateTime, activityId: '' },
+          { createTime: prevGen.activityCreateTime, activityId: '' }
+        ) === 0;
+      const newlyAmbiguous =
+        gen?.ambiguous === true &&
+        sameStamp &&
+        prevGen?.ambiguous !== true &&
+        !genAdvances;
+      const lastGeneratedPlan =
+        gen !== undefined && genAdvances
+          ? {
+              planId: gen.planId,
+              activityId: gen.activityId,
+              activityCreateTime: gen.activityCreateTime,
+              ...(genDigest !== undefined ? { planDigest: genDigest } : {}),
+              ...(gen.ambiguous === true ? { ambiguous: true as const } : {}),
+              seq:
+                sameGen && !(gen.ambiguous === true && !prevGen?.ambiguous)
+                  ? (prevGen?.seq ?? nextSeq(journal))
+                  : nextSeq(journal),
+            }
+          : newlyAmbiguous && prevGen !== undefined
+            ? { ...prevGen, ambiguous: true as const, seq: nextSeq(journal) }
+            : prevGen;
       const next: OperationRecord = applyRetention({
         ...base,
-        ...(update.vendorState !== undefined
+        ...(lastGeneratedPlan !== undefined ? { lastGeneratedPlan } : {}),
+        ...(update.vendorState !== undefined && !keepTerminal
           ? { vendorState: update.vendorState }
           : {}),
-        ...(update.condition !== undefined
+        ...(update.condition !== undefined && !keepTerminal
           ? { condition: update.condition }
           : {}),
         ...(watermark !== undefined
           ? {
               lastActivityCreateTime: watermark.createTime,
               lastActivityId: watermark.activityId,
+            }
+          : {}),
+        // Forward only: a delayed older walk must not pull the stamp back.
+        ...(completeWalkAdvances(current, update)
+          ? {
+              lastCompleteWalkAt: update.completeWalkAt as string,
+              ...(update.completeWalkSeq !== undefined
+                ? { lastCompleteWalkSeq: update.completeWalkSeq }
+                : {}),
             }
           : {}),
         ...(resumePageToken !== undefined ? { resumePageToken } : {}),
@@ -995,7 +1656,7 @@ export async function upsertArtifactResumeToken(
 function artifactKey(a: ArtifactRecord): string {
   return a.kind === 'pr-ref'
     ? `pr-ref:${a.prUrl ?? ''}`
-    : `${a.kind}:${a.sha256 ?? ''}:${a.vendorPath ?? ''}`;
+    : `${a.kind}:${a.sha256 ?? ''}:${a.vendorPathDigest ?? a.vendorPath ?? ''}`;
 }
 
 /**
@@ -1063,4 +1724,729 @@ export async function recordDeviation(
 
 export function hasUnreconciledDeviation(record: OperationRecord): boolean {
   return record.deviations.some((d) => !d.reconciled);
+}
+
+export interface SupervisionPatch {
+  /** Pauses are removed by `supervise --clear-pause` directly, not through this patch. */
+  readonly paused?: NonNullable<SupervisionState['paused']> | null;
+  /** `null` resets the check-failed backoff. */
+  readonly backoff?: NonNullable<SupervisionState['backoff']> | null;
+  readonly lastDecision?: NonNullable<SupervisionState['lastDecision']>;
+  /** Written by `status`; removed with the pause by `--clear-pause`. */
+  readonly outsideSeen?: NonNullable<SupervisionState['outsideSeen']> | null;
+  /** `null` forgets the evaluated plan. */
+  readonly evaluatedPlan?: NonNullable<
+    SupervisionState['evaluatedPlan']
+  > | null;
+  /** Start of the producing pass; orders `evaluatedPlan` writes when no sequence is given. */
+  readonly passStartedAt?: string;
+  /** The journal sequence taken at the start of the producing pass; preferred over `passStartedAt`. */
+  readonly passSeq?: number;
+}
+
+/** `undefined` keeps the stored value, `null` clears it, anything else sets it. */
+function keep<K extends string, V>(
+  key: K,
+  previous: V | undefined,
+  patch: V | null | undefined
+): { [P in K]?: V } {
+  const value = patch === undefined ? previous : (patch ?? undefined);
+  return value === undefined ? {} : ({ [key]: value } as { [P in K]?: V });
+}
+
+/** Merges a patch into the session's supervision state; written by `supervise` and, for `outsideSeen`, by `status` (R32, R33). */
+export async function updateSupervision(
+  dataDir: string,
+  localRequestId: string,
+  patch: SupervisionPatch,
+  now: () => Date = () => new Date(),
+  config: LockConfig = DEFAULT_LOCK_CONFIG
+): Promise<OperationRecord> {
+  return updateJournal(
+    dataDir,
+    (operations, journal) => {
+      const current = requireRecord(operations, localRequestId);
+      const previous: SupervisionState = current.supervision ?? {};
+      // `undefined` keeps the stored value, `null` clears it, anything else sets it.
+      // A pass runs unlocked, so a delayed one can land after a newer one:
+      // markers replace the stored value only with a strictly later one.
+      const pausedPatch =
+        patch.paused != null &&
+        previous.paused !== undefined &&
+        patch.paused.observedAt < previous.paused.observedAt
+          ? undefined
+          : patch.paused;
+      const decisionPatch =
+        patch.lastDecision !== undefined &&
+        previous.lastDecision !== undefined &&
+        patch.lastDecision.decidedAt < previous.lastDecision.decidedAt
+          ? undefined
+          : patch.lastDecision;
+      const outsidePatch =
+        patch.outsideSeen != null &&
+        previous.outsideSeen !== undefined &&
+        !outsideSupersedes(patch.outsideSeen, previous.outsideSeen)
+          ? undefined
+          : patch.outsideSeen;
+      // The evaluated plan is ordered by the start of the pass that produced
+      // it. An older pass, or one starting in the same millisecond (order
+      // unknown), neither replaces nor clears what a newer one stored. A write
+      // with no token (or none stored) keeps the old behaviour.
+      // Sequences order passes exactly (they cannot tie); the timestamp rule
+      // only applies when either side predates sequences.
+      const planStale =
+        patch.evaluatedPlan !== undefined &&
+        (patch.passSeq !== undefined && previous.evaluatedPassSeq !== undefined
+          ? patch.passSeq <= previous.evaluatedPassSeq
+          : patch.passStartedAt !== undefined &&
+            previous.evaluatedPassAt !== undefined &&
+            patch.passStartedAt <= previous.evaluatedPassAt);
+      const planPatch = planStale ? undefined : patch.evaluatedPlan;
+      const passAt =
+        planPatch !== undefined && patch.passStartedAt !== undefined
+          ? patch.passStartedAt
+          : previous.evaluatedPassAt;
+      // The pass stamps travel together: a pass without a sequence drops the
+      // stored one rather than leaving it paired with another pass's time.
+      const passSeq =
+        planPatch !== undefined && patch.passStartedAt !== undefined
+          ? patch.passSeq
+          : previous.evaluatedPassSeq;
+      // The evaluation is stamped under this lock, after the pass read the
+      // plan, so a reply cannot be proven to follow it unless it really did.
+      const stampedPlan =
+        planPatch === null || planPatch === undefined
+          ? planPatch
+          : { ...planPatch, evaluatedSeq: nextSeq(journal) };
+      // A pause that replaces the stored one is stamped under this lock too.
+      const stampedPause =
+        pausedPatch === null || pausedPatch === undefined
+          ? pausedPatch
+          : { ...pausedPatch, observedSeq: nextSeq(journal) };
+      const next: SupervisionState = {
+        ...keep('paused', previous.paused, stampedPause),
+        ...keep('backoff', previous.backoff, patch.backoff),
+        ...keep('lastDecision', previous.lastDecision, decisionPatch),
+        ...keep('outsideSeen', previous.outsideSeen, outsidePatch),
+        ...keep('evaluatedPlan', previous.evaluatedPlan, stampedPlan),
+        ...(passAt !== undefined ? { evaluatedPassAt: passAt } : {}),
+        ...(passSeq !== undefined ? { evaluatedPassSeq: passSeq } : {}),
+        // Owned by claimOwnEchoes; a supervise patch must not drop it.
+        ...(previous.heldActivities !== undefined
+          ? { heldActivities: previous.heldActivities }
+          : {}),
+        ...(previous.heldSeqs !== undefined
+          ? { heldSeqs: previous.heldSeqs }
+          : {}),
+      };
+      const updated: OperationRecord = {
+        ...current,
+        supervision: next,
+        updatedAt: now().toISOString(),
+      };
+      operations[localRequestId] = updated;
+      return updated;
+    },
+    config
+  );
+}
+
+/**
+ * Splits new user messages into this plugin's own echoes and outside ones. Each
+ * landed reply or create explains at most ONE vendor activity (its echo), so a
+ * teammate later repeating an earlier prompt verbatim is not mistaken for the
+ * plugin: the first matching activity claims the operation's `echoActivityId`,
+ * and further matches have no operation left to explain them. A rewalk of an
+ * already-claimed activity stays own. With `mark`, the newest outside message (by
+ * `(createTime, activityId)`, independent of list order) is also recorded as the
+ * owner's `outsideSeen` under the same journal lock; a newer one replaces the marker, so a pending `--clear-pause` confirmation for the older one fails. A message that only a dispatched write
+ * still in flight could explain is reported in `pendingOut` and neither claimed nor
+ * classified, so the caller leaves it for a later walk. On a partial walk (`walkComplete` false) a message that would claim an echo is held the same way. A cleanly rejected or released write never
+ * landed and claims nothing; an abandoned one might have, so it can.
+ */
+export async function claimOwnEchoes(
+  dataDir: string,
+  sessionResource: string,
+  messages: ReadonlyArray<{
+    activityId: string;
+    digest: string;
+    createTime?: string;
+    /** When the walk read this message; the persisted hold starts here. */
+    observedAt?: string;
+  }>,
+  mark?: {
+    readonly ownerRequestId: string;
+    readonly observedAt: string;
+    /**
+     * When the walk that read `messages` began. A write created or dispatched
+     * after it cannot be the echo of a message the walk already held, so it is
+     * not a candidate; a matching message is held for a later walk instead.
+     */
+    readonly walkStartedAt?: string;
+    /**
+     * The journal sequence taken (`takeSeq`) when that walk began. With it, "after
+     * the walk" and "after the first read" are decided by sequence, which cannot
+     * tie; a write is a candidate only when its sequence is proven below it. Without
+     * it (or for a write that predates sequences) the timestamps decide and a tie
+     * counts as after.
+     */
+    readonly walkSeq?: number;
+  },
+  pendingOut?: string[],
+  walkComplete = true,
+  config: LockConfig = DEFAULT_LOCK_CONFIG
+): Promise<{ activityId: string; digest: string } | undefined> {
+  return updateJournal(
+    dataDir,
+    (operations, journal) => {
+      const landed = Object.values(operations).filter((record) => {
+        const neverLanded =
+          (record.status === 'failed' && record.abandonedAt === undefined) ||
+          record.status === 'rejected';
+        return (
+          record.sessionResource === sessionResource &&
+          (record.kind === 'reply' || record.kind === 'create') &&
+          record.promptDigest !== undefined &&
+          !neverLanded &&
+          // A reservation whose POST has not begun cannot have produced an echo.
+          !(record.status === 'reserved' && record.dispatchedAt === undefined)
+        );
+      });
+      const nowMs = Date.parse(mark?.observedAt ?? new Date().toISOString());
+      // A dispatched write that has not settled and is still inside its settle
+      // window; past it the existing unknown-outcome rules apply.
+      const inFlight = (r: OperationRecord): boolean =>
+        r.status === 'reserved' &&
+        r.dispatchedAt !== undefined &&
+        nowMs - Date.parse(r.dispatchedAt) < RESERVATION_SETTLE_MS;
+      const walkStartMs =
+        mark?.walkStartedAt !== undefined
+          ? Date.parse(mark.walkStartedAt)
+          : Number.NaN;
+      const walkSeq = mark?.walkSeq;
+      // Rebased under this lock, but only writes the walk could have raced:
+      // one created or dispatched after the walk began is not a candidate. By
+      // sequence a write is a candidate only when proven below the walk's; a
+      // write that predates sequences falls back to its timestamp, where the
+      // same millisecond cannot be ordered and counts as post-walk (fail closed).
+      const notBeforeWalk = (seq: number | undefined, at: string): boolean =>
+        walkSeq !== undefined && seq !== undefined
+          ? !seqBefore(seq, walkSeq)
+          : !Number.isNaN(walkStartMs) && Date.parse(at) >= walkStartMs;
+      const postWalk = (r: OperationRecord): boolean =>
+        notBeforeWalk(r.createSeq, r.createdAt) ||
+        (r.dispatchedAt !== undefined &&
+          notBeforeWalk(r.dispatchSeq, r.dispatchedAt));
+      const claimed = new Set(
+        landed.flatMap((r) =>
+          r.echoActivityId !== undefined ? [r.echoActivityId] : []
+        )
+      );
+      // Held messages persist when they were first read: a write dispatched
+      // after that can never explain them, however many walks later it is
+      // compared (the 30 s dispatch allowance must not let it reach back).
+      const heldBefore = (
+        mark !== undefined ? operations[mark.ownerRequestId] : undefined
+      )?.supervision?.heldActivities;
+      const held: Record<string, string> = { ...(heldBefore ?? {}) };
+      const heldSeqBefore = (
+        mark !== undefined ? operations[mark.ownerRequestId] : undefined
+      )?.supervision?.heldSeqs;
+      const heldSeqs: Record<string, number> = { ...(heldSeqBefore ?? {}) };
+      const afterFirstRead = (r: OperationRecord, id: string): boolean => {
+        const since = held[id];
+        if (since === undefined) return false;
+        const sinceSeq = heldSeqs[id];
+        const sinceMs = Date.parse(since);
+        // A write is before the first read only when proven so; equal or
+        // unknown order counts as after (it cannot be the echo).
+        const notBefore = (seq: number | undefined, at: string): boolean =>
+          sinceSeq !== undefined && seq !== undefined
+            ? !seqBefore(seq, sinceSeq)
+            : !Number.isNaN(sinceMs) && Date.parse(at) >= sinceMs;
+        return (
+          notBefore(r.createSeq, r.createdAt) ||
+          (r.dispatchedAt !== undefined &&
+            notBefore(r.dispatchSeq, r.dispatchedAt))
+        );
+      };
+      const release = (id: string): void => {
+        delete held[id];
+        delete heldSeqs[id];
+      };
+      const hold = (message: {
+        activityId: string;
+        observedAt?: string;
+      }): void => {
+        if (held[message.activityId] !== undefined) return;
+        const at =
+          message.observedAt ?? mark?.walkStartedAt ?? mark?.observedAt ?? '';
+        if (at === '') return;
+        held[message.activityId] = at;
+        if (walkSeq !== undefined) heldSeqs[message.activityId] = walkSeq;
+      };
+      // The newest outside message by `(createTime, activityId)`, the order
+      // `compareStamp` uses: vendor list order is unverified, so neither the
+      // first nor the last message visited can stand for it.
+      let newestOutside:
+        | { activityId: string; digest: string; createTime?: string }
+        | undefined;
+      // Every outside id sharing that newest createTime: equal times are
+      // unordered, so the marker must cover all of them, not just one.
+      let newestTied = new Set<string>();
+      const noteOutside = (message: {
+        activityId: string;
+        digest: string;
+        createTime?: string;
+      }): void => {
+        const byTime =
+          newestOutside === undefined
+            ? 1
+            : compareStamp(
+                { createTime: message.createTime ?? '', activityId: '' },
+                { createTime: newestOutside.createTime ?? '', activityId: '' }
+              );
+        if (byTime > 0) newestTied = new Set();
+        if (byTime >= 0) newestTied.add(message.activityId);
+        if (
+          newestOutside === undefined ||
+          compareStamp(
+            {
+              createTime: message.createTime ?? '',
+              activityId: message.activityId,
+            },
+            {
+              createTime: newestOutside.createTime ?? '',
+              activityId: newestOutside.activityId,
+            }
+          ) > 0
+        ) {
+          newestOutside = message;
+        }
+      };
+      // Classify each same-digest batch as a whole. When a settled write and an
+      // unresolved one share a digest and the walk holds more such messages than
+      // settled writes to claim them, which message is whose is unknowable: the
+      // settled writes take the earliest messages, the unresolved writes get no
+      // credit from this batch, and the surplus is possible outside activity.
+      // Without this the first message goes to the settled write and the second
+      // to the unresolved one, as false landing evidence.
+      const couldOwn = (
+        r: OperationRecord,
+        message: { activityId: string; createTime?: string }
+      ): boolean => {
+        return (
+          // Only a message proven newer than the activity the controller saw
+          // before dispatch (vendor clock) can be its echo.
+          followsDispatch(r, message.createTime, message.activityId) &&
+          !afterFirstRead(r, message.activityId)
+        );
+      };
+      const blockedDigests = new Set<string>();
+      const surplusIds = new Set<string>();
+      const byDigest = new Map<string, typeof messages>();
+      for (const m of messages) {
+        if (claimed.has(m.activityId)) continue;
+        byDigest.set(m.digest, [...(byDigest.get(m.digest) ?? []), m]);
+      }
+      for (const [digest, group] of byDigest) {
+        // Only writes that could own a message of this batch count: created
+        // and dispatched before the walk began, not dispatched after a message
+        // was first read, and not later than the message allows.
+        const candidates = landed.filter(
+          (r) =>
+            r.echoActivityId === undefined &&
+            r.echoAmbiguous !== true &&
+            r.promptDigest === digest &&
+            !postWalk(r) &&
+            group.some((m) => couldOwn(r, m))
+        );
+        const settledCount = candidates.filter(
+          (r) => r.status === 'accepted' || r.status === 'reconciled'
+        ).length;
+        const unresolvedCount = candidates.length - settledCount;
+        if (
+          settledCount > 0 &&
+          unresolvedCount > 0 &&
+          group.length > settledCount
+        ) {
+          blockedDigests.add(digest);
+          // Permanent: no later walk, whatever it re-reads, may credit these
+          // writes with an echo; only reconcile or abandon settles them.
+          for (const r of candidates) {
+            if (r.status === 'accepted' || r.status === 'reconciled') continue;
+            const marked = {
+              ...r,
+              echoAmbiguous: true,
+              updatedAt: mark?.observedAt ?? r.updatedAt,
+            };
+            operations[r.localRequestId] = marked;
+            landed[landed.indexOf(r)] = marked;
+          }
+          // Which messages the settled writes own is decided by vendor time
+          // alone. A tie (or a missing time) at the boundary cannot be ordered
+          // by opaque id, so every message from the boundary time on is surplus.
+          const byTime = [...group].sort(
+            (a, b) =>
+              Date.parse(a.createTime ?? '') - Date.parse(b.createTime ?? '')
+          );
+          const timeAt = (i: number): number =>
+            Date.parse(byTime[i]?.createTime ?? '');
+          const boundary = settledCount - 1;
+          const unprovable =
+            byTime.some((m) => Number.isNaN(Date.parse(m.createTime ?? ''))) ||
+            (boundary >= 0 &&
+              boundary + 1 < byTime.length &&
+              timeAt(boundary) === timeAt(boundary + 1));
+          byTime.forEach((m, i) => {
+            const t = Date.parse(m.createTime ?? '');
+            if (
+              unprovable
+                ? Number.isNaN(t) || boundary < 0 || t >= timeAt(boundary)
+                : i >= settledCount
+            ) {
+              surplusIds.add(m.activityId);
+            }
+          });
+        }
+      }
+      // Same-text echoes are matched as a vendor-time-ordered batch, never in
+      // arrival order: with several writes sharing a digest, the oldest echo
+      // belongs to the oldest-dispatched write. When the pairing cannot be
+      // proven (equal or missing vendor time, unorderable dispatches, or a
+      // different number of echoes and writes) the batch is ambiguous: its
+      // messages are outside activity and its unresolved writes can never be
+      // credited.
+      const pairedSlots = new Map<string, OperationRecord>();
+      const eligibleOf = (
+        message: (typeof messages)[number]
+      ): OperationRecord[] => {
+        const possible = landed.filter(
+          (r) =>
+            r.echoActivityId === undefined &&
+            r.echoAmbiguous !== true &&
+            r.promptDigest === message.digest &&
+            followsDispatch(r, message.createTime, message.activityId) &&
+            !afterFirstRead(r, message.activityId)
+        );
+        const open = possible.filter((r) => !inFlight(r) && !postWalk(r));
+        const settledOpen = open.filter(
+          (r) => r.status === 'accepted' || r.status === 'reconciled'
+        );
+        return settledOpen.length > 0 ? settledOpen : open;
+      };
+      const timeOf = (m: { createTime?: string }): number =>
+        m.createTime !== undefined ? Date.parse(m.createTime) : Number.NaN;
+      for (const [digest, group] of byDigest) {
+        const live = group.filter((m) => !surplusIds.has(m.activityId));
+        if (live.length < 2 || blockedDigests.has(digest)) continue;
+        // Order first, then check each position: with differing floors the
+        // older echo can be eligible for fewer writes than the newer one, so
+        // the sets are not compared as a whole.
+        const msgs = [...live].sort((x, y) => timeOf(x) - timeOf(y));
+        const sets = msgs.map((m) => eligibleOf(m));
+        const writes: OperationRecord[] = [];
+        for (const e of sets) {
+          for (const r of e) {
+            if (!writes.some((w) => w.localRequestId === r.localRequestId)) {
+              writes.push(r);
+            }
+          }
+        }
+        if (writes.length < 2) continue;
+        const times = msgs.map(timeOf);
+        const distinctTimes =
+          times.every((t) => !Number.isNaN(t)) &&
+          new Set(times).size === times.length;
+        const bySeq = writes.every((r) => r.dispatchSeq !== undefined);
+        const dispatchKey = (r: OperationRecord): number =>
+          bySeq ? (r.dispatchSeq as number) : Date.parse(r.dispatchedAt ?? '');
+        const keys = writes.map(dispatchKey);
+        const distinctDispatch =
+          keys.every((k) => !Number.isNaN(k)) &&
+          new Set(keys).size === keys.length;
+        const recs = [...writes].sort(
+          (x, y) => dispatchKey(x) - dispatchKey(y)
+        );
+        if (
+          distinctTimes &&
+          distinctDispatch &&
+          msgs.length === recs.length &&
+          recs.every((r, idx) =>
+            (sets[idx] ?? []).some((e) => e.localRequestId === r.localRequestId)
+          )
+        ) {
+          msgs.forEach((m, idx) => pairedSlots.set(m.activityId, recs[idx]!));
+          continue;
+        }
+        for (const r of writes) {
+          if (r.status === 'accepted' || r.status === 'reconciled') continue;
+          const marked = {
+            ...r,
+            echoAmbiguous: true,
+            updatedAt: mark?.observedAt ?? r.updatedAt,
+          };
+          operations[r.localRequestId] = marked;
+          landed[landed.indexOf(r)] = marked;
+        }
+        for (const m of live) surplusIds.add(m.activityId);
+      }
+      for (const message of messages) {
+        if (claimed.has(message.activityId)) {
+          release(message.activityId);
+          continue;
+        }
+        if (surplusIds.has(message.activityId)) {
+          // Consumed as outside evidence, not held: once the settled write has
+          // its echo it stops being a candidate, and a held copy would then be
+          // reclassified as the unresolved write's echo on the next walk. The
+          // watermark and dedup ring move past it.
+          release(message.activityId);
+          noteOutside(message);
+          continue;
+        }
+        const sent = message.createTime && Date.parse(message.createTime);
+        const matches = (r: OperationRecord): boolean =>
+          r.echoActivityId === undefined &&
+          r.echoAmbiguous !== true &&
+          r.promptDigest === message.digest &&
+          // Only a message proven newer than the activity the controller saw
+          // before dispatch (vendor clock) can be its echo; unordered is outside.
+          followsDispatch(r, message.createTime, message.activityId);
+        // A write made after the message was first read cannot be its echo.
+        const possible = landed.filter(
+          (r) => matches(r) && !afterFirstRead(r, message.activityId)
+        );
+        const open = possible.filter((r) => !inFlight(r) && !postWalk(r));
+        // A settled write needs no resolution, so an ambiguous message goes to
+        // it before an unresolved one: crediting an unknown-outcome write with
+        // an echo that may be a settled write's would mark it landed.
+        const settledOpen = open.filter(
+          (r) => r.status === 'accepted' || r.status === 'reconciled'
+        );
+        const blocked = blockedDigests.has(message.digest);
+        const eligible =
+          settledOpen.length > 0 ? settledOpen : blocked ? [] : open;
+        // Several unresolved writes can own one message and nothing proves
+        // which landed: crediting the latest would mark a write landed on a
+        // guess. The message stays held until reconcile or abandon settles them.
+        const ambiguousUnresolved =
+          settledOpen.length === 0 && !blocked && open.length > 1;
+        // Vendor list order is unverified, so with a usable timestamp prefer
+        // the latest-dispatched write that precedes the message: an older
+        // identical write then keeps the older echo.
+        // More than one eligible writer and no proven pairing: the message is
+        // never assigned greedily (it may be another write's echo or a
+        // teammate's identical comment), so it is outside activity.
+        if (
+          !pairedSlots.has(message.activityId) &&
+          !ambiguousUnresolved &&
+          eligible.length > 1
+        ) {
+          if (!walkComplete) {
+            pendingOut?.push(message.activityId);
+            hold(message);
+          } else {
+            release(message.activityId);
+            noteOutside(message);
+          }
+          continue;
+        }
+        const slot = pairedSlots.has(message.activityId)
+          ? pairedSlots.get(message.activityId)
+          : ambiguousUnresolved
+            ? undefined
+            : typeof sent === 'number' && !Number.isNaN(sent)
+              ? eligible.reduce<OperationRecord | undefined>(
+                  (best, r) =>
+                    best === undefined ||
+                    Date.parse(r.dispatchedAt ?? r.createdAt) >
+                      Date.parse(best.dispatchedAt ?? best.createdAt)
+                      ? r
+                      : best,
+                  undefined
+                )
+              : eligible[0];
+        if (slot === undefined && possible.length > 0) {
+          // Only a dispatched write whose outcome is unknown could explain it:
+          // `dispatchedAt` proves the POST began, not that it landed. Leave the
+          // message unclassified; the caller must not consume it yet.
+          pendingOut?.push(message.activityId);
+          hold(message);
+          continue;
+        }
+        if (slot !== undefined && !walkComplete) {
+          // A partial walk may not have reached the write's real, older echo:
+          // claiming this same-digest message now could be a teammate's. Hold
+          // it until a complete walk can tell which match is earliest.
+          pendingOut?.push(message.activityId);
+          hold(message);
+          continue;
+        }
+        if (slot === undefined) {
+          release(message.activityId);
+          noteOutside(message);
+          continue;
+        }
+        claimed.add(message.activityId);
+        release(message.activityId);
+        operations[slot.localRequestId] = {
+          ...slot,
+          echoActivityId: message.activityId,
+          ...(message.createTime !== undefined
+            ? { echoCreateTime: message.createTime }
+            : {}),
+        };
+        // `landed` holds the replaced record; keep it current for later matches.
+        landed[landed.indexOf(slot)] = operations[slot.localRequestId]!;
+      }
+      // The marker is written in this same critical section: a reserve cannot
+      // slip between classifying the message and recording that it was seen.
+      const owner =
+        mark !== undefined ? operations[mark.ownerRequestId] : undefined;
+      // Outside evidence strictly newer (by stamp) than the stored marker
+      // replaces it: a `--clear-pause` confirmed against the older id must then
+      // be refused. An older message, from a delayed overlapping walk, never
+      // displaces a newer marker, or clearing it would forget the newer one.
+      const stored = owner?.supervision?.outsideSeen;
+      const evidence =
+        stored === undefined
+          ? newestOutside
+          : newestOutside !== undefined &&
+              outsideSupersedes(
+                {
+                  createTime: newestOutside.createTime ?? '',
+                  activityId: newestOutside.activityId,
+                },
+                {
+                  createTime: stored.createTime ?? '',
+                  activityId: stored.activityId,
+                }
+              )
+            ? newestOutside
+            : undefined;
+      if (evidence !== undefined && mark !== undefined && owner !== undefined) {
+        const tiedIds = new Set(newestTied);
+        // A stored marker at the same createTime is unordered against this
+        // evidence: keep its ids too, so clearing covers every tied message.
+        if (
+          stored !== undefined &&
+          compareStamp(
+            { createTime: evidence.createTime ?? '', activityId: '' },
+            { createTime: stored.createTime ?? '', activityId: '' }
+          ) === 0
+        ) {
+          tiedIds.add(stored.activityId);
+          for (const id of stored.alsoActivityIds ?? []) tiedIds.add(id);
+        }
+        tiedIds.delete(evidence.activityId);
+        operations[mark.ownerRequestId] = {
+          ...owner,
+          supervision: {
+            ...(owner.supervision ?? {}),
+            outsideSeen: {
+              activityId: evidence.activityId,
+              ...(tiedIds.size > 0
+                ? { alsoActivityIds: [...tiedIds].sort() }
+                : {}),
+              observedAt: mark.observedAt,
+              ...(evidence.createTime !== undefined
+                ? { createTime: evidence.createTime }
+                : {}),
+              // Stamped under this lock: a clearing walk must have begun after it.
+              observedSeq: nextSeq(journal),
+            },
+          },
+          updatedAt: mark.observedAt,
+        };
+        // Reservations already written for this session (a reply or approve
+        // between its reserve and its POST) were gated before the outside
+        // activity was seen; the pre-POST re-check reads this flag and refuses.
+        for (const r of Object.values(operations)) {
+          if (
+            r.status === 'reserved' &&
+            (r.kind === 'reply' || r.kind === 'approve') &&
+            r.sessionResource === sessionResource &&
+            r.invalidatedBy === undefined
+          ) {
+            operations[r.localRequestId] = {
+              ...r,
+              invalidatedBy: 'outside-activity',
+              updatedAt: mark.observedAt,
+            };
+          }
+        }
+      }
+      // Persist what is still held (and forget what was classified) in the
+      // same critical section, so the next walk compares writes against when
+      // each held message was first read.
+      const current =
+        mark !== undefined ? operations[mark.ownerRequestId] : undefined;
+      if (current !== undefined && mark !== undefined) {
+        const before = current.supervision?.heldActivities ?? {};
+        const beforeSeqs = current.supervision?.heldSeqs ?? {};
+        const same =
+          Object.keys(held).length === Object.keys(before).length &&
+          Object.entries(held).every(([id, at]) => before[id] === at) &&
+          Object.keys(heldSeqs).length === Object.keys(beforeSeqs).length &&
+          Object.entries(heldSeqs).every(([id, q]) => beforeSeqs[id] === q);
+        if (!same) {
+          const {
+            heldActivities: _drop,
+            heldSeqs: _dropSeqs,
+            ...rest
+          } = current.supervision ?? {};
+          operations[mark.ownerRequestId] = {
+            ...current,
+            supervision: {
+              ...rest,
+              ...(Object.keys(held).length > 0 ? { heldActivities: held } : {}),
+              ...(Object.keys(heldSeqs).length > 0 ? { heldSeqs } : {}),
+            },
+            updatedAt: mark.observedAt,
+          };
+        }
+      }
+      return newestOutside;
+    },
+    config
+  );
+}
+
+/**
+ * An earlier launch of this task under this grant that blocks a repair launch:
+ * it is paused or carries unreviewed outside activity. One predicate for the
+ * pre-reservation gate and the pre-POST re-check.
+ */
+export function blocksRepairLaunch(
+  record: OperationRecord,
+  grantId: string | undefined,
+  taskRef: string | undefined
+): boolean {
+  return (
+    record.kind === 'create' &&
+    record.grantId === grantId &&
+    record.taskRef === taskRef &&
+    (record.supervision?.paused !== undefined ||
+      record.supervision?.outsideSeen !== undefined)
+  );
+}
+
+/** A create this plugin made: the only record a grant can cover (it carries the repository, branch and source). */
+export type OwningCreate = OperationRecord & {
+  readonly repository: string;
+  readonly requestedBranch: string;
+  readonly sourceResource: string;
+};
+
+export function isOwningCreate(
+  record: OperationRecord | undefined
+): record is OwningCreate {
+  return (
+    record !== undefined &&
+    record.kind === 'create' &&
+    record.repository !== undefined &&
+    record.requestedBranch !== undefined &&
+    record.sourceResource !== undefined
+  );
 }

@@ -34,12 +34,23 @@ export interface AdapterErrorOptions {
   readonly requestId?: string;
   readonly status?: number;
   readonly cause?: unknown;
+  /**
+   * Write calls only: a mutating POST was sent before this failure. Absent or
+   * false means nothing was dispatched (pre-dispatch); the runtime maps it with
+   * the matching `CallPhase`, so a failure after dispatch can only be a clear
+   * rejection or JULES_UNKNOWN_OUTCOME (R16).
+   */
+  readonly dispatched?: boolean;
+  /** A session id known despite the failure (kept on an unknown outcome, R16). */
+  readonly sessionResource?: string;
 }
 
 export class AdapterError extends Error {
   readonly kind: AdapterErrorKind;
   readonly requestId: string | undefined;
   readonly status: number | undefined;
+  readonly dispatched: boolean;
+  readonly sessionResource: string | undefined;
 
   constructor(
     kind: AdapterErrorKind,
@@ -54,6 +65,8 @@ export class AdapterError extends Error {
     this.kind = kind;
     this.requestId = options.requestId;
     this.status = options.status;
+    this.dispatched = options.dispatched === true;
+    this.sessionResource = options.sessionResource;
   }
 }
 
@@ -79,7 +92,11 @@ export type AppErrorCode =
   | 'JULES_NO_PROGRESS'
   | 'JULES_SDK_MISSING'
   | 'JULES_SDK_INTEGRITY'
-  | 'JULES_DATA_DIR';
+  | 'JULES_DATA_DIR'
+  | 'JULES_CONTROLLER_MISMATCH'
+  | 'JULES_GRANT_EXHAUSTED'
+  | 'JULES_SUPERVISION_PAUSED'
+  | 'JULES_QUESTION_CHANGED';
 
 // replica:AppError:start
 export interface AppError {
@@ -156,7 +173,7 @@ const CODE_TABLE: Record<AppErrorCode, CodeDefaults> = {
   JULES_CONFIRMATION_REQUIRED: {
     retryable: false,
     recoveryAction:
-      'Confirm through the command wrapper, or pass a grant written by authorize.',
+      'Pass --grant-id from a grant written by authorize, or run the authorize command yourself in a terminal on the controller host.',
   },
   JULES_AUTHORITY_DENIED: {
     retryable: false,
@@ -166,7 +183,7 @@ const CODE_TABLE: Record<AppErrorCode, CodeDefaults> = {
   JULES_GRANT_EXPIRED: {
     retryable: false,
     recoveryAction:
-      'The grant or deadline expired; the remote session may still run. Stop it from the Jules console, revoke the source connection, or rotate JULES_API_KEY.',
+      'The grant expired; remote work may still run and expiry does not stop it. Contain it out of band: stop the session from the Jules console, revoke the source connection, or rotate JULES_API_KEY.',
   },
   JULES_POLICY_DEVIATION: {
     retryable: false,
@@ -201,6 +218,25 @@ const CODE_TABLE: Record<AppErrorCode, CodeDefaults> = {
     retryable: false,
     recoveryAction:
       'Make the data directory owner-only (0700), owned by you, outside any git work tree and the plugin directory, with a writable sdk-scratch/.',
+  },
+  JULES_CONTROLLER_MISMATCH: {
+    retryable: false,
+    recoveryAction:
+      'This data directory is not the authorized controller copy; follow the handoff procedure in the plugin CLAUDE.md.',
+  },
+  JULES_GRANT_EXHAUSTED: {
+    retryable: false,
+    recoveryAction: 'Create a new grant with authorize.',
+  },
+  JULES_SUPERVISION_PAUSED: {
+    retryable: false,
+    recoveryAction:
+      'Inspect the session, then run supervise --clear-pause in a terminal.',
+  },
+  JULES_QUESTION_CHANGED: {
+    retryable: false,
+    recoveryAction:
+      'The session no longer awaits the question or has the plan the pass showed; nothing was sent. Run supervise again.',
   },
 };
 
@@ -309,4 +345,76 @@ export function toAppError(err: unknown, phase: CallPhase = 'read'): AppError {
       : 'JULES_MALFORMED_RESPONSE',
     message
   );
+}
+
+/** The `CallPhase` a write failure must be mapped with: after dispatch only a clear rejection keeps its code. */
+export function phaseOfWrite(err: AdapterError): CallPhase {
+  return err.dispatched ? 'after-dispatch' : 'pre-dispatch';
+}
+
+/**
+ * An AppError that also carries what a mutating failure envelope echoes: the
+ * local request id and local id (so a reservation can be reconciled) and
+ * structured `details` (R39: `runningSessions[]` on an expired grant).
+ */
+export class MutationErrorException extends AppErrorException {
+  readonly localRequestId: string | undefined;
+  readonly localId: string | undefined;
+  readonly details: Readonly<Record<string, unknown>> | undefined;
+
+  constructor(
+    appError: AppError,
+    context: {
+      readonly localRequestId?: string;
+      readonly localId?: string;
+      readonly details?: Readonly<Record<string, unknown>>;
+    } = {}
+  ) {
+    super(appError);
+    this.name = 'MutationErrorException';
+    this.localRequestId = context.localRequestId;
+    this.localId = context.localId;
+    this.details = context.details;
+  }
+}
+
+/** Re-throws any failure with the mutation's ids attached; an existing context is kept. */
+export function rethrowWithContext(
+  err: unknown,
+  context: {
+    readonly localRequestId?: string;
+    readonly localId?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }
+): never {
+  if (err instanceof MutationErrorException) {
+    throw new MutationErrorException(err.appError, {
+      ...context,
+      ...(err.localRequestId !== undefined
+        ? { localRequestId: err.localRequestId }
+        : {}),
+      ...(err.localId !== undefined ? { localId: err.localId } : {}),
+      ...(err.details !== undefined ? { details: err.details } : {}),
+    });
+  }
+  if (err instanceof AppErrorException) {
+    throw new MutationErrorException(err.appError, context);
+  }
+  throw err;
+}
+
+/**
+ * A short, safe label for a caught error in a stderr warning: the JULES_ code
+ * for our own errors, the errno code for filesystem errors, else the error name.
+ * Never the message, which can carry paths or vendor text.
+ */
+export function errorLabel(err: unknown): string {
+  if (err instanceof AppErrorException) return err.appError.code;
+  if (err instanceof Error) {
+    const code = (err as { code?: unknown }).code;
+    return typeof code === 'string' && /^[A-Z0-9_]{1,40}$/.test(code)
+      ? code
+      : err.name;
+  }
+  return 'error';
 }

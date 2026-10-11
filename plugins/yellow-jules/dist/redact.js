@@ -15,13 +15,14 @@
  * legitimate session and activity ids the CLI must echo.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.FENCE_END = exports.FENCE_BEGIN = exports.MAX_VENDOR_ERROR_BYTES = void 0;
+exports.HIDDEN_CHARS_RE = exports.FENCE_END = exports.FENCE_BEGIN = exports.MAX_VENDOR_ERROR_BYTES = void 0;
 exports.redact = redact;
 exports.assertNoSecretShapedValues = assertNoSecretShapedValues;
 exports.redactDeep = redactDeep;
 exports.truncateRedacted = truncateRedacted;
 exports.scanSecretShapes = scanSecretShapes;
 exports.fenceUntrusted = fenceUntrusted;
+exports.fenceAltersText = fenceAltersText;
 const REDACTED = '***REDACTED***';
 const AUTHORIZATION_HEADER_RE = /authorization\s*:\s*(?:bearer\s+)?\S+/gi;
 const BEARER_TOKEN_RE = /\bBearer\s+\S+/gi;
@@ -178,3 +179,24 @@ function fenceUntrusted(text) {
         .join('\n');
     return `${exports.FENCE_BEGIN}\n${neutralized}\n${exports.FENCE_END}`;
 }
+/**
+ * True when `fenceUntrusted` shows something other than `text` (redaction,
+ * a rewritten delimiter or a `--- … ---` line; stripped carriage returns do not
+ * count). A digest bound to `text` must not be offered for such text, because
+ * the reviewer saw the rewritten version.
+ */
+function fenceAltersText(text) {
+    const fenced = fenceUntrusted(text);
+    const body = fenced.slice(exports.FENCE_BEGIN.length + 1, fenced.length - exports.FENCE_END.length - 1);
+    return body !== text.replace(/\r/g, '');
+}
+/**
+ * The hidden-character class the plan and outgoing-message previews reject
+ * (the `HIDDEN=` test in approve.md / supervise.md): controls other than tab,
+ * LF and CR, C1 controls, soft hyphen, bidi and zero-width characters, and tag
+ * characters. Keep it identical to those commands.
+ */
+// The class is the point: it must name control and combining characters.
+exports.HIDDEN_CHARS_RE = 
+// eslint-disable-next-line no-control-regex, no-misleading-character-class
+/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u00ad\u034f\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\u{e0000}-\u{e007f}]/u;

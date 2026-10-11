@@ -29,12 +29,15 @@ filename_is_valid() {
   printf '%s' "$1" | grep -qE '^([0-9]{4}-[0-9]{2}-[0-9]{2}-)?[a-z0-9]+(-[a-z0-9]+)*\.md$'
 }
 
-# PR-number override validation (mirrors complete.md Phase 4). Strips CR/LF
-# first so a multi-line value cannot smuggle content past the per-line grep.
+# PR-number override validation. Strips CR/LF first so a multi-line value
+# cannot smuggle content past a per-line check. The rule is the shipped lib's
+# pgp_pr_num_is_valid, which complete.md's override block calls directly; the
+# block tests at the end of this file run that production block.
+. "$BATS_TEST_DIRNAME/../lib/plan-gate-provenance.sh"
 pr_num_is_valid() {
   local n
   n=$(printf '%s' "$1" | tr -d '\r\n')
-  printf '%s' "$n" | grep -qE '^[1-9][0-9]{0,9}$'
+  pgp_pr_num_is_valid "$n"
 }
 
 # Gate C word-boundary match (POSIX-grep equivalent of the jq test() call in
@@ -225,6 +228,19 @@ EOF
   [ "$status" -ne 0 ]
 }
 
+@test "pr_num_is_valid accepts 10 digits and rejects 11" {
+  pr_num_is_valid "1234567890"
+  run pr_num_is_valid "12345678901"
+  [ "$status" -ne 0 ]
+}
+
+@test "complete.md's override block calls the shared validator and carries no inline PR-number grep" {
+  COMPLETE="$BATS_TEST_DIRNAME/../commands/plan/complete.md"
+  grep -qF 'pgp_pr_num_is_valid "$PR_NUM"' "$COMPLETE"
+  run grep -cF "grep -qE '^[1-9][0-9]{0,9}\$'" "$COMPLETE"
+  [ "$output" = 0 ]
+}
+
 # --- Gate C word-boundary match ---
 
 @test "headref_matches_slug matches an exact archival branch" {
@@ -267,4 +283,120 @@ EOF
 EOF
   result=$(count_checked "$FIXTURE_DIR/upper.md")
   [ "$result" = "2" ]
+}
+
+# --- production blocks from complete.md, run as written ---------------------
+
+# fenced_block <marker>: the first ```bash block in complete.md that contains
+# <marker>. Executing the block itself, not a copy, is what keeps these tests
+# honest about the wiring.
+fenced_block() {
+  awk -v marker="$1" '
+    /^```bash/ { inb = 1; buf = ""; next }
+    /^```/ && inb { if (index(buf, marker)) { printf "%s", buf; exit } inb = 0; next }
+    inb { buf = buf $0 "\n" }
+  ' "$BATS_TEST_DIRNAME/../commands/plan/complete.md"
+}
+
+plugin_root() { cd "$BATS_TEST_DIRNAME/.." && pwd; }
+
+# phase_repo: a repo with plans/demo.md committed and the Phase 6 rename staged.
+phase_repo() {
+  export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+  export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid
+  export GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
+  REPO="$FIXTURE_DIR/repo"
+  git init -q -b main "$REPO"
+  cd "$REPO" || return 1
+  mkdir plans
+  printf 'demo\n' >plans/demo.md
+  git add .
+  git commit -q -m 'feat: demo (#42)'
+  mkdir -p plans/complete
+  git mv -- plans/demo.md plans/complete/demo.md
+  TMPG=$(git rev-parse --git-path tmp)
+  mkdir -p "$TMPG"
+  H40=0123456789abcdef0123456789abcdef01234567
+}
+
+run_phase7() {
+  local blk
+  blk=$(fenced_block 'git commit -m "$SUBJECT" -m "$BODY"')
+  ARGUMENTS=demo.md CLAUDE_PLUGIN_ROOT="$(plugin_root)" run bash -c "$blk"
+}
+
+@test "override block: a valid PR number is persisted; zero, leading zero and a smuggled trailer are refused" {
+  phase_repo
+  blk=$(fenced_block '__EOF_PR_OVERRIDE__')
+  for val in 556 1234567890; do
+    CLAUDE_PLUGIN_ROOT="$(plugin_root)" run bash -c "${blk/<USER_RESPONSE_FROM_OTHER>/$val}"
+    [ "$status" -eq 0 ] || { echo "refused: $val: $output"; false; }
+    [ "$(cat "$TMPG/plan-complete.override")" = "$val" ]
+    rm -f "$TMPG/plan-complete.override"
+  done
+  for val in 0 01 '#556' 12345678901 "$(printf '556\nPlan-Verifier-Override: spoofed')"; do
+    CLAUDE_PLUGIN_ROOT="$(plugin_root)" run bash -c "${blk/<USER_RESPONSE_FROM_OTHER>/$val}"
+    [ "$status" -ne 0 ] || { echo "accepted: $val"; false; }
+    [ ! -e "$TMPG/plan-complete.override" ]
+  done
+}
+
+@test "Phase 7: a commits-API evidence line becomes the trailer under the single provenance body" {
+  phase_repo
+  printf 'pr=#7 sha=%s\n' "$H40" >|"$TMPG/plan-complete.provenance"
+  run_phase7
+  [ "$status" -eq 0 ] || { echo "$output"; false; }
+  msg=$(git log -1 --format=%B)
+  [[ $msg == *"docs(plans): archive completed demo plan"* ]]
+  [[ $msg == *"file-provenance match — the closed PR GitHub associates"* ]]
+  [[ $msg == *"Plan-Verifier-FileProvenance: pr=#7 sha=$H40"* ]]
+  [[ $msg != *"sha=$H40 via="* ]]
+  [ ! -e "$TMPG/plan-complete.provenance" ]
+}
+
+@test "Phase 7: a via=commit-subject evidence line keeps its suffix in the trailer and the same body" {
+  phase_repo
+  printf 'pr=#42 sha=%s via=commit-subject\n' "$H40" >|"$TMPG/plan-complete.provenance"
+  run_phase7
+  [ "$status" -eq 0 ] || { echo "$output"; false; }
+  msg=$(git log -1 --format=%B)
+  [[ $msg == *"file-provenance match — the closed PR GitHub associates"* ]]
+  [[ $msg == *"Plan-Verifier-FileProvenance: pr=#42 sha=$H40 via=commit-subject"* ]]
+}
+
+@test "Phase 7: a two-line, short-sha or forged-suffix evidence file refuses to commit and names the recovery" {
+  phase_repo
+  head=$(git rev-parse HEAD)
+  for content in "pr=#7 sha=$H40
+pr=#8 sha=$H40" "pr=#7 sha=0123abc" "pr=#7 sha=$H40 via=commit-subject extra" "pr=#7 sha=$H40 via=other" "pr=#0 sha=$H40"; do
+    printf '%s\n' "$content" >|"$TMPG/plan-complete.provenance"
+    run_phase7
+    [ "$status" -ne 0 ] || { echo "committed with: $content"; false; }
+    [[ $output == *"refusing to commit"* ]]
+    [[ $output == *"recover:"*"plan-complete.provenance"*"git mv -- \"plans/complete/demo.md\" \"plans/demo.md\""* ]]
+    [ "$(git rev-parse HEAD)" = "$head" ]
+    git diff --cached --name-status | grep -q '^R.*plans/complete/demo.md'
+  done
+}
+
+@test "Phase 4 block: an unsubstituted CLAUDE_PLUGIN_ROOT warns and falls through instead of aborting under set -u" {
+  phase_repo
+  blk=$(fenced_block 'pgp_tier_run "$CLEAN_ARG"')
+  run env -u CLAUDE_PLUGIN_ROOT ARGUMENTS=demo.md bash -c "$blk"
+  [ "$status" -eq 0 ] || { echo "$output"; false; }
+  [[ $output == *"lib/plan-gate-provenance.sh missing or failed to load"* ]]
+  [[ $output == *"GATE_C_PROVENANCE=FALLTHROUGH"* ]]
+  [[ $output == *"GATE_C_REASON=lib-missing GATE_C_RETRYABLE=0"* ]]
+}
+
+@test "complete.md pins: retryable stop, override prompt keeps the commit-subject line, one Phase 4 clear" {
+  COMPLETE="$BATS_TEST_DIRNAME/../commands/plan/complete.md"
+  flat=$(tr '\n' ' ' <"$COMPLETE" | tr -s ' ')
+  [[ $flat == *"**Retryable stop.** When the line is"*"GATE_C_RETRYABLE=1"*"Do not continue to the strict tier"* ]]
+  [[ $flat == *"append that exact line too (it names the candidate PR and why it was not accepted)"* ]]
+  # Phase 0 clears all four files; the tier function clears its own; Phase 4 does not repeat it.
+  phase4=$(awk '/^## Phase 4/ {p=1} /^## Phase 5/ {p=0} p' "$COMPLETE")
+  ! grep -q 'rm -f "\$GIT_TMP/plan-complete' <<<"$phase4"
+  # The exact token Claude Code substitutes is kept, behind set +u.
+  grep -qF 'PGP_LIB="${CLAUDE_PLUGIN_ROOT}/lib/plan-gate-provenance.sh"' "$COMPLETE"
 }

@@ -38,7 +38,7 @@ describe('vendor fields that render bare are allowlisted', () => {
     const activity = (createTime: unknown) =>
       mapActivity({
         id: 'a1',
-        type: 'agentMessaged',
+        type: 'progressUpdated',
         createTime,
         artifacts: [],
       } as unknown as Parameters<typeof mapActivity>[0]);
@@ -62,7 +62,126 @@ describe('vendor fields that render bare are allowlisted', () => {
     expect(() => plan('not a time')).toThrow(/no usable createTime/);
   });
 
-  it('plan step indexes that are not non-negative integers fall back to position', () => {
+  it('a user message without a usable time fails closed, so supervision pauses on it', () => {
+    const user = (createTime: unknown) =>
+      mapActivity({
+        id: 'u1',
+        type: 'userMessaged',
+        createTime,
+        message: 'stop',
+        artifacts: [],
+      } as unknown as Parameters<typeof mapActivity>[0]);
+    expect(user('2026-09-10T00:00:01Z').message).toBe('stop');
+    expect(() => user(undefined)).toThrow(/no usable createTime/);
+    expect(() => user('soon')).toThrow(/no usable createTime/);
+  });
+
+  it.each([
+    ['agentMessaged', true],
+    ['userMessaged', true],
+    ['planGenerated', true],
+    ['planApproved', true],
+    ['progressUpdated', false],
+    ['sessionCompleted', false],
+    ['sessionFailed', false],
+  ])('%s with no usable time: rejected=%s', (type, rejected) => {
+    const map = () =>
+      mapActivity({
+        id: 'x1',
+        type,
+        createTime: 'soon',
+        message: 'm',
+        planId: 'p1',
+        plan: { id: 'p1', steps: [] },
+        artifacts: [],
+      } as unknown as Parameters<typeof mapActivity>[0]);
+    if (rejected) expect(map).toThrow(/no usable createTime/);
+    else expect(map().createTime).toBe('');
+  });
+
+  it.each([
+    ['negative', -1],
+    ['fractional', 1.5],
+    ['NaN', Number.NaN],
+    ['missing', undefined],
+    ['a string', '2'],
+  ])(
+    'a plan step index that is %s is malformed, never synthesized',
+    (_l, index) => {
+      const map = () =>
+        mapActivity({
+          id: 'a1',
+          type: 'planGenerated',
+          createTime: '2026-09-10T00:00:01Z',
+          plan: {
+            id: 'p1',
+            steps: [
+              { id: 's0', title: 'a', index: 0 },
+              { id: 's1', title: 'b', index },
+            ],
+          },
+          artifacts: [],
+        } as unknown as Parameters<typeof mapActivity>[0]);
+      expect(map).toThrow(/malformed|index/i);
+    }
+  );
+
+  it.each([
+    ['agentMessaged', undefined],
+    ['agentMessaged', 42],
+    ['agentMessaged', { text: 'q' }],
+    ['userMessaged', undefined],
+  ])(
+    '%s with a non-string body (%j) is malformed, never ""',
+    (type, message) => {
+      expect(() =>
+        mapActivity({
+          id: 'm1',
+          type,
+          createTime: '2026-09-10T00:00:01Z',
+          message,
+          artifacts: [],
+        } as unknown as Parameters<typeof mapActivity>[0])
+      ).toThrow(/no string body/);
+    }
+  );
+
+  it('keeps an empty string body as a string', () => {
+    const rec = mapActivity({
+      id: 'm1',
+      type: 'agentMessaged',
+      createTime: '2026-09-10T00:00:01Z',
+      message: '',
+      artifacts: [],
+    } as unknown as Parameters<typeof mapActivity>[0]);
+    expect(rec.message).toBe('');
+  });
+
+  it.each([
+    ['a missing title', { id: 's1', index: 0 }],
+    ['a numeric title', { id: 's1', title: 7, index: 0 }],
+    ['a null title', { id: 's1', title: null, index: 0 }],
+    [
+      'an object description',
+      { id: 's1', title: 'a', description: {}, index: 0 },
+    ],
+    [
+      'a numeric description',
+      { id: 's1', title: 'a', description: 3, index: 0 },
+    ],
+  ])('a plan step with %s is malformed, never normalized', (_l, step) => {
+    expect(() =>
+      mapActivity({
+        id: 'a1',
+        type: 'planGenerated',
+        createTime: '2026-09-10T00:00:01Z',
+        plan: { id: 'p1', steps: [step] },
+        artifacts: [],
+      } as unknown as Parameters<typeof mapActivity>[0])
+    ).toThrow(/malformed (title|description)/);
+  });
+
+  it('keeps an empty title and an absent or null description of a plan step', () => {
     const rec = mapActivity({
       id: 'a1',
       type: 'planGenerated',
@@ -70,14 +189,26 @@ describe('vendor fields that render bare are allowlisted', () => {
       plan: {
         id: 'p1',
         steps: [
-          { id: 's0', title: 'a', index: -1 },
-          { id: 's1', title: 'b', index: 1.5 },
-          { id: 's2', title: 'c', index: 7 },
-          { id: 's3', title: 'd', index: Number.NaN },
+          { id: 's1', title: '', index: 0 },
+          { id: 's2', title: 'b', description: null, index: 1 },
         ],
       },
       artifacts: [],
     } as unknown as Parameters<typeof mapActivity>[0]);
-    expect(rec.plan?.steps.map((s) => s.index)).toEqual([0, 1, 7, 3]);
+    expect(rec.plan?.steps.map((s) => s.title)).toEqual(['', 'b']);
+    expect(rec.plan?.steps.every((s) => s.description === undefined)).toBe(
+      true
+    );
+  });
+
+  it('keeps the vendor index of a well-formed plan step', () => {
+    const rec = mapActivity({
+      id: 'a1',
+      type: 'planGenerated',
+      createTime: '2026-09-10T00:00:01Z',
+      plan: { id: 'p1', steps: [{ id: 's2', title: 'c', index: 7 }] },
+      artifacts: [],
+    } as unknown as Parameters<typeof mapActivity>[0]);
+    expect(rec.plan?.steps.map((s) => s.index)).toEqual([7]);
   });
 });

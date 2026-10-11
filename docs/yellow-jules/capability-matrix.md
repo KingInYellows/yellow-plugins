@@ -77,3 +77,64 @@ loading, and filesystem side effects reach `packed-artifact-tested`
 See sdk-investigation.md section 11 for the documented-versus-source table
 (readme config shape, 5xx retry scope, `history()` network use, error-class
 count, `platform.fetch` bypass, `@internal` storage factory).
+
+## Codex supervision capabilities (spec Open Question 2)
+
+Which capabilities a Codex session has when it runs the `jules-supervision`
+skill. The supervision skill's R47 report lists the capabilities a pass used and
+those this host did not offer; this table is the reference for the Codex half of
+that list.
+
+**Host:** `codex-cli 0.156.0` (`codex --version`), checked 2026-10-08 on Linux.
+
+These rows describe the _host_, not the Jules API, so they use their own labels
+instead of the vendor labels above:
+
+| Label           | Meaning                                                                                                                                             |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cli-inspected` | Read from the installed Codex CLI without a model call: `codex features list`, `codex debug prompt-input`, `codex plugin list`, or `--help` output. |
+| `not-exercised` | Not run. A feature flag or subcommand exists, but no session used it.                                                                               |
+
+| Capability a supervision pass may use                               | Codex 0.156.0                                                                                                                                                                                                                                                       | Evidence        |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| Run a shell command (the only way to reach the yellow-jules CLI)    | `shell_tool` stable, on                                                                                                                                                                                                                                             | `cli-inspected` |
+| Plugin skills discovered from a marketplace                         | `plugins` stable, on. The `yellow-plugins` marketplace lists `yellow-jules`; once installed (in an isolated `CODEX_HOME`) the model-visible prompt carries `yellow-jules:jules-delegation` and `yellow-jules:jules-supervision` with their single-line descriptions | `cli-inspected` |
+| Plugin hooks                                                        | `plugin_hooks` removed: inert, so nothing in supervision depends on a hook                                                                                                                                                                                          | `cli-inspected` |
+| Sub-agents for an independent review                                | `multi_agent` stable, on; `multi_agent_v2` stable, off                                                                                                                                                                                                              | `not-exercised` |
+| A non-interactive code review                                       | `codex review` subcommand present                                                                                                                                                                                                                                   | `not-exercised` |
+| Live web search for research                                        | `web_search_cached` and `web_search_request` deprecated, off; `standalone_web_search` in development, off — not on by default                                                                                                                                       | `cli-inspected` |
+| Browser or computer use                                             | `browser_use` and `computer_use` stable, on                                                                                                                                                                                                                         | `not-exercised` |
+| MCP research tools                                                  | `codex mcp list` showed one server (`linear`), enabled, not logged in — no research MCP is usable here                                                                                                                                                              | `cli-inspected` |
+| A host-neutral confirmation prompt (the `AskUserQuestion` analogue) | `default_mode_request_user_input` in development, off — none confirmed                                                                                                                                                                                              | `cli-inspected` |
+
+Consequences for the skills:
+
+- A supervision pass on Codex can run the CLI and read files, and nothing more
+  is assumed. Its report names "web search" and "an independent code review" as
+  unavailable unless the session proves otherwise.
+- There is no confirmation primitive to build `authorize` on. That fits the
+  grants-only decision: `authorize`, `abandon`, and `supervise --clear-pause`
+  are terminal commands the owner runs themselves, and no Codex skill wraps
+  them. Recording this against spec Open Question 4 is a spec-owner follow-up,
+  not done here.
+
+### Codex host smoke, 2026-10-08
+
+A live Codex model session was **not** run: it needs the owner's Codex login and
+a `JULES_API_KEY`, spends quota, and would install the plugin into the owner's
+real Codex configuration. What was exercised instead, with the plugin in an
+isolated `CODEX_HOME` that was removed afterwards, and the CLI run from a shell
+with no controlling terminal:
+
+| Check                                         | Result                                                                                                                                                                 |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Skill discovery                               | pass — both skills listed in the model-visible prompt                                                                                                                  |
+| `status --reconcile` with nothing outstanding | pass — `{"ok":true,"reconciled":[]}`, exit 0, no credential needed                                                                                                     |
+| Real `delegate` without a grant               | refused with `JULES_CONFIRMATION_REQUIRED`; the recovery action names the exact `authorize` command; the failure echoes `localRequestId` and `localId`; no vendor call |
+| `delegate --dry-run` without `JULES_API_KEY`  | `JULES_AUTH_FAILED` — it reads the source, so a credential is required                                                                                                 |
+| `authorize` without a controlling terminal    | refused with `JULES_CONFIRMATION_REQUIRED`; no grant and no controller file written                                                                                    |
+
+Still to do by the owner: run the two skills in a live Codex session with the
+real credential (skill selection by a model, `status` on a real session, a dry
+run, and the grantless refusal), then record the result in the PR that follows
+the R53 smoke.

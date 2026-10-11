@@ -57,7 +57,7 @@ Never use `mergedAt` alone, `merge_group` events alone, or timeline activity alo
 
 **The reliable detection stack (in order of authority):**
 
-1. **`pull_request.merged` (boolean)** — the authoritative merge flag on the PR object. If `true`, the PR merged. If `false`, it did not, regardless of what `mergedAt` says.
+1. **`pull_request.merged` (boolean)** — the authoritative flag for whether GitHub merged the PR. If `true`, the PR merged. If `false`, GitHub did not merge it, regardless of what `mergedAt` says. That is not the same as "the work did not land": Graphite's merge queue fast-forwards trunk and leaves the PR closed with `merged: false` permanently (see the note under the decision table).
 
 2. **GraphQL `mergeQueueEntry` state** — for current queue position. Use this to determine if the PR is still queued (not yet resolved), was ejected, or was merged.
 
@@ -97,6 +97,8 @@ query GetMergeQueueEntry($owner: String!, $repo: String!, $prNumber: Int!) {
 | `false` | null | null | absent | Ejected by GitHub native queue, or closed externally — check `pull_request.dequeued` webhook history |
 | `false` | null | `UNMERGEABLE` | either | Currently blocked in queue — not yet resolved |
 
+**Update 2026-10-06 — Graphite-landed PRs match the `false` / null / null / absent row.** Graphite documents that "when an enqueued PR merges, it will be marked as closed in GitHub instead of merged", because the queue updates trunk to the head commit of a temporary draft PR it built itself. Such a PR stays `merged: false` with a null `mergedAt` forever (checked on PRs #808, #846, #1029, #1030 and #1049) and its `merge_commit_sha` is a temporary merge-group commit that never reaches the repo, so that row alone cannot tell "ejected" from "landed". Tell them apart on trunk: a commit on `origin/main` whose subject ends with `(#N)` is a strong hint that PR N landed (an ejected PR never produces one), and `gh api repos/{owner}/{repo}/pulls/N/files` confirms which files PR N delivered. The subject alone is only a hint: a cherry-pick or a revert-and-re-land can carry another PR's number, so check the files too. `/plan:complete` Gate C does exactly this (see `docs/solutions/workflow/plan-lifecycle-management.md`, update 2026-10-06). `gh pr view --json merged` is not a valid field; read the flag with `gh api repos/{owner}/{repo}/pulls/{number} --jq .merged`.
+
 ## Idempotency Rule
 
 **Before any merge action** in an agent: call the GitHub API and check `pull_request.merged`. If `true`, log and exit as a no-op. Never attempt to merge an already-merged PR.
@@ -109,7 +111,7 @@ if [ "$MERGED" = "true" ]; then
 fi
 ```
 
-This check must run before enqueuing, before posting merge confirmation, and before any `gh pr merge` or `gt submit --merge-queue` call. It guards against double-merge in multi-session or restart scenarios.
+This check must run before enqueuing, before posting merge confirmation, and before any `gh pr merge` or `gt submit --merge-queue` call. It guards against double-merge in multi-session or restart scenarios. For a Graphite merge-queue PR that already landed, `merged` stays `false`, so this guard alone cannot see it; also check trunk for a commit whose subject ends with the PR's `(#N)`.
 
 ## Why This Matters
 

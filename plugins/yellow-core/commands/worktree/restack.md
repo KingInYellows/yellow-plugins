@@ -172,8 +172,9 @@ every call below; never run a call with a provider the router did not report.
 
 For `--abort`, unless `yes=1`, confirm with `AskUserQuestion`: "Abort the
 restack? With Graphite, aborting rolls back the whole restack, including
-branches that had already restacked cleanly." with options "Abort" and
-"Cancel".
+branches that had already restacked cleanly. It also aborts any git rebase of
+a stack branch in the other stack worktrees, discarding that rebase's
+in-progress work." with options "Abort" and "Cancel".
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-restack.sh" continue --provider <provider>
@@ -183,6 +184,62 @@ Use `abort` in place of `continue` for `--abort`. Both subcommands report any
 commit made in a detached worktree during the pause (SHA and a rescue line)
 before they do anything else. With no recorded restack they print "no restack
 in progress" and exit `0`; that is not a completed restack.
+
+After the provider's own abort, `--abort` also aborts a git rebase of a
+recorded stack branch in any of this stack's worktrees, not only the run
+worktree, and then restores. If one of those rebases is still in progress, it
+keeps the state (exit `31`) and restores nothing; run `--abort` again after
+that rebase can be cleared. A rebase in a worktree outside this stack is left
+alone. The state file records a random run id, and the provider's "already
+aborted" marker holds that id: only a regular, non-symlink marker whose content
+equals the current run id lets a retry skip the provider and the
+remaining-rebase check. A missing, mismatched, symlinked or legacy (id-less)
+marker is ignored, and the moved-tip check always runs, so a forged marker
+cannot hide restacked branches. If the provider's abort succeeded but its
+marker cannot be written (for example `provider-aborted` is a directory), the
+abort retries the write before any refusal and otherwise runs to the end. Every
+later refusal then reports the unwritten marker, names its path and exits `31`
+with the state kept: a stuck in-chain rebase, moved tips, a busy operation, a
+run worktree that cannot be returned, or a worktree listing failure. A
+partial restore (exit `40`) prints the same warning. The abort is also recorded
+as `phase aborted` in the state file, so `--continue` refuses (exit `31`) even
+when the marker cannot be written. Before the provider's abort runs, `--abort`
+first records `phase aborting` in the state file; if that write fails it exits
+`31` with nothing aborted, and a state left at `aborting` is treated like
+`aborted` (`--continue` refuses, a retried `--abort` finishes). Fix the marker path and run `--abort` again;
+never run `--continue`, which would treat the rolled-back stack as restacked. With a stuck rebase, clear that rebase by hand first, because
+fixing only the marker path leaves `--abort` refusing as above.
+
+If the provider has lost its record of the paused restack (Graphite's
+`.gtcontinue` or gh-stack's rebase state) while a stack branch is still
+mid-rebase, `--abort` refuses: its whole-stack rollback cannot run, and
+aborting only the paused rebase would leave branches that already restacked
+rebased. It keeps the state (exit `31`) and aborts and restores nothing. Abort
+that rebase by hand, reset any stack branch that already restacked, then run
+`--abort` again.
+
+`--abort` also refuses, with exit `31`, when no rebase is left but a stack
+branch is no longer at the commit recorded at start (a paused rebase finished
+with `git rebase --continue`). It lists each moved branch and its starting
+commit and restores nothing, printing a fix line per branch: `git reset --hard`
+in the worktree that has it checked out, else `git branch -f` (git refuses to
+force-update a checked-out branch). A `warning:` line before a `reset --hard`
+fix means that worktree has uncommitted changes the reset would discard: do
+not run that fix; show the warning and ask the user to commit or save the
+changes first. Run the fix lines, then `--abort` again, or run `--continue`
+to keep the branches.
+
+After aborting in-chain rebases, `--abort` checks the recorded start tips once
+more: a rebase abort restores that rebase's own starting tip, which can put a
+stack branch back on its restacked commit. If any branch moved, it exits `31`
+with the same fix lines and keeps the state; it never resets branches itself.
+The provider abort has already succeeded there (a valid marker), so
+`--continue` is refused: reset the branches and run `--abort` again, or run
+`restore` to keep them where they are, put the worktrees back and clear the
+state.
+
+`--continue` refuses with exit `31` once the provider's abort has succeeded
+(a valid marker) but the abort cleanup is unfinished; run `--abort` to finish.
 
 ## Recovery
 
@@ -220,7 +277,7 @@ the `git worktree unlock` line to run after restoring it).
 | `10` | Paused on a conflict | List the conflicted files and, for Graphite, the detached, locked worktrees. Do not commit in a detached worktree. Resolve the files, `git add` them, then `/worktree:restack --continue` (or `--abort`) |
 | `20` | Preflight refused | Show the `REFUSE` reasons; nothing was touched |
 | `30` | Restack failed, nothing left detached | Worktrees were restored (or nothing had changed yet); show the provider output |
-| `31` | A step failed and the state is kept | Worktrees may still be detached. Run `--status`, then `--continue`, `--abort` or the Recovery `restore` call |
+| `31` | A step failed and the state is kept | Worktrees may still be detached, or an in-chain rebase is still in progress. Run `--status`, then `--continue`, `--abort` or the Recovery `restore` call |
 | `40` | Restore did not finish; state kept | Follow the script's own reason. A GitHub restack still paused means `--continue` or `--abort` (nothing is detached). Otherwise some worktree is still detached: show each per-entry line and its `checkout` fix, then re-run `--continue` or `--abort` |
 | `50` | Restack incomplete | The ancestry check found a branch that was not restacked; worktrees are restored and nothing was submitted |
 | `60` | Submit failed | The restack and restore are done; re-run `/worktree:restack --submit` (the restack is then a no-op and it only submits) |

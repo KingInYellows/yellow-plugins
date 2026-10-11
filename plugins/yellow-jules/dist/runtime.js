@@ -2,13 +2,13 @@
 /**
  * Operation layer: one exported async function per CLI subcommand, each
  * taking a RuntimeDeps bag (the adapter factory is injected so tests use
- * fake-sdk.ts) plus its own already-parsed args. cli.ts is the only caller —
- * it owns argv, the JSON envelope, and exit codes; this module owns the
+ * fake-sdk.ts) plus its own already-parsed args. cli.ts and supervise.ts are the
+ * callers — cli.ts owns argv, the JSON envelope, and exit codes; this module owns the
  * contract rules.
  *
- * PR2 ships reads only (`setup`, `list`, `status`, `collect`). No function
- * here issues a vendor-mutating request; `delegate`, `reply`, and `approve`
- * arrive with `authorize` in PR3 (contract "Open Question 6, decided").
+ * This module holds the reads (`setup`, `list`, `status`, `collect`) and issues
+ * no vendor-mutating request. The grant-gated writes live in mutations.ts, the
+ * supervision pass in supervise.ts, and reconcile in reconcile.ts.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -44,8 +44,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.StagingBuffer = exports.AGGREGATE_ARTIFACT_CAP_BYTES = exports.LIST_MAX_LIMIT = exports.LIST_DEFAULT_LIMIT = exports.SOURCES_PROBE_PAGE_SIZE = exports.UNSUPPORTED_CAPABILITIES = exports.REAL_CLOCK = void 0;
-exports.conditionOf = conditionOf;
+exports.StagingBuffer = exports.AGGREGATE_ARTIFACT_CAP_BYTES = exports.LIST_MAX_LIMIT = exports.LIST_DEFAULT_LIMIT = exports.SOURCES_PROBE_PAGE_SIZE = exports.UNSUPPORTED_CAPABILITIES = exports.withAdapter = exports.resolveSessionResource = exports.REAL_CLOCK = exports.read = exports.prepare = exports.nowFn = exports.conditionOf = exports.checkPolicyDeviation = exports.boundRecord = exports.attentionOf = void 0;
 exports.unsupportedCapability = unsupportedCapability;
 exports.setup = setup;
 exports.list = list;
@@ -59,87 +58,24 @@ const activity_walk_js_1 = require("./activity-walk.js");
 const config_js_1 = require("./config.js");
 const deadline_js_1 = require("./deadline.js");
 const errors_js_1 = require("./errors.js");
+const reconcile_js_1 = require("./reconcile.js");
 const redact_js_1 = require("./redact.js");
+const runtime_support_js_1 = require("./runtime-support.js");
 const sdk_resolver_js_1 = require("./sdk-resolver.js");
+const slot_release_js_1 = require("./slot-release.js");
 const state_js_1 = require("./state.js");
 const validate_js_1 = require("./validate.js");
-exports.REAL_CLOCK = {
-    now: () => Date.now(),
-    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-};
-function nowFn(deps) {
-    return () => new Date(deps.clock.now());
-}
-function prepare(deps) {
-    (0, config_js_1.prepareDataDir)(deps.dataDir, {
-        pluginRoot: deps.pluginRoot ?? (0, config_js_1.resolvePluginRoot)(),
-        cwd: deps.cwd ?? process.cwd(),
-    });
-}
-/** Every vendor read goes through one adapter per invocation, closed (scratch tripwire) before returning. */
-async function withAdapter(deps, fn) {
-    const adapter = await deps.adapterFactory();
-    let result;
-    try {
-        result = await fn(adapter);
-    }
-    catch (err) {
-        try {
-            await adapter.close();
-        }
-        catch (closeErr) {
-            // A scratch-tripwire violation is the more severe invariant failure; it outranks the operation's own error.
-            if (closeErr instanceof errors_js_1.AppErrorException &&
-                closeErr.appError.code === 'JULES_SDK_INTEGRITY')
-                throw closeErr;
-        }
-        throw err;
-    }
-    await adapter.close();
-    return result;
-}
-/** Adapter failures on a read are mapped with the pre-dispatch/read column; nothing here is after dispatch. */
-async function read(deps, deadline, fn) {
-    if ((0, deadline_js_1.isExpired)(deps.clock, deadline)) {
-        return (0, errors_js_1.throwAppError)('JULES_DEADLINE_EXCEEDED', 'the operation deadline expired before the read', {
-            recoveryAction: 'Retry with a larger --deadline-ms.',
-        });
-    }
-    try {
-        return await (0, deadline_js_1.withReadRetry)(fn, { clock: deps.clock, deadline });
-    }
-    catch (err) {
-        if (err instanceof errors_js_1.AdapterError) {
-            const app = (0, errors_js_1.mapAdapterError)(err, 'read');
-            return (0, errors_js_1.throwAppError)(app.code, app.message, {
-                ...(app.requestId !== undefined ? { requestId: app.requestId } : {}),
-            });
-        }
-        throw err;
-    }
-}
-// ---------------------------------------------------------------------------
-// Status vocabulary (R10) and the attention envelope
-// ---------------------------------------------------------------------------
-const CONDITION_BY_STATE = Object.freeze({
-    queued: 'starting',
-    planning: 'starting',
-    awaitingPlanApproval: 'awaiting-approval',
-    awaitingUserFeedback: 'awaiting-reply',
-    inProgress: 'working',
-    paused: 'paused',
-    failed: 'failed',
-    completed: 'remote-completed',
-});
-/** Unknown states — including `unspecified` — are never placed in a completed bucket. */
-function conditionOf(vendorState) {
-    return Object.prototype.hasOwnProperty.call(CONDITION_BY_STATE, vendorState)
-        ? CONDITION_BY_STATE[vendorState]
-        : 'needs-inspection';
-}
-function attentionOf(flags) {
-    return flags.length > 0 ? { requiresAttention: true, attention: flags } : {};
-}
+var runtime_support_js_2 = require("./runtime-support.js");
+Object.defineProperty(exports, "attentionOf", { enumerable: true, get: function () { return runtime_support_js_2.attentionOf; } });
+Object.defineProperty(exports, "boundRecord", { enumerable: true, get: function () { return runtime_support_js_2.boundRecord; } });
+Object.defineProperty(exports, "checkPolicyDeviation", { enumerable: true, get: function () { return runtime_support_js_2.checkPolicyDeviation; } });
+Object.defineProperty(exports, "conditionOf", { enumerable: true, get: function () { return runtime_support_js_2.conditionOf; } });
+Object.defineProperty(exports, "nowFn", { enumerable: true, get: function () { return runtime_support_js_2.nowFn; } });
+Object.defineProperty(exports, "prepare", { enumerable: true, get: function () { return runtime_support_js_2.prepare; } });
+Object.defineProperty(exports, "read", { enumerable: true, get: function () { return runtime_support_js_2.read; } });
+Object.defineProperty(exports, "REAL_CLOCK", { enumerable: true, get: function () { return runtime_support_js_2.REAL_CLOCK; } });
+Object.defineProperty(exports, "resolveSessionResource", { enumerable: true, get: function () { return runtime_support_js_2.resolveSessionResource; } });
+Object.defineProperty(exports, "withAdapter", { enumerable: true, get: function () { return runtime_support_js_2.withAdapter; } });
 exports.UNSUPPORTED_CAPABILITIES = Object.freeze({
     cancel: {
         supported: false,
@@ -168,7 +104,7 @@ function unsupportedCapability(name) {
 // ---------------------------------------------------------------------------
 exports.SOURCES_PROBE_PAGE_SIZE = 20;
 async function setup(deps, args) {
-    prepare(deps);
+    (0, runtime_support_js_1.prepare)(deps);
     const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, args.deadlineMs ?? deadline_js_1.DEFAULT_READ_DEADLINE_MS);
     const credentialSource = (0, config_js_1.hasEnvApiKey)(deps.env)
         ? 'env'
@@ -195,7 +131,7 @@ async function setup(deps, args) {
         sourcesReachable = { supported: false, reason: 'JULES_API_KEY is not set' };
     }
     else {
-        const page = await withAdapter(deps, (adapter) => read(deps, deadline, () => adapter.listSources({ pageSize: exports.SOURCES_PROBE_PAGE_SIZE })));
+        const page = await (0, runtime_support_js_1.withAdapter)(deps, (adapter) => (0, runtime_support_js_1.read)(deps, deadline, () => adapter.listSources({ pageSize: exports.SOURCES_PROBE_PAGE_SIZE })));
         sourcesReachable =
             page.unsupportedReason !== undefined
                 ? { supported: false, reason: page.unsupportedReason }
@@ -224,7 +160,7 @@ async function setup(deps, args) {
             : {}),
         ...(args.installSdk ? { installed: true } : {}),
         sourcesReachable,
-        ...attentionOf(flags),
+        ...(0, runtime_support_js_1.attentionOf)(flags),
     };
 }
 // ---------------------------------------------------------------------------
@@ -233,13 +169,13 @@ async function setup(deps, args) {
 exports.LIST_DEFAULT_LIMIT = 20;
 exports.LIST_MAX_LIMIT = 100;
 async function list(deps, args) {
-    prepare(deps);
+    (0, runtime_support_js_1.prepare)(deps);
     const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, args.deadlineMs ?? deadline_js_1.DEFAULT_READ_DEADLINE_MS);
     const journal = await (0, state_js_1.readJournal)(deps.dataDir);
     const pageToken = args.pageToken !== undefined
         ? (0, validate_js_1.validatePageToken)(args.pageToken, 'input')
         : undefined;
-    const page = await withAdapter(deps, (adapter) => read(deps, deadline, () => adapter.listSessions({
+    const page = await (0, runtime_support_js_1.withAdapter)(deps, (adapter) => (0, runtime_support_js_1.read)(deps, deadline, () => adapter.listSessions({
         pageSize: args.limit ?? exports.LIST_DEFAULT_LIMIT,
         ...(pageToken !== undefined ? { pageToken } : {}),
     })));
@@ -254,12 +190,13 @@ async function list(deps, args) {
             ...(localId !== undefined ? { localId } : {}),
             sessionResource: s.sessionResource,
             vendorState: s.vendorState,
-            condition: conditionOf(s.vendorState),
+            condition: (0, runtime_support_js_1.conditionOf)(s.vendorState),
             title: tag.title,
             ...(s.createTime !== undefined ? { createTime: s.createTime } : {}),
         };
     });
     const journalOnly = Object.values(journal.operations)
+        .filter(state_js_1.ownsSession)
         .filter((r) => r.sessionResource === undefined || !onPage.has(r.sessionResource))
         .map((r) => ({
         localId: r.localId,
@@ -277,61 +214,6 @@ async function list(deps, args) {
         ...(nextPageToken !== undefined ? { nextPageToken } : {}),
         journalOnly,
     };
-}
-// ---------------------------------------------------------------------------
-// shared: session resolution and the R13 policy check
-// ---------------------------------------------------------------------------
-function resolveSessionResource(journal, ref) {
-    const parsed = (0, validate_js_1.parseSessionRef)(ref);
-    if (parsed.kind === 'resource')
-        return parsed.sessionResource;
-    const record = (0, state_js_1.findByLocalId)(journal, parsed.localId);
-    if (record === undefined) {
-        return (0, errors_js_1.throwAppError)('JULES_NOT_FOUND', `no journal record for local id ${parsed.localId}`);
-    }
-    if (record.sessionResource === undefined) {
-        return (0, errors_js_1.throwAppError)('JULES_NOT_FOUND', `local id ${parsed.localId} has no bound session yet`, {
-            recoveryAction: 'Run status --reconcile to bind or release the reservation.',
-        });
-    }
-    return record.sessionResource;
-}
-async function boundRecord(deps, journal, sessionResource) {
-    return ((0, state_js_1.findBySessionResource)(journal, sessionResource) ??
-        (await (0, state_js_1.ensureObservedRecord)(deps.dataDir, sessionResource, nowFn(deps))));
-}
-/**
- * R13: a vendor PR on a session whose create requested `autoPr: false` is a
- * policy deviation. Independently of that request, a PR value that fails
- * `validatePullRequestUrl` is always a deviation (contract: invalid values are
- * reported as `policy-deviation`). The reason carries only the validator's
- * fixed reason string; the vendor-writable URL is never echoed.
- */
-async function checkPolicyDeviation(deps, record, session) {
-    let current = record;
-    for (const output of session.outputs) {
-        if (output.type !== 'pullRequest')
-            continue;
-        const source = record.sourceResource ?? session.sourceResource;
-        const check = source !== undefined
-            ? (0, validate_js_1.validatePullRequestUrl)(output.url, source)
-            : { valid: false, reason: 'session source unknown' };
-        if (!check.valid) {
-            current = await (0, state_js_1.recordDeviation)(deps.dataDir, record.localRequestId, {
-                kind: 'policy-deviation',
-                reason: `vendor pull request reference failed validation: ${check.reason}`,
-            }, nowFn(deps));
-            continue;
-        }
-        if (record.autoPrRequested !== false)
-            continue;
-        current = await (0, state_js_1.recordDeviation)(deps.dataDir, record.localRequestId, {
-            kind: 'policy-deviation',
-            reason: 'vendor pull request observed on a session created with autoPr: false',
-            prUrl: check.url,
-        }, nowFn(deps));
-    }
-    return current;
 }
 function renderOutputs(session) {
     return session.outputs.map((output) => {
@@ -362,26 +244,6 @@ function optionalBaseCommit(value) {
         return undefined;
     }
 }
-/**
- * PR2 has no `delegate`, so no reservation is reachable and `--reconcile`
- * normally returns `reconciled: []`. A hand-planted unresolved record is
- * reported as `not-reached` rather than silently ignored: the reconcile
- * walk ships with `delegate` in PR3.
- */
-function reconcileInPr2(journal, sessionResource) {
-    return Object.values(journal.operations)
-        .filter((r) => state_js_1.UNRESOLVED_STATUSES.has(r.status))
-        .filter((r) => sessionResource === undefined || r.sessionResource === sessionResource)
-        .map((r) => ({
-        localRequestId: r.localRequestId,
-        kind: r.kind,
-        outcome: 'not-reached',
-        reason: 'reconcile ships with delegate in PR3',
-        ...(r.sessionResource !== undefined
-            ? { sessionResource: r.sessionResource }
-            : {}),
-    }));
-}
 function walkStartFor(record, token) {
     const watermark = record.lastActivityCreateTime !== undefined &&
         record.lastActivityId !== undefined
@@ -400,32 +262,76 @@ function walkStartFor(record, token) {
     }
     return watermark ?? { kind: 'session-start' };
 }
+/**
+ * R32: a user message none of this plugin sent is recorded the moment ANY walk
+ * sees it, because `status` advances the watermark and the dedup ring and
+ * `supervise` would otherwise never see the message as new. `supervise` pauses
+ * on the record. Only sessions this plugin created have a digest set to compare
+ * against.
+ */
+async function recordOutsideActivity(deps, record, messages, walkComplete, walkStartedAt, walkSeq) {
+    const pending = [];
+    if (messages.length === 0 || record.kind !== 'create')
+        return new Set();
+    if (record.sessionResource === undefined)
+        return new Set();
+    await (0, state_js_1.claimOwnEchoes)(deps.dataDir, record.sessionResource, messages, {
+        ownerRequestId: record.localRequestId,
+        observedAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString(),
+        walkStartedAt,
+        walkSeq,
+    }, pending, walkComplete);
+    return new Set(pending);
+}
+/** Redacts plan text for persistence and marks a plan redaction changed, so supervision never offers it. */
+function redactedPlan(plan) {
+    const redacted = (0, redact_js_1.redactDeep)(plan);
+    return JSON.stringify(redacted) === JSON.stringify(plan)
+        ? redacted
+        : { ...redacted, redacted: true };
+}
 async function status(deps, args) {
     if (args.session === undefined && !args.reconcile) {
         return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', '--session is required unless --reconcile is given');
     }
-    prepare(deps);
+    (0, runtime_support_js_1.prepare)(deps);
     const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, args.deadlineMs ?? deadline_js_1.DEFAULT_READ_DEADLINE_MS);
-    const journal = await (0, state_js_1.readJournal)(deps.dataDir);
+    let journal = await (0, state_js_1.readJournal)(deps.dataDir);
     const sessionResource = args.session !== undefined
-        ? resolveSessionResource(journal, args.session)
+        ? (0, runtime_support_js_1.resolveSessionResource)(journal, args.session)
         : undefined;
     const reconciled = args.reconcile
-        ? reconcileInPr2(journal, sessionResource)
+        ? await (0, reconcile_js_1.reconcile)(deps, journal, sessionResource, deadline)
         : undefined;
+    // A reconcile may have bound a reservation to its session; look it up fresh.
+    if (reconciled !== undefined && reconciled.length > 0) {
+        journal = await (0, state_js_1.readJournal)(deps.dataDir);
+    }
     const reconcileFlags = (reconciled ?? [])
-        .filter((r) => r.outcome !== 'bound' && r.outcome !== 'released')
-        .map((r) => `reconciled:${r.outcome}`);
+        .filter((r) => (r.outcome !== 'bound' && r.outcome !== 'released') ||
+        r.slotStuck === true ||
+        r.slotReleaseSkipped === true ||
+        r.policyDeviation === true)
+        .map((r) => r.slotStuck === true
+        ? 'reconciled:slotStuck'
+        : r.slotReleaseSkipped === true
+            ? 'reconciled:slotReleaseSkipped'
+            : r.policyDeviation === true
+                ? 'reconciled:policyDeviation'
+                : `reconciled:${r.outcome}`);
     if (sessionResource === undefined) {
         return {
             operation: 'status',
             reconciled: reconciled ?? [],
-            ...attentionOf(reconcileFlags),
+            ...((reconciled ?? []).some((r) => r.outcome === 'policy-deviation' || r.policyDeviation === true)
+                ? { policyDeviation: true }
+                : {}),
+            ...(0, runtime_support_js_1.attentionOf)(reconcileFlags),
         };
     }
-    return withAdapter(deps, async (adapter) => {
-        const session = await read(deps, deadline, () => adapter.getSession(sessionResource));
-        let record = await boundRecord(deps, journal, sessionResource);
+    return (0, runtime_support_js_1.withAdapter)(deps, async (adapter) => {
+        const session = await (0, runtime_support_js_1.read)(deps, deadline, () => adapter.getSession(sessionResource));
+        let record = await (0, runtime_support_js_1.boundRecord)(deps, journal, sessionResource);
         const watermark = record.lastActivityCreateTime !== undefined &&
             record.lastActivityId !== undefined
             ? {
@@ -433,6 +339,13 @@ async function status(deps, args) {
                 activityId: record.lastActivityId,
             }
             : undefined;
+        const newUserMessages = [];
+        // A complete walk vouches only for what it could see when it began: a
+        // pause or outside marker recorded while it ran must postdate the stamp.
+        const walkStartedAt = (0, runtime_support_js_1.nowFn)(deps)().toISOString();
+        // The sequence orders this walk against writes and pauses exactly; the
+        // timestamp above is for display (two events can share a millisecond).
+        const walkSeq = await (0, state_js_1.takeSeq)(deps.dataDir);
         const walk = await (0, activity_walk_js_1.walkActivities)({
             adapter,
             sessionResource,
@@ -448,6 +361,19 @@ async function status(deps, args) {
             ...(record.resumeApproval !== undefined
                 ? { approval: record.resumeApproval }
                 : {}),
+            onActivity: (activity, info) => {
+                if (info.unseen &&
+                    activity.type === 'userMessaged' &&
+                    activity.message !== undefined) {
+                    newUserMessages.push({
+                        activityId: activity.activityId,
+                        digest: (0, state_js_1.messageDigest)(activity.message),
+                        createTime: activity.createTime,
+                        observedAt: (0, runtime_support_js_1.nowFn)(deps)().toISOString(),
+                    });
+                }
+                args.observer?.(activity, info);
+            },
         });
         // Restart guard: a stored token the vendor rejected, or one that yielded
         // nothing new, is discarded; the second consecutive such restart fails.
@@ -465,7 +391,7 @@ async function status(deps, args) {
                 ? 0
                 : record.resumeRestartCount;
         if (restarted && restartCount >= 2) {
-            await (0, state_js_1.upsertReadState)(deps.dataDir, record.localRequestId, { resumePageToken: null, resumeRestartCount: restartCount }, nowFn(deps));
+            await (0, state_js_1.upsertReadState)(deps.dataDir, record.localRequestId, { resumePageToken: null, resumeRestartCount: restartCount }, (0, runtime_support_js_1.nowFn)(deps));
             return (0, errors_js_1.throwAppError)('JULES_NO_PROGRESS', `two consecutive activity walks for ${sessionResource} restarted without advancing`);
         }
         const { ring, dedupWindowExceeded } = (0, activity_walk_js_1.nextRing)(record.recentActivityIds, walk);
@@ -475,24 +401,39 @@ async function status(deps, args) {
             (watermark === undefined || (0, activity_walk_js_1.compareStamp)(walk.newest, watermark) > 0);
         const resumePageToken = walk.complete || noProgress ? null : (walk.resumePageToken ?? null);
         const vendorState = session.vendorState;
-        const condition = conditionOf(vendorState);
+        const condition = (0, runtime_support_js_1.conditionOf)(vendorState);
+        // Record outside evidence BEFORE the watermark/dedup ring advances: a
+        // failure between the two then leaves the message re-detectable on the
+        // next walk instead of lost (the write gate also sees outsideSeen first).
+        // Messages only an in-flight (dispatched, unsettled) reply could explain are
+        // held back: neither the watermark nor the ring may pass them, so the next
+        // walk classifies them once the write has settled.
+        const held = await recordOutsideActivity(deps, record, newUserMessages, walk.complete, walkStartedAt, walkSeq);
+        const heldBack = held.size > 0;
         record = await (0, state_js_1.upsertReadState)(deps.dataDir, record.localRequestId, {
             vendorState,
             condition,
-            ...(advance && walk.newest !== undefined
+            ...(advance && !heldBack && walk.newest !== undefined
                 ? { watermark: walk.newest }
                 : {}),
-            resumePageToken,
+            resumePageToken: heldBack ? null : resumePageToken,
             // A partial walk keeps the newest approval it read so the resumed walk
             // can pair it with the older plan; otherwise it is dropped.
-            resumeApproval: resumePageToken !== null && walk.latestApproval !== undefined
+            resumeApproval: !heldBack &&
+                resumePageToken !== null &&
+                walk.latestApproval !== undefined
                 ? walk.latestApproval
                 : null,
-            recentActivityIds: ring,
-            activityCountDelta: walk.newIds.length,
+            // A walk that holds a message back has not classified it: stamping it
+            // complete would let clearPause forget an older pause over that message.
+            ...(walk.complete && !heldBack
+                ? { completeWalkAt: walkStartedAt, completeWalkSeq: walkSeq }
+                : {}),
+            recentActivityIds: ring.filter((id) => !held.has(id)),
+            activityCountDelta: walk.newIds.filter((id) => !held.has(id)).length,
             // The walk ran unlocked: rebase against the journal record as it is
             // when the update lands, so an overlapping status is not double-counted.
-            newActivityIds: walk.newIds,
+            newActivityIds: walk.newIds.filter((id) => !held.has(id)),
             rebase: {
                 ring: record.recentActivityIds,
                 ...(record.pendingPlan !== undefined
@@ -502,17 +443,32 @@ async function status(deps, args) {
                     ? { approval: record.resumeApproval }
                     : {}),
             },
+            ...(walk.generatedPlan !== undefined
+                ? { generatedPlan: walk.generatedPlan }
+                : {}),
             ...(walk.pendingPlan !== record.pendingPlan
                 ? {
                     // Plan text is vendor-writable: redacted before it is persisted.
-                    pendingPlan: walk.pendingPlan == null ? null : (0, redact_js_1.redactDeep)(walk.pendingPlan),
+                    pendingPlan: walk.pendingPlan == null
+                        ? null
+                        : redactedPlan(walk.pendingPlan),
                 }
                 : {}),
             resumeRestartCount: restartCount,
-        }, nowFn(deps));
-        record = await checkPolicyDeviation(deps, record, session);
+        }, (0, runtime_support_js_1.nowFn)(deps));
+        record = await (0, runtime_support_js_1.checkPolicyDeviation)(deps, record, session);
         const policyDeviation = (0, state_js_1.hasUnreconciledDeviation)(record);
+        // A session observed in a terminal vendor state no longer holds its
+        // grant's active-session slot (tasks and corrective rounds stay spent).
+        // status is a read command: a failed release keeps the slot held, which
+        // only makes the grant stricter, and is reported instead of thrown.
+        const slotRelease = await (0, slot_release_js_1.releaseTerminalSlot)(deps, record, vendorState);
+        const slotStuck = slotRelease === 'stuck';
         const flags = [];
+        if (slotStuck)
+            flags.push('slotStuck');
+        if (slotRelease === 'skipped')
+            flags.push('slotReleaseSkipped');
         if (walk.partialPagination)
             flags.push('partialPagination');
         if (walk.unmappedActivity)
@@ -538,6 +494,9 @@ async function status(deps, args) {
                 partialPagination: walk.partialPagination,
                 dedupWindowExceeded,
                 unmappedActivity: walk.unmappedActivity,
+                ...(walk.partialPagination && walk.stopReason !== undefined
+                    ? { stopReason: walk.stopReason }
+                    : {}),
                 ...(record.resumePageToken !== undefined
                     ? { resumePageToken: record.resumePageToken }
                     : {}),
@@ -548,7 +507,7 @@ async function status(deps, args) {
             outputs: renderOutputs(session),
             ...(policyDeviation ? { policyDeviation: true } : {}),
             ...(reconciled !== undefined ? { reconciled } : {}),
-            ...attentionOf(flags),
+            ...(0, runtime_support_js_1.attentionOf)(flags),
         };
     });
 }
@@ -649,15 +608,40 @@ function readManifestArtifacts(dir, sourceResource) {
             ...(a.kind === 'generated-file' && typeof a.vendorPath === 'string'
                 ? { vendorPath: (0, redact_js_1.redact)(a.vendorPath) }
                 : {}),
+            ...(a.kind === 'generated-file' &&
+                typeof a.vendorPathDigest === 'string' &&
+                /^[0-9a-f]{64}$/.test(a.vendorPathDigest)
+                ? { vendorPathDigest: a.vendorPathDigest }
+                : {}),
             secretShapedContent: (0, redact_js_1.scanSecretShapes)(content),
             verification: 'unverified',
         });
     }
     return out;
 }
-/** Dedupe key for a staged generated file; `safeVendorPath` is already redacted. */
-function generatedKey(digest, safeVendorPath) {
-    return `${digest}:${safeVendorPath}`;
+/**
+ * Dedupe keys for a staged generated file. Identity is the content digest plus
+ * the digest of the RAW vendor path, so two paths that redact to the same
+ * string stay distinct. An entry staged before path digests existed has only
+ * the redacted path, so it is matched by the legacy key.
+ */
+function generatedKey(digest, vendorPathDigest) {
+    return `${digest}:${vendorPathDigest}`;
+}
+function legacyGeneratedKey(digest, safeVendorPath) {
+    return `${digest}:legacy:${safeVendorPath}`;
+}
+/** Records a staged entry as seen under whichever key identifies it. */
+function markGeneratedSeen(seen, a) {
+    if (a.sha256 === undefined)
+        return;
+    seen.add(a.vendorPathDigest !== undefined
+        ? generatedKey(a.sha256, a.vendorPathDigest)
+        : legacyGeneratedKey(a.sha256, a.vendorPath ?? ''));
+}
+function isGeneratedSeen(seen, contentDigest, vendorPath) {
+    return (seen.has(generatedKey(contentDigest, sha256(vendorPath))) ||
+        seen.has(legacyGeneratedKey(contentDigest, (0, redact_js_1.redact)(vendorPath))));
 }
 function countFiles(dir) {
     try {
@@ -691,9 +675,8 @@ class Stager {
             this.artifacts.push(prior);
             if (prior.kind === 'patch' && prior.sha256 !== undefined)
                 this.seenDigests.add(prior.sha256);
-            if (prior.kind === 'generated-file' && prior.sha256 !== undefined) {
-                this.seenGenerated.add(generatedKey(prior.sha256, prior.vendorPath ?? ''));
-            }
+            if (prior.kind === 'generated-file')
+                markGeneratedSeen(this.seenGenerated, prior);
             if (prior.kind === 'pr-ref' && prior.prUrl !== undefined)
                 this.seenPrs.add(prior.prUrl);
         }
@@ -749,10 +732,10 @@ class Stager {
         // reported as skipped (which would set partialStaging for nothing).
         const digest = sha256(content);
         const safeVendorPath = (0, redact_js_1.redact)(vendorPath);
-        const key = generatedKey(digest, safeVendorPath);
-        if (this.seenGenerated.has(key))
+        const vendorPathDigest = sha256(vendorPath);
+        if (isGeneratedSeen(this.seenGenerated, digest, vendorPath))
             return;
-        this.seenGenerated.add(key);
+        this.seenGenerated.add(generatedKey(digest, vendorPathDigest));
         const bytes = Buffer.byteLength(content, 'utf8');
         if (this.overCap(bytes)) {
             this.skipped.push({
@@ -772,6 +755,7 @@ class Stager {
             path: rel,
             sha256: digest,
             vendorPath: safeVendorPath,
+            vendorPathDigest,
             secretShapedContent: (0, redact_js_1.scanSecretShapes)(content),
             verification: 'unverified',
         });
@@ -820,7 +804,7 @@ class StagingBuffer {
             if (a.kind === 'patch')
                 this.seenPatches.add(a.sha256);
             else if (a.kind === 'generated-file')
-                this.seenGenerated.add(generatedKey(a.sha256, a.vendorPath ?? ''));
+                markGeneratedSeen(this.seenGenerated, a);
         }
     }
     /** Bytes of artifact bodies currently retained. */
@@ -847,10 +831,10 @@ class StagingBuffer {
         this.pending.push((s) => s.patch(unidiffPatch, baseCommitId));
     }
     generated(vendorPath, content) {
-        const key = generatedKey(sha256(content), (0, redact_js_1.redact)(vendorPath));
-        if (this.seenGenerated.has(key))
+        const contentDigest = sha256(content);
+        if (isGeneratedSeen(this.seenGenerated, contentDigest, vendorPath))
             return;
-        this.seenGenerated.add(key);
+        this.seenGenerated.add(generatedKey(contentDigest, sha256(vendorPath)));
         const bytes = Buffer.byteLength(content, 'utf8');
         if (this.buffered + bytes > this.capBytes) {
             this.pending.push((s) => s.skipped.push({
@@ -869,14 +853,14 @@ class StagingBuffer {
 }
 exports.StagingBuffer = StagingBuffer;
 async function collect(deps, args) {
-    prepare(deps);
+    (0, runtime_support_js_1.prepare)(deps);
     const deadline = (0, deadline_js_1.deadlineIn)(deps.clock, args.deadlineMs ?? deadline_js_1.DEFAULT_COLLECT_DEADLINE_MS);
     const journal = await (0, state_js_1.readJournal)(deps.dataDir);
-    const sessionResource = resolveSessionResource(journal, args.session);
-    return withAdapter(deps, async (adapter) => {
-        const session = await read(deps, deadline, () => adapter.getSession(sessionResource));
-        let record = await boundRecord(deps, journal, sessionResource);
-        record = await checkPolicyDeviation(deps, record, session);
+    const sessionResource = (0, runtime_support_js_1.resolveSessionResource)(journal, args.session);
+    return (0, runtime_support_js_1.withAdapter)(deps, async (adapter) => {
+        const session = await (0, runtime_support_js_1.read)(deps, deadline, () => adapter.getSession(sessionResource));
+        let record = await (0, runtime_support_js_1.boundRecord)(deps, journal, sessionResource);
+        record = await (0, runtime_support_js_1.checkPolicyDeviation)(deps, record, session);
         // Staging path derives from the local id only (R40); never from vendor data.
         const artifactsRoot = (0, config_js_1.resolveArtifactsDir)(deps.dataDir);
         (0, config_js_1.ensureOwnerOnlyDir)(artifactsRoot);
@@ -951,7 +935,7 @@ async function collect(deps, args) {
             sessionResource,
             collectedAt,
         }));
-        record = await (0, state_js_1.recordArtifacts)(deps.dataDir, record.localRequestId, journalArtifacts, nowFn(deps));
+        record = await (0, state_js_1.recordArtifacts)(deps.dataDir, record.localRequestId, journalArtifacts, (0, runtime_support_js_1.nowFn)(deps));
         // Restart guard, as in `status`: a stored token the vendor rejected, or one
         // whose walk read pages, found nothing new, and handed back the same token,
         // is discarded so the next collect restarts from the session beginning; the
@@ -979,7 +963,7 @@ async function collect(deps, args) {
         // failed before reading keeps it (the walk returns it as resumePageToken).
         walk.complete || noProgress || exhausted
             ? null
-            : (walk.resumePageToken ?? null), nowFn(deps), undefined, restartCount);
+            : (walk.resumePageToken ?? null), (0, runtime_support_js_1.nowFn)(deps), undefined, restartCount);
         if (exhausted) {
             return (0, errors_js_1.throwAppError)('JULES_NO_PROGRESS', `two consecutive artifact walks for ${sessionResource} restarted without advancing`);
         }
@@ -1010,7 +994,7 @@ async function collect(deps, args) {
                 !walk.partialPagination &&
                 !partialStaging,
             ...(policyDeviation ? { policyDeviation: true } : {}),
-            ...attentionOf(flags),
+            ...(0, runtime_support_js_1.attentionOf)(flags),
         };
     });
 }

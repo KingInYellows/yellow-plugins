@@ -76,7 +76,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     },
     {
       "name": "yellow-jules",
-      "description": "Google Jules integration (experimental) — observe Jules remote-agent sessions and stage their artifacts for local review",
+      "description": "Google Jules integration (experimental) — delegate, supervise, and review Jules remote-agent sessions under owner-written grants",
       "version": "0.2.0",
       "author": {
         "name": "KingInYellows"
@@ -752,7 +752,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-jules/.claude-plugin/p
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-jules",
   "version": "0.2.0",
-  "description": "Google Jules integration (experimental) — observe Jules remote-agent sessions and stage their artifacts for local review",
+  "description": "Google Jules integration (experimental) — delegate, supervise, and review Jules remote-agent sessions under owner-written grants",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"

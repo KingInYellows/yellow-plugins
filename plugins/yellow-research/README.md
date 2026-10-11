@@ -25,6 +25,10 @@ for structural code search when it is on PATH, and uses Grep otherwise. Run
 `/research:setup` to install it via npm, or install manually:
 `npm install -g @ast-grep/cli`. There is no ast-grep MCP server.
 
+The agent passes search values to ast-grep through temporary files, so
+`code-researcher` holds the `Write` tool for that purpose only. See "Optional
+ast-grep CLI" in `CLAUDE.md` for the file workflow and its limits.
+
 ## API Key Setup
 
 EXA / Tavily / Perplexity API keys are read from `userConfig` (system

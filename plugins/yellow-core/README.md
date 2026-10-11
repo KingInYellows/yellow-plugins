@@ -30,7 +30,7 @@ TypeScript, Python, Rust, and Go.
 | `/flow:compound`   | Document a recently solved problem to compound knowledge. Pass `--in-pr` while on a feature branch with an open PR to draft the doc + MEMORY.md line from the PR body and commits (the default pattern in CONTRIBUTING.md "Solution Docs") |
 | `/compound:review-staged` | Manually drain the background-compounding staging ledger (M3-gated) |
 | `/plan:status`          | Read-only dashboard of `plans/` (open) and `plans/complete/` (archived) with per-file checkbox progress |
-| `/plan:complete`        | Archive a completed plan with two safety gates: Gate A scans for unchecked task boxes; Gate C verifies merged-PR evidence in three tiers — file-provenance (commit-to-PR lookup) first, then a strict slug match, then a loose token-coverage fallback |
+| `/plan:complete`        | Archive a completed plan with two safety gates: Gate A scans for unchecked task boxes; Gate C verifies merged-PR evidence in three tiers — file-provenance (commit-to-PR lookup, with a commit-subject fallback for Graphite merge-queue PRs that stay closed; see `lib/plan-gate-provenance.sh`) first, then a strict slug match, then a loose token-coverage fallback |
 | `/stack:status`         | Report which stacked-PR provider is active and classify the state as `UNSELECTED`, `READY_GRAPHITE`, `READY_GITHUB`, `CONFLICT`, `CONFIG_MISMATCH`, `MANAGED_CONFLICT`, or `PARTIAL_TOOLING` (read-only) |
 | `/stack:select`         | Select the active stacked-PR provider (`graphite` or `github`) at `user`/`project`/`local` scope — shows the exact `claude plugin` commands first, refuses managed-scope conflicts, never edits settings JSON, never falls back |
 | `/statusline:setup`     | Generate and install an adaptive statusline for plugins; `observer` enables, refreshes or disables the opt-in context observer |
@@ -123,7 +123,11 @@ Three hooks run automatically once the plugin is enabled:
 
 - **SessionStart** — dispatches the background drain of the compound-staging
   queue.
-- **Stop** — captures the session transcript tail into that queue.
+- **Stop** — captures the session transcript tail into that queue. With
+  `COMPOUND_JEV_PREFILTER=shadow` and `TYPESAFE_API_KEY` set, it also asks
+  TypeSafe's Jev model whether the session looks worth keeping and logs the
+  latest answer per session under `jev-shadow/` without changing what is queued. This sends
+  redacted session text to TypeSafe, so it is off unless both are set.
 - **PreCompact** — appends a compaction-preservation instruction to the
   **main-session** compaction prompt so summaries keep the active plan,
   modified files, and your decisions verbatim. Subagent compactons discard

@@ -477,6 +477,73 @@ describe('read-state, external records, deviations, retention', () => {
     expect(cleared.pendingPlan?.activityId).toBe('a3');
   });
 
+  it('an approval rebase keeps a fresh plan that a concurrent walk stored as ambiguous', async () => {
+    const t = '2026-01-01T00:01:00Z';
+    const plan = {
+      planId: 'p-a',
+      steps: [],
+      activityCreateTime: t,
+      activityId: 'a1',
+    };
+    const rec = await ensureObservedRecord(dataDir, 'sessions/amb-approval');
+    await upsertReadState(dataDir, rec.localRequestId, {
+      pendingPlan: { ...plan, ambiguous: true as const },
+      rebase: { ring: [] },
+    });
+    // A stale approval computed against the (unflagged) snapshot of the same plan id.
+    const next = await upsertReadState(dataDir, rec.localRequestId, {
+      pendingPlan: null,
+      rebase: { ring: [], pendingPlan: plan },
+    });
+    expect(next.pendingPlan).toMatchObject({
+      activityId: 'a1',
+      ambiguous: true,
+    });
+  });
+
+  it('marks the pending plan ambiguous when a rebase meets a different plan at the same createTime', async () => {
+    const t = '2026-01-01T00:01:00Z';
+    const plan = (id: string) => ({
+      planId: `p-${id}`,
+      steps: [],
+      activityCreateTime: t,
+      activityId: id,
+    });
+    for (const [stored, walked, winner] of [
+      ['zzz', 'aaa', 'zzz'],
+      ['aaa', 'zzz', 'zzz'],
+    ] as const) {
+      const rec = await ensureObservedRecord(dataDir, `sessions/tie-${stored}`);
+      await upsertReadState(dataDir, rec.localRequestId, {
+        pendingPlan: plan(stored),
+        rebase: { ring: [] },
+      });
+      const next = await upsertReadState(dataDir, rec.localRequestId, {
+        pendingPlan: plan(walked),
+        rebase: { ring: [] },
+      });
+      expect(next.pendingPlan?.activityId).toBe(winner);
+      expect(next.pendingPlan?.ambiguous).toBe(true);
+      // Sticky: re-walking the winner alone keeps the flag.
+      const again = await upsertReadState(dataDir, rec.localRequestId, {
+        pendingPlan: plan(winner),
+        rebase: { ring: [] },
+      });
+      expect(again.pendingPlan?.ambiguous).toBe(true);
+    }
+    // The same plan seen twice is not ambiguous.
+    const same = await ensureObservedRecord(dataDir, 'sessions/tie-same');
+    await upsertReadState(dataDir, same.localRequestId, {
+      pendingPlan: plan('aaa'),
+      rebase: { ring: [] },
+    });
+    const once = await upsertReadState(dataDir, same.localRequestId, {
+      pendingPlan: plan('aaa'),
+      rebase: { ring: [] },
+    });
+    expect(once.pendingPlan?.ambiguous).toBeUndefined();
+  });
+
   it('rebases resumeApproval so a stale walk keeps a newer stored approval', async () => {
     const rec = await ensureObservedRecord(dataDir, 'sessions/s1');
     const older = { createTime: '2026-01-01T00:01:00Z', activityId: 'a2' };
@@ -595,5 +662,56 @@ describe('read-state, external records, deviations, retention', () => {
     await expect(
       codeOfAsync(() => markOperation(dataDir, 'nope', 'failed'))
     ).resolves.toBe('JULES_NOT_FOUND');
+  });
+});
+
+describe('updateJournal change detection', () => {
+  it('a mutation that replaces nothing does not rewrite the file', async () => {
+    await reserveOperation(dataDir, createInput('req-a'));
+    const file = resolveJournalPath(dataDir);
+    const before = fs.statSync(file, { bigint: true }).mtimeNs;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const { updateJournal } = await import('../src/state.js');
+    await updateJournal(dataDir, () => undefined);
+    expect(fs.statSync(file, { bigint: true }).mtimeNs).toBe(before);
+  });
+
+  it('replacing, adding, or deleting a record is written', async () => {
+    const { updateJournal } = await import('../src/state.js');
+    await reserveOperation(dataDir, createInput('req-a'));
+    await reserveOperation(
+      dataDir,
+      createInput('req-b', { requestedBranch: 'other' })
+    );
+    await updateJournal(dataDir, (operations) => {
+      delete operations['req-a'];
+    });
+    expect(Object.keys((await readJournal(dataDir)).operations)).toEqual([
+      'req-b',
+    ]);
+
+    await updateJournal(dataDir, (operations) => {
+      const record = operations['req-b'];
+      if (record !== undefined)
+        operations['req-b'] = { ...record, condition: 'working' };
+    });
+    expect((await readJournal(dataDir)).operations['req-b']?.condition).toBe(
+      'working'
+    );
+  });
+
+  it('only a changed record is secret-scanned: a secret-shaped change is still refused', async () => {
+    const { updateJournal } = await import('../src/state.js');
+    await reserveOperation(dataDir, createInput('req-a'));
+    await expect(
+      updateJournal(dataDir, (operations) => {
+        const record = operations['req-a'];
+        if (record !== undefined)
+          operations['req-a'] = {
+            ...record,
+            condition: 'Bearer abcdefghijklmnop',
+          };
+      })
+    ).rejects.toThrow(/secret-shaped/);
   });
 });

@@ -294,6 +294,9 @@ case "$ALL_ARGS" in
       *"PRRT_reply_priordisagree"*)
         MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_priordisagree","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Not changing this.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_priordisagree disposition=disagree -->\n"}]}}}}'
         ;;
+      *"PRRT_reply_prioroos"*)
+        MOCK_BODY='{"data":{"node":{"id":"PRRT_reply_prioroos","comments":{"nodes":[{"viewerDidAuthor":true,"body":"Filed a follow-up.\n\n<!-- yellow-review:resolve v1 thread=PRRT_reply_prioroos disposition=oos -->\n"}]}}}}'
+        ;;
       *"PRRT_reply_outwindow"*)
         # Our marker pushed out of the 10-comment window by 10 Bot replies: the
         # window holds only Bot comments, so no viewer comment is found and we post.

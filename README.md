@@ -33,7 +33,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-cursor`       | Cursor Cloud Agent delegation — launch, track, and manage remote coding agents via a typed CLI (pilot Cursor distribution target)      | 10 commands, 1 skill                           |
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns                                       | 7 agents, 6 commands, 1 skill, 1 hook          |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, orchestrate plan-implement-review chains (legacy — see yellow-cursor)   | 1 agent, 9 commands, 1 skill, 1 MCP            |
-| `yellow-jules`        | Google Jules integration (experimental) — observe sessions and stage their artifacts for review; read-only in this release             | 4 commands                                     |
+| `yellow-jules`        | Google Jules integration (experimental) — delegate, supervise, and review sessions under owner-written grants (Codex reference skills)  | 10 commands, 2 skills                          |
 | `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                                                       | 10 agents, 6 commands, 1 skill                 |
 | `yellow-goal`         | Process bridge to the yellow-goal `goal-gen` engine (setup/request, stub run, approval-gated real run that may spend)                  | 4 commands                                     |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents                                      | 3 agents, 9 commands, 1 skill, 1 MCP           |
@@ -131,6 +131,11 @@ automatically.
 To re-authenticate or revoke access: run `/mcp` in Claude Code, select the
 server, and choose "Clear authentication".
 
+With Graphite's merge queue, Linear moves an issue to Done only through
+commit magic words, which needs a one-time GitHub push webhook from Linear's
+GitHub integration. The plugin never sees that webhook's secret; the setup
+steps are in `plugins/yellow-linear/README.md` "Graphite Merge Queue".
+
 These plugins require browser access and **will not work in headless SSH
 sessions**.
 
@@ -190,6 +195,20 @@ export SEMGREP_APP_TOKEN="sgp_your_token_here"
 The plugin also expects the `semgrep` CLI, `curl`, `jq`, and Graphite CLI
 (`gt`). Run `/semgrep:setup` to validate credentials, detect your deployment
 slug, and verify MCP tools.
+
+### Jev shadow pre-filter (yellow-core, optional)
+
+yellow-core's Stop hook can ask TypeSafe's Jev model whether a finished session
+looks worth staging for knowledge capture, and log the answer without changing
+what is staged. It is off unless both variables are set in the environment
+Claude Code's hooks inherit, and it sends redacted session text to TypeSafe:
+
+```bash
+export COMPOUND_JEV_PREFILTER=shadow
+export TYPESAFE_API_KEY="..."
+```
+
+See `docs/security.md` "Jev Shadow Pre-Filter" for exactly what is sent.
 
 ### ruvector (yellow-ruvector)
 
@@ -293,7 +312,7 @@ yellow-plugins/
 │   ├── yellow-devin/          # Devin.AI, legacy (1 agent, 9 commands, 1 skill, 1 MCP)
 │   ├── yellow-docs/           # Documentation (10 agents, 6 commands, 1 skill)
 │   ├── yellow-goal/           # yellow-goal engine bridge (4 commands)
-│   ├── yellow-jules/          # Google Jules, experimental, read-only (4 commands)
+│   ├── yellow-jules/          # Google Jules, experimental, grant-gated (10 commands, 2 skills)
 │   ├── yellow-linear/         # Linear PM (3 agents, 9 commands, 1 skill, 1 MCP)
 │   ├── yellow-morph/          # Morph code editing and search (2 commands, 1 MCP)
 │   ├── yellow-research/       # Deep research (2 agents, 4 commands, 2 skills, 7 MCPs)

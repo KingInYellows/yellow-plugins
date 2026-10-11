@@ -787,7 +787,12 @@ implementation evidence named in each item.
 4. Host-neutral owner-confirmation primitive for `/jules:authorize` on Codex
    (R48): until specified, authorize is Claude-only.
 5. Whether grant records need a key-bound MAC beyond owner-only permissions and
-   a separate grants file (R35): decide at shell 03 expansion.
+   a separate grants file (R35): decide at shell 03 expansion. **Decided
+   2026-10-08:** no MAC. Any key the runtime can read is readable by a process
+   running as the same UID; integrity rests on `0600` permissions, the separate
+   `state/grants.json` written only by the TTY-confirmed `authorize`, the R38
+   controller epoch and path binding, and grants that can only narrow. Same-UID
+   forgery is recorded as residual risk in `plugins/yellow-jules/CLAUDE.md`.
 6. How the R29 confirmation event is authenticated on each host (a runtime-owned
    prompt on a controlling terminal, a host-issued capability, or grants only):
    decide at shell 03 expansion; until then the runtime treats wrapper-minted
@@ -801,4 +806,8 @@ implementation evidence named in each item.
    shift (R24, R25, and R52 amended 2026-09-11: the Linear route's `jules`
    branch is a fail-closed stub in PR2, and the R52 split is enumerated by
    name). Reversible by moving the three commands back to PR2 with an interim
-   mechanism specified in shell 03.
+   mechanism specified in shell 03. **Authentication mechanism decided
+   2026-10-08:** grants only. There is no per-operation confirmation token;
+   every real mutation requires `--grant-id`, and `authorize` is the only trust
+   root, confirmed by a runtime-opened `/dev/tty` challenge that a caller
+   without a controlling terminal cannot satisfy.

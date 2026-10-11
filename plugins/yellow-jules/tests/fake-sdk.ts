@@ -13,6 +13,8 @@ import type {
   AdapterSession,
   AdapterSource,
   Clock,
+  CreatedSession,
+  CreateSessionRequest,
   PageOptions,
   SdkAdapter,
   SessionPage,
@@ -140,6 +142,50 @@ export class FakeSdkAdapter implements SdkAdapter {
     truncated: this.sources.length > options.pageSize,
   });
 
+  /** Sessions created through `createSession`, numbered `s100`, `s101`, ... */
+  private createdSeq = 100;
+
+  /**
+   * Default: registers a queued session carrying the tagged title, so the
+   * reconcile sessions walk can find it. Override to inject failures; throw an
+   * `AdapterError` with `dispatched: true` for a post-dispatch failure.
+   */
+  createSessionImpl: (input: CreateSessionRequest) => Promise<CreatedSession> =
+    async (input) => {
+      this.createdSeq += 1;
+      const sessionResource = `sessions/s${this.createdSeq}`;
+      this.sessions.set(
+        sessionResource,
+        makeSession({
+          sessionResource,
+          vendorState: 'queued',
+          title: input.title,
+          sourceResource: `sources/github/${input.owner}/${input.repo}`,
+          startingBranch: input.baseBranch,
+          createTime: new Date().toISOString(),
+        })
+      );
+      return { sessionResource };
+    };
+
+  sendMessageImpl: (sessionResource: string, message: string) => Promise<void> =
+    async () => undefined;
+
+  approvePlanImpl: (sessionResource: string) => Promise<void> = async () =>
+    undefined;
+
+  /** The defaults above, bound to THIS instance, for tests that wrap or restore them. */
+  readonly defaultCreateSessionImpl = this.createSessionImpl;
+  readonly defaultSendMessageImpl = this.sendMessageImpl;
+  readonly defaultApprovePlanImpl = this.approvePlanImpl;
+
+  /** Puts the three write behaviors back to their defaults. */
+  restoreWrites(): void {
+    this.createSessionImpl = this.defaultCreateSessionImpl;
+    this.sendMessageImpl = this.defaultSendMessageImpl;
+    this.approvePlanImpl = this.defaultApprovePlanImpl;
+  }
+
   private record(method: string, ...args: unknown[]): void {
     this.calls.push({ method, args });
   }
@@ -174,6 +220,30 @@ export class FakeSdkAdapter implements SdkAdapter {
   listSources(options: { readonly pageSize: number }): Promise<SourcePage> {
     this.record('listSources', options);
     return this.listSourcesImpl(options);
+  }
+
+  createSession(input: CreateSessionRequest): Promise<CreatedSession> {
+    this.record('createSession', input);
+    return this.createSessionImpl(input);
+  }
+
+  sendMessage(sessionResource: string, message: string): Promise<void> {
+    this.record('sendMessage', sessionResource, message);
+    return this.sendMessageImpl(sessionResource, message);
+  }
+
+  approvePlan(sessionResource: string): Promise<void> {
+    this.record('approvePlan', sessionResource);
+    return this.approvePlanImpl(sessionResource);
+  }
+
+  /** Total write calls issued, for exact outgoing-call assertions. */
+  writeCount(): number {
+    return (
+      this.callsTo('createSession').length +
+      this.callsTo('sendMessage').length +
+      this.callsTo('approvePlan').length
+    );
   }
 
   async close(): Promise<void> {

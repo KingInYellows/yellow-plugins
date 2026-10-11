@@ -73,13 +73,19 @@ interface CapturedInvocation {
   readonly env: Record<string, string>;
 }
 
+/** Lines the fixture has finished writing. A poll can read the file while an
+ *  append is still in flight, so the unterminated tail is not a line yet. */
+function completeLines(file: string): string[] {
+  if (!fs.existsSync(file)) return [];
+  const lines = fs.readFileSync(file, 'utf8').split('\n');
+  lines.pop();
+  return lines.filter((line) => line.length > 0);
+}
+
 function readCapture(): CapturedInvocation[] {
-  if (!fs.existsSync(captureFile)) return [];
-  return fs
-    .readFileSync(captureFile, 'utf8')
-    .split('\n')
-    .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as CapturedInvocation);
+  return completeLines(captureFile).map(
+    (line) => JSON.parse(line) as CapturedInvocation
+  );
 }
 
 function verbsInvoked(): string[] {
@@ -87,11 +93,7 @@ function verbsInvoked(): string[] {
 }
 
 function verbsReady(): string[] {
-  if (!fs.existsSync(readyFile)) return [];
-  return fs
-    .readFileSync(readyFile, 'utf8')
-    .split('\n')
-    .filter((line) => line.length > 0);
+  return completeLines(readyFile);
 }
 
 function sleep(ms: number): Promise<void> {

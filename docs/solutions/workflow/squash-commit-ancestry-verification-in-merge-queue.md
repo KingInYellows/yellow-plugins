@@ -40,8 +40,14 @@ fi
 This is corroborating evidence, not a standalone gate: it proves the commit
 landed, not that its content matches the reviewed branch. Pair it with the
 landed-content comparison in `docs/solutions/workflow/plan-lifecycle-management.md`
-("Verifying an MQ merge when Gate C has nothing"). It is a manual recovery step;
-`/plan:complete` Gate C does not run it.
+("Verifying an MQ merge when Gate C has nothing"). It is a manual recovery step.
+`/plan:complete` Gate C does not run `git merge-base --is-ancestor`: its
+provenance tier reads the plan's commit from `git log origin/<trunk>`, so that
+commit is on trunk by construction. For Graphite merge-queue PRs it confirms the
+PR named in that commit's subject instead (trailer
+`Plan-Verifier-FileProvenance: ... via=commit-subject`; see the 2026-10-06
+update in `docs/solutions/workflow/plan-lifecycle-management.md`). Use the
+check above only when you start from a PR number and squash SHA outside Gate C.
 
 ## Source
 

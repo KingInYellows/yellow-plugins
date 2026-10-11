@@ -1,6 +1,6 @@
 /**
  * The single activity-walk unit (contract "Activity walk"). `status`,
- * `approve` (PR3), and `collect` differ only in the parameters they pass:
+ * `approve`, and `collect` differ only in the parameters they pass:
  * page size, start point, and whether the caller will write read-state
  * (only `status` does; this module never touches the journal).
  *
@@ -24,6 +24,8 @@ export const STATUS_PAGE_SIZE = 50;
 export const COLLECT_PAGE_SIZE = 10;
 export const PAGE_CAP = 20;
 export const OVERLAP_WINDOW_MS = 5 * 60_000;
+/** Longer than any write deadline (cli MAX_DEADLINE_MS 200 s) plus a minute of slack. */
+export const RESERVATION_SETTLE_MS = 260_000;
 export const DEDUP_RING_CAP = 1000;
 
 export type WalkStart =
@@ -72,9 +74,20 @@ export interface WalkParams {
   readonly approval?: {
     readonly createTime: string;
     readonly activityId: string;
+    readonly approvedPlanId?: string;
   };
-  /** Called for every activity read, in page order (collect stages artifacts here). */
-  readonly onActivity?: (activity: AdapterActivity) => void | Promise<void>;
+  /**
+   * Called for every activity read, in page order (collect stages artifacts
+   * here). `isNew` is true when the activity was counted toward `newIds`:
+   * outside the dedup ring and after the watermark. `unseen` is wider: the id
+   * is absent from the ring and not older than the ring's coverage (the
+   * overlap window below the watermark), whatever its sort position.
+   * Classification that must not miss an activity uses `unseen`.
+   */
+  readonly onActivity?: (
+    activity: AdapterActivity,
+    info: { readonly isNew: boolean; readonly unseen: boolean }
+  ) => void | Promise<void>;
 }
 
 export interface WalkResult {
@@ -100,10 +113,13 @@ export interface WalkResult {
   }>;
   /** The pending plan after this walk; `null` when a later planApproved cleared it. */
   readonly pendingPlan: PendingPlan | null | undefined;
+  /** The newest plan generated (including the carried one), whether or not a later approval cleared it. */
+  readonly generatedPlan?: PendingPlan;
   /** Newest `planApproved` seen (including the carried `approval`); persist it across a partial walk. */
   readonly latestApproval?: {
     readonly createTime: string;
     readonly activityId: string;
+    readonly approvedPlanId?: string;
   };
   readonly startedFromResume: boolean;
   /** The stored resume token was rejected (400/404) and the walk restarted from its fallback. */
@@ -159,8 +175,31 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
   const seen: Array<{ activityId: string; createTime: string }> = [];
   const newIds: string[] = [];
   let latestPlan: PendingPlan | undefined = params.pendingPlan;
+  // Content keys of the plans at the newest plan createTime: equal times are
+  // unordered, so more than one distinct key leaves the current plan unknown.
+  const planKeyOf = (p: {
+    planId: string;
+    steps: readonly unknown[];
+  }): string => JSON.stringify([p.planId, p.steps]);
+  let newestPlanKeys = new Set<string>(
+    params.pendingPlan === undefined
+      ? []
+      : [
+          planKeyOf(params.pendingPlan),
+          ...(params.pendingPlan.ambiguous === true ? ['\0ambiguous'] : []),
+        ]
+  );
   let latestApproval: { createTime: string; activityId: string } | undefined =
     params.approval;
+  // The plan the newest approval named; carried in the resume marker, and
+  // unknown for a marker written before it was kept.
+  let latestApprovalPlanId: string | undefined =
+    params.approval?.approvedPlanId;
+  // Every plan id named by approvals at the newest approval time: equal times
+  // are unordered, so a tie naming different plans decides nothing.
+  let approvalPlanIds = new Set<string | undefined>(
+    params.approval !== undefined ? [params.approval.approvedPlanId] : []
+  );
   let newest: { createTime: string; activityId: string } | undefined;
   let pages = 0;
   let processed = 0;
@@ -230,6 +269,8 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
 
     for (const activity of page.activities) {
       processed += 1;
+      let isNew = false;
+      let unseen = false;
       if (!seenIds.has(activity.activityId)) {
         seenIds.add(activity.activityId);
         seen.push({
@@ -239,8 +280,21 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
         const afterWatermark =
           params.watermark === undefined ||
           compareStamp(activity, params.watermark) > 0;
-        if (!ring.has(activity.activityId) && afterWatermark)
+        // The ring covers every id within the overlap window below the
+        // watermark, so an id absent from it there was never seen, even when
+        // it sorts at or before the watermark (equal time, lower opaque id).
+        if (
+          !ring.has(activity.activityId) &&
+          (afterWatermark ||
+            timeOf(activity.createTime) >=
+              timeOf(params.watermark?.createTime ?? '') - OVERLAP_WINDOW_MS)
+        ) {
+          unseen = true;
+        }
+        if (!ring.has(activity.activityId) && afterWatermark) {
           newIds.push(activity.activityId);
+          isNew = true;
+        }
       }
       if (newest === undefined || compareStamp(activity, newest) > 0) {
         newest = {
@@ -256,6 +310,15 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
           createTime: activity.createTime,
           activityId: activity.activityId,
         };
+        const timeCmp =
+          latestPlan == null
+            ? 1
+            : compareStamp(
+                { createTime: stamp.createTime, activityId: '' },
+                { createTime: latestPlan.activityCreateTime, activityId: '' }
+              );
+        if (timeCmp > 0) newestPlanKeys = new Set();
+        if (timeCmp >= 0) newestPlanKeys.add(planKeyOf(activity.plan));
         if (
           latestPlan == null ||
           compareStamp(stamp, {
@@ -271,6 +334,15 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
           };
         }
       } else if (activity.type === 'planApproved') {
+        const approvalCmp =
+          latestApproval === undefined
+            ? 1
+            : compareStamp(
+                { createTime: activity.createTime, activityId: '' },
+                { createTime: latestApproval.createTime, activityId: '' }
+              );
+        if (approvalCmp > 0) approvalPlanIds = new Set();
+        if (approvalCmp >= 0) approvalPlanIds.add(activity.approvedPlanId);
         if (
           latestApproval === undefined ||
           compareStamp(activity, latestApproval) > 0
@@ -279,9 +351,10 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
             createTime: activity.createTime,
             activityId: activity.activityId,
           };
+          latestApprovalPlanId = activity.approvedPlanId;
         }
       }
-      await params.onActivity?.(activity);
+      await params.onActivity?.(activity, { isNew, unseen });
     }
 
     if (page.unmappedActivity === true) {
@@ -306,14 +379,28 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
 
   // An approval newer than the newest plan clears it; an approval alone,
   // with no plan known, leaves the result undefined.
-  const pendingPlan: PendingPlan | null | undefined =
-    latestPlan !== undefined &&
-    latestApproval !== undefined &&
-    compareStamp(latestApproval, {
-      createTime: latestPlan.activityCreateTime,
-      activityId: latestPlan.activityId,
-    }) > 0
-      ? null
+  // Across types an equal createTime is unordered (opaque ids carry no order):
+  // an approval at the plan's own time clears it only when it names that plan's
+  // id; a different plan stays pending and the tie is marked ambiguous.
+  const approvalVsPlan =
+    latestPlan !== undefined && latestApproval !== undefined
+      ? compareStamp(
+          { createTime: latestApproval.createTime, activityId: '' },
+          { createTime: latestPlan.activityCreateTime, activityId: '' }
+        )
+      : undefined;
+  const approvalTies = approvalVsPlan === 0;
+  const approvalClears =
+    approvalVsPlan !== undefined &&
+    (approvalVsPlan > 0 ||
+      (approvalTies &&
+        newestPlanKeys.size <= 1 &&
+        approvalPlanIds.size === 1 &&
+        approvalPlanIds.has(latestPlan?.planId)));
+  const pendingPlan: PendingPlan | null | undefined = approvalClears
+    ? null
+    : latestPlan !== undefined && (newestPlanKeys.size > 1 || approvalTies)
+      ? { ...latestPlan, ambiguous: true as const }
       : latestPlan;
 
   return {
@@ -328,7 +415,25 @@ export async function walkActivities(params: WalkParams): Promise<WalkResult> {
     ...(newest !== undefined ? { newest } : {}),
     seen,
     pendingPlan,
-    ...(latestApproval !== undefined ? { latestApproval } : {}),
+    ...(latestPlan !== undefined
+      ? {
+          generatedPlan:
+            newestPlanKeys.size > 1
+              ? { ...latestPlan, ambiguous: true as const }
+              : latestPlan,
+        }
+      : {}),
+    ...(latestApproval !== undefined
+      ? {
+          latestApproval: {
+            createTime: latestApproval.createTime,
+            activityId: latestApproval.activityId,
+            ...(latestApprovalPlanId !== undefined && approvalPlanIds.size === 1
+              ? { approvedPlanId: latestApprovalPlanId }
+              : {}),
+          },
+        }
+      : {}),
     startedFromResume: params.start.kind === 'resume',
     resumeRejected,
     filterRetried,

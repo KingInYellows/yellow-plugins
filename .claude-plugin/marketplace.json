@@ -73,7 +73,7 @@
     },
     {
       "name": "yellow-jules",
-      "description": "Google Jules integration (experimental) — observe Jules remote-agent sessions and stage their artifacts for local review",
+      "description": "Google Jules integration (experimental) — delegate, supervise, and review Jules remote-agent sessions under owner-written grants",
       "version": "0.2.0",
       "author": {
         "name": "KingInYellows"

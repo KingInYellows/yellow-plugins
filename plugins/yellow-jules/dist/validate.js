@@ -44,6 +44,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.GRANT_OPERATIONS = exports.GRANT_ID_RE = void 0;
 exports.validateRef = validateRef;
 exports.validateIdempotencyKey = validateIdempotencyKey;
 exports.validateRequestId = validateRequestId;
@@ -68,6 +69,13 @@ exports.mintLocalId = mintLocalId;
 exports.extractTitleTag = extractTitleTag;
 exports.parseSessionRef = parseSessionRef;
 exports.validatePositiveInt = validatePositiveInt;
+exports.validateGrantId = validateGrantId;
+exports.mintGrantId = mintGrantId;
+exports.validateBranchPattern = validateBranchPattern;
+exports.branchMatchesPattern = branchMatchesPattern;
+exports.validateOperations = validateOperations;
+exports.validateControllerId = validateControllerId;
+exports.validateOwnerLabel = validateOwnerLabel;
 const crypto = __importStar(require("node:crypto"));
 const errors_js_1 = require("./errors.js");
 function codeFor(origin) {
@@ -276,4 +284,83 @@ function validatePositiveInt(value, label, min, max) {
         return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', `${label} must be between ${min} and ${max}`);
     }
     return parsed;
+}
+exports.GRANT_ID_RE = /^jg-[0-9a-f]{32}$/;
+const CONTROLLER_ID_RE = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,62})$/;
+const BRANCH_PATTERN_MAX = 200;
+exports.GRANT_OPERATIONS = [
+    'create',
+    'reply',
+    'approve',
+    'collect',
+];
+function validateGrantId(value, origin = 'input') {
+    return checkPattern(value, exports.GRANT_ID_RE, 'grant id', origin);
+}
+/** `jg-` + 16 random bytes hex. */
+function mintGrantId() {
+    return `jg-${crypto.randomBytes(16).toString('hex')}`;
+}
+/**
+ * An exact ref or a ref with a single trailing `*` glob, anchored and
+ * length-bounded. The glob never appears mid-ref, so matching is a prefix
+ * test and cannot be turned into an unbounded pattern.
+ */
+function validateBranchPattern(input) {
+    if (input.length === 0 || input.length > BRANCH_PATTERN_MAX) {
+        return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', `branch pattern must be 1-${BRANCH_PATTERN_MAX} characters`);
+    }
+    const star = input.indexOf('*');
+    if (star === -1)
+        return validateRef(input);
+    if (star !== input.length - 1 || input.indexOf('*', star + 1) !== -1) {
+        return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', 'branch pattern allows a single trailing "*" only');
+    }
+    const prefix = input.slice(0, -1);
+    if (prefix.length === 0) {
+        return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', 'branch pattern "*" alone matches every branch and is refused');
+    }
+    // The prefix must itself be a valid ref head; a trailing "/" is allowed
+    // here ("feat/*") although validateRef refuses it on a complete ref.
+    validateRef(prefix.endsWith('/') ? `${prefix}x` : prefix);
+    return input;
+}
+/** True when `branch` is covered by the validated `pattern`. */
+function branchMatchesPattern(pattern, branch) {
+    if (!pattern.endsWith('*'))
+        return pattern === branch;
+    return branch.startsWith(pattern.slice(0, -1));
+}
+/** `create,reply,approve,collect` subset: non-empty, known, no duplicates. */
+function validateOperations(input) {
+    const parts = input.split(',');
+    const seen = new Set();
+    const out = [];
+    for (const raw of parts) {
+        const part = raw.trim();
+        const op = exports.GRANT_OPERATIONS.find((candidate) => candidate === part);
+        if (op === undefined) {
+            return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', `operations must be a comma-separated subset of ${exports.GRANT_OPERATIONS.join(', ')}`);
+        }
+        if (seen.has(op)) {
+            return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', `operation ${op} is listed more than once`);
+        }
+        seen.add(op);
+        out.push(op);
+    }
+    return out;
+}
+function validateControllerId(input) {
+    if (!CONTROLLER_ID_RE.test(input) || PROTOTYPE_KEYS.has(input)) {
+        return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', 'controller id must be 1-63 characters of [A-Za-z0-9._-] starting with an alphanumeric');
+    }
+    return input;
+}
+const OWNER_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9 ._@-]{0,63}$/;
+/** `--owner`: a display label for the grant summary; bounded and printable. */
+function validateOwnerLabel(input) {
+    if (!OWNER_NAME_RE.test(input)) {
+        return (0, errors_js_1.throwAppError)('JULES_INVALID_INPUT', 'owner must be 1-64 characters of [A-Za-z0-9 ._@-] starting with an alphanumeric');
+    }
+    return input;
 }

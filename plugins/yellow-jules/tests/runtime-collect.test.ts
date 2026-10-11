@@ -74,6 +74,48 @@ function listFiles(dir: string): string[] {
 }
 
 describe('collect', () => {
+  it('stages two identical files whose distinct credential-shaped paths redact alike', async () => {
+    const pathA = 'out/AIzaSyA1234567890abcdefghijk/f.txt';
+    const pathB = 'out/AIzaSyB1234567890abcdefghijk/f.txt';
+    fake.sessions.set(
+      S,
+      makeSession({
+        vendorState: 'completed',
+        generatedFiles: [
+          { path: pathA, changeType: 'created', content: 'same\n' },
+          { path: pathB, changeType: 'created', content: 'same\n' },
+        ],
+      })
+    );
+    fake.activities.set(S, []);
+    const run = async () => collect(makeDeps(dataDir, fake), { session: S });
+    const result = await run();
+    const generated = result.artifacts.filter(
+      (a) => a.kind === 'generated-file'
+    );
+    expect(generated).toHaveLength(2);
+    expect(generated[0]?.vendorPath).toBe(generated[1]?.vendorPath);
+    expect(generated[0]?.vendorPath).not.toContain('AIzaSy');
+    expect(generated[0]?.vendorPathDigest).not.toBe(
+      generated[1]?.vendorPathDigest
+    );
+    const dir = path.join(resolveArtifactsDir(dataDir), result.localId);
+    const raw =
+      fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8') +
+      JSON.stringify(await readJournal(dataDir));
+    expect(raw).not.toContain('AIzaSyA');
+    expect(raw).not.toContain('AIzaSyB');
+
+    // A second collect recognizes both as already staged.
+    const again = await run();
+    expect(
+      again.artifacts.filter((a) => a.kind === 'generated-file')
+    ).toHaveLength(2);
+    expect(
+      listFiles(dir).filter((f) => f.startsWith('generated/'))
+    ).toHaveLength(2);
+  });
+
   it('stages every artifact kind under artifacts/<local-id>/ only', async () => {
     fake.sessions.set(
       S,

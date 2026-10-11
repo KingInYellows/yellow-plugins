@@ -191,8 +191,9 @@ Only when Step 7 applied at least one fix and Step 9 commits it.
    (`unproved-content-check`); still reproducing gives `reopened`
    (`fix-abandoned`) only when the fix commit is unreachable from every ref,
    and otherwise stays `applied` (possibly not yet published). A proved fix
-   whose anchor still matches, and anything unverifiable, stays `applied` for
-   `/review:triage`.
+   whose anchor still matches stays `applied` for `/review:triage`:
+   anchor-only re-verify cannot tell a later revert from an additive fix
+   above an unchanged anchor. Anything unverifiable stays `applied`.
 
 3. **Push declined, failed, or skipped** (the interactive gate was rejected, or
    the provider returned an error): append nothing more. The findings stay
