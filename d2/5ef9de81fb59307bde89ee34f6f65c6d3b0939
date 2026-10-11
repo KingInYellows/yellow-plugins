@@ -1,0 +1,16 @@
+plugins/yellow-debt/.codex-plugin/plugin.json
+  h_6000354274ce50 3
+plugins/yellow-research/.codex-plugin/plugin.json
+  h_6000354274ce50 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d25ef9de81fb59307bde89ee34f6f65c6d3b0939",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
