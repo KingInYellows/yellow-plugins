@@ -1,0 +1,24 @@
+docs/codex-distribution.md
+  h_6000354274ce50 42-52,66-72
+docs/research/codex-phases-2-5-2026-10-06/phase2.md
+  h_6000354274ce50 12-16
+plugins/gt-workflow/codex/skills/gt-setup/references/prerequisites.md
+  h_6000354274ce50 147,149,176
+plugins/gt-workflow/skills/gt-setup/references/prerequisites.md
+  h_6000354274ce50 147,149,176
+plugins/yellow-docs/codex/skills/docs-audit/references/audit-contract.md
+  h_6000354274ce50 12
+plugins/yellow-docs/skills/docs-audit/references/audit-contract.md
+  h_6000354274ce50 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8a6bd1d49d0205a4ce9606d03153824c7cfdcd18",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

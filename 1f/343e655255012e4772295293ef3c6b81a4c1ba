@@ -1,0 +1,14 @@
+.changeset/codex-command-migration-exposure.md
+  h_6000354274ce50 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1f343e655255012e4772295293ef3c6b81a4c1ba",
+  "prompts": {},
+  "humans": {
+    "h_6000354274ce50": {
+      "author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
