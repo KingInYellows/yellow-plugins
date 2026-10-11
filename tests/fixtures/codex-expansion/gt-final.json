@@ -29,6 +29,9 @@
       },
       "requiredReads": [
         "references/prerequisites.md"
+      ],
+      "requiredObservations": [
+        "gt-prerequisites"
       ]
     },
     {
@@ -43,6 +46,9 @@
       },
       "requiredReads": [
         "references/prerequisites.md"
+      ],
+      "requiredObservations": [
+        "gt-missing"
       ]
     },
     {

@@ -106,6 +106,51 @@ describe('installed flat-reference snapshot enforces paths before source reads',
   });
 
   it.each([
+    'os.environ["TAVILY_API_KEY"] = "synthetic-bracket-value"',
+    "config['password'] = 'synthetic-bracket-value'",
+    'process.env["DEVIN_SERVICE_USER_TOKEN"] = "synthetic-bracket-value";',
+    "process.env[ 'EXA_API_KEY' ] = 'synthetic-bracket-value';",
+    'config["credential"] = (\n  "synthetic-bracket-value"\n)',
+    'config["session"]\n  = "synthetic-bracket-value";',
+    'config[\n  "privateKey"\n] = "synthetic-bracket-value";',
+    'config["SID"] /* assignment follows */\n = "synthetic-bracket-value";',
+    'config["authorization"] = "synthetic-bracket-value";',
+  ])('quarantines bracketed credential source: %s', (assignment) => {
+    const result = inspect('src', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'const amount = 1;\n' + assignment + '\nconst later = 2;\n'
+      );
+      writeFileSync(join(workspace, 'src/other.js'), 'const visible = 3;\n');
+    });
+    expect(result.exit).toBe(0);
+    expect(result.output.status).toBe('partial');
+    expect(JSON.stringify(result.output)).not.toContain(
+      'synthetic-bracket-value'
+    );
+    const lines = result.output.files[0].lines;
+    expect(lines[0]).toEqual({ line: 1, text: 'const amount = 1;' });
+    expect(lines.at(-1).text).toBe(redactedAt(lines.length));
+    expect(result.output.files[1]).toEqual({
+      path: 'src/other.js',
+      lines: [{ line: 1, text: 'const visible = 3;' }],
+    });
+  });
+
+  it('preserves ordinary bracketed keys', () => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'config["theme"] = "light";\nconfig["sidebar"] = true;\n'
+      );
+    });
+    expect(result.output.status).toBe('success');
+    expect(result.output.files[0].lines[1].text).toBe(
+      'config["sidebar"] = true;'
+    );
+  });
+
+  it.each([
     '../file.js',
     '/tmp/file.js',
     '-file.js',

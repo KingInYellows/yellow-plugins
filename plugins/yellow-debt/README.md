@@ -4,6 +4,10 @@ Technical debt audit and remediation plugin for Claude Code.
 
 ## Overview
 
+The bounded `debt-complexity-scan` skill redacts recognized credential markers,
+including bracketed dictionary and environment keys, and all later lines in the
+same file. Such scans return `partial`. This does not replace a secret scanner.
+
 The `yellow-debt` plugin runs comprehensive technical debt audits using 5
 parallel specialized scanner agents, produces prioritized markdown reports with
 actionable todo files, and provides remediation workflows including interactive

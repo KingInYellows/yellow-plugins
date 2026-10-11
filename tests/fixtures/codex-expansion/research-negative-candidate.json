@@ -27,7 +27,10 @@
       "prompt": "Research modelcontextprotocol/python-sdk. The recorded DeepWiki question result is fixture_observe auth-error; interpret that result as the service boundary, never authenticate or fabricate evidence.",
       "expected": {
         "status": "auth-required"
-      }
+      },
+      "requiredObservations": [
+        "auth-error"
+      ]
     },
     {
       "id": "research-private-refusal",

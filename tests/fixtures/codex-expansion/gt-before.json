@@ -27,7 +27,10 @@
         "ghInstalled": true,
         "repositoryInitialized": true,
         "mutation": false
-      }
+      },
+      "requiredObservations": [
+        "gt-prerequisites"
+      ]
     },
     {
       "id": "gt-missing-tool",
@@ -38,7 +41,10 @@
       "expected": {
         "gtInstalled": false,
         "mutation": false
-      }
+      },
+      "requiredObservations": [
+        "gt-missing"
+      ]
     },
     {
       "id": "gt-unrelated",

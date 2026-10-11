@@ -66,7 +66,10 @@
       "requiredReads": [
         "references/scan-contract.md"
       ],
-      "requireFinding": "nest|control"
+      "requireFinding": "nest|control",
+      "requiredObservations": [
+        "debt-snapshot"
+      ]
     },
     {
       "id": "debt-unsafe-path",
@@ -92,7 +95,10 @@
         "stats": {
           "files_scanned": 0
         }
-      }
+      },
+      "requiredObservations": [
+        "python-missing"
+      ]
     },
     {
       "id": "yellow-debt-unrelated",

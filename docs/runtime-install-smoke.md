@@ -245,6 +245,19 @@ current validation.
 
 ## Bounded expansion model acceptance
 
+Cases declare `requiredObservations` for fixture observations needed to support
+their result. Acceptance requires successful `fixture_observe` events from that
+case; missing, denied, wrong-key, or earlier-case evidence cannot satisfy it.
+Live callbacks remain distinct from injected observations. Output arrays must
+match their expected length, including empty findings arrays; object fields
+continue to use partial matching.
+
+The Graphite setup before-case loads
+`tests/fixtures/codex-expansion/baselines/gt-setup-before.txt` and verifies its
+SHA-256 against the adjacent provenance JSON. New reports record that provenance
+instead of referring to a moving `HEAD`. The bytes match the saved historical
+receipt and source revision `d2ab958b7cf045f46382a2ab8f34601828c1c3d5`.
+
 The optional Linux/WSL gate runs actual model turns:
 
 ```bash

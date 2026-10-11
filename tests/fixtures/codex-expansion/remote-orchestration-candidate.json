@@ -64,6 +64,9 @@
       },
       "requiredReads": [
         "references/plan-contract.md"
+      ],
+      "requiredObservations": [
+        "cursor-plan"
       ]
     },
     {
@@ -75,7 +78,10 @@
       "expected": {
         "code": "CURSOR_RUNTIME_MISSING",
         "launched": false
-      }
+      },
+      "requiredObservations": [
+        "cursor-missing"
+      ]
     },
     {
       "id": "yellow-cursor-unrelated",
@@ -102,6 +108,9 @@
       },
       "requiredReads": [
         "references/readiness-contract.md"
+      ],
+      "requiredObservations": [
+        "codex-readiness"
       ]
     },
     {
@@ -115,7 +124,10 @@
         "authentication": "unverified",
         "modelRequest": false,
         "remoteExecution": "unverified"
-      }
+      },
+      "requiredObservations": [
+        "codex-missing"
+      ]
     },
     {
       "id": "yellow-codex-unrelated",

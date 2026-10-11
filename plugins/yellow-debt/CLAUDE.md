@@ -89,6 +89,10 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
   path validation before source reads through separate process stdin;
   no report/todo writes, state transitions, integrations or agent dispatch
 
+The bounded snapshot quarantines the remainder of each file after a recognized
+credential marker, including bracketed dictionary/environment keys. It reports
+`partial`; ordinary keys remain visible. This is not a comprehensive secret scan.
+
 ### Hooks (1)
 
 - `session-start.sh` — Count high/critical debt findings pending triage; inject

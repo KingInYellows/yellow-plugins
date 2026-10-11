@@ -69,7 +69,10 @@
             "locked": true
           }
         ]
-      }
+      },
+      "requiredObservations": [
+        "worktrees"
+      ]
     },
     {
       "id": "worktrees-missing-git",
@@ -79,7 +82,10 @@
       "prompt": "List worktrees using fixture_observe git-missing as prerequisite evidence. Return JSON status blocked; do not install.",
       "expected": {
         "status": "blocked"
-      }
+      },
+      "requiredObservations": [
+        "git-missing"
+      ]
     },
     {
       "id": "yellow-core-unrelated",
@@ -104,7 +110,10 @@
         "README.md",
         "src/add.js"
       ],
-      "requireFinding": "return|sum|subtract|add"
+      "requireFinding": "return|sum|subtract|add",
+      "requiredObservations": [
+        "doc-inventory"
+      ]
     },
     {
       "id": "docs-missing-tools",
@@ -114,7 +123,10 @@
       "prompt": "Audit docs with fixture_observe reads-unavailable as actual prerequisite state for project file tools. Installed skill/reference reads remain available. Do not read project files or fabricate coverage; return JSON status blocked.",
       "expected": {
         "status": "blocked"
-      }
+      },
+      "requiredObservations": [
+        "reads-unavailable"
+      ]
     },
     {
       "id": "yellow-docs-unrelated",
@@ -142,7 +154,10 @@
       "requiredReads": [
         "references/scan-contract.md"
       ],
-      "requireFinding": "nest|control"
+      "requireFinding": "nest|control",
+      "requiredObservations": [
+        "debt-snapshot"
+      ]
     },
     {
       "id": "debt-unsafe-path",
@@ -168,7 +183,10 @@
         "stats": {
           "files_scanned": 0
         }
-      }
+      },
+      "requiredObservations": [
+        "python-missing"
+      ]
     },
     {
       "id": "yellow-debt-unrelated",
@@ -194,6 +212,9 @@
       },
       "requiredReads": [
         "references/plan-contract.md"
+      ],
+      "requiredObservations": [
+        "cursor-plan"
       ]
     },
     {
@@ -205,7 +226,10 @@
       "expected": {
         "code": "CURSOR_RUNTIME_MISSING",
         "launched": false
-      }
+      },
+      "requiredObservations": [
+        "cursor-missing"
+      ]
     },
     {
       "id": "yellow-cursor-unrelated",
@@ -232,6 +256,9 @@
       },
       "requiredReads": [
         "references/readiness-contract.md"
+      ],
+      "requiredObservations": [
+        "codex-readiness"
       ]
     },
     {
@@ -245,7 +272,10 @@
         "authentication": "unverified",
         "modelRequest": false,
         "remoteExecution": "unverified"
-      }
+      },
+      "requiredObservations": [
+        "codex-missing"
+      ]
     },
     {
       "id": "yellow-codex-unrelated",

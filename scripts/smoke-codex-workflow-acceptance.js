@@ -17,6 +17,28 @@ const {
   equal,
 } = require('./smoke-codex-skill-activation');
 const ROOT = path.resolve(__dirname, '..');
+function loadGtSetupBaseline(
+  directory = path.join(ROOT, 'tests/fixtures/codex-expansion/baselines')
+) {
+  const provenance = JSON.parse(
+    fs.readFileSync(path.join(directory, 'gt-setup-before.json'), 'utf8')
+  );
+  check(
+    /^[a-f0-9]{40}$/.test(provenance.sourceRevision) &&
+      provenance.sourcePath ===
+        'plugins/gt-workflow/codex/skills/gt-setup/SKILL.md' &&
+      /^[a-f0-9]{64}$/.test(provenance.sha256),
+    'Invalid baseline provenance'
+  );
+  const file = path.join(directory, 'gt-setup-before.txt');
+  const bytes = fs.readFileSync(file);
+  check(
+    require('node:crypto').createHash('sha256').update(bytes).digest('hex') ===
+      provenance.sha256,
+    'Baseline hash mismatch'
+  );
+  return { bytes, provenance };
+}
 function stageCandidates(scratch, names, selections, env) {
   const {
     buildCodexPluginManifest,
@@ -110,7 +132,9 @@ function check(ok, message) {
 function contains(actual, expected) {
   if (Array.isArray(expected))
     return (
-      Array.isArray(actual) && expected.every((v, i) => contains(actual[i], v))
+      Array.isArray(actual) &&
+      actual.length === expected.length &&
+      expected.every((v, i) => contains(actual[i], v))
     );
   if (expected && typeof expected === 'object')
     return (
@@ -119,7 +143,19 @@ function contains(actual, expected) {
     );
   return actual === expected;
 }
-function assessWorkflow(test, output, reads, skill, events) {
+function assessWorkflow(test, output, reads, skill, events, eventStart = 0) {
+  events = events.slice(eventStart);
+  for (const key of test.requiredObservations || []) {
+    check(
+      events.some(
+        (event) =>
+          event.method === 'fixture/tool' &&
+          event.params?.tool === 'fixture_observe' &&
+          event.params.key === key
+      ),
+      'Successful required observation missing: ' + key
+    );
+  }
   if (test.activation === false) {
     check(
       !reads.some((file) => file.includes('/codex/skills/')),
@@ -302,21 +338,15 @@ async function main() {
           selections['gt-workflow'].join(',') === 'gt-setup',
         'Invalid baseline request'
       );
-      const baseline = command(
-        'git',
-        ['show', 'HEAD:plugins/gt-workflow/codex/skills/gt-setup/SKILL.md'],
-        env,
-        ROOT
-      );
+      const baseline = loadGtSetupBaseline();
       fs.writeFileSync(
         path.join(
           marketplace,
           'plugins/gt-workflow/codex/skills/gt-setup/SKILL.md'
         ),
-        baseline + '\n'
+        baseline.bytes
       );
-      report.baseline =
-        'HEAD gt-setup installed bytes, Phase 1 did not change this skill';
+      report.baseline = baseline.provenance;
     }
     if (names.includes('gt-workflow')) {
       fs.appendFileSync(
@@ -645,7 +675,7 @@ async function main() {
           equal(snapshot(installedEntry.root), installedEntry.before),
           'Installed plugin changed'
         );
-      assessWorkflow(test, output, reads, skill, events);
+      assessWorkflow(test, output, reads, skill, host.events, start);
       result.status = 'passed';
       save(path.join(scratch, test.id + '.json'), result);
       save(path.join(scratch, 'progress.json'), report);
@@ -682,7 +712,7 @@ async function main() {
     );
   }
 }
-module.exports = { assessWorkflow, contains };
+module.exports = { assessWorkflow, contains, loadGtSetupBaseline };
 if (require.main === module)
   main().catch(() => {
     console.error('Workflow acceptance setup failed');

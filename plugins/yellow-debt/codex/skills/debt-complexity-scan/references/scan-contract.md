@@ -26,12 +26,14 @@ that line and every remaining line in the same file. A recognized name at the
 end of a line, optionally followed by a backslash continuation, also starts
 redaction before a separator on a later line. A comment opener after a
 recognized name also starts redaction, so comments cannot hide a later
-assignment separator. The snapshot returns `partial`. This deliberately
-sacrifices later benign code: without a language parser, delimiter and operator
-heuristics cannot establish where credential expressions end. Other files retain
-their independent bounds. The marker detection is not a comprehensive secret
-scanner; do not use this workflow on a source known to contain credentials that
-lack these markers.
+assignment separator. A closing subscript bracket after a recognized name also
+starts quarantine, including quoted dictionary and environment keys. This
+conservatively includes lookups, so a later separator cannot evade detection.
+The snapshot returns `partial`. This deliberately sacrifices later benign code:
+without a language parser, delimiter and operator heuristics cannot establish
+where credential expressions end. Other files retain their independent bounds.
+The marker detection is not a comprehensive secret scanner; do not use this
+workflow on a source known to contain credentials that lack these markers.
 
 ```python
 import json
@@ -102,7 +104,7 @@ def inspect(parent_fd, name, relative):
     # A detected credential marker quarantines the remainder of this file.
     hidden = False
     for number, line in enumerate(selected, 1):
-        if re.search(r"(?i)(?:(?:api[_-]?key|token|password|secret|private[_-]?key|credentials?|cookie|session|sessid|DEVIN_ORG_ID)[A-Za-z0-9_.-]*[\"']?\s*(?:[=:]|//|/\*|#|\\?\s*$)|(?:(?<![A-Za-z0-9])sid|(?-i:SID|Sid))[\"\x27]?\s*(?:[=:]|//|/\*|#|\\?\s*$)|authorization[\"']?\s*(?:[=:,]|//|/\*|#|\\?\s*$)|\bbearer\s+\S|\b[a-z][a-z0-9+.-]*://[^\s/:@]+:[^\s/@]+@|-----BEGIN [A-Z ]*PRIVATE KEY-----)", line):
+        if re.search(r"(?i)(?:(?:api[_-]?key|token|password|secret|private[_-]?key|credentials?|cookie|session|sessid|DEVIN_ORG_ID)[A-Za-z0-9_.-]*[\"']?\s*(?:[=:\]]|//|/\*|#|\\?\s*$)|(?:(?<![A-Za-z0-9])sid|(?-i:SID|Sid))[\"\x27]?\s*(?:[=:\]]|//|/\*|#|\\?\s*$)|authorization[\"']?\s*(?:[=:,\]]|//|/\*|#|\\?\s*$)|\bbearer\s+\S|\b[a-z][a-z0-9+.-]*://[^\s/:@]+:[^\s/@]+@|-----BEGIN [A-Z ]*PRIVATE KEY-----)", line):
             hidden = True
         if hidden:
             partial = True

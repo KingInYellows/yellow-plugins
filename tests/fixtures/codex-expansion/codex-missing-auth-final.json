@@ -30,7 +30,12 @@
         "modelRequest": false,
         "remoteExecution": "unverified"
       },
-      "requiredReads": ["references/readiness-contract.md"]
+      "requiredReads": [
+        "references/readiness-contract.md"
+      ],
+      "requiredObservations": [
+        "codex-missing-auth"
+      ]
     }
   ]
 }

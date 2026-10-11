@@ -33,6 +33,12 @@ standalone references to credential names. The marker regex includes generic
 identifiers but remains a limited detector, so sources known to contain unmarked
 credentials must remain outside this workflow.
 
+Bracketed keys such as `config["password"]` and `os.environ["TAVILY_API_KEY"]`
+also trigger quarantine. A closing bracket is a boundary after a recognized
+marker, even when the assignment separator appears on a later line. This
+intentionally includes lookups: do not try to distinguish them from assignments
+with expression-ending heuristics.
+
 ## Verification
 
 The executable contract regression suite covers nullish, logical, ternary and
@@ -40,3 +46,7 @@ comment continuations and separators split after credential names alongside
 quoted credentials, URLs, escaped literals, YAML scalars and PEM blocks. A
 separate benign-source test preserves ordinary identifiers and public URLs.
 Generated Codex references must match the source.
+
+Bracketed-key regressions cover Python and JavaScript environment assignments,
+single/double quotes, whitespace, multiline values and separators, and ordinary
+non-credential keys that must remain visible.
