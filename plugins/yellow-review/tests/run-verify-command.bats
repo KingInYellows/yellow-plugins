@@ -3898,6 +3898,19 @@ dirlink_setup() {
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
 }
 
+@test "--revert-denied --no-ignored-guard flags a symlink to an ignored file whose name is a glob matching a tracked file" {
+  mkdir -p .claude config
+  printf 'config/[*]\n' >> .git/info/exclude
+  printf 'safe\n' >| config/safe.txt
+  printf 'payload\n' >| 'config/*'
+  ln -s '../config/*' .claude/settings.json
+  git add -f .claude/settings.json config/safe.txt && git commit -q -m "link to glob-named ignored file"
+  [ -z "$(git ls-files -- 'config/[*]')" ]
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
 @test "--revert-denied --no-ignored-guard accepts a tracked trusted-config symlink to a tracked in-worktree file" {
   mkdir -p .claude
   ln -s ../src/a.txt .claude/settings.json
