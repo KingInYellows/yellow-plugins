@@ -1,5 +1,113 @@
 # Changelog
 
+## 2.9.0
+
+### Minor Changes
+
+- [`28f866a`](https://github.com/KingInYellows/yellow-plugins/commit/28f866a5675b888813728130e311645ee9069627)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add an opt-in
+  TypeSafe Jev shadow pre-filter to the compound-staging Stop hook. With
+  `COMPOUND_JEV_PREFILTER=shadow` and `TYPESAFE_API_KEY` set, the capture
+  subshell asks Jev whether a finished session looks worth staging and records
+  the latest answer per session in
+  `compound-staging/jev-shadow/<session_id>.json`, appending every valid answer
+  to `jev-shadow/predictions.jsonl`. It staging-reviewer drain appends each
+  scorer verdict to `jev-shadow/outcomes.jsonl` for comparison. It never changes
+  what is staged, logs no transcript text, and fails silently. Off by default.
+
+### Patch Changes
+
+- [`e4b7b84`](https://github.com/KingInYellows/yellow-plugins/commit/e4b7b84aeeb6b0a2f6ec5303096b9f350b4280c1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Remove the
+  bundled ast-grep MCP server and use the `ast-grep` CLI directly. The MCP
+  server needed `uvx`, git, Python 3.13 and the binary on the PATH Claude Code
+  launched with, and `/research:setup` could never confirm it: its probe called
+  `find_code` without the required `project_folder`, uv was only installed when
+  ast-grep was missing, and an install mid-session could not start a server that
+  had already failed. The four `mcp__plugin_yellow-research_ast-grep__*` tools
+  are gone.
+
+  `code-researcher` and yellow-debt's duplication and complexity scanners now
+  run `ast-grep run` / `ast-grep scan --inline-rules` through Bash when
+  `ast-grep` is on PATH and fall back to Grep otherwise. `research-conductor`
+  and yellow-review's `silent-failure-hunter` and `type-design-analyzer` have no
+  Bash and use their existing search tools. `install-ast-grep.sh` no longer
+  installs uv or pre-warms Python, `/research:setup` reports the CLI as a local
+  tool (MCP sources now count out of six), and `/setup:all` no longer probes the
+  removed tool or checks `uv` (yellow-research bundled sources now count out of
+  five).
+
+- [`d75d8ae`](https://github.com/KingInYellows/yellow-plugins/commit/d75d8ae864b02907fb3deb336933fca16090a3fc)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/plan:complete` Gate C now passes plans delivered through Graphite's merge
+  queue. Those PRs stay closed with `merged: false`, so GitHub's commit-to-PR
+  lookup returned nothing and every archive needed a manual override. When the
+  lookup succeeds with an empty result, the provenance tier falls back to the PR
+  number in the commit subject (new `lib/plan-gate-provenance.sh`, whose header
+  states the pass conditions); the trailer is `Plan-Verifier-FileProvenance:`
+  with `via=commit-subject`. The whole tier is now `pgp_tier_run`, covered by
+  bats. A plan completed on an unlanded branch no longer borrows the landed
+  version's evidence on either path (the commits-API association included), a
+  garbled or unreadable lookup counts as a failed one, and the base branch name
+  is no longer printed. Transient causes (open PR, rate limit, timeout) now stop
+  the command with a retry hint instead of going straight to the override
+  prompt.
+
+- [`e09f7a8`](https://github.com/KingInYellows/yellow-plugins/commit/e09f7a8b17d5a1d8d5a267eb69dd651b9ee6d549)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make Linear
+  follow PRs landed through Graphite's merge queue. The queue closes PRs instead
+  of merging them, so Linear's "PR merged" automation never fired.
+  `smart-submit` and `/flow:work` now end the commit body with a Linear closing
+  line (`Part of <ISSUE-ID>`, or `Closes <ISSUE-ID>` on the commit that
+  completes the issue) taken only from the branch name's ID segment or the
+  plan's `Linear:` field, and `gt-amend` keeps an existing line. `/linear:sync`,
+  `/linear:sync-all` and `linear-pr-linker` no longer read a `CLOSED` PR whose
+  `(#<number>)` squash commit is on the default branch as closed without merge;
+  the check is the new tested `scripts/pr-landed.sh`, which answers `unknown`
+  for a shallow clone, a mismatched origin or any fetch or log failure.
+  `/linear:sync-all` now lists PRs with `--state all`. The Linear and GitHub
+  setup steps are in the yellow-linear README.
+
+- [`2d877ca`](https://github.com/KingInYellows/yellow-plugins/commit/2d877ca9aa90f0ff92e6d4b7f3786341413871af)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Redact tvly-,
+  pplx- and sgp\_ tokens and `Authorization: Basic` header tokens in
+  compound-staging output. A Basic token of two or three characters plus padding
+  (an empty username or password) is redacted too.
+
+- [`a6cd602`](https://github.com/KingInYellows/yellow-plugins/commit/a6cd602ff595f41f1f09c3b831a82b01e4d6b26b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Abort an
+  in-chain rebase in every stack worktree on /worktree:restack --abort. When the
+  provider has lost its record of the paused restack, --abort now keeps state
+  and restores nothing instead of aborting only the paused rebase. A failed
+  per-worktree `git rebase --abort` now prints a fixed line telling the user to
+  rerun it in that worktree to see git's error, and the exit-31 message names
+  the stuck worktree with the `git -C <path> rebase --abort` fix line. The state
+  file now records each stack branch's pre-restack tip, and --abort also keeps
+  state (exit 31, listing the moved branches) when no rebase is left but a
+  branch tip has moved, such as after finishing the paused rebase with
+  `git rebase --continue`. The state file also records a random run id, and the
+  provider-aborted marker holds that id: a marker that is missing the id,
+  carries another id, is a symlink or belongs to an id-less legacy state no
+  longer skips the remaining-rebase check, and the moved-tip check now runs even
+  beside a valid marker. --continue refuses (exit 31) while a valid abort marker
+  exists, so an unfinished abort cannot be continued or submitted. The
+  moved-branch message prints a per-branch fix line: `git reset --hard` in the
+  worktree that has the branch checked out, else `git branch -f`. --abort
+  rechecks the start tips after aborting in-chain rebases and keeps state
+  (exit 31) if one put a branch back on its restacked tip. --abort now records
+  `phase aborting` in the state file before the provider abort runs and refuses
+  (exit 31, nothing aborted) when that write fails; `--continue` treats
+  `aborting` like `aborted`, so a failed post-abort state or marker write can no
+  longer leave a rolled-back stack that `--continue` would finish. A state whose
+  recorded tips omit or repeat a restacked branch is now rejected as invalid
+  (exit 4). An id-less legacy state records the abort in its phase only, so a
+  later refusal names the real blocker instead of an unwritable marker. A
+  recorded tip must be a full commit hash. Any failed provider abort now keeps
+  `phase aborting`, since it may have rolled part of the stack back, so
+  `--continue` stays refused until a rerun of --abort finishes the cleanup. A
+  detached run worktree's floating commits are now listed by hash only, without
+  their subjects.
+
 ## 2.8.0
 
 ### Minor Changes

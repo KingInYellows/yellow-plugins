@@ -1,5 +1,14 @@
 # yellow-goal
 
+## 0.3.1
+
+### Patch Changes
+
+- [`37d7560`](https://github.com/KingInYellows/yellow-plugins/commit/37d7560966980205ba6c211a63af1d792049791e)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make the
+  runtime-protocol test helpers ignore a capture line the fake provider is still
+  appending, so a poll no longer fails on half-written JSON.
+
 ## 0.3.0
 
 ### Minor Changes
