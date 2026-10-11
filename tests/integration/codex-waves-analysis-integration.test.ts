@@ -221,13 +221,16 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     const result = inspect('src/file.js', (workspace) => {
       writeFileSync(
         join(workspace, 'src/file.js'),
-        'const amount = 1;\n' + assignment +
+        'const amount = 1;\n' +
+          assignment +
           '"synthetic-generic-credential";\nconst later = 2;\n'
       );
     });
     expect(result.exit).toBe(0);
     expect(result.output.status).toBe('partial');
-    expect(JSON.stringify(result.output)).not.toContain('synthetic-generic-credential');
+    expect(JSON.stringify(result.output)).not.toContain(
+      'synthetic-generic-credential'
+    );
     expect(result.output.files[0].lines[0].text).toBe('const amount = 1;');
     expect(result.output.files[0].lines[1].text).toBe(redactedAt(2));
     expect(result.output.files[0].lines[2].text).toBe(redactedAt(3));
@@ -249,14 +252,99 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     const result = inspect('src/file.js', (workspace) => {
       writeFileSync(
         join(workspace, 'src/file.js'),
-        'const amount = 1;\n' + assignment +
+        'const amount = 1;\n' +
+          assignment +
           '"synthetic-cookie-session";\nconst later = 2;\n'
       );
     });
     expect(result.exit).toBe(0);
     expect(result.output.status).toBe('partial');
-    expect(JSON.stringify(result.output)).not.toContain('synthetic-cookie-session');
+    expect(JSON.stringify(result.output)).not.toContain(
+      'synthetic-cookie-session'
+    );
     expect(result.output.files[0].lines[0].text).toBe('const amount = 1;');
+    expect(result.output.files[0].lines[1].text).toBe(redactedAt(2));
+    expect(result.output.files[0].lines[2].text).toBe(redactedAt(3));
+  });
+
+  it.each([
+    'apiKey \\',
+    'const apiKey',
+    'const service_credentials_v2',
+    '"cookie"',
+    'session_id',
+    'SID',
+    '"sId"',
+    'authorization',
+  ])('quarantines credential name before a split separator: %s', (marker) => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        'const amount = 1;\n' +
+          marker +
+          '\n= "synthetic-split-secret";\nconst later = 2;\n'
+      );
+    });
+    expect(result.exit).toBe(0);
+    expect(result.output.status).toBe('partial');
+    expect(JSON.stringify(result.output)).not.toContain(
+      'synthetic-split-secret'
+    );
+    expect(result.output.files[0].lines[0].text).toBe('const amount = 1;');
+    expect(result.output.files[0].lines[1].text).toBe(redactedAt(2));
+    expect(result.output.files[0].lines[2].text).toBe(redactedAt(3));
+    expect(result.output.files[0].lines[3].text).toBe(redactedAt(4));
+  });
+
+  it.each([
+    'const apiKey /* assignment comment */\n= "synthetic-comment-secret";',
+    'const apiKey // assignment comment\n= "synthetic-comment-secret";',
+    'const source = { "cookie" /* assignment comment */\n: "synthetic-comment-secret" };',
+  ])(
+    'quarantines valid JavaScript separators behind comments: %s',
+    (assignment) => {
+      const source =
+        'const amount = 1;\n' + assignment + '\nconst later = 2;\n';
+      const syntax = spawnSync('node', ['--check'], {
+        input: source,
+        encoding: 'utf8',
+      });
+      expect(syntax.status).toBe(0);
+      const result = inspect('src/file.js', (workspace) => {
+        writeFileSync(join(workspace, 'src/file.js'), source);
+      });
+      expect(result.exit).toBe(0);
+      expect(result.output.status).toBe('partial');
+      expect(JSON.stringify(result.output)).not.toContain(
+        'synthetic-comment-secret'
+      );
+      expect(result.output.files[0].lines[0].text).toBe('const amount = 1;');
+      expect(result.output.files[0].lines[1].text).toBe(redactedAt(2));
+      expect(result.output.files[0].lines[2].text).toBe(redactedAt(3));
+    }
+  );
+
+  it('quarantines a valid Python assignment continued before its separator', () => {
+    const source =
+      'amount = 1\napiKey \\\n= "synthetic-python-secret"\nlater = 2\n';
+    const syntax = spawnSync(
+      'python3',
+      ['-c', 'import ast,sys; ast.parse(sys.stdin.read())'],
+      {
+        input: source,
+        encoding: 'utf8',
+      }
+    );
+    expect(syntax.status).toBe(0);
+    const result = inspect('src/file.py', (workspace) => {
+      writeFileSync(join(workspace, 'src/file.py'), source);
+    });
+    expect(result.exit).toBe(0);
+    expect(result.output.status).toBe('partial');
+    expect(JSON.stringify(result.output)).not.toContain(
+      'synthetic-python-secret'
+    );
+    expect(result.output.files[0].lines[0].text).toBe('amount = 1');
     expect(result.output.files[0].lines[1].text).toBe(redactedAt(2));
     expect(result.output.files[0].lines[2].text).toBe(redactedAt(3));
   });
