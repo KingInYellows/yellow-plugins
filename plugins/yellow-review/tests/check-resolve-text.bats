@@ -1603,6 +1603,21 @@ rule=forged line=9.txt"
   done
 }
 
+@test "short Basic credentials whose UTF-8 continuation bytes fall in 0x80-0x9F are refused, under gawk and mawk" {
+  for bin in gawk mawk; do
+    # U+0100 is C4 80 and U+1F511 is F0 9F 94 91: valid UTF-8, not C1 controls.
+    for cred in '\304\200b:cd' 'ab:\360\237\224\221x'; do
+      tok=$(printf "$cred" | base64 | tr -d '\n')
+      [ "${#tok}" -lt 20 ]
+      awk_expect "$bin" 6 "Authorization: Basic ${tok}\n"
+      awk_expect "$bin" 6 "sent Basic ${tok} here\n"
+    done
+    # A C1 byte outside any UTF-8 sequence is still a control.
+    tok=$(printf 'a\200b:cd' | base64 | tr -d '\n')
+    awk_expect "$bin" 0 "Authorization: Basic ${tok}\n"
+  done
+}
+
 @test "an all-non-ASCII leading word is prose, not decoration; symbols are still stripped, under gawk and mawk" {
   ran=0
   for loc in C C.UTF-8; do
