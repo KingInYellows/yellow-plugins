@@ -1011,7 +1011,7 @@ report_floating() {
   done
   FLOAT_SEEN+=("$path")
   err "$(v "$path") is detached at a different commit than recorded ($(v "${head:0:12}") vs $(v "${sha:0:12}")); not restoring it"
-  git -C "$path" log --oneline -n "$MAX_LISTED" "$sha..HEAD" 2>/dev/null | while IFS= read -r line; do
+  git -C "$path" log --format=%H -n "$MAX_LISTED" "$sha..HEAD" 2>/dev/null | while IFS= read -r line; do
     printf '  floating commit: %s\n' "$(v "$line")"
   done
   printf '  rescue: git -C %s branch <new-name> HEAD   (or cherry-pick onto %s)\n' "$(q "$path")" "$(q "${E_REF[i]#refs/heads/}")"
@@ -1561,7 +1561,8 @@ release_run_worktree() {
     head=$(git -C "$S_RUN" rev-parse HEAD 2>/dev/null) || return 1
     if [ -z "$(git -C "$S_RUN" for-each-ref --count=1 --contains "$head" refs/heads 2>/dev/null)" ]; then
       err "$(v "$S_RUN") is detached at $(v "${head:0:12}"), a commit no branch holds; not checking out $(v "$start")"
-      git -C "$S_RUN" log --oneline -n "$MAX_LISTED" "$head" --not --branches 2>/dev/null | while IFS= read -r line; do
+      # Hashes only: a commit subject is repository text, not ours to print.
+      git -C "$S_RUN" log --format=%H -n "$MAX_LISTED" "$head" --not --branches 2>/dev/null | while IFS= read -r line; do
         printf '  floating commit: %s\n' "$(v "$line")"
       done
       printf '  rescue: git -C %s branch <new-name> HEAD   (or cherry-pick onto %s)\n' "$(q "$S_RUN")" "$(q "$start")"

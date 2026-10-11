@@ -555,7 +555,8 @@ forge() {
   resolve_in "$(wtp a)" b.txt
   run bash "$SCRIPT" continue --provider graphite
   [ "$status" -eq 40 ]
-  [[ $output == *"floating commit: "*"floating-work"* ]]
+  [[ $output == *"floating commit: $floating"* ]]
+  [[ $output != *"floating-work"* ]]
   [[ $output == *"rescue: git -C "* ]]
   [ -z "$(branch_of "$(wtp c)")" ]
   [ "$(git -C "$(wtp c)" rev-parse HEAD)" = "$floating" ]
