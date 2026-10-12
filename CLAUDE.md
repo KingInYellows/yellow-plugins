@@ -112,7 +112,8 @@ providers; `plugins/yellow-core/lib/stack-operation-registry.js` maps
 operations to providers. `.graphite.yml` holds gt-workflow conventions (not a
 Graphite CLI feature). The same exactly-one-enabled pattern governs the
 `remote-agent` group (`yellow-cursor` preferred over `yellow-devin`; see
-`docs/cursor-distribution.md`).
+`plugins/yellow-core/commands/setup/all.md` Step 2.5 and
+`plugins/yellow-core/lib/remote-agent-provider-state.js`).
 
 Observed on Claude Code 2.1.259: invoking the `Skill` tool with `smart-submit`
 or `gt-amend` (a command and a skill share each name) returned the thin
