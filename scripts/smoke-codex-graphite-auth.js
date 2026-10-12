@@ -35,6 +35,37 @@ function classify(stdout) {
     repositoryAccess: observedStatus === 'ok',
   };
 }
+function nativeConfig(home, configHome = path.join(home, '.config')) {
+  const candidates = [
+    {
+      source: path.join(home, '.graphite_user_config'),
+      target: 'home/.graphite_user_config',
+    },
+    {
+      source: path.join(configHome, 'graphite/user_config'),
+      target: 'config/graphite/user_config',
+    },
+    {
+      source: path.join(home, '.config/graphite/user_config'),
+      target: 'home/.config/graphite/user_config',
+    },
+  ];
+  for (const candidate of candidates) {
+    let metadata;
+    try {
+      metadata = fs.lstatSync(candidate.source);
+    } catch (error) {
+      if (error.code === 'ENOENT') continue;
+      throw error;
+    }
+    check(
+      metadata.isFile() && !metadata.isSymbolicLink(),
+      'Native config must be a regular file'
+    );
+    return candidate;
+  }
+  throw new Error('Native config unavailable');
+}
 function main() {
   const args = process.argv.slice(2);
   if (args.includes('--help')) {
@@ -50,15 +81,8 @@ function main() {
     'Explicit native-login choice required'
   );
   check(process.platform === 'linux', 'Linux required');
-  const ownerConfig = path.join(
-    process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'),
-    'graphite/user_config'
-  );
-  check(
-    fs.lstatSync(ownerConfig).isFile() &&
-      !fs.lstatSync(ownerConfig).isSymbolicLink(),
-    'Native config unavailable'
-  );
+  const config = nativeConfig(os.homedir(), process.env.XDG_CONFIG_HOME);
+  const ownerConfig = config.source;
   const before = fs.statSync(ownerConfig);
   const pkg = path.join(
     os.homedir(),
@@ -93,6 +117,7 @@ function main() {
     for (const dir of [
       'home',
       'config/graphite',
+      'home/.config/graphite',
       'cache',
       'data',
       'state',
@@ -145,7 +170,7 @@ function main() {
       scratch,
       '--ro-bind',
       ownerConfig,
-      path.join(scratch, 'config/graphite/user_config'),
+      path.join(scratch, config.target),
       '--chdir',
       ROOT,
       '--clearenv',
@@ -209,7 +234,7 @@ function main() {
     console.log(JSON.stringify(report, null, 2));
   }
 }
-module.exports = { classify };
+module.exports = { classify, nativeConfig };
 if (require.main === module) {
   try {
     main();

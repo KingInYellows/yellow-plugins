@@ -234,7 +234,12 @@ hashes must agree. Owner auth metadata is checked afterward. Mocked Responses
 cannot pass.
 
 The separate Graphite gate runs only `gt internal-only check-auth` inside
-read-only repository/config mounts. It retains classified account/access status,
+read-only repository/config mounts. It discovers the first regular native config
+in the same order as setup: `~/.graphite_user_config`,
+`$XDG_CONFIG_HOME/graphite/user_config` (defaulting to `~/.config`), then
+`~/.config/graphite/user_config`. The selected file is mounted at its matching
+sandbox location without reading or copying its contents; symlinks are refused.
+It retains classified account/access status,
 excludes credentials/account identity/raw diagnostics, and verifies unchanged
 owner metadata. No mutation MCP tool runs. Account proof does not replace MCP
 registration or startup evidence.

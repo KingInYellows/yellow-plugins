@@ -50,3 +50,8 @@ Generated Codex references must match the source.
 Bracketed-key regressions cover Python and JavaScript environment assignments,
 single/double quotes, whitespace, multiline values and separators, and ordinary
 non-credential keys that must remain visible.
+
+URL userinfo does not require a nonempty `username:password` pair. Token-only
+and empty-username URLs also trigger quarantine. Regressions test these forms
+independently, before any other credential marker, so an earlier redacted line
+cannot mask a detection gap.

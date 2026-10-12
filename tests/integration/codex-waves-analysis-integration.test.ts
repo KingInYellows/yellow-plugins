@@ -183,6 +183,29 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     }
   });
 
+  it.each([
+    'https://synthetic-url-value@example.com/private',
+    'https://:synthetic-url-value@example.com/private',
+    'https://synthetic-url-value:@example.com/private',
+    'https://user:synthetic-url-value@example.com/private',
+    'git+https://synthetic-url-value@example.com/private',
+  ])('quarantines URL userinfo: %s', (url) => {
+    const result = inspect('src/file.js', (workspace) => {
+      writeFileSync(
+        join(workspace, 'src/file.js'),
+        `const amount = 1;\nconst endpoint = "${url}";\nconst later = 2;\n`
+      );
+    });
+    expect(result.exit).toBe(0);
+    expect(result.output.status).toBe('partial');
+    expect(result.output.files[0].lines).toEqual([
+      { line: 1, text: 'const amount = 1;' },
+      { line: 2, text: '--- redacted possible credential at line 2 ---' },
+      { line: 3, text: '--- redacted possible credential at line 3 ---' },
+    ]);
+    expect(JSON.stringify(result.output)).not.toContain('synthetic-url-value');
+  });
+
   it('bounds source lines and redacts synthetic credential assignments', () => {
     const result = inspect('src/file.js', (workspace) => {
       writeFileSync(
