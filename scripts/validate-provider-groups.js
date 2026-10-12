@@ -5,7 +5,7 @@
  * field that marks a plugin as one interchangeable implementation of a
  * capability group: `stacked-pr` (gt-workflow/graphite, github-workflow/
  * github) and `remote-agent` (yellow-cursor/cursor, yellow-devin/devin,
- * yellow-jules/jules). See plans/stacked-pr-provider-abstraction.md.
+ * yellow-jules/jules). See plans/complete/stacked-pr-provider-abstraction.md.
  *
  * Checks (each failure carries an ERROR-PROVIDER-* code; see
  * packages/domain/src/validation/errorCatalog.ts):
