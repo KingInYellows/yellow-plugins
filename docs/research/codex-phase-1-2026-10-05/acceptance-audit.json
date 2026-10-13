@@ -1,0 +1,65 @@
+{
+  "status": "complete",
+  "recordedAt": "2026-10-06T00:24:18.062257+00:00",
+  "runtimeChoiceAuthorized": "User: Lets do the codex CLI in WSL please",
+  "sourceBase": "cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0",
+  "semanticRuntime": {
+    "provider": "openai",
+    "model": "gpt-6-astra",
+    "cliVersion": "0.157.0"
+  },
+  "activationCases": [
+    {
+      "id": "direct",
+      "status": "passed",
+      "activation": "attached-installed-skill",
+      "outputCorrect": true,
+      "unchanged": true
+    },
+    {
+      "id": "indirect",
+      "status": "passed",
+      "activation": "model-requested-installed-skill-read",
+      "outputCorrect": true,
+      "unchanged": true
+    },
+    {
+      "id": "unrelated",
+      "status": "passed",
+      "activation": "none",
+      "outputCorrect": true,
+      "unchanged": true
+    }
+  ],
+  "ownerAuthMetadataUnchanged": true,
+  "graphiteAuthentication": {
+    "observedStatus": "ok",
+    "authenticated": true,
+    "repositoryAccess": true,
+    "ownerConfigMetadataUnchanged": true
+  },
+  "discoveryReceipt": "discovery-final.json",
+  "hookMcpReceipt": "lifecycle-final.json",
+  "validationReceipt": "validation.json",
+  "remainingBlockers": [],
+  "laterPhasesStarted": false,
+  "completedAt": "2026-10-06T00:26:05.771458+00:00",
+  "discoveryCounts": {
+    "plugins": 4,
+    "skills": 23,
+    "untrustedHooks": 3
+  },
+  "validationCounts": {
+    "unitPassed": 787,
+    "integrationPassed": 1796,
+    "integrationSkipped": 1,
+    "newAcceptanceRegressionPassed": 16,
+    "earlierUnchangedHookBatsPassed": 393,
+    "focusedPassed": 147
+  },
+  "sourceHashes": {
+    "smoke-codex-plugin-lifecycle.js": "8af5a4b99388a340d4a171a8879df780486edbe7223103be1ab14b1828ed4f98",
+    "smoke-codex-skill-activation.js": "7270e8d16f04b0043aee36d9797dd699bd8b02baae792c25a1841aa17ee4b616",
+    "smoke-codex-graphite-auth.js": "d5cdf7c866ba48bb7233638036c752598519d16cbb0024928af67d13df740a35"
+  }
+}

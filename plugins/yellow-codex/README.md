@@ -64,6 +64,20 @@ model your account allows, or unset it (and remove the `model` key from
 | ---------------- | -------------------------------------------------------- |
 | `codex-patterns` | CLI invocation patterns, output parsing, security conventions |
 
+## Bounded Codex support
+
+The shared `codex-readiness` skill checks local CLI version and sanitized native
+login status with a 15-second deadline per probe. It performs no model request,
+review, rescue, install, login, config change, credential-file read or memory
+operation. Native login status proves local authentication state only; remote
+execution, quota and model access remain unverified.
+
+Codex distribution is enabled after installed-cache model acceptance.
+Only `codex-readiness` is proposed for exposure. Existing Claude commands and
+agents keep their separate execution contracts; no Codex-hosted nested model
+execution is advertised. Windows native and WSL CLI/login contexts are checked
+independently on the selected canonical host.
+
 ## Cross-Plugin Dependencies
 
 | Dependency     | Purpose                                                     | Required? |
@@ -86,3 +100,7 @@ identically without `yellow-codex` installed.
 ## License
 
 MIT
+
+Installed Codex acceptance passed for the selected skill, including safe
+failure and unrelated controls. Other plugin components remain excluded.
+See [integrated evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md).

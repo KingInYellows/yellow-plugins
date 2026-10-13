@@ -136,3 +136,14 @@ Also detects monorepo structure and existing doc tooling.
   architectures may need manual refinement
 - No external MCP servers — all analysis is local
 - Large repos (10K+ files) may require scoped audits for best performance
+
+## Codex compatibility expansion
+
+The shared docs-audit skill provides a bounded read-only workflow. Installed
+Codex acceptance and exact support are recorded in the canonical
+[Codex distribution](../../docs/codex-distribution.md) table. Other commands,
+agents and hooks retain their existing host contracts.
+
+Installed Codex acceptance passed for the selected skill, including safe
+failure and unrelated controls. Other plugin components remain excluded.
+See [integrated evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md).

@@ -8,13 +8,7 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-docs",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
-  "keywords": [
-    "documentation",
-    "docs",
-    "mermaid",
-    "audit",
-    "generation"
-  ],
+  "keywords": ["documentation", "docs", "mermaid", "audit", "generation"],
   "marketplace": {
     "category": "development",
     "source": "./plugins/yellow-docs"
@@ -22,7 +16,17 @@
   "targets": {
     "claude": true,
     "codex": {
-      "enabled": false
+      "enabled": true,
+      "includeHooks": false,
+      "interface": {
+        "displayName": "yellow-docs",
+        "category": "Developer Tools"
+      },
+      "skillAllowlist": ["docs-audit"],
+      "componentPaths": {
+        "skills": "./codex/skills"
+      },
+      "description": "One bounded read-only docs-audit workflow. Other commands, agents, skills and hooks remain excluded."
     }
   }
 }

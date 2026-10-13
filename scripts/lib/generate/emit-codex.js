@@ -22,9 +22,18 @@
  * by this module's existence.
  */
 
-const { readFileSync, openSync, closeSync, constants, realpathSync, readdirSync, lstatSync } = require('fs');
+const {
+  readFileSync,
+  openSync,
+  closeSync,
+  constants,
+  realpathSync,
+  readdirSync,
+  lstatSync,
+} = require('fs');
 const { join } = require('path');
 
+const { readSkillPolicy, validatePublicMcp } = require('./skill-policy');
 const { assertWithinRoot, NAME_RE } = require('./write');
 
 // Duplicated from scripts/validate-agent-authoring.js's extractFrontmatter
@@ -43,7 +52,11 @@ const REF_FILE_RE = /^[a-zA-Z0-9_][a-zA-Z0-9_-]*\.md$/;
  * emit-claude.js's isClaudeEnabled.
  */
 function isCodexEnabled(source) {
-  return Boolean(source.targets) && Boolean(source.targets.codex) && source.targets.codex.enabled === true;
+  return (
+    Boolean(source.targets) &&
+    Boolean(source.targets.codex) &&
+    source.targets.codex.enabled === true
+  );
 }
 
 /**
@@ -64,7 +77,10 @@ function buildCodexMarketplace(catalog, sources) {
     const codex = source.targets.codex;
     plugins.push({
       name,
-      description: codex.description !== undefined ? codex.description : source.description,
+      description:
+        codex.description !== undefined
+          ? codex.description
+          : source.description,
       category: catalog.targets.codex.category,
       source: { source: 'local', path: `./plugins/${name}` },
       policy: catalog.targets.codex.policy,
@@ -92,11 +108,21 @@ function buildCodexPluginManifest(source, pkg, hookConfig) {
   const manifest = {
     name: pkg.name,
     version: pkg.version,
+    ...(source.author && { author: source.author }),
+    ...(source.license && { license: source.license }),
+    ...(source.keywords && { keywords: source.keywords }),
     interface: {
       displayName: codex.interface.displayName,
       category: codex.interface.category,
+      ...(source.author && { developerName: source.author.name }),
+      ...(source.homepage && { websiteURL: source.homepage }),
     },
-    description: codex.description !== undefined ? codex.description : source.description,
+    description:
+      codex.description !== undefined ? codex.description : source.description,
+    // Codex 0.157.0 otherwise migrates commands/ into extra installed skills,
+    // bypassing the catalog skill allowlist even with an explicit skills path.
+    // See upstream core-plugins/src/command_migration/plugin.rs.
+    commands: [],
   };
   // Only claim a "skills" field when buildCodexSkillTree() will actually
   // copy at least one skill there (R-review: a componentPaths.skills value
@@ -105,7 +131,8 @@ function buildCodexPluginManifest(source, pkg, hookConfig) {
   // buildCodexSkillTree's own `(codex && codex.skillAllowlist) || []`
   // allowlist read.
   const skillsPath = codex.componentPaths && codex.componentPaths.skills;
-  const hasAllowlistedSkills = Array.isArray(codex.skillAllowlist) && codex.skillAllowlist.length > 0;
+  const hasAllowlistedSkills =
+    Array.isArray(codex.skillAllowlist) && codex.skillAllowlist.length > 0;
   if (skillsPath && hasAllowlistedSkills) {
     manifest.skills = skillsPath;
   }
@@ -118,7 +145,9 @@ function buildCodexPluginManifest(source, pkg, hookConfig) {
   // spiked for Codex. String-shape "not independently spiked for Codex in
   // this shell" per schemas/codex-plugin.schema.json's $comment; re-verify
   // against a live `codex plugin add` before trusting this field fires.
-  if (typeof source.mcpServers === 'string') {
+  if (codex.mcpServers !== undefined) {
+    manifest.mcpServers = validatePublicMcp(codex.mcpServers);
+  } else if (typeof source.mcpServers === 'string') {
     manifest.mcpServers = source.mcpServers;
   }
   return manifest;
@@ -179,7 +208,11 @@ function rewriteClaudeEntrypoint(command) {
  * group-walking/defensive-guard shape exists in exactly one place.
  */
 function mapHooksInGroup(group, transformHookDef) {
-  if (group === null || typeof group !== 'object' || !Array.isArray(group.hooks)) {
+  if (
+    group === null ||
+    typeof group !== 'object' ||
+    !Array.isArray(group.hooks)
+  ) {
     return group;
   }
   return { ...group, hooks: group.hooks.map(transformHookDef) };
@@ -192,7 +225,9 @@ function mapHooksInGroup(group, transformHookDef) {
  */
 function rewriteEntrypointsInGroup(group) {
   return mapHooksInGroup(group, (hookDef) =>
-    hookDef !== null && typeof hookDef === 'object' && typeof hookDef.command === 'string'
+    hookDef !== null &&
+    typeof hookDef === 'object' &&
+    typeof hookDef.command === 'string'
       ? { ...hookDef, command: rewriteClaudeEntrypoint(hookDef.command) }
       : hookDef
   );
@@ -209,7 +244,11 @@ function rewriteEntrypointsInGroup(group) {
  * constrain the inner hook-entry shape.
  */
 function withCommandWindows(hookDef) {
-  if (hookDef === null || typeof hookDef !== 'object' || typeof hookDef.command !== 'string') {
+  if (
+    hookDef === null ||
+    typeof hookDef !== 'object' ||
+    typeof hookDef.command !== 'string'
+  ) {
     return hookDef;
   }
   const result = {};
@@ -229,7 +268,9 @@ function withCommandWindows(hookDef) {
 function addCommandWindows(merged) {
   const result = {};
   for (const [event, groups] of Object.entries(merged)) {
-    result[event] = groups.map((group) => mapHooksInGroup(group, withCommandWindows));
+    result[event] = groups.map((group) =>
+      mapHooksInGroup(group, withCommandWindows)
+    );
   }
   return result;
 }
@@ -257,10 +298,14 @@ function buildCodexHookConfig(source) {
       if (!Array.isArray(defs) || defs.length === 0) {
         continue;
       }
-      merged[event] = (merged[event] || []).concat(defs.map(rewriteEntrypointsInGroup));
+      merged[event] = (merged[event] || []).concat(
+        defs.map(rewriteEntrypointsInGroup)
+      );
     }
   }
-  return Object.keys(merged).length > 0 ? { hooks: addCommandWindows(merged) } : null;
+  return Object.keys(merged).length > 0
+    ? { hooks: addCommandWindows(merged) }
+    : null;
 }
 
 /**
@@ -335,7 +380,9 @@ function buildCodexSkillTree(rootDir, name, source) {
   // Same source buildCodexPluginManifest reads for the manifest's "skills"
   // field (R7) — deriving the on-disk output path from it keeps the two in
   // agreement instead of assuming the 'codex/skills' convention.
-  const skillsPath = (codex && codex.componentPaths && codex.componentPaths.skills) || './codex/skills';
+  const skillsPath =
+    (codex && codex.componentPaths && codex.componentPaths.skills) ||
+    './codex/skills';
   // R7 containment: componentPaths.skills is catalog-authored and can carry
   // a path-escaping override (e.g. '../yellow-core/codex/skills'). The
   // generate-manifests.js callers' assertWithinRoot() calls only bound the
@@ -350,7 +397,9 @@ function buildCodexSkillTree(rootDir, name, source) {
   } catch (_) {
     return {
       status: 'error',
-      errors: [`plugins/${name}/targets.codex.componentPaths.skills ("${skillsPath}"): path must stay within the plugin's own directory`],
+      errors: [
+        `plugins/${name}/targets.codex.componentPaths.skills ("${skillsPath}"): path must stay within the plugin's own directory`,
+      ],
     };
   }
   // Real (symlink-resolved) plugin root, reused below as the containment
@@ -365,7 +414,9 @@ function buildCodexSkillTree(rootDir, name, source) {
 
   for (const skillName of allowlist) {
     if (!NAME_RE.test(skillName)) {
-      errors.push(`plugins/${name}/skills/${skillName}: skill name fails the [a-zA-Z0-9_-] allowlist`);
+      errors.push(
+        `plugins/${name}/skills/${skillName}: skill name fails the [a-zA-Z0-9_-] allowlist`
+      );
       continue;
     }
     const skillDir = join(rootDir, 'plugins', name, 'skills', skillName);
@@ -382,11 +433,18 @@ function buildCodexSkillTree(rootDir, name, source) {
       join(pluginRootReal, 'skills', skillName)
     );
     if (skillDirCheck.status === 'symlink') {
-      errors.push(`plugins/${name}/skills/${skillName}: symlinked skill directories (including a symlinked ancestor such as skills/) are not allowed`);
+      errors.push(
+        `plugins/${name}/skills/${skillName}: symlinked skill directories (including a symlinked ancestor such as skills/) are not allowed`
+      );
       continue;
     }
-    if (skillDirCheck.status === 'error' && skillDirCheck.error.code !== 'ENOENT') {
-      errors.push(`plugins/${name}/skills/${skillName}: ${skillDirCheck.error.message}`);
+    if (
+      skillDirCheck.status === 'error' &&
+      skillDirCheck.error.code !== 'ENOENT'
+    ) {
+      errors.push(
+        `plugins/${name}/skills/${skillName}: ${skillDirCheck.error.message}`
+      );
       continue;
     }
     // ENOENT: missing entirely — fall through to the open below, which
@@ -403,13 +461,19 @@ function buildCodexSkillTree(rootDir, name, source) {
     // for everything outside the supported references/*.md shape.
     let sidecarEntries;
     try {
-      sidecarEntries = readdirSync(skillDir).filter((entry) => entry !== 'SKILL.md');
+      sidecarEntries = readdirSync(skillDir).filter(
+        (entry) => entry !== 'SKILL.md'
+      );
     } catch (_) {
       sidecarEntries = []; // missing entirely; the SKILL.md open below reports it
     }
-    const unsupportedSidecars = sidecarEntries.filter((entry) => entry !== 'references');
+    const unsupportedSidecars = sidecarEntries.filter(
+      (entry) => entry !== 'references' && entry !== 'agents'
+    );
     if (unsupportedSidecars.length > 0) {
-      errors.push(`plugins/${name}/skills/${skillName}: has sidecar file(s) not yet supported for Codex (${unsupportedSidecars.join(', ')}) — only SKILL.md and references/*.md are copied`);
+      errors.push(
+        `plugins/${name}/skills/${skillName}: has sidecar file(s) not yet supported for Codex (${unsupportedSidecars.join(', ')}) — only SKILL.md and references/*.md are copied`
+      );
       continue;
     }
 
@@ -417,6 +481,32 @@ function buildCodexSkillTree(rootDir, name, source) {
     // SKILL.md itself validates below, so a skill never emits references
     // without its (normalized) SKILL.md.
     const referenceTargets = [];
+    if (sidecarEntries.includes('agents')) {
+      try {
+        const policy = readSkillPolicy(skillDir);
+        referenceTargets.push({
+          path: join(
+            pluginRoot,
+            skillsPath,
+            skillName,
+            'agents',
+            'openai.yaml'
+          ),
+          bytes: policy.bytes,
+        });
+      } catch (error) {
+        errors.push(
+          'plugins/' +
+            name +
+            '/skills/' +
+            skillName +
+            '/agents: ' +
+            error.message
+        );
+        continue;
+      }
+    }
+
     if (sidecarEntries.includes('references')) {
       const refDir = join(skillDir, 'references');
       // Same symlink posture as skillDir above (shared helper); O_NOFOLLOW
@@ -430,15 +520,21 @@ function buildCodexSkillTree(rootDir, name, source) {
         join(pluginRootReal, 'skills', skillName, 'references')
       );
       if (refDirCheck.status === 'symlink') {
-        errors.push(`plugins/${name}/skills/${skillName}/references: symlinked references directories (including a symlinked ancestor) are not allowed`);
+        errors.push(
+          `plugins/${name}/skills/${skillName}/references: symlinked references directories (including a symlinked ancestor) are not allowed`
+        );
         continue;
       }
       if (refDirCheck.status === 'notDir') {
-        errors.push(`plugins/${name}/skills/${skillName}/references: exists but is not a directory — only a flat references/ directory of *.md files is supported for Codex`);
+        errors.push(
+          `plugins/${name}/skills/${skillName}/references: exists but is not a directory — only a flat references/ directory of *.md files is supported for Codex`
+        );
         continue;
       }
       if (refDirCheck.status === 'error') {
-        errors.push(`plugins/${name}/skills/${skillName}/references: ${refDirCheck.error.message}`);
+        errors.push(
+          `plugins/${name}/skills/${skillName}/references: ${refDirCheck.error.message}`
+        );
         continue;
       }
 
@@ -446,18 +542,24 @@ function buildCodexSkillTree(rootDir, name, source) {
       try {
         refEntries = readdirSync(refDir, { withFileTypes: true });
       } catch (err) {
-        errors.push(`plugins/${name}/skills/${skillName}/references: ${err.message}`);
+        errors.push(
+          `plugins/${name}/skills/${skillName}/references: ${err.message}`
+        );
         continue;
       }
       let refEntryBad = false;
       // Sort for deterministic target ordering across filesystems.
-      refEntries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+      refEntries.sort((a, b) =>
+        a.name < b.name ? -1 : a.name > b.name ? 1 : 0
+      );
       for (const entry of refEntries) {
         // Flat *.md only — nested directories, non-.md files, and symlinks
         // (isFile() is false for symlinks under withFileTypes) keep the
         // hard error.
         if (!entry.isFile() || !REF_FILE_RE.test(entry.name)) {
-          errors.push(`plugins/${name}/skills/${skillName}/references/${entry.name}: only flat, regular [a-zA-Z0-9_-]+.md reference files are supported for Codex`);
+          errors.push(
+            `plugins/${name}/skills/${skillName}/references/${entry.name}: only flat, regular [a-zA-Z0-9_-]+.md reference files are supported for Codex`
+          );
           refEntryBad = true;
           continue;
         }
@@ -467,9 +569,13 @@ function buildCodexSkillTree(rootDir, name, source) {
           refFd = openSync(refFile, constants.O_RDONLY | constants.O_NOFOLLOW);
         } catch (err) {
           if (err.code === 'ELOOP') {
-            errors.push(`plugins/${name}/skills/${skillName}/references/${entry.name}: symlinked reference files are not allowed`);
+            errors.push(
+              `plugins/${name}/skills/${skillName}/references/${entry.name}: symlinked reference files are not allowed`
+            );
           } else {
-            errors.push(`plugins/${name}/skills/${skillName}/references/${entry.name}: ${err.message}`);
+            errors.push(
+              `plugins/${name}/skills/${skillName}/references/${entry.name}: ${err.message}`
+            );
           }
           refEntryBad = true;
           continue;
@@ -478,7 +584,9 @@ function buildCodexSkillTree(rootDir, name, source) {
         try {
           refRaw = readFileSync(refFd, 'utf8');
         } catch (err) {
-          errors.push(`plugins/${name}/skills/${skillName}/references/${entry.name}: ${err.message}`);
+          errors.push(
+            `plugins/${name}/skills/${skillName}/references/${entry.name}: ${err.message}`
+          );
           refEntryBad = true;
           continue;
         } finally {
@@ -489,7 +597,15 @@ function buildCodexSkillTree(rootDir, name, source) {
         // preserved so skill-relative "sibling" Read stubs resolve
         // identically in source and generated locations.
         referenceTargets.push({
-          path: join(rootDir, 'plugins', name, skillsPath, skillName, 'references', entry.name),
+          path: join(
+            rootDir,
+            'plugins',
+            name,
+            skillsPath,
+            skillName,
+            'references',
+            entry.name
+          ),
           bytes: refRaw,
         });
       }
@@ -503,11 +619,17 @@ function buildCodexSkillTree(rootDir, name, source) {
       fd = openSync(skillFile, constants.O_RDONLY | constants.O_NOFOLLOW);
     } catch (err) {
       if (err.code === 'ENOENT') {
-        errors.push(`plugins/${name}/skills/${skillName}/SKILL.md: not found (declared in codex.skillAllowlist)`);
+        errors.push(
+          `plugins/${name}/skills/${skillName}/SKILL.md: not found (declared in codex.skillAllowlist)`
+        );
       } else if (err.code === 'ELOOP') {
-        errors.push(`plugins/${name}/skills/${skillName}/SKILL.md: symlinked skill files are not allowed`);
+        errors.push(
+          `plugins/${name}/skills/${skillName}/SKILL.md: symlinked skill files are not allowed`
+        );
       } else {
-        errors.push(`plugins/${name}/skills/${skillName}/SKILL.md: ${err.message}`);
+        errors.push(
+          `plugins/${name}/skills/${skillName}/SKILL.md: ${err.message}`
+        );
       }
       continue;
     }
@@ -515,7 +637,9 @@ function buildCodexSkillTree(rootDir, name, source) {
     try {
       raw = readFileSync(fd, 'utf8');
     } catch (err) {
-      errors.push(`plugins/${name}/skills/${skillName}/SKILL.md: ${err.message}`);
+      errors.push(
+        `plugins/${name}/skills/${skillName}/SKILL.md: ${err.message}`
+      );
       continue;
     } finally {
       closeSync(fd);
@@ -523,18 +647,29 @@ function buildCodexSkillTree(rootDir, name, source) {
 
     const match = raw.match(FRONTMATTER_RE);
     if (!match) {
-      errors.push(`plugins/${name}/skills/${skillName}/SKILL.md: missing frontmatter block`);
+      errors.push(
+        `plugins/${name}/skills/${skillName}/SKILL.md: missing frontmatter block`
+      );
       continue;
     }
     let parsed;
     try {
       parsed = YAML.parse(match[1]);
     } catch (err) {
-      errors.push(`plugins/${name}/skills/${skillName}/SKILL.md: malformed frontmatter YAML: ${err.message}`);
+      errors.push(
+        `plugins/${name}/skills/${skillName}/SKILL.md: malformed frontmatter YAML: ${err.message}`
+      );
       continue;
     }
-    if (parsed === null || typeof parsed !== 'object' || typeof parsed.name !== 'string' || typeof parsed.description !== 'string') {
-      errors.push(`plugins/${name}/skills/${skillName}/SKILL.md: frontmatter must have string "name" and "description"`);
+    if (
+      parsed === null ||
+      typeof parsed !== 'object' ||
+      typeof parsed.name !== 'string' ||
+      typeof parsed.description !== 'string'
+    ) {
+      errors.push(
+        `plugins/${name}/skills/${skillName}/SKILL.md: frontmatter must have string "name" and "description"`
+      );
       continue;
     }
     // The allowlist and the stale-artifact sweep both reason about the
@@ -544,7 +679,9 @@ function buildCodexSkillTree(rootDir, name, source) {
     // differently-named skill under an allowlisted directory, so reject
     // rather than silently emit a name that disagrees with the allowlist.
     if (parsed.name !== skillName) {
-      errors.push(`plugins/${name}/skills/${skillName}/SKILL.md: frontmatter "name" ("${parsed.name}") must match the allowlisted directory name ("${skillName}")`);
+      errors.push(
+        `plugins/${name}/skills/${skillName}/SKILL.md: frontmatter "name" ("${parsed.name}") must match the allowlisted directory name ("${skillName}")`
+      );
       continue;
     }
     // `body` retains its own leading blank line (the regex match ends right
@@ -562,7 +699,14 @@ function buildCodexSkillTree(rootDir, name, source) {
     ).trimEnd();
     const normalized = `---\n${normalizedFrontmatter}\n---\n${body}`;
 
-    const targetPath = join(rootDir, 'plugins', name, skillsPath, skillName, 'SKILL.md');
+    const targetPath = join(
+      rootDir,
+      'plugins',
+      name,
+      skillsPath,
+      skillName,
+      'SKILL.md'
+    );
     targets.push({ path: targetPath, bytes: normalized });
     targets.push(...referenceTargets);
   }

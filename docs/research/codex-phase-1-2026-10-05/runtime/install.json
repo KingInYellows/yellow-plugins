@@ -1,0 +1,18 @@
+[
+  {
+    "pluginId": "gt-workflow@yellow-plugins",
+    "name": "gt-workflow",
+    "marketplaceName": "yellow-plugins",
+    "version": "2.0.6",
+    "installedPath": "/tmp/yellow-codex-lifecycle-Kzi7Ft/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6",
+    "authPolicy": "ON_INSTALL"
+  },
+  {
+    "pluginId": "yellow-ci@yellow-plugins",
+    "name": "yellow-ci",
+    "marketplaceName": "yellow-plugins",
+    "version": "1.5.6",
+    "installedPath": "/tmp/yellow-codex-lifecycle-Kzi7Ft/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6",
+    "authPolicy": "ON_INSTALL"
+  }
+]

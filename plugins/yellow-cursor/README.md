@@ -92,6 +92,21 @@ asks you to confirm before the real, billable launch happens.
 - **Credentials are never printed.** Setup reports where a credential came from
   (`env` / `stored-login` / `none`), never its value.
 
+## Bounded Codex support
+
+The shared `cursor-plan` skill prepares a validated offline delegation plan using
+the shipped `dist/cli.js` runtime's `delegate --dry-run`. It requires Node
+>=22.22.0 <25.0.0 and a bounded terminal tool, but no Cursor SDK, credentials or
+network. It returns the idempotency key and supplied repository/ref/model with
+`launched:false` and authentication unverified. It does not expose the paid
+delegation lifecycle, status, setup or memory operations.
+
+Codex distribution is enabled after installed-cache model acceptance.
+The allowlist contains only `cursor-plan`; `cursor-delegation` remains
+the existing Cursor-native lifecycle reference. Resolve the runtime from the
+installed plugin root, never a checkout or sibling installation. No build or
+dependency install is needed for the offline plan: the runtime is committed.
+
 ## Limitations
 
 - **Single-agent v1** — no fan-out to multiple agents in one command, no batch
@@ -125,3 +140,7 @@ over.
 ## License
 
 MIT
+
+Installed Codex acceptance passed for the selected skill, including safe
+failure and unrelated controls. Other plugin components remain excluded.
+See [integrated evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md).

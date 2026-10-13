@@ -1,0 +1,68 @@
+{
+  "data": [
+    {
+      "cwd": "/tmp/yellow-codex-lifecycle-Kzi7Ft/project",
+      "hooks": [
+        {
+          "key": "gt-workflow@yellow-plugins:hooks/codex-hooks.json:pre_tool_use:0:0",
+          "eventName": "preToolUse",
+          "handlerType": "command",
+          "command": "node \"/tmp/yellow-codex-lifecycle-Kzi7Ft/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/hooks/scripts/entrypoint-codex.js\" --hook check-git-push",
+          "async": false,
+          "matcher": "Bash",
+          "timeoutSec": 5,
+          "statusMessage": null,
+          "additionalContextLimit": null,
+          "sourcePath": "/tmp/yellow-codex-lifecycle-Kzi7Ft/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/hooks/codex-hooks.json",
+          "source": "plugin",
+          "pluginId": "gt-workflow@yellow-plugins",
+          "displayOrder": 0,
+          "enabled": true,
+          "isManaged": false,
+          "currentHash": "sha256:5f8e73ba0f9270c4316b492302303640bdcbe17787d6379ceb5e5df4cc9ca2cd",
+          "trustStatus": "untrusted"
+        },
+        {
+          "key": "gt-workflow@yellow-plugins:hooks/codex-hooks.json:post_tool_use:0:0",
+          "eventName": "postToolUse",
+          "handlerType": "command",
+          "command": "node \"/tmp/yellow-codex-lifecycle-Kzi7Ft/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/hooks/scripts/entrypoint-codex.js\" --hook check-commit-message",
+          "async": false,
+          "matcher": "Bash",
+          "timeoutSec": 5,
+          "statusMessage": null,
+          "additionalContextLimit": null,
+          "sourcePath": "/tmp/yellow-codex-lifecycle-Kzi7Ft/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/hooks/codex-hooks.json",
+          "source": "plugin",
+          "pluginId": "gt-workflow@yellow-plugins",
+          "displayOrder": 1,
+          "enabled": true,
+          "isManaged": false,
+          "currentHash": "sha256:23e255c0c4891e6a19521fd88ed37436f9b3747553ecdc51cbd5b7773e8e99a6",
+          "trustStatus": "untrusted"
+        },
+        {
+          "key": "yellow-ci@yellow-plugins:hooks/codex-hooks.json:session_start:0:0",
+          "eventName": "sessionStart",
+          "handlerType": "command",
+          "command": "node \"/tmp/yellow-codex-lifecycle-Kzi7Ft/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/hooks/scripts/entrypoint-codex.js\"",
+          "async": false,
+          "matcher": "*",
+          "timeoutSec": 3,
+          "statusMessage": null,
+          "additionalContextLimit": null,
+          "sourcePath": "/tmp/yellow-codex-lifecycle-Kzi7Ft/codex/plugins/cache/yellow-plugins/yellow-ci/1.5.6/hooks/codex-hooks.json",
+          "source": "plugin",
+          "pluginId": "yellow-ci@yellow-plugins",
+          "displayOrder": 2,
+          "enabled": true,
+          "isManaged": false,
+          "currentHash": "sha256:e7ef7b0cedc85a6421109a51c689d324a0e5ce2e6574c7c8e4d9e38eb0c05358",
+          "trustStatus": "untrusted"
+        }
+      ],
+      "warnings": [],
+      "errors": []
+    }
+  ]
+}

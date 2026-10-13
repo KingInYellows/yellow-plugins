@@ -7,9 +7,10 @@
 // the two entrypoints are intentionally byte-equivalent, kept separate for the
 // per-host entrypoint convention (and referenced independently by the inline
 // hooks block in .claude-plugin/plugin.json / hooks/codex-hooks.json).
-// NOTE: plugin-shipped hooks do not currently fire on Codex (`plugin_hooks`
-// is `removed` on codex-cli 0.144.x) — this
-// entrypoint is carried but inert there until upstream restores the feature.
+// Codex 0.157.0 lifecycle coverage verifies delivery after trusting the
+// disposable installed definition hash; untrusted controls remain idle.
+// Historical 0.144.x inert behavior does not describe that newer runtime.
+// See docs/codex-distribution.md for version-specific evidence and limits.
 
 const { formatSessionStartOutput } = require('./lib/envelope.js');
 const { runHook } = require('./lib/run-hook.js');

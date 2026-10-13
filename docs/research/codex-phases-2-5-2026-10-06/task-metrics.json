@@ -1,0 +1,398 @@
+{
+  "recordedAt": "2026-10-06T15:05:34.129141+00:00",
+  "interpretation": "Single observed runs, not a controlled performance experiment. Source/reference byte reduction is not runtime savings. Provider usage notifications include cumulative repeated input and cache state. GT baseline exposed one selected skill in staging while final plugin exposes its existing eleven; its before/after token totals are not comparable as an efficiency estimate.",
+  "cases": [
+    {
+      "group": "ci-before",
+      "case": "ci-diagnose-success",
+      "model": "gpt-6-astra",
+      "status": "passed",
+      "reads": 1,
+      "toolCalls": 3,
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 91916,
+          "inputTokens": 91700,
+          "cachedInputTokens": 22272,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 216,
+          "reasoningOutputTokens": 21
+        },
+        "last": {
+          "totalTokens": 35173,
+          "inputTokens": 35126,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 47,
+          "reasoningOutputTokens": 21
+        },
+        "modelContextWindow": 258400
+      },
+      "receipt": "pilot-before.json"
+    },
+    {
+      "group": "ci-before",
+      "case": "ci-diagnose-missing-auth",
+      "model": "gpt-6-astra",
+      "status": "passed",
+      "reads": 1,
+      "toolCalls": 2,
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 71120,
+          "inputTokens": 70948,
+          "cachedInputTokens": 38528,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 172,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 41417,
+          "inputTokens": 41349,
+          "cachedInputTokens": 29440,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 68,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      },
+      "receipt": "pilot-before.json"
+    },
+    {
+      "group": "ci-before",
+      "case": "ci-runner-refusal",
+      "model": "gpt-6-astra",
+      "status": "passed",
+      "reads": 2,
+      "toolCalls": 4,
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 126955,
+          "inputTokens": 126758,
+          "cachedInputTokens": 80128,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 197,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 46349,
+          "inputTokens": 46331,
+          "cachedInputTokens": 45952,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 18,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      },
+      "receipt": "pilot-before.json"
+    },
+    {
+      "group": "ci-before",
+      "case": "ci-unrelated",
+      "model": "gpt-6-astra",
+      "status": "passed",
+      "reads": 0,
+      "toolCalls": 0,
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 17903,
+          "inputTokens": 17898,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 5,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 17903,
+          "inputTokens": 17898,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 5,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      },
+      "receipt": "pilot-before.json"
+    },
+    {
+      "group": "ci-after",
+      "case": "ci-diagnose-success",
+      "model": "gpt-6-astra",
+      "status": "passed",
+      "reads": 4,
+      "toolCalls": 6,
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 78061,
+          "inputTokens": 77720,
+          "cachedInputTokens": 61440,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 341,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 24109,
+          "inputTokens": 24085,
+          "cachedInputTokens": 22784,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 24,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      },
+      "receipt": "pilot-after-final.json"
+    },
+    {
+      "group": "ci-after",
+      "case": "ci-diagnose-missing-auth",
+      "model": "gpt-6-astra",
+      "status": "passed",
+      "reads": 2,
+      "toolCalls": 3,
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 65671,
+          "inputTokens": 65387,
+          "cachedInputTokens": 38144,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 284,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 26971,
+          "inputTokens": 26888,
+          "cachedInputTokens": 19456,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 83,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      },
+      "receipt": "pilot-after-final.json"
+    },
+    {
+      "group": "ci-after",
+      "case": "ci-runner-refusal",
+      "model": "gpt-6-astra",
+      "status": "passed",
+      "reads": 3,
+      "toolCalls": 5,
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 65442,
+          "inputTokens": 65169,
+          "cachedInputTokens": 50560,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 273,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 23269,
+          "inputTokens": 23251,
+          "cachedInputTokens": 22784,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 18,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      },
+      "receipt": "pilot-after-final.json"
+    },
+    {
+      "group": "ci-after",
+      "case": "ci-unrelated",
+      "model": "gpt-6-astra",
+      "status": "passed",
+      "reads": 0,
+      "toolCalls": 0,
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 18005,
+          "inputTokens": 18000,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 5,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 18005,
+          "inputTokens": 18000,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 5,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      },
+      "receipt": "pilot-after-final.json"
+    },
+    {
+      "group": "gt-before",
+      "case": "gt-prerequisites",
+      "model": "gpt-6-astra",
+      "status": "passed",
+      "reads": 1,
+      "toolCalls": 2,
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 36208,
+          "inputTokens": 36081,
+          "cachedInputTokens": 15232,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 127,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 20694,
+          "inputTokens": 20670,
+          "cachedInputTokens": 15232,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 24,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      },
+      "receipt": "gt-before.json"
+    },
+    {
+      "group": "gt-before",
+      "case": "gt-missing-tool",
+      "model": "gpt-6-astra",
+      "status": "passed",
+      "reads": 1,
+      "toolCalls": 2,
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 36136,
+          "inputTokens": 36022,
+          "cachedInputTokens": 15232,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 114,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 20648,
+          "inputTokens": 20634,
+          "cachedInputTokens": 15232,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 14,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      },
+      "receipt": "gt-before.json"
+    },
+    {
+      "group": "gt-before",
+      "case": "gt-unrelated",
+      "model": "gpt-6-astra",
+      "status": "passed",
+      "reads": 0,
+      "toolCalls": 0,
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 10187,
+          "inputTokens": 10182,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 5,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 10187,
+          "inputTokens": 10182,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 5,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      },
+      "receipt": "gt-before.json"
+    },
+    {
+      "group": "gt-after",
+      "case": "gt-prerequisites",
+      "model": "gpt-6-astra",
+      "status": "passed",
+      "reads": 2,
+      "toolCalls": 3,
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 53616,
+          "inputTokens": 53413,
+          "cachedInputTokens": 37888,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 203,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 15072,
+          "inputTokens": 15048,
+          "cachedInputTokens": 14848,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 24,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      },
+      "receipt": "gt-after-final.json"
+    },
+    {
+      "group": "gt-after",
+      "case": "gt-missing-tool",
+      "model": "gpt-6-astra",
+      "status": "passed",
+      "reads": 2,
+      "toolCalls": 3,
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 40847,
+          "inputTokens": 40665,
+          "cachedInputTokens": 24576,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 182,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 15775,
+          "inputTokens": 15761,
+          "cachedInputTokens": 12544,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 14,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      },
+      "receipt": "gt-after-final.json"
+    },
+    {
+      "group": "gt-after",
+      "case": "gt-unrelated",
+      "model": "gpt-6-astra",
+      "status": "passed",
+      "reads": 0,
+      "toolCalls": 0,
+      "tokenUsage": {
+        "total": {
+          "totalTokens": 17811,
+          "inputTokens": 17806,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 5,
+          "reasoningOutputTokens": 0
+        },
+        "last": {
+          "totalTokens": 17811,
+          "inputTokens": 17806,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 5,
+          "reasoningOutputTokens": 0
+        },
+        "modelContextWindow": 258400
+      },
+      "receipt": "gt-after-final.json"
+    }
+  ]
+}

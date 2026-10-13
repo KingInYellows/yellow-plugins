@@ -73,3 +73,14 @@ Then enable `yellow-docs` from the plugin list.
   persona (only for findings the orchestrator actually received).
 - **General-purpose**: Works in any git repo — TypeScript, Python, Rust, Go,
   and more
+
+## Codex compatibility expansion
+
+The shared docs-audit skill provides a bounded read-only workflow. Installed
+Codex acceptance and exact support are recorded in the canonical
+[Codex distribution](../../docs/codex-distribution.md) table. Other commands,
+agents and hooks retain their existing host contracts.
+
+Installed Codex acceptance passed for the selected skill, including safe
+failure and unrelated controls. Other plugin components remain excluded.
+See [integrated evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md).

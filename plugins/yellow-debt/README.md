@@ -4,6 +4,10 @@ Technical debt audit and remediation plugin for Claude Code.
 
 ## Overview
 
+The bounded `debt-complexity-scan` skill redacts recognized credential markers,
+including bracketed dictionary and environment keys, and all later lines in the
+same file. Such scans return `partial`. This does not replace a secret scanner.
+
 The `yellow-debt` plugin runs comprehensive technical debt audits using 5
 parallel specialized scanner agents, produces prioritized markdown reports with
 actionable todo files, and provides remediation workflows including interactive
@@ -294,3 +298,27 @@ If synthesis fails:
 ## License
 
 MIT
+
+## Shared read-only complexity skill
+
+`debt-complexity-scan` inspects at most 20 local source files and 2,000 lines,
+returning scanner schema 2.0 inline. Its packaged flat reference contains a
+self-contained Python 3 snapshot program with executable path validation,
+no-follow source reads and stdin-only JSON inputs. A process tool with separate
+stdin and Python directory-descriptor support is required; there is no new
+dependency installation. It needs no Graphite, jq/yq, MCP or sibling plugin.
+It performs no fixes, todo transitions, report writes or Linear synchronization.
+Codex support is limited to this skill after the installed-runtime gate passes;
+the full Claude scanner fleet and SessionStart hook are outside that scope.
+Missing snapshot facilities return an explicit error instead of findings.
+
+Installed Codex acceptance passed for the selected skill, including safe
+failure and unrelated controls. Other plugin components remain excluded.
+See [integrated evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md).
+
+Credential markers make the bounded snapshot return `partial` and redact the
+rest of that source file, including for token-only or empty-username URL
+userinfo and C/C++ credential-array declarators. It retains line numbers but sacrifices later benign
+code rather than guessing expression endings across languages. Other source
+files are scanned independently. Marker detection is not a comprehensive secret
+scanner; exclude sources known to contain unmarked credentials.

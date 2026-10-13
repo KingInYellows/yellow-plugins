@@ -43,6 +43,7 @@ const {
 } = require('fs');
 const { join } = require('path');
 
+const { readSkillPolicy } = require('./skill-policy');
 const { assertWithinRoot, NAME_RE } = require('./write');
 
 // Duplicated from emit-codex.js's own FRONTMATTER_RE (itself duplicated from
@@ -297,7 +298,7 @@ function buildCursorSkillTree(rootDir, name, source) {
       sidecarEntries = []; // missing entirely; the SKILL.md open below reports it
     }
     const unsupportedSidecars = sidecarEntries.filter(
-      (entry) => entry !== 'references'
+      (entry) => entry !== 'references' && entry !== 'agents'
     );
     if (unsupportedSidecars.length > 0) {
       errors.push(
@@ -306,6 +307,22 @@ function buildCursorSkillTree(rootDir, name, source) {
       continue;
     }
 
+    // Validate the Codex-only policy resource but keep Cursor output unchanged.
+    if (sidecarEntries.includes('agents')) {
+      try {
+        readSkillPolicy(skillDir);
+      } catch (error) {
+        errors.push(
+          'plugins/' +
+            name +
+            '/skills/' +
+            skillName +
+            '/agents: ' +
+            error.message
+        );
+        continue;
+      }
+    }
     const referenceTargets = [];
     if (sidecarEntries.includes('references')) {
       const refDir = join(skillDir, 'references');

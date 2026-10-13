@@ -51,13 +51,22 @@
  *   1 - at least one violation (details on stderr)
  */
 
-const { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } = require('fs');
+const {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+} = require('fs');
 const { join, resolve, sep } = require('path');
 
 const Ajv = require('ajv');
 const addFormats = require('ajv-formats');
 
-const { loadCatalog, loadPluginSources } = require('./lib/generate/catalog-reader');
+const {
+  loadCatalog,
+  loadPluginSources,
+} = require('./lib/generate/catalog-reader');
 const { isClaudeEnabled } = require('./lib/generate/emit-claude');
 const { isCodexEnabled, REF_FILE_RE } = require('./lib/generate/emit-codex');
 const { assertWithinRoot } = require('./lib/generate/write');
@@ -70,7 +79,12 @@ function makeAjv() {
   // configuration (strict, allErrors, formats) so scripts/ and packages/
   // apply the same validation rules even though they can't share the
   // compiled factory class across the ESM/CJS wall.
-  const ajv = new Ajv({ strict: true, allErrors: true, verbose: true, allowUnionTypes: true });
+  const ajv = new Ajv({
+    strict: true,
+    allErrors: true,
+    verbose: true,
+    allowUnionTypes: true,
+  });
   addFormats(ajv);
   return ajv;
 }
@@ -92,21 +106,36 @@ function validateArtifacts({ rootDir, catalog, sources, ajv, schemasDir }) {
   const errors = [];
   const validateManifest = loadCompiledSchema(ajv, schemasDir, 'codex-plugin');
   const validateHooks = loadCompiledSchema(ajv, schemasDir, 'codex-hooks');
-  const validateMarketplace = loadCompiledSchema(ajv, schemasDir, 'codex-marketplace');
+  const validateMarketplace = loadCompiledSchema(
+    ajv,
+    schemasDir,
+    'codex-marketplace'
+  );
 
-  const marketplacePath = join(rootDir, '.agents', 'plugins', 'marketplace.json');
+  const marketplacePath = join(
+    rootDir,
+    '.agents',
+    'plugins',
+    'marketplace.json'
+  );
   if (!existsSync(marketplacePath)) {
-    errors.push(`.agents/plugins/marketplace.json: not found — run \`pnpm generate:manifests\` first`);
+    errors.push(
+      `.agents/plugins/marketplace.json: not found — run \`pnpm generate:manifests\` first`
+    );
   } else {
     let data;
     try {
       data = JSON.parse(readFileSync(marketplacePath, 'utf8'));
     } catch (err) {
-      errors.push(`.agents/plugins/marketplace.json: invalid JSON: ${err.message}`);
+      errors.push(
+        `.agents/plugins/marketplace.json: invalid JSON: ${err.message}`
+      );
     }
     if (data !== undefined && !validateMarketplace(data)) {
       for (const err of validateMarketplace.errors) {
-        errors.push(`.agents/plugins/marketplace.json${err.instancePath}: ${err.message}`);
+        errors.push(
+          `.agents/plugins/marketplace.json${err.instancePath}: ${err.message}`
+        );
       }
     }
   }
@@ -116,49 +145,84 @@ function validateArtifacts({ rootDir, catalog, sources, ajv, schemasDir }) {
     if (!isCodexEnabled(source)) {
       continue;
     }
-    const manifestPath = join(rootDir, 'plugins', name, '.codex-plugin', 'plugin.json');
+    const manifestPath = join(
+      rootDir,
+      'plugins',
+      name,
+      '.codex-plugin',
+      'plugin.json'
+    );
     if (!existsSync(manifestPath)) {
-      errors.push(`plugins/${name}/.codex-plugin/plugin.json: not found — run \`pnpm generate:manifests\` first`);
+      errors.push(
+        `plugins/${name}/.codex-plugin/plugin.json: not found — run \`pnpm generate:manifests\` first`
+      );
       continue;
     }
     let manifestData;
     try {
       manifestData = JSON.parse(readFileSync(manifestPath, 'utf8'));
     } catch (err) {
-      errors.push(`plugins/${name}/.codex-plugin/plugin.json: invalid JSON: ${err.message}`);
+      errors.push(
+        `plugins/${name}/.codex-plugin/plugin.json: invalid JSON: ${err.message}`
+      );
     }
     // JSON.parse('null') succeeds, and a non-object top level would make the
     // `.hooks` dereference below throw an uncaught TypeError — escaping the
     // documented string[] return contract (mirrors generate-manifests.js's
     // package.json shape guard).
-    if (manifestData !== undefined && (manifestData === null || typeof manifestData !== 'object' || Array.isArray(manifestData))) {
-      errors.push(`plugins/${name}/.codex-plugin/plugin.json: must be a JSON object`);
+    if (
+      manifestData !== undefined &&
+      (manifestData === null ||
+        typeof manifestData !== 'object' ||
+        Array.isArray(manifestData))
+    ) {
+      errors.push(
+        `plugins/${name}/.codex-plugin/plugin.json: must be a JSON object`
+      );
       manifestData = undefined;
     }
     if (manifestData !== undefined && !validateManifest(manifestData)) {
       for (const err of validateManifest.errors) {
-        errors.push(`plugins/${name}/.codex-plugin/plugin.json${err.instancePath}: ${err.message}`);
+        errors.push(
+          `plugins/${name}/.codex-plugin/plugin.json${err.instancePath}: ${err.message}`
+        );
       }
     }
 
-    const hooksPath = join(rootDir, 'plugins', name, 'hooks', 'codex-hooks.json');
-    if (manifestData !== undefined && manifestData.hooks && !existsSync(hooksPath)) {
+    const hooksPath = join(
+      rootDir,
+      'plugins',
+      name,
+      'hooks',
+      'codex-hooks.json'
+    );
+    if (
+      manifestData !== undefined &&
+      manifestData.hooks &&
+      !existsSync(hooksPath)
+    ) {
       // The manifest declares a hooks pointer (set by buildCodexPluginManifest
       // whenever the plugin has hooks) but the generated file it points at is
       // missing — a partial/corrupted generation. Cross-check against the
       // manifest instead of only gating on existsSync so this can't silently
       // pass.
-      errors.push(`plugins/${name}/hooks/codex-hooks.json: declared in plugin.json "hooks" field but file not found — run \`pnpm generate:manifests\` first`);
+      errors.push(
+        `plugins/${name}/hooks/codex-hooks.json: declared in plugin.json "hooks" field but file not found — run \`pnpm generate:manifests\` first`
+      );
     } else if (existsSync(hooksPath)) {
       let hooksData;
       try {
         hooksData = JSON.parse(readFileSync(hooksPath, 'utf8'));
       } catch (err) {
-        errors.push(`plugins/${name}/hooks/codex-hooks.json: invalid JSON: ${err.message}`);
+        errors.push(
+          `plugins/${name}/hooks/codex-hooks.json: invalid JSON: ${err.message}`
+        );
       }
       if (hooksData !== undefined && !validateHooks(hooksData)) {
         for (const err of validateHooks.errors) {
-          errors.push(`plugins/${name}/hooks/codex-hooks.json${err.instancePath}: ${err.message}`);
+          errors.push(
+            `plugins/${name}/hooks/codex-hooks.json${err.instancePath}: ${err.message}`
+          );
         }
       }
     }
@@ -176,27 +240,32 @@ const DIRECT_CHECKS = [
   {
     name: 'claude-argument-interpolation',
     pattern: /\$ARGUMENTS\b/g,
-    message: '$ARGUMENTS is a Claude-only primitive (no equivalent on Codex per the spike doc finding (a)); rewrite as prose referencing "the argument text after the skill name".',
+    message:
+      '$ARGUMENTS is a Claude-only primitive (no equivalent on Codex per the spike doc finding (a)); rewrite as prose referencing "the argument text after the skill name".',
   },
   {
     name: 'claude-config-dir-write',
     pattern: /\.claude\//g,
-    message: '.claude/ is a Claude-only config directory; Codex-exposed content must never read or write it.',
+    message:
+      '.claude/ is a Claude-only config directory; Codex-exposed content must never read or write it.',
   },
   {
     name: 'user-config-reference',
     pattern: /\buserConfig\b|\$\{user_config\./g,
-    message: 'userConfig is a Claude-only manifest field; Codex has no equivalent user_config templating.',
+    message:
+      'userConfig is a Claude-only manifest field; Codex has no equivalent user_config templating.',
   },
   {
     name: 'output-styles-reference',
     pattern: /\boutputStyles\b|\boutput-styles\//g,
-    message: 'outputStyles/output-styles/ is a Claude-only manifest field and directory convention.',
+    message:
+      'outputStyles/output-styles/ is a Claude-only manifest field and directory convention.',
   },
   {
     name: 'agent-reference',
     pattern: /\bsubagent_type\b/g,
-    message: 'subagent_type is a Claude-only Task-tool parameter; Codex has no agent-dispatch equivalent (per the spec, delegation instructs built-in worker/explorer instead).',
+    message:
+      'subagent_type is a Claude-only Task-tool parameter; Codex has no agent-dispatch equivalent (per the spec, delegation instructs built-in worker/explorer instead).',
   },
   {
     name: 'claude-env-var-reference',
@@ -206,8 +275,10 @@ const DIRECT_CHECKS = [
     // CLAUDE_ENV_FILE, CLAUDE_EFFORT, CLAUDE_CODE_REMOTE. \b before CLAUDE_
     // matches after both "$" and "${" (neither is a word character), so this
     // catches the bare name, "$NAME", and "${NAME}" forms in one pattern.
-    pattern: /\bCLAUDE_(?:PLUGIN_ROOT|PLUGIN_DATA|PROJECT_DIR|ENV_FILE|EFFORT|CODE_REMOTE)\b/g,
-    message: 'Claude Code hook/runtime environment variables (e.g. ${CLAUDE_PLUGIN_ROOT}) exist only in the Claude plugin runtime and are unset in a Codex session; rewrite to avoid referencing them.',
+    pattern:
+      /\bCLAUDE_(?:PLUGIN_ROOT|PLUGIN_DATA|PROJECT_DIR|ENV_FILE|EFFORT|CODE_REMOTE)\b/g,
+    message:
+      'Claude Code hook/runtime environment variables (e.g. ${CLAUDE_PLUGIN_ROOT}) exist only in the Claude plugin runtime and are unset in a Codex session; rewrite to avoid referencing them.',
   },
 ];
 
@@ -221,7 +292,8 @@ const DIRECT_CHECKS = [
 // prose like "write to /tmp" or "read /etc" — registry-gating against the
 // real command-name set (below) resolves that without losing detection of
 // an actually-leaked Claude command reference.
-const SLASH_COMMAND_PATTERN = /(^|[\s`])\/([a-z][a-z0-9-]*(?::[a-z][a-z0-9-]*)*)\b(?!\/)/gm;
+const SLASH_COMMAND_PATTERN =
+  /(^|[\s`])\/([a-z][a-z0-9-]*(?::[a-z][a-z0-9-]*)*)\b(?!\/)/gm;
 
 /**
  * Build the per-plugin-name RegExp registry for the sibling-path check,
@@ -248,7 +320,10 @@ const SLASH_COMMAND_PATTERN = /(^|[\s`])\/([a-z][a-z0-9-]*(?::[a-z][a-z0-9-]*)*)
 function buildSiblingRegexps(pluginOrder) {
   const regexps = new Map();
   for (const sibling of pluginOrder) {
-    regexps.set(sibling, new RegExp(`(?:plugins/|(?:\\.\\./)+)${sibling}(?![a-zA-Z0-9_-])`, 'g'));
+    regexps.set(
+      sibling,
+      new RegExp(`(?:plugins/|(?:\\.\\./)+)${sibling}(?![a-zA-Z0-9_-])`, 'g')
+    );
   }
   return regexps;
 }
@@ -268,7 +343,10 @@ function buildSiblingRegexps(pluginOrder) {
  *   siblingRegexps is pre-built once per run via buildSiblingRegexps().
  * @returns {{ name: string, message: string, matches: string[] }[]}
  */
-function runRegistryGatedChecks(content, { pluginName, siblingRegexps, mcpToolNames, commandNames }) {
+function runRegistryGatedChecks(
+  content,
+  { pluginName, siblingRegexps, mcpToolNames, commandNames }
+) {
   const findings = [];
 
   const siblingMatches = new Set();
@@ -282,7 +360,8 @@ function runRegistryGatedChecks(content, { pluginName, siblingRegexps, mcpToolNa
   if (siblingMatches.size > 0) {
     findings.push({
       name: 'sibling-plugin-path',
-      message: 'references another plugin\'s directory by path; Codex-exposed content must be self-contained within its own plugin.',
+      message:
+        "references another plugin's directory by path; Codex-exposed content must be self-contained within its own plugin.",
       matches: [...siblingMatches],
     });
   }
@@ -296,7 +375,8 @@ function runRegistryGatedChecks(content, { pluginName, siblingRegexps, mcpToolNa
   if (mcpMatches.size > 0) {
     findings.push({
       name: 'hardcoded-mcp-tool-name',
-      message: 'hard-codes a real mcp__plugin_* tool name; MCP tool names are Claude-target-specific (the "mcp__plugin_{pluginName}_{serverName}__{toolName}" convention) and must not be hard-coded into Codex-exposed content.',
+      message:
+        'hard-codes a real mcp__plugin_* tool name; MCP tool names are Claude-target-specific (the "mcp__plugin_{pluginName}_{serverName}__{toolName}" convention) and must not be hard-coded into Codex-exposed content.',
       matches: [...mcpMatches],
     });
   }
@@ -312,7 +392,8 @@ function runRegistryGatedChecks(content, { pluginName, siblingRegexps, mcpToolNa
   if (slashCommandMatches.size > 0) {
     findings.push({
       name: 'slash-command-syntax',
-      message: 'slash-command syntax (/command-name) referencing a real Claude Code command is Claude-only; per the spike doc finding (a), Codex skills receive prompt text with no command-invocation primitive.',
+      message:
+        'slash-command syntax (/command-name) referencing a real Claude Code command is Claude-only; per the spike doc finding (a), Codex skills receive prompt text with no command-invocation primitive.',
       matches: [...slashCommandMatches],
     });
   }
@@ -333,7 +414,13 @@ function buildMcpToolNameRegistry(rootDir, pluginOrder, sources) {
   const names = new Set();
   for (const name of pluginOrder) {
     if (!isClaudeEnabled(sources[name])) continue;
-    const manifestPath = join(rootDir, 'plugins', name, '.claude-plugin', 'plugin.json');
+    const manifestPath = join(
+      rootDir,
+      'plugins',
+      name,
+      '.claude-plugin',
+      'plugin.json'
+    );
     if (!existsSync(manifestPath)) continue;
     let manifest;
     try {
@@ -341,7 +428,11 @@ function buildMcpToolNameRegistry(rootDir, pluginOrder, sources) {
     } catch {
       continue;
     }
-    if (manifest.mcpServers && typeof manifest.mcpServers === 'object' && !Array.isArray(manifest.mcpServers)) {
+    if (
+      manifest.mcpServers &&
+      typeof manifest.mcpServers === 'object' &&
+      !Array.isArray(manifest.mcpServers)
+    ) {
       for (const serverName of Object.keys(manifest.mcpServers)) {
         names.add(`mcp__plugin_${name}_${serverName}__`);
       }
@@ -397,7 +488,13 @@ function collectCommandNames(dir, names) {
 function collectCodexExposedFiles(rootDir, name, source) {
   const files = [];
   const errors = [];
-  const manifestPath = join(rootDir, 'plugins', name, '.codex-plugin', 'plugin.json');
+  const manifestPath = join(
+    rootDir,
+    'plugins',
+    name,
+    '.codex-plugin',
+    'plugin.json'
+  );
   if (existsSync(manifestPath)) {
     files.push(manifestPath);
   }
@@ -408,7 +505,9 @@ function collectCodexExposedFiles(rootDir, name, source) {
   // targets.codex.componentPaths.skills override — instead of assuming the
   // 'codex/skills' convention.
   const codex = source.targets.codex;
-  const skillsPath = (codex && codex.componentPaths && codex.componentPaths.skills) || './codex/skills';
+  const skillsPath =
+    (codex && codex.componentPaths && codex.componentPaths.skills) ||
+    './codex/skills';
   const pluginRoot = join(rootDir, 'plugins', name);
   const skillsDir = join(pluginRoot, skillsPath);
 
@@ -425,7 +524,9 @@ function collectCodexExposedFiles(rootDir, name, source) {
   try {
     assertWithinRoot(skillsDir, pluginRoot);
   } catch (_) {
-    errors.push(`plugins/${name}/targets.codex.componentPaths.skills ("${skillsPath}"): path must stay within the plugin's own directory`);
+    errors.push(
+      `plugins/${name}/targets.codex.componentPaths.skills ("${skillsPath}"): path must stay within the plugin's own directory`
+    );
     return { files, errors };
   }
 
@@ -440,8 +541,13 @@ function collectCodexExposedFiles(rootDir, name, source) {
   if (existsSync(skillsDir)) {
     const pluginRootReal = realpathSync(pluginRoot);
     const skillsDirReal = realpathSync(skillsDir);
-    if (skillsDirReal !== pluginRootReal && !skillsDirReal.startsWith(pluginRootReal + sep)) {
-      errors.push(`plugins/${name}/targets.codex.componentPaths.skills ("${skillsPath}"): symlinked skills directories (including a symlinked ancestor) are not allowed`);
+    if (
+      skillsDirReal !== pluginRootReal &&
+      !skillsDirReal.startsWith(pluginRootReal + sep)
+    ) {
+      errors.push(
+        `plugins/${name}/targets.codex.componentPaths.skills ("${skillsPath}"): symlinked skills directories (including a symlinked ancestor) are not allowed`
+      );
       return { files, errors };
     }
 
@@ -472,7 +578,9 @@ function collectCodexExposedFiles(rootDir, name, source) {
       }
       if (skillFileStat !== null) {
         if (skillFileStat.isSymbolicLink()) {
-          errors.push(`${skillFile.slice(rootDir.length + 1)}: symlinked SKILL.md is not allowed in generated output`);
+          errors.push(
+            `${skillFile.slice(rootDir.length + 1)}: symlinked SKILL.md is not allowed in generated output`
+          );
           foundSkills.add(entry.name); // suppress the misleading missing-file error below
         } else if (skillFileStat.isFile()) {
           files.push(skillFile);
@@ -480,9 +588,24 @@ function collectCodexExposedFiles(rootDir, name, source) {
         } else {
           // e.g. a directory named SKILL.md — without this branch it would
           // fall through to the misleading missing-generated-skill error.
-          errors.push(`${skillFile.slice(rootDir.length + 1)}: exists but is not a regular file`);
+          errors.push(
+            `${skillFile.slice(rootDir.length + 1)}: exists but is not a regular file`
+          );
           foundSkills.add(entry.name); // suppress the misleading missing-file error below
         }
+      }
+      try {
+        const policy = require('./lib/generate/skill-policy').readSkillPolicy(
+          join(skillsDir, entry.name),
+          { allowEmpty: true }
+        );
+        if (policy) files.push(policy.path);
+        for (const resource of readdirSync(join(skillsDir, entry.name))) {
+          if (!['SKILL.md', 'references', 'agents'].includes(resource))
+            errors.push('Unexpected generated skill resource: ' + resource);
+        }
+      } catch (error) {
+        errors.push('Invalid generated policy resource: ' + error.message);
       }
       // Reference sidecars generated by emit-codex.js
       // (<skill>/references/*.md) are equally Codex-exposed content — feed
@@ -506,17 +629,26 @@ function collectCodexExposedFiles(rootDir, name, source) {
       }
       if (refDirStat !== null) {
         if (refDirStat.isSymbolicLink()) {
-          errors.push(`${refDir.slice(rootDir.length + 1)}: symlinked references directories are not allowed in generated output`);
+          errors.push(
+            `${refDir.slice(rootDir.length + 1)}: symlinked references directories are not allowed in generated output`
+          );
         } else if (!refDirStat.isDirectory()) {
           // A plain file named "references" is never generated; error rather
           // than silently skipping so a standalone validate:codex run is
           // fail-closed (generate-manifests.js's sweep handles the same case).
-          errors.push(`${refDir.slice(rootDir.length + 1)}: unexpected non-directory "references" entry in generated output`);
+          errors.push(
+            `${refDir.slice(rootDir.length + 1)}: unexpected non-directory "references" entry in generated output`
+          );
         } else {
           let refEntries = [];
           try {
-            if (realpathSync(refDir) !== join(skillsDirReal, entry.name, 'references')) {
-              errors.push(`${refDir.slice(rootDir.length + 1)}: symlinked references directories (including a symlinked ancestor) are not allowed in generated output`);
+            if (
+              realpathSync(refDir) !==
+              join(skillsDirReal, entry.name, 'references')
+            ) {
+              errors.push(
+                `${refDir.slice(rootDir.length + 1)}: symlinked references directories (including a symlinked ancestor) are not allowed in generated output`
+              );
             } else {
               refEntries = readdirSync(refDir, { withFileTypes: true });
             }
@@ -525,14 +657,18 @@ function collectCodexExposedFiles(rootDir, name, source) {
           }
           for (const refEntry of refEntries) {
             if (refEntry.isSymbolicLink()) {
-              errors.push(`${join(refDir, refEntry.name).slice(rootDir.length + 1)}: symlinked reference files are not allowed in generated output`);
+              errors.push(
+                `${join(refDir, refEntry.name).slice(rootDir.length + 1)}: symlinked reference files are not allowed in generated output`
+              );
             } else if (!refEntry.isFile() || !REF_FILE_RE.test(refEntry.name)) {
               // REF_FILE_RE is buildCodexSkillTree's accepted shape,
               // imported so generator acceptance and validator rejection
               // cannot drift: the generator never writes nested dirs or
               // non-.md entries here, so anything else is corrupted or
               // hand-planted content — error rather than silently skip.
-              errors.push(`${join(refDir, refEntry.name).slice(rootDir.length + 1)}: only flat, regular [a-zA-Z0-9_-]+.md reference files are allowed in generated output`);
+              errors.push(
+                `${join(refDir, refEntry.name).slice(rootDir.length + 1)}: only flat, regular [a-zA-Z0-9_-]+.md reference files are allowed in generated output`
+              );
             } else {
               files.push(join(refDir, refEntry.name));
             }
@@ -546,7 +682,9 @@ function collectCodexExposedFiles(rootDir, name, source) {
   const skillsRelPath = skillsDir.slice(rootDir.length + 1);
   for (const skillName of allowlist) {
     if (!foundSkills.has(skillName)) {
-      errors.push(`${skillsRelPath}/${skillName}/SKILL.md: missing generated skill file (declared in targets.codex.skillAllowlist) — run \`pnpm generate:manifests\` first`);
+      errors.push(
+        `${skillsRelPath}/${skillName}/SKILL.md: missing generated skill file (declared in targets.codex.skillAllowlist) — run \`pnpm generate:manifests\` first`
+      );
     }
   }
   return { files, errors };
@@ -577,7 +715,9 @@ function runExposureLint({ rootDir, catalog, sources }) {
         check.pattern.lastIndex = 0;
         const matches = content.match(check.pattern);
         if (matches && matches.length > 0) {
-          errors.push(`${relPath}: [${check.name}] ${check.message} (found: ${[...new Set(matches)].join(', ')})`);
+          errors.push(
+            `${relPath}: [${check.name}] ${check.message} (found: ${[...new Set(matches)].join(', ')})`
+          );
         }
       }
 
@@ -588,7 +728,9 @@ function runExposureLint({ rootDir, catalog, sources }) {
         commandNames,
       });
       for (const finding of gated) {
-        errors.push(`${relPath}: [${finding.name}] ${finding.message} (found: ${finding.matches.join(', ')})`);
+        errors.push(
+          `${relPath}: [${finding.name}] ${finding.message} (found: ${finding.matches.join(', ')})`
+        );
       }
     }
   }
@@ -601,12 +743,17 @@ function main() {
 
   const catalogResult = loadCatalog(join(rootDir, 'catalog'));
   if (catalogResult.status !== 'ok') {
-    console.error(`[validate-codex] ERROR: ${catalogResult.status === 'missing' ? `catalog not found at ${catalogResult.path}` : catalogResult.errors.join('; ')}`);
+    console.error(
+      `[validate-codex] ERROR: ${catalogResult.status === 'missing' ? `catalog not found at ${catalogResult.path}` : catalogResult.errors.join('; ')}`
+    );
     process.exit(1);
   }
   const catalog = catalogResult.data;
 
-  const sourcesResult = loadPluginSources(join(rootDir, 'catalog'), catalog.pluginOrder);
+  const sourcesResult = loadPluginSources(
+    join(rootDir, 'catalog'),
+    catalog.pluginOrder
+  );
   if (sourcesResult.status !== 'ok') {
     console.error(`[validate-codex] ERROR: ${sourcesResult.errors.join('; ')}`);
     process.exit(1);
@@ -614,7 +761,13 @@ function main() {
   const sources = sourcesResult.sources;
 
   const ajv = makeAjv();
-  const artifactErrors = validateArtifacts({ rootDir, catalog, sources, ajv, schemasDir });
+  const artifactErrors = validateArtifacts({
+    rootDir,
+    catalog,
+    sources,
+    ajv,
+    schemasDir,
+  });
   const exposureErrors = runExposureLint({ rootDir, catalog, sources });
 
   const allErrors = [...artifactErrors, ...exposureErrors];
@@ -626,8 +779,12 @@ function main() {
     process.exit(1);
   }
 
-  const enabledCount = catalog.pluginOrder.filter((n) => isCodexEnabled(sources[n])).length;
-  console.log(`[validate-codex] ✓ ${enabledCount} Codex-enabled plugin(s) pass artifact validation and the exposure lint`);
+  const enabledCount = catalog.pluginOrder.filter((n) =>
+    isCodexEnabled(sources[n])
+  ).length;
+  console.log(
+    `[validate-codex] ✓ ${enabledCount} Codex-enabled plugin(s) pass artifact validation and the exposure lint`
+  );
   process.exit(0);
 }
 

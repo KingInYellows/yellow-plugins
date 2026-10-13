@@ -1,0 +1,890 @@
+{
+  "status": "passed",
+  "recordedAt": "2026-10-06T14:53:47.030Z",
+  "scratch": "/tmp/yellow-workflow-HpY8FC",
+  "harnessSha256": "8ba6fafa3582ce968dd3c74f6f2ce8d837e2c5915b3ec97147c4259f9bf4edc2",
+  "corpusSha256": "05b27253dc993370aeab91be618cd0f94117fe5c785f5767462f233e7460d61a",
+  "credentialHandling": "CLI-native-read-only-bind; no credential copy or harness read",
+  "cases": [
+    {
+      "id": "gt-prerequisites",
+      "threadId": "01a111b4-dd1f-7eb0-a5c4-4c05576fb49f",
+      "skill": {
+        "name": "gt-workflow:gt-setup",
+        "description": "Validate Graphite CLI prerequisites and configure settings for AI agent workflows. Use when first installing the plugin, after Graphite auth changes, or when gt commands fail.",
+        "path": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/SKILL.md",
+        "scope": "user",
+        "enabled": true,
+        "pluginId": "gt-workflow@yellow-plugins"
+      },
+      "output": "{\"gtInstalled\":true,\"ghInstalled\":true,\"repositoryInitialized\":true,\"mutation\":false}",
+      "reads": [
+        "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/SKILL.md",
+        "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/references/prerequisites.md"
+      ],
+      "events": [
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "userMessage",
+              "id": "01a111b4-e262-7d82-a6ea-850f93572905",
+              "clientId": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Report only Graphite setup prerequisites using fixture_observe gt-prerequisites as the recorded executable Phase 1 result. Do not apply settings, create files, auth, initialize, install or make MCP calls. Return JSON {\"gtInstalled\":true,\"ghInstalled\":true,\"repositoryInitialized\":true,\"mutation\":false}.",
+                  "text_elements": []
+                },
+                {
+                  "type": "skill",
+                  "name": "gt-workflow:gt-setup",
+                  "path": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/SKILL.md"
+                }
+              ]
+            },
+            "threadId": "01a111b4-dd1f-7eb0-a5c4-4c05576fb49f",
+            "turnId": "01a111b4-de3a-7111-8e99-5f3b1813a7e1",
+            "completedAtMs": 1791298429538
+          },
+          "emittedAtMs": 1791298429538
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "agentMessage",
+              "id": "msg_0347737184c6caa9016ac50b80407087d1bae50a2003974203",
+              "text": "I’ll use the gt-setup skill to report Phase 1 prerequisites from the recorded fixture result.",
+              "phase": "commentary",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            },
+            "threadId": "01a111b4-dd1f-7eb0-a5c4-4c05576fb49f",
+            "turnId": "01a111b4-de3a-7111-8e99-5f3b1813a7e1",
+            "completedAtMs": 1791298432487
+          },
+          "emittedAtMs": 1791298432488
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_read",
+            "path": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/SKILL.md"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-ccade639-479b-4fd6-a3d8-6b027e24db6f",
+              "namespace": null,
+              "tool": "fixture_read",
+              "arguments": {
+                "path": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/SKILL.md"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "---\nname: gt-setup\ndescription: Validate Graphite CLI prerequisites and configure settings for AI agent workflows. Use when first installing the plugin, after Graphite auth changes, or when gt commands fail.\n---\n\n## What It Does\n\nValidate Graphite prerequisites, guide AI agent settings, and create the\nrepository's .graphite.yml convention file and optional PR template.\n\n## When to Use\n\nUse after first install, authentication changes, or when gt commands stop\nworking in a repository that should be initialized.\n\n## Usage\n\nResolve references relative to this SKILL.md in both source and installed\nplugins. Read each phase's reference when that phase starts.\n\n1. Read [references/prerequisites.md](references/prerequisites.md). Run Phase\n   1's prerequisite check and interpret its printed result. Report missing\n   tools, authentication, and initialization separately. Report-only requests\n   end after this phase. Do not install tools or run interactive gt auth/init on\n   the user's behalf without the authority described in that reference.\n2. Read [references/agent-settings.md](references/agent-settings.md). Follow\n   Phase 2's planned-change preview and branch-prefix/pager prompts before\n   applying settings. Preserve existing values when the user chooses skip. Never\n   silently replace a prefix or pager.\n3. Read [references/convention-files.md](references/convention-files.md). Follow\n   Phase 3's existing-file checks, overwrite/skip confirmation, exact convention\n   schema, optional PR-template behavior, and final report. .graphite.yml is a\n   gt-workflow convention, not Graphite CLI configuration.\n\nShell blocks run as fresh processes. Bind the prompted or validated values where\neach block consumes them; use the complete phase-specific block. Preserve files\nand settings outside the selections the user confirmed. This setup workflow does\nnot authorize commit, push, or PR submission.\n"
+                }
+              ],
+              "success": true,
+              "durationMs": 1
+            },
+            "threadId": "01a111b4-dd1f-7eb0-a5c4-4c05576fb49f",
+            "turnId": "01a111b4-de3a-7111-8e99-5f3b1813a7e1",
+            "completedAtMs": 1791298433644
+          },
+          "emittedAtMs": 1791298433644
+        },
+        {
+          "method": "thread/tokenUsage/updated",
+          "params": {
+            "threadId": "01a111b4-dd1f-7eb0-a5c4-4c05576fb49f",
+            "turnId": "01a111b4-de3a-7111-8e99-5f3b1813a7e1",
+            "tokenUsage": {
+              "total": {
+                "totalTokens": 10778,
+                "inputTokens": 10688,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 90,
+                "reasoningOutputTokens": 0
+              },
+              "last": {
+                "totalTokens": 10778,
+                "inputTokens": 10688,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 90,
+                "reasoningOutputTokens": 0
+              },
+              "modelContextWindow": 258400
+            }
+          },
+          "emittedAtMs": 1791298433679
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_read",
+            "path": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/references/prerequisites.md"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-370aa771-f24c-4052-a8ea-564630ea596b",
+              "namespace": null,
+              "tool": "fixture_read",
+              "arguments": {
+                "path": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/references/prerequisites.md"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "### Phase 1: Validate Prerequisites\n\n#### Step 1: Check Graphite Prerequisites\n\nRun a single Bash call:\n\n```bash\n# awk rather than splitting into a 0-based array: zsh does not word-split\n# `a=($1)` and its arrays start at 1, so the old loop passed every version.\nversion_gte() {\n  awk -v a=\"$1\" -v b=\"$2\" 'BEGIN {\n    na = split(a, x, \".\"); nb = split(b, y, \".\")\n    n = (na > nb) ? na : nb\n    for (i = 1; i <= n; i++) {\n      if (x[i] + 0 > y[i] + 0) exit 0\n      if (x[i] + 0 < y[i] + 0) exit 1\n    }\n    exit 0\n  }'\n}\n\nprintf '=== Prerequisites ===\\n'\nif command -v gt >/dev/null 2>&1; then\n  gt_version_full=$(gt --version 2>/dev/null)\n  gt_version_exit=$?\n  gt_version_raw=$(printf '%s' \"$gt_version_full\" | head -n1)\n  if [ \"$gt_version_exit\" -ne 0 ]; then\n    printf 'gt:            BROKEN (exited with code %s)\\n' \"$gt_version_exit\"\n    printf 'mcp_server:    SKIPPED (gt is broken)\\n'\n  elif [ -n \"$gt_version_raw\" ]; then\n    printf 'gt:            ok (%s)\\n' \"$gt_version_raw\"\n    gt_ver=$(printf '%s' \"$gt_version_raw\" | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1)\n    if [ -z \"$gt_ver\" ]; then\n      printf 'mcp_server:    UNKNOWN (could not parse version from: %s)\\n' \"$gt_version_raw\"\n    elif version_gte \"$gt_ver\" \"1.6.7\"; then\n      printf 'mcp_server:    ok (gt >= 1.6.7)\\n'\n    else\n      printf 'mcp_server:    UPGRADE NEEDED (current: %s, need 1.6.7+)\\n' \"$gt_ver\"\n    fi\n  else\n    printf 'gt:            ok (version unknown)\\n'\n    printf 'mcp_server:    UNKNOWN (gt --version returned no output)\\n'\n  fi\nelse\n  printf 'gt:            NOT FOUND\\n'\n  printf 'mcp_server:    SKIPPED (gt not found)\\n'\nfi\ncommand -v jq >/dev/null 2>&1 && printf 'jq:            ok\\n' || printf 'jq:            NOT FOUND\\n'\nif command -v yq >/dev/null 2>&1; then\n  if yq --help 2>&1 | grep -qi 'jq wrapper\\|kislyuk'; then\n    printf 'yq:            ok\\n'\n  else\n    printf 'yq:            WRONG VARIANT (found non-kislyuk yq; .graphite.yml parsing will be skipped)\\n'\n  fi\nelse\n  printf 'yq:            NOT FOUND (optional — needed by consumer commands to read .graphite.yml)\\n'\nfi\n\nprintf '\\n=== Repository ===\\n'\nrepo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)\n[ -n \"$repo_top\" ] && printf 'git_repo:       ok\\n' || printf 'git_repo:       NOT A GIT REPOSITORY\\n'\ngraphite_repo_config=$(git rev-parse --git-path .graphite_repo_config 2>/dev/null || true)\n[ -n \"$graphite_repo_config\" ] && [ -f \"$graphite_repo_config\" ] && printf 'repo_config:    present (%s)\\n' \"$graphite_repo_config\" || printf 'repo_config:    missing\\n'\n\nif command -v gt >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then\n  trunk=$(gt trunk 2>/dev/null || true)\n  [ -n \"$trunk\" ] && printf 'gt_trunk:       %s\\n' \"$trunk\" || printf 'gt_trunk:       UNAVAILABLE\\n'\nelse\n  printf 'gt_trunk:       SKIPPED\\n'\nfi\n\nprintf '\\n=== Graphite Auth ===\\n'\nauth_ok=0\n# `cfg`, not `path`: in zsh a loop over `path` rewrites $PATH.\nfor cfg in \\\n  \"$HOME/.graphite_user_config\" \\\n  \"${XDG_CONFIG_HOME:-$HOME/.config}/graphite/user_config\" \\\n  \"$HOME/.config/graphite/user_config\"; do\n  if [ -f \"$cfg\" ]; then\n    auth_ok=1\n    printf 'auth_config:    present (%s)\\n' \"$cfg\"\n    break\n  fi\ndone\n[ \"$auth_ok\" -eq 1 ] || printf 'auth_config:    missing\\n'\n\nprintf '\\n=== Convention Files ===\\n'\n[ -n \"$repo_top\" ] && [ -f \"$repo_top/.graphite.yml\" ] && printf 'graphite_yml:   present\\n' || printf 'graphite_yml:   not found\\n'\n[ -n \"$repo_top\" ] && [ -f \"$repo_top/.github/pull_request_template.md\" ] && printf 'pr_template:    present\\n' || printf 'pr_template:    not found\\n'\n\nprintf '\\n=== Merge Queue Compatibility ===\\n'\n# Capture stderr from gh probes so failure diagnostics survive (vs silent 2>/dev/null).\nmq_err_log=$(mktemp 2>/dev/null) || mq_err_log=\"\"\n# Trap covers interruption (e.g. a Bash-tool timeout); the explicit rm at the\n# end of this block still handles normal completion.\n[ -n \"$mq_err_log\" ] && trap 'rm -f \"$mq_err_log\"' EXIT\n# No `gh auth status` precheck: it exits non-zero if ANY known host has stale\n# auth, which produces false COULD NOT CHECK results on multi-host setups\n# (gh.com + ghe.example.com). Let `gh repo view` be the auth probe — it's\n# scoped to the current repo's host and its stderr is captured below.\nif command -v gh >/dev/null 2>&1; then\n  repo_nwo=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>|\"${mq_err_log:-/dev/null}\")\n  repo_view_status=$?\n  if [ \"$repo_view_status\" -ne 0 ]; then\n    if [ -n \"$mq_err_log\" ] && [ -s \"$mq_err_log\" ]; then\n      printf '[gt-workflow] Warning: gh repo view failed (exit %d): %s\\n' \"$repo_view_status\" \"$(head -c 200 \"$mq_err_log\" | tr '\\n' ' ')\" >&2\n    else\n      printf '[gt-workflow] Warning: gh repo view failed (exit %d)\\n' \"$repo_view_status\" >&2\n    fi\n    printf 'gh_native_queue:  COULD NOT CHECK (gh repo view failed)\\n'\n  elif [ -z \"$repo_nwo\" ]; then\n    printf 'gh_native_queue:  COULD NOT CHECK (gh repo view returned no name)\\n'\n  else\n    repo_owner=\"${repo_nwo%/*}\"\n    repo_name=\"${repo_nwo#*/}\"\n    [ -n \"$mq_err_log\" ] && : >| \"$mq_err_log\"  # truncate before next probe\n    # shellcheck disable=SC2016  # $owner/$name are GraphQL variable refs, not shell vars — intentionally literal in single quotes\n    mq_check=$(gh api graphql -f query='\n      query($owner:String!,$name:String!){\n        repository(owner:$owner,name:$name){ mergeQueue { url } }\n      }' -f owner=\"$repo_owner\" -f name=\"$repo_name\" --jq 'if .data.repository == null then error(\"repo null\") else (.data.repository.mergeQueue | if . != null then \"configured\" else empty end) end' 2>|\"${mq_err_log:-/dev/null}\")\n    mq_status=$?\n    if [ \"$mq_status\" -ne 0 ]; then\n      if [ -n \"$mq_err_log\" ] && [ -s \"$mq_err_log\" ]; then\n        printf '[gt-workflow] Warning: merge queue check failed (gh api graphql): %s\\n' \"$(head -c 200 \"$mq_err_log\" | tr '\\n' ' ')\" >&2\n      else\n        printf '[gt-workflow] Warning: merge queue check failed (gh api graphql)\\n' >&2\n      fi\n      printf 'gh_native_queue:  COULD NOT CHECK (gh api graphql failed)\\n'\n    elif [ -n \"$mq_check\" ]; then\n      printf 'gh_native_queue:  WARNING (configured — disable at https://github.com/%s/settings/branches)\\n' \"$repo_nwo\"\n    else\n      printf 'gh_native_queue:  ok (not configured)\\n'\n    fi\n  fi\nelse\n  printf 'gh_native_queue:  COULD NOT CHECK (gh not installed)\\n'\nfi\n[ -n \"$mq_err_log\" ] && rm -f \"$mq_err_log\"\n```\n\n#### Step 2: Interpret Results\n\n**Failures (hard stop)** — stop after reporting all that apply:\n\n- `gt` missing: \"Graphite CLI is required. Install it from\n  https://graphite.dev/docs/cli and re-run `gt-setup`.\"\n- `jq` missing: \"jq is required by gt-workflow (the gt-cleanup skill uses it to\n  parse PR-status JSON). Install it from https://jqlang.github.io/jq/download/.\"\n- `git_repo` not ok: \"gt-workflow must be run inside a git repository.\"\n- `auth_config` missing: \"Graphite auth was not detected. Run `gt auth` or sign\n  in through the Graphite CLI, then re-run `gt-setup`.\"\n- `repo_config` missing OR `gt_trunk` unavailable: \"This repository is not\n  initialized for Graphite. Run `gt init`, confirm `gt trunk` works, then re-run\n  `gt-setup`.\"\n\nIf any hard-stop failures exist, stop here. Do not proceed to Phase 2.\n\n**Warnings (do not block setup — CLI commands still work):**\n\n- `mcp_server` UPGRADE NEEDED: \"Graphite MCP server requires gt v1.6.7+. The\n  `gt mcp` stdio server registered in plugin.json will fail to start and\n  Graphite MCP tools will be unavailable until you upgrade. Run\n  `npm i -g @withgraphite/graphite-cli@latest` to upgrade, then re-run\n  `gt-setup`. All CLI-based skills (`smart-submit`, `gt-sync`, etc.) continue to\n  work without MCP.\"\n- `mcp_server` SKIPPED or UNKNOWN: note accordingly.\n- `yq` NOT FOUND: \"yq (kislyuk variant) is optional but recommended. Without it,\n  consumer skills (`smart-submit`, `gt-stack-plan`, `gt-amend`) will use\n  hardcoded defaults instead of `.graphite.yml` settings. Install with:\n  `pip install yq`\"\n- `gh_native_queue` WARNING (configured): \"GitHub native merge queue is\n  configured for this repo. Graphite and GitHub native merge queue are\n  incompatible — running both causes Graphite to restart CI on queued commits\n  and may produce out-of-order merges. To disable: open\n  https://github.com/<owner>/<repo>/settings/branches, edit the branch\n  protection rule for your trunk branch, and uncheck **Require merge queue**.\n  Setup proceeds, but the warning will repeat each time you run `gt-setup` until\n  resolved.\"\n- `gh_native_queue` COULD NOT CHECK: informational only — but **not necessarily\n  safe to ignore**. The parenthetical reason in the output line indicates which\n  probe failed (gh missing/unauthenticated, `gh repo view`, or\n  `gh api graphql`); the captured stderr is appended to the\n  `[gt-workflow] Warning:` line on failure to aid debugging. Three documented\n  false-negative paths exist for the `repository.mergeQueue { url }` proxy: (1)\n  the GitHub token lacks the admin scope needed to read merge queue config, (2)\n  the repository is not visible to the token, (3) merge queue is configured but\n  `mergeQueue.url` is null. Any of these can produce COULD NOT CHECK or even a\n  misleading `ok (not configured)` while the queue is actually active. If your\n  token is scope-limited (e.g., a CI/automation token), re-run `gt-setup` with\n  an admin-scoped token before relying on the result. Setup itself proceeds\n  normally; the proxy is fail-open by design.\n\n#### Step 3: Validation Report\n\nIf all checks pass, show:\n\n```text\ngt-workflow Validation\n──────────────────────\nGraphite CLI:  ready\njq:            ready\nyq:            ready (or: not found — optional)\nAuth:          detected\nRepository:    initialized (trunk: <branch>)\nMCP Server:    available (or: unavailable — gt < 1.6.7)\nMerge Queue:   ok (or: WARNING — native queue active / COULD NOT CHECK)\n\nProceeding to AI agent configuration...\n```\n"
+                }
+              ],
+              "success": true,
+              "durationMs": 1
+            },
+            "threadId": "01a111b4-dd1f-7eb0-a5c4-4c05576fb49f",
+            "turnId": "01a111b4-de3a-7111-8e99-5f3b1813a7e1",
+            "completedAtMs": 1791298437595
+          },
+          "emittedAtMs": 1791298437596
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_observe",
+            "key": "gt-prerequisites"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-134439c4-33c4-4e62-9ea3-debfaf489f23",
+              "namespace": null,
+              "tool": "fixture_observe",
+              "arguments": {
+                "key": "gt-prerequisites"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "{\"gt\":\"installed 1.7.20\",\"gh\":\"installed\",\"initialized\":true,\"checkExitCode\":0}"
+                }
+              ],
+              "success": true,
+              "durationMs": 0
+            },
+            "threadId": "01a111b4-dd1f-7eb0-a5c4-4c05576fb49f",
+            "turnId": "01a111b4-de3a-7111-8e99-5f3b1813a7e1",
+            "completedAtMs": 1791298437598
+          },
+          "emittedAtMs": 1791298437598
+        },
+        {
+          "method": "thread/tokenUsage/updated",
+          "params": {
+            "threadId": "01a111b4-dd1f-7eb0-a5c4-4c05576fb49f",
+            "turnId": "01a111b4-de3a-7111-8e99-5f3b1813a7e1",
+            "tokenUsage": {
+              "total": {
+                "totalTokens": 22044,
+                "inputTokens": 21874,
+                "cachedInputTokens": 10496,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 170,
+                "reasoningOutputTokens": 0
+              },
+              "last": {
+                "totalTokens": 11266,
+                "inputTokens": 11186,
+                "cachedInputTokens": 10496,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 80,
+                "reasoningOutputTokens": 0
+              },
+              "modelContextWindow": 258400
+            }
+          },
+          "emittedAtMs": 1791298437646
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "agentMessage",
+              "id": "msg_0347737184c6caa9016ac50b8877e087d18f8ad59e588027e9",
+              "text": "{\"gtInstalled\":true,\"ghInstalled\":true,\"repositoryInitialized\":true,\"mutation\":false}",
+              "phase": "final_answer",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            },
+            "threadId": "01a111b4-dd1f-7eb0-a5c4-4c05576fb49f",
+            "turnId": "01a111b4-de3a-7111-8e99-5f3b1813a7e1",
+            "completedAtMs": 1791298440873
+          },
+          "emittedAtMs": 1791298440873
+        },
+        {
+          "method": "thread/tokenUsage/updated",
+          "params": {
+            "threadId": "01a111b4-dd1f-7eb0-a5c4-4c05576fb49f",
+            "turnId": "01a111b4-de3a-7111-8e99-5f3b1813a7e1",
+            "tokenUsage": {
+              "total": {
+                "totalTokens": 36326,
+                "inputTokens": 36132,
+                "cachedInputTokens": 21504,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 194,
+                "reasoningOutputTokens": 0
+              },
+              "last": {
+                "totalTokens": 14282,
+                "inputTokens": 14258,
+                "cachedInputTokens": 11008,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 24,
+                "reasoningOutputTokens": 0
+              },
+              "modelContextWindow": 258400
+            }
+          },
+          "emittedAtMs": 1791298440883
+        },
+        {
+          "method": "turn/completed",
+          "params": {
+            "threadId": "01a111b4-dd1f-7eb0-a5c4-4c05576fb49f",
+            "turn": {
+              "id": "01a111b4-de3a-7111-8e99-5f3b1813a7e1",
+              "items": [
+                {
+                  "type": "agentMessage",
+                  "id": "msg_0347737184c6caa9016ac50b8877e087d18f8ad59e588027e9",
+                  "text": "{\"gtInstalled\":true,\"ghInstalled\":true,\"repositoryInitialized\":true,\"mutation\":false}",
+                  "phase": "final_answer",
+                  "memoryCitation": null,
+                  "delivery": null,
+                  "questions": null
+                }
+              ],
+              "itemsView": "summary",
+              "status": "completed",
+              "error": null,
+              "startedAt": 1791298428,
+              "completedAt": 1791298440,
+              "durationMs": 11372
+            }
+          },
+          "emittedAtMs": 1791298440883
+        }
+      ],
+      "status": "passed"
+    },
+    {
+      "id": "gt-missing-tool",
+      "threadId": "01a111b5-0ec3-7832-9342-f8e4ab6ca5f0",
+      "skill": {
+        "name": "gt-workflow:gt-setup",
+        "description": "Validate Graphite CLI prerequisites and configure settings for AI agent workflows. Use when first installing the plugin, after Graphite auth changes, or when gt commands fail.",
+        "path": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/SKILL.md",
+        "scope": "user",
+        "enabled": true,
+        "pluginId": "gt-workflow@yellow-plugins"
+      },
+      "output": "{\"gtInstalled\":false,\"mutation\":false}",
+      "reads": [
+        "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/SKILL.md",
+        "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/references/prerequisites.md"
+      ],
+      "events": [
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "userMessage",
+              "id": "01a111b5-172c-76b2-90dd-d1f16e4ce928",
+              "clientId": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Report only Graphite setup prerequisites using fixture_observe gt-missing as the recorded executable prerequisite result. Return JSON {\"gtInstalled\":false,\"mutation\":false}; stop without installing or writing convention files.",
+                  "text_elements": []
+                },
+                {
+                  "type": "skill",
+                  "name": "gt-workflow:gt-setup",
+                  "path": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/SKILL.md"
+                }
+              ]
+            },
+            "threadId": "01a111b5-0ec3-7832-9342-f8e4ab6ca5f0",
+            "turnId": "01a111b5-0ec9-7813-8ff1-2f1999fa49d0",
+            "completedAtMs": 1791298443052
+          },
+          "emittedAtMs": 1791298443053
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "agentMessage",
+              "id": "msg_0a2ca884cbd49ed5016ac50b8f6a5487d1b1d3dc0a25642f85",
+              "text": "I’ll read the gt-setup prerequisite guidance and the recorded `gt-missing` result, then return the requested JSON.\n",
+              "phase": "commentary",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            },
+            "threadId": "01a111b5-0ec3-7832-9342-f8e4ab6ca5f0",
+            "turnId": "01a111b5-0ec9-7813-8ff1-2f1999fa49d0",
+            "completedAtMs": 1791298448837
+          },
+          "emittedAtMs": 1791298448837
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_read",
+            "path": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/SKILL.md"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-6173ff94-22ae-4e6c-9acc-1725d0924ed0",
+              "namespace": null,
+              "tool": "fixture_read",
+              "arguments": {
+                "path": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/SKILL.md"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "---\nname: gt-setup\ndescription: Validate Graphite CLI prerequisites and configure settings for AI agent workflows. Use when first installing the plugin, after Graphite auth changes, or when gt commands fail.\n---\n\n## What It Does\n\nValidate Graphite prerequisites, guide AI agent settings, and create the\nrepository's .graphite.yml convention file and optional PR template.\n\n## When to Use\n\nUse after first install, authentication changes, or when gt commands stop\nworking in a repository that should be initialized.\n\n## Usage\n\nResolve references relative to this SKILL.md in both source and installed\nplugins. Read each phase's reference when that phase starts.\n\n1. Read [references/prerequisites.md](references/prerequisites.md). Run Phase\n   1's prerequisite check and interpret its printed result. Report missing\n   tools, authentication, and initialization separately. Report-only requests\n   end after this phase. Do not install tools or run interactive gt auth/init on\n   the user's behalf without the authority described in that reference.\n2. Read [references/agent-settings.md](references/agent-settings.md). Follow\n   Phase 2's planned-change preview and branch-prefix/pager prompts before\n   applying settings. Preserve existing values when the user chooses skip. Never\n   silently replace a prefix or pager.\n3. Read [references/convention-files.md](references/convention-files.md). Follow\n   Phase 3's existing-file checks, overwrite/skip confirmation, exact convention\n   schema, optional PR-template behavior, and final report. .graphite.yml is a\n   gt-workflow convention, not Graphite CLI configuration.\n\nShell blocks run as fresh processes. Bind the prompted or validated values where\neach block consumes them; use the complete phase-specific block. Preserve files\nand settings outside the selections the user confirmed. This setup workflow does\nnot authorize commit, push, or PR submission.\n"
+                }
+              ],
+              "success": true,
+              "durationMs": 1
+            },
+            "threadId": "01a111b5-0ec3-7832-9342-f8e4ab6ca5f0",
+            "turnId": "01a111b5-0ec9-7813-8ff1-2f1999fa49d0",
+            "completedAtMs": 1791298449589
+          },
+          "emittedAtMs": 1791298449590
+        },
+        {
+          "method": "thread/tokenUsage/updated",
+          "params": {
+            "threadId": "01a111b5-0ec3-7832-9342-f8e4ab6ca5f0",
+            "turnId": "01a111b5-0ec9-7813-8ff1-2f1999fa49d0",
+            "tokenUsage": {
+              "total": {
+                "totalTokens": 10760,
+                "inputTokens": 10665,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 95,
+                "reasoningOutputTokens": 0
+              },
+              "last": {
+                "totalTokens": 10760,
+                "inputTokens": 10665,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 95,
+                "reasoningOutputTokens": 0
+              },
+              "modelContextWindow": 258400
+            }
+          },
+          "emittedAtMs": 1791298449634
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_read",
+            "path": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/references/prerequisites.md"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-2b159da6-e2e9-43b1-8a8b-fd697b6db19e",
+              "namespace": null,
+              "tool": "fixture_read",
+              "arguments": {
+                "path": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/references/prerequisites.md"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "### Phase 1: Validate Prerequisites\n\n#### Step 1: Check Graphite Prerequisites\n\nRun a single Bash call:\n\n```bash\n# awk rather than splitting into a 0-based array: zsh does not word-split\n# `a=($1)` and its arrays start at 1, so the old loop passed every version.\nversion_gte() {\n  awk -v a=\"$1\" -v b=\"$2\" 'BEGIN {\n    na = split(a, x, \".\"); nb = split(b, y, \".\")\n    n = (na > nb) ? na : nb\n    for (i = 1; i <= n; i++) {\n      if (x[i] + 0 > y[i] + 0) exit 0\n      if (x[i] + 0 < y[i] + 0) exit 1\n    }\n    exit 0\n  }'\n}\n\nprintf '=== Prerequisites ===\\n'\nif command -v gt >/dev/null 2>&1; then\n  gt_version_full=$(gt --version 2>/dev/null)\n  gt_version_exit=$?\n  gt_version_raw=$(printf '%s' \"$gt_version_full\" | head -n1)\n  if [ \"$gt_version_exit\" -ne 0 ]; then\n    printf 'gt:            BROKEN (exited with code %s)\\n' \"$gt_version_exit\"\n    printf 'mcp_server:    SKIPPED (gt is broken)\\n'\n  elif [ -n \"$gt_version_raw\" ]; then\n    printf 'gt:            ok (%s)\\n' \"$gt_version_raw\"\n    gt_ver=$(printf '%s' \"$gt_version_raw\" | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1)\n    if [ -z \"$gt_ver\" ]; then\n      printf 'mcp_server:    UNKNOWN (could not parse version from: %s)\\n' \"$gt_version_raw\"\n    elif version_gte \"$gt_ver\" \"1.6.7\"; then\n      printf 'mcp_server:    ok (gt >= 1.6.7)\\n'\n    else\n      printf 'mcp_server:    UPGRADE NEEDED (current: %s, need 1.6.7+)\\n' \"$gt_ver\"\n    fi\n  else\n    printf 'gt:            ok (version unknown)\\n'\n    printf 'mcp_server:    UNKNOWN (gt --version returned no output)\\n'\n  fi\nelse\n  printf 'gt:            NOT FOUND\\n'\n  printf 'mcp_server:    SKIPPED (gt not found)\\n'\nfi\ncommand -v jq >/dev/null 2>&1 && printf 'jq:            ok\\n' || printf 'jq:            NOT FOUND\\n'\nif command -v yq >/dev/null 2>&1; then\n  if yq --help 2>&1 | grep -qi 'jq wrapper\\|kislyuk'; then\n    printf 'yq:            ok\\n'\n  else\n    printf 'yq:            WRONG VARIANT (found non-kislyuk yq; .graphite.yml parsing will be skipped)\\n'\n  fi\nelse\n  printf 'yq:            NOT FOUND (optional — needed by consumer commands to read .graphite.yml)\\n'\nfi\n\nprintf '\\n=== Repository ===\\n'\nrepo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)\n[ -n \"$repo_top\" ] && printf 'git_repo:       ok\\n' || printf 'git_repo:       NOT A GIT REPOSITORY\\n'\ngraphite_repo_config=$(git rev-parse --git-path .graphite_repo_config 2>/dev/null || true)\n[ -n \"$graphite_repo_config\" ] && [ -f \"$graphite_repo_config\" ] && printf 'repo_config:    present (%s)\\n' \"$graphite_repo_config\" || printf 'repo_config:    missing\\n'\n\nif command -v gt >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then\n  trunk=$(gt trunk 2>/dev/null || true)\n  [ -n \"$trunk\" ] && printf 'gt_trunk:       %s\\n' \"$trunk\" || printf 'gt_trunk:       UNAVAILABLE\\n'\nelse\n  printf 'gt_trunk:       SKIPPED\\n'\nfi\n\nprintf '\\n=== Graphite Auth ===\\n'\nauth_ok=0\n# `cfg`, not `path`: in zsh a loop over `path` rewrites $PATH.\nfor cfg in \\\n  \"$HOME/.graphite_user_config\" \\\n  \"${XDG_CONFIG_HOME:-$HOME/.config}/graphite/user_config\" \\\n  \"$HOME/.config/graphite/user_config\"; do\n  if [ -f \"$cfg\" ]; then\n    auth_ok=1\n    printf 'auth_config:    present (%s)\\n' \"$cfg\"\n    break\n  fi\ndone\n[ \"$auth_ok\" -eq 1 ] || printf 'auth_config:    missing\\n'\n\nprintf '\\n=== Convention Files ===\\n'\n[ -n \"$repo_top\" ] && [ -f \"$repo_top/.graphite.yml\" ] && printf 'graphite_yml:   present\\n' || printf 'graphite_yml:   not found\\n'\n[ -n \"$repo_top\" ] && [ -f \"$repo_top/.github/pull_request_template.md\" ] && printf 'pr_template:    present\\n' || printf 'pr_template:    not found\\n'\n\nprintf '\\n=== Merge Queue Compatibility ===\\n'\n# Capture stderr from gh probes so failure diagnostics survive (vs silent 2>/dev/null).\nmq_err_log=$(mktemp 2>/dev/null) || mq_err_log=\"\"\n# Trap covers interruption (e.g. a Bash-tool timeout); the explicit rm at the\n# end of this block still handles normal completion.\n[ -n \"$mq_err_log\" ] && trap 'rm -f \"$mq_err_log\"' EXIT\n# No `gh auth status` precheck: it exits non-zero if ANY known host has stale\n# auth, which produces false COULD NOT CHECK results on multi-host setups\n# (gh.com + ghe.example.com). Let `gh repo view` be the auth probe — it's\n# scoped to the current repo's host and its stderr is captured below.\nif command -v gh >/dev/null 2>&1; then\n  repo_nwo=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>|\"${mq_err_log:-/dev/null}\")\n  repo_view_status=$?\n  if [ \"$repo_view_status\" -ne 0 ]; then\n    if [ -n \"$mq_err_log\" ] && [ -s \"$mq_err_log\" ]; then\n      printf '[gt-workflow] Warning: gh repo view failed (exit %d): %s\\n' \"$repo_view_status\" \"$(head -c 200 \"$mq_err_log\" | tr '\\n' ' ')\" >&2\n    else\n      printf '[gt-workflow] Warning: gh repo view failed (exit %d)\\n' \"$repo_view_status\" >&2\n    fi\n    printf 'gh_native_queue:  COULD NOT CHECK (gh repo view failed)\\n'\n  elif [ -z \"$repo_nwo\" ]; then\n    printf 'gh_native_queue:  COULD NOT CHECK (gh repo view returned no name)\\n'\n  else\n    repo_owner=\"${repo_nwo%/*}\"\n    repo_name=\"${repo_nwo#*/}\"\n    [ -n \"$mq_err_log\" ] && : >| \"$mq_err_log\"  # truncate before next probe\n    # shellcheck disable=SC2016  # $owner/$name are GraphQL variable refs, not shell vars — intentionally literal in single quotes\n    mq_check=$(gh api graphql -f query='\n      query($owner:String!,$name:String!){\n        repository(owner:$owner,name:$name){ mergeQueue { url } }\n      }' -f owner=\"$repo_owner\" -f name=\"$repo_name\" --jq 'if .data.repository == null then error(\"repo null\") else (.data.repository.mergeQueue | if . != null then \"configured\" else empty end) end' 2>|\"${mq_err_log:-/dev/null}\")\n    mq_status=$?\n    if [ \"$mq_status\" -ne 0 ]; then\n      if [ -n \"$mq_err_log\" ] && [ -s \"$mq_err_log\" ]; then\n        printf '[gt-workflow] Warning: merge queue check failed (gh api graphql): %s\\n' \"$(head -c 200 \"$mq_err_log\" | tr '\\n' ' ')\" >&2\n      else\n        printf '[gt-workflow] Warning: merge queue check failed (gh api graphql)\\n' >&2\n      fi\n      printf 'gh_native_queue:  COULD NOT CHECK (gh api graphql failed)\\n'\n    elif [ -n \"$mq_check\" ]; then\n      printf 'gh_native_queue:  WARNING (configured — disable at https://github.com/%s/settings/branches)\\n' \"$repo_nwo\"\n    else\n      printf 'gh_native_queue:  ok (not configured)\\n'\n    fi\n  fi\nelse\n  printf 'gh_native_queue:  COULD NOT CHECK (gh not installed)\\n'\nfi\n[ -n \"$mq_err_log\" ] && rm -f \"$mq_err_log\"\n```\n\n#### Step 2: Interpret Results\n\n**Failures (hard stop)** — stop after reporting all that apply:\n\n- `gt` missing: \"Graphite CLI is required. Install it from\n  https://graphite.dev/docs/cli and re-run `gt-setup`.\"\n- `jq` missing: \"jq is required by gt-workflow (the gt-cleanup skill uses it to\n  parse PR-status JSON). Install it from https://jqlang.github.io/jq/download/.\"\n- `git_repo` not ok: \"gt-workflow must be run inside a git repository.\"\n- `auth_config` missing: \"Graphite auth was not detected. Run `gt auth` or sign\n  in through the Graphite CLI, then re-run `gt-setup`.\"\n- `repo_config` missing OR `gt_trunk` unavailable: \"This repository is not\n  initialized for Graphite. Run `gt init`, confirm `gt trunk` works, then re-run\n  `gt-setup`.\"\n\nIf any hard-stop failures exist, stop here. Do not proceed to Phase 2.\n\n**Warnings (do not block setup — CLI commands still work):**\n\n- `mcp_server` UPGRADE NEEDED: \"Graphite MCP server requires gt v1.6.7+. The\n  `gt mcp` stdio server registered in plugin.json will fail to start and\n  Graphite MCP tools will be unavailable until you upgrade. Run\n  `npm i -g @withgraphite/graphite-cli@latest` to upgrade, then re-run\n  `gt-setup`. All CLI-based skills (`smart-submit`, `gt-sync`, etc.) continue to\n  work without MCP.\"\n- `mcp_server` SKIPPED or UNKNOWN: note accordingly.\n- `yq` NOT FOUND: \"yq (kislyuk variant) is optional but recommended. Without it,\n  consumer skills (`smart-submit`, `gt-stack-plan`, `gt-amend`) will use\n  hardcoded defaults instead of `.graphite.yml` settings. Install with:\n  `pip install yq`\"\n- `gh_native_queue` WARNING (configured): \"GitHub native merge queue is\n  configured for this repo. Graphite and GitHub native merge queue are\n  incompatible — running both causes Graphite to restart CI on queued commits\n  and may produce out-of-order merges. To disable: open\n  https://github.com/<owner>/<repo>/settings/branches, edit the branch\n  protection rule for your trunk branch, and uncheck **Require merge queue**.\n  Setup proceeds, but the warning will repeat each time you run `gt-setup` until\n  resolved.\"\n- `gh_native_queue` COULD NOT CHECK: informational only — but **not necessarily\n  safe to ignore**. The parenthetical reason in the output line indicates which\n  probe failed (gh missing/unauthenticated, `gh repo view`, or\n  `gh api graphql`); the captured stderr is appended to the\n  `[gt-workflow] Warning:` line on failure to aid debugging. Three documented\n  false-negative paths exist for the `repository.mergeQueue { url }` proxy: (1)\n  the GitHub token lacks the admin scope needed to read merge queue config, (2)\n  the repository is not visible to the token, (3) merge queue is configured but\n  `mergeQueue.url` is null. Any of these can produce COULD NOT CHECK or even a\n  misleading `ok (not configured)` while the queue is actually active. If your\n  token is scope-limited (e.g., a CI/automation token), re-run `gt-setup` with\n  an admin-scoped token before relying on the result. Setup itself proceeds\n  normally; the proxy is fail-open by design.\n\n#### Step 3: Validation Report\n\nIf all checks pass, show:\n\n```text\ngt-workflow Validation\n──────────────────────\nGraphite CLI:  ready\njq:            ready\nyq:            ready (or: not found — optional)\nAuth:          detected\nRepository:    initialized (trunk: <branch>)\nMCP Server:    available (or: unavailable — gt < 1.6.7)\nMerge Queue:   ok (or: WARNING — native queue active / COULD NOT CHECK)\n\nProceeding to AI agent configuration...\n```\n"
+                }
+              ],
+              "success": true,
+              "durationMs": 2
+            },
+            "threadId": "01a111b5-0ec3-7832-9342-f8e4ab6ca5f0",
+            "turnId": "01a111b5-0ec9-7813-8ff1-2f1999fa49d0",
+            "completedAtMs": 1791298454100
+          },
+          "emittedAtMs": 1791298454100
+        },
+        {
+          "method": "fixture/tool",
+          "params": {
+            "tool": "fixture_observe",
+            "key": "gt-missing"
+          }
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "dynamicToolCall",
+              "id": "exec-4d0fc867-a0a3-4e93-b2a2-8f420b4e6b75",
+              "namespace": null,
+              "tool": "fixture_observe",
+              "arguments": {
+                "key": "gt-missing"
+              },
+              "status": "completed",
+              "contentItems": [
+                {
+                  "type": "inputText",
+                  "text": "{\"gt\":\"missing\",\"gh\":\"installed\",\"checkExitCode\":1}"
+                }
+              ],
+              "success": true,
+              "durationMs": 0
+            },
+            "threadId": "01a111b5-0ec3-7832-9342-f8e4ab6ca5f0",
+            "turnId": "01a111b5-0ec9-7813-8ff1-2f1999fa49d0",
+            "completedAtMs": 1791298454102
+          },
+          "emittedAtMs": 1791298454103
+        },
+        {
+          "method": "thread/tokenUsage/updated",
+          "params": {
+            "threadId": "01a111b5-0ec3-7832-9342-f8e4ab6ca5f0",
+            "turnId": "01a111b5-0ec9-7813-8ff1-2f1999fa49d0",
+            "tokenUsage": {
+              "total": {
+                "totalTokens": 22007,
+                "inputTokens": 21833,
+                "cachedInputTokens": 10496,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 174,
+                "reasoningOutputTokens": 0
+              },
+              "last": {
+                "totalTokens": 11247,
+                "inputTokens": 11168,
+                "cachedInputTokens": 10496,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 79,
+                "reasoningOutputTokens": 0
+              },
+              "modelContextWindow": 258400
+            }
+          },
+          "emittedAtMs": 1791298454153
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "agentMessage",
+              "id": "msg_0a2ca884cbd49ed5016ac50b99576087d1b4507fa44c4f17b0",
+              "text": "{\"gtInstalled\":false,\"mutation\":false}",
+              "phase": "final_answer",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            },
+            "threadId": "01a111b5-0ec3-7832-9342-f8e4ab6ca5f0",
+            "turnId": "01a111b5-0ec9-7813-8ff1-2f1999fa49d0",
+            "completedAtMs": 1791298457028
+          },
+          "emittedAtMs": 1791298457028
+        },
+        {
+          "method": "thread/tokenUsage/updated",
+          "params": {
+            "threadId": "01a111b5-0ec3-7832-9342-f8e4ab6ca5f0",
+            "turnId": "01a111b5-0ec9-7813-8ff1-2f1999fa49d0",
+            "tokenUsage": {
+              "total": {
+                "totalTokens": 36250,
+                "inputTokens": 36062,
+                "cachedInputTokens": 21504,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 188,
+                "reasoningOutputTokens": 0
+              },
+              "last": {
+                "totalTokens": 14243,
+                "inputTokens": 14229,
+                "cachedInputTokens": 11008,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 14,
+                "reasoningOutputTokens": 0
+              },
+              "modelContextWindow": 258400
+            }
+          },
+          "emittedAtMs": 1791298457044
+        },
+        {
+          "method": "turn/completed",
+          "params": {
+            "threadId": "01a111b5-0ec3-7832-9342-f8e4ab6ca5f0",
+            "turn": {
+              "id": "01a111b5-0ec9-7813-8ff1-2f1999fa49d0",
+              "items": [
+                {
+                  "type": "agentMessage",
+                  "id": "msg_0a2ca884cbd49ed5016ac50b99576087d1b4507fa44c4f17b0",
+                  "text": "{\"gtInstalled\":false,\"mutation\":false}",
+                  "phase": "final_answer",
+                  "memoryCitation": null,
+                  "delivery": null,
+                  "questions": null
+                }
+              ],
+              "itemsView": "summary",
+              "status": "completed",
+              "error": null,
+              "startedAt": 1791298440,
+              "completedAt": 1791298457,
+              "durationMs": 16138
+            }
+          },
+          "emittedAtMs": 1791298457045
+        }
+      ],
+      "status": "passed"
+    },
+    {
+      "id": "gt-unrelated",
+      "threadId": "01a111b5-4df7-76a1-bf99-a532c81ca794",
+      "skill": {
+        "name": "gt-workflow:gt-setup",
+        "description": "Validate Graphite CLI prerequisites and configure settings for AI agent workflows. Use when first installing the plugin, after Graphite auth changes, or when gt commands fail.",
+        "path": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/SKILL.md",
+        "scope": "user",
+        "enabled": true,
+        "pluginId": "gt-workflow@yellow-plugins"
+      },
+      "output": "4",
+      "reads": [],
+      "events": [
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "userMessage",
+              "id": "01a111b5-52c8-7f40-8e73-f39ceeebfe16",
+              "clientId": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "What is 2 + 2? Reply only 4.",
+                  "text_elements": []
+                }
+              ]
+            },
+            "threadId": "01a111b5-4df7-76a1-bf99-a532c81ca794",
+            "turnId": "01a111b5-4e30-7543-9450-9318d8acb210",
+            "completedAtMs": 1791298458313
+          },
+          "emittedAtMs": 1791298458313
+        },
+        {
+          "method": "item/completed",
+          "params": {
+            "item": {
+              "type": "agentMessage",
+              "id": "msg_03f3a2c53a8b0d01016ac50b9dcccc87d1b1d464accba1a8f2",
+              "text": "4",
+              "phase": "final_answer",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null
+            },
+            "threadId": "01a111b5-4df7-76a1-bf99-a532c81ca794",
+            "turnId": "01a111b5-4e30-7543-9450-9318d8acb210",
+            "completedAtMs": 1791298461250
+          },
+          "emittedAtMs": 1791298461250
+        },
+        {
+          "method": "thread/tokenUsage/updated",
+          "params": {
+            "threadId": "01a111b5-4df7-76a1-bf99-a532c81ca794",
+            "turnId": "01a111b5-4e30-7543-9450-9318d8acb210",
+            "tokenUsage": {
+              "total": {
+                "totalTokens": 17934,
+                "inputTokens": 17929,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 5,
+                "reasoningOutputTokens": 0
+              },
+              "last": {
+                "totalTokens": 17934,
+                "inputTokens": 17929,
+                "cachedInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+                "outputTokens": 5,
+                "reasoningOutputTokens": 0
+              },
+              "modelContextWindow": 258400
+            }
+          },
+          "emittedAtMs": 1791298461269
+        },
+        {
+          "method": "turn/completed",
+          "params": {
+            "threadId": "01a111b5-4df7-76a1-bf99-a532c81ca794",
+            "turn": {
+              "id": "01a111b5-4e30-7543-9450-9318d8acb210",
+              "items": [
+                {
+                  "type": "agentMessage",
+                  "id": "msg_03f3a2c53a8b0d01016ac50b9dcccc87d1b1d464accba1a8f2",
+                  "text": "4",
+                  "phase": "final_answer",
+                  "memoryCitation": null,
+                  "delivery": null,
+                  "questions": null
+                }
+              ],
+              "itemsView": "summary",
+              "status": "completed",
+              "error": null,
+              "startedAt": 1791298457,
+              "completedAt": 1791298461,
+              "durationMs": 4102
+            }
+          },
+          "emittedAtMs": 1791298461270
+        }
+      ],
+      "status": "passed"
+    }
+  ],
+  "cliVersion": "0.157.0",
+  "candidate": true,
+  "actualObservations": [],
+  "discovery": [
+    {
+      "name": "gt-workflow:gt-setup",
+      "description": "Validate Graphite CLI prerequisites and configure settings for AI agent workflows. Use when first installing the plugin, after Graphite auth changes, or when gt commands fail.",
+      "path": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6/codex/skills/gt-setup/SKILL.md",
+      "scope": "user",
+      "enabled": true,
+      "pluginId": "gt-workflow@yellow-plugins"
+    }
+  ],
+  "model": "gpt-6-astra",
+  "modelProvider": "openai",
+  "ownerAuthMetadataUnchanged": true,
+  "installed": [
+    {
+      "pluginId": "gt-workflow@yellow-plugins",
+      "name": "gt-workflow",
+      "marketplaceName": "yellow-plugins",
+      "version": "2.0.6",
+      "installedPath": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6",
+      "authPolicy": "ON_INSTALL",
+      "root": "/tmp/yellow-workflow-HpY8FC/codex/plugins/cache/yellow-plugins/gt-workflow/2.0.6",
+      "before": {
+        ".claude-plugin/plugin.json": "77acd693b93b314759bcc82f5a07b94711d5e1c7603e8d7cf61fcb17d636b428",
+        ".codex-plugin/plugin.json": "332bf83b8b323da20469b44a9679415bef1f962aa5250184abc812db551f5648",
+        ".mcp.json": "adce4e5bfb7acb4a08f13f53e16be5280e1b41cc07e20f7151a8103ec9288da7",
+        "CHANGELOG.md": "76e5a582b2a65cefccca6225733f260ec5d983e17d5a82a1be190a9808d86f4a",
+        "CLAUDE.md": "a84ee2319ed28bbba1637c3b0c385d6cd96a30bcae4fbc8fa189a6e3d935adaa",
+        "codex/skills/gt-setup/references/agent-settings.md": "c3efcf51075bb359fcad713ac1e09db5a362b7b76f78512dbc3d0b4a43cfc86c",
+        "codex/skills/gt-setup/references/convention-files.md": "b132ff5e409c5efd0de473df6ef4aa8e8dc1ff45c4f9ab30ecc8c57ad07ae297",
+        "codex/skills/gt-setup/references/prerequisites.md": "b848bbc0ee994221cbdf755e9b3b3a147e025d963e2da6e2b2f19980e477fe94",
+        "codex/skills/gt-setup/SKILL.md": "1ee76f2030064712095f633e4a8c26dc625d4091d4588ddfe1a37d80ff4d325f",
+        "commands/gt-amend.md": "b96d674a2d345f1cad9f9425d78f8349e6a5b3a7bcb49997254e31af792c0011",
+        "commands/gt-cleanup.md": "8ddcb717d495d6a9fb224f3e551d41ba54b81dbf6fe78a1739c2a6d0eca61672",
+        "commands/gt-merge.md": "e196ccdfb14ee417aa7ded91888fdaa5fa8640e2ff967bc3b644ef56206febc7",
+        "commands/gt-nav.md": "2411cb3dfaa549bb1fec06f6d630098ef499254a0d4e38fe56269b3673611d98",
+        "commands/gt-setup.md": "190203626b21be164de71822ebc0a8f22c3b30bd4534d568544efd05229dc063",
+        "commands/gt-stack-plan.md": "22699c12c3959de6a5a94d00b71b1e9d78244f89c45140121436fdeb275161ea",
+        "commands/gt-sync.md": "5c6f8a11438ccdc0640875bd863b67760b86b0dd723d24e38a5cb8baca8b5929",
+        "commands/smart-submit.md": "854ca94f7418e37ae4d8e2e88b664653a1eddf5f42b64bc21686130131cb8cb4",
+        "hooks/scripts/entrypoint-claude.js": "038d234c9798c94f62a7b83fa2c9decae6a0804d20df7dab30ac9a35585cef87",
+        "hooks/scripts/entrypoint-codex.js": "3d245848e279a8b09743968323c5adb218f614703670fc4d64638f939016c84c",
+        "hooks/scripts/lib/envelope.js": "899e5569a2639f4ee52ba4077c1be7df2afd8d4c7a737f74629979021c5185ea",
+        "hooks/scripts/lib/git-push-detector.js": "96fb47853dc889ea1225405d8df20cdee550a0281310ce4345081f915e556146",
+        "hooks/scripts/lib/policy-check-commit-message.js": "28c7f383ab0fde47f97d8b7dc515a82eb3e6fccf3f65fc366a6f3c0ede85ed77",
+        "hooks/scripts/lib/policy-check-git-push.js": "194a95298b83494897cc9ff04f34d8c5e31a61710c69a7d0560363f29260f03e",
+        "hooks/scripts/lib/run-hook.js": "ca094416ed29bf1c03a45dfe3dfbf13458790e40637e96ee6d0287e9af76f0a5",
+        "output-styles/stack-decomposition.md": "87727906e73202db04651711b248f01e0a3775fb51e70e962b7ef2c64d98efab",
+        "output-styles/stack-plan.md": "e7898f1f812ffda95d92aedbac00eb33df3d6520429a66efcff60b8db6aecb6c",
+        "package.json": "23b11e47745957927c60e73d961fe8bbcd896368d12a206117b949e745d92d44",
+        "README.md": "0340e8ba7595d8948e5adc88d2ea2d11557e6b7e6df39b220f4438bf52f1a812",
+        "skills/audit-review/SKILL.md": "43c855f77a05e554849dd7d69073b3d6bba183f009990d3ce4e482a763a3e212",
+        "skills/gt-amend/SKILL.md": "ec7cb50f9e92e73336fce61f3c9feeac1bcc4cff9430db70567c61ab7fe80aea",
+        "skills/gt-cleanup/references/actionable-categories.md": "653f263d09caa0199953130f4d6a80603c409dc56ef62d1470eb159083e42240",
+        "skills/gt-cleanup/references/pr-status-lookups.md": "1c6fbb97aacbe366c9692704a401637e7a764e52dd5fa423c7718eae556d3048",
+        "skills/gt-cleanup/references/worktree-cleanup-offer.md": "f7185e141e379f08739f96eac2f8503dedb08ed99a5de2caa1a6b50632d7d80a",
+        "skills/gt-cleanup/SKILL.md": "e770b1b34fe4059d94070ac446aa8f9435b9346b628453bc0616e3558c201a27",
+        "skills/gt-merge/SKILL.md": "5b1d725a550d73047eacb84ee34b8bc64dc260f6d1e0c064ccb6951438105578",
+        "skills/gt-nav/SKILL.md": "6c70c0942673011b5de7492f560d736e61b37bed1dcc5fe33a0a9dcc710b9de4",
+        "skills/gt-setup/SKILL.md": "88e2e8e2bb72ff9627d7f0e361bf759c3fe97cd074497bfeba13f04233801d71",
+        "skills/gt-stack-plan/SKILL.md": "08b42e8afd530ca7d98fbeca3ea881926a230f7d7caf7e298bbf92585514aa1c",
+        "skills/gt-sync/SKILL.md": "04e0618baaef29734aa5cb20113c4608642bacc8f386a6401433f249a028d5a2",
+        "skills/smart-submit/SKILL.md": "c35d5d50a6b4eb82972adb5570e1f322c76e3f003a4587e580554e69c20a7456",
+        "skills/stack-decomposition-format/SKILL.md": "9dc66d73da4a8ddff880b245743c811b50f32e25050140a841f3e12f23547521",
+        "skills/stack-plan-style/SKILL.md": "6944056e0a15b148341239582013b6075785fa4883d74fb8a5791161035480a8",
+        "tests/fixtures/gt-cleanup/branches-mixed.txt": "54eae0aa9f66edb1b5e7c5319c9250d92ed77519a9d1d631daadf4bb2eaff88d",
+        "tests/fixtures/hooks/check-commit-message/codex-tool-response-nonzero-exit-skip.golden.txt": "a1d042ab5de905beafd1d1b4b120a444568d85719839cc994eb61e4557bcf68a",
+        "tests/fixtures/hooks/check-commit-message/codex-tool-response-nonzero-exit-skip.stdin": "bbdbdfb5b97c9f26ab3ccd67a42b84dd53d130603f8be53c44f72b47e64727d7",
+        "tests/fixtures/hooks/check-commit-message/conventional-allow-silent.golden.txt": "a1d042ab5de905beafd1d1b4b120a444568d85719839cc994eb61e4557bcf68a",
+        "tests/fixtures/hooks/check-commit-message/conventional-allow-silent.stdin": "bccf1b0be850e6a2315c8733751e747e038e2ddaff79ff6eb12fa6e59c23a92c",
+        "tests/fixtures/hooks/check-commit-message/double-quoted-m.golden.txt": "a1d042ab5de905beafd1d1b4b120a444568d85719839cc994eb61e4557bcf68a",
+        "tests/fixtures/hooks/check-commit-message/double-quoted-m.stdin": "02d8c540bfa1f28b13e720125abb71e3f6a23daca925ea628c1cc399e680b9dd",
+        "tests/fixtures/hooks/check-commit-message/missing-exit-code-validates.golden.txt": "0b277f0fa8e726b6307f170b3f4b89c2a1e564fa730d70ac4e825a807debbbf4",
+        "tests/fixtures/hooks/check-commit-message/missing-exit-code-validates.stdin": "e91c31439a17230199604777fd9098ff91de30ef143dec356aadbdaac00f477c",
+        "tests/fixtures/hooks/check-commit-message/multi-m-first-only.golden.txt": "a1d042ab5de905beafd1d1b4b120a444568d85719839cc994eb61e4557bcf68a",
+        "tests/fixtures/hooks/check-commit-message/multi-m-first-only.stdin": "3e1dd2b3fd4dffcad839ddd503959fe0d99014ab0ab512dbd2b67b70fcf1b42b",
+        "tests/fixtures/hooks/check-commit-message/non-conventional-warn.golden.txt": "0b277f0fa8e726b6307f170b3f4b89c2a1e564fa730d70ac4e825a807debbbf4",
+        "tests/fixtures/hooks/check-commit-message/non-conventional-warn.stdin": "d592d52588f580d4ebee559737b29f1b4e6ec4b7610b5c294a7b4e17572493c4",
+        "tests/fixtures/hooks/check-commit-message/nonzero-exit-skip.golden.txt": "a1d042ab5de905beafd1d1b4b120a444568d85719839cc994eb61e4557bcf68a",
+        "tests/fixtures/hooks/check-commit-message/nonzero-exit-skip.stdin": "3c34eb1b48e92cb0f809bc2e365ca07ebe1167c0de777312b10466cb90ebcf04",
+        "tests/fixtures/hooks/check-commit-message/null-envelope.golden.txt": "3b2a4abecab82dc365e26cc6a7038ba81146f6c3d016db00ed26e748db49e82b",
+        "tests/fixtures/hooks/check-commit-message/null-envelope.stdin": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+        "tests/fixtures/hooks/check-commit-message/single-quoted-m.golden.txt": "a1d042ab5de905beafd1d1b4b120a444568d85719839cc994eb61e4557bcf68a",
+        "tests/fixtures/hooks/check-commit-message/single-quoted-m.stdin": "ff05d9beb3e409c4cbc7ffe647d79e785c70701be77df9ea8ae8722cfa8a6050",
+        "tests/fixtures/hooks/check-git-push/allowed-non-push.golden.txt": "99838f071fe581f776e9d3e9210cfdce16df69156cbd807b6bac717d831e938e",
+        "tests/fixtures/hooks/check-git-push/allowed-non-push.stdin": "d334491634cd02168718423d5a0b9629460ebdd26e7b8fd7971a52b75089bd4f",
+        "tests/fixtures/hooks/check-git-push/ansi-c-quoted-subcommand.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/ansi-c-quoted-subcommand.stdin": "566e11e67a48b90b839381b5e640a6b6756f13cd0d1889eff488cd330f61b1eb",
+        "tests/fixtures/hooks/check-git-push/bash-c-string.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/bash-c-string.stdin": "a24fcaeef53994d7b4a05a95e364de6694abd8ac58f55b3122478de59089a2a3",
+        "tests/fixtures/hooks/check-git-push/brace-expansion-subcommand.golden.txt": "ce813ba14d7db5ad781964cbc41bb2233c0bcfc47ceb39a99fcae3354f642ecc",
+        "tests/fixtures/hooks/check-git-push/brace-expansion-subcommand.stdin": "f51faca762ecfc096adb7d802adc84df6018e89d6b072763c05039605964ae2b",
+        "tests/fixtures/hooks/check-git-push/case-glob-pattern.golden.txt": "99838f071fe581f776e9d3e9210cfdce16df69156cbd807b6bac717d831e938e",
+        "tests/fixtures/hooks/check-git-push/case-glob-pattern.stdin": "f7680035776a718982f46d5e3dbdc3b1aed5f0d06b7874d12a04b38ac67e0473",
+        "tests/fixtures/hooks/check-git-push/cat-passthrough-pipe.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/cat-passthrough-pipe.stdin": "409639377bcb6b0f06671c43d0d3f3a820f830f1a87a0ccca1eb494a68b3fa71",
+        "tests/fixtures/hooks/check-git-push/end-of-options-then-push.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/end-of-options-then-push.stdin": "0b750d7b69ef3d80ca630589fd69f8434838d78ec5d99c1a137d130808804220",
+        "tests/fixtures/hooks/check-git-push/fd-script-without-source.golden.txt": "ce813ba14d7db5ad781964cbc41bb2233c0bcfc47ceb39a99fcae3354f642ecc",
+        "tests/fixtures/hooks/check-git-push/fd-script-without-source.stdin": "f8207b403ef721bb96a8dd683c655c89c33549fe01fa9ca41833c99939950b33",
+        "tests/fixtures/hooks/check-git-push/git-config-pager-value.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/git-config-pager-value.stdin": "8163826a7413a6dfac2a28e46b2803d520b3b10d44fb4c0c7bf6abd0a47c2946",
+        "tests/fixtures/hooks/check-git-push/git-rebase-exec.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/git-rebase-exec.stdin": "9e2f8b3d9d4b31fc1a71f74d9fea6d11a43d22ad582f572ad62be7e6824c5617",
+        "tests/fixtures/hooks/check-git-push/git-submodule-foreach.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/git-submodule-foreach.stdin": "b92896f82a58e66dff148409610acf92ade5e33c5c5b6fc2d75d3545c07eca24",
+        "tests/fixtures/hooks/check-git-push/git-subtree-push.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/git-subtree-push.stdin": "f834df730b5e1499099c358d31ecb22f1ff0566d68acea7093c7e363a0e4c897",
+        "tests/fixtures/hooks/check-git-push/global-option-C-status.golden.txt": "99838f071fe581f776e9d3e9210cfdce16df69156cbd807b6bac717d831e938e",
+        "tests/fixtures/hooks/check-git-push/global-option-C-status.stdin": "8d835994d3eb5b4b4d073d9eb8fe51ad92bfd2d95e98daa4d26c4b8f204d7937",
+        "tests/fixtures/hooks/check-git-push/global-option-c.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/global-option-C.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/global-option-c.stdin": "044b66c8e229eb64358c231af96666635d07917693563ae34c9a043788290b16",
+        "tests/fixtures/hooks/check-git-push/global-option-C.stdin": "6f2051fa1097f0ca21ae58d8054c48cf5c4a8693c705db90a5f24458e5fc00d4",
+        "tests/fixtures/hooks/check-git-push/global-option-git-dir.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/global-option-git-dir.stdin": "a7903d8de946e082fe8074a75827b49da01195d6c351376c87edd7df242acfff",
+        "tests/fixtures/hooks/check-git-push/group-piped-into-shell.golden.txt": "ce813ba14d7db5ad781964cbc41bb2233c0bcfc47ceb39a99fcae3354f642ecc",
+        "tests/fixtures/hooks/check-git-push/group-piped-into-shell.stdin": "3ee3387d3298aa7b4714fd6a594a23bcda6d9c341b78ad795e9635589dcf0ddc",
+        "tests/fixtures/hooks/check-git-push/gt-submit.golden.txt": "99838f071fe581f776e9d3e9210cfdce16df69156cbd807b6bac717d831e938e",
+        "tests/fixtures/hooks/check-git-push/gt-submit.stdin": "80e96e4ba568105f52999effe7c0df2c4eef6895fb3f12dc710ecb62a9e61827",
+        "tests/fixtures/hooks/check-git-push/heredoc-expanding-substitution.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/heredoc-expanding-substitution.stdin": "e3cf7006b2af2de03ea758905ed37502a58427ab4fcd32b02907e6b056ad6e83",
+        "tests/fixtures/hooks/check-git-push/heredoc-literal.golden.txt": "99838f071fe581f776e9d3e9210cfdce16df69156cbd807b6bac717d831e938e",
+        "tests/fixtures/hooks/check-git-push/heredoc-literal.stdin": "460c6e5d7ae783905f761f16f04cf6c1ca295ef02948ee12d0cf41f743293caf",
+        "tests/fixtures/hooks/check-git-push/heredoc-quoted-delimiter-substitution.golden.txt": "99838f071fe581f776e9d3e9210cfdce16df69156cbd807b6bac717d831e938e",
+        "tests/fixtures/hooks/check-git-push/heredoc-quoted-delimiter-substitution.stdin": "4cb31b58ac2028c26f90b39d34996edc420434259b48fafe9eb07e43807ea767",
+        "tests/fixtures/hooks/check-git-push/heredoc-shell-piped.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/heredoc-shell-piped.stdin": "cf30c342b4e98fd342b6382a08604b7092074e16d7a748ff66655ebf748e3150",
+        "tests/fixtures/hooks/check-git-push/malformed-json.golden.txt": "cef7e6bbbead6b799e6856f694ba2a70b2a4089223b5c3c7cc03ae44cffada90",
+        "tests/fixtures/hooks/check-git-push/malformed-json.stdin": "bfe22c27c8ff498078abb1844c83f9c9e875e4bb69e57423b373dc84f00366a9",
+        "tests/fixtures/hooks/check-git-push/metachar-and.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/metachar-and.stdin": "5df1360c4e4780e05bbcd03cd57734539eec27c6b3362a3f1aa11e08f3974a49",
+        "tests/fixtures/hooks/check-git-push/metachar-semicolon.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/metachar-semicolon.stdin": "c53789f73c7b60f15b8a0bead0cfe79a56a4966616cdde40093c4105b43eb247",
+        "tests/fixtures/hooks/check-git-push/metachar-subshell.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/metachar-subshell.stdin": "6b1ab74708db8495d65078c74d8a6e56f9470b38e80b9883ee902e0ab2ebc6e9",
+        "tests/fixtures/hooks/check-git-push/missing-jq.golden.txt": "67f414a885ed5b5af47afb89c142e5e49da2b2d348ec34fb8ef6943f3a13bc55",
+        "tests/fixtures/hooks/check-git-push/missing-jq.stdin": "8159d08d85f60ed79dfcdf0736df067daa994aa59b2fc14b1ca26991e559fb43",
+        "tests/fixtures/hooks/check-git-push/multi-line-non-push.golden.txt": "99838f071fe581f776e9d3e9210cfdce16df69156cbd807b6bac717d831e938e",
+        "tests/fixtures/hooks/check-git-push/multi-line-non-push.stdin": "bd7af0857679bba44620df4ad09c96d566e757fea3bff4a361750fae5a40d5a7",
+        "tests/fixtures/hooks/check-git-push/nested-shell-depth-2.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/nested-shell-depth-2.stdin": "0966d14b50f26f843d582580808d7c6128ccf88c2a14af68d99425ba960b8af5",
+        "tests/fixtures/hooks/check-git-push/nested-shell-depth-4-cap.golden.txt": "ce813ba14d7db5ad781964cbc41bb2233c0bcfc47ceb39a99fcae3354f642ecc",
+        "tests/fixtures/hooks/check-git-push/nested-shell-depth-4-cap.stdin": "9c8b7cfb77759af3a66b177489215e0e5d7d7d23fa06df210b72a04a0846f500",
+        "tests/fixtures/hooks/check-git-push/non-string-command.golden.txt": "27e793ca910757ccb88898634cb5e47a2d90437fa41a4928f845c5b24398b6ff",
+        "tests/fixtures/hooks/check-git-push/non-string-command.stdin": "7853730d36ab8d95542a26b16256aee8d22e0aa4f6fe204f74fd407d512a705a",
+        "tests/fixtures/hooks/check-git-push/null-envelope.golden.txt": "99838f071fe581f776e9d3e9210cfdce16df69156cbd807b6bac717d831e938e",
+        "tests/fixtures/hooks/check-git-push/null-envelope.stdin": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+        "tests/fixtures/hooks/check-git-push/path-qualified-git.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/path-qualified-git.stdin": "5ed6530c07581d3bd01ab61b824bda75817c40409ce384d181dbc95c207d3acf",
+        "tests/fixtures/hooks/check-git-push/piped-literal-script.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/piped-literal-script.stdin": "b0b1e81766804944e894a23481781de2c23fcdad841b8638b2838573bc87fc11",
+        "tests/fixtures/hooks/check-git-push/plain-block.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/plain-block.stdin": "8159d08d85f60ed79dfcdf0736df067daa994aa59b2fc14b1ca26991e559fb43",
+        "tests/fixtures/hooks/check-git-push/process-substitution-script.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/process-substitution-script.stdin": "fe347550118af2f37222a227fccfc3cf7950deaa86e47f7c6bb29a53c2c35487",
+        "tests/fixtures/hooks/check-git-push/quoted-literal.golden.txt": "99838f071fe581f776e9d3e9210cfdce16df69156cbd807b6bac717d831e938e",
+        "tests/fixtures/hooks/check-git-push/quoted-literal.stdin": "57c7ed0e3f11173ab33e9268a34f123a576b6fbbbdccc7735fee83593e7bf1e9",
+        "tests/fixtures/hooks/check-git-push/real-host-envelope.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/real-host-envelope.stdin": "2f20061e41cfccb18c78e199feb1f19afd9086a932b8fbae2b096dc7b8481214",
+        "tests/fixtures/hooks/check-git-push/redirection-before-subcommand.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/redirection-before-subcommand.stdin": "06ae8c176dd2141dd89df191c77c6699a44a57b2100f011190d1da1f2c0420ba",
+        "tests/fixtures/hooks/check-git-push/reserved-word-group.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/reserved-word-group.stdin": "a18a48380ca8913a37babefee5b9ba05562494fb5930237c138981465a69cd60",
+        "tests/fixtures/hooks/check-git-push/root-level-command-ignored.golden.txt": "99838f071fe581f776e9d3e9210cfdce16df69156cbd807b6bac717d831e938e",
+        "tests/fixtures/hooks/check-git-push/root-level-command-ignored.stdin": "bf972e27660aa662019b210f99ee7ba51316039b9c8c4215359561a3180e67d7",
+        "tests/fixtures/hooks/check-git-push/sh-c-chain.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/sh-c-chain.stdin": "cd98a17682b504f13d43be5f4f7ead46fc583c9bab82ee77c04194aba31d4716",
+        "tests/fixtures/hooks/check-git-push/stdin-inherited-two-shells-down.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/stdin-inherited-two-shells-down.stdin": "a789e55193da42d8c38cd3919c88a69b6e542ab5d4b86227bf8a2b59548d94f4",
+        "tests/fixtures/hooks/check-git-push/substitution-in-option-value.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/substitution-in-option-value.stdin": "6a1d9900e0a8a6e82447dc96e2a3169d7a69eb4a306f787b7f4067312cca8fc3",
+        "tests/fixtures/hooks/check-git-push/sudo-shell-string.golden.txt": "2e51059d94356e2faadd946b09c595618e6dc272885a5fa403abedee86f3dbf7",
+        "tests/fixtures/hooks/check-git-push/sudo-shell-string.stdin": "6a9346d516054253b136febd9ab837a28eb5fdf8a22ac129df0f93c814ff53f7",
+        "tests/gt-amend.bats": "005a9f7ce299a5894568d98fdfd8eac5e92a152d4c95163545ee45c2721ad5ae",
+        "tests/gt-cleanup.bats": "b5fbb82e34c93ae8d1d0ff61b55fed03e0fc301ad9088e72844c57d1bd596154",
+        "tests/hook-parity.bats": "1555373826cbd772a6d07ae473f3ea37bc697b79ab4c4836fb7c57ed88126d3b",
+        "tests/mocks/git": "035be8a5f38cfeb03ec2460adebee5e980370766c9abb24ab008e8a6c33f2ba8",
+        "tests/mocks/gt": "8d5879dd1df403316af829d6a9b809c485e6884262c871a33c2ab7cf538f1e96",
+        "tests/smart-submit.bats": "4cc75277e7db4bf4747a087ade3ce520c08052d8773fd53e6b84a8a27a1ac351"
+      }
+    }
+  ]
+}

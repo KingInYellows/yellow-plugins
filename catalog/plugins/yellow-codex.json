@@ -8,14 +8,7 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-codex",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
-  "keywords": [
-    "codex",
-    "openai",
-    "code-review",
-    "ai-agent",
-    "rescue",
-    "analysis"
-  ],
+  "keywords": ["codex", "openai", "code-review", "ai-agent", "rescue", "analysis"],
   "marketplace": {
     "category": "development",
     "source": "./plugins/yellow-codex"
@@ -23,7 +16,16 @@
   "targets": {
     "claude": true,
     "codex": {
-      "enabled": false
+      "enabled": true,
+      "interface": {
+        "displayName": "Yellow Codex",
+        "category": "development"
+      },
+      "skillAllowlist": ["codex-readiness"],
+      "componentPaths": {
+        "skills": "./codex/skills"
+      },
+      "includeHooks": false
     }
   }
 }

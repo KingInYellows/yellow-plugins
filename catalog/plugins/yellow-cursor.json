@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "description": "Cursor Cloud Agents integration — delegate coding tasks to Cursor's remote agents, track status, and manage runs",
+  "description": "Cursor Cloud Agents integration \u2014 delegate coding tasks to Cursor's remote agents, track status, and manage runs",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"
@@ -20,7 +20,16 @@
   "targets": {
     "claude": true,
     "codex": {
-      "enabled": false
+      "enabled": true,
+      "interface": {
+        "displayName": "Yellow Cursor",
+        "category": "automation"
+      },
+      "skillAllowlist": ["cursor-plan"],
+      "componentPaths": {
+        "skills": "./codex/skills"
+      },
+      "includeHooks": false
     },
     "cursor": {
       "enabled": true,

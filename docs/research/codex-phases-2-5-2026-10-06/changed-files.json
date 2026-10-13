@@ -1,0 +1,1806 @@
+{
+  "recordedAt": "2026-10-06T15:20:19.610458+00:00",
+  "baseRevision": "cb7469ffe5d7c5e455c53c65055dac1d0d7e35b0",
+  "canonicalWorktree": "/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04",
+  "includesPreservedPhase1Changes": true,
+  "trackedDiffStat": " .agents/plugins/marketplace.json                   |   67 +-\n README.md                                          |   67 +-\n catalog/plugins/yellow-codex.json                  |   20 +-\n catalog/plugins/yellow-core.json                   |   18 +-\n catalog/plugins/yellow-cursor.json                 |   13 +-\n catalog/plugins/yellow-debt.json                   |   17 +-\n catalog/plugins/yellow-docs.json                   |   20 +-\n catalog/plugins/yellow-research.json               |   31 +-\n docs/codex-distribution.md                         |  200 ++--\n docs/runtime-install-smoke.md                      |  239 ++++-\n docs/security.md                                   |  656 +++++++------\n .../codex-plugin-manifest-and-hook-contract.md     |  257 ++---\n examples/codex-plugin.example.json                 |    1 +\n package.json                                       |    7 +-\n plugins/gt-workflow/.codex-plugin/plugin.json      |   22 +-\n plugins/gt-workflow/CLAUDE.md                      |   29 +-\n plugins/gt-workflow/README.md                      |   49 +-\n plugins/gt-workflow/codex/skills/gt-setup/SKILL.md |  451 +--------\n plugins/gt-workflow/skills/gt-setup/SKILL.md       |  452 +--------\n plugins/yellow-ci/.codex-plugin/plugin.json        |   17 +-\n plugins/yellow-ci/CLAUDE.md                        |   35 +-\n plugins/yellow-ci/README.md                        |   29 +\n .../yellow-ci/codex/skills/ci-diagnose/SKILL.md    |  643 +-----------\n .../codex/skills/ci-runner-health/SKILL.md         | 1033 +------------------\n .../yellow-ci/hooks/scripts/entrypoint-codex.js    |    7 +-\n plugins/yellow-ci/skills/ci-diagnose/SKILL.md      |  644 +-----------\n plugins/yellow-ci/skills/ci-runner-health/SKILL.md | 1034 +-------------------\n plugins/yellow-codex/CLAUDE.md                     |   15 +-\n plugins/yellow-codex/README.md                     |   20 +-\n plugins/yellow-core/.codex-plugin/plugin.json      |   20 +-\n plugins/yellow-core/CLAUDE.md                      |   18 +-\n plugins/yellow-core/README.md                      |   12 +\n plugins/yellow-cursor/CLAUDE.md                    |   16 +-\n plugins/yellow-cursor/README.md                    |   19 +\n plugins/yellow-debt/CLAUDE.md                      |   10 +-\n plugins/yellow-debt/README.md                      |   17 +\n plugins/yellow-docs/CLAUDE.md                      |   11 +\n plugins/yellow-docs/README.md                      |   11 +\n plugins/yellow-research/CLAUDE.md                  |    9 +\n plugins/yellow-research/README.md                  |   19 +\n plugins/yellow-review/.codex-plugin/plugin.json    |   15 +-\n plugins/yellow-review/CLAUDE.md                    |    4 +\n plugins/yellow-review/README.md                    |    3 +\n schemas/catalog-plugin.schema.json                 |  142 ++-\n schemas/codex-plugin.schema.json                   |  103 +-\n scripts/generate-manifests.js                      |   91 +-\n scripts/lib/generate/emit-codex.js                 |  226 ++++-\n scripts/lib/generate/emit-cursor.js                |   19 +-\n scripts/validate-codex.js                          |  269 +++--\n tests/integration/codex-schema-examples.test.ts    |   13 +\n tests/integration/generate-manifests-codex.test.ts |   65 ++\n tests/integration/thermonuclear-reviewer.test.ts   |    9 +-\n 52 files changed, 2453 insertions(+), 4761 deletions(-)\n",
+  "groups": {
+    "catalogAndMarketplace": [
+      ".agents/plugins/marketplace.json",
+      "catalog/plugins/yellow-codex.json",
+      "catalog/plugins/yellow-core.json",
+      "catalog/plugins/yellow-cursor.json",
+      "catalog/plugins/yellow-debt.json",
+      "catalog/plugins/yellow-docs.json",
+      "catalog/plugins/yellow-research.json"
+    ],
+    "schemasGeneratorAndRuntimeHarnesses": [
+      "package.json",
+      "schemas/catalog-plugin.schema.json",
+      "schemas/codex-plugin.schema.json",
+      "scripts/generate-manifests.js",
+      "scripts/lib/generate/emit-codex.js",
+      "scripts/lib/generate/emit-cursor.js",
+      "scripts/lib/generate/skill-policy.js",
+      "scripts/smoke-codex-graphite-auth.js",
+      "scripts/smoke-codex-plugin-install.js",
+      "scripts/smoke-codex-plugin-lifecycle.js",
+      "scripts/smoke-codex-skill-activation.js",
+      "scripts/smoke-codex-workflow-acceptance.js",
+      "scripts/validate-codex.js"
+    ],
+    "sourceSkillsAndReferences": [
+      "plugins/gt-workflow/skills/gt-setup/SKILL.md",
+      "plugins/gt-workflow/skills/gt-setup/references/agent-settings.md",
+      "plugins/gt-workflow/skills/gt-setup/references/convention-files.md",
+      "plugins/gt-workflow/skills/gt-setup/references/prerequisites.md",
+      "plugins/yellow-ci/skills/ci-diagnose/SKILL.md",
+      "plugins/yellow-ci/skills/ci-diagnose/references/failure-analysis.md",
+      "plugins/yellow-ci/skills/ci-diagnose/references/fetch-logs.md",
+      "plugins/yellow-ci/skills/ci-diagnose/references/resolve-run.md",
+      "plugins/yellow-ci/skills/ci-runner-health/SKILL.md",
+      "plugins/yellow-ci/skills/ci-runner-health/references/configuration.md",
+      "plugins/yellow-ci/skills/ci-runner-health/references/investigation.md",
+      "plugins/yellow-ci/skills/ci-runner-health/references/ssh-probes.md",
+      "plugins/yellow-codex/skills/codex-readiness/SKILL.md",
+      "plugins/yellow-codex/skills/codex-readiness/references/readiness-contract.md",
+      "plugins/yellow-core/skills/worktree-inventory/SKILL.md",
+      "plugins/yellow-cursor/skills/cursor-plan/SKILL.md",
+      "plugins/yellow-cursor/skills/cursor-plan/references/plan-contract.md",
+      "plugins/yellow-debt/skills/debt-complexity-scan/SKILL.md",
+      "plugins/yellow-debt/skills/debt-complexity-scan/references/scan-contract.md",
+      "plugins/yellow-docs/skills/docs-audit/SKILL.md",
+      "plugins/yellow-docs/skills/docs-audit/references/audit-contract.md",
+      "plugins/yellow-research/skills/research-public-repo/SKILL.md",
+      "plugins/yellow-research/skills/research-public-repo/references/deepwiki-contract.md",
+      "plugins/yellow-review/skills/yellow-thermonuclear-review/agents/openai.yaml"
+    ],
+    "generatedHostArtifacts": [
+      "plugins/gt-workflow/.codex-plugin/plugin.json",
+      "plugins/gt-workflow/codex/skills/gt-setup/SKILL.md",
+      "plugins/gt-workflow/codex/skills/gt-setup/references/agent-settings.md",
+      "plugins/gt-workflow/codex/skills/gt-setup/references/convention-files.md",
+      "plugins/gt-workflow/codex/skills/gt-setup/references/prerequisites.md",
+      "plugins/yellow-ci/.codex-plugin/plugin.json",
+      "plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md",
+      "plugins/yellow-ci/codex/skills/ci-diagnose/references/failure-analysis.md",
+      "plugins/yellow-ci/codex/skills/ci-diagnose/references/fetch-logs.md",
+      "plugins/yellow-ci/codex/skills/ci-diagnose/references/resolve-run.md",
+      "plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md",
+      "plugins/yellow-ci/codex/skills/ci-runner-health/references/configuration.md",
+      "plugins/yellow-ci/codex/skills/ci-runner-health/references/investigation.md",
+      "plugins/yellow-ci/codex/skills/ci-runner-health/references/ssh-probes.md",
+      "plugins/yellow-codex/.codex-plugin/plugin.json",
+      "plugins/yellow-codex/codex/skills/codex-readiness/SKILL.md",
+      "plugins/yellow-codex/codex/skills/codex-readiness/references/readiness-contract.md",
+      "plugins/yellow-core/.codex-plugin/plugin.json",
+      "plugins/yellow-core/codex/skills/worktree-inventory/SKILL.md",
+      "plugins/yellow-cursor/.codex-plugin/plugin.json",
+      "plugins/yellow-cursor/codex/skills/cursor-plan/SKILL.md",
+      "plugins/yellow-cursor/codex/skills/cursor-plan/references/plan-contract.md",
+      "plugins/yellow-debt/.codex-plugin/plugin.json",
+      "plugins/yellow-debt/codex/skills/debt-complexity-scan/SKILL.md",
+      "plugins/yellow-debt/codex/skills/debt-complexity-scan/references/scan-contract.md",
+      "plugins/yellow-docs/.codex-plugin/plugin.json",
+      "plugins/yellow-docs/codex/skills/docs-audit/SKILL.md",
+      "plugins/yellow-docs/codex/skills/docs-audit/references/audit-contract.md",
+      "plugins/yellow-research/.codex-plugin/plugin.json",
+      "plugins/yellow-research/codex/skills/research-public-repo/SKILL.md",
+      "plugins/yellow-research/codex/skills/research-public-repo/references/deepwiki-contract.md",
+      "plugins/yellow-review/.codex-plugin/plugin.json",
+      "plugins/yellow-review/codex/skills/yellow-thermonuclear-review/agents/openai.yaml"
+    ],
+    "testsAndFixtures": [
+      "tests/fixtures/codex-activation/cases.json",
+      "tests/fixtures/codex-activation/plans/complete/shipped.md",
+      "tests/fixtures/codex-activation/plans/in-flight.md",
+      "tests/fixtures/codex-activation/plans/ready.md",
+      "tests/fixtures/codex-activation/plans/research.md",
+      "tests/fixtures/codex-expansion/analysis-candidate.json",
+      "tests/fixtures/codex-expansion/analysis-final.json",
+      "tests/fixtures/codex-expansion/developer-docs-candidate.json",
+      "tests/fixtures/codex-expansion/developer-docs-final.json",
+      "tests/fixtures/codex-expansion/gt-after.json",
+      "tests/fixtures/codex-expansion/gt-before.json",
+      "tests/fixtures/codex-expansion/gt-final.json",
+      "tests/fixtures/codex-expansion/policy.json",
+      "tests/fixtures/codex-expansion/remote-orchestration-candidate.json",
+      "tests/fixtures/codex-expansion/remote-orchestration-final.json",
+      "tests/fixtures/codex-expansion/research-candidate.json",
+      "tests/fixtures/codex-expansion/research-final.json",
+      "tests/fixtures/codex-expansion/research-negative-candidate.json",
+      "tests/fixtures/codex-expansion/research-negative-final.json",
+      "tests/fixtures/codex-expansion/waves-candidate.json",
+      "tests/fixtures/codex-pilot-tasks/cases.json",
+      "tests/fixtures/codex-smoke/fake-codex.cjs",
+      "tests/fixtures/codex-waves-analysis-integration/cases.json",
+      "tests/fixtures/codex-waves-analysis-integration/src/complexity.js",
+      "tests/fixtures/codex-waves-remote-orchestration.json",
+      "tests/integration/ci-pilot-progressive-disclosure.test.ts",
+      "tests/integration/codex-schema-examples.test.ts",
+      "tests/integration/codex-skill-policy.test.ts",
+      "tests/integration/codex-waves-analysis-integration.test.ts",
+      "tests/integration/codex-waves-remote-orchestration.test.ts",
+      "tests/integration/generate-manifests-codex.test.ts",
+      "tests/integration/smoke-codex-graphite-auth.test.ts",
+      "tests/integration/smoke-codex-plugin-install.test.ts",
+      "tests/integration/smoke-codex-plugin-lifecycle.test.ts",
+      "tests/integration/smoke-codex-skill-activation.test.ts",
+      "tests/integration/thermonuclear-reviewer.test.ts",
+      "tests/fixtures/codex-expansion/codex-missing-auth-final.json"
+    ],
+    "changesets": [
+      ".changeset/codex-command-migration-exposure.md",
+      ".changeset/codex-hook-lifecycle-evidence.md",
+      ".changeset/codex-manifest-invocation-policy.md",
+      ".changeset/codex-pilot-progressive-disclosure.md",
+      ".changeset/codex-waves-analysis-integration.md",
+      ".changeset/codex-waves-developer-docs.md",
+      ".changeset/codex-waves-remote-orchestration.md"
+    ],
+    "documentationAndEvidence": [
+      "README.md",
+      "docs/codex-distribution.md",
+      "docs/research/codex-evaluation-2026-10-04/catalog-inventory.json",
+      "docs/research/codex-evaluation-2026-10-04/evaluation.md",
+      "docs/research/codex-evaluation-2026-10-04/gt-workflow-install.json",
+      "docs/research/codex-evaluation-2026-10-04/gt-workflow-start.md",
+      "docs/research/codex-evaluation-2026-10-04/gt-workflow.json",
+      "docs/research/codex-evaluation-2026-10-04/gt-workflow.md",
+      "docs/research/codex-evaluation-2026-10-04/installed-plugins.json",
+      "docs/research/codex-evaluation-2026-10-04/installed-skill-paths.json",
+      "docs/research/codex-evaluation-2026-10-04/isolated-smoke-location.txt",
+      "docs/research/codex-evaluation-2026-10-04/marketplace-add.txt",
+      "docs/research/codex-evaluation-2026-10-04/validation.json",
+      "docs/research/codex-evaluation-2026-10-04/yellow-ci-install.json",
+      "docs/research/codex-evaluation-2026-10-04/yellow-ci-start.md",
+      "docs/research/codex-evaluation-2026-10-04/yellow-ci.json",
+      "docs/research/codex-evaluation-2026-10-04/yellow-ci.md",
+      "docs/research/codex-evaluation-2026-10-04/yellow-core-install.json",
+      "docs/research/codex-evaluation-2026-10-04/yellow-core-start.md",
+      "docs/research/codex-evaluation-2026-10-04/yellow-core.json",
+      "docs/research/codex-evaluation-2026-10-04/yellow-core.md",
+      "docs/research/codex-evaluation-2026-10-04/yellow-review-install.json",
+      "docs/research/codex-evaluation-2026-10-04/yellow-review-start.md",
+      "docs/research/codex-evaluation-2026-10-04/yellow-review.json",
+      "docs/research/codex-evaluation-2026-10-04/yellow-review.md",
+      "docs/research/codex-phase-1-2026-10-05/acceptance-audit.json",
+      "docs/research/codex-phase-1-2026-10-05/activation-after.json",
+      "docs/research/codex-phase-1-2026-10-05/activation-initial-failure.json",
+      "docs/research/codex-phase-1-2026-10-05/activation-path-guard-failure.json",
+      "docs/research/codex-phase-1-2026-10-05/continuation.md",
+      "docs/research/codex-phase-1-2026-10-05/discovery-after.json",
+      "docs/research/codex-phase-1-2026-10-05/discovery-before.json",
+      "docs/research/codex-phase-1-2026-10-05/discovery-final.json",
+      "docs/research/codex-phase-1-2026-10-05/discovery-timeout.json",
+      "docs/research/codex-phase-1-2026-10-05/graphite-auth.json",
+      "docs/research/codex-phase-1-2026-10-05/lifecycle-after.json",
+      "docs/research/codex-phase-1-2026-10-05/lifecycle-final.json",
+      "docs/research/codex-phase-1-2026-10-05/report.md",
+      "docs/research/codex-phase-1-2026-10-05/runtime/hooks-trusted.json",
+      "docs/research/codex-phase-1-2026-10-05/runtime/hooks-untrusted.json",
+      "docs/research/codex-phase-1-2026-10-05/runtime/install.json",
+      "docs/research/codex-phase-1-2026-10-05/runtime/mcp-events.json",
+      "docs/research/codex-phase-1-2026-10-05/runtime/mcp-launch.jsonl",
+      "docs/research/codex-phase-1-2026-10-05/runtime/mcp-status.json",
+      "docs/research/codex-phase-1-2026-10-05/runtime/mcp-stubs.json",
+      "docs/research/codex-phase-1-2026-10-05/runtime/result.json",
+      "docs/research/codex-phase-1-2026-10-05/runtime/trusted-events.json",
+      "docs/research/codex-phase-1-2026-10-05/runtime/trusted-stubs.json",
+      "docs/research/codex-phase-1-2026-10-05/runtime/untrusted-events.json",
+      "docs/research/codex-phase-1-2026-10-05/runtime/untrusted-stubs.json",
+      "docs/research/codex-phase-1-2026-10-05/validation-completion-initial.json",
+      "docs/research/codex-phase-1-2026-10-05/validation-initial.json",
+      "docs/research/codex-phase-1-2026-10-05/validation-pre-activation.json",
+      "docs/research/codex-phase-1-2026-10-05/validation.json",
+      "docs/research/codex-phases-2-5-2026-10-06/acceptance-audit.json",
+      "docs/research/codex-phases-2-5-2026-10-06/analysis-candidate.json",
+      "docs/research/codex-phases-2-5-2026-10-06/analysis-evidence-failure.json",
+      "docs/research/codex-phases-2-5-2026-10-06/analysis-final.json",
+      "docs/research/codex-phases-2-5-2026-10-06/analysis-output-failure.json",
+      "docs/research/codex-phases-2-5-2026-10-06/baseline.json",
+      "docs/research/codex-phases-2-5-2026-10-06/cache-refresh.json",
+      "docs/research/codex-phases-2-5-2026-10-06/continuation.md",
+      "docs/research/codex-phases-2-5-2026-10-06/developer-docs-candidate.json",
+      "docs/research/codex-phases-2-5-2026-10-06/developer-docs-final.json",
+      "docs/research/codex-phases-2-5-2026-10-06/discovery-final.json",
+      "docs/research/codex-phases-2-5-2026-10-06/generation-determinism.json",
+      "docs/research/codex-phases-2-5-2026-10-06/graphite-auth-final.json",
+      "docs/research/codex-phases-2-5-2026-10-06/gt-after-candidate.json",
+      "docs/research/codex-phases-2-5-2026-10-06/gt-after-final.json",
+      "docs/research/codex-phases-2-5-2026-10-06/gt-before.json",
+      "docs/research/codex-phases-2-5-2026-10-06/intermediate-checks.json",
+      "docs/research/codex-phases-2-5-2026-10-06/lifecycle-final.json",
+      "docs/research/codex-phases-2-5-2026-10-06/phase2.md",
+      "docs/research/codex-phases-2-5-2026-10-06/phase3-sizes.json",
+      "docs/research/codex-phases-2-5-2026-10-06/phase3.md",
+      "docs/research/codex-phases-2-5-2026-10-06/phase5.md",
+      "docs/research/codex-phases-2-5-2026-10-06/pilot-after-final.json",
+      "docs/research/codex-phases-2-5-2026-10-06/pilot-after-initial.json",
+      "docs/research/codex-phases-2-5-2026-10-06/pilot-before-guard-failure1.json",
+      "docs/research/codex-phases-2-5-2026-10-06/pilot-before-guard-failure2.json",
+      "docs/research/codex-phases-2-5-2026-10-06/pilot-before-guard-failure3.json",
+      "docs/research/codex-phases-2-5-2026-10-06/pilot-before.json",
+      "docs/research/codex-phases-2-5-2026-10-06/plan-activation-final.json",
+      "docs/research/codex-phases-2-5-2026-10-06/policy-final.json",
+      "docs/research/codex-phases-2-5-2026-10-06/policy-initial.json",
+      "docs/research/codex-phases-2-5-2026-10-06/provenance-final.json",
+      "docs/research/codex-phases-2-5-2026-10-06/remote-candidate.json",
+      "docs/research/codex-phases-2-5-2026-10-06/remote-evidence-failure.json",
+      "docs/research/codex-phases-2-5-2026-10-06/remote-orchestration-final.json",
+      "docs/research/codex-phases-2-5-2026-10-06/report.md",
+      "docs/research/codex-phases-2-5-2026-10-06/research-approval-failure.json",
+      "docs/research/codex-phases-2-5-2026-10-06/research-candidate.json",
+      "docs/research/codex-phases-2-5-2026-10-06/research-final.json",
+      "docs/research/codex-phases-2-5-2026-10-06/research-negative-final.json",
+      "docs/research/codex-phases-2-5-2026-10-06/research-negatives-candidate.json",
+      "docs/research/codex-phases-2-5-2026-10-06/runtime-final-index.json",
+      "docs/research/codex-phases-2-5-2026-10-06/task-metrics.json",
+      "docs/research/codex-phases-2-5-2026-10-06/validation-completion.json",
+      "docs/research/codex-phases-2-5-2026-10-06/validation-final.json",
+      "docs/research/codex-phases-2-5-2026-10-06/validation-postfix.json",
+      "docs/research/codex-phases-2-5-2026-10-06/waves1-2-initial.json",
+      "docs/research/codex-phases-2-5-2026-10-06/waves1-2.md",
+      "docs/research/codex-phases-2-5-2026-10-06/waves3-4.md",
+      "docs/research/codex-phases-2-5-2026-10-06/waves5-6.md",
+      "docs/runtime-install-smoke.md",
+      "docs/security.md",
+      "docs/solutions/integration-issues/codex-command-migration-bypasses-skill-allowlist.md",
+      "docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md",
+      "plans/codex-compatibility-expansion.md",
+      "plugins/gt-workflow/CLAUDE.md",
+      "plugins/gt-workflow/README.md",
+      "plugins/yellow-ci/CLAUDE.md",
+      "plugins/yellow-ci/README.md",
+      "plugins/yellow-codex/CLAUDE.md",
+      "plugins/yellow-codex/README.md",
+      "plugins/yellow-core/CLAUDE.md",
+      "plugins/yellow-core/README.md",
+      "plugins/yellow-cursor/CLAUDE.md",
+      "plugins/yellow-cursor/README.md",
+      "plugins/yellow-debt/CLAUDE.md",
+      "plugins/yellow-debt/README.md",
+      "plugins/yellow-docs/CLAUDE.md",
+      "plugins/yellow-docs/README.md",
+      "plugins/yellow-research/CLAUDE.md",
+      "plugins/yellow-research/README.md",
+      "plugins/yellow-review/CLAUDE.md",
+      "plugins/yellow-review/README.md",
+      "docs/research/codex-phases-2-5-2026-10-06/changed-files.json",
+      "docs/research/codex-phases-2-5-2026-10-06/changed-files.md",
+      "docs/research/codex-phases-2-5-2026-10-06/codex-absent-auth-native.json",
+      "docs/research/codex-phases-2-5-2026-10-06/codex-missing-auth-final.json"
+    ],
+    "other": [
+      "examples/codex-plugin.example.json",
+      "plugins/yellow-ci/hooks/scripts/entrypoint-codex.js"
+    ]
+  },
+  "files": [
+    {
+      "path": ".agents/plugins/marketplace.json",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "e443c86a0c50c7bbc17d4aac72bad81dd38c95e600b4755c56693b2215e5ddca"
+    },
+    {
+      "path": ".changeset/codex-command-migration-exposure.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "32bea6d3faf876096b297bddbbd4fc8fd763c56a308b79d672c98ff48faf7c54"
+    },
+    {
+      "path": ".changeset/codex-hook-lifecycle-evidence.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "48a0265b5f876eea0e005095582315806ae991d6d9e43d91f59367ad3c1e13f3"
+    },
+    {
+      "path": ".changeset/codex-manifest-invocation-policy.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "e5c5a9cbf0828d151bc2b1dcbdf603b9c83b7e95dce95c09daf41a3c12ef98ab"
+    },
+    {
+      "path": ".changeset/codex-pilot-progressive-disclosure.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "cf6ac8535e3e53a379bd24bb3a5b09096201425ebdca4b9f25bff4fb2bfd7bd8"
+    },
+    {
+      "path": ".changeset/codex-waves-analysis-integration.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "4858d6b1bb0241f028325d55894e5754a180b4f2f1c9083f361bf2ad9b9d79e8"
+    },
+    {
+      "path": ".changeset/codex-waves-developer-docs.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "981e2c058a5f7c0cbbf402ddda6dd7181daaf8dd4b3dc01af2e0ff269b1a769e"
+    },
+    {
+      "path": ".changeset/codex-waves-remote-orchestration.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "9aa4c306e289612e73180963ae5070349bb9b51d4c426cc822c20dfc32d369a9"
+    },
+    {
+      "path": "README.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "5e45c592ba7a0dc172bcc875873861f7d35baa4d304b435c43e1783c836b5873"
+    },
+    {
+      "path": "catalog/plugins/yellow-codex.json",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "bb78be707ef2a36816a88eb234b8625d63e6d3337f04253a74846457d86f1e12"
+    },
+    {
+      "path": "catalog/plugins/yellow-core.json",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "796a0c756e694a32684fb4aee1acf93f0cb80c70e881849cd905ab61e9543c04"
+    },
+    {
+      "path": "catalog/plugins/yellow-cursor.json",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "d63f2f5a6886c3427c0a458cd9da7098876eb9d25674368be37c7044f4fffdf7"
+    },
+    {
+      "path": "catalog/plugins/yellow-debt.json",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "4e3766dd45fc7288d82d611da0afceb039b5e6eeb62cd306f788a015b921bbde"
+    },
+    {
+      "path": "catalog/plugins/yellow-docs.json",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "d245d566d2133015dffae76546d01e9c3a34c50805da9a2b00b615d8d974fbcd"
+    },
+    {
+      "path": "catalog/plugins/yellow-research.json",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "54d0ff5bedb12a09455058531263511ca379bd56c538948c75b74d2ecfacfa6f"
+    },
+    {
+      "path": "docs/codex-distribution.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "f0d52ab61ba340bff6e2eecf8bea67b3bd7a09639318ff8f6bcc80d13da3440c"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/catalog-inventory.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "50125ccf7aef689f566b9e9d4cbbaeeaf197833c9d9535f4fc387966754653fa"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/evaluation.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "19da365c4ea6d621a6e9e24a805471fc14aca6bc76cf3e0e2860158de2b9c218"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/gt-workflow-install.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "e906779e8e88aab853481aaef7e864fca3b8b95fd52893d7ee9adca02a300fb1"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/gt-workflow-start.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "eb231bc38c2533ffa3e7cc88a883db4f884fd7069e5dba43eb4cb1feae37d229"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/gt-workflow.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "bdaa40e4baa740c14970cc3ff416097df16a339d81349b1194c04979741073b0"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/gt-workflow.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "5f36dbf2d87042a9e23225af60564a8c7c4eb236eb4c2cec8c9bfee86fb4b609"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/installed-plugins.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "51c01a539c7420d1782688970de92ac36b6a880fc031c8850379d523c30e3041"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/installed-skill-paths.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "aaa3867ad9a9bf17ed9732f05f62d136e1956501514235852d90600b90178eea"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/isolated-smoke-location.txt",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "b55705494c89fed45f7b4f602613dac83e90ecfa260bbc0360198887a8661e02"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/marketplace-add.txt",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "71938de03b08b226681150b6b0b55110a936d5e7d78ac933b764a39b6317175e"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/validation.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "4cd74c41f9bdf49c13a373f19a895f148dc554aab74c916ff847c7f01449cead"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/yellow-ci-install.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "b3b8b62f655cdb6f3bc7f5baca51bd988878cf42f27ad1e305fc5984dddf5812"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/yellow-ci-start.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "309662ed1c518029d5ac87f9d980a467241838fab5ed9ec9285db6f028fb7e0f"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/yellow-ci.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "7f4a85da44fc88a220f0f4f70a49bcd96ac391d2826aa1958dc888ccdd9c2e47"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/yellow-ci.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "d9c059e6096823dcacf78d78ab317c7d8cf86898c5aca7c16cd7db1e74209192"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/yellow-core-install.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "b45c9f65c446306acc4c0c9428af3842c5e9d5f4ab2033efd50f063196b28f86"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/yellow-core-start.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "48a68e930deae8b1df04eabd2b5892b784d23051a066660e20202c9d7ef40d90"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/yellow-core.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "f151a41e8018e0ad8aba9af9f0a91623130da85615030fd92b5a1b357e8000c2"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/yellow-core.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "bacbf594963488667f7cfcba9bf60098ee98b83d3d6dc94f0c531d2391ee89ed"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/yellow-review-install.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "b8aa11430e792c0deafb6a3cc5fcabd9f04537c12f99fd534ced9f963a782ac7"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/yellow-review-start.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "dd8e0b9967ab90d12930712a4fd4e1b44b36ef3c649dcfdd5059eb44eced8d40"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/yellow-review.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "9fd1760497d63bc6320fb65b6d3524bf6b90a8486484bcd672d039acdc060ad8"
+    },
+    {
+      "path": "docs/research/codex-evaluation-2026-10-04/yellow-review.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "3c4b46ad5af6ed655614eb4e5022cdab47e51264e2cecae8c78fbf7e3c120680"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/acceptance-audit.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "9c1e27fea7b8aeed6d0fb865d7b9778bd55859529b41a52cbac72aec9dcdd10e"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/activation-after.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "b5f05c25599d74895d8c05d806d8ad11f7c8875defa0d985605b3f8c149ee605"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/activation-initial-failure.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "2ed911d29d1796997696fb4a42cdb0789e31bbc801cc76e122bdb564439dfd4e"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/activation-path-guard-failure.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "7ade9f9c1e27e8e3cab2106b2823aad93295cec2c75aca538c70cb09ce91b317"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/continuation.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "eec6d0d57dce3ac8cec43bf6011cafd25ddc7fddbe7b8364985860e95294a0a8"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/discovery-after.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "8f00a1860733e983df19106885907d0ab53ac9f6b13c023d44b69dc7dd75c547"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/discovery-before.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "2b47c462f63a770ce52a5dc624a5da1477ae1d66c33872e3e4e1e89d5b515f4e"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/discovery-final.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "582f347f8fb492dc7a6e76bc9f8aa62191eff98468e2f1187b135db041b8806a"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/discovery-timeout.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "188bee5d862496f95c64825c92e082609b6d803393fa2c3fbcf66fe0f689fbd6"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/graphite-auth.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "ecd46baec7272a801cbcfceb66a6b7518972800c5534086f09045660963329fd"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/lifecycle-after.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "1d1c253672e36edae3c2fe540ebadbab897ed749796dfb105a56f93ae9552e40"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/lifecycle-final.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "04cb4a89598370d0c176270ac83f6a2a0e5e4c2b3d1f2e71b0fc461297b312c1"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/report.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "a76d5a3022dfd29a2eba256c63d03da7f256a9895a787c7f7da9117de5b7814b"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/runtime/hooks-trusted.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "7f37b609895abd8410571b8986d7bd995fcf34dc2dec29820820383ca2be5ef4"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/runtime/hooks-untrusted.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "60e7523c18e4c4273e7ecde3c9f4f2f4264b688414c47740093fcc62675f3cfe"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/runtime/install.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "ffe73ec27f2370812ebe2b436f68d72ca6be3c27e63f9b1532b2f0d917ed1477"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/runtime/mcp-events.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "dbc53b3a640bae07ce69cb51207be5dc79cce00af561a694aad953f65c1bf693"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/runtime/mcp-launch.jsonl",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "73cc60b3428fca18c62e1a78002f0c34fe67b30e5c92cee224e8b0b46cb172cb"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/runtime/mcp-status.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "7ebfe34c946fdfbd8f9ea64eceaada3b769b0fa09d21ee187566d253c733ca78"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/runtime/mcp-stubs.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "4f20250a10b3562ac60020dea65859e595387fd1381f41a5bc631fc15e9df29d"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/runtime/result.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "ff066fb546cebfd503c2ec0349232aa4ee3959a0fbc99e25db6ad231722b1fa3"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/runtime/trusted-events.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "e62f0c7c77d4388edd475cfc50a873d1f208734e5fe516307d7cfe8f5771255e"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/runtime/trusted-stubs.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "f0db3cae276eed59feeb408db9578240c0820ac02c9a7f3272112779607f6e63"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/runtime/untrusted-events.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "7a405b0171a1e9c19e5b4d27ab2aded5557fbb15af3d575b47b86aba5ec283da"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/runtime/untrusted-stubs.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "7277c1f9a8a7f041dbb506c35d9b8b65b531ec3208e6850bd839c82705a4df4d"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/validation-completion-initial.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "15c067ccf967b21989030abdf38119d8782d30b8911162dbddc54ec961963ec0"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/validation-initial.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "3697917b53a7bbf959ce996743271ba1f8498f0712b53f393db13b2328d51292"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/validation-pre-activation.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "09e9236b1c54272bb2728297509b746533851031a09073597617caea302d77af"
+    },
+    {
+      "path": "docs/research/codex-phase-1-2026-10-05/validation.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "6c62ed8c825d3134ca01bb72db9ca304b5b0c7dff54bda1bf1ee4cc30b5c1a37"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/acceptance-audit.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "ce59da3c1ec00d364d2e008cfe207415693d492aad6a868226492648743b32d1"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/analysis-candidate.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "e5b8978058945339a5a7a9df21eb4e39f9f6c9eb7dd6433ee8c40783a50e172d"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/analysis-evidence-failure.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "c993870809958f435b1d9eeb8bd2d3a4d650dc3602812d1935df9833e608566e"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/analysis-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "0ee189f6ed61fee3430f9671e4b0d1f2f83b2e82f6af9b6ac8aa3ef2c4e4c8ae"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/analysis-output-failure.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "c959a3632e240cbc8b9979ab32306155857d2805768c14af804a12cb3e0ca217"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/baseline.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "9abd2d53d76aaa2202b7758ad881552c24098b5e1b8e28f7066ec4c90950aa6a"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/cache-refresh.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "5ae489169bcdfb48226dfaa601e6cbbb1cb18d24cdf9fcee04b9a0f76ddd6282"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/changed-files.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": null
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/changed-files.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "1a9c10ebb5c61382706cbbf988f46807d581895cddecefdd718d02d65a3271cf"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/codex-absent-auth-native.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "154717a3d873364cf309e4661aaaccbb94f675a666414b40fc770d61b90f364c"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/codex-missing-auth-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "b95f23686a8077c1eb42e7b0aa7ced5e3dee018b5ff1407e6aacf461ce70e534"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/continuation.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "a34bf2985132875f358a491c090c27d933fc141e627c3bc2118fab7ecb2737cc"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/developer-docs-candidate.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "fb256c6fd06e688ec13424c5d93f61073f93b300b8f328c917f94900fb0f19d4"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/developer-docs-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "93966c2bc7ae2dbfc926e9a65b5bb05f4ca62611cc275c998afa9c3aecc24f27"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/discovery-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "6215b08823dac1b0cae74c5b760c9bb720c7672d94c2ecdf17138d23145ea9ad"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/generation-determinism.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "fa6c5bef5f4755505f5bccf5aa7ee70398ceddde3e97984d53ad29ff8f66c44a"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/graphite-auth-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "e482172ca61cb1a8ff355f9cec2ed9d34e41e1ac8bfcad81c097db945cc1e6e9"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/gt-after-candidate.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "fcef18275c78c9f3e6190c124e439eeb0f706d1981493b981ffe60b569afe51d"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/gt-after-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "889fb9bd36bd7a3b9b310ecb5b5445603af61d83845abc1401c778682cea8f1c"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/gt-before.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "7b3189cb591a1300447479dc5738e6effa053b48a9d96f9c32e79d781072b60d"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/intermediate-checks.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "9a496ff0e925662252584551be5207c8d866cfed461db614635b9017543d7a9b"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/lifecycle-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "263a092979cce1e7b7f599f8daeeafe9395038ca80062321163ccf7866e12e01"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/phase2.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "1ba09a6110597e60eb560921a8cf7d027d70c70a09c353114a1c524e50a381a2"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/phase3-sizes.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "d6afa868be491280c58795a268f7a9f62a89ba095234d3668715d66694a80344"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/phase3.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "2e389c5227c71bce74dcfebe96b9cb702f2c0b901db7b5d1aa2bd82f453a365c"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/phase5.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "4e76af0c0e79fa74dc6a029f1cb4a22dee6101c8f48388595d58bafc106d029d"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/pilot-after-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "e0ffddabcb005dd363a861db91aa3ed30001d91eba611a7e01c00a90a3fc73d0"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/pilot-after-initial.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "3bee615ff463108e7bffdc14ab82d4c87ebc13c54c864cad078cddfc7efabe03"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/pilot-before-guard-failure1.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "e3079b84a87da8e8cb959c3f3280f7750a2d6a1c02184cbba776650b60bc9b02"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/pilot-before-guard-failure2.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "5c002ce3141c61417d903bccf51adb9b9cac3f0aedc4ccc4ea24f8ce2dd4a87d"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/pilot-before-guard-failure3.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "b17373eb833b7398afff06aa49e5786971557025490bb4c6f3c70fc03cf1c080"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/pilot-before.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "c5927885c3caf24d61acb1bef94d57232cef35b1a48f8140ee2d3e9e039e3ccd"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/plan-activation-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "b5eb95507032b4afefe73f9bcb2bf780a1184bfdab3347f56b9fd7faed5fe5c8"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/policy-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "1c9c73e0f5c2554199a571319bc748b0c981e7863b5a6aac024ce64fb5bfc0d1"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/policy-initial.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "fe33c61a9b52af8360d1d7117033b49b1920de5d5f4aeb0e57d556e5cbfdefd4"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/provenance-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "8dc947f00d3838ba3eafe00a70ce416af045795d0f2894277037394858418d23"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/remote-candidate.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "63007b21bb7c36acc83ed642ca10fb03eabb3cb694e7ebdc5ea39f892348104c"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/remote-evidence-failure.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "151535a0a264fa4042b5264986d1f75084a501bf3cd15f3545800a2595b8cd9b"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/remote-orchestration-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "bcfd0c7ae7e6dc4b99b4b91ae6eec96af1d399f0e2a898ff226e735abd42630c"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/report.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "259b434af6c89923060dbec8178eb59c93a5bbaf04d25ecda8e7d17e3e135728"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/research-approval-failure.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "2e10d9e84ad4fc0dbdb495e634dc3be9b5a48f7d6c0df5566ab21dfd35b1b873"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/research-candidate.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "ae34aab8888c854062cbb8b4c02e81bffc46e779e7e7ba6ea25cc5a552c45dae"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/research-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "bd90d1a0fabad899bc20e5687607b82399903506a5ae040c6c3cdb6939287aba"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/research-negative-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "8151c375c3a20adf810e8e59a568b5a4b9613013f560e5f5908a23159d2cb0d5"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/research-negatives-candidate.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "b887e7752130c860a76d56753fbdc3a73b46ebc76840eb2456c5124678291f54"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/runtime-final-index.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "0a011451919227c8d3815b212ea7cc6c957276987b195d5993702504c887ee13"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/task-metrics.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "92cea7d7eb0a924f48ce7308630836208a13f3a71cc1d9e32be251d0fb65eb53"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/validation-completion.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "1a4b069b3873dfdd6516ea8203829d5c2960b6c7b8fca30e99349c33cc3aef92"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/validation-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "d943c0592b71cf57baf3ed917e327cbae0c3ef4bc1a09fe3b0cf408482c9886a"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/validation-postfix.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "2057a74ef2117179c3c9e4d96873570776067748c74bb8154b1ee3d479eb21ce"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/waves1-2-initial.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "e4cf0e903672000edb92c5236fb4b04147a21f25b230cdf219e2959c82345c64"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/waves1-2.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "bccf88bc72708c075fb82651221bd9a377b5901b9770f5a00520fc4714d61e33"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/waves3-4.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "5340d181ccbfb2c87dc68b9abce690f8bc8825c77852f62a4d5f49923a634d8e"
+    },
+    {
+      "path": "docs/research/codex-phases-2-5-2026-10-06/waves5-6.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "3d0062ec3a76080d98caa7fb31170eb8f449af63d8ee97a812a583a6d6b2be3b"
+    },
+    {
+      "path": "docs/runtime-install-smoke.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "11ba330668c845e975976e6c8cecc9259410df47f70ca97b22dcef1dc24ed0d7"
+    },
+    {
+      "path": "docs/security.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "64290eb7dafd8734dd04fec5d1d6c6a01da350e732ccc4cf7ecb211b717cb1ba"
+    },
+    {
+      "path": "docs/solutions/integration-issues/codex-command-migration-bypasses-skill-allowlist.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "42ef4b2c4fee42c488976bcd6128ef035a9d03c12e3806e27309195f84e24a6b"
+    },
+    {
+      "path": "docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "e8f7d49f9ea42eb2c2ffbc3256a7348855a0d4bf29728f50fe6a339c9fd27b15"
+    },
+    {
+      "path": "examples/codex-plugin.example.json",
+      "status": "tracked-modification",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "f2506fb2b26311f3781b6ac05dba16e54255e9756fad8e0b93e763a0ccb4fecc"
+    },
+    {
+      "path": "package.json",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "3c8e5922c1a323fb2ec8697a0b3d4c4f215c0d863967c8c48220ceb0a23fb693"
+    },
+    {
+      "path": "plans/codex-compatibility-expansion.md",
+      "status": "untracked",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "a9aa3dc29d821c96eee356e5da17ec2a048341f7f99d9fb9f36ba4eda07f2c97"
+    },
+    {
+      "path": "plugins/gt-workflow/.codex-plugin/plugin.json",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "91c56fcc559c658ba148032966775ee909f262b6e95c9f2801e54ed2c527c724"
+    },
+    {
+      "path": "plugins/gt-workflow/CLAUDE.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "a84ee2319ed28bbba1637c3b0c385d6cd96a30bcae4fbc8fa189a6e3d935adaa"
+    },
+    {
+      "path": "plugins/gt-workflow/README.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "56f68aca565207c11290240d9f1636af0d79c145019a0f03c4d6800b22700c63"
+    },
+    {
+      "path": "plugins/gt-workflow/codex/skills/gt-setup/SKILL.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "1ee76f2030064712095f633e4a8c26dc625d4091d4588ddfe1a37d80ff4d325f"
+    },
+    {
+      "path": "plugins/gt-workflow/codex/skills/gt-setup/references/agent-settings.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "c3efcf51075bb359fcad713ac1e09db5a362b7b76f78512dbc3d0b4a43cfc86c"
+    },
+    {
+      "path": "plugins/gt-workflow/codex/skills/gt-setup/references/convention-files.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "b132ff5e409c5efd0de473df6ef4aa8e8dc1ff45c4f9ab30ecc8c57ad07ae297"
+    },
+    {
+      "path": "plugins/gt-workflow/codex/skills/gt-setup/references/prerequisites.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "b848bbc0ee994221cbdf755e9b3b3a147e025d963e2da6e2b2f19980e477fe94"
+    },
+    {
+      "path": "plugins/gt-workflow/skills/gt-setup/SKILL.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "88e2e8e2bb72ff9627d7f0e361bf759c3fe97cd074497bfeba13f04233801d71"
+    },
+    {
+      "path": "plugins/gt-workflow/skills/gt-setup/references/agent-settings.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "c3efcf51075bb359fcad713ac1e09db5a362b7b76f78512dbc3d0b4a43cfc86c"
+    },
+    {
+      "path": "plugins/gt-workflow/skills/gt-setup/references/convention-files.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "b132ff5e409c5efd0de473df6ef4aa8e8dc1ff45c4f9ab30ecc8c57ad07ae297"
+    },
+    {
+      "path": "plugins/gt-workflow/skills/gt-setup/references/prerequisites.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "b848bbc0ee994221cbdf755e9b3b3a147e025d963e2da6e2b2f19980e477fe94"
+    },
+    {
+      "path": "plugins/yellow-ci/.codex-plugin/plugin.json",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "10fda2dc5909913f52c31567fa42e99677c754965d125188926380870b23efed"
+    },
+    {
+      "path": "plugins/yellow-ci/CLAUDE.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "87e071420f48255bff566f2465b2aa688797fc4a9bf1d685aaae4a6002f7cac0"
+    },
+    {
+      "path": "plugins/yellow-ci/README.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "aa62120ac12d18e706f6d8a45f90bc5a7f4393439f8e079867dcc294a824c537"
+    },
+    {
+      "path": "plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "b0ea8475020597f9f76f8a4da8c80581a982f9b3c7f75eb6cfb0351fa1323ff1"
+    },
+    {
+      "path": "plugins/yellow-ci/codex/skills/ci-diagnose/references/failure-analysis.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "88b4f26b4c31dbf4c3b95cfc91a943b99bb0142c008a41f5df6f27f7f90a30ab"
+    },
+    {
+      "path": "plugins/yellow-ci/codex/skills/ci-diagnose/references/fetch-logs.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "541e74d2d68aa4516a9206fd9f455b0ab46cdcb6707e3f3c174a96c326e47410"
+    },
+    {
+      "path": "plugins/yellow-ci/codex/skills/ci-diagnose/references/resolve-run.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "49d4633a738a4762d11805e44482f9e54d0e916164602d10d8e2775d986850d0"
+    },
+    {
+      "path": "plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "7b5ef645638fe979b3de1e80dfac6cb8ecfa404e7aad7c92a38e15975a78287a"
+    },
+    {
+      "path": "plugins/yellow-ci/codex/skills/ci-runner-health/references/configuration.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "47b25506a284c1c16401d4194c69257f8a75dfc93c14bb7979cb95a07a264876"
+    },
+    {
+      "path": "plugins/yellow-ci/codex/skills/ci-runner-health/references/investigation.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "bf8b39cb2831f9cf486a10805ec72c62471757b6001d240e6a7339c8ded1a694"
+    },
+    {
+      "path": "plugins/yellow-ci/codex/skills/ci-runner-health/references/ssh-probes.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "877c33ce5e13b4fd344c59a043e4158de8a7658c1c6ca587981979b75087f9f7"
+    },
+    {
+      "path": "plugins/yellow-ci/hooks/scripts/entrypoint-codex.js",
+      "status": "tracked-modification",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "c4032cccea2af890f4962c722c3b39a1bfc341430926bee395c138b424112208"
+    },
+    {
+      "path": "plugins/yellow-ci/skills/ci-diagnose/SKILL.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "3a75ad8d5de93ef7c6df64c44b3e3fed6c49de09d477083b1ab71a03ac3b8ac6"
+    },
+    {
+      "path": "plugins/yellow-ci/skills/ci-diagnose/references/failure-analysis.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "88b4f26b4c31dbf4c3b95cfc91a943b99bb0142c008a41f5df6f27f7f90a30ab"
+    },
+    {
+      "path": "plugins/yellow-ci/skills/ci-diagnose/references/fetch-logs.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "541e74d2d68aa4516a9206fd9f455b0ab46cdcb6707e3f3c174a96c326e47410"
+    },
+    {
+      "path": "plugins/yellow-ci/skills/ci-diagnose/references/resolve-run.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "49d4633a738a4762d11805e44482f9e54d0e916164602d10d8e2775d986850d0"
+    },
+    {
+      "path": "plugins/yellow-ci/skills/ci-runner-health/SKILL.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "fcf1406fa3869bb8e308023da29c2dac036e0578ddbefb1e1a498ac009c3d8e6"
+    },
+    {
+      "path": "plugins/yellow-ci/skills/ci-runner-health/references/configuration.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "47b25506a284c1c16401d4194c69257f8a75dfc93c14bb7979cb95a07a264876"
+    },
+    {
+      "path": "plugins/yellow-ci/skills/ci-runner-health/references/investigation.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "bf8b39cb2831f9cf486a10805ec72c62471757b6001d240e6a7339c8ded1a694"
+    },
+    {
+      "path": "plugins/yellow-ci/skills/ci-runner-health/references/ssh-probes.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "877c33ce5e13b4fd344c59a043e4158de8a7658c1c6ca587981979b75087f9f7"
+    },
+    {
+      "path": "plugins/yellow-codex/.codex-plugin/plugin.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "c9c9d62b7335a008353a0a30a5fee0bee865ad8839856aa837cf7317f4201151"
+    },
+    {
+      "path": "plugins/yellow-codex/CLAUDE.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "546d1c31a91d17a2f52c1222b76c379f2435aae5b7da7d87f9b3974846bd0e2a"
+    },
+    {
+      "path": "plugins/yellow-codex/README.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "5b31b3f5767c1354550fa85c577cfee95ae1a615187fd7997044f1485992f955"
+    },
+    {
+      "path": "plugins/yellow-codex/codex/skills/codex-readiness/SKILL.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "74fdb89f60a444a3f6468f7dc3180475c21f11da0dc4c4fc9781fa750e834b21"
+    },
+    {
+      "path": "plugins/yellow-codex/codex/skills/codex-readiness/references/readiness-contract.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "655deae2b3f56e21e03d6fbef0c1688e2d830c9e1d554be4cf5ef91da1851c6f"
+    },
+    {
+      "path": "plugins/yellow-codex/skills/codex-readiness/SKILL.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "6d0efa21a70182a8c9b0db87c0c08f6ec38412727ad758479d7c664e9961b7db"
+    },
+    {
+      "path": "plugins/yellow-codex/skills/codex-readiness/references/readiness-contract.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "655deae2b3f56e21e03d6fbef0c1688e2d830c9e1d554be4cf5ef91da1851c6f"
+    },
+    {
+      "path": "plugins/yellow-core/.codex-plugin/plugin.json",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "6a47faa0c97e99a2f50f91aea27c95b8a13769ddfbb17ef28ff8d316734bc631"
+    },
+    {
+      "path": "plugins/yellow-core/CLAUDE.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "f0b85cc403dd43ba08012ef5ff28f57ecfafb39fdc6336bdcf2f253c0d7621d8"
+    },
+    {
+      "path": "plugins/yellow-core/README.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "8c7b3f826efdf10cda1fe5db6221ffd744abd53c3dbc566c9270a52af34d8c0f"
+    },
+    {
+      "path": "plugins/yellow-core/codex/skills/worktree-inventory/SKILL.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "8f6590126a8c19a27cbd93e82d3c83a7f2537dba7f4289a54065d8dbd7cae63b"
+    },
+    {
+      "path": "plugins/yellow-core/skills/worktree-inventory/SKILL.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "393ca962d56ea3a445d7d3788978013982f004276814f2791e5f0abfaf4ca07d"
+    },
+    {
+      "path": "plugins/yellow-cursor/.codex-plugin/plugin.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "1aba54b1dbac216ca0b04fb7f55f1e7e5be67e6592732300414f6a3875ed46e8"
+    },
+    {
+      "path": "plugins/yellow-cursor/CLAUDE.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "daa3e0b46d00f07779df4c3c870e928f97950c5b132d153d4dc7f23cc574c92e"
+    },
+    {
+      "path": "plugins/yellow-cursor/README.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "d597ecd78276926c89cc7aae180a7a9f93e14e64f627d3f222e92ac2c2711e5e"
+    },
+    {
+      "path": "plugins/yellow-cursor/codex/skills/cursor-plan/SKILL.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "3ccb4995c071ea8400d6329c32d11daed6805d691fdd0d993b3880b0fbd7baad"
+    },
+    {
+      "path": "plugins/yellow-cursor/codex/skills/cursor-plan/references/plan-contract.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "0079607523a2ec8b7296a0a817e0eefb9ee87b42d7ee7b5ef7c463646f2b1505"
+    },
+    {
+      "path": "plugins/yellow-cursor/skills/cursor-plan/SKILL.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "930c75a5122dd9c99e9f869b0f10e8fba96a71c509f2755d901fdaa212cc1504"
+    },
+    {
+      "path": "plugins/yellow-cursor/skills/cursor-plan/references/plan-contract.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "0079607523a2ec8b7296a0a817e0eefb9ee87b42d7ee7b5ef7c463646f2b1505"
+    },
+    {
+      "path": "plugins/yellow-debt/.codex-plugin/plugin.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "46662c1fe6e549ecbb9f0e1425108bd46ae64aed313b905c393fa2e1174dbf79"
+    },
+    {
+      "path": "plugins/yellow-debt/CLAUDE.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "66b514de8b930543520a7b77c1ab0d81f14a0f04dfbf793d7068c9ae29d9cc9f"
+    },
+    {
+      "path": "plugins/yellow-debt/README.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "ce6f67abd1ccaf5f2a400e83aaad3eda4103adf5240b08b37bf38b3dd43d6da4"
+    },
+    {
+      "path": "plugins/yellow-debt/codex/skills/debt-complexity-scan/SKILL.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "9af6e778dc50225b2eb9397dd726d98d36c5f3033557f2df325773ce3c0c49bd"
+    },
+    {
+      "path": "plugins/yellow-debt/codex/skills/debt-complexity-scan/references/scan-contract.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "c6ea8d99ad5c7df5e751dafa0a1bf993b44d934d18b2ac9c8b2844421423f3ae"
+    },
+    {
+      "path": "plugins/yellow-debt/skills/debt-complexity-scan/SKILL.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "27610496a72088ff428e27cb7d8e85972767b02804059f6a056c5fc025003178"
+    },
+    {
+      "path": "plugins/yellow-debt/skills/debt-complexity-scan/references/scan-contract.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "c6ea8d99ad5c7df5e751dafa0a1bf993b44d934d18b2ac9c8b2844421423f3ae"
+    },
+    {
+      "path": "plugins/yellow-docs/.codex-plugin/plugin.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "aa34fa49f69aa4cf2a40d5afff6c905a85151abb01d600879cbe7e714a991a9a"
+    },
+    {
+      "path": "plugins/yellow-docs/CLAUDE.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "9d8e7d56cab71c343af66982efb870fd0366d0441a96ec7098fe8c4ac2b973da"
+    },
+    {
+      "path": "plugins/yellow-docs/README.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "196c47bd9936c7ffc308fb130e96d81f7a1408e2b8cc3e2b98d7f956ec23e064"
+    },
+    {
+      "path": "plugins/yellow-docs/codex/skills/docs-audit/SKILL.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "bd2bc0f228e03a1cd754e9825803860beed438768b321f7bb764b4f633427894"
+    },
+    {
+      "path": "plugins/yellow-docs/codex/skills/docs-audit/references/audit-contract.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "c2a530c043ed066786bf2dc2f3a2b1ba621b68c540fc0e3aa0f89b22cd9d5d8d"
+    },
+    {
+      "path": "plugins/yellow-docs/skills/docs-audit/SKILL.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "472a592d1ef4e01932cc46cbb8de998807cf969a3f0cb4e1685c0f81b28360d0"
+    },
+    {
+      "path": "plugins/yellow-docs/skills/docs-audit/references/audit-contract.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "c2a530c043ed066786bf2dc2f3a2b1ba621b68c540fc0e3aa0f89b22cd9d5d8d"
+    },
+    {
+      "path": "plugins/yellow-research/.codex-plugin/plugin.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "70f5b325136cabbfd13dbb79461803b4259152d83f39bc9ae571b1cf9aa8b2a6"
+    },
+    {
+      "path": "plugins/yellow-research/CLAUDE.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "5ffe9dbbdae51ab698ce66debf38d38ef7356a3f8921068264edea86d6b63c03"
+    },
+    {
+      "path": "plugins/yellow-research/README.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "c059ae2e402f4288adee14d280f7ff88fd042cae85411aa2e3ba27281e6b1683"
+    },
+    {
+      "path": "plugins/yellow-research/codex/skills/research-public-repo/SKILL.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "55353812bdc529a473c9e624478ddbeb043e06be74a0645f0faee908f72b2de0"
+    },
+    {
+      "path": "plugins/yellow-research/codex/skills/research-public-repo/references/deepwiki-contract.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "95dfb754f8d9cf241cb6c0a7062856254eca8b978a04d3764bf375c01510328c"
+    },
+    {
+      "path": "plugins/yellow-research/skills/research-public-repo/SKILL.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "3a90860e87add9d48d4a3389ecd7b1a4d886efa2f738777ed728a1edbac0b0be"
+    },
+    {
+      "path": "plugins/yellow-research/skills/research-public-repo/references/deepwiki-contract.md",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "95dfb754f8d9cf241cb6c0a7062856254eca8b978a04d3764bf375c01510328c"
+    },
+    {
+      "path": "plugins/yellow-review/.codex-plugin/plugin.json",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "595b2a196228d0da1f3bafa876adb39bc7d146ef9321a3e6f247cebd2293c369"
+    },
+    {
+      "path": "plugins/yellow-review/CLAUDE.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "04b8ae6b80f376aa49c97e49dae2094eed68313717e89a39b1d4def79473bb2e"
+    },
+    {
+      "path": "plugins/yellow-review/README.md",
+      "status": "tracked-modification",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "9f3a3d770ca1c9fb60799cd7a460f1d186a042e4a0ccd84c500cbba077b52def"
+    },
+    {
+      "path": "plugins/yellow-review/codex/skills/yellow-thermonuclear-review/agents/openai.yaml",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94"
+    },
+    {
+      "path": "plugins/yellow-review/skills/yellow-thermonuclear-review/agents/openai.yaml",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94"
+    },
+    {
+      "path": "schemas/catalog-plugin.schema.json",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "844fba1831107eba9c9beb1909c43db78b3338347741df4f37c8aa751e2dd297"
+    },
+    {
+      "path": "schemas/codex-plugin.schema.json",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "51100cdddec6e0a7dba02196ec518cf9fd0855d253fb74a777ab4a682be24b10"
+    },
+    {
+      "path": "scripts/generate-manifests.js",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "2f9a9a4f7440173face671235ce1c6b20384afd2ede5e067f5723dfa3ba91468"
+    },
+    {
+      "path": "scripts/lib/generate/emit-codex.js",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "a5aa18d2d62ef01c866e128a54eca6ed6c8c59dd137d63dd9307516c70b309a2"
+    },
+    {
+      "path": "scripts/lib/generate/emit-cursor.js",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "46f428196e91b1d2d86ffed4b66a245cf53fc5f76c1b86137030bb8d8248feb6"
+    },
+    {
+      "path": "scripts/lib/generate/skill-policy.js",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "46b61a3ad2ac3dc90632417036da21014c970f78c25c25f900c86740a67760ef"
+    },
+    {
+      "path": "scripts/smoke-codex-graphite-auth.js",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "d5cdf7c866ba48bb7233638036c752598519d16cbb0024928af67d13df740a35"
+    },
+    {
+      "path": "scripts/smoke-codex-plugin-install.js",
+      "status": "untracked",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "03452d8f11c1dec80ed239ac9cba0aa867f2d6298ff7dfd0c5ecd612e03f00a9"
+    },
+    {
+      "path": "scripts/smoke-codex-plugin-lifecycle.js",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "8af5a4b99388a340d4a171a8879df780486edbe7223103be1ab14b1828ed4f98"
+    },
+    {
+      "path": "scripts/smoke-codex-skill-activation.js",
+      "status": "untracked",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "e22b3e181eb5bdfd8bcb7a54f102235861d39bd5bfa262d7020cde9894754f4f"
+    },
+    {
+      "path": "scripts/smoke-codex-workflow-acceptance.js",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "a0c062584bdcdded2b3c620421c59a9df687a84932bb261926b57edc90064969"
+    },
+    {
+      "path": "scripts/validate-codex.js",
+      "status": "tracked-modification",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "75faeb525f63a789932b474b840641e6dd4bc1db14a240df7492844c3e3be9bc"
+    },
+    {
+      "path": "tests/fixtures/codex-activation/cases.json",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "d6200bdf7eda78d9d0f087fb8d04819ebcb8121a2f24ac426fc0fc700ab26373"
+    },
+    {
+      "path": "tests/fixtures/codex-activation/plans/complete/shipped.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "d47d9a21eaabd0357c3de1cd33c7855d83fceab91fc4be6b79d950284bdfdb66"
+    },
+    {
+      "path": "tests/fixtures/codex-activation/plans/in-flight.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "af623e438209773e365fd22338b3e64672646b032f054f0ccba527515ee29fc7"
+    },
+    {
+      "path": "tests/fixtures/codex-activation/plans/ready.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "b6bb0f269ed95846029074dce3e8b88d4685d850d55551cca9dd41ec23ef48c9"
+    },
+    {
+      "path": "tests/fixtures/codex-activation/plans/research.md",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "e4665f1e5539c267c19f8b11a403172d3a15c42d3b9d345f317962ff351fa46a"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/analysis-candidate.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "6610ed69d4644bdccdcdb1f11ff07e52f232748f8f728058a126bb4104e0cc08"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/analysis-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "ea4ac669a488e893df6f37b9f8c908201fa648d8c0acb8e7268a56977e9df049"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/codex-missing-auth-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "c641f9030d7f53bb867b6322b335c2e3e416d187b8c44c707b0cbbf4a3841d6b"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/developer-docs-candidate.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "bba8181a9f7b84f2f6f073abc738a480779f9b48fe1a1b0abb4b72d33c1c1796"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/developer-docs-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "144ab42035e30417a4344649ef53c8c1c67382ff9c81739f1a3cf11d4b3a1ff3"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/gt-after.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "05b27253dc993370aeab91be618cd0f94117fe5c785f5767462f233e7460d61a"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/gt-before.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "6bb170ac7d20b8a6b0c0432e9277c0a0e70e1dac2c567fc58cb9845e23593b2b"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/gt-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "d8c85c89ca9c340d3e657bab094d1bc79b9e1a08a8cc3b1965b31db7d550ad86"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/policy.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "f3a85e192338bf831348e529986049a540c0e70be965cd7a7650f3c16c3bf161"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/remote-orchestration-candidate.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "dd0a31a4978c0dd8c566e4138aaa645ec93abff2947c809b18a1038b2c82531a"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/remote-orchestration-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "e5d66c960f00f5f7fbce074943e78692bc00af90a5e7915205fd2f37fedf8f6a"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/research-candidate.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "e1e72faa94ca4cdf070cb2b0da331f1fe470cb8bce3c9fb76a762088d5b73751"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/research-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "df58b7b9b2ec20ad590d161d0b6260ea87536a0e91c57ae29413fdf20d1b8bb0"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/research-negative-candidate.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "ab801ef8964f4d31dd3256ffafd90c8926b44d1ab58486624548ea623a40de37"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/research-negative-final.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "fa9be3c9164eb8b972cb50ddf8b1aee5866081b7eb82bf7dfb500d6a030737b0"
+    },
+    {
+      "path": "tests/fixtures/codex-expansion/waves-candidate.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "aae6b9ac5dcfbca6204d750fadd6c421598522fd0342043959b40e700bc43b8d"
+    },
+    {
+      "path": "tests/fixtures/codex-pilot-tasks/cases.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "6b975410428cb7e9ff724852e3f82ade2f336b158106e6d092411a24521dca79"
+    },
+    {
+      "path": "tests/fixtures/codex-smoke/fake-codex.cjs",
+      "status": "untracked",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "fe8c2574e37510ea3b6ab093d19bb033925eeaba3fc0b48387386d9eef25323f"
+    },
+    {
+      "path": "tests/fixtures/codex-waves-analysis-integration/cases.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "6c3b1016d0c4cce73b05ee6119e51808f17490a9e174e064e668a8acfdb9800a"
+    },
+    {
+      "path": "tests/fixtures/codex-waves-analysis-integration/src/complexity.js",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "c22ca62acfcf921e77fa2a196033cbe2cfb08503d927fceb714ff6f77d72c7c2"
+    },
+    {
+      "path": "tests/fixtures/codex-waves-remote-orchestration.json",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "bc2c1e77375e6e69d115421333f4d2196c169d57530f25f45fc712781ad32a4b"
+    },
+    {
+      "path": "tests/integration/ci-pilot-progressive-disclosure.test.ts",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "045d4dc6f6b6ad93689e48b7f2192e5a27746a1a0801c52a8925462d4bcbccec"
+    },
+    {
+      "path": "tests/integration/codex-schema-examples.test.ts",
+      "status": "tracked-modification",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "9dec240d5f2eb27b830c5a0f6986bac33946aedaaa95a064749b13d85d279824"
+    },
+    {
+      "path": "tests/integration/codex-skill-policy.test.ts",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "db3aa05843ac1a99b73d603c1c2d9de7bf624ccac784d3dcca33fc4cc2d05560"
+    },
+    {
+      "path": "tests/integration/codex-waves-analysis-integration.test.ts",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "9b76bc311c7fd6bd2da51e9580b305a153189c2399864fd858b1df20c6d89960"
+    },
+    {
+      "path": "tests/integration/codex-waves-remote-orchestration.test.ts",
+      "status": "untracked",
+      "phaseOrigin": "added-or-modified-this-goal",
+      "sha256": "ba00e008f6b466bf587a987106f3fadaea88ccb034ebaf2ab31e3f43a180ffcc"
+    },
+    {
+      "path": "tests/integration/generate-manifests-codex.test.ts",
+      "status": "tracked-modification",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "64dca19cc18a733901565df8a56817cd59c0f6f37a5b87764ed3c501be847dca"
+    },
+    {
+      "path": "tests/integration/smoke-codex-graphite-auth.test.ts",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "abf01ce99305072fa2185d8260ef651438b723a6bad654160c2d9e2402f0532b"
+    },
+    {
+      "path": "tests/integration/smoke-codex-plugin-install.test.ts",
+      "status": "untracked",
+      "phaseOrigin": "updated-prior-change",
+      "sha256": "f774f3678047e5fc13ed0cc8766d50ab1d4e47b71be67f4c4481e1f975210b7a"
+    },
+    {
+      "path": "tests/integration/smoke-codex-plugin-lifecycle.test.ts",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "3e07dc06005d4b57fb1bf85b4ca4086c8b0545e8a7d68d66772b294a498b17b5"
+    },
+    {
+      "path": "tests/integration/smoke-codex-skill-activation.test.ts",
+      "status": "untracked",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "29c92b2c67cdbb05d8f857c498c7227b6a19ec83b35c234884811481fe029afb"
+    },
+    {
+      "path": "tests/integration/thermonuclear-reviewer.test.ts",
+      "status": "tracked-modification",
+      "phaseOrigin": "preserved-prior-change",
+      "sha256": "9bd0fae1e86781a0a695340d2f3ba6ee00d5c5c119bfcc2f9aa3f1b520e25a2a"
+    }
+  ],
+  "note": "Hash inventory captures final files except its own recursive hash. Historical receipts are included as preserved prior changes. Review source/catalog files rather than hand-editing generated host artifacts."
+}

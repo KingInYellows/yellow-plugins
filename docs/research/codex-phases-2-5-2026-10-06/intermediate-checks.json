@@ -1,0 +1,57 @@
+{
+  "checks": [
+    {
+      "log": "/tmp/yellow-phase2-focused-initial.log",
+      "exitCode": 0,
+      "note": "Initial schema/generator pass:91 tests.",
+      "tail": "\u001b[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.\u001b[39m\n\n RUN  v1.6.1 /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n\n \u2713 tests/integration/codex-schema-examples.test.ts  (28 tests) 110ms\n \u2713 tests/integration/generate-manifests-codex.test.ts  (63 tests) 508ms\n\n Test Files  2 passed (2)\n      Tests  91 passed (91)\n   Start at  09:30:30\n   Duration  880ms (transform 132ms, setup 0ms, collect 314ms, tests 618ms, environment 0ms, prepare 149ms)\n\n"
+    },
+    {
+      "log": "/tmp/yellow-phase2-policy-tests.log",
+      "exitCode": 0,
+      "note": "Initial policy/module+activation:28 tests.",
+      "tail": "\u001b[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.\u001b[39m\n\n RUN  v1.6.1 /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n\n \u2713 tests/integration/codex-skill-policy.test.ts  (17 tests) 48ms\n \u2713 tests/integration/smoke-codex-skill-activation.test.ts  (11 tests) 70ms\n\n Test Files  2 passed (2)\n      Tests  28 passed (28)\n   Start at  09:36:30\n   Duration  317ms (transform 47ms, setup 0ms, collect 72ms, tests 118ms, environment 0ms, prepare 106ms)\n\n"
+    },
+    {
+      "log": "/tmp/yellow-phase2-stale.log",
+      "exitCode": 1,
+      "note": "New drift regression incorrectly expected error status rather than nonempty diffs; assertion corrected.",
+      "tail": "\u001b[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.\u001b[39m\n\n RUN  v1.6.1 /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n\n \u276f tests/integration/generate-manifests-codex.test.ts  (64 tests | 1 failed) 463ms\n   \u276f tests/integration/generate-manifests-codex.test.ts > invocation policy generated drift > detects changed policy bytes and sweeps a removed policy resource\n     \u2192 expected 'ok' not to be 'ok' // Object.is equality\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n\n FAIL  tests/integration/generate-manifests-codex.test.ts > invocation policy generated drift > detects changed policy bytes and sweeps a removed policy resource\nAssertionError: expected 'ok' not to be 'ok' // Object.is equality\n \u276f tests/integration/generate-manifests-codex.test.ts:1651:76\n    1649|     const generated = join(root, 'plugins/alpha/codex/skills/safe/agen\u2026\n    1650|     writeFileSync(generated, 'policy:\\n  allow_implicit_invocation: tr\u2026\n    1651|     expect(generateManifests({ rootDir: root, mode: 'check' }).status)\u2026\n       |                                                                            ^\n    1652|     expect(generateManifests({ rootDir: root, mode: 'apply' }).status)\u2026\n    1653|     rmSync(agents, { recursive: true });\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[1/1]\u23af\n\n Test Files  1 failed (1)\n      Tests  1 failed | 63 passed (64)\n   Start at  09:37:57\n   Duration  770ms (transform 69ms, setup 0ms, collect 93ms, tests 463ms, environment 0ms, prepare 47ms)\n\n"
+    },
+    {
+      "log": "/tmp/yellow-expansion-eslint-initial.log",
+      "exitCode": 1,
+      "note": "Import order, control regex and unused parameter issues; repaired.",
+      "tail": "\n/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/scripts/lib/generate/emit-codex.js\n  29:48  error  `./skill-policy` import should occur before import of `./write`  import/order\n\n/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/scripts/lib/generate/emit-cursor.js\n  47:29  error  `./skill-policy` import should occur before import of `./write`  import/order\n\n/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/scripts/lib/generate/skill-policy.js\n  54:9  error  Unexpected control character(s) in regular expression: \\x00  no-control-regex\n\n/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/scripts/smoke-codex-skill-activation.js\n  55:41  error  'projectFiles' is defined but never used  no-unused-vars\n\n/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/scripts/smoke-codex-workflow-acceptance.js\n    7:23  error  `node:child_process` import should occur before import of `node:fs`  import/order\n    9:14  error  There should be at least one empty line between import groups        import/order\n  152:5   error  Move function declaration to function body root                      no-inner-declarations\n\n/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/tests/integration/codex-skill-policy.test.ts\n  8:69  error  `../../scripts/lib/generate/skill-policy` import should occur after import of `../../scripts/lib/generate/emit-cursor`  import/order\n\n\u2716 8 problems (8 errors, 0 warnings)\n  5 errors and 0 warnings potentially fixable with the `--fix` option.\n\n"
+    },
+    {
+      "log": "/tmp/yellow-expansion-eslint.log",
+      "exitCode": 1,
+      "note": "Formatting moved require statements away from line-based lint directives; module test directive repaired.",
+      "tail": "\n/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/scripts/smoke-codex-skill-activation.js\n  55:41  error  '_projectFiles' is defined but never used  no-unused-vars\n\n/home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04/tests/integration/codex-skill-policy.test.ts\n  18:5  error  Require statement not part of import statement  @typescript-eslint/no-var-requires\n  22:5  error  Require statement not part of import statement  @typescript-eslint/no-var-requires\n  28:5  error  Require statement not part of import statement  @typescript-eslint/no-var-requires\n  32:5  error  Require statement not part of import statement  @typescript-eslint/no-var-requires\n\n\u2716 5 problems (5 errors, 0 warnings)\n\n"
+    },
+    {
+      "log": "/tmp/yellow-expansion-focused-final.log",
+      "exitCode": 0,
+      "note": "143 focused tests passed before later fixture inventory repair.",
+      "tail": "\u001b[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.\u001b[39m\n\n RUN  v1.6.1 /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n\n \u2713 tests/integration/generate-manifests-codex.test.ts  (64 tests) 556ms\n \u2713 tests/integration/ci-pilot-progressive-disclosure.test.ts  (32 tests) 948ms\n \u2713 tests/integration/codex-skill-policy.test.ts  (17 tests) 47ms\n \u2713 tests/integration/codex-waves-analysis-integration.test.ts  (19 tests) 509ms\n \u2713 tests/integration/codex-waves-remote-orchestration.test.ts  (11 tests) 235ms\n\n Test Files  5 passed (5)\n      Tests  143 passed (143)\n   Start at  09:47:34\n   Duration  2.00s (transform 146ms, setup 1ms, collect 270ms, tests 2.29s, environment 1ms, prepare 264ms)\n\n"
+    },
+    {
+      "log": "/tmp/yellow-discovery-regression-postfix.log",
+      "exitCode": 0,
+      "note": "29 process smoke regressions pass after catalog-derived inventory repair.",
+      "tail": "\u001b[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.\u001b[39m\n\n RUN  v1.6.1 /home/kinginyellow/workspaces/yellow-harness_workspace/worktrees/yellow-plugins/codex-compatibility-evaluation-2026-10-04\n\n \u2713 tests/integration/smoke-codex-plugin-install.test.ts  (29 tests) 5469ms\n\n Test Files  1 passed (1)\n      Tests  29 passed (29)\n   Start at  10:00:52\n   Duration  5.69s (transform 31ms, setup 0ms, collect 32ms, tests 5.47s, environment 0ms, prepare 53ms)\n\n"
+    }
+  ],
+  "resolvedRuntimeFailures": [
+    "pilot-before-guard-failure1.json",
+    "pilot-before-guard-failure2.json",
+    "pilot-before-guard-failure3.json",
+    "analysis-output-failure.json",
+    "analysis-evidence-failure.json",
+    "remote-evidence-failure.json",
+    "research-approval-failure.json",
+    "waves1-2-initial.json"
+  ],
+  "correctedFinalReceipts": "runtime-final-index.json and validation-postfix.json"
+}

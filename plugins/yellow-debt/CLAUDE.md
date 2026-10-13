@@ -80,10 +80,20 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 
 - `debt-fixer` — Implements fixes for specific findings with human approval
 
-### Skills (1)
+### Skills (2)
 
 - `debt-conventions` — Shared scanning heuristics, fix patterns, severity
   levels, state machine
+- `debt-complexity-scan` — Shared bounded read-only complexity analysis with
+  inline scanner schema 2.0 and a flat Python snapshot reference that enforces
+  path validation before source reads through separate process stdin;
+  no report/todo writes, state transitions, integrations or agent dispatch
+
+The bounded snapshot quarantines the remainder of each file after a recognized
+credential marker, including bracketed dictionary/environment keys, credential-array declarators,
+and token-only or
+empty-username URL userinfo. It reports
+`partial`; ordinary keys remain visible. This is not a comprehensive secret scan.
 
 ### Hooks (1)
 
@@ -181,3 +191,7 @@ Closing a todo does not close its Linear issue.
   have the `Write` tool and use it only to save ast-grep values into a
   private temp directory the recipe creates (see yellow-research's CLAUDE.md,
   "Optional ast-grep CLI", and `docs/security.md` "ast-grep value files").
+
+Installed Codex acceptance passed for the selected skill, including safe
+failure and unrelated controls. Other plugin components remain excluded.
+See [integrated evidence](../../docs/research/codex-phases-2-5-2026-10-06/report.md).
