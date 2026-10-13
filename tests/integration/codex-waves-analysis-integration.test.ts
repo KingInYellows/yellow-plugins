@@ -206,6 +206,55 @@ describe('installed flat-reference snapshot enforces paths before source reads',
     expect(JSON.stringify(result.output)).not.toContain('synthetic-url-value');
   });
 
+  describe.each(['c', 'cpp'])(
+    'credential arrays in .%s sources',
+    (extension) => {
+      it.each([
+        'const char API_KEY[] = "synthetic-array-value";',
+        'char password[64] = "synthetic-array-value";',
+        'const char secret [2][64] = {"synthetic-array-value"};',
+        'const char token[\n64\n] = "synthetic-array-value";',
+        'char SID[64] = "synthetic-array-value";',
+        'char authorization[64] = "synthetic-array-value";',
+      ])('quarantines array declarator: %s', (declaration) => {
+        const file = `src/sample.${extension}`;
+        const source = `int count = 1;\n${declaration}\nint later = 2;\n`;
+        const result = inspect(file, (workspace) => {
+          writeFileSync(join(workspace, file), source);
+        });
+        expect(result.exit).toBe(0);
+        expect(result.output.status).toBe('partial');
+        expect(result.output.files[0].lines).toEqual(
+          source
+            .trimEnd()
+            .split('\n')
+            .map((text, index) => ({
+              line: index + 1,
+              text:
+                index === 0
+                  ? text
+                  : `--- redacted possible credential at line ${index + 1} ---`,
+            }))
+        );
+        expect(JSON.stringify(result.output)).not.toContain(
+          'synthetic-array-value'
+        );
+      });
+      it('preserves ordinary array declarations', () => {
+        const file = `src/sample.${extension}`;
+        const source = 'char message[64] = "hello";';
+        const result = inspect(file, (workspace) => {
+          writeFileSync(join(workspace, file), source + '\n');
+        });
+        expect(result.exit).toBe(0);
+        expect(result.output.status).toBe('success');
+        expect(result.output.files[0].lines).toEqual([
+          { line: 1, text: source },
+        ]);
+      });
+    }
+  );
+
   it('bounds source lines and redacts synthetic credential assignments', () => {
     const result = inspect('src/file.js', (workspace) => {
       writeFileSync(

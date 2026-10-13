@@ -90,7 +90,8 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
   no report/todo writes, state transitions, integrations or agent dispatch
 
 The bounded snapshot quarantines the remainder of each file after a recognized
-credential marker, including bracketed dictionary/environment keys and token-only or
+credential marker, including bracketed dictionary/environment keys, credential-array declarators,
+and token-only or
 empty-username URL userinfo. It reports
 `partial`; ordinary keys remain visible. This is not a comprehensive secret scan.
 

@@ -36,6 +36,10 @@ files retain their independent bounds. The marker detection is not a
 comprehensive secret scanner; do not use this workflow on a source known to
 contain credentials that lack these markers.
 
+An opening subscript bracket after a recognized name also starts quarantine,
+covering unsized, sized, multidimensional and multiline array declarators.
+This conservatively includes credential-array lookups.
+
 ```python
 import json
 import os
@@ -105,7 +109,7 @@ def inspect(parent_fd, name, relative):
     # A detected credential marker quarantines the remainder of this file.
     hidden = False
     for number, line in enumerate(selected, 1):
-        if re.search(r"(?i)(?:(?:api[_-]?key|token|password|secret|private[_-]?key|credentials?|cookie|session|sessid|DEVIN_ORG_ID)[A-Za-z0-9_.-]*[\"']?\s*(?:[=:\]]|//|/\*|#|\\?\s*$)|(?:(?<![A-Za-z0-9])sid|(?-i:SID|Sid))[\"\x27]?\s*(?:[=:\]]|//|/\*|#|\\?\s*$)|authorization[\"']?\s*(?:[=:,\]]|//|/\*|#|\\?\s*$)|\bbearer\s+\S|\b[a-z][a-z0-9+.-]*://[^\s/@]+@|-----BEGIN [A-Z ]*PRIVATE KEY-----)", line):
+        if re.search(r"(?i)(?:(?:api[_-]?key|token|password|secret|private[_-]?key|credentials?|cookie|session|sessid|DEVIN_ORG_ID)[A-Za-z0-9_.-]*[\"']?\s*(?:[=:\[\]]|//|/\*|#|\\?\s*$)|(?:(?<![A-Za-z0-9])sid|(?-i:SID|Sid))[\"\x27]?\s*(?:[=:\[\]]|//|/\*|#|\\?\s*$)|authorization[\"']?\s*(?:[=:,\[\]]|//|/\*|#|\\?\s*$)|\bbearer\s+\S|\b[a-z][a-z0-9+.-]*://[^\s/@]+@|-----BEGIN [A-Z ]*PRIVATE KEY-----)", line):
             hidden = True
         if hidden:
             partial = True

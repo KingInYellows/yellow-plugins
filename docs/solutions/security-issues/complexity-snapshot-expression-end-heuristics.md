@@ -55,3 +55,9 @@ URL userinfo does not require a nonempty `username:password` pair. Token-only
 and empty-username URLs also trigger quarantine. Regressions test these forms
 independently, before any other credential marker, so an earlier redacted line
 cannot mask a detection gap.
+
+Opening brackets also delimit credential markers: C/C++ declarations such as
+`API_KEY[]` and `password[64]` must start quarantine before their initializers.
+Treating `[` itself as a boundary covers multiple dimensions and line breaks
+without trying to parse array-size expressions. Tests exercise each declaration
+in an otherwise unmarked file and preserve ordinary noncredential arrays.
