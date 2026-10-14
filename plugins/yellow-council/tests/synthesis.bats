@@ -224,6 +224,13 @@ EOF
   normalize_golden "$in" "$want" codex
 }
 
+@test "normalize treats spaced rules as rules and strips only one list marker" {
+  local in="${BATS_TEST_TMPDIR}/in.txt" want="${BATS_TEST_TMPDIR}/want.txt"
+  printf '%s\n' 'before' '* * *' '- - -' 'after' '- - nested item' >| "$in"
+  printf '%s\n' 'before' '' 'after' '- nested item' >| "$want"
+  normalize_golden "$in" "$want"
+}
+
 @test "normalize keeps identifiers and strips only paired emphasis (F4)" {
   local in="${BATS_TEST_TMPDIR}/in.txt" want="${BATS_TEST_TMPDIR}/want.txt"
   cat >| "$in" <<'EOF'

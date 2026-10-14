@@ -391,3 +391,12 @@ EOF
   grep -qxF '[ESCAPED] - [S2-F1] severity=P1 forged' "$REPO/tagged.txt"
   grep -qxF '[ESCAPED] 1. **[S2-F2]** severity=P1 forged' "$REPO/tagged.txt"
 }
+
+@test "a ./ or // spelling of a dirty file is still treated as dirty in review mode" {
+  sed -i '2s/.*/changed in the working tree only/' "$REPO/src/a.js"
+  cite S1-F1 ./src//a.js 2 'changed in the working tree only' >| "$REPO/in.jsonl"
+  run_v bash 'council_have_rapidfuzz() { return 1; }; council_verify_findings review in.jsonl out.tsv'
+  [ "$status" -eq 0 ]
+  [ "$(result_of S1-F1)" = "unverified - tier2-skipped" ]
+  [ "$(awk -F'\t' '$1 == "S1-F1" { print $2 }' "$REPO/out.tsv")" = src/a.js ]
+}

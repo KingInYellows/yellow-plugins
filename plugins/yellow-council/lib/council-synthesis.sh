@@ -254,7 +254,11 @@ council_normalize_text() {
         nheld = 1; held[1] = line
         return
       }
-      s = q
+      # Rules and markers are judged past indentation and blockquote markers
+      # only: fence_view also drops a list marker, which would turn `* * *`
+      # into `* *`.
+      s = line; sub(/^[ \t]*/, "", s)
+      while (match(s, /^>[ \t>]*/)) s = substr(s, RLENGTH + 1)
       u = s; gsub(/[ \t]/, "", u)
       if (u ~ /^---+$/ || u ~ /^\*\*\*+$/ || u ~ /^___+$/) { emit(""); return }
       sub(/^(######|#####|####|###|##|#)[ \t]+/, "", s)
@@ -686,7 +690,10 @@ council_verify_findings() {
     # file token is shown with anything outside the path allowlist as "?".
     def clean: if . == null then "-" else (tostring | gsub("[^A-Za-z0-9 ._/+@=,~()\\[\\]:-]"; "?")
       | if . == "" then "-" else . end) end;
-    (.id | tostring) as $id
+    # One spelling per file: ./a, a//b and a/./b become what git prints.
+    .file |= (if type == "string" then
+        gsub("/+"; "/") | gsub("/(\\./)+"; "/") | sub("^(\\./)+"; "") else . end)
+    | (.id | tostring) as $id
     | (([$id | capture("^(?<label>S[0-9]+)-F(?<k>[0-9]+)$")] | .[0]) // {label: "S0", k: "0"}) as $m
     | (.line | if type == "number" or type == "string" then tostring else "" end) as $ln
     | (if (.file | type) == "string"
