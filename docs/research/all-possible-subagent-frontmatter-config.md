@@ -129,9 +129,9 @@ When both `tools` and `disallowedTools` are specified, `tools` sets the allowlis
 
 | Value | Meaning |
 |-------|---------|
-| `sonnet` | Latest Claude Sonnet model (as of 2026-09: `claude-sonnet-5`) |
-| `opus` | Latest Claude Opus model (as of 2026-09: `claude-opus-5`) |
-| `haiku` | Latest Claude Haiku model (as of 2026-09: `claude-haiku-4-5`; Haiku 4.5 ignores `effort:`) |
+| `sonnet` | Latest Claude Sonnet model (as of 2026-10: `claude-sonnet-5-5`) |
+| `opus` | Latest Claude Opus model (as of 2026-10: `claude-opus-5-5`; default effort `medium`) |
+| `haiku` | Latest Claude Haiku model (as of 2026-10: `claude-haiku-5-5` on the Anthropic API with Claude Code v2.1.293+, default effort `medium`; still Haiku 4.5, which ignores `effort:`, on Bedrock, Vertex and Foundry) |
 | `fable` | Latest Claude Fable model (as of 2026-09: `claude-fable-5-1`) — added to the sub-agents reference with the Claude 5 generation |
 | `inherit` | Use the same model as the parent conversation (default behavior; explicit `inherit` and omitting the field are equivalent) |
 | Full model ID | Any concrete Anthropic API model ID, e.g., `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5-20251001` |

@@ -1,7 +1,8 @@
 ---
 name: codex-analyst
 description: "Codebase research and analysis agent using OpenAI Codex CLI. Answers questions about code architecture, patterns, and behavior. Spawned by research workflows or invoked directly."
-model: inherit
+model: sonnet
+effort: medium
 tools:
   - Bash
   - Read

@@ -2,6 +2,7 @@
 name: coherence-reviewer
 description: "Reviews planning documents for internal consistency — contradictions between sections, terminology drift, structural issues, broken cross-references, and ambiguity where readers would diverge. Does not evaluate quality, feasibility, or completeness; catches when the document disagrees with itself. Use when reviewing brainstorms, plans, specs, PRDs, or design docs via /docs:review."
 model: haiku
+effort: medium
 background: true
 tools:
   - Read

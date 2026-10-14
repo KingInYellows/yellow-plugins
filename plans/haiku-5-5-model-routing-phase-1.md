@@ -1,9 +1,33 @@
 # Feature: Haiku 5.5 model-routing policy — Phase 1
 
-> **Status (2026-10-07):** Planned. Source:
+> **Status (2026-10-14):** In progress. PR #1171 landed most of 1.1 and parts
+> of 1.2 and 1.3; the remaining work is split per "Delivery" below. Source:
 > `docs/brainstorms/2026-10-07-haiku-5-5-model-routing-policy-brainstorm.md`.
 > Phase 2 (replay-gated swaps) and Phase 3 (trigger tightening; router
 > deferred) are tracked under "Follow-ups" and are not implemented here.
+
+## Delivery (decided 2026-10-14)
+
+PR #1171 (`claude/project-thread-lmopn5`) was opened from a cloud session
+before this plan was reconciled with it. It diverged in four places, each
+resolved below with the user:
+
+| #1171 change | Decision | Evidence |
+|---|---|---|
+| Drain defaults to `haiku`, silent fallback, no exit-status log | Keep `haiku`; add the rejection warning, the exit-status line and a hand-off check that warns when no dispatched entry leaves `pending/` (1.3.1), and pass one real drain (1.3.3) before merge | The drain lead makes one Task dispatch; staging-reviewer pins `sonnet` itself. The CLI sets no `--effort`, so the lead runs at Haiku 5.5's `medium` default, not `low`. Anthropic's Haiku 5.5 guide: low→medium "roughly halved early stopping" |
+| `scan-verifier` sonnet → haiku/low | Revert to `sonnet`/`medium` (1.1.20) | `/semgrep:fix` Step 9 has no branch for a refused or empty verifier answer and writes `Verified: pass` into the commit. Haiku 5.5 `cyber` refusals can hit benign security work, have no server-side fallback, and usually repeat on retry |
+| `test-runner` kept `inherit` (allowlisted) | Pin `sonnet`/`medium` as planned (1.1.10); drop the allowlist entry | Inherit runs up to 10 min of browsing on an Opus/Fable lead. Haiku stays a Phase 2 candidate (OSWorld 2.1: Haiku 72.4%, Sonnet 83.9%) |
+| Codex agents haiku/medium without the 1.5.1 gate | `sonnet`/`medium` now; the haiku move goes to Phase 2 | `codex-reviewer` is 1,051 lines with a strict 6-key contract; the guide maps long agent prompts and strict instruction following to higher effort or Sonnet |
+
+Split:
+
+- **PR #1171 (corrective, before merge):** 1.1.10, 1.1.16-17, 1.1.20, 1.2.3,
+  the test-runner allowlist test in 1.2.4, 1.3.1-1.3.3, 1.3.6, the AGENTS.md
+  effort wording from 1.4.4, 1.4.7, 1.6.2, and this plan update.
+- **Follow-up PR, stacked on #1171 via the enabled provider:** 1.0.1-1.0.3,
+  1.1.18, 1.1.19, 1.2.2, the rest of 1.2.4, 1.2.5, 1.4.1-1.4.6 (except the
+  AGENTS.md wording), 1.5.2, 1.5.3, and its own 1.6 pass (changesets for
+  yellow-council and yellow-devin).
 
 ## Overview
 
@@ -63,10 +87,13 @@ usage-limit headroom, not dollars. The quality-relevant fix is explicit
    - Add a new `[V5 advisory]` for a pinned `model:` without `effort:`.
 
    Both are warnings only, so they never change the exit code.
-4. **Drain:** `--model sonnet` by default, overridable with
-   `COMPOUND_DRAIN_MODEL` so a rollback needs no release. Validate the value
-   against an allowlist pattern, and fall back to `sonnet` on a bad value
-   with a warning in `DRAIN_LOG`.
+4. **Drain:** `--model haiku` by default (changed from `sonnet` on
+   2026-10-14; see "Delivery"), overridable with `COMPOUND_DRAIN_MODEL` so a
+   rollback needs no release. Validate the value against an allowlist
+   pattern, and fall back to `haiku` on a bad value with a warning in
+   `DRAIN_LOG`. Log every `claude -p` exit status, and log how many of the
+   dispatched entries left `pending/`. A lead that answers without
+   dispatching still exits 0, so only the second line shows that failure.
 5. **CI:** add `claude_args: --model sonnet` to both workflows. The action's
    `model:` input is deprecated.
 6. **Inherit verdicts:**
@@ -96,8 +123,20 @@ usage-limit headroom, not dollars. The quality-relevant fix is explicit
   user's own machines, so the floor is documentable.
 - **Full model IDs (`claude-haiku-5-5`):** rejected. Aliases follow future
   upgrades, and an unknown full ID errors on older clients.
-- **Drain on haiku:** rejected for Phase 1. A 50-turn dispatch prompt on low
-  effort risks early stops. Haiku is a Phase 2 candidate behind the override.
+- **Drain on sonnet:** rejected on 2026-10-14, reversing the original
+  choice. That choice assumed the lead would run at `low` effort. It runs at
+  Haiku 5.5's `medium` default, and its only job is one Task dispatch to the
+  sonnet-pinned staging-reviewer. A skipped dispatch is recoverable: the
+  entries stay staged and the next SessionStart retries them. It is not
+  free, because the 7-day reaper deletes entries that are never taken. The
+  exit status can't show a skip (the lead still exits 0), so the hook
+  counts the dispatched entries still in `pending/` and logs a warning when
+  none were taken (1.3.1). Watch for that warning, and roll back with
+  `COMPOUND_DRAIN_MODEL=sonnet`.
+- **Codex agents on haiku in Phase 1:** rejected on 2026-10-14. The 1.5.1
+  gate was not run, and `codex-reviewer`'s 1,051-line prompt and strict
+  contract are the case Anthropic's Haiku 5.5 guide maps to higher effort or
+  Sonnet. Both are Phase 2 candidates.
 
 ## Implementation Plan
 
@@ -154,12 +193,12 @@ usage-limit headroom, not dollars. The quality-relevant fix is explicit
 
 The Opus reviewers and existing haiku agents get explicit effort:
 
-- [ ] 1.1.1: `yellow-core`:
+- [x] 1.1.1: `yellow-core`:
   - `agents/review/security-sentinel.md` → `effort: high`
   - `agents/review/performance-oracle.md` → `effort: high`
   - `agents/review/architecture-strategist.md` → `effort: high`
   - `agents/workflow/staging-scorer.md` → `effort: low`
-- [ ] 1.1.2: `yellow-docs`: `agents/review/coherence-reviewer.md` →
+- [x] 1.1.2: `yellow-docs`: `agents/review/coherence-reviewer.md` →
       `effort: medium`.
 
 Inherit moves (all currently `model: inherit` on line 4, with no effort):
@@ -173,14 +212,14 @@ Inherit moves (all currently `model: inherit` on line 4, with no effort):
 | 1.1.7 | `yellow-ruvector/agents/ruvector/semantic-search.md` | haiku/low | |
 | 1.1.8 | `yellow-browser-test/agents/testing/app-discoverer.md` | haiku/medium | |
 | 1.1.9 | `yellow-browser-test/agents/testing/test-reporter.md` | haiku/low | |
-| 1.1.10 | `yellow-browser-test/agents/testing/test-runner.md` | sonnet/medium | haiku is a Phase 2 candidate |
+| 1.1.10 | `yellow-browser-test/agents/testing/test-runner.md` | sonnet/medium | haiku is a Phase 2 candidate. #1171 left it `inherit`; fix in #1171 |
 | 1.1.11 | `yellow-ci/agents/ci/failure-analyst.md` | sonnet/medium | Spawns runner-diagnostics |
 | 1.1.12 | `yellow-ci/agents/ci/workflow-optimizer.md` | sonnet/medium | Edits workflow YAML |
 | 1.1.13 | `yellow-ci/agents/maintenance/runner-diagnostics.md` | sonnet/medium | Was outside V3's scope |
 | 1.1.14 | `yellow-research/agents/research/code-researcher.md` | sonnet/medium | |
 | 1.1.15 | `yellow-semgrep/agents/semgrep/finding-fixer.md` | sonnet/medium | Never haiku |
-| 1.1.16 | `yellow-codex/agents/review/codex-reviewer.md` | haiku/medium | Gated on 1.5.1; separate commit |
-| 1.1.17 | `yellow-codex/agents/research/codex-analyst.md` | haiku/medium | Gated on 1.5.1; separate commit |
+| 1.1.16 | `yellow-codex/agents/review/codex-reviewer.md` | sonnet/medium | Changed from haiku/medium on 2026-10-14; haiku is a Phase 2 candidate. #1171 set haiku; fix in #1171 |
+| 1.1.17 | `yellow-codex/agents/research/codex-analyst.md` | sonnet/medium | Same as 1.1.16 |
 
 Kept `inherit`, with the reason recorded:
 
@@ -209,10 +248,15 @@ Kept `inherit`, with the reason recorded:
       policy doc: it is a recall wrapper with a strict output contract. This
       resolves Open Question 5. Revisit it in Phase 2 if the yield rollup shows
       missed learnings.
+- [x] 1.1.20: `yellow-semgrep/agents/semgrep/scan-verifier.md` → restore
+      `model: sonnet` and add `effort: medium`. #1171 moved it to haiku/low,
+      outside this plan; see "Delivery". It stays a Phase 2 candidate, and
+      handling a refused or empty verifier answer in `/semgrep:fix` Step 9 is
+      a prerequisite for that swap.
 
 ### Phase 1.2: Validator (`scripts/validate-agent-authoring.js`)
 
-- [ ] 1.2.1: Generalize V3 (lines 538-552). Drop the
+- [x] 1.2.1: Generalize V3 (lines 538-552). Drop the
       `subdir === 'scanners' || subdir === 'ci'` clause, and reword the
       message so it no longer interpolates `subdir`: "model: inherit — make an
       explicit model choice, or add the file to MODEL_RULE_ALLOWLIST with a
@@ -235,18 +279,21 @@ Kept `inherit`, with the reason recorded:
 > document the decision in the rule comment.
 <!-- /deepen-plan -->
 
-- [ ] 1.2.3: Edit `MODEL_RULE_ALLOWLIST` (lines 139-157):
+- [x] 1.2.3: Edit `MODEL_RULE_ALLOWLIST` (lines 139-157):
   - Remove `failure-analyst` and `workflow-optimizer`. They are no longer
     `inherit`, and neither name matches V4's pattern.
   - Keep `devin-orchestrator` and `knowledge-compounder`; V4 needs them.
   - Add `codex-executor` and `claude-reviewer`, each with a reason comment.
+  - #1171 also added `test-runner`. Remove it once 1.1.10 lands.
 - [ ] 1.2.4: Update `tests/integration/validate-agent-authoring-model-effort-rules.test.ts`:
   - Header comment (lines 1-14).
   - Invert the line-295 test, "does NOT warn on agents/workflow/", so it now
     warns.
   - Add a `maintenance/` V3 case.
   - Rework the failure-analyst and workflow-optimizer allowlist tests (lines
-    306, 317) to use an entry that is still allowlisted.
+    306, 317) to use an entry that is still allowlisted. #1171 did this, but
+    one of them now uses `test-runner`. Switch it to `claude-reviewer` when
+    1.2.3 drops the test-runner entry.
   - Add V5 tests: warns when a pinned model has no effort; silent when effort
     is set; silent on `inherit`; silent when allowlisted. Use
     `agentBody`/`writeAgent`/`runValidator`.
@@ -254,8 +301,10 @@ Kept `inherit`, with the reason recorded:
       today (V5 doesn't exist yet, so the tool can't report it). After 1.1,
       18 inherit agents drop to 3, all allowlisted, so V3 must report 0. Check
       with `pnpm validate:agents 2>&1 | grep -c 'V3 advisory'`. V5 must report
-      37: the remaining sonnet agents without effort, minus the allowlisted
-      `knowledge-compounder`. Those belong to a Phase 2 sweep; list them in the
+      36: the remaining sonnet agents without effort, minus the allowlisted
+      `knowledge-compounder`. The count was 37 until 1.1.20 gave
+      `scan-verifier` an explicit effort; on 2026-10-14 the #1171 branch had
+      37 sonnet agents without effort, including `knowledge-compounder`. Those belong to a Phase 2 sweep; list them in the
       PR body and don't fix them here.
 
 <!-- deepen-plan: codebase -->
@@ -278,11 +327,11 @@ Kept `inherit`, with the reason recorded:
 
 ### Phase 1.3: Drain and CI pins
 
-- [ ] 1.3.1: In `plugins/yellow-core/hooks/scripts/session-start.sh`, near
+- [x] 1.3.1: In `plugins/yellow-core/hooks/scripts/session-start.sh`, near
       line 341 next to `DRAIN_TIMEOUT_S`, add:
 
       ```sh
-      DRAIN_MODEL="${COMPOUND_DRAIN_MODEL-sonnet}"
+      DRAIN_MODEL="${COMPOUND_DRAIN_MODEL-haiku}"
       case "$DRAIN_MODEL" in
         ''|*[!a-z0-9-]*) DRAIN_MODEL_REJECTED=1 ;;
         claude-|*--*|*-) DRAIN_MODEL_REJECTED=1 ;;
@@ -291,7 +340,11 @@ Kept `inherit`, with the reason recorded:
       esac
       ```
 
-      The default uses `-` (no colon). Unset silently defaults to sonnet with
+      #1171 shipped a simpler block (`${COMPOUND_DRAIN_MODEL:-haiku}`, with
+      one arm that silently resets to haiku). Replace it with this one, and
+      keep the `model=%s` field #1171 added to the dispatch log line.
+
+      The default uses `-` (no colon). Unset silently defaults to haiku with
       no warning; set-but-empty (`COMPOUND_DRAIN_MODEL=`) reaches the `''` arm
       and is rejected and logged. The second arm mirrors the full-ID shape
       of `MODEL_VALUE_PATTERN` in `scripts/validate-agent-authoring.js`
@@ -301,9 +354,9 @@ Kept `inherit`, with the reason recorded:
 
       Put the block after `DRAIN_LOG` is created (`:314-316`). When
       `DRAIN_MODEL_REJECTED=1`, append a warning to `DRAIN_LOG` before
-      resetting: `[compound-drain] COMPOUND_DRAIN_MODEL rejected (only
-      haiku|sonnet|opus|claude-<id> allowed); using sonnet`. Then set
-      `DRAIN_MODEL=sonnet`. Don't echo the raw value, which is untrusted. A
+      resetting: `[yellow-core] compound-staging: COMPOUND_DRAIN_MODEL rejected (only
+      haiku|sonnet|opus|claude-<id> allowed); using haiku`. Then set
+      `DRAIN_MODEL=haiku`. Don't echo the raw value, which is untrusted. A
       mistyped rollback then shows up in the log instead of failing silently.
       The negated class rejects IDs with a `[1m]` suffix. That's acceptable,
       because the drain doesn't need 1M context.
@@ -313,9 +366,20 @@ Kept `inherit`, with the reason recorded:
       the drain calls `staging-reviewer` (see
       `docs/solutions/code-quality/claude-code-bare-flag-and-hook-recursion-guard.md`).
       After each `claude -p` call, append the exit status to `DRAIN_LOG`
-      (`[compound-drain] claude exited <rc>`). Today a non-zero exit, such as
+      (`[yellow-core] compound-staging: drain claude exited <rc>`). Today a non-zero exit, such as
       a model the client rejects, leaves only the CLI's stderr behind, and the
       1.3.3 pass criterion and the rollback watch both depend on seeing it.
+      Both log lines use the script's existing `[yellow-core]
+      compound-staging:` prefix rather than a new `[compound-drain]` one.
+
+      The exit status can't show a lead that answers without dispatching
+      staging-reviewer, because that run still exits 0. Snapshot the
+      `pending/*.jsonl` set before the call. Afterwards, log `drain took <k>
+      of <n> dispatched entries from pending/`, or `WARNING drain left all
+      <n> dispatched entries in pending/` when none moved. staging-reviewer's
+      Phase 1 moves every pending entry to `processing/`, so a skipped
+      hand-off leaves all of them. Added 2026-10-14 after review: untaken
+      entries are reaped after 7 days.
 <!-- deepen-plan: codebase -->
 > **Codebase:** An earlier draft matched `claude-[a-z0-9-]*` with no
 > negated-class arm in front, so `claude-x; rm` passed. The block above now
@@ -329,14 +393,20 @@ Kept `inherit`, with the reason recorded:
 > `DRAIN_TIMEOUT_BIN`/`DRAIN_TIMEOUT_S` at `:340-341`, branches at `:360-371`.
 <!-- /deepen-plan -->
 
-- [ ] 1.3.2: In `plugins/yellow-core/tests/compound-session-start-hook.bats`,
+- [x] 1.3.2: In `plugins/yellow-core/tests/compound-session-start-hook.bats`,
       add tests that grep the stub's recorded argv:
-  - `--model sonnet` by default (unset, no rejection warning).
-  - `COMPOUND_DRAIN_MODEL=haiku` gives `--model haiku`.
+  - `--model haiku` by default (unset, no rejection warning).
+  - `COMPOUND_DRAIN_MODEL=sonnet` gives `--model sonnet`.
   - An invalid value (`'x; rm'`, `claude-x; rm`, set-but-empty
-    `COMPOUND_DRAIN_MODEL=`, and the malformed IDs `claude-`,
-    `claude-opus--5`, `claude-opus-5-`) falls back to
-    `--model sonnet`, and the rejection warning is in `DRAIN_LOG`.
+    `COMPOUND_DRAIN_MODEL=`, the malformed IDs `claude-`,
+    `claude-opus--5`, `claude-opus-5-`, and #1171's
+    `--dangerously-skip-permissions` case) falls back to
+    `--model haiku`, and the rejection warning is in `DRAIN_LOG`.
+  - The `drain claude exited <rc>` line is in `DRAIN_LOG`.
+
+  #1171 already covers the default, the override and the
+  `--dangerously-skip-permissions` fallback. Extend those tests rather than
+  duplicating them.
   - `--bare` is absent and `--max-turns 50` is still present.
 
   The suite runs only the branch the host takes, which in practice is the
@@ -354,20 +424,43 @@ Kept `inherit`, with the reason recorded:
 > rely on the two branches being textually identical.
 <!-- /deepen-plan -->
 
-- [ ] 1.3.3: Run one real drain against a non-empty staging dir. Pass means
-      items are processed, the exit code is 0, the JSON result line in
+- [x] 1.3.3: Run one real drain against a non-empty staging dir. Pass means
+      items are processed (the `drain took <n> of <n>` line, with no
+      `WARNING drain left` line), the exit code is 0, the JSON result line in
       `DRAIN_LOG` parses (`grep -m1 '^{' "$DRAIN_LOG" | jq -e .`;
-      `--output-format json` emits one line), the `[compound-drain] claude
+      `--output-format json` emits one line), the `drain claude
       exited 0` line is present, and there is no rejection warning. Record the result in the PR.
-- [ ] 1.3.4: In `.github/workflows/claude-code-review.yml` (`with:` near line
+
+      Passed 2026-10-14 (Claude Code on subscription auth, unset
+      `COMPOUND_DRAIN_MODEL`). The run used a throwaway git project in the
+      scratchpad with 5 entries staged through `cs_stage_entry`, so nothing
+      was written to this repo.
+      - Log: `model=haiku` on the dispatch line, `drain claude exited 0`, and
+        no rejection warning.
+      - JSON result: `is_error: false`. `modelUsage` lists
+        `claude-haiku-5-5` (the lead) and `claude-sonnet-5-5`
+        (staging-reviewer).
+      - Queue: all 5 entries left `pending/`. 2 were scored trivial and
+        skipped, which was correct.
+      - Not promoted: the other 3 stayed in `processing/` because the scratch
+        project had no `docs/solutions/`, and the promoter declined to create
+        it. Promotion itself was therefore not exercised. staging-promoter is
+        unchanged by this plan.
+      - The run predates the hand-off line in 1.3.1, so the hand-off was
+        confirmed by inspecting `pending/` directly.
+- [x] 1.3.4: In `.github/workflows/claude-code-review.yml` (`with:` near line
       40), add
       `claude_args: --model sonnet  # model pin: docs/<policy doc>`.
-- [ ] 1.3.5: In `.github/workflows/claude.yml` (`with:` near line 35), replace
+- [x] 1.3.5: In `.github/workflows/claude.yml` (`with:` near line 35), replace
       the commented `claude_args` example at lines 46-49 with a live
       `claude_args: --model sonnet`. Keep a comment showing where
       `--allowed-tools` would be appended.
-- [ ] 1.3.6: Run `actionlint` on both files if it is available. After merge,
+- [x] 1.3.6: Run `actionlint` on both files if it is available. After merge,
       confirm in the run logs that the model is Sonnet 5.5 (this is 1.0.3).
+      Done 2026-10-14: actionlint 1.7.12 is clean on both files. The
+      `claude-review` run on #1171 passed `--model sonnet` but skipped the
+      action, which declines to run while a PR changes its own workflow, so
+      the run-log check stays with 1.0.3 after merge.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** `actionlint` isn't installed here (`which actionlint` is
@@ -424,12 +517,18 @@ Kept `inherit`, with the reason recorded:
   `effort:` explicitly on every pinned agent. An exported
   `CLAUDE_CODE_EFFORT_LEVEL` overrides both." Adjust it only if 1.0.2
   observes otherwise. Bump the catalog's "last verified" note (line 28).
+
+  #1171 rewrote `AGENTS.md:313-316` to say Haiku 5.5 and Opus 5.5 "default to
+  `medium`". That is the model's own default, not a subagent's: a subagent
+  without `effort:` takes the session's effort. Fix that sentence in #1171
+  with this wording, along with the same claim in `docs/plugin-template.md`
+  (done 2026-10-14); the catalog and research-doc edits go in the follow-up.
 - [ ] 1.4.5: Add the v2.1.293 floor note to `AGENTS.md`'s model/effort
       section, linking to the policy doc.
 - [ ] 1.4.6: Run `rg -n "Haiku 4\.5|ignores .?effort" AGENTS.md docs/ --glob '!docs/brainstorms/**' --glob '!docs/research/model-selection-token-context-optimization.md'`.
       Only qualified mentions may remain. The superseded doc is excluded
       because its banner covers it.
-- [ ] 1.4.7: In every plugin that 1.1 edits, update `README.md` and `CLAUDE.md`
+- [x] 1.4.7: In every plugin that 1.1 edits, update `README.md` and `CLAUDE.md`
       wherever they state an agent's model, effort or cost tier, so they
       match the new frontmatter. Run
       `rg -n -i "haiku|sonnet|opus|inherit|effort" plugins/<name>/README.md plugins/<name>/CLAUDE.md`
@@ -465,15 +564,17 @@ Kept `inherit`, with the reason recorded:
 
 ### Phase 1.5: Behavioral gates (manual; results go in the PR body)
 
-- [ ] 1.5.1: Codex contract check. Run `codex-reviewer` 5 times on haiku
-      against the same fixed diff. No automated parser exists, so check each
+- 1.5.1 (moved to Phase 2 on 2026-10-14; the codex agents ship as
+      sonnet/medium, so this gate no longer applies to Phase 1. Kept as the
+      entry gate for their haiku move): Codex contract check. Run
+      `codex-reviewer` 5 times on haiku against the same fixed diff. No automated parser exists, so check each
       output by hand against the contract in `codex-reviewer.md:144,199`. It
       needs verdict, confidence, summary and fenced_output_path, plus a
       well-formed findings block (5/5 required). Also run
       `pnpm vitest run tests/integration/codex-reviewer-step6-extraction.test.ts`
       as a regression check on the Step 6 pipeline. Run `codex-analyst` 5 times on a fixed question; each
-      answer must be non-empty and cite files. On any failure, set both agents
-      to sonnet/medium instead and note it.
+      answer must be non-empty and cite files. On any failure, keep both
+      agents on sonnet/medium and note it.
 - [ ] 1.5.2: Run one smoke per haiku MCP agent: `linear-issue-loader`,
       `linear-pr-linker` (against a scratch issue), `linear-explorer`, and
       both ruvector agents. Pass means ToolSearch, then a real MCP call, then
@@ -510,7 +611,7 @@ Kept `inherit`, with the reason recorded:
   - yellow-devin
 
   These are model and effort changes with no new capability.
-- [ ] 1.6.2: Run the gates:
+- [x] 1.6.2: Run the gates:
   - `pnpm validate:agents`
   - `pnpm lint:plugins`
   - `pnpm validate:schemas`
@@ -522,13 +623,23 @@ Kept `inherit`, with the reason recorded:
     `session-start.sh`.
 
   Run `pnpm install` first, because the worktree has no `node_modules`.
+
+  Done for #1171 on 2026-10-14:
+  - Everything listed passes except `test:integration`. Also passing:
+    `typecheck`, `lint`, `validate:shell-compat`, and the yellow-core bats
+    suite (475 tests).
+  - In the full parallel run, `test:integration` failed 4 tests in
+    `check-upstream-pins`, `install-ruvector` and
+    `smoke-codex-plugin-install`, and `test:unit` failed 1 in yellow-cursor
+    `state-store`. Run alone, all five pass on #1171 and on `main`, so they
+    are load-dependent flakes, not regressions.
+  - The follow-up PR runs its own pass.
 - [ ] 1.6.3: Run `/stack:status`, then submit through the enabled provider.
-      Never use raw `git push` or `gh pr create`. Suggested stack:
-      1. The validator and tests (1.2).
-      2. Frontmatter moves and notes (1.1, excluding codex).
-      3. The codex moves (1.1.16-17).
-      4. The drain and CI pins (1.3).
-      5. Docs (1.4).
+      Never use raw `git push` or `gh pr create`. The stack is #1171 plus one
+      follow-up PR on top of it (see "Delivery"); this replaces the original
+      five-PR split. #1171's branch came from a cloud session without `gt`,
+      so on the Graphite provider run `gt track` on it before stacking the
+      follow-up.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:**
@@ -548,26 +659,26 @@ Kept `inherit`, with the reason recorded:
 1. `grep -l '^model: inherit' plugins/*/agents/**/*.md` returns exactly
    codex-executor, claude-reviewer and devin-orchestrator, each with a body
    note.
-2. All 20 agents edited in 1.1 have both `model:` and `effort:` set, matching
-   the table, except that `codex-reviewer` and `codex-analyst` may instead be
-   `sonnet/medium` when 1.5.1 fails. Verify by grepping frontmatter.
-3. `pnpm validate:agents` emits no V3 advisories. V5 lists exactly 37 agents,
+2. All 21 agents edited in 1.1 (including `scan-verifier`, 1.1.20) have both
+   `model:` and `effort:` set, matching the table. Verify by grepping
+   frontmatter.
+3. `pnpm validate:agents` emits no V3 advisories. V5 lists exactly 36 agents,
    all outside this plan's scope, and that list is recorded in the PR.
 4. The validator tests pass, including an inverted `workflow/` V3 case and the
    new `maintenance/` and V5 cases.
 5. The bats tests cover the default model, the override, rejection of an
    invalid value (with its log warning), and the absence of `--bare` on the
    host's drain branch. A static test proves both `claude -p` invocations
-   carry `--model "$DRAIN_MODEL"`. One real drain succeeds, and `DRAIN_LOG`
-   records its exit status.
+   carry `--model "$DRAIN_MODEL"`. Tests also cover the hand-off warning
+   (exit 0 with every entry left in `pending/`) and the `took <n> of <n>`
+   line. One real drain succeeds, and `DRAIN_LOG` records its exit status
+   and that it took every dispatched entry.
 6. Both workflows carry `claude_args: --model sonnet`, and a run log shows
    Sonnet 5.5.
 7. The 1.4.6 `rg` check returns only qualified mentions. The policy doc exists,
    and the old research doc carries a supersede banner with no dangling links.
-8. The 1.5 gates are recorded in the PR body. The codex haiku moves land
-   only if the manual 1.5.1 checklist passes 5/5 and the Step 6 vitest
-   passes; otherwise both agents land as `sonnet/medium` with the failure
-   noted in the PR body.
+8. The 1.5.2 and 1.5.3 gates are recorded in the follow-up PR body. 1.5.1
+   is a Phase 2 gate.
 9. Every touched plugin has a changeset, and `pnpm release:check` passes.
 
 ## Edge Cases & Error Handling
@@ -583,7 +694,7 @@ Kept `inherit`, with the reason recorded:
   then the parent. Confirm this in 1.5.3.
 - **`CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` set by a user:** it overrides every
   frontmatter pin. Note this in the policy doc as the global escape hatch.
-- **Invalid `COMPOUND_DRAIN_MODEL`:** the `case` falls back to `sonnet` and
+- **Invalid `COMPOUND_DRAIN_MODEL`:** the `case` falls back to `haiku` and
   writes a warning to `DRAIN_LOG`, without echoing the raw value. No value
   from the environment is interpolated unquoted.
 - **A model the client rejects:** for example a valid-looking `claude-<id>`
@@ -608,8 +719,10 @@ Kept `inherit`, with the reason recorded:
 
 ## Security Considerations
 
-- `finding-fixer`, `security-sentinel` and `scan-verifier` stay off haiku. The
-  claim that Haiku 5.5 refuses cyber work is undocumented (open question).
+- `finding-fixer`, `security-sentinel` and `scan-verifier` stay off haiku.
+  Anthropic's Haiku 5.5 guide allows finding vulnerabilities in source code,
+  but benign security work can still draw a `cyber` refusal with no fallback.
+  `/semgrep:fix` does not handle a refused verifier yet (1.1.20).
 - `COMPOUND_DRAIN_MODEL` is rejected first if it holds any character outside
   `a-z0-9-`. Only then is it matched against `haiku|sonnet|opus|claude-*`.
   It is always quoted in the argv.
@@ -640,22 +753,30 @@ Kept `inherit`, with the reason recorded:
   Question 6). Then replay these swaps, grading deterministically against
   golden findings:
   - gemini-reviewer and opencode-reviewer effort to medium.
-  - Sonnet→Haiku for scan-verifier, comment-analyzer,
+  - Sonnet→Haiku for scan-verifier (first make `/semgrep:fix` Step 9
+    handle a refused or empty verifier answer), comment-analyzer,
     project-standards-reviewer, git-history-analyzer, the
     complexity/duplication/ai-pattern scanners, and staging-promoter.
   - test-runner to haiku.
+  - codex-reviewer and codex-analyst to haiku/medium, gated on the 1.5.1
+    checklist.
   - The compounder extractors.
   - Opus→Sonnet for agent-cli-readiness-reviewer, agent-native-reviewer,
     audit-synthesizer and research-conductor.
   - The optimize judge.
   - Conditional Opus reviewers in `/flow:work`.
-  - The drain on haiku.
   - The V5 effort sweep.
+
+  The drain moved to haiku in Phase 1 (see "Delivery"), so it is no longer
+  a Phase 2 item.
 - **Phase 3:** tighten the plugin-markdown reviewer triggers in `/review:pr`.
   The router stays deferred; if revisited, use an add-only Haiku pass on top of
   a static floor.
-- **Open questions carried over:** 2 (Max weighting of Haiku), 3 (cyber
-  refusals), 4 (whether OAuth counts as the API alias row; inferred yes).
+- **Open questions carried over:** 2 (Max weighting of Haiku) and 4 (whether
+  OAuth counts as the API alias row; inferred yes). Open Question 3 (cyber
+  refusals) is answered by Anthropic's Haiku 5.5 prompting guide: finding
+  vulnerabilities in source code is allowed, but benign security work can
+  still trigger a `cyber` refusal, and there is no server-side fallback.
 
 ## References
 
@@ -675,6 +796,11 @@ Kept `inherit`, with the reason recorded:
   - https://code.claude.com/docs/en/cli-reference (`--model`, `--effort`)
   - https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
     (`claude_args`)
+  - https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-haiku-5-5
+    (effort levels, early stopping, `cyber` refusals; basis for the
+    2026-10-14 decisions)
+  - https://www.anthropic.com/claude-haiku-5-5 (launch post: OSWorld 2.1 and
+    Terminal-Bench 4.0 against Sonnet 5.5, cyber safeguard scope)
 
 <!-- deepen-plan: external -->
 > **Research:**

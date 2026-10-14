@@ -340,12 +340,38 @@ fi
 DRAIN_TIMEOUT_BIN=$(command -v timeout 2>/dev/null || true)
 DRAIN_TIMEOUT_S="${COMPOUND_DRAIN_TIMEOUT_S:-600}"
 
+# Pin the drain's model. Unpinned, `claude -p` runs on the user's default
+# model (often Opus or Fable) and draws on the same subscription limit
+# window as the user's own session. The drain lead only moves files and
+# dispatches staging-reviewer, whose sub-agents pin their own models, so
+# Haiku is enough. COMPOUND_DRAIN_MODEL overrides it (e.g. `sonnet` if
+# dispatch proves unreliable). Only haiku|sonnet|opus or a well-formed
+# claude-<id> reaches argv: the negated class rejects anything outside
+# [a-z0-9-] first (so `claude-x; rm` never matches the claude-* arm), and
+# the second arm rejects malformed IDs (`claude-`, `--`, trailing `-`) in
+# the shape of MODEL_VALUE_PATTERN in scripts/validate-agent-authoring.js.
+# Unset means haiku silently; set-but-empty or invalid is rejected and
+# logged (without echoing the untrusted value) so a mistyped rollback
+# shows up in DRAIN_LOG instead of failing silently.
+DRAIN_MODEL="${COMPOUND_DRAIN_MODEL-haiku}"
+case "$DRAIN_MODEL" in
+  '' | *[!a-z0-9-]*) DRAIN_MODEL_REJECTED=1 ;;
+  claude- | *--* | *-) DRAIN_MODEL_REJECTED=1 ;;
+  haiku | sonnet | opus | claude-*) DRAIN_MODEL_REJECTED=0 ;;
+  *) DRAIN_MODEL_REJECTED=1 ;;
+esac
+if [ "$DRAIN_MODEL_REJECTED" -eq 1 ]; then
+  printf '[yellow-core] compound-staging: COMPOUND_DRAIN_MODEL rejected (only haiku|sonnet|opus|claude-<id> allowed); using haiku\n' \
+    >> "$DRAIN_LOG" 2>/dev/null
+  DRAIN_MODEL=haiku
+fi
+
 (
   DRAIN_LOCK_PATH="${STAGING_DIR}/.drain-lock"
   trap 'rmdir "$DRAIN_LOCK_PATH" 2>/dev/null || true' EXIT INT TERM
   export COMPOUND_DRAIN_IN_PROGRESS=1
-  printf '[yellow-core] compound-staging: drain dispatch %s (auth=%s, pending=%s, timeout=%s)\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" "$DRAIN_TIMEOUT_S" >> "$DRAIN_LOG" 2>/dev/null
+  printf '[yellow-core] compound-staging: drain dispatch %s (auth=%s, pending=%s, timeout=%s, model=%s)\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" "$DRAIN_TIMEOUT_S" "$DRAIN_MODEL" >> "$DRAIN_LOG" 2>/dev/null
   # NOTE: --bare CANNOT be used here. The drain prompt invokes the
   # yellow-core:workflow:staging-reviewer agent via Task, and --bare
   # skips plugin auto-discovery — the child session would not have the
@@ -357,18 +383,48 @@ DRAIN_TIMEOUT_S="${COMPOUND_DRAIN_TIMEOUT_S:-600}"
   # reachable in the child session.
   # See docs/solutions/code-quality/claude-code-bare-flag-and-hook-recursion-guard.md
   # — "Defense-in-depth alternative when --bare is incompatible".
+  # Snapshot the entries handed to this drain. A lead that answers without
+  # dispatching staging-reviewer still exits 0, so the exit status alone
+  # cannot show a skipped hand-off; entries left in pending/ can.
+  DISPATCHED_ENTRIES=$(find "${STAGING_DIR}/pending" -maxdepth 1 -name '*.jsonl' -type f 2>/dev/null)
   if [ -n "$DRAIN_TIMEOUT_BIN" ]; then
     "$DRAIN_TIMEOUT_BIN" "$DRAIN_TIMEOUT_S" "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
+      --model "$DRAIN_MODEL" \
       --max-turns 50 \
       --permission-mode bypassPermissions \
       --output-format json \
       >> "$DRAIN_LOG" 2>&1
+    DRAIN_RC=$?
   else
     "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
+      --model "$DRAIN_MODEL" \
       --max-turns 50 \
       --permission-mode bypassPermissions \
       --output-format json \
       >> "$DRAIN_LOG" 2>&1
+    DRAIN_RC=$?
+  fi
+  # A non-zero exit (a model the client rejects, --max-turns hit, timeout's
+  # 124) otherwise leaves only the CLI's stderr behind.
+  printf '[yellow-core] compound-staging: drain claude exited %s\n' "$DRAIN_RC" \
+    >> "$DRAIN_LOG" 2>/dev/null
+  # staging-reviewer's Phase 1 moves every pending entry to processing/, so
+  # an entry still in pending/ was never taken. Untaken entries are retried
+  # next SessionStart but reaped after 7 days, so a drain that keeps
+  # skipping the hand-off would lose them silently without this line.
+  DISPATCHED_N=0
+  LEFT_N=0
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    DISPATCHED_N=$((DISPATCHED_N + 1))
+    [ -f "$entry" ] && LEFT_N=$((LEFT_N + 1))
+  done <<< "$DISPATCHED_ENTRIES"
+  if [ "$DISPATCHED_N" -gt 0 ] && [ "$LEFT_N" -eq "$DISPATCHED_N" ]; then
+    printf '[yellow-core] compound-staging: WARNING drain left all %s dispatched entries in pending/ (staging-reviewer never took them)\n' \
+      "$DISPATCHED_N" >> "$DRAIN_LOG" 2>/dev/null
+  else
+    printf '[yellow-core] compound-staging: drain took %s of %s dispatched entries from pending/\n' \
+      "$((DISPATCHED_N - LEFT_N))" "$DISPATCHED_N" >> "$DRAIN_LOG" 2>/dev/null
   fi
   cs_update_drain_budget "$STAGING_DIR" "$AUTH_ROUTE" || true
 ) >/dev/null 2>&1 &

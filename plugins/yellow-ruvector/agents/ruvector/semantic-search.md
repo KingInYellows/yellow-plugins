@@ -1,7 +1,8 @@
 ---
 name: ruvector-semantic-search
 description: "Find code by meaning rather than keyword. Use when an agent needs to search for implementations of a concept, similar patterns, or related functionality across the codebase. Also use when user says \"find similar code\", \"search by concept\", \"where is X implemented\", or \"find code that does Y\"."
-model: inherit
+model: haiku
+effort: low
 skills:
   - ruvector-conventions
 tools:

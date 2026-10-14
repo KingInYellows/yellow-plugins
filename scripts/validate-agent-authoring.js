@@ -113,7 +113,8 @@ const REVIEW_AGENT_ALLOWLIST = new Map([
 // V1: effort: enum (low|medium|high|xhigh|max) — hard error
 // V2: model: alias (haiku|sonnet|opus|fable|inherit, optionally versioned)
 //     or a full `claude-*` model ID — hard error
-// V3: model: inherit on a scanner/CI agent — non-blocking warning
+// V3: model: inherit on any agent outside MODEL_RULE_ALLOWLIST — non-blocking
+//     warning
 // V4: synthesizer/orchestrator name without effort: high — non-blocking warning
 // `inherit` is a bare keyword (no version suffix). Aliases (haiku, sonnet,
 // opus, fable — the set Claude Code's sub-agents reference documents) accept
@@ -139,12 +140,12 @@ const SYNTHESIZER_NAME_PATTERN =
 // agent's role does NOT match the rule's intent (e.g., failure-analyst
 // in agents/ci/ is a workflow integration agent, not a scanner).
 const MODEL_RULE_ALLOWLIST = new Set([
-  // failure-analyst is a CI failure diagnosis orchestrator that delegates
-  // to runner-diagnostics for deep work — its model: inherit is intentional.
-  'yellow-ci/agents/ci/failure-analyst.md',
-  // workflow-optimizer is a CI workflow analysis agent whose output quality
-  // scales with the parent session's model — intentional inherit.
-  'yellow-ci/agents/ci/workflow-optimizer.md',
+  // The council's claude slot stands for the lead session's model lineage,
+  // so it must follow the lead model — intentional inherit.
+  'yellow-council/agents/review/claude-reviewer.md',
+  // codex-executor makes rescue decisions on the lead session's behalf —
+  // intentional inherit.
+  'yellow-codex/agents/workflow/codex-executor.md',
   // devin-orchestrator coordinates Devin V3 sessions; its name matches V4's
   // synthesizer/orchestrator pattern but the effort default is intentional —
   // sub-sessions run independently in Devin.
@@ -535,19 +536,15 @@ function validateAgentFile(filePath, ctx) {
     );
   }
 
-  // V3: model: inherit on a scanner/CI agent — non-blocking warning.
-  // Nudge authors to make an explicit model choice for narrow-role agents
-  // where inheritance is usually wasteful (Opus session → scanner doing
-  // taxonomy matching).
-  if (
-    modelVal === 'inherit' &&
-    !allowlisted &&
-    (subdir === 'scanners' || subdir === 'ci')
-  ) {
+  // V3: model: inherit outside MODEL_RULE_ALLOWLIST — non-blocking warning.
+  // An inheriting agent runs on whatever the lead session runs, so under an
+  // Opus or Fable lead a lookup or wrapper agent costs 40-100x a pinned
+  // Haiku one. Inheritance is a deliberate choice recorded in the allowlist.
+  if (modelVal === 'inherit' && !allowlisted) {
     warnings.push(
       `[V3 advisory] ${relative(filePath)}: model: inherit on a ` +
-        `${subdir}/ agent — consider explicit model: sonnet or model: ` +
-        `haiku based on task complexity.`
+        `${subdir}/ agent — pin model: haiku, sonnet or opus by task ` +
+        `shape, or add the file to MODEL_RULE_ALLOWLIST with a reason.`
     );
   }
 

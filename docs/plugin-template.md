@@ -447,11 +447,13 @@ in a branch with an imperative load stub, for example:
 Frontmatter uses `tools:` (never `allowed-tools:` — that is the command key),
 a single-line `description` with a "Use when" clause, and an explicit `model:`
 (`haiku`, `sonnet`, `opus`, `fable`, a full `claude-*` ID, or `inherit`).
-`effort:` (`low`…`max`) is the cost lever on Sonnet 5 / Opus 5 / Fable; Haiku
-4.5 ignores it. Review agents under `agents/review/` must stay read-only
-(W1.5). Keep the body to the task, inputs, output contract, and the
-project-specific facts Claude cannot infer; brief imperative sentences steer
-the Claude 5 generation better than enumerated ALL-CAPS rules.
+`effort:` (`low`…`max`) is the cost lever on every Claude 5 model; without it
+a subagent inherits the session's effort, so set it explicitly (Haiku 4.5
+ignores it).
+Review agents under `agents/review/` must stay read-only (W1.5). Keep the body
+to the task, inputs, output contract, and the project-specific facts Claude
+cannot infer; brief imperative sentences steer the Claude 5 generation better
+than enumerated ALL-CAPS rules.
 
 ```markdown
 ---

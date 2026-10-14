@@ -5,7 +5,8 @@
  * V1: effort: enum (low|medium|high|xhigh|max) — hard error
  * V2: model: alias (haiku|sonnet|opus|fable|inherit, optionally versioned) or a
  *     full claude-* model ID — hard error
- * V3: model: inherit on agents/scanners/ or agents/ci/ — non-blocking warning
+ * V3: model: inherit outside MODEL_RULE_ALLOWLIST, in any agents/ subdirectory —
+ *     non-blocking warning
  * V4: synthesizer/orchestrator name without effort: high — non-blocking warning
  *
  * The test parameterizes the validator via `VALIDATE_PLUGINS_DIR` and runs it
@@ -249,7 +250,7 @@ describe('validate-agent-authoring V2: model enum', () => {
   });
 });
 
-describe('validate-agent-authoring V3: scanner/CI inheritance advisory', () => {
+describe('validate-agent-authoring V3: inheritance advisory', () => {
   let tmpRoot: string;
   beforeEach(() => {
     tmpRoot = mkdtempSync(join(tmpdir(), 'yellow-validate-v3-'));
@@ -292,7 +293,7 @@ describe('validate-agent-authoring V3: scanner/CI inheritance advisory', () => {
     expect(stdout).toMatch(/\[V3 advisory\]/);
   });
 
-  it('does NOT warn on agents/workflow/ with model: inherit (V3 is scoped)', () => {
+  it('warns on agents/workflow/ with model: inherit (V3 covers every subdir)', () => {
     writeAgent(
       tmpRoot,
       'yellow-test/agents/workflow/wf.md',
@@ -300,10 +301,11 @@ describe('validate-agent-authoring V3: scanner/CI inheritance advisory', () => {
     );
     const { status, stdout } = runValidator(tmpRoot);
     expect(status).toBe(0);
-    expect(stdout).not.toMatch(/V3 advisory/);
+    expect(stdout).toMatch(/\[V3 advisory\]/);
+    expect(stdout).toMatch(/wf\.md/);
   });
 
-  it('honors MODEL_RULE_ALLOWLIST for failure-analyst.md', () => {
+  it('warns on a pinned-elsewhere CI agent that reverts to inherit', () => {
     writeAgent(
       tmpRoot,
       'yellow-ci/agents/ci/failure-analyst.md',
@@ -311,14 +313,39 @@ describe('validate-agent-authoring V3: scanner/CI inheritance advisory', () => {
     );
     const { status, stdout } = runValidator(tmpRoot);
     expect(status).toBe(0);
+    expect(stdout).toMatch(/\[V3 advisory\]/);
+  });
+
+  it('honors MODEL_RULE_ALLOWLIST for claude-reviewer.md', () => {
+    writeAgent(
+      tmpRoot,
+      'yellow-council/agents/review/claude-reviewer.md',
+      // REVIEW_AGENT_ALLOWLIST also lists this path, and that rule requires
+      // the documented-exception section in the body.
+      agentBody({ name: 'claude-reviewer', model: 'inherit' }) +
+        '\n## Tool Surface — Documented Exception\n\nFixture.\n'
+    );
+    const { status, stdout } = runValidator(tmpRoot);
+    expect(status).toBe(0);
     expect(stdout).not.toMatch(/V3 advisory/);
   });
 
-  it('honors MODEL_RULE_ALLOWLIST for workflow-optimizer.md', () => {
+  it('warns on test-runner.md with model: inherit (no longer allowlisted)', () => {
     writeAgent(
       tmpRoot,
-      'yellow-ci/agents/ci/workflow-optimizer.md',
-      agentBody({ name: 'workflow-optimizer', model: 'inherit' })
+      'yellow-browser-test/agents/testing/test-runner.md',
+      agentBody({ name: 'test-runner', model: 'inherit' })
+    );
+    const { status, stdout } = runValidator(tmpRoot);
+    expect(status).toBe(0);
+    expect(stdout).toMatch(/\[V3 advisory\]/);
+  });
+
+  it('honors MODEL_RULE_ALLOWLIST for codex-executor.md', () => {
+    writeAgent(
+      tmpRoot,
+      'yellow-codex/agents/workflow/codex-executor.md',
+      agentBody({ name: 'codex-executor', model: 'inherit' })
     );
     const { status, stdout } = runValidator(tmpRoot);
     expect(status).toBe(0);
