@@ -306,6 +306,30 @@ describe('validate-agent-authoring V3: inheritance advisory', () => {
     expect(stdout).toMatch(/\[V3 advisory\].*diag\.md/);
   });
 
+  it('warns when model: is omitted, since that inherits at runtime', () => {
+    writeAgent(
+      tmpRoot,
+      'yellow-test/agents/workflow/nomodel.md',
+      agentBody({ name: 'nomodel' })
+    );
+    const { status, stdout } = runValidator(tmpRoot);
+    expect(status).toBe(0);
+    expect(stdout).toMatch(
+      /\[V3 advisory\].*nomodel\.md: no model: \(inherits\)/
+    );
+  });
+
+  it('honors MODEL_RULE_ALLOWLIST when model: is omitted', () => {
+    writeAgent(
+      tmpRoot,
+      'yellow-codex/agents/workflow/codex-executor.md',
+      agentBody({ name: 'codex-executor' })
+    );
+    const { status, stdout } = runValidator(tmpRoot);
+    expect(status).toBe(0);
+    expect(stdout).not.toMatch(/V3 advisory/);
+  });
+
   it('warns on agents/workflow/ with model: inherit (V3 covers every subdir)', () => {
     writeAgent(
       tmpRoot,

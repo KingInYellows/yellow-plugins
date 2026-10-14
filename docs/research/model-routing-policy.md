@@ -33,7 +33,7 @@ choice back.
 - `model: inherit` is allowed only with a recorded reason: an entry in
   `MODEL_RULE_ALLOWLIST` in `scripts/validate-agent-authoring.js` and a
   "Model: `inherit` by design" note at the top of the agent body. V3 warns on
-  any other `inherit`.
+  any other `inherit`, including an omitted `model:`, which inherits too.
 - Use aliases (`haiku`, `sonnet`, `opus`), not full model IDs. Aliases follow
   model upgrades, and an unknown full ID errors on older clients.
 - `fable` never appears in frontmatter.

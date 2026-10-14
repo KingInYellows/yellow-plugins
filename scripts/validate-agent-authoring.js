@@ -113,7 +113,7 @@ const REVIEW_AGENT_ALLOWLIST = new Map([
 // V1: effort: enum (low|medium|high|xhigh|max) — hard error
 // V2: model: alias (haiku|sonnet|opus|fable|inherit, optionally versioned)
 //     or a full `claude-*` model ID — hard error
-// V3: model: inherit on any agent outside MODEL_RULE_ALLOWLIST — non-blocking
+// V3: model: inherit (or no model:) outside MODEL_RULE_ALLOWLIST — non-blocking
 //     warning
 // V4: synthesizer/orchestrator name without effort: high — non-blocking warning
 // V5: pinned model: without effort: — non-blocking warning
@@ -541,9 +541,11 @@ function validateAgentFile(filePath, ctx) {
   // An inheriting agent runs on whatever the lead session runs, so under an
   // Opus or Fable lead a lookup or wrapper agent costs 40-100x a pinned
   // Haiku one. Inheritance is a deliberate choice recorded in the allowlist.
-  if (modelVal === 'inherit' && !allowlisted) {
+  // An omitted model: also inherits at runtime, so it warns the same way.
+  if ((modelVal === 'inherit' || modelVal === null) && !allowlisted) {
+    const shape = modelVal === null ? 'no model: (inherits)' : 'model: inherit';
     warnings.push(
-      `[V3 advisory] ${relative(filePath)}: model: inherit on a ` +
+      `[V3 advisory] ${relative(filePath)}: ${shape} on a ` +
         `${subdir}/ agent — pin model: haiku, sonnet or opus by task ` +
         `shape, or add the file to MODEL_RULE_ALLOWLIST with a reason.`
     );
