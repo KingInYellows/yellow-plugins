@@ -1,0 +1,23 @@
+docs/solutions/code-quality/council-md-extension-constraints.md
+  s_ccb027cd70c0fa::t_5a006f0494771f 98-123
+docs/solutions/security-issues/preserve-reviewer-evidence-through-fencing.md
+  s_ccb027cd70c0fa::t_5a006f0494771f 91-130
+docs/solutions/code-quality/cross-plugin-shared-skill-pattern.md
+  s_ccb027cd70c0fa::t_5a006f0494771f 360-390
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5c6c7a9b63249fc8c2c5431024d9caa16989d78a",
+  "prompts": {},
+  "sessions": {
+    "s_ccb027cd70c0fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce3509f8-678c-4d2f-92ba-ab6c39ac34af",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

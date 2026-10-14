@@ -1,0 +1,38 @@
+.github/workflows/validate-schemas.yml
+  s_ccb027cd70c0fa::t_c7f17a6f29c760 1458,1470-1475
+docs/testing/yellow-council-manual-tests.md
+  s_ccb027cd70c0fa::t_c99ddb4dea9f5a 137,141-144,151,168-223
+  s_ccb027cd70c0fa::t_cca4f3ab5285cd 224
+plugins/yellow-council/CLAUDE.md
+  s_ccb027cd70c0fa::t_43ae9cba697f44 27-36,104-109,199-206,253-256,410-425
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_ccb027cd70c0fa::t_006edcbd44c5f9 1075-1078,1084,1100-1103,1107-1113,1137-1140,1171-1208,1216-1230,1237-1238
+plugins/yellow-core/README.md
+  s_ccb027cd70c0fa::t_43ae9cba697f44 183-185
+plans/yellow-council-v2-four-cli-05-evidence-verification-and-finalization.md
+  s_ccb027cd70c0fa::t_c99ddb4dea9f5a 992,1007,1020,1058
+  s_ccb027cd70c0fa::t_6a7f6a3e01102d 1083
+  s_ccb027cd70c0fa::t_0e852a045ca390 1100,1102
+plugins/yellow-council/README.md
+  s_ccb027cd70c0fa::t_43ae9cba697f44 77-87,147-151,192-196
+plugins/yellow-council/commands/council/setup.md
+  s_ccb027cd70c0fa::t_43ae9cba697f44 54-82,257
+.changeset/council-evidence-verification.md
+  s_ccb027cd70c0fa::t_6a7f6a3e01102d 1-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6f1e497d3862e13d78910ee7e8d8b5c74d33951c",
+  "prompts": {},
+  "sessions": {
+    "s_ccb027cd70c0fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce3509f8-678c-4d2f-92ba-ab6c39ac34af",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

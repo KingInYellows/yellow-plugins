@@ -1,0 +1,26 @@
+plugins/yellow-council/tests/verification.bats
+  s_ccb027cd70c0fa::t_a24335d2ec6592 403-418
+plugins/yellow-council/lib/fuzzy-ratio.py
+  s_ccb027cd70c0fa::t_bf65da50003d2f 65-68
+plugins/yellow-council/lib/council-synthesis.sh
+  s_ccb027cd70c0fa::t_a24335d2ec6592 294-296,491,730
+  s_ccb027cd70c0fa::t_f3dc8162b7c421 412-426,431
+plugins/yellow-council/tests/synthesis.bats
+  s_ccb027cd70c0fa::t_f3dc8162b7c421 227-248
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "26f6d8abb69de86fcd9ca99a1e2be3012a46bc1f",
+  "prompts": {},
+  "sessions": {
+    "s_ccb027cd70c0fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce3509f8-678c-4d2f-92ba-ab6c39ac34af",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
