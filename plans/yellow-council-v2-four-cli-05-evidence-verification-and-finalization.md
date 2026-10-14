@@ -423,7 +423,7 @@ Other docs:
 
 ### Phase B — Normalizer fixes F3/F4 (plan step 1; R10 partial)
 
-- [ ] Step 8: **F3 — unclosed fence.** In `council_normalize_text`
+- [x] Step 8: **F3 — unclosed fence.** In `council_normalize_text`
   (`lib/council-synthesis.sh`), hold back the opening-fence line and every
   line after it while a fence is open.
   - At end of input with the fence still open, re-process the whole held
@@ -432,7 +432,7 @@ Other docs:
   - Reword the library header comment ("Copies byte-for-byte: fenced code
     blocks…") to "closed fenced code blocks; an unclosed fence is normalized
     as ordinary text, its opening line included".
-- [ ] Step 9: **F4 — keep identifiers.** Rework emphasis stripping (`strip_emph`
+- [x] Step 9: **F4 — keep identifiers.** Rework emphasis stripping (`strip_emph`
   / `strip_words` / `strip_outside_code`).
 
   Rules for runs of `*`:
@@ -492,7 +492,7 @@ Other docs:
 > See https://spec.commonmark.org/0.31.2/ (examples 355-377).
 <!-- /deepen-plan -->
 
-- [ ] Step 10: Golden cases in `synthesis.bats` (all run through `run_in`
+- [x] Step 10: Golden cases in `synthesis.bats` (all run through `run_in`
   across shell profiles and awk binaries).
 
   F3:

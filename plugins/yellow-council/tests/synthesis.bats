@@ -125,7 +125,7 @@ const **x** = 1;
 EOF
   cat >| "$want" <<'EOF'
 Summary heading
-Summary: The retry loop is unbounded; see `a**b_c_` here.
+Summary: The retry loop is _unbounded_; see `a**b_c_` here.
 
 Findings:
 severity=P1 src/__init__.py:42 Unbounded retry in `do_work()`
@@ -182,6 +182,68 @@ EOF
       diff -u "$want" <(printf '%s\n' "$output") || { echo "$profile/$impl differs"; return 1; }
     done
   done
+}
+
+# normalize_golden <in> <want> [self] — every shell profile x every awk.
+normalize_golden() {
+  local in="$1" want="$2" self="${3:-}" profile impl
+  for profile in $PROFILES; do
+    for impl in $AWKS; do
+      run_in "$profile" "$impl" "council_normalize_text $self < '$in'"
+      [ "$status" -eq 0 ] || { echo "$profile/$impl: status $status: $stderr"; return 1; }
+      diff -u "$want" <(printf '%s\n' "$output") || { echo "$profile/$impl differs"; return 1; }
+    done
+  done
+}
+
+@test "normalize copies a closed fence byte-for-byte and flattens an unclosed one (F3)" {
+  local in="${BATS_TEST_TMPDIR}/in.txt" want="${BATS_TEST_TMPDIR}/want.txt"
+  cat >| "$in" <<'EOF'
+```sh
+- **Codex** keeps this
+```
+after
+```py
+- **Codex** wrote this bullet
+## heading inside
+EOF
+  cat >| "$want" <<'EOF'
+```sh
+- **Codex** keeps this
+```
+after
+```py
+[reviewer] wrote this bullet
+heading inside
+EOF
+  normalize_golden "$in" "$want" codex
+}
+
+@test "normalize keeps identifiers and strips only paired emphasis (F4)" {
+  local in="${BATS_TEST_TMPDIR}/in.txt" want="${BATS_TEST_TMPDIR}/want.txt"
+  cat >| "$in" <<'EOF'
+__init__ _private_fn *ptr snake_case
+**important** and __two words__ and *x*
+**two `code` words** then __two `code` words__
+*ptr `x` y
+*ptr is handled differently by Codex
+an **opened run
+closed on the next** line
+__init__() __init__. (__init__) *ptr, **important**:
+*p = *q; a*b*c **kwargs **Note:**text
+EOF
+  cat >| "$want" <<'EOF'
+__init__ _private_fn *ptr snake_case
+important and two words and x
+two `code` words then two `code` words
+*ptr `x` y
+*ptr is handled differently by [reviewer]
+an **opened run
+closed on the next** line
+__init__() __init__. (__init__) *ptr, important:
+*p = *q; a*b*c **kwargs **Note:**text
+EOF
+  normalize_golden "$in" "$want" codex
 }
 
 # --- council_assign_labels -------------------------------------------------

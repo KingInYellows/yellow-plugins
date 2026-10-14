@@ -26,11 +26,15 @@ _COUNCIL_SYNTHESIS_LOADED=1
 # council_normalize_text — flatten one reviewer's text on stdin (R10). Removes
 # heading, emphasis, bullet, number and blockquote markers, horizontal rules,
 # blank-line runs, reviewer tags, and per-finding self-confidence lines;
-# canonicalizes every severity spelling to one severity=P<n> token. Copies
-# byte-for-byte: fenced code blocks, backtick code spans (any run length), the
-# path:line token of each citation, and everything from an Evidence: label to
-# the end of its line (shell 05's verify_finding() compares that quote to the
-# file). Optional first argument: the reviewer name (claude|codex|gemini|
+# canonicalizes every severity spelling to one severity=P<n> token. Emphasis
+# is stripped only where it pairs: a same-length "*" run wrapping a word, or a
+# "*"/"_" opener and closer around a phrase on one line; identifiers keep
+# their characters (__init__, _private_fn, *ptr, snake_case). Copies
+# byte-for-byte: closed fenced code blocks (an unclosed fence is normalized as
+# ordinary text, its opening line included), backtick code spans (any run
+# length), the path:line token of each citation, and everything from an
+# Evidence: label to the end of its line (verify_finding() compares that
+# quote to the file). Optional first argument: the reviewer name (claude|codex|gemini|
 # opencode). When set, whole-word occurrences of that reviewer's own name and
 # model-family aliases in prose (not code spans, path-like words, fenced
 # blocks or Evidence tails) become [reviewer]; other reviewers' names stay.
@@ -68,38 +72,17 @@ council_normalize_text() {
       if (h ~ /P2|MEDIUM|[Mm]edium/) return "P2"
       return "P3"
     }
-    # Emphasis runs sit at a word edge; interior "_" (snake_case) stays. A
-    # path-like word (citation, file name) only loses "*" runs — "_" can be
-    # part of the path.
-    function strip_emph(w,   path, pre, post) {
-      if (w ~ /^[*_]+$/) return w
-      path = (w ~ /\// || w ~ /:[0-9]/ || w ~ /[A-Za-z0-9]\.[A-Za-z0-9]/)
-      pre = ""; post = ""
-      if (match(w, /^[("[{]+/)) { pre = substr(w, 1, RLENGTH); w = substr(w, RLENGTH + 1) }
-      if (path) { if (match(w, /^\*+/)) w = substr(w, RLENGTH + 1) }
-      else if (match(w, /^[*_]+/)) w = substr(w, RLENGTH + 1)
-      if (match(w, /[]})".,;:!?]+$/)) { post = substr(w, RSTART); w = substr(w, 1, RSTART - 1) }
-      if (path) { if (match(w, /\*+$/)) w = substr(w, 1, RSTART - 1) }
-      else if (match(w, /[*_]+$/)) w = substr(w, 1, RSTART - 1)
-      # Scrub unless the word is a real path or citation: an extension, a :<n>
-      # line, 2+ slashes, or a leading ./ ../ / ~ or - (flag). A lone-slash
-      # word like OpenAI/GPT is prose.
-      if (self != "" && !(w ~ /:[0-9]/ || w ~ /[A-Za-z0-9_]\.[A-Za-z]/ || w ~ /\/.*\// || w ~ /^[.\/~-]/)) w = scrub_self(w)
-      return pre w post
+    # Path or citation shapes. A path-like word keeps "_" runs in any case
+    # ("_" can be part of the path); emph_path is the old, wider test.
+    function emph_path(w) {
+      return (w ~ /\// || w ~ /:[0-9]/ || w ~ /[A-Za-z0-9]\.[A-Za-z0-9]/)
     }
-    # strip_emph calls match() too, so copy RSTART/RLENGTH before calling it.
-    function strip_words(seg,   out, st, len) {
-      out = ""
-      # codex-reviewer appends notes that name Codex; keep only their meaning.
-      # Only unprotected prose reaches here (not code spans or Evidence tails).
-      gsub(/ \(line approximate — not reported by Codex\)/, " (line approximate)", seg)
-      gsub(/ \(priority [^()]* out of range 0-3 — treated as P3\)/, " (priority out of range — treated as P3)", seg)
-      while (match(seg, /[^ \t]+/)) {
-        st = RSTART; len = RLENGTH
-        out = out substr(seg, 1, st - 1) strip_emph(substr(seg, st, len))
-        seg = substr(seg, st + len)
-      }
-      return out seg
+    # Scrub unless the word is a real path or citation: an extension, a :<n>
+    # line, 2+ slashes, or a leading ./ ../ / ~ or - (flag). A lone-slash
+    # word like OpenAI/GPT is prose.
+    function scrub_word(w) {
+      if (self != "" && !(w ~ /:[0-9]/ || w ~ /[A-Za-z0-9_]\.[A-Za-z]/ || w ~ /\/.*\// || w ~ /^[.\/~-]/)) w = scrub_self(w)
+      return w
     }
     # Length of the backtick run starting at position 1 of s.
     function tick_run(s,   n) {
@@ -107,13 +90,29 @@ council_normalize_text() {
       while (substr(s, n + 1, 1) == "`") n++
       return n
     }
-    # A code span opens with a run of N backticks and closes at the next run
-    # of exactly N; both runs and everything between are copied verbatim. An
+    function tok_add(kind, v) { nt++; tk_kind[nt] = kind; tk_val[nt] = v }
+    # Split one prose segment into gaps (whitespace) and words.
+    function tok_prose(seg,   st, len) {
+      # codex-reviewer appends notes that name Codex; keep only their meaning.
+      # Only unprotected prose reaches here (not code spans or Evidence tails).
+      gsub(/ \(line approximate — not reported by Codex\)/, " (line approximate)", seg)
+      gsub(/ \(priority [^()]* out of range 0-3 — treated as P3\)/, " (priority out of range — treated as P3)", seg)
+      while (match(seg, /[^ \t]+/)) {
+        st = RSTART; len = RLENGTH
+        if (st > 1) tok_add("gap", substr(seg, 1, st - 1))
+        tok_add("word", substr(seg, st, len))
+        seg = substr(seg, st + len)
+      }
+      if (seg != "") tok_add("gap", seg)
+    }
+    # Split a line into code spans, gaps and words (tk_kind/tk_val, 1..nt). A
+    # code span opens with a run of N backticks and closes at the next run of
+    # exactly N; both runs and everything between are one verbatim token. An
     # opening run with no closing run protects the rest of the line.
-    function strip_outside_code(s,   out, p, n, rest, q, m) {
-      out = ""
+    function tokenize(s,   p, n, rest, q, m) {
+      nt = 0
       while ((p = index(s, "`")) > 0) {
-        out = out strip_words(substr(s, 1, p - 1))
+        tok_prose(substr(s, 1, p - 1))
         s = substr(s, p)
         n = tick_run(s)
         rest = substr(s, n + 1)
@@ -126,11 +125,78 @@ council_normalize_text() {
           rest = substr(rest, tick_run(rest) + 1)
           q = 0
         }
-        if (q == 0) return out s
-        out = out substr(s, 1, n + m)
+        if (q == 0) { tok_add("code", s); return }
+        tok_add("code", substr(s, 1, n + m))
         s = substr(s, n + m + 1)
       }
-      return out strip_words(s)
+      tok_prose(s)
+    }
+    # Emphasis markers for word i, after peeling leading ( [ { " and trailing
+    # ) ] } " . , : ; ! ? (the peeled punctuation is kept). Sets the
+    # word leading/trailing run (char and length) and its role: "wrap" when one
+    # same-length run wraps the word, "open"/"close" when only one edge has a
+    # run and the rest of the word holds no more of that character. "_" never
+    # opens or closes on a path-like word. A word that is only "*"/"_" (a
+    # bullet-like "*", "2 * 3", a rule) has no role.
+    function classify(i,   w, c, n, body) {
+      w = tk_val[i]
+      w_pre[i] = ""; w_post[i] = ""; lead_c[i] = ""; lead_n[i] = 0
+      trail_c[i] = ""; trail_n[i] = 0; role[i] = ""; cut_l[i] = 0; cut_t[i] = 0
+      if (w !~ /^[*_]+$/) {
+        if (match(w, /^[("[{]+/)) { w_pre[i] = substr(w, 1, RLENGTH); w = substr(w, RLENGTH + 1) }
+        if (match(w, /[]})".,;:!?]+$/)) { w_post[i] = substr(w, RSTART); w = substr(w, 1, RSTART - 1) }
+      }
+      w_core[i] = w
+      if (w == "" || w ~ /^[*_]+$/) return
+      c = substr(w, 1, 1)
+      if (c == "*" || c == "_") { n = 0; while (substr(w, n + 1, 1) == c) n++; lead_c[i] = c; lead_n[i] = n }
+      c = substr(w, length(w), 1)
+      if (c == "*" || c == "_") { n = 0; while (substr(w, length(w) - n, 1) == c) n++; trail_c[i] = c; trail_n[i] = n }
+      body = substr(w, lead_n[i] + 1, length(w) - lead_n[i] - trail_n[i])
+      if (lead_n[i] && lead_c[i] == trail_c[i] && lead_n[i] == trail_n[i] && body != "" && index(body, lead_c[i]) == 0) {
+        role[i] = "wrap"
+        # One word wrapped in "*" is emphasis; one word wrapped in "_" is an
+        # identifier (__init__, _x_), a deliberate CommonMark deviation.
+        if (lead_c[i] == "*") { cut_l[i] = 1; cut_t[i] = 1 }
+      } else if (lead_n[i] && index(substr(w, lead_n[i] + 1), lead_c[i]) == 0 && !(lead_c[i] == "_" && emph_path(w))) {
+        role[i] = "open"
+      } else if (trail_n[i] && index(substr(w, 1, length(w) - trail_n[i]), trail_c[i]) == 0 && !(trail_c[i] == "_" && emph_path(w))) {
+        role[i] = "close"
+      }
+    }
+    # Flatten one prose line (R10 + F4). Pairing state is line-level, so an
+    # opener and its closer can straddle inline code spans; it resets at every
+    # newline. Single-word wraps resolve first; then each closer pairs with the
+    # nearest unpaired opener of the same run before it (a stack per run type,
+    # so the pass stays linear). An opener left unpaired keeps its characters
+    # (*ptr, **kwargs, a run continued on the next line). Every word still gets
+    # the self-name scrub.
+    function flatten_line(s,   i, j, k, w, out) {
+      tokenize(s)
+      split("", open_n)
+      for (i = 1; i <= nt; i++) {
+        if (tk_kind[i] != "word") continue
+        classify(i)
+        if (role[i] == "open") {
+          k = lead_c[i] lead_n[i]
+          open_n[k]++; open_at[k, open_n[k]] = i
+        } else if (role[i] == "close") {
+          k = trail_c[i] trail_n[i]
+          if (open_n[k] > 0) {
+            j = open_at[k, open_n[k]]; open_n[k]--
+            cut_l[j] = 1; cut_t[i] = 1
+          }
+        }
+      }
+      out = ""
+      for (i = 1; i <= nt; i++) {
+        if (tk_kind[i] != "word") { out = out tk_val[i]; continue }
+        w = w_core[i]
+        if (cut_l[i]) w = substr(w, lead_n[i] + 1)
+        if (cut_t[i]) w = substr(w, 1, length(w) - trail_n[i])
+        out = out w_pre[i] scrub_word(w) w_post[i]
+      }
+      return out
     }
     function emit(s) {
       if (s == "") { if (printed) pending_blank = 1; return }
@@ -149,46 +215,45 @@ council_normalize_text() {
       if (c == "`" && index(substr(t, n + 1), "`") > 0) return 0
       return n
     }
-    {
-      line = $0
-      sub(/\r$/, "", line)
-      t = line; sub(/^[ \t]*/, "", t)
-      # Fence tests look past blockquote markers; the original line is printed.
-      q = t
+    # The line as fence tests see it: past indentation and blockquote markers.
+    function fence_view(line,   q) {
+      q = line; sub(/^[ \t]*/, "", q)
       while (match(q, /^>[ \t>]*/)) q = substr(q, RLENGTH + 1)
-      # Fenced code blocks pass through untouched. A fence closes only on a
-      # line of at least as many of the same fence character and nothing else.
-      if (fence_len > 0) {
-        print line; printed = 1; pending_blank = 0
-        u = q; sub(/[ \t]*$/, "", u)
-        n = 0
-        while (substr(u, n + 1, 1) == fence_char) n++
-        if (n >= fence_len && n == length(u)) fence_len = 0
-        next
-      }
-      if ((n = fence_open(q)) > 0) {
+      return q
+    }
+    # A closed fence passes through untouched, opening line to closing line;
+    # it closes only on a line of at least as many of the same fence character
+    # and nothing else. Lines are held until the close, so an unclosed fence
+    # can be re-read as ordinary text at the end of input (F3).
+    function flush_fence(   i) {
+      if (pending_blank) print ""
+      pending_blank = 0; printed = 1
+      for (i = 1; i <= nheld; i++) print held[i]
+      nheld = 0; fence_len = 0
+    }
+    function process(line,   q, n, s, u, tail, p, head, rest, cite, after) {
+      q = fence_view(line)
+      if (!no_fence && (n = fence_open(q)) > 0) {
         fence_len = n; fence_char = substr(q, 1, 1)
-        if (pending_blank) print ""
-        pending_blank = 0; printed = 1
-        print line
-        next
+        nheld = 1; held[1] = line
+        return
       }
       s = q
       u = s; gsub(/[ \t]/, "", u)
-      if (u ~ /^---+$/ || u ~ /^\*\*\*+$/ || u ~ /^___+$/) { emit(""); next }
+      if (u ~ /^---+$/ || u ~ /^\*\*\*+$/ || u ~ /^___+$/) { emit(""); return }
       sub(/^(######|#####|####|###|##|#)[ \t]+/, "", s)
       sub(/^([-*+]|[0-9]+[.)])[ \t]+/, "", s)
       # The quoted source line is compared against the file later: keep
       # everything after the Evidence label exactly as the reviewer wrote it.
-      if (match(s, /^[*_]*[Ee]vidence:[*_]*/)) { emit("Evidence:" substr(s, RLENGTH + 1)); next }
+      if (match(s, /^[*_]*[Ee]vidence:[*_]*/)) { emit("Evidence:" substr(s, RLENGTH + 1)); return }
       # Per-finding self-confidence and reviewer tags identify the source.
-      if (s ~ /^\[([Cc]laude|[Cc]odex|[Gg]emini|[Oo]pen[Cc]ode)\][ \t]+confidence:/) next
+      if (s ~ /^\[([Cc]laude|[Cc]odex|[Gg]emini|[Oo]pen[Cc]ode)\][ \t]+confidence:/) return
       sub(/^\[([Cc]laude|[Cc]odex|[Gg]emini|[Oo]pen[Cc]ode)\][ \t]*/, "", s)
       sub(/^Finding:[ \t]*/, "", s)
       # An Evidence label later in the line starts a verbatim tail.
       tail = ""
       if ((p = index(s, "Evidence:")) > 1) { tail = substr(s, p); s = substr(s, 1, p - 1) }
-      s = strip_outside_code(s) tail
+      s = flatten_line(s) tail
       if (match(s, /^(\[P[123]\]|\(P[123]\)|P[123]:|\[(CRITICAL|HIGH|MEDIUM|LOW)\]|\((CRITICAL|HIGH|MEDIUM|LOW)\)|(CRITICAL|HIGH|MEDIUM|LOW):|[Ss]everity:[ \t]*(P[123]|CRITICAL|HIGH|MEDIUM|LOW|[Cc]ritical|[Hh]igh|[Mm]edium|[Ll]ow))/)) {
         head = substr(s, 1, RLENGTH); rest = substr(s, RLENGTH + 1)
         sub(/^:/, "", rest)
@@ -203,6 +268,27 @@ council_normalize_text() {
         s = "severity=" sev_level(head) (rest == "" ? "" : " " rest)
       }
       emit(s)
+    }
+    {
+      line = $0
+      sub(/\r$/, "", line)
+      if (fence_len > 0) {
+        held[++nheld] = line
+        u = fence_view(line); sub(/[ \t]*$/, "", u)
+        n = 0
+        while (substr(u, n + 1, 1) == fence_char) n++
+        if (n >= fence_len && n == length(u)) flush_fence()
+        next
+      }
+      process(line)
+    }
+    END {
+      # An unclosed fence is normalized as ordinary text, opening line
+      # included; nothing inside it opens another fence.
+      if (fence_len > 0) {
+        fence_len = 0; no_fence = 1
+        for (i = 1; i <= nheld; i++) process(held[i])
+      }
     }
   '
 }
