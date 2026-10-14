@@ -716,9 +716,9 @@ still counts. Two rules follow:
   `fixed` or `addressed` reply. That reply carries the evidence the resolve
   needs, so it is posted. A second `oos` reply to an `oos` marker is a skip,
   and so is `disagree` or `unclear` after `oos`. An `oos` → `fixed` or
-  `addressed` upgrade posts a reply that supersedes the earlier one; the script
-  neither closes nor links the follow-up issue filed for the `oos` reply, so
-  that issue stays open.
+  `addressed` upgrade posts a reply that supersedes the earlier one. Nothing
+  closes the follow-up issue filed for the `oos` reply; the reply names it so a
+  human can close it (see Reply hygiene).
 - Compare before resolving: after a skip, the orchestrator retries the resolve
   (when the lane allows it) only if the reported `disposition` equals the one it
   asked for. Any other posted disposition leaves the thread open and is reported
@@ -752,6 +752,17 @@ Replies and issue bodies end with:
   `Out of scope for this PR; tracked in #12.`, `Not changing this: <reason>.`,
   `Needs a human decision: <what is missing>.`
 - Never quote the reviewer.
+- `oos` upgrade: when a `fixed` or `addressed` thread has a viewer-authored
+  comment (`viewerDidAuthor`, from Step 2's `get-pr-comments` output) ending
+  with this thread's `disposition=oos` marker, find the follow-up issue number
+  `N` before writing the body. Take it from that same comment's outcome
+  sentence (`tracked in #N`, digits only). Only when the sentence has none, run
+  `file-followup-issue --find <owner/repo> <PRRT_id>` and use the `number` of
+  `{"exists":true,"number":N,...}`. Add `Follow-up #N is no longer needed.`
+  after the outcome sentence. No number (a Linear issue, `{"exists":false}`,
+  or a non-zero exit other than 4) adds nothing, and the reply is still
+  posted. Exit 4 (a rate limit or timeout) is the stop rule under Pacing and
+  rate limits: this reply is not posted either.
 - At most 1,000 characters before the marker (`reply-pr-thread` rejects longer
   bodies with exit 2).
 - Text that looks like a credential, or has a markdown image, an `@` mention or
