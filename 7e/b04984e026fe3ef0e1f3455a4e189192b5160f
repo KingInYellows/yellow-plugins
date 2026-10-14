@@ -1,0 +1,28 @@
+plugins/yellow-codex/agents/workflow/codex-executor.md
+  s_038935c1c9408d::t_7f57e19b9ac017 14-15
+plugins/yellow-devin/agents/workflow/devin-orchestrator.md
+  s_038935c1c9408d::t_7f57e19b9ac017 33-34
+  s_038935c1c9408d::t_ccc0d5dcd42f85 35
+docs/research/best-practices/background-compounding-triggers-best-practices.md
+  s_038935c1c9408d::t_ffc6fd2a6cbc85 21-22
+docs/research/model-routing-policy.md
+  s_038935c1c9408d::t_9c90f5c1dc14c3 21,52,90,118
+plugins/yellow-council/agents/review/claude-reviewer.md
+  s_038935c1c9408d::t_7f57e19b9ac017 14-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7eb04984e026fe3ef0e1f3455a4e189192b5160f",
+  "prompts": {},
+  "sessions": {
+    "s_038935c1c9408d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c7683a4-00d4-449e-9d60-dc3112e28dc7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
