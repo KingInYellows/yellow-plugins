@@ -1,0 +1,27 @@
+.changeset/yellow-core-restack-abort-recorded-worktrees.md
+  s_66c69f242a26cf::t_5330d2a8fd9667 1-13
+plugins/yellow-core/skills/git-worktree/tests/worktree-restack.bats
+  s_66c69f242a26cf::t_b2f45e8b21ad64 1633-1793
+plugins/yellow-core/commands/worktree/restack.md
+  s_66c69f242a26cf::t_e4cedc464bee68 189-205
+plugins/yellow-core/skills/git-worktree/scripts/worktree-restack.sh
+  s_66c69f242a26cf::t_8b5d4def71eacd 57-58,389-391,455,492,601-631,1083-1089,1455,1478-1483,1567-1575,1577-1601,1610-1614,1616-1657,1659-1661,1663-1664,1666,1680-1686,1704-1711,1713-1732,1735-1736,1742-1763,1778-1779,1781,1786-1792,1835-1840,1846-1859,1975,2014-2016,2035-2051,2053,2057,2059,2067-2070,2072,2142-2178
+plugins/yellow-core/skills/git-worktree/SKILL.md
+  s_66c69f242a26cf::t_68a57f8b280ebb 211-215
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "944edc857f4144e7a43d78bd603dd7624b12d8aa",
+  "prompts": {},
+  "sessions": {
+    "s_66c69f242a26cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d70c91f9-4862-4cc5-a871-8486fa61cc85",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
