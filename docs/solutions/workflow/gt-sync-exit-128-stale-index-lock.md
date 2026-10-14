@@ -14,6 +14,10 @@ source: compound-staging
 
 When `gt sync` fails with exit code 128 on `git reset -q --keep <sha>`, the cause is a stale `.git/index.lock` file left by a crashed prior git operation. Safe resolution: (1) confirm no live git/gt process is running via `ps aux | grep -E '[g]it|[g]t'`; (2) verify lock file is 0-byte and old (`ls -la .git/index.lock`); (3) remove it: `rm .git/index.lock`. Then re-run `gt sync`.
 
+If the lock keeps coming back with no crash to explain it, a background
+`git status` is the likely source: see
+`docs/solutions/code-quality/background-git-status-leaves-stale-index-lock.md`.
+
 ## Source
 
 Auto-promoted by yellow-core's compound-staging pipeline from session
