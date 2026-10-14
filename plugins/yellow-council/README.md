@@ -12,6 +12,13 @@ synthesizes their verdicts inline.
 /plugin install yellow-council@yellow-plugins
 ```
 
+yellow-council requires yellow-core `>=2.8.0` from the same marketplace
+(installed with it; a missing, disabled or older yellow-core disables
+yellow-council). Evidence verification also uses bash 4.4+ and `iconv` for
+its exact-match tier, and, optionally, python3 `rapidfuzz` for its fuzzy tier
+(`sudo apt install python3-rapidfuzz` on Debian/Ubuntu, `pip install
+rapidfuzz` elsewhere). Run `/council:setup` to check them.
+
 ### Required external CLIs
 
 - **Antigravity CLI** — `agy` v1.0+ (Google's successor to Gemini CLI, which

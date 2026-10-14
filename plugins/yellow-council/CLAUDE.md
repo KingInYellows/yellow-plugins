@@ -159,7 +159,9 @@ and never auto-commits. The user decides what to do with the verdicts.
 - Bare `/council` prints the four-mode help and exits 0.
 - `/council fleet` is reserved for V2 fleet management; prints "fleet management
   not available in V1 — coming in V2" and exits 0.
-- `/council:setup` — prerequisite check (bash 4.3+ or zsh, `timeout`, `jq`, `od`, `sort`, readable `/dev/urandom`) plus a
+- `/council:setup` — prerequisite check (bash 4.3+ or zsh, `timeout`, `jq`, `od`, `sort`, readable `/dev/urandom`); evidence-verification
+  probes that only warn (bash 4.4+ and `iconv` for Tier 1, yellow-core's three
+  libraries, python3 `rapidfuzz` for Tier 2); plus a
   reviewer-availability summary. Does NOT verify CLI authentication, except that
   when the OpenCode model resolves to `openrouter/*` it checks `opencode auth list`
   for an OpenRouter credential (never reading or printing the key).
@@ -217,14 +219,16 @@ Codex agent.)
 |---|---|---|
 | yellow-codex | Provides `codex-reviewer` agent for the Codex leg of the council | Optional |
 | yellow-core `>=2.8.0` | `lib/quote-ground.sh` (`batch`) runs the Tier 1 evidence check; `lib/validate-fs.sh` and `lib/compound-staging.sh` back the citation parse and the Tier 2 redaction | Required (declared in `plugin.json`) |
+| yellow-review | None (yellow-council is a SEPARATE pipeline; yellow-review's 14-reviewer Claude pipeline runs unchanged) | — |
 
 Claude Code has no optional dependencies: a missing, disabled or pre-2.8.0
 yellow-core disables yellow-council entirely, and installing yellow-council
 installs yellow-core from the same marketplace. The runtime fallback only
 covers loads that skip that check (`--plugin-dir`, a local-folder marketplace
-loaded in place): when `council_core_lib` cannot find yellow-core, Tier 1 is
-skipped with a warning and the findings fall to Tier 2 or `unverified`.
-| yellow-review | None (yellow-council is a SEPARATE pipeline; yellow-review's 14-reviewer Claude pipeline runs unchanged) | — |
+loaded in place). There, when `council_core_lib` cannot find yellow-core's
+`validate-fs.sh` and `compound-staging.sh`, every finding is `unverified`
+(`verifier-error`) with a warning; only a missing or failed `quote-ground.sh`
+sends rows on to Tier 2.
 
 ## When to Use What
 
@@ -429,7 +433,7 @@ fresh-machine install CI (see Known Limitations).
   Step 9 and that redaction is not mechanically guaranteed for it. Tracked in
   [#1190](https://github.com/KingInYellows/yellow-plugins/issues/1190).
 - **Single-shot V1.** No multi-round iterative review. Deferred V2 features
-  (evidence contract, quorum aggregation, `--round 2`, `/council fleet`) are
+  (XML evidence contract, quorum aggregation, `--round 2`, `/council fleet`) are
   listed once, in `commands/council/council.md` "V2 Trajectory".
 
 ## Attribution

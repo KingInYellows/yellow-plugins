@@ -187,10 +187,14 @@ run with python3 `rapidfuzz` installed unless a step says otherwise
   and, if only one reviewer raised it, lands in Single-Reviewer Findings
   (verified); raised by two or more reviewers without a conflict, in
   Agreement (verified)
-- **Tier 2 hit:** a quote that differs from the source by whitespace or a
-  word or two (or an exact fragment of 16+ characters of a longer line that
-  Tier 1 still missed, for example on a file with uncommitted edits in
-  `review` mode) shows `fuzzy-verified (fuzzy match)`
+- **Tier 2 hit:** a quote that differs from the source by a word or two
+  shows `fuzzy-verified (fuzzy match)`. (Tier 1 already normalizes
+  whitespace, so a whitespace-only difference is `verified`; it reaches
+  Tier 2 only when Tier 1 is skipped, as for a file with uncommitted edits in
+  `review` mode.)
+- **Credential-shaped quote:** a quote that redaction would change (for
+  example `token = fetchToken(a, b)`) lands in Unverified Claims with reason
+  `redacted-quote`, since once redacted it could match any redacted line
 - **Miss:** a fabricated quote lands in Unverified Claims with reason
   `no-match`; it is listed, never dropped
 - **Codex-only finding:** lands in Unverified Claims with reason

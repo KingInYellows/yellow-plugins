@@ -416,3 +416,85 @@ EOF
   run_v bash 'council_have_rapidfuzz() { return 1; }; council_verify_findings plan in.jsonl out.tsv'
   [ "$(result_of S1-F1)" = "unverified - tier2-skipped" ]
 }
+
+# cache_tree — a plugin cache shaped like Claude Code's: yellow-council and
+# several yellow-core versions side by side. Sets CACHE_COUNCIL.
+cache_tree() {
+  local cache="$BATS_TEST_TMPDIR/cache/yellow-plugins" v
+  for v in 2.8.0 2.9.0 2.10.0; do
+    mkdir -p "$cache/yellow-core/$v"
+    cp -r "$CORE_LIB" "$cache/yellow-core/$v/lib"
+  done
+  mkdir -p "$cache/yellow-core/notes" "$cache/yellow-council"
+  cp -r "$PLUGIN_ROOT" "$cache/yellow-council/9.9.9"
+  CACHE_COUNCIL="$cache/yellow-council/9.9.9"
+}
+
+@test "yellow-core is found in the plugin cache from COUNCIL_PLUGIN_DIR alone, newest numeric version first" {
+  cache_tree
+  printf '%s\n' "cd '$REPO' || exit 1" ". '$CACHE_COUNCIL/lib/council-synthesis.sh'" \
+    "COUNCIL_PLUGIN_DIR='$CACHE_COUNCIL'" 'council_core_lib lib/quote-ground.sh' \
+    'council_verify_findings plan in.jsonl out.tsv' >| "$BATS_TEST_TMPDIR/cache.sh"
+  cite S1-F1 src/a.js 3 'while (attempts < maxAttempts) { attempts++; }' >| "$REPO/in.jsonl"
+  run --separate-stderr env -u CLAUDE_PLUGIN_ROOT -u COUNCIL_CORE_LIB_DIR bash --norc --noprofile "$BATS_TEST_TMPDIR/cache.sh"
+  [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+  [[ "$output" == */yellow-core/2.10.0/lib/quote-ground.sh ]] || { echo "$output"; return 1; }
+  [ "$(result_of S1-F1)" = "verified 1 -" ]
+  # No yellow-core at all: every finding is a verifier error, with a warning.
+  rm -rf "$BATS_TEST_TMPDIR/cache/yellow-plugins/yellow-core"
+  run --separate-stderr env -u CLAUDE_PLUGIN_ROOT -u COUNCIL_CORE_LIB_DIR bash --norc --noprofile "$BATS_TEST_TMPDIR/cache.sh"
+  [ "$(result_of S1-F1)" = "unverified - verifier-error" ]
+  [[ "$stderr" == *"not found"* ]]
+}
+
+@test "review mode judges a dirty file against HEAD even when the working copy is shorter or gone" {
+  printf '%s\n' 'line one here' >| "$REPO/src/a.js"
+  cite S1-F1 src/a.js 3 'while (attempts < maxAttempts) { attempts++; }' >| "$REPO/in.jsonl"
+  run_v bash 'council_have_rapidfuzz() { return 1; }; council_verify_findings review in.jsonl out.tsv'
+  [ "$status" -eq 0 ]
+  [ "$(result_of S1-F1)" = "unverified - tier2-skipped" ]
+  rm -f "$REPO/src/a.js"
+  run_v bash 'council_have_rapidfuzz() { return 1; }; council_verify_findings review in.jsonl out.tsv'
+  [ "$(result_of S1-F1)" = "unverified - tier2-skipped" ]
+  # Past HEAD's own length is still a bad citation.
+  cite S1-F2 src/a.js 40 'while (attempts < maxAttempts) { attempts++; }' >| "$REPO/in.jsonl"
+  run_v bash 'council_verify_findings review in.jsonl out.tsv'
+  [ "$(result_of S1-F2)" = "unverified - bad-citation" ] || [ "$(result_of S1-F2)" = "unverified - tier2-skipped" ]
+}
+
+@test "review mode matches an exact short quote in a dirty file against HEAD" {
+  require_rapidfuzz
+  sed -i '2s/.*/changed in the working tree only/' "$REPO/src/a.js"
+  cite S1-F1 src/a.js 6 'seven' >| "$REPO/in.jsonl"
+  cite S1-F2 src/a.js 3 'attempts++; }' >> "$REPO/in.jsonl"
+  run_v bash 'council_verify_findings review in.jsonl out.tsv'
+  [ "$status" -eq 0 ]
+  [ "$(result_of S1-F2)" = "fuzzy-verified 2 -" ]
+}
+
+@test "a credential-shaped quote is unverified (redacted-quote) and never matched" {
+  printf '%s\n' 'x' 'token = fetchToken(a, b)' 'y' >| "$REPO/src/cfg.py"
+  git -C "$REPO" add src/cfg.py
+  {
+    cite S1-F1 src/cfg.py 2 'token = fetchToken(a, b)'
+    cite S1-F2 src/cfg.py 2 'token = somethingMadeUp, b)'
+    cite S1-F3 src/a.js 3 'while (attempts < maxAttempts) { attempts++; }'
+  } >| "$REPO/in.jsonl"
+  local profile
+  for profile in $PROFILES; do
+    run_v "$profile" 'council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ] || { echo "$profile: $stderr"; return 1; }
+    [ "$(result_of S1-F1)" = "unverified - redacted-quote" ]
+    [ "$(result_of S1-F2)" = "unverified - redacted-quote" ]
+    [ "$(result_of S1-F3)" = "verified 1 -" ]
+  done
+}
+
+@test "only a finding's first Evidence quote is checked; a later one is tagged unchecked" {
+  printf '%s\n' 'severity=P1 src/a.js:3 one' 'Evidence: "while (attempts < maxAttempts) { attempts++; }"' \
+    'Evidence: "a second, made-up quote"' >| "$REPO/norm.txt"
+  run_v bash 'council_extract_citations S1 norm.txt tagged.txt'
+  [ "$status" -eq 0 ]
+  grep -qxF 'Evidence: "while (attempts < maxAttempts) { attempts++; }"' "$REPO/tagged.txt"
+  grep -qxF '[UNCHECKED] Evidence: "a second, made-up quote"' "$REPO/tagged.txt"
+}

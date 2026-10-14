@@ -32,10 +32,11 @@ at implementation time, not plan time. Verified against the shipped file
    `CLAUDE_FENCED_FILE` pattern). Step 5 hands off its staging directory the
    same way: a printed `mktemp -d /tmp/council-synth-*` literal plus a `.token`
    check, guarded by shape and identity when substituted.
-3. **Add synthesis stages to the existing Step 5 fences.** 5a stages, 5b holds
-   the `council-synthesis-lib` (`council_normalize_text`, `council_fence_block`,
-   `council_assign_labels`) and 5e substitutes literals. Extend those rather
-   than adding parallel fences.
+3. **Add synthesis stages to the existing Step 5 fences.** 5a stages, 5b and 5e
+   source the Tier 4 library `lib/council-synthesis.sh` (`council_normalize_text`,
+   `council_fence_block`, `council_assign_labels`, the evidence check and the
+   bucket helpers) through a `COUNCIL_SYNTH_LIB` existence check, and 5e
+   substitutes literals. Extend those rather than adding parallel fences.
 4. **Synthesis-input fences are uniform and anonymous.** Every leg is fenced as
    `council-output:S<n>`, with `S<n>` a random bijection from
    `council_assign_labels`. Do not reintroduce reviewer-named labels there. The

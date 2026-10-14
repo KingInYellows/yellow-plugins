@@ -65,11 +65,14 @@ fi
 command -v iconv >/dev/null 2>&1 \
   || printf '[yellow-council] Warning: iconv not found — Tier 1 evidence checks fall back to Tier 2\n' >&2
 COUNCIL_SYNTH_LIB="${CLAUDE_PLUGIN_ROOT}/lib/council-synthesis.sh"
+COUNCIL_PLUGIN_DIR="${COUNCIL_SYNTH_LIB%/lib/council-synthesis.sh}"
 if [ -f "$COUNCIL_SYNTH_LIB" ] && [ ! -L "$COUNCIL_SYNTH_LIB" ] && . "$COUNCIL_SYNTH_LIB"; then
-  if council_core_lib lib/quote-ground.sh >/dev/null; then
+  if ! council_core_lib lib/validate-fs.sh >/dev/null || ! council_core_lib lib/compound-staging.sh >/dev/null; then
+    printf '[yellow-council] Warning: yellow-core validate-fs.sh / compound-staging.sh not found — every finding will be unverified (verifier-error)\n' >&2
+  elif council_core_lib lib/quote-ground.sh >/dev/null; then
     printf '[yellow-council] evidence Tier 1: yellow-core quote-ground.sh found\n'
   else
-    printf '[yellow-council] Warning: yellow-core >=2.8.0 not found — every finding will be unverified (verifier-error)\n' >&2
+    printf '[yellow-council] Warning: yellow-core quote-ground.sh not found (yellow-core older than 2.8.0?) — Tier 1 is skipped and findings go to Tier 2\n' >&2
   fi
   if council_have_rapidfuzz; then
     printf '[yellow-council] evidence Tier 2: python3 rapidfuzz ok\n'

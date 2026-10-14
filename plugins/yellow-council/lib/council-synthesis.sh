@@ -12,7 +12,9 @@
 #   - MUST NOT set top-level shell options (no `set -e`, `set -u`,
 #     `set -o pipefail`); the caller's fence keeps its own semantics.
 #   - No BASH_SOURCE: the file is located by the caller, not by itself.
-#   - Function definitions only; every public name starts with `council_`.
+#   - Function definitions plus the source guard below. Every public name
+#     starts with `council_`, except `verify_finding`, the name the V2 spec
+#     uses for the one-citation check; internal helpers start with `_council_`.
 #   - Cleanup-only blocks (Step 8 Cancel, Step 9, the council_rm_synth_*
 #     copies) stay inline in council.md, so deleting files never depends on
 #     this file loading.
@@ -35,8 +37,8 @@ _COUNCIL_SYNTHESIS_LOADED=1
 # its opening line or one behind a heading, gets an [ESCAPED] prefix so no
 # later reader sees a fence), backtick code spans (any run
 # length), the path:line token of each citation, and everything from an
-# Evidence: label to the end of its line (verify_finding() compares that
-# quote to the file). Optional first argument: the reviewer name (claude|codex|gemini|
+# Evidence: label to the end of its line (council_verify_findings compares
+# that quote to the file). Optional first argument: the reviewer name (claude|codex|gemini|
 # opencode). When set, whole-word occurrences of that reviewer's own name and
 # model-family aliases in prose (not code spans, path-like words, fenced
 # blocks or Evidence tails) become [reviewer]; other reviewers' names stay.
@@ -531,7 +533,12 @@ council_extract_citations() {
         print "[" id "] " line > tagged
         return
       }
-      if (have && line ~ /^Evidence:/) set_quote(substr(line, 10))
+      if (have && line ~ /^Evidence:/) {
+        # Only a finding first quote is checked; a later one must not read
+        # as if the verification result covered it.
+        if (qseen) { print "[UNCHECKED] " line > tagged; return }
+        set_quote(substr(line, 10))
+      }
       print escape_tag(line) > tagged
     }
     {
@@ -574,10 +581,14 @@ council_extract_citations() {
 # inside yellow-core: the checkout sibling (plugins/yellow-core) first, then
 # the newest numeric version in the installed plugin cache
 # (<marketplace>/yellow-core/<version>). Returns 1 when it is not found.
+# This plugin's directory comes from COUNCIL_PLUGIN_DIR, which every fence
+# derives from its substituted ${CLAUDE_PLUGIN_ROOT} path (a sourced file
+# gets no substitution, and the variable may not be set in the shell);
+# CLAUDE_PLUGIN_ROOT is only the fallback.
 # COUNCIL_CORE_LIB_DIR is a test seam only: it names yellow-core's lib/
 # directly and turns the search off.
 council_core_lib() {
-  local rel="$1" root="${CLAUDE_PLUGIN_ROOT:-}" cand ver
+  local rel="$1" root="${COUNCIL_PLUGIN_DIR:-${CLAUDE_PLUGIN_ROOT:-}}" cand ver
   if [ -n "${COUNCIL_CORE_LIB_DIR:-}" ]; then
     cand="$COUNCIL_CORE_LIB_DIR/${rel##*/}"
     [ -f "$cand" ] || return 1
@@ -646,6 +657,19 @@ _council_citable() {
   fi
 }
 
+# _council_head_citable <file> <base> <root> — the same parse for a review-mode
+# citation judged against HEAD (the file is dirty, so its working-tree copy
+# may be shorter or gone): validate_file_path, no .git segment (case
+# folded), not ignored. HEAD's own line count is checked in Tier 2.
+_council_head_citable() {
+  local lc
+  validate_file_path "$1" "$2" 2>/dev/null || return 1
+  lc=$(printf '%s' "/$1/" | tr 'A-Z' 'a-z')
+  case "$lc" in */.git/*) return 1 ;; esac
+  git -C "$3" check-ignore -q -- "$1" 2>/dev/null
+  [ "$?" -eq 1 ]
+}
+
 # council_verify_findings <mode> <in.jsonl> <out.tsv> — the R22-R25 evidence
 # check for every council_extract_citations row. Writes <out.tsv>: `#` header
 # lines, then one row per input id, in input order:
@@ -680,8 +704,8 @@ _council_citable() {
 council_verify_findings() {
   local mode="$1" in="$2" out="$3" root="" base qg vfs cst fz rows decided="" t1="" t2=""
   local nl='
-' dirty="" seen_ok="" seen_bad="" idx id lab k sevr ok file ln hasq src res rc reason
-  local jsonl qout more ranked cands stream redacted scores mark
+' dirty="" dirty_all=0 seen_ok="" seen_bad="" key idx id lab k sevr ok file ln hasq src res rc reason
+  local jsonl qout more ranked cands stream redacted scores mark qraw qred hidden
   [ -f "$in" ] && [ -r "$in" ] || { printf '[council] Error: cannot read %s\n' "$in" >&2; return 1; }
   command -v jq >/dev/null 2>&1 || { printf '[council] Error: jq is required for evidence verification\n' >&2; return 1; }
   if root=$(git rev-parse --show-toplevel 2>/dev/null) && [ -n "$root" ]; then
@@ -734,7 +758,12 @@ council_verify_findings() {
     return 1
   }
   if [ -n "$root" ] && [ "$mode" = review ]; then
-    dirty=$(git -C "$root" diff --name-only HEAD 2>/dev/null)
+    # Fail closed: if git cannot list the dirty files, treat every file as
+    # dirty (judged against HEAD), never as clean.
+    if ! dirty=$(git -C "$root" diff --name-only HEAD 2>/dev/null); then
+      printf '[council] Warning: git diff --name-only HEAD failed — every cited file is judged against HEAD\n' >&2
+      dirty_all=1
+    fi
   fi
   # Steps 1-2: citation parse and target choice, one row at a time.
   while IFS=$'\t' read -r idx id lab k sevr ok file ln hasq; do
@@ -743,48 +772,95 @@ council_verify_findings() {
       _council_decide "$id" unverified - verifier-error
       continue
     fi
+    # Target first. In review mode a dirty file that HEAD has is judged against
+    # HEAD: its working-tree copy may be shorter or deleted, so it is not
+    # bounds-checked here (Tier 2 checks HEAD's length).
+    src=wt
+    if [ "$ok" = 1 ] && [ -n "$root" ] && [ "$mode" = review ]; then
+      case "$dirty_all$nl$dirty$nl" in
+        1*|*"$nl$file$nl"*)
+          git -C "$root" cat-file -e "HEAD:$file" 2>/dev/null && src=head ;;
+      esac
+    fi
     if [ "$ok" = 1 ]; then
+      key="$src:$file"
       case "$nl$seen_bad" in
-        *"$nl$file$nl"*) ok=0 ;;
+        *"$nl$key$nl"*) ok=0 ;;
         *)
           case "$nl$seen_ok" in
-            *"$nl$file$nl"*) ;;
+            *"$nl$key$nl"*) ;;
             *)
-              if _council_citable "$file" "$base" "$root"; then
-                seen_ok="$seen_ok$file$nl"
+              if { [ "$src" = head ] && _council_head_citable "$file" "$base" "$root"; } \
+                || { [ "$src" = wt ] && _council_citable "$file" "$base" "$root"; }; then
+                seen_ok="$seen_ok$key$nl"
               else
-                seen_bad="$seen_bad$file$nl"
+                seen_bad="$seen_bad$key$nl"
                 ok=0
               fi ;;
           esac ;;
       esac
     fi
-    # The cited line must exist: stop reading at it.
-    [ "$ok" != 1 ] || awk -v ln="$ln" 'NR >= ln { f = 1; exit } END { exit !f }' "$base/$file" 2>/dev/null || ok=0
+    # A working-tree target: the cited line must exist (stop reading at it).
+    if [ "$ok" = 1 ] && [ "$src" = wt ]; then
+      awk -v ln="$ln" 'NR >= ln { f = 1; exit } END { exit !f }' "$base/$file" 2>/dev/null || ok=0
+    fi
     if [ "$ok" != 1 ]; then
       _council_decide "$id" unverified - bad-citation
     elif [ "$hasq" = 2 ]; then
       _council_decide "$id" unverified - too-short
     elif [ "$hasq" != 1 ]; then
       _council_decide "$id" unverified - no-evidence
-    elif [ -z "$root" ]; then
+    elif [ -z "$root" ] || [ "$src" = head ]; then
+      t2="${t2}${lab}	${sevr}	${k}	${id}	${src}	${file}	${ln}
+"
+    elif [ "$mode" = review ] && case "$dirty_all$nl$dirty$nl" in 1*|*"$nl$file$nl"*) true ;; *) false ;; esac; then
+      # Dirty, and HEAD does not have it (a new file): the working tree is the
+      # copy the pack excerpted, but Tier 1 is still skipped for dirty files.
       t2="${t2}${lab}	${sevr}	${k}	${id}	wt	${file}	${ln}
 "
     else
-      case "$nl$dirty$nl" in
-        *"$nl$file$nl"*)
-          src=wt
-          git -C "$root" cat-file -e "HEAD:$file" 2>/dev/null && src=head
-          t2="${t2}${lab}	${sevr}	${k}	${id}	${src}	${file}	${ln}
-" ;;
-        *)
-          t1="${t1}${lab}	${sevr}	${k}	${id}	wt	${file}	${ln}
-" ;;
-      esac
+      t1="${t1}${lab}	${sevr}	${k}	${id}	wt	${file}	${ln}
+"
     fi
   done <<__COUNCIL_VERIFY_ROWS__
 $rows
 __COUNCIL_VERIFY_ROWS__
+  # A quote that redaction would change is credential-shaped: once redacted it
+  # can only match a line that is redacted too, which any such quote does
+  # (a made-up password= quote would "match" a real token= line). Such rows
+  # are unverified (redacted-quote) before either tier. A quote holding a key
+  # marker is one too; it is kept out of the batch, whose sed range would
+  # merge lines. If the batch itself fails, the tiers still run.
+  if [ -n "$t1$t2" ]; then
+    qraw=$(printf '%s%s' "$t1" "$t2" | cut -f4 | jq -Rn -r --slurpfile src "$in" '
+        ([inputs | {(.): true}] | add // {}) as $ids
+        | $src[] | select($ids[.id]) | "\(.id)\t\(.quote | gsub("[\r\n]"; " "))"') || qraw=""
+    hidden=$(printf '%s\n' "$qraw" | awk -F'\t' '/PRIVATE KEY|-----BEGIN|-----END/ { print $1 }')
+    qraw=$(printf '%s\n' "$qraw" | awk '!/PRIVATE KEY|-----BEGIN|-----END/')
+    mark="COUNCIL-QUOTE-END-$$"
+    if [ -n "$qraw" ] && qred=$(printf '%s\n%s\n' "$qraw" "$mark" | cs_redact_secrets) \
+      && [ "$(printf '%s\n' "$qred" | tail -n 1)" = "$mark" ] \
+      && [ "$(printf '%s\n' "$qred" | wc -l)" -eq "$(printf '%s\n%s\n' "$qraw" "$mark" | wc -l)" ]; then
+      hidden="$hidden
+$(printf '%s\n@@COUNCIL-REDACTED@@\n%s\n' "$qraw" "$qred" | awk -F'\t' '
+        $0 == "@@COUNCIL-REDACTED@@" { r = 1; i = 0; next }
+        !r { raw[++n] = $0; next }
+        { if (++i <= n && $0 != raw[i] && $0 != "'"$mark"'") { split(raw[i], f, "\t"); print f[1] } }')"
+    fi
+    while IFS= read -r id; do
+      [ -z "$id" ] || _council_decide "$id" unverified - redacted-quote
+    done <<__COUNCIL_VERIFY_HIDDEN__
+$hidden
+__COUNCIL_VERIFY_HIDDEN__
+    if [ -n "$(printf '%s' "$hidden" | awk 'NF')" ]; then
+      t1=$(printf '%s\n@@COUNCIL-HIDE@@\n%s' "$hidden" "$t1" | awk -F'\t' '$0 == "@@COUNCIL-HIDE@@" { r = 1; next } !r { h[$1] = 1; next } NF && !($4 in h)')
+      t2=$(printf '%s\n@@COUNCIL-HIDE@@\n%s' "$hidden" "$t2" | awk -F'\t' '$0 == "@@COUNCIL-HIDE@@" { r = 1; next } !r { h[$1] = 1; next } NF && !($4 in h)')
+      [ -z "$t1" ] || t1="$t1
+"
+      [ -z "$t2" ] || t2="$t2
+"
+    fi
+  fi
   # Step 3: Tier 1, one quote-ground batch for every working-tree row.
   if [ -n "$t1" ]; then
     qout=""
@@ -835,7 +911,7 @@ __COUNCIL_VERIFY_T1__
     fi
   fi
   if [ -n "$cands" ]; then
-    fz="${CLAUDE_PLUGIN_ROOT:-}/lib/fuzzy-ratio.py"
+    fz="${COUNCIL_PLUGIN_DIR:-${CLAUDE_PLUGIN_ROOT:-}}/lib/fuzzy-ratio.py"
     # Quotes and window lines, unredacted, stay in memory and pipes. A line
     # inside a private-key block (or carrying a key marker) becomes
     # [REDACTED] here: cs_redact_secrets' sed range would merge lines.
@@ -983,16 +1059,21 @@ council_assign_bucket() {
 # shows the finding's own result and reason, which its rubric line copies. `citations` is recounted as the
 # group's distinct labels. A group is only taken as written when every member
 # cites the same file within 6 lines (per verification.tsv); otherwise its
-# members are scored as single findings with a warning, so a model-written
-# group can never lift an unverified finding into Agreement (verified).
-# Duplicate rows for one id are malformed. An id Pass A dropped, or a row whose cells fail
+# members are scored as single findings with a warning. So a model-written
+# group cannot lift a finding across files or beyond 6 lines; inside a valid
+# group the best member's result sets the bucket (the plan's "agreement is
+# the corroboration" rule), and each line still shows the finding's own
+# result. Duplicate rows for one id are malformed. The id cell may be bare,
+# bracketed or emphasized ([S1-F3], **S1-F3**). The last line is
+#   BUCKET_TOTALS verified=<n> fuzzy-verified=<n> unverified=<n> reasons=<reason:n,...>
+# counted from the printed lines, for the report's Evidence check line. An id Pass A dropped, or a row whose cells fail
 # validation, is listed under Unverified Claims with a warning and reason
 # pass-a-missing or pass-a-malformed; an id Pass A invented is ignored with a
 # warning. Nothing is ever dropped.
 council_bucket_lines() {
   local pa="$1" vt="$2" recs id cit conflict corr own reason flag bucket
   recs=$(awk '
-    function trim(s) { gsub(/`/, "", s); sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
+    function trim(s) { gsub(/[`*]/, "", s); sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
     function rank(r) { return r == "verified" ? 3 : (r == "fuzzy-verified" ? 2 : 1) }
     FILENAME == vt_file {
       if ($0 ~ /^#/ || $0 == "") next
@@ -1014,8 +1095,9 @@ council_bucket_lines() {
         if (!(ci && cg && cc)) ci = 0
         next
       }
-      id = trim(c[ci])
+      id = trim(c[ci]); sub(/^\[/, "", id); sub(/\]$/, "", id)
       if (id !~ /^S[0-9]+-F[0-9]+$/) next
+      parsed++
       # Two rows for one id: neither can be trusted.
       if (id in seen) { bad[id] = 1; next }
       seen[id] = 1
@@ -1025,6 +1107,8 @@ council_bucket_lines() {
       grp[id] = g; own_conf[id] = k
     }
     END {
+      if (!ci) print "TABLE\tno header row with id, group and conflict columns"
+      else if (!parsed) print "TABLE\ta header row but no row with an S<n>-F<k> id"
       # A group stands only when its members cite one file within 6 lines.
       for (i = 1; i <= n; i++) {
         id = order[i]
@@ -1076,6 +1160,10 @@ council_bucket_lines() {
       printf '[council] Warning: pass-a.md group %s does not cite one file within 6 lines — its findings are bucketed singly\n' "$cit" >&2
       continue
     fi
+    if [ "$id" = TABLE ]; then
+      printf '[council] Warning: pass-a.md has %s — every finding is listed under Unverified Claims\n' "$cit" >&2
+      continue
+    fi
     if [ "$flag" != ok ]; then
       printf '[council] Warning: %s is %s in pass-a.md — listed under Unverified Claims\n' "$id" "$flag" >&2
       bucket="Unverified Claims"
@@ -1087,4 +1175,20 @@ council_bucket_lines() {
   done <<__COUNCIL_BUCKETS__
 $recs
 __COUNCIL_BUCKETS__
+}
+
+# council_bucket_totals — read BUCKET lines on stdin, print the one
+# BUCKET_TOTALS line (result counts, then reason counts in first-seen order).
+council_bucket_totals() {
+  awk -F' [|] ' '
+    /^BUCKET / {
+      c = $3; sub(/^correctness=/, "", c); n[c]++
+      r = $4; sub(/^reason=/, "", r)
+      if (r != "-") { if (!(r in nr)) order[++k] = r; nr[r]++ }
+    }
+    END {
+      out = ""
+      for (i = 1; i <= k; i++) out = out (i > 1 ? "," : "") order[i] ":" nr[order[i]]
+      printf "BUCKET_TOTALS verified=%d fuzzy-verified=%d unverified=%d reasons=%s\n", n["verified"], n["fuzzy-verified"], n["unverified"], (out == "" ? "-" : out)
+    }'
 }

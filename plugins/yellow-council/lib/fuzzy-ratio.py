@@ -7,7 +7,8 @@ whitespace-normalized. Writes one JSON object per row to stdout:
 {"id", "score"} with score = max over the lines of fuzz.ratio, and of
 fuzz.partial_ratio too when the quote has at least 16 characters and is the
 needle: the line is at least as long as the quote and has 8 or more
-characters outside [REDACTED] placeholders. ratio alone caps an exact fragment
+non-whitespace characters outside [REDACTED] placeholders. A score below the
+85 cutoff comes back as 0, and an exact substring scores 100. ratio alone caps an exact fragment
 of a longer line near 50; the floor stops a short quote scoring 100 against
 almost any line; and partial_ratio aligns the shorter string inside the
 longer, so without the needle rule a fabricated quote that merely contains
@@ -48,6 +49,10 @@ def compact_len(text):
 
 def score(quote, lines):
     # Only >= CUTOFF is ever used, so score_cutoff lets rapidfuzz prune.
+    # An exact substring is a match whatever its length (quote-ground's own
+    # rule), so a short exact quote never scores below a fuzzy one.
+    if any(quote in line for line in lines):
+        return 100.0
     best = 0.0
     for line in lines:
         value = fuzz.ratio(quote, line, score_cutoff=CUTOFF)

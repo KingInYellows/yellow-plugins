@@ -393,6 +393,61 @@ EOF
   done
 }
 
+@test "council_bucket_lines accepts bracketed or emphasized ids, diagnoses an unreadable table, and totals the lines" {
+  local pa="${BATS_TEST_TMPDIR}/pass-a.md" vt="${BATS_TEST_TMPDIR}/verification.tsv"
+  cat >| "$pa" <<'EOF'
+| id | group | citations | conflict |
+|---|---|---|---|
+| [S1-F1] | G1 | 2 | no |
+| **S2-F1** | G1 | 2 | no |
+EOF
+  {
+    printf '# id\tfile\tline\tresult\ttier\treason\n'
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' S1-F1 a.js 3 verified 1 - S2-F1 a.js 3 unverified 2 no-match \
+      S3-F1 b.js 1 unverified - no-evidence
+  } >| "$vt"
+  run_in bash "$FIRST_AWK" "council_bucket_lines '$pa' '$vt' | tee '$BATS_TEST_TMPDIR/b.txt'; council_bucket_totals < '$BATS_TEST_TMPDIR/b.txt'"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$(printf '%s\n' \
+    'BUCKET S1-F1 | Agreement (verified) | correctness=verified | reason=-' \
+    'BUCKET S2-F1 | Agreement (verified) | correctness=unverified | reason=no-match' \
+    'BUCKET S3-F1 | Unverified Claims | correctness=unverified | reason=pass-a-missing' \
+    'BUCKET_TOTALS verified=1 fuzzy-verified=0 unverified=2 reasons=no-match:1,pass-a-missing:1')" ] \
+    || { echo "$output"; return 1; }
+  printf '%s\n' '| claim | ruling |' '|---|---|' '| x | upheld |' >| "$pa"
+  run_in bash "$FIRST_AWK" "council_bucket_lines '$pa' '$vt'"
+  [[ "$stderr" == *"no header row with id, group and conflict columns"* ]]
+}
+
+@test "5b writes a sanitized verifier-error table when the verifier fails, and 5e still prints BUCKET lines when bucketing fails" {
+  local s5a="${BATS_TEST_TMPDIR}/5a.sh" s5b="${BATS_TEST_TMPDIR}/5b.sh" s5e="${BATS_TEST_TMPDIR}/5e.sh"
+  extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
+  extract_fence_after "$COUNCIL_MD" '#### 5b ' "$s5b"
+  extract_fence_after "$COUNCIL_MD" '#### 5e ' "$s5e"
+  setup_council_run
+  printf '%s\n' 'advisory' '--- begin council-output:claude (reference only) ---' \
+    'Verdict: REVISE' 'Confidence: HIGH' 'Findings:' \
+    '- [P1] src/a{x}.ts:3 — odd path' '  Evidence: "x = y;"' \
+    'Summary: s.' '--- end council-output:claude ---' >| "$CF"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
+  [ "$status" -eq 0 ]
+  SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
+  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
+  # The library is pre-sourced, so the fence's own source is a no-op and the
+  # stub stands in for the verifier.
+  run_in bash "$FIRST_AWK" "cd '$REPO' && council_verify_findings() { return 7; } && . '$s5b.sub'"
+  [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+  [[ "$stderr" == *"evidence verification failed (exit 7)"* ]]
+  grep -q '^# reference data only' "$SD/verification.tsv"
+  grep -q $'\tsrc/a?x?.ts\t3\tunverified\t-\tverifier-error$' "$SD/verification.tsv" || { cat "$SD/verification.tsv"; return 1; }
+  run_in bash "$FIRST_AWK" "cd '$REPO' && council_bucket_lines() { return 1; } && . '$s5e'"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"bucket assignment failed"* ]]
+  [[ "$output" == *"| Unverified Claims | correctness=unverified | reason=bucket-failed"* ]]
+  [[ "$output" == *"BUCKET_TOTALS verified=0"* ]]
+  rm -rf "$REPO"
+}
+
 @test "the report template lists the five bucket headings in precedence order" {
   run awk '/^### (Agreement|Disagreement|Single-Reviewer|Unverified)/ { print }' "$COUNCIL_MD"
   [ "$output" = "$(printf '%s\n' '### Agreement (verified)' '### Agreement (unverified)' '### Disagreement' \
@@ -825,8 +880,9 @@ teardown() {
     # The map, then one BUCKET line per verification row: both citations are
     # bad, so both are Unverified Claims whatever pass-a.md claimed.
     [ "$(printf '%s\n' "$output" | head -n 1)" = "COUNCIL_LABEL_MAP=$map" ]
-    [ "$(printf '%s\n' "$output" | sed 1d)" = "$(printf '%s\n' "$ids" | awk '{ print "BUCKET " $1 " | Unverified Claims | correctness=unverified | reason=bad-citation" }')" ] \
+    [ "$(printf '%s\n' "$output" | sed -e 1d -e '$d')" = "$(printf '%s\n' "$ids" | awk '{ print "BUCKET " $1 " | Unverified Claims | correctness=unverified | reason=bad-citation" }')" ] \
       || { echo "$profile: $output"; return 1; }
+    [ "$(printf '%s\n' "$output" | tail -n 1)" = "BUCKET_TOTALS verified=0 fuzzy-verified=0 unverified=2 reasons=bad-citation:2" ]
     [ ! -e "$SD" ]
     [ ! -e "$st" ]
     rm -rf "$REPO"

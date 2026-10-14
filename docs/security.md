@@ -1006,7 +1006,7 @@ Plugins that execute shell commands:
 | yellow-browser-test | `agent-browser`, `npm`, `curl`, `gh`         | Browser automation, setup                                  |
 | yellow-debt         | `git`, `gt`, `jq`, `yq`                      | Codebase analysis, commit generation                       |
 | gt-workflow         | `gt`, `git`                                  | Branch and PR management                                   |
-| yellow-council      | `agy`, `opencode`, `timeout`, `jq`, `mktemp` | Cross-lineage CLI code review                              |
+| yellow-council      | `agy`, `opencode`, `timeout`, `jq`, `mktemp`, `od`, `sort`, `iconv`, `python3` (optional), yellow-core libraries | Cross-lineage CLI code review                              |
 
 ### Prompt Injection Boundaries
 

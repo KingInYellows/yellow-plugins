@@ -1126,7 +1126,8 @@ fan-out, and a failure in 5b stops the run; there is no fixed-order fallback.
 Every leg, Codex included, is fenced as `council-output:S<n>` (see Injection
 Fence Format), and verdicts and confidences are presented per label. The body
 quotes the reviewed diff, so `council_fence_block` applies an escape set to
-anything that could pass for structure; its header comment in `council.md`
+anything that could pass for structure; its header comment in
+`lib/council-synthesis.sh`
 is the one definition of that set. Escaping only prefixes `[ESCAPED] `, so an
 escaped quote keeps its bytes. A voting reviewer whose file cannot be read is
 never shown as an empty review: 5b warns and marks the block `reviewer text
@@ -1183,7 +1184,11 @@ finding.
   yellow-core's `validate_file_path`, a readable regular file that is not a
   symlink, whose resolved location has no `.git` segment (case-folded) and
   is not ignored by git, and the line within its length — else
-  `bad-citation`. A quote holding a broken `[REDACTED` placeholder is
+  `bad-citation`. A quote that redaction would change (credential-shaped,
+  e.g. `token = …`) is `redacted-quote`: redacted, it could match any
+  redacted line. In `review` mode a dirty file that HEAD has is judged
+  against HEAD before any working-tree read; a failed dirty-file listing
+  treats every file as dirty. A quote holding a broken `[REDACTED` placeholder is
   `too-short`.
   No quote is `no-evidence`. A citation token wrapped in backticks, brackets
   or parentheses is unwrapped first; quotes are capped at 4096 characters.
@@ -1211,7 +1216,9 @@ finding.
   severity, then k) are scored; the rest are `tier2-cap` (R25). Without
   rapidfuzz 5b warns (`sudo apt install python3-rapidfuzz` on Debian/Ubuntu,
   `pip install rapidfuzz` elsewhere) and the candidates are `tier2-skipped`.
-  Redaction or scorer failures are `verifier-error`.
+  An exact substring scores 100 in Tier 2 too. Redaction or scorer failures
+  are `verifier-error`. Only a finding's first `Evidence:` quote is checked;
+  a later one is tagged `[UNCHECKED]` in the Pass A input.
 - *Codex limitation*: yellow-codex builds its findings from Codex JSON, which
   carries a location but no source line, so every Codex finding is
   `no-evidence` and a Codex-only finding always lands in Unverified Claims.
@@ -1225,8 +1232,9 @@ finding.
 completeness `holds`; otherwise `weakly-supported`. Correctness is
 **verification-backed**: Pass A copies it from the finding's
 `verification.tsv` row and scores nothing before reading it;
-`fuzzy-verified` renders as `fuzzy-verified (fuzzy match)`. An Agreement
-group's correctness is the best result among its members.
+`fuzzy-verified` renders as `fuzzy-verified (fuzzy match)`. Each finding's
+correctness and support use its own result, inside a group too; only the 5e
+bucket uses a group's best result.
 
 **Buckets (R24).** Five, in this order: `Agreement (verified)`, `Agreement
 (unverified)`, `Disagreement`, `Single-Reviewer Findings (verified)`,
