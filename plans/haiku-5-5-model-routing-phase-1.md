@@ -1,7 +1,8 @@
 # Feature: Haiku 5.5 model-routing policy — Phase 1
 
-> **Status (2026-10-14):** In progress. PR #1171 landed most of 1.1 and parts
-> of 1.2 and 1.3; the remaining work is split per "Delivery" below. Source:
+> **Status (2026-10-14):** Implemented in PR #1171 and the stacked PR #1176,
+> both submitted. 30 of 31 tasks are done; 1.0.3 (the CI run-log check) waits
+> for #1171 to merge. Source:
 > `docs/brainstorms/2026-10-07-haiku-5-5-model-routing-policy-brainstorm.md`.
 > Phase 2 (replay-gated swaps) and Phase 3 (trigger tightening; router
 > deferred) are tracked under "Follow-ups" and are not implemented here.
@@ -28,12 +29,15 @@ Split:
   1.1.18, 1.1.19, 1.2.2, the rest of 1.2.4, 1.2.5, 1.4.1-1.4.6 (except the
   AGENTS.md wording), 1.5.2, 1.5.3, and its own 1.6 pass (changesets for
   yellow-council and yellow-devin).
-- **Still open after the follow-up PR:** these all need #1171 merged or
-  released.
-  - 1.0.3: the CI run-log check.
-  - 1.5.2 and 1.5.3: the smoke and per-tier transcript checks against the
-    installed plugins.
-  - 1.6.3: submitting the stack.
+- **Still open:** only 1.0.3, the CI run-log check. It can run only after
+  #1171 merges, because claude-code-action skips runs on a PR that changes
+  its own workflow.
+- **Also in #1176:** the bot-review follow-ups tracked as CLAUDE-131 (GitHub
+  #1172).
+  - Item 1 (strict drain-model validation) landed in #1171.
+  - Item 2: V3 now also warns when `model:` is omitted. No agent omits it
+    today, so the count stays 0.
+  - Item 3: the catalog's effort guidance, covered by 1.4.3 and 1.4.4.
 
 ## Overview
 
@@ -609,18 +613,45 @@ Kept `inherit`, with the reason recorded:
       as a regression check on the Step 6 pipeline. Run `codex-analyst` 5 times on a fixed question; each
       answer must be non-empty and cite files. On any failure, keep both
       agents on sonnet/medium and note it.
-- [ ] 1.5.2: Run one smoke per haiku MCP agent: `linear-issue-loader`,
+- [x] 1.5.2: Run one smoke per haiku MCP agent: `linear-issue-loader`,
       `linear-pr-linker` (against a scratch issue), `linear-explorer`, and
       both ruvector agents. Pass means ToolSearch, then a real MCP call, then
       output in the documented format. For the linker, the confirmation must
       come before `save_issue`.
-- [ ] 1.5.3: Run the transcript check from 1.0.2 across the tiers.
+- [x] 1.5.3: Run the transcript check from 1.0.2 across the tiers.
 
   1.5.2 and 1.5.3 need the new frontmatter in the plugins Claude Code
   actually loads, so run them once #1171 is released and installed (or with
   `--plugin-dir` pointing at this branch). Use the "Verify" command in
   `docs/research/model-routing-policy.md`. The `linear-pr-linker` smoke
   writes to Linear, so it needs a scratch issue chosen by the user.
+
+  Done 2026-10-14 (Claude Code v2.1.300):
+  - **1.5.3:** the four tier agents were copied from this branch as project
+    agents and dispatched from a `sonnet` / `xhigh` lead, a level no tier
+    uses. They ran at:
+    - T1 linear-issue-loader: haiku/low
+    - T2 coherence-reviewer: haiku/medium
+    - T3 failure-analyst: sonnet/medium
+    - T4 security-sentinel: opus/high
+  - **1.5.2, ruvector agents:** run headless with `--plugin-dir` under a
+    `sonnet` / `high` lead, both ran as haiku/low. Each did ToolSearch, then
+    a real `hooks_recall`, then output in its documented format.
+    semantic-search's top hit was weak (`knowledge-compounder.md`, not the
+    drain code); memory-manager correctly reported no hit above the 0.5
+    floor.
+  - **1.5.2, Linear agents:** headless `claude -p` does not load the
+    plugin's Linear MCP server (only the claude.ai connector), so these ran
+    from an interactive session with a per-call `haiku` model, at that
+    session's effort rather than the pinned one. All three made real MCP
+    calls and returned their documented format:
+    - linear-explorer: `list_teams`, then `list_issues` ×4.
+    - linear-issue-loader: `list_teams`, `get_issue`, `list_comments` on
+      CLAUDE-131.
+    - linear-pr-linker: read CLAUDE-131 and PR #1176, then stopped for
+      approval before any write. As a background agent it had no
+      `AskUserQuestion`, so it asked in text and treated no reply as no.
+      Nothing was written.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** No parser runs `codex-reviewer` output through a model.
@@ -674,12 +705,15 @@ Kept `inherit`, with the reason recorded:
     `state-store`. Run alone, all five pass on #1171 and on `main`, so they
     are load-dependent flakes, not regressions.
   - The follow-up PR runs its own pass.
-- [ ] 1.6.3: Run `/stack:status`, then submit through the enabled provider.
+- [x] 1.6.3: Run `/stack:status`, then submit through the enabled provider.
       Never use raw `git push` or `gh pr create`. The stack is #1171 plus one
       follow-up PR on top of it (see "Delivery"); this replaces the original
       five-PR split. #1171's branch came from a cloud session without `gt`,
       so on the Graphite provider run `gt track` on it before stacking the
       follow-up.
+      Done 2026-10-14: `/stack:status` reported READY_GRAPHITE. #1171 was
+      tracked with `gt track`, and #1176 was submitted with `gt submit` on
+      top of it.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:**
