@@ -1,0 +1,48 @@
+docs/security.md
+  s_ccb027cd70c0fa::t_ed8015d6846b22 1009
+plugins/yellow-council/CLAUDE.md
+  s_ccb027cd70c0fa::t_ed8015d6846b22 162-164,222,228-231,436
+plugins/yellow-council/README.md
+  s_ccb027cd70c0fa::t_ed8015d6846b22 15-21
+docs/testing/yellow-council-manual-tests.md
+  s_ccb027cd70c0fa::t_01a8a9d9912132 190-197
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_ccb027cd70c0fa::t_ed8015d6846b22 1129-1130,1235-1237
+  s_ccb027cd70c0fa::t_01a8a9d9912132 1187-1191,1219-1221
+plugins/yellow-council/lib/council-synthesis.sh
+  s_ccb027cd70c0fa::t_4b3e736c566f09 584-587,591,660-672,707,761-766,775-784,786,788,791,793-795,797,803-806,813-818,822-823,914,1194
+  s_ccb027cd70c0fa::t_4474f28f73c797 708,828-849,855,858-863
+  s_ccb027cd70c0fa::t_189346ae6add3c 850-854,856-857
+  s_ccb027cd70c0fa::t_39a6f795464ad9 15-17,40-41
+  s_ccb027cd70c0fa::t_8d88d004b34010 536-541,1062-1069,1076,1098,1100,1110-1111,1163-1166,1179-1193
+plugins/yellow-council/lib/fuzzy-ratio.py
+  s_ccb027cd70c0fa::t_39a6f795464ad9 10-11
+  s_ccb027cd70c0fa::t_4474f28f73c797 52-55
+plugins/yellow-council/tests/verification.bats
+  s_ccb027cd70c0fa::t_51fb9acdecb5a4 419-500
+plugins/yellow-council/commands/council/setup.md
+  s_ccb027cd70c0fa::t_2ca689e0a7e164 68,70-72,75
+docs/solutions/code-quality/council-md-extension-constraints.md
+  s_ccb027cd70c0fa::t_ed8015d6846b22 35-39
+plugins/yellow-council/tests/synthesis.bats
+  s_ccb027cd70c0fa::t_a1a13e4f121364 883,885
+  s_ccb027cd70c0fa::t_51fb9acdecb5a4 396-450
+plugins/yellow-council/commands/council/council.md
+  s_ccb027cd70c0fa::t_7097ec3509fe06 1564-1566,1702-1703,1708-1711,1887-1888,1891-1894,1941-1944,1981-1987,2170-2173,2190-2197,2292-2296,2365,2396-2397,2420-2422,2456-2457,2757,2760-2763
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1e441bc9881a01442450b37ce4aded6ac19587b0",
+  "prompts": {},
+  "sessions": {
+    "s_ccb027cd70c0fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce3509f8-678c-4d2f-92ba-ab6c39ac34af",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
