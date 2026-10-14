@@ -74,11 +74,17 @@ order-swapped second synthesis pass; it is accepted in every mode.
 Each invocation produces:
 
 - **Inline synthesis** — Headline (verdict count, plus the share of
-  low-confidence findings on a two-pass run) + Agreement (findings cited by
-  ≥2 reviewers) + Disagreement (unique findings or verdict conflicts). Every
-  finding carries rubric scores — correctness (self-assessed for now),
-  completeness, severity calibration, constraint adherence — and a
-  well-supported / weakly-supported result. The synthesizer works on
+  low-confidence findings on a two-pass run), an evidence-check count, then
+  five buckets: Agreement (verified), Agreement (unverified), Disagreement,
+  Single-Reviewer Findings (verified) and Unverified Claims (each with its
+  reason, such as `no-match` or `no-evidence`). Every finding's quoted
+  `Evidence:` line is checked against the cited file — an exact match within
+  three lines (yellow-core's `quote-ground.sh`), then a fuzzy match when
+  python3 `rapidfuzz` is installed (`sudo apt install python3-rapidfuzz` on
+  Debian/Ubuntu). Every finding carries rubric scores — correctness (from
+  that check), completeness, severity calibration, constraint adherence —
+  and a well-supported / weakly-supported result. Nothing is dropped:
+  unverified findings are listed with their reason. The synthesizer works on
   normalized text under randomized `S1`–`S4` labels and checks itself with a
   second, reverse-order pass; a finding whose ruling flips is shown as a tie
   with both readings, never silently resolved.
@@ -138,6 +144,11 @@ The user is asked for confirmation before the report file is written.
 `COUNCIL_OPENCODE_MODEL=openai/gpt-5.4` alongside Codex. Lineage detection is
 best-effort: codex's model may be unreadable, and `agy` has no model field.
 
+Codex findings carry a location but no quoted source line, so evidence
+verification classifies every one as `no-evidence`: a Codex-only finding
+always lands in Unverified Claims
+([#1180](https://github.com/KingInYellows/yellow-plugins/issues/1180)).
+
 A reviewer whose provider reports quota or credit exhaustion returns
 `QUOTA_EXHAUSTED`: it is left out of the synthesis like an unavailable reviewer
 and the headline names the reset time. Detection matches provider error text, so
@@ -178,10 +189,11 @@ stays an ordinary error.
 
 ## V1 / V2
 
-V1 is single-shot, synchronous, advisory-only. V2 will add multi-round
-iterative review, lineage-weighted quorum aggregation, quote-backed evidence
-verification, and persistent-session fleet management. See plugin CLAUDE.md
-for the full V2 trajectory.
+V1 is single-shot, synchronous, advisory-only. V2 shipped the four-reviewer
+roster, blind two-pass rubric-scored synthesis and quote-backed evidence
+verification with the five-bucket report. Still to come: multi-round
+iterative review, lineage-weighted quorum aggregation and persistent-session
+fleet management. See `commands/council/council.md` "V2 Trajectory".
 
 ## License
 

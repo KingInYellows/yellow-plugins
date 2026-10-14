@@ -51,6 +51,35 @@ else
   printf '[yellow-council] Error: run from bash 4.3+ or zsh\n' >&2
   exit 1
 fi
+
+# Evidence verification (council Step 5b). Warnings only: a gap degrades
+# verification and never blocks /council. Tier 1 runs yellow-core's
+# quote-ground.sh with the bash on PATH (4.4+, plus iconv); Tier 2 needs
+# python3 with rapidfuzz. Claude Code disables yellow-council outright when
+# its required yellow-core (>=2.8.0) is missing, disabled or older.
+if bash -c '[ "${BASH_VERSINFO[0]}" -gt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -ge 4 ]; }' 2>/dev/null; then
+  printf '[yellow-council] evidence Tier 1: bash 4.4+ ok\n'
+else
+  printf '[yellow-council] Warning: the bash on PATH is older than 4.4 — Tier 1 evidence checks fall back to Tier 2\n' >&2
+fi
+command -v iconv >/dev/null 2>&1 \
+  || printf '[yellow-council] Warning: iconv not found — Tier 1 evidence checks fall back to Tier 2\n' >&2
+COUNCIL_SYNTH_LIB="${CLAUDE_PLUGIN_ROOT}/lib/council-synthesis.sh"
+if [ -f "$COUNCIL_SYNTH_LIB" ] && [ ! -L "$COUNCIL_SYNTH_LIB" ] && . "$COUNCIL_SYNTH_LIB"; then
+  if council_core_lib lib/quote-ground.sh >/dev/null; then
+    printf '[yellow-council] evidence Tier 1: yellow-core quote-ground.sh found\n'
+  else
+    printf '[yellow-council] Warning: yellow-core >=2.8.0 not found — every finding will be unverified (verifier-error)\n' >&2
+  fi
+  if council_have_rapidfuzz; then
+    printf '[yellow-council] evidence Tier 2: python3 rapidfuzz ok\n'
+  else
+    printf '[yellow-council] Warning: rapidfuzz not installed — Tier 2 fuzzy evidence verification skipped (Debian/Ubuntu: sudo apt install python3-rapidfuzz; elsewhere: pip install rapidfuzz)\n' >&2
+  fi
+else
+  printf '[yellow-council] Error: %s is missing — reinstall yellow-council\n' "$COUNCIL_SYNTH_LIB" >&2
+  exit 1
+fi
 ```
 
 ### Step 2: Detect Antigravity CLI (`agy`, Gemini slot)
@@ -225,6 +254,7 @@ fi
 
 printf '\n[yellow-council] Setup summary:\n'
 printf '  Required: bash 4.3+ or zsh, timeout, jq, od, sort, /dev/urandom — verified\n'
+printf '  Evidence verification: yellow-core >=2.8.0 (Tier 1, needs bash 4.4+ and iconv); python3 rapidfuzz optional (Tier 2) — see the Step 1 lines above\n'
 printf '  Reviewers: %d of 4 available (Claude=in-process (always available), Gemini[agy]=%s, OpenCode=%s, Codex=%s)\n' \
   "$READY_COUNT" "$GEMINI_STATUS" "$OPENCODE_STATUS" "$CODEX_STATUS"
 if [ "$READY_COUNT" -eq 1 ]; then

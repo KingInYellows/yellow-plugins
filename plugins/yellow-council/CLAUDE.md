@@ -24,7 +24,16 @@ and never auto-commits. The user decides what to do with the verdicts.
   without it a cancelled run leaves raw reviewer output behind until the OS
   reaps `/tmp`. `od` and `sort` randomize the Step 5 reviewer labels from
   `/dev/urandom`, which `/council` requires and fails closed without)
-- **`jq`** — required for OpenCode JSON event stream parsing
+- **`jq`** — required for OpenCode JSON event stream parsing and for the
+  Step 5b evidence check
+- **yellow-core `>=2.8.0`** (a declared dependency) — Tier 1 evidence
+  verification runs its `lib/quote-ground.sh batch`, which needs **bash 4.4+**
+  and **`iconv`** on PATH; without them Tier 1 falls back to Tier 2
+- **python3 + `rapidfuzz` (optional)** — Tier 2 fuzzy evidence verification.
+  Debian/Ubuntu: `sudo apt install python3-rapidfuzz` (a bare `pip install`
+  fails there under PEP 668); elsewhere `pip install rapidfuzz`. Without it
+  `/council` warns once and Tier 2 candidates are `unverified`
+  (`tier2-skipped`); the first `python3` on PATH is the one probed and run
 - **External CLIs (user-installed; soft-skipped if missing):**
   - `agy` — Google Antigravity CLI v1.0+ (replaces Gemini CLI, which stopped
     serving consumer subscriptions on 2026-06-18; run `agy` once
@@ -92,9 +101,12 @@ and never auto-commits. The user decides what to do with the verdicts.
   label order to flag per-finding ruling flips as `low-confidence-synthesis`
   ties. Labels
   map back to names only when the report is assembled. All of it is
-  prompt-level inside one orchestrator context — not isolated passes — and
-  correctness is self-assessed until citation verification (`verify_finding()`)
-  lands. `council-patterns` SKILL.md "Synthesis Contract (V2)" has the rules.
+  prompt-level inside one orchestrator context — not isolated passes — except
+  two mechanical steps: correctness is verification-backed (5b checks every
+  quoted `Evidence:` line against its cited file, Tier 1 exact and Tier 2
+  fuzzy, and Pass A copies the result), and 5e assigns the five report
+  buckets in shell. `council-patterns` SKILL.md "Synthesis Contract (V2)" has
+  the rules.
   The staging directory's capability lives in a shell-owned
   `.git/council-synth.state`, one synthesis per checkout, though reclaiming a
   stale state file can race a new run's claim and admit two syntheses in one
@@ -184,6 +196,14 @@ and never auto-commits. The user decides what to do with the verdicts.
 `yellow-codex:review:codex-reviewer`. yellow-council does NOT ship its own
 Codex agent.)
 
+### Libraries
+
+- `lib/council-synthesis.sh` — the Step 5 helpers (normalize, extract,
+  label, fence, citation extraction, evidence verification, buckets). Tier 4
+  dual-shell, sourced by the 5b and 5e fences.
+- `lib/fuzzy-ratio.py` — the Tier 2 scorer (stdlib plus `rapidfuzz`; exits 3
+  when rapidfuzz is missing). Reads JSONL on stdin, touches no files.
+
 ### Skills (1)
 
 - `council-patterns` — canonical reference for CLI invocation conventions,
@@ -230,8 +250,10 @@ skipped with a warning and the findings fall to Tier 2 or `unverified`.
 ## Testing
 
 `bats tests/` from the plugin directory (`redaction.bats`, `extract.bats`,
-`synthesis.bats` and `quota-lineage.bats` —
-the blocking CI gate runs the whole directory). The awk redaction program is
+`synthesis.bats`, `verification.bats` and `quota-lineage.bats` —
+the blocking CI gate runs the whole directory). `verification.bats` runs the
+evidence check against yellow-core's real `quote-ground.sh`; its Tier 2 hit
+cases need python3 with rapidfuzz and fail rather than skip in CI. The awk redaction program is
 shipped as four synchronized carrier files (`REDACTION_SOURCES` in
 `tests/lib/extract-redaction-awk.bash`): `agents/review/gemini-reviewer.md`,
 `agents/review/opencode-reviewer.md`, `skills/council-patterns/SKILL.md`, and
@@ -385,6 +407,22 @@ fresh-machine install CI (see Known Limitations).
   exceed the council's `COUNCIL_TIMEOUT` (default 600s). Run
   `opencode run "test"` once interactively after each upgrade before relying
   on the agent for time-bounded invocations.
+- **Codex findings are always Unverified Claims.** yellow-codex builds its
+  findings from Codex JSON, which has a location but no source line, so no
+  Codex finding carries an `Evidence:` quote: each one is `unverified` with
+  reason `no-evidence`, and a Codex-only finding always lands in Unverified
+  Claims. A lineage limitation, not a verdict on Codex; tracked in
+  [#1180](https://github.com/KingInYellows/yellow-plugins/issues/1180).
+- **Reviewer line numbers are estimates.** Packs do not number excerpt lines,
+  so a citation can miss the ±3 window and land in Unverified Claims
+  (`no-match`) though the code is real. Treat the manual 2.6 scenarios as the
+  calibration before changing the window.
+- **Step 7's `Write` is not path-scoped.** 7c refuses any staging directory
+  that is not this run's (shape, owner, token) and reads only
+  `<dir>/synthesis.md`, so nothing destructive trusts the relayed path and a
+  stray write elsewhere is never read or deleted. It does not stop a
+  deliberate `Write`; a `Write` deny rule does. A run cancelled between 7a and
+  7c leaves the staged synthesis in `/tmp` until a later 5a sweep (24 hours).
 - **Single-shot V1.** No multi-round iterative review. Deferred V2 features
   (evidence contract, quorum aggregation, `--round 2`, `/council fleet`) are
   listed once, in `commands/council/council.md` "V2 Trajectory".

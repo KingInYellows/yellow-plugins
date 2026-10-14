@@ -989,7 +989,7 @@ Other docs:
 
 ### Phase F — Finalization sweep (plan step 8; R26-R30)
 
-- [ ] Step 27: **R26.** Bring
+- [x] Step 27: **R26.** Bring
   `plugins/yellow-council/skills/council-patterns/SKILL.md` into lockstep:
   - the 4-reviewer list, with claude as the in-process exception;
   - per-reviewer invocation blocks;
@@ -1004,7 +1004,7 @@ Other docs:
     - the Codex `no-evidence` limitation.
 
   Remove every "until … lands" phrase.
-- [ ] Step 28: **R27.** Check that `COUNCIL_DOUBLE_PASS_SYNTHESIS` and
+- [x] Step 28: **R27.** Check that `COUNCIL_DOUBLE_PASS_SYNTHESIS` and
   `COUNCIL_OPENCODE_MODEL` appear in both the 4-column table
   (`plugins/yellow-council/CLAUDE.md` L205-214) and the 3-column table
   (council.md ~L3738-3747), plus the Step 2 help `printf` (~L114-137). This
@@ -1017,7 +1017,7 @@ Other docs:
 > table. This step is verify-only.
 <!-- /deepen-plan -->
 
-- [ ] Step 29: **R28.** Update `plugins/yellow-council/CLAUDE.md`:
+- [x] Step 29: **R28.** Update `plugins/yellow-council/CLAUDE.md`:
   - Component counts (L131/L148/L180): Commands (2), Agents (3), Skills
     (1). Recount from disk, and add the `lib/` files if the file lists
     components.
@@ -1055,7 +1055,7 @@ Other docs:
 >   quote-ground) or the yellow-core dependency.
 <!-- /deepen-plan -->
 
-- [ ] Step 30: **R29.** In `docs/testing/yellow-council-manual-tests.md`, add
+- [x] Step 30: **R29.** In `docs/testing/yellow-council-manual-tests.md`, add
   `2.6 — Evidence verification` with these scenarios: Tier 1 hit, Tier 2 hit
   (rapidfuzz installed, a whitespace/word-level near-miss quote), a miss
   landing in Unverified Claims with its reason, a Codex-only finding in
@@ -1080,7 +1080,7 @@ Other docs:
 >   Update it alongside adding 2.6.
 <!-- /deepen-plan -->
 
-- [ ] Step 31: **R30 changesets.** Add
+- [x] Step 31: **R30 changesets.** Add
   `.changeset/council-evidence-verification.md` with
   `'yellow-council': minor` and a `feat:` title, plus bullets for
   verification, the five buckets, F1-F4 and the yellow-core dependency.
@@ -1097,9 +1097,9 @@ Other docs:
 > needed if its README note is edited (see Step 29).
 <!-- /deepen-plan -->
 
-- [ ] Step 32: Run `pnpm lint:plugins` and `pnpm validate:agents` after the
+- [x] Step 32: Run `pnpm lint:plugins` and `pnpm validate:agents` after the
   markdown edits, and fix anything flagged.
-- [ ] Step 33: CI coverage. The job that runs the yellow-council bats suite
+- [x] Step 33: CI coverage. The job that runs the yellow-council bats suite
   (`plugin-shell-tests`, `.github/workflows/validate-schemas.yml:1436-1499`)
   runs on `ubuntu-latest` (24.04), where `pip install` fails under PEP 668.
   - Add `python3-rapidfuzz` to its existing `apt-get install gawk zsh` line
