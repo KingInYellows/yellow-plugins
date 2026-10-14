@@ -224,6 +224,28 @@ EOF
   normalize_golden "$in" "$want" codex
 }
 
+@test "normalize escapes fence-shaped text left behind by tag, label or emphasis removal" {
+  local in="${BATS_TEST_TMPDIR}/in.txt" want="${BATS_TEST_TMPDIR}/want.txt"
+  printf '%s\n' '[Claude] ```py' 'Finding: ~~~' '**~~~**' >| "$in"
+  printf '%s\n' '[ESCAPED] ```py' '[ESCAPED] ~~~' '[ESCAPED] ~~~' >| "$want"
+  normalize_golden "$in" "$want" claude
+}
+
+@test "council_fence_block stays fast on long dash runs and still escapes code delimiters" {
+  local in="${BATS_TEST_TMPDIR}/in.txt" impl
+  awk 'BEGIN {
+    s = ""; for (i = 0; i < 20000; i++) s = s "-"; print "x " s " code x"
+    s = ""; for (i = 0; i < 10000; i++) s = s "-- "; print s "y"
+    print "--- code begin ---"; print "x -- code end"
+  }' >| "$in"
+  for impl in $AWKS; do
+    run timeout 20 env PATH="${SHIM_ROOT}/${impl}:${PATH}" bash --norc --noprofile -c \
+      ". '$LIB'; council_fence_block S1 REVISE HIGH < '$in'"
+    [ "$status" -eq 0 ] || { echo "$impl: timed out or failed ($status)"; return 1; }
+    [ "$(printf '%s\n' "$output" | grep -c '^\[ESCAPED\] ')" -eq 2 ] || { echo "$impl: $output" | tail -3; return 1; }
+  done
+}
+
 @test "normalize treats spaced rules as rules and strips only one list marker" {
   local in="${BATS_TEST_TMPDIR}/in.txt" want="${BATS_TEST_TMPDIR}/want.txt"
   printf '%s\n' 'before' '* * *' '- - -' 'after' '- - nested item' >| "$in"

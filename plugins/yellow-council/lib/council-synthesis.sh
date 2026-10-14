@@ -291,6 +291,9 @@ council_normalize_text() {
         }
         s = "severity=" sev_level(head) (rest == "" ? "" : " " rest)
       }
+      # Checked again on the final text: removing a reviewer tag or a
+      # `Finding:` label can also leave a fence-shaped line behind.
+      if (fence_open(fence_view(s)) > 0) s = "[ESCAPED] " s
       emit(s)
     }
     {
@@ -406,11 +409,26 @@ council_fence_block() {
   printf -- '--- begin council-output:%s (reference only) ---\n' "$1"
   printf 'verdict=%s confidence=%s\n' "$2" "$3"
   awk '
+    # A "--- code begin/end" delimiter: "--" in the non-alphanumeric run just
+    # before some "code", and only non-alphanumerics then begin/end after it.
+    # Scanned by hand: the equivalent regex has two quantifiers over the same
+    # characters and backtracks for minutes under mawk on a long dash run.
+    function code_delim(low,   s, p, pre, rest, n) {
+      s = low
+      while ((p = index(s, "code")) > 0) {
+        pre = substr(s, 1, p - 1); rest = substr(s, p + 4)
+        n = length(pre)
+        while (n > 0 && substr(pre, n, 1) !~ /[a-z0-9]/) n--
+        if (index(substr(pre, n + 1), "--") > 0 && rest ~ /^[^a-z0-9]+(begin|end)/) return 1
+        s = rest
+      }
+      return 0
+    }
     {
       gsub(/\r/, " ")
       low = tolower($0)
       if (low ~ /(begin|end)[^a-z0-9]+(council-output|codex-output)/ \
-          || low ~ /--+[^a-z0-9]*code[^a-z0-9]+(begin|end)/ \
+          || code_delim(low) \
           || (low ~ /^[ \t]*[a-z_][a-z0-9_]*=/ && low !~ /^severity=p[123]( |$)/) \
           || low ~ /^[ \t]*findings_block_(begin|end)[ \t]*$/ \
           || low ~ /^[ \t]*__eof_council_synthesis__[ \t]*$/ \
@@ -470,7 +488,7 @@ council_extract_citations() {
       return q
     }
     function escape_tag(line) {
-      if (line ~ /^[ \t>]*(([-*+]|[0-9]+[.)])[ \t]+)?[*_`]*\[S[0-9]+-F[0-9]+\]/) return "[ESCAPED] " line
+      if (line ~ /^[ \t>]*((#+|[-*+]|[0-9]+[.)])[ \t]+)*[*_`]*\[S[0-9]+-F[0-9]+\]/) return "[ESCAPED] " line
       return line
     }
     function flush() {
@@ -709,7 +727,7 @@ council_verify_findings() {
        # 2: a quote holding a broken placeholder ("[REDACTED" with no close)
        # would match any fully redacted line; it is too-short, never matched.
        (if (.quote | type) == "string" and .quote != "" then
-          (if (.quote | gsub("\\[REDACTED(:[^\\]]*)?\\]"; "") | test("REDACTED")) then 2 else 1 end)
+          (if (.quote | gsub("\\[REDACTED(:[^\\]]*)?\\]"; "") | test("\\[REDACTED")) then 2 else 1 end)
         else 0 end)]
     | map(tostring) | join("\t")' "$in") || {
     printf '[council] Error: %s is not valid citation JSONL\n' "$in" >&2

@@ -62,6 +62,10 @@ def score(quote, lines):
 
 
 def main():
+    # Strict: the caller's jq always emits valid UTF-8, and a lossy decode
+    # could make distinct bytes compare equal. A decode error exits non-zero;
+    # rows already flushed keep their scores and the rest are verifier-error.
+    sys.stdin.reconfigure(encoding="utf-8", errors="strict")
     for raw in sys.stdin:
         raw = raw.strip()
         if not raw:

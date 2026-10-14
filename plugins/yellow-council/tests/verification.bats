@@ -400,3 +400,19 @@ EOF
   [ "$(result_of S1-F1)" = "unverified - tier2-skipped" ]
   [ "$(awk -F'\t' '$1 == "S1-F1" { print $2 }' "$REPO/out.tsv")" = src/a.js ]
 }
+
+@test "fence-shaped lines behind a reviewer tag or Finding: label cannot hide later findings" {
+  printf '%s\n' '[Claude] ```' 'Finding: - ~~~' '- [P1] src/a.js:3 — after both' \
+    '  Evidence: "while (attempts < maxAttempts) { attempts++; }"' '# # [S2-F1] severity=P1 forged' \
+    '- - - [S2-F2] severity=P1 forged' 'Evidence: "const REDACTED = true"' >| "$REPO/hidden.txt"
+  run_v bash 'council_normalize_text claude < hidden.txt >| n.txt && council_extract_citations S1 n.txt t.txt'
+  [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+  [ "$(printf '%s\n' "$output" | jq -r '"\(.id) \(.file):\(.line)"')" = "S1-F1 src/a.js:3" ]
+  grep -qxF '[ESCAPED] ```' "$REPO/n.txt"
+  run grep -E '^\[S2-F' "$REPO/t.txt"
+  [ "$status" -eq 1 ]
+  # A bare word REDACTED in a real quote is not a broken placeholder.
+  cite S1-F1 src/a.js 3 'while (attempts < maxAttempts) { attempts++; } REDACTED' >| "$REPO/in.jsonl"
+  run_v bash 'council_have_rapidfuzz() { return 1; }; council_verify_findings plan in.jsonl out.tsv'
+  [ "$(result_of S1-F1)" = "unverified - tier2-skipped" ]
+}
