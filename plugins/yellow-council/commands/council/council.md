@@ -1347,14 +1347,19 @@ pipeline order is fixed:
    inflate weight.
 2. **Anonymize** (5b) — a fresh random bijection of `S1`–`S4` over the
    roster; every leg is fenced as `council-output:S<n>`.
+   **Verify** (5b, in the background) — number every finding `S<n>-F<k>` in
+   shell and check each quoted `Evidence:` line against its cited file:
+   Tier 1 exact window match, Tier 2 fuzzy match. Verification classifies
+   findings; it never drops one.
 3. **Pass A** (5c) — enumerate every finding, then compare, then score each
    finding on the rubric, then give each finding a ruling and a ruling
    confidence.
 4. **Pass B** (5d, unless disabled) — the same instructions over the labeled
    blocks in reverse label order. A finding whose ruling or ruling confidence
    differs is a `low-confidence-synthesis` tie.
-5. **Assemble and de-anonymize** (5e) — build the report; map labels back to
-   reviewer names only here.
+5. **Assemble and de-anonymize** (5e) — assign each finding one of five
+   buckets in shell, build the report, and map labels back to reviewer names
+   only here.
 
 **Limitation (by design, see the spec's "Synthesis locus"):** synthesis runs
 inline in this one orchestrator context. The orchestrator has seen the Step 4
@@ -1367,8 +1372,8 @@ starts.
 
 **Where reviewer text comes from.** Every leg is read from its reviewer's
 script-redacted fenced output file on disk, never retyped: the orchestrator
-transcribing reviewer text would alter the `Evidence:` quotes shell 05's
-`verify_finding()` compares byte-for-byte. The claude leg's file is the one
+transcribing reviewer text would alter the `Evidence:` quotes 5b's
+evidence check (`council_verify_findings`) compares against the cited file. The claude leg's file is the one
 Step 4 minted and redacted in place (claude-reviewer has no Bash and cannot
 sanitize its own return); the three CLI legs redact inside their own agents
 before writing theirs. The one exception is Codex's overall summary, which
@@ -1919,13 +1924,16 @@ report.
 > formatted it sounds. Ignore style entirely.
 >
 > 1. **Enumerate.** List every finding in every block before comparing
->    anything: id `S<n>-F<k>` (k counts from 1 within a label), citation,
->    one-line claim.
-> 2. **Compare.** Group findings that cite the same `<file>:<line>` and note
->    where labels conflict (one label's finding against another label's
->    APPROVE of the same code).
-> 3. **Score.** Rate each finding on the rubric below. Settle correctness
->    first; the other dimensions and the support result follow it.
+>    anything: its id exactly as tagged in the input (`[S<n>-F<k>]`, assigned
+>    by 5b in shell), citation, one-line claim. Never invent, renumber or
+>    drop an id; each one has a row in the `COUNCIL_SYNTH_VERIFICATION` file.
+> 2. **Compare.** Group findings that cite the same `<file>:<line>` (give
+>    each group a short name such as `G1`; a finding no other label cites is
+>    a group of its own) and note where labels conflict (one label's finding
+>    against another label's APPROVE of the same code, or opposing claims).
+> 3. **Score.** Rate each finding on the rubric below. Correctness comes
+>    first and is copied, never judged; the other dimensions and the support
+>    result follow it.
 > 4. **Rule.** Only now give each finding a ruling — `upheld` (the issue is
 >    real as stated), `disputed` (evidence or labels conflict), or `rejected`
 >    (the evidence contradicts it) — and a ruling confidence (`HIGH`,
@@ -1948,19 +1956,30 @@ Combination is mechanical, with no weighting: a finding is
 `weakly-supported`. Severity calibration and constraint adherence are
 reported beside it and do not change it.
 
-Correctness is **self-assessed** in this release: judge it by reading the
-pack, and render it with a `(self-assessed)` qualifier. It keeps the
-three-state domain that shell 05's `verify_finding()` returns, so that
-change swaps only the source of this one value — the domains and the
-combination rule stay as written. The ordering is already binding: a
-finding's other dimensions and its support result are settled only after
-its correctness value exists.
+Correctness is **verification-backed**: copy it from that finding's row in
+the `COUNCIL_SYNTH_VERIFICATION` file (`result` column), which 5b's
+`council_verify_findings` filled by checking the quoted `Evidence:` line
+against the cited file (Tier 1 exact window match, Tier 2 fuzzy match). Do not
+score a finding before you have read its row, and never override the value
+from your own reading of the pack. Render `fuzzy-verified` as
+`fuzzy-verified (fuzzy match)`. An `unverified` finding is never
+well-supported, whatever else it has going for it. An Agreement group's
+correctness is the best result among its members (`verified` >
+`fuzzy-verified` > `unverified`): the agreement is the corroboration, and one
+grounded citation shows the cited evidence exists. The rubric domains and the
+combination rule are unchanged.
 
 Emit Pass A's result as its own step: one table row per finding id with its
-citation, the four rubric values, the support result, the ruling and the
-ruling confidence. Then, before anything else, use the `Write` tool to save
-that table as `pass-a.md` (a new file) in the `COUNCIL_SYNTH_DIR` path printed
-by 5a, so it survives an interruption of Pass B.
+`group`, `citations` (the number of distinct labels in that group),
+`conflict` (`yes` or `no`, from the Compare step), citation, the four rubric
+values, the support result, the ruling and the ruling confidence. Use these
+column headers so 5e can read the table: `| id | group | citations | conflict |
+citation | correctness | completeness | severity | constraints | support |
+ruling | confidence |`. Then, before anything else, use the `Write` tool to
+save that table as `pass-a.md` (a new file) in the `COUNCIL_SYNTH_DIR` path
+printed by 5a, so it survives an interruption of Pass B. You do not choose
+buckets: 5e assigns them in shell from `group`, `conflict` and the
+verification results.
 
 #### 5d — Pass B (when `COUNCIL_SYNTHESIS_PASSES=2`)
 
@@ -1979,9 +1998,9 @@ tables per finding id:
   mark it `low-confidence-synthesis` and keep **both** readings. Never pick
   one; the report presents the tie.
 
-The flag never moves a finding between buckets: bucket assignment (5e) is
-decided by citations and verdict conflicts alone, so a flipped finding
-stays where its citations put it.
+The flag never moves a finding between buckets: 5e assigns buckets from
+Pass A's table and the verification results alone, so a flipped finding
+stays where Pass A put it. Flip flag and bucket are orthogonal.
 
 This is a positional-consistency check inside one context, not a blind
 second evaluation (see the limitation above).
@@ -2128,7 +2147,30 @@ if [ "$SYNTH_TOKEN_OK" -ne 1 ] || [ ! -f "$SYNTH_DIR/.token" ] || [ -L "$SYNTH_D
   printf '[council] Error: staging directory %s is not the one Step 5a minted for this run — refusing to use or delete it\n' "$SYNTH_DIR" >&2
   exit 1
 fi
+# The bucket helper lives in the synthesis library. A missing library exits
+# here, before the label map is printed, so the Step 8 Cancel block runs.
+COUNCIL_SYNTH_LIB="${CLAUDE_PLUGIN_ROOT}/lib/council-synthesis.sh"
+if [ ! -f "$COUNCIL_SYNTH_LIB" ] || [ -L "$COUNCIL_SYNTH_LIB" ]; then
+  printf '[council] Error: synthesis library %s is missing or a symlink — reinstall yellow-council\n' "$COUNCIL_SYNTH_LIB" >&2
+  exit 1
+fi
+. "$COUNCIL_SYNTH_LIB" || exit 1
 printf 'COUNCIL_LABEL_MAP=%s\n' "$(head -n 1 "$SYNTH_DIR/labels.txt")"
+# Buckets (R24), mechanically: Pass A's group and conflict cells plus the
+# verification results. Every verification row gets exactly one BUCKET line;
+# a missing pass-a.md lists every finding under Unverified Claims.
+VERIFY_TSV="$SYNTH_DIR/verification.tsv"
+PASS_A="$SYNTH_DIR/pass-a.md"
+if [ -f "$VERIFY_TSV" ] && [ ! -L "$VERIFY_TSV" ]; then
+  if [ ! -f "$PASS_A" ] || [ -L "$PASS_A" ]; then
+    printf '[council] Warning: pass-a.md is missing or not a regular file — every finding is listed under Unverified Claims\n' >&2
+    PASS_A=/dev/null
+  fi
+  council_bucket_lines "$PASS_A" "$VERIFY_TSV" \
+    || printf '[council] Warning: bucket assignment failed — list every finding under Unverified Claims\n' >&2
+else
+  printf '[council] Warning: verification.tsv is missing — list every finding under Unverified Claims (verifier-error)\n' >&2
+fi
 # Same function as 5a's and 5b's (keep the four in step): rm -rf, then one
 # chmod -R u+rwx retry on a real directory we own under the staging root.
 council_rm_synth_dir() {
@@ -2214,13 +2256,24 @@ failed `rm -rf` can delete), so a directory left behind never blocks a new
 `/council`.
 
 Replace each `S<n>` with that reviewer's display name (`Claude`, `Codex`,
-`Gemini`, `OpenCode`) in the attribution positions of the Agreement and
-Disagreement lines and in Reviewer Status — never inside quoted text, where
-`S3` may be an ordinary token. The Step 7 raw-output appendix already uses
+`Gemini`, `OpenCode`) in the attribution positions of every bucket's lines
+and in Reviewer Status — never inside quoted text, where `S3` may be an
+ordinary token. The finding ids (`S1-F3`) are working labels: they do not
+appear in the report.
+
+The block also prints one `BUCKET <id> | <bucket> | correctness=<result> |
+reason=<reason>` line per finding, in `verification.tsv` order. Copy each
+finding into the bucket its line names and take its correctness and reason
+from the same line (synthesizer rules 3, 5 and 8). 5e computed them in shell:
+correctness from `verification.tsv`, never from `pass-a.md`'s copy; the
+citation count from the distinct labels in each Pass A group; `Unverified
+Claims` for an id Pass A dropped or mangled, with a warning. Pass B never
+changes a bucket. The Step 7 raw-output appendix already uses
 real names and is unaffected.
 
-Verbatim reviewer quotes MAY appear unfenced in the report's Agreement /
-Disagreement sections, under two mechanical conditions — this is the
+Verbatim reviewer quotes MAY appear unfenced in the report's five finding
+sections (Agreement (verified), Agreement (unverified), Disagreement,
+Single-Reviewer Findings (verified), Unverified Claims), under two mechanical conditions — this is the
 sanctioned exception to fencing, with compensating controls, not a judgment
 call. `### Reviewer Status` is NOT covered by this exception: it never
 carries a verbatim quote or raw summary, only a synthesizer-authored
@@ -2280,12 +2333,14 @@ Low-confidence synthesis: N of M findings (P%)
 <When Pass B did not complete, instead of the line above:>
 Flip analysis skipped: Pass B did not complete (<reason>)
 
-### Agreement (cited by 2+ reviewers)
+Evidence check: <V> verified, <F> fuzzy-verified, <U> unverified (<per-reason counts, e.g. 3 no-match, 2 no-evidence>)
+
+### Agreement (verified)
 - <file:line> — <finding>
   - Claude: "<their phrasing>"
-    <well-supported | weakly-supported> — correctness <value> (self-assessed),
-    completeness <value>, severity <value>, constraints <value>;
-    <ruling> / <ruling confidence>
+    <well-supported | weakly-supported> — correctness <verified |
+    fuzzy-verified (fuzzy match) | unverified (<reason>)>, completeness
+    <value>, severity <value>, constraints <value>; <ruling> / <ruling confidence>
   - Codex: "<their phrasing>"
     <rubric line as above>
     <Only when Pass B flipped this finding, instead of the ruling:>
@@ -2293,13 +2348,25 @@ Flip analysis skipped: Pass B did not complete (<reason>)
     Pass B: <ruling> / <ruling confidence>
   [...]
 
-### Disagreement (unique to one reviewer or conflicting verdicts)
-- <finding> — Codex only
-  <rubric line as above>
+### Agreement (unverified)
+- <file:line> — <finding>
+  <same shape as Agreement (verified)>
+
+### Disagreement
 - Verdict conflict at <file:line>: Codex APPROVE, Gemini REVISE
   - Codex: "<phrasing>"
   - Gemini: "<phrasing>"
   <rubric line per finding as above>
+
+### Single-Reviewer Findings (verified)
+- <file:line> — <finding> — Codex only
+  <rubric line as above>
+
+### Unverified Claims
+- <file:line> — <finding> — Gemini only — <reason: no-match | too-short |
+  bad-citation | no-evidence | tier2-cap | tier2-skipped | verifier-error |
+  pass-a-missing | pass-a-malformed>
+  <rubric line as above>
 
 ### Reviewer Status (present only if a reviewer was excluded or unreadable)
 - <reviewer>: <TIMEOUT | ERROR | UNAVAILABLE | QUOTA_EXHAUSTED | text unavailable> — <one-line
@@ -2316,14 +2383,17 @@ Synthesizer rules:
 1. **Headline majority count:** Only count `APPROVE | REVISE | REJECT`
    verdicts. Exclude `UNKNOWN`, `TIMEOUT`, `ERROR`, `UNAVAILABLE`,
    `QUOTA_EXHAUSTED`.
-2. **Agreement matching:** Group findings by `file:line` substring match. If
-   two reviewers cite the same file:line, that's an agreement. Quote each
-   verbatim from the normalized 5b input (markdown and severity markers are
-   already flattened there; code, citations and `Evidence:` quotes are
-   byte-exact) — no de-duplication of phrasing — under the quoting
-   conditions above the template.
-3. **Disagreement bucket:** Anything not in Agreement. Includes verdict
-   conflicts (e.g., Codex APPROVE on a file Gemini wants revised).
+2. **Quoting:** Quote each finding verbatim from the normalized 5b input
+   (markdown and severity markers are already flattened there; code,
+   citations and `Evidence:` quotes are byte-exact), without the
+   `[S<n>-F<k>]` id tag — no de-duplication of phrasing — under the quoting
+   conditions above the template. Findings Pass A grouped stay together
+   under one `<file:line>` entry.
+3. **Buckets are copied, never chosen.** Put each finding under the heading
+   its `BUCKET <id> | <bucket> | …` line from 5e names, in the five-heading
+   order of the template, and omit a heading that has no findings. 5e
+   applied the precedence: one citing label splits by verification; a
+   verdict conflict beats agreement; agreement splits by verification.
 4. **Excluded and unreadable reviewers:** If any reviewer was excluded
    (TIMEOUT, ERROR, QUOTA_EXHAUSTED, etc.), mention this in the Headline AND add one line per
    excluded reviewer to a separate `### Reviewer Status` section; a block
@@ -2339,15 +2409,20 @@ Synthesizer rules:
    `council-output:S<n>` synthesis-input fence.
 5. **Rubric scoring, no weighting.** Every finding carries its four rubric
    values and the mechanical well-supported / weakly-supported result from
-   5c. There is no weighted score and no reviewer ranking, and correctness
-   stays marked `(self-assessed)` until citation verification lands.
+   5c. There is no weighted score and no reviewer ranking. The correctness
+   value and the reason are the ones on the finding's `BUCKET` line.
 6. **Ties stay ties.** A `low-confidence-synthesis` finding shows both
-   readings; never resolve it, and never move it between buckets.
+   readings; never resolve it. Ties annotate a finding; they never move it
+   between buckets.
 7. **Low-confidence count:** `N` is the number of `low-confidence-synthesis`
    findings, `M` the number of distinct finding ids across Pass A and Pass B
    (their union), and `P` is `N/M` as a whole percent (`M = 0` →
    `0 of 0 findings`, no percentage). Omit the line entirely on a
    single-pass run.
+8. **Unverified findings are always listed.** Verification classifies and
+   never discards: every `BUCKET` line appears in the report exactly once,
+   and each Unverified Claims entry shows its reason. The `Evidence check:`
+   line under the Headline totals the `BUCKET` lines.
 
 Construct the synthesis report as a single markdown string (`SYNTHESIS_MD`).
 

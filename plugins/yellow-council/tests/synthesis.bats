@@ -246,6 +246,99 @@ EOF
   normalize_golden "$in" "$want" codex
 }
 
+# --- Buckets (R24) ---------------------------------------------------------
+
+@test "council_assign_bucket covers every combination and fails closed" {
+  local want="${BATS_TEST_TMPDIR}/want.txt" body="" cit conf corr
+  : >| "$want"
+  for cit in 1 2 3; do
+    for conf in yes no; do
+      for corr in verified fuzzy-verified unverified; do
+        body="${body}printf '%s %s %s => ' $cit $conf $corr; council_assign_bucket $cit $conf $corr
+"
+        case "$cit/$conf/$corr" in
+          1/*/unverified) b="Unverified Claims" ;;
+          1/*) b="Single-Reviewer Findings (verified)" ;;
+          */yes/*) b="Disagreement" ;;
+          */no/unverified) b="Agreement (unverified)" ;;
+          *) b="Agreement (verified)" ;;
+        esac
+        printf '%s %s %s => %s\n' "$cit" "$conf" "$corr" "$b" >> "$want"
+      done
+    done
+  done
+  local profile
+  for profile in $PROFILES; do
+    run_in "$profile" "$FIRST_AWK" "$body"
+    [ "$status" -eq 0 ] || { echo "$profile: $stderr"; return 1; }
+    diff -u "$want" <(printf '%s\n' "$output") || { echo "$profile differs"; return 1; }
+    run_in "$profile" "$FIRST_AWK" "council_assign_bucket 0 no verified; council_assign_bucket x no verified; council_assign_bucket 2 maybe verified; council_assign_bucket 2 no self-assessed; council_assign_bucket 02 no verified"
+    [ "$status" -eq 0 ]
+    [ "$output" = "$(printf 'Unverified Claims\n%.0s' 1 2 3 4 5)" ] || { echo "$profile: $output"; return 1; }
+    [ "$(printf '%s\n' "$stderr" | grep -c 'malformed bucket input')" -eq 5 ]
+  done
+}
+
+@test "council_bucket_lines recomputes correctness and citations and never drops an id" {
+  local pa="${BATS_TEST_TMPDIR}/pass-a.md" vt="${BATS_TEST_TMPDIR}/verification.tsv"
+  cat >| "$pa" <<'EOF'
+| id | group | citations | conflict | citation | correctness | completeness | severity | constraints | support | ruling | confidence |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| S1-F1 | G1 | 1 | no | a.js:3 | verified | holds | calibrated | holds | well-supported | upheld | HIGH |
+| S2-F1 | G1 | 9 | no | a.js:3 | verified | holds | calibrated | holds | well-supported | upheld | HIGH |
+| S1-F2 | G2 | 1 | no | a.js:4 | verified | holds | calibrated | holds | well-supported | upheld | HIGH |
+| `S2-F2` | G3 | 1 | yes | a.js:9 | verified | holds | overstated | holds | weakly-supported | disputed | LOW |
+| S3-F1 | G3 | 1 | no | a.js:9 | verified | holds | calibrated | holds | well-supported | disputed | LOW |
+| S3-F2 | G4 | 1 | maybe | a.js:1 | verified | holds | calibrated | holds | well-supported | upheld | HIGH |
+| S1-F3 | G5 | 1 | no | a.js:2 | verified | holds | calibrated | holds | well-supported | upheld | HIGH |
+| S9-F9 | G6 | 1 | no | a.js:1 | verified | holds | calibrated | holds | well-supported | upheld | HIGH |
+EOF
+  {
+    printf '# id\tfile\tline\tresult\ttier\treason\n'
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+      S1-F1 a.js 3 unverified 2 no-match \
+      S2-F1 a.js 3 fuzzy-verified 2 - \
+      S1-F2 a.js 4 unverified - no-evidence \
+      S2-F2 a.js 9 unverified - no-evidence \
+      S3-F1 a.js 9 verified 1 - \
+      S3-F2 a.js 1 verified 1 - \
+      S1-F3 a.js 2 verified 1 - \
+      S4-F1 a.js 2 unverified - bad-citation
+  } >| "$vt"
+  local want="${BATS_TEST_TMPDIR}/want.txt"
+  cat >| "$want" <<'EOF'
+BUCKET S1-F1 | Agreement (verified) | correctness=unverified | reason=no-match
+BUCKET S2-F1 | Agreement (verified) | correctness=fuzzy-verified | reason=-
+BUCKET S1-F2 | Unverified Claims | correctness=unverified | reason=no-evidence
+BUCKET S2-F2 | Disagreement | correctness=unverified | reason=no-evidence
+BUCKET S3-F1 | Disagreement | correctness=verified | reason=-
+BUCKET S3-F2 | Unverified Claims | correctness=verified | reason=pass-a-malformed
+BUCKET S1-F3 | Single-Reviewer Findings (verified) | correctness=verified | reason=-
+BUCKET S4-F1 | Unverified Claims | correctness=unverified | reason=pass-a-missing
+EOF
+  local profile impl
+  for profile in $PROFILES; do
+    for impl in $AWKS; do
+      run_in "$profile" "$impl" "council_bucket_lines '$pa' '$vt'"
+      [ "$status" -eq 0 ] || { echo "$profile/$impl: $stderr"; return 1; }
+      diff -u "$want" <(printf '%s\n' "$output") || { echo "$profile/$impl differs"; return 1; }
+      [[ "$stderr" == *"S9-F9 has no verification row"* ]]
+      [[ "$stderr" == *"S4-F1 is missing in pass-a.md"* ]]
+    done
+  done
+  # No Pass A table at all: every finding is still listed.
+  run_in bash "$FIRST_AWK" "council_bucket_lines /dev/null '$vt'"
+  [ "$(printf '%s\n' "$output" | grep -c '| Unverified Claims |')" -eq 8 ]
+}
+
+@test "the report template lists the five bucket headings in precedence order" {
+  run awk '/^### (Agreement|Disagreement|Single-Reviewer|Unverified)/ { print }' "$COUNCIL_MD"
+  [ "$output" = "$(printf '%s\n' '### Agreement (verified)' '### Agreement (unverified)' '### Disagreement' \
+    '### Single-Reviewer Findings (verified)' '### Unverified Claims')" ]
+  run grep -c '(self-assessed)' "$COUNCIL_MD"
+  [ "$output" -eq 0 ]
+}
+
 # --- council_assign_labels -------------------------------------------------
 
 @test "labels are a bijection of S1-S4 on every run and vary across runs" {
@@ -657,9 +750,21 @@ teardown() {
       [ "$(awk -v l="--- begin council-output:$label (reference only) ---" '$0 == l { getline; print }' "$fwd")" = "$want" ] \
         || { echo "$profile: $label ($name) verdict mismatch"; return 1; }
     done
+    # Pass A's table, as 5c writes it; 5e reads only group and conflict.
+    local ids
+    ids=$(sed -n 's/^\[\(S[1-4]-F[0-9]*\)\] severity=.*/\1/p' "$fwd")
+    {
+      printf '| id | group | citations | conflict | citation | correctness | completeness | severity | constraints | support | ruling | confidence |\n'
+      printf '|---|---|---|---|---|---|---|---|---|---|---|---|\n'
+      printf '%s\n' "$ids" | awk '{ printf "| %s | G%d | 1 | no | x | verified | holds | calibrated | holds | well-supported | upheld | HIGH |\n", $1, NR }'
+    } >| "$SD/pass-a.md"
     run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
     [ "$status" -eq 0 ] || { echo "$profile 5e: $stderr"; return 1; }
-    [ "$output" = "COUNCIL_LABEL_MAP=$map" ]
+    # The map, then one BUCKET line per verification row: both citations are
+    # bad, so both are Unverified Claims whatever pass-a.md claimed.
+    [ "$(printf '%s\n' "$output" | head -n 1)" = "COUNCIL_LABEL_MAP=$map" ]
+    [ "$(printf '%s\n' "$output" | sed 1d)" = "$(printf '%s\n' "$ids" | awk '{ print "BUCKET " $1 " | Unverified Claims | correctness=unverified | reason=bad-citation" }')" ] \
+      || { echo "$profile: $output"; return 1; }
     [ ! -e "$SD" ]
     [ ! -e "$st" ]
     rm -rf "$REPO"

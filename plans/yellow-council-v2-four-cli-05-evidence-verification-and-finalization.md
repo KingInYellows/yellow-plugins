@@ -823,7 +823,7 @@ Other docs:
 
 ### Phase D — Five buckets and a verification-backed rubric (plan steps 4, 5; R15, R24)
 
-- [ ] Step 19: Add `council_assign_bucket <citations> <conflict yes|no>
+- [x] Step 19: Add `council_assign_bucket <citations> <conflict yes|no>
   <correctness>` to `lib/council-synthesis.sh`. It prints exactly one of
   `Agreement (verified)`, `Agreement (unverified)`, `Disagreement`,
   `Single-Reviewer Findings (verified)` or `Unverified Claims`.
@@ -835,7 +835,7 @@ Other docs:
   3. `citations` ≥ 2 with `conflict=no` → Agreement, split by correctness.
 
   Add a golden table of every combination to `synthesis.bats`.
-- [ ] Step 20: Rewrite council.md 5c Pass A (L2142-2195).
+- [x] Step 20: Rewrite council.md 5c Pass A (L2142-2195).
   - **Enumerate** uses the `[S<n>-F<k>]` ids already written into
     `forward.txt` and `reverse.txt`. Each one matches a `verification.tsv`
     row (with `file` and `line`), which Pass A reads with the Read tool from
@@ -858,7 +858,7 @@ Other docs:
 > `conflict` columns pass.
 <!-- /deepen-plan -->
 
-- [ ] Step 21: In council.md 5e, after the label map is printed and before
+- [x] Step 21: In council.md 5e, after the label map is printed and before
   `rm -rf -- "$SYNTH_DIR"`:
   - Read `pass-a.md` and run `council_assign_bucket` per row.
   - Print `BUCKET <id> <bucket>` lines for the synthesizer to copy.
@@ -877,7 +877,7 @@ Other docs:
 >   `Unverified Claims`, with a warning on stderr.
 <!-- /deepen-plan -->
 
-- [ ] Step 22: Rewrite the Step 5 output template (L2484-2584).
+- [x] Step 22: Rewrite the Step 5 output template (L2484-2584).
   - Replace the Agreement/Disagreement sections with the five headings, in
     order: `### Agreement (verified)`, `### Agreement (unverified)`,
     `### Disagreement`, `### Single-Reviewer Findings (verified)`,

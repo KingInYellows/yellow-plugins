@@ -837,3 +837,121 @@ verify_finding() {
   rm -rf -- "$tmp"
   return "$rc"
 }
+
+# council_assign_bucket <citations> <conflict yes|no> <correctness> — print
+# the one report bucket (R24) for a finding:
+#   Agreement (verified) | Agreement (unverified) | Disagreement |
+#   Single-Reviewer Findings (verified) | Unverified Claims
+# Precedence: one citing label splits by verification (verified or
+# fuzzy-verified -> Single-Reviewer Findings (verified), else Unverified
+# Claims); two or more with a verdict conflict -> Disagreement (it beats
+# Agreement); two or more without -> Agreement split by verification. A
+# malformed input fails closed to Unverified Claims with a warning. A Pass B
+# flip never reaches this function: ties annotate, they do not move findings.
+council_assign_bucket() {
+  local cit="$1" conflict="$2" corr="$3" grounded=0
+  case "$cit" in
+    '' | *[!0-9]* | 0*) cit="" ;;
+  esac
+  case "$conflict" in yes | no) ;; *) conflict="" ;; esac
+  case "$corr" in
+    verified | fuzzy-verified) grounded=1 ;;
+    unverified) ;;
+    *) corr="" ;;
+  esac
+  if [ -z "$cit" ] || [ -z "$conflict" ] || [ -z "$corr" ]; then
+    printf '[council] Warning: malformed bucket input (citations=%s conflict=%s correctness=%s) — listed under Unverified Claims\n' "$1" "$2" "$3" >&2
+    printf 'Unverified Claims\n'
+  elif [ "$cit" -eq 1 ]; then
+    if [ "$grounded" -eq 1 ]; then printf 'Single-Reviewer Findings (verified)\n'; else printf 'Unverified Claims\n'; fi
+  elif [ "$conflict" = yes ]; then
+    printf 'Disagreement\n'
+  elif [ "$grounded" -eq 1 ]; then
+    printf 'Agreement (verified)\n'
+  else
+    printf 'Agreement (unverified)\n'
+  fi
+}
+
+# council_bucket_lines <pass-a.md> <verification.tsv> — print one line per
+# verification.tsv id, in its order:
+#   BUCKET <id> | <bucket> | correctness=<own result> | reason=<own reason>
+# From pass-a.md (the Pass A markdown table) it reads only each id's `group`
+# and `conflict` cells, validated by shape. Correctness comes from
+# verification.tsv, never from the model's copy. The bucket uses the
+# finding's own result, or for a group cited by two or more labels the best
+# result among its members (verified > fuzzy-verified > unverified); the line
+# shows the finding's own result and reason, which its rubric line copies. `citations` is recounted as the
+# group's distinct labels. An id Pass A dropped, or a row whose cells fail
+# validation, is listed under Unverified Claims with a warning and reason
+# pass-a-missing or pass-a-malformed; an id Pass A invented is ignored with a
+# warning. Nothing is ever dropped.
+council_bucket_lines() {
+  local pa="$1" vt="$2" recs id cit conflict corr own reason flag bucket
+  recs=$(awk '
+    function trim(s) { gsub(/`/, "", s); sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
+    function rank(r) { return r == "verified" ? 3 : (r == "fuzzy-verified" ? 2 : 1) }
+    FILENAME == vt_file {
+      if ($0 ~ /^#/ || $0 == "") next
+      split($0, f, "\t")
+      if (f[1] == "" || (f[1] in res)) next
+      order[++n] = f[1]; res[f[1]] = f[4]; why[f[1]] = f[6]
+      next
+    }
+    /^[ \t]*\|/ {
+      line = $0; sub(/^[ \t]*\|/, "", line); sub(/\|[ \t]*$/, "", line)
+      nc = split(line, c, "|")
+      if (!ci) {
+        for (i = 1; i <= nc; i++) {
+          h = tolower(trim(c[i]))
+          if (h == "id") ci = i
+          else if (h == "group") cg = i
+          else if (h == "conflict") cc = i
+        }
+        if (!(ci && cg && cc)) ci = 0
+        next
+      }
+      id = trim(c[ci])
+      if (id !~ /^S[0-9]+-F[0-9]+$/ || (id in seen)) next
+      seen[id] = 1
+      if (!(id in res)) { print "INVENTED\t" id; next }
+      g = trim(c[cg]); k = tolower(trim(c[cc]))
+      if (g !~ /^[A-Za-z0-9_.-]+$/ || (k != "yes" && k != "no")) { bad[id] = 1; next }
+      grp[id] = g
+      lab = id; sub(/-F[0-9]+$/, "", lab)
+      if (!((g SUBSEP lab) in gl)) { gl[g, lab] = 1; nlab[g]++ }
+      if (k == "yes") gconf[g] = 1
+      if (rank(res[id]) > best[g]) best[g] = rank(res[id])
+    }
+    END {
+      for (i = 1; i <= n; i++) {
+        id = order[i]
+        if (!(id in seen) || (id in bad)) {
+          print id "\t-\t-\t" res[id] "\t" res[id] "\t" why[id] "\t" ((id in bad) ? "malformed" : "missing")
+          continue
+        }
+        g = grp[id]
+        corr = res[id]
+        if (nlab[g] >= 2) corr = best[g] == 3 ? "verified" : (best[g] == 2 ? "fuzzy-verified" : "unverified")
+        print id "\t" nlab[g] "\t" ((g in gconf) ? "yes" : "no") "\t" corr "\t" res[id] "\t" why[id] "\tok"
+      }
+    }
+  ' vt_file="$vt" "$vt" "$pa") || return 1
+  while IFS=$'\t' read -r id cit conflict corr own reason flag; do
+    [ -n "$id" ] || continue
+    if [ "$id" = INVENTED ]; then
+      printf '[council] Warning: pass-a.md row %s has no verification row — ignored\n' "$cit" >&2
+      continue
+    fi
+    if [ "$flag" != ok ]; then
+      printf '[council] Warning: %s is %s in pass-a.md — listed under Unverified Claims\n' "$id" "$flag" >&2
+      bucket="Unverified Claims"
+      reason="pass-a-$flag"
+    else
+      bucket=$(council_assign_bucket "$cit" "$conflict" "$corr")
+    fi
+    printf 'BUCKET %s | %s | correctness=%s | reason=%s\n' "$id" "$bucket" "${own:-unverified}" "${reason:--}"
+  done <<__COUNCIL_BUCKETS__
+$recs
+__COUNCIL_BUCKETS__
+}
