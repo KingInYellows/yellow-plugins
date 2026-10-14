@@ -82,6 +82,11 @@ reply):
 | `oos` | Out of this PR's scope; follow-up issue filed (GitHub, or Linear when the branch has a Linear ID); reply links it; thread resolved |
 | `disagree` / `unclear` | Reply explains; thread stays open and is listed as blocking merge |
 
+When a thread `/review:resolve` earlier marked `oos` is later `fixed` or
+`addressed`, the new reply names the GitHub follow-up issue
+(`Follow-up #N is no longer needed.`) so a human can close it; nothing closes it
+automatically. A Linear follow-up, or one the lookup cannot find, is not named.
+
 Human-reviewer threads resolve only on hard evidence by default; others are
 held open (`resolve_pr.resolve_human_threads` in `yellow-plugins.local.md`).
 Unattended runs file at most 3 issues per PR. Replies and issues carry a
