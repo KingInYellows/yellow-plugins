@@ -1,0 +1,23 @@
+plans/haiku-5-5-model-routing-phase-1.md
+  s_038935c1c9408d::t_8787d14e51f3f7 173-197
+  s_038935c1c9408d::t_4f63586e7f63c7 31-36
+  s_038935c1c9408d::t_94226e56f86c93 151,158,257,278,295,319,331,517,525,529,542,557,559,637
+  s_038935c1c9408d::t_415c2290cdf0dc 616-620
+  s_038935c1c9408d::t_cfc1ff674aa2d7 621
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b4dc16bf715297ac169fbbcb74980effb629efcf",
+  "prompts": {},
+  "sessions": {
+    "s_038935c1c9408d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c7683a4-00d4-449e-9d60-dc3112e28dc7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
