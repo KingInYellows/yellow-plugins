@@ -1,0 +1,39 @@
+plugins/yellow-review/README.md
+  s_66c69f242a26cf::t_c78be8bf0a6fca 179
+.changeset/yellow-review-revert-denied-ask-first.md
+  s_66c69f242a26cf::t_3b98dbb7255df5 1-9
+plugins/yellow-review/references/resolve/dispositions.md
+  s_66c69f242a26cf::t_49f7edb3d6a079 617-619
+plugins/yellow-review/CLAUDE.md
+  s_66c69f242a26cf::t_6c230f88fde4fe 250
+plugins/yellow-review/tests/skill-content.bats
+  s_66c69f242a26cf::t_a2eab9ee54be4d 1248-1250,1264-1280
+plugins/yellow-review/tests/run-verify-command.bats
+  s_66c69f242a26cf::t_7c032f53063172 528-586
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_66c69f242a26cf::t_327f5659c0eea0 447-454
+  s_66c69f242a26cf::t_9a895311fda6a2 455-461
+plugins/yellow-review/skills/pr-review-workflow/scripts/run-verify-command
+  s_66c69f242a26cf::t_ce1b59408bcb11 1264-1277
+  s_66c69f242a26cf::t_66869f7177d30e 2252-2256
+  s_66c69f242a26cf::t_03f3ee2fd1aa27 10,118-124,147-148,729
+  s_66c69f242a26cf::t_3eb00eee28629b 757,761
+  s_66c69f242a26cf::t_276c4ff3ffeb31 797
+  s_66c69f242a26cf::t_07824e68e8207b 906-936
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ce36fdb7e037ea6d5e0e42743165de372027492b",
+  "prompts": {},
+  "sessions": {
+    "s_66c69f242a26cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d70c91f9-4862-4cc5-a871-8486fa61cc85",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": null
+    }
+  }
+}
