@@ -1,0 +1,21 @@
+scripts/validate-council-roster.js
+  s_85fc8ead701d66::t_64b48755d3dbd2 923-925,929
+tests/integration/validate-council-roster.test.ts
+  s_85fc8ead701d66::t_8b8c6e819d5408 1027-1043
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0cdb6365a5d2ceab55027e8f30e9543453d8406b",
+  "prompts": {},
+  "sessions": {
+    "s_85fc8ead701d66": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "41035699-7b34-476d-86ad-c4b60fc59b92",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
