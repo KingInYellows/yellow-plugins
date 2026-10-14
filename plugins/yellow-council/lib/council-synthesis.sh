@@ -144,7 +144,11 @@ council_normalize_text() {
       trail_c[i] = ""; trail_n[i] = 0; role[i] = ""; cut_l[i] = 0; cut_t[i] = 0
       if (w !~ /^[*_]+$/) {
         if (match(w, /^[("[{]+/)) { w_pre[i] = substr(w, 1, RLENGTH); w = substr(w, RLENGTH + 1) }
-        if (match(w, /[]})".,;:!?]+$/)) { w_post[i] = substr(w, RSTART); w = substr(w, 1, RSTART - 1) }
+        # Scan the trailing run from the right: an unanchored end regex is
+        # quadratic on a long run that ends in another character.
+        n = length(w)
+        while (n > 0 && index("]})\".,;:!?", substr(w, n, 1)) > 0) n--
+        if (n < length(w)) { w_post[i] = substr(w, n + 1); w = substr(w, 1, n) }
       }
       w_core[i] = w
       if (w == "" || w ~ /^[*_]+$/) return
@@ -215,10 +219,13 @@ council_normalize_text() {
       if (c == "`" && index(substr(t, n + 1), "`") > 0) return 0
       return n
     }
-    # The line as fence tests see it: past indentation and blockquote markers.
+    # The line as fence tests see it: past indentation, blockquote markers and
+    # one list marker (a fence inside a list item is still a fence).
+    # council_extract_citations carries the same function; keep them in step.
     function fence_view(line,   q) {
       q = line; sub(/^[ \t]*/, "", q)
       while (match(q, /^>[ \t>]*/)) q = substr(q, RLENGTH + 1)
+      if (match(q, /^([-*+]|[0-9]+[.)])[ \t]+/)) q = substr(q, RLENGTH + 1)
       return q
     }
     # A closed fence passes through untouched, opening line to closing line;
@@ -407,17 +414,21 @@ council_fence_block() {
 # council_normalize_text output, where every reviewer's finding header is one
 # `severity=P<n> <file>:<line> ...` line and the Evidence: tail is verbatim.
 # Each such line outside a closed code fence is finding <label>-F<k> (k from
-# 1). Prints one JSONL row per finding on stdout: {id, sev, file, line,
-# quote}; quote is the finding's first `Evidence: "..."` text before the next
-# severity= line with its outer quotes (or backticks) removed, and null when
-# the Evidence is missing, empty or `N/A ...` (every Codex finding: its
-# records carry no quoted line). A header with no `<file>:<line>` token gets a
-# null file and line. Writes <tagged-out>: the same text with `[<id>] `
-# prefixed to each numbered line; a reviewer line that already starts like an
-# id tag is prefixed `[ESCAPED] ` so it cannot pass for one. Rows carry the
-# label only, never a reviewer name.
+# 1); fences are judged exactly as the normalizer judges them (same view, an
+# unclosed fence re-read as ordinary text), so the two never disagree about
+# which headers are findings. Prints one JSONL row per finding on stdout:
+# {id, sev, file, line, quote}. The citation token may be wrapped in
+# backticks, brackets or parentheses; a range or :col suffix uses its first
+# line. quote is the finding's first `Evidence: "..."` text before the next
+# severity= line, outer quotes (or backticks) removed, capped at 4096
+# characters, and null when the Evidence is missing, empty or `N/A ...`
+# (every Codex finding: its records carry no quoted line). A header with no
+# `<file>:<line>` token gets a null file and line. Writes <tagged-out>: the
+# same text with `[<id>] ` prefixed to each numbered line; any other line that
+# starts like an id tag, fenced or not, is prefixed `[ESCAPED] ` so it cannot
+# pass for one. Rows carry the label only, never a reviewer name.
 council_extract_citations() {
-  local label="$1" in="$2" tagged="$3" recs id sev file ln hasq quote
+  local label="$1" in="$2" tagged="$3" recs
   recs=$(awk -v label="$label" -v tagged="$tagged" '
     function fence_open(t,   c, n) {
       c = substr(t, 1, 1)
@@ -428,10 +439,17 @@ council_extract_citations() {
       if (c == "`" && index(substr(t, n + 1), "`") > 0) return 0
       return n
     }
+    # Same as council_normalize_text: past indentation, blockquote markers and
+    # one list marker. Keep the two in step.
     function fence_view(line,   q) {
       q = line; sub(/^[ \t]*/, "", q)
       while (match(q, /^>[ \t>]*/)) q = substr(q, RLENGTH + 1)
+      if (match(q, /^([-*+]|[0-9]+[.)])[ \t]+/)) q = substr(q, RLENGTH + 1)
       return q
+    }
+    function escape_tag(line) {
+      if (line ~ /^[ \t>]*\[S[0-9]+-F[0-9]+\]/) return "[ESCAPED] " line
+      return line
     }
     function flush() {
       if (!have) return
@@ -448,23 +466,11 @@ council_extract_citations() {
         for (i = length(t); i > 1 && substr(t, i, 1) != c; i--) ;
         if (i > 1) t = substr(t, 2, i - 2)
       } else if (t ~ /^N\/A/) t = ""
+      # No single source line is longer; keeps every later stage bounded.
+      if (length(t) > 4096) t = substr(t, 1, 4096)
       if (t != "") { hasq = 1; quote = t }
     }
-    {
-      line = $0
-      if (fence_len > 0) {
-        print line > tagged
-        u = fence_view(line); sub(/[ \t]*$/, "", u)
-        n = 0
-        while (substr(u, n + 1, 1) == fence_char) n++
-        if (n >= fence_len && n == length(u)) fence_len = 0
-        next
-      }
-      if ((n = fence_open(fence_view(line))) > 0) {
-        fence_len = n; fence_char = substr(fence_view(line), 1, 1)
-        print line > tagged
-        next
-      }
+    function text_line(line,   rest, cite, p, num) {
       if (line ~ /^severity=P[123]( |$)/) {
         flush()
         k++; id = label "-F" k; sev = substr(line, 11, 1)
@@ -472,6 +478,7 @@ council_extract_citations() {
         rest = substr(line, 13)
         if (match(rest, /^[^ \t]+/)) {
           cite = substr(rest, 1, RLENGTH)
+          sub(/^[(\[`"]+/, "", cite)
           if ((p = index(cite, ":")) > 1 && substr(cite, p + 1) ~ /^[0-9]/) {
             file = substr(cite, 1, p - 1)
             num = substr(cite, p + 1); match(num, /^[0-9]+/); ln = substr(num, 1, RLENGTH)
@@ -480,29 +487,45 @@ council_extract_citations() {
         if ((p = index(line, "Evidence:")) > 0) set_quote(substr(line, p + 9))
         have = 1
         print "[" id "] " line > tagged
-        next
+        return
       }
       if (have && line ~ /^Evidence:/) set_quote(substr(line, 10))
-      if (line ~ /^\[S[0-9]+-F[0-9]+\]/) line = "[ESCAPED] " line
-      print line > tagged
+      print escape_tag(line) > tagged
     }
-    END { flush(); close(tagged) }
+    {
+      line = $0
+      if (fence_len > 0) {
+        held[++nheld] = line
+        u = fence_view(line); sub(/[ \t]*$/, "", u)
+        n = 0
+        while (substr(u, n + 1, 1) == fence_char) n++
+        if (n >= fence_len && n == length(u)) {
+          for (i = 1; i <= nheld; i++) print escape_tag(held[i]) > tagged
+          nheld = 0; fence_len = 0
+        }
+        next
+      }
+      if ((n = fence_open(fence_view(line))) > 0) {
+        fence_len = n; fence_char = substr(fence_view(line), 1, 1)
+        nheld = 1; held[1] = line
+        next
+      }
+      text_line(line)
+    }
+    END {
+      # An unclosed fence: ordinary text, as the normalizer treated it.
+      for (i = 1; i <= nheld; i++) text_line(held[i])
+      flush(); close(tagged)
+    }
   ' "$in") || return 1
   [ -n "$recs" ] || return 0
-  while IFS=$'\t' read -r id sev file ln hasq quote; do
-    [ -n "$id" ] || continue
-    [ "$file" != "-" ] || file=""
-    [ "$ln" != "-" ] || ln=""
-    [ "$hasq" = 1 ] || quote=""
-    jq -cn --arg id "$id" --arg sev "P$sev" --arg file "$file" --arg line "$ln" \
-      --arg quote "$quote" --arg hasq "$hasq" \
-      '{id: $id, sev: $sev,
-        file: (if $file == "" then null else $file end),
-        line: (if $line == "" then null else $line end),
-        quote: (if $hasq == "1" then $quote else null end)}' || return 1
-  done <<__COUNCIL_CITATIONS__
-$recs
-__COUNCIL_CITATIONS__
+  # One jq pass on stdin: no reviewer text in argv (one argument is capped at
+  # 128 KiB) and no fork per finding. A quote may itself contain tabs.
+  printf '%s\n' "$recs" | jq -R -c 'select(length > 0) | split("\t")
+    | {id: .[0], sev: ("P" + .[1]),
+       file: (if .[2] == "-" then null else .[2] end),
+       line: (if .[3] == "-" then null else .[3] end),
+       quote: (if .[4] == "1" then (.[5:] | join("\t")) else null end)}'
 }
 
 # council_core_lib <rel> — print the path of <rel> (e.g. lib/quote-ground.sh)
@@ -534,11 +557,15 @@ council_core_lib() {
 }
 
 # council_have_rapidfuzz — true when python3 can import rapidfuzz (Tier 2,
-# optional, R23). Cached for the life of the shell. The probe and the Tier 2
-# run both use the first python3 on PATH, so they cannot disagree.
+# optional, R23). Cached for the life of the shell. The probe runs from /:
+# `python3 -c` puts the current directory first on sys.path, and the current
+# directory is the checkout under review, where a planted rapidfuzz.py would
+# run. The scorer runs as a script (sys.path[0] is the plugin's lib/) from /
+# too, with the same first python3 on PATH, so probe and run cannot disagree.
 council_have_rapidfuzz() {
   if [ -z "${_COUNCIL_RAPIDFUZZ:-}" ]; then
-    if command -v python3 >/dev/null 2>&1 && python3 -c 'import rapidfuzz' >/dev/null 2>&1; then
+    if command -v python3 >/dev/null 2>&1 \
+      && (cd / && python3 -c 'import rapidfuzz') >/dev/null 2>&1; then
       _COUNCIL_RAPIDFUZZ=yes
     else
       _COUNCIL_RAPIDFUZZ=no
@@ -547,38 +574,60 @@ council_have_rapidfuzz() {
   [ "$_COUNCIL_RAPIDFUZZ" = yes ]
 }
 
+# _council_citable <file> <base> <root> — the read-side half of the citation
+# parse: no `.git` segment, yellow-core's validate_file_path (no traversal, no
+# escaping symlink), a readable regular file, and, inside a git work tree,
+# not ignored by git (a reviewer only ever saw tracked or pack files; an
+# ignored .env must not become a yes/no oracle).
+_council_citable() {
+  case "/$1/" in */.git/*) return 1 ;; esac
+  validate_file_path "$1" "$2" 2>/dev/null || return 1
+  [ -f "$2/$1" ] && [ -r "$2/$1" ] || return 1
+  # check-ignore exits 0 ignored, 1 not ignored; anything else fails closed.
+  # (It refuses GIT_LITERAL_PATHSPECS; it matches the name against ignore
+  # rules rather than expanding it.)
+  if [ -n "$3" ]; then
+    git -C "$3" check-ignore -q -- "$1" 2>/dev/null
+    [ "$?" -eq 1 ] || return 1
+  fi
+}
+
 # council_verify_findings <mode> <in.jsonl> <out.tsv> — the R22-R25 evidence
-# check for every council_extract_citations row. Writes <out.tsv>: a `#`
-# header, then one row per input id, in input order:
+# check for every council_extract_citations row. Writes <out.tsv>: `#` header
+# lines, then one row per input id, in input order:
 #   id<TAB>file<TAB>line<TAB>result<TAB>tier<TAB>reason
 # result is verified (tier 1), fuzzy-verified (tier 2) or unverified (tier
 # "-" or 2) with reason no-match, too-short, bad-citation, no-evidence,
-# tier2-cap, tier2-skipped or verifier-error; reason is "-" otherwise.
-#  1. Strict citation parse before any read: an ASCII allowlist path with no
-#     leading / ~ or -, no .. segment, a line of 1-7 digits, then
-#     validate_file_path (yellow-core validate-fs.sh) against the git root, a
-#     readable regular file, and the line within its length. Any failure is
-#     bad-citation; a null quote is no-evidence.
+# tier2-cap, tier2-skipped or verifier-error; reason is "-" otherwise. The
+# file column is the reviewer's token with anything outside the path
+# allowlist shown as "?".
+#  1. Citation parse, before any read: an ASCII allowlist path with no
+#     leading / ~ or -, no .. or .git segment, a line of 1-7 digits, then
+#     _council_citable and the line within the file. Any failure is
+#     bad-citation; a null quote is no-evidence. Results are cached per file.
 #  2. Target per mode: plan/debug/question read the working tree. review
-#     reads it only when `git diff --quiet HEAD -- <file>` holds; otherwise
-#     Tier 1 is skipped and Tier 2 reads `git show HEAD:<file>` (the working
-#     tree for a file HEAD does not have). No git work tree skips Tier 1.
+#     reads it only for a file `git diff --name-only HEAD` does not list;
+#     otherwise Tier 1 is skipped and Tier 2 reads `git show HEAD:<file>`
+#     (the working tree for a file HEAD does not have). No git work tree
+#     skips Tier 1.
 #  3. Tier 1: one `bash quote-ground.sh batch` call from the git root (the
 #     cited line +-3, redacted and whitespace-normalized). grounded ->
 #     verified; too-short and unsafe-path are final; ungrounded goes to Tier 2.
-#     A missing quote-ground or a batch exit 2 warns and sends every pending
+#     A missing quote-ground or a failed batch warns and sends every pending
 #     row to Tier 2.
 #  4. Tier 2 (R25): each label's top 50 candidates by severity, then k; the
 #     rest are tier2-cap. Without rapidfuzz: tier2-skipped. Quote and window
-#     are redacted with cs_redact_secrets and normalized like quote-ground,
-#     then lib/fuzzy-ratio.py scores max(ratio, partial_ratio for a quote of
-#     16+ characters) per window line; >= 85 is fuzzy-verified.
-# Returns non-zero only when it cannot read its input or write <out.tsv>;
-# every other failure becomes a reason. It never drops a row.
+#     (lines clipped to 4096 characters) are redacted with cs_redact_secrets
+#     and normalized like quote-ground, then lib/fuzzy-ratio.py scores them
+#     (see its header); >= 85 is fuzzy-verified.
+# Without yellow-core's validate-fs.sh and compound-staging.sh every row is
+# verifier-error. Returns non-zero only when it cannot read its input or
+# write <out.tsv>; every other failure becomes a reason. It never drops a row.
 council_verify_findings() {
   local mode="$1" in="$2" out="$3" root="" base qg vfs cst fz rows decided="" t1="" t2=""
-  local idx id lab k sevr ok file ln hasq full lines src res tier reason
-  local jsonl qout rc ranked cands quotes stream mark redacted scores
+  local nl='
+' dirty="" seen_ok="" seen_bad="" idx id lab k sevr ok file ln hasq src res rc reason
+  local jsonl qout more ranked cands stream redacted scores mark
   [ -f "$in" ] && [ -r "$in" ] || { printf '[council] Error: cannot read %s\n' "$in" >&2; return 1; }
   command -v jq >/dev/null 2>&1 || { printf '[council] Error: jq is required for evidence verification\n' >&2; return 1; }
   if root=$(git rev-parse --show-toplevel 2>/dev/null) && [ -n "$root" ]; then
@@ -590,19 +639,20 @@ council_verify_findings() {
   qg=$(council_core_lib lib/quote-ground.sh) || qg=""
   vfs=$(council_core_lib lib/validate-fs.sh) || vfs=""
   cst=$(council_core_lib lib/compound-staging.sh) || cst=""
-  if [ -n "$vfs" ]; then
-    . "$vfs" || vfs=""
+  if [ -z "$vfs" ] || [ -z "$cst" ] || ! . "$vfs" || ! . "$cst"; then
+    vfs=""
+    printf '[council] Warning: yellow-core (validate-fs.sh, compound-staging.sh) not found — every finding is unverified (verifier-error)\n' >&2
+  elif [ -z "$qg" ]; then
+    printf '[council] Warning: yellow-core quote-ground.sh not found — Tier 1 evidence checks fall back to Tier 2\n' >&2
   fi
-  if [ -n "$cst" ]; then
-    . "$cst" || cst=""
-  fi
-  if [ -z "$vfs" ] || [ -z "$cst" ] || [ -z "$qg" ]; then
-    printf '[council] Warning: yellow-core (quote-ground.sh, validate-fs.sh, compound-staging.sh) not found — evidence verification is limited\n' >&2
-  fi
+  # _council_decide <id> <result> <tier> <reason> — record one decision.
+  _council_decide() { decided="${decided}$1	$2	$3	$4
+"; }
   # idx, id, label, k, severity rank, citation shape ok, file, line, has quote.
   rows=$(jq -r '
-    # Fields feed a tab-split `read`, where an empty field would collapse.
-    def clean: if . == null then "-" else (tostring | gsub("[[:cntrl:]]"; "?")
+    # Fields feed a tab-split `read`, where an empty field would collapse; the
+    # file token is shown with anything outside the path allowlist as "?".
+    def clean: if . == null then "-" else (tostring | gsub("[^A-Za-z0-9 ._/+@=,~()\\[\\]:-]"; "?")
       | if . == "" then "-" else . end) end;
     (.id | tostring) as $id
     | (([$id | capture("^(?<label>S[0-9]+)-F(?<k>[0-9]+)$")] | .[0]) // {label: "S0", k: "0"}) as $m
@@ -616,51 +666,58 @@ council_verify_findings() {
         then 1 else 0 end) as $ok
     | [input_line_number, $id, $m.label, $m.k,
        (if .sev == "P1" then 1 elif .sev == "P2" then 2 else 3 end),
-       $ok, (.file | clean), (if $ln == "" then "-" else ($ln | clean) end),
+       $ok, (.file | clean), ($ln | clean),
        (if (.quote | type) == "string" and .quote != "" then 1 else 0 end)]
     | map(tostring) | join("\t")' "$in") || {
     printf '[council] Error: %s is not valid citation JSONL\n' "$in" >&2
     return 1
   }
-  # Step 1-2: citation parse and target choice, one row at a time.
+  if [ -n "$root" ] && [ "$mode" = review ]; then
+    dirty=$(git -C "$root" diff --name-only HEAD 2>/dev/null)
+  fi
+  # Steps 1-2: citation parse and target choice, one row at a time.
   while IFS=$'\t' read -r idx id lab k sevr ok file ln hasq; do
     [ -n "$id" ] || continue
-    if [ "$ok" = 1 ] && [ -n "$vfs" ] && validate_file_path "$file" "$base" 2>/dev/null; then
-      full="$base/$file"
-      if [ -f "$full" ] && [ -r "$full" ]; then
-        lines=$(awk 'END { print NR }' "$full" 2>/dev/null) || lines=0
-        [ "$ln" -le "${lines:-0}" ] 2>/dev/null || ok=0
-      else
-        ok=0
-      fi
-    elif [ "$ok" = 1 ] && [ -z "$vfs" ]; then
-      ok=v
-    else
-      ok=0
+    if [ -z "$vfs" ]; then
+      _council_decide "$id" unverified - verifier-error
+      continue
     fi
-    if [ "$ok" = v ]; then
-      decided="${decided}${id}	unverified	-	verifier-error
-"
-    elif [ "$ok" != 1 ]; then
-      decided="${decided}${id}	unverified	-	bad-citation
-"
+    if [ "$ok" = 1 ]; then
+      case "$nl$seen_bad" in
+        *"$nl$file$nl"*) ok=0 ;;
+        *)
+          case "$nl$seen_ok" in
+            *"$nl$file$nl"*) ;;
+            *)
+              if _council_citable "$file" "$base" "$root"; then
+                seen_ok="$seen_ok$file$nl"
+              else
+                seen_bad="$seen_bad$file$nl"
+                ok=0
+              fi ;;
+          esac ;;
+      esac
+    fi
+    # The cited line must exist: stop reading at it.
+    [ "$ok" != 1 ] || awk -v ln="$ln" 'NR >= ln { f = 1; exit } END { exit !f }' "$base/$file" 2>/dev/null || ok=0
+    if [ "$ok" != 1 ]; then
+      _council_decide "$id" unverified - bad-citation
     elif [ "$hasq" != 1 ]; then
-      decided="${decided}${id}	unverified	-	no-evidence
-"
+      _council_decide "$id" unverified - no-evidence
     elif [ -z "$root" ]; then
       t2="${t2}${lab}	${sevr}	${k}	${id}	wt	${file}	${ln}
 "
-    elif [ "$mode" = review ] && ! git -C "$root" diff --quiet HEAD -- "$file" 2>/dev/null; then
-      if git -C "$root" cat-file -e "HEAD:$file" 2>/dev/null; then
-        t2="${t2}${lab}	${sevr}	${k}	${id}	head	${file}	${ln}
-"
-      else
-        t2="${t2}${lab}	${sevr}	${k}	${id}	wt	${file}	${ln}
-"
-      fi
     else
-      t1="${t1}${lab}	${sevr}	${k}	${id}	wt	${file}	${ln}
-"
+      case "$nl$dirty$nl" in
+        *"$nl$file$nl"*)
+          src=wt
+          git -C "$root" cat-file -e "HEAD:$file" 2>/dev/null && src=head
+          t2="${t2}${lab}	${sevr}	${k}	${id}	${src}	${file}	${ln}
+" ;;
+        *)
+          t1="${t1}${lab}	${sevr}	${k}	${id}	wt	${file}	${ln}
+" ;;
+      esac
     fi
   done <<__COUNCIL_VERIFY_ROWS__
 $rows
@@ -670,11 +727,12 @@ __COUNCIL_VERIFY_ROWS__
     qout=""
     rc=1
     if [ -n "$qg" ]; then
-      jsonl=$(printf '%s' "$t1" | cut -f4 | jq -R . | jq -cs . \
-        | jq -c --slurpfile src "$in" '. as $ids | $src[] | select(.id as $i | $ids | index($i))
-            | {id, file, line: (.line | tostring), quote}') && \
-      qout=$(cd "$root" && printf '%s\n' "$jsonl" | bash "$qg" batch 2>/dev/null)
-      rc=$?
+      if jsonl=$(printf '%s' "$t1" | cut -f4 | jq -Rn -c --slurpfile src "$in" '
+          ([inputs | {(.): true}] | add // {}) as $ids
+          | $src[] | select($ids[.id]) | {id, file, line: (.line | tostring), quote}') \
+        && qout=$(cd "$root" && printf '%s\n' "$jsonl" | bash "$qg" batch 2>/dev/null); then
+        rc=0
+      fi
     fi
     if [ "$rc" -ne 0 ] || [ -z "$qout" ]; then
       printf '[council] Warning: Tier 1 evidence check unavailable (quote-ground.sh missing or failed) — falling back to Tier 2\n' >&2
@@ -684,26 +742,24 @@ __COUNCIL_VERIFY_ROWS__
       while IFS=$'\t' read -r id res; do
         [ -n "$id" ] || continue
         case "$res" in
-          grounded) decided="${decided}${id}	verified	1	-
-" ;;
-          too-short) decided="${decided}${id}	unverified	-	too-short
-" ;;
-          unsafe-path) decided="${decided}${id}	unverified	-	bad-citation
-" ;;
+          grounded) _council_decide "$id" verified 1 - ;;
+          too-short) _council_decide "$id" unverified - too-short ;;
+          unsafe-path) _council_decide "$id" unverified - bad-citation ;;
         esac
       done <<__COUNCIL_VERIFY_T1__
 $qout
 __COUNCIL_VERIFY_T1__
       # Ungrounded rows, and any row quote-ground did not answer, go on.
-      t2="${t2}$(printf '%s' "$t1" | awk -F'\t' -v done="$decided" '
-        BEGIN { n = split(done, d, "\n"); for (i = 1; i <= n; i++) { split(d[i], f, "\t"); seen[f[1]] = 1 } }
-        !($4 in seen) { print }')"
-      [ -z "$t2" ] || t2="${t2%
-}
+      more=$(printf '%s@@COUNCIL-T1@@\n%s' "$decided" "$t1" | awk -F'\t' '
+        $0 == "@@COUNCIL-T1@@" { r = 1; next }
+        !r { seen[$1] = 1; next }
+        NF && !($4 in seen)')
+      [ -z "$more" ] || t2="${t2}${more}
 "
     fi
   fi
   # Step 4: Tier 2, capped per label.
+  cands=""
   if [ -n "$t2" ]; then
     ranked=$(printf '%s' "$t2" | sort -t '	' -k1,1 -k2,2n -k3,3n)
     cands=$(printf '%s\n' "$ranked" | awk -F'\t' 'NF { if (++n[$1] <= 50) print }')
@@ -713,52 +769,40 @@ __COUNCIL_VERIFY_T1__
       decided="${decided}$(printf '%s\n' "$cands" | awk -F'\t' '{ print $4 "\tunverified\t-\ttier2-skipped" }')
 "
       cands=""
-    elif [ -n "$cands" ] && [ -z "$cst" ]; then
-      decided="${decided}$(printf '%s\n' "$cands" | awk -F'\t' '{ print $4 "\tunverified\t-\tverifier-error" }')
-"
-      cands=""
     fi
   fi
-  if [ -n "${cands:-}" ]; then
+  if [ -n "$cands" ]; then
     fz="${CLAUDE_PLUGIN_ROOT:-}/lib/fuzzy-ratio.py"
     # Quotes and window lines, unredacted, stay in memory and pipes. A line
     # inside a private-key block (or carrying a key marker) becomes
     # [REDACTED] here: cs_redact_secrets' sed range would merge lines.
-    quotes=$(printf '%s\n' "$cands" | cut -f4 | jq -R . | jq -cs . \
-      | jq -r --slurpfile src "$in" '. as $ids | $src[] | select(.id as $i | $ids | index($i))
-          | "Q\t\(.id)\t\(.quote | gsub("[\r\n]"; " "))"') || quotes=""
-    stream=$(printf '%s\n' "$quotes" | awk -F'\t' '
-      { t = $0; sub(/^[^\t]*\t[^\t]*\t/, "", t) }
-      t ~ /PRIVATE KEY|-----BEGIN|-----END/ { print $1 "\t" $2 "\t[REDACTED]"; next }
-      { print }')
-    while IFS=$'\t' read -r lab sevr k id src file ln; do
-      [ -n "$id" ] || continue
-      if [ "$src" = head ]; then
-        lines=$(git -C "$root" show "HEAD:$file" 2>/dev/null | awk -v id="$id" -v ln="$ln" '
+    stream=$(
+      printf '%s\n' "$cands" | cut -f4 | jq -Rn -r --slurpfile src "$in" '
+          ([inputs | {(.): true}] | add // {}) as $ids
+          | $src[] | select($ids[.id]) | "Q\t\(.id)\t\(.quote | gsub("[\r\n]"; " "))"' \
+        | awk -F'\t' '{ t = $0; sub(/^[^\t]*\t[^\t]*\t/, "", t) }
+            t ~ /PRIVATE KEY|-----BEGIN|-----END/ { print $1 "\t" $2 "\t[REDACTED]"; next }
+            { print }'
+      while IFS=$'\t' read -r lab sevr k id src file ln; do
+        [ -n "$id" ] || continue
+        if [ "$src" = head ]; then
+          git -C "$root" show "HEAD:$file" 2>/dev/null
+        else
+          cat -- "$base/$file" 2>/dev/null
+        fi | awk -v id="$id" -v ln="$ln" '
           { key = 0
             if (inkey) { key = 1; if ($0 ~ /-----END.*PRIVATE KEY-----/) inkey = 0 }
             else if ($0 ~ /-----BEGIN.*PRIVATE KEY-----/) { key = 1; if ($0 !~ /-----END.*PRIVATE KEY-----/) inkey = 1 } }
           NR >= ln - 3 && NR <= ln + 3 {
             t = $0; sub(/\r$/, "", t)
             if (key || t ~ /PRIVATE KEY|-----BEGIN|-----END/) t = "[REDACTED]"
-            print "L\t" id "\t" t }
-          END { if (NR < ln) print "X\t" id "\tout-of-range" }')
-      else
-        lines=$(awk -v id="$id" -v ln="$ln" '
-          { key = 0
-            if (inkey) { key = 1; if ($0 ~ /-----END.*PRIVATE KEY-----/) inkey = 0 }
-            else if ($0 ~ /-----BEGIN.*PRIVATE KEY-----/) { key = 1; if ($0 !~ /-----END.*PRIVATE KEY-----/) inkey = 1 } }
-          NR >= ln - 3 && NR <= ln + 3 {
-            t = $0; sub(/\r$/, "", t)
-            if (key || t ~ /PRIVATE KEY|-----BEGIN|-----END/) t = "[REDACTED]"
-            print "L\t" id "\t" t }
-          NR > ln + 3 { exit }' "$base/$file" 2>/dev/null)
-      fi
-      stream="${stream}
-${lines}"
-    done <<__COUNCIL_VERIFY_T2__
+            print "L\t" id "\t" substr(t, 1, 4096) }
+          NR > ln + 3 { exit }
+          END { if (NR < ln) print "X\t" id "\tout-of-range" }'
+      done <<__COUNCIL_VERIFY_T2__
 $cands
 __COUNCIL_VERIFY_T2__
+    )
     # Out-of-range against HEAD is a bad citation, not a miss.
     decided="${decided}$(printf '%s\n' "$stream" | awk -F'\t' '$1 == "X" { print $2 "\tunverified\t-\tbad-citation" }')
 "
@@ -766,17 +810,14 @@ __COUNCIL_VERIFY_T2__
     # One redaction pass over the whole stream; the end mark proves no line
     # was dropped or merged. Then the quote-ground canonicalization:
     # [REDACTED:<type>] -> [REDACTED], tabs to spaces, runs of spaces to one,
-    # trimmed.
+    # trimmed. An id with no quote row gets no score (verifier-error below).
     mark="COUNCIL-VERIFY-END-$$"
-    redacted=$(printf '%s\n%s\n' "$stream" "$mark" | cs_redact_secrets) || redacted=""
-    if [ -z "$redacted" ] \
-      || [ "$(printf '%s\n' "$redacted" | tail -n 1)" != "$mark" ] \
-      || [ "$(printf '%s\n' "$redacted" | wc -l)" -ne "$(printf '%s\n%s\n' "$stream" "$mark" | wc -l)" ]; then
-      printf '[council] Warning: Tier 2 redaction failed — those findings are unverified (verifier-error)\n' >&2
-      scores=""
-      rc=9
-    else
-      jsonl=$(printf '%s\n' "$redacted" | sed '$d' | awk -F'\t' '
+    rc=1
+    scores=""
+    if redacted=$(printf '%s\n%s\n' "$stream" "$mark" | cs_redact_secrets) \
+      && [ "$(printf '%s\n' "$redacted" | tail -n 1)" = "$mark" ] \
+      && [ "$(printf '%s\n' "$redacted" | wc -l)" -eq "$(printf '%s\n%s\n' "$stream" "$mark" | wc -l)" ] \
+      && jsonl=$(printf '%s\n' "$redacted" | sed '$d' | awk -F'\t' '
         { tag = $1; id = $2; t = $0; sub(/^[^\t]*\t[^\t]*\t/, "", t)
           gsub(/\[REDACTED(:[^]]*)?\]/, "[REDACTED]", t)
           gsub(/\t/, " ", t); gsub(/\r/, "", t)
@@ -785,18 +826,12 @@ __COUNCIL_VERIFY_T2__
           print tag "\t" id "\t" t }' \
         | jq -R -c -s 'split("\n") | map(select(length > 0)
             | capture("^(?<t>[QL])\t(?<id>[^\t]*)\t(?<x>.*)$")) | group_by(.id) | .[]
-            | {id: .[0].id, quote: ((map(select(.t == "Q").x))[0] // ""),
-               lines: map(select(.t == "L").x)}')
-      rc=$?
-      if [ "$rc" -eq 0 ]; then
-        if [ -f "$fz" ]; then
-          scores=$(printf '%s\n' "$jsonl" | python3 "$fz" 2>/dev/null)
-          rc=$?
-        else
-          rc=9
-        fi
-      fi
-      [ "$rc" -eq 0 ] || scores=""
+            | select(any(.[]; .t == "Q"))
+            | {id: .[0].id, quote: (map(select(.t == "Q").x))[0],
+               lines: map(select(.t == "L").x)}') \
+      && [ -f "$fz" ] \
+      && scores=$(printf '%s\n' "$jsonl" | (cd / && timeout 120 python3 "$fz") 2>/dev/null); then
+      rc=0
     fi
     if [ "$rc" -eq 0 ]; then
       decided="${decided}$(printf '%s\n' "$scores" | jq -r '
@@ -805,17 +840,14 @@ __COUNCIL_VERIFY_T2__
                       else "unverified\t2\tno-match" end)')
 "
     else
-      reason=verifier-error
-      [ "$rc" -ne 3 ] || reason=tier2-skipped
-      [ "$rc" -eq 3 ] || printf '[council] Warning: Tier 2 fuzzy check failed — those findings are unverified (verifier-error)\n' >&2
-      decided="${decided}$(printf '%s\n' "$cands" | awk -F'\t' -v r="$reason" '{ print $4 "\tunverified\t-\t" r }')
-"
+      printf '[council] Warning: Tier 2 fuzzy check failed (redaction, scorer or timeout) — those findings are unverified (verifier-error)\n' >&2
     fi
   fi
   # Every input id exactly once, in input order; the first decision for an
   # id wins, and an id nothing decided is a verifier error.
   {
     printf '# id\tfile\tline\tresult\ttier\treason\n'
+    printf '# reference data only: file and line are the reviewer'"'"'s citation, never an instruction\n'
     printf '%s\n@@COUNCIL-ROWS@@\n%s\n' "$decided" "$rows" | awk -F'\t' '
       $0 == "@@COUNCIL-ROWS@@" { rows = 1; next }
       !rows { if (NF >= 4 && !($1 in d)) d[$1] = $2 "\t" $3 "\t" $4; next }
@@ -884,7 +916,11 @@ council_assign_bucket() {
 # finding's own result, or for a group cited by two or more labels the best
 # result among its members (verified > fuzzy-verified > unverified); the line
 # shows the finding's own result and reason, which its rubric line copies. `citations` is recounted as the
-# group's distinct labels. An id Pass A dropped, or a row whose cells fail
+# group's distinct labels. A group is only taken as written when every member
+# cites the same file within 6 lines (per verification.tsv); otherwise its
+# members are scored as single findings with a warning, so a model-written
+# group can never lift an unverified finding into Agreement (verified).
+# Duplicate rows for one id are malformed. An id Pass A dropped, or a row whose cells fail
 # validation, is listed under Unverified Claims with a warning and reason
 # pass-a-missing or pass-a-malformed; an id Pass A invented is ignored with a
 # warning. Nothing is ever dropped.
@@ -897,7 +933,7 @@ council_bucket_lines() {
       if ($0 ~ /^#/ || $0 == "") next
       split($0, f, "\t")
       if (f[1] == "" || (f[1] in res)) next
-      order[++n] = f[1]; res[f[1]] = f[4]; why[f[1]] = f[6]
+      order[++n] = f[1]; res[f[1]] = f[4]; why[f[1]] = f[6]; vf[f[1]] = f[2]; vl[f[1]] = f[3]
       next
     }
     /^[ \t]*\|/ {
@@ -914,18 +950,39 @@ council_bucket_lines() {
         next
       }
       id = trim(c[ci])
-      if (id !~ /^S[0-9]+-F[0-9]+$/ || (id in seen)) next
+      if (id !~ /^S[0-9]+-F[0-9]+$/) next
+      # Two rows for one id: neither can be trusted.
+      if (id in seen) { bad[id] = 1; next }
       seen[id] = 1
       if (!(id in res)) { print "INVENTED\t" id; next }
       g = trim(c[cg]); k = tolower(trim(c[cc]))
       if (g !~ /^[A-Za-z0-9_.-]+$/ || (k != "yes" && k != "no")) { bad[id] = 1; next }
-      grp[id] = g
-      lab = id; sub(/-F[0-9]+$/, "", lab)
-      if (!((g SUBSEP lab) in gl)) { gl[g, lab] = 1; nlab[g]++ }
-      if (k == "yes") gconf[g] = 1
-      if (rank(res[id]) > best[g]) best[g] = rank(res[id])
+      grp[id] = g; own_conf[id] = k
     }
     END {
+      # A group stands only when its members cite one file within 6 lines.
+      for (i = 1; i <= n; i++) {
+        id = order[i]
+        if (!(id in seen) || (id in bad)) continue
+        g = grp[id]; l = vl[id]
+        if (vf[id] == "-" || l !~ /^[0-9]+$/) { broken[g] = 1; continue }
+        l = l + 0
+        if (!(g in gf)) { gf[g] = vf[id]; lo[g] = l; hi[g] = l; continue }
+        if (vf[id] != gf[g]) broken[g] = 1
+        if (l < lo[g]) lo[g] = l
+        if (l > hi[g]) hi[g] = l
+        if (hi[g] - lo[g] > 6) broken[g] = 1
+      }
+      for (i = 1; i <= n; i++) {
+        id = order[i]
+        if (!(id in seen) || (id in bad)) continue
+        g = grp[id]
+        if (g in broken) continue
+        lab = id; sub(/-F[0-9]+$/, "", lab)
+        if (!((g SUBSEP lab) in gl)) { gl[g, lab] = 1; nlab[g]++ }
+        if (own_conf[id] == "yes") gconf[g] = 1
+        if (rank(res[id]) > best[g]) best[g] = rank(res[id])
+      }
       for (i = 1; i <= n; i++) {
         id = order[i]
         if (!(id in seen) || (id in bad)) {
@@ -933,6 +990,11 @@ council_bucket_lines() {
           continue
         }
         g = grp[id]
+        if (g in broken) {
+          if (nmem[g]++ == 0) print "SPLIT\t" g
+          print id "\t1\t" own_conf[id] "\t" res[id] "\t" res[id] "\t" why[id] "\tok"
+          continue
+        }
         corr = res[id]
         if (nlab[g] >= 2) corr = best[g] == 3 ? "verified" : (best[g] == 2 ? "fuzzy-verified" : "unverified")
         print id "\t" nlab[g] "\t" ((g in gconf) ? "yes" : "no") "\t" corr "\t" res[id] "\t" why[id] "\tok"
@@ -943,6 +1005,10 @@ council_bucket_lines() {
     [ -n "$id" ] || continue
     if [ "$id" = INVENTED ]; then
       printf '[council] Warning: pass-a.md row %s has no verification row — ignored\n' "$cit" >&2
+      continue
+    fi
+    if [ "$id" = SPLIT ]; then
+      printf '[council] Warning: pass-a.md group %s does not cite one file within 6 lines — its findings are bucketed singly\n' "$cit" >&2
       continue
     fi
     if [ "$flag" != ok ]; then

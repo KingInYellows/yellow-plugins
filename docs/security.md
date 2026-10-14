@@ -888,9 +888,13 @@ boundary from the pack and fenced-output files above:
 - **Verification files**: 5b also writes `citations.jsonl` (each finding's id,
   file, line and quoted `Evidence:` text) and `verification.tsv` (its
   result). The evidence check reads cited files only after a strict citation
-  parse (ASCII allowlist path, no leading `/`, `~` or `-`, no `..` segment, a
-  numeric line within the file, and yellow-core's `validate_file_path`), so a
-  reviewer cannot make it read outside the repository. Window lines reach the
+  parse (ASCII allowlist path, no leading `/`, `~` or `-`, no `..` or `.git`
+  segment, a numeric line within the file, yellow-core's `validate_file_path`,
+  and a file git does not ignore), so a reviewer cannot make it read outside
+  the repository or turn an ignored `.env` into a yes/no oracle. The
+  `rapidfuzz` probe runs from `/`, because `python3 -c` would otherwise import
+  a `rapidfuzz.py` planted in the checkout under review. `verification.tsv`
+  shows file tokens with non-allowlist characters as `?`. Window lines reach the
   Tier 2 scorer in memory and through pipes only, redacted by
   `cs_redact_secrets`; lines inside a private-key block are replaced before
   redaction.

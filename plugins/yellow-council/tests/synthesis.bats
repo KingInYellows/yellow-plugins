@@ -331,6 +331,34 @@ EOF
   [ "$(printf '%s\n' "$output" | grep -c '| Unverified Claims |')" -eq 8 ]
 }
 
+@test "council_bucket_lines splits a group that does not cite one place, and rejects duplicate rows" {
+  local pa="${BATS_TEST_TMPDIR}/pass-a.md" vt="${BATS_TEST_TMPDIR}/verification.tsv"
+  cat >| "$pa" <<'EOF'
+| id | group | citations | conflict | citation | correctness |
+|---|---|---|---|---|---|
+| S1-F1 | G1 | 2 | no | a.js:3 | verified |
+| S2-F1 | G1 | 2 | no | b.js:40 | verified |
+| S3-F1 | G2 | 1 | no | a.js:9 | verified |
+| S3-F1 | G9 | 3 | no | a.js:9 | verified |
+EOF
+  {
+    printf '# id\tfile\tline\tresult\ttier\treason\n'
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' S1-F1 a.js 3 verified 1 - S2-F1 b.js 40 unverified 2 no-match \
+      S3-F1 a.js 9 verified 1 -
+  } >| "$vt"
+  local profile
+  for profile in $PROFILES; do
+    run_in "$profile" "$FIRST_AWK" "council_bucket_lines '$pa' '$vt'"
+    [ "$status" -eq 0 ]
+    [ "$output" = "$(printf '%s\n' \
+      'BUCKET S1-F1 | Single-Reviewer Findings (verified) | correctness=verified | reason=-' \
+      'BUCKET S2-F1 | Unverified Claims | correctness=unverified | reason=no-match' \
+      'BUCKET S3-F1 | Unverified Claims | correctness=verified | reason=pass-a-malformed')" ] \
+      || { echo "$profile: $output"; return 1; }
+    [[ "$stderr" == *"group G1 does not cite one file within 6 lines"* ]]
+  done
+}
+
 @test "the report template lists the five bucket headings in precedence order" {
   run awk '/^### (Agreement|Disagreement|Single-Reviewer|Unverified)/ { print }' "$COUNCIL_MD"
   [ "$output" = "$(printf '%s\n' '### Agreement (verified)' '### Agreement (unverified)' '### Disagreement' \

@@ -1177,9 +1177,11 @@ row per id, in order, with `result` `verified`, `fuzzy-verified` or
 finding.
 
 - *Citation parse first, before any read*: an ASCII allowlist path with no
-  leading `/`, `~` or `-` and no `..` segment, a line of 1-7 digits,
-  yellow-core's `validate_file_path`, a readable regular file and the line
-  within its length — else `bad-citation`. No quote is `no-evidence`.
+  leading `/`, `~` or `-` and no `..` or `.git` segment, a line of 1-7
+  digits, yellow-core's `validate_file_path`, a readable regular file that
+  git does not ignore, and the line within its length — else `bad-citation`.
+  No quote is `no-evidence`. A citation token wrapped in backticks, brackets
+  or parentheses is unwrapped first; quotes are capped at 4096 characters.
 - *Targets*: `plan`, `debug` and `question` read the working tree. `review`
   reads it only for a file that matches `HEAD`; a dirty file skips Tier 1 and
   Tier 2 reads `git show HEAD:<file>` (the working tree for a file `HEAD`
@@ -1195,7 +1197,10 @@ finding.
 - *Tier 2* (optional `rapidfuzz`, R23): the same window, redacted with
   `cs_redact_secrets` and normalized, scored by `lib/fuzzy-ratio.py` as the
   max over lines of `fuzz.ratio`, and of `fuzz.partial_ratio` too for a quote
-  of 16 or more characters; ≥ 85 is `fuzzy-verified`, else `no-match`. Adding
+  of 16 or more characters that is the needle (the line is at least as long
+  and has 8+ real characters, so a fabricated quote containing `}` cannot
+  score 100 against a lone `}` line); ≥ 85 is `fuzzy-verified`, else
+  `no-match`. Adding
   `partial_ratio` overrides R22's `ratio`-only wording: `ratio` caps an exact
   fragment of a longer line near 50. Only each label's top 50 candidates (by
   severity, then k) are scored; the rest are `tier2-cap` (R25). Without
@@ -1223,6 +1228,9 @@ group's correctness is the best result among its members.
 `Unverified Claims`. 5e assigns them in shell (`council_bucket_lines`,
 `council_assign_bucket`) from Pass A's `group` and `conflict` cells and the
 verification results, recounting citations as the group's distinct labels.
+A group whose members do not cite one file within 6 lines is split and its
+findings bucketed singly, so a model-written group cannot lift an unverified
+finding into Agreement (verified); a duplicated id row is malformed.
 Precedence: one citing label splits by verification; a verdict conflict beats
 agreement; agreement splits by verification. A dropped or malformed Pass A
 row fails closed to Unverified Claims. The synthesizer copies the `BUCKET`

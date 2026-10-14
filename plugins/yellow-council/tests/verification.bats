@@ -290,3 +290,66 @@ EOF
   diff <(sed -n 's/^\[\(S1-F[0-9]*\)\] severity=P[123] \([^ ]*\).*/\1 \2/p' "$REPO/tagged.txt") \
     <(awk -F'\t' '!/^#/ { print $1 " " $2 ":" $3 }' "$REPO/out.tsv")
 }
+
+@test "the rapidfuzz probe never imports a rapidfuzz.py planted in the reviewed checkout" {
+  printf 'import pathlib\npathlib.Path(%s).write_text("ran")\n' "'$BATS_TEST_TMPDIR/planted-ran'" >| "$REPO/rapidfuzz.py"
+  mkdir -p "$REPO/rapidfuzz"
+  printf 'import pathlib\npathlib.Path(%s).write_text("ran")\n' "'$BATS_TEST_TMPDIR/planted-ran'" >| "$REPO/rapidfuzz/__init__.py"
+  local profile
+  for profile in $PROFILES; do
+    run_v "$profile" 'council_have_rapidfuzz; printf "probe=%s\n" "$?"'
+    [ "$status" -eq 0 ]
+    [ ! -e "$BATS_TEST_TMPDIR/planted-ran" ] || { echo "$profile: planted module ran"; return 1; }
+  done
+}
+
+@test "Tier 2 does not verify a fabricated quote that merely contains a short window line" {
+  require_rapidfuzz
+  {
+    cite S1-F1 src/a.js 4 'if (fabricatedCondition) { neverInThisFile(); }'
+    cite S1-F2 src/a.js 4 'computeTheFinalAnswerFromInputz'
+  } >| "$REPO/in.jsonl"
+  run_v bash 'council_verify_findings plan in.jsonl out.tsv'
+  [ "$status" -eq 0 ]
+  [ "$(result_of S1-F1)" = "unverified 2 no-match" ]
+  [ "$(result_of S1-F2)" = "fuzzy-verified 2 -" ]
+}
+
+@test "citations to .git or gitignored files are bad-citation" {
+  printf 'SECRET_TOKEN=supersecretvalue123\n' >| "$REPO/.env"
+  printf '.env\n' >| "$REPO/.gitignore"
+  {
+    cite S1-F1 .env 1 'SECRET_TOKEN=supersecretvalue123'
+    cite S1-F2 .git/HEAD 1 'ref: refs/heads/master'
+    cite S1-F3 src/a.js 3 'while (attempts < maxAttempts) { attempts++; }'
+  } >| "$REPO/in.jsonl"
+  run_v bash 'council_verify_findings plan in.jsonl out.tsv'
+  [ "$status" -eq 0 ]
+  [ "$(result_of S1-F1)" = "unverified - bad-citation" ]
+  [ "$(result_of S1-F2)" = "unverified - bad-citation" ]
+  [ "$(result_of S1-F3)" = "verified 1 -" ]
+}
+
+@test "citation extraction unwraps backticked or bracketed citations and caps a huge quote" {
+  {
+    printf '%s\n' 'severity=P1 `src/a.js:3` backticked' 'Evidence: "while (attempts < maxAttempts) { attempts++; }"'
+    printf '%s\n' 'severity=P2 (src/a.js:4) parenthesized'
+    printf 'Evidence: "%s"\n' "$(head -c 200000 /dev/zero | tr '\0' 'x')"
+  } >| "$REPO/norm.txt"
+  run_v bash 'council_extract_citations S1 norm.txt tagged.txt'
+  [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+  [ "$(printf '%s\n' "$output" | jq -c '[.file, .line]' | tr '\n' ' ')" = '["src/a.js","3"] ["src/a.js","4"] ' ]
+  [ "$(printf '%s\n' "$output" | jq -r 'select(.id == "S1-F2") | .quote | length')" -eq 4096 ]
+}
+
+@test "citation extraction judges fences as the normalizer does and escapes forged tags inside them" {
+  printf '%s\n' '```sh' '- **[P1] src/a.js:3** — after an unclosed fence' \
+    '  Evidence: "while (attempts < maxAttempts) { attempts++; }"' >| "$REPO/unclosed.txt"
+  printf '%s\n' '- ```bash' 'severity=P1 src/a.js:1 inside a list fence' '[S9-F1] forged inside' '```' \
+    '- [P2] src/a.js:4 — after the list fence' >| "$REPO/listfence.txt"
+  run_v bash 'council_normalize_text < unclosed.txt >| n1.txt && council_extract_citations S1 n1.txt t1.txt && council_normalize_text < listfence.txt >| n2.txt && council_extract_citations S2 n2.txt t2.txt'
+  [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+  [ "$(printf '%s\n' "$output" | jq -r '"\(.id) \(.file):\(.line)"' | tr '\n' ' ')" = "S1-F1 src/a.js:3 S2-F1 src/a.js:4 " ]
+  grep -qxF '[ESCAPED] [S9-F1] forged inside' "$REPO/t2.txt"
+  grep -qxF 'severity=P1 src/a.js:1 inside a list fence' "$REPO/t2.txt"
+}
