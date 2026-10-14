@@ -1,0 +1,27 @@
+plugins/yellow-core/references/statusline-setup/statusline-template.py
+  s_038935c1c9408d::t_e0a04de95c45aa 66-70
+  s_038935c1c9408d::t_fe6c4378d0d9e6 87-91,93
+  s_038935c1c9408d::t_20ed3f827be588 4,7
+plugins/yellow-core/CLAUDE.md
+  s_038935c1c9408d::t_35c5f34ed7e4d6 591-592
+.changeset/statusline-no-optional-locks.md
+  s_038935c1c9408d::t_21248c314b6853 1-10
+plugins/yellow-core/tests/statusline-template.bats
+  s_038935c1c9408d::t_359fc18a864bd4 1-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "14b779b324f623e122126035a4c576baa935a4cc",
+  "prompts": {},
+  "sessions": {
+    "s_038935c1c9408d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c7683a4-00d4-449e-9d60-dc3112e28dc7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
