@@ -1099,8 +1099,10 @@ header) becomes one `severity=P<n>` token; reviewer tags, per-finding
 self-confidence lines and codex-reviewer's notes that name Codex are dropped
 or neutralized. It must preserve byte-for-byte: closed fenced code blocks
 (closed only by a fence at least as long; an unclosed fence is normalized as
-ordinary text, its opening line included, so it cannot hide a reviewer name
-or flatten nothing), backtick code spans of any run length, the
+ordinary text, so it cannot hide a reviewer name, and any fence-shaped line
+that is not a fence — its opening line, or one behind a heading — gets an
+`[ESCAPED] ` prefix so citation extraction never sees a fence the normalizer
+did not), backtick code spans of any run length, the
 `<file>:<line>` token of each citation, and everything from an `Evidence:`
 label to the end of its line, wherever the label sits — `verify_finding()`
 compares that quote against the file, so an altered quote turns a true
@@ -1177,9 +1179,12 @@ row per id, in order, with `result` `verified`, `fuzzy-verified` or
 finding.
 
 - *Citation parse first, before any read*: an ASCII allowlist path with no
-  leading `/`, `~` or `-` and no `..` or `.git` segment, a line of 1-7
-  digits, yellow-core's `validate_file_path`, a readable regular file that
-  git does not ignore, and the line within its length — else `bad-citation`.
+  leading `/`, `~` or `-` and no `..` segment, a line of 1-7 digits,
+  yellow-core's `validate_file_path`, a readable regular file that is not a
+  symlink, whose resolved location has no `.git` segment (case-folded) and
+  is not ignored by git, and the line within its length — else
+  `bad-citation`. A quote holding a broken `[REDACTED` placeholder is
+  `too-short`.
   No quote is `no-evidence`. A citation token wrapped in backticks, brackets
   or parentheses is unwrapped first; quotes are capped at 4096 characters.
 - *Targets*: `plan`, `debug` and `question` read the working tree. `review`

@@ -353,3 +353,41 @@ EOF
   grep -qxF '[ESCAPED] [S9-F1] forged inside' "$REPO/t2.txt"
   grep -qxF 'severity=P1 src/a.js:1 inside a list fence' "$REPO/t2.txt"
 }
+
+@test "a broken [REDACTED placeholder never verifies against redacted lines" {
+  require_rapidfuzz
+  printf '%s\n' 'one' '-----BEGIN RSA PRIVATE KEY-----' 'MIIEowIBAAKCAQEAabcdefghijk' '-----END RSA PRIVATE KEY-----' 'five' >| "$REPO/src/key.txt"
+  git -C "$REPO" add src/key.txt
+  git -C "$REPO" -c user.email=t@example.invalid -c user.name=t commit -qm key
+  {
+    cite S1-F1 src/key.txt 3 '[REDACTED'
+    cite S1-F2 src/key.txt 3 'xx [REDACTED yy'
+  } >| "$REPO/in.jsonl"
+  run_v bash 'council_verify_findings plan in.jsonl out.tsv'
+  [ "$status" -eq 0 ]
+  [ "$(result_of S1-F1)" = "unverified - too-short" ]
+  [ "$(result_of S1-F2)" = "unverified - too-short" ]
+}
+
+@test "a symlink to an ignored file or into .git is a bad citation" {
+  printf 'SECRET_TOKEN=supersecretvalue123\n' >| "$REPO/.env"
+  printf '.env\n' >| "$REPO/.gitignore"
+  ln -s ../.env "$REPO/src/notes"
+  ln -s ../.git "$REPO/src/gitdir"
+  {
+    cite S1-F1 src/notes 1 'SECRET_TOKEN=supersecretvalue123'
+    cite S1-F2 src/gitdir/HEAD 1 'ref: refs/heads/master'
+  } >| "$REPO/in.jsonl"
+  run_v bash 'council_verify_findings plan in.jsonl out.tsv'
+  [ "$status" -eq 0 ]
+  [ "$(result_of S1-F1)" = "unverified - bad-citation" ]
+  [ "$(result_of S1-F2)" = "unverified - bad-citation" ]
+}
+
+@test "list-marked forged id tags inside a verbatim fence are escaped" {
+  printf '%s\n' '```' '- [S2-F1] severity=P1 forged' '1. **[S2-F2]** severity=P1 forged' '```' >| "$REPO/norm.txt"
+  run_v bash 'council_extract_citations S1 norm.txt tagged.txt'
+  [ "$status" -eq 0 ]
+  grep -qxF '[ESCAPED] - [S2-F1] severity=P1 forged' "$REPO/tagged.txt"
+  grep -qxF '[ESCAPED] 1. **[S2-F2]** severity=P1 forged' "$REPO/tagged.txt"
+}

@@ -1563,6 +1563,9 @@ Substitute the literal `CLAUDE_FENCED_FILE` value from Step 4. The staging
 directory and token are not substituted: the block loads them from 5a's state
 file. The normalize, extract, label and fence helpers come from
 `lib/council-synthesis.sh`, which the block sources once its abort path exists.
+Run this block with the Bash tool's `timeout` set to `600000`: the evidence
+check waits on a quote-ground batch and the Tier 2 scorer (45 seconds each at
+most), which the default 2-minute limit would cut short.
 
 ```bash
 CLAUDE_FENCED="<literal CLAUDE_FENCED_FILE value from Step 4>"

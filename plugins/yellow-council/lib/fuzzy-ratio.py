@@ -11,8 +11,11 @@ characters outside [REDACTED] placeholders. ratio alone caps an exact fragment
 of a longer line near 50; the floor stops a short quote scoring 100 against
 almost any line; and partial_ratio aligns the shorter string inside the
 longer, so without the needle rule a fabricated quote that merely contains
-`}` would score 100 against a lone `}` line. A quote with fewer than 8
-characters outside placeholders gets {"id", "score": 0, "short": true}.
+`}` would score 100 against a lone `}` line. partial_ratio is skipped above
+1024 quote characters (or a line over 4096) to bound its cost, and both
+scorers take score_cutoff=85. A quote with fewer than 8 characters outside
+placeholders gets {"id", "score": 0, "short": true}. Each row is flushed as
+it is scored, so a caller's timeout keeps the rows already done.
 
 Takes no arguments and touches no files. Exits 3 when rapidfuzz cannot be
 imported, so the caller can tell "skipped" from "failed".
@@ -26,23 +29,34 @@ except ImportError:
     sys.exit(3)
 
 PARTIAL_MIN_CHARS = 16
+PARTIAL_MAX_CHARS = 1024
 MIN_CHARS = 8
+CUTOFF = 85
+# Each [REDACTED] placeholder becomes one private-use character on both
+# sides, so a quote holding a broken "[REDACTED" cannot match it and counts
+# as ordinary text.
+PLACEHOLDER = "\ue000"
+
+
+def canon(text):
+    return text.replace("[REDACTED]", PLACEHOLDER)
 
 
 def compact_len(text):
-    return len("".join(text.replace("[REDACTED]", "").split()))
+    return len("".join(text.replace(PLACEHOLDER, "").split()))
 
 
 def score(quote, lines):
+    # Only >= CUTOFF is ever used, so score_cutoff lets rapidfuzz prune.
     best = 0.0
     for line in lines:
-        value = fuzz.ratio(quote, line)
+        value = fuzz.ratio(quote, line, score_cutoff=CUTOFF)
         if (
-            len(quote) >= PARTIAL_MIN_CHARS
-            and len(line) >= len(quote)
+            PARTIAL_MIN_CHARS <= len(quote) <= PARTIAL_MAX_CHARS
+            and len(quote) <= len(line) <= PARTIAL_MAX_CHARS * 4
             and compact_len(line) >= MIN_CHARS
         ):
-            value = max(value, fuzz.partial_ratio(quote, line))
+            value = max(value, fuzz.partial_ratio(quote, line, score_cutoff=CUTOFF))
         best = max(best, value)
     return best
 
@@ -53,13 +67,14 @@ def main():
         if not raw:
             continue
         row = json.loads(raw)
-        quote = row["quote"]
-        lines = row["lines"]
+        quote = canon(row["quote"])
+        lines = [canon(line) for line in row["lines"]]
         if compact_len(quote) < MIN_CHARS:
             out = {"id": row["id"], "score": 0, "short": True}
         else:
             out = {"id": row["id"], "score": score(quote, lines)}
         sys.stdout.write(json.dumps(out) + "\n")
+        sys.stdout.flush()
 
 
 if __name__ == "__main__":

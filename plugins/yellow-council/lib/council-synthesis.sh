@@ -31,7 +31,9 @@ _COUNCIL_SYNTHESIS_LOADED=1
 # "*"/"_" opener and closer around a phrase on one line; identifiers keep
 # their characters (__init__, _private_fn, *ptr, snake_case). Copies
 # byte-for-byte: closed fenced code blocks (an unclosed fence is normalized as
-# ordinary text, its opening line included), backtick code spans (any run
+# ordinary text, and any fence-shaped line that is not a fence here, such as
+# its opening line or one behind a heading, gets an [ESCAPED] prefix so no
+# later reader sees a fence), backtick code spans (any run
 # length), the path:line token of each citation, and everything from an
 # Evidence: label to the end of its line (verify_finding() compares that
 # quote to the file). Optional first argument: the reviewer name (claude|codex|gemini|
@@ -219,6 +221,13 @@ council_normalize_text() {
       if (c == "`" && index(substr(t, n + 1), "`") > 0) return 0
       return n
     }
+    # Trailing spaces and tabs, scanned from the right: an end-anchored regex
+    # is quadratic on a long run that ends in another character.
+    function rtrim_ws(s,   n) {
+      n = length(s)
+      while (n > 0 && index(" \t", substr(s, n, 1)) > 0) n--
+      return substr(s, 1, n)
+    }
     # The line as fence tests see it: past indentation, blockquote markers and
     # one list marker (a fence inside a list item is still a fence).
     # council_extract_citations carries the same function; keep them in step.
@@ -250,6 +259,10 @@ council_normalize_text() {
       if (u ~ /^---+$/ || u ~ /^\*\*\*+$/ || u ~ /^___+$/) { emit(""); return }
       sub(/^(######|#####|####|###|##|#)[ \t]+/, "", s)
       sub(/^([-*+]|[0-9]+[.)])[ \t]+/, "", s)
+      # Text that was not a fence here (behind a heading, a second list
+      # marker, or an unclosed fence re-read at the end) must not look like
+      # one to council_extract_citations, which reads this output.
+      if (fence_open(fence_view(s)) > 0) { emit("[ESCAPED] " s); return }
       # The quoted source line is compared against the file later: keep
       # everything after the Evidence label exactly as the reviewer wrote it.
       if (match(s, /^[*_]*[Ee]vidence:[*_]*/)) { emit("Evidence:" substr(s, RLENGTH + 1)); return }
@@ -281,7 +294,7 @@ council_normalize_text() {
       sub(/\r$/, "", line)
       if (fence_len > 0) {
         held[++nheld] = line
-        u = fence_view(line); sub(/[ \t]*$/, "", u)
+        u = rtrim_ws(fence_view(line))
         n = 0
         while (substr(u, n + 1, 1) == fence_char) n++
         if (n >= fence_len && n == length(u)) flush_fence()
@@ -439,6 +452,11 @@ council_extract_citations() {
       if (c == "`" && index(substr(t, n + 1), "`") > 0) return 0
       return n
     }
+    function rtrim_ws(s,   n) {
+      n = length(s)
+      while (n > 0 && index(" \t", substr(s, n, 1)) > 0) n--
+      return substr(s, 1, n)
+    }
     # Same as council_normalize_text: past indentation, blockquote markers and
     # one list marker. Keep the two in step.
     function fence_view(line,   q) {
@@ -448,7 +466,7 @@ council_extract_citations() {
       return q
     }
     function escape_tag(line) {
-      if (line ~ /^[ \t>]*\[S[0-9]+-F[0-9]+\]/) return "[ESCAPED] " line
+      if (line ~ /^[ \t>]*(([-*+]|[0-9]+[.)])[ \t]+)?[*_`]*\[S[0-9]+-F[0-9]+\]/) return "[ESCAPED] " line
       return line
     }
     function flush() {
@@ -459,7 +477,9 @@ council_extract_citations() {
     function set_quote(t,   c, i) {
       if (qseen) return
       qseen = 1
-      sub(/^[ \t]+/, "", t); sub(/[ \t]+$/, "", t)
+      sub(/^[ \t]+/, "", t)
+      if (length(t) > 8192) t = substr(t, 1, 8192)
+      t = rtrim_ws(t)
       c = substr(t, 1, 1)
       if ((c == "\"" || c == "`") && length(t) >= 2) {
         # Up to the last matching mark, so a trailing note is dropped.
@@ -496,7 +516,7 @@ council_extract_citations() {
       line = $0
       if (fence_len > 0) {
         held[++nheld] = line
-        u = fence_view(line); sub(/[ \t]*$/, "", u)
+        u = rtrim_ws(fence_view(line))
         n = 0
         while (substr(u, n + 1, 1) == fence_char) n++
         if (n >= fence_len && n == length(u)) {
@@ -580,14 +600,26 @@ council_have_rapidfuzz() {
 # not ignored by git (a reviewer only ever saw tracked or pack files; an
 # ignored .env must not become a yes/no oracle).
 _council_citable() {
-  case "/$1/" in */.git/*) return 1 ;; esac
+  local croot rdir rel lc
   validate_file_path "$1" "$2" 2>/dev/null || return 1
-  [ -f "$2/$1" ] && [ -r "$2/$1" ] || return 1
+  # A symlinked file could point at .env or .git/config inside the root.
+  [ ! -L "$2/$1" ] && [ -f "$2/$1" ] && [ -r "$2/$1" ] || return 1
+  # Judge the real location (a symlinked directory resolves here), case
+  # folded so .GIT on a case-insensitive filesystem is caught too.
+  croot=$(cd -- "$2" 2>/dev/null && pwd -P) || return 1
+  case "$1" in
+    */*) rdir=$(cd -- "$2/${1%/*}" 2>/dev/null && pwd -P) || return 1 ;;
+    *) rdir="$croot" ;;
+  esac
+  case "$rdir/" in "$croot/"*) ;; *) return 1 ;; esac
+  rel="${rdir#"$croot"}"; rel="${rel#/}"; rel="${rel:+$rel/}${1##*/}"
+  lc=$(printf '%s' "/$rel/" | tr 'A-Z' 'a-z')
+  case "$lc" in */.git/*) return 1 ;; esac
   # check-ignore exits 0 ignored, 1 not ignored; anything else fails closed.
   # (It refuses GIT_LITERAL_PATHSPECS; it matches the name against ignore
   # rules rather than expanding it.)
   if [ -n "$3" ]; then
-    git -C "$3" check-ignore -q -- "$1" 2>/dev/null
+    git -C "$3" check-ignore -q -- "$rel" 2>/dev/null
     [ "$?" -eq 1 ] || return 1
   fi
 }
@@ -667,7 +699,11 @@ council_verify_findings() {
     | [input_line_number, $id, $m.label, $m.k,
        (if .sev == "P1" then 1 elif .sev == "P2" then 2 else 3 end),
        $ok, (.file | clean), ($ln | clean),
-       (if (.quote | type) == "string" and .quote != "" then 1 else 0 end)]
+       # 2: a quote holding a broken placeholder ("[REDACTED" with no close)
+       # would match any fully redacted line; it is too-short, never matched.
+       (if (.quote | type) == "string" and .quote != "" then
+          (if (.quote | gsub("\\[REDACTED(:[^\\]]*)?\\]"; "") | test("REDACTED")) then 2 else 1 end)
+        else 0 end)]
     | map(tostring) | join("\t")' "$in") || {
     printf '[council] Error: %s is not valid citation JSONL\n' "$in" >&2
     return 1
@@ -702,6 +738,8 @@ council_verify_findings() {
     [ "$ok" != 1 ] || awk -v ln="$ln" 'NR >= ln { f = 1; exit } END { exit !f }' "$base/$file" 2>/dev/null || ok=0
     if [ "$ok" != 1 ]; then
       _council_decide "$id" unverified - bad-citation
+    elif [ "$hasq" = 2 ]; then
+      _council_decide "$id" unverified - too-short
     elif [ "$hasq" != 1 ]; then
       _council_decide "$id" unverified - no-evidence
     elif [ -z "$root" ]; then
@@ -730,7 +768,7 @@ __COUNCIL_VERIFY_ROWS__
       if jsonl=$(printf '%s' "$t1" | cut -f4 | jq -Rn -c --slurpfile src "$in" '
           ([inputs | {(.): true}] | add // {}) as $ids
           | $src[] | select($ids[.id]) | {id, file, line: (.line | tostring), quote}') \
-        && qout=$(cd "$root" && printf '%s\n' "$jsonl" | bash "$qg" batch 2>/dev/null); then
+        && qout=$(cd "$root" && printf '%s\n' "$jsonl" | timeout 45 bash "$qg" batch 2>/dev/null); then
         rc=0
       fi
     fi
@@ -829,18 +867,20 @@ __COUNCIL_VERIFY_T2__
             | select(any(.[]; .t == "Q"))
             | {id: .[0].id, quote: (map(select(.t == "Q").x))[0],
                lines: map(select(.t == "L").x)}') \
-      && [ -f "$fz" ] \
-      && scores=$(printf '%s\n' "$jsonl" | (cd / && timeout 120 python3 "$fz") 2>/dev/null); then
-      rc=0
-    fi
-    if [ "$rc" -eq 0 ]; then
-      decided="${decided}$(printf '%s\n' "$scores" | jq -r '
-        "\(.id)\t" + (if .short then "unverified\t-\ttoo-short"
-                      elif .score >= 85 then "fuzzy-verified\t2\t-"
-                      else "unverified\t2\tno-match" end)')
+      && [ -f "$fz" ]; then
+      # A 45-second deadline keeps the whole 5b call inside its Bash budget.
+      # The scorer flushes per row, so rows scored before a timeout or crash
+      # keep their result; the rest fall through to verifier-error below.
+      scores=$(printf '%s\n' "$jsonl" | (cd / && timeout 45 python3 "$fz") 2>/dev/null)
+      rc=$?
+      decided="${decided}$(printf '%s\n' "$scores" | jq -R -r 'fromjson? | select(.id)
+        | "\(.id)\t" + (if .short then "unverified\t-\ttoo-short"
+                       elif .score >= 85 then "fuzzy-verified\t2\t-"
+                       else "unverified\t2\tno-match" end)')
 "
-    else
-      printf '[council] Warning: Tier 2 fuzzy check failed (redaction, scorer or timeout) — those findings are unverified (verifier-error)\n' >&2
+    fi
+    if [ "$rc" -ne 0 ]; then
+      printf '[council] Warning: Tier 2 fuzzy check failed or timed out (redaction, scorer or deadline) — unscored findings are unverified (verifier-error)\n' >&2
     fi
   fi
   # Every input id exactly once, in input order; the first decision for an

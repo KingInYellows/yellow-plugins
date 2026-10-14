@@ -212,10 +212,15 @@ EOF
 - **Codex** keeps this
 ```
 after
-```py
+[ESCAPED] ```py
 [reviewer] wrote this bullet
 heading inside
 EOF
+  normalize_golden "$in" "$want" codex
+  # A fence opener behind a heading is text here, so it must not read as one
+  # downstream either.
+  printf '%s\n' '## ```bash' 'severity line' >| "$in"
+  printf '%s\n' '[ESCAPED] ```bash' 'severity line' >| "$want"
   normalize_golden "$in" "$want" codex
 }
 
