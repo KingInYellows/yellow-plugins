@@ -613,7 +613,7 @@ Kept `inherit`, with the reason recorded:
       as a regression check on the Step 6 pipeline. Run `codex-analyst` 5 times on a fixed question; each
       answer must be non-empty and cite files. On any failure, keep both
       agents on sonnet/medium and note it.
-- [x] 1.5.2: Run one smoke per haiku MCP agent: `linear-issue-loader`,
+- [ ] 1.5.2: Run one smoke per haiku MCP agent: `linear-issue-loader`,
       `linear-pr-linker` (against a scratch issue), `linear-explorer`, and
       both ruvector agents. Pass means ToolSearch, then a real MCP call, then
       output in the documented format. For the linker, the confirmation must
@@ -652,6 +652,11 @@ Kept `inherit`, with the reason recorded:
       approval before any write. As a background agent it had no
       `AskUserQuestion`, so it asked in text and treated no reply as no.
       Nothing was written.
+  - **1.5.2 stays open for the linker's write path.** That run used
+    CLAUDE-131, not a scratch issue chosen by the user, and it never reached
+    `save_issue`. Rerun `linear-pr-linker` interactively against a scratch
+    issue, accept the confirmation, and check that `save_issue` follows it.
+    Then tick 1.5.2.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** No parser runs `codex-reviewer` output through a model.

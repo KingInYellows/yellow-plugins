@@ -10,10 +10,11 @@ which is kept for history.
 - Plan: `plans/haiku-5-5-model-routing-phase-1.md`, where the per-decision
   evidence lives.
 
-Every agent in this marketplace pins a model and an effort level, except
-three that inherit the lead session's model on purpose. This page says which
-tier each agent is on, why, how to check what actually ran, and how to roll a
-choice back.
+Every agent routed in Phase 1 pins a model and an effort level, except three
+that inherit the lead session's model on purpose. Other agents still pin a
+model without an effort level; see "Per-agent verdicts (Phase 1)" for the
+count and the Phase 2 sweep. This page says which tier each agent is on, why,
+how to check what actually ran, and how to roll a choice back.
 
 ## Tiers
 
@@ -164,9 +165,13 @@ for t in "$SESSION_DIR"/subagents/agent-*.jsonl; do
 done
 ```
 
-Each line is `agent  model  effort`. A pinned agent should show its tier's
-model and effort. An agent showing the lead's model was not pinned, or ran
-under `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`.
+Each line is `agent  model  effort`. Compare it with the agent's tier. Model
+equality alone proves nothing: an agent whose tier matches the lead's model
+shows that model whether or not the pin applied. To test a pin, run under a
+lead whose model differs from the agent's tier (for example a `sonnet` lead for
+a haiku or opus agent). Then an agent showing its tier's model and effort was
+pinned, and an agent showing the lead's model was not pinned, or ran under
+`CLAUDE_CODE_SUBAGENT_MODEL_FORCE`.
 
 For the drain, read the newest file in
 `~/.claude/projects/<project-slug>/compound-staging/drain-logs/`:
@@ -178,9 +183,11 @@ For the drain, read the newest file in
 
 ## Rollback
 
-- **One agent:** restore `model: inherit`, drop its `effort:`, and add a
-  `MODEL_RULE_ALLOWLIST` entry with the reason. Or move it up a tier.
-  Frontmatter changes ship with a plugin patch release.
+- **One agent:** restore `model: inherit`, drop its `effort:`, add a
+  `MODEL_RULE_ALLOWLIST` entry with the reason, and add a "Model: `inherit` by
+  design" note at the top of the agent body (V3 checks only the allowlist, so
+  it passes without the note). Or move it up a tier. Frontmatter changes ship
+  with a plugin patch release.
 - **The drain:** export `COMPOUND_DRAIN_MODEL=sonnet` (or `opus`). No release
   is needed. Restoring the old unpinned behaviour exactly needs a code revert.
 - **CI:** delete the `claude_args` line from the workflow.

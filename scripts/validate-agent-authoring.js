@@ -135,7 +135,7 @@ const HIGH_EFFORT = new Set(['high', 'xhigh', 'max']);
 const SYNTHESIZER_NAME_PATTERN =
   /(synthesizer|orchestrator|conductor|aggregator|compounder)/i;
 
-// Files exempt from V3/V4/V5 advisory warnings — intentional inheritance
+// Files exempt from V3/V4 advisory warnings (V5 has its own exemption) — intentional inheritance
 // or intentional default-effort. Each entry must be a plugins-relative
 // POSIX path. Adding a file here is a documented decision that the
 // agent's role does NOT match the rule's intent (e.g., failure-analyst
@@ -572,16 +572,19 @@ function validateAgentFile(filePath, ctx) {
 
   // V5: a pinned model: without effort: — non-blocking warning. A subagent
   // without effort: inherits the session's effort, not the pinned model's
-  // default, so the level it runs at depends on whoever launched it. Honors
-  // MODEL_RULE_ALLOWLIST like V3/V4, which keeps knowledge-compounder
-  // (sonnet, no effort, allowlisted for V4) out of it. Skipped when V2
-  // already errors on the model value.
+  // default, so the level it runs at depends on whoever launched it. Only
+  // knowledge-compounder (sonnet, no effort, intentional default effort) is
+  // exempt. The other MODEL_RULE_ALLOWLIST entries are there for
+  // `model: inherit`, so a stale one that gains a pinned model still warns.
+  // Skipped when V2 already errors on the model value.
+  const v5Exempt =
+    pluginsRelPath === 'yellow-core/agents/workflow/knowledge-compounder.md';
   if (
     modelVal !== null &&
     modelVal !== 'inherit' &&
     MODEL_VALUE_PATTERN.test(modelVal) &&
     effortVal === null &&
-    !allowlisted
+    !v5Exempt
   ) {
     warnings.push(
       `[V5 advisory] ${relative(filePath)}: model: ${modelVal} pinned ` +
