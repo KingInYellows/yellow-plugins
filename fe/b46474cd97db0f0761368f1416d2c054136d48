@@ -1,0 +1,31 @@
+plans/haiku-5-5-model-routing-phase-1.md
+  s_038935c1c9408d::t_99108fa5003ec3 672-675
+  s_038935c1c9408d::t_eb1a39000dbe11 251,282,330,357,369,396,405,431,458,531,614
+  s_038935c1c9408d::t_1eb419db518b03 129-135
+  s_038935c1c9408d::t_d8fbfcecda6be8 17
+  s_038935c1c9408d::t_2f8837b11c562a 460-463
+  s_038935c1c9408d::t_40eb7096fef5d8 524-525
+  s_038935c1c9408d::t_baf0d6c757333c 626-636
+  s_038935c1c9408d::t_434705d1ff3ee7 428-429
+  s_038935c1c9408d::t_28fdd4d449ff35 374-382
+  s_038935c1c9408d::t_91bf18e6c4e91b 433-450
+  s_038935c1c9408d::t_67007ea7035e67 427
+  s_038935c1c9408d::t_dcdc53aa7357f8 372-373
+  s_038935c1c9408d::t_a8b0d8f9fd7c5b 94-96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "feb46474cd97db0f0761368f1416d2c054136d48",
+  "prompts": {},
+  "sessions": {
+    "s_038935c1c9408d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c7683a4-00d4-449e-9d60-dc3112e28dc7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
