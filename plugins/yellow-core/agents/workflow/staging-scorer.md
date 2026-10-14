@@ -2,6 +2,7 @@
 name: staging-scorer
 description: Score a session-transcript excerpt for compounding salience and return structured JSON with category, candidate text, priority, and tags. Use when invoked by staging-reviewer during a background drain; emits SKIP for trivial content rather than promoting low-priority entries.
 model: haiku
+effort: low
 tools:
   - Read
 disallowedTools:

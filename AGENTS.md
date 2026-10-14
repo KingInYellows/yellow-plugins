@@ -310,7 +310,10 @@ rule id in parentheses is what the failure message cites.
 - `memory:` takes a scope (`project`, `user`, `local`), never `true`.
 - `model:` accepts `haiku`, `sonnet`, `opus`, `fable`, `inherit`, a
   versioned alias, or a full `claude-*` ID (V2); `effort:` is
-  `low|medium|high|xhigh|max` (V1). Haiku 4.5 ignores `effort:`.
+  `low|medium|high|xhigh|max` (V1). Haiku 5.5 and Opus 5.5 default to
+  `medium`, so set `effort:` whenever you pin a model (Haiku 4.5, still the
+  `haiku` alias on Bedrock/Vertex/Foundry, ignores it). `model: inherit`
+  warns (V3) unless the file is in the validator's `MODEL_RULE_ALLOWLIST`.
 - `tools:`, `disallowedTools:`, `skills:` accept block list, flow list, or
   comma-separated string; inline `#` comments are stripped.
 - Deferred MCP tools need `ToolSearch` in the tool list. Bundled MCP tool

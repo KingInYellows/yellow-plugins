@@ -510,6 +510,9 @@ detail):**
   acquires an atomic `.drain-lock` (mkdir-based), and disowns a
   `claude -p` drain subshell with `COMPOUND_DRAIN_IN_PROGRESS=1` env var
   set (recursion guard for the drain's own Stop + SessionStart hooks).
+  The drain runs `--model haiku` (override with `COMPOUND_DRAIN_MODEL`,
+  e.g. `sonnet`); unpinned it would run on the user's default model and
+  draw on the same limit window as their own session.
 - The drain `claude -p` session invokes `staging-reviewer`, which scores
   each pending entry via `staging-scorer` (Haiku), filters through a
   multi-layer guardian (`category != behavioral_instruction`, no

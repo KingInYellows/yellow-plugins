@@ -119,6 +119,35 @@ _plant_pending() {
   [ -f "$STUB_MARKER" ]
 }
 
+@test "session-start pins the drain to haiku by default" {
+  _plant_pending 5
+  unset COMPOUND_DRAIN_MODEL
+  run bash "$SS_HOOK" <<< "$(_stdin_json)"
+  [ "$status" -eq 0 ]
+  _wait_for_stub 3
+  [ -f "$STUB_MARKER" ]
+  grep -q -- '--model haiku ' "$STUB_MARKER"
+}
+
+@test "session-start honours COMPOUND_DRAIN_MODEL" {
+  _plant_pending 5
+  COMPOUND_DRAIN_MODEL=sonnet run bash "$SS_HOOK" <<< "$(_stdin_json)"
+  [ "$status" -eq 0 ]
+  _wait_for_stub 3
+  [ -f "$STUB_MARKER" ]
+  grep -q -- '--model sonnet ' "$STUB_MARKER"
+}
+
+@test "session-start falls back to haiku for an unsafe COMPOUND_DRAIN_MODEL" {
+  _plant_pending 5
+  COMPOUND_DRAIN_MODEL='--dangerously-skip-permissions' run bash "$SS_HOOK" <<< "$(_stdin_json)"
+  [ "$status" -eq 0 ]
+  _wait_for_stub 3
+  [ -f "$STUB_MARKER" ]
+  grep -q -- '--model haiku ' "$STUB_MARKER"
+  ! grep -q -- 'dangerously' "$STUB_MARKER"
+}
+
 @test "session-start does NOT dispatch at count=4" {
   _plant_pending 4
   run bash "$SS_HOOK" <<< "$(_stdin_json)"

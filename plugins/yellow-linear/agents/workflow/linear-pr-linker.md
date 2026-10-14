@@ -1,7 +1,8 @@
 ---
 name: linear-pr-linker
 description: "Suggest linking pull requests to Linear issues and syncing status. Use when user creates a pull request via the resolved stacked-PR provider or mentions submitting a PR and the branch name contains a Linear issue identifier. Also use when user says \"link to linear\", \"update issue from PR\", or \"sync status\". IMPORTANT: Always confirm with user before updating Linear issue status."
-model: inherit
+model: haiku
+effort: low
 skills:
   - linear-workflows
 tools:

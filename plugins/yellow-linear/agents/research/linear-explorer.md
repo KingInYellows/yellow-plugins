@@ -1,7 +1,8 @@
 ---
 name: linear-explorer
 description: "Deep search and analysis of Linear backlog. Use when user asks to search, analyze, or explore Linear issues, projects, or backlog. Also use when user says \"search linear\", \"has anyone reported\", \"find similar issues\", \"is this a duplicate\", \"what's in the backlog\", or \"related issues\"."
-model: inherit
+model: haiku
+effort: medium
 skills:
   - linear-workflows
 tools:

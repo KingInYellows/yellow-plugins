@@ -340,12 +340,24 @@ fi
 DRAIN_TIMEOUT_BIN=$(command -v timeout 2>/dev/null || true)
 DRAIN_TIMEOUT_S="${COMPOUND_DRAIN_TIMEOUT_S:-600}"
 
+# Pin the drain's model. Unpinned, `claude -p` runs on the user's default
+# model (often Opus or Fable) and draws on the same subscription limit
+# window as the user's own session. The drain lead only moves files and
+# dispatches staging-reviewer, whose sub-agents pin their own models, so
+# Haiku is enough. COMPOUND_DRAIN_MODEL overrides it (e.g. `sonnet` if
+# dispatch proves unreliable); a value that is not a plain alias or model
+# ID falls back to haiku rather than reaching argv.
+DRAIN_MODEL="${COMPOUND_DRAIN_MODEL:-haiku}"
+case "$DRAIN_MODEL" in
+  '' | -* | *[!a-z0-9.-]*) DRAIN_MODEL=haiku ;;
+esac
+
 (
   DRAIN_LOCK_PATH="${STAGING_DIR}/.drain-lock"
   trap 'rmdir "$DRAIN_LOCK_PATH" 2>/dev/null || true' EXIT INT TERM
   export COMPOUND_DRAIN_IN_PROGRESS=1
-  printf '[yellow-core] compound-staging: drain dispatch %s (auth=%s, pending=%s, timeout=%s)\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" "$DRAIN_TIMEOUT_S" >> "$DRAIN_LOG" 2>/dev/null
+  printf '[yellow-core] compound-staging: drain dispatch %s (auth=%s, pending=%s, timeout=%s, model=%s)\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" "$DRAIN_TIMEOUT_S" "$DRAIN_MODEL" >> "$DRAIN_LOG" 2>/dev/null
   # NOTE: --bare CANNOT be used here. The drain prompt invokes the
   # yellow-core:workflow:staging-reviewer agent via Task, and --bare
   # skips plugin auto-discovery — the child session would not have the
@@ -359,12 +371,14 @@ DRAIN_TIMEOUT_S="${COMPOUND_DRAIN_TIMEOUT_S:-600}"
   # — "Defense-in-depth alternative when --bare is incompatible".
   if [ -n "$DRAIN_TIMEOUT_BIN" ]; then
     "$DRAIN_TIMEOUT_BIN" "$DRAIN_TIMEOUT_S" "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
+      --model "$DRAIN_MODEL" \
       --max-turns 50 \
       --permission-mode bypassPermissions \
       --output-format json \
       >> "$DRAIN_LOG" 2>&1
   else
     "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
+      --model "$DRAIN_MODEL" \
       --max-turns 50 \
       --permission-mode bypassPermissions \
       --output-format json \
