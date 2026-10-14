@@ -257,6 +257,9 @@ Kept `inherit`, with the reason recorded:
 - [x] 1.1.18: Add a one-line body note under the frontmatter, in the form
       "Model: `inherit` by design — <reason>". Use a body note rather than a
       YAML comment, because the parser treatment of comments is unverified.
+      As shipped (#1176), the note sits below each file's opening heading (or
+      after devin-orchestrator's `<examples>` block), not directly under the
+      frontmatter, so markdownlint MD041 passes.
   - `yellow-codex/agents/workflow/codex-executor.md`: workspace-write rescue
     that makes decisions for the lead.
   - `yellow-council/agents/review/claude-reviewer.md`: stands for the lead's

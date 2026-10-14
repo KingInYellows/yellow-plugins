@@ -18,7 +18,7 @@ choice back.
 ## Tiers
 
 | Tier | Model / effort | Use for |
-|---|---|---|
+| --- | --- | --- |
 | T1 | `haiku` / `low` | One MCP call or a fixed procedure: loaders, recall wrappers, formatters, scorers |
 | T2 | `haiku` / `medium` | Narrow lookups that need some judgment: search with duplicate detection, config discovery, consistency review |
 | T3 | `sonnet` / `medium`–`high` | Diagnosis, code-writing fixers, research synthesis, long agent loops, strict output contracts |
@@ -32,7 +32,7 @@ choice back.
   pinned model without effort.
 - `model: inherit` is allowed only with a recorded reason: an entry in
   `MODEL_RULE_ALLOWLIST` in `scripts/validate-agent-authoring.js` and a
-  "Model: `inherit` by design" note under the agent's frontmatter. V3 warns on
+  "Model: `inherit` by design" note at the top of the agent body. V3 warns on
   any other `inherit`.
 - Use aliases (`haiku`, `sonnet`, `opus`), not full model IDs. Aliases follow
   model upgrades, and an unknown full ID errors on older clients.
@@ -49,7 +49,7 @@ choice back.
 ## Per-agent verdicts (Phase 1)
 
 | Agent | Model / effort | Reason |
-|---|---|---|
+| --- | --- | --- |
 | `yellow-core` security-sentinel, performance-oracle, architecture-strategist | opus / high | They had no effort, so they ran at the session's level (Opus 5.5 defaults to `medium`) |
 | `yellow-core` staging-scorer | haiku / low | One-excerpt rubric scorer with a fixed JSON contract |
 | `yellow-core` learnings-researcher | haiku / low (unchanged) | Recall wrapper with a strict output contract. Revisit in Phase 2 if the yield rollup shows missed learnings |
@@ -87,7 +87,7 @@ orchestration only, with the heavy work in its sub-agents.
 ## Requirements
 
 | Alias | Resolves to the 5.5 model from |
-|---|---|
+| --- | --- |
 | `opus` | Claude Code v2.1.280 |
 | `sonnet` | Claude Code v2.1.284 |
 | `haiku` | Claude Code v2.1.293 |
@@ -115,7 +115,7 @@ models).
 Observed on Claude Code v2.1.300 (2026-10-14), from subagent transcripts:
 
 | Case | Session | Agent frontmatter | Subagent ran at |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Inheritance | `--effort low` | `haiku`, no effort | `low` |
 | Inheritance | `--effort high` | `haiku`, no effort | `high` |
 | `modelSettings` vs session | `--effort low`, with `modelSettings.claude-sonnet-5-5.effortLevel: high` | `sonnet`, no effort | `low` |
