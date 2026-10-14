@@ -1,0 +1,24 @@
+tests/integration/validate-agent-authoring-model-effort-rules.test.ts
+  s_038935c1c9408d::t_905dd9629e34c5 309-332
+docs/research/model-routing-policy.md
+  s_038935c1c9408d::t_dcb6afc90b8615 36
+scripts/validate-agent-authoring.js
+  s_038935c1c9408d::t_aa5d302bd03af1 544-546,548
+  s_038935c1c9408d::t_04a79103288f80 116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "848ab982f5767a45f3a55790ff1bd16dd623b4e5",
+  "prompts": {},
+  "sessions": {
+    "s_038935c1c9408d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c7683a4-00d4-449e-9d60-dc3112e28dc7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
