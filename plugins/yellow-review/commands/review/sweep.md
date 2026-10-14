@@ -120,110 +120,41 @@ esac
 ```
 
 The PR head can ignore the file when this branch does not. Classify it before
-Step 2's checkout. Once that head ignores the file, `/review:pr` can write it.
-`git check-ignore` reads this work tree, so fetch `refs/pull/<PR#>/head` into
-`FETCH_HEAD` (no checkout) and point `--work-tree` at a temp directory holding
-only that commit's root `.gitignore`. Use `--no-index` and the `-q` exit
-(`0` ignored, `1` not): this branch's index can still track the file, and
-`-v` exits `0` for a negation too. The remote is `origin`, else the sole
-remote, taken as git printed it (one line, no leading `-`); several remotes
-without `origin` is a failure. On failure, before any snapshot, print
-`[review:sweep] Error: could not read the PR head ignore rules.` and stop
-with no skip line. The raw blob is only what checkout writes when `.gitignore`
-has no content-transforming attribute, so the probe also reads the commit's
-`filter`, `eol`, `working-tree-encoding` and `ident` attributes
-(`check-attr --cached` on a throwaway index of that commit) and stops with its own `Error:` line, no
-skip line, on any value other than unspecified (`eol` may also be `lf`). Each
-attribute is checked on its own line. A PR can set `filter=unspecified` as a
-literal value, which `check-attr` prints the same as the unset sentinel, so
-`filter: unspecified` passes only when no `filter.unspecified.*` driver is
-configured. A root entry that differs from `.gitignore`, `.gitattributes` or
-`yellow-plugins.local.md` only in ASCII case (`.GITIGNORE`, `.GITATTRIBUTES`)
-is an alias of that file on a case-insensitive filesystem (default macOS APFS),
-which the exact-name probes would miss, so it stops with its own `Error:` line,
-no skip line.
+Step 2's checkout: once that head ignores the file, `/review:pr` can write it.
+Give this call a Bash tool `timeout` of 300000 ms:
 
 ```bash
-set -u
-head_fail() { printf '[review:sweep] Error: could not read the PR head ignore rules.\n' >&2; exit 2; }
-HEAD_SHA=$(gh pr view <PR#> --json headRefOid -q .headRefOid 2>/dev/null) || HEAD_SHA=""
-case "$HEAD_SHA" in *[!0-9a-f]*|'') head_fail ;; esac
-[ "${#HEAD_SHA}" -eq 40 ] || [ "${#HEAD_SHA}" -eq 64 ] || head_fail
-TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
-[ -n "$TOP" ] || head_fail
-REMOTE=origin
-git -C "$TOP" remote get-url origin >/dev/null 2>&1 || REMOTE=$(git -C "$TOP" remote 2>/dev/null)
-case "$REMOTE" in ''|-*|*[[:space:]]*|*[[:cntrl:]]*) head_fail ;; esac
-GOT=""
-for delay in 0 1 2 4 8 16; do
-  sleep "$delay"
-  git -C "$TOP" fetch -q --no-tags -- "$REMOTE" "refs/pull/<PR#>/head" 2>/dev/null || continue
-  GOT=$(git -C "$TOP" rev-parse -q --verify FETCH_HEAD 2>/dev/null) || GOT=""
-  [ "$GOT" = "$HEAD_SHA" ] && break
-done
-[ "$GOT" = "$HEAD_SHA" ] || head_fail
-NAMES=$(mktemp) || head_fail
-git -C "$TOP" ls-tree -z --name-only "$GOT" >| "$NAMES" 2>/dev/null || { rm -f -- "$NAMES"; head_fail; }
-ALIAS=$(tr '\000\n' '\n\001' < "$NAMES" | LC_ALL=C grep -Fix -e .gitignore -e .gitattributes -e yellow-plugins.local.md | LC_ALL=C grep -Fvx -e .gitignore -e .gitattributes -e yellow-plugins.local.md)
-rm -f -- "$NAMES"
-if [ -n "$ALIAS" ]; then
-  printf '[review:sweep] Error: the PR head has a root entry that differs from .gitignore, .gitattributes or yellow-plugins.local.md only in case, which a case-insensitive filesystem treats as that file.\n' >&2
-  exit 2
-fi
-if git -C "$TOP" cat-file -e "${GOT}:yellow-plugins.local.md" 2>/dev/null; then
-  printf 'head=tracked\n'
-else
-  WT=$(mktemp -d) || head_fail
-  GI_LS=$(git -C "$TOP" ls-tree "$GOT" -- .gitignore 2>/dev/null) || { rm -rf -- "$WT"; head_fail; }
-  GI_MODE=${GI_LS%% *}
-  if [ -n "$GI_MODE" ]; then
-    GIT_INDEX_FILE="$WT/idx" git -C "$TOP" read-tree "$GOT" 2>/dev/null || { rm -rf -- "$WT"; head_fail; }
-    ATTRS=$(GIT_INDEX_FILE="$WT/idx" git -C "$TOP" check-attr --cached filter eol working-tree-encoding ident -- .gitignore 2>/dev/null) || { rm -rf -- "$WT"; head_fail; }
-    [ -n "$ATTRS" ] || { rm -rf -- "$WT"; head_fail; }
-    git -C "$TOP" config --get-regexp '^filter\.unspecified\.' >/dev/null 2>&1
-    case $? in 0) DRV=1 ;; 1) DRV=0 ;; *) rm -rf -- "$WT"; head_fail ;; esac
-    BAD=0
-    N=0
-    while IFS= read -r line; do
-      N=$((N + 1))
-      case "$line" in
-        '.gitignore: filter: unspecified') [ "$DRV" -eq 0 ] || BAD=1 ;;
-        '.gitignore: eol: unspecified'|'.gitignore: eol: lf') ;;
-        '.gitignore: working-tree-encoding: unspecified'|'.gitignore: ident: unspecified') ;;
-        *) BAD=1 ;;
-      esac
-    done <<EOF
-$ATTRS
-EOF
-    [ "$N" -eq 4 ] || { rm -rf -- "$WT"; head_fail; }
-    if [ "$BAD" -ne 0 ]; then
-      rm -rf -- "$WT"
-      printf '[review:sweep] Error: the PR head sets content-transforming attributes on .gitignore, so its ignore rules cannot be read from the blob.\n' >&2
-      exit 2
-    fi
-  fi
-  case "$GI_MODE" in
-    '') ;;
-    100644|100755) git -C "$TOP" show "${GOT}:.gitignore" > "$WT/.gitignore" || { rm -rf -- "$WT"; head_fail; } ;;
-    *) rm -rf -- "$WT"; head_fail ;;
-  esac
-  git -C "$TOP" --work-tree="$WT" check-ignore -q --no-index -- yellow-plugins.local.md
-  rc=$?
-  rm -rf -- "$WT"
-  if [ "$rc" -eq 0 ]; then printf 'head=ignored\n'
-  elif [ "$rc" -eq 1 ]; then printf 'head=unignored\n'
-  else head_fail
-  fi
-fi
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/head-ignore-probe" "<PR#>"
 ```
+
+It reads the head commit (`headRefOid`) through `gh api`: the root listing and
+the root `.gitignore` and `.gitattributes` blobs, never a fetch or checkout, so
+a fork PR and a shallow clone work the same. It judges them against this
+clone's `.git/info/exclude` and `core.excludesFile`. It prints one line.
+
+- `head=tracked`, `head=ignored` or `head=unignored` (exit `0`) is the result.
+- Exit `4` with `error=<class>` is specific to this PR: the head is gone or
+  unreadable, its `.gitignore` or `.gitattributes` is a symlink, a root entry
+  differs from `.gitignore`, `.gitattributes` or `yellow-plugins.local.md`
+  only in case or has a non-ASCII name (either can be the same file on a
+  case-insensitive filesystem), or
+  `.gitignore` has a content-transforming attribute. Print
+  `[review:sweep] PR #<PR#>: could not judge the PR head ignore rules (<class>)`,
+  with `<class>` from the `error=` line. Stop before any snapshot, ending with `Sweep: skipped (head-ignore-unreadable)`.
+- Exit `3` (a rate limit, a network error or timeout, failed authentication,
+  or a local git failure) or any other exit: print
+  `[review:sweep] Error: could not read the PR head ignore rules.` and stop
+  before any snapshot with no skip line, so `/review:sweep-all` records
+  `no contract` and stops the batch.
 
 When the work-tree probe printed `tracked` and this probe printed
 `head=ignored`, do not snapshot: the snapshot would keep the tracked
 repository bytes, the checkout would remove them, and Step 2b would restore
 them as an ignored, untracked config that `/review:resolve` trusts. Print
 `[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md is tracked on this branch but ignored on the PR head; rerun /review:sweep from the PR's branch`
-and stop before Step 2, with no `Sweep:` or `Resolve:` line, so
-`/review:sweep-all` records `no contract` and stops the batch.
+and stop before Step 2, ending with
+`Sweep: skipped (tracked-here-ignored-on-head)`: the condition belongs to this
+PR, so `/review:sweep-all` moves on to the next one.
 
 When the work-tree probe printed `unignored` and this probe printed
 `head=ignored`, the snapshot is only safe for an absent path: `git status`
@@ -241,8 +172,8 @@ if [ -z "$TOP" ] || [ -e "$p" ] || [ -L "$p" ]; then
 fi
 ```
 
-Print no `Sweep:` or `Resolve:` line on that stop, as for the tracked case
-above.
+End that stop with `Sweep: skipped (untracked-here-ignored-on-head)`, as for
+the tracked case above.
 
 Otherwise snapshot when the work-tree probe printed `ignored`, or when it
 printed `unignored` and this probe printed `head=ignored` (the path is absent
@@ -331,6 +262,8 @@ esac
 - **`ignored` and `<guard-dir>` is `none`:** the config was not snapshotted
   before the review. Print
   `[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md is ignored on the PR branch but was not snapshotted before the review; rerun /review:sweep from the PR's branch`
+  and, when the file exists,
+  `inspect yellow-plugins.local.md before any further run: /review:pr may have written it, and a rerun would snapshot it as the trusted baseline`,
   and stop without invoking `/review:resolve`. Print no `Sweep:` or `Resolve:`
   line, so `/review:sweep-all` records `no contract` and stops the batch.
 - **Anything but `ignored`, and `<guard-dir>` is not `none`:** the PR head
@@ -534,25 +467,31 @@ command's output) can parse `blocking` and `ratelimited`.
 
 A stop before `/review:resolve` runs never reaches the command that prints the
 `Resolve:` contract line, so a caller that fails closed on a missing contract
-would read a benign skip as a crash. The two PR-specific stops therefore end
-with one distinct line, as the very last line of output:
+would read a benign skip as a crash. The PR-specific stops therefore end with
+one distinct line, as the very last line of output:
 
 ```text
 Sweep: skipped (pr-not-open)
 Sweep: skipped (branch-mismatch)
+Sweep: skipped (head-ignore-unreadable)
+Sweep: skipped (tracked-here-ignored-on-head)
+Sweep: skipped (untracked-here-ignored-on-head)
 ```
 
 `/review:sweep-all` reads it by the anchored form
-`^Sweep: skipped \((pr-not-open|branch-mismatch)\)$`, on the last line only,
+`^Sweep: skipped \((pr-not-open|branch-mismatch|head-ignore-unreadable|tracked-here-ignored-on-head|untracked-here-ignored-on-head)\)$`,
+on the last line only,
 and records `skipped — <reason>`. Its absence means the sweep crashed or was
 cut off, which stays `no contract`. `pr-not-open` is printed only when
 `gh pr view` succeeded and returned a state other than `OPEN`, and
 `branch-mismatch` only when `gh pr view` and `git rev-parse` both succeeded and
-their branch names differ. Argument errors,
-a failed PR fetch (including a rate limit, at Step 1 or Step 2a), a dirty tree,
-unreadable PR head ignore rules and the Step 1b abort for a config tracked on
-this branch but ignored on the PR head print no skip line: they are not
-specific to this PR, or are not a benign skip, so the batch must still stop.
+their branch names differ. The three Step 1b reasons are printed only on
+`head-ignore-probe`'s exit `4` (`head-ignore-unreadable`) or on its
+`head=ignored` result against this branch's tracked or untracked file.
+Argument errors, a failed PR fetch (including a rate limit, at Step 1 or Step
+2a), a dirty tree and a `head-ignore-probe` exit `3` print no skip line: they
+are not specific to this PR, or are not a benign skip, so the batch must still
+stop.
 
 ## Error Handling
 
@@ -564,18 +503,23 @@ specific to this PR, or are not a benign skip, so the batch must still stop.
   ending with `Sweep: skipped (pr-not-open)`.
 - **PR fetch failed** (including a rate limit): `[review:sweep] Error: could
   not fetch PR #<PR#>.` and stop, with no skip line.
-- **PR head ignore rules unreadable** (Step 1b): `[review:sweep] Error: could
-  not read the PR head ignore rules.` and stop with exit 2, before any
-  snapshot and with no skip line.
+- **PR head ignore rules unreadable for this PR** (Step 1b,
+  `head-ignore-probe` exit `4`): `[review:sweep] PR #<PR#>: could not judge
+  the PR head ignore rules (<class>)` and stop before any snapshot, ending with
+  `Sweep: skipped (head-ignore-unreadable)`.
+- **PR head ignore rules unreadable** (Step 1b, `head-ignore-probe` exit `3`
+  or any other failure: rate limit, network, auth or local git):
+  `[review:sweep] Error: could not read the PR head ignore rules.` and stop
+  before any snapshot, with no skip line.
 - **Config tracked here, ignored on the PR head** (Step 1b): `[review:sweep]
   aborted at PR #<PR#>: yellow-plugins.local.md is tracked on this branch but
   ignored on the PR head; rerun /review:sweep from the PR's branch` and stop
-  before Step 2, with no `Sweep:` or `Resolve:` line, so `/review:sweep-all`
-  records `no contract`.
+  before Step 2, ending with `Sweep: skipped (tracked-here-ignored-on-head)`.
 - **Untracked config here, ignored on the PR head** (Step 1b): `[review:sweep]
   aborted at PR #<PR#>: yellow-plugins.local.md exists untracked and unignored
   on this branch but is ignored on the PR head; remove it or rerun
-  /review:sweep from the PR branch` and stop with exit 1, before Step 2.
+  /review:sweep from the PR branch` and stop before Step 2, ending with
+  `Sweep: skipped (untracked-here-ignored-on-head)`.
 - **Dirty working directory** at Step 1: `[review:sweep] Error:
   uncommitted changes detected. Commit or stash first.` and stop.
   Both downstream skills enforce this independently; the wrapper-level
