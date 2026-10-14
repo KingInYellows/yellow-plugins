@@ -1,0 +1,133 @@
+plugins/yellow-core/tests/fixtures/jev-eval/frontmatter/plain-multiline.md
+  s_95386ee8c755dd::t_4189e024b5ae42 1-9
+plugins/yellow-core/tests/fixtures/jev-eval/repo/docs/solutions/code-quality/alpha.md
+  s_95386ee8c755dd::t_4189e024b5ae42 1-12
+plugins/yellow-core/tests/fixtures/jev-eval/repo/docs/solutions/code-quality/no-frontmatter.md
+  s_95386ee8c755dd::t_4189e024b5ae42 1-3
+plugins/yellow-core/tests/fixtures/jev-eval/frontmatter-expected.json
+  s_95386ee8c755dd::t_88e686eef1c68b 3
+  s_95386ee8c755dd::t_856564da4e047c 1-2,4-37
+docs/solutions/logic-errors/verdict-step-must-refuse-on-input-integrity-doubt.md
+  s_95386ee8c755dd::t_d39e2c420a674f 1-94
+plugins/yellow-core/tests/fixtures/jev-eval/frontmatter/err-tab.md
+  s_95386ee8c755dd::t_4189e024b5ae42 1-4
+plugins/yellow-core/tests/fixtures/jev-eval/frontmatter/err-colon.md
+  s_95386ee8c755dd::t_4189e024b5ae42 1-3
+plugins/yellow-core/lib/jev-category-eval.py
+  s_95386ee8c755dd::t_bd252f240fa886 48,53,129,131-133,261,265-267,270-271,273,687,689,750-751
+  s_95386ee8c755dd::t_a8070ec247db16 671-673,695,699,726-735,737-739,741,743,745,752-753,762-763,807,810-811,822-823,839,850,869,876-886,889,899,902-905,940-943
+  s_95386ee8c755dd::t_1b4c7d95fbaccd 54-55,59,74,108,120-122,304-307,499-502,504,506,641,645-648,663-665,667,682,685-686,690-693,697-698,700-723,754-756,760,794-795,803-804,812,817,825-826,831,835-838,840-841,843,870-875,887-888,892-898,976,1091-1098,1112-1142,1165,1168-1169,1174,1177-1179,1188-1189,1196-1197,1211-1212,1214-1215,1229,1278-1280,1283,1286-1288,1290,1295-1305,1307,1332,1361
+  s_95386ee8c755dd::t_c7a83f9266f8cb 115,1183-1187
+  s_95386ee8c755dd::t_ea1771d5dfb9a2 1-19,41-45,47,49-52,56-58,60-73,75,78-107,109-110,112-114,116-119,123-128,130,134-260,262-264,268-269,272,274-303,308-319,321-326,328-350,354-441,443,446,452,458-466,468,495-498,503,505,507-545,547,550-557,559-563,565-567,569-570,572-579,581-584,586-587,589-591,593-594,596-599,601-640,642-644,649-662,666,668-670,674-681,683-684,688,694,696,724-725,736,740,742,744,746-749,757-759,761,764-793,796-802,805-806,808-809,813-816,818-821,824,827-830,832-834,842,844-849,851-868,890-891,900-901,906-939,944-970,977,1015,1020,1054-1056,1060,1090,1099-1111,1156-1160,1163-1164,1166-1167,1170-1173,1199-1200,1202-1205,1209-1210,1213,1216,1221-1228,1230-1233,1235-1237,1240-1241,1246-1249,1252-1253,1257-1260,1267-1270,1276-1277,1281-1282,1284-1285,1291-1294,1306,1308-1310,1324-1331,1333,1335,1339-1360,1362-1377
+  s_95386ee8c755dd::t_7d39c6db9fffe2 76-77,973-975,978-1014,1016-1019,1021-1053,1057-1059,1061-1089,1143-1155,1161-1162,1175-1176,1180-1182,1190-1195,1198,1201,1206-1208,1217-1220,1234,1238-1239,1242-1245,1250-1251,1254-1256,1261-1266,1271-1275,1289,1311-1323,1334,1336-1338
+  s_95386ee8c755dd::t_b400419e15a499 351-353
+  s_95386ee8c755dd::t_ecd79699f75f9f 20-40,46,111,320,327,442,444-445,447-451,453-457,467,469-494,546,548-549,558,564,568,571,580,585,588,592,595,600
+  s_95386ee8c755dd::t_ad7f23e8cb0ceb 971-972
+plugins/yellow-core/tests/fixtures/jev-eval/frontmatter/err-unterminated.md
+  s_95386ee8c755dd::t_4189e024b5ae42 1-3
+docs/security.md
+  s_95386ee8c755dd::t_d2aa53ac7ad01f 574,576-579
+  s_95386ee8c755dd::t_3ed467299a3490 538-546,553-554,580
+  s_95386ee8c755dd::t_f36f4c11b8367a 547-552,555-573,575
+plugins/yellow-core/tests/fixtures/jev-eval/frontmatter/quoted-variants.md
+  s_95386ee8c755dd::t_4189e024b5ae42 1-20
+plugins/yellow-core/README.md
+  s_95386ee8c755dd::t_d2aa53ac7ad01f 236-244,246,249,254-259,262-278
+  s_95386ee8c755dd::t_3beabf315700c9 221-235,245,247-248,250-253,260-261,279
+plugins/yellow-core/tests/fixtures/jev-eval/frontmatter/block-and-plain.md
+  s_95386ee8c755dd::t_4189e024b5ae42 1,3-17
+  s_95386ee8c755dd::t_88e686eef1c68b 2
+plugins/yellow-core/tests/fixtures/jev-eval/frontmatter/no-date.md
+  s_95386ee8c755dd::t_4189e024b5ae42 1-6
+plugins/yellow-core/lib/jev-category-criteria.json
+  s_95386ee8c755dd::t_9ac87dda660fcc 1-4,7-37,39-56
+  s_95386ee8c755dd::t_68f10cb232f927 6
+  s_95386ee8c755dd::t_b5438f6b997474 5,38
+.changeset/jev-category-offline-eval.md
+  s_95386ee8c755dd::t_d6bd48effc2564 1-10
+plugins/yellow-core/tests/fixtures/jev-eval/repo/docs/solutions/archived/old.md
+  s_95386ee8c755dd::t_4189e024b5ae42 1-6
+plugins/yellow-core/tests/fixtures/jev-eval/repo/docs/solutions/optimizations/new-folder.md
+  s_95386ee8c755dd::t_4189e024b5ae42 1-6
+plugins/yellow-core/tests/fixtures/jev-eval/repo/docs/solutions/logic-errors/beta.md
+  s_95386ee8c755dd::t_4189e024b5ae42 1-15
+plans/jev-category-offline-eval.md
+  s_15dbf824d2feee::t_e623687507a9a8 393-398
+  s_15dbf824d2feee::t_1bfb91c4ba9569 478-485
+  s_15dbf824d2feee::t_8b14730182a472 31-41
+  s_15dbf824d2feee::t_5e7a1e07e5114a 1-30,42-89,101-106,153-160,189-192,194-197,199-207,209-215,264-270,284-292,294-305,313,315-318,320-326,358-371,381-383,385-392,400-403,412,414-451,461-477,486-503,521-530
+  s_15dbf824d2feee::t_349102c6cbcbd9 404-410
+  s_95386ee8c755dd::t_f6c4f3adb4cb37 193,198,208
+  s_95386ee8c755dd::t_d6bd48effc2564 411
+  s_15dbf824d2feee::t_ddc775cc379c58 271-283
+  s_15dbf824d2feee::t_cb09a9f3ebc964 306-312
+  s_95386ee8c755dd::t_ad0f945ecb01a7 399
+  s_15dbf824d2feee::t_3a0af8f068a47c 107-118
+  s_95386ee8c755dd::t_a1061c6b620919 384
+  s_15dbf824d2feee::t_08e72115bc808f 452-460
+  s_15dbf824d2feee::t_d4d743bfda5bb7 504-517
+  s_95386ee8c755dd::t_507dc2cea0804f 263,293,314,319,357
+  s_15dbf824d2feee::t_8e8d02e359251a 372-379
+  s_95386ee8c755dd::t_057ff578b0dd1c 380
+  s_95386ee8c755dd::t_ea27cbe080d498 413
+  s_15dbf824d2feee::t_4087d1c03b07bd 161-188
+  s_15dbf824d2feee::t_40317967c11ddb 216-262
+  s_15dbf824d2feee::t_d90b5b5d0d3bf6 327-356
+  s_95386ee8c755dd::t_792159a9e82b10 518-520
+  s_15dbf824d2feee::t_87423e382a29b3 119-152
+  s_15dbf824d2feee::t_cd3bd7448d0612 90-100
+plugins/yellow-core/tests/fixtures/jev-eval/report-results.jsonl
+  s_95386ee8c755dd::t_e4a3146b9b4745 1-14
+  s_95386ee8c755dd::t_0d39cf6b03e94c 15
+plugins/yellow-core/tests/fixtures/jev-eval/frontmatter/err-duplicate.md
+  s_95386ee8c755dd::t_4189e024b5ae42 1-4
+plugins/yellow-core/tests/fixtures/jev-eval/README.md
+  s_95386ee8c755dd::t_00e1acad70293e 1-36
+plugins/yellow-core/CLAUDE.md
+  s_95386ee8c755dd::t_1053416dffb4eb 345
+  s_95386ee8c755dd::t_d2aa53ac7ad01f 338-343
+  s_95386ee8c755dd::t_a1061c6b620919 289,334-337,344,611
+plugins/yellow-core/tests/jev-category-eval.bats
+  s_95386ee8c755dd::t_dcdc03176a3e3d 677-686,688-694,696-707
+  s_95386ee8c755dd::t_a34a7c1f0bf448 650-654
+  s_95386ee8c755dd::t_81334f5f3f4225 1-2,7-10,12-34,37-38,40-42,44-85,100-109,111-112,137-180,231-246,249-251,253-262,290-297,306-326,328-330,332-340,347-352,354-356,358-363,365-368,370-371,374-375,385-390,392,394-395,398-403,405,422-425,428-429,431,433-435,437-442,445,448-450,452-453,455,478,498-500,503-506,511-512,514-521,559-561,566,569,571-574,579-582,585-612,647-648,655-676,708-712
+  s_95386ee8c755dd::t_30289065843689 86,89-91,98-99,331,353,364,373,391,393,396-397,404,432,567,687,695
+  s_95386ee8c755dd::t_ac1a3927f9b271 3-6,11,35-36,39,43,87-88,92-97,110,113-136,181-230,247-248,252,263-289,298-305,327,341-346,357,369,372,376-384,406-421,426-427,430,443-444,446-447,451,454,456-477,479-497,501-502,507-510,513,522-558,562-565,568,570,575-578,583-584,614-646,649
+  s_95386ee8c755dd::t_c7a83f9266f8cb 436,613
+plugins/yellow-core/tests/fixtures/jev-eval/stub_server.py
+  s_95386ee8c755dd::t_8db6b769369cb9 1-6,9-15,17-49,60-65,67-79,88-105
+  s_95386ee8c755dd::t_e676acd0389122 7-8,50-59,66
+  s_95386ee8c755dd::t_0d39cf6b03e94c 16,80-87
+docs/brainstorms/2026-10-14-replace-prompt-and-parse-llm-judgments-i-brainstorm.md
+  s_15dbf824d2feee::t_970547a14ab31d 1-12,14-17,36-41,46-82,123-129,142-148,153-158,161-163,165-169,176-182,190-194
+  s_95386ee8c755dd::t_ad0f945ecb01a7 13,18-35,130-135,139-141,170-175,183-189
+  s_95386ee8c755dd::t_fa7720c534e90e 84-87,92-94,97,99-102,104-106,113-114,117-118,120-122
+  s_95386ee8c755dd::t_36afccb1206635 42-45,88-91,95-96,98,103,107-112,115-116,119,136-138,149-152,159-160,164
+  s_95386ee8c755dd::t_ce26c671243ec6 83
+plugins/yellow-core/tests/fixtures/jev-eval/repo/docs/solutions/workflow/gamma.md
+  s_95386ee8c755dd::t_4189e024b5ae42 1-10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6c09f7a9be6cba7e422c4d7e5aee5440a2678134",
+  "prompts": {},
+  "sessions": {
+    "s_15dbf824d2feee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aa7eb31c-5ab9-4d4d-b856-60b1dd2ceb0f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_95386ee8c755dd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b62d1f2e-6f39-4d18-ab20-e7e5d8476f1f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": null
+    }
+  }
+}
