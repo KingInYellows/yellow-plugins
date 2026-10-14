@@ -1010,6 +1010,20 @@ describe('validate-council-roster', () => {
       expect(run(root).status).toBe(0);
     });
 
+    it('excludes the gitignored .ruvector store from the walk', () => {
+      writeFixture(root);
+      stamp(root);
+      writeFile(
+        root,
+        '.ruvector/intelligence.json',
+        JSON.stringify({
+          memories: [{ content: 'Council uses Codex, Gemini and OpenCode.' }],
+        }) + '\n'
+      );
+
+      expect(run(root).status).toBe(0);
+    });
+
     it('reports an unreadable file instead of dropping it from the ledger', () => {
       writeFixture(root);
       writeFile(
