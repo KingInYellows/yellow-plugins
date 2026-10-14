@@ -394,9 +394,12 @@ as Step 1) to confirm `statusLine` is present:
 ```bash
 CONFIG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 python3 -c "import json, sys; d=json.load(open(sys.argv[1])); print('statusLine:', json.dumps(d.get('statusLine'), indent=2))" "$CONFIG/settings.json"
+sed -n 's/^STATUSLINE_VERSION = "\(.*\)"$/version: \1/p' "$CONFIG/yellow-statusline.py"
 ```
 
-Display the final report, substituting the actual `$CONFIG` value:
+Display the final report, substituting the actual `$CONFIG` value and the
+`version:` line printed above (the installed script's `STATUSLINE_VERSION`, so
+the report never drifts from the template):
 
 ```text
 Yellow Plugins Statusline — Installed
@@ -406,7 +409,7 @@ Yellow Plugins Statusline — Installed
   Settings:  $CONFIG/settings.json (statusLine key added)
   Plugins:   X detected (Y with MCP servers)
   Observer:  enabled | not enabled | unknown (<error_code>)   (measured)
-  Version:   1.0.0
+  Version:   <version printed above>
 
 The statusline will appear after your next assistant message.
 

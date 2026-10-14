@@ -44,6 +44,22 @@ skills from Claude command wrappers. See
 | `/worktree:cleanup`     | Scan git worktrees, classify by state, and remove stale worktrees with safeguards |
 | `/worktree:restack` | Restack branches in separate worktrees; restore after; pause with `--continue` / `--abort` |
 
+## Statusline
+
+`/statusline:setup` copies a generated `yellow-statusline.py` into your Claude
+config directory. That copy does not change when yellow-core updates, so re-run
+`/statusline:setup` after an upgrade to pick up template fixes.
+
+Statusline 1.0.1 runs `git --no-optional-locks status`, so a refresh killed by
+its 2-second timeout no longer leaves a stale `.git/index.lock` that blocks your
+next commit. It also keeps one git cache per working directory, so sessions in
+different repositories or worktrees stop showing each other's branch. Check the
+installed version with:
+
+```bash
+grep '^STATUSLINE_VERSION' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-statusline.py"
+```
+
 ## Agents
 
 ### Review (10)
