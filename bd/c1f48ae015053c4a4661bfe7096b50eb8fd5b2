@@ -1,0 +1,22 @@
+docs/solutions/code-quality/background-git-status-leaves-stale-index-lock.md
+  s_038935c1c9408d::t_36a935471daabb 33
+  s_038935c1c9408d::t_689ae72fad54fb 1-32,34-82
+docs/solutions/workflow/gt-sync-exit-128-stale-index-lock.md
+  s_038935c1c9408d::t_edad62f6c01874 17-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bdc1f48ae015053c4a4661bfe7096b50eb8fd5b2",
+  "prompts": {},
+  "sessions": {
+    "s_038935c1c9408d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c7683a4-00d4-449e-9d60-dc3112e28dc7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
