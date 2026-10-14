@@ -1,8 +1,9 @@
 # Feature: Haiku 5.5 model-routing policy — Phase 1
 
 > **Status (2026-10-14):** Implemented in PR #1171 and the stacked PR #1176,
-> both submitted. 30 of 31 tasks are done; 1.0.3 (the CI run-log check) waits
-> for #1171 to merge. Source:
+> both submitted. 29 of 31 tasks are done. 1.0.3 (the CI run-log check) waits
+> for #1171 to merge, and 1.5.2 stays open until the `linear-pr-linker` write
+> path is smoke-tested interactively. Source:
 > `docs/brainstorms/2026-10-07-haiku-5-5-model-routing-policy-brainstorm.md`.
 > Phase 2 (replay-gated swaps) and Phase 3 (trigger tightening; router
 > deferred) are tracked under "Follow-ups" and are not implemented here.
@@ -29,9 +30,12 @@ Split:
   1.1.18, 1.1.19, 1.2.2, the rest of 1.2.4, 1.2.5, 1.4.1-1.4.6 (except the
   AGENTS.md wording), 1.5.2, 1.5.3, and its own 1.6 pass (changesets for
   yellow-council and yellow-devin).
-- **Still open:** only 1.0.3, the CI run-log check. It can run only after
-  #1171 merges, because claude-code-action skips runs on a PR that changes
-  its own workflow.
+- **Still open:** two tasks.
+  - 1.0.3, the CI run-log check. It can run only after #1171 merges, because
+    claude-code-action skips runs on a PR that changes its own workflow.
+  - 1.5.2, the `linear-pr-linker` write path. Rerun it interactively against
+    a scratch issue and check that `save_issue` follows an accepted
+    confirmation (see the note under 1.5.3).
 - **Also in #1176:** the bot-review follow-ups tracked as CLAUDE-131 (GitHub
   #1172).
   - Item 1 (strict drain-model validation) landed in #1171.
