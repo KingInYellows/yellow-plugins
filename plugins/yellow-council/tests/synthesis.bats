@@ -1,15 +1,17 @@
 #!/usr/bin/env bats
-# synthesis.bats — behaviour gate for commands/council/council.md's synthesis
-# code: the Step 5b helper library (council_normalize_text (R10),
+# synthesis.bats — behaviour gate for /council's synthesis code: the Tier 4
+# helper library lib/council-synthesis.sh (council_normalize_text (R10),
 # council_extract_fenced, council_assign_labels (R9), council_fence_block),
-# the Step 2 flag/env fence, and the Step 5a/5b/5e fences end to end.
+# the Step 2 flag/env fence, and the Step 5a/5b/5e and Step 7-9 fences
+# extracted from commands/council/council.md, end to end.
 #
-# The helpers are EXTRACTED from council.md (lib/extract-synthesis-lib.bash)
-# and run under every shell profile the Bash tool can use — bash, zsh, and
-# zsh with common interactive-snapshot options — and under every awk
-# implementation found (mawk has no interval expressions or gensub, so a
-# gawk-only construct fails there). Without zsh, zsh cases skip locally and
-# fail in CI.
+# The library is sourced directly; the fences are extracted
+# (lib/extract-synthesis-lib.bash) and run with CLAUDE_PLUGIN_ROOT pointing at
+# this plugin, so they source the same library. Everything runs under every
+# shell profile the Bash tool can use — bash, zsh, and zsh with common
+# interactive-snapshot options — and under every awk implementation found
+# (mawk has no interval expressions or gensub, so a gawk-only construct fails
+# there). Without zsh, zsh cases skip locally and fail in CI.
 
 bats_require_minimum_version 1.7.0
 
@@ -17,9 +19,9 @@ setup() {
   load 'lib/extract-redaction-awk'
   load 'lib/extract-synthesis-lib'
   REPO_ROOT="$(repo_root)"
-  COUNCIL_MD="${REPO_ROOT}/plugins/yellow-council/commands/council/council.md"
-  LIB="${BATS_TEST_TMPDIR}/synthesis-lib.sh"
-  extract_synthesis_lib "$COUNCIL_MD" "$LIB"
+  PLUGIN_ROOT="${REPO_ROOT}/plugins/yellow-council"
+  COUNCIL_MD="${PLUGIN_ROOT}/commands/council/council.md"
+  LIB="${PLUGIN_ROOT}/lib/council-synthesis.sh"
 
   # One shim per distinct awk binary: plain `awk` is usually an alternative
   # symlink to mawk or gawk, and running the same binary twice adds nothing.
@@ -52,8 +54,9 @@ setup() {
 
 # --- Harness ---------------------------------------------------------------
 
-# run_in <profile> <awk-impl> <script-body> — run the extracted helpers plus
-# <script-body> under that shell profile with <awk-impl> first on PATH.
+# run_in <profile> <awk-impl> <script-body> — source the library, then run
+# <script-body> under that shell profile with <awk-impl> first on PATH and
+# CLAUDE_PLUGIN_ROOT set, so an extracted fence sources the same library.
 run_in() {
   local profile="$1" impl="$2" body="$3" script="${BATS_TEST_TMPDIR}/run-$1-$2.sh"
   local -a cmd
@@ -63,34 +66,42 @@ run_in() {
     zsh-snapshot) cmd=(zsh -f -o noclobber -o extendedglob -o rcquotes -o nocaseglob) ;;
   esac
   printf '. "%s"\n%s\n' "$LIB" "$body" >| "$script"
-  run --separate-stderr env PATH="${SHIM_ROOT}/${impl}:${PATH}" "${cmd[@]}" "$script"
+  run --separate-stderr env PATH="${SHIM_ROOT}/${impl}:${PATH}" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" "${cmd[@]}" "$script"
 }
 
-# --- Extraction ------------------------------------------------------------
+# --- Library layout ------------------------------------------------------
 
-@test "extractor finds the helpers in council.md" {
+@test "the library defines the synthesis helpers" {
   run grep -c -e '^council_normalize_text()' -e '^council_extract_fenced()' \
     -e '^council_assign_labels()' -e '^council_fence_block()' "$LIB"
   [ "$status" -eq 0 ]
   [ "$output" -eq 4 ]
 }
 
-@test "extractor fails on a missing or duplicated marker pair" {
-  local fx="${BATS_TEST_TMPDIR}/fx.md"
-  printf 'no markers here\n' >| "$fx"
-  run extract_synthesis_lib "$fx" "${BATS_TEST_TMPDIR}/out"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"no opening marker"* ]]
-
-  printf '%s\nx\n%s\n%s\ny\n%s\n' "$SYNTH_LIB_OPEN" "$SYNTH_LIB_CLOSE" "$SYNTH_LIB_OPEN" "$SYNTH_LIB_CLOSE" >| "$fx"
-  run extract_synthesis_lib "$fx" "${BATS_TEST_TMPDIR}/out"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"more than one opening marker"* ]]
-
-  printf '%s\nx\n' "$SYNTH_LIB_OPEN" >| "$fx"
-  run extract_synthesis_lib "$fx" "${BATS_TEST_TMPDIR}/out"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"no closing marker"* ]]
+# The helpers used to sit between marker lines inside the 5b fence, where the
+# tests ran the exact bytes the fence ran. Now that they are sourced, nothing
+# else proves a fence still loads the library before calling into it.
+@test "council.md has no inline library and every helper-calling fence sources it" {
+  run grep -c 'council-synthesis-lib' "$COUNCIL_MD"
+  [ "$output" -eq 0 ]
+  local defined bad
+  defined=$(sed -n 's/^\(council_[a-z_]*\)() {$/\1/p' "$LIB" | paste -sd'|' -)
+  [ -n "$defined" ]
+  bad=$(awk -v names="$defined" '
+    BEGIN { re = "(^|[^a-z_])(" names ")([^a-z_]|$)" }
+    $0 == "```bash" { inside = 1; call = 0; var = 0; dot = 0; start = NR; next }
+    inside && $0 == "```" {
+      inside = 0
+      # The library must be named and sourced before the first call.
+      if (call && !(var && dot && var < dot && dot < call)) print "fence at line " start
+      next
+    }
+    inside && !var && $0 == "COUNCIL_SYNTH_LIB=\"${CLAUDE_PLUGIN_ROOT}/lib/council-synthesis.sh\"" { var = NR }
+    inside && !dot && /^\. "\$COUNCIL_SYNTH_LIB"/ { dot = NR }
+    inside && !call && $0 !~ /^[ \t]*#/ && $0 ~ re { call = NR }
+  ' "$COUNCIL_MD")
+  [ -z "$bad" ] || { echo "fences call library helpers without sourcing it: $bad"; return 1; }
+  grep -qxF 'COUNCIL_SYNTH_LIB="${CLAUDE_PLUGIN_ROOT}/lib/council-synthesis.sh"' "$COUNCIL_MD"
 }
 
 # --- council_normalize_text ------------------------------------------------

@@ -1,28 +1,23 @@
 #!/usr/bin/env bash
-# Extract marker-delimited helper libraries from commands/council/council.md:
-# the Step 5b synthesis helpers (`extract_synthesis_lib`), and any other pair via
-# `extract_marked_lib <file> <outfile> <marker-name>` (council-quota-lib in
-# Step 4, council-lineage-lib in Step 2b).
+# Extraction helpers for the council test suites.
 #
-# council.md carries council_normalize_text, council_assign_labels and
-# council_fence_block inline in its Step 5b bash fence, between two marker
-# comment lines. Tests run that extracted text rather than a copy pasted into
-# the test tree, for the same reason redaction.bats does: a copy drifts
-# silently the moment the shipped fence is edited.
+# `extract_marked_lib <file> <outfile> <marker-name>` cuts a marker-delimited
+# helper block out of commands/council/council.md (council-quota-lib in Step 4,
+# council-lineage-lib in Step 2b). Tests run that extracted text rather than a
+# copy pasted into the test tree, for the same reason redaction.bats does: a
+# copy drifts silently the moment the shipped fence is edited.
+# `extract_fence_after <file> <heading-prefix> <outfile>` cuts a whole fence.
 #
-# Return contract: `extract_synthesis_lib <file> <outfile>` writes the lines
-# strictly between the markers to <outfile> and returns 0. It fails loudly
-# (non-zero, message on stderr) unless the file holds exactly one opening
-# marker followed by exactly one closing marker.
+# The Step 5 synthesis helpers are no longer inline: they live in
+# lib/council-synthesis.sh, which synthesis.bats sources directly.
+#
+# Return contract: both helpers write their output to <outfile> and return 0,
+# and fail loudly (non-zero, message on stderr) when the marker pair or the
+# heading and its fence are missing or malformed.
 
-SYNTH_LIB_OPEN='# >>> council-synthesis-lib'
-SYNTH_LIB_CLOSE='# <<< council-synthesis-lib'
-
-# extract_marked_lib <file> <outfile> <marker-name> — the same extraction for
-# any `# >>> <marker-name>` / `# <<< <marker-name>` pair. council.md carries
-# three: council-synthesis-lib (Step 5b), council-quota-lib (Step 4) and
-# council-lineage-lib (Step 2b). Marker names are compared as whole-line
-# prefixes, so one name must not be a prefix of another.
+# extract_marked_lib <file> <outfile> <marker-name> — print the lines strictly
+# between `# >>> <marker-name>` and `# <<< <marker-name>`. Marker names are
+# compared as whole-line prefixes, so one name must not be a prefix of another.
 extract_marked_lib() {
   local src="$1" out="$2" name="$3"
   awk -v opener="# >>> ${name}" -v closer="# <<< ${name}" -v fn="extract_marked_lib(${name})" '
@@ -41,10 +36,6 @@ extract_marked_lib() {
       if (err != "") { print fn ": " FILENAME ": " err > "/dev/stderr"; exit 1 }
     }
   ' "$src" >| "$out"
-}
-
-extract_synthesis_lib() {
-  extract_marked_lib "$1" "$2" council-synthesis-lib
 }
 
 # extract_fence_after <file> <heading-prefix> <outfile> — write the body of the

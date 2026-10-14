@@ -110,6 +110,13 @@ and never auto-commits. The user decides what to do with the verdicts.
   residual and the residual Write forgery are in `docs/security.md` "Synthesis staging directory
   (yellow-council)". The `CLAUDE_FENCED_FILE` literal handoff still
   relays its path through the model.
+- **Synthesis helpers are a sourced library, cleanup stays inline.** The
+  Step 5 helpers live in `lib/council-synthesis.sh`, a Tier 4 dual-shell
+  library each fence sources through `${CLAUDE_PLUGIN_ROOT}` after an
+  existence check that routes through the fence's abort path. It grew past
+  what one fence can carry and is now shared by 5b and 5e. Cleanup-only
+  blocks (Step 8 Cancel, Step 9, the `council_rm_synth_*` copies) stay
+  inline, so removing staged files never depends on the library loading.
 - **Read-only invocation.** Reviewers must NOT use
   `--dangerously-skip-permissions` (agy, OpenCode) or
   `--sandbox workspace-write` (Codex). Read-only behavior is enforced via
@@ -225,10 +232,11 @@ shipped as four synchronized carrier files (`REDACTION_SOURCES` in
 redact_awk=` and Step 7 `section_body=$(awk '`). The bats suite extracts and
 runs the first entry, `gemini-reviewer.md`, and also asserts byte-identity
 across every carrier — edit the patterns in all four files together, never
-just one. `synthesis.bats` extracts the Step 5b helper library (between the
-`council-synthesis-lib` markers) and the Step 2, 5a, 5b, 5d-resume, 5e, 7, 8
-(Cancel) and 9 fences from `council.md` and runs them under bash, zsh and zsh
-with snapshot options, and
+just one. The synthesis helpers live in `lib/council-synthesis.sh` (Tier 4,
+sourced by the Step 5 fences); `synthesis.bats` sources it directly, extracts
+the Step 2, 5a, 5b, 5d-resume, 5e, 7, 8 (Cancel) and 9 fences from
+`council.md` (with `CLAUDE_PLUGIN_ROOT` pointing at the plugin, so they source
+the same file), and runs them under bash, zsh and zsh with snapshot options, and
 under every awk it finds; it needs zsh, and fails rather than skips in CI
 without it. `quota-lineage.bats` extracts the `council-quota-lib` (Step 4) and
 `council-lineage-lib` (Step 2b) marker pairs, runs the Step 4 parse fence, the
