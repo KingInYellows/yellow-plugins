@@ -127,7 +127,14 @@ README for the personas that do carry the field.
 Three hooks run automatically once the plugin is enabled:
 
 - **SessionStart** — dispatches the background drain of the compound-staging
-  queue.
+  queue. The drain runs on Haiku; set `COMPOUND_DRAIN_MODEL` to `sonnet`,
+  `opus`, or a full `claude-<id>` to change it. Any other value is logged and
+  ignored (the drain stays on Haiku). Each drain writes a log to
+  `~/.claude/projects/<slug>/compound-staging/drain-logs/`. A log line
+  `WARNING drain left all <n> dispatched entries` means the drain never
+  handed the queue to `staging-reviewer`. Those entries are retried but
+  reaped after 7 days, so set `COMPOUND_DRAIN_MODEL=sonnet` if the warning
+  repeats.
 - **Stop** — captures the session transcript tail into that queue. With
   `COMPOUND_JEV_PREFILTER=shadow` and `TYPESAFE_API_KEY` set, it also asks
   TypeSafe's Jev model whether the session looks worth keeping and logs the
