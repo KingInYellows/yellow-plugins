@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "model_default": "jev-1.13.0",
+  "frozen_at": "2026-10-14",
+  "tuned_on": "the 2026-10-14 brainstorm experiment's own 57-doc dev split, not this tool's sha256(path) dev split (variant B was written after reading those dev errors, so only the holdout split is untouched by tuning)",
+  "note": "Frozen. Any edit to this file, even a wording fix in a note, changes the sha256 every results row records; report refuses to pool rows across shas and gives a verdict only for results made under the current file. Ship an edit as a new frozen version with a new frozen_at, which restarts the holdout.",
+  "instructions": "Which solution-doc category best fits the engineering lesson described in `lesson`? Pick the category whose description matches the main subject of the lesson.",
+  "criteria": {
+    "security-issues": {
+      "what": "Vulnerabilities and hardening: injection, secrets or token leakage, unsafe parsing of untrusted input, permission or trust-boundary bypass, redaction.",
+      "not_for": "General shell or script bugs with no attacker or secret involved."
+    },
+    "logic-errors": {
+      "what": "A concrete defect in program logic that produced wrong behavior: state-machine or parser bugs, stale or inconsistent state, off-by-one, race conditions, wrong exit codes, fail-open checks.",
+      "not_for": "Authoring conventions, process advice, or CI and build configuration problems."
+    },
+    "build-errors": {
+      "what": "Failures in the build, CI, packaging or test-runner toolchain: dependency resolution, schema or lint validators, bats or vitest quirks, tool version incompatibilities.",
+      "not_for": "Bugs in the plugin's own runtime logic."
+    },
+    "integration-issues": {
+      "what": "Problems at the boundary with an external system: GitHub API, gh or gt CLI behavior, MCP servers, third-party CLIs, provider setup and cross-plugin wiring.",
+      "not_for": "Pure internal logic bugs or style conventions."
+    },
+    "code-quality": {
+      "what": "Authoring conventions, design patterns, anti-patterns and gotchas for writing agents, commands, skills, docs and shell; guidance and lessons that apply across many files. The default home for general engineering knowledge.",
+      "not_for": "A single concrete defect in one specific script or command."
+    },
+    "workflow": {
+      "what": "How work flows through git and GitHub: branches, stacked PRs, merge queues, restacks, review and resolve loops, worktrees, release and changeset process, session and gate procedures.",
+      "not_for": "The correctness of a single script's logic."
+    }
+  },
+  "protocol": {
+    "primary_metric": "adjudicated accuracy on the holdout split (docs dated after frozen_at); printed as agreement until review marks exist",
+    "confidence_thresholds": [0.7, 0.95],
+    "thresholds_note": "Fixed in advance; never tuned on eval data.",
+    "decision_rule": "No change ships without GO: NO-GO and INSUFFICIENT-DATA both keep the current Sonnet category table.",
+    "go_rule": {
+      "test": "paired non-inferiority, Tango score interval on Jev minus folder correctness over the same holdout docs",
+      "margin": 0.1,
+      "alpha_one_sided": 0.05,
+      "go": "interval lower bound above -margin",
+      "no_go": "interval upper bound below -margin",
+      "otherwise": "INSUFFICIENT-DATA",
+      "look_at_n": 155,
+      "look_note": "One pre-registered look at 155 adjudicated holdout docs (about 80% power at 25% discordance). Earlier reports are descriptive only and print INSUFFICIENT-DATA."
+    },
+    "adjudication": {
+      "disagreements": "all",
+      "agreement_sample_fraction": 0.2,
+      "agreement_sample_seed": 0,
+      "note": "A random sample of agreements is judged too, to limit discrepant-analysis bias."
+    }
+  }
+}

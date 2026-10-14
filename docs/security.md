@@ -535,6 +535,49 @@ third party, TypeSafe AI (`https://api.typesafe.ai/v1/systemone`):
   is written, every error is silent, and the answer never changes what is
   staged or drained.
 
+#### Jev category eval (offline)
+
+`lib/jev-category-eval.py run` is a manual tool; no hook, agent or command
+runs it, and it changes no staging behaviour.
+
+- **What leaves the machine.** For each `docs/solutions/<category>/*.md` in
+  the git index (staged content, not the working tree; `archived/` and
+  unknown folders excluded), the frontmatter `title`, `problem` and `tags`
+  only, plus the fixed criteria from `lib/jev-category-criteria.json`. Doc
+  bodies are never read into a request. The docs come from whichever
+  repository `--repo` names, which may be private; run `--dry-run` first to
+  see what would be sent. Unlike the shadow pre-filter, the frontmatter is
+  sent unfenced: it is the repository's own docs, and the answer is only
+  compared with the doc's folder, never executed or fed back to Claude.
+  `--dry-run` prints the doc count and request size and sends nothing.
+- **When.** Only when a person runs `run`, one request per doc. `report` is
+  offline.
+- **Credential handling.** The key comes from `TYPESAFE_API_KEY` (printable
+  ASCII only) and is sent only in an unredirected `Authorization` header:
+  redirects are refused (not followed), proxy environment variables are
+  ignored, and TLS verification keeps urllib's defaults. The key never
+  appears in argv, output, error messages or result files; error rows carry
+  fixed status tokens, not response bodies. The git subprocesses that list
+  and read the docs run with the key removed from their environment and with
+  the repository's `core.fsmonitor` and hooks disabled.
+- **Endpoint override.** `--url` and `--model` choose the endpoint and model.
+  `--url` must be `https`, or plain `http` to a loopback IP address (for the
+  test stub; the key then crosses loopback unencrypted), and must not carry
+  credentials.
+- **Output.** `run` writes `results-<utc>.jsonl` (mode 600, created
+  exclusively, never overwritten) to `--out`. It refuses an `--out` under
+  the repository's top level (compared by resolved path, so another worktree
+  or a case-insensitive spelling is not caught) and an existing `--out` that
+  other users can write. Rows hold paths, folders, the answer, probabilities
+  and token counts, no doc text. `report` writes `disagreements.tsv` (mode
+  600, paths only, through an exclusive temp file) beside the results file,
+  with no repository check of its own. It reads an existing
+  `disagreements.tsv` only when that is a regular file you own that others
+  cannot write; otherwise it exits 2 rather than replace it, unless the file
+  is passed with `--review`. It validates every results row (whole-string
+  matches, no repeated paths) and every judged review row before printing or
+  writing anything.
+
 ### Context Observer Persistence (yellow-core)
 
 `/statusline:setup` Step 5b (or `/statusline:setup observer`) offers an opt-in
