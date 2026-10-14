@@ -512,9 +512,14 @@ detail):**
   set (recursion guard for the drain's own Stop + SessionStart hooks).
   The drain runs `--model haiku` (override with `COMPOUND_DRAIN_MODEL`,
   e.g. `sonnet`; any value other than `haiku|sonnet|opus|claude-<id>` is
-  logged to `drain-logs/` and falls back to haiku, and every run logs
-  `[compound-drain] claude exited <rc>`); unpinned it would run on the
-  user's default model and draw on the same limit window as their own session.
+  logged to `drain-logs/` and falls back to haiku); unpinned it would run
+  on the user's default model and
+  draw on the same limit window as their own session. The drain log records
+  the `claude -p` exit status and how many dispatched entries left
+  `pending/`. `WARNING drain left all <n> dispatched entries` means the lead
+  never handed off to staging-reviewer; those entries are retried, but
+  reaped after 7 days, so a repeated warning calls for
+  `COMPOUND_DRAIN_MODEL=sonnet`.
 - The drain `claude -p` session invokes `staging-reviewer`, which scores
   each pending entry via `staging-scorer` (Haiku), filters through a
   multi-layer guardian (`category != behavioral_instruction`, no

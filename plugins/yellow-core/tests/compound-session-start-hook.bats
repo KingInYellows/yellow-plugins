@@ -119,12 +119,15 @@ _plant_pending() {
   [ -f "$STUB_MARKER" ]
 }
 
-# Wait for a fixed-string line to appear in the drain log. The exit-status
-# line is written after the stub returns, so it can lag the stub marker.
-_wait_for_drain_log() {
-  local needle="$1" i=0
+# --- Drain model pin ---
+
+# Wait for the drain subshell to log the claude exit status and release
+# .drain-lock, so the next run in the same test can dispatch again.
+_wait_for_drain_done() {
+  local i=0
   while [ "$i" -lt 30 ]; do
-    if cat "$STAGING"/drain-logs/*.log 2>/dev/null | grep -qF -- "$needle"; then
+    if grep -qs 'drain claude exited' "$STAGING"/drain-logs/*.log \
+      && [ ! -d "$STAGING/.drain-lock" ]; then
       return 0
     fi
     sleep 0.1
@@ -133,86 +136,98 @@ _wait_for_drain_log() {
   return 1
 }
 
-# Run one drain with COMPOUND_DRAIN_MODEL set to $1 and assert it was
-# rejected: haiku reaches argv, the warning is logged, the raw value is not.
-_assert_drain_model_rejected() {
+@test "session-start pins the drain to haiku by default and logs the exit status" {
   _plant_pending 5
-  COMPOUND_DRAIN_MODEL="$1" run bash "$SS_HOOK" <<< "$(_stdin_json)"
+  run env -u COMPOUND_DRAIN_MODEL bash "$SS_HOOK" <<< "$(_stdin_json)"
   [ "$status" -eq 0 ]
-  _wait_for_stub 3
-  [ -f "$STUB_MARKER" ]
-  grep -q -- '--model haiku ' "$STUB_MARKER"
-  _wait_for_drain_log 'COMPOUND_DRAIN_MODEL rejected'
-}
-
-@test "session-start pins the drain to haiku by default" {
-  _plant_pending 5
-  unset COMPOUND_DRAIN_MODEL
-  run bash "$SS_HOOK" <<< "$(_stdin_json)"
-  [ "$status" -eq 0 ]
-  _wait_for_stub 3
-  [ -f "$STUB_MARKER" ]
+  _wait_for_drain_done
   grep -q -- '--model haiku ' "$STUB_MARKER"
   grep -q -- '--max-turns 50' "$STUB_MARKER"
-  ! grep -q -- '--bare' "$STUB_MARKER" || false
-  _wait_for_drain_log '[compound-drain] claude exited 0'
-  ! cat "$STAGING"/drain-logs/*.log | grep -qF 'COMPOUND_DRAIN_MODEL rejected' || false
+  run grep -q -- '--bare' "$STUB_MARKER"
+  [ "$status" -eq 1 ]
+  grep -q 'drain claude exited 0' "$STAGING"/drain-logs/*.log
+  run grep -q 'COMPOUND_DRAIN_MODEL rejected' "$STAGING"/drain-logs/*.log
+  [ "$status" -eq 1 ]
+}
+
+@test "session-start warns when the drain exits 0 but leaves every entry in pending/" {
+  # The default stub exits 0 without touching pending/ — the shape of a
+  # lead that answers without dispatching staging-reviewer.
+  _plant_pending 5
+  run env -u COMPOUND_DRAIN_MODEL bash "$SS_HOOK" <<< "$(_stdin_json)"
+  [ "$status" -eq 0 ]
+  _wait_for_drain_done
+  grep -q 'drain claude exited 0' "$STAGING"/drain-logs/*.log
+  grep -q 'WARNING drain left all 5 dispatched entries in pending/' "$STAGING"/drain-logs/*.log
+}
+
+@test "session-start logs how many entries the drain took from pending/" {
+  _plant_pending 5
+  # A stub that does what staging-reviewer's Phase 1 does: move every
+  # pending entry to processing/.
+  cat > "$STUB_BIN" <<STUB
+#!/usr/bin/env bash
+printf 'invoked with args: %s\n' "\$*" > "$STUB_MARKER"
+mkdir -p "$STAGING/processing"
+mv -- "$STAGING"/pending/*.jsonl "$STAGING/processing/"
+printf '{"result": "stub", "is_error": false}\n'
+STUB
+  run env -u COMPOUND_DRAIN_MODEL bash "$SS_HOOK" <<< "$(_stdin_json)"
+  [ "$status" -eq 0 ]
+  _wait_for_drain_done
+  grep -q 'drain took 5 of 5 dispatched entries from pending/' "$STAGING"/drain-logs/*.log
+  run grep -q 'WARNING drain left' "$STAGING"/drain-logs/*.log
+  [ "$status" -eq 1 ]
 }
 
 @test "session-start honours COMPOUND_DRAIN_MODEL" {
   _plant_pending 5
-  COMPOUND_DRAIN_MODEL=sonnet run bash "$SS_HOOK" <<< "$(_stdin_json)"
+  run env COMPOUND_DRAIN_MODEL=sonnet bash "$SS_HOOK" <<< "$(_stdin_json)"
   [ "$status" -eq 0 ]
-  _wait_for_stub 3
-  [ -f "$STUB_MARKER" ]
+  _wait_for_drain_done
   grep -q -- '--model sonnet ' "$STUB_MARKER"
+  run grep -q 'COMPOUND_DRAIN_MODEL rejected' "$STAGING"/drain-logs/*.log
+  [ "$status" -eq 1 ]
 }
 
 @test "session-start honours a full claude-* COMPOUND_DRAIN_MODEL" {
   _plant_pending 5
-  COMPOUND_DRAIN_MODEL=claude-haiku-5-5 run bash "$SS_HOOK" <<< "$(_stdin_json)"
+  run env COMPOUND_DRAIN_MODEL=claude-haiku-5-5 bash "$SS_HOOK" <<< "$(_stdin_json)"
   [ "$status" -eq 0 ]
-  _wait_for_stub 3
-  [ -f "$STUB_MARKER" ]
+  _wait_for_drain_done
   grep -q -- '--model claude-haiku-5-5 ' "$STUB_MARKER"
+  run grep -q 'COMPOUND_DRAIN_MODEL rejected' "$STAGING"/drain-logs/*.log
+  [ "$status" -eq 1 ]
 }
 
-@test "session-start rejects an option-shaped COMPOUND_DRAIN_MODEL" {
-  _assert_drain_model_rejected '--dangerously-skip-permissions'
-  ! grep -q -- 'dangerously' "$STUB_MARKER" || false
-  ! cat "$STAGING"/drain-logs/*.log | grep -qF 'dangerously' || false
+@test "session-start rejects invalid COMPOUND_DRAIN_MODEL values, logs it and falls back to haiku" {
+  _plant_pending 5
+  local value
+  for value in 'x; rm' 'claude-x; rm' '' 'claude-' 'claude-opus--5' \
+    'claude-opus-5-' '--dangerously-skip-permissions' 'gpt-5' 'sonnett'; do
+    rm -f "$STUB_MARKER" "$STAGING"/drain-logs/*.log
+    run env COMPOUND_DRAIN_MODEL="$value" bash "$SS_HOOK" <<< "$(_stdin_json)"
+    [ "$status" -eq 0 ]
+    _wait_for_drain_done
+    grep -q -- '--model haiku ' "$STUB_MARKER"
+    grep -q 'COMPOUND_DRAIN_MODEL rejected' "$STAGING"/drain-logs/*.log
+    # The untrusted value never reaches argv or the log.
+    run grep -q -e 'dangerously' -e 'x; rm' -e 'gpt' "$STUB_MARKER"
+    [ "$status" -eq 1 ]
+    run grep -q -e 'dangerously' -e 'x; rm' -e 'gpt' "$STAGING"/drain-logs/*.log
+    [ "$status" -eq 1 ]
+  done
 }
 
-@test "session-start rejects a shell-metacharacter COMPOUND_DRAIN_MODEL" {
-  _assert_drain_model_rejected 'x; rm'
-}
-
-@test "session-start rejects claude-x; rm as COMPOUND_DRAIN_MODEL" {
-  _assert_drain_model_rejected 'claude-x; rm'
-}
-
-@test "session-start rejects a set-but-empty COMPOUND_DRAIN_MODEL" {
-  _assert_drain_model_rejected ''
-}
-
-@test "session-start rejects malformed claude-* COMPOUND_DRAIN_MODEL ids" {
-  _assert_drain_model_rejected 'claude-'
-}
-
-@test "session-start rejects claude-opus--5 as COMPOUND_DRAIN_MODEL" {
-  _assert_drain_model_rejected 'claude-opus--5'
-}
-
-@test "session-start rejects claude-opus-5- as COMPOUND_DRAIN_MODEL" {
-  _assert_drain_model_rejected 'claude-opus-5-'
-}
-
-@test "session-start rejects an unknown alias such as sonnett" {
-  _assert_drain_model_rejected 'sonnett'
-}
-
-@test "both claude -p branches pass --model \"\$DRAIN_MODEL\"" {
-  [ "$(grep -c -- '--model "\$DRAIN_MODEL"' "$SS_HOOK")" -eq 2 ]
+@test "both drain claude -p branches pass --model \"\$DRAIN_MODEL\"" {
+  # The suite only exercises the host's branch (timeout present), so pin
+  # the no-timeout branch statically: every `-p "$DRAIN_PROMPT"` line must
+  # be followed directly by the --model line.
+  run grep -c -- '-p "$DRAIN_PROMPT"' "$SS_HOOK"
+  [ "$output" -eq 2 ]
+  run awk 'prev ~ /-p "\$DRAIN_PROMPT"/ && /--model "\$DRAIN_MODEL"/ { n++ }
+    { prev = $0 } END { print n + 0 }' "$SS_HOOK"
+  [ "$output" -eq 2 ]
 }
 
 @test "session-start does NOT dispatch at count=4" {
