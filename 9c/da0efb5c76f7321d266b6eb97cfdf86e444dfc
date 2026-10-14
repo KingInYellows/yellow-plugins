@@ -1,0 +1,27 @@
+scripts/validate-agent-authoring.js
+  s_4345376e03d3fe::t_90593b080d63e6 138
+  s_4345376e03d3fe::t_5e5b89111fb504 575-581,587
+plans/haiku-5-5-model-routing-phase-1.md
+  s_4345376e03d3fe::t_9b4ef8988ecbf7 616
+  s_4345376e03d3fe::t_2c1213ab4ed948 655-659
+docs/research/model-routing-policy.md
+  s_4345376e03d3fe::t_aeac082c7343f6 13-17
+  s_4345376e03d3fe::t_1edff7aed1030b 186-190
+  s_4345376e03d3fe::t_0c0d8202436f3a 168-174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9cda0efb5c76f7321d266b6eb97cfdf86e444dfc",
+  "prompts": {},
+  "sessions": {
+    "s_4345376e03d3fe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a1435856-f8fe-417a-8592-9c0db60c0621",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
