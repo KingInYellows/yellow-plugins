@@ -1,0 +1,65 @@
+tests/shell-compat/drivers/yellow-council--council-synthesis.sh
+  s_ccb027cd70c0fa::t_1b84cb42cd6a27 1-18
+plugins/yellow-council/CLAUDE.md
+  s_ccb027cd70c0fa::t_5b5369ee15aadc 113-119,235-239
+plugins/yellow-council/commands/council/council.md
+  s_ccb027cd70c0fa::t_42f1c9f2c8e370 1559-1560
+  s_ccb027cd70c0fa::t_b4215c00c05b24 1685-1694
+scripts/shell-compat-config.json
+  s_ccb027cd70c0fa::t_1b84cb42cd6a27 16
+plans/yellow-council-v2-four-cli-05-evidence-verification-and-finalization.md
+  s_ccb027cd70c0fa::t_b164888b03634e 392
+  s_6fec6a88314cd3::t_f5ff0d481f298a 78-84,106-128,370-376,402-407,464-465,525,528-530,535-537,546-564,614-615,657,686-689,752-756,761-763,799-802,818-822,839-842,932-937,1000-1004,1030-1037,1061-1063,1102-1111,1183
+  s_ccb027cd70c0fa::t_91fff2d61f1a36 327
+  s_ccb027cd70c0fa::t_6825c86f93bb45 397
+  s_6fec6a88314cd3::t_8da87d28400c86 62-75,85-95,134-162,232-246,346-356,377-387,408-422,466-494,538-544,567-584,592-611,660-683,693-714,725-750,771-789,854-860,869-879,931,938-951,972-978,1012-1019,1044-1057,1072-1082,1091-1099,1113-1175,1205-1229
+  s_ee6ff17b408c60::t_a68a1c3d548af3 1-61,76-77,96-105,163-231,247-326,328-335,337-345,358-362,364-369,389-391,393-396,398-401,423-463,495-524,526-527,531-534,545,565-566,585-591,612-613,616-656,658-659,684-685,690-692,715-720,722-724,751,757-760,764-770,790-798,803-817,823-838,843-853,861-868,880-930,952-971,979-999,1005-1011,1020-1024,1029,1038-1043,1058-1060,1064-1071,1083-1090,1100-1101,1112,1176-1182,1184-1204
+  s_ccb027cd70c0fa::t_5b5369ee15aadc 363,388
+  s_ccb027cd70c0fa::t_352c6cb448678a 357
+  s_ccb027cd70c0fa::t_d9fb4143581235 336
+  s_6fec6a88314cd3::t_f49e7f61775c5f 129-133,721,1025-1028
+docs/solutions/code-quality/bash-zsh-tiered-shell-contract.md
+  s_ee6ff17b408c60::t_4f085f26d844df 95-130
+plugins/yellow-council/tests/lib/extract-synthesis-lib.bash
+  s_ccb027cd70c0fa::t_f19b773ec4aa69 2,4-9,11-16
+  s_ccb027cd70c0fa::t_0da0dfae84e155 18-20
+plugins/yellow-council/tests/synthesis.bats
+  s_ccb027cd70c0fa::t_9ba5dac68a5f56 92,95-96,99-101
+  s_ccb027cd70c0fa::t_cebdd1e5c4fca4 2-3,5-6,8-14,22-24,57-59,69,72,74,81-91,93-94,97-98,102-104
+scripts/council-roster.json
+  s_ccb027cd70c0fa::t_bb8d9481fef84d 2,63
+plugins/yellow-council/lib/council-synthesis.sh
+  s_ccb027cd70c0fa::t_e95645220524da 1-315
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f96a901d6871637ce2866848b49a60842e2f12aa",
+  "prompts": {},
+  "sessions": {
+    "s_6fec6a88314cd3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8e08fae3-0b5c-4c25-a976-d940824f7c77",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_ccb027cd70c0fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce3509f8-678c-4d2f-92ba-ab6c39ac34af",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_ee6ff17b408c60": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "709e45d4-4ebd-4892-97c0-80cd69c05877",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
