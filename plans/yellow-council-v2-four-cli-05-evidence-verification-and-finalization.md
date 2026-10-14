@@ -896,7 +896,7 @@ Other docs:
 
 ### Phase E — F2: Step 7 report staging (plan step 7)
 
-- [ ] Step 23: Split council.md Step 7's report block into a cross-call
+- [x] Step 23: Split council.md Step 7's report block into a cross-call
   lifecycle, under headings `#### 7a — stage` and `#### 7c — assemble` so
   `extract_fence_after` can find each fence.
 
@@ -949,7 +949,7 @@ Other docs:
 >   than replace it.
 <!-- /deepen-plan -->
 
-- [ ] Step 24: Remove the `<<'__EOF_COUNCIL_SYNTHESIS__'` heredoc (L2783-2788)
+- [x] Step 24: Remove the `<<'__EOF_COUNCIL_SYNTHESIS__'` heredoc (L2783-2788)
   and sweep what it leaves behind.
   - Keep the `__EOF_COUNCIL_SYNTHESIS__` escape in `council_fence_block` and
     Step 5e as defense in depth, and keep the `synthesis.bats` delimiter
@@ -960,7 +960,7 @@ Other docs:
     `council_fence_block` escape-set comment (now in the lib), the "inline
     via quoted heredoc" comment, and both "Step 7's heredoc text lands in the
     report" comments (~L3493, ~L3631).
-- [ ] Step 25: Document the residuals.
+- [x] Step 25: Document the residuals.
   - **Step 7 prose:** `Write` is not path-scoped. The guarantee is that
     nothing destructive trusts a relayed path, and a stray write outside the
     validated file is never read or deleted. The real mitigation is a `Write`
@@ -976,7 +976,7 @@ Other docs:
 > 7a/7c lifecycle and its residual there too.
 <!-- /deepen-plan -->
 
-- [ ] Step 26: Bats cases in `synthesis.bats`. Extract the 7a and 7c fences
+- [x] Step 26: Bats cases in `synthesis.bats`. Extract the 7a and 7c fences
   with `extract_fence_after` and run them across `run_in` profiles.
   - path guards: wrong prefix, `..`, an extra `/`, an empty suffix;
   - a symlinked dir and a symlinked `synthesis.md`;

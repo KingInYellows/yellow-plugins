@@ -1305,6 +1305,136 @@ cancel_script() {
   rm -rf "$REPO"
 }
 
+# s7c_script <out> <own-dir> — the Step 7c fence with every literal
+# substituted (CLAUDE_FENCED_FILE from $CF, COUNCIL_SYNTH_DIR from <own-dir>),
+# behind a preamble that runs the 7a fence and stages synthesis.md
+# ($S7_SYNTHESIS, default a one-line report) the way 7b's Write does. Each run
+# of <out> therefore gets its own staging directory, which 7c's trap removes.
+s7c_script() {
+  local out="$1" own="$2" s7a="${BATS_TEST_TMPDIR}/7a.sh"
+  extract_fence_after "$COUNCIL_MD" '#### 7a' "$s7a"
+  extract_fence_after "$COUNCIL_MD" '#### 7c' "$out.raw"
+  {
+    printf 'S7_OUT=$(. "%s") || exit 1\n' "$s7a"
+    printf '%s\n' 'S7_REPORT_FILE=$(printf "%s\n" "$S7_OUT" | sed -n "s/^COUNCIL_REPORT_FILE=//p")' \
+      'S7_REPORT_TOKEN=$(printf "%s\n" "$S7_OUT" | sed -n "s/^COUNCIL_REPORT_TOKEN=//p")' \
+      'printf "%s\n" "${S7_SYNTHESIS:-## Council Report}" >| "$S7_REPORT_FILE"'
+    sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" \
+      -e "s|<literal COUNCIL_SYNTH_DIR value from 5a>|$own|" \
+      -e 's|<literal COUNCIL_REPORT_FILE value from 7a>|$S7_REPORT_FILE|' \
+      -e 's|<literal COUNCIL_REPORT_TOKEN value from 7a>|$S7_REPORT_TOKEN|' "$out.raw"
+  } >| "$out"
+}
+
+# stage7a — run the 7a fence; sets RD (staging dir) and RT (token).
+stage7a() {
+  local s7a="${BATS_TEST_TMPDIR}/7a.sh"
+  extract_fence_after "$COUNCIL_MD" '#### 7a' "$s7a"
+  run_in bash "$FIRST_AWK" ". '$s7a'"
+  [ "$status" -eq 0 ] || { echo "7a: $stderr"; return 1; }
+  RD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_REPORT_FILE=//p'); RD="${RD%/synthesis.md}"
+  RT=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_REPORT_TOKEN=//p')
+  [ -d "$RD" ] && [ "${#RT}" -eq 32 ] && [ "$(cat "$RD/.token")" = "$RT" ]
+}
+
+# run7c <profile> <file-literal> <token-literal> — run the 7c fence with the
+# given report literals (CLAUDE_FENCED_FILE from $CF), then print
+# REPORT_CONTENT.
+run7c() {
+  local s7c="${BATS_TEST_TMPDIR}/7c.sh"
+  extract_fence_after "$COUNCIL_MD" '#### 7c' "$s7c.raw"
+  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" \
+    -e 's|<literal COUNCIL_SYNTH_DIR value from 5a>|/tmp/council-synth-x|' \
+    -e "s|<literal COUNCIL_REPORT_FILE value from 7a>|$2|" \
+    -e "s|<literal COUNCIL_REPORT_TOKEN value from 7a>|$3|" "$s7c.raw" >| "$s7c"
+  run_in "$1" "$FIRST_AWK" "cd '$REPO' && . '$s7c' && printf '%s\n' \"\$REPORT_CONTENT\""
+}
+
+@test "7a mints a private staging dir and 7c reads synthesis.md byte-exact, then removes the dir" {
+  local profile want="${BATS_TEST_TMPDIR}/synthesis.md"
+  printf '%s\n' '## Council Report — review: x — 2026-10-14' '__EOF_COUNCIL_SYNTHESIS__' \
+    "  it's \$(not run) \`nor this\` \\ kept" '' 'last line' >| "$want"
+  for profile in $PROFILES; do
+    setup_council_run
+    stage7a
+    [ "$(ls -ld "$RD" | cut -c1-10)" = "drwx------" ]
+    cp "$want" "$RD/synthesis.md"
+    run7c "$profile" "$RD/synthesis.md" "$RT"
+    [ "$status" -eq 0 ] || { echo "$profile: $stderr"; return 1; }
+    diff <(cat "$want") <(printf '%s\n' "$output" | sed -n '1,/^last line$/p') \
+      || { echo "$profile: content changed"; return 1; }
+    [ ! -e "$RD" ] || { echo "$profile: staging dir left behind"; return 1; }
+    rm -rf "$REPO"
+  done
+}
+
+@test "7c refuses a bad report path or token and deletes nothing" {
+  local profile evil="${BATS_TEST_TMPDIR}/evil" lit
+  for profile in $PROFILES; do
+    setup_council_run
+    stage7a
+    printf 'x\n' >| "$RD/synthesis.md"
+    mkdir -p "$evil"; printf '%s\n' "$RT" >| "$evil/.token"; printf 'x\n' >| "$evil/synthesis.md"
+    mkdir -p "$RD/sub"; printf '%s\n' "$RT" >| "$RD/sub/.token"; printf 'x\n' >| "$RD/sub/synthesis.md"
+    for lit in "$evil/synthesis.md" "$RD/../${RD##*/}/synthesis.md" "$RD/sub/synthesis.md" \
+      /tmp/council-synth-/synthesis.md "$RD/other.md" '<literal COUNCIL_REPORT_FILE value from 7a>'; do
+      run7c "$profile" "$lit" "$RT"
+      [ "$status" -eq 1 ] || { echo "$profile [$lit]: status $status"; return 1; }
+      [[ "$stderr" == *"refusing to read or delete it"* ]] || { echo "$profile [$lit]: $stderr"; return 1; }
+    done
+    # Token mismatch and a non-hex token: refused, nothing deleted.
+    for lit in 0123456789abcdef0123456789abcdef "${RT%?}G" "$RT$RT" ''; do
+      run7c "$profile" "$RD/synthesis.md" "$lit"
+      [ "$status" -eq 1 ] || { echo "$profile [token $lit]: status $status"; return 1; }
+    done
+    [ -f "$RD/synthesis.md" ] && [ -f "$evil/synthesis.md" ] && [ -f "$RD/sub/synthesis.md" ]
+    rm -rf "$RD" "$evil" "$REPO"
+  done
+}
+
+@test "7c refuses a symlinked staging dir or synthesis.md, and a missing file still removes the dir" {
+  local link
+  setup_council_run
+  stage7a
+  printf 'x\n' >| "$RD/synthesis.md"
+  link="/tmp/council-synth-link$$"
+  ln -s "$RD" "$link"
+  run7c bash "$link/synthesis.md" "$RT"
+  [ "$status" -eq 1 ]
+  [ -L "$link" ] && [ -f "$RD/synthesis.md" ]
+  rm -f "$link"
+  # A symlinked synthesis.md: the directory is valid, so it is removed, but the
+  # link target is never read.
+  printf 'secret\n' >| "$BATS_TEST_TMPDIR/target"
+  rm -f "$RD/synthesis.md"
+  ln -s "$BATS_TEST_TMPDIR/target" "$RD/synthesis.md"
+  run7c bash "$RD/synthesis.md" "$RT"
+  [ "$status" -eq 1 ]
+  [[ "$output" != *secret* ]]
+  [ ! -e "$RD" ]
+  [ "$(cat "$BATS_TEST_TMPDIR/target")" = secret ]
+  # A failed Write (no synthesis.md): refused, and the validated dir is removed.
+  stage7a
+  run7c bash "$RD/synthesis.md" "$RT"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"7b Write did not land"* ]]
+  [ ! -e "$RD" ]
+  rm -rf "$REPO"
+}
+
+@test "7c refuses a staging dir another user owns" {
+  [ "$(id -u)" -eq 0 ] || skip "needs root to chown a directory to another user"
+  id nobody >/dev/null 2>&1 || skip "no nobody user"
+  setup_council_run
+  stage7a
+  printf 'x\n' >| "$RD/synthesis.md"
+  chown -R nobody "$RD"
+  run7c bash "$RD/synthesis.md" "$RT"
+  [ "$status" -eq 1 ]
+  [ -f "$RD/synthesis.md" ]
+  rm -rf "$RD" "$REPO"
+}
+
 # check_state_cleanup <script> — a cleanup fence (substituted with own dir
 # /tmp/council-synth-x) leaves a symlink at the synth state path in place
 # without following it (its target untouched), then removes a regular
@@ -1326,9 +1456,8 @@ check_state_cleanup() {
 
 @test "Step 7 early-exit cleanup unlinks its own state file, leaves a symlink untouched" {
   local s7="${BATS_TEST_TMPDIR}/7.sh"
-  extract_fence_after "$COUNCIL_MD" '### Step 7' "$s7.raw"
   setup_council_run
-  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e 's|<literal COUNCIL_SYNTH_DIR value from 5a>|/tmp/council-synth-x|' "$s7.raw" >| "$s7"
+  s7c_script "$s7" /tmp/council-synth-x
   # No Step 4 state file: the guard exits through council_cleanup_claude_only.
   rm -f "$REPO/.git/council-state.tsv"
   check_state_cleanup "$s7"
@@ -1366,9 +1495,8 @@ check_state_cleanup() {
 
 @test "Step 7 appendix says no output for a QUOTA_EXHAUSTED /dev/null stub and still refuses /dev/null under another verdict" {
   local s7="${BATS_TEST_TMPDIR}/7.sh"
-  extract_fence_after "$COUNCIL_MD" '### Step 7' "$s7.raw"
   setup_council_run
-  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e 's|<literal COUNCIL_SYNTH_DIR value from 5a>|/tmp/council-synth-x|' "$s7.raw" >| "$s7"
+  s7c_script "$s7" /tmp/council-synth-x
   printf 'claude\tREVISE\tHIGH\t%s\ncodex\tAPPROVE\tLOW\t/dev/null\ngemini\tQUOTA_EXHAUSTED\tN/A\t/dev/null\nopencode\tTIMEOUT\tN/A\t\n' \
     "$CF" >| "$REPO/.git/council-state.tsv"
   run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s7' && printf '%s\n' \"\$REPORT_CONTENT\""
@@ -1674,7 +1802,6 @@ EOF2
   local T2=fedcba9876543210fedcba9876543210
   extract_fence_after "$COUNCIL_MD" '#### 5a ' "$s5a"
   extract_fence_after "$COUNCIL_MD" '#### 5e ' "$s5e"
-  extract_fence_after "$COUNCIL_MD" '### Step 7' "$s7.raw"
   extract_fence_after "$COUNCIL_MD" 'If user selects **Cancel**' "$s8.raw"
   extract_fence_after "$COUNCIL_MD" '### Step 9' "$s9.raw"
   for profile in $PROFILES; do
@@ -1693,7 +1820,7 @@ EOF2
     [ ! -e "$SD" ]
     [ ! -e "$st" ]
     cancel_script "$s8.raw" "$s8" 1 "$SD"
-    sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e "s|<literal COUNCIL_SYNTH_DIR value from 5a>|$SD|" "$s7.raw" >| "$s7"
+    s7c_script "$s7" "$SD"
     sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e "s|<literal COUNCIL_SYNTH_DIR value from 5a>|$SD|" "$s9.raw" >| "$s9"
     # The file is gone: every later cleanup succeeds quietly (Steps 7 and 9 exit 1
     # only for their own unrelated reasons).
@@ -1787,7 +1914,6 @@ EOF2
 @test "cleanup never follows or removes a symlink at the state path, even one whose target looks like this run's claim" {
   local s7="${BATS_TEST_TMPDIR}/7.sh" s8="${BATS_TEST_TMPDIR}/8.sh" s9="${BATS_TEST_TMPDIR}/9.sh" st tsv script
   local TOKEN=0123456789abcdef0123456789abcdef
-  extract_fence_after "$COUNCIL_MD" '### Step 7' "$s7.raw"
   extract_fence_after "$COUNCIL_MD" 'If user selects **Cancel**' "$s8.raw"
   extract_fence_after "$COUNCIL_MD" '### Step 9' "$s9.raw"
   setup_council_run
@@ -1797,7 +1923,7 @@ EOF2
   SD=$(mktemp -d /tmp/council-synth-XXXXXX)
   printf '%s\n' "$TOKEN" >| "$SD/.token"
   cancel_script "$s8.raw" "$s8" 1 "$SD"
-  sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e "s|<literal COUNCIL_SYNTH_DIR value from 5a>|$SD|" "$s7.raw" >| "$s7"
+  s7c_script "$s7" "$SD"
   sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e "s|<literal COUNCIL_SYNTH_DIR value from 5a>|$SD|" "$s9.raw" >| "$s9"
   # The target is a well-formed claim for THIS run's directory and token.
   printf '%s\n%s\n' "$SD" "$TOKEN" >| "$BATS_TEST_TMPDIR/target"

@@ -2283,10 +2283,10 @@ below):
 1. Every quoted phrasing MUST come from the 5b input, where
    `council_fence_block` has already applied its escape set, and MUST carry
    the same `[ESCAPED] ` prefix on any line that set covers if quoted from
-   anywhere else — including a `__EOF_COUNCIL_SYNTHESIS__` line, since Step 7
-   carries this markdown in a heredoc with that delimiter. A quote can then
-   never forge or terminate a fence in the persisted report, or end that
-   heredoc.
+   anywhere else — including a `__EOF_COUNCIL_SYNTHESIS__` line (the
+   delimiter of a heredoc earlier releases carried this markdown in; Step 7
+   now stages it through a file, and the escape stays as defense in depth). A
+   quote can then never forge or terminate a fence in the persisted report.
 2. The report MUST carry the untrusted-quotes advisory line shown in the
    template below, directly under the report header, so any later
    consumer re-reading `docs/council/*.md` (including a future
@@ -2549,6 +2549,67 @@ mkdir -p "$(dirname "$REPORT_PATH_ABS")" || {
 
 ### Step 7: Construct full report content
 
+The synthesis markdown reaches the shell through a file, never through a
+heredoc: reviewer quotes inside it are attacker-influenced, and a line equal
+to a heredoc delimiter would end the heredoc and run as shell input. Step 7
+is three tool calls.
+
+#### 7a — stage
+
+Mint a private directory for the synthesis markdown. There is deliberately
+no trap here: the `Write` in 7b happens in a later tool call, after this
+shell has exited, and a trap would delete the directory before it is used.
+
+```bash
+# Same /tmp/council-synth- root as 5a, so 5a's 24-hour sweep reclaims a
+# directory a cancelled run leaves between 7a and 7c. mktemp -d makes it 0700.
+REPORT_DIR=$(mktemp -d /tmp/council-synth-XXXXXX) || {
+  printf '[council] Error: cannot create the report staging directory\n' >&2
+  exit 1
+}
+REPORT_TOKEN=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
+case "$REPORT_TOKEN" in
+  *[!0-9a-f]*) REPORT_TOKEN="" ;;
+esac
+if [ "${#REPORT_TOKEN}" -ne 32 ]; then
+  rm -rf -- "$REPORT_DIR"
+  printf '[council] Error: cannot draw the report staging token\n' >&2
+  exit 1
+fi
+printf '%s\n' "$REPORT_TOKEN" >| "$REPORT_DIR/.token" || {
+  rm -rf -- "$REPORT_DIR"
+  printf '[council] Error: cannot write the report staging token\n' >&2
+  exit 1
+}
+printf 'COUNCIL_REPORT_FILE=%s/synthesis.md\n' "$REPORT_DIR"
+printf 'COUNCIL_REPORT_TOKEN=%s\n' "$REPORT_TOKEN"
+```
+
+If 7a exits non-zero, run the Step 8 Cancel cleanup block, then stop.
+
+#### 7b — write the synthesis
+
+Use the `Write` tool to create the file at exactly the `COUNCIL_REPORT_FILE`
+path 7a printed (a new file), holding `SYNTHESIS_MD` from Step 5 verbatim.
+Write nothing else into that directory.
+
+`Write` is not path-scoped: nothing stops a stray write elsewhere. The
+guarantee is narrower: nothing destructive trusts a relayed path. 7c refuses
+any directory that is not a real `/tmp/council-synth-*` directory this user
+owns holding the token 7a minted, reads only `<dir>/synthesis.md`, and its
+trap re-checks all of that before `rm -rf`. A write outside that one file is
+never read or deleted. The real mitigation is a `Write` deny rule in your
+Claude Code settings. This removes the relayed-literal vector, not a
+deliberate `Write`.
+
+#### 7c — assemble
+
+Substitute both 7a literals (the directory and token are carried as literals
+from 7a's output; 7c never re-reads the expected token from the directory),
+plus the `CLAUDE_FENCED_FILE` literal from Step 4 and the `COUNCIL_SYNTH_DIR`
+literal from 5a. `REPORT_DIR` (this step's staging) and `SYNTH_OWN_DIR` (5a's
+claim, used only to release the state file) are different directories.
+
 ```bash
 # Re-load reviewer state — fresh subprocess (Steps 8 and 9 must start with
 # this same snippet before touching REVIEWER_* arrays)
@@ -2594,6 +2655,40 @@ council_rm_synth_state() {
     return 1
   }
 }
+# 7a's staging directory and token, carried as literals.
+REPORT_FILE="<literal COUNCIL_REPORT_FILE value from 7a>"
+REPORT_TOKEN="<literal COUNCIL_REPORT_TOKEN value from 7a>"
+REPORT_DIR=""
+# council_report_dir_ok <dir> — true only for a real /tmp/council-synth-<suffix>
+# directory this user owns whose .token equals the 7a literal. The suffix must
+# be non-empty, a single path segment, and free of "..".
+council_report_dir_ok() {
+  local d="$1" suffix
+  suffix="${d#/tmp/council-synth-}"
+  [ -n "$d" ] && [ "$suffix" != "$d" ] && [ -n "$suffix" ] || return 1
+  case "$suffix" in */* | *..*) return 1 ;; esac
+  [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ] || return 1
+  [ "${#REPORT_TOKEN}" -eq 32 ] || return 1
+  case "$REPORT_TOKEN" in *[!0-9a-f]*) return 1 ;; esac
+  [ -f "$d/.token" ] && [ ! -L "$d/.token" ] || return 1
+  [ "$(head -n 1 "$d/.token")" = "$REPORT_TOKEN" ]
+}
+# The trap repeats the whole check, so nothing that failed it reaches rm -rf.
+council_rm_report_dir() {
+  if [ -n "$REPORT_DIR" ] && council_report_dir_ok "$REPORT_DIR"; then
+    rm -rf -- "$REPORT_DIR" \
+      || printf '[council] Warning: could not remove %s; remove it by hand\n' "$REPORT_DIR" >&2
+  fi
+}
+case "$REPORT_FILE" in
+  */synthesis.md) REPORT_DIR="${REPORT_FILE%/synthesis.md}" ;;
+esac
+if ! council_report_dir_ok "$REPORT_DIR"; then
+  printf '[council] Error: %s is not the report staging directory 7a minted (wrong shape, symlink, owner or token) — refusing to read or delete it\n' "${REPORT_DIR:-$REPORT_FILE}" >&2
+  REPORT_DIR=""
+  exit 1
+fi
+trap council_rm_report_dir EXIT
 council_cleanup_claude_only() {
   local cf
   cf="<literal CLAUDE_FENCED_FILE value from Step 4>"
@@ -2623,12 +2718,14 @@ while IFS=$'\t' read -r r v c fp; do
 done < "$STATE_FILE"
 [ "${#REVIEWER_VERDICTS[@]}" -gt 0 ] || { printf '[council] Error: state file empty — Step 4 was interrupted; re-run /council\n' >&2; council_cleanup_claude_only; exit 1; }
 
-# $SYNTHESIS_MD does not survive into this fresh subprocess — substitute the
-# Step 5 synthesis markdown inline via quoted heredoc:
-REPORT_CONTENT=$(cat <<'__EOF_COUNCIL_SYNTHESIS__'
-<substitute the Step 5 synthesis markdown here>
-__EOF_COUNCIL_SYNTHESIS__
-)
+# $SYNTHESIS_MD does not survive into this fresh subprocess: 7b staged it.
+# Read exactly <dir>/synthesis.md, a regular file this user owns. A failed
+# Write leaves it missing; the trap still removes the validated directory.
+if [ ! -f "$REPORT_FILE" ] || [ -L "$REPORT_FILE" ] || [ ! -O "$REPORT_FILE" ]; then
+  printf '[council] Error: %s is missing, a symlink, or not ours — the 7b Write did not land; re-run Step 7\n' "$REPORT_FILE" >&2
+  exit 1
+fi
+REPORT_CONTENT=$(cat -- "$REPORT_FILE") || exit 1
 
 # Append reviewer raw output sections from fenced_output_path files.
 #
@@ -3333,7 +3430,7 @@ done
 # agent never wrote it (mktemp -u created no file).
 #
 # The shape check makes a MISSED substitution loud. Every other placeholder in
-# this file fails visibly (Step 7's heredoc text lands in the report; Step 9's
+# this file fails visibly (7c refuses an unsubstituted report literal; Step 9's
 # $REPORT_PATH_ABS trips the existence check), but a bare `rm -f` on an
 # unsubstituted placeholder silently succeeds — and unlike those, this value
 # cannot be re-derived later, because the mktemp suffix is random.
@@ -3471,7 +3568,7 @@ done
 # agent never wrote it (mktemp -u created no file).
 #
 # The shape check makes a MISSED substitution loud. Every other placeholder in
-# this file fails visibly (Step 7's heredoc text lands in the report; Step 9's
+# this file fails visibly (7c refuses an unsubstituted report literal; Step 9's
 # $REPORT_PATH_ABS trips the existence check), but a bare `rm -f` on an
 # unsubstituted placeholder silently succeeds — and unlike those, this value
 # cannot be re-derived later, because the mktemp suffix is random.
@@ -3573,6 +3670,14 @@ This is the final output of the command. Exit 0.
 | `pass-a.md` missing or not a table on resume (5d resume block exits 1) | No synthesis is shipped; run the Step 8 Cancel cleanup (so the next 5a is not refused by the leftover state file, and the staged reviewer text is removed with it), then stop and re-run `/council` |
 | 5e exits non-zero (state file, directory, label map or token unusable) | No label map is printed; run the Step 8 Cancel cleanup (with `SYNTH_OWN_DIR` set to the path 5a printed), then stop. The block unlinks the state file, and removes the staging directory, only if the file is still this run's claim and the directory carries its token (checked before the claim is released): a file that is missing, symlinked, foreign, another run's live claim (for example a paused run whose stale state another `/council` reclaimed) or token-mismatched is left in place with a `Note:`. After a successful 5e, `Note: released this run's synthesis state claim` means this run no longer owns the file, so the Step 7, 8 and 9 cleanups find it missing or another run's and leave it. 5e releases the claim (unlinks the state file) BEFORE it removes the directory, so a `rm -rf` that fails partway after deleting `.token` cannot strand the state file: the file is already gone and a new `/council` is not blocked. A `Warning:` that the staging directory could not be removed still exits 0: the map was printed. 5e already tried `chmod -R u+rwx` and a second `rm -rf`, so the warning names the exact `chmod -R u+rwx <dir> && rm -rf <dir>` command to run by hand; the 5a sweep applies the same chmod-then-remove, but only once the directory is over 24 hours old and a later `/council` reaches 5a |
 | Run stops between Step 5a and 5e | The 0700 `/tmp/council-synth-*` staging directory (normalized, already-redacted reviewer text, the label map, `pass-a.md`) is left behind unless the Step 8 Cancel block runs for it (a 5b abort and a 5e failure followed by Cancel both remove it). 24 hours is the sweep's eligibility threshold, not a maximum retention: the text stays until a later `/council` invocation reaches 5a after the directory is over 24h old, or until you remove it |
+| Run cancelled or aborted between Step 7a and 7c | The 0700 `/tmp/council-synth-*` report staging directory with the staged synthesis remains until a later `/council` reaches 5a and its sweep removes it (over 24 hours old). A failed 7b `Write` is still cleaned up: 7c validates the directory, finds no `synthesis.md`, exits 1, and its trap removes the directory |
+| 7c report literal refused (wrong shape, `..`, extra `/`, empty suffix, symlink, foreign owner, or a `.token` that does not equal the 7a token) | `[council] Error: ... refusing to read or delete it`; exit 1; nothing is read or deleted. Run the Step 8 Cancel cleanup and stop |
+| yellow-core not found (a `--plugin-dir` or in-place load that skipped the dependency check) | `[council] Warning: yellow-core ... not found`; Tier 1 is skipped and every finding is `unverified` with reason `verifier-error`. Verification never aborts the council |
+| `quote-ground.sh batch` fails (exit 2) or is missing | `[council] Warning: Tier 1 evidence check unavailable`; every Tier 1 row goes to Tier 2. An unreadable cited file would fail the whole batch, so the citation parse rejects it first as `bad-citation` |
+| rapidfuzz not importable by the first `python3` on PATH | `[council] Warning: rapidfuzz not installed` in 5b; Tier 2 candidates are `unverified` with reason `tier2-skipped`. The import probe and the scorer run the same `python3`, so a venv that is not on PATH counts as absent |
+| Tier 2 redaction (`cs_redact_secrets`) or the scorer fails | Warning on stderr; those findings are `unverified` with reason `verifier-error` |
+| The background verifier fails or 5b aborts while it runs | On failure 5b warns and writes `verification.tsv` with every id `unverified` / `verifier-error`; on an abort `council_synth_abort` kills and reaps it before removing the staging directory |
+| Pass A drops, invents or mangles a finding id | 5e lists a dropped or mangled id under Unverified Claims (`pass-a-missing` / `pass-a-malformed`) with a warning and ignores an invented one; every `verification.tsv` id gets exactly one `BUCKET` line |
 | Leftover `.git/council-synth.state` from a run that stopped before 5e, Step 7, 8 or 9 cleaned up | The next 5a removes it when its directory is gone or over 24 hours old (`STALE_MINUTES=1440`, the eligibility threshold for reclamation, which happens only when a later `/council` reaches 5a); before that, 5a exits 1 with `another council synthesis is in progress in this checkout` — wait, or remove the file by hand. After any 5a failure run the Step 8 Cancel block with `SYNTH_STATE_CLAIMED=0`: this run claimed nothing, so the block leaves the state path alone (another run's file, a concurrent winner's claim, or the symlink or foreign entry 5a refused) and prints a `Note:` naming it. Only a run whose 5a printed `COUNCIL_SYNTH_DIR` passes `SYNTH_STATE_CLAIMED=1` and `SYNTH_OWN_DIR` set to that path, and only then does the block unlink the state file, and only when the file is a regular non-symlink file of this user whose first line equals `SYNTH_OWN_DIR` (and whose token matches while that directory exists); otherwise it prints a `Note:` and leaves it. The same run's staging directory is removed after the release, only when it passed `council_synth_dir_is_ours` beforehand (shape, state file, owned real directory, matching `.token`); a symlink, a path outside `/tmp/council-synth-*` or one containing `..` is never removed. A stale file the next 5a reclaims is announced with `[council] Note: reclaimed a stale synthesis state file` |
 | Bash < 4.3 | Pre-flight error; exit 1 |
 | `jq` missing | Pre-flight error; exit 1 |
@@ -3591,13 +3696,15 @@ This is the final output of the command. Exit 0.
 
 ## V2 Trajectory (NOT implemented in V1)
 
+Evidence verification shipped in V2: the Step 5b Tier 1/Tier 2 quote check,
+the verification-backed correctness rubric and the five-bucket report. The
+items below are still future.
+
 - `/council fleet status` — show persistent reviewer session state
 - `/council fleet restart` — restart wedged sessions
 - `/council review --round 2` — multi-round iterative review with prior-round
   context injection
 - Lineage-weighted quorum aggregation in synthesis (replaces V1 raw count)
-- Quote-verification pass against repository source (downgrade unverifiable
-  findings)
 - XML evidence contract for findings output
 - `/council history` browse command
 

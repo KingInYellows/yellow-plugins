@@ -372,7 +372,9 @@ __COUNCIL_LABEL_KEYS__
 # COUNCIL_*=, CLAUDE_FENCED_FILE=, ...; the normalizer's own severity=P<n>
 # token excepted), the findings sentinels, the "END OF SYNTHESIS INPUT"
 # footer (a forged copy would end the orchestrator's pagination early), and
-# the Step 7 heredoc delimiter. Escaping only prefixes: the rest of the line
+# the __EOF_COUNCIL_SYNTHESIS__ delimiter (Step 7 used to carry the synthesis
+# in a heredoc; it now stages a file, and the escape stays as defense in
+# depth). Escaping only prefixes: the rest of the line
 # keeps its bytes, so an escaped Evidence quote still compares exactly. The one rewrite
 # is \r -> space, since a bare carriage return reads as a line break.
 council_fence_block() {
