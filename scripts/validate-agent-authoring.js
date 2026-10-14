@@ -109,13 +109,14 @@ const REVIEW_AGENT_ALLOWLIST = new Map([
   ['yellow-council/agents/review/claude-reviewer.md', new Set(['Write'])],
 ]);
 
-// V1/V2/V3/V4 — model/effort frontmatter lint rules (see M-A-01 plan).
+// V1-V5 — model/effort frontmatter lint rules (see M-A-01 plan).
 // V1: effort: enum (low|medium|high|xhigh|max) — hard error
 // V2: model: alias (haiku|sonnet|opus|fable|inherit, optionally versioned)
 //     or a full `claude-*` model ID — hard error
 // V3: model: inherit on any agent outside MODEL_RULE_ALLOWLIST — non-blocking
 //     warning
 // V4: synthesizer/orchestrator name without effort: high — non-blocking warning
+// V5: pinned model: without effort: — non-blocking warning
 // `inherit` is a bare keyword (no version suffix). Aliases (haiku, sonnet,
 // opus, fable — the set Claude Code's sub-agents reference documents) accept
 // an optional one- or two-segment numeric suffix (e.g., `sonnet-4-6`). Full
@@ -134,7 +135,7 @@ const HIGH_EFFORT = new Set(['high', 'xhigh', 'max']);
 const SYNTHESIZER_NAME_PATTERN =
   /(synthesizer|orchestrator|conductor|aggregator|compounder)/i;
 
-// Files exempt from V3/V4 advisory warnings — intentional inheritance
+// Files exempt from V3/V4/V5 advisory warnings — intentional inheritance
 // or intentional default-effort. Each entry must be a plugins-relative
 // POSIX path. Adding a file here is a documented decision that the
 // agent's role does NOT match the rule's intent (e.g., failure-analyst
@@ -564,6 +565,26 @@ function validateAgentFile(filePath, ctx) {
     warnings.push(
       `[V4 advisory] ${relative(filePath)}: synthesizer/orchestrator ` +
         `agent without effort: high — consider extended chain-of-thought.`
+    );
+  }
+
+  // V5: a pinned model: without effort: — non-blocking warning. A subagent
+  // without effort: inherits the session's effort, not the pinned model's
+  // default, so the level it runs at depends on whoever launched it. Honors
+  // MODEL_RULE_ALLOWLIST like V3/V4, which keeps knowledge-compounder
+  // (sonnet, no effort, allowlisted for V4) out of it. Skipped when V2
+  // already errors on the model value.
+  if (
+    modelVal !== null &&
+    modelVal !== 'inherit' &&
+    MODEL_VALUE_PATTERN.test(modelVal) &&
+    effortVal === null &&
+    !allowlisted
+  ) {
+    warnings.push(
+      `[V5 advisory] ${relative(filePath)}: model: ${modelVal} pinned ` +
+        `without effort: — it inherits the session's effort; set it ` +
+        `explicitly.`
     );
   }
 
