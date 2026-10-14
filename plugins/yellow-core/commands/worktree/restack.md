@@ -186,11 +186,23 @@ before they do anything else. With no recorded restack they print "no restack
 in progress" and exit `0`; that is not a completed restack.
 
 After the provider's own abort, `--abort` also aborts a git rebase of a
-recorded stack branch in any of this stack's worktrees, not only the run
-worktree, and then restores. If one of those rebases is still in progress, it
-keeps the state (exit `31`) and restores nothing; run `--abort` again after
-that rebase can be cleared. A rebase in a worktree outside this stack is left
-alone. The state file records a random run id, and the provider's "already
+recorded stack branch in each worktree the run recorded: the run worktree, the
+worktrees Graphite detached, and, for GitHub, the worktrees that held a
+restacked branch at start (gh-stack rebases in whichever worktree holds a
+branch). Then it restores. A rebase in a worktree the run never recorded is left
+alone and named (`left alone: ...`); when the provider has no paused restack to
+roll back, that rebase may be the run's own, so the state is kept (exit `31`)
+until it is finished or aborted there. It keeps the state (exit `31`) and restores
+nothing, naming every worktree concerned, when a recorded worktree's rebase
+will not clear (run `git -C <worktree> rebase --abort` there to see git's
+error) or when its git directory or `head-name` cannot be read (run
+`git -C <worktree> status`). A worktree whose directory was deleted counts as
+having no rebase (`git worktree prune` removes its record). Each stuck worktree gets a fix line.
+The run worktree is put back on the start branch when an aborted rebase left it
+on a stack branch, but not while an operation is in progress there. Run
+`--abort` again once each named worktree is cleared. `--status` lists the recorded worktrees, any that is
+rebasing, busy or unreadable, and any unrecorded worktree rebasing a stack
+branch. The state file records a random run id, and the provider's "already
 aborted" marker holds that id: only a regular, non-symlink marker whose content
 equals the current run id lets a retry skip the provider and the
 remaining-rebase check. A missing, mismatched, symlinked or legacy (id-less)

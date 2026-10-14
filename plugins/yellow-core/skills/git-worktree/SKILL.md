@@ -208,8 +208,11 @@ Safety rules the script holds:
   in progress. An untracked `.ruvector` symlink does not count as dirty.
 - Its own git calls never force a checkout, stash, hard-reset or pass
   `--ignore-other-worktrees`. Graphite's abort (run by `--abort`) rolls the
-  whole restack back, and `--abort` runs `git rebase --abort` in any stack
-  worktree holding an in-chain rebase, discarding its in-progress state. A
+  whole restack back, and `--abort` runs `git rebase --abort` in each worktree
+  the run recorded (the run worktree, Graphite's detached ones, GitHub's
+  branch owners) that holds an in-chain rebase, discarding its in-progress
+  state. An unrecorded worktree is left alone. A recorded worktree whose
+  rebase state cannot be read stops the abort (exit `31`, named). A
   worktree that cannot be restored stays detached and the script prints the
   `git -C <path> checkout <branch>` line.
 - `--abort` keeps the state (exit `31`) when a stack branch is off its recorded
