@@ -1,0 +1,24 @@
+plugins/yellow-core/README.md
+  s_038935c1c9408d::t_c28cc1b5990b7f 47-62
+plugins/yellow-core/commands/statusline/setup.md
+  s_038935c1c9408d::t_d484ca7dfc596b 397,400-402
+  s_038935c1c9408d::t_bcea9401705139 412
+.changeset/statusline-followups.md
+  s_038935c1c9408d::t_b39cfc52a6051b 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "45d67b89422e5682a4188fbd9e210e6efa350d8e",
+  "prompts": {},
+  "sessions": {
+    "s_038935c1c9408d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c7683a4-00d4-449e-9d60-dc3112e28dc7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
