@@ -154,9 +154,9 @@ _assert_drain_model_rejected() {
   [ -f "$STUB_MARKER" ]
   grep -q -- '--model haiku ' "$STUB_MARKER"
   grep -q -- '--max-turns 50' "$STUB_MARKER"
-  ! grep -q -- '--bare' "$STUB_MARKER"
+  ! grep -q -- '--bare' "$STUB_MARKER" || false
   _wait_for_drain_log '[compound-drain] claude exited 0'
-  ! cat "$STAGING"/drain-logs/*.log | grep -qF 'COMPOUND_DRAIN_MODEL rejected'
+  ! cat "$STAGING"/drain-logs/*.log | grep -qF 'COMPOUND_DRAIN_MODEL rejected' || false
 }
 
 @test "session-start honours COMPOUND_DRAIN_MODEL" {
@@ -179,8 +179,8 @@ _assert_drain_model_rejected() {
 
 @test "session-start rejects an option-shaped COMPOUND_DRAIN_MODEL" {
   _assert_drain_model_rejected '--dangerously-skip-permissions'
-  ! grep -q -- 'dangerously' "$STUB_MARKER"
-  ! cat "$STAGING"/drain-logs/*.log | grep -qF 'dangerously'
+  ! grep -q -- 'dangerously' "$STUB_MARKER" || false
+  ! cat "$STAGING"/drain-logs/*.log | grep -qF 'dangerously' || false
 }
 
 @test "session-start rejects a shell-metacharacter COMPOUND_DRAIN_MODEL" {
