@@ -345,12 +345,21 @@ DRAIN_TIMEOUT_S="${COMPOUND_DRAIN_TIMEOUT_S:-600}"
 # window as the user's own session. The drain lead only moves files and
 # dispatches staging-reviewer, whose sub-agents pin their own models, so
 # Haiku is enough. COMPOUND_DRAIN_MODEL overrides it (e.g. `sonnet` if
-# dispatch proves unreliable); a value that is not a plain alias or model
-# ID falls back to haiku rather than reaching argv.
-DRAIN_MODEL="${COMPOUND_DRAIN_MODEL:-haiku}"
+# dispatch proves unreliable). Only haiku|sonnet|opus or a well-formed
+# claude-<id> passes; anything else, including set-but-empty, is logged
+# and falls back to haiku. The raw value is untrusted, so it is never echoed.
+DRAIN_MODEL="${COMPOUND_DRAIN_MODEL-haiku}"
 case "$DRAIN_MODEL" in
-  '' | -* | *[!a-z0-9.-]*) DRAIN_MODEL=haiku ;;
+  ''|*[!a-z0-9-]*) DRAIN_MODEL_REJECTED=1 ;;
+  claude-|*--*|*-) DRAIN_MODEL_REJECTED=1 ;;
+  haiku|sonnet|opus|claude-*) DRAIN_MODEL_REJECTED=0 ;;
+  *) DRAIN_MODEL_REJECTED=1 ;;
 esac
+if [ "$DRAIN_MODEL_REJECTED" = 1 ]; then
+  printf '[compound-drain] COMPOUND_DRAIN_MODEL rejected (only haiku|sonnet|opus|claude-<id> allowed); using haiku\n' \
+    >> "$DRAIN_LOG" 2>/dev/null
+  DRAIN_MODEL=haiku
+fi
 
 (
   DRAIN_LOCK_PATH="${STAGING_DIR}/.drain-lock"
@@ -384,6 +393,8 @@ esac
       --output-format json \
       >> "$DRAIN_LOG" 2>&1
   fi
+  DRAIN_RC=$?
+  printf '[compound-drain] claude exited %s\n' "$DRAIN_RC" >> "$DRAIN_LOG" 2>/dev/null
   cs_update_drain_budget "$STAGING_DIR" "$AUTH_ROUTE" || true
 ) >/dev/null 2>&1 &
 # Hand lock ownership to the subshell immediately after `&` parses — the

@@ -243,7 +243,7 @@ Kept `inherit`, with the reason recorded:
       policy doc: it is a recall wrapper with a strict output contract. This
       resolves Open Question 5. Revisit it in Phase 2 if the yield rollup shows
       missed learnings.
-- [ ] 1.1.20: `yellow-semgrep/agents/semgrep/scan-verifier.md` → restore
+- [x] 1.1.20: `yellow-semgrep/agents/semgrep/scan-verifier.md` → restore
       `model: sonnet` and add `effort: medium`. #1171 moved it to haiku/low,
       outside this plan; see "Delivery". It stays a Phase 2 candidate, and
       handling a refused or empty verifier answer in `/semgrep:fix` Step 9 is
@@ -274,7 +274,7 @@ Kept `inherit`, with the reason recorded:
 > document the decision in the rule comment.
 <!-- /deepen-plan -->
 
-- [ ] 1.2.3: Edit `MODEL_RULE_ALLOWLIST` (lines 139-157):
+- [x] 1.2.3: Edit `MODEL_RULE_ALLOWLIST` (lines 139-157):
   - Remove `failure-analyst` and `workflow-optimizer`. They are no longer
     `inherit`, and neither name matches V4's pattern.
   - Keep `devin-orchestrator` and `knowledge-compounder`; V4 needs them.
@@ -322,7 +322,7 @@ Kept `inherit`, with the reason recorded:
 
 ### Phase 1.3: Drain and CI pins
 
-- [ ] 1.3.1: In `plugins/yellow-core/hooks/scripts/session-start.sh`, near
+- [x] 1.3.1: In `plugins/yellow-core/hooks/scripts/session-start.sh`, near
       line 341 next to `DRAIN_TIMEOUT_S`, add:
 
       ```sh
@@ -377,7 +377,7 @@ Kept `inherit`, with the reason recorded:
 > `DRAIN_TIMEOUT_BIN`/`DRAIN_TIMEOUT_S` at `:340-341`, branches at `:360-371`.
 <!-- /deepen-plan -->
 
-- [ ] 1.3.2: In `plugins/yellow-core/tests/compound-session-start-hook.bats`,
+- [x] 1.3.2: In `plugins/yellow-core/tests/compound-session-start-hook.bats`,
       add tests that grep the stub's recorded argv:
   - `--model haiku` by default (unset, no rejection warning).
   - `COMPOUND_DRAIN_MODEL=sonnet` gives `--model sonnet`.

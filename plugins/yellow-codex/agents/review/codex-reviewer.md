@@ -1,7 +1,7 @@
 ---
 name: codex-reviewer
 description: "Supplementary code reviewer using OpenAI Codex CLI. Returns a structured 6-key return (verdict/confidence/summary/fenced_output_path/findings block) matching the council reviewer contract. Spawned by review:pr and council when yellow-codex is installed."
-model: haiku
+model: sonnet
 effort: medium
 background: true
 tools:

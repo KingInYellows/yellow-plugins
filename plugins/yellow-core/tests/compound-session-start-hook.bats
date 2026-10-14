@@ -119,6 +119,32 @@ _plant_pending() {
   [ -f "$STUB_MARKER" ]
 }
 
+# Wait for a fixed-string line to appear in the drain log. The exit-status
+# line is written after the stub returns, so it can lag the stub marker.
+_wait_for_drain_log() {
+  local needle="$1" i=0
+  while [ "$i" -lt 30 ]; do
+    if cat "$STAGING"/drain-logs/*.log 2>/dev/null | grep -qF -- "$needle"; then
+      return 0
+    fi
+    sleep 0.1
+    i=$((i + 1))
+  done
+  return 1
+}
+
+# Run one drain with COMPOUND_DRAIN_MODEL set to $1 and assert it was
+# rejected: haiku reaches argv, the warning is logged, the raw value is not.
+_assert_drain_model_rejected() {
+  _plant_pending 5
+  COMPOUND_DRAIN_MODEL="$1" run bash "$SS_HOOK" <<< "$(_stdin_json)"
+  [ "$status" -eq 0 ]
+  _wait_for_stub 3
+  [ -f "$STUB_MARKER" ]
+  grep -q -- '--model haiku ' "$STUB_MARKER"
+  _wait_for_drain_log 'COMPOUND_DRAIN_MODEL rejected'
+}
+
 @test "session-start pins the drain to haiku by default" {
   _plant_pending 5
   unset COMPOUND_DRAIN_MODEL
@@ -127,6 +153,10 @@ _plant_pending() {
   _wait_for_stub 3
   [ -f "$STUB_MARKER" ]
   grep -q -- '--model haiku ' "$STUB_MARKER"
+  grep -q -- '--max-turns 50' "$STUB_MARKER"
+  ! grep -q -- '--bare' "$STUB_MARKER"
+  _wait_for_drain_log '[compound-drain] claude exited 0'
+  ! cat "$STAGING"/drain-logs/*.log | grep -qF 'COMPOUND_DRAIN_MODEL rejected'
 }
 
 @test "session-start honours COMPOUND_DRAIN_MODEL" {
@@ -138,14 +168,51 @@ _plant_pending() {
   grep -q -- '--model sonnet ' "$STUB_MARKER"
 }
 
-@test "session-start falls back to haiku for an unsafe COMPOUND_DRAIN_MODEL" {
+@test "session-start honours a full claude-* COMPOUND_DRAIN_MODEL" {
   _plant_pending 5
-  COMPOUND_DRAIN_MODEL='--dangerously-skip-permissions' run bash "$SS_HOOK" <<< "$(_stdin_json)"
+  COMPOUND_DRAIN_MODEL=claude-haiku-5-5 run bash "$SS_HOOK" <<< "$(_stdin_json)"
   [ "$status" -eq 0 ]
   _wait_for_stub 3
   [ -f "$STUB_MARKER" ]
-  grep -q -- '--model haiku ' "$STUB_MARKER"
+  grep -q -- '--model claude-haiku-5-5 ' "$STUB_MARKER"
+}
+
+@test "session-start rejects an option-shaped COMPOUND_DRAIN_MODEL" {
+  _assert_drain_model_rejected '--dangerously-skip-permissions'
   ! grep -q -- 'dangerously' "$STUB_MARKER"
+  ! cat "$STAGING"/drain-logs/*.log | grep -qF 'dangerously'
+}
+
+@test "session-start rejects a shell-metacharacter COMPOUND_DRAIN_MODEL" {
+  _assert_drain_model_rejected 'x; rm'
+}
+
+@test "session-start rejects claude-x; rm as COMPOUND_DRAIN_MODEL" {
+  _assert_drain_model_rejected 'claude-x; rm'
+}
+
+@test "session-start rejects a set-but-empty COMPOUND_DRAIN_MODEL" {
+  _assert_drain_model_rejected ''
+}
+
+@test "session-start rejects malformed claude-* COMPOUND_DRAIN_MODEL ids" {
+  _assert_drain_model_rejected 'claude-'
+}
+
+@test "session-start rejects claude-opus--5 as COMPOUND_DRAIN_MODEL" {
+  _assert_drain_model_rejected 'claude-opus--5'
+}
+
+@test "session-start rejects claude-opus-5- as COMPOUND_DRAIN_MODEL" {
+  _assert_drain_model_rejected 'claude-opus-5-'
+}
+
+@test "session-start rejects an unknown alias such as sonnett" {
+  _assert_drain_model_rejected 'sonnett'
+}
+
+@test "both claude -p branches pass --model \"\$DRAIN_MODEL\"" {
+  [ "$(grep -c -- '--model "\$DRAIN_MODEL"' "$SS_HOOK")" -eq 2 ]
 }
 
 @test "session-start does NOT dispatch at count=4" {

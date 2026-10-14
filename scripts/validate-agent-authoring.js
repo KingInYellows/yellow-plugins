@@ -146,9 +146,6 @@ const MODEL_RULE_ALLOWLIST = new Set([
   // codex-executor makes rescue decisions on the lead session's behalf —
   // intentional inherit.
   'yellow-codex/agents/workflow/codex-executor.md',
-  // test-runner stays on inherit until the Phase 2 model-routing eval
-  // decides between haiku and sonnet for exploratory browser testing.
-  'yellow-browser-test/agents/testing/test-runner.md',
   // devin-orchestrator coordinates Devin V3 sessions; its name matches V4's
   // synthesizer/orchestrator pattern but the effort default is intentional —
   // sub-sessions run independently in Devin.

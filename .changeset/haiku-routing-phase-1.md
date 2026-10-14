@@ -11,8 +11,9 @@
 ---
 
 Pin explicit models and effort levels on agents that used to inherit the lead
-session's model, so tool wrappers and lookups run on Haiku 5.5 and diagnosis
-or fix agents run on Sonnet instead of Opus or Fable. Restore `effort: high`
+session's model, so simple wrappers and lookups run on Haiku 5.5 and
+diagnosis, fix, Codex, browser-test and semgrep-verification agents run on
+Sonnet instead of Opus or Fable. Restore `effort: high`
 on the three yellow-core Opus reviewers (Opus 5.5 defaults to medium), and run
 the SessionStart compound drain on Haiku (override with
-`COMPOUND_DRAIN_MODEL`).
+`COMPOUND_DRAIN_MODEL`; an invalid value is logged and falls back to Haiku).

@@ -1,8 +1,8 @@
 ---
 name: scan-verifier
 description: "Post-fix verification specialist. Re-scans with the specific rule to confirm finding is resolved, then full-scans and reports findings at the modified lines as a WARNING (no pre-fix baseline — not proven regressions). Spawned by /semgrep:fix after a fix is applied."
-model: haiku
-effort: low
+model: sonnet
+effort: medium
 color: green
 skills:
   - semgrep-conventions
