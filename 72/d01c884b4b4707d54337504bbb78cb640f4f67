@@ -1,0 +1,22 @@
+plugins/yellow-core/tests/statusline-template.bats
+  s_038935c1c9408d::t_92769a2b292165 46-50
+  s_038935c1c9408d::t_da09de1a8f6a14 98
+  s_038935c1c9408d::t_e223f32137257d 94
+  s_038935c1c9408d::t_9e610f74f86902 91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "72d01c884b4b4707d54337504bbb78cb640f4f67",
+  "prompts": {},
+  "sessions": {
+    "s_038935c1c9408d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c7683a4-00d4-449e-9d60-dc3112e28dc7",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
