@@ -43,6 +43,11 @@ _render() {
     | PATH="$2:$PATH" python3 "$TEST_HOME/statusline.py"
 }
 
+# Print the mtime of $1 in nanoseconds. BSD stat (stock macOS) has no -c, so use Python.
+_mtime_ns() {
+  python3 -c 'import os, sys; print(os.stat(sys.argv[1]).st_mtime_ns)' "$1"
+}
+
 @test "git status runs with --no-optional-locks" {
   mkdir -p "$TEST_HOME/repo"
   echo main > "$TEST_HOME/repo/.stub-branch"
@@ -83,12 +88,12 @@ _render() {
   sleep 1.1
   touch "$repo/f.txt"
   local before after
-  before=$(stat -c %Y.%y "$repo/.git/index")
+  before=$(_mtime_ns "$repo/.git/index")
   run --separate-stderr _render "$repo" "/nonexistent"
   [ "$status" -eq 0 ]
-  after=$(stat -c %Y.%y "$repo/.git/index")
+  after=$(_mtime_ns "$repo/.git/index")
   [ "$before" = "$after" ]
   # Control: a plain `git status` does rewrite it, so the check above can fail.
   git -C "$repo" status --porcelain >/dev/null
-  [ "$before" != "$(stat -c %Y.%y "$repo/.git/index")" ]
+  [ "$before" != "$(_mtime_ns "$repo/.git/index")" ]
 }
