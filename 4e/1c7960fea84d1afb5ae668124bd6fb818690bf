@@ -1,0 +1,46 @@
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_038935c1c9408d::t_64cada8f6ac4da 4
+plugins/yellow-codex/agents/research/codex-analyst.md
+  s_038935c1c9408d::t_64cada8f6ac4da 4
+docs/plugin-template.md
+  s_038935c1c9408d::t_83ee92de456a9b 450-452
+tests/integration/validate-agent-authoring-model-effort-rules.test.ts
+  s_038935c1c9408d::t_fa4d41acc186df 318-321,324-325
+plugins/yellow-core/tests/compound-session-start-hook.bats
+  s_038935c1c9408d::t_a09107ce55474b 205
+  s_038935c1c9408d::t_2454156dd515dc 122-139,141,143,145-151,185,187,189-190,193,195-204,206-220
+  s_038935c1c9408d::t_419c4c9f62fc7c 153-180
+  s_038935c1c9408d::t_52410219318c84 152
+plugins/yellow-core/hooks/scripts/session-start.sh
+  s_038935c1c9408d::t_c5a7cce0973ffe 397,405-410
+  s_038935c1c9408d::t_05a09e34504ed9 386-389
+  s_038935c1c9408d::t_c8fc2e327d5522 348-356,358-361,363-367
+  s_038935c1c9408d::t_ba8b3817706000 411-427
+AGENTS.md
+  s_038935c1c9408d::t_40c880937adcb2 313-318
+plugins/yellow-core/CLAUDE.md
+  s_038935c1c9408d::t_0597f7d04e80f4 515-520
+plugins/yellow-browser-test/agents/testing/test-runner.md
+  s_038935c1c9408d::t_64cada8f6ac4da 4-5
+.changeset/haiku-routing-phase-1.md
+  s_038935c1c9408d::t_dff87d9cb5cbc5 14-19
+  s_038935c1c9408d::t_53135ee5e949dc 20-21
+plugins/yellow-semgrep/agents/semgrep/scan-verifier.md
+  s_038935c1c9408d::t_64cada8f6ac4da 4-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4e1c7960fea84d1afb5ae668124bd6fb818690bf",
+  "prompts": {},
+  "sessions": {
+    "s_038935c1c9408d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c7683a4-00d4-449e-9d60-dc3112e28dc7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
