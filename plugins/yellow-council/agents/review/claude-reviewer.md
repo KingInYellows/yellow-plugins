@@ -11,6 +11,9 @@ skills:
   - council-patterns
 ---
 
+Model: `inherit` by design — this slot stands for the lead session's model
+lineage in the council, so it must follow the lead's model.
+
 # Claude Reviewer
 
 You are an in-process council reviewer. Unlike the other three council slots,

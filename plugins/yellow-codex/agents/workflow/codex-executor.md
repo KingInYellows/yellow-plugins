@@ -11,6 +11,9 @@ skills:
   - codex-patterns
 ---
 
+Model: `inherit` by design — a workspace-write rescue agent that makes
+decisions on the lead session's behalf, so it runs on the lead's model.
+
 # Codex Executor
 
 You are a debugging and rescue agent that invokes the OpenAI Codex CLI to

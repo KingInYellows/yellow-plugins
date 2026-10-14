@@ -14,6 +14,9 @@ tools:
   - Agent
 ---
 
+Model: `inherit` by design — a plan, implement and review loop that acts for
+the lead session, so it runs on the lead's model.
+
 <examples>
 <example>
 Context: User has a detailed implementation plan and wants Devin to execute it.
