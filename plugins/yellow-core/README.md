@@ -246,7 +246,7 @@ python3 lib/jev-category-eval.py report ~/jev-eval/results-<utc>.jsonl
   interval, coverage and agreement at confidence >= the fixed 0.7 and 0.95
   thresholds, the most common folder-to-Jev confusions, and the
   pre-registered verdict. It refuses a results file that mixes criteria
-  versions or models or repeats a path (exit 2).
+  versions or models (requested or returned) or repeats a path (exit 2).
 - **Judging.** `report` writes `disagreements.tsv` beside the results: every
   disagreement plus a fixed-seed 20% sample of agreements, with an empty
   `judgement` column. Fill it with `folder`, `jev`, `both` or `neither` and
@@ -261,7 +261,8 @@ python3 lib/jev-category-eval.py report ~/jev-eval/results-<utc>.jsonl
   0.10, one-sided alpha 0.05) on the first 155 holdout docs by date, once
   every listed one is judged: `GO`, `NO-GO`, or `INSUFFICIENT-DATA`. There
   is no verdict for results made under another criteria file or for a
-  partial run (no summary, stopped early, or `--limit`). An invalid answer
+  partial run (no summary, stopped early, or `--limit`), or when `--seed`
+  is not the pre-registered seed. An invalid answer
   counts as a Jev miss; a request error in that window blocks the verdict
   until a new full run answers it, since `report` reads one results file.
   Before that look the report is descriptive only, and no change ships

@@ -338,7 +338,7 @@ than sourced:
   sha256 every row records, and writes results outside the repository,
   ending with a run-summary record; `report` prints agreement and the
   pre-registered Tango non-inferiority verdict (only for a complete run
-  under the current criteria file) and writes `disagreements.tsv` for
+  under the current criteria file and the pre-registered seed) and writes `disagreements.tsv` for
   judging. Any edit to the criteria file restarts the holdout. Not run by
   any hook or agent. Trust boundary: `docs/security.md` "Jev category eval (offline)".
   Bats coverage at `tests/jev-category-eval.bats` with a local stub endpoint

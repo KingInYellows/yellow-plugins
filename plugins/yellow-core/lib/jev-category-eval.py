@@ -28,16 +28,17 @@ folder a doc already lives in (plans/jev-category-offline-eval.md).
 
 `run` ends the results file with one summary record (eligible and written
 counts, --limit, abort flag, skip counts). `report` gives a verdict only for
-a complete run made under the current criteria file.
+a complete run made under the current criteria file, with the pre-registered
+--seed.
 
 Exit codes: 0 success; 1 no request in `run` returned a usable answer, or
 `run` stopped after ABORT_AFTER_ERRORS consecutive failed requests (the
 results file is then partial); 2 usage error (missing key, no eligible docs,
 --out inside the repository or writable by others, bad URL, a malformed
-criteria, results or review file, mixed criteria sha or model in RESULTS,
-duplicate paths, an existing disagreements.tsv that is not a private regular
-file). --timeout bounds each socket operation of an attempt, not the whole
-request.
+criteria, results or review file, mixed criteria sha, requested model or
+returned model in RESULTS, duplicate paths, an existing disagreements.tsv
+that is not a private regular file). --timeout bounds each socket operation
+of an attempt, not the whole request.
 
 Stdlib only, Python 3.9+.
 """
@@ -990,6 +991,7 @@ def _check_row(row):
         ("prediction", row.get("prediction") is None or _is(LABEL_RE, row["prediction"])),
         ("prediction", (row.get("status") == "ok") == (row.get("prediction") is not None)),
         ("confidence", row.get("confidence") is None or _num_in(row["confidence"], 0, 1)),
+        ("model_requested", _is(MODEL_RE, row.get("model_requested"))),
         ("model_returned", row.get("model_returned") is None or _is(MODEL_RE, row["model_returned"])),
         ("date", row.get("date") is None or _is(DATE_RE, row["date"])),
     )
@@ -1162,6 +1164,11 @@ def cmd_report(args):
     shas = sorted({r["criteria_sha"] for r in rows} | ({summary["criteria_sha"]} if summary else set()))
     if len(shas) > 1:
         raise UsageError("results mix %d criteria shas; report one criteria version at a time" % len(shas))
+    # Requested models are checked too: an answer with no valid returned model
+    # still records which model it asked for.
+    requested = sorted({r["model_requested"] for r in rows})
+    if len(requested) > 1:
+        raise UsageError("results mix requested models (%s); report one model at a time" % ", ".join(requested))
     models = sorted({r["model_returned"] for r in rows if r.get("model_returned")})
     if len(models) > 1:
         raise UsageError("results mix models (%s); report one model at a time" % ", ".join(models))
@@ -1310,6 +1317,8 @@ def cmd_report(args):
     print("")
     if sha != current_sha:
         print("verdict: INSUFFICIENT-DATA (the results were made under another criteria file; its protocol is not the one loaded here; descriptive only)")
+    elif seed != frozen_seed:
+        print("verdict: INSUFFICIENT-DATA (--seed %d is not the pre-registered seed %d, so the adjudication sample is not the frozen one; descriptive only)" % (seed, frozen_seed))
     elif coverage is not None:
         print("verdict: INSUFFICIENT-DATA (%s; descriptive only)" % coverage)
     elif len(holdout) < look:

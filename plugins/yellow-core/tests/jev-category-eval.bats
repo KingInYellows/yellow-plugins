@@ -519,6 +519,11 @@ PY
   run --separate-stderr python3 "$EVAL" report "$BATS_TEST_TMPDIR/mixed.jsonl"
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"mix models"* ]]
+  # Row 11 returned no model, so only its requested model can reveal the mix.
+  sed '11s/"model_requested": "jev-1.13.0"/"model_requested": "jev-1.14.0"/' "$FIX/report-results.jsonl" > "$BATS_TEST_TMPDIR/mixed.jsonl"
+  run --separate-stderr python3 "$EVAL" report "$BATS_TEST_TMPDIR/mixed.jsonl"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"mix requested models"* ]]
   { head -n 1 "$FIX/report-results.jsonl"; cat "$FIX/report-results.jsonl"; } > "$BATS_TEST_TMPDIR/dup.jsonl"
   run --separate-stderr python3 "$EVAL" report "$BATS_TEST_TMPDIR/dup.jsonl"
   [ "$status" -eq 2 ]
@@ -631,6 +636,13 @@ judge_all() {
   judge_all folder
   run python3 "$EVAL" report "$BATS_TEST_TMPDIR/results.jsonl" --review "$BATS_TEST_TMPDIR/review.tsv"
   [[ "$output" == *"verdict: INSUFFICIENT-DATA (the run used --limit 160"* ]]
+
+  make_holdout 160 0
+  judge_all folder
+  run python3 "$EVAL" report "$BATS_TEST_TMPDIR/results.jsonl" --review "$BATS_TEST_TMPDIR/review.tsv" --seed 1
+  [[ "$output" == *"verdict: INSUFFICIENT-DATA (--seed 1 is not the pre-registered seed 0"* ]]
+  [[ "$output" != *"verdict: GO"* ]]
+  [[ "$output" != *"verdict: NO-GO"* ]]
 }
 
 @test "report: errors in the holdout window block the verdict; invalid counts as a Jev miss" {
