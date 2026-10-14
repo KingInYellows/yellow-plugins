@@ -29,7 +29,10 @@ The field table above reflects the 2026-05-04 source check. The `effort`
 tier notes were re-verified on 2026-09-02 against the Claude Code sub-agents
 reference and the platform effort documentation — where a claim carries its
 own later date, that date marks the narrower re-check, not a full re-read of
-every field below. See [Version Changelog](#version-changelog).
+every field below. The effort-inheritance behaviour was observed on
+2026-10-14 (Claude Code v2.1.300) in subagent transcripts; see
+`docs/research/model-routing-policy.md` "Verify". See
+[Version Changelog](#version-changelog).
 
 ---
 
@@ -50,7 +53,7 @@ every field below. See [Version Changelog](#version-changelog).
 | `disallowedTools` | comma-string or list | none | v2.0.x late 2025 |
 | `model` | enum alias or full model ID | `inherit` | v2.0.28 |
 | `permissionMode` | enum (see below) | inherit from parent | v2.0.43 |
-| `effort` | `low`/`medium`/`high`/`xhigh`/`max` or integer | inherit | v2.0.x late 2025 |
+| `effort` | `low`/`medium`/`high`/`xhigh`/`max` or integer | inherits the session's effort | v2.0.x late 2025 |
 | `maxTurns` | positive integer | no limit | v2.0.x late 2025 |
 | `isolation` | `worktree` (only valid value) | none | v2.1.49 |
 | `background` | boolean | `false` | v2.0.x |
@@ -64,6 +67,11 @@ every field below. See [Version Changelog](#version-changelog).
 
 ### `effort` tier-selection rule (high vs xhigh vs max)
 
+A subagent without `effort:` inherits the session's effort. The session
+default is the model's own (`medium` on the 5.5 models), so set `effort:`
+explicitly on every pinned agent (V5 warns otherwise). An exported
+`CLAUDE_CODE_EFFORT_LEVEL` overrides both frontmatter and session.
+
 The official Anthropic docs list the `effort` enum but do not document
 operational distinctions between `high`, `xhigh`, and `max`. Community
 precedent and yellow-plugins convention (established M-A-05, 2026-05-08):
@@ -74,12 +82,13 @@ precedent and yellow-plugins convention (established M-A-05, 2026-05-08):
 | `medium` | Default for caller-flexible agents — let the calling session's context decide depth | The agent has compound reasoning that should override caller defaults |
 | `high` | Agent applies a **bounded structured rubric** (n principles, n axes, n criteria) where each axis is itself bounded; multi-axis but bounded analysis | The agent is open-ended and additional CoT mostly redoes the same axes |
 | `xhigh` | Open-ended reasoning with **no rubric ceiling** — adversarial scenario construction, novel-pattern detection, agents that _generate_ failure modes rather than check against them. Documented as the setting for the hardest coding and agentic work on Sonnet 5 / Opus 5 / Fable 5.x | Agent is sonnet/haiku-tier (xhigh on lower models is pointless — model ceiling already constrains output before effort would) |
-| `max` | Deepest single-pass synthesis on the largest documents, when wall-clock cost is acceptable | The agent runs on `haiku` (Haiku 4.5 has no effort control) or the extra wall-clock is not justified. `max` is accepted on Sonnet 5, Opus 5 and Fable 5.x (verified 2026-09-02); the earlier "Opus 4.6-exclusive" caveat no longer applies |
+| `max` | Deepest single-pass synthesis on the largest documents, when wall-clock cost is acceptable | The agent runs on Haiku 4.5, which has no effort control (the `haiku` alias on clients older than v2.1.293 and on Bedrock/Vertex/Foundry), or the extra wall-clock is not justified. Haiku 5.5 accepts `low`..`max`. `max` is accepted on Sonnet 5, Opus 5 and Fable 5.x (verified 2026-09-02); the earlier "Opus 4.6-exclusive" caveat no longer applies |
 
 **Pairing with `model:`:** `xhigh`/`max` are most impactful with `model: opus`.
 On `sonnet` or `haiku`, the model's ceiling constrains output quality before
-the effort budget would; pair lower-tier models with `low`/`medium`/`high`
-or omit `effort:` entirely to inherit caller context.
+the effort budget would; pair lower-tier models with `low`/`medium`/`high`.
+Omitting `effort:` makes the agent run at whatever effort the launching
+session has, so it is no longer a recommended default.
 
 **No published cost/latency multipliers.** Anthropic does not document the
 token-budget ratio between tiers. Order-of-magnitude proxies based on the

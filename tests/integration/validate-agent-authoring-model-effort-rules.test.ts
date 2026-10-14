@@ -1,5 +1,5 @@
 /**
- * Integration tests for the V1–V4 model/effort lint rules in
+ * Integration tests for the V1–V5 model/effort lint rules in
  * `scripts/validate-agent-authoring.js`.
  *
  * V1: effort: enum (low|medium|high|xhigh|max) — hard error
@@ -8,6 +8,7 @@
  * V3: model: inherit outside MODEL_RULE_ALLOWLIST, in any agents/ subdirectory —
  *     non-blocking warning
  * V4: synthesizer/orchestrator name without effort: high — non-blocking warning
+ * V5: pinned model: without effort: — non-blocking warning
  *
  * The test parameterizes the validator via `VALIDATE_PLUGINS_DIR` and runs it
  * as a child process against fixture trees in `os.tmpdir()`. Mirrors the
@@ -293,6 +294,42 @@ describe('validate-agent-authoring V3: inheritance advisory', () => {
     expect(stdout).toMatch(/\[V3 advisory\]/);
   });
 
+  it('warns on agents/maintenance/ with model: inherit', () => {
+    // runner-diagnostics lived here, outside the old scanners/ci scope.
+    writeAgent(
+      tmpRoot,
+      'yellow-test/agents/maintenance/diag.md',
+      agentBody({ name: 'diag', model: 'inherit' })
+    );
+    const { status, stdout } = runValidator(tmpRoot);
+    expect(status).toBe(0);
+    expect(stdout).toMatch(/\[V3 advisory\].*diag\.md/);
+  });
+
+  it('warns when model: is omitted, since that inherits at runtime', () => {
+    writeAgent(
+      tmpRoot,
+      'yellow-test/agents/workflow/nomodel.md',
+      agentBody({ name: 'nomodel' })
+    );
+    const { status, stdout } = runValidator(tmpRoot);
+    expect(status).toBe(0);
+    expect(stdout).toMatch(
+      /\[V3 advisory\].*nomodel\.md: no model: \(inherits\)/
+    );
+  });
+
+  it('honors MODEL_RULE_ALLOWLIST when model: is omitted', () => {
+    writeAgent(
+      tmpRoot,
+      'yellow-codex/agents/workflow/codex-executor.md',
+      agentBody({ name: 'codex-executor' })
+    );
+    const { status, stdout } = runValidator(tmpRoot);
+    expect(status).toBe(0);
+    expect(stdout).not.toMatch(/V3 advisory/);
+  });
+
   it('warns on agents/workflow/ with model: inherit (V3 covers every subdir)', () => {
     writeAgent(
       tmpRoot,
@@ -461,6 +498,97 @@ describe('validate-agent-authoring V4: synthesizer effort:high advisory', () => 
     expect(status).toBeGreaterThan(0);
     expect(stderr).toMatch(/invalid effort: 'hight'/);
     expect(stdout).not.toMatch(/V4 advisory/);
+  });
+});
+
+describe('validate-agent-authoring V5: pinned model without effort advisory', () => {
+  let tmpRoot: string;
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'yellow-validate-v5-'));
+  });
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('warns when a pinned model has no effort:', () => {
+    writeAgent(
+      tmpRoot,
+      'yellow-test/agents/research/pinned.md',
+      agentBody({ name: 'pinned', model: 'sonnet' })
+    );
+    const { status, stdout } = runValidator(tmpRoot);
+    expect(status).toBe(0);
+    expect(stdout).toMatch(
+      /\[V5 advisory\].*pinned\.md: model: sonnet pinned without effort:/
+    );
+  });
+
+  it('warns for a full claude-* model ID without effort:', () => {
+    writeAgent(
+      tmpRoot,
+      'yellow-test/agents/research/full-id.md',
+      agentBody({ name: 'full-id', model: 'claude-haiku-5-5' })
+    );
+    const { status, stdout } = runValidator(tmpRoot);
+    expect(status).toBe(0);
+    expect(stdout).toMatch(/\[V5 advisory\].*full-id\.md/);
+  });
+
+  it('does NOT warn when effort: is set', () => {
+    writeAgent(
+      tmpRoot,
+      'yellow-test/agents/research/pinned.md',
+      agentBody({ name: 'pinned', model: 'haiku', effort: 'low' })
+    );
+    const { status, stdout } = runValidator(tmpRoot);
+    expect(status).toBe(0);
+    expect(stdout).not.toMatch(/V5 advisory/);
+  });
+
+  it('does NOT warn on model: inherit (that is V3)', () => {
+    writeAgent(
+      tmpRoot,
+      'yellow-test/agents/research/inh.md',
+      agentBody({ name: 'inh', model: 'inherit' })
+    );
+    const { status, stdout } = runValidator(tmpRoot);
+    expect(status).toBe(0);
+    expect(stdout).not.toMatch(/V5 advisory/);
+    expect(stdout).toMatch(/\[V3 advisory\]/);
+  });
+
+  it('does NOT warn when model: is absent', () => {
+    writeAgent(
+      tmpRoot,
+      'yellow-test/agents/research/nomodel.md',
+      agentBody({ name: 'nomodel' })
+    );
+    const { status, stdout } = runValidator(tmpRoot);
+    expect(status).toBe(0);
+    expect(stdout).not.toMatch(/V5 advisory/);
+  });
+
+  it('honors MODEL_RULE_ALLOWLIST for knowledge-compounder.md', () => {
+    writeAgent(
+      tmpRoot,
+      'yellow-core/agents/workflow/knowledge-compounder.md',
+      agentBody({ name: 'knowledge-compounder', model: 'sonnet' })
+    );
+    const { status, stdout } = runValidator(tmpRoot);
+    expect(status).toBe(0);
+    expect(stdout).not.toMatch(/V5 advisory/);
+  });
+
+  it('does NOT fire when V2 already errors on the model value', () => {
+    writeAgent(
+      tmpRoot,
+      'yellow-test/agents/research/typo.md',
+      agentBody({ name: 'typo', model: 'gpt-4' })
+    );
+    const { status, stderr, stdout } = runValidator(tmpRoot);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/invalid model: 'gpt-4'/);
+    expect(stdout).not.toMatch(/V5 advisory/);
   });
 });
 

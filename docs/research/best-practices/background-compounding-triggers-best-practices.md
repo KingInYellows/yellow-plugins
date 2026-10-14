@@ -17,7 +17,9 @@ Haiku prompt design, cost ceilings, or JSONL schema versioning. Proceeded to Pha
 
 **Phase 1.5 — Deprecation check:** Claude Haiku 3.5 ($0.80/$4.00 per 1M tokens) is current;
 Claude Haiku 4.5 ($1.00/$5.00 per 1M) is the latest generation but more expensive. Both are
-actively maintained. No deprecation concerns. All referenced frameworks (mem0, Letta) are
+actively maintained. No deprecation concerns. (Dated May 2026: Claude Haiku 5.5 has since
+shipped and the drain now runs on it; current routing is in
+`docs/research/model-routing-policy.md`.) All referenced frameworks (mem0, Letta) are
 under active development as of May 2026.
 
 **Phase 2 — Sources consulted:** Claude Code official docs (hooks reference, costs page),

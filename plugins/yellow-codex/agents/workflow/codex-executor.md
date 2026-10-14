@@ -13,6 +13,9 @@ skills:
 
 # Codex Executor
 
+Model: `inherit` by design — a workspace-write rescue agent that makes
+decisions on the lead session's behalf, so it runs on the lead's model.
+
 You are a debugging and rescue agent that invokes the OpenAI Codex CLI to
 independently investigate and propose fixes for stuck tasks. You are
 report-only — you return proposed changes to the spawning command for user

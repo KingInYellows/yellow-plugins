@@ -109,13 +109,14 @@ const REVIEW_AGENT_ALLOWLIST = new Map([
   ['yellow-council/agents/review/claude-reviewer.md', new Set(['Write'])],
 ]);
 
-// V1/V2/V3/V4 — model/effort frontmatter lint rules (see M-A-01 plan).
+// V1-V5 — model/effort frontmatter lint rules (see M-A-01 plan).
 // V1: effort: enum (low|medium|high|xhigh|max) — hard error
 // V2: model: alias (haiku|sonnet|opus|fable|inherit, optionally versioned)
 //     or a full `claude-*` model ID — hard error
-// V3: model: inherit on any agent outside MODEL_RULE_ALLOWLIST — non-blocking
+// V3: model: inherit (or no model:) outside MODEL_RULE_ALLOWLIST — non-blocking
 //     warning
 // V4: synthesizer/orchestrator name without effort: high — non-blocking warning
+// V5: pinned model: without effort: — non-blocking warning
 // `inherit` is a bare keyword (no version suffix). Aliases (haiku, sonnet,
 // opus, fable — the set Claude Code's sub-agents reference documents) accept
 // an optional one- or two-segment numeric suffix (e.g., `sonnet-4-6`). Full
@@ -134,7 +135,7 @@ const HIGH_EFFORT = new Set(['high', 'xhigh', 'max']);
 const SYNTHESIZER_NAME_PATTERN =
   /(synthesizer|orchestrator|conductor|aggregator|compounder)/i;
 
-// Files exempt from V3/V4 advisory warnings — intentional inheritance
+// Files exempt from V3/V4 advisory warnings (V5 has its own exemption) — intentional inheritance
 // or intentional default-effort. Each entry must be a plugins-relative
 // POSIX path. Adding a file here is a documented decision that the
 // agent's role does NOT match the rule's intent (e.g., failure-analyst
@@ -540,9 +541,11 @@ function validateAgentFile(filePath, ctx) {
   // An inheriting agent runs on whatever the lead session runs, so under an
   // Opus or Fable lead a lookup or wrapper agent costs 40-100x a pinned
   // Haiku one. Inheritance is a deliberate choice recorded in the allowlist.
-  if (modelVal === 'inherit' && !allowlisted) {
+  // An omitted model: also inherits at runtime, so it warns the same way.
+  if ((modelVal === 'inherit' || modelVal === null) && !allowlisted) {
+    const shape = modelVal === null ? 'no model: (inherits)' : 'model: inherit';
     warnings.push(
-      `[V3 advisory] ${relative(filePath)}: model: inherit on a ` +
+      `[V3 advisory] ${relative(filePath)}: ${shape} on a ` +
         `${subdir}/ agent — pin model: haiku, sonnet or opus by task ` +
         `shape, or add the file to MODEL_RULE_ALLOWLIST with a reason.`
     );
@@ -564,6 +567,29 @@ function validateAgentFile(filePath, ctx) {
     warnings.push(
       `[V4 advisory] ${relative(filePath)}: synthesizer/orchestrator ` +
         `agent without effort: high — consider extended chain-of-thought.`
+    );
+  }
+
+  // V5: a pinned model: without effort: — non-blocking warning. A subagent
+  // without effort: inherits the session's effort, not the pinned model's
+  // default, so the level it runs at depends on whoever launched it. Only
+  // knowledge-compounder (sonnet, no effort, intentional default effort) is
+  // exempt. The other MODEL_RULE_ALLOWLIST entries are there for
+  // `model: inherit`, so a stale one that gains a pinned model still warns.
+  // Skipped when V2 already errors on the model value.
+  const v5Exempt =
+    pluginsRelPath === 'yellow-core/agents/workflow/knowledge-compounder.md';
+  if (
+    modelVal !== null &&
+    modelVal !== 'inherit' &&
+    MODEL_VALUE_PATTERN.test(modelVal) &&
+    effortVal === null &&
+    !v5Exempt
+  ) {
+    warnings.push(
+      `[V5 advisory] ${relative(filePath)}: model: ${modelVal} pinned ` +
+        `without effort: — it inherits the session's effort; set it ` +
+        `explicitly.`
     );
   }
 

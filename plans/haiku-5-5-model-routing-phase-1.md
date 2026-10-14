@@ -1,7 +1,9 @@
 # Feature: Haiku 5.5 model-routing policy — Phase 1
 
-> **Status (2026-10-14):** In progress. PR #1171 landed most of 1.1 and parts
-> of 1.2 and 1.3; the remaining work is split per "Delivery" below. Source:
+> **Status (2026-10-14):** Implemented in PR #1171 and the stacked PR #1176,
+> both submitted. 29 of 31 tasks are done. 1.0.3 (the CI run-log check) waits
+> for #1171 to merge, and 1.5.2 stays open until the `linear-pr-linker` write
+> path is smoke-tested interactively. Source:
 > `docs/brainstorms/2026-10-07-haiku-5-5-model-routing-policy-brainstorm.md`.
 > Phase 2 (replay-gated swaps) and Phase 3 (trigger tightening; router
 > deferred) are tracked under "Follow-ups" and are not implemented here.
@@ -28,6 +30,18 @@ Split:
   1.1.18, 1.1.19, 1.2.2, the rest of 1.2.4, 1.2.5, 1.4.1-1.4.6 (except the
   AGENTS.md wording), 1.5.2, 1.5.3, and its own 1.6 pass (changesets for
   yellow-council and yellow-devin).
+- **Still open:** two tasks.
+  - 1.0.3, the CI run-log check. It can run only after #1171 merges, because
+    claude-code-action skips runs on a PR that changes its own workflow.
+  - 1.5.2, the `linear-pr-linker` write path. Rerun it interactively against
+    a scratch issue and check that `save_issue` follows an accepted
+    confirmation (see the note under 1.5.3).
+- **Also in #1176:** the bot-review follow-ups tracked as CLAUDE-131 (GitHub
+  #1172).
+  - Item 1 (strict drain-model validation) landed in #1171.
+  - Item 2: V3 now also warns when `model:` is omitted. No agent omits it
+    today, so the count stays 0.
+  - Item 3: the catalog's effort guidance, covered by 1.4.3 and 1.4.4.
 
 ## Overview
 
@@ -142,14 +156,14 @@ usage-limit headroom, not dollars. The quality-relevant fix is explicit
 
 ### Phase 1.0: Verification tooling (do first; gates the doc wording)
 
-- [ ] 1.0.1: Write a transcript check that prints, for each subagent in a
+- [x] 1.0.1: Write a transcript check that prints, for each subagent in a
       session, the `message.model` and effort actually used. Run the `jq`
       one-liner from the research note below over the per-agent transcripts
       at `~/.claude/projects/<slug>/<session-id>/subagents/agent-*.jsonl`,
       not the session JSONL. `/tasks` shows effort only when the definition
       sets `effort:`, so it cannot confirm inherited effort. Put the command
       in the new policy doc's "Verify" section.
-- [ ] 1.0.2: Run the check once on a current client (≥ v2.1.293). Spawn one
+- [x] 1.0.2: Run the check once on a current client (≥ v2.1.293). Spawn one
       agent per tier (T1 `linear-issue-loader`, T2 `coherence-reviewer`, T3
       `failure-analyst`, T4 `security-sentinel`) after their edits land.
       Confirm the documented behavior (brainstorm Open Question 1, answered
@@ -164,6 +178,31 @@ usage-limit headroom, not dollars. The quality-relevant fix is explicit
       claude ...`), then repeat one pinned case with it exported to confirm
       it overrides frontmatter. If the transcript contradicts the docs,
       record that and word 1.4.4 to match what was observed.
+
+      Done 2026-10-14 on Claude Code v2.1.300. Four scratch `claude -p` runs
+      with project agents, `CLAUDE_CODE_EFFORT_LEVEL` unset except in run D:
+
+      | Run | Session | Agent | Ran at |
+      |---|---|---|---|
+      | A | `--effort low` | haiku, no effort | low |
+      | B | `--effort high` | haiku, no effort | high |
+      | C | `--effort low` | sonnet, no effort | low |
+      | D | `CLAUDE_CODE_EFFORT_LEVEL=medium` | haiku, `effort: low` | medium |
+
+      - **Inheritance:** A and B confirm that a pinned agent without
+        `effort:` inherits the session's effort.
+      - **#91415:** in C, `modelSettings.claude-sonnet-5-5.effortLevel: high`
+        did not beat the explicit session effort, which answers #91415 for
+        that case.
+      - **Env override:** D confirms the env var beats frontmatter.
+      - **Override from past runs:** 33 earlier runs of pinned haiku/low
+        agents ran at `low` under `high` sessions, which confirms the
+        override.
+
+      The four named tier agents still carry their pre-#1171 frontmatter in
+      the installed plugins, so running them is 1.5.3, after release. The
+      results and the Verify command are in
+      `docs/research/model-routing-policy.md`.
 - [ ] 1.0.3: Confirm the action's bundled CLI is ≥ v2.1.284, so that `sonnet`
       resolves to 5.5. Read the run log of the first CI run after 1.3.
 
@@ -223,9 +262,12 @@ Inherit moves (all currently `model: inherit` on line 4, with no effort):
 
 Kept `inherit`, with the reason recorded:
 
-- [ ] 1.1.18: Add a one-line body note under the frontmatter, in the form
+- [x] 1.1.18: Add a one-line body note under the frontmatter, in the form
       "Model: `inherit` by design — <reason>". Use a body note rather than a
       YAML comment, because the parser treatment of comments is unverified.
+      As shipped (#1176), the note sits below each file's opening heading (or
+      after devin-orchestrator's `<examples>` block), not directly under the
+      frontmatter, so markdownlint MD041 passes.
   - `yellow-codex/agents/workflow/codex-executor.md`: workspace-write rescue
     that makes decisions for the lead.
   - `yellow-council/agents/review/claude-reviewer.md`: stands for the lead's
@@ -244,7 +286,7 @@ Kept `inherit`, with the reason recorded:
 > already `haiku`/`low` (`learnings-researcher.md:4-5`).
 <!-- /deepen-plan -->
 
-- [ ] 1.1.19: Leave `learnings-researcher` at haiku/low and record why in the
+- [x] 1.1.19: Leave `learnings-researcher` at haiku/low and record why in the
       policy doc: it is a recall wrapper with a strict output contract. This
       resolves Open Question 5. Revisit it in Phase 2 if the yield rollup shows
       missed learnings.
@@ -261,7 +303,7 @@ Kept `inherit`, with the reason recorded:
       message so it no longer interpolates `subdir`: "model: inherit — make an
       explicit model choice, or add the file to MODEL_RULE_ALLOWLIST with a
       reason." Update the rule comment block at lines 112-117.
-- [ ] 1.2.2: Add V5 after V4. When `modelVal`, `modelVal !== 'inherit'` and
+- [x] 1.2.2: Add V5 after V4. When `modelVal`, `modelVal !== 'inherit'` and
       `effortVal === null` all hold and the file is not allowlisted, push
       `[V5 advisory] <path>: model: <m> pinned without effort: — it inherits
       the session's effort; set it explicitly`. It is a warning only. V5
@@ -285,7 +327,7 @@ Kept `inherit`, with the reason recorded:
   - Keep `devin-orchestrator` and `knowledge-compounder`; V4 needs them.
   - Add `codex-executor` and `claude-reviewer`, each with a reason comment.
   - #1171 also added `test-runner`. Remove it once 1.1.10 lands.
-- [ ] 1.2.4: Update `tests/integration/validate-agent-authoring-model-effort-rules.test.ts`:
+- [x] 1.2.4: Update `tests/integration/validate-agent-authoring-model-effort-rules.test.ts`:
   - Header comment (lines 1-14).
   - Invert the line-295 test, "does NOT warn on agents/workflow/", so it now
     warns.
@@ -297,7 +339,7 @@ Kept `inherit`, with the reason recorded:
   - Add V5 tests: warns when a pinned model has no effort; silent when effort
     is set; silent on `inherit`; silent when allowlisted. Use
     `agentBody`/`writeAgent`/`runValidator`.
-- [ ] 1.2.5: The baseline is 43 agents that pin a model without `effort:`
+- [x] 1.2.5: The baseline is 43 agents that pin a model without `effort:`
       today (V5 doesn't exist yet, so the tool can't report it). After 1.1,
       18 inherit agents drop to 3, all allowlisted, so V3 must report 0. Check
       with `pnpm validate:agents 2>&1 | grep -c 'V3 advisory'`. V5 must report
@@ -483,7 +525,7 @@ Kept `inherit`, with the reason recorded:
 
 ### Phase 1.4: Docs (root, `docs/` and the touched plugins)
 
-- [ ] 1.4.1: Write the policy doc at `docs/research/model-routing-policy.md`.
+- [x] 1.4.1: Write the policy doc at `docs/research/model-routing-policy.md`.
       It covers:
   - The tier table, the rules and the per-agent verdicts with reasons.
   - Requirements: the client floor, and a one-line Bedrock/Vertex/Foundry note
@@ -491,11 +533,11 @@ Kept `inherit`, with the reason recorded:
   - A "Verify" section with the 1.0.1 command.
   - Rollback steps.
   - Phase 2 and 3 entry gates.
-- [ ] 1.4.2: Supersede `docs/research/model-selection-token-context-optimization.md`
+- [x] 1.4.2: Supersede `docs/research/model-selection-token-context-optimization.md`
       without deleting it, because CHANGELOGs, `plans/complete/` and the
       2026-05-08 brainstorm link to it. Add a top banner: "Superseded
       2026-10-07 by model-routing-policy.md; kept for history."
-- [ ] 1.4.3: Fix the stale Haiku statements:
+- [x] 1.4.3: Fix the stale Haiku statements:
   - `AGENTS.md:313`
   - `docs/plugin-template.md:450-451`
   - `docs/solutions/code-quality/subagent-frontmatter-field-catalog.md:77`
@@ -508,7 +550,7 @@ Kept `inherit`, with the reason recorded:
   `docs/research/best-practices/background-compounding-triggers-best-practices.md:19`
   cites Haiku 4.5 *pricing*, not effort. Refresh its version reference, or
   mark it dated, rather than applying the effort wording.
-- [ ] 1.4.4: Resolve the default-effort statements:
+- [x] 1.4.4: Resolve the default-effort statements:
   - Catalog lines 53 and 82, and the effort tier rule at 65-67.
   - Research doc: the default column near 304-308, line 309 and line 694.
 
@@ -523,9 +565,9 @@ Kept `inherit`, with the reason recorded:
   without `effort:` takes the session's effort. Fix that sentence in #1171
   with this wording, along with the same claim in `docs/plugin-template.md`
   (done 2026-10-14); the catalog and research-doc edits go in the follow-up.
-- [ ] 1.4.5: Add the v2.1.293 floor note to `AGENTS.md`'s model/effort
+- [x] 1.4.5: Add the v2.1.293 floor note to `AGENTS.md`'s model/effort
       section, linking to the policy doc.
-- [ ] 1.4.6: Run `rg -n "Haiku 4\.5|ignores .?effort" AGENTS.md docs/ --glob '!docs/brainstorms/**' --glob '!docs/research/model-selection-token-context-optimization.md'`.
+- [x] 1.4.6: Run `rg -n "Haiku 4\.5|ignores .?effort" AGENTS.md docs/ --glob '!docs/brainstorms/**' --glob '!docs/research/model-selection-token-context-optimization.md'`.
       Only qualified mentions may remain. The superseded doc is excluded
       because its banner covers it.
 - [x] 1.4.7: In every plugin that 1.1 edits, update `README.md` and `CLAUDE.md`
@@ -580,7 +622,45 @@ Kept `inherit`, with the reason recorded:
       both ruvector agents. Pass means ToolSearch, then a real MCP call, then
       output in the documented format. For the linker, the confirmation must
       come before `save_issue`.
-- [ ] 1.5.3: Run the transcript check from 1.0.2 across the tiers.
+- [x] 1.5.3: Run the transcript check from 1.0.2 across the tiers.
+
+  1.5.2 and 1.5.3 need the new frontmatter in the plugins Claude Code
+  actually loads, so run them once #1171 is released and installed (or with
+  `--plugin-dir` pointing at this branch). Use the "Verify" command in
+  `docs/research/model-routing-policy.md`. The `linear-pr-linker` smoke
+  writes to Linear, so it needs a scratch issue chosen by the user.
+
+  Done 2026-10-14 (Claude Code v2.1.300):
+  - **1.5.3:** the four tier agents were copied from this branch as project
+    agents and dispatched from a `sonnet` / `xhigh` lead, a level no tier
+    uses. They ran at:
+    - T1 linear-issue-loader: haiku/low
+    - T2 coherence-reviewer: haiku/medium
+    - T3 failure-analyst: sonnet/medium
+    - T4 security-sentinel: opus/high
+  - **1.5.2, ruvector agents:** run headless with `--plugin-dir` under a
+    `sonnet` / `high` lead, both ran as haiku/low. Each did ToolSearch, then
+    a real `hooks_recall`, then output in its documented format.
+    semantic-search's top hit was weak (`knowledge-compounder.md`, not the
+    drain code); memory-manager correctly reported no hit above the 0.5
+    floor.
+  - **1.5.2, Linear agents:** headless `claude -p` does not load the
+    plugin's Linear MCP server (only the claude.ai connector), so these ran
+    from an interactive session with a per-call `haiku` model, at that
+    session's effort rather than the pinned one. All three made real MCP
+    calls and returned their documented format:
+    - linear-explorer: `list_teams`, then `list_issues` ×4.
+    - linear-issue-loader: `list_teams`, `get_issue`, `list_comments` on
+      CLAUDE-131.
+    - linear-pr-linker: read CLAUDE-131 and PR #1176, then stopped for
+      approval before any write. As a background agent it had no
+      `AskUserQuestion`, so it asked in text and treated no reply as no.
+      Nothing was written.
+  - **1.5.2 stays open for the linker's write path.** That run used
+    CLAUDE-131, not a scratch issue chosen by the user, and it never reached
+    `save_issue`. Rerun `linear-pr-linker` interactively against a scratch
+    issue, accept the confirmation, and check that `save_issue` follows it.
+    Then tick 1.5.2.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** No parser runs `codex-reviewer` output through a model.
@@ -597,7 +677,7 @@ Kept `inherit`, with the reason recorded:
 
 ### Phase 1.6: Release hygiene
 
-- [ ] 1.6.1: Add a `patch` changeset for each plugin with edited files:
+- [x] 1.6.1: Add a `patch` changeset for each plugin with edited files:
   - yellow-core
   - yellow-docs
   - yellow-linear
@@ -634,12 +714,15 @@ Kept `inherit`, with the reason recorded:
     `state-store`. Run alone, all five pass on #1171 and on `main`, so they
     are load-dependent flakes, not regressions.
   - The follow-up PR runs its own pass.
-- [ ] 1.6.3: Run `/stack:status`, then submit through the enabled provider.
+- [x] 1.6.3: Run `/stack:status`, then submit through the enabled provider.
       Never use raw `git push` or `gh pr create`. The stack is #1171 plus one
       follow-up PR on top of it (see "Delivery"); this replaces the original
       five-PR split. #1171's branch came from a cloud session without `gt`,
       so on the Graphite provider run `gt track` on it before stacking the
       follow-up.
+      Done 2026-10-14: `/stack:status` reported READY_GRAPHITE. #1171 was
+      tracked with `gt track`, and #1176 was submitted with `gt submit` on
+      top of it.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:**
