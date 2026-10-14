@@ -1,0 +1,35 @@
+plans/haiku-5-5-model-routing-phase-1-followups.md
+  s_50403716e09fd0::t_acaae693c23b2e 1-35
+plans/haiku-5-5-model-routing-phase-1.md
+  s_50403716e09fd0::t_21137f0fc8506d 3-6
+  s_50403716e09fd0::t_59335b23e2ca2d 773-774
+  s_50403716e09fd0::t_67b7b55522e685 778-779
+  s_50403716e09fd0::t_94ecd0c741af61 206,209-220
+  s_50403716e09fd0::t_baa01e172dd250 674-676
+  s_50403716e09fd0::t_14e5eea87ef97f 633-635
+  s_fb55a548cc1a90::t_eaba46a1ef93f7 221
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ffae42abfe8f3c6676f5588d639d557d4c1d5de2",
+  "prompts": {},
+  "sessions": {
+    "s_50403716e09fd0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "54c72aa1-e630-48f9-a692-710cf91acfa5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_fb55a548cc1a90": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eaefb775-430d-4fdb-9402-641dccb1ee04",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
