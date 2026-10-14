@@ -315,7 +315,11 @@ rule id in parentheses is what the failure message cites.
   the 5.5 models). Set `effort:` explicitly on every pinned agent; an
   exported `CLAUDE_CODE_EFFORT_LEVEL` overrides both (Haiku 4.5, still the
   `haiku` alias on Bedrock/Vertex/Foundry, ignores it). `model: inherit`
-  warns (V3) unless the file is in the validator's `MODEL_RULE_ALLOWLIST`.
+  warns (V3) unless the file is in the validator's `MODEL_RULE_ALLOWLIST`;
+  a pinned model without `effort:` warns (V5). The `haiku` alias means Haiku
+  5.5 only from Claude Code v2.1.293 (`sonnet` from v2.1.284, `opus` from
+  v2.1.280). Tiers, per-agent verdicts and the client floor are in
+  `docs/research/model-routing-policy.md`.
 - `tools:`, `disallowedTools:`, `skills:` accept block list, flow list, or
   comma-separated string; inline `#` comments are stripped.
 - Deferred MCP tools need `ToolSearch` in the tool list. Bundled MCP tool

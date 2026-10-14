@@ -308,6 +308,8 @@ When `memory` is set, the subagent reads and updates its `MEMORY.md` file automa
 
 **Semantics:** Sets the reasoning effort level for this subagent when it runs. Overrides the session-level effort setting. Available levels depend on the model — not all models support all effort levels. Numeric values are also accepted by the SDK (maps to internal token budget).
 
+Without `effort:`, the subagent runs at the session's effort, not the pinned model's own default (the 5.5 models default to `medium`). An exported `CLAUDE_CODE_EFFORT_LEVEL` overrides frontmatter `effort:`. Both were observed in subagent transcripts on Claude Code v2.1.300 (2026-10-14; see `docs/research/model-routing-policy.md`).
+
 | Value | Effect |
 |-------|--------|
 | `low` | Minimal thinking tokens, fastest response, lowest cost |

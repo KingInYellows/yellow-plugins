@@ -1,5 +1,10 @@
 # Model Selection and Token Context Optimization in yellow-plugins
 
+> **Superseded 2026-10-14 by [model-routing-policy.md](model-routing-policy.md);
+> kept for history.** CHANGELOGs, `plans/complete/` and the 2026-05-08
+> brainstorm link here. Its model and effort claims describe the Claude 4.x
+> generation and the 2026-05 agent set.
+
 **Date:** 2026-05-08
 **Sources:** Ceramic (10 results), GitHub code search (community agent patterns), direct codebase reads (15 agent files), Anthropic Claude Code CLI reference (blakecrosley.com), Parallel Task (running — partial; not retrieved). EXA and Tavily skipped — see Sources section at end of document for full provenance.
 
