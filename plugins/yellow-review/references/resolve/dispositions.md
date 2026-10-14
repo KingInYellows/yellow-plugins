@@ -614,7 +614,9 @@ a change outside the set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify
 `skipped` — the orchestrator runs `run-verify-command --pr <N> --revert-only`
 on the files the clusters reported under `Files modified`, which saves a patch
 first. Then `--revert-denied` (no file list) reverts dirty trusted-config
-paths on the contract deny list without asking, with the `--ignored-since`
+paths on the contract deny list: without asking in a non-interactive run;
+an interactive run lists them first with `--dry-run` and asks Revert or
+Leave (Leave reports them under Blocking merge). Both use the `--ignored-since`
 marker (it refuses on a changed gitignored trusted-config file: the ignored-file
 stop), and a refusal before the verify call also runs `--check-ignored` for the
 other gitignored files. The marker lives until the end of Step 6. Step 2
