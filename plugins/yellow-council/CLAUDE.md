@@ -196,7 +196,14 @@ Codex agent.)
 | Dependency | Purpose | Required? |
 |---|---|---|
 | yellow-codex | Provides `codex-reviewer` agent for the Codex leg of the council | Optional |
-| yellow-core | None (yellow-council does NOT depend on yellow-core) | — |
+| yellow-core `>=2.8.0` | `lib/quote-ground.sh` (`batch`) runs the Tier 1 evidence check; `lib/validate-fs.sh` and `lib/compound-staging.sh` back the citation parse and the Tier 2 redaction | Required (declared in `plugin.json`) |
+
+Claude Code has no optional dependencies: a missing, disabled or pre-2.8.0
+yellow-core disables yellow-council entirely, and installing yellow-council
+installs yellow-core from the same marketplace. The runtime fallback only
+covers loads that skip that check (`--plugin-dir`, a local-folder marketplace
+loaded in place): when `council_core_lib` cannot find yellow-core, Tier 1 is
+skipped with a warning and the findings fall to Tier 2 or `unverified`.
 | yellow-review | None (yellow-council is a SEPARATE pipeline; yellow-review's 14-reviewer Claude pipeline runs unchanged) | — |
 
 ## When to Use What

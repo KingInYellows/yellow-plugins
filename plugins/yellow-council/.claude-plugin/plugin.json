@@ -19,5 +19,13 @@
     "opencode",
     "codex",
     "advisory"
+  ],
+  "dependencies": [
+    {
+      "name": "yellow-core",
+      "version": ">=2.8.0",
+      "optional": false,
+      "reason": "quote-ground.sh batch is the Tier 1 evidence check; validate-fs.sh and compound-staging.sh back the citation parse and the Tier 2 redaction"
+    }
   ]
 }

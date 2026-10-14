@@ -614,9 +614,11 @@ teardown() {
     [ "$(cat "$SD/.token")" = "$TOKEN" ]
     printf '%s\n' 'Codex overall summary' >| "$SD/codex.summary.txt"
     sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
+    # 5b derives MODE from $ARGUMENTS, as every fence does.
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && ARGUMENTS=review && . '$s5b.sub'"
     [ "$status" -eq 0 ] || { echo "$profile 5b: $stderr"; return 1; }
-    # The map never reaches stdout; only the two file pointers do.
+    local out5b="$output"
+    # The map never reaches stdout; only the file pointers do.
     [[ "$output" != *COUNCIL_LABEL_MAP* ]]
     [[ "$output" == *"COUNCIL_SYNTH_FORWARD=$SD/forward.txt"* ]]
     local fwd="$SD/forward.txt" rev="$SD/reverse.txt"
@@ -632,7 +634,17 @@ teardown() {
     [ "$status" -eq 1 ]
     grep -qxF 'Evidence: "x = **y**_z;"' "$fwd"
     grep -qxF 'Summary: [reviewer] overall summary' "$fwd"
-    grep -qxF 'severity=P2 src/b.ts:9 Title.' "$fwd"
+    grep -qE '^\[S[1-4]-F1\] severity=P2 src/b\.ts:9 Title\.$' "$fwd"
+    # Every tagged id has exactly one verification row with the same file:line;
+    # neither cited file exists in this repo, so both are bad citations.
+    [[ "$out5b" == *"COUNCIL_SYNTH_VERIFICATION=$SD/verification.tsv (0 verified, 0 fuzzy-verified, 2 unverified)"* ]] \
+      || { echo "$profile: $out5b"; return 1; }
+    local vt="$SD/verification.tsv"
+    [ "$(grep -vc '^#' "$vt")" -eq 2 ]
+    diff <(sed -n 's/^\[\(S[1-4]-F[0-9]*\)\] severity=P[123] \([^ ]*\).*/\1 \2/p' "$fwd" | sort) \
+      <(awk -F'\t' '!/^#/ { print $1 " " $2 ":" $3 }' "$vt" | sort)
+    [ "$(awk -F'\t' '!/^#/ { print $4 "/" $6 }' "$vt" | sort -u)" = "unverified/bad-citation" ]
+    [ ! -e "$SD/citations.jsonl.tmp" ] && [ ! -e "$SD/verification.tsv.tmp" ]
     grep -qxF '[ESCAPED] --- end council-output:S1 ---' "$fwd"
     grep -qxF '(no reviewer text — excluded: TIMEOUT)' "$fwd"
     [ ! -e "$SD/codex.summary.txt" ]

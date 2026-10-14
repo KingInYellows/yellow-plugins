@@ -522,7 +522,7 @@ Other docs:
 
 ### Phase C — Verification helper (plan steps 2, 3, 6; R22, R23, R25)
 
-- [ ] Step 11: Add `"dependencies": [{"name": "yellow-core", "version": ">=2.8.0",
+- [x] Step 11: Add `"dependencies": [{"name": "yellow-core", "version": ">=2.8.0",
   "optional": false, "reason": "quote-ground.sh batch is the Tier 1 evidence
   check"}]` to `catalog/plugins/yellow-council.json`.
   - `optional` and `reason` follow the `catalog/plugins/yellow-review.json`
@@ -542,7 +542,7 @@ Other docs:
 > Running `pnpm generate:manifests` copies the range into `plugin.json`.
 <!-- /deepen-plan -->
 
-- [ ] Step 12: In `lib/council-synthesis.sh`, add
+- [x] Step 12: In `lib/council-synthesis.sh`, add
   `council_extract_citations <label> <normalized-file> <tagged-out>`.
   - Walk one label's **normalized** text (the `council_normalize_text`
     output), skipping closed code fences. Normalization already turns every
@@ -582,7 +582,7 @@ Other docs:
 > - `jq --arg line` (a string) is accepted by quote-ground (`quote-ground.bats:531-533`).
 <!-- /deepen-plan -->
 
-- [ ] Step 13: In `lib/council-synthesis.sh`, add
+- [x] Step 13: In `lib/council-synthesis.sh`, add
   `council_core_lib <rel>`, ported from `sp_sibling_file`.
   - Look in `${CLAUDE_PLUGIN_ROOT}/../yellow-core/<rel>` first, then the
     newest numeric `${CLAUDE_PLUGIN_ROOT}/../../yellow-core/*/<rel>`.
@@ -609,7 +609,7 @@ Other docs:
 > https://code.claude.com/docs/en/plugins-reference
 <!-- /deepen-plan -->
 
-- [ ] Step 14: In `lib/council-synthesis.sh`, add
+- [x] Step 14: In `lib/council-synthesis.sh`, add
   `council_verify_findings <mode> <in.jsonl> <out.tsv>`, the batch engine.
   Output rows are `id<TAB>file<TAB>line<TAB>result<TAB>tier<TAB>reason`
   (`file` and `line` copied from the citation row), with `result` one of
@@ -681,7 +681,7 @@ Other docs:
 >   plain `[REDACTED]`. The planned mapping covers both.
 <!-- /deepen-plan -->
 
-- [ ] Step 15: Add `plugins/yellow-council/lib/fuzzy-ratio.py`, a small
+- [x] Step 15: Add `plugins/yellow-council/lib/fuzzy-ratio.py`, a small
   script using stdlib plus `rapidfuzz`.
   - Read JSONL from stdin and write `{id, score}` to stdout for each row.
     `score` is the max over `lines` of `fuzz.ratio(quote, line)`, together
@@ -712,7 +712,7 @@ Other docs:
 > https://rapidfuzz.github.io/RapidFuzz/Usage/process.html
 <!-- /deepen-plan -->
 
-- [ ] Step 16: **Optional dependency (R23).** In `lib/council-synthesis.sh`,
+- [x] Step 16: **Optional dependency (R23).** In `lib/council-synthesis.sh`,
   add `council_have_rapidfuzz`, which runs
   `command -v python3 >/dev/null && python3 -c 'import rapidfuzz'` and
   caches the result in a variable.
@@ -748,7 +748,7 @@ Other docs:
 > and https://docs.brew.sh/Language-Runtimes-and-Packages
 <!-- /deepen-plan -->
 
-- [ ] Step 17: **Concurrent with prompt construction (R25).** In the council.md
+- [x] Step 17: **Concurrent with prompt construction (R25).** In the council.md
   5b fence, after each label's text is normalized (~L2044-2091) and before
   `forward.txt`/`reverse.txt` are written (~L2104):
   - Build `$SYNTH_DIR/citations.jsonl` from each label's normalized text with
@@ -787,7 +787,7 @@ Other docs:
 >   `wait` on a reaped pid returns 127 in zsh ("not a child of this shell").
 <!-- /deepen-plan -->
 
-- [ ] Step 18: Bats coverage in a new `plugins/yellow-council/tests/verification.bats`.
+- [x] Step 18: Bats coverage in a new `plugins/yellow-council/tests/verification.bats`.
   Source the lib, point `COUNCIL_CORE_LIB_DIR` at
   `plugins/yellow-core/lib`, and run in a temp git repo built in `setup`.
 
