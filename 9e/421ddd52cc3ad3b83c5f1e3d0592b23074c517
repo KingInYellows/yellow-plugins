@@ -1,0 +1,26 @@
+plugins/yellow-council/lib/council-synthesis.sh
+  s_ccb027cd70c0fa::t_2cf9a8e8b86637 75-83,85,87-95,102-103,106,108-110,112-113,115,128-129,132-134,137-199,218-220,222-236,238-239,243,248,250,256,272-292
+  s_ccb027cd70c0fa::t_9aa5becbc749db 29-37,135
+  s_ccb027cd70c0fa::t_8669b1643fc46d 136
+plans/yellow-council-v2-four-cli-05-evidence-verification-and-finalization.md
+  s_ccb027cd70c0fa::t_af50520e8da891 426,435,495
+plugins/yellow-council/tests/synthesis.bats
+  s_ccb027cd70c0fa::t_d0077aaf1518d4 128,187-247
+  s_ccb027cd70c0fa::t_95902a794e5756 248
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9e421ddd52cc3ad3b83c5f1e3d0592b23074c517",
+  "prompts": {},
+  "sessions": {
+    "s_ccb027cd70c0fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce3509f8-678c-4d2f-92ba-ab6c39ac34af",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
