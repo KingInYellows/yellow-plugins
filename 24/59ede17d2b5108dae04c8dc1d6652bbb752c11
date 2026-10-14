@@ -1,0 +1,34 @@
+docs/research/model-selection-token-context-optimization.md
+  s_038935c1c9408d::t_8fa6d6da60c7ae 3-7
+docs/research/best-practices/background-compounding-triggers-best-practices.md
+  s_038935c1c9408d::t_85714cc3bf01a8 20-21
+docs/solutions/code-quality/subagent-frontmatter-field-catalog.md
+  s_038935c1c9408d::t_71da31c5b8c6f3 85
+  s_038935c1c9408d::t_880a199aa58b56 89-91
+  s_038935c1c9408d::t_4997789485ba0b 56
+  s_038935c1c9408d::t_73c1c47148243e 32-35
+  s_038935c1c9408d::t_1eb8a1177dadd3 70-74
+docs/research/model-routing-policy.md
+  s_038935c1c9408d::t_8bc4f7f79042a9 1-122,124-222
+  s_038935c1c9408d::t_41d64fba67fdfc 123
+docs/research/all-possible-subagent-frontmatter-config.md
+  s_038935c1c9408d::t_9e2e458d1a2e5f 311-312
+AGENTS.md
+  s_038935c1c9408d::t_f340d8015e0ce2 318-322
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2459ede17d2b5108dae04c8dc1d6652bbb752c11",
+  "prompts": {},
+  "sessions": {
+    "s_038935c1c9408d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c7683a4-00d4-449e-9d60-dc3112e28dc7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
