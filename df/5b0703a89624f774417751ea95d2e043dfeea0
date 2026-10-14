@@ -1,0 +1,32 @@
+docs/plugin-template.md
+  s_038935c1c9408d::t_5646bb8c47c08a 450-452
+plugins/yellow-core/CLAUDE.md
+  s_038935c1c9408d::t_5646bb8c47c08a 517-522
+  s_038935c1c9408d::t_2d88d53717457c 515-516
+plugins/yellow-core/tests/compound-session-start-hook.bats
+  s_038935c1c9408d::t_5646bb8c47c08a 122-127,129-130,139,141,143,145-150,153-155,157,159-180,185,187,189-190,203-206,208-219,222-230
+  s_038935c1c9408d::t_06421ac7ab3117 195,197,199-200
+  s_038935c1c9408d::t_cf546a4df29db9 207
+.changeset/haiku-routing-phase-1.md
+  s_038935c1c9408d::t_5646bb8c47c08a 14-21
+plans/haiku-5-5-model-routing-phase-1.md
+  s_038935c1c9408d::t_5646bb8c47c08a 17,94-96,129-135,357,369,372-382,405,427-429,431,433-450,458,460-463,524-525,531,614,626-636,672-675
+plugins/yellow-core/hooks/scripts/session-start.sh
+  s_038935c1c9408d::t_5646bb8c47c08a 349-355,358-360,363-364,386-389,397,405-427
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "df5b0703a89624f774417751ea95d2e043dfeea0",
+  "prompts": {},
+  "sessions": {
+    "s_038935c1c9408d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5c7683a4-00d4-449e-9d60-dc3112e28dc7",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
