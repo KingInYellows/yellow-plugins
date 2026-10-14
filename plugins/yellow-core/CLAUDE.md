@@ -588,7 +588,8 @@ inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
 `compound-staging`, `compound-stop-hook`, `context-observer`,
 `credential-status`, `handoff`, `jev-prefilter`, `plan-commands`, `plan-status-parity`,
 `plan-gate-tier`, `plugin-identity`, `pre-compact-hook`, `quote-ground`, `repo-profile`,
-`setup-all-ruvector-probe`, `validate-fs`) plus `skills/git-worktree/tests/` (`worktree-manager.bats`,
+`setup-all-ruvector-probe`, `statusline-template`, `validate-fs`) plus
+`skills/git-worktree/tests/` (`worktree-manager.bats`,
 `worktree-restack.bats` with stub `gt` / `gh` / `git` shims under `tests/mocks/`).
 Manifest hook budgets: Stop 5s, SessionStart 3s, PreCompact 3s
 (`catalog/plugins/yellow-core.json`).
