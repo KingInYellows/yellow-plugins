@@ -140,3 +140,48 @@ Three review findings were left open by decision:
   existing repo convention, confidence 50).
 - Provider calls have no script-side timeout.
 - `--status` prints free-form prose instead of tagged lines.
+
+## Update — 2026-10-14 (PR #1197)
+
+PR #1197 limited `/worktree:restack --abort` to the worktrees the run recorded
+(the run worktree, Graphite's detached entries, and GitHub `owner` lines). Its
+`/review:pr` findings were fixed in the same PR and `worktree-restack.bats`
+passed 138/138. They share one theme: a refusal gate, or its advice, was wider
+than the evidence behind it.
+
+- **Gate scoped to the wrong provider.** The "unrecorded worktree is
+  mid-rebase" gate also applied to Graphite and counted worktrees whose rebase
+  state could not be read, so an unrelated unreadable worktree blocked a
+  Graphite run. `gt` rebases only in the run worktree; `gh stack` rebases in
+  the worktrees recorded as owners. `unrecorded_keeps_state` now applies to
+  github state only and counts only readable rebases. An unreadable state is
+  named but never keeps the state.
+- **Legacy state with no owner lines.** A github state written before owners
+  were recorded cannot rule any worktree out, yet it cleared the state over an
+  unrecorded rebase once the provider abort had run. It now keeps the state
+  (exit 31) while such a rebase exists, with or without the provider abort.
+- **Advice chosen by refusal reason.** A busy or floating run worktree was told
+  to `git checkout` the start branch. `release_run_worktree` now sets
+  `RELEASE_WHY` (busy, floating, unreadable, checkout) and `release_advice`
+  picks the next step per reason.
+- **A hint that refuses for the same reason.** `--continue` exited 10 and
+  suggested `--abort` for an unrecorded rebase, which `--abort` refuses too. It
+  now exits 31 without the hint.
+- **Placeholder instead of a fix.** The refusal printed `<worktree>`. It now
+  prints a `fix:` line per path (`rebase --abort`, or `git status` for an
+  unreadable state) and says the rebase may be another session's.
+- **Found while testing.** A deleted github owner still listed on its branch
+  read as busy in `in_chain_busy`; worktrees git reports prunable or whose
+  directory is gone are now skipped there.
+
+Prevention:
+
+- Scope a safety gate to the provider that creates the hazard, and test it with
+  the other provider and with an unrelated, unreadable worktree.
+- Every refusal's advice must be reachable: never suggest a command that
+  refuses for the same reason, and when a refusal has several causes, record
+  the cause and branch on it.
+- When a gate depends on a newly recorded field, test a state written before
+  the field existed.
+- Do not run a probe with side effects inside an `if`/`elif` condition; compute
+  it first.
