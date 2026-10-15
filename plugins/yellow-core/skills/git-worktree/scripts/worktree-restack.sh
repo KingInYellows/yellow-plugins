@@ -380,6 +380,7 @@ write_state() {
     printf 'run\t%s\n' "$S_RUN"
     printf 'submit\t%s\n' "$S_SUBMIT"
     printf 'remote\t%s\n' "$S_REMOTE"
+    [ -z "$S_BOUND" ] || printf 'bound\t%s\n' "$S_BOUND"
     printf 'chain'
     for ((i = 0; i < ${#S_CHAIN[@]}; i++)); do printf '\t%s' "${S_CHAIN[i]}"; done
     printf '\n'
@@ -447,11 +448,39 @@ new_run_id() {
   printf '%s' "$id"
 }
 
+# S_BOUND is read from the state file; empty until a state is read.
+S_BOUND=""
+
+# The file in a linked worktree's own git directory ($COMMON/worktrees/<id>)
+# that holds the run id of the restack that recorded it. git deletes that
+# directory with the worktree, so a worktree removed and registered again at
+# the same path, even under the same <id>, has none.
+WT_MARK=yellow-core-restack-run
+
+# bind_worktree PATH: write the run id into PATH's own git directory, through a
+# temp file and a rename (a planted symlink is replaced, never followed). The
+# main worktree, whose git directory is the common one and which cannot be
+# removed, needs none.
+bind_worktree() {
+  local gd tmp
+  gd=$(git -C "$1" rev-parse --absolute-git-dir 2>/dev/null) || return 1
+  gd=$(canon "$gd") || return 1
+  [ "$gd" != "$COMMON" ] || return 0
+  [ ! -d "$gd/$WT_MARK" ] || return 1
+  tmp=$(umask 077 && mktemp "$gd/$WT_MARK.tmp.XXXXXX") || return 1
+  if printf '%s\n' "$S_RUNID" >|"$tmp" && mv -f -- "$tmp" "$gd/$WT_MARK"; then
+    return 0
+  fi
+  rm -f -- "$tmp"
+  return 1
+}
+
 clear_state() { rm -f -- "$STATE_FILE" "$STATE_FILE".tmp.* "$ABORTED_FILE" "$ABORTED_FILE".tmp.* 2>/dev/null; }
 
 # read_state parses the fixed-field TSV; validate_state decides whether to trust it.
 read_state() {
   S_PROVIDER="" S_COMMON="" S_RUN="" S_SUBMIT="" S_REMOTE="" S_RUNID="" S_PHASE=""
+  S_BOUND=""
   S_CHAIN=() E_PATH=() E_REF=() E_SHA=() T_BRANCH=() T_SHA=() O_PATH=()
   STATE_ERR=""
   if [ ! -f "$STATE_FILE" ] || [ -L "$STATE_FILE" ]; then
@@ -478,6 +507,7 @@ read_state() {
       run) S_RUN=${f[1]:-} ;;
       submit) S_SUBMIT=${f[1]:-} ;;
       remote) S_REMOTE=${f[1]:-} ;;
+      bound) S_BOUND=${f[1]:-} ;;
       chain) S_CHAIN=("${f[@]:1}") ;;
       entry)
         E_PATH[n]=${f[1]:-}
@@ -575,6 +605,19 @@ validate_state() {
   fi
   case $S_PHASE in '' | aborting | aborted) ;; *)
     STATE_ERR="bad phase"
+    return 1
+    ;;
+  esac
+  # bound 1: start wrote this run's id into each recorded linked worktree's
+  # git directory (bind_worktree). It needs a run id to compare with.
+  case $S_BOUND in '') ;; 1)
+    [ -n "$S_RUNID" ] || {
+      STATE_ERR="bound state has no run id"
+      return 1
+    }
+    ;;
+  *)
+    STATE_ERR="bad bound flag"
     return 1
     ;;
   esac
@@ -1476,6 +1519,23 @@ cmd_start() {
       O_PATH+=("${SEL_PATH[i]}")
     done
   fi
+  # Bind every recorded worktree to this run, so a later abort never takes a
+  # worktree registered again at a recorded path for this run's. When one
+  # cannot be bound the state stays unbound and is probed as before.
+  S_BOUND=1
+  for ((i = 0; i < ${#E_PATH[@]} + ${#O_PATH[@]} + 1; i++)); do
+    if [ "$i" -eq 0 ]; then
+      k=$S_RUN
+    elif [ "$i" -le "${#E_PATH[@]}" ]; then
+      k=${E_PATH[i - 1]}
+    else
+      k=${O_PATH[i - 1 - ${#E_PATH[@]}]}
+    fi
+    bind_worktree "$k" || {
+      S_BOUND=""
+      break
+    }
+  done
   rm -f -- "$ABORTED_FILE" 2>/dev/null
   write_state || {
     release_lock
@@ -1561,7 +1621,7 @@ hold_or_release_lock() {
 # canon_or_raw PATH: PATH canonicalized, or as given when that fails.
 canon_or_raw() { canon "$1" || printf '%s' "$1"; }
 
-# worktree_in_chain_rebase PATH: 0 when PATH is mid-rebase of a recorded stack
+# worktree_in_chain_rebase PATH [any]: 0 when PATH is mid-rebase of a recorded stack
 # branch (not the base), 1 when it is not, 2 when that cannot be read. Only a
 # registered, present worktree of this repository whose top level is PATH
 # itself is probed: a path git no longer lists (or lists as prunable), a
@@ -1570,7 +1630,9 @@ canon_or_raw() { canon "$1" || printf '%s' "$1"; }
 # directory is not this repository's), or one whose .git link names another
 # worktree's git directory, holds no rebase this run may abort, so it is 1. A directory git cannot read, or a rebase path that is not a readable
 # directory with a non-empty head-name, is 2: the caller fails closed. A
-# rebase-apply holding `applying` is a `git am`, not a rebase.
+# rebase-apply holding `applying` is a `git am`, not a rebase. In a bound
+# state a linked worktree must also hold this run's id (bind_worktree), or it
+# is 1; `any` skips that check, to probe a worktree the run did not record.
 worktree_in_chain_rebase() {
   local wi out top gd gcd merge apply d b n=0
   local -a l=()
@@ -1607,6 +1669,10 @@ worktree_in_chain_rebase() {
     # worktree.useRelativePaths writes it relative to the git directory.
     case $d in /*) ;; *) d=$gd/$d ;; esac
     [ "$(canon_or_raw "${d%/*}")" = "$1" ] || return 1
+    if [ "${S_BOUND:-}" = 1 ] && [ "${2:-}" != any ]; then
+      [ -f "$gd/$WT_MARK" ] && [ ! -L "$gd/$WT_MARK" ] || return 1
+      [ "$(head -c 64 -- "$gd/$WT_MARK" 2>/dev/null)" = "$S_RUNID" ] || return 1
+    fi
   fi
   merge=${l[3]} apply=${l[4]}
   [ ! -e "$apply/applying" ] || apply=""
@@ -1677,9 +1743,15 @@ unrecorded_chain_rebases() {
   for ((i = 0; i < ${#WT_PATH[@]}; i++)); do
     p=${WT_PATH[i]}
     [ -z "${WT_BRANCH[i]}" ] || continue
-    is_recorded "$p" && continue
+    if is_recorded "$p"; then
+      # A recorded path now holding another worktree (removed and registered
+      # again during the pause) is probed as an unrecorded one.
+      st=0
+      worktree_in_chain_rebase "$p" || st=$?
+      [ "$st" -eq 1 ] || continue
+    fi
     st=0
-    worktree_in_chain_rebase "$p" || st=$?
+    worktree_in_chain_rebase "$p" any || st=$?
     case $st in
       0) printf 'rebasing\t%s\n' "$p" ;;
       2) printf 'unreadable\t%s\n' "$p" ;;

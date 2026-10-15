@@ -1067,7 +1067,7 @@ JSEOF
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
   [ "$status" -eq 10 ]
-  sed -i '/^runid\t/d' "$SD/state"
+  sed -i '/^runid\t/d;/^bound\t/d' "$SD/state"
   plant_stuck_rebase "$(wtp c)" c
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 31 ]
@@ -1209,7 +1209,7 @@ moved_by_hand() {
   [ "$status" -eq 31 ]
   [[ $output == *"no record of it"* ]]
   # A state written before run ids existed can never be matched by a marker.
-  sed -i '/^runid\t/d' "$SD/state"
+  sed -i '/^runid\t/d;/^bound\t/d' "$SD/state"
   printf '%s\n' "$id" >"$SD/provider-aborted"
   run bash "$SCRIPT" abort --provider graphite
   [ "$status" -eq 31 ]
@@ -1532,7 +1532,7 @@ SH
 legacy_tipless() {
   rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
   git -C "$(wtp a)" rebase --abort
-  sed -i '/^tip\t/d;/^runid\t/d;/^phase\t/d' "$SD/state"
+  sed -i '/^tip\t/d;/^runid\t/d;/^bound\t/d;/^phase\t/d' "$SD/state"
   [ -z "$1" ] || sed -i "2i phase\t$1" "$SD/state"
   ! grep -q '^tip\|^runid' "$SD/state"
 }
@@ -1977,6 +1977,26 @@ legacy_tipless() {
   assert_all_restored
   run rebase_marker "$(wtp c)"
   [ "$status" -eq 1 ]
+}
+
+@test "github: --abort never aborts a rebase in a worktree registered again at a recorded path" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack b
+  orig_a=$(git rev-parse a)
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  grep -qx "bound	1" "$SD/state"
+  # The owner worktree is removed during the pause and a new one is registered
+  # at the same path (git reuses its worktrees/ name): top level, common dir and
+  # gitdir backlink all match, but it does not hold this run's id.
+  git -C "$REPO" worktree remove --force "$(wtp c)"
+  git -C "$REPO" worktree add -q --detach "$(wtp c)" c
+  plant_rebase "$(wtp c)" c b
+  lose_github_record "$orig_a"
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" abort --provider github
+  [[ $output != *"did not clear the rebase in $(wtp c)"* ]]
+  [[ $output == *"not recorded: $(wtp c) is rebasing a stack branch"* ]]
+  rebase_marker "$(wtp c)"
 }
 
 @test "github: owner lines that are relative, hold '..' or control characters, name the run worktree or repeat are rejected" {

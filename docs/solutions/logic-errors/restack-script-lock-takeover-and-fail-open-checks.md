@@ -154,8 +154,9 @@ than the evidence behind it.
   state could not be read, so an unrelated unreadable worktree blocked a
   Graphite run. `gt` rebases only in the run worktree; `gh stack` rebases in
   the worktrees recorded as owners. `unrecorded_keeps_state` now applies to
-  github state only and counts only readable rebases. An unreadable state is
-  named but never keeps the state.
+  github state only, so an unreadable state is named but never blocks
+  Graphite. For github it counts both readable and unreadable rebases, since
+  either may be gh-stack's own.
 - **Legacy state with no owner lines.** A github state written before owners
   were recorded cannot rule any worktree out, yet it cleared the state over an
   unrecorded rebase once the provider abort had run. It now keeps the state
@@ -170,6 +171,13 @@ than the evidence behind it.
 - **Placeholder instead of a fix.** The refusal printed `<worktree>`. It now
   prints a `fix:` line per path (`rebase --abort`, or `git status` for an
   unreadable state) and says the rebase may be another session's.
+- **Recorded path reused by another worktree.** Path, top level, common dir
+  and per-worktree gitdir backlink all still match when a recorded worktree is
+  removed during the pause and a new one is registered at the same path (git
+  can reuse the `worktrees/<id>` name). `start` now writes the run id into each
+  recorded linked worktree's own git directory (`bind_worktree`, state line
+  `bound 1`); git deletes that directory with the worktree, so a replacement
+  lacks it and is treated as unrecorded.
 - **Found while testing.** A deleted github owner still listed on its branch
   read as busy in `in_chain_busy`; worktrees git reports prunable or whose
   directory is gone are now skipped there.
