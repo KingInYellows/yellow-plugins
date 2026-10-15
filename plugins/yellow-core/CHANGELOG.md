@@ -1,5 +1,89 @@
 # Changelog
 
+## 2.10.0
+
+### Minor Changes
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add read-only
+  worktree inventory and sequential documentation audit skills for the bounded
+  Codex compatibility expansion.
+
+### Patch Changes
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Suppress
+  automatic Claude-command migration in Codex manifests so installed skills stay
+  within each plugin's catalog allowlist.
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Carry shared
+  author/identity metadata and validated Codex invocation policy. Enforce
+  explicit-only thermonuclear selection on the pinned host.
+
+- [`d888c64`](https://github.com/KingInYellows/yellow-plugins/commit/d888c64dddec1c8cf8651c129cb599b0f1b632cd)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - feat: evidence
+  verification and the five-bucket council report.
+  - `yellow-council`: Step 5b numbers every finding (`S<n>-F<k>`) in shell and
+    checks its quoted `Evidence:` line against the cited file in the background:
+    a strict citation parse first, then Tier 1, an exact match within three
+    lines through yellow-core's `quote-ground.sh batch`, then Tier 2, a fuzzy
+    match (`max(ratio, partial_ratio)` at 85) through the optional python3
+    `rapidfuzz` (`sudo apt install python3-rapidfuzz` on Debian/Ubuntu), capped
+    at 50 candidates per reviewer label. Verification classifies and never drops
+    a finding.
+  - `yellow-council`: rubric correctness is verification-backed instead of
+    self-assessed, and 5e assigns five buckets in shell — Agreement (verified),
+    Agreement (unverified), Disagreement, Single-Reviewer Findings (verified),
+    Unverified Claims (each with its reason). Codex findings carry no quote, so
+    they are always `no-evidence` (#1180).
+  - `yellow-council`: the synthesis helpers move to a Tier 4 library,
+    `lib/council-synthesis.sh` (F1); an unclosed fence is normalized as ordinary
+    text (F3); emphasis stripping keeps identifiers such as `__init__`,
+    `_private_fn` and `*ptr` (F4); Step 7 stages the synthesis through a
+    token-checked file instead of a heredoc (F2).
+  - `yellow-council` now declares yellow-core `>=2.8.0` as a required
+    dependency: Claude Code disables yellow-council when yellow-core is missing,
+    disabled or older.
+  - `yellow-core`: the README's quote-grounding note names its yellow-council
+    caller.
+
+- [`c01968c`](https://github.com/KingInYellows/yellow-plugins/commit/c01968ceb89d4d7f1d826c73d76a447b9c9ecd55)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Pin explicit
+  models and effort levels on agents that used to inherit the lead session's
+  model, so MCP wrappers and lookups run on Haiku 5.5 and diagnosis, fix,
+  browser-test and Codex wrapper agents run on Sonnet instead of Opus or Fable.
+  Restore `effort: high` on the three yellow-core Opus reviewers (Opus 5.5
+  defaults to medium) and give `scan-verifier` an explicit `effort: medium`. Run
+  the SessionStart compound drain on Haiku (override with
+  `COMPOUND_DRAIN_MODEL`; an invalid value falls back to Haiku with a warning),
+  and record the drain's `claude -p` exit status in its log, with a warning when
+  the drain took none of the entries it was handed.
+
+- [`33563db`](https://github.com/KingInYellows/yellow-plugins/commit/33563dbf837d59dd8373b42376e498ba7671cf35)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Document the
+  statusline in the README: the installed copy does not update with the plugin,
+  so re-run `/statusline:setup` after an upgrade, and check the installed
+  version with `grep STATUSLINE_VERSION`. `/statusline:setup` now reads the
+  reported version from the installed script instead of a hard-coded 1.0.0.
+
+- [`addb5b1`](https://github.com/KingInYellows/yellow-plugins/commit/addb5b183f00d6d0cf5bebb6b6b0e56552262149)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Stop the
+  generated statusline from leaving a stale `.git/index.lock`: its git segment
+  now runs `git --no-optional-locks status`, so a refresh killed by the 2-second
+  timeout no longer blocks the next commit. The git cache is now keyed by
+  working directory, so concurrent sessions in different repos or worktrees no
+  longer show each other's branch. Re-run `/statusline:setup` to pick up the
+  fix.
+
+- [`84dadd9`](https://github.com/KingInYellows/yellow-plugins/commit/84dadd949a18f04ce01fac484328e597758f011a)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/review:resolve` names the open follow-up issue
+  (`Follow-up #N is no longer needed.`) when a thread it once marked `oos` is
+  later fixed or addressed. The `cs_redact_secrets` header in yellow-core's
+  `lib/compound-staging.sh` now describes its pattern list as separate from
+  yellow-ci's, not a subset, and gives the right yellow-ci path.
+
 ## 2.9.0
 
 ### Minor Changes

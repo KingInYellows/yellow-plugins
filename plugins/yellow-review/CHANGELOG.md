@@ -1,5 +1,42 @@
 # Changelog
 
+## 3.8.1
+
+### Patch Changes
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Suppress
+  automatic Claude-command migration in Codex manifests so installed skills stay
+  within each plugin's catalog allowlist.
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Carry shared
+  author/identity metadata and validated Codex invocation policy. Enforce
+  explicit-only thermonuclear selection on the pinned host.
+
+- [`ce4e138`](https://github.com/KingInYellows/yellow-plugins/commit/ce4e138a88a1cd25dd93a6485e828f3c8b5151b8)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - The resolve
+  ignored-file guard no longer stops on `.ruvector/intelligence.json`. A linked
+  worktree shares the ruvector memory store with the main checkout, so another
+  session's MCP server could save it mid-run and revert every fix.
+  `run-verify-command` now skips it while it is a regular file and prints a
+  `Note:` line when it changed, and `/review:resolve` reports it as a
+  non-blocking note. Other files under `.ruvector/` still stop the run.
+
+- [`84dadd9`](https://github.com/KingInYellows/yellow-plugins/commit/84dadd949a18f04ce01fac484328e597758f011a)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/review:resolve` names the open follow-up issue
+  (`Follow-up #N is no longer needed.`) when a thread it once marked `oos` is
+  later fixed or addressed. The `cs_redact_secrets` header in yellow-core's
+  `lib/compound-staging.sh` now describes its pattern list as separate from
+  yellow-ci's, not a subset, and gives the right yellow-ci path.
+
+- [`e5d9225`](https://github.com/KingInYellows/yellow-plugins/commit/e5d92250f3c9d5a1780d30f1a5f6e1e277a67fc4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Find
+  `lib/resolve-paths.sh`'s own directory by parameter expansion instead of
+  `dirname`, so `commit-resolve-fixes` and `run-verify-command` no longer run a
+  PATH-resolved `dirname` before they screen PATH.
+
 ## 3.8.0
 
 ### Minor Changes
@@ -214,7 +251,7 @@
   cannot judge
   ($VAR, backticks, ;, |, ...) is refused, a HOME or XDG_CONFIG_HOME that puts the global git config inside the worktree is refused (set GIT_CONFIG_GLOBAL for a dotfiles repository), global-scope command entries are judged by their file, and a #! optional argument that names the worktree counts like the interpreter. The first git, gh and jq are checked for a #! interpreter inside the worktree before the library is sourced, and `env -S`/`--split-string` forms in #! lines are parsed. The verify command keeps the caller's PATH. The PATH screen follows a symlinked PATH entry into its children (`find -H`), a `#!` line with `env -S` and a `$`is treated as entering the worktree (the bootstrap resolvers included), and a git command variable containing a backslash, or a quote inside a word, is refused as unjudgeable shell syntax. A`#!`line whose`env`has a`NAME=value`operand before the utility, or a backslash or quote after`-S`, is treated the same way. An `env
   -P`in a`#!`line is treated the same way, and a`PATH`directory that exists but cannot be listed (execute-only) is dropped. An inherited`GIT_CONFIG`is refused, since it makes the config scans read only that file. An`env
-  -C`/`--chdir`in a`#!`line counts as entering the worktree, and a`GIT_CONFIG_PARAMETERS`entry that cannot be decoded exactly is refused instead of skipped. An injected`include.path`or`includeIf._.path`(GIT_CONFIG_KEY_n or GIT_CONFIG_PARAMETERS) is refused, since git loads the file as command-line config that the scans skip, and a quote that opens in one word and closes in another (a quoted span with whitespace) in a command variable is refused. Any inherited`GIT_EXEC_PATH`is refused, the`#!`check follows interpreter scripts to a depth of 4 (a deeper chain counts as entering the worktree), and the PATH screen and the tool resolvers drop a directory or tool that is a hard link to a file inside the worktree. A hard-link walk of the worktree that fails part way drops every same-device PATH directory holding a multi-link file instead of trusting the partial result, and a global or system git config file that sets a command and is hard-linked to a file inside the worktree is refused.`harden_git_config`(both scopes) also refuses a repository-local`lfs.customtransfer._`, `lfs.standalonetransferagent`or`lfs.extension._`, which the stock Git LFS filter would run when it downloads an object. `harden_git_config` screens PATH once in the calling shell instead of once per git call, cutting a call from about 1.4 s to 0.3 s. The two lists of command-bearing git config keys are now one classifier (`yr_cfg_key_runs_command`) applied by origin: a matching entry in the repository's local or worktree config, or in a global or system file inside the worktree or hard-linked to a file in it (including one reached through an include), is refused. It adds `merge._.driver`, `diff._.command|textconv`, `core.editor|pager|alternateRefsCommand`, `sequence.editor`, `pager._`, `remote._.uploadpack|receivepack|vcs`, `lfs._`program keys,`alias._`and`submodule._.update`with a`!`value, and`url.ext::_.insteadOf`. The config scan percent-encodes each field it hands to the shell, so a config path or value holding a tab or newline cannot shift the columns and hide an in-worktree include. A `$`, backtick, `~`or backslash in the optional argument of a`#!` line (`#!/bin/sh
+  -C`/`--chdir`in a`#!`line counts as entering the worktree, and a`GIT_CONFIG_PARAMETERS`entry that cannot be decoded exactly is refused instead of skipped. An injected`include.path`or`includeIf._.path`(GIT_CONFIG_KEY_n or GIT_CONFIG_PARAMETERS) is refused, since git loads the file as command-line config that the scans skip, and a quote that opens in one word and closes in another (a quoted span with whitespace) in a command variable is refused. Any inherited`GIT*EXEC_PATH`is refused, the`#!`check follows interpreter scripts to a depth of 4 (a deeper chain counts as entering the worktree), and the PATH screen and the tool resolvers drop a directory or tool that is a hard link to a file inside the worktree. A hard-link walk of the worktree that fails part way drops every same-device PATH directory holding a multi-link file instead of trusting the partial result, and a global or system git config file that sets a command and is hard-linked to a file inside the worktree is refused.`harden_git_config`(both scopes) also refuses a repository-local`lfs.customtransfer.*`, `lfs.standalonetransferagent`or`lfs.extension._`, which the stock Git LFS filter would run when it downloads an object. `harden_git_config` screens PATH once in the calling shell instead of once per git call, cutting a call from about 1.4 s to 0.3 s. The two lists of command-bearing git config keys are now one classifier (`yr_cfg_key_runs_command`) applied by origin: a matching entry in the repository's local or worktree config, or in a global or system file inside the worktree or hard-linked to a file in it (including one reached through an include), is refused. It adds `merge._.driver`, `diff._.command|textconv`, `core.editor|pager|alternateRefsCommand`, `sequence.editor`, `pager._`, `remote._.uploadpack|receivepack|vcs`, `lfs._`program keys,`alias._`and`submodule._.update`with a`!`value, and`url.ext::\_.insteadOf`. The config scan percent-encodes each field it hands to the shell, so a config path or value holding a tab or newline cannot shift the columns and hide an in-worktree include. A `$`, backtick, `~`or backslash in the optional argument of a`#!` line (`#!/bin/sh
   -c
   $PWD/evil`, passed as separate arguments on macOS) counts as entering the worktree, in the shell check, the awk screen and the bootstrap copies. The verify command's PATH starts with a private directory (0700, outside the worktree) holding a `git`shim that runs the validated git on the screened PATH, so every helper a git it starts resolves (ssh, askpass, a pager,`GIT_SSH_COMMAND='env
   ssh'`, a `core.sshCommand` from the user's own config) comes from that PATH

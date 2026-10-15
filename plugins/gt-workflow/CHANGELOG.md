@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.0.8
+
+### Patch Changes
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Suppress
+  automatic Claude-command migration in Codex manifests so installed skills stay
+  within each plugin's catalog allowlist.
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Document
+  verified Codex 0.157.0 hook lifecycle behavior and the requirement to review
+  and trust installed hook definitions. Keep Graphite MCP startup separate from
+  account authentication and skill activation.
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Carry shared
+  author/identity metadata and validated Codex invocation policy. Enforce
+  explicit-only thermonuclear selection on the pinned host.
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Move CI
+  diagnosis, runner health, and Graphite setup details into flat skill-local
+  references while preserving validation, sanitization, shell self-containment,
+  and confirmation gates.
+
 ## 2.0.7
 
 ### Patch Changes

@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.5.7
+
+### Patch Changes
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Suppress
+  automatic Claude-command migration in Codex manifests so installed skills stay
+  within each plugin's catalog allowlist.
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Document
+  verified Codex 0.157.0 hook lifecycle behavior and the requirement to review
+  and trust installed hook definitions. Keep Graphite MCP startup separate from
+  account authentication and skill activation.
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Carry shared
+  author/identity metadata and validated Codex invocation policy. Enforce
+  explicit-only thermonuclear selection on the pinned host.
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Move CI
+  diagnosis, runner health, and Graphite setup details into flat skill-local
+  references while preserving validation, sanitization, shell self-containment,
+  and confirmation gates.
+
+- [`c01968c`](https://github.com/KingInYellows/yellow-plugins/commit/c01968ceb89d4d7f1d826c73d76a447b9c9ecd55)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Pin explicit
+  models and effort levels on agents that used to inherit the lead session's
+  model, so MCP wrappers and lookups run on Haiku 5.5 and diagnosis, fix,
+  browser-test and Codex wrapper agents run on Sonnet instead of Opus or Fable.
+  Restore `effort: high` on the three yellow-core Opus reviewers (Opus 5.5
+  defaults to medium) and give `scan-verifier` an explicit `effort: medium`. Run
+  the SessionStart compound drain on Haiku (override with
+  `COMPOUND_DRAIN_MODEL`; an invalid value falls back to Haiku with a warning),
+  and record the drain's `claude -p` exit status in its log, with a warning when
+  the drain took none of the entries it was handed.
+
 ## 1.5.6
 
 ### Patch Changes
