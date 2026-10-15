@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.0.6
+
+### Patch Changes
+
+- [`35d1367`](https://github.com/KingInYellows/yellow-plugins/commit/35d1367507f25cb915406cdd3db545b8f94769d8)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Record why
+  `codex-executor`, the council `claude-reviewer` and `devin-orchestrator` keep
+  `model: inherit`: each acts for the lead session, so it runs on the lead's
+  model. The note sits at the top of each agent body.
+
 ## 3.0.5
 
 ### Patch Changes

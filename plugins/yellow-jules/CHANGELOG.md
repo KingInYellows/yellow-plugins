@@ -1,5 +1,14 @@
 # yellow-jules
 
+## 0.3.1
+
+### Patch Changes
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Suppress
+  automatic Claude-command migration in Codex manifests so installed skills stay
+  within each plugin's catalog allowlist.
+
 ## 0.3.0
 
 ### Minor Changes
