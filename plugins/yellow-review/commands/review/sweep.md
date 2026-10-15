@@ -129,8 +129,10 @@ Give this call a Bash tool `timeout` of 300000 ms:
 
 It reads the head commit (`headRefOid`) through `gh api`: the root listing and
 the root `.gitignore` and `.gitattributes` blobs, never a fetch or checkout, so
-a fork PR and a shallow clone work the same. It judges them against this
-clone's `.git/info/exclude` and `core.excludesFile`. It prints one line.
+a fork PR and a shallow clone work the same, on the host and repository the
+PR's URL names (so a GitHub Enterprise remote works without `GH_HOST`). It
+judges them against this clone's `.git/info/exclude` and `core.excludesFile`.
+It prints one line.
 
 - `head=tracked`, `head=ignored` or `head=unignored` (exit `0`) is the result.
 - Exit `4` with `error=<class>` is specific to this PR: the head is gone or
@@ -142,7 +144,8 @@ clone's `.git/info/exclude` and `core.excludesFile`. It prints one line.
   `[review:sweep] PR #<PR#>: could not judge the PR head ignore rules (<class>)`,
   with `<class>` from the `error=` line. Stop before any snapshot, ending with `Sweep: skipped (head-ignore-unreadable)`.
 - Exit `3` (a rate limit, a network error or timeout, failed authentication,
-  or a local git failure) or any other exit: print
+  an HTTP 403 such as a token without Contents read, or a local git failure)
+  or any other exit: print
   `[review:sweep] Error: could not read the PR head ignore rules.` and stop
   before any snapshot with no skip line, so `/review:sweep-all` records
   `no contract` and stops the batch.
@@ -508,7 +511,7 @@ stop.
   the PR head ignore rules (<class>)` and stop before any snapshot, ending with
   `Sweep: skipped (head-ignore-unreadable)`.
 - **PR head ignore rules unreadable** (Step 1b, `head-ignore-probe` exit `3`
-  or any other failure: rate limit, network, auth or local git):
+  or any other failure: rate limit, network, auth, a 403 or local git):
   `[review:sweep] Error: could not read the PR head ignore rules.` and stop
   before any snapshot, with no skip line.
 - **Config tracked here, ignored on the PR head** (Step 1b): `[review:sweep]

@@ -3,7 +3,8 @@
 # /review:sweep checks the head out (Step 1b). The head's root tree and its
 # root .gitignore and .gitattributes blobs are read through the GitHub API at
 # the head commit (headRefOid): no remote, fetch or checkout, so a fork PR and
-# a shallow clone work the same. Only the root .gitignore can decide a root
+# a shallow clone work the same. The API host, owner and repository come from
+# the PR's own URL, so a GitHub Enterprise remote is read on its own host. Only the root .gitignore can decide a root
 # path. The blobs are written as data into a temp work tree and judged by
 # git against this clone's own git dir, so .git/info/exclude and
 # core.excludesFile still apply. Nothing from the head is executed.
@@ -18,11 +19,11 @@
 #   0 a head= line
 #   2 usage, not inside a git repository, or jq missing
 #   3 systemic, so a batch caller stops: rate-limited (tested before any 403),
-#     auth, network (a timeout, or a gh failure that is neither a 404 nor a
-#     403), local (git itself failed here)
+#     auth, forbidden (a 403 that is not a rate limit: a token without
+#     Contents read is refused on every PR), network (a timeout, or a gh
+#     failure that is neither a 404 nor a 403), local (git itself failed here)
 #   4 this PR only, so a batch caller skips it: not-found (HTTP 404, or no
-#     such pull request), forbidden (a 403 that is not a rate limit),
-#     unreadable (a malformed or truncated answer, a head entry that is not a
+#     such pull request), unreadable (a malformed or truncated answer or URL, a head entry that is not a
 #     regular-file blob), symlink (.gitignore or .gitattributes is a symlink,
 #     which git does not read), case-alias (a root entry that differs from
 #     .gitignore, .gitattributes or yellow-plugins.local.md only in ASCII case,
@@ -77,19 +78,29 @@ gh_call() {
     rg_is_rate_limited "$ERR" && fail 3 rate-limited "GitHub API rate limit"
     rg_is_auth_failure "$ERR" && fail 3 auth "gh is not authenticated"
     grep -qiE 'HTTP 404|Not Found|Could not resolve to a PullRequest' "$ERR" && fail 4 not-found "PR #$PR or its head commit was not found"
-    rg_is_permission_denied "$ERR" && fail 4 forbidden "access to PR #$PR's head was refused"
+    rg_is_permission_denied "$ERR" && fail 3 forbidden "GitHub refused access to this repository's contents"
     fail 3 network "a gh call failed (exit $rc)"
 }
 
 is_oid() { [[ "$1" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]]; }
 
-gh_call "$WORK/oid" pr view "$PR" --json headRefOid -q .headRefOid
-SHA=$(tr -d '\n' <"$WORK/oid")
+gh_call "$WORK/pr" pr view "$PR" --json headRefOid,url
+SHA=$(jq -r '.headRefOid // empty' "$WORK/pr" 2>/dev/null)
 is_oid "$SHA" || fail 4 unreadable "PR #$PR's head commit id is malformed"
+# gh api takes its host from GH_HOST or its default, not from the remote, so
+# read the host and repository from the PR URL and pass them explicitly.
+URL=$(jq -r '.url // empty' "$WORK/pr" 2>/dev/null)
+[[ "$URL" =~ ^https://([A-Za-z0-9.-]+(:[0-9]+)?)/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/([1-9][0-9]*)$ ]] \
+    || fail 4 unreadable "PR #$PR's URL is malformed"
+HOST=${BASH_REMATCH[1]}
+NWO=${BASH_REMATCH[3]}
+[ "${BASH_REMATCH[4]}" = "$PR" ] || fail 4 unreadable "PR #$PR's URL names another PR"
+[[ ! "$NWO" =~ (^|/)\.\.?(/|$) ]] || fail 4 unreadable "PR #$PR's URL is malformed"
+REPO_PATH="repos/$NWO"
 
 # The root listing only (non-recursive): it is never truncated in practice,
 # and a truncated or malformed one is refused.
-gh_call "$WORK/tree" api "repos/{owner}/{repo}/git/trees/$SHA"
+gh_call "$WORK/tree" api --hostname "$HOST" "$REPO_PATH/git/trees/$SHA"
 jq -e '(.tree | type) == "array" and (.truncated | not)' "$WORK/tree" >/dev/null 2>&1 \
     || fail 4 unreadable "the PR head's root listing is malformed or truncated"
 
@@ -128,7 +139,7 @@ fetch_entry() {
     if [ "$type" != blob ] || ! is_oid "$sha"; then
         fail 4 unreadable "$1 on the PR head is not a readable blob"
     fi
-    gh_call "$WT/$1" api -H 'Accept: application/vnd.github.raw+json' "repos/{owner}/{repo}/git/blobs/$sha"
+    gh_call "$WT/$1" api --hostname "$HOST" -H 'Accept: application/vnd.github.raw+json' "$REPO_PATH/git/blobs/$sha"
 }
 
 # git against this clone's git dir with the temp tree as the work tree and an

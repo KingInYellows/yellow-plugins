@@ -8,7 +8,8 @@
 end with `Sweep: skipped (head-ignore-unreadable)`,
 `(tracked-here-ignored-on-head)` or `(untracked-here-ignored-on-head)`, which
 `/review:sweep-all` records before moving on to the next PR. A rate limit,
-network or auth failure still stops the batch. `/review:sweep-all` retries a
+network, auth or HTTP 403 failure still stops the batch, and the API reads go
+to the host the PR URL names. `/review:sweep-all` retries a
 transient open-PR check once and skips a PR that is not found. When the
 config is ignored on the PR branch but was not snapshotted, the abort now says to
 inspect it before any rerun.

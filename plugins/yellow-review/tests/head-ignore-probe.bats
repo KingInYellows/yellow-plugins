@@ -23,6 +23,7 @@ setup() {
   cat >"$BATS_TEST_TMPDIR/bin/gh" <<'STUB'
 #!/bin/bash
 kind=""
+printf '%s\n' "$*" >>"$FIX/calls"
 case "$1 $2" in
   "pr view") kind=pr ;;
   api*) case "$*" in *git/trees/*) kind=tree ;; *git/blobs/*) kind=blob ;; esac ;;
@@ -33,7 +34,7 @@ if [ -n "${FAKE_FAIL:-}" ] && [ "${FAKE_FAIL%%:*}" = "$kind" ]; then
   exit 1
 fi
 case $kind in
-  pr) cat "$FIX/oid" ;;
+  pr) jq -n --arg o "$(tr -d '\n' <"$FIX/oid")" --arg u "$(cat "$FIX/url")" '{headRefOid: $o, url: $u}' ;;
   tree) cat "$FIX/tree.json" ;;
   blob) last=${*: -1}; cat "$FIX/blobs/${last##*/}" ;;
   *) exit 2 ;;
@@ -41,6 +42,7 @@ esac
 STUB
   chmod +x "$BATS_TEST_TMPDIR/bin/gh"
   export PATH="$BATS_TEST_TMPDIR/bin:$PATH" FIX
+  printf 'https://github.com/o/r/pull/7' >|"$FIX/url"
   unset FAKE_FAIL
   cd "$REPO"
 }
@@ -207,11 +209,42 @@ probe() { run --separate-stderr "$SCRIPT" 7; }
   [ "$output" = error=not-found ]
 }
 
-@test "a 403 that is not a rate limit is PR-specific" {
+@test "a 403 that is not a rate limit is systemic" {
   head_commit '.gitignore=x\n'
   FAKE_FAIL='blob:gh: Resource not accessible by integration (HTTP 403)' probe
-  [ "$status" -eq 4 ]
+  [ "$status" -eq 3 ]
   [ "$output" = error=forbidden ]
+  head_commit 'a.txt=a\n'
+  FAKE_FAIL='tree:gh: Resource not accessible by personal access token (HTTP 403)' probe
+  [ "$status" -eq 3 ]
+  [ "$output" = error=forbidden ]
+}
+
+@test "API reads go to the PR URL's host and repository" {
+  head_commit '.gitignore=yellow-plugins.local.md\n'
+  printf 'https://ghe.example.com/acme/widgets/pull/7' >|"$FIX/url"
+  probe
+  [ "$status" -eq 0 ]
+  [ "$output" = head=ignored ]
+  grep -q -- '^api --hostname ghe.example.com repos/acme/widgets/git/trees/' "$FIX/calls"
+  grep -q -- '^api --hostname ghe.example.com .*repos/acme/widgets/git/blobs/' "$FIX/calls"
+  run ! grep -q -- '{owner}' "$FIX/calls"
+}
+
+@test "a PR URL that is malformed or names another PR is refused" {
+  head_commit 'a.txt=a\n'
+  printf 'https://github.com/o/r/pull/8' >|"$FIX/url"
+  probe
+  [ "$status" -eq 4 ]
+  [ "$output" = error=unreadable ]
+  printf 'https://github.com/o/r/../x/pull/7?y' >|"$FIX/url"
+  probe
+  [ "$status" -eq 4 ]
+  [ "$output" = error=unreadable ]
+  printf 'https://github.com/o/../pull/7' >|"$FIX/url"
+  probe
+  [ "$status" -eq 4 ]
+  [ "$output" = error=unreadable ]
 }
 
 @test "an unclassified gh failure is systemic" {

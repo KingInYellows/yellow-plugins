@@ -97,7 +97,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   on the PR head, an existing untracked unignored file there, or a head whose
   rules the probe cannot judge for that PR (its exit 4) stops before the
   checkout with a `Sweep: skipped (...)` line; a probe exit 3 (rate limit,
-  network, auth) stops with no skip line
+  network, auth, a 403) stops with no skip line
 - `/review:sweep-all` — Run `/review:sweep` on every open non-draft PR you
   authored sequentially, with one upfront confirmation, skip-and-continue per
   PR, end-of-loop summary (with `Blocking` and `Residual` pending/attention
@@ -395,8 +395,9 @@ not `dirname`.
   `.gitattributes`, a case-only alias of the three root names, and a
   content-transforming attribute on `.gitignore`. Failures print
   `error=<class>`: exit 3 is systemic (`rate-limited` tested before any 403,
-  `auth`, `network`, `local`), exit 4 is this PR only (`not-found`,
-  `forbidden`, `unreadable`, `symlink`, `case-alias`, `attributes`).
+  `auth`, `forbidden`, `network`, `local`), exit 4 is this PR only
+  (`not-found`, `unreadable`, `symlink`, `case-alias`, `attributes`). The API
+  host and repository come from the PR's URL, passed as `gh api --hostname`.
 - `guard-local-config snapshot | check <dir> <digest> | clear <dir>` — Snapshot the
   ignored `yellow-plugins.local.md` (printing the path and a `digest=<hex>`
   line the caller holds), then detect and restore a resolver edit

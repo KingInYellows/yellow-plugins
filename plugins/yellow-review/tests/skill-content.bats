@@ -392,7 +392,7 @@ SWEEP_ALL="$COMMANDS_DIR/sweep-all.md"
   [[ "$step1b" == *'`head=tracked`, `head=ignored` or `head=unignored` (exit `0`) is the result'* ]]
   [[ "$step1b" == *'Exit `4` with `error=<class>` is specific to this PR'* ]]
   [[ "$step1b" == *'ending with `Sweep: skipped (head-ignore-unreadable)`'* ]]
-  [[ "$step1b" == *'Exit `3` (a rate limit, a network error or timeout, failed authentication, or a local git failure) or any other exit'* ]]
+  [[ "$step1b" == *'Exit `3` (a rate limit, a network error or timeout, failed authentication, an HTTP 403 such as a token without Contents read, or a local git failure) or any other exit'* ]]
   [[ "$step1b" == *'could not read the PR head ignore rules'* ]]
   # A config tracked here and ignored on the PR head is never snapshotted: the abort is pinned.
   [[ "$step1b" == *'do not snapshot: the snapshot would keep the tracked repository bytes'* ]]
