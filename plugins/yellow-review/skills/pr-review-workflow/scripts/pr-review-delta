@@ -1,0 +1,302 @@
+#!/bin/bash
+# Zero-token change check: has a review thread opened on a PR since
+# /review:resolve last recorded the threads it saw?
+# Usage: pr-review-delta check <owner/repo> <pr-number>...
+#        pr-review-delta record <owner/repo> <pr-number> <ids-file> <head-sha>
+# check prints one line per PR, in argument order:
+#   PR <n> state=<new|unchanged|unknown|closed> new_threads=<count> head_changed=<0|1>
+#   new: an unresolved thread ID (outdated included) is missing from the
+#   record, or there is no record yet (head_changed=1). unchanged: none is.
+#   unknown: a fetch, parse or record read failed, or the thread list was
+#   truncated (get-pr-comments exit 3); a failure is never read as unchanged.
+#   closed: the PR is merged or closed. new_threads and head_changed are 0 on
+#   unknown and closed lines. Each unknown line's reason goes to stderr
+#   ("pr-review-delta: PR <n>: <reason>").
+# record replaces the PR's record with the thread IDs in <ids-file> (one per
+#   line; blank lines and CRs are ignored; an empty set is valid) and
+#   <head-sha>, written atomically (mktemp beside it, then mv) at
+#   $(git rev-parse --git-common-dir)/yellow-review/delta/<owner>__<repo>/<pr>.seen
+#   (owner and repo lowercased; directories mode 0700). Every ID must match
+#   ^PRRT_[A-Za-z0-9_-]+$ and the sha must be 40 lowercase hex digits. A
+#   symlinked or non-directory path component, or a symlinked record, is
+#   refused.
+# Exit codes: 0 done (check: read each line's state), 1 the record could not
+#   be written or the IDs file read, 2 usage or invalid input, 4 rate limited
+#   (stderr reason=rate-limit; that PR and every later one print
+#   state=unknown and nothing more is fetched).
+# Time bounds: gh pr view runs under rg_gh (lib/resolve-gh.sh:
+#   YELLOW_REVIEW_GH_TIMEOUT, default 30, clamped to 60 s). Each
+#   get-pr-comments run gets YELLOW_REVIEW_FETCH_DEADLINE=55 behind a 60 s
+#   hard cap, as in poll-new-threads, so one PR takes at most about 120 s.
+#   check starts no PR after CHECK_DEADLINE (420 s; the rest print
+#   state=unknown, reason "deadline"), so a call ends inside the 600000 ms
+#   Bash tool timeout a caller passes (references/resolve/dispositions.md,
+#   "Bash timeouts"). Without timeout(1) or gtimeout(1) the calls run
+#   unbounded and a note goes to stderr.
+
+set -u
+
+FETCH_WINDOW=60
+FETCH_DEADLINE=55
+CHECK_DEADLINE=420
+RECORD_HEADER='yellow-review-delta 1'
+ID_RE='^PRRT_[A-Za-z0-9_-]+$'
+SHA_RE='^[0-9a-f]{40}$'
+# GitHub owners are letters, digits and hyphens (managed users add one
+# "_shortcode"), so an owner never holds "__" or ends in "_" and the
+# <owner>__<repo> directory name splits one way only.
+OWNER_RE='^[A-Za-z0-9-]+(_[A-Za-z0-9-]+)*$'
+NAME_RE='^[A-Za-z0-9._-]+$'
+
+usage() {
+    printf 'Usage: pr-review-delta check <owner/repo> <pr-number>...\n       pr-review-delta record <owner/repo> <pr-number> <ids-file> <head-sha>\n' >&2
+    exit 2
+}
+die() {
+    _code=$1
+    shift
+    printf 'pr-review-delta: %s\n' "$*" >&2
+    exit "$_code"
+}
+
+# valid_repo <owner/repo>: sets OWNER and NAME.
+valid_repo() {
+    case "$1" in */*/*|'') return 1 ;; */*) ;; *) return 1 ;; esac
+    OWNER=${1%%/*}
+    NAME=${1#*/}
+    [[ $OWNER =~ $OWNER_RE ]] && [ "${#OWNER}" -le 39 ] || return 1
+    [[ $NAME =~ $NAME_RE ]] && [ "${#NAME}" -le 100 ] || return 1
+    case "$NAME" in .|..) return 1 ;; esac
+    return 0
+}
+
+# valid_pr <n>: digits only, at most 9; prints the canonical decimal.
+valid_pr() {
+    case "$1" in ''|*[!0-9]*) return 1 ;; esac
+    [ "${#1}" -le 9 ] || return 1
+    printf '%s' "$((10#$1))"
+}
+
+[ $# -ge 1 ] || usage
+MODE=$1
+shift
+case "$MODE" in
+    check) [ $# -ge 2 ] || usage ;;
+    record) [ $# -eq 4 ] || usage ;;
+    *) usage ;;
+esac
+REPO=$1
+shift
+valid_repo "$REPO" || die 2 "invalid owner/repo: $REPO"
+for _p in "$@"; do
+    [ "$MODE" = record ] && break
+    valid_pr "$_p" >/dev/null || die 2 "PR number must be numeric, got: $_p"
+done
+command -v jq >/dev/null 2>&1 || die 1 "jq not found"
+
+WORK=$(mktemp -d) || exit 1
+trap 'rm -rf "$WORK"' EXIT
+
+# --- record location ---------------------------------------------------------
+
+# delta_dirs: sets BASE (the git common dir), the three directory levels
+# LEVEL1..3 and DIR (= LEVEL3). Creates nothing.
+delta_dirs() {
+    local c slug
+    if c=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && [ -n "$c" ] && [ "${c#/}" != "$c" ]; then
+        :
+    else
+        c=$(git rev-parse --git-common-dir 2>/dev/null) && [ -n "$c" ] || return 1
+    fi
+    BASE=$(cd -- "$c" && pwd -P) || return 1
+    slug=$(printf '%s__%s' "$OWNER" "$NAME" | tr '[:upper:]' '[:lower:]')
+    LEVEL1="$BASE/yellow-review"
+    LEVEL2="$LEVEL1/delta"
+    LEVEL3="$LEVEL2/$slug"
+    DIR=$LEVEL3
+}
+
+# read_record <pr>: 0 with REC_HEAD and $WORK/rec set, 1 when there is no
+# record, 2 when the record or its directories cannot be trusted or parsed.
+read_record() {
+    local d f
+    delta_dirs || return 2
+    for d in "$LEVEL1" "$LEVEL2" "$LEVEL3"; do
+        [ ! -L "$d" ] || return 2
+        [ -e "$d" ] || return 1
+        [ -d "$d" ] || return 2
+    done
+    f="$DIR/$1.seen"
+    [ ! -L "$f" ] || return 2
+    [ -e "$f" ] || return 1
+    [ -f "$f" ] && [ -r "$f" ] || return 2
+    [ "$(head -n 1 -- "$f")" = "$RECORD_HEADER" ] || return 2
+    REC_HEAD=$(sed -n '2s/^head //p' "$f")
+    [[ $REC_HEAD =~ $SHA_RE ]] || return 2
+    tail -n +3 -- "$f" >"$WORK/rec" || return 2
+    # grep exits 0 when a line is not an ID, 1 when every line is one.
+    _rc=0
+    grep -Eqvx 'PRRT_[A-Za-z0-9_-]+' "$WORK/rec" || _rc=$?
+    [ "$_rc" -eq 1 ] || [ ! -s "$WORK/rec" ] || return 2
+    LC_ALL=C sort -u "$WORK/rec" >"$WORK/rec.sorted" || return 2
+    mv -f -- "$WORK/rec.sorted" "$WORK/rec"
+}
+
+# --- record ------------------------------------------------------------------
+
+if [ "$MODE" = record ]; then
+    PR=$(valid_pr "$1") || die 2 "PR number must be numeric, got: $1"
+    IDS=$2
+    SHA=$3
+    [[ $SHA =~ $SHA_RE ]] || die 2 "head sha must be 40 lowercase hex digits"
+    [ -f "$IDS" ] && [ -r "$IDS" ] || die 1 "ids file not readable: $IDS"
+    tr -d '\r' <"$IDS" | grep -v '^$' >"$WORK/ids" || :
+    _rc=0
+    grep -Eqvx 'PRRT_[A-Za-z0-9_-]+' "$WORK/ids" || _rc=$?
+    if [ "$_rc" -eq 0 ]; then die 2 "ids file holds a line that is not a thread ID"; fi
+    if [ "$_rc" -ge 2 ]; then die 1 "could not read the ids file"; fi
+    delta_dirs || die 1 "no git directory here"
+    for _d in "$LEVEL1" "$LEVEL2" "$LEVEL3"; do
+        [ ! -L "$_d" ] || die 1 "refusing a symlinked record directory: $_d"
+        if [ ! -e "$_d" ]; then
+            (umask 077 && mkdir -- "$_d") || die 1 "could not create $_d"
+        fi
+        [ -d "$_d" ] && [ ! -L "$_d" ] && [ -O "$_d" ] || die 1 "refusing record directory: $_d"
+        chmod 700 -- "$_d" || die 1 "could not set mode 0700 on $_d"
+    done
+    REC="$DIR/$PR.seen"
+    [ ! -L "$REC" ] || die 1 "refusing a symlinked record: $REC"
+    if [ -e "$REC" ] && [ ! -f "$REC" ]; then die 1 "refusing a record that is not a regular file: $REC"; fi
+    TMP=$(mktemp "$DIR/.$PR.seen.XXXXXX") || die 1 "mktemp failed in $DIR"
+    if {
+        printf '%s\n' "$RECORD_HEADER"
+        printf 'head %s\n' "$SHA"
+        LC_ALL=C sort -u "$WORK/ids"
+    } >|"$TMP" && mv -f -- "$TMP" "$REC"; then
+        printf 'recorded PR %s threads=%s\n' "$PR" "$(LC_ALL=C sort -u "$WORK/ids" | wc -l | tr -d ' ')"
+        exit 0
+    fi
+    rm -f -- "$TMP"
+    die 1 "could not write $REC"
+fi
+
+# --- check -------------------------------------------------------------------
+
+command -v gh >/dev/null 2>&1 || die 1 "gh CLI not found"
+SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd) || exit 1
+RG_LIB="$SCRIPT_DIR/../../../lib/resolve-gh.sh"
+[ -r "$RG_LIB" ] || die 1 "lib/resolve-gh.sh not readable: $RG_LIB"
+# shellcheck source=../../../lib/resolve-gh.sh
+. "$RG_LIB"
+
+# fetch_threads <pr>: get-pr-comments under its own deadline and a hard cap;
+# exit 124 means the cap killed it.
+fetch_threads() {
+    if [ -n "$RG_TIMEOUT_BIN" ]; then
+        YELLOW_REVIEW_FETCH_DEADLINE=$FETCH_DEADLINE "$RG_TIMEOUT_BIN" "$FETCH_WINDOW" "$SCRIPT_DIR/get-pr-comments" --include-outdated "$REPO" "$1"
+    else
+        YELLOW_REVIEW_FETCH_DEADLINE=$FETCH_DEADLINE "$SCRIPT_DIR/get-pr-comments" --include-outdated "$REPO" "$1"
+    fi
+}
+
+unknown() {
+    printf 'PR %s state=unknown new_threads=0 head_changed=0\n' "$1"
+    printf 'pr-review-delta: PR %s: %s\n' "$1" "$2" >&2
+}
+
+# check_one <pr>: prints its line; returns 4 on a rate limit.
+check_one() {
+    local pr=$1 rc rec state head new changed
+    rc=0
+    rg_gh pr view "$pr" --repo "$REPO" --json headRefOid,state >"$WORK/view" 2>"$WORK/err" || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        if rg_is_rate_limited "$WORK/err"; then return 4; fi
+        if [ "$rc" -eq 124 ] && [ -n "$RG_TIMEOUT_BIN" ]; then
+            unknown "$pr" "gh pr view timed out after ${RG_GH_TIMEOUT}s"
+        else
+            unknown "$pr" "gh pr view failed: $(head -c 200 "$WORK/err" | tr '\n' ' ')"
+        fi
+        return 0
+    fi
+    state=$(jq -r '.state // empty' "$WORK/view" 2>/dev/null) || state=""
+    head=$(jq -r '.headRefOid // empty' "$WORK/view" 2>/dev/null) || head=""
+    case "$state" in
+        OPEN) ;;
+        MERGED|CLOSED) printf 'PR %s state=closed new_threads=0 head_changed=0\n' "$pr"; return 0 ;;
+        *) unknown "$pr" "unreadable PR state"; return 0 ;;
+    esac
+    [[ $head =~ $SHA_RE ]] || { unknown "$pr" "unreadable PR head"; return 0; }
+    rc=0
+    read_record "$pr" || rc=$?
+    if [ "$rc" -eq 2 ]; then unknown "$pr" "record unreadable or untrusted"; return 0; fi
+    rec=$rc
+
+    rc=0
+    fetch_threads "$pr" >"$WORK/threads" 2>"$WORK/err" || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        if [ "$rc" -eq 124 ] && [ -n "$RG_TIMEOUT_BIN" ]; then
+            unknown "$pr" "get-pr-comments timed out after ${FETCH_WINDOW}s"
+        elif [ "$rc" -eq 3 ]; then
+            unknown "$pr" "thread list truncated"
+        elif rg_is_rate_limited "$WORK/err"; then
+            return 4
+        else
+            unknown "$pr" "get-pr-comments failed: $(head -c 200 "$WORK/err" | tr '\n' ' ')"
+        fi
+        return 0
+    fi
+    if ! jq -er 'if type == "array" then .[].threadId else error("not an array") end' "$WORK/threads" >"$WORK/ids" 2>/dev/null; then
+        # -e fails on an empty array too; only a real empty array is no threads.
+        if [ "$(jq -c . "$WORK/threads" 2>/dev/null)" = "[]" ]; then
+            : >"$WORK/ids"
+        else
+            unknown "$pr" "unparseable thread list"
+            return 0
+        fi
+    fi
+    rc=0
+    grep -Eqvx 'PRRT_[A-Za-z0-9_-]+' "$WORK/ids" || rc=$?
+    if [ "$rc" -ne 1 ] && [ -s "$WORK/ids" ]; then unknown "$pr" "unexpected thread ID"; return 0; fi
+    LC_ALL=C sort -u "$WORK/ids" >"$WORK/ids.sorted" || { unknown "$pr" "sort failed"; return 0; }
+
+    if [ "$rec" -eq 1 ]; then
+        new=$(wc -l <"$WORK/ids.sorted" | tr -d ' ')
+        printf 'PR %s state=new new_threads=%s head_changed=1\n' "$pr" "$new"
+        return 0
+    fi
+    new=$(LC_ALL=C comm -23 "$WORK/ids.sorted" "$WORK/rec" | wc -l | tr -d ' ') || { unknown "$pr" "compare failed"; return 0; }
+    case "$new" in ''|*[!0-9]*) unknown "$pr" "compare failed"; return 0 ;; esac
+    changed=0
+    [ "$head" = "$REC_HEAD" ] || changed=1
+    if [ "$new" -gt 0 ]; then
+        printf 'PR %s state=new new_threads=%s head_changed=%s\n' "$pr" "$new" "$changed"
+    else
+        printf 'PR %s state=unchanged new_threads=0 head_changed=%s\n' "$pr" "$changed"
+    fi
+}
+
+START=$(date +%s) || START=0
+limited=0
+for _p in "$@"; do
+    _p=$(valid_pr "$_p")
+    if [ "$limited" = 1 ]; then
+        unknown "$_p" "not checked (rate limit)"
+        continue
+    fi
+    _now=$(date +%s) || _now=$START
+    if [ $((_now - START)) -ge "$CHECK_DEADLINE" ]; then
+        unknown "$_p" "deadline"
+        continue
+    fi
+    _rc=0
+    check_one "$_p" || _rc=$?
+    if [ "$_rc" -eq 4 ]; then
+        limited=1
+        unknown "$_p" "rate limited"
+    fi
+done
+if [ "$limited" = 1 ]; then
+    printf 'reason=rate-limit\n' >&2
+    exit 4
+fi
+exit 0

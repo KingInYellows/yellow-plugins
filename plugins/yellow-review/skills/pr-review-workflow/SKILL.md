@@ -456,12 +456,17 @@ Located at `skills/pr-review-workflow/scripts/`:
   GitHub returns no patch); only paths matching `^[A-Za-z0-9._/-]+$` are
   listed. Exit 1 on a fetch failure, 2 on usage. `/review:resolve` Step 4
   builds the resolver's `PR-changed lines` and `PR files` from it.
-- **poll-new-threads** `--wait <s> <owner/repo> <pr> <round1-ids-file> <out-file>`
-  — The Step 8 re-pass poll: fetches at least once (`--wait 0` fetches once
-  with no sleep), stops at the first fetch with a thread ID not in the
-  round-1 file, and ends with `repass fetched=<0|1> found=<0|1>`. A failed
-  fetch or parse is never read as "no new threads". Exit 4 on a rate limit
-  (`poll rate-limited`), 2 on usage.
+- **poll-new-threads** `--wait <s> [--fixed-anchors <file>] <owner/repo> <pr>
+  <seen-ids-file> <out-file>` — The Step 8 re-pass poll: fetches at least once
+  (`--wait 0` fetches once with no sleep), stops at the first fetch with a
+  thread ID not in the seen-IDs file, and ends with `repass fetched=<0|1>
+  found=<0|1> p1=<n> p2plus=<n> same_anchor=<n>` (header comment has the
+  rules). A failed fetch or parse is never read as "no new threads". Exit 4
+  on a rate limit (`poll rate-limited`), 2 on usage.
+- **pr-review-delta** `check <owner/repo> <pr>...` | `record <owner/repo> <pr>
+  <ids-file> <head-sha>` — `check` prints `PR <n> state=<new|unchanged|unknown|closed>
+  ...` per PR against the set Step 9 recorded; a failure is `unknown`, never
+  `unchanged`. Exit 4 on a rate limit, 2 on usage, 1 when `record` cannot write.
 
 The GraphQL scripts above require `gh` and `jq`; `check-resolve-text` needs only
 POSIX sh with awk. Exit codes and markers are defined in
@@ -487,6 +492,6 @@ Same directory. Not GraphQL; it reads only the local repository:
 
 ## Verification Loop
 
-`/review:resolve` Step 8 (the bounded re-pass and resolve retries) is the
+`/review:resolve` Step 8 (the re-pass loop and resolve retries) is the
 procedure; `references/resolve/dispositions.md` defines what counts as
 blocking. Threads left open by design are not errors.

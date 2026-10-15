@@ -72,6 +72,7 @@ resolve_pr:
   verify_unattended: false                # default: false (opt in for --non-interactive)
   verify_timeout_seconds: 540             # default: 540 (integer 1–540)
   repass_wait_seconds: 120                # default: 120 (integer 0–480; 0 disables)
+  repass_max_passes: 5                    # default: 5 (integer 1–10)
   resolve_human_threads: evidence         # evidence | never | all
 ---
 ```
@@ -86,7 +87,7 @@ land in separate Wave 3 PRs:
 | `agent_native_focus`   | `review:pr` Step 4 dispatch (forces W3.5 reviewers) | Pending W3.5 (`agent-native-reviewers` branch). Until then: documented but ignored. |
 | `confidence_threshold` | `review:pr` aggregation gate, `audit-synthesizer` | Pending W3.13b (`yellow-debt-confidence-calibration` branch). Until then: documented but ignored. |
 | `resolve_pr.cluster_line_distance` | `review:resolve` Step 3d cluster threshold | Acted on by `review:resolve` (W3.3). Invalid values (non-integer, ≤ 0) emit a warning to stderr and fall back to the default 10. |
-| `resolve_pr.cluster_cap`, `verify_command`, `verify_unattended`, `verify_timeout_seconds`, `repass_wait_seconds`, `resolve_human_threads` | `review:resolve` Steps 4–8 | Acted on by `review:resolve`. See the field reference for defaults and fallbacks. |
+| `resolve_pr.cluster_cap`, `verify_command`, `verify_unattended`, `verify_timeout_seconds`, `repass_wait_seconds`, `repass_max_passes`, `resolve_human_threads` | `review:resolve` Steps 4–8 | Acted on by `review:resolve`. See the field reference for defaults and fallbacks. |
 
 Authors may set Wave 3 keys today without breaking Wave 2 consumers — the
 graceful-degradation rule (unknown keys emit a warning but do not abort)
@@ -108,7 +109,8 @@ means the file remains valid forward-and-backward.
 | `resolve_pr.verify_command` | string | unset | Shell command `review:resolve` runs from the repo root before committing resolver fixes (Step 6). On failure it attempts to save a patch under the git common dir, reverts the resolver files and holds `fixed` threads open; a patch the credential screen flags or cannot screen is withheld. Interactive runs show it with `git diff --stat` and ask first. Unset means no verification. The command runs test and script files the resolvers may just have edited from untrusted review comments, with your credentials. |
 | `resolve_pr.verify_unattended` | boolean | `false` | Lets `--non-interactive` runs (`/review:sweep`, `/review:resolve-stack`) execute `verify_command`. When `false`, unattended runs behave as if `verify_command` were unset: nothing runs and threads resolve normally. When `true`, verify still does not run if `yellow-plugins.local.md` is tracked by git (`verify skipped (tracked config)`) or the fixes touch runner files — code or config a verify command, package manager or git hook would execute, such as `package.json`, lockfiles, `.npmrc`, `Makefile`, `conftest.py`, `pyproject.toml` or anything under the repo-root `scripts/` or any `.husky/` (full list in yellow-review's `references/resolve/dispositions.md`) — (`verify skipped (runner files changed)`); in both cases `fixed` threads are held open. Keep this file untracked and ignored: add `yellow-plugins.local.md` to `.git/info/exclude` (or a global or repo `.gitignore`), because an untracked file that is not ignored shows as `?? yellow-plugins.local.md` and stops `/review:resolve` at its clean-tree check. The runner gate refuses only a deny list of known entry points (manifests, lockfiles, hooks, root `scripts/`, test setup files), so the command can still execute any source file the test suite imports: opt in only for repositories whose review comments you trust. |
 | `resolve_pr.verify_timeout_seconds` | integer 1–540 | `540` | Timeout for `verify_command`; the command is killed 10 s after it. Capped so the run fits Claude Code's 600 s Bash tool limit. Invalid or larger values warn and use the default or cap. |
-| `resolve_pr.repass_wait_seconds` | integer 0–480 | `120` | How long `review:resolve` Step 8 polls (every 20 s) for new threads after a successful push before its single re-pass. `0` disables the re-pass. Capped so the poll fits the Bash tool limit. Out-of-range or non-integer values warn and use `120`. |
+| `resolve_pr.repass_wait_seconds` | integer 0–480 | `120` | How long each `review:resolve` Step 8 poll waits (fetching every 20 s) for new threads after a successful push before the next re-pass. `0` disables the re-pass. Capped so the poll fits the Bash tool limit. Out-of-range or non-integer values warn and use `120`. |
+| `resolve_pr.repass_max_passes` | integer 1–10 | `5` | Most re-passes `review:resolve` Step 8 runs after the first pass. The loop also ends sooner: no new thread within the wait, a pass that did not push, a re-pass whose new threads are all P2 or lower, or a new thread on a line this run already fixed. A non-integer warns and uses `5`; a value outside 1–10 warns and is clamped to the nearer bound. `repass_wait_seconds: 0` still disables the re-pass. |
 | `resolve_pr.resolve_human_threads` | `evidence` \| `never` \| `all` | `evidence` | Which human-reviewer threads `review:resolve` may resolve. `evidence`: resolve `fixed` (verified push) and `addressed` (verified pointer); `oos` and `disagree` reply and stay open. Dropped non-actionable threads are also resolved, except under `never`. `never`: reply only and never resolve. `all`: same as bot threads. A thread counts as a bot thread only when every comment you did not write is from a `Bot` account (and all its comments were fetched); one human reply makes it human. Other values warn and use `evidence`. |
 | `resolve_pr.cluster_line_distance` | positive integer | `10` | Cluster threshold for `review:resolve` Step 3d. Adjacent threads on the same file with line distance ≤ this value merge into a single resolver task (transitive merge). Larger values cluster more aggressively (fewer resolvers, broader edits per agent); smaller values keep clusters tighter. Invalid values (non-integer, ≤ 0) emit a warning to stderr and fall back to the default. |
 
@@ -147,8 +149,9 @@ Commands that honor this config (today: `review:pr`, `review:all`,
 their built-in defaults. `review:resolve` reads only the `resolve_pr.*` keys;
 `review:resolve-stack` and `review:sweep` do not read the file themselves but
 run `review:resolve` per PR, so those keys apply to them too.
-`review:sweep-all` also reads `resolve_pr.repass_wait_seconds` itself, to
-print the worst-case re-pass wait before it starts. The merge precedence is:
+`review:sweep-all` also reads `resolve_pr.repass_wait_seconds` and
+`resolve_pr.repass_max_passes` itself, to print the worst-case re-pass wait
+before it starts. The merge precedence is:
 
 1. Command argument overrides (e.g., explicit flags) — highest
 2. `yellow-plugins.local.md` frontmatter

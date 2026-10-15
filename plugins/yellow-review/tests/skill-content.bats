@@ -509,7 +509,7 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   s5=$(grep -n '^### Step 5: Dispositions' "$RESOLVE_PR" | cut -d: -f1)
   s6=$(grep -n '^### Step 6: Verify, Commit and Push' "$RESOLVE_PR" | cut -d: -f1)
   s7=$(grep -n '^### Step 7: Write Phase' "$RESOLVE_PR" | cut -d: -f1)
-  s8=$(grep -n '^### Step 8: Bounded Re-pass' "$RESOLVE_PR" | cut -d: -f1)
+  s8=$(grep -n '^### Step 8: Re-pass Until Quiet' "$RESOLVE_PR" | cut -d: -f1)
   s9=$(grep -n '^### Step 9: Report' "$RESOLVE_PR" | cut -d: -f1)
   [ "$s5" -lt "$s6" ] && [ "$s6" -lt "$s7" ] && [ "$s7" -lt "$s8" ] && [ "$s8" -lt "$s9" ]
 }
@@ -1461,4 +1461,55 @@ sweep_unignored_guard() {
   grep -q '^\*\*Version-only manifest edits do not trigger\.\*\*' "$REVIEW_PR"
   grep -q 'line is `"version"` does not count as touching `plugin.json` for the triggers' "$REVIEW_PR"
   grep -q 'conditional personas (version-only `plugin.json` edits do not' "$REVIEW_ALL"
+}
+
+@test "resolve-pr: Step 8 re-passes until quiet, bounded by repass_max_passes" {
+  step8=$(sed -n '/^### Step 8: Re-pass Until Quiet/,/^### Step 9/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step8" == *'poll-new-threads" --wait "<wait>" --fixed-anchors "<anchors-file>" "<owner/repo>" "<PR#>" "<seen-file>" "<refetch-file>"'* ]]
+  [[ "$step8" == *'jq -r '"'"'.[].threadId'"'"' "<refetch-file>" >>"<seen-file>"'* ]]
+  [[ "$step8" == *'`repass_max_passes` (`bound reached`)'* ]]
+  [[ "$step8" == *'`same_anchor` is above 0 (`fix did not hold`)'* ]]
+  [[ "$step8" == *'when its `p1` is 0 (`p2 only`)'* ]]
+  [[ "$step8" == *'did not end `push=ok`'*'end `no push`'* ]]
+  [[ "$step8" == *'`found=0` → end `quiet`'* ]]
+  [[ "$step8" == *'they only end the loop sooner, never decide a disposition'* ]]
+  # The old two-pass ceiling is gone.
+  [[ "$(flat "$RESOLVE_PR")" != *'never a third round'* ]]
+}
+
+@test "resolve-pr: Step 9 records the threads it saw and prints Repass before Resolve" {
+  step9=$(sed -n '/^### Step 9: Report/,/^## Error Handling/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step9" == *'scripts/pr-review-delta" record "<owner/repo>" "<PR#>" "<ids-file>" "$HEAD_OID"'* ]]
+  [[ "$step9" == *'Notes line `review delta not recorded`; it never stops the run'* ]]
+  [[ "$step9" == *'exactly the contract'"'"'s `Repass:` line and then its `Resolve:` line'* ]]
+  refs=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$refs" == *'Repass: repasses=<k> end=<quiet|no-push|p2-only|fix-did-not-hold|bound-reached|inconclusive|rate-limited|timeout|skipped>'* ]]
+  [[ "$refs" == *'## Change record'* ]]
+  [[ "$refs" == *'Record an empty set instead when work was left undone'* ]]
+  [[ "$refs" == *'they never resolve, skip or downgrade a thread'* ]]
+  [[ "$refs" == *'`pr-review-delta check` gets a `timeout` of 600000 ms'* ]]
+  # The caller-side contract copies still read only the last line.
+  for copy in "$BATS_TEST_DIRNAME"/../references/review-*/resolve-contract.md; do
+    [[ "$(flat "$copy")" == *'The contract is the LAST line of the captured output'* ]]
+  done
+}
+
+@test "local-config and sweep-all document repass_max_passes with its default and clamp" {
+  lc=$(flat "$BATS_TEST_DIRNAME/../../yellow-core/skills/local-config/SKILL.md")
+  [[ "$lc" == *'repass_max_passes: 5 # default: 5 (integer 1–10)'* ]]
+  [[ "$lc" == *'| `resolve_pr.repass_max_passes` | integer 1–10 | `5` |'* ]]
+  [[ "$lc" == *'a value outside 1–10 warns and is clamped to the nearer bound'* ]]
+  sa=$(flat "$SWEEP_ALL")
+  [[ "$sa" == *'Re-pass wait: up to <N> × <P> × <W>s'* ]]
+  [[ "$sa" == *'`P` is `resolve_pr.repass_max_passes`'* ]]
+}
+
+@test "scripts lists name pr-review-delta and the script count matches the directory" {
+  scripts="$BATS_TEST_DIRNAME/../skills/pr-review-workflow/scripts"
+  [ -x "$scripts/pr-review-delta" ]
+  n=$(find "$scripts" -maxdepth 1 -type f | wc -l | tr -d ' ')
+  grep -qF "### Scripts ($n)" "$BATS_TEST_DIRNAME/../CLAUDE.md"
+  grep -qF '`pr-review-delta check' "$BATS_TEST_DIRNAME/../CLAUDE.md"
+  grep -qF '| `pr-review-delta` |' "$BATS_TEST_DIRNAME/../README.md"
+  grep -qF '**pr-review-delta**' "$BATS_TEST_DIRNAME/../skills/pr-review-workflow/SKILL.md"
 }
