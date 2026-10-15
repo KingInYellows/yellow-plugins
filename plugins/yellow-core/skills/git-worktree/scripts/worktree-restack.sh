@@ -1569,12 +1569,13 @@ hold_or_release_lock() {
 # read. INDEX is PATH's WT_PATH index when the caller has it. Only a registered,
 # present worktree of this repository whose top level is PATH itself is
 # probed: a path git no longer lists (or lists as prunable), a deleted
-# directory, or one whose .git link is gone (git -C would walk up into another
-# checkout) holds no rebase this run may abort, so it is 1. A directory git
-# cannot read, or a rebase directory without a readable head-name, is 2: the
-# caller fails closed. A rebase-apply holding `applying` is a `git am`.
+# directory, one whose .git link is gone (git -C would walk up into another
+# checkout), or one recreated as another repository (its common git directory
+# is not this repository's) holds no rebase this run may abort, so it is 1. A
+# directory git cannot read, or a rebase directory without a readable
+# head-name, is 2: the caller fails closed. A rebase-apply holding `applying` is a `git am`.
 worktree_in_chain_rebase() {
-  local wi=${2:-} out top d name b n=0
+  local wi=${2:-} out top gcd d name b n=0
   local -a l=()
   [ -n "$wi" ] || wi=$(wt_index "$1")
   [ "$wi" -ge 0 ] || return 1
@@ -1583,20 +1584,22 @@ worktree_in_chain_rebase() {
   # Without its .git link, git -C would walk up into another checkout.
   [ -e "$1/.git" ] || return 1
   out=$(git -C "$1" rev-parse --show-toplevel --path-format=absolute \
-    --git-path rebase-merge --git-path rebase-apply 2>/dev/null) || return 2
+    --git-common-dir --git-path rebase-merge --git-path rebase-apply 2>/dev/null) || return 2
   while IFS= read -r d; do l[n]=$d; n=$((n + 1)); done <<<"$out"
-  # Three absolute lines, or git did not understand the request (an older git
+  # Four absolute lines, or git did not understand the request (an older git
   # prints --path-format back as output).
-  [ "$n" -eq 3 ] || return 2
+  [ "$n" -eq 4 ] || return 2
   for d in "${l[@]}"; do
     case $d in /*) ;; *) return 2 ;; esac
   done
   top=$(canon "${l[0]}" || printf '%s' "${l[0]}")
   [ "$top" = "$1" ] || return 1
-  for name in 1 2; do
+  gcd=$(canon "${l[1]}" || printf '%s' "${l[1]}")
+  [ "$gcd" = "$COMMON" ] || return 1
+  for name in 2 3; do
     d=${l[name]}
     [ -d "$d" ] || continue
-    [ "$name" = 2 ] && [ -e "$d/applying" ] && continue
+    [ "$name" = 3 ] && [ -e "$d/applying" ] && continue
     [ -f "$d/head-name" ] && [ -r "$d/head-name" ] || return 2
     b=$(cat -- "$d/head-name" 2>/dev/null) || return 2
     b=${b#refs/heads/}

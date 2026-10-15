@@ -1723,6 +1723,24 @@ legacy_tipless() {
   ! git -C "$REPO" worktree list --porcelain | grep -qx "worktree $(wtp c)"
 }
 
+@test "--abort never aborts a rebase in another repository recreated at a recorded path" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  # The recorded entry is deleted during the pause and its path becomes an
+  # unrelated repository that is rebasing a branch with a stack branch's name.
+  rm -rf "$(wtp c)"
+  git init -q -b c "$(wtp c)"
+  git -C "$(wtp c)" commit -q --allow-empty -m other
+  git -C "$(wtp c)" checkout -q --detach
+  plant_rebase "$(wtp c)" c c
+  run bash "$SCRIPT" abort --provider graphite
+  [[ $output != *"did not clear the rebase in $(wtp c)"* ]]
+  [[ $output != *"cannot read the git rebase state of $(wtp c)"* ]]
+  # Never aborted: the other repository's rebase marker is still there.
+  rebase_marker "$(wtp c)"
+}
+
 @test "--abort tries every stuck recorded worktree and names them all" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
