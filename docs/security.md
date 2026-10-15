@@ -471,13 +471,13 @@ interactive run asks before filing an issue. The controls
   dangling link) but the head ignores it, so those existing bytes never
   become trusted unattended config (exit 1, before the checkout). Both
   failure paths fail closed, before any snapshot or checkout. A head the
-  probe cannot judge for that PR (its exit 4: not found, a malformed or
+  probe cannot judge for that PR (its exit 4: the PR not found, a malformed or
   truncated answer, a `.gitignore` or `.gitattributes` that is a symlink or
   not a regular file, a root name that may case-fold onto one of the three
   files, or a content-transforming attribute on `.gitignore`) skips only that
   PR with `Sweep: skipped (head-ignore-unreadable)`, and `/review:sweep-all`
-  continues. A systemic failure (exit 3: rate limit, auth, an HTTP 403,
-  network or timeout, or a local git failure) prints no skip line, so
+  continues. A systemic failure (exit 3: rate limit, auth, an HTTP 403 or a
+  404 from the tree or blob read, network or timeout, or a local git failure) prints no skip line, so
   `/review:sweep-all` stops the batch. Step 2b re-checks after checkout.
 
 ### Unattended Review Learning Staging (yellow-review / yellow-core)

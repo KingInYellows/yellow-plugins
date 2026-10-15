@@ -196,9 +196,19 @@ probe() { run --separate-stderr "$SCRIPT" 7; }
   [[ "$stderr" == *'API rate limit exceeded'* ]]
 }
 
-@test "a 404 is PR-specific" {
+@test "a 404 from the tree or blob read is systemic" {
   head_commit 'a.txt=a\n'
   FAKE_FAIL='tree:gh: Not Found (HTTP 404)' probe
+  [ "$status" -eq 3 ]
+  [ "$output" = error=forbidden ]
+  head_commit '.gitignore=x\n'
+  FAKE_FAIL='blob:gh: Not Found (HTTP 404)' probe
+  [ "$status" -eq 3 ]
+  [ "$output" = error=forbidden ]
+}
+
+@test "a 404 from pr view is PR-specific" {
+  FAKE_FAIL='pr:gh: Not Found (HTTP 404)' probe
   [ "$status" -eq 4 ]
   [ "$output" = error=not-found ]
 }

@@ -19,11 +19,13 @@
 #   0 a head= line
 #   2 usage, not inside a git repository, or jq missing
 #   3 systemic, so a batch caller stops: rate-limited (tested before any 403),
-#     auth, forbidden (a 403 that is not a rate limit: a token without
-#     Contents read is refused on every PR), network (a timeout, or a gh
-#     failure that is neither a 404 nor a 403), local (git itself failed here)
-#   4 this PR only, so a batch caller skips it: not-found (HTTP 404, or no
-#     such pull request), unreadable (a malformed or truncated answer or URL, a head entry that is not a
+#     auth, forbidden (a 403 that is not a rate limit, or a 404 from the tree
+#     or blob read: a token without Contents read is refused on every PR, and
+#     GitHub can report that as 404 on a private repository), network (a
+#     timeout, or a gh failure that is neither a 404 nor a 403), local (git
+#     itself failed here)
+#   4 this PR only, so a batch caller skips it: not-found (gh pr view found no
+#     such pull request; only that call's 404 is PR-specific), unreadable (a malformed or truncated answer or URL, a head entry that is not a
 #     regular-file blob), symlink (.gitignore or .gitattributes is a symlink,
 #     which git does not read), case-alias (a root entry that differs from
 #     .gitignore, .gitattributes or yellow-plugins.local.md only in ASCII case,
@@ -68,6 +70,10 @@ fail() {
 # gh_call <out-file> <gh args...>: run gh into <out-file>, or classify the
 # failure and exit. A rate limit is tested before a permission failure: a
 # secondary rate limit is also an HTTP 403.
+# A 404 is PR-specific only before API_STAGE is set: pr view has then shown
+# the PR and its head commit exist, so a later 404 on the base repository's
+# tree or blob endpoints is a hidden permission failure, not this PR's.
+API_STAGE=0
 gh_call() {
     local out=$1 rc=0
     shift
@@ -77,7 +83,10 @@ gh_call() {
     [ "$rc" -ne 124 ] || fail 3 network "a gh call timed out"
     rg_is_rate_limited "$ERR" && fail 3 rate-limited "GitHub API rate limit"
     rg_is_auth_failure "$ERR" && fail 3 auth "gh is not authenticated"
-    grep -qiE 'HTTP 404|Not Found|Could not resolve to a PullRequest' "$ERR" && fail 4 not-found "PR #$PR or its head commit was not found"
+    if grep -qiE 'HTTP 404|Not Found|Could not resolve to a PullRequest' "$ERR"; then
+        [ "$API_STAGE" -eq 0 ] || fail 3 forbidden "GitHub answered 404 for the PR head's contents, which it also answers for a token without Contents read"
+        fail 4 not-found "PR #$PR was not found"
+    fi
     rg_is_permission_denied "$ERR" && fail 3 forbidden "GitHub refused access to this repository's contents"
     fail 3 network "a gh call failed (exit $rc)"
 }
@@ -97,6 +106,7 @@ NWO=${BASH_REMATCH[3]}
 [ "${BASH_REMATCH[4]}" = "$PR" ] || fail 4 unreadable "PR #$PR's URL names another PR"
 [[ ! "$NWO" =~ (^|/)\.\.?(/|$) ]] || fail 4 unreadable "PR #$PR's URL is malformed"
 REPO_PATH="repos/$NWO"
+API_STAGE=1
 
 # The root listing only (non-recursive): it is never truncated in practice,
 # and a truncated or malformed one is refused.

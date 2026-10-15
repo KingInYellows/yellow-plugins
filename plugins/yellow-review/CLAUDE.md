@@ -395,8 +395,8 @@ not `dirname`.
   `.gitattributes`, a case-only alias of the three root names, and a
   content-transforming attribute on `.gitignore`. Failures print
   `error=<class>`: exit 3 is systemic (`rate-limited` tested before any 403,
-  `auth`, `forbidden`, `network`, `local`), exit 4 is this PR only
-  (`not-found`, `unreadable`, `symlink`, `case-alias`, `attributes`). The API
+  `auth`, `forbidden` for a 403 or a tree/blob 404, `network`, `local`), exit 4
+  is this PR only (`not-found` from `gh pr view`, `unreadable`, `symlink`, `case-alias`, `attributes`). The API
   host and repository come from the PR's URL, passed as `gh api --hostname`.
 - `guard-local-config snapshot | check <dir> <digest> | clear <dir>` — Snapshot the
   ignored `yellow-plugins.local.md` (printing the path and a `digest=<hex>`

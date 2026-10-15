@@ -135,7 +135,7 @@ judges them against this clone's `.git/info/exclude` and `core.excludesFile`.
 It prints one line.
 
 - `head=tracked`, `head=ignored` or `head=unignored` (exit `0`) is the result.
-- Exit `4` with `error=<class>` is specific to this PR: the head is gone or
+- Exit `4` with `error=<class>` is specific to this PR: the PR is gone, the head is
   unreadable, its `.gitignore` or `.gitattributes` is a symlink, a root entry
   differs from `.gitignore`, `.gitattributes` or `yellow-plugins.local.md`
   only in case or has a non-ASCII name (either can be the same file on a
@@ -144,7 +144,8 @@ It prints one line.
   `[review:sweep] PR #<PR#>: could not judge the PR head ignore rules (<class>)`,
   with `<class>` from the `error=` line. Stop before any snapshot, ending with `Sweep: skipped (head-ignore-unreadable)`.
 - Exit `3` (a rate limit, a network error or timeout, failed authentication,
-  an HTTP 403 such as a token without Contents read, or a local git failure)
+  an HTTP 403, or a 404 from the tree or blob read, such as a token without
+  Contents read, or a local git failure)
   or any other exit: print
   `[review:sweep] Error: could not read the PR head ignore rules.` and stop
   before any snapshot with no skip line, so `/review:sweep-all` records
@@ -511,7 +512,8 @@ stop.
   the PR head ignore rules (<class>)` and stop before any snapshot, ending with
   `Sweep: skipped (head-ignore-unreadable)`.
 - **PR head ignore rules unreadable** (Step 1b, `head-ignore-probe` exit `3`
-  or any other failure: rate limit, network, auth, a 403 or local git):
+  or any other failure: rate limit, network, auth, a 403, a tree or blob
+  404, or local git):
   `[review:sweep] Error: could not read the PR head ignore rules.` and stop
   before any snapshot, with no skip line.
 - **Config tracked here, ignored on the PR head** (Step 1b): `[review:sweep]
