@@ -150,7 +150,7 @@
 #              waived; --revert-dirty and --revert-denied take no list.
 #              --revert-denied reverts only the trusted-config dirty paths.
 # Output: JSON to stdout:
-#   {"result":"pass|fail|timeout|skipped|reverted|noop","patch":"<path>|null",
+#   {"result":"pass|fail|timeout|skipped|reverted|noop|dry-run","patch":"<path>|null",
 #    "log":"<path>|null","treeClean":true|false[,"reason":"..."]}
 #   --revert-denied adds "deniedClean" (no deny-listed change remains),
 #   "reverted" (the deny-listed paths no longer dirty, at most 20, screened
@@ -163,8 +163,11 @@
 #   failed revert step, a log that is withheld or may be incomplete, a
 #   --revert-only entry skipped as unchanged, or a tree that is not clean.
 #   Reasons seen only with --revert-denied: "no deny-listed changes to
-#   revert", "deny-listed changes remain after the revert", "reverted list
-#   withheld: ...", "reverted list shows the first 20 of N" and "left a
+#   revert", "deny-listed changes remain after the revert", "<list> list
+#   withheld: ..." and "<list> list shows the first 20 of N" (<list> is
+#   reverted, pending or linkHits; a list is withheld whole when one name has a
+#   control character, contains ---, looks like a credential, or cannot be
+#   screened) and "left a
 #   nested git repository in place: <path>" and "found a trusted-config
 #   symlink whose target may have been edited (or sits outside the worktree):
 #   <path>" (deniedClean false; a redirected link is judged by its HEAD target; a tracked trusted-config symlink's
@@ -742,6 +745,7 @@ usage() {
     printf '       run-verify-command --pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard) [--dry-run | --expect-snapshot <hex>]\n' >&2
     printf '       run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>\n' >&2
     printf '  exactly one of --revert-only, --revert-dirty, --revert-denied and --check-ignored may be given; --revert-dirty and --revert-denied take no file list\n' >&2
+    printf '  --dry-run: only with --revert-denied; print result "dry-run" with pending/pendingCount and linkHits/linkHitCount, and change nothing\n' >&2
     printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required for every run and for --revert-denied (or --no-ignored-guard); --revert-only and --revert-dirty ignore it\n' >&2
     exit 2
 }
@@ -930,7 +934,7 @@ add_path_reason() {
 # (PATHS_JSON stays []) and adds a reason. Each path is scanned whole and as its /-split
 # segments, because the scanner keeps "/" inside a word.
 paths_json() {
-    local label="$1" t="" rc=0 f
+    local label="$1" rc=0 f
     shift
     PATHS_JSON='[]'
     [ "$#" -gt 0 ] || return 0
@@ -939,12 +943,12 @@ paths_json() {
         [[ "$f" != *---* ]] || { rc=8; break; }
     done
     if [ "$rc" = 0 ]; then
-        if t=$(mktemp) && printf '%s\n' "$@" "${@//\//$'\n'}" >|"$t"; then
-            rt_code_clean "$t" || rc=$?
+        if { [ -n "$PATHS_SCRATCH" ] || PATHS_SCRATCH=$(mktemp); } \
+            && printf '%s\n' "$@" "${@//\//$'\n'}" >|"$PATHS_SCRATCH"; then
+            rt_code_clean "$PATHS_SCRATCH" || rc=$?
         else
-            rc=1
+            rc=2
         fi
-        [ -z "$t" ] || rm -f -- "$t"
     fi
     case $rc in
         0)
@@ -954,7 +958,8 @@ paths_json() {
             ;;
         7) add_reason "$label list withheld: a file name has a control character" ;;
         8) add_reason "$label list withheld: a file name contains ---" ;;
-        *) add_reason "$label list withheld: file names look like a credential" ;;
+        1) add_reason "$label list withheld: file names look like a credential" ;;
+        *) add_reason "$label list withheld: the names could not be screened" ;;
     esac
 }
 
@@ -971,6 +976,7 @@ DIR_LIST=""
 HIDDEN_HITS=""
 VR_SHIM=""
 HOLD_LEFTOVER=""
+PATHS_SCRATCH=""
 # The snapshot is provisional until it is complete and credential-screened: any
 # exit before then (a signal, a die, a failed screen) removes it, so no
 # unscreened patch stays under .git.
@@ -978,7 +984,7 @@ PATCH=""
 PATCH_PROVISIONAL=0
 cleanup() {
     local f
-    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$IGNORED_HITS" "$DIR_LIST" "$HIDDEN_HITS" "$HOLD_LEFTOVER"; do
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$IGNORED_HITS" "$DIR_LIST" "$HIDDEN_HITS" "$HOLD_LEFTOVER" "$PATHS_SCRATCH"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
     [ -z "$VR_SHIM" ] || rm -rf -- "$VR_SHIM"
@@ -1306,9 +1312,12 @@ elif [ "$MODE" = revert-denied ]; then
     # A symlink target that may have been edited cannot be reverted from here
     # (it can sit outside the worktree): leave it, report it, deniedClean false.
     check_trusted_links
-    for f in ${LINK_HITS[@]+"${LINK_HITS[@]}"}; do
-        add_path_reason "found a trusted-config symlink whose target may have been edited (or sits outside the worktree)" "$f"
-    done
+    # --dry-run reports link hits in linkHits (screened as a list) instead.
+    if [ "$DRY_RUN" = 0 ]; then
+        for f in ${LINK_HITS[@]+"${LINK_HITS[@]}"}; do
+            add_path_reason "found a trusted-config symlink whose target may have been edited (or sits outside the worktree)" "$f"
+        done
+    fi
     # --dry-run: the same listing (and the same ignored-file refusal above),
     # reported instead of reverted, so an interactive caller can ask first.
     # pending is an upper bound: a nested repository or special file found

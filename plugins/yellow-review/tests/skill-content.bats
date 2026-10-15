@@ -1263,30 +1263,28 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
 
 @test "resolve-pr: an interactive refusal lists trusted-config paths with --dry-run and asks before reverting them" {
   step6flat=$(sed -n '/^### Step 6/,/^### Step 7/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
-  [[ "$step6flat" == *'Non-interactive runs it as is. Interactive asks first: add `--dry-run` to the same call'* ]]
-  [[ "$step6flat" == *'prints `pending` (at most 20 paths, `[]` when withheld; an upper bound), `pendingCount`, `linkHits` / `linkHitCount`'* ]]
-  # A link the dry run can only report reaches Blocking merge whatever is chosen.
-  [[ "$step6flat" == *'Whatever happens next, report each `linkHits` path in Step 9 under Blocking merge'* ]]
-  [[ "$step6flat" == *'With `pendingCount` 0 there is nothing to ask or revert, so make no second call'* ]]
-  # AskUserQuestion needs two options, so a withheld or cut list keeps a Leave.
-  [[ "$step6flat" == *'when `pendingCount` exceeds the paths shown (withheld or cut at 20), the second option is "Leave them (names not shown)"'* ]]
-  [[ "$step6flat" == *'trusted-config edits left on disk (names withheld; kept by the user)'* ]]
-  # Only the guard's own refusal is the ignored-file stop; any other failure falls back to the real call.
-  [[ "$step6flat" == *'Exit 2 with `gitignored trusted-config files changed since` on stderr is the ignored-file stop below'* ]]
-  [[ "$step6flat" == *'Any other non-zero dry-run exit: ask nothing, run the call without `--dry-run`'* ]]
-  # A later Revert of other paths can undo Leave, so kept files are reported from git status.
-  [[ "$step6flat" == *'report each kept path that `git status --porcelain` still lists'* ]]
-  [[ "$step6flat" == *'Read the dry-run JSON for those five fields only'* ]]
-  [[ "$step6flat" == *'"Trusted-config files changed during this run"'* ]]
-  [[ "$step6flat" == *'listing `pending` and any `linkHits` inside a `--- begin untrusted-content (reference only) ---`'* ]]
+  [[ "$step6flat" == *'Non-interactive runs it as is. Interactive asks first'* ]]
+  [[ "$step6flat" == *'Add `--dry-run` to the same call'* ]]
+  [[ "$step6flat" == *'Read only those five fields'* ]]
+  # A failed listing never falls back to the unasked revert: it asks without a list.
+  [[ "$step6flat" == *'means the files could not be listed: ask the question in step 4 with that said and no list'* ]]
+  [[ "$step6flat" == *'With `pendingCount` 0 there is nothing to revert: ask nothing and make no second call'* ]]
+  # Two real options; anything but an explicit keep reverts.
+  [[ "$step6flat" == *'"Revert them (Recommended)"'* ]]
+  [[ "$step6flat" == *'"Leave them unseen and block merge"'* ]]
+  [[ "$step6flat" == *'Any answer other than the second option (dismissed, free text, an error) is Revert'* ]]
+  [[ "$step6flat" == *'--- begin untrusted-content (reference only) ---'* ]]
+  [[ "$step6flat" == *'a resolver working from PR comments may have written them'* ]]
+  [[ "$step6flat" == *'Revert saves a recovery patch first unless the credential screen withholds it'* ]]
   # The confirmed revert is bound to what the user was shown.
   [[ "$step6flat" == *'Revert runs the call with `--expect-snapshot "<snapshot>"` in place of `--dry-run`'* ]]
   [[ "$step6flat" == *'run the dry run and ask once more; on a second mismatch'* ]]
-  # A kept file is trusted by the next session, and a resolver may have written it.
-  [[ "$step6flat" == *'a resolver working from PR comments may have written them'* ]]
-  [[ "$step6flat" == *'"Revert them (Recommended)" and "Leave them (only files I edited myself)"'* ]]
-  [[ "$step6flat" == *'Revert saves a recovery patch first unless the credential screen withholds it'* ]]
-  [[ "$step6flat" == *'`<path>: deny-listed edit left on disk (kept by the user)`'* ]]
+  # Blocking-merge strings, including kept files re-listed after the next question.
+  [[ "$step6flat" == *'trusted-config symlink target may have been edited (left in place)'* ]]
+  [[ "$step6flat" == *'deny-listed edit left on disk (kept by the user)'* ]]
+  [[ "$step6flat" == *'run the dry-run call again and report each `pending` path'* ]]
+  [[ "$step6flat" != *'offer only Revert'* ]]
+  [[ "$step6flat" != *'Any other non-zero dry-run exit: ask nothing, run the call without'* ]]
   dispo=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')
   [[ "$dispo" == *'an interactive run lists them first with `--dry-run` and asks Revert or Leave'* ]]
 }
