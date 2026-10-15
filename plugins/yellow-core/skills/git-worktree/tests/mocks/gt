@@ -30,6 +30,9 @@ case "${1:-}" in
     ;;
   restack)
     [ -z "${STUB_GT_SLEEP:-}" ] || sleep "$STUB_GT_SLEEP"
+    # STUB_GT_HOOK: a script run while the restack is in flight (a test
+    # changes worktrees under the running provider).
+    [ -z "${STUB_GT_HOOK:-}" ] || bash "$STUB_GT_HOOK" >/dev/null 2>&1
     if [ "${STUB_FAIL:-}" = restack ]; then echo "ERROR: restack failed (stub)" >&2; exit 1; fi
     cur=$(g branch --show-current)
     eng_begin "$cur"

@@ -140,3 +140,94 @@ Three review findings were left open by decision:
   existing repo convention, confidence 50).
 - Provider calls have no script-side timeout.
 - `--status` prints free-form prose instead of tagged lines.
+
+## Update — 2026-10-14 (PR #1197)
+
+PR #1197 limited `/worktree:restack --abort` to the worktrees the run recorded
+(the run worktree, Graphite's detached entries, and GitHub `owner` lines). Its
+`/review:pr` findings were fixed in the same PR and `worktree-restack.bats`
+passed 138/138. They share one theme: a refusal gate, or its advice, was wider
+than the evidence behind it.
+
+- **Gate scoped to the wrong provider.** The "unrecorded worktree is
+  mid-rebase" gate also applied to Graphite and counted worktrees whose rebase
+  state could not be read, so an unrelated unreadable worktree blocked a
+  Graphite run. `gt` rebases only in the run worktree; `gh stack` rebases in
+  the worktrees recorded as owners. `unrecorded_keeps_state` now applies to
+  github state only, so an unreadable state is named but never blocks
+  Graphite. For github it counts both readable and unreadable rebases, since
+  either may be gh-stack's own.
+- **Legacy state with no owner lines.** A github state written before owners
+  were recorded cannot rule any worktree out, yet it cleared the state over an
+  unrecorded rebase once the provider abort had run. It now keeps the state
+  (exit 31) while such a rebase exists, with or without the provider abort.
+- **Advice chosen by refusal reason.** A busy or floating run worktree was told
+  to `git checkout` the start branch. `release_run_worktree` now sets
+  `RELEASE_WHY` (busy, floating, unreadable, checkout) and `release_advice`
+  picks the next step per reason.
+- **A hint that refuses for the same reason.** `--continue` exited 10 and
+  suggested `--abort` for an unrecorded rebase, which `--abort` refuses too. It
+  now exits 31 without the hint.
+- **Placeholder instead of a fix.** The refusal printed `<worktree>`. It now
+  prints a `fix:` line per path (`rebase --abort`, or `git status` for an
+  unreadable state) and says the rebase may be another session's.
+- **Recorded path reused by another worktree.** Path, top level, common dir
+  and per-worktree gitdir backlink all still match when a recorded worktree is
+  removed during the pause and a new one is registered at the same path (git
+  can reuse the `worktrees/<id>` name). `start` now writes the run id into each
+  recorded linked worktree's own git directory (`bind_worktree`, state line
+  `bound 1`); git deletes that directory with the worktree, so a replacement
+  lacks it. A follow-up review found `release_run_worktree` still checked out
+  an unbound run worktree, so the check moved to one gate: `refuse_replaced`
+  runs before `--continue`, `--abort` and `restore` touch any recorded path
+  (checkout, reset, lock, unlock, rebase --abort, provider calls) and keeps
+  the state (exit 31). Put a binding check at the entry of every mutating
+  command, not at each call site. A third review found `start` fell back to
+  an unbound (legacy) state when a binding could not be written, silently
+  dropping the check; it now refuses (exit 30), removes the bindings it wrote
+  and leaves no state, and a binding that cannot be read is never a match.
+  A safety marker that cannot be written must stop the run, not downgrade it.
+  A fourth review found `[ ! -d PATH ]` (and git's own prunable verdict) is
+  also true when a parent lost its execute bit, so an inaccessible entry was
+  unlocked and dropped. Every "is it gone" decision now goes through
+  `path_state` / `wt_gone`, which call a path gone only when its nearest
+  existing ancestor is a searchable directory; anything else is unreadable
+  and keeps the state.
+- **Another provider's marker.** `provider_paused` accepted a leftover
+  `gh-stack-rebase-state` for a graphite run, so with `.gtcontinue` lost,
+  `--continue` skipped the "rebase still in progress" guard, restored over an
+  entry still mid-rebase and cleared the state. Every pause-marker check now
+  goes through `gh_paused` / `gt_paused` gated by the recorded `S_PROVIDER`.
+- **A gate that runs once.** `refuse_replaced` guarded only the start of a
+  resumed command; `start` restored straight after `gt restack` returned, so a
+  worktree replaced while the provider ran was checked out and the state
+  cleared. The binding is now rechecked inside each primitive that touches a
+  recorded worktree after a provider step: `restore_entries` (keeps it,
+  exit 40), `lock_detached_entries` (never locks it), `release_run_worktree`
+  and `provider_submit` (refuse). A check that guards a mutation belongs next
+  to the mutation, not only at command entry.
+- **One invariant, one guard.** Seven rounds closed one path each. The root
+  cause: deleting the state and restoring were allowed wherever the caller
+  had probed only the worktree it expected (usually the run worktree). Now
+  `recorded_hold` probes every recorded worktree (run, entries, owners; both
+  providers) for a rebase or other operation, or an unreadable one, and
+  `restore_and_clear`, the only path that deletes the state (finish,
+  failure, abort, restore, interrupt), refuses while it holds.
+  `step_graphite`, `step_github` and the interrupt handler classify a
+  failure with a hold as a pause, and `release_run_worktree` refuses a
+  checkout while it holds.
+- **Found while testing.** A deleted github owner still listed on its branch
+  read as busy in `in_chain_busy`; worktrees git reports prunable or whose
+  directory is gone are now skipped there.
+
+Prevention:
+
+- Scope a safety gate to the provider that creates the hazard, and test it with
+  the other provider and with an unrelated, unreadable worktree.
+- Every refusal's advice must be reachable: never suggest a command that
+  refuses for the same reason, and when a refusal has several causes, record
+  the cause and branch on it.
+- When a gate depends on a newly recorded field, test a state written before
+  the field existed.
+- Do not run a probe with side effects inside an `if`/`elif` condition; compute
+  it first.

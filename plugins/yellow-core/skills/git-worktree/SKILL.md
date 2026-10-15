@@ -192,7 +192,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-restack.sh" \
 | `preflight` | Read-only. Prints the run worktree, the stack, the worktrees to detach and any `REFUSE` reasons |
 | `start` | Lock, detach, restack, verify ancestry, restore; `--submit` submits after |
 | `continue` | Resumes a paused conflict, then verifies and restores |
-| `abort` | Aborts the provider's restack (Graphite rolls back the whole restack) and any in-chain git rebase in a stack worktree, returns the run worktree to the start branch, then restores |
+| `abort` | Aborts the provider's restack (Graphite rolls back the whole restack) and any in-chain git rebase in a worktree the run recorded (other worktrees are left alone and named), returns the run worktree to the start branch, then restores |
 | `status` | Shows the recorded restack, or a worktree stranded detached at a branch tip |
 | `restore` | Restore only after partial restore, failed abort, mismatch, or hand finish |
 
@@ -208,8 +208,12 @@ Safety rules the script holds:
   in progress. An untracked `.ruvector` symlink does not count as dirty.
 - Its own git calls never force a checkout, stash, hard-reset or pass
   `--ignore-other-worktrees`. Graphite's abort (run by `--abort`) rolls the
-  whole restack back, and `--abort` runs `git rebase --abort` in any stack
-  worktree holding an in-chain rebase, discarding its in-progress state. A
+  whole restack back, and `--abort` runs `git rebase --abort` in each worktree
+  the run recorded (the run worktree, Graphite's detached ones, GitHub's
+  branch owners) that holds an in-chain rebase, discarding its in-progress
+  state. An unrecorded worktree is left alone; for GitHub, a rebase there that
+  may be the run's own keeps the state (exit `31`). A recorded worktree whose
+  rebase state cannot be read stops the abort (exit `31`, named). A
   worktree that cannot be restored stays detached and the script prints the
   `git -C <path> checkout <branch>` line.
 - `--abort` keeps the state (exit `31`) when a stack branch is off its recorded

@@ -54,6 +54,8 @@ readonly X_REFUSED=20 X_FAILED=30 X_KEPT=31 X_PARTIAL=40 X_INCOMPLETE=50 X_SUBMI
 readonly ADAPTER_TIMEOUT_MS=600000
 readonly PAUSE_REASON='worktree:restack paused - do not commit; run /worktree:restack --continue or --abort'
 readonly MAX_LISTED=20
+# Owner worktrees of a github run (state field `owner`); see validate_state.
+O_PATH=()
 
 # --- output helpers ---------------------------------------------------------
 
@@ -208,7 +210,7 @@ branch_holder() {
 wt_busy() {
   local -a names=(rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD sequencer)
   local -a paths=()
-  local name p out i=0
+  local name p out i=0 st
   out=$(git -C "$1" rev-parse --path-format=absolute \
     --git-path rebase-merge --git-path rebase-apply --git-path MERGE_HEAD \
     --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD --git-path sequencer 2>/dev/null) || {
@@ -226,10 +228,18 @@ wt_busy() {
   fi
   for ((i = 0; i < ${#names[@]}; i++)); do
     name=${names[i]}
-    if [ -e "${paths[i]}" ]; then
-      printf '%s' "$name"
-      return 0
-    fi
+    st=0
+    path_state "${paths[i]}" || st=$?
+    case $st in
+      0)
+        printf '%s' "$name"
+        return 0
+        ;;
+      2)
+        printf 'unreadable'
+        return 0
+        ;;
+    esac
   done
   return 1
 }
@@ -378,11 +388,15 @@ write_state() {
     printf 'run\t%s\n' "$S_RUN"
     printf 'submit\t%s\n' "$S_SUBMIT"
     printf 'remote\t%s\n' "$S_REMOTE"
+    [ -z "$S_BOUND" ] || printf 'bound\t%s\n' "$S_BOUND"
     printf 'chain'
     for ((i = 0; i < ${#S_CHAIN[@]}; i++)); do printf '\t%s' "${S_CHAIN[i]}"; done
     printf '\n'
     for ((i = 0; i < ${#E_PATH[@]}; i++)); do
       printf 'entry\t%s\t%s\t%s\n' "${E_PATH[i]}" "${E_REF[i]}" "${E_SHA[i]}"
+    done
+    for ((i = 0; i < ${#O_PATH[@]}; i++)); do
+      printf 'owner\t%s\n' "${O_PATH[i]}"
     done
     for ((i = 0; i < ${#T_BRANCH[@]}; i++)); do
       printf 'tip\t%s\t%s\n' "${T_BRANCH[i]}" "${T_SHA[i]}"
@@ -442,12 +456,64 @@ new_run_id() {
   printf '%s' "$id"
 }
 
+# S_BOUND is read from the state file; empty until a state is read.
+S_BOUND=""
+
+# The file in a linked worktree's own git directory ($COMMON/worktrees/<id>)
+# that holds the run id of the restack that recorded it. git deletes that
+# directory with the worktree, so a worktree removed and registered again at
+# the same path, even under the same <id>, has none.
+WT_MARK=yellow-core-restack-run
+
+# bind_worktree PATH: write the run id into PATH's own git directory, through a
+# temp file and a rename (a planted symlink is replaced, never followed), then
+# read it back. The main worktree (listed first), whose git directory is the
+# common one and which cannot be removed, needs none. On success a written
+# file is added to BOUND_FILES; on failure BIND_GD names the git directory
+# (empty when git could not name it).
+BOUND_FILES=() BIND_GD=""
+bind_worktree() {
+  local gd tmp wi
+  BIND_GD=""
+  wi=$(wt_index "$1")
+  [ "$wi" -ge 0 ] || return 1
+  gd=$(git -C "$1" rev-parse --absolute-git-dir 2>/dev/null) || return 1
+  gd=$(canon "$gd") || return 1
+  BIND_GD=$gd
+  if [ "$gd" = "$COMMON" ]; then
+    [ "$wi" -eq 0 ]
+    return
+  fi
+  [ ! -d "$gd/$WT_MARK" ] || return 1
+  tmp=$(umask 077 && mktemp "$gd/$WT_MARK.tmp.XXXXXX") || return 1
+  if ! { printf '%s\n' "$S_RUNID" >|"$tmp" && mv -f -- "$tmp" "$gd/$WT_MARK"; }; then
+    rm -f -- "$tmp"
+    return 1
+  fi
+  BOUND_FILES+=("$gd/$WT_MARK")
+  [ -f "$gd/$WT_MARK" ] && [ ! -L "$gd/$WT_MARK" ] &&
+    [ "$(head -c 64 -- "$gd/$WT_MARK" 2>/dev/null)" = "$S_RUNID" ]
+}
+
+# unbind_worktrees: remove each binding this start wrote that still holds its
+# run id (a start that refuses leaves nothing behind).
+unbind_worktrees() {
+  local f
+  for f in "${BOUND_FILES[@]+"${BOUND_FILES[@]}"}"; do
+    if [ -f "$f" ] && [ ! -L "$f" ] && [ "$(head -c 64 -- "$f" 2>/dev/null)" = "$S_RUNID" ]; then
+      rm -f -- "$f"
+    fi
+  done
+  BOUND_FILES=()
+}
+
 clear_state() { rm -f -- "$STATE_FILE" "$STATE_FILE".tmp.* "$ABORTED_FILE" "$ABORTED_FILE".tmp.* 2>/dev/null; }
 
 # read_state parses the fixed-field TSV; validate_state decides whether to trust it.
 read_state() {
   S_PROVIDER="" S_COMMON="" S_RUN="" S_SUBMIT="" S_REMOTE="" S_RUNID="" S_PHASE=""
-  S_CHAIN=() E_PATH=() E_REF=() E_SHA=() T_BRANCH=() T_SHA=()
+  S_BOUND=""
+  S_CHAIN=() E_PATH=() E_REF=() E_SHA=() T_BRANCH=() T_SHA=() O_PATH=()
   STATE_ERR=""
   if [ ! -f "$STATE_FILE" ] || [ -L "$STATE_FILE" ]; then
     STATE_ERR="state file is missing or not a regular file"
@@ -473,6 +539,7 @@ read_state() {
       run) S_RUN=${f[1]:-} ;;
       submit) S_SUBMIT=${f[1]:-} ;;
       remote) S_REMOTE=${f[1]:-} ;;
+      bound) S_BOUND=${f[1]:-} ;;
       chain) S_CHAIN=("${f[@]:1}") ;;
       entry)
         E_PATH[n]=${f[1]:-}
@@ -484,6 +551,7 @@ read_state() {
         T_BRANCH+=("${f[1]:-}")
         T_SHA+=("${f[2]:-}")
         ;;
+      owner) O_PATH+=("${f[1]:-}") ;;
       '') ;;
       *)
         STATE_ERR="unknown field in state file"
@@ -519,6 +587,28 @@ in_chain() {
   return 1
 }
 
+# bad_state_path KIND PATH RUN-ERR: set STATE_ERR and return 0 when an entry or
+# owner PATH is not absolute, has control characters or '..', or is the run
+# worktree (RUN-ERR is that message). Return 1 when PATH passes.
+bad_state_path() {
+  case $2 in /*) ;; *)
+    STATE_ERR="$1 path is not absolute"
+    return 0
+    ;;
+  esac
+  case $2 in
+    *[[:cntrl:]]* | */../* | */..)
+      STATE_ERR="$1 path has control characters or '..'"
+      return 0
+      ;;
+  esac
+  if [ "$2" = "$S_RUN" ]; then
+    STATE_ERR=$3
+    return 0
+  fi
+  return 1
+}
+
 # validate_state: nothing read from the state file reaches git until it passes.
 validate_state() {
   local i j b p
@@ -547,6 +637,19 @@ validate_state() {
   fi
   case $S_PHASE in '' | aborting | aborted) ;; *)
     STATE_ERR="bad phase"
+    return 1
+    ;;
+  esac
+  # bound 1: start wrote this run's id into each recorded linked worktree's
+  # git directory (bind_worktree). It needs a run id to compare with.
+  case $S_BOUND in '') ;; 1)
+    [ -n "$S_RUNID" ] || {
+      STATE_ERR="bound state has no run id"
+      return 1
+    }
+    ;;
+  *)
+    STATE_ERR="bad bound flag"
     return 1
     ;;
   esac
@@ -592,6 +695,23 @@ validate_state() {
     STATE_ERR="github state must have no detached entries"
     return 1
   fi
+  # owner: a worktree that held a restacked branch when a github run started.
+  # gh-stack rebases in such a worktree without detaching it, so the run records
+  # it for --abort. Nothing is restored there, so it is not an entry.
+  if [ "$S_PROVIDER" != github ] && [ "${#O_PATH[@]}" -ne 0 ]; then
+    STATE_ERR="only github state records owner worktrees"
+    return 1
+  fi
+  for ((i = 0; i < ${#O_PATH[@]}; i++)); do
+    p=${O_PATH[i]}
+    ! bad_state_path owner "$p" "run worktree listed as an owner" || return 1
+    for ((j = 0; j < i; j++)); do
+      if [ "${O_PATH[j]}" = "$p" ]; then
+        STATE_ERR="duplicate owner path"
+        return 1
+      fi
+    done
+  done
   for ((i = 0; i < ${#T_BRANCH[@]}; i++)); do
     in_chain "${T_BRANCH[i]}" || {
       STATE_ERR="recorded tip is not for a branch in the chain"
@@ -620,24 +740,10 @@ validate_state() {
   fi
   for ((i = 0; i < ${#E_PATH[@]}; i++)); do
     p=${E_PATH[i]}
-    case $p in /*) ;; *)
-      STATE_ERR="entry path is not absolute"
-      return 1
-      ;;
-    esac
-    case $p in
-      *[[:cntrl:]]* | */../* | */..)
-        STATE_ERR="entry path has control characters or '..'"
-        return 1
-        ;;
-    esac
     # A path that is no longer a worktree is not rejected: the worktree may
     # have been removed during a pause, and restore drops such an entry with a
     # warning without running any git command on the path.
-    [ "$p" != "$S_RUN" ] || {
-      STATE_ERR="run worktree listed as detached entry"
-      return 1
-    }
+    ! bad_state_path entry "$p" "run worktree listed as detached entry" || return 1
     valid_ref "${E_REF[i]}" || {
       STATE_ERR="entry ref is not a valid refs/heads/ name"
       return 1
@@ -995,6 +1101,52 @@ plan_github_stack() {
 FLOAT_SEEN=()
 S_PROVIDER="" S_PHASE=""
 
+# path_state PATH: 0 when PATH is there (as anything, a dangling symlink too).
+# 1 only when it is confirmed gone: its nearest existing ancestor is a
+# directory this process can search, so the lookup failed because PATH is
+# missing. 2 when that cannot be told, as when an ancestor lost its execute
+# bit (then `[ -d PATH ]` is false for a path that is still there): callers
+# treat it as unreadable and keep the state. Every "is it gone" decision on a
+# recorded path goes through here or wt_gone.
+path_state() {
+  local d=$1
+  if [ -e "$d" ] || [ -L "$d" ]; then return 0; fi
+  while [ "$d" != / ]; do
+    d=${d%/*}
+    [ -n "$d" ] || d=/
+    if [ -e "$d" ] || [ -L "$d" ]; then
+      [ -d "$d" ] && [ -x "$d" ] && return 1
+      return 2
+    fi
+  done
+  return 2
+}
+
+# wt_gone PATH: whether the worktree at PATH is gone (load_worktrees first).
+# 0 when it is: its directory is confirmed missing (path_state), or it is a
+# readable directory that git no longer lists, or lists as prunable while its
+# .git link is confirmed missing or still there. 1 when it is present. 2 when
+# that cannot be told (an inaccessible ancestor, something other than a
+# directory at PATH, or a .git link that cannot be looked up): never gone.
+# git's own prunable verdict is not proof: it also calls a worktree behind an
+# inaccessible directory prunable.
+wt_gone() {
+  local wi st=0
+  path_state "$1" || st=$?
+  case $st in
+    1) return 0 ;;
+    2) return 2 ;;
+  esac
+  [ -d "$1" ] && [ -x "$1" ] || return 2
+  wi=$(wt_index "$1")
+  if [ "$wi" -lt 0 ]; then return 0; fi
+  [ "${WT_PRUNABLE[wi]}" -ne 0 ] || return 1
+  st=0
+  path_state "$1/.git" || st=$?
+  [ "$st" -ne 2 ] || return 2
+  return 0
+}
+
 # report_floating I: when entry I's worktree is detached at a commit other than
 # the recorded one (someone committed or moved HEAD during the pause), print the
 # floating commits and a rescue line and return 0. A checkout would orphan
@@ -1028,7 +1180,7 @@ unlock_entry() { # unlock a worktree that carries this command's lock reason, ne
 # restore_entries: per-entry best effort over E_*. Restored and dropped entries
 # leave the arrays; the rest stay detached. Returns 0 when none remain.
 restore_entries() {
-  local i n=${#E_PATH[@]} path ref br wi cur holder out
+  local i n=${#E_PATH[@]} path ref br wi cur holder out gone
   local -a kp=() kr=() ks=()
   if ! load_worktrees; then
     err "git worktree list failed; nothing was restored or dropped"
@@ -1039,8 +1191,37 @@ restore_entries() {
     ref=${E_REF[i]}
     br=${ref#refs/heads/}
     wi=$(wt_index "$path")
-    if [ "$wi" -lt 0 ] || [ "${WT_PRUNABLE[wi]}" -ne 0 ]; then
-      note "dropped: $(v "$path") is no longer a worktree"
+    gone=0
+    wt_gone "$path" || gone=$?
+    if [ "$gone" -eq 2 ]; then
+      # Not confirmed gone (an ancestor may have lost its execute bit): it may
+      # still hold a rebase, so it is neither unlocked nor dropped.
+      note "kept: cannot tell whether $(v "$path") still exists; left as it is"
+      note "  fix: restore access to $(v "$path") (check each parent directory's permissions), then run this again"
+      kp+=("$path")
+      kr+=("$ref")
+      ks+=("${E_SHA[i]}")
+      continue
+    fi
+    if [ "$gone" -eq 0 ]; then
+      if [ "$wi" -lt 0 ] || [ "${WT_PRUNABLE[wi]}" -ne 0 ]; then
+        note "dropped: $(v "$path") is no longer a worktree"
+        continue
+      fi
+      # Deleted during the pause: git does not call a locked worktree prunable,
+      # so drop our lock and leave the record to `git worktree prune`.
+      unlock_entry "$i"
+      note "dropped: $(v "$path") was deleted; git worktree prune removes its record"
+      continue
+    fi
+    # A provider step can run for minutes, and refuse_replaced only guarded
+    # the command's start: recheck the binding right before touching it.
+    if wt_replaced "$path"; then
+      note "kept: $(v "$path") cannot be confirmed as the worktree this run recorded; not unlocked or checked out"
+      note "  fix: restore access to it, or move it aside or remove it (git worktree remove $(q "$path")), then run /worktree:restack --abort or the restore subcommand again"
+      kp+=("$path")
+      kr+=("$ref")
+      ks+=("${E_SHA[i]}")
       continue
     fi
     if ! branch_exists "$br"; then
@@ -1077,11 +1258,61 @@ restore_entries() {
   [ "${#E_PATH[@]}" -eq 0 ]
 }
 
+# recorded_hold: the one guard on clearing the state and on restoring. Print
+# "<what><TAB><path>" and return 0 when any recorded worktree (the run
+# worktree, an entry or an owner, either provider) has a rebase or another
+# operation in progress (wt_busy), or cannot be read, or the worktree list
+# cannot be read. While it holds, the state is never deleted and no recorded
+# worktree is unlocked or checked out. A worktree confirmed gone holds
+# nothing. Needs the state loaded (RECORDED comes from it).
+recorded_hold() {
+  local p g why
+  load_worktrees 2>/dev/null || {
+    printf 'unreadable\t%s' "git worktree list"
+    return 0
+  }
+  load_recorded
+  for p in "${RECORDED[@]}"; do
+    g=0
+    wt_gone "$p" || g=$?
+    [ "$g" -ne 0 ] || continue
+    if [ "$g" -eq 2 ]; then
+      printf 'unreadable\t%s' "$p"
+      return 0
+    fi
+    if why=$(wt_busy "$p"); then
+      printf '%s\t%s' "$why" "$p"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# hold_note LINE: explain a recorded_hold line.
+hold_note() {
+  local why=${1%%$'\t'*} p=${1#*$'\t'}
+  if [ "$why" = unreadable ]; then
+    err "$(v "$p") cannot be read; state kept, nothing restored. Check it with git -C $(q "$p") status, then run /worktree:restack --continue or --abort"
+  else
+    err "a $(v "$why") is in progress in $(v "$p"); state kept, nothing restored. Finish or abort it there, then run /worktree:restack --continue or --abort"
+  fi
+}
+
 # restore_and_clear: restore, then drop state and lock if everything is back.
-# Returns 0 on a full restore, 1 when entries remain (state rewritten).
+# Returns 0 on a full restore, 1 when entries remain or recorded_hold holds
+# (state rewritten, entries locked). Every path that deletes the state goes
+# through here: finish, failure, abort, restore and the interrupt handler.
 restore_and_clear() {
+  local hold
+  if hold=$(recorded_hold); then
+    hold_note "$hold"
+    lock_detached_entries
+    write_state || err "could not rewrite the state file"
+    lock_mark_paused
+    return 1
+  fi
   if restore_entries; then
-    if [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; then
+    if gh_paused; then
       write_state || err "could not rewrite the state file"
       lock_mark_paused
       err "a GitHub restack conflict is still paused; use --continue or --abort first"
@@ -1103,6 +1334,12 @@ lock_detached_entries() {
   for ((i = 0; i < ${#E_PATH[@]}; i++)); do
     wi=$(wt_index "${E_PATH[i]}")
     if [ "$wi" -ge 0 ] && [ "${WT_LOCKREASON[wi]}" = "$PAUSE_REASON" ]; then continue; fi
+    # Never lock a worktree that replaced a recorded one (see wt_replaced);
+    # --continue and --abort refuse it until it is moved aside.
+    if wt_replaced "${E_PATH[i]}"; then
+      err "$(v "${E_PATH[i]}") cannot be confirmed as the worktree this run recorded; not locking it"
+      continue
+    fi
     git worktree lock --reason "$PAUSE_REASON" -- "${E_PATH[i]}" >/dev/null 2>&1 ||
       err "could not lock $(v "${E_PATH[i]}"); do not prune or remove it"
   done
@@ -1128,6 +1365,12 @@ check_ancestry() {
 }
 
 provider_submit() {
+  # gt submits from the run worktree: never from one that replaced it.
+  load_worktrees || return 1
+  if wt_replaced "$S_RUN"; then
+    err "$(v "$S_RUN") cannot be confirmed as this run's worktree; not submitting from it"
+    return 1
+  fi
   if [ "$S_PROVIDER" = graphite ]; then
     (cd -- "$S_RUN" && gt submit --stack --no-interactive)
   else
@@ -1166,11 +1409,8 @@ finish_restack() {
 fail_and_restore() {
   ARMED=0
   err "restack failed; restoring worktrees"
-  if [ "${#E_PATH[@]}" -eq 0 ]; then
-    clear_state
-    release_lock
-    exit "$X_FAILED"
-  fi
+  # Even with no entries to restore, the state is deleted only through the
+  # guard in restore_and_clear.
   if restore_and_clear; then exit "$X_FAILED"; fi
   exit "$X_PARTIAL"
 }
@@ -1216,7 +1456,7 @@ on_exit() {
   trap - EXIT
   if [ "${ARMED:-0}" = 1 ]; then
     ARMED=0
-    if { [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; } || { [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; }; then
+    if { [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; } || gh_paused; then
       # Interrupted with a conflict paused: restoring now would strand the
       # provider's own --continue. Keep the state and lock the worktrees.
       lock_detached_entries
@@ -1226,13 +1466,13 @@ on_exit() {
       [ "$rc" -ne 0 ] || rc=$X_PAUSED
     else
       local busy
-      if busy=$(wt_busy "$S_RUN"); then
-        # No conflict marker yet, but the provider's rebase is mid-flight in
-        # the run worktree: restoring now would drop the recovery record.
+      if busy=$(recorded_hold); then
+        # No conflict marker yet, but a rebase or operation is mid-flight in a
+        # recorded worktree: restoring now would drop the recovery record.
         lock_detached_entries
         write_state || true
         lock_mark_paused
-        err "interrupted while the provider's rebase is still in progress in $(v "$S_RUN") ($busy); finish or abort that rebase, then run /worktree:restack --continue or --abort"
+        err "interrupted while a $(v "${busy%%$'\t'*}") is still in progress in $(v "${busy#*$'\t'}"); finish or abort it, then run /worktree:restack --continue or --abort"
         [ "$rc" -ne 0 ] || rc=$X_PAUSED
       else
         err "interrupted; restoring worktrees"
@@ -1269,7 +1509,9 @@ step_graphite() { # step_graphite restack|continue|abort
   fi
   if [ "$rc" -eq 0 ]; then
     RESULT=ok
-  elif [ "$1" != abort ] && gt_paused "$S_RUN"; then
+  elif [ "$1" != abort ] && { gt_paused "$S_RUN" || recorded_hold >/dev/null; }; then
+    # A failed step that left a rebase or operation in a recorded worktree
+    # (or one that cannot be read) is a pause: failing would restore over it.
     RESULT=conflict
   else
     RESULT=failed
@@ -1288,10 +1530,11 @@ step_github() { # step_github upstack|continue|abort
     *)
       err "gh stack rebase ($1): $(v "$AD_STATUS") $(v "$AD_RECOVERY")"
       printf '%s\n' "$AD_STDERR" | cap_lines 10 >&2
-      # A failed step with gh-stack's own rebase record, an in-flight git
-      # rebase, or an adapter timeout (SPAWN_FAILURE) is a pause, not a
-      # failure: clearing our state would orphan a partially applied restack.
-      if [ "$1" != abort ] && { [ -e "$COMMON/gh-stack-rebase-state" ] || [ "$AD_STATUS" = SPAWN_FAILURE ] || wt_busy "$S_RUN" >/dev/null; }; then
+      # A failed step with gh-stack's own rebase record, a rebase or other
+      # operation in any recorded worktree (gh-stack rebases in the owners),
+      # or an adapter timeout (SPAWN_FAILURE) is a pause, not a failure:
+      # clearing our state would orphan a partially applied restack.
+      if [ "$1" != abort ] && { gh_paused || [ "$AD_STATUS" = SPAWN_FAILURE ] || recorded_hold >/dev/null; }; then
         RESULT=conflict
       else
         RESULT=failed
@@ -1408,7 +1651,7 @@ cmd_start() {
     release_lock
     die "$X_FAILED" "cannot generate a run id; nothing was changed"
   }
-  E_PATH=() E_REF=() E_SHA=() T_BRANCH=() T_SHA=()
+  E_PATH=() E_REF=() E_SHA=() T_BRANCH=() T_SHA=() O_PATH=()
   # Pre-restack tips of the restack set: --abort compares them with the current
   # tips to tell whether a rollback is still owed after the provider lost track.
   local tipsha k
@@ -1431,9 +1674,42 @@ cmd_start() {
       E_REF+=("refs/heads/${SEL_BRANCH[i]}")
       E_SHA+=("$sha")
     done
+  else
+    # gh-stack rebases each branch in the worktree that holds it. Record those
+    # worktrees, so --abort may clear a rebase there and only there.
+    for ((i = 0; i < ${#SEL_PATH[@]}; i++)); do
+      O_PATH+=("${SEL_PATH[i]}")
+    done
   fi
+  # Bind every recorded worktree to this run, so a later abort never takes a
+  # worktree registered again at a recorded path for this run's. One that
+  # cannot be bound stops the start before the provider runs: an unbound state
+  # would silently lose the replacement check.
+  S_BOUND=1
+  BOUND_FILES=()
+  for ((i = 0; i < ${#E_PATH[@]} + ${#O_PATH[@]} + 1; i++)); do
+    if [ "$i" -eq 0 ]; then
+      k=$S_RUN
+    elif [ "$i" -le "${#E_PATH[@]}" ]; then
+      k=${E_PATH[i - 1]}
+    else
+      k=${O_PATH[i - 1 - ${#E_PATH[@]}]}
+    fi
+    bind_worktree "$k" || {
+      unbind_worktrees
+      release_lock
+      err "cannot bind the worktree $(v "$k") to this restack; nothing was changed"
+      if [ -n "$BIND_GD" ]; then
+        err "fix: make $(v "$BIND_GD") writable and remove anything at $(v "$BIND_GD/$WT_MARK"), then run start again"
+      else
+        err "fix: check $(v "$k") with git -C $(q "$k") status, then run start again"
+      fi
+      exit "$X_FAILED"
+    }
+  done
   rm -f -- "$ABORTED_FILE" 2>/dev/null
   write_state || {
+    unbind_worktrees
     release_lock
     die "$X_FAILED" "could not write the state file"
   }
@@ -1514,15 +1790,98 @@ hold_or_release_lock() {
   exit "$rc"
 }
 
-# worktree_in_chain_rebase PATH: 0 when PATH is mid-rebase of a recorded stack
-# branch (not the base). An unreadable worktree is not a match.
+# canon_or_raw PATH: PATH canonicalized, or as given when that fails.
+canon_or_raw() { canon "$1" || printf '%s' "$1"; }
+
+# worktree_in_chain_rebase PATH [any]: 0 when PATH is mid-rebase of a recorded stack
+# branch (not the base), 1 when it is not, 2 when that cannot be read. Only a
+# registered, present worktree of this repository whose top level is PATH
+# itself is probed: a path git no longer lists (or lists as prunable), a
+# deleted directory, one whose .git link is gone (git -C would walk up into
+# another checkout), or one recreated as another repository (its common git
+# directory is not this repository's), or one whose .git link names another
+# worktree's git directory, holds no rebase this run may abort, so it is 1. A directory git cannot read, or a rebase path that is not a readable
+# directory with a non-empty head-name, is 2: the caller fails closed. A
+# rebase-apply holding `applying` is a `git am`, not a rebase. In a bound
+# state a linked worktree must also hold this run's id (bind_worktree), or it
+# is 1; `any` skips that check, to probe a worktree the run did not record.
 worktree_in_chain_rebase() {
-  local gd name b
-  gd=$(git -C "$1" rev-parse --path-format=absolute --git-dir 2>/dev/null) || return 1
-  for name in rebase-merge rebase-apply; do
-    [ -f "$gd/$name/head-name" ] || continue
-    b=$(cat -- "$gd/$name/head-name" 2>/dev/null) || continue
+  local wi out top gd gcd merge apply d b n=0 st=0
+  local -a l=()
+  wt_gone "$1" || st=$?
+  case $st in
+    0) return 1 ;;
+    2) return 2 ;;
+  esac
+  wi=$(wt_index "$1")
+  # Without its .git link, git -C would walk up into another checkout.
+  st=0
+  path_state "$1/.git" || st=$?
+  case $st in
+    1) return 1 ;;
+    2) return 2 ;;
+  esac
+  out=$(git -C "$1" rev-parse --show-toplevel --absolute-git-dir --path-format=absolute \
+    --git-common-dir --git-path rebase-merge --git-path rebase-apply 2>/dev/null) || return 2
+  while IFS= read -r d; do l[n]=$d; n=$((n + 1)); done <<<"$out"
+  # Five absolute lines, or git did not understand the request (an older git
+  # prints --path-format back as output).
+  [ "$n" -eq 5 ] || return 2
+  for d in "${l[@]}"; do
+    case $d in /*) ;; *) return 2 ;; esac
+  done
+  top=$(canon_or_raw "${l[0]}")
+  [ "$top" = "$1" ] || return 1
+  gd=$(canon_or_raw "${l[1]}")
+  gcd=$(canon_or_raw "${l[2]}")
+  [ "$gcd" = "$COMMON" ] || return 1
+  # The per-worktree git directory must be PATH's own: the common directory for
+  # the main worktree (listed first), else a worktrees/ entry whose gitdir file
+  # points back at PATH/.git. A .git link copied from another worktree passes
+  # the checks above but would abort that worktree's rebase.
+  if [ "$gd" = "$COMMON" ]; then
+    [ "$wi" -eq 0 ] || return 1
+  else
+    [ "$(canon_or_raw "${gd%/*}")" = "$COMMON/worktrees" ] || return 1
+    [ -f "$gd/gitdir" ] && [ -r "$gd/gitdir" ] || return 1
+    d=$(cat -- "$gd/gitdir" 2>/dev/null) || return 1
+    # worktree.useRelativePaths writes it relative to the git directory.
+    case $d in /*) ;; *) d=$gd/$d ;; esac
+    [ "$(canon_or_raw "${d%/*}")" = "$1" ] || return 1
+    if [ "${S_BOUND:-}" = 1 ] && [ "${2:-}" != any ]; then
+      # No binding there: another worktree, not this run's. A binding that
+      # cannot be read is not proof either way: fail closed.
+      st=0
+      path_state "$gd/$WT_MARK" || st=$?
+      case $st in
+        1) return 1 ;;
+        2) return 2 ;;
+      esac
+      [ -f "$gd/$WT_MARK" ] && [ ! -L "$gd/$WT_MARK" ] && [ -r "$gd/$WT_MARK" ] || return 2
+      d=$(head -c 64 -- "$gd/$WT_MARK" 2>/dev/null) || return 2
+      [ "$d" = "$S_RUNID" ] || return 1
+    fi
+  fi
+  merge=${l[3]} apply=${l[4]}
+  st=0
+  path_state "$apply/applying" || st=$?
+  case $st in
+    0) apply="" ;;
+    2) return 2 ;;
+  esac
+  for d in "$merge" "$apply"; do
+    [ -n "$d" ] || continue
+    st=0
+    path_state "$d" || st=$?
+    case $st in
+      1) continue ;;
+      2) return 2 ;;
+    esac
+    [ -d "$d" ] && [ -r "$d" ] && [ -x "$d" ] || return 2
+    [ -f "$d/head-name" ] && [ -r "$d/head-name" ] || return 2
+    b=$(cat -- "$d/head-name" 2>/dev/null) || return 2
     b=${b#refs/heads/}
+    [ -n "$b" ] || return 2
     if in_chain "$b"; then
       return 0
     fi
@@ -1530,35 +1889,243 @@ worktree_in_chain_rebase() {
   return 1
 }
 
-# chain_rebase_worktree: print the path of a worktree that is in the middle of a
-# git rebase of one of the recorded stack branches (gh-stack rebases in the
-# worktree that holds the branch, which need not be the run worktree).
-chain_rebase_worktree() {
+# load_recorded: set RECORDED to every worktree this run recorded: the run
+# worktree, each detached entry (graphite) and each owner (github). Nothing
+# else is aborted: a worktree the run never recorded is not ours.
+RECORDED=()
+load_recorded() {
   local i
-  for ((i = 0; i < ${#WT_PATH[@]}; i++)); do
-    if worktree_in_chain_rebase "${WT_PATH[i]}"; then
-      printf '%s' "${WT_PATH[i]}"
-      return 0
-    fi
+  RECORDED=("$S_RUN")
+  for ((i = 0; i < ${#E_PATH[@]}; i++)); do RECORDED+=("${E_PATH[i]}"); done
+  for ((i = 0; i < ${#O_PATH[@]}; i++)); do RECORDED+=("${O_PATH[i]}"); done
+}
+
+# wt_replaced PATH: 0 when, in a bound state, the recorded PATH is a present,
+# registered worktree that cannot be confirmed as the one this run recorded:
+# its .git link is gone, git cannot read it, its top level or own git
+# directory is not PATH's, or that git directory lacks this run's id
+# (bind_worktree), as for a worktree removed and registered again at PATH.
+# A deleted or prunable path is not replaced (it is reported missing), and an
+# unbound state (written before binding) never reports one.
+wt_replaced() {
+  local wi out top gd d st=0
+  [ "${S_BOUND:-}" = 1 ] || return 1
+  # Confirmed gone is not replaced (it is reported missing); not knowing is
+  # not confirmation either way, so it is refused.
+  wt_gone "$1" || st=$?
+  case $st in
+    0) return 1 ;;
+    2) return 0 ;;
+  esac
+  wi=$(wt_index "$1")
+  [ -e "$1/.git" ] || return 0
+  out=$(git -C "$1" rev-parse --show-toplevel --absolute-git-dir 2>/dev/null) || return 0
+  case $out in *$'\n'*) ;; *) return 0 ;; esac
+  top=$(canon_or_raw "${out%%$'\n'*}")
+  gd=$(canon_or_raw "${out#*$'\n'}")
+  [ "$top" = "$1" ] || return 0
+  if [ "$gd" = "$COMMON" ]; then
+    [ "$wi" -eq 0 ] && return 1
+    return 0
+  fi
+  [ "$(canon_or_raw "${gd%/*}")" = "$COMMON/worktrees" ] || return 0
+  d=$(cat -- "$gd/gitdir" 2>/dev/null) || return 0
+  case $d in /*) ;; *) d=$gd/$d ;; esac
+  [ "$(canon_or_raw "${d%/*}")" = "$1" ] || return 0
+  # Only a regular, readable binding holding this run's id (never empty: a
+  # bound state has a validated run id) confirms the worktree; a read error
+  # is never a match.
+  [ -f "$gd/$WT_MARK" ] && [ ! -L "$gd/$WT_MARK" ] && [ -r "$gd/$WT_MARK" ] || return 0
+  d=$(head -c 64 -- "$gd/$WT_MARK" 2>/dev/null) || return 0
+  [ -n "$S_RUNID" ] && [ "$d" = "$S_RUNID" ] && return 1
+  return 0
+}
+
+# refuse_replaced: continue, abort and restore check out, reset, lock, unlock
+# and rebase --abort in recorded worktrees, and run the provider in the run
+# worktree. Before any of that, keep the state and stop (exit 31) when a
+# recorded path holds a worktree this run did not record (wt_replaced),
+# naming each one.
+refuse_replaced() {
+  local p
+  local -a bad=()
+  load_recorded
+  for p in "${RECORDED[@]}"; do
+    if wt_replaced "$p"; then bad+=("$p"); fi
+  done
+  [ "${#bad[@]}" -gt 0 ] || return 0
+  for p in "${bad[@]}"; do
+    err "$(v "$p") cannot be confirmed as the worktree this run recorded (removed and registered again, its .git link changed, or it cannot be read); nothing was run there"
+    note "  fix: restore access to $(v "$p") if a parent directory lost its permissions; otherwise finish any work there, move it aside or remove it (git worktree remove $(q "$p")), then run this again"
+  done
+  die "$X_KEPT" "state kept: a recorded worktree path holds a worktree this run did not record"
+}
+
+# is_recorded PATH: PATH is in RECORDED (load_recorded first).
+is_recorded() {
+  local r
+  for r in "${RECORDED[@]}"; do
+    [ "$r" != "$1" ] || return 0
   done
   return 1
+}
+
+# chain_rebase_worktree: print the path of a recorded worktree that is in the
+# middle of a git rebase of one of the stack branches (gh-stack rebases in the
+# worktree that holds the branch, which need not be the run worktree), and
+# return 0. Return 2, printing the path, when a recorded worktree cannot be
+# read. Return 1 when neither.
+chain_rebase_worktree() {
+  local p rc
+  load_recorded
+  for p in "${RECORDED[@]}"; do
+    rc=0
+    worktree_in_chain_rebase "$p" || rc=$?
+    case $rc in
+      0 | 2)
+        printf '%s' "$p"
+        return "$rc"
+        ;;
+    esac
+  done
+  return 1
+}
+
+# unrecorded_chain_rebases: print "rebasing<TAB>PATH" for each worktree the run
+# did not record that is mid-rebase of a stack branch, and "unreadable<TAB>PATH"
+# for one whose rebase state cannot be read (it may be such a rebase). --abort
+# leaves them alone; status, continue and abort name them. A rebase detaches
+# HEAD, so a worktree on a branch is skipped without running git.
+unrecorded_chain_rebases() {
+  local i p st
+  load_recorded
+  for ((i = 0; i < ${#WT_PATH[@]}; i++)); do
+    p=${WT_PATH[i]}
+    [ -z "${WT_BRANCH[i]}" ] || continue
+    if is_recorded "$p"; then
+      # A recorded path now holding another worktree (removed and registered
+      # again during the pause) is probed as an unrecorded one.
+      st=0
+      worktree_in_chain_rebase "$p" || st=$?
+      [ "$st" -eq 1 ] || continue
+    fi
+    st=0
+    worktree_in_chain_rebase "$p" any || st=$?
+    case $st in
+      0) printf 'rebasing\t%s\n' "$p" ;;
+      2) printf 'unreadable\t%s\n' "$p" ;;
+    esac
+  done
+  return 0
+}
+
+# unrecorded_note LINE [INDENT]: name one unrecorded_chain_rebases line.
+unrecorded_note() {
+  local tag=${1%%$'\t'*} p=${1#*$'\t'}
+  if [ "$tag" = unreadable ]; then
+    note "${2:-}not recorded: $(v "$p") has a rebase state that cannot be read; --abort leaves it alone"
+  else
+    note "${2:-}not recorded: $(v "$p") is rebasing a stack branch (perhaps another session's); --abort leaves it alone"
+  fi
+}
+
+# note_unrecorded_fixes LINES: a fix line per unrecorded_chain_rebases line.
+note_unrecorded_fixes() {
+  local line p
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    p=${line#*$'\t'}
+    if [ "${line%%$'\t'*}" = unreadable ]; then
+      note "  fix: git -C $(q "$p") status   (see whose operation it is first)"
+    else
+      note "  fix: git -C $(q "$p") rebase --abort   (only if it is not another session's rebase)"
+    fi
+  done <<<"$1"
+}
+
+# unrecorded_keeps_state LINES NO-ROLLBACK: 0 when an unrecorded rebase in LINES
+# (unrecorded_chain_rebases) may be this run's own, so the state must be kept.
+# Only gh-stack rebases outside the run worktree, and it does so in the
+# worktrees recorded as owners: a github state with no owner lines (written
+# before they were recorded) cannot rule any worktree out, and one whose
+# provider has no paused restack or rollback on record (NO-ROLLBACK 1) may have
+# lost the record of it. An unreadable rebase state counts too: it may be that
+# rebase, and gh-stack's conflict worktree is exactly where it would be.
+unrecorded_keeps_state() {
+  [ "$S_PROVIDER" = github ] || return 1
+  case $'\n'"$1" in
+    *$'\n'rebasing$'\t'* | *$'\n'unreadable$'\t'*) ;;
+    *) return 1 ;;
+  esac
+  [ "${#O_PATH[@]}" -eq 0 ] || [ "$2" = 1 ]
+}
+
+# unrecorded_reason: why unrecorded_keeps_state held, for the refusal.
+unrecorded_reason() {
+  if [ "${#O_PATH[@]}" -eq 0 ]; then
+    printf 'this state records no worktrees that held a stack branch, so gh-stack may have rebased there'
+  else
+    printf 'the provider has no paused restack or rollback on record, so the rebase may be this run'"'"'s own'
+  fi
+}
+
+# gh_paused: gh-stack records a paused rebase, and this is a github run. A
+# gh-stack-rebase-state left beside a graphite run is no record of it.
+gh_paused() { [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; }
+
+# provider_paused: the recorded provider, and only it, records a paused restack
+# (gh-stack's rebase state, or Graphite's continue marker in the run worktree).
+# Another provider's leftover marker must never stand in for a lost one.
+provider_paused() {
+  gh_paused || { [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; }
 }
 
 # release_run_worktree START: `git rebase --abort` leaves the run worktree on
 # the branch it was rebasing. Check the recorded start branch START back out so
 # that branch's own worktree can be restored. A non-stack branch is left as it
-# is.
+# is. On failure RELEASE_WHY says why: busy, floating, unreadable or checkout.
+RELEASE_WHY=""
 release_run_worktree() {
   local start=$1 cur head line
+  RELEASE_WHY=""
   [ -n "$start" ] || return 0
+  # Recheck the binding here too: a provider step may have run since the
+  # command's refuse_replaced.
+  load_worktrees 2>/dev/null || {
+    RELEASE_WHY=unreadable
+    return 1
+  }
+  if wt_replaced "$S_RUN"; then
+    err "$(v "$S_RUN") cannot be confirmed as this run's worktree; not checking out $(v "$start")"
+    RELEASE_WHY=replaced
+    return 1
+  fi
   cur=$(git -C "$S_RUN" branch --show-current 2>/dev/null) || cur=""
   if [ "$cur" = "$start" ] || { [ -n "$cur" ] && ! in_chain "$cur"; }; then
     return 0
   fi
+  # A checkout in the middle of a merge, cherry-pick or rebase would fail or,
+  # with nothing staged yet, carry the half-done work onto the start branch.
+  # No recorded worktree is checked out while any of them is mid-operation
+  # or unreadable (recorded_hold).
+  local why
+  if why=$(recorded_hold); then
+    if [ "${why%%$'\t'*}" = unreadable ]; then
+      err "$(v "${why#*$'\t'}") cannot be read; not checking out $(v "$start") in $(v "$S_RUN")"
+      RELEASE_WHY=unreadable
+    else
+      err "$(v "${why#*$'\t'}") has a $(v "${why%%$'\t'*}") in progress; not checking out $(v "$start") in $(v "$S_RUN")"
+      RELEASE_WHY=busy
+    fi
+    return 1
+  fi
   if [ -z "$cur" ]; then
     # A detached run worktree may hold commits no branch has. The checkout
     # below would orphan them, so report them and refuse instead.
-    head=$(git -C "$S_RUN" rev-parse HEAD 2>/dev/null) || return 1
+    head=$(git -C "$S_RUN" rev-parse HEAD 2>/dev/null) || {
+      RELEASE_WHY=unreadable
+      return 1
+    }
     if [ -z "$(git -C "$S_RUN" for-each-ref --count=1 --contains "$head" refs/heads 2>/dev/null)" ]; then
       err "$(v "$S_RUN") is detached at $(v "${head:0:12}"), a commit no branch holds; not checking out $(v "$start")"
       # Hashes only: a commit subject is repository text, not ours to print.
@@ -1566,58 +2133,120 @@ release_run_worktree() {
         printf '  floating commit: %s\n' "$(v "$line")"
       done
       printf '  rescue: git -C %s branch <new-name> HEAD   (or cherry-pick onto %s)\n' "$(q "$S_RUN")" "$(q "$start")"
+      RELEASE_WHY=floating
       return 1
     fi
   fi
-  git -C "$S_RUN" checkout --quiet "$start" -- >/dev/null 2>&1
+  git -C "$S_RUN" checkout --quiet "$start" -- >/dev/null 2>&1 || {
+    RELEASE_WHY=checkout
+    return 1
+  }
 }
 
-# abort_in_chain_rebases: clear every in-chain rebase. Each worktree is tried
-# once, so a marker that will not clear cannot spin and cannot hide the
-# abortable rebases in later worktrees. A failed attempt prints a fixed line
-# (git's own error can carry repository-controlled text, so it is not echoed)
-# and sets ABORT_STUCK to the first worktree that is still mid-rebase.
-# Nonzero when any attempt failed.
-ABORT_STUCK=""
+# release_advice START CMD: what to do after release_run_worktree refused, by
+# RELEASE_WHY, ending with "then run CMD again".
+release_advice() {
+  case $RELEASE_WHY in
+    busy) printf 'Finish or abort the operation in progress there, then run %s again' "$2" ;;
+    floating) printf 'Keep the floating commits listed above (see the rescue line), then run %s again' "$2" ;;
+    unreadable) printf 'Check it with git -C %s status, then run %s again' "$(q "$S_RUN")" "$2" ;;
+    replaced) printf 'Restore access to %s, or move it aside or remove it (git worktree remove %s), then run %s again' "$(v "$S_RUN")" "$(q "$S_RUN")" "$2" ;;
+    *) printf 'Check out %s there (git -C %s checkout %s; git names any local change that blocks it), then run %s again' "$(v "$1")" "$(q "$S_RUN")" "$(q "$1")" "$2" ;;
+  esac
+}
+
+# abort_in_chain_rebases: clear every in-chain rebase in the worktrees this run
+# recorded (load_recorded). Each worktree is tried once, so a marker that will
+# not clear cannot spin and cannot hide the abortable rebases in later
+# worktrees. A failed attempt, or a worktree whose rebase state cannot be read,
+# prints a fixed line naming it (git's own error can carry repository-controlled
+# text, so it is not echoed) and adds it to ABORT_STUCK. Nonzero when any
+# worktree is left stuck.
+ABORT_STUCK=() ABORT_WHY=()
 abort_in_chain_rebases() {
-  local i p rc=0
-  ABORT_STUCK=""
-  for ((i = 0; i < ${#WT_PATH[@]}; i++)); do
-    p=${WT_PATH[i]}
-    worktree_in_chain_rebase "$p" || continue
-    if git -C "$p" rebase --abort >/dev/null 2>&1 && ! worktree_in_chain_rebase "$p"; then
-      continue
+  local p rc=0 st
+  ABORT_STUCK=() ABORT_WHY=()
+  load_recorded
+  for p in "${RECORDED[@]}"; do
+    st=0
+    worktree_in_chain_rebase "$p" || st=$?
+    if [ "$st" -eq 0 ]; then
+      # 3: still rebasing after the abort, or the abort failed.
+      st=3
+      if git -C "$p" rebase --abort </dev/null >/dev/null 2>&1; then
+        st=0
+        worktree_in_chain_rebase "$p" || st=$?
+        [ "$st" -ne 0 ] || st=3
+      fi
     fi
+    case $st in
+      1) continue ;;
+      2)
+        ABORT_WHY+=(unreadable)
+        err "cannot read the git rebase state of $(v "$p"); left as it is. Check it with git -C $(q "$p") status"
+        ;;
+      *)
+        ABORT_WHY+=(abort)
+        err "git rebase --abort did not clear the rebase in $(v "$p"); run it there by hand to see git's error"
+        ;;
+    esac
     rc=1
-    [ -n "$ABORT_STUCK" ] || ABORT_STUCK=$p
-    err "git rebase --abort did not clear the rebase in $(v "$p"); run it there by hand to see git's error"
+    ABORT_STUCK+=("$p")
   done
   return "$rc"
 }
 
-# in_chain_busy: print "<operation>\t<path>" and return 0 when the run worktree,
-# a recorded detached entry, or a worktree checked out on a recorded stack
-# branch is mid-operation. Return 2 when the worktree list cannot be read.
-# Unrelated worktrees are skipped on purpose: wt_busy reports an unreadable
-# worktree as busy, so scanning a broken one outside the stack would block the
-# abort over something the restack never touched.
+# abort_stuck_list: the stuck worktrees, printable, comma-separated.
+abort_stuck_list() {
+  local i out=""
+  for ((i = 0; i < ${#ABORT_STUCK[@]}; i++)); do
+    out="${out:+$out, }$(v "${ABORT_STUCK[i]}")"
+  done
+  printf '%s' "$out"
+}
+
+# note_stuck_fixes: one fix line per stuck worktree. A rebase aborted by hand
+# shows git's own error; an unreadable rebase state is inspected first.
+note_stuck_fixes() {
+  local i
+  for ((i = 0; i < ${#ABORT_STUCK[@]}; i++)); do
+    if [ "${ABORT_WHY[i]}" = unreadable ]; then
+      note "  fix: git -C $(q "${ABORT_STUCK[i]}") status   (then finish or abort its rebase)"
+    else
+      note "  fix: git -C $(q "${ABORT_STUCK[i]}") rebase --abort"
+    fi
+  done
+}
+
+# in_chain_busy: print "<operation>\t<path>" and return 0 when a recorded
+# worktree (load_recorded: the run worktree, a detached entry or an owner) or a
+# worktree checked out on a recorded stack branch is mid-operation. Return 2
+# when the worktree list cannot be read. Unrelated worktrees are skipped on
+# purpose: wt_busy reports an unreadable worktree as busy, so scanning a broken
+# one outside the stack would block the abort over something the restack never
+# touched.
 in_chain_busy() {
-  local i p b busy wi
+  local i p b busy
   local -a paths=()
   load_worktrees || return 2
-  paths+=("$S_RUN")
-  for ((i = 0; i < ${#E_PATH[@]}; i++)); do
-    # An entry whose worktree was removed or pruned during the pause is dropped
-    # by restore_entries; wt_busy would call its unreadable path busy forever.
-    wi=$(wt_index "${E_PATH[i]}")
-    if [ "$wi" -lt 0 ] || [ "${WT_PRUNABLE[wi]}" -ne 0 ]; then
+  load_recorded
+  for ((i = 0; i < ${#RECORDED[@]}; i++)); do
+    p=${RECORDED[i]}
+    # A recorded worktree (index 0 is the run's own) that was removed or pruned
+    # during the pause is dropped by restore_entries; wt_busy would call its
+    # unreadable path busy forever. A paused graphite run locks its entries,
+    # and git never reports a locked worktree prunable, so a deleted directory
+    # is checked for itself.
+    # One that cannot be confirmed gone stays: wt_busy calls it unreadable.
+    if [ "$i" -gt 0 ] && wt_gone "$p"; then
       continue
     fi
-    paths+=("${E_PATH[i]}")
+    paths+=("$p")
   done
   for ((i = 0; i < ${#WT_PATH[@]}; i++)); do
     b=${WT_BRANCH[i]#refs/heads/}
-    if in_chain "$b"; then
+    # A deleted worktree still listed on its branch holds no operation.
+    if in_chain "$b" && ! wt_gone "${WT_PATH[i]}"; then
       paths+=("${WT_PATH[i]}")
     fi
   done
@@ -1638,8 +2267,9 @@ in_chain_busy() {
 # worktree cannot be restored. Check the start branch back out first; refuse,
 # keeping the state, when that would lose commits or git refuses the checkout.
 continue_release_run() {
-  release_run_worktree "${S_CHAIN[1]:-}" ||
-    die "$X_KEPT" "could not return the run worktree $(v "$S_RUN") to $(v "${S_CHAIN[1]:-}") before restoring; state kept. Check out $(v "${S_CHAIN[1]:-}") there (resolving any local changes first), then run --continue again"
+  local start=${S_CHAIN[1]:-}
+  release_run_worktree "$start" ||
+    die "$X_KEPT" "could not return the run worktree $(v "$S_RUN") to $(v "$start") before restoring; state kept. $(release_advice "$start" --continue)"
 }
 
 cmd_continue() {
@@ -1648,6 +2278,7 @@ cmd_continue() {
   require_env
   load_state_or_exit
   need_lock
+  refuse_replaced
   report_all_floating
   # A valid marker means this run was aborted at the provider and only the
   # abort cleanup is pending; continuing would treat the rollback as success.
@@ -1657,12 +2288,26 @@ cmd_continue() {
   # A git rebase still in progress that the provider has no record of (an
   # adapter timeout, a lost marker) is not "nothing paused": finishing now
   # would clear the state and the lock over a half-applied restack.
-  local busy
-  if busy=$(chain_rebase_worktree) && [ ! -e "$COMMON/gh-stack-rebase-state" ] \
-    && ! { [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; }; then
-    note "a git rebase of this stack is still in progress in $(v "$busy") but the provider reports none paused; state kept"
-    note "finish it with git (rebase --continue or --abort) and run --continue again, or run --abort"
-    exit "$X_PAUSED"
+  local busy line foreign brc=0
+  busy=$(chain_rebase_worktree) || brc=$?
+  if [ "$brc" -eq 2 ]; then
+    die "$X_KEPT" "cannot read the git rebase state of $(v "$busy"); state kept. Check it with git -C $(q "$busy") status, then run --continue again"
+  fi
+  if ! provider_paused; then
+    if [ "$brc" -eq 0 ]; then
+      note "a git rebase of this stack is still in progress in $(v "$busy") but the provider reports none paused; state kept"
+      note "finish it with git (rebase --continue or --abort) and run --continue again, or run --abort"
+      exit "$X_PAUSED"
+    fi
+    # Nothing recorded is rebasing, but a worktree the run did not record
+    # rebases a stack branch, and it may be this run's own: keep the state.
+    # --abort would refuse for the same reason, so it is not offered.
+    foreign=$(unrecorded_chain_rebases)
+    if unrecorded_keeps_state "$foreign" 1; then
+      while IFS= read -r line; do unrecorded_note "$line"; done <<<"$foreign"
+      note_unrecorded_fixes "$foreign"
+      die "$X_KEPT" "a worktree this run did not record is rebasing a stack branch (or its rebase state cannot be read) and $(unrecorded_reason); state kept. Find out whose rebase it is and finish or abort it there, then run --continue again"
+    fi
   fi
   if [ "$S_PROVIDER" = graphite ]; then
     command -v gt >/dev/null 2>&1 || die "$X_KEPT" "gt (Graphite CLI) is not installed; state kept"
@@ -1679,7 +2324,7 @@ cmd_continue() {
       continue_release_run
       RESULT=ok
     fi
-  elif [ -e "$COMMON/gh-stack-rebase-state" ]; then
+  elif gh_paused; then
     step_github continue
   else
     note "no provider rebase is paused; verifying and restoring"
@@ -1778,8 +2423,9 @@ cmd_abort() {
   require_env
   load_state_or_exit
   need_lock
+  refuse_replaced
   report_all_floating
-  local provider_aborted=0 left moved start=${S_CHAIN[1]:-}
+  local provider_aborted=0 rebasing="" rrc=1 no_rollback=0 moved start=${S_CHAIN[1]:-}
   if [ "$S_PROVIDER" = graphite ] && abort_recorded && ! gt_paused "$S_RUN"; then
     : # a recorded provider abort leaves nothing for gt to do, so a retry needs no gt.
     # A marker beside a still-paused Graphite conflict is stale or forged: gt abort runs.
@@ -1794,13 +2440,20 @@ cmd_abort() {
       }
       provider_aborted=1
     fi
-  elif [ -e "$COMMON/gh-stack-rebase-state" ]; then
+  elif gh_paused; then
     begin_abort
     step_github abort
     [ "$RESULT" = ok ] || {
       die "$X_KEPT" "$ABORT_UNCLEAR"
     }
     provider_aborted=1
+  fi
+  # With no provider rollback run or on record, a recorded worktree still
+  # rebasing a stack branch means the provider lost track of it.
+  if [ "$provider_aborted" = 0 ] && ! abort_recorded; then
+    no_rollback=1
+    rrc=0
+    rebasing=$(chain_rebase_worktree) || rrc=$?
   fi
   if [ "$provider_aborted" = 1 ]; then
     # The marker tells a later --abort the provider already rolled back. A
@@ -1818,12 +2471,14 @@ cmd_abort() {
     if [ -n "$S_RUNID" ]; then
       write_aborted_marker 2>/dev/null || MARKER_PENDING=1
     fi
-  elif ! abort_recorded && left=$(chain_rebase_worktree); then
+  elif [ "$rrc" -eq 2 ]; then
+    die "$X_KEPT" "cannot read the git rebase state of $(v "$rebasing"); state kept, nothing aborted or restored. Check it with git -C $(q "$rebasing") status, then run --abort again"
+  elif [ "$rrc" -eq 0 ]; then
     # The provider lost its record (Graphite's .gtcontinue or gh-stack's
     # rebase state) mid-restack, so its whole-stack rollback cannot run.
     # Aborting only this rebase would leave branches that already restacked
     # rebased and report success; keep everything for a manual recovery.
-    die "$X_KEPT" "a rebase of a stack branch is in progress in $(v "$left") but the provider has no record of it, so its whole-stack rollback cannot run; state kept, nothing aborted or restored. Abort that rebase by hand, reset any stack branch that already restacked, then run --abort again"
+    die "$X_KEPT" "a rebase of a stack branch is in progress in $(v "$rebasing") but the provider has no record of it, so its whole-stack rollback cannot run; state kept, nothing aborted or restored. Abort that rebase by hand, reset any stack branch that already restacked, then run --abort again"
   elif moved=$(moved_tips); then
     # No rebase directory is left, yet stack branches are not where they
     # started: the user finished the paused rebase with git, or the provider
@@ -1837,15 +2492,29 @@ cmd_abort() {
     die "$X_KEPT" "the provider has no paused restack to roll back and this state file has no recorded start tips, so it cannot tell whether stack branches were already restacked; state kept, nothing aborted or restored. Inspect the stack branches and, if needed, point them back by hand (reset it in the worktree that has the branch checked out, else git branch -f <branch> <commit>). Then run --continue to keep them, or run restore (no provider) to put the worktrees back and clear the state"
   fi
   # The provider abort only clears the rebase it recorded. Abort any other
-  # in-chain git rebase (a stack branch, in whichever worktree holds it),
-  # then refuse to restore while one of those worktrees is still busy.
+  # in-chain git rebase in a worktree this run recorded (gh-stack rebases in
+  # whichever worktree holds the branch), then refuse to restore while one of
+  # those worktrees is still busy. A worktree the run never recorded is left
+  # alone and named.
+  local foreign line
+  foreign=$(unrecorded_chain_rebases)
+  if [ -n "$foreign" ]; then
+    while IFS= read -r line; do unrecorded_note "$line"; done <<<"$foreign"
+    # When that rebase may be this run's own, clearing the state now would let
+    # it move a stack branch afterwards.
+    if unrecorded_keeps_state "$foreign" "$no_rollback"; then
+      note_unrecorded_fixes "$foreign"
+      abort_die "a worktree this run did not record is rebasing a stack branch (or its rebase state cannot be read) and $(unrecorded_reason); state kept, nothing restored. Find out whose rebase it is and abort it there if it is this run's, then run --abort again"
+    fi
+  fi
   if ! abort_in_chain_rebases; then
+    note_stuck_fixes
     # The provider rollback already ran, so a retry must not reach the
     # lost-provider branch: it needs the marker, or no rebase left to find.
     if ! rollback_recorded; then
-      die "$X_KEPT" "the provider's abort succeeded, but the marker $(v "$ABORTED_FILE") could not be written and a rebase operation is still in progress in $(v "$ABORT_STUCK"); state kept, nothing restored. Abort that rebase by hand (git -C $(q "$ABORT_STUCK") rebase --abort) before running --abort again; fixing only the marker path is not enough, because a rerun with that rebase in place would wrongly ask for a manual whole-stack reset"
+      die "$X_KEPT" "the provider's abort succeeded, but the marker $(v "$ABORTED_FILE") could not be written and a rebase operation is still in progress in $(abort_stuck_list) (or its state cannot be read); state kept, nothing restored. Run each fix line above before running --abort again; fixing only the marker path is not enough, because a rerun with that rebase in place would wrongly ask for a manual whole-stack reset"
     fi
-    abort_die "a rebase operation is still in progress in $(v "$ABORT_STUCK"); state kept, nothing restored. Finish or abort it (git -C $(q "$ABORT_STUCK") rebase --abort), then run --abort again"
+    abort_die "a rebase operation is still in progress in $(abort_stuck_list) (or its state cannot be read); state kept, nothing restored. Run each fix line above, then run --abort again"
   fi
   # An auxiliary rebase abort restores that rebase's own orig-head, which can
   # be a restacked tip the provider rollback had just undone. Recheck before
@@ -1853,8 +2522,12 @@ cmd_abort() {
   if moved=$(moved_tips); then
     refuse_moved "stack branches are not at their starting commits after the abort:" "$moved"
   fi
+  # A rebase aborted in the run worktree (by the provider, above, or by hand
+  # during the pause) leaves it on the stack branch it was rebasing, which the
+  # restore needs elsewhere. release_run_worktree does nothing unless the run
+  # worktree is on such a branch, and refuses while an operation is running there.
   if ! release_run_worktree "$start"; then
-    abort_die "could not return the run worktree to $(v "$start"); state kept, nothing restored"
+    abort_die "could not return the run worktree $(v "$S_RUN") to $(v "$start"); state kept, nothing restored. $(release_advice "$start" --abort)"
   fi
   local busy_line rc busy_name busy_path
   busy_line=$(in_chain_busy) || rc=$?
@@ -1881,9 +2554,10 @@ cmd_restore() {
   require_env
   load_state_or_exit
   need_lock
+  refuse_replaced
   if [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; then
     note "warning: a conflict is still paused; restoring now strands the provider's own --continue. Prefer /worktree:restack --continue or --abort"
-  elif [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; then
+  elif gh_paused; then
     note "warning: a GitHub restack conflict is still paused; restore will not clear state while gh-stack-rebase-state exists. Prefer /worktree:restack --continue or --abort"
   fi
   report_all_floating
@@ -1907,24 +2581,65 @@ cmd_status() {
   printf 'stack: %s' "$(v "${S_CHAIN[0]}")"
   for ((i = 1; i < ${#S_CHAIN[@]}; i++)); do printf ' -> %s' "$(v "${S_CHAIN[i]}")"; done
   printf '\n'
-  if { gt_paused "$S_RUN" 2>/dev/null; } || { [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; }; then note "a conflict is paused in the run worktree"; fi
+  if { [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN" 2>/dev/null; } || gh_paused; then note "a conflict is paused in the run worktree"; fi
   for ((i = 0; i < ${#E_PATH[@]}; i++)); do
     wi=$(wt_index "${E_PATH[i]}")
     if [ "$wi" -lt 0 ]; then
-      note "  missing:   $(v "${E_PATH[i]}") is no longer a worktree"
+      status_line missing "$(v "${E_PATH[i]}") is no longer a worktree"
       continue
     fi
     cur=${WT_BRANCH[wi]}
     if [ "$cur" = "${E_REF[i]}" ]; then
-      note "  on branch: $(v "${E_PATH[i]}") ($(v "${E_REF[i]#refs/heads/}"))"
+      status_line "on branch" "$(v "${E_PATH[i]}") ($(v "${E_REF[i]#refs/heads/}"))"
     elif [ -z "$cur" ]; then
-      note "  detached:  $(v "${E_PATH[i]}") ($(v "${E_REF[i]#refs/heads/}"))"
+      status_line detached "$(v "${E_PATH[i]}") ($(v "${E_REF[i]#refs/heads/}"))"
       report_floating "$i" || true
     else
-      note "  moved:     $(v "${E_PATH[i]}") is on $(v "${cur#refs/heads/}")"
+      status_line moved "$(v "${E_PATH[i]}") is on $(v "${cur#refs/heads/}")"
     fi
   done
+  # What --abort would meet in each recorded worktree: RECORDED is the run
+  # worktree (index 0), the entries named above, then the owners.
+  local why rst p line
+  load_recorded
+  for ((i = 0; i < ${#RECORDED[@]}; i++)); do
+    p=${RECORDED[i]}
+    if wt_replaced "$p"; then
+      status_line replaced "$(v "$p") (not confirmed as this run's worktree; --continue, --abort and restore refuse)"
+      continue
+    fi
+    if [ "$i" -gt "${#E_PATH[@]}" ]; then
+      if wt_gone "$p"; then
+        status_line missing "$(v "$p") is no longer a worktree"
+        continue
+      fi
+      status_line owner "$(v "$p")"
+    fi
+    rst=0
+    worktree_in_chain_rebase "$p" || rst=$?
+    case $rst in
+      # The run worktree's own paused rebase is reported above.
+      0) [ "$i" -eq 0 ] || status_line rebasing "$(v "$p") (a stack branch; --abort aborts it)" ;;
+      2) status_line unreadable "$(v "$p") (its rebase state cannot be read; --abort stops here)" ;;
+      *)
+        # A deleted or unregistered worktree was already named above, or holds
+        # nothing to report; wt_busy would call it busy.
+        if [ "$i" -eq 0 ] || wt_gone "$p"; then
+          continue
+        fi
+        if why=$(wt_busy "$p"); then status_line busy "$(v "$p") ($(v "$why") in progress)"; fi
+        ;;
+    esac
+  done
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    unrecorded_note "$line" "  "
+  done < <(unrecorded_chain_rebases)
 }
+
+# status_line LABEL TEXT: one indented status line, labels aligned to the
+# widest ("not recorded:", printed by unrecorded_note).
+status_line() { note "  $(printf '%-14s' "$1:")$2"; }
 
 # status with no state still looks for a stranded worktree: detached at the tip
 # of a local branch that no worktree has checked out.
