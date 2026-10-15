@@ -195,7 +195,8 @@ branch). Then it restores. Every worktree it stops on is named with a fix line.
 - **Unrecorded worktree.** A rebase in a worktree the run never recorded is
   left alone and named (`not recorded: ...`); it may be another session's.
   For GitHub it keeps the state (exit `31`) on `--abort` and `--continue` when
-  that rebase may be the run's own: the state has no `owner` lines (written
+  that rebase, or a rebase state there that cannot be read, may be the run's
+  own: the state has no `owner` lines (written
   before they were recorded), or the provider has no paused restack or
   rollback on record.
 - **Stuck or unreadable.** The state is kept (exit `31`) and nothing restored

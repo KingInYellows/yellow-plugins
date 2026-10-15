@@ -1567,12 +1567,12 @@ canon_or_raw() { canon "$1" || printf '%s' "$1"; }
 # itself is probed: a path git no longer lists (or lists as prunable), a
 # deleted directory, one whose .git link is gone (git -C would walk up into
 # another checkout), or one recreated as another repository (its common git
-# directory is not this repository's) holds no rebase this run may abort, so it
-# is 1. A directory git cannot read, or a rebase path that is not a readable
+# directory is not this repository's), or one whose .git link names another
+# worktree's git directory, holds no rebase this run may abort, so it is 1. A directory git cannot read, or a rebase path that is not a readable
 # directory with a non-empty head-name, is 2: the caller fails closed. A
 # rebase-apply holding `applying` is a `git am`, not a rebase.
 worktree_in_chain_rebase() {
-  local wi out top gcd merge apply d b n=0
+  local wi out top gd gcd merge apply d b n=0
   local -a l=()
   wi=$(wt_index "$1")
   [ "$wi" -ge 0 ] || return 1
@@ -1580,20 +1580,35 @@ worktree_in_chain_rebase() {
   [ -d "$1" ] || return 1
   # Without its .git link, git -C would walk up into another checkout.
   [ -e "$1/.git" ] || return 1
-  out=$(git -C "$1" rev-parse --show-toplevel --path-format=absolute \
+  out=$(git -C "$1" rev-parse --show-toplevel --absolute-git-dir --path-format=absolute \
     --git-common-dir --git-path rebase-merge --git-path rebase-apply 2>/dev/null) || return 2
   while IFS= read -r d; do l[n]=$d; n=$((n + 1)); done <<<"$out"
-  # Four absolute lines, or git did not understand the request (an older git
+  # Five absolute lines, or git did not understand the request (an older git
   # prints --path-format back as output).
-  [ "$n" -eq 4 ] || return 2
+  [ "$n" -eq 5 ] || return 2
   for d in "${l[@]}"; do
     case $d in /*) ;; *) return 2 ;; esac
   done
   top=$(canon_or_raw "${l[0]}")
   [ "$top" = "$1" ] || return 1
-  gcd=$(canon_or_raw "${l[1]}")
+  gd=$(canon_or_raw "${l[1]}")
+  gcd=$(canon_or_raw "${l[2]}")
   [ "$gcd" = "$COMMON" ] || return 1
-  merge=${l[2]} apply=${l[3]}
+  # The per-worktree git directory must be PATH's own: the common directory for
+  # the main worktree (listed first), else a worktrees/ entry whose gitdir file
+  # points back at PATH/.git. A .git link copied from another worktree passes
+  # the checks above but would abort that worktree's rebase.
+  if [ "$gd" = "$COMMON" ]; then
+    [ "$wi" -eq 0 ] || return 1
+  else
+    [ "$(canon_or_raw "${gd%/*}")" = "$COMMON/worktrees" ] || return 1
+    [ -f "$gd/gitdir" ] && [ -r "$gd/gitdir" ] || return 1
+    d=$(cat -- "$gd/gitdir" 2>/dev/null) || return 1
+    # worktree.useRelativePaths writes it relative to the git directory.
+    case $d in /*) ;; *) d=$gd/$d ;; esac
+    [ "$(canon_or_raw "${d%/*}")" = "$1" ] || return 1
+  fi
+  merge=${l[3]} apply=${l[4]}
   [ ! -e "$apply/applying" ] || apply=""
   for d in "$merge" "$apply"; do
     [ -n "$d" ] || continue
@@ -1703,12 +1718,12 @@ note_unrecorded_fixes() {
 # worktrees recorded as owners: a github state with no owner lines (written
 # before they were recorded) cannot rule any worktree out, and one whose
 # provider has no paused restack or rollback on record (NO-ROLLBACK 1) may have
-# lost the record of it. An unreadable rebase state does not count here: it is
-# named, but cannot be told from an unrelated worktree's.
+# lost the record of it. An unreadable rebase state counts too: it may be that
+# rebase, and gh-stack's conflict worktree is exactly where it would be.
 unrecorded_keeps_state() {
   [ "$S_PROVIDER" = github ] || return 1
   case $'\n'"$1" in
-    *$'\n'rebasing$'\t'*) ;;
+    *$'\n'rebasing$'\t'* | *$'\n'unreadable$'\t'*) ;;
     *) return 1 ;;
   esac
   [ "${#O_PATH[@]}" -eq 0 ] || [ "$2" = 1 ]
@@ -1937,7 +1952,7 @@ cmd_continue() {
     if unrecorded_keeps_state "$foreign" 1; then
       while IFS= read -r line; do unrecorded_note "$line"; done <<<"$foreign"
       note_unrecorded_fixes "$foreign"
-      die "$X_KEPT" "a worktree this run did not record is rebasing a stack branch and $(unrecorded_reason); state kept. Find out whose rebase it is and finish or abort it there, then run --continue again"
+      die "$X_KEPT" "a worktree this run did not record is rebasing a stack branch (or its rebase state cannot be read) and $(unrecorded_reason); state kept. Find out whose rebase it is and finish or abort it there, then run --continue again"
     fi
   fi
   if [ "$S_PROVIDER" = graphite ]; then
@@ -2134,7 +2149,7 @@ cmd_abort() {
     # it move a stack branch afterwards.
     if unrecorded_keeps_state "$foreign" "$no_rollback"; then
       note_unrecorded_fixes "$foreign"
-      abort_die "a worktree this run did not record is rebasing a stack branch and $(unrecorded_reason); state kept, nothing restored. Find out whose rebase it is and abort it there if it is this run's, then run --abort again"
+      abort_die "a worktree this run did not record is rebasing a stack branch (or its rebase state cannot be read) and $(unrecorded_reason); state kept, nothing restored. Find out whose rebase it is and abort it there if it is this run's, then run --abort again"
     fi
   fi
   if ! abort_in_chain_rebases; then

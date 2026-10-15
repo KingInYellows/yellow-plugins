@@ -1880,6 +1880,46 @@ legacy_tipless() {
   rebase_marker "$(wtp c)"
 }
 
+@test "--abort never aborts another worktree's rebase through a copied .git link at a recorded path" {
+  mk_stack b
+  git -C "$REPO" worktree add -q --detach "$T/wt-extra" c
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  # The recorded entry's .git link now names the unrecorded worktree's git
+  # directory: top level and common directory still match, the git dir does not.
+  cp -f "$T/wt-extra/.git" "$(wtp c)/.git"
+  plant_rebase "$T/wt-extra" c c
+  run bash "$SCRIPT" abort --provider graphite
+  [[ $output != *"did not clear the rebase in $(wtp c)"* ]]
+  [[ $output == *"not recorded: $T/wt-extra is rebasing a stack branch"* ]]
+  # Never aborted: the unrecorded worktree's rebase is still there.
+  rebase_marker "$T/wt-extra"
+}
+
+@test "github: a state with no owner lines keeps the state over an unrecorded unreadable rebase state" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack b
+  orig_a=$(git rev-parse a)
+  git -C "$REPO" worktree add -q --detach "$T/wt-extra" c
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  grep -v '^owner' "$SD/state" >|"$SD/state.legacy"
+  mv -f "$SD/state.legacy" "$SD/state"
+  lose_github_record "$orig_a"
+  # A rebase directory with no head-name: it may be gh-stack's own.
+  gd=$(git -C "$T/wt-extra" rev-parse --path-format=absolute --git-dir)
+  mkdir -p "$gd/rebase-merge"
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" continue --provider github
+  [ "$status" -eq 31 ]
+  [[ $output == *"not recorded: $T/wt-extra has a rebase state that cannot be read"* ]]
+  [ -e "$SD/state" ]
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" abort --provider github
+  [ "$status" -eq 31 ]
+  [[ $output == *"records no worktrees that held a stack branch"* ]]
+  [ -e "$SD/state" ]
+  [ -d "$gd/rebase-merge" ]
+}
+
 @test "--abort tries every stuck recorded worktree and names them all" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
