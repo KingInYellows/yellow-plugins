@@ -885,6 +885,49 @@ boundary from the pack and fenced-output files above:
   still relays its path through the model. It is guarded by a shape check on
   `/tmp/council-claude-fenced-*.txt` plus identity with the minted literal;
   converting it to a state file is a follow-up.
+- **Verification files**: 5b also writes `citations.jsonl` (each finding's id,
+  file, line and quoted `Evidence:` text) and `verification.tsv` (its
+  result). The evidence check reads cited files only after a strict citation
+  parse (ASCII allowlist path, no leading `/`, `~` or `-`, no `..` or `.git`
+  segment, a numeric line within the file, yellow-core's `validate_file_path`,
+  and a file git does not ignore), so a reviewer cannot make it read outside
+  the repository or turn an ignored `.env` into a yes/no oracle. The
+  `rapidfuzz` probe runs from `/`, because `python3 -c` would otherwise import
+  a `rapidfuzz.py` planted in the checkout under review. `verification.tsv`
+  shows file tokens with non-allowlist characters as `?`. Window lines reach the
+  Tier 2 scorer in memory and through pipes only, redacted by
+  `cs_redact_secrets`; lines inside a private-key block are replaced before
+  redaction.
+
+#### Report staging (yellow-council Step 7)
+
+Step 7 used to carry the synthesis markdown into Bash in a quoted heredoc. A
+reviewer quote equal to the delimiter would have ended it and run the rest as
+shell input, so the markdown now reaches the shell through a file:
+
+- **7a** mints `/tmp/council-synth-XXXXXX` (0700) and a 32-hex token in
+  `.token` (written with `>|`), and prints `COUNCIL_REPORT_FILE=<dir>/synthesis.md`
+  and `COUNCIL_REPORT_TOKEN=<hex>`. It arms no trap: the `Write` in 7b is a
+  later tool call, after 7a's shell has exited.
+- **7b** `Write`s the synthesis to that exact path.
+- **7c** carries both values as literals and never re-reads the expected token
+  from the directory. It refuses (and deletes nothing) unless the directory is
+  `/tmp/council-synth-<suffix>` with a non-empty single-segment suffix and no
+  `..`, a real directory the user owns, with a regular non-symlink `.token`
+  equal to the literal 32-hex token. Only then does it arm an `EXIT` trap whose
+  body repeats that whole check before `rm -rf`, and read exactly
+  `<dir>/synthesis.md`, which must be a regular non-symlink file the user owns.
+- **Known residual (Write)**: `Write` is not path-scoped, and the directory and
+  token must be relayed through the model because `Write` needs the path. The
+  guarantee is that nothing destructive trusts a relayed path and a stray write
+  outside the validated file is never read or deleted. This removes the
+  relayed-literal vector, not a deliberate `Write`; a `Write` deny rule is the
+  real mitigation.
+- **Residual (interrupted run)**: a run cancelled or aborted between 7a and 7c
+  leaves the 0700 directory, holding the staged synthesis, until a later
+  `/council` reaches 5a and its sweep removes directories over 24 hours old. A
+  failed `Write` is still cleaned up: 7c validates the directory, finds no
+  `synthesis.md`, exits 1, and its trap removes the directory.
 
 ### OpenCode default route and quota stubs (yellow-council)
 
@@ -963,7 +1006,7 @@ Plugins that execute shell commands:
 | yellow-browser-test | `agent-browser`, `npm`, `curl`, `gh`         | Browser automation, setup                                  |
 | yellow-debt         | `git`, `gt`, `jq`, `yq`                      | Codebase analysis, commit generation                       |
 | gt-workflow         | `gt`, `git`                                  | Branch and PR management                                   |
-| yellow-council      | `agy`, `opencode`, `timeout`, `jq`, `mktemp` | Cross-lineage CLI code review                              |
+| yellow-council      | `agy`, `opencode`, `timeout`, `jq`, `mktemp`, `od`, `sort`, `iconv`, `python3` (optional), yellow-core libraries | Cross-lineage CLI code review                              |
 
 ### Prompt Injection Boundaries
 

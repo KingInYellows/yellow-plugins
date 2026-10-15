@@ -6,9 +6,17 @@
 # execute. Contract: references/resolve/dispositions.md ("File set").
 # shellcheck shell=bash
 
+# This file's directory by parameter expansion, not dirname: both scripts
+# source it before yr_adopt_path, so a dirname found on the caller's PATH
+# could be one a resolver planted in the worktree.
+case "${BASH_SOURCE[0]}" in
+    */*) _rp_dir=${BASH_SOURCE[0]%/*}; [ -n "$_rp_dir" ] || _rp_dir=/ ;;
+    *) _rp_dir=. ;;
+esac
 # sp_sibling_file: the sibling-plugin lookup shared with review-ledger.sh.
 # shellcheck source=sibling-plugin.sh
-. "$(dirname -- "${BASH_SOURCE[0]}")/sibling-plugin.sh"
+. "$_rp_dir/sibling-plugin.sh"
+unset _rp_dir
 
 # yr_helper <name>: a helper the trust check itself must run (readlink). Looked
 # up in fixed system directories, never on PATH: a PATH directory inside the
@@ -1863,12 +1871,13 @@ rp_walk_cap() {
 # does rp_ignored_changed_since, filtered or not. The walk is bounded: see rp_walk_cap (at the cap the target counts as changed). Run it from the working
 # tree root with a path that does not begin with `-`.
 rp_link_target_changed() {
-    local l="$1" marker="$2" follow="${3:-}" t p d x n=0 cap skip="" cjson="" top c v dup qi queue seen
+    local l="$1" marker="$2" follow="${3:-}" t p d x n=0 cap skip="" cjson="" ijson="" top c v dup qi queue seen
     if [ -e "$l" ]; then
         if [ -d "$l" ]; then
-            # The root `.ruvector` link: skip its co-edit state as the literal
-            # directory scan does (see rp_ignored_changed_since).
-            case "$l" in .ruvector|./.ruvector) skip="$l/coedit-sessions" cjson="$l/coedit.json" ;; esac
+            # The root `.ruvector` link: skip its co-edit state and memory
+            # store as the literal directory scan does (see
+            # rp_ignored_changed_since).
+            case "$l" in .ruvector|./.ruvector) skip="$l/coedit-sessions" cjson="$l/coedit.json" ijson="$l/intelligence.json" ;; esac
             # Every visited entry counts against rp_walk_cap; the walk is
             # streamed and stops at the first newer file (changed), at the cap
             # (changed: too large to judge) or at a find error (cannot tell).
@@ -1915,6 +1924,7 @@ rp_link_target_changed() {
                     [ "$x" -nt "$marker" ] && return 0
                 done < <(find -H "$d" -name .git -prune -o -path "$skip" -prune \
                     -o \( -path "$cjson" -type f \) -prune \
+                    -o \( -path "$ijson" -type f \) -prune \
                     -o \( \( -path '*/node_modules/.vite/vitest/results.json' -o -path 'node_modules/.vite/vitest/results.json' \) -type f \) -prune -o -print0 2>/dev/null || printf '\001ERR\0')
             done
             return 1
@@ -1961,7 +1971,12 @@ rp_link_target_changed() {
 # resolver Edit) entirely, and the pair store `.ruvector/coedit.json` (rewritten
 # whenever one session edits a second file) while it is a regular file. Both
 # are JSON data nothing executes, and counting them would refuse every resolve
-# that edits two files. Anything else under `.ruvector/` still counts. Vitest's
+# that edits two files. The memory store `.ruvector/intelligence.json` is
+# skipped on the same terms: a linked worktree shares it with the main
+# checkout, so any session's ruvector MCP server rewrites it mid-run. Unlike
+# the co-edit state it is not proven to be tool-written, so callers report it
+# with rp_shared_store_changed instead of passing silently. Anything else under
+# `.ruvector/` still counts. Vitest's
 # run cache `node_modules/.vite/vitest/results.json` (at any depth; a regular
 # file only) is skipped too: every vitest run rewrites it, and vitest reads it
 # only to order test files. Every other file under node_modules still counts.
@@ -2012,7 +2027,7 @@ rp_ignored_changed_since() {
             case "$f" in .git|.git/*|*/.git|*/.git/*) continue ;; esac
             case "$f" in .ruvector/coedit-sessions|.ruvector/coedit-sessions/) continue ;; esac
             case "$f" in
-                .ruvector/coedit.json|node_modules/.vite/vitest/results.json|*/node_modules/.vite/vitest/results.json)
+                .ruvector/coedit.json|.ruvector/intelligence.json|node_modules/.vite/vitest/results.json|*/node_modules/.vite/vitest/results.json)
                     if [ -f "./$f" ] && [ ! -L "./$f" ]; then continue; fi ;;
             esac
             : >|"$outfile"
@@ -2027,6 +2042,7 @@ rp_ignored_changed_since() {
                 (set -o pipefail
                     find "./$f" -name .git -prune -o -path ./.ruvector/coedit-sessions -prune \
                         -o \( -path ./.ruvector/coedit.json -type f \) -prune \
+                        -o \( -path ./.ruvector/intelligence.json -type f \) -prune \
                         -o \( -path '*/node_modules/.vite/vitest/results.json' -type f \) -prune -o \( -type f -o -type l \) -newer "$marker" -print0 2>/dev/null \
                         | { k=0; while IFS= read -r -d '' x; do kept "$x" || continue; [ "$k" -ge 20 ] || printf '%s\0' "$x" || exit 2; k=$((k + 1)); done; }) >|"$outfile" || rc=$?
                 if [ ! -s "$outfile" ] && [ "$rc" -eq 0 ]; then
@@ -2105,6 +2121,16 @@ rp_format_ignored_hits() {
         printf '%s' "$p"
     done <"$f"
     [ "$sep" != $'\n' ] || [ -n "$first" ] || printf '\n'
+}
+
+# rp_shared_store_changed <marker>: success when yellow-ruvector's memory store
+# `.ruvector/intelligence.json` is a regular file newer than <marker>, through a
+# `.ruvector` symlink too. rp_ignored_changed_since skips it; callers name it
+# in their output so the change stays visible. Run it from the working tree
+# root.
+rp_shared_store_changed() {
+    local s=.ruvector/intelligence.json
+    [ -f "$1" ] && [ -f "$s" ] && [ ! -L "$s" ] && [ "$s" -nt "$1" ]
 }
 
 # rp_hooks_untracked <outfile>: the dirty-set guard cannot see a resolver edit

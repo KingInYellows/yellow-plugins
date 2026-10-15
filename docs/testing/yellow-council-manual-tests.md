@@ -134,20 +134,21 @@ Reuse the 2.2 branch (a diff where at least two reviewers raise findings).
 - The Pass A and Pass B working (enumeration `S<n>-F<k>`, rubric tables)
   names reviewers only by label — no `Claude`, `Codex`, `Gemini`, `OpenCode`,
   agent names or model families
-- The saved report uses real reviewer names in Agreement / Disagreement,
+- The saved report uses real reviewer names in the five finding buckets,
   Reviewer Status and the raw-output appendix, and carries the "labels were
   randomized" note under the header, ending with the two-pass note ("both
   passes ran in one context …")
-- Every Agreement / Disagreement finding shows `correctness … (self-assessed)`,
-  `completeness`, `severity`, `constraints`, and `well-supported` or
-  `weakly-supported`
+- Every finding shows `correctness <verified | fuzzy-verified (fuzzy match) |
+  unverified (<reason>)>` (never `(self-assessed)`), `completeness`,
+  `severity`, `constraints`, and `well-supported` or `weakly-supported`; no
+  `unverified` finding is `well-supported`
 - The Headline includes `Low-confidence synthesis: N of M findings (P%)`
 
 **Ruling flip presented as a tie:** when Pass B's ruling or ruling
 confidence for a finding differs from Pass A's (it may take a few runs on an
 ambiguous diff), that finding shows `low-confidence-synthesis` with both
 readings (`Pass A: …; Pass B: …`), is not resolved to either, and stays in the
-bucket its citations put it in.
+bucket 5e's `BUCKET` line put it in.
 
 **Single-pass bypass:**
 
@@ -163,6 +164,67 @@ COUNCIL_DOUBLE_PASS_SYNTHESIS=yes claude  # then: /council review
   passes ran
 - The third prints `[council] Warning: COUNCIL_DOUBLE_PASS_SYNTHESIS=yes is
   not 0 or 1; keeping 2-pass synthesis` and runs both passes
+
+### 2.6 — Evidence verification
+
+Use a scratch branch whose diff gives the reviewers something to cite, and
+run with python3 `rapidfuzz` installed unless a step says otherwise
+(`python3 -c 'import rapidfuzz'`; Debian/Ubuntu:
+`sudo apt install python3-rapidfuzz`).
+
+```text
+/council review
+```
+
+**Expected behavior:**
+- Step 5b prints `COUNCIL_SYNTH_VERIFICATION=<dir>/verification.tsv (<V>
+  verified, <F> fuzzy-verified, <U> unverified)`; `forward.txt` shows each
+  finding header as `[S<n>-F<k>] severity=P<n> <file>:<line> …`; Step 5e
+  prints one `BUCKET <id> | <bucket> | correctness=… | reason=…` line per
+  finding after the label map
+- **Tier 1 hit:** a finding whose `Evidence:` quote appears verbatim within
+  ±3 lines of its cited line (on a file that matches `HEAD`) is `verified`
+  and, if only one reviewer raised it, lands in Single-Reviewer Findings
+  (verified); raised by two or more reviewers without a conflict, in
+  Agreement (verified)
+- **Tier 2 hit:** a quote that differs from the source by a word or two
+  shows `fuzzy-verified (fuzzy match)`. (Tier 1 already normalizes
+  whitespace, so a whitespace-only difference is `verified`; it reaches
+  Tier 2 only when Tier 1 is skipped, as for a file with uncommitted edits in
+  `review` mode.)
+- **Credential-shaped quote:** a quote that redaction would change (for
+  example `token = fetchToken(a, b)`) lands in Unverified Claims with reason
+  `redacted-quote`, since once redacted it could match any redacted line
+- **Miss:** a fabricated quote lands in Unverified Claims with reason
+  `no-match`; it is listed, never dropped
+- **Codex-only finding:** lands in Unverified Claims with reason
+  `no-evidence` (Codex findings carry no quote; see
+  [#1180](https://github.com/KingInYellows/yellow-plugins/issues/1180))
+- **rapidfuzz absent** (run `/council` from a shell whose first `python3`
+  cannot import it): 5b prints `[council] Warning: rapidfuzz not installed —
+  Tier 2 fuzzy evidence verification skipped (Debian/Ubuntu: sudo apt install
+  python3-rapidfuzz; elsewhere: pip install rapidfuzz)` once, and Tier 2
+  candidates show `unverified (tier2-skipped)`
+- The Headline area carries `Evidence check: <V> verified, <F> fuzzy-verified,
+  <U> unverified (…)` and the counts total the `BUCKET` lines. Record the
+  per-reason split: reviewers estimate line numbers, so a high `no-match`
+  share calibrates the ±3 window before anyone changes it
+
+### 2.7 — All four reviewers APPROVE
+
+Use a trivial, obviously correct change (a comment typo fix) with all four
+reviewers available.
+
+```text
+/council review
+```
+
+**Expected behavior:**
+- Headline: `All 4 reviewers APPROVE`
+- No finding buckets, or only findings the reviewers raised as non-blocking
+  notes; Reviewer Status absent
+- The report still carries the `Evidence check:` line (`0 verified, 0
+  fuzzy-verified, 0 unverified` when no finding was raised)
 
 ## Phase 3: Failure Path Tests (Advisory)
 

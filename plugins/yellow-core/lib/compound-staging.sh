@@ -14,7 +14,7 @@
 # Contract:
 #   - Sourced library only — never invoked as a script.
 #   - Functions exit non-zero on failure but do not abort the caller via set -e.
-#   - Never echoes secrets; redact_secrets is the gate before any disk write.
+#   - Never echoes secrets; cs_redact_secrets is the gate before any disk write.
 #   - All disk writes are atomic (sibling tmp + rename in same filesystem).
 #
 # Note: this file MUST NOT set top-level shell options (no `set -e`, `set -u`,
@@ -108,9 +108,9 @@ cs_atomic_jsonl_write() {
 }
 
 # Redact secrets from stdin, write to stdout.
-# Self-contained subset of yellow-ci's lib/redact.sh — the patterns Brad
-# called out in the plan (D12): password=, token=, api_key=, secret=,
-# Bearer, basic auth, plus the high-value vendor token prefixes
+# A self-contained pattern list, separate from yellow-ci's
+# hooks/scripts/lib/redact.sh and not a subset of it: password=, token=,
+# api_key=, secret=, Bearer, basic auth, the high-value vendor token prefixes
 # (including tvly-, pplx- and sgp_) and PEM key blocks. A bare Basic payload
 # the sed shapes miss is ambiguous with prose, so _cs_redact_bare_basic decodes it
 # and redacts only a control-free user:pass. Pipes sed into awk, whose output

@@ -180,9 +180,9 @@ you want richer library docs:
 
 `lib/quote-ground.sh` grounds a single-line quote inside a cited window.
 Run it with bash 4.4 or newer (`batch` also needs jq and iconv). Do not
-source it, and it is not a dual-shell library. The later council shell 05 PR
-calls `quote-ground.sh batch` for its Tier 1 check and adds the yellow-core
-catalog dependency.
+source it, and it is not a dual-shell library. yellow-council's `/council`
+calls `quote-ground.sh batch` for its Tier 1 evidence check and declares
+yellow-core `>=2.8.0` as a dependency.
 
 ```bash
 printf '%s' "$quote" | bash lib/quote-ground.sh check <file> <line> [radius]

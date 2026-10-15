@@ -865,7 +865,7 @@ cd -- "$TOP"
 # the working tree (an ignored <repo>/node_modules/.bin, say), or a symlink
 # outside it whose canonical file is inside, lets a resolver replace one with no
 # tracked change, and the first call would run it with submission authority.
-# This runs before anything on PATH executes (the timeout probe included):
+# This runs before any of these tools executes (the timeout probe included):
 #   1. Empty and relative entries are dropped, and an empty result is refused,
 #      because an empty PATH makes bash search the working directory.
 #   2. Each tool is resolved through yr_resolve_tool and refused when its
@@ -876,7 +876,7 @@ cd -- "$TOP"
 #      symlink into it, are dropped, so a child lookup of any other
 #      name (git, env, gh, grep) cannot land in a resolver-writable file either.
 # A tool outside the worktree is not judged, and one that cannot be found is
-# left to the "not found" handling. gh and jq were bound above. No tool has run.
+# left to the "not found" handling. gh and jq were bound above.
 check_tools_outside_repo() {
     local tool root canon hit rc entry rest cleaned
     root=$(yr_worktree_root) || die 3 "cannot resolve the repository root to verify the tools on PATH; nothing committed"

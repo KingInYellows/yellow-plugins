@@ -13,6 +13,7 @@
     "plugins/yellow-core/lib/plan-gate-provenance.sh",
     "plugins/yellow-core/lib/repo-profile.sh",
     "plugins/yellow-core/lib/validate-fs.sh",
+    "plugins/yellow-council/lib/council-synthesis.sh",
     "plugins/yellow-morph/lib/install-morphmcp.sh",
     "plugins/yellow-ruvector/hooks/scripts/lib/validate.sh"
   ],

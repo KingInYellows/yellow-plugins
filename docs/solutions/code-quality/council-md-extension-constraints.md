@@ -32,10 +32,11 @@ at implementation time, not plan time. Verified against the shipped file
    `CLAUDE_FENCED_FILE` pattern). Step 5 hands off its staging directory the
    same way: a printed `mktemp -d /tmp/council-synth-*` literal plus a `.token`
    check, guarded by shape and identity when substituted.
-3. **Add synthesis stages to the existing Step 5 fences.** 5a stages, 5b holds
-   the `council-synthesis-lib` (`council_normalize_text`, `council_fence_block`,
-   `council_assign_labels`) and 5e substitutes literals. Extend those rather
-   than adding parallel fences.
+3. **Add synthesis stages to the existing Step 5 fences.** 5a stages, 5b and 5e
+   source the Tier 4 library `lib/council-synthesis.sh` (`council_normalize_text`,
+   `council_fence_block`, `council_assign_labels`, the evidence check and the
+   bucket helpers) through a `COUNCIL_SYNTH_LIB` existence check, and 5e
+   substitutes literals. Extend those rather than adding parallel fences.
 4. **Synthesis-input fences are uniform and anonymous.** Every leg is fenced as
    `council-output:S<n>`, with `S<n>` a random bijection from
    `council_assign_labels`. Do not reintroduce reviewer-named labels there. The
@@ -94,3 +95,30 @@ at implementation time, not plan time. Verified against the shipped file
 Any change to council.md steps 4-9, the synthesis pipeline, or roster handling.
 Run `pnpm validate:schemas` (includes council-roster) and
 `bats plugins/yellow-council/tests/` after edits.
+
+
+---
+
+## Update — 2026-10-14
+
+Additions from the PR #1198 review (`1e441bc98`). Item 9 is partly
+superseded: finding ids are now assigned in shell by
+`council_extract_citations` (5b), not by the Pass A prompt; flip detection is
+still prompt-level.
+
+12. **Hand the library its own substituted path.** Fences set
+    `COUNCIL_SYNTH_LIB` from the substituted `${CLAUDE_PLUGIN_ROOT}` text and
+    source it by that name; `lib/council-synthesis.sh` derives its plugin
+    directory from it, preferring it over `CLAUDE_PLUGIN_ROOT`. See
+    `docs/solutions/code-quality/cross-plugin-shared-skill-pattern.md`.
+13. **Per-finding versus group-best correctness.** Pass A uses each finding's
+    own result; only the 5e bucket uses the group best. Mixing them prints
+    contradictory report lines.
+14. **5e degrades visibly.** It prints `BUCKET_TOTALS`, accepts bracketed ids,
+    and falls back to one Unverified Claims line per verification row.
+15. **Keep markdown tables contiguous.** A prose paragraph inserted mid-table
+    in `plugins/yellow-council/CLAUDE.md` orphaned a row (nine reviewers
+    flagged it). Put prose after the table.
+
+**Open:** Step 7 stages a `REPORT_CONTENT` that nothing downstream reads
+(issue #1190). Do not build on it until that issue is fixed.

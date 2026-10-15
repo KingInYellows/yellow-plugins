@@ -357,3 +357,33 @@ not. The same path was already on `main`, so older callers were affected too.
       with a cache-shaped tree.
 - [ ] Fail loudly when a cross-plugin helper is missing; a silent no-op passes
       CI and ships.
+
+
+---
+
+## Update — 2026-10-14
+
+### A sourced library cannot read CLAUDE_PLUGIN_ROOT at runtime (PR #1198 review, P1)
+
+`plugins/yellow-council/lib/council-synthesis.sh` located yellow-core and its
+fuzzy scorer from `${CLAUDE_PLUGIN_ROOT}`. In command markdown that string is
+replaced by text substitution before the fence runs; a sourced `.sh` file gets
+no substitution, and the variable may not be set in the shell. Installed runs
+could therefore mark every finding `verifier-error`. The bats suites exported
+`CLAUDE_PLUGIN_ROOT` themselves, so CI stayed green; the architecture review
+found it.
+
+**Fix** (commit `1e441bc98`, simplified in the review-ledger pass): each
+fence sources the library by its substituted path, `COUNCIL_SYNTH_LIB`, and
+the library's `_council_plugin_dir` strips `/lib/council-synthesis.sh` from
+that path, using `CLAUDE_PLUGIN_ROOT` only as a fallback; a test runs against
+a cache-shaped tree with `CLAUDE_PLUGIN_ROOT` unset.
+
+**Prevention:**
+
+- [ ] Only a fence's own text carries a substituted path. Hand it to a sourced
+      library as an argument or a derived variable; do not read the plugin-root
+      variable from inside the library.
+- [ ] A test that exports the variable the code under test reads proves
+      nothing about it. Run at least one case with it unset, entering through
+      the substituted path the way the fence does.

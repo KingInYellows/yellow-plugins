@@ -29,7 +29,7 @@ ls_remote_shim_dir() {
     cat >| "$d/git" <<'SHIM'
 #!/bin/sh
 # Drop this directory from PATH so the next git (a test shim or the real one) runs.
-PATH=${PATH#"$(dirname "$0"):"}
+PATH=${PATH#"${0%/*}:"}
 if [ "$1" = ls-remote ]; then
   for a in "$@"; do
     shift
@@ -499,6 +499,27 @@ run_check() { run --separate-stderr "$SCRIPT" --check-ranges "$@"; }
   [ ! -e "$marker" ]
   [ "$status" -eq 0 ]
   [ "$(jq -c . <<<"$output")" = '{"out_of_range":[{"path":"src/a.txt","old_lines":["25-25"]}]}' ]
+}
+
+@test "a dirname planted on PATH never runs while the libraries are sourced, in either mode" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/dirname-ran"
+  rm -f "$marker"
+  printf 'canary-dn/\n' >> .git/info/exclude
+  mkdir -p canary-dn
+  # Logs the call, then behaves like dirname, so a call shows up in the marker
+  # rather than as a failed source.
+  printf '#!/bin/sh\necho "$*" >> "%s"\nexec "%s" "$@"\n' "$marker" "$(command -v dirname)" >| canary-dn/dirname
+  chmod +x canary-dn/dirname
+  printf 'one\nfeature2\n' >| src/a.txt
+  printf 'src/a.txt 2-2\n' >| "$BATS_TEST_TMPDIR/ranges"
+  run --separate-stderr env "PATH=$REPO/canary-dn:canary-dn:$old_path" "$SCRIPT" --check-ranges --ranges-from "$BATS_TEST_TMPDIR/ranges" -- src/a.txt
+  [ "$status" -eq 0 ]
+  [ ! -e "$marker" ] || { cat "$marker" >&2; return 1; }
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf_path "$REPO/canary-dn:canary-dn:$old_path" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 0 ] || { echo "refused: $stderr" >&2; return 1; }
+  [ ! -e "$marker" ] || { cat "$marker" >&2; return 1; }
 }
 
 @test "--check-ranges lists an out-of-range file with its old-line span" {

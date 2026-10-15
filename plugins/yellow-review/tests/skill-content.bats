@@ -715,6 +715,20 @@ flat() { tr '\n' ' ' <"$1" | tr -s ' '; }
   [[ "$text" == *'A missing or unrecognized reason is treated as `rate-limit`'* ]]
 }
 
+@test "dispositions: an oos to fixed or addressed upgrade names the follow-up issue" {
+  text=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$text" == *'ending with this thread'"'"'s `disposition=oos` marker, find the follow-up issue number `N` before writing the body'* ]]
+  # The number comes from the viewer's own oos reply first; --find is the fallback.
+  [[ "$text" == *'Take it from that same comment'"'"'s outcome sentence (`tracked in #N`, digits only)'* ]]
+  [[ "$text" == *'Only when the sentence has none, run `file-followup-issue --find <owner/repo> <PRRT_id>`'* ]]
+  [[ "$text" == *'Add `Follow-up #N is no longer needed.` after the outcome sentence'* ]]
+  [[ "$text" == *'or a non-zero exit other than 4) adds nothing, and the reply is still posted'* ]]
+  # A rate-limited lookup obeys the exit-4 stop rule instead of posting.
+  [[ "$text" == *'Exit 4 (a rate limit or timeout) is the stop rule under Pacing and rate limits: this reply is not posted either'* ]]
+  # The old statement that nothing links the issue must be gone.
+  [[ "$text" != *'neither closes nor links the follow-up issue'* ]]
+}
+
 @test "dispositions: a reused Linear hit passes the same response checks as save_issue" {
   text=$(flat "$RESOLVE_REFS/dispositions.md")
   [[ "$text" == *'reuse a hit only when it passes the **Linear response checks** below'* ]]

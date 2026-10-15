@@ -1,0 +1,754 @@
+#!/usr/bin/env bats
+# verification.bats — the /council evidence check (R22-R25) in
+# lib/council-synthesis.sh: council_extract_citations, council_verify_findings
+# and verify_finding, against a throwaway git repo and yellow-core's real
+# quote-ground.sh, validate-fs.sh and compound-staging.sh.
+#
+# Every check runs under each shell profile (bash, zsh, zsh with snapshot
+# options) crossed with each distinct awk on the host ($COMBOS), except two
+# that change the tree between runs.
+#
+# Tier 2 needs python3 with rapidfuzz. Without it the Tier 2 hit cases skip
+# locally and fail in CI (the plugin-shell-tests job installs
+# python3-rapidfuzz); the rapidfuzz-absent path is covered with a shim either
+# way.
+
+bats_require_minimum_version 1.7.0
+
+setup() {
+  load 'lib/extract-redaction-awk'
+  REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)"
+  PLUGIN_ROOT="$REPO_ROOT/plugins/yellow-council"
+  LIB="$PLUGIN_ROOT/lib/council-synthesis.sh"
+  CORE_LIB="$REPO_ROOT/plugins/yellow-core/lib"
+  REPO="$BATS_TEST_TMPDIR/repo"
+  OUTSIDE="$BATS_TEST_TMPDIR/outside"
+  mkdir -p "$REPO/src" "$OUTSIDE"
+  git -C "$REPO" init -q
+  printf '%s\n' 'line one here' 'function retryLoop(count) {' \
+    '  while (attempts < maxAttempts) { attempts++; }' \
+    '  return computeTheFinalAnswerFromInputs(alpha, beta, gamma);' \
+    '}' 'six' 'seven' 'eight' 'nine' >| "$REPO/src/a.js"
+  git -C "$REPO" add src/a.js
+  git -C "$REPO" -c user.email=t@example.invalid -c user.name=t commit -qm init
+  PROFILES="bash zsh zsh-snapshot"
+  if ! command -v zsh >/dev/null 2>&1; then
+    case "${CI:-}" in
+      '' | false | 0) PROFILES="bash" ;;
+      *) echo "zsh not installed (required in CI)" >&2; return 1 ;;
+    esac
+  fi
+  # One shim per distinct awk binary (plain `awk` is usually a symlink to one
+  # of the others), crossed with every profile.
+  local impl real seen="" awks="" profile
+  for impl in $(available_awks); do
+    real="$(readlink -f "$(command -v "$impl")")"
+    case " $seen " in *" $real "*) continue ;; esac
+    seen="$seen $real"
+    awks="${awks:+$awks }$impl"
+    mkdir -p "$BATS_TEST_TMPDIR/shim/$impl"
+    ln -sf "$(command -v "$impl")" "$BATS_TEST_TMPDIR/shim/$impl/awk"
+  done
+  require_awks "$awks"
+  FIRST_AWK="${awks%% *}"
+  COMBOS=""
+  for profile in $PROFILES; do
+    for impl in $awks; do COMBOS="${COMBOS:+$COMBOS }$profile:$impl"; done
+  done
+  # Loops over an empty list would pass without running anything.
+  [ -n "$COMBOS" ] || { echo "no shell/awk combinations to run" >&2; return 1; }
+}
+
+# run_v <profile>[:<awk>] <body> — source the library and run <body> from
+# $REPO under that shell profile, with that awk (default: the first found)
+# first on PATH and yellow-core found through the test seam.
+run_v() {
+  local profile="${1%%:*}" impl="$FIRST_AWK" body="$2" script
+  case "$1" in *:*) impl="${1#*:}" ;; esac
+  script="$BATS_TEST_TMPDIR/run-$profile-$impl.sh"
+  local -a cmd
+  case "$profile" in
+    bash) cmd=(bash --norc --noprofile) ;;
+    zsh) cmd=(zsh -f) ;;
+    zsh-snapshot) cmd=(zsh -f -o noclobber -o extendedglob -o rcquotes -o nocaseglob) ;;
+  esac
+  printf 'cd "%s" || exit 1\n. "%s"\n%s\n' "$REPO" "$LIB" "$body" >| "$script"
+  run --separate-stderr timeout 60 env PATH="$BATS_TEST_TMPDIR/shim/$impl:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+    COUNCIL_CORE_LIB_DIR="${CORE_DIR:-$CORE_LIB}" "${cmd[@]}" "$script"
+}
+
+# require_rapidfuzz — skip locally, fail in CI, when python3 cannot import it.
+require_rapidfuzz() {
+  if ! python3 -c 'import rapidfuzz' >/dev/null 2>&1; then
+    case "${CI:-}" in
+      '' | false | 0) skip "python3 rapidfuzz not installed (Tier 2 hit cases)" ;;
+      *) echo "python3-rapidfuzz not installed (required in CI)" >&2; return 1 ;;
+    esac
+  fi
+}
+
+# cite <id> <file> <line> [quote] — one citation row; no quote means null.
+cite() {
+  if [ "$#" -ge 4 ]; then
+    jq -cn --arg id "$1" --arg file "$2" --arg line "$3" --arg quote "$4" \
+      '{id: $id, sev: "P2", file: $file, line: $line, quote: $quote}'
+  else
+    jq -cn --arg id "$1" --arg file "$2" --arg line "$3" \
+      '{id: $id, sev: "P2", file: $file, line: $line, quote: null}'
+  fi
+}
+
+# result_of <id> — "result tier reason" for <id> in $REPO/out.tsv.
+result_of() {
+  awk -F'\t' -v id="$1" '$1 == id { print $4 " " $5 " " $6 }' "$REPO/out.tsv"
+}
+
+@test "Tier 1 grounds an exact quote within +-3 lines, the same under every shell" {
+  cite S1-F1 src/a.js 5 'while (attempts < maxAttempts) { attempts++; }' >| "$REPO/in.jsonl"
+  local profile
+  for profile in $COMBOS; do
+    run_v "$profile" 'council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ] || { echo "$profile: $stderr"; return 1; }
+    [ "$(result_of S1-F1)" = "verified 1 -" ] || { echo "$profile: $(cat "$REPO/out.tsv")"; return 1; }
+    [ "$(head -n 1 "$REPO/out.tsv")" = "$(printf '# id\tfile\tline\tresult\ttier\treason')" ]
+  done
+}
+
+@test "Tier 2 scores a near-miss and a long fragment as fuzzy-verified, a short fragment and a miss as no-match" {
+  require_rapidfuzz
+  {
+    cite S1-F1 src/a.js 4 'return computeTheFinalAnswerFromInput(alpha, beta, gama);'
+    cite S1-F2 src/a.js 4 'computeTheFinalAnswerFromInputz'
+    cite S1-F3 src/a.js 4 'computeTheFinXl'
+    cite S1-F4 src/a.js 2 'this text does not exist anywhere at all'
+  } >| "$REPO/in.jsonl"
+  local profile
+  for profile in $COMBOS; do
+    run_v "$profile" 'council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ] || { echo "$profile: $stderr"; return 1; }
+    [ "$(result_of S1-F1)" = "fuzzy-verified 2 -" ]
+    [ "$(result_of S1-F2)" = "fuzzy-verified 2 -" ]
+    [ "$(result_of S1-F3)" = "unverified 2 no-match" ]
+    [ "$(result_of S1-F4)" = "unverified 2 no-match" ]
+  done
+}
+
+@test "a quote under 8 characters is too-short and never reaches Tier 2" {
+  cite S1-F1 src/a.js 1 'one' >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ]
+    [ "$(result_of S1-F1)" = "unverified - too-short" ]
+  done
+}
+
+@test "a finding with no Evidence quote is no-evidence" {
+  cite S1-F1 src/a.js 3 >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ]
+    [ "$(result_of S1-F1)" = "unverified - no-evidence" ]
+  done
+}
+
+@test "unsafe or out-of-range citations are bad-citation and are never opened" {
+  # FIFOs block any reader, so a citation that is opened hangs past the
+  # timeout instead of passing.
+  mkfifo "$OUTSIDE/fifo" "$BATS_TEST_TMPDIR/x"
+  ln -s "$OUTSIDE/fifo" "$REPO/src/escape.txt"
+  local q='while (attempts < maxAttempts) { attempts++; }'
+  {
+    cite S1-F1 ../x 1 "$q"
+    cite S1-F2 "$OUTSIDE/fifo" 1 "$q"
+    cite S1-F3 '~/x' 1 "$q"
+    cite S1-F4 src/a.js 0 "$q"
+    cite S1-F5 src/a.js -1 "$q"
+    cite S1-F6 src/a.js 1e3 "$q"
+    cite S1-F7 src/a.js 10 "$q"
+    cite S1-F8 src/escape.txt 1 "$q"
+    cite S1-F9 'src/$(id).js' 1 "$q"
+    jq -cn '{id: "S1-F10", sev: "P1", file: null, line: null, quote: "while (attempts"}'
+  } >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+    local id
+    for id in S1-F1 S1-F2 S1-F3 S1-F4 S1-F5 S1-F6 S1-F7 S1-F8 S1-F9 S1-F10; do
+      [ "$(result_of "$id")" = "unverified - bad-citation" ] || { echo "$id: $(result_of "$id")"; return 1; }
+    done
+  done
+}
+
+@test "an unreadable cited file is a bad citation and does not fail its siblings" {
+  [ "$(id -u)" -ne 0 ] || skip "root reads mode-000 files"
+  printf 'secret body line here\n' >| "$REPO/src/locked.txt"
+  chmod 000 "$REPO/src/locked.txt"
+  {
+    cite S1-F1 src/locked.txt 1 'secret body line here'
+    cite S1-F2 src/a.js 3 'while (attempts < maxAttempts) { attempts++; }'
+  } >| "$REPO/in.jsonl"
+  run_v bash 'council_verify_findings plan in.jsonl out.tsv'
+  chmod 600 "$REPO/src/locked.txt"
+  [ "$status" -eq 0 ]
+  [ "$(result_of S1-F1)" = "unverified - bad-citation" ]
+  [ "$(result_of S1-F2)" = "verified 1 -" ]
+}
+
+@test "Tier 2 checks only each label's top 50 by severity then k; the rest are tier2-cap" {
+  local k sev
+  {
+    for k in $(seq 1 51); do
+      sev=P3
+      [ "$k" -ne 51 ] || sev=P1
+      jq -cn --arg id "S2-F$k" --arg sev "$sev" \
+        '{id: $id, sev: $sev, file: "src/a.js", line: "3", quote: "no such text on these lines at all"}'
+    done
+    cite S1-F1 src/a.js 3 'no such text on these lines at all'
+  } >| "$REPO/in.jsonl"
+  # Shimmed absent so the case does not depend on rapidfuzz: capped rows are
+  # tier2-cap, every checked row tier2-skipped.
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_have_rapidfuzz() { return 1; }; council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ]
+    [ "$(result_of S2-F50)" = "unverified - tier2-cap" ]
+    [ "$(result_of S2-F51)" = "unverified - tier2-skipped" ]
+    [ "$(result_of S2-F49)" = "unverified - tier2-skipped" ]
+    [ "$(result_of S1-F1)" = "unverified - tier2-skipped" ]
+    [ "$(grep -c 'tier2-cap' "$REPO/out.tsv")" -eq 1 ]
+  done
+}
+
+@test "without rapidfuzz a Tier 2 candidate is tier2-skipped" {
+  cite S1-F1 src/a.js 4 'return computeTheFinalAnswerFromInput(alpha, beta, gama);' >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_have_rapidfuzz() { return 1; }; council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ]
+    [ "$(result_of S1-F1)" = "unverified - tier2-skipped" ]
+  done
+}
+
+@test "a missing quote-ground.sh warns and sends Tier 1 rows to Tier 2" {
+  CORE_DIR="$BATS_TEST_TMPDIR/core-lib"
+  mkdir -p "$CORE_DIR"
+  cp "$CORE_LIB/validate-fs.sh" "$CORE_LIB/compound-staging.sh" "$CORE_DIR/"
+  cite S1-F1 src/a.js 3 'while (attempts < maxAttempts) { attempts++; }' >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_have_rapidfuzz() { return 1; }; council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ]
+    [[ "$stderr" == *"Tier 1 evidence check unavailable"* ]]
+    [ "$(result_of S1-F1)" = "unverified - tier2-skipped" ]
+  done
+}
+
+@test "review mode skips Tier 1 for a cited file that differs from HEAD" {
+  printf '%s\n' 'line one here' 'changed in the working tree only' >| "$REPO/src/a.js"
+  cite S1-F1 src/a.js 2 'changed in the working tree only' >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_have_rapidfuzz() { return 1; }; council_verify_findings plan in.jsonl out.tsv'
+    [ "$(result_of S1-F1)" = "verified 1 -" ]
+    run_v "$combo" 'council_have_rapidfuzz() { return 1; }; council_verify_findings review in.jsonl out.tsv'
+    [ "$status" -eq 0 ]
+    [ "$(result_of S1-F1)" = "unverified - tier2-skipped" ]
+  done
+}
+
+@test "review mode matches a dirty file's Tier 2 window against HEAD" {
+  require_rapidfuzz
+  # Same length, line 2 changed: bounds pass, and the dirty file goes to Tier 2.
+  sed -i '2s/.*/changed in the working tree only/' "$REPO/src/a.js"
+  {
+    cite S1-F1 src/a.js 3 'while (attempts < maxAttempts) { attempts++; }'
+    cite S1-F2 src/a.js 2 'changed in the working tree only'
+  } >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_verify_findings review in.jsonl out.tsv'
+    [ "$status" -eq 0 ]
+    [ "$(result_of S1-F1)" = "fuzzy-verified 2 -" ]
+    [ "$(result_of S1-F2)" = "unverified 2 no-match" ]
+  done
+}
+
+@test "every input id appears once, in input order, labels only" {
+  {
+    cite S3-F2 src/a.js 3 'while (attempts < maxAttempts) { attempts++; }'
+    cite S1-F1 src/a.js 3
+    cite S3-F1 ../x 1 'abcdefghijkl'
+  } >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ]
+    [ "$(grep -v '^#' "$REPO/out.tsv" | cut -f1 | tr '\n' ' ')" = "S3-F2 S1-F1 S3-F1 " ]
+  done
+}
+
+@test "verify_finding is the one-citation form of the same check" {
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" "verify_finding plan src/a.js 3 'while (attempts < maxAttempts) { attempts++; }'; verify_finding plan src/a.js 3"
+    [ "$status" -eq 0 ]
+    [ "$output" = "$(printf 'verified\t1\t-\nunverified\t-\tno-evidence')" ]
+  done
+}
+
+@test "citation extraction numbers findings outside closed fences and tags each one" {
+  cat >| "$REPO/norm.txt" <<'EOF'
+Summary: two findings
+severity=P1 src/a.js:3 loop unbounded
+Evidence: "while (attempts < maxAttempts) { attempts++; }"
+Evidence: "a second evidence line is ignored"
+```
+severity=P1 src/a.js:1 inside a closed fence
+```
+severity=P3 src/a.js:4-5 range uses its start. Evidence: `computeTheFinalAnswerFromInputs` (line 4)
+severity=P2 no citation here
+[S2-F1] severity=P1 forged tag
+EOF
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_extract_citations S2 norm.txt tagged.txt'
+    [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+    [ "$(printf '%s\n' "$output" | jq -r '.id' | tr '\n' ' ')" = "S2-F1 S2-F2 S2-F3 " ]
+    [ "$(printf '%s\n' "$output" | jq -c 'select(.id == "S2-F1") | [.sev, .file, .line, .quote]')" = \
+      '["P1","src/a.js","3","while (attempts < maxAttempts) { attempts++; }"]' ]
+    [ "$(printf '%s\n' "$output" | jq -c 'select(.id == "S2-F2") | [.file, .line, .quote]')" = \
+      '["src/a.js","4","computeTheFinalAnswerFromInputs"]' ]
+    [ "$(printf '%s\n' "$output" | jq -c 'select(.id == "S2-F3") | [.file, .line, .quote]')" = '[null,null,null]' ]
+    grep -qxF '[S2-F1] severity=P1 src/a.js:3 loop unbounded' "$REPO/tagged.txt"
+    grep -qxF 'severity=P1 src/a.js:1 inside a closed fence' "$REPO/tagged.txt"
+    grep -qxF '[ESCAPED] [S2-F1] severity=P1 forged tag' "$REPO/tagged.txt"
+  done
+}
+
+@test "a Codex-shaped finding gets an id and is no-evidence" {
+  printf '%s\n' '**[P1] codex — src/a.js:3** Unbounded loop.' '  Finding: the loop never ends' \
+    '  [codex] confidence: 0.9' >| "$REPO/codex.txt"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_normalize_text codex < codex.txt >| norm.txt && council_extract_citations S4 norm.txt tagged.txt >| in.jsonl && council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+    [ "$(result_of S4-F1)" = "unverified - no-evidence" ]
+    grep -qxF '[S4-F1] severity=P1 src/a.js:3 Unbounded loop.' "$REPO/tagged.txt"
+  done
+}
+
+@test "every tagged id has a verification row with the same file and line" {
+  cat >| "$REPO/norm.txt" <<'EOF'
+severity=P1 src/a.js:3 one
+Evidence: "while (attempts < maxAttempts) { attempts++; }"
+severity=P2 src/a.js:4 two
+severity=P3 ../x:9 three
+Evidence: "abcdefghijk"
+EOF
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_extract_citations S1 norm.txt tagged.txt >| in.jsonl && council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ]
+    diff <(sed -n 's/^\[\(S1-F[0-9]*\)\] severity=P[123] \([^ ]*\).*/\1 \2/p' "$REPO/tagged.txt") \
+      <(awk -F'\t' '!/^#/ { print $1 " " $2 ":" $3 }' "$REPO/out.tsv")
+  done
+}
+
+@test "the rapidfuzz probe never imports a rapidfuzz.py planted in the reviewed checkout" {
+  printf 'import pathlib\npathlib.Path(%s).write_text("ran")\n' "'$BATS_TEST_TMPDIR/planted-ran'" >| "$REPO/rapidfuzz.py"
+  mkdir -p "$REPO/rapidfuzz"
+  printf 'import pathlib\npathlib.Path(%s).write_text("ran")\n' "'$BATS_TEST_TMPDIR/planted-ran'" >| "$REPO/rapidfuzz/__init__.py"
+  local profile
+  for profile in $COMBOS; do
+    run_v "$profile" 'council_have_rapidfuzz; printf "probe=%s\n" "$?"'
+    [ "$status" -eq 0 ]
+    [ ! -e "$BATS_TEST_TMPDIR/planted-ran" ] || { echo "$profile: planted module ran"; return 1; }
+  done
+}
+
+@test "Tier 2 does not verify a fabricated quote that merely contains a short window line" {
+  require_rapidfuzz
+  {
+    cite S1-F1 src/a.js 4 'if (fabricatedCondition) { neverInThisFile(); }'
+    cite S1-F2 src/a.js 4 'computeTheFinalAnswerFromInputz'
+  } >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ]
+    [ "$(result_of S1-F1)" = "unverified 2 no-match" ]
+    [ "$(result_of S1-F2)" = "fuzzy-verified 2 -" ]
+  done
+}
+
+@test "citations to .git or gitignored files are bad-citation" {
+  printf 'SECRET_TOKEN=supersecretvalue123\n' >| "$REPO/.env"
+  printf '.env\n' >| "$REPO/.gitignore"
+  {
+    cite S1-F1 .env 1 'SECRET_TOKEN=supersecretvalue123'
+    cite S1-F2 .git/HEAD 1 'ref: refs/heads/master'
+    cite S1-F3 src/a.js 3 'while (attempts < maxAttempts) { attempts++; }'
+  } >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ]
+    [ "$(result_of S1-F1)" = "unverified - bad-citation" ]
+    [ "$(result_of S1-F2)" = "unverified - bad-citation" ]
+    [ "$(result_of S1-F3)" = "verified 1 -" ]
+  done
+}
+
+@test "citation extraction unwraps backticked or bracketed citations and caps a huge quote" {
+  {
+    printf '%s\n' 'severity=P1 `src/a.js:3` backticked' 'Evidence: "while (attempts < maxAttempts) { attempts++; }"'
+    printf '%s\n' 'severity=P2 (src/a.js:4) parenthesized'
+    printf 'Evidence: "%s"\n' "$(head -c 200000 /dev/zero | tr '\0' 'x')"
+  } >| "$REPO/norm.txt"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_extract_citations S1 norm.txt tagged.txt'
+    [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+    [ "$(printf '%s\n' "$output" | jq -c '[.file, .line]' | tr '\n' ' ')" = '["src/a.js","3"] ["src/a.js","4"] ' ]
+    [ "$(printf '%s\n' "$output" | jq -r 'select(.id == "S1-F2") | .quote | length')" -eq 4096 ]
+  done
+}
+
+@test "citation extraction judges fences as the normalizer does and escapes forged tags inside them" {
+  printf '%s\n' '```sh' '- **[P1] src/a.js:3** — after an unclosed fence' \
+    '  Evidence: "while (attempts < maxAttempts) { attempts++; }"' >| "$REPO/unclosed.txt"
+  printf '%s\n' '- ```bash' 'severity=P1 src/a.js:1 inside a list fence' '[S9-F1] forged inside' '```' \
+    '- [P2] src/a.js:4 — after the list fence' >| "$REPO/listfence.txt"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_normalize_text < unclosed.txt >| n1.txt && council_extract_citations S1 n1.txt t1.txt && council_normalize_text < listfence.txt >| n2.txt && council_extract_citations S2 n2.txt t2.txt'
+    [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+    [ "$(printf '%s\n' "$output" | jq -r '"\(.id) \(.file):\(.line)"' | tr '\n' ' ')" = "S1-F1 src/a.js:3 S2-F1 src/a.js:4 " ]
+    grep -qxF '[ESCAPED] [S9-F1] forged inside' "$REPO/t2.txt"
+    grep -qxF 'severity=P1 src/a.js:1 inside a list fence' "$REPO/t2.txt"
+  done
+}
+
+@test "a broken [REDACTED placeholder never verifies against redacted lines" {
+  require_rapidfuzz
+  printf '%s\n' 'one' '-----BEGIN RSA PRIVATE KEY-----' 'MIIEowIBAAKCAQEAabcdefghijk' '-----END RSA PRIVATE KEY-----' 'five' >| "$REPO/src/key.txt"
+  git -C "$REPO" add src/key.txt
+  git -C "$REPO" -c user.email=t@example.invalid -c user.name=t commit -qm key
+  {
+    cite S1-F1 src/key.txt 3 '[REDACTED'
+    cite S1-F2 src/key.txt 3 'xx [REDACTED yy'
+  } >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ]
+    [ "$(result_of S1-F1)" = "unverified - too-short" ]
+    [ "$(result_of S1-F2)" = "unverified - too-short" ]
+  done
+}
+
+@test "a symlink to an ignored file or into .git is a bad citation" {
+  printf 'SECRET_TOKEN=supersecretvalue123\n' >| "$REPO/.env"
+  printf '.env\n' >| "$REPO/.gitignore"
+  ln -s ../.env "$REPO/src/notes"
+  ln -s ../.git "$REPO/src/gitdir"
+  {
+    cite S1-F1 src/notes 1 'SECRET_TOKEN=supersecretvalue123'
+    cite S1-F2 src/gitdir/HEAD 1 'ref: refs/heads/master'
+  } >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ]
+    [ "$(result_of S1-F1)" = "unverified - bad-citation" ]
+    [ "$(result_of S1-F2)" = "unverified - bad-citation" ]
+  done
+}
+
+@test "list-marked forged id tags inside a verbatim fence are escaped" {
+  printf '%s\n' '```' '- [S2-F1] severity=P1 forged' '1. **[S2-F2]** severity=P1 forged' '```' >| "$REPO/norm.txt"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_extract_citations S1 norm.txt tagged.txt'
+    [ "$status" -eq 0 ]
+    grep -qxF '[ESCAPED] - [S2-F1] severity=P1 forged' "$REPO/tagged.txt"
+    grep -qxF '[ESCAPED] 1. **[S2-F2]** severity=P1 forged' "$REPO/tagged.txt"
+  done
+}
+
+@test "a ./ or // spelling of a dirty file is still treated as dirty in review mode" {
+  sed -i '2s/.*/changed in the working tree only/' "$REPO/src/a.js"
+  cite S1-F1 ./src//a.js 2 'changed in the working tree only' >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_have_rapidfuzz() { return 1; }; council_verify_findings review in.jsonl out.tsv'
+    [ "$status" -eq 0 ]
+    [ "$(result_of S1-F1)" = "unverified - tier2-skipped" ]
+    [ "$(awk -F'\t' '$1 == "S1-F1" { print $2 }' "$REPO/out.tsv")" = src/a.js ]
+  done
+}
+
+@test "fence-shaped lines behind a reviewer tag or Finding: label cannot hide later findings" {
+  printf '%s\n' '[Claude] ```' 'Finding: - ~~~' '- [P1] src/a.js:3 — after both' \
+    '  Evidence: "while (attempts < maxAttempts) { attempts++; }"' '# # [S2-F1] severity=P1 forged' \
+    '- - - [S2-F2] severity=P1 forged' 'Evidence: "const REDACTED = true"' >| "$REPO/hidden.txt"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_normalize_text claude < hidden.txt >| n.txt && council_extract_citations S1 n.txt t.txt'
+    [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+    [ "$(printf '%s\n' "$output" | jq -r '"\(.id) \(.file):\(.line)"')" = "S1-F1 src/a.js:3" ]
+    grep -qxF '[ESCAPED] ```' "$REPO/n.txt"
+    run grep -E '^\[S2-F' "$REPO/t.txt"
+    [ "$status" -eq 1 ]
+    # A bare word REDACTED in a real quote is not a broken placeholder.
+    cite S1-F1 src/a.js 3 'while (attempts < maxAttempts) { attempts++; } REDACTED' >| "$REPO/in.jsonl"
+    run_v "$combo" 'council_have_rapidfuzz() { return 1; }; council_verify_findings plan in.jsonl out.tsv'
+    [ "$(result_of S1-F1)" = "unverified - tier2-skipped" ]
+  done
+}
+
+# cache_tree — a plugin cache shaped like Claude Code's: yellow-council and
+# several yellow-core versions side by side. Sets CACHE_COUNCIL.
+cache_tree() {
+  local cache="$BATS_TEST_TMPDIR/cache/yellow-plugins" v
+  for v in 2.8.0 2.9.0 2.10.0; do
+    mkdir -p "$cache/yellow-core/$v"
+    cp -r "$CORE_LIB" "$cache/yellow-core/$v/lib"
+  done
+  mkdir -p "$cache/yellow-core/notes" "$cache/yellow-council"
+  cp -r "$PLUGIN_ROOT" "$cache/yellow-council/9.9.9"
+  CACHE_COUNCIL="$cache/yellow-council/9.9.9"
+}
+
+@test "yellow-core is found in the plugin cache from COUNCIL_SYNTH_LIB alone, newest numeric version first" {
+  cache_tree
+  # As a fence does: name the library, source it by that name.
+  printf '%s\n' "cd '$REPO' || exit 1" "COUNCIL_SYNTH_LIB='$CACHE_COUNCIL/lib/council-synthesis.sh'" \
+    '. "$COUNCIL_SYNTH_LIB"' 'council_core_lib lib/quote-ground.sh' \
+    'council_verify_findings plan in.jsonl out.tsv' >| "$BATS_TEST_TMPDIR/cache.sh"
+  cite S1-F1 src/a.js 3 'while (attempts < maxAttempts) { attempts++; }' >| "$REPO/in.jsonl"
+  run --separate-stderr env -u CLAUDE_PLUGIN_ROOT -u COUNCIL_CORE_LIB_DIR bash --norc --noprofile "$BATS_TEST_TMPDIR/cache.sh"
+  [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+  [[ "$output" == */yellow-core/2.10.0/lib/quote-ground.sh ]] || { echo "$output"; return 1; }
+  [ "$(result_of S1-F1)" = "verified 1 -" ]
+  # No yellow-core at all: every finding is a verifier error, with a warning.
+  rm -rf "$BATS_TEST_TMPDIR/cache/yellow-plugins/yellow-core"
+  run --separate-stderr env -u CLAUDE_PLUGIN_ROOT -u COUNCIL_CORE_LIB_DIR bash --norc --noprofile "$BATS_TEST_TMPDIR/cache.sh"
+  [ "$(result_of S1-F1)" = "unverified - verifier-error" ]
+  [[ "$stderr" == *"not found"* ]]
+}
+
+@test "review mode judges a dirty file against HEAD even when the working copy is shorter or gone" {
+  printf '%s\n' 'line one here' >| "$REPO/src/a.js"
+  cite S1-F1 src/a.js 3 'while (attempts < maxAttempts) { attempts++; }' >| "$REPO/in.jsonl"
+  run_v bash 'council_have_rapidfuzz() { return 1; }; council_verify_findings review in.jsonl out.tsv'
+  [ "$status" -eq 0 ]
+  [ "$(result_of S1-F1)" = "unverified - tier2-skipped" ]
+  rm -f "$REPO/src/a.js"
+  run_v bash 'council_have_rapidfuzz() { return 1; }; council_verify_findings review in.jsonl out.tsv'
+  [ "$(result_of S1-F1)" = "unverified - tier2-skipped" ]
+  # Past HEAD's own length is still a bad citation.
+  cite S1-F2 src/a.js 40 'while (attempts < maxAttempts) { attempts++; }' >| "$REPO/in.jsonl"
+  run_v bash 'council_verify_findings review in.jsonl out.tsv'
+  [ "$(result_of S1-F2)" = "unverified - bad-citation" ] || [ "$(result_of S1-F2)" = "unverified - tier2-skipped" ]
+}
+
+@test "review mode matches an exact short quote in a dirty file against HEAD" {
+  require_rapidfuzz
+  sed -i '2s/.*/changed in the working tree only/' "$REPO/src/a.js"
+  cite S1-F1 src/a.js 6 'seven' >| "$REPO/in.jsonl"
+  cite S1-F2 src/a.js 3 'attempts++; }' >> "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_verify_findings review in.jsonl out.tsv'
+    [ "$status" -eq 0 ]
+    [ "$(result_of S1-F2)" = "fuzzy-verified 2 -" ]
+  done
+}
+
+@test "a credential-shaped quote is unverified (redacted-quote) and never matched" {
+  printf '%s\n' 'x' 'token = fetchToken(a, b)' 'y' >| "$REPO/src/cfg.py"
+  git -C "$REPO" add src/cfg.py
+  {
+    cite S1-F1 src/cfg.py 2 'token = fetchToken(a, b)'
+    cite S1-F2 src/cfg.py 2 'token = somethingMadeUp, b)'
+    cite S1-F3 src/a.js 3 'while (attempts < maxAttempts) { attempts++; }'
+  } >| "$REPO/in.jsonl"
+  local profile
+  for profile in $COMBOS; do
+    run_v "$profile" 'council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ] || { echo "$profile: $stderr"; return 1; }
+    [ "$(result_of S1-F1)" = "unverified - redacted-quote" ]
+    [ "$(result_of S1-F2)" = "unverified - redacted-quote" ]
+    [ "$(result_of S1-F3)" = "verified 1 -" ]
+  done
+}
+
+@test "finding-shaped lines with an unrecognized severity spelling get one warning and no id" {
+  printf '%s\n' 'severity=P1 src/a.js:3 one' 'Major src/a.js:4 not converted' \
+    '[p0] src/a.js:5 also not converted' 'High-level summary of src/a.js with no line' \
+    'see src/a.js:3 for context' >| "$REPO/norm.txt"
+  local profile
+  for profile in $COMBOS; do
+    run_v "$profile" 'council_extract_citations S2 norm.txt tagged.txt'
+    [ "$status" -eq 0 ] || { echo "$profile: $stderr"; return 1; }
+    [ "$(printf '%s\n' "$output" | jq -r '.id')" = "S2-F1" ]
+    [ "$(printf '%s\n' "$stderr" | grep -c 'S2 has 2 finding-shaped line(s)')" -eq 1 ] || { echo "$profile: $stderr"; return 1; }
+  done
+  printf '%s\n' 'severity=P1 src/a.js:3 one' >| "$REPO/norm.txt"
+  run_v bash 'council_extract_citations S2 norm.txt tagged.txt'
+  [ -z "$stderr" ]
+}
+
+@test "only a finding's first Evidence quote is checked; a later one is tagged unchecked" {
+  printf '%s\n' 'severity=P1 src/a.js:3 one' 'Evidence: "while (attempts < maxAttempts) { attempts++; }"' \
+    'Evidence: "a second, made-up quote"' >| "$REPO/norm.txt"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_extract_citations S1 norm.txt tagged.txt'
+    [ "$status" -eq 0 ]
+    grep -qxF 'Evidence: "while (attempts < maxAttempts) { attempts++; }"' "$REPO/tagged.txt"
+    grep -qxF '[UNCHECKED] Evidence: "a second, made-up quote"' "$REPO/tagged.txt"
+  done
+}
+
+# edge_file — src/w.txt, 12 committed lines that share no fuzzy-matchable
+# text, so a quote can only match its own line.
+edge_file() {
+  local i
+  for i in $(seq 1 12); do
+    printf 'marker %s\n' "$(printf 'edge-%s' "$i" | sha256sum | cut -c1-24)"
+  done >| "$REPO/src/w.txt"
+  git -C "$REPO" add src/w.txt
+  git -C "$REPO" -c user.email=t@example.invalid -c user.name=t commit -qm edges
+}
+
+@test "the window is the cited line +-3 in both tiers, edges included" {
+  edge_file
+  {
+    cite S1-F1 src/w.txt 6 "$(sed -n 3p "$REPO/src/w.txt")"
+    cite S1-F2 src/w.txt 6 "$(sed -n 9p "$REPO/src/w.txt")"
+    cite S1-F3 src/w.txt 6 "$(sed -n 2p "$REPO/src/w.txt")"
+    cite S1-F4 src/w.txt 6 "$(sed -n 10p "$REPO/src/w.txt")"
+  } >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    # Tier 1 (clean file): the edges ground, one line past them does not.
+    run_v "$combo" 'council_have_rapidfuzz() { return 1; }; council_verify_findings plan in.jsonl out.tsv'
+    [ "$status" -eq 0 ] || { echo "$combo: $stderr"; return 1; }
+    [ "$(result_of S1-F1)" = "verified 1 -" ] || { echo "$combo: $(cat "$REPO/out.tsv")"; return 1; }
+    [ "$(result_of S1-F2)" = "verified 1 -" ]
+    [ "$(result_of S1-F3)" = "unverified - tier2-skipped" ]
+    [ "$(result_of S1-F4)" = "unverified - tier2-skipped" ]
+  done
+  require_rapidfuzz
+  # Tier 2 (dirty file, judged against HEAD): the same window.
+  printf 'appended in the working tree\n' >> "$REPO/src/w.txt"
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_verify_findings review in.jsonl out.tsv'
+    [ "$status" -eq 0 ] || { echo "$combo: $stderr"; return 1; }
+    [ "$(result_of S1-F1)" = "fuzzy-verified 2 -" ] || { echo "$combo: $(cat "$REPO/out.tsv")"; return 1; }
+    [ "$(result_of S1-F2)" = "fuzzy-verified 2 -" ]
+    [ "$(result_of S1-F3)" = "unverified 2 no-match" ]
+    [ "$(result_of S1-F4)" = "unverified 2 no-match" ]
+  done
+}
+
+@test "review mode reads a staged new file from the working tree in Tier 2, an untracked one in Tier 1" {
+  printf '%s\n' 'first line' 'staged only, never committed here' >| "$REPO/src/staged.js"
+  git -C "$REPO" add src/staged.js
+  printf '%s\n' 'first line' 'untracked and not ignored at all' >| "$REPO/src/untracked.js"
+  {
+    cite S1-F1 src/staged.js 2 'staged only, never committed here'
+    cite S1-F2 src/untracked.js 2 'untracked and not ignored at all'
+  } >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    # A staged new file is dirty and HEAD lacks it: Tier 1 is skipped. An
+    # untracked file is not in `git diff HEAD`, so it is judged as clean.
+    run_v "$combo" 'council_have_rapidfuzz() { return 1; }; council_verify_findings review in.jsonl out.tsv'
+    [ "$status" -eq 0 ] || { echo "$combo: $stderr"; return 1; }
+    [ "$(result_of S1-F1)" = "unverified - tier2-skipped" ] || { echo "$combo: $(cat "$REPO/out.tsv")"; return 1; }
+    [ "$(result_of S1-F2)" = "verified 1 -" ]
+  done
+  require_rapidfuzz
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_verify_findings review in.jsonl out.tsv'
+    [ "$(result_of S1-F1)" = "fuzzy-verified 2 -" ] || { echo "$combo: $(cat "$REPO/out.tsv")"; return 1; }
+  done
+}
+
+@test "review mode: a line past HEAD's end is a bad citation even when the working copy has it" {
+  require_rapidfuzz
+  printf '%s\n' 'line ten exists only in the working tree' 'line eleven too' >> "$REPO/src/a.js"
+  cite S1-F1 src/a.js 10 'line ten exists only in the working tree' >| "$REPO/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" 'council_verify_findings plan in.jsonl out.tsv'
+    [ "$(result_of S1-F1)" = "verified 1 -" ] || { echo "$combo: $(cat "$REPO/out.tsv")"; return 1; }
+    run_v "$combo" 'council_verify_findings review in.jsonl out.tsv'
+    [ "$status" -eq 0 ] || { echo "$combo: $stderr"; return 1; }
+    [ "$(result_of S1-F1)" = "unverified - bad-citation" ] || { echo "$combo: $(cat "$REPO/out.tsv")"; return 1; }
+  done
+}
+
+@test "outside a git work tree Tier 1 is skipped and Tier 2 reads the files" {
+  require_rapidfuzz
+  mkdir -p "$OUTSIDE/src"
+  cp "$REPO/src/a.js" "$OUTSIDE/src/a.js"
+  {
+    cite S1-F1 src/a.js 3 'while (attempts < maxAttempts) { attempts++; }'
+    cite S1-F2 src/a.js 3 'nothing like this is in the file'
+  } >| "$OUTSIDE/in.jsonl"
+  local combo
+  for combo in $COMBOS; do
+    run_v "$combo" "cd '$OUTSIDE' && council_verify_findings review in.jsonl out.tsv"
+    [ "$status" -eq 0 ] || { echo "$combo: $stderr"; return 1; }
+    [ "$(awk -F'\t' '$1 == "S1-F1" { print $4 " " $5 }' "$OUTSIDE/out.tsv")" = "fuzzy-verified 2" ] \
+      || { echo "$combo: $(cat "$OUTSIDE/out.tsv")"; return 1; }
+    [ "$(awk -F'\t' '$1 == "S1-F2" { print $4 " " $5 " " $6 }' "$OUTSIDE/out.tsv")" = "unverified 2 no-match" ]
+  done
+}
+
+# recording_scorer — a plugin dir whose fuzzy-ratio.py only records its stdin
+# to $BATS_TEST_TMPDIR/scorer-input. Prints the COUNCIL_SYNTH_LIB value that
+# points the library at it.
+recording_scorer() {
+  local dir="$BATS_TEST_TMPDIR/rec-plugin"
+  mkdir -p "$dir/lib"
+  printf 'import sys\nopen(%s, "w").write(sys.stdin.read())\n' "'$BATS_TEST_TMPDIR/scorer-input'" >| "$dir/lib/fuzzy-ratio.py"
+  printf '%s\n' "$dir/lib/council-synthesis.sh"
+}
+
+@test "Tier 2 never hands the scorer a stream whose redaction dropped a line" {
+  printf '%s\n' 'one' 'two' 'token = "ghp_1234567890abcdefghijABCDEFGHIJ123456"' 'four' >| "$REPO/src/cred.py"
+  git -C "$REPO" add src/cred.py
+  git -C "$REPO" -c user.email=t@example.invalid -c user.name=t commit -qm cred
+  cite S1-F1 src/cred.py 3 'this quote is not in the cited file at all' >| "$REPO/in.jsonl"
+  local synth_lib combo
+  synth_lib=$(recording_scorer)
+  # Control: the real redactor passes the guard, and the planted token reaches
+  # the scorer only redacted.
+  run_v bash "_COUNCIL_RAPIDFUZZ=yes COUNCIL_SYNTH_LIB='$synth_lib'; council_verify_findings plan in.jsonl out.tsv"
+  [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+  [ -s "$BATS_TEST_TMPDIR/scorer-input" ]
+  grep -q 'REDACTED' "$BATS_TEST_TMPDIR/scorer-input"
+  run grep -c 'ghp_1234567890' "$BATS_TEST_TMPDIR/scorer-input"
+  [ "$output" = 0 ]
+  # A redactor that drops a line (and redacts nothing) must stop the scorer.
+  CORE_DIR="$BATS_TEST_TMPDIR/core-lib"
+  mkdir -p "$CORE_DIR"
+  cp "$CORE_LIB/quote-ground.sh" "$CORE_LIB/validate-fs.sh" "$CORE_LIB/compound-staging.sh" "$CORE_DIR/"
+  printf '%s\n' "cs_redact_secrets() { sed '1d'; }" >> "$CORE_DIR/compound-staging.sh"
+  for combo in $COMBOS; do
+    rm -f "$BATS_TEST_TMPDIR/scorer-input"
+    run_v "$combo" "_COUNCIL_RAPIDFUZZ=yes COUNCIL_SYNTH_LIB='$synth_lib'; council_verify_findings plan in.jsonl out.tsv"
+    [ "$status" -eq 0 ] || { echo "$combo: $stderr"; return 1; }
+    [ ! -e "$BATS_TEST_TMPDIR/scorer-input" ] || { echo "$combo: scorer ran"; return 1; }
+    [ "$(result_of S1-F1)" = "unverified - verifier-error" ] || { echo "$combo: $(cat "$REPO/out.tsv")"; return 1; }
+    [[ "$stderr" == *"Tier 2 fuzzy check failed"* ]]
+  done
+}
