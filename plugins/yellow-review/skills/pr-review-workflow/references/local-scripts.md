@@ -25,14 +25,17 @@ callers that walk several PRs. Exit codes and markers are defined in
     (no file list); `/review:resolve-stack` runs it after a dirty resolve
     through `references/review-resolve-stack/dirty-tree-cleanup.md` and
     `/review:sweep-all` through `references/review-sweep-all/dirty-tree-cleanup.md`
-  - `--pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard) [--dry-run]`
+  - `--pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard) [--dry-run | --expect-snapshot <hex>]`
     first refuses (exit 2) when a gitignored trusted-config file is newer than
     the marker, then reverts only dirty trusted-config paths
     (`rp_trusted_config`, a subset of the resolver deny list; no file list;
     other dirty paths and gitignored files stay) and reports `deniedClean`,
     `reverted` and `revertedCount`; nothing to revert is `result: "noop"`.
     `--dry-run` reverts nothing and reports `pending`, `pendingCount`,
-    `linkHits` and `linkHitCount` (interactive `/review:resolve` asks first).
+    `linkHits`, `linkHitCount` and `snapshot` (interactive `/review:resolve`
+    asks first); `--expect-snapshot <snapshot>` makes the confirmed revert
+    refuse (exit 2, nothing reverted) when the paths or their content changed
+    since that preview.
     Give exactly one of the revert flags and `--check-ignored`; a second one
     exits 2
 - **guard-local-config** `snapshot` | `check <snap-dir> <digest>` | `clear <snap-dir>` —

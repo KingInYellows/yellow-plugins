@@ -588,6 +588,47 @@ assert_recreated_patch_restores() {
   [[ "$output" != *'choose Leave'* ]]
 }
 
+@test "--revert-denied --expect-snapshot reverts when the tree still matches the --dry-run preview" {
+  printf 'resolver-written\n' >| CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --dry-run
+  [ "$status" -eq 0 ]
+  snap=$(printf '%s' "$output" | jq -r .snapshot)
+  [[ "$snap" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]]
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --expect-snapshot "$snap"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = reverted ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  ! grep -q 'resolver-written' CLAUDE.md
+}
+
+@test "--revert-denied --expect-snapshot refuses when a trusted-config file changed after the --dry-run preview" {
+  printf 'resolver-written\n' >| CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --dry-run
+  snap=$(printf '%s' "$output" | jq -r .snapshot)
+  # The user edits the previewed file, and adds another, while being asked.
+  printf 'user edit\n' >> CLAUDE.md
+  mkdir -p .cursor
+  printf 'user rule\n' >| .cursor/rules
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --expect-snapshot "$snap"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'trusted-config changes differ from the --dry-run preview; nothing was reverted'* ]]
+  grep -q 'user edit' CLAUDE.md
+  grep -q 'user rule' .cursor/rules
+  [ -z "$(ls -A "$PATCH_DIR" 2>/dev/null)" ]
+}
+
+@test "--expect-snapshot applies only to --revert-denied without --dry-run and takes a hex digest" {
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty --expect-snapshot 0123456789abcdef0123456789abcdef01234567
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'--expect-snapshot applies only to --revert-denied without --dry-run'* ]]
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --dry-run --expect-snapshot 0123456789abcdef0123456789abcdef01234567
+  [ "$status" -eq 2 ]
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --expect-snapshot 'x;y'
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'--expect-snapshot must be the hex digest'* ]]
+  grep -q 'resolver edit' src/a.txt
+}
+
 @test "--dry-run applies only to --revert-denied" {
   run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty --dry-run
   [ "$status" -eq 2 ]

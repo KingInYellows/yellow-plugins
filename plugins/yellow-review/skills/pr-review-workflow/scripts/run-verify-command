@@ -7,7 +7,7 @@
 #                           [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-dirty
-#        run-verify-command --pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard) [--dry-run]
+#        run-verify-command --pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard) [--dry-run | --expect-snapshot <hex>]
 #        run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>
 #   --trusted:     required to run a command. The caller sets it only after
 #                  confirming the command came from an untracked config file
@@ -123,8 +123,17 @@
 #                  bound, since a nested repository or special file is kept),
 #                  "pendingCount", and "linkHits"/"linkHitCount" (trusted-config
 #                  symlinks whose target may have been edited, which no revert
-#                  undoes), and changes nothing: no patch, no revert.
-#                  For an interactive caller that asks before reverting.
+#                  undoes), and "snapshot" (a digest of the pending paths
+#                  and their current content), and changes nothing: no
+#                  patch, no revert. For an interactive caller that asks
+#                  before reverting.
+#   --expect-snapshot <hex>: only with --revert-denied, without --dry-run:
+#                  the "snapshot" a --dry-run printed. When the pending paths
+#                  or their content no longer match it (a file changed while
+#                  the caller was asking), refuse (exit 2, nothing reverted)
+#                  with "trusted-config changes differ from the --dry-run
+#                  preview" on stderr, so a revert never reaches an edit the
+#                  user was not shown.
 #   Exactly one of --revert-only, --revert-dirty, --revert-denied and
 #   --check-ignored may be given (exit 2 otherwise); a repeated flag is fine.
 #   --timeout, --command-file, --trusted and --unattended apply only when
@@ -148,8 +157,8 @@
 #   like the patch, empty when withheld) and "revertedCount" (the whole count).
 #   "noop" is only reported by --revert-denied, when no deny-listed path
 #   changed. --revert-denied --dry-run reports result "dry-run" with
-#   "deniedClean", "pending", "pendingCount", "linkHits" and "linkHitCount"
-#   instead of the revert fields.
+#   "deniedClean", "pending", "pendingCount", "linkHits", "linkHitCount" and
+#   "snapshot" instead of the revert fields.
 #   "reason" explains a skipped run, a withheld patch, an interrupted run, a
 #   failed revert step, a log that is withheld or may be incomplete, a
 #   --revert-only entry skipped as unchanged, or a tree that is not clean.
@@ -730,7 +739,7 @@ usage() {
     printf 'Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted [--unattended] --ignored-since <marker-file> [--files-from <file>] [-- <files...>]\n' >&2
     printf '       run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]\n' >&2
     printf '       run-verify-command --pr <N> --revert-dirty\n' >&2
-    printf '       run-verify-command --pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard) [--dry-run]\n' >&2
+    printf '       run-verify-command --pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard) [--dry-run | --expect-snapshot <hex>]\n' >&2
     printf '       run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>\n' >&2
     printf '  exactly one of --revert-only, --revert-dirty, --revert-denied and --check-ignored may be given; --revert-dirty and --revert-denied take no file list\n' >&2
     printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required for every run and for --revert-denied (or --no-ignored-guard); --revert-only and --revert-dirty ignore it\n' >&2
@@ -759,10 +768,12 @@ UNATTENDED=0
 IGNORED_SINCE=""
 NO_IGNORED_GUARD=0
 DRY_RUN=0
+EXPECT_SNAPSHOT=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --pr) [ $# -ge 2 ] || usage; PR="$2"; shift 2 ;;
         --dry-run) DRY_RUN=1; shift ;;
+        --expect-snapshot) [ $# -ge 2 ] || usage; EXPECT_SNAPSHOT="$2"; shift 2 ;;
         --ignored-since) [ $# -ge 2 ] || usage; IGNORED_SINCE="$2"; shift 2 ;;
         --timeout) [ $# -ge 2 ] || usage; TIMEOUT="$2"; shift 2 ;;
         --command-file) [ $# -ge 2 ] || usage; COMMAND_FILE="$2"; shift 2 ;;
@@ -799,6 +810,11 @@ elif [ "$NO_IGNORED_GUARD" = 1 ]; then
     die 2 "--no-ignored-guard applies only to --revert-denied"
 fi
 [ "$DRY_RUN" = 0 ] || [ "$MODE" = revert-denied ] || die 2 "--dry-run applies only to --revert-denied"
+if [ -n "$EXPECT_SNAPSHOT" ]; then
+    [ "$MODE" = revert-denied ] && [ "$DRY_RUN" = 0 ] \
+        || die 2 "--expect-snapshot applies only to --revert-denied without --dry-run"
+    [[ "$EXPECT_SNAPSHOT" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] || die 2 "--expect-snapshot must be the hex digest a --dry-run printed"
+fi
 if [ "$MODE" = check-ignored ]; then
     [ -n "$IGNORED_SINCE" ] || die 2 "--check-ignored requires --ignored-since <marker-file>"
     [ "${#FILES[@]}" -eq 0 ] || die 2 "--check-ignored takes no file list"
@@ -1053,6 +1069,31 @@ add_unique_file() {
     FILES+=("$1")
 }
 
+# --revert-denied: one digest of the listed paths and what each holds now (a
+# blob id, a symlink target, or a marker for a directory, a missing path or
+# one git cannot hash), so --expect-snapshot can tell that the set a --dry-run
+# showed is still the set a revert would touch. Sets SNAPSHOT.
+denied_snapshot() {
+    local f h
+    SNAPSHOT=$(
+        for f in ${FILES[@]+"${FILES[@]}"}; do
+            if [ -L "$f" ]; then
+                h="link:$(readlink -- "$f" 2>/dev/null || printf '?')"
+            elif [ -d "$f" ]; then
+                h=dir
+            elif [ -f "$f" ]; then
+                h=$(yr_git hash-object --no-filters -- "$f" 2>/dev/null) || h='?'
+            elif [ -e "$f" ]; then
+                # Never open a FIFO or other special file: it can block.
+                h=special
+            else
+                h=missing
+            fi
+            printf '%s\0%s\0' "$f" "$h"
+        done | yr_git hash-object --stdin
+    ) || die 2 "cannot compute the trusted-config snapshot; nothing was reverted"
+}
+
 # The tracked links come from HEAD (ls-tree), the tree the revert restores from
 # (`checkout HEAD`), never the index: a staged retarget must not hide the
 # committed target. A write through a tracked symlink edits its target and leaves the link, which
@@ -1273,6 +1314,10 @@ elif [ "$MODE" = revert-denied ]; then
     # pending is an upper bound: a nested repository or special file found
     # below is left in place by the real revert. linkHits are reported, never
     # reverted.
+    denied_snapshot
+    if [ -n "$EXPECT_SNAPSHOT" ] && [ "$SNAPSHOT" != "$EXPECT_SNAPSHOT" ]; then
+        die 2 "trusted-config changes differ from the --dry-run preview; nothing was reverted"
+    fi
     if [ "$DRY_RUN" = 1 ]; then
         DRY_CLEAN=true
         [ ! -s "$CHANGES_FILE" ] || DRY_CLEAN=false
@@ -1283,8 +1328,9 @@ elif [ "$MODE" = revert-denied ]; then
         paths_json linkHits ${LINK_HITS[@]+"${LINK_HITS[@]}"}
         jq -nc --argjson clean "$DRY_CLEAN" --argjson dc "$DRY_DENIED" --argjson p "$PENDING_JSON" \
             --argjson n "${#FILES[@]}" --argjson l "$PATHS_JSON" --argjson ln "${#LINK_HITS[@]}" --arg why "$REASON" \
+            --arg snap "$SNAPSHOT" \
             '{result: "dry-run", patch: null, log: null, treeClean: $clean, deniedClean: $dc,
-              pending: $p, pendingCount: $n, linkHits: $l, linkHitCount: $ln}
+              pending: $p, pendingCount: $n, linkHits: $l, linkHitCount: $ln, snapshot: $snap}
              + (if $why == "" then {} else {reason: $why} end)' \
             || die 2 "cannot encode the dry-run result"
         exit 0
