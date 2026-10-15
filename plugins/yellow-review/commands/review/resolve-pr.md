@@ -481,7 +481,7 @@ runs it as is. Interactive asks first:
 5. Revert runs the call with `--expect-snapshot "<snapshot>"` in place of
    `--dry-run`, read by the rules below, and prints its `patch` path. Exit 2
    with `differ from the --dry-run preview` on stderr means a trusted-config
-   file changed while you asked and nothing was reverted: run the dry run and
+   file or symlink target changed while you asked and nothing was reverted: run the dry run and
    ask once more; on a second mismatch, treat it as a failed revert (below).
 6. Leave keeps them: if the question below about other changed paths
    follows, say in it that Revert there reverts these kept files too. After

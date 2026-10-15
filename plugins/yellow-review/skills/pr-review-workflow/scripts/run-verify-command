@@ -123,14 +123,14 @@
 #                  bound, since a nested repository or special file is kept),
 #                  "pendingCount", and "linkHits"/"linkHitCount" (trusted-config
 #                  symlinks whose target may have been edited, which no revert
-#                  undoes), and "snapshot" (a digest of the pending paths
-#                  and their current content), and changes nothing: no
+#                  undoes), and "snapshot" (a digest of the pending paths,
+#                  their current content and the link hits), and changes nothing: no
 #                  patch, no revert. For an interactive caller that asks
 #                  before reverting.
 #   --expect-snapshot <hex>: only with --revert-denied, without --dry-run:
-#                  the "snapshot" a --dry-run printed. When the pending paths
-#                  or their content no longer match it (a file changed while
-#                  the caller was asking), refuse (exit 2, nothing reverted)
+#                  the "snapshot" a --dry-run printed. When the pending paths,
+#                  their content or the link hits no longer match it (a file
+#                  or symlink target changed while the caller was asking), refuse (exit 2, nothing reverted)
 #                  with "trusted-config changes differ from the --dry-run
 #                  preview" on stderr, so a revert never reaches an edit the
 #                  user was not shown.
@@ -1077,11 +1077,12 @@ add_unique_file() {
 
 # --revert-denied: one digest of the listed paths and what each holds now (a
 # blob id, a symlink target, or a marker for a directory, a missing path or
-# one git cannot hash), so --expect-snapshot can tell that the set a --dry-run
+# one git cannot hash), plus the LINK_HITS set (call after
+# check_trusted_links), so --expect-snapshot can tell that the set a --dry-run
 # showed is still the set a revert would touch. Sets SNAPSHOT.
 denied_snapshot() {
     local f h
-    SNAPSHOT=$(
+    SNAPSHOT=$({
         for f in ${FILES[@]+"${FILES[@]}"}; do
             if [ -L "$f" ]; then
                 h="link:$(readlink -- "$f" 2>/dev/null || printf '?')"
@@ -1096,7 +1097,15 @@ denied_snapshot() {
                 h=missing
             fi
             printf '%s\0%s\0' "$f" "$h"
-        done | yr_git hash-object --stdin
+        done
+        # The link hits join the digest after an empty field (no listed path
+        # is empty), so a symlink target edited while the caller was asking
+        # is a mismatch too: its new hit would otherwise go unreported.
+        printf '\0'
+        for f in ${LINK_HITS[@]+"${LINK_HITS[@]}"}; do
+            printf '%s\0' "$f"
+        done
+    } | yr_git hash-object --stdin
     ) || die 2 "cannot compute the trusted-config snapshot; nothing was reverted"
 }
 

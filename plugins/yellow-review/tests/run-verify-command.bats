@@ -3938,6 +3938,22 @@ link_setup() {
   [ -f CLAUDE.md ]
 }
 
+@test "--revert-denied --expect-snapshot refuses when a trusted-config symlink target was written after the --dry-run preview" {
+  link_setup
+  printf 'rule\n' >| CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --dry-run
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -c .linkHits)" = '[]' ]
+  snap=$(printf '%s' "$output" | jq -r .snapshot)
+  # The link's outside target is written while the caller is asking.
+  printf '{"hooks":"evil"}\n' >| "$OUTSIDE/settings.json"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --expect-snapshot "$snap"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'trusted-config changes differ from the --dry-run preview; nothing was reverted'* ]]
+  grep -q rule CLAUDE.md
+  [ -z "$(ls -A "$PATCH_DIR" 2>/dev/null)" ]
+}
+
 @test "--revert-denied --dry-run withholds a link hit whose name contains ---, and keeps it out of reason" {
   OUTSIDE="$BATS_TEST_TMPDIR/outside-rules"
   mkdir -p "$OUTSIDE" .cursor/rules
