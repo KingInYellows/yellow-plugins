@@ -710,7 +710,9 @@ failed`, and `CHANGES_REQUESTED` reviewers from `get-pr-blockers`, or
 is null),
 **Follow-up issues filed** (links, with `tracker=`), **Reverted deny-listed
 paths** when Step 6's `--revert-denied` removed any (each path in its `reverted`
-list with the patch path, or `revert incomplete` when it failed), and
+list with the patch path, or `revert incomplete` when it failed), **Notes**
+(`shared ruvector store changed during the run (not judged)` when a Step 6 call
+printed the `Note: .ruvector/intelligence.json` line; not blocking), and
 **Conversation resolution** (`enforced` / `not enforced` / `unknown`). The final
 line is exactly the contract's `Resolve:` line.
 
