@@ -124,12 +124,14 @@
 #                  "pendingCount", and "linkHits"/"linkHitCount" (trusted-config
 #                  symlinks whose target may have been edited, which no revert
 #                  undoes), and "snapshot" (a digest of the pending paths,
-#                  their current content and the link hits), and changes nothing: no
+#                  their current content, mode and index entries, and the link
+#                  hits), and changes nothing: no
 #                  patch, no revert. For an interactive caller that asks
 #                  before reverting.
 #   --expect-snapshot <hex>: only with --revert-denied, without --dry-run:
 #                  the "snapshot" a --dry-run printed. When the pending paths,
-#                  their content or the link hits no longer match it (a file
+#                  their content, mode, index entries or the link hits no
+#                  longer match it (a file
 #                  or symlink target changed while the caller was asking), refuse (exit 2, nothing reverted)
 #                  with "trusted-config changes differ from the --dry-run
 #                  preview" on stderr, so a revert never reaches an edit the
@@ -1076,12 +1078,14 @@ add_unique_file() {
 }
 
 # --revert-denied: one digest of the listed paths and what each holds now (a
-# blob id, a symlink target, or a marker for a directory, a missing path or
-# one git cannot hash), plus the LINK_HITS set (call after
-# check_trusted_links), so --expect-snapshot can tell that the set a --dry-run
-# showed is still the set a revert would touch. Sets SNAPSHOT.
+# blob id plus its executable bit, a symlink target, or a marker for a
+# directory, a missing path or one git cannot hash), each path's index entries
+# (mode, blob and stage, so a staged edit or mode change the worktree does not
+# show is bound too: the revert checks out HEAD over both), plus the LINK_HITS
+# set (call after check_trusted_links), so --expect-snapshot can tell that the
+# set a --dry-run showed is still the set a revert would touch. Sets SNAPSHOT.
 denied_snapshot() {
-    local f h
+    local f h idx
     SNAPSHOT=$({
         for f in ${FILES[@]+"${FILES[@]}"}; do
             if [ -L "$f" ]; then
@@ -1090,13 +1094,15 @@ denied_snapshot() {
                 h=dir
             elif [ -f "$f" ]; then
                 h=$(yr_git hash-object --no-filters -- "$f" 2>/dev/null) || h='?'
+                if [ -x "$f" ]; then h="$h:x"; else h="$h:-"; fi
             elif [ -e "$f" ]; then
                 # Never open a FIFO or other special file: it can block.
                 h=special
             else
                 h=missing
             fi
-            printf '%s\0%s\0' "$f" "$h"
+            idx=$(lgit ls-files --stage -z -- "$f" 2>/dev/null | tr '\0' '\n') || idx='?'
+            printf '%s\0%s\0%s\0' "$f" "$h" "$idx"
         done
         # The link hits join the digest after an empty field (no listed path
         # is empty), so a symlink target edited while the caller was asking

@@ -36,7 +36,8 @@ callers that walk several PRs. Exit codes and markers are defined in
     `linkHitCount` and `snapshot` (interactive `/review:resolve` asks first);
     the ignored-file refusal still applies. `--expect-snapshot <snapshot>`
     makes the confirmed revert refuse (exit 2, nothing reverted) when the
-    paths, their content or the link hits changed since that preview. A list is withheld
+    paths, their content, mode, index entries or the link hits changed since
+    that preview. A list is withheld
     whole (`[]`, count kept) when one name has a control character, contains
     `---`, looks like a credential or cannot be screened; `reverted` follows
     the same rule.

@@ -617,6 +617,38 @@ assert_recreated_patch_restores() {
   [ -z "$(ls -A "$PATCH_DIR" 2>/dev/null)" ]
 }
 
+@test "--expect-snapshot refuses when a trusted-config file was staged after the --dry-run preview" {
+  printf 'committed\n' >| CLAUDE.md
+  git add CLAUDE.md && git commit -q -m "add CLAUDE.md"
+  printf 'resolver-written\n' >| CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --dry-run
+  [ "$status" -eq 0 ]
+  snap=$(printf '%s' "$output" | jq -r .snapshot)
+  # Another process stages new contents, then restores the previewed worktree.
+  printf 'staged user edit\n' >| CLAUDE.md
+  git add CLAUDE.md
+  printf 'resolver-written\n' >| CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --expect-snapshot "$snap"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'trusted-config changes differ from the --dry-run preview; nothing was reverted'* ]]
+  [ "$(git show :CLAUDE.md)" = 'staged user edit' ]
+}
+
+@test "--expect-snapshot refuses when a trusted-config file's executable bit changed after the --dry-run preview" {
+  printf 'committed\n' >| CLAUDE.md
+  git add CLAUDE.md && git commit -q -m "add CLAUDE.md"
+  printf 'resolver-written\n' >| CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --dry-run
+  [ "$status" -eq 0 ]
+  snap=$(printf '%s' "$output" | jq -r .snapshot)
+  chmod +x CLAUDE.md
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --expect-snapshot "$snap"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *'trusted-config changes differ from the --dry-run preview; nothing was reverted'* ]]
+  [ -x CLAUDE.md ]
+  grep -q 'resolver-written' CLAUDE.md
+}
+
 @test "--expect-snapshot applies only to --revert-denied without --dry-run and takes a hex digest" {
   run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty --expect-snapshot 0123456789abcdef0123456789abcdef01234567
   [ "$status" -eq 2 ]
