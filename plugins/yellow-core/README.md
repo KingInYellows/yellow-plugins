@@ -218,6 +218,68 @@ bash lib/quote-ground.sh batch < findings.jsonl
 - **No temp files.** Unredacted source lines and quotes stay in process memory
   and pipes.
 
+## Jev category eval (offline)
+
+`lib/jev-category-eval.py` measures whether TypeSafe's Jev picks the same
+`docs/solutions/` folder a doc already lives in, using the frozen criteria in
+`lib/jev-category-criteria.json`. It is a manual tool (Python 3.9+, stdlib
+only); nothing runs it automatically and it changes no staging behaviour.
+
+```bash
+python3 lib/jev-category-eval.py run --repo . --dry-run          # count, send nothing
+TYPESAFE_API_KEY=... python3 lib/jev-category-eval.py run --repo . --out ~/jev-eval
+python3 lib/jev-category-eval.py report ~/jev-eval/results-<utc>.jsonl
+```
+
+- **`run`** sends each tracked doc's frontmatter `title`, `problem` and
+  `tags` (never the body) and writes one JSONL row per doc to
+  `--out/results-<utc>.jsonl`, ending with a summary record (eligible and
+  written counts, `--limit`, whether it stopped early, skip counts).
+  `--out` must be outside the repository. Failed requests are rows too:
+  `status` is `invalid` for a well-formed answer outside the six categories
+  and `error:<class>` when there was no answer (timeout, HTTP error, a body
+  that is not an answer). Splits: `holdout` is every doc dated after the
+  criteria's `frozen_at`; the rest are `dev` or `test` by
+  `sha256(path) mod 100` (below 30 is dev). Only holdout was never used for
+  tuning.
+- **`report`** is offline. It prints agreement per split with a Wilson
+  interval, coverage and agreement at confidence >= the fixed 0.7 and 0.95
+  thresholds, the most common folder-to-Jev confusions, and the
+  pre-registered verdict. It refuses a results file that mixes criteria
+  versions or models (requested or returned) or repeats a path (exit 2).
+- **Judging.** `report` writes `disagreements.tsv` beside the results: every
+  disagreement plus a fixed-seed 20% sample of agreements, with an empty
+  `judgement` column. Fill it with `folder`, `jev`, `both` or `neither` and
+  re-run `report`; judgements are kept across runs (or read from
+  `--review FILE`). Each row carries `lesson_sha`, the sha256 of the
+  frontmatter sent (from the git index; `git show :<path>` shows that
+  version). A judgement is never dropped: one whose doc's folder,
+  frontmatter or Jev answer has changed is kept as `kind=stale`, and one whose doc has no
+  ok row as `kind=orphan`; neither counts. `report` refuses to overwrite an
+  existing `disagreements.tsv` that is not a private regular file you own;
+  pass it with `--review` instead. Unsampled agreements count as correct
+  for both.
+- **Verdict.** A paired non-inferiority test (Tango score interval, margin
+  0.10, one-sided alpha 0.05) on the first 155 holdout docs by date, once
+  every listed one is judged: `GO`, `NO-GO`, or `INSUFFICIENT-DATA`. There
+  is no verdict for results made under another criteria file or for a
+  partial run (no summary, stopped early, or `--limit`), or when `--seed`
+  is not the pre-registered seed. An invalid answer
+  counts as a Jev miss; a request error in that window blocks the verdict
+  until a new full run answers it, since `report` reads one results file.
+  Before that look the report is descriptive only, and no change ships
+  without `GO`.
+- **Exit codes.** 0 success; 1 no `run` request returned a usable answer,
+  or `run` stopped after 5 consecutive failed requests (the results file is
+  then partial); 2 usage error (missing key, no eligible docs, `--out`
+  inside the repository or writable by others, a bad `--url`, a malformed
+  criteria, results or review file, mixed or repeated results, an unsafe
+  existing `disagreements.tsv`).
+- **Changing the criteria.** Any edit to the criteria file, even a note,
+  changes the sha every row records, and `report` gives no verdict across
+  shas. Ship it as a new frozen version with a new `frozen_at`, which
+  restarts the holdout.
+
 ## License
 
 MIT
