@@ -1,5 +1,10 @@
 # Claude Code + Codex Plugin Pilot
 
+> **Status (2026-10-15):** complete. All five pilot shells
+> (`claude-code-codex-plugin-pilot-01` to `-05`) are archived in
+> `plans/complete/`. Later Codex work (`codex-compatibility-expansion`) is
+> archived there too.
+
 ## Overview
 
 yellow-plugins ships 17 Claude Code plugins from one pnpm monorepo, gated by

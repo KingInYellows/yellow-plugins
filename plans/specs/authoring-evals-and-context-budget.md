@@ -1,5 +1,11 @@
 # Authoring Evals and Context Budget
 
+> **Status (2026-10-15):** not started and not decomposed into shells. No
+> listing-budget baseline or trigger-eval harness exists. The Overview's
+> `disable-model-invocation` count has drifted: `yellow-goal`'s
+> `commands/goal/run-real.md` now sets it too, beside
+> `yellow-ci/commands/ci/runner-cleanup.md`.
+
 ## Overview
 
 The integration evaluation (`docs/brainstorms/2026-10-02-turn-the-integration-evaluation-into-an-brainstorm.md`, Spec C) found four gaps in how yellow authors components and measures the result:

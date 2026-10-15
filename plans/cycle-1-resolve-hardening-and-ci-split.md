@@ -1,15 +1,18 @@
 # Feature: Cycle 1 — resolve-flow hardening, CI split, restack abort guard
 
-> **Status (2026-10-10):** reconciled against the stack tree. 32 of 40 boxes
-> are `[x]`, 1 is `[-]` (4.4, not applicable) and 7 are open. Phases 2, 3
+> **Status (2026-10-15):** reconciled against `main`. 33 of 40 boxes are
+> `[x]`, 1 is `[-]` (4.4, not applicable) and 6 are open. Phases 2, 3, 5
 > and 6 are implemented, and Phase 1 except 1.7. Tasks 2.5 and 2.6 landed
 > with #1125 on `main` (special files held aside until `save_patch`, and the
-> snapshot-failure FIFO test in `run-verify-command.bats`). Phase 4 lacks 4.3 (`resolve-stack.md`
-> is 502 lines, over the 500-line target). Phase 5 lacks only the
-> `plugins/yellow-review/CLAUDE.md` update in 5.4. Open and not code: 0.1
-> (`/stack:status` gate), 1.7 (CI counts and green jobs), 7.1 to 7.3 (ledger
-> reconcile; Linear shows the five issues Done, but the mapping and confirm
-> step were not recorded). Open risk: `agent/fix/astra-bridge` edits the same
+> snapshot-failure FIFO test in `run-verify-command.bats`). 5.4 is done:
+> the `oos → fixed/addressed` upgrade shipped in #1079 and the
+> `plugins/yellow-review/CLAUDE.md` text in #1187. Phase 4 lacks 4.3
+> (`resolve-stack.md` is still 502 lines, over the 500-line target). Open
+> and not code: 0.1 (`/stack:status` gate), 1.7 (the `ci-status` gate does
+> include `yellow-review-shell-tests`, split out in #1075, but the summed
+> test counts were never recorded), 7.1 to 7.3 (ledger reconcile; Linear
+> shows the five issues Done, but the mapping and confirm step were not
+> recorded). Open risk: `agent/fix/astra-bridge` edits the same
 > `ci-status` block as task 1.3. Line numbers in the tasks have drifted;
 > re-find them by name.
 
@@ -370,7 +373,9 @@ Start from a base that includes `stage-unattended-learnings` and PR 3.
   (`^sgp_[a-zA-Z0-9]{20,}$` in `plugins/yellow-semgrep/CLAUDE.md:80`) with
   floors from those in-repo formats. Add the same prefixes to yellow-core
   `cs_redact_secrets` (`compound-staging.sh` L118–150).
-- [ ] 5.4: `scripts/reply-pr-thread` L215–217: allow `oos → fixed` and
+- [x] 5.4: (done: #1079 allows the upgrade in `reply-pr-thread`; #1187
+  documents it in `plugins/yellow-review/CLAUDE.md`.)
+  `scripts/reply-pr-thread` L215–217: allow `oos → fixed` and
   `oos → addressed`; keep `oos → oos` idempotent. Update the header
   (L14–16), `dispositions.md` (L650–653), and `plugins/yellow-review/CLAUDE.md`.
 - [x] 5.5: Tests in `check-resolve-text.bats` and `reply-pr-thread.bats`, run

@@ -1,5 +1,10 @@
 # Feature: Gate C commit-subject provenance for Graphite merge-queue PRs
 
+> **Status (2026-10-15):** complete. Shipped in #1083 (`d75d8ae`):
+> `plugins/yellow-core/lib/plan-gate-provenance.sh` and the Gate C
+> commit-subject tier in `/plan:complete`. Archived on the 2026-10-15 plan
+> audit.
+
 ## Problem Statement
 
 `/plan:complete` Gate C cannot verify plans delivered through Graphite's merge
@@ -257,7 +262,10 @@ positives).
 > The #808 check above is one data point; also check one stacked queue-merged PR
 > before relying on the blob match.
 <!-- /deepen-plan -->
-- [ ] 4.4: Submit through the provider reported by `/stack:status`.
+- [x] 4.4: (done: landed through the Graphite merge queue as #1083,
+  `d75d8ae` on `main`; later archives such as #1174 carry
+  `via=commit-subject` trailers from it.) Submit through the provider
+  reported by `/stack:status`.
 
 ## Technical Details
 

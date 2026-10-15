@@ -100,9 +100,9 @@ replaces the two manual greps in `zsh-noclobber-mktemp-stderr-redirect.md`.
 
 ### Promoting a marker-delimited command block to a Tier 4 library (plan-time, yellow-council synthesis)
 
-Planned in `plans/yellow-council-v2-four-cli-05-evidence-verification-and-finalization.md`
-(Phase A); not shipped when this was written, so re-check the file names
-before citing them.
+Planned in `plans/complete/yellow-council-v2-four-cli-05-evidence-verification-and-finalization.md`
+(Phase A) and shipped in #1198; this section predates it, so re-check the
+file names before citing them.
 
 **Why the inline layout was safe.** The `council-synthesis-lib` helpers sat
 between `# >>> ... / # <<< ...` markers in `council.md`. `tests/lib/extract-synthesis-lib.bash`

@@ -1,5 +1,10 @@
 # Feature: Harden plugin fenced shell blocks against user shell aliases
 
+> **Status (2026-10-15):** not started (0 of 19 boxes); only the plan
+> landed (#1093). Re-checked against `main`: every "Must fix" site below is
+> still unguarded at the cited line, and `SHC-010` /
+> `aliasGuardedCommands` do not exist yet.
+
 ## Problem Statement
 
 Claude Code's Bash tool runs fenced shell blocks under the user's login shell

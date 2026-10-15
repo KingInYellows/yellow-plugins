@@ -1,5 +1,16 @@
 # yellow-review Grounding and Resolve Loop
 
+> **Status (2026-10-15):** partly shipped, never decomposed into shells.
+> - **R1–R4 done.** `plugins/yellow-core/lib/quote-ground.sh` landed with
+>   #1055's stack, and council shell 05 (#1198) consumes it for Tier 1.
+> - **R17–R21 superseded.** #1212 made `/review:resolve` re-pass by default
+>   until the bot is quiet (`resolve_pr.repass_max_passes`, default 5,
+>   clamped 1..10) with a `Repass:` report line. There is no `--until-clean`
+>   flag; re-scope these requirements against #1212 before building them.
+> - **Not started:** R5–R14 (grounding gate in `/review:pr`; no review
+>   command calls `quote-ground.sh` yet), R15–R16 (repro-required
+>   "Confirmed") and R22–R23 (phantom resolver claims).
+
 ## Overview
 
 The integration evaluation (`docs/brainstorms/2026-10-02-turn-the-integration-evaluation-into-an-brainstorm.md`, Spec B) found three review transitions that are judged by an LLM rather than checked:

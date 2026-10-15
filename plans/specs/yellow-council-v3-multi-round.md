@@ -10,7 +10,7 @@ Roadmap step 11 of the integration evaluation (`docs/brainstorms/2026-10-02-turn
 - keep first-round positions independent, and add a corrections-only addendum before round 2, preserving dissent (Advisory Council);
 - run a persistent `opencode serve` with headless permission-deny (the opencode plugin).
 
-**Blocked.** This spec starts only after council v2 shells `yellow-council-v2-four-cli-04` (quota and OpenCode routing) and `-05` (evidence verification) are archived in `plans/complete/`. It consumes shell 05's `verify_finding()`, which uses the yellow-core quote-grounding script from Spec B R1–R4, and shell 04's `QUOTA_EXHAUSTED` handling.
+**Unblocked (2026-10-15).** This spec was gated on council v2 shells `yellow-council-v2-four-cli-04` (quota and OpenCode routing) and `-05` (evidence verification) being archived in `plans/complete/`; both are (shell 05 shipped in #1198). It has not been decomposed into shells yet. It consumes shell 05's `verify_finding()`, which uses the yellow-core quote-grounding script from Spec B R1–R4, and shell 04's `QUOTA_EXHAUSTED` handling.
 
 ## Requirements
 
