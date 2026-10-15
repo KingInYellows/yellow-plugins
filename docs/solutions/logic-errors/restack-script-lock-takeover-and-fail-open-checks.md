@@ -206,6 +206,16 @@ than the evidence behind it.
   exit 40), `lock_detached_entries` (never locks it), `release_run_worktree`
   and `provider_submit` (refuse). A check that guards a mutation belongs next
   to the mutation, not only at command entry.
+- **One invariant, one guard.** Seven rounds closed one path each. The root
+  cause: deleting the state and restoring were allowed wherever the caller
+  had probed only the worktree it expected (usually the run worktree). Now
+  `recorded_hold` probes every recorded worktree (run, entries, owners; both
+  providers) for a rebase or other operation, or an unreadable one, and
+  `restore_and_clear`, the only path that deletes the state (finish,
+  failure, abort, restore, interrupt), refuses while it holds.
+  `step_graphite`, `step_github` and the interrupt handler classify a
+  failure with a hold as a pause, and `release_run_worktree` refuses a
+  checkout while it holds.
 - **Found while testing.** A deleted github owner still listed on its branch
   read as busy in `in_chain_busy`; worktrees git reports prunable or whose
   directory is gone are now skipped there.

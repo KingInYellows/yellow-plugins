@@ -538,15 +538,31 @@ forge() {
   [ ! -e "$SD/state" ]
 }
 
-@test "restore: a deleted branch is dropped, a branch still in a rebase is kept (exit 40)" {
+@test "restore: a deleted branch is dropped, a branch held by the run worktree is kept (exit 40)" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  # restore changes nothing while the paused rebase is in progress
+  # (recorded_hold), so end it first; the run worktree is left on b.
+  git -C "$(wtp a)" rebase --abort
+  git branch -D c
+  run bash "$SCRIPT" restore
+  [ "$status" -eq 40 ]
+  [[ $output == *"dropped: branch c no longer exists"* ]]
+  [[ $output == *"kept: b is checked out in $(wtp a)"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "restore changes nothing while a recorded worktree is mid-rebase (exit 40)" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
   [ "$status" -eq 10 ]
   git branch -D c
   run bash "$SCRIPT" restore
   [ "$status" -eq 40 ]
-  [[ $output == *"dropped: branch c no longer exists"* ]]
-  [[ $output == *"kept: checkout of b"*"was refused"* ]]
+  [[ $output == *"a rebase-merge is in progress in $(wtp a); state kept, nothing restored"* ]]
+  [[ $output != *"dropped:"* ]]
+  [ -z "$(branch_of "$(wtp c)")" ]
   [ -e "$SD/state" ]
 }
 
@@ -554,6 +570,7 @@ forge() {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
   [ "$status" -eq 10 ]
+  git -C "$(wtp a)" rebase --abort
   git -C "$(wtp c)" checkout -q -b other
   run bash "$SCRIPT" restore
   [ "$status" -eq 40 ]
@@ -2091,7 +2108,9 @@ teardown() {
   chmod a-x "$T/p-c"
   run bash "$SCRIPT" restore
   [ "$status" -eq 40 ]
-  [[ $output == *"kept: cannot tell whether $(wtp c) still exists"* ]]
+  # recorded_hold stops it first: the paused rebase in the run worktree, or
+  # the unreadable entry.
+  [[ $output == *"state kept, nothing restored"* ]]
   [[ $output != *"dropped: $(wtp c)"* ]]
   [ -e "$SD/state" ]
   run bash "$SCRIPT" abort --provider graphite
@@ -2159,6 +2178,72 @@ HOOK
   run bash "$SCRIPT" continue --provider graphite
   [ "$status" -eq 31 ]
   [ -e "$SD/state" ]
+}
+
+# hook_plant WT BRANCH ONTO [MERGE]: write a provider hook that leaves a rebase
+# of BRANCH (or, with MERGE, a merge) in progress in WT.
+hook_plant() {
+  cat >"$T/hook" <<HOOK
+gd=\$(git -C "$1" rev-parse --path-format=absolute --git-dir)
+if [ -n "${4:-}" ]; then
+  git -C "$1" rev-parse HEAD >"\$gd/MERGE_HEAD"
+  exit 0
+fi
+mkdir -p "\$gd/rebase-merge"
+printf 'refs/heads/%s\n' "$2" >"\$gd/rebase-merge/head-name"
+git -C "$1" rev-parse "refs/heads/$2" >"\$gd/rebase-merge/orig-head"
+git -C "$1" rev-parse "$3" >"\$gd/rebase-merge/onto"
+HOOK
+}
+
+@test "github: a failed rebase with no gh-stack marker keeps the state while an owner is mid-rebase" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  hook_plant "$(wtp c)" c b
+  STUB_GH_HOOK="$T/hook" STUB_FAIL=rebase STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  [[ $output == *"PAUSED"* ]]
+  [ -e "$SD/state" ]
+  [ ! -e "$COMMON/gh-stack-rebase-state" ]
+  rebase_marker "$(wtp c)"
+}
+
+@test "graphite: a failed restack keeps the state while an entry is mid-rebase" {
+  mk_stack
+  orig_c=$(git rev-parse c)
+  hook_plant "$(wtp c)" c b
+  STUB_GT_HOOK="$T/hook" STUB_FAIL=restack run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  [ -e "$SD/state" ]
+  # Not checked out over the rebase.
+  [ -z "$(branch_of "$(wtp c)")" ]
+  rebase_marker "$(wtp c)"
+}
+
+@test "github: a restack that succeeds keeps the state while an owner has a merge in progress" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  hook_plant "$(wtp c)" c b merge
+  STUB_GH_POST_HOOK="$T/hook" STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 40 ]
+  [[ $output == *"a MERGE_HEAD is in progress in $(wtp c); state kept, nothing restored"* ]]
+  [[ $output != *"restack complete"* ]]
+  [ -e "$SD/state" ]
+}
+
+@test "github: restore keeps the state while an owner is mid-rebase and gh-stack has no record" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack b
+  orig_a=$(git rev-parse a)
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  lose_github_record "$orig_a"
+  plant_rebase "$(wtp c)" c b
+  run bash "$SCRIPT" restore
+  [ "$status" -eq 40 ]
+  [[ $output == *"in progress in $(wtp c); state kept, nothing restored"* ]]
+  [ -e "$SD/state" ]
+  rebase_marker "$(wtp c)"
 }
 
 @test "--abort never checks out a run worktree registered again at the recorded path" {

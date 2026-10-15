@@ -1258,9 +1258,59 @@ restore_entries() {
   [ "${#E_PATH[@]}" -eq 0 ]
 }
 
+# recorded_hold: the one guard on clearing the state and on restoring. Print
+# "<what><TAB><path>" and return 0 when any recorded worktree (the run
+# worktree, an entry or an owner, either provider) has a rebase or another
+# operation in progress (wt_busy), or cannot be read, or the worktree list
+# cannot be read. While it holds, the state is never deleted and no recorded
+# worktree is unlocked or checked out. A worktree confirmed gone holds
+# nothing. Needs the state loaded (RECORDED comes from it).
+recorded_hold() {
+  local p g why
+  load_worktrees 2>/dev/null || {
+    printf 'unreadable\t%s' "git worktree list"
+    return 0
+  }
+  load_recorded
+  for p in "${RECORDED[@]}"; do
+    g=0
+    wt_gone "$p" || g=$?
+    [ "$g" -ne 0 ] || continue
+    if [ "$g" -eq 2 ]; then
+      printf 'unreadable\t%s' "$p"
+      return 0
+    fi
+    if why=$(wt_busy "$p"); then
+      printf '%s\t%s' "$why" "$p"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# hold_note LINE: explain a recorded_hold line.
+hold_note() {
+  local why=${1%%$'\t'*} p=${1#*$'\t'}
+  if [ "$why" = unreadable ]; then
+    err "$(v "$p") cannot be read; state kept, nothing restored. Check it with git -C $(q "$p") status, then run /worktree:restack --continue or --abort"
+  else
+    err "a $(v "$why") is in progress in $(v "$p"); state kept, nothing restored. Finish or abort it there, then run /worktree:restack --continue or --abort"
+  fi
+}
+
 # restore_and_clear: restore, then drop state and lock if everything is back.
-# Returns 0 on a full restore, 1 when entries remain (state rewritten).
+# Returns 0 on a full restore, 1 when entries remain or recorded_hold holds
+# (state rewritten, entries locked). Every path that deletes the state goes
+# through here: finish, failure, abort, restore and the interrupt handler.
 restore_and_clear() {
+  local hold
+  if hold=$(recorded_hold); then
+    hold_note "$hold"
+    lock_detached_entries
+    write_state || err "could not rewrite the state file"
+    lock_mark_paused
+    return 1
+  fi
   if restore_entries; then
     if gh_paused; then
       write_state || err "could not rewrite the state file"
@@ -1359,11 +1409,8 @@ finish_restack() {
 fail_and_restore() {
   ARMED=0
   err "restack failed; restoring worktrees"
-  if [ "${#E_PATH[@]}" -eq 0 ]; then
-    clear_state
-    release_lock
-    exit "$X_FAILED"
-  fi
+  # Even with no entries to restore, the state is deleted only through the
+  # guard in restore_and_clear.
   if restore_and_clear; then exit "$X_FAILED"; fi
   exit "$X_PARTIAL"
 }
@@ -1419,13 +1466,13 @@ on_exit() {
       [ "$rc" -ne 0 ] || rc=$X_PAUSED
     else
       local busy
-      if busy=$(wt_busy "$S_RUN"); then
-        # No conflict marker yet, but the provider's rebase is mid-flight in
-        # the run worktree: restoring now would drop the recovery record.
+      if busy=$(recorded_hold); then
+        # No conflict marker yet, but a rebase or operation is mid-flight in a
+        # recorded worktree: restoring now would drop the recovery record.
         lock_detached_entries
         write_state || true
         lock_mark_paused
-        err "interrupted while the provider's rebase is still in progress in $(v "$S_RUN") ($busy); finish or abort that rebase, then run /worktree:restack --continue or --abort"
+        err "interrupted while a $(v "${busy%%$'\t'*}") is still in progress in $(v "${busy#*$'\t'}"); finish or abort it, then run /worktree:restack --continue or --abort"
         [ "$rc" -ne 0 ] || rc=$X_PAUSED
       else
         err "interrupted; restoring worktrees"
@@ -1462,7 +1509,9 @@ step_graphite() { # step_graphite restack|continue|abort
   fi
   if [ "$rc" -eq 0 ]; then
     RESULT=ok
-  elif [ "$1" != abort ] && gt_paused "$S_RUN"; then
+  elif [ "$1" != abort ] && { gt_paused "$S_RUN" || recorded_hold >/dev/null; }; then
+    # A failed step that left a rebase or operation in a recorded worktree
+    # (or one that cannot be read) is a pause: failing would restore over it.
     RESULT=conflict
   else
     RESULT=failed
@@ -1481,10 +1530,11 @@ step_github() { # step_github upstack|continue|abort
     *)
       err "gh stack rebase ($1): $(v "$AD_STATUS") $(v "$AD_RECOVERY")"
       printf '%s\n' "$AD_STDERR" | cap_lines 10 >&2
-      # A failed step with gh-stack's own rebase record, an in-flight git
-      # rebase, or an adapter timeout (SPAWN_FAILURE) is a pause, not a
-      # failure: clearing our state would orphan a partially applied restack.
-      if [ "$1" != abort ] && { gh_paused || [ "$AD_STATUS" = SPAWN_FAILURE ] || wt_busy "$S_RUN" >/dev/null; }; then
+      # A failed step with gh-stack's own rebase record, a rebase or other
+      # operation in any recorded worktree (gh-stack rebases in the owners),
+      # or an adapter timeout (SPAWN_FAILURE) is a pause, not a failure:
+      # clearing our state would orphan a partially applied restack.
+      if [ "$1" != abort ] && { gh_paused || [ "$AD_STATUS" = SPAWN_FAILURE ] || recorded_hold >/dev/null; }; then
         RESULT=conflict
       else
         RESULT=failed
@@ -2056,10 +2106,17 @@ release_run_worktree() {
   fi
   # A checkout in the middle of a merge, cherry-pick or rebase would fail or,
   # with nothing staged yet, carry the half-done work onto the start branch.
+  # No recorded worktree is checked out while any of them is mid-operation
+  # or unreadable (recorded_hold).
   local why
-  if why=$(wt_busy "$S_RUN"); then
-    err "$(v "$S_RUN") has a $(v "$why") in progress; not checking out $(v "$start")"
-    RELEASE_WHY=busy
+  if why=$(recorded_hold); then
+    if [ "${why%%$'\t'*}" = unreadable ]; then
+      err "$(v "${why#*$'\t'}") cannot be read; not checking out $(v "$start") in $(v "$S_RUN")"
+      RELEASE_WHY=unreadable
+    else
+      err "$(v "${why#*$'\t'}") has a $(v "${why%%$'\t'*}") in progress; not checking out $(v "$start") in $(v "$S_RUN")"
+      RELEASE_WHY=busy
+    fi
     return 1
   fi
   if [ -z "$cur" ]; then

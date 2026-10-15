@@ -213,6 +213,12 @@ branch). Then it restores. Every worktree it stops on is named with a fix line.
   when a recorded worktree's rebase will not clear (run
   `git -C <worktree> rebase --abort` there to see git's error) or its git
   directory or `head-name` cannot be read (run `git -C <worktree> status`).
+- **Any operation in a recorded worktree.** While the run worktree, a
+  detached worktree or an owner has a rebase, merge, cherry-pick, revert or
+  sequencer in progress, or cannot be read, nothing is restored or checked
+  out and the state is kept: a failed provider step pauses (exit `10`), and
+  finish, `--abort` and `restore` stop (exit `40`/`31`). Finish or abort it
+  there, then run again.
 - **Deleted worktree.** It counts as having no rebase; `git worktree prune`
   removes its record. Only a path confirmed gone counts: one behind a parent
   directory that cannot be searched (a lost execute bit) is unreadable, keeps
