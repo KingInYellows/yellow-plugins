@@ -198,6 +198,14 @@ than the evidence behind it.
   `--continue` skipped the "rebase still in progress" guard, restored over an
   entry still mid-rebase and cleared the state. Every pause-marker check now
   goes through `gh_paused` / `gt_paused` gated by the recorded `S_PROVIDER`.
+- **A gate that runs once.** `refuse_replaced` guarded only the start of a
+  resumed command; `start` restored straight after `gt restack` returned, so a
+  worktree replaced while the provider ran was checked out and the state
+  cleared. The binding is now rechecked inside each primitive that touches a
+  recorded worktree after a provider step: `restore_entries` (keeps it,
+  exit 40), `lock_detached_entries` (never locks it), `release_run_worktree`
+  and `provider_submit` (refuse). A check that guards a mutation belongs next
+  to the mutation, not only at command entry.
 - **Found while testing.** A deleted github owner still listed on its branch
   read as busy in `in_chain_busy`; worktrees git reports prunable or whose
   directory is gone are now skipped there.

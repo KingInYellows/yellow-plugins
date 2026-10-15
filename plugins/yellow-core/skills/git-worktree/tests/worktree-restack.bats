@@ -2121,6 +2121,46 @@ teardown() {
   rebase_marker "$(wtp c)"
 }
 
+@test "start never restores into a worktree registered again at a recorded path while the provider ran" {
+  mk_stack
+  orig_c=$(git rev-parse c)
+  # While gt restack runs, entry c is removed and a new worktree is
+  # registered at its path (git reuses its worktrees/ name), detached at the
+  # commit start recorded, so nothing but the binding tells them apart.
+  cat >"$T/hook" <<HOOK
+git -C "$REPO" worktree remove --force "$(wtp c)"
+git -C "$REPO" worktree add -q --detach "$(wtp c)" $orig_c
+HOOK
+  STUB_GT_HOOK="$T/hook" run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 40 ]
+  [[ $output == *"kept: $(wtp c) cannot be confirmed as the worktree this run recorded"* ]]
+  [[ $output != *"restored: $(wtp c)"* ]]
+  [ -e "$SD/state" ]
+  # The replacement is untouched: still detached, not locked.
+  [ -z "$(branch_of "$(wtp c)")" ]
+  [ "$(git -C "$(wtp c)" rev-parse HEAD)" = "$orig_c" ]
+  ! git -C "$REPO" worktree list --porcelain | grep -A6 -x "worktree $(wtp c)" | grep -q '^locked'
+  # The other entry was restored as usual.
+  [ "$(branch_of "$(wtp b)")" = b ]
+}
+
+@test "a pause never locks a worktree registered again at a recorded path while the provider ran" {
+  mk_stack b
+  orig_c=$(git rev-parse c)
+  cat >"$T/hook" <<HOOK
+git -C "$REPO" worktree remove --force "$(wtp c)"
+git -C "$REPO" worktree add -q --detach "$(wtp c)" $orig_c
+HOOK
+  STUB_GT_HOOK="$T/hook" run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  [[ $output == *"$(wtp c) cannot be confirmed as the worktree this run recorded; not locking it"* ]]
+  ! git -C "$REPO" worktree list --porcelain | grep -A6 -x "worktree $(wtp c)" | grep -q '^locked'
+  # The resumed commands refuse it.
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 31 ]
+  [ -e "$SD/state" ]
+}
+
 @test "--abort never checks out a run worktree registered again at the recorded path" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite

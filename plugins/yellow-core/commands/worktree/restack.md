@@ -203,7 +203,9 @@ branch). Then it restores. Every worktree it stops on is named with a fix line.
   When a recorded path now holds a worktree without it (removed and
   registered again, or its `.git` link changed), `--continue`, `--abort` and
   `restore` change nothing and keep the state (exit `31`); `status` lists it
-  as `replaced`. Move or remove that worktree, then run again. When start
+  as `replaced`. Move or remove that worktree, then run again. The check is
+  repeated after every provider step, so one replaced while the provider ran
+  is never restored, locked, checked out or submitted from (exit `40`). When start
   cannot bind one (its git directory is not writable, or something sits at the
   binding path), it changes nothing, leaves no state and exits `30` with a fix
   line.

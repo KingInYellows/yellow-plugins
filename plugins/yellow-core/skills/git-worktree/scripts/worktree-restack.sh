@@ -1214,6 +1214,16 @@ restore_entries() {
       note "dropped: $(v "$path") was deleted; git worktree prune removes its record"
       continue
     fi
+    # A provider step can run for minutes, and refuse_replaced only guarded
+    # the command's start: recheck the binding right before touching it.
+    if wt_replaced "$path"; then
+      note "kept: $(v "$path") cannot be confirmed as the worktree this run recorded; not unlocked or checked out"
+      note "  fix: restore access to it, or move it aside or remove it (git worktree remove $(q "$path")), then run /worktree:restack --abort or the restore subcommand again"
+      kp+=("$path")
+      kr+=("$ref")
+      ks+=("${E_SHA[i]}")
+      continue
+    fi
     if ! branch_exists "$br"; then
       note "dropped: branch $(v "$br") no longer exists (worktree $(v "$path"))"
       unlock_entry "$i"
@@ -1274,6 +1284,12 @@ lock_detached_entries() {
   for ((i = 0; i < ${#E_PATH[@]}; i++)); do
     wi=$(wt_index "${E_PATH[i]}")
     if [ "$wi" -ge 0 ] && [ "${WT_LOCKREASON[wi]}" = "$PAUSE_REASON" ]; then continue; fi
+    # Never lock a worktree that replaced a recorded one (see wt_replaced);
+    # --continue and --abort refuse it until it is moved aside.
+    if wt_replaced "${E_PATH[i]}"; then
+      err "$(v "${E_PATH[i]}") cannot be confirmed as the worktree this run recorded; not locking it"
+      continue
+    fi
     git worktree lock --reason "$PAUSE_REASON" -- "${E_PATH[i]}" >/dev/null 2>&1 ||
       err "could not lock $(v "${E_PATH[i]}"); do not prune or remove it"
   done
@@ -1299,6 +1315,12 @@ check_ancestry() {
 }
 
 provider_submit() {
+  # gt submits from the run worktree: never from one that replaced it.
+  load_worktrees || return 1
+  if wt_replaced "$S_RUN"; then
+    err "$(v "$S_RUN") cannot be confirmed as this run's worktree; not submitting from it"
+    return 1
+  fi
   if [ "$S_PROVIDER" = graphite ]; then
     (cd -- "$S_RUN" && gt submit --stack --no-interactive)
   else
@@ -2017,6 +2039,17 @@ release_run_worktree() {
   local start=$1 cur head line
   RELEASE_WHY=""
   [ -n "$start" ] || return 0
+  # Recheck the binding here too: a provider step may have run since the
+  # command's refuse_replaced.
+  load_worktrees 2>/dev/null || {
+    RELEASE_WHY=unreadable
+    return 1
+  }
+  if wt_replaced "$S_RUN"; then
+    err "$(v "$S_RUN") cannot be confirmed as this run's worktree; not checking out $(v "$start")"
+    RELEASE_WHY=replaced
+    return 1
+  fi
   cur=$(git -C "$S_RUN" branch --show-current 2>/dev/null) || cur=""
   if [ "$cur" = "$start" ] || { [ -n "$cur" ] && ! in_chain "$cur"; }; then
     return 0
@@ -2060,6 +2093,7 @@ release_advice() {
     busy) printf 'Finish or abort the operation in progress there, then run %s again' "$2" ;;
     floating) printf 'Keep the floating commits listed above (see the rescue line), then run %s again' "$2" ;;
     unreadable) printf 'Check it with git -C %s status, then run %s again' "$(q "$S_RUN")" "$2" ;;
+    replaced) printf 'Restore access to %s, or move it aside or remove it (git worktree remove %s), then run %s again' "$(v "$S_RUN")" "$(q "$S_RUN")" "$2" ;;
     *) printf 'Check out %s there (git -C %s checkout %s; git names any local change that blocks it), then run %s again' "$(v "$1")" "$(q "$S_RUN")" "$(q "$1")" "$2" ;;
   esac
 }
