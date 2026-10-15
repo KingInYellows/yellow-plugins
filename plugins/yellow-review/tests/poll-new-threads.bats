@@ -402,3 +402,83 @@ EOS
   [[ "$output" == *"repass fetched=1 found=0"* ]]
   [ "$(grep -c 'neither timeout nor gtimeout' <<<"$stderr")" -eq 1 ]
 }
+
+# --- Severity and anchor summary over the new threads ---
+
+# json_setup <json>: a get-pr-comments stub that prints <json>.
+json_setup() {
+  fake_setup
+  printf '%s\n' "$1" >"${BATS_TEST_TMPDIR}/threads.json"
+  printf '#!/bin/sh\ncat "%s"\n' "${BATS_TEST_TMPDIR}/threads.json" >"$FAKE_DIR/get-pr-comments"
+  chmod +x "$FAKE_DIR/get-pr-comments"
+}
+
+# thread <id> <authorType> <body> [path] [originalLine] [line]
+thread() {
+  jq -nc --arg id "$1" --arg t "$2" --arg b "$3" --arg p "${4:-a.txt}" \
+    --argjson ol "${5:-null}" --argjson l "${6:-null}" \
+    '{threadId: $id, path: $p, line: $l, originalLine: $ol, comments: [{author: "x", authorType: $t, body: $b}]}'
+}
+
+CODEX_P1='**<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat)</sub></sub>  Fix the loop**'
+CODEX_P2='**<sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub>  Rename**'
+
+@test "summary: a Codex P1 badge counts as p1 and a P2 badge as p2plus" {
+  json_setup "[$(thread PRRT_old Bot "$CODEX_P2"),$(thread PRRT_n1 Bot "$CODEX_P1"),$(thread PRRT_n2 Bot "$CODEX_P2")]"
+  printf 'PRRT_old\n' >"$ROUND1"
+  run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repass fetched=1 found=1 p1=1 p2plus=1 same_anchor=0"* ]]
+}
+
+@test "summary: P2 alt text and a P3 shields URL alone are p2plus" {
+  json_setup "[$(thread PRRT_n1 Bot "$CODEX_P2"),$(thread PRRT_n2 Bot 'see https://img.shields.io/badge/P3-lightgrey nit')]"
+  : >"$ROUND1"
+  run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
+  [[ "$output" == *"repass fetched=1 found=1 p1=0 p2plus=2 same_anchor=0"* ]]
+}
+
+@test "summary: no badge, a human author or a missing body counts as p1" {
+  json_setup "[$(thread PRRT_n1 Bot 'plain finding'),$(thread PRRT_n2 User "$CODEX_P2"),{\"threadId\":\"PRRT_n3\",\"comments\":[]},{\"threadId\":\"PRRT_n4\",\"comments\":[{\"authorType\":\"Bot\",\"body\":{\"x\":1}}]}]"
+  : >"$ROUND1"
+  run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
+  [[ "$output" == *"repass fetched=1 found=1 p1=4 p2plus=0 same_anchor=0"* ]]
+}
+
+@test "summary: the most severe badge in a comment wins, so a quoted P3 badge cannot lower a P1" {
+  json_setup "[$(thread PRRT_n1 Bot "$CODEX_P1 quoted: ![P3 Badge](https://img.shields.io/badge/P3-x)")]"
+  : >"$ROUND1"
+  run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
+  [[ "$output" == *"p1=1 p2plus=0"* ]]
+}
+
+@test "summary: same_anchor matches a fixed path and original line, falling back to line" {
+  json_setup "[$(thread PRRT_n1 Bot "$CODEX_P1" src/a.sh 10),$(thread PRRT_n2 Bot "$CODEX_P1" src/b.sh null 7),$(thread PRRT_n3 Bot "$CODEX_P1" src/a.sh 11),$(thread PRRT_old Bot "$CODEX_P1" src/a.sh 10)]"
+  printf 'PRRT_old\n' >"$ROUND1"
+  printf 'src/a.sh 10\r\nsrc/b.sh 7\n\n' >"${BATS_TEST_TMPDIR}/anchors"
+  run "$FAKE_DIR/poll-new-threads" --wait 0 --fixed-anchors "${BATS_TEST_TMPDIR}/anchors" "o/r" 1 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repass fetched=1 found=1 p1=3 p2plus=0 same_anchor=2"* ]]
+}
+
+@test "summary: counts stay 0 when nothing is new, and an unreadable anchors file is usage" {
+  json_setup "[$(thread PRRT_old Bot "$CODEX_P2")]"
+  printf 'PRRT_old\n' >"$ROUND1"
+  run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
+  [[ "$output" == *"repass fetched=1 found=0 p1=0 p2plus=0 same_anchor=0"* ]]
+  run "$FAKE_DIR/poll-new-threads" --wait 0 --fixed-anchors "${BATS_TEST_TMPDIR}/missing" "o/r" 1 "$ROUND1" "$OUT"
+  [ "$status" -eq 2 ]
+}
+
+@test "summary: a failed summary reads as p1, never as P2 only" {
+  json_setup '[{"threadId":"PRRT_n1","comments":[{"authorType":"Bot","body":"![P2 Badge](x)"}]}]'
+  : >"$ROUND1"
+  # A jq that runs the poll's ID extraction but fails the summary call.
+  bin_setup bin-jq bash dirname mktemp tr grep rm date head cp cat sleep
+  REAL_JQ=$(command -v jq)
+  printf '#!/bin/sh\nfor a; do [ "$a" = --rawfile ] && exit 5; done\nexec "%s" "$@"\n' "$REAL_JQ" >"${BIN_DIR}/jq"
+  chmod +x "${BIN_DIR}/jq"
+  PATH="${BIN_DIR}:${BATS_TEST_TMPDIR}/stubs" run "$FAKE_DIR/poll-new-threads" --wait 0 "o/r" 1 "$ROUND1" "$OUT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"repass fetched=1 found=1 p1=1 p2plus=0 same_anchor=0"* ]]
+}

@@ -1,16 +1,29 @@
 #!/bin/bash
-# Poll for review threads that appeared after round 1 of /review:resolve.
-# Usage: poll-new-threads --wait <seconds, at most 480> <owner/repo> <pr-number> <round1-ids-file> <out-file>
+# Poll for review threads that appeared since the last pass of /review:resolve.
+# Usage: poll-new-threads --wait <seconds, at most 480> [--fixed-anchors <file>] <owner/repo> <pr-number> <seen-ids-file> <out-file>
 #   --wait 0 fetches exactly once with no sleep. Otherwise the script sleeps
 #   min(20, remaining) seconds, fetches, and stops at the first fetch that
-#   shows a thread ID missing from <round1-ids-file> (one ID per line; blank
-#   lines and CRs are ignored) or when the wait is used up; it always fetches
+#   shows a thread ID missing from <seen-ids-file> (every thread ID the run
+#   has seen, one per line; blank lines and CRs are ignored) or when the wait
+#   is used up; it always fetches
 #   at least once. --wait is a wall-clock bound: time spent inside
 #   get-pr-comments counts, so the remaining wait shrinks after a slow fetch
 #   and no further round starts once it is used up.
 # Output: the last successful get-pr-comments JSON in <out-file>; progress
-#   lines "poll t=<s> new=<0|1>" and a final "repass fetched=<0|1> found=<0|1>"
-#   on stdout. fetched=0 means no fetch succeeded (inconclusive).
+#   lines "poll t=<s> new=<0|1>" and a final
+#   "repass fetched=<0|1> found=<0|1> p1=<n> p2plus=<n> same_anchor=<n>" on
+#   stdout. fetched=0 means no fetch succeeded (inconclusive). The counts
+#   cover the new threads only (0 unless found=1): p2plus counts threads whose
+#   first comment is from a Bot account and carries a P2 or P3 badge (Codex's
+#   "![P2 Badge](...)" alt text or an img.shields.io/badge/P2- URL; the most
+#   severe badge in the comment wins), p1 counts every other new thread (P0,
+#   P1, no badge, or a non-bot author), and same_anchor counts new threads
+#   whose "<path> <originalLine, else line>" equals a line of
+#   --fixed-anchors (the threads this run fixed, one "<path> <line>" per
+#   line). The badge is reviewer text: it may only end the caller's loop
+#   early, never decide a thread's disposition. If the counts cannot be
+#   computed, p1=1 and the others 0, so a parse failure never reads as
+#   "P2 only".
 # Exit codes: 0 finished (read the final line), 2 usage, 4 rate limited
 #             ("poll rate-limited" is printed; stop mutating).
 # Each fetch gets its own pagination deadline: this script passes
@@ -45,14 +58,16 @@ done
 [ -n "$TIMEOUT_BIN" ] || printf 'Note: neither timeout nor gtimeout is installed; fetches run without a time limit.\n' >&2
 
 usage() {
-    printf 'Usage: poll-new-threads --wait <seconds> <owner/repo> <pr-number> <round1-ids-file> <out-file>\n' >&2
+    printf 'Usage: poll-new-threads --wait <seconds> [--fixed-anchors <file>] <owner/repo> <pr-number> <seen-ids-file> <out-file>\n' >&2
     exit 2
 }
 
 WAIT=""
+ANCHORS=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --wait) [ $# -ge 2 ] || usage; WAIT="$2"; shift 2 ;;
+        --fixed-anchors) [ $# -ge 2 ] || usage; ANCHORS="$2"; shift 2 ;;
         --*) usage ;;
         *) break ;;
     esac
@@ -65,7 +80,11 @@ case "$WAIT" in ''|*[!0-9]*) usage ;; esac
 [ "${#WAIT}" -le 4 ] && [ "$WAIT" -le 480 ] || usage
 # Force base 10: arithmetic below would read a leading zero as octal ("08" errors, "010" is 8).
 WAIT=$((10#$WAIT))
-[ -r "$ROUND1" ] || { printf 'Error: round-1 file not readable: %s\n' "$ROUND1" >&2; exit 2; }
+[ -r "$ROUND1" ] || { printf 'Error: seen-ids file not readable: %s\n' "$ROUND1" >&2; exit 2; }
+if [ -n "$ANCHORS" ] && [ ! -r "$ANCHORS" ]; then
+    printf 'Error: fixed-anchors file not readable: %s\n' "$ANCHORS" >&2
+    exit 2
+fi
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
 WORK=$(mktemp -d) || exit 1
@@ -73,6 +92,8 @@ trap 'rm -rf "$WORK"' EXIT
 
 # Blank lines would make grep -F match everything; CRs would never match.
 tr -d '\r' <"$ROUND1" | grep -v '^$' >"$WORK/round1" || :
+: >"$WORK/anchors"
+if [ -n "$ANCHORS" ]; then tr -d '\r' <"$ANCHORS" | grep -v '^$' >"$WORK/anchors" || :; fi
 
 fetched=0
 found=0
@@ -136,4 +157,34 @@ while :; do
     tick
     if [ "$found" = 1 ] || [ "$waited" -ge "$WAIT" ]; then break; fi
 done
-printf 'repass fetched=%s found=%s\n' "$fetched" "$found"
+
+# Severity and anchor counts over the new threads in <out-file>.
+p1=0; p2plus=0; same=0
+if [ "$fetched" = 1 ] && [ "$found" = 1 ]; then
+    # shellcheck disable=SC2016
+    if counts=$(jq -r --rawfile seen "$WORK/round1" --rawfile anchors "$WORK/anchors" '
+        def lines: split("\n") | map(select(. != ""));
+        def sev:
+          ((.comments // [])[0] // {}) as $c
+          | if ($c.authorType // "") != "Bot" then 1
+            else [ ($c.body // "") | if type == "string" then . else "" end
+                   | scan("!\\[(P[0-3]) Badge\\]|img\\.shields\\.io/badge/(P[0-3])-")
+                   | .[] | select(. != null) | .[1:] | tonumber ]
+                 | if length == 0 then 1 else min end
+            end;
+        ($seen | lines) as $s
+        | ($anchors | lines) as $a
+        | [ .[] | select((.threadId | IN($s[])) | not) ] as $new
+        | [ $new[] | sev ] as $sev
+        | [ $new[] | select(.path | type == "string")
+            | select((.originalLine // .line) | type == "number")
+            | "\(.path) \(.originalLine // .line)" | select(IN($a[])) ] as $same
+        | "\([ $sev[] | select(. <= 1) ] | length) \([ $sev[] | select(. >= 2) ] | length) \($same | length)"
+      ' "$OUT" 2>/dev/null) && [ -n "$counts" ]; then
+        read -r p1 p2plus same <<<"$counts"
+    fi
+    case "$p1$p2plus$same" in ''|*[!0-9]*) p1=1; p2plus=0; same=0 ;; esac
+    # found=1 means at least one new thread; zero counted means the summary failed.
+    if [ $((p1 + p2plus)) -eq 0 ]; then p1=1; p2plus=0; same=0; fi
+fi
+printf 'repass fetched=%s found=%s p1=%s p2plus=%s same_anchor=%s\n' "$fetched" "$found" "$p1" "$p2plus" "$same"

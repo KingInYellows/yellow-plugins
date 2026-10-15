@@ -721,11 +721,12 @@ case "$ALL_ARGS" in
     ;;
   *"pr view "*)
     # Review-ledger PR metadata. MOCK_GH_FAIL=1 simulates an unreachable
-    # API; the state and OIDs come from the environment.
-    if [ "${MOCK_GH_FAIL:-0}" = 1 ]; then
-      printf 'mock gh: pr view failed\n' >&2
-      exit 1
-    fi
+    # API and MOCK_GH_FAIL=ratelimit a secondary rate limit; the state and
+    # OIDs come from the environment.
+    case "${MOCK_GH_FAIL:-0}" in
+      1) printf 'mock gh: pr view failed\n' >&2; exit 1 ;;
+      ratelimit) printf 'gh: You have exceeded a secondary rate limit. (HTTP 403)\n' >&2; exit 1 ;;
+    esac
     printf '{"state":"%s","headRefOid":"%s","baseRefOid":"%s"}\n' \
       "${MOCK_GH_PR_STATE:-OPEN}" "${MOCK_GH_HEAD_OID:-}" "${MOCK_GH_BASE_OID:-}"
     ;;

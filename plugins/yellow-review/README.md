@@ -99,6 +99,17 @@ is best-effort. The last output line is a machine summary:
 Resolve: 5 resolved, 2 fixed, 1 issues filed, 1 blocking, push=ok, verify=skipped, ratelimited=0
 ```
 
+After a push, `/review:resolve` waits for reviewers to post again
+(`resolve_pr.repass_wait_seconds`) and re-passes on the new threads, for as
+long as the bot keeps posting P1 findings: it stops when no new thread
+arrives, a pass pushes nothing, a re-pass sees only P2-or-lower threads, a new
+thread lands on a line it already fixed, or after
+`resolve_pr.repass_max_passes` re-passes (default 5). A thread with no
+severity badge counts as P1. The line before `Resolve:` says how the loop
+ended (`Repass: repasses=2 end=quiet`), and the run records the threads it
+saw so `pr-review-delta check` can tell later, with no model call, whether
+anything new has been posted.
+
 Optional `resolve_pr.verify_command` runs before the commit. Interactive
 runs ask first; unattended runs need `resolve_pr.verify_unattended: true`,
 an untracked `yellow-plugins.local.md`, and no runner files in the fix.
@@ -178,7 +189,8 @@ fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
 | `reply-pr-thread` | Reply to a thread with an idempotency marker |
 | `resolve-pr-thread` | Resolve one thread |
 | `file-followup-issue` | File or find the follow-up issue for an out-of-scope thread |
-| `poll-new-threads` | Bounded re-pass poll for threads that appeared after round 1 |
+| `poll-new-threads` | Re-pass poll for threads not yet seen this run, with P1 / P2-or-lower counts from the bot's severity badge |
+| `pr-review-delta` | Zero-token change check: has a thread appeared since `/review:resolve` last recorded the PR (`check`), and the record itself (`record`) |
 | `check-resolve-text` | Refuse credential-shaped or unsafe text (image, `@` mention, foreign URL) before it is posted outside the resolve scripts (for example a Linear issue) |
 | `commit-resolve-fixes` | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files |
 | `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--ignored-since <marker-file>` is required for every run and refuses when a gitignored file is newer than the marker, except regular-file tool state: `.ruvector/coedit.json`, `.ruvector/coedit-sessions/`, `.ruvector/intelligence.json` (a change is named in a stderr `Note:` line) and `node_modules/.vite/vitest/results.json`; `--unattended` also skips runner files; `--revert-only` and `--revert-dirty` revert without running and ignore the marker; `--revert-denied` reverts only trusted-config dirty paths (a subset of the deny list), takes no file list, and needs `--ignored-since` (refusing on a changed gitignored trusted-config file) or `--no-ignored-guard`, and leaves a tracked trusted-config symlink whose target was written (or, without the marker, points outside the worktree) in place with `deniedClean` false; `--check-ignored` runs only the gitignored-file guard) |
