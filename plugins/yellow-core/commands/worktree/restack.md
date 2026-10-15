@@ -173,8 +173,9 @@ every call below; never run a call with a provider the router did not report.
 For `--abort`, unless `yes=1`, confirm with `AskUserQuestion`: "Abort the
 restack? With Graphite, aborting rolls back the whole restack, including
 branches that had already restacked cleanly. It also aborts any git rebase of
-a stack branch in the other stack worktrees, discarding that rebase's
-in-progress work." with options "Abort" and "Cancel".
+a stack branch in the worktrees this restack recorded, discarding that
+rebase's in-progress work; other worktrees are left alone." with options
+"Abort" and "Cancel".
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-restack.sh" continue --provider <provider>
@@ -189,21 +190,30 @@ After the provider's own abort, `--abort` also aborts a git rebase of a
 recorded stack branch in each worktree the run recorded: the run worktree, the
 worktrees Graphite detached, and, for GitHub, the worktrees that held a
 restacked branch at start (gh-stack rebases in whichever worktree holds a
-branch). Then it restores. A rebase in a worktree the run never recorded is left
-alone and named (`left alone: ...`); when the provider has no paused restack to
-roll back, that rebase may be the run's own, so the state is kept (exit `31`)
-until it is finished or aborted there. It keeps the state (exit `31`) and restores
-nothing, naming every worktree concerned, when a recorded worktree's rebase
-will not clear (run `git -C <worktree> rebase --abort` there to see git's
-error) or when its git directory or `head-name` cannot be read (run
-`git -C <worktree> status`). A worktree whose directory was deleted counts as
-having no rebase (`git worktree prune` removes its record). Each stuck worktree gets a fix line.
-The run worktree is put back on the start branch when an aborted rebase left it
-on a stack branch, but not while an operation is in progress there. Run
-`--abort` again once each named worktree is cleared. `--status` lists the recorded worktrees, any that is
-rebasing, busy or unreadable, and any unrecorded worktree rebasing a stack
-branch or holding an unreadable rebase state; with no provider rollback on
-record, either keeps the state on `--abort` and `--continue`. The state file records a random run id, and the provider's "already
+branch). Then it restores. Every worktree it stops on is named with a fix line.
+
+- **Unrecorded worktree.** A rebase in a worktree the run never recorded is
+  left alone and named (`not recorded: ...`); it may be another session's.
+  For GitHub it keeps the state (exit `31`) on `--abort` and `--continue` when
+  that rebase may be the run's own: the state has no `owner` lines (written
+  before they were recorded), or the provider has no paused restack or
+  rollback on record.
+- **Stuck or unreadable.** The state is kept (exit `31`) and nothing restored
+  when a recorded worktree's rebase will not clear (run
+  `git -C <worktree> rebase --abort` there to see git's error) or its git
+  directory or `head-name` cannot be read (run `git -C <worktree> status`).
+- **Deleted worktree.** It counts as having no rebase; `git worktree prune`
+  removes its record.
+- **Run worktree.** It is put back on the start branch when an aborted rebase
+  left it on a stack branch, but not while an operation is in progress there
+  or while it holds commits no branch has.
+
+Run `--abort` again once each named worktree is cleared. `--status` lists the
+recorded worktrees, any that is rebasing, busy or unreadable, and any
+unrecorded worktree rebasing a stack branch or holding an unreadable rebase
+state.
+
+The state file records a random run id, and the provider's "already
 aborted" marker holds that id: only a regular, non-symlink marker whose content
 equals the current run id lets a retry skip the provider and the
 remaining-rebase check. A missing, mismatched, symlinked or legacy (id-less)

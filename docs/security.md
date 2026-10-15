@@ -621,8 +621,13 @@ boundary:
   branch name or ref, a branch outside the recorded stack, a run worktree that
   is not a worktree of this clone, non-absolute or `..` or control-character
   paths, duplicate entries, non-commit-id SHAs, and a recorded remote that is
-  not a configured remote (or any remote for Graphite). A rejected file runs
-  nothing (exit 4).
+  not a configured remote (or any remote for Graphite). `owner` lines (the
+  worktrees that held a restacked branch when a GitHub run started) pass the
+  same path checks, may not name the run worktree or repeat, and are rejected
+  in Graphite state. `--abort` runs `git rebase --abort` only in recorded
+  worktrees (the run worktree, entries and owners), and only after git confirms
+  the path is still a worktree of this clone whose top level is that path. A
+  rejected file runs nothing (exit 4).
 - **Provider output is untrusted.** Stack branch names parsed from
   `gt log short` or the github-workflow adapter's JSON must pass the same
   branch-name check before they reach a command line. A failed provider call
