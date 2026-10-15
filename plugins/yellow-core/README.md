@@ -251,8 +251,10 @@ python3 lib/jev-category-eval.py report ~/jev-eval/results-<utc>.jsonl
   disagreement plus a fixed-seed 20% sample of agreements, with an empty
   `judgement` column. Fill it with `folder`, `jev`, `both` or `neither` and
   re-run `report`; judgements are kept across runs (or read from
-  `--review FILE`). A judgement is never dropped: one whose doc's folder or
-  Jev answer has changed is kept as `kind=stale`, and one whose doc has no
+  `--review FILE`). Each row carries `lesson_sha`, the sha256 of the
+  frontmatter sent (from the git index; `git show :<path>` shows that
+  version). A judgement is never dropped: one whose doc's folder,
+  frontmatter or Jev answer has changed is kept as `kind=stale`, and one whose doc has no
   ok row as `kind=orphan`; neither counts. `report` refuses to overwrite an
   existing `disagreements.tsv` that is not a private regular file you own;
   pass it with `--review` instead. Unsampled agreements count as correct

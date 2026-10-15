@@ -284,7 +284,8 @@ Key decisions:
   - **Rows:** each row records `schema`, `path`, `folder`, `split`,
     `prediction`, `confidence`, `probabilities` (filtered to the criteria
     keys), `model_requested`, `model_returned` (kept only if it matches
-    `^jev-[0-9.]+$`), `criteria_sha`, `latency_s`, `input_tokens` and
+    `^jev-[0-9.]+$`), `criteria_sha`, `lesson_sha` (sha256 of the lesson
+    sent, so judgements bind to content), `latency_s`, `input_tokens` and
     `status` (`ok`, `invalid` or `error:<class>`).
   - **Failures are rows.** A failed request writes a row with
     `prediction: null`. Never drop it silently.

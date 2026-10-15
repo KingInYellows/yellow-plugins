@@ -569,7 +569,8 @@ runs it, and it changes no staging behaviour.
   the repository's top level (compared by resolved path, so another worktree
   or a case-insensitive spelling is not caught) and an existing `--out` that
   other users can write. Rows hold paths, folders, the answer, probabilities
-  and token counts, no doc text. `report` writes `disagreements.tsv` (mode
+  and token counts, plus a sha256 of the frontmatter sent (`lesson_sha`), no
+  doc text. `report` writes `disagreements.tsv` (mode
   600, paths only, through an exclusive temp file) beside the results file,
   with no repository check of its own. It reads an existing
   `disagreements.tsv` only when that is a regular file you own that others

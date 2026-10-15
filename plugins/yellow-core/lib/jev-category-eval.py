@@ -24,7 +24,10 @@ folder a doc already lives in (plans/jev-category-offline-eval.md).
       carrying over judgements from --review, or from an existing private
       disagreements.tsv when --review is absent. A judgement that no longer
       matches a listed row is kept as kind=stale or kind=orphan, never
-      dropped.
+      dropped. Each row and each judgement carries lesson_sha, the sha256
+      of the exact title, problem and tags sent (read from the git index;
+      `git show :<path>` shows that version), so a judgement never carries
+      over to edited frontmatter.
 
 `run` ends the results file with one summary record (eligible and written
 counts, --limit, abort flag, skip counts). `report` gives a verdict only for
@@ -78,7 +81,8 @@ MODEL_RE = re.compile(r"jev-[0-9.]+")
 DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 SPLITS = ("dev", "test", "holdout")
 JUDGEMENTS = ("folder", "jev", "both", "neither")
-TSV_COLUMNS = ("path", "folder", "jev", "confidence", "kind", "judgement")
+TSV_COLUMNS = ("path", "folder", "jev", "confidence", "kind", "judgement", "lesson_sha")
+LESSON_SHA_RE = re.compile(r"[0-9a-f]{64}")
 
 
 class UsageError(Exception):
@@ -594,20 +598,28 @@ def collect_docs(repo, criteria):
             continue
         date = fm["date"].strip()
         m = DATE_RE.match(date)
+        lesson = {
+            "title": title,
+            "problem": problem,
+            "tags": [t.strip() for t in fm["tags"] if t.strip()],
+        }
         docs.append(
             {
                 "path": path,
                 "folder": folder,
                 "date": m.group(1) if m else None,
                 "split": split_for(path, date, criteria["frozen_at"]),
-                "lesson": {
-                    "title": title,
-                    "problem": problem,
-                    "tags": [t.strip() for t in fm["tags"] if t.strip()],
-                },
+                "lesson": lesson,
+                "lesson_sha": lesson_sha(lesson),
             }
         )
     return docs, skipped
+
+
+def lesson_sha(lesson):
+    """sha256 of the lesson exactly as sent, binding judgements to content."""
+    canon = json.dumps(lesson, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(canon.encode("utf-8")).hexdigest()
 
 
 def request_body(doc, criteria, model):
@@ -855,6 +867,7 @@ def cmd_run(args):
                 "folder": doc["folder"],
                 "split": doc["split"],
                 "date": doc["date"],
+                "lesson_sha": doc["lesson_sha"],
                 "prediction": fields["prediction"],
                 "confidence": fields["confidence"],
                 "probabilities": fields["probabilities"],
@@ -994,6 +1007,7 @@ def _check_row(row):
         ("model_requested", _is(MODEL_RE, row.get("model_requested"))),
         ("model_returned", row.get("model_returned") is None or _is(MODEL_RE, row["model_returned"])),
         ("date", row.get("date") is None or _is(DATE_RE, row["date"])),
+        ("lesson_sha", _is(LESSON_SHA_RE, row.get("lesson_sha"))),
     )
     return next((field for field, ok in checks if not ok), None)
 
@@ -1056,14 +1070,14 @@ def load_rows(path):
 
 
 def read_review(path):
-    """Return {(path, folder, jev): judgement} for every judged row. A judged
-    row with a malformed path or label, or a repeated triple, is an error
-    rather than a judgement silently dropped later."""
+    """Return {(path, folder, jev, lesson_sha): judgement} for every judged
+    row. A judged row with a malformed path, label or sha, or a repeated
+    key, is an error rather than a judgement silently dropped later."""
     marks = {}
     try:
         with open(path, encoding="utf-8") as fh:
             header = fh.readline().rstrip("\n").split("\t")
-            missing = [c for c in ("path", "folder", "jev", "judgement") if c not in header]
+            missing = [c for c in ("path", "folder", "jev", "lesson_sha", "judgement") if c not in header]
             if missing:
                 raise UsageError("%s: header lacks %s" % (path, ", ".join(missing)))
             idx = {name: header.index(name) for name in header}
@@ -1081,11 +1095,14 @@ def read_review(path):
                     raise UsageError(
                         "%s:%d: judgement must be one of %s or empty" % (path, lineno, "|".join(JUDGEMENTS))
                     )
-                key = (cols[idx["path"]], cols[idx["folder"]], cols[idx["jev"]])
-                if not (_is(ROW_PATH_RE, key[0]) and _is(LABEL_RE, key[1]) and _is(LABEL_RE, key[2])):
-                    raise UsageError("%s:%d: judged row has a malformed path, folder or jev" % (path, lineno))
+                key = (cols[idx["path"]], cols[idx["folder"]], cols[idx["jev"]], cols[idx["lesson_sha"]])
+                if not (
+                    _is(ROW_PATH_RE, key[0]) and _is(LABEL_RE, key[1]) and _is(LABEL_RE, key[2])
+                    and _is(LESSON_SHA_RE, key[3])
+                ):
+                    raise UsageError("%s:%d: judged row has a malformed path, folder, jev or lesson_sha" % (path, lineno))
                 if key in marks:
-                    raise UsageError("%s:%d: repeats a judged path/folder/jev row" % (path, lineno))
+                    raise UsageError("%s:%d: repeats a judged path/folder/jev/lesson_sha row" % (path, lineno))
                 marks[key] = judgement
     except UnicodeDecodeError:
         raise UsageError("%s is not UTF-8" % path) from None
@@ -1119,7 +1136,7 @@ def write_tsv(path, entries):
             fh.write("\t".join(TSV_COLUMNS) + "\n")
             for e in entries:
                 conf = "" if e["confidence"] is None else "%.2f" % e["confidence"]
-                fh.write("\t".join([e["path"], e["folder"], e["jev"], conf, e["kind"], e["judgement"]]) + "\n")
+                fh.write("\t".join([e["path"], e["folder"], e["jev"], conf, e["kind"], e["judgement"], e["lesson_sha"]]) + "\n")
         os.replace(tmp, path)
     except BaseException:
         try:
@@ -1243,13 +1260,14 @@ def cmd_report(args):
         print("  confusion (folder -> jev): %s" % ("; ".join("%s %d" % kv for kv in top) or "none"))
 
     # List every disagreement, the sampled agreements, and any agreement
-    # already judged; carry a judgement only onto the same path/folder/jev.
+    # already judged; carry a judgement only onto the same path/folder/jev and
+    # the same frontmatter (lesson_sha).
     entries = []
     judged = {}
     used = set()
     ok_rows = sorted((r for r in rows if r["status"] == "ok"), key=lambda r: r["path"])
     for r in ok_rows:
-        key = (r["path"], r["folder"], r["prediction"])
+        key = (r["path"], r["folder"], r["prediction"], r["lesson_sha"])
         if r["prediction"] != r["folder"]:
             kind = "disagreement"
         elif sampled(r["path"], seed, fraction):
@@ -1263,20 +1281,20 @@ def cmd_report(args):
             used.add(key)
         judged[r["path"]] = judgement
         entries.append(
-            {"path": r["path"], "folder": r["folder"], "jev": r["prediction"], "confidence": r.get("confidence"), "kind": kind, "judgement": judgement}
+            {"path": r["path"], "folder": r["folder"], "jev": r["prediction"], "confidence": r.get("confidence"), "kind": kind, "judgement": judgement, "lesson_sha": r["lesson_sha"]}
         )
     ok_paths = {r["path"] for r in ok_rows}
     kept = {"stale": 0, "orphan": 0}
     for key in sorted(k for k in marks if k not in used):
         kind = "stale" if key[0] in ok_paths else "orphan"
         kept[kind] += 1
-        entries.append({"path": key[0], "folder": key[1], "jev": key[2], "confidence": None, "kind": kind, "judgement": marks[key]})
+        entries.append({"path": key[0], "folder": key[1], "jev": key[2], "confidence": None, "kind": kind, "judgement": marks[key], "lesson_sha": key[3]})
     write_tsv(tsv_path, entries)
 
     print("")
     print("adjudication (review: %s)" % (review_path or "none"))
     if kept["stale"]:
-        print("  %d judgement(s) kept as kind=stale: the doc's folder or Jev's answer changed since it was judged" % kept["stale"])
+        print("  %d judgement(s) kept as kind=stale: the doc's folder, its frontmatter or Jev's answer changed since it was judged" % kept["stale"])
     if kept["orphan"]:
         print("  %d judgement(s) kept as kind=orphan: the doc has no ok row in these results" % kept["orphan"])
     for name, group, ok in groups:

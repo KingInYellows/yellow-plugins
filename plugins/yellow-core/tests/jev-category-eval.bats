@@ -319,6 +319,16 @@ PY
   [[ "${lines[1]}" == '{"title": "Beta lesson", "problem": "Beta problem statement", "tags": ["beta-tag", "shared"]}' ]]
   run grep -c 'BODY-SENTINEL' "$LOG"
   [ "$output" = "0" ]
+  # Each row's lesson_sha is the sha256 of the lesson it sent.
+  run python3 - "$LOG" "$(results_file)" <<'PY'
+import hashlib, json, sys
+sent = [r["body"]["state"]["lesson"] for r in map(json.loads, open(sys.argv[1]))]
+rows = [r for r in map(json.loads, open(sys.argv[2])) if "record" not in r]
+want = {hashlib.sha256(json.dumps(l, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest() for l in sent}
+assert {r["lesson_sha"] for r in rows} == want and len(want) == 3
+print("ok")
+PY
+  [ "$output" = "ok" ]
   # The key reaches the server only as the bearer header.
   run python3 -c 'import json,sys; print({json.loads(l)["headers"].get("authorization") for l in open(sys.argv[1])})' "$LOG"
   [ "$output" = "{'Bearer $KEY'}" ]
@@ -449,7 +459,7 @@ PY
   [ "$status" -eq 0 ]
   [[ "$output" == *"test: folder 8/9 = 88.9%, jev 8/9 = 88.9%; awaiting judgement 1"* ]]
   [[ "$output" == *"(4 disagreements, 0 agreements listed, 2 judged)"* ]]
-  run grep -c $'\tjev$' "$BATS_TEST_TMPDIR/disagreements.tsv"
+  run grep -cE $'\tjev\t[0-9a-f]{64}$' "$BATS_TEST_TMPDIR/disagreements.tsv"
   [ "$output" = "1" ]
   # t8's prediction changes: its judgement no longer applies but is kept.
   sed -i '/t8.md/s/"prediction": "logic-errors"/"prediction": "workflow"/' "$BATS_TEST_TMPDIR/results.jsonl"
@@ -457,11 +467,23 @@ PY
   [ "$status" -eq 0 ]
   [[ "$output" == *"1 judgement(s) kept as kind=stale"* ]]
   [[ "$output" == *"(4 disagreements, 0 agreements listed, 1 judged)"* ]]
-  run grep -c $'t8.md\tcode-quality\tlogic-errors\t\tstale\tjev$' "$BATS_TEST_TMPDIR/disagreements.tsv"
+  run grep -cE $'t8.md\tcode-quality\tlogic-errors\t\tstale\tjev\t[0-9a-f]{64}$' "$BATS_TEST_TMPDIR/disagreements.tsv"
   [ "$output" = "1" ]
   # The stale mark survives a further run too.
   run python3 "$EVAL" report "$BATS_TEST_TMPDIR/results.jsonl"
   [[ "$output" == *"1 judgement(s) kept as kind=stale"* ]]
+}
+
+@test "report: a judgement does not carry over to edited frontmatter" {
+  use_fixture
+  python3 "$EVAL" report "$BATS_TEST_TMPDIR/results.jsonl" >/dev/null
+  judge 't10\.md$' folder
+  # Same path, folder and Jev answer, but the lesson sent was different.
+  sed -i '/t10.md/s/"lesson_sha": "[0-9a-f]*"/"lesson_sha": "'"$(printf 'b%.0s' $(seq 64))"'"/' "$BATS_TEST_TMPDIR/results.jsonl"
+  run python3 "$EVAL" report "$BATS_TEST_TMPDIR/results.jsonl"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"1 judgement(s) kept as kind=stale"* ]]
+  [[ "$output" == *"(4 disagreements, 0 agreements listed, 0 judged)"* ]]
 }
 
 @test "report: keeps orphaned judgements and protects an existing judged TSV" {
@@ -469,7 +491,7 @@ PY
   python3 "$EVAL" report "$BATS_TEST_TMPDIR/results.jsonl" >/dev/null
   judge 't10\.md$' folder
   # A separate review file would overwrite the judged TSV: refused.
-  printf 'path\tfolder\tjev\tjudgement\n' > "$BATS_TEST_TMPDIR/other.tsv"
+  printf 'path\tfolder\tjev\tlesson_sha\tjudgement\n' > "$BATS_TEST_TMPDIR/other.tsv"
   run --separate-stderr python3 "$EVAL" report "$BATS_TEST_TMPDIR/results.jsonl" --review "$BATS_TEST_TMPDIR/other.tsv"
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"missing from --review that this run would overwrite"* ]]
@@ -478,7 +500,7 @@ PY
   run python3 "$EVAL" report "$BATS_TEST_TMPDIR/results.jsonl"
   [ "$status" -eq 0 ]
   [[ "$output" == *"1 judgement(s) kept as kind=orphan"* ]]
-  run grep -c $'\torphan\tfolder$' "$BATS_TEST_TMPDIR/disagreements.tsv"
+  run grep -cE $'\torphan\tfolder\t[0-9a-f]{64}$' "$BATS_TEST_TMPDIR/disagreements.tsv"
   [ "$output" = "1" ]
 }
 
@@ -500,14 +522,18 @@ PY
 
 @test "report: a bad judgement value or a malformed judged row is a usage error" {
   use_fixture
-  printf 'path\tfolder\tjev\tjudgement\nx\ty\tz\tmaybe\n' > "$BATS_TEST_TMPDIR/review.tsv"
+  printf 'path\tfolder\tjev\tlesson_sha\tjudgement\nx\ty\tz\tw\tmaybe\n' > "$BATS_TEST_TMPDIR/review.tsv"
   run --separate-stderr python3 "$EVAL" report "$BATS_TEST_TMPDIR/results.jsonl" --review "$BATS_TEST_TMPDIR/review.tsv"
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"review.tsv:2: judgement must be one of"* ]]
-  printf 'path\tfolder\tjev\tjudgement\nnot/a/doc\tworkflow\tworkflow\tboth\n' > "$BATS_TEST_TMPDIR/review.tsv"
+  printf 'path\tfolder\tjev\tlesson_sha\tjudgement\nnot/a/doc\tworkflow\tworkflow\t%s\tboth\n' "$(printf 'a%.0s' $(seq 64))" > "$BATS_TEST_TMPDIR/review.tsv"
   run --separate-stderr python3 "$EVAL" report "$BATS_TEST_TMPDIR/results.jsonl" --review "$BATS_TEST_TMPDIR/review.tsv"
   [ "$status" -eq 2 ]
-  [[ "$stderr" == *"review.tsv:2: judged row has a malformed path, folder or jev"* ]]
+  [[ "$stderr" == *"review.tsv:2: judged row has a malformed path, folder, jev or lesson_sha"* ]]
+  printf 'path\tfolder\tjev\tlesson_sha\tjudgement\ndocs/solutions/workflow/x.md\tworkflow\tworkflow\tnot-a-sha\tboth\n' > "$BATS_TEST_TMPDIR/review.tsv"
+  run --separate-stderr python3 "$EVAL" report "$BATS_TEST_TMPDIR/results.jsonl" --review "$BATS_TEST_TMPDIR/review.tsv"
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"review.tsv:2: judged row has a malformed path, folder, jev or lesson_sha"* ]]
 }
 
 @test "report: refuses mixed criteria shas, mixed models and repeated paths" {
@@ -542,7 +568,7 @@ PY
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"bad.jsonl:1 has a bad path"* ]]
   # A trailing newline would pass a `$`-anchored re.match.
-  for field in path folder prediction; do
+  for field in path folder prediction lesson_sha; do
     python3 - "$FIX/report-results.jsonl" "$field" > "$BATS_TEST_TMPDIR/bad.jsonl" <<'PY'
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1])]
@@ -575,7 +601,7 @@ import json, sys
 n, bad, sha, no_summary = int(sys.argv[1]), int(sys.argv[2]), sys.argv[3], sys.argv[4]
 for i in range(n):
     print(json.dumps({"schema": 1, "path": "docs/solutions/workflow/h%03d.md" % i, "folder": "workflow",
-        "split": "holdout", "date": "2027-01-01", "prediction": "code-quality" if i < bad else "workflow",
+        "split": "holdout", "date": "2027-01-01", "lesson_sha": "%064x" % i, "prediction": "code-quality" if i < bad else "workflow",
         "confidence": 0.9, "probabilities": {}, "model_requested": "jev-1.13.0", "model_returned": "jev-1.13.0",
         "criteria_sha": sha, "latency_s": 0.1, "input_tokens": 900, "status": "ok"}))
 if not no_summary:
