@@ -148,6 +148,17 @@ has_kill_after() {
   [ ! -e "$BATS_TEST_TMPDIR/awk-ran" ]
 }
 
+@test "a dirname planted on PATH never runs while the libraries are sourced" {
+  mkdir -p fakebin
+  # Marks the run, then behaves like dirname, so a call shows up as the marker
+  # rather than as a failed source.
+  printf '#!/bin/sh\ntouch "%s/dirname-ran"\nexec "%s" "$@"\n' "$BATS_TEST_TMPDIR" "$(command -v dirname)" >| fakebin/dirname
+  chmod +x fakebin/dirname
+  run --separate-stderr env "PATH=$REPO/fakebin:fakebin:$PATH" "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ] || { echo "refused: $stderr" >&2; return 1; }
+  [ ! -e "$BATS_TEST_TMPDIR/dirname-ran" ]
+}
+
 @test "a symlink to an executable inside the worktree in an outside PATH directory never runs" {
   mkdir -p ignored "$BATS_TEST_TMPDIR/outbin"
   printf '#!/bin/sh\ntouch "%s/helper-ran"\nexit 1\n' "$BATS_TEST_TMPDIR" >| ignored/helper

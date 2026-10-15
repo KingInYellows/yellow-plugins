@@ -6,9 +6,17 @@
 # execute. Contract: references/resolve/dispositions.md ("File set").
 # shellcheck shell=bash
 
+# This file's directory by parameter expansion, not dirname: both scripts
+# source it before yr_adopt_path, so a dirname found on the caller's PATH
+# could be one a resolver planted in the worktree.
+case "${BASH_SOURCE[0]}" in
+    */*) _rp_dir=${BASH_SOURCE[0]%/*}; [ -n "$_rp_dir" ] || _rp_dir=/ ;;
+    *) _rp_dir=. ;;
+esac
 # sp_sibling_file: the sibling-plugin lookup shared with review-ledger.sh.
 # shellcheck source=sibling-plugin.sh
-. "$(dirname -- "${BASH_SOURCE[0]}")/sibling-plugin.sh"
+. "$_rp_dir/sibling-plugin.sh"
+unset _rp_dir
 
 # yr_helper <name>: a helper the trust check itself must run (readlink). Looked
 # up in fixed system directories, never on PATH: a PATH directory inside the

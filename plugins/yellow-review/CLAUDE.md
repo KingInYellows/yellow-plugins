@@ -387,8 +387,8 @@ evil`, `env nice evil`), counts as entering the worktree. So does a `#!`
 argument with expansion or glob syntax, or with a shell operator, redirection
 or parenthesis (`#!/bin/sh -c PATH=tools:/usr/bin;evil`).
 `run-verify-command` still gives the verify command the caller's `PATH`
-(`YR_ORIG_PATH`). Both scripts take their own directory by parameter expansion,
-not `dirname`.
+(`YR_ORIG_PATH`). Both scripts, and `lib/resolve-paths.sh` (sourced before the
+screen), take their own directory by parameter expansion, not `dirname`.
 
 - `guard-local-config snapshot | check <dir> <digest> | clear <dir>` — Snapshot the
   ignored `yellow-plugins.local.md` (printing the path and a `digest=<hex>`
