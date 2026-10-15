@@ -210,7 +210,7 @@ branch_holder() {
 wt_busy() {
   local -a names=(rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD sequencer)
   local -a paths=()
-  local name p out i=0
+  local name p out i=0 st
   out=$(git -C "$1" rev-parse --path-format=absolute \
     --git-path rebase-merge --git-path rebase-apply --git-path MERGE_HEAD \
     --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD --git-path sequencer 2>/dev/null) || {
@@ -228,10 +228,18 @@ wt_busy() {
   fi
   for ((i = 0; i < ${#names[@]}; i++)); do
     name=${names[i]}
-    if [ -e "${paths[i]}" ]; then
-      printf '%s' "$name"
-      return 0
-    fi
+    st=0
+    path_state "${paths[i]}" || st=$?
+    case $st in
+      0)
+        printf '%s' "$name"
+        return 0
+        ;;
+      2)
+        printf 'unreadable'
+        return 0
+        ;;
+    esac
   done
   return 1
 }
@@ -1093,6 +1101,52 @@ plan_github_stack() {
 FLOAT_SEEN=()
 S_PROVIDER="" S_PHASE=""
 
+# path_state PATH: 0 when PATH is there (as anything, a dangling symlink too).
+# 1 only when it is confirmed gone: its nearest existing ancestor is a
+# directory this process can search, so the lookup failed because PATH is
+# missing. 2 when that cannot be told, as when an ancestor lost its execute
+# bit (then `[ -d PATH ]` is false for a path that is still there): callers
+# treat it as unreadable and keep the state. Every "is it gone" decision on a
+# recorded path goes through here or wt_gone.
+path_state() {
+  local d=$1
+  if [ -e "$d" ] || [ -L "$d" ]; then return 0; fi
+  while [ "$d" != / ]; do
+    d=${d%/*}
+    [ -n "$d" ] || d=/
+    if [ -e "$d" ] || [ -L "$d" ]; then
+      [ -d "$d" ] && [ -x "$d" ] && return 1
+      return 2
+    fi
+  done
+  return 2
+}
+
+# wt_gone PATH: whether the worktree at PATH is gone (load_worktrees first).
+# 0 when it is: its directory is confirmed missing (path_state), or it is a
+# readable directory that git no longer lists, or lists as prunable while its
+# .git link is confirmed missing or still there. 1 when it is present. 2 when
+# that cannot be told (an inaccessible ancestor, something other than a
+# directory at PATH, or a .git link that cannot be looked up): never gone.
+# git's own prunable verdict is not proof: it also calls a worktree behind an
+# inaccessible directory prunable.
+wt_gone() {
+  local wi st=0
+  path_state "$1" || st=$?
+  case $st in
+    1) return 0 ;;
+    2) return 2 ;;
+  esac
+  [ -d "$1" ] && [ -x "$1" ] || return 2
+  wi=$(wt_index "$1")
+  if [ "$wi" -lt 0 ]; then return 0; fi
+  [ "${WT_PRUNABLE[wi]}" -ne 0 ] || return 1
+  st=0
+  path_state "$1/.git" || st=$?
+  [ "$st" -ne 2 ] || return 2
+  return 0
+}
+
 # report_floating I: when entry I's worktree is detached at a commit other than
 # the recorded one (someone committed or moved HEAD during the pause), print the
 # floating commits and a rescue line and return 0. A checkout would orphan
@@ -1126,7 +1180,7 @@ unlock_entry() { # unlock a worktree that carries this command's lock reason, ne
 # restore_entries: per-entry best effort over E_*. Restored and dropped entries
 # leave the arrays; the rest stay detached. Returns 0 when none remain.
 restore_entries() {
-  local i n=${#E_PATH[@]} path ref br wi cur holder out
+  local i n=${#E_PATH[@]} path ref br wi cur holder out gone
   local -a kp=() kr=() ks=()
   if ! load_worktrees; then
     err "git worktree list failed; nothing was restored or dropped"
@@ -1137,13 +1191,25 @@ restore_entries() {
     ref=${E_REF[i]}
     br=${ref#refs/heads/}
     wi=$(wt_index "$path")
-    if [ "$wi" -lt 0 ] || [ "${WT_PRUNABLE[wi]}" -ne 0 ]; then
-      note "dropped: $(v "$path") is no longer a worktree"
+    gone=0
+    wt_gone "$path" || gone=$?
+    if [ "$gone" -eq 2 ]; then
+      # Not confirmed gone (an ancestor may have lost its execute bit): it may
+      # still hold a rebase, so it is neither unlocked nor dropped.
+      note "kept: cannot tell whether $(v "$path") still exists; left as it is"
+      note "  fix: restore access to $(v "$path") (check each parent directory's permissions), then run this again"
+      kp+=("$path")
+      kr+=("$ref")
+      ks+=("${E_SHA[i]}")
       continue
     fi
-    # Deleted during the pause: git does not call a locked worktree prunable,
-    # so drop our lock and leave the record to `git worktree prune`.
-    if [ ! -d "$path" ]; then
+    if [ "$gone" -eq 0 ]; then
+      if [ "$wi" -lt 0 ] || [ "${WT_PRUNABLE[wi]}" -ne 0 ]; then
+        note "dropped: $(v "$path") is no longer a worktree"
+        continue
+      fi
+      # Deleted during the pause: git does not call a locked worktree prunable,
+      # so drop our lock and leave the record to `git worktree prune`.
       unlock_entry "$i"
       note "dropped: $(v "$path") was deleted; git worktree prune removes its record"
       continue
@@ -1668,14 +1734,21 @@ canon_or_raw() { canon "$1" || printf '%s' "$1"; }
 # state a linked worktree must also hold this run's id (bind_worktree), or it
 # is 1; `any` skips that check, to probe a worktree the run did not record.
 worktree_in_chain_rebase() {
-  local wi out top gd gcd merge apply d b n=0
+  local wi out top gd gcd merge apply d b n=0 st=0
   local -a l=()
+  wt_gone "$1" || st=$?
+  case $st in
+    0) return 1 ;;
+    2) return 2 ;;
+  esac
   wi=$(wt_index "$1")
-  [ "$wi" -ge 0 ] || return 1
-  [ "${WT_PRUNABLE[wi]}" -eq 0 ] || return 1
-  [ -d "$1" ] || return 1
   # Without its .git link, git -C would walk up into another checkout.
-  [ -e "$1/.git" ] || return 1
+  st=0
+  path_state "$1/.git" || st=$?
+  case $st in
+    1) return 1 ;;
+    2) return 2 ;;
+  esac
   out=$(git -C "$1" rev-parse --show-toplevel --absolute-git-dir --path-format=absolute \
     --git-common-dir --git-path rebase-merge --git-path rebase-apply 2>/dev/null) || return 2
   while IFS= read -r d; do l[n]=$d; n=$((n + 1)); done <<<"$out"
@@ -1706,17 +1779,32 @@ worktree_in_chain_rebase() {
     if [ "${S_BOUND:-}" = 1 ] && [ "${2:-}" != any ]; then
       # No binding there: another worktree, not this run's. A binding that
       # cannot be read is not proof either way: fail closed.
-      if [ ! -e "$gd/$WT_MARK" ] && [ ! -L "$gd/$WT_MARK" ]; then return 1; fi
+      st=0
+      path_state "$gd/$WT_MARK" || st=$?
+      case $st in
+        1) return 1 ;;
+        2) return 2 ;;
+      esac
       [ -f "$gd/$WT_MARK" ] && [ ! -L "$gd/$WT_MARK" ] && [ -r "$gd/$WT_MARK" ] || return 2
       d=$(head -c 64 -- "$gd/$WT_MARK" 2>/dev/null) || return 2
       [ "$d" = "$S_RUNID" ] || return 1
     fi
   fi
   merge=${l[3]} apply=${l[4]}
-  [ ! -e "$apply/applying" ] || apply=""
+  st=0
+  path_state "$apply/applying" || st=$?
+  case $st in
+    0) apply="" ;;
+    2) return 2 ;;
+  esac
   for d in "$merge" "$apply"; do
     [ -n "$d" ] || continue
-    if [ ! -e "$d" ] && [ ! -L "$d" ]; then continue; fi
+    st=0
+    path_state "$d" || st=$?
+    case $st in
+      1) continue ;;
+      2) return 2 ;;
+    esac
     [ -d "$d" ] && [ -r "$d" ] && [ -x "$d" ] || return 2
     [ -f "$d/head-name" ] && [ -r "$d/head-name" ] || return 2
     b=$(cat -- "$d/head-name" 2>/dev/null) || return 2
@@ -1748,10 +1836,16 @@ load_recorded() {
 # A deleted or prunable path is not replaced (it is reported missing), and an
 # unbound state (written before binding) never reports one.
 wt_replaced() {
-  local wi out top gd d
+  local wi out top gd d st=0
   [ "${S_BOUND:-}" = 1 ] || return 1
+  # Confirmed gone is not replaced (it is reported missing); not knowing is
+  # not confirmation either way, so it is refused.
+  wt_gone "$1" || st=$?
+  case $st in
+    0) return 1 ;;
+    2) return 0 ;;
+  esac
   wi=$(wt_index "$1")
-  [ "$wi" -ge 0 ] && [ "${WT_PRUNABLE[wi]}" -eq 0 ] && [ -d "$1" ] || return 1
   [ -e "$1/.git" ] || return 0
   out=$(git -C "$1" rev-parse --show-toplevel --absolute-git-dir 2>/dev/null) || return 0
   case $out in *$'\n'*) ;; *) return 0 ;; esac
@@ -1789,8 +1883,8 @@ refuse_replaced() {
   done
   [ "${#bad[@]}" -gt 0 ] || return 0
   for p in "${bad[@]}"; do
-    err "$(v "$p") cannot be confirmed as the worktree this run recorded (removed and registered again, or its .git link changed); nothing was run there"
-    note "  fix: finish any work in $(v "$p"), move it aside or remove it (git worktree remove $(q "$p")), then run this again"
+    err "$(v "$p") cannot be confirmed as the worktree this run recorded (removed and registered again, its .git link changed, or it cannot be read); nothing was run there"
+    note "  fix: restore access to $(v "$p") if a parent directory lost its permissions; otherwise finish any work there, move it aside or remove it (git worktree remove $(q "$p")), then run this again"
   done
   die "$X_KEPT" "state kept: a recorded worktree path holds a worktree this run did not record"
 }
@@ -2036,7 +2130,7 @@ note_stuck_fixes() {
 # one outside the stack would block the abort over something the restack never
 # touched.
 in_chain_busy() {
-  local i p b busy wi
+  local i p b busy
   local -a paths=()
   load_worktrees || return 2
   load_recorded
@@ -2047,18 +2141,16 @@ in_chain_busy() {
     # unreadable path busy forever. A paused graphite run locks its entries,
     # and git never reports a locked worktree prunable, so a deleted directory
     # is checked for itself.
-    if [ "$i" -gt 0 ]; then
-      wi=$(wt_index "$p")
-      if [ "$wi" -lt 0 ] || [ "${WT_PRUNABLE[wi]}" -ne 0 ] || [ ! -d "$p" ]; then
-        continue
-      fi
+    # One that cannot be confirmed gone stays: wt_busy calls it unreadable.
+    if [ "$i" -gt 0 ] && wt_gone "$p"; then
+      continue
     fi
     paths+=("$p")
   done
   for ((i = 0; i < ${#WT_PATH[@]}; i++)); do
     b=${WT_BRANCH[i]#refs/heads/}
     # A deleted worktree still listed on its branch holds no operation.
-    if in_chain "$b" && [ "${WT_PRUNABLE[i]}" -eq 0 ] && [ -d "${WT_PATH[i]}" ]; then
+    if in_chain "$b" && ! wt_gone "${WT_PATH[i]}"; then
       paths+=("${WT_PATH[i]}")
     fi
   done
@@ -2421,8 +2513,7 @@ cmd_status() {
       continue
     fi
     if [ "$i" -gt "${#E_PATH[@]}" ]; then
-      wi=$(wt_index "$p")
-      if [ "$wi" -lt 0 ] || [ "${WT_PRUNABLE[wi]}" -ne 0 ]; then
+      if wt_gone "$p"; then
         status_line missing "$(v "$p") is no longer a worktree"
         continue
       fi
@@ -2437,7 +2528,7 @@ cmd_status() {
       *)
         # A deleted or unregistered worktree was already named above, or holds
         # nothing to report; wt_busy would call it busy.
-        if [ "$i" -eq 0 ] || [ ! -d "$p" ] || [ "$(wt_index "$p")" -lt 0 ]; then
+        if [ "$i" -eq 0 ] || wt_gone "$p"; then
           continue
         fi
         if why=$(wt_busy "$p"); then status_line busy "$(v "$p") ($(v "$why") in progress)"; fi

@@ -2052,6 +2052,56 @@ legacy_tipless() {
   [ ! -e "$SD/state" ]
 }
 
+# mk_stack_nested: mk_stack with each worktree one directory down
+# ($T/p-NAME/wt), so a parent can lose its execute bit without touching $T.
+mk_stack_nested() {
+  WTFMT='p-%s/wt'
+  mk_stack "$@"
+}
+
+# Restores search permission on every p-* parent a test took it from, so the
+# temp directory can be removed.
+teardown() {
+  chmod u+rwx "$BATS_TEST_TMPDIR"/p-* 2>/dev/null || true
+}
+
+@test "an entry behind a parent directory that lost its execute bit is never dropped by --abort" {
+  [ "$(id -u)" -ne 0 ] || skip "chmod does not stop root"
+  mk_stack_nested b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  plant_rebase "$(wtp c)" c b
+  chmod a-x "$T/p-c"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"$(wtp c) cannot be confirmed as the worktree this run recorded"* ]]
+  [[ $output != *"dropped: $(wtp c)"* ]]
+  [ -e "$SD/state" ]
+  chmod u+x "$T/p-c"
+  rebase_marker "$(wtp c)"
+}
+
+@test "legacy state: an entry behind an inaccessible parent keeps the state on --abort and restore" {
+  [ "$(id -u)" -ne 0 ] || skip "chmod does not stop root"
+  mk_stack_nested b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  sed -i '/^bound\t/d' "$SD/state"
+  plant_rebase "$(wtp c)" c b
+  chmod a-x "$T/p-c"
+  run bash "$SCRIPT" restore
+  [ "$status" -eq 40 ]
+  [[ $output == *"kept: cannot tell whether $(wtp c) still exists"* ]]
+  [[ $output != *"dropped: $(wtp c)"* ]]
+  [ -e "$SD/state" ]
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output != *"dropped: $(wtp c)"* ]]
+  [ -e "$SD/state" ]
+  chmod u+x "$T/p-c"
+  rebase_marker "$(wtp c)"
+}
+
 @test "--abort never checks out a run worktree registered again at the recorded path" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite

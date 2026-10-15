@@ -187,6 +187,12 @@ than the evidence behind it.
   dropping the check; it now refuses (exit 30), removes the bindings it wrote
   and leaves no state, and a binding that cannot be read is never a match.
   A safety marker that cannot be written must stop the run, not downgrade it.
+  A fourth review found `[ ! -d PATH ]` (and git's own prunable verdict) is
+  also true when a parent lost its execute bit, so an inaccessible entry was
+  unlocked and dropped. Every "is it gone" decision now goes through
+  `path_state` / `wt_gone`, which call a path gone only when its nearest
+  existing ancestor is a searchable directory; anything else is unreadable
+  and keeps the state.
 - **Found while testing.** A deleted github owner still listed on its branch
   read as busy in `in_chain_busy`; worktrees git reports prunable or whose
   directory is gone are now skipped there.

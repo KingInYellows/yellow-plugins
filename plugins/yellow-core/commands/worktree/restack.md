@@ -212,7 +212,9 @@ branch). Then it restores. Every worktree it stops on is named with a fix line.
   `git -C <worktree> rebase --abort` there to see git's error) or its git
   directory or `head-name` cannot be read (run `git -C <worktree> status`).
 - **Deleted worktree.** It counts as having no rebase; `git worktree prune`
-  removes its record.
+  removes its record. Only a path confirmed gone counts: one behind a parent
+  directory that cannot be searched (a lost execute bit) is unreadable, keeps
+  the state and is never unlocked or dropped; restore access, then run again.
 - **Run worktree.** It is put back on the start branch when an aborted rebase
   left it on a stack branch, but not while an operation is in progress there
   or while it holds commits no branch has.
