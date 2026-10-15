@@ -1074,7 +1074,13 @@ jobs:
             # MORPH_API_KEY; on a hit, only file:line + credential type are
             # reported below — never the full matched line, which could
             # contain a real secret value.
+            # plugins/yellow-core/lib/jev-category-criteria.json is exempt as a
+            # whole: it holds frozen prose describing solution-doc categories
+            # ("security-issues" names secrets and tokens as subjects), and
+            # rewording it would change the sha256 every jev eval results row
+            # records. It carries no config fields that could hold a value.
             SENSITIVE=$(grep -rniE '(api[_-]?key|password|token|secret)' .claude-plugin/ plugins/ catalog/ --include="*.json" \
+              | grep -vE '^plugins/yellow-core/lib/jev-category-criteria\.json:' \
               | grep -vE '"permissionScopes"|:[[:space:]]*\{[[:space:]]*$|\$\{[A-Za-z_][A-Za-z0-9_.]*(:-(\$\{?[A-Za-z_][A-Za-z0-9_.]*\}?)?)?\}|"description":|"title":' \
               | grep -viE '(api[_-]?key|password|token|secret)[A-Za-z]' \
               || true)
