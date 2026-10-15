@@ -286,7 +286,7 @@ for why that opt-out exists.
 
 ### Shared Libraries
 
-`lib/` also carries four Node modules and two Python scripts, invoked rather
+`lib/` also carries four Node modules and three Python scripts, invoked rather
 than sourced:
 
 - `stack-provider-state.js` — the single owner of stacked-PR provider state.
@@ -331,6 +331,18 @@ than sourced:
   (`statusline`, `status`, `plan`, `install`, `remove`, `prune`); every path
   has a default, `--dry-run` writes nothing, one JSON object per run. Used by
   `/statusline:setup` Steps 1, 5, 5b and 6
+- `jev-category-eval.py` — manual, offline evaluation of TypeSafe Jev on the
+  `docs/solutions/` category pick (`run` / `report`; stdlib only, Python
+  3.9+). `run` sends tracked docs' frontmatter title, problem and tags (never
+  bodies) with the frozen criteria in `jev-category-criteria.json`, whose
+  sha256 every row records, and writes results outside the repository,
+  ending with a run-summary record; `report` prints agreement and the
+  pre-registered Tango non-inferiority verdict (only for a complete run
+  under the current criteria file and the pre-registered seed) and writes `disagreements.tsv` for
+  judging. Any edit to the criteria file restarts the holdout. Not run by
+  any hook or agent. Trust boundary: `docs/security.md` "Jev category eval (offline)".
+  Bats coverage at `tests/jev-category-eval.bats` with a local stub endpoint
+  and fixture repository under `tests/fixtures/jev-eval/`
 
 `lib/` otherwise contains sourceable shell helpers that consumer plugins
 reach via the `${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/<name>.sh`
@@ -596,7 +608,7 @@ inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
 
 `bats tests/` from the plugin directory (`compound-session-start-hook`,
 `compound-staging`, `compound-stop-hook`, `context-observer`,
-`credential-status`, `handoff`, `jev-prefilter`, `plan-commands`, `plan-status-parity`,
+`credential-status`, `handoff`, `jev-category-eval`, `jev-prefilter`, `plan-commands`, `plan-status-parity`,
 `plan-gate-tier`, `plugin-identity`, `pre-compact-hook`, `quote-ground`, `repo-profile`,
 `setup-all-ruvector-probe`, `statusline-template`, `validate-fs`) plus
 `skills/git-worktree/tests/` (`worktree-manager.bats`,

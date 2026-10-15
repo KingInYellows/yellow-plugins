@@ -1,0 +1,37 @@
+{
+  "block-and-plain.md": {
+    "title": "Plain title with an issue#42 hash",
+    "problem": "Folded block that spans lines\nand keeps a paragraph break",
+    "tags": [
+      "at-key-indent",
+      "quoted item"
+    ],
+    "date": "2026-08-09"
+  },
+  "no-date.md": {
+    "title": "",
+    "problem": "Problem without a title",
+    "tags": [
+      "x"
+    ],
+    "date": ""
+  },
+  "plain-multiline.md": {
+    "title": "A plain scalar continued on the next line",
+    "problem": "Literal block\nkeeps lines\n",
+    "tags": [
+      "only"
+    ],
+    "date": ""
+  },
+  "quoted-variants.md": {
+    "title": "It's a Continued Title That Wraps Onto a Second Line",
+    "problem": "Double \"quoted\" text with a\ttab, é and an escaped break, then a fold\nand a blank line",
+    "tags": [
+      "one",
+      "two, still two",
+      "three"
+    ],
+    "date": "2026-07-04"
+  }
+}

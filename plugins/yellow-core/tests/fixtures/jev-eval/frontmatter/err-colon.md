@@ -1,0 +1,3 @@
+---
+title: Colon: inside plain
+---
