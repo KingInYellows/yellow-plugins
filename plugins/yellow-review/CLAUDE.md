@@ -77,7 +77,12 @@ resolution, and sequential stack review. Graphite-native workflow.
   contract line; usage errors before it print only their error. Accepts
   `--non-interactive` to suppress its spawn-cap, CONFLICT, issue-filing,
   verify-command, and push-confirmation gates (used by
-  `/review:resolve-stack` and `/review:sweep`)
+  `/review:resolve-stack` and `/review:sweep`). After a push, Step 8 keeps
+  polling and re-passing while reviewers post new threads, until the bot is
+  quiet, a pass does not push, a re-pass sees only P2-or-lower threads, a fix
+  does not hold, or `resolve_pr.repass_max_passes` (default 5) is reached;
+  Step 9 prints a `Repass:` line before the `Resolve:` line and records the
+  threads it saw for `pr-review-delta check`
 - `/review:resolve-stack` — Walk the current Graphite stack bottom-up and run
   `/review:resolve --non-interactive` on every open PR fully autonomously (no
   prompts), pushing and restacking as it goes. It ends the walk, and exits 1,
@@ -195,7 +200,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   rails and inline MIT attribution so the rules survive on hosts with no
   tool restriction (not user-invocable)
 
-### Scripts (12)
+### Scripts (14)
 
 - `get-pr-comments [--include-outdated] <owner/repo> <pr>` — Fetch unresolved
   PR review threads via GitHub GraphQL API (non-outdated only unless the flag
@@ -233,8 +238,17 @@ resolution, and sequential stack review. Graphite-native workflow.
   text posted outside the resolve scripts); exits 6
 - `pr-changed-ranges <pr>` — The PR's changed files and new-side line ranges
   from the files API (`/review:resolve` resolver envelope)
-- `poll-new-threads --wait <s> ...` — Step 8 re-pass poll for threads that
-  appeared after round 1; always fetches at least once
+- `poll-new-threads --wait <s> [--fixed-anchors <file>] ...` — Step 8
+  re-pass poll for threads not yet seen this run; always fetches at least
+  once and ends with per-new-thread counts (`p1`, `p2plus` from a Bot
+  comment's P0-P3 badge, no badge counting as P1, and `same_anchor` for a new
+  thread on a line this run fixed)
+- `pr-review-delta check <owner/repo> <pr>... | record <owner/repo> <pr>
+  <ids-file> <head-sha>` — Zero-token change check: `check` prints
+  `state=new|unchanged|unknown|closed` per PR against the thread IDs
+  `/review:resolve` Step 9 last recorded under the git common dir (a failure
+  or truncated list is `unknown`, never `unchanged`; exit 4 on a rate limit);
+  `record` validates and writes that set atomically
 - `commit-resolve-fixes` — Stage the resolver files, add a new commit,
   submit through the provider, verify the remote head; never pushes itself.
   Refuses paths outside the PR, deny-listed paths, credential-shaped added
@@ -252,7 +266,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   file list; `--revert-denied` reverts only trusted-config dirty paths
   (`rp_trusted_config`, a subset of the deny list), takes no file list, and
   needs `--ignored-since <marker-file>` (refusing on a changed gitignored
-  trusted-config file) or `--no-ignored-guard`; a tracked trusted-config symlink whose target was written since the marker (or, with `--no-ignored-guard`, resolves outside the worktree, onto a directory, onto anything but a tracked regular file with a plain `H` tag, or onto a target git lists as modified unless that target is itself trusted-config) is reported with `deniedClean: false` (a clean link is left alone; a redirected or replaced one is restored and its HEAD target judged the same way), and a verify run refuses on one; a tracked symlink with an ordinary name that resolves to a directory outside the worktree is checked the same way for trusted-config descendants (`cfg -> /elsewhere`, then a write to `cfg/.claude/settings.json`): it counts when such a file is newer than the marker (nested links followed, a loop or find error counts) or, with `--no-ignored-guard`, when one exists, and the walk counts after 50000 entries; `--check-ignored --ignored-since <marker-file>` runs only the
+  trusted-config file) or `--no-ignored-guard`, and with `--dry-run` lists those paths (`pending`) and a `snapshot` digest without reverting, so an interactive `/review:resolve` can ask first and then revert with `--expect-snapshot`, which refuses when the files or link hits changed since the preview; a tracked trusted-config symlink whose target was written since the marker (or, with `--no-ignored-guard`, resolves outside the worktree, onto a directory, onto anything but a tracked regular file with a plain `H` tag, or onto a target git lists as modified unless that target is itself trusted-config) is reported with `deniedClean: false` (a clean link is left alone; a redirected or replaced one is restored and its HEAD target judged the same way), and a verify run refuses on one; a tracked symlink with an ordinary name that resolves to a directory outside the worktree is checked the same way for trusted-config descendants (`cfg -> /elsewhere`, then a write to `cfg/.claude/settings.json`): it counts when such a file is newer than the marker (nested links followed, a loop or find error counts) or, with `--no-ignored-guard`, when one exists, and the walk counts after 50000 entries; `--check-ignored --ignored-since <marker-file>` runs only the
   gitignored-file guard, for a resolve with no verify command.
   `/review:resolve-stack` and `/review:sweep-all` run it after a
   dirty resolve only when every dirty path is owned by the run (a PR file
@@ -725,8 +739,8 @@ explicit-invocation wording live in the skill body and description.
 - `get-pr-comments.bats`, `get-pr-blockers.bats`, `reply-pr-thread.bats`,
   `resolve-pr-thread.bats`, `file-followup-issue.bats`,
   `check-resolve-text.bats`, `pr-changed-ranges.bats`,
-  `poll-new-threads.bats` — GraphQL fixtures in `tests/fixtures/`, fake
-  `gh` in `tests/mocks/gh`
+  `poll-new-threads.bats`, `pr-review-delta.bats` — GraphQL fixtures in
+  `tests/fixtures/`, fake `gh` in `tests/mocks/gh`
 - `commit-resolve-fixes.bats`, `run-verify-command.bats` — a throwaway
   repository with a bare origin and stub `gt`/`node`/`gh`, built by
   `tests/helpers/resolve-repo.bash`

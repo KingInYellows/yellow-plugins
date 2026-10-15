@@ -169,11 +169,13 @@ Use the `AskUserQuestion` tool with:
   fenced list: `Also deletes the review-findings ledgers of <K> closed or
   merged PRs: #<a> #<b> …`.
 
-  Always add the worst-case extra wait from `/review:resolve`'s bounded
-  re-pass: `Re-pass wait: up to <N> × <W>s = <N×W/60> min added` (`W` is
-  `resolve_pr.repass_wait_seconds` from `yellow-plugins.local.md`, read and
-  validated as the `local-config` skill describes: an integer 0–480, anything
-  else means the default 120; `0` prints `Re-pass wait: disabled`).
+  Always add the worst-case extra wait from `/review:resolve`'s re-pass
+  loop: `Re-pass wait: up to <N> × <P> × <W>s = <N×P×W/60> min added` (`W` is
+  `resolve_pr.repass_wait_seconds` and `P` is `resolve_pr.repass_max_passes`
+  from `yellow-plugins.local.md`, read and validated as the `local-config`
+  skill describes: `W` an integer 0–480, anything else means the default 120;
+  `P` an integer clamped to 1–10, a non-integer means the default 5; `W` of
+  `0` prints `Re-pass wait: disabled`).
 
 - **Options**:
   - **Proceed — sweep all <N> PRs** — run Step 3b's prune (when there is

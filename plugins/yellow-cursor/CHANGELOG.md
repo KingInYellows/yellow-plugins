@@ -1,5 +1,16 @@
 # yellow-cursor
 
+## 0.3.0
+
+### Minor Changes
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  host-neutral offline Cursor plan validation and bounded local Codex readiness
+  skills. Preserve the remote-spend, credential, recursion and memory
+  boundaries; neither skill launches remote agents or makes a nested model
+  request.
+
 ## 0.2.4
 
 ### Patch Changes

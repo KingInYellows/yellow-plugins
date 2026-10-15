@@ -920,12 +920,13 @@ function checkExceptions(roster, errors) {
  * put the silent failure straight back: a redaction copy under
  * plugins/yellow-review/, docs/council/, tests/, a CHANGELOG, or a .awk file
  * was simply invisible. Only VCS and dependency trees, and the gitignored
- * yellow-ruvector store (.ruvector/, which records session text that can quote
- * the roster), are skipped here.
+ * yellow-ruvector store at the repository root (.ruvector/, which records
+ * session text that can quote the roster), are skipped here. A .ruvector
+ * directory anywhere else is still walked.
  */
 function redactionExcluded(rel) {
   const segs = rel.split('/');
-  if (segs.includes('.git') || segs.includes('node_modules') || segs.includes('.ruvector')) return true;
+  if (segs.includes('.git') || segs.includes('node_modules') || segs[0] === '.ruvector') return true;
   // The detector and its fixtures carry the marker strings as literals. The
   // tool that finds carriers is not itself a carrier.
   return SELF_FILES.has(rel);

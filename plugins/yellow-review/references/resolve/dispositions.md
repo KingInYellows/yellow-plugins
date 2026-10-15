@@ -215,7 +215,7 @@ only the resolve is withheld.
   options "File issue" / "Leave open"), four questions per `AskUserQuestion`
   call. "Leave open" makes the thread `unclear`.
 - Unattended (`--non-interactive`): file only when `oos_reason` is non-empty, at
-  most **3 created issues per PR per run**, shared across the re-pass. Issues
+  most **3 created issues per PR per run**, shared across every re-pass. Issues
   found by marker dedupe do not count against the cap. Passing
   `--non-interactive` is the explicit opt-in to these unattended GitHub writes
   (filing, replies, resolves), under the carve-out in
@@ -300,12 +300,12 @@ phase failed.
    (`reply-pr-thread`), then resolve (`resolve-pr-thread`), where the lane
    allows it.
 
-Before Phase C and at the start of the re-pass, re-check
+Before Phase C and before each re-pass poll, re-check
 `gh pr view --json state`. If the PR is no longer `OPEN`, stop with
 `PR #<N> is <STATE>; write phase stopped` and do not report per-thread errors.
-Re-check again after the re-pass poll returns, before any retry or second-round
-write; if the state is not `OPEN` or cannot be read, skip those writes and
-report the re-pass as `inconclusive` with the state.
+Re-check again after each poll returns, before any retry or re-pass write; if
+the state is not `OPEN` or cannot be read, skip those writes and end the
+re-pass loop `inconclusive` with the state.
 
 Each thread's outcome is recorded per stage, for the report:
 
@@ -614,7 +614,9 @@ a change outside the set, a `commit-resolve-fixes` exit 2, 3 or 4, or verify
 `skipped` — the orchestrator runs `run-verify-command --pr <N> --revert-only`
 on the files the clusters reported under `Files modified`, which saves a patch
 first. Then `--revert-denied` (no file list) reverts dirty trusted-config
-paths on the contract deny list without asking, with the `--ignored-since`
+paths on the contract deny list: without asking in a non-interactive run;
+an interactive run lists them first with `--dry-run` and asks Revert or
+Leave (Leave reports them under Blocking merge). Both use the `--ignored-since`
 marker (it refuses on a changed gitignored trusted-config file: the ignored-file
 stop), and a refusal before the verify call also runs `--check-ignored` for the
 other gitignored files. The marker lives until the end of Step 6. Step 2
@@ -637,7 +639,8 @@ A refused set is a staged mismatch (exit 3): nothing is committed and every
 
 Long calls must fit the Bash tool (120 s default, 600 s maximum). Pass a
 `timeout` of `(verify_timeout_seconds + 60) × 1000` ms for verify,
-`(repass_wait_seconds + 120) × 1000` ms for the Step 8 poll, and 600000 ms for
+`(<wait> + 120) × 1000` ms for each Step 8 poll (`<wait>` is
+`repass_wait_seconds`, or 0 after a pass that did not push), and 600000 ms for
 `commit-resolve-fixes` (hooks, submit and the head check). The settings are
 capped at 540 and 480 seconds. Each write-phase script (`file-followup-issue`,
 `reply-pr-thread`, `resolve-pr-thread`) runs as its own Bash call with a
@@ -665,7 +668,16 @@ that hits the deadline exits 3 and counts as a failed fetch for that round. The
 270 s default below does not apply to the poll. Without either binary the 60 s
 hard cap and the `--wait` + 60 s bound do not hold: the script prints a note and
 fetches run with no time limit, so only the between-page deadline applies and a
-hung `gh` call is not cut short.
+hung `gh` call is not cut short. The Step 8 loop runs at most
+`repass_max_passes` re-passes (1 to 10), each poll in its own Bash call, so no
+single call outgrows its budget.
+
+`pr-review-delta check` gets a `timeout` of 600000 ms. Per PR it makes one
+`gh pr view` (60 s cap) and one `get-pr-comments` run under the same 55 s
+deadline and 60 s hard cap as the poll, about 120 s in all, and it starts no
+PR after 420 s (`CHECK_DEADLINE`; later PRs print `state=unknown`), so the
+worst case is about 540 s. `pr-review-delta record` makes no network call; the
+`gh pr view` before it in Step 9 takes the Bash default.
 
 `get-pr-comments` (Step 3) gets a `timeout` of 300000
 ms. It can fetch 10 pages, so it adds a wall-clock deadline to the per-call cap:
@@ -856,7 +868,16 @@ Report exit 3 as `needs permission` only for `reason=permission`, and as
 
 `pr-changed-ranges` exits 1 on a fetch failure (the caller passes `unknown`, and
 every resolver proposal for that cluster is `unclear`, never `oos`) and 2 on
-usage. `poll-new-threads` exits 4 on a rate limit and 2 on usage.
+usage. `poll-new-threads` exits 4 on a rate limit and 2 on usage (an
+unreadable seen-IDs or `--fixed-anchors` file included).
+
+`pr-review-delta` exits 0 when done (`check`: read each line's `state`; a
+failure is a `state=unknown` line, never `unchanged`), 1 when `record` could
+not write (a symlinked or foreign record path included) or read its IDs file,
+2 on usage or invalid input (a thread ID outside `^PRRT_[A-Za-z0-9_-]+$`, a
+head that is not 40 lowercase hex digits, an unsafe `owner/repo`), and 4 on a
+rate limit (stderr `reason=rate-limit`; that PR and the rest print
+`state=unknown`).
 
 `get-pr-comments` exits 1 on any failure (usage included, and a `gh` call killed
 by the time limit) and 3 when the thread list is truncated by the page cap, a
@@ -885,8 +906,8 @@ The report sections are: Resolved (by disposition), Blocking merge
 (disagree/unclear, human-held, needs permission, verify failed with the patch
 path, rate-limited, gh timeout, `not found`, `CHANGES_REQUESTED`), Follow-up
 issues filed, and Conversation resolution (`enforced` / `not enforced` /
-`unknown`, from `get-pr-blockers`). The last line of the command's output is
-exactly:
+`unknown`, from `get-pr-blockers`), plus a Re-pass section saying how Step 8
+ended. The last line of the command's output is exactly:
 
 ```text
 Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipped|failed|noop>, verify=<pass|fail|skipped|none>, ratelimited=<0|1>
@@ -940,6 +961,43 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
 - `/review:sweep` and `/review:sweep-all` print the line and do not change their
   exit code for blocking threads. `/review:resolve-stack` exits 1 when any PR's
   `b` is non-zero.
+- Step 9 prints one line just before it, outside the `Resolve:` contract:
+
+  ```text
+  Repass: repasses=<k> end=<quiet|no-push|p2-only|fix-did-not-hold|bound-reached|inconclusive|rate-limited|timeout|skipped>
+  ```
+
+  `k` counts the re-passes Step 8 ran (0 to `repass_max_passes`). `end` is
+  the hyphenated form of Step 8's end name: no new thread within the wait
+  (`quiet`); the last pass did not push (`no-push`); every new thread in the
+  last re-pass was P2 or lower (`p2-only`); a new thread landed on the path
+  and original line of a thread this run fixed (`fix-did-not-hold`); the bound
+  (`bound-reached`); no fetch succeeded or the PR left `OPEN`
+  (`inconclusive`); a rate limit (`rate-limited`); a write-phase `gh` timeout
+  (`timeout`); or Step 8 did not run (`skipped`: disabled, a dirty tree or a
+  write-phase stop). Stops that print only the `Resolve:` line print no
+  `Repass:` line. Callers that need the contract keep reading only the last
+  line.
+
+## Change record
+
+Step 9 records which threads the run saw with `pr-review-delta record`, so a
+later `pr-review-delta check` spends no tokens on a PR where no thread has
+appeared since. The IDs are Step 8's `<seen-file>` (Step 3's threads plus each
+re-pass's), or Step 3's IDs when Step 8 did not run. A thread no pass handled
+is not in it, so it reads as new later.
+
+Record an empty set instead when work was left undone, so a later check
+reports every open thread as new: a cancel or a stop before Step 7 finished
+(the Step 5 conflict stops and the ignored-file stop included), a Step 7 write
+phase stopped by an exit 4 or a PR that left `OPEN`, a thread `not attempted`
+(cluster cap, rate limit or `gh` timeout), `push=failed`, `verify=fail` or
+`verify=skipped`. Skip the record when Step 3's fetch failed or was partial. A
+failed record is a Notes line (`review delta not recorded`), never a stop.
+
+Severity badges (`p1`/`p2plus` from `poll-new-threads`) are reviewer text and
+can be forged. They only decide whether Step 8 polls again; they never resolve,
+skip or downgrade a thread. A thread without a Bot-authored badge counts as P1.
 
 ## Known limits
 

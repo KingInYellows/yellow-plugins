@@ -7,7 +7,7 @@
 #                           [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]
 #        run-verify-command --pr <N> --revert-dirty
-#        run-verify-command --pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard)
+#        run-verify-command --pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard) [--dry-run | --expect-snapshot <hex>]
 #        run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>
 #   --trusted:     required to run a command. The caller sets it only after
 #                  confirming the command came from an untracked config file
@@ -117,6 +117,27 @@
 #                  reports result "noop". Read "deniedClean" for success:
 #                  "treeClean" covers the whole tree, so it is false whenever
 #                  the other (kept) changes remain.
+#   --dry-run:     only with --revert-denied: list instead of revert. The same
+#                  guard and listing run (a changed gitignored trusted-config
+#                  file still refuses with exit 2), then it prints result
+#                  "dry-run" with "pending" (the trusted-config paths a revert
+#                  would act on, at most 20, screened like "reverted"; an upper
+#                  bound, since a nested repository or special file is kept),
+#                  "pendingCount", and "linkHits"/"linkHitCount" (trusted-config
+#                  symlinks whose target may have been edited, which no revert
+#                  undoes), and "snapshot" (a digest of the pending paths,
+#                  their current content, mode and index entries, and the link
+#                  hits), and changes nothing: no
+#                  patch, no revert. For an interactive caller that asks
+#                  before reverting.
+#   --expect-snapshot <hex>: only with --revert-denied, without --dry-run:
+#                  the "snapshot" a --dry-run printed. When the pending paths,
+#                  their content, mode, index entries or the link hits no
+#                  longer match it (a file
+#                  or symlink target changed while the caller was asking), refuse (exit 2, nothing reverted)
+#                  with "trusted-config changes differ from the --dry-run
+#                  preview" on stderr, so a revert never reaches an edit the
+#                  user was not shown.
 #   Exactly one of --revert-only, --revert-dirty, --revert-denied and
 #   --check-ignored may be given (exit 2 otherwise); a repeated flag is fine.
 #   --timeout, --command-file, --trusted and --unattended apply only when
@@ -133,19 +154,24 @@
 #              waived; --revert-dirty and --revert-denied take no list.
 #              --revert-denied reverts only the trusted-config dirty paths.
 # Output: JSON to stdout:
-#   {"result":"pass|fail|timeout|skipped|reverted|noop","patch":"<path>|null",
+#   {"result":"pass|fail|timeout|skipped|reverted|noop|dry-run","patch":"<path>|null",
 #    "log":"<path>|null","treeClean":true|false[,"reason":"..."]}
 #   --revert-denied adds "deniedClean" (no deny-listed change remains),
 #   "reverted" (the deny-listed paths no longer dirty, at most 20, screened
 #   like the patch, empty when withheld) and "revertedCount" (the whole count).
 #   "noop" is only reported by --revert-denied, when no deny-listed path
-#   changed.
+#   changed. --revert-denied --dry-run reports result "dry-run" with
+#   "deniedClean", "pending", "pendingCount", "linkHits", "linkHitCount" and
+#   "snapshot" instead of the revert fields.
 #   "reason" explains a skipped run, a withheld patch, an interrupted run, a
 #   failed revert step, a log that is withheld or may be incomplete, a
 #   --revert-only entry skipped as unchanged, or a tree that is not clean.
 #   Reasons seen only with --revert-denied: "no deny-listed changes to
-#   revert", "deny-listed changes remain after the revert", "reverted list
-#   withheld: ...", "reverted list shows the first 20 of N" and "left a
+#   revert", "deny-listed changes remain after the revert", "<list> list
+#   withheld: ..." and "<list> list shows the first 20 of N" (<list> is
+#   reverted, pending or linkHits; a list is withheld whole when one name has a
+#   control character, contains ---, looks like a credential, or cannot be
+#   screened) and "left a
 #   nested git repository in place: <path>" and "found a trusted-config
 #   symlink whose target may have been edited (or sits outside the worktree):
 #   <path>" (deniedClean false; a redirected link is judged by its HEAD target; a tracked trusted-config symlink's
@@ -720,9 +746,10 @@ usage() {
     printf 'Usage: run-verify-command --pr <N> --timeout <s> --command-file <f> --trusted [--unattended] --ignored-since <marker-file> [--files-from <file>] [-- <files...>]\n' >&2
     printf '       run-verify-command --pr <N> --revert-only [--files-from <file>] [-- <files...>]\n' >&2
     printf '       run-verify-command --pr <N> --revert-dirty\n' >&2
-    printf '       run-verify-command --pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard)\n' >&2
+    printf '       run-verify-command --pr <N> --revert-denied (--ignored-since <marker-file> | --no-ignored-guard) [--dry-run | --expect-snapshot <hex>]\n' >&2
     printf '       run-verify-command --pr <N> --check-ignored --ignored-since <marker-file>\n' >&2
     printf '  exactly one of --revert-only, --revert-dirty, --revert-denied and --check-ignored may be given; --revert-dirty and --revert-denied take no file list\n' >&2
+    printf '  --dry-run: only with --revert-denied; print result "dry-run" with pending/pendingCount and linkHits/linkHitCount, and change nothing\n' >&2
     printf '  --ignored-since <marker-file>: refuse to run when a gitignored file, or the target of a gitignored symlink, is newer than the marker; required for every run and for --revert-denied (or --no-ignored-guard); --revert-only and --revert-dirty ignore it\n' >&2
     exit 2
 }
@@ -748,9 +775,13 @@ TRUSTED=0
 UNATTENDED=0
 IGNORED_SINCE=""
 NO_IGNORED_GUARD=0
+DRY_RUN=0
+EXPECT_SNAPSHOT=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --pr) [ $# -ge 2 ] || usage; PR="$2"; shift 2 ;;
+        --dry-run) DRY_RUN=1; shift ;;
+        --expect-snapshot) [ $# -ge 2 ] || usage; EXPECT_SNAPSHOT="$2"; shift 2 ;;
         --ignored-since) [ $# -ge 2 ] || usage; IGNORED_SINCE="$2"; shift 2 ;;
         --timeout) [ $# -ge 2 ] || usage; TIMEOUT="$2"; shift 2 ;;
         --command-file) [ $# -ge 2 ] || usage; COMMAND_FILE="$2"; shift 2 ;;
@@ -785,6 +816,12 @@ if [ "$MODE" = revert-denied ]; then
         || die 2 "--ignored-since and --no-ignored-guard cannot be combined"
 elif [ "$NO_IGNORED_GUARD" = 1 ]; then
     die 2 "--no-ignored-guard applies only to --revert-denied"
+fi
+[ "$DRY_RUN" = 0 ] || [ "$MODE" = revert-denied ] || die 2 "--dry-run applies only to --revert-denied"
+if [ -n "$EXPECT_SNAPSHOT" ]; then
+    [ "$MODE" = revert-denied ] && [ "$DRY_RUN" = 0 ] \
+        || die 2 "--expect-snapshot applies only to --revert-denied without --dry-run"
+    [[ "$EXPECT_SNAPSHOT" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] || die 2 "--expect-snapshot must be the hex digest a --dry-run printed"
 fi
 if [ "$MODE" = check-ignored ]; then
     [ -n "$IGNORED_SINCE" ] || die 2 "--check-ignored requires --ignored-since <marker-file>"
@@ -894,6 +931,41 @@ add_path_reason() {
         add_reason "$1: <path withheld: it looks like a credential or could not be screened>"
     fi
 }
+# paths_json <label> <path>...: set PATHS_JSON to the first 20 paths as a JSON
+# array. The list is screened as a whole, like the patch: one name with a
+# control character, a `---` (it could close the untrusted-content fence the
+# caller shows the list in) or a credential shape withholds all of it
+# (PATHS_JSON stays []) and adds a reason. Each path is scanned whole and as its /-split
+# segments, because the scanner keeps "/" inside a word.
+paths_json() {
+    local label="$1" rc=0 f
+    shift
+    PATHS_JSON='[]'
+    [ "$#" -gt 0 ] || return 0
+    for f in "$@"; do
+        [[ "$f" != *[[:cntrl:]]* ]] || { rc=7; break; }
+        [[ "$f" != *---* ]] || { rc=8; break; }
+    done
+    if [ "$rc" = 0 ]; then
+        if { [ -n "$PATHS_SCRATCH" ] || PATHS_SCRATCH=$(mktemp); } \
+            && printf '%s\n' "$@" "${@//\//$'\n'}" >|"$PATHS_SCRATCH"; then
+            rt_code_clean "$PATHS_SCRATCH" || rc=$?
+        else
+            rc=2
+        fi
+    fi
+    case $rc in
+        0)
+            PATHS_JSON=$(printf '%s\0' "${@:1:20}" | jq -Rs 'split("\u0000") | .[:-1]') \
+                || { PATHS_JSON='[]'; add_reason "$label list withheld: it could not be encoded"; }
+            [ "$#" -le 20 ] || add_reason "$label list shows the first 20 of $#"
+            ;;
+        7) add_reason "$label list withheld: a file name has a control character" ;;
+        8) add_reason "$label list withheld: a file name contains ---" ;;
+        1) add_reason "$label list withheld: file names look like a credential" ;;
+        *) add_reason "$label list withheld: the names could not be screened" ;;
+    esac
+}
 
 # Temp files and the output pipe; removed on every exit.
 CHANGES_FILE=""
@@ -908,6 +980,7 @@ DIR_LIST=""
 HIDDEN_HITS=""
 VR_SHIM=""
 HOLD_LEFTOVER=""
+PATHS_SCRATCH=""
 # The snapshot is provisional until it is complete and credential-screened: any
 # exit before then (a signal, a die, a failed screen) removes it, so no
 # unscreened patch stays under .git.
@@ -915,7 +988,7 @@ PATCH=""
 PATCH_PROVISIONAL=0
 cleanup() {
     local f
-    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$IGNORED_HITS" "$DIR_LIST" "$HIDDEN_HITS" "$HOLD_LEFTOVER"; do
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$IGNORED_HITS" "$DIR_LIST" "$HIDDEN_HITS" "$HOLD_LEFTOVER" "$PATHS_SCRATCH"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
     [ -z "$VR_SHIM" ] || rm -rf -- "$VR_SHIM"
@@ -1013,6 +1086,44 @@ add_unique_file() {
         [ "$p" = "$1" ] && return 0
     done
     FILES+=("$1")
+}
+
+# --revert-denied: one digest of the listed paths and what each holds now (a
+# blob id plus its executable bit, a symlink target, or a marker for a
+# directory, a missing path or one git cannot hash), each path's index entries
+# (mode, blob and stage, so a staged edit or mode change the worktree does not
+# show is bound too: the revert checks out HEAD over both), plus the LINK_HITS
+# set (call after check_trusted_links), so --expect-snapshot can tell that the
+# set a --dry-run showed is still the set a revert would touch. Sets SNAPSHOT.
+denied_snapshot() {
+    local f h idx
+    SNAPSHOT=$({
+        for f in ${FILES[@]+"${FILES[@]}"}; do
+            if [ -L "$f" ]; then
+                h="link:$(readlink -- "$f" 2>/dev/null || printf '?')"
+            elif [ -d "$f" ]; then
+                h=dir
+            elif [ -f "$f" ]; then
+                h=$(yr_git hash-object --no-filters -- "$f" 2>/dev/null) || h='?'
+                if [ -x "$f" ]; then h="$h:x"; else h="$h:-"; fi
+            elif [ -e "$f" ]; then
+                # Never open a FIFO or other special file: it can block.
+                h=special
+            else
+                h=missing
+            fi
+            idx=$(lgit ls-files --stage -z -- "$f" 2>/dev/null | tr '\0' '\n') || idx='?'
+            printf '%s\0%s\0%s\0' "$f" "$h" "$idx"
+        done
+        # The link hits join the digest after an empty field (no listed path
+        # is empty), so a symlink target edited while the caller was asking
+        # is a mismatch too: its new hit would otherwise go unreported.
+        printf '\0'
+        for f in ${LINK_HITS[@]+"${LINK_HITS[@]}"}; do
+            printf '%s\0' "$f"
+        done
+    } | yr_git hash-object --stdin
+    ) || die 2 "cannot compute the trusted-config snapshot; nothing was reverted"
 }
 
 # The tracked links come from HEAD (ls-tree), the tree the revert restores from
@@ -1227,9 +1338,38 @@ elif [ "$MODE" = revert-denied ]; then
     # A symlink target that may have been edited cannot be reverted from here
     # (it can sit outside the worktree): leave it, report it, deniedClean false.
     check_trusted_links
-    for f in ${LINK_HITS[@]+"${LINK_HITS[@]}"}; do
-        add_path_reason "found a trusted-config symlink whose target may have been edited (or sits outside the worktree)" "$f"
-    done
+    # --dry-run reports link hits in linkHits (screened as a list) instead.
+    if [ "$DRY_RUN" = 0 ]; then
+        for f in ${LINK_HITS[@]+"${LINK_HITS[@]}"}; do
+            add_path_reason "found a trusted-config symlink whose target may have been edited (or sits outside the worktree)" "$f"
+        done
+    fi
+    # --dry-run: the same listing (and the same ignored-file refusal above),
+    # reported instead of reverted, so an interactive caller can ask first.
+    # pending is an upper bound: a nested repository or special file found
+    # below is left in place by the real revert. linkHits are reported, never
+    # reverted.
+    denied_snapshot
+    if [ -n "$EXPECT_SNAPSHOT" ] && [ "$SNAPSHOT" != "$EXPECT_SNAPSHOT" ]; then
+        die 2 "trusted-config changes differ from the --dry-run preview; nothing was reverted"
+    fi
+    if [ "$DRY_RUN" = 1 ]; then
+        DRY_CLEAN=true
+        [ ! -s "$CHANGES_FILE" ] || DRY_CLEAN=false
+        DRY_DENIED=true
+        { [ "${#FILES[@]}" -eq 0 ] && [ "${#LINK_HITS[@]}" -eq 0 ]; } || DRY_DENIED=false
+        paths_json pending ${FILES[@]+"${FILES[@]}"}
+        PENDING_JSON=$PATHS_JSON
+        paths_json linkHits ${LINK_HITS[@]+"${LINK_HITS[@]}"}
+        jq -nc --argjson clean "$DRY_CLEAN" --argjson dc "$DRY_DENIED" --argjson p "$PENDING_JSON" \
+            --argjson n "${#FILES[@]}" --argjson l "$PATHS_JSON" --argjson ln "${#LINK_HITS[@]}" --arg why "$REASON" \
+            --arg snap "$SNAPSHOT" \
+            '{result: "dry-run", patch: null, log: null, treeClean: $clean, deniedClean: $dc,
+              pending: $p, pendingCount: $n, linkHits: $l, linkHitCount: $ln, snapshot: $snap}
+             + (if $why == "" then {} else {reason: $why} end)' \
+            || die 2 "cannot encode the dry-run result"
+        exit 0
+    fi
 else
     # KEEP_FILES is the deduplicated list (first-seen order). A path listed
     # twice, in --files-from and/or after --, would otherwise put its diff into
@@ -2205,31 +2345,11 @@ if [ "$MODE" = revert-denied ]; then
         done
     fi
     REVERTED_COUNT=${#REVERTED[@]}
-    if [ "$REVERTED_COUNT" -gt 0 ]; then
-        # File names can look like a credential: screen the list as the patch
-        # is, and bound it. The count stays whole. Each path is scanned whole
-        # and as its /-split segments: the scanner keeps "/" inside a word, so a
-        # credential prefix after a slash would otherwise go unseen.
-        # A name with a control character is withheld outright: a newline
-        # could carry instruction-like text into the resolve summary.
-        RV_RC=0
-        for f in "${REVERTED[@]}"; do
-            [[ "$f" != *[[:cntrl:]]* ]] || { RV_RC=7; break; }
-        done
-        if [ "$RV_RC" = 0 ]; then
-            printf '%s\n' "${REVERTED[@]}" "${REVERTED[@]//\//$'\n'}" >|"$ADDED_FILE"
-            rt_code_clean "$ADDED_FILE" || RV_RC=$?
-        fi
-        case $RV_RC in
-            0)
-                REVERTED_JSON=$(printf '%s\0' "${REVERTED[@]:0:20}" | jq -Rs 'split("\u0000") | .[:-1]') \
-                    || { REVERTED_JSON='[]'; add_reason "reverted list withheld: it could not be encoded"; }
-                [ "$REVERTED_COUNT" -le 20 ] || add_reason "reverted list shows the first 20 of $REVERTED_COUNT"
-                ;;
-            7) add_reason "reverted list withheld: a file name has a control character" ;;
-            *) add_reason "reverted list withheld: file names look like a credential" ;;
-        esac
-    fi
+    # File names can look like a credential, and a newline could carry
+    # instruction-like text into the resolve summary: screened and bounded by
+    # paths_json. The count stays whole.
+    paths_json reverted ${REVERTED[@]+"${REVERTED[@]}"}
+    REVERTED_JSON=$PATHS_JSON
 fi
 
 [ -z "$LOG" ] || vr_prune "$OUT_DIR" "$PR" log "$KEEP"

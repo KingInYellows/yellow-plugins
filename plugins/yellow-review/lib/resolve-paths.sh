@@ -1588,8 +1588,9 @@ rp_denied() {
 
 # rp_trusted_config <path>: the subset of rp_denied a later agent session
 # trusts as instructions or tool config, matched the same way. These are the
-# only dirty paths a refusal cleanup reverts without asking (--revert-denied,
-# the stack and sweep dirty-tree cleanup); other deny-listed paths (.env*,
+# only dirty paths a refusal cleanup reverts (--revert-denied: without asking
+# in unattended runs and the stack and sweep dirty-tree cleanup; interactive
+# /review:resolve lists them with --dry-run and asks first); other deny-listed paths (.env*,
 # keys, CI and Docker files) can hold the user's own work and are asked about
 # or left in place. .claude/agent-memory/ at the repository root is excluded:
 # agents with `memory: project` write there during a normal run.

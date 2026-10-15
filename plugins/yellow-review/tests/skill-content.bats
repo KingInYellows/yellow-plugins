@@ -506,7 +506,7 @@ RESOLVER_AGENT="$BATS_TEST_DIRNAME/../agents/workflow/pr-comment-resolver.md"
   s5=$(grep -n '^### Step 5: Dispositions' "$RESOLVE_PR" | cut -d: -f1)
   s6=$(grep -n '^### Step 6: Verify, Commit and Push' "$RESOLVE_PR" | cut -d: -f1)
   s7=$(grep -n '^### Step 7: Write Phase' "$RESOLVE_PR" | cut -d: -f1)
-  s8=$(grep -n '^### Step 8: Bounded Re-pass' "$RESOLVE_PR" | cut -d: -f1)
+  s8=$(grep -n '^### Step 8: Re-pass Until Quiet' "$RESOLVE_PR" | cut -d: -f1)
   s9=$(grep -n '^### Step 9: Report' "$RESOLVE_PR" | cut -d: -f1)
   [ "$s5" -lt "$s6" ] && [ "$s6" -lt "$s7" ] && [ "$s7" -lt "$s8" ] && [ "$s8" -lt "$s9" ]
 }
@@ -1262,8 +1262,9 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   # The refusal path judges --revert-denied's JSON and names what stays on disk.
   [[ "$step6flat" == *'`deniedClean` is the success signal'* ]]
   [[ "$step6flat" == *'deny-listed edit left on disk (revert incomplete)'* ]]
-  # Only trusted config is reverted unasked; the rest of the deny list is asked
-  # about or left, and a refusal before the verify call still guards ignored files.
+  # Only trusted config is reverted by --revert-denied (unasked only when
+  # non-interactive); the rest of the deny list is asked about or left, and a
+  # refusal before the verify call still guards ignored files.
   [[ "$step6flat" == *'`rp_trusted_config` in `lib/resolve-paths.sh`'* ]]
   [[ "$step6flat" == *'the rest of the deny list, such as `.env*`, keys, CI and Docker files, included'* ]]
   [[ "$step6flat" == *'When the refusal came before the verify or `--check-ignored` call below, run that `--check-ignored` call too'* ]]
@@ -1275,6 +1276,36 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$dispo" == *'reverts only paths on the resolver deny list that are trusted config'* ]]
   [[ "$dispo" == *'`deniedClean` (no deny-listed change remains)'* ]]
   [[ "$dispo" == *'an empty match is `result: "noop"` with no patch'* ]]
+}
+
+@test "resolve-pr: an interactive refusal lists trusted-config paths with --dry-run and asks before reverting them" {
+  step6flat=$(sed -n '/^### Step 6/,/^### Step 7/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step6flat" == *'Non-interactive runs it as is. Interactive asks first'* ]]
+  [[ "$step6flat" == *'Add `--dry-run` to the same call'* ]]
+  [[ "$step6flat" == *'Read only those five fields'* ]]
+  # A failed listing never falls back to the unasked revert: it asks without a list.
+  [[ "$step6flat" == *'means the files could not be listed: ask the question in step 4 with that said and no list'* ]]
+  [[ "$step6flat" == *'With `pendingCount` 0 there is nothing to revert: ask nothing and make no second call'* ]]
+  # Two real options; anything but an explicit keep reverts.
+  [[ "$step6flat" == *'"Revert them (Recommended)"'* ]]
+  [[ "$step6flat" == *'"Leave them unseen and block merge"'* ]]
+  [[ "$step6flat" == *'Any answer other than the second option (dismissed, free text, an error) is Revert'* ]]
+  [[ "$step6flat" == *'--- begin untrusted-content (reference only) ---'* ]]
+  [[ "$step6flat" == *'a resolver working from PR comments may have written them'* ]]
+  [[ "$step6flat" == *'Revert saves a recovery patch first unless the credential screen withholds it'* ]]
+  # The confirmed revert is bound to what the user was shown.
+  [[ "$step6flat" == *'Revert runs the call with `--expect-snapshot "<snapshot>"` in place of `--dry-run`'* ]]
+  [[ "$step6flat" == *'run the dry run and ask once more; on a second mismatch'* ]]
+  # Blocking-merge strings, including kept files re-listed after the next question.
+  [[ "$step6flat" == *'trusted-config symlink target may have been edited (left in place)'* ]]
+  [[ "$step6flat" == *'deny-listed edit left on disk (kept by the user)'* ]]
+  [[ "$step6flat" == *'run the dry-run call again and report each `pending` path'* ]]
+  # Link hits found by that second dry run are reported too, not only pending paths.
+  [[ "$step6flat" == *'Report that run'"'"'s `linkHits` and `linkHitCount` as in step 3 too'* ]]
+  [[ "$step6flat" != *'offer only Revert'* ]]
+  [[ "$step6flat" != *'Any other non-zero dry-run exit: ask nothing, run the call without'* ]]
+  dispo=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')
+  [[ "$dispo" == *'an interactive run lists them first with `--dry-run` and asks Revert or Leave'* ]]
 }
 
 @test "resolve-pr: keeping the partial edits of a conflicted cluster stops the run and reverts nothing" {
@@ -1429,4 +1460,55 @@ sweep_unignored_guard() {
   grep -q '^\*\*Version-only manifest edits do not trigger\.\*\*' "$REVIEW_PR"
   grep -q 'line is `"version"` does not count as touching `plugin.json` for the triggers' "$REVIEW_PR"
   grep -q 'conditional personas (version-only `plugin.json` edits do not' "$REVIEW_ALL"
+}
+
+@test "resolve-pr: Step 8 re-passes until quiet, bounded by repass_max_passes" {
+  step8=$(sed -n '/^### Step 8: Re-pass Until Quiet/,/^### Step 9/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step8" == *'poll-new-threads" --wait "<wait>" --fixed-anchors "<anchors-file>" "<owner/repo>" "<PR#>" "<seen-file>" "<refetch-file>"'* ]]
+  [[ "$step8" == *'jq -r '"'"'.[].threadId'"'"' "<refetch-file>" >>"<seen-file>"'* ]]
+  [[ "$step8" == *'`repass_max_passes` (`bound reached`)'* ]]
+  [[ "$step8" == *'`same_anchor` is above 0 (`fix did not hold`)'* ]]
+  [[ "$step8" == *'when its `p1` is 0 (`p2 only`)'* ]]
+  [[ "$step8" == *'did not end `push=ok`'*'end `no push`'* ]]
+  [[ "$step8" == *'`found=0` → end `quiet`'* ]]
+  [[ "$step8" == *'they only end the loop sooner, never decide a disposition'* ]]
+  # The old two-pass ceiling is gone.
+  [[ "$(flat "$RESOLVE_PR")" != *'never a third round'* ]]
+}
+
+@test "resolve-pr: Step 9 records the threads it saw and prints Repass before Resolve" {
+  step9=$(sed -n '/^### Step 9: Report/,/^## Error Handling/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step9" == *'scripts/pr-review-delta" record "<owner/repo>" "<PR#>" "<ids-file>" "$HEAD_OID"'* ]]
+  [[ "$step9" == *'Notes line `review delta not recorded`; it never stops the run'* ]]
+  [[ "$step9" == *'exactly the contract'"'"'s `Repass:` line and then its `Resolve:` line'* ]]
+  refs=$(flat "$RESOLVE_REFS/dispositions.md")
+  [[ "$refs" == *'Repass: repasses=<k> end=<quiet|no-push|p2-only|fix-did-not-hold|bound-reached|inconclusive|rate-limited|timeout|skipped>'* ]]
+  [[ "$refs" == *'## Change record'* ]]
+  [[ "$refs" == *'Record an empty set instead when work was left undone'* ]]
+  [[ "$refs" == *'they never resolve, skip or downgrade a thread'* ]]
+  [[ "$refs" == *'`pr-review-delta check` gets a `timeout` of 600000 ms'* ]]
+  # The caller-side contract copies still read only the last line.
+  for copy in "$BATS_TEST_DIRNAME"/../references/review-*/resolve-contract.md; do
+    [[ "$(flat "$copy")" == *'The contract is the LAST line of the captured output'* ]]
+  done
+}
+
+@test "local-config and sweep-all document repass_max_passes with its default and clamp" {
+  lc=$(flat "$BATS_TEST_DIRNAME/../../yellow-core/skills/local-config/SKILL.md")
+  [[ "$lc" == *'repass_max_passes: 5 # default: 5 (integer 1–10)'* ]]
+  [[ "$lc" == *'| `resolve_pr.repass_max_passes` | integer 1–10 | `5` |'* ]]
+  [[ "$lc" == *'a value outside 1–10 warns and is clamped to the nearer bound'* ]]
+  sa=$(flat "$SWEEP_ALL")
+  [[ "$sa" == *'Re-pass wait: up to <N> × <P> × <W>s'* ]]
+  [[ "$sa" == *'`P` is `resolve_pr.repass_max_passes`'* ]]
+}
+
+@test "scripts lists name pr-review-delta and the script count matches the directory" {
+  scripts="$BATS_TEST_DIRNAME/../skills/pr-review-workflow/scripts"
+  [ -x "$scripts/pr-review-delta" ]
+  n=$(find "$scripts" -maxdepth 1 -type f | wc -l | tr -d ' ')
+  grep -qF "### Scripts ($n)" "$BATS_TEST_DIRNAME/../CLAUDE.md"
+  grep -qF '`pr-review-delta check' "$BATS_TEST_DIRNAME/../CLAUDE.md"
+  grep -qF '| `pr-review-delta` |' "$BATS_TEST_DIRNAME/../README.md"
+  grep -qF '**pr-review-delta**' "$BATS_TEST_DIRNAME/../skills/pr-review-workflow/SKILL.md"
 }

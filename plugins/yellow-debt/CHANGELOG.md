@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.9.0
+
+### Minor Changes
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add bounded
+  shared read-only skills for local complexity scans and public repository
+  DeepWiki research, with inline outputs and safe unavailable-tool and
+  authentication boundaries.
+
+### Patch Changes
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Quarantine
+  recognized credential keys in bracketed dictionary and environment assignments
+  before returning bounded complexity source snapshots.
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Quarantine
+  credential-array declarations before emitting bounded complexity snapshots,
+  including sized, unsized and multiline C/C++ arrays.
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fail closed
+  after credential markers in bounded complexity snapshots, preventing chained
+  fallback values from reaching the model. Report reduced context as partial.
+
+- [`8e64f62`](https://github.com/KingInYellows/yellow-plugins/commit/8e64f621fbdc5feffd5ca3a4382043dc3e5eb7d4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Quarantine
+  token-only and empty-username URL userinfo in bounded complexity snapshots
+  before returning source to the model.
+
 ## 1.8.1
 
 ### Patch Changes
