@@ -254,7 +254,7 @@ EOS
 
 @test "the record lives in the common git dir, keyed by lowercased owner and repo" {
   record 'PRRT_a\n'
-  git -C "$REPO_DIR" commit -q --allow-empty -m init
+  git -C "$REPO_DIR" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -q --allow-empty -m init
   git -C "$REPO_DIR" worktree add -q "${BATS_TEST_TMPDIR}/wt" 2>/dev/null
   cd "${BATS_TEST_TMPDIR}/wt"
   FAKE_RESULTS="ok:PRRT_a" run "$DELTA" check Owner/Repo 7
