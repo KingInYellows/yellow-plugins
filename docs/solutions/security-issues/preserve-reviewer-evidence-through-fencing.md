@@ -88,3 +88,43 @@ Related: `docs/solutions/code-quality/llm-as-judge-style-bias-dominance.md`
 (the synthesis bias this change mitigates) and
 `docs/solutions/code-quality/fence-output-cap-and-untested-orchestration.md`
 (the output-cap and testing side).
+
+
+---
+
+## Update — 2026-10-14
+
+### Evidence verification must not overstate what it checked (PR #1198 review)
+
+Fidelity failures one layer up, in the evidence check and the synthesis that
+reports it. Each produced well-formed output. Fixed in `1e441bc98`.
+
+1. **Redaction can make a fabricated quote match.** A made-up
+   credential-shaped quote matched any redacted line once both sides were
+   redacted. A quote that redaction would change is unverified
+   (`redacted-quote`) before either comparison tier.
+2. **Mark what the result does not cover.** A second `Evidence:` line in a
+   finding read as if the verification result covered it. Later lines are
+   tagged `[UNCHECKED]`.
+3. **Fail closed on a failed dirty listing.** If `git diff --name-only HEAD`
+   fails, every file is treated as dirty (judged against HEAD), never as clean.
+4. **Choose the comparison target before reading the file.** Review-mode
+   citations were bounds-checked against the working tree before the HEAD
+   target was picked, which rejected valid citations in locally shortened or
+   deleted files.
+5. **Report each finding's own result.** Scoring support from a group-best
+   correctness while the report showed the finding's own result printed
+   "well-supported — correctness unverified". Only the bucket uses the group
+   best.
+6. **Parse ids in the form the prompt shows.** Pass A copied ids bracketed
+   (`[S1-F2]`), the parser expected them bare, and every finding fell to
+   Unverified Claims with no error. Accept the decorated forms and print one
+   diagnostic for an unreadable table.
+7. **Degrade to a per-row fallback, not silence.** When bucket assignment
+   fails, one Unverified Claims line per verification row is printed.
+
+**Prevention:**
+
+- [ ] For each verifier path, ask what a forged input yields when the same
+      redaction or normalization is applied to both sides.
+- [ ] Every "could not check" outcome prints a marker, never an empty section.
