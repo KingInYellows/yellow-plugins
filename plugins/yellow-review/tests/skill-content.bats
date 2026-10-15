@@ -1297,6 +1297,8 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$step6flat" == *'trusted-config symlink target may have been edited (left in place)'* ]]
   [[ "$step6flat" == *'deny-listed edit left on disk (kept by the user)'* ]]
   [[ "$step6flat" == *'run the dry-run call again and report each `pending` path'* ]]
+  # Link hits found by that second dry run are reported too, not only pending paths.
+  [[ "$step6flat" == *'Report that run'"'"'s `linkHits` and `linkHitCount` as in step 3 too'* ]]
   [[ "$step6flat" != *'offer only Revert'* ]]
   [[ "$step6flat" != *'Any other non-zero dry-run exit: ask nothing, run the call without'* ]]
   dispo=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')

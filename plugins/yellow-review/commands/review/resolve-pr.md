@@ -489,7 +489,8 @@ runs it as is. Interactive asks first:
    in Step 9 under Blocking merge as
    `<path>: deny-listed edit left on disk (kept by the user)`, plus
    `<n> more trusted-config edits left on disk (names withheld; kept by the user)`
-   when `pendingCount` exceeds the paths shown.
+   when `pendingCount` exceeds the paths shown. Report that run's `linkHits`
+   and `linkHitCount` as in step 3 too, skipping paths already reported.
 
 The call without `--dry-run` reverts only dirty paths on the contract deny list that are trusted config
 (`rp_trusted_config` in `lib/resolve-paths.sh`: agent instruction and
