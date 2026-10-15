@@ -32,7 +32,9 @@ folder a doc already lives in (plans/jev-category-offline-eval.md).
 `run` ends the results file with one summary record (eligible and written
 counts, --limit, abort flag, skip counts). `report` gives a verdict only for
 a complete run made under the current criteria file, with the pre-registered
---seed.
+--seed. A doc whose frontmatter fails to parse and whose date line does not
+show it predates frozen_at is skipped as parse-error-maybe-holdout, and makes
+the run partial.
 
 Exit codes: 0 success; 1 no request in `run` returned a usable answer, or
 `run` stopped after ABORT_AFTER_ERRORS consecutive failed requests (the
@@ -79,6 +81,9 @@ ABORT_AFTER_ERRORS = 5
 MAX_RESPONSE_BYTES = 1 << 20
 MODEL_RE = re.compile(r"jev-[0-9.]+")
 DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
+# Coarse date probe for docs the frontmatter parser rejects.
+DATE_PROBE_RE = re.compile(r"^date:[ \t]*[\"']?(\d{4}-\d{2}-\d{2})", re.M)
+HOLDOUT_PARSE_SKIP = "parse-error-maybe-holdout"
 SPLITS = ("dev", "test", "holdout")
 JUDGEMENTS = ("folder", "jev", "both", "neither")
 TSV_COLUMNS = ("path", "folder", "jev", "confidence", "kind", "judgement", "lesson_sha")
@@ -587,7 +592,12 @@ def collect_docs(repo, criteria):
         try:
             fm = parse_frontmatter(blob.decode("utf-8"))
         except (UnicodeDecodeError, FrontmatterError):
-            skip(["parse-error"])
+            # A doc the parser rejects drops out of the cohort. Unless its
+            # date line shows it predates the freeze, it may belong in the
+            # holdout look, so it gets a reason report treats as partial.
+            m = DATE_PROBE_RE.search(blob.decode("utf-8", "replace"))
+            pre_freeze = m is not None and m.group(1) <= criteria["frozen_at"]
+            skip(["parse-error" if pre_freeze else HOLDOUT_PARSE_SKIP])
             continue
         if fm is None:
             skip(["no-frontmatter"])
@@ -1171,6 +1181,9 @@ def _coverage_problem(rows, summary):
         return "the run used --limit %d" % summary["limit"]
     if summary["written"] != summary["eligible"] or len(rows) != summary["written"]:
         return "the run wrote %d of %d eligible docs" % (len(rows), summary["eligible"])
+    unparsed = summary["skipped"].get(HOLDOUT_PARSE_SKIP, 0)
+    if unparsed:
+        return "%d doc(s) not dated before the freeze failed to parse and were left out" % unparsed
     return None
 
 

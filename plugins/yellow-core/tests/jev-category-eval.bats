@@ -356,6 +356,17 @@ PY
   [ "$(summary skipped)" = '{"archived": 1, "no-frontmatter": 1, "unknown-folder": 1}' ]
 }
 
+@test "run: a parse error not dated before the freeze is a possible holdout skip" {
+  printf -- "---\ntitle: 'Old' trailing\ndate: 2026-05-04\n---\n" > "$REPO/docs/solutions/workflow/bad-old.md"
+  printf -- "---\ntitle: 'New' trailing\ndate: 2027-02-01\n---\n" > "$REPO/docs/solutions/workflow/bad-new.md"
+  printf -- "---\ntitle: 'Undated' trailing\n---\n" > "$REPO/docs/solutions/workflow/bad-undated.md"
+  git -C "$REPO" add docs/solutions/workflow/bad-old.md docs/solutions/workflow/bad-new.md docs/solutions/workflow/bad-undated.md
+  run --separate-stderr env -u TYPESAFE_API_KEY python3 "$EVAL" run --repo "$REPO" --url "http://127.0.0.1:9/v1/systemone" --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"eligible_docs=3 "* ]]
+  [[ "$output" == *"parse-error=1, parse-error-maybe-holdout=2"* ]]
+}
+
 @test "run: 500 after one retry becomes an error row and all-failed exits 1" {
   start_stub 500
   eval_run
@@ -662,6 +673,18 @@ judge_all() {
   judge_all folder
   run python3 "$EVAL" report "$BATS_TEST_TMPDIR/results.jsonl" --review "$BATS_TEST_TMPDIR/review.tsv"
   [[ "$output" == *"verdict: INSUFFICIENT-DATA (the run used --limit 160"* ]]
+
+  make_holdout 160 0
+  sed -i '$s/"skipped": {}/"skipped": {"parse-error": 1, "parse-error-maybe-holdout": 1}/' "$BATS_TEST_TMPDIR/results.jsonl"
+  judge_all folder
+  run python3 "$EVAL" report "$BATS_TEST_TMPDIR/results.jsonl" --review "$BATS_TEST_TMPDIR/review.tsv"
+  [[ "$output" == *"verdict: INSUFFICIENT-DATA (1 doc(s) not dated before the freeze failed to parse"* ]]
+
+  make_holdout 160 0
+  sed -i '$s/"skipped": {}/"skipped": {"parse-error": 1}/' "$BATS_TEST_TMPDIR/results.jsonl"
+  judge_all folder
+  run python3 "$EVAL" report "$BATS_TEST_TMPDIR/results.jsonl" --review "$BATS_TEST_TMPDIR/review.tsv"
+  [[ "$output" == *"verdict: GO"* ]]
 
   make_holdout 160 0
   judge_all folder
