@@ -202,7 +202,8 @@ The run worktree is put back on the start branch when an aborted rebase left it
 on a stack branch, but not while an operation is in progress there. Run
 `--abort` again once each named worktree is cleared. `--status` lists the recorded worktrees, any that is
 rebasing, busy or unreadable, and any unrecorded worktree rebasing a stack
-branch. The state file records a random run id, and the provider's "already
+branch or holding an unreadable rebase state; with no provider rollback on
+record, either keeps the state on `--abort` and `--continue`. The state file records a random run id, and the provider's "already
 aborted" marker holds that id: only a regular, non-symlink marker whose content
 equals the current run id lets a retry skip the provider and the
 remaining-rebase check. A missing, mismatched, symlinked or legacy (id-less)

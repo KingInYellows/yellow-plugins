@@ -1651,12 +1651,13 @@ chain_rebase_worktree() {
   return 1
 }
 
-# unrecorded_chain_rebases: print, one per line, each worktree the run did not
-# record that is mid-rebase of a stack branch. --abort leaves them alone; status
-# and abort name them. A rebase detaches HEAD, so a worktree on a branch is
-# skipped without running git.
+# unrecorded_chain_rebases: print "rebasing<TAB>PATH" for each worktree the run
+# did not record that is mid-rebase of a stack branch, and "unreadable<TAB>PATH"
+# for one whose rebase state cannot be read (it may be such a rebase). --abort
+# leaves them alone; status, continue and abort name them. A rebase detaches
+# HEAD, so a worktree on a branch is skipped without running git.
 unrecorded_chain_rebases() {
-  local i p
+  local i p st
   load_recorded
   for ((i = 0; i < ${#WT_PATH[@]}; i++)); do
     p=${WT_PATH[i]}
@@ -1664,9 +1665,24 @@ unrecorded_chain_rebases() {
       continue
     fi
     is_recorded "$p" && continue
-    worktree_in_chain_rebase "$p" "$i" && printf '%s\n' "$p"
+    st=0
+    worktree_in_chain_rebase "$p" "$i" || st=$?
+    case $st in
+      0) printf 'rebasing\t%s\n' "$p" ;;
+      2) printf 'unreadable\t%s\n' "$p" ;;
+    esac
   done
   return 0
+}
+
+# unrecorded_note LINE PREFIX SUFFIX: name one unrecorded_chain_rebases line.
+unrecorded_note() {
+  local tag=${1%%$'\t'*} p=${1#*$'\t'}
+  if [ "$tag" = unreadable ]; then
+    note "$2the rebase state of $(v "$p"), a worktree this run did not record, cannot be read (it may be rebasing a stack branch)$3"
+  else
+    note "$2a rebase of a stack branch is in progress in $(v "$p"), a worktree this run did not record$3"
+  fi
 }
 
 # release_run_worktree START: `git rebase --abort` leaves the run worktree on
@@ -1854,7 +1870,7 @@ cmd_continue() {
     busy=$(unrecorded_chain_rebases)
     if [ -n "$busy" ]; then
       while IFS= read -r p; do
-        note "a rebase of a stack branch is in progress in $(v "$p"), a worktree this run did not record, and the provider reports none paused; state kept"
+        unrecorded_note "$p" "" ", and the provider reports none paused; state kept"
       done <<<"$busy"
       note "finish or abort it there and run --continue again, or run --abort"
       exit "$X_PAUSED"
@@ -2043,13 +2059,13 @@ cmd_abort() {
   foreign=$(unrecorded_chain_rebases)
   if [ -n "$foreign" ]; then
     while IFS= read -r left; do
-      note "left alone: a rebase of a stack branch is in progress in $(v "$left"), a worktree this run did not record"
+      unrecorded_note "$left" "left alone: " ""
     done <<<"$foreign"
     # With no provider rollback on record, that rebase may be this run's own
     # (a state written before owners were recorded, or a lost provider record):
     # clearing the state now would let it move a stack branch afterwards.
     if [ "$provider_aborted" = 0 ] && ! abort_recorded; then
-      die "$X_KEPT" "a rebase of a stack branch is in progress in a worktree this run did not record, and the provider has no paused restack to roll back; state kept, nothing aborted or restored. Finish or abort that rebase there (git -C <worktree> rebase --abort), then run --abort again"
+      die "$X_KEPT" "a rebase of a stack branch is in progress (or its state cannot be read) in a worktree this run did not record, and the provider has no paused restack to roll back; state kept, nothing aborted or restored. Finish or abort that rebase there (git -C <worktree> rebase --abort), then run --abort again"
     fi
   fi
   if ! abort_in_chain_rebases; then
@@ -2175,9 +2191,15 @@ cmd_status() {
         ;;
     esac
   done
-  while IFS= read -r p; do
-    [ -n "$p" ] || continue
-    note "  not recorded: $(v "$p") is rebasing a stack branch; --abort leaves it alone"
+  local line
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    p=${line#*$'\t'}
+    if [ "${line%%$'\t'*}" = unreadable ]; then
+      note "  not recorded: $(v "$p") has a rebase state that cannot be read; --abort leaves it alone"
+    else
+      note "  not recorded: $(v "$p") is rebasing a stack branch; --abort leaves it alone"
+    fi
   done < <(unrecorded_chain_rebases)
 }
 

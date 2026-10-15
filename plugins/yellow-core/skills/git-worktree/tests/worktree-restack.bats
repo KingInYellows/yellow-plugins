@@ -1687,6 +1687,35 @@ legacy_tipless() {
   [ -e "$SD/state" ]
 }
 
+@test "an unreadable rebase state in an unrecorded worktree keeps the state when the provider has nothing paused" {
+  mk_stack b
+  orig_a=$(git rev-parse a)
+  git -C "$REPO" worktree add -q --detach "$T/wt-extra" c
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  rm -f "$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)/.gtcontinue"
+  git -C "$(wtp a)" rebase --abort
+  git update-ref refs/heads/a "$orig_a"
+  # A rebase directory with no head-name: it may be this run's own rebase.
+  gd=$(git -C "$T/wt-extra" rev-parse --path-format=absolute --git-dir)
+  mkdir -p "$gd/rebase-merge"
+  run bash "$SCRIPT" status
+  [[ $output == *"not recorded: $T/wt-extra has a rebase state that cannot be read"* ]]
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 10 ]
+  [[ $output == *"the rebase state of $T/wt-extra, a worktree this run did not record, cannot be read"* ]]
+  [ -e "$SD/state" ]
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"left alone: the rebase state of $T/wt-extra"* ]]
+  [ -e "$SD/state" ]
+  [ -d "$gd/rebase-merge" ]
+  rm -rf "$gd/rebase-merge"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  assert_all_restored
+}
+
 @test "--abort exits 31 naming a recorded worktree whose rebase state cannot be read, then finishes" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite
