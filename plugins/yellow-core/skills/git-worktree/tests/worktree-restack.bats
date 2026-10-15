@@ -1870,10 +1870,10 @@ legacy_tipless() {
   git -C "$(wtp c)" checkout -q --detach
   plant_rebase "$(wtp c)" c c
   run bash "$SCRIPT" abort --provider graphite
-  # The other repository's rebase still blocks the restore of that path: the
-  # state is kept, and nothing there was aborted.
+  # That path is not the recorded worktree: the state is kept and nothing
+  # there was aborted or restored.
   [ "$status" -eq 31 ]
-  [[ $output == *"operation is still in progress in $(wtp c)"* ]]
+  [[ $output == *"$(wtp c) cannot be confirmed as the worktree this run recorded"* ]]
   [[ $output != *"did not clear the rebase in $(wtp c)"* ]]
   [[ $output != *"cannot read the git rebase state of $(wtp c)"* ]]
   # Never aborted: the other repository's rebase marker is still there.
@@ -1890,8 +1890,9 @@ legacy_tipless() {
   cp -f "$T/wt-extra/.git" "$(wtp c)/.git"
   plant_rebase "$T/wt-extra" c c
   run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
   [[ $output != *"did not clear the rebase in $(wtp c)"* ]]
-  [[ $output == *"not recorded: $T/wt-extra is rebasing a stack branch"* ]]
+  [[ $output == *"$(wtp c) cannot be confirmed as the worktree this run recorded"* ]]
   # Never aborted: the unrecorded worktree's rebase is still there.
   rebase_marker "$T/wt-extra"
 }
@@ -1993,10 +1994,42 @@ legacy_tipless() {
   git -C "$REPO" worktree add -q --detach "$(wtp c)" c
   plant_rebase "$(wtp c)" c b
   lose_github_record "$orig_a"
+  run bash "$SCRIPT" status
+  [[ $output == *"  replaced:     $(wtp c)"* ]]
   STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" abort --provider github
+  [ "$status" -eq 31 ]
+  [[ $output == *"$(wtp c) cannot be confirmed as the worktree this run recorded"* ]]
   [[ $output != *"did not clear the rebase in $(wtp c)"* ]]
-  [[ $output == *"not recorded: $(wtp c) is rebasing a stack branch"* ]]
+  [ -e "$SD/state" ]
   rebase_marker "$(wtp c)"
+}
+
+@test "--abort never checks out a run worktree registered again at the recorded path" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  grep -qx "bound	1" "$SD/state"
+  # A first --abort rolls the provider back but stops on a stuck rebase, so the
+  # retry is the one that would check the run worktree out.
+  plant_stuck_rebase "$(wtp c)" c
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  gd=$(git -C "$(wtp c)" rev-parse --path-format=absolute --git-dir)
+  rm -rf "$gd/rebase-merge"
+  cd "$REPO"
+  git worktree remove --force "$(wtp a)"
+  git worktree add -q --detach "$(wtp a)" main
+  cd "$(wtp a)"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"$(wtp a) cannot be confirmed as the worktree this run recorded"* ]]
+  [ -e "$SD/state" ]
+  # Still detached where it was added: nothing was checked out there.
+  [ -z "$(branch_of "$(wtp a)")" ]
+  [ "$(git -C "$(wtp a)" rev-parse HEAD)" = "$(git rev-parse main)" ]
+  run bash "$SCRIPT" restore
+  [ "$status" -eq 31 ]
+  [ -z "$(branch_of "$(wtp a)")" ]
 }
 
 @test "github: owner lines that are relative, hold '..' or control characters, name the run worktree or repeat are rejected" {

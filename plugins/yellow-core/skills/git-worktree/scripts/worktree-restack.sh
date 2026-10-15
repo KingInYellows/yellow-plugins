@@ -1702,6 +1702,57 @@ load_recorded() {
   for ((i = 0; i < ${#O_PATH[@]}; i++)); do RECORDED+=("${O_PATH[i]}"); done
 }
 
+# wt_replaced PATH: 0 when, in a bound state, the recorded PATH is a present,
+# registered worktree that cannot be confirmed as the one this run recorded:
+# its .git link is gone, git cannot read it, its top level or own git
+# directory is not PATH's, or that git directory lacks this run's id
+# (bind_worktree), as for a worktree removed and registered again at PATH.
+# A deleted or prunable path is not replaced (it is reported missing), and an
+# unbound state (written before binding) never reports one.
+wt_replaced() {
+  local wi out top gd d
+  [ "${S_BOUND:-}" = 1 ] || return 1
+  wi=$(wt_index "$1")
+  [ "$wi" -ge 0 ] && [ "${WT_PRUNABLE[wi]}" -eq 0 ] && [ -d "$1" ] || return 1
+  [ -e "$1/.git" ] || return 0
+  out=$(git -C "$1" rev-parse --show-toplevel --absolute-git-dir 2>/dev/null) || return 0
+  case $out in *$'\n'*) ;; *) return 0 ;; esac
+  top=$(canon_or_raw "${out%%$'\n'*}")
+  gd=$(canon_or_raw "${out#*$'\n'}")
+  [ "$top" = "$1" ] || return 0
+  if [ "$gd" = "$COMMON" ]; then
+    [ "$wi" -eq 0 ] && return 1
+    return 0
+  fi
+  [ "$(canon_or_raw "${gd%/*}")" = "$COMMON/worktrees" ] || return 0
+  d=$(cat -- "$gd/gitdir" 2>/dev/null) || return 0
+  case $d in /*) ;; *) d=$gd/$d ;; esac
+  [ "$(canon_or_raw "${d%/*}")" = "$1" ] || return 0
+  [ -f "$gd/$WT_MARK" ] && [ ! -L "$gd/$WT_MARK" ] || return 0
+  [ "$(head -c 64 -- "$gd/$WT_MARK" 2>/dev/null)" = "$S_RUNID" ] && return 1
+  return 0
+}
+
+# refuse_replaced: continue, abort and restore check out, reset, lock, unlock
+# and rebase --abort in recorded worktrees, and run the provider in the run
+# worktree. Before any of that, keep the state and stop (exit 31) when a
+# recorded path holds a worktree this run did not record (wt_replaced),
+# naming each one.
+refuse_replaced() {
+  local p
+  local -a bad=()
+  load_recorded
+  for p in "${RECORDED[@]}"; do
+    if wt_replaced "$p"; then bad+=("$p"); fi
+  done
+  [ "${#bad[@]}" -gt 0 ] || return 0
+  for p in "${bad[@]}"; do
+    err "$(v "$p") cannot be confirmed as the worktree this run recorded (removed and registered again, or its .git link changed); nothing was run there"
+    note "  fix: finish any work in $(v "$p"), move it aside or remove it (git worktree remove $(q "$p")), then run this again"
+  done
+  die "$X_KEPT" "state kept: a recorded worktree path holds a worktree this run did not record"
+}
+
 # is_recorded PATH: PATH is in RECORDED (load_recorded first).
 is_recorded() {
   local r
@@ -1997,6 +2048,7 @@ cmd_continue() {
   require_env
   load_state_or_exit
   need_lock
+  refuse_replaced
   report_all_floating
   # A valid marker means this run was aborted at the provider and only the
   # abort cleanup is pending; continuing would treat the rollback as success.
@@ -2141,6 +2193,7 @@ cmd_abort() {
   require_env
   load_state_or_exit
   need_lock
+  refuse_replaced
   report_all_floating
   local provider_aborted=0 rebasing="" rrc=1 no_rollback=0 moved start=${S_CHAIN[1]:-}
   if [ "$S_PROVIDER" = graphite ] && abort_recorded && ! gt_paused "$S_RUN"; then
@@ -2271,6 +2324,7 @@ cmd_restore() {
   require_env
   load_state_or_exit
   need_lock
+  refuse_replaced
   if [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; then
     note "warning: a conflict is still paused; restoring now strands the provider's own --continue. Prefer /worktree:restack --continue or --abort"
   elif [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; then
@@ -2320,6 +2374,10 @@ cmd_status() {
   load_recorded
   for ((i = 0; i < ${#RECORDED[@]}; i++)); do
     p=${RECORDED[i]}
+    if wt_replaced "$p"; then
+      status_line replaced "$(v "$p") (not confirmed as this run's worktree; --continue, --abort and restore refuse)"
+      continue
+    fi
     if [ "$i" -gt "${#E_PATH[@]}" ]; then
       wi=$(wt_index "$p")
       if [ "$wi" -lt 0 ] || [ "${WT_PRUNABLE[wi]}" -ne 0 ]; then

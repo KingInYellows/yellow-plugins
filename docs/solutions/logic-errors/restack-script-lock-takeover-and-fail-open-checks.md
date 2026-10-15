@@ -177,7 +177,12 @@ than the evidence behind it.
   can reuse the `worktrees/<id>` name). `start` now writes the run id into each
   recorded linked worktree's own git directory (`bind_worktree`, state line
   `bound 1`); git deletes that directory with the worktree, so a replacement
-  lacks it and is treated as unrecorded.
+  lacks it. A follow-up review found `release_run_worktree` still checked out
+  an unbound run worktree, so the check moved to one gate: `refuse_replaced`
+  runs before `--continue`, `--abort` and `restore` touch any recorded path
+  (checkout, reset, lock, unlock, rebase --abort, provider calls) and keeps
+  the state (exit 31). Put a binding check at the entry of every mutating
+  command, not at each call site.
 - **Found while testing.** A deleted github owner still listed on its branch
   read as busy in `in_chain_busy`; worktrees git reports prunable or whose
   directory is gone are now skipped there.
