@@ -578,14 +578,17 @@ SH
   [ "$output" = .ruvector/hook.sh ]
 }
 
-@test "rp_ignored_changed_since ignores the ruvector coedit.json pair store but not its siblings" {
+@test "rp_ignored_changed_since ignores the ruvector pair and memory stores but not their siblings" {
   ignored_repo
   printf '.ruvector/\n' >> .gitignore
   mkdir -p .ruvector
   printf '{}\n' >| .ruvector/coedit.json
   printf 'old\n' >| .ruvector/intelligence.json
-  touch -t 201901010000 .ruvector/coedit.json .ruvector/intelligence.json
+  printf 'old\n' >| .ruvector/vectors.db
+  touch -t 201901010000 .ruvector/coedit.json .ruvector/intelligence.json .ruvector/vectors.db
   printf '{"version":1}\n' >| .ruvector/coedit.json
+  # Another session's MCP server saving the shared memory store.
+  printf '{"memories":[]}\n' >| .ruvector/intelligence.json
   run rp_ignored_changed_since "$MARKER" "$SCRATCH"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
@@ -596,10 +599,42 @@ SH
   [ "$status" -eq 1 ]
   [ "$output" = node_modules/.ruvector/coedit.json ]
   rm -rf node_modules/.ruvector
-  printf 'new\n' >| .ruvector/intelligence.json
+  printf 'new\n' >| .ruvector/vectors.db
   run rp_ignored_changed_since "$MARKER" "$SCRATCH"
   [ "$status" -eq 1 ]
-  [ "$output" = .ruvector/intelligence.json ]
+  [ "$output" = .ruvector/vectors.db ]
+}
+
+@test "rp_ignored_changed_since still judges a symlink at .ruvector/intelligence.json" {
+  ignored_repo
+  printf '.ruvector/\n' >> .gitignore
+  mkdir -p .ruvector
+  ln -s ../node_modules/.bin/runner .ruvector/intelligence.json
+  touch -h -t 201901010000 .ruvector/intelligence.json
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 0 ]
+  printf 'new\n' >| node_modules/.bin/runner
+  run rp_ignored_changed_since "$MARKER" "$SCRATCH"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *node_modules/.bin/runner* ]]
+  run rp_shared_store_changed "$MARKER"
+  [ "$status" -ne 0 ]
+}
+
+@test "rp_shared_store_changed reports a newer regular memory store, directly or through a .ruvector symlink" {
+  ignored_repo
+  run rp_shared_store_changed "$MARKER"
+  [ "$status" -ne 0 ]
+  store="$BATS_TEST_TMPDIR/store"
+  mkdir -p "$store"
+  printf 'old\n' >| "$store/intelligence.json"
+  touch -t 201901010000 "$store/intelligence.json"
+  ln -s "$store" .ruvector
+  run rp_shared_store_changed "$MARKER"
+  [ "$status" -ne 0 ]
+  printf 'new\n' >| "$store/intelligence.json"
+  run rp_shared_store_changed "$MARKER"
+  [ "$status" -eq 0 ]
 }
 
 @test "rp_ignored_changed_since still judges a symlink at .ruvector/coedit.json" {
@@ -661,7 +696,7 @@ SH
   [[ "$output" == *node_modules/.bin/runner* ]]
 }
 
-@test "rp_ignored_changed_since ignores co-edit state through a .ruvector symlink but not its siblings" {
+@test "rp_ignored_changed_since ignores co-edit state and the memory store through a .ruvector symlink but not their siblings" {
   ignored_repo
   printf '.ruvector\n' >> .gitignore
   store="$BATS_TEST_TMPDIR/store"
@@ -671,10 +706,12 @@ SH
   touch -t 201901010000 "$store/coedit-sessions/s1.json" "$store/hook.sh"
   ln -s "$store" .ruvector
   printf '{}\n' >| "$store/coedit.json"
-  touch -t 201901010000 "$store/coedit.json"
+  printf '{}\n' >| "$store/intelligence.json"
+  touch -t 201901010000 "$store/coedit.json" "$store/intelligence.json"
   touch -h -t 201901010000 .ruvector
   printf 'new\n' >| "$store/coedit-sessions/s1.json"
   printf '{"version":1}\n' >| "$store/coedit.json"
+  printf '{"memories":[]}\n' >| "$store/intelligence.json"
   run rp_ignored_changed_since "$MARKER" "$SCRATCH"
   [ "$status" -eq 0 ]
   [ -z "$output" ]

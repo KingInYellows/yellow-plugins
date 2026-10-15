@@ -86,8 +86,12 @@ resolve docs do not:
 4. **Exclude tool-state directories from the ignored-file scan**
    (`.ruvector/` first), keyed by an explicit list of the exact hook-owned
    artifacts expected to change, not the whole directory. A resolver edit to
-   other state, such as `intelligence.json` or vector data (which a linked
-   worktree may share with the main store), must still fail closed.
+   other state, such as vector data, must still fail closed. Amended
+   2026-10-14: `intelligence.json` is now skipped too, but reported. A linked
+   worktree shares it with the main store, and another session's MCP server
+   saved it mid-run on PR #1192, so every resolve that overlapped another
+   session stopped. `run-verify-command` names the change in a `Note:` line,
+   and the residual is recorded in `dispositions.md` Known limits.
 5. **Cite only committed, verified edits.** If the cited edit is later
    reverted, downgrade the thread to `unclear`. Revert only the cluster whose
    resolver omitted `Files modified`, not every cluster.

@@ -1,5 +1,5 @@
 {
-  "$comment": "Canonical /council reviewer roster. Build-time artifact only \u2014 nothing reads this at runtime, and council.md must not be changed to do so (a missing or corrupt roster would abort a review mid-fan-out to buy nothing). Consumed by scripts/validate-council-roster.js. Deliberately stores no count field: a stored count would itself be a drift site. Totals are derived.",
+  "$comment": "Canonical /council reviewer roster. Build-time artifact only — nothing reads this at runtime, and council.md must not be changed to do so (a missing or corrupt roster would abort a review mid-fan-out to buy nothing). Consumed by scripts/validate-council-roster.js. Deliberately stores no count field: a stored count would itself be a drift site. Totals are derived.",
   "reviewers": [
     {
       "name": "claude",
@@ -60,6 +60,7 @@
     "plugins/yellow-council/agents/review/opencode-reviewer.md": "1efa59b3",
     "plugins/yellow-council/commands/council/council.md": "1efa59b3",
     "plugins/yellow-council/commands/council/setup.md": "1efa59b3",
+    "plugins/yellow-council/lib/council-synthesis.sh": "1efa59b3",
     "plugins/yellow-council/package.json": "1efa59b3",
     "plugins/yellow-council/skills/council-patterns/SKILL.md": "1efa59b3",
     "plugins/yellow-council/skills/council-patterns/references/cross-references.md": "1efa59b3",

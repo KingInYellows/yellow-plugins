@@ -1455,7 +1455,7 @@ jobs:
         # bats_require_minimum_version helper (>=1.5.0) used in this repo.
         run: sudo npm install -g bats@1.11.0
 
-      - name: Install gawk and zsh
+      - name: Install gawk, zsh and python3-rapidfuzz
         # ubuntu-latest ships mawk only. The yellow-council suites run the
         # redaction program and the walker under every awk they find by
         # explicit binary name (mawk, gawk), so without this step the gawk
@@ -1467,7 +1467,12 @@ jobs:
         # zsh: yellow-council's synthesis.bats runs council.md's Step 5b
         # helpers under bash and zsh, and fails rather than skips in CI
         # without it.
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq gawk zsh
+        # python3-rapidfuzz: yellow-council's verification.bats runs the Tier 2
+        # fuzzy-evidence hit cases, which fail rather than skip in CI without
+        # it. apt, not pip: the runner's Python is externally managed (PEP
+        # 668). Do not add actions/setup-python to this job: its python3 would
+        # shadow the apt package.
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gawk zsh python3-rapidfuzz
 
       - name: Run yellow-core git-worktree bats suite (required)
         run: bats plugins/yellow-core/skills/git-worktree/tests/

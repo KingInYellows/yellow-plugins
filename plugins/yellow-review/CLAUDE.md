@@ -210,7 +210,10 @@ resolution, and sequential stack review. Graphite-native workflow.
   with an idempotency marker (skips when our latest recent comment has a
   marker for the thread, any disposition, and only bot comments follow it).
   Which prior markers a new reply may supersede is the Recovery rule in
-  `references/resolve/dispositions.md`. One rate-limit retry and a per-call `gh`
+  `references/resolve/dispositions.md`; an `oos` → `fixed`/`addressed` reply
+  names the GitHub follow-up (`Follow-up #N is no longer needed.`, found via
+  `file-followup-issue --find` when the old reply lacks it) but never closes it,
+  and a Linear follow-up is not named. One rate-limit retry and a per-call `gh`
   timeout apply, enforced when `timeout(1)` or `gtimeout(1)` is installed
   (without either `gh` runs unbounded, so unattended calls can hang; see
   `references/resolve/dispositions.md`)
@@ -243,6 +246,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   (`--ignored-since <marker-file>` is required for every run, attended or
   not, and refuses when a gitignored file is newer than the marker, except
   regular-file tool state (`.ruvector/coedit.json`, `.ruvector/coedit-sessions/`,
+  `.ruvector/intelligence.json` (named in a stderr `Note:` line when it changed),
   `node_modules/.vite/vitest/results.json`); `--unattended` also skips runner files;
   `--revert-only` reverts the listed files; `--revert-dirty` reverts every change in the tree and takes no
   file list; `--revert-denied` reverts only trusted-config dirty paths
@@ -384,8 +388,8 @@ evil`, `env nice evil`), counts as entering the worktree. So does a `#!`
 argument with expansion or glob syntax, or with a shell operator, redirection
 or parenthesis (`#!/bin/sh -c PATH=tools:/usr/bin;evil`).
 `run-verify-command` still gives the verify command the caller's `PATH`
-(`YR_ORIG_PATH`). Both scripts take their own directory by parameter expansion,
-not `dirname`.
+(`YR_ORIG_PATH`). Both scripts, and `lib/resolve-paths.sh` (sourced before the
+screen), take their own directory by parameter expansion, not `dirname`.
 
 - `head-ignore-probe <PR#>` — `/review:sweep` Step 1b: prints
   `head=tracked|ignored|unignored` for `yellow-plugins.local.md` on the PR head,

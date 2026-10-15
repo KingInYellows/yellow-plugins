@@ -92,3 +92,39 @@ replaces the two manual greps in `zsh-noclobber-mktemp-stderr-redirect.md`.
   CI requires it and the `shell-compat-tests` job.
 - A newly sourced plugin library fails SHC-008 until it is classified; a new
   Tier 4 library fails `tests/shell-compat` until it has a driver.
+
+
+---
+
+## Update — 2026-10-14
+
+### Promoting a marker-delimited command block to a Tier 4 library (plan-time, yellow-council synthesis)
+
+Planned in `plans/yellow-council-v2-four-cli-05-evidence-verification-and-finalization.md`
+(Phase A); not shipped when this was written, so re-check the file names
+before citing them.
+
+**Why the inline layout was safe.** The `council-synthesis-lib` helpers sat
+between `# >>> ... / # <<< ...` markers in `council.md`. `tests/lib/extract-synthesis-lib.bash`
+cut that block out and `synthesis.bats` ran it, so the tests ran the same
+bytes the Step 5 fences ran. Drift was impossible by construction.
+
+**What moving it removes.** Once the helpers live in `lib/council-synthesis.sh`
+and the fences `. "${CLAUDE_PLUGIN_ROOT}/lib/..."` them, the tests source the
+file directly and nothing proves a fence still sources it or still calls a
+name the library defines. Both sides can be renamed apart and stay green.
+
+**Do these in the same PR as the move:**
+
+1. Register the file under `tier4Libraries` in `scripts/shell-compat-config.json`
+   (SHC-008) and add `tests/shell-compat/drivers/<plugin>--<basename>.sh`
+   (`tier4-libraries.bats` fails without it).
+2. Add a pinned-text test: the old markers are gone, and every fence that calls
+   a library helper also sources the library.
+3. Retarget the old extractor and its callers. Keep any generic marker helper
+   another suite still uses.
+4. Source through an existence check that names the missing file and routes
+   through the command's existing abort path, so an unresolved
+   `CLAUDE_PLUGIN_ROOT` fails loudly instead of leaving helpers undefined.
+5. Keep cleanup-only blocks (cancel, final removal) inline. They must run when
+   the library cannot be loaded.

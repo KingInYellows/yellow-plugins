@@ -716,9 +716,9 @@ still counts. Two rules follow:
   `fixed` or `addressed` reply. That reply carries the evidence the resolve
   needs, so it is posted. A second `oos` reply to an `oos` marker is a skip,
   and so is `disagree` or `unclear` after `oos`. An `oos` → `fixed` or
-  `addressed` upgrade posts a reply that supersedes the earlier one; the script
-  neither closes nor links the follow-up issue filed for the `oos` reply, so
-  that issue stays open.
+  `addressed` upgrade posts a reply that supersedes the earlier one. Nothing
+  closes the follow-up issue filed for the `oos` reply; the reply names it so a
+  human can close it (see Reply hygiene).
 - Compare before resolving: after a skip, the orchestrator retries the resolve
   (when the lane allows it) only if the reported `disposition` equals the one it
   asked for. Any other posted disposition leaves the thread open and is reported
@@ -752,6 +752,17 @@ Replies and issue bodies end with:
   `Out of scope for this PR; tracked in #12.`, `Not changing this: <reason>.`,
   `Needs a human decision: <what is missing>.`
 - Never quote the reviewer.
+- `oos` upgrade: when a `fixed` or `addressed` thread has a viewer-authored
+  comment (`viewerDidAuthor`, from Step 2's `get-pr-comments` output) ending
+  with this thread's `disposition=oos` marker, find the follow-up issue number
+  `N` before writing the body. Take it from that same comment's outcome
+  sentence (`tracked in #N`, digits only). Only when the sentence has none, run
+  `file-followup-issue --find <owner/repo> <PRRT_id>` and use the `number` of
+  `{"exists":true,"number":N,...}`. Add `Follow-up #N is no longer needed.`
+  after the outcome sentence. No number (a Linear issue, `{"exists":false}`,
+  or a non-zero exit other than 4) adds nothing, and the reply is still
+  posted. Exit 4 (a rate limit or timeout) is the stop rule under Pacing and
+  rate limits: this reply is not posted either.
 - At most 1,000 characters before the marker (`reply-pr-thread` rejects longer
   bodies with exit 2).
 - Text that looks like a credential, or has a markdown image, an `@` mention or
@@ -943,14 +954,23 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   own; `/review:resolve-stack` and `/review:sweep-all` read `verify=skipped` as
   the stop and end the walk or batch after that PR: restore the named files
   before running anything again.
-- The ignored-file guard skips three tool-owned paths it would otherwise
+- The ignored-file guard skips four tool-owned paths it would otherwise
   count on every run: yellow-ruvector's session log `.ruvector/coedit-sessions/`
   and pair store `.ruvector/coedit.json` (its PostToolUse hook rewrites them on
-  resolver edits), and vitest's run cache
-  `node_modules/.vite/vitest/results.json` at any depth. The two files are
+  resolver edits), its memory store `.ruvector/intelligence.json` (a linked
+  worktree shares it with the main checkout, so another session's MCP server
+  can save it mid-run), and vitest's run cache
+  `node_modules/.vite/vitest/results.json` at any depth. The three files are
   skipped only while they are regular files (a symlink there is still judged by
   its target). They are JSON data nothing executes; every other path under
-  `.ruvector/` or `node_modules/` still stops the run. Other test runs can
+  `.ruvector/` or `node_modules/` still stops the run. A changed memory store is
+  not proven to be tool-written, so `run-verify-command` prints a
+  `Note: .ruvector/intelligence.json ...` line on stderr, and Step 9 reports
+  `shared ruvector store changed during the run (not judged)` as a note. It
+  neither stops the run nor counts as blocking. Accepted residual: a resolver
+  edit to the store is no longer a stop. Recall output stays fenced as
+  untrusted, and the MCP server overwrites the file from memory at its next
+  save. Other test runs can
   still write ignored files (coverage, `*.tsbuildinfo`, pre-bundled deps), so
   run no project command between Step 3f's marker and Step 6's guard.
 - Issue dedupe follows every page of the viewer's issues, but the whole scan is

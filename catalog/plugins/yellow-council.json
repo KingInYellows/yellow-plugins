@@ -22,6 +22,14 @@
     "category": "development",
     "source": "./plugins/yellow-council"
   },
+  "dependencies": [
+    {
+      "name": "yellow-core",
+      "version": ">=2.8.0",
+      "optional": false,
+      "reason": "quote-ground.sh batch is the Tier 1 evidence check; validate-fs.sh and compound-staging.sh back the citation parse and the Tier 2 redaction"
+    }
+  ],
   "targets": {
     "claude": true,
     "codex": {

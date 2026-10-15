@@ -1072,13 +1072,16 @@ do not re-inline it here. This section carries the contract the template and
 Step 5's code must keep.
 
 **Pipeline order** — fixed, each stage consumes the previous one's output:
-normalize → anonymize → Pass A → Pass B → assemble → de-anonymize.
+normalize → anonymize → verify (in the background, while the Pass A and Pass
+B inputs are built) → Pass A → Pass B → bucket → assemble → de-anonymize. The
+helpers live in `lib/council-synthesis.sh`, a Tier 4 dual-shell library the
+Step 5 fences source.
 
 **Source of reviewer text.** Every leg is read from its reviewer's
 script-redacted fenced output file (`council_extract_fenced`, fence-scoped,
 same selection rules as `parse_reviewer_return`); the orchestrator never
 retypes reviewer text, because transcription alters the `Evidence:` quotes
-`verify_finding()` compares. Codex's one-line overall summary, which exists
+the evidence check (`verify_finding()` / `council_verify_findings`) compares. Codex's one-line overall summary, which exists
 only in its Agent return, is the single value staged through `Write`. The
 blinded input goes to files in a private `/tmp/council-synth-*` directory that
 the orchestrator Reads (never one large Bash result, which the Bash tool
@@ -1094,12 +1097,22 @@ horizontal rules and blank-line runs go; every severity spelling (`[P1]`,
 `P1:`, `(P1)`, `CRITICAL:`, `Severity: high`, Codex's `**[P1] codex — …**`
 header) becomes one `severity=P<n>` token; reviewer tags, per-finding
 self-confidence lines and codex-reviewer's notes that name Codex are dropped
-or neutralized. It must preserve byte-for-byte: fenced code blocks (closed
-only by a fence at least as long), backtick code spans of any run length, the
+or neutralized. It must preserve byte-for-byte: closed fenced code blocks
+(closed only by a fence at least as long; an unclosed fence is normalized as
+ordinary text, so it cannot hide a reviewer name, and any fence-shaped line
+that is not a fence — its opening line, or one behind a heading — gets an
+`[ESCAPED] ` prefix so citation extraction never sees a fence the normalizer
+did not), backtick code spans of any run length, the
 `<file>:<line>` token of each citation, and everything from an `Evidence:`
 label to the end of its line, wherever the label sits — `verify_finding()`
 compares that quote against the file, so an altered quote turns a true
-citation false. In prose, a reviewer's own name and model-family aliases
+citation false. Emphasis is stripped only where it pairs on one line: a
+same-length `*` run wrapping one word (`**important**`), or a `*`/`_` opener
+and closer around a phrase, even across inline code spans. Identifiers keep
+their characters: `__init__`, `_private_fn`, `*ptr`, `**kwargs`, `snake_case`,
+and any unpaired edge run. A single word wrapped in `_`/`__` is kept as an
+identifier — a deliberate deviation from CommonMark, which would read
+`__init__` as strong emphasis. In prose, a reviewer's own name and model-family aliases
 (Claude/Anthropic, Codex/OpenAI/GPT, Gemini/Google/agy, OpenCode) are replaced
 with `[reviewer]`; other names are kept because the content may legitimately
 be about them. Code, citations and `Evidence:` tails are untouched.
@@ -1113,7 +1126,8 @@ fan-out, and a failure in 5b stops the run; there is no fixed-order fallback.
 Every leg, Codex included, is fenced as `council-output:S<n>` (see Injection
 Fence Format), and verdicts and confidences are presented per label. The body
 quotes the reviewed diff, so `council_fence_block` applies an escape set to
-anything that could pass for structure; its header comment in `council.md`
+anything that could pass for structure; its header comment in
+`lib/council-synthesis.sh`
 is the one definition of that set. Escaping only prefixes `[ESCAPED] `, so an
 escaped quote keeps its bytes. A voting reviewer whose file cannot be read is
 never shown as an empty review: 5b warns and marks the block `reviewer text
@@ -1123,8 +1137,10 @@ writes, never in model-relayed text; that closes the relay vector but not a
 deliberate `Write` forgery. See `docs/security.md` "Synthesis staging
 directory (yellow-council)".
 
-**Pass A.** Enumerate every finding per label (`S<n>-F<k>`, citation, claim)
-before comparing anything; then compare across labels; then score; only then
+**Pass A.** Enumerate every finding per label before comparing anything,
+using the `[S<n>-F<k>]` id 5b wrote in shell in front of each finding header
+(Pass A never invents, renumbers or drops an id; each one is a row of
+`verification.tsv`); then compare across labels; then score; only then
 give each finding a ruling (`upheld` / `disputed` / `rejected`) and a ruling
 confidence (`HIGH` / `MEDIUM` / `LOW`) — the spec's per-finding verdict and
 confidence tier, distinct from each reviewer's APPROVE/REVISE/REJECT vote.
@@ -1155,6 +1171,58 @@ Step 4's per-reviewer verdict lines. Pass B is a positional-consistency check,
 not an isolated blind re-evaluation; full isolation needs the dedicated
 synthesis subagent the spec defers to V3.
 
+**Evidence verification (R22-R25).** `council_extract_citations` numbers
+each label's findings from its normalized text and emits `{id, sev, file,
+line, quote}`; `council_verify_findings` (and the one-citation wrapper
+`verify_finding <mode> <file> <line> [quote]`) writes one `verification.tsv`
+row per id, in order, with `result` `verified`, `fuzzy-verified` or
+`unverified`, `tier` and `reason`. It classifies and never gates or drops a
+finding.
+
+- *Citation parse first, before any read*: an ASCII allowlist path with no
+  leading `/`, `~` or `-` and no `..` segment, a line of 1-7 digits,
+  yellow-core's `validate_file_path`, a readable regular file that is not a
+  symlink, whose resolved location has no `.git` segment (case-folded) and
+  is not ignored by git, and the line within its length — else
+  `bad-citation`. A quote that redaction would change (credential-shaped,
+  e.g. `token = …`) is `redacted-quote`: redacted, it could match any
+  redacted line. In `review` mode a dirty file that HEAD has is judged
+  against HEAD before any working-tree read; a failed dirty-file listing
+  treats every file as dirty. A quote holding a broken `[REDACTED` placeholder is
+  `too-short`.
+  No quote is `no-evidence`. A citation token wrapped in backticks, brackets
+  or parentheses is unwrapped first; quotes are capped at 4096 characters.
+- *Targets*: `plan`, `debug` and `question` read the working tree. `review`
+  reads it only for a file that matches `HEAD`; a dirty file skips Tier 1 and
+  Tier 2 reads `git show HEAD:<file>` (the working tree for a file `HEAD`
+  lacks). This overrides spec R22's `git show HEAD:<file>` wording for Tier 1,
+  because `quote-ground.sh` takes no ref, and drops R22's HEAD fallback for
+  the other modes. No git work tree skips Tier 1.
+- *Tier 1*: one `bash quote-ground.sh batch` call (yellow-core, a required
+  dependency `>=2.8.0`): the cited line ±3, redacted and
+  whitespace-normalized, literal substring. `grounded` → `verified`;
+  `too-short` (under 8 characters) and `unsafe-path` are final; `ungrounded`
+  goes to Tier 2. A missing script or a batch exit 2 warns and sends every
+  row to Tier 2.
+- *Tier 2* (optional `rapidfuzz`, R23): the same window, redacted with
+  `cs_redact_secrets` and normalized, scored by `lib/fuzzy-ratio.py` as the
+  max over lines of `fuzz.ratio`, and of `fuzz.partial_ratio` too for a quote
+  of 16 or more characters that is the needle (the line is at least as long
+  and has 8+ real characters, so a fabricated quote containing `}` cannot
+  score 100 against a lone `}` line); ≥ 85 is `fuzzy-verified`, else
+  `no-match`. Adding
+  `partial_ratio` overrides R22's `ratio`-only wording: `ratio` caps an exact
+  fragment of a longer line near 50. Only each label's top 50 candidates (by
+  severity, then k) are scored; the rest are `tier2-cap` (R25). Without
+  rapidfuzz 5b warns (`sudo apt install python3-rapidfuzz` on Debian/Ubuntu,
+  `pip install rapidfuzz` elsewhere) and the candidates are `tier2-skipped`.
+  An exact substring scores 100 in Tier 2 too. Redaction or scorer failures
+  are `verifier-error`. Only a finding's first `Evidence:` quote is checked;
+  a later one is tagged `[UNCHECKED]` in the Pass A input.
+- *Codex limitation*: yellow-codex builds its findings from Codex JSON, which
+  carries a location but no source line, so every Codex finding is
+  `no-evidence` and a Codex-only finding always lands in Unverified Claims.
+
 **Rubric.** Per finding, with fixed domains:
 `correctness ∈ {verified, fuzzy-verified, unverified}`,
 `completeness ∈ {holds, fails}`,
@@ -1162,20 +1230,32 @@ synthesis subagent the spec defers to V3.
 `constraint_adherence ∈ {holds, fails}`. Combination is mechanical:
 `well-supported` iff correctness is `verified` or `fuzzy-verified` AND
 completeness `holds`; otherwise `weakly-supported`. Correctness is
-**self-assessed** (rendered with that qualifier) until `verify_finding()`
-lands; it already uses that function's three-state domain, and a finding's
-other scores wait for its correctness value, so the swap changes only where
-correctness comes from — not the domains or the rule.
+**verification-backed**: Pass A copies it from the finding's
+`verification.tsv` row and scores nothing before reading it;
+`fuzzy-verified` renders as `fuzzy-verified (fuzzy match)`. Each finding's
+correctness and support use its own result, inside a group too; only the 5e
+bucket uses a group's best result.
 
-**Buckets.** Agreement / Disagreement, as in V1, until the five-bucket
-structure lands.
+**Buckets (R24).** Five, in this order: `Agreement (verified)`, `Agreement
+(unverified)`, `Disagreement`, `Single-Reviewer Findings (verified)`,
+`Unverified Claims`. 5e assigns them in shell (`council_bucket_lines`,
+`council_assign_bucket`) from Pass A's `group` and `conflict` cells and the
+verification results, recounting citations as the group's distinct labels.
+A group whose members do not cite one file within 6 lines is split and its
+findings bucketed singly, so a model-written group cannot lift an unverified
+finding into Agreement (verified); a duplicated id row is malformed.
+Precedence: one citing label splits by verification; a verdict conflict beats
+agreement; agreement splits by verification. A dropped or malformed Pass A
+row fails closed to Unverified Claims. The synthesizer copies the `BUCKET`
+lines and never chooses; every Unverified Claims entry shows its reason; a
+Pass B flip annotates and never moves a finding.
 
 Synthesis non-goals that live only here:
 
 - No weighting — the rubric combines by rule, never by score arithmetic
 - No reviewer ranking
 
-The remaining deferred features (lineage-weighted quorum, quote
-verification, XML evidence contract, `/council history`) are listed in
+The remaining deferred features (lineage-weighted quorum, XML evidence
+contract, `/council history`) are listed in
 `council.md`'s "V2 Trajectory" section — read them there rather than tracking
 a second copy.

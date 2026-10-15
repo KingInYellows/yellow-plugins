@@ -82,6 +82,11 @@ reply):
 | `oos` | Out of this PR's scope; follow-up issue filed (GitHub, or Linear when the branch has a Linear ID); reply links it; thread resolved |
 | `disagree` / `unclear` | Reply explains; thread stays open and is listed as blocking merge |
 
+When a thread `/review:resolve` earlier marked `oos` is later `fixed` or
+`addressed`, the new reply names the GitHub follow-up issue
+(`Follow-up #N is no longer needed.`) so a human can close it; nothing closes it
+automatically. A Linear follow-up, or one the lookup cannot find, is not named.
+
 Human-reviewer threads resolve only on hard evidence by default; others are
 held open (`resolve_pr.resolve_human_threads` in `yellow-plugins.local.md`).
 Unattended runs file at most 3 issues per PR. Replies and issues carry a
@@ -176,7 +181,7 @@ fetch, verify, commit and re-pass steps. All but `check-resolve-text` and
 | `poll-new-threads` | Bounded re-pass poll for threads that appeared after round 1 |
 | `check-resolve-text` | Refuse credential-shaped or unsafe text (image, `@` mention, foreign URL) before it is posted outside the resolve scripts (for example a Linear issue) |
 | `commit-resolve-fixes` | Stage the resolver files, add a new commit, submit it and verify the PR head; refuses paths outside the PR, deny-listed paths and credential-shaped added lines (`--allow-credential-shaped` is interactive only), and with `--unattended` runner files |
-| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--ignored-since <marker-file>` is required for every run and refuses when a gitignored file is newer than the marker, except regular-file tool state: `.ruvector/coedit.json`, `.ruvector/coedit-sessions/` and `node_modules/.vite/vitest/results.json`; `--unattended` also skips runner files; `--revert-only` and `--revert-dirty` revert without running and ignore the marker; `--revert-denied` reverts only trusted-config dirty paths (a subset of the deny list), takes no file list, and needs `--ignored-since` (refusing on a changed gitignored trusted-config file) or `--no-ignored-guard`, and leaves a tracked trusted-config symlink whose target was written (or, without the marker, points outside the worktree) in place with `deniedClean` false; `--check-ignored` runs only the gitignored-file guard) |
+| `run-verify-command` | Run `resolve_pr.verify_command` under a timeout (requires `--trusted`); on failure save a patch and revert the files (`--ignored-since <marker-file>` is required for every run and refuses when a gitignored file is newer than the marker, except regular-file tool state: `.ruvector/coedit.json`, `.ruvector/coedit-sessions/`, `.ruvector/intelligence.json` (a change is named in a stderr `Note:` line) and `node_modules/.vite/vitest/results.json`; `--unattended` also skips runner files; `--revert-only` and `--revert-dirty` revert without running and ignore the marker; `--revert-denied` reverts only trusted-config dirty paths (a subset of the deny list), takes no file list, and needs `--ignored-since` (refusing on a changed gitignored trusted-config file) or `--no-ignored-guard`, and leaves a tracked trusted-config symlink whose target was written (or, without the marker, points outside the worktree) in place with `deniedClean` false; `--check-ignored` runs only the gitignored-file guard) |
 | `head-ignore-probe` | Judge whether a PR head ignores `yellow-plugins.local.md` from its root tree, `.gitignore` and `.gitattributes`, read through `gh api` at `headRefOid` (no fetch or checkout), against this clone's `info/exclude` and `core.excludesFile`; exit 3 is systemic (rate limit, network, auth, 403, tree/blob 404), exit 4 PR-specific (`/review:sweep` Step 1b) |
 | `guard-local-config` | Snapshot the gitignored `yellow-plugins.local.md` and restore it if a resolver changed, created or deleted it; refuses a symlinked config (`/review:resolve-stack` checks after each PR) |
 | `file-line-counts` | Base/head line counts per changed file for `thermonuclear-reviewer` |
