@@ -2102,6 +2102,25 @@ teardown() {
   rebase_marker "$(wtp c)"
 }
 
+@test "graphite: a stale gh-stack marker never stands in for a lost .gtcontinue on --continue" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  # gt lost its record: the run worktree's rebase is gone with .gtcontinue,
+  # but a recorded entry is still mid-rebase of a stack branch.
+  git -C "$(wtp a)" rebase --abort
+  gd_a=$(git -C "$(wtp a)" rev-parse --path-format=absolute --git-dir)
+  rm -f "$gd_a/.gtcontinue"
+  plant_rebase "$(wtp c)" c b
+  # A leftover GitHub marker belongs to no graphite run.
+  : >"$COMMON/gh-stack-rebase-state"
+  run bash "$SCRIPT" continue --provider graphite
+  [ "$status" -eq 10 ]
+  [[ $output == *"a git rebase of this stack is still in progress in $(wtp c)"* ]]
+  [ -e "$SD/state" ]
+  rebase_marker "$(wtp c)"
+}
+
 @test "--abort never checks out a run worktree registered again at the recorded path" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite

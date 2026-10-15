@@ -193,6 +193,11 @@ than the evidence behind it.
   `path_state` / `wt_gone`, which call a path gone only when its nearest
   existing ancestor is a searchable directory; anything else is unreadable
   and keeps the state.
+- **Another provider's marker.** `provider_paused` accepted a leftover
+  `gh-stack-rebase-state` for a graphite run, so with `.gtcontinue` lost,
+  `--continue` skipped the "rebase still in progress" guard, restored over an
+  entry still mid-rebase and cleared the state. Every pause-marker check now
+  goes through `gh_paused` / `gt_paused` gated by the recorded `S_PROVIDER`.
 - **Found while testing.** A deleted github owner still listed on its branch
   read as busy in `in_chain_busy`; worktrees git reports prunable or whose
   directory is gone are now skipped there.

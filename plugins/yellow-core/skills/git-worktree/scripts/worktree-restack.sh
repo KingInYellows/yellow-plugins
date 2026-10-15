@@ -1252,7 +1252,7 @@ restore_entries() {
 # Returns 0 on a full restore, 1 when entries remain (state rewritten).
 restore_and_clear() {
   if restore_entries; then
-    if [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; then
+    if gh_paused; then
       write_state || err "could not rewrite the state file"
       lock_mark_paused
       err "a GitHub restack conflict is still paused; use --continue or --abort first"
@@ -1387,7 +1387,7 @@ on_exit() {
   trap - EXIT
   if [ "${ARMED:-0}" = 1 ]; then
     ARMED=0
-    if { [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; } || { [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; }; then
+    if { [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; } || gh_paused; then
       # Interrupted with a conflict paused: restoring now would strand the
       # provider's own --continue. Keep the state and lock the worktrees.
       lock_detached_entries
@@ -1462,7 +1462,7 @@ step_github() { # step_github upstack|continue|abort
       # A failed step with gh-stack's own rebase record, an in-flight git
       # rebase, or an adapter timeout (SPAWN_FAILURE) is a pause, not a
       # failure: clearing our state would orphan a partially applied restack.
-      if [ "$1" != abort ] && { [ -e "$COMMON/gh-stack-rebase-state" ] || [ "$AD_STATUS" = SPAWN_FAILURE ] || wt_busy "$S_RUN" >/dev/null; }; then
+      if [ "$1" != abort ] && { gh_paused || [ "$AD_STATUS" = SPAWN_FAILURE ] || wt_busy "$S_RUN" >/dev/null; }; then
         RESULT=conflict
       else
         RESULT=failed
@@ -1997,10 +1997,15 @@ unrecorded_reason() {
   fi
 }
 
-# provider_paused: the provider records a paused restack (gh-stack's rebase
-# state, or Graphite's continue marker in the run worktree).
+# gh_paused: gh-stack records a paused rebase, and this is a github run. A
+# gh-stack-rebase-state left beside a graphite run is no record of it.
+gh_paused() { [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; }
+
+# provider_paused: the recorded provider, and only it, records a paused restack
+# (gh-stack's rebase state, or Graphite's continue marker in the run worktree).
+# Another provider's leftover marker must never stand in for a lost one.
 provider_paused() {
-  [ -e "$COMMON/gh-stack-rebase-state" ] || { [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; }
+  gh_paused || { [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; }
 }
 
 # release_run_worktree START: `git rebase --abort` leaves the run worktree on
@@ -2228,7 +2233,7 @@ cmd_continue() {
       continue_release_run
       RESULT=ok
     fi
-  elif [ -e "$COMMON/gh-stack-rebase-state" ]; then
+  elif gh_paused; then
     step_github continue
   else
     note "no provider rebase is paused; verifying and restoring"
@@ -2344,7 +2349,7 @@ cmd_abort() {
       }
       provider_aborted=1
     fi
-  elif [ -e "$COMMON/gh-stack-rebase-state" ]; then
+  elif gh_paused; then
     begin_abort
     step_github abort
     [ "$RESULT" = ok ] || {
@@ -2461,7 +2466,7 @@ cmd_restore() {
   refuse_replaced
   if [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN"; then
     note "warning: a conflict is still paused; restoring now strands the provider's own --continue. Prefer /worktree:restack --continue or --abort"
-  elif [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; then
+  elif gh_paused; then
     note "warning: a GitHub restack conflict is still paused; restore will not clear state while gh-stack-rebase-state exists. Prefer /worktree:restack --continue or --abort"
   fi
   report_all_floating
@@ -2485,7 +2490,7 @@ cmd_status() {
   printf 'stack: %s' "$(v "${S_CHAIN[0]}")"
   for ((i = 1; i < ${#S_CHAIN[@]}; i++)); do printf ' -> %s' "$(v "${S_CHAIN[i]}")"; done
   printf '\n'
-  if { gt_paused "$S_RUN" 2>/dev/null; } || { [ "$S_PROVIDER" = github ] && [ -e "$COMMON/gh-stack-rebase-state" ]; }; then note "a conflict is paused in the run worktree"; fi
+  if { [ "$S_PROVIDER" = graphite ] && gt_paused "$S_RUN" 2>/dev/null; } || gh_paused; then note "a conflict is paused in the run worktree"; fi
   for ((i = 0; i < ${#E_PATH[@]}; i++)); do
     wi=$(wt_index "${E_PATH[i]}")
     if [ "$wi" -lt 0 ]; then
