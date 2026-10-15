@@ -1259,8 +1259,9 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   # The refusal path judges --revert-denied's JSON and names what stays on disk.
   [[ "$step6flat" == *'`deniedClean` is the success signal'* ]]
   [[ "$step6flat" == *'deny-listed edit left on disk (revert incomplete)'* ]]
-  # Only trusted config is reverted unasked; the rest of the deny list is asked
-  # about or left, and a refusal before the verify call still guards ignored files.
+  # Only trusted config is reverted by --revert-denied (unasked only when
+  # non-interactive); the rest of the deny list is asked about or left, and a
+  # refusal before the verify call still guards ignored files.
   [[ "$step6flat" == *'`rp_trusted_config` in `lib/resolve-paths.sh`'* ]]
   [[ "$step6flat" == *'the rest of the deny list, such as `.env*`, keys, CI and Docker files, included'* ]]
   [[ "$step6flat" == *'When the refusal came before the verify or `--check-ignored` call below, run that `--check-ignored` call too'* ]]
@@ -1272,6 +1273,36 @@ DIRTY_REF="$BATS_TEST_DIRNAME/../references/review-resolve-stack/dirty-tree-clea
   [[ "$dispo" == *'reverts only paths on the resolver deny list that are trusted config'* ]]
   [[ "$dispo" == *'`deniedClean` (no deny-listed change remains)'* ]]
   [[ "$dispo" == *'an empty match is `result: "noop"` with no patch'* ]]
+}
+
+@test "resolve-pr: an interactive refusal lists trusted-config paths with --dry-run and asks before reverting them" {
+  step6flat=$(sed -n '/^### Step 6/,/^### Step 7/p' "$RESOLVE_PR" | tr '\n' ' ' | tr -s ' ')
+  [[ "$step6flat" == *'Non-interactive runs it as is. Interactive asks first'* ]]
+  [[ "$step6flat" == *'Add `--dry-run` to the same call'* ]]
+  [[ "$step6flat" == *'Read only those five fields'* ]]
+  # A failed listing never falls back to the unasked revert: it asks without a list.
+  [[ "$step6flat" == *'means the files could not be listed: ask the question in step 4 with that said and no list'* ]]
+  [[ "$step6flat" == *'With `pendingCount` 0 there is nothing to revert: ask nothing and make no second call'* ]]
+  # Two real options; anything but an explicit keep reverts.
+  [[ "$step6flat" == *'"Revert them (Recommended)"'* ]]
+  [[ "$step6flat" == *'"Leave them unseen and block merge"'* ]]
+  [[ "$step6flat" == *'Any answer other than the second option (dismissed, free text, an error) is Revert'* ]]
+  [[ "$step6flat" == *'--- begin untrusted-content (reference only) ---'* ]]
+  [[ "$step6flat" == *'a resolver working from PR comments may have written them'* ]]
+  [[ "$step6flat" == *'Revert saves a recovery patch first unless the credential screen withholds it'* ]]
+  # The confirmed revert is bound to what the user was shown.
+  [[ "$step6flat" == *'Revert runs the call with `--expect-snapshot "<snapshot>"` in place of `--dry-run`'* ]]
+  [[ "$step6flat" == *'run the dry run and ask once more; on a second mismatch'* ]]
+  # Blocking-merge strings, including kept files re-listed after the next question.
+  [[ "$step6flat" == *'trusted-config symlink target may have been edited (left in place)'* ]]
+  [[ "$step6flat" == *'deny-listed edit left on disk (kept by the user)'* ]]
+  [[ "$step6flat" == *'run the dry-run call again and report each `pending` path'* ]]
+  # Link hits found by that second dry run are reported too, not only pending paths.
+  [[ "$step6flat" == *'Report that run'"'"'s `linkHits` and `linkHitCount` as in step 3 too'* ]]
+  [[ "$step6flat" != *'offer only Revert'* ]]
+  [[ "$step6flat" != *'Any other non-zero dry-run exit: ask nothing, run the call without'* ]]
+  dispo=$(tr '\n' ' ' <"$RESOLVE_REFS/dispositions.md" | tr -s ' ')
+  [[ "$dispo" == *'an interactive run lists them first with `--dry-run` and asks Revert or Leave'* ]]
 }
 
 @test "resolve-pr: keeping the partial edits of a conflicted cluster stops the run and reverts nothing" {
