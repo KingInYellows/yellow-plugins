@@ -1024,6 +1024,23 @@ describe('validate-council-roster', () => {
       expect(run(root).status).toBe(0);
     });
 
+    it('still walks a .ruvector directory below the root', () => {
+      writeFixture(root);
+      stamp(root);
+      writeFile(
+        root,
+        'plugins/yellow-council/.ruvector/notes.md',
+        '# notes\n\nCouncil uses Codex, Gemini and OpenCode.\n'
+      );
+
+      const r = run(root);
+      expect(r.status).not.toBe(0);
+      // Failing for the nested copy itself, not for an unrelated reason.
+      expect(r.stdout + r.stderr).toContain(
+        'plugins/yellow-council/.ruvector/notes.md'
+      );
+    });
+
     it('reports an unreadable file instead of dropping it from the ledger', () => {
       writeFixture(root);
       writeFile(
