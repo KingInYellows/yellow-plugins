@@ -458,21 +458,45 @@ S_BOUND=""
 WT_MARK=yellow-core-restack-run
 
 # bind_worktree PATH: write the run id into PATH's own git directory, through a
-# temp file and a rename (a planted symlink is replaced, never followed). The
-# main worktree, whose git directory is the common one and which cannot be
-# removed, needs none.
+# temp file and a rename (a planted symlink is replaced, never followed), then
+# read it back. The main worktree (listed first), whose git directory is the
+# common one and which cannot be removed, needs none. On success a written
+# file is added to BOUND_FILES; on failure BIND_GD names the git directory
+# (empty when git could not name it).
+BOUND_FILES=() BIND_GD=""
 bind_worktree() {
-  local gd tmp
+  local gd tmp wi
+  BIND_GD=""
+  wi=$(wt_index "$1")
+  [ "$wi" -ge 0 ] || return 1
   gd=$(git -C "$1" rev-parse --absolute-git-dir 2>/dev/null) || return 1
   gd=$(canon "$gd") || return 1
-  [ "$gd" != "$COMMON" ] || return 0
+  BIND_GD=$gd
+  if [ "$gd" = "$COMMON" ]; then
+    [ "$wi" -eq 0 ]
+    return
+  fi
   [ ! -d "$gd/$WT_MARK" ] || return 1
   tmp=$(umask 077 && mktemp "$gd/$WT_MARK.tmp.XXXXXX") || return 1
-  if printf '%s\n' "$S_RUNID" >|"$tmp" && mv -f -- "$tmp" "$gd/$WT_MARK"; then
-    return 0
+  if ! { printf '%s\n' "$S_RUNID" >|"$tmp" && mv -f -- "$tmp" "$gd/$WT_MARK"; }; then
+    rm -f -- "$tmp"
+    return 1
   fi
-  rm -f -- "$tmp"
-  return 1
+  BOUND_FILES+=("$gd/$WT_MARK")
+  [ -f "$gd/$WT_MARK" ] && [ ! -L "$gd/$WT_MARK" ] &&
+    [ "$(head -c 64 -- "$gd/$WT_MARK" 2>/dev/null)" = "$S_RUNID" ]
+}
+
+# unbind_worktrees: remove each binding this start wrote that still holds its
+# run id (a start that refuses leaves nothing behind).
+unbind_worktrees() {
+  local f
+  for f in "${BOUND_FILES[@]+"${BOUND_FILES[@]}"}"; do
+    if [ -f "$f" ] && [ ! -L "$f" ] && [ "$(head -c 64 -- "$f" 2>/dev/null)" = "$S_RUNID" ]; then
+      rm -f -- "$f"
+    fi
+  done
+  BOUND_FILES=()
 }
 
 clear_state() { rm -f -- "$STATE_FILE" "$STATE_FILE".tmp.* "$ABORTED_FILE" "$ABORTED_FILE".tmp.* 2>/dev/null; }
@@ -1520,9 +1544,11 @@ cmd_start() {
     done
   fi
   # Bind every recorded worktree to this run, so a later abort never takes a
-  # worktree registered again at a recorded path for this run's. When one
-  # cannot be bound the state stays unbound and is probed as before.
+  # worktree registered again at a recorded path for this run's. One that
+  # cannot be bound stops the start before the provider runs: an unbound state
+  # would silently lose the replacement check.
   S_BOUND=1
+  BOUND_FILES=()
   for ((i = 0; i < ${#E_PATH[@]} + ${#O_PATH[@]} + 1; i++)); do
     if [ "$i" -eq 0 ]; then
       k=$S_RUN
@@ -1532,12 +1558,20 @@ cmd_start() {
       k=${O_PATH[i - 1 - ${#E_PATH[@]}]}
     fi
     bind_worktree "$k" || {
-      S_BOUND=""
-      break
+      unbind_worktrees
+      release_lock
+      err "cannot bind the worktree $(v "$k") to this restack; nothing was changed"
+      if [ -n "$BIND_GD" ]; then
+        err "fix: make $(v "$BIND_GD") writable and remove anything at $(v "$BIND_GD/$WT_MARK"), then run start again"
+      else
+        err "fix: check $(v "$k") with git -C $(q "$k") status, then run start again"
+      fi
+      exit "$X_FAILED"
     }
   done
   rm -f -- "$ABORTED_FILE" 2>/dev/null
   write_state || {
+    unbind_worktrees
     release_lock
     die "$X_FAILED" "could not write the state file"
   }
@@ -1670,8 +1704,12 @@ worktree_in_chain_rebase() {
     case $d in /*) ;; *) d=$gd/$d ;; esac
     [ "$(canon_or_raw "${d%/*}")" = "$1" ] || return 1
     if [ "${S_BOUND:-}" = 1 ] && [ "${2:-}" != any ]; then
-      [ -f "$gd/$WT_MARK" ] && [ ! -L "$gd/$WT_MARK" ] || return 1
-      [ "$(head -c 64 -- "$gd/$WT_MARK" 2>/dev/null)" = "$S_RUNID" ] || return 1
+      # No binding there: another worktree, not this run's. A binding that
+      # cannot be read is not proof either way: fail closed.
+      if [ ! -e "$gd/$WT_MARK" ] && [ ! -L "$gd/$WT_MARK" ]; then return 1; fi
+      [ -f "$gd/$WT_MARK" ] && [ ! -L "$gd/$WT_MARK" ] && [ -r "$gd/$WT_MARK" ] || return 2
+      d=$(head -c 64 -- "$gd/$WT_MARK" 2>/dev/null) || return 2
+      [ "$d" = "$S_RUNID" ] || return 1
     fi
   fi
   merge=${l[3]} apply=${l[4]}
@@ -1728,8 +1766,12 @@ wt_replaced() {
   d=$(cat -- "$gd/gitdir" 2>/dev/null) || return 0
   case $d in /*) ;; *) d=$gd/$d ;; esac
   [ "$(canon_or_raw "${d%/*}")" = "$1" ] || return 0
-  [ -f "$gd/$WT_MARK" ] && [ ! -L "$gd/$WT_MARK" ] || return 0
-  [ "$(head -c 64 -- "$gd/$WT_MARK" 2>/dev/null)" = "$S_RUNID" ] && return 1
+  # Only a regular, readable binding holding this run's id (never empty: a
+  # bound state has a validated run id) confirms the worktree; a read error
+  # is never a match.
+  [ -f "$gd/$WT_MARK" ] && [ ! -L "$gd/$WT_MARK" ] && [ -r "$gd/$WT_MARK" ] || return 0
+  d=$(head -c 64 -- "$gd/$WT_MARK" 2>/dev/null) || return 0
+  [ -n "$S_RUNID" ] && [ "$d" = "$S_RUNID" ] && return 1
   return 0
 }
 

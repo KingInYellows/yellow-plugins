@@ -2004,6 +2004,54 @@ legacy_tipless() {
   rebase_marker "$(wtp c)"
 }
 
+@test "start refuses and leaves nothing behind when a recorded worktree cannot be bound" {
+  mk_stack b
+  tip_b=$(git rev-parse b) tip_c=$(git rev-parse c)
+  gd_a=$(git -C "$(wtp a)" rev-parse --absolute-git-dir)
+  gd_b=$(git -C "$(wtp b)" rev-parse --absolute-git-dir)
+  gd_c=$(git -C "$(wtp c)" rev-parse --absolute-git-dir)
+  # A directory where c's binding goes: the rename cannot replace it.
+  mkdir "$gd_c/yellow-core-restack-run"
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 30 ]
+  [[ $output == *"cannot bind the worktree $(wtp c) to this restack; nothing was changed"* ]]
+  [[ $output == *"fix: make $gd_c writable and remove anything at $gd_c/yellow-core-restack-run"* ]]
+  [ ! -e "$SD/state" ]
+  [ ! -e "$SD/lock.d" ]
+  # Bindings already written for this start are removed again.
+  [ ! -e "$gd_a/yellow-core-restack-run" ]
+  [ ! -e "$gd_b/yellow-core-restack-run" ]
+  # The provider never ran: nothing detached or restacked.
+  [ "$(branch_of "$(wtp b)")" = b ]
+  [ "$(branch_of "$(wtp c)")" = c ]
+  [ "$(git rev-parse b)" = "$tip_b" ]
+  [ "$(git rev-parse c)" = "$tip_c" ]
+}
+
+@test "a binding that is a symlink or holds more than the run id never confirms a worktree" {
+  mk_stack b
+  run bash "$SCRIPT" start --provider graphite
+  [ "$status" -eq 10 ]
+  gd_c=$(git -C "$(wtp c)" rev-parse --absolute-git-dir)
+  id=$(sed -n 's/^runid\t//p' "$SD/state")
+  printf '%s\n' "$id" >"$T/id-elsewhere"
+  rm -f "$gd_c/yellow-core-restack-run"
+  ln -s "$T/id-elsewhere" "$gd_c/yellow-core-restack-run"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [[ $output == *"$(wtp c) cannot be confirmed as the worktree this run recorded"* ]]
+  [ -e "$SD/state" ]
+  rm -f "$gd_c/yellow-core-restack-run"
+  printf '%sextra\n' "$id" >"$gd_c/yellow-core-restack-run"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 31 ]
+  [ -e "$SD/state" ]
+  printf '%s\n' "$id" >|"$gd_c/yellow-core-restack-run"
+  run bash "$SCRIPT" abort --provider graphite
+  [ "$status" -eq 0 ]
+  [ ! -e "$SD/state" ]
+}
+
 @test "--abort never checks out a run worktree registered again at the recorded path" {
   mk_stack b
   run bash "$SCRIPT" start --provider graphite

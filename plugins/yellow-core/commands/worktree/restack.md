@@ -203,7 +203,10 @@ branch). Then it restores. Every worktree it stops on is named with a fix line.
   When a recorded path now holds a worktree without it (removed and
   registered again, or its `.git` link changed), `--continue`, `--abort` and
   `restore` change nothing and keep the state (exit `31`); `status` lists it
-  as `replaced`. Move or remove that worktree, then run again.
+  as `replaced`. Move or remove that worktree, then run again. When start
+  cannot bind one (its git directory is not writable, or something sits at the
+  binding path), it changes nothing, leaves no state and exits `30` with a fix
+  line.
 - **Stuck or unreadable.** The state is kept (exit `31`) and nothing restored
   when a recorded worktree's rebase will not clear (run
   `git -C <worktree> rebase --abort` there to see git's error) or its git

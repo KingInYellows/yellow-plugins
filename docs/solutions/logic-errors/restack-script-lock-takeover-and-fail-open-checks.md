@@ -182,7 +182,11 @@ than the evidence behind it.
   runs before `--continue`, `--abort` and `restore` touch any recorded path
   (checkout, reset, lock, unlock, rebase --abort, provider calls) and keeps
   the state (exit 31). Put a binding check at the entry of every mutating
-  command, not at each call site.
+  command, not at each call site. A third review found `start` fell back to
+  an unbound (legacy) state when a binding could not be written, silently
+  dropping the check; it now refuses (exit 30), removes the bindings it wrote
+  and leaves no state, and a binding that cannot be read is never a match.
+  A safety marker that cannot be written must stop the run, not downgrade it.
 - **Found while testing.** A deleted github owner still listed on its branch
   read as busy in `in_chain_busy`; worktrees git reports prunable or whose
   directory is gone are now skipped there.
