@@ -106,9 +106,10 @@ superseded: finding ids are now assigned in shell by
 `council_extract_citations` (5b), not by the Pass A prompt; flip detection is
 still prompt-level.
 
-12. **Pass the plugin dir to the library from the fence.** Fences derive
-    `COUNCIL_PLUGIN_DIR` from the substituted `COUNCIL_SYNTH_LIB` path;
-    `lib/council-synthesis.sh` prefers it over `CLAUDE_PLUGIN_ROOT`. See
+12. **Hand the library its own substituted path.** Fences set
+    `COUNCIL_SYNTH_LIB` from the substituted `${CLAUDE_PLUGIN_ROOT}` text and
+    source it by that name; `lib/council-synthesis.sh` derives its plugin
+    directory from it, preferring it over `CLAUDE_PLUGIN_ROOT`. See
     `docs/solutions/code-quality/cross-plugin-shared-skill-pattern.md`.
 13. **Per-finding versus group-best correctness.** Pass A uses each finding's
     own result; only the 5e bucket uses the group best. Mixing them prints

@@ -14,7 +14,7 @@ bats_require_minimum_version 1.7.0
 
 setup() {
   load 'lib/extract-redaction-awk'
-  load 'lib/extract-synthesis-lib'
+  load 'lib/extract-council-fences'
   REPO_ROOT="$(repo_root)"
   PLUGIN_DIR="${REPO_ROOT}/plugins/yellow-council"
   COUNCIL_MD="${PLUGIN_DIR}/commands/council/council.md"

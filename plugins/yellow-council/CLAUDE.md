@@ -204,7 +204,8 @@ Codex agent.)
   label, fence, citation extraction, evidence verification, buckets). Tier 4
   dual-shell, sourced by the 5b and 5e fences.
 - `lib/fuzzy-ratio.py` — the Tier 2 scorer (stdlib plus `rapidfuzz`; exits 3
-  when rapidfuzz is missing). Reads JSONL on stdin, touches no files.
+  when rapidfuzz is missing). Reads the redacted `Q`/`L` tab-separated
+  stream on stdin, normalizes it itself, touches no files.
 
 ### Skills (1)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Extraction helpers for the council test suites.
+# Fence and marker extraction helpers for the council test suites.
 #
 # `extract_marked_lib <file> <outfile> <marker-name>` cuts a marker-delimited
 # helper block out of commands/council/council.md (council-quota-lib in Step 4,

@@ -373,12 +373,11 @@ could therefore mark every finding `verifier-error`. The bats suites exported
 `CLAUDE_PLUGIN_ROOT` themselves, so CI stayed green; the architecture review
 found it.
 
-**Fix** (commit `1e441bc98`): each fence that sources the library derives the
-plugin directory from the substituted library path,
-`COUNCIL_PLUGIN_DIR="${COUNCIL_SYNTH_LIB%/lib/council-synthesis.sh}"`; the
-library reads `COUNCIL_PLUGIN_DIR` first and `CLAUDE_PLUGIN_ROOT` only as a
-fallback; a test runs against a cache-shaped tree with `CLAUDE_PLUGIN_ROOT`
-unset.
+**Fix** (commit `1e441bc98`, simplified in the review-ledger pass): each
+fence sources the library by its substituted path, `COUNCIL_SYNTH_LIB`, and
+the library's `_council_plugin_dir` strips `/lib/council-synthesis.sh` from
+that path, using `CLAUDE_PLUGIN_ROOT` only as a fallback; a test runs against
+a cache-shaped tree with `CLAUDE_PLUGIN_ROOT` unset.
 
 **Prevention:**
 

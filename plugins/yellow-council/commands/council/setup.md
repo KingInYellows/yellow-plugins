@@ -65,7 +65,6 @@ fi
 command -v iconv >/dev/null 2>&1 \
   || printf '[yellow-council] Warning: iconv not found — Tier 1 evidence checks fall back to Tier 2\n' >&2
 COUNCIL_SYNTH_LIB="${CLAUDE_PLUGIN_ROOT}/lib/council-synthesis.sh"
-COUNCIL_PLUGIN_DIR="${COUNCIL_SYNTH_LIB%/lib/council-synthesis.sh}"
 if [ -f "$COUNCIL_SYNTH_LIB" ] && [ ! -L "$COUNCIL_SYNTH_LIB" ] && . "$COUNCIL_SYNTH_LIB"; then
   if ! council_core_lib lib/validate-fs.sh >/dev/null || ! council_core_lib lib/compound-staging.sh >/dev/null; then
     printf '[yellow-council] Warning: yellow-core validate-fs.sh / compound-staging.sh not found — every finding will be unverified (verifier-error)\n' >&2

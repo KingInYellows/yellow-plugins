@@ -6,7 +6,7 @@
 # extracted from commands/council/council.md, end to end.
 #
 # The library is sourced directly; the fences are extracted
-# (lib/extract-synthesis-lib.bash) and run with CLAUDE_PLUGIN_ROOT pointing at
+# (lib/extract-council-fences.bash) and run with CLAUDE_PLUGIN_ROOT pointing at
 # this plugin, so they source the same library. Everything runs under every
 # shell profile the Bash tool can use — bash, zsh, and zsh with common
 # interactive-snapshot options — and under every awk implementation found
@@ -17,7 +17,7 @@ bats_require_minimum_version 1.7.0
 
 setup() {
   load 'lib/extract-redaction-awk'
-  load 'lib/extract-synthesis-lib'
+  load 'lib/extract-council-fences'
   REPO_ROOT="$(repo_root)"
   PLUGIN_ROOT="${REPO_ROOT}/plugins/yellow-council"
   COUNCIL_MD="${PLUGIN_ROOT}/commands/council/council.md"
@@ -56,17 +56,39 @@ setup() {
 
 # run_in <profile> <awk-impl> <script-body> — source the library, then run
 # <script-body> under that shell profile with <awk-impl> first on PATH and
-# CLAUDE_PLUGIN_ROOT set, so an extracted fence sources the same library.
-run_in() {
-  local profile="$1" impl="$2" body="$3" script="${BATS_TEST_TMPDIR}/run-$1-$2.sh"
+# CLAUDE_PLUGIN_ROOT set. For library functions; fences use run_fence.
+run_in() { _run_shell 1 "$@"; }
+
+# run_fence <profile> <awk-impl> <script-body> — the same without sourcing the
+# library first, so a fence that stops sourcing it fails here instead of
+# finding the helpers already defined. CLAUDE_PLUGIN_ROOT is FENCE_PLUGIN_ROOT
+# when set (see stub_library), else this plugin.
+run_fence() { _run_shell 0 "$@"; }
+
+_run_shell() {
+  local presource="$1" profile="$2" impl="$3" body="$4" script="${BATS_TEST_TMPDIR}/run-$2-$3.sh"
   local -a cmd
   case "$profile" in
     bash) cmd=(bash --norc --noprofile) ;;
     zsh) cmd=(zsh -f) ;;
     zsh-snapshot) cmd=(zsh -f -o noclobber -o extendedglob -o rcquotes -o nocaseglob) ;;
   esac
-  printf '. "%s"\n%s\n' "$LIB" "$body" >| "$script"
-  run --separate-stderr env PATH="${SHIM_ROOT}/${impl}:${PATH}" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" "${cmd[@]}" "$script"
+  if [ "$presource" = 1 ]; then
+    printf '. "%s"\n%s\n' "$LIB" "$body" >| "$script"
+  else
+    printf '%s\n' "$body" >| "$script"
+  fi
+  run --separate-stderr env PATH="${SHIM_ROOT}/${impl}:${PATH}" \
+    CLAUDE_PLUGIN_ROOT="${FENCE_PLUGIN_ROOT:-$PLUGIN_ROOT}" "${cmd[@]}" "$script"
+}
+
+# stub_library <shell-text> — a plugin root whose library is the real one with
+# <shell-text> appended (the later definition wins), for a fence that must
+# source the library itself. Sets FENCE_PLUGIN_ROOT.
+stub_library() {
+  FENCE_PLUGIN_ROOT="${BATS_TEST_TMPDIR}/stub-plugin"
+  mkdir -p "$FENCE_PLUGIN_ROOT/lib"
+  { cat "$LIB"; printf '%s\n' "$1"; } >| "$FENCE_PLUGIN_ROOT/lib/council-synthesis.sh"
 }
 
 # --- Library layout ------------------------------------------------------
@@ -349,6 +371,7 @@ BUCKET S3-F1 | Disagreement | correctness=verified | reason=-
 BUCKET S3-F2 | Unverified Claims | correctness=verified | reason=pass-a-malformed
 BUCKET S1-F3 | Single-Reviewer Findings (verified) | correctness=verified | reason=-
 BUCKET S4-F1 | Unverified Claims | correctness=unverified | reason=pass-a-missing
+BUCKET_TOTALS verified=3 fuzzy-verified=1 unverified=4 reasons=no-match:1,no-evidence:2,pass-a-malformed:1,pass-a-missing:1
 EOF
   local profile impl
   for profile in $PROFILES; do
@@ -387,7 +410,8 @@ EOF
     [ "$output" = "$(printf '%s\n' \
       'BUCKET S1-F1 | Single-Reviewer Findings (verified) | correctness=verified | reason=-' \
       'BUCKET S2-F1 | Unverified Claims | correctness=unverified | reason=no-match' \
-      'BUCKET S3-F1 | Unverified Claims | correctness=verified | reason=pass-a-malformed')" ] \
+      'BUCKET S3-F1 | Unverified Claims | correctness=verified | reason=pass-a-malformed' \
+      'BUCKET_TOTALS verified=2 fuzzy-verified=0 unverified=1 reasons=no-match:1,pass-a-malformed:1')" ] \
       || { echo "$profile: $output"; return 1; }
     [[ "$stderr" == *"group G1 does not cite one file within 6 lines"* ]]
   done
@@ -406,7 +430,7 @@ EOF
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' S1-F1 a.js 3 verified 1 - S2-F1 a.js 3 unverified 2 no-match \
       S3-F1 b.js 1 unverified - no-evidence
   } >| "$vt"
-  run_in bash "$FIRST_AWK" "council_bucket_lines '$pa' '$vt' | tee '$BATS_TEST_TMPDIR/b.txt'; council_bucket_totals < '$BATS_TEST_TMPDIR/b.txt'"
+  run_in bash "$FIRST_AWK" "council_bucket_lines '$pa' '$vt'"
   [ "$status" -eq 0 ]
   [ "$output" = "$(printf '%s\n' \
     'BUCKET S1-F1 | Agreement (verified) | correctness=verified | reason=-' \
@@ -416,7 +440,12 @@ EOF
     || { echo "$output"; return 1; }
   printf '%s\n' '| claim | ruling |' '|---|---|' '| x | upheld |' >| "$pa"
   run_in bash "$FIRST_AWK" "council_bucket_lines '$pa' '$vt'"
-  [[ "$stderr" == *"no header row with id, group and conflict columns"* ]]
+  [[ "$stderr" == *"pass-a.md has no table with id, group and conflict columns"* ]]
+  [ "$(printf '%s\n' "$stderr" | grep -c 'Warning: pass-a.md')" -eq 1 ]
+  # A header with no id rows gets the same single diagnostic.
+  printf '%s\n' '| id | group | conflict |' '|---|---|---|' >| "$pa"
+  run_in bash "$FIRST_AWK" "council_bucket_lines '$pa' '$vt'"
+  [ "$(printf '%s\n' "$stderr" | grep -c 'Warning: pass-a.md has no table')" -eq 1 ]
 }
 
 @test "5b writes a sanitized verifier-error table when the verifier fails, and 5e still prints BUCKET lines when bucketing fails" {
@@ -433,14 +462,16 @@ EOF
   [ "$status" -eq 0 ]
   SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
   sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
-  # The library is pre-sourced, so the fence's own source is a no-op and the
-  # stub stands in for the verifier.
-  run_in bash "$FIRST_AWK" "cd '$REPO' && council_verify_findings() { return 7; } && . '$s5b.sub'"
+  # The fence sources a copy of the library whose verifier fails.
+  stub_library 'council_verify_findings() { return 7; }'
+  run_fence bash "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
   [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
   [[ "$stderr" == *"evidence verification failed (exit 7)"* ]]
   grep -q '^# reference data only' "$SD/verification.tsv"
   grep -q $'\tsrc/a?x?.ts\t3\tunverified\t-\tverifier-error$' "$SD/verification.tsv" || { cat "$SD/verification.tsv"; return 1; }
-  run_in bash "$FIRST_AWK" "cd '$REPO' && council_bucket_lines() { return 1; } && . '$s5e'"
+  stub_library 'council_bucket_lines() { return 1; }'
+  run_fence bash "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
+  unset FENCE_PLUGIN_ROOT
   [ "$status" -eq 0 ]
   [[ "$stderr" == *"bucket assignment failed"* ]]
   [[ "$output" == *"| Unverified Claims | correctness=unverified | reason=bucket-failed"* ]]
@@ -825,7 +856,7 @@ teardown() {
     printf '%s\n' 'Codex overall summary' >| "$SD/codex.summary.txt"
     sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
     # 5b derives MODE from $ARGUMENTS, as every fence does.
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && ARGUMENTS=review && . '$s5b.sub'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && ARGUMENTS=review && . '$s5b.sub'"
     [ "$status" -eq 0 ] || { echo "$profile 5b: $stderr"; return 1; }
     local out5b="$output"
     # The map never reaches stdout; only the file pointers do.
@@ -875,7 +906,7 @@ teardown() {
       printf '|---|---|---|---|---|---|---|---|---|---|---|---|\n'
       printf '%s\n' "$ids" | awk '{ printf "| %s | G%d | 1 | no | x | verified | holds | calibrated | holds | well-supported | upheld | HIGH |\n", $1, NR }'
     } >| "$SD/pass-a.md"
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
     [ "$status" -eq 0 ] || { echo "$profile 5e: $stderr"; return 1; }
     # The map, then one BUCKET line per verification row: both citations are
     # bad, so both are Unverified Claims whatever pass-a.md claimed.
@@ -900,7 +931,7 @@ teardown() {
     write_synth_state "$SD" "$TOKEN"
     rm -f "$GF"   # gemini voted APPROVE but its file is gone
     sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
     [ "$status" -eq 0 ] || { echo "$profile: $stderr"; return 1; }
     [[ "$stderr" == *"(gemini) text unavailable"* ]] || { echo "$profile: $stderr"; return 1; }
     grep -q '^(reviewer text unavailable: fenced output file missing or not a regular file' "$SD/forward.txt"
@@ -911,7 +942,7 @@ teardown() {
     printf '%s\n' "$TOKEN" >| "$SD/.token"
     write_synth_state "$SD" "$TOKEN"
     cp "$s5b" "$s5b.sub"
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
     [ "$status" -ne 0 ]
     [[ "$stderr" == *"CLAUDE_FENCED_FILE placeholder was not substituted"* ]]
     [ ! -e "$SD" ]
@@ -932,13 +963,13 @@ teardown() {
     TOKEN=0123456789abcdef0123456789abcdef
     write_synth_state "$SD" "$TOKEN"
     sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
     [ "$status" -ne 0 ]
     [[ "$stderr" == *"not the one Step 5a minted"* ]] || { echo "$profile 5b: $stderr"; return 1; }
     [ -d "$SD" ]
     [ -f "$SD/.token" ]
     [ -f "$SD/labels.txt" ]
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
     [ "$status" -ne 0 ]
     [[ "$stderr" == *"not the one Step 5a minted"* ]] || { echo "$profile 5e: $stderr"; return 1; }
     [[ "$output" != *COUNCIL_LABEL_MAP* ]]
@@ -972,7 +1003,7 @@ teardown() {
     # Whatever the orchestrator might try to inject (env vars, arguments,
     # edited literals) cannot name the attacker dir: the fences read the state file.
     sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && SYNTH_DIR='$EVIL' SYNTH_TOKEN='$BAD' COUNCIL_SYNTH_DIR='$EVIL' . '$s5b.sub'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && SYNTH_DIR='$EVIL' SYNTH_TOKEN='$BAD' COUNCIL_SYNTH_DIR='$EVIL' . '$s5b.sub'"
     [ "$status" -eq 0 ] || { echo "$profile 5b: $stderr"; return 1; }
     [[ "$output" == *"COUNCIL_SYNTH_FORWARD=$SD/forward.txt"* ]]
     [[ "$output" != *"$EVIL"* ]]
@@ -983,7 +1014,7 @@ teardown() {
     [ "$status" -eq 0 ] || { echo "$profile 5d: $stderr"; return 1; }
     [[ "$output" == *"| F1 | y |"* ]]
     [[ "$output" != *"| F1 | x |"* ]]
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && SYNTH_DIR='$EVIL' SYNTH_TOKEN='$BAD' . '$s5e'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && SYNTH_DIR='$EVIL' SYNTH_TOKEN='$BAD' . '$s5e'"
     [ "$status" -eq 0 ] || { echo "$profile 5e: $stderr"; return 1; }
     [ ! -e "$SD" ]
     [ ! -e "$REPO/.git/council-synth.state" ]
@@ -1319,7 +1350,7 @@ cancel_script() {
     # A read-only staging dir: the first rm -rf cannot unlink the files inside
     # it. The block must not restore the mode for the test; it repairs it.
     chmod 555 "$SD"
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
     [ "$status" -eq 0 ] || { echo "$profile 5e: $stderr"; return 1; }
     [ "$output" = "COUNCIL_LABEL_MAP=S1:claude,S2:codex,S3:gemini,S4:opencode" ]
     [[ "$stderr" != *"could not remove"* ]] || { echo "$profile: $stderr"; return 1; }
@@ -1345,7 +1376,7 @@ cancel_script() {
     printf 'S1:claude,S2:codex,S3:gemini,S4:opencode\n' >| "$SD/labels.txt"
     chmod 555 "$SD"
     # A chmod that fails stands in for a repair the filesystem refuses.
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && chmod() { return 1; } && . '$s5e'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && chmod() { return 1; } && . '$s5e'"
     # The directory is still there as the block left it; restore access only
     # to assert on it and let teardown clean up.
     [ -d "$SD" ]
@@ -1678,7 +1709,7 @@ check_state_cleanup() {
     [ "$status" -eq 0 ] || { rm -f "$AF"; echo "$profile 5a: $stderr"; return 1; }
     SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
     sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
     rm -f "$AF"
     [ "$status" -eq 0 ] || { echo "$profile 5b: $stderr"; return 1; }
     grep -qxF '(excluded: ERROR) Status detail: agy auth expired' "$SD/forward.txt"
@@ -1770,7 +1801,7 @@ EOF2
     SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
     printf '%s\n' 'CLI not installed.' >| "$SD/gemini.summary.txt"
     sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
     [ "$status" -eq 0 ] || { echo "$profile 5b: $stderr"; return 1; }
     grep -qxF '(excluded: UNAVAILABLE) Status detail: CLI not installed.' "$SD/forward.txt"
     [ ! -e "$SD/gemini.summary.txt" ]
@@ -1793,7 +1824,7 @@ EOF2
     SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
     printf '%s\n' 'Gemini quota exhausted — resets in 3h' >| "$SD/gemini.summary.txt"
     sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" "$s5b" >| "$s5b.sub"
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5b.sub'"
     [ "$status" -eq 0 ] || { echo "$profile 5b: $stderr"; return 1; }
     # Excluded, with the staged ETA as the status detail, and no refusal noise.
     grep -q '(excluded: QUOTA_EXHAUSTED) Status detail: .*quota exhausted — resets in 3h' "$SD/forward.txt" \
@@ -1886,7 +1917,7 @@ EOF2
   write_synth_state "$SD" "$TOKEN"
   chmod 555 "$SD"
   # CLAUDE_FENCED_FILE left unsubstituted: council_synth_abort runs.
-  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s5b'"
+  run_fence bash "$FIRST_AWK" "cd '$REPO' && . '$s5b'"
   [ "$status" -ne 0 ]
   [[ "$stderr" != *"could not remove"* ]] || { echo "$stderr"; return 1; }
   [ ! -e "$SD" ]
@@ -1904,7 +1935,7 @@ EOF2
   write_synth_state "$SD" "$TOKEN"
   chmod 555 "$SD"
   # A chmod that fails stands in for a repair the filesystem refuses.
-  run_in bash "$FIRST_AWK" "cd '$REPO' && chmod() { return 1; } && . '$s5b'"
+  run_fence bash "$FIRST_AWK" "cd '$REPO' && chmod() { return 1; } && . '$s5b'"
   [ -d "$SD" ]
   chmod 755 "$SD"
   [ "$status" -ne 0 ]
@@ -1931,7 +1962,7 @@ EOF2
     [ "$status" -eq 0 ] || { echo "$profile 5a: $stderr"; return 1; }
     SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
     printf 'S1:claude,S2:codex,S3:gemini,S4:opencode\n' >| "$SD/labels.txt"
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
     [ "$status" -eq 0 ] || { echo "$profile 5e: $stderr"; return 1; }
     # 5e says this run's claim is released.
     [[ "$stderr" == *"released this run's synthesis state claim"* ]] || { echo "$profile: $stderr"; return 1; }
@@ -1994,7 +2025,7 @@ EOF2
   LIVE=$(mktemp -d /tmp/council-synth-XXXXXX)
   printf '%s\n' "$OTHER" >| "$LIVE/.token"
   write_synth_state "$LIVE" "$OTHER"
-  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
+  run_fence bash "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
   [ "$status" -ne 0 ]
   [[ "$output" != *COUNCIL_LABEL_MAP* ]]
   run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8'"
@@ -2009,7 +2040,7 @@ EOF2
   # directory's .token: 5e exits on the mismatch and Cancel leaves the file.
   cp "$tsv.bak" "$tsv"
   write_synth_state "$SD" "$BAD"
-  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
+  run_fence bash "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
   [ "$status" -ne 0 ]
   [[ "$stderr" == *"not the one Step 5a minted"* ]] || { echo "$stderr"; return 1; }
   [ -d "$SD" ]
@@ -2109,7 +2140,7 @@ assert_next_5a_claims() {
     # Normal path: the directory is removed while the state file is already gone.
     : >| "$log"
     write_rm_stub "${BATS_TEST_TMPDIR}/rm-stub.sh" record "$SD" "$st" "$log"
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '${BATS_TEST_TMPDIR}/rm-stub.sh' && . '$s5e'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && . '${BATS_TEST_TMPDIR}/rm-stub.sh' && . '$s5e'"
     [ "$status" -eq 0 ] || { echo "$profile 5e: $stderr"; return 1; }
     [ "$output" = "COUNCIL_LABEL_MAP=S1:claude,S2:codex,S3:gemini,S4:opencode" ]
     [ "$(cat "$log")" = absent ] || { echo "$profile: state file still present at rm -rf: $(cat "$log")"; return 1; }
@@ -2127,7 +2158,7 @@ assert_next_5a_claims() {
     printf 'S1:claude,S2:codex,S3:gemini,S4:opencode\n' >| "$SD/labels.txt"
     : >| "$log"
     write_rm_stub "${BATS_TEST_TMPDIR}/rm-stub.sh" partial "$SD" "$st" "$log"
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '${BATS_TEST_TMPDIR}/rm-stub.sh' && . '$s5e'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && . '${BATS_TEST_TMPDIR}/rm-stub.sh' && . '$s5e'"
     [ "$status" -eq 0 ] || { echo "$profile 5e: $stderr"; return 1; }
     [ "$output" = "COUNCIL_LABEL_MAP=S1:claude,S2:codex,S3:gemini,S4:opencode" ]
     [[ "$stderr" == *"released this run's synthesis state claim"* ]] || { echo "$profile: $stderr"; return 1; }
@@ -2160,7 +2191,7 @@ assert_next_5a_claims() {
     : >| "$log"
     write_rm_stub "${BATS_TEST_TMPDIR}/rm-stub.sh" "$mode" "$SD" "$st" "$log"
     # CLAUDE_FENCED_FILE left unsubstituted: council_synth_abort runs.
-    run_in bash "$FIRST_AWK" "cd '$REPO' && . '${BATS_TEST_TMPDIR}/rm-stub.sh' && . '$s5b'"
+    run_fence bash "$FIRST_AWK" "cd '$REPO' && . '${BATS_TEST_TMPDIR}/rm-stub.sh' && . '$s5b'"
     [ "$status" -ne 0 ]
     [ "$(head -n 1 "$log")" = absent ] || { echo "$mode: state file still present at rm -rf"; return 1; }
     [ ! -e "$st" ]
@@ -2203,7 +2234,7 @@ head() {
 }
 EOF
   rm -f "${BATS_TEST_TMPDIR}/flipped"
-  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$head_stub' && . '$s5e'"
+  run_fence bash "$FIRST_AWK" "cd '$REPO' && . '$head_stub' && . '$s5e'"
   [ "$status" -eq 0 ] || { echo "5e: $stderr"; return 1; }
   [ "$output" = "COUNCIL_LABEL_MAP=S1:claude,S2:codex,S3:gemini,S4:opencode" ]
   [[ "$stderr" == *"leaving $st in place"* ]] || { echo "$stderr"; return 1; }
@@ -2253,7 +2284,7 @@ EOF
     run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5a'"
     [ "$status" -eq 0 ] || { echo "$profile 5a: $stderr"; return 1; }
     SD=$(printf '%s\n' "$output" | sed -n 's/^COUNCIL_SYNTH_DIR=//p')
-    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
+    run_fence "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s5e'"
     [ "$status" -ne 0 ]
     [[ "$output" != *COUNCIL_LABEL_MAP* ]]
     [ -d "$SD" ] && [ -f "$st" ]

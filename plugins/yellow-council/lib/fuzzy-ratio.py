@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """Tier 2 evidence scorer for /council (council_verify_findings).
 
-Reads JSONL on stdin, one row per finding: {"id", "quote", "lines": [...]},
-where the quote and the window lines are already redacted and
-whitespace-normalized. Writes one JSON object per row to stdout:
+Reads the caller's redacted stream on stdin, one tab-separated record per
+line: `Q<TAB>id<TAB>quote` or `L<TAB>id<TAB>window line` (anything after the
+second tab is text, tabs included). Text is normalized like quote-ground:
+[REDACTED:<type>] becomes [REDACTED], tabs become spaces, carriage returns go,
+space runs collapse to one, and the ends are trimmed. Records group by id; an
+id with no Q record is not scored, and its first Q record is its quote. Bytes
+that are not UTF-8 are kept distinct (surrogateescape), never merged by a
+lossy decode. Writes one JSON object per scored id to stdout:
 {"id", "score"} with score = max over the lines of fuzz.ratio, and of
 fuzz.partial_ratio too when the quote has at least 16 characters and is the
 needle: the line is at least as long as the quote and has 8 or more
@@ -22,6 +27,7 @@ Takes no arguments and touches no files. Exits 3 when rapidfuzz cannot be
 imported, so the caller can tell "skipped" from "failed".
 """
 import json
+import re
 import sys
 
 try:
@@ -37,6 +43,15 @@ CUTOFF = 85
 # sides, so a quote holding a broken "[REDACTED" cannot match it and counts
 # as ordinary text.
 PLACEHOLDER = "\ue000"
+
+
+REDACTED_TYPED = re.compile(r"\[REDACTED(:[^\]]*)?\]")
+
+
+def normalize(text):
+    text = REDACTED_TYPED.sub("[REDACTED]", text)
+    text = text.replace("\t", " ").replace("\r", "")
+    return re.sub(" +", " ", text).strip(" ")
 
 
 def canon(text):
@@ -66,22 +81,34 @@ def score(quote, lines):
     return best
 
 
-def main():
-    # Strict: the caller's jq always emits valid UTF-8, and a lossy decode
-    # could make distinct bytes compare equal. A decode error exits non-zero;
-    # rows already flushed keep their scores and the rest are verifier-error.
-    sys.stdin.reconfigure(encoding="utf-8", errors="strict")
-    for raw in sys.stdin:
-        raw = raw.strip()
-        if not raw:
+def read_rows(stream):
+    quotes = {}
+    lines = {}
+    order = []
+    for raw in stream:
+        parts = raw.rstrip("\n").split("\t", 2)
+        if len(parts) != 3 or parts[0] not in ("Q", "L"):
             continue
-        row = json.loads(raw)
-        quote = canon(row["quote"])
-        lines = [canon(line) for line in row["lines"]]
-        if compact_len(quote) < MIN_CHARS:
-            out = {"id": row["id"], "score": 0, "short": True}
+        tag, row_id, text = parts
+        if row_id not in lines:
+            lines[row_id] = []
+            order.append(row_id)
+        if tag == "Q":
+            quotes.setdefault(row_id, normalize(text))
         else:
-            out = {"id": row["id"], "score": score(quote, lines)}
+            lines[row_id].append(normalize(text))
+    return [(row_id, quotes[row_id], lines[row_id]) for row_id in order if row_id in quotes]
+
+
+def main():
+    sys.stdin.reconfigure(encoding="utf-8", errors="surrogateescape", newline="\n")
+    for row_id, quote, window in read_rows(sys.stdin):
+        quote = canon(quote)
+        window = [canon(line) for line in window]
+        if compact_len(quote) < MIN_CHARS:
+            out = {"id": row_id, "score": 0, "short": True}
+        else:
+            out = {"id": row_id, "score": score(quote, window)}
         sys.stdout.write(json.dumps(out) + "\n")
         sys.stdout.flush()
 
