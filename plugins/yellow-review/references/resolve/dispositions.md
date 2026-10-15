@@ -943,14 +943,23 @@ Resolve: <r> resolved, <f> fixed, <i> issues filed, <b> blocking, push=<ok|skipp
   own; `/review:resolve-stack` and `/review:sweep-all` read `verify=skipped` as
   the stop and end the walk or batch after that PR: restore the named files
   before running anything again.
-- The ignored-file guard skips three tool-owned paths it would otherwise
+- The ignored-file guard skips four tool-owned paths it would otherwise
   count on every run: yellow-ruvector's session log `.ruvector/coedit-sessions/`
   and pair store `.ruvector/coedit.json` (its PostToolUse hook rewrites them on
-  resolver edits), and vitest's run cache
-  `node_modules/.vite/vitest/results.json` at any depth. The two files are
+  resolver edits), its memory store `.ruvector/intelligence.json` (a linked
+  worktree shares it with the main checkout, so another session's MCP server
+  can save it mid-run), and vitest's run cache
+  `node_modules/.vite/vitest/results.json` at any depth. The three files are
   skipped only while they are regular files (a symlink there is still judged by
   its target). They are JSON data nothing executes; every other path under
-  `.ruvector/` or `node_modules/` still stops the run. Other test runs can
+  `.ruvector/` or `node_modules/` still stops the run. A changed memory store is
+  not proven to be tool-written, so `run-verify-command` prints a
+  `Note: .ruvector/intelligence.json ...` line on stderr, and Step 9 reports
+  `shared ruvector store changed during the run (not judged)` as a note. It
+  neither stops the run nor counts as blocking. Accepted residual: a resolver
+  edit to the store is no longer a stop. Recall output stays fenced as
+  untrusted, and the MCP server overwrites the file from memory at its next
+  save. Other test runs can
   still write ignored files (coverage, `*.tsbuildinfo`, pre-bundled deps), so
   run no project command between Step 3f's marker and Step 6's guard.
 - Issue dedupe follows every page of the viewer's issues, but the whole scan is

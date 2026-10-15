@@ -29,8 +29,10 @@
 #                  refuses, a dangling target does not, and a target that cannot
 #                  be examined refuses (fail closed). Skipped
 #                  while a regular file: .ruvector/coedit.json,
-#                  .ruvector/coedit-sessions/ and
-#                  node_modules/.vite/vitest/results.json at any depth;
+#                  .ruvector/coedit-sessions/,
+#                  .ruvector/intelligence.json (the memory store a linked
+#                  worktree shares; a change is named in a stderr Note line)
+#                  and node_modules/.vite/vitest/results.json at any depth;
 #                  everything else still refuses. A
 #                  marker that is missing, unreadable, a symlink or not a
 #                  regular file also refuses (fail closed), as does a listing
@@ -931,11 +933,20 @@ list_tree_changes() {
     rp_tree_changes "$CHANGES_FILE"
 }
 
+# The ignored-file guard skips the shared ruvector memory store; say so when it
+# changed, so the caller can report it.
+note_shared_store() {
+    if rp_shared_store_changed "$IGNORED_SINCE"; then
+        printf '[run-verify-command] Note: .ruvector/intelligence.json (the ruvector memory store, shared with other sessions) changed since the --ignored-since marker; not judged\n' >&2
+    fi
+}
+
 if [ "$MODE" = check-ignored ]; then
     IGNORED_SCRATCH=$(mktemp) || die 2 "mktemp failed"
     IGNORED_HITS=$(mktemp) || die 2 "mktemp failed"
     IGN_RC=0
     rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH" "$IGNORED_HITS" || IGN_RC=$?
+    note_shared_store
     case "$IGN_RC" in
         # No treeClean: this guard never looks at tracked or untracked-unignored
         # changes (the resolver edits are in the tree by design), so claiming
@@ -1304,6 +1315,7 @@ if [ "$MODE" = run ]; then
     IGN_RC=0
     rp_ignored_changed_since "$IGNORED_SINCE" "$IGNORED_SCRATCH" "$IGNORED_HITS" || IGN_RC=$?
     rm -f -- "$IGNORED_SCRATCH"
+    note_shared_store
     case "$IGN_RC" in
         0) ;;
         1) die 2 "gitignored files changed since the --ignored-since marker (a resolver may have edited an ignored executable); refusing to run: $(safe_path_list_z <"$IGNORED_HITS")" ;;

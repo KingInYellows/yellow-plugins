@@ -2289,12 +2289,20 @@ ignored_fixture() {
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
   [ "$status" -eq 0 ]
   [ "$(printf '%s' "$output" | jq -r .result)" = clean ]
+  [[ "$stderr" != *intelligence.json* ]]
+  # The shared memory store, saved by another session's MCP server: passes,
+  # and is named in a Note line.
+  printf '{"memories":[]}\n' >| .ruvector/intelligence.json
+  run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = clean ]
+  [[ "$stderr" == *"Note: .ruvector/intelligence.json"* ]]
   # Any other file under .ruvector/ is still the ignored-file stop.
-  printf 'new\n' >| .ruvector/intelligence.json
+  printf 'new\n' >| .ruvector/vectors.db
   run --separate-stderr "$SCRIPT" --pr 7 --check-ignored --ignored-since "$IGN_MARKER"
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"gitignored files changed since"* ]]
-  [[ "$stderr" == *".ruvector/intelligence.json"* ]]
+  [[ "$stderr" == *".ruvector/vectors.db"* ]]
   [[ "$stderr" != *coedit* ]]
 }
 
