@@ -97,11 +97,12 @@ resolution, and sequential stack review. Graphite-native workflow.
   (reconcile only), a Ledger line and a `Merge:` row (not ready while P0-P2
   ledger findings are pending) in its summary. Before `/review:pr` it
   snapshots `yellow-plugins.local.md` when this work tree ignores it, or when
-  the file is absent here and the fetched PR head ignores it; a config
-  tracked here but ignored on the PR head, or an existing untracked unignored
-  file there, aborts before the checkout, and an
-  unreadable PR head ignore rule set stops with exit 2 (neither prints a skip
-  line)
+  the file is absent here and the PR head ignores it (`head-ignore-probe`,
+  read through `gh api` at `headRefOid`). A config tracked here but ignored
+  on the PR head, an existing untracked unignored file there, or a head whose
+  rules the probe cannot judge for that PR (its exit 4) stops before the
+  checkout with a `Sweep: skipped (...)` line; a probe exit 3 (rate limit,
+  network, auth, a 403) stops with no skip line
 - `/review:sweep-all` — Run `/review:sweep` on every open non-draft PR you
   authored sequentially, with one upfront confirmation, skip-and-continue per
   PR, end-of-loop summary (with `Blocking` and `Residual` pending/attention
@@ -199,7 +200,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   rails and inline MIT attribution so the rules survive on hosts with no
   tool restriction (not user-invocable)
 
-### Scripts (13)
+### Scripts (14)
 
 - `get-pr-comments [--include-outdated] <owner/repo> <pr>` — Fetch unresolved
   PR review threads via GitHub GraphQL API (non-outdated only unless the flag
@@ -404,6 +405,17 @@ or parenthesis (`#!/bin/sh -c PATH=tools:/usr/bin;evil`).
 (`YR_ORIG_PATH`). Both scripts, and `lib/resolve-paths.sh` (sourced before the
 screen), take their own directory by parameter expansion, not `dirname`.
 
+- `head-ignore-probe <PR#>` — `/review:sweep` Step 1b: prints
+  `head=tracked|ignored|unignored` for `yellow-plugins.local.md` on the PR head,
+  read through `gh api` at `headRefOid` (root listing, `.gitignore` and
+  `.gitattributes` blobs written as data to a temp work tree, judged with this
+  clone's git dir and an empty index). It refuses a symlinked `.gitignore` or
+  `.gitattributes`, a case-only alias of the three root names, and a
+  content-transforming attribute on `.gitignore`. Failures print
+  `error=<class>`: exit 3 is systemic (`rate-limited` tested before any 403,
+  `auth`, `forbidden` for a 403 or a tree/blob 404, `network`, `local`), exit 4
+  is this PR only (`not-found` from `gh pr view`, `unreadable`, `symlink`, `case-alias`, `attributes`). The API
+  host and repository come from the PR's URL, passed as `gh api --hostname`.
 - `guard-local-config snapshot | check <dir> <digest> | clear <dir>` — Snapshot the
   ignored `yellow-plugins.local.md` (printing the path and a `digest=<hex>`
   line the caller holds), then detect and restore a resolver edit

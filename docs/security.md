@@ -458,14 +458,27 @@ interactive run asks before filing an issue. The controls
 
 - **Local config guard.** `yellow-plugins.local.md` is gitignored per-user
   config that `guard-local-config` protects. `/review:sweep` snapshots it
-  before `/review:pr` and classifies the PR head's root `.gitignore` through a
-  temporary work tree (`check-ignore -q --no-index`); it aborts when the file
-  is tracked here but ignored on the head, and also when an untracked,
-  unignored `yellow-plugins.local.md` exists here (as a file or symlink,
-  including a dangling link) but the head ignores it, so those existing bytes
-  never become trusted unattended config (exit 1, before the checkout). It
-  fails closed (exit 2) when the head's rules cannot be read, including a
-  `.gitignore` that is not a regular file. Step 2b re-checks after checkout.
+  before `/review:pr` and classifies the PR head with `head-ignore-probe`,
+  which never fetches or checks out the head: it reads the head commit's root
+  listing and root `.gitignore` and `.gitattributes` blobs through `gh api`
+  at `headRefOid`, on the host and repository the PR's URL names. Those API
+  answers are untrusted data: they are written as plain files into a
+  temporary work tree and judged with this clone's git dir, `info/exclude`,
+  `core.excludesFile` and an empty index (`check-ignore -q --no-index`);
+  nothing from the head runs. The sweep aborts when the file is tracked here
+  but ignored on the head, and also when an untracked, unignored
+  `yellow-plugins.local.md` exists here (as a file or symlink, including a
+  dangling link) but the head ignores it, so those existing bytes never
+  become trusted unattended config (exit 1, before the checkout). Both
+  failure paths fail closed, before any snapshot or checkout. A head the
+  probe cannot judge for that PR (its exit 4: the PR not found, a malformed or
+  truncated answer, a `.gitignore` or `.gitattributes` that is a symlink or
+  not a regular file, a root name that may case-fold onto one of the three
+  files, or a content-transforming attribute on `.gitignore`) skips only that
+  PR with `Sweep: skipped (head-ignore-unreadable)`, and `/review:sweep-all`
+  continues. A systemic failure (exit 3: rate limit, auth, an HTTP 403 or a
+  404 from the tree or blob read, network or timeout, or a local git failure) prints no skip line, so
+  `/review:sweep-all` stops the batch. Step 2b re-checks after checkout.
 
 ### Unattended Review Learning Staging (yellow-review / yellow-core)
 

@@ -232,17 +232,33 @@ For each iteration:
 
    ```bash
    OUT=$(gh pr view <PR#> --json state -q .state 2>&1) && RC=0 || RC=$?
-   if [ "$RC" -eq 0 ]; then
-     printf 'state=%s exit=0 ratelimited=0\n' "$OUT"
-   elif printf '%s' "$OUT" | grep -qiE 'rate limit|abuse|HTTP 429'; then
-     printf 'state=unreadable exit=%s ratelimited=1\n' "$RC"
-   else
+   RL=0 CAUSE=""
+   classify() {
+     RL=0 CAUSE=""
+     [ "$RC" -ne 0 ] || return 0
+     if printf '%s' "$OUT" | grep -qiE 'rate limit|abuse|HTTP 429'; then RL=1; return 0; fi
      case $(printf '%s' "$OUT" | tr 'A-Z' 'a-z') in
        *timeout*|*'timed out'*|*connect*|*network*|*proxy*|*tls*|*dns*|*'could not resolve host'*) CAUSE='network error' ;;
        *'http 401'*|*'http 403'*|*'gh auth login'*|*'bad credentials'*|*authenticat*) CAUSE='gh auth failed' ;;
+       *'could not resolve to a pullrequest'*) CAUSE='PR not found' ;;
        *'http 404'*|*'not found'*|*'could not resolve to'*) CAUSE='PR or repository not found' ;;
        *) CAUSE="gh exited $RC" ;;
      esac
+   }
+   classify
+   # One retry after a short wait, only for a failure a retry can fix.
+   case "$CAUSE" in
+     'network error'|'gh exited '*)
+       sleep 5
+       OUT=$(gh pr view <PR#> --json state -q .state 2>&1) && RC=0 || RC=$?
+       classify
+       ;;
+   esac
+   if [ "$RC" -eq 0 ]; then
+     printf 'state=%s exit=0 ratelimited=0\n' "$OUT"
+   elif [ "$RL" -eq 1 ]; then
+     printf 'state=unreadable exit=%s ratelimited=1\n' "$RC"
+   else
      printf 'state=unreadable exit=%s ratelimited=0 cause=%s\n' "$RC" "$CAUSE"
    fi
    ```
@@ -257,7 +273,11 @@ For each iteration:
    is never echoed, so a token in an error body cannot reach the summary), and
    set this PR's row to `Outcome` `skipped`, `Skip
    Reason` `state unreadable` and `Blocking` `?` (it counts as skipped in the
-   totals, not attempted). Mark every remaining PR
+   totals, not attempted). When the cause is `PR not found` (GitHub has no such
+   pull request), that is specific to this PR: go to item 6 and continue. Any
+   other cause, `PR or repository not found` included (a lost repository or an
+   under-scoped token fails every PR the same way), is not, and the retry above
+   already ran for a network error: mark every remaining PR
    `skipped — not attempted (state unreadable)`, record `pending-exit-1` and go
    to `### Step 5: End-of-loop summary table`. Do not continue to the next PR.
    When `exit` is `0` and `state` is not `OPEN`, record
@@ -272,10 +292,12 @@ For each iteration:
    fail to invoke) or any directory-based path.
 3. **Record outcome** for the summary table:
    - If the LAST line of the sweep output fully matches
-     `^Sweep: skipped \((pr-not-open|branch-mismatch)\)$` (`/review:sweep`
-     "Skip line"), the sweep stopped before `/review:resolve` on a PR-specific
-     condition: outcome is `skipped — <reason>` (`PR not open` or `branch
-     mismatch`), not `no contract`. Item 4's clean-tree check still runs; the
+     `^Sweep: skipped \((pr-not-open|branch-mismatch|head-ignore-unreadable|tracked-here-ignored-on-head|untracked-here-ignored-on-head)\)$`
+     (`/review:sweep` "Skip line"), the sweep stopped before `/review:resolve`
+     on a PR-specific condition: outcome is `skipped — <reason>` (`PR not
+     open`, `branch mismatch`, `head ignore rules unreadable`, `config tracked
+     here, ignored on the PR head` or `config untracked here, ignored on the PR
+     head`), not `no contract`. Item 4's clean-tree check still runs; the
      batch continues.
    - If the Skill call returned and no exception was raised in the
      surrounding Bash blocks: outcome is `attempted`. (The Skill tool
@@ -427,7 +449,9 @@ If set, the command exits `1`; otherwise (`pending-exit-1` unset), exit `0`.
   with a short reason. The loop continues unless Step 4 item 1b, 4, 5, 5b or
   5c stops it. The user can re-run `/review:sweep <PR#>` manually to inspect.
 - **Open-PR pre-check could not read the PR** (Step 4 item 1b, `exit`
-  non-zero and not a rate limit): the loop stops, this PR is noted
+  non-zero and not a rate limit, after one retry for a network error): a
+  missing pull request (`PR not found`) is a per-PR skip and the loop
+  continues. Any other cause stops the loop: this PR is noted
   `state unreadable`, every remaining PR is
   `skipped — not attempted (state unreadable)`, the summary is printed, and
   the command exits `1`. A closed PR stays a per-PR skip
