@@ -1,0 +1,23 @@
+docs/solutions/code-quality/bats-tests-can-pass-for-the-wrong-reason-adding-a.md
+  s_1711216e586c18::t_5f9a62ad4c5172 1-23
+docs/solutions/workflow/review-ledger-findings-can-already-be-fixed-at-the.md
+  s_1711216e586c18::t_ed8416db4050a9 1-22
+plans/complete/cycle-1-pending-cards-followup.md
+  s_1711216e586c18::t_113077a52c10de 1-1057
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bff9ddc554ed475d946dbf41501025843782b1a6",
+  "prompts": {},
+  "sessions": {
+    "s_1711216e586c18": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6e3a4b61-6d1f-45e2-83a0-e7616ef0761c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
