@@ -1,5 +1,42 @@
 # Changelog
 
+## 3.9.0
+
+### Minor Changes
+
+- [`111ba7f`](https://github.com/KingInYellows/yellow-plugins/commit/111ba7f9169f3cc548a3735a868d0bdeb7a91db5)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/review:resolve` keeps re-passing after each fix push while the review bot
+  keeps posting P1 findings, up to `resolve_pr.repass_max_passes` (default 5),
+  and stops early when the bot goes quiet or only P2-or-lower findings arrive. A
+  new `pr-review-delta` script checks without a model call whether any review
+  thread has appeared since the last recorded run.
+
+- [`546ed96`](https://github.com/KingInYellows/yellow-plugins/commit/546ed96a84aece1c85a868407705e17aef34d220)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Interactive
+  `/review:resolve` now asks before reverting trusted-config files (agent
+  instructions and tool config) on a refusal path. The new
+  `run-verify-command --revert-denied --dry-run` lists them without reverting,
+  and "Leave them" reports each under Blocking merge. `--non-interactive` runs
+  still revert them without asking. The confirmed revert passes the preview's
+  `--expect-snapshot` and refuses when a trusted-config file changed while the
+  user was asked. The `reverted`, `pending` and `linkHits` lists are now
+  withheld whole when any name contains `---`, so a file name cannot close the
+  untrusted-content fence the list is shown in.
+
+- [`5208df3`](https://github.com/KingInYellows/yellow-plugins/commit/5208df366b9af44ba3bd85ff3b064cea952d9e80)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/review:sweep`
+  reads the PR head's ignore rules through the new `head-ignore-probe` script
+  (`gh api` at `headRefOid`, under a timeout), not a `git fetch` of
+  `refs/pull/<N>/head` from a guessed remote. PR-specific stops now end with
+  `Sweep: skipped (head-ignore-unreadable)`, `(tracked-here-ignored-on-head)` or
+  `(untracked-here-ignored-on-head)`, which `/review:sweep-all` records before
+  moving on to the next PR. A rate limit, network, auth or HTTP 403 failure
+  still stops the batch, and the API reads go to the host the PR URL names.
+  `/review:sweep-all` retries a transient open-PR check once and skips a PR that
+  is not found. When the config is ignored on the PR branch but was not
+  snapshotted, the abort now says to inspect it before any rerun.
+
 ## 3.8.1
 
 ### Patch Changes
