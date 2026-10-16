@@ -154,3 +154,46 @@ _wait_for_file() {
   tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
   [ "$tail" = "" ]
 }
+
+@test "capture keeps user and assistant records and drops attachments" {
+  STAGING=$(_expected_staging_dir)
+  {
+    printf '%s\n' '{"type":"attachment","attachment":{"type":"prompt_snapshot","systemPrompt":["SYSTEM_PROMPT_NOISE"],"tools":[{"name":"TOOL_SCHEMA_NOISE"}]}}'
+    printf '%s\n' '{"type":"user","message":{"role":"user","content":"USER_DIALOGUE"}}'
+    printf '%s\n' '{"type":"queue-operation","operation":"enqueue"}'
+    printf '%s\n' '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"ASSISTANT_DIALOGUE"}]}}'
+    printf '%s\n' 'plain text line'
+  } > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
+  echo "$tail" | grep -q 'USER_DIALOGUE'
+  echo "$tail" | grep -q 'ASSISTANT_DIALOGUE'
+  echo "$tail" | grep -q 'plain text line'
+  ! echo "$tail" | grep -q 'SYSTEM_PROMPT_NOISE'
+  ! echo "$tail" | grep -q 'TOOL_SCHEMA_NOISE'
+  ! echo "$tail" | grep -q 'queue-operation'
+}
+
+@test "capture keeps the last 100 dialogue records past interleaved attachments" {
+  STAGING=$(_expected_staging_dir)
+  for i in $(seq 1 150); do
+    printf '{"type":"user","message":{"role":"user","content":"msg-%03d"}}\n' "$i"
+    printf '%s\n' '{"type":"attachment","attachment":{"type":"prompt_snapshot","systemPrompt":["x"]}}'
+  done > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
+  [ "$(printf '%s\n' "$tail" | wc -l)" -eq 100 ]
+  echo "$tail" | grep -q 'msg-150'
+  echo "$tail" | grep -q 'msg-051'
+  ! echo "$tail" | grep -q 'msg-050'
+  ! echo "$tail" | grep -q 'prompt_snapshot'
+}
+
+@test "capture writes an entry for a tail larger than one argv string" {
+  STAGING=$(_expected_staging_dir)
+  big=$(head -c 200000 /dev/zero | tr '\0' 'a')
+  printf '{"type":"user","message":{"role":"user","content":"%s"}}\n' "$big" > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  [ -f "$STAGING/pending/$SESSION_ID.jsonl" ]
+  jq -e '(.transcript_tail | length) > 200000' "$STAGING/pending/$SESSION_ID.jsonl"
+}

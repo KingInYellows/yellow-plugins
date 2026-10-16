@@ -41,12 +41,28 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-# Read up to 100 lines of the transcript (PII cap per D12). The transcript
-# file may be missing or unreadable (race with Claude Code cleanup); silently
-# produce empty tail in that case.
+# Read up to 100 dialogue lines of the transcript (PII cap per D12). Only
+# `user` and `assistant` records are kept: Claude Code 2.1.300+ also writes
+# `attachment` records (prompt_snapshot with the full system prompt and tool
+# schemas, skill and MCP listings, memory files) that can run to hundreds of
+# KB and would otherwise fill the tail. Lines that are not JSON objects with
+# a `type` pass through unchanged. The scan is bounded to the last
+# TAIL_SCAN_LINES lines; if the filter fails, fall back to the raw tail.
+# The transcript file may be missing or unreadable (race with Claude Code
+# cleanup); silently produce empty tail in that case.
+TAIL_LINES=100
+TAIL_SCAN_LINES=1000
 TAIL_RAW=""
 if [ -f "$TRANSCRIPT" ] && [ -r "$TRANSCRIPT" ]; then
-  TAIL_RAW=$(tail -n 100 -- "$TRANSCRIPT" 2>/dev/null || printf '')
+  # shellcheck disable=SC2016  # $l is a jq variable, not a shell one.
+  if ! TAIL_RAW=$(tail -n "$TAIL_SCAN_LINES" -- "$TRANSCRIPT" 2>/dev/null \
+      | jq -Rr '. as $l | (try fromjson catch null) as $j
+          | if ($j | type) == "object" and ($j | has("type")) then
+              if $j.type == "user" or $j.type == "assistant" then $l else empty end
+            else $l end' 2>/dev/null \
+      | tail -n "$TAIL_LINES"); then
+    TAIL_RAW=$(tail -n "$TAIL_LINES" -- "$TRANSCRIPT" 2>/dev/null || printf '')
+  fi
 fi
 
 # Redact secrets BEFORE hashing or writing.
@@ -64,14 +80,15 @@ fi
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Build JSONL entry. jq handles all escaping; we never embed user content
-# directly into a printf format string.
-ENTRY=$(jq -nc \
+# directly into a printf format string. The tail goes in on stdin, not as
+# --arg: Linux caps one argv string at 128 KiB (MAX_ARG_STRLEN), and a
+# larger tail made jq fail with E2BIG so the entry was silently dropped.
+ENTRY=$(printf '%s' "$TAIL_REDACTED" | jq -Rsc \
   --arg ts "$TIMESTAMP" \
   --arg sid "$SESSION_ID" \
   --arg hash "$CONTENT_HASH" \
   --arg cwd "$CWD" \
-  --arg tail "$TAIL_REDACTED" \
-  '{
+  '. as $tail | {
      schema: "1",
      schema_min_reader: "1",
      timestamp: $ts,
