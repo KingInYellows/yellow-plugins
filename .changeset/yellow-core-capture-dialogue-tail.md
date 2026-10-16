@@ -8,4 +8,5 @@ transcript records, so the new `prompt_snapshot` attachments (full system
 prompt and tool schemas) and other attachment records no longer fill it or
 reach the Haiku drain. The tail is also passed to jq on stdin: a tail over
 Linux's 128 KiB per-argument limit used to make jq fail and the entry was
-silently dropped.
+silently dropped. The tail is now capped at 96 KiB (newest whole records
+kept), and the jq-failure fallback drops attachment lines too.

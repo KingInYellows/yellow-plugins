@@ -41,17 +41,20 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-# Read up to 100 dialogue lines of the transcript (PII cap per D12). Only
-# `user` and `assistant` records are kept: Claude Code 2.1.300+ also writes
-# `attachment` records (prompt_snapshot with the full system prompt and tool
-# schemas, skill and MCP listings, memory files) that can run to hundreds of
-# KB and would otherwise fill the tail. Lines that are not JSON objects with
-# a `type` pass through unchanged. The scan is bounded to the last
-# TAIL_SCAN_LINES lines; if the filter fails, fall back to the raw tail.
+# Read up to TAIL_LINES dialogue records of the transcript (PII cap per D12).
+# Only `user` and `assistant` records are kept: Claude Code 2.1.300+ also
+# writes `attachment` records (prompt_snapshot with the full system prompt and
+# tool schemas, skill and MCP listings, memory files) that can run to hundreds
+# of KB and would otherwise fill the tail. Lines that are not JSON objects
+# with a `type` pass through unchanged. The scan is bounded to the last
+# TAIL_SCAN_LINES lines, so a window with no dialogue yields an empty tail.
+# If the jq filter fails, fall back to the raw tail minus attachment lines.
+# The result is capped at TAIL_MAX_BYTES, keeping the newest whole lines.
 # The transcript file may be missing or unreadable (race with Claude Code
 # cleanup); silently produce empty tail in that case.
 TAIL_LINES=100
 TAIL_SCAN_LINES=1000
+TAIL_MAX_BYTES=98304
 TAIL_RAW=""
 if [ -f "$TRANSCRIPT" ] && [ -r "$TRANSCRIPT" ]; then
   # shellcheck disable=SC2016  # $l is a jq variable, not a shell one.
@@ -61,8 +64,16 @@ if [ -f "$TRANSCRIPT" ] && [ -r "$TRANSCRIPT" ]; then
               if $j.type == "user" or $j.type == "assistant" then $l else empty end
             else $l end' 2>/dev/null \
       | tail -n "$TAIL_LINES"); then
-    TAIL_RAW=$(tail -n "$TAIL_LINES" -- "$TRANSCRIPT" 2>/dev/null || printf '')
+    TAIL_RAW=$(tail -n "$TAIL_LINES" -- "$TRANSCRIPT" 2>/dev/null \
+      | grep -v '^{"type":"attachment"' || printf '')
   fi
+fi
+if [ "$(printf '%s' "$TAIL_RAW" | wc -c)" -gt "$TAIL_MAX_BYTES" ]; then
+  TAIL_RAW=$(printf '%s' "$TAIL_RAW" | tail -c "$TAIL_MAX_BYTES")
+  # Drop the partial first line unless it is the only one.
+  case "$TAIL_RAW" in
+    *$'\n'*) TAIL_RAW=${TAIL_RAW#*$'\n'} ;;
+  esac
 fi
 
 # Redact secrets BEFORE hashing or writing.
@@ -81,8 +92,8 @@ TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Build JSONL entry. jq handles all escaping; we never embed user content
 # directly into a printf format string. The tail goes in on stdin, not as
-# --arg: Linux caps one argv string at 128 KiB (MAX_ARG_STRLEN), and a
-# larger tail made jq fail with E2BIG so the entry was silently dropped.
+# --arg: Linux caps one argv string at 128 KiB (MAX_ARG_STRLEN); a larger
+# tail made exec of jq fail with E2BIG, so the entry was silently dropped.
 ENTRY=$(printf '%s' "$TAIL_REDACTED" | jq -Rsc \
   --arg ts "$TIMESTAMP" \
   --arg sid "$SESSION_ID" \
