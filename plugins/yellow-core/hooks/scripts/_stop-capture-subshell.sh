@@ -41,16 +41,46 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-# Read up to 100 lines of the transcript (PII cap per D12). The transcript
-# file may be missing or unreadable (race with Claude Code cleanup); silently
-# produce empty tail in that case.
+# Read up to TAIL_LINES dialogue records of the transcript (PII cap per D12).
+# Only `user` and `assistant` records are kept: Claude Code 2.1.300+ also
+# writes `attachment` records (prompt_snapshot with the full system prompt and
+# tool schemas, skill and MCP listings, memory files) that can run to hundreds
+# of KB and would otherwise fill the tail. Lines that are not JSON objects
+# with a `type` pass through unchanged. The scan is bounded to the last
+# TAIL_SCAN_LINES lines, so a window with no dialogue yields an empty tail.
+# If the jq filter fails, fall back to the raw tail minus attachment lines.
+# After redaction the staged tail is capped at TAIL_MAX_BYTES, keeping the
+# newest whole lines; the Jev shadow gets the uncapped tail so it still sees
+# whole records and applies its own cap.
+# The transcript file may be missing or unreadable (race with Claude Code
+# cleanup); silently produce empty tail in that case.
+TAIL_LINES=100
+TAIL_SCAN_LINES=1000
+TAIL_MAX_BYTES=98304
 TAIL_RAW=""
 if [ -f "$TRANSCRIPT" ] && [ -r "$TRANSCRIPT" ]; then
-  TAIL_RAW=$(tail -n 100 -- "$TRANSCRIPT" 2>/dev/null || printf '')
+  # shellcheck disable=SC2016  # $l is a jq variable, not a shell one.
+  if ! TAIL_RAW=$(tail -n "$TAIL_SCAN_LINES" -- "$TRANSCRIPT" 2>/dev/null \
+      | jq -Rr '. as $l | (try fromjson catch null) as $j
+          | if ($j | type) == "object" and ($j | has("type")) then
+              if $j.type == "user" or $j.type == "assistant" then $l else empty end
+            else $l end' 2>/dev/null \
+      | tail -n "$TAIL_LINES"); then
+    TAIL_RAW=$(tail -n "$TAIL_LINES" -- "$TRANSCRIPT" 2>/dev/null \
+      | grep -v '^{"type":"attachment"' || printf '')
+  fi
 fi
 
-# Redact secrets BEFORE hashing or writing.
+# Redact secrets BEFORE capping, hashing or writing: a byte cut taken first
+# could drop a `password=` style label and leave its value unrecognized.
 TAIL_REDACTED=$(printf '%s' "$TAIL_RAW" | cs_redact_secrets 2>/dev/null || printf '')
+if [ "$(printf '%s' "$TAIL_REDACTED" | wc -c)" -gt "$TAIL_MAX_BYTES" ]; then
+  TAIL_REDACTED=$(printf '%s' "$TAIL_REDACTED" | tail -c "$TAIL_MAX_BYTES")
+  # Drop the partial first line unless it is the only one.
+  case "$TAIL_REDACTED" in
+    *$'\n'*) TAIL_REDACTED=${TAIL_REDACTED#*$'\n'} ;;
+  esac
+fi
 
 # Content hash (sha256) for fast dedup at drain time. Hash of the REDACTED
 # tail so identical post-redaction sessions collide.
@@ -64,14 +94,15 @@ fi
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Build JSONL entry. jq handles all escaping; we never embed user content
-# directly into a printf format string.
-ENTRY=$(jq -nc \
+# directly into a printf format string. The tail goes in on stdin, not as
+# --arg: Linux caps one argv string at 128 KiB (MAX_ARG_STRLEN); a larger
+# tail made exec of jq fail with E2BIG, so the entry was silently dropped.
+ENTRY=$(printf '%s' "$TAIL_REDACTED" | jq -Rsc \
   --arg ts "$TIMESTAMP" \
   --arg sid "$SESSION_ID" \
   --arg hash "$CONTENT_HASH" \
   --arg cwd "$CWD" \
-  --arg tail "$TAIL_REDACTED" \
-  '{
+  '. as $tail | {
      schema: "1",
      schema_min_reader: "1",
      timestamp: $ts,

@@ -127,7 +127,7 @@ cs_atomic_jsonl_write() {
 # sed failure upstream: nothing more is printed and awk exits 3 after the
 # input drains. By default every line is held in memory and printed only after
 # the input ends cleanly, so a failure leaves no partial result and nothing is
-# written to disk; callers pass bounded text (a 100-line transcript tail, an
+# written to disk; callers pass bounded text (a 96 KiB transcript tail, an
 # 8 KiB narrative, quote lines). With CS_REDACT_STREAM=1 each line is printed
 # as soon as it is redacted, so memory does not grow with the input; a failure
 # then leaves the lines sed had already redacted, and the caller must treat a

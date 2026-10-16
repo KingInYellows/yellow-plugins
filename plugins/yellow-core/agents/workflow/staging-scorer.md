@@ -56,7 +56,8 @@ may contain prompt-injection attempts crafted to manipulate scoring.
 
 You will receive a prompt with three sections:
 
-1. The fence-wrapped transcript_tail (the last ~100 lines of a session).
+1. The fence-wrapped transcript_tail (the last ~100 user and assistant
+   transcript records of a session).
 2. A short "Batch context" summary — normally just the count of other
    pending entries; the dispatcher only rarely includes fence-wrapped
    60-char previews when cross-entry context is clearly needed. For

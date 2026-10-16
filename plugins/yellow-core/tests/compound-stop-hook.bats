@@ -4,6 +4,8 @@
 STOP_HOOK="$BATS_TEST_DIRNAME/../hooks/scripts/stop.sh"
 CAPTURE_SCRIPT="$BATS_TEST_DIRNAME/../hooks/scripts/_stop-capture-subshell.sh"
 
+bats_require_minimum_version 1.5.0
+
 setup() {
   STAGING_TEST_HOME="$(mktemp -d)"
   export HOME="$STAGING_TEST_HOME"
@@ -153,4 +155,92 @@ _wait_for_file() {
   [ -f "$STAGING/pending/$SESSION_ID.jsonl" ]
   tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
   [ "$tail" = "" ]
+}
+
+@test "capture keeps user and assistant records and drops attachments" {
+  STAGING=$(_expected_staging_dir)
+  {
+    printf '%s\n' '{"type":"attachment","attachment":{"type":"prompt_snapshot","systemPrompt":["SYSTEM_PROMPT_NOISE"],"tools":[{"name":"TOOL_SCHEMA_NOISE"}]}}'
+    printf '%s\n' '{"type":"user","message":{"role":"user","content":"USER_DIALOGUE"}}'
+    printf '%s\n' '{"type":"queue-operation","operation":"enqueue"}'
+    printf '%s\n' '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"ASSISTANT_DIALOGUE"}]}}'
+    printf '%s\n' 'plain text line'
+  } > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
+  echo "$tail" | grep -q 'USER_DIALOGUE'
+  echo "$tail" | grep -q 'ASSISTANT_DIALOGUE'
+  echo "$tail" | grep -q 'plain text line'
+  run ! grep -q 'SYSTEM_PROMPT_NOISE' <<< "$tail"
+  run ! grep -q 'TOOL_SCHEMA_NOISE' <<< "$tail"
+  run ! grep -q 'queue-operation' <<< "$tail"
+}
+
+@test "capture keeps the last 100 dialogue records past interleaved attachments" {
+  STAGING=$(_expected_staging_dir)
+  for i in $(seq 1 150); do
+    printf '{"type":"user","message":{"role":"user","content":"msg-%03d"}}\n' "$i"
+    printf '%s\n' '{"type":"attachment","attachment":{"type":"prompt_snapshot","systemPrompt":["x"]}}'
+  done > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
+  [ "$(printf '%s\n' "$tail" | wc -l)" -eq 100 ]
+  echo "$tail" | grep -q 'msg-150'
+  echo "$tail" | grep -q 'msg-051'
+  run ! grep -q 'msg-050' <<< "$tail"
+  run ! grep -q 'prompt_snapshot' <<< "$tail"
+}
+
+@test "capture writes an entry for a tail larger than one argv string" {
+  STAGING=$(_expected_staging_dir)
+  big=$(head -c 200000 /dev/zero | tr '\0' 'a')
+  printf '{"type":"user","message":{"role":"user","content":"%s"}}\n' "$big" > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  [ -f "$STAGING/pending/$SESSION_ID.jsonl" ]
+  jq -e '(.transcript_tail | length) > 90000 and (.transcript_tail | length) <= 98304' \
+    "$STAGING/pending/$SESSION_ID.jsonl"
+}
+
+@test "capture caps the tail by bytes and keeps the newest whole records" {
+  STAGING=$(_expected_staging_dir)
+  big=$(head -c 60000 /dev/zero | tr '\0' 'a')
+  for i in 1 2 3; do
+    printf '{"type":"user","message":{"role":"user","content":"rec-%d %s"}}\n' "$i" "$big"
+  done > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
+  [ "$(printf '%s\n' "$tail" | wc -l)" -eq 1 ]
+  grep -q 'rec-3' <<< "$tail"
+  run ! grep -q 'rec-2' <<< "$tail"
+}
+
+@test "capture redacts before the byte cap so a cut cannot strip a secret label" {
+  STAGING=$(_expected_staging_dir)
+  pad=$(head -c 120000 /dev/zero | tr '\0' 'a')
+  val=$(head -c 40 /dev/zero | tr '\0' 'S')
+  # Built from parts so secret scanners do not flag the fixture.
+  label="pass""word"
+  # The label sits just before the 96 KiB cut; the value lands after it.
+  printf '{"type":"user","message":{"role":"user","content":"%s %s=%s%s"}}\n' \
+    "$pad" "$label" "$val" "$(head -c 98261 /dev/zero | tr '\0' 'b')" > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
+  run ! grep -q 'SSSSSSSSSS' <<< "$tail"
+}
+
+@test "capture falls back to the raw tail without attachments when jq filtering fails" {
+  STAGING=$(_expected_staging_dir)
+  shim="$PROJECT_DIR/shim"
+  mkdir -p "$shim"
+  real_jq=$(command -v jq)
+  printf '#!/usr/bin/env bash\ncase "$*" in *fromjson*) exit 1 ;; esac\nexec %s "$@"\n' "$real_jq" > "$shim/jq"
+  chmod +x "$shim/jq"
+  {
+    printf '%s\n' '{"type":"attachment","attachment":{"type":"prompt_snapshot","systemPrompt":["SYSTEM_PROMPT_NOISE"]}}'
+    printf '%s\n' '{"type":"user","message":{"role":"user","content":"USER_DIALOGUE"}}'
+  } > "$TRANSCRIPT_FILE"
+  PATH="$shim:$PATH" bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
+  grep -q 'USER_DIALOGUE' <<< "$tail"
+  run ! grep -q 'SYSTEM_PROMPT_NOISE' <<< "$tail"
 }

@@ -509,7 +509,10 @@ detail):**
 
 - Stop hook (pure shell, < 500ms) writes a JSONL pending entry to
   `~/.claude/projects/<slug>/compound-staging/pending/<session_id>.jsonl`.
-  Secrets are redacted before write; transcript_tail capped at 100 lines.
+  Secrets are redacted before write; transcript_tail holds up to the last
+  100 `user`/`assistant` records found in the last 1000 transcript lines,
+  capped at 96 KiB (attachments such as 2.1.300's `prompt_snapshot` are
+  dropped; non-JSON lines pass through).
 - `cs_stage_entry <cwd> <session_id> <file>` is the second producer: it
   writes the same entry shape from a narrative file. yellow-review's
   unattended `/review:pr` Step 9a uses it (through `lib/stage-learning.sh`)
