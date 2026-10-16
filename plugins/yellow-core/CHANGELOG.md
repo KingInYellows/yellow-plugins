@@ -1,5 +1,52 @@
 # Changelog
 
+## 2.11.0
+
+### Minor Changes
+
+- [`749db64`](https://github.com/KingInYellows/yellow-plugins/commit/749db64824c321116455b4f150f72b3874764321)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `lib/jev-category-eval.py`, a manual offline evaluation of TypeSafe Jev on the
+  `docs/solutions/` category pick. `run` sends tracked docs' frontmatter (never
+  bodies) with frozen, committed criteria and writes results outside the
+  repository; `report` prints agreement per split and a pre-registered paired
+  non-inferiority verdict, and writes `disagreements.tsv` for judging. No hook,
+  agent or staging behaviour changes.
+
+### Patch Changes
+
+- [`111ba7f`](https://github.com/KingInYellows/yellow-plugins/commit/111ba7f9169f3cc548a3735a868d0bdeb7a91db5)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/review:resolve` keeps re-passing after each fix push while the review bot
+  keeps posting P1 findings, up to `resolve_pr.repass_max_passes` (default 5),
+  and stops early when the bot goes quiet or only P2-or-lower findings arrive. A
+  new `pr-review-delta` script checks without a model call whether any review
+  thread has appeared since the last recorded run.
+
+- [`3c5263a`](https://github.com/KingInYellows/yellow-plugins/commit/3c5263a910aba2a3d427ca4c761131b0b45f3192)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fix the
+  background-compounding Stop capture for Claude Code 2.1.300+. The staged
+  `transcript_tail` now keeps only the last 100 `user` and `assistant`
+  transcript records, so the new `prompt_snapshot` attachments (full system
+  prompt and tool schemas) and other attachment records no longer fill it or
+  reach the Haiku drain. The tail is also passed to jq on stdin: a tail over
+  Linux's 128 KiB per-argument limit used to make jq fail and the entry was
+  silently dropped. The tail is now capped at 96 KiB (newest whole records
+  kept), and the jq-failure fallback drops attachment lines too.
+
+- [`d8a000c`](https://github.com/KingInYellows/yellow-plugins/commit/d8a000c68342e5b712a1bd56fb1f7b6a2df86c35)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/worktree:restack --abort` now aborts git rebases only in worktrees the run
+  recorded: the run worktree, Graphite's detached worktrees and, for GitHub, the
+  worktrees that held a restacked branch at start (newly recorded as `owner`
+  lines in the state file). A rebase elsewhere is left alone and named; for
+  GitHub, one that may be the run's own keeps the state (exit 31). A recorded
+  worktree whose rebase state cannot be read stops the abort (exit 31) instead
+  of being treated as clean, and every stuck worktree is named with a fix line.
+  A worktree deleted during the pause no longer blocks the abort. The run
+  worktree is not checked out while an operation is in progress there. `status`
+  lists owner, rebasing, busy, unreadable and unrecorded worktrees.
+
 ## 2.10.0
 
 ### Minor Changes
