@@ -49,7 +49,9 @@ fi
 # with a `type` pass through unchanged. The scan is bounded to the last
 # TAIL_SCAN_LINES lines, so a window with no dialogue yields an empty tail.
 # If the jq filter fails, fall back to the raw tail minus attachment lines.
-# The result is capped at TAIL_MAX_BYTES, keeping the newest whole lines.
+# After redaction the staged tail is capped at TAIL_MAX_BYTES, keeping the
+# newest whole lines; the Jev shadow gets the uncapped tail so it still sees
+# whole records and applies its own cap.
 # The transcript file may be missing or unreadable (race with Claude Code
 # cleanup); silently produce empty tail in that case.
 TAIL_LINES=100
@@ -68,16 +70,17 @@ if [ -f "$TRANSCRIPT" ] && [ -r "$TRANSCRIPT" ]; then
       | grep -v '^{"type":"attachment"' || printf '')
   fi
 fi
-if [ "$(printf '%s' "$TAIL_RAW" | wc -c)" -gt "$TAIL_MAX_BYTES" ]; then
-  TAIL_RAW=$(printf '%s' "$TAIL_RAW" | tail -c "$TAIL_MAX_BYTES")
+
+# Redact secrets BEFORE capping, hashing or writing: a byte cut taken first
+# could drop a `password=` style label and leave its value unrecognized.
+TAIL_REDACTED=$(printf '%s' "$TAIL_RAW" | cs_redact_secrets 2>/dev/null || printf '')
+if [ "$(printf '%s' "$TAIL_REDACTED" | wc -c)" -gt "$TAIL_MAX_BYTES" ]; then
+  TAIL_REDACTED=$(printf '%s' "$TAIL_REDACTED" | tail -c "$TAIL_MAX_BYTES")
   # Drop the partial first line unless it is the only one.
-  case "$TAIL_RAW" in
-    *$'\n'*) TAIL_RAW=${TAIL_RAW#*$'\n'} ;;
+  case "$TAIL_REDACTED" in
+    *$'\n'*) TAIL_REDACTED=${TAIL_REDACTED#*$'\n'} ;;
   esac
 fi
-
-# Redact secrets BEFORE hashing or writing.
-TAIL_REDACTED=$(printf '%s' "$TAIL_RAW" | cs_redact_secrets 2>/dev/null || printf '')
 
 # Content hash (sha256) for fast dedup at drain time. Hash of the REDACTED
 # tail so identical post-redaction sessions collide.

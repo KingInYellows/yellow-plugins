@@ -214,6 +214,20 @@ _wait_for_file() {
   run ! grep -q 'rec-2' <<< "$tail"
 }
 
+@test "capture redacts before the byte cap so a cut cannot strip a secret label" {
+  STAGING=$(_expected_staging_dir)
+  pad=$(head -c 120000 /dev/zero | tr '\0' 'a')
+  val=$(head -c 40 /dev/zero | tr '\0' 'S')
+  # Built from parts so secret scanners do not flag the fixture.
+  label="pass""word"
+  # The label sits just before the 96 KiB cut; the value lands after it.
+  printf '{"type":"user","message":{"role":"user","content":"%s %s=%s%s"}}\n' \
+    "$pad" "$label" "$val" "$(head -c 98261 /dev/zero | tr '\0' 'b')" > "$TRANSCRIPT_FILE"
+  bash "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR"
+  tail=$(jq -r '.transcript_tail' "$STAGING/pending/$SESSION_ID.jsonl")
+  run ! grep -q 'SSSSSSSSSS' <<< "$tail"
+}
+
 @test "capture falls back to the raw tail without attachments when jq filtering fails" {
   STAGING=$(_expected_staging_dir)
   shim="$PROJECT_DIR/shim"
