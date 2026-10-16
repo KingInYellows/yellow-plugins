@@ -1,9 +1,10 @@
 # Feature: Haiku 5.5 model-routing policy — Phase 1
 
-> **Status (2026-10-14):** Implemented in PR #1171 and the stacked PR #1176,
-> both submitted. 29 of 31 tasks are done. 1.0.3 (the CI run-log check) waits
-> for #1171 to merge, and 1.5.2 stays open until the `linear-pr-linker` write
-> path is smoke-tested interactively. Source:
+> **Status (2026-10-15):** Implemented and on `main`: #1171 (`c01968c`) and
+> #1176 (`35d1367`). Not yet released; the open "chore: version packages" PR
+> (#1218) carries it. 30 of 31 tasks are done. 1.0.3 is confirmed from a CI
+> run log. 1.5.2 stays open until the `linear-pr-linker` write path is
+> smoke-tested interactively against the released plugins. Source:
 > `docs/brainstorms/2026-10-07-haiku-5-5-model-routing-policy-brainstorm.md`.
 > Phase 2 (replay-gated swaps) and Phase 3 (trigger tightening; router
 > deferred) are tracked under "Follow-ups" and are not implemented here.
@@ -203,8 +204,11 @@ usage-limit headroom, not dollars. The quality-relevant fix is explicit
       the installed plugins, so running them is 1.5.3, after release. The
       results and the Verify command are in
       `docs/research/model-routing-policy.md`.
-- [ ] 1.0.3: Confirm the action's bundled CLI is ≥ v2.1.284, so that `sonnet`
-      resolves to 5.5. Read the run log of the first CI run after 1.3.
+- [x] 1.0.3: (done 2026-10-15: Claude Code Review run 38775342148 on PR
+      #1197 installed Claude Code v2.1.300, and `--model sonnet` initialized
+      as `claude-sonnet-5-5`.) Confirm the action's bundled CLI is
+      ≥ v2.1.284, so that `sonnet` resolves to 5.5. Read the run log of the
+      first CI run after 1.3.
 
 <!-- deepen-plan: external -->
 > **Research:**

@@ -1,5 +1,9 @@
 # Docs, Debt and Delegation Borrows
 
+> **Status (2026-10-15):** not started and not decomposed into shells. No
+> `sources` / `verified_at` doc frontmatter, `debt-ratchet.sh` or
+> `RATCHET.json` exists in any plugin.
+
 ## Overview
 
 The integration evaluation (`docs/brainstorms/2026-10-02-turn-the-integration-evaluation-into-an-brainstorm.md`, Spec D) found eight places where a borrowed technique would make yellow's checks deterministic or its handoffs complete:

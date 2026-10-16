@@ -1,5 +1,10 @@
 # yellow-core Loop and Work Integrity
 
+> **Status (2026-10-15):** not started and not decomposed into shells.
+> `plugins/yellow-core/hooks/scripts/stop.sh` still exits early on
+> `stop_hook_active` (R1), `plan-chain.sh` does not exist (R6–R14), and
+> `/flow:work` has no `--goal-condition` (R15–R21).
+
 ## Overview
 
 The integration evaluation (`docs/brainstorms/2026-10-02-turn-the-integration-evaluation-into-an-brainstorm.md`, Spec A) found that two yellow-core loop transitions are guessed rather than checked. The first is which plan is current. The second is whether a lesson was captured from the final state of a loop.

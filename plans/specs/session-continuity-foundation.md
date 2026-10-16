@@ -1,5 +1,10 @@
 # Session Continuity Foundation
 
+> **Status (2026-10-15):** stage F is complete. Both shells
+> (`session-continuity-foundation-01-handoff-tool-and-preflight`,
+> `-02-context-observer`) are archived in `plans/complete/`. Stages E, P, B
+> and Later stay with yellow-goal, as the Overview says.
+
 ## Overview
 
 yellow-core's `session-handoff` skill writes a redacted note to

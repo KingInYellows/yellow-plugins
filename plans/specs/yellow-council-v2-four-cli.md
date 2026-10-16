@@ -1,5 +1,10 @@
 # yellow-council V2: Four-CLI Review Council
 
+> **Status (2026-10-15):** complete. All five shells are archived in
+> `plans/complete/` (`yellow-council-v2-four-cli-01` to `-05`); the last,
+> evidence verification and finalization, shipped in #1198 (`d888c64`).
+> Multi-round review continues in `plans/specs/yellow-council-v3-multi-round.md`.
+
 ## Overview
 
 `yellow-council` V1 fans a code review out to 3 CLI reviewers (Codex via
