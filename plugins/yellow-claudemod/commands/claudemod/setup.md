@@ -1,9 +1,6 @@
 ---
 name: claudemod:setup
-description:
-  'Check that Claude Code can load the yellow-claudemod hooks module and show
-  how to turn the downshift on. Use after installing the plugin or when
-  /claudemod-status is missing.'
+description: "Check that Claude Code can load the yellow-claudemod hooks module and show how to turn the downshift on. Use after installing the plugin or when /claudemod-status is missing."
 argument-hint: ''
 allowed-tools:
   - Bash
