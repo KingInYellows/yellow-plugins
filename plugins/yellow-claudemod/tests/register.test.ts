@@ -144,4 +144,17 @@ describe('ledger', () => {
     expect(text).toContain('Ledger: 4 spawn(s) recorded');
     for (const t of types) expect(text).toContain(`${t}: ran opus`);
   });
+
+  test('runs a failing spawn once and lets the failure through', async ($, on) => {
+    let calls = 0;
+    mock.store(on);
+    mock.clock(on);
+    on('agent.spawn', () => {
+      calls += 1;
+      throw new Error('subagent aborted');
+    });
+    on('command.run', () => ({ text: 'engine' }));
+    await expect(spawn($, REVIEWER)).rejects.toThrow();
+    expect(calls).toBe(1);
+  });
 });

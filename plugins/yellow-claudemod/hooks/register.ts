@@ -64,8 +64,8 @@ export const register: Register = (on, options) => {
 
   // Observes every spawn and may downshift an allowlisted Opus agent. Not a
   // guard: a failure before next lets the .catch below run the spawn on its
-  // own model. Nothing after next may throw, or that .catch would call next
-  // a second time and launch the subagent twice.
+  // own model; after next, the engine's next(e) replays what that call
+  // settled to, so the subagent never runs twice.
   on('agent.spawn', async ($, e, next) => {
     const plugin = pluginOf(e.subagentType, e.provider?.plugin);
     const model = downshiftModel(
