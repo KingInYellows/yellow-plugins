@@ -167,14 +167,26 @@ command -v agy >/dev/null 2>&1 && printf 'agy:                OK (%s)\n' "$(agy 
 command -v opencode >/dev/null 2>&1 && printf 'opencode:           OK (%s)\n' "$(opencode --version 2>&1 | head -n1)" || printf 'opencode:           NOT FOUND\n'
 command -v claude >/dev/null 2>&1 && printf 'claude:             OK (%s)\n' "$(claude --version 2>/dev/null | head -n1)" || printf 'claude:             NOT FOUND\n'
 # yellow-goal pins goal-gen engineVersion 0.3.0 (/goal:setup is authoritative).
-# Keep only a plain version string from the engine's JSON.
-if command -v goal-gen >/dev/null 2>&1; then
-  _gg_ver=$(goal-gen version --json 2>/dev/null | sed -n 's/.*"engineVersion"[[:space:]]*:[[:space:]]*"\([0-9][0-9.]*[0-9A-Za-z.+-]*\)".*/\1/p' | head -n1)
+# Same binary and output contract as src/spawn.ts and src/runtime.ts: honor
+# GOAL_GEN_BIN, require exit 0, empty stderr and exactly one JSON stdout line.
+_gg_bin=${GOAL_GEN_BIN:-goal-gen}
+if command -v "$_gg_bin" >/dev/null 2>&1; then
+  _gg_ver=$(_GG_BIN="$_gg_bin" node -e '
+const r = require("child_process").spawnSync(process.env._GG_BIN, ["version", "--json"], { encoding: "utf8", timeout: 15000, shell: false });
+if (r.status !== 0 || String(r.stderr || "").trim()) process.exit(1);
+const lines = String(r.stdout || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+if (lines.length !== 1) process.exit(1);
+try {
+  const v = JSON.parse(lines[0]).engineVersion;
+  if (typeof v === "string" && /^[0-9][0-9A-Za-z.+-]*$/.test(v)) process.stdout.write(v);
+} catch {}
+' 2>/dev/null)
   [ -n "$_gg_ver" ] && printf 'goal-gen:           OK (%s)\n' "$_gg_ver" || printf 'goal-gen:           UNPARSEABLE\n'
   unset _gg_ver
 else
   printf 'goal-gen:           NOT FOUND\n'
 fi
+unset _gg_bin
 
 if command -v python3 >/dev/null 2>&1; then
   py_ver=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
@@ -484,10 +496,18 @@ fi
 # then the data-dir runtime /cursor:setup installs (src/config.ts resolveDataDir).
 if [ -n "${YELLOW_CURSOR_DATA_DIR:-}" ]; then _cursor_data=$YELLOW_CURSOR_DATA_DIR
 elif [ -n "${XDG_DATA_HOME:-}" ]; then _cursor_data="$XDG_DATA_HOME/yellow-cursor"
-elif [ "$(uname -s 2>/dev/null)" = Darwin ]; then _cursor_data="$HOME/Library/Application Support/yellow-cursor"
-else _cursor_data="$HOME/.local/share/yellow-cursor"; fi
+else
+  case "$(uname -s 2>/dev/null)" in
+    Darwin) _cursor_data="$HOME/Library/Application Support/yellow-cursor" ;;
+    MINGW*|MSYS*|CYGWIN*) _cursor_data="${APPDATA:-$HOME/AppData/Roaming}/yellow-cursor" ;;
+    *) _cursor_data="$HOME/.local/share/yellow-cursor" ;;
+  esac
+fi
+# Load the module like src/sdk-resolver.ts does; a leftover directory from a
+# failed install does not count.
 _cursor_sdk=no
-if { [ -n "$_cursor_root" ] && [ -d "$_cursor_root/node_modules/@cursor/sdk" ]; } || [ -d "$_cursor_data/runtime/node_modules/@cursor/sdk" ]; then
+if node -e 'for (const p of process.argv.slice(1)) { if (!p) continue; try { require(p); process.exit(0); } catch {} } process.exit(1);' \
+    "${_cursor_root:+$_cursor_root/node_modules/@cursor/sdk}" "$_cursor_data/runtime/node_modules/@cursor/sdk" >/dev/null 2>&1; then
   _cursor_sdk=yes
   printf 'cursor_sdk_resolved: OK\n'
 else
@@ -879,8 +899,8 @@ checks it.
 
 **yellow-goal:**
 
-Classify from Step 1's `goal-gen` row (`goal-gen version --json`); the pin
-is `0.3.0` (`plugins/yellow-goal/src/pin.ts`) and `/goal:setup` is
+Classify from Step 1's `goal-gen` row (`$GOAL_GEN_BIN` or `goal-gen`,
+`version --json`); the pin is `0.3.0` (`plugins/yellow-goal/src/pin.ts`) and `/goal:setup` is
 authoritative.
 
 - READY: `goal-gen` OK with version `0.3.0` AND `yellow-core` installed AND
