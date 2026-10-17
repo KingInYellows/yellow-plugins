@@ -305,9 +305,11 @@ needs `TYPESAFE_API_KEY` and is made only for public repositories or those in
 exact and orchestrator sets. Records land in
 `<git-common-dir>/yellow-review/jev-persona/` and hold no diff text.
 
-To turn it on for every repository, put the keys in the user-level file
-`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md` instead; a repo file that sets `reviewer_selection` still wins.
-`owner/*` allows all of one owner's private repositories:
+To turn it on for every repository, put `reviewer_selection` in the
+user-level file `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md` instead; a repo file that sets it still wins.
+`reviewer_selection_private_repos` is read only from that user-level file,
+since a PR could otherwise add its own opt-in. `owner/*` allows all of one
+owner's private repositories:
 
 ```yaml
 ---

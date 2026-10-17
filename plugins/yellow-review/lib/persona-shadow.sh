@@ -402,10 +402,10 @@ jp_shadow() {
     body=$(jq -cn --rawfile diff /dev/stdin \
       --arg model "${REVIEW_JEV_MODEL:-$JP_DEFAULT_MODEL}" \
       --arg title "$(head -c 300 "$title_file" 2>/dev/null | tr -d '\000-\037' | cs_redact_secrets 2>/dev/null)" \
-      --argjson files "$(jp_files_json)" \
+      --slurpfile files <(jp_files_json) \
       --slurpfile c "$JP_CRITERIA" '{
         model: $model,
-        state: {title: $title, files: $files, diff: $diff},
+        state: {title: $title, files: $files[0], diff: $diff},
         questions: ($c[0].questions | with_entries(.value = {type: "noul", instructions: .value}))
       }' <<<"$diff") || reason='request build failed'
   fi

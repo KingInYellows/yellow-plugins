@@ -616,9 +616,12 @@ before dispatch. It never changes which reviewers run.
   entry (case-insensitive; it covers every repository of that owner,
   including ones created later). A failed or unparseable lookup counts as
   private, so diffs from private repositories never leave without an
-  explicit entry. Both keys may come from the user-level
-  `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md`, which applies to every repository whose own file leaves
-  `reviewer_selection` unset.
+  explicit entry. `reviewer_selection_private_repos` is read only from the
+  user-level `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md`, never from the repository's file:
+  `/review:pr` reads config from the checked-out PR head, so a contributor
+  could otherwise opt a private repository in. `reviewer_selection` itself
+  may come from either file; it alone sends nothing from a private
+  repository.
 - **When.** Once per `/review:pr` run with the key set (5 s timeout,
   `REVIEW_JEV_TIMEOUT_S`). `/review:all` does not call it.
 - **Credential handling.** The key reaches curl as a config on fd 3, fed by
