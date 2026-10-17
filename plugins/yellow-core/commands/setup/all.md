@@ -66,6 +66,14 @@ command -v bash >/dev/null 2>&1 && printf 'bash:               OK\n' || printf '
 command -v timeout >/dev/null 2>&1 && printf 'timeout:            OK\n' || printf 'timeout:            NOT FOUND\n'
 command -v od >/dev/null 2>&1 && printf 'od:                 OK\n' || printf 'od:                 NOT FOUND\n'
 command -v sort >/dev/null 2>&1 && printf 'sort:               OK\n' || printf 'sort:               NOT FOUND\n'
+# The rest of /council:setup's required set, plus its /dev/urandom check.
+_cn_miss=""
+for _cn_t in mktemp awk sed grep find; do command -v "$_cn_t" >/dev/null 2>&1 || _cn_miss="$_cn_miss $_cn_t"; done
+case "$(od -An -N4 -tu4 /dev/urandom 2>/dev/null | tr -d ' \n')" in
+  '' | *[!0-9]*) _cn_miss="$_cn_miss /dev/urandom" ;;
+esac
+[ -z "$_cn_miss" ] && printf 'council_extra_tools: ok\n' || printf 'council_extra_tools: missing%s\n' "$_cn_miss"
+unset _cn_miss _cn_t
 # yellow-council's blocks need bash 4.3+ or zsh (associative arrays).
 if [ -n "${BASH_VERSION:-}" ]; then
   case "$BASH_VERSION" in
@@ -157,7 +165,20 @@ command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(co
 # Codex v0.118+ keeps auth in the OS keyring, not ~/.codex/auth.json. Never
 # echo the status text: it can include API key fragments.
 if command -v codex >/dev/null 2>&1; then
-  codex login status 2>&1 | grep -qi '^logged in' && printf 'codex_login:        ok\n' || printf 'codex_login:        not_logged_in\n'
+  # Bounded per yellow-codex's readiness contract (15s; keyring access can
+  # block). Prints only a label: ok, not_logged_in, unverified, probe_error,
+  # timeout.
+  _cx_login=$(node -e '
+const r = require("child_process").spawnSync("codex", ["login", "status"], { encoding: "utf8", timeout: 15000, killSignal: "SIGKILL", shell: false });
+const out = String(r.stdout || "") + String(r.stderr || "");
+let label = "probe_error";
+if (r.error && r.error.code === "ETIMEDOUT") label = "timeout";
+else if (/^\s*not logged in/i.test(out)) label = "not_logged_in";
+else if (r.status === 0) label = /^\s*logged in/i.test(out) ? "ok" : "unverified";
+process.stdout.write(label);
+' 2>/dev/null)
+  printf 'codex_login:        %s\n' "${_cx_login:-probe_error}"
+  unset _cx_login
 else
   printf 'codex_login:        SKIPPED\n'
 fi
@@ -172,7 +193,7 @@ command -v claude >/dev/null 2>&1 && printf 'claude:             OK (%s)\n' "$(c
 _gg_bin=${GOAL_GEN_BIN:-goal-gen}
 if command -v "$_gg_bin" >/dev/null 2>&1; then
   _gg_ver=$(_GG_BIN="$_gg_bin" node -e '
-const r = require("child_process").spawnSync(process.env._GG_BIN, ["version", "--json"], { encoding: "utf8", timeout: 15000, shell: false });
+const r = require("child_process").spawnSync(process.env._GG_BIN, ["version", "--json"], { encoding: "utf8", timeout: 15000, killSignal: "SIGKILL", shell: false });
 if (r.status !== 0 || String(r.stderr || "").trim()) process.exit(1);
 const lines = String(r.stdout || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 if (lines.length !== 1) process.exit(1);
@@ -879,7 +900,9 @@ prefixes and are not in the recorded probe list.
 - READY: `codex` binary found in PATH AND version >= 0.140.0 AND
   (`OPENAI_API_KEY` set OR `codex_login` ok OR `~/.codex/auth.json` exists).
   Current CLIs keep ChatGPT login in the OS keyring, so `codex_login` is the
-  normal signal; `auth.json` only covers pre-0.118 installs.
+  normal signal; `auth.json` only covers pre-0.118 installs. `timeout`,
+  `probe_error` and `unverified` mean auth is unknown, not absent: report it
+  as such and point at `/codex:setup`.
 - PARTIAL: `codex` binary found AND version >= 0.140.0, but auth not configured
 - NEEDS SETUP: `codex` binary not found OR version < 0.140.0
 
@@ -887,7 +910,8 @@ prefixes and are not in the recorded probe list.
 
 Required system tools: `bash` on PATH (the council scripts run under
 `bash`, even from a zsh session), `shell_check` ok (bash 4.3+ or zsh),
-`timeout`, `jq`, `od` and `sort`, plus `yellow-core` installed (Claude
+`timeout`, `jq`, `od`, `sort` and `council_extra_tools` ok (`mktemp`, `awk`,
+`sed`, `grep`, `find`, readable `/dev/urandom`), plus `yellow-core` installed (Claude
 Code disables the council without it). Reviewer CLIs: `agy` >= 1.0 (Gemini slot; a legacy
 `gemini` binary does not count), `opencode` >= 1.14, and yellow-codex
 installed. OpenRouter auth for OpenCode is not probed here; `/council:setup`
