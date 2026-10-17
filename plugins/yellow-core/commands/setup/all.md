@@ -38,11 +38,17 @@ else
   printf 'node:               NOT FOUND\n'
   printf 'node18_check:       missing\n'
 fi
-# yellow-morph, yellow-cursor and yellow-goal need Node >= 22.22.0.
+# yellow-morph needs Node >= 22.22.0; yellow-cursor and yellow-goal pin
+# engines to >=22.22.0 <25.0.0.
 if command -v node >/dev/null 2>&1 && node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit(a > 22 || (a === 22 && b >= 22) ? 0 : 1)' 2>/dev/null; then
   printf 'node2222_check:     ok\n'
 else
   printf 'node2222_check:     too_old_or_missing\n'
+fi
+if command -v node >/dev/null 2>&1 && node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit((a > 22 || (a === 22 && b >= 22)) && a < 25 ? 0 : 1)' 2>/dev/null; then
+  printf 'node2222_lt25_check: ok\n'
+else
+  printf 'node2222_lt25_check: out_of_range_or_missing\n'
 fi
 command -v npm >/dev/null 2>&1 && printf 'npm:                OK (%s)\n' "$(npm --version 2>/dev/null)" || printf 'npm:                NOT FOUND\n'
 command -v npx >/dev/null 2>&1 && printf 'npx:                OK\n' || printf 'npx:                NOT FOUND\n'
@@ -56,6 +62,7 @@ command -v semgrep >/dev/null 2>&1 && printf 'semgrep:            OK\n' || print
 command -v yq >/dev/null 2>&1 && printf 'yq:                 OK\n' || printf 'yq:                 NOT FOUND\n'
 command -v realpath >/dev/null 2>&1 && printf 'realpath:           OK\n' || printf 'realpath:           NOT FOUND\n'
 command -v flock >/dev/null 2>&1 && printf 'flock:              OK\n' || printf 'flock:              NOT FOUND\n'
+command -v bash >/dev/null 2>&1 && printf 'bash:               OK\n' || printf 'bash:               NOT FOUND\n'
 command -v timeout >/dev/null 2>&1 && printf 'timeout:            OK\n' || printf 'timeout:            NOT FOUND\n'
 command -v od >/dev/null 2>&1 && printf 'od:                 OK\n' || printf 'od:                 NOT FOUND\n'
 command -v sort >/dev/null 2>&1 && printf 'sort:               OK\n' || printf 'sort:               NOT FOUND\n'
@@ -500,12 +507,31 @@ if [ -n "$_core_root" ] && [ -f "$_core_root/lib/remote-agent-provider-state.js"
   _t_cursor=no; [ -n "$_cursor_root" ] && [ -f "$_cursor_root/dist/cli.js" ] && [ "$_cursor_sdk" = yes ] && _t_cursor=yes
   _t_devin=no; [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ] && [ -n "${DEVIN_ORG_ID:-}" ] && _t_devin=yes
   _t_jules=no; [ -n "$_jules_root" ] && [ -f "$_jules_root/dist/cli.js" ] && _t_jules=yes
-  _ra_state=$(printf '%s' "$_plugin_list_json" | node "$_core_root/lib/remote-agent-provider-state.js" classify \
-      --plugins-file - --project-path "${repo_top:-}" \
-      --tooling-cursor "$_t_cursor" --tooling-devin "$_t_devin" --tooling-jules "$_t_jules" 2>/dev/null \
-    | node -e 'let d = ""; process.stdin.on("data", (c) => { d += c; }).on("end", () => { try { process.stdout.write(String(JSON.parse(d).state || "")); } catch {} });' 2>/dev/null)
-  printf 'remote_agent_state: %s\n' "${_ra_state:-UNKNOWN}"
-  unset _t_cursor _t_devin _t_jules _ra_state
+  # Without a repo, project/local rows from other checkouts must not count, so
+  # drop them here; the classifier only filters them when given a path.
+  printf '%s' "$_plugin_list_json" | _RA_LIB="$_core_root/lib/remote-agent-provider-state.js" \
+    _RA_PROJECT="${repo_top:-}" _RA_CURSOR="$_t_cursor" _RA_DEVIN="$_t_devin" _RA_JULES="$_t_jules" \
+    node -e '
+let d = "";
+process.stdin.on("data", (c) => { d += c; }).on("end", () => {
+  const e = process.env;
+  let state = "UNKNOWN", detail = "";
+  try {
+    let plugins = JSON.parse(d);
+    if (!e._RA_PROJECT && Array.isArray(plugins)) plugins = plugins.filter((r) => !(r && (r.scope === "project" || r.scope === "local")));
+    const r = require(e._RA_LIB).classifyRemoteAgentState({
+      plugins,
+      projectPath: e._RA_PROJECT || null,
+      tooling: { cursor: e._RA_CURSOR === "yes", devin: e._RA_DEVIN === "yes", jules: e._RA_JULES === "yes" },
+    });
+    state = String(r.state || "UNKNOWN");
+    detail = String(r.detail || "");
+  } catch {}
+  const clean = (v) => v.replace(/[\r\n]+/g, " ");
+  process.stdout.write("remote_agent_state: " + clean(state) + "\n");
+  if (detail) process.stdout.write("remote_agent_detail: " + clean(detail) + "\n");
+});' 2>/dev/null || printf 'remote_agent_state: UNKNOWN\n'
+  unset _t_cursor _t_devin _t_jules
 else
   printf 'remote_agent_state: UNKNOWN (yellow-core classifier not resolved)\n'
 fi
@@ -648,7 +674,7 @@ CLI reads `CURSOR_API_KEY` or the Cursor SDK's stored login. Every command
 fails with `CURSOR_SDK_MISSING` until `/cursor:setup` installs `@cursor/sdk`.
 
 - READY: `cursor_cli_resolved` is `OK` AND `cursor_sdk_resolved` is `OK` AND
-  `jq` OK AND `node2222_check` ok AND (`CURSOR_API_KEY` shows
+  `jq` OK AND `node2222_lt25_check` ok AND (`CURSOR_API_KEY` shows
   `set (shell env)` OR `cursor_stored_login` is `present`)
 - PARTIAL: plugin enabled but any READY condition fails while at least one
   of the CLI or a credential source resolved — detail names the gap, e.g.
@@ -837,9 +863,10 @@ prefixes and are not in the recorded probe list.
 
 **yellow-council:**
 
-Required system tools: `shell_check` ok (bash 4.3+ or zsh), `timeout`, `jq`,
-`od` and `sort`, plus `yellow-core` installed (Claude Code disables the
-council without it). Reviewer CLIs: `agy` >= 1.0 (Gemini slot; a legacy
+Required system tools: `bash` on PATH (the council scripts run under
+`bash`, even from a zsh session), `shell_check` ok (bash 4.3+ or zsh),
+`timeout`, `jq`, `od` and `sort`, plus `yellow-core` installed (Claude
+Code disables the council without it). Reviewer CLIs: `agy` >= 1.0 (Gemini slot; a legacy
 `gemini` binary does not count), `opencode` >= 1.14, and yellow-codex
 installed. OpenRouter auth for OpenCode is not probed here; `/council:setup`
 checks it.
@@ -857,12 +884,12 @@ is `0.3.0` (`plugins/yellow-goal/src/pin.ts`) and `/goal:setup` is
 authoritative.
 
 - READY: `goal-gen` OK with version `0.3.0` AND `yellow-core` installed AND
-  `node2222_check` ok
+  `node2222_lt25_check` ok (engines pin `>=22.22.0 <25.0.0`)
 - PARTIAL: never — missing binary or version mismatch is fail-closed
 - NEEDS SETUP: `goal-gen` NOT FOUND (`GOAL_ENGINE_MISSING`), a version other
   than `0.3.0` (`GOAL_ENGINE_VERSION_MISMATCH`), `UNPARSEABLE`
   (`GOAL_ENGINE_UNPARSEABLE`), `yellow-core` NOT INSTALLED (required
-  dependency), or `node2222_check` not ok
+  dependency), or `node2222_lt25_check` not ok
 
 **yellow-claudemod:**
 
@@ -950,8 +977,8 @@ readiness is worth reporting. Only the **enabled** one is offered for setup:
    `remote-agent`, read Step 1's `remote_agent_state` row: the dashboard
    already ran `lib/remote-agent-provider-state.js classify` (the classifier
    `/linear:delegate` uses) with the cursor, devin and jules tooling probes,
-   so `PARTIAL_TOOLING` is reachable. `UNKNOWN` means the classifier could
-   not run; treat it like a missing yellow-core (item 5). Do not infer
+   so `PARTIAL_TOOLING` is reachable; its `detail` is on the
+   `remote_agent_detail` row. `UNKNOWN` means the classifier could not run; treat it like a missing yellow-core (item 5). Do not infer
    either group's active member from which CLI happens to be on PATH.
 2. Offer setup for that member only. Show every other member's row with its
    status and the annotation `(alternative provider — not enabled)`.
