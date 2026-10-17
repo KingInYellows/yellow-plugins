@@ -48,8 +48,12 @@ export const register: Register = (on, options) => {
       argumentHint: '[rows]',
       immediate: true,
     });
-    const usage = await $.session.usage();
-    windows = [...usage.rateLimits];
+    // Optional: session.measure fills the windows in later anyway.
+    try {
+      windows = [...(await $.session.usage()).rateLimits];
+    } catch {
+      windows = [];
+    }
     return next(e);
   });
 
@@ -59,8 +63,9 @@ export const register: Register = (on, options) => {
   });
 
   // Observes every spawn and may downshift an allowlisted Opus agent. Not a
-  // guard: on a failure the .catch below lets the spawn go ahead on its own
-  // model (or replays what next already settled to), which is the safe side.
+  // guard: a failure before next lets the .catch below run the spawn on its
+  // own model. Nothing after next may throw, or that .catch would call next
+  // a second time and launch the subagent twice.
   on('agent.spawn', async ($, e, next) => {
     const plugin = pluginOf(e.subagentType, e.provider?.plugin);
     const model = downshiftModel(
@@ -74,19 +79,25 @@ export const register: Register = (on, options) => {
       windows,
       config
     );
-    const result = await next(model === undefined ? e : { ...e, model });
+    // Snapshot at spawn time: next resolves when the subagent finishes.
     const top = fullestWindow(windows);
+    const ts = new Date(await $.clock.now()).toISOString();
+    const result = await next(model === undefined ? e : { ...e, model });
 
     if (model !== undefined && !hasToasted) {
       hasToasted = true;
-      $.ui.toast(
-        `yellow-claudemod: ${top?.kind ?? 'usage'} window at ${top?.percentUsed ?? '?'}%, ` +
-          `running listed Opus reviewers on ${model}`
-      );
+      try {
+        $.ui.toast(
+          `yellow-claudemod: ${top?.kind ?? 'usage'} window at ${top?.percentUsed ?? '?'}%, ` +
+            `running listed Opus reviewers on ${model}`
+        );
+      } catch {
+        // A lost toast is cosmetic; the ledger row still records the downshift.
+      }
     }
 
     const row: LedgerRow = {
-      ts: new Date(await $.clock.now()).toISOString(),
+      ts,
       subagentType: e.subagentType,
       plugin,
       requested: e.model ?? null,
