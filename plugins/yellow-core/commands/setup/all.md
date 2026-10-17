@@ -167,18 +167,20 @@ command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(co
 if command -v codex >/dev/null 2>&1; then
   # Bounded per yellow-codex's readiness contract (15s; keyring access can
   # block). Prints only a label: ok, not_logged_in, unverified, probe_error,
-  # timeout.
-  _cx_login=$(node -e '
-const r = require("child_process").spawnSync("codex", ["login", "status"], { encoding: "utf8", timeout: 15000, killSignal: "SIGKILL", shell: false });
-const out = String(r.stdout || "") + String(r.stderr || "");
-let label = "probe_error";
-if (r.error && r.error.code === "ETIMEDOUT") label = "timeout";
-else if (/^\s*not logged in/i.test(out)) label = "not_logged_in";
-else if (r.status === 0) label = /^\s*logged in/i.test(out) ? "ok" : "unverified";
-process.stdout.write(label);
-' 2>/dev/null)
-  printf 'codex_login:        %s\n' "${_cx_login:-probe_error}"
-  unset _cx_login
+  # timeout. Plain shell, since the standalone Codex CLI needs no Node.
+  if command -v timeout >/dev/null 2>&1; then
+    _cx_out=$(timeout -s KILL 15 codex login status 2>&1)
+    _cx_rc=$?
+    if [ "$_cx_rc" -eq 137 ] || [ "$_cx_rc" -eq 124 ]; then _cx_login=timeout
+    elif printf '%s\n' "$_cx_out" | grep -qi '^[[:space:]]*not logged in'; then _cx_login=not_logged_in
+    elif [ "$_cx_rc" -eq 0 ]; then
+      printf '%s\n' "$_cx_out" | grep -qi '^[[:space:]]*logged in' && _cx_login=ok || _cx_login=unverified
+    else _cx_login=probe_error; fi
+  else
+    _cx_login='unverified (no timeout command to bound the probe)'
+  fi
+  printf 'codex_login:        %s\n' "$_cx_login"
+  unset _cx_login _cx_out _cx_rc
 else
   printf 'codex_login:        SKIPPED\n'
 fi
