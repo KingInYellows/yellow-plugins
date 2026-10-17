@@ -284,7 +284,10 @@ mv plugins/hookify-old plugins/hookify
 > presence (RULE 7) — an error whenever the file exists, with or without
 > inline `hooks` in the manifest, because Claude Code auto-loads it as a
 > second hook source and hook config in this repo lives only in `catalog/`
-> (`pnpm validate:generated` reports the same file as `forbidden`, never deletes it); `userConfig`
+> (`pnpm validate:generated` reports the same file as `forbidden`, never deletes it).
+> The one allowed shape is a mod's lone `{ "modules": ["./<file>.ts"] }`
+> naming an existing file inside `hooks/` (`scripts/lib/mod-hooks.js`);
+> `userConfig`
 > entry shape — a
 > required `type` from the supported set, a required `title`, and the
 > allowlist of fields Claude Code's remote validator accepts, applied to both
@@ -311,8 +314,8 @@ mv plugins/hookify-old plugins/hookify
 > `realpath(script)` against `realpath(pluginDir)` — defence in depth,
 > both sides resolved, so a plugin reached through a symlinked parent
 > (macOS `/var` → `/private/var` cache roots) still passes. RULE 7 and the
-> generator's forbidden-file check share one `lstat`-based existence
-> helper (`lexistsSync` in `scripts/lib/plugin-symlink-policy.js`): a _dangling_
+> generator's forbidden-file check share one `lstat`-based classifier
+> (`classifyHooksJson` in `scripts/lib/mod-hooks.js`): a _dangling_
 > `hooks/hooks.json` symlink is still an error (`existsSync` would report
 > it absent while Claude Code can still try to load it), `hooks` being a
 > plain file counts as absent, and an entry that cannot be inspected

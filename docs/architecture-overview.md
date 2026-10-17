@@ -1,6 +1,6 @@
 # yellow-plugins Technical Overview
 
-`yellow-plugins` is a git-native Claude Code plugin marketplace (20 plugins)
+`yellow-plugins` is a git-native Claude Code plugin marketplace (21 plugins)
 plus the validation and release tooling that gates it. There is no published
 application server. Claude Code (and, opt-in, Codex/Cursor) loads the plugins;
 this repository authors, validates, and versions them.
@@ -57,7 +57,7 @@ convention:
 
 Byte-identity drift is gated by `pnpm validate:generated`.
 
-### The 20 plugins
+### The 21 plugins
 
 Source of truth for membership and order: `pluginOrder` in
 `catalog/catalog.json`. The grouping below is editorial.
@@ -88,6 +88,10 @@ Source of truth for membership and order: `pluginOrder` in
 - **yellow-semgrep** — Semgrep AppSec “to fix” fetch/fix/verify via MCP.
 - **yellow-ci** — CI diagnosis, workflow lint, self-hosted runner health.
 - **yellow-docs** — Doc audit/generation/Mermaid.
+- **yellow-claudemod** — Claude-Code-only mod (a TypeScript hooks module
+  declared by a modules-only `hooks/hooks.json`, the one shape RULE 7
+  allows): records the model each subagent ran on and, when enabled,
+  downshifts listed Opus reviewers to Sonnet near a Max usage limit.
 - **yellow-browser-test** — Autonomous web testing via `agent-browser`.
 
 #### Integrations

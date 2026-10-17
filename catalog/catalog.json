@@ -29,7 +29,8 @@
     "yellow-docs",
     "yellow-codex",
     "yellow-council",
-    "yellow-goal"
+    "yellow-goal",
+    "yellow-claudemod"
   ],
   "targets": {
     "claude": {

@@ -72,6 +72,7 @@ const {
   atomicWrite,
   serializeJson,
 } = require('./lib/generate/write');
+const { classifyHooksJson } = require('./lib/mod-hooks');
 const {
   lexistsSync,
   resolvePluginRootReal,
@@ -956,14 +957,15 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     ];
     // hooks/hooks.json is never generated, but Claude Code auto-loads it as
     // a second hook source next to the inline plugin.json block —
-    // validate-plugin.js RULE 7 rejects its presence. `--check` reports a
+    // validate-plugin.js RULE 7 rejects its presence, except a mod's
+    // modules-only declaration (scripts/lib/mod-hooks.js). `--check` reports a
     // reintroduced file as stale so `pnpm validate:generated` fails too;
     // `apply` refuses rather than deletes, because unlike every other
     // candidate here the generator holds no source to regenerate it from
     // (this apply path also runs unattended from sync-manifests.js during
     // `pnpm apply:changesets`).
     const forbiddenHooksJson = join(pluginRoot, 'hooks', 'hooks.json');
-    if (lexistsSync(forbiddenHooksJson)) {
+    if (classifyHooksJson(forbiddenHooksJson).kind === 'forbidden') {
       result.diffs.push({
         path: relative(rootDir, forbiddenHooksJson),
         state: 'forbidden',
@@ -1283,7 +1285,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       'hooks',
       'hooks.json'
     );
-    if (lexistsSync(orphanHooksJson)) {
+    if (classifyHooksJson(orphanHooksJson).kind === 'forbidden') {
       result.diffs.push({
         path: relative(rootDir, orphanHooksJson),
         state: 'forbidden',
