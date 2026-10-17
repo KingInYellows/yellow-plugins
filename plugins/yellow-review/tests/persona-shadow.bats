@@ -231,6 +231,27 @@ run_shadow() {
   [ ! -s "$LOG" ]
 }
 
+@test "shadow: a title the redactor fails on sends nothing" {
+  start_stub ok
+  cat > "$BATS_TEST_TMPDIR/core.sh" <<'CORE'
+cs_redact_secrets() {
+  local in
+  in=$(cat)
+  case "$in" in
+    *TITLE-FAIL*) printf '[REDACTED: sanitization failed]\n'; return 1 ;;
+    *) printf '%s\n' "$in" ;;
+  esac
+}
+CORE
+  export JP_CORE_LIB="$BATS_TEST_TMPDIR/core.sh"
+  printf 'TITLE-FAIL\n' > "$BATS_TEST_TMPDIR/title"
+  echo change >> src/a.ts
+  commit_change
+  run_shadow
+  [ "$output" = "persona-shadow: logged without Jev (redaction failed)" ]
+  [ ! -s "$LOG" ]
+}
+
 @test "shadow: a valid answer is logged with the Jev set and no diff text" {
   start_stub ok
   printf 'const marker = "UNIQUE-DIFF-MARKER-123";\n' >> src/a.ts

@@ -375,7 +375,7 @@ jp_shadow() {
     [ "$allowed" = 1 ] || reason='private repo'
   fi
 
-  local core diff body state_chars=0 lat_file diff_file
+  local core diff title body state_chars=0 lat_file diff_file
   if [ -z "$reason" ]; then
     core=$(jp_core_lib_path)
     # shellcheck disable=SC1090
@@ -398,12 +398,18 @@ jp_shadow() {
     if [ -z "$diff" ] || [[ "$diff" == *'[REDACTED: sanitization failed]'* ]]; then
       reason='redaction failed'
     fi
+    # Redact the title here, not inside `--arg`, so a redactor failure
+    # stops the call instead of being discarded by the substitution.
+    if ! title=$(head -c 300 "$title_file" 2>/dev/null | tr -d '\000-\037' | cs_redact_secrets 2>/dev/null) \
+      || [[ "$title" == *'[REDACTED: sanitization failed]'* ]]; then
+      reason='redaction failed'
+    fi
   fi
   if [ -z "$reason" ]; then
     state_chars=${#diff}
     body=$(jq -cn --rawfile diff /dev/stdin \
       --arg model "${REVIEW_JEV_MODEL:-$JP_DEFAULT_MODEL}" \
-      --arg title "$(head -c 300 "$title_file" 2>/dev/null | tr -d '\000-\037' | cs_redact_secrets 2>/dev/null)" \
+      --arg title "$title" \
       --slurpfile files <(jp_files_json) \
       --slurpfile c "$JP_CRITERIA" '{
         model: $model,
