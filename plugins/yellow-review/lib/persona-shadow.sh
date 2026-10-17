@@ -224,7 +224,7 @@ jp_core_lib_path() {
 jp_repo_visibility() {
   local t=() out
   command -v timeout >/dev/null 2>&1 && t=(timeout 15)
-  out=$("${t[@]}" gh api 'repos/{owner}/{repo}' --jq '.full_name + " " + .visibility' 2>/dev/null) || return 1
+  out=$(${t[@]+"${t[@]}"} gh api 'repos/{owner}/{repo}' --jq '.full_name + " " + .visibility' 2>/dev/null) || return 1
   [[ "$out" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\ [a-z]+$ ]] || return 1
   printf '%s' "$out"
 }
@@ -267,13 +267,14 @@ jp_build_diff() {
 
 # Changed paths with per-file line counts (-1 for binary) as a JSON array.
 jp_files_json() {
-  local i args=()
+  # One --arg/--argjson call per file: values never go through jq's
+  # positional parsing, where some jq versions read "-1" (binary files) or a
+  # path starting with "-" as an option.
+  local i
   for ((i = 0; i < ${#JP_FILES[@]}; i++)); do
-    args+=("${JP_FILES[i]}" "${JP_ADDED[i]}" "${JP_DELETED[i]}")
-  done
-  jq -cn '[$ARGS.positional | _nwise(3)
-           | {path: .[0], added: (.[1] | tonumber), deleted: (.[2] | tonumber)}]' \
-    --args ${args[@]+"${args[@]}"}
+    jq -cn --arg p "${JP_FILES[i]}" --argjson a "${JP_ADDED[i]}" \
+      --argjson d "${JP_DELETED[i]}" '{path: $p, added: $a, deleted: $d}'
+  done | jq -cs .
 }
 
 # Ask Jev. stdin: the request body. Prints the validated answers object

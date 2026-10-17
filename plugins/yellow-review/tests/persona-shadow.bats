@@ -235,6 +235,18 @@ run_shadow() {
   [ "$(jq -r '.body.state.title' "$LOG")" = 'A title' ]
 }
 
+@test "shadow: binary files and dash-led paths reach the request" {
+  start_stub ok
+  printf '\000\001\002binary' > img.png
+  printf 'x\n' > ./-dash.txt
+  echo change >> src/a.ts
+  commit_change
+  run_shadow
+  [ "$output" = "persona-shadow: logged" ]
+  [ "$(jq -c '.body.state.files[] | select(.path == "img.png") | [.added, .deleted]' "$LOG")" = '[-1,-1]' ]
+  jq -e '.body.state.files[] | select(.path == "-dash.txt")' "$LOG" >/dev/null
+}
+
 @test "shadow: a diff over the cap is trimmed and flagged" {
   start_stub ok
   head -c 40000 /dev/zero | tr '\0' 'x' | fold -w 100 > src/huge.txt
