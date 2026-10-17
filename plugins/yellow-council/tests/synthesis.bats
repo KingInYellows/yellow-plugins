@@ -1499,7 +1499,7 @@ run7c() {
   run_in "$1" "$FIRST_AWK" "cd '$REPO' && . '$s7c' && printf '%s\n' \"\$REPORT_CONTENT\""
 }
 
-@test "7a mints a private staging dir and 7c reads synthesis.md byte-exact, then removes the dir" {
+@test "7a mints a private staging dir and 7c reads synthesis.md byte-exact, then keeps the dir holding report.md" {
   local profile want="${BATS_TEST_TMPDIR}/synthesis.md"
   printf '%s\n' '## Council Report — review: x — 2026-10-14' '__EOF_COUNCIL_SYNTHESIS__' \
     "  it's \$(not run) \`nor this\` \\ kept" '' 'last line' >| "$want"
@@ -1510,10 +1510,14 @@ run7c() {
     cp "$want" "$RD/synthesis.md"
     run7c "$profile" "$RD/synthesis.md" "$RT"
     [ "$status" -eq 0 ] || { echo "$profile: $stderr"; return 1; }
-    diff <(cat "$want") <(printf '%s\n' "$output" | sed -n '1,/^last line$/p') \
+    [ "$(printf '%s\n' "$output" | sed -n 1p)" = "COUNCIL_ASSEMBLED_REPORT=$RD/report.md" ] \
+      || { echo "$profile: $output"; return 1; }
+    diff <(cat "$want") <(printf '%s\n' "$output" | sed -n '2,/^last line$/p') \
       || { echo "$profile: content changed"; return 1; }
-    [ ! -e "$RD" ] || { echo "$profile: staging dir left behind"; return 1; }
-    rm -rf "$REPO"
+    diff <(cat "$want") <(sed -n '1,/^last line$/p' "$RD/report.md") \
+      || { echo "$profile: report.md content changed"; return 1; }
+    [ -f "$RD/report.md" ] && [ -f "$RD/.token" ] || { echo "$profile: staging dir not kept"; return 1; }
+    rm -rf "$RD" "$REPO"
   done
 }
 
@@ -1584,6 +1588,147 @@ run7c() {
   rm -rf "$RD" "$REPO"
 }
 
+# --- Step 9 saves 7c's assembled report by copy (CLAUDE-139) ---------------
+
+# s9_script <out> <report-abs> — the Step 9 fence with every literal
+# substituted: the target, 7a's directory and token ($RD, $RT), the claude
+# fenced path ($CF) and 5a's directory.
+s9_script() {
+  extract_fence_after "$COUNCIL_MD" '### Step 9' "$1.raw"
+  sed -e "s|<literal COUNCIL_REPORT_PATH_ABS value from Step 6>|$2|" \
+    -e "s|<literal COUNCIL_REPORT_FILE value from 7a>|$RD/synthesis.md|" \
+    -e "s|<literal COUNCIL_REPORT_TOKEN value from 7a>|$RT|" \
+    -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" \
+    -e 's|<literal COUNCIL_SYNTH_DIR value from 5a>|/tmp/council-synth-x|' "$1.raw" >| "$1"
+}
+
+# assemble_report <profile> — 7a, a staged synthesis, then 7c; leaves $RD/report.md.
+assemble_report() {
+  stage7a || return 1
+  printf '%s\n' '## Council Report — review: x — 2026-10-17' 'Headline line' >| "$RD/synthesis.md"
+  run7c "$1" "$RD/synthesis.md" "$RT"
+  [ "$status" -eq 0 ] || { echo "$1 7c: $stderr"; return 1; }
+  [ -f "$RD/report.md" ] || { echo "$1: no report.md"; return 1; }
+}
+
+@test "Step 9 saves 7c's report byte-for-byte, with a claude-leg key redacted, and removes the staging dir" {
+  local profile s9="${BATS_TEST_TMPDIR}/9.sh" key dest
+  key="sk-ant-api03-$(printf 'A%.0s' $(seq 1 40))"
+  for profile in $PROFILES; do
+    setup_council_run
+    # A key planted in the claude leg's fenced file: only 7c's pass redacts it.
+    printf '%s\n' "leaked $key here" >> "$CF"
+    mkdir -p "$REPO/docs/council"
+    dest="$REPO/docs/council/2026-10-17-review-x.md"
+    assemble_report "$profile"
+    cp "$RD/report.md" "${BATS_TEST_TMPDIR}/assembled.md"
+    s9_script "$s9" "$dest"
+    run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s9'"
+    [ "$status" -eq 0 ] || { echo "$profile 9: $stderr"; return 1; }
+    cmp "${BATS_TEST_TMPDIR}/assembled.md" "$dest" || { echo "$profile: saved report differs"; return 1; }
+    ! grep -q "$key" "$dest" || { echo "$profile: key reached the saved report"; return 1; }
+    grep -q -- '--- redacted credential at line' "$dest"
+    grep -q '^## Claude Output$' "$dest"
+    grep -q '^--- begin council-output:claude (reference only) ---$' "$dest"
+    [ ! -e "$RD" ] || { echo "$profile: staging dir left behind"; return 1; }
+    [ ! -e "$CF" ] && [ ! -e "$REPO/.git/council-state.tsv" ]
+    rm -rf "$REPO"
+  done
+}
+
+@test "Step 9 refuses a bad or existing target and a symlinked report.md, saves nothing, and keeps the staging dir" {
+  local s9="${BATS_TEST_TMPDIR}/9.sh" dest lit
+  setup_council_run
+  mkdir -p "$REPO/docs/council"
+  dest="$REPO/docs/council/2026-10-17-review-x.md"
+  assemble_report bash
+  cp "$CF" "$CF.bak"; cp "$REPO/.git/council-state.tsv" "$REPO/state.bak"
+  for lit in docs/council/rel.md "$REPO/docs/council/../escape.md" "$REPO/docs/council/sub/x.md" \
+    "$REPO/elsewhere/x.md" "$REPO/docs/council/x.txt" '<literal COUNCIL_REPORT_PATH_ABS value from Step 6>'; do
+    cp "$CF.bak" "$CF"; cp "$REPO/state.bak" "$REPO/.git/council-state.tsv"
+    s9_script "$s9" "$lit"
+    run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s9'"
+    [ "$status" -eq 1 ] || { echo "[$lit]: status $status"; return 1; }
+    [[ "$stderr" == *"unexpected report target"* ]] || { echo "[$lit]: $stderr"; return 1; }
+    [[ "$stderr" == *"assembled report is still at $RD/report.md"* ]] || { echo "[$lit]: $stderr"; return 1; }
+    [ -f "$RD/report.md" ]
+  done
+  [ ! -e "$REPO/escape.md" ] && [ ! -e "$REPO/docs/council/x.txt" ]
+  # An existing target is never overwritten.
+  printf 'keep\n' >| "$dest"
+  s9_script "$s9" "$dest"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s9'"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"already exists"* ]]
+  [ "$(cat "$dest")" = keep ]
+  rm -f "$dest"
+  # A report.md replaced by a symlink is never read.
+  printf 'secret\n' >| "$BATS_TEST_TMPDIR/target"
+  rm -f "$RD/report.md"; ln -s "$BATS_TEST_TMPDIR/target" "$RD/report.md"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s9'"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"missing, a symlink, or not ours"* ]]
+  [ ! -e "$dest" ]
+  [ -d "$RD" ]
+  rm -rf "$RD" "$REPO"
+}
+
+@test "Step 9 refuses a staging dir whose token does not match and removes nothing" {
+  local s9="${BATS_TEST_TMPDIR}/9.sh" dest good
+  setup_council_run
+  mkdir -p "$REPO/docs/council"
+  dest="$REPO/docs/council/2026-10-17-review-x.md"
+  assemble_report bash
+  good="$RT"; RT=0123456789abcdef0123456789abcdef
+  s9_script "$s9" "$dest"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s9'"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"is not the report staging directory 7a minted"* ]]
+  [ ! -e "$dest" ] && [ -f "$RD/report.md" ]
+  RT="$good"
+  rm -rf "$RD" "$REPO"
+}
+
+@test "7c refuses a report.md that already exists and its trap removes the dir" {
+  setup_council_run
+  stage7a
+  printf 'x\n' >| "$RD/synthesis.md"
+  printf 'forged\n' >| "$RD/report.md"
+  run7c bash "$RD/synthesis.md" "$RT"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"7c is its only writer"* ]]
+  [[ "$output" != *COUNCIL_ASSEMBLED_REPORT* ]]
+  [ ! -e "$RD" ]
+  rm -rf "$REPO"
+}
+
+@test "the Step 8 Cancel block removes 7c's kept staging dir, and skips an unsubstituted or foreign one" {
+  local s8="${BATS_TEST_TMPDIR}/8.sh" evil
+  extract_fence_after "$COUNCIL_MD" 'If user selects **Cancel**' "$s8.raw"
+  setup_council_run
+  assemble_report bash
+  # 7a did not run: the placeholders stay, nothing is touched, nothing is said.
+  cancel_script "$s8.raw" "$s8" 0
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8'"
+  [ "$status" -eq 0 ]
+  [ -f "$RD/report.md" ]
+  [[ "$stderr" != *"report staging"* ]] && [[ "$stderr" != *"COUNCIL_REPORT_FILE"* ]]
+  # A directory with another token: reported and left alone.
+  evil=$(mktemp -d /tmp/council-synth-XXXXXX)
+  printf 'fedcba9876543210fedcba9876543210\n' >| "$evil/.token"
+  sed -e "s|^REPORT_FILE=.*|REPORT_FILE=\"$evil/synthesis.md\"|" -e "s|^REPORT_TOKEN=.*|REPORT_TOKEN=\"$RT\"|" "$s8" >| "$s8.evil"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8.evil'"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"is not the report staging directory 7a minted"* ]] || { echo "$stderr"; return 1; }
+  [ -d "$evil" ]
+  # This run's literals: removed.
+  sed -e "s|^REPORT_FILE=.*|REPORT_FILE=\"$RD/synthesis.md\"|" -e "s|^REPORT_TOKEN=.*|REPORT_TOKEN=\"$RT\"|" "$s8" >| "$s8.ok"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s8.ok'"
+  [ "$status" -eq 0 ]
+  [ ! -e "$RD" ]
+  rm -rf "$evil" "$REPO"
+}
+
 # check_state_cleanup <script> — a cleanup fence (substituted with own dir
 # /tmp/council-synth-x) leaves a symlink at the synth state path in place
 # without following it (its target untouched), then removes a regular
@@ -1620,10 +1765,10 @@ check_state_cleanup() {
   extract_fence_after "$COUNCIL_MD" '### Step 9' "$s9.raw"
   setup_council_run
   sed -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" -e 's|<literal COUNCIL_SYNTH_DIR value from 5a>|/tmp/council-synth-x|' "$s9.raw" >| "$s9"
-  # REPORT_PATH_ABS is unset, so verification fails, but cleanup still runs first.
+  # The report literals are unsubstituted, so the copy is refused, but cleanup still runs.
   check_state_cleanup "$s9"
   [ "$status" -eq 1 ]
-  [[ "$stderr" == *"file write reported success but file not found"* ]]
+  [[ "$stderr" == *"is not the report staging directory 7a minted"* ]]
   [ ! -e "$REPO/.git/council-state.tsv" ]
   rm -rf "$REPO"
 }

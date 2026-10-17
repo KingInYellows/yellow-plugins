@@ -141,9 +141,12 @@ and never auto-commits. The user decides what to do with the verdicts.
 - **Path validation.** All `--paths` and file inputs validated via SKILL
   pattern (regex + `..` reject + existence check) before constructing shell
   args.
-- **Atomic file write via Write tool.** Writes synthesis report directly to
-  `docs/council/<date>-<mode>-<slug>.md` using the Write tool (no temp file
-  staging — matches brainstorm-orchestrator precedent).
+- **The report is saved by shell copy, never by `Write`.** Step 7c writes the
+  assembled report (synthesis plus redacted, fenced reviewer sections) to
+  `report.md` in its 0700 staging directory; Step 9 copies that file to
+  `docs/council/<date>-<mode>-<slug>.md` with `cp` and checks it with `cmp`.
+  The model never retypes the report, so the claude leg's redaction reaches
+  the saved file.
 
 ## Plugin Components
 
@@ -426,13 +429,9 @@ fresh-machine install CI (see Known Limitations).
   that is not this run's (shape, owner, token) and reads only
   `<dir>/synthesis.md`, so nothing destructive trusts the relayed path and a
   stray write elsewhere is never read or deleted. It does not stop a
-  deliberate `Write`; a `Write` deny rule does. A run cancelled between 7a and
-  7c leaves the staged synthesis in `/tmp` until a later 5a sweep (24 hours).
-- **Step 9 does not receive Step 7's assembled report (security).** 7c
-  builds `REPORT_CONTENT`, including the redaction pass over the claude leg,
-  but never hands it on, so the saved report is whatever the model writes in
-  Step 9 and that redaction is not mechanically guaranteed for it. Tracked in
-  [#1190](https://github.com/KingInYellows/yellow-plugins/issues/1190).
+  deliberate `Write`; a `Write` deny rule does. A run abandoned between 7a and
+  Step 9 leaves the staged synthesis (and, after 7c, the assembled report) in
+  its 0700 `/tmp` directory until a later 5a sweep (24 hours).
 - **Single-shot V1.** No multi-round iterative review. Deferred V2 features
   (XML evidence contract, quorum aggregation, `--round 2`, `/council fleet`) are
   listed once, in `commands/council/council.md` "V2 Trajectory".

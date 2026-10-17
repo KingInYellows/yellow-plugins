@@ -19,7 +19,7 @@ Single source of truth for yellow-council reviewer surfaces. Defines:
 - Slug derivation algorithm with collision handling
 - Diff truncation algorithm for `review` mode
 - UNKNOWN verdict fallback semantics
-- Atomic file write convention (Write tool direct, brainstorm-orchestrator pattern)
+- Report save convention (shell copy of the assembled, redacted report)
 
 Reviewer agents (`claude-reviewer.md`, `gemini-reviewer.md`,
 `opencode-reviewer.md`) and the `/council` orchestrator command read this skill
@@ -896,20 +896,21 @@ ORCHESTRATOR's turn absorbs, not the reviewers'. If the single-message fan-out
 ever fails to fit, lower the pack budget — do not serialize the spawns, which
 would forfeit the parallelism the whole design rests on.
 
-### Atomic File Write (Write Tool Direct)
+### Report Save (Shell Copy of the Assembled Report)
 
-Per brainstorm-orchestrator precedent, write the council report directly to
-the final path using the Write tool — no temp file staging:
+`/council` never writes the report with the `Write` tool. Step 7c assembles
+it in shell, including the redaction pass and fence rebuild over the
+`claude-reviewer` leg, and writes it to `report.md` inside its private 0700
+staging directory. After the Step 8 confirmation gate, Step 9 copies that
+exact file to `$REPORT_PATH_ABS` (computed via `build_target_path`) with
+`cp`, re-checking the staging directory's shape, owner and token, refusing an
+existing target, and confirming the copy with `cmp`.
 
-```text
-Use the Write tool with file_path = $REPORT_PATH (computed via build_target_path)
-and content = synthesis report + raw reviewer output sections.
-```
-
-Write tool failure leaves no partial file. This is simpler than mktemp + mv
-and matches the closest existing precedent (brainstorm-orchestrator does the
-same for `docs/brainstorms/<file>.md`). Atomic-write-via-rename is a V2
-option if concurrent invocations become possible.
+A model `Write` would need the report in the model's context, and shell
+variables do not survive between Bash blocks; printing the report is no fix
+because the Bash tool truncates long output. The model would rebuild the
+report from memory, and nothing would guarantee the claude leg's redaction
+for the saved copy. The copy keeps that guarantee mechanical.
 
 ### Write-Tool Pack Staging Rationale
 

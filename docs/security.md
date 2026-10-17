@@ -985,11 +985,26 @@ shell input, so the markdown now reaches the shell through a file:
   outside the validated file is never read or deleted. This removes the
   relayed-literal vector, not a deliberate `Write`; a `Write` deny rule is the
   real mitigation.
-- **Residual (interrupted run)**: a run cancelled or aborted between 7a and 7c
-  leaves the 0700 directory, holding the staged synthesis, until a later
-  `/council` reaches 5a and its sweep removes directories over 24 hours old. A
-  failed `Write` is still cleaned up: 7c validates the directory, finds no
-  `synthesis.md`, exits 1, and its trap removes the directory.
+- **7c hands off a file, not a variable.** After assembling the report
+  (including the redaction pass and fence rebuild over the claude leg), 7c
+  writes it to `<dir>/report.md` (refusing one that already exists), disarms
+  its trap, and prints `COUNCIL_ASSEMBLED_REPORT=<path>`.
+- **Step 9** re-runs the same directory check against the 7a literals,
+  requires `report.md` to be a regular non-symlink file the user owns, and
+  copies it with `cp` to the Step 6 target, which must be an absolute
+  `docs/council/<name>.md` path with no `..` that does not exist yet. `cmp`
+  confirms the copy; a failed or mismatched copy is removed. The saved report
+  is therefore byte-identical to what 7c assembled, so the claude leg's
+  redaction is mechanical rather than dependent on the model retyping the
+  report. A saved report removes the directory; the Step 8 Cancel block
+  removes it after the same check.
+- **Residual (interrupted run)**: a run cancelled or aborted between 7a and
+  Step 9 leaves the 0700 directory, holding the staged synthesis and (after
+  7c) the assembled report, until a later `/council` reaches 5a and its sweep
+  removes directories over 24 hours old. So does a Step 9 copy that fails, so
+  the report can be copied by hand. A failed `Write` is still cleaned up: 7c
+  validates the directory, finds no `synthesis.md`, exits 1, and its trap
+  removes the directory.
 
 ### OpenCode default route and quota stubs (yellow-council)
 
