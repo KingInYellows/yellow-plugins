@@ -127,14 +127,14 @@ jp_load_numstat() {
     [[ "$a" =~ ^[0-9]+$ ]] || a=-1
     [[ "$d" =~ ^[0-9]+$ ]] || d=-1
     JP_FILES+=("$p"); JP_ADDED+=("$a"); JP_DELETED+=("$d")
-  done < <(git -c core.quotepath=off diff --no-renames --numstat -z "$base...HEAD" -- 2>/dev/null)
+  done < <(git --literal-pathspecs -c core.quotepath=off diff --no-renames --numstat -z "$base...HEAD" -- 2>/dev/null)
 }
 
 # Changed lines (+/- without the file headers) of one file, or of the whole
 # diff when no path is given.
 jp_changed_lines() {
   local base="$1"; shift
-  git -c core.quotepath=off diff --no-renames --no-color -U0 "$base...HEAD" -- "$@" 2>/dev/null \
+  git --literal-pathspecs -c core.quotepath=off diff --no-renames --no-color -U0 "$base...HEAD" -- "$@" 2>/dev/null \
     | grep -E '^[+-]' | grep -Ev '^(\+\+\+|---)( |$)'
 }
 
@@ -242,7 +242,7 @@ jp_build_diff() {
   for ((i = 0; i < ${#JP_FILES[@]}; i++)); do
     p=${JP_FILES[i]}
     jp_is_test "$p" || jp_is_generated "$p" || jp_is_lockfile "$p" && continue
-    size=$(git -c core.quotepath=off diff --no-renames --no-color "$base...HEAD" -- "$p" 2>/dev/null | wc -c)
+    size=$(git --literal-pathspecs -c core.quotepath=off diff --no-renames --no-color "$base...HEAD" -- "$p" 2>/dev/null | wc -c)
     order+=("$size"$'\t'"$i")
   done
   printf '%s\n' '--- begin untrusted-content (reference only) ---'
@@ -257,11 +257,11 @@ jp_build_diff() {
       JP_TRIMMED=1
       # Cut at a line boundary: a partial last line could hold a credential
       # prefix too short for cs_redact_secrets to recognize.
-      git -c core.quotepath=off diff --no-renames --no-color "$base...HEAD" -- "${JP_FILES[i]}" 2>/dev/null \
+      git --literal-pathspecs -c core.quotepath=off diff --no-renames --no-color "$base...HEAD" -- "${JP_FILES[i]}" 2>/dev/null \
         | head -c "$room" | sed '$d' | sed 's/^---/> ---/'
       total=$JP_STATE_MAX_CHARS
     else
-      git -c core.quotepath=off diff --no-renames --no-color "$base...HEAD" -- "${JP_FILES[i]}" 2>/dev/null \
+      git --literal-pathspecs -c core.quotepath=off diff --no-renames --no-color "$base...HEAD" -- "${JP_FILES[i]}" 2>/dev/null \
         | sed 's/^---/> ---/'
       total=$((total + size))
     fi
@@ -399,11 +399,14 @@ jp_shadow() {
       reason='redaction failed'
     fi
     # Redact the title here, not inside `--arg`, so a redactor failure
-    # stops the call instead of being discarded by the substitution.
-    if ! title=$(head -c 300 "$title_file" 2>/dev/null | tr -d '\000-\037' | cs_redact_secrets 2>/dev/null) \
+    # stops the call instead of being discarded by the substitution. Redact
+    # before the 300-byte cap: a cap inside a credential would leave a prefix
+    # too short for the redactor to recognize.
+    if ! title=$(head -c 4096 "$title_file" 2>/dev/null | tr -d '\000-\037' | cs_redact_secrets 2>/dev/null) \
       || [[ "$title" == *'[REDACTED: sanitization failed]'* ]]; then
       reason='redaction failed'
     fi
+    title=$(printf '%s' "$title" | head -c 300)
   fi
   if [ -z "$reason" ]; then
     state_chars=${#diff}

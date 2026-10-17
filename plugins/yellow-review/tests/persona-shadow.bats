@@ -299,6 +299,28 @@ CORE
   jq -e '.body.state.files[] | select(.path == "-dash.txt")' "$LOG" >/dev/null
 }
 
+@test "shadow: a credential cut by the title cap is still redacted" {
+  start_stub ok
+  { head -c 285 /dev/zero | tr '\0' 'x'; printf ' ghp_%s\n' "abcdefghijklmnopqrstuvwxyz0123456789"; } > "$BATS_TEST_TMPDIR/title"
+  echo change >> src/a.ts
+  commit_change
+  run_shadow
+  [ "$output" = "persona-shadow: logged" ]
+  title=$(jq -r .body.state.title "$LOG")
+  [ "${#title}" -le 300 ]
+  [[ "$title" != *ghp_abc* ]]
+}
+
+@test "shadow: a pathspec-magic file name matches only itself" {
+  start_stub ok
+  printf 'x\n' > ':(glob)**'
+  printf 'TEST-ONLY-MARKER\n' > normal.test.js
+  commit_change
+  run_shadow
+  [ "$output" = "persona-shadow: logged" ]
+  ! grep -q 'TEST-ONLY-MARKER' "$LOG"
+}
+
 @test "shadow: a diff over the cap is trimmed and flagged" {
   start_stub ok
   head -c 40000 /dev/zero | tr '\0' 'x' | fold -w 100 > src/huge.txt
