@@ -126,6 +126,7 @@ unset -f _rv_sys _rv_base_ok _rv_probe
 command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(codex --version 2>/dev/null | head -n1)" || printf 'codex:              NOT FOUND\n'
 command -v gemini >/dev/null 2>&1 && printf 'gemini:             OK (%s)\n' "$(gemini --version 2>&1 | head -n1)" || printf 'gemini:             NOT FOUND\n'
 command -v opencode >/dev/null 2>&1 && printf 'opencode:           OK (%s)\n' "$(opencode --version 2>&1 | head -n1)" || printf 'opencode:           NOT FOUND\n'
+command -v claude >/dev/null 2>&1 && printf 'claude:             OK (%s)\n' "$(claude --version 2>/dev/null | head -n1)" || printf 'claude:             NOT FOUND\n'
 
 if command -v python3 >/dev/null 2>&1; then
   py_ver=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
@@ -777,11 +778,12 @@ prefixes and are not in the recorded probe list.
 
 **yellow-claudemod:**
 
-- READY: `claude --version` is 2.1.301 or later (the hooks module needs
-  `agent.spawn` for Agent-tool subagents)
+- READY: Step 1's `claude:` row is OK with a version of 2.1.301 or later
+  (the hooks module needs `agent.spawn` for Agent-tool subagents)
 - PARTIAL: never — the downshift is off by default by design, and the
   ledger needs no setup
-- NEEDS SETUP: `claude` missing from PATH OR older than 2.1.301
+- NEEDS SETUP: the `claude:` row is NOT FOUND OR its version is older than
+  2.1.301 or unparseable
 
 **yellow-core:**
 
