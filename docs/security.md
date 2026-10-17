@@ -612,7 +612,9 @@ before dispatch. It never changes which reviewers run.
   `REVIEW_JEV_MODEL` is set). Redaction is a pattern list, so a secret it does
   not recognize in the diff can still be sent.
 - **Repository gate.** The request is made only when `gh api
-  repos/{owner}/{repo}` reports the repository `public`, or the repository is
+  repos/<owner>/<repo>`, with the owner, repository and host parsed from the
+  `origin` remote that `/review:pr` diffs (never gh's default repository,
+  `GH_REPO` or `gh repo set-default`), reports the repository `public`, or the repository is
   listed in `reviewer_selection_private_repos` by name or by an `owner/*`
   entry (case-insensitive; it covers every repository of that owner,
   including ones created later). A failed or unparseable lookup counts as

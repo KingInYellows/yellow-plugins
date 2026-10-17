@@ -19,6 +19,7 @@ setup() {
   printf '{\n  "name": "demo",\n  "version": "1.0.0",\n  "description": "d"\n}\n' \
     > plugins/demo/.claude-plugin/plugin.json
   git add . && git commit -qm base
+  git remote add origin https://github.com/acme/widgets.git
   BASE=$(git rev-parse HEAD)
 
   KEY="sk-bats-$RANDOM$RANDOM-SECRET"
@@ -27,7 +28,15 @@ setup() {
 #!/usr/bin/env bash
 [ -n "${MOCK_GH_FAIL:-}" ] && exit 1
 [ -n "${GH_REPO:-}" ] && { printf '%s public\n' "$GH_REPO"; exit 0; }
-printf '%s %s\n' "${MOCK_REPO:-acme/widgets}" "${MOCK_VIS:-public}"
+printf '%s\n' "$*" >> "${MOCK_GH_LOG:-/dev/null}"
+for a in "$@"; do
+  case "$a" in
+    # gh's own default repository (a public second remote, say).
+    'repos/{owner}/{repo}') printf 'acme/public-fork public\n'; exit 0 ;;
+    repos/*) req=${a#repos/} ;;
+  esac
+done
+printf '%s %s\n' "${MOCK_REPO:-$req}" "${MOCK_VIS:-public}"
 SHIM
   chmod +x "$BATS_TEST_TMPDIR/bin/gh"
   export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
@@ -35,7 +44,7 @@ SHIM
   printf 'reliability-reviewer\nnot-an-agent\nsecurity-reviewer\n' > "$BATS_TEST_TMPDIR/trig"
   printf 'reliability-reviewer\n' > "$BATS_TEST_TMPDIR/disp"
   STUB_PID=""
-  unset TYPESAFE_API_KEY REVIEW_JEV_URL REVIEW_JEV_TIMEOUT_S JP_CORE_LIB MOCK_GH_FAIL MOCK_VIS MOCK_REPO GH_REPO
+  unset TYPESAFE_API_KEY REVIEW_JEV_URL REVIEW_JEV_TIMEOUT_S JP_CORE_LIB MOCK_GH_FAIL MOCK_VIS MOCK_REPO MOCK_GH_LOG GH_REPO
 }
 
 teardown() {
@@ -190,6 +199,28 @@ run_shadow() {
   run_shadow
   unset GH_REPO
   [ "$output" = "persona-shadow: logged without Jev (private repo)" ]
+  [ ! -s "$LOG" ]
+}
+
+@test "shadow: the gate checks origin, not gh's default repository" {
+  start_stub ok
+  export MOCK_VIS=private MOCK_GH_LOG="$BATS_TEST_TMPDIR/gh.log"
+  git remote set-url origin git@github.com:Acme/secret.git
+  echo change >> src/a.ts
+  commit_change
+  run_shadow
+  [ "$output" = "persona-shadow: logged without Jev (private repo)" ]
+  [ ! -s "$LOG" ]
+  grep -q -- '--hostname github.com repos/Acme/secret ' "$MOCK_GH_LOG"
+}
+
+@test "shadow: no usable origin fails closed" {
+  start_stub ok
+  git remote remove origin
+  echo change >> src/a.ts
+  commit_change
+  run_shadow
+  [ "$output" = "persona-shadow: logged without Jev (repo visibility unknown)" ]
   [ ! -s "$LOG" ]
 }
 

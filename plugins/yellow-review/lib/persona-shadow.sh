@@ -220,14 +220,25 @@ jp_core_lib_path() {
   sp_sibling_file "$root" yellow-core lib/compound-staging.sh || true
 }
 
-# Print `<full_name> <visibility>` for the current repository via REST
-# (gh repo view uses GraphQL, which some environments refuse). GH_REPO is
-# cleared so {owner}/{repo} always names the checkout, never another repo.
+# Print `<full_name> <visibility>` for the repository behind `origin` via REST
+# (gh repo view uses GraphQL, which some environments refuse). /review:pr
+# fetches and diffs `origin`, so the gate names that repository explicitly:
+# gh's own default (GH_REPO, `gh repo set-default`) could pick another remote.
 jp_repo_visibility() {
-  local t=() out
+  local t=() out url host owner name
+  url=$(git remote get-url origin 2>/dev/null) || return 1
+  if [[ "$url" =~ ^(https?|ssh|git)://([^@/]+@)?([^/:]+)(:[0-9]+)?/([A-Za-z0-9._-]+)/([A-Za-z0-9._-]+)$ ]]; then
+    host=${BASH_REMATCH[3]} owner=${BASH_REMATCH[5]} name=${BASH_REMATCH[6]}
+  elif [[ "$url" =~ ^([^@/:]+@)?([^/:]+):([A-Za-z0-9._-]+)/([A-Za-z0-9._-]+)$ ]]; then
+    host=${BASH_REMATCH[2]} owner=${BASH_REMATCH[3]} name=${BASH_REMATCH[4]}
+  else
+    return 1
+  fi
+  name=${name%.git}
   if command -v timeout >/dev/null 2>&1; then t=(timeout 15)
   elif command -v gtimeout >/dev/null 2>&1; then t=(gtimeout 15); fi
-  out=$(${t[@]+"${t[@]}"} env -u GH_REPO gh api 'repos/{owner}/{repo}' --jq '.full_name + " " + .visibility' 2>/dev/null) || return 1
+  out=$(${t[@]+"${t[@]}"} env -u GH_REPO gh api --hostname "$host" "repos/$owner/$name" \
+    --jq '.full_name + " " + .visibility' 2>/dev/null) || return 1
   [[ "$out" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\ [a-z]+$ ]] || return 1
   printf '%s' "$out"
 }
