@@ -220,11 +220,13 @@ jp_core_lib_path() {
 }
 
 # Print `<full_name> <visibility>` for the current repository via REST
-# (gh repo view uses GraphQL, which some environments refuse).
+# (gh repo view uses GraphQL, which some environments refuse). GH_REPO is
+# cleared so {owner}/{repo} always names the checkout, never another repo.
 jp_repo_visibility() {
   local t=() out
-  command -v timeout >/dev/null 2>&1 && t=(timeout 15)
-  out=$(${t[@]+"${t[@]}"} gh api 'repos/{owner}/{repo}' --jq '.full_name + " " + .visibility' 2>/dev/null) || return 1
+  if command -v timeout >/dev/null 2>&1; then t=(timeout 15)
+  elif command -v gtimeout >/dev/null 2>&1; then t=(gtimeout 15); fi
+  out=$(${t[@]+"${t[@]}"} env -u GH_REPO gh api 'repos/{owner}/{repo}' --jq '.full_name + " " + .visibility' 2>/dev/null) || return 1
   [[ "$out" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\ [a-z]+$ ]] || return 1
   printf '%s' "$out"
 }

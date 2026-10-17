@@ -26,6 +26,7 @@ setup() {
   cat > "$BATS_TEST_TMPDIR/bin/gh" <<'SHIM'
 #!/usr/bin/env bash
 [ -n "${MOCK_GH_FAIL:-}" ] && exit 1
+[ -n "${GH_REPO:-}" ] && { printf '%s public\n' "$GH_REPO"; exit 0; }
 printf '%s %s\n' "${MOCK_REPO:-acme/widgets}" "${MOCK_VIS:-public}"
 SHIM
   chmod +x "$BATS_TEST_TMPDIR/bin/gh"
@@ -34,7 +35,7 @@ SHIM
   printf 'reliability-reviewer\nnot-an-agent\nsecurity-reviewer\n' > "$BATS_TEST_TMPDIR/trig"
   printf 'reliability-reviewer\n' > "$BATS_TEST_TMPDIR/disp"
   STUB_PID=""
-  unset TYPESAFE_API_KEY REVIEW_JEV_URL REVIEW_JEV_TIMEOUT_S JP_CORE_LIB MOCK_GH_FAIL MOCK_VIS MOCK_REPO
+  unset TYPESAFE_API_KEY REVIEW_JEV_URL REVIEW_JEV_TIMEOUT_S JP_CORE_LIB MOCK_GH_FAIL MOCK_VIS MOCK_REPO GH_REPO
 }
 
 teardown() {
@@ -172,6 +173,17 @@ run_shadow() {
   echo change >> src/a.ts
   commit_change
   run_shadow
+  [ "$output" = "persona-shadow: logged without Jev (private repo)" ]
+  [ ! -s "$LOG" ]
+}
+
+@test "shadow: GH_REPO naming a public repository does not open a private one" {
+  start_stub ok
+  export MOCK_VIS=private GH_REPO=acme/public-thing
+  echo change >> src/a.ts
+  commit_change
+  run_shadow
+  unset GH_REPO
   [ "$output" = "persona-shadow: logged without Jev (private repo)" ]
   [ ! -s "$LOG" ]
 }
