@@ -24,6 +24,7 @@ setup() {
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$MOCK_JEV_LOG"
 cat > "$MOCK_JEV_BODY"
+[ -p /dev/fd/3 ] && printf 'pipe\n' > "$MOCK_JEV_CFG.type"
 cat /dev/fd/3 > "$MOCK_JEV_CFG" 2>/dev/null
 [ "${MOCK_JEV_FAIL:-0}" = "1" ] && exit 22
 printf '%s\n0.142' "$MOCK_JEV_RESPONSE"
@@ -100,6 +101,23 @@ _capture() {
   grep -q -- '--data-binary @-' "$MOCK_JEV_LOG"
   [ "$(cut -d' ' -f1 "$MOCK_JEV_LOG")" = "-q" ]
   grep -q 'Authorization: Bearer test-key-123' "$MOCK_JEV_CFG"
+}
+
+@test "API key reaches curl through a pipe, never a here-document" {
+  COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 _capture
+  [ "$(cat "$MOCK_JEV_CFG")" = 'header = "Authorization: Bearer test-key-123"' ]
+  [ "$(cat "$MOCK_JEV_CFG.type")" = pipe ]
+  # bash < 5.1 backs every here-document with a temp file in $TMPDIR.
+  ! grep -nE '3<<' "$BATS_TEST_DIRNAME/../lib/jev-prefilter.sh"
+}
+
+@test "xtrace does not log the API key" {
+  COMPOUND_JEV_PREFILTER=shadow TYPESAFE_API_KEY=test-key-123 \
+    bash -x "$CAPTURE_SCRIPT" "$TRANSCRIPT_FILE" "$SESSION_ID" "$STAGING" "$PROJECT_DIR" \
+    2> "$MOCK_BIN/xtrace.log"
+  grep -q 'Authorization: Bearer test-key-123' "$MOCK_JEV_CFG"
+  grep -q 'jev_' "$MOCK_BIN/xtrace.log"
+  ! grep -q 'test-key-123' "$MOCK_BIN/xtrace.log"
 }
 
 @test "transcript is fenced as untrusted reference data" {
