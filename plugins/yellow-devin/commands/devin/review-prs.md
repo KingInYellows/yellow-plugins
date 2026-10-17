@@ -274,11 +274,11 @@ Processing PRs as independent.", and process as independent.
 If stacked PRs detected and the router state is `READY_GITHUB`:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode upstack
+node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" rebase --mode upstack
 ```
 
 Read the JSON result's `status` field. `CONFLICT`: run
-`node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode abort`,
+`node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" rebase --mode abort`,
 warn "Stack restack failed. Processing PRs as independent.", and process as
 independent. Any other non-`SUCCESS` status: report the result's
 `recoveryAction` and process as independent.
@@ -469,7 +469,7 @@ If the router state is `READY_GITHUB`:
 ```bash
 git add -- "${CHANGED_FILES[@]}"
 git commit -m "fix: address review findings"
-node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
+node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" submit
 ```
 
 Read the JSON result's `status` field; `SUCCESS` continues, anything else
@@ -645,11 +645,11 @@ If PR is part of a stack and changes were made, and the router state is
 `READY_GITHUB`:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode upstack
+node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" rebase --mode upstack
 ```
 
 Read the JSON result's `status` field. `CONFLICT`: run
-`node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode abort`,
+`node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" rebase --mode abort`,
 report to user, continue to next PR. Any other non-`SUCCESS` status: report
 the result's `recoveryAction`, continue to next PR.
 

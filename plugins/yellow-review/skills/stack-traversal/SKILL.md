@@ -61,7 +61,7 @@ leading graph characters (`◉`, `◯`, `│`, etc.).
 **GitHub:**
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" view
+node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" view
 ```
 
 Read the JSON result's `status` field. `SUCCESS` — parse `stdout` as the
@@ -188,11 +188,11 @@ surfaces restack conflicts in its summary so the user can restack manually.
 **GitHub:**
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode upstack
+node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" rebase --mode upstack
 ```
 
 Read the JSON result's `status` field. `CONFLICT`: run
-`node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode abort`
+`node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" rebase --mode abort`
 to clear the conflicted rebase (otherwise the repo stays mid-rebase and the
 next checkout fails), record the conflict for the command's final summary,
 and continue to the next PR. Any other non-`SUCCESS` status: report the

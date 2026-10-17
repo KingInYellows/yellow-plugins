@@ -80,7 +80,7 @@ Filter to open PRs only. Order base → tip (bottom of stack first).
 **GitHub (`READY_GITHUB`):**
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" view
+node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" view
 ```
 
 Read the JSON result's `status` field. `SUCCESS` — parse `stdout` per the
@@ -391,7 +391,7 @@ aggregation rules change there, propagate the same change here.
     printf 'fix: address review findings from %s\n' "<reviewer-categories>" >| "$msgfile"
     git commit -F "$msgfile"
     rm -f "$msgfile"
-    node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
+    node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" submit
     ```
 
     Read the JSON result's `status` field; `SUCCESS` continues, anything
@@ -423,11 +423,11 @@ aggregation rules change there, propagate the same change here.
     GitHub:
 
     ```bash
-    node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode upstack
+    node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" rebase --mode upstack
     ```
 
     Read the JSON result's `status` field. `CONFLICT`: run
-    `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode abort`,
+    `node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" rebase --mode abort`,
     report to user, continue to next PR. Anything else non-`SUCCESS`:
     report the result's `recoveryAction`, continue to next PR.
 

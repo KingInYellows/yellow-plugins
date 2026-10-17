@@ -286,7 +286,7 @@ for why that opt-out exists.
 
 ### Shared Libraries
 
-`lib/` also carries four Node modules and three Python scripts, invoked rather
+`lib/` also carries five Node modules and three Python scripts, invoked rather
 than sourced:
 
 - `stack-provider-state.js` — the single owner of stacked-PR provider state.
@@ -318,6 +318,14 @@ than sourced:
   (yellow-cursor, yellow-devin, or yellow-jules) is active for
   `/linear:delegate` and `/setup:all` Step 2.5; a smaller
   sibling of `stack-provider-state.js` with no intent file and no switch plan
+- `run-github-stack-runtime.js` — how commands call github-workflow's
+  `lib/github-stack-runtime.js`: `node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" <op> ...`.
+  Finds the source-tree sibling, then the highest numeric version in the
+  installed cache (`${CLAUDE_PLUGIN_ROOT}/../github-workflow/` exists only in
+  the source tree), and passes argv, stdio and exit code through. A missing
+  runtime prints a `RUNTIME_NOT_FOUND` result; `--locate` prints the path.
+  yellow-review, yellow-debt, yellow-devin and yellow-semgrep ship
+  byte-identical copies (`tests/integration/run-github-stack-runtime.test.ts`)
 - `context-observer.py` — opt-in statusline stage (installed as
   `<config>/yellow-context-observer.py`): passes the payload through, always
   exits 0, and records context-window numbers to

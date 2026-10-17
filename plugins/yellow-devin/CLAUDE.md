@@ -86,6 +86,9 @@ installs that still bundle DeepWiki here.
 - **Shell quoting:** Always quote variables: `"$VAR"` not `$VAR`.
 - **Git workflow:** Use the active stacked-PR provider (see `/stack:status`), not raw
   `git push` or `gh pr create`.
+  Under `READY_GITHUB`, call github-workflow's runtime through
+  `lib/run-github-stack-runtime.js` (a copy of yellow-core's), which finds it
+  in the source tree or the installed cache.
 - **Input validation:**
   - Token format: `^cog_[a-zA-Z0-9_-]{20,128}$`
   - Session ID: `^[a-zA-Z0-9_-]{8,64}$`

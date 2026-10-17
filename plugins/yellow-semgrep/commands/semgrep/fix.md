@@ -244,7 +244,7 @@ Rule: {check_id}
 Severity: {severity}
 Fix-Type: autofix|llm
 Verified: pass|warning (findings at modified lines, not proven regression)|unverified (semgrep CLI unavailable)"
-node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
+node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" submit
 ```
 
 Read the JSON result's `status` field; `SUCCESS` continues, anything else

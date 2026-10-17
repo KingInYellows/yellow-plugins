@@ -523,7 +523,7 @@ TRUNK=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/nu
 git checkout "$TRUNK"
 git pull --ff-only 2>/dev/null || \
   printf '[plan:complete] WARNING: git pull failed; proceeding on possibly-stale trunk\n' >&2
-node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" init --base "$TRUNK" --branch "plan/archive-$SLUG"
+node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" init --base "$TRUNK" --branch "plan/archive-$SLUG"
 ```
 
 This is a first branch off trunk, so the GitHub adapter operation is `init`
@@ -628,7 +628,7 @@ gh pr view --json url -q .url 2>/dev/null || printf '[plan:complete] (submitted;
 
 ```bash
 set -euo pipefail
-node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
+node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" submit
 ```
 
 Read the JSON result's `status` field. `SUCCESS` continues below, anything

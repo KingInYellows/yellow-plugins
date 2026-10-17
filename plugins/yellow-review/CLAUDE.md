@@ -535,6 +535,9 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   sibling plugin: the source tree first, then the newest numeric version in
   the installed cache. `review-ledger.sh` checks `RL_CORE_LIB` before calling
   it; the helper itself has no override.
+- `lib/run-github-stack-runtime.js` (node) — the commands' and skills' entry
+  to github-workflow's `github-stack-runtime.js` in both layouts; a
+  byte-identical copy of yellow-core's (see yellow-core `CLAUDE.md`)
 - `lib/review-ledger.sh <subcommand>` — the durable review-findings ledger
   (plans/complete/review-findings-ledger.md): an append-only JSONL file
   per PR at
