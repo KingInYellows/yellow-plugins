@@ -322,6 +322,9 @@ jp_shadow() {
   local pr='' head='' base='' title_file='' trig_file='' disp_file=''
   local -a allow=()
   while [ $# -gt 0 ]; do
+    # Every flag takes a value; a trailing flag would make `shift 2` a no-op
+    # and loop forever.
+    [ $# -ge 2 ] || { jp_out "skipped (usage)"; return 0; }
     case "$1" in
       --pr) pr=${2:-}; shift 2 ;;
       --head) head=${2:-}; shift 2 ;;

@@ -144,6 +144,12 @@ run_shadow() {
   [ "$output" = "persona-shadow: skipped (usage)" ]
 }
 
+@test "shadow: a trailing flag with no value is skipped, not a hang" {
+  run timeout 10 "$SCRIPT" shadow --pr 1 --allow-repo
+  [ "$status" -eq 0 ]
+  [ "$output" = "persona-shadow: skipped (usage)" ]
+}
+
 @test "shadow: no key logs exact and orchestrator sets without calling Jev" {
   start_stub ok
   unset TYPESAFE_API_KEY
