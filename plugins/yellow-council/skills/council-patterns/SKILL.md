@@ -1220,9 +1220,10 @@ finding.
   An exact substring scores 100 in Tier 2 too. Redaction or scorer failures
   are `verifier-error`. Only a finding's first `Evidence:` quote is checked;
   a later one is tagged `[UNCHECKED]` in the Pass A input.
-- *Codex limitation*: yellow-codex builds its findings from Codex JSON, which
-  carries a location but no source line, so every Codex finding is
-  `no-evidence` and a Codex-only finding always lands in Unverified Claims.
+- *Codex*: `codex-reviewer` emits Codex's quote of the cited line as the
+  finding's `Evidence:`, or `Evidence: N/A — <reason>` when there is none,
+  which is `no-evidence`. An older yellow-codex emits no quote, so every
+  Codex finding is `no-evidence`.
 
 **Rubric.** Per finding, with fixed domains:
 `correctness ∈ {verified, fuzzy-verified, unverified}`,

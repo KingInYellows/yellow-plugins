@@ -417,12 +417,11 @@ fresh-machine install CI (see Known Limitations).
   exceed the council's `COUNCIL_TIMEOUT` (default 600s). Run
   `opencode run "test"` once interactively after each upgrade before relying
   on the agent for time-bounded invocations.
-- **Codex findings are always Unverified Claims.** yellow-codex builds its
-  findings from Codex JSON, which has a location but no source line, so no
-  Codex finding carries an `Evidence:` quote: each one is `unverified` with
-  reason `no-evidence`, and a Codex-only finding always lands in Unverified
-  Claims. A lineage limitation, not a verdict on Codex; tracked in
-  [#1180](https://github.com/KingInYellows/yellow-plugins/issues/1180).
+- **Codex evidence depends on Codex quoting the line.** `codex-reviewer`
+  asks Codex for the cited line and emits it as the finding's `Evidence:`
+  quote; when Codex returns none it emits `Evidence: N/A`, which verifies as
+  `no-evidence`, and a quote of the wrong line lands as `no-match`. An older
+  yellow-codex without the quote leaves every Codex finding `no-evidence`.
 - **Reviewer line numbers are estimates.** Packs do not number excerpt lines,
   so a citation can miss the ±3 window and land in Unverified Claims
   (`no-match`) though the code is real. Treat the manual 2.6 scenarios as the
