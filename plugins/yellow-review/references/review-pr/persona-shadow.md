@@ -1,7 +1,10 @@
 # Persona selection shadow log — `/review:pr` Step 4
 
 Loaded by `/review:pr` Step 4 only when `yellow-plugins.local.md` sets
-`reviewer_selection: shadow` or `reviewer_selection: jev`. Both mean shadow
+`reviewer_selection: shadow` or `reviewer_selection: jev`. A repo file that
+leaves `reviewer_selection` unset falls back to the user-level file
+`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md`, which turns the log on for every repository; read
+`reviewer_selection_private_repos` from the same file the setting came from. Both mean shadow
 for now: the log never changes which reviewers run. `/review:all` does not
 run it. Skip it under `review_pipeline: legacy`.
 
@@ -27,9 +30,10 @@ applied) and before Step 5 dispatches anything. Run it once per review.
 Write agent names only, one per line, from the conditional table (leave out
 always-on personas and `codex-reviewer`). The PR title goes to a file
 straight from `gh`, never through command text. Use the `DIFF_BASE` value
-from Step 3a. Add one `--allow-repo <owner/repo>` per entry in
-`reviewer_selection_private_repos`; with none, private repositories send
-nothing.
+from Step 3a. Add one `--allow-repo <entry>` per entry in
+`reviewer_selection_private_repos`, where an entry is `owner/repo` or
+`owner/*` (every repository of that owner, matched case-insensitively);
+with none, private repositories send nothing.
 
 ```bash
 JP="${CLAUDE_PLUGIN_ROOT}/lib/persona-shadow.sh"

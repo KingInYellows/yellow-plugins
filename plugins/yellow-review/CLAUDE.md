@@ -576,7 +576,9 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   `<git-common-dir>/yellow-review/jev-persona/<pr>-<head>.json` with the
   exact, orchestrator, Jev and dispatched sets; never diff text. The Jev call
   runs only with `TYPESAFE_API_KEY`, yellow-core's `cs_redact_secrets`, and
-  a public repository or one in `reviewer_selection_private_repos`; always
+  a public repository or one in `reviewer_selection_private_repos`
+  (`owner/repo` or `owner/*`; both keys fall back to the user-level
+  `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md`); always
   exits 0 with one `persona-shadow:` line for Coverage. The procedure is
   `references/review-pr/persona-shadow.md`; `/review:all` does not run it.
   Trust boundary: `docs/security.md` "Persona Selection Shadow Log".

@@ -196,6 +196,19 @@ run_shadow() {
   [ "$(wc -l < "$LOG")" -eq 1 ]
 }
 
+@test "shadow: an owner wildcard allows that owner's private repositories only" {
+  start_stub ok
+  export MOCK_VIS=private MOCK_REPO=Acme/secret
+  echo change >> src/a.ts
+  commit_change
+  run_shadow --allow-repo 'acme/*'
+  [ "$output" = "persona-shadow: logged" ]
+  export MOCK_REPO=acmeco/secret
+  run_shadow --allow-repo 'acme/*'
+  [ "$output" = "persona-shadow: logged without Jev (private repo)" ]
+  [ "$(wc -l < "$LOG")" -eq 1 ]
+}
+
 @test "shadow: missing redactor sends nothing" {
   start_stub ok
   export JP_CORE_LIB="$BATS_TEST_TMPDIR/none.sh"

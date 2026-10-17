@@ -612,9 +612,13 @@ before dispatch. It never changes which reviewers run.
   not recognize in the diff can still be sent.
 - **Repository gate.** The request is made only when `gh api
   repos/{owner}/{repo}` reports the repository `public`, or the repository is
-  listed in `reviewer_selection_private_repos`. A failed or unparseable
-  lookup counts as private, so diffs from private repositories never leave
-  without an explicit entry.
+  listed in `reviewer_selection_private_repos` by name or by an `owner/*`
+  entry (case-insensitive; it covers every repository of that owner,
+  including ones created later). A failed or unparseable lookup counts as
+  private, so diffs from private repositories never leave without an
+  explicit entry. Both keys may come from the user-level
+  `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md`, which applies to every repository whose own file leaves
+  `reviewer_selection` unset.
 - **When.** Once per `/review:pr` run with the key set (5 s timeout,
   `REVIEW_JEV_TIMEOUT_S`). `/review:all` does not call it.
 - **Credential handling.** As in the pre-filter: the key reaches curl as a

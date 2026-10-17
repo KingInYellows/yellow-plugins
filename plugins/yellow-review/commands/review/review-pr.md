@@ -425,7 +425,9 @@ below covers this table too.
 
 #### Shadow selection log (`reviewer_selection`)
 
-When `yellow-plugins.local.md` sets `reviewer_selection: shadow` or `jev`,
+When `yellow-plugins.local.md` sets `reviewer_selection: shadow` or `jev`
+(if the repo file leaves it unset, use the value in
+`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md`),
 Read `${CLAUDE_PLUGIN_ROOT}/references/review-pr/persona-shadow.md` once the
 selection above is final, and run it before Step 5. It only logs; dispatch
 stays exactly as selected. Unset or `off` (the default): skip the Read.

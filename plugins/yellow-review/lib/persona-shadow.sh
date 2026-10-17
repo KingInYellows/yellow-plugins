@@ -8,7 +8,7 @@
 #       files, dirs}. Globs, extensions, keyword regexes and line counts only.
 #   persona-shadow.sh shadow --pr <n> --head <sha> --base <diff-base>
 #           --title-file <f> --triggered-file <f> --dispatched-file <f>
-#           [--allow-repo <owner/repo>]...
+#           [--allow-repo <owner/repo|owner/*>]...
 #       Compute the exact triggers, ask TypeSafe's Jev the nine fuzzy-trigger
 #       questions in lib/jev-persona-criteria.json (one request), and write one
 #       JSON record to <git-common-dir>/yellow-review/jev-persona/<pr>-<head>.json.
@@ -360,8 +360,13 @@ jp_shadow() {
   else
     repo=${vis% *} visibility=${vis##* }
     [ "$visibility" = public ] && allowed=1
+    # GitHub names are case-insensitive; "owner/*" allows every repo of owner.
+    local repo_lc a_lc
+    repo_lc=$(printf '%s' "$repo" | tr '[:upper:]' '[:lower:]')
     for a in "${allow[@]+"${allow[@]}"}"; do
-      [ "$a" = "$repo" ] && allowed=1
+      a_lc=$(printf '%s' "$a" | tr '[:upper:]' '[:lower:]')
+      [ "$a_lc" = "$repo_lc" ] && allowed=1
+      [ "${a_lc%/\*}/*" = "$a_lc" ] && [ "${a_lc%/\*}" = "${repo_lc%%/*}" ] && allowed=1
     done
     [ "$allowed" = 1 ] || reason='private repo'
   fi

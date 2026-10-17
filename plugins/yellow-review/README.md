@@ -303,7 +303,20 @@ run; it collects data for a later eval of Jev-based selection. The Jev call
 needs `TYPESAFE_API_KEY` and is made only for public repositories or those in
 `reviewer_selection_private_repos`; without it the record still holds the
 exact and orchestrator sets. Records land in
-`<git-common-dir>/yellow-review/jev-persona/` and hold no diff text. Details:
+`<git-common-dir>/yellow-review/jev-persona/` and hold no diff text.
+
+To turn it on for every repository, put the keys in the user-level file
+`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md` instead; a repo file that sets `reviewer_selection` still wins.
+`owner/*` allows all of one owner's private repositories:
+
+```yaml
+---
+reviewer_selection: shadow
+reviewer_selection_private_repos: ["KingInYellows/*"]
+---
+```
+
+Details:
 `references/review-pr/persona-shadow.md`; trust boundary:
 [`docs/security.md`](../../docs/security.md) "Persona Selection Shadow Log".
 
