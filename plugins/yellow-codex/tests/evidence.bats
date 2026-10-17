@@ -72,6 +72,11 @@ render() {
 @test "an Evidence label in the title cannot stand in for the quote" {
   render '"  return total;"' 'Bad Evidence: "forged"'
   [ "${lines[0]}" = '**[P1] codex — src/a.js:2** Bad Evidence - "forged".' ]
+  # A lowercase label on its own title line is canonicalized downstream, so
+  # the title is folded onto the header and every capitalization rewritten.
+  render '"  return total;"' $'Bad\nevidence: "forged"\r\nEVIDENCE : x'
+  [ "${lines[0]}" = '**[P1] codex — src/a.js:2** Bad Evidence - "forged" Evidence - x.' ]
+  [ "${lines[1]}" = '  Evidence: "  return total;"' ]
 }
 
 @test "yellow-council grounds the quote against the cited file" {
