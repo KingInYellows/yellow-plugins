@@ -234,6 +234,8 @@ one whose interpreter is inside it.
 
 Shared shell libraries live in `lib/` (`resolve-text.sh`, `resolve-gh.sh`,
 `resolve-paths.sh`, `gh-graphql.sh`, `verify-run.sh`) and are sourced by these scripts.
+`lib/persona-shadow.sh` is the `/review:pr` shadow selection logger (see
+"Opt-in: persona selection shadow log" below).
 
 ## Opt-in: thermonuclear structural review
 
@@ -290,6 +292,35 @@ Two caveats worth knowing before enabling it:
   persona back out after `reviewer_set.include` adds it — add
   `maintainability` to `focus_areas` too, or the opt-in snippet above has
   no effect.
+
+## Opt-in: persona selection shadow log
+
+Set `reviewer_selection: shadow` in `yellow-plugins.local.md` to log, for each
+`/review:pr` run, which conditional personas the dispatch table's exact rules
+pick, which ones the orchestrator picked, and which ones TypeSafe's Jev would
+pick from one request on the redacted diff. It never changes which reviewers
+run; it collects data for a later eval of Jev-based selection. The Jev call
+needs `TYPESAFE_API_KEY` and is made only for public repositories or those in
+`reviewer_selection_private_repos`; without it the record still holds the
+exact and orchestrator sets. Records land in
+`<git-common-dir>/yellow-review/jev-persona/` and hold no diff text.
+
+To turn it on for every repository, put `reviewer_selection` in the
+user-level file `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md` instead; a repo file that sets it still wins.
+`reviewer_selection_private_repos` is read only from that user-level file,
+since a PR could otherwise add its own opt-in. `owner/*` allows all of one
+owner's private repositories:
+
+```yaml
+---
+reviewer_selection: shadow
+reviewer_selection_private_repos: ["KingInYellows/*"]
+---
+```
+
+Details:
+`references/review-pr/persona-shadow.md`; trust boundary:
+[`docs/security.md`](../../docs/security.md) "Persona Selection Shadow Log".
 
 ## Review-findings ledger
 

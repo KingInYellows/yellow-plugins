@@ -592,6 +592,62 @@ runs it, and it changes no staging behaviour.
   matches, no repeated paths) and every judged review row before printing or
   writing anything.
 
+### Persona Selection Shadow Log (yellow-review)
+
+Off by default. When `yellow-plugins.local.md` sets `reviewer_selection:
+shadow` (or `jev`, which behaves the same for now), `/review:pr` Step 4 runs
+`lib/persona-shadow.sh shadow` once per review, after reviewer selection and
+before dispatch. It never changes which reviewers run.
+
+- **What leaves the machine.** Only when `TYPESAFE_API_KEY` is set and curl,
+  jq and yellow-core's `cs_redact_secrets` are available: the PR title (first
+  300 bytes, control characters stripped), the changed paths with per-file
+  line counts, and the diff hunks of every file that is not a test, generated
+  file or lockfile. All three pass through `cs_redact_secrets` (no call if it
+  is missing or reports a failure) and are each wrapped in the
+  untrusted-content fence; the diff is capped near 24,000 characters with the
+  largest files dropped first. The request also carries the nine fixed questions in
+  `lib/jev-persona-criteria.json`. It goes to TypeSafe AI
+  (`https://api.typesafe.ai/v1/systemone`, model `jev-1.13.0` unless
+  `REVIEW_JEV_MODEL` is set). Redaction is a pattern list, so a secret it does
+  not recognize in the diff can still be sent.
+- **Repository gate.** The request is made only when `gh api
+  repos/<owner>/<repo>`, with the owner, repository and host parsed from the
+  `origin` remote that `/review:pr` diffs (never gh's default repository,
+  `GH_REPO` or `gh repo set-default`), reports the repository `public`, or the repository is
+  listed in `reviewer_selection_private_repos` by name or by an `owner/*`
+  entry (case-insensitive; it covers every repository of that owner,
+  including ones created later). A failed or unparseable lookup counts as
+  private, so diffs from private repositories never leave without an
+  explicit entry. `reviewer_selection_private_repos` is read only from the
+  user-level `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-plugins.local.md`, never from the repository's file:
+  `/review:pr` reads config from the checked-out PR head, so a contributor
+  could otherwise opt a private repository in. `reviewer_selection` itself
+  may come from either file; it alone sends nothing from a private
+  repository.
+- **When.** Once per `/review:pr` run with the key set (5 s timeout,
+  `REVIEW_JEV_TIMEOUT_S`). `/review:all` does not call it.
+- **Credential handling.** The key reaches curl as a config on fd 3, fed by
+  a process substitution (a pipe, not a here-document, which bash before 5.1
+  writes to a temp file), and the body on stdin, never argv; curl runs with
+  `-q`. The key is never written to disk or logs. `REVIEW_JEV_URL` and
+  `REVIEW_JEV_MODEL` redirect the request and are trusted configuration.
+- **Prompt injection.** The diff is wrapped in the
+  `--- begin untrusted-content (reference only) ---` fence (lines starting
+  `---` are quoted), and every question tells the model to read it as data.
+  Answers are accepted only when all nine are probabilities in [0, 1]; they
+  are logged, never executed or fed back to Claude, and no reviewer is
+  skipped on their account in this phase.
+- **Local record.** `<git-common-dir>/yellow-review/jev-persona/<pr>-<head>.json`
+  (directory 0700, file 0600, replaced atomically) holds the criteria file's
+  sha256, the model, the exact-rule, orchestrator, Jev and dispatched persona
+  sets, probabilities, line counts, the trim flag and latency. It holds no
+  diff or title text and is never pushed. The diff exists on disk only as a
+  private temp file between `git diff` and redaction.
+- **Failure mode.** Fail-open and shadow only: every error ends in one
+  `persona-shadow:` line, exit 0, and the review continues with the
+  selection it already made.
+
 ### Context Observer Persistence (yellow-core)
 
 `/statusline:setup` Step 5b (or `/statusline:setup observer`) offers an opt-in
