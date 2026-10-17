@@ -28,6 +28,10 @@
             "type": ["number", "null"],
             "description": "Confidence in this finding from 0.0 to 1.0, or null if not assessed"
           },
+          "evidence": {
+            "type": ["string", "null"],
+            "description": "The exact text of the source line at code_location.line_range.start, copied verbatim from the file as it reads after the change (one line, no line number, no added quotes); null when the finding has no single quotable line"
+          },
           "category": {
             "type": ["string", "null"],
             "description": "Finding category: security, correctness, quality, performance, style; null if uncategorized"
@@ -61,6 +65,7 @@
           "priority",
           "confidence_score",
           "category",
+          "evidence",
           "code_location"
         ]
       }

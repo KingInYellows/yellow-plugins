@@ -144,8 +144,12 @@ one diagnostics file and reads only those events (`codex-patterns`
 
 ## Testing
 
-`bats tests/` from the plugin directory (`redaction.bats` — the blocking CI
-gate runs the whole directory). `redaction.bats` pins the redact-then-cap order
+`bats tests/` from the plugin directory (`redaction.bats` and
+`evidence.bats` — the blocking CI gate runs the whole directory).
+`evidence.bats` extracts `codex-reviewer`'s Step 6 findings `jq` and runs its
+output through yellow-council's real normalize, extract and verify helpers, so
+a format change that breaks `/council`'s evidence check fails here.
+`redaction.bats` pins the redact-then-cap order
 in `commands/codex/review.md` so a credential can never straddle the byte cap
 unredacted; the mechanics live in that file's header. Also validate with
 `pnpm validate:codex` (artifact + exposure lint) and `pnpm validate:schemas`.
