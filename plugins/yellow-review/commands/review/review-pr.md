@@ -423,6 +423,13 @@ from `reviewer_set.include` to a spawnable `subagent_type`; without it the
 opt-in path has no mapping to dispatch. The graceful-degradation guard
 below covers this table too.
 
+#### Shadow selection log (`reviewer_selection`)
+
+When `yellow-plugins.local.md` sets `reviewer_selection: shadow` or `jev`,
+Read `${CLAUDE_PLUGIN_ROOT}/references/review-pr/persona-shadow.md` once the
+selection above is final, and run it before Step 5. It only logs; dispatch
+stays exactly as selected. Unset or `off` (the default): skip the Read.
+
 #### Graceful-degradation guard (mandatory)
 
 For each agent above, attempt the Agent spawn. If the spawn fails with an
@@ -1177,6 +1184,7 @@ findings were produced but extension classification was malformed."
 - Categories unmapped: <count or omit when zero>
 - Plugin-contract extension strips (malformed `breaking_change_class`): <count or omit when zero>
 - Past learnings: <"none found" | "N injected">
+- Persona shadow: <the persona-shadow line, or omit when `reviewer_selection` is unset or `off`>
 - Ledger: <new> new, <merged> carried over, <reopened> reopened, <pending> pending, <attention> need attention (plus dismissed-context counts, rejected ordinals and write failures — ledger.md "Step 10")
 
 ### Verdict

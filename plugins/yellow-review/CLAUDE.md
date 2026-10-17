@@ -565,6 +565,21 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   The procedure lives once in `references/review-pr/ledger.md`; both
   commands read it, so keep them in parity through that file. A ledger
   error never aborts a review — it is reported in Coverage.
+- `lib/persona-shadow.sh exact <base> | shadow ...` (bash, executed) —
+  `/review:pr` Step 4's opt-in shadow log (`reviewer_selection: shadow|jev`
+  in `yellow-plugins.local.md`; `jev` is shadow until per-persona switching
+  ships). `exact` prints the conditional-table personas the deterministic
+  rules pick (paths, extensions, keyword regexes, line counts, the
+  version-only manifest exemption). `shadow` adds one TypeSafe Jev request
+  answering the nine fuzzy-trigger questions frozen in
+  `lib/jev-persona-criteria.json` (any edit restarts the eval) and writes
+  `<git-common-dir>/yellow-review/jev-persona/<pr>-<head>.json` with the
+  exact, orchestrator, Jev and dispatched sets; never diff text. The Jev call
+  runs only with `TYPESAFE_API_KEY`, yellow-core's `cs_redact_secrets`, and
+  a public repository or one in `reviewer_selection_private_repos`; always
+  exits 0 with one `persona-shadow:` line for Coverage. The procedure is
+  `references/review-pr/persona-shadow.md`; `/review:all` does not run it.
+  Trust boundary: `docs/security.md` "Persona Selection Shadow Log".
 - `lib/stage-learning.sh tmpfile | stage <pr> <file>` — stages an unattended
   `/review:pr` run's outcome narrative (Step 9a under `--non-interactive`) in
   yellow-core's compound-staging ledger via `cs_stage_entry`, as
@@ -753,6 +768,11 @@ explicit-invocation wording live in the skill body and description.
   installs ctags in `yellow-review-shell-tests`
 - `session-start.bats` — the hook's counts, orphan and stale-state handling,
   fold fallback, held-lock and 5 MB budget
+- `persona-shadow.bats` — exact-trigger rules against throwaway repositories,
+  and the shadow log against a local Jev stub
+  (`tests/fixtures/jev-persona/stub_server.py`) and a stub `gh`: the
+  private-repo gate, every fail-open path, the cap and no diff text in the
+  record
 - `skill-content.bats` — pins load-bearing command and skill text
 
 ## Known Limitations
