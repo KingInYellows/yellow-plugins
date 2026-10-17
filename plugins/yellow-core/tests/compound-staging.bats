@@ -150,6 +150,25 @@ teardown() {
   [ "$result" = "Basic [REDACTED] and Basic [REDACTED] and Basic $t3" ]
 }
 
+@test "redact_secrets redacts a Basic payload folded onto the next line, under gawk and mawk (CLAUDE-124)" {
+  tok=$(printf 'a:b' | base64 | tr -d '\n')
+  for bin in gawk mawk; do
+    command -v "$bin" >/dev/null 2>&1 || { echo "missing $bin"; false; }
+    dir="${BATS_TEST_TMPDIR}/awkbin-$bin"
+    mkdir -p "$dir"
+    ln -sfn "$(command -v "$bin")" "$dir/awk"
+    # after a header any 4+ character payload goes, as on one line
+    result=$(printf 'Authorization: Basic\n %s\nAuthorization: Basic\n\tAAAA rest\n' "$tok" | PATH="$dir:$PATH" cs_redact_secrets)
+    [ "$result" = "$(printf 'Authorization: Basic\n [REDACTED]\nAuthorization: Basic\n\t[REDACTED] rest')" ] || { echo "$bin header: $result"; false; }
+    # after a bare Basic the credential test decides: a user:pass goes, prose stays
+    result=$(printf 'the client sends Basic\n  %s here\nThis endpoint supports Basic\n  Only mode\n' "$tok" | PATH="$dir:$PATH" cs_redact_secrets)
+    [ "$result" = "$(printf 'the client sends Basic\n  [REDACTED] here\nThis endpoint supports Basic\n  Only mode')" ] || { echo "$bin bare: $result"; false; }
+    # only the next line carries, and an in-word scheme does not
+    result=$(printf 'Authorization: Basic\n\n %s\nxBasic\n%s\n' "$tok" "$tok" | PATH="$dir:$PATH" cs_redact_secrets)
+    [ "$result" = "$(printf 'Authorization: Basic\n\n %s\nxBasic\n%s' "$tok" "$tok")" ] || { echo "$bin carry bound: $result"; false; }
+  done
+}
+
 @test "redact_secrets redacts a bare Basic payload with an empty user and a colon in the password" {
   # OmE6Yg = ":a:b" (empty user, password "a:b").
   result=$(printf 'sent Basic OmE6Yg ok\n' | cs_redact_secrets)

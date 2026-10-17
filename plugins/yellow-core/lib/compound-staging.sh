@@ -119,7 +119,8 @@ cs_atomic_jsonl_write() {
 # Future consolidation: when yellow-ci's redact.sh is relocated to a
 # shared yellow-core/lib/redact.sh, this wrapper can `. ` that file.
 # Redact a bare `Basic <base64>` payload that base64-decodes to a control-free
-# `user:pass` (non-empty user). Shape heuristics cannot tell a short
+# `user:pass` (non-empty user), and a Basic payload folded onto the line after
+# its scheme (see carried). Shape heuristics cannot tell a short
 # credential from prose, and decoding can: "Basic Authentication" and
 # "BASIC SETTINGS" decode to binary, "Basic Only" to ":yr". The boundary
 # before the keyword matches the sed rule. POSIX awk only (mawk, gawk, BSD
@@ -140,7 +141,7 @@ _cs_redact_bare_basic() {
     BEGIN {
       b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
       kw = "[Bb][Aa][Ss][Ii][Cc][ \t\r\v\f]+[A-Za-z0-9+/]+=*"
-      failed = 0; nh = 0
+      failed = 0; nh = 0; bc = 0
     }
     function is_cred(tok,    n, i, acc, bits, p, byte, nb, fc, lead, bv, k, j, need) {
       n = length(tok)
@@ -180,9 +181,54 @@ _cs_redact_bare_basic() {
       # a shorter leading-colon payload stays prose ("Only" decodes to ":yr").
       return (fc > 1 && fc < nb) || (lead && nb >= 17)
     }
+    # bareshape(r, pads): 1 when the bare-Basic sed rule in cs_redact_secrets
+    # would redact the run r followed by pads `=`: padding after 2+
+    # characters, a digit, `+` or `/` with 6+ characters after the first one
+    # or anywhere past the 7th, or a camelCase hump with 6+ letters before
+    # its lowercase or after its capital. The sed alternatives, spelled out
+    # without {n,} intervals (mawk lacks them).
+    function bareshape(r, pads,    n, p, lp, k) {
+      n = length(r)
+      if (pads > 0 && n >= 2) return 1
+      p = match(r, /[0-9+\/]/)
+      if (p && n - p >= 6) return 1
+      if (substr(r, 8) ~ /[0-9+\/]/) return 1
+      if (match(r, /^[A-Za-z]+/)) {
+        lp = substr(r, 1, RLENGTH)
+        if (substr(lp, 7) ~ /[a-z][A-Z]/) return 1
+        for (k = 1; k < length(lp); k++)
+          if (substr(lp, k, 2) ~ /^[a-z][A-Z]$/ && length(lp) - k - 1 >= 6) return 1
+      }
+      return 0
+    }
+    # carried(line): the line after one that ended in a Basic scheme with no
+    # payload (a folded or log-wrapped header). The token that starts it,
+    # after any whitespace, is judged as if it followed the scheme on the
+    # same line: after an Authorization header the sed rule redacts 4+
+    # characters (3 with one `=`, 2 with `==`); after a bare Basic the
+    # sed shapes or is_cred decide. A judged payload is replaced whole.
+    function carried(line,    ws, t, r, pads, keep) {
+      if (!match(line, /^[ \t\r\v\f]*[A-Za-z0-9+\/]/)) return line
+      ws = substr(line, 1, RLENGTH - 1)
+      t = substr(line, RLENGTH)
+      match(t, /^[A-Za-z0-9+\/]+/)
+      r = substr(t, 1, RLENGTH)
+      t = substr(t, RLENGTH + 1)
+      match(t, /^=*/)
+      pads = RLENGTH
+      if (bc == 2) {
+        keep = (length(r) >= 4) ? 2 : (length(r) == 3) ? 1 : (pads >= 2) ? 2 : -1
+        if (keep < 0) return line
+        if (pads > keep) pads = keep
+        return ws "[REDACTED]" substr(t, pads + 1)
+      }
+      if (bareshape(r, pads) || is_cred(r)) return ws "[REDACTED]" substr(t, pads + 1)
+      return line
+    }
     {
-      if ($0 == fail_mark) { failed = 1; next }
-      out = ""; rest = $0; prev = ""
+      if ($0 == fail_mark) { failed = 1; bc = 0; next }
+      rest = bc ? carried($0) : $0
+      out = ""; prev = ""
       while (match(rest, kw)) {
         pre = substr(rest, 1, RSTART - 1)
         m = substr(rest, RSTART, RLENGTH)
@@ -200,8 +246,16 @@ _cs_redact_bare_basic() {
           rest = substr(rest, RSTART + 5)
         }
       }
-      if (stream) print out rest
-      else held[++nh] = out rest
+      # A line that ends in a Basic scheme with no payload carries it to the
+      # next line: bc is 2 after an Authorization header, 1 after a bare
+      # Basic (the same keyword boundary as the sed rule).
+      cur = out rest
+      lc = tolower(cur)
+      bc = 0
+      if (lc ~ /(^|[^a-z0-9_])basic[ \t\r\v\f]*$/)
+        bc = (lc ~ /authorization[ \t\r\v\f]*[=:][ \t\r\v\f]*basic[ \t\r\v\f]*$/) ? 2 : 1
+      if (stream) print cur
+      else held[++nh] = cur
     }
     END {
       if (failed) exit 3
