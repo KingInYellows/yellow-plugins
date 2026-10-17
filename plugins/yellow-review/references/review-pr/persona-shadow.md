@@ -41,7 +41,7 @@ with none, private repositories send nothing.
 JP="${CLAUDE_PLUGIN_ROOT}/lib/persona-shadow.sh"
 JP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/jp-shadow.XXXXXX") || JP_DIR=''
 if [ -n "$JP_DIR" ]; then
-  gh pr view <PR#> --json title -q .title >| "$JP_DIR/title" 2>/dev/null || : >| "$JP_DIR/title"
+  env -u GH_REPO gh pr view <PR#> --json title -q .title >| "$JP_DIR/title" 2>/dev/null || : >| "$JP_DIR/title"
   printf '%s\n' <triggered conditional names> >| "$JP_DIR/triggered"
   printf '%s\n' <dispatched conditional names> >| "$JP_DIR/dispatched"
   "$JP" shadow --pr <PR#> --head "$(git rev-parse HEAD)" --base "<DIFF_BASE>" \
