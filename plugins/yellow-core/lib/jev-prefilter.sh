@@ -39,7 +39,7 @@ JEV_SKIP_MAX_INSTRUCTION='0.2'
 # Return 0 when the pre-filter is enabled and usable.
 jev_prefilter_enabled() {
   [ "${COMPOUND_JEV_PREFILTER:-}" = "shadow" ] || return 1
-  [ -n "${TYPESAFE_API_KEY:-}" ] || return 1
+  [ -n "${TYPESAFE_API_KEY:+set}" ] || return 1
   command -v curl >/dev/null 2>&1 || return 1
   command -v jq >/dev/null 2>&1 || return 1
   return 0
@@ -188,7 +188,7 @@ jev_prefilter_shadow() {
   # Key: curl config on fd 3. Body: stdin. Neither reaches argv.
   # fd 3 is a process substitution (a pipe), not a here-document: bash
   # before 5.1 backs every here-document with a temp file, which would put
-  # the key on disk.
+  # the key on disk. set +x inside it keeps xtrace from logging the key.
   # -q (must be first) skips the user's ~/.curlrc, which could enable trace
   # output or --insecure for this request. -w appends curl's own total time on a final line, split off below.
   resp=$(printf '%s' "$body" \
@@ -198,7 +198,7 @@ jev_prefilter_shadow() {
         --data-binary @- \
         -w '\n%{time_total}' \
         "${COMPOUND_JEV_URL:-$JEV_DEFAULT_URL}" 2>/dev/null \
-        3< <(printf 'header = "Authorization: Bearer %s"\n' "$TYPESAFE_API_KEY")
+        3< <(set +x; printf 'header = "Authorization: Bearer %s"\n' "$TYPESAFE_API_KEY")
   ) || return 0
   latency=$(printf '%s' "$resp" | tail -n 1)
   resp=$(printf '%s' "$resp" | sed '$d')
