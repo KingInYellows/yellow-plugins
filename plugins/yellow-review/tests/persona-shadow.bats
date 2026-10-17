@@ -289,6 +289,8 @@ run_shadow() {
   [ "$(jq -r .body.state.diff "$LOG" | wc -c)" -lt 24400 ]
   # The small file goes in first; the large one is cut.
   jq -r .body.state.diff "$LOG" | grep -q '^+small$'
+  # The cut lands on a line boundary, never inside a line.
+  ! jq -r .body.state.diff "$LOG" | grep -Eq '^\+x{1,99}$'
 }
 
 @test "shadow: every bad answer fails open" {

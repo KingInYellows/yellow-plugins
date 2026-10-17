@@ -255,8 +255,10 @@ jp_build_diff() {
     fi
     if [ "$size" -gt "$room" ]; then
       JP_TRIMMED=1
+      # Cut at a line boundary: a partial last line could hold a credential
+      # prefix too short for cs_redact_secrets to recognize.
       git -c core.quotepath=off diff --no-renames --no-color "$base...HEAD" -- "${JP_FILES[i]}" 2>/dev/null \
-        | head -c "$room" | sed 's/^---/> ---/'
+        | head -c "$room" | sed '$d' | sed 's/^---/> ---/'
       total=$JP_STATE_MAX_CHARS
     else
       git -c core.quotepath=off diff --no-renames --no-color "$base...HEAD" -- "${JP_FILES[i]}" 2>/dev/null \
