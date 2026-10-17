@@ -151,10 +151,10 @@ The user is asked for confirmation before the report file is written.
 `COUNCIL_OPENCODE_MODEL=openai/gpt-5.4` alongside Codex. Lineage detection is
 best-effort: codex's model may be unreadable, and `agy` has no model field.
 
-Codex findings carry a location but no quoted source line, so evidence
-verification classifies every one as `no-evidence`: a Codex-only finding
-always lands in Unverified Claims
-([#1180](https://github.com/KingInYellows/yellow-plugins/issues/1180)).
+Codex findings quote their cited line as `Evidence:` and are verified like
+the other reviewers'. A finding Codex returns without a quote is `no-evidence`
+and lands in Unverified Claims, as does every Codex finding from a yellow-codex
+release older than the quote.
 
 A reviewer whose provider reports quota or credit exhaustion returns
 `QUOTA_EXHAUSTED`: it is left out of the synthesis like an unavailable reviewer

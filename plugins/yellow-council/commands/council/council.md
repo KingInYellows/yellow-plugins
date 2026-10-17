@@ -45,8 +45,9 @@ and atomic file write conventions.
 # claude-reviewer leaves raw output in /tmp indefinitely while the docs promise
 # next-run reclamation. Declare it rather than depend on it undeclared.
 # `od` and `sort` randomize the Step 5 reviewer labels, which fail closed
-# without them rather than fall back to a fixed order.
-for tool in bash git timeout jq mktemp awk sed grep find od sort; do
+# without them rather than fall back to a fixed order. `cp`, `ln`, `chmod` and
+# `cmp` save the report in Step 9; check them before reviewer runs are spent.
+for tool in bash git timeout jq mktemp awk sed grep find od sort cp ln chmod cmp; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     printf '[council] Error: required tool "%s" not found\n' "$tool" >&2
     exit 1
@@ -2554,6 +2555,10 @@ mkdir -p "$(dirname "$REPORT_PATH_ABS")" || {
   council_cleanup_temps
   exit 1
 }
+# Step 8 shows REPORT_PATH and Step 9 takes it as a literal. Only this
+# repo-relative path travels: its characters are fixed by build_slug, while the
+# absolute path carries the checkout directory, which may hold shell syntax.
+printf 'COUNCIL_REPORT_PATH=%s\n' "$REPORT_PATH"
 ```
 
 ### Step 7: Construct full report content
@@ -2618,6 +2623,15 @@ from 7a's output; 7c never re-reads the expected token from the directory),
 plus the `CLAUDE_FENCED_FILE` literal from Step 4 and the `COUNCIL_SYNTH_DIR`
 literal from 5a. `REPORT_DIR` (this step's staging) and `SYNTH_OWN_DIR` (5a's
 claim, used only to release the state file) are different directories.
+
+7c writes the assembled report to `<dir>/report.md` and prints
+`COUNCIL_ASSEMBLED_REPORT=<path>`. On success it keeps the staging directory:
+Step 9 copies that file into `docs/council/` byte for byte, and Step 9 or the
+Step 8 Cancel block removes the directory. That copy is how the claude leg's
+redaction pass and fence rebuild reach the saved report; never retype the
+report or write it with `Write`. 7c's output does not echo the report (the
+Bash tool truncates long output), so read `report.md` when Step 8 needs a
+preview.
 
 ```bash
 # Re-load reviewer state — fresh subprocess (Steps 8 and 9 must start with
@@ -3282,6 +3296,27 @@ ${section_body}
 "
   fi
 done
+
+# Hand the assembled report to Step 9 as a file. Shell variables die with this
+# subprocess, and printing REPORT_CONTENT is no substitute: the Bash tool
+# truncates long output, so the model would rebuild the report from memory and
+# the claude leg's redaction would not be guaranteed for the saved copy.
+# report.md must not exist yet: 7c is its only writer, so anything already
+# there is a stray Write and is refused (the trap removes the directory).
+ASSEMBLED_REPORT="$REPORT_DIR/report.md"
+if [ -e "$ASSEMBLED_REPORT" ] || [ -L "$ASSEMBLED_REPORT" ]; then
+  printf '[council] Error: %s already exists — 7c is its only writer; this staging directory is now removed, so re-run Step 7 from 7a\n' "$ASSEMBLED_REPORT" >&2
+  exit 1
+fi
+printf '%s\n' "$REPORT_CONTENT" >| "$ASSEMBLED_REPORT" || {
+  printf '[council] Error: cannot write %s — re-run Step 7 from 7a\n' "$ASSEMBLED_REPORT" >&2
+  exit 1
+}
+# Keep the directory: Step 9 copies report.md out of it, and Step 9 or the
+# Step 8 Cancel block removes it. A run abandoned here is swept by 5a after
+# 24 hours.
+trap - EXIT
+printf 'COUNCIL_ASSEMBLED_REPORT=%s\n' "$ASSEMBLED_REPORT"
 ```
 
 ### Step 8: Confirmation gate (AskUserQuestion)
@@ -3289,9 +3324,9 @@ done
 Every file write must be gated by AskUserQuestion — there is no batch-size
 threshold below which confirmation may be skipped. Show the user:
 
-- Resolved `$REPORT_PATH` (repo-relative path shown to user)
+- Resolved `$REPORT_PATH` (the `COUNCIL_REPORT_PATH` value Step 6 printed)
 - Headline summary (one line)
-- Two-line synthesis preview
+- Two-line synthesis preview (from `SYNTHESIS_MD`, or read 7c's `report.md`)
 
 Use `AskUserQuestion` with these options:
 
@@ -3356,6 +3391,23 @@ council_synth_dir_is_ours() {
   [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ] || return 1
   [ -f "$d/.token" ] && [ ! -L "$d/.token" ] || return 1
   [ "$(head -n 1 "$d/.token")" = "$st" ]
+}
+# 7a's report staging directory, which 7c keeps for Step 9. Substitute the two
+# 7a literals when 7a ran; leave both placeholders when it did not (a 5d or 5e
+# failure, or a failed 7a), and nothing is touched.
+REPORT_FILE="<literal COUNCIL_REPORT_FILE value from 7a, or this placeholder when 7a did not run>"
+REPORT_TOKEN="<literal COUNCIL_REPORT_TOKEN value from 7a, or this placeholder when 7a did not run>"
+# Same function as 7c's and Step 9's (keep the three in step).
+council_report_dir_ok() {
+  local d="$1" suffix
+  suffix="${d#/tmp/council-synth-}"
+  [ -n "$d" ] && [ "$suffix" != "$d" ] && [ -n "$suffix" ] || return 1
+  case "$suffix" in */* | *..*) return 1 ;; esac
+  [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ] || return 1
+  [ "${#REPORT_TOKEN}" -eq 32 ] || return 1
+  case "$REPORT_TOKEN" in *[!0-9a-f]*) return 1 ;; esac
+  [ -f "$d/.token" ] && [ ! -L "$d/.token" ] || return 1
+  [ "$(head -n 1 "$d/.token")" = "$REPORT_TOKEN" ]
 }
 # Same function as 5b's (keep the five in step): unlink the state file only when
 # it is THIS run's claim (regular, non-symlink, ours, line 1 equals this run's
@@ -3442,8 +3494,8 @@ done
 # agent never wrote it (mktemp -u created no file).
 #
 # The shape check makes a MISSED substitution loud. Every other placeholder in
-# this file fails visibly (7c refuses an unsubstituted report literal; Step 9's
-# $REPORT_PATH_ABS trips the existence check), but a bare `rm -f` on an
+# this file fails visibly (7c and Step 9 refuse an unsubstituted report literal,
+# and Step 9 refuses an unsubstituted target), but a bare `rm -f` on an
 # unsubstituted placeholder silently succeeds — and unlike those, this value
 # cannot be re-derived later, because the mktemp suffix is random.
 CLAUDE_FENCED="<literal CLAUDE_FENCED_FILE value from Step 4>"
@@ -3487,37 +3539,131 @@ if [ "$SYNTH_DIR_OK" = 1 ]; then
   council_rm_synth_dir "$SYNTH_OWN_DIR" \
     || printf '[council] Warning: could not remove %s; remove it by hand: chmod -R u+rwx %s && rm -rf %s\n' "$SYNTH_OWN_DIR" "$SYNTH_OWN_DIR" "$SYNTH_OWN_DIR" >&2
 fi
+# The assembled report 7c kept for Step 9. Removed only when it passes the same
+# shape, owner and token check 7c applied; an unsubstituted placeholder (7a did
+# not run) is skipped quietly, anything else is reported and left for the sweep.
+case "$REPORT_FILE" in
+  "<"*) ;;
+  */synthesis.md)
+    REPORT_DIR="${REPORT_FILE%/synthesis.md}"
+    if council_report_dir_ok "$REPORT_DIR"; then
+      rm -rf -- "$REPORT_DIR" \
+        || printf '[council] Warning: could not remove %s; remove it by hand\n' "$REPORT_DIR" >&2
+    else
+      printf '[council] Warning: %s is not the report staging directory 7a minted — leaving it for the 24-hour sweep\n' "$REPORT_DIR" >&2
+    fi
+    ;;
+  *) printf '[council] Warning: unexpected COUNCIL_REPORT_FILE value (%s) — nothing removed\n' "$REPORT_FILE" >&2 ;;
+esac
 exit 0
 ```
 
 If user selects **Save report**: continue to Step 9.
 
-### Step 9: Atomic file write via Write tool
+### Step 9: Copy the assembled report into docs/council/
 
-Per `council-patterns` SKILL atomic-write convention (Option B —
-brainstorm-orchestrator pattern):
-
-```text
-Use the Write tool with:
-  file_path = $REPORT_PATH_ABS  (absolute path: "${CLAUDE_PROJECT_DIR:-$(pwd)}/${REPORT_PATH}")
-  content = $REPORT_CONTENT
-```
-
-The Write tool either succeeds (file fully written) or fails (no partial
-file). No mktemp + mv staging; no `.gitignore` additions needed.
-
-After the Write tool succeeds, verify (fresh subprocess — substitute the
-literal absolute path from Step 6 for `$REPORT_PATH_ABS`, or re-run the
-Step 6 derivation first):
+Copy 7c's `report.md` to the target path with a shell `cp`, published with
+an exclusive `ln` so an existing file is never overwritten. Do not use
+`Write` and do not retype the report: the copy is what carries the claude
+leg's redaction pass and fence rebuild into the saved file. Substitute the
+`COUNCIL_REPORT_PATH` literal from Step 6, the two 7a literals, the
+`CLAUDE_FENCED_FILE` literal from Step 4 and the `COUNCIL_SYNTH_DIR` literal
+from 5a.
 
 ```bash
-# Record the verification result but do NOT exit on it yet — the cleanup below
-# must run whether or not the write landed, or a failed verification strands
-# every reviewer's fenced output in /tmp. Exit code is applied at the end.
-WRITE_OK=1
-if [ ! -f "$REPORT_PATH_ABS" ]; then
-  printf '[council] Error: file write reported success but file not found at %s\n' "$REPORT_PATH_ABS" >&2
-  WRITE_OK=0
+# Record the copy result but do NOT exit on it yet — the cleanup below must run
+# whether or not the copy landed, or a failure strands every reviewer's fenced
+# output in /tmp. Exit code is applied at the end.
+WRITE_OK=0
+# Single quotes: nothing in the pasted value is expanded before it is checked.
+REPORT_PATH='<literal COUNCIL_REPORT_PATH value from Step 6>'
+REPORT_PATH_ABS=""
+REPORT_FILE="<literal COUNCIL_REPORT_FILE value from 7a>"
+REPORT_TOKEN="<literal COUNCIL_REPORT_TOKEN value from 7a>"
+REPORT_DIR=""
+# Same function as 7c's and the Step 8 Cancel block's (keep the three in step).
+council_report_dir_ok() {
+  local d="$1" suffix
+  suffix="${d#/tmp/council-synth-}"
+  [ -n "$d" ] && [ "$suffix" != "$d" ] && [ -n "$suffix" ] || return 1
+  case "$suffix" in */* | *..*) return 1 ;; esac
+  [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ] || return 1
+  [ "${#REPORT_TOKEN}" -eq 32 ] || return 1
+  case "$REPORT_TOKEN" in *[!0-9a-f]*) return 1 ;; esac
+  [ -f "$d/.token" ] && [ ! -L "$d/.token" ] || return 1
+  [ "$(head -n 1 "$d/.token")" = "$REPORT_TOKEN" ]
+}
+case "$REPORT_FILE" in
+  */synthesis.md) REPORT_DIR="${REPORT_FILE%/synthesis.md}" ;;
+esac
+ASSEMBLED_REPORT="$REPORT_DIR/report.md"
+if ! council_report_dir_ok "$REPORT_DIR"; then
+  printf '[council] Error: %s is not the report staging directory 7a minted (wrong shape, symlink, owner or token) — report not saved\n' "${REPORT_DIR:-$REPORT_FILE}" >&2
+  REPORT_DIR=""
+elif [ ! -f "$ASSEMBLED_REPORT" ] || [ -L "$ASSEMBLED_REPORT" ] || [ ! -O "$ASSEMBLED_REPORT" ]; then
+  printf '[council] Error: %s is missing, a symlink, or not ours — 7c did not finish; report not saved\n' "$ASSEMBLED_REPORT" >&2
+else
+  # The target: docs/council/<name>.md, where <name> uses only the characters
+  # build_target_path emits ([a-z0-9-]), re-anchored at the same root Step 6
+  # used, not yet present (build_target_path picked a free name), in a real
+  # directory.
+  DEST_OK=0
+  case "$REPORT_PATH" in
+    docs/council/?*.md)
+      REPORT_NAME="${REPORT_PATH#docs/council/}"
+      REPORT_NAME="${REPORT_NAME%.md}"
+      case "$REPORT_NAME" in
+        *[!a-z0-9-]*) ;;
+        *) DEST_OK=1 ;;
+      esac
+      ;;
+  esac
+  if [ "$DEST_OK" -eq 1 ]; then
+    SAVE_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || SAVE_ROOT=""
+    if [ -n "$SAVE_ROOT" ] && cd "$SAVE_ROOT"; then
+      REPORT_PATH_ABS="${CLAUDE_PROJECT_DIR:-$(pwd)}/${REPORT_PATH}"
+    else
+      DEST_OK=0
+    fi
+  fi
+  if [ "$DEST_OK" -ne 1 ]; then
+    printf '[council] Error: unexpected report target (%s) — expected the docs/council/<name>.md path Step 6 printed, inside a git checkout; report not saved\n' "$REPORT_PATH" >&2
+  elif [ -e "$REPORT_PATH_ABS" ] || [ -L "$REPORT_PATH_ABS" ]; then
+    printf '[council] Error: %s already exists — refusing to overwrite it; re-run Step 6 for a free name\n' "$REPORT_PATH_ABS" >&2
+  elif [ ! -d "${REPORT_PATH_ABS%/*}" ]; then
+    printf '[council] Error: %s is not a directory — report not saved\n' "${REPORT_PATH_ABS%/*}" >&2
+  else
+    # Copy to a private temp file beside the target, give it the mode a plain
+    # file gets under this umask, check it, then publish it with `ln`, which
+    # fails if the target exists. A concurrent /council that picked the same
+    # name therefore cannot be overwritten, and the cmp never runs against a
+    # file another run may own.
+    PUBLISH_TMP=$(mktemp "${REPORT_PATH_ABS%/*}/.council-report-XXXXXX") || PUBLISH_TMP=""
+    if [ -z "$PUBLISH_TMP" ]; then
+      printf '[council] Error: cannot create a temp file in %s — report not saved\n' "${REPORT_PATH_ABS%/*}" >&2
+    elif ! cp -- "$ASSEMBLED_REPORT" "$PUBLISH_TMP" \
+      || ! chmod "$(umask -S)" "$PUBLISH_TMP" || ! chmod a-x "$PUBLISH_TMP"; then
+      printf '[council] Error: copying the report to %s failed — report not saved\n' "$PUBLISH_TMP" >&2
+    elif ! cmp -s -- "$ASSEMBLED_REPORT" "$PUBLISH_TMP"; then
+      printf '[council] Error: the copy does not match the assembled report — report not saved\n' >&2
+    elif ! ln -- "$PUBLISH_TMP" "$REPORT_PATH_ABS"; then
+      printf '[council] Error: %s appeared while saving (another /council?) — refusing to overwrite it; re-run Step 6 for a free name\n' "$REPORT_PATH_ABS" >&2
+    else
+      WRITE_OK=1
+    fi
+    [ -z "$PUBLISH_TMP" ] || rm -f -- "$PUBLISH_TMP"
+  fi
+fi
+# A saved report frees the staging directory. On failure keep it (0700, ours)
+# so the redacted report can still be copied by hand; 5a's sweep reclaims it
+# after 24 hours.
+if [ -n "$REPORT_DIR" ]; then
+  if [ "$WRITE_OK" -eq 1 ]; then
+    rm -rf -- "$REPORT_DIR" \
+      || printf '[council] Warning: could not remove %s; remove it by hand\n' "$REPORT_DIR" >&2
+  elif [ -f "$ASSEMBLED_REPORT" ] && [ ! -L "$ASSEMBLED_REPORT" ]; then
+    printf '[council] Note: the assembled report is still at %s\n' "$ASSEMBLED_REPORT" >&2
+  fi
 fi
 
 # Cleanup fenced output files, the Step 4 state file and the Step 5a synthesis
@@ -3580,8 +3726,8 @@ done
 # agent never wrote it (mktemp -u created no file).
 #
 # The shape check makes a MISSED substitution loud. Every other placeholder in
-# this file fails visibly (7c refuses an unsubstituted report literal; Step 9's
-# $REPORT_PATH_ABS trips the existence check), but a bare `rm -f` on an
+# this file fails visibly (7c and Step 9 refuse an unsubstituted report literal,
+# and Step 9 refuses an unsubstituted target), but a bare `rm -f` on an
 # unsubstituted placeholder silently succeeds — and unlike those, this value
 # cannot be re-derived later, because the mktemp suffix is random.
 CLAUDE_FENCED="<literal CLAUDE_FENCED_FILE value from Step 4>"
@@ -3669,7 +3815,7 @@ This is the final output of the command. Exit 0.
 | claude-reviewer never returns at all | **No automatic recovery.** `COUNCIL_TIMEOUT` wraps only the three CLI reviewers; the in-process slot has no subprocess to kill, so the fan-out blocks. The agent is instructed to bound its own investigation and return partial findings, but that is prose, not a guard. Cancel the invocation and re-run. The fenced temp file, if it was written, is NOT reclaimed immediately: the next run mints a different random `mktemp -u` suffix, and Step 4's stale-file sweep only reclaims files older than `STALE_MINUTES` (1440 = 24h) — so it stays until either the OS reaps `/tmp` or a later `/council` invocation runs after it has aged past the threshold. Deliberate — an unconditional glob-and-unlink would risk deleting a concurrent run's in-flight file from another checkout on the same machine; the age gate lets genuine orphans get reclaimed without that risk |
 | A reviewer returns a `fenced_output_path` outside `/tmp/council-<reviewer>-fenced-*.txt`, or one containing `..` or an extra `/` | Refused at every site that touches it (the one exception is the `/dev/null` sentinel under `QUOTA_EXHAUSTED`, see that row), each warning on stderr: Step 7 does not read it (the appendix renders "output withheld: path refused (see stderr)"), and Steps 8/9 do not unlink it either — refusing to delete an attacker-named path matters more than reclaiming a temp file. A path that is a symlink is also refused at the read site |
 | Slug collision >10 same-day | Error: "too many same-day collisions for slug X (>10)"; exit 1 |
-| User selects Cancel at the confirmation gate | Print "Report not saved"; cleanup temps; exit 0. A run that claimed the synthesis state (`SYNTH_STATE_CLAIMED=1`) first proves its staging directory is its own, releases the claim, then removes the directory (a no-op after a successful 5e); a failed removal prints `Warning: could not remove <dir>; remove it by hand: chmod -R u+rwx <dir> && rm -rf <dir>` and leaves the directory for the 5a sweep. A run that claimed nothing leaves both the state path and any directory alone |
+| User selects Cancel at the confirmation gate | Print "Report not saved"; cleanup temps; exit 0. A run that claimed the synthesis state (`SYNTH_STATE_CLAIMED=1`) first proves its staging directory is its own, releases the claim, then removes the directory (a no-op after a successful 5e); a failed removal prints `Warning: could not remove <dir>; remove it by hand: chmod -R u+rwx <dir> && rm -rf <dir>` and leaves the directory for the 5a sweep. A run that claimed nothing leaves both the state path and any directory alone. The 7a report staging directory 7c kept is removed when its literals pass 7c's check, and skipped when 7a did not run |
 | `docs/council/` not writable | mkdir -p fails; exit 1 |
 | Invalid `COUNCIL_DOUBLE_PASS_SYNTHESIS` (not `0` or `1`) | Warning on stderr; 2-pass synthesis kept |
 | `--single-pass` or `COUNCIL_DOUBLE_PASS_SYNTHESIS=0` | Pass B skipped; Headline omits the low-confidence line |
@@ -3682,8 +3828,9 @@ This is the final output of the command. Exit 0.
 | `pass-a.md` missing or not a table on resume (5d resume block exits 1) | No synthesis is shipped; run the Step 8 Cancel cleanup (so the next 5a is not refused by the leftover state file, and the staged reviewer text is removed with it), then stop and re-run `/council` |
 | 5e exits non-zero (state file, directory, label map or token unusable) | No label map is printed; run the Step 8 Cancel cleanup (with `SYNTH_OWN_DIR` set to the path 5a printed), then stop. The block unlinks the state file, and removes the staging directory, only if the file is still this run's claim and the directory carries its token (checked before the claim is released): a file that is missing, symlinked, foreign, another run's live claim (for example a paused run whose stale state another `/council` reclaimed) or token-mismatched is left in place with a `Note:`. After a successful 5e, `Note: released this run's synthesis state claim` means this run no longer owns the file, so the Step 7, 8 and 9 cleanups find it missing or another run's and leave it. 5e releases the claim (unlinks the state file) BEFORE it removes the directory, so a `rm -rf` that fails partway after deleting `.token` cannot strand the state file: the file is already gone and a new `/council` is not blocked. A `Warning:` that the staging directory could not be removed still exits 0: the map was printed. 5e already tried `chmod -R u+rwx` and a second `rm -rf`, so the warning names the exact `chmod -R u+rwx <dir> && rm -rf <dir>` command to run by hand; the 5a sweep applies the same chmod-then-remove, but only once the directory is over 24 hours old and a later `/council` reaches 5a |
 | Run stops between Step 5a and 5e | The 0700 `/tmp/council-synth-*` staging directory (normalized, already-redacted reviewer text, the label map, `pass-a.md`) is left behind unless the Step 8 Cancel block runs for it (a 5b abort and a 5e failure followed by Cancel both remove it). 24 hours is the sweep's eligibility threshold, not a maximum retention: the text stays until a later `/council` invocation reaches 5a after the directory is over 24h old, or until you remove it |
-| Run cancelled or aborted between Step 7a and 7c | The 0700 `/tmp/council-synth-*` report staging directory with the staged synthesis remains until a later `/council` reaches 5a and its sweep removes it (over 24 hours old). A failed 7b `Write` is still cleaned up: 7c validates the directory, finds no `synthesis.md`, exits 1, and its trap removes the directory |
+| Run cancelled or aborted between Step 7a and Step 9 | The 0700 `/tmp/council-synth-*` report staging directory with the staged synthesis remains until a later `/council` reaches 5a and its sweep removes it (over 24 hours old). A failed 7b `Write` is still cleaned up: 7c validates the directory, finds no `synthesis.md`, exits 1, and its trap removes the directory |
 | 7c report literal refused (wrong shape, `..`, extra `/`, empty suffix, symlink, foreign owner, or a `.token` that does not equal the 7a token) | `[council] Error: ... refusing to read or delete it`; exit 1; nothing is read or deleted. Run the Step 8 Cancel cleanup and stop |
+| Step 9 cannot save the report (staging literal refused, `report.md` missing or a symlink, target not the `docs/council/<name>.md` path Step 6 printed, target already exists or appears during the save, `cp` fails, or the copy differs from `report.md`) | `[council] Error: ... report not saved`; the temp copy is removed and the target is never overwritten; the reviewer temp files are still cleaned up and the step exits 1. A validated staging directory is kept and its `report.md` path printed, so the redacted report can be copied by hand; the 5a sweep removes it after 24 hours |
 | yellow-core not found (a `--plugin-dir` or in-place load that skipped the dependency check) | `[council] Warning: yellow-core ... not found`; Tier 1 is skipped and every finding is `unverified` with reason `verifier-error`. Verification never aborts the council |
 | `quote-ground.sh batch` fails (exit 2) or is missing | `[council] Warning: Tier 1 evidence check unavailable`; every Tier 1 row goes to Tier 2. An unreadable cited file would fail the whole batch, so the citation parse rejects it first as `bad-citation` |
 | rapidfuzz not importable by the first `python3` on PATH | `[council] Warning: rapidfuzz not installed` in 5b; Tier 2 candidates are `unverified` with reason `tier2-skipped`. The import probe and the scorer run the same `python3`, so a venv that is not on PATH counts as absent |

@@ -21,13 +21,13 @@ present and at compatible versions.
 ### Step 1: Verify required system tools
 
 ```bash
-for tool in bash timeout jq mktemp awk sed grep find od sort; do
+for tool in bash timeout jq mktemp awk sed grep find od sort cp ln chmod cmp; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     printf '[yellow-council] Error: required system tool "%s" not found\n' "$tool" >&2
     exit 1
   fi
 done
-printf '[yellow-council] system tools: ok (bash, timeout, jq, mktemp, awk, sed, grep, find, od, sort)\n'
+printf '[yellow-council] system tools: ok (bash, timeout, jq, mktemp, awk, sed, grep, find, od, sort, cp, ln, chmod, cmp)\n'
 
 # /council randomizes reviewer labels from /dev/urandom and fails closed without it.
 case "$(od -An -N4 -tu4 /dev/urandom 2>/dev/null | tr -d ' \n')" in
