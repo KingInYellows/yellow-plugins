@@ -186,6 +186,9 @@ jev_prefilter_shadow() {
   body=$(printf '%s' "$state" | jev_build_request) || return 0
 
   # Key: curl config on fd 3. Body: stdin. Neither reaches argv.
+  # fd 3 is a process substitution (a pipe), not a here-document: bash
+  # before 5.1 backs every here-document with a temp file, which would put
+  # the key on disk.
   # -q (must be first) skips the user's ~/.curlrc, which could enable trace
   # output or --insecure for this request. -w appends curl's own total time on a final line, split off below.
   resp=$(printf '%s' "$body" \
@@ -194,9 +197,8 @@ jev_prefilter_shadow() {
         -H 'Content-Type: application/json' \
         --data-binary @- \
         -w '\n%{time_total}' \
-        "${COMPOUND_JEV_URL:-$JEV_DEFAULT_URL}" 2>/dev/null 3<<JEVCFG
-header = "Authorization: Bearer ${TYPESAFE_API_KEY}"
-JEVCFG
+        "${COMPOUND_JEV_URL:-$JEV_DEFAULT_URL}" 2>/dev/null \
+        3< <(printf 'header = "Authorization: Bearer %s"\n' "$TYPESAFE_API_KEY")
   ) || return 0
   latency=$(printf '%s' "$resp" | tail -n 1)
   resp=$(printf '%s' "$resp" | sed '$d')
