@@ -174,7 +174,8 @@ awk_expect() {
 }
 
 # accented_status <awk binary> [locale]: the expected status for an accented
-# first word followed by ASCII words. Only a multibyte gawk can tell the letter
+# lowercase first word followed by ASCII words (an accented capital is prose
+# in every mode). Only a multibyte gawk can tell the letter
 # from punctuation (prose, 0); byte-wise awk (mawk, gawk in C) fails closed (6).
 accented_status() {
   local loc="${2-}"
@@ -1450,7 +1451,8 @@ rule=forged line=9.txt"
     command -v "$bin" >/dev/null 2>&1 || { echo "missing $bin"; false; }
     with_awk "$bin" 6 'password:\n  my correct horse battery staple\n'
     with_awk "$bin" 0 'password:\n  Rotation is scheduled for Friday\n'
-    with_awk "$bin" "$(accented_status "$bin")" 'password:\n  Élève a trois mots ici\n'
+    # an accented capital starts a sentence-case word in every mode
+    with_awk "$bin" 0 'password:\n  Élève a trois mots ici\n'
     with_awk "$bin" "$(accented_status "$bin")" 'password:\n  élève a trois mots ici\n'
     with_awk "$bin" 6 "Authorization: Basic ${tok4}\n"
     with_awk "$bin" 6 "Authorization: Basic ${tok8}\n"
@@ -1689,7 +1691,7 @@ rule=forged line=9.txt"
       awk_expect "$bin" 6 'password:\n  — correct horse battery staple\n' "$loc"
       awk_expect "$bin" 6 'password:\n  \xc2\xa0correct horse battery staple\n' "$loc"
       awk_expect "$bin" "$(accented_status "$bin" "$loc")" 'password:\n  élève a trois mots ici\n' "$loc"
-      awk_expect "$bin" "$(accented_status "$bin" "$loc")" 'password:\n  Élève a trois mots ici\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  Élève a trois mots ici\n' "$loc"
       awk_expect "$bin" 0 'password:\n  “Correct horse battery staple”\n' "$loc"
     done
   done
@@ -1741,4 +1743,81 @@ rule=forged line=9.txt"
     run "$SCRIPT" "$A"
     [ "$status" -eq 0 ] || { echo "flagged across an invalid character: $prefix"; false; }
   done
+}
+
+@test "a Basic scheme that ends its line carries to a payload that starts the next line, under gawk and mawk (CLAUDE-124)" {
+  tok=$(printf 'a:b' | base64 | tr -d '\n')
+  long=$(printf 'user:correct-horse-battery' | base64 | tr -d '\n')
+  for bin in gawk mawk; do
+    command -v "$bin" >/dev/null 2>&1 || { echo "missing $bin"; false; }
+    # folded header: indented, unindented, tab and CRLF continuations
+    awk_expect "$bin" 6 "Authorization: Basic\n ${tok}\n"
+    awk_expect "$bin" 6 "Authorization: Basic\n${tok}\n"
+    awk_expect "$bin" 6 "Authorization: Basic \r\n\t${tok}\r\n"
+    awk_expect "$bin" 6 "Authorization: Basic\n ${long}\n"
+    # a bare scheme keeps the bare rule: an interior colon is needed
+    awk_expect "$bin" 6 "the client sends Basic\n  ${tok} here\n"
+    awk_expect "$bin" 0 'This endpoint supports Basic\n  Only mode\n'
+    awk_expect "$bin" 6 'Authorization: Basic\n  Only\n'
+    # same judgment as one line: prose and malformed tokens stay clean
+    awk_expect "$bin" 0 'Authorization: Basic\n AAAA\n'
+    awk_expect "$bin" 0 'Authorization: Basic\n Authentication\n'
+    awk_expect "$bin" 0 'This one is pretty basic\n  and short.\n'
+    # only the next line carries: a blank line or a later line does not
+    awk_expect "$bin" 0 "Authorization: Basic\n\n ${tok}\n"
+    awk_expect "$bin" 0 "Authorization: Basic\nnext line\n ${tok}\n"
+    # an in-word scheme does not carry
+    awk_expect "$bin" 0 "nonbasic\n ${tok}\n"
+  done
+}
+
+@test "vendor-prefixed tokens after a slash or = inside an allowed URL are flagged, under gawk and mawk (CLAUDE-126)" {
+  tv=$(printf 'tv%s-' 'ly')
+  px=$(printf 'pp%s-' 'lx')
+  sg=$(printf 'sg%s_' 'p')
+  gh=$(printf 'gh%s_' 'p')
+  a20=$(printf 'A%.0s' $(seq 1 20))
+  a19=$(printf 'A%.0s' $(seq 1 19))
+  a40=$(printf 'A%.0s' $(seq 1 40))
+  for bin in gawk mawk; do
+    command -v "$bin" >/dev/null 2>&1 || { echo "missing $bin"; false; }
+    awk_expect "$bin" 6 "see https://github.com/o/r/blob/${tv}${a20}\n"
+    awk_expect "$bin" 6 "see https://github.com/o/${px}${a40}/x\n"
+    awk_expect "$bin" 6 "see https://github.com/o/r?k=v/${sg}${a20}\n"
+    awk_expect "$bin" 6 "see https://github.com/o/${gh}${a20}${a20}\n"
+    # the floors still apply to each segment
+    awk_expect "$bin" 0 "see https://github.com/o/r/blob/${tv}${a19}\n"
+    awk_expect "$bin" 0 "see https://github.com/o/r/${sg}${a19}/x\n"
+    # an ordinary allowed URL stays clean
+    awk_expect "$bin" 0 'see https://github.com/KingInYellows/yellow-plugins/pull/1079/files\n'
+  done
+}
+
+@test "byte-wise awk treats a standalone non-letter non-ASCII token as decoration, and C2 and capital letters as words (CLAUDE-103, CLAUDE-110)" {
+  ran=0
+  for loc in C C.UTF-8; do
+    locale_installed "$loc" || continue
+    for bin in gawk mawk; do
+      ran=$((ran + 1))
+      # Arabic comma, Arabic semicolon, Greek ano teleia and an Armenian full
+      # stop before a multiword credential
+      awk_expect "$bin" 6 'password:\n  \xd8\x8c correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xd8\x9b correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xce\x87 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xd6\x89 \xc2\xbf correct horse battery staple\n' "$loc"
+      # Latin-1 letters in the C2 range are words, punctuation there is not
+      awk_expect "$bin" 0 'password:\n  \xc2\xb5 is the SI prefix for micro\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xc2\xaa is a feminine ordinal\n' "$loc"
+      awk_expect "$bin" 6 'password:\n  \xc2\xa7 correct horse battery staple\n' "$loc"
+      # an accented capital starts sentence-case prose, as an ASCII capital does
+      awk_expect "$bin" 0 'password:\n  \xc3\x9cber die Br\xc3\xbccke ist lang\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xd0\x9f\xd1\x80\xd0\xb8 correct horse battery\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  Uber die Brucke ist lang\n' "$loc"
+      # Hebrew, Arabic and Thai words stay prose
+      awk_expect "$bin" 0 'password:\n  \xd7\xa9\xd7\x9c\xd7\x95\xd7\x9d correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xd9\x83\xd9\x84\xd9\x85\xd8\xa9 correct horse battery staple\n' "$loc"
+      awk_expect "$bin" 0 'password:\n  \xe0\xb8\x84\xe0\xb8\xb3 correct horse battery staple\n' "$loc"
+    done
+  done
+  [ "$ran" -ge 2 ]
 }

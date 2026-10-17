@@ -264,6 +264,62 @@ _rt_scan() {
             if (bare && !icolon) return 0
             return (colon && nb > 1) ? 1 : 0
         }
+        # authtok(seg, segorig, hdr): judge one Authorization or Bearer/Basic
+        # token. seg is the lowercased text after the header name (scheme
+        # included), segorig the same text in its original bytes, and hdr
+        # is 1 when an `Authorization` header named it.
+        function authtok(seg, segorig, hdr,    scheme, btok, blen, plen) {
+            scheme = ""
+            if (match(seg, /^(bearer|basic)[ \t]+/)) {
+                scheme = substr(seg, 1, RLENGTH)
+                sub(/[ \t]+$/, "", scheme)
+                seg = substr(seg, RLENGTH + 1)
+                segorig = substr(segorig, RLENGTH + 1)
+            } else if (match(seg, /^[a-z]+[ \t]+/)) {
+                seg = substr(seg, RLENGTH + 1)
+                segorig = substr(segorig, RLENGTH + 1)
+            }
+            # The token class admits `. ~ -`, so a credential followed by
+            # sentence punctuation would keep it and fail the length check.
+            # Cut to the leading base64 run and pad it to a multiple of 4.
+            # A run of 20+ characters is flagged by the floor below without
+            # decoding, so a hostile long token never reaches the
+            # per-byte decoder (mawk concatenation is quadratic).
+            btok = ""
+            blen = 0
+            plen = 0
+            # A run followed by more base64 characters or `=` is not a
+            # token (`YWI6Yw=Z`): leave btok empty.
+            if (scheme == "basic" && match(segorig, /^[A-Za-z0-9+\/]+=*/)) {
+                btok = substr(segorig, 1, RLENGTH)
+                if (substr(segorig, RLENGTH + 1, 1) ~ /[A-Za-z0-9+\/=]/) btok = ""
+                # Valid padding is 0-2 `=` that bring the length to a
+                # multiple of 4. `YWI6Yw===` and `YWI6Yw=` are malformed,
+                # not credentials: do not normalize them into valid ones.
+                plen = length(btok)
+                sub(/=+$/, "", btok)
+                plen -= length(btok)
+                if (plen > 2 || (plen > 0 && (length(btok) + plen) % 4)) btok = ""
+                # The threshold below uses this unpadded length: padding
+                # an 18 or 19 character run to 20 must not skip basiccred.
+                blen = length(btok)
+                while (btok != "" && length(btok) % 4) btok = btok "="
+            }
+            if (scheme == "basic" && (blen >= 3 || (plen > 0 && blen >= 2)) && blen < 20 && basiccred(btok, !hdr)) flag("authorization-header")
+            else if (length(seg) >= 20) flag("authorization-header")
+        }
+        # bwtok(s): byte-wise mode only. Drop the standalone decoration
+        # tokens that lead s: each a run of non-ASCII bytes followed by
+        # whitespace with no letter code point (letc), so an Arabic comma or
+        # an unlisted symbol before ASCII words cannot exempt them. A token
+        # with a letter is a word and stops it.
+        function bwtok(s) {
+            while (match(s, bwlead)) {
+                if (substr(s, 1, RLENGTH) ~ letc) break
+                s = substr(s, RLENGTH + 1)
+            }
+            return s
+        }
         # Multi-line quoted value. A credential keyword whose value opens a
         # quote that does not close on its line starts a carry (mqo): the
         # following lines are joined with a space until the closing quote,
@@ -339,38 +395,55 @@ _rt_scan() {
             lead = "^((“|”|‘|’|•|·|«|»|–|—|…|\302\240)[ \t]*)+"
             # symtok: a run of symbol-only non-ASCII tokens, each followed by
             # whitespace. With a multibyte locale (gawk in UTF-8) a token is
-            # symbolic when it holds no [:alpha:] character. Byte-wise awk
-            # (mawk, BWK awk, gawk in C) cannot classify letters, so the token
-            # is matched by UTF-8 symbol blocks instead: E2 80-AF (U+2000-2BFF
-            # punctuation, arrows, dingbats, shapes), E2 B8-B9 (U+2E00-2E7F
-            # supplemental punctuation), E3 80 (CJK punctuation), EF B8
-            # (variation selectors), F0 9F (emoji), C2 (Latin-1 punctuation)
-            # and the two C3 symbols x (97) and division (B7). Every other
-            # lead byte (accented Latin, Greek, Cyrillic, CJK, Hangul, and E2
-            # B0-B7 Glagolitic/Coptic/Tifinagh) is a word. E2 BA-BF (CJK
-            # radicals, Kangxi, ideographic description) are arguably symbols
-            # but count as words: the safe side for prose. The fullwidth
-            # punctuation of EF BC 80-8F (U+FF00-FF0F) and EF BD 9B-A5
-            # (U+FF5B-FF65) is a symbol too; fullwidth letters and digits are
-            # words. symlead consumes a symbol run attached directly to the first
-            # word (a fullwidth quote or an emoji glued to a passphrase),
-            # with no whitespace required: symbol-only characters in a
-            # multibyte locale, a non-ASCII byte run glued to ASCII in byte-wise mode.
+            # symbolic when it holds no [:alpha:] character. symlead consumes
+            # a symbol run attached directly to the first word (a fullwidth
+            # quote or an emoji glued to a passphrase), with no whitespace
+            # required: symbol-only characters in a multibyte locale, a
+            # non-ASCII byte run glued to ASCII in byte-wise mode.
+            # Byte-wise awk (mawk, BWK awk, gawk in C) cannot classify
+            # letters, so it uses letc, an allowlist of letter code points by
+            # UTF-8 block: Latin-1 letters (C2 AA, B5, BA and C3 minus the x
+            # and division signs), Latin Extended and IPA (C4-CA), Greek
+            # (CD B0-BD minus the question mark, CE-CF minus the ano teleia),
+            # Cyrillic (D0-D4 minus D2 82-89), Armenian, Hebrew and Arabic
+            # letters and digits (their punctuation, such as the Arabic comma
+            # D8 8C, is left out), Syriac to NKo (DC-DF), Indic, Thai and the
+            # rest of E0-E1, Glagolitic, Coptic, Tifinagh and CJK radicals
+            # (E2 B0-B7, BA-BF), kana, CJK and Hangul (E3 81-ED), fullwidth
+            # letters, digits and halfwidth kana (EF BC-BE) and the
+            # supplementary letters (F0 90-9E, A0-BF). A standalone token of
+            # non-ASCII bytes with no letc code point is decoration (bwtok);
+            # any other is a word. A script outside the list counts as
+            # decoration, which fails closed.
+            # capc is the capital subset (Latin-1, Greek and Cyrillic): a
+            # glued run that holds one starts a sentence-case word, like an
+            # ASCII capital, so `Über die Brücke` stays prose.
             bytewise = 0
             if (length("\303\251") == 1) {
                 symtok = "^([^\001-\177[:alpha:][:digit:]]+[ \t]+)+"
                 symlead = "^[^\001-\177[:alpha:][:digit:]]+"
             } else {
                 symb = "[\200-\277]"
-                symc = "(\342[\200-\257]" symb "|\342[\270\271]" symb "|\303[\227\267]|\343\200" symb "|\357\270" symb "|\360\237" symb symb "|\302" symb "|\357\274[\200-\217]|\357\275[\233-\245])"
-                symtok = "^(" symc "+[ \t]+)+"
+                letc = "(\302[\252\265\272]|\303[\200-\226\230-\266\270-\277]|[\304-\312]" symb
+                letc = letc "|\315[\260-\267\272-\275]|\316[\206\210-\277]|\317" symb
+                letc = letc "|[\320\321\323\324]" symb "|\322[\200\201\212-\277]"
+                letc = letc "|\325[\200-\226\240-\277]|\326[\200-\210]|\327[\220-\252\257-\262]"
+                letc = letc "|\330[\240-\277]|\331[\200-\212\240-\251\256-\277]|\332" symb "|\333[\200-\223\225\256-\277]"
+                letc = letc "|[\334-\337]" symb "|[\340\341\344-\355]" symb symb
+                letc = letc "|\342[\260-\267\272-\277]" symb "|\343[\201-\277]" symb
+                letc = letc "|\357\274[\220-\231\241-\272]|\357\275[\201-\232\246-\277]|\357\276" symb
+                letc = letc "|\360[\220-\236\240-\277]" symb symb ")"
+                capc = "(\303[\200-\226\230-\236]|\316[\206\210-\217\221-\253]|\320[\200-\257])"
                 # Fail closed: a non-ASCII byte run glued to a printable
                 # ASCII character is dropped, so the ASCII words after it are
-                # judged like plain ASCII. Byte-wise awk cannot tell a letter
-                # from punctuation, so an accented first word (`éclair recipe
-                # is great`) may be refused here; the multibyte path keeps it.
-                # A non-ASCII word followed by whitespace stays prose.
+                # judged like plain ASCII, unless the run holds a capital. An
+                # accented lowercase first word (`éclair recipe is great`) may
+                # be refused here; the multibyte path keeps it.
                 symlead = "^[\200-\377]+[\041-\176]"
+                # Dynamic regex strings only: gawk in a UTF-8 locale refuses
+                # a literal byte range at parse time, and its parse-error
+                # status (1) would read as clean.
+                bwlead = "^[\200-\377]+[ \t]+"
                 bytewise = 1
             }
             kw = "(pass([_-]?(phrase|code)|word|wd)?|pwd|secret([_ \t-]?key)?|(private|access)[_ \t-]?key|token|api[_ \t-]?key|credentials?)"
@@ -536,17 +609,23 @@ _rt_scan() {
                             sub(/^[ \t]+/, "", o)
                             sub(/^[ \t]+/, "", r2)
                             # Any other standalone symbol token (checkmark,
-                            # arrow, emoji) is decoration too. A token that
-                            # holds a non-ASCII letter or word (CJK, Cyrillic,
-                            # accented) is prose and is kept (symtok).
-                            sub(symtok, "", o)
-                            sub(symtok, "", r2)
-                            # A symbol run attached to the first word (no
-                            # whitespace) goes too; a letter or digit stops it.
+                            # arrow, emoji, Arabic comma) is decoration too. A
+                            # token that holds a non-ASCII letter or word (CJK,
+                            # Cyrillic, accented) is prose and is kept (symtok,
+                            # bwtok). A symbol run attached to the first word
+                            # (no whitespace) goes too; a letter or digit
+                            # stops it, and in byte-wise mode a capital keeps
+                            # the whole run.
                             if (bytewise) {
-                                if (match(o, symlead)) o = substr(o, RLENGTH)
-                                if (match(r2, symlead)) r2 = substr(r2, RLENGTH)
+                                o = bwtok(o)
+                                r2 = bwtok(r2)
+                                if (match(o, symlead) && substr(o, 1, RLENGTH - 1) !~ capc) {
+                                    o = substr(o, RLENGTH)
+                                    if (match(r2, symlead)) r2 = substr(r2, RLENGTH)
+                                }
                             } else {
+                                sub(symtok, "", o)
+                                sub(symtok, "", r2)
                                 sub(symlead, "", o)
                                 sub(symlead, "", r2)
                             }
@@ -622,44 +701,25 @@ _rt_scan() {
                     seg = substr(seg, RLENGTH + 1)
                     segorig = substr(segorig, RLENGTH + 1)
                 }
-                scheme = ""
-                if (match(seg, /^(bearer|basic)[ \t]+/)) {
-                    scheme = substr(seg, 1, RLENGTH)
-                    sub(/[ \t]+$/, "", scheme)
-                    seg = substr(seg, RLENGTH + 1)
-                    segorig = substr(segorig, RLENGTH + 1)
-                } else if (match(seg, /^[a-z]+[ \t]+/)) {
-                    seg = substr(seg, RLENGTH + 1)
-                    segorig = substr(segorig, RLENGTH + 1)
+                authtok(seg, segorig, hdr)
+            }
+            # A folded or log-wrapped header puts the payload on the next
+            # line (`Authorization: Basic` then ` YTpi`). A line that ends in
+            # a Basic scheme with no payload carries it forward: the token
+            # that starts the next line (after any leading whitespace) is
+            # judged as if it followed the scheme on the same line. Only the
+            # next line is read, so a blank line ends the carry.
+            if (bcarry) {
+                bcarry = 0
+                if (match($0, /^[ \t]*[A-Za-z0-9._~+\/=-]+/)) {
+                    t = substr($0, RSTART, RLENGTH)
+                    sub(/^[ \t]+/, "", t)
+                    authtok("basic " tolower(t), "Basic " t, bchdr)
                 }
-                # The token class admits `. ~ -`, so a credential followed by
-                # sentence punctuation would keep it and fail the length check.
-                # Cut to the leading base64 run and pad it to a multiple of 4.
-                # A run of 20+ characters is flagged by the floor below without
-                # decoding, so a hostile long token never reaches the
-                # per-byte decoder (mawk concatenation is quadratic).
-                btok = ""
-                blen = 0
-                plen = 0
-                # A run followed by more base64 characters or `=` is not a
-                # token (`YWI6Yw=Z`): leave btok empty.
-                if (scheme == "basic" && match(segorig, /^[A-Za-z0-9+\/]+=*/)) {
-                    btok = substr(segorig, 1, RLENGTH)
-                    if (substr(segorig, RLENGTH + 1, 1) ~ /[A-Za-z0-9+\/=]/) btok = ""
-                    # Valid padding is 0-2 `=` that bring the length to a
-                    # multiple of 4. `YWI6Yw===` and `YWI6Yw=` are malformed,
-                    # not credentials: do not normalize them into valid ones.
-                    plen = length(btok)
-                    sub(/=+$/, "", btok)
-                    plen -= length(btok)
-                    if (plen > 2 || (plen > 0 && (length(btok) + plen) % 4)) btok = ""
-                    # The threshold below uses this unpadded length: padding
-                    # an 18 or 19 character run to 20 must not skip basiccred.
-                    blen = length(btok)
-                    while (btok != "" && length(btok) % 4) btok = btok "="
-                }
-                if (scheme == "basic" && (blen >= 3 || (plen > 0 && blen >= 2)) && blen < 20 && basiccred(btok, !hdr)) flag("authorization-header")
-                else if (length(seg) >= 20) flag("authorization-header")
+            }
+            if (l ~ /(^|[^a-z0-9_])basic[ \t]*$/) {
+                bcarry = 1
+                bchdr = (l ~ /authorization[ \t]*[=:][ \t]*basic[ \t]*$/)
             }
             # split() keeps this linear on very long (minified) lines.
             n = split($0, ws, /[^A-Za-z0-9+\/_=-]+/)
@@ -668,13 +728,15 @@ _rt_scan() {
                 m = length(w)
                 if (m == 0) continue
                 # `=` is a word character (base64 padding), so `auth=ghp_...`
-                # is one word: test the prefixes on the whole word and on the
-                # part after its last `=`.
-                t = w
-                sub(/^.*=/, "", t)
-                for (k = 0; k < 2; k++) {
-                    if (k == 1 && t == w) break
-                    v = k ? t : w
+                # is one word.
+                # A `/` is a word character too (paths, base64), so a token
+                # inside an allowed URL path (`github.com/x/<token>`) would
+                # keep the slash in front of its prefix. Test the whole word,
+                # then each `/`- or `=`-delimited segment of it.
+                np = (w ~ /[\/=]/) ? split(w, wsegs, /[\/=]+/) : 0
+                for (k = 0; k <= np; k++) {
+                    v = k ? wsegs[k] : w
+                    if (k && (v == "" || v == w)) continue
                     mv = length(v)
                     if (v ~ /^(ghp|gho|ghu|ghs|ghr)_/ && mv >= 24) flag("token-prefix")
                     if (v ~ /^github_pat_/ && mv >= 30) flag("token-prefix")
