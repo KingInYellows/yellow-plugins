@@ -250,9 +250,10 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   reports it as `forbidden` (never deleted, even by apply). Hook config lives
   in `catalog/plugins/<name>.json#hooks` and is generated into `plugin.json`;
   `hooks/codex-hooks.json` is generated too, never hand-written. One
-  exception: a Claude Code mod (`yellow-claudemod`) declares its TypeScript
-  hooks module there as a lone `{ "modules": ["./<file>.ts"] }`, which is
-  the only place Claude Code reads it from. `scripts/lib/mod-hooks.js`
+  exception to the `hooks/hooks.json` ban: a Claude Code mod
+  (`yellow-claudemod`) declares its TypeScript hooks module in
+  `hooks/hooks.json` as a lone `{ "modules": ["./<file>.ts"] }`, the only
+  place Claude Code reads it from. `scripts/lib/mod-hooks.js`
   defines that shape for both checks; anything else in the file is still an
   error.
 - For `userConfig`, mark secrets with `sensitive: true`. Do not interpolate
