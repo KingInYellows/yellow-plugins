@@ -30,19 +30,26 @@ for plugin in yellow-research yellow-semgrep; do
   status_file="$PLUGIN_DATA_DIR/$plugin-yellow-plugins/credential-status.json"
   [ -f "$status_file" ] || status_file="$PLUGIN_DATA_DIR/$plugin/credential-status.json"
   if [ -f "$status_file" ] && command -v jq >/dev/null 2>&1; then
-    # Single jq invocation per plugin — extract all fields as TSV.
-    read -r present_count total_count user_config_count shell_env_count version <<EOF
-$(jq -r '[
+    # Single jq invocation per plugin — extract all fields as TSV. A malformed
+    # file is "status unknown", never 0/0 (docs/plugin-credential-status-protocol.md).
+    if _cs_row=$(jq -er '[
   ([.credentials[] | select(.present == true)] | length),
   (.credentials | length),
   ([.credentials[] | select(.source == "userConfig")] | length),
   ([.credentials[] | select(.source == "shell_env")] | length),
   (.version // "unknown")
-] | @tsv' "$status_file" 2>/dev/null)
+] | @tsv' "$status_file" 2>/dev/null) && [ -n "$_cs_row" ]; then
+      read -r present_count total_count user_config_count shell_env_count version <<EOF
+$_cs_row
 EOF
-    printf '%-22s %s/%s present (uc:%s env:%s, v%s)\n' \
-      "$plugin:" "${present_count:-0}" "${total_count:-0}" \
-      "${user_config_count:-0}" "${shell_env_count:-0}" "${version:-unknown}"
+      printf '%-22s %s/%s present (uc:%s env:%s, v%s)\n' \
+        "$plugin:" "${present_count:-0}" "${total_count:-0}" \
+        "${user_config_count:-0}" "${shell_env_count:-0}" "${version:-unknown}"
+    else
+      printf '%-22s status file malformed (status unknown)\n' "$plugin:"
+      printf 'warning: %s credential-status.json is malformed\n' "$plugin" >&2
+    fi
+    unset _cs_row
   elif [ -f "$status_file" ]; then
     printf '%-22s status file present but jq missing\n' "$plugin:"
   else
@@ -53,8 +60,8 @@ done
 ```
 
 The status file is the AUTHORITATIVE source for classification. When it
-exists, prefer its `present_count` over shell-env-only probes. When it is
-absent, fall back to the legacy shell-env-only check (and emit a hint that
+exists and parses, prefer its `present_count` over shell-env-only probes.
+When it is absent or reported malformed, fall back to the legacy shell-env-only check (and emit a hint that
 the user should restart Claude Code to populate the file).
 
 ## Step 1.7: Plugin Version Drift Check

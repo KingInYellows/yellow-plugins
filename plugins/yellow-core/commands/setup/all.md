@@ -738,7 +738,8 @@ with consent.
 
 **yellow-semgrep:**
 
-Prefer the credential-status file from Step 1.6 over shell-env-only probes.
+Prefer the credential-status file from Step 1.6 over shell-env-only probes;
+a file reported `malformed` counts as absent.
 The wrapper script honors both userConfig and shell env as of v4.1.0.
 
 - READY: `curl` OK AND `jq` OK AND `semgrep` OK AND (status file shows
@@ -751,7 +752,8 @@ The wrapper script honors both userConfig and shell env as of v4.1.0.
 
 **yellow-research:**
 
-Prefer the credential-status file from Step 1.6 over shell-env-only probes.
+Prefer the credential-status file from Step 1.6 over shell-env-only probes;
+a file reported `malformed` counts as absent.
 The 3-element fallback wrapper means keys may be resolved from the keychain
 (invisible to the dashboard's Bash subprocess) — the status file is the
 only accurate signal.
