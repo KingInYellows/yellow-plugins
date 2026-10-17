@@ -66,9 +66,9 @@ Step 5 whatever it says.
 ## What leaves the machine
 
 Only on `logged`: the PR title, the changed paths with line counts, and the
-diff hunks of non-test, non-generated, non-lockfile files, redacted with
-yellow-core's `cs_redact_secrets`, fenced as untrusted reference data and
-capped near 24,000 characters (largest files dropped first). Trust boundary:
+diff hunks of non-test, non-generated, non-lockfile files. Each is redacted
+with yellow-core's `cs_redact_secrets` and fenced as untrusted reference data;
+the diff is capped near 24,000 characters (largest files dropped first). Trust boundary:
 `docs/security.md` "Persona selection shadow log". The record at
 `<git-common-dir>/yellow-review/jev-persona/<pr>-<head>.json` (mode 600)
 holds names, numbers and probabilities, never diff text.

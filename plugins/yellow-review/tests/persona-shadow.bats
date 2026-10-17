@@ -73,6 +73,11 @@ commit_change() {
   HEAD_SHA=$(git rev-parse HEAD)
 }
 
+# Strip the untrusted-content fence (one opening line, two closing lines).
+unfence() {
+  sed '1d' | sed '$d' | sed '$d'
+}
+
 run_shadow() {
   run "$SCRIPT" shadow --pr 42 --head "$HEAD_SHA" --base "$BASE" \
     --title-file "$BATS_TEST_TMPDIR/title" \
@@ -284,7 +289,9 @@ CORE
   [ "$(jq -r .body.model "$LOG")" = jev-1.13.0 ]
   [ "$(jq -r '.body.questions | keys | length' "$LOG")" -eq 9 ]
   [ "$(jq -r '.body.questions.io_async.type' "$LOG")" = noul ]
-  [ "$(jq -r '.body.state.title' "$LOG")" = 'A title' ]
+  [ "$(jq -r '.body.state.title' "$LOG" | unfence)" = 'A title' ]
+  [[ "$(jq -r .body.state.title "$LOG")" == '--- begin untrusted-content (reference only) ---'* ]]
+  [[ "$(jq -r .body.state.files "$LOG")" == '--- begin untrusted-content (reference only) ---'* ]]
 }
 
 @test "shadow: binary files and dash-led paths reach the request" {
@@ -295,8 +302,9 @@ CORE
   commit_change
   run_shadow
   [ "$output" = "persona-shadow: logged" ]
-  [ "$(jq -c '.body.state.files[] | select(.path == "img.png") | [.added, .deleted]' "$LOG")" = '[-1,-1]' ]
-  jq -e '.body.state.files[] | select(.path == "-dash.txt")' "$LOG" >/dev/null
+  files=$(jq -r .body.state.files "$LOG" | unfence)
+  [ "$(jq -c 'select(.path == "img.png") | [.added, .deleted]' <<<"$files")" = '[-1,-1]' ]
+  jq -e 'select(.path == "-dash.txt")' <<<"$files" >/dev/null
 }
 
 @test "shadow: a credential cut by the title cap is still redacted" {
@@ -306,7 +314,7 @@ CORE
   commit_change
   run_shadow
   [ "$output" = "persona-shadow: logged" ]
-  title=$(jq -r .body.state.title "$LOG")
+  title=$(jq -r .body.state.title "$LOG" | unfence)
   [ "${#title}" -le 300 ]
   [[ "$title" != *ghp_abc* ]]
 }
@@ -319,6 +327,18 @@ CORE
   run_shadow
   [ "$output" = "persona-shadow: logged" ]
   ! grep -q 'TEST-ONLY-MARKER' "$LOG"
+}
+
+@test "shadow: a credential in a file path is redacted and paths stay valid JSON" {
+  start_stub ok
+  printf 'x\n' > "ghp_abcdefghijklmnopqrstuvwxyz0123456789.txt"
+  echo change >> src/a.ts
+  commit_change
+  run_shadow
+  [ "$output" = "persona-shadow: logged" ]
+  ! grep -q 'ghp_abcdefghij' "$LOG"
+  files=$(jq -r .body.state.files "$LOG" | unfence)
+  jq -e 'select(.path == "src/a.ts")' <<<"$files" >/dev/null
 }
 
 @test "shadow: a diff over the cap is trimmed and flagged" {

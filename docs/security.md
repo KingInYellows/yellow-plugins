@@ -603,9 +603,10 @@ before dispatch. It never changes which reviewers run.
   jq and yellow-core's `cs_redact_secrets` are available: the PR title (first
   300 bytes, control characters stripped), the changed paths with per-file
   line counts, and the diff hunks of every file that is not a test, generated
-  file or lockfile, passed through `cs_redact_secrets` (no call if it is
-  missing or reports a failure) and capped near 24,000 characters with the
-  largest files dropped first, plus the nine fixed questions in
+  file or lockfile. All three pass through `cs_redact_secrets` (no call if it
+  is missing or reports a failure) and are each wrapped in the
+  untrusted-content fence; the diff is capped near 24,000 characters with the
+  largest files dropped first. The request also carries the nine fixed questions in
   `lib/jev-persona-criteria.json`. It goes to TypeSafe AI
   (`https://api.typesafe.ai/v1/systemone`, model `jev-1.13.0` unless
   `REVIEW_JEV_MODEL` is set). Redaction is a pattern list, so a secret it does
