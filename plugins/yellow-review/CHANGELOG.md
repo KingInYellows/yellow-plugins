@@ -1,5 +1,47 @@
 # Changelog
 
+## 3.10.0
+
+### Minor Changes
+
+- [`7bc954d`](https://github.com/KingInYellows/yellow-plugins/commit/7bc954dade63f3b1621843b14bf8f6b046c68d9e)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add an opt-in
+  shadow log for `/review:pr` conditional-persona selection. With
+  `reviewer_selection: shadow` in `yellow-plugins.local.md`, Step 4 records the
+  personas the dispatch table's exact rules pick, the ones the orchestrator
+  picked, and the ones TypeSafe's Jev would pick from one request on the
+  redacted diff (public repositories, or those in
+  `reviewer_selection_private_repos`, which accepts `owner/*` and is read only
+  from the user-level `~/.claude/yellow-plugins.local.md`). That user-level file
+  can also set `reviewer_selection` for every repository. Dispatch is unchanged.
+  yellow-core's `local-config` skill documents the two new keys.
+
+### Patch Changes
+
+- [`87cc231`](https://github.com/KingInYellows/yellow-plugins/commit/87cc231c75f7d38d1e1b3862aea5f59c3687a61e)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Close four
+  credential-scan edge cases. Both screens now judge a Basic payload folded onto
+  the line after its scheme (`Authorization: Basic` then ` YTpi`) the same way
+  as a same-line payload: `rt_text_clean` refuses it and `cs_redact_secrets`
+  redacts it. The resolve-text screen tests known token prefixes (`tvly-`,
+  `pplx-`, `sgp_` and the rest) on each `/`- or `=`-delimited segment of a word,
+  so a token inside an allowed URL path is caught. Under byte-wise awk (mawk,
+  gawk in C) a standalone non-ASCII token with no letter (an Arabic comma, say)
+  is decoration rather than prose, while Latin-1 letters such as `µ` and
+  accented capitals such as `Über` are words, as they already were under a
+  multibyte gawk.
+
+- [`9b000b5`](https://github.com/KingInYellows/yellow-plugins/commit/9b000b552796820fb8169e41e3db34bfe715ded0)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fix
+  `READY_GITHUB` stack operations in the installed plugin cache. Commands,
+  skills and agents called
+  `${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js`, which
+  exists only in the source tree; the cache is
+  `<marketplace>/<plugin>/<version>/`. They now call
+  `lib/run-github-stack-runtime.js`, which finds the runtime in either layout
+  (highest numeric cached version) and reports `RUNTIME_NOT_FOUND` with a
+  recovery action when github-workflow is absent.
+
 ## 3.9.0
 
 ### Minor Changes
