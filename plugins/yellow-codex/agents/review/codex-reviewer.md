@@ -569,10 +569,11 @@ first quote: `/council` checks that quote against the cited file
 (yellow-council `council_verify_findings`). A null, blank or over-500-character
 `evidence`, or one holding a private-key marker, becomes
 `Evidence: N/A — <reason>`, which `/council` reads as no evidence. Only the
-first non-blank line of a multi-line value is kept. A title is folded onto the
-header line and any `evidence:` label in it, in any capitalization, is
-rewritten to `Evidence -`: the normalizer canonicalizes a lowercase label at a
-line start, so either would otherwise stand in for the quote.
+first non-blank line of a multi-line value is kept. The whole header (path and
+title, both Codex-controlled) is folded onto one line and any `evidence:` label
+in it, in any capitalization, is rewritten to `Evidence -`: the normalizer
+canonicalizes a lowercase label at a line start, and an inline label on the
+header line is read as the quote, so either would otherwise replace it.
 This step is reference only — no action to take, no bash block to run.
 `FINDINGS` is never hand-transcribed: Codex's `body` text is free-form
 LLM prose that can quote arbitrary content from the reviewed diff
@@ -765,10 +766,11 @@ FINDINGS=$(jq -r --arg repo_root "$REPO_ROOT" '
   (rel_path($abs)) as $loc |
   (if ($raw_line | type) == "number" and $raw_line > 0 then $raw_line else 1 end) as $line |
   (if ($raw_line | type) == "number" and $raw_line > 0 then "" else " (line approximate — not reported by Codex)" end) as $loc_note |
-  (escape_header(.title // "Untitled finding") | gsub("[\r\n]+"; " ") | gsub("evidence\\s*:"; "Evidence -"; "i")) as $title |
+  (escape_header(.title // "Untitled finding")) as $title |
   (escape_header(.body // "No description provided.")) as $body |
   (evidence_line(.evidence)) as $evidence |
-  "**[\($sev)] codex — \($loc):\($line)** \($title).\n  Evidence: \($evidence)\n  Finding: \($body)\($loc_note)\($priority_note)\n  [codex] confidence: \(.confidence_score // 0)\n"
+  ("**[\($sev)] codex — \($loc):\($line)** \($title)." | gsub("[\r\n]+"; " ") | gsub("evidence\\s*:"; "Evidence -"; "i")) as $header |
+  "\($header)\n  Evidence: \($evidence)\n  Finding: \($body)\($loc_note)\($priority_note)\n  [codex] confidence: \(.confidence_score // 0)\n"
 ' "$OUTPUT_FILE" 2>/dev/null)
 
 # --- Shared credential-redaction routine for both FINDINGS and SUMMARY below
