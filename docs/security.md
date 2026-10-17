@@ -991,9 +991,11 @@ shell input, so the markdown now reaches the shell through a file:
   its trap, and prints `COUNCIL_ASSEMBLED_REPORT=<path>`.
 - **Step 9** re-runs the same directory check against the 7a literals,
   requires `report.md` to be a regular non-symlink file the user owns, and
-  copies it with `cp` to the Step 6 target, which must be an absolute
-  `docs/council/<name>.md` path with no `..` that does not exist yet. `cmp`
-  confirms the copy; a failed or mismatched copy is removed. The saved report
+  copies it with `cp` to a `mktemp` file beside the Step 6 target, which must
+  be an absolute `docs/council/<name>.md` path with no `..` that does not
+  exist yet. `cmp` confirms the copy, and `ln` publishes it, failing if the
+  target appeared meanwhile, so a concurrent run's report is never
+  overwritten. The temp file is always removed. The saved report
   is therefore byte-identical to what 7c assembled, so the claude leg's
   redaction is mechanical rather than dependent on the model retyping the
   report. A saved report removes the directory; the Step 8 Cancel block

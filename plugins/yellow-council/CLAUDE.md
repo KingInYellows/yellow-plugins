@@ -20,7 +20,8 @@ and never auto-commits. The user decides what to do with the verdicts.
   shells accept: no `${!arr[@]}` key expansion or `${var^}` case conversion,
   and `>|` wherever a redirect overwrites an existing file (zsh `noclobber`)
 - **GNU coreutils + findutils** — `timeout`, `mktemp`, `mv`, `awk`, `sed`,
-  `grep`, `find`, `od`, and `sort` (`find` drives the stale-`/tmp` sweep;
+  `grep`, `find`, `od`, `sort`, `cp`, `ln`, `chmod`, and `cmp` (the last four
+  save the report in Step 9; `find` drives the stale-`/tmp` sweep;
   without it a cancelled run leaves raw reviewer output behind until the OS
   reaps `/tmp`. `od` and `sort` randomize the Step 5 reviewer labels from
   `/dev/urandom`, which `/council` requires and fails closed without)
@@ -144,7 +145,8 @@ and never auto-commits. The user decides what to do with the verdicts.
 - **The report is saved by shell copy, never by `Write`.** Step 7c writes the
   assembled report (synthesis plus redacted, fenced reviewer sections) to
   `report.md` in its 0700 staging directory; Step 9 copies that file to
-  `docs/council/<date>-<mode>-<slug>.md` with `cp` and checks it with `cmp`.
+  `docs/council/<date>-<mode>-<slug>.md` (copy to a temp file beside it,
+  `cmp`, then an exclusive `ln`, so an existing report is never overwritten).
   The model never retypes the report, so the claude leg's redaction reaches
   the saved file.
 

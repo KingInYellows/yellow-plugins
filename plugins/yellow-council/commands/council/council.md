@@ -45,8 +45,9 @@ and atomic file write conventions.
 # claude-reviewer leaves raw output in /tmp indefinitely while the docs promise
 # next-run reclamation. Declare it rather than depend on it undeclared.
 # `od` and `sort` randomize the Step 5 reviewer labels, which fail closed
-# without them rather than fall back to a fixed order.
-for tool in bash git timeout jq mktemp awk sed grep find od sort; do
+# without them rather than fall back to a fixed order. `cp`, `ln`, `chmod` and
+# `cmp` save the report in Step 9; check them before reviewer runs are spent.
+for tool in bash git timeout jq mktemp awk sed grep find od sort cp ln chmod cmp; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     printf '[council] Error: required tool "%s" not found\n' "$tool" >&2
     exit 1
@@ -3560,7 +3561,8 @@ If user selects **Save report**: continue to Step 9.
 
 ### Step 9: Copy the assembled report into docs/council/
 
-Copy 7c's `report.md` to the target path with a shell `cp`. Do not use
+Copy 7c's `report.md` to the target path with a shell `cp`, published with
+an exclusive `ln` so an existing file is never overwritten. Do not use
 `Write` and do not retype the report: the copy is what carries the claude
 leg's redaction pass and fence rebuild into the saved file. Substitute the
 `COUNCIL_REPORT_PATH_ABS` literal from Step 6, the two 7a literals, the
@@ -3611,14 +3613,26 @@ else
     printf '[council] Error: %s already exists — refusing to overwrite it; re-run Step 6 for a free name\n' "$REPORT_PATH_ABS" >&2
   elif [ ! -d "${REPORT_PATH_ABS%/*}" ]; then
     printf '[council] Error: %s is not a directory — report not saved\n' "${REPORT_PATH_ABS%/*}" >&2
-  elif ! cp -- "$ASSEMBLED_REPORT" "$REPORT_PATH_ABS"; then
-    rm -f -- "$REPORT_PATH_ABS"
-    printf '[council] Error: copying the report to %s failed — report not saved\n' "$REPORT_PATH_ABS" >&2
-  elif ! cmp -s -- "$ASSEMBLED_REPORT" "$REPORT_PATH_ABS"; then
-    rm -f -- "$REPORT_PATH_ABS"
-    printf '[council] Error: %s does not match the assembled report — removed it; report not saved\n' "$REPORT_PATH_ABS" >&2
   else
-    WRITE_OK=1
+    # Copy to a private temp file beside the target, give it the mode a plain
+    # file gets under this umask, check it, then publish it with `ln`, which
+    # fails if the target exists. A concurrent /council that picked the same
+    # name therefore cannot be overwritten, and the cmp never runs against a
+    # file another run may own.
+    PUBLISH_TMP=$(mktemp "${REPORT_PATH_ABS%/*}/.council-report-XXXXXX") || PUBLISH_TMP=""
+    if [ -z "$PUBLISH_TMP" ]; then
+      printf '[council] Error: cannot create a temp file in %s — report not saved\n' "${REPORT_PATH_ABS%/*}" >&2
+    elif ! cp -- "$ASSEMBLED_REPORT" "$PUBLISH_TMP" \
+      || ! chmod "$(umask -S)" "$PUBLISH_TMP" || ! chmod a-x "$PUBLISH_TMP"; then
+      printf '[council] Error: copying the report to %s failed — report not saved\n' "$PUBLISH_TMP" >&2
+    elif ! cmp -s -- "$ASSEMBLED_REPORT" "$PUBLISH_TMP"; then
+      printf '[council] Error: the copy does not match the assembled report — report not saved\n' >&2
+    elif ! ln -- "$PUBLISH_TMP" "$REPORT_PATH_ABS"; then
+      printf '[council] Error: %s appeared while saving (another /council?) — refusing to overwrite it; re-run Step 6 for a free name\n' "$REPORT_PATH_ABS" >&2
+    else
+      WRITE_OK=1
+    fi
+    [ -z "$PUBLISH_TMP" ] || rm -f -- "$PUBLISH_TMP"
   fi
 fi
 # A saved report frees the staging directory. On failure keep it (0700, ours)
@@ -3797,7 +3811,7 @@ This is the final output of the command. Exit 0.
 | Run stops between Step 5a and 5e | The 0700 `/tmp/council-synth-*` staging directory (normalized, already-redacted reviewer text, the label map, `pass-a.md`) is left behind unless the Step 8 Cancel block runs for it (a 5b abort and a 5e failure followed by Cancel both remove it). 24 hours is the sweep's eligibility threshold, not a maximum retention: the text stays until a later `/council` invocation reaches 5a after the directory is over 24h old, or until you remove it |
 | Run cancelled or aborted between Step 7a and Step 9 | The 0700 `/tmp/council-synth-*` report staging directory with the staged synthesis remains until a later `/council` reaches 5a and its sweep removes it (over 24 hours old). A failed 7b `Write` is still cleaned up: 7c validates the directory, finds no `synthesis.md`, exits 1, and its trap removes the directory |
 | 7c report literal refused (wrong shape, `..`, extra `/`, empty suffix, symlink, foreign owner, or a `.token` that does not equal the 7a token) | `[council] Error: ... refusing to read or delete it`; exit 1; nothing is read or deleted. Run the Step 8 Cancel cleanup and stop |
-| Step 9 cannot save the report (staging literal refused, `report.md` missing or a symlink, target not an absolute `docs/council/<name>.md` path, target already exists, `cp` fails, or the copy differs from `report.md`) | `[council] Error: ... report not saved`; a partial or mismatched copy is removed; the reviewer temp files are still cleaned up and the step exits 1. A validated staging directory is kept and its `report.md` path printed, so the redacted report can be copied by hand; the 5a sweep removes it after 24 hours |
+| Step 9 cannot save the report (staging literal refused, `report.md` missing or a symlink, target not an absolute `docs/council/<name>.md` path, target already exists or appears during the save, `cp` fails, or the copy differs from `report.md`) | `[council] Error: ... report not saved`; the temp copy is removed and the target is never overwritten; the reviewer temp files are still cleaned up and the step exits 1. A validated staging directory is kept and its `report.md` path printed, so the redacted report can be copied by hand; the 5a sweep removes it after 24 hours |
 | yellow-core not found (a `--plugin-dir` or in-place load that skipped the dependency check) | `[council] Warning: yellow-core ... not found`; Tier 1 is skipped and every finding is `unverified` with reason `verifier-error`. Verification never aborts the council |
 | `quote-ground.sh batch` fails (exit 2) or is missing | `[council] Warning: Tier 1 evidence check unavailable`; every Tier 1 row goes to Tier 2. An unreadable cited file would fail the whole batch, so the citation parse rejects it first as `bad-citation` |
 | rapidfuzz not importable by the first `python3` on PATH | `[council] Warning: rapidfuzz not installed` in 5b; Tier 2 candidates are `unverified` with reason `tier2-skipped`. The import probe and the scorer run the same `python3`, so a venv that is not on PATH counts as absent |

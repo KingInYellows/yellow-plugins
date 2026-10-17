@@ -1673,6 +1673,28 @@ assemble_report() {
   rm -rf "$RD" "$REPO"
 }
 
+@test "Step 9 never overwrites a report that appears during the save, and the saved file follows the umask" {
+  local s9="${BATS_TEST_TMPDIR}/9.sh" dest
+  setup_council_run
+  mkdir -p "$REPO/docs/council"
+  dest="$REPO/docs/council/2026-10-17-review-x.md"
+  assemble_report bash
+  s9_script "$s9" "$dest"
+  # Another /council publishes the same name between the existence check and ln.
+  run_in bash "$FIRST_AWK" "cd '$REPO' && ln() { printf 'other run\\n' > '$dest'; command ln \"\$@\"; } && . '$s9'"
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"appeared while saving"* ]] || { echo "$stderr"; return 1; }
+  [ "$(cat "$dest")" = "other run" ]
+  [ -z "$(find "$REPO/docs/council" -name '.council-report-*')" ]
+  [ -f "$RD/report.md" ]
+  rm -f "$dest"
+  run_in bash "$FIRST_AWK" "cd '$REPO' && umask 027 && . '$s9'"
+  [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+  [ "$(ls -l "$dest" | cut -c1-10)" = "-rw-r-----" ]
+  [ -z "$(find "$REPO/docs/council" -name '.council-report-*')" ]
+  rm -rf "$REPO"
+}
+
 @test "Step 9 refuses a staging dir whose token does not match and removes nothing" {
   local s9="${BATS_TEST_TMPDIR}/9.sh" dest good
   setup_council_run
