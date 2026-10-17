@@ -26,7 +26,8 @@
 #
 # Diff text leaves the machine only when the repository is public or named
 # with --allow-repo; an unknown visibility counts as private. The key goes to
-# curl as a config on fd 3 and the body on stdin, so neither is in argv. The
+# curl as a config on a pipe at fd 3 (never a here-document, which older bash
+# writes to a temp file) and the body on stdin, so neither is in argv. The
 # record holds names, numbers and probabilities, never diff text.
 #
 # Environment: TYPESAFE_API_KEY (required for the Jev call), REVIEW_JEV_MODEL
@@ -288,9 +289,8 @@ jp_ask_jev() {
       -H 'Content-Type: application/json' \
       --data-binary @- \
       -w '\n%{time_total}' \
-      "${REVIEW_JEV_URL:-$JP_DEFAULT_URL}" 2>/dev/null 3<<JPCFG
-header = "Authorization: Bearer ${TYPESAFE_API_KEY}"
-JPCFG
+      "${REVIEW_JEV_URL:-$JP_DEFAULT_URL}" 2>/dev/null \
+      3< <(printf 'header = "Authorization: Bearer %s"\n' "$TYPESAFE_API_KEY")
   ) || return 1
   latency=$(printf '%s' "$resp" | tail -n 1)
   resp=$(printf '%s' "$resp" | sed '$d')

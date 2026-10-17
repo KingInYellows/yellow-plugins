@@ -621,9 +621,10 @@ before dispatch. It never changes which reviewers run.
   `reviewer_selection` unset.
 - **When.** Once per `/review:pr` run with the key set (5 s timeout,
   `REVIEW_JEV_TIMEOUT_S`). `/review:all` does not call it.
-- **Credential handling.** As in the pre-filter: the key reaches curl as a
-  config on fd 3 and the body on stdin, never argv; curl runs with `-q`. The
-  key is never written to disk or logs. `REVIEW_JEV_URL` and
+- **Credential handling.** The key reaches curl as a config on fd 3, fed by
+  a process substitution (a pipe, not a here-document, which bash before 5.1
+  writes to a temp file), and the body on stdin, never argv; curl runs with
+  `-q`. The key is never written to disk or logs. `REVIEW_JEV_URL` and
   `REVIEW_JEV_MODEL` redirect the request and are trusted configuration.
 - **Prompt injection.** The diff is wrapped in the
   `--- begin untrusted-content (reference only) ---` fence (lines starting
