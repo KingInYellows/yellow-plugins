@@ -22,13 +22,13 @@ Run one Bash block to read each plugin's status file:
 printf '\n=== Credential Status Files ===\n'
 # Hooks write to ${CLAUDE_PLUGIN_DATA}, i.e. <config>/plugins/data/<id>/, where
 # <id> is the sanitized plugin id (`<plugin>-yellow-plugins` for a marketplace
-# install). The bare `<plugin>` dir is the writer's fallback when
-# CLAUDE_PLUGIN_DATA is unset.
+# install). When CLAUDE_PLUGIN_DATA is unset, lib/credential-status.sh falls
+# back to $HOME/.claude/plugins/data/<plugin> regardless of CLAUDE_CONFIG_DIR.
 PLUGIN_DATA_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/data"
 # setup-all-credential-status-plugins:start
 for plugin in yellow-research yellow-semgrep; do
   status_file="$PLUGIN_DATA_DIR/$plugin-yellow-plugins/credential-status.json"
-  [ -f "$status_file" ] || status_file="$PLUGIN_DATA_DIR/$plugin/credential-status.json"
+  [ -f "$status_file" ] || status_file="$HOME/.claude/plugins/data/$plugin/credential-status.json"
   if [ -f "$status_file" ] && command -v jq >/dev/null 2>&1; then
     # Single jq invocation per plugin — extract all fields as TSV. A malformed
     # file is "status unknown", never 0/0 (docs/plugin-credential-status-protocol.md).

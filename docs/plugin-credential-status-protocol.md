@@ -117,7 +117,8 @@ The dashboard reads each plugin's status file via plain Bash + jq:
 ```bash
 data_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/data"
 STATUS_FILE="$data_dir/${plugin}-yellow-plugins/credential-status.json"
-[ -f "$STATUS_FILE" ] || STATUS_FILE="$data_dir/${plugin}/credential-status.json"
+# lib/credential-status.sh falls back here when CLAUDE_PLUGIN_DATA is unset.
+[ -f "$STATUS_FILE" ] || STATUS_FILE="$HOME/.claude/plugins/data/${plugin}/credential-status.json"
 if [ -f "$STATUS_FILE" ] && command -v jq >/dev/null 2>&1; then
   present_count=$(jq '[.credentials[] | select(.present == true)] | length' "$STATUS_FILE" 2>/dev/null)
   total_count=$(jq '.credentials | length' "$STATUS_FILE" 2>/dev/null)
