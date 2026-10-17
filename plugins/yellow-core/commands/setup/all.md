@@ -38,6 +38,12 @@ else
   printf 'node:               NOT FOUND\n'
   printf 'node18_check:       missing\n'
 fi
+# yellow-morph, yellow-cursor and yellow-goal need Node >= 22.22.0.
+if command -v node >/dev/null 2>&1 && node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit(a > 22 || (a === 22 && b >= 22) ? 0 : 1)' 2>/dev/null; then
+  printf 'node2222_check:     ok\n'
+else
+  printf 'node2222_check:     too_old_or_missing\n'
+fi
 command -v npm >/dev/null 2>&1 && printf 'npm:                OK (%s)\n' "$(npm --version 2>/dev/null)" || printf 'npm:                NOT FOUND\n'
 command -v npx >/dev/null 2>&1 && printf 'npx:                OK\n' || printf 'npx:                NOT FOUND\n'
 command -v git >/dev/null 2>&1 && printf 'git:                OK\n' || printf 'git:                NOT FOUND\n'
@@ -50,6 +56,23 @@ command -v semgrep >/dev/null 2>&1 && printf 'semgrep:            OK\n' || print
 command -v yq >/dev/null 2>&1 && printf 'yq:                 OK\n' || printf 'yq:                 NOT FOUND\n'
 command -v realpath >/dev/null 2>&1 && printf 'realpath:           OK\n' || printf 'realpath:           NOT FOUND\n'
 command -v flock >/dev/null 2>&1 && printf 'flock:              OK\n' || printf 'flock:              NOT FOUND\n'
+command -v timeout >/dev/null 2>&1 && printf 'timeout:            OK\n' || printf 'timeout:            NOT FOUND\n'
+command -v od >/dev/null 2>&1 && printf 'od:                 OK\n' || printf 'od:                 NOT FOUND\n'
+command -v sort >/dev/null 2>&1 && printf 'sort:               OK\n' || printf 'sort:               NOT FOUND\n'
+# yellow-council's blocks need bash 4.3+ or zsh (associative arrays).
+if [ -n "${BASH_VERSION:-}" ]; then
+  case "$BASH_VERSION" in
+    [0-3].*|4.[0-2].*) printf 'shell_check:        too_old (bash %s)\n' "$BASH_VERSION" ;;
+    *) printf 'shell_check:        ok (bash %s)\n' "$BASH_VERSION" ;;
+  esac
+elif [ -n "${ZSH_VERSION:-}" ]; then
+  printf 'shell_check:        ok (zsh %s)\n' "$ZSH_VERSION"
+else
+  printf 'shell_check:        unsupported\n'
+fi
+# yellow-review's /review:resolve refuses BWK awk (stock macOS /usr/bin/awk).
+nul_n=$(printf 'a\0b\0c\0' | awk 'BEGIN { RS = "\0" } END { print NR }' 2>/dev/null)
+[ "$nul_n" = 3 ] && printf 'awk_nul:            ok\n' || printf 'awk_nul:            UNSUPPORTED\n'
 command -v ast-grep >/dev/null 2>&1 && printf 'ast-grep:           OK\n' || printf 'ast-grep:           NOT FOUND\n'
 command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' || printf 'agent-browser:      NOT FOUND\n'
 [ -n "$_gt" ] && printf 'gt:                 OK (%s)\n' "$("$_gt" --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'
@@ -124,9 +147,27 @@ else printf 'ruvector:           NOT INSTALLED (plugin-managed)\n'; fi
 unset _rv_cli _rv_xdg _rv_d _rv_p _rv_b _rv_home _rv_ver _rv_t _rv_i _rv_c
 unset -f _rv_sys _rv_base_ok _rv_probe
 command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(codex --version 2>/dev/null | head -n1)" || printf 'codex:              NOT FOUND\n'
-command -v gemini >/dev/null 2>&1 && printf 'gemini:             OK (%s)\n' "$(gemini --version 2>&1 | head -n1)" || printf 'gemini:             NOT FOUND\n'
+# Codex v0.118+ keeps auth in the OS keyring, not ~/.codex/auth.json. Never
+# echo the status text: it can include API key fragments.
+if command -v codex >/dev/null 2>&1; then
+  codex login status 2>&1 | grep -qi '^logged in' && printf 'codex_login:        ok\n' || printf 'codex_login:        not_logged_in\n'
+else
+  printf 'codex_login:        SKIPPED\n'
+fi
+# yellow-council's Google slot is the Antigravity CLI; the legacy `gemini` CLI
+# stopped serving consumer requests on 2026-06-18 and does not count.
+command -v agy >/dev/null 2>&1 && printf 'agy:                OK (%s)\n' "$(agy --version 2>&1 | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)" || printf 'agy:                NOT FOUND\n'
 command -v opencode >/dev/null 2>&1 && printf 'opencode:           OK (%s)\n' "$(opencode --version 2>&1 | head -n1)" || printf 'opencode:           NOT FOUND\n'
 command -v claude >/dev/null 2>&1 && printf 'claude:             OK (%s)\n' "$(claude --version 2>/dev/null | head -n1)" || printf 'claude:             NOT FOUND\n'
+# yellow-goal pins goal-gen engineVersion 0.3.0 (/goal:setup is authoritative).
+# Keep only a plain version string from the engine's JSON.
+if command -v goal-gen >/dev/null 2>&1; then
+  _gg_ver=$(goal-gen version --json 2>/dev/null | sed -n 's/.*"engineVersion"[[:space:]]*:[[:space:]]*"\([0-9][0-9.]*[0-9A-Za-z.+-]*\)".*/\1/p' | head -n1)
+  [ -n "$_gg_ver" ] && printf 'goal-gen:           OK (%s)\n' "$_gg_ver" || printf 'goal-gen:           UNPARSEABLE\n'
+  unset _gg_ver
+else
+  printf 'goal-gen:           NOT FOUND\n'
+fi
 
 if command -v python3 >/dev/null 2>&1; then
   py_ver=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
@@ -147,29 +188,24 @@ fi
 printf '\n=== Environment Variables ===\n'
 if [ -n "${MORPH_API_KEY:-}" ]; then
   printf 'MORPH_API_KEY:             set (shell env)\n'
-elif grep -qE '"morph_api_key"[[:space:]]*:' "${HOME}/.claude/.credentials.json" 2>/dev/null; then
+elif grep -qE '"morph_api_key"[[:space:]]*:' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json" 2>/dev/null; then
   printf 'MORPH_API_KEY:             set (userConfig)\n'
 else
   printf 'MORPH_API_KEY:             NOT SET (run /morph:setup if you configured via keychain)\n'
 fi
-if [ -n "${CURSOR_API_KEY:-}" ]; then
-  printf 'CURSOR_API_KEY:            set (shell env)\n'
-elif grep -qE '"cursor_api_key"[[:space:]]*:' "${HOME}/.claude/.credentials.json" 2>/dev/null; then
-  printf 'CURSOR_API_KEY:            set (userConfig)\n'
-else
-  printf 'CURSOR_API_KEY:            NOT SET (run /cursor:setup if you configured via keychain or `cursor login`)\n'
-fi
+# yellow-cursor has no userConfig: the CLI reads CURSOR_API_KEY or the SDK's stored login.
+[ -n "${CURSOR_API_KEY:-}" ] && printf 'CURSOR_API_KEY:            set (shell env)\n' || printf 'CURSOR_API_KEY:            NOT SET (export it, or use the Cursor stored login; /cursor:setup verifies)\n'
 [ -f "$HOME/.cursor/sdk/auth.json" ] && printf 'cursor_stored_login:       present\n' || printf 'cursor_stored_login:       missing\n'
 if [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ]; then
   printf 'DEVIN_SERVICE_USER_TOKEN:  set (shell env)\n'
-elif grep -qE '"devin_service_user_token"[[:space:]]*:' "${HOME}/.claude/.credentials.json" 2>/dev/null; then
+elif grep -qE '"devin_service_user_token"[[:space:]]*:' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json" 2>/dev/null; then
   printf 'DEVIN_SERVICE_USER_TOKEN:  set (userConfig)\n'
 else
   printf 'DEVIN_SERVICE_USER_TOKEN:  NOT SET (run /devin:setup if you configured via keychain)\n'
 fi
 if [ -n "${DEVIN_ORG_ID:-}" ]; then
   printf 'DEVIN_ORG_ID:              set (shell env)\n'
-elif grep -qE '"devin_org_id"[[:space:]]*:' "${HOME}/.claude/.credentials.json" 2>/dev/null; then
+elif grep -qE '"devin_org_id"[[:space:]]*:' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json" 2>/dev/null; then
   printf 'DEVIN_ORG_ID:              set (userConfig)\n'
 else
   printf 'DEVIN_ORG_ID:              NOT SET (run /devin:setup if you configured via keychain)\n'
@@ -437,11 +473,43 @@ if [ -n "$_cursor_root" ] && [ -f "$_cursor_root/dist/cli.js" ]; then
 else
   printf 'cursor_cli_resolved: NOT FOUND\n'
 fi
+# Every cursor command needs @cursor/sdk: the plugin's own node_modules first,
+# then the data-dir runtime /cursor:setup installs (src/config.ts resolveDataDir).
+if [ -n "${YELLOW_CURSOR_DATA_DIR:-}" ]; then _cursor_data=$YELLOW_CURSOR_DATA_DIR
+elif [ -n "${XDG_DATA_HOME:-}" ]; then _cursor_data="$XDG_DATA_HOME/yellow-cursor"
+elif [ "$(uname -s 2>/dev/null)" = Darwin ]; then _cursor_data="$HOME/Library/Application Support/yellow-cursor"
+else _cursor_data="$HOME/.local/share/yellow-cursor"; fi
+_cursor_sdk=no
+if { [ -n "$_cursor_root" ] && [ -d "$_cursor_root/node_modules/@cursor/sdk" ]; } || [ -d "$_cursor_data/runtime/node_modules/@cursor/sdk" ]; then
+  _cursor_sdk=yes
+  printf 'cursor_sdk_resolved: OK\n'
+else
+  printf 'cursor_sdk_resolved: MISSING\n'
+fi
 if [ -n "$_jules_root" ] && [ -f "$_jules_root/dist/cli.js" ]; then
   printf 'jules_cli_resolved: OK (%s)\n' "$_jules_root"
 else
   printf 'jules_cli_resolved: NOT FOUND\n'
 fi
+# Remote-agent group state for Step 2.5, from the classifier /linear:delegate
+# uses. Tooling flags come from the probes above; devin counts only when both
+# credential env vars are exported, because its commands call curl directly.
+_core_root=""
+[ -n "${_plugin_list_json:-}" ] && _core_root=$(_enabled_install_path 'yellow-core@yellow-plugins')
+if [ -n "$_core_root" ] && [ -f "$_core_root/lib/remote-agent-provider-state.js" ]; then
+  _t_cursor=no; [ -n "$_cursor_root" ] && [ -f "$_cursor_root/dist/cli.js" ] && [ "$_cursor_sdk" = yes ] && _t_cursor=yes
+  _t_devin=no; [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ] && [ -n "${DEVIN_ORG_ID:-}" ] && _t_devin=yes
+  _t_jules=no; [ -n "$_jules_root" ] && [ -f "$_jules_root/dist/cli.js" ] && _t_jules=yes
+  _ra_state=$(printf '%s' "$_plugin_list_json" | node "$_core_root/lib/remote-agent-provider-state.js" classify \
+      --plugins-file - --project-path "${repo_top:-}" \
+      --tooling-cursor "$_t_cursor" --tooling-devin "$_t_devin" --tooling-jules "$_t_jules" 2>/dev/null \
+    | node -e 'let d = ""; process.stdin.on("data", (c) => { d += c; }).on("end", () => { try { process.stdout.write(String(JSON.parse(d).state || "")); } catch {} });' 2>/dev/null)
+  printf 'remote_agent_state: %s\n' "${_ra_state:-UNKNOWN}"
+  unset _t_cursor _t_devin _t_jules _ra_state
+else
+  printf 'remote_agent_state: UNKNOWN (yellow-core classifier not resolved)\n'
+fi
+unset _cursor_data _cursor_sdk _core_root
 # setup-all-remote-agent-tooling:end
 ```
 
@@ -502,12 +570,16 @@ as **NOT INSTALLED** and skip all other checks for that plugin.
 <!-- setup-all-classification:start -->
 **gt-workflow:**
 
-- READY: `gt` OK AND `jq` OK AND `graphite_auth` present AND (`graphite_repo`
-  present OR `gt_trunk` not `UNAVAILABLE`) AND `.graphite.yml` present
-- PARTIAL: `gt` OK AND `jq` OK AND `graphite_auth` present AND (`graphite_repo`
-  present OR `gt_trunk` not `UNAVAILABLE`) AND `.graphite.yml` missing
-- NEEDS SETUP: any core condition not met (`gt`, `jq`, `graphite_auth`,
-  `graphite_repo`/`gt_trunk`)
+`/gt-setup` stops when the repo is not initialised (`graphite_repo` missing
+OR `gt_trunk` unavailable), so both checks are required. `gt_trunk:
+SKIPPED` (no `gt`, or not in a git repo) is a failure, not a pass.
+
+- READY: `git_repo` ok AND `gt` OK AND `jq` OK AND `graphite_auth` present
+  AND `graphite_repo` present AND `gt_trunk` names a branch (not
+  `UNAVAILABLE`, not `SKIPPED`) AND `.graphite.yml` present
+- PARTIAL: every READY condition except `.graphite.yml`, which is missing
+- NEEDS SETUP: any of `git_repo`, `gt`, `jq`, `graphite_auth`,
+  `graphite_repo` or `gt_trunk` fails
 
 **github-workflow:**
 
@@ -529,12 +601,14 @@ stacks as well.
 
 **yellow-ruvector:**
 
-- READY: `node20_check` ok AND `ruvector` OK (plugin-managed install) AND
-  `.ruvector/` exists
-- PARTIAL: `node20_check` ok AND `.ruvector/` exists AND `ruvector` NOT
-  INSTALLED — the plugin installs it on the next session start (prewarm hook)
-  or via `/ruvector:setup`; detail: "plugin-managed ruvector not installed yet"
-- NEEDS SETUP: `node20_check` not ok, or `.ruvector/` missing
+- READY: `node20_check` ok AND `npm` OK AND `jq` OK AND `ruvector` OK
+  (plugin-managed install) AND `.ruvector/` exists
+- PARTIAL: `node20_check` ok AND `npm` OK AND `jq` OK AND `.ruvector/` exists
+  AND `ruvector` NOT INSTALLED — the plugin installs it on the next session
+  start (prewarm hook) or via `/ruvector:setup`; detail: "plugin-managed
+  ruvector not installed yet"
+- NEEDS SETUP: `node20_check` not ok, `npm` or `jq` missing (the install runs
+  `npm ci` and the hooks need `jq`), or `.ruvector/` missing
 
 **yellow-morph:**
 
@@ -544,22 +618,22 @@ prompt (stored in the system keychain, preferred) or a shell
 shell checks directly, so treat READY as "key is configured via *some*
 path" and rely on `/morph:status` for authoritative OFFLINE detection.
 
-- READY: `node18_check` ok AND `npm` OK AND `rg` OK AND either of:
+- READY: `node2222_check` ok AND `npm` OK AND `rg` OK AND either of:
   (a) shell `MORPH_API_KEY` set, OR
   (b) `pluginConfigs.yellow-morph.options.morph_api_key` present in
       `~/.claude/.credentials.json` (userConfig was answered). Detection:
       classification derives from the `MORPH_API_KEY` row already produced
       by Step 1 — if it shows `set (shell env)` or `set (userConfig)`,
-      condition (b) is satisfied. Do NOT re-run a bare grep here; the
-      Step 1 output is the authoritative source and uses path-scoped
-      detection (`pluginConfigs.<plugin>.options.<key>`) rather than an
-      unscoped string match.
+      condition (b) is satisfied. Do NOT re-run a grep here; the Step 1
+      row is the source. It is a key-name match in
+      `${CLAUDE_CONFIG_DIR:-~/.claude}/.credentials.json`, not a path-scoped
+      lookup, and `/morph:status` remains authoritative.
 - PARTIAL: local prerequisites are satisfied but neither the shell env
   var nor the userConfig option is detectable — the plugin will install
   but the MCP server will not start. Recommend running `/morph:setup`
   or answering the userConfig prompt at next plugin-enable.
-- NEEDS SETUP: any local prerequisite missing (`node18_check`, `npm`, or
-  `rg`).
+- NEEDS SETUP: any local prerequisite missing (`node2222_check` — `/morph:setup`
+  requires Node 22.22.0 or later — `npm`, or `rg`).
 
 **yellow-cursor:**
 
@@ -568,17 +642,17 @@ Alternative Provider Groups section below) and the **preferred** member —
 `yellow-devin` below is the legacy path. `credential-status.json` is not
 emitted for this plugin in v1 (it has no MCP server and no SessionStart
 hook writing that file), so classification reads Step 1's `CURSOR_API_KEY`
-row plus the `cursor_stored_login` and `cursor_cli_resolved` probes
-directly, the same way yellow-morph's block does before it joins that
-protocol.
+row plus the `cursor_stored_login`, `cursor_cli_resolved` and
+`cursor_sdk_resolved` probes directly. The plugin has no `userConfig`: the
+CLI reads `CURSOR_API_KEY` or the Cursor SDK's stored login. Every command
+fails with `CURSOR_SDK_MISSING` until `/cursor:setup` installs `@cursor/sdk`.
 
-- READY: `cursor_cli_resolved` is `OK` AND (`CURSOR_API_KEY` shows
-  `set (shell env)`/`set (userConfig)` OR `cursor_stored_login` is
-  `present`)
-- PARTIAL: plugin enabled but `cursor_cli_resolved` is `NOT FOUND`, OR the
-  CLI resolved but no credential source was found (`CURSOR_API_KEY` is
-  `NOT SET` AND `cursor_stored_login` is `missing`) — detail: "run
-  `/cursor:setup` to resolve the SDK and configure credentials"
+- READY: `cursor_cli_resolved` is `OK` AND `cursor_sdk_resolved` is `OK` AND
+  `jq` OK AND `node2222_check` ok AND (`CURSOR_API_KEY` shows
+  `set (shell env)` OR `cursor_stored_login` is `present`)
+- PARTIAL: plugin enabled but any READY condition fails while at least one
+  of the CLI or a credential source resolved — detail names the gap, e.g.
+  "@cursor/sdk not installed — run `/cursor:setup`"
 - NEEDS SETUP: neither the CLI nor any credential source resolved
 
 **yellow-devin:**
@@ -626,7 +700,7 @@ The wrapper script honors both userConfig and shell env as of v4.1.0.
   set in shell env)
 - PARTIAL: token resolved (per status file or shell env) but `semgrep` CLI
   is missing
-- NEEDS SETUP: token absent (status file shows `source: absent` OR file
+- NEEDS SETUP: token absent (status file shows `0/1 present` OR file
   absent AND shell env unset) OR `curl` missing OR `jq` missing
 
 **yellow-research:**
@@ -664,7 +738,7 @@ yellow-research` to re-trigger the userConfig prompts."
 **yellow-debt:**
 
 - READY: `git_repo` ok AND `repo_root` writable AND `git` OK AND `jq` OK AND
-  `yq` OK AND `realpath` OK AND `flock` OK AND `gt` OK AND `yellow-core`
+  `yq` OK AND `realpath` OK AND `gt` OK AND `yellow-core`
   installed AND `yellow-linear` installed
 - PARTIAL: all required local checks pass AND `yellow-core` installed, but
   `yellow-linear` is NOT INSTALLED (optional — only `/debt:sync` needs it)
@@ -677,18 +751,21 @@ yellow-research` to re-trigger the userConfig prompts."
 
 - READY: `gh` OK AND `jq` OK AND `ssh` OK AND `gh_auth` OK AND
   `.claude/yellow-ci.local.md` exists AND `yellow-linear` installed
-- PARTIAL: `gh` OK AND `jq` OK AND config exists, but `ssh` is missing or
-  `gh_auth` is not authenticated — OR all other READY conditions hold but
-  `yellow-linear` is NOT INSTALLED (optional — only `/ci:report-linear`
-  needs it)
-- NEEDS SETUP: `gh` missing OR `jq` missing OR config missing
+- PARTIAL: `gh` OK AND `jq` OK AND `gh_auth` OK AND config exists, but `ssh`
+  is missing (only self-hosted runner diagnosis needs it) — OR all other
+  READY conditions hold but `yellow-linear` is NOT INSTALLED (optional —
+  only `/ci:report-linear` needs it)
+- NEEDS SETUP: `gh` missing OR `jq` missing OR `gh_auth` NOT AUTHENTICATED
+  (the `ci-setup` skill stops on it) OR config missing
 
 **yellow-review:**
 
-- READY: `gh` OK AND `jq` OK AND `gt` OK AND `gh_auth` OK AND `yellow-core`
-  installed
+- READY: `gh` OK AND `jq` OK AND `gt` OK AND `gh_auth` OK AND `awk_nul` ok
+  AND `yellow-core` installed
 - PARTIAL: required local review checks pass, but `yellow-core` is NOT INSTALLED
-- NEEDS SETUP: any required local review check fails
+- NEEDS SETUP: any required local review check fails (`awk_nul`
+  UNSUPPORTED means BWK awk, e.g. stock macOS `/usr/bin/awk`, which
+  `/review:resolve` refuses; install gawk or mawk)
 
 **yellow-browser-test:**
 
@@ -707,13 +784,12 @@ absent, OMIT this plugin from the dashboard entirely — a non-web-app repo
 
 Classification when `web_signal_count >= 1` OR config file present:
 
-- READY: `.claude/yellow-browser-test.local.md` exists AND `node18_check` ok
-  AND `npm` OK AND `agent-browser` OK
+- READY: `.claude/yellow-browser-test.local.md` exists AND `agent-browser` OK
 - RECOMMENDED: `web_signal_count >= 1` but `.claude/yellow-browser-test.local.md`
   is missing — emit "Web app detected; run `/browser-test:setup` to enable
   testing." This is informational, not a NEEDS SETUP error.
-- NEEDS SETUP: config file exists but tooling missing (`node18_check`/`npm`/
-  `agent-browser`)
+- NEEDS SETUP: config file exists but `agent-browser` missing — detail notes
+  that installing it needs `npm` and Node 22.22.0 or later
 
 If `web_signal_count` is `0` AND no config file: omit from dashboard.
 
@@ -753,28 +829,40 @@ prefixes and are not in the recorded probe list.
 **yellow-codex:**
 
 - READY: `codex` binary found in PATH AND version >= 0.140.0 AND
-  (`OPENAI_API_KEY` set OR `~/.codex/auth.json` exists)
+  (`OPENAI_API_KEY` set OR `codex_login` ok OR `~/.codex/auth.json` exists).
+  Current CLIs keep ChatGPT login in the OS keyring, so `codex_login` is the
+  normal signal; `auth.json` only covers pre-0.118 installs.
 - PARTIAL: `codex` binary found AND version >= 0.140.0, but auth not configured
 - NEEDS SETUP: `codex` binary not found OR version < 0.140.0
 
 **yellow-council:**
 
-- READY: `bash` >= 4.3 AND `timeout` AND `jq` AND
-  (`gemini` >= 0.40 OR `opencode` >= 1.14 OR yellow-codex installed)
-- PARTIAL: required system tools present AND at least 1 of 3 reviewer CLIs
-  installed (Gemini, OpenCode, Codex via yellow-codex) — council can run with
-  reduced coverage
-- NEEDS SETUP: required system tools missing (`bash`, `timeout`, `jq`) OR
-  system tools present but 0 of 3 reviewer CLIs installed
+Required system tools: `shell_check` ok (bash 4.3+ or zsh), `timeout`, `jq`,
+`od` and `sort`, plus `yellow-core` installed (Claude Code disables the
+council without it). Reviewer CLIs: `agy` >= 1.0 (Gemini slot; a legacy
+`gemini` binary does not count), `opencode` >= 1.14, and yellow-codex
+installed. OpenRouter auth for OpenCode is not probed here; `/council:setup`
+checks it.
+
+- READY: required system tools present AND all 3 reviewer CLIs installed
+- PARTIAL: required system tools present AND 1 or 2 of 3 reviewer CLIs
+  installed — council runs with reduced coverage
+- NEEDS SETUP: any required system tool missing, `yellow-core` NOT
+  INSTALLED, OR 0 of 3 reviewer CLIs installed
 
 **yellow-goal:**
 
-- READY: `/goal:setup` (or `node ${CLAUDE_PLUGIN_ROOT}/dist/cli.js setup`)
-  reports `ok:true` with `engineVersion` equal to the pin `0.3.0`
+Classify from Step 1's `goal-gen` row (`goal-gen version --json`); the pin
+is `0.3.0` (`plugins/yellow-goal/src/pin.ts`) and `/goal:setup` is
+authoritative.
+
+- READY: `goal-gen` OK with version `0.3.0` AND `yellow-core` installed AND
+  `node2222_check` ok
 - PARTIAL: never — missing binary or version mismatch is fail-closed
-- NEEDS SETUP: `goal-gen` missing from PATH OR version probe fails
-  (`GOAL_ENGINE_MISSING` / `GOAL_ENGINE_VERSION_MISMATCH` /
-  `GOAL_ENGINE_UNPARSEABLE`)
+- NEEDS SETUP: `goal-gen` NOT FOUND (`GOAL_ENGINE_MISSING`), a version other
+  than `0.3.0` (`GOAL_ENGINE_VERSION_MISMATCH`), `UNPARSEABLE`
+  (`GOAL_ENGINE_UNPARSEABLE`), `yellow-core` NOT INSTALLED (required
+  dependency), or `node2222_check` not ok
 
 **yellow-claudemod:**
 
@@ -820,7 +908,7 @@ Marketplace Setup Dashboard
   yellow-docs          READY           git available, repo is a git repository
   yellow-composio      PARTIAL         MCP visible, usage counter missing
   yellow-codex         PARTIAL         codex v0.140.0 found, OPENAI_API_KEY not set
-  yellow-council       PARTIAL         1 of 3 reviewer CLIs installed (codex only)
+  yellow-council       PARTIAL         1 of 3 reviewer CLIs installed (Codex only)
   yellow-goal          NEEDS SETUP     goal-gen missing from PATH
   yellow-claudemod     READY           Claude Code 2.1.302 (downshift off)
   yellow-core          PARTIAL         statusLine installed, disableAllHooks=true
@@ -859,11 +947,12 @@ readiness is worth reporting. Only the **enabled** one is offered for setup:
 
 1. Determine the group's enabled member. For `stacked-pr`, use
    `/stack:status` (or the `stack-provider-router` skill). For
-   `remote-agent`, there is no dedicated status command yet — run
-   `plugins/yellow-core/lib/remote-agent-provider-state.js classify`
-   against `claude plugin list --json`, the same classifier
-   `/linear:delegate` uses. Do not infer either group's active member from
-   which CLI happens to be on PATH.
+   `remote-agent`, read Step 1's `remote_agent_state` row: the dashboard
+   already ran `lib/remote-agent-provider-state.js classify` (the classifier
+   `/linear:delegate` uses) with the cursor, devin and jules tooling probes,
+   so `PARTIAL_TOOLING` is reachable. `UNKNOWN` means the classifier could
+   not run; treat it like a missing yellow-core (item 5). Do not infer
+   either group's active member from which CLI happens to be on PATH.
 2. Offer setup for that member only. Show every other member's row with its
    status and the annotation `(alternative provider — not enabled)`.
 <!-- setup-all-remote-agent-states:start -->

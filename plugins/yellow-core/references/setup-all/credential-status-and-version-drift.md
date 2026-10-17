@@ -20,10 +20,15 @@ Run one Bash block to read each plugin's status file:
 
 ```bash
 printf '\n=== Credential Status Files ===\n'
-PLUGIN_DATA_DIR="$HOME/.claude/plugins/data"
+# Hooks write to ${CLAUDE_PLUGIN_DATA}, i.e. <config>/plugins/data/<id>/, where
+# <id> is the sanitized plugin id (`<plugin>-yellow-plugins` for a marketplace
+# install). The bare `<plugin>` dir is the writer's fallback when
+# CLAUDE_PLUGIN_DATA is unset.
+PLUGIN_DATA_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/data"
 # setup-all-credential-status-plugins:start
 for plugin in yellow-research yellow-semgrep; do
-  status_file="$PLUGIN_DATA_DIR/$plugin/credential-status.json"
+  status_file="$PLUGIN_DATA_DIR/$plugin-yellow-plugins/credential-status.json"
+  [ -f "$status_file" ] || status_file="$PLUGIN_DATA_DIR/$plugin/credential-status.json"
   if [ -f "$status_file" ] && command -v jq >/dev/null 2>&1; then
     # Single jq invocation per plugin — extract all fields as TSV.
     read -r present_count total_count user_config_count shell_env_count version <<EOF
