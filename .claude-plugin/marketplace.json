@@ -210,6 +210,16 @@
       },
       "source": "./plugins/yellow-goal",
       "category": "development"
+    },
+    {
+      "name": "yellow-claudemod",
+      "description": "Claude Code mod that records the model each subagent runs on and can downshift listed Opus reviewers near a usage limit",
+      "version": "0.0.0",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-claudemod",
+      "category": "development"
     }
   ]
 }

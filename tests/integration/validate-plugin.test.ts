@@ -501,9 +501,9 @@ printf 'plain text\\n'
     expect(stderr).toMatch(/hooks\/hooks\.json: not allowed/);
   });
 
-  it('reports the same presence error for an unparseable hooks/hooks.json (RULE 7: contents are not inspected)', () => {
-    // Presence is fatal, so the validator no longer parses the file — a
-    // malformed one produces the one presence error, not a parse error.
+  it('reports the same presence error for an unparseable hooks/hooks.json (RULE 7: no separate parse error)', () => {
+    // The file is read only to recognise a mod's modules-only declaration;
+    // a malformed one produces the one presence error, not a parse error.
     mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
     writeFileSync(
       join(pluginDir, 'hooks', 'hooks.json'),
@@ -515,6 +515,68 @@ printf 'plain text\\n'
     expect(status).toBeGreaterThan(0);
     expect(stderr).toMatch(/hooks\/hooks\.json: not allowed/);
     expect(stderr).not.toMatch(/cannot parse/);
+  });
+
+  // The one carve-out: a Claude Code mod declares its hooks module only in
+  // hooks/hooks.json, as a lone `modules` key (scripts/lib/mod-hooks.js).
+  function writeModHooks(contents: unknown, moduleFile = 'register.ts'): void {
+    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
+    writeFileSync(join(pluginDir, 'hooks', moduleFile), 'export const register = () => {}\n', 'utf8');
+    writeFileSync(join(pluginDir, 'hooks', 'hooks.json'), JSON.stringify(contents), 'utf8');
+    writePluginManifest(pluginDir, VALID_BASE_MANIFEST);
+  }
+
+  it("accepts a mod's modules-only hooks/hooks.json (RULE 7 carve-out)", () => {
+    writeModHooks({ modules: ['./register.ts'] });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(stderr).not.toMatch(/hooks\/hooks\.json: not allowed/);
+    expect(status).toBe(0);
+  });
+
+  it('rejects a modules declaration that also carries command hooks', () => {
+    writeModHooks({ modules: ['./register.ts'], hooks: {} });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/not allowed \(holds something other than a lone "modules" key\)/);
+  });
+
+  it('rejects a module path that leaves hooks/', () => {
+    writeModHooks({ modules: ['../register.ts'] });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/must start with \.\/ and stay inside hooks\//);
+  });
+
+  it('rejects a modules declaration whose module file is missing', () => {
+    writeModHooks({ modules: ['./missing.ts'] });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/module "\.\/missing\.ts" not found/);
+  });
+
+  it('rejects a modules declaration reached through a symlinked hooks/', () => {
+    const outside = join(tmpRoot, 'outside-hooks');
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(outside, 'register.ts'), 'export const register = () => {}\n', 'utf8');
+    writeFileSync(join(outside, 'hooks.json'), JSON.stringify({ modules: ['./register.ts'] }), 'utf8');
+    symlinkSync(outside, join(pluginDir, 'hooks'));
+    writePluginManifest(pluginDir, VALID_BASE_MANIFEST);
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/hooks\/hooks\.json: not allowed \(passes through a symlinked directory \(hooks\)/);
+  });
+
+  it('rejects a module reached through a symlinked directory under hooks/', () => {
+    const outside = join(tmpRoot, 'outside-lib');
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(outside, 'register.ts'), 'export const register = () => {}\n', 'utf8');
+    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
+    symlinkSync(outside, join(pluginDir, 'hooks', 'lib'));
+    writeFileSync(join(pluginDir, 'hooks', 'hooks.json'), JSON.stringify({ modules: ['./lib/register.ts'] }), 'utf8');
+    writePluginManifest(pluginDir, VALID_BASE_MANIFEST);
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/module "\.\/lib\/register\.ts" passes through a symlinked directory \(hooks\/lib\)/);
   });
 });
 

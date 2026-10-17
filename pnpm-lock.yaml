@@ -120,6 +120,8 @@ importers:
 
   plugins/yellow-ci: {}
 
+  plugins/yellow-claudemod: {}
+
   plugins/yellow-codex: {}
 
   plugins/yellow-composio: {}

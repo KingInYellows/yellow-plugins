@@ -1,6 +1,6 @@
 # yellow-plugins
 
-Personal Claude Code plugin marketplace — 20 plugins for Git workflows, code
+Personal Claude Code plugin marketplace — 21 plugins for Git workflows, code
 review, CI, research, testing, documentation, code editing, security
 remediation, and cross-lineage code council.
 
@@ -26,6 +26,7 @@ Add the marketplace, then install individual plugins:
 | `github-workflow`     | GitHub-native stacked-PR provider — full command surface (setup, status, plan, submit, amend, sync, nav, cleanup, merge)               | 9 commands, 9 skills, 2 hooks                  |
 | `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting                                    | 3 agents, 4 commands, 2 skills                 |
 | `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners                            | 4 agents, 9 commands, 8 skills, 1 hook         |
+| `yellow-claudemod`    | Claude Code mod: records the model each subagent runs on and can downshift listed Opus reviewers near a usage limit (experimental)       | 1 command, 1 hooks module                      |
 | `yellow-codex`        | OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration                                             | 3 agents, 4 commands, 2 skills                 |
 | `yellow-composio`     | Composio MCP integration with usage tracking and budget guardrails                                                                     | 2 commands, 1 skill, 1 MCP                     |
 | `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                                               | 21 agents, 19 commands, 23 skills              |
@@ -312,6 +313,7 @@ yellow-plugins/
 │   ├── github-workflow/       # GitHub-native stacked-PR provider (9 commands, 9 skills, 2 hooks)
 │   ├── yellow-browser-test/   # Browser testing (3 agents, 4 commands, 2 skills)
 │   ├── yellow-ci/             # CI toolkit (4 agents, 9 commands, 8 skills, 1 hook)
+│   ├── yellow-claudemod/      # Claude Code mod: spawn ledger + usage downshift (1 command, 1 hooks module)
 │   ├── yellow-codex/          # Codex CLI wrapper (3 agents, 4 commands, 2 skills)
 │   ├── yellow-composio/       # Composio MCP (2 commands, 1 skill, 1 MCP)
 │   ├── yellow-core/           # Dev toolkit (21 agents, 19 commands, 23 skills)

@@ -703,6 +703,28 @@ describe('generator hook-authority rule (R20)', () => {
     }
   });
 
+  it("does not flag a mod's modules-only hooks/hooks.json (the RULE 7 carve-out)", () => {
+    // A Claude Code mod can declare its hooks module only in
+    // hooks/hooks.json, as a lone `modules` key (scripts/lib/mod-hooks.js);
+    // validate-plugin RULE 7 and this sweep share that one classifier.
+    const root = makeCodexFixtureRoot([{ name: 'mod-plugin', codexEnabled: false }]);
+    const hooksDir = join(root, 'plugins', 'mod-plugin', 'hooks');
+    mkdirSync(hooksDir, { recursive: true });
+    writeFileSync(join(hooksDir, 'register.ts'), 'export const register = () => {}\n', 'utf8');
+    writeJson(join(hooksDir, 'hooks.json'), { modules: ['./register.ts'] });
+
+    const applied = generateManifests({ mode: 'apply', rootDir: root });
+    expect(applied.status).toBe('ok');
+    expect(applied.diffs.some((d: { state: string }) => d.state === 'forbidden')).toBe(false);
+    expect(existsSync(join(hooksDir, 'hooks.json'))).toBe(true);
+
+    // The same file with a command-hook key beside `modules` is forbidden.
+    writeJson(join(hooksDir, 'hooks.json'), { modules: ['./register.ts'], hooks: {} });
+    const checked = generateManifests({ mode: 'check', rootDir: root });
+    expect(checked.status).toBe('error');
+    expect(checked.results['mod-plugin']).toBe('error');
+  });
+
   it('flags plugins/<name>/hooks/hooks.json even when that directory is not yet in catalog.pluginOrder', () => {
     // Mirrors adding a new plugin directory under plugins/ before its
     // catalog/plugins/<name>.json entry exists. The per-plugin sweep above

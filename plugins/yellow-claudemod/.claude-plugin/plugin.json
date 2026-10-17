@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-claudemod",
+  "version": "0.0.0",
+  "description": "Claude Code mod that records the model each subagent runs on and can downshift listed Opus reviewers near a usage limit",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-claudemod",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "mod",
+    "model-routing",
+    "usage-limits",
+    "subagents",
+    "observability"
+  ],
+  "userConfig": {
+    "downshift_enabled": {
+      "type": "boolean",
+      "title": "Downshift Opus reviewers near a usage limit",
+      "description": "When on, listed Opus-tier agents (not security-sentinel) run on Sonnet once the fullest Max usage window passes the threshold.",
+      "default": false
+    },
+    "downshift_threshold": {
+      "type": "number",
+      "title": "Downshift threshold (percent)",
+      "description": "Percent of the fullest usage window (five_hour or seven_day) at which the downshift starts. 1 to 100.",
+      "default": 80
+    }
+  }
+}

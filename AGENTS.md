@@ -16,7 +16,7 @@ validators in `scripts/`, the schemas in `schemas/`, and this file.
 
 - `plugins/`: Installable plugins. Current plugin directories are
   `github-workflow`, `gt-workflow`, `yellow-browser-test`, `yellow-ci`,
-  `yellow-codex`, `yellow-composio`, `yellow-core`, `yellow-council`,
+  `yellow-claudemod`, `yellow-codex`, `yellow-composio`, `yellow-core`, `yellow-council`,
   `yellow-cursor`, `yellow-debt`, `yellow-devin`, `yellow-docs`,
   `yellow-goal`, `yellow-jules`, `yellow-linear`, `yellow-morph`,
   `yellow-research`, `yellow-review`, `yellow-ruvector`, and `yellow-semgrep`.
@@ -249,7 +249,13 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   on its presence (with or without inline hooks) and `pnpm validate:generated`
   reports it as `forbidden` (never deleted, even by apply). Hook config lives
   in `catalog/plugins/<name>.json#hooks` and is generated into `plugin.json`;
-  `hooks/codex-hooks.json` is generated too, never hand-written.
+  `hooks/codex-hooks.json` is generated too, never hand-written. One
+  exception to the `hooks/hooks.json` ban: a Claude Code mod
+  (`yellow-claudemod`) declares its TypeScript hooks module in
+  `hooks/hooks.json` as a lone `{ "modules": ["./<file>.ts"] }`, the only
+  place Claude Code reads it from. `scripts/lib/mod-hooks.js`
+  defines that shape for both checks; anything else in the file is still an
+  error.
 - For `userConfig`, mark secrets with `sensitive: true`. Do not interpolate
   untrusted user config directly into shell commands; pass it through
   environment variables or validated wrapper scripts.
