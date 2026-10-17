@@ -2555,9 +2555,10 @@ mkdir -p "$(dirname "$REPORT_PATH_ABS")" || {
   council_cleanup_temps
   exit 1
 }
-# Step 8 shows REPORT_PATH; Step 9 copies to REPORT_PATH_ABS as a literal.
+# Step 8 shows REPORT_PATH and Step 9 takes it as a literal. Only this
+# repo-relative path travels: its characters are fixed by build_slug, while the
+# absolute path carries the checkout directory, which may hold shell syntax.
 printf 'COUNCIL_REPORT_PATH=%s\n' "$REPORT_PATH"
-printf 'COUNCIL_REPORT_PATH_ABS=%s\n' "$REPORT_PATH_ABS"
 ```
 
 ### Step 7: Construct full report content
@@ -3565,7 +3566,7 @@ Copy 7c's `report.md` to the target path with a shell `cp`, published with
 an exclusive `ln` so an existing file is never overwritten. Do not use
 `Write` and do not retype the report: the copy is what carries the claude
 leg's redaction pass and fence rebuild into the saved file. Substitute the
-`COUNCIL_REPORT_PATH_ABS` literal from Step 6, the two 7a literals, the
+`COUNCIL_REPORT_PATH` literal from Step 6, the two 7a literals, the
 `CLAUDE_FENCED_FILE` literal from Step 4 and the `COUNCIL_SYNTH_DIR` literal
 from 5a.
 
@@ -3574,7 +3575,9 @@ from 5a.
 # whether or not the copy landed, or a failure strands every reviewer's fenced
 # output in /tmp. Exit code is applied at the end.
 WRITE_OK=0
-REPORT_PATH_ABS="<literal COUNCIL_REPORT_PATH_ABS value from Step 6>"
+# Single quotes: nothing in the pasted value is expanded before it is checked.
+REPORT_PATH='<literal COUNCIL_REPORT_PATH value from Step 6>'
+REPORT_PATH_ABS=""
 REPORT_FILE="<literal COUNCIL_REPORT_FILE value from 7a>"
 REPORT_TOKEN="<literal COUNCIL_REPORT_TOKEN value from 7a>"
 REPORT_DIR=""
@@ -3600,15 +3603,31 @@ if ! council_report_dir_ok "$REPORT_DIR"; then
 elif [ ! -f "$ASSEMBLED_REPORT" ] || [ -L "$ASSEMBLED_REPORT" ] || [ ! -O "$ASSEMBLED_REPORT" ]; then
   printf '[council] Error: %s is missing, a symlink, or not ours — 7c did not finish; report not saved\n' "$ASSEMBLED_REPORT" >&2
 else
-  # The target: an absolute docs/council/<name>.md path with no traversal, not
-  # yet present (build_target_path picked a free name), in a real directory.
-  case "$REPORT_PATH_ABS" in
-    *..*|*/docs/council/*/*) DEST_OK=0 ;;
-    /*/docs/council/?*.md) DEST_OK=1 ;;
-    *) DEST_OK=0 ;;
+  # The target: docs/council/<name>.md, where <name> uses only the characters
+  # build_target_path emits ([a-z0-9-]), re-anchored at the same root Step 6
+  # used, not yet present (build_target_path picked a free name), in a real
+  # directory.
+  DEST_OK=0
+  case "$REPORT_PATH" in
+    docs/council/?*.md)
+      REPORT_NAME="${REPORT_PATH#docs/council/}"
+      REPORT_NAME="${REPORT_NAME%.md}"
+      case "$REPORT_NAME" in
+        *[!a-z0-9-]*) ;;
+        *) DEST_OK=1 ;;
+      esac
+      ;;
   esac
+  if [ "$DEST_OK" -eq 1 ]; then
+    SAVE_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || SAVE_ROOT=""
+    if [ -n "$SAVE_ROOT" ] && cd "$SAVE_ROOT"; then
+      REPORT_PATH_ABS="${CLAUDE_PROJECT_DIR:-$(pwd)}/${REPORT_PATH}"
+    else
+      DEST_OK=0
+    fi
+  fi
   if [ "$DEST_OK" -ne 1 ]; then
-    printf '[council] Error: unexpected report target (%s) — expected the absolute docs/council/<name>.md path Step 6 printed; report not saved\n' "$REPORT_PATH_ABS" >&2
+    printf '[council] Error: unexpected report target (%s) — expected the docs/council/<name>.md path Step 6 printed, inside a git checkout; report not saved\n' "$REPORT_PATH" >&2
   elif [ -e "$REPORT_PATH_ABS" ] || [ -L "$REPORT_PATH_ABS" ]; then
     printf '[council] Error: %s already exists — refusing to overwrite it; re-run Step 6 for a free name\n' "$REPORT_PATH_ABS" >&2
   elif [ ! -d "${REPORT_PATH_ABS%/*}" ]; then
@@ -3811,7 +3830,7 @@ This is the final output of the command. Exit 0.
 | Run stops between Step 5a and 5e | The 0700 `/tmp/council-synth-*` staging directory (normalized, already-redacted reviewer text, the label map, `pass-a.md`) is left behind unless the Step 8 Cancel block runs for it (a 5b abort and a 5e failure followed by Cancel both remove it). 24 hours is the sweep's eligibility threshold, not a maximum retention: the text stays until a later `/council` invocation reaches 5a after the directory is over 24h old, or until you remove it |
 | Run cancelled or aborted between Step 7a and Step 9 | The 0700 `/tmp/council-synth-*` report staging directory with the staged synthesis remains until a later `/council` reaches 5a and its sweep removes it (over 24 hours old). A failed 7b `Write` is still cleaned up: 7c validates the directory, finds no `synthesis.md`, exits 1, and its trap removes the directory |
 | 7c report literal refused (wrong shape, `..`, extra `/`, empty suffix, symlink, foreign owner, or a `.token` that does not equal the 7a token) | `[council] Error: ... refusing to read or delete it`; exit 1; nothing is read or deleted. Run the Step 8 Cancel cleanup and stop |
-| Step 9 cannot save the report (staging literal refused, `report.md` missing or a symlink, target not an absolute `docs/council/<name>.md` path, target already exists or appears during the save, `cp` fails, or the copy differs from `report.md`) | `[council] Error: ... report not saved`; the temp copy is removed and the target is never overwritten; the reviewer temp files are still cleaned up and the step exits 1. A validated staging directory is kept and its `report.md` path printed, so the redacted report can be copied by hand; the 5a sweep removes it after 24 hours |
+| Step 9 cannot save the report (staging literal refused, `report.md` missing or a symlink, target not the `docs/council/<name>.md` path Step 6 printed, target already exists or appears during the save, `cp` fails, or the copy differs from `report.md`) | `[council] Error: ... report not saved`; the temp copy is removed and the target is never overwritten; the reviewer temp files are still cleaned up and the step exits 1. A validated staging directory is kept and its `report.md` path printed, so the redacted report can be copied by hand; the 5a sweep removes it after 24 hours |
 | yellow-core not found (a `--plugin-dir` or in-place load that skipped the dependency check) | `[council] Warning: yellow-core ... not found`; Tier 1 is skipped and every finding is `unverified` with reason `verifier-error`. Verification never aborts the council |
 | `quote-ground.sh batch` fails (exit 2) or is missing | `[council] Warning: Tier 1 evidence check unavailable`; every Tier 1 row goes to Tier 2. An unreadable cited file would fail the whole batch, so the citation parse rejects it first as `bad-citation` |
 | rapidfuzz not importable by the first `python3` on PATH | `[council] Warning: rapidfuzz not installed` in 5b; Tier 2 candidates are `unverified` with reason `tier2-skipped`. The import probe and the scorer run the same `python3`, so a venv that is not on PATH counts as absent |

@@ -1590,12 +1590,12 @@ run7c() {
 
 # --- Step 9 saves 7c's assembled report by copy (CLAUDE-139) ---------------
 
-# s9_script <out> <report-abs> — the Step 9 fence with every literal
+# s9_script <out> <report-rel> — the Step 9 fence with every literal
 # substituted: the target, 7a's directory and token ($RD, $RT), the claude
 # fenced path ($CF) and 5a's directory.
 s9_script() {
   extract_fence_after "$COUNCIL_MD" '### Step 9' "$1.raw"
-  sed -e "s|<literal COUNCIL_REPORT_PATH_ABS value from Step 6>|$2|" \
+  sed -e "s|<literal COUNCIL_REPORT_PATH value from Step 6>|$2|" \
     -e "s|<literal COUNCIL_REPORT_FILE value from 7a>|$RD/synthesis.md|" \
     -e "s|<literal COUNCIL_REPORT_TOKEN value from 7a>|$RT|" \
     -e "s|<literal CLAUDE_FENCED_FILE value from Step 4>|$CF|" \
@@ -1622,7 +1622,7 @@ assemble_report() {
     dest="$REPO/docs/council/2026-10-17-review-x.md"
     assemble_report "$profile"
     cp "$RD/report.md" "${BATS_TEST_TMPDIR}/assembled.md"
-    s9_script "$s9" "$dest"
+    s9_script "$s9" docs/council/2026-10-17-review-x.md
     run_in "$profile" "$FIRST_AWK" "cd '$REPO' && . '$s9'"
     [ "$status" -eq 0 ] || { echo "$profile 9: $stderr"; return 1; }
     cmp "${BATS_TEST_TMPDIR}/assembled.md" "$dest" || { echo "$profile: saved report differs"; return 1; }
@@ -1643,8 +1643,10 @@ assemble_report() {
   dest="$REPO/docs/council/2026-10-17-review-x.md"
   assemble_report bash
   cp "$CF" "$CF.bak"; cp "$REPO/.git/council-state.tsv" "$REPO/state.bak"
-  for lit in docs/council/rel.md "$REPO/docs/council/../escape.md" "$REPO/docs/council/sub/x.md" \
-    "$REPO/elsewhere/x.md" "$REPO/docs/council/x.txt" '<literal COUNCIL_REPORT_PATH_ABS value from Step 6>'; do
+  for lit in "$REPO/docs/council/x.md" docs/council/../escape.md docs/council/sub/x.md \
+    elsewhere/x.md docs/council/x.txt docs/council/.md 'docs/council/$(touch pwned).md' \
+    'docs/council/`touch pwned`.md' 'docs/council/$HOME.md' docs/council/X.md \
+    '<literal COUNCIL_REPORT_PATH value from Step 6>'; do
     cp "$CF.bak" "$CF"; cp "$REPO/state.bak" "$REPO/.git/council-state.tsv"
     s9_script "$s9" "$lit"
     run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s9'"
@@ -1653,10 +1655,10 @@ assemble_report() {
     [[ "$stderr" == *"assembled report is still at $RD/report.md"* ]] || { echo "[$lit]: $stderr"; return 1; }
     [ -f "$RD/report.md" ]
   done
-  [ ! -e "$REPO/escape.md" ] && [ ! -e "$REPO/docs/council/x.txt" ]
+  [ ! -e "$REPO/escape.md" ] && [ ! -e "$REPO/docs/council/x.txt" ] && [ ! -e "$REPO/pwned" ]
   # An existing target is never overwritten.
   printf 'keep\n' >| "$dest"
-  s9_script "$s9" "$dest"
+  s9_script "$s9" docs/council/2026-10-17-review-x.md
   run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s9'"
   [ "$status" -eq 1 ]
   [[ "$stderr" == *"already exists"* ]]
@@ -1679,7 +1681,7 @@ assemble_report() {
   mkdir -p "$REPO/docs/council"
   dest="$REPO/docs/council/2026-10-17-review-x.md"
   assemble_report bash
-  s9_script "$s9" "$dest"
+  s9_script "$s9" docs/council/2026-10-17-review-x.md
   # Another /council publishes the same name between the existence check and ln.
   run_in bash "$FIRST_AWK" "cd '$REPO' && ln() { printf 'other run\\n' > '$dest'; command ln \"\$@\"; } && . '$s9'"
   [ "$status" -eq 1 ]
@@ -1695,6 +1697,22 @@ assemble_report() {
   rm -rf "$REPO"
 }
 
+@test "Step 9 saves into a checkout whose path holds shell syntax without expanding it" {
+  local s9="${BATS_TEST_TMPDIR}/9.sh" weird
+  setup_council_run
+  weird="${BATS_TEST_TMPDIR}/co\$(touch pwned)\"\$HOME\`id\`"
+  mv "$REPO" "$weird"
+  REPO="$weird"
+  mkdir -p "$REPO/docs/council"
+  assemble_report bash
+  s9_script "$s9" docs/council/2026-10-17-review-x.md
+  run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s9'"
+  [ "$status" -eq 0 ] || { echo "$stderr"; return 1; }
+  [ -f "$REPO/docs/council/2026-10-17-review-x.md" ]
+  [ ! -e "${BATS_TEST_TMPDIR}/pwned" ] && [ ! -e "$REPO/pwned" ] && [ ! -e pwned ]
+  rm -rf "$REPO"
+}
+
 @test "Step 9 refuses a staging dir whose token does not match and removes nothing" {
   local s9="${BATS_TEST_TMPDIR}/9.sh" dest good
   setup_council_run
@@ -1702,7 +1720,7 @@ assemble_report() {
   dest="$REPO/docs/council/2026-10-17-review-x.md"
   assemble_report bash
   good="$RT"; RT=0123456789abcdef0123456789abcdef
-  s9_script "$s9" "$dest"
+  s9_script "$s9" docs/council/2026-10-17-review-x.md
   run_in bash "$FIRST_AWK" "cd '$REPO' && . '$s9'"
   [ "$status" -eq 1 ]
   [[ "$stderr" == *"is not the report staging directory 7a minted"* ]]
