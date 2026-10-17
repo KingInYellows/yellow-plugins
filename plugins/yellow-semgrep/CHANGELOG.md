@@ -1,5 +1,20 @@
 # Changelog
 
+## 4.2.7
+
+### Patch Changes
+
+- [`9b000b5`](https://github.com/KingInYellows/yellow-plugins/commit/9b000b552796820fb8169e41e3db34bfe715ded0)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fix
+  `READY_GITHUB` stack operations in the installed plugin cache. Commands,
+  skills and agents called
+  `${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js`, which
+  exists only in the source tree; the cache is
+  `<marketplace>/<plugin>/<version>/`. They now call
+  `lib/run-github-stack-runtime.js`, which finds the runtime in either layout
+  (highest numeric cached version) and reports `RUNTIME_NOT_FOUND` with a
+  recovery action when github-workflow is absent.
+
 ## 4.2.6
 
 ### Patch Changes
