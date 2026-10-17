@@ -15,6 +15,8 @@
 const { lstatSync, readFileSync } = require('fs');
 const path = require('path');
 
+const { symlinkedAncestorProblem } = require('./plugin-symlink-policy');
+
 const MODULE_EXTENSIONS = new Set([
   '.ts',
   '.tsx',
@@ -42,6 +44,16 @@ function classifyHooksJson(hooksJsonPath) {
   }
   if (!stat.isFile()) {
     return { kind: 'forbidden', reason: 'not a regular file' };
+  }
+  // lstat follows a symlinked `hooks/`, so check every directory between
+  // the plugin root and the file; the same policy covers the module below.
+  const pluginDir = path.dirname(path.dirname(hooksJsonPath));
+  const declarationAncestor = symlinkedAncestorProblem(
+    hooksJsonPath,
+    pluginDir
+  );
+  if (declarationAncestor !== null) {
+    return { kind: 'forbidden', reason: declarationAncestor };
   }
   let parsed;
   try {
@@ -91,6 +103,13 @@ function classifyHooksJson(hooksJsonPath) {
     return {
       kind: 'forbidden',
       reason: `module "${modulePath}" is not a regular file`,
+    };
+  }
+  const moduleAncestor = symlinkedAncestorProblem(resolved, pluginDir);
+  if (moduleAncestor !== null) {
+    return {
+      kind: 'forbidden',
+      reason: `module "${modulePath}" ${moduleAncestor}`,
     };
   }
   return { kind: 'mod', module: modulePath };

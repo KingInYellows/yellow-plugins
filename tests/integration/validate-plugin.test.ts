@@ -553,6 +553,31 @@ printf 'plain text\\n'
     expect(status).toBeGreaterThan(0);
     expect(stderr).toMatch(/module "\.\/missing\.ts" not found/);
   });
+
+  it('rejects a modules declaration reached through a symlinked hooks/', () => {
+    const outside = join(tmpRoot, 'outside-hooks');
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(outside, 'register.ts'), 'export const register = () => {}\n', 'utf8');
+    writeFileSync(join(outside, 'hooks.json'), JSON.stringify({ modules: ['./register.ts'] }), 'utf8');
+    symlinkSync(outside, join(pluginDir, 'hooks'));
+    writePluginManifest(pluginDir, VALID_BASE_MANIFEST);
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/hooks\/hooks\.json: not allowed \(passes through a symlinked directory \(hooks\)/);
+  });
+
+  it('rejects a module reached through a symlinked directory under hooks/', () => {
+    const outside = join(tmpRoot, 'outside-lib');
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(outside, 'register.ts'), 'export const register = () => {}\n', 'utf8');
+    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
+    symlinkSync(outside, join(pluginDir, 'hooks', 'lib'));
+    writeFileSync(join(pluginDir, 'hooks', 'hooks.json'), JSON.stringify({ modules: ['./lib/register.ts'] }), 'utf8');
+    writePluginManifest(pluginDir, VALID_BASE_MANIFEST);
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/module "\.\/lib\/register\.ts" passes through a symlinked directory \(hooks\/lib\)/);
+  });
 });
 
 describe('validate-plugin RULE 6: node hook commands and ${CLAUDE_PLUGIN_ROOT} quoting', () => {
