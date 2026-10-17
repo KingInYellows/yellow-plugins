@@ -28,6 +28,14 @@ yellow-core integration before reviewing real PRs.
 
 ## Optional integrations
 
+### github-workflow (GitHub-native stacks)
+
+Under `READY_GITHUB`, `/review:pr`, `/review:all`, `/review:resolve-stack` and the
+stack-traversal skill run github-workflow's `lib/github-stack-runtime.js` through
+this plugin's `lib/run-github-stack-runtime.js`, which finds it in a source checkout
+or the newest installed version. Without it they report `RUNTIME_NOT_FOUND` and tell
+you to install it or run `/stack:select`.
+
 ### yellow-linear (follow-up issues)
 
 `yellow-linear` is an optional dependency. `/review:resolve` files a follow-up
