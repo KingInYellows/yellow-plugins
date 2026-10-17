@@ -1092,7 +1092,7 @@ GitHub push commands (`READY_GITHUB`):
 ```bash
 git add -- <specific files, never -A/.>
 git commit -m "fix: address review findings from <comma-separated-reviewer-categories>"
-node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
+node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" submit
 ```
 
 Read the JSON result's `status` field; `SUCCESS` continues, anything else

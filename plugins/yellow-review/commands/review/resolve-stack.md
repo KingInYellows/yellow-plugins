@@ -96,7 +96,7 @@ command -v gt >/dev/null 2>&1 || {
 **GitHub (`READY_GITHUB`):**
 
 ```bash
-[ -f "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" ] || {
+node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" --locate >/dev/null || {
   printf '[review:resolve-stack] Error: github-workflow runtime adapter not found; is the github-workflow plugin installed?\n' >&2
   exit 1
 }
@@ -155,7 +155,7 @@ Build the ordered walk list:
 
 ```bash
 set -u
-node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" view
+node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" view
 ```
 
 Read the JSON result's `status` field. `SUCCESS` — parse `stdout` per the
@@ -405,8 +405,8 @@ stop or item 3b's dirty-tree or config stop ends the walk.
 3. **Self-verify and clean-tree check** — identical to Graphite steps 3 and
    3b above; the scripts are provider-agnostic.
 
-4. **Rebase upstack** — `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode upstack`. Read the JSON result's `status` field. `CONFLICT`: do not pause — run
-   `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode abort` to clear the conflicted rebase (without this, the repo stays mid-rebase and the next iteration's checkout fails), record the conflict for the final summary, and continue to the next PR. `SUCCESS`: continue. Anything else: report the result's `recoveryAction`, record it for the final summary, and continue to the next PR.
+4. **Rebase upstack** — `node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" rebase --mode upstack`. Read the JSON result's `status` field. `CONFLICT`: do not pause — run
+   `node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" rebase --mode abort` to clear the conflicted rebase (without this, the repo stays mid-rebase and the next iteration's checkout fails), record the conflict for the final summary, and continue to the next PR. `SUCCESS`: continue. Anything else: report the result's `recoveryAction`, record it for the final summary, and continue to the next PR.
    Downstream PRs may then rest on an unrestacked base; the summary surfaces
    this so the user can restack manually.
 

@@ -148,7 +148,7 @@ assurance.
 
    **Graphite:** also run `gt log short --steps 3`.
    **GitHub:** also run
-   `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" view`
+   `node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" view`
    and read its JSON `status` field for the current stack state.
 
 5. Branch decision:
@@ -172,7 +172,7 @@ assurance.
        ```
      - **GitHub:**
        ```bash
-       node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" \
+       node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" \
          init --base <trunk-branch> --branch feature-name-from-plan
        ```
        Read the JSON result's `status`; anything but `SUCCESS` stops here —
@@ -280,10 +280,10 @@ in order from bottom (item 1) to top:
      completed items yet — the "Fresh start" case from Phase 1 step 5, not
      "Resume"): checkout `<trunk>` (from `<!-- stack-trunk: -->`
      metadata), then
-     `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" init --base <trunk> --branch "<branch-name>"`.
+     `node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" init --base <trunk> --branch "<branch-name>"`.
    - **Linear topology, resuming or continuing a later item:** checkout
      only —
-     `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" checkout --target <last-completed-branch>`.
+     `node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" checkout --target <last-completed-branch>`.
      Do NOT create the new branch here: this adapter has no branch-only
      primitive — `add` stages, commits, AND creates the branch in one
      atomic call — so this item's branch is created together with its
@@ -302,7 +302,7 @@ in order from bottom (item 1) to top:
    - Stop immediately
    - Report which items completed, which failed, and the current stack
      state via
-     `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" view`
+     `node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" view`
    - Ask user how to proceed via AskUserQuestion, same options and `Other`
      free-text contract as the Graphite branch above.
 
@@ -412,7 +412,7 @@ in order from bottom (item 1) to top:
 
    ```bash
    git commit -F <(tr -d '\r' < "$msgfile")
-   node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
+   node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" submit
    ```
 
    **GitHub — linear continuation** (step 1 only checked out the
@@ -420,7 +420,7 @@ in order from bottom (item 1) to top:
    commit together):
 
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" add --branch "<branch-name>" --message "$(tr -d '\r' < "$msgfile")"
+   node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" add --branch "<branch-name>" --message "$(tr -d '\r' < "$msgfile")"
    ```
 
    (`<branch-name>` must already have passed step 1's check-ref-format +
@@ -924,7 +924,7 @@ step 5. Phase 4 becomes a summary phase:
 1. Show the completed stack and submitted PRs, using the provider resolved
    in Phase 1 step 4: **Graphite** — `gt log short --no-interactive`.
    **GitHub** —
-   `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" view`.
+   `node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" view`.
 2. Verify all acceptance criteria from the plan are met across the full stack.
    If any are unmet, report them to the user and ask: "Continue to review or
    address unmet criteria first?"
@@ -938,7 +938,7 @@ step 5. Phase 4 becomes a summary phase:
 
 1. Review all changes, using the provider resolved in Phase 1 step 4:
    **Graphite** — `gt log short`. **GitHub** —
-   `node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" view`.
+   `node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" view`.
 
    ```bash
    git diff main...HEAD
@@ -1001,7 +1001,7 @@ step 5. Phase 4 becomes a summary phase:
       pattern as Phase 1b step 5 — then commit and submit:
       ```bash
       git commit -F <(tr -d '\r' < "$msgfile")
-      node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
+      node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" submit
       ```
       Read the JSON result's `status`; anything but `SUCCESS` stops here —
       report `recoveryAction`.

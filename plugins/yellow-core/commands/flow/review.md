@@ -453,7 +453,7 @@ After all three dimensions produce findings:
    git status --porcelain
    git add -- <specific files, never -A/.>
    git commit -m "fix: address session review findings"
-   node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit
+   node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" submit
    ```
 
    Parse the JSON result's `status` field. `SUCCESS` continues to the next
@@ -464,7 +464,7 @@ After all three dimensions produce findings:
    linear stack and a base branch was modified:
 
    ```bash
-   node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" rebase --mode upstack
+   node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" rebase --mode upstack
    ```
 
    Run this only once, after the per-branch loop completes — not inside it.

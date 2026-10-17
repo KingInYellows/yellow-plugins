@@ -116,6 +116,9 @@ empty-username URL userinfo. It reports
 - **yellow-linear** — Required for `/debt:sync` command (pushes debt findings to
   Linear as issues). Without it, `/debt:sync` will report that the yellow-linear
   plugin is not installed.
+- **github-workflow** — `debt-fixer` submits through its runtime under
+  `READY_GITHUB`, via `lib/run-github-stack-runtime.js` (a copy of
+  yellow-core's), which finds it in the source tree or the installed cache.
 
 ## Testing
 

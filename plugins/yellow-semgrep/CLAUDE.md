@@ -149,6 +149,7 @@ Layer 3: LIFECYCLE (write state)  → REST API for triage mutations
 | yellow-core >= 1.17.1 | `hooks/write-credential-status.sh` (SessionStart, 3s) sources `lib/credential-status.sh` to publish credential status for `/setup:all`; no-ops if absent | **Required** (`optional: false` in `plugin.json`) |
 | yellow-linear | Create Linear issues for unfixable findings | Optional |
 | yellow-ci | Re-run CI after fixes to verify no regressions | Optional |
+| github-workflow | `/semgrep:fix` submits under `READY_GITHUB` through its runtime, via `lib/run-github-stack-runtime.js` (a copy of yellow-core's) | Optional |
 
 ## Testing
 

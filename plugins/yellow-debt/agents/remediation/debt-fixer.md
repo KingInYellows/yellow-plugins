@@ -229,7 +229,7 @@ printf 'fix: resolve %s\n\nResolves todo: %s\nCategory: %s\nSeverity: %s\n' \
   "$safe_title" "$todo_path" "$category" "$severity" >| "$msgfile"
 git commit -F "$msgfile"
 rm -f "$msgfile"
-SUBMIT_JSON=$(node "${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js" submit)
+SUBMIT_JSON=$(node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" submit)
 printf '%s\n' "$SUBMIT_JSON"
 SUBMIT_STATUS=$(printf '%s' "$SUBMIT_JSON" | jq -r '.status')
 if [ "$SUBMIT_STATUS" = "SUCCESS" ]; then
