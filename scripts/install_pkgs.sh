@@ -13,8 +13,10 @@ fi
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
 cd "$PROJECT_DIR" || exit 1
 
-# Detected package manager: pnpm
-pnpm install --frozen-lockfile
+# Detected package manager: pnpm. --ignore-scripts keeps dependency (and
+# branch-edited) lifecycle scripts from running before anyone has reviewed the
+# checkout; the toolchain works without them.
+pnpm install --frozen-lockfile --ignore-scripts
 INSTALL_RC=$?
 if [ "$INSTALL_RC" -ne 0 ]; then
   printf '[install_pkgs] Warning: pnpm install exited %d — cloud session may be missing dependencies\n' \
