@@ -1,5 +1,30 @@
 # Changelog
 
+## 3.0.7
+
+### Patch Changes
+
+- [`b0787eb`](https://github.com/KingInYellows/yellow-plugins/commit/b0787eb94203744b9ce216600668d247a7fb272b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Sibling-plugin
+  lookups in the installed cache now prefer the active install recorded in
+  `installed_plugins.json` over the highest numeric version directory, so a
+  rolled-back plugin no longer runs an orphaned newer cache copy. This covers
+  `lib/run-github-stack-runtime.js`, yellow-review's `lib/sibling-plugin.sh` and
+  the git-worktree restack adapter lookup. A project-scoped install applies
+  inside its project; the highest version stays the fallback when the file or
+  entry is missing or unusable.
+
+- [`9b000b5`](https://github.com/KingInYellows/yellow-plugins/commit/9b000b552796820fb8169e41e3db34bfe715ded0)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fix
+  `READY_GITHUB` stack operations in the installed plugin cache. Commands,
+  skills and agents called
+  `${CLAUDE_PLUGIN_ROOT}/../github-workflow/lib/github-stack-runtime.js`, which
+  exists only in the source tree; the cache is
+  `<marketplace>/<plugin>/<version>/`. They now call
+  `lib/run-github-stack-runtime.js`, which finds the runtime in either layout
+  (highest numeric cached version) and reports `RUNTIME_NOT_FOUND` with a
+  recovery action when github-workflow is absent.
+
 ## 3.0.6
 
 ### Patch Changes
