@@ -532,9 +532,10 @@ carries the anchored line and the `Reading ratelimited (callers)` rule from
   accepts only a `timeout`/`gtimeout` that supports `--kill-after`
 - `lib/sibling-plugin.sh` (bash, sourced by `review-ledger.sh` and
   `resolve-paths.sh`) — `sp_sibling_file`, the one lookup of a file in a
-  sibling plugin: the source tree first, then the newest numeric version in
-  the installed cache. `review-ledger.sh` checks `RL_CORE_LIB` before calling
-  it; the helper itself has no override.
+  sibling plugin: the source tree first, then the active install recorded in
+  `installed_plugins.json` (`sp_active_version`), then the newest numeric
+  version in the installed cache. `review-ledger.sh` checks `RL_CORE_LIB`
+  before calling it; the helper itself has no override.
 - `lib/run-github-stack-runtime.js` (node) — the commands' and skills' entry
   to github-workflow's `github-stack-runtime.js` in both layouts; a
   byte-identical copy of yellow-core's (see yellow-core `CLAUDE.md`)

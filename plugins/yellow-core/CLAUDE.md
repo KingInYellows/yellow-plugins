@@ -320,7 +320,8 @@ than sourced:
   sibling of `stack-provider-state.js` with no intent file and no switch plan
 - `run-github-stack-runtime.js` — how commands call github-workflow's
   `lib/github-stack-runtime.js`: `node "${CLAUDE_PLUGIN_ROOT}/lib/run-github-stack-runtime.js" <op> ...`.
-  Finds the source-tree sibling, then the highest numeric version in the
+  Finds the source-tree sibling, then the active install recorded in
+  `installed_plugins.json`, then the highest numeric version in the
   installed cache (`${CLAUDE_PLUGIN_ROOT}/../github-workflow/` exists only in
   the source tree), and passes argv, stdio and exit code through. A missing
   runtime prints a `RUNTIME_NOT_FOUND` result; `--locate` prints the path.

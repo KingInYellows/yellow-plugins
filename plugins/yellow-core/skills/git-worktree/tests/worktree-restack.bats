@@ -23,7 +23,7 @@ setup() {
   local s
   for s in gt gh git; do ln -s "$MOCKS/$s" "$STUB_DIR/bin/$s"; done
   export PATH="$STUB_DIR/bin:$PATH"
-  unset STUB_SKIP STUB_FORK STUB_GH_VERSION STUB_GH_UPGRADE STUB_GT_VERSION CLAUDE_PLUGIN_ROOT
+  unset STUB_SKIP STUB_FORK STUB_GH_VERSION STUB_GH_UPGRADE STUB_GT_VERSION CLAUDE_PLUGIN_ROOT CLAUDE_CONFIG_DIR
   WTFMT='wt-%s'
   REPO="$T/repo"
 }
@@ -848,6 +848,34 @@ JSEOF
   CLAUDE_PLUGIN_ROOT="$T/cache/yellow-core/2.6.2" STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github
   [ "$status" -eq 20 ]
   [[ $output == *"adapter not found"* ]]
+}
+
+@test "github: the active install in installed_plugins.json beats a newer orphaned cache version" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack
+  local ver
+  mkdir -p "$T/mkt/yellow-core/2.6.2"
+  for ver in 1.9.0 1.10.0 1.11.0; do
+    mkdir -p "$T/mkt/github-workflow/$ver/lib"
+    cat >"$T/mkt/github-workflow/$ver/lib/github-stack-runtime.js" <<JSEOF
+if (process.argv.includes('--timeout-ms') && process.argv[process.argv.indexOf('--timeout-ms') + 1] === '0') { console.error('--timeout-ms must be a positive integer'); process.exit(1); }
+process.stdout.write(JSON.stringify({status:'SUCCESS',stdout:JSON.stringify({trunk:'from_${ver//./_}',branches:[{name:'a',isCurrent:true}]})}));
+JSEOF
+  done
+  # 1.11.0 predates --timeout-ms: an active install that fails the probe falls back.
+  printf '%s\n' "process.stdout.write(JSON.stringify({status:'SUCCESS',stdout:JSON.stringify({trunk:'old',branches:[{name:'a',isCurrent:true}]})}));" \
+    >|"$T/mkt/github-workflow/1.11.0/lib/github-stack-runtime.js"
+  mkdir -p "$HOME/.claude/plugins"
+  printf '{"version":2,"plugins":{"github-workflow@mkt":[{"scope":"user","installPath":"%s"}]}}\n' "$T/mkt/github-workflow/1.9.0" \
+    >|"$HOME/.claude/plugins/installed_plugins.json"
+  CLAUDE_PLUGIN_ROOT="$T/mkt/yellow-core/2.6.2" STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github
+  [ "$status" -eq 0 ]
+  [[ $output == *$'CHAIN\tfrom_1_9_0\ta'* ]]
+  printf '{"version":2,"plugins":{"github-workflow@mkt":[{"scope":"user","installPath":"%s"}]}}\n' "$T/mkt/github-workflow/1.11.0" \
+    >|"$HOME/.claude/plugins/installed_plugins.json"
+  CLAUDE_PLUGIN_ROOT="$T/mkt/yellow-core/2.6.2" STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" preflight --provider github
+  [ "$status" -eq 0 ]
+  [[ $output == *$'CHAIN\tfrom_1_10_0\ta'* ]]
 }
 
 # --- failure, signals, mid-stack and resume edge cases -------------------------

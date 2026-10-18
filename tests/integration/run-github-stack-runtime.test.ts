@@ -43,13 +43,34 @@ function installShim(pluginRoot: string): string {
   return dest;
 }
 
-function run(shim: string, args: string[], opts: { input?: string; env?: Record<string, string> } = {}) {
+function run(shim: string, args: string[], opts: { input?: string; env?: Record<string, string>; cwd?: string } = {}) {
   return spawnSync(process.execPath, [shim, ...args], {
     encoding: 'utf8',
     input: opts.input ?? '',
+    cwd: opts.cwd,
     env: { ...process.env, ...opts.env },
   });
 }
+
+// Write <configDir>/plugins/installed_plugins.json with these entries under
+// one key; returns the env that points the shim at it.
+function installed(configDir: string, key: string, entries: unknown): Record<string, string> {
+  mkdirSync(join(configDir, 'plugins'), { recursive: true });
+  writeFileSync(join(configDir, 'plugins', 'installed_plugins.json'), JSON.stringify({ version: 2, plugins: { [key]: entries } }));
+  return { CLAUDE_CONFIG_DIR: configDir };
+}
+
+// A cache with github-workflow 1.9.0 and 1.10.0 and the shim under yellow-review.
+function cacheWithTwoVersions(prefix: string): { market: string; shim: string } {
+  tmp = mkdtempSync(join(tmpdir(), prefix));
+  const market = join(tmp, 'cache', 'yellow-plugins');
+  const shim = installShim(join(market, 'yellow-review', '3.1.0'));
+  plant(join(market, 'github-workflow', '1.9.0'), 'v1.9.0');
+  plant(join(market, 'github-workflow', '1.10.0'), 'v1.10.0');
+  return { market, shim };
+}
+
+const tagOf = (res: ReturnType<typeof run>): string => JSON.parse(res.stdout).tag;
 
 afterEach(() => {
   if (tmp) rmSync(tmp, { recursive: true, force: true });
@@ -104,6 +125,51 @@ describe('run-github-stack-runtime.js', () => {
     const res = run(shim, ['submit', '--json-args', '-'], { input: '{"x":1}', env: { RUNTIME_EXIT: '0' } });
     expect(res.status).toBe(0);
     expect(JSON.parse(res.stdout)).toEqual({ tag: 'v1.10.0', argv: ['submit', '--json-args', '-'], stdin: '{"x":1}' });
+  });
+
+  it('prefers the active install recorded in installed_plugins.json over a newer orphan', () => {
+    const { market, shim } = cacheWithTwoVersions('ghsr-active-');
+    const env = installed(join(tmp, 'config'), 'github-workflow@yellow-plugins', [
+      { scope: 'user', installPath: join(market, 'github-workflow', '1.9.0'), version: '1.9.0' },
+    ]);
+    expect(tagOf(run(shim, ['view'], { env }))).toBe('v1.9.0');
+  });
+
+  it('lets a project-scoped install for the cwd beat the user-scoped one', () => {
+    const { market, shim } = cacheWithTwoVersions('ghsr-project-');
+    plant(join(market, 'github-workflow', '1.8.0'), 'v1.8.0');
+    const project = join(tmp, 'project');
+    const other = join(tmp, 'other');
+    mkdirSync(join(project, 'sub'), { recursive: true });
+    mkdirSync(other, { recursive: true });
+    const env = installed(join(tmp, 'config'), 'github-workflow@yellow-plugins', [
+      { scope: 'user', installPath: join(market, 'github-workflow', '1.9.0') },
+      { scope: 'project', projectPath: project, installPath: join(market, 'github-workflow', '1.8.0') },
+    ]);
+    expect(tagOf(run(shim, ['view'], { env, cwd: join(project, 'sub') }))).toBe('v1.8.0');
+    expect(tagOf(run(shim, ['view'], { env, cwd: other }))).toBe('v1.9.0');
+  });
+
+  it('falls back to the highest version when the active entry is unusable', () => {
+    const { market, shim } = cacheWithTwoVersions('ghsr-fallback-');
+    const config = join(tmp, 'config');
+    // No file at all.
+    expect(tagOf(run(shim, ['view'], { env: { CLAUDE_CONFIG_DIR: config } }))).toBe('v1.10.0');
+    // An installPath outside <marketplace>/github-workflow/.
+    const outside = join(tmp, 'elsewhere', '1.0.0');
+    plant(outside, 'outside');
+    let env = installed(config, 'github-workflow@yellow-plugins', [{ installPath: outside }]);
+    expect(tagOf(run(shim, ['view'], { env }))).toBe('v1.10.0');
+    // A recorded version directory without the runtime.
+    mkdirSync(join(market, 'github-workflow', '1.5.0'), { recursive: true });
+    env = installed(config, 'github-workflow@yellow-plugins', [{ installPath: join(market, 'github-workflow', '1.5.0') }]);
+    expect(tagOf(run(shim, ['view'], { env }))).toBe('v1.10.0');
+    // Another marketplace's entry.
+    env = installed(config, 'github-workflow@other-market', [{ installPath: join(market, 'github-workflow', '1.9.0') }]);
+    expect(tagOf(run(shim, ['view'], { env }))).toBe('v1.10.0');
+    // Malformed JSON.
+    writeFileSync(join(config, 'plugins', 'installed_plugins.json'), '{not json');
+    expect(tagOf(run(shim, ['view'], { env }))).toBe('v1.10.0');
   });
 
   it("passes the runtime's exit code through", () => {
