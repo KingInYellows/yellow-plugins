@@ -10,8 +10,10 @@ READY / PARTIAL / NEEDS SETUP without probing the system keychain.
 ${CLAUDE_PLUGIN_DATA}/credential-status.json
 ```
 
-Resolves to `~/.claude/plugins/data/<plugin-id>/credential-status.json` on
-disk (per official Claude Code [plugins reference](https://code.claude.com/docs/en/plugins-reference)).
+Resolves to `~/.claude/plugins/data/<id>/credential-status.json` on disk,
+where `<id>` is the plugin identifier with every character other than a
+letter, digit, `_` or `-` replaced by `-` (`yellow-research-yellow-plugins`
+for a marketplace install) (per official Claude Code [plugins reference](https://code.claude.com/docs/en/plugins-reference)).
 
 One file per plugin. Files for different plugins live in different
 directories — no cross-plugin write contention.
@@ -113,7 +115,10 @@ printf '{"continue": true}\n'
 The dashboard reads each plugin's status file via plain Bash + jq:
 
 ```bash
-STATUS_FILE="$HOME/.claude/plugins/data/${plugin}/credential-status.json"
+data_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/data"
+STATUS_FILE="$data_dir/${plugin}-yellow-plugins/credential-status.json"
+# lib/credential-status.sh falls back here when CLAUDE_PLUGIN_DATA is unset.
+[ -f "$STATUS_FILE" ] || STATUS_FILE="$HOME/.claude/plugins/data/${plugin}/credential-status.json"
 if [ -f "$STATUS_FILE" ] && command -v jq >/dev/null 2>&1; then
   present_count=$(jq '[.credentials[] | select(.present == true)] | length' "$STATUS_FILE" 2>/dev/null)
   total_count=$(jq '.credentials | length' "$STATUS_FILE" 2>/dev/null)
