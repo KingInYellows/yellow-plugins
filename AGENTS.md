@@ -196,7 +196,10 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   `plugins/yellow-ruvector/package-lock.json` (both pin a plugin-managed
   install; the lockfile hash names the install dir), and
   `plugins/yellow-jules/runtime/package-lock.json` (pins the Jules SDK
-  installed into the data dir by `npm ci --ignore-scripts`).
+  installed into the data dir by `npm ci --ignore-scripts`). The one committed
+  `.claude/` file is `.claude/settings.json` (the shared SessionStart install
+  hook; `.gitignore` re-includes it); keep it, and leave the rest of `.claude/`
+  uncommitted.
 
 ## Git, Changesets, And Release Workflow
 

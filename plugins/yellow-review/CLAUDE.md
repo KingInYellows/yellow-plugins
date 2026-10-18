@@ -27,9 +27,9 @@ resolution, and sequential stack review. Graphite-native workflow.
   findings the gate actually removes as `suppressed` — surviving P0-at-50+
   exceptions are not suppressed). Pre-existing findings are gated before the
   Pre-existing section. If a recall persona would exceed 40 findings, rank
-  gate-surviving items first (anchors 75/100) by severity then confidence, then
-  remaining findings, and drop the lowest-ranked overflow — never emit partial
-  JSON.
+  gate-surviving items first (anchors 75/100, plus P0 at 50+) by severity then
+  confidence, then remaining findings, and drop the lowest-ranked overflow —
+  never emit partial JSON.
 - All shell scripts follow POSIX security patterns (quoted variables, input
   validation, `set -eu`)
 - Working directory must be clean before running any review command
@@ -125,9 +125,9 @@ the resolve scripts: `references/resolve/dispositions.md`.
 - `pr-review-delta check` | `record` — zero-token change check against seen
   thread IDs
 - `commit-resolve-fixes`, `run-verify-command` — commit and verify resolver
-  fixes; they refuse worktree-resident `git`/`gh`/`jq`/`gt`/`node`/`awk` and
-  screen `PATH` and git config (`yr_safe_path`, `harden_git_config`); never push
-  themselves
+  fixes; both refuse worktree-resident `git`/`gh`/`jq` and screen `PATH` and git
+  config (`yr_safe_path`, `harden_git_config`), `commit-resolve-fixes` also
+  refuses worktree-resident `gt`/`node`/`awk`; neither pushes
 - `head-ignore-probe`, `guard-local-config` — protect the ignored
   `yellow-plugins.local.md` for sweep and resolve-stack
 - `file-line-counts` — base/head line counts for `thermonuclear-reviewer`
