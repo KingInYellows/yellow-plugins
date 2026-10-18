@@ -19,7 +19,7 @@ skills from Claude command wrappers. See
 
 - Git
 - Graphite CLI (`gt`) recommended for branch management
-- github-workflow plugin (optional): under `READY_GITHUB`, stack operations run its `lib/github-stack-runtime.js` through this plugin's `lib/run-github-stack-runtime.js`, which finds it in a source checkout or the newest installed version. Without it they report `RUNTIME_NOT_FOUND` and tell you to install it or run `/stack:select`.
+- github-workflow plugin (optional): under `READY_GITHUB`, stack operations run its `lib/github-stack-runtime.js` through this plugin's `lib/run-github-stack-runtime.js`, which finds it in a source checkout or the active installed version (the newest cached one when that is unknown). Without it they report `RUNTIME_NOT_FOUND` and tell you to install it or run `/stack:select`.
 
 ## Commands
 

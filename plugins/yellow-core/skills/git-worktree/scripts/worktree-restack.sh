@@ -822,8 +822,41 @@ gh_version_ok() {
   [ "$((10#$maj))" -gt 0 ] || [ "$((10#$min))" -ge 2 ]
 }
 
-# resolve_adapter: the checkout layout first, then the highest installed
-# version in the plugin cache (cache/<plugin>/<version>/).
+# active_version CACHE PLUGIN: the version directory name installed_plugins.json
+# (${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/) records as PLUGIN's active
+# install. CACHE is <marketplace>/<plugin>; the entry key is
+# <plugin>@<marketplace>. A project-scoped entry applies only when $PWD is
+# inside its projectPath and beats a user-scoped one (the deepest projectPath
+# wins); an installPath outside CACHE is ignored. Returns 1 when the file or a
+# usable entry is missing. yellow-review's lib/sibling-plugin.sh and
+# lib/run-github-stack-runtime.js apply the same rule.
+active_version() {
+  local file real mkt ver
+  file="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json"
+  [ -f "$file" ] || return 1
+  real=$(cd -P -- "$1" 2>/dev/null && pwd -P) || return 1
+  mkt=${real%/*}
+  mkt=${mkt##*/}
+  ver=$(jq -r --arg key "$2@$mkt" --arg cwd "$PWD" '
+    [ (.plugins[$key] // empty) | if type == "array" then .[] else . end
+      | select(type == "object" and (.installPath | type) == "string")
+      | (.projectPath // "") as $pp
+      | if $pp == "" then [0, .installPath]
+        elif $cwd == $pp or ($cwd | startswith($pp + "/")) then [1 + ($pp | length), .installPath]
+        else empty end ]
+    | sort_by(-.[0]) | .[] | .[1]' "$file" 2>/dev/null |
+    while IFS= read -r dir; do
+      dir=$(cd -P -- "$dir" 2>/dev/null && pwd -P) || continue
+      [ "${dir%/*}" = "$real" ] && { printf '%s' "${dir##*/}"; break; }
+    done)
+  [ -n "$ver" ] || return 1
+  printf '%s' "$ver"
+}
+
+# resolve_adapter: the checkout layout first, then the active install
+# (active_version), then the highest installed version in the plugin cache
+# (cache/<plugin>/<version>/). The active install wins so a rolled-back
+# github-workflow does not run an orphaned newer cache directory.
 # adapter_honors_timeout FILE: an adapter older than the --timeout-ms flag
 # ignores it and keeps its 120 s subprocess cap, so a restack that needs the
 # ten minutes this script asks for would be cut off. Probe it: an adapter that
@@ -847,6 +880,13 @@ resolve_adapter() {
   if [ -f "$cand" ] && adapter_honors_timeout "$cand"; then
     ADAPTER=$cand
     return 0
+  fi
+  if ver=$(active_version "$root/../../github-workflow" github-workflow); then
+    cand="$root/../../github-workflow/$ver/lib/github-stack-runtime.js"
+    if [ -f "$cand" ] && adapter_honors_timeout "$cand"; then
+      ADAPTER=$cand
+      return 0
+    fi
   fi
   for cand in "$root"/../../github-workflow/*/lib/github-stack-runtime.js; do
     [ -f "$cand" ] || continue

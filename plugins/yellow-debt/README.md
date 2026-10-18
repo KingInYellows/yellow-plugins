@@ -236,7 +236,7 @@ All state transitions are atomic and TOCTOU-safe: they hold a `mkdir` lock, writ
 
 - **Required**: git, jq, yq, realpath, Graphite CLI (gt)
 - **Optional**: yellow-linear plugin (for `/debt:sync`)
-- **Optional**: github-workflow plugin (optional): under `READY_GITHUB`, stack operations run its `lib/github-stack-runtime.js` through this plugin's `lib/run-github-stack-runtime.js`, which finds it in a source checkout or the newest installed version. Without it they report `RUNTIME_NOT_FOUND` and tell you to install it or run `/stack:select`.
+- **Optional**: github-workflow plugin (optional): under `READY_GITHUB`, stack operations run its `lib/github-stack-runtime.js` through this plugin's `lib/run-github-stack-runtime.js`, which finds it in a source checkout or the active installed version (the newest cached one when that is unknown). Without it they report `RUNTIME_NOT_FOUND` and tell you to install it or run `/stack:select`.
 
 **Note on yq**: This plugin is compatible with kislyuk/yq (Python-based YAML
 processor). Todo files are markdown with YAML frontmatter, which requires
