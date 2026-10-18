@@ -12,17 +12,15 @@ release tooling that gates it. There is no published runtime — the TypeScript
 packages exist solely to validate manifests, schemas, and authoring rules.
 Plugin install/uninstall/rollback is handled natively by Claude Code.
 
-Companion docs: `AGENTS.md` (project structure, authoring rules),
-`CONTRIBUTING.md` (PR process, changesets, solution docs), `docs/CLAUDE.md`
-(versioning and release model), `plugins/<name>/CLAUDE.md` (per-plugin
-conventions and component catalogs).
+Companion docs: `AGENTS.md` (structure, authoring rules), `CONTRIBUTING.md`
+(PR process, changesets), `docs/CLAUDE.md` (versioning and release).
 
 ## Common Commands
 
 Use `pnpm` only — `preinstall` enforces it via `only-allow pnpm`.
 
 ```bash
-pnpm install                  # workspace install
+pnpm install                  # workspace install (cloud sessions: SessionStart runs scripts/install_pkgs.sh)
 pnpm build                    # build all workspace packages
 pnpm typecheck                # strict tsc --noEmit
 pnpm lint                     # eslint .js/.ts
@@ -47,16 +45,11 @@ pnpm apply:changesets         # version + run scripts/sync-manifests.js
 ```
 
 Run a single Vitest file: `pnpm vitest run path/to/file.test.ts`. Bats shell
-tests live under `plugins/<name>/tests/` for `github-workflow`,
-`gt-workflow`, `yellow-ci`, `yellow-codex`,
-`yellow-core`, `yellow-council`, `yellow-debt`, `yellow-linear`,
-`yellow-research`, `yellow-review`, `yellow-ruvector`, and `yellow-semgrep`
-— run `bats tests/`
-from inside the plugin directory (`yellow-core` also has a required nested
-suite at `skills/git-worktree/tests/`; CI runs both separately). The
-cross-plugin bash/zsh suite lives at `tests/shell-compat/` (`pnpm
-test:shell-compat`; needs zsh). CI installs `bats@1.11.0` via npm; locally
-`pnpm dlx bats@1.11.0 tests/` works when it is not on PATH).
+tests: run `bats tests/` inside any `plugins/<name>/` that has a `tests/`
+directory (`yellow-core` also has a required nested suite at
+`skills/git-worktree/tests/`). CI pins `bats@1.11.0`; locally
+`pnpm dlx bats@1.11.0 tests/` works when it is not on PATH. The cross-plugin
+bash/zsh suite is `pnpm test:shell-compat` (needs zsh).
 
 `pnpm validate:schemas && pnpm test:unit && pnpm test:integration && pnpm lint
 && pnpm typecheck` is a local baseline, not the full CI gate — the
@@ -73,14 +66,12 @@ requires `validate-versions`, `contract-drift`, `security-audit`, `build`,
    layered one way — `cli → infrastructure → domain`, `domain` imports nothing —
    and ESLint enforces the direction.
 2. **Manifests are generated.** `pnpm generate:manifests` emits the root
-   `.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`,
-   and each plugin's `.claude-plugin/plugin.json` (including its `hooks`
-   block) from `catalog/` sources — other root `.claude-plugin/` files
-   (`config.json`, `flags.json`, `registry.schema.json`, `audit/`) have no
-   catalog source and are hand-maintained. Edit the catalog source,
-   regenerate, and expect
-   `tests/integration/generate-manifests-characterization.test.ts` to need a
-   snapshot refresh (`vitest -u`) when the output legitimately changes.
+   `.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`, and
+   each plugin's `.claude-plugin/plugin.json` (including `hooks`) from
+   `catalog/`. Other root `.claude-plugin/` files (`config.json`,
+   `flags.json`, `registry.schema.json`, `audit/`) are hand-maintained. After
+   a legitimate output change, refresh the snapshot in
+   `tests/integration/generate-manifests-characterization.test.ts` (`vitest -u`).
 3. **Versions sync three ways.** `plugins/<name>/package.json` → `plugin.json` →
    `marketplace.json`; `package.json` is the source of truth and
    `validate-versions.js` blocks drift. Codex-enabled plugins also two-way-check
@@ -195,10 +186,9 @@ still rely on review:
 
 ## Judgment
 
-Make routine calls yourself. Ask only when different readings of the request
-would lead to materially different work, and when you do ask, state the two
-readings. Deliver the scope as asked; note anything else worth doing as a
-follow-up rather than doing it.
+Make routine calls yourself. Ask only when readings of the request lead to
+materially different work, and then state both. Deliver the scope as asked;
+note anything else as a follow-up rather than doing it.
 
 ## Compact instructions
 
@@ -209,11 +199,9 @@ command and its error, and in-flight branch, PR, and worktree names.
 
 ## Where to look next
 
-- How the pieces fit (catalog, generator, hooks, CI, release)?
-  `docs/architecture-overview.md`
-- New plugin? `CONTRIBUTING.md` "Adding a Plugin" + `docs/plugin-template.md`
-- Plugin manifest issues? `docs/plugin-validation-guide.md`
-- A specific plugin's conventions? `plugins/<name>/CLAUDE.md`
-- A solved problem you want context on? `docs/solutions/<category>/`
-- Schema drift / hooks-format weirdness? `docs/solutions/build-errors/`
-- Cursor distribution target / the `yellow-cursor` pilot? `docs/cursor-distribution.md`
+`docs/architecture-overview.md` (how catalog, generator, hooks, CI and
+release fit) · `CONTRIBUTING.md` "Adding a Plugin" + `docs/plugin-template.md`
+· `docs/plugin-validation-guide.md` (manifest issues) ·
+`plugins/<name>/CLAUDE.md` (per-plugin conventions) · `docs/solutions/<category>/`
+(solved problems; schema drift and hooks-format issues under `build-errors/`)
+· `docs/cursor-distribution.md` (Cursor target, `yellow-cursor` pilot).
