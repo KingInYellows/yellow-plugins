@@ -45,8 +45,8 @@ pnpm apply:changesets         # version + run scripts/sync-manifests.js
 ```
 
 Run a single Vitest file: `pnpm vitest run path/to/file.test.ts`. Bats shell
-tests: run `bats tests/` inside any `plugins/<name>/` that has a `tests/`
-directory (`yellow-core` also has a required nested suite at
+tests: run `bats tests/` inside any `plugins/<name>/` whose `tests/` holds
+`.bats` files (`yellow-core` also has a required nested suite at
 `skills/git-worktree/tests/`). CI pins `bats@1.11.0`; locally
 `pnpm dlx bats@1.11.0 tests/` works when it is not on PATH. The cross-plugin
 bash/zsh suite is `pnpm test:shell-compat` (needs zsh).
