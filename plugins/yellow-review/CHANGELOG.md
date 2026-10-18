@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.10.1
+
+### Patch Changes
+
+- [`dad964a`](https://github.com/KingInYellows/yellow-plugins/commit/dad964a10e546fca0e2d0afeaf3e75abfda7cf00)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - docs: move
+  component reference out of CLAUDE.md
+
 ## 3.10.0
 
 ### Minor Changes
