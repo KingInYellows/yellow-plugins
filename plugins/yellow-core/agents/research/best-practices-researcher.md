@@ -195,10 +195,10 @@ first, then WebSearch fallback:
   or returns an error response (network error, OAuth failure, 5xx), treat
   it as unavailable — fall through to `WebSearch` and annotate:
   `[best-practices-researcher] Ceramic call failed — falling back to WebSearch.`
-- **Terminator:** if both Ceramic and `WebSearch` return fewer than 3
-  combined results, stop and report: "Insufficient web evidence for this
-  best-practices query — narrow the topic or supply explicit library
-  names." Do not synthesize when the combined results count is below 3.
+- **Terminator:** if Ceramic and `WebSearch` together yield fewer than 3
+  relevant results from distinct URLs, stop and report: "Insufficient web
+  evidence for this best-practices query — narrow the topic or supply
+  explicit library names." Do not synthesize below that count.
 - **Single-URL content fetch:** built-in `WebFetch`. Ceramic has no
   fetch endpoint — keep `WebFetch` primary for "pull the content of
   this specific URL" tasks.
