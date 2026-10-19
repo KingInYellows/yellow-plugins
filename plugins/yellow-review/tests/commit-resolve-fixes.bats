@@ -4,6 +4,7 @@
 bats_require_minimum_version 1.5.0
 
 load helpers/resolve-repo
+load helpers/overlay-dev
 
 SCRIPT="${RESOLVE_SCRIPTS}/commit-resolve-fixes"
 MSG="fix: resolve PR #7 review comments (2 files)"
@@ -2660,6 +2661,23 @@ crf_ssh_remote() {
   chmod +x "$REPO/tools/interp"
   printf '#!%s/tools/interp\n' "$REPO" >| "$BATS_TEST_TMPDIR/gitbin/git"
   chmod +x "$BATS_TEST_TMPDIR/gitbin/git"
+  printf 'one\nfeature\nfix-boot\n' >| src/a.txt
+  run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$old_path" "$SCRIPT" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ ! -e "$marker" ] || { echo "the bootstrap ran the planted git" >&2; return 1; }
+  [ "$status" -eq 3 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
+}
+
+@test "overlay split: a git hard-linked to a worktree file in an outside PATH directory never runs from the pre-lib git discovery (commit-resolve-fixes)" {
+  old_path="$PATH"
+  marker="$BATS_TEST_TMPDIR/boot-hardlink-canary"
+  printf 'tools/\n' >> .git/info/exclude
+  mkdir -p "$REPO/tools" "$BATS_TEST_TMPDIR/gitbin"
+  printf '#!/bin/sh\ntouch "%s"\nexec "%s" "$@"\n' "$marker" "$(command -v git)" >| "$REPO/tools/git"
+  chmod +x "$REPO/tools/git"
+  ln "$REPO/tools/git" "$BATS_TEST_TMPDIR/gitbin/git"
+  SCRIPT=$(overlay_dev_bootstrap_copy commit-resolve-fixes)
+  overlay_dev_sanity "$BATS_TEST_TMPDIR/ovl"
   printf 'one\nfeature\nfix-boot\n' >| src/a.txt
   run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$old_path" "$SCRIPT" --provider graphite --pr 7 --message "$MSG" -- src/a.txt
   [ ! -e "$marker" ] || { echo "the bootstrap ran the planted git" >&2; return 1; }

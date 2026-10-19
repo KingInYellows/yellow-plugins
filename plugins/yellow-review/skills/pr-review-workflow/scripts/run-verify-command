@@ -600,17 +600,17 @@ yr_file_shebang_enters() {
 # and one of them is inside <root> (a link to an ignored script there keeps
 # the script's content under an outside name), or when that cannot be told
 # (the link count unreadable, or the walk of <root> failed before a match).
-# find comes from yr_helper, never PATH. The tree is walked only for a file
-# with a link count above 1 that is on the worktree's device.
+# find comes from yr_helper, never PATH. The tree is walked for any file
+# with a link count above 1 (bounded by -xdev and -quit). A directory's
+# st_dev is not compared because overlayfs reports different st_dev for
+# directories and regular files. -samefile compares the file's own device
+# and inode, so the match is file to file.
 yr_hardlink_enters() {
-    local f="$1" root="$2" find fd rd hit
+    local f="$1" root="$2" find hit
     [ -f "$f" ] || return 1
     find=$(yr_helper find) || return 0
     hit=$("$find" "$f" -maxdepth 0 -links +1 -print 2>/dev/null) || return 0
     [ -n "$hit" ] || return 1
-    fd=$("$find" "$f" -maxdepth 0 -printf '%D' 2>/dev/null) || fd=""
-    rd=$("$find" "$root" -maxdepth 0 -printf '%D' 2>/dev/null) || rd=""
-    if [ -n "$fd" ] && [ -n "$rd" ] && [ "$fd" != "$rd" ]; then return 1; fi
     hit=$("$find" "$root" -xdev -type f -samefile "$f" -print -quit 2>/dev/null) || return 0
     [ -n "$hit" ]
 }
