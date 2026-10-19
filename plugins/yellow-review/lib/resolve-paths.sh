@@ -1944,6 +1944,22 @@ rp_link_target_changed() {
             done
             return 1
         fi
+        if [ -L "$l" ] && [ "$follow" = follow ]; then
+            # A symlink to another symlink is not a directory, so the walk
+            # above never runs; resolve one hop and judge the referent (the
+            # chain may continue).
+            t=$(readlink -- "$l" 2>/dev/null) || return 2
+            case "$t" in
+                /*) p="$t" ;;
+                *) p="${l%/*}/$t" ;;
+            esac
+            if [ -L "$p" ] || [ -d "$p" ]; then
+                rp_link_target_changed "$p" "$marker" follow
+                return $?
+            fi
+            [ -f "$p" ] && [ "$p" -nt "$marker" ] && return 0
+            return 1
+        fi
         [ -f "$l" ] || return 1
         [ "$l" -nt "$marker" ] && return 0
         return 1
