@@ -62,7 +62,9 @@ keyword queries in one parallel response instead of one long query:
 Merge the results by URL. A result is **relevant** when its title or
 description contains the main entity **and** at least one other distinctive
 term from the same query (a constraint, version or technical term, e.g.
-`Redis` plus `eviction`). A page that only names the entity does not count.
+`Redis` plus `eviction`). A page that only names the entity does not count,
+unless the query is nothing but the entity (`OAuth 2.0`); then naming it is
+enough.
 Ceramic returns up to 10 results
 for almost any query, so judge relevance, not `result.totalResults`. The
 original topic still goes to Perplexity/Tavily/EXA, which handle natural

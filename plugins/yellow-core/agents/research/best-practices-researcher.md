@@ -186,7 +186,8 @@ first, then WebSearch fallback:
 - **Fallback (insufficient results):** merge results by URL and count the
   relevant ones, whose title or description contains the main entity
   and at least one other distinctive term from the same query (a page
-  that only names the entity does not count). Ceramic returns up to 10 results for almost any query,
+  that only names the entity does not count, unless the query is nothing
+  but the entity). Ceramic returns up to 10 results for almost any query,
   so `result.totalResults` says nothing about relevance. With fewer than 3
   relevant results from distinct URLs, fall through to built-in
   `WebSearch`. A response without `result.results` counts as zero results
