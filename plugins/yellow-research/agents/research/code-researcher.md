@@ -48,21 +48,38 @@ for any library query; do not re-document it here.
 
 **For general web queries** (when no library is named and no code-context
 match exists), prefer `mcp__plugin_yellow-research_ceramic__ceramic_search`
-as the first hop — it is high-volume-friendly and significantly cheaper
-than EXA. Ceramic is a **lexical** search engine, so before calling it
-**rewrite the topic into a concise keyword-form query** (≤50 words, no
-conversational phrasing — drop "how do I", "what is", filler words; keep
-proper nouns, technical terms, version numbers).
+as the first hop — it is priced for many queries and far cheaper than EXA.
+Ceramic is a **lexical** search engine, so send a small set of keyword
+queries instead of the user's sentence:
 
-Example rewrite: `"How do I configure Redis eviction in production?"` →
-`"Redis eviction policy production configuration"`.
+- Write 2–3 queries of 2–8 words: one naming the entity, one using words
+  likely to appear in the answer, one with synonyms (Ceramic does not map
+  them). A plain lookup of a named thing needs only one.
+- Keep every hard constraint (library, version, year). Replace "latest" or
+  "current" with the year. Drop filler ("how do I", "what is", articles).
+  No slashes, URLs, file paths, comma-grouped numbers or non-Latin
+  characters.
+- Send the queries in one parallel response with
+  `maxDescriptionLength: 1000`. If the tool rejects that parameter, retry
+  with `query` only.
+- Example: `"How do I configure Redis eviction in production?"` →
+  `Redis eviction policy`, `Redis maxmemory-policy allkeys-lru`,
+  `Redis memory limit cache eviction`.
 
-If `ceramic_search` returns `result.totalResults < 3` results, fall
-through to `mcp__plugin_yellow-research_exa__web_search_exa` (neural).
-Three is the threshold because lexical search is permissive on single
-hits — three confirms the keyword query found a real cluster, not a
-fluke match. If `result.totalResults` is missing from the response shape,
-treat it as 0 and fall through (fail closed, not open).
+Merge the results by URL. A result is **relevant** when its title or
+description contains the main entity **and** at least one other distinctive
+term from the same query (a constraint, version or technical term, e.g.
+`Redis` plus `eviction`). A page that only names the entity does not count,
+unless the query is nothing but the entity (`OAuth 2.0`); then naming it is
+enough.
+Ceramic returns up to 10 results
+for almost any query, so judge relevance, not `result.totalResults`.
+
+If the set yields fewer than 3 relevant results from distinct URLs, fall
+through to `mcp__plugin_yellow-research_exa__web_search_exa` (neural) with
+the original question. Three distinct relevant pages confirm the keywords
+found a real cluster, not a fluke match. A response without
+`result.results` counts as zero results (fail closed, not open).
 
 If Ceramic is unavailable in ToolSearch, skip directly to EXA without
 erroring, and annotate the response with
