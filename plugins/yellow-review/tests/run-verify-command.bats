@@ -4,6 +4,7 @@
 bats_require_minimum_version 1.5.0
 
 load helpers/resolve-repo
+load helpers/overlay-dev
 
 SCRIPT="${RESOLVE_SCRIPTS}/run-verify-command"
 
@@ -240,6 +241,64 @@ vr_ssh_fixture() {
   run --separate-stderr env "PATH=$caller" "GIT_SSH_COMMAND=ssh" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
   [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
   [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside ssh did not run: $stderr" >&2; return 1; }
+}
+
+# Copy the plugin outside the repository (as "a plugin lib directory outside
+# the repository is not judged" does) and point its yr_helper at the overlay
+# find and stat shims. Absolute paths are baked in; other names stay on the
+# fixed-location lookup.
+ovl_plugin_copy() {
+  local copy qfind qstat
+  copy="$BATS_TEST_TMPDIR/outside/yellow-review"
+  mkdir -p "$copy/skills/pr-review-workflow"
+  cp -R "$RESOLVE_SCRIPTS/../../../lib" "$copy/lib"
+  cp -R "$RESOLVE_SCRIPTS" "$copy/skills/pr-review-workflow/scripts"
+  overlay_dev_shims "$BATS_TEST_TMPDIR/ovl"
+  qfind=$(printf '%q' "$BATS_TEST_TMPDIR/ovl/find")
+  qstat=$(printf '%q' "$BATS_TEST_TMPDIR/ovl/stat")
+  printf '\n' >> "$copy/lib/resolve-paths.sh"
+  cat >> "$copy/lib/resolve-paths.sh" <<EOF
+yr_helper() {
+    case "\$1" in
+        find) printf '%s\\n' $qfind; return 0 ;;
+        stat) printf '%s\\n' $qstat; return 0 ;;
+    esac
+    local name="\$1" cand
+    for cand in "/usr/bin/\$name" "/bin/\$name" "/run/current-system/sw/bin/\$name"; do
+        if [ -f "\$cand" ] && [ -x "\$cand" ]; then
+            printf '%s\\n' "\$cand"
+            return 0
+        fi
+    done
+    return 1
+}
+EOF
+  SCRIPT="$copy/skills/pr-review-workflow/scripts/run-verify-command"
+}
+
+@test "overlay split: an ssh hard-linked to a worktree file in an outside PATH directory never runs from the verify command's git" {
+  vr_ssh_fixture
+  ovl_plugin_copy
+  ln ignored/helper "$BATS_TEST_TMPDIR/hardbin/ssh"
+  caller="$BATS_TEST_TMPDIR/hardbin:$BATS_TEST_TMPDIR/goodbin:$PATH"
+  run --separate-stderr env "PATH=$caller" "GIT_SSH_COMMAND=ssh" "$SCRIPT" --pr 7 --command-file "$CMD" --ignored-since "$IGN_MARKER" --timeout 20 --trusted -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/bad-ran" ]
+  [ -e "$BATS_TEST_TMPDIR/good-ran" ] || { echo "outside ssh did not run: $stderr" >&2; return 1; }
+}
+
+@test "overlay split: a git-lfs hard-linked to a worktree file in an outside PATH directory never runs" {
+  mkdir -p ignored "$BATS_TEST_TMPDIR/outbin"
+  printf 'ignored/\n' >> .git/info/exclude
+  printf '#!/bin/sh\ntouch "%s/helper-ran"\nexit 1\n' "$BATS_TEST_TMPDIR" >| ignored/helper
+  chmod +x ignored/helper
+  ln ignored/helper "$BATS_TEST_TMPDIR/outbin/git-lfs"
+  git config --local filter.lfs.clean 'git-lfs clean -- %f'
+  git config --local filter.lfs.smudge 'git-lfs smudge -- %f'
+  git config --local filter.lfs.process 'git-lfs filter-process'
+  printf '*.txt filter=lfs\n' >| .git/info/attributes
+  ovl_plugin_copy
+  PATH="$BATS_TEST_TMPDIR/outbin:$PATH" run --separate-stderr "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ ! -e "$BATS_TEST_TMPDIR/helper-ran" ]
 }
 
 @test "a tr symlinked into the worktree never runs in the revert modes (rp_lower runs tr by name)" {

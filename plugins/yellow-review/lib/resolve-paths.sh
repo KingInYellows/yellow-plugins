@@ -353,17 +353,17 @@ yr_file_shebang_enters() {
 # and one of them is inside <root> (a link to an ignored script there keeps
 # the script's content under an outside name), or when that cannot be told
 # (the link count unreadable, or the walk of <root> failed before a match).
-# find comes from yr_helper, never PATH. The tree is walked only for a file
-# with a link count above 1 that is on the worktree's device.
+# find comes from yr_helper, never PATH. The tree is walked for any file
+# with a link count above 1 (bounded by -xdev and -quit). A directory's
+# st_dev is not compared because overlayfs reports different st_dev for
+# directories and regular files. -samefile compares the file's own device
+# and inode, so the match is file to file.
 yr_hardlink_enters() {
-    local f="$1" root="$2" find fd rd hit
+    local f="$1" root="$2" find hit
     [ -f "$f" ] || return 1
     find=$(yr_helper find) || return 0
     hit=$("$find" "$f" -maxdepth 0 -links +1 -print 2>/dev/null) || return 0
     [ -n "$hit" ] || return 1
-    fd=$("$find" "$f" -maxdepth 0 -printf '%D' 2>/dev/null) || fd=""
-    rd=$("$find" "$root" -maxdepth 0 -printf '%D' 2>/dev/null) || rd=""
-    if [ -n "$fd" ] && [ -n "$rd" ] && [ "$fd" != "$rd" ]; then return 1; fi
     hit=$("$find" "$root" -xdev -type f -samefile "$f" -print -quit 2>/dev/null) || return 0
     [ -n "$hit" ]
 }
@@ -654,23 +654,22 @@ yr_shebang_inside() {
 # file directly in any <dir> (links followed) has a link count above 1 and
 # shares its device and inode with a regular file inside <root>: a hard link
 # is no symlink and has no #! to read, but it is the worktree's file under an
-# outside name. Only files on the worktree's device can match, so the tree is
-# walked (-xdev, once per yr_safe_path call: YR_HL_TREE) only when a <dir>
-# holds such a file. A find without -printf cannot tell; yr_safe_path then
-# uses yr_hardlink_stat per directory.
+# outside name. Candidates are no longer limited to the root directory's
+# device (overlayfs reports different st_dev for directories and regular
+# files), so the tree is walked whenever a <dir> holds any multi-link regular
+# file. The walk stays once per yr_safe_path call (YR_HL_TREE) and is -xdev
+# bounded. A find without -printf cannot tell; yr_safe_path then uses
+# yr_hardlink_stat per directory.
 yr_hardlink_inside() {
-    local root="$1" find="$2" awk="$3" dev cands
+    local root="$1" find="$2" awk="$3" cands
     shift 3
-    dev=$("$find" "$root" -maxdepth 0 -printf '%D' 2>/dev/null) || dev=""
     # Not checked for errors: -L reports a symlink loop such as /usr/bin/X11
     # as one, and the entries it did list are all that matters here.
     cands=$("$find" -L "$@" -maxdepth 1 -type f -links +1 -printf '%D:%i\n' 2>/dev/null) || true
     [ -n "$cands" ] || return 1
-    [ -z "$dev" ] || cands=$(printf '%s\n' "$cands" | "$awk" -v d="$dev:" 'index($0, d) == 1')
-    [ -n "$cands" ] || return 1
     # A walk that fails part way (an unreadable directory hides links) is not
-    # cached and not trusted: every directory holding a same-device multi-link
-    # file is dropped, as in yr_hardlink_stat.
+    # cached and not trusted: every directory holding a multi-link file is
+    # dropped, as in yr_hardlink_stat.
     if [ -z "${YR_HL_TREE+x}" ]; then
         YR_HL_TREE=$("$find" "$root" -xdev -type f -links +1 -printf '%D:%i\n' 2>/dev/null) || { unset YR_HL_TREE; return 0; }
     fi
@@ -679,13 +678,19 @@ yr_hardlink_inside() {
 }
 
 # yr_hardlink_stat <dir> <root>: the fallback of yr_hardlink_inside for a
-# system without a find that has -printf: succeed when any non-directory
-# directly in <dir> has a link count above 1 and is on the worktree's device,
-# or when stat (GNU or BSD, from yr_helper) cannot tell. Without find the
-# inode cannot be matched, so a same-device multi-link file drops the
-# directory. A directory on another device cannot hold a link into the tree.
+# system without a find that has -printf. Succeed when stat (GNU or BSD, from
+# yr_helper) is missing or the root directory's device cannot be read, and
+# when any non-directory directly in <dir> has a link count above 1 and is on
+# the root directory's device. Directories are skipped. Without -printf the
+# inode cannot be matched, so that same-device multi-link file drops the
+# directory. Overlayfs reports a different st_dev for a directory than for a
+# regular file, so a multi-link non-directory whose device differs from the
+# root directory's also drops the directory when that device is the device of
+# any multi-link regular file inside <root>. That set is computed lazily, only
+# when such a file is seen, once per yr_safe_path call (YR_HL_SDEVS). A missing
+# find, or a walk that fails part way, is not cached and fails closed.
 yr_hardlink_stat() {
-    local dir="$1" root="$2" stat out rd line links dev
+    local dir="$1" root="$2" stat out rd line links dev find
     stat=$(yr_helper stat) || return 0
     rd=$("$stat" -L -c '%d' -- "$root" 2>/dev/null) || rd=$("$stat" -L -f '%d' "$root" 2>/dev/null) || return 0
     # Unmatched globs stay literal and make stat exit non-zero after printing
@@ -696,6 +701,16 @@ yr_hardlink_stat() {
         [ -n "$links" ] || continue
         case "$line" in [Dd]irectory*) continue ;; esac
         [ "$dev" = "$rd" ] && [ "$links" -gt 1 ] 2>/dev/null && return 0
+        # A different device can still be the file's own device on overlayfs.
+        if [ "$dev" != "$rd" ] && [ "$links" -gt 1 ] 2>/dev/null; then
+            if [ -z "${YR_HL_SDEVS+x}" ]; then
+                find=$(yr_helper find) || return 0
+                YR_HL_SDEVS=$("$find" "$root" -xdev -type f -links +1 -exec "$stat" -L -c '%d' {} + 2>/dev/null) || YR_HL_SDEVS=$("$find" "$root" -xdev -type f -links +1 -exec "$stat" -L -f '%d' {} + 2>/dev/null) || { unset YR_HL_SDEVS; return 0; }
+            fi
+            case $'\n'"$YR_HL_SDEVS"$'\n' in
+                *$'\n'"$dev"$'\n'*) return 0 ;;
+            esac
+        fi
     done <<<"$out"
     return 1
 }
@@ -824,10 +839,10 @@ yr_safe_path() {
         [ "${verdict[i]}" != k ] || cand+=("$i")
     done
     if [ "${#cand[@]}" -gt 0 ] && [ -n "$root" ]; then
+        unset YR_HL_TREE YR_HL_SDEVS
         if [ -n "$rp" ] && [ -n "$find" ] && [ -n "$awk" ]; then
             dirs=()
             for i in "${cand[@]}"; do dirs+=("${ents[i]}"); done
-            unset YR_HL_TREE
             if yr_batch_inside "$root" "$find" "$rp" "$awk" "${dirs[@]}" \
                 || yr_shebang_inside "$root" "$find" "$rp" "$awk" "${dirs[@]}" \
                 || yr_hardlink_any "$root" "$find" "$awk" "${dirs[@]}"; then

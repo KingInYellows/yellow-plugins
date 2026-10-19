@@ -4,6 +4,7 @@
 bats_require_minimum_version 1.5.0
 
 LIB="$(cd "$(dirname "${BATS_TEST_DIRNAME}")" && pwd)/lib/resolve-paths.sh"
+load helpers/overlay-dev
 
 setup() {
   export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
@@ -1765,6 +1766,183 @@ CFG_CMD_KEYS=(
   ln ignored/helper "$BATS_TEST_TMPDIR/hbin/mytool"
   rc=0; PATH="$BATS_TEST_TMPDIR/hbin:$PATH" yr_resolve_tool mytool >/dev/null || rc=$?
   [ "$rc" -eq 2 ]
+}
+
+# --- Hard-link screens under a simulated overlayfs device split ---
+
+@test "overlay split: yr_resolve_tool refuses a git-lfs in an outside PATH directory hard-linked to a worktree file (exit 2)" {
+  overlay_dev_shims "$BATS_TEST_TMPDIR/ovl"
+  overlay_dev_use "$BATS_TEST_TMPDIR/ovl"
+  overlay_dev_sanity "$BATS_TEST_TMPDIR/ovl"
+  mkdir -p ignored "$BATS_TEST_TMPDIR/hbin"
+  printf '#!/bin/sh\nexit 0\n' >| ignored/git-lfs
+  chmod +x ignored/git-lfs
+  ln ignored/git-lfs "$BATS_TEST_TMPDIR/hbin/git-lfs"
+  rc=0; PATH="$BATS_TEST_TMPDIR/hbin:$PATH" yr_resolve_tool git-lfs >/dev/null || rc=$?
+  [ "$rc" -eq 2 ]
+}
+
+@test "overlay split: yr_safe_path drops an outside directory holding a hard link to a worktree file" {
+  overlay_dev_shims "$BATS_TEST_TMPDIR/ovl"
+  overlay_dev_use "$BATS_TEST_TMPDIR/ovl"
+  overlay_dev_sanity "$BATS_TEST_TMPDIR/ovl"
+  mkdir -p ignored "$BATS_TEST_TMPDIR/hbin" "$BATS_TEST_TMPDIR/hok"
+  printf '#!/bin/sh\nexit 0\n' >| ignored/helper
+  chmod +x ignored/helper
+  ln ignored/helper "$BATS_TEST_TMPDIR/hbin/git-lfs"
+  printf '#!/bin/sh\nexit 0\n' >| "$BATS_TEST_TMPDIR/hok/a"
+  chmod +x "$BATS_TEST_TMPDIR/hok/a"
+  ln "$BATS_TEST_TMPDIR/hok/a" "$BATS_TEST_TMPDIR/hok/b"
+  out=$(PATH="$BATS_TEST_TMPDIR/hbin:$BATS_TEST_TMPDIR/hok:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *hbin* ]]
+  # a multi-link file that is not linked into the worktree is fine
+  [[ "$out" == "$BATS_TEST_TMPDIR/hok:"* ]]
+}
+
+@test "overlay split: yr_safe_path drops the directory through yr_hardlink_stat when find has no -printf" {
+  overlay_dev_shims "$BATS_TEST_TMPDIR/ovl"
+  overlay_dev_use "$BATS_TEST_TMPDIR/ovl"
+  overlay_dev_sanity "$BATS_TEST_TMPDIR/ovl"
+  export OVERLAY_FIND_NO_PRINTF=1
+  mkdir -p ignored "$BATS_TEST_TMPDIR/hbin" "$BATS_TEST_TMPDIR/hok" "$BATS_TEST_TMPDIR/plain"
+  printf '#!/bin/sh\nexit 0\n' >| ignored/helper
+  chmod +x ignored/helper
+  ln ignored/helper "$BATS_TEST_TMPDIR/hbin/git-lfs"
+  printf '#!/bin/sh\nexit 0\n' >| "$BATS_TEST_TMPDIR/hok/a"
+  chmod +x "$BATS_TEST_TMPDIR/hok/a"
+  ln "$BATS_TEST_TMPDIR/hok/a" "$BATS_TEST_TMPDIR/hok/b"
+  : >| "$BATS_TEST_TMPDIR/plain/a"
+  out=$(PATH="$BATS_TEST_TMPDIR/hbin:$BATS_TEST_TMPDIR/hok:$BATS_TEST_TMPDIR/plain:/usr/bin:/bin" yr_safe_path)
+  [[ "$out" != *hbin* ]]
+  # a directory holding only a single-link file does not need the device set
+  [[ ":$out:" == *":$BATS_TEST_TMPDIR/plain:"* ]]
+}
+
+@test "overlay split: harden_git_config refuses a global config hard-linked to a worktree file" {
+  overlay_dev_shims "$BATS_TEST_TMPDIR/ovl"
+  overlay_dev_use "$BATS_TEST_TMPDIR/ovl"
+  overlay_dev_sanity "$BATS_TEST_TMPDIR/ovl"
+  mkdir -p ignored "$BATS_TEST_TMPDIR/home"
+  printf '[core]\n\tsshCommand = true\n' >| ignored/gitcfg
+  ln ignored/gitcfg "$BATS_TEST_TMPDIR/home/.gitconfig"
+  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/home/.gitconfig"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 1 ]
+  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/home/.gitconfig"; harden_git_config full; [[ "$YR_HARDEN_MSG" == *"hard-linked"* ]] ) || rc=$?
+  # a multi-link global config that is not linked into the worktree is the user's own
+  printf '[core]\n\tsshCommand = ssh -x\n' >| "$BATS_TEST_TMPDIR/home/own"
+  ln "$BATS_TEST_TMPDIR/home/own" "$BATS_TEST_TMPDIR/home/own2"
+  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/home/own"; harden_git_config full ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
+@test "overlay split: an outside tool with several links all outside the worktree still resolves (exit 0)" {
+  overlay_dev_shims "$BATS_TEST_TMPDIR/ovl"
+  overlay_dev_use "$BATS_TEST_TMPDIR/ovl"
+  overlay_dev_sanity "$BATS_TEST_TMPDIR/ovl"
+  mkdir -p "$BATS_TEST_TMPDIR/obin"
+  printf '#!/bin/sh\nexit 0\n' >| "$BATS_TEST_TMPDIR/obin/mytool"
+  chmod +x "$BATS_TEST_TMPDIR/obin/mytool"
+  ln "$BATS_TEST_TMPDIR/obin/mytool" "$BATS_TEST_TMPDIR/obin/mytool2"
+  rc=0; out=$(PATH="$BATS_TEST_TMPDIR/obin:$PATH" yr_resolve_tool mytool) || rc=$?
+  [ "$rc" -eq 0 ]
+  [ "$out" = "$BATS_TEST_TMPDIR/obin/mytool" ]
+}
+
+@test "a multi-link file on a genuinely different device with no link into the worktree is not refused" {
+  here=$(stat -c %d "$PWD" 2>/dev/null || stat -f %d "$PWD") || true
+  base=""
+  if [ -n "$here" ]; then
+    for cand in /dev/shm "/run/user/$(id -u)"; do
+      [ -d "$cand" ] && [ -w "$cand" ] || continue
+      dev=$(stat -c %d "$cand" 2>/dev/null || stat -f %d "$cand") || continue
+      [ -n "$dev" ] && [ "$dev" != "$here" ] || continue
+      base=$cand
+      break
+    done
+  fi
+  [ -n "$base" ] || skip "no writable directory on a different device"
+  other=$(mktemp -d "$base/yr-hl.XXXXXX")
+  rc=0
+  (
+    printf '#!/bin/sh\nexit 0\n' >| "$other/mytool"
+    chmod +x "$other/mytool"
+    ln "$other/mytool" "$other/mytool2"
+    rc=0; out=$(PATH="$other:$PATH" yr_resolve_tool mytool) || rc=$?
+    [ "$rc" -eq 0 ]
+    [ "$out" = "$other/mytool" ]
+    out=$(PATH="$other:/usr/bin:/bin" yr_safe_path)
+    [[ ":$out:" == *":$other:"* ]]
+    overlay_dev_shims "$BATS_TEST_TMPDIR/ovl"
+    overlay_dev_use "$BATS_TEST_TMPDIR/ovl"
+    overlay_dev_sanity "$BATS_TEST_TMPDIR/ovl"
+    rc=0; out=$(PATH="$other:$PATH" yr_resolve_tool mytool) || rc=$?
+    [ "$rc" -eq 0 ]
+    [ "$out" = "$other/mytool" ]
+  ) || rc=$?
+  rm -rf "$other"
+  [ "$rc" -eq 0 ]
+}
+
+@test "overlay split: an unreadable link count or a failed walk still fails closed" {
+  overlay_dev_shims "$BATS_TEST_TMPDIR/ovl"
+  overlay_dev_use "$BATS_TEST_TMPDIR/ovl"
+  overlay_dev_sanity "$BATS_TEST_TMPDIR/ovl"
+  unset OVERLAY_FIND_NO_PRINTF
+  cat >| "$BATS_TEST_TMPDIR/fail-links" <<EOF
+#!/bin/sh
+case " \$* " in
+  *" -maxdepth 0 -links "*|*" -links "*" -maxdepth 0 "*) exit 1 ;;
+esac
+exec "$BATS_TEST_TMPDIR/ovl/find" "\$@"
+EOF
+  cat >| "$BATS_TEST_TMPDIR/fail-xdev" <<EOF
+#!/bin/sh
+"$BATS_TEST_TMPDIR/ovl/find" "\$@"
+rc=\$?
+case " \$* " in
+  *" -xdev "*) exit 1 ;;
+esac
+exit \$rc
+EOF
+  chmod +x "$BATS_TEST_TMPDIR/fail-links" "$BATS_TEST_TMPDIR/fail-xdev"
+  # shellcheck disable=SC2329
+  yr_helper() {
+    case "$1" in
+      find) printf '%s\n' "$OVL_FIND"; return 0 ;;
+      stat) printf '%s\n' "$BATS_TEST_TMPDIR/ovl/stat"; return 0 ;;
+    esac
+    local name="$1" cand
+    for cand in "/usr/bin/$name" "/bin/$name" "/run/current-system/sw/bin/$name"; do
+      if [ -f "$cand" ] && [ -x "$cand" ]; then
+        printf '%s\n' "$cand"
+        return 0
+      fi
+    done
+    return 1
+  }
+  mkdir -p "$BATS_TEST_TMPDIR/solo" "$BATS_TEST_TMPDIR/multi"
+  printf 'solo\n' >| "$BATS_TEST_TMPDIR/solo/file"
+  printf '#!/bin/sh\nexit 0\n' >| "$BATS_TEST_TMPDIR/multi/a"
+  ln "$BATS_TEST_TMPDIR/multi/a" "$BATS_TEST_TMPDIR/multi/b"
+  # (i) the link count cannot be read
+  OVL_FIND=$BATS_TEST_TMPDIR/fail-links
+  rc=0; yr_hardlink_enters "$BATS_TEST_TMPDIR/solo/file" "$PWD" || rc=$?
+  [ "$rc" -eq 0 ]
+  # (ii) the overlay walk is run, then fails
+  OVL_FIND=$BATS_TEST_TMPDIR/fail-xdev
+  unset YR_HL_TREE YR_HL_SDEVS
+  rc=0; yr_hardlink_enters "$BATS_TEST_TMPDIR/multi/a" "$PWD" || rc=$?
+  [ "$rc" -eq 0 ]
+  awk=$(yr_helper awk || true)
+  [ -n "$awk" ] || awk=/usr/bin/awk
+  unset YR_HL_TREE YR_HL_SDEVS
+  rc=0; yr_hardlink_inside "$PWD" "$OVL_FIND" "$awk" "$BATS_TEST_TMPDIR/multi" || rc=$?
+  [ "$rc" -eq 0 ]
+  # (iii) stat fallback: the device walk fails closed
+  export OVERLAY_FIND_NO_PRINTF=1
+  unset YR_HL_TREE YR_HL_SDEVS
+  rc=0; yr_hardlink_stat "$BATS_TEST_TMPDIR/multi" "$PWD" || rc=$?
+  [ "$rc" -eq 0 ]
 }
 
 @test "a #! optional argument with expansion, glob or shell operator syntax counts as entering, in awk and in the shell" {
