@@ -1751,7 +1751,7 @@ CFG_CMD_KEYS=(
   ln ignored/gitcfg "$BATS_TEST_TMPDIR/home/.gitconfig"
   rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/home/.gitconfig"; harden_git_config full ) || rc=$?
   [ "$rc" -eq 1 ]
-  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/home/.gitconfig"; harden_git_config full; [[ "$YR_HARDEN_MSG" == *"hard-linked"* ]] ) || rc=$?
+  ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/home/.gitconfig"; harden_git_config full || true; [[ "$YR_HARDEN_MSG" == *"hard-linked"* ]] )
   # a multi-link global config that is not linked into the worktree is the user's own
   printf '[core]\n\tsshCommand = ssh -x\n' >| "$BATS_TEST_TMPDIR/home/own"
   ln "$BATS_TEST_TMPDIR/home/own" "$BATS_TEST_TMPDIR/home/own2"
@@ -1827,7 +1827,7 @@ CFG_CMD_KEYS=(
   ln ignored/gitcfg "$BATS_TEST_TMPDIR/home/.gitconfig"
   rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/home/.gitconfig"; harden_git_config full ) || rc=$?
   [ "$rc" -eq 1 ]
-  rc=0; ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/home/.gitconfig"; harden_git_config full; [[ "$YR_HARDEN_MSG" == *"hard-linked"* ]] ) || rc=$?
+  ( export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/home/.gitconfig"; harden_git_config full || true; [[ "$YR_HARDEN_MSG" == *"hard-linked"* ]] )
   # a multi-link global config that is not linked into the worktree is the user's own
   printf '[core]\n\tsshCommand = ssh -x\n' >| "$BATS_TEST_TMPDIR/home/own"
   ln "$BATS_TEST_TMPDIR/home/own" "$BATS_TEST_TMPDIR/home/own2"
@@ -1864,19 +1864,17 @@ CFG_CMD_KEYS=(
   other=$(mktemp -d "$base/yr-hl.XXXXXX")
   rc=0
   (
-    printf '#!/bin/sh\nexit 0\n' >| "$other/mytool"
-    chmod +x "$other/mytool"
-    ln "$other/mytool" "$other/mytool2"
-    rc=0; out=$(PATH="$other:$PATH" yr_resolve_tool mytool) || rc=$?
-    [ "$rc" -eq 0 ]
-    [ "$out" = "$other/mytool" ]
-    out=$(PATH="$other:/usr/bin:/bin" yr_safe_path)
-    [[ ":$out:" == *":$other:"* ]]
-    overlay_dev_shims "$BATS_TEST_TMPDIR/ovl"
-    overlay_dev_use "$BATS_TEST_TMPDIR/ovl"
-    overlay_dev_sanity "$BATS_TEST_TMPDIR/ovl"
-    rc=0; out=$(PATH="$other:$PATH" yr_resolve_tool mytool) || rc=$?
-    [ "$rc" -eq 0 ]
+    printf '#!/bin/sh\nexit 0\n' >| "$other/mytool" &&
+    chmod +x "$other/mytool" &&
+    ln "$other/mytool" "$other/mytool2" &&
+    out=$(PATH="$other:$PATH" yr_resolve_tool mytool) &&
+    [ "$out" = "$other/mytool" ] &&
+    out=$(PATH="$other:/usr/bin:/bin" yr_safe_path) &&
+    [[ ":$out:" == *":$other:"* ]] &&
+    overlay_dev_shims "$BATS_TEST_TMPDIR/ovl" &&
+    overlay_dev_use "$BATS_TEST_TMPDIR/ovl" &&
+    overlay_dev_sanity "$BATS_TEST_TMPDIR/ovl" &&
+    out=$(PATH="$other:$PATH" yr_resolve_tool mytool) &&
     [ "$out" = "$other/mytool" ]
   ) || rc=$?
   rm -rf "$other"
@@ -2940,7 +2938,7 @@ walk_fixture() {
           else [ "$rc" -eq 1 ] || { echo "$kv ($scope) rc=$rc" >&2; return 1; }; fi ;;
       esac
     done
-    rc=0; ( export GIT_CONFIG_GLOBAL="$g"; harden_git_config full; [[ "$YR_HARDEN_MSG" != *tools/evil* ]] ) || rc=$?
+    ( export GIT_CONFIG_GLOBAL="$g"; harden_git_config full || true; [[ "$YR_HARDEN_MSG" != *tools/evil* ]] )
   done
   # a filter command is in the checkout subset, so revert refuses it too
   : >| "$g"; git config -f "$g" filter.x.smudge ./tools/evil
