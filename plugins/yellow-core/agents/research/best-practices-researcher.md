@@ -172,20 +172,24 @@ first, then WebSearch fallback:
   `[best-practices-researcher] yellow-research not installed — using WebSearch directly.`
 - **Primary (when available):**
   `mcp__plugin_yellow-research_ceramic__ceramic_search` for general web
-  queries. Ceramic is a **lexical** search engine (English only,
-  1–50-word keyword queries), so before each call rewrite the topic into
-  a concise keyword-form query — drop "how do I", "what is", filler words;
-  keep proper nouns, technical terms, version numbers. Example:
-  `"How do I configure Redis eviction in production?"` → `"Redis eviction
-  policy production configuration"`. See
+  queries. Ceramic is a **lexical**, English-only search engine priced for
+  many queries, so send 2–3 keyword queries of 2–8 words in one parallel
+  response instead of one long query: one naming the entity, one using
+  words likely to appear in the answer, one with synonyms. Keep library
+  names, versions and years; drop filler ("how do I", "what is"); no
+  slashes or URLs. Pass `maxDescriptionLength: 1000`, and retry with
+  `query` only if the tool rejects it. Example:
+  `"How do I configure Redis eviction in production?"` →
+  `Redis eviction policy`, `Redis maxmemory-policy allkeys-lru`,
+  `Redis memory limit cache eviction`. See
   `https://docs.ceramic.ai/api/search/best-practices.md`.
-- **Fallback (insufficient results):** if `ceramic_search` returns
-  `result.totalResults < 3`, fall through to built-in `WebSearch`. Three
-  is the threshold because lexical search is permissive on single hits —
-  three confirms the keyword query found a real cluster, not a fluke
-  match. If `result.totalResults` is missing from the response shape,
-  treat it as 0 and fall through — do not attempt to read a substitute
-  field (fail closed, not open).
+- **Fallback (insufficient results):** merge results by URL and count the
+  relevant ones, whose title or description contains the query's
+  distinctive terms. Ceramic returns up to 10 results for almost any query,
+  so `result.totalResults` says nothing about relevance. With fewer than 3
+  relevant results from distinct URLs, fall through to built-in
+  `WebSearch`. A response without `result.results` counts as zero results
+  (fail closed, not open).
 - **Fallback (call-time error):** if `ceramic_search` raises an exception
   or returns an error response (network error, OAuth failure, 5xx), treat
   it as unavailable — fall through to `WebSearch` and annotate:
@@ -281,11 +285,11 @@ Sources list and stop — Phases 1, 1.5, and 2 are skipped by design.
 - **Context7 MCP:** Primary source for official documentation and best practices
 - **Ceramic MCP** (when yellow-research is installed): Primary source for
   keyword-tight general web queries
-  (`mcp__plugin_yellow-research_ceramic__ceramic_search`); rewrite to
-  keyword form first. Lexical, English-only. OAuth on first use; no API
+  (`mcp__plugin_yellow-research_ceramic__ceramic_search`); send 2–3
+  short keyword variants. Lexical, English-only. OAuth on first use; no API
   key in plugin.json.
-- **WebSearch (built-in):** Fallback when Ceramic is unavailable or returns
-  `result.totalResults < 3`; handles natural-language queries.
+- **WebSearch (built-in):** Fallback when Ceramic is unavailable or yields
+  fewer than 3 relevant results; handles natural-language queries.
 - **WebFetch (built-in):** Pull specific URL content (Ceramic does not
   fetch URLs).
 - **GitHub Code Search:** For real-world implementation patterns

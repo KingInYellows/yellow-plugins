@@ -50,7 +50,8 @@ currently enables all seven exa tools, including these heavier ones:
 ### ceramic — OAuth 2.1 (auto-managed by Claude Code; first use opens browser)
 
 - `ceramic_search` — Lexical web search (~$0.05 per 1,000 queries on
-  pay-as-you-go; 20 QPS). English only, 1–50-word keyword queries.
+  pay-as-you-go; 20 QPS). English only, keyword queries; optional
+  `maxResults` (1–20) and `maxDescriptionLength` (1,000–8,000 characters).
 
 The Ceramic MCP at `https://mcp.ceramic.ai/mcp` authenticates via OAuth 2.1 —
 **no API key in plugin.json**, same shape as `parallel`. Browser pops on first
@@ -64,10 +65,12 @@ terminal — it needs a TTY, so never run it through `!` or the Bash tool, and
 paste the callback URL (a one-time code) only into that terminal.
 
 Ceramic is **lexical**, not semantic — Perplexity/Tavily/EXA-neural still handle
-conversational queries and synthesis. The research-conductor and code-researcher
-agents rewrite topics into keyword form before calling `ceramic_search` and fall
-through to the existing providers when Ceramic is unavailable or returns
-`result.totalResults < 3`. See
+conversational queries and synthesis. The research-conductor, code-researcher
+and yellow-core best-practices-researcher agents send 2–3 short keyword
+variants per lookup with `maxDescriptionLength: 1000`, and fall through to the
+other providers when Ceramic is unavailable or fewer than 3 results contain the
+query's distinctive terms. `result.totalResults` is not a relevance signal:
+Ceramic returns up to 10 results for almost any query. See
 `https://docs.ceramic.ai/api/search/best-practices.md`.
 
 ### deepwiki — No API key (public repos only)

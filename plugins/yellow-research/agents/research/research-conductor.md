@@ -1,6 +1,6 @@
 ---
 name: research-conductor
-description: "Routes /research:deep queries across multiple MCP sources. Use when deep research needs multi-source investigation. Triages complexity and dispatches parallel fan-out -- simple queries try Ceramic first (keyword-tight) and fall back to Perplexity; moderate runs Ceramic plus 2-3 parallel sources; complex topics trigger full fan-out including Parallel Task MCP for async reports."
+description: "Routes /research:deep queries across multiple MCP sources. Use when deep research needs multi-source investigation. Triages complexity and dispatches parallel fan-out -- simple queries try a set of Ceramic keyword queries first and fall back to Perplexity; moderate runs Ceramic plus 2-3 parallel sources; complex topics trigger full fan-out including Parallel Task MCP for async reports."
 model: opus
 effort: high
 background: true
@@ -41,45 +41,55 @@ years of change history OR requires multiple domain expertise areas. Classify as
 **Simple** if: a single authoritative source can answer the complete question
 with no synthesis needed. Classify as **Moderate** for everything in between.
 
-**Lexical-first prep** — Before any Ceramic call below, rewrite the topic
-into a concise keyword-form query (≤50 words, drop conversational phrasing,
-keep proper nouns and technical terms). Example rewrite:
-`"How do I configure Redis eviction in production?"` → `"Redis eviction
-policy production configuration"`. Ceramic
+**Ceramic query set** — Ceramic
 (`mcp__plugin_yellow-research_ceramic__ceramic_search`) is a lexical search
-engine — keyword queries return tightly relevant results; conversational
-queries dilute the signal. The original topic is still passed to
-Perplexity/Tavily/EXA which handle natural language. See
-`https://docs.ceramic.ai/api/search/best-practices.md`.
+engine priced for many queries, so each Ceramic step below sends a set of
+keyword queries in one parallel response instead of one long query:
 
-**Ceramic error handling** — for every Ceramic call below: missing
-`result.totalResults` is treated as 0 (fail closed); call-time errors
-(network, OAuth, 5xx) are treated as unavailable per the existing
-"Skip any source that is unavailable" rule below. Annotate failures as
+- Write 2–3 queries of 2–8 words: one naming the entity, one using words
+  likely to appear in the answer, one with synonyms (Ceramic does not map
+  them). A plain lookup of a named thing needs only one.
+- Keep every hard constraint (product, version, year, place). Replace
+  "latest" or "current" with the year. Drop filler ("how do I", "what is",
+  articles). No slashes, URLs, file paths, comma-grouped numbers or
+  non-Latin characters.
+- Pass `maxDescriptionLength: 1000` to keep snippets short. If the tool
+  rejects that parameter, retry with `query` only.
+- Example: `"How do I configure Redis eviction in production?"` →
+  `Redis eviction policy`, `Redis maxmemory-policy allkeys-lru`,
+  `Redis memory limit cache eviction`.
+
+Merge the results by URL. A result is **relevant** when its title or
+description contains the query's distinctive terms (entity names, technical
+terms, versions), not just common words. Ceramic returns up to 10 results
+for almost any query, so judge relevance, not `result.totalResults`. The
+original topic still goes to Perplexity/Tavily/EXA, which handle natural
+language. See `https://docs.ceramic.ai/api/search/best-practices.md`.
+
+**Ceramic error handling** — a response without `result.results` counts as
+zero results (fail closed); call-time errors (network, OAuth, 5xx) count as
+unavailable per the "Skip any source that is unavailable" rule below.
+Annotate failures as
 `[research-conductor] Ceramic call failed — falling back to <next-source>.`
 
 **Simple** — 1 well-defined aspect, quick answer needed:
 
-- First: `mcp__plugin_yellow-research_ceramic__ceramic_search` (with the
-  rewritten keyword query). If `result.totalResults >= 3`, return Ceramic
-  results.
+- First: the Ceramic query set. If it yields 3 or more relevant results
+  from distinct URLs, answer from them with citations.
 - Fallback: `mcp__plugin_yellow-research_perplexity__perplexity_reason`
-  if Ceramic is unavailable in ToolSearch, or if `result.totalResults < 3`.
-  Three is the threshold because lexical search is permissive on single
-  hits — three confirms the keyword query found a real cluster, not a
-  fluke match.
+  if Ceramic is unavailable in ToolSearch or yields fewer than 3 relevant
+  results. Three distinct relevant pages confirm the keywords found a real
+  cluster, not a fluke match.
 - Terminator: if both Ceramic and Perplexity are unavailable or return
-  fewer than 3 combined results, stop and report:
+  fewer than 3 combined relevant results, stop and report:
   `[research-conductor] Insufficient results for simple query — all sources exhausted. Narrow the topic or retry.`
   Do not synthesize from zero results.
 
 **Moderate** — 2-3 aspects or medium depth:
 
-- Issue the following three MCP tool calls **in parallel** (do not
-  serialize, and do not wrap them in Agent — these names are bundled MCP
-  tools, not subagents):
-  `mcp__plugin_yellow-research_ceramic__ceramic_search` (with the
-  rewritten keyword query),
+- Issue these MCP tool calls **in parallel** (do not serialize, and do not
+  wrap them in Agent — these names are bundled MCP tools, not subagents):
+  the Ceramic query set,
   `mcp__plugin_yellow-research_perplexity__perplexity_research` for
   synthesis, and `mcp__plugin_yellow-research_tavily__tavily_search` for
   recent web. Union the result sets and synthesize.
@@ -93,8 +103,7 @@ for public docs, comparisons, or broader ecosystem context.
 **Complex** — Broad topic, multiple angles, report-grade depth:
 
 - Full fan-out in parallel:
-  1. `mcp__plugin_yellow-research_ceramic__ceramic_search` — lexical
-     web (rewritten keyword query) for keyword-tight grounding
+  1. The Ceramic query set — lexical web for keyword-tight grounding
   2. `mcp__plugin_yellow-research_perplexity__perplexity_research` —
      web-grounded synthesis
   3. `mcp__plugin_yellow-research_tavily__tavily_research` — additional web
