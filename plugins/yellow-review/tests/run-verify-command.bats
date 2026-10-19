@@ -301,6 +301,21 @@ EOF
   [ ! -e "$BATS_TEST_TMPDIR/helper-ran" ]
 }
 
+@test "overlay split: a git hard-linked to a worktree file in an outside PATH directory never runs from the pre-lib git discovery" {
+  marker="$BATS_TEST_TMPDIR/boot-git-ran"
+  mkdir -p ignored "$BATS_TEST_TMPDIR/gitbin"
+  printf 'ignored/\n' >> .git/info/exclude
+  printf '#!/bin/sh\ntouch "%s"\nexec "%s" "$@"\n' "$marker" "$(command -v git)" >| ignored/git
+  chmod +x ignored/git
+  ln ignored/git "$BATS_TEST_TMPDIR/gitbin/git"
+  SCRIPT=$(overlay_dev_bootstrap_copy run-verify-command)
+  overlay_dev_sanity "$BATS_TEST_TMPDIR/ovl"
+  run --separate-stderr env "PATH=$BATS_TEST_TMPDIR/gitbin:$PATH" "$SCRIPT" --pr 7 --revert-only -- src/a.txt src/new.txt
+  [ ! -e "$marker" ] || { echo "the bootstrap ran the planted git" >&2; return 1; }
+  [ "$status" -eq 2 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [[ "$stderr" == *"git resolves to a path inside the repository"* ]]
+}
+
 @test "a tr symlinked into the worktree never runs in the revert modes (rp_lower runs tr by name)" {
   mkdir -p ignored "$BATS_TEST_TMPDIR/outbin"
   printf '#!/bin/sh\ntouch "%s/tr-ran"\ncat\n' "$BATS_TEST_TMPDIR" >| ignored/helper

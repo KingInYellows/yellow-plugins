@@ -139,3 +139,28 @@ overlay_dev_sanity() {
   rm -rf "$tmp"
   [ -n "$dd" ] && [ -n "$fd" ] && [ "$dd" != "$fd" ]
 }
+
+# overlay_dev_bootstrap_copy <script>: copy the plugin outside the repository
+# (the installed-cache layout, where the libraries are not judged) and point
+# the named entry script's own inline yr_helper, which the pre-lib git
+# discovery uses, at the overlay find and stat shims. Prints the copy's path
+# to the script. The library's yr_helper is left alone.
+overlay_dev_bootstrap_copy() {
+  local name="$1" copy script
+  copy="$BATS_TEST_TMPDIR/outside-boot/yellow-review"
+  overlay_dev_shims "$BATS_TEST_TMPDIR/ovl"
+  mkdir -p "$copy/skills/pr-review-workflow"
+  cp -R "$BATS_TEST_DIRNAME/../lib" "$copy/lib"
+  cp -R "$BATS_TEST_DIRNAME/../skills/pr-review-workflow/scripts" "$copy/skills/pr-review-workflow/scripts"
+  script="$copy/skills/pr-review-workflow/scripts/$name"
+  awk -v d="$BATS_TEST_TMPDIR/ovl" '
+    { print }
+    !done && $0 == "yr_helper() {" {
+      printf "    case \"$1\" in find|stat) printf \"%%s\\n\" \"%s/$1\"; return 0 ;; esac\n", d
+      done = 1
+    }
+    END { if (!done) exit 1 }
+  ' "$script" >| "$script.ovl" || return 1
+  cat "$script.ovl" >| "$script" && rm -f "$script.ovl"
+  printf '%s\n' "$script"
+}
