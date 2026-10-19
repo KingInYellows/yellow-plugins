@@ -67,8 +67,10 @@ queries instead of the user's sentence:
   `Redis memory limit cache eviction`.
 
 Merge the results by URL. A result is **relevant** when its title or
-description contains the query's distinctive terms (entity names, technical
-terms, versions), not just common words. Ceramic returns up to 10 results
+description contains the main entity **and** at least one other distinctive
+term from the same query (a constraint, version or technical term, e.g.
+`Redis` plus `eviction`). A page that only names the entity does not count.
+Ceramic returns up to 10 results
 for almost any query, so judge relevance, not `result.totalResults`.
 
 If the set yields fewer than 3 relevant results from distinct URLs, fall

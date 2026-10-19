@@ -60,8 +60,10 @@ keyword queries in one parallel response instead of one long query:
   `Redis memory limit cache eviction`.
 
 Merge the results by URL. A result is **relevant** when its title or
-description contains the query's distinctive terms (entity names, technical
-terms, versions), not just common words. Ceramic returns up to 10 results
+description contains the main entity **and** at least one other distinctive
+term from the same query (a constraint, version or technical term, e.g.
+`Redis` plus `eviction`). A page that only names the entity does not count.
+Ceramic returns up to 10 results
 for almost any query, so judge relevance, not `result.totalResults`. The
 original topic still goes to Perplexity/Tavily/EXA, which handle natural
 language. See `https://docs.ceramic.ai/api/search/best-practices.md`.

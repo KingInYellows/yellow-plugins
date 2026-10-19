@@ -69,7 +69,7 @@ conversational queries and synthesis. The research-conductor, code-researcher
 and yellow-core best-practices-researcher agents send 2–3 short keyword
 variants per lookup with `maxDescriptionLength: 1000`, and fall through to the
 other providers when Ceramic is unavailable or fewer than 3 results contain the
-query's distinctive terms. `result.totalResults` is not a relevance signal:
+query's main entity plus at least one other distinctive term. `result.totalResults` is not a relevance signal:
 Ceramic returns up to 10 results for almost any query. See
 `https://docs.ceramic.ai/api/search/best-practices.md`.
 

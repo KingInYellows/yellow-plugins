@@ -88,7 +88,7 @@ mkdir -p docs/research
 keyword matching). Instead of one sentence, send `ceramic_search` 2–3
 keyword variants of 2–8 words (entity, answer words, synonyms) in parallel
 with `maxDescriptionLength: 1000`, then count results that contain the
-query's distinctive terms; `result.totalResults` is not a relevance signal. See
+query's main entity plus at least one other distinctive term; `result.totalResults` is not a relevance signal. See
 `https://docs.ceramic.ai/api/search/best-practices.md`. The Ceramic MCP at
 `https://mcp.ceramic.ai/mcp` authenticates via OAuth 2.1 (browser flow on
 first use) — same UX as Parallel Task, no API key in plugin.json.
