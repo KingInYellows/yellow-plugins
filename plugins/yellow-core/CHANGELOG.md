@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.11.2
+
+### Patch Changes
+
+- [`5a8c234`](https://github.com/KingInYellows/yellow-plugins/commit/5a8c23421135633b4a2aa0bf40cab4dc9810584f)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fix stale
+  `/setup:all` checks so the dashboard agrees with each plugin's own setup
+  command: read credential-status files from the real `CLAUDE_PLUGIN_DATA`
+  directory, probe `agy` (not the retired `gemini` CLI) plus council's system
+  tools, detect keyring Codex login, add `goal-gen`, `awk_nul`, Node 22.22 and
+  `@cursor/sdk` probes, run the remote-agent classifier correctly, and tighten
+  the gt-workflow, yellow-ruvector, yellow-debt, yellow-ci, yellow-browser-test
+  and yellow-council rules.
+
+- [`dad964a`](https://github.com/KingInYellows/yellow-plugins/commit/dad964a10e546fca0e2d0afeaf3e75abfda7cf00)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - docs: move
+  component reference out of CLAUDE.md
+
 ## 2.11.1
 
 ### Patch Changes
