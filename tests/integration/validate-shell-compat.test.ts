@@ -821,6 +821,8 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged("[[ \"$x\" == '`ls`' ]]")).toEqual([]);
     expect(flagged(`x=$(( '$(ls)' ))`)).toEqual([]);
     expect(flagged('[[ "$x" == "$(ls)" ]]')).toEqual([1]);
+    expect(flagged('[[ -r <(ls x) ]]')).toEqual([1]);
+    expect(flagged("[[ -n $(printf ')'; ls x) ]]")).toEqual([1]);
   });
 
   it('reads the elements of an array assignment as words', () => {
@@ -828,6 +830,7 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('commands=(ls ps)')).toEqual([]);
     expect(flagged('a+=(df) ; echo "${a[@]}"')).toEqual([]);
     expect(flagged('x=($(ls d))')).toEqual([1]);
+    expect(flagged('x=( <(ls d) )')).toEqual([1]);
     expect(flagged('x=(a) && ls d')).toEqual([1]);
     expect(flagged('(ls d)')).toEqual([1]);
     expect(flagged('commands=(\n  ls\n  ps\n)')).toEqual([]);

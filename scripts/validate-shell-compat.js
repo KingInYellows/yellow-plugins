@@ -1012,22 +1012,29 @@ const ENV_ASSIGN_RE = /(?:^|(?<=[\s;&|(`]))(?:[A-Za-z_][A-Za-z0-9_]*=[^\s(`]*\s+
 // alternatives.
 const CASE_ARM_HEAD_RE = /(^|;;&?|;&|\bin)\s*(\()?((?:[^\s()|;&]+\s*\|\s*)*)$/;
 
-// A `$(…)` command substitution, not the `$((` that opens arithmetic.
+// A `$(…)` command substitution or a `<(…)` / `>(…)` process substitution
+// opens at `i`. The `$((` that opens arithmetic does not count.
+function opensSub(text, i) {
+  if (text[i + 1] !== '(') return false;
+  if (text[i] === '$') return text[i + 2] !== '(';
+  return text[i] === '<' || text[i] === '>';
+}
+
 function hasCommandSub(span) {
   if (span.includes('`')) return true;
   for (let i = 0; i < span.length - 1; i++) {
-    if (span[i] === '$' && span[i + 1] === '(' && span[i + 2] !== '(') {
-      return true;
-    }
+    if (opensSub(span, i)) return true;
   }
   return false;
 }
 
 // Same-length copy of an arithmetic span with everything blanked except its
-// `$(…)` and backtick substitutions, which still run commands. Text inside
-// single quotes is literal, so a `'$(ls)'` there is blanked too.
+// `$(…)`, `<(…)` and backtick substitutions, which still run commands. Text
+// inside single quotes is literal, so a `'$(ls)'` there is blanked too.
 function keepCommandSubs(span) {
   const out = ' '.repeat(span.length).split('');
+  // Parens inside quotes (`$(printf ')'; ls)`) do not close a substitution.
+  const masked = maskShell(span);
   let single = false;
   let double = false;
   for (let i = 0; i < span.length; i++) {
@@ -1044,11 +1051,11 @@ function keepCommandSubs(span) {
     else if (span[i] === '"') double = !double;
     else if (span[i] === '`') {
       end = span.indexOf('`', i + 1);
-    } else if (span[i] === '$' && span[i + 1] === '(' && span[i + 2] !== '(') {
+    } else if (opensSub(span, i)) {
       let depth = 0;
       for (let j = i + 1; j < span.length; j++) {
-        if (span[j] === '(') depth++;
-        else if (span[j] === ')' && --depth === 0) {
+        if (masked[j] === '(') depth++;
+        else if (masked[j] === ')' && --depth === 0) {
           end = j;
           break;
         }
