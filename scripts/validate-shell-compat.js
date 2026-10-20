@@ -1058,8 +1058,9 @@ function maskAliasLine(line) {
 }
 
 // One physical line. `classifyLines` has already dropped comments, heredoc
-// bodies, and pinned bash wrappers before this runs.
-function ruleAliasGuarded(line, commands) {
+// bodies, and pinned bash wrappers before this runs. `continued` is true when
+// the previous line ended in `\`, so the line starts mid-command.
+function ruleAliasGuarded(line, commands, continued = false) {
   const names = commands.filter((c) => COMMAND_NAME_RE.test(c));
   if (names.length === 0) return [];
   const wordRe = new RegExp(
@@ -1070,7 +1071,7 @@ function ruleAliasGuarded(line, commands) {
   const found = [];
   let m;
   while ((m = wordRe.exec(mask)) !== null) {
-    const rawPrefix = mask.slice(0, m.index);
+    const rawPrefix = (continued ? '_ ' : '') + mask.slice(0, m.index);
     const afterWord = mask.slice(m.index + m[1].length);
     // A case-arm pattern (`ps|df)`, `(ps|df)`, `;; ps)`) names the word, it
     // does not run it. At line start, `(ps)` is a subshell unless an
@@ -1135,8 +1136,11 @@ function lintShellText(
       text: lines[i].trim(),
     });
 
+  let nextContinued = false;
   for (let i = 0; i < lines.length; i++) {
     const { kind, code: line, badWrapper, sourceCode } = classes[i];
+    const continued = nextContinued;
+    nextContinued = false;
     if (kind === 'comment' || kind === 'data') continue;
     if (badWrapper) add('SHC-009', i, badWrapper);
     if (kind === 'expand') {
@@ -1202,10 +1206,17 @@ function lintShellText(
     }
     for (const detail of ruleAliasGuarded(
       line,
-      ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED
+      ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED,
+      continued
     )) {
       add('SHC-010', i, detail);
     }
+    // A `\` after an operator (`&& \`) still leaves the next line at a
+    // command position.
+    const tail = maskShell(line).trimEnd();
+    nextContinued =
+      tail.endsWith('\\') &&
+      !COMMAND_POSITION_RE.test(tail.slice(0, -1).trimEnd());
   }
   return findings;
 }
