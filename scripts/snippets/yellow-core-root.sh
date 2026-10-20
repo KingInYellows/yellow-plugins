@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Library path only. Enablement still comes solely from
 # `claude plugin list --json`. A missed path is an error, not a provider guess.
 # There is no fallback to plugins/yellow-core in the open repository: that
