@@ -814,6 +814,9 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('command find . \\\n  -exec \\\n  ls {} +')).toEqual([]);
     expect(flagged("printf '%s\\n' \\\n  ls")).toEqual([]);
     expect(flagged('true && \\\n  ls x')).toEqual([2]);
+    expect(flagged('LC_ALL=C \\\n  ls x')).toEqual([2]);
+    expect(flagged('true && A=1 B=2 \\\n  ls x')).toEqual([2]);
+    expect(flagged('echo A=1 \\\n  ls')).toEqual([]);
   });
 
   it('flags a pipe split across lines at the line holding the command', () => {

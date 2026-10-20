@@ -1211,12 +1211,14 @@ function lintShellText(
     )) {
       add('SHC-010', i, detail);
     }
-    // A `\` after an operator (`&& \`) still leaves the next line at a
-    // command position.
+    // A `\` after an operator (`&& \`) or an assignment run (`LC_ALL=C \`)
+    // still leaves the next line at a command position.
     const tail = maskShell(line).trimEnd();
     nextContinued =
       tail.endsWith('\\') &&
-      !COMMAND_POSITION_RE.test(tail.slice(0, -1).trimEnd());
+      !COMMAND_POSITION_RE.test(
+        `${tail.slice(0, -1).trimEnd()} `.replace(ENV_ASSIGN_RE, '').trimEnd()
+      );
   }
   return findings;
 }
