@@ -1233,9 +1233,14 @@ function ruleAliasGuarded(line, commands, continued = false, inCase = false) {
     ) {
       continue;
     }
-    // Outside a `case` block, `(ps | cat)` is a subshell.
+    // Outside a `case` block, `(ps | cat)` is a subshell. Inside one, the
+    // spaced form needs a `|`; a lone `(ps)` is left to the check above.
     const spaced = inCase && SPACED_ARM_HEAD_RE.exec(rawPrefix);
-    if (spaced && /^(?:\s*\|\s*[^\s()|;&]+)*\s*\)/.test(afterWord)) {
+    if (
+      spaced &&
+      (spaced[3] || /^\s*\|/.test(afterWord)) &&
+      /^(?:\s*\|\s*[^\s()|;&]+)*\s*\)/.test(afterWord)
+    ) {
       continue;
     }
     const prefix = rawPrefix.replace(ENV_ASSIGN_RE, '').trimEnd();
