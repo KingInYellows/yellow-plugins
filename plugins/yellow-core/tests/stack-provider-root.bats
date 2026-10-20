@@ -115,11 +115,49 @@ root_block() {
 @test "local installPath beats a user installPath" {
   make_root "$TMP/user"
   make_root "$TMP/local"
+  mkdir -p "$TMP/repo"
   plugin_json="[{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"user\",\"installPath\":\"$TMP/user\"},{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"local\",\"projectPath\":\"$TMP/repo\",\"installPath\":\"$TMP/local\"}]"
   repo_root="$TMP/repo"
   run resolve_yellow_core_root
   [ "$status" -eq 0 ]
   [ "$output" = "$TMP/local" ]
+}
+
+@test "an empty toplevel drops project and local installs" {
+  make_root "$TMP/local"
+  make_root "$TMP/user"
+  make_root "$TMP/repo/plugins/yellow-core"
+  plugin_json="[{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"local\",\"projectPath\":\"$TMP/repo\",\"installPath\":\"$TMP/local\"},{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"user\",\"installPath\":\"$TMP/user\"}]"
+  repo_root=""
+  run resolve_yellow_core_root
+  [ "$status" -eq 0 ]
+  [ "$output" = "$TMP/user" ]
+}
+
+@test "a project install matches the toplevel through a symlink" {
+  make_root "$TMP/project"
+  make_root "$TMP/user"
+  mkdir -p "$TMP/real-repo"
+  ln -s "$TMP/real-repo" "$TMP/link-repo"
+  plugin_json="[{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"project\",\"projectPath\":\"$TMP/real-repo\",\"installPath\":\"$TMP/project\"},{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"user\",\"installPath\":\"$TMP/user\"}]"
+  repo_root="$TMP/link-repo"
+  run resolve_yellow_core_root
+  [ "$status" -eq 0 ]
+  [ "$output" = "$TMP/project" ]
+}
+
+@test "a plugin-list failure is reported before root resolution and the probe" {
+  local file fail_line root_line probe_line
+  for file in "$STATUS_MD" "$ROUTER_MD"; do
+    fail_line=$(grep -n 'claude plugin list --json` failed' "$file" | head -1 | cut -d: -f1)
+    root_line=$(grep -n 'ROOT=$(resolve_yellow_core_root)' "$file" | head -1 | cut -d: -f1)
+    probe_line=$(grep -n 'node "$PROBE"' "$file" | head -1 | cut -d: -f1)
+    [ -n "$fail_line" ]
+    [ -n "$root_line" ]
+    [ -n "$probe_line" ]
+    [ "$fail_line" -lt "$root_line" ]
+    [ "$fail_line" -lt "$probe_line" ]
+  done
 }
 
 @test "a project installPath for another repository is ignored" {

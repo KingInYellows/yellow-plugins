@@ -131,10 +131,12 @@ pipeline.
   `CONFLICT`, `CONFIG_MISMATCH`, `CONFIG_INVALID`, `MANAGED_CONFLICT`,
   `PARTIAL_TOOLING`). Reads `claude plugin list --json` plus the repository's
   optional `.yellow-stack.yml` intent through `lib/stack-provider-state.js`.
-  Before classify, the library root is `CLAUDE_PLUGIN_ROOT`, then the enabled
-  `yellow-core@yellow-plugins` `installPath`, then `plugins/yellow-core` in the
-  current checkout. A missed root is `stack_provider_error`, not a provider
-  guess
+  A failed `claude plugin list --json` is UNKNOWN before any library runs.
+  Otherwise the library root is `CLAUDE_PLUGIN_ROOT`, then the
+  first enabled `yellow-core@yellow-plugins` `installPath` (project and
+  local rows only when `realpath` of `projectPath` is the git toplevel), then
+  `plugins/yellow-core` in the current checkout. A missed root is
+  `stack_provider_error`, not a provider guess
 - `/stack:select` — switch the active stacked-PR provider (`graphite` /
   `github`) at `user`, `project`, or `local` scope. Shows the exact
   `claude plugin install|enable|disable` commands before running any of them,

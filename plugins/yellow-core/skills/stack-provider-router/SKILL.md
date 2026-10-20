@@ -119,6 +119,11 @@ else
   plugin_json=""
 fi
 
+if [ "$plugin_list_ok" -ne 1 ]; then
+  printf 'stack_provider_error: `claude plugin list --json` failed — provider state is UNKNOWN\n'
+  exit 0
+fi
+
 ROOT=$(resolve_yellow_core_root)
 if [ -z "$ROOT" ]; then
   printf 'stack_provider_error: router library not found (CLAUDE_PLUGIN_ROOT, installPath, and in-repo copy missed)\n'
@@ -131,11 +136,6 @@ PROBE="$ROOT/lib/stack-tooling-probe.js"
 # gh auth validity, and github/gh-stack extension identity) — this skill no
 # longer inlines its own copy of that logic.
 probe_json=$(node "$PROBE" probe --provider both)
-
-if [ "$plugin_list_ok" -ne 1 ]; then
-  printf 'stack_provider_error: `claude plugin list --json` failed — provider state is UNKNOWN\n'
-  exit 0
-fi
 
 printf '%s' "$plugin_json" | node "$LIB" classify \
   --plugins-file - \
