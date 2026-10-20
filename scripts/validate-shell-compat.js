@@ -1101,6 +1101,34 @@ function blankOpenArithmetic(line, depth) {
   return { line: out.slice(0, at) + keepCommandSubs(out.slice(at)), depth };
 }
 
+// Carries a `[[` test left open at the end of one line into the next. `open`
+// is true when an earlier line left one open. Returns the line with its test
+// part blanked except for substitutions, and whether a test is still open.
+function blankOpenTest(line, open) {
+  let start = 0;
+  let out = line;
+  if (open) {
+    const close = maskShell(line).indexOf(']]');
+    if (close === -1) return { line: keepCommandSubs(line), open: true };
+    start = close + 2;
+    out = keepCommandSubs(line.slice(0, start)) + line.slice(start);
+  }
+  const rest = maskShell(out.slice(start));
+  const testRe = /(?:^|[\s;&|(])\[\[(?=\s|$)/g;
+  for (let m = testRe.exec(rest); m; m = testRe.exec(rest)) {
+    const at = m.index + m[0].length - 2;
+    const close = rest.indexOf(']]', at + 2);
+    if (close === -1) {
+      return {
+        line: out.slice(0, start + at) + keepCommandSubs(out.slice(start + at)),
+        open: true,
+      };
+    }
+    testRe.lastIndex = close + 2;
+  }
+  return { line: out, open: false };
+}
+
 // One physical line. `classifyLines` has already dropped comments, heredoc
 // bodies, and pinned bash wrappers before this runs. `continued` is true when
 // the previous line ended in `\`, so the line starts mid-command.
@@ -1182,6 +1210,7 @@ function lintShellText(
 
   let nextContinued = false;
   let arithDepth = 0;
+  let testOpen = false;
   for (let i = 0; i < lines.length; i++) {
     const { kind, code: line, badWrapper, sourceCode } = classes[i];
     const continued = nextContinued;
@@ -1252,8 +1281,11 @@ function lintShellText(
     // `$((` spanning lines: its operands are variables, not commands.
     const arith = blankOpenArithmetic(line, arithDepth);
     arithDepth = arith.depth;
+    // Likewise a `[[ … ]]` test spanning lines: its operands are words.
+    const test = blankOpenTest(arith.line, testOpen);
+    testOpen = test.open;
     for (const detail of ruleAliasGuarded(
-      arith.line,
+      test.line,
       ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED,
       continued
     )) {
