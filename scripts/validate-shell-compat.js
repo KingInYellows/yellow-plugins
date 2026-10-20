@@ -1014,11 +1014,13 @@ const CONDITION_KEYWORD_RE =
   /(?:^\s*|[;&|({]\s*)(?:if|elif|while|until)(?=\s|$)/g;
 // True when `prefix` ends inside the condition list of an `if`, `elif`,
 // `while` or `until` that no `then`/`do` has closed yet, so the exit status of
-// `[ -d d ] && ls d >/dev/null` is tested.
-function inConditionList(prefix) {
+// `[ -d d ] && ls d >/dev/null` is tested. `rest` is the text after the word:
+// `if ls; true; then` leaves `ls` display-only.
+function inConditionList(prefix, rest = '') {
   let end = -1;
   for (const m of prefix.matchAll(CONDITION_KEYWORD_RE)) end = m.index + m[0].length;
-  return end !== -1 && !/\b(?:then|do)\b/.test(prefix.slice(end));
+  if (end === -1 || /\b(?:then|do)\b/.test(prefix.slice(end))) return false;
+  return !rest.split(/\b(?:then|do)\b/)[0].replace(/;\s*$/, '').includes(';');
 }
 
 // A case-arm pattern (`ps)`, `a|b)`, `;; ps)`, `in ps)`) ending at the end of
@@ -1026,7 +1028,9 @@ function inConditionList(prefix) {
 const CASE_ARM_BEFORE_RE =
   /(?:^\s*|;[;&]\s*|\bin\s+)[^\s()|;&]+(?:\|[^\s()|;&]+)*$/;
 
-// Advances `state` ({ depth, ticks }) over one line of mask text and says
+const openCases = (t) => (t.match(/\bcase\b/g) || []).length - (t.match(/\besac\b/g) || []).length; // > 0: inside a case
+
+// Advances `state` ({ depth, ticks, cases }) over one line of mask text and says
 // whether a `(` or backtick span is still open, so a `$(` or `( … )` span that
 // opens on one physical line keeps the logical line going. A case-arm `)` has
 // no opener, so it must not close a span opened on an earlier line; the depth
@@ -1042,11 +1046,12 @@ function openNesting(mask, state) {
       if (opened > 0) {
         opened--;
         state.depth--;
-      } else if (!CASE_ARM_BEFORE_RE.test(mask.slice(0, i))) {
+      } else if (!(state.cases + openCases(mask.slice(0, i)) > 0 && CASE_ARM_BEFORE_RE.test(mask.slice(0, i)))) {
         state.depth--;
       }
     } else if (ch === '`') state.ticks++;
   }
+  state.cases += openCases(mask);
   return state.depth > 0 || state.ticks % 2 === 1;
 }
 
@@ -1083,7 +1088,7 @@ function logicalLines(classes) {
     const raw = stripArithmetic(classes[i].code);
     let piece = classes[i].code;
     if (!current) {
-      current = { text: '', mask: '', parts: [], nesting: { depth: 0, ticks: 0 } };
+      current = { text: '', mask: '', parts: [], nesting: { depth: 0, ticks: 0, cases: 0 } };
       groups.push(current);
     }
     const mask = maskShell(raw);
@@ -1097,8 +1102,11 @@ function logicalLines(classes) {
     current.mask += maskShell(blankArithmetic(piece));
     current.parts.push({ start, end: current.text.length, line: i });
     const nested = openNesting(mask, current.nesting);
+    // A bare `if`, `elif`, `while` or `until` ends the line: the tested
+    // command starts on the next one.
+    const bareKeyword = /(?:^\s*|[;&|({]\s*)(?:if|elif|while|until)$/.test(trimmed);
     const continues =
-      backslash || /(?:^|[^|&])\|$|&&$|\|\|$/.test(trimmed) || nested;
+      backslash || /(?:^|[^|&])\|$|&&$|\|\|$/.test(trimmed) || nested || bareKeyword;
     if (!continues) {
       current = null;
     } else {
@@ -1134,7 +1142,7 @@ function substitutionRanges(mask, lineStarts = [0]) {
         if (mask[j] === '(') depth++;
         else if (mask[j] === ')') {
           const lineStart = Math.max(...lineStarts.filter((start) => start <= j));
-          if (CASE_ARM_BEFORE_RE.test(mask.slice(lineStart, j))) continue;
+          if (openCases(mask.slice(i, j)) > 0 && CASE_ARM_BEFORE_RE.test(mask.slice(lineStart, j))) continue;
           if (--depth === 0) break;
         }
       }
@@ -1168,13 +1176,24 @@ function consumedAfter(rest) {
       return '';
     } else if (ch === '|') return 'pipe';
     else if (ch === '>' && rest[i - 1] !== '>') {
-      if (rest[i - 1] === '2') continue; // 2>file: stderr only
+      // 2>file, 3>file: only descriptor 1 or none reaches stdout.
+      const fd = /(?:^|\s)(\d+)$/.exec(rest.slice(0, i));
+      if (fd && fd[1] !== '1') continue;
       const target = rest.slice(i + 1).replace(/^[>|]?\s*/, '');
-      if (/^&/.test(target) || /^\/dev\/null\b/.test(target)) continue;
+      // `>&1`, `>&2`, `>&-` duplicate or close a descriptor; `>& file` writes a file.
+      if (/^&\s*(?:\d+|-)(?=$|[\s;|&)<>])/.test(target) || /^\/dev\/null\b/.test(target)) continue;
       return 'redirect';
     }
   }
   return '';
+}
+
+// True when the command discards its own stdout and a `;` or newline follows,
+// as in `$(ls >/dev/null; x)`: nothing of it reaches the captured value.
+function discardedBeforeList(rest) {
+  const end = rest.search(/[;\n`]/);
+  const segment = end === -1 ? '' : rest.slice(0, end);
+  return !/[|)]|&&/.test(segment) && /(?:^|\s)(?:1?>|&>)\s*(?:\/dev\/null\b|&\s*2\b)/.test(segment);
 }
 
 // Findings for SHC-010: [{ line, detail }] with `line` the physical index
@@ -1215,9 +1234,12 @@ function aliasGuardedFindings(classes, commands) {
         COMMAND_POSITION_RE.test(prefix) || prefix.endsWith('`');
       if (!atCommand) continue;
       let how = '';
-      if (captures.some(([a, b]) => m.index > a && m.index < b)) {
+      if (
+        captures.some(([a, b]) => m.index > a && m.index < b) &&
+        !discardedBeforeList(mask.slice(m.index + m[1].length))
+      ) {
         how = 'captured';
-      } else if (TESTED_PREFIX_RE.test(prefix) || inConditionList(prefix)) {
+      } else if (TESTED_PREFIX_RE.test(prefix) || inConditionList(prefix, mask.slice(m.index + m[1].length))) {
         how = 'tested';
       } else {
         how = consumedAfter(mask.slice(m.index + m[1].length));
