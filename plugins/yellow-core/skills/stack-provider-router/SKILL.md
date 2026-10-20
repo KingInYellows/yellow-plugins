@@ -114,6 +114,13 @@ function fromInstalled(file) {
       const row = rows[j];
       if (!row || typeof row !== 'object') continue;
       if (!Object.prototype.hasOwnProperty.call(SCOPE_TIER, row.scope)) continue;
+      // user is global. project/local belong to one repo; skip other trees.
+      if (
+        (row.scope === 'project' || row.scope === 'local') &&
+        !(checkoutRootArg.length > 0 && row.projectPath === checkoutRootArg)
+      ) {
+        continue;
+      }
       const root = acceptedRoot(row.installPath);
       if (!root) continue;
       candidates.push({ scope: row.scope, root: root });

@@ -86,12 +86,37 @@ JSON
   make_lib "$TMP/user/yellow-core"
   make_lib "$TMP/local/yellow-core"
   write_installed "$TMP/installed.json" "$(cat <<JSON
-{"plugins":{"yellow-core@yellow-plugins":[{"scope":"user","installPath":"$TMP/user/yellow-core"},{"scope":"local","installPath":"$TMP/local/yellow-core"}]}}
+{"plugins":{"yellow-core@yellow-plugins":[{"scope":"user","installPath":"$TMP/user/yellow-core"},{"scope":"local","installPath":"$TMP/local/yellow-core","projectPath":"$TMP/repo"}]}}
 JSON
 )"
-  run node "$PROGRAM" "" "" "$TMP/installed.json"
+  run node "$PROGRAM" "" "$TMP/repo" "$TMP/installed.json"
   [ "$status" -eq 0 ]
   [ "$output" = "$(realpath "$TMP/local/yellow-core")" ]
+}
+
+@test "a foreign local install does not beat this checkout's user install" {
+  make_lib "$TMP/user/yellow-core"
+  make_lib "$TMP/foreign/yellow-core"
+  write_installed "$TMP/installed.json" "$(cat <<JSON
+{"plugins":{"yellow-core@yellow-plugins":[{"scope":"user","installPath":"$TMP/user/yellow-core"},{"scope":"local","installPath":"$TMP/foreign/yellow-core","projectPath":"$TMP/other-repo"}]}}
+JSON
+)"
+  run node "$PROGRAM" "" "$TMP/repo" "$TMP/installed.json"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$(realpath "$TMP/user/yellow-core")" ]
+}
+
+@test "two foreign local installs do not error when this checkout has a user install" {
+  make_lib "$TMP/user/yellow-core"
+  make_lib "$TMP/other-a/yellow-core"
+  make_lib "$TMP/other-b/yellow-core"
+  write_installed "$TMP/installed.json" "$(cat <<JSON
+{"plugins":{"yellow-core@yellow-plugins":[{"scope":"user","installPath":"$TMP/user/yellow-core"},{"scope":"local","installPath":"$TMP/other-a/yellow-core","projectPath":"$TMP/other-a"},{"scope":"local","installPath":"$TMP/other-b/yellow-core","projectPath":"$TMP/other-b"}]}}
+JSON
+)"
+  run node "$PROGRAM" "" "$TMP/repo" "$TMP/installed.json"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$(realpath "$TMP/user/yellow-core")" ]
 }
 
 @test "two user-scope install paths are an error and print no path" {
