@@ -71,7 +71,7 @@ if [ -d "$CODEX_SESSIONS" ]; then
   printf '[yellow-codex] Saved sessions: %d\n' "$session_count"
   if [ "$session_count" -gt 0 ]; then
     printf '  Recent:\n'
-    ls -lt "$CODEX_SESSIONS" 2>/dev/null | head -5
+    command ls -lt "$CODEX_SESSIONS" 2>/dev/null | head -5
   fi
 else
   printf '[yellow-codex] Saved sessions: none (no ~/.codex/sessions/)\n'

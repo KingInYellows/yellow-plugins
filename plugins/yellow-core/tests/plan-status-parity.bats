@@ -11,7 +11,7 @@ FIXTURE_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/fixtures/plan-status" && pw
 
 run_phase1() {
   set -euo pipefail
-  if ! ls plans/*.md >/dev/null 2>&1; then
+  if [ -z "$(command find -H plans -maxdepth 1 -type f -name '*.md' 2>/dev/null | head -1)" ]; then
     printf 'plans/ is empty (no open plans).\n\n'
     return 0
   fi

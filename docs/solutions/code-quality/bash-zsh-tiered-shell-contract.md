@@ -43,7 +43,7 @@ was not only the known `noclobber` class:
 A four-tier contract — inline blocks portable, bash-only code in a
 `bash /dev/fd/3 3<<'TAG'` wrapper, bash-only libraries sourced only inside
 it, dual-shell libraries sourced directly — enforced by
-`scripts/validate-shell-compat.js` (SHC-001..009), `scripts/check-shell-parse.js`
+`scripts/validate-shell-compat.js` (SHC-001..010), `scripts/check-shell-parse.js`
 and the `tests/shell-compat/` bats suite. CONTRIBUTING.md "Shell Scripts →
 Bash and zsh" is the authoritative statement of the tiers and authoring
 rules; the tier lists live in `scripts/shell-compat-config.json`. SHC-001
@@ -82,6 +82,21 @@ replaces the two manual greps in `zsh-noclobber-mktemp-stderr-redirect.md`.
   `bash -n` on each); a rollout `--report` flag that forced exit 0 stayed
   available (removed); and the hook-parity test used floors that let new
   unverifiable blocks in (now an exact per-file ratchet).
+- **Aliases and `nomatch` break `ls` parsing without an error.** Claude Code
+  replays the user's alias snapshot, so `alias ls=eza` made
+  `ls -t plans/*.md 2>/dev/null | head -5` print nothing (eza reads `-t` as
+  `--time`) and `/flow:work` reported that no plans exist. Separately, zsh's
+  `nomatch` aborts a command whose glob matches nothing *before* its
+  `2>/dev/null` applies, so the error leaks and `ls` never runs; `command ls`
+  alone fixes neither. List through
+  `command find -H DIR -maxdepth 1 -type f -name '*.md' -exec ls -t {} +`
+  (the real `ls` runs without a shell; an empty match prints nothing and
+  exits 0) and prefix other parsed calls with `command`. SHC-010 enforces it
+  from `aliasGuardedCommands`, and `tests/shell-compat/aliases.bats` runs the
+  shipped lines under `alias ls=false …` in every profile. Pass `-H` so a
+  symlinked `plans/` is followed, as the old glob did. Two limits:
+  `-exec … {} +` sorts only within each batch, and Claude Code also shadows
+  `find` and `grep` with functions, so write `command find`, not `\find`.
 - **Expanded text counts.** `${reviewer^}` inside a multi-line double-quoted
   string, or in an unquoted-tag heredoc, is a zsh `bad substitution` even
   though it is not a command.

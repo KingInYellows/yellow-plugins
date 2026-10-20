@@ -382,7 +382,7 @@ else
 fi
 HEALTH_OUT=$("${TIMEOUT_CMD:-timeout}" 10 ssh "${ssh_opts[@]}" "$user@$host" 2>&1 << 'HEALTHCHECK'
 echo "=== DISK ==="
-df -h / /home 2>/dev/null | tail -n +2
+command df -h / /home 2>/dev/null | tail -n +2
 echo "=== MEMORY ==="
 free -m | grep -E 'Mem|Swap'
 echo "=== CPU ==="

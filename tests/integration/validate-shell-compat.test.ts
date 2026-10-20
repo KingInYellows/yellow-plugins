@@ -751,3 +751,97 @@ describe('line continuations (follow-up 21)', () => {
     ]);
   });
 });
+
+describe('SHC-010 alias-prone commands', () => {
+  const flagged = (text: string) =>
+    lint(text)
+      .filter((f) => f.rule === 'SHC-010')
+      .map((f) => f.line);
+
+  it.each([
+    ['piped ls', 'ls -t plans/*.md | head'],
+    ['piped ls with stderr dropped', 'ls -t plans/*.md 2>/dev/null | head -5'],
+    ['captured ps', 'x=$(ps -p 1 -o comm=)'],
+    ['captured in a case subject', 'case "$(ls -ld -- "$b")" in d*) ;; esac'],
+    ['tested ls', 'if ! ls a/*.md >/dev/null 2>&1; then :; fi'],
+    ['ls as an if condition', 'if ls a >/dev/null 2>&1; then :; fi'],
+    ['ls as a while condition', 'while ls a >/dev/null 2>&1; do :; done'],
+    ['ls as the left side of &&', 'ls a >/dev/null 2>&1 && echo yes'],
+    ['backtick capture', 'x=`ls -t plans`'],
+    ['process substitution', 'while read -r f; do :; done < <(ls -t plans)'],
+    ['du piped to cut', 'du -sh x | cut -f1'],
+    ['df redirected to a file', 'df -h > out.txt'],
+    ['top inside a pipeline segment', 'echo go; top -bn1 | head -3'],
+  ])('flags %s', (_name, text) => {
+    expect(flagged(text)).toEqual([1]);
+  });
+
+  it('flags a pipe split across lines at the line holding the command', () => {
+    expect(flagged('echo go\nls -t x \\\n  | head -5')).toEqual([2]);
+    expect(flagged('ls -t x |\n  head -5')).toEqual([1]);
+  });
+
+  it('flags a multiline capture at the line holding the command', () => {
+    expect(flagged('v=$(\n  ls -t x\n)')).toEqual([2]);
+  });
+
+  it.each([
+    ['command prefix', 'command ls -t x | head'],
+    ['backslash prefix', '\\ls x | head'],
+    ['bare display call', 'ls -d .ruvector/'],
+    ['bare display with stderr dropped', 'ls -la x 2>/dev/null'],
+    ['find -exec ls', "command find -H plans -name '*.md' -exec ls -t {} + | head"],
+    ['xargs ls', 'printf "%s\\n" a | xargs ls -t'],
+    ['ssh remote command', 'ssh host ls -t x | head'],
+    ['ls in a string', "printf 'ls -t' | cat"],
+    ['ls as an argument', 'echo ls | head'],
+    ['placeholder in a bare call', 'ls -la .worktrees/<name>/.ruvector'],
+    ['a longer command name', 'lsof -i | head'],
+    ['a path ending in ls', './bin/ls x | head'],
+  ])('passes %s', (_name, text) => {
+    expect(flagged(text)).toEqual([]);
+  });
+
+  it('passes the same ls inside a bash fd wrapper and a quoted heredoc', () => {
+    const wrapper = ["bash /dev/fd/3 3<<'__W__'", 'ls -t x | head', '__W__'];
+    expect(flagged(wrapper.join('\n'))).toEqual([]);
+    const remote = ['ssh host <<\'REMOTE\'', 'df -h | tail -1', 'REMOTE'];
+    expect(flagged(remote.join('\n'))).toEqual([]);
+  });
+
+  it('honours aliasGuardedCommands from the context', () => {
+    const ctx = { ...EMPTY_CTX, aliasGuarded: ['find'] };
+    const hits = (text: string) =>
+      lintShellText(text, 'plugins/p/x.md', 1, ctx)
+        .filter((f: Finding) => f.rule === 'SHC-010')
+        .map((f: Finding) => f.line);
+    expect(hits('find . -name x | head')).toEqual([1]);
+    expect(hits('ls -t x | head')).toEqual([]);
+  });
+
+  it('runs against the tree: fails on a bare piped ls, passes with command', () => {
+    write('plugins/demo/commands/bad.md', md('ls -t plans | head -5'));
+    const failed = run();
+    expect(failed.status).toBe(1);
+    expect(failed.stderr).toContain('plugins/demo/commands/bad.md:4 [SHC-010]');
+    write('plugins/demo/commands/bad.md', md('command ls -t plans | head -5'));
+    expect(run().status).toBe(0);
+  });
+
+  it('rejects a malformed aliasGuardedCommands as SHC-900', () => {
+    for (const bad of [[], 'ls', ['ls', 3], ['l s']]) {
+      config({ aliasGuardedCommands: bad });
+      const result = run();
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('aliasGuardedCommands must be');
+    }
+  });
+
+  it('uses the configured command list', () => {
+    config({ aliasGuardedCommands: ['du'] });
+    write('plugins/demo/commands/mix.md', md('ls -t a | head\ndu -sh a | cut -f1'));
+    const result = run();
+    expect(result.stderr).toContain('mix.md:5 [SHC-010]');
+    expect(result.stderr).not.toContain('mix.md:4');
+  });
+});

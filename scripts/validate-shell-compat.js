@@ -26,6 +26,9 @@
  *   SHC-008  markdown sources a Tier 3 library outside a wrapper, or sources
  *            a plugin library that is in neither tier list
  *   SHC-009  a bash wrapper other than `bash /dev/fd/3 3<<'TAG'`
+ *   SHC-010  alias-prone command (`aliasGuardedCommands`: ls, ps, du, df, top)
+ *            in command position whose result is consumed (piped, captured,
+ *            redirected to a file or tested) without a `command` prefix
  *   SHC-101  plugin `.sh` file with no shebang and no library marker
  *   SHC-900  shell-compat-config.json problem (unknown path, missing reason,
  *            stale allowlist cap, ...)
@@ -93,6 +96,10 @@ const RULES = {
   'SHC-009': {
     summary: 'unsupported bash wrapper form',
     hint: "use bash /dev/fd/3 3<<'TAG' … TAG: bash <<'TAG' lets any stdin reader swallow the script, and the git-push hook refuses bash -c \"$(…)\"",
+  },
+  'SHC-010': {
+    summary: 'alias-prone command whose result is consumed',
+    hint: "write `command <cmd>` (or list files with `command find … -exec ls -t {} +`): users' aliases (ls=eza, ps=procs, du=dust, df=duf) apply to these blocks",
   },
   'SHC-101': {
     summary: 'shell file without a shebang or library marker',
@@ -976,6 +983,173 @@ function classifySource(target, rel, ctx) {
   return { unclassified: candidates[0] };
 }
 
+
+// ---------------------------------------------------------------------------
+// SHC-010: alias-prone commands whose output the block consumes
+
+const DEFAULT_ALIAS_GUARDED = ['ls', 'ps', 'du', 'df', 'top'];
+function validAliasGuarded(list) {
+  return (
+    Array.isArray(list) &&
+    list.length > 0 &&
+    list.every((c) => typeof c === 'string' && /^[A-Za-z0-9_-]+$/.test(c))
+  );
+}
+// Text before a command word that tests its exit status (`if ! ls …`).
+const TESTED_PREFIX_RE = /(?:\b(?:if|elif|while|until)(?:\s+!)?|!)$/;
+
+// Advances `state` ({ depth, ticks }) over one line of mask text and says
+// whether a `(` or backtick span is still open, so a `$(` or `( … )` span that
+// opens on one physical line keeps the logical line going. A case-arm `)` has
+// no opener; the depth never drops below zero.
+function openNesting(mask, state) {
+  for (const ch of mask) {
+    if (ch === '(') state.depth++;
+    else if (ch === ')' && state.depth > 0) state.depth--;
+    else if (ch === '`') state.ticks++;
+  }
+  return state.depth > 0 || state.ticks % 2 === 1;
+}
+
+// Groups `code` lines into logical commands: a line joins the next when it
+// ends in `\`, a trailing `|`, `&&` or `||`, or leaves a `$(`, backtick or
+// `( … )` span open. Returns { text, parts } where `parts` maps each piece of
+// the joined text back to its physical line index.
+function logicalLines(classes) {
+  const groups = [];
+  let current = null;
+  for (let i = 0; i < classes.length; i++) {
+    if (classes[i].kind !== 'code') {
+      current = null;
+      continue;
+    }
+    const raw = stripArithmetic(classes[i].code);
+    let piece = classes[i].code;
+    if (!current) {
+      current = { text: '', parts: [], mask: '', nesting: { depth: 0, ticks: 0 } };
+      groups.push(current);
+    }
+    const mask = maskShell(raw);
+    const trimmed = mask.trimEnd();
+    const backslash = trimmed.endsWith('\\');
+    if (backslash) piece = piece.trimEnd().slice(0, -1);
+    const start = current.text.length;
+    current.text += piece;
+    current.parts.push({ start, end: current.text.length, line: i });
+    current.mask += mask;
+    const nested = openNesting(mask, current.nesting);
+    const continues =
+      backslash || /(?:^|[^|&])\|$|&&$|\|\|$/.test(trimmed) || nested;
+    if (!continues) {
+      current = null;
+    } else {
+      // Join with `;` inside an open span (separate statements) and a space
+      // otherwise (a pipe or `\` continues the same command).
+      const sep = !backslash && nested ? ' ; ' : ' ';
+      current.text += sep;
+      current.mask += sep;
+    }
+  }
+  return groups;
+}
+
+// [start, end] ranges of `$( … )`, `<( … )` / `>( … )` and backtick
+// substitutions in `mask`.
+function substitutionRanges(mask) {
+  const ranges = [];
+  for (let i = 0; i < mask.length; i++) {
+    if (mask[i] === '`') {
+      const end = mask.indexOf('`', i + 1);
+      if (end === -1) break;
+      ranges.push([i, end]);
+      i = end;
+    } else if (
+      (mask[i] === '$' && mask[i + 1] === '(' && mask[i + 2] !== '(') ||
+      ((mask[i] === '<' || mask[i] === '>') && mask[i + 1] === '(')
+    ) {
+      let depth = 0;
+      let j = i + 1;
+      for (; j < mask.length; j++) {
+        if (mask[j] === '(') depth++;
+        else if (mask[j] === ')' && --depth === 0) break;
+      }
+      ranges.push([i, j]);
+    }
+  }
+  return ranges;
+}
+
+// How a command word's result is used, from the text after it up to the end
+// of its simple command: 'pipe', 'redirect', 'tested', or '' when it is only
+// displayed. `rest` is mask text, so quoted operators are already blanked.
+function consumedAfter(rest) {
+  // `<name>` is a doc placeholder, not a pair of redirects.
+  rest = rest.replace(/<[\w-]+>/g, (placeholder) => '_'.repeat(placeholder.length));
+  let depth = 0;
+  for (let i = 0; i < rest.length; i++) {
+    const ch = rest[i];
+    const next = rest[i + 1];
+    if (ch === '(') depth++;
+    else if (ch === ')') {
+      if (depth === 0) return '';
+      depth--;
+    } else if (depth > 0) continue;
+    else if (ch === '`' || ch === ';' || ch === '\n') return '';
+    else if (ch === '&' && next === '&') return 'tested';
+    else if (ch === '|' && next === '|') return 'tested';
+    else if (ch === '&') {
+      if (rest[i - 1] === '>' || rest[i - 1] === '<') continue; // 2>&1
+      return '';
+    } else if (ch === '|') return 'pipe';
+    else if (ch === '>' && rest[i - 1] !== '>') {
+      if (/\d/.test(rest[i - 1] || '')) continue; // 2>file: stderr only
+      const target = rest.slice(i + 1).replace(/^[>|]?\s*/, '');
+      if (/^&/.test(target) || /^\/dev\/null\b/.test(target)) continue;
+      return 'redirect';
+    }
+  }
+  return '';
+}
+
+// Findings for SHC-010: [{ line, detail }] with `line` the physical index
+// holding the command word.
+function aliasGuardedFindings(classes, commands) {
+  const found = [];
+  // An empty alternative would match everywhere and never advance lastIndex.
+  commands = commands.filter((c) => /^[A-Za-z0-9_-]+$/.test(c));
+  if (commands.length === 0) return found;
+  const wordRe = new RegExp(`(?<![\\w./-])(${commands.join('|')})(?=$|[\\s;|&)<>])`, 'g');
+  for (const group of logicalLines(classes)) {
+    const mask = maskShell(group.text);
+    const captures = substitutionRanges(mask);
+    wordRe.lastIndex = 0;
+    let m;
+    while ((m = wordRe.exec(mask)) !== null) {
+      const prefix = mask.slice(0, m.index).trimEnd();
+      const atCommand =
+        COMMAND_POSITION_RE.test(prefix) || prefix.endsWith('`');
+      if (!atCommand) continue;
+      let how = '';
+      if (captures.some(([a, b]) => m.index > a && m.index < b)) {
+        how = 'captured';
+      } else if (TESTED_PREFIX_RE.test(prefix)) {
+        how = 'tested';
+      } else {
+        how = consumedAfter(mask.slice(m.index + m[1].length));
+      }
+      if (!how) continue;
+      const part = group.parts.find(
+        (p) => m.index >= p.start && m.index <= p.end
+      );
+      found.push({
+        line: part ? part.line : group.parts[0].line,
+        detail: `\`${m[1]}\` is ${how === 'pipe' ? 'piped' : how === 'redirect' ? 'redirected to a file' : how === 'captured' ? 'captured' : 'tested'} without \`command\`, so a user alias (ls=eza, ps=procs, du=dust, df=duf) changes it`,
+      });
+    }
+  }
+  return found;
+}
+
 // ---------------------------------------------------------------------------
 // Linting
 
@@ -1082,6 +1256,12 @@ function lintShellText(
     for (const [rule, fn] of LINE_RULES) {
       for (const detail of fn(line, blockCode)) add(rule, i, detail);
     }
+  }
+  for (const { line, detail } of aliasGuardedFindings(
+    classes,
+    ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED
+  )) {
+    add('SHC-010', line, detail);
   }
   return findings;
 }
@@ -1204,6 +1384,14 @@ function validateConfig(config, root, shellFiles) {
       }
     }
   }
+  const guarded = config.aliasGuardedCommands;
+  if (guarded !== undefined && !validAliasGuarded(guarded)) {
+    problems.push(
+      configProblem(
+        'aliasGuardedCommands must be a non-empty array of command names'
+      )
+    );
+  }
   for (const [file, rules] of Object.entries(config.allowlist || {})) {
     for (const [rule, entry] of Object.entries(rules)) {
       if (!RULES[rule] || rule === 'SHC-900') {
@@ -1273,6 +1461,10 @@ function run(root) {
     shellFiles,
     tier3: new Set(config.tier3Libraries || []),
     tier4: new Set(config.tier4Libraries || []),
+    // A malformed list is reported as SHC-900; lint with the default meanwhile.
+    aliasGuarded: validAliasGuarded(config.aliasGuardedCommands)
+      ? config.aliasGuardedCommands
+      : DEFAULT_ALIAS_GUARDED,
   };
   const findings = [];
   const markdownFiles = listMarkdownFiles(root);
