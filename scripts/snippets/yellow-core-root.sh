@@ -6,7 +6,9 @@
 # Canonical source: scripts/snippets/yellow-core-root.sh — edit there, then
 # run `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
 core_libs_ok() {
-  local root="${1%/}"
+  local root="$1"
+  # Strip every trailing slash: `[ -L dir/ ]` follows the link.
+  while [ "${root%/}" != "$root" ]; do root="${root%/}"; done
   [ -n "$root" ] || return 1
   # A symlinked root or lib/ could point back into the checkout. Ancestors
   # are not checked: a symlinked $HOME or /home is common and harmless.

@@ -116,7 +116,7 @@ root_block() {
   make_root "$TMP/real"
   ln -s "$TMP/real" "$TMP/linked"
   make_root "$TMP/install"
-  export CLAUDE_PLUGIN_ROOT="$TMP/linked/"
+  export CLAUDE_PLUGIN_ROOT="$TMP/linked//"
   plugin_json="[{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"user\",\"installPath\":\"$TMP/install\"}]"
   repo_root=""
   run resolve_yellow_core_root
