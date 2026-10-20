@@ -142,7 +142,7 @@ current blocks still get an empty result, but they leak an error line, and
    functions:
 
    ```bash
-   command find plans -maxdepth 1 -type f -name '*.md' -exec ls -t {} + 2>/dev/null | head -5
+   command find -H plans -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -5
    ```
 
    Output is byte-identical to today's (`plans/<name>.md`, newest first). No
@@ -166,7 +166,7 @@ current blocks still get an empty result, but they leak an error line, and
    first match with the same `find`:
 
    ```bash
-   if [ -z "$(command find plans/shells -maxdepth 1 -type f -name '*.md' 2>/dev/null | head -1)" ]; then
+   if [ -z "$(command find -H plans/shells -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' 2>/dev/null | head -1)" ]; then
    ```
 
 3. **Every other parsed call (`ps -p`, `ls -lt <dir>`, remote `df`/`top`):**
@@ -256,8 +256,9 @@ runs in CI. An AGENTS.md rule would need a second parser to get that right.
 
 - [x] 2.1: `flow/work.md:47`, `flow/review.md:79` and the prose at
       `flow/review.md:51`: use pattern 1.
-- [x] 2.2: `flow/decompose.md:48`: `SPEC_LIST=$(command find plans/specs
-      -maxdepth 1 -type f -name '*.md' -exec ls -t {} + 2>/dev/null)`.
+- [x] 2.2: `flow/decompose.md:48`: `SPEC_LIST=$(command find -H plans/specs
+      -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*'
+      -exec ls -t {} + 2>/dev/null)`.
 - [x] 2.3: `flow/pick-next-shell.md:33` and `skills/plan-status/SKILL.md:27`:
       use pattern 2. Update `plugins/yellow-core/tests/plan-status-parity.bats`
       `run_phase1` in the same commit, because it copies the block verbatim.
@@ -340,8 +341,9 @@ runs in CI. An AGENTS.md rule would need a second parser to get that right.
 > the range update to `SHC-001..010`. The plan only lists AGENTS.md:100 (which
 > does read "rules SHC-001..009, SHC-101, SHC-900") and the validator header.
 <!-- /deepen-plan -->
-- [x] 4.3: Patch changesets for `yellow-core`, `yellow-codex`,
-      `yellow-browser-test` and `yellow-ci`. `yellow-ruvector` is unchanged.
+- [x] 4.3: One patch changeset for `yellow-core`, `yellow-codex`,
+      `yellow-browser-test`, `yellow-ci`, `yellow-debt` and `yellow-research`.
+      `yellow-ruvector` is unchanged.
 
 ## Validation
 
@@ -371,9 +373,9 @@ Run all of these before submitting:
 
 ## Edge Cases
 
-- A `plans/*.md` that is a symlink is dropped by `-type f`. Use
-  `\( -type f -o -type l \)` if any workflow relies on symlinked plans
-  (none found).
+- A `plans/*.md` that is a symlink is kept: the shipped form passes `-H` and
+  matches `\( -type f -o -type l \)`. Dotfiles such as `.hidden.md` are
+  excluded with `! -name '.*'`, as the shell glob it replaced did.
 - `head` and `cut` could be aliased too. They are out of scope, since no
   common replacement changes their output.
 - Global zsh aliases (`alias -g`) and suffix aliases are out of scope.

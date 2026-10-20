@@ -57,7 +57,7 @@ if [ ! -d plans/complete ]; then
   printf 'Archived plans (plans/complete/): (0) — directory does not exist yet.\n'
   exit 0
 fi
-count=$(find plans/complete -maxdepth 1 -name '*.md' ! -name '.*' -type f 2>/dev/null | wc -l | tr -d ' ')
+count=$(command find -H plans/complete -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' 2>/dev/null | wc -l | tr -d ' ')
 if [ "$count" -eq 0 ]; then
   printf 'Archived plans (plans/complete/): (0)\n'
   exit 0

@@ -768,6 +768,13 @@ describe('SHC-010 alias-prone commands', () => {
     ['ls as a while condition', 'while ls a >/dev/null 2>&1; do :; done'],
     ['ls as the left side of &&', 'ls a >/dev/null 2>&1 && echo yes'],
     ['backtick capture', 'x=`ls -t plans`'],
+    ['argument-free backtick capture', 'x=`ls`'],
+    ['argument-free backtick df', 'x=`df`'],
+    ['capture inside arithmetic', 'x=$(( $(du -sk dir | cut -f1) / 1024 ))'],
+    ['ls with &> then &&', 'ls plans/*.md &>/dev/null && echo found'],
+    ['ls with &> to a file', 'ls x &> f'],
+    ['last command of an if list', 'if [ -d plans ] && ls plans/*.md >/dev/null 2>&1; then :; fi'],
+    ['last command of a while list', 'while [ -d plans ] && ls plans/*.md >/dev/null 2>&1; do :; done'],
     ['process substitution', 'while read -r f; do :; done < <(ls -t plans)'],
     ['du piped to cut', 'du -sh x | cut -f1'],
     ['df redirected to a file', 'df -h > out.txt'],
@@ -790,6 +797,15 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('ls -t x |\n  # note\n  head')).toEqual([1]);
   });
 
+  it('keeps a capture open across a case arm and judges the command after it', () => {
+    const text = 'v=$(\n  case "$c" in\n    ps) echo a ;;\n  esac\n  ls -t x\n)';
+    expect(flagged(text)).toEqual([5]);
+  });
+
+  it('does not read a case-arm pattern inside a capture as a command', () => {
+    expect(flagged('v=$(\n  case "$c" in\n    ls|ps) echo a ;;\n  esac\n)')).toEqual([]);
+  });
+
   it('does not let a trailing comment hide later lines of the command', () => {
     expect(flagged('v=$( # newest first\n  ls -t x\n)')).toEqual([2]);
     expect(flagged('v=$(\n  echo a # note\n  ls -t x\n)')).toEqual([3]);
@@ -804,11 +820,12 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('ls a > /dev/null')).toEqual([]);
   });
 
-  it('documents the known gaps so a later fix flips them on purpose', () => {
-    expect(flagged('LC_ALL=C ls x | head')).toEqual([]);
-    expect(flagged('ls x &> f')).toEqual([]);
-    expect(flagged('( ls x ) | head')).toEqual([]);
-  });
+  // Known gaps (CONTRIBUTING.md "Shell Scripts" lists them). Todos, not
+  // pinned passes, so fixing the lint does not fail a test.
+  it.todo('flags an env-prefixed command: LC_ALL=C ls x | head');
+  it.todo('flags a wrapper-prefixed command: timeout 5 ls x | head');
+  it.todo('flags a sudo-prefixed command: sudo df | tail');
+  it.todo('flags a piped subshell: ( ls x ) | head');
 
   it.each([
     ['command prefix', 'command ls -t x | head'],
@@ -816,6 +833,14 @@ describe('SHC-010 alias-prone commands', () => {
     ['bare display call', 'ls -d .ruvector/'],
     ['bare display with stderr dropped', 'ls -la x 2>/dev/null'],
     ['find -exec ls', "command find -H plans -name '*.md' ! -name '.*' -exec ls -t {} + | head"],
+    [
+      'the shipped work.md listing',
+      `command find -H plans -maxdepth 1 \\( -type f -o -type l \\) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -5`,
+    ],
+    [
+      'the shipped plan-status existence check',
+      `if [ -z "$(command find -H plans -maxdepth 1 \\( -type f -o -type l \\) -name '*.md' ! -name '.*' 2>/dev/null | head -1)" ]; then`,
+    ],
     ['xargs ls', 'printf "%s\\n" a | xargs ls -t'],
     ['ssh remote command', 'ssh host ls -t x | head'],
     ['ls in a string', "printf 'ls -t' | cat"],
@@ -828,6 +853,9 @@ describe('SHC-010 alias-prone commands', () => {
     ['an arithmetic comparison', 'if (( top > 0 )); then :; fi'],
     ['an arithmetic expansion', 'x=$(( ps > 3 ? 1 : 0 ))'],
     ['a path ending in ls', './bin/ls x | head'],
+    ['a display call in an if body', 'if [ -d x ]; then ls -la x 2>/dev/null; fi'],
+    ['a display call in a while body', 'while read -r f; do ls -d x; done'],
+    ['arithmetic around a plain variable', 'x=$(( n / 1024 ))'],
   ])('passes %s', (_name, text) => {
     expect(flagged(text)).toEqual([]);
   });
@@ -857,6 +885,17 @@ describe('SHC-010 alias-prone commands', () => {
         .map((f: Finding) => f.line);
     expect(hits('find . -name x | head')).toEqual([1]);
     expect(hits('ls -t x | head')).toEqual([]);
+  });
+
+  it.each([
+    ['an empty list', []],
+    ['only invalid names', ['', 'l s', '(ls', 'a|b']],
+  ])('reports nothing for %s in the context', (_name, aliasGuarded) => {
+    const ctx = { ...EMPTY_CTX, aliasGuarded };
+    const hits = lintShellText('ls -t x | head', 'plugins/p/x.md', 1, ctx).filter(
+      (f: Finding) => f.rule === 'SHC-010'
+    );
+    expect(hits).toEqual([]);
   });
 
   it('runs against the tree: fails on a bare piped ls, passes with command', () => {

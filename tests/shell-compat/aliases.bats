@@ -14,9 +14,10 @@ setup() {
   require_zsh
   PROJ="$BATS_TEST_TMPDIR/proj"
   mkdir -p "$PROJ/plans/shells"
-  : > "$PROJ/plans/new.md"
-  : > "$PROJ/plans/old.md"
-  touch -t 200001010000 "$PROJ/plans/old.md"
+  # Newest-first is the reverse of name order, so dropping `-t` fails a test.
+  : > "$PROJ/plans/b-new.md"
+  : > "$PROJ/plans/a-old.md"
+  touch -t 200001010000 "$PROJ/plans/a-old.md"
   # Claude Code shadows find (and grep) with shell functions, not aliases.
   ALIASES=$'alias ls=false ps=false du=false df=false\nfind() { false; }'
 }
@@ -28,6 +29,15 @@ shipped_line() {
   line=$(grep -F -m1 -- "$2" "$REPO_ROOT/$1" | sed 's/^[[:space:]]*//')
   [ -n "$line" ] || { printf 'no line with %s in %s\n' "$2" "$1" >&2; return 1; }
   printf '%s' "$line"
+}
+
+# Every line of $1 (repo-relative) containing the fixed string $2, blanks
+# stripped, one per line. Fails the test when none is left.
+shipped_lines() {
+  local lines
+  lines=$(grep -F -- "$2" "$REPO_ROOT/$1" | sed 's/^[[:space:]]*//')
+  [ -n "$lines" ] || { printf 'no line with %s in %s\n' "$2" "$1" >&2; return 1; }
+  printf '%s\n' "$lines"
 }
 
 # Runs $3 under profile $1 inside the fixture dir. $2 is "aliased" or "plain".
@@ -51,8 +61,20 @@ run_profile() {
   for profile in "${PROFILES[@]}"; do
     run_profile "$profile" plain "ls -t plans/*.md 2>/dev/null | head -5"
     [ "$status" -eq 0 ]
-    [ "$output" = $'plans/new.md\nplans/old.md' ]
+    [ "$output" = $'plans/b-new.md\nplans/a-old.md' ]
     run_profile "$profile" aliased "ls -t plans/*.md 2>/dev/null | head -5"
+    [ -z "$output" ]
+  done
+}
+
+@test "control: the find shadow in the alias prelude takes effect in every profile" {
+  local profile
+  for profile in "${PROFILES[@]}"; do
+    run_profile "$profile" plain "find plans -name '*.md'"
+    [ "$status" -eq 0 ]
+    [ -n "$output" ]
+    run_profile "$profile" aliased "find plans -name '*.md'"
+    [ "$status" -ne 0 ]
     [ -z "$output" ]
   done
 }
@@ -65,7 +87,7 @@ run_profile() {
     for profile in "${PROFILES[@]}"; do
       run_profile "$profile" aliased "$line"
       [ "$status" -eq 0 ]
-      [ "$output" = $'plans/new.md\nplans/old.md' ]
+      [ "$output" = $'plans/b-new.md\nplans/a-old.md' ]
     done
   done
 }
@@ -100,7 +122,7 @@ run_profile() {
   : > "$PROJ/plans/.hidden.md"
   for profile in "${PROFILES[@]}"; do
     run_profile "$profile" aliased "$line"
-    [ "$output" = $'plans/new.md\nplans/old.md' ]
+    [ "$output" = $'plans/b-new.md\nplans/a-old.md' ]
   done
 }
 
@@ -112,7 +134,7 @@ run_profile() {
   for profile in "${PROFILES[@]}"; do
     run_profile "$profile" aliased "$line"
     [ "$status" -eq 0 ]
-    [ "$output" = $'plans/new.md\nplans/old.md' ]
+    [ "$output" = $'plans/b-new.md\nplans/a-old.md' ]
   done
 }
 
@@ -139,7 +161,20 @@ run_profile() {
   for profile in "${PROFILES[@]}"; do
     run_profile "$profile" aliased "$line"
     [ "$status" -eq 0 ]
-    [ "$output" = $'plans/new.md\nplans/old.md\nplans/shells/s1.md' ] || [ "$output" = $'plans/old.md\nplans/new.md\nplans/shells/s1.md' ]
+    [ "$output" = $'plans/b-new.md\nplans/a-old.md\nplans/shells/s1.md' ] || [ "$output" = $'plans/a-old.md\nplans/b-new.md\nplans/shells/s1.md' ]
+    [ -z "$stderr" ]
+  done
+}
+
+@test "flow decompose collision check tolerates a missing plans/complete" {
+  local profile line
+  : > "$PROJ/plans/shells/s1.md"
+  line=$(awk '/^for d in plans plans\/complete plans\/shells; do$/ {p=1} p {print} /^done$/ && p {exit}' "$REPO_ROOT/plugins/yellow-core/commands/flow/decompose.md")
+  [ -n "$line" ]
+  for profile in "${PROFILES[@]}"; do
+    run_profile "$profile" aliased "$line"
+    [ "$status" -eq 0 ]
+    [ "$output" = $'plans/b-new.md\nplans/a-old.md\nplans/shells/s1.md' ] || [ "$output" = $'plans/a-old.md\nplans/b-new.md\nplans/shells/s1.md' ]
     [ -z "$stderr" ]
   done
 }
@@ -196,21 +231,27 @@ branch_probe() {
     for profile in "${PROFILES[@]}"; do
       run_profile "$profile" aliased 'PID=$$'$'\n'"$line"$'\nprintf "%s\\n" "$PROC_CMD"'
       [ "$status" -eq 0 ]
-      [ -n "$output" ]
+      # `ps -o comm=` names the running shell: bash, or zsh for both zsh profiles.
+      [ "$output" = "${profile%%-*}" ]
     done
   done
 }
 
-@test "agent cache-dir permission check keeps a private directory under aliases" {
+@test "agent cache-dir permission check keeps a private directory and drops an open one under aliases" {
   local profile line file
   mkdir -m 700 "$PROJ/private"
+  mkdir -m 755 "$PROJ/open"
   for file in plugins/yellow-debt/agents/scanners/duplication-scanner.md plugins/yellow-debt/agents/scanners/complexity-scanner.md plugins/yellow-research/agents/research/code-researcher.md; do
-    line=$(shipped_line "$file" 'case "$(command ls -ld -- "$b")" in')
-    for profile in "${PROFILES[@]}"; do
-      run_profile "$profile" aliased 'b="$PWD/private"'$'\n'"$line"$'\nprintf "%s\\n" "$b"'
-      [ "$status" -eq 0 ]
-      [ "$output" = "$PROJ/private" ]
-    done
+    while IFS= read -r line; do
+      for profile in "${PROFILES[@]}"; do
+        run_profile "$profile" aliased 'b="$PWD/private"'$'\n'"$line"$'\nprintf "%s\\n" "$b"'
+        [ "$status" -eq 0 ]
+        [ "$output" = "$PROJ/private" ]
+        run_profile "$profile" aliased 'b="$PWD/open"'$'\n'"$line"$'\nprintf "[%s]\\n" "$b"'
+        [ "$status" -eq 0 ]
+        [ "$output" = "[]" ]
+      done
+    done < <(shipped_lines "$file" 'case "$(command ls -ld -- "$b")" in')
   done
 }
 

@@ -619,7 +619,10 @@ Inline blocks:
 - Users' aliases (`ls=eza`, `ps=procs`, `du=dust`, `df=duf`) apply to these
   blocks, so never parse the output of a bare `ls`, `ps`, `du`, `df` or `top`.
   Lint rule SHC-010 flags those commands when their result is piped, captured,
-  redirected to a file or tested. Fix them one of three ways:
+  redirected to a file or tested. It does not see a command behind a wrapper
+  or env prefix (`timeout 5 ls x | head`, `sudo df | tail`), a piped subshell,
+  or a display-only call (`ls -t plans/*.md 2>/dev/null`), so review those by
+  hand. Fix them one of three ways:
   - List files by mtime through `find`, which hands the matches to the real
     `ls` and also avoids zsh's `nomatch` error on an unmatched glob:
     `command find -H plans -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -5`

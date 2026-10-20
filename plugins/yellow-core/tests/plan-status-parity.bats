@@ -40,7 +40,7 @@ run_phase2() {
     printf 'Archived plans (plans/complete/): (0) — directory does not exist yet.\n'
     return 0
   fi
-  count=$(find plans/complete -maxdepth 1 -name '*.md' ! -name '.*' -type f 2>/dev/null | wc -l | tr -d ' ')
+  count=$(command find -H plans/complete -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' 2>/dev/null | wc -l | tr -d ' ')
   if [ "$count" -eq 0 ]; then
     printf 'Archived plans (plans/complete/): (0)\n'
     return 0
@@ -79,3 +79,22 @@ capture_actual() {
 @test "plan-status skill logic matches golden output: zero-task" {
   diff "$FIXTURE_ROOT/zero-task.golden.txt" <(capture_actual zero-task)
 }
+
+# Symlinked plans are listed and counted (find -H, -type l); dotfiles are not.
+@test "plan-status skill logic matches golden output: dotfile-symlink" {
+  diff "$FIXTURE_ROOT/dotfile-symlink.golden.txt" <(capture_actual dotfile-symlink)
+}
+
+# run_phase1/run_phase2 are hand copies of the SKILL.md blocks; fail when a
+# `find` line in the skill (or the codex copy) is edited without them.
+@test "plan-status parity functions carry every SKILL.md find line" {
+  local skill count=0 line
+  for skill in skills/plan-status/SKILL.md codex/skills/plan-status/SKILL.md; do
+    while IFS= read -r line; do
+      count=$((count + 1))
+      grep -qF -- "$line" "$BATS_TEST_FILENAME"
+    done < <(grep -F 'command find -H' "$BATS_TEST_DIRNAME/../$skill" | sed 's/^[[:space:]]*//')
+  done
+  [ "$count" -ge 4 ]
+}
+

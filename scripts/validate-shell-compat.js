@@ -1010,24 +1010,58 @@ const CONSUMED_PHRASE = {
 };
 // Text before a command word that tests its exit status (`if ! ls …`).
 const TESTED_PREFIX_RE = /(?:\b(?:if|elif|while|until)(?:\s+!)?|!)$/;
+const CONDITION_KEYWORD_RE = /(?:^|[;&|({]\s*)(?:if|elif|while|until)(?=\s|$)/g;
+// True when `prefix` ends inside the condition list of an `if`, `elif`,
+// `while` or `until` that no `then`/`do` has closed yet, so the exit status of
+// `[ -d d ] && ls d >/dev/null` is tested.
+function inConditionList(prefix) {
+  let end = -1;
+  for (const m of prefix.matchAll(CONDITION_KEYWORD_RE)) end = m.index + m[0].length;
+  return end !== -1 && !/\b(?:then|do)\b/.test(prefix.slice(end));
+}
+
+// A case-arm pattern (`ps)`, `a|b)`, `;; ps)`, `in ps)`) ending at the end of
+// the text it is tested against.
+const CASE_ARM_BEFORE_RE =
+  /(?:^\s*|;[;&]\s*|\bin\s+)[^\s()|;&]+(?:\|[^\s()|;&]+)*$/;
 
 // Advances `state` ({ depth, ticks }) over one line of mask text and says
 // whether a `(` or backtick span is still open, so a `$(` or `( … )` span that
 // opens on one physical line keeps the logical line going. A case-arm `)` has
-// no opener; the depth never drops below zero.
+// no opener, so it must not close a span opened on an earlier line; the depth
+// never drops below zero.
 function openNesting(mask, state) {
-  for (const ch of mask) {
-    if (ch === '(') state.depth++;
-    else if (ch === ')' && state.depth > 0) state.depth--;
-    else if (ch === '`') state.ticks++;
+  let opened = 0;
+  for (let i = 0; i < mask.length; i++) {
+    const ch = mask[i];
+    if (ch === '(') {
+      state.depth++;
+      opened++;
+    } else if (ch === ')' && state.depth > 0) {
+      if (opened > 0) {
+        opened--;
+        state.depth--;
+      } else if (!CASE_ARM_BEFORE_RE.test(mask.slice(0, i))) {
+        state.depth--;
+      }
+    } else if (ch === '`') state.ticks++;
   }
   return state.depth > 0 || state.ticks % 2 === 1;
 }
 
-// Same-length copy with `$((…))` / `((…))` spans blanked, so `((top > 0))`
-// is not read as a command followed by a redirect.
+// Same-length copy with `$((…))` / `((…))` spans blanked except for the
+// command substitutions inside them, so `((top > 0))` is not read as a command
+// followed by a redirect while `$(( $(du d) / 2 ))` still scans `du`.
 function blankArithmetic(code) {
-  return code.replace(ARITHMETIC_RE, (span) => ' '.repeat(span.length));
+  return code.replace(ARITHMETIC_RE, (span) => {
+    const out = ' '.repeat(span.length).split('');
+    // Keep a nested `$(…)` or backtick capture: `x=$(( $(du -sk d) / 1024 ))`
+    // still runs `du`.
+    for (const [a, b] of substitutionRanges(maskShell(span))) {
+      for (let i = a; i <= b; i++) out[i] = span[i];
+    }
+    return out.join('');
+  });
 }
 
 // Groups `code` lines into logical commands: a line joins the next when it
@@ -1078,8 +1112,10 @@ function logicalLines(classes) {
 }
 
 // [start, end] ranges of `$( … )`, `<( … )` / `>( … )` and backtick
-// substitutions in `mask`.
-function substitutionRanges(mask) {
+// substitutions in `mask`. `lineStarts` are the offsets where a physical line
+// begins in a joined mask, so a case-arm `)` is judged from its own line and
+// does not end the span.
+function substitutionRanges(mask, lineStarts = [0]) {
   const ranges = [];
   for (let i = 0; i < mask.length; i++) {
     if (mask[i] === '`') {
@@ -1095,7 +1131,11 @@ function substitutionRanges(mask) {
       let j = i + 1;
       for (; j < mask.length; j++) {
         if (mask[j] === '(') depth++;
-        else if (mask[j] === ')' && --depth === 0) break;
+        else if (mask[j] === ')') {
+          const lineStart = Math.max(...lineStarts.filter((start) => start <= j));
+          if (CASE_ARM_BEFORE_RE.test(mask.slice(lineStart, j))) continue;
+          if (--depth === 0) break;
+        }
       }
       ranges.push([i, j]);
     }
@@ -1123,6 +1163,7 @@ function consumedAfter(rest) {
     else if (ch === '|' && next === '|') return 'tested';
     else if (ch === '&') {
       if (rest[i - 1] === '>' || rest[i - 1] === '<') continue; // 2>&1
+      if (next === '>') continue; // &>file: the '>' branch checks the target
       return '';
     } else if (ch === '|') return 'pipe';
     else if (ch === '>' && rest[i - 1] !== '>') {
@@ -1143,10 +1184,13 @@ function aliasGuardedFindings(classes, commands) {
   // alternative would match everywhere and never advance lastIndex.
   commands = commands.filter((c) => COMMAND_NAME_RE.test(c));
   if (commands.length === 0) return found;
-  const wordRe = new RegExp(`(?<![\\w./-])(${commands.join('|')})(?=$|[\\s;|&)<>])`, 'g');
+  const wordRe = new RegExp(`(?<![\\w./-])(${commands.join('|')})(?=$|[\\s;|&)<>\`])`, 'g');
   for (const group of logicalLines(classes)) {
     const { mask } = group;
-    const captures = substitutionRanges(mask);
+    const captures = substitutionRanges(
+      mask,
+      group.parts.map((part) => part.start)
+    );
     wordRe.lastIndex = 0;
     let m;
     while ((m = wordRe.exec(mask)) !== null) {
@@ -1154,7 +1198,10 @@ function aliasGuardedFindings(classes, commands) {
       // A case-arm pattern at line start (`ps|df) …`) names the word, it
       // does not run it.
       const afterWord = mask.slice(m.index + m[1].length);
-      const armStart = prefix.trim();
+      const armPart = group.parts.find(
+        (part) => m.index >= part.start && m.index <= part.end
+      );
+      const armStart = mask.slice(armPart.start, m.index).trim();
       if (
         /^(?:\|[^\s()|;&]+)*\)/.test(afterWord) &&
         (armStart === '' ||
@@ -1169,7 +1216,7 @@ function aliasGuardedFindings(classes, commands) {
       let how = '';
       if (captures.some(([a, b]) => m.index > a && m.index < b)) {
         how = 'captured';
-      } else if (TESTED_PREFIX_RE.test(prefix)) {
+      } else if (TESTED_PREFIX_RE.test(prefix) || inConditionList(prefix)) {
         how = 'tested';
       } else {
         how = consumedAfter(mask.slice(m.index + m[1].length));

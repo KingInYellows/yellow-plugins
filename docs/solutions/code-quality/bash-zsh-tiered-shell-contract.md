@@ -99,7 +99,7 @@ replaces the two manual greps in `zsh-noclobber-mktemp-stderr-redirect.md`.
   `find` and `grep` with functions, so write `command find`, not `\find`.
 - **A line-based command lint needs a model of shell lines, and each
   hardening PR needs a sweep for sibling sites.** Review of SHC-010 found it
-  blind or wrong in five ways, all fixed: a comment line inside a multi-line
+  blind or wrong in six ways, all fixed: a comment line inside a multi-line
   `$(` capture closed the logical-line group, and a trailing comment blanked
   later lines because the joined text was masked once (mask each physical line,
   then join; skip comments without closing the group); `if ls …` and
