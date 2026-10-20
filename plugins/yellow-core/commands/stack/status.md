@@ -40,6 +40,10 @@ core_libs_ok() {
   # Strip every trailing slash: `[ -L dir/ ]` follows the link.
   while [ "${root%/}" != "$root" ]; do root="${root%/}"; done
   [ -n "$root" ] || return 1
+  # Only an absolute path with no `.` or `..` component, so the -L checks
+  # below see the real last component (`link/.` would pass -L).
+  case "$root" in /*) ;; *) return 1 ;; esac
+  case "$root/" in */./* | */../*) return 1 ;; esac
   # A symlinked root or lib/ could point back into the checkout. Ancestors
   # are not checked: a symlinked $HOME or /home is common and harmless.
   [ -L "$root" ] && return 1

@@ -124,6 +124,31 @@ root_block() {
   [ "$output" = "$TMP/install" ]
 }
 
+@test "a symlinked root reached through a dot component is not a root" {
+  make_root "$TMP/real"
+  ln -s "$TMP/real" "$TMP/linked"
+  make_root "$TMP/install"
+  plugin_json="[{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"user\",\"installPath\":\"$TMP/install\"}]"
+  repo_root=""
+  for root in "$TMP/linked/." "$TMP/linked/lib/.." "$TMP/install/../linked"; do
+    export CLAUDE_PLUGIN_ROOT="$root"
+    run resolve_yellow_core_root
+    [ "$status" -eq 0 ]
+    [ "$output" = "$TMP/install" ]
+  done
+}
+
+@test "a relative root is not a root" {
+  make_root "$TMP/rel"
+  cd "$TMP"
+  export CLAUDE_PLUGIN_ROOT="rel"
+  plugin_json="[]"
+  repo_root=""
+  run resolve_yellow_core_root
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
 @test "an install with a symlinked lib directory is skipped" {
   make_root "$TMP/real"
   mkdir -p "$TMP/linked"
