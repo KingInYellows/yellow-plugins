@@ -112,6 +112,29 @@ root_block() {
   [ "$output" = "$TMP/install" ]
 }
 
+@test "a symlinked plugin root is not a root" {
+  make_root "$TMP/real"
+  ln -s "$TMP/real" "$TMP/linked"
+  make_root "$TMP/install"
+  export CLAUDE_PLUGIN_ROOT="$TMP/linked/"
+  plugin_json="[{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"user\",\"installPath\":\"$TMP/install\"}]"
+  repo_root=""
+  run resolve_yellow_core_root
+  [ "$status" -eq 0 ]
+  [ "$output" = "$TMP/install" ]
+}
+
+@test "an install with a symlinked lib directory is skipped" {
+  make_root "$TMP/real"
+  mkdir -p "$TMP/linked"
+  ln -s "$TMP/real/lib" "$TMP/linked/lib"
+  plugin_json="[{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"user\",\"installPath\":\"$TMP/linked\"}]"
+  repo_root=""
+  run resolve_yellow_core_root
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
 @test "local installPath beats a user installPath" {
   make_root "$TMP/user"
   make_root "$TMP/local"
