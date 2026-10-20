@@ -37,7 +37,17 @@ set -uo pipefail
 # run `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
 core_libs_ok() {
   local root="$1"
+  # Strip every trailing slash: `[ -L dir/ ]` follows the link.
+  while [ "${root%/}" != "$root" ]; do root="${root%/}"; done
   [ -n "$root" ] || return 1
+  # Only an absolute path with no `.` or `..` component, so the -L checks
+  # below see the real last component (`link/.` would pass -L).
+  case "$root" in /*) ;; *) return 1 ;; esac
+  case "$root/" in */./* | */../*) return 1 ;; esac
+  # A symlinked root or lib/ could point back into the checkout. Ancestors
+  # are not checked: a symlinked $HOME or /home is common and harmless.
+  [ -L "$root" ] && return 1
+  [ -L "$root/lib" ] && return 1
   [ -f "$root/lib/stack-provider-state.js" ] || return 1
   [ -f "$root/lib/stack-tooling-probe.js" ] || return 1
   [ -L "$root/lib/stack-provider-state.js" ] && return 1
