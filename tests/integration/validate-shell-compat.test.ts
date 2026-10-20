@@ -794,6 +794,10 @@ describe('SHC-010 alias-prone commands', () => {
     ['placeholder in a bare call', 'ls -la .worktrees/<name>/.ruvector'],
     ['env-prefixed command', 'LC_ALL=C ls x | head'],
     ['piped subshell', '( ls x ) | head'],
+    ['env-prefixed command after &&', 'true && LC_ALL=C ls x'],
+    ['env-prefixed if condition', 'if LC_ALL=C ls x; then :; fi'],
+    ['env-prefixed command in a subshell', '( LC_ALL=C ls x )'],
+    ['env-prefixed command after indent', '  LC_ALL=C TZ=UTC ls x'],
   ])('flags %s', (_name, text) => {
     expect(flagged(text)).toEqual([1]);
   });
@@ -875,6 +879,13 @@ describe('SHC-010 alias-prone commands', () => {
     ['an arithmetic expansion', 'x=$(( ps > 3 ? 1 : 0 ))'],
     ['a path ending in ls', './bin/ls x | head'],
     ['arithmetic around a plain variable', 'x=$(( n / 1024 ))'],
+    ['a variable beside a substitution in arithmetic', 'x=$(( top + $(echo 1) ))'],
+    ['a variable beside a substitution in a comparison', 'if (( ps > $(echo 1) )); then :; fi'],
+    ['a later case arm on the same line', 'case "$c" in foo) echo a ;; ps) echo disk ;; esac'],
+    ['one-line case alternatives', 'case "$c" in ps|df) echo disk ;; esac'],
+    ['a parenthesised later case arm', 'case "$c" in a) :;; (ps|df) echo x ;; esac'],
+    ['an assignment argument before ls', 'echo FOO=bar ls'],
+    ['an indented capture of command ps', '  v=$(command ps -p 1 -o comm=)'],
   ])('passes %s', (_name, text) => {
     expect(flagged(text)).toEqual([]);
   });
