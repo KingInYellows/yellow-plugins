@@ -123,6 +123,29 @@ root_block() {
   [ "$output" = "$TMP/local" ]
 }
 
+@test "a local install missing a library falls through to a valid user install" {
+  mkdir -p "$TMP/local" "$TMP/repo"
+  make_root "$TMP/user"
+  plugin_json="[{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"user\",\"installPath\":\"$TMP/user\"},{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"local\",\"projectPath\":\"$TMP/repo\",\"installPath\":\"$TMP/local\"}]"
+  repo_root="$TMP/repo"
+  run resolve_yellow_core_root
+  [ "$status" -eq 0 ]
+  [ "$output" = "$TMP/user" ]
+}
+
+@test "a local install with a symlinked library falls through to a valid user install" {
+  make_root "$TMP/real"
+  mkdir -p "$TMP/local/lib" "$TMP/repo"
+  ln -s "$TMP/real/lib/stack-provider-state.js" "$TMP/local/lib/stack-provider-state.js"
+  ln -s "$TMP/real/lib/stack-tooling-probe.js" "$TMP/local/lib/stack-tooling-probe.js"
+  make_root "$TMP/user"
+  plugin_json="[{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"local\",\"projectPath\":\"$TMP/repo\",\"installPath\":\"$TMP/local\"},{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"user\",\"installPath\":\"$TMP/user\"}]"
+  repo_root="$TMP/repo"
+  run resolve_yellow_core_root
+  [ "$status" -eq 0 ]
+  [ "$output" = "$TMP/user" ]
+}
+
 @test "an empty toplevel drops project and local installs" {
   make_root "$TMP/local"
   make_root "$TMP/user"
