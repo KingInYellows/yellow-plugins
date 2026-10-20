@@ -1176,7 +1176,7 @@ function blankOpenParens(line, depth, sub, closedRe, findOpen) {
 // operator, or a keyword that starts a command list. `echo [[` is an
 // ordinary argument, not a test.
 const RESERVED_POS =
-  '(?:^|[;&|()!{]|(?:^|[\\s;&|()])(?:if|elif|then|else|do|while|until|time))[ \\t]*';
+  '(?:^|[;&|(!{]|(?:^|[\\s;&|(])(?:if|elif|then|else|do|while|until|time))[ \\t]*';
 
 // Carries a `[[` test left open at the end of one line into the next. `open`
 // is true when an earlier line left one open. Returns the line with its test
