@@ -1012,6 +1012,12 @@ const CONSUMED_PHRASE = {
 const TESTED_PREFIX_RE = /(?:\b(?:if|elif|while|until)(?:\s+!)?|!)$/;
 const CONDITION_KEYWORD_RE =
   /(?:^\s*|[;&|({]\s*)(?:if|elif|while|until)(?=\s|$)/g;
+// True when `rest` has no other statement before `then`/`do`, so this word is
+// the last command in the condition list.
+function lastInConditionRest(rest) {
+  return !rest.split(/\b(?:then|do)\b/)[0].replace(/;\s*$/, '').includes(';');
+}
+
 // True when `prefix` ends inside the condition list of an `if`, `elif`,
 // `while` or `until` that no `then`/`do` has closed yet, so the exit status of
 // `[ -d d ] && ls d >/dev/null` is tested. `rest` is the text after the word:
@@ -1020,7 +1026,7 @@ function inConditionList(prefix, rest = '') {
   let end = -1;
   for (const m of prefix.matchAll(CONDITION_KEYWORD_RE)) end = m.index + m[0].length;
   if (end === -1 || /\b(?:then|do)\b/.test(prefix.slice(end))) return false;
-  return !rest.split(/\b(?:then|do)\b/)[0].replace(/;\s*$/, '').includes(';');
+  return lastInConditionRest(rest);
 }
 
 // A case-arm pattern (`ps)`, `a|b)`, `;; ps)`, `in ps)`) ending at the end of
@@ -1239,10 +1245,15 @@ function aliasGuardedFindings(classes, commands) {
         !discardedBeforeList(mask.slice(m.index + m[1].length))
       ) {
         how = 'captured';
-      } else if (TESTED_PREFIX_RE.test(prefix) || inConditionList(prefix, mask.slice(m.index + m[1].length))) {
+      } else if (
+        inConditionList(prefix, afterWord) ||
+        (TESTED_PREFIX_RE.test(prefix) &&
+          (!/\b(?:if|elif|while|until)(?:\s+!)?$/.test(prefix) ||
+            lastInConditionRest(afterWord)))
+      ) {
         how = 'tested';
       } else {
-        how = consumedAfter(mask.slice(m.index + m[1].length));
+        how = consumedAfter(afterWord);
       }
       if (!how) continue;
       // `m.index` always falls inside a part: the match is never on a joiner.

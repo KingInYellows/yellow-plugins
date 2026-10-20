@@ -871,6 +871,8 @@ describe('SHC-010 alias-prone commands', () => {
     ['a path ending in ls', './bin/ls x | head'],
     ['a display call in an if body', 'if [ -d x ]; then ls -la x 2>/dev/null; fi'],
     ['a display call in a while body', 'while read -r f; do ls -d x; done'],
+    ['a display-only command before then', 'if ls; true; then :; fi'],
+    ['a display-only command before do', 'while ls; true; do :; done'],
     ['arithmetic around a plain variable', 'x=$(( n / 1024 ))'],
   ])('passes %s', (_name, text) => {
     expect(flagged(text)).toEqual([]);
