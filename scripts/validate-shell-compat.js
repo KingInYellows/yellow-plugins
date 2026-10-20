@@ -1010,7 +1010,7 @@ const ENV_ASSIGN_RE = /(?:^|(?<=[\s;&|(`]))(?:[A-Za-z_][A-Za-z0-9_]*=[^\s(`]*\s+
 // The start of a case arm (`in ps)`, `;; ps|df)`, `(ps|df)`) ending right
 // before the word: group 1 is the anchor, 2 an opening `(`, 3 earlier
 // alternatives.
-const CASE_ARM_HEAD_RE = /(^|;;&?|;&|\bin)\s*(\()?((?:[^\s()|;&]+\|)*)$/;
+const CASE_ARM_HEAD_RE = /(^|;;&?|;&|\bin)\s*(\()?((?:[^\s()|;&]+\s*\|\s*)*)$/;
 
 // A `$(…)` command substitution, not the `$((` that opens arithmetic.
 function hasCommandSub(span) {
@@ -1094,6 +1094,22 @@ function maskAliasLine(line) {
 // the line with its arithmetic part blanked except for substitutions, and the
 // depth left open after it.
 function blankOpenArithmetic(line, depth) {
+  return blankOpenParens(line, depth, ARITHMETIC_RE, (rest) =>
+    rest.indexOf('((')
+  );
+}
+
+// Likewise an array assignment (`a=(` then one element per line).
+function blankOpenArray(line, depth) {
+  return blankOpenParens(line, depth, ARRAY_ASSIGN_RE, (rest) => {
+    const m = /(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*\+?=\(/.exec(rest);
+    return m ? m.index + m[0].length - 1 : -1;
+  });
+}
+
+// `closedRe` matches the spans that close on the same line; `findOpen` gives
+// the index of the `(` that opens one left open, or -1.
+function blankOpenParens(line, depth, closedRe, findOpen) {
   let start = 0;
   let out = line;
   if (depth > 0) {
@@ -1107,9 +1123,9 @@ function blankOpenArithmetic(line, depth) {
     start = i;
   }
   const rest = maskShell(
-    out.slice(start).replace(ARITHMETIC_RE, (span) => ' '.repeat(span.length))
+    out.slice(start).replace(closedRe, (span) => ' '.repeat(span.length))
   );
-  const open = rest.indexOf('((');
+  const open = findOpen(rest);
   if (open === -1) return { line: out, depth: 0 };
   depth = 0;
   for (let i = open; i < rest.length; i++) {
@@ -1171,8 +1187,8 @@ function ruleAliasGuarded(line, commands, continued = false) {
     const arm = CASE_ARM_HEAD_RE.exec(rawPrefix);
     if (
       arm &&
-      /^(?:\|[^\s()|;&]+)*\)/.test(afterWord) &&
-      !(arm[1] === '' && arm[2] && !arm[3] && !afterWord.startsWith('|'))
+      /^(?:\s*\|\s*[^\s()|;&]+)*\s*\)/.test(afterWord) &&
+      !(arm[1] === '' && arm[2] && !arm[3] && !/^\s*\|/.test(afterWord))
     ) {
       continue;
     }
@@ -1231,6 +1247,7 @@ function lintShellText(
   let nextContinued = false;
   let arithDepth = 0;
   let testOpen = false;
+  let arrayDepth = 0;
   for (let i = 0; i < lines.length; i++) {
     const { kind, code: line, badWrapper, sourceCode } = classes[i];
     const continued = nextContinued;
@@ -1301,8 +1318,11 @@ function lintShellText(
     // `$((` spanning lines: its operands are variables, not commands.
     const arith = blankOpenArithmetic(line, arithDepth);
     arithDepth = arith.depth;
-    // Likewise a `[[ … ]]` test spanning lines: its operands are words.
-    const test = blankOpenTest(arith.line, testOpen);
+    // Likewise `[[ … ]]` tests and arrays spanning lines: their operands and
+    // elements are words.
+    const array = blankOpenArray(arith.line, arrayDepth);
+    arrayDepth = array.depth;
+    const test = blankOpenTest(array.line, testOpen);
     testOpen = test.open;
     for (const detail of ruleAliasGuarded(
       test.line,

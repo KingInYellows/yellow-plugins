@@ -830,6 +830,10 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('x=($(ls d))')).toEqual([1]);
     expect(flagged('x=(a) && ls d')).toEqual([1]);
     expect(flagged('(ls d)')).toEqual([1]);
+    expect(flagged('commands=(\n  ls\n  ps\n)')).toEqual([]);
+    expect(flagged('a=(x\n  ls) && ls d')).toEqual([2]);
+    expect(flagged('a=(\n  $(ls d)\n)')).toEqual([2]);
+    expect(flagged('a=(\n  x\n)\nls d')).toEqual([4]);
   });
 
   it('reads the operands of a [[ ]] test spanning lines as words', () => {
@@ -932,6 +936,8 @@ describe('SHC-010 alias-prone commands', () => {
     ['a variable beside a substitution in a comparison', 'if (( ps > $(echo 1) )); then :; fi'],
     ['a later case arm on the same line', 'case "$c" in foo) echo a ;; ps) echo disk ;; esac'],
     ['one-line case alternatives', 'case "$c" in ps|df) echo disk ;; esac'],
+    ['spaced case alternatives', 'case "$c" in foo | ps) :;; esac'],
+    ['a spaced first case alternative', 'case "$c" in\n  ps | df) :;;\nesac'],
     ['a parenthesised later case arm', 'case "$c" in a) :;; (ps|df) echo x ;; esac'],
     ['an assignment argument before ls', 'echo FOO=bar ls'],
     ['an indented capture of command ps', '  v=$(command ps -p 1 -o comm=)'],
