@@ -1011,9 +1011,6 @@ const ENV_ASSIGN_RE = /(?:^|(?<=[\s;&|(`]))(?:[A-Za-z_][A-Za-z0-9_]*=[^\s(`]*\s+
 // before the word: group 1 is the anchor, 2 an opening `(`, 3 earlier
 // alternatives.
 const CASE_ARM_HEAD_RE = /(^|;;&?|;&|\bin)\s*(\()?((?:[^\s()|;&]+\|)*)$/;
-// Inside a `case` block, alternatives may be spaced (`foo | ps)`).
-const SPACED_ARM_HEAD_RE =
-  /(^|;;&?|;&|\bin)\s*(\()?((?:[^\s()|;&]+\s*\|\s*)*)$/;
 
 // A `$(…)` command substitution or a `<(…)` / `>(…)` process substitution
 // opens at `i`. The `$((` that opens arithmetic does not count.
@@ -1176,12 +1173,10 @@ function blankOpenParens(line, depth, sub, closedRe, findOpen) {
 }
 
 // Text before a reserved word in command position: line start, a control
-// operator, or a keyword that starts a command list. `echo [[` and
-// `echo esac` are ordinary arguments, not reserved words.
+// operator, or a keyword that starts a command list. `echo [[` is an
+// ordinary argument, not a test.
 const RESERVED_POS =
   '(?:^|[;&|(!{]|(?:^|[\\s;&|(])(?:if|elif|then|else|do|while|until|time))[ \\t]*';
-const CASE_OPEN_RE = new RegExp(`${RESERVED_POS}case\\s`, 'g');
-const ESAC_RE = new RegExp(`${RESERVED_POS}esac(?=$|[\\s;&|)])`, 'g');
 
 // Carries a `[[` test left open at the end of one line into the next. `open`
 // is true when an earlier line left one open. Returns the line with its test
@@ -1215,10 +1210,8 @@ function blankOpenTest(line, open, sub) {
 
 // One physical line. `classifyLines` has already dropped comments, heredoc
 // bodies, and pinned bash wrappers before this runs. `continued` is true when
-// the previous line ended in `\`, so the line starts mid-command. `inCase` is
-// a boolean or a function of the column, true inside a `case` block.
-function ruleAliasGuarded(line, commands, continued = false, inCase = false) {
-  const inCaseAt = typeof inCase === 'function' ? inCase : () => inCase;
+// the previous line ended in `\`, so the line starts mid-command.
+function ruleAliasGuarded(line, commands, continued = false) {
   const names = commands.filter((c) => COMMAND_NAME_RE.test(c));
   if (names.length === 0) return [];
   const wordRe = new RegExp(
@@ -1239,25 +1232,6 @@ function ruleAliasGuarded(line, commands, continued = false, inCase = false) {
       arm &&
       /^(?:\|[^\s()|;&]+)*\)/.test(afterWord) &&
       !(arm[1] === '' && arm[2] && !arm[3] && !afterWord.startsWith('|'))
-    ) {
-      continue;
-    }
-    // Outside a `case` block, `(ps | cat)` is a subshell. Inside one, the
-    // spaced form needs a `|`; a lone `(ps)` is left to the check above.
-    // A line-leading `(ps | cat)` is still a subshell: the `|` is a pipe,
-    // matching CASE_ARM_HEAD_RE's exception (an alternative follows only
-    // when `|` is tight against the word).
-    const spaced = inCaseAt(m.index) && SPACED_ARM_HEAD_RE.exec(rawPrefix);
-    if (
-      spaced &&
-      (spaced[3] || /^\s*\|/.test(afterWord)) &&
-      /^(?:\s*\|\s*[^\s()|;&]+)*\s*\)/.test(afterWord) &&
-      !(
-        spaced[1] === '' &&
-        spaced[2] &&
-        !spaced[3] &&
-        !afterWord.startsWith('|')
-      )
     ) {
       continue;
     }
@@ -1317,7 +1291,6 @@ function lintShellText(
   let arithDepth = 0;
   let testOpen = false;
   let arrayDepth = 0;
-  let caseDepth = 0;
   const arithSub = { depth: 0 };
   const arraySub = { depth: 0 };
   const testSub = { depth: 0 };
@@ -1397,26 +1370,13 @@ function lintShellText(
     arrayDepth = array.depth;
     const test = blankOpenTest(array.line, testOpen, testSub);
     testOpen = test.open;
-    // Case blocks open at each column, in source order, for spaced case-arm
-    // alternatives: `(ps | cat); case …` runs `ps` before the block opens.
-    const masked = maskShell(line);
-    const ends = (re) => [...masked.matchAll(re)].map((x) => x.index + x[0].length);
-    const opens = ends(CASE_OPEN_RE);
-    const closes = ends(ESAC_RE);
-    const depthBefore = caseDepth;
-    const depthAt = (col) =>
-      depthBefore +
-      opens.filter((p) => p <= col).length -
-      closes.filter((p) => p <= col).length;
     for (const detail of ruleAliasGuarded(
       test.line,
       ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED,
-      continued,
-      (col) => depthAt(col) > 0
+      continued
     )) {
       add('SHC-010', i, detail);
     }
-    caseDepth = Math.max(0, depthAt(line.length));
     // A `\` after an operator (`&& \`) or an assignment run (`LC_ALL=C \`)
     // still leaves the next line at a command position. On a line that is
     // itself mid-command (`env \` then `LC_ALL=C \`) the assignment is an
