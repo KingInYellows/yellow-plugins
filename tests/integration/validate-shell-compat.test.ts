@@ -850,6 +850,8 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('[[ -n $a &&\n  -n $b ]] && ls x')).toEqual([2]);
     expect(flagged('[[ -n $a ]]\nls x')).toEqual([2]);
     expect(flagged('[[ -n $(\n  ls x\n) ]]')).toEqual([2]);
+    expect(flagged('case "$c" in\n  a) [[ -n $x &&\n    ls == "$cmd" ]]\nesac')).toEqual([]);
+    expect(flagged('f() [[ -n $a &&\n  ls == x ]]')).toEqual([]);
   });
 
   it('reads the operands of arithmetic spanning lines as variables', () => {
