@@ -823,6 +823,15 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('[[ "$x" == "$(ls)" ]]')).toEqual([1]);
   });
 
+  it('reads the elements of an array assignment as words', () => {
+    expect(flagged('x=(ls)')).toEqual([]);
+    expect(flagged('commands=(ls ps)')).toEqual([]);
+    expect(flagged('a+=(df) ; echo "${a[@]}"')).toEqual([]);
+    expect(flagged('x=($(ls d))')).toEqual([1]);
+    expect(flagged('x=(a) && ls d')).toEqual([1]);
+    expect(flagged('(ls d)')).toEqual([1]);
+  });
+
   it('reads the operands of a [[ ]] test spanning lines as words', () => {
     expect(flagged('[[ "$cmd" == foo ||\n  ls == "$cmd" ]]')).toEqual([]);
     expect(flagged('if [[ -n $a &&\n  ps == "$b" ]]; then :; fi')).toEqual([]);
@@ -846,6 +855,8 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('LC_ALL=C \\\n  ls x')).toEqual([2]);
     expect(flagged('true && A=1 B=2 \\\n  ls x')).toEqual([2]);
     expect(flagged('echo A=1 \\\n  ls')).toEqual([]);
+    expect(flagged('env \\\n  LC_ALL=C \\\n  ls x')).toEqual([]);
+    expect(flagged('env \\\n  LC_ALL=C &&\\\n  ls x')).toEqual([3]);
   });
 
   it('flags a pipe split across lines at the line holding the command', () => {

@@ -1064,20 +1064,27 @@ function keepCommandSubs(span) {
 // `[[ … ]]` on one line. Its `||`, `|` and `(` are test syntax, not
 // command boundaries.
 const DOUBLE_BRACKET_RE = /\[\[\s(?:[^\]]|\][^\]])*\]\]/g;
+// An array assignment on one line (`a=(ls ps)`, `a+=(df)`). Its elements are
+// words, not commands.
+const ARRAY_ASSIGN_RE =
+  /(?:^|(?<=[\s;&|(]))[A-Za-z_][A-Za-z0-9_]*\+?=\((?:[^()]|\([^()]*\))*\)/g;
 
-// Blank arithmetic and `[[ … ]]` tests, which cannot run a command, except
+// Blank arithmetic, `[[ … ]]` tests and array assignments, which cannot run a
+// command, except
 // for the `$(…)` or backtick substitutions inside them, which still run.
 function maskAliasLine(line) {
   const blank = (span) =>
     hasCommandSub(span) ? keepCommandSubs(span) : ' '.repeat(span.length);
   let prepared = line.replace(ARITHMETIC_RE, blank);
   // Find `]]` on the quote-masked text so a quoted `"]]"` does not end it.
-  for (const m of maskShell(prepared).matchAll(DOUBLE_BRACKET_RE)) {
-    const end = m.index + m[0].length;
-    prepared =
-      prepared.slice(0, m.index) +
-      blank(prepared.slice(m.index, end)) +
-      prepared.slice(end);
+  for (const re of [DOUBLE_BRACKET_RE, ARRAY_ASSIGN_RE]) {
+    for (const m of maskShell(prepared).matchAll(re)) {
+      const end = m.index + m[0].length;
+      prepared =
+        prepared.slice(0, m.index) +
+        blank(prepared.slice(m.index, end)) +
+        prepared.slice(end);
+    }
   }
   return maskShell(prepared);
 }
@@ -1305,8 +1312,10 @@ function lintShellText(
       add('SHC-010', i, detail);
     }
     // A `\` after an operator (`&& \`) or an assignment run (`LC_ALL=C \`)
-    // still leaves the next line at a command position.
-    const tail = maskShell(line).trimEnd();
+    // still leaves the next line at a command position. On a line that is
+    // itself mid-command (`env \` then `LC_ALL=C \`) the assignment is an
+    // argument, so the next line stays mid-command.
+    const tail = (continued ? '_ ' : '') + maskShell(line).trimEnd();
     nextContinued =
       tail.endsWith('\\') &&
       !COMMAND_POSITION_RE.test(
