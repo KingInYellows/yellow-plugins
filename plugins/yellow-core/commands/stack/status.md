@@ -26,9 +26,14 @@ variables.
 ```bash
 set -uo pipefail
 
-# yellow-core-root:start
+# >>> generated: yellow-core-root (source: scripts/snippets/yellow-core-root.sh) >>>
+# DO NOT EDIT — regenerate with: pnpm generate:snippets
 # Library path only. Enablement still comes solely from
 # `claude plugin list --json`. A missed path is an error, not a provider guess.
+# There is no fallback to plugins/yellow-core in the open repository: that
+# tree is repository-controlled, and these libraries are executed.
+# Canonical source: scripts/snippets/yellow-core-root.sh — edit there, then
+# run `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
 core_libs_ok() {
   local root="$1"
   [ -n "$root" ] || return 1
@@ -40,76 +45,58 @@ core_libs_ok() {
 }
 
 resolve_yellow_core_root() {
-  local candidate install_root
-  for candidate in "${CLAUDE_PLUGIN_ROOT:-}" "${GROK_PLUGIN_ROOT:-}"; do
-    if core_libs_ok "$candidate"; then
-      printf '%s' "$candidate"
-      return 0
-    fi
-  done
-  install_root=$(printf '%s' "${plugin_json:-}" | node -e '
-const fs = require("fs");
-const projectPath = process.argv[1] || "";
-let raw = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", function (chunk) { raw += chunk; });
-process.stdin.on("end", function () {
-  let rows = [];
-  try { rows = JSON.parse(raw); } catch (err) { rows = []; }
-  if (!Array.isArray(rows)) rows = [];
-  const scopeRank = { local: 0, project: 1, user: 2, managed: 3 };
-  const marker = "/lib/stack-provider-state.js";
-  const probe = "/lib/stack-tooling-probe.js";
-  function regularFile(p) {
-    try { return fs.lstatSync(p).isFile(); } catch (err) { return false; }
-  }
-  function sameDir(a, b) {
-    try {
-      return fs.realpathSync(a) === fs.realpathSync(b);
-    } catch (err) {
-      return false;
-    }
-  }
-  const candidates = rows.filter(function (row) {
-    if (row === null || typeof row !== "object") return false;
-    if (row.id !== "yellow-core@yellow-plugins") return false;
-    if (row.enabled !== true) return false;
-    if (typeof row.installPath !== "string" || row.installPath.length === 0) return false;
-    if (row.installPath.indexOf("\n") !== -1 || row.installPath.indexOf("\0") !== -1) return false;
-    if (row.scope === "project" || row.scope === "local") {
-      if (projectPath.length === 0) return false;
-      if (typeof row.projectPath !== "string" || row.projectPath.length === 0) return false;
-      return sameDir(row.projectPath, projectPath);
-    }
-    return true;
-  }).sort(function (a, b) {
-    const rank = function (scope) {
-      return Object.prototype.hasOwnProperty.call(scopeRank, scope) ? scopeRank[scope] : 9;
-    };
-    return rank(a.scope) - rank(b.scope);
-  });
-  let chosen = "";
-  for (let i = 0; i < candidates.length; i++) {
-    const root = candidates[i].installPath;
-    if (regularFile(root + marker) && regularFile(root + probe)) {
-      chosen = root;
-      break;
-    }
-  }
-  process.stdout.write(chosen);
-});
-' "${repo_root:-}")
-  if core_libs_ok "$install_root"; then
-    printf '%s' "$install_root"
+  local candidate install_roots
+  candidate="${CLAUDE_PLUGIN_ROOT:-}"
+  if core_libs_ok "$candidate"; then
+    printf '%s' "$candidate"
     return 0
   fi
-  if [ -n "${repo_root:-}" ] && core_libs_ok "${repo_root}/plugins/yellow-core"; then
-    printf '%s' "${repo_root}/plugins/yellow-core"
+  # Same ranking as _enabled_install_path in commands/setup/all.md: local,
+  # then project, then user, then managed. Any other scope is dropped, since
+  # the path feeds node. Project and local rows count only when realpath of
+  # projectPath is this repository. Every ranked path is printed, one per
+  # line; the shell takes the first with a complete library, so a stale
+  # higher-ranked install does not hide a valid lower-ranked one.
+  install_roots=$(printf '%s' "${plugin_json:-}" | PROJECT_PATH="${repo_root:-}" node -e '
+    const fs = require("fs");
+    let rows;
+    try { rows = JSON.parse(fs.readFileSync(0, "utf8")); } catch { rows = []; }
+    if (!Array.isArray(rows)) rows = [];
+    const projectPath = process.env.PROJECT_PATH || "";
+    const scopeRank = { local: 0, project: 1, user: 2, managed: 3 };
+    const sameDir = (a, b) => {
+      try { return fs.realpathSync(a) === fs.realpathSync(b); } catch { return false; }
+    };
+    const candidates = rows
+      .filter((row) =>
+        row && typeof row === "object" &&
+        row.id === "yellow-core@yellow-plugins" &&
+        row.enabled === true &&
+        Object.prototype.hasOwnProperty.call(scopeRank, row.scope) &&
+        typeof row.installPath === "string" && row.installPath.length > 0 &&
+        !row.installPath.includes("\n") && !row.installPath.includes("\0") &&
+        ((row.scope !== "project" && row.scope !== "local") ||
+          (projectPath.length > 0 &&
+            typeof row.projectPath === "string" && row.projectPath.length > 0 &&
+            sameDir(row.projectPath, projectPath)))
+      )
+      .sort((a, b) => scopeRank[a.scope] - scopeRank[b.scope]);
+    process.stdout.write(candidates.map((c) => c.installPath).join("\n"));
+  ' 2>/dev/null)
+  # A pipe, not a heredoc: the paths come from CLI output (AGENTS.md).
+  candidate=$(printf '%s\n' "$install_roots" | while IFS= read -r root; do
+    if core_libs_ok "$root"; then
+      printf '%s' "$root"
+      break
+    fi
+  done)
+  if [ -n "$candidate" ]; then
+    printf '%s' "$candidate"
     return 0
   fi
   printf ''
 }
-# yellow-core-root:end
+# <<< generated: yellow-core-root <<<
 
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null || printf '')
 intent_file="${repo_root:-.}/.yellow-stack.yml"
@@ -134,7 +121,7 @@ fi
 
 ROOT=$(resolve_yellow_core_root)
 if [ -z "$ROOT" ]; then
-  printf 'stack_provider_error: state library not found (CLAUDE_PLUGIN_ROOT, GROK_PLUGIN_ROOT, installPath, and in-repo copy missed)\n'
+  printf 'stack_provider_error: state library not found (CLAUDE_PLUGIN_ROOT and installPath missed)\n'
   exit 0
 fi
 LIB="$ROOT/lib/stack-provider-state.js"
