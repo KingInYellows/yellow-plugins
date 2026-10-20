@@ -1,0 +1,19 @@
+docs/solutions/code-quality/bash-zsh-tiered-shell-contract.md
+  s_461fbfc28ab2f8::t_86736301dfce41 100-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5483d1c13993b44015bc26aceaa64172df593558",
+  "prompts": {},
+  "sessions": {
+    "s_461fbfc28ab2f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "11df0fbb-afe4-4922-916e-4b9d0e74abd8",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
