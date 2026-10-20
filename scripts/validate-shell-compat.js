@@ -1001,9 +1001,10 @@ function validAliasGuarded(list) {
     list.every((c) => typeof c === 'string' && COMMAND_NAME_RE.test(c))
   );
 }
-// `LC_ALL=C ls` is still the command `ls`. A wrapper (`timeout`, `sudo`) is
-// not an assignment and stays invisible to this rule.
-const ENV_ASSIGN_RE = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)+/;
+// Assignments immediately before the command word (`LC_ALL=C ls`,
+// `cd x && LC_ALL=C ls`) still leave `ls` in command position. A wrapper
+// (`timeout`, `sudo`) is not an assignment and stays invisible to this rule.
+const ENV_ASSIGN_RE = /(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)+$/;
 
 // A `$(…)` command substitution, not the `$((` that opens arithmetic.
 function hasCommandSub(span) {
@@ -1040,20 +1041,21 @@ function ruleAliasGuarded(line, commands) {
   while ((m = wordRe.exec(mask)) !== null) {
     const rawPrefix = mask.slice(0, m.index);
     const afterWord = mask.slice(m.index + m[1].length);
-    // A case-arm pattern (`ps|df)`, `(ps|df)`) names the word, it does not
-    // run it.
-    const armStart = rawPrefix.trim();
+    // A case-arm pattern names the word, it does not run it. Match after
+    // `in` / `;;` / `;&` or at line start, not only when the pattern is the
+    // entire prefix (`case "$c" in ps|df)` and `;; ps|df)`). `(ls)` at line
+    // start is a subshell, so a leading `(` still needs a `|` before `)`.
     if (
       /^(?:\|[^\s()|;&]+)*\)/.test(afterWord) &&
-      (armStart === '' ||
-        (armStart === '(' && afterWord.startsWith('|')) ||
-        /^\(?(?:[^\s()|;&]+\|)+$/.test(armStart))
+      (/(?:^|;[;&]|\bin)\s*$/.test(rawPrefix) ||
+        (/(?:^|;[;&]|\bin)\s*\($/.test(rawPrefix) &&
+          afterWord.startsWith('|')) ||
+        /(?:^|;[;&]|\bin)\s*\(?(?:[^\s()|;&]+\|)+$/.test(rawPrefix))
     ) {
       continue;
     }
     const prefix = rawPrefix.replace(ENV_ASSIGN_RE, '').trimEnd();
-    const atCommand =
-      COMMAND_POSITION_RE.test(prefix) || prefix.endsWith('`');
+    const atCommand = COMMAND_POSITION_RE.test(prefix) || prefix.endsWith('`');
     if (!atCommand) continue;
     found.push(
       `\`${m[1]}\` is in command position without \`command\`, so a user alias can change its output`

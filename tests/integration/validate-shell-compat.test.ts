@@ -793,6 +793,11 @@ describe('SHC-010 alias-prone commands', () => {
     ['bare display with stderr dropped', 'ls -la x 2>/dev/null'],
     ['placeholder in a bare call', 'ls -la .worktrees/<name>/.ruvector'],
     ['env-prefixed command', 'LC_ALL=C ls x | head'],
+    ['indented env-prefixed command', '  LC_ALL=C ls x | head'],
+    ['env-prefixed after &&', 'cd x && LC_ALL=C ls x | head'],
+    ['env-prefixed after then', 'if true; then LC_ALL=C ls x; fi'],
+    ['env-prefixed after do', 'while true; do LC_ALL=C ls x; done'],
+    ['env-prefixed in a subshell', '( LC_ALL=C ls x ) | head'],
     ['piped subshell', '( ls x ) | head'],
   ])('flags %s', (_name, text) => {
     expect(flagged(text)).toEqual([1]);
@@ -871,6 +876,10 @@ describe('SHC-010 alias-prone commands', () => {
     ['a case-arm pattern', 'case "$c" in\n  ps|df) echo disk ;;\nesac'],
     ['a later case-arm alternative', 'case "$c" in\n  ls|ps|du) echo x ;;\nesac'],
     ['a parenthesised case-arm', 'case "$c" in\n  (ps|df) echo x ;;\nesac'],
+    ['a one-line case-arm', 'case "$c" in ps|df) echo disk ;; esac'],
+    ['a one-line later alternative', 'case "$c" in ls|ps|du) echo x ;; esac'],
+    ['a one-line parenthesised case-arm', 'case "$c" in (ps|df) echo x ;; esac'],
+    ['a case-arm after ;;', 'case "$c" in x) echo ;; ps|df) echo disk ;; esac'],
     ['an arithmetic comparison', 'if (( top > 0 )); then :; fi'],
     ['an arithmetic expansion', 'x=$(( ps > 3 ? 1 : 0 ))'],
     ['a path ending in ls', './bin/ls x | head'],
