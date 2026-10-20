@@ -1244,11 +1244,20 @@ function ruleAliasGuarded(line, commands, continued = false, inCase = false) {
     }
     // Outside a `case` block, `(ps | cat)` is a subshell. Inside one, the
     // spaced form needs a `|`; a lone `(ps)` is left to the check above.
+    // A line-leading `(ps | cat)` is still a subshell: the `|` is a pipe,
+    // matching CASE_ARM_HEAD_RE's exception (an alternative follows only
+    // when `|` is tight against the word).
     const spaced = inCaseAt(m.index) && SPACED_ARM_HEAD_RE.exec(rawPrefix);
     if (
       spaced &&
       (spaced[3] || /^\s*\|/.test(afterWord)) &&
-      /^(?:\s*\|\s*[^\s()|;&]+)*\s*\)/.test(afterWord)
+      /^(?:\s*\|\s*[^\s()|;&]+)*\s*\)/.test(afterWord) &&
+      !(
+        spaced[1] === '' &&
+        spaced[2] &&
+        !spaced[3] &&
+        !afterWord.startsWith('|')
+      )
     ) {
       continue;
     }

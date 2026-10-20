@@ -877,6 +877,9 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('ls x | head)')).toEqual([1]);
     expect(flagged('case "$c" in\n  ps | df) :;;\nesac\n(ps | cat)')).toEqual([4]);
     expect(flagged('case "$c" in\n  a)\n    (ps)\n    ;;\nesac')).toEqual([3]);
+    expect(flagged('case "$c" in\n  a)\n    (ps | cat)\n    ;;\nesac')).toEqual(
+      [3]
+    );
     expect(flagged('(ps | cat); case "$x" in a) :;; esac')).toEqual([1]);
     expect(flagged('case "$x" in a) :;; esac; (ps | cat)')).toEqual([1]);
   });
