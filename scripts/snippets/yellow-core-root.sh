@@ -51,15 +51,16 @@ resolve_yellow_core_root() {
       .sort((a, b) => scopeRank[a.scope] - scopeRank[b.scope]);
     process.stdout.write(candidates.map((c) => c.installPath).join("\n"));
   ' 2>/dev/null)
-  if [ -n "$install_roots" ]; then
-    while IFS= read -r candidate; do
-      if core_libs_ok "$candidate"; then
-        printf '%s' "$candidate"
-        return 0
-      fi
-    done <<EOF_ROOTS
-$install_roots
-EOF_ROOTS
+  # A pipe, not a heredoc: the paths come from CLI output (AGENTS.md).
+  candidate=$(printf '%s\n' "$install_roots" | while IFS= read -r root; do
+    if core_libs_ok "$root"; then
+      printf '%s' "$root"
+      break
+    fi
+  done)
+  if [ -n "$candidate" ]; then
+    printf '%s' "$candidate"
+    return 0
   fi
   if [ -n "${repo_root:-}" ] && core_libs_ok "${repo_root}/plugins/yellow-core"; then
     printf '%s' "${repo_root}/plugins/yellow-core"
