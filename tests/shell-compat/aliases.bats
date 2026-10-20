@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# aliases.bats — Tier 2: shipped shell blocks survive hostile user aliases.
+# aliases.bats — Tier 1: shipped inline shell blocks survive hostile user aliases.
 # Claude Code replays the user's alias snapshot in every Bash call, so
 # `alias ls=eza` (stood in for here by `false`) breaks any block that parses
 # `ls` output, and zsh's `nomatch` aborts `ls plans/*.md 2>/dev/null` before
@@ -16,8 +16,9 @@ setup() {
   mkdir -p "$PROJ/plans/shells"
   : > "$PROJ/plans/new.md"
   : > "$PROJ/plans/old.md"
-  touch -d '-1 hour' "$PROJ/plans/old.md"
-  ALIASES='alias ls=false ps=false du=false df=false find=false'
+  touch -t 200001010000 "$PROJ/plans/old.md"
+  # Claude Code shadows find (and grep) with shell functions, not aliases.
+  ALIASES=$'alias ls=false ps=false du=false df=false\nfind() { false; }'
 }
 
 # The first line of $1 (repo-relative) containing the fixed string $2, with
@@ -58,8 +59,8 @@ run_profile() {
 
 @test "flow work and review list plans newest first under aliases" {
   local profile line work_line review_line
-  work_line=$(shipped_line plugins/yellow-core/commands/flow/work.md "command find -H plans -maxdepth 1 -type f -name '*.md' -exec ls -t {} + 2>/dev/null | head -5")
-  review_line=$(shipped_line plugins/yellow-core/commands/flow/review.md "command find -H plans -maxdepth 1 -type f -name '*.md' -exec ls -t {} + 2>/dev/null | head -3")
+  work_line=$(shipped_line plugins/yellow-core/commands/flow/work.md "command find -H plans -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -5")
+  review_line=$(shipped_line plugins/yellow-core/commands/flow/review.md "command find -H plans -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -3")
   for line in "$work_line" "$review_line"; do
     for profile in "${PROFILES[@]}"; do
       run_profile "$profile" aliased "$line"
@@ -71,7 +72,7 @@ run_profile() {
 
 @test "the plan listing is silent with no plans: no output, exit 0, no nomatch error" {
   local profile line
-  line=$(shipped_line plugins/yellow-core/commands/flow/work.md "command find -H plans -maxdepth 1 -type f -name '*.md' -exec ls -t {} + 2>/dev/null | head -5")
+  line=$(shipped_line plugins/yellow-core/commands/flow/work.md "command find -H plans -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -5")
   rm -f "$PROJ"/plans/*.md
   for profile in "${PROFILES[@]}"; do
     run_profile "$profile" aliased "$line"
@@ -81,15 +82,65 @@ run_profile() {
   done
 }
 
+@test "control: the old glob leaks a nomatch error under zsh and the shipped line does not" {
+  local line profile
+  line=$(shipped_line plugins/yellow-core/commands/flow/work.md "command find -H plans -maxdepth 1 \\( -type f -o -type l \\) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -5")
+  rm -f "$PROJ"/plans/*.md
+  for profile in zsh zsh-snapshot; do
+    run_profile "$profile" plain 'ls -t plans/*.md 2>/dev/null | head -5'
+    [[ "$stderr" == *"no matches found"* ]]
+    run_profile "$profile" plain "$line"
+    [ -z "$stderr" ]
+  done
+}
+
+@test "dotfile plans are not listed, matching the old glob" {
+  local line profile
+  line=$(shipped_line plugins/yellow-core/commands/flow/work.md "command find -H plans -maxdepth 1 \\( -type f -o -type l \\) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -5")
+  : > "$PROJ/plans/.hidden.md"
+  for profile in "${PROFILES[@]}"; do
+    run_profile "$profile" aliased "$line"
+    [ "$output" = $'plans/new.md\nplans/old.md' ]
+  done
+}
+
 @test "a symlinked plans/ directory is still listed" {
   local profile line
-  line=$(shipped_line plugins/yellow-core/commands/flow/work.md "command find -H plans -maxdepth 1 -type f -name '*.md' -exec ls -t {} + 2>/dev/null | head -5")
+  line=$(shipped_line plugins/yellow-core/commands/flow/work.md "command find -H plans -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -5")
   mv "$PROJ/plans" "$PROJ/real-plans"
   ln -s real-plans "$PROJ/plans"
   for profile in "${PROFILES[@]}"; do
     run_profile "$profile" aliased "$line"
     [ "$status" -eq 0 ]
     [ "$output" = $'plans/new.md\nplans/old.md' ]
+  done
+}
+
+@test "a symlinked plan file is still listed" {
+  local profile line
+  line=$(shipped_line plugins/yellow-core/commands/flow/work.md "command find -H plans -maxdepth 1 \\( -type f -o -type l \\) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -5")
+  mkdir -p "$PROJ/elsewhere" "$PROJ/plans/dir.md"
+  : > "$PROJ/elsewhere/linked.md"
+  ln -s ../elsewhere/linked.md "$PROJ/plans/linked.md"
+  for profile in "${PROFILES[@]}"; do
+    run_profile "$profile" aliased "$line"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *plans/linked.md* ]]
+    [[ "$output" != *dir.md* ]]
+  done
+}
+
+@test "flow decompose collision check lists every directory under aliases" {
+  local profile line
+  mkdir -p "$PROJ/plans/complete"
+  : > "$PROJ/plans/shells/s1.md"
+  line=$(awk '/^for d in plans plans\/complete plans\/shells; do$/ {p=1} p {print} /^done$/ && p {exit}' "$REPO_ROOT/plugins/yellow-core/commands/flow/decompose.md")
+  [ -n "$line" ]
+  for profile in "${PROFILES[@]}"; do
+    run_profile "$profile" aliased "$line"
+    [ "$status" -eq 0 ]
+    [ "$output" = $'plans/new.md\nplans/old.md\nplans/shells/s1.md' ] || [ "$output" = $'plans/old.md\nplans/new.md\nplans/shells/s1.md' ]
+    [ -z "$stderr" ]
   done
 }
 
@@ -146,6 +197,19 @@ branch_probe() {
       run_profile "$profile" aliased 'PID=$$'$'\n'"$line"$'\nprintf "%s\\n" "$PROC_CMD"'
       [ "$status" -eq 0 ]
       [ -n "$output" ]
+    done
+  done
+}
+
+@test "agent cache-dir permission check keeps a private directory under aliases" {
+  local profile line file
+  mkdir -m 700 "$PROJ/private"
+  for file in plugins/yellow-debt/agents/scanners/duplication-scanner.md plugins/yellow-debt/agents/scanners/complexity-scanner.md plugins/yellow-research/agents/research/code-researcher.md; do
+    line=$(shipped_line "$file" 'case "$(command ls -ld -- "$b")" in')
+    for profile in "${PROFILES[@]}"; do
+      run_profile "$profile" aliased 'b="$PWD/private"'$'\n'"$line"$'\nprintf "%s\\n" "$b"'
+      [ "$status" -eq 0 ]
+      [ "$output" = "$PROJ/private" ]
     done
   done
 }

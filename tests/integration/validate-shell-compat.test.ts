@@ -785,18 +785,48 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('v=$(\n  ls -t x\n)')).toEqual([2]);
   });
 
+  it('keeps a capture or pipe open across a comment line', () => {
+    expect(flagged('v=$(\n  # note\n  ls -t x\n)')).toEqual([3]);
+    expect(flagged('ls -t x |\n  # note\n  head')).toEqual([1]);
+  });
+
+  it('does not let a trailing comment hide later lines of the command', () => {
+    expect(flagged('v=$( # newest first\n  ls -t x\n)')).toEqual([2]);
+    expect(flagged('v=$(\n  echo a # note\n  ls -t x\n)')).toEqual([3]);
+  });
+
+  it('flags other redirect and pipe forms', () => {
+    expect(flagged('df -h 1> out.txt')).toEqual([1]);
+    expect(flagged('df -h 2> err.txt')).toEqual([]);
+    expect(flagged('ls a 2>&1 | head')).toEqual([1]);
+    expect(flagged('ls a >> out')).toEqual([1]);
+    expect(flagged('ls a >| out')).toEqual([1]);
+    expect(flagged('ls a > /dev/null')).toEqual([]);
+  });
+
+  it('documents the known gaps so a later fix flips them on purpose', () => {
+    expect(flagged('LC_ALL=C ls x | head')).toEqual([]);
+    expect(flagged('ls x &> f')).toEqual([]);
+    expect(flagged('( ls x ) | head')).toEqual([]);
+  });
+
   it.each([
     ['command prefix', 'command ls -t x | head'],
     ['backslash prefix', '\\ls x | head'],
     ['bare display call', 'ls -d .ruvector/'],
     ['bare display with stderr dropped', 'ls -la x 2>/dev/null'],
-    ['find -exec ls', "command find -H plans -name '*.md' -exec ls -t {} + | head"],
+    ['find -exec ls', "command find -H plans -name '*.md' ! -name '.*' -exec ls -t {} + | head"],
     ['xargs ls', 'printf "%s\\n" a | xargs ls -t'],
     ['ssh remote command', 'ssh host ls -t x | head'],
     ['ls in a string', "printf 'ls -t' | cat"],
     ['ls as an argument', 'echo ls | head'],
     ['placeholder in a bare call', 'ls -la .worktrees/<name>/.ruvector'],
     ['a longer command name', 'lsof -i | head'],
+    ['a case-arm pattern', 'case "$c" in\n  ps|df) echo disk ;;\nesac'],
+    ['a later case-arm alternative', 'case "$c" in\n  ls|ps|du) echo x ;;\nesac'],
+    ['a parenthesised case-arm', 'case "$c" in\n  (ps|df) echo x ;;\nesac'],
+    ['an arithmetic comparison', 'if (( top > 0 )); then :; fi'],
+    ['an arithmetic expansion', 'x=$(( ps > 3 ? 1 : 0 ))'],
     ['a path ending in ls', './bin/ls x | head'],
   ])('passes %s', (_name, text) => {
     expect(flagged(text)).toEqual([]);
@@ -807,6 +837,16 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged(wrapper.join('\n'))).toEqual([]);
     const remote = ['ssh host <<\'REMOTE\'', 'df -h | tail -1', 'REMOTE'];
     expect(flagged(remote.join('\n'))).toEqual([]);
+  });
+
+  it('lints a tier 4 library file with the same rule', () => {
+    write(
+      'plugins/demo/lib/dual.sh',
+      '#!/usr/bin/env bash\ndual_fn() { ls -t d | head -1; }\n'
+    );
+    const result = run();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('plugins/demo/lib/dual.sh:2 [SHC-010]');
   });
 
   it('honours aliasGuardedCommands from the context', () => {

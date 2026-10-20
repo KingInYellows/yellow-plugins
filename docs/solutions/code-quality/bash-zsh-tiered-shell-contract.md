@@ -88,8 +88,8 @@ replaces the two manual greps in `zsh-noclobber-mktemp-stderr-redirect.md`.
   `--time`) and `/flow:work` reported that no plans exist. Separately, zsh's
   `nomatch` aborts a command whose glob matches nothing *before* its
   `2>/dev/null` applies, so the error leaks and `ls` never runs; `command ls`
-  alone fixes neither. List through
-  `command find -H DIR -maxdepth 1 -type f -name '*.md' -exec ls -t {} +`
+  alone fixes the alias but not the nomatch error. List through
+  `command find -H DIR -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' -exec ls -t {} +`
   (the real `ls` runs without a shell; an empty match prints nothing and
   exits 0) and prefix other parsed calls with `command`. SHC-010 enforces it
   from `aliasGuardedCommands`, and `tests/shell-compat/aliases.bats` runs the

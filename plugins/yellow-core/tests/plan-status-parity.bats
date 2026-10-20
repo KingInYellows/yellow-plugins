@@ -11,7 +11,7 @@ FIXTURE_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/fixtures/plan-status" && pw
 
 run_phase1() {
   set -euo pipefail
-  if [ -z "$(command find -H plans -maxdepth 1 -type f -name '*.md' 2>/dev/null | head -1)" ]; then
+  if [ -z "$(command find -H plans -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' 2>/dev/null | head -1)" ]; then
     printf 'plans/ is empty (no open plans).\n\n'
     return 0
   fi
@@ -40,7 +40,7 @@ run_phase2() {
     printf 'Archived plans (plans/complete/): (0) — directory does not exist yet.\n'
     return 0
   fi
-  count=$(find plans/complete -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')
+  count=$(find plans/complete -maxdepth 1 -name '*.md' ! -name '.*' -type f 2>/dev/null | wc -l | tr -d ' ')
   if [ "$count" -eq 0 ]; then
     printf 'Archived plans (plans/complete/): (0)\n'
     return 0

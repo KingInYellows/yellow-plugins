@@ -28,7 +28,10 @@
  *   SHC-009  a bash wrapper other than `bash /dev/fd/3 3<<'TAG'`
  *   SHC-010  alias-prone command (`aliasGuardedCommands`: ls, ps, du, df, top)
  *            in command position whose result is consumed (piped, captured,
- *            redirected to a file or tested) without a `command` prefix
+ *            redirected to a file or tested) without a `command` prefix.
+ *            Not detected: an env-assignment prefix (`LC_ALL=C ls …`),
+ *            `ls &> file`, a piped subshell (`( ls ) | head`), and code in
+ *            unquoted-tag heredocs or multi-line double-quoted strings.
  *   SHC-101  plugin `.sh` file with no shebang and no library marker
  *   SHC-900  shell-compat-config.json problem (unknown path, missing reason,
  *            stale allowlist cap, ...)
@@ -99,7 +102,7 @@ const RULES = {
   },
   'SHC-010': {
     summary: 'alias-prone command whose result is consumed',
-    hint: "write `command <cmd>` (or list files with `command find … -exec ls -t {} +`): users' aliases (ls=eza, ps=procs, du=dust, df=duf) apply to these blocks",
+    hint: "list a glob with `command find -H DIR -maxdepth 1 … -exec ls -t {} +` (`command ls` alone still hits zsh's nomatch error); for any other call write `command <cmd>`. Users' aliases (ls=eza, ps=procs, du=dust, df=duf) apply to these blocks",
   },
   'SHC-101': {
     summary: 'shell file without a shebang or library marker',
@@ -201,7 +204,8 @@ const WRAPPER_OPERAND = String.raw`(?:'[^']*'|"\$\{?[A-Za-z_][A-Za-z0-9_]*\}?")`
 const BASH_FD_WRAPPER_RE = new RegExp(
   String.raw`(?:^|(?<=[\s;&|(){!]))(?:command\s+)?bash((?:\s+${WRAPPER_OPTION})*)\s+\/dev\/fd\/(\d+)((?:\s+${WRAPPER_OPERAND})*)\s+(\d+)$`
 );
-// What may stand before `bash` for it to be the command word. A case-arm
+// What may stand before a command word (`bash` for SHC-009, an alias-guarded
+// command for SHC-010) for it to be in command position. A case-arm
 // pattern `y)` / `(a|b)` also counts, but only at line start, after `in` or
 // after `;;`/`;&` — a bare `)` (`$(foo)`, `(cd x)`) does not.
 const COMMAND_POSITION_RE =
@@ -987,14 +991,23 @@ function classifySource(target, rel, ctx) {
 // ---------------------------------------------------------------------------
 // SHC-010: alias-prone commands whose output the block consumes
 
+// The default for callers that pass no list (unit tests); the list in
+// scripts/shell-compat-config.json is authoritative for real runs.
 const DEFAULT_ALIAS_GUARDED = ['ls', 'ps', 'du', 'df', 'top'];
+const COMMAND_NAME_RE = /^[A-Za-z0-9_-]+$/;
 function validAliasGuarded(list) {
   return (
     Array.isArray(list) &&
     list.length > 0 &&
-    list.every((c) => typeof c === 'string' && /^[A-Za-z0-9_-]+$/.test(c))
+    list.every((c) => typeof c === 'string' && COMMAND_NAME_RE.test(c))
   );
 }
+const CONSUMED_PHRASE = {
+  pipe: 'piped',
+  redirect: 'redirected to a file',
+  captured: 'captured',
+  tested: 'tested',
+};
 // Text before a command word that tests its exit status (`if ! ls …`).
 const TESTED_PREFIX_RE = /(?:\b(?:if|elif|while|until)(?:\s+!)?|!)$/;
 
@@ -1011,22 +1024,31 @@ function openNesting(mask, state) {
   return state.depth > 0 || state.ticks % 2 === 1;
 }
 
+// Same-length copy with `$((…))` / `((…))` spans blanked, so `((top > 0))`
+// is not read as a command followed by a redirect.
+function blankArithmetic(code) {
+  return code.replace(ARITHMETIC_RE, (span) => ' '.repeat(span.length));
+}
+
 // Groups `code` lines into logical commands: a line joins the next when it
 // ends in `\`, a trailing `|`, `&&` or `||`, or leaves a `$(`, backtick or
-// `( … )` span open. Returns { text, parts } where `parts` maps each piece of
-// the joined text back to its physical line index.
+// `( … )` span open. Returns [{ text, mask, parts }]: the joined text, its
+// maskShell copy, and `parts`, which maps each piece of the text back to its
+// physical line index.
 function logicalLines(classes) {
   const groups = [];
   let current = null;
   for (let i = 0; i < classes.length; i++) {
     if (classes[i].kind !== 'code') {
-      current = null;
+      // A comment between continued lines or inside an open `$(` span does
+      // not end the command; anything else (heredoc body, string) does.
+      if (!(classes[i].kind === 'comment' && current)) current = null;
       continue;
     }
     const raw = stripArithmetic(classes[i].code);
     let piece = classes[i].code;
     if (!current) {
-      current = { text: '', parts: [], mask: '', nesting: { depth: 0, ticks: 0 } };
+      current = { text: '', mask: '', parts: [], nesting: { depth: 0, ticks: 0 } };
       groups.push(current);
     }
     const mask = maskShell(raw);
@@ -1035,8 +1057,10 @@ function logicalLines(classes) {
     if (backslash) piece = piece.trimEnd().slice(0, -1);
     const start = current.text.length;
     current.text += piece;
+    // Masked per physical line: a `#` comment ends at its own line, not at
+    // the end of the joined text.
+    current.mask += maskShell(blankArithmetic(piece));
     current.parts.push({ start, end: current.text.length, line: i });
-    current.mask += mask;
     const nested = openNesting(mask, current.nesting);
     const continues =
       backslash || /(?:^|[^|&])\|$|&&$|\|\|$/.test(trimmed) || nested;
@@ -1102,7 +1126,7 @@ function consumedAfter(rest) {
       return '';
     } else if (ch === '|') return 'pipe';
     else if (ch === '>' && rest[i - 1] !== '>') {
-      if (/\d/.test(rest[i - 1] || '')) continue; // 2>file: stderr only
+      if (rest[i - 1] === '2') continue; // 2>file: stderr only
       const target = rest.slice(i + 1).replace(/^[>|]?\s*/, '');
       if (/^&/.test(target) || /^\/dev\/null\b/.test(target)) continue;
       return 'redirect';
@@ -1115,17 +1139,30 @@ function consumedAfter(rest) {
 // holding the command word.
 function aliasGuardedFindings(classes, commands) {
   const found = [];
-  // An empty alternative would match everywhere and never advance lastIndex.
-  commands = commands.filter((c) => /^[A-Za-z0-9_-]+$/.test(c));
+  // Unit tests inject ctx.aliasGuarded without validateConfig; an empty
+  // alternative would match everywhere and never advance lastIndex.
+  commands = commands.filter((c) => COMMAND_NAME_RE.test(c));
   if (commands.length === 0) return found;
   const wordRe = new RegExp(`(?<![\\w./-])(${commands.join('|')})(?=$|[\\s;|&)<>])`, 'g');
   for (const group of logicalLines(classes)) {
-    const mask = maskShell(group.text);
+    const { mask } = group;
     const captures = substitutionRanges(mask);
     wordRe.lastIndex = 0;
     let m;
     while ((m = wordRe.exec(mask)) !== null) {
       const prefix = mask.slice(0, m.index).trimEnd();
+      // A case-arm pattern at line start (`ps|df) …`) names the word, it
+      // does not run it.
+      const afterWord = mask.slice(m.index + m[1].length);
+      const armStart = prefix.trim();
+      if (
+        /^(?:\|[^\s()|;&]+)*\)/.test(afterWord) &&
+        (armStart === '' ||
+          (armStart === '(' && afterWord.startsWith('|')) ||
+          /^\(?(?:[^\s()|;&]+\|)+$/.test(armStart))
+      ) {
+        continue;
+      }
       const atCommand =
         COMMAND_POSITION_RE.test(prefix) || prefix.endsWith('`');
       if (!atCommand) continue;
@@ -1138,12 +1175,13 @@ function aliasGuardedFindings(classes, commands) {
         how = consumedAfter(mask.slice(m.index + m[1].length));
       }
       if (!how) continue;
-      const part = group.parts.find(
-        (p) => m.index >= p.start && m.index <= p.end
+      // `m.index` always falls inside a part: the match is never on a joiner.
+      const { line } = group.parts.find(
+        (part) => m.index >= part.start && m.index <= part.end
       );
       found.push({
-        line: part ? part.line : group.parts[0].line,
-        detail: `\`${m[1]}\` is ${how === 'pipe' ? 'piped' : how === 'redirect' ? 'redirected to a file' : how === 'captured' ? 'captured' : 'tested'} without \`command\`, so a user alias (ls=eza, ps=procs, du=dust, df=duf) changes it`,
+        line,
+        detail: `\`${m[1]}\` is ${CONSUMED_PHRASE[how]} without \`command\`, so a user alias can change its output`,
       });
     }
   }

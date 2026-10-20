@@ -30,7 +30,7 @@ fi
   printf '[pick-next-shell] Error: plans/shells/ is not readable.\n' >&2
   exit 1
 }
-if [ -z "$(command find -H plans/shells -maxdepth 1 -type f -name '*.md' 2>/dev/null | head -1)" ]; then
+if [ -z "$(command find -H plans/shells -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' 2>/dev/null | head -1)" ]; then
   printf 'All shells have been expanded — no shell files remain in plans/shells/.\n'
   printf 'Run /plan:status to confirm the shell-derived plans are archived in plans/complete/.\n'
   exit 0

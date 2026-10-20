@@ -7,4 +7,4 @@
 "yellow-research": patch
 ---
 
-Guard shell blocks that parse `ls`, `ps`, `df` or `top` output against user aliases (`ls=eza`, `ps=procs`): plan listings now go through `command find … -exec ls -t {} +`, which also stops zsh's `nomatch` error on an empty `plans/`, and the other parsed calls use `command`. `/flow:work`, `/flow:review`, `/flow:decompose`, `/flow:pick-next-shell` and `/plan:status` no longer report "no plans" when `ls` is aliased.
+Guard shell blocks that parse `ls`, `ps`, `df` or `top` output against user aliases (`ls=eza`, `ps=procs`). Plan listings in `/flow:work`, `/flow:review` and `/flow:decompose` now go through `command find -H … -exec ls -t {} +`, so an aliased `ls` no longer makes them report "no plans" and zsh's `nomatch` error no longer leaks on an empty `plans/`. `/plan:status` and `/flow:pick-next-shell` get the same `find` existence check. The codex status listing, the browser-test process check, the yellow-debt scanner and yellow-research code-researcher cache-directory permission checks, and the yellow-ci remote probes use `command`.

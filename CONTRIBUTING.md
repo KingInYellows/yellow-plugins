@@ -622,9 +622,9 @@ Inline blocks:
   redirected to a file or tested. Fix them one of three ways:
   - List files by mtime through `find`, which hands the matches to the real
     `ls` and also avoids zsh's `nomatch` error on an unmatched glob:
-    `command find -H plans -maxdepth 1 -type f -name '*.md' -exec ls -t {} + 2>/dev/null | head -5`
+    `command find -H plans -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -5`
   - Test whether a glob matches with the same `find`:
-    `[ -z "$(command find -H plans -maxdepth 1 -type f -name '*.md' 2>/dev/null | head -1)" ]`
+    `[ -z "$(command find -H plans -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' 2>/dev/null | head -1)" ]`
   - Prefix any other parsed call with `command` (`command ps -p "$PID" -o comm=`).
     Prefer it to `\ls`: `command` also bypasses shell functions, works the
     same in bash and zsh, and is POSIX on remote runners.

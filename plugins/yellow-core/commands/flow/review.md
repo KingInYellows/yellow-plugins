@@ -48,7 +48,7 @@ Parse the argument to determine review mode.
 starts with `./`, `../`, or `plans/`):
 
 - Report: "File not found: <path>. Check the path and try again." List
-  available plans from `command find -H plans -maxdepth 1 -type f -name '*.md' -exec ls -t {} + 2>/dev/null | head -5` if any exist.
+  available plans from `command find -H plans -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -5` if any exist.
   Stop here.
 
 **If argument is a PR number, URL, or branch name** (not a file path):
@@ -76,7 +76,7 @@ starts with `./`, `../`, or `plans/`):
   1. Find most recently modified plan files:
 
      ```bash
-     command find -H plans -maxdepth 1 -type f -name '*.md' -exec ls -t {} + 2>/dev/null | head -3
+     command find -H plans -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -3
      ```
 
   2. If plan files found, use AskUserQuestion: "Which plan should I review
