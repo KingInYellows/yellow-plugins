@@ -53,6 +53,8 @@ count_checked() {
   grep -ciE '^[[:space:]]*- \[x\]' "$1" 2>/dev/null || true
 }
 
+bats_require_minimum_version 1.5.0
+
 setup() {
   FIXTURE_DIR="$(mktemp -d)"
 }
@@ -396,7 +398,7 @@ pr=#8 sha=$H40" "pr=#7 sha=0123abc" "pr=#7 sha=$H40 via=commit-subject extra" "p
   [[ $flat == *"append that exact line too (it names the candidate PR and why it was not accepted)"* ]]
   # Phase 0 clears all four files; the tier function clears its own; Phase 4 does not repeat it.
   phase4=$(awk '/^## Phase 4/ {p=1} /^## Phase 5/ {p=0} p' "$COMPLETE")
-  ! grep -q 'rm -f "\$GIT_TMP/plan-complete' <<<"$phase4"
+  run ! grep -q 'rm -f "\$GIT_TMP/plan-complete' <<<"$phase4"
   # The exact token Claude Code substitutes is kept, behind set +u.
   grep -qF 'PGP_LIB="${CLAUDE_PLUGIN_ROOT}/lib/plan-gate-provenance.sh"' "$COMPLETE"
 }
@@ -425,7 +427,7 @@ path_without_gt() {
   stub=$(path_without_gt)
   bash_bin=$(command -v bash)
   blk=$(fenced_block 'gh auth status')
-  ! grep -q 'command -v gt' <<<"$blk"
+  run ! grep -q 'command -v gt' <<<"$blk"
   run env PATH="$stub" "$bash_bin" -c "$blk"
   [ "$status" -eq 0 ] || { echo "$output"; false; }
 }
@@ -450,8 +452,8 @@ path_without_gt() {
   submit=$(fenced_block 'run-github-stack-runtime.js" submit')
   [ -n "$init" ]
   [ -n "$submit" ]
-  ! grep -qE '(^|[^A-Za-z0-9_])gt([^A-Za-z0-9_]|$)' <<<"$init"
-  ! grep -qE '(^|[^A-Za-z0-9_])gt([^A-Za-z0-9_]|$)' <<<"$submit"
+  run ! grep -qE '(^|[^A-Za-z0-9_])gt([^A-Za-z0-9_]|$)' <<<"$init"
+  run ! grep -qE '(^|[^A-Za-z0-9_])gt([^A-Za-z0-9_]|$)' <<<"$submit"
   grep -qF 'gt submit --no-interactive' "$BATS_TEST_DIRNAME/../commands/plan/complete.md"
   grep -qF 'run-github-stack-runtime.js submit' "$BATS_TEST_DIRNAME/../commands/plan/complete.md"
 }
