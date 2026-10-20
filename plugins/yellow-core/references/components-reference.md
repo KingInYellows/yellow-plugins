@@ -130,7 +130,12 @@ pipeline.
   one of eight states (`UNSELECTED`, `READY_GRAPHITE`, `READY_GITHUB`,
   `CONFLICT`, `CONFIG_MISMATCH`, `CONFIG_INVALID`, `MANAGED_CONFLICT`,
   `PARTIAL_TOOLING`). Reads `claude plugin list --json` plus the repository's
-  optional `.yellow-stack.yml` intent through `lib/stack-provider-state.js`
+  optional `.yellow-stack.yml` intent through `lib/stack-provider-state.js`.
+  Before that read, resolves the yellow-core directory from
+  `$CLAUDE_PLUGIN_ROOT` when the state library is there, otherwise the
+  checkout's `plugins/yellow-core`, otherwise `yellow-core`'s `installPath`
+  in `installed_plugins.json` (`local` over `project` over `user`). An
+  unresolved directory stops the command.
 - `/stack:select` — switch the active stacked-PR provider (`graphite` /
   `github`) at `user`, `project`, or `local` scope. Shows the exact
   `claude plugin install|enable|disable` commands before running any of them,
@@ -244,7 +249,8 @@ pipeline.
   proposes anything
 - `stack-provider-router` — resolves the active stacked-PR provider and routes
   provider-specific work to it. Only `READY_GRAPHITE` and `READY_GITHUB` route;
-  the other six states stop with the classifier's own `detail` string
+  the other six states stop with the classifier's own `detail` string. Uses
+  the same yellow-core root resolution as `/stack:status`
 
 ## Shared Libraries
 
@@ -252,7 +258,10 @@ pipeline.
 than sourced:
 
 - `stack-provider-state.js` — the single owner of stacked-PR provider state.
-  Classifies `claude plugin list --json` plus the repository's optional
+  `/stack:status` and `stack-provider-router` locate this file from
+  `$CLAUDE_PLUGIN_ROOT`, the marketplace checkout, or `installed_plugins.json`
+  before they classify. The eight states are unchanged. Classifies
+  `claude plugin list --json` plus the repository's optional
   `.yellow-stack.yml` intent into the eight `/stack:status` states, and builds
   (never executes) the ordered `claude plugin` command plan for a provider
   switch. Dependency-free CJS with a small CLI

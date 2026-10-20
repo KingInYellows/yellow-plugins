@@ -11,10 +11,13 @@ active right now, and is it safe to act on that answer?**
 
 It resolves the answer from `plugins/yellow-core/lib/stack-provider-state.js`,
 which classifies `claude plugin list --json` plus the repository's
-`.yellow-stack.yml` intent into exactly one of eight states. The router
-never re-derives a state from tooling presence, branch shape, or the
-existence of a `.graphite.yml` — those are downstream symptoms, not the
-provider decision.
+`.yellow-stack.yml` intent into exactly one of eight states. The library
+directory is `$CLAUDE_PLUGIN_ROOT` when that file is there, otherwise this
+checkout's `plugins/yellow-core`, otherwise `yellow-core`'s `installPath`
+in `installed_plugins.json`. Finding that directory is not provider
+selection. The router never re-derives a state from tooling presence,
+branch shape, or the existence of a `.graphite.yml` — those are downstream
+symptoms, not the provider decision.
 
 Only two states route. The other six stop.
 
@@ -51,10 +54,128 @@ Run this in a single Bash call. It is read-only.
 ```bash
 set -uo pipefail
 
-LIB="${CLAUDE_PLUGIN_ROOT}/lib/stack-provider-state.js"
-PROBE="${CLAUDE_PLUGIN_ROOT}/lib/stack-tooling-probe.js"
+# Path lookup only. Not a provider choice: CLAUDE_PLUGIN_ROOT, then this
+# checkout's plugins/yellow-core, then installed_plugins.json. An error
+# line stops the command. Keep the marked program byte-identical with
+# commands/stack/status.md.
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || printf '')
+installed_plugins="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json"
+plugin_root="${CLAUDE_PLUGIN_ROOT:-}"
+core_root=$(node - "$plugin_root" "$repo_root" "$installed_plugins" <<'YCR_RESOLVE'
+// YCR_RESOLVE_START
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const pluginRootArg = process.argv[2] || '';
+const checkoutRootArg = process.argv[3] || '';
+const installedFileArg = process.argv[4] || '';
+const LIB_SUFFIX = path.sep + 'yellow-core' + path.sep + 'lib' + path.sep + 'stack-provider-state.js';
+const SCOPE_TIER = { user: 0, project: 1, local: 2 };
+function fail(message) {
+  process.stdout.write('stack_provider_error: ' + message + '\n');
+  process.exit(1);
+}
+function acceptedRoot(dir) {
+  if (typeof dir !== 'string' || dir.length === 0) return null;
+  if (!path.isAbsolute(dir)) return null;
+  if (/[\r\n\0]/.test(dir)) return null;
+  const lib = path.join(dir, 'lib', 'stack-provider-state.js');
+  let st;
+  try { st = fs.lstatSync(lib); } catch (err) { return null; }
+  if (!st.isFile() || st.isSymbolicLink()) return null;
+  let real;
+  try { real = fs.realpathSync(lib); } catch (err) { return null; }
+  if (!real.endsWith(LIB_SUFFIX)) return null;
+  return path.dirname(path.dirname(real));
+}
+function fromInstalled(file) {
+  if (!file || /[\r\n\0]/.test(file)) return { error: null, root: null };
+  let raw;
+  try { raw = fs.readFileSync(file, 'utf8'); } catch (err) {
+    if (err && err.code === 'ENOENT') return { error: null, root: null };
+    return { error: 'installed_plugins.json could not be read' };
+  }
+  let data;
+  try { data = JSON.parse(raw); } catch (err) {
+    return { error: 'installed_plugins.json could not be parsed' };
+  }
+  const plugins = data && typeof data === 'object' ? data.plugins : null;
+  if (!plugins || typeof plugins !== 'object' || Array.isArray(plugins)) {
+    return { error: null, root: null };
+  }
+  const candidates = [];
+  const keys = Object.keys(plugins);
+  for (let i = 0; i < keys.length; i += 1) {
+    const key = keys[i];
+    if (!/^yellow-core@[A-Za-z0-9][A-Za-z0-9._-]*$/.test(key)) continue;
+    const value = plugins[key];
+    const rows = Array.isArray(value) ? value : [value];
+    for (let j = 0; j < rows.length; j += 1) {
+      const row = rows[j];
+      if (!row || typeof row !== 'object') continue;
+      if (!Object.prototype.hasOwnProperty.call(SCOPE_TIER, row.scope)) continue;
+      const root = acceptedRoot(row.installPath);
+      if (!root) continue;
+      candidates.push({ scope: row.scope, root: root });
+    }
+  }
+  if (candidates.length === 0) return { error: null, root: null };
+  let best = -1;
+  for (let i = 0; i < candidates.length; i += 1) {
+    best = Math.max(best, SCOPE_TIER[candidates[i].scope]);
+  }
+  const winners = [];
+  for (let i = 0; i < candidates.length; i += 1) {
+    if (SCOPE_TIER[candidates[i].scope] !== best) continue;
+    if (winners.indexOf(candidates[i].root) === -1) winners.push(candidates[i].root);
+  }
+  if (winners.length !== 1) {
+    return { error: 'more than one yellow-core install at the same scope' };
+  }
+  return { error: null, root: winners[0] };
+}
+const fromEnv = acceptedRoot(pluginRootArg);
+if (fromEnv) {
+  process.stdout.write(fromEnv + '\n');
+  process.exit(0);
+}
+const fromCheckout = acceptedRoot(
+  checkoutRootArg ? path.join(checkoutRootArg, 'plugins', 'yellow-core') : ''
+);
+if (fromCheckout) {
+  process.stdout.write(fromCheckout + '\n');
+  process.exit(0);
+}
+const installed = fromInstalled(installedFileArg);
+if (installed.error) fail(installed.error);
+if (installed.root) {
+  process.stdout.write(installed.root + '\n');
+  process.exit(0);
+}
+fail('yellow-core library not found');
+// YCR_RESOLVE_END
+YCR_RESOLVE
+) || true
+case "$core_root" in
+  *$'\n'*)
+    printf 'stack_provider_error: yellow-core library not found\n'
+    exit 0
+    ;;
+  stack_provider_error:*)
+    printf '%s\n' "$core_root"
+    exit 0
+    ;;
+  /*)
+    ;;
+  *)
+    printf 'stack_provider_error: yellow-core library not found\n'
+    exit 0
+    ;;
+esac
+LIB="$core_root/lib/stack-provider-state.js"
+PROBE="$core_root/lib/stack-tooling-probe.js"
 if [ ! -f "$LIB" ]; then
-  printf 'stack_provider_error: router library not found at %s\n' "$LIB"
+  printf 'stack_provider_error: yellow-core library not found\n'
   exit 0
 fi
 if [ ! -f "$PROBE" ]; then
@@ -62,7 +183,6 @@ if [ ! -f "$PROBE" ]; then
   exit 0
 fi
 
-repo_root=$(git rev-parse --show-toplevel 2>/dev/null || printf '')
 intent_file="${repo_root:-.}/.yellow-stack.yml"
 
 # stack-tooling-probe.js is the single owner of gt/gh readiness (presence,
@@ -82,6 +202,10 @@ printf '%s' "$plugin_json" | node "$LIB" classify \
   --tooling-probe-file <(printf '%s' "$probe_json") \
   || printf 'stack_provider_error: classification failed — provider state is UNKNOWN\n'
 ```
+
+If the output contains a `stack_provider_error:` line, print that line and
+stop. Do not infer a provider from the tooling rows, from `.graphite.yml`,
+or from which binaries are on `PATH`.
 
 ### Step 2: Route or stop
 
