@@ -124,7 +124,7 @@ grep '^STATUSLINE_VERSION' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/yellow-statuslin
 | `session-handoff`     | Write a measured, secret-redacted handoff note at `plans/handoff/<date>-<slug>.md` (identity, HEAD, dirty fingerprint, `context_at_capture` from the opt-in context observer) and resume only from an explicitly named note after a read-only preflight |
 | `session-history`     | Cross-vendor session-history user surface — dispatches the `session-historian` agent against Claude Code + Devin + Codex backends with availability detection and graceful degradation per backend |
 | `stack-provider-guard` | Enforces the stacked-PR provider invariants before any provider-changing action — exactly one enabled, managed scopes fail closed, no direct settings-JSON edits, no silent fallback |
-| `stack-provider-router` | Resolves which stacked-PR provider is active from `plugins/yellow-core/lib/stack-provider-state.js` and routes provider-specific work to it; stops rather than guessing on any of the five non-READY states |
+| `stack-provider-router` | Resolves which stacked-PR provider is active from `stack-provider-state.js` (`CLAUDE_PLUGIN_ROOT`, then `GROK_PLUGIN_ROOT`, then the enabled `installPath`, then the in-repo tree) and routes provider-specific work to it; stops rather than guessing on any non-READY state |
 
 ## Prompt cache TTL
 

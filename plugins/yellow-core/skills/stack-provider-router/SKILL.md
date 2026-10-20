@@ -51,26 +51,107 @@ Run this in a single Bash call. It is read-only.
 ```bash
 set -uo pipefail
 
-LIB="${CLAUDE_PLUGIN_ROOT}/lib/stack-provider-state.js"
-PROBE="${CLAUDE_PLUGIN_ROOT}/lib/stack-tooling-probe.js"
-if [ ! -f "$LIB" ]; then
-  printf 'stack_provider_error: router library not found at %s\n' "$LIB"
-  exit 0
-fi
-if [ ! -f "$PROBE" ]; then
-  printf 'stack_provider_error: tooling probe not found at %s\n' "$PROBE"
-  exit 0
-fi
+# yellow-core-root:start
+# Library path only. Enablement still comes solely from
+# `claude plugin list --json`. A missed path is an error, not a provider guess.
+core_libs_ok() {
+  local root="$1"
+  [ -n "$root" ] || return 1
+  [ -f "$root/lib/stack-provider-state.js" ] || return 1
+  [ -f "$root/lib/stack-tooling-probe.js" ] || return 1
+  [ -L "$root/lib/stack-provider-state.js" ] && return 1
+  [ -L "$root/lib/stack-tooling-probe.js" ] && return 1
+  return 0
+}
+
+resolve_yellow_core_root() {
+  local candidate install_root
+  for candidate in "${CLAUDE_PLUGIN_ROOT:-}" "${GROK_PLUGIN_ROOT:-}"; do
+    if core_libs_ok "$candidate"; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  done
+  install_root=$(printf '%s' "${plugin_json:-}" | node -e '
+const fs = require("fs");
+const projectPath = process.argv[1] || "";
+let raw = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", function (chunk) { raw += chunk; });
+process.stdin.on("end", function () {
+  let rows = [];
+  try { rows = JSON.parse(raw); } catch (err) { rows = []; }
+  if (!Array.isArray(rows)) rows = [];
+  const scopeRank = { local: 0, project: 1, user: 2, managed: 3 };
+  const marker = "/lib/stack-provider-state.js";
+  const probe = "/lib/stack-tooling-probe.js";
+  function regularFile(p) {
+    try { return fs.lstatSync(p).isFile(); } catch (err) { return false; }
+  }
+  const candidates = rows.filter(function (row) {
+    if (row === null || typeof row !== "object") return false;
+    if (row.id !== "yellow-core@yellow-plugins") return false;
+    if (row.enabled !== true) return false;
+    if (typeof row.installPath !== "string" || row.installPath.length === 0) return false;
+    if (row.installPath.indexOf("\n") !== -1 || row.installPath.indexOf("\0") !== -1) return false;
+    if ((row.scope === "project" || row.scope === "local") && projectPath.length > 0) {
+      return row.projectPath === projectPath;
+    }
+    return true;
+  }).sort(function (a, b) {
+    const rank = function (scope) {
+      return Object.prototype.hasOwnProperty.call(scopeRank, scope) ? scopeRank[scope] : 9;
+    };
+    return rank(a.scope) - rank(b.scope);
+  });
+  let chosen = "";
+  for (let i = 0; i < candidates.length; i++) {
+    const root = candidates[i].installPath;
+    if (regularFile(root + marker) && regularFile(root + probe)) {
+      chosen = root;
+      break;
+    }
+  }
+  process.stdout.write(chosen);
+});
+' "${repo_root:-}")
+  if core_libs_ok "$install_root"; then
+    printf '%s' "$install_root"
+    return 0
+  fi
+  if [ -n "${repo_root:-}" ] && core_libs_ok "${repo_root}/plugins/yellow-core"; then
+    printf '%s' "${repo_root}/plugins/yellow-core"
+    return 0
+  fi
+  printf ''
+}
+# yellow-core-root:end
 
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null || printf '')
 intent_file="${repo_root:-.}/.yellow-stack.yml"
+
+plugin_list_ok=0
+plugin_json=""
+if plugin_json=$(claude plugin list --json 2>/dev/null); then
+  plugin_list_ok=1
+else
+  plugin_json=""
+fi
+
+ROOT=$(resolve_yellow_core_root)
+if [ -z "$ROOT" ]; then
+  printf 'stack_provider_error: router library not found (CLAUDE_PLUGIN_ROOT, GROK_PLUGIN_ROOT, installPath, and in-repo copy missed)\n'
+  exit 0
+fi
+LIB="$ROOT/lib/stack-provider-state.js"
+PROBE="$ROOT/lib/stack-tooling-probe.js"
 
 # stack-tooling-probe.js is the single owner of gt/gh readiness (presence,
 # gh auth validity, and github/gh-stack extension identity) — this skill no
 # longer inlines its own copy of that logic.
 probe_json=$(node "$PROBE" probe --provider both)
 
-if ! plugin_json=$(claude plugin list --json 2>/dev/null); then
+if [ "$plugin_list_ok" -ne 1 ]; then
   printf 'stack_provider_error: `claude plugin list --json` failed — provider state is UNKNOWN\n'
   exit 0
 fi
