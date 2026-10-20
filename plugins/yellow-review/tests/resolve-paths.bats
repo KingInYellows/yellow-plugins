@@ -964,12 +964,16 @@ old_link() {
 
 @test "rp_ignored_changed_since follows a chain of symlinks to the final target" {
   link_repo
-  old_link ../../real/tool node_modules/.bin/hop2
-  old_link hop2 node_modules/.bin/hop1
+  # hop2 sits outside node_modules: the walk of an ignored directory stops at
+  # its first changed link, in readdir order, so two links in one directory
+  # would make it a coin toss which one is judged and named.
+  old_link ../real/tool src/hop2.cache
+  old_link ../../src/hop2.cache node_modules/.bin/hop1
   printf 'new\n' >| real/tool
   run rp_ignored_changed_since "$MARKER" "$SCRATCH"
   [ "$status" -eq 1 ]
   [[ "$output" == *node_modules/.bin/hop1* ]]
+  [[ "$output" == *src/hop2.cache* ]]
 }
 
 @test "rp_ignored_changed_since follows symlinks nested below a target directory without a predicate too" {
