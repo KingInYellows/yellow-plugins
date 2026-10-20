@@ -79,6 +79,7 @@ function generatedBlock(name: string, body: string): string {
 
 const HELPERS_BODY = `readonly RED='\\033[0;31m'\nerror() { printf '%s\\n' "$1" >&2; exit 1; }`;
 const VERSION_GTE_BODY = `version_gte() { [ "$1" = "$2" ]; }`;
+const ROOT_BODY = `resolve_yellow_core_root() { printf '%s' "$1"; }`;
 
 // Match the script's TARGETS manifest exactly so the per-target loop
 // finds every entry. Focus drift tests on the ast-grep target (single
@@ -93,6 +94,7 @@ function seedAllTargets(tmp: string, focusBlock: string): void {
   // Snippets — canonical content the script will compare against.
   write(tmp, 'scripts/snippets/install-helpers.sh', `${HELPERS_BODY}\n`);
   write(tmp, 'scripts/snippets/install-version-gte.sh', `${VERSION_GTE_BODY}\n`);
+  write(tmp, 'scripts/snippets/yellow-core-root.sh', `${ROOT_BODY}\n`);
 
   const helpersBlock = generatedBlock('install-helpers', HELPERS_BODY);
   const versionBlock = generatedBlock('install-version-gte', VERSION_GTE_BODY);
@@ -110,6 +112,13 @@ function seedAllTargets(tmp: string, focusBlock: string): void {
   // The focus target uses the caller-supplied block so individual tests
   // can drift it without touching the other targets.
   write(tmp, FOCUS_TARGET, buildSimpleTarget([focusBlock]));
+  const rootBlock = generatedBlock('yellow-core-root', ROOT_BODY);
+  write(tmp, 'plugins/yellow-core/commands/stack/status.md', rootBlock + '\n');
+  write(
+    tmp,
+    'plugins/yellow-core/skills/stack-provider-router/SKILL.md',
+    rootBlock + '\n'
+  );
 }
 
 describe('sync-shell-snippets.js', () => {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# Pins and exercises the yellow-core root lookup shared by
-# commands/stack/status.md and skills/stack-provider-router/SKILL.md.
-# The lookup is inlined in both files (a shell helper cannot be found
+# Exercises the yellow-core root lookup shared by commands/stack/status.md
+# and skills/stack-provider-router/SKILL.md. The lookup is generated from
+# scripts/snippets/yellow-core-root.sh (a shell helper cannot be sourced
 # before the library path is known). Run from the plugin directory:
 # `bats tests/stack-provider-root.bats`
 
@@ -11,13 +11,13 @@ setup() {
   STATUS_MD="$PLUGIN_DIR/commands/stack/status.md"
   ROUTER_MD="$PLUGIN_DIR/skills/stack-provider-router/SKILL.md"
   TMP="$(mktemp -d)"
-  unset CLAUDE_PLUGIN_ROOT GROK_PLUGIN_ROOT plugin_json repo_root
+  unset CLAUDE_PLUGIN_ROOT plugin_json repo_root
   # shellcheck disable=SC1090
-  eval "$(awk '/# yellow-core-root:start/,/# yellow-core-root:end/' "$STATUS_MD")"
+  eval "$(root_block "$STATUS_MD")"
 }
 
 teardown() {
-  unset CLAUDE_PLUGIN_ROOT GROK_PLUGIN_ROOT plugin_json repo_root
+  unset CLAUDE_PLUGIN_ROOT plugin_json repo_root
   [ -n "${TMP:-}" ] && [ -d "$TMP" ] && rm -rf "$TMP"
   return 0
 }
@@ -29,18 +29,14 @@ make_root() {
 }
 
 root_block() {
-  awk '/# yellow-core-root:start/,/# yellow-core-root:end/' "$1"
+  awk '/# >>> generated: yellow-core-root /,/# <<< generated: yellow-core-root <<</' "$1"
 }
 
-@test "status and router ship the same root lookup" {
-  diff -u <(root_block "$STATUS_MD") <(root_block "$ROUTER_MD")
-}
-
-@test "both surfaces name GROK_PLUGIN_ROOT and installPath" {
-  grep -F 'GROK_PLUGIN_ROOT' "$STATUS_MD"
-  grep -F 'installPath' "$STATUS_MD"
-  grep -F 'GROK_PLUGIN_ROOT' "$ROUTER_MD"
-  grep -F 'installPath' "$ROUTER_MD"
+@test "both surfaces embed the generated root lookup" {
+  grep -F 'scripts/snippets/yellow-core-root.sh' "$STATUS_MD"
+  grep -F 'scripts/snippets/yellow-core-root.sh' "$ROUTER_MD"
+  grep -F 'resolve_yellow_core_root' "$STATUS_MD"
+  grep -F 'resolve_yellow_core_root' "$ROUTER_MD"
 }
 
 @test "a missed root is still stack_provider_error" {
@@ -71,15 +67,13 @@ root_block() {
   [ "$output" = "$TMP/claude" ]
 }
 
-@test "GROK_PLUGIN_ROOT is used when CLAUDE_PLUGIN_ROOT is unset" {
-  make_root "$TMP/grok"
+@test "installPath is used when CLAUDE_PLUGIN_ROOT is unset" {
   make_root "$TMP/install"
-  export GROK_PLUGIN_ROOT="$TMP/grok"
   plugin_json="[{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"user\",\"installPath\":\"$TMP/install\"}]"
   repo_root=""
   run resolve_yellow_core_root
   [ "$status" -eq 0 ]
-  [ "$output" = "$TMP/grok" ]
+  [ "$output" = "$TMP/install" ]
 }
 
 @test "an env root missing a library falls through to installPath" {
@@ -92,6 +86,16 @@ root_block() {
   run resolve_yellow_core_root
   [ "$status" -eq 0 ]
   [ "$output" = "$TMP/install" ]
+}
+
+@test "an install path missing a library falls through to the checkout" {
+  mkdir -p "$TMP/install"
+  make_root "$TMP/repo/plugins/yellow-core"
+  plugin_json="[{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"user\",\"installPath\":\"$TMP/install\"}]"
+  repo_root="$TMP/repo"
+  run resolve_yellow_core_root
+  [ "$status" -eq 0 ]
+  [ "$output" = "$TMP/repo/plugins/yellow-core" ]
 }
 
 @test "a symlinked library is not a root" {

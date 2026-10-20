@@ -63,8 +63,8 @@ it before editing a command, library or the staging pipeline.
   (archive a plan behind Gate A unchecked-box and Gate C merged-PR evidence; see
   reference for the provenance tiers and commit trailers)
 - `/stack:status` (classify provider state into eight states; resolves the
-  yellow-core library via `CLAUDE_PLUGIN_ROOT`, then `GROK_PLUGIN_ROOT`, then
-  the enabled `installPath`, then the in-repo tree, before classify),
+  yellow-core library via `CLAUDE_PLUGIN_ROOT`, then the enabled `installPath`,
+  then the in-repo tree, before classify),
   `/stack:select` (switch provider; never edits settings JSON, never falls back)
 - `/statusline:setup`, `/setup:all`, `/setup:claude-web`
 - `/worktree:cleanup`, `/worktree:restack` (logic lives in

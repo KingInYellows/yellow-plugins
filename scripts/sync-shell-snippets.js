@@ -8,7 +8,7 @@
  * canonical source (debt findings 014/015/036/037).
  *
  * Canonical snippets live in scripts/snippets/<name>.sh. Each consuming
- * install script carries one generated block per snippet it embeds,
+ * file carries one generated block per snippet it embeds,
  * delimited by sentinel markers:
  *
  *   # >>> generated: <name> (source: scripts/snippets/<name>.sh) >>>
@@ -48,6 +48,9 @@ const CHECK_MODE = process.argv.slice(2).includes('--check');
 // review #534, threadId PRRT_kwDOQ3SUys6CmtOZ):
 //   - plugins/yellow-research/scripts/install-ast-grep.sh — embeds the
 //     install-helpers block byte-for-byte; onboarded as a TARGETS entry.
+// yellow-core-root is the library-path bootstrap shared by /stack:status and
+// stack-provider-router. It cannot be sourced: the block runs before the
+// plugin root is known.
 const TARGETS = {
   'plugins/yellow-codex/scripts/install-codex.sh': [
     'install-helpers',
@@ -58,6 +61,10 @@ const TARGETS = {
     'install-version-gte',
   ],
   'plugins/yellow-research/scripts/install-ast-grep.sh': ['install-helpers'],
+  'plugins/yellow-core/commands/stack/status.md': ['yellow-core-root'],
+  'plugins/yellow-core/skills/stack-provider-router/SKILL.md': [
+    'yellow-core-root',
+  ],
 };
 
 // Cache loaded snippets so a multi-target manifest does not re-read the
@@ -159,8 +166,8 @@ function main() {
       process.exit(1);
     }
     console.log(
-      `[sync-shell-snippets] ✓ all ${Object.keys(TARGETS).length} install ` +
-        'scripts are in sync with scripts/snippets/'
+      `[sync-shell-snippets] ✓ all ${Object.keys(TARGETS).length} targets ` +
+        'are in sync with scripts/snippets/'
     );
   } else {
     console.log('[sync-shell-snippets] done');
