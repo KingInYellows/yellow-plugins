@@ -52,7 +52,7 @@ Capture the upstream output first, then test it separately — never let `head`
 own the exit code of a presence check:
 
 ```bash
-SPEC_LIST=$(ls -t plans/specs/*.md 2>/dev/null)
+SPEC_LIST=$(command find -H plans/specs -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null)
 if [ -z "$SPEC_LIST" ]; then
   printf '[decompose] No specs found in plans/specs/. Run /workflows:spec first.\n' >&2
   exit 1

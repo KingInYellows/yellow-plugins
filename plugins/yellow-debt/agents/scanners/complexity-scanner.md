@@ -111,7 +111,7 @@ b=''
 [ -n "$p" ] && [ -O "$p" ] && b="$p/yellow-ast-grep"
 [ -n "$b" ] && mkdir -m 700 -- "$b" 2>/dev/null
 if [ -n "$b" ] && [ -d "$b" ] && [ ! -L "$b" ] && [ -O "$b" ]; then
-  case "$(ls -ld -- "$b")" in drwx------*) ;; *) b='' ;; esac
+  case "$(command ls -ld -- "$b")" in drwx------*) ;; *) b='' ;; esac
 else
   b=''
 fi
@@ -160,7 +160,7 @@ case "$p" in /*) ;; *) p='' ;; esac
 b=''
 [ -n "$p" ] && [ -O "$p" ] && b="$p/yellow-ast-grep"
 if [ -n "$b" ] && [ -d "$b" ] && [ ! -L "$b" ] && [ -O "$b" ]; then
-  case "$(ls -ld -- "$b")" in drwx------*) ;; *) b='' ;; esac
+  case "$(command ls -ld -- "$b")" in drwx------*) ;; *) b='' ;; esac
 else
   b=''
 fi

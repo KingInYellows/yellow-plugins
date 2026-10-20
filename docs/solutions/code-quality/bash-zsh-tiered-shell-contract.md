@@ -43,7 +43,7 @@ was not only the known `noclobber` class:
 A four-tier contract — inline blocks portable, bash-only code in a
 `bash /dev/fd/3 3<<'TAG'` wrapper, bash-only libraries sourced only inside
 it, dual-shell libraries sourced directly — enforced by
-`scripts/validate-shell-compat.js` (SHC-001..009), `scripts/check-shell-parse.js`
+`scripts/validate-shell-compat.js` (SHC-001..010), `scripts/check-shell-parse.js`
 and the `tests/shell-compat/` bats suite. CONTRIBUTING.md "Shell Scripts →
 Bash and zsh" is the authoritative statement of the tiers and authoring
 rules; the tier lists live in `scripts/shell-compat-config.json`. SHC-001
@@ -82,6 +82,39 @@ replaces the two manual greps in `zsh-noclobber-mktemp-stderr-redirect.md`.
   `bash -n` on each); a rollout `--report` flag that forced exit 0 stayed
   available (removed); and the hook-parity test used floors that let new
   unverifiable blocks in (now an exact per-file ratchet).
+- **Aliases and `nomatch` break `ls` parsing without an error.** Claude Code
+  replays the user's alias snapshot, so `alias ls=eza` made
+  `ls -t plans/*.md 2>/dev/null | head -5` print nothing (eza reads `-t` as
+  `--time`) and `/flow:work` reported that no plans exist. Separately, zsh's
+  `nomatch` aborts a command whose glob matches nothing *before* its
+  `2>/dev/null` applies, so the error leaks and `ls` never runs; `command ls`
+  alone fixes the alias but not the nomatch error. List through
+  `command find -H DIR -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' -exec ls -t {} +`
+  (the real `ls` runs without a shell; an empty match prints nothing and
+  exits 0) and prefix other parsed calls with `command`. SHC-010 enforces it
+  from `aliasGuardedCommands`, and `tests/shell-compat/aliases.bats` runs the
+  shipped lines under `alias ls=false …` in every profile. Pass `-H` so a
+  symlinked `plans/` is followed, as the old glob did. Two limits:
+  `-exec … {} +` sorts only within each batch, and Claude Code also shadows
+  `find` and `grep` with functions, so write `command find`, not `\find`.
+- **A line-based command lint needs a model of shell lines, and each
+  hardening PR needs a sweep for sibling sites.** Review of SHC-010 found it
+  blind or wrong in six ways, all fixed: a comment line inside a multi-line
+  `$(` capture closed the logical-line group, and a trailing comment blanked
+  later lines because the joined text was masked once (mask each physical line,
+  then join; skip comments without closing the group); `if ls …` and
+  `while ls …` were never flagged because the tested-prefix regex required
+  whitespace after a trimmed keyword; an empty `aliasGuardedCommands` built an
+  empty alternation that matched zero-length forever (validate the list is
+  non-empty before building the regex); and case-arm patterns (`ps|df)`) and
+  arithmetic (`(( top > 0 ))`) read as commands. The same review found a bare
+  `ls "$d"/*.md` left in `flow/decompose.md` after the other sites were
+  converted, and a `find -type f` rewrite that dropped the symlinked plans the
+  old glob listed. After converting a pattern, grep the plugin tree for the old
+  form, and keep `-type l` in any `find` that replaces a glob. Open question:
+  display-only calls such as `ls -t plans/*.md 2>/dev/null` still pass SHC-010
+  although `ls=eza` changes their output; decide whether output-changing flags
+  alone should be flagged. The fixes were verified only by the local suites.
 - **Expanded text counts.** `${reviewer^}` inside a multi-line double-quoted
   string, or in an unquoted-tag heredoc, is a zsh `bad substitution` even
   though it is not a command.

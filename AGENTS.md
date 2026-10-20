@@ -97,7 +97,7 @@ Use pnpm only. `preinstall` enforces Node and pnpm through
 - `pnpm validate:agents`: Run the agent and markdown authoring validator only.
 - `pnpm validate:shell-compat`: bash/zsh compatibility lint of fenced shell
   blocks in plugin markdown and the Tier 4 (dual-shell) libraries listed in
-  `scripts/shell-compat-config.json` (rules SHC-001..009, SHC-101, SHC-900).
+  `scripts/shell-compat-config.json` (rules SHC-001..010, SHC-101, SHC-900).
 - `pnpm check:shell-parse`: Flag shell blocks that bash parses but zsh does
   not, and Tier 2 wrapper bodies bash rejects. Without zsh it prints SKIP
   and exits 0 locally — a SKIP verifies nothing; `SHELL_COMPAT_REQUIRE_ZSH=1`

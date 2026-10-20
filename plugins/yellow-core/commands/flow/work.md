@@ -44,7 +44,7 @@ assurance.
    If no arguments are provided, check for recent plan files:
 
    ```bash
-   ls -t plans/*.md 2>/dev/null | head -5
+   command find -H plans -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -5
    ```
 
    If plans exist, use `AskUserQuestion` to ask: "Which plan file should I

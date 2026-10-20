@@ -185,9 +185,9 @@ timeout 10 ssh \
   -o ConnectTimeout=3 \
   -o ServerAliveInterval=60 \
   "$user@$host" << 'METRICS'
-echo "CPU=$(top -bn1 | awk '/^%Cpu/ {print 100 - $8}')"
+echo "CPU=$(command top -bn1 | awk '/^%Cpu/ {print 100 - $8}')"
 echo "MEM_FREE=$(free -m | awk '/^Mem:/{print $7}')"
-echo "DISK_USED=$(df / | awk 'NR==2{gsub(/%/,""); print $5}')"
+echo "DISK_USED=$(command df / | awk 'NR==2{gsub(/%/,""); print $5}')"
 METRICS
 ```
 

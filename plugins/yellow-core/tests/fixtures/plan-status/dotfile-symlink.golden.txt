@@ -1,0 +1,11 @@
+Open plans (plans/):
+File                                                         Progress
+----                                                         --------
+plans/a-real.md                                              [ 1/2 ]
+plans/b-link.md                                              [ 1/2 ]
+
+Archived plans (plans/complete/): (2)
+File                                                         Progress
+----                                                         --------
+plans/complete/y-real.md                                     [ 1/1 ]
+plans/complete/z-link.md                                     [ 1/1 ]

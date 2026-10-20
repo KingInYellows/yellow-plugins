@@ -751,3 +751,194 @@ describe('line continuations (follow-up 21)', () => {
     ]);
   });
 });
+
+describe('SHC-010 alias-prone commands', () => {
+  const flagged = (text: string) =>
+    lint(text)
+      .filter((f) => f.rule === 'SHC-010')
+      .map((f) => f.line);
+
+  it.each([
+    ['piped ls', 'ls -t plans/*.md | head'],
+    ['piped ls with stderr dropped', 'ls -t plans/*.md 2>/dev/null | head -5'],
+    ['captured ps', 'x=$(ps -p 1 -o comm=)'],
+    ['captured in a case subject', 'case "$(ls -ld -- "$b")" in d*) ;; esac'],
+    ['tested ls', 'if ! ls a/*.md >/dev/null 2>&1; then :; fi'],
+    ['ls as an if condition', 'if ls a >/dev/null 2>&1; then :; fi'],
+    ['ls as a while condition', 'while ls a >/dev/null 2>&1; do :; done'],
+    ['ls as the left side of &&', 'ls a >/dev/null 2>&1 && echo yes'],
+    ['backtick capture', 'x=`ls -t plans`'],
+    ['argument-free backtick capture', 'x=`ls`'],
+    ['argument-free backtick df', 'x=`df`'],
+    ['capture inside arithmetic', 'x=$(( $(du -sk dir | cut -f1) / 1024 ))'],
+    ['ls with &> then &&', 'ls plans/*.md &>/dev/null && echo found'],
+    ['ls with &> to a file', 'ls x &> f'],
+    ['last command of an if list', 'if [ -d plans ] && ls plans/*.md >/dev/null 2>&1; then :; fi'],
+    ['last command of a while list', 'while [ -d plans ] && ls plans/*.md >/dev/null 2>&1; do :; done'],
+    [
+      'indented last command of an if list',
+      '  if [ -d plans ] && ls plans/*.md >/dev/null 2>&1; then :; fi',
+    ],
+    [
+      'indented last command of a while list',
+      '  while [ -d plans ] && ls plans/*.md >/dev/null 2>&1; do :; done',
+    ],
+    ['process substitution', 'while read -r f; do :; done < <(ls -t plans)'],
+    ['du piped to cut', 'du -sh x | cut -f1'],
+    ['df redirected to a file', 'df -h > out.txt'],
+    ['top inside a pipeline segment', 'echo go; top -bn1 | head -3'],
+  ])('flags %s', (_name, text) => {
+    expect(flagged(text)).toEqual([1]);
+  });
+
+  it('flags a condition-list command indented inside a function', () => {
+    expect(
+      flagged(
+        'fn() {\n  if [ -d plans ] && ls plans/*.md >/dev/null 2>&1; then :; fi\n}'
+      )
+    ).toEqual([2]);
+  });
+
+  it('flags a pipe split across lines at the line holding the command', () => {
+    expect(flagged('echo go\nls -t x \\\n  | head -5')).toEqual([2]);
+    expect(flagged('ls -t x |\n  head -5')).toEqual([1]);
+  });
+
+  it('flags a multiline capture at the line holding the command', () => {
+    expect(flagged('v=$(\n  ls -t x\n)')).toEqual([2]);
+  });
+
+  it('keeps a capture or pipe open across a comment line', () => {
+    expect(flagged('v=$(\n  # note\n  ls -t x\n)')).toEqual([3]);
+    expect(flagged('ls -t x |\n  # note\n  head')).toEqual([1]);
+  });
+
+  it('keeps a capture open across a case arm and judges the command after it', () => {
+    const text = 'v=$(\n  case "$c" in\n    ps) echo a ;;\n  esac\n  ls -t x\n)';
+    expect(flagged(text)).toEqual([5]);
+  });
+
+  it('does not read a case-arm pattern inside a capture as a command', () => {
+    expect(flagged('v=$(\n  case "$c" in\n    ls|ps) echo a ;;\n  esac\n)')).toEqual([]);
+  });
+
+  it('does not let a trailing comment hide later lines of the command', () => {
+    expect(flagged('v=$( # newest first\n  ls -t x\n)')).toEqual([2]);
+    expect(flagged('v=$(\n  echo a # note\n  ls -t x\n)')).toEqual([3]);
+  });
+
+  it('flags other redirect and pipe forms', () => {
+    expect(flagged('df -h 1> out.txt')).toEqual([1]);
+    expect(flagged('df -h 2> err.txt')).toEqual([]);
+    expect(flagged('ls a 2>&1 | head')).toEqual([1]);
+    expect(flagged('ls a >> out')).toEqual([1]);
+    expect(flagged('ls a >| out')).toEqual([1]);
+    expect(flagged('ls a > /dev/null')).toEqual([]);
+  });
+
+  // Known gaps (CONTRIBUTING.md "Shell Scripts" lists them). Todos, not
+  // pinned passes, so fixing the lint does not fail a test.
+  it.todo('flags an env-prefixed command: LC_ALL=C ls x | head');
+  it.todo('flags a wrapper-prefixed command: timeout 5 ls x | head');
+  it.todo('flags a sudo-prefixed command: sudo df | tail');
+  it.todo('flags a piped subshell: ( ls x ) | head');
+
+  it.each([
+    ['command prefix', 'command ls -t x | head'],
+    ['backslash prefix', '\\ls x | head'],
+    ['bare display call', 'ls -d .ruvector/'],
+    ['bare display with stderr dropped', 'ls -la x 2>/dev/null'],
+    ['find -exec ls', "command find -H plans -name '*.md' ! -name '.*' -exec ls -t {} + | head"],
+    [
+      'the shipped work.md listing',
+      `command find -H plans -maxdepth 1 \\( -type f -o -type l \\) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null | head -5`,
+    ],
+    [
+      'the shipped plan-status existence check',
+      `if [ -z "$(command find -H plans -maxdepth 1 \\( -type f -o -type l \\) -name '*.md' ! -name '.*' 2>/dev/null | head -1)" ]; then`,
+    ],
+    ['xargs ls', 'printf "%s\\n" a | xargs ls -t'],
+    ['ssh remote command', 'ssh host ls -t x | head'],
+    ['ls in a string', "printf 'ls -t' | cat"],
+    ['ls as an argument', 'echo ls | head'],
+    ['placeholder in a bare call', 'ls -la .worktrees/<name>/.ruvector'],
+    ['a longer command name', 'lsof -i | head'],
+    ['a case-arm pattern', 'case "$c" in\n  ps|df) echo disk ;;\nesac'],
+    ['a later case-arm alternative', 'case "$c" in\n  ls|ps|du) echo x ;;\nesac'],
+    ['a parenthesised case-arm', 'case "$c" in\n  (ps|df) echo x ;;\nesac'],
+    ['an arithmetic comparison', 'if (( top > 0 )); then :; fi'],
+    ['an arithmetic expansion', 'x=$(( ps > 3 ? 1 : 0 ))'],
+    ['a path ending in ls', './bin/ls x | head'],
+    ['a display call in an if body', 'if [ -d x ]; then ls -la x 2>/dev/null; fi'],
+    ['a display call in a while body', 'while read -r f; do ls -d x; done'],
+    ['a display-only command before then', 'if ls; true; then :; fi'],
+    ['a display-only command before do', 'while ls; true; do :; done'],
+    ['arithmetic around a plain variable', 'x=$(( n / 1024 ))'],
+  ])('passes %s', (_name, text) => {
+    expect(flagged(text)).toEqual([]);
+  });
+
+  it('passes the same ls inside a bash fd wrapper and a quoted heredoc', () => {
+    const wrapper = ["bash /dev/fd/3 3<<'__W__'", 'ls -t x | head', '__W__'];
+    expect(flagged(wrapper.join('\n'))).toEqual([]);
+    const remote = ['ssh host <<\'REMOTE\'', 'df -h | tail -1', 'REMOTE'];
+    expect(flagged(remote.join('\n'))).toEqual([]);
+  });
+
+  it('lints a tier 4 library file with the same rule', () => {
+    write(
+      'plugins/demo/lib/dual.sh',
+      '#!/usr/bin/env bash\ndual_fn() { ls -t d | head -1; }\n'
+    );
+    const result = run();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('plugins/demo/lib/dual.sh:2 [SHC-010]');
+  });
+
+  it('honours aliasGuardedCommands from the context', () => {
+    const ctx = { ...EMPTY_CTX, aliasGuarded: ['find'] };
+    const hits = (text: string) =>
+      lintShellText(text, 'plugins/p/x.md', 1, ctx)
+        .filter((f: Finding) => f.rule === 'SHC-010')
+        .map((f: Finding) => f.line);
+    expect(hits('find . -name x | head')).toEqual([1]);
+    expect(hits('ls -t x | head')).toEqual([]);
+  });
+
+  it.each([
+    ['an empty list', []],
+    ['only invalid names', ['', 'l s', '(ls', 'a|b']],
+  ])('reports nothing for %s in the context', (_name, aliasGuarded) => {
+    const ctx = { ...EMPTY_CTX, aliasGuarded };
+    const hits = lintShellText('ls -t x | head', 'plugins/p/x.md', 1, ctx).filter(
+      (f: Finding) => f.rule === 'SHC-010'
+    );
+    expect(hits).toEqual([]);
+  });
+
+  it('runs against the tree: fails on a bare piped ls, passes with command', () => {
+    write('plugins/demo/commands/bad.md', md('ls -t plans | head -5'));
+    const failed = run();
+    expect(failed.status).toBe(1);
+    expect(failed.stderr).toContain('plugins/demo/commands/bad.md:4 [SHC-010]');
+    write('plugins/demo/commands/bad.md', md('command ls -t plans | head -5'));
+    expect(run().status).toBe(0);
+  });
+
+  it('rejects a malformed aliasGuardedCommands as SHC-900', () => {
+    for (const bad of [[], 'ls', ['ls', 3], ['l s']]) {
+      config({ aliasGuardedCommands: bad });
+      const result = run();
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('aliasGuardedCommands must be');
+    }
+  });
+
+  it('uses the configured command list', () => {
+    config({ aliasGuardedCommands: ['du'] });
+    write('plugins/demo/commands/mix.md', md('ls -t a | head\ndu -sh a | cut -f1'));
+    const result = run();
+    expect(result.stderr).toContain('mix.md:5 [SHC-010]');
+    expect(result.stderr).not.toContain('mix.md:4');
+  });
+});

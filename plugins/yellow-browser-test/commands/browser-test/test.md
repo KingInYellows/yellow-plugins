@@ -168,7 +168,7 @@ if [ -f .claude/browser-test-server.pid ]; then
   PID=$(cat .claude/browser-test-server.pid)
   if printf '%s' "$PID" | grep -qE '^[0-9]+$' && kill -0 "$PID" 2>/dev/null; then
     # Verify this PID is actually a node/npm process before killing
-    PROC_CMD=$(ps -p "$PID" -o comm= 2>/dev/null || true)
+    PROC_CMD=$(command ps -p "$PID" -o comm= 2>/dev/null || true)
     case "$PROC_CMD" in
       node|npm|npx|sh|bash)
         # Kill child processes first (e.g., node spawned by npm run dev)

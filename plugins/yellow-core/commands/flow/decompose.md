@@ -45,7 +45,7 @@ contains `..`, or otherwise resolves outside `plans/specs/`. Every shell's
 anywhere else would leave each generated shell pointing at a missing file.
 
 ```bash
-SPEC_LIST=$(ls -t plans/specs/*.md 2>/dev/null)
+SPEC_LIST=$(command find -H plans/specs -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' -exec ls -t {} + 2>/dev/null)
 if [ -z "$SPEC_LIST" ]; then
   printf '[decompose] No specs found in plans/specs/. Run /flow:spec first.\n' >&2
   exit 1
@@ -126,7 +126,7 @@ Before writing, confirm none of the shell slugs collide with existing files in
 
 ```bash
 for d in plans plans/complete plans/shells; do
-  ls "$d"/*.md 2>/dev/null
+  command find -H "$d" -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' 2>/dev/null
 done
 ```
 

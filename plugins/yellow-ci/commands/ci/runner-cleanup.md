@@ -74,7 +74,7 @@ echo "=== TEMP FILES ==="
 find /tmp -name "actions-*" -mtime +7 2>/dev/null | wc -l
 
 echo "=== DISK USAGE ==="
-df -h / | tail -1
+command df -h / | tail -1
 PREVIEW
 ```
 
@@ -132,7 +132,7 @@ echo "Cleaning temp files..."
 find /tmp -name "actions-*" -mtime +7 -delete || echo "WARN: Some temp files could not be deleted"
 
 echo "=== POST DISK ==="
-df -h / | tail -1
+command df -h / | tail -1
 CLEANUP
 ```
 

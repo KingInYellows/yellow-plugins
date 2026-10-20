@@ -24,7 +24,7 @@ annotated `-- ready to complete` so the next archival step is obvious.
 
 ```bash
 set -euo pipefail
-if ! ls plans/*.md >/dev/null 2>&1; then
+if [ -z "$(command find -H plans -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' 2>/dev/null | head -1)" ]; then
   printf 'plans/ is empty (no open plans).\n\n'
   exit 0
 fi
@@ -58,7 +58,7 @@ if [ ! -d plans/complete ]; then
   printf 'Archived plans (plans/complete/): (0) — directory does not exist yet.\n'
   exit 0
 fi
-count=$(find plans/complete -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')
+count=$(command find -H plans/complete -maxdepth 1 \( -type f -o -type l \) -name '*.md' ! -name '.*' 2>/dev/null | wc -l | tr -d ' ')
 if [ "$count" -eq 0 ]; then
   printf 'Archived plans (plans/complete/): (0)\n'
   exit 0
