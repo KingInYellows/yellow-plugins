@@ -43,8 +43,10 @@ Archives a single open plan from `plans/<arg>.md` to
 
 This command does NOT delete the source file or push directly to main —
 it creates an archival branch (`plan/archive-<slug>`), records the
-rename via `git mv`, commits, and submits via `gt submit --no-interactive`.
-Review and merge land via the normal PR flow.
+rename via `git mv`, and commits. Submit follows the provider resolved
+in Phase 6: `gt submit --no-interactive` on Graphite, or
+`run-github-stack-runtime.js submit` on GitHub. Review and merge land
+via the normal PR flow.
 
 Sibling commands: `/plan:status` (read-only dashboard),
 `/flow:plan` (creates plans). See `plugins/yellow-core/CLAUDE.md`
@@ -62,7 +64,6 @@ accepted and stripped (tab-completion convenience).
 ```bash
 set -euo pipefail
 command -v gh >/dev/null 2>&1 || { printf '[plan:complete] error: gh not installed\n' >&2; exit 1; }
-command -v gt >/dev/null 2>&1 || { printf '[plan:complete] error: gt not installed\n' >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { printf '[plan:complete] error: jq not installed\n' >&2; exit 1; }
 gh auth status >/dev/null 2>&1 || { printf '[plan:complete] error: gh not authenticated (run: gh auth login)\n' >&2; exit 1; }
 # Clear any stale state from a prior aborted run. Without this, a previous
@@ -487,6 +488,11 @@ from its result.
 
 ```bash
 set -euo pipefail
+# gt is required only on this Graphite path. Phase 0 does not check it:
+# a READY_GITHUB run must reach the GitHub fence when gt is absent.
+# An unrun tooling probe can still report READY_GRAPHITE, so fail closed
+# here before any gt invocation.
+command -v gt >/dev/null 2>&1 || { printf '[plan:complete] error: gt not installed\n' >&2; exit 1; }
 ARG="$ARGUMENTS"
 CLEAN_ARG="${ARG#plans/}"
 SLUG=$(basename "$CLEAN_ARG" .md | sed 's/^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-//')
@@ -495,7 +501,7 @@ SLUG=$(basename "$CLEAN_ARG" .md | sed 's/^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-//')
 # on `develop`); basing the archival branch on the wrong trunk would stack
 # the PR incorrectly. `gt checkout --trunk` resolves the configured trunk.
 # Fall back to the gh default branch, then `main`, if gt cannot resolve one
-# (gt is a Phase 0 prerequisite, but may be uninitialised in a fresh repo).
+# (gt may be present but uninitialised in a fresh repo).
 if ! gt checkout --trunk 2>/dev/null; then
   TRUNK=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)
   [ -n "$TRUNK" ] || TRUNK=main
