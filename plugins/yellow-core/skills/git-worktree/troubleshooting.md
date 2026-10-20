@@ -74,13 +74,13 @@ was created (so the symlink was skipped to avoid a dangling link).
 ```bash
 # 1. Make sure the main repo has a .ruvector/ directory
 cd /path/to/main/repo
-ls -d .ruvector/   # must exist; if not, run /ruvector:setup
+command ls -d .ruvector/   # must exist; if not, run /ruvector:setup
 
 # 2. Repair the symlink in the existing worktree
 worktree-manager.sh copy-env <worktree-name>
 
 # 3. Verify
-ls -la .worktrees/<worktree-name>/.ruvector
+command ls -la .worktrees/<worktree-name>/.ruvector
 # expected: lrwxrwxrwx  ...  .ruvector -> /path/to/main/repo/.ruvector
 ```
 

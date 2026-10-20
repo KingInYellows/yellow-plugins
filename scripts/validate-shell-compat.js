@@ -27,11 +27,10 @@
  *            a plugin library that is in neither tier list
  *   SHC-009  a bash wrapper other than `bash /dev/fd/3 3<<'TAG'`
  *   SHC-010  alias-prone command (`aliasGuardedCommands`: ls, ps, du, df, top)
- *            in command position whose result is consumed (piped, captured,
- *            redirected to a file or tested) without a `command` prefix.
- *            Not detected: an env-assignment prefix (`LC_ALL=C ls …`),
- *            `ls &> file`, a piped subshell (`( ls ) | head`), and code in
- *            unquoted-tag heredocs or multi-line double-quoted strings.
+ *            in command position without a `command` prefix. A leading run of
+ *            environment assignments (`LC_ALL=C ls`) is stripped first.
+ *            Not detected: a wrapper prefix (`timeout 5 ls`, `sudo df`) and
+ *            code in unquoted-tag heredocs or multi-line double-quoted strings.
  *   SHC-101  plugin `.sh` file with no shebang and no library marker
  *   SHC-900  shell-compat-config.json problem (unknown path, missing reason,
  *            stale allowlist cap, ...)
@@ -101,8 +100,8 @@ const RULES = {
     hint: "use bash /dev/fd/3 3<<'TAG' … TAG: bash <<'TAG' lets any stdin reader swallow the script, and the git-push hook refuses bash -c \"$(…)\"",
   },
   'SHC-010': {
-    summary: 'alias-prone command whose result is consumed',
-    hint: "list a glob with `command find -H DIR -maxdepth 1 … -exec ls -t {} +` (`command ls` alone still hits zsh's nomatch error); for any other call write `command <cmd>`. Users' aliases (ls=eza, ps=procs, du=dust, df=duf) apply to these blocks",
+    summary: 'alias-prone command in command position',
+    hint: "write `command <cmd>` (`command` also bypasses shell functions). List a glob with `command find -H DIR -maxdepth 1 … -exec ls -t {} +`: `command ls` alone still hits zsh's nomatch error. Users' aliases (ls=eza, ps=procs, du=dust, df=duf) apply to these blocks",
   },
   'SHC-101': {
     summary: 'shell file without a shebang or library marker',
@@ -989,7 +988,7 @@ function classifySource(target, rel, ctx) {
 
 
 // ---------------------------------------------------------------------------
-// SHC-010: alias-prone commands whose output the block consumes
+// SHC-010: alias-prone commands in command position
 
 // The default for callers that pass no list (unit tests); the list in
 // scripts/shell-compat-config.json is authoritative for real runs.
@@ -1002,269 +1001,63 @@ function validAliasGuarded(list) {
     list.every((c) => typeof c === 'string' && COMMAND_NAME_RE.test(c))
   );
 }
-const CONSUMED_PHRASE = {
-  pipe: 'piped',
-  redirect: 'redirected to a file',
-  captured: 'captured',
-  tested: 'tested',
-};
-// Text before a command word that tests its exit status (`if ! ls …`).
-const TESTED_PREFIX_RE = /(?:\b(?:if|elif|while|until)(?:\s+!)?|!)$/;
-const CONDITION_KEYWORD_RE =
-  /(?:^\s*|[;&|({]\s*)(?:if|elif|while|until)(?=\s|$)/g;
-// True when `rest` has no other statement before `then`/`do`, so this word is
-// the last command in the condition list.
-function lastInConditionRest(rest) {
-  return !rest.split(/\b(?:then|do)\b/)[0].replace(/;\s*$/, '').includes(';');
-}
+// `LC_ALL=C ls` is still the command `ls`. A wrapper (`timeout`, `sudo`) is
+// not an assignment and stays invisible to this rule.
+const ENV_ASSIGN_RE = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)+/;
 
-// True when `prefix` ends inside the condition list of an `if`, `elif`,
-// `while` or `until` that no `then`/`do` has closed yet, so the exit status of
-// `[ -d d ] && ls d >/dev/null` is tested. `rest` is the text after the word:
-// `if ls; true; then` leaves `ls` display-only.
-function inConditionList(prefix, rest = '') {
-  let end = -1;
-  for (const m of prefix.matchAll(CONDITION_KEYWORD_RE)) end = m.index + m[0].length;
-  if (end === -1 || /\b(?:then|do)\b/.test(prefix.slice(end))) return false;
-  return lastInConditionRest(rest);
-}
-
-// A case-arm pattern (`ps)`, `a|b)`, `;; ps)`, `in ps)`) ending at the end of
-// the text it is tested against.
-const CASE_ARM_BEFORE_RE =
-  /(?:^\s*|;[;&]\s*|\bin\s+)[^\s()|;&]+(?:\|[^\s()|;&]+)*$/;
-
-const openCases = (t) => (t.match(/\bcase\b/g) || []).length - (t.match(/\besac\b/g) || []).length; // > 0: inside a case
-
-// Advances `state` ({ depth, ticks, cases }) over one line of mask text and says
-// whether a `(` or backtick span is still open, so a `$(` or `( … )` span that
-// opens on one physical line keeps the logical line going. A case-arm `)` has
-// no opener, so it must not close a span opened on an earlier line; the depth
-// never drops below zero.
-function openNesting(mask, state) {
-  let opened = 0;
-  for (let i = 0; i < mask.length; i++) {
-    const ch = mask[i];
-    if (ch === '(') {
-      state.depth++;
-      opened++;
-    } else if (ch === ')' && state.depth > 0) {
-      if (opened > 0) {
-        opened--;
-        state.depth--;
-      } else if (!(state.cases + openCases(mask.slice(0, i)) > 0 && CASE_ARM_BEFORE_RE.test(mask.slice(0, i)))) {
-        state.depth--;
-      }
-    } else if (ch === '`') state.ticks++;
-  }
-  state.cases += openCases(mask);
-  return state.depth > 0 || state.ticks % 2 === 1;
-}
-
-// Same-length copy with `$((…))` / `((…))` spans blanked except for the
-// command substitutions inside them, so `((top > 0))` is not read as a command
-// followed by a redirect while `$(( $(du d) / 2 ))` still scans `du`.
-function blankArithmetic(code) {
-  return code.replace(ARITHMETIC_RE, (span) => {
-    const out = ' '.repeat(span.length).split('');
-    // Keep a nested `$(…)` or backtick capture: `x=$(( $(du -sk d) / 1024 ))`
-    // still runs `du`.
-    for (const [a, b] of substitutionRanges(maskShell(span))) {
-      for (let i = a; i <= b; i++) out[i] = span[i];
+// A `$(…)` command substitution, not the `$((` that opens arithmetic.
+function hasCommandSub(span) {
+  if (span.includes('`')) return true;
+  for (let i = 0; i < span.length - 1; i++) {
+    if (span[i] === '$' && span[i + 1] === '(' && span[i + 2] !== '(') {
+      return true;
     }
-    return out.join('');
-  });
+  }
+  return false;
 }
 
-// Groups `code` lines into logical commands: a line joins the next when it
-// ends in `\`, a trailing `|`, `&&` or `||`, or leaves a `$(`, backtick or
-// `( … )` span open. Returns [{ text, mask, parts }]: the joined text, its
-// maskShell copy, and `parts`, which maps each piece of the text back to its
-// physical line index.
-function logicalLines(classes) {
-  const groups = [];
-  let current = null;
-  for (let i = 0; i < classes.length; i++) {
-    if (classes[i].kind !== 'code') {
-      // A comment between continued lines or inside an open `$(` span does
-      // not end the command; anything else (heredoc body, string) does.
-      if (!(classes[i].kind === 'comment' && current)) current = null;
+// Blank arithmetic that cannot run a command. A `$(…)` or backtick inside
+// `$((…))` still runs, so that span stays for maskShell.
+function maskAliasLine(line) {
+  const prepared = line.replace(ARITHMETIC_RE, (span) =>
+    hasCommandSub(span) ? span : ' '.repeat(span.length)
+  );
+  return maskShell(prepared);
+}
+
+// One physical line. `classifyLines` has already dropped comments, heredoc
+// bodies, and pinned bash wrappers before this runs.
+function ruleAliasGuarded(line, commands) {
+  const names = commands.filter((c) => COMMAND_NAME_RE.test(c));
+  if (names.length === 0) return [];
+  const wordRe = new RegExp(
+    `(?<![\\w./-])(${names.join('|')})(?=$|[\\s;|&)<>\`])`,
+    'g'
+  );
+  const mask = maskAliasLine(line);
+  const found = [];
+  let m;
+  while ((m = wordRe.exec(mask)) !== null) {
+    const rawPrefix = mask.slice(0, m.index);
+    const afterWord = mask.slice(m.index + m[1].length);
+    // A case-arm pattern (`ps|df)`, `(ps|df)`) names the word, it does not
+    // run it.
+    const armStart = rawPrefix.trim();
+    if (
+      /^(?:\|[^\s()|;&]+)*\)/.test(afterWord) &&
+      (armStart === '' ||
+        (armStart === '(' && afterWord.startsWith('|')) ||
+        /^\(?(?:[^\s()|;&]+\|)+$/.test(armStart))
+    ) {
       continue;
     }
-    const raw = stripArithmetic(classes[i].code);
-    let piece = classes[i].code;
-    if (!current) {
-      current = { text: '', mask: '', parts: [], nesting: { depth: 0, ticks: 0, cases: 0 } };
-      groups.push(current);
-    }
-    const mask = maskShell(raw);
-    const trimmed = mask.trimEnd();
-    const backslash = trimmed.endsWith('\\');
-    if (backslash) piece = piece.trimEnd().slice(0, -1);
-    const start = current.text.length;
-    current.text += piece;
-    // Masked per physical line: a `#` comment ends at its own line, not at
-    // the end of the joined text.
-    current.mask += maskShell(blankArithmetic(piece));
-    current.parts.push({ start, end: current.text.length, line: i });
-    const nested = openNesting(mask, current.nesting);
-    // A bare `if`, `elif`, `while` or `until` ends the line: the tested
-    // command starts on the next one.
-    const bareKeyword = /(?:^\s*|[;&|({]\s*)(?:if|elif|while|until)$/.test(trimmed);
-    const continues =
-      backslash || /(?:^|[^|&])\|$|&&$|\|\|$/.test(trimmed) || nested || bareKeyword;
-    if (!continues) {
-      current = null;
-    } else {
-      // Join with `;` inside an open span (separate statements) and a space
-      // otherwise (a pipe or `\` continues the same command).
-      const sep = !backslash && nested ? ' ; ' : ' ';
-      current.text += sep;
-      current.mask += sep;
-    }
-  }
-  return groups;
-}
-
-// [start, end] ranges of `$( … )`, `<( … )` / `>( … )` and backtick
-// substitutions in `mask`. `lineStarts` are the offsets where a physical line
-// begins in a joined mask, so a case-arm `)` is judged from its own line and
-// does not end the span.
-function substitutionRanges(mask, lineStarts = [0]) {
-  const ranges = [];
-  for (let i = 0; i < mask.length; i++) {
-    if (mask[i] === '`') {
-      const end = mask.indexOf('`', i + 1);
-      if (end === -1) break;
-      ranges.push([i, end]);
-      i = end;
-    } else if (
-      (mask[i] === '$' && mask[i + 1] === '(' && mask[i + 2] !== '(') ||
-      ((mask[i] === '<' || mask[i] === '>') && mask[i + 1] === '(')
-    ) {
-      let depth = 0;
-      let j = i + 1;
-      for (; j < mask.length; j++) {
-        if (mask[j] === '(') depth++;
-        else if (mask[j] === ')') {
-          const lineStart = Math.max(...lineStarts.filter((start) => start <= j));
-          if (openCases(mask.slice(i, j)) > 0 && CASE_ARM_BEFORE_RE.test(mask.slice(lineStart, j))) continue;
-          if (--depth === 0) break;
-        }
-      }
-      ranges.push([i, j]);
-    }
-  }
-  return ranges;
-}
-
-// How a command word's result is used, from the text after it up to the end
-// of its simple command: 'pipe', 'redirect', 'tested', or '' when it is only
-// displayed. `rest` is mask text, so quoted operators are already blanked.
-function consumedAfter(rest) {
-  // `<name>` is a doc placeholder, not a pair of redirects.
-  rest = rest.replace(/<[\w-]+>/g, (placeholder) => '_'.repeat(placeholder.length));
-  let depth = 0;
-  for (let i = 0; i < rest.length; i++) {
-    const ch = rest[i];
-    const next = rest[i + 1];
-    if (ch === '(') depth++;
-    else if (ch === ')') {
-      if (depth === 0) return '';
-      depth--;
-    } else if (depth > 0) continue;
-    else if (ch === '`' || ch === ';' || ch === '\n') return '';
-    else if (ch === '&' && next === '&') return 'tested';
-    else if (ch === '|' && next === '|') return 'tested';
-    else if (ch === '&') {
-      if (rest[i - 1] === '>' || rest[i - 1] === '<') continue; // 2>&1
-      if (next === '>') continue; // &>file: the '>' branch checks the target
-      return '';
-    } else if (ch === '|') return 'pipe';
-    else if (ch === '>' && rest[i - 1] !== '>') {
-      // 2>file, 3>file: only descriptor 1 or none reaches stdout.
-      const fd = /(?:^|\s)(\d+)$/.exec(rest.slice(0, i));
-      if (fd && fd[1] !== '1') continue;
-      const target = rest.slice(i + 1).replace(/^[>|]?\s*/, '');
-      // `>&1`, `>&2`, `>&-` duplicate or close a descriptor; `>& file` writes a file.
-      if (/^&\s*(?:\d+|-)(?=$|[\s;|&)<>])/.test(target) || /^\/dev\/null\b/.test(target)) continue;
-      return 'redirect';
-    }
-  }
-  return '';
-}
-
-// True when the command discards its own stdout and a `;` or newline follows,
-// as in `$(ls >/dev/null; x)`: nothing of it reaches the captured value.
-function discardedBeforeList(rest) {
-  const end = rest.search(/[;\n`]/);
-  const segment = end === -1 ? '' : rest.slice(0, end);
-  return !/[|)]|&&/.test(segment) && /(?:^|\s)(?:1?>|&>)\s*(?:\/dev\/null\b|&\s*2\b)/.test(segment);
-}
-
-// Findings for SHC-010: [{ line, detail }] with `line` the physical index
-// holding the command word.
-function aliasGuardedFindings(classes, commands) {
-  const found = [];
-  // Unit tests inject ctx.aliasGuarded without validateConfig; an empty
-  // alternative would match everywhere and never advance lastIndex.
-  commands = commands.filter((c) => COMMAND_NAME_RE.test(c));
-  if (commands.length === 0) return found;
-  const wordRe = new RegExp(`(?<![\\w./-])(${commands.join('|')})(?=$|[\\s;|&)<>\`])`, 'g');
-  for (const group of logicalLines(classes)) {
-    const { mask } = group;
-    const captures = substitutionRanges(
-      mask,
-      group.parts.map((part) => part.start)
+    const prefix = rawPrefix.replace(ENV_ASSIGN_RE, '').trimEnd();
+    const atCommand =
+      COMMAND_POSITION_RE.test(prefix) || prefix.endsWith('`');
+    if (!atCommand) continue;
+    found.push(
+      `\`${m[1]}\` is in command position without \`command\`, so a user alias can change its output`
     );
-    wordRe.lastIndex = 0;
-    let m;
-    while ((m = wordRe.exec(mask)) !== null) {
-      const prefix = mask.slice(0, m.index).trimEnd();
-      // A case-arm pattern at line start (`ps|df) …`) names the word, it
-      // does not run it.
-      const afterWord = mask.slice(m.index + m[1].length);
-      const armPart = group.parts.find(
-        (part) => m.index >= part.start && m.index <= part.end
-      );
-      const armStart = mask.slice(armPart.start, m.index).trim();
-      if (
-        /^(?:\|[^\s()|;&]+)*\)/.test(afterWord) &&
-        (armStart === '' ||
-          (armStart === '(' && afterWord.startsWith('|')) ||
-          /^\(?(?:[^\s()|;&]+\|)+$/.test(armStart))
-      ) {
-        continue;
-      }
-      const atCommand =
-        COMMAND_POSITION_RE.test(prefix) || prefix.endsWith('`');
-      if (!atCommand) continue;
-      let how = '';
-      if (
-        captures.some(([a, b]) => m.index > a && m.index < b) &&
-        !discardedBeforeList(mask.slice(m.index + m[1].length))
-      ) {
-        how = 'captured';
-      } else if (
-        inConditionList(prefix, afterWord) ||
-        (TESTED_PREFIX_RE.test(prefix) &&
-          (!/\b(?:if|elif|while|until)(?:\s+!)?$/.test(prefix) ||
-            lastInConditionRest(afterWord)))
-      ) {
-        how = 'tested';
-      } else {
-        how = consumedAfter(afterWord);
-      }
-      if (!how) continue;
-      // `m.index` always falls inside a part: the match is never on a joiner.
-      const { line } = group.parts.find(
-        (part) => m.index >= part.start && m.index <= part.end
-      );
-      found.push({
-        line,
-        detail: `\`${m[1]}\` is ${CONSUMED_PHRASE[how]} without \`command\`, so a user alias can change its output`,
-      });
-    }
   }
   return found;
 }
@@ -1375,12 +1168,12 @@ function lintShellText(
     for (const [rule, fn] of LINE_RULES) {
       for (const detail of fn(line, blockCode)) add(rule, i, detail);
     }
-  }
-  for (const { line, detail } of aliasGuardedFindings(
-    classes,
-    ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED
-  )) {
-    add('SHC-010', line, detail);
+    for (const detail of ruleAliasGuarded(
+      line,
+      ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED
+    )) {
+      add('SHC-010', i, detail);
+    }
   }
   return findings;
 }
