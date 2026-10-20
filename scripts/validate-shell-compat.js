@@ -27,8 +27,8 @@
  *            a plugin library that is in neither tier list
  *   SHC-009  a bash wrapper other than `bash /dev/fd/3 3<<'TAG'`
  *   SHC-010  alias-prone command (`aliasGuardedCommands`: ls, ps, du, df, top)
- *            in command position without a `command` prefix. A leading run of
- *            environment assignments (`LC_ALL=C ls`) is stripped first.
+ *            in command position without a `command` prefix. The run of
+ *            environment assignments before it (`LC_ALL=C ls`) is stripped.
  *            Not detected: a wrapper prefix (`timeout 5 ls`, `sudo df`) and
  *            code in unquoted-tag heredocs or multi-line double-quoted strings.
  *   SHC-101  plugin `.sh` file with no shebang and no library marker
@@ -1001,9 +1001,16 @@ function validAliasGuarded(list) {
     list.every((c) => typeof c === 'string' && COMMAND_NAME_RE.test(c))
   );
 }
-// `LC_ALL=C ls` is still the command `ls`. A wrapper (`timeout`, `sudo`) is
-// not an assignment and stays invisible to this rule.
-const ENV_ASSIGN_RE = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)+/;
+// `LC_ALL=C ls` is still the command `ls`, also after `&&`, `then` or `(`. The
+// run of assignments right before the word is stripped. A wrapper (`timeout`,
+// `sudo`) is not an assignment and stays invisible to this rule.
+// The value stops at `(` or a backtick so `v=$(command ls` is not read as an
+// assignment followed by `ls`.
+const ENV_ASSIGN_RE = /(?:^|(?<=[\s;&|(`]))(?:[A-Za-z_][A-Za-z0-9_]*=[^\s(`]*\s+)+$/;
+// The start of a case arm (`in ps)`, `;; ps|df)`, `(ps|df)`) ending right
+// before the word: group 1 is the anchor, 2 an opening `(`, 3 earlier
+// alternatives.
+const CASE_ARM_HEAD_RE = /(^|;;&?|;&|\bin)\s*(\()?((?:[^\s()|;&]+\|)*)$/;
 
 // A `$(…)` command substitution, not the `$((` that opens arithmetic.
 function hasCommandSub(span) {
@@ -1016,11 +1023,36 @@ function hasCommandSub(span) {
   return false;
 }
 
-// Blank arithmetic that cannot run a command. A `$(…)` or backtick inside
-// `$((…))` still runs, so that span stays for maskShell.
+// Same-length copy of an arithmetic span with everything blanked except its
+// `$(…)` and backtick substitutions, which still run commands.
+function keepCommandSubs(span) {
+  const out = ' '.repeat(span.length).split('');
+  for (let i = 0; i < span.length; i++) {
+    let end = -1;
+    if (span[i] === '`') {
+      end = span.indexOf('`', i + 1);
+    } else if (span[i] === '$' && span[i + 1] === '(' && span[i + 2] !== '(') {
+      let depth = 0;
+      for (let j = i + 1; j < span.length; j++) {
+        if (span[j] === '(') depth++;
+        else if (span[j] === ')' && --depth === 0) {
+          end = j;
+          break;
+        }
+      }
+    }
+    if (end === -1) continue;
+    for (let k = i; k <= end; k++) out[k] = span[k];
+    i = end;
+  }
+  return out.join('');
+}
+
+// Blank arithmetic, which cannot run a command, except for the `$(…)` or
+// backtick substitutions inside `$((…))`, which still run.
 function maskAliasLine(line) {
   const prepared = line.replace(ARITHMETIC_RE, (span) =>
-    hasCommandSub(span) ? span : ' '.repeat(span.length)
+    hasCommandSub(span) ? keepCommandSubs(span) : ' '.repeat(span.length)
   );
   return maskShell(prepared);
 }
@@ -1040,14 +1072,14 @@ function ruleAliasGuarded(line, commands) {
   while ((m = wordRe.exec(mask)) !== null) {
     const rawPrefix = mask.slice(0, m.index);
     const afterWord = mask.slice(m.index + m[1].length);
-    // A case-arm pattern (`ps|df)`, `(ps|df)`) names the word, it does not
-    // run it.
-    const armStart = rawPrefix.trim();
+    // A case-arm pattern (`ps|df)`, `(ps|df)`, `;; ps)`) names the word, it
+    // does not run it. At line start, `(ps)` is a subshell unless an
+    // alternative follows.
+    const arm = CASE_ARM_HEAD_RE.exec(rawPrefix);
     if (
+      arm &&
       /^(?:\|[^\s()|;&]+)*\)/.test(afterWord) &&
-      (armStart === '' ||
-        (armStart === '(' && afterWord.startsWith('|')) ||
-        /^\(?(?:[^\s()|;&]+\|)+$/.test(armStart))
+      !(arm[1] === '' && arm[2] && !arm[3] && !afterWord.startsWith('|'))
     ) {
       continue;
     }
