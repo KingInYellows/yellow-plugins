@@ -1,5 +1,7 @@
 # Library path only. Enablement still comes solely from
 # `claude plugin list --json`. A missed path is an error, not a provider guess.
+# There is no fallback to plugins/yellow-core in the open repository: that
+# tree is repository-controlled, and these libraries are executed.
 # Canonical source: scripts/snippets/yellow-core-root.sh — edit there, then
 # run `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
 core_libs_ok() {
@@ -60,10 +62,6 @@ resolve_yellow_core_root() {
   done)
   if [ -n "$candidate" ]; then
     printf '%s' "$candidate"
-    return 0
-  fi
-  if [ -n "${repo_root:-}" ] && core_libs_ok "${repo_root}/plugins/yellow-core"; then
-    printf '%s' "${repo_root}/plugins/yellow-core"
     return 0
   fi
   printf ''

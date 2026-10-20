@@ -55,6 +55,8 @@ set -uo pipefail
 # DO NOT EDIT — regenerate with: pnpm generate:snippets
 # Library path only. Enablement still comes solely from
 # `claude plugin list --json`. A missed path is an error, not a provider guess.
+# There is no fallback to plugins/yellow-core in the open repository: that
+# tree is repository-controlled, and these libraries are executed.
 # Canonical source: scripts/snippets/yellow-core-root.sh — edit there, then
 # run `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
 core_libs_ok() {
@@ -117,10 +119,6 @@ resolve_yellow_core_root() {
     printf '%s' "$candidate"
     return 0
   fi
-  if [ -n "${repo_root:-}" ] && core_libs_ok "${repo_root}/plugins/yellow-core"; then
-    printf '%s' "${repo_root}/plugins/yellow-core"
-    return 0
-  fi
   printf ''
 }
 # <<< generated: yellow-core-root <<<
@@ -143,7 +141,7 @@ fi
 
 ROOT=$(resolve_yellow_core_root)
 if [ -z "$ROOT" ]; then
-  printf 'stack_provider_error: router library not found (CLAUDE_PLUGIN_ROOT, installPath, and in-repo copy missed)\n'
+  printf 'stack_provider_error: router library not found (CLAUDE_PLUGIN_ROOT and installPath missed)\n'
   exit 0
 fi
 LIB="$ROOT/lib/stack-provider-state.js"

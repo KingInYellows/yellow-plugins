@@ -65,8 +65,8 @@ it before editing a command, library or the staging pipeline.
 - `/stack:status` (classify provider state into eight states; a failed
   `claude plugin list --json` is UNKNOWN before any library runs; otherwise
   resolves yellow-core via `CLAUDE_PLUGIN_ROOT`, then the first enabled
-  `installPath` with the library for this repository, then the in-repo tree,
-  before classify),
+  `installPath` with the library for this repository (never the open
+  repository's tree), before classify),
   `/stack:select` (switch provider; never edits settings JSON, never falls back)
 - `/statusline:setup`, `/setup:all`, `/setup:claude-web`
 - `/worktree:cleanup`, `/worktree:restack` (logic lives in

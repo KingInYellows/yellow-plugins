@@ -55,7 +55,7 @@ root_block() {
   [ "$status" -eq 1 ]
 }
 
-@test "CLAUDE_PLUGIN_ROOT wins over installPath and the checkout" {
+@test "CLAUDE_PLUGIN_ROOT wins over installPath" {
   make_root "$TMP/claude"
   make_root "$TMP/install"
   make_root "$TMP/repo/plugins/yellow-core"
@@ -88,14 +88,14 @@ root_block() {
   [ "$output" = "$TMP/install" ]
 }
 
-@test "an install path missing a library falls through to the checkout" {
+@test "an install path missing a library is not rescued by the checkout" {
   mkdir -p "$TMP/install"
   make_root "$TMP/repo/plugins/yellow-core"
   plugin_json="[{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"user\",\"installPath\":\"$TMP/install\"}]"
   repo_root="$TMP/repo"
   run resolve_yellow_core_root
   [ "$status" -eq 0 ]
-  [ "$output" = "$TMP/repo/plugins/yellow-core" ]
+  [ -z "$output" ]
 }
 
 @test "a symlinked library is not a root" {
@@ -203,14 +203,14 @@ root_block() {
   [ "$output" = "$TMP/user" ]
 }
 
-@test "a disabled installPath is ignored and the checkout is used" {
+@test "a disabled installPath is ignored and the checkout is not used" {
   make_root "$TMP/disabled"
   make_root "$TMP/repo/plugins/yellow-core"
   plugin_json="[{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":false,\"scope\":\"user\",\"installPath\":\"$TMP/disabled\"}]"
   repo_root="$TMP/repo"
   run resolve_yellow_core_root
   [ "$status" -eq 0 ]
-  [ "$output" = "$TMP/repo/plugins/yellow-core" ]
+  [ -z "$output" ]
 }
 
 @test "no root at all prints an empty path" {
