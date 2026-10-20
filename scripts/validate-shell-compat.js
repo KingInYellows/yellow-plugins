@@ -1168,6 +1168,14 @@ function blankOpenParens(line, depth, sub, closedRe, findOpen) {
   };
 }
 
+// Text before a reserved word in command position: line start, a control
+// operator, or a keyword that starts a command list. `echo [[` and
+// `echo esac` are ordinary arguments, not reserved words.
+const RESERVED_POS =
+  '(?:^|[;&|(!{]|(?:^|[\\s;&|(])(?:if|elif|then|else|do|while|until|time))[ \\t]*';
+const CASE_OPEN_RE = new RegExp(`${RESERVED_POS}case\\s`, 'g');
+const ESAC_RE = new RegExp(`${RESERVED_POS}esac(?=$|[\\s;&|)])`, 'g');
+
 // Carries a `[[` test left open at the end of one line into the next. `open`
 // is true when an earlier line left one open. Returns the line with its test
 // part blanked except for substitutions, and whether a test is still open.
@@ -1182,7 +1190,7 @@ function blankOpenTest(line, open, sub) {
     sub.depth = 0;
   }
   const rest = maskShell(out.slice(start));
-  const testRe = /(?:^|[\s;&|(])\[\[(?=\s|$)/g;
+  const testRe = new RegExp(`${RESERVED_POS}\\[\\[(?=\\s|$)`, 'g');
   for (let m = testRe.exec(rest); m; m = testRe.exec(rest)) {
     const at = m.index + m[0].length - 2;
     const close = rest.indexOf(']]', at + 2);
@@ -1368,7 +1376,7 @@ function lintShellText(
     testOpen = test.open;
     // Case blocks open so far, for spaced case-arm alternatives.
     const masked = maskShell(line);
-    caseDepth += (masked.match(/(?:^|[\s;&|(])case\s/g) ?? []).length;
+    caseDepth += (masked.match(CASE_OPEN_RE) ?? []).length;
     for (const detail of ruleAliasGuarded(
       test.line,
       ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED,
@@ -1377,7 +1385,7 @@ function lintShellText(
     )) {
       add('SHC-010', i, detail);
     }
-    const closes = (masked.match(/(?:^|[\s;&|])esac(?=$|[\s;&|)])/g) ?? []).length;
+    const closes = (masked.match(ESAC_RE) ?? []).length;
     caseDepth = Math.max(0, caseDepth - closes);
     // A `\` after an operator (`&& \`) or an assignment run (`LC_ALL=C \`)
     // still leaves the next line at a command position. On a line that is

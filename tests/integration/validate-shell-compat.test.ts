@@ -878,6 +878,13 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('case "$c" in\n  ps | df) :;;\nesac\n(ps | cat)')).toEqual([4]);
   });
 
+  it('reads case, esac and [[ as reserved words only in command position', () => {
+    expect(flagged("printf '%s\\n' [[\nls x | cat")).toEqual([2]);
+    expect(flagged('case "$c" in\n  a) echo esac here ;;\n  foo | ps) :;;\nesac')).toEqual([]);
+    expect(flagged('echo case x\n(ps | cat)')).toEqual([2]);
+    expect(flagged('if [[ -n $a &&\n  -n $b ]]; then ls x; fi')).toEqual([2]);
+  });
+
   it('flags a pipe split across lines at the line holding the command', () => {
     expect(flagged('echo go\nls -t x \\\n  | head -5')).toEqual([2]);
     expect(flagged('ls -t x |\n  head -5')).toEqual([1]);
