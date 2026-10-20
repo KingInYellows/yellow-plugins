@@ -817,6 +817,10 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('[[ -n $(ls x) ]]')).toEqual([1]);
     expect(flagged('[[ -d x ]] && ls x')).toEqual([1]);
     expect(flagged('[[ "$x" == "]]" ]] && ls x')).toEqual([1]);
+    expect(flagged(`[[ "$x" == '$(ls)' ]]`)).toEqual([]);
+    expect(flagged("[[ \"$x\" == '`ls`' ]]")).toEqual([]);
+    expect(flagged(`x=$(( '$(ls)' ))`)).toEqual([]);
+    expect(flagged('[[ "$x" == "$(ls)" ]]')).toEqual([1]);
   });
 
   it('reads the operands of a [[ ]] test spanning lines as words', () => {

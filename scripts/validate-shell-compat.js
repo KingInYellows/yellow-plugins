@@ -1024,12 +1024,25 @@ function hasCommandSub(span) {
 }
 
 // Same-length copy of an arithmetic span with everything blanked except its
-// `$(…)` and backtick substitutions, which still run commands.
+// `$(…)` and backtick substitutions, which still run commands. Text inside
+// single quotes is literal, so a `'$(ls)'` there is blanked too.
 function keepCommandSubs(span) {
   const out = ' '.repeat(span.length).split('');
+  let single = false;
+  let double = false;
   for (let i = 0; i < span.length; i++) {
     let end = -1;
-    if (span[i] === '`') {
+    if (single) {
+      if (span[i] === "'") single = false;
+      continue;
+    }
+    if (span[i] === '\\') {
+      i++;
+      continue;
+    }
+    if (span[i] === "'" && !double) single = true;
+    else if (span[i] === '"') double = !double;
+    else if (span[i] === '`') {
       end = span.indexOf('`', i + 1);
     } else if (span[i] === '$' && span[i + 1] === '(' && span[i + 2] !== '(') {
       let depth = 0;
