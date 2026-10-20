@@ -1113,10 +1113,12 @@ function blankOpenParens(line, depth, closedRe, findOpen) {
   let start = 0;
   let out = line;
   if (depth > 0) {
+    // Count on the quote-masked line so a quoted `"("` is not syntax.
+    const masked = maskShell(line);
     let i = 0;
-    for (; i < line.length && depth > 0; i++) {
-      if (line[i] === '(') depth++;
-      else if (line[i] === ')') depth--;
+    for (; i < masked.length && depth > 0; i++) {
+      if (masked[i] === '(') depth++;
+      else if (masked[i] === ')') depth--;
     }
     out = keepCommandSubs(line.slice(0, i)) + line.slice(i);
     if (depth > 0) return { line: out, depth };

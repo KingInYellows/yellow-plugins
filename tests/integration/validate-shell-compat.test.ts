@@ -834,6 +834,9 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('a=(x\n  ls) && ls d')).toEqual([2]);
     expect(flagged('a=(\n  $(ls d)\n)')).toEqual([2]);
     expect(flagged('a=(\n  x\n)\nls d')).toEqual([4]);
+    expect(flagged('a=(\n  "("\n)\nls d')).toEqual([4]);
+    expect(flagged('a=(\n  ")"\n  ls\n)')).toEqual([]);
+    expect(flagged('x=$((\n  1 ")"\n))\nls d')).toEqual([4]);
   });
 
   it('reads the operands of a [[ ]] test spanning lines as words', () => {
