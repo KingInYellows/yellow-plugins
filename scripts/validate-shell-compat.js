@@ -1010,7 +1010,8 @@ const CONSUMED_PHRASE = {
 };
 // Text before a command word that tests its exit status (`if ! ls …`).
 const TESTED_PREFIX_RE = /(?:\b(?:if|elif|while|until)(?:\s+!)?|!)$/;
-const CONDITION_KEYWORD_RE = /(?:^|[;&|({]\s*)(?:if|elif|while|until)(?=\s|$)/g;
+const CONDITION_KEYWORD_RE =
+  /(?:^\s*|[;&|({]\s*)(?:if|elif|while|until)(?=\s|$)/g;
 // True when `prefix` ends inside the condition list of an `if`, `elif`,
 // `while` or `until` that no `then`/`do` has closed yet, so the exit status of
 // `[ -d d ] && ls d >/dev/null` is tested.

@@ -775,12 +775,28 @@ describe('SHC-010 alias-prone commands', () => {
     ['ls with &> to a file', 'ls x &> f'],
     ['last command of an if list', 'if [ -d plans ] && ls plans/*.md >/dev/null 2>&1; then :; fi'],
     ['last command of a while list', 'while [ -d plans ] && ls plans/*.md >/dev/null 2>&1; do :; done'],
+    [
+      'indented last command of an if list',
+      '  if [ -d plans ] && ls plans/*.md >/dev/null 2>&1; then :; fi',
+    ],
+    [
+      'indented last command of a while list',
+      '  while [ -d plans ] && ls plans/*.md >/dev/null 2>&1; do :; done',
+    ],
     ['process substitution', 'while read -r f; do :; done < <(ls -t plans)'],
     ['du piped to cut', 'du -sh x | cut -f1'],
     ['df redirected to a file', 'df -h > out.txt'],
     ['top inside a pipeline segment', 'echo go; top -bn1 | head -3'],
   ])('flags %s', (_name, text) => {
     expect(flagged(text)).toEqual([1]);
+  });
+
+  it('flags a condition-list command indented inside a function', () => {
+    expect(
+      flagged(
+        'fn() {\n  if [ -d plans ] && ls plans/*.md >/dev/null 2>&1; then :; fi\n}'
+      )
+    ).toEqual([2]);
   });
 
   it('flags a pipe split across lines at the line holding the command', () => {
