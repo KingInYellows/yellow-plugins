@@ -193,6 +193,16 @@ root_block() {
   [ "$output" = "$TMP/user" ]
 }
 
+@test "an installPath with an unrecognized scope is ignored" {
+  make_root "$TMP/odd"
+  make_root "$TMP/user"
+  plugin_json="[{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"weird\",\"installPath\":\"$TMP/odd\"},{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"installPath\":\"$TMP/odd\"},{\"id\":\"yellow-core@yellow-plugins\",\"enabled\":true,\"scope\":\"user\",\"installPath\":\"$TMP/user\"}]"
+  repo_root=""
+  run resolve_yellow_core_root
+  [ "$status" -eq 0 ]
+  [ "$output" = "$TMP/user" ]
+}
+
 @test "a disabled installPath is ignored and the checkout is used" {
   make_root "$TMP/disabled"
   make_root "$TMP/repo/plugins/yellow-core"

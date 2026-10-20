@@ -75,10 +75,11 @@ resolve_yellow_core_root() {
     return 0
   fi
   # Same ranking as _enabled_install_path in commands/setup/all.md: local,
-  # then project, then user, then managed. Project and local rows count only
-  # when realpath of projectPath is this repository. Every ranked path is
-  # printed, one per line; the shell takes the first with a complete library,
-  # so a stale higher-ranked install does not hide a valid lower-ranked one.
+  # then project, then user, then managed. Any other scope is dropped, since
+  # the path feeds node. Project and local rows count only when realpath of
+  # projectPath is this repository. Every ranked path is printed, one per
+  # line; the shell takes the first with a complete library, so a stale
+  # higher-ranked install does not hide a valid lower-ranked one.
   install_roots=$(printf '%s' "${plugin_json:-}" | PROJECT_PATH="${repo_root:-}" node -e '
     const fs = require("fs");
     let rows;
@@ -94,6 +95,7 @@ resolve_yellow_core_root() {
         row && typeof row === "object" &&
         row.id === "yellow-core@yellow-plugins" &&
         row.enabled === true &&
+        Object.prototype.hasOwnProperty.call(scopeRank, row.scope) &&
         typeof row.installPath === "string" && row.installPath.length > 0 &&
         !row.installPath.includes("\n") && !row.installPath.includes("\0") &&
         ((row.scope !== "project" && row.scope !== "local") ||
@@ -101,7 +103,7 @@ resolve_yellow_core_root() {
             typeof row.projectPath === "string" && row.projectPath.length > 0 &&
             sameDir(row.projectPath, projectPath)))
       )
-      .sort((a, b) => (scopeRank[a.scope] ?? 9) - (scopeRank[b.scope] ?? 9));
+      .sort((a, b) => scopeRank[a.scope] - scopeRank[b.scope]);
     process.stdout.write(candidates.map((c) => c.installPath).join("\n"));
   ' 2>/dev/null)
   if [ -n "$install_roots" ]; then
