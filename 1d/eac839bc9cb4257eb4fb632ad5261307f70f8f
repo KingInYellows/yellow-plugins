@@ -1,0 +1,51 @@
+.changeset/shell-alias-hardening.md
+  s_392f3aadbf6bd9::t_b5f734e274737c 10
+CONTRIBUTING.md
+  s_392f3aadbf6bd9::t_cc078e489de9d3 622-625
+docs/solutions/code-quality/bash-zsh-tiered-shell-contract.md
+  s_392f3aadbf6bd9::t_369bfef052bc35 102
+plans/shell-alias-hardening.md
+  s_392f3aadbf6bd9::t_69e271ffadaec4 145,169,259-261,344-346,376-378
+plugins/yellow-core/codex/skills/plan-status/SKILL.md
+  s_392f3aadbf6bd9::t_04ef38c1129d2f 60
+plugins/yellow-core/skills/plan-status/SKILL.md
+  s_392f3aadbf6bd9::t_548d1a97653a18 61
+plugins/yellow-core/tests/fixtures/plan-status/dotfile-symlink.golden.txt
+  s_392f3aadbf6bd9::t_a3c9aaf988763f 1-11
+plugins/yellow-core/tests/fixtures/plan-status/dotfile-symlink/plans/.hidden.md
+  s_392f3aadbf6bd9::t_8e017dfaaada08 1
+plugins/yellow-core/tests/fixtures/plan-status/dotfile-symlink/plans/a-real.md
+  s_392f3aadbf6bd9::t_82c2e7b5af0e47 1-2
+plugins/yellow-core/tests/fixtures/plan-status/dotfile-symlink/plans/b-link.md
+  s_392f3aadbf6bd9::t_eec2c31830ce7e 1
+plugins/yellow-core/tests/fixtures/plan-status/dotfile-symlink/plans/complete/.hidden.md
+  s_392f3aadbf6bd9::t_d45d15aacfe47c 1
+plugins/yellow-core/tests/fixtures/plan-status/dotfile-symlink/plans/complete/y-real.md
+  s_392f3aadbf6bd9::t_2e8bdbb06afa13 1
+plugins/yellow-core/tests/fixtures/plan-status/dotfile-symlink/plans/complete/z-link.md
+  s_392f3aadbf6bd9::t_ee76b11c5da3ba 1
+plugins/yellow-core/tests/plan-status-parity.bats
+  s_392f3aadbf6bd9::t_78e3f24e0c0571 43,82-100
+scripts/validate-shell-compat.js
+  s_392f3aadbf6bd9::t_6171a326455922 1013-1026,1031-1032,1034-1047,1052-1054,1056-1064,1115-1118,1134-1138,1166,1187,1190-1193,1201-1204,1219
+tests/integration/validate-shell-compat.test.ts
+  s_392f3aadbf6bd9::t_c65d2a98856c32 771-777,800-808,823-828,836-843,856-858,890-900
+tests/shell-compat/aliases.bats
+  s_392f3aadbf6bd9::t_08ba443d19230e 17-20,34-42,64,70-81,90,125,137,164-177,234-235,240,243,245-254
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1deac839bc9cb4257eb4fb632ad5261307f70f8f",
+  "prompts": {},
+  "sessions": {
+    "s_392f3aadbf6bd9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "91c9ac66-c916-494e-877c-c15d7b1bcea9",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
