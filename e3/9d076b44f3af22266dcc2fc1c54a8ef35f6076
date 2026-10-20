@@ -1,0 +1,69 @@
+plugins/yellow-core/commands/flow/pick-next-shell.md
+  s_461fbfc28ab2f8::t_23d5468b027a5e 33
+plugins/yellow-core/commands/flow/work.md
+  s_461fbfc28ab2f8::t_2397f45de2892b 47
+plugins/yellow-browser-test/commands/browser-test/explore.md
+  s_461fbfc28ab2f8::t_43665d4bdb7019 169
+plugins/yellow-ci/skills/ci-runner-health/references/ssh-probes.md
+  s_461fbfc28ab2f8::t_fe4ef220cc3f1c 385
+tests/integration/validate-shell-compat.test.ts
+  s_461fbfc28ab2f8::t_28747f4f905b73 754-847
+plugins/yellow-core/skills/plan-status/SKILL.md
+  s_461fbfc28ab2f8::t_5c5683a68a624f 27
+plugins/yellow-debt/agents/scanners/duplication-scanner.md
+  s_461fbfc28ab2f8::t_ed66295c36a083 112,161
+plugins/yellow-debt/agents/scanners/complexity-scanner.md
+  s_461fbfc28ab2f8::t_fc6b6621c451b8 114,163
+scripts/shell-compat-config.json
+  s_461fbfc28ab2f8::t_033cf95c711328 2,20
+AGENTS.md
+  s_461fbfc28ab2f8::t_6ec0cf9ff76037 100
+tests/shell-compat/aliases.bats
+  s_461fbfc28ab2f8::t_5db74d0103f6bd 1-163
+plugins/yellow-core/commands/flow/decompose.md
+  s_461fbfc28ab2f8::t_74b0ae10990fa1 48
+plugins/yellow-browser-test/commands/browser-test/test.md
+  s_461fbfc28ab2f8::t_f2965f8fae27d9 171
+plugins/yellow-core/tests/plan-status-parity.bats
+  s_461fbfc28ab2f8::t_5b8e7498ff6ac9 14
+plugins/yellow-research/agents/research/code-researcher.md
+  s_461fbfc28ab2f8::t_e0ae95c7bade83 120,169
+plans/shell-alias-hardening.md
+  s_461fbfc28ab2f8::t_2b4fcbe98f398c 3-6,21-32,54-68,75-85,110-118,127-135,153-164,208-222,227,230,234-244,252,257,259,261,265-275,281-292,295,300,306,316,319,321-330,334,336,338-343,395-403
+plugins/yellow-codex/commands/codex/status.md
+  s_461fbfc28ab2f8::t_e573e6e418c5d7 74
+docs/solutions/code-quality/bash-zsh-tiered-shell-contract.md
+  s_461fbfc28ab2f8::t_7490038d0b01ff 46,85-99
+plugins/yellow-ci/commands/ci/runner-cleanup.md
+  s_461fbfc28ab2f8::t_a81b16cb0e731f 77,135
+plugins/yellow-ci/codex/skills/ci-runner-health/references/ssh-probes.md
+  s_461fbfc28ab2f8::t_5e770a624338e0 385
+scripts/validate-shell-compat.js
+  s_461fbfc28ab2f8::t_43319319c369b2 29-31,100-103,986-1152,1260-1265,1387-1394,1464-1467
+plugins/yellow-core/codex/skills/plan-status/SKILL.md
+  s_461fbfc28ab2f8::t_def2a7222be950 26
+CONTRIBUTING.md
+  s_461fbfc28ab2f8::t_71f21dd4438840 619-633
+plugins/yellow-ci/commands/ci/setup-self-hosted.md
+  s_461fbfc28ab2f8::t_c15527ad1d0687 188,190
+.changeset/shell-alias-hardening.md
+  s_461fbfc28ab2f8::t_8c529c90183266 1-10
+plugins/yellow-core/commands/flow/review.md
+  s_461fbfc28ab2f8::t_97a2ece4696676 51,79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e39d076b44f3af22266dcc2fc1c54a8ef35f6076",
+  "prompts": {},
+  "sessions": {
+    "s_461fbfc28ab2f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "11df0fbb-afe4-4922-916e-4b9d0e74abd8",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
