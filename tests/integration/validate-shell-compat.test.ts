@@ -810,6 +810,12 @@ describe('SHC-010 alias-prone commands', () => {
     ).toEqual([2]);
   });
 
+  it('reads a line after a backslash continuation as mid-command', () => {
+    expect(flagged('command find . \\\n  -exec \\\n  ls {} +')).toEqual([]);
+    expect(flagged("printf '%s\\n' \\\n  ls")).toEqual([]);
+    expect(flagged('true && \\\n  ls x')).toEqual([2]);
+  });
+
   it('flags a pipe split across lines at the line holding the command', () => {
     expect(flagged('echo go\nls -t x \\\n  | head -5')).toEqual([2]);
     expect(flagged('ls -t x |\n  head -5')).toEqual([1]);
