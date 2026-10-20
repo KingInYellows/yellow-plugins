@@ -23,7 +23,7 @@ Index source code files for semantic search using ruvector's embedding engine.
 Check `.ruvector/` exists in the project root:
 
 ```bash
-ls -d .ruvector/ 2>/dev/null
+command ls -d .ruvector/ 2>/dev/null
 ```
 
 If not found, suggest: "Run `/ruvector:setup` first to initialize ruvector."

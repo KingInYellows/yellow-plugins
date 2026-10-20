@@ -111,10 +111,12 @@ replaces the two manual greps in `zsh-noclobber-mktemp-stderr-redirect.md`.
   `ls "$d"/*.md` left in `flow/decompose.md` after the other sites were
   converted, and a `find -type f` rewrite that dropped the symlinked plans the
   old glob listed. After converting a pattern, grep the plugin tree for the old
-  form, and keep `-type l` in any `find` that replaces a glob. Open question:
-  display-only calls such as `ls -t plans/*.md 2>/dev/null` still pass SHC-010
-  although `ls=eza` changes their output; decide whether output-changing flags
-  alone should be flagged. The fixes were verified only by the local suites.
+  form, and keep `-type l` in any `find` that replaces a glob. SHC-010 flags
+  every alias-prone word in command position, including a display-only call:
+  `ls=eza` changes that output too, and `command ls` is the same fix. A leading
+  run of environment assignments is stripped first (`LC_ALL=C ls`). A wrapper
+  prefix (`timeout`, `sudo`) is still not command position. The fixes were
+  verified only by the local suites.
 - **Expanded text counts.** `${reviewer^}` inside a multi-line double-quoted
   string, or in an unquoted-tag heredoc, is a zsh `bad substitution` even
   though it is not a command.

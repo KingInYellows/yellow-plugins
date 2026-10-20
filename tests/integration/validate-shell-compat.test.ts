@@ -786,7 +786,14 @@ describe('SHC-010 alias-prone commands', () => {
     ['process substitution', 'while read -r f; do :; done < <(ls -t plans)'],
     ['du piped to cut', 'du -sh x | cut -f1'],
     ['df redirected to a file', 'df -h > out.txt'],
+    ['df with stderr redirected', 'df -h 2> err.txt'],
+    ['ls redirected to /dev/null', 'ls a > /dev/null'],
     ['top inside a pipeline segment', 'echo go; top -bn1 | head -3'],
+    ['bare display call', 'ls -d .ruvector/'],
+    ['bare display with stderr dropped', 'ls -la x 2>/dev/null'],
+    ['placeholder in a bare call', 'ls -la .worktrees/<name>/.ruvector'],
+    ['env-prefixed command', 'LC_ALL=C ls x | head'],
+    ['piped subshell', '( ls x ) | head'],
   ])('flags %s', (_name, text) => {
     expect(flagged(text)).toEqual([1]);
   });
@@ -829,25 +836,24 @@ describe('SHC-010 alias-prone commands', () => {
 
   it('flags other redirect and pipe forms', () => {
     expect(flagged('df -h 1> out.txt')).toEqual([1]);
-    expect(flagged('df -h 2> err.txt')).toEqual([]);
     expect(flagged('ls a 2>&1 | head')).toEqual([1]);
     expect(flagged('ls a >> out')).toEqual([1]);
     expect(flagged('ls a >| out')).toEqual([1]);
-    expect(flagged('ls a > /dev/null')).toEqual([]);
   });
 
-  // Known gaps (CONTRIBUTING.md "Shell Scripts" lists them). Todos, not
-  // pinned passes, so fixing the lint does not fail a test.
-  it.todo('flags an env-prefixed command: LC_ALL=C ls x | head');
+  it('flags a display call in an if or while body', () => {
+    expect(flagged('if [ -d x ]; then ls -la x 2>/dev/null; fi')).toEqual([1]);
+    expect(flagged('while read -r f; do ls -d x; done')).toEqual([1]);
+  });
+
+  // A wrapper is not an assignment, so the command word is not in command
+  // position. Todos, not pinned passes.
   it.todo('flags a wrapper-prefixed command: timeout 5 ls x | head');
   it.todo('flags a sudo-prefixed command: sudo df | tail');
-  it.todo('flags a piped subshell: ( ls x ) | head');
 
   it.each([
     ['command prefix', 'command ls -t x | head'],
     ['backslash prefix', '\\ls x | head'],
-    ['bare display call', 'ls -d .ruvector/'],
-    ['bare display with stderr dropped', 'ls -la x 2>/dev/null'],
     ['find -exec ls', "command find -H plans -name '*.md' ! -name '.*' -exec ls -t {} + | head"],
     [
       'the shipped work.md listing',
@@ -861,7 +867,6 @@ describe('SHC-010 alias-prone commands', () => {
     ['ssh remote command', 'ssh host ls -t x | head'],
     ['ls in a string', "printf 'ls -t' | cat"],
     ['ls as an argument', 'echo ls | head'],
-    ['placeholder in a bare call', 'ls -la .worktrees/<name>/.ruvector'],
     ['a longer command name', 'lsof -i | head'],
     ['a case-arm pattern', 'case "$c" in\n  ps|df) echo disk ;;\nesac'],
     ['a later case-arm alternative', 'case "$c" in\n  ls|ps|du) echo x ;;\nesac'],
@@ -869,8 +874,6 @@ describe('SHC-010 alias-prone commands', () => {
     ['an arithmetic comparison', 'if (( top > 0 )); then :; fi'],
     ['an arithmetic expansion', 'x=$(( ps > 3 ? 1 : 0 ))'],
     ['a path ending in ls', './bin/ls x | head'],
-    ['a display call in an if body', 'if [ -d x ]; then ls -la x 2>/dev/null; fi'],
-    ['a display call in a while body', 'while read -r f; do ls -d x; done'],
     ['arithmetic around a plain variable', 'x=$(( n / 1024 ))'],
   ])('passes %s', (_name, text) => {
     expect(flagged(text)).toEqual([]);
