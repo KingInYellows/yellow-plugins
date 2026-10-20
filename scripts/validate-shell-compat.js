@@ -1061,7 +1061,14 @@ function keepCommandSubs(span, sub = { depth: 0 }) {
     if (span[i] === "'" && !double) single = true;
     else if (span[i] === '"') double = !double;
     else if (span[i] === '`') {
-      end = span.indexOf('`', i + 1);
+      // An escaped backtick (`\``) does not close the substitution.
+      for (let j = i + 1; j < span.length; j++) {
+        if (span[j] === '\\') j++;
+        else if (span[j] === '`') {
+          end = j;
+          break;
+        }
+      }
     } else if (opensSub(span, i)) {
       let depth = 0;
       for (let j = i + 1; j < span.length; j++) {
@@ -1208,8 +1215,10 @@ function blankOpenTest(line, open, sub) {
 
 // One physical line. `classifyLines` has already dropped comments, heredoc
 // bodies, and pinned bash wrappers before this runs. `continued` is true when
-// the previous line ended in `\`, so the line starts mid-command.
+// the previous line ended in `\`, so the line starts mid-command. `inCase` is
+// a boolean or a function of the column, true inside a `case` block.
 function ruleAliasGuarded(line, commands, continued = false, inCase = false) {
+  const inCaseAt = typeof inCase === 'function' ? inCase : () => inCase;
   const names = commands.filter((c) => COMMAND_NAME_RE.test(c));
   if (names.length === 0) return [];
   const wordRe = new RegExp(
@@ -1235,7 +1244,7 @@ function ruleAliasGuarded(line, commands, continued = false, inCase = false) {
     }
     // Outside a `case` block, `(ps | cat)` is a subshell. Inside one, the
     // spaced form needs a `|`; a lone `(ps)` is left to the check above.
-    const spaced = inCase && SPACED_ARM_HEAD_RE.exec(rawPrefix);
+    const spaced = inCaseAt(m.index) && SPACED_ARM_HEAD_RE.exec(rawPrefix);
     if (
       spaced &&
       (spaced[3] || /^\s*\|/.test(afterWord)) &&
@@ -1379,19 +1388,26 @@ function lintShellText(
     arrayDepth = array.depth;
     const test = blankOpenTest(array.line, testOpen, testSub);
     testOpen = test.open;
-    // Case blocks open so far, for spaced case-arm alternatives.
+    // Case blocks open at each column, in source order, for spaced case-arm
+    // alternatives: `(ps | cat); case …` runs `ps` before the block opens.
     const masked = maskShell(line);
-    caseDepth += (masked.match(CASE_OPEN_RE) ?? []).length;
+    const ends = (re) => [...masked.matchAll(re)].map((x) => x.index + x[0].length);
+    const opens = ends(CASE_OPEN_RE);
+    const closes = ends(ESAC_RE);
+    const depthBefore = caseDepth;
+    const depthAt = (col) =>
+      depthBefore +
+      opens.filter((p) => p <= col).length -
+      closes.filter((p) => p <= col).length;
     for (const detail of ruleAliasGuarded(
       test.line,
       ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED,
       continued,
-      caseDepth > 0
+      (col) => depthAt(col) > 0
     )) {
       add('SHC-010', i, detail);
     }
-    const closes = (masked.match(ESAC_RE) ?? []).length;
-    caseDepth = Math.max(0, caseDepth - closes);
+    caseDepth = Math.max(0, depthAt(line.length));
     // A `\` after an operator (`&& \`) or an assignment run (`LC_ALL=C \`)
     // still leaves the next line at a command position. On a line that is
     // itself mid-command (`env \` then `LC_ALL=C \`) the assignment is an

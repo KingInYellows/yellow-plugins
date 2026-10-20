@@ -877,10 +877,13 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('ls x | head)')).toEqual([1]);
     expect(flagged('case "$c" in\n  ps | df) :;;\nesac\n(ps | cat)')).toEqual([4]);
     expect(flagged('case "$c" in\n  a)\n    (ps)\n    ;;\nesac')).toEqual([3]);
+    expect(flagged('(ps | cat); case "$x" in a) :;; esac')).toEqual([1]);
+    expect(flagged('case "$x" in a) :;; esac; (ps | cat)')).toEqual([1]);
   });
 
   it('reads case, esac and [[ as reserved words only in command position', () => {
     expect(flagged("printf '%s\\n' [[\nls x | cat")).toEqual([2]);
+    expect(flagged("[[ -n `printf '\\`'; ls x` ]]")).toEqual([1]);
     expect(flagged('case "$c" in\n  a) echo esac here ;;\n  foo | ps) :;;\nesac')).toEqual([]);
     expect(flagged('echo case x\n(ps | cat)')).toEqual([2]);
     expect(flagged('if [[ -n $a &&\n  -n $b ]]; then ls x; fi')).toEqual([2]);
