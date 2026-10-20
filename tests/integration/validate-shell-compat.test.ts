@@ -810,6 +810,14 @@ describe('SHC-010 alias-prone commands', () => {
     ).toEqual([2]);
   });
 
+  it('reads the operands of a [[ ]] test as words', () => {
+    expect(flagged('[[ "$cmd" == foo || ls == "$cmd" ]]')).toEqual([]);
+    expect(flagged('[[ $cmd =~ ^(ls|ps)$ ]]')).toEqual([]);
+    expect(flagged('if [[ $c =~ ^(ls|ps)$ ]]; then :; fi')).toEqual([]);
+    expect(flagged('[[ -n $(ls x) ]]')).toEqual([1]);
+    expect(flagged('[[ -d x ]] && ls x')).toEqual([1]);
+  });
+
   it('reads the operands of arithmetic spanning lines as variables', () => {
     expect(flagged('x=$((\n  top + 1\n))')).toEqual([]);
     expect(flagged('((\n  ps > 0\n))')).toEqual([]);

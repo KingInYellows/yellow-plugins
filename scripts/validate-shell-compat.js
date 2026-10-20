@@ -1048,12 +1048,18 @@ function keepCommandSubs(span) {
   return out.join('');
 }
 
-// Blank arithmetic, which cannot run a command, except for the `$(…)` or
-// backtick substitutions inside `$((…))`, which still run.
+// `[[ … ]]` on one line. Its `||`, `|` and `(` are test syntax, not
+// command boundaries.
+const DOUBLE_BRACKET_RE = /\[\[\s(?:[^\]]|\][^\]])*\]\]/g;
+
+// Blank arithmetic and `[[ … ]]` tests, which cannot run a command, except
+// for the `$(…)` or backtick substitutions inside them, which still run.
 function maskAliasLine(line) {
-  const prepared = line.replace(ARITHMETIC_RE, (span) =>
-    hasCommandSub(span) ? keepCommandSubs(span) : ' '.repeat(span.length)
-  );
+  const blank = (span) =>
+    hasCommandSub(span) ? keepCommandSubs(span) : ' '.repeat(span.length);
+  const prepared = line
+    .replace(ARITHMETIC_RE, blank)
+    .replace(DOUBLE_BRACKET_RE, blank);
   return maskShell(prepared);
 }
 
