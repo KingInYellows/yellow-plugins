@@ -1057,6 +1057,38 @@ function maskAliasLine(line) {
   return maskShell(prepared);
 }
 
+// Carries a `((` or `$((` left open at the end of one line into the next.
+// `depth` is the paren depth still open from earlier lines (0: none). Returns
+// the line with its arithmetic part blanked except for substitutions, and the
+// depth left open after it.
+function blankOpenArithmetic(line, depth) {
+  let start = 0;
+  let out = line;
+  if (depth > 0) {
+    let i = 0;
+    for (; i < line.length && depth > 0; i++) {
+      if (line[i] === '(') depth++;
+      else if (line[i] === ')') depth--;
+    }
+    out = keepCommandSubs(line.slice(0, i)) + line.slice(i);
+    if (depth > 0) return { line: out, depth };
+    start = i;
+  }
+  const rest = maskShell(
+    out.slice(start).replace(ARITHMETIC_RE, (span) => ' '.repeat(span.length))
+  );
+  const open = rest.indexOf('((');
+  if (open === -1) return { line: out, depth: 0 };
+  depth = 0;
+  for (let i = open; i < rest.length; i++) {
+    if (rest[i] === '(') depth++;
+    else if (rest[i] === ')') depth--;
+  }
+  if (depth <= 0) return { line: out, depth: 0 };
+  const at = start + open;
+  return { line: out.slice(0, at) + keepCommandSubs(out.slice(at)), depth };
+}
+
 // One physical line. `classifyLines` has already dropped comments, heredoc
 // bodies, and pinned bash wrappers before this runs. `continued` is true when
 // the previous line ended in `\`, so the line starts mid-command.
@@ -1137,6 +1169,7 @@ function lintShellText(
     });
 
   let nextContinued = false;
+  let arithDepth = 0;
   for (let i = 0; i < lines.length; i++) {
     const { kind, code: line, badWrapper, sourceCode } = classes[i];
     const continued = nextContinued;
@@ -1204,8 +1237,11 @@ function lintShellText(
     for (const [rule, fn] of LINE_RULES) {
       for (const detail of fn(line, blockCode)) add(rule, i, detail);
     }
+    // `$((` spanning lines: its operands are variables, not commands.
+    const arith = blankOpenArithmetic(line, arithDepth);
+    arithDepth = arith.depth;
     for (const detail of ruleAliasGuarded(
-      line,
+      arith.line,
       ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED,
       continued
     )) {

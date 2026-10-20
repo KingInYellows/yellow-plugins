@@ -810,6 +810,14 @@ describe('SHC-010 alias-prone commands', () => {
     ).toEqual([2]);
   });
 
+  it('reads the operands of arithmetic spanning lines as variables', () => {
+    expect(flagged('x=$((\n  top + 1\n))')).toEqual([]);
+    expect(flagged('((\n  ps > 0\n))')).toEqual([]);
+    expect(flagged('n=$(( a +\n  top ))')).toEqual([]);
+    expect(flagged('x=$((\n  $(du -sk d | cut -f1) / 2\n))')).toEqual([2]);
+    expect(flagged('x=$((\n  1\n)) && ls x')).toEqual([3]);
+  });
+
   it('reads a line after a backslash continuation as mid-command', () => {
     expect(flagged('command find . \\\n  -exec \\\n  ls {} +')).toEqual([]);
     expect(flagged("printf '%s\\n' \\\n  ls")).toEqual([]);
