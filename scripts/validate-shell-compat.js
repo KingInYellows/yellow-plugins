@@ -1057,9 +1057,15 @@ const DOUBLE_BRACKET_RE = /\[\[\s(?:[^\]]|\][^\]])*\]\]/g;
 function maskAliasLine(line) {
   const blank = (span) =>
     hasCommandSub(span) ? keepCommandSubs(span) : ' '.repeat(span.length);
-  const prepared = line
-    .replace(ARITHMETIC_RE, blank)
-    .replace(DOUBLE_BRACKET_RE, blank);
+  let prepared = line.replace(ARITHMETIC_RE, blank);
+  // Find `]]` on the quote-masked text so a quoted `"]]"` does not end it.
+  for (const m of maskShell(prepared).matchAll(DOUBLE_BRACKET_RE)) {
+    const end = m.index + m[0].length;
+    prepared =
+      prepared.slice(0, m.index) +
+      blank(prepared.slice(m.index, end)) +
+      prepared.slice(end);
+  }
   return maskShell(prepared);
 }
 

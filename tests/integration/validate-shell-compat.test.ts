@@ -816,6 +816,7 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('if [[ $c =~ ^(ls|ps)$ ]]; then :; fi')).toEqual([]);
     expect(flagged('[[ -n $(ls x) ]]')).toEqual([1]);
     expect(flagged('[[ -d x ]] && ls x')).toEqual([1]);
+    expect(flagged('[[ "$x" == "]]" ]] && ls x')).toEqual([1]);
   });
 
   it('reads the operands of arithmetic spanning lines as variables', () => {
