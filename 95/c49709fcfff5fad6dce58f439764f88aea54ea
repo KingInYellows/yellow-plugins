@@ -1,0 +1,21 @@
+plugins/yellow-core/commands/stack/status.md
+  s_780f5cb36029fa::t_1779606368c663 72-73
+plugins/yellow-core/skills/stack-provider-router/SKILL.md
+  s_780f5cb36029fa::t_8f187af3594988 97-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "95c49709fcfff5fad6dce58f439764f88aea54ea",
+  "prompts": {},
+  "sessions": {
+    "s_780f5cb36029fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd5fd241-6b1f-4d56-9662-0144c617eeb5",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
