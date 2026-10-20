@@ -1,0 +1,45 @@
+.changeset/shell-alias-hardening.md
+  s_461fbfc28ab2f8::t_bc3f5a48100803 10
+CONTRIBUTING.md
+  s_461fbfc28ab2f8::t_a1c05409f2151b 625,627
+docs/solutions/code-quality/bash-zsh-tiered-shell-contract.md
+  s_461fbfc28ab2f8::t_4e5492e50f15be 91-92
+docs/solutions/logic-errors/bash-pipe-head-exit-code-masking.md
+  s_461fbfc28ab2f8::t_dab1e062a11400 55
+plugins/yellow-core/codex/skills/plan-status/SKILL.md
+  s_461fbfc28ab2f8::t_0c702352f4bb08 26,60
+plugins/yellow-core/commands/flow/decompose.md
+  s_461fbfc28ab2f8::t_94527cdc8f83f9 48,129
+plugins/yellow-core/commands/flow/pick-next-shell.md
+  s_461fbfc28ab2f8::t_75b3b61d4b0952 33
+plugins/yellow-core/commands/flow/review.md
+  s_461fbfc28ab2f8::t_8f6b99eedb4780 51,79
+plugins/yellow-core/commands/flow/work.md
+  s_461fbfc28ab2f8::t_50593b3c534ccf 47
+plugins/yellow-core/skills/plan-status/SKILL.md
+  s_461fbfc28ab2f8::t_a6a777ce90002c 27,61
+plugins/yellow-core/tests/plan-status-parity.bats
+  s_461fbfc28ab2f8::t_af83ed2936e656 14,43
+scripts/validate-shell-compat.js
+  s_461fbfc28ab2f8::t_5f68ac10ce8891 31-34,105,207-208,994-995,997,1002,1005-1010,1027-1032,1035-1037,1043-1045,1051,1060-1062,1129,1142-1144,1148,1154-1165,1178-1180,1183-1184
+tests/integration/validate-shell-compat.test.ts
+  s_461fbfc28ab2f8::t_bbbe72db07a3a1 788-812,818,825-829,842-851
+tests/shell-compat/aliases.bats
+  s_461fbfc28ab2f8::t_e98583f413f245 2,19-21,62-63,75,85-106,109,119-146,204-216
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6c7d5857876e89ef7b04fd2a845ee184d28d2e9d",
+  "prompts": {},
+  "sessions": {
+    "s_461fbfc28ab2f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "11df0fbb-afe4-4922-916e-4b9d0e74abd8",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
