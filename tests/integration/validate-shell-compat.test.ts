@@ -837,6 +837,7 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('a=(x\n  ls) && ls d')).toEqual([2]);
     expect(flagged('a=(\n  $(ls d)\n)')).toEqual([2]);
     expect(flagged('a=(\n  x\n)\nls d')).toEqual([4]);
+    expect(flagged('a=(\n  $(\n  ls x\n  )\n  ps\n)')).toEqual([3]);
     expect(flagged('a=(\n  "("\n)\nls d')).toEqual([4]);
     expect(flagged('a=(\n  ")"\n  ls\n)')).toEqual([]);
     expect(flagged('x=$((\n  1 ")"\n))\nls d')).toEqual([4]);
@@ -848,6 +849,7 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('[[ -n $a &&\n  -n $(ls x) ]]')).toEqual([2]);
     expect(flagged('[[ -n $a &&\n  -n $b ]] && ls x')).toEqual([2]);
     expect(flagged('[[ -n $a ]]\nls x')).toEqual([2]);
+    expect(flagged('[[ -n $(\n  ls x\n) ]]')).toEqual([2]);
   });
 
   it('reads the operands of arithmetic spanning lines as variables', () => {
@@ -856,6 +858,7 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('n=$(( a +\n  top ))')).toEqual([]);
     expect(flagged('x=$((\n  $(du -sk d | cut -f1) / 2\n))')).toEqual([2]);
     expect(flagged('x=$((\n  1\n)) && ls x')).toEqual([3]);
+    expect(flagged('x=$((\n  $(\n  ls x | wc -l\n  ) / 2\n))')).toEqual([3]);
   });
 
   it('reads a line after a backslash continuation as mid-command', () => {
@@ -867,6 +870,12 @@ describe('SHC-010 alias-prone commands', () => {
     expect(flagged('echo A=1 \\\n  ls')).toEqual([]);
     expect(flagged('env \\\n  LC_ALL=C \\\n  ls x')).toEqual([]);
     expect(flagged('env \\\n  LC_ALL=C &&\\\n  ls x')).toEqual([3]);
+  });
+
+  it('reads a spaced alternation as a case arm only inside a case block', () => {
+    expect(flagged('(ps | cat)')).toEqual([1]);
+    expect(flagged('ls x | head)')).toEqual([1]);
+    expect(flagged('case "$c" in\n  ps | df) :;;\nesac\n(ps | cat)')).toEqual([4]);
   });
 
   it('flags a pipe split across lines at the line holding the command', () => {

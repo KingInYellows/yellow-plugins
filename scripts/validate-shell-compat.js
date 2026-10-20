@@ -1010,7 +1010,10 @@ const ENV_ASSIGN_RE = /(?:^|(?<=[\s;&|(`]))(?:[A-Za-z_][A-Za-z0-9_]*=[^\s(`]*\s+
 // The start of a case arm (`in ps)`, `;; ps|df)`, `(ps|df)`) ending right
 // before the word: group 1 is the anchor, 2 an opening `(`, 3 earlier
 // alternatives.
-const CASE_ARM_HEAD_RE = /(^|;;&?|;&|\bin)\s*(\()?((?:[^\s()|;&]+\s*\|\s*)*)$/;
+const CASE_ARM_HEAD_RE = /(^|;;&?|;&|\bin)\s*(\()?((?:[^\s()|;&]+\|)*)$/;
+// Inside a `case` block, alternatives may be spaced (`foo | ps)`).
+const SPACED_ARM_HEAD_RE =
+  /(^|;;&?|;&|\bin)\s*(\()?((?:[^\s()|;&]+\s*\|\s*)*)$/;
 
 // A `$(…)` command substitution or a `<(…)` / `>(…)` process substitution
 // opens at `i`. The `$((` that opens arithmetic does not count.
@@ -1031,13 +1034,21 @@ function hasCommandSub(span) {
 // Same-length copy of an arithmetic span with everything blanked except its
 // `$(…)`, `<(…)` and backtick substitutions, which still run commands. Text
 // inside single quotes is literal, so a `'$(ls)'` there is blanked too.
-function keepCommandSubs(span) {
+// `sub.depth` carries a `$(` or `<(` left open at the end of one line of a
+// multi-line span into the next.
+function keepCommandSubs(span, sub = { depth: 0 }) {
   const out = ' '.repeat(span.length).split('');
   // Parens inside quotes (`$(printf ')'; ls)`) do not close a substitution.
   const masked = maskShell(span);
+  let i = 0;
+  for (; i < span.length && sub.depth > 0; i++) {
+    out[i] = span[i];
+    if (masked[i] === '(') sub.depth++;
+    else if (masked[i] === ')') sub.depth--;
+  }
   let single = false;
   let double = false;
-  for (let i = 0; i < span.length; i++) {
+  for (; i < span.length; i++) {
     let end = -1;
     if (single) {
       if (span[i] === "'") single = false;
@@ -1059,6 +1070,12 @@ function keepCommandSubs(span) {
           end = j;
           break;
         }
+      }
+      if (end === -1) {
+        // Still open at the end of the span: keep the rest and carry it.
+        for (let k = i; k < span.length; k++) out[k] = span[k];
+        sub.depth = depth;
+        break;
       }
     }
     if (end === -1) continue;
@@ -1100,23 +1117,24 @@ function maskAliasLine(line) {
 // `depth` is the paren depth still open from earlier lines (0: none). Returns
 // the line with its arithmetic part blanked except for substitutions, and the
 // depth left open after it.
-function blankOpenArithmetic(line, depth) {
-  return blankOpenParens(line, depth, ARITHMETIC_RE, (rest) =>
+function blankOpenArithmetic(line, depth, sub) {
+  return blankOpenParens(line, depth, sub, ARITHMETIC_RE, (rest) =>
     rest.indexOf('((')
   );
 }
 
 // Likewise an array assignment (`a=(` then one element per line).
-function blankOpenArray(line, depth) {
-  return blankOpenParens(line, depth, ARRAY_ASSIGN_RE, (rest) => {
+function blankOpenArray(line, depth, sub) {
+  return blankOpenParens(line, depth, sub, ARRAY_ASSIGN_RE, (rest) => {
     const m = /(?:^|[\s;&|(])[A-Za-z_][A-Za-z0-9_]*\+?=\(/.exec(rest);
     return m ? m.index + m[0].length - 1 : -1;
   });
 }
 
 // `closedRe` matches the spans that close on the same line; `findOpen` gives
-// the index of the `(` that opens one left open, or -1.
-function blankOpenParens(line, depth, closedRe, findOpen) {
+// the index of the `(` that opens one left open, or -1. `sub` carries an open
+// substitution inside the span (see `keepCommandSubs`).
+function blankOpenParens(line, depth, sub, closedRe, findOpen) {
   let start = 0;
   let out = line;
   if (depth > 0) {
@@ -1127,8 +1145,9 @@ function blankOpenParens(line, depth, closedRe, findOpen) {
       if (masked[i] === '(') depth++;
       else if (masked[i] === ')') depth--;
     }
-    out = keepCommandSubs(line.slice(0, i)) + line.slice(i);
+    out = keepCommandSubs(line.slice(0, i), sub) + line.slice(i);
     if (depth > 0) return { line: out, depth };
+    sub.depth = 0;
     start = i;
   }
   const rest = maskShell(
@@ -1143,20 +1162,24 @@ function blankOpenParens(line, depth, closedRe, findOpen) {
   }
   if (depth <= 0) return { line: out, depth: 0 };
   const at = start + open;
-  return { line: out.slice(0, at) + keepCommandSubs(out.slice(at)), depth };
+  return {
+    line: out.slice(0, at) + keepCommandSubs(out.slice(at), sub),
+    depth,
+  };
 }
 
 // Carries a `[[` test left open at the end of one line into the next. `open`
 // is true when an earlier line left one open. Returns the line with its test
 // part blanked except for substitutions, and whether a test is still open.
-function blankOpenTest(line, open) {
+function blankOpenTest(line, open, sub) {
   let start = 0;
   let out = line;
   if (open) {
     const close = maskShell(line).indexOf(']]');
-    if (close === -1) return { line: keepCommandSubs(line), open: true };
+    if (close === -1) return { line: keepCommandSubs(line, sub), open: true };
     start = close + 2;
-    out = keepCommandSubs(line.slice(0, start)) + line.slice(start);
+    out = keepCommandSubs(line.slice(0, start), sub) + line.slice(start);
+    sub.depth = 0;
   }
   const rest = maskShell(out.slice(start));
   const testRe = /(?:^|[\s;&|(])\[\[(?=\s|$)/g;
@@ -1165,7 +1188,8 @@ function blankOpenTest(line, open) {
     const close = rest.indexOf(']]', at + 2);
     if (close === -1) {
       return {
-        line: out.slice(0, start + at) + keepCommandSubs(out.slice(start + at)),
+        line:
+          out.slice(0, start + at) + keepCommandSubs(out.slice(start + at), sub),
         open: true,
       };
     }
@@ -1177,7 +1201,7 @@ function blankOpenTest(line, open) {
 // One physical line. `classifyLines` has already dropped comments, heredoc
 // bodies, and pinned bash wrappers before this runs. `continued` is true when
 // the previous line ended in `\`, so the line starts mid-command.
-function ruleAliasGuarded(line, commands, continued = false) {
+function ruleAliasGuarded(line, commands, continued = false, inCase = false) {
   const names = commands.filter((c) => COMMAND_NAME_RE.test(c));
   if (names.length === 0) return [];
   const wordRe = new RegExp(
@@ -1196,9 +1220,14 @@ function ruleAliasGuarded(line, commands, continued = false) {
     const arm = CASE_ARM_HEAD_RE.exec(rawPrefix);
     if (
       arm &&
-      /^(?:\s*\|\s*[^\s()|;&]+)*\s*\)/.test(afterWord) &&
-      !(arm[1] === '' && arm[2] && !arm[3] && !/^\s*\|/.test(afterWord))
+      /^(?:\|[^\s()|;&]+)*\)/.test(afterWord) &&
+      !(arm[1] === '' && arm[2] && !arm[3] && !afterWord.startsWith('|'))
     ) {
+      continue;
+    }
+    // Outside a `case` block, `(ps | cat)` is a subshell.
+    const spaced = inCase && SPACED_ARM_HEAD_RE.exec(rawPrefix);
+    if (spaced && /^(?:\s*\|\s*[^\s()|;&]+)*\s*\)/.test(afterWord)) {
       continue;
     }
     const prefix = rawPrefix.replace(ENV_ASSIGN_RE, '').trimEnd();
@@ -1257,6 +1286,10 @@ function lintShellText(
   let arithDepth = 0;
   let testOpen = false;
   let arrayDepth = 0;
+  let caseDepth = 0;
+  const arithSub = { depth: 0 };
+  const arraySub = { depth: 0 };
+  const testSub = { depth: 0 };
   for (let i = 0; i < lines.length; i++) {
     const { kind, code: line, badWrapper, sourceCode } = classes[i];
     const continued = nextContinued;
@@ -1325,21 +1358,27 @@ function lintShellText(
       for (const detail of fn(line, blockCode)) add(rule, i, detail);
     }
     // `$((` spanning lines: its operands are variables, not commands.
-    const arith = blankOpenArithmetic(line, arithDepth);
+    const arith = blankOpenArithmetic(line, arithDepth, arithSub);
     arithDepth = arith.depth;
     // Likewise `[[ … ]]` tests and arrays spanning lines: their operands and
     // elements are words.
-    const array = blankOpenArray(arith.line, arrayDepth);
+    const array = blankOpenArray(arith.line, arrayDepth, arraySub);
     arrayDepth = array.depth;
-    const test = blankOpenTest(array.line, testOpen);
+    const test = blankOpenTest(array.line, testOpen, testSub);
     testOpen = test.open;
+    // Case blocks open so far, for spaced case-arm alternatives.
+    const masked = maskShell(line);
+    caseDepth += (masked.match(/(?:^|[\s;&|(])case\s/g) ?? []).length;
     for (const detail of ruleAliasGuarded(
       test.line,
       ctx.aliasGuarded ?? DEFAULT_ALIAS_GUARDED,
-      continued
+      continued,
+      caseDepth > 0
     )) {
       add('SHC-010', i, detail);
     }
+    const closes = (masked.match(/(?:^|[\s;&|])esac(?=$|[\s;&|)])/g) ?? []).length;
+    caseDepth = Math.max(0, caseDepth - closes);
     // A `\` after an operator (`&& \`) or an assignment run (`LC_ALL=C \`)
     // still leaves the next line at a command position. On a line that is
     // itself mid-command (`env \` then `LC_ALL=C \`) the assignment is an
