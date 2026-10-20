@@ -400,3 +400,58 @@ pr=#8 sha=$H40" "pr=#7 sha=0123abc" "pr=#7 sha=$H40 via=commit-subject extra" "p
   # The exact token Claude Code substitutes is kept, behind set +u.
   grep -qF 'PGP_LIB="${CLAUDE_PLUGIN_ROOT}/lib/plan-gate-provenance.sh"' "$COMPLETE"
 }
+
+# PATH with gh, jq, git, and rm, and without gt. The fences under test are
+# the ones in complete.md; this only hides gt so those fences can run.
+path_without_gt() {
+  local stub bin
+  stub="$FIXTURE_DIR/bin"
+  mkdir -p "$stub"
+  printf '#!/bin/sh\nif [ "$1" = auth ] && [ "$2" = status ]; then exit 0; fi\nexit 1\n' >"$stub/gh"
+  printf '#!/bin/sh\nexit 0\n' >"$stub/jq"
+  chmod +x "$stub/gh" "$stub/jq"
+  for bin in git rm; do
+    ln -s "$(command -v "$bin")" "$stub/$bin"
+  done
+  if [ -e "$stub/gt" ]; then
+    echo "stub PATH still contains gt" >&2
+    return 1
+  fi
+  printf '%s' "$stub"
+}
+
+@test "Phase 0 fence succeeds when gt is absent and gh plus jq exist" {
+  phase_repo
+  stub=$(path_without_gt)
+  bash_bin=$(command -v bash)
+  blk=$(fenced_block 'gh auth status')
+  ! grep -q 'command -v gt' <<<"$blk"
+  run env PATH="$stub" "$bash_bin" -c "$blk"
+  [ "$status" -eq 0 ] || { echo "$output"; false; }
+}
+
+@test "Graphite Phase 6 fence fails closed when gt is absent and does not touch the repo" {
+  phase_repo
+  stub=$(path_without_gt)
+  bash_bin=$(command -v bash)
+  # The provenance fence mentions `gt checkout --trunk` only in a comment.
+  blk=$(fenced_block 'gt create "plan/archive-$SLUG"')
+  grep -q 'command -v gt' <<<"$blk"
+  before=$(git status --porcelain; git rev-parse HEAD)
+  run env PATH="$stub" "$bash_bin" -c "$blk"
+  [ "$status" -ne 0 ]
+  [[ $output == *"[plan:complete] error: gt not installed"* ]]
+  after=$(git status --porcelain; git rev-parse HEAD)
+  [ "$before" = "$after" ]
+}
+
+@test "GitHub Phase 6 and Phase 8 fences do not invoke gt" {
+  init=$(fenced_block 'run-github-stack-runtime.js" init')
+  submit=$(fenced_block 'run-github-stack-runtime.js" submit')
+  [ -n "$init" ]
+  [ -n "$submit" ]
+  ! grep -qE '(^|[^A-Za-z0-9_])gt([^A-Za-z0-9_]|$)' <<<"$init"
+  ! grep -qE '(^|[^A-Za-z0-9_])gt([^A-Za-z0-9_]|$)' <<<"$submit"
+  grep -qF 'gt submit --no-interactive' "$BATS_TEST_DIRNAME/../commands/plan/complete.md"
+  grep -qF 'run-github-stack-runtime.js submit' "$BATS_TEST_DIRNAME/../commands/plan/complete.md"
+}
