@@ -786,7 +786,18 @@ describe('SHC-010 alias-prone commands', () => {
     ['process substitution', 'while read -r f; do :; done < <(ls -t plans)'],
     ['du piped to cut', 'du -sh x | cut -f1'],
     ['df redirected to a file', 'df -h > out.txt'],
+    ['df with stderr redirected', 'df -h 2> err.txt'],
+    ['ls redirected to /dev/null', 'ls a > /dev/null'],
     ['top inside a pipeline segment', 'echo go; top -bn1 | head -3'],
+    ['bare display call', 'ls -d .ruvector/'],
+    ['bare display with stderr dropped', 'ls -la x 2>/dev/null'],
+    ['placeholder in a bare call', 'ls -la .worktrees/<name>/.ruvector'],
+    ['env-prefixed command', 'LC_ALL=C ls x | head'],
+    ['piped subshell', '( ls x ) | head'],
+    ['env-prefixed command after &&', 'true && LC_ALL=C ls x'],
+    ['env-prefixed if condition', 'if LC_ALL=C ls x; then :; fi'],
+    ['env-prefixed command in a subshell', '( LC_ALL=C ls x )'],
+    ['env-prefixed command after indent', '  LC_ALL=C TZ=UTC ls x'],
   ])('flags %s', (_name, text) => {
     expect(flagged(text)).toEqual([1]);
   });
@@ -797,6 +808,95 @@ describe('SHC-010 alias-prone commands', () => {
         'fn() {\n  if [ -d plans ] && ls plans/*.md >/dev/null 2>&1; then :; fi\n}'
       )
     ).toEqual([2]);
+  });
+
+  it('reads the operands of a [[ ]] test as words', () => {
+    expect(flagged('[[ "$cmd" == foo || ls == "$cmd" ]]')).toEqual([]);
+    expect(flagged('[[ $cmd =~ ^(ls|ps)$ ]]')).toEqual([]);
+    expect(flagged('if [[ $c =~ ^(ls|ps)$ ]]; then :; fi')).toEqual([]);
+    expect(flagged('[[ -n $(ls x) ]]')).toEqual([1]);
+    expect(flagged('[[ -d x ]] && ls x')).toEqual([1]);
+    expect(flagged('[[ "$x" == "]]" ]] && ls x')).toEqual([1]);
+    expect(flagged(`[[ "$x" == '$(ls)' ]]`)).toEqual([]);
+    expect(flagged("[[ \"$x\" == '`ls`' ]]")).toEqual([]);
+    expect(flagged(`x=$(( '$(ls)' ))`)).toEqual([]);
+    expect(flagged('[[ "$x" == "$(ls)" ]]')).toEqual([1]);
+    expect(flagged('[[ -r <(ls x) ]]')).toEqual([1]);
+    expect(flagged("[[ -n $(printf ')'; ls x) ]]")).toEqual([1]);
+  });
+
+  it('reads the elements of an array assignment as words', () => {
+    expect(flagged('x=(ls)')).toEqual([]);
+    expect(flagged('commands=(ls ps)')).toEqual([]);
+    expect(flagged('a+=(df) ; echo "${a[@]}"')).toEqual([]);
+    expect(flagged('x=($(ls d))')).toEqual([1]);
+    expect(flagged('x=( <(ls d) )')).toEqual([1]);
+    expect(flagged('x=(a) && ls d')).toEqual([1]);
+    expect(flagged('(ls d)')).toEqual([1]);
+    expect(flagged('commands=(\n  ls\n  ps\n)')).toEqual([]);
+    expect(flagged('a=(x\n  ls) && ls d')).toEqual([2]);
+    expect(flagged('a=(\n  $(ls d)\n)')).toEqual([2]);
+    expect(flagged('a=(\n  x\n)\nls d')).toEqual([4]);
+    expect(flagged('a=(\n  $(\n  ls x\n  )\n  ps\n)')).toEqual([3]);
+    expect(flagged('a=(\n  "("\n)\nls d')).toEqual([4]);
+    expect(flagged('a=(\n  ")"\n  ls\n)')).toEqual([]);
+    expect(flagged('x=$((\n  1 ")"\n))\nls d')).toEqual([4]);
+  });
+
+  it('reads the operands of a [[ ]] test spanning lines as words', () => {
+    expect(flagged('[[ "$cmd" == foo ||\n  ls == "$cmd" ]]')).toEqual([]);
+    expect(flagged('if [[ -n $a &&\n  ps == "$b" ]]; then :; fi')).toEqual([]);
+    expect(flagged('[[ -n $a &&\n  -n $(ls x) ]]')).toEqual([2]);
+    expect(flagged('[[ -n $a &&\n  -n $b ]] && ls x')).toEqual([2]);
+    expect(flagged('[[ -n $a ]]\nls x')).toEqual([2]);
+    expect(flagged('[[ -n $(\n  ls x\n) ]]')).toEqual([2]);
+  });
+
+  it('does not read a `)` that closes a substitution as a reserved-word prefix', () => {
+    expect(flagged('echo $(date) [[\nls x | cat')).toEqual([2]);
+  });
+
+  // A `)` that ends a case-arm pattern or `f()` should allow a multi-line
+  // `[[` after it, but telling it from a substitution's `)` needs case-arm
+  // tracking (CLAUDE-172).
+  it.todo('reads a multi-line [[ after a case-arm `)` as a test');
+
+  it('reads the operands of arithmetic spanning lines as variables', () => {
+    expect(flagged('x=$((\n  top + 1\n))')).toEqual([]);
+    expect(flagged('((\n  ps > 0\n))')).toEqual([]);
+    expect(flagged('n=$(( a +\n  top ))')).toEqual([]);
+    expect(flagged('x=$((\n  $(du -sk d | cut -f1) / 2\n))')).toEqual([2]);
+    expect(flagged('x=$((\n  1\n)) && ls x')).toEqual([3]);
+    expect(flagged('x=$((\n  $(\n  ls x | wc -l\n  ) / 2\n))')).toEqual([3]);
+  });
+
+  it('reads a line after a backslash continuation as mid-command', () => {
+    expect(flagged('command find . \\\n  -exec \\\n  ls {} +')).toEqual([]);
+    expect(flagged("printf '%s\\n' \\\n  ls")).toEqual([]);
+    expect(flagged('true && \\\n  ls x')).toEqual([2]);
+    expect(flagged('LC_ALL=C \\\n  ls x')).toEqual([2]);
+    expect(flagged('true && A=1 B=2 \\\n  ls x')).toEqual([2]);
+    expect(flagged('echo A=1 \\\n  ls')).toEqual([]);
+    expect(flagged('env \\\n  LC_ALL=C \\\n  ls x')).toEqual([]);
+    expect(flagged('env \\\n  LC_ALL=C &&\\\n  ls x')).toEqual([3]);
+  });
+
+  it('reads a spaced alternation as a subshell, not a case arm', () => {
+    expect(flagged('(ps | cat)')).toEqual([1]);
+    expect(flagged('ls x | head)')).toEqual([1]);
+    expect(flagged('case "$c" in\n  a)\n    (ps)\n    ;;\nesac')).toEqual([3]);
+    expect(flagged('case "$c" in\n  a)\n    (ps | cat)\n    ;;\nesac')).toEqual([3]);
+    expect(flagged('(ps | cat); case "$x" in a) :;; esac')).toEqual([1]);
+  });
+
+  // Spaced alternatives (`foo | ps)`) are flagged like `main` does; telling
+  // them from a subshell needs case-arm tracking (CLAUDE-172).
+  it.todo('passes spaced case alternatives: case "$c" in foo | ps) :;; esac');
+
+  it('reads [[ as a reserved word only in command position', () => {
+    expect(flagged("printf '%s\\n' [[\nls x | cat")).toEqual([2]);
+    expect(flagged("[[ -n `printf '\\`'; ls x` ]]")).toEqual([1]);
+    expect(flagged('if [[ -n $a &&\n  -n $b ]]; then ls x; fi')).toEqual([2]);
   });
 
   it('flags a pipe split across lines at the line holding the command', () => {
@@ -829,25 +929,24 @@ describe('SHC-010 alias-prone commands', () => {
 
   it('flags other redirect and pipe forms', () => {
     expect(flagged('df -h 1> out.txt')).toEqual([1]);
-    expect(flagged('df -h 2> err.txt')).toEqual([]);
     expect(flagged('ls a 2>&1 | head')).toEqual([1]);
     expect(flagged('ls a >> out')).toEqual([1]);
     expect(flagged('ls a >| out')).toEqual([1]);
-    expect(flagged('ls a > /dev/null')).toEqual([]);
   });
 
-  // Known gaps (CONTRIBUTING.md "Shell Scripts" lists them). Todos, not
-  // pinned passes, so fixing the lint does not fail a test.
-  it.todo('flags an env-prefixed command: LC_ALL=C ls x | head');
+  it('flags a display call in an if or while body', () => {
+    expect(flagged('if [ -d x ]; then ls -la x 2>/dev/null; fi')).toEqual([1]);
+    expect(flagged('while read -r f; do ls -d x; done')).toEqual([1]);
+  });
+
+  // A wrapper is not an assignment, so the command word is not in command
+  // position. Todos, not pinned passes.
   it.todo('flags a wrapper-prefixed command: timeout 5 ls x | head');
   it.todo('flags a sudo-prefixed command: sudo df | tail');
-  it.todo('flags a piped subshell: ( ls x ) | head');
 
   it.each([
     ['command prefix', 'command ls -t x | head'],
     ['backslash prefix', '\\ls x | head'],
-    ['bare display call', 'ls -d .ruvector/'],
-    ['bare display with stderr dropped', 'ls -la x 2>/dev/null'],
     ['find -exec ls', "command find -H plans -name '*.md' ! -name '.*' -exec ls -t {} + | head"],
     [
       'the shipped work.md listing',
@@ -861,7 +960,6 @@ describe('SHC-010 alias-prone commands', () => {
     ['ssh remote command', 'ssh host ls -t x | head'],
     ['ls in a string', "printf 'ls -t' | cat"],
     ['ls as an argument', 'echo ls | head'],
-    ['placeholder in a bare call', 'ls -la .worktrees/<name>/.ruvector'],
     ['a longer command name', 'lsof -i | head'],
     ['a case-arm pattern', 'case "$c" in\n  ps|df) echo disk ;;\nesac'],
     ['a later case-arm alternative', 'case "$c" in\n  ls|ps|du) echo x ;;\nesac'],
@@ -869,11 +967,14 @@ describe('SHC-010 alias-prone commands', () => {
     ['an arithmetic comparison', 'if (( top > 0 )); then :; fi'],
     ['an arithmetic expansion', 'x=$(( ps > 3 ? 1 : 0 ))'],
     ['a path ending in ls', './bin/ls x | head'],
-    ['a display call in an if body', 'if [ -d x ]; then ls -la x 2>/dev/null; fi'],
-    ['a display call in a while body', 'while read -r f; do ls -d x; done'],
-    ['a display-only command before then', 'if ls; true; then :; fi'],
-    ['a display-only command before do', 'while ls; true; do :; done'],
     ['arithmetic around a plain variable', 'x=$(( n / 1024 ))'],
+    ['a variable beside a substitution in arithmetic', 'x=$(( top + $(echo 1) ))'],
+    ['a variable beside a substitution in a comparison', 'if (( ps > $(echo 1) )); then :; fi'],
+    ['a later case arm on the same line', 'case "$c" in foo) echo a ;; ps) echo disk ;; esac'],
+    ['one-line case alternatives', 'case "$c" in ps|df) echo disk ;; esac'],
+    ['a parenthesised later case arm', 'case "$c" in a) :;; (ps|df) echo x ;; esac'],
+    ['an assignment argument before ls', 'echo FOO=bar ls'],
+    ['an indented capture of command ps', '  v=$(command ps -p 1 -o comm=)'],
   ])('passes %s', (_name, text) => {
     expect(flagged(text)).toEqual([]);
   });
