@@ -71,7 +71,9 @@
 #             revert; on Graphite the upstack is restacked back onto the
 #             reset branch, or stderr tells the user to run `gt restack`),
 #             5 submit failed or timed out, 6 verify mismatch or a
-#             verify call timed out. After 5 or 6 the commit exists locally:
+#             verify call timed out, 7 GitHub rate limit while listing the
+#             PR's changed files (stderr `reason=rate-limit`; nothing staged
+#             or committed). After 5 or 6 the commit exists locally:
 #             resubmit through the provider rather than re-running this
 #             script (a re-run sees a clean tree: NOOP).
 # Env: YELLOW_REVIEW_GITHUB_STACK_RUNTIME — path to github-stack-runtime.js
@@ -958,7 +960,17 @@ done
 
 # Only files the PR already changes may be committed.
 if [ "${#EXPECTED[@]}" -gt 0 ]; then
-    PR_FILES=$(rp_pr_files "$PR" 2>/dev/null) || die 3 "could not list PR #$PR's changed files"
+    # gh's stderr is read only to tell a rate limit apart, never echoed: a
+    # rate-limited listing is exit 7 so callers stop instead of moving on.
+    PF_ERR=$(mktemp) || die 2 "mktemp failed"
+    PR_FILES=$(rp_pr_files "$PR" 2>"$PF_ERR") && PF_RC=0 || PF_RC=$?
+    PF_RL=0
+    grep -qiE 'rate limit|abuse|HTTP 429' "$PF_ERR" && PF_RL=1
+    rm -f -- "$PF_ERR"
+    if [ "$PF_RC" -ne 0 ]; then
+        [ "$PF_RL" -eq 0 ] || { printf 'reason=rate-limit\n' >&2; die 7 "GitHub rate limit while listing PR #$PR's changed files"; }
+        die 3 "could not list PR #$PR's changed files"
+    fi
     for f in "${EXPECTED[@]}"; do
         grep -qxF -- "$f" <<<"$PR_FILES" || die 3 "not one of PR #$PR's changed files: $f"
     done

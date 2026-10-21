@@ -1584,6 +1584,24 @@ SECRET_COMMAND='echo "GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789"; ec
   [ ! -e "$BATS_TEST_TMPDIR/ran" ]
 }
 
+@test "a rate-limited PR file listing skips the run with rateLimited" {
+  printf '#!/bin/sh\nprintf "gh: API rate limit exceeded (HTTP 429)\\n" >&2\nexit 1\n' >| "$STUB_BIN/gh"
+  verify 'touch "$BATS_TEST_TMPDIR/ran"' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
+  [ "$(printf '%s' "$output" | jq -r .rateLimited)" = true ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"GitHub rate limit while listing the PR's changed files"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
+}
+
+@test "a PR file listing that fails without a rate limit has no rateLimited field" {
+  printf '#!/bin/sh\nprintf "gh: HTTP 502\\n" >&2\nexit 1\n' >| "$STUB_BIN/gh"
+  verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = skipped ]
+  [ "$(printf '%s' "$output" | jq -r 'has("rateLimited")')" = false ]
+}
+
 @test "a non-numeric YELLOW_REVIEW_NET_TIMEOUT exits 2" {
   YELLOW_REVIEW_NET_TIMEOUT=soon verify 'true' --timeout 5 --trusted -- src/a.txt src/new.txt
   [ "$status" -eq 2 ]

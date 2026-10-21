@@ -264,7 +264,9 @@ For each iteration:
    ```
 
    When `ratelimited=1`, the next `gh` call would hit the same limit: record
-   `rate limited` in this PR's `Notes`, mark every remaining PR
+   `rate limited` in this PR's `Notes`, set this PR's row to `Outcome`
+   `skipped`, `Skip Reason` `rate limited` and `Blocking` `?` (it counts as
+   skipped in the totals, like the unreadable branch below), mark every remaining PR
    `skipped — not attempted (rate limit)`, record `pending-exit-1` and go to
    `### Step 5: End-of-loop summary table` (item 5's stop). When `exit` is
    non-zero and `ratelimited` is not `1`, the state is unknown for another
@@ -292,10 +294,10 @@ For each iteration:
    fail to invoke) or any directory-based path.
 3. **Record outcome** for the summary table:
    - If the LAST line of the sweep output fully matches
-     `^Sweep: skipped \((pr-not-open|branch-mismatch|head-ignore-unreadable|tracked-here-ignored-on-head|untracked-here-ignored-on-head)\)$`
+     `^Sweep: skipped \((pr-not-open|branch-mismatch|head-mismatch|head-ignore-unreadable|tracked-here-ignored-on-head|untracked-here-ignored-on-head)\)$`
      (`/review:sweep` "Skip line"), the sweep stopped before `/review:resolve`
      on a PR-specific condition: outcome is `skipped — <reason>` (`PR not
-     open`, `branch mismatch`, `head ignore rules unreadable`, `config tracked
+     open`, `branch mismatch`, `local branch behind the PR head`, `head ignore rules unreadable`, `config tracked
      here, ignored on the PR head` or `config untracked here, ignored on the PR
      head`), not `no contract`. Item 4's clean-tree check still runs; the
      batch continues.

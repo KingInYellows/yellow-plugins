@@ -1119,6 +1119,26 @@ STUB
   [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
 }
 
+@test "a rate-limited PR file listing is exit 7 with reason=rate-limit" {
+  mv "$STUB_BIN/gh" "$STUB_BIN/gh.real"
+  cat >| "$STUB_BIN/gh" <<'STUB'
+#!/bin/sh
+case "$1" in
+  api) printf 'gh: API rate limit exceeded for user ID 1. (HTTP 403)\n' >&2; exit 1 ;;
+esac
+exec "$(dirname "$0")/gh.real" "$@"
+STUB
+  chmod +x "$STUB_BIN/gh"
+  printf 'one\nfeature\nfix\n' >| src/a.txt
+  run_crf --provider graphite --pr 7 --message "$MSG" -- src/a.txt
+  [ "$status" -eq 7 ]
+  [[ "$stderr" == *"reason=rate-limit"* ]]
+  [[ "$stderr" == *"GitHub rate limit while listing PR #7's changed files"* ]]
+  [[ "$stderr" != *"user ID 1"* ]]
+  [ "$(git rev-parse HEAD)" = "$FIRST_SHA" ]
+  [ -z "$(git diff --cached --name-only)" ]
+}
+
 @test "the last gh error reaches the verify message with URL credentials masked" {
   mv "$STUB_BIN/gh" "$STUB_BIN/gh.real"
   cat >| "$STUB_BIN/gh" <<'STUB'

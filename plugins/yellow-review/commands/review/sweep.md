@@ -102,8 +102,8 @@ contract and stops the batch as `no contract`.
 `resolve_pr.verify_command` is run without confirmation by the unattended
 `/review:resolve`. An untrusted PR can steer `/review:pr`'s fix `Edit` into
 that file, so snapshot it before `/review:pr` and validate it before resolve
-reads it. Classify this work tree first. Step 2b classifies again after the
-checkout and does not reuse this result:
+reads it. Classify this work tree first and keep the result as
+`<start-class>`. Step 2b classifies again after the checkout:
 
 ```bash
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
@@ -134,7 +134,9 @@ PR's URL names (so a GitHub Enterprise remote works without `GH_HOST`). It
 judges them against this clone's `.git/info/exclude` and `core.excludesFile`.
 It prints one line.
 
-- `head=tracked`, `head=ignored` or `head=unignored` (exit `0`) is the result.
+- `head=tracked`, `head=ignored` or `head=unignored`, then `sha=<oid>` (exit
+  `0`), is the result. Keep the `sha=` value as `<head-sha>`: it is the commit
+  the probe judged, and Step 2a checks that `/review:pr` reviewed it.
 - Exit `4` with `error=<class>` is specific to this PR: the PR is gone, the head is
   unreadable, its `.gitignore` or `.gitattributes` is a symlink, a root entry
   differs from `.gitignore`, `.gitattributes` or `yellow-plugins.local.md`
@@ -145,7 +147,8 @@ It prints one line.
   with `<class>` from the `error=` line. Stop before any snapshot, ending with `Sweep: skipped (head-ignore-unreadable)`.
 - Exit `3` (a rate limit, a network error or timeout, failed authentication,
   an HTTP 403, or a 404 from the tree or blob read, such as a token without
-  Contents read, or a local git failure)
+  Contents read, a local git failure, or this clone's own attributes
+  transforming `.gitignore`, `error=local-attributes`)
   or any other exit: print
   `[review:sweep] Error: could not read the PR head ignore rules.` and stop
   before any snapshot with no skip line, so `/review:sweep-all` records
@@ -160,32 +163,36 @@ and stop before Step 2, ending with
 `Sweep: skipped (tracked-here-ignored-on-head)`: the condition belongs to this
 PR, so `/review:sweep-all` moves on to the next one.
 
-When the work-tree probe printed `unignored` and this probe printed
-`head=ignored`, the snapshot is only safe for an absent path: `git status`
-can hide an existing untracked file (`status.showUntrackedFiles=no`), and the
-checkout would leave those bytes in place as an ignored config that
-`/review:resolve` trusts. Stop when the path exists as a file or symlink
-(`-L` also catches a dangling link):
+When the work-tree probe printed `unignored`, check whether the path exists
+as a file or symlink (`-L` also catches a dangling link) and keep the answer
+as `<start-present>`; `git status` can hide an existing untracked file
+(`status.showUntrackedFiles=no`):
 
 ```bash
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || TOP=""
 p="$TOP/yellow-plugins.local.md"
-if [ -z "$TOP" ] || [ -e "$p" ] || [ -L "$p" ]; then
-  printf '[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md exists untracked and unignored on this branch but is ignored on the PR head; remove it or rerun /review:sweep from the PR branch\n' >&2
-  exit 1
-fi
+if [ -z "$TOP" ] || [ -e "$p" ] || [ -L "$p" ]; then printf 'present\n'; else printf 'absent\n'; fi
 ```
 
-End that stop with `Sweep: skipped (untracked-here-ignored-on-head)`, as for
-the tracked case above.
+When it printed `present` and this probe printed `head=ignored`, the checkout
+would leave those bytes in place as an ignored config that `/review:resolve`
+trusts. Print
+`[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md exists untracked and unignored on this branch but is ignored on the PR head; remove it or rerun /review:sweep from the PR branch`
+and stop before Step 2, ending with
+`Sweep: skipped (untracked-here-ignored-on-head)`, as for the tracked case
+above. Step 2b repeats this check on the tree `/review:pr` checked out.
 
-Otherwise snapshot when the work-tree probe printed `ignored`, or when it
-printed `unignored` and this probe printed `head=ignored` (the path is absent
-on this branch). If neither holds, log
+If neither stop applies, snapshot whenever the work-tree probe printed
+`ignored` or `unignored`, whatever this probe printed: a steered `/review:pr` fix can add
+the path to `.gitignore` or `.git/info/exclude` and then create it, and the
+branch Step 2 checks out can differ from the head commit this probe judged.
+The snapshot records an absent path as absent, so Step 2b and 3a delete a
+config created during the run. When the work-tree probe printed `tracked` or
+`unknown`, log
 `[review:sweep] PR #<PR#>: yellow-plugins.local.md is not an ignored untracked file; not guarded`,
 set `<guard-dir>` to `none`, and skip every `guard-local-config` call below
-(`/review:resolve` treats a tracked config as untrusted). When the snapshot
-condition holds, snapshot now, before Step 2:
+(`/review:resolve` treats a tracked config as untrusted). Otherwise snapshot
+now, before Step 2:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" snapshot
@@ -211,9 +218,13 @@ the `--non-interactive` flag is fixed text). Wait for it to complete.
 ### Step 2a: Verify branch alignment
 
 After `/review:pr` completes, verify the current checked-out branch still
-matches the PR's head branch. If `/review:pr` errored mid-way or a tool
-checked out a different branch, `/review:resolve` would commit fixes
-against the wrong PR.
+matches the PR's head branch, and that it contains the head commit Step 1b
+judged (`<head-sha>`). If `/review:pr` errored mid-way or a tool checked out a
+different branch, `/review:resolve` would commit fixes against the wrong PR;
+a stale or restacked local branch was reviewed, and had its ignore rules
+judged, at a commit other than the PR head. `/review:pr` may have committed
+fixes on top, so the head commit must be an ancestor of `HEAD`, not equal
+to it.
 
 ```bash
 set -u
@@ -227,19 +238,36 @@ fi
   printf '[review:sweep] Error: branch mismatch (expected %s, on %s). Aborting resolve.\n' "$EXPECTED" "$ACTUAL" >&2
   exit 1
 }
+git cat-file -e '<head-sha>^{commit}' 2>/dev/null || {
+  printf '[review:sweep] Error: the checked-out branch does not contain the PR head commit <head-sha>. Aborting resolve.\n' >&2
+  exit 3
+}
+git merge-base --is-ancestor '<head-sha>' HEAD; rc=$?
+case "$rc" in
+  0) ;;
+  1) printf '[review:sweep] Error: the checked-out branch does not contain the PR head commit <head-sha>. Aborting resolve.\n' >&2
+     exit 3 ;;
+  *) printf '[review:sweep] Error: could not compare the checked-out branch with the PR head commit. Aborting resolve.\n' >&2
+     exit 2 ;;
+esac
 ```
 
 Exit 1 means both names were read and they differ: stop, do not proceed to
 Step 3, and end the output with the skip line
-`Sweep: skipped (branch-mismatch)` (see "Skip line"). Exit 2 means `gh pr
-view` or `git rev-parse` failed or printed nothing, so no mismatch was
-established (a failed fetch can be a rate limit): stop the same way, but print
-no `Sweep:` or `Resolve:` line, so `/review:sweep-all` records `no contract`
-and stops the batch. Before either stop prints anything, run the guard exit
+`Sweep: skipped (branch-mismatch)` (see "Skip line"). Exit 3 means the branch
+matches but does not contain `<head-sha>` (the local branch is stale or was
+restacked): stop the same way, ending with `Sweep: skipped (head-mismatch)`.
+Exit 2 means `gh pr view`, `git rev-parse` or `git merge-base` failed or
+printed nothing, so no mismatch was established (a failed fetch can be a rate
+limit): stop the same way, but print no `Sweep:` or `Resolve:` line, so
+`/review:sweep-all` records `no contract` and stops the batch. Before any of
+these stops prints anything, and unless `<guard-dir>` is `none`, run Step 2b's
+work-tree probe. When it prints `tracked` or `unknown`, run no
+`guard-local-config` call (the checked-out branch owns the path) and print
+Step 2b's `snapshot kept at <guard-dir>` line. Otherwise run the guard exit
 check (Step 3a's `check` call and its exit handling: clear only on exit `0` or
 `3`, keep and name the snapshot otherwise), so a config edit from `/review:pr`
-is restored and never loses its recovery snapshot. Skip it when `<guard-dir>`
-is `none`.
+is restored and never loses its recovery snapshot.
 
 ### Step 2b: Check the local config before resolve
 
@@ -263,33 +291,40 @@ case "$rc" in
 esac
 ```
 
-- **`ignored` and `<guard-dir>` is `none`:** the config was not snapshotted
-  before the review. Print
+- **`ignored` and `<guard-dir>` is `none`:** Step 1b found the path tracked
+  or could not classify it, so the config was not snapshotted before the
+  review. Print
   `[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md is ignored on the PR branch but was not snapshotted before the review; rerun /review:sweep from the PR's branch`
   and, when the file exists,
   `inspect yellow-plugins.local.md before any further run: /review:pr may have written it, and a rerun would snapshot it as the trusted baseline`,
   and stop without invoking `/review:resolve`. Print no `Sweep:` or `Resolve:`
   line, so `/review:sweep-all` records `no contract` and stops the batch.
-- **Anything but `ignored`, and `<guard-dir>` is not `none`:** the PR head
-  tracks the path (or does not ignore it), so the checkout replaced the ignored
-  file and Step 1b's snapshot no longer describes it. Run no `guard-local-config`
-  call: `check` would overwrite the PR's file with the starting branch's
-  private config. Print
+- **`tracked` or `unknown`, and `<guard-dir>` is not `none`:** the checked-out
+  branch tracks the path (or it cannot be classified), so the checkout may
+  have replaced the file and Step 1b's snapshot no longer describes it. Run no
+  `guard-local-config` call: `check` would overwrite the PR's file with the
+  starting branch's private config. Print
   `[review:sweep] PR #<PR#>: yellow-plugins.local.md is not an ignored untracked file on the PR branch; not guarded`
   and
   `snapshot kept at <guard-dir> (it holds the starting branch's private config; restore it by hand if you need it, then run guard-local-config clear "<guard-dir>")`,
   set `<guard-dir>` to `none`, and continue unguarded, as in Step 1b.
 - **Anything but `ignored`, and `<guard-dir>` is `none`:** continue unguarded,
   as in Step 1b.
-- **`ignored` and `<guard-dir>` is set:** the path is still an ignored file, so
-  compare it with Step 1b's snapshot before `/review:resolve` can read it. The
-  check restores a changed, created or deleted `yellow-plugins.local.md`:
+- **`ignored` or `unignored`, and `<guard-dir>` is set:** the path is still an
+  untracked file, so compare it with Step 1b's snapshot before
+  `/review:resolve` can read it. The check restores a changed, created or
+  deleted `yellow-plugins.local.md`, whatever ignore rule now hides it:
 
   ```bash
   "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/guard-local-config" check "<guard-dir>" "<guard-digest>"
   ```
 
-  Exit `0`: unchanged, continue to Step 3 with the same snapshot. Exit `3`
+  Exit `0`: unchanged. When this probe printed `ignored`, `<start-class>` was
+  `unignored` and `<start-present>` was `present`, the checked-out tree now
+  ignores the untracked file Step 1b saw unignored, which Step 1b's head probe
+  did not predict: run the Step 3a `clear` call and stop with Step 1b's
+  `untracked-here-ignored-on-head` message and skip line. Otherwise continue to
+  Step 3 with the same snapshot. Exit `3`
   (changed and restored): run the Step 3a `clear` call, print
   `[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md changed during the review`
   with the script's `changed:` / `restore failed:` lines, and stop without
@@ -297,8 +332,9 @@ esac
   its digest check) or any other exit: do not clear; print the same abort
   message plus `inspect yellow-plugins.local.md before any further run` and
   `snapshot kept at <guard-dir> (recover yellow-plugins.local.md from it by hand, then run guard-local-config clear "<guard-dir>")`,
-  and stop without invoking `/review:resolve`. Print no `Sweep:` or `Resolve:` line, so
-  `/review:sweep-all` records `no contract` and stops the batch.
+  and stop without invoking `/review:resolve`. On exit `3`, `4` or any other
+  exit, print no `Sweep:` or `Resolve:` line, so `/review:sweep-all` records
+  `no contract` and stops the batch.
 
 ### Step 3: Run /review:resolve --non-interactive
 
@@ -477,21 +513,25 @@ one distinct line, as the very last line of output:
 ```text
 Sweep: skipped (pr-not-open)
 Sweep: skipped (branch-mismatch)
+Sweep: skipped (head-mismatch)
 Sweep: skipped (head-ignore-unreadable)
 Sweep: skipped (tracked-here-ignored-on-head)
 Sweep: skipped (untracked-here-ignored-on-head)
 ```
 
 `/review:sweep-all` reads it by the anchored form
-`^Sweep: skipped \((pr-not-open|branch-mismatch|head-ignore-unreadable|tracked-here-ignored-on-head|untracked-here-ignored-on-head)\)$`,
+`^Sweep: skipped \((pr-not-open|branch-mismatch|head-mismatch|head-ignore-unreadable|tracked-here-ignored-on-head|untracked-here-ignored-on-head)\)$`,
 on the last line only,
 and records `skipped — <reason>`. Its absence means the sweep crashed or was
 cut off, which stays `no contract`. `pr-not-open` is printed only when
 `gh pr view` succeeded and returned a state other than `OPEN`, and
 `branch-mismatch` only when `gh pr view` and `git rev-parse` both succeeded and
-their branch names differ. The three Step 1b reasons are printed only on
-`head-ignore-probe`'s exit `4` (`head-ignore-unreadable`) or on its
-`head=ignored` result against this branch's tracked or untracked file.
+their branch names differ, and `head-mismatch` only when the branch matched and
+`git` confirmed it does not contain `<head-sha>`. The three Step 1b reasons are
+printed only on `head-ignore-probe`'s exit `4` (`head-ignore-unreadable`), on
+its `head=ignored` result against this branch's tracked or untracked file, or
+(`untracked-here-ignored-on-head`) on Step 2b finding that untracked file
+ignored after the checkout.
 Argument errors, a failed PR fetch (including a rate limit, at Step 1 or Step
 2a), a dirty tree and a `head-ignore-probe` exit `3` print no skip line: they
 are not specific to this PR, or are not a benign skip, so the batch must still
@@ -534,9 +574,14 @@ stop.
   resolve.` and stop. Indicates `/review:pr` errored mid-checkout or
   another tool changed branches during the run — re-run after manually
   checking out the PR head branch.
+- **Local branch behind the PR head** (Step 2a, exit 3): `[review:sweep]
+  Error: the checked-out branch does not contain the PR head commit <sha>.
+  Aborting resolve.` and stop, ending with `Sweep: skipped (head-mismatch)`.
+  Sync the local branch with the PR through the enabled stack provider and rerun.
 - **Branch unreadable after `/review:pr`** (Step 2a, exit 2): `[review:sweep]
   Error: could not read the PR head branch or the current branch. Aborting
-  resolve.` and stop, with no skip line: no mismatch was established, and a
+  resolve.` (or `could not compare the checked-out branch with the PR head
+  commit`) and stop, with no skip line: no mismatch was established, and a
   failed fetch can be a rate limit.
 - **Local config changed or unguardable** (Steps 1b, 2b, 3a): the file is
   restored when possible, the snapshot is cleared unless the check exited `4`

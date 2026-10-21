@@ -156,6 +156,8 @@
 # Output: JSON to stdout:
 #   {"result":"pass|fail|timeout|skipped|reverted|noop|dry-run","patch":"<path>|null",
 #    "log":"<path>|null","treeClean":true|false[,"reason":"..."]}
+#   A --unattended run whose PR file listing hit a GitHub rate limit is
+#   "skipped" with "rateLimited": true; the field is absent otherwise.
 #   --revert-denied adds "deniedClean" (no deny-listed change remains),
 #   "reverted" (the deny-listed paths no longer dirty, at most 20, screened
 #   like the patch, empty when withheld) and "revertedCount" (the whole count).
@@ -1469,11 +1471,23 @@ if [ "$MODE" = run ]; then
 
     # Never execute files outside the PR (the resolver's list is untrusted),
     # attended or not. Unattended also never runs runner files.
+    # skip <reason> [ratelimited]: the second argument adds rateLimited: true.
     skip() {
-        jq -nc --arg why "$1" '{result: "skipped", patch: null, log: null, treeClean: true, reason: $why}'
+        jq -nc --arg why "$1" --arg rl "${2:-}" \
+            '{result: "skipped", patch: null, log: null, treeClean: true, reason: $why}
+             + (if $rl == "" then {} else {rateLimited: true} end)'
         exit 0
     }
-    PR_FILES=$(rp_pr_files "$PR" 2>/dev/null) || skip "could not list the PR's changed files"
+    # gh's stderr is read only to tell a rate limit apart, never echoed.
+    PF_ERR=$(mktemp) || die 2 "mktemp failed"
+    PR_FILES=$(rp_pr_files "$PR" 2>"$PF_ERR") && PF_RC=0 || PF_RC=$?
+    PF_RL=0
+    grep -qiE 'rate limit|abuse|HTTP 429' "$PF_ERR" && PF_RL=1
+    rm -f -- "$PF_ERR"
+    if [ "$PF_RC" -ne 0 ]; then
+        [ "$PF_RL" -eq 0 ] || skip "GitHub rate limit while listing the PR's changed files" ratelimited
+        skip "could not list the PR's changed files"
+    fi
     for f in ${FILES[@]+"${FILES[@]}"}; do
         [ "$UNATTENDED" = 1 ] && rp_runner "$f" && skip "runner files changed: $f"
         grep -qxF -- "$f" <<<"$PR_FILES" || skip "not one of the PR's changed files: $f"

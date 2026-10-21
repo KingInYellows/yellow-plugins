@@ -79,28 +79,28 @@ probe() { run --separate-stderr "$SCRIPT" 7; }
   head_commit 'yellow-plugins.local.md=x\n'
   probe
   [ "$status" -eq 0 ]
-  [ "$output" = head=tracked ]
+  [ "$output" = "head=tracked sha=$(cat "$FIX/oid")" ]
 }
 
 @test "a head whose root .gitignore names the file is head=ignored" {
   head_commit '.gitignore=yellow-plugins.local.md\n'
   probe
   [ "$status" -eq 0 ]
-  [ "$output" = head=ignored ]
+  [ "$output" = "head=ignored sha=$(cat "$FIX/oid")" ]
 }
 
 @test "a head with no .gitignore is head=unignored" {
   head_commit 'a.txt=a\n'
   probe
   [ "$status" -eq 0 ]
-  [ "$output" = head=unignored ]
+  [ "$output" = "head=unignored sha=$(cat "$FIX/oid")" ]
 }
 
 @test "a root negation that re-includes the file is head=unignored" {
   head_commit '.gitignore=*.md\n!yellow-plugins.local.md\n'
   probe
   [ "$status" -eq 0 ]
-  [ "$output" = head=unignored ]
+  [ "$output" = "head=unignored sha=$(cat "$FIX/oid")" ]
 }
 
 @test "the local info/exclude still applies" {
@@ -108,7 +108,7 @@ probe() { run --separate-stderr "$SCRIPT" 7; }
   printf 'yellow-plugins.local.md\n' >>"$REPO/.git/info/exclude"
   probe
   [ "$status" -eq 0 ]
-  [ "$output" = head=ignored ]
+  [ "$output" = "head=ignored sha=$(cat "$FIX/oid")" ]
 }
 
 @test "this branch tracking the file does not hide the head's ignore rule" {
@@ -118,7 +118,7 @@ probe() { run --separate-stderr "$SCRIPT" 7; }
   head_commit '.gitignore=yellow-plugins.local.md\n'
   probe
   [ "$status" -eq 0 ]
-  [ "$output" = head=ignored ]
+  [ "$output" = "head=ignored sha=$(cat "$FIX/oid")" ]
 }
 
 @test "this branch's .gitignore does not answer for the head" {
@@ -126,7 +126,7 @@ probe() { run --separate-stderr "$SCRIPT" 7; }
   head_commit 'a.txt=a\n'
   probe
   [ "$status" -eq 0 ]
-  [ "$output" = head=unignored ]
+  [ "$output" = "head=unignored sha=$(cat "$FIX/oid")" ]
 }
 
 @test "a symlinked .gitignore on the head is refused as PR-specific" {
@@ -165,24 +165,44 @@ probe() { run --separate-stderr "$SCRIPT" 7; }
   head_commit '.gitignore=yellow-plugins.local.md\n' '.gitattributes=.gitignore eol=lf\n'
   probe
   [ "$status" -eq 0 ]
-  [ "$output" = head=ignored ]
+  [ "$output" = "head=ignored sha=$(cat "$FIX/oid")" ]
 }
 
 @test "a literal filter=unspecified passes only while no filter.unspecified driver is configured" {
   head_commit '.gitignore=yellow-plugins.local.md\n' '.gitattributes=.gitignore filter=unspecified\n'
   probe
   [ "$status" -eq 0 ]
-  [ "$output" = head=ignored ]
+  [ "$output" = "head=ignored sha=$(cat "$FIX/oid")" ]
+  # The driver makes every .gitignore ambiguous, head attributes or not, so it
+  # is this clone's problem and stops the batch.
   git -C "$REPO" config filter.unspecified.clean cat
   probe
-  [ "$status" -eq 4 ]
-  [ "$output" = error=attributes ]
+  [ "$status" -eq 3 ]
+  [ "$output" = error=local-attributes ]
 }
 
-@test "this clone's info/attributes counts toward the .gitignore attribute check" {
+@test "this clone's info/attributes alone transforming .gitignore is systemic" {
   head_commit '.gitignore=yellow-plugins.local.md\n'
   mkdir -p "$REPO/.git/info"
   printf '.gitignore ident\n' >>"$REPO/.git/info/attributes"
+  probe
+  [ "$status" -eq 3 ]
+  [ "$output" = error=local-attributes ]
+}
+
+@test "a global core.attributesFile transforming .gitignore is systemic" {
+  head_commit '.gitignore=yellow-plugins.local.md\n'
+  printf '.gitignore filter=lfs\n' >|"$BATS_TEST_TMPDIR/attrs"
+  git -C "$REPO" config core.attributesFile "$BATS_TEST_TMPDIR/attrs"
+  probe
+  [ "$status" -eq 3 ]
+  [ "$output" = error=local-attributes ]
+}
+
+@test "a head .gitattributes that transforms .gitignore stays PR-specific with clean local attributes" {
+  head_commit '.gitignore=yellow-plugins.local.md\n' '.gitattributes=.gitignore ident\n'
+  mkdir -p "$REPO/.git/info"
+  printf '*.txt eol=lf\n' >>"$REPO/.git/info/attributes"
   probe
   [ "$status" -eq 4 ]
   [ "$output" = error=attributes ]
@@ -235,7 +255,7 @@ probe() { run --separate-stderr "$SCRIPT" 7; }
   printf 'https://ghe.example.com/acme/widgets/pull/7' >|"$FIX/url"
   probe
   [ "$status" -eq 0 ]
-  [ "$output" = head=ignored ]
+  [ "$output" = "head=ignored sha=$(cat "$FIX/oid")" ]
   grep -q -- '^api --hostname ghe.example.com repos/acme/widgets/git/trees/' "$FIX/calls"
   grep -q -- '^api --hostname ghe.example.com .*repos/acme/widgets/git/blobs/' "$FIX/calls"
   run ! grep -q -- '{owner}' "$FIX/calls"
@@ -275,6 +295,18 @@ probe() { run --separate-stderr "$SCRIPT" 7; }
 @test "a truncated root listing is refused" {
   head_commit 'a.txt=a\n'
   jq '.truncated = true' "$FIX/tree.json" >|"$FIX/t" && mv "$FIX/t" "$FIX/tree.json"
+  probe
+  [ "$status" -eq 4 ]
+  [ "$output" = error=unreadable ]
+}
+
+@test "a root listing without a truncated flag is refused" {
+  head_commit 'a.txt=a\n'
+  jq 'del(.truncated)' "$FIX/tree.json" >|"$FIX/t" && mv "$FIX/t" "$FIX/tree.json"
+  probe
+  [ "$status" -eq 4 ]
+  [ "$output" = error=unreadable ]
+  jq '.truncated = null' "$FIX/tree.json" >|"$FIX/t" && mv "$FIX/t" "$FIX/tree.json"
   probe
   [ "$status" -eq 4 ]
   [ "$output" = error=unreadable ]
