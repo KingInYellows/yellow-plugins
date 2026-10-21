@@ -177,7 +177,11 @@ if [ -z "$TOP" ] || [ -e "$p" ] || [ -L "$p" ]; then printf 'present\n'; else pr
 When it printed `present` and this probe printed `head=ignored`, the checkout
 would leave those bytes in place as an ignored config that `/review:resolve`
 trusts. Print
-`[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md exists untracked and unignored on this branch but is ignored on the PR head; remove it or rerun /review:sweep from the PR branch`
+
+```text
+[review:sweep] aborted at PR #<PR#>: yellow-plugins.local.md exists untracked and unignored on this branch but is ignored on the PR head; remove it or rerun /review:sweep from the PR branch
+```
+
 and stop before Step 2, ending with
 `Sweep: skipped (untracked-here-ignored-on-head)`, as for the tracked case
 above. Step 2b repeats this check on the tree `/review:pr` checked out.
