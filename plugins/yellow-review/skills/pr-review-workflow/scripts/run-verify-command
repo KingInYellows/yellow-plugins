@@ -983,6 +983,7 @@ HIDDEN_HITS=""
 VR_SHIM=""
 HOLD_LEFTOVER=""
 PATHS_SCRATCH=""
+PF_ERR=""
 # The snapshot is provisional until it is complete and credential-screened: any
 # exit before then (a signal, a die, a failed screen) removes it, so no
 # unscreened patch stays under .git.
@@ -990,7 +991,7 @@ PATCH=""
 PATCH_PROVISIONAL=0
 cleanup() {
     local f
-    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$IGNORED_HITS" "$DIR_LIST" "$HIDDEN_HITS" "$HOLD_LEFTOVER" "$PATHS_SCRATCH"; do
+    for f in "$CHANGES_FILE" "$ADDED_FILE" "$TEXT_FILE" "$FIFO" "$MARKER" "$STREAM_FILE" "$IGNORED_SCRATCH" "$IGNORED_HITS" "$DIR_LIST" "$HIDDEN_HITS" "$HOLD_LEFTOVER" "$PATHS_SCRATCH" "$PF_ERR"; do
         [ -z "$f" ] || rm -f -- "$f"
     done
     [ -z "$VR_SHIM" ] || rm -rf -- "$VR_SHIM"

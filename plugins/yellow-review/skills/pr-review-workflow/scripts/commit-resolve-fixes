@@ -962,11 +962,15 @@ done
 if [ "${#EXPECTED[@]}" -gt 0 ]; then
     # gh's stderr is read only to tell a rate limit apart, never echoed: a
     # rate-limited listing is exit 7 so callers stop instead of moving on.
+    # The main EXIT trap below is not set yet; this one removes the
+    # unscreened stderr on a die or a signal and is replaced by it.
     PF_ERR=$(mktemp) || die 2 "mktemp failed"
+    trap 'rm -f -- "$PF_ERR"' EXIT
     PR_FILES=$(rp_pr_files "$PR" 2>"$PF_ERR") && PF_RC=0 || PF_RC=$?
     PF_RL=0
     grep -qiE 'rate limit|abuse|HTTP 429' "$PF_ERR" && PF_RL=1
     rm -f -- "$PF_ERR"
+    trap - EXIT
     if [ "$PF_RC" -ne 0 ]; then
         [ "$PF_RL" -eq 0 ] || { printf 'reason=rate-limit\n' >&2; die 7 "GitHub rate limit while listing PR #$PR's changed files"; }
         die 3 "could not list PR #$PR's changed files"
