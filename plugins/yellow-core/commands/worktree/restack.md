@@ -200,7 +200,7 @@ worktrees it already cleared (`Already aborted: ...`).
   left alone and named (`not recorded: ...`); it may be another session's.
   For GitHub it keeps the state (exit `31`) on `--abort` and `--continue` when
   that rebase, or a rebase state there that cannot be read, may be the run's
-  own: the state has no `owners` line (written
+  own: the state has neither an `owners` line nor any `owner` line (written
   before owners were recorded; a run that recorded none writes `owners 0`), or
   the provider has no paused restack or rollback on record.
 - **Replaced worktree.** Start binds each recorded worktree to the run's id.

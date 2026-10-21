@@ -2168,6 +2168,25 @@ legacy_tipless() {
   rebase_marker "$T/wt-extra"
 }
 
+@test "github: a state with owner lines but no owners count still rules out an unrelated rebase" {
+  command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
+  mk_stack b
+  git -C "$REPO" worktree add -q --detach "$T/wt-extra" c
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" start --provider github
+  [ "$status" -eq 10 ]
+  # A state written before the owners count existed, with its owner lines.
+  grep -v '^owners	' "$SD/state" >|"$SD/state.legacy"
+  mv -f "$SD/state.legacy" "$SD/state"
+  [ "$(grep -c '^owner	' "$SD/state")" -eq 2 ]
+  plant_stuck_rebase "$T/wt-extra" c
+  STUB_GH_VERSION=v0.2.1 run bash "$SCRIPT" abort --provider github
+  [ "$status" -eq 0 ]
+  [[ $output == *"not recorded: $T/wt-extra is rebasing a stack branch"* ]]
+  [[ $output != *"records no worktrees that held a stack branch"* ]]
+  assert_all_restored
+  rebase_marker "$T/wt-extra"
+}
+
 @test "an owners count that does not match the owner lines, or one in graphite state, is rejected (exit 4)" {
   command -v jq >/dev/null && command -v node >/dev/null || skip "jq and node are required"
   mk_stack b

@@ -2142,8 +2142,9 @@ note_unrecorded_fixes() {
 # unrecorded_keeps_state LINES NO-ROLLBACK: 0 when an unrecorded rebase in LINES
 # (unrecorded_chain_rebases) may be this run's own, so the state must be kept.
 # Only gh-stack rebases outside the run worktree, and it does so in the
-# worktrees recorded as owners: a github state with no `owners` line (written
-# before owners were recorded) cannot rule any worktree out, and one whose
+# worktrees recorded as owners: a github state with neither an `owners` line
+# nor any `owner` line (written before owners were recorded) cannot rule any
+# worktree out (owners_unknown), and one whose
 # provider has no paused restack or rollback on record (NO-ROLLBACK 1) may have
 # lost the record of it. An unreadable rebase state counts too: it may be that
 # rebase, and gh-stack's conflict worktree is exactly where it would be.
@@ -2153,12 +2154,17 @@ unrecorded_keeps_state() {
     *$'\n'rebasing$'\t'* | *$'\n'unreadable$'\t'*) ;;
     *) return 1 ;;
   esac
-  [ -z "$S_OWNERS" ] || [ "$2" = 1 ]
+  owners_unknown || [ "$2" = 1 ]
 }
+
+# owners_unknown: the state cannot say which worktrees held a stack branch. A
+# state with `owner` lines but no `owners` count (written before the count
+# existed) still names them.
+owners_unknown() { [ -z "$S_OWNERS" ] && [ "${#O_PATH[@]}" -eq 0 ]; }
 
 # unrecorded_reason: why unrecorded_keeps_state held, for the refusal.
 unrecorded_reason() {
-  if [ -z "$S_OWNERS" ]; then
+  if owners_unknown; then
     printf 'this state records no worktrees that held a stack branch, so gh-stack may have rebased there'
   else
     printf 'the provider has no paused restack or rollback on record, so the rebase may be this run'"'"'s own'

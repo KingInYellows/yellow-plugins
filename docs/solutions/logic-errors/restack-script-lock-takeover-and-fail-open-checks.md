@@ -161,9 +161,10 @@ than the evidence behind it.
   were recorded cannot rule any worktree out, yet it cleared the state over an
   unrecorded rebase once the provider abort had run. It now keeps the state
   (exit 31) while such a rebase exists, with or without the provider abort.
-  Legacy is now keyed on a missing `owners N` line, which every `github`
-  start writes: a run that recorded no owners (`owners 0`) is no longer
-  mistaken for a legacy state and refused over an unrelated rebase.
+  Legacy now means no `owners N` line (every `github` start writes one) and
+  no `owner` lines: a run that recorded no owners (`owners 0`) is no longer
+  mistaken for a legacy state and refused over an unrelated rebase, and a
+  state from before the count still uses its `owner` lines.
 - **Advice chosen by refusal reason.** A busy or floating run worktree was told
   to `git checkout` the start branch. `release_run_worktree` now sets
   `RELEASE_WHY` (busy, floating, unreadable, checkout) and `release_advice`
