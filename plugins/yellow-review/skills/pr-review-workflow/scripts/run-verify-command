@@ -1319,6 +1319,20 @@ check_trusted_links() {
                 if [ "$hit" = 1 ] && [ "$rc" -eq 0 ] && [ -n "$canon" ] && yr_inside_root "$canon" "$top"; then
                     rel="${canon#"$top"/}"
                     ! rp_trusted_config "$rel" || hit=0
+                    # A tracked target git lists as unchanged matches HEAD:
+                    # --revert-dirty restores an owned target with a new mtime.
+                    if [ "$hit" = 1 ] && [ -f "$canon" ] && [ ! -L "$canon" ]; then
+                        case "$rel" in .git|.git/*) ;; *)
+                            tagged=$(lgit ls-files -v -z -- "$rel" 2>/dev/null | tr '\0' '\n' | head -n 1) || tagged=""
+                            if [ "$tagged" = "H $rel" ]; then
+                                hit=0
+                                for c in ${changed[@]+"${changed[@]}"}; do
+                                    [ "$c" != "$rel" ] || { hit=1; break; }
+                                done
+                            fi
+                            ;;
+                        esac
+                    fi
                 fi
             else
                 # Inside the worktree counts as covered only for a tracked path

@@ -4521,6 +4521,33 @@ dirlink_setup() {
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
 }
 
+@test "--revert-denied with a marker passes a link whose tracked target --revert-dirty just restored" {
+  mkdir -p .claude config
+  printf '{}\n' >| config/settings.json
+  ln -s ../config/settings.json .claude/settings.json
+  git add -f .claude/settings.json config/settings.json && git commit -q -m "link to config"
+  touch -t 200001010000 "$IGN_MARKER"
+  printf '{"hooks":"evil"}\n' >| config/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-dirty
+  [ "$status" -eq 0 ] || { echo "revert-dirty status $status: $stderr" >&2; return 1; }
+  [ "$(cat config/settings.json)" = '{}' ]
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ] || { echo "status $status: $stderr" >&2; return 1; }
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+}
+
+@test "--revert-denied with a marker still flags a link whose tracked target is modified" {
+  mkdir -p .claude config
+  printf '{}\n' >| config/settings.json
+  ln -s ../config/settings.json .claude/settings.json
+  git add -f .claude/settings.json config/settings.json && git commit -q -m "link to config"
+  touch -t 200001010000 "$IGN_MARKER"
+  printf '{"hooks":"evil"}\n' >| config/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
 @test "--revert-denied --no-ignored-guard flags a link to a tracked in-worktree target marked skip-worktree" {
   mkdir -p .claude
   ln -s ../src/a.txt .claude/settings.json
