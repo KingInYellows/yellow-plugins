@@ -107,8 +107,8 @@
 #                  the marker: it has no HEAD copy to restore, so the caller
 #                  stops. Other gitignored files (a verify run's build output)
 #                  do not count. --no-ignored-guard is for callers that hold
-#                  no marker (the stack and sweep dirty-tree cleanup, after
-#                  /review:resolve ran its own guard). It deletes an
+#                  no marker (the stack and sweep dirty-tree cleanup when its
+#                  pre-flight could not create one). It deletes an
 #                  untracked trusted-config file whoever created it; the
 #                  recovery patch holds the content unless the credential
 #                  screen withholds it. An untracked nested git repository is
@@ -123,18 +123,20 @@
 #                  "dry-run" with "pending" (the trusted-config paths a revert
 #                  would act on, at most 20, screened like "reverted"; an upper
 #                  bound, since a nested repository or special file is kept),
-#                  "pendingCount", and "linkHits"/"linkHitCount" (trusted-config
+#                  "pendingCount", "linkHits"/"linkHitCount" (trusted-config
 #                  symlinks whose target may have been edited, which no revert
-#                  undoes), and "snapshot" (a digest of the pending paths,
-#                  their current content, mode and index entries, and the link
-#                  hits), and changes nothing: no
-#                  patch, no revert. For an interactive caller that asks
-#                  before reverting.
+#                  undoes), "specialHits"/"specialHitCount" (untracked FIFO,
+#                  socket or device at a trusted-config path, left unopened,
+#                  which no revert undoes), and "snapshot" (a digest of the
+#                  pending paths, their current content, mode and index
+#                  entries, the link hits and the special-file hits), and
+#                  changes nothing: no patch, no revert. For an interactive
+#                  caller that asks before reverting.
 #   --expect-snapshot <hex>: only with --revert-denied, without --dry-run:
 #                  the "snapshot" a --dry-run printed. When the pending paths,
-#                  their content, mode, index entries or the link hits no
-#                  longer match it (a file
-#                  or symlink target changed while the caller was asking), refuse (exit 2, nothing reverted)
+#                  their content, mode, index entries, the link hits or the
+#                  special-file hits no longer match it (a file, symlink
+#                  target or special file changed while the caller was asking), refuse (exit 2, nothing reverted)
 #                  with "trusted-config changes differ from the --dry-run
 #                  preview" on stderr, so a revert never reaches an edit the
 #                  user was not shown.
@@ -163,8 +165,9 @@
 #   like the patch, empty when withheld) and "revertedCount" (the whole count).
 #   "noop" is only reported by --revert-denied, when no deny-listed path
 #   changed. --revert-denied --dry-run reports result "dry-run" with
-#   "deniedClean", "pending", "pendingCount", "linkHits", "linkHitCount" and
-#   "snapshot" instead of the revert fields.
+#   "deniedClean", "pending", "pendingCount", "linkHits", "linkHitCount",
+#   "specialHits", "specialHitCount" and "snapshot" instead of the revert
+#   fields.
 #   "reason" explains a skipped run, a withheld patch, an interrupted run, a
 #   failed revert step, a log that is withheld or may be incomplete, a
 #   --revert-only entry skipped as unchanged, or a tree that is not clean.
@@ -179,7 +182,11 @@
 #   <path>" (deniedClean false; a redirected link is judged by its HEAD target; a tracked trusted-config symlink's
 #   target is judged against the --ignored-since marker, or counts when it
 #   resolves outside the worktree under --no-ignored-guard; a verify run
-#   refuses on one). The usual
+#   refuses on one; an untracked trusted-config symlink is judged the same
+#   way before the revert deletes it), and "kept an untracked special file
+#   at a trusted-config path, unopened: <path>" (deniedClean false; a FIFO,
+#   socket or device git cannot list, newer than the marker when there is
+#   one). The usual
 #   "changes remain after the revert" is not used there: the kept changes
 #   are expected.
 #   The revert modes run nothing and report "log": null. A passing command
@@ -1095,8 +1102,8 @@ add_unique_file() {
 # blob id plus its executable bit, a symlink target, or a marker for a
 # directory, a missing path or one git cannot hash), each path's index entries
 # (mode, blob and stage, so a staged edit or mode change the worktree does not
-# show is bound too: the revert checks out HEAD over both), plus the LINK_HITS
-# set (call after check_trusted_links), so --expect-snapshot can tell that the
+# show is bound too: the revert checks out HEAD over both), plus the LINK_HITS and SPECIAL_HITS
+# sets (call after check_trusted_links and check_untracked_special), so --expect-snapshot can tell that the
 # set a --dry-run showed is still the set a revert would touch. Sets SNAPSHOT.
 denied_snapshot() {
     local f h idx
@@ -1125,6 +1132,10 @@ denied_snapshot() {
         for f in ${LINK_HITS[@]+"${LINK_HITS[@]}"}; do
             printf '%s\0' "$f"
         done
+        printf '\0'
+        for f in ${SPECIAL_HITS[@]+"${SPECIAL_HITS[@]}"}; do
+            printf '%s\0' "$f"
+        done
     } | yr_git hash-object --stdin
     ) || die 2 "cannot compute the trusted-config snapshot; nothing was reverted"
 }
@@ -1135,8 +1146,12 @@ denied_snapshot() {
 # is all rp_tree_changes sees. check_trusted_links fills LINK_HITS with every
 # tracked trusted-config symlink (.claude/settings.json -> a file elsewhere)
 # whose target may have been edited, so a clean listing is not read as a clean
-# denied set. With a marker (--ignored-since) the target is judged as an ignored
-# symlink's is (rp_link_target_changed: newer than the marker, or unjudgeable).
+# denied set. A symlink git lists as untracked (or staged new) is checked the
+# same way: the revert deletes the link, never what it points to (CLAUDE-101).
+# With a marker (--ignored-since) the target is judged as an ignored
+# symlink's is (rp_link_target_changed: newer than the marker, or unjudgeable),
+# in its `trusted` mode: a nested link newer than the marker, or one leading
+# back into the worktree, is judged too (CLAUDE-94, CLAUDE-115).
 # A target inside the worktree that is itself trusted-config is skipped: the
 # tree listing already covers it. Without a marker (--revert-denied
 # --no-ignored-guard) nothing can be compared, so a link that resolves outside
@@ -1156,7 +1171,10 @@ denied_snapshot() {
 # than the marker (nested symlinks followed, a loop or find error counts) or,
 # without a marker, when any such P exists. The walk stops at the first match
 # and counts after 50000 entries visited, old ones included (find is streamed and stopped at the cap, never stored); a target inside the worktree is
-# covered by the tree listing and the ignored-file guard.
+# covered by the tree listing and the ignored-file guard, except a nested
+# directory link inside it that leaves the worktree: that one is walked under
+# the outer link's name (cfg/sub/... for `cfg -> .claude/agent-memory/x` holding
+# `sub -> /elsewhere`, CLAUDE-113).
 LINK_HITS=()
 check_trusted_links() {
     local ls out safe top f c changed tdir
@@ -1166,6 +1184,15 @@ check_trusted_links() {
     tdir=$(mktemp -d) || { rm -f -- "$ls" "$out"; die 2 "mktemp failed"; }
     yr_git ls-tree -r -z HEAD >|"$ls" 2>/dev/null \
         || { rm -rf -- "$ls" "$out" "$tdir"; die 2 "cannot list tracked symlinks to check trusted-config targets"; }
+    # Untracked (or staged new) symlinks join the HEAD records with the object
+    # id `-`, which never names a blob.
+    if [ -s "$CHANGES_FILE" ]; then
+        while IFS= read -r -d '' c; do
+            [ -L "$c" ] || continue
+            ! lgit cat-file -e "HEAD:$c" 2>/dev/null || continue
+            printf '120000 blob -\t%s\0' "$c" >>"$ls"
+        done <"$CHANGES_FILE"
+    fi
     safe=$(yr_walk_path) || { rm -rf -- "$ls" "$out" "$tdir"; die 2 "cannot build a safe PATH to check trusted-config symlinks"; }
     top=$(pwd -P)
     changed=()
@@ -1182,7 +1209,7 @@ check_trusted_links() {
         # target, P only counts when <physical>/P is not itself trusted-config
         # (the tree listing already covers that spelling).
         dir_link_hit() {
-            local x rel n=0 cap fl=-L
+            local x rel c lnew n=0 cap fl=-L
             cap=$(rp_walk_cap)
             # Nested links inside the worktree are covered by the tree listing:
             # an in-worktree target is walked without following them.
@@ -1194,9 +1221,37 @@ check_trusted_links() {
                 rel="${x#"$1"}"
                 rel="${rel#/}"
                 [ -n "$rel" ] || continue
+                # -H lists a nested link without descending. A directory link
+                # that leaves the worktree is outside the tree listing: walk it
+                # under this link's name (an unresolvable one counts). A link
+                # newer than the marker (created or retargeted after it) can
+                # expose old content under a trusted name: a directory one is
+                # walked with no marker, a file one counts when its name here is
+                # trusted config.
+                if [ -n "${3:-}" ] && [ -L "$x" ]; then
+                    lnew=""
+                    if [ -n "$IGNORED_SINCE" ]; then
+                        lnew=$(find -P "$x" -prune -newer "$IGNORED_SINCE" -print 2>/dev/null) || return 0
+                    fi
+                    if [ -d "$x" ]; then
+                        c=$(yr_canon_path "$x" 2>/dev/null) || return 0
+                        if [ -n "$lnew" ]; then
+                            IGNORED_SINCE="" dir_link_hit "$x" "$2/$rel" && return 0
+                            continue
+                        fi
+                        if ! yr_inside_root "$c" "$top"; then
+                            dir_link_hit "$x" "$2/$rel" && return 0
+                            continue
+                        fi
+                    elif [ -n "$lnew" ] && rp_trusted_config "$2/$rel" && ! rp_trusted_config "$3/$rel"; then
+                        return 0
+                    fi
+                fi
                 # Every visited entry counts against the cap; the marker test
-                # (a regular file newer than it) is judged here, per entry.
-                [ -z "$IGNORED_SINCE" ] || { [ -f "$x" ] && [ "$x" -nt "$IGNORED_SINCE" ]; } || continue
+                # (a regular or special file newer than it) is judged here,
+                # per entry, so a FIFO live at cfg/.claude/settings.json is
+                # not skipped (CLAUDE-121).
+                [ -z "$IGNORED_SINCE" ] || { rp_file_or_special "$x" && [ "$x" -nt "$IGNORED_SINCE" ]; } || continue
                 rp_trusted_config "$2/$rel" || continue
                 [ -n "${3:-}" ] && rp_trusted_config "$3/$rel" && continue
                 return 0
@@ -1214,12 +1269,12 @@ check_trusted_links() {
             for c in ${changed[@]+"${changed[@]}"}; do
                 [ "$c" != "$f" ] || { dirty=1; break; }
             done
-            if [ "$dirty" = 1 ]; then
+            sha="${rec#* }"
+            sha="${sha#* }"
+            sha="${sha%%$'\t'*}"
+            if [ "$dirty" = 1 ] && [ "$sha" != - ]; then
                 # Git lists the link as changed and the revert restores the HEAD
                 # link, so judge the HEAD link's target through a scratch link.
-                sha="${rec#* }"
-                sha="${sha#* }"
-                sha="${sha%%$'\t'*}"
                 t=$(yr_git cat-file blob "$sha" 2>/dev/null; printf x) || t=""
                 t="${t%x}"
                 if [ -z "$t" ]; then printf '%s\0' "$f" >>"$out"; continue; fi
@@ -1255,7 +1310,7 @@ check_trusted_links() {
             fi
             if [ -n "$IGNORED_SINCE" ]; then
                 rc=0
-                rp_link_target_changed "$probe" "$IGNORED_SINCE" follow || rc=$?
+                rp_link_target_changed "$probe" "$IGNORED_SINCE" trusted || rc=$?
                 [ "$rc" -eq 1 ] || hit=1
                 if [ "$hit" = 1 ] && [ "$rc" -eq 0 ] && [ -n "$canon" ] && yr_inside_root "$canon" "$top"; then
                     rel="${canon#"$top"/}"
@@ -1305,6 +1360,57 @@ check_trusted_links() {
     rm -rf -- "$ls" "$out" "$tdir"
 }
 
+# Git lists no untracked FIFO, socket or device, so one at a trusted-config
+# path (.claude/settings.json) is invisible to the tree listing (CLAUDE-121).
+# check_untracked_special fills SPECIAL_HITS with each such node that HEAD does
+# not track (a tracked one replaced by a special file is listed as changed and
+# handled below), never opening it. With a marker only a node newer than it
+# counts. `.git` directories are pruned; a walk failure stops the run.
+# The first find does not follow directory symlinks (pnpm stores; `-type p`
+# does not match the link). Each trusted-config directory link is then
+# walked with find -H (follows only the starting point, capped) so a FIFO
+# live at `.claude/settings.json` through `.claude -> elsewhere` is listed
+# under that spelling.
+SPECIAL_HITS=()
+check_untracked_special() {
+    local f safe out
+    SPECIAL_HITS=()
+    safe=$(yr_walk_path) || die 2 "cannot build a safe PATH to look for special files"
+    out=$(mktemp) || die 2 "mktemp failed"
+    (
+        PATH=$safe
+        hash -r 2>/dev/null || true
+        if [ -n "$IGNORED_SINCE" ]; then
+            find . -name .git -prune -o \( -type p -o -type s -o -type b -o -type c \) -newer "$IGNORED_SINCE" -print0
+        else
+            find . -name .git -prune -o \( -type p -o -type s -o -type b -o -type c \) -print0
+        fi || exit 1
+        cap=$(rp_walk_cap)
+        while IFS= read -r -d '' l; do
+            [ "$l" != $'\001ERR' ] || exit 1
+            l="${l#./}"
+            [ -L "$l" ] && [ -d "$l" ] || continue
+            rp_trusted_config "$l" || continue
+            n=0
+            while IFS= read -r -d '' x; do
+                [ "$x" != $'\001ERR' ] || exit 1
+                n=$((n + 1))
+                [ "$n" -le "$cap" ] || exit 1
+                rp_is_special "$x" || continue
+                [ -z "$IGNORED_SINCE" ] || [ "$x" -nt "$IGNORED_SINCE" ] || continue
+                printf '%s\0' "${x#./}"
+            done < <(find -H "$l" -name .git -prune -o -print0 2>/dev/null || printf '\001ERR\0')
+        done < <(find . -name .git -prune -o -type l -print0 2>/dev/null || printf '\001ERR\0')
+    ) >|"$out" 2>/dev/null || { rm -f -- "$out"; die 2 "cannot look for special files at trusted-config paths"; }
+    while IFS= read -r -d '' f; do
+        f="${f#./}"
+        rp_trusted_config "$f" || continue
+        ! lgit cat-file -e "HEAD:$f" 2>/dev/null || continue
+        SPECIAL_HITS+=("$f")
+    done <"$out"
+    rm -f -- "$out"
+}
+
 if [ "$MODE" != revert-only ]; then
     list_tree_changes || die 2 "cannot list tree changes"
     refuse_hidden_flags
@@ -1341,17 +1447,22 @@ elif [ "$MODE" = revert-denied ]; then
     # A symlink target that may have been edited cannot be reverted from here
     # (it can sit outside the worktree): leave it, report it, deniedClean false.
     check_trusted_links
-    # --dry-run reports link hits in linkHits (screened as a list) instead.
+    check_untracked_special
+    # --dry-run reports link hits in linkHits and special-file hits in
+    # specialHits (each screened as a list) instead of reason.
     if [ "$DRY_RUN" = 0 ]; then
         for f in ${LINK_HITS[@]+"${LINK_HITS[@]}"}; do
             add_path_reason "found a trusted-config symlink whose target may have been edited (or sits outside the worktree)" "$f"
+        done
+        for f in ${SPECIAL_HITS[@]+"${SPECIAL_HITS[@]}"}; do
+            add_path_reason "kept an untracked special file at a trusted-config path, unopened" "$f"
         done
     fi
     # --dry-run: the same listing (and the same ignored-file refusal above),
     # reported instead of reverted, so an interactive caller can ask first.
     # pending is an upper bound: a nested repository or special file found
-    # below is left in place by the real revert. linkHits are reported, never
-    # reverted.
+    # below is left in place by the real revert. linkHits and specialHits
+    # are reported, never reverted.
     denied_snapshot
     if [ -n "$EXPECT_SNAPSHOT" ] && [ "$SNAPSHOT" != "$EXPECT_SNAPSHOT" ]; then
         die 2 "trusted-config changes differ from the --dry-run preview; nothing was reverted"
@@ -1360,15 +1471,19 @@ elif [ "$MODE" = revert-denied ]; then
         DRY_CLEAN=true
         [ ! -s "$CHANGES_FILE" ] || DRY_CLEAN=false
         DRY_DENIED=true
-        { [ "${#FILES[@]}" -eq 0 ] && [ "${#LINK_HITS[@]}" -eq 0 ]; } || DRY_DENIED=false
+        { [ "${#FILES[@]}" -eq 0 ] && [ "${#LINK_HITS[@]}" -eq 0 ] && [ "${#SPECIAL_HITS[@]}" -eq 0 ]; } || DRY_DENIED=false
         paths_json pending ${FILES[@]+"${FILES[@]}"}
         PENDING_JSON=$PATHS_JSON
         paths_json linkHits ${LINK_HITS[@]+"${LINK_HITS[@]}"}
+        LINK_JSON=$PATHS_JSON
+        paths_json specialHits ${SPECIAL_HITS[@]+"${SPECIAL_HITS[@]}"}
         jq -nc --argjson clean "$DRY_CLEAN" --argjson dc "$DRY_DENIED" --argjson p "$PENDING_JSON" \
-            --argjson n "${#FILES[@]}" --argjson l "$PATHS_JSON" --argjson ln "${#LINK_HITS[@]}" --arg why "$REASON" \
+            --argjson n "${#FILES[@]}" --argjson l "$LINK_JSON" --argjson ln "${#LINK_HITS[@]}" \
+            --argjson s "$PATHS_JSON" --argjson sn "${#SPECIAL_HITS[@]}" --arg why "$REASON" \
             --arg snap "$SNAPSHOT" \
             '{result: "dry-run", patch: null, log: null, treeClean: $clean, deniedClean: $dc,
-              pending: $p, pendingCount: $n, linkHits: $l, linkHitCount: $ln, snapshot: $snap}
+              pending: $p, pendingCount: $n, linkHits: $l, linkHitCount: $ln,
+              specialHits: $s, specialHitCount: $sn, snapshot: $snap}
              + (if $why == "" then {} else {reason: $why} end)' \
             || die 2 "cannot encode the dry-run result"
         exit 0
@@ -2244,7 +2359,7 @@ if [ "$MODE" = revert-denied ] && [ "${#FILES[@]}" -eq 0 ]; then
     [ ! -s "$CHANGES_FILE" ] || NOOP_CLEAN=false
     # A kept nested repository is a trusted-config change that remains.
     NOOP_DENIED=true
-    if [ "${#NESTED_KEPT[@]}" -gt 0 ] || [ "${#LINK_HITS[@]}" -gt 0 ]; then
+    if [ "${#NESTED_KEPT[@]}" -gt 0 ] || [ "${#LINK_HITS[@]}" -gt 0 ] || [ "${#SPECIAL_HITS[@]}" -gt 0 ]; then
         NOOP_DENIED=false
     else
         add_reason "no deny-listed changes to revert"
@@ -2344,6 +2459,7 @@ if [ "$MODE" = revert-denied ]; then
         add_reason "could not re-list the tree to check the deny-listed paths"
     fi
     [ "${#LINK_HITS[@]}" -eq 0 ] || DENIED_CLEAN=false
+    [ "${#SPECIAL_HITS[@]}" -eq 0 ] || DENIED_CLEAN=false
     if [ "${#REMAINING[@]}" -gt 0 ]; then
         DENIED_CLEAN=false
         [ "${#REVERT_FAILS[@]}" -gt 0 ] || add_reason "deny-listed changes remain after the revert"

@@ -7,6 +7,10 @@ an editor or build touched it. Revert only what the run owns and leave
 everything else in place. `<PR#>` is the PR just processed; the caller
 substitutes the literal number.
 
+The caller also passes `<marker>`, the `cleanup_marker:` path its pre-flight
+printed (a file created while the tree was clean, before any resolver ran), or
+`none` when it printed `none`.
+
 Each command loads its own copy, because offloaded detail lives under that
 command's `references/<slug>/`: this file and
 `references/review-sweep-all/dirty-tree-cleanup.md` are byte-identical.
@@ -91,20 +95,28 @@ JSON before acting. Exit `2` means it refused and reverted nothing.
   `revert incomplete`.
 - **Any dirty path is unrecognized** — do NOT run `--revert-dirty`. Revert
   only the trusted-config paths; the script lists them itself with
-  `rp_trusted_config`, so no path goes on the command line:
+  `rp_trusted_config`, so no path goes on the command line. Run it even when
+  step 2 found no trusted-config path: a write through a tracked
+  trusted-config symlink (`.claude/settings.json -> ../config/settings.json`)
+  dirties only the link's target, which `rp_trusted_config` does not match,
+  and only this call checks those links. With a marker:
 
   ```bash
-  "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-denied --no-ignored-guard
+  "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/run-verify-command" --pr "<PR#>" --revert-denied --ignored-since "<marker>"
   ```
 
-  `--no-ignored-guard` is required here: this cleanup holds no
-  `--ignored-since` marker, and `/review:resolve` already guarded the
-  gitignored files of its own run. Skip the call when step 2 found no
-  trusted-config path. A non-zero exit,
-  `deniedClean: false`, or an incomplete-revert `reason` (below) is
-  `revert incomplete`; `result: "noop"` means nothing needed reverting.
-  `treeClean` stays `false` here because the unrecognized paths remain, so do
-  not read it as a failure. Report the unrecognized paths as
+  When `<marker>` is `none`, or the marker file is gone, run the same call with
+  `--no-ignored-guard` in place of `--ignored-since "<marker>"`; it then
+  cannot see a gitignored trusted-config edit (below).
+
+  A non-zero exit, `deniedClean: false`, or an incomplete-revert `reason`
+  (below) is `revert incomplete`; `result: "noop"` means nothing needed
+  reverting. Exit `2` with `gitignored trusted-config files changed since the
+  --ignored-since marker` in its stderr means a resolver edited an ignored
+  file such as `.claude/settings.local.json`, which no revert restores: report
+  `revert incomplete` and add `ignored trusted-config changed: <paths from the
+  message>`. `treeClean` stays `false` here because the unrecognized paths
+  remain, so do not read it as a failure. Report the unrecognized paths as
   `unrecognized changes left in place`.
 
 An **incomplete-revert `reason`** is a `reason` in the JSON containing
@@ -114,8 +126,10 @@ zero exit.
 
 `--revert-dirty` and `--revert-denied` delete an untracked, non-ignored file
 they revert, whoever created it, because the pre-resolve state is not
-recorded (tracked in #973). Neither lists a gitignored file, so a gitignored
-trusted-config edit stays on disk.
+recorded (tracked in #973). Neither lists or reverts a gitignored file:
+`--revert-denied` with a marker refuses when a gitignored trusted-config file
+changed after it, and `--revert-dirty` (or `--no-ignored-guard`) leaves such an
+edit on disk unreported.
 
 The caller says what to do with the outcome: the patch path, `revert
 incomplete`, and `unrecognized changes left in place` all feed its summary.

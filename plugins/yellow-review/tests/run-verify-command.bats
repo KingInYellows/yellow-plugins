@@ -636,6 +636,8 @@ assert_recreated_patch_restores() {
   [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
   [ "$(printf '%s' "$output" | jq -c .pending)" = '[]' ]
   [ "$(printf '%s' "$output" | jq -r .pendingCount)" = 0 ]
+  [ "$(printf '%s' "$output" | jq -c .specialHits)" = '[]' ]
+  [ "$(printf '%s' "$output" | jq -r .specialHitCount)" = 0 ]
 }
 
 @test "--revert-denied --dry-run still refuses when a gitignored trusted-config file changed since the marker" {
@@ -4590,4 +4592,162 @@ dirlink_setup() {
     [ "$status" -eq 2 ] || { echo "status $status: $shebang: $stderr" >&2; return 1; }
     [[ "$stderr" == *"git resolves to a path inside the repository"* ]] || { echo "accepted: $shebang" >&2; return 1; }
   done
+}
+
+# --- cycle 2 --revert-denied gaps (CLAUDE-101, 94, 115, 113, 121) ---
+@test "CLAUDE-101: --revert-denied judges an untracked trusted-config symlink's outside target before deleting the link" {
+  OUTSIDE="$BATS_TEST_TMPDIR/outside-untracked"
+  mkdir -p "$OUTSIDE" .claude
+  printf '{}\n' >| "$OUTSIDE/settings.json"
+  touch -t 201901010000 "$OUTSIDE/settings.json"
+  touch -t 202001010000 "$IGN_MARKER"
+  ln -s "$OUTSIDE/settings.json" .claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --dry-run
+  [ "$(printf '%s' "$output" | jq -c .linkHits)" = '[]' ]
+  printf '{"hooks":"evil"}\n' >| "$OUTSIDE/settings.json"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'trusted-config symlink'*'.claude/settings.json'* ]]
+  [ ! -L .claude/settings.json ]
+  grep -q evil "$OUTSIDE/settings.json"
+}
+
+@test "CLAUDE-101: --no-ignored-guard counts an untracked trusted-config symlink that leaves the worktree" {
+  OUTSIDE="$BATS_TEST_TMPDIR/outside-untracked"
+  mkdir -p "$OUTSIDE" .claude
+  printf '{}\n' >| "$OUTSIDE/settings.json"
+  ln -s "$OUTSIDE/settings.json" .claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "CLAUDE-94: --revert-denied counts a nested config link that leads back to an assume-unchanged worktree file" {
+  EXTDIR="$BATS_TEST_TMPDIR/ext-cfg"
+  mkdir -p "$EXTDIR"
+  printf 'b\n' >| src/b.txt
+  git add src/b.txt && git commit -q -m "add b"
+  ln -s "$REPO/src/b.txt" "$EXTDIR/settings.json"
+  ln -s "$EXTDIR" .claude
+  git add .claude && git commit -q -m "track .claude dir link"
+  git update-index --assume-unchanged src/b.txt
+  touch -t 201901010000 src/b.txt "$EXTDIR"
+  touch -h -t 201901010000 "$EXTDIR/settings.json"
+  touch -t 202001010000 "$IGN_MARKER"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  printf '{"hooks":"evil"}\n' >| .claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'.claude'* ]]
+}
+
+@test "CLAUDE-115: --revert-denied counts a nested config link retargeted after the marker at an old file" {
+  dirlink_setup
+  OLD="$BATS_TEST_TMPDIR/old-file"
+  printf '{"hooks":"evil"}\n' >| "$OLD"
+  touch -t 201901010000 "$OLD"
+  rm -f "$EXTDIR/settings.json"
+  ln -s "$OLD" "$EXTDIR/settings.json"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+}
+
+@test "CLAUDE-113: --revert-denied walks a nested outside link below an alias into agent memory under the alias's name" {
+  EXT="$BATS_TEST_TMPDIR/ext-sub"
+  mkdir -p .claude/agent-memory/x "$EXT/.claude"
+  printf 'm\n' >| .claude/agent-memory/x/notes.md
+  ln -s .claude/agent-memory/x cfg
+  ln -s "$EXT" .claude/agent-memory/x/sub
+  git add -f .claude/agent-memory/x/notes.md .claude/agent-memory/x/sub cfg && git commit -q -m "alias with nested outside link"
+  touch -t 201901010000 .claude/agent-memory/x/notes.md "$EXT" "$EXT/.claude"
+  touch -h -t 201901010000 .claude/agent-memory/x/sub
+  touch -t 202001010000 "$IGN_MARKER"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  printf '{"hooks":"evil"}\n' >| cfg/sub/.claude/settings.json
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'cfg'* ]]
+}
+
+@test "CLAUDE-121: --revert-denied keeps an untracked FIFO at a trusted-config path and reports it" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  touch -t 202001010000 "$IGN_MARKER"
+  mkdir -p .claude && mkfifo .claude/settings.json
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --dry-run
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ "$(printf '%s' "$output" | jq -r .pendingCount)" = 0 ]
+  [ "$(printf '%s' "$output" | jq -c .specialHits)" = '[".claude/settings.json"]' ]
+  [ "$(printf '%s' "$output" | jq -r .specialHitCount)" = 1 ]
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .result)" = noop ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'untracked special file'*'.claude/settings.json'* ]]
+  [ -p .claude/settings.json ]
+}
+
+@test "CLAUDE-121: --revert-denied reports a FIFO behind a tracked trusted-config directory symlink" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  dirlink_setup
+  rm -f "$EXTDIR/settings.json"
+  mkfifo "$EXTDIR/settings.json"
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER" --dry-run
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [ "$(printf '%s' "$output" | jq -c .specialHits)" = '[".claude/settings.json"]' ]
+  [ "$(printf '%s' "$output" | jq -r .specialHitCount)" = 1 ]
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'special file'*'.claude'* ]]
+  [ -p "$EXTDIR/settings.json" ]
+}
+
+@test "CLAUDE-121: --revert-denied reports a FIFO behind an ordinary-named dir link at a trusted-config descendant" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  ancestor_link_setup
+  rm -f "$OUTDIR/.claude/settings.json"
+  mkfifo "$OUTDIR/.claude/settings.json"
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *'cfg'* ]]
+  [ -p "$OUTDIR/.claude/settings.json" ]
+}
+
+@test "CLAUDE-121: an untracked FIFO outside the trusted-config paths does not count" {
+  command -v mkfifo >/dev/null 2>&1 || skip "mkfifo not available"
+  mkfifo src/pipe
+  run --separate-stderr timeout 20 "$SCRIPT" --pr 7 --revert-denied --no-ignored-guard
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+}
+
+@test "CLAUDE-113: a nested link below an alias into agent memory, retargeted after the marker at an old outside tree, counts" {
+  OLDT="$BATS_TEST_TMPDIR/old-tree"
+  NEWT="$BATS_TEST_TMPDIR/empty-tree"
+  mkdir -p .claude/agent-memory/x "$OLDT/.claude" "$NEWT"
+  printf '{"hooks":"evil"}\n' >| "$OLDT/.claude/settings.json"
+  printf 'm\n' >| .claude/agent-memory/x/notes.md
+  ln -s .claude/agent-memory/x cfg
+  ln -s "$NEWT" .claude/agent-memory/x/sub
+  git add -f .claude/agent-memory/x/notes.md .claude/agent-memory/x/sub cfg && git commit -q -m "alias with nested outside link"
+  touch -t 201901010000 .claude/agent-memory/x/notes.md "$OLDT" "$OLDT/.claude" "$OLDT/.claude/settings.json" "$NEWT"
+  touch -h -t 201901010000 .claude/agent-memory/x/sub
+  touch -t 202001010000 "$IGN_MARKER"
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = true ]
+  rm -f .claude/agent-memory/x/sub
+  ln -s "$OLDT" .claude/agent-memory/x/sub
+  run --separate-stderr "$SCRIPT" --pr 7 --revert-denied --ignored-since "$IGN_MARKER"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .deniedClean)" = false ]
 }
