@@ -1,5 +1,75 @@
 # Changelog
 
+## 2.11.3
+
+### Patch Changes
+
+- [`2f42614`](https://github.com/KingInYellows/yellow-plugins/commit/2f42614e1f41ff0edcea25d64fda2d8ac8b9f01a)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Use Ceramic the
+  way its docs recommend: research agents now send 2–3 short keyword variants
+  per lookup with `maxDescriptionLength: 1000`, and fall back to other providers
+  based on how many results contain the query's distinctive terms instead of
+  `result.totalResults`, which Ceramic sets to the number of results returned.
+
+- [`6efb64e`](https://github.com/KingInYellows/yellow-plugins/commit/6efb64e6ccdcc02e53db3b8177b673578dbc2979)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  jev-category-eval `run` now rejects a `--model` that is not shaped like
+  `jev-1.13.0` before the key check or any request, so a typo can no longer
+  spend paid requests on a results file `report` refuses. CI's Security Audit
+  also scans the keyword-exempt `jev-category-criteria.json` for
+  credential-shaped values.
+
+- [`b00a769`](https://github.com/KingInYellows/yellow-plugins/commit/b00a7699200cf602f38b1d9246713ea94d220e31)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/plan:complete` no longer exits when `gt` is missing before the stacked-PR
+  provider is resolved. The Graphite archival path still fails closed without
+  `gt`. The GitHub path keeps using `run-github-stack-runtime.js`.
+
+- [`6f17ca6`](https://github.com/KingInYellows/yellow-plugins/commit/6f17ca697b61d473b5c3d55314ebb401ff3299bd)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  `/worktree:restack --abort` follow-ups from #1197: every exit 31 now ends with
+  a stable `kept: <reason>` token; each cleared worktree rebase is reported, and
+  a partial abort lists the worktrees it already cleared; a refused run-worktree
+  checkout shows git's reason; a rebase started in a detached stack worktree
+  from its recorded commit is aborted with the stack; GitHub runs record an
+  `owners N` count so a run with no owner worktrees is not mistaken for legacy
+  state; `status` names the run worktree's rebase once the provider has lost its
+  record; moved-branch advice asks for `git worktree prune` before
+  `git branch -f` when the branch's holder was deleted; and a legacy run left at
+  phase `aborting` is pointed at `restore` instead of `--continue`.
+
+- [`85766df`](https://github.com/KingInYellows/yellow-plugins/commit/85766df25bfc66b93bb3b1423e6309b82de43197)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Guard shell
+  blocks that parse `ls`, `ps`, `df` or `top` output against user aliases
+  (`ls=eza`, `ps=procs`). Plan listings in `/flow:work`, `/flow:review` and
+  `/flow:decompose` now go through `command find -H … -exec ls -t {} +`, so an
+  aliased `ls` no longer makes them report "no plans" and zsh's `nomatch` error
+  no longer leaks on an empty `plans/`. `/plan:status` and
+  `/flow:pick-next-shell` get the same `find` existence check, and the
+  archived-plan count in `/plan:status` uses it too, so symlinked plans are
+  counted and dotfiles are skipped. The codex status listing, the browser-test
+  process check, the yellow-debt scanner and yellow-research code-researcher
+  cache-directory permission checks, the yellow-ci remote probes, and the
+  ruvector and worktree `.ruvector/` checks use `command`.
+
+- [`62c54bb`](https://github.com/KingInYellows/yellow-plugins/commit/62c54bb7ac2fdfb033808be1ac5cc82cd30601ab)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - The stack
+  library lookup also rejects a plugin root that is a symlink, has a symlinked
+  `lib/` directory, is relative, or contains a `.` or `..` component, so none of
+  these can point it at repository-controlled JavaScript.
+
+- [`0ad8cb2`](https://github.com/KingInYellows/yellow-plugins/commit/0ad8cb2d62dde74cd33d50b3f90c781ffcf3a6dc)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - `/stack:status`
+  and `stack-provider-router` find `stack-provider-state.js` when
+  `CLAUDE_PLUGIN_ROOT` is unset. They try that variable, then each enabled
+  `yellow-core@yellow-plugins` install path from `claude plugin list --json` in
+  `/setup:all` scope order until one has the library. The open repository's
+  `plugins/yellow-core` is never executed. Project and local installs count only
+  when that directory is the git toplevel. If the plugin list fails, the state
+  is UNKNOWN and no library is executed. Enablement still comes only from that
+  plugin list. A missed library is an error, not a guess about which stacked-PR
+  provider is active.
+
 ## 2.11.2
 
 ### Patch Changes
